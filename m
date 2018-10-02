@@ -1,61 +1,35 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 2 Oct 2018 07:53:46 -0700
-Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
-In-Reply-To: <20181002085041.GV30658@n2100.armlinux.org.uk>
-References: <20181001175845.168430-1-salyzyn@android.com>
- <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
- <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
- <20181002085041.GV30658@n2100.armlinux.org.uk>
-Message-ID: <7b5611cb-5bd0-d906-7013-31dbe55f8dbb@android.com>
+From: vkoul@kernel.org (Vinod)
+Date: Tue, 2 Oct 2018 20:26:47 +0530
+Subject: [PATCH v5 4/7] dmaengine: xilinx_dma: program hardware supported
+ buffer length
+In-Reply-To: <CAN8YU5OySuzAyQ=Buad=Jidhes28koV52Gi-QJ-qOiG5TFBO=Q@mail.gmail.com>
+References: <20180907062502.8241-1-andrea.merello@gmail.com>
+ <20180907062502.8241-4-andrea.merello@gmail.com>
+ <20180918162508.GD2613@vkoul-mobl>
+ <CAN8YU5OySuzAyQ=Buad=Jidhes28koV52Gi-QJ-qOiG5TFBO=Q@mail.gmail.com>
+Message-ID: <20181002145647.GG19792@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2018 01:50 AM, Russell King - ARM Linux wrote:
-> On Mon, Oct 01, 2018 at 01:44:52PM -0700, Mark Salyzyn wrote:
->> Despite the gain of 0.4% for screen-on battery life, where Android has a mix
->> of 64 and 32 bit applications, thus still relevant _today_ on 64 bit
->> architectures (providing vDSO32 for 32-bit applications).
-> I don't think the issue is what you think it is.  0.4% gain is
-> equivalent to almost (but not quite) 1 minute extra for a lifetime of
-> 4 hours.  Is that really noticable, and is it worth the churn from
-> merging this series?
+On 28-09-18, 08:53, Andrea Merello wrote:
+> On Tue, Sep 18, 2018 at 6:25 PM Vinod <vkoul@kernel.org> wrote:
 
-Screen on battery life, all other components of the system active, 
-backlights, touchscreen, sensors etc and it still had a measurable 
-impact on power from the portion that came from the CPU complex. This 
-impact came solely from 32 bit applications left over on the 64-bit 
-platforms that did not formerly have vDSO support. 32-bit applications 
-are not going away even with the advent of 64-bit (sound media framework 
-on Android is 32-bit).
+> > > @@ -964,7 +968,7 @@ static int xilinx_dma_calc_copysize(struct xilinx_dma_chan *chan,
+> > >                                   int size, int done)
+> > >  {
+> > >       size_t copy = min_t(size_t, size - done,
+> > > -                  XILINX_DMA_MAX_TRANS_LEN);
+> > > +                         chan->xdev->max_buffer_len);
+> >
+> > hmm why not add max_buffer_len in patch 1 again, and then use default
+> > len as XILINX_DMA_MAX_TRANS_LEN and add multiple lengths here :)
+> 
+> Sorry, I'm not getting your point. Could you please elaborate the "add
+> multiple lengths here" thing ?
 
-Reduction in power is also an increase in performance. The 
-microbenchmarks show ~3-10 fold improvement in the actions of acquiring 
-the time of various sorts for 32-bit applications on 64-bit. A savings 
-in the range of sub-microseconds each time(sic) adds up to 0.4% battery 
-improvement overall.
-> Given that the gain is so marginal, I can see why people find it
-> difficult to get excited about this series to spend the time reviewing
-> it.
-The reviews were intense over the years IMHO, appeasing several 
-stakeholders and testers. Its that final ACK that has been elusive. I 
-have gotten private emails from ARM many times promising some 
-engineering to look at these waiting patiently without feedback.
+IIRC (sorry been travelling and vacation), add
+chan->xdev->max_buffer_len in patch 1 and initialize it to
+XILINX_DMA_MAX_TRANS_LEN. Then in subsequent patches update the length.
 
-The changes, as requested in the reviews of the past, turned also into 
-moving most vdso maintenance for all architectures of ARM into lib/vdso 
-with no reduction in microbenchmark performance for the other 
-configurations, at least two additional non-arm architectures look like 
-they could readily switch over to using it as well. This is a major win 
-for maintenance (and was not part of the original set).
-
-As a result switching 64-ARM vdso assembler to C is a win for 
-maintenance if upstream'd.
-
-Given the Android will need to place these patches in their common tree 
-(not there yet because I have required upstream first, but with limits, 
-2 years seems a bit long to wait for a project started in ARM, then I 
-was asked to help push it forward), not having them upstream, tested, 
-with many eyes on the code, will be a pity and will result in a possible 
-maintenance burden on up to 13000 phone devices.
-
--- Mark
+-- 
+~Vinod
