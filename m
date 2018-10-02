@@ -1,30 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  2 Oct 2018 23:10:01 +0200
-Subject: [PATCH] nvmem: lpc18xx_eeprom: remove an unused variable
-Message-ID: <20181002211016.2638186-1-arnd@arndb.de>
+Date: Tue,  2 Oct 2018 23:11:44 +0200
+Subject: [PATCH] arm64: arch_timer: avoid unused function warning
+Message-ID: <20181002211214.2672576-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/nvmem/lpc18xx_eeprom.c: In function 'lpc18xx_eeprom_remove':
-drivers/nvmem/lpc18xx_eeprom.c:258:6: error: unused variable 'ret' [-Werror=unused-variable]
+arm64_1188873_read_cntvct_el0() is protected by the correct
+CONFIG_ARM64_ERRATUM_1188873 #ifdef, but the only reference to it is
+also inside of an CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND section,
+and causes a warning if that is disabled:
 
-Fixes: 226014d13fa5 ("nvmem: lpc18xx_eeprom: use devm_nvmem_register()")
+drivers/clocksource/arm_arch_timer.c:323:20: error: 'arm64_1188873_read_cntvct_el0' defined but not used [-Werror=unused-function]
+
+Since the erratum requires that we always apply the workaround
+in the timer driver, select that symbol as we do for SoC
+specific errata.
+
+Fixes: 95b861a4a6d9 ("arm64: arch_timer: Add workaround for ARM erratum 1188873")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/nvmem/lpc18xx_eeprom.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
-index b42dbaddb419..66cff1e2147a 100644
---- a/drivers/nvmem/lpc18xx_eeprom.c
-+++ b/drivers/nvmem/lpc18xx_eeprom.c
-@@ -255,7 +255,6 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
- static int lpc18xx_eeprom_remove(struct platform_device *pdev)
- {
- 	struct lpc18xx_eeprom_dev *eeprom = platform_get_drvdata(pdev);
--	int ret;
- 
- 	clk_disable_unprepare(eeprom->clk);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 130f3a766aef..0661c6103c21 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -483,6 +483,7 @@ config ARM64_ERRATUM_1024718
+ config ARM64_ERRATUM_1188873
+ 	bool "Cortex-A76: MRC read following MRRC read of specific Generic Timer in AArch32 might give incorrect result"
+ 	default y
++	select ARM_ARCH_TIMER_OOL_WORKAROUND
+ 	help
+ 	  This option adds work arounds for ARM Cortex-A76 erratum 1188873
  
 -- 
 2.18.0
