@@ -1,41 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Oct 2018 10:10:39 +0200
-Subject: [GIT PULL] arm: actions: drivers for v4.20 #1
-In-Reply-To: <20180930180715.25829-4-afaerber@suse.de>
-References: <20180930180715.25829-1-afaerber@suse.de>
- <20180930180715.25829-4-afaerber@suse.de>
-Message-ID: <CAK8P3a3y9y4vYb6vdCC4GJdwhShZMi72Dz9AeLEo2VkUHZTmEg@mail.gmail.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Tue, 2 Oct 2018 16:10:35 +0800
+Subject: [PATCH v4 05/11] drm/mediatek: convert dpi driver to use
+ drm_of_find_panel_or_bridge
+In-Reply-To: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
+References: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
+Message-ID: <20181002081041.32629-6-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2018 at 8:07 PM Andreas F?rber <afaerber@suse.de> wrote:
->
-> Hi Olof and Arnd,
->
-> Here's my drivers pull for Actions Semi.
->
-> Regards,
-> Andreas
->
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
->
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-drivers-for-4.20
->
-> for you to fetch changes up to 067517513ae437c2845bc593dbf99a142bdc9250:
->
->   soc: actions: Update SPS help text for S700 (2018-09-22 22:09:47 +0200)
->
-> ----------------------------------------------------------------
-> Actions Semi SoC drivers for v4.20 #1
->
-> This adopts SPDX license identifiers.
-> It also updates Kconfig help text.
+From: chunhui dai <chunhui.dai@mediatek.com>
 
-Since I pulled the actions-drivers+s900-sps-for-4.20 tag first, this was
-already included.
+Convert dpi driver to use drm_of_find_panel_or_bridge.
+This changes some error messages to debug messages (in the graph core).
+Graph connections are often "no connects" depending on the particular
+board, so we want to avoid spurious messages. Plus the kernel is not a
+DT validator.
+related links:
+[1] https://lkml.org/lkml/2017/2/3/716
+[2] https://lkml.org/lkml/2017/2/3/719
 
-     Arnd
+Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_dpi.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index 0dbe9345fa2e..08915e1765f8 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -14,6 +14,7 @@
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
++#include <drm/drm_of.h>
+ #include <linux/kernel.h>
+ #include <linux/component.h>
+ #include <linux/platform_device.h>
+@@ -668,7 +669,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct mtk_dpi *dpi;
+ 	struct resource *mem;
+-	struct device_node *bridge_node;
+ 	int comp_id;
+ 	int ret;
+ 
+@@ -714,16 +714,12 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
+-	if (!bridge_node)
+-		return -ENODEV;
+-
+-	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
++	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
++					  NULL, &dpi->bridge);
++	if (ret)
++		return ret;
+ 
+-	dpi->bridge = of_drm_find_bridge(bridge_node);
+-	of_node_put(bridge_node);
+-	if (!dpi->bridge)
+-		return -EPROBE_DEFER;
++	dev_info(dev, "Found bridge node: %pOF\n", dpi->bridge->of_node);
+ 
+ 	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
+ 	if (comp_id < 0) {
+-- 
+2.12.5.2.gbdf23ab
