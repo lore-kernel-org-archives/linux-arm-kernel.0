@@ -1,135 +1,60 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 2 Oct 2018 11:41:36 +0100
-Subject: perf segmentation fault from NULL dereference
-In-Reply-To: <20180927160210.GF6916@krava>
-References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
- <20180927160210.GF6916@krava>
-Message-ID: <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 2 Oct 2018 12:53:25 +0200
+Subject: [PATCH v3 2/4] firmware: xilinx: Add zynqmp IOCTL API for device
+ control
+In-Reply-To: <CAOesGMixcQS605kmpW+n-yWBGWu4Dz5SXH396mrWCUfQjfcWcQ@mail.gmail.com>
+References: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
+ <1537985581-32164-3-git-send-email-jollys@xilinx.com>
+ <CAOesGMhEcMB4caAPtCSq-m5zQBDc-8Z4f_xAkomnEwVaHyX2Mw@mail.gmail.com>
+ <BL2PR02MB21308D0B6AF76A8094E70863B8EC0@BL2PR02MB2130.namprd02.prod.outlook.com>
+ <CAOesGMiUnVrnW1VDh1CKRKGpkwAC9G8tiHjpb+7bss6LpPWU-A@mail.gmail.com>
+ <2350f5c3-b59e-b37b-c679-5b0a36f9a79c@xilinx.com>
+ <CAOesGMixcQS605kmpW+n-yWBGWu4Dz5SXH396mrWCUfQjfcWcQ@mail.gmail.com>
+Message-ID: <3b9ddd6a-7965-af51-cae5-4135f34de6c4@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->> I am suspicious that this is a real issue, as this patch has been in
->> mainline for some time...
+On 1.10.2018 19:26, Olof Johansson wrote:
+> On Mon, Oct 1, 2018 at 6:17 AM Michal Simek <michal.simek@xilinx.com> wrote:
 >>
->> This simple change fixes the issue me:
->> diff --git a/tools/perf/util/header.c b/tools/perf/util/header.c
->> index 91e6d9c..f4fd826 100644
->> --- a/tools/perf/util/header.c
->> +++ b/tools/perf/util/header.c
->> @@ -3576,7 +3576,7 @@ int perf_event__process_feature(struct perf_tool
->> *tool,
->>      int max, err;
->>      u16 type;
+>> Hi,
 >>
->> -    if (!evsel->own_cpus)
->> +    if (!evsel->own_cpus || !(evsel->attr.read_format & PERF_FORMAT_ID)) //
->> roundabout check for !evsel->id
->>          return 0;
+>> On 28.9.2018 23:12, Olof Johansson wrote:
+>>> On Fri, Sep 28, 2018 at 10:15 AM Jolly Shah <JOLLYS@xilinx.com> wrote:
+>>>>
+>>>> Hi Olof,
+>>>>
+>>>> Thanks for the review. Pushed v4 with suggested fixes. Let us know if series looks good and we can create pull request for same.
+>>>>
+>>>> Thanks,
+>>>> Jolly Shah
+>>>
+>>> I'm happy with this one, thanks for revising the patchset with the fixes.
+>>>
+>>> Feel free to add:
+>>>
+>>> Acked-by: Olof Johansson <olof@lixom.net>
+>>>
+>>> to the patches.
 >>
->>      ev = cpu_map_data__alloc(evsel->own_cpus, &size, &type, &max);
+>> Just for clarification. I have checked driver/clk and patches should
+>> still go via Michael or Stephen.
+>> Firmware code is already in arm-soc tree that's why I would expect
+>> Michael/Stephen should review it and then it shouldn't be a problem to
+>> take this via arm-soc tree.
 >>
->> It turns out that evsel->id is NULL on a call to
->> perf_event__process_feature(), which upsets this code:
->>
->>     ev->header.type = PERF_RECORD_EVENT_UPDATE;
->>     ev->header.size = (u16)size;
->>     ev->type = PERF_EVENT_UPDATE__CPUS;
->>     ev->id   = evsel->id[0];
->>
->> Please me let me know if a valid issue so we can get a fix in.
->
-> yea, I can see how we can get here with event having
-> its own CPUs, and we allocate the id array later at
-> the time we map the event
->
-> I wonder instead of skipping on this feature, we should
-> allocate the id array, like below
->
-> I did not test that.. need to find the server having event
-> with its own cpus.. also need to make sure evsel->cpus is
-> the way to go in here
->
+>> Olof: Please correct me if I am wrong and you are happy to take it via
+>> arm-soc directly.
+> 
+> Honestly it might be easiest for you to prepare one branch and send to
+> all parties in case you have contents you expect to go on top, but
+> besides that I'd be fine with merging through either tree.
 
-Thanks for the fix, but I got this:
-root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-Couldn't synthesize evsel cpus.
-root at localhost:~#
+ok.
 
-
-> thanks,
-> jirka
->
->
-> ---
-> diff --git a/tools/perf/util/header.c b/tools/perf/util/header.c
-> index 1ec1d9bc2d63..fb2a0dab3978 100644
-> --- a/tools/perf/util/header.c
-> +++ b/tools/perf/util/header.c
-> @@ -29,6 +29,7 @@
->  #include "symbol.h"
->  #include "debug.h"
->  #include "cpumap.h"
-> +#include "thread_map.h"
->  #include "pmu.h"
->  #include "vdso.h"
->  #include "strbuf.h"
-> @@ -3579,6 +3580,11 @@ perf_event__synthesize_event_update_cpus(struct perf_tool *tool,
-> 	if (!evsel->own_cpus)
-> 		return 0;
->
-> +	if (!evsel->id ||
-
-for my test, evsel->id is NULL
-
-> +	    perf_evsel__alloc_id(evsel, cpu_map__nr(evsel->cpus),
-> +				 thread_map__nr(evsel->threads)))
-
-and then this function is not called as we return immediately. So did 
-you really want this:
-
-if (!evsel->id && perf_evsel__alloc_id(...))
-	return -ENOMEM;
-
-This looks to work:
-
-root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-[ perf record: Woken up 1 times to write data ]
-[ perf record: Captured and wrote 0.001 MB perf.data (7 samples) ]
-root at localhost:~# ./perf_debug_ report
-# To display the perf.data header info, please use 
---header/--header-only option
-#
-#
-# Total Lost Samples: 0
-#
-# Samples: 7  of event 'armv8_pmuv3_0/br_mis_pred/'
-# Event count (approx.): 8260
-#
-# Overhead  Command  Shared Object      Symbol
-# ........  .......  .................  ......................
-#
-     78.28%  sleep    libc-2.23.so       [.] 0x00000000000faef0
-     20.53%  sleep    [kernel.kallsyms]  [k] vmacache_find
-      1.09%  sleep    [kernel.kallsyms]  [k] find_vma
-      0.10%  perf_de  [kernel.kallsyms]  [k] perf_event_exec
-
-
-#
-# (Cannot load tips.txt file, please install perf!)
-#
-root at localhost:~#
-
-
-> +		return -ENOMEM;
-> +
-> 	ev = cpu_map_data__alloc(evsel->own_cpus, &size, &type, &max);
-> 	if (!ev)
-> 		return -ENOMEM;
->
-> .
->
-
+Stephen: Can you please take a look at 4/4?
+dt binding was already reviewed that's when we have ACK from 4/4 I will
+prepare that branch.
 
 Thanks,
-John
+Michal
