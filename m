@@ -1,48 +1,36 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Tue, 2 Oct 2018 15:07:30 -0500
-Subject: [PATCH v2 5/5] soc/fsl_qbman: export coalesce change API
-In-Reply-To: <AM6PR04MB400877EC0C140A7D919AEF41ECE80@AM6PR04MB4008.eurprd04.prod.outlook.com>
-References: <1538124204-31406-1-git-send-email-madalin.bucur@nxp.com>
- <1538124204-31406-6-git-send-email-madalin.bucur@nxp.com>
- <CADRPPNQgGAYTCmppyxPwQnnC433QLm21D5iq_4EvSj0LrsAxGQ@mail.gmail.com>
- <AM6PR04MB400877EC0C140A7D919AEF41ECE80@AM6PR04MB4008.eurprd04.prod.outlook.com>
-Message-ID: <CADRPPNSNc50K8EcJUuQ-cnBs4NhHnNnhEDwdTSXgxm0j1FMCTw@mail.gmail.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Tue,  2 Oct 2018 22:48:59 +0200
+Subject: [PATCH 1/2] drm/sun4i: tcon: fix check of tcon->panel null pointer
+In-Reply-To: <20181001093612.GA13672@mwanda>
+References: <20181001093612.GA13672@mwanda>
+Message-ID: <20181002204900.82118-1-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2018 at 1:08 AM Madalin-cristian Bucur
-<madalin.bucur@nxp.com> wrote:
->
-> > -----Original Message-----
-> > From: Li Yang [mailto:leoyang.li at nxp.com]
-> > Sent: Tuesday, October 2, 2018 12:50 AM
-> > To: Madalin-cristian Bucur <madalin.bucur@nxp.com>
-> > Cc: Roy Pledge <roy.pledge@nxp.com>; Claudiu Manoil
-> > <claudiu.manoil@nxp.com>; Catalin Marinas <catalin.marinas@arm.com>; Scott
-> > Wood <oss@buserror.net>; moderated list:ARM/FREESCALE IMX / MXC ARM
-> > ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linuxppc-dev
-> > <linuxppc-dev@lists.ozlabs.org>; lkml <linux-kernel@vger.kernel.org>
-> > Subject: Re: [PATCH v2 5/5] soc/fsl_qbman: export coalesce change API
-> >
-> > On Fri, Sep 28, 2018 at 3:45 AM Madalin Bucur <madalin.bucur@nxp.com>
-> > wrote:
-> > >
-> > > Export the API required to control the QMan portal interrupt coalescing
-> > > settings.
-> >
-> > These are new APIs not just old APIs being exported.  What is the user
-> > of these APIs?  Is the user being submitted?  We cannot have APIs in
-> > kernel that has no users.
->
-> Hi,
->
-> These are new APIs that will be used in the DPAA Ethernet driver.
-> Changes for the DPAA QBMan and DPAA Ethernet follow different paths upstream
-> so the Ethernet driver patch that makes use of these APIs will be sent when
-> these changes reach the net-next/master tree.
+At the moment, the check of tcon->panel to be valid is wrong. IS_ERR()
+has been used, but that macro doesn't check if tcon->panel pointer is
+null or not, but check if tcon->panel is between -1 and -4095(MAX_ERRNO).
 
-Applied for next after changing from "export API" to "add API" in the
-introduction and updated the subsystem prefix.
+Remove IS_ERR() from tcon->panel checking and let "if (tcon->panel)" as
+condition to check if it's a pointer not null.
 
-Regards,
-Leo
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index c78cd35a1294..e4b3bd0307ef 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -555,7 +555,7 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	 * Following code is a way to avoid quirks all around TCON
+ 	 * and DOTCLOCK drivers.
+ 	 */
+-	if (!IS_ERR(tcon->panel)) {
++	if (tcon->panel) {
+ 		struct drm_panel *panel = tcon->panel;
+ 		struct drm_connector *connector = panel->connector;
+ 		struct drm_display_info display_info = connector->display_info;
+-- 
+2.17.1
