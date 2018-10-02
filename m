@@ -1,96 +1,198 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 02 Oct 2018 09:52:43 +0100
-Subject: [PATCH v8 9/9] KVM: arm64: Add support for creating PUD hugepages
- at stage 2
-In-Reply-To: <3bd022cd-e470-479a-d7a5-680810db6a42@arm.com> (Suzuki
- K. Poulose's message of "Mon, 1 Oct 2018 22:30:00 +0100")
-References: <20181001155443.23032-1-punit.agrawal@arm.com>
- <20181001155443.23032-10-punit.agrawal@arm.com>
- <3bd022cd-e470-479a-d7a5-680810db6a42@arm.com>
-Message-ID: <87y3bgk9wk.fsf@e105922-lin.cambridge.arm.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 2 Oct 2018 10:54:16 +0200
+Subject: [PATCH v7 06/14] irqchip/irq-mvebu-icu: support ICU subnodes
+In-Reply-To: <86k1n1vcgb.wl-marc.zyngier@arm.com>
+References: <20181001141358.31508-1-miquel.raynal@bootlin.com>
+ <20181001141358.31508-7-miquel.raynal@bootlin.com>
+ <86k1n1vcgb.wl-marc.zyngier@arm.com>
+Message-ID: <20181002105416.70b93857@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suzuki K Poulose <suzuki.poulose@arm.com> writes:
+The ICU can handle several type of interrupt, each of them being handled
+differently on AP side. On CP side, the ICU should be able to make the
+distinction between each interrupt group by pointing to the right parent.
 
-> On 10/01/2018 04:54 PM, Punit Agrawal wrote:
->> KVM only supports PMD hugepages at stage 2. Now that the various page
->> handling routines are updated, extend the stage 2 fault handling to
->> map in PUD hugepages.
->>
->> Addition of PUD hugepage support enables additional page sizes (e.g.,
->> 1G with 4K granule) which can be useful on cores that support mapping
->> larger block sizes in the TLB entries.
->>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_mmu.h         |  20 +++++
->>   arch/arm/include/asm/stage2_pgtable.h  |   9 +++
->>   arch/arm64/include/asm/kvm_mmu.h       |  16 ++++
->>   arch/arm64/include/asm/pgtable-hwdef.h |   2 +
->>   arch/arm64/include/asm/pgtable.h       |   2 +
->>   virt/kvm/arm/mmu.c                     | 106 +++++++++++++++++++++++--
->>   6 files changed, 149 insertions(+), 6 deletions(-)
->>
->
-> ...
->
->> diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
->> index f6a7ea805232..a4ec25360e50 100644
->> --- a/arch/arm/include/asm/stage2_pgtable.h
->> +++ b/arch/arm/include/asm/stage2_pgtable.h
->> @@ -68,4 +68,13 @@ stage2_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
->>   #define stage2_pmd_table_empty(kvm, pmdp)	kvm_page_empty(pmdp)
->>   #define stage2_pud_table_empty(kvm, pudp)	false
->>   +static inline bool kvm_stage2_has_pud(struct kvm *kvm)
->> +{
->> +#if CONFIG_PGTABLE_LEVELS > 3
->> +	return true;
->> +#else
->> +	return false;
->> +#endif
->
-> nit: We can only have PGTABLE_LEVELS=3 on ARM with LPAE.
-> AFAIT, this can be set to false always for ARM.
+This is done through the introduction of new bindings, presenting the ICU
+node as the parent of multiple ICU sub-nodes, each of them being an
+interrupt type with a different interrupt parent. ICU interrupt 'clients'
+now directly point to the right sub-node, avoiding the need for the extra
+ICU_GRP_* parameter.
 
-I debated this and veered towards being generic but not committed either
-ways.
+ICU subnodes are probed automatically with devm_platform_populate(). If
+the node as no child, the probe function for NSRs will still be called
+'manually' in order to preserve backward compatibility with DT using the
+old binding.
 
-I've updated this locally but will wait for further comments before
-re-posting.
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
 
->
->> +}
->> +
->
-> ...
->
->> @@ -1669,7 +1752,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>   	needs_exec = exec_fault ||
->>   		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
->>   -	if (hugetlb && vma_pagesize == PMD_SIZE) {
->> +	if (hugetlb && vma_pagesize == PUD_SIZE) {
->> +		pud_t new_pud = kvm_pfn_pud(pfn, mem_type);
->> +
->> +		new_pud = kvm_pud_mkhuge(new_pud);
->> +		if (writable)
->> +			new_pud = kvm_s2pud_mkwrite(new_pud);
->> +
->> +		if (needs_exec)
->> +			new_pud = kvm_s2pud_mkexec(new_pud);
->> +
->> +		ret = stage2_set_pud_huge(kvm, memcache, fault_ipa, &new_pud);
->> +	} else if (hugetlb && vma_pagesize == PMD_SIZE) {
->>   		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
->>     		new_pmd = kvm_pmd_mkhuge(new_pmd);
->>
->
->
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Changes since v6:
+-----------------
+* Used the static key at the top of the mvebu_icu_subset_probe()
+  function.
 
-Thanks a lot for going through the series.
+drivers/irqchip/irq-mvebu-icu.c | 73 +++++++++++++++++++++++++--------
+ 1 file changed, 57 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+index d09f220a2701..d0b1994e2a6f 100644
+--- a/drivers/irqchip/irq-mvebu-icu.c
++++ b/drivers/irqchip/irq-mvebu-icu.c
+@@ -13,6 +13,7 @@
+ #include <linux/irq.h>
+ #include <linux/irqchip.h>
+ #include <linux/irqdomain.h>
++#include <linux/jump_label.h>
+ #include <linux/kernel.h>
+ #include <linux/msi.h>
+ #include <linux/of_irq.h>
+@@ -49,6 +50,8 @@ struct mvebu_icu_irq_data {
+ 	unsigned int type;
+ };
+ 
++DEFINE_STATIC_KEY_FALSE(legacy_bindings);
++
+ static void mvebu_icu_init(struct mvebu_icu *icu, struct msi_msg *msg)
+ {
+ 	if (atomic_cmpxchg(&icu->initialized, false, true))
+@@ -105,32 +108,33 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+ 			       unsigned long *hwirq, unsigned int *type)
+ {
+ 	struct mvebu_icu *icu = platform_msi_get_host_data(d);
+-	unsigned int icu_group;
++	unsigned int param_count = static_branch_unlikely(&legacy_bindings) ? 3 : 2;
+ 
+ 	/* Check the count of the parameters in dt */
+-	if (WARN_ON(fwspec->param_count < 3)) {
++	if (WARN_ON(fwspec->param_count != param_count)) {
+ 		dev_err(icu->dev, "wrong ICU parameter count %d\n",
+ 			fwspec->param_count);
+ 		return -EINVAL;
+ 	}
+ 
+-	/* Only ICU group type is handled */
+-	icu_group = fwspec->param[0];
+-	if (icu_group != ICU_GRP_NSR && icu_group != ICU_GRP_SR &&
+-	    icu_group != ICU_GRP_SEI && icu_group != ICU_GRP_REI) {
+-		dev_err(icu->dev, "wrong ICU group type %x\n", icu_group);
+-		return -EINVAL;
++	if (static_branch_unlikely(&legacy_bindings)) {
++		*hwirq = fwspec->param[1];
++		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
++		if (fwspec->param[0] != ICU_GRP_NSR) {
++			dev_err(icu->dev, "wrong ICU group type %x\n",
++				fwspec->param[0]);
++			return -EINVAL;
++		}
++	} else {
++		*hwirq = fwspec->param[0];
++		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
+ 	}
+ 
+-	*hwirq = fwspec->param[1];
+ 	if (*hwirq >= ICU_MAX_IRQS) {
+ 		dev_err(icu->dev, "invalid interrupt number %ld\n", *hwirq);
+ 		return -EINVAL;
+ 	}
+ 
+-	/* Mask the type to prevent wrong DT configuration */
+-	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+-
+ 	return 0;
+ }
+ 
+@@ -155,7 +159,10 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 		goto free_irqd;
+ 	}
+ 
+-	icu_irqd->icu_group = fwspec->param[0];
++	if (static_branch_unlikely(&legacy_bindings))
++		icu_irqd->icu_group = fwspec->param[0];
++	else
++		icu_irqd->icu_group = ICU_GRP_NSR;
+ 	icu_irqd->icu = icu;
+ 
+ 	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
+@@ -203,6 +210,13 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
+ 	.free      = mvebu_icu_irq_domain_free,
+ };
+ 
++static const struct of_device_id mvebu_icu_subset_of_match[] = {
++	{
++		.compatible = "marvell,cp110-icu-nsr",
++	},
++	{},
++};
++
+ static int mvebu_icu_subset_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *msi_parent_dn;
+@@ -210,7 +224,10 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
+ 	struct irq_domain *irq_domain;
+ 	struct mvebu_icu *icu;
+ 
+-	icu = dev_get_drvdata(dev);
++	if (static_branch_unlikely(&legacy_bindings))
++		icu = dev_get_drvdata(dev);
++	else
++		icu = dev_get_drvdata(dev->parent);
+ 
+ 	dev->msi_domain = of_msi_get_domain(dev, dev->of_node,
+ 					    DOMAIN_BUS_PLATFORM_MSI);
+@@ -233,6 +250,15 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static struct platform_driver mvebu_icu_subset_driver = {
++	.probe  = mvebu_icu_subset_probe,
++	.driver = {
++		.name = "mvebu-icu-subset",
++		.of_match_table = mvebu_icu_subset_of_match,
++	},
++};
++builtin_platform_driver(mvebu_icu_subset_driver);
++
+ static int mvebu_icu_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_icu *icu;
+@@ -259,6 +285,16 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 	if (!icu->irq_chip.name)
+ 		return -ENOMEM;
+ 
++	/*
++	 * Legacy bindings: ICU is one node with one MSI parent: force manually
++	 *                  the probe of the NSR interrupts side.
++	 * New bindings: ICU node has children, one per interrupt controller
++	 *               having its own MSI parent: call platform_populate().
++	 * All ICU instances should use the same bindings.
++	 */
++	if (!of_get_child_count(pdev->dev.of_node))
++		static_branch_enable(&legacy_bindings);
++
+ 	icu->irq_chip.irq_mask = irq_chip_mask_parent;
+ 	icu->irq_chip.irq_unmask = irq_chip_unmask_parent;
+ 	icu->irq_chip.irq_eoi = irq_chip_eoi_parent;
+@@ -277,13 +313,18 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 		icu_int = readl_relaxed(icu->base + ICU_INT_CFG(i));
+ 		icu_grp = icu_int >> ICU_GROUP_SHIFT;
+ 
+-		if (icu_grp == ICU_GRP_NSR)
++		if (icu_grp == ICU_GRP_NSR ||
++		    (icu_grp == ICU_GRP_SEI &&
++		     !static_branch_unlikely(&legacy_bindings)))
+ 			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
+ 	}
+ 
+ 	platform_set_drvdata(pdev, icu);
+ 
+-	return mvebu_icu_subset_probe(pdev);
++	if (static_branch_unlikely(&legacy_bindings))
++		return mvebu_icu_subset_probe(pdev);
++	else
++		return devm_of_platform_populate(&pdev->dev);
+ }
+ 
+ static const struct of_device_id mvebu_icu_of_match[] = {
+-- 
+2.17.1
