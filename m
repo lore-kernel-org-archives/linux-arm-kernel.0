@@ -1,32 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Oct 2018 11:19:23 +0200
-Subject: [GIT PULL] arm: actions: dt64 for v4.20 #1
-In-Reply-To: <20180930180715.25829-2-afaerber@suse.de>
-References: <20180930180715.25829-1-afaerber@suse.de>
- <20180930180715.25829-2-afaerber@suse.de>
-Message-ID: <CAK8P3a3piYDWEPGUZsbcBM2=hbLOrHyuXeY8BSr_d92eNSRXCw@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 2 Oct 2018 11:28:16 +0200
+Subject: [GIT PULL] Allwinner arm64 DT changes for 4.20
+In-Reply-To: <CAK8P3a3qoz2rY2PLxBpLpr+7uFD9jwbWNAipD4RNC1bH9b9b_Q@mail.gmail.com>
+References: <20180929145659.73sto3j7235jg6b6@flea>
+ <CAK8P3a3qoz2rY2PLxBpLpr+7uFD9jwbWNAipD4RNC1bH9b9b_Q@mail.gmail.com>
+Message-ID: <20181002092816.g42dlxegxm7j7qjk@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2018 at 8:07 PM Andreas F?rber <afaerber@suse.de> wrote:
+On Tue, Oct 02, 2018 at 11:02:21AM +0200, Arnd Bergmann wrote:
+> On Sat, Sep 29, 2018 at 4:57 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> 
+> > ----------------------------------------------------------------
+> > Allwinner arm64 DT changes for 4.20
+> >
+> > Our usual set of DT changes for the arm64 Allwinner SoCs.
+> >
+> > The most notable things are:
+> >   - HDMI support on the A64
+> >   - New boards: OrangePi One Plus
+> 
+> I just had a look at the OrangePi One Plus, that seems to be a particularly
+> nice combination of low price and (possibly) low power consumption with
+> the 28nm CPU and LPDDR3 memory. How well does it work in practice?
 
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-dt-for-4.20
->
-> for you to fetch changes up to 01463ac63b53e24e4e315aa9c5f091e9e0342ad4:
->
->   arm64: dts: actions: s700: Set UART clock references from CMU (2018-09-30 18:57:23 +0200)
->
-> ----------------------------------------------------------------
-> Actions Semi arm64 based SoC DT for v4.20
->
-> This updates SPDX headers for remaining files.
->
-> For S900 it adds clock, pinctrl, i2c and dma nodes.
-> S900 SPS is added via topic branch (shared with driver).
->
-> For S700 it adds clock nodes.
+The support is really early at that point. There's basically only
+support for the UART and the MMC, but it definitely looks promising :)
 
-Pulled into next/dt, thanks!
+Maxime
 
-        Arnd
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181002/32056b98/attachment.sig>
