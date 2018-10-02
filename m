@@ -1,67 +1,61 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Tue, 2 Oct 2018 16:10:33 +0800
-Subject: [PATCH v4 03/11] drm/mediatek: adjust EDGE to match clock and data
+Date: Tue, 2 Oct 2018 16:10:40 +0800
+Subject: [PATCH v4 10/11] drm/mediatek: implement connection from BLS to DPI0
 In-Reply-To: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
 References: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
-Message-ID: <20181002081041.32629-4-bibby.hsieh@mediatek.com>
+Message-ID: <20181002081041.32629-11-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: chunhui dai <chunhui.dai@mediatek.com>
+Modify display driver to support connection from BLS to DPI.
 
-The default timing of DPI data and clock is not match.
-We could adjust this bit to make them match.
-
-Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c      | 8 ++++++++
- drivers/gpu/drm/mediatek/mtk_dpi_regs.h | 1 +
- 2 files changed, 9 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 72aa43187731..0ce4b61efaeb 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -114,6 +114,7 @@ struct mtk_dpi_yc_limit {
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 87e4191c250e..f3068c62ed48 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -39,6 +39,7 @@
+ #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
+ #define DISP_REG_CONFIG_OUT_SEL			0x04c
+ #define DISP_REG_CONFIG_DSI_SEL			0x050
++#define DISP_REG_CONFIG_DPI_SEL			0x064
  
- struct mtk_dpi_conf {
- 	u32 reg_h_fre_con;
-+	bool edge_sel_en;
- };
+ #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+ #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+@@ -132,7 +133,10 @@
  
- static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
-@@ -344,6 +345,12 @@ static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
- 	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
+ #define OVL_MOUT_EN_RDMA		0x1
+ #define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
++#define BLS_TO_DPI_RDMA1_TO_DSI		0x2
+ #define DSI_SEL_IN_BLS			0x0
++#define DPI_SEL_IN_BLS			0x0
++#define DSI_SEL_IN_RDMA			0x1
+ 
+ struct mtk_disp_mutex {
+ 	int id;
+@@ -323,9 +327,17 @@ static void mtk_ddp_sout_sel(void __iomem *config_regs,
+ 			     enum mtk_ddp_comp_id cur,
+ 			     enum mtk_ddp_comp_id next)
+ {
+-	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
++	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
+ 		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
+ 			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
++		writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
++			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++		writel_relaxed(DSI_SEL_IN_RDMA,
++			       config_regs + DISP_REG_CONFIG_DSI_SEL);
++		writel_relaxed(DPI_SEL_IN_BLS,
++			       config_regs + DISP_REG_CONFIG_DPI_SEL);
++	}
  }
  
-+static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
-+{
-+	if (dpi->conf->edge_sel_en)
-+		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
-+}
-+
- static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
- 					enum mtk_dpi_out_color_format format)
- {
-@@ -507,6 +514,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 	mtk_dpi_config_yc_map(dpi, dpi->yc_map);
- 	mtk_dpi_config_color_format(dpi, dpi->color_format);
- 	mtk_dpi_config_2n_h_fre(dpi);
-+	mtk_dpi_config_disable_edge(dpi);
- 	mtk_dpi_sw_reset(dpi, false);
- 
- 	return 0;
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-index 040444d7718d..d9db8c4cacd7 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-@@ -223,5 +223,6 @@
- #define ESAV_CODE2			(0xFFF << 0)
- #define ESAV_CODE3_MSB			BIT(16)
- 
-+#define EDGE_SEL_EN			BIT(5)
- #define H_FRE_2N			BIT(25)
- #endif /* __MTK_DPI_REGS_H */
+ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
 -- 
 2.12.5.2.gbdf23ab
