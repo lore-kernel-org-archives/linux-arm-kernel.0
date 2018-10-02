@@ -1,50 +1,57 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 02 Oct 2018 16:30:51 +0200
-Subject: [PATCH v6 00/14] Add System Error Interrupt support to Armada SoCs
-In-Reply-To: <86a7nwvcnn.wl-marc.zyngier@arm.com> (Marc Zyngier's message of
- "Tue, 02 Oct 2018 11:57:48 +0100")
+Date: Tue, 02 Oct 2018 16:39:23 +0200
+Subject: [PATCH v6 12/14] arm64: dts: marvell: add AP806 SEI subnode
+In-Reply-To: <20181001141358.31508-13-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Mon, 1 Oct 2018 16:13:56 +0200")
 References: <20181001141358.31508-1-miquel.raynal@bootlin.com>
- <86a7nwvcnn.wl-marc.zyngier@arm.com>
-Message-ID: <875zyko1yc.fsf@bootlin.com>
+ <20181001141358.31508-13-miquel.raynal@bootlin.com>
+Message-ID: <871s98o1k4.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Miquel,
  
- On mar., oct. 02 2018, Marc Zyngier <marc.zyngier@arm.com> wrote:
+ On lun., oct. 01 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> On Mon, 01 Oct 2018 15:13:44 +0100,
-> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
->> 
->> The ICU is an IRQ chip found in Armada CP110. It currently has 207 wired
->> inputs. Its purpose is to aggregate all CP interrupts and report them to
->> the AP through MSIs. The ICU writes into GIC registers (AP side) by way
->> of the interconnect. These interrupts can be of several groups:
->> - SecuRe (SR);
->> - Non-SecuRe (NSR);
->> - System Error Interrupts (SEI);
->> - RAM Error Interrupts (REI);
->> - ...
->> Each ICU wired interrupt can be of any of these groups. The group is
->> encoded in the MSI payload.
+> Add the System Error Interrupt node, representing an IRQ chip which is
+> part of the GIC. The SEI node aggregates interrupts from the AP through
+> wired interrupts, and from the CPs through MSIs.
 >
-> [...]
->
-> I'm now ready to queue patches 1 through to 11 (with patches 6 and 9
-> as of v7). Who is picking up the DT patches (12 to 14)?
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-I will do it.
+Applied on mvebu/dt64
 
 Thanks,
 
 Gregory
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 >
-> Thanks,
->
-> 	M.
->
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index 176e38d54872..92215342b453 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -124,6 +124,15 @@
+>  				interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
+>  			};
+>  
+> +			sei: interrupt-controller at 3f0200 {
+> +				compatible = "marvell,ap806-sei";
+> +				reg = <0x3f0200 0x40>;
+> +				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> +				#interrupt-cells = <1>;
+> +				interrupt-controller;
+> +				msi-controller;
+> +			};
+> +
+>  			xor at 400000 {
+>  				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+>  				reg = <0x400000 0x1000>,
 > -- 
-> Jazz is not dead, it just smell funny.
+> 2.17.1
+>
 
 -- 
 Gregory Clement, Bootlin
