@@ -1,200 +1,135 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 2 Oct 2018 12:39:15 +0200
-Subject: [PATCH v3 2/4] arm64: implement ftrace with regs
-In-Reply-To: <20181002100223.GA2398@lst.de>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141648.1DBED68BDF@newverein.lst.de>
- <CAKv+Gu8ji7fz_-THmvd-wvod3LqrtBQq4g38UTuo+ke+NZfE9w@mail.gmail.com>
- <20181002100223.GA2398@lst.de>
-Message-ID: <CAKv+Gu8QO1V=k_51EsFS7BuQiHM=5Dpta2mt-vboJ=H6uPjeHA@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 2 Oct 2018 11:41:36 +0100
+Subject: perf segmentation fault from NULL dereference
+In-Reply-To: <20180927160210.GF6916@krava>
+References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
+ <20180927160210.GF6916@krava>
+Message-ID: <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2018 at 12:02, Torsten Duwe <duwe@lst.de> wrote:
-> On Mon, Oct 01, 2018 at 05:57:52PM +0200, Ard Biesheuvel wrote:
->> > --- a/arch/arm64/include/asm/ftrace.h
->> > +++ b/arch/arm64/include/asm/ftrace.h
->> > @@ -16,6 +16,17 @@
->> >  #define MCOUNT_ADDR            ((unsigned long)_mcount)
->> >  #define MCOUNT_INSN_SIZE       AARCH64_INSN_SIZE
->> >
->> > +/* DYNAMIC_FTRACE_WITH_REGS is implemented by adding 2 NOPs at the beginning
->> > +   of each function, with the second NOP actually calling ftrace. In contrary
->> > +   to a classic _mcount call, the call instruction to be modified is thus
->> > +   the second one, and not the only one. */
+
+>> I am suspicious that this is a real issue, as this patch has been in
+>> mainline for some time...
 >>
->> OK, so the first slot will be patched unconditionally to do the 'mov x9, x30' ?
->
-> Right.
->
->> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
->> > +#define ARCH_SUPPORTS_FTRACE_OPS 1
->> > +#define REC_IP_BRANCH_OFFSET AARCH64_INSN_SIZE
->> > +#else
->> > +#define REC_IP_BRANCH_OFFSET 0
->> > +#endif
->
-> The main reason for above comment was that a previous reviewer wondered
-> about a magic value of "4" for the REC_IP_BRANCH_OFFSET, which is actually
-> an insn size. The comment should leave no doubt. I'd leave the LR save
-> explanation elsewhere.
->
->> >         mcount_exit
->> >  ENDPROC(ftrace_caller)
->> > +#else /* CC_USING_PATCHABLE_FUNCTION_ENTRY */
->> > +
->> > +/* Since no -pg or similar compiler flag is used, there should really be
->> > +   no reference to _mcount; so do not define one. Only a function address
->> > +   is needed in order to refer to it. */
->> > +ENTRY(_mcount)
->> > +       ret     /* just in case, prevent any fall through. */
->> > +ENDPROC(_mcount)
->> > +
->> > +ENTRY(ftrace_regs_caller)
->> > +       sub     sp, sp, #S_FRAME_SIZE
->> > +       stp     x29, x9, [sp, #-16]     /* FP/LR link */
->> > +
+>> This simple change fixes the issue me:
+>> diff --git a/tools/perf/util/header.c b/tools/perf/util/header.c
+>> index 91e6d9c..f4fd826 100644
+>> --- a/tools/perf/util/header.c
+>> +++ b/tools/perf/util/header.c
+>> @@ -3576,7 +3576,7 @@ int perf_event__process_feature(struct perf_tool
+>> *tool,
+>>      int max, err;
+>>      u16 type;
 >>
->> You cannot write below the stack pointer. So you are missing a
->> trailing ! here. Note that you can fold the sub
+>> -    if (!evsel->own_cpus)
+>> +    if (!evsel->own_cpus || !(evsel->attr.read_format & PERF_FORMAT_ID)) //
+>> roundabout check for !evsel->id
+>>          return 0;
 >>
->> stp x29, x9, [sp, #-(S_FRAME_SIZE+16)]!
->
-> Very well, but...
->
->> > +       stp     x10, x11, [sp, #S_X10]
->> > +       stp     x12, x13, [sp, #S_X12]
->> > +       stp     x14, x15, [sp, #112]
->> > +       stp     x16, x17, [sp, #128]
->> > +       stp     x18, x19, [sp, #144]
->> > +       stp     x20, x21, [sp, #160]
->> > +       stp     x22, x23, [sp, #176]
->> > +       stp     x24, x25, [sp, #192]
->> > +       stp     x26, x27, [sp, #208]
->> > +
+>>      ev = cpu_map_data__alloc(evsel->own_cpus, &size, &type, &max);
 >>
->> All these will shift by 16 bytes though
+>> It turns out that evsel->id is NULL on a call to
+>> perf_event__process_feature(), which upsets this code:
 >>
->> I am now wondering if it wouldn't be better to create 2 stack frames:
->> one for the interrupted function, and one for this function.
+>>     ev->header.type = PERF_RECORD_EVENT_UPDATE;
+>>     ev->header.size = (u16)size;
+>>     ev->type = PERF_EVENT_UPDATE__CPUS;
+>>     ev->id   = evsel->id[0];
 >>
->> So something like
->>
->> stp x29, x9, [sp, #-16]!
->> mov x29, sp
+>> Please me let me know if a valid issue so we can get a fix in.
 >
-> That's about the way it was before, when you criticised it was
-> the wrong way ;-)
+> yea, I can see how we can get here with event having
+> its own CPUs, and we allocate the id array later at
+> the time we map the event
 >
-
-Really? With two stack frames?
-
-In any case, the important thing is that you call into the next
-function with fp/lr on the top of the stack, and fp pointing to the
-next fp/lr pair.
-
-I think it would be an improvement to add the second fp/lr for the
-interrupted function first, or the *caller* of that function will not
-be visible from the state of the stack (since x9 is the only register
-that points into that function)
-
-So in summary:
-
-ftraced_function():
-  mov x9, x30
-  bl  ftrace_regs_caller
-
-ftrace_regs_caller():
-  stp  x29, x9, [sp, #-16]!
-  mov x29, sp
-
-* At this point, we have a fp/lr pair on the top of the stack that
-links the call to ftraced_function() into its caller.
-
-stp x29, x30, [sp, #-(S_FRAME_SIZE+16)]!
-
-(note the x30 instead of x9 - my mistake)
-
-* At this point we have a fp/lr pair on the top of the stack that
-links the call to ftrace_regs_caller() into ftraced_function()
-
-You can now populate the pt_regs structure with the various register value.
-
-mov x29, sp
-
-* Now fp points to the top of the stack, where a fp/lr pair lives, so
-you can proceed to call other functions.
-
-I hope this helps.
-
-
-
-
-
->> stp x29, x30, [sp, #-(S_FRAME_SIZE + 16]!
->>
->> ... store all registers including x29 ...
->>
->> and do another mov x29, sp before calling into the handler. That way
->> everything should be visible on the call stack when we do a backtrace.
+> I wonder instead of skipping on this feature, we should
+> allocate the id array, like below
 >
-> I'm not 100% sure, but I think it already is visible correctly. Note
-> that the callee has in no way been called yet; control flow is
-> immediately diverted to the ftrace_caller.
+> I did not test that.. need to find the server having event
+> with its own cpus.. also need to make sure evsel->cpus is
+> the way to go in here
 >
 
-Yes but the link register lives in x9 so there is no way the normal
-backtrace logic can see where the ftraced_function() has been called
-from.
+Thanks for the fix, but I got this:
+root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+Couldn't synthesize evsel cpus.
+root at localhost:~#
 
-> About using SP as a pt_regs pointer: maybe I can free another register
-> for that purpose and thus achieve conformance *and* pretty code.
+
+> thanks,
+> jirka
+>
+>
+> ---
+> diff --git a/tools/perf/util/header.c b/tools/perf/util/header.c
+> index 1ec1d9bc2d63..fb2a0dab3978 100644
+> --- a/tools/perf/util/header.c
+> +++ b/tools/perf/util/header.c
+> @@ -29,6 +29,7 @@
+>  #include "symbol.h"
+>  #include "debug.h"
+>  #include "cpumap.h"
+> +#include "thread_map.h"
+>  #include "pmu.h"
+>  #include "vdso.h"
+>  #include "strbuf.h"
+> @@ -3579,6 +3580,11 @@ perf_event__synthesize_event_update_cpus(struct perf_tool *tool,
+> 	if (!evsel->own_cpus)
+> 		return 0;
+>
+> +	if (!evsel->id ||
+
+for my test, evsel->id is NULL
+
+> +	    perf_evsel__alloc_id(evsel, cpu_map__nr(evsel->cpus),
+> +				 thread_map__nr(evsel->threads)))
+
+and then this function is not called as we return immediately. So did 
+you really want this:
+
+if (!evsel->id && perf_evsel__alloc_id(...))
+	return -ENOMEM;
+
+This looks to work:
+
+root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.001 MB perf.data (7 samples) ]
+root at localhost:~# ./perf_debug_ report
+# To display the perf.data header info, please use 
+--header/--header-only option
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 7  of event 'armv8_pmuv3_0/br_mis_pred/'
+# Event count (approx.): 8260
+#
+# Overhead  Command  Shared Object      Symbol
+# ........  .......  .................  ......................
+#
+     78.28%  sleep    libc-2.23.so       [.] 0x00000000000faef0
+     20.53%  sleep    [kernel.kallsyms]  [k] vmacache_find
+      1.09%  sleep    [kernel.kallsyms]  [k] find_vma
+      0.10%  perf_de  [kernel.kallsyms]  [k] perf_event_exec
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
+root at localhost:~#
+
+
+> +		return -ENOMEM;
+> +
+> 	ev = cpu_map_data__alloc(evsel->own_cpus, &size, &type, &max);
+> 	if (!ev)
+> 		return -ENOMEM;
+>
+> .
 >
 
-Sure.
 
->>
->> > +       b       ftrace_common
->> > +ENDPROC(ftrace_regs_caller)
->> > +
->> > +ENTRY(ftrace_caller)
->> > +       sub     sp, sp, #S_FRAME_SIZE
->> > +       stp     x29, x9, [sp, #-16]     /* FP/LR link */
->> > +
->>
->> Same as above
->
-> Yes, Steven demanded 2 entry points :)
->
->> >  /*
->> > --- a/arch/arm64/kernel/ftrace.c
->> > +++ b/arch/arm64/kernel/ftrace.c
->> > @@ -65,18 +65,66 @@ int ftrace_update_ftrace_func(ftrace_fun
->> >         return ftrace_modify_code(pc, 0, new, false);
->> >  }
->> >
->> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
->> > +/* Have the assembler generate a known "mov x9,x30" at compile time. */
->> > +static void notrace noinline __attribute__((used)) mov_x9_x30(void)
->> > +{
->> > +       asm(" .global insn_mov_x9_x30\n"
->> > +                    "insn_mov_x9_x30: mov x9,x30\n" : : : "x9");
->> > +}
->>
->> You cannot rely on the compiler putting the mov at the beginning. I
->
-> As you can see from the asm inline, I tried the more precise assembler
-> label, but it didn't work out. With enough optimisation, the mov _is_
-> first; but you're right, it's not a good idea to rely on that.
->
-
-Ah right, I missed that. Still pretty nasty though :-)
-
->> think some well commented #define should do for the opcode (or did you
->> just remove that?)
->
-> Alas, yes I did. I had a define, then run-time generation, and now this
-> assembler hack. Looking at the 3, the define would be best, I'd say.
->
-
-I tend to agree with that.
+Thanks,
+John
