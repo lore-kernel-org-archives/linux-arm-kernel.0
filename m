@@ -1,60 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  2 Oct 2018 07:53:03 -0700
-Subject: [GIT PULL] more dts changes for omaps for v4.20
-Message-ID: <pull-1538491958-348872@atomide.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Tue, 2 Oct 2018 07:53:46 -0700
+Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
+In-Reply-To: <20181002085041.GV30658@n2100.armlinux.org.uk>
+References: <20181001175845.168430-1-salyzyn@android.com>
+ <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
+ <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
+ <20181002085041.GV30658@n2100.armlinux.org.uk>
+Message-ID: <7b5611cb-5bd0-d906-7013-31dbe55f8dbb@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On 10/02/2018 01:50 AM, Russell King - ARM Linux wrote:
+> On Mon, Oct 01, 2018 at 01:44:52PM -0700, Mark Salyzyn wrote:
+>> Despite the gain of 0.4% for screen-on battery life, where Android has a mix
+>> of 64 and 32 bit applications, thus still relevant _today_ on 64 bit
+>> architectures (providing vDSO32 for 32-bit applications).
+> I don't think the issue is what you think it is.  0.4% gain is
+> equivalent to almost (but not quite) 1 minute extra for a lifetime of
+> 4 hours.  Is that really noticable, and is it worth the churn from
+> merging this series?
 
-The following changes since commit 20bcd4a4d76d7474047ff4539e7d65b990bb2556:
+Screen on battery life, all other components of the system active, 
+backlights, touchscreen, sensors etc and it still had a measurable 
+impact on power from the portion that came from the CPU complex. This 
+impact came solely from 32 bit applications left over on the 64-bit 
+platforms that did not formerly have vDSO support. 32-bit applications 
+are not going away even with the advent of 64-bit (sound media framework 
+on Android is 32-bit).
 
-  ARM: dts: add omap3-gta04a5one to Makefile (2018-09-27 08:29:14 -0700)
+Reduction in power is also an increase in performance. The 
+microbenchmarks show ~3-10 fold improvement in the actions of acquiring 
+the time of various sorts for 32-bit applications on 64-bit. A savings 
+in the range of sub-microseconds each time(sic) adds up to 0.4% battery 
+improvement overall.
+> Given that the gain is so marginal, I can see why people find it
+> difficult to get excited about this series to spend the time reviewing
+> it.
+The reviews were intense over the years IMHO, appeasing several 
+stakeholders and testers. Its that final ACK that has been elusive. I 
+have gotten private emails from ARM many times promising some 
+engineering to look at these waiting patiently without feedback.
 
-are available in the Git repository at:
+The changes, as requested in the reviews of the past, turned also into 
+moving most vdso maintenance for all architectures of ARM into lib/vdso 
+with no reduction in microbenchmark performance for the other 
+configurations, at least two additional non-arm architectures look like 
+they could readily switch over to using it as well. This is a major win 
+for maintenance (and was not part of the original set).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.20/dt-signed-part2
+As a result switching 64-ARM vdso assembler to C is a win for 
+maintenance if upstream'd.
 
-for you to fetch changes up to 5f681f41fe1714e9961dcba2e98adea2a0daf9c5:
+Given the Android will need to place these patches in their common tree 
+(not there yet because I have required upstream first, but with limits, 
+2 years seems a bit long to wait for a project started in ARM, then I 
+was asked to help push it forward), not having them upstream, tested, 
+with many eyes on the code, will be a pity and will result in a possible 
+maintenance burden on up to 13000 phone devices.
 
-  ARM: dts: am335x: Replace remaining legacy phy_id with phy-handle (2018-09-28 13:36:48 -0700)
-
-----------------------------------------------------------------
-More devicetree changes for omap variants
-
-There's a patch for previously merged dts changes to remove the last
-remaining use of legacy phy_id property.
-
-For dra7, we have a non-urgent PCIe dts fix, enable a PCIe errata for
-unaligned access.
-
-For omap5, we enable omap5 USB OTG mode for DWC3 controller.
-
-And we add support for am335x based Moxa UC-2100 series of industrial
-computers.
-
-----------------------------------------------------------------
-H. Nikolaus Schaller (1):
-      ARM: dts: omap5: enable OTG role for DWC3 controller
-
-SZ Lin (???) (2):
-      ARM: dts: am335x: add common file for UC-2100 series
-      ARM: dts: am335x: add support for Moxa UC-2101 open platform
-
-Tony Lindgren (1):
-      ARM: dts: am335x: Replace remaining legacy phy_id with phy-handle
-
-Vignesh R (2):
-      ARM: dts: dra7: Fix up unaligned access setting for PCIe EP
-      ARM: dts: dra7: Enable workaround for errata i870 in PCIe host mode
-
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/am335x-moxa-uc-2100-common.dtsi | 249 ++++++++++++++++++++++
- arch/arm/boot/dts/am335x-moxa-uc-2101.dts         |  69 ++++++
- arch/arm/boot/dts/am335x-osd3358-sm-red.dts       |   6 +-
- arch/arm/boot/dts/am335x-sancloud-bbe.dts         |   6 +-
- arch/arm/boot/dts/dra7.dtsi                       |   4 +-
- arch/arm/boot/dts/omap5-board-common.dtsi         |   4 +
- 7 files changed, 336 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-moxa-uc-2100-common.dtsi
- create mode 100644 arch/arm/boot/dts/am335x-moxa-uc-2101.dts
+-- Mark
