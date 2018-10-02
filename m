@@ -1,35 +1,23 @@
 From: vkoul@kernel.org (Vinod)
-Date: Tue, 2 Oct 2018 20:28:20 +0530
-Subject: [PATCH v5 2/7] dmaengine: xilinx_dma: in axidma slave_sg and
- dma_cyclic mode align split descriptors
-In-Reply-To: <CAN8YU5PWB0sRskcirCcYnY5vG5A_W6pcOMpgyOD3faWfMeu5Rg@mail.gmail.com>
-References: <20180907062502.8241-1-andrea.merello@gmail.com>
- <20180907062502.8241-2-andrea.merello@gmail.com>
- <20180918162105.GC2613@vkoul-mobl>
- <CAN8YU5PWB0sRskcirCcYnY5vG5A_W6pcOMpgyOD3faWfMeu5Rg@mail.gmail.com>
-Message-ID: <20181002145820.GH19792@vkoul-mobl>
+Date: Tue, 2 Oct 2018 20:32:29 +0530
+Subject: [PATCH v1 1/1] dmaengine: stm32-dma: check whether length is
+ aligned on FIFO threshold
+In-Reply-To: <1536651076-17005-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1536651076-17005-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20181002150229.GI19792@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28-09-18, 09:11, Andrea Merello wrote:
-> On Tue, Sep 18, 2018 at 6:21 PM Vinod <vkoul@kernel.org> wrote:
-
-> > > @@ -1804,7 +1817,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
-> > >                        * Calculate the maximum number of bytes to transfer,
-> > >                        * making sure it is less than the hw limit
-> > >                        */
-> > > -                     copy = xilinx_dma_calc_copysize(sg_dma_len(sg),
-> > > +                     copy = xilinx_dma_calc_copysize(chan, sg_dma_len(sg),
-> >
-> > why not keep chan in patch 1 and add only handling in patch 2, seems
-> > less churn to me..
+On 11-09-18, 09:31, Pierre-Yves MORDRET wrote:
+> When a period length is not multiple of FIFO some data may be stuck
+> within FIFO.
 > 
-> Indeed this was something I was unsure about.. I ended up in feeling
-> better not to add introduce a function that takes an unused (yet)
-> argument, but I can change this of course :)
+> Burst/FIFO Threshold/Period or buffer length check has to be hardened
+> 
+> In any case DMA will grant any request from client but will degraded
+> any parameters whether awkward.
 
-IMO It is fine to add a user in subsequent patch in a series. Not fine to
-add something and not use in "that" series :)
+Applied, thanks
 
 -- 
 ~Vinod
