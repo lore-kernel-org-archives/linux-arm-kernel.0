@@ -1,27 +1,47 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 3 Oct 2018 15:34:09 +0800
-Subject: [PATCH 2/2] drm/sun4i: tcon: prevent tcon->panel dereference if
- null
-In-Reply-To: <20181002215917.1849-2-giulio.benetti@micronovasrl.com>
-References: <20181001093612.GA13672@mwanda>
- <20181002215917.1849-1-giulio.benetti@micronovasrl.com>
- <20181002215917.1849-2-giulio.benetti@micronovasrl.com>
-Message-ID: <CAGb2v66mEqBYfeX_j_pj1Uu4OUfeESBQwXmQeqoqfEHP-CW3dQ@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 3 Oct 2018 09:49:41 +0200
+Subject: [PATCH i2c-next v4 2/3] i2c: aspeed: Add 'timeout' DT property
+ reading code
+In-Reply-To: <20181001202748.8030-3-jae.hyun.yoo@linux.intel.com>
+References: <20181001202748.8030-1-jae.hyun.yoo@linux.intel.com>
+ <20181001202748.8030-3-jae.hyun.yoo@linux.intel.com>
+Message-ID: <CACPK8XeuFm_GYFhe-KimOHV7y7PBdFjhMGG+QAmfNrfOcb488A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 3, 2018 at 5:59 AM Giulio Benetti
-<giulio.benetti@micronovasrl.com> wrote:
->
-> If using tcon with VGA, tcon->panel will be null(0), this will cause
-> segmentation fault when trying to dereference tcon->panel->connector.
->
-> Add tcon->panel null check before calling
-> sun4i_tcon0_mode_set_dithering().
->
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Hello Jae,
 
-Fixes: f11adcecbd5f ("drm/sun4i: tcon: Add dithering support for
-                      RGB565/RGB666 LCD panels")
+On Mon, 1 Oct 2018 at 22:28, Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
+>
+> This commit adds reading code of the 'timeout' DT property to set
+> bus timeout value in adapter configuration. This value still
+> can be configured through an I2C_TIMEOUT ioctl on cdev too.
+>
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> ---
+>  drivers/i2c/busses/i2c-aspeed.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+> index 8dc9161ced38..6d31f54a6653 100644
+> --- a/drivers/i2c/busses/i2c-aspeed.c
+> +++ b/drivers/i2c/busses/i2c-aspeed.c
+> @@ -885,6 +885,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
+>         struct clk *parent_clk;
+>         struct resource *res;
+>         int irq, ret;
+> +       u32 timeout_ms;
+>
+>         bus = devm_kzalloc(&pdev->dev, sizeof(*bus), GFP_KERNEL);
+>         if (!bus)
+> @@ -918,6 +919,11 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
+>                 bus->bus_frequency = 100000;
+>         }
+>
+> +       ret = of_property_read_u32(pdev->dev.of_node, "timeout",
+> +                                  &timeout_ms);
+> +       if (ret)
+> +               timeout_ms = 0; /* then adap.timeout will be set by i2c-core */
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Is it possible to implement the parsing of this property in the i2c
+core instead?
