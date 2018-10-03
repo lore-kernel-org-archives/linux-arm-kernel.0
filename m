@@ -1,56 +1,47 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 3 Oct 2018 16:43:45 +0300
-Subject: [PATCH] arm64: dts: clearfog-gt-8k: add PCIe slot description
-In-Reply-To: <20181003133110.GD427@lunn.ch>
-References: <ac8d233a624411272616d19f070cea756f625235.1538572981.git.baruch@tkos.co.il>
- <20181003133110.GD427@lunn.ch>
-Message-ID: <20181003134345.id34eoianoeeodvs@sapphire.tkos.co.il>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 3 Oct 2018 15:45:53 +0200
+Subject: [GIT PULL] ARM: at91: DT for 4.20 #2
+Message-ID: <20181003134553.aqbogomrxqmpgpmo@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Arnd, Olof,
 
-On Wed, Oct 03, 2018 at 03:31:10PM +0200, Andrew Lunn wrote:
-> On Wed, Oct 03, 2018 at 04:23:01PM +0300, Baruch Siach wrote:
-> > This adds support for the PCIe interface on the CON4 mini-PCIe
-> > connector.
-> 
-> Is there a dependency between this and the implementation of the
-> reset-gpios? It would be good to at least mention if there is/is not
-> such a dependency. You could put it under the ---.
+Here are the second round of DT changes for 4.20. It consists in NAND
+description fixes (size and partitions).
 
-There is no hard dependency between the patches. This patch is about hardware 
-description which is correct regardless of software implementation. For the 
-hardware to work you need to toggle the reset signal. But you can also do that 
-in the bootloader if the kernel does not support reset-gpios.
+Regards
 
-baruch
+Ludovic
 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> >  arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-> > index 2e06d82bec58..a13549749ee7 100644
-> > --- a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-> > +++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-> > @@ -233,6 +233,13 @@
-> >  	};
-> >  };
-> >  
-> > +&cp0_pcie0 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&cp0_pci0_reset_pins>;
-> > +	reset-gpios = <&cp0_gpio2 0 GPIO_ACTIVE_LOW>;
-> > +	status = "okay";
-> > +};
-> > +
-> >  &cp0_gpio2 {
-> >  	sata_reset {
-> >  		gpio-hog;
+The following changes since commit 97181516b0785dd032700ae4899842389c6bea78:
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+  arm: dts: sama5d2: Update coresight bindings for hardware ports (2018-09-19 19:12:25 +0200)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-dt2
+
+for you to fetch changes up to 767466b63de3368376323958b7777b9319bfa8d8:
+
+  ARM: dts: at91: sama5d4_xplained: even nand memory partitions (2018-10-03 10:26:57 +0200)
+
+----------------------------------------------------------------
+AT91 DT for 4.20 #2
+
+ - fixes NAND size and partitions for some boards
+
+----------------------------------------------------------------
+Tudor Ambarus (6):
+      ARM: dts: at91: sama5d4_xplained: fix addressable nand flash size
+      ARM: dts: at91: at91sam9x5cm: fix addressable nand flash size
+      ARM: dts: at91: sama5d2_ptc_ek: fix bootloader env offsets
+      ARM: dts: at91: at91sam9x5cm: even nand memory partitions
+      ARM: dts: at91: sama5d3_xplained: even nand memory partitions
+      ARM: dts: at91: sama5d4_xplained: even nand memory partitions
+
+ arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts   |  8 ++++----
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 11 ++++++++---
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts | 13 +++++++++----
+ arch/arm/boot/dts/at91sam9x5cm.dtsi         | 18 ++++++++++++++----
+ 4 files changed, 35 insertions(+), 15 deletions(-)
