@@ -1,61 +1,106 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 3 Oct 2018 11:41:50 +0800
-Subject: [PATCH v5 10/11] drm/mediatek: implement connection from BLS to DPI0
+Date: Wed, 3 Oct 2018 11:41:42 +0800
+Subject: [PATCH v5 02/11] drm/mediatek: move hardware register to node data
 In-Reply-To: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
 References: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
-Message-ID: <20181003034151.31452-11-bibby.hsieh@mediatek.com>
+Message-ID: <20181003034151.31452-3-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify display driver to support connection from BLS to DPI.
+From: chunhui dai <chunhui.dai@mediatek.com>
 
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+The address of register DPI_H_FRE_CON is different in different IC.
+Using of_node data to find this address.
+
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
+Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_dpi.c      | 19 ++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  1 -
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 87e4191c250e..f3068c62ed48 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -39,6 +39,7 @@
- #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
- #define DISP_REG_CONFIG_OUT_SEL			0x04c
- #define DISP_REG_CONFIG_DSI_SEL			0x050
-+#define DISP_REG_CONFIG_DPI_SEL			0x064
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index 5ede1ddbaa1a..72aa43187731 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -18,6 +18,7 @@
+ #include <linux/component.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/interrupt.h>
+ #include <linux/types.h>
+@@ -72,6 +73,7 @@ struct mtk_dpi {
+ 	struct clk *tvd_clk;
+ 	int irq;
+ 	struct drm_display_mode mode;
++	const struct mtk_dpi_conf *conf;
+ 	enum mtk_dpi_out_color_format color_format;
+ 	enum mtk_dpi_out_yc_map yc_map;
+ 	enum mtk_dpi_out_bit_num bit_num;
+@@ -110,6 +112,10 @@ struct mtk_dpi_yc_limit {
+ 	u16 c_bottom;
+ };
  
- #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
- #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
-@@ -132,7 +133,10 @@
- 
- #define OVL_MOUT_EN_RDMA		0x1
- #define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
-+#define BLS_TO_DPI_RDMA1_TO_DSI		0x2
- #define DSI_SEL_IN_BLS			0x0
-+#define DPI_SEL_IN_BLS			0x0
-+#define DSI_SEL_IN_RDMA			0x1
- 
- struct mtk_disp_mutex {
- 	int id;
-@@ -323,9 +327,17 @@ static void mtk_ddp_sout_sel(void __iomem *config_regs,
- 			     enum mtk_ddp_comp_id cur,
- 			     enum mtk_ddp_comp_id next)
++struct mtk_dpi_conf {
++	u32 reg_h_fre_con;
++};
++
+ static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
  {
--	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
-+	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
- 		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
- 			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-+	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
-+		writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
-+			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-+		writel_relaxed(DSI_SEL_IN_RDMA,
-+			       config_regs + DISP_REG_CONFIG_DSI_SEL);
-+		writel_relaxed(DPI_SEL_IN_BLS,
-+			       config_regs + DISP_REG_CONFIG_DPI_SEL);
-+	}
+ 	u32 tmp = readl(dpi->regs + offset) & ~mask;
+@@ -335,7 +341,7 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
+ 
+ static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
+ {
+-	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
++	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
  }
  
- void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+@@ -639,6 +645,10 @@ static const struct component_ops mtk_dpi_component_ops = {
+ 	.unbind = mtk_dpi_unbind,
+ };
+ 
++static const struct mtk_dpi_conf mt8173_conf = {
++	.reg_h_fre_con = 0xe0,
++};
++
+ static int mtk_dpi_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -653,6 +663,7 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	dpi->dev = dev;
++	dpi->conf = (struct mtk_dpi_conf *)of_device_get_match_data(dev);
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	dpi->regs = devm_ioremap_resource(dev, mem);
+@@ -732,8 +743,10 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id mtk_dpi_of_ids[] = {
+-	{ .compatible = "mediatek,mt8173-dpi", },
+-	{}
++	{ .compatible = "mediatek,mt8173-dpi",
++	  .data = &mt8173_conf,
++	},
++	{ },
+ };
+ 
+ struct platform_driver mtk_dpi_driver = {
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+index 4b6ad4751a31..040444d7718d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
++++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+@@ -223,6 +223,5 @@
+ #define ESAV_CODE2			(0xFFF << 0)
+ #define ESAV_CODE3_MSB			BIT(16)
+ 
+-#define DPI_H_FRE_CON		0xE0
+ #define H_FRE_2N			BIT(25)
+ #endif /* __MTK_DPI_REGS_H */
 -- 
 2.12.5.2.gbdf23ab
