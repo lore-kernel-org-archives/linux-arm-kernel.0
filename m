@@ -1,101 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 3 Oct 2018 16:20:39 +0100
-Subject: [PATCH v8 2/9] KVM: arm/arm64: Share common code in
- user_mem_abort()
-In-Reply-To: <20181001155443.23032-3-punit.agrawal@arm.com>
-References: <20181001155443.23032-1-punit.agrawal@arm.com>
- <20181001155443.23032-3-punit.agrawal@arm.com>
-Message-ID: <1eb4df93-4610-ac83-fec3-6a7efeddfc4f@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 03 Oct 2018 17:22:55 +0200
+Subject: [PATCH] arm64: dts: clearfog-gt-8k: add PCIe slot description
+In-Reply-To: <20181003134345.id34eoianoeeodvs@sapphire.tkos.co.il> (Baruch
+ Siach's message of "Wed, 3 Oct 2018 16:43:45 +0300")
+References: <ac8d233a624411272616d19f070cea756f625235.1538572981.git.baruch@tkos.co.il>
+ <20181003133110.GD427@lunn.ch>
+ <20181003134345.id34eoianoeeodvs@sapphire.tkos.co.il>
+Message-ID: <87bm8bm4vk.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
+Hi Baruch,
+ 
+ On mer., oct. 03 2018, Baruch Siach <baruch@tkos.co.il> wrote:
 
-On 01/10/18 16:54, Punit Agrawal wrote:
-> The code for operations such as marking the pfn as dirty, and
-> dcache/icache maintenance during stage 2 fault handling is duplicated
-> between normal pages and PMD hugepages.
-> 
-> Instead of creating another copy of the operations when we introduce
-> PUD hugepages, let's share them across the different pagesizes.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   virt/kvm/arm/mmu.c | 45 +++++++++++++++++++++++++++++----------------
->   1 file changed, 29 insertions(+), 16 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index c23a1b323aad..5b76ee204000 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1490,7 +1490,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   	kvm_pfn_t pfn;
->   	pgprot_t mem_type = PAGE_S2;
->   	bool logging_active = memslot_is_logging(memslot);
-> -	unsigned long flags = 0;
-> +	unsigned long vma_pagesize, flags = 0;
->   
->   	write_fault = kvm_is_write_fault(vcpu);
->   	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
-> @@ -1510,10 +1510,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   		return -EFAULT;
->   	}
->   
-> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
-> +	vma_pagesize = vma_kernel_pagesize(vma);
-> +	if (vma_pagesize == PMD_SIZE && !logging_active) {
->   		hugetlb = true;
->   		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->   	} else {
-> +		/*
-> +		 * Fallback to PTE if it's not one of the Stage 2
-> +		 * supported hugepage sizes
-> +		 */
-> +		vma_pagesize = PAGE_SIZE;
-> +
->   		/*
->   		 * Pages belonging to memslots that don't have the same
->   		 * alignment for userspace and IPA cannot be mapped using
-> @@ -1579,23 +1586,34 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   	if (mmu_notifier_retry(kvm, mmu_seq))
->   		goto out_unlock;
->   
-> -	if (!hugetlb && !force_pte)
-> +	if (!hugetlb && !force_pte) {
-> +		/*
-> +		 * Only PMD_SIZE transparent hugepages(THP) are
-> +		 * currently supported. This code will need to be
-> +		 * updated to support other THP sizes.
-> +		 */
->   		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
-> +		if (hugetlb)
-> +			vma_pagesize = PMD_SIZE;
-> +	}
-> +
-> +	if (writable)
-> +		kvm_set_pfn_dirty(pfn);
->   
-> -	if (hugetlb) {
-> +	if (fault_status != FSC_PERM)
-> +		clean_dcache_guest_page(pfn, vma_pagesize);
-> +
-> +	if (exec_fault)
-> +		invalidate_icache_guest_page(pfn, vma_pagesize);
-> +
-> +	if (hugetlb && vma_pagesize == PMD_SIZE) {
+> Hi Andrew,
+>
+> On Wed, Oct 03, 2018 at 03:31:10PM +0200, Andrew Lunn wrote:
+>> On Wed, Oct 03, 2018 at 04:23:01PM +0300, Baruch Siach wrote:
+>> > This adds support for the PCIe interface on the CON4 mini-PCIe
+>> > connector.
+>> 
+>> Is there a dependency between this and the implementation of the
+>> reset-gpios? It would be good to at least mention if there is/is not
+>> such a dependency. You could put it under the ---.
+>
+> There is no hard dependency between the patches. This patch is about hardware 
+> description which is correct regardless of software implementation. For the 
+> hardware to work you need to toggle the reset signal. But you can also do that 
+> in the bootloader if the kernel does not support reset-gpios.
+>
+> baruch
+>
+>> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-Can you end-up in a situation where hugetlb==false and vma_pagesize == 
-PMD_SIZE? If that's the case, then the above CMOs are not done on the 
-same granularity as they were done before this patch. If that cannot 
-happen, then the above condition can be simplified.
-
-Which one is it?
+Applied on mvebu/dt64
 
 Thanks,
 
-	M.
+Gregory
+
+>> > ---
+>> >  arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts | 7 +++++++
+>> >  1 file changed, 7 insertions(+)
+>> > 
+>> > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+>> > index 2e06d82bec58..a13549749ee7 100644
+>> > --- a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+>> > +++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+>> > @@ -233,6 +233,13 @@
+>> >  	};
+>> >  };
+>> >  
+>> > +&cp0_pcie0 {
+>> > +	pinctrl-names = "default";
+>> > +	pinctrl-0 = <&cp0_pci0_reset_pins>;
+>> > +	reset-gpios = <&cp0_gpio2 0 GPIO_ACTIVE_LOW>;
+>> > +	status = "okay";
+>> > +};
+>> > +
+>> >  &cp0_gpio2 {
+>> >  	sata_reset {
+>> >  		gpio-hog;
+>
+> -- 
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+
 -- 
-Jazz is not dead. It just smells funny...
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
