@@ -1,196 +1,95 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Oct 2018 16:38:17 +0200
-Subject: [PATCH v9 04/11] dt: psci: Update DT bindings to support hierarchical
- PSCI states
+Date: Wed,  3 Oct 2018 16:38:24 +0200
+Subject: [PATCH v9 11/11] drivers: firmware: psci: Simplify error path of
+ psci_dt_init()
 In-Reply-To: <20181003143824.13059-1-ulf.hansson@linaro.org>
 References: <20181003143824.13059-1-ulf.hansson@linaro.org>
-Message-ID: <20181003143824.13059-5-ulf.hansson@linaro.org>
+Message-ID: <20181003143824.13059-12-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lina Iyer <lina.iyer@linaro.org>
-
-Update DT bindings to represent hierarchical CPU and CPU PM domain idle
-states for PSCI. Also update the PSCI examples to clearly show how
-flattened and hierarchical idle states can be represented in DT.
+Instead of having each psci init function taking care of the of_node_put(),
+let's deal with that from psci_dt_init(), as this enables a bit simpler
+error path for each psci init function.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- .../devicetree/bindings/arm/psci.txt          | 156 ++++++++++++++++++
- 1 file changed, 156 insertions(+)
+ drivers/firmware/psci/psci.c | 23 ++++++++++-------------
+ 1 file changed, 10 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index a2c4f1d52492..17aa3d3a1c8e 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -105,7 +105,163 @@ Case 3: PSCI v0.2 and PSCI v0.1.
- 		...
- 	};
+diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+index 256b4edbb20a..38881007584e 100644
+--- a/drivers/firmware/psci/psci.c
++++ b/drivers/firmware/psci/psci.c
+@@ -608,9 +608,9 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	int err;
  
-+ARM systems can have multiple cores sometimes in hierarchical arrangement.
-+This often, but not always, maps directly to the processor power topology of
-+the system. Individual nodes in a topology have their own specific power states
-+and can be better represented in DT hierarchically.
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
 +
-+For these cases, the definitions of the idle states for the CPUs and the CPU
-+topology, must conform to the domain idle state specification [3]. The domain
-+idle states themselves, must be compatible with the defined 'domain-idle-state'
-+binding [1], and also need to specify the arm,psci-suspend-param property for
-+each idle state.
+ 	/*
+ 	 * Starting with v0.2, the PSCI specification introduced a call
+ 	 * (PSCI_VERSION) that allows probing the firmware version, so
+@@ -618,11 +618,7 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	 * can be carried out according to the specific version reported
+ 	 * by firmware
+ 	 */
+-	err = psci_probe();
+-
+-out_put_node:
+-	of_node_put(np);
+-	return err;
++	return psci_probe();
+ }
+ 
+ /*
+@@ -634,9 +630,8 @@ static int __init psci_0_1_init(struct device_node *np)
+ 	int err;
+ 
+ 	err = get_set_conduit_method(np);
+-
+ 	if (err)
+-		goto out_put_node;
++		return err;
+ 
+ 	pr_info("Using PSCI v0.1 Function IDs from DT\n");
+ 
+@@ -660,9 +655,7 @@ static int __init psci_0_1_init(struct device_node *np)
+ 		psci_ops.migrate = psci_migrate;
+ 	}
+ 
+-out_put_node:
+-	of_node_put(np);
+-	return err;
++	return 0;
+ }
+ 
+ static const struct of_device_id psci_of_match[] __initconst = {
+@@ -677,6 +670,7 @@ int __init psci_dt_init(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *matched_np;
+ 	psci_initcall_t init_fn;
++	int ret;
+ 
+ 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+ 
+@@ -684,7 +678,10 @@ int __init psci_dt_init(void)
+ 		return -ENODEV;
+ 
+ 	init_fn = (psci_initcall_t)matched_np->data;
+-	return init_fn(np);
++	ret = init_fn(np);
 +
-+DT allows representing CPUs and CPU idle states in two different ways -
-+
-+The flattened model as given in Example 1, lists CPU's idle states followed by
-+the domain idle state that the CPUs may choose. Note that the idle states are
-+all compatible with "arm,idle-state".
-+
-+Example 2 represents the hierarchical model of CPUs and domain idle states.
-+CPUs define their domain provider in their psci DT node. The domain controls
-+the power to the CPU and possibly other h/w blocks that would enter an idle
-+state along with the CPU. The CPU's idle states may therefore be considered as
-+the domain's idle states and have the compatible "arm,idle-state". Such domains
-+may also be embedded within another domain that may represent common h/w blocks
-+between these CPUs. The idle states of the CPU topology shall be represented as
-+the domain's idle states.
-+
-+In PSCI firmware v1.0, the OS-Initiated mode is introduced. In order to use it,
-+the hierarchical representation must be used.
-+
-+Example 1: Flattened representation of CPU and domain idle states
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_PWRDN>, <&CLUSTER_RET>,
-+					  <&CLUSTER_PWRDN>;
-+		};
-+
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x100>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_PWRDN>, <&CLUSTER_RET>,
-+					  <&CLUSTER_PWRDN>;
-+		};
-+
-+		idle-states {
-+			CPU_PWRDN: cpu-power-down {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x000001>;
-+				entry-latency-us = <10>;
-+				exit-latency-us = <10>;
-+				min-residency-us = <100>;
-+			};
-+
-+			CLUSTER_RET: cluster-retention {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
-+
-+			CLUSTER_PWRDN: cluster-power-down {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+Example 2: Hierarchical representation of CPU and domain idle states
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0>;
-+			enable-method = "psci";
-+			power-domains = <&CPU_PD0>;
-+		};
-+
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x100>;
-+			enable-method = "psci";
-+			power-domains = <&CPU_PD1>;
-+		};
-+
-+		idle-states {
-+			CPU_PWRDN: cpu-power-down {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x000001>;
-+				entry-latency-us = <10>;
-+				exit-latency-us = <10>;
-+				min-residency-us = <100>;
-+			};
-+
-+			CLUSTER_RET: cluster-retention {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
-+
-+			CLUSTER_PWRDN: cluster-power-down {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+
-+		CPU_PD0: cpu-pd0 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CPU_PWRDN>;
-+			power-domains = <&CLUSTER_PD>;
-+		};
-+
-+		CPU_PD1: cpu-pd1 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states =  <&CPU_PWRDN>;
-+			power-domains = <&CLUSTER_PD>;
-+		};
-+
-+		CLUSTER_PD: cluster-pd {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWRDN>;
-+		};
-+	};
-+
- [1] Kernel documentation - ARM idle states bindings
-     Documentation/devicetree/bindings/arm/idle-states.txt
- [2] Power State Coordination Interface (PSCI) specification
-     http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
-+[3]. PM Domains description
-+    Documentation/devicetree/bindings/power/power_domain.txt
++	of_node_put(np);
++	return ret;
+ }
+ 
+ #ifdef CONFIG_ACPI
 -- 
 2.17.1
