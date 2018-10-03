@@ -1,59 +1,109 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Wed, 3 Oct 2018 18:03:29 +0200
-Subject: SoCFPGA Turn on ARM errata for L2 cache ?
-Message-ID: <CAJiuCcdR5dfN3MtvoqOMEG1hK+EuYgsdAaabW5wQrEDTdAOQdw@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 03 Oct 2018 17:25:59 +0100
+Subject: [PATCH v8 2/9] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+In-Reply-To: <1eb4df93-4610-ac83-fec3-6a7efeddfc4f@arm.com> (Marc Zyngier's
+ message of "Wed, 3 Oct 2018 16:20:39 +0100")
+References: <20181001155443.23032-1-punit.agrawal@arm.com>
+ <20181001155443.23032-3-punit.agrawal@arm.com>
+ <1eb4df93-4610-ac83-fec3-6a7efeddfc4f@arm.com>
+Message-ID: <87o9cbhu94.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-Saw this patch on the Altera OpenSource GitHub.
+> Hi Punit,
+>
+> On 01/10/18 16:54, Punit Agrawal wrote:
+>> The code for operations such as marking the pfn as dirty, and
+>> dcache/icache maintenance during stage 2 fault handling is duplicated
+>> between normal pages and PMD hugepages.
+>>
+>> Instead of creating another copy of the operations when we introduce
+>> PUD hugepages, let's share them across the different pagesizes.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   virt/kvm/arm/mmu.c | 45 +++++++++++++++++++++++++++++----------------
+>>   1 file changed, 29 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index c23a1b323aad..5b76ee204000 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1490,7 +1490,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   	kvm_pfn_t pfn;
+>>   	pgprot_t mem_type = PAGE_S2;
+>>   	bool logging_active = memslot_is_logging(memslot);
+>> -	unsigned long flags = 0;
+>> +	unsigned long vma_pagesize, flags = 0;
+>>     	write_fault = kvm_is_write_fault(vcpu);
+>>   	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+>> @@ -1510,10 +1510,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   		return -EFAULT;
+>>   	}
+>>   -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+>> +	vma_pagesize = vma_kernel_pagesize(vma);
+>> +	if (vma_pagesize == PMD_SIZE && !logging_active) {
+>>   		hugetlb = true;
+>>   		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>>   	} else {
+>> +		/*
+>> +		 * Fallback to PTE if it's not one of the Stage 2
+>> +		 * supported hugepage sizes
+>> +		 */
+>> +		vma_pagesize = PAGE_SIZE;
+>> +
+>>   		/*
+>>   		 * Pages belonging to memslots that don't have the same
+>>   		 * alignment for userspace and IPA cannot be mapped using
+>> @@ -1579,23 +1586,34 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   	if (mmu_notifier_retry(kvm, mmu_seq))
+>>   		goto out_unlock;
+>>   -	if (!hugetlb && !force_pte)
+>> +	if (!hugetlb && !force_pte) {
+>> +		/*
+>> +		 * Only PMD_SIZE transparent hugepages(THP) are
+>> +		 * currently supported. This code will need to be
+>> +		 * updated to support other THP sizes.
+>> +		 */
+>>   		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>> +		if (hugetlb)
+>> +			vma_pagesize = PMD_SIZE;
+>> +	}
+>> +
+>> +	if (writable)
+>> +		kvm_set_pfn_dirty(pfn);
+>>   -	if (hugetlb) {
+>> +	if (fault_status != FSC_PERM)
+>> +		clean_dcache_guest_page(pfn, vma_pagesize);
+>> +
+>> +	if (exec_fault)
+>> +		invalidate_icache_guest_page(pfn, vma_pagesize);
+>> +
+>> +	if (hugetlb && vma_pagesize == PMD_SIZE) {
+>
+> Can you end-up in a situation where hugetlb==false and vma_pagesize ==
+> PMD_SIZE? If that's the case, then the above CMOs are not done on the
+> same granularity as they were done before this patch. If that cannot
+> happen, then the above condition can be simplified.
+>
+> Which one is it?
 
-But it's not mainlained can I propose it?
+hugetlb is a hangover from when we didn't have vma_pagesize. I think we
+can drop it and rely on the pagesize to control the size of mapping we
+put down.
 
-How do you do when the patch is from someone else ? Do you keep the
-sign-off of the original author or do you just mention it? in the
-commit log ?
+Let me give that a try.
 
-Thanks,
-Clement
+Thanks for taking a look.
 
->From 6f7559407c1fcdb9b31c9493f0da79d614290e91 Mon Sep 17 00:00:00 2001
-From: Dinh Nguyen <dinguyen@kernel.org>
-Date: Wed, 27 Feb 2013 18:29:14 -0600
-Subject: [PATCH] ARM: socfpga: Turn on ARM errata for L2 cache
-
-Turn on these ARM and PL310 errata for SoCFPGA:
-
-ARM_ERRATA_754322
-ARM_ERRATA_764369
-ARM_ERRATA_775420
-
-PL310_ERRATA_588369
-PL310_ERRATA_727915
-PL310_ERRATA_753970
-PL310_ERRATA_769419
-
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
- arch/arm/mach-socfpga/Kconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-index 4adb901dd5eb..a04660918d71 100644
---- a/arch/arm/mach-socfpga/Kconfig
-+++ b/arch/arm/mach-socfpga/Kconfig
-@@ -11,6 +11,13 @@ menuconfig ARCH_SOCFPGA
-  select HAVE_ARM_TWD if SMP
-  select MFD_SYSCON
-  select PCI_DOMAINS if PCI
-+ select ARM_ERRATA_754322
-+ select ARM_ERRATA_764369 if SMP
-+ select ARM_ERRATA_775420
-+ select PL310_ERRATA_588369
-+ select PL310_ERRATA_727915
-+ select PL310_ERRATA_753970 if PL310
-+ select PL310_ERRATA_769419
-
- if ARCH_SOCFPGA
- config SOCFPGA_SUSPEND
+>
+>
+> Thanks,
+>
+> 	M.
