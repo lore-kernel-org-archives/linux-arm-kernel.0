@@ -1,53 +1,27 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  3 Oct 2018 09:31:11 +0200
-Subject: [PATCH v3] nvmem: fix nvmem_cell_get_from_lookup()
-Message-ID: <20181003073111.27212-1-brgl@bgdev.pl>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 3 Oct 2018 15:34:09 +0800
+Subject: [PATCH 2/2] drm/sun4i: tcon: prevent tcon->panel dereference if
+ null
+In-Reply-To: <20181002215917.1849-2-giulio.benetti@micronovasrl.com>
+References: <20181001093612.GA13672@mwanda>
+ <20181002215917.1849-1-giulio.benetti@micronovasrl.com>
+ <20181002215917.1849-2-giulio.benetti@micronovasrl.com>
+Message-ID: <CAGb2v66mEqBYfeX_j_pj1Uu4OUfeESBQwXmQeqoqfEHP-CW3dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Wed, Oct 3, 2018 at 5:59 AM Giulio Benetti
+<giulio.benetti@micronovasrl.com> wrote:
+>
+> If using tcon with VGA, tcon->panel will be null(0), this will cause
+> segmentation fault when trying to dereference tcon->panel->connector.
+>
+> Add tcon->panel null check before calling
+> sun4i_tcon0_mode_set_dithering().
+>
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 
-We check if the pointer returned by __nvmem_device_get() is not NULL
-while we should actually check if it is not IS_ERR(nvmem). Fix it.
+Fixes: f11adcecbd5f ("drm/sun4i: tcon: Add dithering support for
+                      RGB565/RGB666 LCD panels")
 
-While we're at it: fix the next error path where we should assign an
-error value to cell before returning.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
-v1 -> v2:
-- use ERR_CAST() instead of a direct pointer cast
-
-v2 -> v3:
-- added the Reported-by tag
-
- drivers/nvmem/core.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index ad1227df1984..f49474e1ad49 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -952,9 +952,9 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
- 		    (strcmp(lookup->con_id, con_id) == 0)) {
- 			/* This is the right entry. */
- 			nvmem = __nvmem_device_get(NULL, lookup->nvmem_name);
--			if (!nvmem) {
-+			if (IS_ERR(nvmem)) {
- 				/* Provider may not be registered yet. */
--				cell = ERR_PTR(-EPROBE_DEFER);
-+				cell = ERR_CAST(nvmem);
- 				goto out;
- 			}
- 
-@@ -962,6 +962,7 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
- 						       lookup->cell_name);
- 			if (!cell) {
- 				__nvmem_device_put(nvmem);
-+				cell = ERR_PTR(-ENOENT);
- 				goto out;
- 			}
- 		}
--- 
-2.19.0
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
