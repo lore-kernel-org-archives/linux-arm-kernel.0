@@ -1,31 +1,35 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu,  4 Oct 2018 00:54:18 +0200
-Subject: [PATCH] ARM: dts: socfpga: Turn FPGA manager node into syscon
-Message-ID: <20181003225418.21742-1-marex@denx.de>
+Date: Thu,  4 Oct 2018 00:54:36 +0200
+Subject: [PATCH] ARM: dts: socfpga: Add FPGA manager GPIO binding
+Message-ID: <20181003225436.21793-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FPGA manager contains additional functionality, the GPI/GPO block.
-Turn the FPGA manager node into syscon, so that the gpio-syscon driver
-can be used to access the GPI/GPO block.
+Add gpio-syscon binding to export the GPIO pins accessible via the
+FPGA manager GPIO block.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index daf249e57b08..1835a824c9b9 100644
+index 1835a824c9b9..b77c96bc445c 100644
 --- a/arch/arm/boot/dts/socfpga.dtsi
 +++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -551,7 +551,7 @@
+@@ -557,6 +557,13 @@
+ 			interrupts = <0 175 4>;
  		};
  
- 		fpgamgr0: fpgamgr at ff706000 {
--			compatible = "altr,socfpga-fpga-mgr";
-+			compatible = "altr,socfpga-fpga-mgr", "syscon";
- 			reg = <0xff706000 0x1000
- 			       0xffb90000 0x4>;
- 			interrupts = <0 175 4>;
++		fpgamgr_gpio: gpio at ff706010 {
++			compatible = "altr,fpga-mgr-gpio";
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio,syscon-dev = <&fpgamgr0 0x4>;
++		};
++
+ 		gmac0: ethernet at ff700000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			altr,sysmgr-syscon = <&sysmgr 0x60 0>;
 -- 
 2.18.0
