@@ -1,32 +1,23 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Wed, 3 Oct 2018 15:31:12 +0200
-Subject: [PATCH v7 0/8] arm64: untag user pointers passed to the kernel
-In-Reply-To: <cover.1538485901.git.andreyknvl@google.com>
-References: <cover.1538485901.git.andreyknvl@google.com>
-Message-ID: <20181003133110.4y3xhexjrvffivff@ltop.local>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed,  3 Oct 2018 15:31:53 +0200
+Subject: [PATCH 0/2] rtc: Add ASPEED RTC
+Message-ID: <20181003133155.27494-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2018 at 03:12:35PM +0200, Andrey Konovalov wrote:
-...
+This adds support for the ASPEED RTC hardware.
 
-> Changes in v7:
-> - Rebased onto 17b57b18 (4.19-rc6).
-> - Dropped the "arm64: untag user address in __do_user_fault" patch, since
->   the existing patches already handle user faults properly.
-> - Dropped the "usb, arm64: untag user addresses in devio" patch, since the
->   passed pointer must come from a vma and therefore be untagged.
-> - Dropped the "arm64: annotate user pointers casts detected by sparse"
->   patch (see the discussion to the replies of the v6 of this patchset).
-> - Added more context to the cover letter.
-> - Updated Documentation/arm64/tagged-pointers.txt.
+Joel Stanley (2):
+  rtc: Add ASPEED RTC driver
+  dt-bindings: rtc: Add ASPEED description
 
-Hi,
+ .../devicetree/bindings/rtc/rtc-aspeed.txt    |  18 +++
+ drivers/rtc/Kconfig                           |  10 ++
+ drivers/rtc/Makefile                          |   1 +
+ drivers/rtc/rtc-aspeed.c                      | 142 ++++++++++++++++++
+ 4 files changed, 171 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-aspeed.txt
+ create mode 100644 drivers/rtc/rtc-aspeed.c
 
-I'm quite hapy now with what concerns me (sparse).
-Please, feel free to add my:
-Reviewed-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-
-
-Cheers,
--- Luc Van Oostenryck
+-- 
+2.17.1
