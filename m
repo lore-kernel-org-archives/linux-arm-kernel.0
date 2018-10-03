@@ -1,176 +1,277 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Wed, 3 Oct 2018 17:07:13 +0530
-Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
-In-Reply-To: <20181003105926.GA4714@dhcp22.suse.cz>
-References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
- <1538482531-26883-2-git-send-email-anshuman.khandual@arm.com>
- <20181002123909.GS18290@dhcp22.suse.cz>
- <fae68a4e-b14b-8342-940c-ea5ef3c978af@arm.com>
- <20181003065833.GD18290@dhcp22.suse.cz>
- <7f0488b5-053f-0954-9b95-8c0890ef5597@arm.com>
- <20181003105926.GA4714@dhcp22.suse.cz>
-Message-ID: <34b25855-fcef-61ed-312d-2011f80bdec4@arm.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Wed, 3 Oct 2018 13:44:01 +0200
+Subject: [PATCH V4 02/25] mmc: mmci: create generic mmci_dma_setup
+In-Reply-To: <CAPDyKFpZKdZ5Oh29_EpgDqpwppa63Uci-FeLHF2KZBxVcO4COQ@mail.gmail.com>
+References: <1538482167-13819-1-git-send-email-ludovic.Barre@st.com>
+ <1538482167-13819-3-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFpZKdZ5Oh29_EpgDqpwppa63Uci-FeLHF2KZBxVcO4COQ@mail.gmail.com>
+Message-ID: <a4257361-b6ad-3ccc-1ade-303065744bad@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+hi Ulf
 
+On 10/03/2018 11:22 AM, Ulf Hansson wrote:
+> + Srinivas
 
-On 10/03/2018 04:29 PM, Michal Hocko wrote:
-> On Wed 03-10-18 15:28:23, Anshuman Khandual wrote:
->>
->>
->> On 10/03/2018 12:28 PM, Michal Hocko wrote:
->>> On Wed 03-10-18 07:46:27, Anshuman Khandual wrote:
->>>>
->>>>
->>>> On 10/02/2018 06:09 PM, Michal Hocko wrote:
->>>>> On Tue 02-10-18 17:45:28, Anshuman Khandual wrote:
->>>>>> Architectures like arm64 have PUD level HugeTLB pages for certain configs
->>>>>> (1GB huge page is PUD based on ARM64_4K_PAGES base page size) that can be
->>>>>> enabled for migration. It can be achieved through checking for PUD_SHIFT
->>>>>> order based HugeTLB pages during migration.
->>>>>
->>>>> Well a long term problem with hugepage_migration_supported is that it is
->>>>> used in two different context 1) to bail out from the migration early
->>>>> because the arch doesn't support migration at all and 2) to use movable
->>>>> zone for hugetlb pages allocation. I am especially concerned about the
->>>>> later because the mere support for migration is not really good enough.
->>>>> Are you really able to find a different giga page during the runtime to
->>>>> move an existing giga page out of the movable zone?
->>>>
->>>> I pre-allocate them before trying to initiate the migration (soft offline
->>>> in my experiments). Hence it should come from the pre-allocated HugeTLB
->>>> pool instead from the buddy. I might be missing something here but do we
->>>> ever allocate HugeTLB on the go when trying to migrate ? IIUC it always
->>>> came from the pool (unless its something related to ovecommit/surplus).
->>>> Could you please kindly explain regarding how migration target HugeTLB
->>>> pages are allocated on the fly from movable zone.
->>>
->>> Hotplug comes to mind. You usually do not pre-allocate to cover full
->>> node going offline. And people would like to do that. Another example is
->>> CMA. You would really like to move pages out of the way.
->>
->> You are right.
->>
->> Hotplug migration:
->>
->> __offline_pages
->>    do_migrate_range
->> 	migrate_pages(...new_node_page...)
->>
->> new_node_page
->>    new_page_nodemask
->> 	alloc_huge_page_nodemask
->> 	   dequeue_huge_page_nodemask (Getting from pool)
->> 	or
->> 	   alloc_migrate_huge_page    (Getting from buddy - non-gigantic)
->> 		alloc_fresh_huge_page
->> 		    alloc_buddy_huge_page
->> 			__alloc_pages_nodemask ----> goes into buddy
->>
->> CMA allocation:
->>
->> cma_alloc
->>    alloc_contig_range
->> 	__alloc_contig_migrate_range
->> 		migrate_pages(...alloc_migrate_target...)
->>
->> alloc_migrate_target
->>    new_page_nodemask -> __alloc_pages_nodemask ---> goes into buddy
->>
->> But this is not applicable for gigantic pages for which it backs off way
->> before going into buddy.
+for next series, I will add Srinivas
+
 > 
-> This is an implementation detail - mostly a missing or an incomplete
-> hugetlb overcommit implementation IIRC. The primary point remains the
-> same. Being able to migrate in principle and feasible enough to migrate
-> to be placed in zone movable are two distinct things.
-
-I agree. They are two distinct things.
-
 > [...]
->>>> But even if there are some chances of run time allocation failure from
->>>> movable zone (as in point 2) that should not block the very initiation
->>>> of migration itself. IIUC thats not the semantics for either THP or
->>>> normal pages. Why should it be different here. If the allocation fails
->>>> we should report and abort as always. Its the caller of migration taking
->>>> the chances. why should we prevent that.
->>>
->>> Yes I agree, hence the distinction between the arch support for
->>> migrateability and the criterion on the movable zone placement.
->> movable zone placement sounds very tricky here. How can the platform
->> (through the hook huge_movable) before hand say whether destination
->> page could be allocated from the ZONE_MOVABLE without looking into the
->> state of buddy at migration (any sort attempt to do this is going to
->> be expensive) or it merely indicates the desire to live with possible
->> consequence (unable to hot unplug/CMA going forward) for a migration
->> which might end up in an unmovable area.
 > 
-> I do not follow. The whole point of zone_movable is to provide a
-> physical memory range which is more or less movable. That means that
-> pages allocated from this zone can be migrated away should there be a
-> reason for that.
-
-I understand this.
-
-> 
->>>>> So I guess we want to split this into two functions
->>>>> arch_hugepage_migration_supported and hugepage_movable. The later would
->>>>
->>>> So the set difference between arch_hugepage_migration_supported and 
->>>> hugepage_movable still remains un-migratable ? Then what is the purpose
->>>> for arch_hugepage_migration_supported page size set in the first place.
->>>> Does it mean we allow the migration at the beginning and the abort later
->>>> when the page size does not fall within the subset for hugepage_movable.
->>>> Could you please kindly explain this in more detail.
->>>
->>> The purpose of arch_hugepage_migration_supported is to tell whether it
->>> makes any sense to even try to migration. The allocation placement is
+>>   #ifdef CONFIG_DMA_ENGINE
+>> -static void mmci_dma_setup(struct mmci_host *host)
+>> +static inline void mmci_dma_release(struct mmci_host *host);
+>> +
+>> +int mmci_dmae_setup(struct mmci_host *host)
+>>   {
+>>          const char *rxname, *txname;
 >>
->> Which kind of matches what we have right now and being continued with this
->> proposal in the series.
-> 
-> Except you only go half way there. Because you still consider "able to
-> migrate" and "feasible to migrate" as the same thing.
-
-Okay.
-
-> 
+>> @@ -464,8 +485,12 @@ static void mmci_dma_setup(struct mmci_host *host)
+>>                          host->mmc->max_seg_size = max_seg_size;
+>>          }
 >>
->>> completely independent on this choice. The later just says whether it is
->>> feasible to place a hugepage to the zone movable. Sure regular 2MB pages
+>> -       if (host->ops && host->ops->dma_setup)
+>> -               host->ops->dma_setup(host);
+>> +       if (!host->dma_tx_channel || !host->dma_rx_channel) {
+>> +               mmci_dma_release(host);
+> 
+> This doesn't look right to me. The existing code allows a tx channel
+> to be used, even if an rx channel could not be setup. It seems
+> reasonable to still allow that.
+
+ok, I could replace by
+if (!host->dma_tx_channel && !host->dma_rx_channel)
+
+> 
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       return 0;
+>>   }
 >>
->> What do you exactly mean by feasible ? Wont it depend on the state of the
->> buddy allocator (ZONE_MOVABLE in particular) and it's ability to accommodate
->> a given huge page. How can the platform decide on it ?
+>>   /*
+>> @@ -496,7 +521,7 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+>>
+>>   static void mmci_dma_data_error(struct mmci_host *host)
+>>   {
+>> -       if (!dma_inprogress(host))
+>> +       if (!host->use_dma || !dma_inprogress(host))
 > 
-> It is not the platform that decides. That is the whole point of the
-> distinction. It is us to say what is feasible and what we want to
-> support. Do we want to support giga pages in zone_movable? Under which
-> conditions? See my point?
+> Adding the check for use_dma here seems like an unnecessary check,
+> unless there is a reason for it due to following changes on top. In
+> such case, please make it a part of the patch(es) where it's actually
+> needed.
 
-So huge_movable() is going to be a generic MM function deciding on the
-feasibility for allocating a huge page of 'size' from movable zone during
-migration. If the feasibility turns out to be negative, then migration
-process is aborted there.
-
-huge_movable() will do something like these:
-
-- Return positive right away on smaller size huge pages
-- Measure movable allocation feasibility for bigger huge pages
-	- Look out for free_pages in the huge page order in movable areas
-	- if (order > (MAX_ORDER - 1))
-		- Scan the PFN ranges in movable zone for possible allocation
-	- etc
-	- etc
-
-Did I get this right ?
+In Fact, these checks are add to ensure the pio fallback, if only this 
+patch it's taken. In the next commit of serie, these checks are moved to 
+common functions mmci_dma_XX function.
 
 > 
->> Or as I mentioned
->> before it's platform's willingness to live with unmovable huge pages (of
->> certain sizes) as a consequence of migration.
+>>                  return;
+>>
+>>          dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
+>> @@ -514,7 +539,7 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
+>>          u32 status;
+>>          int i;
+>>
+>> -       if (!dma_inprogress(host))
+>> +       if (!host->use_dma || !dma_inprogress(host))
 > 
-> No, the platform has no saying in that. The platform only says that it
-> supports migrating those pages in principle.
-I understand this now.
+> Ditto.
+> 
+>>                  return;
+>>
+>>          /* Wait up to 1ms for the DMA to complete */
+>> @@ -546,6 +571,7 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
+>>          if (status & MCI_RXDATAAVLBLMASK) {
+>>                  dev_err(mmc_dev(host->mmc), "buggy DMA detected. Taking evasive action.\n");
+>>                  mmci_dma_release(host);
+>> +               host->use_dma = false;
+>>          }
+>>
+>>          host->dma_in_progress = false;
+>> @@ -640,6 +666,9 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+>>          int ret;
+>>          struct mmc_data *data = host->data;
+>>
+>> +       if (!host->use_dma)
+>> +               return -EINVAL;
+>> +
+>>          ret = mmci_dma_prep_data(host, host->data);
+>>          if (ret)
+>>                  return ret;
+>> @@ -674,6 +703,9 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+>>   {
+>>          struct mmci_host_next *next = &host->next_data;
+>>
+>> +       if (!host->use_dma)
+>> +               return;
+>> +
+>>          WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
+>>          WARN_ON(!data->host_cookie && (next->dma_desc || next->dma_chan));
+>>
+>> @@ -689,7 +721,7 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>>          struct mmc_data *data = mrq->data;
+>>          struct mmci_host_next *nd = &host->next_data;
+>>
+>> -       if (!data)
+>> +       if (!host->use_dma || !data)
+>>                  return;
+>>
+>>          BUG_ON(data->host_cookie);
+>> @@ -707,7 +739,7 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+>>          struct mmci_host *host = mmc_priv(mmc);
+>>          struct mmc_data *data = mrq->data;
+>>
+>> -       if (!data || !data->host_cookie)
+>> +       if (!host->use_dma || !data || !data->host_cookie)
+> 
+> Ditto.
+> 
+>>                  return;
+>>
+>>          mmci_dma_unmap(host, data);
+>> @@ -735,14 +767,14 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+>>          }
+>>   }
+>>
+>> +static struct mmci_host_ops mmci_variant_ops = {
+>> +       .dma_setup = mmci_dmae_setup,
+>> +};
+>>   #else
+>>   /* Blank functions if the DMA engine is not available */
+>>   static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+>>   {
+>>   }
+>> -static inline void mmci_dma_setup(struct mmci_host *host)
+>> -{
+>> -}
+>>
+>>   static inline void mmci_dma_release(struct mmci_host *host)
+>>   {
+>> @@ -765,8 +797,14 @@ static inline int mmci_dma_start_data(struct mmci_host *host, unsigned int datac
+>>   #define mmci_pre_request NULL
+>>   #define mmci_post_request NULL
+>>
+>> +static struct mmci_host_ops mmci_variant_ops = {};
+> 
+> This seems a bit unnecessary. See more about why, below.
+> 
+>>   #endif
+>>
+>> +void mmci_variant_init(struct mmci_host *host)
+> 
+> Looks like you should make mmci_variant_init() internal to mmci.c,
+> thus covert it to static.
+> 
+> Moreover, I suggest you define a "static inline void
+> mmci_variant_init()", when CONFIG_DMA_ENGINE is unset. In that way you
+> don't need to assign host->ops at all for this case.
+
+OK, no problem
+
+> 
+>> +{
+>> +       host->ops = &mmci_variant_ops;
+>> +}
+>> +
+>>   static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+>>   {
+>>          struct variant_data *variant = host->variant;
+>> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+>> index 01e6c6b..f7fe80f 100644
+>> --- a/drivers/mmc/host/mmci.h
+>> +++ b/drivers/mmc/host/mmci.h
+>> @@ -273,7 +273,7 @@ struct variant_data {
+>>
+>>   /* mmci variant callbacks */
+>>   struct mmci_host_ops {
+>> -       void (*dma_setup)(struct mmci_host *host);
+>> +       int (*dma_setup)(struct mmci_host *host);
+>>   };
+>>
+>>   struct mmci_host_next {
+>> @@ -323,6 +323,7 @@ struct mmci_host {
+>>          unsigned int            size;
+>>          int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
+>>
+>> +       u8                      use_dma:1;
+>>   #ifdef CONFIG_DMA_ENGINE
+>>          /* DMA stuff */
+>>          struct dma_chan         *dma_current;
+>> @@ -336,3 +337,7 @@ struct mmci_host {
+>>   #endif
+>>   };
+>>
+>> +void mmci_variant_init(struct mmci_host *host);
+>> +
+>> +int mmci_dmae_setup(struct mmci_host *host);
+>> +
+>> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
+>> index be3fab5..c8d7592 100644
+>> --- a/drivers/mmc/host/mmci_qcom_dml.c
+>> +++ b/drivers/mmc/host/mmci_qcom_dml.c
+>> @@ -119,19 +119,22 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
+>>   }
+>>
+>>   /* Initialize the dml hardware connected to SD Card controller */
+>> -static void qcom_dma_setup(struct mmci_host *host)
+>> +static int qcom_dma_setup(struct mmci_host *host)
+>>   {
+>>          u32 config;
+>>          void __iomem *base;
+>>          int consumer_id, producer_id;
+>>          struct device_node *np = host->mmc->parent->of_node;
+>>
+>> +       if (mmci_dmae_setup(host))
+>> +               return -EINVAL;
+>> +
+>>          consumer_id = of_get_dml_pipe_index(np, "tx");
+>>          producer_id = of_get_dml_pipe_index(np, "rx");
+>>
+>>          if (producer_id < 0 || consumer_id < 0) {
+>>                  host->variant->qcom_dml = false;
+>> -               return;
+>> +               return -EINVAL;
+> 
+> Seems like you need to call a corresponding dma release function here,
+> before returning the error code.
+> 
+> Probably an "mmci_dmae_release()" needs to be implemented as a part of
+> this change - and then also called from here. This is according to
+> Srinivas recommendations, which means falling back to pio. As a matter
+> of fact this also needs to be clearly stated in the changelog, as you
+> are really also improving the behavior for the Qcom variant.
+
+it's in relation with the comment on
++       if (!host->dma_tx_channel || !host->dma_rx_channel) {
+
+So yes.
+At first sight Qcom need to have a tx and rx channel,
+I will add mmci_dmae_release before returning error code.
+
+> 
+> Unfortunate, I am not able to test this as I don't have the HW (which
+> I thought I had). Perhaps Srinivas can help, once we have something
+> ready for him to test.
+> 
+>>          }
+>>
+>>          base = host->base + DML_OFFSET;
+>> @@ -175,6 +178,8 @@ static void qcom_dma_setup(struct mmci_host *host)
+>>
+>>          /* Make sure dml initialization is finished */
+>>          mb();
+>> +
+>> +       return 0;
+>>   }
+>>
+>>   static struct mmci_host_ops qcom_variant_ops = {
+>> --
+>> 2.7.4
+>>
+> 
+> Kind regards
+> Uffe
+> 
