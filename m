@@ -1,60 +1,46 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Wed, 3 Oct 2018 07:46:27 +0530
-Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
-In-Reply-To: <20181002123909.GS18290@dhcp22.suse.cz>
-References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
- <1538482531-26883-2-git-send-email-anshuman.khandual@arm.com>
- <20181002123909.GS18290@dhcp22.suse.cz>
-Message-ID: <fae68a4e-b14b-8342-940c-ea5ef3c978af@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 2 Oct 2018 19:48:17 -0700
+Subject: [GIT PULL] i.MX fixes for 4.19, round 2
+In-Reply-To: <CAK8P3a0d3C3gDi_Ozh1gBTVXiAOc67_8SOYh7tzWVpP8trO8-A@mail.gmail.com>
+References: <20181001023923.GQ26692@dragon>
+ <CAK8P3a1e8+HMwsFjE5AJW1E8M309dTkXHLqQb0Dne1gO_n61vg@mail.gmail.com>
+ <f31c2fe8e753ba4c21e1c4b4ede270f88dddbf42.camel@pengutronix.de>
+ <CAK8P3a0d3C3gDi_Ozh1gBTVXiAOc67_8SOYh7tzWVpP8trO8-A@mail.gmail.com>
+Message-ID: <20181003024815.GA4398@X250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 02, 2018 at 02:09:10PM +0200, Arnd Bergmann wrote:
+> Shawn, should I cherry-pick the other fix, or do you want to
+> follow up with a new pull request for the fixes?
+
+Arnd, I just updated the pull request with the patch in question dropped.
+
+Shawn
 
 
-On 10/02/2018 06:09 PM, Michal Hocko wrote:
-> On Tue 02-10-18 17:45:28, Anshuman Khandual wrote:
->> Architectures like arm64 have PUD level HugeTLB pages for certain configs
->> (1GB huge page is PUD based on ARM64_4K_PAGES base page size) that can be
->> enabled for migration. It can be achieved through checking for PUD_SHIFT
->> order based HugeTLB pages during migration.
-> 
-> Well a long term problem with hugepage_migration_supported is that it is
-> used in two different context 1) to bail out from the migration early
-> because the arch doesn't support migration at all and 2) to use movable
-> zone for hugetlb pages allocation. I am especially concerned about the
-> later because the mere support for migration is not really good enough.
-> Are you really able to find a different giga page during the runtime to
-> move an existing giga page out of the movable zone?
+The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
 
-I pre-allocate them before trying to initiate the migration (soft offline
-in my experiments). Hence it should come from the pre-allocated HugeTLB
-pool instead from the buddy. I might be missing something here but do we
-ever allocate HugeTLB on the go when trying to migrate ? IIUC it always
-came from the pool (unless its something related to ovecommit/surplus).
-Could you please kindly explain regarding how migration target HugeTLB
-pages are allocated on the fly from movable zone.
+  Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
 
-But even if there are some chances of run time allocation failure from
-movable zone (as in point 2) that should not block the very initiation
-of migration itself. IIUC thats not the semantics for either THP or
-normal pages. Why should it be different here. If the allocation fails
-we should report and abort as always. Its the caller of migration taking
-the chances. why should we prevent that.
+are available in the git repository at:
 
-> 
-> So I guess we want to split this into two functions
-> arch_hugepage_migration_supported and hugepage_movable. The later would
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.19-2
 
-So the set difference between arch_hugepage_migration_supported and 
-hugepage_movable still remains un-migratable ? Then what is the purpose
-for arch_hugepage_migration_supported page size set in the first place.
-Does it mean we allow the migration at the beginning and the abort later
-when the page size does not fall within the subset for hugepage_movable.
-Could you please kindly explain this in more detail.
+for you to fetch changes up to eea96566c189c77e5272585984eb2729881a2f1d:
 
-> be a reasonably migrateable subset of the former. Without that this
-> patch migth introduce subtle regressions when somebody relies on movable
-> zone to be really movable.
-PUD based HugeTLB pages were never migratable, then how can there be any
-regression here ? At present we even support PGD based HugeTLB pages for
-migration. Wondering how PUD based ones are going to be any different.
+  ARM: dts: imx53-qsb: disable 1.2GHz OPP (2018-09-12 14:44:33 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 4.19, round 2:
+ - i.MX53 QSB board stops working when cpufreq driver is enabled,
+   because the default OPP table has the maximum CPU frequency at
+   1.2GHz, while the board is only capable of running 1GHz.  Fix up
+   the OPP table for the board to get it work with cpufreq driver.
+
+----------------------------------------------------------------
+Sascha Hauer (1):
+      ARM: dts: imx53-qsb: disable 1.2GHz OPP
+
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
