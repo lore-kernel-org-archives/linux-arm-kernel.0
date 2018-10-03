@@ -1,75 +1,90 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Wed, 3 Oct 2018 03:03:09 +0200
-Subject: [PATCH net-next v6 19/23] zinc: Curve25519 ARM implementation
-In-Reply-To: <CAKv+Gu9FLDRLxHReKcveZYHNYerR5Y2pZd9gn-hWrU0jb2KgfA@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-20-Jason@zx2c4.com>
- <CAKv+Gu9FLDRLxHReKcveZYHNYerR5Y2pZd9gn-hWrU0jb2KgfA@mail.gmail.com>
-Message-ID: <CAHmME9rp0Fi5ObK5oi8FHj1_nK5hP4T2Bq7_dAmzq4OQ0mp0uw@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 03 Oct 2018 03:38:46 +0200
+Subject: [GIT PULL 1/3] Rockchip ARM64 devicetree updates for 4.20 - round2
+Message-ID: <2559110.ail6FZQ9dJ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+Dan,Peter in CC. Replying to:
-<https://lore.kernel.org/lkml/CAKv+Gu9FLDRLxHReKcveZYHNYerR5Y2pZd9gn-hWrU0jb2KgfA@mail.gmail.com/>
-for context.)
+Hi Arnd, Kevin, Olof,
 
-Hi Ard,
+please find below and in the following pull-requests more rockchip
+changes targetted at 4.20.
 
-On Tue, Oct 2, 2018 at 6:59 PM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Shouldn't this use the new simd abstraction as well?
+Nice mix of new boards and some improvements + fixes as described
+in the tags. So please pull.
 
-Yes, it probably should, thanks.
+Thanks
+Heiko
 
-> I guess qhasm means generated code, right?
-> Because many of these adds are completely redundant ...
-> This looks odd as well.
-> Could you elaborate on what qhasm is exactly? And, as with the other
-> patches, I would prefer it if we could have your changes as a separate
-> patch (although having the qhasm base would be preferred)
 
-Indeed qhasm converts this --
-<https://github.com/floodyberry/supercop/blob/master/crypto_scalarmult/curve25519/neon2/scalarmult.pq>
--- into this. It's a thing from Dan (CC'd now) --
-<http://cr.yp.to/qhasm.html>. As you've requested, I can layer the
-patches to show our changes on top.
+The following changes since commit 78f26da3ffbce0ea3692a89fe3f5487cb8dda068:
 
-> ... you can drop this add
-> same here
-> and here
-> and here
-> and here
-> and here
-> and here
-> and here
-> redundant add
-> I'll stop here - let me just note that this code does not strike me as
-> particularly well optimized for in-order cores (such as A7).
-> For instance, the sequence
-> can be reordered as
-> and not have every other instruction depend on the output of the previous one.
-> Obviously, the ultimate truth is in the benchmark numbers, but I'd
-> thought I'd mention it anyway.
+  arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board (2018-09-10 19:16:26 +0200)
 
-Yes indeed the output is suboptimal in a lot of places. We can
-gradually clean this up -- slowly and carefully over time -- if you
-want. I can also look into producing a new implementation within HACL*
-so that it's verified. Assurance-wise, though, I feel pretty good
-about this implementation considering its origins, its breadth of use
-(in BoringSSL), the fuzzing hours it's incurred, and the actual
-implementation itself.
+are available in the Git repository at:
 
- Either way, performance-wise, it's really worth having.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64-2
 
-For example, on a Cortex-A7, we get these results (according to get_cycles()):
+for you to fetch changes up to e78d53c7b2873e0724eb765a88ccde42560b0e05:
 
-neon: 23142 cycles per call
-fiat32: 49136 cycles per call
-donna32: 71988 cycles per call
+  arm64: dts: rockchip: enable display nodes on rk3328-rock64 (2018-09-28 13:18:37 +0200)
 
-And on a Cortex-A9, we get these results (according to get_cycles()):
+----------------------------------------------------------------
+Some additional new boards, the rk3399-based RockPro64 from Pine64, as well
+as the Vamrs Rock960. Another big feature is display support including hdmi
+and the Innosilicon hdmiphy on the rk3328, right now enabled on the rock64.
+The rock64 also got its spi-nor and spdif enabled. On the px30 we can see
+dwc2-based usb support now and finally some misc fixes, like for a new dtc
+warning, missing address and size cells and microSD fix on sapphire.
 
-neon: 5020 cycles per call
-fiat32: 17326 cycles per call
-donna32: 28076 cycles per call
+----------------------------------------------------------------
+Akash Gajjar (1):
+      arm64: dts: rockchip: add initial dts support for Rockpro64
 
-Jason
+Chen-Yu Tsai (1):
+      arm64: dts: rockchip: Enable SPI NOR flash on Rock64
+
+Heiko Stuebner (6):
+      arm64: dts: rockchip: add dwc2 otg controller on px30
+      arm64: dts: rockchip: enable dwc2-based otg controller on px30-evb
+      arm64: dts: rockchip: add missing address and size cells for rk3399 mipi dsi
+      arm64: dts: rockchip: add Innosilicon hdmi phy node to rk3328
+      arm64: dts: rockchip: add rk3328 display nodes
+      arm64: dts: rockchip: enable display nodes on rk3328-rock64
+
+Katsuhiro Suzuki (1):
+      arm64: dts: rockchip: add spdif sound node for rock64
+
+Liang Chen (1):
+      dt-bindings: usb: dwc2: add description for px30
+
+Manivannan Sadhasivam (4):
+      arm64: dts: rockchip: Split out common nodes for Rock960 based boards
+      dt-bindings: arm: rockchip: Add binding for Rock960 board
+      arm64: dts: rockchip: Add support for Rock960 board
+      arm64: dts: rockchip: Enable SD card detection for Rock960 boards
+
+Rob Herring (1):
+      arm64: dts: rockchip: Fix I2C bus unit-address error on rk3399-puma-haikou
+
+Vicente Bergas (1):
+      arm64: dts: rockchip: Fix microSD in rk3399 sapphire board
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   8 +
+ Documentation/devicetree/bindings/usb/dwc2.txt     |   1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |   2 +
+ arch/arm64/boot/dts/rockchip/px30-evb.dts          |   4 +
+ arch/arm64/boot/dts/rockchip/px30.dtsi             |  16 +
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     |  57 ++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  67 ++
+ arch/arm64/boot/dts/rockchip/rk3399-ficus.dts      | 524 +---------------
+ .../arm64/boot/dts/rockchip/rk3399-puma-haikou.dts |   2 +-
+ arch/arm64/boot/dts/rockchip/rk3399-rock960.dts    |  52 ++
+ arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi   | 542 ++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts  | 692 +++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi  |  24 +-
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   4 +
+ 14 files changed, 1474 insertions(+), 521 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
