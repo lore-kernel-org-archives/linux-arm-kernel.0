@@ -1,33 +1,20 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 3 Oct 2018 22:36:57 +0530
-Subject: [PATCH 1/2] dt-bindings: pwm: tiecap: Add TI AM654 SoC specific
- compatible
-In-Reply-To: <20181003170658.3835-1-vigneshr@ti.com>
-References: <20181003170658.3835-1-vigneshr@ti.com>
-Message-ID: <20181003170658.3835-2-vigneshr@ti.com>
+Date: Wed, 3 Oct 2018 22:36:56 +0530
+Subject: [PATCH 0/2] pwm-tiecap: Add support for AM654 SoCs
+Message-ID: <20181003170658.3835-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new compatible string "ti,am654-ecap" to support PWM ECAP IP of
-TI AM654 SoC.
+Couple of patches to enable pwm-tiecap driver to be used with TI's new
+AM654 platforms.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
+Vignesh R (2):
+  dt-bindings: pwm: tiecap: Add TI AM654 SoC specific compatible
+  pwm: Kconfig: Enable TI ECAP driver for ARCH_K3
+
  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pwm/Kconfig                                  | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-index 06a363d9ccef..b9a1d7402128 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-@@ -7,6 +7,7 @@ Required properties:
-   for da850  - compatible = "ti,da850-ecap", "ti,am3352-ecap", "ti,am33xx-ecap";
-   for dra746 - compatible = "ti,dra746-ecap", "ti,am3352-ecap";
-   for 66ak2g - compatible = "ti,k2g-ecap", "ti,am3352-ecap";
-+  for am654  - compatible = "ti,am654-ecap", "ti,am3352-ecap";
- - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-   the cells format. The PWM channel index ranges from 0 to 4. The only third
-   cell flag supported by this binding is PWM_POLARITY_INVERTED.
 -- 
 2.19.0
