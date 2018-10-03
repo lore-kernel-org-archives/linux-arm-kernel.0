@@ -1,54 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  3 Oct 2018 10:48:31 -0700
-Subject: [GIT PULL] ti-sysc driver changes for omaps for v4.20
-Message-ID: <pull-1538588866-709117@atomide.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 3 Oct 2018 18:50:38 +0100
+Subject: [PATCH v6 00/18] APEI in_nmi() rework
+In-Reply-To: <20180925124526.GD23986@zn.tnic>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180925124526.GD23986@zn.tnic>
+Message-ID: <c04d1b78-122b-d7f2-5a75-3d9c56386b11@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Hi Boris,
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+On 25/09/18 13:45, Borislav Petkov wrote:
+> On Fri, Sep 21, 2018 at 11:16:47PM +0100, James Morse wrote:
+>> Hello,
+>>
+>> The GHES driver has collected quite a few bugs:
+>>
+>> ghes_proc() at ghes_probe() time can be interrupted by an NMI that
+>> will clobber the ghes->estatus fields, flags, and the buffer_paddr.
+>>
+>> ghes_copy_tofrom_phys() uses in_nmi() to decide which path to take. arm64's
+>> SEA taking both paths, depending on what it interrupted.
+>>
+>> There is no guarantee that queued memory_failure() errors will be processed
+>> before this CPU returns to user-space.
+>>
+>> x86 can't TLBI from interrupt-masked code which this driver does all the
+>> time.
+>>
+>>
+>> This series aims to fix the first three, with an eye to fixing the
+>> last one with a follow-up series.
+>>
+>> Previous postings included the SDEI notification calls, which I haven't
+>> finished re-testing. This series is big enough as it is.
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> Yeah, and everywhere I look, this thing looks overengineered. Like,
+> for example, what's the purpose of this ghes_esource_prealloc_size()
+> computing a size each time the pool changes size?
 
-are available in the Git repository at:
+The size to grow the pool by, because each error-source described by a GHES
+entry has its own worst-case size.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.20/ti-sysc-take2-signed
+Today ghes_nmi_add() does this each time its called. You could have multiple
+GHES entries in the HEST that describe NMI as the notification. The worst-case
+size for the records is described in the GHES entry, and could be different for
+each one. (error_block_length and records_to_preallocate, or table 18-379 of
+acpi v6.2)
 
-for you to fetch changes up to f5e80203dadc28176f7b5ad2ec00652dd524fb9a:
+These different error-sources could be delivered on different CPUs at the same
+time, so need their own pre-allocated reserved memory. ghes_notify_nmi()'s
+atomic_add_unless() suggests this can happen on x86, but I don't know the
+arch-specifics. It definitely can happen on arm64.
 
-  bus: ti-sysc: Just use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS (2018-10-01 09:33:28 -0700)
 
-----------------------------------------------------------------
-TI sysc driver changes for v4.20 merge window
+> AFAICT, this size can be computed exactly *once* at driver init and be
+> done with it. Right?
 
-This series gets rid of the SYSC_QUIRK_RESOURCE_PROVIDER to make device
-detection happen mostly only if #define DEBUG is set. Few core devices still
-need to be detected to set legacy quirks.
+We could do two passes of the HEST to pre-compute the total size of this
+estatus-queue memory, allocate it, then do the notification registration stuff.
+But this doesn't really work with the way this driver acts as platform-driver
+for a ghes device...
 
-We also add support for booting am335x, am437x and dra7 SoCs with L4 devices
-defined in device tree instead of legacy platform data.
+The non-ghes HEST entries have a "number of records to pre-allocate" too, we
+could make this memory pool something hest.c looks after, but I can't see if the
+other error sources use those values.
 
-And finally we simplify suspend with just SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
-and dropping the custom functions that were attempting to work around
-issues that really turned out to be child device driver related issues.
+Hmmm,
+The size is capped to 64K, we could ignore the firmware description of the
+memory requirements, and allocate SZ_64K each time. Doing it per-GHES is still
+the only way to avoid allocating nmi-safe memory for irqs.
 
-Apologies for a late pull request, debugging the suspend issues took a while
-and I did not want to send these changes until that got sorted out.
 
-----------------------------------------------------------------
-Tony Lindgren (9):
-      bus: ti-sysc: Defer suspend as needed
-      bus: ti-sysc: Update revision masks to support am437x
-      bus: ti-sysc: Detect more devices on am473x for debugging
-      bus: ti-sysc: Detect devices on am335x when DEBUG is enabled
-      Merge commit '4f3530f4a41d49c41015020cd9a5ed5c95b5d2db' into omap-for-v4.20/ti-sysc
-      bus: ti-sysc: Detect timer and gpio on dra7
-      bus: ti-sysc: Detect devices for debug on dra7
-      bus: ti-sysc: Make some warnings debug only
-      bus: ti-sysc: Just use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
+Thanks,
 
- arch/arm/mach-omap2/omap_hwmod.c      |  39 ++++++-
- drivers/bus/ti-sysc.c                 | 202 +++++++++++-----------------------
- include/linux/platform_data/ti-sysc.h |   1 -
- 3 files changed, 100 insertions(+), 142 deletions(-)
+James
