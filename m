@@ -1,203 +1,39 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed,  3 Oct 2018 15:31:54 +0200
-Subject: [PATCH 1/2] rtc: Add ASPEED RTC driver
-In-Reply-To: <20181003133155.27494-1-joel@jms.id.au>
-References: <20181003133155.27494-1-joel@jms.id.au>
-Message-ID: <20181003133155.27494-2-joel@jms.id.au>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 3 Oct 2018 16:35:43 +0300
+Subject: [PATCH] PCI: armada8k: add support for gpio controlled reset
+ signal
+In-Reply-To: <20181003132811.GC427@lunn.ch>
+References: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
+ <20181003132811.GC427@lunn.ch>
+Message-ID: <20181003133543.t7laclm5wbj2olhq@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read and writes the time to the non-battery backed RTC in the ASPEED
-AST2400 and AST2500 system on chip.
+Hi Andrew,
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- drivers/rtc/Kconfig      |  10 +++
- drivers/rtc/Makefile     |   1 +
- drivers/rtc/rtc-aspeed.c | 142 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 153 insertions(+)
- create mode 100644 drivers/rtc/rtc-aspeed.c
+On Wed, Oct 03, 2018 at 03:28:11PM +0200, Andrew Lunn wrote:
+> On Wed, Oct 03, 2018 at 03:49:43PM +0300, Baruch Siach wrote:
+> > This commit adds support for the gpio reset signal binding as described
+> > in the designware-pcie.txt DT binding document. Both the documented
+> > 'reset-gpio' property name, and the more standard 'reset-gpios' name are
+> > supported.
+> 
+> I don't know this code at all, so maybe a dumb question. Why support
+> the old none-standard binding of reset-gpio on new hardware? I'm
+> assuming reset-gpio is marked a deprecated and reset-gpios is
+> recommended?
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index a819ef07b7ec..372944b59b69 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1783,6 +1783,16 @@ config RTC_DRV_RTD119X
- 	  If you say yes here, you get support for the RTD1295 SoC
- 	  Real Time Clock.
- 
-+config RTC_DRV_ASPEED
-+	tristate "Aspeed RTC"
-+	depends on ARCH_ASPEED || COMPILE_TEST
-+	help
-+	  If you say yes here you get support for the ASPEED AST2400 and
-+	  AST2500 SoC real time clocks.
-+
-+	  This driver can also be built as a module, if so, the module
-+	  will be called "rtc-aspeed".
-+
- comment "HID Sensor RTC drivers"
- 
- config RTC_DRV_HID_SENSOR_TIME
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 290c1730fb0a..7d924577d133 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -33,6 +33,7 @@ obj-$(CONFIG_RTC_DRV_AC100)	+= rtc-ac100.o
- obj-$(CONFIG_RTC_DRV_ARMADA38X)	+= rtc-armada38x.o
- obj-$(CONFIG_RTC_DRV_AS3722)	+= rtc-as3722.o
- obj-$(CONFIG_RTC_DRV_ASM9260)	+= rtc-asm9260.o
-+obj-$(CONFIG_RTC_DRV_ASPEED)	+= rtc-aspeed.o
- obj-$(CONFIG_RTC_DRV_AT91RM9200)+= rtc-at91rm9200.o
- obj-$(CONFIG_RTC_DRV_AT91SAM9)	+= rtc-at91sam9.o
- obj-$(CONFIG_RTC_DRV_AU1XXX)	+= rtc-au1xxx.o
-diff --git a/drivers/rtc/rtc-aspeed.c b/drivers/rtc/rtc-aspeed.c
-new file mode 100644
-index 000000000000..dce00e594910
---- /dev/null
-+++ b/drivers/rtc/rtc-aspeed.c
-@@ -0,0 +1,142 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+// Copyright 2015 IBM Corp.
-+
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+#include <linux/io.h>
-+
-+struct aspeed_rtc {
-+	struct rtc_device	*rtc_dev;
-+	void __iomem		*base;
-+	spinlock_t		lock;
-+};
-+
-+#define RTC_TIME	0x00
-+#define RTC_YEAR	0x04
-+#define RTC_CTRL	0x10
-+
-+#define RTC_UNLOCK	0x02
-+#define RTC_ENABLE	0x01
-+
-+static int aspeed_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct aspeed_rtc *rtc = dev_get_drvdata(dev);
-+	unsigned int cent, year, mon, day, hour, min, sec;
-+	unsigned long flags;
-+	u32 reg1, reg2;
-+
-+	spin_lock_irqsave(&rtc->lock, flags);
-+
-+	do {
-+		reg2 = readl(rtc->base + RTC_YEAR);
-+		reg1 = readl(rtc->base + RTC_TIME);
-+	} while (reg2 != readl(rtc->base + RTC_YEAR));
-+
-+	day  = (reg1 >> 24) & 0x1f;
-+	hour = (reg1 >> 16) & 0x1f;
-+	min  = (reg1 >>  8) & 0x3f;
-+	sec  = (reg1 >>  0) & 0x3f;
-+	cent = (reg2 >> 16) & 0x1f;
-+	year = (reg2 >>  8) & 0x7f;
-+	/*
-+	 * Month is 1-12 in hardware, and 0-11 in struct rtc_time, however we
-+	 * are using mktime64 which is 1-12, so no adjustment is necessary
-+	 */
-+	mon  = (reg2 >>  0) & 0x0f;
-+
-+	rtc_time64_to_tm(mktime64(cent * 100 + year, mon, day, hour, min, sec),
-+			tm);
-+
-+	spin_unlock_irqrestore(&rtc->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int aspeed_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct aspeed_rtc *rtc = dev_get_drvdata(dev);
-+	unsigned long flags;
-+	u32 reg1, reg2, ctrl;
-+	int year, cent;
-+
-+	spin_lock_irqsave(&rtc->lock, flags);
-+
-+	cent = (tm->tm_year + 1900) / 100;
-+	year = tm->tm_year % 100;
-+
-+	reg1 = (tm->tm_mday << 24) | (tm->tm_hour << 16) | (tm->tm_min << 8) |
-+		tm->tm_sec;
-+
-+	/* Hardware is 1-12, convert to 0-11 */
-+	reg2 = ((cent & 0x1f) << 16) | ((year & 0x7f) << 8) |
-+		((tm->tm_mon & 0xf) + 1);
-+
-+	ctrl = readl(rtc->base + RTC_CTRL);
-+	writel(ctrl | RTC_UNLOCK, rtc->base + RTC_CTRL);
-+
-+	writel(reg1, rtc->base + RTC_TIME);
-+	writel(reg2, rtc->base + RTC_YEAR);
-+
-+	writel(ctrl, rtc->base + RTC_CTRL);
-+
-+	spin_unlock_irqrestore(&rtc->lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct rtc_class_ops aspeed_rtc_ops = {
-+	.read_time = aspeed_rtc_read_time,
-+	.set_time = aspeed_rtc_set_time,
-+};
-+
-+static int aspeed_rtc_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct aspeed_rtc *rtc;
-+
-+	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
-+	if (!rtc)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rtc->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(rtc->base))
-+		return PTR_ERR(rtc->base);
-+
-+	platform_set_drvdata(pdev, rtc);
-+
-+	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
-+						&aspeed_rtc_ops, THIS_MODULE);
-+
-+	if (IS_ERR(rtc->rtc_dev))
-+		return PTR_ERR(rtc->rtc_dev);
-+
-+	spin_lock_init(&rtc->lock);
-+
-+	/* Enable RTC and clear the unlock bit */
-+	writel(RTC_ENABLE, rtc->base + RTC_CTRL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id aspeed_rtc_match[] = {
-+	{ .compatible = "aspeed,ast2400-rtc", },
-+	{ .compatible = "aspeed,ast2500-rtc", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, aspeed_rtc_match);
-+
-+static struct platform_driver aspeed_rtc_driver = {
-+	.driver = {
-+		.name = "aspeed-rtc",
-+		.of_match_table = of_match_ptr(aspeed_rtc_match),
-+	},
-+};
-+
-+module_platform_driver_probe(aspeed_rtc_driver, aspeed_rtc_probe);
-+
-+MODULE_DESCRIPTION("Aspeed RTC driver");
-+MODULE_AUTHOR("Joel Stanley <joel@jms.id.au>");
-+MODULE_LICENSE("GPL");
+This is all hidden behind the devm_gpiod_get_optional() call that only sees 
+the "reset" string. The generic code supports both the new property name and 
+also the older one for backward compatibility. This patch changes nothing in 
+this regard.
+
+The designware-pcie.txt document mentions the older 'reset-gpio' name. So I 
+mentioned that name as well in the commit log.
+
+baruch
+
 -- 
-2.17.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
