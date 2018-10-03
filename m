@@ -1,150 +1,67 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Wed, 3 Oct 2018 23:20:52 +0200
-Subject: [PATCH] perf tools: Store ids for events with their own cpus
- perf_event__synthesize_event_update_cpus
-In-Reply-To: <20181003141627.GA6341@krava>
-References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
- <20180927160210.GF6916@krava>
- <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
- <20181002111621.GA6357@krava> <20181003113643.GA31725@krava>
- <594506a2-8cb3-3d09-82ab-5cb6d8c31ed0@huawei.com>
- <20181003141627.GA6341@krava>
-Message-ID: <20181003212052.GA32371@krava>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Oct 2018 23:14:45 +0100
+Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
+In-Reply-To: <20181003200003.GA9965@bombadil.infradead.org>
+References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
+ <20181003200003.GA9965@bombadil.infradead.org>
+Message-ID: <20181003221444.GZ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 04:16:27PM +0200, Jiri Olsa wrote:
-> On Wed, Oct 03, 2018 at 03:08:10PM +0100, John Garry wrote:
-> > On 03/10/2018 12:36, Jiri Olsa wrote:
-> > > On Tue, Oct 02, 2018 at 01:16:21PM +0200, Jiri Olsa wrote:
-> > > > On Tue, Oct 02, 2018 at 11:41:36AM +0100, John Garry wrote:
-> > > > 
-> > > > SNIP
-> > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > ---
-> > > > > > diff --git a/tools/perf/util/header.c b/tools/perf/util/header.c
-> > > > > > index 1ec1d9bc2d63..fb2a0dab3978 100644
-> > > > > > --- a/tools/perf/util/header.c
-> > > > > > +++ b/tools/perf/util/header.c
-> > > > > > @@ -29,6 +29,7 @@
-> > > > > >  #include "symbol.h"
-> > > > > >  #include "debug.h"
-> > > > > >  #include "cpumap.h"
-> > > > > > +#include "thread_map.h"
-> > > > > >  #include "pmu.h"
-> > > > > >  #include "vdso.h"
-> > > > > >  #include "strbuf.h"
-> > > > > > @@ -3579,6 +3580,11 @@ perf_event__synthesize_event_update_cpus(struct perf_tool *tool,
-> > > > > > 	if (!evsel->own_cpus)
-> > > > > > 		return 0;
-> > > > > > 
-> > > > > > +	if (!evsel->id ||
-> > > > > 
-> > > > > for my test, evsel->id is NULL
-> > > > > 
-> > > > > > +	    perf_evsel__alloc_id(evsel, cpu_map__nr(evsel->cpus),
-> > > > > > +				 thread_map__nr(evsel->threads)))
-> > > > > 
-> > > > > and then this function is not called as we return immediately. So did you
-> > > > > really want this:
-> > > > > 
-> > > > > if (!evsel->id && perf_evsel__alloc_id(...))
-> > > > > 	return -ENOMEM;
-> > > > 
-> > > > ugh.. yes ;-) thanks for the fix.. I'll double
-> > > > check the logic and post the patch this week
-> > > 
-> > > actualy, we also need to populate those ids ;-)
-> > > so calling perf_evsel__store_ids instead..
-> > > attaching the full patch
-> > > 
-> > > thanks,
-> > > jirka
-> > > 
+On Wed, Oct 03, 2018 at 01:00:03PM -0700, Matthew Wilcox wrote:
+> On Thu, Oct 04, 2018 at 12:28:54AM +0530, Souptick Joarder wrote:
+> > These are the approaches which could have been taken to handle
+> > this scenario -
 > > 
-> > Hi Jirka,
+> > *  Replace vm_insert_page with vmf_insert_page and then write few
+> >    extra lines of code to convert VM_FAULT_CODE to errno which
+> >    makes driver users more complex ( also the reverse mapping errno to
+> >    VM_FAULT_CODE have been cleaned up as part of vm_fault_t migration ,
+> >    not preferred to introduce anything similar again)
 > > 
-> > Can you please double-check your new patch, as I'm getting this now:
-> > root at localhost:~# ./perf_debug record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-> > [ perf record: Woken up 1 times to write data ]
-> > [ perf record: Captured and wrote 0.001 MB perf.data (6 samples) ]
-> > root at localhost:~# ./perf_debug report
-> > 0xe8 [0]: failed to process type: 461
-> > Error:
-> > failed to process sample
-> > # To display the perf.data header info, please use --header/--header-only
-> > option
-> > #
-> > root at localhost:~#
+> > *  Maintain both vm_insert_page and vmf_insert_page and use it in
+> >    respective places. But it won't gurantee that vm_insert_page will
+> >    never be used in #PF context.
+> > 
+> > *  Introduce a similar API like vm_insert_page, convert all non #PF
+> >    consumer to use it and finally remove vm_insert_page by converting
+> >    it to vmf_insert_page.
+> > 
+> > And the 3rd approach was taken by introducing vm_insert_kmem_page().
+> > 
+> > In short, vmf_insert_page will be used in page fault handlers
+> > context and vm_insert_kmem_page will be used to map kernel
+> > memory to user vma outside page fault handlers context.
 > 
-> ok, I need to get a machine to test this.. but it looks like
-> any sample-able events with cpumask are in arm :-\ will try
-> to get some..
+> As far as I can tell, vm_insert_kmem_page() is line-for-line identical
+> with vm_insert_page().  Seriously, here's a diff I just did:
+> 
+> -static int insert_page(struct vm_area_struct *vma, unsigned long addr,
+> -                       struct page *page, pgprot_t prot)
+> +static int insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
+> +               struct page *page, pgprot_t prot)
+> -       /* Ok, finally just insert the thing.. */
+> -int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+> +int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
+> -       return insert_page(vma, addr, page, vma->vm_page_prot);
+> +       return insert_kmem_page(vma, addr, page, vma->vm_page_prot);
+> -EXPORT_SYMBOL(vm_insert_page);
+> +EXPORT_SYMBOL(vm_insert_kmem_page);
+> 
+> What on earth are you trying to do?
 
-got an arm server and patch below works for me.. could you please test?
+Reading the commit log, it seems that the intention is to split out
+vm_insert_page() used outside of page-fault handling with the use
+within page-fault handling, so that different return codes can be
+used.
 
-thanks,
-jirka
+I don't see that justifies the code duplication - can't
+vm_insert_page() and vm_insert_kmem_page() use the same mechanics
+to do their job, and just translate the error code from the most-
+specific to the least-specific error code?  Do we really need two
+copies of the same code just to return different error codes.
 
-
----
-
-John reported crash when recording on an event under
-pmu with cpumask defined:
-
-  root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-  perf: Segmentation fault
-  Obtained 9 stack frames.
-  ./perf_debug_() [0x4c5ef8]
-  [0xffff82ba267c]
-  ./perf_debug_() [0x4bc5a8]
-  ./perf_debug_() [0x419550]
-  ./perf_debug_() [0x41a928]
-  ./perf_debug_() [0x472f58]
-  ./perf_debug_() [0x473210]
-  ./perf_debug_() [0x4070f4]
-  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe0) [0xffff8294c8a0]
-  Segmentation fault (core dumped)
-
-We synthesize an update event that needs to touch the evsel
-id array, which is not defined at that time. Fixing this by
-forcing the id allocation for events with theeir own cpus.
-
-Reported-by: John Garry <john.garry@huawei.com>
-Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
-Signed-off-by: Jiri Olsa <jolsa@kernel.org>
----
- tools/perf/builtin-report.c | 1 +
- tools/perf/util/evsel.c     | 3 +++
- 2 files changed, 4 insertions(+)
-
-diff --git a/tools/perf/builtin-report.c b/tools/perf/builtin-report.c
-index c0703979c51d..257c9c18cb7e 100644
---- a/tools/perf/builtin-report.c
-+++ b/tools/perf/builtin-report.c
-@@ -980,6 +980,7 @@ int cmd_report(int argc, const char **argv)
- 			.id_index	 = perf_event__process_id_index,
- 			.auxtrace_info	 = perf_event__process_auxtrace_info,
- 			.auxtrace	 = perf_event__process_auxtrace,
-+			.event_update	 = perf_event__process_event_update,
- 			.feature	 = process_feature_event,
- 			.ordered_events	 = true,
- 			.ordering_requires_timestamps = true,
-diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-index ac6cfb8b085e..7a0d5fbaf3c1 100644
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -1088,6 +1088,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
- 		attr->exclude_user   = 1;
- 	}
- 
-+	if (evsel->own_cpus)
-+		evsel->attr.read_format |= PERF_FORMAT_ID;
-+
- 	/*
- 	 * Apply event specific term settings,
- 	 * it overloads any global configuration.
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
