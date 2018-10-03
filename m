@@ -1,58 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 3 Oct 2018 17:43:09 +0800
-Subject: [PATCH 1/2] drm/sun4i: tcon: fix check of tcon->panel null pointer
-In-Reply-To: <20181002215917.1849-1-giulio.benetti@micronovasrl.com>
-References: <20181001093612.GA13672@mwanda>
- <20181002215917.1849-1-giulio.benetti@micronovasrl.com>
-Message-ID: <CAGb2v64z+j=ywU8n210Zw+97n=Ff4rVdUwNR9nbKO-hMD3nJcQ@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Wed, 3 Oct 2018 10:46:57 +0100
+Subject: [PATCH v3 2/3] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838793F4E@FRAEML521-MBX.china.huawei.com>
+References: <20180921150803.25444-1-shameerali.kolothum.thodi@huawei.com>
+ <20180921150803.25444-3-shameerali.kolothum.thodi@huawei.com>
+ <ecc2877c-146c-d70f-efd7-306fe704d55f@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA838793F4E@FRAEML521-MBX.china.huawei.com>
+Message-ID: <6d51a825-325f-5f78-20da-bf27f208fe37@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 3, 2018 at 5:59 AM Giulio Benetti
-<giulio.benetti@micronovasrl.com> wrote:
->
-> At the moment, the check of tcon->panel to be valid is wrong. IS_ERR()
-> has been used, but that macro doesn't check if tcon->panel pointer is
-> null or not, but check if tcon->panel is between -1 and -4095(MAX_ERRNO).
->
-> Remove IS_ERR() from tcon->panel checking and let "if (tcon->panel)" as
-> condition to check if it's a pointer not null.
+On 03/10/2018 09:46, Shameerali Kolothum Thodi wrote:
+[...]
+>>> +	/* Verify specified event is supported on this PMU */
+>>> +	event_id = get_event(event);
+>>> +	if (((event_id < SMMU_ARCH_MAX_EVENT_ID) &&
+>>> +	    (!test_bit(event_id, smmu_pmu->supported_events))) ||
+>>> +	    (event_id > SMMU_IMPDEF_MAX_EVENT_ID)) {
+>>
+>>> = ?
+> 
+> I was slightly confused by the spec here as it says,
+> 
+> Performance events are indicated by a numeric ID, in the following ranges:
+> ? 0x0000 to 0x007F: Architected events
+> ? 0x0080 to 0xFFFF: IMPLEMENTATION DEFINED events
+> 
+> It looks to me the ids are valid including those limits.
 
-There's actually more than one occurance of this error:
+Yes my mistake, I mixed up IMPDEF_MAX_EVENT_ID which is inclusive with
+ARCH_MAX_EVENT_ID which isn't, sorry about that
 
-drivers/gpu/drm/sun4i/sun4i_lvds.c:     if (!IS_ERR(tcon->panel)) {
-drivers/gpu/drm/sun4i/sun4i_lvds.c:     if (!IS_ERR(tcon->panel)) {
-drivers/gpu/drm/sun4i/sun4i_rgb.c:      if (!IS_ERR(tcon->panel)) {
-drivers/gpu/drm/sun4i/sun4i_rgb.c:      if (!IS_ERR(tcon->panel)) {
+[...]
+>>> +		dev_err(dev, "Setup irq failed, PMU @%pa\n", &res_0->start);
+>>
+>> You can probably remove "PMU @%pa" from error and info messages, since
+>> the device name already uniquely identifies it:
+>> "[    6.168200] arm-smmu-v3-pmu 2b442000.smmu-pmcg: Registered SMMU
+>> PMU
+>> @ 0x000000002b442000 using 4 counters"
+> 
+> Interesting. What I have is,
+> 
+> [   25.669636] arm-smmu-v3-pmu arm-smmu-v3-pmu.6.auto: Registered SMMU
+> PMU @ 0x0000000148001000 using 8 counters
+> 
+> Are you using the same patches and is booting using ACPI? IIRC, in the iort
+> code  it uses the name "arm-smmu-v3-pmu" and AUTO id to register/add the platform
+> dev. So not sure, how it is printing the address in your case. 
+> 
+> Please check and let me know.
 
-These four are responsible for enabling and disabling the panel.
+Right, I've been using device tree for my tests, not ACPI. I thought it
+was the core platform code that was creating the names. I guess we could
+add nicer names to IORT but that's probably for a different series, so
+nevermind.
 
-drivers/gpu/drm/sun4i/sun4i_tcon.c:     if (!IS_ERR(tcon->panel)) {
-
-All this looks like it was left over from commit ebc9446135671 ("drm: convert
-drivers to use drm_of_find_panel_or_bridge"). We have checks against tcon->panel
-in several places and not all of them were converted.
-
-ChenYu
-
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index c78cd35a1294..e4b3bd0307ef 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -555,7 +555,7 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
->          * Following code is a way to avoid quirks all around TCON
->          * and DOTCLOCK drivers.
->          */
-> -       if (!IS_ERR(tcon->panel)) {
-> +       if (tcon->panel) {
->                 struct drm_panel *panel = tcon->panel;
->                 struct drm_connector *connector = panel->connector;
->                 struct drm_display_info display_info = connector->display_info;
-> --
-> 2.17.1
->
+Thanks,
+Jean
