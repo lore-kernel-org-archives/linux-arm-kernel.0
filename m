@@ -1,37 +1,80 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 3 Oct 2018 11:41:48 +0800
-Subject: [PATCH v5 08/11] drm/mediatek: add support for SPDIF audio in HDMI
-In-Reply-To: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
-References: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
-Message-ID: <20181003034151.31452-9-bibby.hsieh@mediatek.com>
+Date: Wed, 3 Oct 2018 11:41:40 +0800
+Subject: [PATCH v5 00/11] drm/mediatek: support hdmi output for mt2701 and
+ mt7623
+Message-ID: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: chunhui dai <chunhui.dai@mediatek.com>
+In order to support HDMI on mt2701,
+we have to make some modifications.
+1) Add the HDMI driver.
+2) Add the DPI driver.
+3) Add a mechanism that config output component by dts.
 
-add support for SPDIF audio  in HDMI
+Change since v4:
+ - move some change from patch9 to patch7
 
-Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_hdmi.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Change since v3:
+ - Remove drm/mediatek: config component output by device node port
+   patch, we will push another patches to flexibly config the component output.
+ - fixup the return value
+ - replace dpi->power_ctl and power_sta with reference count mechanism.
+ - move the common function to mtk_hdmi_phy.c/h
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-index 2ca9f6a64dab..d62e685cec73 100644
---- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-@@ -1576,6 +1576,11 @@ static int mtk_hdmi_audio_hw_params(struct device *dev, void *data,
- 		hdmi_params.aud_i2s_fmt = HDMI_I2S_MODE_I2S_24BIT;
- 		hdmi_params.aud_mclk = HDMI_AUD_MCLK_128FS;
- 		break;
-+	case HDMI_SPDIF:
-+		hdmi_params.aud_codec = HDMI_AUDIO_CODING_TYPE_PCM;
-+		hdmi_params.aud_sampe_size = HDMI_AUDIO_SAMPLE_SIZE_16;
-+		hdmi_params.aud_input_type = HDMI_AUD_INPUT_SPDIF;
-+		break;
- 	default:
- 		dev_err(hdmi->dev, "%s: Invalid DAI format %d\n", __func__,
- 			daifmt->fmt);
+Changes since v2:
+ - Fix the typo in commit message.
+ - Remove const of reg_h_fre_con in the mtk_dpi_conf struct
+ - Remove unused error log
+ - Use lower casee for hex number
+ - Use common API which defined in mtk_hdmi_phy.c to reduce code size
+ - Implemet the enable/disable of phy_pll_ops the same as 8173
+ - Move the common header to mtk_hdmi_phy.h
+ - Remove the including of debugfs.h
+NOTE:
+ - add description about thecoponent output in the binding document in v4.
+
+Changes since v1:
+ - Separate some patches to independent patch.
+ - add DISP_REG_CONFIG_DSI_SEL and DISP_REG_CONFIG_DPI_SEL
+   configuration in the condition of BLS&DPI0 connection.
+
+Changes since v0:
+ - Correct some typos in commit message.
+ - Fixup the build warning (tmp variable didn't be initialized)
+
+Bibby Hsieh (2):
+  drm/mediatek: implement connection from BLS to DPI0
+  drm/mediatek: add a error return value when clock driver has been
+    prepared
+
+chunhui dai (9):
+  drm/mediatek: add refcount for DPI power on/off
+  drm/mediatek: move hardware register to node data
+  drm/mediatek: adjust EDGE to match clock and data
+  drm/mediatek: add clock factor for different IC
+  drm/mediatek: convert dpi driver to use drm_of_find_panel_or_bridge
+  drm/mediatek: add dpi driver for mt2701 and mt7623
+  drm/mediatek: separate hdmi phy to different file
+  drm/mediatek: add support for SPDIF audio in HDMI
+  drm/mediatek: add hdmi driver for MT2701 and MT7623
+
+ drivers/gpu/drm/mediatek/Makefile              |   5 +-
+ drivers/gpu/drm/mediatek/mtk_dpi.c             | 131 ++++++++------
+ drivers/gpu/drm/mediatek/mtk_dpi_regs.h        |   2 +-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c         |  14 +-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c    |   2 +-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c         |   2 +
+ drivers/gpu/drm/mediatek/mtk_hdmi.c            |  15 +-
+ drivers/gpu/drm/mediatek/mtk_hdmi.h            |   2 +-
+ drivers/gpu/drm/mediatek/mtk_hdmi_phy.c        | 235 +++++++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_hdmi_phy.h        |  60 +++++++
+ drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 212 ++++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c | 226 +-----------------------
+ 12 files changed, 627 insertions(+), 279 deletions(-)
+ create mode 100644 drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
+ create mode 100644 drivers/gpu/drm/mediatek/mtk_hdmi_phy.h
+ create mode 100644 drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+
 -- 
 2.12.5.2.gbdf23ab
