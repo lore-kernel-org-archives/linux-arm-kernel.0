@@ -1,101 +1,35 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Wed, 3 Oct 2018 10:50:46 +0000
-Subject: [PATCH v2 08/22] soc/fsl/qbman_portals: add APIs to retrieve the
- probing status
-In-Reply-To: <CADRPPNTD=SNpSqz=zoLyGP1tvh_xDr5E1NDHF_P0bcSPyx9X1A@mail.gmail.com>
-References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
- <20180926132247.10971-9-laurentiu.tudor@nxp.com>
- <CADRPPNTD=SNpSqz=zoLyGP1tvh_xDr5E1NDHF_P0bcSPyx9X1A@mail.gmail.com>
-Message-ID: <c4ff9977-c730-be48-8046-97da663c5a23@nxp.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 03 Oct 2018 11:59:10 +0100
+Subject: [PATCH v8 1/9] KVM: arm/arm64: Ensure only THP is candidate for
+ adjustment
+In-Reply-To: <0809a9d0-d256-c23a-c3cc-0b2be33aecff@arm.com> (Marc Zyngier's
+ message of "Wed, 3 Oct 2018 11:50:38 +0100")
+References: <20181001155443.23032-1-punit.agrawal@arm.com>
+ <20181001155443.23032-2-punit.agrawal@arm.com>
+ <0809a9d0-d256-c23a-c3cc-0b2be33aecff@arm.com>
+Message-ID: <87tvm3i9dt.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-On 27.09.2018 23:03, Li Yang wrote:
-> On Wed, Sep 26, 2018 at 8:26 AM <laurentiu.tudor@nxp.com> wrote:
+> On 01/10/18 16:54, Punit Agrawal wrote:
+>> PageTransCompoundMap() returns true for hugetlbfs and THP
+>> hugepages. This behaviour incorrectly leads to stage 2 faults for
+>> unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
+>> treated as THP faults.
 >>
->> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>> Tighten the check to filter out hugetlbfs pages. This also leads to
+>> consistently mapping all unsupported hugepage sizes as PTE level
+>> entries at stage 2.
 >>
->> Add a couple of new APIs to check the probing status of the required
->> cpu bound qman and bman portals:
->>   'int bman_portals_probed()' and 'int qman_portals_probed()'.
->> They return the following values.
->>   *  1 if qman/bman portals were all probed correctly
->>   *  0 if qman/bman portals were not yet probed
->>   * -1 if probing of qman/bman portals failed
->> Drivers that use qman/bman portal driver services are required to use
->> these APIs before calling any functions exported by these drivers or
->> otherwise they will crash the kernel.
->> First user will be the dpaa1 ethernet driver, coming in a subsequent
->> patch.
->>
->> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->> ---
->>   drivers/soc/fsl/qbman/bman_portal.c | 10 ++++++++++
->>   drivers/soc/fsl/qbman/qman_portal.c | 10 ++++++++++
->>   include/soc/fsl/bman.h              |  8 ++++++++
->>   include/soc/fsl/qman.h              |  9 +++++++++
->>   4 files changed, 37 insertions(+)
->>
->> diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
->> index f9edd28894fd..8048d35de8a2 100644
->> --- a/drivers/soc/fsl/qbman/bman_portal.c
->> +++ b/drivers/soc/fsl/qbman/bman_portal.c
->> @@ -32,6 +32,7 @@
->>
->>   static struct bman_portal *affine_bportals[NR_CPUS];
->>   static struct cpumask portal_cpus;
->> +static int __bman_portals_probed;
->>   /* protect bman global registers and global data shared among portals */
->>   static DEFINE_SPINLOCK(bman_lock);
->>
->> @@ -85,6 +86,12 @@ static int bman_online_cpu(unsigned int cpu)
->>          return 0;
->>   }
->>
->> +int bman_portals_probed(void)
->> +{
->> +       return __bman_portals_probed;
->> +}
->> +EXPORT_SYMBOL_GPL(bman_portals_probed);
->> +
->>   static int bman_portal_probe(struct platform_device *pdev)
->>   {
->>          struct device *dev = &pdev->dev;
->> @@ -148,6 +155,7 @@ static int bman_portal_probe(struct platform_device *pdev)
->>          spin_lock(&bman_lock);
->>          cpu = cpumask_next_zero(-1, &portal_cpus);
->>          if (cpu >= nr_cpu_ids) {
->> +               __bman_portals_probed = 1;
-> 
-> What if the last CPU is not used for portals?  Is there a hard
-> requirement that all CPUs need to be used for portal? 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: stable at vger.kernel.org # v4.13+
+>
+> FWIW, I've cherry-picked that single patch from the series and queued
+> it for 4.20.
 
-As far as I know, in the current driver design a portal is required for 
-each CPU.
-
-> What happens if the last CPU is offline?
-
-Can this happen at probe time?
-Anyway, I'm not sure that the driver is even aware of cpu hotplug but 
-I'll let Roy comment on this one.
-
-> 
->>                  /* unassigned portal, skip init */
->>                  spin_unlock(&bman_lock);
->>                  return 0;
->> @@ -173,6 +181,8 @@ static int bman_portal_probe(struct platform_device *pdev)
->>   err_ioremap2:
->>          memunmap(pcfg->addr_virt_ce);
->>   err_ioremap1:
->> +        __bman_portals_probed = 1;
->> +
-> 
-> There are other error paths that not covered.
-
-Right, thanks for pointing. On top of that, the assigned value here 
-should be -1 to signal error (instead of 1 which signals success).
-
----
-Best Regards, Laurentiu
+Thanks for picking up the fix.
