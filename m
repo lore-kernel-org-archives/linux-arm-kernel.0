@@ -1,29 +1,23 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 3 Oct 2018 16:09:10 +0100
-Subject: [PATCH v5 04/27] arm64: daifflags: Use irqflags functions for
- daifflags
-In-Reply-To: <1535471497-38854-5-git-send-email-julien.thierry@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-5-git-send-email-julien.thierry@arm.com>
-Message-ID: <20181003150909.GD12998@arrakis.emea.arm.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 3 Oct 2018 17:11:02 +0200
+Subject: [PATCH 0/3] ARM: dts: stm32: add dmas to stm32mp157c timers
+Message-ID: <1538579465-7854-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 04:51:14PM +0100, Julien Thierry wrote:
-> Some of the work done in daifflags save/restore is already provided
-> by irqflags functions. Daifflags should always be a superset of irqflags
-> (it handles irq status + status of other flags). Modifying behaviour of
-> irqflags should alter the behaviour of daifflags.
-> 
-> Use irqflags_save/restore functions for the corresponding daifflags
-> operation.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
+This series adds dmas description to stm32mp157c device tree file.
+But dmas are kept disabled by default on all boards. They are only
+necessary for PWM capture. So, spare them for other usage by default.
 
-Queued for 4.20. Thanks.
+Fabrice Gasnier (3):
+  ARM: dts: stm32: Add dmas to timer on stm32mp157c
+  ARM: dts: stm32: don't use timers dmas on stm32mp157c-ed1
+  ARM: dts: stm32: don't use timers dmas on stm32mp157c-ev1
+
+ arch/arm/boot/dts/stm32mp157c-ed1.dts |  3 ++
+ arch/arm/boot/dts/stm32mp157c-ev1.dts |  7 +++++
+ arch/arm/boot/dts/stm32mp157c.dtsi    | 58 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 68 insertions(+)
 
 -- 
-Catalin
+1.9.1
