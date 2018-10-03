@@ -1,73 +1,121 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 3 Oct 2018 11:06:45 -0700
-Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
-In-Reply-To: <20181003093346.GA12570@e107155-lin>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-3-georgi.djakov@linaro.org>
- <20180925180215.GA12435@bogus>
- <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
- <20180926144830.GB25838@e107155-lin>
- <fa74c24f-1f22-f11f-60fe-5a4489d9c7c2@codeaurora.org>
- <20181002111758.GC1086@e107155-lin>
- <c17450ce-fc25-e792-b91b-51106f032542@codeaurora.org>
- <20181003093346.GA12570@e107155-lin>
-Message-ID: <0a276103-15fb-807c-5379-1a35de789290@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Oct 2018 19:08:43 +0100
+Subject: How is the Linux kernel API dma_alloc_coherent() typically
+ implemented for the ARM Architecture?
+In-Reply-To: <866a698a-aa61-6c48-0258-f2dd97973e87@arm.com>
+References: <BYAPR12MB2791F73EC1033F998FF533BAC8E90@BYAPR12MB2791.namprd12.prod.outlook.com>
+ <866a698a-aa61-6c48-0258-f2dd97973e87@arm.com>
+Message-ID: <20181003180843.GY30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 03, 2018 at 06:44:56PM +0100, Robin Murphy wrote:
+> Hi Casey,
+> 
+> On 03/10/18 17:55, Casey Leedom wrote:
+> >   I have a question about ARM CPU versus PCIe DMA I/O Coherence that I'm
+> >trying to understand. In general, I thought that ARM is I/O Incoherent and
+> >that setting up Device DMA READs from Coherent Memory and Device DMA WRITEs
+> >to Coherent Memory require that the Device Driver/OS coordinate to
+> >FLUSH/INVALIDATE Caches, etc.  In Linux this is all handled automatically
+> >via the dam_map*()/dma_unmap*() APIs.  But what does the Linux kernel API
+> >dma_alloc_coherent() do on an architecture like ARM?  Return an UNCACHED
+> >mapping? I've tried ferreting my way down through the layers and layers of
+> >abstraction and implementation differences for various ARM platforms but
+> >it's pretty opaque ...
+> 
+> The really old stuff is a bit murky, but certainly from Armv7 onwards (i.e.
+> the kind of systems you'd be plugging a PCIe card into today), it's
+> relatively straightforward.
 
+The old stuff is _not_ murky - it operates the same way as modern
+systems as far as Linux is concerned.  That's one of the reasons
+for having the DMA API - to provide a consistent cross-platform
+cross-architecture way to deal with the DMA coherency issues.
 
-On 10/03/2018 02:33 AM, Sudeep Holla wrote:
-> On Tue, Oct 02, 2018 at 11:56:56AM -0700, Saravana Kannan wrote:
->> On 10/02/2018 04:17 AM, Sudeep Holla wrote:
-> [...]
->
->>> Yes, I do understand I have made the same point multiple time and it's
->>> intentional. We need to get the fragmented f/w support story fixed.
->>> Different ARM vendors are doing different things in f/w and ARM sees the
->>> same fragmentation story as before. We have come up with new specification
->>> and my annoying multiple emails are just to constantly remind the same.
->>>
->>> I do understand we have existing implementations to consider, but fixing
->>> the functionality in arbitrary way is not a good design and it better
->>> to get them fixed for future.
->> I believe the fragmentation you are referring to is? in the
->> interface/communication protocol. I see the benefit of standardizing that as
->> long as the standard actually turns out to be good. But that's completely
->> separate from what the FW can/can't do. Asking to standardize what the FW
->> can/can't do doesn't seem realistic as each chip vendor will have different
->> priorities - power, performance, cost, chip area, etc. It's the conflation
->> of these separate topics that doesn't help IMHO.
-> I agree on interface/communication protocol fragmentation and firmware
-> can implement whatever the vendor wish. What I was also referring was
-> the mix-n-match approach which should be avoided.
->
-> e.g. Device A and B's PM is managed completely by firmware using OSPM hints
-> Suppose Device X's PM is dependent on Device A and B, in which case it's
-> simpler and cleaner to leave Device X PM to firmware. Reading the state
-> of A and B and using that as hint for X is just overhead which firmware
-> can manage better. That was my main concern here: A=CPU and B=some other
-> device and X is inter-connect to which A and B are connected.
->
-> If CPU OPPs are obtained from f/w and this inter-connect from DT, mapping
-> then is a mess and that's what I was concerned. I am sorry if that's not
-> the scenario here, I may have mistaken then.
->
-What you are asking would be an ideal case, but this is not an ideal 
-world. There are tons of constraints for each chip vendor. Saying you 
-can't mix and match makes perfect the enemy of the good. Adding FW 
-support for A and B might make them optimal. But adding support for X 
-might not be possible for multiple real world constraints (chip area, 
-cost, time to market, etc). Saying "either do it all or do nothing" is 
-going to hold back a lot progress that can come in increments. Heck, we 
-do the same thing in the kernel. We'll add basic simple features first 
-and then improve on them. Why is it suddenly frowned up if a FW/HW 
-follows the same approach? I'll just have to agree to disagree with you 
-on this view point.
+There are two major parts of the DMA API - the coherent API and the
+streaming API.
 
--Saravana
+The coherent API consists of dma_alloc_coherent() and friends.
+dma_alloc_coherent() returns an allocation of memory to the driver
+that is guaranteed to be coherent with the device that was passed
+into the API.  How that happens depends on the implementation, but
+the requirement is that the memory can be read and written by the
+CPU _while_ the DMA device is also reading and writing that memory.
+No cache flushing is required (if it were, then simultaneous access
+would not be possible.)
+
+The main purpose of this memory is for things like descriptor rings,
+where (eg) the CPU places addresses for the device to process and
+links the ring entry into the ring, or sets an ownership or go bit
+in the descriptor.  Meanwhile the hardware polls the go bit and
+processes the descriptor as soon as it notices that the go or ownership
+bit has been set.
+
+Barriers are required for weakly ordered architectures to ensure the
+correct visibility semantics for CPU reads and writes.
+
+Essentially, in *all* ARMs where the memory is noncoherent with the
+device, allocating coherent memory means that the memory is remapped
+with the caches disabled.
+
+The streaming API consists of memory which is not inherently coherent,
+and requires some form of cache maintanence to ensure that the data
+transferred by DMA or the CPU is visible to the other.  These are the
+dma_map_*(), dma_unmap_*() and dma_sync_*() functions.
+
+> >   We use the Linux dma_alloc_coherent() API in order to allocate our TX and
+> >RX "Rings".  All TX and RX "Buffers" are managed with the dma_map*(*READ*
+> >and *WRITE*) APIs in order to Flush Caches to Memory / Invalidate Caches, etc.
+> >
+> >   But these "Rings" serve as "message" rings between the Host and the Device
+> >and we don't do Cache Flushes/Invalidates on them.  Messages sent from the
+> >Host to the Device include Work Requests and lists of Free List Buffer
+> >Pointers.  Messages sent from the Device to the Host include Ingress Packet
+> >Delivery Notifications, Link Status, etc.  For the Ingress Queues which the
+> >Device uses to send messages to the Host, we use a Generation Bit scheme
+> >where the Generation Bit flips back and forth between 0 and 1 every time the
+> >Device's Write Index in the Ingress Queue wraps back around to the start of
+> >the Ingress Queue.  The Host software uses the Generation Bit value to
+> >determine when there are new Device Messages available in the Ingress Queue.
+> >
+> >   So, as I was grinding my way down through the layers of implementation on
+> >the Linux dma_alloc_coherent() I was trying to see how the above
+> >dma_alloc_coherent() semantic was being implemented on the ARM architecture
+> >which [I thought] doesn't generally support I/O Coherency.  Setting up a
+> >completely UNCACHED mapping would of course work but at a significant cost
+> >in terms of access.  It's conceivable that the TX Rings could be mapped with
+> >a WRITE-COMBINING UNCACHED mapping I suppose (though the Linux API doesn't
+> >include any information on the DIRECTION of a dma_map_coherent() call).  So
+> >I'm curious about how that all fits together.
+
+To Casey:
+
+If you are writing at the level where you need to know exactly how
+coherent memory is implemented, then you're doing it wrong - and
+your driver will never be reliable.  You will be writing it based
+upon implementation semantics, rather than the API definition.
+
+If you're thinking about avoiding "uncached" mappings by using a
+streaming mapping and doing cache maintanence, please don't.  Writes
+in that situation are written back using a full (or sometimes half
+depending on the implementation) cache line which can be 16, 32, 64
+or 128 bytes.
+
+What this means is that if your descriptors are 16 bytes long, flushing
+just that descriptor is impossible without also writing neighbouring
+entries - and if the hardware has updated those entries while the
+cache line is in the CPU cache, the hardware update will be lost upon
+writeback.
+
+Also note that there is no dma_map_coherent() API, and "direction" is
+not relevant for memory which is inherently coherent.
+
+Direction is necessary for the streaming API so it knows how to most
+efficiently perform the cache maintanence if the memory is not coherent
+with the device.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
