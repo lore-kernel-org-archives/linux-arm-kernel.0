@@ -1,63 +1,114 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 3 Oct 2018 11:28:19 +0000
-Subject: [PATCH v3 2/3] perf: add arm64 smmuv3 pmu driver
-In-Reply-To: <2b4a53bc-7839-6826-44ed-6099c732a31a@arm.com>
-References: <20180921150803.25444-1-shameerali.kolothum.thodi@huawei.com>
- <20180921150803.25444-3-shameerali.kolothum.thodi@huawei.com>
- <2b4a53bc-7839-6826-44ed-6099c732a31a@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838794127@FRAEML521-MBX.china.huawei.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 3 Oct 2018 13:36:43 +0200
+Subject: [PATCH] perf tools: Allocate id array in
+ perf_event__synthesize_event_update_cpus
+In-Reply-To: <20181002111621.GA6357@krava>
+References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
+ <20180927160210.GF6916@krava>
+ <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
+ <20181002111621.GA6357@krava>
+Message-ID: <20181003113643.GA31725@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: 03 October 2018 11:37
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>;
-> lorenzo.pieralisi at arm.com
-> Cc: will.deacon at arm.com; mark.rutland at arm.com; Guohanjun (Hanjun Guo)
-> <guohanjun@huawei.com>; John Garry <john.garry@huawei.com>;
-> pabba at codeaurora.org; vkilari at codeaurora.org; rruigrok at codeaurora.org;
-> linux-acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Linuxarm <linuxarm@huawei.com>;
-> neil.m.leeder at gmail.com
-> Subject: Re: [PATCH v3 2/3] perf: add arm64 smmuv3 pmu driver
+On Tue, Oct 02, 2018 at 01:16:21PM +0200, Jiri Olsa wrote:
+> On Tue, Oct 02, 2018 at 11:41:36AM +0100, John Garry wrote:
 > 
-> On 21/09/18 16:08, Shameer Kolothum wrote:
-> [...]
-> > +
-> > +	err = cpuhp_state_add_instance_nocalls(cpuhp_state_num,
-> > +					       &smmu_pmu->node);
+> SNIP
 > 
-> In theory a hotplug event could happen as soon as the instance is
-> registered...
+> > > 
+> > > 
+> > > ---
+> > > diff --git a/tools/perf/util/header.c b/tools/perf/util/header.c
+> > > index 1ec1d9bc2d63..fb2a0dab3978 100644
+> > > --- a/tools/perf/util/header.c
+> > > +++ b/tools/perf/util/header.c
+> > > @@ -29,6 +29,7 @@
+> > >  #include "symbol.h"
+> > >  #include "debug.h"
+> > >  #include "cpumap.h"
+> > > +#include "thread_map.h"
+> > >  #include "pmu.h"
+> > >  #include "vdso.h"
+> > >  #include "strbuf.h"
+> > > @@ -3579,6 +3580,11 @@ perf_event__synthesize_event_update_cpus(struct perf_tool *tool,
+> > > 	if (!evsel->own_cpus)
+> > > 		return 0;
+> > > 
+> > > +	if (!evsel->id ||
+> > 
+> > for my test, evsel->id is NULL
+> > 
+> > > +	    perf_evsel__alloc_id(evsel, cpu_map__nr(evsel->cpus),
+> > > +				 thread_map__nr(evsel->threads)))
+> > 
+> > and then this function is not called as we return immediately. So did you
+> > really want this:
+> > 
+> > if (!evsel->id && perf_evsel__alloc_id(...))
+> > 	return -ENOMEM;
 > 
-> > +	if (err) {
-> > +		dev_err(dev, "Error %d registering hotplug, PMU @%pa\n",
-> > +			err, &res_0->start);
-> > +		return err;
-> > +	}
-> > +
-> > +	/* Pick one CPU to be the preferred one to use */
-> > +	smmu_pmu->on_cpu = get_cpu();
-> 
-> ...so this looks too late, i.e. a race here can result in a bogus call
-> to perf_pmu_migrate_context() with an uninitialised pmu.
+> ugh.. yes ;-) thanks for the fix.. I'll double
+> check the logic and post the patch this week
 
-Thanks Robin. I will reorder them.
+actualy, we also need to populate those ids ;-)
+so calling perf_evsel__store_ids instead..
+attaching the full patch
 
-Shameer
+thanks,
+jirka
 
-> Robin. 
-> > +	WARN_ON(irq_set_affinity(smmu_pmu->irq, cpumask_of(smmu_pmu-
-> >on_cpu)));
-> > +
-> > +	err = perf_pmu_register(&smmu_pmu->pmu, name, -1);
-> > +	if (err) {
-> > +		dev_err(dev, "Error %d registering PMU @%pa\n",
-> > +			err, &res_0->start);
-> > +		goto out_unregister;
-> > +	}
-> > +
-> > +	put_cpu();
+
+---
+John reported crash when recording on an event under
+pmu with cpumask defined:
+
+  root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+  perf: Segmentation fault
+  Obtained 9 stack frames.
+  ./perf_debug_() [0x4c5ef8]
+  [0xffff82ba267c]
+  ./perf_debug_() [0x4bc5a8]
+  ./perf_debug_() [0x419550]
+  ./perf_debug_() [0x41a928]
+  ./perf_debug_() [0x472f58]
+  ./perf_debug_() [0x473210]
+  ./perf_debug_() [0x4070f4]
+  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe0) [0xffff8294c8a0]
+  Segmentation fault (core dumped)
+
+We synthesize an update event that needs to touch the evsel
+id array, which is not defined at that time. Fixing this
+by allocating the array and getting IDs before it's used.
+
+Reported-by: John Garry <john.garry@huawei.com>
+Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
+Signed-off-by: Jiri Olsa <jolsa@kernel.org>
+---
+ tools/perf/util/header.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/tools/perf/util/header.c b/tools/perf/util/header.c
+index 1ec1d9bc2d63..14ca27f79d4a 100644
+--- a/tools/perf/util/header.c
++++ b/tools/perf/util/header.c
+@@ -29,6 +29,7 @@
+ #include "symbol.h"
+ #include "debug.h"
+ #include "cpumap.h"
++#include "thread_map.h"
+ #include "pmu.h"
+ #include "vdso.h"
+ #include "strbuf.h"
+@@ -3579,6 +3580,9 @@ perf_event__synthesize_event_update_cpus(struct perf_tool *tool,
+ 	if (!evsel->own_cpus)
+ 		return 0;
+ 
++	if (!evsel->id && perf_evsel__store_ids(evsel, evsel->evlist))
++		return -ENOMEM;
++
+ 	ev = cpu_map_data__alloc(evsel->own_cpus, &size, &type, &max);
+ 	if (!ev)
+ 		return -ENOMEM;
+-- 
+2.17.1
