@@ -1,68 +1,84 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Tue,  2 Oct 2018 22:22:15 -0700
-Subject: [PATCH] crypto: arm64/aes - fix handling sub-block CTS-CBC inputs
-Message-ID: <20181003052215.22468-1-ebiggers@kernel.org>
+From: ldr709@gmail.com (Lance Roy)
+Date: Tue,  2 Oct 2018 22:39:02 -0700
+Subject: [PATCH 16/16] KVM: arm/arm64: vgic: Replace spin_is_locked() with
+ lockdep
+In-Reply-To: <20181003053902.6910-1-ldr709@gmail.com>
+References: <20181003053902.6910-1-ldr709@gmail.com>
+Message-ID: <20181003053902.6910-17-ldr709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Biggers <ebiggers@google.com>
+lockdep_assert_held() is better suited to checking locking requirements,
+since it won't get confused when someone else holds the lock. This is
+also a step towards possibly removing spin_is_locked().
 
-In the new arm64 CTS-CBC implementation, return an error code rather
-than crashing on inputs shorter than AES_BLOCK_SIZE bytes.  Also set
-cra_blocksize to AES_BLOCK_SIZE (like is done in the cts template) to
-indicate the minimum input size.
-
-Fixes: dd597fb33ff0 ("crypto: arm64/aes-blk - add support for CTS-CBC mode")
-Signed-off-by: Eric Biggers <ebiggers@google.com>
+Signed-off-by: Lance Roy <ldr709@gmail.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Eric Auger <eric.auger@redhat.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: <kvmarm@lists.cs.columbia.edu>
 ---
- arch/arm64/crypto/aes-glue.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-index 26d2b0263ba63..1e676625ef33f 100644
---- a/arch/arm64/crypto/aes-glue.c
-+++ b/arch/arm64/crypto/aes-glue.c
-@@ -243,8 +243,11 @@ static int cts_cbc_encrypt(struct skcipher_request *req)
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 7cfdfbc910e0..50e25438fb3c 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -196,7 +196,7 @@ void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active)
+  */
+ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+ {
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
++	lockdep_assert_held(&irq->irq_lock);
  
- 	skcipher_request_set_tfm(&rctx->subreq, tfm);
+ 	/* If the interrupt is active, it must stay on the current vcpu */
+ 	if (irq->active)
+@@ -273,7 +273,7 @@ static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
  
--	if (req->cryptlen == AES_BLOCK_SIZE)
-+	if (req->cryptlen <= AES_BLOCK_SIZE) {
-+		if (req->cryptlen < AES_BLOCK_SIZE)
-+			return -EINVAL;
- 		cbc_blocks = 1;
-+	}
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
++	lockdep_assert_held(&vgic_cpu->ap_list_lock);
  
- 	if (cbc_blocks > 0) {
- 		unsigned int blocks;
-@@ -305,8 +308,11 @@ static int cts_cbc_decrypt(struct skcipher_request *req)
+ 	list_sort(NULL, &vgic_cpu->ap_list_head, vgic_irq_cmp);
+ }
+@@ -311,7 +311,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
+ {
+ 	struct kvm_vcpu *vcpu;
  
- 	skcipher_request_set_tfm(&rctx->subreq, tfm);
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
++	lockdep_assert_held(&irq->irq_lock);
  
--	if (req->cryptlen == AES_BLOCK_SIZE)
-+	if (req->cryptlen <= AES_BLOCK_SIZE) {
-+		if (req->cryptlen < AES_BLOCK_SIZE)
-+			return -EINVAL;
- 		cbc_blocks = 1;
-+	}
+ retry:
+ 	vcpu = vgic_target_oracle(irq);
+@@ -702,7 +702,7 @@ static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+ static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
+ 				    struct vgic_irq *irq, int lr)
+ {
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
++	lockdep_assert_held(&irq->irq_lock);
  
- 	if (cbc_blocks > 0) {
- 		unsigned int blocks;
-@@ -486,14 +492,13 @@ static struct skcipher_alg aes_algs[] = { {
- 		.cra_driver_name	= "__cts-cbc-aes-" MODE,
- 		.cra_priority		= PRIO,
- 		.cra_flags		= CRYPTO_ALG_INTERNAL,
--		.cra_blocksize		= 1,
-+		.cra_blocksize		= AES_BLOCK_SIZE,
- 		.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
- 		.cra_module		= THIS_MODULE,
- 	},
- 	.min_keysize	= AES_MIN_KEY_SIZE,
- 	.max_keysize	= AES_MAX_KEY_SIZE,
- 	.ivsize		= AES_BLOCK_SIZE,
--	.chunksize	= AES_BLOCK_SIZE,
- 	.walksize	= 2 * AES_BLOCK_SIZE,
- 	.setkey		= skcipher_aes_setkey,
- 	.encrypt	= cts_cbc_encrypt,
+ 	if (kvm_vgic_global_state.type == VGIC_V2)
+ 		vgic_v2_populate_lr(vcpu, irq, lr);
+@@ -736,7 +736,7 @@ static int compute_ap_list_depth(struct kvm_vcpu *vcpu,
+ 
+ 	*multi_sgi = false;
+ 
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
++	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+ 
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+ 		int w;
+@@ -761,7 +761,7 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ 	bool multi_sgi;
+ 	u8 prio = 0xff;
+ 
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
++	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+ 
+ 	count = compute_ap_list_depth(vcpu, &multi_sgi);
+ 	if (count > kvm_vgic_global_state.nr_lr || multi_sgi)
 -- 
 2.19.0
