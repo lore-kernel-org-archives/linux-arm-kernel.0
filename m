@@ -1,73 +1,61 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 3 Oct 2018 11:41:44 +0800
-Subject: [PATCH v5 04/11] drm/mediatek: add clock factor for different IC
+Date: Wed, 3 Oct 2018 11:41:50 +0800
+Subject: [PATCH v5 10/11] drm/mediatek: implement connection from BLS to DPI0
 In-Reply-To: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
 References: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
-Message-ID: <20181003034151.31452-5-bibby.hsieh@mediatek.com>
+Message-ID: <20181003034151.31452-11-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: chunhui dai <chunhui.dai@mediatek.com>
+Modify display driver to support connection from BLS to DPI.
 
-different IC has different clock designed in HDMI, the factor for
-calculate clock should be different. Usinng the data in of_node
-to find this factor.
-
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
-Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c | 24 +++++++++++++++---------
- 1 file changed, 15 insertions(+), 9 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 0ce4b61efaeb..0dbe9345fa2e 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -113,6 +113,7 @@ struct mtk_dpi_yc_limit {
- };
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 87e4191c250e..f3068c62ed48 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -39,6 +39,7 @@
+ #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
+ #define DISP_REG_CONFIG_OUT_SEL			0x04c
+ #define DISP_REG_CONFIG_DSI_SEL			0x050
++#define DISP_REG_CONFIG_DPI_SEL			0x064
  
- struct mtk_dpi_conf {
-+	unsigned int (*cal_factor)(int clock);
- 	u32 reg_h_fre_con;
- 	bool edge_sel_en;
- };
-@@ -431,15 +432,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 	unsigned int factor;
+ #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+ #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+@@ -132,7 +133,10 @@
  
- 	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
--
--	if (mode->clock <= 27000)
--		factor = 3 << 4;
--	else if (mode->clock <= 84000)
--		factor = 3 << 3;
--	else if (mode->clock <= 167000)
--		factor = 3 << 2;
--	else
--		factor = 3 << 1;
-+	factor = dpi->conf->cal_factor(mode->clock);
- 	drm_display_mode_to_videomode(mode, &vm);
- 	pll_rate = vm.pixelclock * factor;
+ #define OVL_MOUT_EN_RDMA		0x1
+ #define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
++#define BLS_TO_DPI_RDMA1_TO_DSI		0x2
+ #define DSI_SEL_IN_BLS			0x0
++#define DPI_SEL_IN_BLS			0x0
++#define DSI_SEL_IN_RDMA			0x1
  
-@@ -653,7 +646,20 @@ static const struct component_ops mtk_dpi_component_ops = {
- 	.unbind = mtk_dpi_unbind,
- };
+ struct mtk_disp_mutex {
+ 	int id;
+@@ -323,9 +327,17 @@ static void mtk_ddp_sout_sel(void __iomem *config_regs,
+ 			     enum mtk_ddp_comp_id cur,
+ 			     enum mtk_ddp_comp_id next)
+ {
+-	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
++	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
+ 		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
+ 			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
++		writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
++			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++		writel_relaxed(DSI_SEL_IN_RDMA,
++			       config_regs + DISP_REG_CONFIG_DSI_SEL);
++		writel_relaxed(DPI_SEL_IN_BLS,
++			       config_regs + DISP_REG_CONFIG_DPI_SEL);
++	}
+ }
  
-+static unsigned int mt8173_calculate_factor(int clock)
-+{
-+	if (clock <= 27000)
-+		return 3 << 4;
-+	else if (clock <= 84000)
-+		return 3 << 3;
-+	else if (clock <= 167000)
-+		return 3 << 2;
-+	else
-+		return 3 << 1;
-+}
-+
- static const struct mtk_dpi_conf mt8173_conf = {
-+	.cal_factor = mt8173_calculate_factor,
- 	.reg_h_fre_con = 0xe0,
- };
- 
+ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
 -- 
 2.12.5.2.gbdf23ab
