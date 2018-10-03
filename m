@@ -1,111 +1,63 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 3 Oct 2018 13:27:34 +0100
-Subject: [PATCH v2 08/22] soc/fsl/qbman_portals: add APIs to retrieve the
- probing status
-In-Reply-To: <c4ff9977-c730-be48-8046-97da663c5a23@nxp.com>
-References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
- <20180926132247.10971-9-laurentiu.tudor@nxp.com>
- <CADRPPNTD=SNpSqz=zoLyGP1tvh_xDr5E1NDHF_P0bcSPyx9X1A@mail.gmail.com>
- <c4ff9977-c730-be48-8046-97da663c5a23@nxp.com>
-Message-ID: <37ad85d7-6540-60de-6d47-66f57fa3473a@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 3 Oct 2018 15:38:31 +0300
+Subject: [PATCH v3 RESEND 0/4] clk: clk: Add functions to save/restore
+ clock context en-masse
+In-Reply-To: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+References: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <c46b0b42-2325-7baf-2e97-5e45b26aaea4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-10-03 11:50 AM, Laurentiu Tudor wrote:
-> Hi Leo,
-> 
-> On 27.09.2018 23:03, Li Yang wrote:
->> On Wed, Sep 26, 2018 at 8:26 AM <laurentiu.tudor@nxp.com> wrote:
->>>
->>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>
->>> Add a couple of new APIs to check the probing status of the required
->>> cpu bound qman and bman portals:
->>>    'int bman_portals_probed()' and 'int qman_portals_probed()'.
->>> They return the following values.
->>>    *  1 if qman/bman portals were all probed correctly
->>>    *  0 if qman/bman portals were not yet probed
->>>    * -1 if probing of qman/bman portals failed
->>> Drivers that use qman/bman portal driver services are required to use
->>> these APIs before calling any functions exported by these drivers or
->>> otherwise they will crash the kernel.
->>> First user will be the dpaa1 ethernet driver, coming in a subsequent
->>> patch.
->>>
->>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>> ---
->>>    drivers/soc/fsl/qbman/bman_portal.c | 10 ++++++++++
->>>    drivers/soc/fsl/qbman/qman_portal.c | 10 ++++++++++
->>>    include/soc/fsl/bman.h              |  8 ++++++++
->>>    include/soc/fsl/qman.h              |  9 +++++++++
->>>    4 files changed, 37 insertions(+)
->>>
->>> diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
->>> index f9edd28894fd..8048d35de8a2 100644
->>> --- a/drivers/soc/fsl/qbman/bman_portal.c
->>> +++ b/drivers/soc/fsl/qbman/bman_portal.c
->>> @@ -32,6 +32,7 @@
->>>
->>>    static struct bman_portal *affine_bportals[NR_CPUS];
->>>    static struct cpumask portal_cpus;
->>> +static int __bman_portals_probed;
->>>    /* protect bman global registers and global data shared among portals */
->>>    static DEFINE_SPINLOCK(bman_lock);
->>>
->>> @@ -85,6 +86,12 @@ static int bman_online_cpu(unsigned int cpu)
->>>           return 0;
->>>    }
->>>
->>> +int bman_portals_probed(void)
->>> +{
->>> +       return __bman_portals_probed;
->>> +}
->>> +EXPORT_SYMBOL_GPL(bman_portals_probed);
->>> +
->>>    static int bman_portal_probe(struct platform_device *pdev)
->>>    {
->>>           struct device *dev = &pdev->dev;
->>> @@ -148,6 +155,7 @@ static int bman_portal_probe(struct platform_device *pdev)
->>>           spin_lock(&bman_lock);
->>>           cpu = cpumask_next_zero(-1, &portal_cpus);
->>>           if (cpu >= nr_cpu_ids) {
->>> +               __bman_portals_probed = 1;
->>
->> What if the last CPU is not used for portals?  Is there a hard
->> requirement that all CPUs need to be used for portal?
-> 
-> As far as I know, in the current driver design a portal is required for
-> each CPU.
-> 
->> What happens if the last CPU is offline?
-> 
-> Can this happen at probe time?
+Hi Keerthy,
 
-As I understand things, yes - if you boot with "maxcpus=1", only the 
-boot CPU will be onlined by the kernel, but the others can still be 
-brought up manually by userspace later.
+Queuing the three clock patches for 4.20 (assuming these can still fit 
+in), the pm33xx related patch should be picked up by Tony.
 
-Robin.
+-Tero
 
-> Anyway, I'm not sure that the driver is even aware of cpu hotplug but
-> I'll let Roy comment on this one.
+On 04/09/18 09:49, Keerthy wrote:
+> Deep enough power saving mode can result into losing context of the clock
+> registers also, and they need to be restored once coming back from the power
+> saving mode. Hence add functions to save/restore clock context.
 > 
->>
->>>                   /* unassigned portal, skip init */
->>>                   spin_unlock(&bman_lock);
->>>                   return 0;
->>> @@ -173,6 +181,8 @@ static int bman_portal_probe(struct platform_device *pdev)
->>>    err_ioremap2:
->>>           memunmap(pcfg->addr_virt_ce);
->>>    err_ioremap1:
->>> +        __bman_portals_probed = 1;
->>> +
->>
->> There are other error paths that not covered.
+> Tested for DS0 on am437x-gp-evm
 > 
-> Right, thanks for pointing. On top of that, the assigned value here
-> should be -1 to signal error (instead of 1 which signals success).
+> Based on top of linux-next
 > 
-> ---
-> Best Regards, Laurentiu
+> Resend Series:
 > 
+>    * Rebased on top of Linux 4.19-rc2
+>    * Added Tony's Ack.
+> 
+> Changes in v2:
+> 
+>          * Renamed clk_dflt_restore to clk_gate_restore_context
+> 
+> Changes in v3: Corrected the e-mail address of linux-omap list
+> 
+> Keerthy (2):
+>    clk: clk: Add clk_gate_restore_context function
+>    ti: pm33xx: Save/restore clk context based on enable_off_mode setting
+> 
+> Russ Dill (2):
+>    clk: clk: Add functions to save/restore clock context en-masse
+>    clk: ti: Add functions to save/restore clk context
+> 
+>   arch/arm/mach-omap2/pm33xx-core.c    |  15 +++++
+>   drivers/clk/clk.c                    |  93 ++++++++++++++++++++++++++
+>   drivers/clk/ti/clock.h               |   2 +
+>   drivers/clk/ti/divider.c             |  36 ++++++++++
+>   drivers/clk/ti/dpll.c                |   6 ++
+>   drivers/clk/ti/dpll3xxx.c            | 124 +++++++++++++++++++++++++++++++++++
+>   drivers/clk/ti/gate.c                |   3 +
+>   drivers/clk/ti/mux.c                 |  29 ++++++++
+>   drivers/soc/ti/pm33xx.c              |  13 ++++
+>   include/linux/clk-provider.h         |   9 +++
+>   include/linux/clk.h                  |  25 +++++++
+>   include/linux/clk/ti.h               |   6 ++
+>   include/linux/platform_data/pm33xx.h |   1 +
+>   13 files changed, 362 insertions(+)
+> 
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
