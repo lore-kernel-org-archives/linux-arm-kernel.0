@@ -1,176 +1,319 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 3 Oct 2018 11:41:41 +0800
-Subject: [PATCH v5 01/11] drm/mediatek: add refcount for DPI power on/off
-In-Reply-To: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 3 Oct 2018 11:52:51 +0800
+Subject: [PATCH v5 09/11] drm/mediatek: add hdmi driver for MT2701 and
+ MT7623
+In-Reply-To: <20181003034151.31452-10-bibby.hsieh@mediatek.com>
 References: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
-Message-ID: <20181003034151.31452-2-bibby.hsieh@mediatek.com>
+ <20181003034151.31452-10-bibby.hsieh@mediatek.com>
+Message-ID: <1538538771.14795.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: chunhui dai <chunhui.dai@mediatek.com>
+Hi, Bibby:
 
-After the kernel 4.4, the DRM disable flow was changed, if DPI was
-disableed before CRTC, it will cause warning message as following:
+On Wed, 2018-10-03 at 11:41 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
+> 
+> This patch adds hdmi dirver suppot for both MT2701 and MT7623.
+> And also support other (existing or future) chips that use
+> the same binding and driver.
+> 
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1339 at ../../linux/linux-4.4.24-mtk/drivers/gpu/drm/drm_irq.c:1326 drm_wait_one_vblank+0x188/0x18c()
-vblank wait timed out on crtc 0
-Modules linked in: bridge mt8521p_ir_shim(O) i2c_eeprom(O) mtk_m4(O) fuse_ctrl(O) virtual_block(O) caamkeys(PO) chk(PO) amperctl(O) ledctl(O) apple_auth(PO) micctl(O) sensors(PO) lla(O) sdd(PO) ice40_fpga(O) psmon(O) event_queue(PO) utils(O) blackbox(O)
-CPU: 0 PID: 1339 Comm: kworker/0:1 Tainted: P        W  O    4.4.24 #1
-Hardware name: Mediatek Cortex-A7 (Device Tree)
-Workqueue: events drm_mode_rmfb_work_fn
-[<c001a710>] (unwind_backtrace) from [<c00151e4>] (show_stack+0x20/0x24)
-[<c00151e4>] (show_stack) from [<c027961c>] (dump_stack+0x98/0xac)
-[<c027961c>] (dump_stack) from [<c002ac54>] (warn_slowpath_common+0x94/0xc4)
-[<c002ac54>] (warn_slowpath_common) from [<c002acc4>] (warn_slowpath_fmt+0x40/0x48)
-[<c002acc4>] (warn_slowpath_fmt) from [<c03307ac>] (drm_wait_one_vblank+0x188/0x18c)
-[<c03307ac>] (drm_wait_one_vblank) from [<c03307d8>] (drm_crtc_wait_one_vblank+0x28/0x2c)
-[<c03307d8>] (drm_crtc_wait_one_vblank) from [<c034f48c>] (mtk_drm_crtc_disable+0x78/0x240)
-[<c034f48c>] (mtk_drm_crtc_disable) from [<c03240d4>] (drm_atomic_helper_commit_modeset_disables+0x128/0x3b8)
-[<c03240d4>] (drm_atomic_helper_commit_modeset_disables) from [<c0350a7c>] (mtk_atomic_complete+0x74/0xb4)
-[<c0350a7c>] (mtk_atomic_complete) from [<c0350b24>] (mtk_atomic_commit+0x68/0x98)
-[<c0350b24>] (mtk_atomic_commit) from [<c034ab48>] (drm_atomic_commit+0x54/0x74)
-[<c034ab48>] (drm_atomic_commit) from [<c0325c4c>] (drm_atomic_helper_set_config+0x7c/0xa0)
-[<c0325c4c>] (drm_atomic_helper_set_config) from [<c0338594>] (drm_mode_set_config_internal+0x68/0xe4)
-[<c0338594>] (drm_mode_set_config_internal) from [<c033967c>] (drm_framebuffer_remove+0xe4/0x120)
-[<c033967c>] (drm_framebuffer_remove) from [<c0339700>] (drm_mode_rmfb_work_fn+0x48/0x58)
-[<c0339700>] (drm_mode_rmfb_work_fn) from [<c0043a38>] (process_one_work+0x154/0x50c)
-[<c0043a38>] (process_one_work) from [<c0044074>] (worker_thread+0x284/0x568)
-[<c0044074>] (worker_thread) from [<c0049dc4>] (kthread+0xec/0x104)
-[<c0049dc4>] (kthread) from [<c0010678>] (ret_from_fork+0x14/0x3c)
----[ end trace 12ae5358e992abd5 ]---
-
-so, we add refcount for DPI power on/off to protect the flow.
-
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_dpi.c | 43 ++++++++++++--------------------------
- 1 file changed, 13 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 6c0ea39d5739..5ede1ddbaa1a 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -76,8 +76,7 @@ struct mtk_dpi {
- 	enum mtk_dpi_out_yc_map yc_map;
- 	enum mtk_dpi_out_bit_num bit_num;
- 	enum mtk_dpi_out_channel_swap channel_swap;
--	bool power_sta;
--	u8 power_ctl;
-+	int refcount;
- };
- 
- static inline struct mtk_dpi *mtk_dpi_from_encoder(struct drm_encoder *e)
-@@ -90,11 +89,6 @@ enum mtk_dpi_polarity {
- 	MTK_DPI_POLARITY_FALLING,
- };
- 
--enum mtk_dpi_power_ctl {
--	DPI_POWER_START = BIT(0),
--	DPI_POWER_ENABLE = BIT(1),
--};
--
- struct mtk_dpi_polarities {
- 	enum mtk_dpi_polarity de_pol;
- 	enum mtk_dpi_polarity ck_pol;
-@@ -367,40 +361,30 @@ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
- 	}
- }
- 
--static void mtk_dpi_power_off(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
-+static void mtk_dpi_power_off(struct mtk_dpi *dpi)
- {
--	dpi->power_ctl &= ~pctl;
--
--	if ((dpi->power_ctl & DPI_POWER_START) ||
--	    (dpi->power_ctl & DPI_POWER_ENABLE))
-+	if (WARN_ON(dpi->refcount == 0))
- 		return;
- 
--	if (!dpi->power_sta)
-+	if (--dpi->refcount != 0)
- 		return;
- 
- 	mtk_dpi_disable(dpi);
- 	clk_disable_unprepare(dpi->pixel_clk);
- 	clk_disable_unprepare(dpi->engine_clk);
--	dpi->power_sta = false;
- }
- 
--static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
-+static int mtk_dpi_power_on(struct mtk_dpi *dpi)
- {
- 	int ret;
- 
--	dpi->power_ctl |= pctl;
--
--	if (!(dpi->power_ctl & DPI_POWER_START) &&
--	    !(dpi->power_ctl & DPI_POWER_ENABLE))
--		return 0;
--
--	if (dpi->power_sta)
-+	if (++dpi->refcount != 1)
- 		return 0;
- 
- 	ret = clk_prepare_enable(dpi->engine_clk);
- 	if (ret) {
- 		dev_err(dpi->dev, "Failed to enable engine clock: %d\n", ret);
--		goto err_eng;
-+		goto err_refcount;
- 	}
- 
- 	ret = clk_prepare_enable(dpi->pixel_clk);
-@@ -410,13 +394,12 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
- 	}
- 
- 	mtk_dpi_enable(dpi);
--	dpi->power_sta = true;
- 	return 0;
- 
- err_pixel:
- 	clk_disable_unprepare(dpi->engine_clk);
--err_eng:
--	dpi->power_ctl &= ~pctl;
-+err_refcount:
-+	dpi->refcount--;
- 	return ret;
- }
- 
-@@ -552,14 +535,14 @@ static void mtk_dpi_encoder_disable(struct drm_encoder *encoder)
- {
- 	struct mtk_dpi *dpi = mtk_dpi_from_encoder(encoder);
- 
--	mtk_dpi_power_off(dpi, DPI_POWER_ENABLE);
-+	mtk_dpi_power_off(dpi);
- }
- 
- static void mtk_dpi_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct mtk_dpi *dpi = mtk_dpi_from_encoder(encoder);
- 
--	mtk_dpi_power_on(dpi, DPI_POWER_ENABLE);
-+	mtk_dpi_power_on(dpi);
- 	mtk_dpi_set_display_mode(dpi, &dpi->mode);
- }
- 
-@@ -582,14 +565,14 @@ static void mtk_dpi_start(struct mtk_ddp_comp *comp)
- {
- 	struct mtk_dpi *dpi = container_of(comp, struct mtk_dpi, ddp_comp);
- 
--	mtk_dpi_power_on(dpi, DPI_POWER_START);
-+	mtk_dpi_power_on(dpi);
- }
- 
- static void mtk_dpi_stop(struct mtk_ddp_comp *comp)
- {
- 	struct mtk_dpi *dpi = container_of(comp, struct mtk_dpi, ddp_comp);
- 
--	mtk_dpi_power_off(dpi, DPI_POWER_START);
-+	mtk_dpi_power_off(dpi);
- }
- 
- static const struct mtk_ddp_comp_funcs mtk_dpi_funcs = {
--- 
-2.12.5.2.gbdf23ab
+> ---
+>  drivers/gpu/drm/mediatek/Makefile              |   3 +-
+>  drivers/gpu/drm/mediatek/mtk_hdmi.c            |   9 +-
+>  drivers/gpu/drm/mediatek/mtk_hdmi_phy.c        |   3 +
+>  drivers/gpu/drm/mediatek/mtk_hdmi_phy.h        |   2 +
+>  drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 212 +++++++++++++++++++++++++
+>  5 files changed, 226 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> 
+> diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
+> index 61cf0d2ab28a..82ae49c64221 100644
+> --- a/drivers/gpu/drm/mediatek/Makefile
+> +++ b/drivers/gpu/drm/mediatek/Makefile
+> @@ -19,7 +19,8 @@ obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
+>  mediatek-drm-hdmi-objs := mtk_cec.o \
+>  			  mtk_hdmi.o \
+>  			  mtk_hdmi_ddc.o \
+> +                          mtk_mt2701_hdmi_phy.o \
+>  			  mtk_mt8173_hdmi_phy.o \
+>  			  mtk_hdmi_phy.o
+>  
+> -obj-$(CONFIG_DRM_MEDIATEK_HDMI) += mediatek-drm-hdmi.o
+> \ No newline at end of file
+> +obj-$(CONFIG_DRM_MEDIATEK_HDMI) += mediatek-drm-hdmi.o
+> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> index d62e685cec73..11e3644da79a 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+> @@ -241,8 +241,13 @@ static void mtk_hdmi_hw_make_reg_writable(struct mtk_hdmi *hdmi, bool enable)
+>  	 * The ARM trusted firmware provides an API for the HDMI driver to set
+>  	 * this control bit to enable HDMI output in supervisor mode.
+>  	 */
+> -	arm_smccc_smc(MTK_SIP_SET_AUTHORIZED_SECURE_REG, 0x14000904, 0x80000000,
+> -		      0, 0, 0, 0, 0, &res);
+> +	if (hdmi_phy->conf && hdmi_phy->conf->tz_disabled)
+> +		regmap_update_bits(hdmi->sys_regmap,
+> +				   hdmi->sys_offset + HDMI_SYS_CFG20,
+> +				   0x80008005, enable ? 0x80000005 : 0x8000);
+> +	else
+> +		arm_smccc_smc(MTK_SIP_SET_AUTHORIZED_SECURE_REG, 0x14000904,
+> +			      0x80000000, 0, 0, 0, 0, 0, &res);
+>  
+>  	regmap_update_bits(hdmi->sys_regmap, hdmi->sys_offset + HDMI_SYS_CFG20,
+>  			   HDMI_PCLK_FREE_RUN, enable ? HDMI_PCLK_FREE_RUN : 0);
+> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
+> index 514f3e9a8767..4ef9c57ffd44 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
+> @@ -214,6 +214,9 @@ static int mtk_hdmi_phy_probe(struct platform_device *pdev)
+>  }
+>  
+>  static const struct of_device_id mtk_hdmi_phy_match[] = {
+> +	{ .compatible = "mediatek,mt2701-hdmi-phy",
+> +	  .data = &mtk_hdmi_phy_2701_conf,
+> +	},
+>  	{ .compatible = "mediatek,mt8173-hdmi-phy",
+>  	  .data = &mtk_hdmi_phy_8173_conf,
+>  	},
+> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h
+> index 09b8f525e6b8..f39b1fc66612 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h
+> @@ -20,6 +20,7 @@
+>  struct mtk_hdmi_phy;
+>  
+>  struct mtk_hdmi_phy_conf {
+> +	bool tz_disabled;
+>  	const struct clk_ops *hdmi_phy_clk_ops;
+>  	void (*hdmi_phy_enable_tmds)(struct mtk_hdmi_phy *hdmi_phy);
+>  	void (*hdmi_phy_disable_tmds)(struct mtk_hdmi_phy *hdmi_phy);
+> @@ -54,5 +55,6 @@ unsigned long mtk_hdmi_pll_recalc_rate(struct clk_hw *hw,
+>  
+>  extern struct platform_driver mtk_hdmi_phy_driver;
+>  extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_8173_conf;
+> +extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_2701_conf;
+>  
+>  #endif /* _MTK_HDMI_PHY_H */
+> diff --git a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> new file mode 100644
+> index 000000000000..fcc42dc6ea7f
+> --- /dev/null
+> +++ b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> @@ -0,0 +1,212 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2018 MediaTek Inc.
+> + * Author: Chunhui Dai <chunhui.dai@mediatek.com>
+> + */
+> +
+> +#include "mtk_hdmi_phy.h"
+> +
+> +#define HDMI_CON0	0x00
+> +#define RG_HDMITX_DRV_IBIAS		0
+> +#define RG_HDMITX_DRV_IBIAS_MASK	(0x3f << 0)
+> +#define RG_HDMITX_EN_SER		12
+> +#define RG_HDMITX_EN_SER_MASK		(0x0f << 12)
+> +#define RG_HDMITX_EN_SLDO		16
+> +#define RG_HDMITX_EN_SLDO_MASK		(0x0f << 16)
+> +#define RG_HDMITX_EN_PRED		20
+> +#define RG_HDMITX_EN_PRED_MASK		(0x0f << 20)
+> +#define RG_HDMITX_EN_IMP		24
+> +#define RG_HDMITX_EN_IMP_MASK		(0x0f << 24)
+> +#define RG_HDMITX_EN_DRV		28
+> +#define RG_HDMITX_EN_DRV_MASK		(0x0f << 28)
+> +
+> +#define HDMI_CON1	0x04
+> +#define RG_HDMITX_PRED_IBIAS		18
+> +#define RG_HDMITX_PRED_IBIAS_MASK	(0x0f << 18)
+> +#define RG_HDMITX_PRED_IMP		(0x01 << 22)
+> +#define RG_HDMITX_DRV_IMP		26
+> +#define RG_HDMITX_DRV_IMP_MASK		(0x3f << 26)
+> +
+> +#define HDMI_CON2	0x08
+> +#define RG_HDMITX_EN_TX_CKLDO		(0x01 << 0)
+> +#define RG_HDMITX_EN_TX_POSDIV		(0x01 << 1)
+> +#define RG_HDMITX_TX_POSDIV		3
+> +#define RG_HDMITX_TX_POSDIV_MASK	(0x03 << 3)
+> +#define RG_HDMITX_EN_MBIAS		(0x01 << 6)
+> +#define RG_HDMITX_MBIAS_LPF_EN		(0x01 << 7)
+> +
+> +#define HDMI_CON4	0x10
+> +#define RG_HDMITX_RESERVE_MASK		(0xffffffff << 0)
+> +
+> +#define HDMI_CON6	0x18
+> +#define RG_HTPLL_BR			0
+> +#define RG_HTPLL_BR_MASK		(0x03 << 0)
+> +#define RG_HTPLL_BC			2
+> +#define RG_HTPLL_BC_MASK		(0x03 << 2)
+> +#define RG_HTPLL_BP			4
+> +#define RG_HTPLL_BP_MASK		(0x0f << 4)
+> +#define RG_HTPLL_IR			8
+> +#define RG_HTPLL_IR_MASK		(0x0f << 8)
+> +#define RG_HTPLL_IC			12
+> +#define RG_HTPLL_IC_MASK		(0x0f << 12)
+> +#define RG_HTPLL_POSDIV			16
+> +#define RG_HTPLL_POSDIV_MASK		(0x03 << 16)
+> +#define RG_HTPLL_PREDIV			18
+> +#define RG_HTPLL_PREDIV_MASK		(0x03 << 18)
+> +#define RG_HTPLL_FBKSEL			20
+> +#define RG_HTPLL_FBKSEL_MASK		(0x03 << 20)
+> +#define RG_HTPLL_RLH_EN			(0x01 << 22)
+> +#define RG_HTPLL_FBKDIV			24
+> +#define RG_HTPLL_FBKDIV_MASK		(0x7f << 24)
+> +#define RG_HTPLL_EN			(0x01 << 31)
+> +
+> +#define HDMI_CON7	0x1c
+> +#define RG_HTPLL_AUTOK_EN		(0x01 << 23)
+> +#define RG_HTPLL_DIVEN			28
+> +#define RG_HTPLL_DIVEN_MASK		(0x07 << 28)
+> +
+> +static int mtk_hdmi_pll_prepare(struct clk_hw *hw)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
+> +
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_RLH_EN);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_EN);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+> +	usleep_range(80, 100);
+> +	return 0;
+> +}
+> +
+> +static void mtk_hdmi_pll_unprepare(struct clk_hw *hw)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
+> +
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_RLH_EN);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN);
+> +	usleep_range(80, 100);
+> +}
+> +
+> +static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> +				 unsigned long parent_rate)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
+> +	u32 pos_div;
+> +
+> +	if (rate <= 64000000)
+> +		pos_div = 3;
+> +	else if (rate <= 12800000)
+> +		pos_div = 1;
+> +	else
+> +		pos_div = 1;
+> +
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_PREDIV_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IC),
+> +			  RG_HTPLL_IC_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IR),
+> +			  RG_HTPLL_IR_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON2, (pos_div << RG_HDMITX_TX_POSDIV),
+> +			  RG_HDMITX_TX_POSDIV_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (1 << RG_HTPLL_FBKSEL),
+> +			  RG_HTPLL_FBKSEL_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (19 << RG_HTPLL_FBKDIV),
+> +			  RG_HTPLL_FBKDIV_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON7, (0x2 << RG_HTPLL_DIVEN),
+> +			  RG_HTPLL_DIVEN_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0xc << RG_HTPLL_BP),
+> +			  RG_HTPLL_BP_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x2 << RG_HTPLL_BC),
+> +			  RG_HTPLL_BC_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_BR),
+> +			  RG_HTPLL_BR_MASK);
+> +
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON1, RG_HDMITX_PRED_IMP);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON1, (0x3 << RG_HDMITX_PRED_IBIAS),
+> +			  RG_HDMITX_PRED_IBIAS_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_IMP_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON1, (0x28 << RG_HDMITX_DRV_IMP),
+> +			  RG_HDMITX_DRV_IMP_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4, 0x28, RG_HDMITX_RESERVE_MASK);
+> +	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON0, (0xa << RG_HDMITX_DRV_IBIAS),
+> +			  RG_HDMITX_DRV_IBIAS_MASK);
+> +	return 0;
+> +}
+> +
+> +static const struct clk_ops mtk_hdmi_phy_pll_ops = {
+> +	.prepare = mtk_hdmi_pll_prepare,
+> +	.unprepare = mtk_hdmi_pll_unprepare,
+> +	.set_rate = mtk_hdmi_pll_set_rate,
+> +	.round_rate = mtk_hdmi_pll_round_rate,
+> +	.recalc_rate = mtk_hdmi_pll_recalc_rate,
+> +};
+> +
+> +static void mtk_hdmi_phy_enable_tmds(struct mtk_hdmi_phy *hdmi_phy)
+> +{
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_RLH_EN);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_EN);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+> +	usleep_range(80, 100);
+> +}
+> +
+> +static void mtk_hdmi_phy_disable_tmds(struct mtk_hdmi_phy *hdmi_phy)
+> +{
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_RLH_EN);
+> +	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN);
+> +	usleep_range(80, 100);
+> +}
+> +
+> +struct mtk_hdmi_phy_conf mtk_hdmi_phy_2701_conf = {
+> +	.tz_disabled = true,
+> +	.hdmi_phy_clk_ops = &mtk_hdmi_phy_pll_ops,
+> +	.hdmi_phy_enable_tmds = mtk_hdmi_phy_enable_tmds,
+> +	.hdmi_phy_disable_tmds = mtk_hdmi_phy_disable_tmds,
+> +};
+> +
+> +MODULE_AUTHOR("Chunhui Dai <chunhui.dai@mediatek.com>");
+> +MODULE_DESCRIPTION("MediaTek HDMI PHY Driver");
+> +MODULE_LICENSE("GPL v2");
