@@ -1,41 +1,59 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Wed, 3 Oct 2018 17:53:38 +0200
-Subject: [PATCH] spi: pxa2xx: Mark expected switch fall-through
-In-Reply-To: <22e7d33d-db33-d2e4-30b1-fa87176e4277@embeddedor.com>
-References: <20181003121211.GA28108@embeddedor.com>
- <20181003152255.GE7132@sirena.org.uk>
- <22e7d33d-db33-d2e4-30b1-fa87176e4277@embeddedor.com>
-Message-ID: <64472b50-f00d-e22c-5dff-aa290c6559c5@embeddedor.com>
+From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
+Date: Wed, 3 Oct 2018 18:03:29 +0200
+Subject: SoCFPGA Turn on ARM errata for L2 cache ?
+Message-ID: <CAJiuCcdR5dfN3MtvoqOMEG1hK+EuYgsdAaabW5wQrEDTdAOQdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Saw this patch on the Altera OpenSource GitHub.
 
-On 10/3/18 5:27 PM, Gustavo A. R. Silva wrote:
-> 
-> 
-> On 10/3/18 5:22 PM, Mark Brown wrote:
->> On Wed, Oct 03, 2018 at 02:12:11PM +0200, Gustavo A. R. Silva wrote:
->>
->>>  			switch (drv_data->n_bytes) {
->>>  			case 4:
->>>  				bytes_left >>= 1;
->>> +				/* Fall through */
->>>  			case 2:
->>>  				bytes_left >>= 1;
->>>  			}
->>
->> I think this code is just being too cute and it'd be better to just
->> rewrite it to directly do the expected number of shifts directly in each
->> case and have break statements; your fix is good but still not ideal for
->> readability I think.
->>
-> 
-> Okay. I agree. I'll rewrite and send v2.
-> 
+But it's not mainlained can I propose it?
 
-I'll actually send a completely new patch for this.
+How do you do when the patch is from someone else ? Do you keep the
+sign-off of the original author or do you just mention it? in the
+commit log ?
 
-Thanks
---
-Gustavo
+Thanks,
+Clement
+
+>From 6f7559407c1fcdb9b31c9493f0da79d614290e91 Mon Sep 17 00:00:00 2001
+From: Dinh Nguyen <dinguyen@kernel.org>
+Date: Wed, 27 Feb 2013 18:29:14 -0600
+Subject: [PATCH] ARM: socfpga: Turn on ARM errata for L2 cache
+
+Turn on these ARM and PL310 errata for SoCFPGA:
+
+ARM_ERRATA_754322
+ARM_ERRATA_764369
+ARM_ERRATA_775420
+
+PL310_ERRATA_588369
+PL310_ERRATA_727915
+PL310_ERRATA_753970
+PL310_ERRATA_769419
+
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm/mach-socfpga/Kconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 4adb901dd5eb..a04660918d71 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -11,6 +11,13 @@ menuconfig ARCH_SOCFPGA
+  select HAVE_ARM_TWD if SMP
+  select MFD_SYSCON
+  select PCI_DOMAINS if PCI
++ select ARM_ERRATA_754322
++ select ARM_ERRATA_764369 if SMP
++ select ARM_ERRATA_775420
++ select PL310_ERRATA_588369
++ select PL310_ERRATA_727915
++ select PL310_ERRATA_753970 if PL310
++ select PL310_ERRATA_769419
+
+ if ARCH_SOCFPGA
+ config SOCFPGA_SUSPEND
