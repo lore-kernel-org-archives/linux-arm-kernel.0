@@ -1,35 +1,35 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 3 Oct 2018 12:39:12 +0900
-Subject: [PATCH 1/4] ARM: dts: uniphier: Add USB3 controller nodes
-In-Reply-To: <1538478722-20351-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1538478722-20351-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1538478722-20351-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNAQjXkD_j3WO=SR=5708f=C7tmcZUc9ryZ5mXnMnKujmZw@mail.gmail.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Wed, 3 Oct 2018 11:41:51 +0800
+Subject: [PATCH v5 11/11] drm/mediatek: add a error return value when clock
+ driver has been prepared
+In-Reply-To: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
+References: <20181003034151.31452-1-bibby.hsieh@mediatek.com>
+Message-ID: <20181003034151.31452-12-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2018 at 8:12 PM Kunihiko Hayashi
-<hayashi.kunihiko@socionext.com> wrote:
->
-> Add USB3 controller nodes including usb-core, resets, regulator, ss-phy
-> and hs-phy. This supports for Pro4, PXs2 and the boards.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
->  arch/arm/boot/dts/uniphier-pro4-ace.dts    |   8 ++
->  arch/arm/boot/dts/uniphier-pro4-ref.dts    |   8 ++
->  arch/arm/boot/dts/uniphier-pro4.dtsi       |  94 +++++++++++++++
->  arch/arm/boot/dts/uniphier-pxs2-gentil.dts |   8 ++
->  arch/arm/boot/dts/uniphier-pxs2-vodka.dts  |   4 +
->  arch/arm/boot/dts/uniphier-pxs2.dtsi       | 180 +++++++++++++++++++++++++++++
->  6 files changed, 302 insertions(+)
+DRM driver get the comp->clk by of_clk_get(), we only
+assign NULL to comp->clk when error happened, but do
+not return the error number.
 
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I will enable this on uniphier-ld6b-ref.dts
-and uniphier-pro4-sanji.dts as well
-when I pick up this series.
-
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index ff974d82a4a6..54ca794db3e9 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -294,7 +294,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+ 	comp->irq = of_irq_get(node, 0);
+ 	comp->clk = of_clk_get(node, 0);
+ 	if (IS_ERR(comp->clk))
+-		comp->clk = NULL;
++		return PTR_ERR(comp->clk);
+ 
+ 	/* Only DMA capable components need the LARB property */
+ 	comp->larb_dev = NULL;
 -- 
-Best Regards
-Masahiro Yamada
+2.12.5.2.gbdf23ab
