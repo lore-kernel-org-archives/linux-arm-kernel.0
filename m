@@ -1,84 +1,34 @@
-From: ldr709@gmail.com (Lance Roy)
-Date: Tue,  2 Oct 2018 22:39:02 -0700
-Subject: [PATCH 16/16] KVM: arm/arm64: vgic: Replace spin_is_locked() with
- lockdep
-In-Reply-To: <20181003053902.6910-1-ldr709@gmail.com>
-References: <20181003053902.6910-1-ldr709@gmail.com>
-Message-ID: <20181003053902.6910-17-ldr709@gmail.com>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Tue, 2 Oct 2018 23:12:37 -0700
+Subject: [PATCH net-next v6 11/23] zinc: import Andy Polyakov's Poly1305
+ ARM and ARM64 implementations
+In-Reply-To: <20180925145622.29959-12-Jason@zx2c4.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-12-Jason@zx2c4.com>
+Message-ID: <20181003061236.GB745@sol.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-lockdep_assert_held() is better suited to checking locking requirements,
-since it won't get confused when someone else holds the lock. This is
-also a step towards possibly removing spin_is_locked().
+On Tue, Sep 25, 2018 at 04:56:10PM +0200, Jason A. Donenfeld wrote:
+> These NEON and non-NEON implementations come from Andy Polyakov's
+> implementation, and are included here in raw form without modification,
+> so that subsequent commits that fix these up for the kernel can see how
+> it has changed. This awkward commit splitting has been requested for the
+> ARM[64] implementations in particular.
+> 
+> While this is CRYPTOGAMS code, the originating code for this happens to
+> be the same as OpenSSL's commit 5bb1cd2292b388263a0cc05392bb99141212aa53
 
-Signed-off-by: Lance Roy <ldr709@gmail.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Eric Auger <eric.auger@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: <kvmarm@lists.cs.columbia.edu>
----
- virt/kvm/arm/vgic/vgic.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Sorry to ruin the fun, but actually there are no Poly1305 implementations in
+CRYPTOGAMS (https://github.com/dot-asm/cryptogams).  Nor are there any ChaCha20
+implementations.
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 7cfdfbc910e0..50e25438fb3c 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -196,7 +196,7 @@ void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active)
-  */
- static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
- {
--	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-+	lockdep_assert_held(&irq->irq_lock);
- 
- 	/* If the interrupt is active, it must stay on the current vcpu */
- 	if (irq->active)
-@@ -273,7 +273,7 @@ static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 
--	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
-+	lockdep_assert_held(&vgic_cpu->ap_list_lock);
- 
- 	list_sort(NULL, &vgic_cpu->ap_list_head, vgic_irq_cmp);
- }
-@@ -311,7 +311,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
- {
- 	struct kvm_vcpu *vcpu;
- 
--	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-+	lockdep_assert_held(&irq->irq_lock);
- 
- retry:
- 	vcpu = vgic_target_oracle(irq);
-@@ -702,7 +702,7 @@ static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
- static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
- 				    struct vgic_irq *irq, int lr)
- {
--	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-+	lockdep_assert_held(&irq->irq_lock);
- 
- 	if (kvm_vgic_global_state.type == VGIC_V2)
- 		vgic_v2_populate_lr(vcpu, irq, lr);
-@@ -736,7 +736,7 @@ static int compute_ap_list_depth(struct kvm_vcpu *vcpu,
- 
- 	*multi_sgi = false;
- 
--	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
-+	lockdep_assert_held(&vgic_cpu->ap_list_lock);
- 
- 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
- 		int w;
-@@ -761,7 +761,7 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- 	bool multi_sgi;
- 	u8 prio = 0xff;
- 
--	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
-+	lockdep_assert_held(&vgic_cpu->ap_list_lock);
- 
- 	count = compute_ap_list_depth(vcpu, &multi_sgi);
- 	if (count > kvm_vgic_global_state.nr_lr || multi_sgi)
--- 
-2.19.0
+Andy P., can you please add your Poly1305 and ChaCha20 implementations to the
+CRYPTOGAMS repository, so that they have a clear kernel-compatible license?
+
+It would be great if you'd include a kernel-compatible license directly in the
+versions in the OpenSSL tree too...
+
+Thanks!
+
+- Eric
