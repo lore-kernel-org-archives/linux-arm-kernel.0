@@ -1,31 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 3 Oct 2018 09:22:36 +0100
-Subject: [PATCH] arm64: arch_timer: avoid unused function warning
-In-Reply-To: <20181002211214.2672576-1-arnd@arndb.de>
-References: <20181002211214.2672576-1-arnd@arndb.de>
-Message-ID: <2a0968fd-c690-3eec-ba61-28f9fadd3b28@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 3 Oct 2018 09:28:09 +0100
+Subject: [PATCH v3] nvmem: fix nvmem_cell_get_from_lookup()
+In-Reply-To: <20181003073111.27212-1-brgl@bgdev.pl>
+References: <20181003073111.27212-1-brgl@bgdev.pl>
+Message-ID: <16778679-514a-a3f6-edd5-b92e0e23830a@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/18 22:11, Arnd Bergmann wrote:
-> arm64_1188873_read_cntvct_el0() is protected by the correct
-> CONFIG_ARM64_ERRATUM_1188873 #ifdef, but the only reference to it is
-> also inside of an CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND section,
-> and causes a warning if that is disabled:
-> 
-> drivers/clocksource/arm_arch_timer.c:323:20: error: 'arm64_1188873_read_cntvct_el0' defined but not used [-Werror=unused-function]
-> 
-> Since the erratum requires that we always apply the workaround
-> in the timer driver, select that symbol as we do for SoC
-> specific errata.
-> 
-> Fixes: 95b861a4a6d9 ("arm64: arch_timer: Add workaround for ARM erratum 1188873")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks,
+On 03/10/18 08:31, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> We check if the pointer returned by __nvmem_device_get() is not NULL
+> while we should actually check if it is not IS_ERR(nvmem). Fix it.
+> 
+> While we're at it: fix the next error path where we should assign an
+> error value to cell before returning.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+
+> ---
+> v1 -> v2:
+> - use ERR_CAST() instead of a direct pointer cast
+> 
+> v2 -> v3:
+> - added the Reported-by tag
+> 
+>   drivers/nvmem/core.c | 5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index ad1227df1984..f49474e1ad49 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+> @@ -952,9 +952,9 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
+>   		    (strcmp(lookup->con_id, con_id) == 0)) {
+>   			/* This is the right entry. */
+>   			nvmem = __nvmem_device_get(NULL, lookup->nvmem_name);
+> -			if (!nvmem) {
+> +			if (IS_ERR(nvmem)) {
+>   				/* Provider may not be registered yet. */
+> -				cell = ERR_PTR(-EPROBE_DEFER);
+> +				cell = ERR_CAST(nvmem);
+>   				goto out;
+>   			}
+>   
+> @@ -962,6 +962,7 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
+>   						       lookup->cell_name);
+>   			if (!cell) {
+>   				__nvmem_device_put(nvmem);
+> +				cell = ERR_PTR(-ENOENT);
+>   				goto out;
+>   			}
+>   		}
+> 
