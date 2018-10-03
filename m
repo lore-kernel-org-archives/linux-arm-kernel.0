@@ -1,39 +1,61 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 3 Oct 2018 16:35:43 +0300
-Subject: [PATCH] PCI: armada8k: add support for gpio controlled reset
- signal
-In-Reply-To: <20181003132811.GC427@lunn.ch>
-References: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
- <20181003132811.GC427@lunn.ch>
-Message-ID: <20181003133543.t7laclm5wbj2olhq@sapphire.tkos.co.il>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 3 Oct 2018 15:36:09 +0200
+Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
+In-Reply-To: <d42cc88b-6bab-797c-f263-2dce650ea3ab@arm.com>
+References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
+ <1538482531-26883-2-git-send-email-anshuman.khandual@arm.com>
+ <20181002123909.GS18290@dhcp22.suse.cz>
+ <fae68a4e-b14b-8342-940c-ea5ef3c978af@arm.com>
+ <20181003065833.GD18290@dhcp22.suse.cz>
+ <7f0488b5-053f-0954-9b95-8c0890ef5597@arm.com>
+ <20181003105926.GA4714@dhcp22.suse.cz>
+ <34b25855-fcef-61ed-312d-2011f80bdec4@arm.com>
+ <20181003114842.GD4714@dhcp22.suse.cz>
+ <d42cc88b-6bab-797c-f263-2dce650ea3ab@arm.com>
+Message-ID: <20181003133609.GG4714@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Wed, Oct 03, 2018 at 03:28:11PM +0200, Andrew Lunn wrote:
-> On Wed, Oct 03, 2018 at 03:49:43PM +0300, Baruch Siach wrote:
-> > This commit adds support for the gpio reset signal binding as described
-> > in the designware-pcie.txt DT binding document. Both the documented
-> > 'reset-gpio' property name, and the more standard 'reset-gpios' name are
-> > supported.
+On Wed 03-10-18 18:36:39, Anshuman Khandual wrote:
+[...]
+> So we have two checks here
 > 
-> I don't know this code at all, so maybe a dumb question. Why support
-> the old none-standard binding of reset-gpio on new hardware? I'm
-> assuming reset-gpio is marked a deprecated and reset-gpios is
-> recommended?
+> 1) platform specific arch_hugetlb_migration -> In principle go ahead
+> 
+> 2) huge_movable() during allocation
+> 
+> 	- If huge page does not have to be placed on movable zone
+> 
+> 		- Allocate any where successfully and done !
+>  
+> 	- If huge page *should* be placed on a movable zone
+> 
+> 		- Try allocating on movable zone
+> 
+> 			- Successfull and done !
+> 
+> 		- If the new page could not be allocated on movable zone
+> 		
+> 			- Abort the migration completely
+> 
+> 					OR
+> 
+> 			- Warn and fall back to non-movable
 
-This is all hidden behind the devm_gpiod_get_optional() call that only sees 
-the "reset" string. The generic code supports both the new property name and 
-also the older one for backward compatibility. This patch changes nothing in 
-this regard.
+I guess you are still making it more complicated than necessary. The
+later is really only about __GFP_MOVABLE at this stage. I would just
+make it simple for now. We do not have to implement any dynamic
+heuristic right now. All that I am asking for is to split the migrate
+possible part from movable part.
 
-The designware-pcie.txt document mentions the older 'reset-gpio' name. So I 
-mentioned that name as well in the commit log.
+I should have been more clear about that I guess from my very first
+reply. I do like how you moved the current coarse grained
+hugepage_migration_supported to be more arch specific but I merely
+wanted to point out that we need to do some other changes before we can
+go that route and that thing is to distinguish movable from migration
+supported.
 
-baruch
-
+See my point?
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Michal Hocko
+SUSE Labs
