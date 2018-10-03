@@ -1,51 +1,277 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Wed, 3 Oct 2018 18:36:14 +0000
-Subject: How is the Linux kernel API dma_alloc_coherent() typically
- implemented for the ARM Architecture?
-In-Reply-To: <866a698a-aa61-6c48-0258-f2dd97973e87@arm.com>
-References: <BYAPR12MB2791F73EC1033F998FF533BAC8E90@BYAPR12MB2791.namprd12.prod.outlook.com>,
- <866a698a-aa61-6c48-0258-f2dd97973e87@arm.com>
-Message-ID: <BYAPR12MB2791A35A45209A6D3D448A87C8E90@BYAPR12MB2791.namprd12.prod.outlook.com>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Thu, 4 Oct 2018 00:28:54 +0530
+Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
+Message-ID: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[ Sorry if there's a duplicate: the mailing list complained about HTML email. ]]
+vm_insert_kmem_page is similar to vm_insert_page and will
+be used by drivers to map kernel (kmalloc/vmalloc/pages)
+allocated memory to user vma.
 
-  Thanks Robin and Russell!
+Going forward, the plan is to restrict future drivers not
+to use vm_insert_page ( *it will generate new errno to
+VM_FAULT_CODE mapping code for new drivers which were already
+cleaned up for existing drivers*) in #PF (page fault handler)
+context but to make use of vmf_insert_page which returns
+VMF_FAULT_CODE and that is not possible until both vm_insert_page
+and vmf_insert_page API exists.
 
-| From: Russell King - ARM Linux <linux@armlinux.org.uk>
-| Sent: Wednesday, October 3, 2018 11:08 AM
-| 
-| If you are writing at the level where you need to know exactly how coherent
-| memory is implemented, then you're doing it wrong - and your driver will
-| never be reliable.  You will be writing it based upon implementation
-| semantics, rather than the API definition.
+But there are some consumers of vm_insert_page which use it
+outside #PF context. straight forward conversion of vm_insert_page
+to vmf_insert_page won't work there as those function calls expects
+errno not vm_fault_t in return.
 
-  Ah, sorry, no, that's not what's happening.  Our current software uses all
-of the appropriate Linux kernel APIs for all of this.  I am asking because
-I'm trying to offer advice to a Hardware Team which has been tasked with
-adding an embedded ARM Cluster to an existing chip.  The Hardware Team
-wanted to know whether they needed to extend the ARM's CPU Coherency Domain
-to include DMA I/O from a different portion of the chip (it's sort of
-emulated PCIe DMA).  My initial response was "no" because I had thought that
-ARM systems were, in general, not I/O coherent.  (Though I've seen cases
-where tightly coupled co-processors like Graphics Engines are made to be
-coherent in the CPU Coherency Domain.)
+These are the approaches which could have been taken to handle
+this scenario -
 
-  That was all fine until someone dragged my attention over to the Linux
-kernel API dma_alloc_coherent() which in fact we do use for our TX/RX
-"Descriptor Rings".  Before I signed off on my recommendation to the
-Hardware Team I wanted to make sure I wasn't blowing smoke out my ... er, I
-wasn't directing them incorrectly ... :-)
+*  Replace vm_insert_page with vmf_insert_page and then write few
+   extra lines of code to convert VM_FAULT_CODE to errno which
+   makes driver users more complex ( also the reverse mapping errno to
+   VM_FAULT_CODE have been cleaned up as part of vm_fault_t migration ,
+   not preferred to introduce anything similar again)
 
-| Also note that there is no dma_map_coherent() API, and "direction" is not
-| relevant for memory which is inherently coherent.
+*  Maintain both vm_insert_page and vmf_insert_page and use it in
+   respective places. But it won't gurantee that vm_insert_page will
+   never be used in #PF context.
 
-  The reason that I thought that there might be a need for a "direction" in
-the dma_map_coherent() API is because RX and TX Descriptor Rings might
-benefit under some Architectural Implementations from different
-treatments/mappings.  For instance, for RX Rings, UNCACHED is the right
-answer.  But for TX Rings where a Write Combining Buffer is implemented, an
-UNCACHED/WRITE-COMBINING mapping might be best.
+*  Introduce a similar API like vm_insert_page, convert all non #PF
+   consumer to use it and finally remove vm_insert_page by converting
+   it to vmf_insert_page.
 
-Casey
+And the 3rd approach was taken by introducing vm_insert_kmem_page().
+
+In short, vmf_insert_page will be used in page fault handlers
+context and vm_insert_kmem_page will be used to map kernel
+memory to user vma outside page fault handlers context.
+
+Few drivers are converted to use vm_insert_kmem_page(). This will
+allow both to review the api and that it serves it purpose. other
+consumers of vm_insert_page (*used in non #PF context*) will be
+replaced by vm_insert_kmem_page, but in separate patches.
+
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+---
+v2: Few non #PF consumers of vm_insert_page are converted
+    to use vm_insert_kmem_page in patch v2.
+
+    Updated the change log.
+    
+ arch/arm/mm/dma-mapping.c                   |  2 +-
+ drivers/auxdisplay/cfag12864bfb.c           |  2 +-
+ drivers/auxdisplay/ht16k33.c                |  2 +-
+ drivers/firewire/core-iso.c                 |  2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c |  2 +-
+ include/linux/mm.h                          |  2 +
+ kernel/kcov.c                               |  4 +-
+ mm/memory.c                                 | 69 +++++++++++++++++++++++++++++
+ mm/nommu.c                                  |  7 +++
+ mm/vmalloc.c                                |  2 +-
+ 10 files changed, 86 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 6656647..58d7971 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1598,7 +1598,7 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
+ 	pages += off;
+ 
+ 	do {
+-		int ret = vm_insert_page(vma, uaddr, *pages++);
++		int ret = vm_insert_kmem_page(vma, uaddr, *pages++);
+ 		if (ret) {
+ 			pr_err("Remapping memory failed: %d\n", ret);
+ 			return ret;
+diff --git a/drivers/auxdisplay/cfag12864bfb.c b/drivers/auxdisplay/cfag12864bfb.c
+index 40c8a55..82fd627 100644
+--- a/drivers/auxdisplay/cfag12864bfb.c
++++ b/drivers/auxdisplay/cfag12864bfb.c
+@@ -52,7 +52,7 @@
+ 
+ static int cfag12864bfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
+ {
+-	return vm_insert_page(vma, vma->vm_start,
++	return vm_insert_kmem_page(vma, vma->vm_start,
+ 		virt_to_page(cfag12864b_buffer));
+ }
+ 
+diff --git a/drivers/auxdisplay/ht16k33.c b/drivers/auxdisplay/ht16k33.c
+index a43276c..64de30b 100644
+--- a/drivers/auxdisplay/ht16k33.c
++++ b/drivers/auxdisplay/ht16k33.c
+@@ -224,7 +224,7 @@ static int ht16k33_mmap(struct fb_info *info, struct vm_area_struct *vma)
+ {
+ 	struct ht16k33_priv *priv = info->par;
+ 
+-	return vm_insert_page(vma, vma->vm_start,
++	return vm_insert_kmem_page(vma, vma->vm_start,
+ 			      virt_to_page(priv->fbdev.buffer));
+ }
+ 
+diff --git a/drivers/firewire/core-iso.c b/drivers/firewire/core-iso.c
+index 051327a..5f1548d 100644
+--- a/drivers/firewire/core-iso.c
++++ b/drivers/firewire/core-iso.c
+@@ -112,7 +112,7 @@ int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
+ 
+ 	uaddr = vma->vm_start;
+ 	for (i = 0; i < buffer->page_count; i++) {
+-		err = vm_insert_page(vma, uaddr, buffer->pages[i]);
++		err = vm_insert_kmem_page(vma, uaddr, buffer->pages[i]);
+ 		if (err)
+ 			return err;
+ 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index a8db758..57eb7af 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -234,7 +234,7 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
+ 		return -ENXIO;
+ 
+ 	for (i = offset; i < end; i++) {
+-		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
++		ret = vm_insert_kmem_page(vma, uaddr, rk_obj->pages[i]);
+ 		if (ret)
+ 			return ret;
+ 		uaddr += PAGE_SIZE;
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index a61ebe8..5f42d35 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -2477,6 +2477,8 @@ unsigned long change_prot_numa(struct vm_area_struct *vma,
+ struct vm_area_struct *find_extend_vma(struct mm_struct *, unsigned long addr);
+ int remap_pfn_range(struct vm_area_struct *, unsigned long addr,
+ 			unsigned long pfn, unsigned long size, pgprot_t);
++int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
++				struct page *page);
+ int vm_insert_page(struct vm_area_struct *, unsigned long addr, struct page *);
+ int vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+ 			unsigned long pfn);
+diff --git a/kernel/kcov.c b/kernel/kcov.c
+index 3ebd09e..2afaeb4 100644
+--- a/kernel/kcov.c
++++ b/kernel/kcov.c
+@@ -293,8 +293,8 @@ static int kcov_mmap(struct file *filep, struct vm_area_struct *vma)
+ 		spin_unlock(&kcov->lock);
+ 		for (off = 0; off < size; off += PAGE_SIZE) {
+ 			page = vmalloc_to_page(kcov->area + off);
+-			if (vm_insert_page(vma, vma->vm_start + off, page))
+-				WARN_ONCE(1, "vm_insert_page() failed");
++			if (vm_insert_kmem_page(vma, vma->vm_start + off, page))
++				WARN_ONCE(1, "vm_insert_kmem_page() failed");
+ 		}
+ 		return 0;
+ 	}
+diff --git a/mm/memory.c b/mm/memory.c
+index c467102..b800c10 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -1682,6 +1682,75 @@ pte_t *__get_locked_pte(struct mm_struct *mm, unsigned long addr,
+ 	return pte_alloc_map_lock(mm, pmd, addr, ptl);
+ }
+ 
++static int insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
++		struct page *page, pgprot_t prot)
++{
++	struct mm_struct *mm = vma->vm_mm;
++	int retval;
++	pte_t *pte;
++	spinlock_t *ptl;
++
++	retval = -EINVAL;
++	if (PageAnon(page))
++		goto out;
++	retval = -ENOMEM;
++	flush_dcache_page(page);
++	pte = get_locked_pte(mm, addr, &ptl);
++	if (!pte)
++		goto out;
++	retval = -EBUSY;
++	if (!pte_none(*pte))
++		goto out_unlock;
++
++	get_page(page);
++	inc_mm_counter_fast(mm, mm_counter_file(page));
++	page_add_file_rmap(page, false);
++	set_pte_at(mm, addr, pte, mk_pte(page, prot));
++
++	retval = 0;
++	pte_unmap_unlock(pte, ptl);
++	return retval;
++out_unlock:
++	pte_unmap_unlock(pte, ptl);
++out:
++	return retval;
++}
++
++/**
++ * vm_insert_kmem_page - insert single page into user vma
++ * @vma: user vma to map to
++ * @addr: target user address of this page
++ * @page: source kernel page
++ *
++ * This allows drivers to insert individual kernel memory into a user vma.
++ * This API should be used outside page fault handlers context.
++ *
++ * Previously the same has been done with vm_insert_page by drivers. But
++ * vm_insert_page will be converted to vmf_insert_page and will be used
++ * in fault handlers context and return type of vmf_insert_page will be
++ * vm_fault_t type.
++ *
++ * But there are places where drivers need to map kernel memory into user
++ * vma outside fault handlers context. As vmf_insert_page will be restricted
++ * to use within page fault handlers, vm_insert_kmem_page could be used
++ * to map kernel memory to user vma outside fault handlers context.
++ */
++int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
++			struct page *page)
++{
++	if (addr < vma->vm_start || addr >= vma->vm_end)
++		return -EFAULT;
++	if (!page_count(page))
++		return -EINVAL;
++	if (!(vma->vm_flags & VM_MIXEDMAP)) {
++		BUG_ON(down_read_trylock(&vma->vm_mm->mmap_sem));
++		BUG_ON(vma->vm_flags & VM_PFNMAP);
++		vma->vm_flags |= VM_MIXEDMAP;
++	}
++	return insert_kmem_page(vma, addr, page, vma->vm_page_prot);
++}
++EXPORT_SYMBOL(vm_insert_kmem_page);
++
+ /*
+  * This is the old fallback for page remapping.
+  *
+diff --git a/mm/nommu.c b/mm/nommu.c
+index e4aac33..153b8c8 100644
+--- a/mm/nommu.c
++++ b/mm/nommu.c
+@@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+ }
+ EXPORT_SYMBOL(vm_insert_page);
+ 
++int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
++				struct page *page)
++{
++	return -EINVAL;
++}
++EXPORT_SYMBOL(vm_insert_kmem_page);
++
+ /*
+  *  sys_brk() for the most part doesn't need the global kernel
+  *  lock, except when an application is doing something nasty
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index a728fc4..61d279f 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -2251,7 +2251,7 @@ int remap_vmalloc_range_partial(struct vm_area_struct *vma, unsigned long uaddr,
+ 		struct page *page = vmalloc_to_page(kaddr);
+ 		int ret;
+ 
+-		ret = vm_insert_page(vma, uaddr, page);
++		ret = vm_insert_kmem_page(vma, uaddr, page);
+ 		if (ret)
+ 			return ret;
+ 
+-- 
+1.9.1
