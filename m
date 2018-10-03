@@ -1,77 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Oct 2018 10:02:34 +0200
-Subject: [PATCH] crypto: arm64/aes - fix handling sub-block CTS-CBC inputs
-In-Reply-To: <20181003052215.22468-1-ebiggers@kernel.org>
-References: <20181003052215.22468-1-ebiggers@kernel.org>
-Message-ID: <CAKv+Gu-vGYWJy9Q4da0KjBi0qiu+Dh1oA=tTeScKvq=jmwG5yg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 3 Oct 2018 09:22:36 +0100
+Subject: [PATCH] arm64: arch_timer: avoid unused function warning
+In-Reply-To: <20181002211214.2672576-1-arnd@arndb.de>
+References: <20181002211214.2672576-1-arnd@arndb.de>
+Message-ID: <2a0968fd-c690-3eec-ba61-28f9fadd3b28@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 October 2018 at 07:22, Eric Biggers <ebiggers@kernel.org> wrote:
-> From: Eric Biggers <ebiggers@google.com>
->
-> In the new arm64 CTS-CBC implementation, return an error code rather
-> than crashing on inputs shorter than AES_BLOCK_SIZE bytes.  Also set
-> cra_blocksize to AES_BLOCK_SIZE (like is done in the cts template) to
-> indicate the minimum input size.
->
-> Fixes: dd597fb33ff0 ("crypto: arm64/aes-blk - add support for CTS-CBC mode")
-> Signed-off-by: Eric Biggers <ebiggers@google.com>
+On 02/10/18 22:11, Arnd Bergmann wrote:
+> arm64_1188873_read_cntvct_el0() is protected by the correct
+> CONFIG_ARM64_ERRATUM_1188873 #ifdef, but the only reference to it is
+> also inside of an CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND section,
+> and causes a warning if that is disabled:
+> 
+> drivers/clocksource/arm_arch_timer.c:323:20: error: 'arm64_1188873_read_cntvct_el0' defined but not used [-Werror=unused-function]
+> 
+> Since the erratum requires that we always apply the workaround
+> in the timer driver, select that symbol as we do for SoC
+> specific errata.
+> 
+> Fixes: 95b861a4a6d9 ("arm64: arch_timer: Add workaround for ARM erratum 1188873")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks Eric
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Thanks,
 
-> ---
->  arch/arm64/crypto/aes-glue.c | 13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-> index 26d2b0263ba63..1e676625ef33f 100644
-> --- a/arch/arm64/crypto/aes-glue.c
-> +++ b/arch/arm64/crypto/aes-glue.c
-> @@ -243,8 +243,11 @@ static int cts_cbc_encrypt(struct skcipher_request *req)
->
->         skcipher_request_set_tfm(&rctx->subreq, tfm);
->
-> -       if (req->cryptlen == AES_BLOCK_SIZE)
-> +       if (req->cryptlen <= AES_BLOCK_SIZE) {
-> +               if (req->cryptlen < AES_BLOCK_SIZE)
-> +                       return -EINVAL;
->                 cbc_blocks = 1;
-> +       }
->
->         if (cbc_blocks > 0) {
->                 unsigned int blocks;
-> @@ -305,8 +308,11 @@ static int cts_cbc_decrypt(struct skcipher_request *req)
->
->         skcipher_request_set_tfm(&rctx->subreq, tfm);
->
-> -       if (req->cryptlen == AES_BLOCK_SIZE)
-> +       if (req->cryptlen <= AES_BLOCK_SIZE) {
-> +               if (req->cryptlen < AES_BLOCK_SIZE)
-> +                       return -EINVAL;
->                 cbc_blocks = 1;
-> +       }
->
->         if (cbc_blocks > 0) {
->                 unsigned int blocks;
-> @@ -486,14 +492,13 @@ static struct skcipher_alg aes_algs[] = { {
->                 .cra_driver_name        = "__cts-cbc-aes-" MODE,
->                 .cra_priority           = PRIO,
->                 .cra_flags              = CRYPTO_ALG_INTERNAL,
-> -               .cra_blocksize          = 1,
-> +               .cra_blocksize          = AES_BLOCK_SIZE,
->                 .cra_ctxsize            = sizeof(struct crypto_aes_ctx),
->                 .cra_module             = THIS_MODULE,
->         },
->         .min_keysize    = AES_MIN_KEY_SIZE,
->         .max_keysize    = AES_MAX_KEY_SIZE,
->         .ivsize         = AES_BLOCK_SIZE,
-> -       .chunksize      = AES_BLOCK_SIZE,
->         .walksize       = 2 * AES_BLOCK_SIZE,
->         .setkey         = skcipher_aes_setkey,
->         .encrypt        = cts_cbc_encrypt,
-> --
-> 2.19.0
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
