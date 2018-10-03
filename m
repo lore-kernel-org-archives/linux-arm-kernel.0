@@ -1,37 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 3 Oct 2018 10:26:00 +0100
-Subject: [PATCH v5 19/27] irqchip/gic-v3: Remove acknowledge loop
-In-Reply-To: <1535471497-38854-20-git-send-email-julien.thierry@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-20-git-send-email-julien.thierry@arm.com>
-Message-ID: <ee78b536-6a87-52c7-16c4-292f7ecbe61a@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 3 Oct 2018 10:33:46 +0100
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
+In-Reply-To: <c17450ce-fc25-e792-b91b-51106f032542@codeaurora.org>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-3-georgi.djakov@linaro.org>
+ <20180925180215.GA12435@bogus>
+ <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
+ <20180926144830.GB25838@e107155-lin>
+ <fa74c24f-1f22-f11f-60fe-5a4489d9c7c2@codeaurora.org>
+ <20181002111758.GC1086@e107155-lin>
+ <c17450ce-fc25-e792-b91b-51106f032542@codeaurora.org>
+Message-ID: <20181003093346.GA12570@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/18 16:51, Julien Thierry wrote:
-> Multiple interrupts pending for a CPU is actually rare. Doing an
-> acknowledge loop does not give much better performance or even can
-> deteriorate them.
+On Tue, Oct 02, 2018 at 11:56:56AM -0700, Saravana Kannan wrote:
 > 
-> Do not loop when an interrupt has been acknowledged, just return
-> from interrupt and wait for another one to be raised.
+> On 10/02/2018 04:17 AM, Sudeep Holla wrote:
+
+[...]
+
+> > Yes, I do understand I have made the same point multiple time and it's
+> > intentional. We need to get the fragmented f/w support story fixed.
+> > Different ARM vendors are doing different things in f/w and ARM sees the
+> > same fragmentation story as before. We have come up with new specification
+> > and my annoying multiple emails are just to constantly remind the same.
+> > 
+> > I do understand we have existing implementations to consider, but fixing
+> > the functionality in arbitrary way is not a good design and it better
+> > to get them fixed for future.
 > 
-> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   drivers/irqchip/irq-gic-v3.c | 65 +++++++++++++++++++++-----------------------
->   1 file changed, 31 insertions(+), 34 deletions(-)
+> I believe the fragmentation you are referring to is? in the
+> interface/communication protocol. I see the benefit of standardizing that as
+> long as the standard actually turns out to be good. But that's completely
+> separate from what the FW can/can't do. Asking to standardize what the FW
+> can/can't do doesn't seem realistic as each chip vendor will have different
+> priorities - power, performance, cost, chip area, etc. It's the conflation
+> of these separate topics that doesn't help IMHO.
 
-It would probably be valuable to do the same thing for GICv1/v2, where 
-the MMIO access can be even more costly.
+I agree on interface/communication protocol fragmentation and firmware
+can implement whatever the vendor wish. What I was also referring was
+the mix-n-match approach which should be avoided.
 
-In the meantime, I've queued this for 4.20.
+e.g. Device A and B's PM is managed completely by firmware using OSPM hints
+Suppose Device X's PM is dependent on Device A and B, in which case it's
+simpler and cleaner to leave Device X PM to firmware. Reading the state
+of A and B and using that as hint for X is just overhead which firmware
+can manage better. That was my main concern here: A=CPU and B=some other
+device and X is inter-connect to which A and B are connected.
 
-Thanks,
+If CPU OPPs are obtained from f/w and this inter-connect from DT, mapping
+then is a mess and that's what I was concerned. I am sorry if that's not
+the scenario here, I may have mistaken then.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--
+Regards,
+Sudeep
