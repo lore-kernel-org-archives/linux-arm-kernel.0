@@ -1,63 +1,55 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed,  3 Oct 2018 15:31:04 -0700
-Subject: [PATCH i2c-next v5 2/5] i2c: Add support for 'timeout-ms' and
- '#retries' OF properties
-In-Reply-To: <20181003223107.16133-1-jae.hyun.yoo@linux.intel.com>
-References: <20181003223107.16133-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20181003223107.16133-3-jae.hyun.yoo@linux.intel.com>
+Date: Wed,  3 Oct 2018 15:31:02 -0700
+Subject: [PATCH i2c-next v5 0/5] i2c: aspeed: Add bus idle waiting logic for
+ multi-master use cases
+Message-ID: <20181003223107.16133-1-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for 'timeout-ms' and '#retries' OF
-properties to set 'timeout' and 'retries' values in
-'struct i2c_adapter' in case an adapter node has the properties.
-Still the values can be set by I2C_TIMEOUT and I2C_RETRIES ioctls
-on cdev at runtime too.
+In multi-master environment, this driver's master cannot know
+exactly when peer master sends data to this driver's slave so a
+case can be happened that this master tries to send data through
+the master_xfer function but slave data from peer master is still
+being processed by this driver. To prevent state corruption in the
+case, this patch adds checking code if any slave operation is
+ongoing and it waits up to the bus timeout duration before starting
+a master_xfer operation.
 
-These properties may not be supported by all drivers. However, if
-a driver wants to support one of them, it should adapt the
-bindings in the dt-bindings document.
+To support this change, it introduces changes on i2c-core-base to
+make that able to read the bus timeout and master transfer retries
+count values from device tree properties.
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
- drivers/i2c/i2c-core-base.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+Please review this patch set.
 
-diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-index 9ee9a15e7134..b58aa17b287b 100644
---- a/drivers/i2c/i2c-core-base.c
-+++ b/drivers/i2c/i2c-core-base.c
-@@ -1214,6 +1214,7 @@ EXPORT_SYMBOL_GPL(i2c_handle_smbus_host_notify);
- static int i2c_register_adapter(struct i2c_adapter *adap)
- {
- 	int res = -EINVAL;
-+	u32 timeout_ms;
- 
- 	/* Can't register until after driver model init */
- 	if (WARN_ON(!is_registered)) {
-@@ -1239,8 +1240,21 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
- 	INIT_LIST_HEAD(&adap->userspace_clients);
- 
- 	/* Set default timeout to 1 second if not already set */
--	if (adap->timeout == 0)
--		adap->timeout = HZ;
-+	if (adap->timeout == 0) {
-+		if (adap->dev.of_node)
-+			res = of_property_read_u32(adap->dev.of_node,
-+						   "timeout-ms",
-+						   &timeout_ms);
-+		if (res)
-+			timeout_ms = 0;
-+
-+		adap->timeout = timeout_ms ? msecs_to_jiffies(timeout_ms) : HZ;
-+	}
-+
-+	/* Set retries value if it has the OF property */
-+	if (adap->dev.of_node)
-+		of_property_read_u32(adap->dev.of_node, "#retries",
-+				     &adap->retries);
- 
- 	/* register soft irqs for Host Notify */
- 	res = i2c_setup_host_notify_irq_domain(adap);
+Thanks,
+
+-Jae
+
+Changes since v3:
+- Changed the property name to 'timeout' and made it use the
+  default setting in i2c-core when not specified.
+
+Changes since v2:
+- Changed the property name to 'aspeed,timeout' and made it to
+  update the adapter's timeout configuration.
+
+Changes since v1:
+- Changed define names of timeout related.
+
+Jae Hyun Yoo (5):
+  dt-bindings: i2c: Add 'timeout-ms' and '#retries' properties as common
+    optional
+  i2c: Add support for 'timeout-ms' and '#retries' OF properties
+  dt-bindings: i2c: aspeed: Add 'timeout-ms' property as an optional
+    property
+  i2c: aspeed: Remove hard-coded bus timeout value setting
+  i2c: aspeed: Add bus idle waiting logic for multi-master use cases
+
+ .../devicetree/bindings/i2c/i2c-aspeed.txt    |  3 ++
+ Documentation/devicetree/bindings/i2c/i2c.txt |  6 +++
+ drivers/i2c/busses/i2c-aspeed.c               | 54 +++++++++++++------
+ drivers/i2c/i2c-core-base.c                   | 18 ++++++-
+ 4 files changed, 63 insertions(+), 18 deletions(-)
+
 -- 
 2.19.0
