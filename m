@@ -1,95 +1,71 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Oct 2018 16:38:24 +0200
-Subject: [PATCH v9 11/11] drivers: firmware: psci: Simplify error path of
- psci_dt_init()
-In-Reply-To: <20181003143824.13059-1-ulf.hansson@linaro.org>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
-Message-ID: <20181003143824.13059-12-ulf.hansson@linaro.org>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 3 Oct 2018 16:41:29 +0200
+Subject: [PATCH v2] ARM: multi_v7_defconfig: enable STM32 analog & timer
+ drivers
+Message-ID: <1538577689-22847-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having each psci init function taking care of the of_node_put(),
-let's deal with that from psci_dt_init(), as this enables a bit simpler
-error path for each psci init function.
+This enables drivers for STM32 timer, low power timer and analog hardware
+that can be used on STM32MP1 SoC:
+- Timer & LP Timer MFD core, PWM, trigger & encoder drivers
+- IIO ADC/DAC/DFSDM
+- vrefbuf regu driver (voltage reference buffer).
 
-Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/firmware/psci/psci.c | 23 ++++++++++-------------
- 1 file changed, 10 insertions(+), 13 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index 256b4edbb20a..38881007584e 100644
---- a/drivers/firmware/psci/psci.c
-+++ b/drivers/firmware/psci/psci.c
-@@ -608,9 +608,9 @@ static int __init psci_0_2_init(struct device_node *np)
- 	int err;
- 
- 	err = get_set_conduit_method(np);
--
- 	if (err)
--		goto out_put_node;
-+		return err;
-+
- 	/*
- 	 * Starting with v0.2, the PSCI specification introduced a call
- 	 * (PSCI_VERSION) that allows probing the firmware version, so
-@@ -618,11 +618,7 @@ static int __init psci_0_2_init(struct device_node *np)
- 	 * can be carried out according to the specific version reported
- 	 * by firmware
- 	 */
--	err = psci_probe();
--
--out_put_node:
--	of_node_put(np);
--	return err;
-+	return psci_probe();
- }
- 
- /*
-@@ -634,9 +630,8 @@ static int __init psci_0_1_init(struct device_node *np)
- 	int err;
- 
- 	err = get_set_conduit_method(np);
--
- 	if (err)
--		goto out_put_node;
-+		return err;
- 
- 	pr_info("Using PSCI v0.1 Function IDs from DT\n");
- 
-@@ -660,9 +655,7 @@ static int __init psci_0_1_init(struct device_node *np)
- 		psci_ops.migrate = psci_migrate;
- 	}
- 
--out_put_node:
--	of_node_put(np);
--	return err;
-+	return 0;
- }
- 
- static const struct of_device_id psci_of_match[] __initconst = {
-@@ -677,6 +670,7 @@ int __init psci_dt_init(void)
- 	struct device_node *np;
- 	const struct of_device_id *matched_np;
- 	psci_initcall_t init_fn;
-+	int ret;
- 
- 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
- 
-@@ -684,7 +678,10 @@ int __init psci_dt_init(void)
- 		return -ENODEV;
- 
- 	init_fn = (psci_initcall_t)matched_np->data;
--	return init_fn(np);
-+	ret = init_fn(np);
-+
-+	of_node_put(np);
-+	return ret;
- }
- 
- #ifdef CONFIG_ACPI
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fc33444..15700cb 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -518,6 +518,7 @@ CONFIG_MFD_TPS65217=y
+ CONFIG_MFD_TPS65218=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_MFD_TPS65910=y
++CONFIG_MFD_STM32_LPTIMER=m
+ CONFIG_REGULATOR_ACT8865=y
+ CONFIG_REGULATOR_ACT8945A=y
+ CONFIG_REGULATOR_ANATOP=y
+@@ -548,6 +549,7 @@ CONFIG_REGULATOR_RK808=y
+ CONFIG_REGULATOR_RN5T618=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_REGULATOR_S5M8767=y
++CONFIG_REGULATOR_STM32_VREFBUF=m
+ CONFIG_REGULATOR_TI_ABB=y
+ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+@@ -902,14 +904,20 @@ CONFIG_AT91_SAMA5D2_ADC=m
+ CONFIG_BERLIN2_ADC=m
+ CONFIG_CPCAP_ADC=m
+ CONFIG_EXYNOS_ADC=m
++CONFIG_STM32_ADC_CORE=m
++CONFIG_STM32_ADC=m
++CONFIG_STM32_DFSDM_ADC=m
+ CONFIG_VF610_ADC=m
+ CONFIG_XILINX_XADC=y
++CONFIG_STM32_LPTIMER_CNT=m
++CONFIG_STM32_DAC=m
+ CONFIG_MPU3050_I2C=y
+ CONFIG_CM36651=m
+ CONFIG_SENSORS_ISL29018=y
+ CONFIG_SENSORS_ISL29028=y
+ CONFIG_AK8975=y
+ CONFIG_IIO_HRTIMER_TRIGGER=y
++CONFIG_IIO_STM32_LPTIMER_TRIGGER=m
+ CONFIG_PWM=y
+ CONFIG_PWM_ATMEL=m
+ CONFIG_PWM_ATMEL_HLCDC_PWM=m
+@@ -923,6 +931,8 @@ CONFIG_PWM_RENESAS_TPU=y
+ CONFIG_PWM_ROCKCHIP=m
+ CONFIG_PWM_SAMSUNG=m
+ CONFIG_PWM_STI=y
++CONFIG_PWM_STM32=m
++CONFIG_PWM_STM32_LP=m
+ CONFIG_PWM_SUN4I=y
+ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
 -- 
-2.17.1
+1.9.1
