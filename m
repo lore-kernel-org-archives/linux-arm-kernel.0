@@ -1,52 +1,52 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Oct 2018 16:38:15 +0200
-Subject: [PATCH v9 02/11] PM / Domains: Deal with multiple states but no
- governor in genpd
+Date: Wed,  3 Oct 2018 16:38:19 +0200
+Subject: [PATCH v9 06/11] cpuidle: dt: Support hierarchical CPU idle states
 In-Reply-To: <20181003143824.13059-1-ulf.hansson@linaro.org>
 References: <20181003143824.13059-1-ulf.hansson@linaro.org>
-Message-ID: <20181003143824.13059-3-ulf.hansson@linaro.org>
+Message-ID: <20181003143824.13059-7-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A caller of pm_genpd_init() that provides some states for the genpd via the
-->states pointer in the struct generic_pm_domain, should also provide a
-governor. This because it's the job of the governor to pick a state that
-satisfies the constraints.
+From: Lina Iyer <lina.iyer@linaro.org>
 
-Therefore, let's print a warning to inform the user about such bogus
-configuration and avoid to bail out, by instead picking the shallowest
-state before genpd invokes the ->power_off() callback.
+Currently CPU's idle states are represented in a flattened model, via the
+"cpu-idle-states" binding from within the CPU's device nodes.
+
+Support the hierarchical layout during parsing and validating of the CPU's
+idle states. This is simply done by calling the new OF helper,
+of_get_cpu_state_node().
 
 Cc: Lina Iyer <ilina@codeaurora.org>
+Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Lina Iyer <ilina@codeaurora.org>
 ---
- drivers/base/power/domain.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/cpuidle/dt_idle_states.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index e1bbddb02871..7f38a92b444a 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -467,6 +467,10 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool one_dev_on,
- 			return -EAGAIN;
- 	}
+diff --git a/drivers/cpuidle/dt_idle_states.c b/drivers/cpuidle/dt_idle_states.c
+index 53342b7f1010..13f9b7cd32d1 100644
+--- a/drivers/cpuidle/dt_idle_states.c
++++ b/drivers/cpuidle/dt_idle_states.c
+@@ -118,8 +118,7 @@ static bool idle_state_valid(struct device_node *state_node, unsigned int idx,
+ 	for (cpu = cpumask_next(cpumask_first(cpumask), cpumask);
+ 	     cpu < nr_cpu_ids; cpu = cpumask_next(cpu, cpumask)) {
+ 		cpu_node = of_cpu_device_node_get(cpu);
+-		curr_state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
+-						   idx);
++		curr_state_node = of_get_cpu_state_node(cpu_node, idx);
+ 		if (state_node != curr_state_node)
+ 			valid = false;
  
-+	/* Default to shallowest state. */
-+	if (!genpd->gov)
-+		genpd->state_idx = 0;
-+
- 	if (genpd->power_off) {
- 		int ret;
+@@ -176,7 +175,7 @@ int dt_init_idle_driver(struct cpuidle_driver *drv,
+ 	cpu_node = of_cpu_device_node_get(cpumask_first(cpumask));
  
-@@ -1687,6 +1691,8 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
- 		ret = genpd_set_default_power_state(genpd);
- 		if (ret)
- 			return ret;
-+	} else if (!gov) {
-+		pr_warn("%s : no governor for states\n", genpd->name);
- 	}
+ 	for (i = 0; ; i++) {
+-		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++		state_node = of_get_cpu_state_node(cpu_node, i);
+ 		if (!state_node)
+ 			break;
  
- 	device_initialize(&genpd->dev);
 -- 
 2.17.1
