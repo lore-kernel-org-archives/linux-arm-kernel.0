@@ -1,85 +1,34 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed,  3 Oct 2018 16:24:57 +0200
-Subject: [PATCH v2 1/2] drm/sun4i: tcon: fix check of tcon->panel null pointer
-In-Reply-To: <9a545739-eed5-7af1-3b75-108bdd3427a2@micronovasrl.com>
-References: <9a545739-eed5-7af1-3b75-108bdd3427a2@micronovasrl.com>
-Message-ID: <20181003142458.33120-1-giulio.benetti@micronovasrl.com>
+From: vabhav.sharma@nxp.com (Vabhav Sharma)
+Date: Wed, 3 Oct 2018 14:25:11 +0000
+Subject: [PATCH v3 3/6] drivers: clk-qoriq: increase array size of
+ cmux_to_group
+In-Reply-To: <153843144041.119890.5558230475983572666@swboyd.mtv.corp.google.com>
+References: <1537747741-6245-1-git-send-email-vabhav.sharma@nxp.com>
+ <1537747741-6245-4-git-send-email-vabhav.sharma@nxp.com>
+ <153843144041.119890.5558230475983572666@swboyd.mtv.corp.google.com>
+Message-ID: <VI1PR04MB48001B1FBCF455D690ACF58DF3E90@VI1PR04MB4800.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, the check of tcon->panel to be valid is wrong. IS_ERR()
-has been used, but that macro doesn't check if tcon->panel pointer is
-null or not, but check if tcon->panel is between -1 and -4095(MAX_ERRNO).
 
-Remove IS_ERR() from tcon->panel checking and let "if (tcon->panel)" as
-condition to check if it's a pointer not null.
 
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
----
-Changes V1->V2:
-* correct same bug for all same occurences in drm/sun4i folder
-
- drivers/gpu/drm/sun4i/sun4i_lvds.c | 4 ++--
- drivers/gpu/drm/sun4i/sun4i_rgb.c  | 4 ++--
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-index af7dcb6da351..e7eb0d1e17be 100644
---- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-@@ -75,7 +75,7 @@ static void sun4i_lvds_encoder_enable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Enabling LVDS output\n");
- 
--	if (!IS_ERR(tcon->panel)) {
-+	if (tcon->panel) {
- 		drm_panel_prepare(tcon->panel);
- 		drm_panel_enable(tcon->panel);
- 	}
-@@ -88,7 +88,7 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Disabling LVDS output\n");
- 
--	if (!IS_ERR(tcon->panel)) {
-+	if (tcon->panel) {
- 		drm_panel_disable(tcon->panel);
- 		drm_panel_unprepare(tcon->panel);
- 	}
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index bf068da6b12e..f4a22689eb54 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -135,7 +135,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
- 
--	if (!IS_ERR(tcon->panel)) {
-+	if (tcon->panel) {
- 		drm_panel_prepare(tcon->panel);
- 		drm_panel_enable(tcon->panel);
- 	}
-@@ -148,7 +148,7 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
- 
--	if (!IS_ERR(tcon->panel)) {
-+	if (tcon->panel) {
- 		drm_panel_disable(tcon->panel);
- 		drm_panel_unprepare(tcon->panel);
- 	}
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index c78cd35a1294..e4b3bd0307ef 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -555,7 +555,7 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 	 * Following code is a way to avoid quirks all around TCON
- 	 * and DOTCLOCK drivers.
- 	 */
--	if (!IS_ERR(tcon->panel)) {
-+	if (tcon->panel) {
- 		struct drm_panel *panel = tcon->panel;
- 		struct drm_connector *connector = panel->connector;
- 		struct drm_display_info display_info = connector->display_info;
--- 
-2.17.1
+> -----Original Message-----
+> From: Stephen Boyd <sboyd@kernel.org>
+> Sent: Tuesday, October 2, 2018 3:34 AM
+> To: Vabhav Sharma <vabhav.sharma@nxp.com>; arnd at arndb.de;
+> catalin.marinas at arm.com; devicetree at vger.kernel.org;
+> gregkh at linuxfoundation.org; kstewart at linuxfoundation.org; linux-arm-
+> kernel at lists.infradead.org; linux-clk at vger.kernel.org; linux-kernel-
+> owner at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> pm at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; mark.rutland at arm.com;
+> mturquette at baylibre.com; oss at buserror.net; rjw at rjwysocki.net;
+> robh+dt at kernel.org; sudeep.holla at arm.com; viresh.kumar at linaro.org;
+> will.deacon at arm.com; yamada.masahiro at socionext.com
+> Cc: linux at armlinux.org.uk; Varun Sethi <V.Sethi@nxp.com>; Udit Kumar
+> <udit.kumar@nxp.com>; Yogesh Narayan Gaur
+> <yogeshnarayan.gaur@nxp.com>; Vabhav Sharma <vabhav.sharma@nxp.com>
+> Subject: Re: [PATCH v3 3/6] drivers: clk-qoriq: increase array size of
+> cmux_to_group
+> 
+> Subject should be "clk: qoriq: increase array size ..."
+Ok
