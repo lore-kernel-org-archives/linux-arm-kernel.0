@@ -1,66 +1,52 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 3 Oct 2018 13:48:42 +0200
-Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
-In-Reply-To: <34b25855-fcef-61ed-312d-2011f80bdec4@arm.com>
-References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
- <1538482531-26883-2-git-send-email-anshuman.khandual@arm.com>
- <20181002123909.GS18290@dhcp22.suse.cz>
- <fae68a4e-b14b-8342-940c-ea5ef3c978af@arm.com>
- <20181003065833.GD18290@dhcp22.suse.cz>
- <7f0488b5-053f-0954-9b95-8c0890ef5597@arm.com>
- <20181003105926.GA4714@dhcp22.suse.cz>
- <34b25855-fcef-61ed-312d-2011f80bdec4@arm.com>
-Message-ID: <20181003114842.GD4714@dhcp22.suse.cz>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Wed, 3 Oct 2018 14:13:53 +0200
+Subject: [PATCH 1/2] drm/sun4i: tcon: fix check of tcon->panel null pointer
+In-Reply-To: <CAGb2v64z+j=ywU8n210Zw+97n=Ff4rVdUwNR9nbKO-hMD3nJcQ@mail.gmail.com>
+References: <20181001093612.GA13672@mwanda>
+ <20181002215917.1849-1-giulio.benetti@micronovasrl.com>
+ <CAGb2v64z+j=ywU8n210Zw+97n=Ff4rVdUwNR9nbKO-hMD3nJcQ@mail.gmail.com>
+Message-ID: <9a545739-eed5-7af1-3b75-108bdd3427a2@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 03-10-18 17:07:13, Anshuman Khandual wrote:
+Il 03/10/2018 11:43, Chen-Yu Tsai ha scritto:
+> On Wed, Oct 3, 2018 at 5:59 AM Giulio Benetti
+> <giulio.benetti@micronovasrl.com> wrote:
+>>
+>> At the moment, the check of tcon->panel to be valid is wrong. IS_ERR()
+>> has been used, but that macro doesn't check if tcon->panel pointer is
+>> null or not, but check if tcon->panel is between -1 and -4095(MAX_ERRNO).
+>>
+>> Remove IS_ERR() from tcon->panel checking and let "if (tcon->panel)" as
+>> condition to check if it's a pointer not null.
 > 
+> There's actually more than one occurance of this error:
 > 
-> On 10/03/2018 04:29 PM, Michal Hocko wrote:
-[...]
-> > It is not the platform that decides. That is the whole point of the
-> > distinction. It is us to say what is feasible and what we want to
-> > support. Do we want to support giga pages in zone_movable? Under which
-> > conditions? See my point?
+> drivers/gpu/drm/sun4i/sun4i_lvds.c:     if (!IS_ERR(tcon->panel)) {
+> drivers/gpu/drm/sun4i/sun4i_lvds.c:     if (!IS_ERR(tcon->panel)) {
+> drivers/gpu/drm/sun4i/sun4i_rgb.c:      if (!IS_ERR(tcon->panel)) {
+> drivers/gpu/drm/sun4i/sun4i_rgb.c:      if (!IS_ERR(tcon->panel)) {
 > 
-> So huge_movable() is going to be a generic MM function deciding on the
-> feasibility for allocating a huge page of 'size' from movable zone during
-> migration.
-
-Yeah, this might be a more complex logic than just the size check. If
-there is a sufficient pre-allocated pool to migrate the page off it
-might be pre-reserved for future migration etc... Nothing to be done
-right now of course.
-
-> If the feasibility turns out to be negative, then migration
-> process is aborted there.
-
-You are still confusing allocation and migration here I am afraid. The
-whole "feasible to migrate" is for the _allocation_ time when we decide
-whether the new page should be placed in zone_movable or not.
-
-> huge_movable() will do something like these:
+> These four are responsible for enabling and disabling the panel.
 > 
-> - Return positive right away on smaller size huge pages
-> - Measure movable allocation feasibility for bigger huge pages
-> 	- Look out for free_pages in the huge page order in movable areas
-> 	- if (order > (MAX_ORDER - 1))
-> 		- Scan the PFN ranges in movable zone for possible allocation
-> 	- etc
-> 	- etc
+> drivers/gpu/drm/sun4i/sun4i_tcon.c:     if (!IS_ERR(tcon->panel)) {
 > 
-> Did I get this right ?
+> All this looks like it was left over from commit ebc9446135671 ("drm: convert
+> drivers to use drm_of_find_panel_or_bridge"). We have checks against tcon->panel
+> in several places and not all of them were converted.
+> 
 
-Well, not really. I was thinking of something like this for the
-beginning
-	if (!arch_hugepage_migration_supporte())
-		return false;
-	if (hstate_is_gigantic(h))
-		return false;
-	return true;
+Then, I'm going to send a patchset to correct them.
 
-further changes might be done on top of this.
+Best regards
 -- 
-Michal Hocko
-SUSE Labs
+Giulio Benetti
+CTO
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
