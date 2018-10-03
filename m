@@ -1,28 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 3 Oct 2018 11:42:18 +0100
-Subject: [PATCH] arm64: arch_timer: avoid unused function warning
-In-Reply-To: <20181002211214.2672576-1-arnd@arndb.de>
-References: <20181002211214.2672576-1-arnd@arndb.de>
-Message-ID: <20181003104218.GC12998@arrakis.emea.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 3 Oct 2018 11:50:38 +0100
+Subject: [PATCH v8 1/9] KVM: arm/arm64: Ensure only THP is candidate for
+ adjustment
+In-Reply-To: <20181001155443.23032-2-punit.agrawal@arm.com>
+References: <20181001155443.23032-1-punit.agrawal@arm.com>
+ <20181001155443.23032-2-punit.agrawal@arm.com>
+Message-ID: <0809a9d0-d256-c23a-c3cc-0b2be33aecff@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2018 at 11:11:44PM +0200, Arnd Bergmann wrote:
-> arm64_1188873_read_cntvct_el0() is protected by the correct
-> CONFIG_ARM64_ERRATUM_1188873 #ifdef, but the only reference to it is
-> also inside of an CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND section,
-> and causes a warning if that is disabled:
+On 01/10/18 16:54, Punit Agrawal wrote:
+> PageTransCompoundMap() returns true for hugetlbfs and THP
+> hugepages. This behaviour incorrectly leads to stage 2 faults for
+> unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
+> treated as THP faults.
 > 
-> drivers/clocksource/arm_arch_timer.c:323:20: error: 'arm64_1188873_read_cntvct_el0' defined but not used [-Werror=unused-function]
+> Tighten the check to filter out hugetlbfs pages. This also leads to
+> consistently mapping all unsupported hugepage sizes as PTE level
+> entries at stage 2.
 > 
-> Since the erratum requires that we always apply the workaround
-> in the timer driver, select that symbol as we do for SoC
-> specific errata.
-> 
-> Fixes: 95b861a4a6d9 ("arm64: arch_timer: Add workaround for ARM erratum 1188873")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: stable at vger.kernel.org # v4.13+
 
-Applied. Thanks.
+FWIW, I've cherry-picked that single patch from the series and queued it 
+for 4.20.
 
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
