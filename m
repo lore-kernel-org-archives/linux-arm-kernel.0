@@ -1,35 +1,24 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed,  3 Oct 2018 16:23:01 +0300
-Subject: [PATCH] arm64: dts: clearfog-gt-8k: add PCIe slot description
-Message-ID: <ac8d233a624411272616d19f070cea756f625235.1538572981.git.baruch@tkos.co.il>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 3 Oct 2018 15:28:11 +0200
+Subject: [PATCH] PCI: armada8k: add support for gpio controlled reset
+ signal
+In-Reply-To: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
+References: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
+Message-ID: <20181003132811.GC427@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the PCIe interface on the CON4 mini-PCIe
-connector.
+On Wed, Oct 03, 2018 at 03:49:43PM +0300, Baruch Siach wrote:
+> This commit adds support for the gpio reset signal binding as described
+> in the designware-pcie.txt DT binding document. Both the documented
+> 'reset-gpio' property name, and the more standard 'reset-gpios' name are
+> supported.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+Hi Baruch
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-index 2e06d82bec58..a13549749ee7 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-@@ -233,6 +233,13 @@
- 	};
- };
- 
-+&cp0_pcie0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp0_pci0_reset_pins>;
-+	reset-gpios = <&cp0_gpio2 0 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
- &cp0_gpio2 {
- 	sata_reset {
- 		gpio-hog;
--- 
-2.19.0
+I don't know this code at all, so maybe a dumb question. Why support
+the old none-standard binding of reset-gpio on new hardware? I'm
+assuming reset-gpio is marked a deprecated and reset-gpios is
+recommended?
+
+    Andrew
