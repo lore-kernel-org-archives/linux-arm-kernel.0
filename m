@@ -1,55 +1,43 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 3 Oct 2018 11:22:59 +0100
-Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
-In-Reply-To: <c0689b0c-4810-e0e8-354e-55c45d59b6d0@arm.com>
-References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
- <1538482531-26883-2-git-send-email-anshuman.khandual@arm.com>
- <835085a2-79c2-4eb5-2c10-13bb2893f611@arm.com>
- <c0689b0c-4810-e0e8-354e-55c45d59b6d0@arm.com>
-Message-ID: <a6b96126-5571-2aa2-6deb-09a457afd781@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 3 Oct 2018 11:37:07 +0100
+Subject: [PATCH v3 2/3] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <20180921150803.25444-3-shameerali.kolothum.thodi@huawei.com>
+References: <20180921150803.25444-1-shameerali.kolothum.thodi@huawei.com>
+ <20180921150803.25444-3-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <2b4a53bc-7839-6826-44ed-6099c732a31a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 21/09/18 16:08, Shameer Kolothum wrote:
+[...]
+> +
+> +	err = cpuhp_state_add_instance_nocalls(cpuhp_state_num,
+> +					       &smmu_pmu->node);
 
+In theory a hotplug event could happen as soon as the instance is 
+registered...
 
-On 02/10/18 13:56, Anshuman Khandual wrote:
-> 
-> 
-> On 10/02/2018 06:08 PM, Suzuki K Poulose wrote:
->> Hi Anshuman
->>
->> On 02/10/18 13:15, Anshuman Khandual wrote:
->>> Architectures like arm64 have PUD level HugeTLB pages for certain configs
->>> (1GB huge page is PUD based on ARM64_4K_PAGES base page size) that can be
->>> enabled for migration. It can be achieved through checking for PUD_SHIFT
->>> order based HugeTLB pages during migration.
->>>
->>> Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
->>> ---
->>>  ? include/linux/hugetlb.h | 3 ++-
->>>  ? 1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
->>> index 6b68e34..9c1b77f 100644
->>> --- a/include/linux/hugetlb.h
->>> +++ b/include/linux/hugetlb.h
->>> @@ -483,7 +483,8 @@ static inline bool hugepage_migration_supported(struct hstate *h)
->>>  ? {
->>>  ? #ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
->>>  ????? if ((huge_page_shift(h) == PMD_SHIFT) ||
->>> -??????? (huge_page_shift(h) == PGDIR_SHIFT))
->>> +??????? (huge_page_shift(h) == PUD_SHIFT) ||
->>
->>
->>> +??????????? (huge_page_shift(h) == PGDIR_SHIFT))
->>
->> nit: Extra Tab ^^.
-> 
-> The tab is in there when you apply this patch and all three checks are tab separated
-> in a newline.
+> +	if (err) {
+> +		dev_err(dev, "Error %d registering hotplug, PMU @%pa\n",
+> +			err, &res_0->start);
+> +		return err;
+> +	}
+> +
+> +	/* Pick one CPU to be the preferred one to use */
+> +	smmu_pmu->on_cpu = get_cpu();
 
-Well, with the patch applied, at least I can see 2 tabs for the
-PUD_SHIFT check and 3 tabs for PGDIR_SHIFT check. Which seems
-inconsistent. Is it just me (my mail client) ?
+...so this looks too late, i.e. a race here can result in a bogus call 
+to perf_pmu_migrate_context() with an uninitialised pmu.
 
-Suzuki
+Robin.
+
+> +	WARN_ON(irq_set_affinity(smmu_pmu->irq, cpumask_of(smmu_pmu->on_cpu)));
+> +
+> +	err = perf_pmu_register(&smmu_pmu->pmu, name, -1);
+> +	if (err) {
+> +		dev_err(dev, "Error %d registering PMU @%pa\n",
+> +			err, &res_0->start);
+> +		goto out_unregister;
+> +	}
+> +
+> +	put_cpu();
