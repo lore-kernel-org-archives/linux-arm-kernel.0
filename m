@@ -1,90 +1,50 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 03 Oct 2018 03:38:46 +0200
-Subject: [GIT PULL 1/3] Rockchip ARM64 devicetree updates for 4.20 - round2
-Message-ID: <2559110.ail6FZQ9dJ@phil>
+Date: Wed, 03 Oct 2018 03:39:29 +0200
+Subject: [GIT PULL 2/3] Rockchip ARM32 devicetree updates for 4.20
+In-Reply-To: <2559110.ail6FZQ9dJ@phil>
+References: <2559110.ail6FZQ9dJ@phil>
+Message-ID: <1670292.M4d8aT802m@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-please find below and in the following pull-requests more rockchip
-changes targetted at 4.20.
-
-Nice mix of new boards and some improvements + fixes as described
-in the tags. So please pull.
-
-Thanks
-Heiko
-
-
-The following changes since commit 78f26da3ffbce0ea3692a89fe3f5487cb8dda068:
-
-  arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board (2018-09-10 19:16:26 +0200)
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts32-1
 
-for you to fetch changes up to e78d53c7b2873e0724eb765a88ccde42560b0e05:
+for you to fetch changes up to 186b45657b244ce865e01b65d73868a48252e1ff:
 
-  arm64: dts: rockchip: enable display nodes on rk3328-rock64 (2018-09-28 13:18:37 +0200)
-
-----------------------------------------------------------------
-Some additional new boards, the rk3399-based RockPro64 from Pine64, as well
-as the Vamrs Rock960. Another big feature is display support including hdmi
-and the Innosilicon hdmiphy on the rk3328, right now enabled on the rock64.
-The rock64 also got its spi-nor and spdif enabled. On the px30 we can see
-dwc2-based usb support now and finally some misc fixes, like for a new dtc
-warning, missing address and size cells and microSD fix on sapphire.
+  ARM: dts: rockchip: add rk3288-based Tinker board S (2018-09-26 14:31:30 +0200)
 
 ----------------------------------------------------------------
-Akash Gajjar (1):
-      arm64: dts: rockchip: add initial dts support for Rockpro64
+Nodes for the newly support rk3188 display controller, a fix for a new
+dtc warning, gpio setting for the sdmmc regulator on radxarock and a
+new board the "S" variant of the rk3288-based Tinker board, that sports
+an added emmc.
 
-Chen-Yu Tsai (1):
-      arm64: dts: rockchip: Enable SPI NOR flash on Rock64
+----------------------------------------------------------------
+David Summers (2):
+      ARM: dts: rockchip: move shared tinker-board nodes to a common dtsi
+      ARM: dts: rockchip: add rk3288-based Tinker board S
 
-Heiko Stuebner (6):
-      arm64: dts: rockchip: add dwc2 otg controller on px30
-      arm64: dts: rockchip: enable dwc2-based otg controller on px30-evb
-      arm64: dts: rockchip: add missing address and size cells for rk3399 mipi dsi
-      arm64: dts: rockchip: add Innosilicon hdmi phy node to rk3328
-      arm64: dts: rockchip: add rk3328 display nodes
-      arm64: dts: rockchip: enable display nodes on rk3328-rock64
-
-Katsuhiro Suzuki (1):
-      arm64: dts: rockchip: add spdif sound node for rock64
-
-Liang Chen (1):
-      dt-bindings: usb: dwc2: add description for px30
-
-Manivannan Sadhasivam (4):
-      arm64: dts: rockchip: Split out common nodes for Rock960 based boards
-      dt-bindings: arm: rockchip: Add binding for Rock960 board
-      arm64: dts: rockchip: Add support for Rock960 board
-      arm64: dts: rockchip: Enable SD card detection for Rock960 boards
+Heiko Stuebner (2):
+      ARM: dts: rockchip: add rk3188 lcd controller nodes
+      ARM: dts: rockchip: explicitly set vcc_sd0 pin to gpio on rk3188-radxarock
 
 Rob Herring (1):
-      arm64: dts: rockchip: Fix I2C bus unit-address error on rk3399-puma-haikou
+      ARM: dts: rockchip: Fix erroneous SPI bus dtc warnings on rk3036
 
-Vicente Bergas (1):
-      arm64: dts: rockchip: Fix microSD in rk3399 sapphire board
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   8 +
- Documentation/devicetree/bindings/usb/dwc2.txt     |   1 +
- arch/arm64/boot/dts/rockchip/Makefile              |   2 +
- arch/arm64/boot/dts/rockchip/px30-evb.dts          |   4 +
- arch/arm64/boot/dts/rockchip/px30.dtsi             |  16 +
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     |  57 ++
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  67 ++
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts      | 524 +---------------
- .../arm64/boot/dts/rockchip/rk3399-puma-haikou.dts |   2 +-
- arch/arm64/boot/dts/rockchip/rk3399-rock960.dts    |  52 ++
- arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi   | 542 ++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts  | 692 +++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi  |  24 +-
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   4 +
- 14 files changed, 1474 insertions(+), 521 deletions(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3036.dtsi                      |   2 +-
+ arch/arm/boot/dts/rk3188-radxarock.dts             |   8 +
+ arch/arm/boot/dts/rk3188.dtsi                      |  82 ++++
+ arch/arm/boot/dts/rk3288-tinker-s.dts              |  26 ++
+ arch/arm/boot/dts/rk3288-tinker.dts                | 498 +-------------------
+ arch/arm/boot/dts/rk3288-tinker.dtsi               | 502 +++++++++++++++++++++
+ 8 files changed, 626 insertions(+), 497 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3288-tinker-s.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-tinker.dtsi
