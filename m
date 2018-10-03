@@ -1,47 +1,64 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 3 Oct 2018 18:50:36 +0100
-Subject: [PATCH v6 05/18] ACPI / APEI: Make estatus queue a Kconfig symbol
-In-Reply-To: <20181001175956.GF7269@zn.tnic>
-References: <20180921221705.6478-1-james.morse@arm.com>
- <20180921221705.6478-6-james.morse@arm.com> <20181001175956.GF7269@zn.tnic>
-Message-ID: <a562d7c4-2e74-3a18-7fb0-ba8f40d2dce4@arm.com>
+Date: Wed,  3 Oct 2018 18:50:52 +0100
+Subject: [PATCH] asm-generic/pgtable-nop?d.h: define folded with a value for
+ use in C
+Message-ID: <20181003175052.31917-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+It turns out "if (__is_defined(__PAGETABLE_PMD_FOLDED))" isn't equivalent
+to "#ifdef __PAGETABLE_PMD_FOLDED". (who knew!)
 
-On 01/10/18 18:59, Borislav Petkov wrote:
-> On Fri, Sep 21, 2018 at 11:16:52PM +0100, James Morse wrote:
->> Now that there are two users of the estatus queue, and likely to be more,
->> make it a Kconfig symbol selected by the appropriate notification. We
->> can move the ARCH_HAVE_NMI_SAFE_CMPXCHG checks in here too.
-> 
-> Ok, question: why do we need to complicate things at all? I mean, why do
-> we even need a Kconfig symbol?
+kconfig.h's __is_defined() expects a define of the form
+"#define CONFIG_BOOGER 1". But these nop?d headers just have
+"#define __PAGETABLE_PMD_FOLDED".
 
-Before patch 4, this was behind CONFIG_HAVE_ACPI_APEI_NMI, (so it made use of an
-existing kconfig symbol), and there was only one user x86:NMI.
+This means ____is_defined()'s triplet passed to __take_second_arg() is
+'empty-string, 1 0' in both cases, meaning these symbols can't be used
+from C. (they are always false).
 
-The ACPI spec has four ~NMI notifications, so far the support for these in Linux
-has been selectable separately. If you build the kernel without any of them then
-this code would be unused, and generate warnings because all those users are
-behind #ifdef too.
+asm-generic gets away with this as its using the pre-processor's
+defined() macro on this, not the C __is_defined().
 
+Add the expected '1'.
 
-> This code is being used by two arches now so why not simply build it in
-> unconditionally and be done with it. The couple of KB saved are simply
-> not worth the effort, especially if it is going to end up being enabled
-> on 99% of the setups...
-
-I'm all in favour of letting the compiler work it out, but the existing ghes
-code has #ifdef/#else all over the place. This is 'keeping the style'.
-I assumed it was done this way to support an older compiler on x86, (I see that
-jumped from 3.2 to 4.6 with commit cafa0010cd51)
-
-We could strip the lot away to a few IS_ENABLED() in ghes_probe() and the
-memory_failure()/AER calls if you'd prefer.
+Signed-off-by: James Morse <james.morse@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+---
+This fixes an issue with patches queued for arm64. Can it go via the arm64 tree?
+Link: lore.kernel.org/r/0f9a3abc-4890-faf5-ee7e-18434641b858 at arm.com
 
 
-Thanks,
 
-James
+ include/asm-generic/pgtable-nopmd.h | 2 +-
+ include/asm-generic/pgtable-nopud.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/asm-generic/pgtable-nopmd.h b/include/asm-generic/pgtable-nopmd.h
+index f35f6e8149e4..fcb4769a075a 100644
+--- a/include/asm-generic/pgtable-nopmd.h
++++ b/include/asm-generic/pgtable-nopmd.h
+@@ -8,7 +8,7 @@
+ 
+ struct mm_struct;
+ 
+-#define __PAGETABLE_PMD_FOLDED
++#define __PAGETABLE_PMD_FOLDED	1
+ 
+ /*
+  * Having the pmd type consist of a pud gets the size right, and allows
+diff --git a/include/asm-generic/pgtable-nopud.h b/include/asm-generic/pgtable-nopud.h
+index e950b9c50f34..d300dbcddaf3 100644
+--- a/include/asm-generic/pgtable-nopud.h
++++ b/include/asm-generic/pgtable-nopud.h
+@@ -9,7 +9,7 @@
+ #else
+ #include <asm-generic/pgtable-nop4d.h>
+ 
+-#define __PAGETABLE_PUD_FOLDED
++#define __PAGETABLE_PUD_FOLDED	1
+ 
+ /*
+  * Having the pud type consist of a p4d gets the size right, and allows
+-- 
+2.19.0
