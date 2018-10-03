@@ -1,64 +1,73 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed,  3 Oct 2018 18:50:52 +0100
-Subject: [PATCH] asm-generic/pgtable-nop?d.h: define folded with a value for
- use in C
-Message-ID: <20181003175052.31917-1-james.morse@arm.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 3 Oct 2018 11:06:45 -0700
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
+In-Reply-To: <20181003093346.GA12570@e107155-lin>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-3-georgi.djakov@linaro.org>
+ <20180925180215.GA12435@bogus>
+ <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
+ <20180926144830.GB25838@e107155-lin>
+ <fa74c24f-1f22-f11f-60fe-5a4489d9c7c2@codeaurora.org>
+ <20181002111758.GC1086@e107155-lin>
+ <c17450ce-fc25-e792-b91b-51106f032542@codeaurora.org>
+ <20181003093346.GA12570@e107155-lin>
+Message-ID: <0a276103-15fb-807c-5379-1a35de789290@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out "if (__is_defined(__PAGETABLE_PMD_FOLDED))" isn't equivalent
-to "#ifdef __PAGETABLE_PMD_FOLDED". (who knew!)
-
-kconfig.h's __is_defined() expects a define of the form
-"#define CONFIG_BOOGER 1". But these nop?d headers just have
-"#define __PAGETABLE_PMD_FOLDED".
-
-This means ____is_defined()'s triplet passed to __take_second_arg() is
-'empty-string, 1 0' in both cases, meaning these symbols can't be used
-from C. (they are always false).
-
-asm-generic gets away with this as its using the pre-processor's
-defined() macro on this, not the C __is_defined().
-
-Add the expected '1'.
-
-Signed-off-by: James Morse <james.morse@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
----
-This fixes an issue with patches queued for arm64. Can it go via the arm64 tree?
-Link: lore.kernel.org/r/0f9a3abc-4890-faf5-ee7e-18434641b858 at arm.com
 
 
+On 10/03/2018 02:33 AM, Sudeep Holla wrote:
+> On Tue, Oct 02, 2018 at 11:56:56AM -0700, Saravana Kannan wrote:
+>> On 10/02/2018 04:17 AM, Sudeep Holla wrote:
+> [...]
+>
+>>> Yes, I do understand I have made the same point multiple time and it's
+>>> intentional. We need to get the fragmented f/w support story fixed.
+>>> Different ARM vendors are doing different things in f/w and ARM sees the
+>>> same fragmentation story as before. We have come up with new specification
+>>> and my annoying multiple emails are just to constantly remind the same.
+>>>
+>>> I do understand we have existing implementations to consider, but fixing
+>>> the functionality in arbitrary way is not a good design and it better
+>>> to get them fixed for future.
+>> I believe the fragmentation you are referring to is? in the
+>> interface/communication protocol. I see the benefit of standardizing that as
+>> long as the standard actually turns out to be good. But that's completely
+>> separate from what the FW can/can't do. Asking to standardize what the FW
+>> can/can't do doesn't seem realistic as each chip vendor will have different
+>> priorities - power, performance, cost, chip area, etc. It's the conflation
+>> of these separate topics that doesn't help IMHO.
+> I agree on interface/communication protocol fragmentation and firmware
+> can implement whatever the vendor wish. What I was also referring was
+> the mix-n-match approach which should be avoided.
+>
+> e.g. Device A and B's PM is managed completely by firmware using OSPM hints
+> Suppose Device X's PM is dependent on Device A and B, in which case it's
+> simpler and cleaner to leave Device X PM to firmware. Reading the state
+> of A and B and using that as hint for X is just overhead which firmware
+> can manage better. That was my main concern here: A=CPU and B=some other
+> device and X is inter-connect to which A and B are connected.
+>
+> If CPU OPPs are obtained from f/w and this inter-connect from DT, mapping
+> then is a mess and that's what I was concerned. I am sorry if that's not
+> the scenario here, I may have mistaken then.
+>
+What you are asking would be an ideal case, but this is not an ideal 
+world. There are tons of constraints for each chip vendor. Saying you 
+can't mix and match makes perfect the enemy of the good. Adding FW 
+support for A and B might make them optimal. But adding support for X 
+might not be possible for multiple real world constraints (chip area, 
+cost, time to market, etc). Saying "either do it all or do nothing" is 
+going to hold back a lot progress that can come in increments. Heck, we 
+do the same thing in the kernel. We'll add basic simple features first 
+and then improve on them. Why is it suddenly frowned up if a FW/HW 
+follows the same approach? I'll just have to agree to disagree with you 
+on this view point.
 
- include/asm-generic/pgtable-nopmd.h | 2 +-
- include/asm-generic/pgtable-nopud.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+-Saravana
 
-diff --git a/include/asm-generic/pgtable-nopmd.h b/include/asm-generic/pgtable-nopmd.h
-index f35f6e8149e4..fcb4769a075a 100644
---- a/include/asm-generic/pgtable-nopmd.h
-+++ b/include/asm-generic/pgtable-nopmd.h
-@@ -8,7 +8,7 @@
- 
- struct mm_struct;
- 
--#define __PAGETABLE_PMD_FOLDED
-+#define __PAGETABLE_PMD_FOLDED	1
- 
- /*
-  * Having the pmd type consist of a pud gets the size right, and allows
-diff --git a/include/asm-generic/pgtable-nopud.h b/include/asm-generic/pgtable-nopud.h
-index e950b9c50f34..d300dbcddaf3 100644
---- a/include/asm-generic/pgtable-nopud.h
-+++ b/include/asm-generic/pgtable-nopud.h
-@@ -9,7 +9,7 @@
- #else
- #include <asm-generic/pgtable-nop4d.h>
- 
--#define __PAGETABLE_PUD_FOLDED
-+#define __PAGETABLE_PUD_FOLDED	1
- 
- /*
-  * Having the pud type consist of a p4d gets the size right, and allows
 -- 
-2.19.0
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
