@@ -1,33 +1,22 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 4 Oct 2018 09:49:31 +0900
-Subject: [PATCH 1/4] ARM: dts: uniphier: Add USB3 controller nodes
-In-Reply-To: <1538478722-20351-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1538478722-20351-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1538478722-20351-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNATgBVDt3g4OfxF4kj5w-_u3Y4Yd9-FjC3wseijoR12O0g@mail.gmail.com>
+Date: Thu, 4 Oct 2018 09:50:21 +0900
+Subject: [PATCH 1/2] ARM: dts: uniphier: add SD/eMMC controller nodes
+In-Reply-To: <1538521191-16333-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1538521191-16333-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNASM5qjYOBm_ho4ZMtzNjtFGgTiNXrZpvH9k3nJmOF7vSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 2, 2018 at 8:12 PM Kunihiko Hayashi
-<hayashi.kunihiko@socionext.com> wrote:
+On Wed, Oct 3, 2018 at 8:01 AM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 >
-> Add USB3 controller nodes including usb-core, resets, regulator, ss-phy
-> and hs-phy. This supports for Pro4, PXs2 and the boards.
+> Add SD controller nodes for LD4, Pro4, sLD8, Pro5, and PXs2.
+> This is also used as an eMMC controller for LD4, Pro4, and sLD8.
 >
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->  arch/arm/boot/dts/uniphier-pro4-ace.dts    |   8 ++
->  arch/arm/boot/dts/uniphier-pro4-ref.dts    |   8 ++
->  arch/arm/boot/dts/uniphier-pro4.dtsi       |  94 +++++++++++++++
->  arch/arm/boot/dts/uniphier-pxs2-gentil.dts |   8 ++
->  arch/arm/boot/dts/uniphier-pxs2-vodka.dts  |   4 +
->  arch/arm/boot/dts/uniphier-pxs2.dtsi       | 180 +++++++++++++++++++++++++++++
->  6 files changed, 302 insertions(+)
-
 
 Series, applied.
-
-Thanks.
 
 
 -- 
