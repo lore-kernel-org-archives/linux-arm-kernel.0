@@ -1,31 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Oct 2018 17:19:28 +0200
-Subject: [GIT PULL] ti-sysc driver changes for omaps for v4.20
-In-Reply-To: <pull-1538588866-709117@atomide.com>
-References: <pull-1538588866-709117@atomide.com>
-Message-ID: <CAK8P3a2uKxvd5ujeemoNNuOTo_zgYth8g-PDPBfapg_1eT7_tA@mail.gmail.com>
+Date: Thu, 4 Oct 2018 17:21:14 +0200
+Subject: [GIT PULL] DaVinci DT support for v4.20
+In-Reply-To: <2b3c8d80-578c-45f6-b111-ca98222cc290@ti.com>
+References: <2b3c8d80-578c-45f6-b111-ca98222cc290@ti.com>
+Message-ID: <CAK8P3a0i5Sx0==hyTLYbkqAkVg8ULQZbhe5SWhs0srGi-yWUhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 3, 2018 at 7:48 PM Tony Lindgren <tony@atomide.com> wrote:
-> TI sysc driver changes for v4.20 merge window
+On Thu, Oct 4, 2018 at 5:18 PM Sekhar Nori <nsekhar@ti.com> wrote:
 >
-> This series gets rid of the SYSC_QUIRK_RESOURCE_PROVIDER to make device
-> detection happen mostly only if #define DEBUG is set. Few core devices still
-> need to be detected to set legacy quirks.
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 >
-> We also add support for booting am335x, am437x and dra7 SoCs with L4 devices
-> defined in device tree instead of legacy platform data.
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 >
-> And finally we simplify suspend with just SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
-> and dropping the custom functions that were attempting to work around
-> issues that really turned out to be child device driver related issues.
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.20/dt
+>
+> for you to fetch changes up to aea4762fb46e048c059ff49565ee33da07c8aeb3:
+>
+>   ARM: dts: da850-lego-ev3: slow down A/DC as much as possible (2018-10-04 20:08:40 +0530)
+>
+> ----------------------------------------------------------------
+> DaVinci DT updates for v4.20
+> ----------------------------
+> - A non-critical fix to reduce errors on A/DC on Lego Mindstorms EV3
+> - Support for GPIO expander on DA850 EVM
 
-Pulled into next/drivers, thanks!
+Pulled into next/dt, thanks!
 
-> Apologies for a late pull request, debugging the suspend issues took a while
-> and I did not want to send these changes until that got sorted out.
-
-No worries.
-
-     Arnd
+        Arnd
