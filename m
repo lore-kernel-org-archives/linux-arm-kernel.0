@@ -1,31 +1,46 @@
 From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Thu,  4 Oct 2018 06:33:47 +0530
-Subject: [PATCH v4 2/6] soc/fsl/guts: Add compatible string for LX2160A
+Date: Thu,  4 Oct 2018 06:33:48 +0530
+Subject: [PATCH v4 3/6] clk: qoriq: increase array size of cmux_to_group
 In-Reply-To: <1538615031-7507-1-git-send-email-vabhav.sharma@nxp.com>
 References: <1538615031-7507-1-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <1538615031-7507-3-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <1538615031-7507-4-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding compatible string "lx2160a-dcfg" to
-initialize guts driver for lx2160
+From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 
+Increase size of cmux_to_group array, to accomdate entry of
+-1 termination.
+
+Added -1, terminated, entry for 4080_cmux_grpX.
+
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
 ---
- drivers/soc/fsl/guts.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/clk-qoriq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
-index 302e0c8..5e1e633 100644
---- a/drivers/soc/fsl/guts.c
-+++ b/drivers/soc/fsl/guts.c
-@@ -222,6 +222,7 @@ static const struct of_device_id fsl_guts_of_match[] = {
- 	{ .compatible = "fsl,ls1088a-dcfg", },
- 	{ .compatible = "fsl,ls1012a-dcfg", },
- 	{ .compatible = "fsl,ls1046a-dcfg", },
-+	{ .compatible = "fsl,lx2160a-dcfg", },
- 	{}
+diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+index 3a1812f..e152bfb 100644
+--- a/drivers/clk/clk-qoriq.c
++++ b/drivers/clk/clk-qoriq.c
+@@ -79,7 +79,7 @@ struct clockgen_chipinfo {
+ 	const struct clockgen_muxinfo *cmux_groups[2];
+ 	const struct clockgen_muxinfo *hwaccel[NUM_HWACCEL];
+ 	void (*init_periph)(struct clockgen *cg);
+-	int cmux_to_group[NUM_CMUX]; /* -1 terminates if fewer than NUM_CMUX */
++	int cmux_to_group[NUM_CMUX+1]; /* array should be -1 terminated */
+ 	u32 pll_mask;	/* 1 << n bit set if PLL n is valid */
+ 	u32 flags;	/* CG_xxx */
  };
- MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
+@@ -601,7 +601,7 @@ static const struct clockgen_chipinfo chipinfo[] = {
+ 			&p4080_cmux_grp1, &p4080_cmux_grp2
+ 		},
+ 		.cmux_to_group = {
+-			0, 0, 0, 0, 1, 1, 1, 1
++			0, 0, 0, 0, 1, 1, 1, 1, -1
+ 		},
+ 		.pll_mask = 0x1f,
+ 	},
 -- 
 2.7.4
