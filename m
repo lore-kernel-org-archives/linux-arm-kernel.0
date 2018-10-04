@@ -1,79 +1,64 @@
-From: grant.likely@arm.com (Grant Likely)
-Date: Thu, 4 Oct 2018 10:39:33 +0100
-Subject: drivers binding to device node with multiple compatible strings
-In-Reply-To: <CACxGe6u2FQ8r1Ya6-mWoGcs7g2OLMccu68uskZvDLS6ows-hXQ@mail.gmail.com>
-References: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
- <CAL_JsqKRH8uEzSx6H6ZSRJF9Ecp4am1cNsxgQqf2OO5_aGR1zw@mail.gmail.com>
- <CADRPPNQam-QUfqDMvu42KS+50VaHfGPhCZj-1jRHQ-Od0fbxuQ@mail.gmail.com>
- <CACxGe6u2FQ8r1Ya6-mWoGcs7g2OLMccu68uskZvDLS6ows-hXQ@mail.gmail.com>
-Message-ID: <aa3341d6-8fef-40bc-783b-fbbd55b88420@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 4 Oct 2018 14:52:18 +0530
+Subject: [PATCH 0/4] spi: add support for octal mode data transfer
+In-Reply-To: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <43cff872-0dc5-d3ce-ca35-082faa0e0e7c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2018 10:32, Grant Likely wrote:
-> On Fri, Sep 28, 2018 at 10:01 PM Li Yang <leoyang.li@nxp.com> wrote:
->>
->> On Fri, Sep 28, 2018 at 3:07 PM Rob Herring <robh+dt@kernel.org> wrote:
->>>
->>> On Thu, Sep 27, 2018 at 5:25 PM Li Yang <leoyang.li@nxp.com> wrote:
->>>>
->>>> Hi Rob and Grant,
->>>>
->>>> Various device tree specs are recommending to include all the
->>>> potential compatible strings in the device node, with the order from
->>>> most specific to most general.  But it looks like Linux kernel doesn't
->>>> provide a way to bind the device to the most specific driver, however,
->>>> the first registered compatible driver will be bound.
->>>>
->>>> As more and more generic drivers are added to the Linux kernel, they
->>>> are competing with the more specific vendor drivers and causes problem
->>>> when both are built into the kernel.  I'm wondering if there is a
->>>> generic solution (or in plan) to make the most specific driver bound
->>>> to the device.   Or we have to disable the more general driver or
->>>> remove the more general compatible string from the device tree?
->>>
->>> It's been a known limitation for a long time. However, in practice it
->>> doesn't seem to be a common problem. Perhaps folks just remove the
->>> less specific compatible from their DT (though that's not ideal). For
->>> most modern bindings, there's so many other resources beyond
->>> compatible (clocks, resets, pinctrl, etc.) that there are few generic
->>> drivers that can work.
->>>
->>> I guess if we want to fix this, we'd need to have weighted matching in
->>> the driver core and unbind drivers when we get a better match. Though
->>> it could get messy if the better driver probe fails. Then we've got to
->>> rebind to the original driver.
->>
->> Probably we can populate the platform devices from device tree after
->> the device_init phase?  So that all built-in drivers are already
->> registered when the devices are created and we can try find the best
->> match in one go?  For more specific loadable modules we probably need
->> to unbind from the old driver and bind to the new one.  But I agree
->> with you that it could be messy.
+Hi Yogesh,
+
+On Thursday 04 October 2018 02:18 PM, Yogesh Gaur wrote:
+> Add support for octal mode IO data transfer.
+> Micron flash, mt35xu512aba, supports octal mode data transfer and
+> NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
 > 
-> It's a tradeoff.
+> Patch series 
+> * Add support for octal mode flags and parsing of same in spi driver.
+> * Add octal data communication commands required for mt35xu512aba [1] flash.
+> * Add support for Read and Write proto for (1-1-8/1-8-8) mode.
+> * Add mode bit required for octal mode in nxp-fspi driver [2].
+> * Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
+> 
+> Tested on LX2160ARDB target with nxp-fspi driver, below are
+> Read performance number of 1-1-1 and 1-1-8 read protocol.
+> 
+>  root at lxxx:~# cat /proc/mtd
+>  dev:    size   erasesize  name
+>  mtd0: 04000000 00001000 "spi0.0"
+>  mtd1: 04000000 00001000 "spi0.1"
+>  root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
+>  Copied 16777216 bytes from address 0x00000000 in flash to 0read
+>  
+>  real    0m2.792s
+>  user    0m0.000s
+>  sys     0m2.790s
+>  root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
+>  Copied 16777216 bytes from address 0x00000000 in flash to 0read
+>  
+>  real    0m0.441s
+>  user    0m0.000s
+>  sys     0m0.440s
+>  root at ls1012ardb:~#
+> 
+>  Flash device MTD0 configured in 1-1-1 protocol.
+>  Flash device MTD1 configured in 1-1-8 protocol.
+> 
+> [1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=66317
+> [2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=66887
+> 
+> Yogesh Gaur (4):
+>   spi: add support for octal I/O data transfer
+>   mtd: spi-nor: add support for octal mode data transfer
+>   spi: nxp-fspi: add mode flag bit for octal support
+>   arm64: dts: lx2160a: update fspi node
 
-Oops! Accidentally hit send too early.
+This is a bit confusing and difficult to follow. I suggest to order
+patches such that spi-nor layer changes are at the first, then m25p80
+related things, followed by spi-mem (if needed spi) changes and finally
+spi-mem controller driver changes.
 
-It's a tradeoff. If the platform device population is deferred until 
-after all drivers are loaded, then there isn't any mechanism to ensure 
-some devices get probed early in the init sequence.
-
-As Rob said, while it is a problem in theory, there haven't been a lot 
-of actual cases where it is a problem. The solution has been to either 
-remove the generic match from the device, or we can blacklist particular 
-devices from the generic driver.
-
-g.
-
-
->>
->>>
->>> Do you have a specific case where you hit this?
->>
->> Maybe not a new issue but "snps,dw-pcie" is competing with various
->> "fsl,<chip>-pcie" compatibles.  Also a specific PHY
->> "ethernet-phy-idAAAA.BBBB" with generic "ethernet-phy-ieee802.3-c45".
->>
->> Regards,
->> Leo
+-- 
+Regards
+Vignesh
