@@ -1,20 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Oct 2018 17:05:50 +0200
-Subject: [GIT PULL] ARM: at91: DT for 4.20 #2
-In-Reply-To: <20181003134553.aqbogomrxqmpgpmo@M43218.corp.atmel.com>
-References: <20181003134553.aqbogomrxqmpgpmo@M43218.corp.atmel.com>
-Message-ID: <CAK8P3a08=FMJUKgSe10d5Nw+626=-pmP7Fy8G6f+_+OtU_VEcQ@mail.gmail.com>
+Date: Thu, 4 Oct 2018 17:07:59 +0200
+Subject: [GIT PULL v2] ARM: dts: uniphier: UniPhier DT updates for v4.20
+In-Reply-To: <CAK7LNAR90vJA6vyEP_6_zmW_CAoxrHQC8-iAK0ixn6+o2uQfkg@mail.gmail.com>
+References: <CAK7LNAR90vJA6vyEP_6_zmW_CAoxrHQC8-iAK0ixn6+o2uQfkg@mail.gmail.com>
+Message-ID: <CAK8P3a13q8TYaWvc1iF+V+pOdSc-dLLfFJUTnAD+_dDmD3_x6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 3, 2018 at 3:45 PM Ludovic Desroches
-<ludovic.desroches@microchip.com> wrote:
+On Thu, Oct 4, 2018 at 2:54 AM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+
+> UniPhier ARM SoC DT updates for v4.20
 >
-> Arnd, Olof,
+> - Add more clocks to NAND controller nodes
 >
-> Here are the second round of DT changes for 4.20. It consists in NAND
-> description fixes (size and partitions).
+> - Add SPI controller nodes
+>
+> - Add SD controller nodes
+>
+> - Add USB 3.0 and its PHY nodes
+>
+> - Add PHY nodes for USB 2.0
 
 Pulled into next/dt, thanks!
 
-       Arnd
+     Arnd
