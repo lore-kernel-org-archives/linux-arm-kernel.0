@@ -1,24 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 4 Oct 2018 10:45:00 +0100
-Subject: [PATCH] asm-generic/pgtable-nop?d.h: define folded with a value
- for use in C
-In-Reply-To: <20181003175052.31917-1-james.morse@arm.com>
-References: <20181003175052.31917-1-james.morse@arm.com>
-Message-ID: <20181004094500.GA108096@arrakis.emea.arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 4 Oct 2018 11:45:35 +0200
+Subject: [PATCH 1/3] mtd: spi-nor: Add Octal mode support for mt35xu512aba
+In-Reply-To: <20181003165603.2579-2-vigneshr@ti.com>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003165603.2579-2-vigneshr@ti.com>
+Message-ID: <20181004114535.3a5dba05@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 06:50:52PM +0100, James Morse wrote:
-> It turns out "if (__is_defined(__PAGETABLE_PMD_FOLDED))" isn't equivalent
-> to "#ifdef __PAGETABLE_PMD_FOLDED". (who knew!)
+On Wed, 3 Oct 2018 22:26:01 +0530
+Vignesh R <vigneshr@ti.com> wrote:
+
+> Micron's mt35xu512aba flash is an Octal flash that has x8 IO lines. It
+> supports read/write over 8 IO lines simulatenously. Add support for
+> Octal read mode for Micron mt35xu512aba.
+> Unfortunately, this flash is only complaint to SFDP JESD216B and does not
+> seem to support newer JESD216C standard that provides auto detection of
+> Octal mode capabilities and opcodes. Therefore, this capability is
+> manually added using new SPI_NOR_OCTAL_READ flag.
 > 
-> kconfig.h's __is_defined() expects a define of the form
-> "#define CONFIG_BOOGER 1". But these nop?d headers just have
-> "#define __PAGETABLE_PMD_FOLDED".
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  drivers/mtd/spi-nor/spi-nor.c | 11 ++++++++++-
+>  include/linux/mtd/spi-nor.h   |  2 ++
+>  2 files changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index aff5e6ff0b2c..4926e805a8cb 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -90,6 +90,7 @@ struct flash_info {
+>  #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
+>  #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
+>  #define USE_CLSR		BIT(14)	/* use CLSR command */
+> +#define SPI_NOR_OCTAL_READ	BIT(15)	/* Flash supports Octal Read */
 
-I wonder why we're using __is_defined() at all on arm64. It looks like
-some internal kconfig.h helper for IS_ENABLED() etc. Even if it looks
-nicer, I'd rather go for an #ifdef in the arm64 set_pmd() code.
+Hm, we'll need to clarify what OCTAL means. I see at least 3 different
+modes using 8 IO lines (1-1-8, 1-8-8 and 8-8-8) and all of them could
+be qualified as "octal" modes.
+So how about renaming this macro SPI_NOR_1_1_8_READ.
 
--- 
-Catalin
+Also, I fear we'll soon run out of bits in ->flags if we keep adding
+one flag per mode which is why I proposed a solution to let flash
+chips tweak the flash parameters as they wish [1][2]. I'm not saying we
+should do it now, but we should definitely plan for something like that.
+
+[1]https://github.com/bbrezillon/linux/commit/9c672e4c85a91f1b0803c9c6e4b8f3aae5d79ffb
+[2]https://github.com/bbrezillon/linux/commit/3a5515c8821314c06a3d84f9861aefe476bb711e
