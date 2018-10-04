@@ -1,76 +1,40 @@
-From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Thu,  4 Oct 2018 10:54:14 +0200
-Subject: [PATCH 2/3] ARM: socfpga: Turn on all peripheral clocks for a system
- reboot
-In-Reply-To: <20181004085415.12925-1-peron.clem@gmail.com>
-References: <20181004085415.12925-1-peron.clem@gmail.com>
-Message-ID: <20181004085415.12925-2-peron.clem@gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 4 Oct 2018 11:10:30 +0200
+Subject: [PATCH 1/3] mtd: spi-nor: Add Octal mode support for mt35xu512aba
+In-Reply-To: <VI1PR04MB103837831B8BFEC2F7FD12E799EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003165603.2579-2-vigneshr@ti.com>
+ <VI1PR04MB1038C20CA97E453FC4C9CEAE99EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181004093925.2961d881@bbrezillon>
+ <VI1PR04MB103837831B8BFEC2F7FD12E799EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+Message-ID: <20181004111030.4ae3670c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Thu, 4 Oct 2018 08:47:33 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-When doing a software reboot, all peripheral clocks must get turned on for the
-L3 interconnect to work.
+> > 
+> > Yogesh, you already sent "spi: add flags for octal I/O data
+> > transfer" [3] which is only adding the new OCTAL flags but is not
+> > patching spi.c and spi-mem.c to take those new flags into account.
+> > Here is my version of this patch [2] (it's still missing an update
+> > of SPI_MEM_MAX_BUSWIDTH). Let me know what you want to do (rework
+> > your version to address the problem or take mine). 
+> I haven't said that I have sent the patches.
 
-This code is needed when doing a "reboot" from user-space and a peripheral
-clock as been gated off. Why would a peripheral clock get gated? An example
-use case would be a .ko that gets insmod and rmmod during runtime. The insmod
-would turn on the IP's clock, and the rmmod would turn off the IP's clock.
-Doing a "reboot" would cause the system to hang.
+Well, you at least sent one of them, I know it because I was in
+CC :P.
 
-5c04b57fe33c ("ARM: socfpga: Enable soft reset")
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
----
- arch/arm/mach-socfpga/core.h    | 3 +++
- arch/arm/mach-socfpga/socfpga.c | 8 ++++++++
- 2 files changed, 11 insertions(+)
+> My patches are ready and needed to be sent for review.
 
-diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-index 92cae0a9213f..17c8a97c04d9 100644
---- a/arch/arm/mach-socfpga/core.h
-+++ b/arch/arm/mach-socfpga/core.h
-@@ -52,4 +52,7 @@ extern unsigned long socfpga_cpu1start_addr;
- 
- #define SOCFPGA_SCU_VIRT_BASE   0xfee00000
- 
-+/* Clock manager defines */
-+#define SOCFPGA_ENABLE_PLL_REG	0xA0
-+
- #endif
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 5fb6f79059a8..c9c881f7c67c 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -31,6 +31,7 @@ void __iomem *sys_manager_base_addr;
- void __iomem *rst_manager_base_addr;
- void __iomem *sdr_ctl_base_addr;
- unsigned long socfpga_cpu1start_addr;
-+void __iomem *clkmgr_base_addr;
- 
- static void __init socfpga_sysmgr_init(void)
- {
-@@ -51,6 +52,10 @@ static void __init socfpga_sysmgr_init(void)
- 	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
- 	rst_manager_base_addr = of_iomap(np, 0);
- 
-+	np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
-+	clkmgr_base_addr = of_iomap(np, 0);
-+	WARN_ON(!clkmgr_base_addr);
-+
- 	np = of_find_compatible_node(NULL, NULL, "altr,sdr-ctl");
- 	sdr_ctl_base_addr = of_iomap(np, 0);
- }
-@@ -80,6 +85,9 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
- {
- 	u32 temp;
- 
-+	/* Turn on all periph PLL clocks */
-+	writel(0xffff, clkmgr_base_addr + SOCFPGA_ENABLE_PLL_REG);
-+
- 	temp = readl(rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
- 
- 	if (mode == REBOOT_HARD)
--- 
-2.17.1
+I initially told you to drop those patches because we didn't have a
+user yet, that's about to change, so I guess we're all good.
+
+> In these patches,  I am adding support for X-X-X protocol for octal
+> support and integrating them with spi  and flash m25p80 interface.
+
+>From what I've seen you're not adding support of 8-8-8 but for 1-8-8 an
+1-1-8, which is a lot easier to deal with (it's completely stateless,
+which is what the spi-nor expects). Unless you're talking about other
+patches you haven't sent yet...
