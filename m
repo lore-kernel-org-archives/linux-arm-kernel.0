@@ -1,43 +1,106 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Fri, 5 Oct 2018 00:19:37 +0530
-Subject: [PATCHv3 2/2] iommu/arm-smmu: Add SMMU clock
-In-Reply-To: <1538605693-22073-3-git-send-email-thor.thayer@linux.intel.com>
-References: <1538605693-22073-1-git-send-email-thor.thayer@linux.intel.com>
- <1538605693-22073-3-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <1898b9fb-0523-4de4-741a-a52de5fdab70@codeaurora.org>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Fri, 5 Oct 2018 00:23:07 +0530
+Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
+In-Reply-To: <20181004181736.GB20842@bombadil.infradead.org>
+References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
+ <20181003200003.GA9965@bombadil.infradead.org>
+ <20181003221444.GZ30658@n2100.armlinux.org.uk>
+ <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
+ <20181004123400.GC30658@n2100.armlinux.org.uk>
+ <CAFqt6zZPOM17QwmcWKF3F1gqkJm=2PxvuJ3naWuRXZGHc2HrEQ@mail.gmail.com>
+ <20181004181736.GB20842@bombadil.infradead.org>
+Message-ID: <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thor,
-
-
-On 10/4/2018 3:58 AM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Thu, Oct 4, 2018 at 11:47 PM Matthew Wilcox <willy@infradead.org> wrote:
 >
-> Add a clock to the SMMU structure. In the device tree case,
-> check for a clock node and enable the clock if found.
+> On Thu, Oct 04, 2018 at 11:42:18PM +0530, Souptick Joarder wrote:
+> > On Thu, Oct 4, 2018 at 6:04 PM Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> > > I'm confused, what are you trying to do?
+> > >
+> > > It seems that we already have:
+> > >
+> > > vm_insert_page() - returns an errno
+> > > vmf_insert_page() - returns a VM_FAULT_* code
+> > >
+> > > From what I _think_ you're saying, you're trying to provide
+> > > vm_insert_kmem_page() as a direct replacement for the existing
+> > > vm_insert_page(), and then make vm_insert_page() behave as per
+> > > vmf_insert_page(), so we end up with:
+> >
+> > yes, vm_insert_kmem_page() can be a direct replacement of vm_insert_page
+> > or might be a wrapper function written using vm_insert_page whichever
+> > suites better
+> > based on feedback.
+> >
+> > >
+> > > vm_insert_kmem_page() - returns an errno
+> > > vm_insert_page() - returns a VM_FAULT_* code
+> > > vmf_insert_page() - returns a VM_FAULT_* code and is identical to
+> > >       vm_insert_page()
+> > >
+> >
+> > After completion of conversion we end up with
+> >
+> >  vm_insert_kmem_page() - returns an errno
+> >  vmf_insert_page() - returns a VM_FAULT_* code
+> >
+> >
+> > > Given that the documentation for vm_insert_page() says:
+> > >
+> > >  * Usually this function is called from f_op->mmap() handler
+> > >  * under mm->mmap_sem write-lock, so it can change vma->vm_flags.
+> > >  * Caller must set VM_MIXEDMAP on vma if it wants to call this
+> > >  * function from other places, for example from page-fault handler.
+> > >
+> > > this says that the "usual" use method for vm_insert_page() is
+> > > _outside_ of page fault handling - if it is used _inside_ page fault
+> > > handling, then it states that additional fixups are required on the
+> > > VMA.  So I don't get why your patch commentry seems to be saying that
+> > > users of vm_insert_page() outside of page fault handling all need to
+> > > be patched - isn't this the use case that this function is defined
+> > > to be handling?
+> >
+> > The answer is yes best of my knowledge.
+> >
+> > But as mentioned in change log ->
+> >
+> > Going forward, the plan is to restrict future drivers not
+> > to use vm_insert_page ( *it will generate new errno to
+> > VM_FAULT_CODE mapping code for new drivers which were already
+> > cleaned up for existing drivers*) in #PF (page fault handler)
+> > context but to make use of vmf_insert_page which returns
+> > VMF_FAULT_CODE and that is not possible until both vm_insert_page
+> > and vmf_insert_page API exists.
+> >
+> > But there are some consumers of vm_insert_page which use it
+> > outside #PF context. straight forward conversion of vm_insert_page
+> > to vmf_insert_page won't work there as those function calls expects
+> > errno not vm_fault_t in return.
+> >
+> > If both {vm, vmf}_insert_page exists, vm_insert_page might be used for
+> > #PF context which we want to protect by removing/ replacing vm_insert_page
+> > with another similar/ wrapper API.
+> >
+> > Is that the right answer of your question ? no ?
 >
-> This patch is dependent upon the following patches that add
-> a device tree bulk clock function.
-> "[V6, 1/4] clk: bulk: add of_clk_bulk_get()"
-> https://patchwork.kernel.org/patch/10583133/
-> "[V6, 2/4] clk: add new APIs to operation on all available
-> clocks"
-> https://patchwork.kernel.org/patch/10583131/
-> "[V6, 3/4] clk: add managerged version of clk_bulk_get_all"
-> https://patchwork.kernel.org/patch/10583139/
+> I think this is a bad plan.  What we should rather do is examine the current
+> users of vm_insert_page() and ask "What interface would better replace
+> vm_insert_page()?"
 >
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->   drivers/iommu/arm-smmu.c | 20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
+> As I've said to you before, I believe the right answer is to have a
+> vm_insert_range() which takes an array of struct page pointers.  That
+> fits the majority of remaining users.
 
-The clock part is already handled by one of the patch in the
-runtime pm series of arm-smmu [1]. This patch should not be needed.
+Ok, but it will take some time.
+Is it a good idea to introduce the final vm_fault_t patch and then
+start working on vm_insert_range as it will be bit time consuming ?
 
-[1] https://patchwork.kernel.org/patch/10581899/
-
-[...]
-
-Regards
-Vivek
+>
+> ----
+>
+> If we do want to rename vm_insert_page() to vm_insert_kmem_page(), then
+> the right answer is to _just do that_.  Not duplicate vm_insert_page()
+> in its entirety.  I don't see the point to doing that.
