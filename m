@@ -1,68 +1,59 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 4 Oct 2018 16:57:55 +0100
-Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM) (a subset)
-In-Reply-To: <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
- <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
- <10136406.EY9A7BdqYq@aspire.rjw.lan>
- <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
-Message-ID: <20181004155755.GD5233@e107981-ln.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 04 Oct 2018 18:02:07 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.20 (#2)
+Message-ID: <87woqxlmyo.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2018 at 11:32:41AM +0200, Rafael J. Wysocki wrote:
-> On Thu, Oct 4, 2018 at 11:04 AM Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >
-> > On Thursday, October 4, 2018 10:58:53 AM CEST Ulf Hansson wrote:
-> > > On 4 October 2018 at 10:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > > > On Wed, Oct 3, 2018 at 4:39 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > > >>
-> > > >> I have digested the review comments so far, including a recent offlist chat
-> > > >> with with Lorenzo Pieralisi around the debatable PSCI changes. More or less I
-> > > >> have a plan for how to move forward.
-> > > >>
-> > > >> However, to avoid re-posting non-changed patches over and over again, I decided
-> > > >> to withhold the more debatable part from this v9, hence this is not the complete
-> > > >> series to make things play. In v9, I have just included the trivial changes,
-> > > >> which are either already acked/reviewed or hopefully can be rather soon/easily.
-> > > >>
-> > > >> My hope is to get this queued for v4.20, to move things forward. I know it's
-> > > >> late, but there are more or less nothing new here since v8.
-> > > >
-> > > > I have no problems with the first three patches in this series, so I
-> > > > can apply them right away.  Do you want me to do that?
-> > >
-> > > Yes, please.
-> > >
-> > > >
-> > > > As for the rest, the cpuidle driver patch looks OK to me, but the
-> > > > PSCI-related ones need ACKs.
-> > >
-> > > For some yes, but I think you can go ahead with a few more.
-> > >
-> > > Patch 4, 5 is already acked/reviewed.
-> > >
-> > > Patch 6 should be fine (if you are okay with it else wait for an ack
-> > > from Daniel)
-> >
-> > OK, thanks.
-> >
-> > Do the 4-6 depend on the 1-3?
-> 
-> I don't see any dependency there, so I'll queue up the 1-3 in
-> pm-domains and the 4-6 in pm-cpuidle.
+Hi,
 
-I do not see why we should merge patches 4-6 for v4.20; they add legacy
-(DT bindings and related parsing code) with no user in the kernel; we
-may still want to tweak them, in particular PSCI DT bindings.
+Here is the second pull request for dt64 for mvebu for v4.20. It comes
+later that usual but the driver part of the System Error Interrupt
+support was accepted only on the beginning of the week. And while I
+was on adding more dts patch, I also add the CPU idle patches that
+were pending since a few weeks.
 
-Likewise, it makes no sense to merge patches 7-8 without the rest of
-the PSCI patches.
+Gregory
 
-Why do not we target v4.20-rc1 for the whole series re-posting and we take
-it from there given that we are at -rc6 tail end ?
+The following changes since commit 620cfb31bad4c5be7d9250f1e47a592750fc364b:
 
-Thanks,
-Lorenzo
+  arm64: dts: marvell: armada-37xx: add nodes to support watchdog (2018-09-28 10:00:17 +0200)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.20-2
+
+for you to fetch changes up to 91f84690b502075550ca01d853d5c49b319921eb:
+
+  arm64: dts: clearfog-gt-8k: add PCIe slot description (2018-10-03 17:22:34 +0200)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.20 (part 2)
+
+ - Add System Error Interrupt support to Armada SoCs (7K/8K)
+ - Add CPU idle support on Armada 8K
+
+----------------------------------------------------------------
+Baruch Siach (1):
+      arm64: dts: clearfog-gt-8k: add PCIe slot description
+
+Gregory CLEMENT (1):
+      arm64: dts: marvell: Add node labels for the cpus
+
+Miquel Raynal (3):
+      arm64: dts: marvell: add AP806 SEI subnode
+      arm64: dts: marvell: use new bindings for CP110 interrupts
+      arm64: dts: marvell: add CP110 ICU SEI subnode
+
+orenbh (1):
+      arm64: dts: marvell: add CPU Idle power state support on Armada 7K/8K
+
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   2 +-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   2 +-
+ .../dts/marvell/armada-8040-clearfog-gt-8k.dts     |   7 +
+ arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |   4 +-
+ arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  12 +-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  36 +++++
+ .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    |  16 +--
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi      | 149 ++++++++++++---------
+ 8 files changed, 145 insertions(+), 83 deletions(-)
