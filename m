@@ -1,24 +1,59 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 4 Oct 2018 09:11:47 -0700
-Subject: [PATCH i2c-next v5 4/5] i2c: aspeed: Remove hard-coded bus
- timeout value setting
-In-Reply-To: <CACPK8XdTMfdw1Tu97oD7R7MXQKGHnA5A+SVfAA3RDkiTd_bawA@mail.gmail.com>
-References: <20181003223107.16133-1-jae.hyun.yoo@linux.intel.com>
- <20181003223107.16133-5-jae.hyun.yoo@linux.intel.com>
- <CACPK8XdTMfdw1Tu97oD7R7MXQKGHnA5A+SVfAA3RDkiTd_bawA@mail.gmail.com>
-Message-ID: <185b73f1-ad5f-eedb-7c56-2a2e266f5960@linux.intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Oct 2018 09:13:51 -0700
+Subject: [PATCH v9 03/11] PM / Domains: Document flags for genpd
+In-Reply-To: <CAPDyKFr1H_ah3OYqghQgADs8fwNd+HpjWw9VfGR1T1-K5KbnhQ@mail.gmail.com>
+References: <20181003143824.13059-1-ulf.hansson@linaro.org>
+ <20181003143824.13059-4-ulf.hansson@linaro.org>
+ <20181004134839.GZ5662@atomide.com>
+ <CAPDyKFr1H_ah3OYqghQgADs8fwNd+HpjWw9VfGR1T1-K5KbnhQ@mail.gmail.com>
+Message-ID: <20181004161351.GH5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/4/2018 1:32 AM, Joel Stanley wrote:
-> On Thu, 4 Oct 2018 at 00:31, Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
->>
->> This commit removes hard-coded bus timeout value setting so that
->> it can be set by i2c-core-base.
->>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+* Ulf Hansson <ulf.hansson@linaro.org> [181004 15:02]:
+> On 4 October 2018 at 15:48, Tony Lindgren <tony@atomide.com> wrote:
+> > Hi,
+> >
+> > * Ulf Hansson <ulf.hansson@linaro.org> [181003 14:43]:
+> >> + * GENPD_FLAG_IRQ_SAFE:              This informs genpd that its backend callbacks,
+> >> + *                           ->power_on|off(), doesn't sleep. Hence, these
+> >> + *                           can be invoked from within atomic context, which
+> >> + *                           enables genpd to power on/off the PM domain,
+> >> + *                           even when pm_runtime_is_irq_safe() returns true,
+> >> + *                           for any of its attached devices. Note that, a
+> >> + *                           genpd having this flag set, requires its
+> >> + *                           masterdomains to also have it set.
+> >> + *
+> >
+> > Let's try to avoid adding more irq_safe stuff because of having that
+> > propagate to the masterdomains..
 > 
-> Reviewed-by: Joel Stanley <joel@jms.id.au>
-> 
+> I am not sure I get your point. This is just documenting existing
+> functionality in genpd, there is nothing new here.
 
-Thanks for the review, Joel!
+Right, and I'm just bringing up that this FLAG_IRQ_SAFE is not a
+good way to in the long run :)
+
+> > I think you can just flag the power_on/off in genpd, then have cpu_pm
+> > callbacks do it.
+> 
+> Not really sure what you propose, but feel free to send a patch.
+
+Well there is not much to really patch, just don't attempt to
+do irq_safe stuff from genpd and have cpu_idle callbacks to do
+it instead. And then no need for GENPD_FLAG_IRQ_SAFE :)
+
+> Do note, genpd has since the beginning of its time tried to cope with
+> pm_runtime_irq_safe() devices. I admit it's quite complicated, however
+> GENPD_FLAG_IRQ_SAFE greatly improved the support for such devices and
+> their PM domains. Moreover, we need this functionality, in one way or
+> the other, as long as there users of pm_runtime_irq_safe().
+
+Right, and I'm still struggling years after with legacy device drivers
+that have done pm_runtime_irq_safe() and come to the conclusion that
+it should not be used at all. Getting rid of GENPD_FLAG_IRQ_SAFE
+might just safe you years of pain later on.
+
+Regards,
+
+Tony
