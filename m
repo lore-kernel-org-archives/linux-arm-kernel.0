@@ -1,58 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 4 Oct 2018 09:19:45 +0100
-Subject: kernel BUG at arch/arm/kvm/coproc.c:1406!
-In-Reply-To: <6b134030-f9a4-1983-caac-5cfcc2be9776@gmail.com>
-References: <6b134030-f9a4-1983-caac-5cfcc2be9776@gmail.com>
-Message-ID: <3d719d5f-d7b9-9bba-4fa8-61175a9b05a9@arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Thu, 4 Oct 2018 03:21:44 -0500
+Subject: SoCFPGA Turn on ARM errata for L2 cache ?
+In-Reply-To: <CAJiuCcdR5dfN3MtvoqOMEG1hK+EuYgsdAaabW5wQrEDTdAOQdw@mail.gmail.com>
+References: <CAJiuCcdR5dfN3MtvoqOMEG1hK+EuYgsdAaabW5wQrEDTdAOQdw@mail.gmail.com>
+Message-ID: <c6ad1229-72b1-a7ab-554b-429debc5ee30@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
 
-On 04/10/18 04:02, Florian Fainelli wrote:
+
+On 10/03/2018 11:03 AM, Cl?ment P?ron wrote:
 > Hi,
 > 
-> Seeing the following BUG_ON() being triggered on a Lamobo R1
-> (SUN7I/Cortex-A7), did not have the time to run a bisection since I was
-> chasing another regression. My guess would be that
-> 3e8a8a50c7ef1a4f71921731f0e1748a7f70ddaa ("KVM: arm: vgic-v3: Add
-> support for ICC_SGI0R and ICC_ASGI1R accesses") is the culprit since it
-> does add new entries to cp15_regs[].
+> Saw this patch on the Altera OpenSource GitHub.
+> 
+> But it's not mainlained can I propose it?
+>
 
-OK, this is quite embarrassing. I remember fixing that exact bug before
-the 4.19 merge window, and was 100% convinced that I had merged the fix.
+You sure can!
 
-Turns out I didn't. 
+> How do you do when the patch is from someone else ? Do you keep the
+> sign-off of the original author or do you just mention it? in the
+> commit log ?
 
-Can you verify that the following patch works for you?
-
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 450c7a4fbc8a..cb094e55dc5f 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -478,15 +478,15 @@ static const struct coproc_reg cp15_regs[] = {
- 
- 	/* ICC_SGI1R */
- 	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
--	/* ICC_ASGI1R */
--	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
--	/* ICC_SGI0R */
--	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
- 
- 	/* VBAR: swapped by interrupt.S. */
- 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
- 			NULL, reset_val, c12_VBAR, 0x00000000 },
- 
-+	/* ICC_ASGI1R */
-+	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
-+	/* ICC_SGI0R */
-+	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
- 	/* ICC_SRE */
- 	{ CRn(12), CRm(12), Op1( 0), Op2(5), is32, access_gic_sre },
- 
+Sure, just keep the original Signed-off-by:.
 
 Thanks,
+Dinh
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Thanks,
+> Clement
+> 
+> From 6f7559407c1fcdb9b31c9493f0da79d614290e91 Mon Sep 17 00:00:00 2001
+> From: Dinh Nguyen <dinguyen@kernel.org>
+> Date: Wed, 27 Feb 2013 18:29:14 -0600
+> Subject: [PATCH] ARM: socfpga: Turn on ARM errata for L2 cache
+> 
+> Turn on these ARM and PL310 errata for SoCFPGA:
+> 
+> ARM_ERRATA_754322
+> ARM_ERRATA_764369
+> ARM_ERRATA_775420
+> 
+> PL310_ERRATA_588369
+> PL310_ERRATA_727915
+> PL310_ERRATA_753970
+> PL310_ERRATA_769419
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+> ---
+>  arch/arm/mach-socfpga/Kconfig | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+> index 4adb901dd5eb..a04660918d71 100644
+> --- a/arch/arm/mach-socfpga/Kconfig
+> +++ b/arch/arm/mach-socfpga/Kconfig
+> @@ -11,6 +11,13 @@ menuconfig ARCH_SOCFPGA
+>   select HAVE_ARM_TWD if SMP
+>   select MFD_SYSCON
+>   select PCI_DOMAINS if PCI
+> + select ARM_ERRATA_754322
+> + select ARM_ERRATA_764369 if SMP
+> + select ARM_ERRATA_775420
+> + select PL310_ERRATA_588369
+> + select PL310_ERRATA_727915
+> + select PL310_ERRATA_753970 if PL310
+> + select PL310_ERRATA_769419
+> 
+>  if ARCH_SOCFPGA
+>  config SOCFPGA_SUSPEND
+> 
