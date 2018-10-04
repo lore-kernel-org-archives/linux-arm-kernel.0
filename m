@@ -1,31 +1,32 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 4 Oct 2018 21:37:27 +0200
-Subject: linux-next: Signed-off-by missing for commits in the arm-soc tree
-In-Reply-To: <20181003072140.7c18d772@canb.auug.org.au>
-References: <20181003072140.7c18d772@canb.auug.org.au>
-Message-ID: <20181004193727.qci3puitpxml26m5@flea>
+Date: Thu, 4 Oct 2018 21:54:06 +0200
+Subject: [PATCH v2 1/2] drm/sun4i: tcon: fix check of tcon->panel null
+ pointer
+In-Reply-To: <20181003142458.33120-1-giulio.benetti@micronovasrl.com>
+References: <9a545739-eed5-7af1-3b75-108bdd3427a2@micronovasrl.com>
+ <20181003142458.33120-1-giulio.benetti@micronovasrl.com>
+Message-ID: <20181004195406.prjuko556tnuau2u@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi,
 
-On Wed, Oct 03, 2018 at 07:21:40AM +1000, Stephen Rothwell wrote:
-> Hi all,
+On Wed, Oct 03, 2018 at 04:24:57PM +0200, Giulio Benetti wrote:
+> At the moment, the check of tcon->panel to be valid is wrong. IS_ERR()
+> has been used, but that macro doesn't check if tcon->panel pointer is
+> null or not, but check if tcon->panel is between -1 and -4095(MAX_ERRNO).
 > 
-> Commits
+> Remove IS_ERR() from tcon->panel checking and let "if (tcon->panel)" as
+> condition to check if it's a pointer not null.
 > 
->   6eeb4180d4b9 ("ARM: dts: sunxi: h3-h5: Add Bananapi M2+ v1.2 device trees")
->   80c21c8c8b8d ("arm64: dts: allwinner: h5: Add device tree for Bananapi M2 Plus H5")
->   aa8fee415f46 ("ARM: dts: sun8i: h3: Split out non-SoC-specific parts of Bananapi M2 Plus")
->   db9fd9d13e30 ("ARM: dts: sun8i: h3: bpi-m2-plus: Fix address for external RGMII Ethernet PHY")
->   6c700289a3e8 ("ARM: dts: sun8i: h3-h5: ir register size should be the whole memory block")
-> 
-> are missing a Signed-off-by from their committer.
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 
-I just sent a new PR with the SoB this time (and I just learnt that
-git rebase rewrites the committer...)
+The commit log should be improved. The issue isn't really with the
+IS_ERR macro as you suggest, but that what is returned by
+of_drm_find_panel, and thus stored in tcon->panel. is not an error
+pointer in the first place but a NULL pointer on error. So the check
+doesn't check for the proper thing.
 
-Thanks!
 Maxime
 
 -- 
@@ -38,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181004/a1d0e8ec/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181004/5728b4a0/attachment.sig>
