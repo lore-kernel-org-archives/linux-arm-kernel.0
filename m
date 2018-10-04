@@ -1,26 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Oct 2018 17:07:59 +0200
-Subject: [GIT PULL v2] ARM: dts: uniphier: UniPhier DT updates for v4.20
-In-Reply-To: <CAK7LNAR90vJA6vyEP_6_zmW_CAoxrHQC8-iAK0ixn6+o2uQfkg@mail.gmail.com>
-References: <CAK7LNAR90vJA6vyEP_6_zmW_CAoxrHQC8-iAK0ixn6+o2uQfkg@mail.gmail.com>
-Message-ID: <CAK8P3a13q8TYaWvc1iF+V+pOdSc-dLLfFJUTnAD+_dDmD3_x6g@mail.gmail.com>
+Date: Thu, 4 Oct 2018 17:09:18 +0200
+Subject: [GIT PULL] arm64: dts: Amlogic updtes for v4.20, round 3
+In-Reply-To: <7hsh1loo57.fsf@baylibre.com>
+References: <7hsh1loo57.fsf@baylibre.com>
+Message-ID: <CAK8P3a3dKwEiQ5YsDB7YD8UP54LP3_TQgXPu_UcTxJaumQompg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 2:54 AM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-
-> UniPhier ARM SoC DT updates for v4.20
+On Thu, Oct 4, 2018 at 3:08 PM Kevin Hilman <khilman@baylibre.com> wrote:
 >
-> - Add more clocks to NAND controller nodes
+> The following changes since commit 9c8c52f7cb4f3b604bb9836947dadfbb255f465f:
 >
-> - Add SPI controller nodes
+>   arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support (2018-09-26 02:04:58 -0700)
 >
-> - Add SD controller nodes
+> are available in the git repository at:
 >
-> - Add USB 3.0 and its PHY nodes
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
 >
-> - Add PHY nodes for USB 2.0
+> for you to fetch changes up to 59d925ac203b4a3d6fae3e0dda183261fb81bf7a:
+>
+>   arm64: dts: meson-axg: s400: disable emmc (2018-10-03 08:52:04 -0700)
+>
+> ----------------------------------------------------------------
+> arm64: dts: Amlogic updates for v4.20, round 3
+> - AXG: fix eMMC
 
 Pulled into next/dt, thanks!
 
