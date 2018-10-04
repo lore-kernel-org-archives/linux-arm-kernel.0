@@ -1,48 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 4 Oct 2018 18:21:09 +0100
-Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM) (a subset)
-In-Reply-To: <CAJZ5v0j+W2CHiqkniXNJgZ3DU9pOpd_83Wj9Egwf+pVkRCjZLg@mail.gmail.com>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
- <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
- <10136406.EY9A7BdqYq@aspire.rjw.lan>
- <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
- <20181004155755.GD5233@e107981-ln.cambridge.arm.com>
- <CAJZ5v0j+W2CHiqkniXNJgZ3DU9pOpd_83Wj9Egwf+pVkRCjZLg@mail.gmail.com>
-Message-ID: <20181004172109.GA16878@red-moon>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 4 Oct 2018 19:34:16 +0200
+Subject: [PATCH v6 05/18] ACPI / APEI: Make estatus queue a Kconfig symbol
+In-Reply-To: <a562d7c4-2e74-3a18-7fb0-ba8f40d2dce4@arm.com>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-6-james.morse@arm.com>
+ <20181001175956.GF7269@zn.tnic>
+ <a562d7c4-2e74-3a18-7fb0-ba8f40d2dce4@arm.com>
+Message-ID: <20181004173416.GC5149@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2018 at 07:07:27PM +0200, Rafael J. Wysocki wrote:
+On Wed, Oct 03, 2018 at 06:50:36PM +0100, James Morse wrote:
+> I'm all in favour of letting the compiler work it out, but the existing ghes
+> code has #ifdef/#else all over the place. This is 'keeping the style'.
 
-[...]
+Yeah, but this "style" is not the optimal one and we should
+simplify/clean up and fix this thing.
 
-> > > I don't see any dependency there, so I'll queue up the 1-3 in
-> > > pm-domains and the 4-6 in pm-cpuidle.
-> >
-> > I do not see why we should merge patches 4-6 for v4.20; they add legacy
-> > (DT bindings and related parsing code) with no user in the kernel; we
-> > may still want to tweak them, in particular PSCI DT bindings.
-> 
-> My impression was that 4-6 have been agreed on due to the ACKs they
-> carry.  I'll drop them if that's not the case.
+Swapping the order of your statements here:
 
-I have not expressed myself correctly: they have been agreed (even
-though as I said they may require some tweaking) but I see no urgency
-of merging them in v4.20 since they have no user. They contain DT
-bindings, that create ABI/legacy, I think it is better to have code
-that uses them in the kernel before merging them and creating a
-dependency that is not needed.
+> The ACPI spec has four ~NMI notifications, so far the support for
+> these in Linux has been selectable separately.
 
-> > Likewise, it makes no sense to merge patches 7-8 without the rest of
-> > the PSCI patches.
-> 
-> OK
-> 
-> I'll let the ARM camp sort out the PSCI material then.
+Yes, but: distro kernels end up enabling all those options anyway and
+distro kernels are 90-ish% of the setups. Which means, this will get
+enabled anyway and this additional Kconfig symbol is simply going to be
+one automatic reply "Yes".
 
-We will do.
+So let's build it in by default and if someone complains about it, we
+can always carve it out. But right now I don't see the need for the
+unnecessary separation...
 
-Thanks,
-Lorenzo
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
