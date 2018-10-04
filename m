@@ -1,32 +1,24 @@
-From: kyrylo.tkachov@arm.com (Kyrylo Tkachov)
-Date: Thu,  4 Oct 2018 17:06:46 +0100
-Subject: [PATCH] Fix typo in a comment in arch/arm64/mm/kasan_init.c
-Message-ID: <20181004160646.3348-1-kyrylo.tkachov@arm.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 4 Oct 2018 09:11:47 -0700
+Subject: [PATCH i2c-next v5 4/5] i2c: aspeed: Remove hard-coded bus
+ timeout value setting
+In-Reply-To: <CACPK8XdTMfdw1Tu97oD7R7MXQKGHnA5A+SVfAA3RDkiTd_bawA@mail.gmail.com>
+References: <20181003223107.16133-1-jae.hyun.yoo@linux.intel.com>
+ <20181003223107.16133-5-jae.hyun.yoo@linux.intel.com>
+ <CACPK8XdTMfdw1Tu97oD7R7MXQKGHnA5A+SVfAA3RDkiTd_bawA@mail.gmail.com>
+Message-ID: <185b73f1-ad5f-eedb-7c56-2a2e266f5960@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"bellow" -> "below"
+On 10/4/2018 1:32 AM, Joel Stanley wrote:
+> On Thu, 4 Oct 2018 at 00:31, Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
+>>
+>> This commit removes hard-coded bus timeout value setting so that
+>> it can be set by i2c-core-base.
+>>
+>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> 
+> Reviewed-by: Joel Stanley <joel@jms.id.au>
+> 
 
-The recommendation from kegel.com/kerspell is to only fix the howlers.
-"Bellow" is a synonym of "howl" so this should be appropriate.
-
-Signed-off-by: Kyrylo Tkachov <kyrylo.tkachov@arm.com>
----
- arch/arm64/mm/kasan_init.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index 12145874c02b..fccb1a6f8c6f 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -192,7 +192,7 @@ void __init kasan_init(void)
- 
- 	/*
- 	 * We are going to perform proper setup of shadow memory.
--	 * At first we should unmap early shadow (clear_pgds() call bellow).
-+	 * At first we should unmap early shadow (clear_pgds() call below).
- 	 * However, instrumented code couldn't execute without shadow memory.
- 	 * tmp_pg_dir used to keep early shadow mapped until full shadow
- 	 * setup will be finished.
--- 
-2.19.0
+Thanks for the review, Joel!
