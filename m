@@ -1,133 +1,50 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Thu,  4 Oct 2018 14:18:38 +0530
-Subject: [PATCH 2/4] mtd: spi-nor: add support for octal mode data transfer
-In-Reply-To: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1538642920-3843-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Oct 2018 10:58:53 +0200
+Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM) (a subset)
+In-Reply-To: <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
+References: <20181003143824.13059-1-ulf.hansson@linaro.org>
+ <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
+Message-ID: <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for octal mode data transfer for Micron mt35xu512aba.
+On 4 October 2018 at 10:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Wed, Oct 3, 2018 at 4:39 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>> I have digested the review comments so far, including a recent offlist chat
+>> with with Lorenzo Pieralisi around the debatable PSCI changes. More or less I
+>> have a plan for how to move forward.
+>>
+>> However, to avoid re-posting non-changed patches over and over again, I decided
+>> to withhold the more debatable part from this v9, hence this is not the complete
+>> series to make things play. In v9, I have just included the trivial changes,
+>> which are either already acked/reviewed or hopefully can be rather soon/easily.
+>>
+>> My hope is to get this queued for v4.20, to move things forward. I know it's
+>> late, but there are more or less nothing new here since v8.
+>
+> I have no problems with the first three patches in this series, so I
+> can apply them right away.  Do you want me to do that?
 
-Unfortunately, this flash is only complaint to SFDP JESD216B and does
-not seem to support newer JESD216C standard that provides auto detection
-of Octal mode capabilities and opcodes. Therefore, this capability is
-manually added using new SPI_NOR_OCTAL_READ flag.
+Yes, please.
 
-Added support of Octal mode parsing for 'm25p80' spi-nor flash interface.
+>
+> As for the rest, the cpuidle driver patch looks OK to me, but the
+> PSCI-related ones need ACKs.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
- drivers/mtd/devices/m25p80.c  |  9 ++++++++-
- drivers/mtd/spi-nor/spi-nor.c | 14 +++++++++++++-
- include/linux/mtd/spi-nor.h   |  8 ++++++++
- 3 files changed, 29 insertions(+), 2 deletions(-)
+For some yes, but I think you can go ahead with a few more.
 
-diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index fe260cc..e22aa2b 100644
---- a/drivers/mtd/devices/m25p80.c
-+++ b/drivers/mtd/devices/m25p80.c
-@@ -182,7 +182,14 @@ static int m25p_probe(struct spi_mem *spimem)
- 	spi_mem_set_drvdata(spimem, flash);
- 	flash->spimem = spimem;
- 
--	if (spi->mode & SPI_RX_QUAD) {
-+	if (spi->mode & SPI_RX_OCTAL) {
-+		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
-+
-+		if (spi->mode & SPI_TX_OCTAL)
-+			hwcaps.mask |= (SNOR_HWCAPS_READ_1_8_8 |
-+					SNOR_HWCAPS_PP_1_1_8 |
-+					SNOR_HWCAPS_PP_1_8_8);
-+	} else if (spi->mode & SPI_RX_QUAD) {
- 		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
- 
- 		if (spi->mode & SPI_TX_QUAD)
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 6042df8..0587b9c 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -89,6 +89,7 @@ struct flash_info {
- #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
- #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
- #define USE_CLSR		BIT(14)	/* use CLSR command */
-+#define SPI_NOR_OCTAL_READ	BIT(15)	/* Flash supports Octal Read */
- 
- 	int	(*quad_enable)(struct spi_nor *nor);
- };
-@@ -208,6 +209,8 @@ static inline u8 spi_nor_convert_3to4_read(u8 opcode)
- 		{ SPINOR_OP_READ_1_2_2,	SPINOR_OP_READ_1_2_2_4B },
- 		{ SPINOR_OP_READ_1_1_4,	SPINOR_OP_READ_1_1_4_4B },
- 		{ SPINOR_OP_READ_1_4_4,	SPINOR_OP_READ_1_4_4_4B },
-+		{ SPINOR_OP_READ_1_1_8,	SPINOR_OP_READ_1_1_8_4B },
-+		{ SPINOR_OP_READ_1_8_8,	SPINOR_OP_READ_1_8_8_4B },
- 
- 		{ SPINOR_OP_READ_1_1_1_DTR,	SPINOR_OP_READ_1_1_1_DTR_4B },
- 		{ SPINOR_OP_READ_1_2_2_DTR,	SPINOR_OP_READ_1_2_2_DTR_4B },
-@@ -224,6 +227,8 @@ static inline u8 spi_nor_convert_3to4_program(u8 opcode)
- 		{ SPINOR_OP_PP,		SPINOR_OP_PP_4B },
- 		{ SPINOR_OP_PP_1_1_4,	SPINOR_OP_PP_1_1_4_4B },
- 		{ SPINOR_OP_PP_1_4_4,	SPINOR_OP_PP_1_4_4_4B },
-+		{ SPINOR_OP_PP_1_1_8,	SPINOR_OP_PP_1_1_8_4B },
-+		{ SPINOR_OP_PP_1_8_8,	SPINOR_OP_PP_1_8_8_4B },
- 	};
- 
- 	return spi_nor_convert_opcode(opcode, spi_nor_3to4_program,
-@@ -1114,7 +1119,7 @@ static const struct flash_info spi_nor_ids[] = {
- 	{ "mt25qu02g",   INFO(0x20bb22, 0, 64 * 1024, 4096, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ | NO_CHIP_ERASE) },
- 
- 	/* Micron */
--	{ "mt35xu512aba", INFO(0x2c5b1a, 0, 128 * 1024, 512, SECT_4K | USE_FSR | SPI_NOR_4B_OPCODES) },
-+	{ "mt35xu512aba", INFO(0x2c5b1a, 0, 128 * 1024, 512, SECT_4K | USE_FSR | SPI_NOR_OCTAL_READ | SPI_NOR_4B_OPCODES) },
- 
- 	/* PMC */
- 	{ "pm25lv512",   INFO(0,        0, 32 * 1024,    2, SECT_4K_PMC) },
-@@ -2493,6 +2498,13 @@ static int spi_nor_init_params(struct spi_nor *nor,
- 					  SNOR_PROTO_1_1_4);
- 	}
- 
-+	if (info->flags & SPI_NOR_OCTAL_READ) {
-+		params->hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
-+		spi_nor_set_read_settings(&params->reads[SNOR_CMD_READ_1_1_8],
-+					  0, 8, SPINOR_OP_READ_1_1_8,
-+					  SNOR_PROTO_1_1_8);
-+	}
-+
- 	/* Page Program settings. */
- 	params->hwcaps.mask |= SNOR_HWCAPS_PP;
- 	spi_nor_set_pp_settings(&params->page_programs[SNOR_CMD_PP],
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index f43bfc5..b23c69d 100644
---- a/include/linux/mtd/spi-nor.h
-+++ b/include/linux/mtd/spi-nor.h
-@@ -50,9 +50,13 @@
- #define SPINOR_OP_READ_1_2_2	0xbb	/* Read data bytes (Dual I/O SPI) */
- #define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad Output SPI) */
- #define SPINOR_OP_READ_1_4_4	0xeb	/* Read data bytes (Quad I/O SPI) */
-+#define SPINOR_OP_READ_1_1_8	0x8b	/* Read data bytes (Octal Output SPI) */
-+#define SPINOR_OP_READ_1_8_8	0xcb	/* Read data bytes (Octal I/O SPI) */
- #define SPINOR_OP_PP		0x02	/* Page program (up to 256 bytes) */
- #define SPINOR_OP_PP_1_1_4	0x32	/* Quad page program */
- #define SPINOR_OP_PP_1_4_4	0x38	/* Quad page program */
-+#define SPINOR_OP_PP_1_1_8	0x82	/* Octal page program */
-+#define SPINOR_OP_PP_1_8_8	0xc2	/* Octal page program */
- #define SPINOR_OP_BE_4K		0x20	/* Erase 4KiB block */
- #define SPINOR_OP_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
- #define SPINOR_OP_BE_32K	0x52	/* Erase 32KiB block */
-@@ -73,9 +77,13 @@
- #define SPINOR_OP_READ_1_2_2_4B	0xbc	/* Read data bytes (Dual I/O SPI) */
- #define SPINOR_OP_READ_1_1_4_4B	0x6c	/* Read data bytes (Quad Output SPI) */
- #define SPINOR_OP_READ_1_4_4_4B	0xec	/* Read data bytes (Quad I/O SPI) */
-+#define SPINOR_OP_READ_1_1_8_4B	0x7c	/* Read data bytes (Octal Output SPI) */
-+#define SPINOR_OP_READ_1_8_8_4B	0xcc	/* Read data bytes (Octal I/O SPI) */
- #define SPINOR_OP_PP_4B		0x12	/* Page program (up to 256 bytes) */
- #define SPINOR_OP_PP_1_1_4_4B	0x34	/* Quad page program */
- #define SPINOR_OP_PP_1_4_4_4B	0x3e	/* Quad page program */
-+#define SPINOR_OP_PP_1_1_8_4B	0x84	/* Octal page program */
-+#define SPINOR_OP_PP_1_8_8_4B	0x8e	/* Octal page program */
- #define SPINOR_OP_BE_4K_4B	0x21	/* Erase 4KiB block */
- #define SPINOR_OP_BE_32K_4B	0x5c	/* Erase 32KiB block */
- #define SPINOR_OP_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
--- 
-2.7.4
+Patch 4, 5 is already acked/reviewed.
+
+Patch 6 should be fine (if you are okay with it else wait for an ack
+from Daniel)
+
+Patch 7 and 8 should be fine. They were suggested by Mark.
+
+Patch 9 and 10 needs acks.
+
+Patch 11 has been acked, but depends on the other PSCI changes.
+
+Kind regards
+Uffe
