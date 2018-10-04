@@ -1,89 +1,58 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 4 Oct 2018 21:36:30 +0200
-Subject: [GIT PULL] Allwinner H3/H5 changes for 4.20, bis
-Message-ID: <20181004193630.lbxyiecochf5cdfq@flea>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 5 Oct 2018 01:09:33 +0530
+Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
+ armv8_pmuv3 events.
+In-Reply-To: <20181004122207.GE4065@arm.com>
+References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+ <20181001142914.GD9716@arm.com>
+ <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
+ <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
+ <20181004122207.GE4065@arm.com>
+Message-ID: <CAKTKpr4a12FHkMtFNueWqQbAhT4TLw_4DLDrOD6Tjsbno28U3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Will,
 
-Here is a second attempt at the previous PR for the H3 and H5 changes,
-hopefully with the right SoB this time. It replaces the previous one.
+On Thu, Oct 4, 2018 at 5:51 PM Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Ganapat,
+>
+> On Thu, Oct 04, 2018 at 11:12:09AM +0530, Ganapatrao Kulkarni wrote:
+> > can you please pull this patch?
+>
+> I still don't like the idea of just removing events like this, especially
+> when other architectures (including some x86 and Power CPUs afaict) playa
+> similar games for generic events, and these events do actually appear in
+> user code.
+>
+> I also don't understand why you remove the TLB events. I think that logic
+> would imply we should remove all of the events, because we can't distinguish
+> prefetches from reads either. If we want to be consistent, then I think
+> we should just remove the OP_WRITE events for L1D and BPU -- would you be
+> ok with that instead?
 
-Thanks!
-Maxime
+IIUC, dTLB-load-misses is mapped to
+ARMV8_PMUV3_PERFCTR_L1D_TLB_REFILL(event 0x05) and dTLB-loads is
+mapped to ARMV8_PMUV3_PERFCTR_L1D_TLB(0x25). Which are as per spec,
+counts TLB access/misses for both memory-read operation and
+memory-write operation.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+IMO, It won't help in keeping these events, knowingly that their
+mapping is not accurate, only thing i can say to users is , dont use
+events that are marked as "Hardware cache event"
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>
+> Also, looking at the code, I think our PMCEID parsing is broken for 8.1
+> parts, where the upper 32 bits of the register are offset by 0x4000 in the
+> event numbering space.
 
-are available in the Git repository at:
+yes, i did not find any mapping in PMCEIDx registers for
+implementation defined events, otherwise we would have remapped at
+runtime.
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-h3-h5-for-4.20-bis
+>
+> Will
 
-for you to fetch changes up to d9492e3e4607e80421f395715def1c257ddf2f8f:
-
-  ARM: dts: sunxi: h3-h5: Add Bananapi M2+ v1.2 device trees (2018-10-04 21:31:50 +0200)
-
-----------------------------------------------------------------
-Allwinner H3 and H5 DT additions for 4.20
-
-This is our usual H3/H5 pull request
-
-The most notable changes are:
-  - the video decoding / encoding unit is finally enabled on the H3
-  - Mali support for the H5
-  - New boards: BananaPi M2+ v1.2, Orange Pi Zero Plus 2 H3 support
-
-----------------------------------------------------------------
-Chen-Yu Tsai (5):
-      arm64: dts: allwinner: h5: Add device node for Mali-450 GPU
-      ARM: dts: sun8i: h3: bpi-m2-plus: Fix address for external RGMII Ethernet PHY
-      ARM: dts: sun8i: h3: Split out non-SoC-specific parts of Bananapi M2 Plus
-      arm64: dts: allwinner: h5: Add device tree for Bananapi M2 Plus H5
-      ARM: dts: sunxi: h3-h5: Add Bananapi M2+ v1.2 device trees
-
-Diego Rondini (1):
-      ARM: dts: sun8i: Add initial Orangepi Zero Plus 2 H3 support
-
-Emmanuel Vadot (1):
-      nvmem: sunxi-sid: add support for H5's SID controller
-
-Paul Kocialkowski (1):
-      ARM: dts: sun8i-h3: Add Video Engine and reserved memory nodes
-
-Philipp Rossak (1):
-      ARM: dts: sun8i: h3-h5: ir register size should be the whole memory block
-
- .../bindings/nvmem/allwinner,sunxi-sid.txt         |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- .../boot/dts/sun8i-h3-bananapi-m2-plus-v1.2.dts    |  13 ++
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 190 +----------------
- arch/arm/boot/dts/sun8i-h3-orangepi-zero-plus2.dts | 140 +++++++++++++
- arch/arm/boot/dts/sun8i-h3.dtsi                    |  25 +++
- arch/arm/boot/dts/sunxi-bananapi-m2-plus-v1.2.dtsi |  31 +++
- arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi      | 231 +++++++++++++++++++++
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |   2 +-
- arch/arm64/boot/dts/allwinner/Makefile             |   2 +
- .../allwinner/sun50i-h5-bananapi-m2-plus-v1.2.dts  |  11 +
- .../dts/allwinner/sun50i-h5-bananapi-m2-plus.dts   |  11 +
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       |  43 ++++
- 13 files changed, 513 insertions(+), 189 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus-v1.2.dts
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-zero-plus2.dts
- create mode 100644 arch/arm/boot/dts/sunxi-bananapi-m2-plus-v1.2.dtsi
- create mode 100644 arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-bananapi-m2-plus-v1.2.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-bananapi-m2-plus.dts
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181004/21fb35ed/attachment.sig>
+thanks
+Ganapat
