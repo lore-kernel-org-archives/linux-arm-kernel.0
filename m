@@ -1,53 +1,35 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 4 Oct 2018 17:15:55 +0200
-Subject: [PATCH v6 00/18] APEI in_nmi() rework
-In-Reply-To: <c04d1b78-122b-d7f2-5a75-3d9c56386b11@arm.com>
-References: <20180921221705.6478-1-james.morse@arm.com>
- <20180925124526.GD23986@zn.tnic>
- <c04d1b78-122b-d7f2-5a75-3d9c56386b11@arm.com>
-Message-ID: <20181004151555.GN1864@zn.tnic>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 4 Oct 2018 20:48:19 +0530
+Subject: [GIT PULL] DaVinci DT support for v4.20
+Message-ID: <2b3c8d80-578c-45f6-b111-ca98222cc290@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 06:50:38PM +0100, James Morse wrote:
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-...
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-> The non-ghes HEST entries have a "number of records to pre-allocate" too, we
-> could make this memory pool something hest.c looks after, but I can't see if the
-> other error sources use those values.
+are available in the Git repository at:
 
-Thanks for the detailed analysis!
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.20/dt
 
-> Hmmm, The size is capped to 64K, we could ignore the firmware description of the
-> memory requirements, and allocate SZ_64K each time. Doing it per-GHES is still
-> the only way to avoid allocating nmi-safe memory for irqs.
+for you to fetch changes up to aea4762fb46e048c059ff49565ee33da07c8aeb3:
 
-Right, so I'm thinking a lot simpler: allocate a pool which should
-be large enough to handle all situations and drop all that logic
-which recomputes and reallocates pool size. Just a static thing which
-JustWorks(tm).
+  ARM: dts: da850-lego-ev3: slow down A/DC as much as possible (2018-10-04 20:08:40 +0530)
 
-For a couple of reasons:
+----------------------------------------------------------------
+DaVinci DT updates for v4.20
+----------------------------
+- A non-critical fix to reduce errors on A/DC on Lego Mindstorms EV3
+- Support for GPIO expander on DA850 EVM
 
- - you state it above: all those synchronization issues are gone with a
- prellocated pool
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: dts: da850-evm: Enable tca6416 on baseboard
 
- - 64K per-GHES pool is nothing if you consider the machines this thing
- runs on - fat servers with lotsa memory. And RAS there *is* important.
- And TBH 64K is nothing even on a small client sporting gigabytes of
- memory.
+David Lechner (1):
+      ARM: dts: da850-lego-ev3: slow down A/DC as much as possible
 
- - code is a lot simpler and cleaner - you don't need all that pool
- expanding and shrinking. I mean, I'm all for smarter solutions if they
- have any clear advantages warranting the complication but this is a
- lot of machinery just so that we can save a couple of KBs. Which, as a
- whole, sounds just too much to me.
-
-But this is just me.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+ arch/arm/boot/dts/da850-evm.dts      | 6 ++++++
+ arch/arm/boot/dts/da850-lego-ev3.dts | 3 ++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
