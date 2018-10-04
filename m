@@ -1,43 +1,73 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  4 Oct 2018 09:33:15 +0100
-Subject: [PATCH 3/3] arm64: cpufeature: Trap CTR_EL0 access only where it is
- necessary
+Date: Thu,  4 Oct 2018 09:33:13 +0100
+Subject: [PATCH 1/3] arm64: cpufeature: ctr: Fix cpu capability check for late
+ CPUs
 In-Reply-To: <20181004083315.31174-1-suzuki.poulose@arm.com>
 References: <20181004083315.31174-1-suzuki.poulose@arm.com>
-Message-ID: <20181004083315.31174-4-suzuki.poulose@arm.com>
+Message-ID: <20181004083315.31174-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there is a mismatch in the CTR_EL0 field, we trap
-access to CTR from EL0 on all CPUs to expose the safe
-value. However, we could skip trapping on a CPU which
-matches the safe value.
+The matches() routine for a capability must honor the "scope"
+passed to it and return the proper results.
+i.e, when passed with SCOPE_LOCAL_CPU, it should check the
+status of the capability on the current CPU. This is used by
+verify_local_cpu_capabilities() on a late secondary CPU to make
+sure that it's compliant with the established system features.
+However, ARM64_HAS_CACHE_{IDC/DIC} always checks the system wide
+registers and this could mean that a late secondary CPU could return
+"true" (since the CPU hasn't updated the system wide registers yet)
+and thus lead the system in an inconsistent state, where
+the system assumes it has IDC/DIC feature, while the new CPU
+doesn't.
 
+Fixes: commit 6ae4b6e0578886eb36 ("arm64: Add support for new control bits CTR_EL0.DIC and CTR_EL0.IDC")
+Cc: Philip Elcan <pelcan@codeaurora.org>
+Cc: Shanker Donthineni <shankerd@codeaurora.org>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/cpufeature.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 31551f444ce3..e07ba717860e 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -84,7 +84,12 @@ has_mismatched_cache_type(const struct arm64_cpu_capabilities *entry,
- static void
- cpu_enable_trap_ctr_access(const struct arm64_cpu_capabilities *__unused)
- {
--	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCT, 0);
-+	u64 mask = arm64_ftr_reg_ctrel0.strict_mask;
-+
-+	/* Trap CTR_EL0 access on this CPU, only if it has a mismatch */
-+	if ((read_cpuid_cachetype() & mask) !=
-+	    (arm64_ftr_reg_ctrel0.sys_val & mask))
-+		sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCT, 0);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 00e7c313f088..ba16bb7762ca 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -854,15 +854,29 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
  }
  
- atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
+ static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
+-			  int __unused)
++			  int scope)
+ {
+-	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_IDC_SHIFT);
++	u64 ctr;
++
++	if (scope == SCOPE_SYSTEM)
++		ctr = arm64_ftr_reg_ctrel0.sys_val;
++	else
++		ctr = read_cpuid_cachetype();
++
++	return ctr & BIT(CTR_IDC_SHIFT);
+ }
+ 
+ static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
+-			  int __unused)
++			  int scope)
+ {
+-	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
++	u64 ctr;
++
++	if (scope == SCOPE_SYSTEM)
++		ctr = arm64_ftr_reg_ctrel0.sys_val;
++	else
++		ctr = read_cpuid_cachetype();
++
++	return ctr & BIT(CTR_DIC_SHIFT);
+ }
+ 
+ static bool __maybe_unused
 -- 
 2.19.0
