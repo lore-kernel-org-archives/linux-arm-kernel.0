@@ -1,34 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Oct 2018 13:22:07 +0100
-Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
- armv8_pmuv3 events.
-In-Reply-To: <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
-References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
- <20181001142914.GD9716@arm.com>
- <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
- <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
-Message-ID: <20181004122207.GE4065@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu,  4 Oct 2018 20:28:45 +0800
+Subject: [PATCH v4 00/10] Allwinner H6 USB support
+Message-ID: <20181004122855.22981-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganapat,
+This patchset introduces support for the USB ports (both USB2 and USB3)
+on the Allwinner H6 SoC.
 
-On Thu, Oct 04, 2018 at 11:12:09AM +0530, Ganapatrao Kulkarni wrote:
-> can you please pull this patch?
+The first 6 PATCHes are the USB2 part, and the latter 4 PATCHes are the
+USB3 part.
 
-I still don't like the idea of just removing events like this, especially
-when other architectures (including some x86 and Power CPUs afaict) playa
-similar games for generic events, and these events do actually appear in
-user code.
+PATCH 1, 2, 3, 7, 8 should go through the PHY tree, and the remaining
+patches should go through the armsoc tree via sunxi tree.
 
-I also don't understand why you remove the TLB events. I think that logic
-would imply we should remove all of the events, because we can't distinguish
-prefetches from reads either. If we want to be consistent, then I think
-we should just remove the OP_WRITE events for L1D and BPU -- would you be
-ok with that instead?
+Icenowy Zheng (10):
+  dt-bindings: phy: add binding for Allwinner H6 USB2 PHY
+  phy: sun4i-usb: add support for missing USB PHY index
+  phy: sun4i-usb: add support for H6 USB2 PHY
+  arm64: allwinner: dts: h6: add USB2-related device nodes
+  arm64: allwinner: dts: h6: add USB Vbus regulator
+  arm64: allwinner: dts: h6: enable USB2 on Pine H64
+  dt-bindings: phy: add binding for Allwinner USB3 PHY
+  phy: allwinner: add phy driver for USB3 PHY on Allwinner H6 SoC
+  arm64: allwinner: dts: h6: add USB3 device nodes
+  arm64: allwinner: dts: h6: enable USB3 port on Pine H64
 
-Also, looking at the code, I think our PMCEID parsing is broken for 8.1
-parts, where the upper 32 bits of the register are offset by 0x4000 in the
-event numbering space.
+ .../devicetree/bindings/phy/sun4i-usb-phy.txt |   8 +-
+ .../bindings/phy/sun50i-usb3-phy.txt          |  23 ++
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts |  46 ++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  | 113 +++++++++
+ drivers/phy/allwinner/Kconfig                 |  12 +
+ drivers/phy/allwinner/Makefile                |   1 +
+ drivers/phy/allwinner/phy-sun4i-usb.c         |  26 +-
+ drivers/phy/allwinner/phy-sun50i-usb3.c       | 239 ++++++++++++++++++
+ 8 files changed, 463 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+ create mode 100644 drivers/phy/allwinner/phy-sun50i-usb3.c
 
-Will
+-- 
+2.18.0
