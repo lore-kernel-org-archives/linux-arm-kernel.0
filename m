@@ -1,76 +1,66 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 4 Oct 2018 19:07:27 +0200
-Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM) (a subset)
-In-Reply-To: <20181004155755.GD5233@e107981-ln.cambridge.arm.com>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
- <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
- <10136406.EY9A7BdqYq@aspire.rjw.lan>
- <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
- <20181004155755.GD5233@e107981-ln.cambridge.arm.com>
-Message-ID: <CAJZ5v0j+W2CHiqkniXNJgZ3DU9pOpd_83Wj9Egwf+pVkRCjZLg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 4 Oct 2018 10:19:54 -0700
+Subject: [PATCH] ARM: KVM: Correctly order SGI register entries in the
+ cp15 array
+In-Reply-To: <20181004092946.59836-1-marc.zyngier@arm.com>
+References: <20181004092946.59836-1-marc.zyngier@arm.com>
+Message-ID: <1334e22d-a64b-9116-e8a5-448eacbecf45@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 5:58 PM Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
->
-> On Thu, Oct 04, 2018 at 11:32:41AM +0200, Rafael J. Wysocki wrote:
-> > On Thu, Oct 4, 2018 at 11:04 AM Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > >
-> > > On Thursday, October 4, 2018 10:58:53 AM CEST Ulf Hansson wrote:
-> > > > On 4 October 2018 at 10:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > > > > On Wed, Oct 3, 2018 at 4:39 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > > > >>
-> > > > >> I have digested the review comments so far, including a recent offlist chat
-> > > > >> with with Lorenzo Pieralisi around the debatable PSCI changes. More or less I
-> > > > >> have a plan for how to move forward.
-> > > > >>
-> > > > >> However, to avoid re-posting non-changed patches over and over again, I decided
-> > > > >> to withhold the more debatable part from this v9, hence this is not the complete
-> > > > >> series to make things play. In v9, I have just included the trivial changes,
-> > > > >> which are either already acked/reviewed or hopefully can be rather soon/easily.
-> > > > >>
-> > > > >> My hope is to get this queued for v4.20, to move things forward. I know it's
-> > > > >> late, but there are more or less nothing new here since v8.
-> > > > >
-> > > > > I have no problems with the first three patches in this series, so I
-> > > > > can apply them right away.  Do you want me to do that?
-> > > >
-> > > > Yes, please.
-> > > >
-> > > > >
-> > > > > As for the rest, the cpuidle driver patch looks OK to me, but the
-> > > > > PSCI-related ones need ACKs.
-> > > >
-> > > > For some yes, but I think you can go ahead with a few more.
-> > > >
-> > > > Patch 4, 5 is already acked/reviewed.
-> > > >
-> > > > Patch 6 should be fine (if you are okay with it else wait for an ack
-> > > > from Daniel)
-> > >
-> > > OK, thanks.
-> > >
-> > > Do the 4-6 depend on the 1-3?
-> >
-> > I don't see any dependency there, so I'll queue up the 1-3 in
-> > pm-domains and the 4-6 in pm-cpuidle.
->
-> I do not see why we should merge patches 4-6 for v4.20; they add legacy
-> (DT bindings and related parsing code) with no user in the kernel; we
-> may still want to tweak them, in particular PSCI DT bindings.
+On 10/04/2018 02:29 AM, Marc Zyngier wrote:
+> The ICC_ASGI1R and ICC_SGI0R register entries in the cp15 array
+> are not correctly ordered, leading to a BUG() at boot time.
+> 
+> Move them to their natural location.
+> 
+> Fixes: 3e8a8a50c7ef ("KVM: arm: vgic-v3: Add support for ICC_SGI0R and ICC_ASGI1R accesses")
+> Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Paolo, Radim,
+> 
+> Could you please send this patch directly to Greg so that it makes it
+> into 4.19? I thought I had it fixed long before the merge window, and
+> obviously didn't...
 
-My impression was that 4-6 have been agreed on due to the ACKs they
-carry.  I'll drop them if that's not the case.
+Thanks for the quick fix! I probably won't be able to test this until 8h
+from now but this looks obviously correct.
 
-> Likewise, it makes no sense to merge patches 7-8 without the rest of
-> the PSCI patches.
+> 
+> Thanks,
+> 
+> 	M.
+> 
+>  arch/arm/kvm/coproc.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 450c7a4fbc8a..cb094e55dc5f 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -478,15 +478,15 @@ static const struct coproc_reg cp15_regs[] = {
+>  
+>  	/* ICC_SGI1R */
+>  	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
+> -	/* ICC_ASGI1R */
+> -	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
+> -	/* ICC_SGI0R */
+> -	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
+>  
+>  	/* VBAR: swapped by interrupt.S. */
+>  	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+>  			NULL, reset_val, c12_VBAR, 0x00000000 },
+>  
+> +	/* ICC_ASGI1R */
+> +	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
+> +	/* ICC_SGI0R */
+> +	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
+>  	/* ICC_SRE */
+>  	{ CRn(12), CRm(12), Op1( 0), Op2(5), is32, access_gic_sre },
+>  
+> 
 
-OK
 
-I'll let the ARM camp sort out the PSCI material then.
-
-Thanks,
-Rafael
+-- 
+Florian
