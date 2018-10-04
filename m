@@ -1,129 +1,30 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Thu, 4 Oct 2018 21:26:02 +0000
-Subject: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
- bindings
-In-Reply-To: <CAL_JsqJOz_z9dHcG5dfx=UTXQMaLTQKBPu+vTrTOt=sdAabqSw@mail.gmail.com>
-References: <1534447304-12919-1-git-send-email-jollys@xilinx.com>
- <1534447304-12919-2-git-send-email-jollys@xilinx.com>
- <20180820194628.GA26783@bogus>
- <CY1PR02MB2138C05E97C1EFAEA921CB5CB81A0@CY1PR02MB2138.namprd02.prod.outlook.com>
- <CAL_JsqJOz_z9dHcG5dfx=UTXQMaLTQKBPu+vTrTOt=sdAabqSw@mail.gmail.com>
-Message-ID: <CY1PR02MB21389329CFE7985FD31179ADB8EA0@CY1PR02MB2138.namprd02.prod.outlook.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri,  5 Oct 2018 00:42:26 +0200
+Subject: [PATCH 1/2] of: Add vendor prefix for Menlo Systems GmbH
+Message-ID: <20181004224227.16836-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Add vendor prefix for Menlo Systems GmbH, http://www.menlosystems.com/ .
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Tuesday, September 25, 2018 9:15 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>; Andy Gross
-> <andy.gross@linaro.org>; Shawn Guo <shawnguo@kernel.org>; Geert
-> Uytterhoeven <geert+renesas@glider.be>; Bjorn Andersson
-> <bjorn.andersson@linaro.org>; Sean Wang <sean.wang@mediatek.com>;
-> Marek Szyprowski <m.szyprowski@samsung.com>; Michal Simek
-> <michals@xilinx.com>; Mark Rutland <mark.rutland@arm.com>; Rajan Vaja
-> <RAJANV@xilinx.com>; devicetree at vger.kernel.org; moderated
-> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
-> kernel at lists.infradead.org>; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
-> bindings
-> 
-> On Thu, Sep 13, 2018 at 12:51 PM Jolly Shah <JOLLYS@xilinx.com> wrote:
-> >
-> > Hi Rob,
-> >
-> > > -----Original Message-----
-> > > From: Rob Herring [mailto:robh at kernel.org]
-> > > Sent: Monday, August 20, 2018 12:46 PM
-> > > To: Jolly Shah <JOLLYS@xilinx.com>
-> > > Cc: matthias.bgg at gmail.com; andy.gross at linaro.org;
-> > > shawnguo at kernel.org;
-> > > geert+renesas at glider.be; bjorn.andersson at linaro.org;
-> > > sean.wang at mediatek.com; m.szyprowski at samsung.com; Michal Simek
-> > > <michals@xilinx.com>; mark.rutland at arm.com; Rajan Vaja
-> > > <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> > > kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Rajan Vaja
-> > > <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>
-> > > Subject: Re: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power
-> > > domain bindings
-> > >
-> > > On Thu, Aug 16, 2018 at 12:21:42PM -0700, Jolly Shah wrote:
-> > > > From: Rajan Vaja <rajan.vaja@xilinx.com>
-> > > >
-> > > > Add documentation to describe ZynqMP power domain bindings.
-> > > >
-> > > > Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-> > > > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > > > ---
-> > > >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 47
-> > > ++++++++++++++++++++++
-> > >
-> > > This should be with all the other power domain bindings.
-> > >
-> > > >  1 file changed, 47 insertions(+)
-> > > >
-> > > > diff --git
-> > > > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
-> > > > rmwa
-> > > > re.txt
-> > > > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
-> > > > rmwa
-> > > > re.txt
-> > > > index d215d15..5fa10a0 100644
-> > > > ---
-> > > > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
-> > > > rmwa
-> > > > re.txt
-> > > > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqm
-> > > > +++ p-fi
-> > > > +++ rmware.txt
-> > > > @@ -64,6 +64,29 @@ Output clocks are registered based on clock
-> > > > information received  from firmware. Output clocks indexes are
-> > > > mentioned in  include/dt-bindings/clock/xlnx,zynqmp-clk.h.
-> > > >
-> > > > +-----------------------------------------------------------
-> > > > +Device Tree Bindings for the Xilinx Zynq MPSoC PM domains
-> > > > +-----------------------------------------------------------
-> > > > +The binding for zynqmp-power-controller follow the common generic
-> > > > +PM domain binding[1].
-> > > > +
-> > > > +[1] Documentation/devicetree/bindings/power/power_domain.txt
-> > > > +
-> > > > +== Zynq MPSoC Generic PM Domain Node ==
-> > > > +
-> > > > +Required properties:
-> > > > + - compatible:     Must be: "xlnx,zynqmp-power-controller"
-> > > > +
-> > > > +This node contains a number of subnodes, each representing a
-> > > > +single PM domain that PM domain consumer devices reference.
-> > > > +
-> > > > +== PM Domain Nodes ==
-> > > > +
-> > > > +Required properties:
-> > > > + - #power-domain-cells:    Number of cells in a PM domain specifier. Must
-> > > be 0.
-> > > > + - pd-id:          Domain identifier as defined by platform firmware.
-> > > > +                   This identifier is passed to the PM firmware.
-> > >
-> > > Make this a cell for the power domain consumer.
-> > [Jolly] We have more than one Ids for GPU device. Also they don't have
-> > parent child relationship and hence are defined as flat hierarchy.
-> > (shown in example below)
-> 
-> Then the gpu node should have:
-> 
-> power-domains = <&pd 58 &pd 20 &pd 21>;
-> 
-> Also, for this and the firmware reset binding, there is no reason that I see to
-> make these all subnodes. A single firmware node can be a provider of multiple
-> functions. You only need child nodes if the sub-functions have their own
-> resources (clks, irqs, etc.). IOW, don't create nodes just because you want to
-> instantiate drivers that way. DT is not the only way to instantiate devices for
-> drivers.
-> 
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: devicetree at vger.kernel.org
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Got it. Pushed v3 with suggested changes. Please review.
-
-> Rob
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 4cf887bac4ac..2bf470e06a15 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -233,6 +233,7 @@ melexis	Melexis N.V.
+ melfas	MELFAS Inc.
+ mellanox	Mellanox Technologies
+ memsic	MEMSIC Inc.
++menlo	Menlo Systems GmbH
+ merrii	Merrii Technology Co., Ltd.
+ micrel	Micrel Inc.
+ microchip	Microchip Technology Inc.
+-- 
+2.18.0
