@@ -1,282 +1,81 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 4 Oct 2018 10:36:24 +0530
-Subject: [PATCH 2/2] cpufreq: ap806: add cpufreq driver for Armada 8K
-In-Reply-To: <20180924151249.32328-3-gregory.clement@bootlin.com>
-References: <20180924151249.32328-1-gregory.clement@bootlin.com>
- <20180924151249.32328-3-gregory.clement@bootlin.com>
-Message-ID: <20181004050624.ecjl3ouczm7huqgg@vireshk-i7>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 4 Oct 2018 11:12:09 +0530
+Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
+ armv8_pmuv3 events.
+In-Reply-To: <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
+References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+ <20181001142914.GD9716@arm.com>
+ <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
+Message-ID: <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-09-18, 17:12, Gregory CLEMENT wrote:
-> Add cpufreq driver for Marvell AP-806 found on Aramda 8K.
-> The AP-806 has DFS (Dynamic Frequency Scaling) with coupled
-> clock domain for two clusters, so this driver will directly
-> use generic cpufreq-dt driver as backend.
-> 
-> Based on the work of Omri Itach <omrii@marvell.com>.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  drivers/cpufreq/Kconfig.arm         |  11 +++
->  drivers/cpufreq/Makefile            |   1 +
->  drivers/cpufreq/armada-8k-cpufreq.c | 148 ++++++++++++++++++++++++++++
->  3 files changed, 160 insertions(+)
->  create mode 100644 drivers/cpufreq/armada-8k-cpufreq.c
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 0cd8eb76ad59..fd34095743a7 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -25,6 +25,17 @@ config ARM_ARMADA_37XX_CPUFREQ
->  	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
->  	  The Armada 37xx PMU supports 4 frequency and VDD levels.
->  
-> +config ARM_ARMADA_8K_CPUFREQ
-> +	tristate "Armada 8K CPUFreq driver"
+Hi Will,
 
-Since you wanted this to be tristate, have you tried
+can you please pull this patch?
 
-insmod armada-8k-cpufreq.ko
-rmmod armada-8k-cpufreq.ko
-insmod armada-8k-cpufreq.ko
+On Mon, Oct 1, 2018 at 10:09 PM Ganapatrao Kulkarni <gklkml16@gmail.com> wrote:
+>
+> Hi Will,
+>
+> On Mon, Oct 1, 2018 at 7:58 PM Will Deacon <will.deacon@arm.com> wrote:
+> >
+> > Hi Ganapat,
+> >
+> > On Mon, Oct 01, 2018 at 10:07:43AM +0000, Kulkarni, Ganapatrao wrote:
+> > > Perf events L1-dcache-load-misses, L1-dcache-store-misses are mapped to
+> > > armv8_pmuv3 (both DT and ACPI) event L1D_CACHE_REFILL. This is incorrect,
+> > > since L1D_CACHE_REFILL counts both load and store misses.
+> > > Similarly the events L1-dcache-loads, L1-dcache-stores, dTLB-load-misses
+> > > and dTLB-loads are wrongly mapped. Hence Deleting all these cache events
+> > > from armv8_pmuv3 cache mapping.
+> > >
+> > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > > ---
+> > >  arch/arm64/kernel/perf_event.c | 8 --------
+> > >  1 file changed, 8 deletions(-)
+> >
+> > The "generic" events are really implemented on a best-effort basis, as
+> > they rarely tend to map exactly to what the hardware supports. I think
+> > they originally stemmed from the x86 CPU PMU, but that doesn't really
+> > help us.
+>
+> This works fairly well for DT based boots, since almost all SoCs have
+> added remapping using custom dt object binding.
+> However we have concluded in the past to drop SoC specific from the
+> ACPI mapping and use json to add SoC/micro architecture specific
+> events support.
+> At present ,  When we boot with ACPI,  it is misleading for these events.
+>
+> In fact, this has been pointed internally from benchmark team and
+> reported it as hardware bug!
+> IMHO, it would be much simpler to delete these misleading events
+> mapping rather explaining to perf tool users.
+>
+> We already have proper mapping for these events,
+> armv8_pmuv3_0/l1d_cache_refill/
+> armv8_pmuv3_0/l1d_cache/
+> [core imp def:]
+> l1d_cache_rd
+> l1d_cache_wr
+> l1d_cache_refill_rd
+> l1d_cache_refill_wr
+>
+> >
+> > I had a discussion with Ingo back when we originally implemented perf
+> > because I actually preferred not to implement the generic events at all.
+> > However, he was strongly of the opinion that a best-effort approach was
+> > sufficient to get casual users going with the tool, so that's what we went
+> > with.
+>
+> thanks for the background info, these generic mapping fairly works
+> except these events.
+>
+> >
+> > Will
+>
+> thanks,
+> Ganapat
 
-?
-
-That will show some failures I believe.
-
-> +	depends on ARCH_MVEBU && CPUFREQ_DT
-> +	help
-> +	  This enables the CPUFreq driver support for Marvell
-> +	  Armada8k SOCs.
-> +	  Armada8K device has the AP806 which supports scaling
-> +	  to any full integer divider.
-> +
-> +	  If in doubt, say N.
-> +
->  # big LITTLE core layer and glue drivers
->  config ARM_BIG_LITTLE_CPUFREQ
->  	tristate "Generic ARM big LITTLE CPUfreq driver"
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index c1ffeabe4ecf..21f4f56229db 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -53,6 +53,7 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
->  obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
->  
->  obj-$(CONFIG_ARM_ARMADA_37XX_CPUFREQ)	+= armada-37xx-cpufreq.o
-> +obj-$(CONFIG_ARM_ARMADA_8K_CPUFREQ)	+= armada-8k-cpufreq.o
-
-Maybe add another tab before + to align with other lines ?
-
->  obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
->  obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
->  obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
-> diff --git a/drivers/cpufreq/armada-8k-cpufreq.c b/drivers/cpufreq/armada-8k-cpufreq.c
-> new file mode 100644
-> index 000000000000..1c604f1d27d2
-> --- /dev/null
-> +++ b/drivers/cpufreq/armada-8k-cpufreq.c
-> @@ -0,0 +1,148 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * CPUFreq support for Armada 7K/8K
-
-7K ?
-
-> + *
-> + * Copyright (C) 2018 Marvell
-> + *
-> + * Omri Itach <omrii@marvell.com>
-> + * Gregory Clement <gregory.clement@bootlin.com>
-> + */
-> +
-> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> +
-> +#include <linux/clk.h>
-> +#include <linux/cpu.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_opp.h>
-> +#include <linux/slab.h>
-> +
-> +#define MIN_FREQ 100000000
-> +
-> +/*
-> + * Setup the opps list with the divider for the max frequency, that
-> + * will be filled at runtime, 0 meaning 100Mhz
-
-Add a full-stop at the end please.
-
-I am not sure why will you want to support 100 MHz as the CPUs may end
-up running on that a lot :)
-
-> + */
-> +static const int opps_div[] __initconst = {1, 2, 3, 0};
-> +
-> +struct opps_array {
-
-Maybe name this freq_table.
-
-> +	struct device *cpu_dev;
-> +	unsigned int freq[ARRAY_SIZE(opps_div)];
-> +};
-> +
-> +/* If the CPUs share the same clock, then they are in the same cluster */
-> +static void __init armada_8k_get_sharing_cpus(struct clk *cur_clk,
-> +				       struct cpumask *cpumask)
-
-Maybe align better to calm down checkpatch --strict :)
-
-> +{
-> +	int cpu;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		struct device *cpu_dev = get_cpu_device(cpu);
-> +		struct clk *clk = clk_get(cpu_dev, 0);
-
-Don't you need to do a corresponding clk_put() ?
-
-> +
-> +		if (IS_ERR(clk))
-> +			dev_warn(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
-
-Why continue after this point and check the next if ? Maybe write this
-as if/else.
-
-> +
-> +		if (clk_is_match(clk, cur_clk))
-> +			cpumask_set_cpu(cpu, cpumask);
-> +	}
-> +
-
-Remove blank line ?
-
-> +}
-> +
-> +static int __init armada_8k_cpufreq_init(void)
-> +{
-> +	struct opps_array *opps_arrays;
-> +	struct platform_device *pdev;
-> +	int ret, cpu, opps_index = 0;
-> +	unsigned int cur_frequency;
-> +	struct device_node *node;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clock");
-> +	if (!node || !of_device_is_available(node))
-> +		return -ENODEV;
-> +
-> +	opps_arrays = kcalloc(num_possible_cpus(), sizeof(*opps_arrays),
-> +			      GFP_KERNEL);
-> +	/*
-> +	 * For each CPU, this loop registers the operating points
-> +	 * supported (which are the nominal CPU frequency and full integer
-> +	 * divisions of it).
-> +	 */
-> +	for_each_possible_cpu(cpu) {
-> +		struct device *cpu_dev;
-> +		struct cpumask cpus;
-> +		unsigned int freq;
-> +		struct clk *clk;
-> +		int i;
-> +
-> +		cpu_dev = get_cpu_device(cpu);
-> +		if (!cpu_dev) {
-> +			dev_err(cpu_dev, "Cannot get CPU %d\n", cpu);
-> +			continue;
-> +		}
-> +
-> +		clk = clk_get(cpu_dev, 0);
-> +		if (IS_ERR(clk)) {
-> +			dev_err(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
-> +			ret = PTR_ERR(clk);
-> +			goto free_opp_array;
-
-What if this is the second iteration of this loop. Who will remove the
-OPPs added during earlier iteration ?
-
-> +		}
-> +
-> +		/* Get nominal (current) CPU frequency */
-> +		cur_frequency = clk_get_rate(clk);
-> +		if (!cur_frequency) {
-> +			dev_err(cpu_dev,
-> +				"Failed to get clock rate for CPU %d\n", cpu);
-> +			ret = -EINVAL;
-
-clk_put() ?
-
-> +			goto free_opp_array;
-> +		}
-> +
-> +		opps_arrays[opps_index].cpu_dev = cpu_dev;
-
-I will add a blank line here.
-
-> +		for (i = 0; i < ARRAY_SIZE(opps_div); i++) {
-> +			if (opps_div[i])
-> +				freq = cur_frequency / opps_div[i];
-> +			else
-> +				freq = MIN_FREQ;
-> +
-> +			ret = dev_pm_opp_add(cpu_dev, freq, 0);
-> +			if (ret)
-> +				goto remove_opp;
-> +
-> +			opps_arrays[opps_index].freq[i] = freq;
-> +		}
-> +
-> +		cpumask_clear(&cpus);
-> +		armada_8k_get_sharing_cpus(clk, &cpus);
-> +		dev_pm_opp_set_sharing_cpus(cpu_dev, &cpus);
-
-Don't you get any error or print messages like duplicate-OPPs ? Maybe
-they are dev_dbg() :(
-
-You have already done above for a group of CPUs and you shouldn't be
-adding the OPPs again for the same group for an iteration that belongs
-to the next CPU.
-
-So if you have CPU 0-3 sharing the clock line, then you will add 4
-OPPs in the first iteration and then try the same for 3 more times for
-the CPU 1,2,3. You should really avoid it.
-
-And generally the error handling should improve here.
-
-> +	}
-> +
-> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> +	ret = PTR_ERR_OR_ZERO(pdev);
-> +	if (ret)
-> +		goto remove_opp;
-> +	kfree(opps_arrays);
-> +	return 0;
-> +
-> +remove_opp:
-> +	for (; opps_index >= 0; opps_index--) {
-> +		int i = 0;
-> +
-> +		while (opps_arrays[opps_index].freq[i]) {
-> +			dev_pm_opp_remove(opps_arrays[opps_index].cpu_dev,
-> +					  opps_arrays[opps_index].freq[i]);
-> +			i++;
-> +		}
-> +	}
-> +free_opp_array:
-> +	kfree(opps_arrays);
-> +	return ret;
-> +}
-> +module_init(armada_8k_cpufreq_init);
-> +
-> +MODULE_AUTHOR("Gregory Clement <gregory.clement@bootlin.com>");
-> +MODULE_DESCRIPTION("Armada 8K cpufreq driver");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 2.19.0
-
--- 
-viresh
+thanks,
+Ganapat
