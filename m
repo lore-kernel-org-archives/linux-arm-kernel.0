@@ -1,151 +1,635 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 4 Oct 2018 16:08:31 +0530
-Subject: [PATCH 1/3] mtd: spi-nor: Add Octal mode support for mt35xu512aba
-In-Reply-To: <VI1PR04MB1038C20CA97E453FC4C9CEAE99EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <20181003165603.2579-1-vigneshr@ti.com>
- <20181003165603.2579-2-vigneshr@ti.com>
- <VI1PR04MB1038C20CA97E453FC4C9CEAE99EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <ad1e560a-9dc8-c99c-acf4-de8be00b934e@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 4 Oct 2018 11:48:05 +0100
+Subject: [PATCHv2 2/3] PCI: mvebu: Convert to PCI emulated bridge config
+ space
+In-Reply-To: <20180918161745.GB31440@e107981-ln.cambridge.arm.com>
+References: <20180912154831.2220-1-thomas.petazzoni@bootlin.com>
+ <20180912154831.2220-3-thomas.petazzoni@bootlin.com>
+ <20180918161745.GB31440@e107981-ln.cambridge.arm.com>
+Message-ID: <20181004104805.GB5233@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 04 October 2018 12:21 PM, Yogesh Narayan Gaur wrote:
-> Hi Vignesh,
+On Tue, Sep 18, 2018 at 05:17:45PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Sep 12, 2018 at 05:48:30PM +0200, Thomas Petazzoni wrote:
+> > This commit convers the pci-mvebu driver to use the recently
 > 
->> -----Original Message-----
->> From: Vignesh R [mailto:vigneshr at ti.com]
->> Sent: Wednesday, October 3, 2018 10:26 PM
->> To: Boris Brezillon <boris.brezillon@bootlin.com>; Marek Vasut
->> <marek.vasut@gmail.com>; Rob Herring <robh+dt@kernel.org>
->> Cc: Brian Norris <computersforpeace@gmail.com>; Yogesh Narayan Gaur
->> <yogeshnarayan.gaur@nxp.com>; Linux ARM Mailing List <linux-arm-
->> kernel at lists.infradead.org>; linux-mtd at lists.infradead.org;
->> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; Vignesh R
->> <vigneshr@ti.com>
->> Subject: [PATCH 1/3] mtd: spi-nor: Add Octal mode support for mt35xu512aba
->>
->> Micron's mt35xu512aba flash is an Octal flash that has x8 IO lines. It supports
->> read/write over 8 IO lines simulatenously. Add support for Octal read mode for
->> Micron mt35xu512aba.
->> Unfortunately, this flash is only complaint to SFDP JESD216B and does not seem
->> to support newer JESD216C standard that provides auto detection of Octal
->> mode capabilities and opcodes. Therefore, this capability is manually added
->> using new SPI_NOR_OCTAL_READ flag.
->>
+> Nits:
 > 
-> Thanks for sending the patch-set of adding octal support.
-> If possible, can you share the MT35x datasheet?
+> s/convers/converts
 > 
-
-I dont have datasheet, this patch is based on prior patches from here:
-http://patchwork.ozlabs.org/patch/740942/
-
-> I also have the patch ready in which I have added support for Read (1-1-8 and 1-8-8) protocol and Write (1-1-8 and 1-8-8).
-> Also have added support of Octal in driver/spi/spi.c framework.
+> Actually I would just write "Convert the pci-mvebu....".
 > 
-> IMO, we would collaborate our patches.
-
-That would be great, thanks!
-
-Regards
-Vignesh
-
-> --
-> Regards
-> Yogesh Gaur
+> I would drop "recently introduced", unless we can define a precise
+> commit when code was added so that it can actually be checked (I know
+> you can't since the relevant patch is part of this series and not in
+> the mainline yet).
 > 
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>  drivers/mtd/spi-nor/spi-nor.c | 11 ++++++++++-
->>  include/linux/mtd/spi-nor.h   |  2 ++
->>  2 files changed, 12 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c index
->> aff5e6ff0b2c..4926e805a8cb 100644
->> --- a/drivers/mtd/spi-nor/spi-nor.c
->> +++ b/drivers/mtd/spi-nor/spi-nor.c
->> @@ -90,6 +90,7 @@ struct flash_info {
->>  #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip
->> erase */
->>  #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
->>  #define USE_CLSR		BIT(14)	/* use CLSR command */
->> +#define SPI_NOR_OCTAL_READ	BIT(15)	/* Flash supports Octal Read */
->>
->>  	int	(*quad_enable)(struct spi_nor *nor);
->>  };
->> @@ -209,6 +210,7 @@ static inline u8 spi_nor_convert_3to4_read(u8 opcode)
->>  		{ SPINOR_OP_READ_1_2_2,	SPINOR_OP_READ_1_2_2_4B },
->>  		{ SPINOR_OP_READ_1_1_4,	SPINOR_OP_READ_1_1_4_4B },
->>  		{ SPINOR_OP_READ_1_4_4,	SPINOR_OP_READ_1_4_4_4B },
->> +		{ SPINOR_OP_READ_1_1_8,	SPINOR_OP_READ_1_1_8_4B },
->>
->>  		{ SPINOR_OP_READ_1_1_1_DTR,
->> 	SPINOR_OP_READ_1_1_1_DTR_4B },
->>  		{ SPINOR_OP_READ_1_2_2_DTR,
->> 	SPINOR_OP_READ_1_2_2_DTR_4B },
->> @@ -1406,7 +1408,7 @@ static const struct flash_info spi_nor_ids[] = {
->>  	{ "mt25qu02g",   INFO(0x20bb22, 0, 64 * 1024, 4096, SECT_4K |
->> USE_FSR | SPI_NOR_QUAD_READ | NO_CHIP_ERASE) },
->>
->>  	/* Micron */
->> -	{ "mt35xu512aba", INFO(0x2c5b1a, 0, 128 * 1024, 512, SECT_4K |
->> USE_FSR | SPI_NOR_4B_OPCODES) },
->> +	{ "mt35xu512aba", INFO(0x2c5b1a, 0, 128 * 1024, 512, SECT_4K |
->> USE_FSR
->> +| SPI_NOR_OCTAL_READ | SPI_NOR_4B_OPCODES) },
->>
->>  	/* PMC */
->>  	{ "pm25lv512",   INFO(0,        0, 32 * 1024,    2, SECT_4K_PMC) },
->> @@ -3199,6 +3201,13 @@ static int spi_nor_init_params(struct spi_nor *nor,
->>  					  SNOR_PROTO_1_1_4);
->>  	}
->>
->> +	if (info->flags & SPI_NOR_OCTAL_READ) {
->> +		params->hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
->> +		spi_nor_set_read_settings(&params-
->>> reads[SNOR_CMD_READ_1_1_8],
->> +					  0, 8, SPINOR_OP_READ_1_1_8,
->> +					  SNOR_PROTO_1_1_8);
->> +	}
->> +
->>  	/* Page Program settings. */
->>  	params->hwcaps.mask |= SNOR_HWCAPS_PP;
->>  	spi_nor_set_pp_settings(&params->page_programs[SNOR_CMD_PP],
->> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h index
->> 8b1acf68b7ac..ae9861ed7e0f 100644
->> --- a/include/linux/mtd/spi-nor.h
->> +++ b/include/linux/mtd/spi-nor.h
->> @@ -50,6 +50,7 @@
->>  #define SPINOR_OP_READ_1_2_2	0xbb	/* Read data bytes (Dual I/O
->> SPI) */
->>  #define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad
->> Output SPI) */
->>  #define SPINOR_OP_READ_1_4_4	0xeb	/* Read data bytes (Quad I/O
->> SPI) */
->> +#define SPINOR_OP_READ_1_1_8	0x8b	/* Read data bytes (Octal
->> Output SPI) */
->>  #define SPINOR_OP_PP		0x02	/* Page program (up to 256 bytes) */
->>  #define SPINOR_OP_PP_1_1_4	0x32	/* Quad page program */
->>  #define SPINOR_OP_PP_1_4_4	0x38	/* Quad page program */
->> @@ -73,6 +74,7 @@
->>  #define SPINOR_OP_READ_1_2_2_4B	0xbc	/* Read data bytes (Dual I/O
->> SPI) */
->>  #define SPINOR_OP_READ_1_1_4_4B	0x6c	/* Read data bytes (Quad
->> Output SPI) */
->>  #define SPINOR_OP_READ_1_4_4_4B	0xec	/* Read data bytes (Quad I/O
->> SPI) */
->> +#define SPINOR_OP_READ_1_1_8_4B	0x7c	/* Read data bytes (Octal
->> Output SPI) */
->>  #define SPINOR_OP_PP_4B		0x12	/* Page program (up to 256
->> bytes) */
->>  #define SPINOR_OP_PP_1_1_4_4B	0x34	/* Quad page program */
->>  #define SPINOR_OP_PP_1_4_4_4B	0x3e	/* Quad page program */
->> --
->> 2.19.0
+> Bjorn posted some guidelines that are helpful:
 > 
+> https://marc.info/?l=linux-pci&m=150905742808166&w=2
+> 
+> I can make these changes myself, no problem but please address Russell's
+> comment so that we can proceed.
 
--- 
-Regards
-Vignesh
+Hi Thomas,
+
+I understand you have more important things to think about these days :)
+(congratulations), let me know if I can fix this patch up myself, I
+would like to merge this series for v4.20.
+
+Thanks,
+Lorenzo
+
+> 
+> Thanks,
+> Lorenzo
+> 
+> > introduced pci-bridge-emul logic, that helps emulating a root port PCI
+> > bridge configuration space.
+> > 
+> > It has been tested on Armada GP XP, with a E1000E NIC.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> > ---
+> >  drivers/pci/controller/Kconfig     |   1 +
+> >  drivers/pci/controller/pci-mvebu.c | 375 +++++++++++--------------------------
+> >  2 files changed, 107 insertions(+), 269 deletions(-)
+> > 
+> > diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
+> > index 028b287466fb..6d0f9930be7f 100644
+> > --- a/drivers/pci/controller/Kconfig
+> > +++ b/drivers/pci/controller/Kconfig
+> > @@ -9,6 +9,7 @@ config PCI_MVEBU
+> >  	depends on MVEBU_MBUS
+> >  	depends on ARM
+> >  	depends on OF
+> > +	select PCI_BRIDGE_EMUL
+> >  
+> >  config PCI_AARDVARK
+> >  	bool "Aardvark PCIe controller"
+> > diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
+> > index 50eb0729385b..f97f48cf2bf6 100644
+> > --- a/drivers/pci/controller/pci-mvebu.c
+> > +++ b/drivers/pci/controller/pci-mvebu.c
+> > @@ -22,6 +22,7 @@
+> >  #include <linux/of_platform.h>
+> >  
+> >  #include "../pci.h"
+> > +#include "../pci-bridge-emul.h"
+> >  
+> >  /*
+> >   * PCIe unit register offsets.
+> > @@ -63,61 +64,6 @@
+> >  #define PCIE_DEBUG_CTRL         0x1a60
+> >  #define  PCIE_DEBUG_SOFT_RESET		BIT(20)
+> >  
+> > -enum {
+> > -	PCISWCAP = PCI_BRIDGE_CONTROL + 2,
+> > -	PCISWCAP_EXP_LIST_ID	= PCISWCAP + PCI_CAP_LIST_ID,
+> > -	PCISWCAP_EXP_DEVCAP	= PCISWCAP + PCI_EXP_DEVCAP,
+> > -	PCISWCAP_EXP_DEVCTL	= PCISWCAP + PCI_EXP_DEVCTL,
+> > -	PCISWCAP_EXP_LNKCAP	= PCISWCAP + PCI_EXP_LNKCAP,
+> > -	PCISWCAP_EXP_LNKCTL	= PCISWCAP + PCI_EXP_LNKCTL,
+> > -	PCISWCAP_EXP_SLTCAP	= PCISWCAP + PCI_EXP_SLTCAP,
+> > -	PCISWCAP_EXP_SLTCTL	= PCISWCAP + PCI_EXP_SLTCTL,
+> > -	PCISWCAP_EXP_RTCTL	= PCISWCAP + PCI_EXP_RTCTL,
+> > -	PCISWCAP_EXP_RTSTA	= PCISWCAP + PCI_EXP_RTSTA,
+> > -	PCISWCAP_EXP_DEVCAP2	= PCISWCAP + PCI_EXP_DEVCAP2,
+> > -	PCISWCAP_EXP_DEVCTL2	= PCISWCAP + PCI_EXP_DEVCTL2,
+> > -	PCISWCAP_EXP_LNKCAP2	= PCISWCAP + PCI_EXP_LNKCAP2,
+> > -	PCISWCAP_EXP_LNKCTL2	= PCISWCAP + PCI_EXP_LNKCTL2,
+> > -	PCISWCAP_EXP_SLTCAP2	= PCISWCAP + PCI_EXP_SLTCAP2,
+> > -	PCISWCAP_EXP_SLTCTL2	= PCISWCAP + PCI_EXP_SLTCTL2,
+> > -};
+> > -
+> > -/* PCI configuration space of a PCI-to-PCI bridge */
+> > -struct mvebu_sw_pci_bridge {
+> > -	u16 vendor;
+> > -	u16 device;
+> > -	u16 command;
+> > -	u16 status;
+> > -	u16 class;
+> > -	u8 interface;
+> > -	u8 revision;
+> > -	u8 bist;
+> > -	u8 header_type;
+> > -	u8 latency_timer;
+> > -	u8 cache_line_size;
+> > -	u32 bar[2];
+> > -	u8 primary_bus;
+> > -	u8 secondary_bus;
+> > -	u8 subordinate_bus;
+> > -	u8 secondary_latency_timer;
+> > -	u8 iobase;
+> > -	u8 iolimit;
+> > -	u16 secondary_status;
+> > -	u16 membase;
+> > -	u16 memlimit;
+> > -	u16 iobaseupper;
+> > -	u16 iolimitupper;
+> > -	u32 romaddr;
+> > -	u8 intline;
+> > -	u8 intpin;
+> > -	u16 bridgectrl;
+> > -
+> > -	/* PCI express capability */
+> > -	u32 pcie_sltcap;
+> > -	u16 pcie_devctl;
+> > -	u16 pcie_rtctl;
+> > -};
+> > -
+> >  struct mvebu_pcie_port;
+> >  
+> >  /* Structure representing all PCIe interfaces */
+> > @@ -153,7 +99,7 @@ struct mvebu_pcie_port {
+> >  	struct clk *clk;
+> >  	struct gpio_desc *reset_gpio;
+> >  	char *reset_name;
+> > -	struct mvebu_sw_pci_bridge bridge;
+> > +	struct pci_bridge_emul bridge;
+> >  	struct device_node *dn;
+> >  	struct mvebu_pcie *pcie;
+> >  	struct mvebu_pcie_window memwin;
+> > @@ -415,11 +361,12 @@ static void mvebu_pcie_set_window(struct mvebu_pcie_port *port,
+> >  static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+> >  {
+> >  	struct mvebu_pcie_window desired = {};
+> > +	struct pci_bridge_emul_conf *conf = &port->bridge.conf;
+> >  
+> >  	/* Are the new iobase/iolimit values invalid? */
+> > -	if (port->bridge.iolimit < port->bridge.iobase ||
+> > -	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
+> > -	    !(port->bridge.command & PCI_COMMAND_IO)) {
+> > +	if (conf->iolimit < conf->iobase ||
+> > +	    conf->iolimitupper < conf->iobaseupper ||
+> > +	    !(conf->command & PCI_COMMAND_IO)) {
+> >  		mvebu_pcie_set_window(port, port->io_target, port->io_attr,
+> >  				      &desired, &port->iowin);
+> >  		return;
+> > @@ -438,11 +385,11 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+> >  	 * specifications. iobase is the bus address, port->iowin_base
+> >  	 * is the CPU address.
+> >  	 */
+> > -	desired.remap = ((port->bridge.iobase & 0xF0) << 8) |
+> > -			(port->bridge.iobaseupper << 16);
+> > +	desired.remap = ((conf->iobase & 0xF0) << 8) |
+> > +			(conf->iobaseupper << 16);
+> >  	desired.base = port->pcie->io.start + desired.remap;
+> > -	desired.size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> > -			 (port->bridge.iolimitupper << 16)) -
+> > +	desired.size = ((0xFFF | ((conf->iolimit & 0xF0) << 8) |
+> > +			 (conf->iolimitupper << 16)) -
+> >  			desired.remap) +
+> >  		       1;
+> >  
+> > @@ -453,10 +400,11 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+> >  static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+> >  {
+> >  	struct mvebu_pcie_window desired = {.remap = MVEBU_MBUS_NO_REMAP};
+> > +	struct pci_bridge_emul_conf *conf = &port->bridge.conf;
+> >  
+> >  	/* Are the new membase/memlimit values invalid? */
+> > -	if (port->bridge.memlimit < port->bridge.membase ||
+> > -	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+> > +	if (conf->memlimit < conf->membase ||
+> > +	    !(conf->command & PCI_COMMAND_MEMORY)) {
+> >  		mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
+> >  				      &desired, &port->memwin);
+> >  		return;
+> > @@ -468,130 +416,34 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+> >  	 * window to setup, according to the PCI-to-PCI bridge
+> >  	 * specifications.
+> >  	 */
+> > -	desired.base = ((port->bridge.membase & 0xFFF0) << 16);
+> > -	desired.size = (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> > +	desired.base = ((conf->membase & 0xFFF0) << 16);
+> > +	desired.size = (((conf->memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> >  		       desired.base + 1;
+> >  
+> >  	mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
+> >  			      &port->memwin);
+> >  }
+> >  
+> > -/*
+> > - * Initialize the configuration space of the PCI-to-PCI bridge
+> > - * associated with the given PCIe interface.
+> > - */
+> > -static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
+> > +static pci_bridge_emul_read_status_t
+> > +mvebu_pci_bridge_emul_pcie_conf_read(struct pci_bridge_emul *bridge,
+> > +				     int reg, u32 *value)
+> >  {
+> > -	struct mvebu_sw_pci_bridge *bridge = &port->bridge;
+> > -
+> > -	memset(bridge, 0, sizeof(struct mvebu_sw_pci_bridge));
+> > -
+> > -	bridge->class = PCI_CLASS_BRIDGE_PCI;
+> > -	bridge->vendor = PCI_VENDOR_ID_MARVELL;
+> > -	bridge->device = mvebu_readl(port, PCIE_DEV_ID_OFF) >> 16;
+> > -	bridge->revision = mvebu_readl(port, PCIE_DEV_REV_OFF) & 0xff;
+> > -	bridge->header_type = PCI_HEADER_TYPE_BRIDGE;
+> > -	bridge->cache_line_size = 0x10;
+> > -
+> > -	/* We support 32 bits I/O addressing */
+> > -	bridge->iobase = PCI_IO_RANGE_TYPE_32;
+> > -	bridge->iolimit = PCI_IO_RANGE_TYPE_32;
+> > -
+> > -	/* Add capabilities */
+> > -	bridge->status = PCI_STATUS_CAP_LIST;
+> > -}
+> > -
+> > -/*
+> > - * Read the configuration space of the PCI-to-PCI bridge associated to
+> > - * the given PCIe interface.
+> > - */
+> > -static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+> > -				  unsigned int where, int size, u32 *value)
+> > -{
+> > -	struct mvebu_sw_pci_bridge *bridge = &port->bridge;
+> > -
+> > -	switch (where & ~3) {
+> > -	case PCI_VENDOR_ID:
+> > -		*value = bridge->device << 16 | bridge->vendor;
+> > -		break;
+> > -
+> > -	case PCI_COMMAND:
+> > -		*value = bridge->command | bridge->status << 16;
+> > -		break;
+> > -
+> > -	case PCI_CLASS_REVISION:
+> > -		*value = bridge->class << 16 | bridge->interface << 8 |
+> > -			 bridge->revision;
+> > -		break;
+> > -
+> > -	case PCI_CACHE_LINE_SIZE:
+> > -		*value = bridge->bist << 24 | bridge->header_type << 16 |
+> > -			 bridge->latency_timer << 8 | bridge->cache_line_size;
+> > -		break;
+> > -
+> > -	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+> > -		*value = bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4];
+> > -		break;
+> > -
+> > -	case PCI_PRIMARY_BUS:
+> > -		*value = (bridge->secondary_latency_timer << 24 |
+> > -			  bridge->subordinate_bus         << 16 |
+> > -			  bridge->secondary_bus           <<  8 |
+> > -			  bridge->primary_bus);
+> > -		break;
+> > -
+> > -	case PCI_IO_BASE:
+> > -		if (!mvebu_has_ioport(port))
+> > -			*value = bridge->secondary_status << 16;
+> > -		else
+> > -			*value = (bridge->secondary_status << 16 |
+> > -				  bridge->iolimit          <<  8 |
+> > -				  bridge->iobase);
+> > -		break;
+> > -
+> > -	case PCI_MEMORY_BASE:
+> > -		*value = (bridge->memlimit << 16 | bridge->membase);
+> > -		break;
+> > -
+> > -	case PCI_PREF_MEMORY_BASE:
+> > -		*value = 0;
+> > -		break;
+> > -
+> > -	case PCI_IO_BASE_UPPER16:
+> > -		*value = (bridge->iolimitupper << 16 | bridge->iobaseupper);
+> > -		break;
+> > -
+> > -	case PCI_CAPABILITY_LIST:
+> > -		*value = PCISWCAP;
+> > -		break;
+> > +	struct mvebu_pcie_port *port = bridge->data;
+> >  
+> > -	case PCI_ROM_ADDRESS1:
+> > -		*value = 0;
+> > -		break;
+> > -
+> > -	case PCI_INTERRUPT_LINE:
+> > -		/* LINE PIN MIN_GNT MAX_LAT */
+> > -		*value = 0;
+> > -		break;
+> > -
+> > -	case PCISWCAP_EXP_LIST_ID:
+> > -		/* Set PCIe v2, root port, slot support */
+> > -		*value = (PCI_EXP_TYPE_ROOT_PORT << 4 | 2 |
+> > -			  PCI_EXP_FLAGS_SLOT) << 16 | PCI_CAP_ID_EXP;
+> > -		break;
+> > -
+> > -	case PCISWCAP_EXP_DEVCAP:
+> > +	switch (reg) {
+> > +	case PCI_EXP_DEVCAP:
+> >  		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_DEVCAP);
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_DEVCTL:
+> > +	case PCI_EXP_DEVCTL:
+> >  		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL) &
+> >  				 ~(PCI_EXP_DEVCTL_URRE | PCI_EXP_DEVCTL_FERE |
+> >  				   PCI_EXP_DEVCTL_NFERE | PCI_EXP_DEVCTL_CERE);
+> > -		*value |= bridge->pcie_devctl;
+> > +		/* FIXME */
+> > +		*value |= bridge->pcie_conf.devctl;
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_LNKCAP:
+> > +	case PCI_EXP_LNKCAP:
+> >  		/*
+> >  		 * PCIe requires the clock power management capability to be
+> >  		 * hard-wired to zero for downstream ports
+> > @@ -600,132 +452,88 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+> >  			 ~PCI_EXP_LNKCAP_CLKPM;
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_LNKCTL:
+> > +	case PCI_EXP_LNKCTL:
+> >  		*value = mvebu_readl(port, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_SLTCAP:
+> > -		*value = bridge->pcie_sltcap;
+> > -		break;
+> > -
+> > -	case PCISWCAP_EXP_SLTCTL:
+> > +	case PCI_EXP_SLTCTL:
+> >  		*value = PCI_EXP_SLTSTA_PDS << 16;
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_RTCTL:
+> > -		*value = bridge->pcie_rtctl;
+> > -		break;
+> > -
+> > -	case PCISWCAP_EXP_RTSTA:
+> > +	case PCI_EXP_RTSTA:
+> >  		*value = mvebu_readl(port, PCIE_RC_RTSTA);
+> >  		break;
+> >  
+> > -	/* PCIe requires the v2 fields to be hard-wired to zero */
+> > -	case PCISWCAP_EXP_DEVCAP2:
+> > -	case PCISWCAP_EXP_DEVCTL2:
+> > -	case PCISWCAP_EXP_LNKCAP2:
+> > -	case PCISWCAP_EXP_LNKCTL2:
+> > -	case PCISWCAP_EXP_SLTCAP2:
+> > -	case PCISWCAP_EXP_SLTCTL2:
+> >  	default:
+> > -		/*
+> > -		 * PCI defines configuration read accesses to reserved or
+> > -		 * unimplemented registers to read as zero and complete
+> > -		 * normally.
+> > -		 */
+> > -		*value = 0;
+> > -		return PCIBIOS_SUCCESSFUL;
+> > +		return PCI_BRIDGE_EMUL_NOT_HANDLED;
+> >  	}
+> >  
+> > -	if (size == 2)
+> > -		*value = (*value >> (8 * (where & 3))) & 0xffff;
+> > -	else if (size == 1)
+> > -		*value = (*value >> (8 * (where & 3))) & 0xff;
+> > -
+> > -	return PCIBIOS_SUCCESSFUL;
+> > +	return PCI_BRIDGE_EMUL_HANDLED;
+> >  }
+> >  
+> > -/* Write to the PCI-to-PCI bridge configuration space */
+> > -static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+> > -				     unsigned int where, int size, u32 value)
+> > +static void
+> > +mvebu_pci_bridge_emul_base_conf_write(struct pci_bridge_emul *bridge,
+> > +				      int reg, u32 old, u32 new, u32 mask)
+> >  {
+> > -	struct mvebu_sw_pci_bridge *bridge = &port->bridge;
+> > -	u32 mask, reg;
+> > -	int err;
+> > -
+> > -	if (size == 4)
+> > -		mask = 0x0;
+> > -	else if (size == 2)
+> > -		mask = ~(0xffff << ((where & 3) * 8));
+> > -	else if (size == 1)
+> > -		mask = ~(0xff << ((where & 3) * 8));
+> > -	else
+> > -		return PCIBIOS_BAD_REGISTER_NUMBER;
+> > -
+> > -	err = mvebu_sw_pci_bridge_read(port, where & ~3, 4, &reg);
+> > -	if (err)
+> > -		return err;
+> > -
+> > -	value = (reg & mask) | value << ((where & 3) * 8);
+> > +	struct mvebu_pcie_port *port = bridge->data;
+> > +	struct pci_bridge_emul_conf *conf = &bridge->conf;
+> >  
+> > -	switch (where & ~3) {
+> > +	switch (reg) {
+> >  	case PCI_COMMAND:
+> >  	{
+> > -		u32 old = bridge->command;
+> > -
+> >  		if (!mvebu_has_ioport(port))
+> > -			value &= ~PCI_COMMAND_IO;
+> > +			conf->command &= ~PCI_COMMAND_IO;
+> >  
+> > -		bridge->command = value & 0xffff;
+> > -		if ((old ^ bridge->command) & PCI_COMMAND_IO)
+> > +		if ((old ^ new) & PCI_COMMAND_IO)
+> >  			mvebu_pcie_handle_iobase_change(port);
+> > -		if ((old ^ bridge->command) & PCI_COMMAND_MEMORY)
+> > +		if ((old ^ new) & PCI_COMMAND_MEMORY)
+> >  			mvebu_pcie_handle_membase_change(port);
+> > -		break;
+> > -	}
+> >  
+> > -	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+> > -		bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
+> >  		break;
+> > +	}
+> >  
+> >  	case PCI_IO_BASE:
+> >  		/*
+> > -		 * We also keep bit 1 set, it is a read-only bit that
+> > +		 * We keep bit 1 set, it is a read-only bit that
+> >  		 * indicates we support 32 bits addressing for the
+> >  		 * I/O
+> >  		 */
+> > -		bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
+> > -		bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
+> > +		conf->iobase |= PCI_IO_RANGE_TYPE_32;
+> > +		conf->iolimit |= PCI_IO_RANGE_TYPE_32;
+> >  		mvebu_pcie_handle_iobase_change(port);
+> >  		break;
+> >  
+> >  	case PCI_MEMORY_BASE:
+> > -		bridge->membase = value & 0xffff;
+> > -		bridge->memlimit = value >> 16;
+> >  		mvebu_pcie_handle_membase_change(port);
+> >  		break;
+> >  
+> >  	case PCI_IO_BASE_UPPER16:
+> > -		bridge->iobaseupper = value & 0xffff;
+> > -		bridge->iolimitupper = value >> 16;
+> >  		mvebu_pcie_handle_iobase_change(port);
+> >  		break;
+> >  
+> >  	case PCI_PRIMARY_BUS:
+> > -		bridge->primary_bus             = value & 0xff;
+> > -		bridge->secondary_bus           = (value >> 8) & 0xff;
+> > -		bridge->subordinate_bus         = (value >> 16) & 0xff;
+> > -		bridge->secondary_latency_timer = (value >> 24) & 0xff;
+> > -		mvebu_pcie_set_local_bus_nr(port, bridge->secondary_bus);
+> > +		mvebu_pcie_set_local_bus_nr(port, conf->secondary_bus);
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_DEVCTL:
+> > +	default:
+> > +		break;
+> > +	}
+> > +}
+> > +
+> > +static void
+> > +mvebu_pci_bridge_emul_pcie_conf_write(struct pci_bridge_emul *bridge,
+> > +				      int reg, u32 old, u32 new, u32 mask)
+> > +{
+> > +	struct mvebu_pcie_port *port = bridge->data;
+> > +
+> > +	switch (reg) {
+> > +	case PCI_EXP_DEVCTL:
+> >  		/*
+> >  		 * Armada370 data says these bits must always
+> >  		 * be zero when in root complex mode.
+> >  		 */
+> > -		value &= ~(PCI_EXP_DEVCTL_URRE | PCI_EXP_DEVCTL_FERE |
+> > -			   PCI_EXP_DEVCTL_NFERE | PCI_EXP_DEVCTL_CERE);
+> > +		new &= ~(PCI_EXP_DEVCTL_URRE | PCI_EXP_DEVCTL_FERE |
+> > +			 PCI_EXP_DEVCTL_NFERE | PCI_EXP_DEVCTL_CERE);
+> >  
+> >  		/*
+> >  		 * If the mask is 0xffff0000, then we only want to write
+> > @@ -733,20 +541,20 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+> >  		 * RW1C bits in the device status register.  Mask out the
+> >  		 * status register bits.
+> >  		 */
+> > -		if (mask == 0xffff0000)
+> > -			value &= 0xffff;
+> > +		if (new == 0xffff0000)
+> > +			new &= 0xffff;
+> >  
+> > -		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL);
+> > +		mvebu_writel(port, new, PCIE_CAP_PCIEXP + PCI_EXP_DEVCTL);
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_LNKCTL:
+> > +	case PCI_EXP_LNKCTL:
+> >  		/*
+> >  		 * If we don't support CLKREQ, we must ensure that the
+> >  		 * CLKREQ enable bit always reads zero.  Since we haven't
+> >  		 * had this capability, and it's dependent on board wiring,
+> >  		 * disable it for the time being.
+> >  		 */
+> > -		value &= ~PCI_EXP_LNKCTL_CLKREQ_EN;
+> > +		new &= ~PCI_EXP_LNKCTL_CLKREQ_EN;
+> >  
+> >  		/*
+> >  		 * If the mask is 0xffff0000, then we only want to write
+> > @@ -755,21 +563,48 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+> >  		 * RW1C status register bits.
+> >  		 */
+> >  		if (mask == 0xffff0000)
+> > -			value &= ~((PCI_EXP_LNKSTA_LABS |
+> > -				    PCI_EXP_LNKSTA_LBMS) << 16);
+> > +			new &= ~((PCI_EXP_LNKSTA_LABS |
+> > +				  PCI_EXP_LNKSTA_LBMS) << 16);
+> >  
+> > -		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
+> > +		mvebu_writel(port, new, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
+> >  		break;
+> >  
+> > -	case PCISWCAP_EXP_RTSTA:
+> > -		mvebu_writel(port, value, PCIE_RC_RTSTA);
+> > +	case PCI_EXP_RTSTA:
+> > +		mvebu_writel(port, new, PCIE_RC_RTSTA);
+> >  		break;
+> > +	}
+> > +}
+> >  
+> > -	default:
+> > -		break;
+> > +struct pci_bridge_emul_ops mvebu_pci_bridge_emul_ops = {
+> > +	.write_base = mvebu_pci_bridge_emul_base_conf_write,
+> > +	.read_pcie = mvebu_pci_bridge_emul_pcie_conf_read,
+> > +	.write_pcie = mvebu_pci_bridge_emul_pcie_conf_write,
+> > +};
+> > +
+> > +/*
+> > + * Initialize the configuration space of the PCI-to-PCI bridge
+> > + * associated with the given PCIe interface.
+> > + */
+> > +static void mvebu_pci_bridge_emul_init(struct mvebu_pcie_port *port)
+> > +{
+> > +	struct pci_bridge_emul *bridge = &port->bridge;
+> > +
+> > +	bridge->conf.vendor = PCI_VENDOR_ID_MARVELL;
+> > +	bridge->conf.device = mvebu_readl(port, PCIE_DEV_ID_OFF) >> 16;
+> > +	bridge->conf.class_revision =
+> > +		mvebu_readl(port, PCIE_DEV_REV_OFF) & 0xff;
+> > +
+> > +	if (mvebu_has_ioport(port)) {
+> > +		/* We support 32 bits I/O addressing */
+> > +		bridge->conf.iobase = PCI_IO_RANGE_TYPE_32;
+> > +		bridge->conf.iolimit = PCI_IO_RANGE_TYPE_32;
+> >  	}
+> >  
+> > -	return PCIBIOS_SUCCESSFUL;
+> > +	bridge->has_pcie = true;
+> > +	bridge->data = port;
+> > +	bridge->ops = &mvebu_pci_bridge_emul_ops;
+> > +
+> > +	pci_bridge_emul_init(bridge);
+> >  }
+> >  
+> >  static inline struct mvebu_pcie *sys_to_pcie(struct pci_sys_data *sys)
+> > @@ -789,8 +624,8 @@ static struct mvebu_pcie_port *mvebu_pcie_find_port(struct mvebu_pcie *pcie,
+> >  		if (bus->number == 0 && port->devfn == devfn)
+> >  			return port;
+> >  		if (bus->number != 0 &&
+> > -		    bus->number >= port->bridge.secondary_bus &&
+> > -		    bus->number <= port->bridge.subordinate_bus)
+> > +		    bus->number >= port->bridge.conf.secondary_bus &&
+> > +		    bus->number <= port->bridge.conf.subordinate_bus)
+> >  			return port;
+> >  	}
+> >  
+> > @@ -811,7 +646,8 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+> >  
+> >  	/* Access the emulated PCI-to-PCI bridge */
+> >  	if (bus->number == 0)
+> > -		return mvebu_sw_pci_bridge_write(port, where, size, val);
+> > +		return pci_bridge_emul_conf_write(&port->bridge, where,
+> > +						  size, val);
+> >  
+> >  	if (!mvebu_pcie_link_up(port))
+> >  		return PCIBIOS_DEVICE_NOT_FOUND;
+> > @@ -839,7 +675,8 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+> >  
+> >  	/* Access the emulated PCI-to-PCI bridge */
+> >  	if (bus->number == 0)
+> > -		return mvebu_sw_pci_bridge_read(port, where, size, val);
+> > +		return pci_bridge_emul_conf_read(&port->bridge, where,
+> > +						 size, val);
+> >  
+> >  	if (!mvebu_pcie_link_up(port)) {
+> >  		*val = 0xffffffff;
+> > @@ -1253,7 +1090,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+> >  
+> >  		mvebu_pcie_setup_hw(port);
+> >  		mvebu_pcie_set_local_dev_nr(port, 1);
+> > -		mvebu_sw_pci_bridge_init(port);
+> > +		mvebu_pci_bridge_emul_init(port);
+> >  	}
+> >  
+> >  	pcie->nports = i;
+> > -- 
+> > 2.14.4
+> > 
