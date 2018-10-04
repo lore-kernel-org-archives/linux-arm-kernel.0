@@ -1,110 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Oct 2018 15:58:36 +0200
-Subject: [PATCH v2 00/29] at24: remove at24_platform_data
-In-Reply-To: <CAMRc=MfwM7vODsnuV9eKS4Uf7M5ac59u7ao7KvyaxKzPv5FRvw@mail.gmail.com>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180831194643.GA62862@ban.mtv.corp.google.com>
- <CAMRc=MejZLV1EQ7uAddsxLY0MTUF8WyiBn=F0ZhkWQJpET0EDQ@mail.gmail.com>
- <a4c2e6cf-749a-83a1-0bda-43ddb7e744cd@gmail.com>
- <CAMRc=MfwM7vODsnuV9eKS4Uf7M5ac59u7ao7KvyaxKzPv5FRvw@mail.gmail.com>
-Message-ID: <CAK8P3a1LufzR1_6mXH=1zDb34VQStLywGM1w5x5CDAMh_7uMyA@mail.gmail.com>
+Date: Thu, 4 Oct 2018 16:12:40 +0200
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.20, part 3
+In-Reply-To: <1538490605-26653-1-git-send-email-dinguyen@kernel.org>
+References: <1538490605-26653-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <CAK8P3a2BjnCZQiR8qRE--=RHTaFw2kB-Jz=g0A0KvGpaaWY3DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 1:06 PM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> ?r., 3 pa? 2018 o 23:04 Florian Fainelli <f.fainelli@gmail.com> napisa?(a):
-> > On 10/3/2018 1:15 PM, Bartosz Golaszewski wrote:
-> > > pt., 31 sie 2018 o 21:46 Brian Norris <computersforpeace@gmail.com> napisa?(a):
-> > >>
-> > >> Hi,
-> > >>
-> > >> On Fri, Aug 10, 2018 at 10:04:57AM +0200, Bartosz Golaszewski wrote:
-> > >>> Most boards use the EEPROM to store the MAC address. This series adds
-> > >>> support for cell lookups to the nvmem framework, registers relevant
-> > >>> cells for all users, adds nvmem support to eth_platform_get_mac_address(),
-> > >>> converts davinci_emac driver to using it and replaces at24_platform_data
-> > >>> with device properties.
-> > >>
-> > >> We already have:
-> > >>
-> > >> of_get_nvmem_mac_address() (which does exactly what you're adding,
-> > >> except it's DT specific)
-> > >> of_get_mac_address()
-> > >> fwnode_get_mac_address()
-> > >> device_get_mac_address()
-> > >>
-> > >> and now you've taught me that this exists too:
-> > >>
-> > >> eth_platform_get_mac_address()
-> > >>
-> > >> These mostly don't share code, and with your series, they'll start to
-> > >> diverge even more as to what they support. Can you please help rectify
-> > >> that, instead of widening the gap?
-> > >>
-> > >> For instance, you can delete most of eth_platform_get_mac_address() and
-> > >> replace it with device_get_mac_address() [1]. And you could add your new
-> > >> stuff to fwnode_get_mac_address().
-> > >>
-> > >> And important part to note here is that you code isn't just useful for
-> > >> ethernet -- it could be useful for Wifi devices too. So IMO, sticking it
-> > >> only in an "eth" function is the wrong move.
-> > >>
-> > >> Brian
-> > >>
-> > >> [1] arch_get_platform_mac_address() is the only part I wouldn't want to
-> > >> replicate into a truly generic helper. The following should be a no-op
-> > >> refactor, AIUI:
-> > >>
-> > >
-> > > The only user of arch_get_platform_mac_address() is sparc. It returns
-> > > an address that seems to be read from some kind of EEPROM. I'm not
-> > > familiar with this arch though. I'm wondering if we could somehow
-> > > seamlessly remove this call and then convert all users of
-> > > eth_platform_get_mac_address() to using device_get_mac_address()?
-> > >
-> > > David: I couldn't find a place in sparc code where any ethernet device
-> > > would be registered, so is there a chance that nobody is using it?
-> >
-> > SPARC uses a true Open Firmware implementation, so it would register
-> > drivers through the CONFIG_OF infrastructure.
-> > --
->
-> I'm seeing that there are only six callers of
-> eth_platform_get_mac_address() (the only function which calls
-> arch_get_platform_mac_address()).
->
-> Of these six callers four are intel ethernet drivers and two are usb
-> ethernet adapter drivers.
->
-> Is it even possible that sparc wants to get the mac address for a usb
-> adapter from some memory chip? Maybe we *can* safely remove that
-> function completely? That would allow us to simplify a lot of code.
+On Tue, Oct 2, 2018 at 4:30 PM Dinh Nguyen <dinguyen@kernel.org> wrote:
 
-The calls are not even that old, and clearly added intentionally for sparc,
-see commit ba94272d08a7 ("i40e: use eth_platform_get_mac_address()")
-which added the first one.
+> Dinh Nguyen (1):
+>       arm64: dts: stratix10: add ethernet aliases
 
-Before that commit, the driver did the same as a couple of sun
-specific ones that access the idprom directly:
+This one doesn't look quite right: you are adding the aliases in the .dtsi
+files, which might be shared by multiple .dts files. There is no guarantee
+that each board uses all three ethernet ports in the chip, even when all
+boards we support in the kernel do.
 
-drivers/net/ethernet/aeroflex/greth.c:
-macaddr[i] = (unsigned int) idprom->id_ethaddr[i];
-drivers/net/ethernet/amd/sun3lance.c:        dev->dev_addr[i] =
-idprom->id_ethaddr[i];
-drivers/net/ethernet/amd/sunlance.c:            dev->dev_addr[i] =
-idprom->id_ethaddr[i];
-drivers/net/ethernet/broadcom/tg3.c:    memcpy(dev->dev_addr,
-idprom->id_ethaddr, ETH_ALEN);
-drivers/net/ethernet/i825xx/sun3_82586.c:            dev->dev_addr[i]
-= idprom->id_ethaddr[i];
-drivers/net/ethernet/sun/sunbmac.c:             dev->dev_addr[i] =
-idprom->id_ethaddr[i];
-drivers/net/ethernet/sun/sungem.c:              addr = idprom->id_ethaddr;
-drivers/net/ethernet/sun/sunhme.c:
-memcpy(dev->dev_addr, idprom->id_ethaddr, ETH_ALEN);
-drivers/net/ethernet/sun/sunhme.c:
-memcpy(dev->dev_addr, idprom->id_ethaddr, ETH_ALEN);
-drivers/net/ethernet/sun/sunqe.c:       memcpy(dev->dev_addr,
-idprom->id_ethaddr, ETH_ALEN);
+Can you have a look at why those are not in the .dts file?
 
-      Arnd
+       Arnd
