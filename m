@@ -1,58 +1,70 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 04 Oct 2018 18:15:41 +0200
-Subject: [GIT PULL 1/3] Rockchip ARM64 devicetree updates for 4.20 - round2
-In-Reply-To: <CAK8P3a1EKduDFqJOsXq6W9r=0+-fyrfyTnwPeHEp1BDVRxNk_g@mail.gmail.com>
-References: <2559110.ail6FZQ9dJ@phil>
- <CAK8P3a1EKduDFqJOsXq6W9r=0+-fyrfyTnwPeHEp1BDVRxNk_g@mail.gmail.com>
-Message-ID: <11931084.yfuDoSsS8u@phil>
+From: nicolas.cavallari@green-communications.fr (Nicolas Cavallari)
+Date: Thu,  4 Oct 2018 18:23:38 +0200
+Subject: [RFC 1/2] reboot: Make restart_handler_list a blocking notifier chain.
+In-Reply-To: <20181004162339.19493-1-nicolas.cavallari@green-communications.fr>
+References: <20181004162339.19493-1-nicolas.cavallari@green-communications.fr>
+Message-ID: <20181004162339.19493-2-nicolas.cavallari@green-communications.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Many users of restart_handlers are sleeping in their callbacks.  Some
+are doing infinite loops or calling driver code that may sleep or
+perform operation on slow busses, like i2c.
 
-Am Donnerstag, 4. Oktober 2018, 16:18:06 CEST schrieb Arnd Bergmann:
-> On Wed, Oct 3, 2018 at 3:38 AM Heiko Stuebner <heiko@sntech.de> wrote:
-> 
-> >
-> > The following changes since commit 78f26da3ffbce0ea3692a89fe3f5487cb8dda068:
-> >
-> >   arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board (2018-09-10 19:16:26 +0200)
-> >
-> > are available in the Git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64-2
-> >
-> > for you to fetch changes up to e78d53c7b2873e0724eb765a88ccde42560b0e05:
-> >
-> >   arm64: dts: rockchip: enable display nodes on rk3328-rock64 (2018-09-28 13:18:37 +0200)
-> >
-> > ----------------------------------------------------------------
-> > Some additional new boards, the rk3399-based RockPro64 from Pine64, as well
-> > as the Vamrs Rock960. Another big feature is display support including hdmi
-> > and the Innosilicon hdmiphy on the rk3328, right now enabled on the rock64.
-> > The rock64 also got its spi-nor and spdif enabled. On the px30 we can see
-> > dwc2-based usb support now and finally some misc fixes, like for a new dtc
-> > warning, missing address and size cells and microSD fix on sapphire.
-> 
-> Nice to see those new boards!
-> 
-> What about the bugfixes though, shouldn't at least the sapphire microSD fix
-> be merged into 4.19 and possibly backported to stable kernels?
-> 
-> I've pulled this into next/dt for now, please have a look at whether we
-> also want some of them in the fixes branch for 4.19. Thanks,
+This is not allowed in an atomic notifier chain, which is what
+restart_handler_list currently is, so use a blocking notifier chain
+instead.
 
-The fixes aren't that critical:
-- the dtc warning stems from the updated dtc that will get merged
-  into 4.20, so doesn't affect current kernels
-- the first board using a dsi-display at all is still in flight, so the
-  missing -*cells aren't really causing issues on old kernels
-- and finally I think Vicente is the only actual user of a sapphire
-  board (they are rk3399 eval boards after all) and he's using new
-  kernels and is still making new things work on that board.
+Signed-off-by: Nicolas Cavallari <nicolas.cavallari@green-communications.fr>
+---
+ kernel/reboot.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-So I'd think it we can save stable-maintainers time for breakage that
-affects bigger crowds ;-)
-
-
-Heiko
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+index 8fb44dec9ad7..f0ba0008dbde 100644
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -135,7 +135,7 @@ EXPORT_SYMBOL(devm_register_reboot_notifier);
+  *	Notifier list for kernel code which wants to be called
+  *	to restart the system.
+  */
+-static ATOMIC_NOTIFIER_HEAD(restart_handler_list);
++static BLOCKING_NOTIFIER_HEAD(restart_handler_list);
+ 
+ /**
+  *	register_restart_handler - Register function to be called to reset
+@@ -172,12 +172,12 @@ static ATOMIC_NOTIFIER_HEAD(restart_handler_list);
+  *	hardware is expected to register with low priority to ensure that
+  *	it only runs if no other means to restart the system is available.
+  *
+- *	Currently always returns zero, as atomic_notifier_chain_register()
++ *	Currently always returns zero, as blocking_notifier_chain_register()
+  *	always returns zero.
+  */
+ int register_restart_handler(struct notifier_block *nb)
+ {
+-	return atomic_notifier_chain_register(&restart_handler_list, nb);
++	return blocking_notifier_chain_register(&restart_handler_list, nb);
+ }
+ EXPORT_SYMBOL(register_restart_handler);
+ 
+@@ -192,7 +192,7 @@ EXPORT_SYMBOL(register_restart_handler);
+  */
+ int unregister_restart_handler(struct notifier_block *nb)
+ {
+-	return atomic_notifier_chain_unregister(&restart_handler_list, nb);
++	return blocking_notifier_chain_unregister(&restart_handler_list, nb);
+ }
+ EXPORT_SYMBOL(unregister_restart_handler);
+ 
+@@ -209,7 +209,7 @@ EXPORT_SYMBOL(unregister_restart_handler);
+  */
+ void do_kernel_restart(char *cmd)
+ {
+-	atomic_notifier_call_chain(&restart_handler_list, reboot_mode, cmd);
++	blocking_notifier_call_chain(&restart_handler_list, reboot_mode, cmd);
+ }
+ 
+ void migrate_to_reboot_cpu(void)
+-- 
+2.19.0
