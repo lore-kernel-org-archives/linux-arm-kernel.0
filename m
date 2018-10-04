@@ -1,77 +1,49 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 4 Oct 2018 11:26:08 +0200
-Subject: [PATCH 4/4] arm64: dts: lx2160a: update fspi node
-In-Reply-To: <VI1PR04MB1038ECE25B571117405A617799EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1538642920-3843-5-git-send-email-yogeshnarayan.gaur@nxp.com>
- <20181004111822.48ab1f5c@bbrezillon>
- <VI1PR04MB1038ECE25B571117405A617799EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <20181004112608.3ae23d99@bbrezillon>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Thu, 4 Oct 2018 09:37:52 +0000
+Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19 take 2
+In-Reply-To: <20181001225827.21946-1-leoyang.li@nxp.com>
+References: <20181001225827.21946-1-leoyang.li@nxp.com>
+Message-ID: <f1847dd8-0cbc-3be6-303f-73e5dac5e5d1@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Oct 2018 09:24:57 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+Hi Leo,
 
-> Hi Boris,
+On 02.10.2018 01:58, Li Yang wrote:
+> Hi arm-soc maintainers,
 > 
-> > -----Original Message-----
-> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > Sent: Thursday, October 4, 2018 2:48 PM
-> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com; vigneshr at ti.com;
-> > linux-spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
-> > mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
-> > kernel at lists.infradead.org; computersforpeace at gmail.com;
-> > frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org
-> > Subject: Re: [PATCH 4/4] arm64: dts: lx2160a: update fspi node
-> > 
-> > On Thu,  4 Oct 2018 14:18:40 +0530
-> > Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> >   
-> > > Flash mt35xu512aba connected to FlexSPI controller supports
-> > > 1-1-8 protocol.
-> > > Added flag spi-rx-bus-width and spi-tx-bus-width with values as
-> > > 8 and 1 respectively for both flashes connected at CS0 and CS1.
-> > >
-> > > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> > > ---
-> > >  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> > > b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> > > index 901ca346..817175a 100644
-> > > --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> > > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> > > @@ -42,6 +42,8 @@
-> > >  		m25p,fast-read;
-> > >  		spi-max-frequency = <20000000>;
-> > >  		reg = <0>;
-> > > +		spi-rx-bus-width = <8>;
-> > > +		spi-tx-bus-width = <1>;  
-> > 
-> > Why 1? The flash is already flagged with SPI_NOR_OCTAL_READ, which means
-> > only the read path will use 1-1-8 mode, so you can safely set spi-tx-bus-width
+> Please merge the updated fix for the following issue.
+> 
+> Regards,
+> Leo
+> 
+> The following changes since commit 96fc74333f84cfdf8d434c6c07254e215e2aad00:
+> 
+>    soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift() (2018-09-25 13:57:26 -0700)
+> 
+> are available in the Git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git soc-fsl-fix-v4.19-2
+> 
+> for you to fetch changes up to 5a1eb8b9542884592a018829bb1ff20c9695d925:
+> 
+>    soc: fsl: qman_portals: defer probe after qman's probe (2018-10-01 17:47:43 -0500)
+> 
+> ----------------------------------------------------------------
+> NXP/FSL SoC driver fixes for v4.19 round 2
+> 
+> - Fix crash of qman_portal by deferring its probe if qman is not probed
+> 
+> ----------------------------------------------------------------
+> Laurentiu Tudor (2):
+>        soc: fsl: qbman: add APIs to retrieve the probing status
+>        soc: fsl: qman_portals: defer probe after qman's probe
 
-I meant 'set spi-tx-bus-width to 8' here
+There's a similar fix for bman portals [1]. I was under the impression 
+that you plan to pick that up too.
 
-> > here and let the framework choose the appropriate mode based on the flash
-> > capabilities.  
-> 
-> Ok.
-> 
-> >   
-> > >  	};
-> > >
-> > >  	mt35xu512aba1: flash at 1 {
-> > > @@ -51,6 +53,8 @@
-> > >  		m25p,fast-read;
-> > >  		spi-max-frequency = <20000000>;
-> > >  		reg = <1>;
-> > > +		spi-rx-bus-width = <8>;
-> > > +		spi-tx-bus-width = <1>;
-> > >  	};
-> > >  };
-> > >  
-> 
+[1] "soc/fsl/bman_portals: defer probe after bman's probe", found here:
+https://lore.kernel.org/patchwork/patch/992009/
+
+---
+Thanks & Best Regards, Laurentiu
