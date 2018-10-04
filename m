@@ -1,68 +1,63 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 4 Oct 2018 12:09:58 +0200
-Subject: [PATCH] drm/meson: fix max mode_config height/width
-In-Reply-To: <1538642563-22465-1-git-send-email-narmstrong@baylibre.com>
-References: <1538642563-22465-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20181004100958.GI31561@phenom.ffwll.local>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Oct 2018 12:10:40 +0200
+Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM) (a subset)
+In-Reply-To: <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
+References: <20181003143824.13059-1-ulf.hansson@linaro.org>
+ <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
+ <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
+ <10136406.EY9A7BdqYq@aspire.rjw.lan>
+ <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
+Message-ID: <CAPDyKFqgXy9Yf9j_zf5n7QcrCg8V20qqprVdZK-KYKhWJEkuoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2018 at 10:42:43AM +0200, Neil Armstrong wrote:
-> The mode_config max_width/max_height determines the maximum framebuffer
-> size the pixel reader can handle. But the values were set thinking they
-> were determining the maximum screen dimensions.
-> 
-> This patch changes the values to the maximum height/width the CANVAS block
-> can handle rounded to some coherent values.
-> 
-> Fixes: a41e82e6c457 ("drm/meson: Add support for components")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+On 4 October 2018 at 11:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Thu, Oct 4, 2018 at 11:04 AM Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>>
+>> On Thursday, October 4, 2018 10:58:53 AM CEST Ulf Hansson wrote:
+>> > On 4 October 2018 at 10:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> > > On Wed, Oct 3, 2018 at 4:39 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> > >>
+>> > >> I have digested the review comments so far, including a recent offlist chat
+>> > >> with with Lorenzo Pieralisi around the debatable PSCI changes. More or less I
+>> > >> have a plan for how to move forward.
+>> > >>
+>> > >> However, to avoid re-posting non-changed patches over and over again, I decided
+>> > >> to withhold the more debatable part from this v9, hence this is not the complete
+>> > >> series to make things play. In v9, I have just included the trivial changes,
+>> > >> which are either already acked/reviewed or hopefully can be rather soon/easily.
+>> > >>
+>> > >> My hope is to get this queued for v4.20, to move things forward. I know it's
+>> > >> late, but there are more or less nothing new here since v8.
+>> > >
+>> > > I have no problems with the first three patches in this series, so I
+>> > > can apply them right away.  Do you want me to do that?
+>> >
+>> > Yes, please.
+>> >
+>> > >
+>> > > As for the rest, the cpuidle driver patch looks OK to me, but the
+>> > > PSCI-related ones need ACKs.
+>> >
+>> > For some yes, but I think you can go ahead with a few more.
+>> >
+>> > Patch 4, 5 is already acked/reviewed.
+>> >
+>> > Patch 6 should be fine (if you are okay with it else wait for an ack
+>> > from Daniel)
+>>
+>> OK, thanks.
+>>
+>> Do the 4-6 depend on the 1-3?
+>
+> I don't see any dependency there, so I'll queue up the 1-3 in
+> pm-domains and the 4-6 in pm-cpuidle.
 
-It's both. Grep for all the callers of ->fill_modes and you'll see that
-this limit is also used to filter max screen sizes.
+Great, thanks!
 
-If you want to change this, then I think we need a new
-mode_config.fb_max_width/height, which if non-zero, would extend the limit
-for fbs.
+Make sure you put the remaining of the PSCI changes on pm-cpuidle
+(once acked), as there are dependency.
 
-There's also the problem that if you extend this for fbs, then there's no
-check anymore in the atomic_commit paths (or legacy modeset), so that
-needs to be addressed somehow too.
-
-Bunch of igt to make sure we're not missing anything would be sweet on
-top, e.g. e.g. trying to set a mode over the limit and making sure it
-fails.
-
-Cheers, Daniel
-
-> ---
->  drivers/gpu/drm/meson/meson_drv.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-> index d344312..2e29968 100644
-> --- a/drivers/gpu/drm/meson/meson_drv.c
-> +++ b/drivers/gpu/drm/meson/meson_drv.c
-> @@ -243,8 +243,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
->  		goto free_drm;
->  
->  	drm_mode_config_init(drm);
-> -	drm->mode_config.max_width = 3840;
-> -	drm->mode_config.max_height = 2160;
-> +	drm->mode_config.max_width = 16384;
-> +	drm->mode_config.max_height = 8192;
->  	drm->mode_config.funcs = &meson_mode_config_funcs;
->  
->  	/* Hardware Initialization */
-> -- 
-> 2.7.4
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Kind regards
+Uffe
