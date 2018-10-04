@@ -1,37 +1,37 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 4 Oct 2018 21:56:05 +0200
-Subject: [PATCH v2 2/2] drm/sun4i: tcon: prevent tcon->panel dereference
- if null
-In-Reply-To: <20181003142458.33120-2-giulio.benetti@micronovasrl.com>
-References: <9a545739-eed5-7af1-3b75-108bdd3427a2@micronovasrl.com>
- <20181003142458.33120-1-giulio.benetti@micronovasrl.com>
- <20181003142458.33120-2-giulio.benetti@micronovasrl.com>
-Message-ID: <20181004195605.txvbkshvxklyzxyb@flea>
+From: daniel.vetter@ffwll.ch (Daniel Vetter)
+Date: Thu,  4 Oct 2018 22:24:34 +0200
+Subject: [PATCH 09/21] drm/atmel: Drop transitional hooks
+In-Reply-To: <20181004202446.22905-1-daniel.vetter@ffwll.ch>
+References: <20181004202446.22905-1-daniel.vetter@ffwll.ch>
+Message-ID: <20181004202446.22905-10-daniel.vetter@ffwll.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 04:24:58PM +0200, Giulio Benetti wrote:
-> If using tcon with VGA,
+These do absolutely nothing for atomic drivers.
 
-We don't have support for VGA at the moment. Or are you talking about
-using a VGA bridge?
+Reviewed-by: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Cc: Boris Brezillon <boris.brezillon@bootlin.com>
+Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-> tcon->panel will be null(0), this will cause segmentation fault when
-> trying to dereference tcon->panel->connector.
-
-It's not a segmentation fault, but a null pointer dereference. And
-that case will also happen with bridges.
-
-Maxime
-
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index 9e34bce089d0..96f4082671fe 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -364,9 +364,7 @@ static void atmel_hlcdc_crtc_atomic_flush(struct drm_crtc *crtc,
+ 
+ static const struct drm_crtc_helper_funcs lcdc_crtc_helper_funcs = {
+ 	.mode_valid = atmel_hlcdc_crtc_mode_valid,
+-	.mode_set = drm_helper_crtc_mode_set,
+ 	.mode_set_nofb = atmel_hlcdc_crtc_mode_set_nofb,
+-	.mode_set_base = drm_helper_crtc_mode_set_base,
+ 	.atomic_check = atmel_hlcdc_crtc_atomic_check,
+ 	.atomic_begin = atmel_hlcdc_crtc_atomic_begin,
+ 	.atomic_flush = atmel_hlcdc_crtc_atomic_flush,
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181004/fc276c6c/attachment.sig>
+2.19.0.rc2
