@@ -1,27 +1,71 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Thu, 4 Oct 2018 18:39:52 +0530
-Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: enable so-said LDOs for A64
- SoC's pll-mipi clock
-In-Reply-To: <20181002122911.22094-1-icenowy@aosc.io>
-References: <20181002122911.22094-1-icenowy@aosc.io>
-Message-ID: <9bd28354-28f8-0393-20ff-e935bbc9a62c@openedev.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu,  4 Oct 2018 20:28:54 +0800
+Subject: [PATCH v4 09/10] arm64: allwinner: dts: h6: add USB3 device nodes
+In-Reply-To: <20181004122855.22981-1-icenowy@aosc.io>
+References: <20181004122855.22981-1-icenowy@aosc.io>
+Message-ID: <20181004122855.22981-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 October 2018 05:59 PM, Icenowy Zheng wrote:
-> In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
-> register is called "LDO{1,2}_EN", and according to the BSP source code
-> from Allwinner , the LDOs are enabled during the clock's enabling
-> process.
-> 
-> The clock failed to generate output if the two LDOs are not enabled.
-> 
-> Add the two bits to the clock's gate bits, so that the LDOs are enabled
-> when the PLL is enabled.
-> 
-> Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
+Allwinner H6 SoC features USB3 functionality, with a DWC3 controller and
+a custom PHY.
 
-Tested-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Jagan Teki <jagan@amarulasolutions.com>
+Add device tree nodes for them.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+---
+No changes in v4.
+
+Changes in v3:
+- Changed the dwc3 clock according to the user manual.
+- Added Chen-Yu's Review tag.
+
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 32 ++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index 3d60af6cb3ae..0a8b4845c0df 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -313,6 +313,38 @@
+ 			status = "disabled";
+ 		};
+ 
++		dwc3: dwc3 at 5200000 {
++			compatible = "snps,dwc3";
++			reg = <0x05200000 0x10000>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_XHCI>,
++				 <&ccu CLK_BUS_XHCI>,
++				 <&osc32k>;
++			clock-names = "ref", "bus_early", "suspend";
++			resets = <&ccu RST_BUS_XHCI>;
++			/*
++			 * The datasheet of the chip doesn't declare the
++			 * peripheral function, and there's no boards known
++			 * to have a USB Type-B port routed to the port.
++			 * In addition, no one has tested the peripheral
++			 * function yet.
++			 * So set the dr_mode to "host" in the DTSI file.
++			 */
++			dr_mode = "host";
++			phys = <&usb3phy>;
++			phy-names = "usb3-phy";
++			status = "disabled";
++		};
++
++		usb3phy: phy at 5210000 {
++			compatible = "allwinner,sun50i-h6-usb3-phy";
++			reg = <0x5210000 0x10000>;
++			clocks = <&ccu CLK_USB_PHY1>;
++			resets = <&ccu RST_USB_PHY1>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
+ 		ehci3: usb at 5311000 {
+ 			compatible = "allwinner,sun50i-h6-ehci", "generic-ehci";
+ 			reg = <0x05311000 0x100>;
+-- 
+2.18.0
