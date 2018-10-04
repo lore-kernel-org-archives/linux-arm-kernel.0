@@ -1,106 +1,66 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Fri, 5 Oct 2018 00:23:07 +0530
-Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
-In-Reply-To: <20181004181736.GB20842@bombadil.infradead.org>
-References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
- <20181003200003.GA9965@bombadil.infradead.org>
- <20181003221444.GZ30658@n2100.armlinux.org.uk>
- <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
- <20181004123400.GC30658@n2100.armlinux.org.uk>
- <CAFqt6zZPOM17QwmcWKF3F1gqkJm=2PxvuJ3naWuRXZGHc2HrEQ@mail.gmail.com>
- <20181004181736.GB20842@bombadil.infradead.org>
-Message-ID: <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Oct 2018 20:38:14 +0200
+Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM) (a subset)
+In-Reply-To: <CAPDyKFrWzDU9BsfAnx7uoaXq=gmGg2r46Mn-cJHSWUk-TmyomA@mail.gmail.com>
+References: <20181003143824.13059-1-ulf.hansson@linaro.org>
+ <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
+ <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
+ <10136406.EY9A7BdqYq@aspire.rjw.lan>
+ <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
+ <20181004155755.GD5233@e107981-ln.cambridge.arm.com>
+ <CAJZ5v0j+W2CHiqkniXNJgZ3DU9pOpd_83Wj9Egwf+pVkRCjZLg@mail.gmail.com>
+ <20181004172109.GA16878@red-moon>
+ <CAPDyKFrWzDU9BsfAnx7uoaXq=gmGg2r46Mn-cJHSWUk-TmyomA@mail.gmail.com>
+Message-ID: <CAPDyKFoOkC7Tr0Hkx2OHhCA4Tk9j5Y3HBB4bG6ORaiHp-KcJ9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 11:47 PM Matthew Wilcox <willy@infradead.org> wrote:
+On 4 October 2018 at 20:36, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 4 October 2018 at 19:21, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> On Thu, Oct 04, 2018 at 07:07:27PM +0200, Rafael J. Wysocki wrote:
+>>
+>> [...]
+>>
+>>> > > I don't see any dependency there, so I'll queue up the 1-3 in
+>>> > > pm-domains and the 4-6 in pm-cpuidle.
+>>> >
+>>> > I do not see why we should merge patches 4-6 for v4.20; they add legacy
+>>> > (DT bindings and related parsing code) with no user in the kernel; we
+>>> > may still want to tweak them, in particular PSCI DT bindings.
+>>>
+>>> My impression was that 4-6 have been agreed on due to the ACKs they
+>>> carry.  I'll drop them if that's not the case.
+>>
+>> I have not expressed myself correctly: they have been agreed (even
+>> though as I said they may require some tweaking) but I see no urgency
+>> of merging them in v4.20 since they have no user. They contain DT
+>> bindings, that create ABI/legacy, I think it is better to have code
+>> that uses them in the kernel before merging them and creating a
+>> dependency that is not needed.
 >
-> On Thu, Oct 04, 2018 at 11:42:18PM +0530, Souptick Joarder wrote:
-> > On Thu, Oct 4, 2018 at 6:04 PM Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> > > I'm confused, what are you trying to do?
-> > >
-> > > It seems that we already have:
-> > >
-> > > vm_insert_page() - returns an errno
-> > > vmf_insert_page() - returns a VM_FAULT_* code
-> > >
-> > > From what I _think_ you're saying, you're trying to provide
-> > > vm_insert_kmem_page() as a direct replacement for the existing
-> > > vm_insert_page(), and then make vm_insert_page() behave as per
-> > > vmf_insert_page(), so we end up with:
-> >
-> > yes, vm_insert_kmem_page() can be a direct replacement of vm_insert_page
-> > or might be a wrapper function written using vm_insert_page whichever
-> > suites better
-> > based on feedback.
-> >
-> > >
-> > > vm_insert_kmem_page() - returns an errno
-> > > vm_insert_page() - returns a VM_FAULT_* code
-> > > vmf_insert_page() - returns a VM_FAULT_* code and is identical to
-> > >       vm_insert_page()
-> > >
-> >
-> > After completion of conversion we end up with
-> >
-> >  vm_insert_kmem_page() - returns an errno
-> >  vmf_insert_page() - returns a VM_FAULT_* code
-> >
-> >
-> > > Given that the documentation for vm_insert_page() says:
-> > >
-> > >  * Usually this function is called from f_op->mmap() handler
-> > >  * under mm->mmap_sem write-lock, so it can change vma->vm_flags.
-> > >  * Caller must set VM_MIXEDMAP on vma if it wants to call this
-> > >  * function from other places, for example from page-fault handler.
-> > >
-> > > this says that the "usual" use method for vm_insert_page() is
-> > > _outside_ of page fault handling - if it is used _inside_ page fault
-> > > handling, then it states that additional fixups are required on the
-> > > VMA.  So I don't get why your patch commentry seems to be saying that
-> > > users of vm_insert_page() outside of page fault handling all need to
-> > > be patched - isn't this the use case that this function is defined
-> > > to be handling?
-> >
-> > The answer is yes best of my knowledge.
-> >
-> > But as mentioned in change log ->
-> >
-> > Going forward, the plan is to restrict future drivers not
-> > to use vm_insert_page ( *it will generate new errno to
-> > VM_FAULT_CODE mapping code for new drivers which were already
-> > cleaned up for existing drivers*) in #PF (page fault handler)
-> > context but to make use of vmf_insert_page which returns
-> > VMF_FAULT_CODE and that is not possible until both vm_insert_page
-> > and vmf_insert_page API exists.
-> >
-> > But there are some consumers of vm_insert_page which use it
-> > outside #PF context. straight forward conversion of vm_insert_page
-> > to vmf_insert_page won't work there as those function calls expects
-> > errno not vm_fault_t in return.
-> >
-> > If both {vm, vmf}_insert_page exists, vm_insert_page might be used for
-> > #PF context which we want to protect by removing/ replacing vm_insert_page
-> > with another similar/ wrapper API.
-> >
-> > Is that the right answer of your question ? no ?
->
-> I think this is a bad plan.  What we should rather do is examine the current
-> users of vm_insert_page() and ask "What interface would better replace
-> vm_insert_page()?"
->
-> As I've said to you before, I believe the right answer is to have a
-> vm_insert_range() which takes an array of struct page pointers.  That
-> fits the majority of remaining users.
+> There is already code using the new bindings, for the idle states.
+> Please have look at patch 5, 6 and 11.
 
-Ok, but it will take some time.
-Is it a good idea to introduce the final vm_fault_t patch and then
-start working on vm_insert_range as it will be bit time consuming ?
+Should be 5, 6 and 10, sorry.
 
 >
-> ----
+> Moreover, you have had plenty on time to look at the series, as those
+> patches haven't changed since a very long time.
 >
-> If we do want to rename vm_insert_page() to vm_insert_kmem_page(), then
-> the right answer is to _just do that_.  Not duplicate vm_insert_page()
-> in its entirety.  I don't see the point to doing that.
+> May I suggest you do the review instead, so we can move things
+> forward, please. The changes in the v9 series should be trivial to
+> review.
+>
+>>
+>>> > Likewise, it makes no sense to merge patches 7-8 without the rest of
+>>> > the PSCI patches.
+>
+> Well, those patches are part of this series, because Mark wanted me to
+> move the files. Is really such a big deal? I think it makes sense, no
+> matter what happens afterwards.
+>
+> [...]
+>
+> Kind regards
+> Uffe
