@@ -1,76 +1,60 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  4 Oct 2018 20:28:51 +0800
-Subject: [PATCH v4 06/10] arm64: allwinner: dts: h6: enable USB2 on Pine H64
+Date: Thu,  4 Oct 2018 20:28:52 +0800
+Subject: [PATCH v4 07/10] dt-bindings: phy: add binding for Allwinner USB3 PHY
 In-Reply-To: <20181004122855.22981-1-icenowy@aosc.io>
 References: <20181004122855.22981-1-icenowy@aosc.io>
-Message-ID: <20181004122855.22981-7-icenowy@aosc.io>
+Message-ID: <20181004122855.22981-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pine H64 board has both the USB2 OTG pins and the USB2 host pins on H6
-SoC wired out to USB Type-A ports.
+The new Allwinner H6 SoC contains a USB3 PHY that is wired to the
+external USB3 pins of the SoC.
 
-Enable them.
+Add a device tree binding for the PHY.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
-No changes in v4.
+Changes in v4:
+- Changed Vbus regulator property to vbus-supply.
 
 Changes in v3:
 - Added Chen-Yu's Review tag.
 
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 27 +++++++++++++++++++
- 1 file changed, 27 insertions(+)
+No changes in v2, v1.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-index b181088d7500..2fde0ff3dd6b 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -51,6 +51,14 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
+ .../bindings/phy/sun50i-usb3-phy.txt          | 23 +++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+
+diff --git a/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+new file mode 100644
+index 000000000000..9f49c6b8c7e7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+@@ -0,0 +1,23 @@
++Allwinner sun50i USB3 PHY
++-----------------------
 +
-+&ehci3 {
-+	status = "okay";
-+};
++Required properties:
++- compatible : should be one of
++  * allwinner,sun60i-h6-usb3-phy
++- reg : a list of offset + length pairs
++- #phy-cells : from the generic phy bindings, must be 0
++- clocks : phandle + clock specifier for the phy clock
++- resets : phandle + reset specifier for the phy reset
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -71,6 +79,14 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
++Optional Properties:
++- vbus-supply : a phandle to a regulator that provides power to VBUS.
 +
-+&ohci3 {
-+	status = "okay";
-+};
-+
- &r_i2c {
- 	status = "okay";
- 
-@@ -195,3 +211,14 @@
- 	pinctrl-0 = <&uart0_ph_pins>;
- 	status = "okay";
- };
-+
-+&usb2otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usb2phy {
-+	usb0_vbus-supply = <&reg_usb_vbus>;
-+	usb3_vbus-supply = <&reg_usb_vbus>;
-+	status = "okay";
-+};
++Example:
++	usb3phy: phy at 5210000 {
++		compatible = "allwinner,sun50i-h6-usb3-phy";
++		reg = <0x5210000 0x10000>;
++		clocks = <&ccu CLK_USB_PHY1>;
++		resets = <&ccu RST_USB_PHY1>;
++		#phy-cells = <0>;
++		status = "disabled";
++	};
 -- 
 2.18.0
