@@ -1,84 +1,73 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 4 Oct 2018 13:06:20 +0200
-Subject: [PATCH v2 00/29] at24: remove at24_platform_data
-In-Reply-To: <a4c2e6cf-749a-83a1-0bda-43ddb7e744cd@gmail.com>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180831194643.GA62862@ban.mtv.corp.google.com>
- <CAMRc=MejZLV1EQ7uAddsxLY0MTUF8WyiBn=F0ZhkWQJpET0EDQ@mail.gmail.com>
- <a4c2e6cf-749a-83a1-0bda-43ddb7e744cd@gmail.com>
-Message-ID: <CAMRc=MfwM7vODsnuV9eKS4Uf7M5ac59u7ao7KvyaxKzPv5FRvw@mail.gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 4 Oct 2018 16:42:22 +0530
+Subject: [PATCH 1/3] mtd: spi-nor: Add Octal mode support for mt35xu512aba
+In-Reply-To: <20181004114535.3a5dba05@bbrezillon>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003165603.2579-2-vigneshr@ti.com> <20181004114535.3a5dba05@bbrezillon>
+Message-ID: <904391ba-5a12-aee9-966a-17346dded080@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?r., 3 pa? 2018 o 23:04 Florian Fainelli <f.fainelli@gmail.com> napisa?(a):
->
->
->
-> On 10/3/2018 1:15 PM, Bartosz Golaszewski wrote:
-> > pt., 31 sie 2018 o 21:46 Brian Norris <computersforpeace@gmail.com> napisa?(a):
-> >>
-> >> Hi,
-> >>
-> >> On Fri, Aug 10, 2018 at 10:04:57AM +0200, Bartosz Golaszewski wrote:
-> >>> Most boards use the EEPROM to store the MAC address. This series adds
-> >>> support for cell lookups to the nvmem framework, registers relevant
-> >>> cells for all users, adds nvmem support to eth_platform_get_mac_address(),
-> >>> converts davinci_emac driver to using it and replaces at24_platform_data
-> >>> with device properties.
-> >>
-> >> We already have:
-> >>
-> >> of_get_nvmem_mac_address() (which does exactly what you're adding,
-> >> except it's DT specific)
-> >> of_get_mac_address()
-> >> fwnode_get_mac_address()
-> >> device_get_mac_address()
-> >>
-> >> and now you've taught me that this exists too:
-> >>
-> >> eth_platform_get_mac_address()
-> >>
-> >> These mostly don't share code, and with your series, they'll start to
-> >> diverge even more as to what they support. Can you please help rectify
-> >> that, instead of widening the gap?
-> >>
-> >> For instance, you can delete most of eth_platform_get_mac_address() and
-> >> replace it with device_get_mac_address() [1]. And you could add your new
-> >> stuff to fwnode_get_mac_address().
-> >>
-> >> And important part to note here is that you code isn't just useful for
-> >> ethernet -- it could be useful for Wifi devices too. So IMO, sticking it
-> >> only in an "eth" function is the wrong move.
-> >>
-> >> Brian
-> >>
-> >> [1] arch_get_platform_mac_address() is the only part I wouldn't want to
-> >> replicate into a truly generic helper. The following should be a no-op
-> >> refactor, AIUI:
-> >>
-> >
-> > The only user of arch_get_platform_mac_address() is sparc. It returns
-> > an address that seems to be read from some kind of EEPROM. I'm not
-> > familiar with this arch though. I'm wondering if we could somehow
-> > seamlessly remove this call and then convert all users of
-> > eth_platform_get_mac_address() to using device_get_mac_address()?
-> >
-> > David: I couldn't find a place in sparc code where any ethernet device
-> > would be registered, so is there a chance that nobody is using it?
->
-> SPARC uses a true Open Firmware implementation, so it would register
-> drivers through the CONFIG_OF infrastructure.
-> --
 
-I'm seeing that there are only six callers of
-eth_platform_get_mac_address() (the only function which calls
-arch_get_platform_mac_address()).
 
-Of these six callers four are intel ethernet drivers and two are usb
-ethernet adapter drivers.
+On Thursday 04 October 2018 03:15 PM, Boris Brezillon wrote:
+> On Wed, 3 Oct 2018 22:26:01 +0530
+> Vignesh R <vigneshr@ti.com> wrote:
+> 
+>> Micron's mt35xu512aba flash is an Octal flash that has x8 IO lines. It
+>> supports read/write over 8 IO lines simulatenously. Add support for
+>> Octal read mode for Micron mt35xu512aba.
+>> Unfortunately, this flash is only complaint to SFDP JESD216B and does not
+>> seem to support newer JESD216C standard that provides auto detection of
+>> Octal mode capabilities and opcodes. Therefore, this capability is
+>> manually added using new SPI_NOR_OCTAL_READ flag.
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>  drivers/mtd/spi-nor/spi-nor.c | 11 ++++++++++-
+>>  include/linux/mtd/spi-nor.h   |  2 ++
+>>  2 files changed, 12 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+>> index aff5e6ff0b2c..4926e805a8cb 100644
+>> --- a/drivers/mtd/spi-nor/spi-nor.c
+>> +++ b/drivers/mtd/spi-nor/spi-nor.c
+>> @@ -90,6 +90,7 @@ struct flash_info {
+>>  #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
+>>  #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
+>>  #define USE_CLSR		BIT(14)	/* use CLSR command */
+>> +#define SPI_NOR_OCTAL_READ	BIT(15)	/* Flash supports Octal Read */
+> 
+> Hm, we'll need to clarify what OCTAL means. I see at least 3 different
+> modes using 8 IO lines (1-1-8, 1-8-8 and 8-8-8) and all of them could
+> be qualified as "octal" modes.
+> So how about renaming this macro SPI_NOR_1_1_8_READ.
+> 
 
-Is it even possible that sparc wants to get the mac address for a usb
-adapter from some memory chip? Maybe we *can* safely remove that
-function completely? That would allow us to simplify a lot of code.
+My understanding is that, if a flash is Octal IO capable, then it
+supports all mode of Octal IO (1-1-8, 1-8-8 and 8-8-8). At least in the
+current code, I see SPI_NOR_QUAD_READ seems to imply 1-1-4, 1-4-4 and
+4-4-4 modes.
+Moreover, these capabilities should be auto discoverable once flash
+start populating SFDP JESD216C tables (IIRC, JESD216B already takes care
+of QUAD IO modes). So, I don't think we need different flags for 1-1-8,
+1-8-8 and 8-8-8. Please let me if that's not the case.
 
-Bart
+For this patch, I wanted to start small and support only 1-1-8 mode
+which is the easiest.
+
+
+> Also, I fear we'll soon run out of bits in ->flags if we keep adding
+> one flag per mode which is why I proposed a solution to let flash
+> chips tweak the flash parameters as they wish [1][2]. I'm not saying we
+> should do it now, but we should definitely plan for something like that.
+> 
+> [1]https://github.com/bbrezillon/linux/commit/9c672e4c85a91f1b0803c9c6e4b8f3aae5d79ffb
+> [2]https://github.com/bbrezillon/linux/commit/3a5515c8821314c06a3d84f9861aefe476bb711e
+> 
+
+Hmm, it almost seems like Macronix flash warrants its own driver now.
+
+-- 
+Regards
+Vignesh
