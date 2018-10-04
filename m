@@ -1,16 +1,16 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  4 Oct 2018 20:28:48 +0800
-Subject: [PATCH v4 03/10] phy: sun4i-usb: add support for H6 USB2 PHY
+Date: Thu,  4 Oct 2018 20:28:51 +0800
+Subject: [PATCH v4 06/10] arm64: allwinner: dts: h6: enable USB2 on Pine H64
 In-Reply-To: <20181004122855.22981-1-icenowy@aosc.io>
 References: <20181004122855.22981-1-icenowy@aosc.io>
-Message-ID: <20181004122855.22981-4-icenowy@aosc.io>
+Message-ID: <20181004122855.22981-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB 2.0 PHY on Allwinner H6 SoC is similar to older Allwinner SoCs,
-with some USB0 quirk like A83T and PHY index 1/2 missing.
+Pine H64 board has both the USB2 OTG pins and the USB2 host pins on H6
+SoC wired out to USB Type-A ports.
 
-Add support for it.
+Enable them.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
@@ -20,66 +20,57 @@ No changes in v4.
 Changes in v3:
 - Added Chen-Yu's Review tag.
 
- drivers/phy/allwinner/phy-sun4i-usb.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 27 +++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
-index 881078ff73f6..ae16854a770a 100644
---- a/drivers/phy/allwinner/phy-sun4i-usb.c
-+++ b/drivers/phy/allwinner/phy-sun4i-usb.c
-@@ -115,6 +115,7 @@ enum sun4i_usb_phy_type {
- 	sun8i_r40_phy,
- 	sun8i_v3s_phy,
- 	sun50i_a64_phy,
-+	sun50i_h6_phy,
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+index b181088d7500..2fde0ff3dd6b 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+@@ -51,6 +51,14 @@
+ 	};
  };
  
- struct sun4i_usb_phy_cfg {
-@@ -295,7 +296,8 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		return ret;
- 	}
- 
--	if (data->cfg->type == sun8i_a83t_phy) {
-+	if (data->cfg->type == sun8i_a83t_phy ||
-+	    data->cfg->type == sun50i_h6_phy) {
- 		if (phy->index == 0) {
- 			val = readl(data->base + data->cfg->phyctl_offset);
- 			val |= PHY_CTL_VBUSVLDEXT;
-@@ -344,7 +346,8 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
- 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
- 
- 	if (phy->index == 0) {
--		if (data->cfg->type == sun8i_a83t_phy) {
-+		if (data->cfg->type == sun8i_a83t_phy ||
-+		    data->cfg->type == sun50i_h6_phy) {
- 			void __iomem *phyctl = data->base +
- 				data->cfg->phyctl_offset;
- 
-@@ -959,6 +962,17 @@ static const struct sun4i_usb_phy_cfg sun50i_a64_cfg = {
- 	.phy0_dual_route = true,
- };
- 
-+static const struct sun4i_usb_phy_cfg sun50i_h6_cfg = {
-+	.num_phys = 4,
-+	.type = sun50i_h6_phy,
-+	.disc_thresh = 3,
-+	.phyctl_offset = REG_PHYCTL_A33,
-+	.dedicated_clocks = true,
-+	.enable_pmu_unk1 = true,
-+	.phy0_dual_route = true,
-+	.missing_phys = BIT(1) | BIT(2),
++&ehci0 {
++	status = "okay";
 +};
 +
- static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
- 	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
-@@ -972,6 +986,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = &sun8i_v3s_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-usb-phy",
- 	  .data = &sun50i_a64_cfg},
-+	{ .compatible = "allwinner,sun50i-h6-usb-phy", .data = &sun50i_h6_cfg },
- 	{ },
++&ehci3 {
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+@@ -71,6 +79,14 @@
+ 	status = "okay";
  };
- MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+ 
++&ohci0 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
+ &r_i2c {
+ 	status = "okay";
+ 
+@@ -195,3 +211,14 @@
+ 	pinctrl-0 = <&uart0_ph_pins>;
+ 	status = "okay";
+ };
++
++&usb2otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usb2phy {
++	usb0_vbus-supply = <&reg_usb_vbus>;
++	usb3_vbus-supply = <&reg_usb_vbus>;
++	status = "okay";
++};
 -- 
 2.18.0
