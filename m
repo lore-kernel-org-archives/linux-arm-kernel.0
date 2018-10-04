@@ -1,331 +1,95 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Thu, 4 Oct 2018 17:26:08 +0530
-Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
-In-Reply-To: <CANiq72nHXzOuH7kOgYL7OZ7D0fC3SSLYpC13Gk5ZMYPXfimqMA@mail.gmail.com>
-References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
- <CANiq72nHXzOuH7kOgYL7OZ7D0fC3SSLYpC13Gk5ZMYPXfimqMA@mail.gmail.com>
-Message-ID: <CAFqt6zaUaGHkBORY+0sX8qWYcAd3F1Rpv+W9+GUD7ybBJ9odVQ@mail.gmail.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Thu, 4 Oct 2018 12:07:17 +0000
+Subject: [PATCH 1/4] spi: add support for octal I/O data transfer
+In-Reply-To: <VI1PR04MB1038E23CBFE9CFD5C2ECCD3299EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1538642920-3843-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20181004110446.5e1bb255@bbrezillon>
+ <VI1PR04MB10380FD9CE99E34BA27E55B699EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181004111941.0da33ec0@bbrezillon>
+ <VI1PR04MB1038E23CBFE9CFD5C2ECCD3299EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+Message-ID: <VI1PR04MB10384B74E6E27435313CC73099EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 1:28 AM Miguel Ojeda
-<miguel.ojeda.sandonis@gmail.com> wrote:
->
-> Hi Souptick,
->
-> On Wed, Oct 3, 2018 at 8:55 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
-> >
-> > vm_insert_kmem_page is similar to vm_insert_page and will
-> > be used by drivers to map kernel (kmalloc/vmalloc/pages)
-> > allocated memory to user vma.
-> >
-> > Going forward, the plan is to restrict future drivers not
-> > to use vm_insert_page ( *it will generate new errno to
-> > VM_FAULT_CODE mapping code for new drivers which were already
-> > cleaned up for existing drivers*) in #PF (page fault handler)
-> > context but to make use of vmf_insert_page which returns
-> > VMF_FAULT_CODE and that is not possible until both vm_insert_page
-> > and vmf_insert_page API exists.
-> >
-> > But there are some consumers of vm_insert_page which use it
-> > outside #PF context. straight forward conversion of vm_insert_page
-> > to vmf_insert_page won't work there as those function calls expects
-> > errno not vm_fault_t in return.
-> >
-> > These are the approaches which could have been taken to handle
-> > this scenario -
-> >
-> > *  Replace vm_insert_page with vmf_insert_page and then write few
-> >    extra lines of code to convert VM_FAULT_CODE to errno which
-> >    makes driver users more complex ( also the reverse mapping errno to
-> >    VM_FAULT_CODE have been cleaned up as part of vm_fault_t migration ,
-> >    not preferred to introduce anything similar again)
-> >
-> > *  Maintain both vm_insert_page and vmf_insert_page and use it in
-> >    respective places. But it won't gurantee that vm_insert_page will
-> >    never be used in #PF context.
-> >
-> > *  Introduce a similar API like vm_insert_page, convert all non #PF
-> >    consumer to use it and finally remove vm_insert_page by converting
-> >    it to vmf_insert_page.
-> >
-> > And the 3rd approach was taken by introducing vm_insert_kmem_page().
->
-> This looks better than the previous one of adding non-trivial code to
-> each driver, thank you!
->
-> A couple of comments below.
->
-> >
-> > In short, vmf_insert_page will be used in page fault handlers
-> > context and vm_insert_kmem_page will be used to map kernel
-> > memory to user vma outside page fault handlers context.
-> >
-> > Few drivers are converted to use vm_insert_kmem_page(). This will
-> > allow both to review the api and that it serves it purpose. other
-> > consumers of vm_insert_page (*used in non #PF context*) will be
-> > replaced by vm_insert_kmem_page, but in separate patches.
-> >
->
-> other -> Other
->
-> Also, as far as I can see, there are only a few vm_insert_page users
-> remaining. With the new function, they should be trivial to convert,
-> no? Therefore, could we do them all in one go, possibly in a patch
-> series?
+Hi Boris,
 
-yes, all the user can be converted in a patch series.
+> -----Original Message-----
+> From: Yogesh Narayan Gaur
+> Sent: Thursday, October 4, 2018 2:56 PM
+> To: 'Boris Brezillon' <boris.brezillon@bootlin.com>
+> Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com; vigneshr at ti.com;
+> linux-spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
+> mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
+> kernel at lists.infradead.org; computersforpeace at gmail.com;
+> frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org
+> Subject: RE: [PATCH 1/4] spi: add support for octal I/O data transfer
+> 
+> Hi Boris,
+> 
+> > -----Original Message-----
+> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> > Sent: Thursday, October 4, 2018 2:50 PM
+> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com;
+> > vigneshr at ti.com; linux-spi at vger.kernel.org;
+> > devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
+> > shawnguo at kernel.org; linux-arm- kernel at lists.infradead.org;
+> > computersforpeace at gmail.com; frieder.schrempf at exceet.de;
+> > linux-kernel at vger.kernel.org
+> > Subject: Re: [PATCH 1/4] spi: add support for octal I/O data transfer
+> >
+> > On Thu, 4 Oct 2018 09:14:36 +0000
+> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> >
+> > > Hi Boris,
+> > >
+> > > > -----Original Message-----
+> > > > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> > > > Sent: Thursday, October 4, 2018 2:35 PM
+> > > > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> > > > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com;
+> > > > vigneshr at ti.com; linux-spi at vger.kernel.org;
+> > > > devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
+> > > > shawnguo at kernel.org; linux-arm- kernel at lists.infradead.org;
+> > > > computersforpeace at gmail.com; frieder.schrempf at exceet.de;
+> > > > linux-kernel at vger.kernel.org Subject: Re: [PATCH 1/4] spi: add
+> > > > support for octal I/O data transfer
+> > > >
+> > > > Hi Yogesh,
+> > > >
+[...]
+> > > > > +#define	SPI_RX_OCTAL
+> > > > > 0x2000			/* receive with 8 wires
+> > > > */
+> > > > >  	int			irq;
+> > > > >  	void			*controller_state;
+> > > > >  	void			*controller_data;
+> > > >
+> > > > You're still not updating spi-mem.c to check those flags and
+> > > > SPI_MEM_MAX_BUSWIDTH is not updated to match the new limit (8
+> > > > instead of 4).
+> > > >
+> > > Yes and its strange that my octal mode communication is working fine
+> > > without adding support in spi-mem.c and that's why this has been
+> > > missed from me.
+> >
+> > Are you based on top of spi-next?
+> 
+> Ok, that might be the reason. I have rebased few days back.
+> Would rebase with current tip and add support in spi-mem interface too.
 
->
-> Or, maybe, even better: wait until you remove the vm_* functions and
-> simply reuse vm_insert_page for this -- that way you don't need a new
-> name and you don't have to change any of the last users (I mean the
-> drivers using it outside the page fault handlers).
->
-> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> > ---
-> > v2: Few non #PF consumers of vm_insert_page are converted
-> >     to use vm_insert_kmem_page in patch v2.
-> >
-> >     Updated the change log.
-> >
-> >  arch/arm/mm/dma-mapping.c                   |  2 +-
-> >  drivers/auxdisplay/cfag12864bfb.c           |  2 +-
-> >  drivers/auxdisplay/ht16k33.c                |  2 +-
-> >  drivers/firewire/core-iso.c                 |  2 +-
-> >  drivers/gpu/drm/rockchip/rockchip_drm_gem.c |  2 +-
-> >  include/linux/mm.h                          |  2 +
-> >  kernel/kcov.c                               |  4 +-
-> >  mm/memory.c                                 | 69 +++++++++++++++++++++++++++++
-> >  mm/nommu.c                                  |  7 +++
-> >  mm/vmalloc.c                                |  2 +-
-> >  10 files changed, 86 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index 6656647..58d7971 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -1598,7 +1598,7 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
-> >         pages += off;
-> >
-> >         do {
-> > -               int ret = vm_insert_page(vma, uaddr, *pages++);
-> > +               int ret = vm_insert_kmem_page(vma, uaddr, *pages++);
-> >                 if (ret) {
-> >                         pr_err("Remapping memory failed: %d\n", ret);
-> >                         return ret;
-> > diff --git a/drivers/auxdisplay/cfag12864bfb.c b/drivers/auxdisplay/cfag12864bfb.c
-> > index 40c8a55..82fd627 100644
-> > --- a/drivers/auxdisplay/cfag12864bfb.c
-> > +++ b/drivers/auxdisplay/cfag12864bfb.c
-> > @@ -52,7 +52,7 @@
-> >
-> >  static int cfag12864bfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
-> >  {
-> > -       return vm_insert_page(vma, vma->vm_start,
-> > +       return vm_insert_kmem_page(vma, vma->vm_start,
-> >                 virt_to_page(cfag12864b_buffer));
-> >  }
-> >
-> > diff --git a/drivers/auxdisplay/ht16k33.c b/drivers/auxdisplay/ht16k33.c
-> > index a43276c..64de30b 100644
-> > --- a/drivers/auxdisplay/ht16k33.c
-> > +++ b/drivers/auxdisplay/ht16k33.c
-> > @@ -224,7 +224,7 @@ static int ht16k33_mmap(struct fb_info *info, struct vm_area_struct *vma)
-> >  {
-> >         struct ht16k33_priv *priv = info->par;
-> >
-> > -       return vm_insert_page(vma, vma->vm_start,
-> > +       return vm_insert_kmem_page(vma, vma->vm_start,
-> >                               virt_to_page(priv->fbdev.buffer));
-> >  }
-> >
-> > diff --git a/drivers/firewire/core-iso.c b/drivers/firewire/core-iso.c
-> > index 051327a..5f1548d 100644
-> > --- a/drivers/firewire/core-iso.c
-> > +++ b/drivers/firewire/core-iso.c
-> > @@ -112,7 +112,7 @@ int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
-> >
-> >         uaddr = vma->vm_start;
-> >         for (i = 0; i < buffer->page_count; i++) {
-> > -               err = vm_insert_page(vma, uaddr, buffer->pages[i]);
-> > +               err = vm_insert_kmem_page(vma, uaddr, buffer->pages[i]);
-> >                 if (err)
-> >                         return err;
-> >
-> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > index a8db758..57eb7af 100644
-> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> > @@ -234,7 +234,7 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
-> >                 return -ENXIO;
-> >
-> >         for (i = offset; i < end; i++) {
-> > -               ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
-> > +               ret = vm_insert_kmem_page(vma, uaddr, rk_obj->pages[i]);
-> >                 if (ret)
-> >                         return ret;
-> >                 uaddr += PAGE_SIZE;
-> > diff --git a/include/linux/mm.h b/include/linux/mm.h
-> > index a61ebe8..5f42d35 100644
-> > --- a/include/linux/mm.h
-> > +++ b/include/linux/mm.h
-> > @@ -2477,6 +2477,8 @@ unsigned long change_prot_numa(struct vm_area_struct *vma,
-> >  struct vm_area_struct *find_extend_vma(struct mm_struct *, unsigned long addr);
-> >  int remap_pfn_range(struct vm_area_struct *, unsigned long addr,
-> >                         unsigned long pfn, unsigned long size, pgprot_t);
-> > +int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
-> > +                               struct page *page);
-> >  int vm_insert_page(struct vm_area_struct *, unsigned long addr, struct page *);
-> >  int vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
-> >                         unsigned long pfn);
-> > diff --git a/kernel/kcov.c b/kernel/kcov.c
-> > index 3ebd09e..2afaeb4 100644
-> > --- a/kernel/kcov.c
-> > +++ b/kernel/kcov.c
-> > @@ -293,8 +293,8 @@ static int kcov_mmap(struct file *filep, struct vm_area_struct *vma)
-> >                 spin_unlock(&kcov->lock);
-> >                 for (off = 0; off < size; off += PAGE_SIZE) {
-> >                         page = vmalloc_to_page(kcov->area + off);
-> > -                       if (vm_insert_page(vma, vma->vm_start + off, page))
-> > -                               WARN_ONCE(1, "vm_insert_page() failed");
-> > +                       if (vm_insert_kmem_page(vma, vma->vm_start + off, page))
-> > +                               WARN_ONCE(1, "vm_insert_kmem_page() failed");
-> >                 }
-> >                 return 0;
-> >         }
-> > diff --git a/mm/memory.c b/mm/memory.c
-> > index c467102..b800c10 100644
-> > --- a/mm/memory.c
-> > +++ b/mm/memory.c
-> > @@ -1682,6 +1682,75 @@ pte_t *__get_locked_pte(struct mm_struct *mm, unsigned long addr,
-> >         return pte_alloc_map_lock(mm, pmd, addr, ptl);
-> >  }
-> >
-> > +static int insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
-> > +               struct page *page, pgprot_t prot)
-> > +{
-> > +       struct mm_struct *mm = vma->vm_mm;
-> > +       int retval;
-> > +       pte_t *pte;
-> > +       spinlock_t *ptl;
-> > +
-> > +       retval = -EINVAL;
-> > +       if (PageAnon(page))
-> > +               goto out;
-> > +       retval = -ENOMEM;
-> > +       flush_dcache_page(page);
-> > +       pte = get_locked_pte(mm, addr, &ptl);
-> > +       if (!pte)
-> > +               goto out;
-> > +       retval = -EBUSY;
-> > +       if (!pte_none(*pte))
-> > +               goto out_unlock;
-> > +
-> > +       get_page(page);
-> > +       inc_mm_counter_fast(mm, mm_counter_file(page));
-> > +       page_add_file_rmap(page, false);
-> > +       set_pte_at(mm, addr, pte, mk_pte(page, prot));
-> > +
-> > +       retval = 0;
-> > +       pte_unmap_unlock(pte, ptl);
-> > +       return retval;
-> > +out_unlock:
-> > +       pte_unmap_unlock(pte, ptl);
-> > +out:
-> > +       return retval;
-> > +}
-> > +
-> > +/**
-> > + * vm_insert_kmem_page - insert single page into user vma
-> > + * @vma: user vma to map to
-> > + * @addr: target user address of this page
-> > + * @page: source kernel page
-> > + *
-> > + * This allows drivers to insert individual kernel memory into a user vma.
-> > + * This API should be used outside page fault handlers context.
-> > + *
-> > + * Previously the same has been done with vm_insert_page by drivers. But
-> > + * vm_insert_page will be converted to vmf_insert_page and will be used
-> > + * in fault handlers context and return type of vmf_insert_page will be
-> > + * vm_fault_t type.
->
-> This is a "temporal" comment, i.e. it refers to things that are
-> happening at the moment -- I would say that should be part of the
-> commit message, not the code, since it will be obsolete soon. Also,
-> consider that, in a way, vm_insert_page is actually being replaced by
-> vmf_insert_page only in one of the use cases (the other being replaced
-> by this). Maybe you could instead say something like:
->
->     In the past, vm_insert_page was used for this purpose. Do not use
-> vmf_insert_page because...
->
-> and leave the full explanation in the commit.
+I have rebased spi-next and currently on top but still my octal command support is working fine without any issue with current shared patch series, performed data sanity.
 
-Sure , I will work on it.
->
-> > + *
-> > + * But there are places where drivers need to map kernel memory into user
-> > + * vma outside fault handlers context. As vmf_insert_page will be restricted
-> > + * to use within page fault handlers, vm_insert_kmem_page could be used
-> > + * to map kernel memory to user vma outside fault handlers context.
-> > + */
->
-> Ditto.
->
-> > +int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
-> > +                       struct page *page)
-> > +{
-> > +       if (addr < vma->vm_start || addr >= vma->vm_end)
-> > +               return -EFAULT;
-> > +       if (!page_count(page))
-> > +               return -EINVAL;
-> > +       if (!(vma->vm_flags & VM_MIXEDMAP)) {
-> > +               BUG_ON(down_read_trylock(&vma->vm_mm->mmap_sem));
-> > +               BUG_ON(vma->vm_flags & VM_PFNMAP);
-> > +               vma->vm_flags |= VM_MIXEDMAP;
-> > +       }
-> > +       return insert_kmem_page(vma, addr, page, vma->vm_page_prot);
-> > +}
-> > +EXPORT_SYMBOL(vm_insert_kmem_page);
-> > +
-> >  /*
-> >   * This is the old fallback for page remapping.
-> >   *
-> > diff --git a/mm/nommu.c b/mm/nommu.c
-> > index e4aac33..153b8c8 100644
-> > --- a/mm/nommu.c
-> > +++ b/mm/nommu.c
-> > @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
-> >  }
-> >  EXPORT_SYMBOL(vm_insert_page);
-> >
-> > +int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
-> > +                               struct page *page)
-> > +{
-> > +       return -EINVAL;
-> > +}
-> > +EXPORT_SYMBOL(vm_insert_kmem_page);
-> > +
-> >  /*
-> >   *  sys_brk() for the most part doesn't need the global kernel
-> >   *  lock, except when an application is doing something nasty
-> > diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> > index a728fc4..61d279f 100644
-> > --- a/mm/vmalloc.c
-> > +++ b/mm/vmalloc.c
-> > @@ -2251,7 +2251,7 @@ int remap_vmalloc_range_partial(struct vm_area_struct *vma, unsigned long uaddr,
-> >                 struct page *page = vmalloc_to_page(kaddr);
-> >                 int ret;
-> >
-> > -               ret = vm_insert_page(vma, uaddr, page);
-> > +               ret = vm_insert_kmem_page(vma, uaddr, page);
-> >                 if (ret)
-> >                         return ret;
-> >
-> > --
-> > 1.9.1
-> >
->
-> Cheers,
-> Miguel
+=>  git log  --pretty=oneline -3
+	496c415717b8bb7d37181127fcfad0ba450eb10d mtd: spi-nor: fsl-quadspi: Don't let -EINVAL on the bus
+	2336d3a7b125683c9e8b25d6efa6064310d19dbe mtd: devices: m25p80: Make sure WRITE_EN is issued before each write
+	e55841874471282d32eec595997afce43a5f55c0 mtd: spi-nor: Support controllers with limited TX FIFO size
+
+GIT Repo - 	git://git.infradead.org/linux-mtd.git
+Branch -	remotes/origin/spi-nor/next
+
+Also, I am not able to find string SPI_MEM_MAX_BUSWIDTH in current source code, can you share the GIT details where these changes are pushed.
+--
+Regards
+Yogesh Gaur.
