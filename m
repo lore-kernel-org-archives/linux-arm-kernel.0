@@ -1,61 +1,51 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Oct 2018 10:16:32 +0100
-Subject: [PATCH 3/3] ARM: socfpga: Turn on ARM errata for L2 cache
-In-Reply-To: <20181004085415.12925-3-peron.clem@gmail.com>
-References: <20181004085415.12925-1-peron.clem@gmail.com>
- <20181004085415.12925-3-peron.clem@gmail.com>
-Message-ID: <20181004091632.GA30658@n2100.armlinux.org.uk>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 4 Oct 2018 11:18:22 +0200
+Subject: [PATCH 4/4] arm64: dts: lx2160a: update fspi node
+In-Reply-To: <1538642920-3843-5-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1538642920-3843-5-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <20181004111822.48ab1f5c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2018 at 10:54:15AM +0200, Cl?ment P?ron wrote:
-> From: Dinh Nguyen <dinguyen@kernel.org>
-> 
-> Turn on these ARM and PL310 errata for SoCFPGA:
-> 
-> ARM_ERRATA_754322
-> ARM_ERRATA_764369
-> ARM_ERRATA_775420
-> 
-> PL310_ERRATA_588369
-> PL310_ERRATA_727915
-> PL310_ERRATA_753970
-> PL310_ERRATA_769419
-> 
-> Fixes: 387798b37c8d ("ARM: initial multiplatform support")
+On Thu,  4 Oct 2018 14:18:40 +0530
+Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-What was broken in the referred to commit that caused this regression?
-If it's not a regression, why does it have a Fixes: line?
-
-> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
-> Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+> Flash mt35xu512aba connected to FlexSPI controller supports
+> 1-1-8 protocol.
+> Added flag spi-rx-bus-width and spi-tx-bus-width with values as
+> 8 and 1 respectively for both flashes connected at CS0 and CS1.
+> 
+> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 > ---
->  arch/arm/mach-socfpga/Kconfig | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-> index 4adb901dd5eb..a04660918d71 100644
-> --- a/arch/arm/mach-socfpga/Kconfig
-> +++ b/arch/arm/mach-socfpga/Kconfig
-> @@ -11,6 +11,13 @@ menuconfig ARCH_SOCFPGA
->  	select HAVE_ARM_TWD if SMP
->  	select MFD_SYSCON
->  	select PCI_DOMAINS if PCI
-> +	select ARM_ERRATA_754322
-> +	select ARM_ERRATA_764369 if SMP
-> +	select ARM_ERRATA_775420
-> +	select PL310_ERRATA_588369
-> +	select PL310_ERRATA_727915
-> +	select PL310_ERRATA_753970 if PL310
-> +	select PL310_ERRATA_769419
->  
->  if ARCH_SOCFPGA
->  config SOCFPGA_SUSPEND
-> -- 
-> 2.17.1
-> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> index 901ca346..817175a 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> @@ -42,6 +42,8 @@
+>  		m25p,fast-read;
+>  		spi-max-frequency = <20000000>;
+>  		reg = <0>;
+> +		spi-rx-bus-width = <8>;
+> +		spi-tx-bus-width = <1>;
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Why 1? The flash is already flagged with SPI_NOR_OCTAL_READ, which
+means only the read path will use 1-1-8 mode, so you can safely set
+spi-tx-bus-width here and let the framework choose the appropriate mode
+based on the flash capabilities.
+
+>  	};
+>  
+>  	mt35xu512aba1: flash at 1 {
+> @@ -51,6 +53,8 @@
+>  		m25p,fast-read;
+>  		spi-max-frequency = <20000000>;
+>  		reg = <1>;
+> +		spi-rx-bus-width = <8>;
+> +		spi-tx-bus-width = <1>;
+>  	};
+>  };
+>  
