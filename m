@@ -1,57 +1,84 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 4 Oct 2018 12:05:55 +0100
-Subject: How is the Linux kernel API dma_alloc_coherent() typically
- implemented for the ARM Architecture?
-In-Reply-To: <20181003180843.GY30658@n2100.armlinux.org.uk>
-References: <BYAPR12MB2791F73EC1033F998FF533BAC8E90@BYAPR12MB2791.namprd12.prod.outlook.com>
- <866a698a-aa61-6c48-0258-f2dd97973e87@arm.com>
- <20181003180843.GY30658@n2100.armlinux.org.uk>
-Message-ID: <41f7c1e1-066a-b984-53cd-17b5c25420d4@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 4 Oct 2018 13:06:20 +0200
+Subject: [PATCH v2 00/29] at24: remove at24_platform_data
+In-Reply-To: <a4c2e6cf-749a-83a1-0bda-43ddb7e744cd@gmail.com>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180831194643.GA62862@ban.mtv.corp.google.com>
+ <CAMRc=MejZLV1EQ7uAddsxLY0MTUF8WyiBn=F0ZhkWQJpET0EDQ@mail.gmail.com>
+ <a4c2e6cf-749a-83a1-0bda-43ddb7e744cd@gmail.com>
+Message-ID: <CAMRc=MfwM7vODsnuV9eKS4Uf7M5ac59u7ao7KvyaxKzPv5FRvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/18 19:08, Russell King - ARM Linux wrote:
-> On Wed, Oct 03, 2018 at 06:44:56PM +0100, Robin Murphy wrote:
->> Hi Casey,
->>
->> On 03/10/18 17:55, Casey Leedom wrote:
->>>    I have a question about ARM CPU versus PCIe DMA I/O Coherence that I'm
->>> trying to understand. In general, I thought that ARM is I/O Incoherent and
->>> that setting up Device DMA READs from Coherent Memory and Device DMA WRITEs
->>> to Coherent Memory require that the Device Driver/OS coordinate to
->>> FLUSH/INVALIDATE Caches, etc.  In Linux this is all handled automatically
->>> via the dam_map*()/dma_unmap*() APIs.  But what does the Linux kernel API
->>> dma_alloc_coherent() do on an architecture like ARM?  Return an UNCACHED
->>> mapping? I've tried ferreting my way down through the layers and layers of
->>> abstraction and implementation differences for various ARM platforms but
->>> it's pretty opaque ...
->>
->> The really old stuff is a bit murky, but certainly from Armv7 onwards (i.e.
->> the kind of systems you'd be plugging a PCIe card into today), it's
->> relatively straightforward.
-> 
-> The old stuff is _not_ murky - it operates the same way as modern
-> systems as far as Linux is concerned.
+?r., 3 pa? 2018 o 23:04 Florian Fainelli <f.fainelli@gmail.com> napisa?(a):
+>
+>
+>
+> On 10/3/2018 1:15 PM, Bartosz Golaszewski wrote:
+> > pt., 31 sie 2018 o 21:46 Brian Norris <computersforpeace@gmail.com> napisa?(a):
+> >>
+> >> Hi,
+> >>
+> >> On Fri, Aug 10, 2018 at 10:04:57AM +0200, Bartosz Golaszewski wrote:
+> >>> Most boards use the EEPROM to store the MAC address. This series adds
+> >>> support for cell lookups to the nvmem framework, registers relevant
+> >>> cells for all users, adds nvmem support to eth_platform_get_mac_address(),
+> >>> converts davinci_emac driver to using it and replaces at24_platform_data
+> >>> with device properties.
+> >>
+> >> We already have:
+> >>
+> >> of_get_nvmem_mac_address() (which does exactly what you're adding,
+> >> except it's DT specific)
+> >> of_get_mac_address()
+> >> fwnode_get_mac_address()
+> >> device_get_mac_address()
+> >>
+> >> and now you've taught me that this exists too:
+> >>
+> >> eth_platform_get_mac_address()
+> >>
+> >> These mostly don't share code, and with your series, they'll start to
+> >> diverge even more as to what they support. Can you please help rectify
+> >> that, instead of widening the gap?
+> >>
+> >> For instance, you can delete most of eth_platform_get_mac_address() and
+> >> replace it with device_get_mac_address() [1]. And you could add your new
+> >> stuff to fwnode_get_mac_address().
+> >>
+> >> And important part to note here is that you code isn't just useful for
+> >> ethernet -- it could be useful for Wifi devices too. So IMO, sticking it
+> >> only in an "eth" function is the wrong move.
+> >>
+> >> Brian
+> >>
+> >> [1] arch_get_platform_mac_address() is the only part I wouldn't want to
+> >> replicate into a truly generic helper. The following should be a no-op
+> >> refactor, AIUI:
+> >>
+> >
+> > The only user of arch_get_platform_mac_address() is sparc. It returns
+> > an address that seems to be read from some kind of EEPROM. I'm not
+> > familiar with this arch though. I'm wondering if we could somehow
+> > seamlessly remove this call and then convert all users of
+> > eth_platform_get_mac_address() to using device_get_mac_address()?
+> >
+> > David: I couldn't find a place in sparc code where any ethernet device
+> > would be registered, so is there a chance that nobody is using it?
+>
+> SPARC uses a true Open Firmware implementation, so it would register
+> drivers through the CONFIG_OF infrastructure.
+> --
 
-Apologies if that came across wrong - I mean it from my viewpoint in 
-terms of the level of detail I wanted to go into (my point of reference 
-is primarily VMSAv8, plus what it changed from VMSAv7). I can't say that 
-an ARMv5 kernel is going to give a Normal-NC mapping since as I 
-understand things it may be Strongly-Ordered instead depending on 
-configuration. TBH I can't even fully remember off-hand what exactly the 
-pre-TEX-remap attributes are and how they would map to AXI/ACE 
-transactions, and it didn't seem worth spending half an hour looking it 
-all up since the prospect of something like an ARM296 being the main 
-application processor driving the kind of kit that Chelsio do seems 
-rather unlikely.
+I'm seeing that there are only six callers of
+eth_platform_get_mac_address() (the only function which calls
+arch_get_platform_mac_address()).
 
->  That's one of the reasons
-> for having the DMA API - to provide a consistent cross-platform
-> cross-architecture way to deal with the DMA coherency issues.
+Of these six callers four are intel ethernet drivers and two are usb
+ethernet adapter drivers.
 
-Fully agreed that driver authors shouldn't care about this and can trust 
-the kernel to provide the best thing it can, but Casey's initial 
-question implied that a bit more architectural background might be 
-useful (especially now given the response).
+Is it even possible that sparc wants to get the mac address for a usb
+adapter from some memory chip? Maybe we *can* safely remove that
+function completely? That would allow us to simplify a lot of code.
 
-Robin.
+Bart
