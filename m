@@ -1,47 +1,80 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Thu, 4 Oct 2018 13:13:42 +0200
-Subject: [PATCHv2 2/3] PCI: mvebu: Convert to PCI emulated bridge config
- space
-In-Reply-To: <20181004104805.GB5233@e107981-ln.cambridge.arm.com>
-References: <20180912154831.2220-1-thomas.petazzoni@bootlin.com>
- <20180912154831.2220-3-thomas.petazzoni@bootlin.com>
- <20180918161745.GB31440@e107981-ln.cambridge.arm.com>
- <20181004104805.GB5233@e107981-ln.cambridge.arm.com>
-Message-ID: <20181004131342.130d356a@windsurf>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 4 Oct 2018 13:17:32 +0200
+Subject: [PATCH 0/3] spi-nor: Add Octal SPI support
+In-Reply-To: <1074d503-71ef-2998-7096-de6135bb965d@ti.com>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003212017.653e739f@bbrezillon>
+ <1074d503-71ef-2998-7096-de6135bb965d@ti.com>
+Message-ID: <20181004131732.4c9e2ae9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 4 Oct 2018 16:05:36 +0530
+Vignesh R <vigneshr@ti.com> wrote:
 
-On Thu, 4 Oct 2018 11:48:05 +0100, Lorenzo Pieralisi wrote:
-
-> > I would drop "recently introduced", unless we can define a precise
-> > commit when code was added so that it can actually be checked (I know
-> > you can't since the relevant patch is part of this series and not in
-> > the mainline yet).
+> >>
+> >>  .../devicetree/bindings/mtd/cadence-quadspi.txt       |  1 +
+> >>  drivers/mtd/spi-nor/cadence-quadspi.c                 |  9 +++++++++  
 > > 
-> > Bjorn posted some guidelines that are helpful:
-> > 
-> > https://marc.info/?l=linux-pci&m=150905742808166&w=2
-> > 
-> > I can make these changes myself, no problem but please address Russell's
-> > comment so that we can proceed.  
+> > On a slightly different topic, do you plan to convert the Cadence
+> > driver to spi-mem? And if you don't, is it because you don't have time
+> > or because some features are missing in spi-mem (I remember you
+> > mentioned a few things back when you were reviewing the spi-mem series)?
+> >   
 > 
-> Hi Thomas,
+> I do not have plans to convert cadence QSPI driver to spi-mem yet,
+> mainly due to lack of time. Also, not sure if original author Marek and
+> other altera people are okay with that.
 > 
-> I understand you have more important things to think about these days :)
-> (congratulations), let me know if I can fix this patch up myself, I
-> would like to merge this series for v4.20.
+> I see couple of issues in the way of conversion:
+> 1. I would wait to know what direction would direct mapping APIs[1] go
+> before starting spi-mem conversion for Cadence QSPI driver. Else, we
+> have may to re write again if direct mapping APIs are merged.
 
-Fixing up the commit log, of course, you can fix up yourself. However,
-Russell made a comment about a remaining FIXME, and I haven't had the
-chance to get back deep into the code to remember why I added this
-FIXME, and whether it is still needed or not.
+I'd suggest reviewing the proposal I posted so that you can influence
+the design of this new API ;-).
 
-Best regards,
+> 2. New Cadence OSPI IP has an integrated PHY to support high throughput
+> OSPI flashes operating up 200MHz in Octal DDR mode. In order to work
+> with such flashes, PHY DLLs need to be calibrated. Highly simplified
+> calibration sequence is as below(See [2] for actual sequence):
+> -Read flash ID at low speed and store it.
+> -Enable PHY and set DLLs to a defined initial value
+> -Increment RX DLL value
+> -Read flash ID and check for correctness of data read
+> -repeat above two steps until a band of passing values is obtained for
+> RX DLL where flash ID is correctly read.
+> -DLL needs to set to middle of the passing band.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Is the Read ID operation hardcoded or do you just use it as a way to
+trigger predictable transfers on the IO bus?
+
+> 
+> I am trying to figure out how to fit this into the spi-mem framework as
+> controller would to need to store READ ID opcode and expected JEDEC ID
+> before starting calibration sequence.
+
+I think this should be split in 2:
+
+- the SPI NOR framework passing the operation to use to do the
+  calibration (here a READ ID)
+- the SPI controller framework replaying the same operation with
+  different DLL configs until it finds the best match
+
+So, it would basically be added as a new hook:
+
+	int (*calibrate)(struct spi_mem *mem,
+			 const struct spi_mem_op *tmpl);
+
+and a new function provided by the spi-mem API
+
+int spi_mem_calibrate(struct spi_mem *mem,
+		      const struct spi_mem_op *tmpl);
+
+and calibration outcome would be somehow attached to the spi_mem
+object.
+
+This way we stay memory agnostic but still provide the necessary blocks
+at the spi-mem level to do such callibrations.
+
+Would that work?
