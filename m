@@ -1,59 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Oct 2018 09:13:51 -0700
-Subject: [PATCH v9 03/11] PM / Domains: Document flags for genpd
-In-Reply-To: <CAPDyKFr1H_ah3OYqghQgADs8fwNd+HpjWw9VfGR1T1-K5KbnhQ@mail.gmail.com>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <20181003143824.13059-4-ulf.hansson@linaro.org>
- <20181004134839.GZ5662@atomide.com>
- <CAPDyKFr1H_ah3OYqghQgADs8fwNd+HpjWw9VfGR1T1-K5KbnhQ@mail.gmail.com>
-Message-ID: <20181004161351.GH5662@atomide.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 04 Oct 2018 18:15:41 +0200
+Subject: [GIT PULL 1/3] Rockchip ARM64 devicetree updates for 4.20 - round2
+In-Reply-To: <CAK8P3a1EKduDFqJOsXq6W9r=0+-fyrfyTnwPeHEp1BDVRxNk_g@mail.gmail.com>
+References: <2559110.ail6FZQ9dJ@phil>
+ <CAK8P3a1EKduDFqJOsXq6W9r=0+-fyrfyTnwPeHEp1BDVRxNk_g@mail.gmail.com>
+Message-ID: <11931084.yfuDoSsS8u@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [181004 15:02]:
-> On 4 October 2018 at 15:48, Tony Lindgren <tony@atomide.com> wrote:
-> > Hi,
-> >
-> > * Ulf Hansson <ulf.hansson@linaro.org> [181003 14:43]:
-> >> + * GENPD_FLAG_IRQ_SAFE:              This informs genpd that its backend callbacks,
-> >> + *                           ->power_on|off(), doesn't sleep. Hence, these
-> >> + *                           can be invoked from within atomic context, which
-> >> + *                           enables genpd to power on/off the PM domain,
-> >> + *                           even when pm_runtime_is_irq_safe() returns true,
-> >> + *                           for any of its attached devices. Note that, a
-> >> + *                           genpd having this flag set, requires its
-> >> + *                           masterdomains to also have it set.
-> >> + *
-> >
-> > Let's try to avoid adding more irq_safe stuff because of having that
-> > propagate to the masterdomains..
+Hi Arnd,
+
+Am Donnerstag, 4. Oktober 2018, 16:18:06 CEST schrieb Arnd Bergmann:
+> On Wed, Oct 3, 2018 at 3:38 AM Heiko Stuebner <heiko@sntech.de> wrote:
 > 
-> I am not sure I get your point. This is just documenting existing
-> functionality in genpd, there is nothing new here.
-
-Right, and I'm just bringing up that this FLAG_IRQ_SAFE is not a
-good way to in the long run :)
-
-> > I think you can just flag the power_on/off in genpd, then have cpu_pm
-> > callbacks do it.
+> >
+> > The following changes since commit 78f26da3ffbce0ea3692a89fe3f5487cb8dda068:
+> >
+> >   arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board (2018-09-10 19:16:26 +0200)
+> >
+> > are available in the Git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64-2
+> >
+> > for you to fetch changes up to e78d53c7b2873e0724eb765a88ccde42560b0e05:
+> >
+> >   arm64: dts: rockchip: enable display nodes on rk3328-rock64 (2018-09-28 13:18:37 +0200)
+> >
+> > ----------------------------------------------------------------
+> > Some additional new boards, the rk3399-based RockPro64 from Pine64, as well
+> > as the Vamrs Rock960. Another big feature is display support including hdmi
+> > and the Innosilicon hdmiphy on the rk3328, right now enabled on the rock64.
+> > The rock64 also got its spi-nor and spdif enabled. On the px30 we can see
+> > dwc2-based usb support now and finally some misc fixes, like for a new dtc
+> > warning, missing address and size cells and microSD fix on sapphire.
 > 
-> Not really sure what you propose, but feel free to send a patch.
+> Nice to see those new boards!
+> 
+> What about the bugfixes though, shouldn't at least the sapphire microSD fix
+> be merged into 4.19 and possibly backported to stable kernels?
+> 
+> I've pulled this into next/dt for now, please have a look at whether we
+> also want some of them in the fixes branch for 4.19. Thanks,
 
-Well there is not much to really patch, just don't attempt to
-do irq_safe stuff from genpd and have cpu_idle callbacks to do
-it instead. And then no need for GENPD_FLAG_IRQ_SAFE :)
+The fixes aren't that critical:
+- the dtc warning stems from the updated dtc that will get merged
+  into 4.20, so doesn't affect current kernels
+- the first board using a dsi-display at all is still in flight, so the
+  missing -*cells aren't really causing issues on old kernels
+- and finally I think Vicente is the only actual user of a sapphire
+  board (they are rk3399 eval boards after all) and he's using new
+  kernels and is still making new things work on that board.
 
-> Do note, genpd has since the beginning of its time tried to cope with
-> pm_runtime_irq_safe() devices. I admit it's quite complicated, however
-> GENPD_FLAG_IRQ_SAFE greatly improved the support for such devices and
-> their PM domains. Moreover, we need this functionality, in one way or
-> the other, as long as there users of pm_runtime_irq_safe().
+So I'd think it we can save stable-maintainers time for breakage that
+affects bigger crowds ;-)
 
-Right, and I'm still struggling years after with legacy device drivers
-that have done pm_runtime_irq_safe() and come to the conclusion that
-it should not be used at all. Getting rid of GENPD_FLAG_IRQ_SAFE
-might just safe you years of pain later on.
 
-Regards,
-
-Tony
+Heiko
