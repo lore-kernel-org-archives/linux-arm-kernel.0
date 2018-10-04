@@ -1,61 +1,89 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Oct 2018 20:36:24 +0200
-Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM) (a subset)
-In-Reply-To: <20181004172109.GA16878@red-moon>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
- <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
- <10136406.EY9A7BdqYq@aspire.rjw.lan>
- <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
- <20181004155755.GD5233@e107981-ln.cambridge.arm.com>
- <CAJZ5v0j+W2CHiqkniXNJgZ3DU9pOpd_83Wj9Egwf+pVkRCjZLg@mail.gmail.com>
- <20181004172109.GA16878@red-moon>
-Message-ID: <CAPDyKFrWzDU9BsfAnx7uoaXq=gmGg2r46Mn-cJHSWUk-TmyomA@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 4 Oct 2018 20:37:00 +0200
+Subject: [PATCH 1/2] rtc: Add ASPEED RTC driver
+In-Reply-To: <20181003133155.27494-2-joel@jms.id.au>
+References: <20181003133155.27494-1-joel@jms.id.au>
+ <20181003133155.27494-2-joel@jms.id.au>
+Message-ID: <20181004183700.GA5626@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 October 2018 at 19:21, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Oct 04, 2018 at 07:07:27PM +0200, Rafael J. Wysocki wrote:
->
-> [...]
->
->> > > I don't see any dependency there, so I'll queue up the 1-3 in
->> > > pm-domains and the 4-6 in pm-cpuidle.
->> >
->> > I do not see why we should merge patches 4-6 for v4.20; they add legacy
->> > (DT bindings and related parsing code) with no user in the kernel; we
->> > may still want to tweak them, in particular PSCI DT bindings.
->>
->> My impression was that 4-6 have been agreed on due to the ACKs they
->> carry.  I'll drop them if that's not the case.
->
-> I have not expressed myself correctly: they have been agreed (even
-> though as I said they may require some tweaking) but I see no urgency
-> of merging them in v4.20 since they have no user. They contain DT
-> bindings, that create ABI/legacy, I think it is better to have code
-> that uses them in the kernel before merging them and creating a
-> dependency that is not needed.
+Hello,
 
-There is already code using the new bindings, for the idle states.
-Please have look at patch 5, 6 and 11.
+On 03/10/2018 15:31:54+0200, Joel Stanley wrote:
+> +static int aspeed_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct aspeed_rtc *rtc = dev_get_drvdata(dev);
+> +	unsigned int cent, year, mon, day, hour, min, sec;
+> +	unsigned long flags;
+> +	u32 reg1, reg2;
+> +
+> +	spin_lock_irqsave(&rtc->lock, flags);
+> +
+> +	do {
+> +		reg2 = readl(rtc->base + RTC_YEAR);
+> +		reg1 = readl(rtc->base + RTC_TIME);
+> +	} while (reg2 != readl(rtc->base + RTC_YEAR));
+> +
+> +	day  = (reg1 >> 24) & 0x1f;
+> +	hour = (reg1 >> 16) & 0x1f;
+> +	min  = (reg1 >>  8) & 0x3f;
+> +	sec  = (reg1 >>  0) & 0x3f;
+> +	cent = (reg2 >> 16) & 0x1f;
+> +	year = (reg2 >>  8) & 0x7f;
+> +	/*
+> +	 * Month is 1-12 in hardware, and 0-11 in struct rtc_time, however we
+> +	 * are using mktime64 which is 1-12, so no adjustment is necessary
+> +	 */
+> +	mon  = (reg2 >>  0) & 0x0f;
+> +
+> +	rtc_time64_to_tm(mktime64(cent * 100 + year, mon, day, hour, min, sec),
+> +			tm);
+> +
 
-Moreover, you have had plenty on time to look at the series, as those
-patches haven't changed since a very long time.
+This is quite wasteful. You already have the broken out time. Why don't
+you directly fill the tm struct?
 
-May I suggest you do the review instead, so we can move things
-forward, please. The changes in the v9 series should be trivial to
-review.
+> +static int aspeed_rtc_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct aspeed_rtc *rtc;
+> +
+> +	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
+> +	if (!rtc)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	rtc->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(rtc->base))
+> +		return PTR_ERR(rtc->base);
+> +
+> +	platform_set_drvdata(pdev, rtc);
+> +
+> +	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
+> +						&aspeed_rtc_ops, THIS_MODULE);
+> +
 
->
->> > Likewise, it makes no sense to merge patches 7-8 without the rest of
->> > the PSCI patches.
+Please use devm_rtc_allocate_device to allocate the rtc and then
+register it with rtc_register_device. Please also fill
+rtc->range_{min,max} before the registration.
 
-Well, those patches are part of this series, because Mark wanted me to
-move the files. Is really such a big deal? I think it makes sense, no
-matter what happens afterwards.
+> +	if (IS_ERR(rtc->rtc_dev))
+> +		return PTR_ERR(rtc->rtc_dev);
+> +
+> +	spin_lock_init(&rtc->lock);
+> +
+> +	/* Enable RTC and clear the unlock bit */
+> +	writel(RTC_ENABLE, rtc->base + RTC_CTRL);
+> +
 
-[...]
+Maybe this should only be done in set_time so you can know whether the
+time that is read in read_time has a chance to be valid.
 
-Kind regards
-Uffe
+For example you could return -EINVAL when RTC_ENABLE is not set if this
+bit is readable.
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
