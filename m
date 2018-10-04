@@ -1,32 +1,53 @@
-From: nicolas.cavallari@green-communications.fr (Nicolas Cavallari)
-Date: Thu,  4 Oct 2018 18:23:39 +0200
-Subject: [RFC UGLY 2/2] arm: Re-enable interrupts after shutting down non-boot
- CPUs.
-In-Reply-To: <20181004162339.19493-1-nicolas.cavallari@green-communications.fr>
-References: <20181004162339.19493-1-nicolas.cavallari@green-communications.fr>
-Message-ID: <20181004162339.19493-3-nicolas.cavallari@green-communications.fr>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 4 Oct 2018 18:20:04 +0200
+Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A64 SoC's
+ pll-mipi clock
+In-Reply-To: <20181002122911.22094-1-icenowy@aosc.io>
+References: <20181002122911.22094-1-icenowy@aosc.io>
+Message-ID: <20181004162004.dstnrzyaqryenfj3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some system power controller are behind bus like i2c, whose
-controller driver requires interrupts to work.
+Hi!
 
-Signed-off-by: Nicolas Cavallari <nicolas.cavallari@green-communications.fr>
----
- arch/arm/kernel/reboot.c | 1 +
- 1 file changed, 1 insertion(+)
+On Tue, Oct 02, 2018 at 08:29:11PM +0800, Icenowy Zheng wrote:
+> In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
+> register is called "LDO{1,2}_EN", and according to the BSP source code
+> from Allwinner , the LDOs are enabled during the clock's enabling
+> process.
+> 
+> The clock failed to generate output if the two LDOs are not enabled.
+> 
+> Add the two bits to the clock's gate bits, so that the LDOs are enabled
+> when the PLL is enabled.
+> 
+> Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> As PLL-MIPI is not used before 4.20~5.0, I decide not to target this patch
+> on stable/mainline kernels.
+> 
+>  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> index 5f80eb018014..f7d297368eb2 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> @@ -162,7 +162,7 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
+>  #define SUN50I_A64_PLL_MIPI_REG		0x040
+>  
+>  static struct ccu_nkm pll_mipi_clk = {
+> -	.enable		= BIT(31),
+> +	.enable		= BIT(31) | BIT(23) | BIT(22),
 
-diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
-index 3b2aa9a9fe26..2773068c0d67 100644
---- a/arch/arm/kernel/reboot.c
-+++ b/arch/arm/kernel/reboot.c
-@@ -140,6 +140,7 @@ void machine_restart(char *cmd)
- {
- 	local_irq_disable();
- 	smp_send_stop();
-+	local_irq_enable();
- 
- 	if (arm_pm_restart)
- 		arm_pm_restart(reboot_mode, cmd);
+Adding a comment on why those are needed in addition to the enable bit
+would be great :)
+
+Thanks!
+Maxime
+
 -- 
-2.19.0
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
