@@ -1,49 +1,56 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Thu, 4 Oct 2018 09:37:52 +0000
-Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19 take 2
-In-Reply-To: <20181001225827.21946-1-leoyang.li@nxp.com>
-References: <20181001225827.21946-1-leoyang.li@nxp.com>
-Message-ID: <f1847dd8-0cbc-3be6-303f-73e5dac5e5d1@nxp.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  4 Oct 2018 10:29:46 +0100
+Subject: [PATCH] ARM: KVM: Correctly order SGI register entries in the cp15
+ array
+Message-ID: <20181004092946.59836-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+The ICC_ASGI1R and ICC_SGI0R register entries in the cp15 array
+are not correctly ordered, leading to a BUG() at boot time.
 
-On 02.10.2018 01:58, Li Yang wrote:
-> Hi arm-soc maintainers,
-> 
-> Please merge the updated fix for the following issue.
-> 
-> Regards,
-> Leo
-> 
-> The following changes since commit 96fc74333f84cfdf8d434c6c07254e215e2aad00:
-> 
->    soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift() (2018-09-25 13:57:26 -0700)
-> 
-> are available in the Git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git soc-fsl-fix-v4.19-2
-> 
-> for you to fetch changes up to 5a1eb8b9542884592a018829bb1ff20c9695d925:
-> 
->    soc: fsl: qman_portals: defer probe after qman's probe (2018-10-01 17:47:43 -0500)
-> 
-> ----------------------------------------------------------------
-> NXP/FSL SoC driver fixes for v4.19 round 2
-> 
-> - Fix crash of qman_portal by deferring its probe if qman is not probed
-> 
-> ----------------------------------------------------------------
-> Laurentiu Tudor (2):
->        soc: fsl: qbman: add APIs to retrieve the probing status
->        soc: fsl: qman_portals: defer probe after qman's probe
+Move them to their natural location.
 
-There's a similar fix for bman portals [1]. I was under the impression 
-that you plan to pick that up too.
-
-[1] "soc/fsl/bman_portals: defer probe after bman's probe", found here:
-https://lore.kernel.org/patchwork/patch/992009/
-
+Fixes: 3e8a8a50c7ef ("KVM: arm: vgic-v3: Add support for ICC_SGI0R and ICC_ASGI1R accesses")
+Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Thanks & Best Regards, Laurentiu
+Paolo, Radim,
+
+Could you please send this patch directly to Greg so that it makes it
+into 4.19? I thought I had it fixed long before the merge window, and
+obviously didn't...
+
+Thanks,
+
+	M.
+
+ arch/arm/kvm/coproc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 450c7a4fbc8a..cb094e55dc5f 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -478,15 +478,15 @@ static const struct coproc_reg cp15_regs[] = {
+ 
+ 	/* ICC_SGI1R */
+ 	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
+-	/* ICC_ASGI1R */
+-	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
+-	/* ICC_SGI0R */
+-	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
+ 
+ 	/* VBAR: swapped by interrupt.S. */
+ 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+ 			NULL, reset_val, c12_VBAR, 0x00000000 },
+ 
++	/* ICC_ASGI1R */
++	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
++	/* ICC_SGI0R */
++	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
+ 	/* ICC_SRE */
+ 	{ CRn(12), CRm(12), Op1( 0), Op2(5), is32, access_gic_sre },
+ 
+-- 
+2.19.0
