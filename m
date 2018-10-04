@@ -1,92 +1,70 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 4 Oct 2018 14:08:58 +0100
-Subject: [PATCH 2/3] arm64: cpufeature: Fix handling of CTR_EL0.IDC field
-In-Reply-To: <20181004083315.31174-3-suzuki.poulose@arm.com>
-References: <20181004083315.31174-1-suzuki.poulose@arm.com>
- <20181004083315.31174-3-suzuki.poulose@arm.com>
-Message-ID: <6f077baa-573b-a98e-889c-f78198f1e22d@arm.com>
+From: vabhav.sharma@nxp.com (Vabhav Sharma)
+Date: Thu,  4 Oct 2018 06:33:45 +0530
+Subject: [PATCH v4 0/6] arm64: dts: NXP: add basic dts file for LX2160A SoC
+Message-ID: <1538615031-7507-1-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Changes for v4:
+-Updated bindings for lx2160a clockgen and dcfg
+-Modified commit message for lx2160a clockgen changes
+-Updated interrupt property with macro definition
+-Added required enable-method property to each core node with psci value
+-Removed unused node syscon in device tree
+-Removed blank lines in device tree fsl-lx2160a.dtsi
+-Updated uart node compatible sbsa-uart first
+-Added and defined vcc-supply property to temperature sensor node in
+ device tree fsl-lx2160a-rdb.dts
 
-On 04/10/18 09:33, Suzuki K Poulose wrote:
-> CTR_EL0.IDC reports the data cache clean requirements for instruction
-> to data coherence. However, if the field is 0, we need to check the
-> CLIDR_EL1 fields to detect the status of the feature. Currently we
-> don't do this and generate a warning with tainting the kernel, when
-> there is a mismatch in the field among the CPUs. Also the userspace
-> doesn't have a reliable way to check the CLIDR_EL1 register to check
-> the status.
-> 
-> This patch fixes the problem by checking the CLIDR_EL1 fields, when
-> (CTR_EL0.IDC == 0) and updates the kernel's copy of the CTR_EL0 for
-> the CPU with the actual status of the feature. This would allow the
-> sanity check infrastructure to do the proper checking of the fields
-> and also allow the CTR_EL0 emulation code to supply the real status
-> of the feature.
-> 
-> Now, if a CPU has raw CTR_EL0.IDC == 0 and effective IDC == 1 (with
-> overall system wide IDC == 1), we need to expose the real value to
-> the user. So, we trap CTR_EL0 access on the CPU which reports incorrect
-> CTR_EL0.IDC.
-> 
-> Fixes: commit 6ae4b6e057888 ("arm64: Add support for new control bits CTR_EL0.DIC and CTR_EL0.IDC")
-> Cc: Shanker Donthineni <shankerd@codeaurora.org>
-> Cc: Philip Elcan <pelcan@codeaurora.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Changes for v3:
+-Split clockgen support patch into below two patches:
+- a)Updated array size of cmux_to_group[] with NUM_CMUX+1 to include -1
+ terminator and p4080 cmux_to_group[] array with -1 terminator
+- b)Add clockgen support for lx2160a
 
->   static void
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index ba16bb7762ca..d3caeabf09ed 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -861,18 +861,30 @@ static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
->   	if (scope == SCOPE_SYSTEM)
->   		ctr = arm64_ftr_reg_ctrel0.sys_val;
->   	else
-> -		ctr = read_cpuid_cachetype();
-> +		ctr = read_cpuid_effective_cachetype();
->   
->   	return ctr & BIT(CTR_IDC_SHIFT);
->   }
->   
-> +static void cpu_emulate_effective_ctr(const struct arm64_cpu_capabilities *__unused)
-> +{
-> +	/*
-> +	 * If the CPU exposes raw CTR_EL0.IDC = 0, while effectively
-> +	 * CTR_EL0.IDC = 1 (from CLIDR values), we need to trap accesses
-> +	 * to the CTR_EL0 on this CPU and emulate it with the real/safe
-> +	 * value.
-> +	 */
-> +	if (!(read_cpuid_cachetype() & BIT(CTR_IDC_SHIFT)))
-> +		sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCT, 0);
-> +}
-> +
+Changes for v2:
+- Modified cmux_to_group array to include -1 terminator
+- Revert NUM_CMUX to original value 8 from 16
+- Remove ?As LX2160A is 16 core, so modified value for NUM_CMUX?
+  in patch "[PATCH 3/5] drivers: clk-qoriq: Add clockgen support for
+  lx2160a" description
+- Populated cache properties for L1 and L2 cache in lx2160a device-tree.
+- Removed reboot node from lx2160a device-tree as PSCI is implemented.
+- Removed incorrect comment for timer node interrupt property in
+  lx2160a device-tree.
+- Modified pmu node compatible property from "arm,armv8-pmuv3" to
+  "arm,cortex-a72-pmu" in lx2160a device-tree
+- Non-standard aliases removed in lx2160a rdb board device-tree
+- Updated i2c child nodes to generic name in lx2160a rdb device-tree.
 
+Changes for v1:
+- Add compatible string for LX2160A clockgen support
+- Add compatible string to initialize LX2160A guts driver
+- Add compatible string for LX2160A support in dt-bindings
+- Add dts file to enable support for LX2160A SoC and LX2160A RDB
+  (Reference design board)
 
->   static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
->   			  int scope)
->   {
->   	u64 ctr;
->   
->   	if (scope == SCOPE_SYSTEM)
-> -		ctr = arm64_ftr_reg_ctrel0.sys_val;
-> +		ctr = read_cpuid_effective_cachetype();
->   	else
->   		ctr = read_cpuid_cachetype();
+Vabhav Sharma (4):
+  dt-bindings: arm64: add compatible for LX2160A
+  soc/fsl/guts: Add compatible string for LX2160A
+  arm64: dts: add QorIQ LX2160A SoC support
+  arm64: dts: add LX2160ARDB board support
 
-I have messed this hunk in resolving the conflict with a rebase.
-This should be :
+Yogesh Gaur (2):
+  clk: qoriq: increase array size of cmux_to_group
+  clk: qoriq: Add clockgen support for lx2160a
 
-  	if (scope == SCOPE_SYSTEM)
-  		ctr = arm64_ftr_reg_ctrel0.sys_val;
-  	else
--		ctr = read_cpuid_cachetype();
-+		ctr = read_cpuid_effective_cachetype();
+ Documentation/devicetree/bindings/arm/fsl.txt      |  14 +-
+ .../devicetree/bindings/clock/qoriq-clock.txt      |   1 +
+ arch/arm64/boot/dts/freescale/Makefile             |   1 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  | 100 +++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     | 702 +++++++++++++++++++++
+ drivers/clk/clk-qoriq.c                            |  16 +-
+ drivers/cpufreq/qoriq-cpufreq.c                    |   1 +
+ drivers/soc/fsl/guts.c                             |   1 +
+ 8 files changed, 833 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
 
-I have fixed this locally for v2.
-
-Suzuki
+-- 
+2.7.4
