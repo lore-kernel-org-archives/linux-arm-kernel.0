@@ -1,74 +1,34 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Thu, 4 Oct 2018 17:45:13 +0530
-Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
-In-Reply-To: <20181003221444.GZ30658@n2100.armlinux.org.uk>
-References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
- <20181003200003.GA9965@bombadil.infradead.org>
- <20181003221444.GZ30658@n2100.armlinux.org.uk>
-Message-ID: <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Oct 2018 13:22:07 +0100
+Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
+ armv8_pmuv3 events.
+In-Reply-To: <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
+References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+ <20181001142914.GD9716@arm.com>
+ <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
+ <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
+Message-ID: <20181004122207.GE4065@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 3:45 AM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Wed, Oct 03, 2018 at 01:00:03PM -0700, Matthew Wilcox wrote:
-> > On Thu, Oct 04, 2018 at 12:28:54AM +0530, Souptick Joarder wrote:
-> > > These are the approaches which could have been taken to handle
-> > > this scenario -
-> > >
-> > > *  Replace vm_insert_page with vmf_insert_page and then write few
-> > >    extra lines of code to convert VM_FAULT_CODE to errno which
-> > >    makes driver users more complex ( also the reverse mapping errno to
-> > >    VM_FAULT_CODE have been cleaned up as part of vm_fault_t migration ,
-> > >    not preferred to introduce anything similar again)
-> > >
-> > > *  Maintain both vm_insert_page and vmf_insert_page and use it in
-> > >    respective places. But it won't gurantee that vm_insert_page will
-> > >    never be used in #PF context.
-> > >
-> > > *  Introduce a similar API like vm_insert_page, convert all non #PF
-> > >    consumer to use it and finally remove vm_insert_page by converting
-> > >    it to vmf_insert_page.
-> > >
-> > > And the 3rd approach was taken by introducing vm_insert_kmem_page().
-> > >
-> > > In short, vmf_insert_page will be used in page fault handlers
-> > > context and vm_insert_kmem_page will be used to map kernel
-> > > memory to user vma outside page fault handlers context.
-> >
-> > As far as I can tell, vm_insert_kmem_page() is line-for-line identical
-> > with vm_insert_page().  Seriously, here's a diff I just did:
-> >
-> > -static int insert_page(struct vm_area_struct *vma, unsigned long addr,
-> > -                       struct page *page, pgprot_t prot)
-> > +static int insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
-> > +               struct page *page, pgprot_t prot)
-> > -       /* Ok, finally just insert the thing.. */
-> > -int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
-> > +int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
-> > -       return insert_page(vma, addr, page, vma->vm_page_prot);
-> > +       return insert_kmem_page(vma, addr, page, vma->vm_page_prot);
-> > -EXPORT_SYMBOL(vm_insert_page);
-> > +EXPORT_SYMBOL(vm_insert_kmem_page);
-> >
-> > What on earth are you trying to do?
+Hi Ganapat,
 
->
-> Reading the commit log, it seems that the intention is to split out
-> vm_insert_page() used outside of page-fault handling with the use
-> within page-fault handling, so that different return codes can be
-> used.
->
-> I don't see that justifies the code duplication - can't
-> vm_insert_page() and vm_insert_kmem_page() use the same mechanics
-> to do their job, and just translate the error code from the most-
-> specific to the least-specific error code?  Do we really need two
-> copies of the same code just to return different error codes.
+On Thu, Oct 04, 2018 at 11:12:09AM +0530, Ganapatrao Kulkarni wrote:
+> can you please pull this patch?
 
-Sorry about it.
-can I take below approach in a patch series ->
+I still don't like the idea of just removing events like this, especially
+when other architectures (including some x86 and Power CPUs afaict) playa
+similar games for generic events, and these events do actually appear in
+user code.
 
-create a wrapper function vm_insert_kmem_page using vm_insert_page.
-Convert all the non #PF users to use it.
-Then make vm_insert_page static and convert inline vmf_insert_page to caller.
+I also don't understand why you remove the TLB events. I think that logic
+would imply we should remove all of the events, because we can't distinguish
+prefetches from reads either. If we want to be consistent, then I think
+we should just remove the OP_WRITE events for L1D and BPU -- would you be
+ok with that instead?
+
+Also, looking at the code, I think our PMCEID parsing is broken for 8.1
+parts, where the upper 32 bits of the register are offset by 0x4000 in the
+event numbering space.
+
+Will
