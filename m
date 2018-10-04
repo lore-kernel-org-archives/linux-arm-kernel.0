@@ -1,109 +1,75 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Thu, 4 Oct 2018 09:28:05 +0000
-Subject: [PATCH 0/4] spi: add support for octal mode data transfer
-In-Reply-To: <43cff872-0dc5-d3ce-ca35-082faa0e0e7c@ti.com>
-References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <43cff872-0dc5-d3ce-ca35-082faa0e0e7c@ti.com>
-Message-ID: <VI1PR04MB103828C628A6550F7E1B942E99EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 4 Oct 2018 16:05:36 +0530
+Subject: [PATCH 0/3] spi-nor: Add Octal SPI support
+In-Reply-To: <20181003212017.653e739f@bbrezillon>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003212017.653e739f@bbrezillon>
+Message-ID: <1074d503-71ef-2998-7096-de6135bb965d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vignesh,
-
-> -----Original Message-----
-> From: Vignesh R [mailto:vigneshr at ti.com]
-> Sent: Thursday, October 4, 2018 2:52 PM
-> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; linux-
-> mtd at lists.infradead.org; boris.brezillon at bootlin.com; marek.vasut at gmail.com;
-> linux-spi at vger.kernel.org; devicetree at vger.kernel.org
-> Cc: robh at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; linux-
-> arm-kernel at lists.infradead.org; computersforpeace at gmail.com;
-> frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 0/4] spi: add support for octal mode data transfer
+On Thursday 04 October 2018 12:50 AM, Boris Brezillon wrote:
+> On Wed, 3 Oct 2018 22:26:00 +0530
+> Vignesh R <vigneshr@ti.com> wrote:
 > 
-> Hi Yogesh,
+>> This series adds support for octal mode of mt35x flash. Also, adds
+>> support for OSPI version of Cadence QSPI controller.
+>>
+>> Based on top of patches adding basic support for mt35xu512aba here:
+>> https://patchwork.ozlabs.org/cover/971437/
+>>
+>> Vignesh R (3):
+>>   mtd: spi-nor: Add Octal mode support for mt35xu512aba
+>>   dt-bindings: cadence-quadspi: Add new compatible for AM654 SoC
+>>   mtd: spi-nor: cadence-quadspi: Add support for Octal SPI controller
 > 
-> On Thursday 04 October 2018 02:18 PM, Yogesh Gaur wrote:
-> > Add support for octal mode IO data transfer.
-> > Micron flash, mt35xu512aba, supports octal mode data transfer and NXP
-> > FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
-> >
-> > Patch series
-> > * Add support for octal mode flags and parsing of same in spi driver.
-> > * Add octal data communication commands required for mt35xu512aba [1]
-> flash.
-> > * Add support for Read and Write proto for (1-1-8/1-8-8) mode.
-> > * Add mode bit required for octal mode in nxp-fspi driver [2].
-> > * Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
-> >
-> > Tested on LX2160ARDB target with nxp-fspi driver, below are Read
-> > performance number of 1-1-1 and 1-1-8 read protocol.
-> >
-> >  root at lxxx:~# cat /proc/mtd
-> >  dev:    size   erasesize  name
-> >  mtd0: 04000000 00001000 "spi0.0"
-> >  mtd1: 04000000 00001000 "spi0.1"
-> >  root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
-> > Copied 16777216 bytes from address 0x00000000 in flash to 0read
-> >
-> >  real    0m2.792s
-> >  user    0m0.000s
-> >  sys     0m2.790s
-> >  root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
-> > Copied 16777216 bytes from address 0x00000000 in flash to 0read
-> >
-> >  real    0m0.441s
-> >  user    0m0.000s
-> >  sys     0m0.440s
-> >  root at ls1012ardb:~#
-> >
-> >  Flash device MTD0 configured in 1-1-1 protocol.
-> >  Flash device MTD1 configured in 1-1-8 protocol.
-> >
-> > [1]
-> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpat
-> > chwork.ozlabs.org%2Fproject%2Flinux-
-> mtd%2Flist%2F%3Fseries%3D66317&amp
-> > ;data=02%7C01%7Cyogeshnarayan.gaur%40nxp.com%7C7aae8ba71d80420d4
-> 49f08d
-> >
-> 629dad44d%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636742417
-> 189300
-> >
-> 574&amp;sdata=xsSpmoRzDKJ9Z6O56kTG5pHPojjmUfSz9rB5cWQlPEM%3D&am
-> p;reser
-> > ved=0 [2]
-> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpat
-> > chwork.ozlabs.org%2Fproject%2Flinux-
-> mtd%2Flist%2F%3Fseries%3D66887&amp
-> > ;data=02%7C01%7Cyogeshnarayan.gaur%40nxp.com%7C7aae8ba71d80420d4
-> 49f08d
-> >
-> 629dad44d%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636742417
-> 189300
-> >
-> 574&amp;sdata=oFsfTtpt0GDi3y0Fi%2B%2F9SFp8ZvbwPPe5qMNFIwVw7wE%3D
-> &amp;r
-> > eserved=0
-> >
-> > Yogesh Gaur (4):
-> >   spi: add support for octal I/O data transfer
-> >   mtd: spi-nor: add support for octal mode data transfer
-> >   spi: nxp-fspi: add mode flag bit for octal support
-> >   arm64: dts: lx2160a: update fspi node
-> 
-> This is a bit confusing and difficult to follow. I suggest to order patches such that
-> spi-nor layer changes are at the first, then m25p80 related things, followed by
-> spi-mem (if needed spi) changes and finally spi-mem controller driver changes.
+> The patchset looks good to me, I'll just wait the next release cycle
+> before applying it, since I'd prefer to have it stay a bit longer in
+> -next. This should leave enough time to let other people review this
+> stuff.
 > 
 
-Thanks for the comment.
-Would change the patch order as suggested and break the functionality in small patches as suggested by Boris.
+Ok, thats fine...
 
---
+>>
+>>  .../devicetree/bindings/mtd/cadence-quadspi.txt       |  1 +
+>>  drivers/mtd/spi-nor/cadence-quadspi.c                 |  9 +++++++++
+> 
+> On a slightly different topic, do you plan to convert the Cadence
+> driver to spi-mem? And if you don't, is it because you don't have time
+> or because some features are missing in spi-mem (I remember you
+> mentioned a few things back when you were reviewing the spi-mem series)?
+> 
+
+I do not have plans to convert cadence QSPI driver to spi-mem yet,
+mainly due to lack of time. Also, not sure if original author Marek and
+other altera people are okay with that.
+
+I see couple of issues in the way of conversion:
+1. I would wait to know what direction would direct mapping APIs[1] go
+before starting spi-mem conversion for Cadence QSPI driver. Else, we
+have may to re write again if direct mapping APIs are merged.
+2. New Cadence OSPI IP has an integrated PHY to support high throughput
+OSPI flashes operating up 200MHz in Octal DDR mode. In order to work
+with such flashes, PHY DLLs need to be calibrated. Highly simplified
+calibration sequence is as below(See [2] for actual sequence):
+-Read flash ID at low speed and store it.
+-Enable PHY and set DLLs to a defined initial value
+-Increment RX DLL value
+-Read flash ID and check for correctness of data read
+-repeat above two steps until a band of passing values is obtained for
+RX DLL where flash ID is correctly read.
+-DLL needs to set to middle of the passing band.
+
+I am trying to figure out how to fit this into the spi-mem framework as
+controller would to need to store READ ID opcode and expected JEDEC ID
+before starting calibration sequence.
+
+
+[1]https://patchwork.ozlabs.org/cover/924041/
+[2]http://www.ti.com/lit/ug/spruid7a/spruid7a.pdf(12.3.2.4.14 PHY Module
+page 9770-9772)
+
+-- 
 Regards
-Yogesh Gaur
-
-> --
-> Regards
-> Vignesh
+Vignesh
