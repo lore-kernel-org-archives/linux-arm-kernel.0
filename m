@@ -1,53 +1,73 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 4 Oct 2018 17:02:37 +0200
-Subject: [PATCH] arm64: dts: allwinner: a64: Re-add "syscon" compatible
-In-Reply-To: <22014c5e-fee0-d4c6-bc6c-cd30c8545292@arm.com>
-References: <20180917152857.162662-1-andre.przywara@arm.com>
- <CAGb2v643=V_3DbLeEyXEavSQJsW2KdknpZZLfw4QwCjhfdmVsA@mail.gmail.com>
- <20180921153522.0413c280@donnerap.Emea.Arm.com>
- <20180921151625.wkaypyueyi2pguur@flea>
- <20180924112230.73e3009b@donnerap.Emea.Arm.com>
- <20180926095202.tdibor3x7fsn6afz@flea>
- <22014c5e-fee0-d4c6-bc6c-cd30c8545292@arm.com>
-Message-ID: <20181004150237.hsvytl6iycow5xyo@flea>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 4 Oct 2018 17:04:25 +0200
+Subject: [PATCH] drm/meson: fix max mode_config height/width
+In-Reply-To: <20181004100958.GI31561@phenom.ffwll.local>
+References: <1538642563-22465-1-git-send-email-narmstrong@baylibre.com>
+ <20181004100958.GI31561@phenom.ffwll.local>
+Message-ID: <0ef7fa13-ce77-f8a5-f5f3-6568be3d6145@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 01:55:19AM +0100, Andr? Przywara wrote:
-> >> So I am sorry if those things frustrate you (which I can understand
-> >> very well), but I believe fixing the DT in a proper way is
-> >> much more user friendly in the long term (actually this issue was
-> >> brought forward by a user[1]).
-> > 
-> > Given the current state of the industry, I don't really see how the DT
-> > can allow you to do what you are trying to achieve.
+On 04/10/2018 12:09, Daniel Vetter wrote:
+> On Thu, Oct 04, 2018 at 10:42:43AM +0200, Neil Armstrong wrote:
+>> The mode_config max_width/max_height determines the maximum framebuffer
+>> size the pixel reader can handle. But the values were set thinking they
+>> were determining the maximum screen dimensions.
+>>
+>> This patch changes the values to the maximum height/width the CANVAS block
+>> can handle rounded to some coherent values.
+>>
+>> Fixes: a41e82e6c457 ("drm/meson: Add support for components")
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > 
-> I am not sure I do understand what you mean with "industry"? If you are
-> thinking about the SoC vendor or board vendors to push this endeavor and
-> create stable bindings and DTs from the beginning: I see that this won't
-> work with the prevalent attitude across many vendors today.
+> It's both. Grep for all the callers of ->fill_modes and you'll see that
+> this limit is also used to filter max screen sizes.
+> 
+> If you want to change this, then I think we need a new
+> mode_config.fb_max_width/height, which if non-zero, would extend the limit
+> for fbs.
+> 
+> There's also the problem that if you extend this for fbs, then there's no
+> check anymore in the atomic_commit paths (or legacy modeset), so that
+> needs to be addressed somehow too.
 
-This is what I meant.
+What about adding optionals mode_config.fb_max_width/height and update
+drm_internal_framebuffer_create() to use these if non-0 or fallback
+to the mode_config max_width/max_height.
 
-> But in our case we (as the community) drive the DTs and the bindings
-> anyway, and we decided to mostly ignore Allwinner's DT effort - for good
-> reasons. So we can - given consensus on the goals and approach - make
-> this possible and don't need to rely on any company or "industry".
+Neil
 
-Actually, I think this is part of the reason. We like our DT bindings
-so much that we are ready to spend monthes debating on it, while with
-ACPI (or the DT from the older days, from what I understood) you're
-stuck with whatever comes with the board. Whether one likes it or not
-doesn't matter. And then you can use whatever kernel with it.
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181004/80ce8460/attachment.sig>
+> 
+> Bunch of igt to make sure we're not missing anything would be sweet on
+> top, e.g. e.g. trying to set a mode over the limit and making sure it
+> fails.
+> 
+> Cheers, Daniel
+> 
+>> ---
+>>  drivers/gpu/drm/meson/meson_drv.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+>> index d344312..2e29968 100644
+>> --- a/drivers/gpu/drm/meson/meson_drv.c
+>> +++ b/drivers/gpu/drm/meson/meson_drv.c
+>> @@ -243,8 +243,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>>  		goto free_drm;
+>>  
+>>  	drm_mode_config_init(drm);
+>> -	drm->mode_config.max_width = 3840;
+>> -	drm->mode_config.max_height = 2160;
+>> +	drm->mode_config.max_width = 16384;
+>> +	drm->mode_config.max_height = 8192;
+>>  	drm->mode_config.funcs = &meson_mode_config_funcs;
+>>  
+>>  	/* Hardware Initialization */
+>> -- 
+>> 2.7.4
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
