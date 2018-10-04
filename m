@@ -1,35 +1,36 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Thu, 4 Oct 2018 09:33:45 -0500
-Subject: [PATCH] ARM: dts: socfpga: arria10: add aliases for ethernet
-In-Reply-To: <6dd30835-b56c-8322-2c1e-e8c09c7bcc4c@kernel.org>
-References: <20180928121643.18100-1-s.trumtrar@pengutronix.de>
- <6dd30835-b56c-8322-2c1e-e8c09c7bcc4c@kernel.org>
-Message-ID: <e38342bf-0add-ef97-2f38-ca5471f35f19@kernel.org>
+From: sowmini.varadhan@oracle.com (Sowmini Varadhan)
+Date: Thu, 4 Oct 2018 10:35:08 -0400
+Subject: [PATCH v2 00/29] at24: remove at24_platform_data
+In-Reply-To: <CAK8P3a1LufzR1_6mXH=1zDb34VQStLywGM1w5x5CDAMh_7uMyA@mail.gmail.com>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180831194643.GA62862@ban.mtv.corp.google.com>
+ <CAMRc=MejZLV1EQ7uAddsxLY0MTUF8WyiBn=F0ZhkWQJpET0EDQ@mail.gmail.com>
+ <a4c2e6cf-749a-83a1-0bda-43ddb7e744cd@gmail.com>
+ <CAMRc=MfwM7vODsnuV9eKS4Uf7M5ac59u7ao7KvyaxKzPv5FRvw@mail.gmail.com>
+ <CAK8P3a1LufzR1_6mXH=1zDb34VQStLywGM1w5x5CDAMh_7uMyA@mail.gmail.com>
+Message-ID: <20181004143508.GG13299@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Just catching up on this thread, so please excuse any unintentional
+misquotes here.
 
+> > > > David: I couldn't find a place in sparc code where any ethernet device
+> > > > would be registered, so is there a chance that nobody is using it?
+> > >
+> > > SPARC uses a true Open Firmware implementation, so it would register
+> > > drivers through the CONFIG_OF infrastructure.
 
-On 09/28/2018 10:47 AM, Dinh Nguyen wrote:
-> 
-> 
-> On 09/28/2018 07:16 AM, Steffen Trumtrar wrote:
->> The stmmac driver uses the alias id to enumerate multiple ethernet devices.
->> Add the aliases for ethernet, so multiple ethernet ports can be enabled
->> without errors.
->>
->> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->> ---
->>  arch/arm/boot/dts/socfpga_arria10.dtsi | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
-> 
-> Applied, thanks!
+correct
 
-I don't think we can add these ethernet aliases to the base arria10 dtsi
-file. The reason is that different boards may elect to use other gmacs
-instead of gmac0.
+> The calls are not even that old, and clearly added intentionally for sparc,
+> see commit ba94272d08a7 ("i40e: use eth_platform_get_mac_address()")
+> which added the first one.
 
-Do you agree?
+Yes, correct again. Wouldn't PPC also end up doing the same thing?
 
-Dinh
+See also commit c762dff24c06 (for ixgbe) - without this fix sparc systems
+will come up with a bogus mac address and then you end up having to
+manually fix this in ugly ways.
+
+--Sowmini
