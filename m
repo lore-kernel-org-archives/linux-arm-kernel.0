@@ -1,126 +1,72 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu,  4 Oct 2018 13:43:22 -0700
-Subject: [PATCH i2c-next v6 5/5] i2c: aspeed: Add bus idle waiting logic for
- multi-master use cases
-In-Reply-To: <20181004204322.20665-1-jae.hyun.yoo@linux.intel.com>
-References: <20181004204322.20665-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20181004204322.20665-6-jae.hyun.yoo@linux.intel.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Thu, 4 Oct 2018 16:00:48 -0500
+Subject: [PATCHv3 2/2] iommu/arm-smmu: Add SMMU clock
+In-Reply-To: <1898b9fb-0523-4de4-741a-a52de5fdab70@codeaurora.org>
+References: <1538605693-22073-1-git-send-email-thor.thayer@linux.intel.com>
+ <1538605693-22073-3-git-send-email-thor.thayer@linux.intel.com>
+ <1898b9fb-0523-4de4-741a-a52de5fdab70@codeaurora.org>
+Message-ID: <793d47b7-cb56-9017-2030-e248921ccab4@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In multi-master environment, this driver's master cannot know
-exactly when peer master sends data to this driver's slave so a
-case can be happened that this master tries to send data through
-the master_xfer function but slave data from peer master is still
-being processed by this driver.
+Hi Vivek,
 
-To prevent any state corruption in the case, this patch adds
-checking code if any slave operation is ongoing and it waits up to
-the bus timeout duration before starting a master_xfer operation.
+On 10/04/2018 01:49 PM, Vivek Gautam wrote:
+> Hi Thor,
+> 
+> 
+> On 10/4/2018 3:58 AM, thor.thayer at linux.intel.com wrote:
+>> From: Thor Thayer <thor.thayer@linux.intel.com>
+>>
+>> Add a clock to the SMMU structure. In the device tree case,
+>> check for a clock node and enable the clock if found.
+>>
+>> This patch is dependent upon the following patches that add
+>> a device tree bulk clock function.
+>> "[V6, 1/4] clk: bulk: add of_clk_bulk_get()"
+>> https://patchwork.kernel.org/patch/10583133/
+>> "[V6, 2/4] clk: add new APIs to operation on all available
+>> clocks"
+>> https://patchwork.kernel.org/patch/10583131/
+>> "[V6, 3/4] clk: add managed version of clk_bulk_get_all"
+>> https://patchwork.kernel.org/patch/10583139/
+>>
+>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>> ---
+>> ? drivers/iommu/arm-smmu.c | 20 ++++++++++++++++++++
+>> ? 1 file changed, 20 insertions(+)
+> 
+> The clock part is already handled by one of the patch in the
+> runtime pm series of arm-smmu [1]. This patch should not be needed.
+> 
+> [1] https://patchwork.kernel.org/patch/10581899/
+> 
+> [...]
+> 
+> Regards
+> Vivek
+> 
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
- drivers/i2c/busses/i2c-aspeed.c | 53 +++++++++++++++++++++++----------
- 1 file changed, 38 insertions(+), 15 deletions(-)
+Thanks. FYI, I had problems applying [v16,2/5] on [1] but was able to 
+apply [v17,2/5] cleanly.
 
-diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-index 833b6b6a4c7e..8d60d7e5b323 100644
---- a/drivers/i2c/busses/i2c-aspeed.c
-+++ b/drivers/i2c/busses/i2c-aspeed.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/clk.h>
- #include <linux/completion.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/errno.h>
- #include <linux/i2c.h>
-@@ -115,6 +116,9 @@
- /* 0x18 : I2CD Slave Device Address Register   */
- #define ASPEED_I2CD_DEV_ADDR_MASK			GENMASK(6, 0)
- 
-+/* Busy checking */
-+#define ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US		(10 * 1000)
-+
- enum aspeed_i2c_master_state {
- 	ASPEED_I2C_MASTER_INACTIVE,
- 	ASPEED_I2C_MASTER_START,
-@@ -156,6 +160,8 @@ struct aspeed_i2c_bus {
- 	int				cmd_err;
- 	/* Protected only by i2c_lock_bus */
- 	int				master_xfer_result;
-+	/* Multi-master */
-+	bool				multi_master;
- #if IS_ENABLED(CONFIG_I2C_SLAVE)
- 	struct i2c_client		*slave;
- 	enum aspeed_i2c_slave_state	slave_state;
-@@ -596,27 +602,42 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
- 	return irq_remaining ? IRQ_NONE : IRQ_HANDLED;
- }
- 
-+static int aspeed_i2c_check_bus_busy(struct aspeed_i2c_bus *bus)
-+{
-+	ktime_t timeout;
-+
-+	if (bus->multi_master) {
-+		might_sleep();
-+		timeout = ktime_add_ms(ktime_get(),
-+				       jiffies_to_msecs(bus->adap.timeout));
-+	}
-+
-+	for (;;) {
-+		if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
-+		      ASPEED_I2CD_BUS_BUSY_STS) &&
-+		    bus->slave_state == ASPEED_I2C_SLAVE_STOP)
-+			return 0;
-+		if (!bus->multi_master)
-+			break;
-+		if (ktime_compare(ktime_get(), timeout) > 0)
-+			break;
-+		usleep_range((ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US >> 2) + 1,
-+			     ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US);
-+	}
-+
-+	return aspeed_i2c_recover_bus(bus);
-+}
-+
- static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
- 				  struct i2c_msg *msgs, int num)
- {
- 	struct aspeed_i2c_bus *bus = i2c_get_adapdata(adap);
- 	unsigned long time_left, flags;
--	int ret = 0;
- 
--	spin_lock_irqsave(&bus->lock, flags);
--	bus->cmd_err = 0;
--
--	/* If bus is busy, attempt recovery. We assume a single master
--	 * environment.
--	 */
--	if (readl(bus->base + ASPEED_I2C_CMD_REG) & ASPEED_I2CD_BUS_BUSY_STS) {
--		spin_unlock_irqrestore(&bus->lock, flags);
--		ret = aspeed_i2c_recover_bus(bus);
--		if (ret)
--			return ret;
--		spin_lock_irqsave(&bus->lock, flags);
--	}
-+	if (aspeed_i2c_check_bus_busy(bus))
-+		return -EAGAIN;
- 
-+	spin_lock_irqsave(&bus->lock, flags);
- 	bus->cmd_err = 0;
- 	bus->msgs = msgs;
- 	bus->msgs_index = 0;
-@@ -827,7 +848,9 @@ static int aspeed_i2c_init(struct aspeed_i2c_bus *bus,
- 	if (ret < 0)
- 		return ret;
- 
--	if (!of_property_read_bool(pdev->dev.of_node, "multi-master"))
-+	if (of_property_read_bool(pdev->dev.of_node, "multi-master"))
-+		bus->multi_master = true;
-+	else
- 		fun_ctrl_reg |= ASPEED_I2CD_MULTI_MASTER_DIS;
- 
- 	/* Enable Master Mode */
--- 
-2.19.0
+The bigger issue is that with your patchset I need to create a new 
+structure for my variation of the ARM SMMUv2 due to the 
+of_device_get_match_data() call in arm_smmu_device_dt_probe(). I want to 
+use the default arm_mmu500 but it doesn't have a clock specified and I 
+end up with num_clks of 0.
+
+Creating a new smmu_match_data structure for each variant feels wrong 
+because I have the clock data specified in my device tree. The 
+of_clk_bulk_get() call handles this nicely but that patchset isn't 
+getting much attention.
+
+I'll investigate adding the of_clk_bulk_get() call on top of your 
+patches. This may simplify your patches too since the additional 
+structures in [v16,5/5] wouldn't be needed.
+
+Thanks,
+
+Thor
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git - next
