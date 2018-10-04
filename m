@@ -1,45 +1,41 @@
-From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
-Date: Thu, 4 Oct 2018 21:46:34 +0200
-Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
-In-Reply-To: <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
-References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
- <20181003200003.GA9965@bombadil.infradead.org>
- <20181003221444.GZ30658@n2100.armlinux.org.uk>
- <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
- <20181004123400.GC30658@n2100.armlinux.org.uk>
- <CAFqt6zZPOM17QwmcWKF3F1gqkJm=2PxvuJ3naWuRXZGHc2HrEQ@mail.gmail.com>
- <20181004181736.GB20842@bombadil.infradead.org>
- <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
-Message-ID: <CANiq72mkTP_m20vqei-cpN+ypQ_gU472qn5m68vb_4Nqj5afMQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 4 Oct 2018 21:37:27 +0200
+Subject: linux-next: Signed-off-by missing for commits in the arm-soc tree
+In-Reply-To: <20181003072140.7c18d772@canb.auug.org.au>
+References: <20181003072140.7c18d772@canb.auug.org.au>
+Message-ID: <20181004193727.qci3puitpxml26m5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Souptick,
+Hi Stephen,
 
-On Thu, Oct 4, 2018 at 8:49 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
->
-> On Thu, Oct 4, 2018 at 11:47 PM Matthew Wilcox <willy@infradead.org> wrote:
-> >
-> > I think this is a bad plan.  What we should rather do is examine the current
-> > users of vm_insert_page() and ask "What interface would better replace
-> > vm_insert_page()?"
-> >
-> > As I've said to you before, I believe the right answer is to have a
-> > vm_insert_range() which takes an array of struct page pointers.  That
-> > fits the majority of remaining users.
->
-> Ok, but it will take some time.
-> Is it a good idea to introduce the final vm_fault_t patch and then
-> start working on vm_insert_range as it will be bit time consuming ?
->
+On Wed, Oct 03, 2018 at 07:21:40AM +1000, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Commits
+> 
+>   6eeb4180d4b9 ("ARM: dts: sunxi: h3-h5: Add Bananapi M2+ v1.2 device trees")
+>   80c21c8c8b8d ("arm64: dts: allwinner: h5: Add device tree for Bananapi M2 Plus H5")
+>   aa8fee415f46 ("ARM: dts: sun8i: h3: Split out non-SoC-specific parts of Bananapi M2 Plus")
+>   db9fd9d13e30 ("ARM: dts: sun8i: h3: bpi-m2-plus: Fix address for external RGMII Ethernet PHY")
+>   6c700289a3e8 ("ARM: dts: sun8i: h3-h5: ir register size should be the whole memory block")
+> 
+> are missing a Signed-off-by from their committer.
 
-Well, why is there a rush? Development should be done in a patch
-series or a tree, and submitted as a whole, instead of sending partial
-patches.
+I just sent a new PR with the SoB this time (and I just learnt that
+git rebase rewrites the committer...)
 
-Also, not sure if you saw my comments/review: if the interface is not
-going to change, why the name change? Why can't we simply keep using
-vm_insert_page?
+Thanks!
+Maxime
 
-Cheers,
-Miguel
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181004/a1d0e8ec/attachment.sig>
