@@ -1,123 +1,68 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 04 Oct 2018 10:53:57 +0100
-Subject: [PATCH v2] KVM: arm/arm64: Check memslot bounds before mapping
- hugepages
-In-Reply-To: <20180926151135.16083-1-koomi@moshbit.net> (Lukas Braun's message
- of "Wed, 26 Sep 2018 17:11:35 +0200")
-References: <20180926151135.16083-1-koomi@moshbit.net>
-Message-ID: <87ftxmhway.fsf@e105922-lin.cambridge.arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 4 Oct 2018 12:09:58 +0200
+Subject: [PATCH] drm/meson: fix max mode_config height/width
+In-Reply-To: <1538642563-22465-1-git-send-email-narmstrong@baylibre.com>
+References: <1538642563-22465-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20181004100958.GI31561@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukas,
+On Thu, Oct 04, 2018 at 10:42:43AM +0200, Neil Armstrong wrote:
+> The mode_config max_width/max_height determines the maximum framebuffer
+> size the pixel reader can handle. But the values were set thinking they
+> were determining the maximum screen dimensions.
+> 
+> This patch changes the values to the maximum height/width the CANVAS block
+> can handle rounded to some coherent values.
+> 
+> Fixes: a41e82e6c457 ("drm/meson: Add support for components")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Lukas Braun <koomi@moshbit.net> writes:
+It's both. Grep for all the callers of ->fill_modes and you'll see that
+this limit is also used to filter max screen sizes.
 
-> Userspace can create a memslot with memory backed by (transparent)
-> hugepages, but with bounds that do not align with hugepages.
-> In that case, we cannot map the entire region in the guest as hugepages
-> without exposing additional host memory to the guest and potentially
-> interfering with other memslots.
-> Consequently, this patch adds a bounds check when populating guest page
-> tables and forces the creation of regular PTEs if mapping an entire
-> hugepage would violate the memslots bounds.
->
-> Signed-off-by: Lukas Braun <koomi@moshbit.net>
+If you want to change this, then I think we need a new
+mode_config.fb_max_width/height, which if non-zero, would extend the limit
+for fbs.
+
+There's also the problem that if you extend this for fbs, then there's no
+check anymore in the atomic_commit paths (or legacy modeset), so that
+needs to be addressed somehow too.
+
+Bunch of igt to make sure we're not missing anything would be sweet on
+top, e.g. e.g. trying to set a mode over the limit and making sure it
+fails.
+
+Cheers, Daniel
+
 > ---
->
-> Hi everyone,
->
-> for v2, in addition to writing the condition the way Marc suggested, I
-> moved the whole check so it also catches the problem when the hugepage
-> was allocated explicitly, not only for THPs.
-
-Ok, that makes sense. Memslot bounds could exceed for hugetlbfs pages as
-well.
-
-> The second line is quite long, but splitting it up would make things
-> rather ugly IMO, so I left it as it is.
-
-Let's try to do better - user_mem_abort() is quite hard to follow as it
-is.
-
->
->
-> Regards,
-> Lukas
->
->
->  virt/kvm/arm/mmu.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index ed162a6c57c5..ba77339e23ec 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1500,7 +1500,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		return -EFAULT;
->  	}
+>  drivers/gpu/drm/meson/meson_drv.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index d344312..2e29968 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -243,8 +243,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  		goto free_drm;
 >  
-> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
-> +	if ((fault_ipa & S2_PMD_MASK) < (memslot->base_gfn << PAGE_SHIFT) ||
-> +	    ALIGN(fault_ipa, S2_PMD_SIZE) >= ((memslot->base_gfn + memslot->npages) << PAGE_SHIFT)) {
-> +		/* PMD entry would map something outside of the memslot */
-> +		force_pte = true;
-> +	} else if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
->  		hugetlb = true;
->  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->  	} else {
+>  	drm_mode_config_init(drm);
+> -	drm->mode_config.max_width = 3840;
+> -	drm->mode_config.max_height = 2160;
+> +	drm->mode_config.max_width = 16384;
+> +	drm->mode_config.max_height = 8192;
+>  	drm->mode_config.funcs = &meson_mode_config_funcs;
+>  
+>  	/* Hardware Initialization */
+> -- 
+> 2.7.4
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-For the purpose of this fix, using a helper to check whether the mapping
-fits in the memslot makes things clearer (imo) (untested patch below) -
-
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index ed162a6c57c5..8bca141eb45e 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1466,6 +1466,18 @@ static void kvm_send_hwpoison_signal(unsigned long address,
-        send_sig_info(SIGBUS, &info, current);
- }
- 
-+static bool mapping_in_memslot(struct kvm_memory_slot *memslot,
-+                        phys_addr_t fault_ipa, unsigned long mapping_size)
-+{
-+ gfn_t start_gfn = (fault_ipa & ~(mapping_size - 1)) >> PAGE_SHIFT;
-+ gfn_t end_gfn = ALIGN(fault_ipa, mapping_size) >> PAGE_SHIFT;
-+
-+ WARN_ON(!is_power_of_2(mapping_size));
-+
-+ return memslot->base_gfn <= start_gfn &&
-+         end_gfn < memslot->base_gfn + memslot->npages;
-+}
-+
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-                          struct kvm_memory_slot *memslot, unsigned long hva,
-                          unsigned long fault_status)
-@@ -1480,7 +1492,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-        kvm_pfn_t pfn;
-        pgprot_t mem_type = PAGE_S2;
-        bool logging_active = memslot_is_logging(memslot);
--   unsigned long flags = 0;
-+ unsigned long vma_pagesize, flags = 0;
- 
-        write_fault = kvm_is_write_fault(vcpu);
-        exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
-@@ -1500,7 +1512,15 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-                return -EFAULT;
-        }
- 
--   if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
-+ vma_pagesize = vma_kernel_pagesize(vma);
-+ /* Is the mapping contained in the memslot? */
-+ if (!mapping_in_memslot(memslot, fault_ipa, vma_pagesize)) {
-+         /* memslot should be aligned to page size */
-+         vma_pagesize = PAGE_SIZE;
-+         force_pte = true;
-+ }
-+
-+ if (vma_pagesize == PMD_SIZE && !logging_active) {
-                hugetlb = true;
-                gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-        } else {
-
-Thoughts?
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
