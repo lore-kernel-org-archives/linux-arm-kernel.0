@@ -1,204 +1,91 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 4 Oct 2018 18:35:15 +0100
-Subject: [PATCH v3 1/3] acpi: arm64: add iort support for PMCG
-In-Reply-To: <20181004164356.GA16278@red-moon>
-References: <20180921150803.25444-1-shameerali.kolothum.thodi@huawei.com>
- <20180921150803.25444-2-shameerali.kolothum.thodi@huawei.com>
- <20181004164356.GA16278@red-moon>
-Message-ID: <7572d65b-1d10-b460-c2c8-4f46e2e0d53c@arm.com>
+From: ben.hutchings@codethink.co.uk (Ben Hutchings)
+Date: Thu, 4 Oct 2018 18:36:31 +0100
+Subject: [RFC PATCH] skb: Define NET_IP_ALIGN based on
+ CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+Message-ID: <20181004173631.3nchegr6rm3jgz24@xylophone.i.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/18 17:43, Lorenzo Pieralisi wrote:
-> On Fri, Sep 21, 2018 at 04:08:01PM +0100, Shameer Kolothum wrote:
->> From: Neil Leeder <nleeder@codeaurora.org>
->>
->> Add support for the SMMU Performance Monitor Counter Group
->> information from ACPI. This is in preparation for its use
->> in the SMMUv3 PMU driver.
->>
->> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
->> Signed-off-by: Hanjun Guo <guohanjun@huawei.com>
->> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
->> ---
->>   drivers/acpi/arm64/iort.c | 78 +++++++++++++++++++++++++++++++++++++++--------
->>   1 file changed, 66 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index 08f26db..b979c86 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -356,7 +356,8 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->>   	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
->>   		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
->>   		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
->> -		    node->type == ACPI_IORT_NODE_SMMU_V3) {
->> +		    node->type == ACPI_IORT_NODE_SMMU_V3 ||
->> +		    node->type == ACPI_IORT_NODE_PMCG) {
->>   			*id_out = map->output_base;
->>   			return parent;
->>   		}
->> @@ -394,6 +395,8 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
->>   		}
->>   
->>   		return smmu->id_mapping_index;
->> +	case ACPI_IORT_NODE_PMCG:
->> +		return 0;
->>   	default:
->>   		return -EINVAL;
->>   	}
->> @@ -1309,6 +1312,50 @@ static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
->>   	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
->>   }
->>   
->> +static void __init arm_smmu_common_dma_configure(struct device *dev,
->> +						enum dev_dma_attr attr)
->> +{
->> +	/* We expect the dma masks to be equivalent for all SMMUs set-ups */
->> +	dev->dma_mask = &dev->coherent_dma_mask;
->> +
->> +	/* Configure DMA for the page table walker */
->> +	acpi_dma_configure(dev, attr);
->> +}
-> 
-> It looks like we can't get rid of this acpi_dma_configure() call
-> given that the platform device we create has no ACPI companion
-> (and I am not looking forward to fabricating one to make the
-> code homogeneous :)).
+NET_IP_ALIGN is supposed to be defined as 0 if DMA writes to an
+unaligned buffer would be more expensive than CPU access to unaligned
+header fields, and otherwise defined as 2.
 
-Yeah, given that this is essentially only for SMMUs, the alternatives 
-all end up looking like too much bother to be worthwhile.
+Currently only ppc64 and x86 configurations define it to be 0.
+However several other architectures (conditionally) define
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS, which seems to imply that
+NET_IP_ALIGN should be 0.
 
-> Still, having two methods per IORT node type (dev_is_coherent() and
-> dev_dma_configure()) does not make much sense, we can merge it into one
-> I think.
+Remove the overriding definitions for ppc64 and x86 and define
+NET_IP_ALIGN solely based on CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS.
 
-Good point - looks the attr from dev_is_coherent is only ever passed 
-through dev_dma_configure, so we may as well just have per-SMMU-type 
-dev_dma_configure methods which retrieve their own relevant coherency 
-directly. FWIW, on v2 I was tempted to suggest just wrapping the DMA 
-setup in "if (node->type != ACPI_IORT_NODE_PMCG)..." rather than messing 
-with more callbacks, but that clearly wouldn't fit well with the local 
-style here.
+Signed-off-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
+---
+ arch/powerpc/include/asm/processor.h | 11 -----------
+ arch/x86/include/asm/processor.h     |  8 --------
+ include/linux/skbuff.h               |  7 +++----
+ 3 files changed, 3 insertions(+), 23 deletions(-)
 
-Robin.
-
-> 
-> Thanks,
-> Lorenzo
-> 
->> +static int __init arm_smmu_v3_pmcg_count_resources(struct acpi_iort_node *node)
->> +{
->> +	struct acpi_iort_pmcg *pmcg;
->> +
->> +	/* Retrieve PMCG specific data */
->> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
->> +
->> +	/*
->> +	 * There are always 2 memory resources.
->> +	 * If the overflow_gsiv is present then add that for a total of 3.
->> +	 */
->> +	return pmcg->overflow_gsiv ? 3 : 2;
->> +}
->> +
->> +static void __init arm_smmu_v3_pmcg_init_resources(struct resource *res,
->> +					       struct acpi_iort_node *node)
->> +{
->> +	struct acpi_iort_pmcg *pmcg;
->> +
->> +	/* Retrieve PMCG specific data */
->> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
->> +
->> +	res[0].start = pmcg->page0_base_address;
->> +	res[0].end = pmcg->page0_base_address + SZ_4K - 1;
->> +	res[0].flags = IORESOURCE_MEM;
->> +	res[1].start = pmcg->page1_base_address;
->> +	res[1].end = pmcg->page1_base_address + SZ_4K - 1;
->> +	res[1].flags = IORESOURCE_MEM;
->> +
->> +	if (pmcg->overflow_gsiv)
->> +		acpi_iort_register_irq(pmcg->overflow_gsiv, "overflow",
->> +				       ACPI_EDGE_SENSITIVE, &res[2]);
->> +}
->> +
->>   struct iort_dev_config {
->>   	const char *name;
->>   	int (*dev_init)(struct acpi_iort_node *node);
->> @@ -1318,6 +1365,8 @@ struct iort_dev_config {
->>   				     struct acpi_iort_node *node);
->>   	void (*dev_set_proximity)(struct device *dev,
->>   				    struct acpi_iort_node *node);
->> +	void (*dev_dma_configure)(struct device *dev,
->> +					enum dev_dma_attr attr);
->>   };
->>   
->>   static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
->> @@ -1326,23 +1375,34 @@ static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
->>   	.dev_count_resources = arm_smmu_v3_count_resources,
->>   	.dev_init_resources = arm_smmu_v3_init_resources,
->>   	.dev_set_proximity = arm_smmu_v3_set_proximity,
->> +	.dev_dma_configure = arm_smmu_common_dma_configure,
->>   };
->>   
->>   static const struct iort_dev_config iort_arm_smmu_cfg __initconst = {
->>   	.name = "arm-smmu",
->>   	.dev_is_coherent = arm_smmu_is_coherent,
->>   	.dev_count_resources = arm_smmu_count_resources,
->> -	.dev_init_resources = arm_smmu_init_resources
->> +	.dev_init_resources = arm_smmu_init_resources,
->> +	.dev_dma_configure = arm_smmu_common_dma_configure,
->> +};
->> +
->> +static const struct iort_dev_config iort_arm_smmu_v3_pmcg_cfg __initconst = {
->> +	.name = "arm-smmu-v3-pmu",
->> +	.dev_count_resources = arm_smmu_v3_pmcg_count_resources,
->> +	.dev_init_resources = arm_smmu_v3_pmcg_init_resources,
->>   };
->>   
->>   static __init const struct iort_dev_config *iort_get_dev_cfg(
->>   			struct acpi_iort_node *node)
->>   {
->> +
->>   	switch (node->type) {
->>   	case ACPI_IORT_NODE_SMMU_V3:
->>   		return &iort_arm_smmu_v3_cfg;
->>   	case ACPI_IORT_NODE_SMMU:
->>   		return &iort_arm_smmu_cfg;
->> +	case ACPI_IORT_NODE_PMCG:
->> +		return &iort_arm_smmu_v3_pmcg_cfg;
->>   	default:
->>   		return NULL;
->>   	}
->> @@ -1398,12 +1458,6 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
->>   	if (ret)
->>   		goto dev_put;
->>   
->> -	/*
->> -	 * We expect the dma masks to be equivalent for
->> -	 * all SMMUs set-ups
->> -	 */
->> -	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
->> -
->>   	fwnode = iort_get_fwnode(node);
->>   
->>   	if (!fwnode) {
->> @@ -1413,11 +1467,11 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
->>   
->>   	pdev->dev.fwnode = fwnode;
->>   
->> -	attr = ops->dev_is_coherent && ops->dev_is_coherent(node) ?
->> +	if (ops->dev_dma_configure) {
->> +		attr = ops->dev_is_coherent && ops->dev_is_coherent(node) ?
->>   			DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
->> -
->> -	/* Configure DMA for the page table walker */
->> -	acpi_dma_configure(&pdev->dev, attr);
->> +		ops->dev_dma_configure(&pdev->dev, attr);
->> +	}
->>   
->>   	iort_set_device_domain(&pdev->dev, node);
->>   
->> -- 
->> 2.7.4
->>
->>
+diff --git a/arch/powerpc/include/asm/processor.h b/arch/powerpc/include/asm/processor.h
+index 52fadded5c1e..65c8210d2787 100644
+--- a/arch/powerpc/include/asm/processor.h
++++ b/arch/powerpc/include/asm/processor.h
+@@ -525,17 +525,6 @@ extern void cvt_fd(float *from, double *to);
+ extern void cvt_df(double *from, float *to);
+ extern void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
+ 
+-#ifdef CONFIG_PPC64
+-/*
+- * We handle most unaligned accesses in hardware. On the other hand 
+- * unaligned DMA can be very expensive on some ppc64 IO chips (it does
+- * powers of 2 writes until it reaches sufficient alignment).
+- *
+- * Based on this we disable the IP header alignment in network drivers.
+- */
+-#define NET_IP_ALIGN	0
+-#endif
+-
+ #endif /* __KERNEL__ */
+ #endif /* __ASSEMBLY__ */
+ #endif /* _ASM_POWERPC_PROCESSOR_H */
+diff --git a/arch/x86/include/asm/processor.h b/arch/x86/include/asm/processor.h
+index d53c54b842da..0108efc9726e 100644
+--- a/arch/x86/include/asm/processor.h
++++ b/arch/x86/include/asm/processor.h
+@@ -33,14 +33,6 @@ struct vm86;
+ #include <linux/irqflags.h>
+ #include <linux/mem_encrypt.h>
+ 
+-/*
+- * We handle most unaligned accesses in hardware.  On the other hand
+- * unaligned DMA can be quite expensive on some Nehalem processors.
+- *
+- * Based on this we disable the IP header alignment in network drivers.
+- */
+-#define NET_IP_ALIGN	0
+-
+ #define HBP_NUM 4
+ /*
+  * Default implementation of macro that returns current
+diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
+index 17a13e4785fc..42467be8021f 100644
+--- a/include/linux/skbuff.h
++++ b/include/linux/skbuff.h
+@@ -2435,11 +2435,10 @@ static inline int pskb_network_may_pull(struct sk_buff *skb, unsigned int len)
+  * The downside to this alignment of the IP header is that the DMA is now
+  * unaligned. On some architectures the cost of an unaligned DMA is high
+  * and this cost outweighs the gains made by aligning the IP header.
+- *
+- * Since this trade off varies between architectures, we allow NET_IP_ALIGN
+- * to be overridden.
+  */
+-#ifndef NET_IP_ALIGN
++#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
++#define NET_IP_ALIGN	0
++#else
+ #define NET_IP_ALIGN	2
+ #endif
+ 
+-- 
+Ben Hutchings, Software Developer                         Codethink Ltd
+https://www.codethink.co.uk/                 Dale House, 35 Dale Street
+                                     Manchester, M1 2HF, United Kingdom
