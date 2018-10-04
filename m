@@ -1,63 +1,62 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Oct 2018 12:10:40 +0200
-Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM) (a subset)
-In-Reply-To: <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
- <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
- <10136406.EY9A7BdqYq@aspire.rjw.lan>
- <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
-Message-ID: <CAPDyKFqgXy9Yf9j_zf5n7QcrCg8V20qqprVdZK-KYKhWJEkuoQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 4 Oct 2018 10:32:56 +0100
+Subject: drivers binding to device node with multiple compatible strings
+In-Reply-To: <CADRPPNQam-QUfqDMvu42KS+50VaHfGPhCZj-1jRHQ-Od0fbxuQ@mail.gmail.com>
+References: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
+ <CAL_JsqKRH8uEzSx6H6ZSRJF9Ecp4am1cNsxgQqf2OO5_aGR1zw@mail.gmail.com>
+ <CADRPPNQam-QUfqDMvu42KS+50VaHfGPhCZj-1jRHQ-Od0fbxuQ@mail.gmail.com>
+Message-ID: <CACxGe6u2FQ8r1Ya6-mWoGcs7g2OLMccu68uskZvDLS6ows-hXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 October 2018 at 11:32, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Thu, Oct 4, 2018 at 11:04 AM Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->>
->> On Thursday, October 4, 2018 10:58:53 AM CEST Ulf Hansson wrote:
->> > On 4 October 2018 at 10:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
->> > > On Wed, Oct 3, 2018 at 4:39 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> > >>
->> > >> I have digested the review comments so far, including a recent offlist chat
->> > >> with with Lorenzo Pieralisi around the debatable PSCI changes. More or less I
->> > >> have a plan for how to move forward.
->> > >>
->> > >> However, to avoid re-posting non-changed patches over and over again, I decided
->> > >> to withhold the more debatable part from this v9, hence this is not the complete
->> > >> series to make things play. In v9, I have just included the trivial changes,
->> > >> which are either already acked/reviewed or hopefully can be rather soon/easily.
->> > >>
->> > >> My hope is to get this queued for v4.20, to move things forward. I know it's
->> > >> late, but there are more or less nothing new here since v8.
->> > >
->> > > I have no problems with the first three patches in this series, so I
->> > > can apply them right away.  Do you want me to do that?
->> >
->> > Yes, please.
->> >
->> > >
->> > > As for the rest, the cpuidle driver patch looks OK to me, but the
->> > > PSCI-related ones need ACKs.
->> >
->> > For some yes, but I think you can go ahead with a few more.
->> >
->> > Patch 4, 5 is already acked/reviewed.
->> >
->> > Patch 6 should be fine (if you are okay with it else wait for an ack
->> > from Daniel)
->>
->> OK, thanks.
->>
->> Do the 4-6 depend on the 1-3?
+On Fri, Sep 28, 2018 at 10:01 PM Li Yang <leoyang.li@nxp.com> wrote:
 >
-> I don't see any dependency there, so I'll queue up the 1-3 in
-> pm-domains and the 4-6 in pm-cpuidle.
+> On Fri, Sep 28, 2018 at 3:07 PM Rob Herring <robh+dt@kernel.org> wrote:
+> >
+> > On Thu, Sep 27, 2018 at 5:25 PM Li Yang <leoyang.li@nxp.com> wrote:
+> > >
+> > > Hi Rob and Grant,
+> > >
+> > > Various device tree specs are recommending to include all the
+> > > potential compatible strings in the device node, with the order from
+> > > most specific to most general.  But it looks like Linux kernel doesn't
+> > > provide a way to bind the device to the most specific driver, however,
+> > > the first registered compatible driver will be bound.
+> > >
+> > > As more and more generic drivers are added to the Linux kernel, they
+> > > are competing with the more specific vendor drivers and causes problem
+> > > when both are built into the kernel.  I'm wondering if there is a
+> > > generic solution (or in plan) to make the most specific driver bound
+> > > to the device.   Or we have to disable the more general driver or
+> > > remove the more general compatible string from the device tree?
+> >
+> > It's been a known limitation for a long time. However, in practice it
+> > doesn't seem to be a common problem. Perhaps folks just remove the
+> > less specific compatible from their DT (though that's not ideal). For
+> > most modern bindings, there's so many other resources beyond
+> > compatible (clocks, resets, pinctrl, etc.) that there are few generic
+> > drivers that can work.
+> >
+> > I guess if we want to fix this, we'd need to have weighted matching in
+> > the driver core and unbind drivers when we get a better match. Though
+> > it could get messy if the better driver probe fails. Then we've got to
+> > rebind to the original driver.
+>
+> Probably we can populate the platform devices from device tree after
+> the device_init phase?  So that all built-in drivers are already
+> registered when the devices are created and we can try find the best
+> match in one go?  For more specific loadable modules we probably need
+> to unbind from the old driver and bind to the new one.  But I agree
+> with you that it could be messy.
 
-Great, thanks!
-
-Make sure you put the remaining of the PSCI changes on pm-cpuidle
-(once acked), as there are dependency.
-
-Kind regards
-Uffe
+It's a tradeoff.
+>
+> >
+> > Do you have a specific case where you hit this?
+>
+> Maybe not a new issue but "snps,dw-pcie" is competing with various
+> "fsl,<chip>-pcie" compatibles.  Also a specific PHY
+> "ethernet-phy-idAAAA.BBBB" with generic "ethernet-phy-ieee802.3-c45".
+>
+> Regards,
+> Leo
