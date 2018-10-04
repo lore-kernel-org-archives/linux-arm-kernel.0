@@ -1,226 +1,282 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 4 Oct 2018 09:59:41 +0530
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <20181001163253.GW5662@atomide.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com> <20180925175537.GQ5662@atomide.com>
- <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
- <20180926155911.GT5662@atomide.com> <20180926162303.GU5662@atomide.com>
- <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
- <20180926233111.GY5662@atomide.com>
- <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
- <20181001163253.GW5662@atomide.com>
-Message-ID: <ff68a664-aa7a-92b6-b78c-78382f7b0ec1@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 4 Oct 2018 10:36:24 +0530
+Subject: [PATCH 2/2] cpufreq: ap806: add cpufreq driver for Armada 8K
+In-Reply-To: <20180924151249.32328-3-gregory.clement@bootlin.com>
+References: <20180924151249.32328-1-gregory.clement@bootlin.com>
+ <20180924151249.32328-3-gregory.clement@bootlin.com>
+Message-ID: <20181004050624.ecjl3ouczm7huqgg@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 01 October 2018 10:02 PM, Tony Lindgren wrote:
-> * Keerthy <j-keerthy@ti.com> [180927 05:00]:
->> Also tested on beaglebone black DS0 works fine. Although there seems to
->> be an additional warning which was not seen before:
->>
->> "l4-wkup-clkctrl:0008:0: failed to disable"
->>
->> log: https://pastebin.ubuntu.com/p/Ns2WRdVkXS/
+On 24-09-18, 17:12, Gregory CLEMENT wrote:
+> Add cpufreq driver for Marvell AP-806 found on Aramda 8K.
+> The AP-806 has DFS (Dynamic Frequency Scaling) with coupled
+> clock domain for two clusters, so this driver will directly
+> use generic cpufreq-dt driver as backend.
 > 
-> Can you test the following patch applied on top of the
-> omap-for-v4.20/dt-ti-sysc-tmp-testing-v2 testing branch?
-
-Tony,
-
-Apologies for the delay in responding.
-
-AM437X-GP-EVM: https://pastebin.ubuntu.com/p/m3ybBvH7Qj/
-
-Tested for UART/RTCWAKE/TOUCH_WAKE from DS0, apart from the expected
-gpio warnings all seems fine.
-
-AM335X-BONEBLACK: https://pastebin.ubuntu.com/p/xdsMDS5XtQ/
-
-Tested for rtcwake/UART wake up from DS0. Again except for gpio messages
-everything else seems to be fine.
-
-Regards,
-Keerthy
-
+> Based on the work of Omri Itach <omrii@marvell.com>.
 > 
-> Based on Grygorii's i2c-omap comments, I think we should also
-> do the following in the ti-sysc driver becasuse the pm_runtime
-> use count can be whatever.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ----------------------
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Mon, 1 Oct 2018 09:11:57 -0700
-> Subject: [PATCH] bus: ti-sysc: Just use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
-> 
-> As Grygorii Strashko pointed out, the runtime PM use count of the
-> children can be whatever at suspend and we should not use it. So
-> let's just suspend ti-sysc at noirq level and get rid of some code.
-> 
-> Let's also remove the PM_SLEEP ifdef and use __maybe_unused as the
-> PM code already deals with the ifdefs.
-> 
-> Suggested-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 > ---
->  drivers/bus/ti-sysc.c | 113 ++----------------------------------------
->  1 file changed, 4 insertions(+), 109 deletions(-)
+>  drivers/cpufreq/Kconfig.arm         |  11 +++
+>  drivers/cpufreq/Makefile            |   1 +
+>  drivers/cpufreq/armada-8k-cpufreq.c | 148 ++++++++++++++++++++++++++++
+>  3 files changed, 160 insertions(+)
+>  create mode 100644 drivers/cpufreq/armada-8k-cpufreq.c
 > 
-> diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
-> --- a/drivers/bus/ti-sysc.c
-> +++ b/drivers/bus/ti-sysc.c
-> @@ -87,7 +87,6 @@ struct sysc {
->  	u32 revision;
->  	bool enabled;
->  	bool needs_resume;
-> -	unsigned int noirq_suspend:1;
->  	bool child_needs_resume;
->  	struct delayed_work idle_work;
->  };
-> @@ -702,75 +701,7 @@ static int __maybe_unused sysc_runtime_resume(struct device *dev)
->  	return error;
->  }
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 0cd8eb76ad59..fd34095743a7 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -25,6 +25,17 @@ config ARM_ARMADA_37XX_CPUFREQ
+>  	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
+>  	  The Armada 37xx PMU supports 4 frequency and VDD levels.
 >  
-> -#ifdef CONFIG_PM_SLEEP
-> -static int sysc_suspend(struct device *dev)
-> -{
-> -	struct sysc *ddata;
-> -	int error;
-> -
-> -	ddata = dev_get_drvdata(dev);
-> -
-> -	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
-> -		return 0;
-> -
-> -	if (!ddata->enabled || ddata->noirq_suspend)
-> -		return 0;
-> -
-> -	dev_dbg(ddata->dev, "%s %s\n", __func__,
-> -		ddata->name ? ddata->name : "");
-> -
-> -	error = pm_runtime_put_sync_suspend(dev);
-> -	if (error == -EBUSY) {
-> -		dev_dbg(ddata->dev, "%s busy, tagging for noirq suspend %s\n",
-> -			__func__, ddata->name ? ddata->name : "");
-> -
-> -		ddata->noirq_suspend = true;
-> -
-> -		return 0;
-> -	} else if (error < 0) {
-> -		dev_warn(ddata->dev, "%s cannot suspend %i %s\n",
-> -			 __func__, error,
-> -			 ddata->name ? ddata->name : "");
-> -
-> -		return 0;
-> -	}
-> -
-> -	ddata->needs_resume = true;
-> -
-> -	return 0;
-> -}
-> -
-> -static int sysc_resume(struct device *dev)
-> -{
-> -	struct sysc *ddata;
-> -	int error;
-> -
-> -	ddata = dev_get_drvdata(dev);
-> -
-> -	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
-> -		return 0;
-> -
-> -	if (!ddata->needs_resume || ddata->noirq_suspend)
-> -		return 0;
-> -
-> -	dev_dbg(ddata->dev, "%s %s\n", __func__,
-> -		ddata->name ? ddata->name : "");
-> -
-> -	error = pm_runtime_get_sync(dev);
-> -	if (error < 0) {
-> -		dev_err(ddata->dev, "%s  error %i %s\n",
-> -			__func__, error,
-> -			ddata->name ? ddata->name : "");
-> -
-> -		return error;
-> -	}
-> -
-> -	ddata->needs_resume = false;
-> -
-> -	return 0;
-> -}
-> -
-> -static int sysc_noirq_suspend(struct device *dev)
-> +static int __maybe_unused sysc_noirq_suspend(struct device *dev)
->  {
->  	struct sysc *ddata;
->  	int error;
-> @@ -780,26 +711,10 @@ static int sysc_noirq_suspend(struct device *dev)
->  	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
->  		return 0;
+> +config ARM_ARMADA_8K_CPUFREQ
+> +	tristate "Armada 8K CPUFreq driver"
+
+Since you wanted this to be tristate, have you tried
+
+insmod armada-8k-cpufreq.ko
+rmmod armada-8k-cpufreq.ko
+insmod armada-8k-cpufreq.ko
+
+?
+
+That will show some failures I believe.
+
+> +	depends on ARCH_MVEBU && CPUFREQ_DT
+> +	help
+> +	  This enables the CPUFreq driver support for Marvell
+> +	  Armada8k SOCs.
+> +	  Armada8K device has the AP806 which supports scaling
+> +	  to any full integer divider.
+> +
+> +	  If in doubt, say N.
+> +
+>  # big LITTLE core layer and glue drivers
+>  config ARM_BIG_LITTLE_CPUFREQ
+>  	tristate "Generic ARM big LITTLE CPUfreq driver"
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index c1ffeabe4ecf..21f4f56229db 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -53,6 +53,7 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
+>  obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
 >  
-> -	if (!ddata->enabled || !ddata->noirq_suspend)
-> -		return 0;
-> -
-> -	dev_dbg(ddata->dev, "%s %s\n", __func__,
-> -		ddata->name ? ddata->name : "");
-> -
-> -	error = sysc_runtime_suspend(dev);
-> -	if (error) {
-> -		dev_warn(ddata->dev, "%s busy %i %s\n",
-> -			 __func__, error, ddata->name ? ddata->name : "");
-> -
-> -		return 0;
-> -	}
-> -
-> -	ddata->needs_resume = true;
-> -
-> -	return 0;
-> +	return pm_runtime_force_suspend(dev);
->  }
->  
-> -static int sysc_noirq_resume(struct device *dev)
-> +static int __maybe_unused sysc_noirq_resume(struct device *dev)
->  {
->  	struct sysc *ddata;
->  	int error;
-> @@ -809,30 +724,10 @@ static int sysc_noirq_resume(struct device *dev)
->  	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
->  		return 0;
->  
-> -	if (!ddata->needs_resume || !ddata->noirq_suspend)
-> -		return 0;
-> -
-> -	dev_dbg(ddata->dev, "%s %s\n", __func__,
-> -		ddata->name ? ddata->name : "");
-> -
-> -	error = sysc_runtime_resume(dev);
-> -	if (error) {
-> -		dev_warn(ddata->dev, "%s cannot resume %i %s\n",
-> -			 __func__, error,
-> -			 ddata->name ? ddata->name : "");
-> -
-> -		return error;
-> -	}
-> -
-> -	/* Maybe also reconsider clearing noirq_suspend at some point */
-> -	ddata->needs_resume = false;
-> -
-> -	return 0;
-> +	return pm_runtime_force_resume(dev);
->  }
-> -#endif
->  
->  static const struct dev_pm_ops sysc_pm_ops = {
-> -	SET_SYSTEM_SLEEP_PM_OPS(sysc_suspend, sysc_resume)
->  	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(sysc_noirq_suspend, sysc_noirq_resume)
->  	SET_RUNTIME_PM_OPS(sysc_runtime_suspend,
->  			   sysc_runtime_resume,
-> 
+>  obj-$(CONFIG_ARM_ARMADA_37XX_CPUFREQ)	+= armada-37xx-cpufreq.o
+> +obj-$(CONFIG_ARM_ARMADA_8K_CPUFREQ)	+= armada-8k-cpufreq.o
+
+Maybe add another tab before + to align with other lines ?
+
+>  obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
+>  obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
+>  obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
+> diff --git a/drivers/cpufreq/armada-8k-cpufreq.c b/drivers/cpufreq/armada-8k-cpufreq.c
+> new file mode 100644
+> index 000000000000..1c604f1d27d2
+> --- /dev/null
+> +++ b/drivers/cpufreq/armada-8k-cpufreq.c
+> @@ -0,0 +1,148 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * CPUFreq support for Armada 7K/8K
+
+7K ?
+
+> + *
+> + * Copyright (C) 2018 Marvell
+> + *
+> + * Omri Itach <omrii@marvell.com>
+> + * Gregory Clement <gregory.clement@bootlin.com>
+> + */
+> +
+> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+> +
+> +#include <linux/clk.h>
+> +#include <linux/cpu.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/slab.h>
+> +
+> +#define MIN_FREQ 100000000
+> +
+> +/*
+> + * Setup the opps list with the divider for the max frequency, that
+> + * will be filled at runtime, 0 meaning 100Mhz
+
+Add a full-stop at the end please.
+
+I am not sure why will you want to support 100 MHz as the CPUs may end
+up running on that a lot :)
+
+> + */
+> +static const int opps_div[] __initconst = {1, 2, 3, 0};
+> +
+> +struct opps_array {
+
+Maybe name this freq_table.
+
+> +	struct device *cpu_dev;
+> +	unsigned int freq[ARRAY_SIZE(opps_div)];
+> +};
+> +
+> +/* If the CPUs share the same clock, then they are in the same cluster */
+> +static void __init armada_8k_get_sharing_cpus(struct clk *cur_clk,
+> +				       struct cpumask *cpumask)
+
+Maybe align better to calm down checkpatch --strict :)
+
+> +{
+> +	int cpu;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		struct device *cpu_dev = get_cpu_device(cpu);
+> +		struct clk *clk = clk_get(cpu_dev, 0);
+
+Don't you need to do a corresponding clk_put() ?
+
+> +
+> +		if (IS_ERR(clk))
+> +			dev_warn(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
+
+Why continue after this point and check the next if ? Maybe write this
+as if/else.
+
+> +
+> +		if (clk_is_match(clk, cur_clk))
+> +			cpumask_set_cpu(cpu, cpumask);
+> +	}
+> +
+
+Remove blank line ?
+
+> +}
+> +
+> +static int __init armada_8k_cpufreq_init(void)
+> +{
+> +	struct opps_array *opps_arrays;
+> +	struct platform_device *pdev;
+> +	int ret, cpu, opps_index = 0;
+> +	unsigned int cur_frequency;
+> +	struct device_node *node;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clock");
+> +	if (!node || !of_device_is_available(node))
+> +		return -ENODEV;
+> +
+> +	opps_arrays = kcalloc(num_possible_cpus(), sizeof(*opps_arrays),
+> +			      GFP_KERNEL);
+> +	/*
+> +	 * For each CPU, this loop registers the operating points
+> +	 * supported (which are the nominal CPU frequency and full integer
+> +	 * divisions of it).
+> +	 */
+> +	for_each_possible_cpu(cpu) {
+> +		struct device *cpu_dev;
+> +		struct cpumask cpus;
+> +		unsigned int freq;
+> +		struct clk *clk;
+> +		int i;
+> +
+> +		cpu_dev = get_cpu_device(cpu);
+> +		if (!cpu_dev) {
+> +			dev_err(cpu_dev, "Cannot get CPU %d\n", cpu);
+> +			continue;
+> +		}
+> +
+> +		clk = clk_get(cpu_dev, 0);
+> +		if (IS_ERR(clk)) {
+> +			dev_err(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
+> +			ret = PTR_ERR(clk);
+> +			goto free_opp_array;
+
+What if this is the second iteration of this loop. Who will remove the
+OPPs added during earlier iteration ?
+
+> +		}
+> +
+> +		/* Get nominal (current) CPU frequency */
+> +		cur_frequency = clk_get_rate(clk);
+> +		if (!cur_frequency) {
+> +			dev_err(cpu_dev,
+> +				"Failed to get clock rate for CPU %d\n", cpu);
+> +			ret = -EINVAL;
+
+clk_put() ?
+
+> +			goto free_opp_array;
+> +		}
+> +
+> +		opps_arrays[opps_index].cpu_dev = cpu_dev;
+
+I will add a blank line here.
+
+> +		for (i = 0; i < ARRAY_SIZE(opps_div); i++) {
+> +			if (opps_div[i])
+> +				freq = cur_frequency / opps_div[i];
+> +			else
+> +				freq = MIN_FREQ;
+> +
+> +			ret = dev_pm_opp_add(cpu_dev, freq, 0);
+> +			if (ret)
+> +				goto remove_opp;
+> +
+> +			opps_arrays[opps_index].freq[i] = freq;
+> +		}
+> +
+> +		cpumask_clear(&cpus);
+> +		armada_8k_get_sharing_cpus(clk, &cpus);
+> +		dev_pm_opp_set_sharing_cpus(cpu_dev, &cpus);
+
+Don't you get any error or print messages like duplicate-OPPs ? Maybe
+they are dev_dbg() :(
+
+You have already done above for a group of CPUs and you shouldn't be
+adding the OPPs again for the same group for an iteration that belongs
+to the next CPU.
+
+So if you have CPU 0-3 sharing the clock line, then you will add 4
+OPPs in the first iteration and then try the same for 3 more times for
+the CPU 1,2,3. You should really avoid it.
+
+And generally the error handling should improve here.
+
+> +	}
+> +
+> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> +	ret = PTR_ERR_OR_ZERO(pdev);
+> +	if (ret)
+> +		goto remove_opp;
+> +	kfree(opps_arrays);
+> +	return 0;
+> +
+> +remove_opp:
+> +	for (; opps_index >= 0; opps_index--) {
+> +		int i = 0;
+> +
+> +		while (opps_arrays[opps_index].freq[i]) {
+> +			dev_pm_opp_remove(opps_arrays[opps_index].cpu_dev,
+> +					  opps_arrays[opps_index].freq[i]);
+> +			i++;
+> +		}
+> +	}
+> +free_opp_array:
+> +	kfree(opps_arrays);
+> +	return ret;
+> +}
+> +module_init(armada_8k_cpufreq_init);
+> +
+> +MODULE_AUTHOR("Gregory Clement <gregory.clement@bootlin.com>");
+> +MODULE_DESCRIPTION("Armada 8K cpufreq driver");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 2.19.0
+
+-- 
+viresh
