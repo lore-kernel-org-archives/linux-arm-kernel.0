@@ -1,45 +1,53 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Oct 2018 16:57:37 +0200
-Subject: [PATCH v9 03/11] PM / Domains: Document flags for genpd
-In-Reply-To: <20181004134839.GZ5662@atomide.com>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <20181003143824.13059-4-ulf.hansson@linaro.org>
- <20181004134839.GZ5662@atomide.com>
-Message-ID: <CAPDyKFr1H_ah3OYqghQgADs8fwNd+HpjWw9VfGR1T1-K5KbnhQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 4 Oct 2018 17:02:37 +0200
+Subject: [PATCH] arm64: dts: allwinner: a64: Re-add "syscon" compatible
+In-Reply-To: <22014c5e-fee0-d4c6-bc6c-cd30c8545292@arm.com>
+References: <20180917152857.162662-1-andre.przywara@arm.com>
+ <CAGb2v643=V_3DbLeEyXEavSQJsW2KdknpZZLfw4QwCjhfdmVsA@mail.gmail.com>
+ <20180921153522.0413c280@donnerap.Emea.Arm.com>
+ <20180921151625.wkaypyueyi2pguur@flea>
+ <20180924112230.73e3009b@donnerap.Emea.Arm.com>
+ <20180926095202.tdibor3x7fsn6afz@flea>
+ <22014c5e-fee0-d4c6-bc6c-cd30c8545292@arm.com>
+Message-ID: <20181004150237.hsvytl6iycow5xyo@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 October 2018 at 15:48, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Ulf Hansson <ulf.hansson@linaro.org> [181003 14:43]:
->> + * GENPD_FLAG_IRQ_SAFE:              This informs genpd that its backend callbacks,
->> + *                           ->power_on|off(), doesn't sleep. Hence, these
->> + *                           can be invoked from within atomic context, which
->> + *                           enables genpd to power on/off the PM domain,
->> + *                           even when pm_runtime_is_irq_safe() returns true,
->> + *                           for any of its attached devices. Note that, a
->> + *                           genpd having this flag set, requires its
->> + *                           masterdomains to also have it set.
->> + *
->
-> Let's try to avoid adding more irq_safe stuff because of having that
-> propagate to the masterdomains..
+On Mon, Oct 01, 2018 at 01:55:19AM +0100, Andr? Przywara wrote:
+> >> So I am sorry if those things frustrate you (which I can understand
+> >> very well), but I believe fixing the DT in a proper way is
+> >> much more user friendly in the long term (actually this issue was
+> >> brought forward by a user[1]).
+> > 
+> > Given the current state of the industry, I don't really see how the DT
+> > can allow you to do what you are trying to achieve.
+> 
+> I am not sure I do understand what you mean with "industry"? If you are
+> thinking about the SoC vendor or board vendors to push this endeavor and
+> create stable bindings and DTs from the beginning: I see that this won't
+> work with the prevalent attitude across many vendors today.
 
-I am not sure I get your point. This is just documenting existing
-functionality in genpd, there is nothing new here.
+This is what I meant.
 
->
-> I think you can just flag the power_on/off in genpd, then have cpu_pm
-> callbacks do it.
+> But in our case we (as the community) drive the DTs and the bindings
+> anyway, and we decided to mostly ignore Allwinner's DT effort - for good
+> reasons. So we can - given consensus on the goals and approach - make
+> this possible and don't need to rely on any company or "industry".
 
-Not really sure what you propose, but feel free to send a patch.
+Actually, I think this is part of the reason. We like our DT bindings
+so much that we are ready to spend monthes debating on it, while with
+ACPI (or the DT from the older days, from what I understood) you're
+stuck with whatever comes with the board. Whether one likes it or not
+doesn't matter. And then you can use whatever kernel with it.
 
-Do note, genpd has since the beginning of its time tried to cope with
-pm_runtime_irq_safe() devices. I admit it's quite complicated, however
-GENPD_FLAG_IRQ_SAFE greatly improved the support for such devices and
-their PM domains. Moreover, we need this functionality, in one way or
-the other, as long as there users of pm_runtime_irq_safe().
-
-Kind regards
-Uffe
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181004/80ce8460/attachment.sig>
