@@ -1,45 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Oct 2018 17:48:43 +0200
-Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19 take 2
-In-Reply-To: <f1847dd8-0cbc-3be6-303f-73e5dac5e5d1@nxp.com>
-References: <20181001225827.21946-1-leoyang.li@nxp.com>
- <f1847dd8-0cbc-3be6-303f-73e5dac5e5d1@nxp.com>
-Message-ID: <CAK8P3a3t1oKTxPU=7_S4K=_rA=YcOpBUTs9-aHDFAJAwHGyBpw@mail.gmail.com>
+Date: Thu, 4 Oct 2018 17:50:05 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC SoC Updates for v4.20
+In-Reply-To: <CAMuHMdXvU17JkfsZrZmci0nAhh0oJrXO3wYQ5nyox_aWUBdRzA@mail.gmail.com>
+References: <cover.1538127537.git.horms+renesas@verge.net.au>
+ <CAK8P3a0NreOTfL6L+w2WHnC5uf3jELf6ud_wdBZ7iAU3yuf4VA@mail.gmail.com>
+ <CAMuHMdWF2XwWbb0-f_RuSYnFfQzLKNW7Foq9XM7cha3QVU+kHg@mail.gmail.com>
+ <CAK8P3a22freS+j7hmB_bzFTq83eDrUidrV=mmaRYfYAV7gbwAQ@mail.gmail.com>
+ <CAMuHMdWQ0aiLCra-DQrSQ+UB977PCZ7yNa9U_tT7Da7VuAyVXw@mail.gmail.com>
+ <CAMuHMdXvU17JkfsZrZmci0nAhh0oJrXO3wYQ5nyox_aWUBdRzA@mail.gmail.com>
+Message-ID: <CAK8P3a3rE_n8dHUkpx96E8J0so80hc1E273RVeYZ6adkzFSMRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 11:39 AM Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
+On Thu, Oct 4, 2018 at 5:39 PM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Tue, Oct 2, 2018 at 2:31 PM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > On Tue, Oct 2, 2018 at 2:18 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Tue, Oct 2, 2018 at 10:31 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > > > On Fri, Sep 28, 2018 at 10:10 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > > > On Fri, Sep 28, 2018 at 12:21 PM Simon Horman
+> > > > > <horms+renesas@verge.net.au> wrote:
+> > > > > > * Add support for RZ/G2E (r8a774c0) and RZ/G2M (r8a774a1) SoCs
+> > > > > > * Enable Compare Match Timer (CMT) and Timer Unit (TMU)
+> > > > > >   for Renesas SoCs
+> > > > > > * Remove no longer needed ARCH_SHMOBILE Kconfig symbol
+> > > > >
+> > > > > The ARCH_SHMOBILE removal and cleanup is fine, but I wonder about
+> > > > > the newly added symbols for specific SoCs. I see you already have a
+> > > > > couple of those, but the other manufacturers don't.
+> > > > >
+> > > > > I think what happened here is that I tried to reject those additions
+> > > > > normally, but I never noticed yours. From what I see in drivers,
+> > > > > you have additional symbols depending on these in clk, pinctrl,
+> > > > > drivers/soc, and the dtb files, so at the very least we can't
+> > > > > just drop the config options, but I'd still like to see this work
+> > > > > more like other platforms.
+> > > >
+> > > > The main motivation for SoC-specific controls is to avoid including pinctrl
+> > > > and (to a lesser extent) clock tables for unused SoCs.  Each pinctrl driver
+> > > > consumes a few tens of KiB, each clock driver a few KiB.
+> > > > If we remove the SoC-specific ARCH_* controls, the user has to configure
+> > > > both pinctrl and clock driver selections, thus trading one user-visible
+> > > > symbol for two new user-visible symbols (except for RZ/A and RZ/N,
+> > > > where the pinctrl symbols are already visible, to allow reducing kernel
+> > > > size).
+> > > > Perhaps that is acceptable?
+> > >
+> > > It's definitely fine with me. I understand that this is less user friendly,
 >
-> > ----------------------------------------------------------------
-> > NXP/FSL SoC driver fixes for v4.19 round 2
-> >
-> > - Fix crash of qman_portal by deferring its probe if qman is not probed
-> >
-> > ----------------------------------------------------------------
-> > Laurentiu Tudor (2):
-> >        soc: fsl: qbman: add APIs to retrieve the probing status
-> >        soc: fsl: qman_portals: defer probe after qman's probe
+> Upon closer look, the SoC-specific controls are also used to control compilation
+> of the SYSC (power domain) tables,  each consuming a few 100 bytes.
+> So either they become user-visible, too, or always compiled in (depending
+> on SoC family?).
 >
-> There's a similar fix for bman portals [1]. I was under the impression
-> that you plan to pick that up too.
+> > > but it does address my concern about consistency between the platforms.
 >
-> [1] "soc/fsl/bman_portals: defer probe after bman's probe", found here:
-> https://lore.kernel.org/patchwork/patch/992009/
+> I've just noticed Tegra also has SoC-specific controls, but they're located
+> in drivers/soc/tegra/Kconfig, not the main arch/arm64/Kconfig.platforms.
+> Do you consider that a viable alternative?
 
-I've pulled the first two into the fixes branch for now, but it does sound
-like we need the third patch as well.
+Yes, I think that would be ok as well.
 
-The new interface seems a bit odd, since it does not pass
-an instance pointer at all, but instead relies on the idea that
-there is only one qman/bman instance in the system. While this
-may be true in all cases, generally our driver interfaces should
-be based around device objects instead of making assumptions
-like this. I assume that is part of what led to the bug in the first
-place.
-
-Of course that is nothing that can be changed easily, and the
-bug needs to be fixed, so I have pulled the fixes for 4.19, but
-it would be good to see if the interfaces could be restructured
-to behave more like other subsystems in the future.
-
-     Arnd
+      Arnd
