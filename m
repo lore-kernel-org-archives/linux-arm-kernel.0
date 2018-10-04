@@ -1,54 +1,37 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu,  4 Oct 2018 13:43:19 -0700
-Subject: [PATCH i2c-next v6 2/5] i2c: Add support reading of 'timeout-ms' and
- '#retries' properties
+Date: Thu,  4 Oct 2018 13:43:20 -0700
+Subject: [PATCH i2c-next v6 3/5] dt-bindings: i2c: aspeed: Add 'timeout-ms'
+ property as an optional property
 In-Reply-To: <20181004204322.20665-1-jae.hyun.yoo@linux.intel.com>
 References: <20181004204322.20665-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20181004204322.20665-3-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20181004204322.20665-4-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for 'timeout-ms' and '#retries' properties
-to set 'timeout' and 'retries' values in 'struct i2c_adapter' in
-case an adapter node has the properties. Still the values can be
-set by I2C_TIMEOUT and I2C_RETRIES ioctls on cdev at runtime too.
-
-These properties may not be supported by all drivers. However, if
-a driver wants to support one of them, it should adapt the
-bindings in the dt-bindings document.
+This commit adds 'timeout-ms' property as an optional property
+which can be used for setting the bus timeout value of an adapter.
+With this patch, the bus timeout value can be set through this
+property at the probing time of this module. Still the bus timeout
+value can be set by an I2C_TIMEOUT ioctl on cdev at runtime too.
 
 Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 ---
- drivers/i2c/i2c-core-base.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/i2c/i2c-aspeed.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-index 9ee9a15e7134..433867e9af2f 100644
---- a/drivers/i2c/i2c-core-base.c
-+++ b/drivers/i2c/i2c-core-base.c
-@@ -1214,6 +1214,7 @@ EXPORT_SYMBOL_GPL(i2c_handle_smbus_host_notify);
- static int i2c_register_adapter(struct i2c_adapter *adap)
- {
- 	int res = -EINVAL;
-+	u32 timeout_ms = 0;
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
+index 8fbd8633a387..af9be200383c 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
+@@ -17,6 +17,9 @@ Optional Properties:
+ 		  specified
+ - multi-master	: states that there is another master active on this bus.
  
- 	/* Can't register until after driver model init */
- 	if (WARN_ON(!is_registered)) {
-@@ -1239,8 +1240,13 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
- 	INIT_LIST_HEAD(&adap->userspace_clients);
- 
- 	/* Set default timeout to 1 second if not already set */
--	if (adap->timeout == 0)
--		adap->timeout = HZ;
-+	if (adap->timeout == 0) {
-+		device_property_read_u32(&adap->dev, "timeout-ms", &timeout_ms);
-+		adap->timeout = timeout_ms ? msecs_to_jiffies(timeout_ms) : HZ;
-+	}
++- timeout-ms	: bus timeout in milliseconds defaults to 1 second when not
++		  specified.
 +
-+	/* Set retries value if it has the property setting */
-+	device_property_read_u32(&adap->dev, "#retries", &adap->retries);
+ Example:
  
- 	/* register soft irqs for Host Notify */
- 	res = i2c_setup_host_notify_irq_domain(adap);
+ i2c {
 -- 
 2.19.0
