@@ -1,44 +1,82 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Thu, 4 Oct 2018 19:13:06 +0000
-Subject: How is the Linux kernel API dma_alloc_coherent() typically
- implemented for the ARM Architecture?
-In-Reply-To: <41f7c1e1-066a-b984-53cd-17b5c25420d4@arm.com>
-References: <BYAPR12MB2791F73EC1033F998FF533BAC8E90@BYAPR12MB2791.namprd12.prod.outlook.com>
- <866a698a-aa61-6c48-0258-f2dd97973e87@arm.com>
- <20181003180843.GY30658@n2100.armlinux.org.uk>,
- <41f7c1e1-066a-b984-53cd-17b5c25420d4@arm.com>
-Message-ID: <BYAPR12MB2791AB6C94175B4693EBBA4CC8EA0@BYAPR12MB2791.namprd12.prod.outlook.com>
+From: oskari@lemmela.net (Oskari Lemmela)
+Date: Thu,  4 Oct 2018 22:34:09 +0300
+Subject: [PATCH 3/4] arm64: allwinner: a64: add battery and AC power supply
+ support
+In-Reply-To: <20181004193410.7265-1-oskari@lemmela.net>
+References: <20181004193410.7265-1-oskari@lemmela.net>
+Message-ID: <20181004193410.7265-4-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-| From: Robin Murphy <robin.murphy@arm.com>
-| Sent: Thursday, October 4, 2018 4:05 AM
-|
-| On 03/10/18 19:08, Russell King - ARM Linux wrote:
-| >
-| > That's one of the reasons
-| > for having the DMA API - to provide a consistent cross-platform
-| > cross-architecture way to deal with the DMA coherency issues.
-|
-| Fully agreed that driver authors shouldn't care about this and can trust the
-| kernel to provide the best thing it can, but Casey's initial question
-| implied that a bit more architectural background might be useful (especially
-| now given the response).
+Add AXP803 DT nodes for AC and battery power supplies.
+Enable AC and battery power supplies for sopine-baseboard.
 
-Yes, I'm basically trying to advise a Hardware Team on what work they need
-to do in order to successfully integrate a 4-Core ARM Complex into an
-existing SoC.
+Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+---
+ arch/arm64/boot/dts/allwinner/axp803.dtsi     | 31 +++++++++++++++++++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  8 +++++
+ 2 files changed, 39 insertions(+)
 
-Their initial plan was to make this completely I/O Coherent which would have
-causes _*ALL*_ I/O to flow through a bandwidth limited Coherency Switch.
-But that's definitely not necessary (or desirable because of the bandwidth
-issue) for the actual Data being transferred.
-
-But the TX/RX Rings on the other hand ... that could be an issue.  As noted,
-these are mapped with the Linux dma_alloc_coherent() API and I was trying to
-understand what mapping this actually ended up with on various ARM platform
-implementations.  It ~looked like~ this resulted in an UNCACHED Mapping, but
-I couldn't tell for sure.  The levels of API Abstraction made it very
-difficult to see what's happening.
-
-Casey
+diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+index e5eae8bafc42..d23e5d1e9310 100644
+--- a/arch/arm64/boot/dts/allwinner/axp803.dtsi
++++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+@@ -49,6 +49,37 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
+ 
++	axp_adc: adc {
++		compatible = "x-powers,axp803-adc";
++		#io-channel-cells = <1>;
++	};
++
++	axp_gpio: gpio {
++		compatible = "x-powers,axp803-gpio";
++		gpio-controller;
++		#gpio-cells = <2>;
++
++		gpio0_ldo: gpio0-ldo {
++			pins = "GPIO0";
++			function = "ldo";
++		};
++
++		gpio1_ldo: gpio1-ldo {
++			pins = "GPIO1";
++			function = "ldo";
++		};
++	};
++
++	ac_power_supply: ac-power-supply {
++		compatible = "x-powers,axp803-ac-power-supply";
++		status = "disabled";
++	};
++
++	battery_power_supply: battery-power-supply {
++		compatible = "x-powers,axp803-battery-power-supply";
++		status = "disabled";
++	};
++
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <3000>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+index c21f2331add6..335cf2263d19 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+@@ -69,6 +69,14 @@
+ 	};
+ };
+ 
++&ac_power_supply {
++	status = "okay";
++};
++
++&battery_power_supply {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+-- 
+2.17.1
