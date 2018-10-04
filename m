@@ -1,56 +1,96 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 4 Oct 2018 11:32:41 +0200
-Subject: [PATCH v9 00/11] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM) (a subset)
-In-Reply-To: <10136406.EY9A7BdqYq@aspire.rjw.lan>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <CAJZ5v0h7jvoa4oUeM4FgFizF_jbAonoAgP3m417n_TGqfqNsqg@mail.gmail.com>
- <CAPDyKFq0GLs2AMA+6b-Khf+4kGxzVCTvtehp-YmwV2h=_SP4=g@mail.gmail.com>
- <10136406.EY9A7BdqYq@aspire.rjw.lan>
-Message-ID: <CAJZ5v0iv9OYoaLYHsmdp2xbDuENPgue_mBgFujdmesnBOegRKQ@mail.gmail.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Thu, 4 Oct 2018 09:27:07 +0000
+Subject: [PATCH 4/4] arm64: dts: lx2160a: update fspi node
+In-Reply-To: <20181004112608.3ae23d99@bbrezillon>
+References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1538642920-3843-5-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20181004111822.48ab1f5c@bbrezillon>
+ <VI1PR04MB1038ECE25B571117405A617799EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181004112608.3ae23d99@bbrezillon>
+Message-ID: <VI1PR04MB1038A3CE7098227B6912C6F699EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 11:04 AM Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->
-> On Thursday, October 4, 2018 10:58:53 AM CEST Ulf Hansson wrote:
-> > On 4 October 2018 at 10:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > > On Wed, Oct 3, 2018 at 4:39 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > >>
-> > >> I have digested the review comments so far, including a recent offlist chat
-> > >> with with Lorenzo Pieralisi around the debatable PSCI changes. More or less I
-> > >> have a plan for how to move forward.
-> > >>
-> > >> However, to avoid re-posting non-changed patches over and over again, I decided
-> > >> to withhold the more debatable part from this v9, hence this is not the complete
-> > >> series to make things play. In v9, I have just included the trivial changes,
-> > >> which are either already acked/reviewed or hopefully can be rather soon/easily.
-> > >>
-> > >> My hope is to get this queued for v4.20, to move things forward. I know it's
-> > >> late, but there are more or less nothing new here since v8.
-> > >
-> > > I have no problems with the first three patches in this series, so I
-> > > can apply them right away.  Do you want me to do that?
-> >
-> > Yes, please.
-> >
-> > >
-> > > As for the rest, the cpuidle driver patch looks OK to me, but the
-> > > PSCI-related ones need ACKs.
-> >
-> > For some yes, but I think you can go ahead with a few more.
-> >
-> > Patch 4, 5 is already acked/reviewed.
-> >
-> > Patch 6 should be fine (if you are okay with it else wait for an ack
-> > from Daniel)
->
-> OK, thanks.
->
-> Do the 4-6 depend on the 1-3?
 
-I don't see any dependency there, so I'll queue up the 1-3 in
-pm-domains and the 4-6 in pm-cpuidle.
 
-Thanks,
-Rafael
+> -----Original Message-----
+> From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> Sent: Thursday, October 4, 2018 2:56 PM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com; vigneshr at ti.com;
+> linux-spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
+> mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
+> kernel at lists.infradead.org; computersforpeace at gmail.com;
+> frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH 4/4] arm64: dts: lx2160a: update fspi node
+> 
+> On Thu, 4 Oct 2018 09:24:57 +0000
+> Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> 
+> > Hi Boris,
+> >
+> > > -----Original Message-----
+> > > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> > > Sent: Thursday, October 4, 2018 2:48 PM
+> > > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> > > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com;
+> > > vigneshr at ti.com; linux-spi at vger.kernel.org;
+> > > devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
+> > > shawnguo at kernel.org; linux-arm- kernel at lists.infradead.org;
+> > > computersforpeace at gmail.com; frieder.schrempf at exceet.de;
+> > > linux-kernel at vger.kernel.org
+> > > Subject: Re: [PATCH 4/4] arm64: dts: lx2160a: update fspi node
+> > >
+> > > On Thu,  4 Oct 2018 14:18:40 +0530
+> > > Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> > >
+> > > > Flash mt35xu512aba connected to FlexSPI controller supports
+> > > > 1-1-8 protocol.
+> > > > Added flag spi-rx-bus-width and spi-tx-bus-width with values as
+> > > > 8 and 1 respectively for both flashes connected at CS0 and CS1.
+> > > >
+> > > > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> > > > ---
+> > > >  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 4 ++++
+> > > >  1 file changed, 4 insertions(+)
+> > > >
+> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > > > b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > > > index 901ca346..817175a 100644
+> > > > --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > > > @@ -42,6 +42,8 @@
+> > > >  		m25p,fast-read;
+> > > >  		spi-max-frequency = <20000000>;
+> > > >  		reg = <0>;
+> > > > +		spi-rx-bus-width = <8>;
+> > > > +		spi-tx-bus-width = <1>;
+> > >
+> > > Why 1? The flash is already flagged with SPI_NOR_OCTAL_READ, which
+> > > means only the read path will use 1-1-8 mode, so you can safely set
+> > > spi-tx-bus-width
+> 
+> I meant 'set spi-tx-bus-width to 8' here
+
+Yes.
+
+> 
+> > > here and let the framework choose the appropriate mode based on the
+> > > flash capabilities.
+> >
+> > Ok.
+> >
+> > >
+> > > >  	};
+> > > >
+> > > >  	mt35xu512aba1: flash at 1 {
+> > > > @@ -51,6 +53,8 @@
+> > > >  		m25p,fast-read;
+> > > >  		spi-max-frequency = <20000000>;
+> > > >  		reg = <1>;
+> > > > +		spi-rx-bus-width = <8>;
+> > > > +		spi-tx-bus-width = <1>;
+> > > >  	};
+> > > >  };
+> > > >
+> >
