@@ -1,32 +1,34 @@
-From: colin.king@canonical.com (Colin King)
-Date: Thu,  4 Oct 2018 15:20:27 +0100
-Subject: [PATCH] media: exynos4-is: make const array config_ids static
-Message-ID: <20181004142027.21009-1-colin.king@canonical.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Thu, 4 Oct 2018 09:20:53 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.20, part 3
+In-Reply-To: <CAK8P3a2BjnCZQiR8qRE--=RHTaFw2kB-Jz=g0A0KvGpaaWY3DA@mail.gmail.com>
+References: <1538490605-26653-1-git-send-email-dinguyen@kernel.org>
+ <CAK8P3a2BjnCZQiR8qRE--=RHTaFw2kB-Jz=g0A0KvGpaaWY3DA@mail.gmail.com>
+Message-ID: <2db3b052-eb2f-1411-f2d3-602a1327174a@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hi Arnd,
 
-The const array config_ids can be made static, saves populating it on
-the stack and will make it read-only.
+On 10/04/2018 09:12 AM, Arnd Bergmann wrote:
+> On Tue, Oct 2, 2018 at 4:30 PM Dinh Nguyen <dinguyen@kernel.org> wrote:
+> 
+>> Dinh Nguyen (1):
+>>       arm64: dts: stratix10: add ethernet aliases
+> 
+> This one doesn't look quite right: you are adding the aliases in the .dtsi
+> files, which might be shared by multiple .dts files. There is no guarantee
+> that each board uses all three ethernet ports in the chip, even when all
+> boards we support in the kernel do.
+> 
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/media/platform/exynos4-is/fimc-is.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I kinda thought it would make sense to have all the ethernet aliases in
+the dtsi file because even if different boards do not use all the
+ethernets ports, the unused ethernet ports would be left disabled from
+the dtsi file.
 
-diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
-index 5ddb2321e9e4..f5fc54de19da 100644
---- a/drivers/media/platform/exynos4-is/fimc-is.c
-+++ b/drivers/media/platform/exynos4-is/fimc-is.c
-@@ -656,7 +656,7 @@ static int fimc_is_hw_open_sensor(struct fimc_is *is,
- 
- int fimc_is_hw_initialize(struct fimc_is *is)
- {
--	const int config_ids[] = {
-+	static const int config_ids[] = {
- 		IS_SC_PREVIEW_STILL, IS_SC_PREVIEW_VIDEO,
- 		IS_SC_CAPTURE_STILL, IS_SC_CAPTURE_VIDEO
- 	};
--- 
-2.17.1
+But then some boards may just use gmac1 or gmac2 instead of gmac0. So
+yes, I'll move the aliases to the specific board file.
+
+Thanks,
+Dinh
