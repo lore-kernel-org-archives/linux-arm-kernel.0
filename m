@@ -1,58 +1,45 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 5 Oct 2018 01:09:33 +0530
-Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
- armv8_pmuv3 events.
-In-Reply-To: <20181004122207.GE4065@arm.com>
-References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
- <20181001142914.GD9716@arm.com>
- <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
- <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
- <20181004122207.GE4065@arm.com>
-Message-ID: <CAKTKpr4a12FHkMtFNueWqQbAhT4TLw_4DLDrOD6Tjsbno28U3A@mail.gmail.com>
+From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
+Date: Thu, 4 Oct 2018 21:46:34 +0200
+Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
+In-Reply-To: <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
+References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
+ <20181003200003.GA9965@bombadil.infradead.org>
+ <20181003221444.GZ30658@n2100.armlinux.org.uk>
+ <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
+ <20181004123400.GC30658@n2100.armlinux.org.uk>
+ <CAFqt6zZPOM17QwmcWKF3F1gqkJm=2PxvuJ3naWuRXZGHc2HrEQ@mail.gmail.com>
+ <20181004181736.GB20842@bombadil.infradead.org>
+ <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
+Message-ID: <CANiq72mkTP_m20vqei-cpN+ypQ_gU472qn5m68vb_4Nqj5afMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Souptick,
 
-On Thu, Oct 4, 2018 at 5:51 PM Will Deacon <will.deacon@arm.com> wrote:
+On Thu, Oct 4, 2018 at 8:49 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
 >
-> Hi Ganapat,
+> On Thu, Oct 4, 2018 at 11:47 PM Matthew Wilcox <willy@infradead.org> wrote:
+> >
+> > I think this is a bad plan.  What we should rather do is examine the current
+> > users of vm_insert_page() and ask "What interface would better replace
+> > vm_insert_page()?"
+> >
+> > As I've said to you before, I believe the right answer is to have a
+> > vm_insert_range() which takes an array of struct page pointers.  That
+> > fits the majority of remaining users.
 >
-> On Thu, Oct 04, 2018 at 11:12:09AM +0530, Ganapatrao Kulkarni wrote:
-> > can you please pull this patch?
+> Ok, but it will take some time.
+> Is it a good idea to introduce the final vm_fault_t patch and then
+> start working on vm_insert_range as it will be bit time consuming ?
 >
-> I still don't like the idea of just removing events like this, especially
-> when other architectures (including some x86 and Power CPUs afaict) playa
-> similar games for generic events, and these events do actually appear in
-> user code.
->
-> I also don't understand why you remove the TLB events. I think that logic
-> would imply we should remove all of the events, because we can't distinguish
-> prefetches from reads either. If we want to be consistent, then I think
-> we should just remove the OP_WRITE events for L1D and BPU -- would you be
-> ok with that instead?
 
-IIUC, dTLB-load-misses is mapped to
-ARMV8_PMUV3_PERFCTR_L1D_TLB_REFILL(event 0x05) and dTLB-loads is
-mapped to ARMV8_PMUV3_PERFCTR_L1D_TLB(0x25). Which are as per spec,
-counts TLB access/misses for both memory-read operation and
-memory-write operation.
+Well, why is there a rush? Development should be done in a patch
+series or a tree, and submitted as a whole, instead of sending partial
+patches.
 
-IMO, It won't help in keeping these events, knowingly that their
-mapping is not accurate, only thing i can say to users is , dont use
-events that are marked as "Hardware cache event"
+Also, not sure if you saw my comments/review: if the interface is not
+going to change, why the name change? Why can't we simply keep using
+vm_insert_page?
 
->
-> Also, looking at the code, I think our PMCEID parsing is broken for 8.1
-> parts, where the upper 32 bits of the register are offset by 0x4000 in the
-> event numbering space.
-
-yes, i did not find any mapping in PMCEIDx registers for
-implementation defined events, otherwise we would have remapped at
-runtime.
-
->
-> Will
-
-thanks
-Ganapat
+Cheers,
+Miguel
