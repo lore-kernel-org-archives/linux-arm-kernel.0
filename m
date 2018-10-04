@@ -1,100 +1,74 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 4 Oct 2018 14:12:04 +0200
-Subject: [PATCH 1/4] spi: add support for octal I/O data transfer
-In-Reply-To: <VI1PR04MB10384B74E6E27435313CC73099EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <1538642920-3843-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1538642920-3843-2-git-send-email-yogeshnarayan.gaur@nxp.com>
- <20181004110446.5e1bb255@bbrezillon>
- <VI1PR04MB10380FD9CE99E34BA27E55B699EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181004111941.0da33ec0@bbrezillon>
- <VI1PR04MB1038E23CBFE9CFD5C2ECCD3299EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <VI1PR04MB10384B74E6E27435313CC73099EA0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <20181004141204.04168a22@bbrezillon>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Thu, 4 Oct 2018 17:45:13 +0530
+Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
+In-Reply-To: <20181003221444.GZ30658@n2100.armlinux.org.uk>
+References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
+ <20181003200003.GA9965@bombadil.infradead.org>
+ <20181003221444.GZ30658@n2100.armlinux.org.uk>
+Message-ID: <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Oct 2018 12:07:17 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-
-> Hi Boris,
-> 
-> > -----Original Message-----
-> > From: Yogesh Narayan Gaur
-> > Sent: Thursday, October 4, 2018 2:56 PM
-> > To: 'Boris Brezillon' <boris.brezillon@bootlin.com>
-> > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com; vigneshr at ti.com;
-> > linux-spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
-> > mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
-> > kernel at lists.infradead.org; computersforpeace at gmail.com;
-> > frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org
-> > Subject: RE: [PATCH 1/4] spi: add support for octal I/O data transfer
-> > 
-> > Hi Boris,
-> >   
-> > > -----Original Message-----
-> > > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > > Sent: Thursday, October 4, 2018 2:50 PM
-> > > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com;
-> > > vigneshr at ti.com; linux-spi at vger.kernel.org;
-> > > devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
-> > > shawnguo at kernel.org; linux-arm- kernel at lists.infradead.org;
-> > > computersforpeace at gmail.com; frieder.schrempf at exceet.de;
-> > > linux-kernel at vger.kernel.org
-> > > Subject: Re: [PATCH 1/4] spi: add support for octal I/O data transfer
+On Thu, Oct 4, 2018 at 3:45 AM Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+>
+> On Wed, Oct 03, 2018 at 01:00:03PM -0700, Matthew Wilcox wrote:
+> > On Thu, Oct 04, 2018 at 12:28:54AM +0530, Souptick Joarder wrote:
+> > > These are the approaches which could have been taken to handle
+> > > this scenario -
 > > >
-> > > On Thu, 4 Oct 2018 09:14:36 +0000
-> > > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> > >  
-> > > > Hi Boris,
-> > > >  
-> > > > > -----Original Message-----
-> > > > > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > > > > Sent: Thursday, October 4, 2018 2:35 PM
-> > > > > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > > > > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com;
-> > > > > vigneshr at ti.com; linux-spi at vger.kernel.org;
-> > > > > devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
-> > > > > shawnguo at kernel.org; linux-arm- kernel at lists.infradead.org;
-> > > > > computersforpeace at gmail.com; frieder.schrempf at exceet.de;
-> > > > > linux-kernel at vger.kernel.org Subject: Re: [PATCH 1/4] spi: add
-> > > > > support for octal I/O data transfer
-> > > > >
-> > > > > Hi Yogesh,
-> > > > >  
-> [...]
-> > > > > > +#define	SPI_RX_OCTAL
-> > > > > > 0x2000			/* receive with 8 wires  
-> > > > > */  
-> > > > > >  	int			irq;
-> > > > > >  	void			*controller_state;
-> > > > > >  	void			*controller_data;  
-> > > > >
-> > > > > You're still not updating spi-mem.c to check those flags and
-> > > > > SPI_MEM_MAX_BUSWIDTH is not updated to match the new limit (8
-> > > > > instead of 4).
-> > > > >  
-> > > > Yes and its strange that my octal mode communication is working fine
-> > > > without adding support in spi-mem.c and that's why this has been
-> > > > missed from me.  
+> > > *  Replace vm_insert_page with vmf_insert_page and then write few
+> > >    extra lines of code to convert VM_FAULT_CODE to errno which
+> > >    makes driver users more complex ( also the reverse mapping errno to
+> > >    VM_FAULT_CODE have been cleaned up as part of vm_fault_t migration ,
+> > >    not preferred to introduce anything similar again)
 > > >
-> > > Are you based on top of spi-next?  
-> > 
-> > Ok, that might be the reason. I have rebased few days back.
-> > Would rebase with current tip and add support in spi-mem interface too.  
-> 
-> I have rebased spi-next and currently on top but still my octal command support is working fine without any issue with current shared patch series, performed data sanity.
-> 
-> =>  git log  --pretty=oneline -3  
-> 	496c415717b8bb7d37181127fcfad0ba450eb10d mtd: spi-nor: fsl-quadspi: Don't let -EINVAL on the bus
-> 	2336d3a7b125683c9e8b25d6efa6064310d19dbe mtd: devices: m25p80: Make sure WRITE_EN is issued before each write
-> 	e55841874471282d32eec595997afce43a5f55c0 mtd: spi-nor: Support controllers with limited TX FIFO size
-> 
-> GIT Repo - 	git://git.infradead.org/linux-mtd.git
-> Branch -	remotes/origin/spi-nor/next
-> 
-> Also, I am not able to find string SPI_MEM_MAX_BUSWIDTH in current source code, can you share the GIT details where these changes are pushed.
+> > > *  Maintain both vm_insert_page and vmf_insert_page and use it in
+> > >    respective places. But it won't gurantee that vm_insert_page will
+> > >    never be used in #PF context.
+> > >
+> > > *  Introduce a similar API like vm_insert_page, convert all non #PF
+> > >    consumer to use it and finally remove vm_insert_page by converting
+> > >    it to vmf_insert_page.
+> > >
+> > > And the 3rd approach was taken by introducing vm_insert_kmem_page().
+> > >
+> > > In short, vmf_insert_page will be used in page fault handlers
+> > > context and vm_insert_kmem_page will be used to map kernel
+> > > memory to user vma outside page fault handlers context.
+> >
+> > As far as I can tell, vm_insert_kmem_page() is line-for-line identical
+> > with vm_insert_page().  Seriously, here's a diff I just did:
+> >
+> > -static int insert_page(struct vm_area_struct *vma, unsigned long addr,
+> > -                       struct page *page, pgprot_t prot)
+> > +static int insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
+> > +               struct page *page, pgprot_t prot)
+> > -       /* Ok, finally just insert the thing.. */
+> > -int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+> > +int vm_insert_kmem_page(struct vm_area_struct *vma, unsigned long addr,
+> > -       return insert_page(vma, addr, page, vma->vm_page_prot);
+> > +       return insert_kmem_page(vma, addr, page, vma->vm_page_prot);
+> > -EXPORT_SYMBOL(vm_insert_page);
+> > +EXPORT_SYMBOL(vm_insert_kmem_page);
+> >
+> > What on earth are you trying to do?
 
-It's in Mark's tree [1] (spi-next != spi-nor/next).
+>
+> Reading the commit log, it seems that the intention is to split out
+> vm_insert_page() used outside of page-fault handling with the use
+> within page-fault handling, so that different return codes can be
+> used.
+>
+> I don't see that justifies the code duplication - can't
+> vm_insert_page() and vm_insert_kmem_page() use the same mechanics
+> to do their job, and just translate the error code from the most-
+> specific to the least-specific error code?  Do we really need two
+> copies of the same code just to return different error codes.
 
-[1]https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git/log/?h=for-next
+Sorry about it.
+can I take below approach in a patch series ->
+
+create a wrapper function vm_insert_kmem_page using vm_insert_page.
+Convert all the non #PF users to use it.
+Then make vm_insert_page static and convert inline vmf_insert_page to caller.
