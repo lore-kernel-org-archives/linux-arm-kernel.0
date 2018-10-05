@@ -1,251 +1,78 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:12 -0500
-Subject: [PATCH 00/36] Devicetree schema
-Message-ID: <20181005165848.3474-1-robh@kernel.org>
+Date: Fri,  5 Oct 2018 11:58:22 -0500
+Subject: [PATCH 10/36] dt-bindings: altera: Convert clkmgr binding to
+ json-schema
+In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
+References: <20181005165848.3474-1-robh@kernel.org>
+Message-ID: <20181005165848.3474-11-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current DT binding documentation is not ideal as it is just free form
-text with at most only a loose structure. This makes reviewing bindings a
-manual process. The bindings are often duplicating information that's
-already defined elsewhere and missing information one would need to
-validate a DTS file. The examples in binding documents are not built and
-a source of lots of typos sometimes found in review and sometimes not.
-Secondly, there's no verification that DTS files match what the
-documentation says. While dtc does do some checking (and has gained more
-recently), it can't do per binding checks as it would have to understand
-thousands of compatible strings to match on.
+Convert Altera clkmgr to DT schema format using json-schema.
 
-There's been a number of proposals over the years to address validation.
-They've all suffered from inventing their own validation language and the
-effort it would take to fully define and flush out a validation language.
-Enter json-schema. The language has a defined specification, maps well to
-DT data, and there are numerous existing tools which can be leveraged.
-The actual DT schema doc files are stored as YAML using only a JSON
-compatible subset. YAML is considered more human readable allowing
-comments for example.
-
-This series adds the build support, some documentation, and converts
-some bindings (mostly ARM board/soc bindings). The tools, core schema,
-and meta-schema are in a separate repository[1]. This might eventually
-be integrated with dtc or added to the kernel, but for now I plan to
-keep it separate.
-
-Future plans/ideas:
-- Validate examples against the schema. Currently, they are just built
-  with dtc.
-- Support single targets in addition to validating all enabled dtb
-  targets.
-- Better control of which schemas to use for validation such as core
-  only or specific lists of schemas. This will make for more easily
-  testing new schema and filtering warnings.
-- Printing out nodes without any specific schema (i.e. missing schema).
-
-This series is dependent on the dt/next branch and is available here[2].
-The branch also has a doc2yaml script which can help convert binding
-files. It's not perfect, but works pretty well considering the input is
-free form text.
-
-Rob
-
-
-[1] https://github.com/robherring/yaml-bindings
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git yaml-bindings
-
-Rob Herring (36):
-  dt-bindings: arm: alpine: Move CPU control related binding to
-    cpu-enable-method/al,alpine-smp
-  dt-bindings: arm: amlogic: Move 'amlogic,meson-gx-ao-secure' binding
-    to its own file
-  dt-bindings: arm: atmel: Move various sys registers out of SoC binding
-    doc
-  dt-bindings: arm: fsl: Move DCFG and SCFG bindings to their own docs
-  dt-bindings: arm: renesas: Move 'renesas,prr' binding to its own doc
-  dt-bindings: arm: zte: Move sysctrl bindings to their own doc
-  kbuild: Add support for DT binding schema checks
-  dt-bindings: Add a writing DT schemas how-to and annotated example
-  dt-bindings: Convert trivial-devices.txt to json-schema
-  dt-bindings: altera: Convert clkmgr binding to json-schema
-  dt-bindings: timer: Convert ARM timer bindings to json-schema
-  dt-bindings: arm: Convert cpu binding to json-schema
-  dt-bindings: arm: Convert PMU binding to json-schema
-  dt-bindings: arm: Convert primecell binding to json-schema
-  dt-bindings: arm: Convert Actions Semi bindings to jsonschema
-  dt-bindings: arm: Convert Alpine board/soc bindings to json-schema
-  dt-bindings: arm: Convert Altera board/soc bindings to json-schema
-  dt-bindings: arm: Convert Amlogic board/soc bindings to json-schema
-  dt-bindings: arm: Convert Atmel board/soc bindings to json-schema
-  dt-bindings: arm: Convert Calxeda board/soc bindings to json-schema
-  dt-bindings: arm: Convert TI davinci board/soc bindings to json-schema
-  dt-bindings: arm: Convert FSL board/soc bindings to json-schema
-  dt-bindings: arm: Convert MediaTek board/soc bindings to json-schema
-  dt-bindings: arm: Convert TI nspire board/soc bindings to json-schema
-  dt-bindings: arm: Convert Oxford Semi board/soc bindings to
-    json-schema
-  dt-bindings: arm: Convert QCom board/soc bindings to json-schema
-  dt-bindings: arm: Convert Realtek board/soc bindings to json-schema
-  dt-bindings: arm: Convert Rockchip board/soc bindings to json-schema
-  dt-bindings: arm: Convert Renesas board/soc bindings to json-schema
-  dt-bindings: arm: Convert CSR SiRF board/soc bindings to json-schema
-  dt-bindings: arm: Convert SPEAr board/soc bindings to json-schema
-  dt-bindings: arm: Convert ST STi board/soc bindings to json-schema
-  dt-bindings: arm: Convert Tegra board/soc bindings to json-schema
-  dt-bindings: arm: Convert VIA board/soc bindings to json-schema
-  dt-bindings: arm: Convert Xilinx board/soc bindings to json-schema
-  dt-bindings: arm: Convert ZTE board/soc bindings to json-schema
-
- .gitignore                                    |   1 +
- Documentation/Makefile                        |   2 +-
- Documentation/devicetree/bindings/.gitignore  |   2 +
- Documentation/devicetree/bindings/Makefile    |  30 ++
- .../devicetree/bindings/arm/actions.txt       |  56 --
- .../devicetree/bindings/arm/actions.yaml      |  34 ++
- .../devicetree/bindings/arm/al,alpine.txt     |  88 ---
- .../devicetree/bindings/arm/al,alpine.yaml    |  21 +
- .../devicetree/bindings/arm/altera.txt        |  14 -
- .../devicetree/bindings/arm/altera.yaml       |  20 +
- .../arm/altera/socfpga-clk-manager.txt        |  11 -
- .../arm/altera/socfpga-clk-manager.yaml       |  30 ++
- .../devicetree/bindings/arm/amlogic.txt       | 131 -----
- .../devicetree/bindings/arm/amlogic.yaml      | 104 ++++
- .../amlogic/amlogic,meson-gx-ao-secure.txt    |  28 +
- .../devicetree/bindings/arm/armadeus.txt      |   6 -
- .../devicetree/bindings/arm/atmel-at91.yaml   | 132 +++++
- .../arm/{atmel-at91.txt => atmel-sysregs.txt} |  73 +--
- Documentation/devicetree/bindings/arm/bhf.txt |   6 -
- .../devicetree/bindings/arm/calxeda.txt       |  15 -
- .../devicetree/bindings/arm/calxeda.yaml      |  22 +
- .../bindings/arm/compulab-boards.txt          |  25 -
- .../arm/cpu-enable-method/al,alpine-smp       |  34 +-
- .../devicetree/bindings/arm/cpus.txt          | 490 -----------------
- .../devicetree/bindings/arm/cpus.yaml         | 503 ++++++++++++++++++
- .../devicetree/bindings/arm/davinci.txt       |  25 -
- .../arm/freescale/fsl,layerscape-dcfg.txt     |  19 +
- .../arm/freescale/fsl,layerscape-scfg.txt     |  19 +
- Documentation/devicetree/bindings/arm/fsl.txt | 224 --------
- .../devicetree/bindings/arm/fsl.yaml          | 166 ++++++
- .../devicetree/bindings/arm/i2se.txt          |  22 -
- .../devicetree/bindings/arm/mediatek.txt      |  79 ---
- .../devicetree/bindings/arm/mediatek.yaml     |  85 +++
- .../devicetree/bindings/arm/nspire.txt        |  14 -
- .../devicetree/bindings/arm/olimex.txt        |  10 -
- .../devicetree/bindings/arm/oxnas.txt         |  14 -
- .../devicetree/bindings/arm/oxnas.yaml        |  25 +
- Documentation/devicetree/bindings/arm/pmu.txt |  70 ---
- .../devicetree/bindings/arm/pmu.yaml          |  96 ++++
- .../devicetree/bindings/arm/primecell.txt     |  46 --
- .../devicetree/bindings/arm/primecell.yaml    |  35 ++
- .../devicetree/bindings/arm/qcom.txt          |  57 --
- .../devicetree/bindings/arm/qcom.yaml         | 125 +++++
- .../devicetree/bindings/arm/realtek.txt       |  22 -
- .../devicetree/bindings/arm/realtek.yaml      |  25 +
- .../devicetree/bindings/arm/renesas,prr.txt   |  18 +
- .../devicetree/bindings/arm/rockchip.txt      | 220 --------
- .../devicetree/bindings/arm/rockchip.yaml     | 242 +++++++++
- .../devicetree/bindings/arm/shmobile.txt      | 161 ------
- .../devicetree/bindings/arm/shmobile.yaml     | 205 +++++++
- .../devicetree/bindings/arm/sirf.txt          |  11 -
- .../devicetree/bindings/arm/sirf.yaml         |  27 +
- .../devicetree/bindings/arm/spear.txt         |  26 -
- .../devicetree/bindings/arm/spear.yaml        |  25 +
- Documentation/devicetree/bindings/arm/sti.txt |  23 -
- .../devicetree/bindings/arm/sti.yaml          |  23 +
- .../devicetree/bindings/arm/technologic.txt   |  23 -
- .../devicetree/bindings/arm/tegra.txt         |  60 ---
- .../devicetree/bindings/arm/tegra.yaml        |  88 +++
- .../devicetree/bindings/arm/ti/nspire.yaml    |  24 +
- .../bindings/arm/ti/ti,davinci.yaml           |  26 +
- .../devicetree/bindings/arm/vt8500.txt        |  22 -
- .../devicetree/bindings/arm/vt8500.yaml       |  23 +
- .../devicetree/bindings/arm/xilinx.txt        |  83 ---
- .../devicetree/bindings/arm/xilinx.yaml       |  81 +++
- .../bindings/arm/{zte.txt => zte-sysctrl.txt} |  15 +-
- .../devicetree/bindings/arm/zte.yaml          |  26 +
- .../devicetree/bindings/example-schema.yaml   | 155 ++++++
- .../bindings/timer/arm,arch_timer.txt         | 112 ----
- .../bindings/timer/arm,arch_timer.yaml        | 103 ++++
- .../bindings/timer/arm,arch_timer_mmio.yaml   | 120 +++++
- .../bindings/timer/arm,global_timer.txt       |  27 -
- .../bindings/timer/arm,global_timer.yaml      |  46 ++
- .../devicetree/bindings/trivial-devices.txt   | 201 -------
- .../devicetree/bindings/trivial-devices.yaml  | 414 ++++++++++++++
- Documentation/devicetree/writing-schema.md    | 111 ++++
- Makefile                                      |   8 +-
- scripts/Makefile.lib                          |  24 +-
- 78 files changed, 3344 insertions(+), 2485 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/.gitignore
- create mode 100644 Documentation/devicetree/bindings/Makefile
- delete mode 100644 Documentation/devicetree/bindings/arm/actions.txt
- create mode 100644 Documentation/devicetree/bindings/arm/actions.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
- create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/altera.txt
- create mode 100644 Documentation/devicetree/bindings/arm/altera.yaml
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Dinh Nguyen <dinguyen@kernel.org>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ .../arm/altera/socfpga-clk-manager.txt        | 11 -------
+ .../arm/altera/socfpga-clk-manager.yaml       | 30 +++++++++++++++++++
+ 2 files changed, 30 insertions(+), 11 deletions(-)
  delete mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic.yaml
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/amlogic,meson-gx-ao-secure.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/armadeus.txt
- create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.yaml
- rename Documentation/devicetree/bindings/arm/{atmel-at91.txt => atmel-sysregs.txt} (67%)
- delete mode 100644 Documentation/devicetree/bindings/arm/bhf.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
- create mode 100644 Documentation/devicetree/bindings/arm/calxeda.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
- create mode 100644 Documentation/devicetree/bindings/arm/cpus.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/davinci.txt
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-dcfg.txt
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-scfg.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/fsl.txt
- create mode 100644 Documentation/devicetree/bindings/arm/fsl.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/i2se.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/mediatek.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/nspire.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/olimex.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
- create mode 100644 Documentation/devicetree/bindings/arm/oxnas.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/primecell.txt
- create mode 100644 Documentation/devicetree/bindings/arm/primecell.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
- create mode 100644 Documentation/devicetree/bindings/arm/qcom.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/realtek.txt
- create mode 100644 Documentation/devicetree/bindings/arm/realtek.yaml
- create mode 100644 Documentation/devicetree/bindings/arm/renesas,prr.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
- create mode 100644 Documentation/devicetree/bindings/arm/shmobile.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/sirf.txt
- create mode 100644 Documentation/devicetree/bindings/arm/sirf.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/spear.txt
- create mode 100644 Documentation/devicetree/bindings/arm/spear.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/sti.txt
- create mode 100644 Documentation/devicetree/bindings/arm/sti.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/technologic.txt
- delete mode 100644 Documentation/devicetree/bindings/arm/tegra.txt
- create mode 100644 Documentation/devicetree/bindings/arm/tegra.yaml
- create mode 100644 Documentation/devicetree/bindings/arm/ti/nspire.yaml
- create mode 100644 Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/vt8500.txt
- create mode 100644 Documentation/devicetree/bindings/arm/vt8500.yaml
- delete mode 100644 Documentation/devicetree/bindings/arm/xilinx.txt
- create mode 100644 Documentation/devicetree/bindings/arm/xilinx.yaml
- rename Documentation/devicetree/bindings/arm/{zte.txt => zte-sysctrl.txt} (62%)
- create mode 100644 Documentation/devicetree/bindings/arm/zte.yaml
- create mode 100644 Documentation/devicetree/bindings/example-schema.yaml
- delete mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.txt
- create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
- create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
- delete mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.txt
- create mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.yaml
- delete mode 100644 Documentation/devicetree/bindings/trivial-devices.txt
- create mode 100644 Documentation/devicetree/bindings/trivial-devices.yaml
- create mode 100644 Documentation/devicetree/writing-schema.md
 
---
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
+deleted file mode 100644
+index 2c28f1d12f45..000000000000
+--- a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-Altera SOCFPGA Clock Manager
+-
+-Required properties:
+-- compatible : "altr,clk-mgr"
+-- reg : Should contain base address and length for Clock Manager
+-
+-Example:
+-	 clkmgr at ffd04000 {
+-		compatible = "altr,clk-mgr";
+-		reg = <0xffd04000 0x1000>;
+-	};
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+new file mode 100644
+index 000000000000..37c2cf08fae0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+@@ -0,0 +1,30 @@
++# SPDX-License-Identifier: None
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/bindings/arm/altera/socfpga-clk-manager.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Altera SOCFPGA Clock Manager
++
++maintainers:
++  - Dinh Nguyen <dinguyen@altera.com>
++description: test
++
++properties:
++  compatible:
++    items:
++      - const: altr,clk-mgr
++  reg:
++    maxItems: 1
++
++required:
++  - compatible
++
++examples:
++  - |
++    clkmgr at ffd04000 {
++      compatible = "altr,clk-mgr";
++      reg = <0xffd04000 0x1000>;
++    };
++
++...
+-- 
 2.17.1
