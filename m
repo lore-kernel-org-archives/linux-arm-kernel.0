@@ -1,85 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 5 Oct 2018 14:42:32 +0100
-Subject: [PATCH] irqchip/gic-v3-its: Add early memory allocation errata
-In-Reply-To: <8ef6b381-e170-30de-ad0e-fae8ccf189e5@suse.com>
-References: <20180912095232.2110-1-matthias.bgg@kernel.org>
- <a08119a0-fc4e-6328-c3ad-04e5250f38d7@suse.com>
- <95733d12-ee1d-9874-16a7-c614cc0ce8cd@arm.com>
- <8ef6b381-e170-30de-ad0e-fae8ccf189e5@suse.com>
-Message-ID: <1d227152-2770-3e93-f78c-71e7a3b4fe76@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Oct 2018 14:34:29 +0100
+Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
+ armv8_pmuv3 events.
+In-Reply-To: <CAKTKpr4a12FHkMtFNueWqQbAhT4TLw_4DLDrOD6Tjsbno28U3A@mail.gmail.com>
+References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+ <20181001142914.GD9716@arm.com>
+ <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
+ <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
+ <20181004122207.GE4065@arm.com>
+ <CAKTKpr4a12FHkMtFNueWqQbAhT4TLw_4DLDrOD6Tjsbno28U3A@mail.gmail.com>
+Message-ID: <20181005133428.GF14398@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/18 13:33, Matthias Brugger wrote:
+On Fri, Oct 05, 2018 at 01:09:33AM +0530, Ganapatrao Kulkarni wrote:
+> On Thu, Oct 4, 2018 at 5:51 PM Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Oct 04, 2018 at 11:12:09AM +0530, Ganapatrao Kulkarni wrote:
+> > > can you please pull this patch?
+> >
+> > I still don't like the idea of just removing events like this, especially
+> > when other architectures (including some x86 and Power CPUs afaict) playa
+> > similar games for generic events, and these events do actually appear in
+> > user code.
+> >
+> > I also don't understand why you remove the TLB events. I think that logic
+> > would imply we should remove all of the events, because we can't distinguish
+> > prefetches from reads either. If we want to be consistent, then I think
+> > we should just remove the OP_WRITE events for L1D and BPU -- would you be
+> > ok with that instead?
 > 
+> IIUC, dTLB-load-misses is mapped to
+> ARMV8_PMUV3_PERFCTR_L1D_TLB_REFILL(event 0x05) and dTLB-loads is
+> mapped to ARMV8_PMUV3_PERFCTR_L1D_TLB(0x25). Which are as per spec,
+> counts TLB access/misses for both memory-read operation and
+> memory-write operation.
 > 
-> On 05/10/2018 12:55, Marc Zyngier wrote:
->> Hi Matthias,
->>
->> On 04/10/18 23:11, Matthias Brugger wrote:
->>> Friendly reminder, if anyone has any comment on the patch :)
->>>
->>> On 9/12/18 11:52 AM, matthias.bgg at kernel.org wrote:
->>>> From: Matthias Brugger <mbrugger@suse.com>
->>>>
->>>> Some hardware does not implement two-level page tables so that
->>>> the amount of contigious memory needed by the baser is bigger
->>>> then the zone order. This is a known problem on Cavium Thunderx
->>>> with 4K page size.
->>>>
->>>> We fix this by adding an errata which allocates the memory early
->>>> in the boot cycle, using the memblock allocator.
->>>>
->>>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
->>>> ---
->>>>  ? arch/arm64/Kconfig?????????????? | 12 ++++++++
->>>>  ? arch/arm64/include/asm/cpucaps.h |? 3 +-
->>>>  ? arch/arm64/kernel/cpu_errata.c?? | 33 +++++++++++++++++++++
->>>>  ? drivers/irqchip/irq-gic-v3-its.c | 50 ++++++++++++++++++++------------
->>>>  ? 4 files changed, 79 insertions(+), 19 deletions(-)
->>
->> My only comment would be to state how much I dislike both the HW and the
->> patch... ;-) The idea that we have some erratum that depends on the page size
->> doesn't feel good at all.
->>
-> 
-> Well ugly HW needs ugly patches ;-)
-> 
->>>>
->>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>> index 1b1a0e95c751..dfd9fe08f0b2 100644
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -597,6 +597,18 @@ config QCOM_FALKOR_ERRATUM_E1041
->>>>  ? ??????? If unsure, say Y.
->>>>  ? +config CAVIUM_ALLOC_ITS_TABLE_EARLY
->>>> +??? bool "Cavium Thunderx: Allocate the its table early"
->>>> +??? default y
->>>> +??? depends on ARM64_4K_PAGES && FORCE_MAX_ZONEORDER < 13
->>
->> Here's a though: Why don't we ensure that FORCE_MAX_ZONEORDER is such as we
->> could always allocate the same amount of memory, no matter what the page size
->> is? That, or bump FORCE_MAX_ZONEORDER to 13 if the kernel includes support for TX1.
->>
-> 
-> Bumping FORCE_MAX_ZONEORDER when TX1 is supported was proposed here:
-> https://patchwork.kernel.org/patch/6322281/
-> 
-> To bring in some more history, the CMA approach ended with this discussion:
-> https://patchwork.kernel.org/patch/9888041/
-> 
->> Any of this of course requires buy-in from the arm64 maintainers, as this is
->> quite a departure from the way things work so far.
->>
-> 
-> With my distribution head on, I would prefer a solution that does not change
-> FORCE_MAX_ZONEORDER. That's how I came to the idea providing a third solution to
-> the same problem :)
+> IMO, It won't help in keeping these events, knowingly that their
+> mapping is not accurate, only thing i can say to users is , dont use
+> events that are marked as "Hardware cache event"
 
-Why is that a problem? What impact does this have on your favourite distro?
+Right, but my point is that all of the events are inaccurate by this line
+of reasoning, because we don't support PREFETCH for any of them. So I'd
+rather just drop the duplicate events from the WRITE entries, like other
+CPUs and architectures do.
 
-Thanks,
+I'm about to pack my desk up because we're moving office, but I pushed out
+some patches I hacked up on my perf/updates branch:
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/log/?h=perf/updates
+
+I'll post them to the list next week if it's not the merge window.
+
+Will
