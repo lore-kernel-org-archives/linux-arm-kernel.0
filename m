@@ -1,39 +1,48 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Fri, 5 Oct 2018 20:40:03 +0200
-Subject: [PATCH net-next v6 19/23] zinc: Curve25519 ARM implementation
-In-Reply-To: <20181005150538.17006.qmail@cr.yp.to>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-20-Jason@zx2c4.com>
- <CAKv+Gu9FLDRLxHReKcveZYHNYerR5Y2pZd9gn-hWrU0jb2KgfA@mail.gmail.com>
- <CAHmME9rp0Fi5ObK5oi8FHj1_nK5hP4T2Bq7_dAmzq4OQ0mp0uw@mail.gmail.com>
- <20181005150538.17006.qmail@cr.yp.to>
-Message-ID: <20181005184001.GA10106@zx2c4.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Oct 2018 14:10:16 -0500
+Subject: [PATCH] arm64: dts: k3-am65-wakeup: Fix wakeup_uart reg address
+In-Reply-To: <20180927050146.17847-1-vigneshr@ti.com>
+References: <20180927050146.17847-1-vigneshr@ti.com>
+Message-ID: <20181005191015.qkk7vvmdoksemctw@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Dan,
+On 05:01-20180927, Vignesh R wrote:
+> cbass_wakeup interconnect which is the parent of wakeup_uart node
+> defines address-cells=1 and size-cells=1, therefore fix up reg property
+> of wakeup_uart node accordingly. Otherwise, this UART instance fails to
+> probe if enabled.
+> 
+> Fixes: 4201af2544b3 ("arm64: dts: ti: am654: Add uart nodes")
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+> 
+> Based on next-20180926
+> 
+>  arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+> index ee56959f4af8..c617393ea767 100644
+> --- a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+> +++ b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+> @@ -44,7 +44,7 @@
+>  
+>  	wkup_uart0: serial at 42300000 {
+>  		compatible = "ti,am654-uart";
+> -		reg = <0x00 0x42300000 0x00 0x100>;
+> +		reg = <0x42300000 0x100>;
+>  		reg-shift = <2>;
+>  		reg-io-width = <4>;
+>  		interrupts = <GIC_SPI 697 IRQ_TYPE_LEVEL_HIGH>;
 
-On Fri, Oct 05, 2018 at 03:05:38PM -0000, D. J. Bernstein wrote:
-> Of course, there are other ARM microarchitectures, and there are many
-> cases where different microarchitectures prefer different optimizations.
-> The kernel already has boot-time benchmarks for different optimizations
-> for raid6, and should do the same for crypto code, so that implementors
-> can focus on each microarchitecture separately rather than living in the
-> barbaric world of having to choose which CPUs to favor.
 
-I've been playing a bit with some code to do this sort of thing,
-choosing a set of implementations to enable or disable by trying all the
-combinations, and then calculating a quick median. I don't know if I'll
-submit that for the initial merge of this patchset -- and in fact all
-the current implementations I'm proposing are pretty much okay on
-microarchitectures -- but down the line this could be useful as a
-mechanism.
+Thanks. Tero: we should probably queue for rc fixes. wkup_uart is used
+by System Firmware logs (if enabled), so kernel usage is limited to some
+specific platforms. This is a valid fix and my miss..
 
-Jason
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181005/5046b070/attachment.sig>
+Acked-by: Nishanth Menon <nm@ti.com>
+
+-- 
+Regards,
+Nishanth Menon
