@@ -1,382 +1,313 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:15 -0500
-Subject: [PATCH 03/36] dt-bindings: arm: atmel: Move various sys registers out
- of SoC binding doc
+Date: Fri,  5 Oct 2018 11:58:20 -0500
+Subject: [PATCH 08/36] dt-bindings: Add a writing DT schemas how-to and
+ annotated example
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-4-robh@kernel.org>
+Message-ID: <20181005165848.3474-9-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to convert board-level bindings to json-schema, move
-various misc SoC bindings out to their own file.
+Add a how-to doc on writing DT schema documentation. This gives a
+description of each section and details on how to validate the DT schema
+file. The DT schema are written using json-schema vocabulary in a YAML
+encoded document. Using jsonschema gives us access to existing tooling.
+A YAML encoding gives us something easy to edit. The example is
+annotated to help explain what each section does.
+
+This example is just the tip of the iceberg, but is it the part most
+developers writing bindings will interact with. Backing all this up
+are meta-schema (to validate the binding schemas), some DT core schema,
+YAML encoded DT output with dtc, and a small number of python scripts to
+run validation.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
 Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/atmel-at91.txt    | 170 -----------------
- .../devicetree/bindings/arm/atmel-sysregs.txt | 171 ++++++++++++++++++
- 2 files changed, 171 insertions(+), 170 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+ .../devicetree/bindings/example-schema.yaml   | 155 ++++++++++++++++++
+ Documentation/devicetree/writing-schema.md    | 111 +++++++++++++
+ 2 files changed, 266 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/example-schema.yaml
+ create mode 100644 Documentation/devicetree/writing-schema.md
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 31220b54d85d..4bf1b4da7659 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -70,173 +70,3 @@ compatible: must be one of:
-        - "atmel,samv71q19"
-        - "atmel,samv71q20"
-        - "atmel,samv71q21"
--
--Chipid required properties:
--- compatible: Should be "atmel,sama5d2-chipid"
--- reg : Should contain registers location and length
--
--PIT Timer required properties:
--- compatible: Should be "atmel,at91sam9260-pit"
--- reg: Should contain registers location and length
--- interrupts: Should contain interrupt for the PIT which is the IRQ line
--  shared across all System Controller members.
--
--System Timer (ST) required properties:
--- compatible: Should be "atmel,at91rm9200-st", "syscon", "simple-mfd"
--- reg: Should contain registers location and length
--- interrupts: Should contain interrupt for the ST which is the IRQ line
--  shared across all System Controller members.
--- clocks: phandle to input clock.
--Its subnodes can be:
--- watchdog: compatible should be "atmel,at91rm9200-wdt"
--
--RSTC Reset Controller required properties:
--- compatible: Should be "atmel,<chip>-rstc".
--  <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
--- reg: Should contain registers location and length
--- clocks: phandle to input clock.
--
--Example:
--
--	rstc at fffffd00 {
--		compatible = "atmel,at91sam9260-rstc";
--		reg = <0xfffffd00 0x10>;
--		clocks = <&clk32k>;
--	};
--
--RAMC SDRAM/DDR Controller required properties:
--- compatible: Should be "atmel,at91rm9200-sdramc", "syscon"
--			"atmel,at91sam9260-sdramc",
--			"atmel,at91sam9g45-ddramc",
--			"atmel,sama5d3-ddramc",
--- reg: Should contain registers location and length
--
--Examples:
--
--	ramc0: ramc at ffffe800 {
--		compatible = "atmel,at91sam9g45-ddramc";
--		reg = <0xffffe800 0x200>;
--	};
--
--SHDWC Shutdown Controller
--
--required properties:
--- compatible: Should be "atmel,<chip>-shdwc".
--  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
--- reg: Should contain registers location and length
--- clocks: phandle to input clock.
--
--optional properties:
--- atmel,wakeup-mode: String, operation mode of the wakeup mode.
--  Supported values are: "none", "high", "low", "any".
--- atmel,wakeup-counter: Counter on Wake-up 0 (between 0x0 and 0xf).
--
--optional at91sam9260 properties:
--- atmel,wakeup-rtt-timer: boolean to enable Real-time Timer Wake-up.
--
--optional at91sam9rl properties:
--- atmel,wakeup-rtc-timer: boolean to enable Real-time Clock Wake-up.
--- atmel,wakeup-rtt-timer: boolean to enable Real-time Timer Wake-up.
--
--optional at91sam9x5 properties:
--- atmel,wakeup-rtc-timer: boolean to enable Real-time Clock Wake-up.
--
--Example:
--
--	shdwc at fffffd10 {
--		compatible = "atmel,at91sam9260-shdwc";
--		reg = <0xfffffd10 0x10>;
--		clocks = <&clk32k>;
--	};
--
--SHDWC SAMA5D2-Compatible Shutdown Controller
--
--1) shdwc node
--
--required properties:
--- compatible: should be "atmel,sama5d2-shdwc".
--- reg: should contain registers location and length
--- clocks: phandle to input clock.
--- #address-cells: should be one. The cell is the wake-up input index.
--- #size-cells: should be zero.
--
--optional properties:
--
--- debounce-delay-us: minimum wake-up inputs debouncer period in
--  microseconds. It's usually a board-related property.
--- atmel,wakeup-rtc-timer: boolean to enable Real-Time Clock wake-up.
--
--The node contains child nodes for each wake-up input that the platform uses.
--
--2) input nodes
--
--Wake-up input nodes are usually described in the "board" part of the Device
--Tree. Note also that input 0 is linked to the wake-up pin and is frequently
--used.
--
--Required properties:
--- reg: should contain the wake-up input index [0 - 15].
--
--Optional properties:
--- atmel,wakeup-active-high: boolean, the corresponding wake-up input described
--  by the child, forces the wake-up of the core power supply on a high level.
--  The default is to be active low.
--
--Example:
--
--On the SoC side:
--	shdwc at f8048010 {
--		compatible = "atmel,sama5d2-shdwc";
--		reg = <0xf8048010 0x10>;
--		clocks = <&clk32k>;
--		#address-cells = <1>;
--		#size-cells = <0>;
--		atmel,wakeup-rtc-timer;
--	};
--
--On the board side:
--	shdwc at f8048010 {
--		debounce-delay-us = <976>;
--
--		input at 0 {
--			reg = <0>;
--		};
--
--		input at 1 {
--			reg = <1>;
--			atmel,wakeup-active-high;
--		};
--	};
--
--Special Function Registers (SFR)
--
--Special Function Registers (SFR) manage specific aspects of the integrated
--memory, bridge implementations, processor and other functionality not controlled
--elsewhere.
--
--required properties:
--- compatible: Should be "atmel,<chip>-sfr", "syscon" or
--	"atmel,<chip>-sfrbu", "syscon"
--  <chip> can be "sama5d3", "sama5d4" or "sama5d2".
--- reg: Should contain registers location and length
--
--	sfr at f0038000 {
--		compatible = "atmel,sama5d3-sfr", "syscon";
--		reg = <0xf0038000 0x60>;
--	};
--
--Security Module (SECUMOD)
--
--The Security Module macrocell provides all necessary secure functions to avoid
--voltage, temperature, frequency and mechanical attacks on the chip. It also
--embeds secure memories that can be scrambled
--
--required properties:
--- compatible: Should be "atmel,<chip>-secumod", "syscon".
--  <chip> can be "sama5d2".
--- reg: Should contain registers location and length
--
--	secumod at fc040000 {
--		compatible = "atmel,sama5d2-secumod", "syscon";
--		reg = <0xfc040000 0x100>;
--	};
-diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+diff --git a/Documentation/devicetree/bindings/example-schema.yaml b/Documentation/devicetree/bindings/example-schema.yaml
 new file mode 100644
-index 000000000000..4b96608ad692
+index 000000000000..4cbdbf59695f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-@@ -0,0 +1,171 @@
-+Atmel system registers
++++ b/Documentation/devicetree/bindings/example-schema.yaml
+@@ -0,0 +1,155 @@
++# SPDX-License-Identifier: BSD-2-Clause
++# Copyright 2018 Linaro Ltd.
++%YAML 1.2
++---
++# All the top-level keys are standard json-schema keywords except for
++# 'maintainers' and 'select'
 +
-+Chipid required properties:
-+- compatible: Should be "atmel,sama5d2-chipid"
-+- reg : Should contain registers location and length
++# $id is a unique idenifier based on the filename
++$id: "http://devicetree.org/schemas/example-schema.yaml#"
++$schema: "http://devicetree.org/meta-schemas/core.yaml#"
 +
-+PIT Timer required properties:
-+- compatible: Should be "atmel,at91sam9260-pit"
-+- reg: Should contain registers location and length
-+- interrupts: Should contain interrupt for the PIT which is the IRQ line
-+  shared across all System Controller members.
++title: An example schema annotated with jsonschema details
 +
-+System Timer (ST) required properties:
-+- compatible: Should be "atmel,at91rm9200-st", "syscon", "simple-mfd"
-+- reg: Should contain registers location and length
-+- interrupts: Should contain interrupt for the ST which is the IRQ line
-+  shared across all System Controller members.
-+- clocks: phandle to input clock.
-+Its subnodes can be:
-+- watchdog: compatible should be "atmel,at91rm9200-wdt"
++maintainers:
++  - Rob Herring <robh@kernel.org>
 +
-+RSTC Reset Controller required properties:
-+- compatible: Should be "atmel,<chip>-rstc".
-+  <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
-+- reg: Should contain registers location and length
-+- clocks: phandle to input clock.
++description: |
++  A more detailed multi-line description of the binding.
 +
-+Example:
++  Details about the hardware device and any links to datasheets can go here.
 +
-+	rstc at fffffd00 {
-+		compatible = "atmel,at91sam9260-rstc";
-+		reg = <0xfffffd00 0x10>;
-+		clocks = <&clk32k>;
-+	};
++  Literal blocks are marked with the '|' at the beginning. The end is marked by
++  indentation less than the first line of the literal block.
 +
-+RAMC SDRAM/DDR Controller required properties:
-+- compatible: Should be "atmel,at91rm9200-sdramc", "syscon"
-+			"atmel,at91sam9260-sdramc",
-+			"atmel,at91sam9g45-ddramc",
-+			"atmel,sama5d3-ddramc",
-+- reg: Should contain registers location and length
++select: false
++  # 'select' is a schema applied to a DT node to determine if this binding
++  # schema should be applied to the node. It is optional and by default the
++  # possible compatible strings are extracted and used to match.
 +
-+Examples:
++properties:
++  # A dictionary of DT properties for this binding schema
++  compatible:
++    # More complicated schema can use oneOf (XOR), anyOf (OR), or allOf (AND)
++    # to handle different conditions.
++    # In this case, it's needed to handle a variable number of values as there
++    # isn't another way to express a constraint of the last string value.
++    # The boolean schema must be a list of schemas.
++    oneOf:
++      - items:
++          # items is a list of possible values for the property. The number of
++          # values is determined by the number of elements in the list.
++          # Order in lists is significant, order in dicts is not
++          # Must be one of the 1st enums followed by the 2nd enum
++          #
++          # Each element in items should be 'enum' or 'const'
++          - enum:
++              - vendor,soc4-ip
++              - vendor,soc3-ip
++              - vendor,soc2-ip
++          - enum:
++              - vendor,soc1-ip
++        # additionalItems being false is implied
++        # minItems/maxItems equal to 2 is implied
++      - items:
++          # 'const' is just a special case of an enum with a single possible value
++          - const: vendor,soc1-ip
 +
-+	ramc0: ramc at ffffe800 {
-+		compatible = "atmel,at91sam9g45-ddramc";
-+		reg = <0xffffe800 0x200>;
-+	};
++  reg:
++    # The description of each element defines the order and implicitly defines
++    # the number of reg entries
++    items:
++      - description: core registers
++      - description: aux registers
++    # minItems/maxItems equal to 2 is implied
 +
-+SHDWC Shutdown Controller
++  reg-names:
++    # The core schema enforces this is a string array
++    items:
++      - const: core
++      - const: aux
 +
-+required properties:
-+- compatible: Should be "atmel,<chip>-shdwc".
-+  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
-+- reg: Should contain registers location and length
-+- clocks: phandle to input clock.
++  clocks:
++    maxItems: 1
++    # Only a single entry, so just need to set the max number of items.
++    description: hello
 +
-+optional properties:
-+- atmel,wakeup-mode: String, operation mode of the wakeup mode.
-+  Supported values are: "none", "high", "low", "any".
-+- atmel,wakeup-counter: Counter on Wake-up 0 (between 0x0 and 0xf).
++  clock-names:
++    items:
++      - const: bus
 +
-+optional at91sam9260 properties:
-+- atmel,wakeup-rtt-timer: boolean to enable Real-time Timer Wake-up.
++  interrupts:
++    # Either 1 or 2 interrupts can be present
++    minItems: 1
++    maxItems: 2
++    items:
++      - description: tx or combined interrupt
++      - description: rx interrupt
 +
-+optional at91sam9rl properties:
-+- atmel,wakeup-rtc-timer: boolean to enable Real-time Clock Wake-up.
-+- atmel,wakeup-rtt-timer: boolean to enable Real-time Timer Wake-up.
++    description:
++      A variable number of interrupts warrants a description of what conditions
++      affect the number of interrupts. Otherwise, descriptions on standard
++      properties are not necessary.
 +
-+optional at91sam9x5 properties:
-+- atmel,wakeup-rtc-timer: boolean to enable Real-time Clock Wake-up.
++  interrupt-names:
++    # minItems must be specified here because the default would be 2
++    minItems: 1
++    maxItems: 2
++    items:
++      - const: "tx irq"
++      - const: "rx irq"
 +
-+Example:
++  # Property names starting with '#' must be quoted
++  '#interrupt-cells':
++    # A simple case where the value must always be '2'.
++    # The core schema handles that this must be a single integer.
++    const: 2
 +
-+	shdwc at fffffd10 {
-+		compatible = "atmel,at91sam9260-shdwc";
-+		reg = <0xfffffd10 0x10>;
-+		clocks = <&clk32k>;
-+	};
++  interrupt-controller: true
++    # The core checks this is a boolean, so just have to list it here to be
++    # valid for this binding.
 +
-+SHDWC SAMA5D2-Compatible Shutdown Controller
++  clock-frequency:
++    # The type is set in the core schema. Per device schema only need to set
++    # constraints on the possible values.
++    minimum: 100
++    maximum: 400000
++    # The value that should be used if the property is not present
++    default: 200
 +
-+1) shdwc node
++  foo-gpios:
++    maxItems: 1
++    description: A connection of the 'foo' gpio line.
 +
-+required properties:
-+- compatible: should be "atmel,sama5d2-shdwc".
-+- reg: should contain registers location and length
-+- clocks: phandle to input clock.
-+- #address-cells: should be one. The cell is the wake-up input index.
-+- #size-cells: should be zero.
++  vendor,int-property:
++    description: Vendor specific properties must have a description
++    allOf:
++      - $ref: "/schemas/types.yaml#/definitions/uint32"
++      - enum: [2, 4, 6, 8, 10]
 +
-+optional properties:
++  vendor,bool-property:
++    description: Vendor specific properties must have a description
++    type: boolean
 +
-+- debounce-delay-us: minimum wake-up inputs debouncer period in
-+  microseconds. It's usually a board-related property.
-+- atmel,wakeup-rtc-timer: boolean to enable Real-Time Clock wake-up.
++  vendor,string-array-property:
++    description: Vendor specific properties may refer to core schema
++    allOf:
++      - $ref: '/schemas/types.yaml#/definitions/stringarray'
++      - maxItems: 2
 +
-+The node contains child nodes for each wake-up input that the platform uses.
++required:
++  - compatible
++  - reg
++  - interrupts
++  - interrupt-controller
 +
-+2) input nodes
++examples:
++  - |
++    node at 1000 {
++          compatible = "vendor,soc4-ip", "vendor,soc1-ip";
++          reg = <0x1000 0x80>,
++                <0x3000 0x80>;
++          reg-names = "core", "aux";
++          interrupts = <10>;
++          interrupt-controller;
++    };
+diff --git a/Documentation/devicetree/writing-schema.md b/Documentation/devicetree/writing-schema.md
+new file mode 100644
+index 000000000000..b1d9798ca3e4
+--- /dev/null
++++ b/Documentation/devicetree/writing-schema.md
+@@ -0,0 +1,111 @@
++# Writing DeviceTree Bindings in json-schema
 +
-+Wake-up input nodes are usually described in the "board" part of the Device
-+Tree. Note also that input 0 is linked to the wake-up pin and is frequently
-+used.
++Devicetree bindings are written using json-schema vocabulary. Schema files are
++written in a JSON compatible subset of YAML. YAML is used instead of JSON as it
++considered more human readable and has some advantages such as allowing
++comments (Prefixed with '#').
 +
-+Required properties:
-+- reg: should contain the wake-up input index [0 - 15].
++## Schema Contents
 +
-+Optional properties:
-+- atmel,wakeup-active-high: boolean, the corresponding wake-up input described
-+  by the child, forces the wake-up of the core power supply on a high level.
-+  The default is to be active low.
++Each schema doc is a structured json-schema which is defined by a set of
++top-level properties:
 +
-+Example:
++- __$id__ - A json-schema unique identifier string. The string must be a valid
++URI typically containing the binding's filename and path. DT schema it must
++begin with "http://devicetree.org/schema/". The URL is used for non file local
++"$ref" lookups. A URL is used even for local files, and there may not actually
++be files present at those locations.
 +
-+On the SoC side:
-+	shdwc at f8048010 {
-+		compatible = "atmel,sama5d2-shdwc";
-+		reg = <0xf8048010 0x10>;
-+		clocks = <&clk32k>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		atmel,wakeup-rtc-timer;
-+	};
++- __$schema__ - Indicates the meta-schema the schema file adheres to.
 +
-+On the board side:
-+	shdwc at f8048010 {
-+		debounce-delay-us = <976>;
++- __title__ - A one line description on the contents of the binding schema.
 +
-+		input at 0 {
-+			reg = <0>;
-+		};
++- __maintainers__ - A DT specific property. Contains a list of email address(es)
++for maintainers of this binding.
 +
-+		input at 1 {
-+			reg = <1>;
-+			atmel,wakeup-active-high;
-+		};
-+	};
++- __description__ - Optional. A multi-line text block containing any detailed
++information about this binding. It should contain things such as what the block
++or device does, standards the device conforms to, and links to datasheets for
++more information.
 +
-+Special Function Registers (SFR)
++- __select__ - Optional. A json-schema to match nodes for applying the schema.
++By default, nodes are matched against their possible compatible string values
++or node name and select is not necessary.
 +
-+Special Function Registers (SFR) manage specific aspects of the integrated
-+memory, bridge implementations, processor and other functionality not controlled
-+elsewhere.
++- __properties__ - A set of sub-schema defining all the DT properties for the
++binding. The exact schema depends on the type of property. A property can also
++define a child DT node with child properties defined under it.
 +
-+required properties:
-+- compatible: Should be "atmel,<chip>-sfr", "syscon" or
-+	"atmel,<chip>-sfrbu", "syscon"
-+  <chip> can be "sama5d3", "sama5d4" or "sama5d2".
-+- reg: Should contain registers location and length
++- __patternProperties__ - Optional. Similar to 'properties', but names are regex.
 +
-+	sfr at f0038000 {
-+		compatible = "atmel,sama5d3-sfr", "syscon";
-+		reg = <0xf0038000 0x60>;
-+	};
++- __required__ - A list of DT properties from the 'properties' section that
++must always be present.
 +
-+Security Module (SECUMOD)
++- __examples__ - Optional. A list of one or more DTS hunks implementing the
++binding.
 +
-+The Security Module macrocell provides all necessary secure functions to avoid
-+voltage, temperature, frequency and mechanical attacks on the chip. It also
-+embeds secure memories that can be scrambled
++Unless noted otherwise, all properties are required.
 +
-+required properties:
-+- compatible: Should be "atmel,<chip>-secumod", "syscon".
-+  <chip> can be "sama5d2".
-+- reg: Should contain registers location and length
++## Property Schema
 +
-+	secumod at fc040000 {
-+		compatible = "atmel,sama5d2-secumod", "syscon";
-+		reg = <0xfc040000 0x100>;
-+	};
++The 'properties' section of the schema contains all the DT properties for a
++binding. Each property contains a set of constraints using json-schema
++vocabulary for that property. The properties schemas are what is used for
++validation of DT files.
++
++For common properties, only additional constraints not covered by the common
++binding schema need to be defined such as how many values are valid or what
++possible values are valid.
++
++Vendor specific properties will typically need more detailed schema. With the
++exception of boolean properties, they should have a reference to a type in
++schemas/types.yaml. A "description" property is always required.
++
++The Devicetree schemas don't exactly match the YAML encoded DT data produced by
++dtc. They are simplified to make them more compact and avoid a bunch of
++boilerplate. The tools process the schema files to produce the final schema for
++validation. There are currently 2 transformations the tools perform.
++
++The default for arrays in json-schema is they are variable sized and allow more
++entries than explicitly defined. This can be restricted by defining 'minItems',
++'maxItems', and 'additionalItems'. However, for DeviceTree Schemas, a fixed
++size is desired in most cases, so these properties are added based on the
++number of entries in an 'items' list.
++
++The YAML Devicetree format also makes all string values an array and scalar
++values a matrix (in order to define groupings) even when only a single value
++is present. Single entries in schemas are fixed up to match this encoding.
++
++## Testing
++
++### Dependencies
++
++The DT schema project must be installed in order to validate the DT schema
++binding documents and validate DTS files using the DT schema. The DT schema
++project can be installed with pip:
++
++`pip3 install git+https://github.com/robherring/yaml-bindings.git at master --process-dependency-links`
++
++dtc must also be built with YAML output support enabled. This requires that
++libyaml and its headers be installed on the host system.
++
++### Running checks
++
++The DT schema binding documents must be validated using the meta-schema (the
++schema for the schema) to ensure they are both valid json-schema and valid
++binding schema. All of the DT binding documents can be validated using the
++`dt_binding_check` target:
++
++`make dt_binding_check`
++
++In order to perform validation of DT source files, use the `dtbs_check` target:
++
++`make dtbs_check`
++
++This will first run the `dt_binding_check` which generates the processed schema.
++
++## json-schema Resources
++
++[JSON-Schema Specifications](http://json-schema.org/)
++
++[Using JSON Schema Book](http://usingjsonschema.com/)
 -- 
 2.17.1
