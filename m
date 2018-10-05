@@ -1,119 +1,152 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Fri, 5 Oct 2018 13:04:43 +0530
-Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
-In-Reply-To: <20181003133609.GG4714@dhcp22.suse.cz>
-References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
- <1538482531-26883-2-git-send-email-anshuman.khandual@arm.com>
- <20181002123909.GS18290@dhcp22.suse.cz>
- <fae68a4e-b14b-8342-940c-ea5ef3c978af@arm.com>
- <20181003065833.GD18290@dhcp22.suse.cz>
- <7f0488b5-053f-0954-9b95-8c0890ef5597@arm.com>
- <20181003105926.GA4714@dhcp22.suse.cz>
- <34b25855-fcef-61ed-312d-2011f80bdec4@arm.com>
- <20181003114842.GD4714@dhcp22.suse.cz>
- <d42cc88b-6bab-797c-f263-2dce650ea3ab@arm.com>
- <20181003133609.GG4714@dhcp22.suse.cz>
-Message-ID: <5dc1dc4d-de60-43b9-aab6-3b3bb6a22a4b@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 5 Oct 2018 09:39:34 +0200
+Subject: [PATCH] drm/meson: fix max mode_config height/width
+In-Reply-To: <CAKMK7uHxiDF3z19cMBb0o2o4Ev0DFJkhMR7Ny6U2776Ry4oc=A@mail.gmail.com>
+References: <1538642563-22465-1-git-send-email-narmstrong@baylibre.com>
+ <20181004100958.GI31561@phenom.ffwll.local>
+ <0ef7fa13-ce77-f8a5-f5f3-6568be3d6145@baylibre.com>
+ <CAKMK7uHxiDF3z19cMBb0o2o4Ev0DFJkhMR7Ny6U2776Ry4oc=A@mail.gmail.com>
+Message-ID: <8e980de4-5a52-8f3d-fba2-734617e40d1b@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/03/2018 07:06 PM, Michal Hocko wrote:
-> On Wed 03-10-18 18:36:39, Anshuman Khandual wrote:
-> [...]
->> So we have two checks here
+On 04/10/2018 20:10, Daniel Vetter wrote:
+> On Thu, Oct 4, 2018 at 5:05 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
 >>
->> 1) platform specific arch_hugetlb_migration -> In principle go ahead
+>> On 04/10/2018 12:09, Daniel Vetter wrote:
+>>> On Thu, Oct 04, 2018 at 10:42:43AM +0200, Neil Armstrong wrote:
+>>>> The mode_config max_width/max_height determines the maximum framebuffer
+>>>> size the pixel reader can handle. But the values were set thinking they
+>>>> were determining the maximum screen dimensions.
+>>>>
+>>>> This patch changes the values to the maximum height/width the CANVAS block
+>>>> can handle rounded to some coherent values.
+>>>>
+>>>> Fixes: a41e82e6c457 ("drm/meson: Add support for components")
+>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>>
+>>> It's both. Grep for all the callers of ->fill_modes and you'll see that
+>>> this limit is also used to filter max screen sizes.
+>>>
+>>> If you want to change this, then I think we need a new
+>>> mode_config.fb_max_width/height, which if non-zero, would extend the limit
+>>> for fbs.
+>>>
+>>> There's also the problem that if you extend this for fbs, then there's no
+>>> check anymore in the atomic_commit paths (or legacy modeset), so that
+>>> needs to be addressed somehow too.
 >>
->> 2) huge_movable() during allocation
->>
->> 	- If huge page does not have to be placed on movable zone
->>
->> 		- Allocate any where successfully and done !
->>  
->> 	- If huge page *should* be placed on a movable zone
->>
->> 		- Try allocating on movable zone
->>
->> 			- Successfull and done !
->>
->> 		- If the new page could not be allocated on movable zone
->> 		
->> 			- Abort the migration completely
->>
->> 					OR
->>
->> 			- Warn and fall back to non-movable
+>> What about adding optionals mode_config.fb_max_width/height and update
+>> drm_internal_framebuffer_create() to use these if non-0 or fallback
+>> to the mode_config max_width/max_height.
 > 
-> I guess you are still making it more complicated than necessary. The
-> later is really only about __GFP_MOVABLE at this stage. I would just
-> make it simple for now. We do not have to implement any dynamic
-> heuristic right now. All that I am asking for is to split the migrate
-> possible part from movable part.
-> 
-> I should have been more clear about that I guess from my very first
-> reply. I do like how you moved the current coarse grained
-> hugepage_migration_supported to be more arch specific but I merely
-> wanted to point out that we need to do some other changes before we can
-> go that route and that thing is to distinguish movable from migration
-> supported.
-> 
-> See my point?
+> That's what I meant. Except you also need to then fix the gap you've
+> opened in atomic_check, and validate the mode size against
+> mode_config.max_width/height.
 
-Does the following sound close enough to what you are looking for ?
+OK, won't this be enough ?
+--- a/include/drm/drm_mode_config.h
++++ b/include/drm/drm_mode_config.h
+@@ -333,6 +333,8 @@ struct drm_mode_config_funcs {
+  * @min_height: minimum fb pixel height on this device
+  * @max_width: maximum fb pixel width on this device
+  * @max_height: maximum fb pixel height on this device
++ * @max_fb_width: maximum fb buffer width if differs from max_width
++ * @max_fb_height: maximum fb buffer height if differs from max_height
+  * @funcs: core driver provided mode setting functions
+  * @fb_base: base address of the framebuffer
+  * @poll_enabled: track polling support for this device
+@@ -508,6 +510,7 @@ struct drm_mode_config {
 
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 9df1d59..070c419 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -504,6 +504,13 @@ static inline bool hugepage_migration_supported(struct hstate *h)
-        return arch_hugetlb_migration_supported(h);
- }
- 
-+static inline bool hugepage_movable_required(struct hstate *h)
-+{
-+       if (hstate_is_gigantic(h))
-+               return true;
-+       return false;
-+}
-+
- static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
-                                           struct mm_struct *mm, pte_t *pte)
- {
-@@ -600,6 +607,11 @@ static inline bool hugepage_migration_supported(struct hstate *h)
-        return false;
- }
- 
-+static inline bool hugepage_movable_required(struct hstate *h)
-+{
-+       return false;
-+}
-+
- static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
-                                           struct mm_struct *mm, pte_t *pte)
- {
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 3c21775..8b0afdc 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1635,6 +1635,9 @@ struct page *alloc_huge_page_node(struct hstate *h, int nid)
-        if (nid != NUMA_NO_NODE)
-                gfp_mask |= __GFP_THISNODE;
- 
-+       if (hugepage_movable_required(h))
-+               gfp_mask |= __GFP_MOVABLE;
-+
-        spin_lock(&hugetlb_lock);
-        if (h->free_huge_pages - h->resv_huge_pages > 0)
-                page = dequeue_huge_page_nodemask(h, gfp_mask, nid, NULL);
-@@ -1652,6 +1655,9 @@ struct page *alloc_huge_page_nodemask(struct hstate *h, int preferred_nid,
- {
-        gfp_t gfp_mask = htlb_alloc_mask(h);
- 
-+       if (hugepage_movable_required(h))
-+               gfp_mask |= __GFP_MOVABLE;
-+
-        spin_lock(&hugetlb_lock);
-        if (h->free_huge_pages - h->resv_huge_pages > 0) {
-                struct page *page;
+        int min_width, min_height;
+        int max_width, max_height;
++       int max_fb_width, max_fb_height;
+        const struct drm_mode_config_funcs *funcs;
+        resource_size_t fb_base;
+
+--- a/drivers/gpu/drm/drm_framebuffer.c
++++ b/drivers/gpu/drm/drm_framebuffer.c
+@@ -283,14 +283,20 @@ drm_internal_framebuffer_create(struct drm_device *dev,
+                return ERR_PTR(-EINVAL);
+        }
+
+-       if ((config->min_width > r->width) || (r->width > config->max_width)) {
++       if ((config->min_width > r->width) ||
++           (!config->max_fb_width && r->width > config->max_width) ||
++           (config->max_fb_width && r->width > config->max_fb_width)) {
+                DRM_DEBUG_KMS("bad framebuffer width %d, should be >= %d && <= %d\n",
+-                         r->width, config->min_width, config->max_width);
++                         r->width, config->min_width, config->max_fb_width ?
++                         config->max_fb_width : config->max_width);
+                return ERR_PTR(-EINVAL);
+        }
+-       if ((config->min_height > r->height) || (r->height > config->max_height)) {
++       if ((config->min_height > r->height) ||
++           (!config->max_fb_height && r->height > config->max_height) ||
++           (config->max_fb_height && r->height > config->max_fb_height)) {
+                DRM_DEBUG_KMS("bad framebuffer height %d, should be >= %d && <= %d\n",
+-                         r->height, config->min_height, config->max_height);
++                         r->height, config->min_height, config->max_fb_height ?
++                         config->max_fb_height : config->max_height);
+                return ERR_PTR(-EINVAL);
+        }
+
+and in the driver :
+
++       drm->mode_config.max_width = 4096;
++       drm->mode_config.max_height = 3840;
++       drm->mode_config.max_fb_width = 16384;
++       drm->mode_config.max_fb_height = 8192;
+
+With this I leave the mode filtering intact.
+
+Neil
+
+
+> -Daniel
+> 
+>>
+>> Neil
+>>
+>>>
+>>> Bunch of igt to make sure we're not missing anything would be sweet on
+>>> top, e.g. e.g. trying to set a mode over the limit and making sure it
+>>> fails.
+>>>
+>>> Cheers, Daniel
+>>>
+>>>> ---
+>>>>  drivers/gpu/drm/meson/meson_drv.c | 4 ++--
+>>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+>>>> index d344312..2e29968 100644
+>>>> --- a/drivers/gpu/drm/meson/meson_drv.c
+>>>> +++ b/drivers/gpu/drm/meson/meson_drv.c
+>>>> @@ -243,8 +243,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>>>>              goto free_drm;
+>>>>
+>>>>      drm_mode_config_init(drm);
+>>>> -    drm->mode_config.max_width = 3840;
+>>>> -    drm->mode_config.max_height = 2160;
+>>>> +    drm->mode_config.max_width = 16384;
+>>>> +    drm->mode_config.max_height = 8192;
+>>>>      drm->mode_config.funcs = &meson_mode_config_funcs;
+>>>>
+>>>>      /* Hardware Initialization */
+>>>> --
+>>>> 2.7.4
+>>>>
+>>>> _______________________________________________
+>>>> dri-devel mailing list
+>>>> dri-devel at lists.freedesktop.org
+>>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>>
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> 
+> 
