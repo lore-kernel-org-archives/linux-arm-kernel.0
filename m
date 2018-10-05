@@ -1,70 +1,52 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 5 Oct 2018 15:14:53 -0500
-Subject: [PATCH 4/4] firmware: ti_sci: Add helper apis to mange resources
-In-Reply-To: <20181005143006.18284-5-lokeshvutla@ti.com>
-References: <20181005143006.18284-1-lokeshvutla@ti.com>
- <20181005143006.18284-5-lokeshvutla@ti.com>
-Message-ID: <20181005201453.g3p2jhpigcvijpce@kahuna>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 Oct 2018 15:39:30 -0500
+Subject: [PATCH i2c-next v6 1/5] dt-bindings: i2c: Add 'timeout-ms' and
+ '#retries' properties as common optional
+In-Reply-To: <20181004204322.20665-2-jae.hyun.yoo@linux.intel.com>
+References: <20181004204322.20665-1-jae.hyun.yoo@linux.intel.com>
+ <20181004204322.20665-2-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20181005203930.GA12987@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:30-20181005, Lokesh Vutla wrote:
-> +struct ti_sci_resource *
-> +devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
-> +			    struct device *dev, char *of_prop)
-> +{
-> +	u32 resource_type, resource_subtype;
-> +	struct ti_sci_resource *res;
-> +	int sets, i, ret;
-> +
-> +	res = devm_kzalloc(dev, sizeof(*res), GFP_KERNEL);
-> +	if (!res)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	sets = of_property_count_elems_of_size(dev_of_node(dev), of_prop,
-> +					       sizeof(u32));
-> +	if (sets < 0) {
-> +		dev_err(dev, "%s resource type ids not available\n", of_prop);
-> +		return ERR_PTR(sets);
-> +	}
-> +
-> +	res->sets = sets / 2;
-> +
-> +	res->desc = devm_kcalloc(dev, res->sets, sizeof(*res->desc),
-> +				 GFP_KERNEL);
-> +	if (!res->desc)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	for (i = 0; i < res->sets; i++) {
-> +		ret = of_property_read_u32_index(dev_of_node(dev), of_prop,
-> +						 i * 2, &resource_type);
-> +		if (ret)
-> +			return ERR_PTR(-EINVAL);
-> +
-> +		ret = of_property_read_u32_index(dev_of_node(dev), of_prop,
-> +						 (i * 2) + 1,
-> +						 &resource_subtype);
-> +		if (ret)
-> +			return ERR_PTR(-EINVAL);
-> +
-> +		ret = handle->ops.rm_core_ops.get_range(handle, resource_type,
-> +							resource_subtype,
-> +							&res->desc[i].start,
-> +							&res->desc[i].num);
-> +		if (ret) {
-> +			dev_err(dev, "type %d subtype %d not allocated for host %d\n",
-> +				resource_type, resource_subtype,
-> +				handle_to_ti_sci_info(handle)->host_id);
-> +			return ERR_PTR(ret);
-> +		}
-> +
-> +		dev_dbg(dev, "res type = %d, subtype = %d, start = %d, num = %d\n",
-> +			resource_type, resource_subtype, res->desc[i].start,
-> +			res->desc[i].num);
+On Thu, Oct 04, 2018 at 01:43:18PM -0700, Jae Hyun Yoo wrote:
+> This commit adds 'timeout-ms' and '#retries' properties as common
+> optional properties that can be used for setting 'timeout' and
+> 'retries' values of 'struct i2c_adapter'. With this patch, the bus
+> timeout value and the master transfer retries count can be set
+> through these properties at the registration time of an adapter.
+> Still the values can be set by I2C_TIMEOUT and I2C_RETRIES ioctls
+> on cdev at runtime too.
+> 
+> These properties may not be supported by all drivers. However, if
+> a driver wants to support one of them, it should adapt the
+> bindings in this document.
+> 
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c.txt b/Documentation/devicetree/bindings/i2c/i2c.txt
+> index 11263982470e..6d7a6e919cf8 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c.txt
+> @@ -80,6 +80,12 @@ wants to support one of the below features, it should adapt the bindings below.
+>  	Names of map programmable addresses.
+>  	It can contain any map needing another address than default one.
+>  
+> +- timeout-ms
 
-NAK. Where is the binding for this? What is this decoding? Please don't
-decode binding without having an official binding.
+bus-timeout-ms in case we have some other timeout needed.
 
--- 
-Regards,
-Nishanth Menon
+> +	Bus timeout in milliseconds.
+> +
+> +- #retries
+> +	Number of retries for master transfer.
+> +
+>  Binding may contain optional "interrupts" property, describing interrupts
+>  used by the device. I2C core will assign "irq" interrupt (or the very first
+>  interrupt if not using interrupt names) as primary interrupt for the slave.
+> -- 
+> 2.19.0
+> 
