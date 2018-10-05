@@ -1,43 +1,80 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 5 Oct 2018 10:33:31 -0700
-Subject: [GIT PULL] Allwinner H3/H5 changes for 4.20, bis
-In-Reply-To: <CAK8P3a121EMnah1rKx7H8Bu1MrH_ZLyq3kNMM3U6eo13Gpx6yg@mail.gmail.com>
-References: <20181004193630.lbxyiecochf5cdfq@flea>
- <CAK8P3a121EMnah1rKx7H8Bu1MrH_ZLyq3kNMM3U6eo13Gpx6yg@mail.gmail.com>
-Message-ID: <CAOesGMgKj5XhnaY2Aeovm6Oa1Xf8sXfB3c-BqMoimvQYNqH7VA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 5 Oct 2018 12:31:45 -0500
+Subject: [PATCH 00/12] error handling and pciehp maintenance
+In-Reply-To: <20181004221137.GB21834@localhost.localdomain>
+References: <20180918235848.26694-1-keith.busch@intel.com>
+ <20181004214015.GK120535@bhelgaas-glaptop.roam.corp.google.com>
+ <20181004221137.GB21834@localhost.localdomain>
+Message-ID: <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 5, 2018 at 8:43 AM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Thu, Oct 4, 2018 at 9:36 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> > Hi Arnd, Olof,
-> >
-> > Here is a second attempt at the previous PR for the H3 and H5 changes,
-> > hopefully with the right SoB this time. It replaces the previous one.
->
-> Hi Maxime,
->
-> I'm not completely sure about this, we generally try not to rebase the
-> branches, and the previous version is now deep in the git history of the
-> next/dt branch.
->
-> Obviously having a missing signoff is also bad, but I think keeping
-> the old version of your branch is better in this case. Merging the
-> new branch on top of next/dt would give us a proper signoff chain on
-> each patch, but would not remove the patches with the missing
-> signoff. Instead we'd have lots of duplicate commits, which is probably
-> worse.
->
-> Olof, do you have any other ideas?
+[+cc arm64 folks, LKML: This conversation is about this patch:
 
-We now have the history documented on the mailing list, so we can find
-the history if needed, and the missing signoff was by one of several
-co-maintainers so it's not ideal but also not catastrophic.
+  https://lore.kernel.org/linux-pci/20180918235848.26694-3-keith.busch at intel.com
 
-We should probably get better at tooling for this instead (a pull
-request linter using Stephen's script or somesuch).
+which fixes some PCIe AER error injection bugs, but also makes the error
+injector dependent on DYNAMIC_FTRACE_WITH_REGS, which not all arches
+support.  Note that this question is only about the error *injection*
+module used for testing.  It doesn't affect AER support itself.]
 
+On Thu, Oct 04, 2018 at 04:11:37PM -0600, Keith Busch wrote:
+> On Thu, Oct 04, 2018 at 04:40:15PM -0500, Bjorn Helgaas wrote:
+> > On Tue, Sep 18, 2018 at 05:58:36PM -0600, Keith Busch wrote:
+> > > I ran into a lot of trouble testing error handling, and this series is
+> > > just trying to simplify some things. The first 4 fix up aer_inject, and
+> > > the rest are cleanup to make better use of kernel APIs.
+> > > 
+> > > Keith Busch (12):
+> > >   PCI: Set PCI bus accessors to noinline
+> > >   PCI/AER: Covertly inject errors
+> > >   PCI/AER: Reuse existing service device lookup
+> > >   PCI/AER: Abstract AER interrupt handling
+> > >   PCI/AER: Remove dead code
+> > >   PCI/AER: Remove error source from aer struct
+> > >   PCI/AER: Use kfifo for tracking events
+> > >   PCI/AER: Use kfifo helper inserting locked elements
+> > >   PCI/AER: Don't read upstream ports below fatal errors
+> > >   PCI/AER: Use threaded IRQ for bottom half
+> > >   PCI/AER: Use managed resource allocations
+> > >   PCI/pciehp: Use device managed allocations
+> > > 
+> > >  drivers/pci/access.c              |   4 +-
+> > >  drivers/pci/hotplug/pciehp_core.c |  14 +-
+> > >  drivers/pci/hotplug/pciehp_hpc.c  |  48 ++----
+> > >  drivers/pci/pcie/Kconfig          |   2 +-
+> > >  drivers/pci/pcie/aer.c            | 219 ++++++---------------------
+> > >  drivers/pci/pcie/aer_inject.c     | 306 ++++++++++++++++++++------------------
+> > >  drivers/pci/pcie/portdrv.h        |   4 -
+> > >  drivers/pci/pcie/portdrv_core.c   |   1 +
+> > >  8 files changed, 227 insertions(+), 371 deletions(-)
+> > 
+> > Thanks a lot for doing this!  I applied these to pci/hotplug for
+> > v4.20, except for "PCI/AER: Don't read upstream ports below fatal
+> > errors", which seems to be already there via another posting, and
+> > "PCI/pciehp: Use device managed allocations", which needs a few
+> > tweaks.
+> 
+> Sounds good, and thanks for applying!
+> 
+> In case this went unnoticed, patch 2's aer_inject using ftrace hooks
+> to pci config accessors is really cool and fixes several kernel crashes
+> I encountered, but it may not work on every architecture. I'm not sure
+> how widely aer_inject is used, so maybe there are no concerns with the
+> DYNAMIC_FTRACE_WITH_REGS dependency, but I just want to reemphasize that
+> dependency in case there are valid objections.
 
--Olof
+Oh, indeed, I hadn't noticed this arch dependency.  AFAICT, the new
+DYNAMIC_FTRACE_WITH_REGS dependency means aer_inject will work only
+on these arches:
+
+  arm		# if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+  powerpc	# if PPC64 && CPU_LITTLE_ENDIAN
+  riscv		# ARCH_RV64I only
+  s390
+  x86
+
+Notably missing is arm64, which has DYNAMIC_FTRACE but not
+DYNAMIC_FTRACE_WITH_REGS.
+
+Bjorn
