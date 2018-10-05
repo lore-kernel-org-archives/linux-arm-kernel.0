@@ -1,92 +1,77 @@
-From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
-Date: Fri, 5 Oct 2018 17:34:08 +0900
-Subject: [PATCH v2] arm64: dts: rockchip: add spdif sound node for rock64
-In-Reply-To: <CAGb2v64gTj7766o+6-BZkqKy=cDv9bqLcKHOzj-BiJOtjQMSyQ@mail.gmail.com>
-References: <20180917122633.31401-1-katsuhiro@katsuster.net>
- <CAGb2v64gTj7766o+6-BZkqKy=cDv9bqLcKHOzj-BiJOtjQMSyQ@mail.gmail.com>
-Message-ID: <9b54c5e6-f705-c792-1f41-c33c3403baa9@katsuster.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Oct 2018 09:39:44 +0100
+Subject: [RFC 1/2] reboot: Make restart_handler_list a blocking notifier
+ chain.
+In-Reply-To: <211e71a4-57ce-2383-c74f-dfbfa053e4b7@green-communications.fr>
+References: <20181004162339.19493-1-nicolas.cavallari@green-communications.fr>
+ <20181004162339.19493-2-nicolas.cavallari@green-communications.fr>
+ <20181004164911.GD30658@n2100.armlinux.org.uk>
+ <211e71a4-57ce-2383-c74f-dfbfa053e4b7@green-communications.fr>
+Message-ID: <20181005083944.GF30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Sorry for late, thank you for your comments.
-
-On 2018?10?03? 18:53, Chen-Yu Tsai wrote:
-> Hi,
+On Fri, Oct 05, 2018 at 10:27:48AM +0200, Nicolas Cavallari wrote:
+> On 04/10/2018 18:49, Russell King - ARM Linux wrote:
+> > This isn't going to work.
+> > 
+> > For example, sysrq processing (which can happen in IRQ context) calls
+> > emergency_restart() for the reboot sysrq.  That calls through to
+> > machine_restart(), which then calls do_kernel_restart().
+> >
+> > If do_kernel_restart() sleeps, then we're trying to sleep in IRQ
+> > context, and that's a no no.  I'm afraid you can't just add an irq
+> > enable and change the notifier list to be atomic - and, as you're
+> > making the change in generic code, this affects everyone, not just the
+> > architecture that happens to be in front of you (so if it were merged,
+> > you're likely to get a lot of bug reports!)
 > 
-> On Mon, Sep 17, 2018 at 8:28 PM Katsuhiro Suzuki
-> <katsuhiro@katsuster.net> wrote:
->>
->> This patch adds sound card node for rock64. Currently we can support
->> S/PDIF only. It seems the lack of codec driver of rk3328 to enable
->> analog audio out.
->>
->> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
->> ---
->>   .../arm64/boot/dts/rockchip/rk3328-rock64.dts | 29 +++++++++++++++++++
->>   1 file changed, 29 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
->> index 5852061e497b..9ee4f57557f3 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
->> +++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
->> @@ -62,6 +62,23 @@
->>                  regulator-min-microvolt = <5000000>;
->>                  regulator-max-microvolt = <5000000>;
->>          };
->> +
->> +       sound {
->> +               compatible = "audio-graph-card";
->> +               label = "rockchip,rk3328";
+> I don't get it.
 > 
-> I understand that this patch has been merged. However, seeing this label
-> I wonder how this works when the analog codec and HDMI audio out are added,
-> and how userspace is supposed to select an output.
+> Many implementations of machine_restart() sleeps or do an infinite loop.
+> Almost half of the restart_handler users sleeps or do an infinite loop.
+
+Infinite loops are not a problem when shutting down or rebooting -
+they're only "infinite" in the sense that control never returns but
+that is the case anyway when the restart or shutdown takes effect.
+
+> I understand that sleeping in IRQ context is bad, but the kernel does it
+> anyway. And it seems nobody have noticed any problem with this.
+
+That is incorrect - there are reports of this failing as I mentioned
+in my email.
+
+Also note that there is a big difference between sleeping in atomic
+context (iow, sleeping with spinlocks held, attempting to sleep with
+IRQs disabled) and sleeping in IRQ context (iow, sleeping in an
+interrupt handler).  You can "work around" the former with your code,
+but in doing so you end up _breaking_ the latter case for every
+situation.
+
+I've pointed out some of the issues that make it unreliable in my
+initial email (quoted below).
+
+> > It gets worse, because (eg) a panic() or IRQ can happen with any locks
+> > held - and if the I2C device's locks are held when one of those events
+> > happen, you have a deadlock situation (hence you won't reboot!)
+> > 
+> > I suppose a good first step would be for us to have our own
+> > machine_emergency_restart() on ARM, to separate the atomic paths
+> > from the non-atomic paths, so that those who need to talk to an I2C,
+> > that can happen from the non-atomic path (which means things like
+> > /sbin/reboot will work) but other stuff (eg, restart on panic, sysrq,
+> > soft-watchdog) will fail.
 > 
+> That would fix my use case, but not the existing code ?
 
-I don't know detail of HDMI audio of RK3328, but maybe it has cpu or 
-codec DAIs. The audio-graph-card is supporting to use multiple DAIs on
-a card. This is same as simple-audio-card.
+There is no fix possible for a blocking I2C transfer in IRQ context,
+it will always be unreliable for the reasons I've explained above.
 
-For example, add I2S0 device as hw:X,0
-(and move SPDIF to hw:X,0 -> hw:X,1)
+All those existing cases where drivers are doing I2C transfers using
+the I2C host driver for power down or restart are broken and
+unreliable.
 
-sound {
-	compatible = "audio-graph-card";
-	label = "rockchip,rk3328";
-	dais = <&i2s0_p0
-		&spdif_p0>;
-};
-
-&i2s0 {
-	status = "okay";
-	#sound-dai-cells = <0>;
-
-	i2s0_p0: port {
-		i2s0_p0_0: endpoint {
-			dai-format = "i2s";
-			remote-endpoint = <&some_codec_abcd>;
-		};
-	};
-};
-
-We should write special card driver for RK3328 sound if audio-graph-card
-is not enough to deal with HDMI audio.
-
-
-> On the side, it seems that extra codecs, such as the rock64 add-on board,
-> are easier dealt with by adding a separate simple-audio-card node to couple
-> the codec and i2s nodes.
-
-I think multiple DAIs on single card and single DAI on multiple cards
-are both OK to work. But I cannot decide the way for this issue.
-
-
-> 
-> ChenYu
-> 
-
-Regards,
---
-Katsuhiro Suzuki
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
