@@ -1,110 +1,87 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 05 Oct 2018 16:17:30 +0100
-Subject: [PATCH] irqchip/gic-v3-its: Add early memory allocation errata
-In-Reply-To: <93532c6a-0a84-4063-3f9f-171490985cbb@gmail.com>
-References: <20180912095232.2110-1-matthias.bgg@kernel.org>
- <a08119a0-fc4e-6328-c3ad-04e5250f38d7@suse.com>
- <95733d12-ee1d-9874-16a7-c614cc0ce8cd@arm.com>
- <8ef6b381-e170-30de-ad0e-fae8ccf189e5@suse.com>
- <1d227152-2770-3e93-f78c-71e7a3b4fe76@arm.com>
- <93532c6a-0a84-4063-3f9f-171490985cbb@gmail.com>
-Message-ID: <86y3bctoc5.wl-marc.zyngier@arm.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Fri, 5 Oct 2018 09:20:09 -0600
+Subject: [RFC PATCH 0/2] ACPI / PPTT: ids for caches
+In-Reply-To: <20181005150235.13846-1-james.morse@arm.com>
+References: <20181005150235.13846-1-james.morse@arm.com>
+Message-ID: <da8a4ae0-b63c-d27f-1f54-af19f058881c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 05 Oct 2018 15:13:48 +0100,
-Matthias Brugger <matthias.bgg@gmail.com> wrote:
+On 10/5/2018 9:02 AM, James Morse wrote:
+> Hi guys,
+> 
+> To get resctrl working on arm64, we need to generate 'id's for caches.
+> This is this value that shows up in, e.g.:
+> | /sys/devices/system/cpu/cpu0/cache/index3/id
+> 
+> This value needs to be unique for each level of cache, but doesn't
+> need to be contiguous. (there may be gaps, it may not start at 0).
+> Details in Documentation/x86/intel_rdt_ui.txt::Cache IDs
+> 
+> resctrl receives these values back via its schemata file. e.g.:
+> | echo "L3:0=fff;1=fff" > /sys/fs/resctrl/p1/schemata
+> Where 0 and 1 are the ids of two caches in the system.
+> 
+> These values become ABI, and are likely to be baked into shell scripts.
+> We want a value that is the same over reboots, and should be the same
+> on identical hardware, even if the PPTT is generated in a different
+> order. The hardware doesn't give us any indication of which caches are
+> shared, so this information must come from firmware tables.
+> 
+> This series generates an id from the PPTT topology, based on the lowest
+> MPIDR of the cpus that share a cache.
+> 
+> The remaining problems with this approach are:
+>   * the 32bit ID field is full of MPIDR.Aff{0-3}. We don't have space to
+>     hide 'i/d/unified', so can only generate ids for unified caches. If we
+>     ever get an Aff4 (plenty of RES0 space in there) we can no longer generate
+>     an id. Having all these bits accounted for in the initial version doesn't
+>     feel like a good ABI choice.
+> 
+> * Existing software is going to assume caches are numbered 0,1,2. This was
+>    documented as not guaranteed, and its likely never going to be the case
+>    if we generate ids like this.
+> 
+> * The table walk is recursive.
 > 
 > 
+> Fixes for the first two require extra-code to compact the ID range, which would
+> require us generating all the IDs up front, not from hotplug callbacks as has
+> to happen today.
 > 
-> On 05/10/2018 15:42, Marc Zyngier wrote:
-> > On 05/10/18 13:33, Matthias Brugger wrote:
-> >>
-> >>
-> >> On 05/10/2018 12:55, Marc Zyngier wrote:
-> >>> Hi Matthias,
-> >>>
-> >>> On 04/10/18 23:11, Matthias Brugger wrote:
-> >>>> Friendly reminder, if anyone has any comment on the patch :)
-> >>>>
-> >>>> On 9/12/18 11:52 AM, matthias.bgg at kernel.org wrote:
-> >>>>> From: Matthias Brugger <mbrugger@suse.com>
-> >>>>>
-> >>>>> Some hardware does not implement two-level page tables so that
-> >>>>> the amount of contigious memory needed by the baser is bigger
-> >>>>> then the zone order. This is a known problem on Cavium Thunderx
-> >>>>> with 4K page size.
-> >>>>>
-> >>>>> We fix this by adding an errata which allocates the memory early
-> >>>>> in the boot cycle, using the memblock allocator.
-> >>>>>
-> >>>>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> >>>>> ---
-> >>>>> ?? arch/arm64/Kconfig?????????????? | 12 ++++++++
-> >>>>> ?? arch/arm64/include/asm/cpucaps.h |? 3 +-
-> >>>>> ?? arch/arm64/kernel/cpu_errata.c?? | 33 +++++++++++++++++++++
-> >>>>> ?? drivers/irqchip/irq-gic-v3-its.c | 50 ++++++++++++++++++++------------
-> >>>>> ?? 4 files changed, 79 insertions(+), 19 deletions(-)
-> >>>
-> >>> My only comment would be to state how much I dislike both the HW and the
-> >>> patch... ;-) The idea that we have some erratum that depends on the page size
-> >>> doesn't feel good at all.
-> >>>
-> >>
-> >> Well ugly HW needs ugly patches ;-)
-> >>
-> >>>>>
-> >>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >>>>> index 1b1a0e95c751..dfd9fe08f0b2 100644
-> >>>>> --- a/arch/arm64/Kconfig
-> >>>>> +++ b/arch/arm64/Kconfig
-> >>>>> @@ -597,6 +597,18 @@ config QCOM_FALKOR_ERRATUM_E1041
-> >>>>> ?? ??????? If unsure, say Y.
-> >>>>> ?? +config CAVIUM_ALLOC_ITS_TABLE_EARLY
-> >>>>> +??? bool "Cavium Thunderx: Allocate the its table early"
-> >>>>> +??? default y
-> >>>>> +??? depends on ARM64_4K_PAGES && FORCE_MAX_ZONEORDER < 13
-> >>>
-> >>> Here's a though: Why don't we ensure that FORCE_MAX_ZONEORDER is such as we
-> >>> could always allocate the same amount of memory, no matter what the page size
-> >>> is? That, or bump FORCE_MAX_ZONEORDER to 13 if the kernel includes support
-> >>> for TX1.
-> >>>
-> >>
-> >> Bumping FORCE_MAX_ZONEORDER when TX1 is supported was proposed here:
-> >> https://patchwork.kernel.org/patch/6322281/
-> >>
-> >> To bring in some more history, the CMA approach ended with this discussion:
-> >> https://patchwork.kernel.org/patch/9888041/
-> >>
-> >>> Any of this of course requires buy-in from the arm64 maintainers, as this is
-> >>> quite a departure from the way things work so far.
-> >>>
-> >>
-> >> With my distribution head on, I would prefer a solution that does not change
-> >> FORCE_MAX_ZONEORDER. That's how I came to the idea providing a third solution to
-> >> the same problem :)
-> > 
-> > Why is that a problem? What impact does this have on your favourite distro?
-> > 
+> Alternatively, we could try and change the abi to provide a u64 as the
+> cache id. The size isn't documented, and for resctrl userspace can treat
+> it as a string.
 > 
-> The impact is on changing FORCE_MAX_ZONEORDER on an already released
-> kernel will break Kernel ABI and with that all external modules. I
-> know that's nothing upstream cares too much about, but the distros
-> do :)
+> Better ideas welcome!
 
-Unfortunately, that's something you're bringing upon yourself, and I'm
-afraid I can't really take this into account. You could always bump
-that ABI if you really want to support this platform as, at the end of
-the day, this is something you're in control of.
+I'm sorry, I'm not familiar with this resctrl, and therefore I don't 
+quite feel like I have a handle on what we need out of the ids file (and 
+the Documentation you pointed to doesn't seem to clarify it for me).
 
-But I'd really like to hear what Catalin or Will think of this (Will
-wasn't massively impressed by this 3 years ago, and I wonder if his
-approach has changed since).
+Lets assume we have a trivial 4 core system.  Each core has a private 
+L1i and L1d cache.  Cores 0/1 and 2/3 share a L2.  Cores 0-3 share L3.
 
-Thanks,
+If we are assigning ids in the range 1-N, what might we expect the id of 
+each cache to be?
 
-	M.
+Is this sane (each unique cache instance has a unique id), or have I 
+misunderstood?
+CPU0 L1i - 1
+CPU0 L1d - 2
+CPU1 L1i - 3
+CPU1 L1d - 4
+CPU2 L1i - 5
+CPU2 L1d - 6
+CPU3 L1i - 7
+CPU3 L1d - 8
+CPU0/1 L2 - 9
+CPU2/3 L2 - 10
+        L3 - 11
 
 -- 
-Jazz is not dead, it just smell funny.
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
