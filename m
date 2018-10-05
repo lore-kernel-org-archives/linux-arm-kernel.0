@@ -1,35 +1,35 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri,  5 Oct 2018 15:21:20 +0100
-Subject: [PATCH] MAINTAINERS: fix bad sdei paths
-Message-ID: <20181005142120.13279-1-james.morse@arm.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 5 Oct 2018 20:00:02 +0530
+Subject: [PATCH 0/4] firmware: ti_sci: Introduce RM support
+Message-ID: <20181005143006.18284-1-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDEI header files had an 'arm_' namespace added, but the patterns
-in the MAINTAINERS files were missed. Oops.
+This series adds support for:
+- Resource management(RM) core apis to get the range of resources assigned to
+  a device.
+- RM IRQ management apis to configure/release the irq route between requested
+  source and destination.
 
-Reported-by: Joe Perches <joe@perches.com>
-Signed-off-by: James Morse <james.morse@arm.com>
----
-The SDEI stuff originally went via arm64, ... what about this?
+More information on RM APIs can be found here[1].
 
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Based on tag: next-20181005
+Boot Log: https://pastebin.ubuntu.com/p/FCvgrRMXtM/
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2c7069037a15..30df8d42baa9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -13186,8 +13186,8 @@ L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/arm/firmware/sdei.txt
- F:	drivers/firmware/arm_sdei.c
--F:	include/linux/sdei.h
--F:	include/uapi/linux/sdei.h
-+F:	include/linux/arm_sdei.h
-+F:	include/uapi/linux/arm_sdei.h
- 
- SOFTWARE RAID (Multiple Disks) SUPPORT
- M:	Shaohua Li <shli@kernel.org>
+[1] http://downloads.ti.com/tisci/esd/latest/
+
+Grygorii Strashko (1):
+  firmware: ti_sci: Add support to get TISCI handle using of_phandle
+
+Lokesh Vutla (3):
+  firmware: ti_sci: Add support for RM core ops
+  firmware: ti_sci: Add support for IRQ management
+  firmware: ti_sci: Add helper apis to mange resources
+
+ drivers/firmware/ti_sci.c              | 759 +++++++++++++++++++++++++
+ drivers/firmware/ti_sci.h              | 102 ++++
+ include/linux/soc/ti/ti_sci_protocol.h | 168 ++++++
+ 3 files changed, 1029 insertions(+)
+
 -- 
-2.17.1
+2.19.0
