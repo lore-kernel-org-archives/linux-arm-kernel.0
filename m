@@ -1,244 +1,188 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:30 -0500
-Subject: [PATCH 18/36] dt-bindings: arm: Convert Amlogic board/soc bindings to
- json-schema
+Date: Fri,  5 Oct 2018 11:58:19 -0500
+Subject: [PATCH 07/36] kbuild: Add support for DT binding schema checks
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-19-robh@kernel.org>
+Message-ID: <20181005165848.3474-8-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert Amlogic SoC bindings to DT schema format using json-schema.
+This adds the build infrastructure for checking DT binding schema
+documents and validating dts files using the binding schema.
 
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
+Check DT binding schema documents:
+make dt_binding_check
+
+Build dts files and check using DT binding schema:
+make dtbs_check
+
+Currently, the validation targets are separate from a normal build to
+avoid a hard dependency on the external DT schema project and because
+there are lots of warnings generated.
+
+Cc: Jonathan Corbet <corbet@lwn.net>
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Michal Marek <michal.lkml@markovi.net>
+Cc: linux-doc at vger.kernel.org
 Cc: devicetree at vger.kernel.org
+Cc: linux-kbuild at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/amlogic.txt       | 102 -----------------
- .../devicetree/bindings/arm/amlogic.yaml      | 104 ++++++++++++++++++
- 2 files changed, 104 insertions(+), 102 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic.yaml
+ .gitignore                                   |  1 +
+ Documentation/Makefile                       |  2 +-
+ Documentation/devicetree/bindings/.gitignore |  2 ++
+ Documentation/devicetree/bindings/Makefile   | 30 ++++++++++++++++++++
+ Makefile                                     |  8 +++++-
+ scripts/Makefile.lib                         | 24 ++++++++++++++--
+ 6 files changed, 63 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/.gitignore
+ create mode 100644 Documentation/devicetree/bindings/Makefile
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-deleted file mode 100644
-index 2f2d01a00c54..000000000000
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ /dev/null
-@@ -1,102 +0,0 @@
--Amlogic MesonX device tree bindings
---------------------------------------------
--
--Work in progress statement:
--
--Device tree files and bindings applying to Amlogic SoCs and boards are
--considered "unstable". Any Amlogic device tree binding may change at
--any time. Be sure to use a device tree binary and a kernel image
--generated from the same source tree.
--
--Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
--stable binding/ABI.
--
-----------------------------------------------------------------
--
--Boards with the Amlogic Meson6 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson6"
--
--Boards with the Amlogic Meson8 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson8";
--
--Boards with the Amlogic Meson8b SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson8b";
--
--Boards with the Amlogic Meson8m2 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson8m2";
--
--Boards with the Amlogic Meson GXBaby SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson-gxbb";
--
--Boards with the Amlogic Meson GXL S905X SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s905x", "amlogic,meson-gxl";
--
--Boards with the Amlogic Meson GXL S905D SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s905d", "amlogic,meson-gxl";
--
--Boards with the Amlogic Meson GXL S805X SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s805x", "amlogic,meson-gxl";
--
--Boards with the Amlogic Meson GXL S905W SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s905w", "amlogic,meson-gxl";
--
--Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s912", "amlogic,meson-gxm";
--
--Boards with the Amlogic Meson AXG A113D SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,a113d", "amlogic,meson-axg";
--
--Board compatible values (alphabetically, grouped by SoC):
--
--  - "geniatech,atv1200" (Meson6)
--
--  - "minix,neo-x8" (Meson8)
--
--  - "hardkernel,odroid-c1" (Meson8b)
--  - "tronfy,mxq" (Meson8b)
--
--  - "tronsmart,mxiii-plus" (Meson8m2)
--
--  - "amlogic,p200" (Meson gxbb)
--  - "amlogic,p201" (Meson gxbb)
--  - "friendlyarm,nanopi-k2" (Meson gxbb)
--  - "hardkernel,odroid-c2" (Meson gxbb)
--  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
--  - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
--  - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
--  - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
--  - "wetek,hub" (Meson gxbb)
--  - "wetek,play2" (Meson gxbb)
--
--  - "amlogic,p212" (Meson gxl s905x)
--  - "hwacom,amazetv" (Meson gxl s905x)
--  - "khadas,vim" (Meson gxl s905x)
--  - "libretech,cc" (Meson gxl s905x)
--
--  - "amlogic,p230" (Meson gxl s905d)
--  - "amlogic,p231" (Meson gxl s905d)
--
--  - "amlogic,p241" (Meson gxl s805x)
--
--  - "amlogic,p281" (Meson gxl s905w)
--  - "oranth,tx3-mini" (Meson gxl s905w)
--
--  - "amlogic,q200" (Meson gxm s912)
--  - "amlogic,q201" (Meson gxm s912)
--  - "khadas,vim2" (Meson gxm s912)
--  - "kingnovel,r-box-pro" (Meson gxm S912)
--  - "nexbox,a1" (Meson gxm s912)
--  - "tronsmart,vega-s96" (Meson gxm s912)
--
--  - "amlogic,s400" (Meson axg a113d)
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.yaml b/Documentation/devicetree/bindings/arm/amlogic.yaml
+diff --git a/.gitignore b/.gitignore
+index 97ba6b79834c..a20ac26aa2f5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -15,6 +15,7 @@
+ *.bin
+ *.bz2
+ *.c.[012]*.*
++*.dt.yaml
+ *.dtb
+ *.dtb.S
+ *.dwo
+diff --git a/Documentation/Makefile b/Documentation/Makefile
+index 2ca77ad0f238..9786957c6a35 100644
+--- a/Documentation/Makefile
++++ b/Documentation/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Sphinx documentation
+ #
+ 
+-subdir-y :=
++subdir-y := devicetree/bindings/
+ 
+ # You can set these variables from the command line.
+ SPHINXBUILD   = sphinx-build
+diff --git a/Documentation/devicetree/bindings/.gitignore b/Documentation/devicetree/bindings/.gitignore
 new file mode 100644
-index 000000000000..6168fef53aa1
+index 000000000000..7e47316f1d7a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic.yaml
-@@ -0,0 +1,104 @@
-+# SPDX-License-Identifier: None
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/bindings/arm/amlogic.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
++++ b/Documentation/devicetree/bindings/.gitignore
+@@ -0,0 +1,2 @@
++*.example.dts
++*.yaml.tmp
+diff --git a/Documentation/devicetree/bindings/Makefile b/Documentation/devicetree/bindings/Makefile
+new file mode 100644
+index 000000000000..b57f0dec3fab
+--- /dev/null
++++ b/Documentation/devicetree/bindings/Makefile
+@@ -0,0 +1,30 @@
++# SPDX-License-Identifier: GPL-2.0
++DT_DOC_CHECKER ?= dt-doc-validate
++DT_EXTRACT_EX ?= dt-extract-example
 +
-+title: Amlogic MesonX device tree bindings
++quiet_cmd_chk_binding = CHKDT   $<
++      cmd_chk_binding = (set -e; \
++                         $(DT_DOC_CHECKER) $< ; \
++                         mkdir -p $(dir $@) ; \
++                         $(DT_EXTRACT_EX) $< > $@ )
 +
-+maintainers:
-+  - Neil Armstrong <narmstrong@baylibre.com>
-+  - Carlo Caione <carlo@caione.org>
-+description: |+
-+  Work in progress statement:
++$(obj)/%.example.dts: $(src)/%.yaml FORCE
++	$(call if_changed,chk_binding)
 +
-+  Device tree files and bindings applying to Amlogic SoCs and boards are
-+  considered "unstable". Any Amlogic device tree binding may change at
-+  any time. Be sure to use a device tree binary and a kernel image
-+  generated from the same source tree.
++DT_MK_SCHEMA ?= dt-mk-schema
++DT_TMP_SCHEMA := .schema.yaml.tmp
++extra-y += $(DT_TMP_SCHEMA)
 +
-+  Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
-+  stable binding/ABI.
++quiet_cmd_mk_schema = SCHEMA  $@
++      cmd_mk_schema = mkdir -p $(obj); \
++                      $(DT_MK_SCHEMA) -o $@ $(srctree)/$(src)
 +
-+properties:
-+  $nodename:
-+    const: '/'
-+  compatible:
-+    oneOf:
-+      - items:
-+          - enum:
-+              - geniatech,atv1200
-+          - const: amlogic,meson6
-+      - items:
-+          - enum:
-+              - minix,neo-x8
-+          - const: amlogic,meson8
-+      - items:
-+          - enum:
-+              - tronsmart,mxiii-plus
-+          - const: amlogic,meson8m2
-+      - items:
-+          - enum:
-+              - hardkernel,odroid-c1
-+              - tronfy,mxq
-+          - const: amlogic,meson8b
-+      - items:
-+          - enum:
-+              - amlogic,p200
-+              - amlogic,p201
-+              - friendlyarm,nanopi-k2
-+              - hardkernel,odroid-c2
-+              - nexbox,a95x
-+              - wetek,hub
-+              - wetek,play2
-+          - const: amlogic,meson-gxbb
-+      - items:
-+          - enum:
-+              - tronsmart,vega-s95-pro
-+              - tronsmart,vega-s95-meta
-+              - tronsmart,vega-s95-telos
-+          - const: tronsmart,vega-s95
-+          - const: amlogic,meson-gxbb
-+      - items:
-+          - enum:
-+              - amlogic,p241
-+          - const: amlogic,s805x
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,p281
-+              - oranth,tx3-mini
-+          - const: amlogic,s905w
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,p212
-+              - hwacom,amazetv
-+              - khadas,vim
-+              - libretech,cc
-+              - nexbox,a95x
-+          - const: amlogic,s905x
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,p230
-+              - amlogic,p231
-+          - const: amlogic,s905d
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,q200
-+              - amlogic,q201
-+              - khadas,vim2
-+              - kingnovel,r-box-pro
-+              - nexbox,a1
-+              - tronsmart,vega-s96
-+          - const: amlogic,s912
-+          - const: amlogic,meson-gxm
-+      - items:
-+          - enum:
-+              - amlogic,s400
-+          - const: amlogic,a113d
-+          - const: amlogic,meson-axg
++DT_DOCS = $(shell cd $(srctree)/$(src) && find * -name '*.yaml')
++DTS_EXAMPLES = $(patsubst %.yaml,%.example.dts, $(DT_DOCS))
++extra-y += $(DTS_EXAMPLES)
 +
-+...
++DTBS = $(patsubst %.yaml,%.example.dtb, $(DT_DOCS))
++extra-y += $(DTBS)
++
++$(obj)/$(DT_TMP_SCHEMA): $(addprefix $(obj)/, $(DTBS)) FORCE
++	$(call if_changed,mk_schema)
+diff --git a/Makefile b/Makefile
+index 021e274c4b03..648f7238e883 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1227,10 +1227,13 @@ ifneq ($(dtstree),)
+ %.dtb: prepare3 scripts_dtc
+ 	$(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
+ 
+-PHONY += dtbs dtbs_install
++PHONY += dtbs dtbs_install dt_binding_check
+ dtbs: prepare3 scripts_dtc
+ 	$(Q)$(MAKE) $(build)=$(dtstree)
+ 
++dtbs_check: prepare3 dt_binding_check
++	$(Q)$(MAKE) $(build)=$(dtstree) CHECK_DTBS=1
++
+ dtbs_install:
+ 	$(Q)$(MAKE) $(dtbinst)=$(dtstree)
+ 
+@@ -1244,6 +1247,9 @@ PHONY += scripts_dtc
+ scripts_dtc: scripts_basic
+ 	$(Q)$(MAKE) $(build)=scripts/dtc
+ 
++dt_binding_check: scripts_dtc
++	$(Q)$(MAKE) $(build)=Documentation/devicetree/bindings
++
+ # ---------------------------------------------------------------------------
+ # Modules
+ 
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 8fe4468f9bda..d1c5630ba24c 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -61,6 +61,11 @@ real-obj-m := $(foreach m, $(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))
+ extra-y				+= $(dtb-y)
+ extra-$(CONFIG_OF_ALL_DTBS)	+= $(dtb-)
+ 
++ifneq ($(CHECK_DTBS),)
++extra-y += $(patsubst %.dtb,%.dt.yaml, $(dtb-y))
++extra-$(CONFIG_OF_ALL_DTBS) += $(patsubst %.dtb,%.dt.yaml, $(dtb-))
++endif
++
+ # Add subdir path
+ 
+ extra-y		:= $(addprefix $(obj)/,$(extra-y))
+@@ -284,13 +289,28 @@ $(obj)/%.dtb.S: $(obj)/%.dtb FORCE
+ quiet_cmd_dtc = DTC     $@
+ cmd_dtc = mkdir -p $(dir ${dtc-tmp}) ; \
+ 	$(HOSTCC) -E $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
+-	$(DTC) -O dtb -o $@ -b 0 \
++	$(DTC) -O $(2) -o $@ -b 0 \
+ 		$(addprefix -i,$(dir $<) $(DTC_INCLUDE)) $(DTC_FLAGS) \
+ 		-d $(depfile).dtc.tmp $(dtc-tmp) ; \
+ 	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
+ 
+ $(obj)/%.dtb: $(src)/%.dts $(DTC) FORCE
+-	$(call if_changed_dep,dtc)
++	$(call if_changed_dep,dtc,dtb)
++
++DT_CHECKER ?= dt-validate
++DT_BINDING_DIR := Documentation/devicetree/bindings
++DT_TMP_SCHEMA := $(objtree)/$(DT_BINDING_DIR)/.schema.yaml.tmp
++
++quiet_cmd_dtb_check =	CHECK  $@
++      cmd_dtb_check =	$(DT_CHECKER) -p $(DT_TMP_SCHEMA) $@ ;
++
++define rule_dtc_dt_yaml
++	$(call cmd_and_fixdep,dtc,yaml)		\
++	$(call echo-cmd,dtb_check) $(cmd_dtb_check)
++endef
++
++$(obj)/%.dt.yaml: $(src)/%.dts $(DTC) $(DT_TMP_SCHEMA) FORCE
++	$(call if_changed_rule,dtc_dt_yaml)
+ 
+ dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
+ 
 -- 
 2.17.1
