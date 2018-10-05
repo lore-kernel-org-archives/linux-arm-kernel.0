@@ -1,50 +1,57 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Fri, 5 Oct 2018 23:38:06 +0200
-Subject: [PATCH v2 2/2] drm/sun4i: tcon: prevent tcon->panel dereference
- if null
-In-Reply-To: <20181004195605.txvbkshvxklyzxyb@flea>
-References: <9a545739-eed5-7af1-3b75-108bdd3427a2@micronovasrl.com>
- <20181003142458.33120-1-giulio.benetti@micronovasrl.com>
- <20181003142458.33120-2-giulio.benetti@micronovasrl.com>
- <20181004195605.txvbkshvxklyzxyb@flea>
-Message-ID: <5c45b263-e310-82af-ffb3-85eac93622d5@micronovasrl.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Fri,  5 Oct 2018 14:45:04 -0700
+Subject: [PATCH i2c-next v7 2/5] i2c: core: Add support reading of
+ 'bus-timeout-ms' and '#retries' properties
+In-Reply-To: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
+References: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20181005214507.26315-3-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This commit adds support for 'bus-timeout-ms' and '#retries'
+properties to set 'timeout' and 'retries' values in
+'struct i2c_adapter' in case an adapter node has the properties.
+Still the values can be set by I2C_TIMEOUT and I2C_RETRIES ioctls
+on cdev at runtime too.
 
-Il 04/10/2018 21:56, Maxime Ripard ha scritto:
-> On Wed, Oct 03, 2018 at 04:24:58PM +0200, Giulio Benetti wrote:
->> If using tcon with VGA,
-> 
-> We don't have support for VGA at the moment. Or are you talking about
-> using a VGA bridge?
+These properties may not be supported by all drivers. However, if
+a driver wants to support one of them, it should adapt the
+bindings in the dt-bindings document.
 
-You're right, in general VGA is not the point.
-tcon->panel is retrieved by drm_of_find_panel_or_bridge() and panel can 
-be present or not.
+Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+---
+ drivers/i2c/i2c-core-base.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
->> tcon->panel will be null(0), this will cause segmentation fault when
->> trying to dereference tcon->panel->connector.
-> 
-> It's not a segmentation fault, but a null pointer dereference. And
-> that case will also happen with bridges.
-
-Right.
-
-Going to improve/rewrite commit logs and submit v2 patchset.
-
-Thanks for reviewing.
-
-Best regards
+diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
+index 799776c6d421..aa2a365d374a 100644
+--- a/drivers/i2c/i2c-core-base.c
++++ b/drivers/i2c/i2c-core-base.c
+@@ -1214,6 +1214,7 @@ EXPORT_SYMBOL_GPL(i2c_handle_smbus_host_notify);
+ static int i2c_register_adapter(struct i2c_adapter *adap)
+ {
+ 	int res = -EINVAL;
++	u32 bus_timeout_ms = 0;
+ 
+ 	/* Can't register until after driver model init */
+ 	if (WARN_ON(!is_registered)) {
+@@ -1239,8 +1240,15 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
+ 	INIT_LIST_HEAD(&adap->userspace_clients);
+ 
+ 	/* Set default timeout to 1 second if not already set */
+-	if (adap->timeout == 0)
+-		adap->timeout = HZ;
++	if (adap->timeout == 0) {
++		device_property_read_u32(&adap->dev, "bus-timeout-ms",
++					 &bus_timeout_ms);
++		adap->timeout = bus_timeout_ms ?
++					msecs_to_jiffies(bus_timeout_ms) : HZ;
++	}
++
++	/* Set retries count if it has the property setting */
++	device_property_read_u32(&adap->dev, "#retries", &adap->retries);
+ 
+ 	/* register soft irqs for Host Notify */
+ 	res = i2c_setup_host_notify_irq_domain(adap);
 -- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+2.19.0
