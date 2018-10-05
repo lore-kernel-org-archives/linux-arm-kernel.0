@@ -1,50 +1,110 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Oct 2018 17:16:08 +0200
-Subject: [PATCH net-next v6 19/23] zinc: Curve25519 ARM implementation
-In-Reply-To: <20181005150538.17006.qmail@cr.yp.to>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-20-Jason@zx2c4.com>
- <CAKv+Gu9FLDRLxHReKcveZYHNYerR5Y2pZd9gn-hWrU0jb2KgfA@mail.gmail.com>
- <CAHmME9rp0Fi5ObK5oi8FHj1_nK5hP4T2Bq7_dAmzq4OQ0mp0uw@mail.gmail.com>
- <20181005150538.17006.qmail@cr.yp.to>
-Message-ID: <CAKv+Gu8SFbKXwO_fngymM6Rh6jU4=B14=V0NaCBOTOCoO3M-kA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 05 Oct 2018 16:17:30 +0100
+Subject: [PATCH] irqchip/gic-v3-its: Add early memory allocation errata
+In-Reply-To: <93532c6a-0a84-4063-3f9f-171490985cbb@gmail.com>
+References: <20180912095232.2110-1-matthias.bgg@kernel.org>
+ <a08119a0-fc4e-6328-c3ad-04e5250f38d7@suse.com>
+ <95733d12-ee1d-9874-16a7-c614cc0ce8cd@arm.com>
+ <8ef6b381-e170-30de-ad0e-fae8ccf189e5@suse.com>
+ <1d227152-2770-3e93-f78c-71e7a3b4fe76@arm.com>
+ <93532c6a-0a84-4063-3f9f-171490985cbb@gmail.com>
+Message-ID: <86y3bctoc5.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2018 at 17:05, D. J. Bernstein <djb@cr.yp.to> wrote:
-> For the in-order ARM Cortex-A8 (the target for this code), adjacent
-> multiply-add instructions forward summands quickly. A simple in-order
-> dot-product computation has no latency problems, while interleaving
-> computations, as suggested in this thread, creates problems. Also, on
-> this microarchitecture, occasional ARM instructions run in parallel with
-> NEON, so trying to manually eliminate ARM instructions through global
-> pointer tracking wouldn't gain speed; it would simply create unnecessary
-> code-maintenance problems.
->
-> See https://cr.yp.to/papers.html#neoncrypto for analysis of the
-> performance of---and remaining bottlenecks in---this code. Further
-> speedups should be possible on this microarchitecture, but, for anyone
-> interested in this, I recommend focusing on building a cycle-accurate
-> simulator (e.g., fixing inaccuracies in the Sobole simulator) first.
->
-> Of course, there are other ARM microarchitectures, and there are many
-> cases where different microarchitectures prefer different optimizations.
-> The kernel already has boot-time benchmarks for different optimizations
-> for raid6, and should do the same for crypto code, so that implementors
-> can focus on each microarchitecture separately rather than living in the
-> barbaric world of having to choose which CPUs to favor.
->
+On Fri, 05 Oct 2018 15:13:48 +0100,
+Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> 
+> 
+> 
+> On 05/10/2018 15:42, Marc Zyngier wrote:
+> > On 05/10/18 13:33, Matthias Brugger wrote:
+> >>
+> >>
+> >> On 05/10/2018 12:55, Marc Zyngier wrote:
+> >>> Hi Matthias,
+> >>>
+> >>> On 04/10/18 23:11, Matthias Brugger wrote:
+> >>>> Friendly reminder, if anyone has any comment on the patch :)
+> >>>>
+> >>>> On 9/12/18 11:52 AM, matthias.bgg at kernel.org wrote:
+> >>>>> From: Matthias Brugger <mbrugger@suse.com>
+> >>>>>
+> >>>>> Some hardware does not implement two-level page tables so that
+> >>>>> the amount of contigious memory needed by the baser is bigger
+> >>>>> then the zone order. This is a known problem on Cavium Thunderx
+> >>>>> with 4K page size.
+> >>>>>
+> >>>>> We fix this by adding an errata which allocates the memory early
+> >>>>> in the boot cycle, using the memblock allocator.
+> >>>>>
+> >>>>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> >>>>> ---
+> >>>>> ?? arch/arm64/Kconfig?????????????? | 12 ++++++++
+> >>>>> ?? arch/arm64/include/asm/cpucaps.h |? 3 +-
+> >>>>> ?? arch/arm64/kernel/cpu_errata.c?? | 33 +++++++++++++++++++++
+> >>>>> ?? drivers/irqchip/irq-gic-v3-its.c | 50 ++++++++++++++++++++------------
+> >>>>> ?? 4 files changed, 79 insertions(+), 19 deletions(-)
+> >>>
+> >>> My only comment would be to state how much I dislike both the HW and the
+> >>> patch... ;-) The idea that we have some erratum that depends on the page size
+> >>> doesn't feel good at all.
+> >>>
+> >>
+> >> Well ugly HW needs ugly patches ;-)
+> >>
+> >>>>>
+> >>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >>>>> index 1b1a0e95c751..dfd9fe08f0b2 100644
+> >>>>> --- a/arch/arm64/Kconfig
+> >>>>> +++ b/arch/arm64/Kconfig
+> >>>>> @@ -597,6 +597,18 @@ config QCOM_FALKOR_ERRATUM_E1041
+> >>>>> ?? ??????? If unsure, say Y.
+> >>>>> ?? +config CAVIUM_ALLOC_ITS_TABLE_EARLY
+> >>>>> +??? bool "Cavium Thunderx: Allocate the its table early"
+> >>>>> +??? default y
+> >>>>> +??? depends on ARM64_4K_PAGES && FORCE_MAX_ZONEORDER < 13
+> >>>
+> >>> Here's a though: Why don't we ensure that FORCE_MAX_ZONEORDER is such as we
+> >>> could always allocate the same amount of memory, no matter what the page size
+> >>> is? That, or bump FORCE_MAX_ZONEORDER to 13 if the kernel includes support
+> >>> for TX1.
+> >>>
+> >>
+> >> Bumping FORCE_MAX_ZONEORDER when TX1 is supported was proposed here:
+> >> https://patchwork.kernel.org/patch/6322281/
+> >>
+> >> To bring in some more history, the CMA approach ended with this discussion:
+> >> https://patchwork.kernel.org/patch/9888041/
+> >>
+> >>> Any of this of course requires buy-in from the arm64 maintainers, as this is
+> >>> quite a departure from the way things work so far.
+> >>>
+> >>
+> >> With my distribution head on, I would prefer a solution that does not change
+> >> FORCE_MAX_ZONEORDER. That's how I came to the idea providing a third solution to
+> >> the same problem :)
+> > 
+> > Why is that a problem? What impact does this have on your favourite distro?
+> > 
+> 
+> The impact is on changing FORCE_MAX_ZONEORDER on an already released
+> kernel will break Kernel ABI and with that all external modules. I
+> know that's nothing upstream cares too much about, but the distros
+> do :)
 
-Thanks Dan for the insight.
+Unfortunately, that's something you're bringing upon yourself, and I'm
+afraid I can't really take this into account. You could always bump
+that ABI if you really want to support this platform as, at the end of
+the day, this is something you're in control of.
 
-We have already established in a separate discussion that Cortex-A7,
-which is main optimization target for future development, does not
-have the microarchitectural peculiarity that you are referring to that
-ARM instructions are essentially free when interleaved with NEON code.
+But I'd really like to hear what Catalin or Will think of this (Will
+wasn't massively impressed by this 3 years ago, and I wonder if his
+approach has changed since).
 
-But I take your point re benchmarking (as I already indicated in my
-reply to Jason): if we optimize towards speed, we should ideally reuse
-the existing benchmarking infrastructure we have to select the fastest
-implementation at runtime. For instance, it turns out that scalar
-ChaCha20 is almost as fast as NEON (or even faster?) on A7, and using
-NEON in the kernel has some issues of its own.
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
