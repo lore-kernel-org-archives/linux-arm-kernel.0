@@ -1,41 +1,85 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 5 Oct 2018 16:59:59 +0000
-Subject: [RFC PATCH] skb: Define NET_IP_ALIGN based on
- CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-In-Reply-To: <20181004173631.3nchegr6rm3jgz24@xylophone.i.decadent.org.uk>
-References: <20181004173631.3nchegr6rm3jgz24@xylophone.i.decadent.org.uk>
-Message-ID: <a291a6b17cc04eac8ccd9febe7152d9e@AcuMS.aculab.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri,  5 Oct 2018 11:58:39 -0500
+Subject: [PATCH 27/36] dt-bindings: arm: Convert Realtek board/soc bindings to
+ json-schema
+In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
+References: <20181005165848.3474-1-robh@kernel.org>
+Message-ID: <20181005165848.3474-28-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Hutchings
-> Sent: 04 October 2018 18:37
-> 
-> NET_IP_ALIGN is supposed to be defined as 0 if DMA writes to an
-> unaligned buffer would be more expensive than CPU access to unaligned
-> header fields, and otherwise defined as 2.
-> 
-> Currently only ppc64 and x86 configurations define it to be 0.
-> However several other architectures (conditionally) define
-> CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS, which seems to imply that
-> NET_IP_ALIGN should be 0.
-> 
-> Remove the overriding definitions for ppc64 and x86 and define
-> NET_IP_ALIGN solely based on CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS.
+Convert Realtek SoC bindings to DT schema format using json-schema.
 
-Even if CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is set unaligned
-accesses are likely to be slightly slower than aligned ones.
-So having NET_IP_ALIGN set to 2 might make sense even on x86.
-(ISTR DM saying why this isn't done.)
+Cc: "Andreas F?rber" <afaerber@suse.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/arm/realtek.txt       | 22 ----------------
+ .../devicetree/bindings/arm/realtek.yaml      | 25 +++++++++++++++++++
+ 2 files changed, 25 insertions(+), 22 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/realtek.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/realtek.yaml
 
-I've also met systems when misaligned DMA transfers (for ethernet receive)
-were so bad that is was necessary to DMA to a 4n aligned buffer and
-then do a misaligned copy to the real rx buffer (skb equiv) for the
-network stack - which required the buffer be 4n+2 aligned.
-(sparc sbus with the original DMA part.)
-
-	David
-
+diff --git a/Documentation/devicetree/bindings/arm/realtek.txt b/Documentation/devicetree/bindings/arm/realtek.txt
+deleted file mode 100644
+index 95839e19ae92..000000000000
+--- a/Documentation/devicetree/bindings/arm/realtek.txt
++++ /dev/null
+@@ -1,22 +0,0 @@
+-Realtek platforms device tree bindings
+---------------------------------------
 -
-Registered Address Lakeside, Bramley Road, Mount Farm, Milton Keynes, MK1 1PT, UK
-Registration No: 1397386 (Wales)
+-
+-RTD1295 SoC
+-===========
+-
+-Required root node properties:
+-
+- - compatible :  must contain "realtek,rtd1295"
+-
+-
+-Root node property compatible must contain, depending on board:
+-
+- - MeLE V9: "mele,v9"
+- - ProBox2 AVA: "probox2,ava"
+- - Zidoo X9S: "zidoo,x9s"
+-
+-
+-Example:
+-
+-    compatible = "zidoo,x9s", "realtek,rtd1295";
+diff --git a/Documentation/devicetree/bindings/arm/realtek.yaml b/Documentation/devicetree/bindings/arm/realtek.yaml
+new file mode 100644
+index 000000000000..9e3bb3249c77
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/realtek.yaml
+@@ -0,0 +1,25 @@
++# SPDX-License-Identifier: None
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/bindings/arm/realtek.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Realtek platforms device tree bindings
++
++maintainers:
++  - Andreas F?rber <afaerber@suse.de>
++
++description: |+
++  RTD1295 SoC
++
++properties:
++  $nodename:
++    const: '/'
++  compatible:
++    items:
++      - enum:
++          - mele,v9
++          - probox2,ava
++          - zidoo,x9s
++      - const: realtek,rtd1295
++...
+-- 
+2.17.1
