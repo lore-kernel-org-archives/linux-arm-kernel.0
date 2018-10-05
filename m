@@ -1,132 +1,271 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:35 -0500
-Subject: [PATCH 23/36] dt-bindings: arm: Convert MediaTek board/soc bindings
+Date: Fri,  5 Oct 2018 11:58:40 -0500
+Subject: [PATCH 28/36] dt-bindings: arm: Convert Rockchip board/soc bindings
  to json-schema
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-24-robh@kernel.org>
+Message-ID: <20181005165848.3474-29-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert MediaTek SoC bindings to DT schema format using json-schema.
+Convert Rockchip SoC bindings to DT schema format using json-schema.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
 Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/mediatek.txt      | 79 -----------------
- .../devicetree/bindings/arm/mediatek.yaml     | 85 +++++++++++++++++++
- 2 files changed, 85 insertions(+), 79 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/mediatek.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek.yaml
+ .../devicetree/bindings/arm/rockchip.txt      | 220 ----------------
+ .../devicetree/bindings/arm/rockchip.yaml     | 242 ++++++++++++++++++
+ 2 files changed, 242 insertions(+), 220 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip.yaml
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
 deleted file mode 100644
-index 8f260e5cfd16..000000000000
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
+index acfd3c773dd0..000000000000
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
 +++ /dev/null
-@@ -1,79 +0,0 @@
--MediaTek SoC based Platforms Device Tree Bindings
+@@ -1,220 +0,0 @@
+-Rockchip platforms device tree bindings
+----------------------------------------
 -
--Boards with a MediaTek SoC shall have the following property:
+-- 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
+-    Required root node properties:
+-      - compatible = "vamrs,ficus", "rockchip,rk3399";
 -
--Required root node property:
+-- Amarula Vyasa RK3288 board
+-    Required root node properties:
+-      - compatible = "amarula,vyasa-rk3288", "rockchip,rk3288";
 -
--compatible: Must contain one of
--   "mediatek,mt2701"
--   "mediatek,mt2712"
--   "mediatek,mt6580"
--   "mediatek,mt6589"
--   "mediatek,mt6592"
--   "mediatek,mt6755"
--   "mediatek,mt6765"
--   "mediatek,mt6795"
--   "mediatek,mt6797"
--   "mediatek,mt7622"
--   "mediatek,mt7623" which is referred to MT7623N SoC
--   "mediatek,mt7623a"
--   "mediatek,mt8127"
--   "mediatek,mt8135"
--   "mediatek,mt8173"
+-- Asus Tinker board
+-    Required root node properties:
+-      - compatible = "asus,rk3288-tinker", "rockchip,rk3288";
 -
+-- Kylin RK3036 board:
+-    Required root node properties:
+-      - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
 -
--Supported boards:
+-- MarsBoard RK3066 board:
+-    Required root node properties:
+-      - compatible = "haoyu,marsboard-rk3066", "rockchip,rk3066a";
 -
--- Evaluation board for MT2701:
+-- bq Curie 2 tablet:
 -    Required root node properties:
--      - compatible = "mediatek,mt2701-evb", "mediatek,mt2701";
--- Evaluation board for MT2712:
+-      - compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
+-
+-- ChipSPARK Rayeager PX2 board:
 -    Required root node properties:
--      - compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
--- Evaluation board for MT6580:
+-      - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
+-
+-- Radxa Rock board:
 -    Required root node properties:
--      - compatible = "mediatek,mt6580-evbp1", "mediatek,mt6580";
--- bq Aquaris5 smart phone:
+-      - compatible = "radxa,rock", "rockchip,rk3188";
+-
+-- Radxa Rock2 Square board:
 -    Required root node properties:
--      - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
--- Evaluation board for MT6592:
+-      - compatible = "radxa,rock2-square", "rockchip,rk3288";
+-
+-- Rikomagic MK808 v1 board:
 -    Required root node properties:
--      - compatible = "mediatek,mt6592-evb", "mediatek,mt6592";
--- Evaluation phone for MT6755(Helio P10):
+-      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
+-
+-- Firefly Firefly-RK3288 board:
 -    Required root node properties:
--      - compatible = "mediatek,mt6755-evb", "mediatek,mt6755";
--- Evaluation board for MT6765(Helio P22):
+-      - compatible = "firefly,firefly-rk3288", "rockchip,rk3288";
+-    or
+-      - compatible = "firefly,firefly-rk3288-beta", "rockchip,rk3288";
+-
+-- Firefly Firefly-RK3288 Reload board:
 -    Required root node properties:
--      - compatible = "mediatek,mt6765-evb", "mediatek,mt6765";
--- Evaluation board for MT6795(Helio X10):
+-      - compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
+-
+-- Firefly Firefly-RK3399 board:
 -    Required root node properties:
--      - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
--- Evaluation board for MT6797(Helio X20):
+-      - compatible = "firefly,firefly-rk3399", "rockchip,rk3399";
+-
+-- Firefly roc-rk3328-cc board:
 -    Required root node properties:
--      - compatible = "mediatek,mt6797-evb", "mediatek,mt6797";
--- Mediatek X20 Development Board:
+-      - compatible = "firefly,roc-rk3328-cc", "rockchip,rk3328";
+-
+-- ChipSPARK PopMetal-RK3288 board:
 -    Required root node properties:
--      - compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
--- Reference board variant 1 for MT7622:
+-      - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
+-
+-- Netxeon R89 board:
 -    Required root node properties:
--      - compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
--- Reference board for MT7623a with eMMC:
+-      - compatible = "netxeon,r89", "rockchip,rk3288";
+-
+-- GeekBuying GeekBox:
 -    Required root node properties:
--      - compatible = "mediatek,mt7623a-rfb-emmc", "mediatek,mt7623";
--- Reference board for MT7623a with NAND:
+-      - compatible = "geekbuying,geekbox", "rockchip,rk3368";
+-
+-- Google Bob (Asus Chromebook Flip C101PA):
 -    Required root node properties:
--      - compatible = "mediatek,mt7623a-rfb-nand", "mediatek,mt7623";
--- Reference board for MT7623n with eMMC:
+-	compatible = "google,bob-rev13", "google,bob-rev12",
+-		     "google,bob-rev11", "google,bob-rev10",
+-		     "google,bob-rev9", "google,bob-rev8",
+-		     "google,bob-rev7", "google,bob-rev6",
+-		     "google,bob-rev5", "google,bob-rev4",
+-		     "google,bob", "google,gru", "rockchip,rk3399";
+-
+-- Google Brain (dev-board):
 -    Required root node properties:
--      - compatible = "mediatek,mt7623n-rfb-emmc", "mediatek,mt7623";
--- Bananapi BPI-R2 board:
--      - compatible = "bananapi,bpi-r2", "mediatek,mt7623";
--- MTK mt8127 tablet moose EVB:
+-      - compatible = "google,veyron-brain-rev0", "google,veyron-brain",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Gru (dev-board):
 -    Required root node properties:
--      - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
--- MTK mt8135 tablet EVB:
+-      - compatible = "google,gru-rev15", "google,gru-rev14",
+-		     "google,gru-rev13", "google,gru-rev12",
+-		     "google,gru-rev11", "google,gru-rev10",
+-		     "google,gru-rev9", "google,gru-rev8",
+-		     "google,gru-rev7", "google,gru-rev6",
+-		     "google,gru-rev5", "google,gru-rev4",
+-		     "google,gru-rev3", "google,gru-rev2",
+-		     "google,gru", "rockchip,rk3399";
+-
+-- Google Jaq (Haier Chromebook 11 and more):
 -    Required root node properties:
--      - compatible = "mediatek,mt8135-evbp1", "mediatek,mt8135";
--- MTK mt8173 tablet EVB:
+-      - compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
+-		     "google,veyron-jaq-rev3", "google,veyron-jaq-rev2",
+-		     "google,veyron-jaq-rev1", "google,veyron-jaq",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Jerry (Hisense Chromebook C11 and more):
 -    Required root node properties:
--      - compatible = "mediatek,mt8173-evb", "mediatek,mt8173";
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.yaml b/Documentation/devicetree/bindings/arm/mediatek.yaml
+-      - compatible = "google,veyron-jerry-rev7", "google,veyron-jerry-rev6",
+-		     "google,veyron-jerry-rev5", "google,veyron-jerry-rev4",
+-		     "google,veyron-jerry-rev3", "google,veyron-jerry",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Kevin (Samsung Chromebook Plus):
+-    Required root node properties:
+-      - compatible = "google,kevin-rev15", "google,kevin-rev14",
+-		     "google,kevin-rev13", "google,kevin-rev12",
+-		     "google,kevin-rev11", "google,kevin-rev10",
+-		     "google,kevin-rev9", "google,kevin-rev8",
+-		     "google,kevin-rev7", "google,kevin-rev6",
+-		     "google,kevin", "google,gru", "rockchip,rk3399";
+-
+-- Google Mickey (Asus Chromebit CS10):
+-    Required root node properties:
+-      - compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
+-		     "google,veyron-mickey-rev6", "google,veyron-mickey-rev5",
+-		     "google,veyron-mickey-rev4", "google,veyron-mickey-rev3",
+-		     "google,veyron-mickey-rev2", "google,veyron-mickey-rev1",
+-		     "google,veyron-mickey-rev0", "google,veyron-mickey",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Minnie (Asus Chromebook Flip C100P):
+-    Required root node properties:
+-      - compatible = "google,veyron-minnie-rev4", "google,veyron-minnie-rev3",
+-		     "google,veyron-minnie-rev2", "google,veyron-minnie-rev1",
+-		     "google,veyron-minnie-rev0", "google,veyron-minnie",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Pinky (dev-board):
+-    Required root node properties:
+-      - compatible = "google,veyron-pinky-rev2", "google,veyron-pinky",
+-		     "google,veyron", "rockchip,rk3288";
+-
+-- Google Speedy (Asus C201 Chromebook):
+-    Required root node properties:
+-      - compatible = "google,veyron-speedy-rev9", "google,veyron-speedy-rev8",
+-		     "google,veyron-speedy-rev7", "google,veyron-speedy-rev6",
+-		     "google,veyron-speedy-rev5", "google,veyron-speedy-rev4",
+-		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
+-		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
+-
+-- mqmaker MiQi:
+-    Required root node properties:
+-      - compatible = "mqmaker,miqi", "rockchip,rk3288";
+-
+-- Phytec phyCORE-RK3288: Rapid Development Kit
+-    Required root node properties:
+-     - compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
+-
+-- Pine64 Rock64 board:
+-    Required root node properties:
+-    - compatible = "pine64,rock64", "rockchip,rk3328";
+-
+-- Rockchip PX3 Evaluation board:
+-    Required root node properties:
+-      - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+-
+-- Rockchip PX5 Evaluation board:
+-    Required root node properties:
+-      - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
+-
+-- Rockchip RV1108 Evaluation board
+-    Required root node properties:
+-      - compatible = "rockchip,rv1108-evb", "rockchip,rv1108";
+-
+-- Rockchip RK3368 evb:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+-
+-- Rockchip R88 board:
+-    Required root node properties:
+-      - compatible = "rockchip,r88", "rockchip,rk3368";
+-
+-- Rockchip RK3228 Evaluation board:
+-    Required root node properties:
+-     - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
+-
+-- Rockchip RK3229 Evaluation board:
+-     - compatible = "rockchip,rk3229-evb", "rockchip,rk3229";
+-
+-- Rockchip RK3288 Fennec board:
+-    Required root node properties:
+-     - compatible = "rockchip,rk3288-fennec", "rockchip,rk3288";
+-
+-- Rockchip RK3328 evb:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
+-
+-- Rockchip RK3399 evb:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3399-evb", "rockchip,rk3399";
+-
+-- Rockchip RK3399 Sapphire board standalone:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3399-sapphire", "rockchip,rk3399";
+-
+-- Rockchip RK3399 Sapphire Excavator board:
+-    Required root node properties:
+-      - compatible = "rockchip,rk3399-sapphire-excavator", "rockchip,rk3399";
+-
+-- Theobroma Systems RK3368-uQ7 Haikou Baseboard:
+-    Required root node properties:
+-      - compatible = "tsd,rk3368-uq7-haikou", "rockchip,rk3368";
+-
+-- Theobroma Systems RK3399-Q7 Haikou Baseboard:
+-    Required root node properties:
+-      - compatible = "tsd,rk3399-q7-haikou", "rockchip,rk3399";
+-
+-- Tronsmart Orion R68 Meta
+-    Required root node properties:
+-      - compatible = "tronsmart,orion-r68-meta", "rockchip,rk3368";
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.yaml b/Documentation/devicetree/bindings/arm/rockchip.yaml
 new file mode 100644
-index 000000000000..861af7c66ac5
+index 000000000000..4b4b892e5af7
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek.yaml
-@@ -0,0 +1,85 @@
++++ b/Documentation/devicetree/bindings/arm/rockchip.yaml
+@@ -0,0 +1,242 @@
 +# SPDX-License-Identifier: None
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/bindings/arm/mediatek.yaml#
++$id: http://devicetree.org/schemas/bindings/arm/rockchip.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: MediaTek SoC based Platforms Device Tree Bindings
++title: Rockchip platforms device tree bindings
 +
 +maintainers:
-+  - Sean Wang <sean.wang@mediatek.com>
-+  - Matthias Brugger <matthias.bgg@gmail.com>
-+description: |
-+  Boards with a MediaTek SoC shall have the following properties.
++  - Beniamino Galvani <b.galvani@gmail.com>
++  - Heiko Stuebner <heiko@sntech.de>
 +
 +properties:
 +  $nodename:
@@ -135,69 +274,228 @@ index 000000000000..861af7c66ac5
 +    oneOf:
 +      - items:
 +          - enum:
-+              - mediatek,mt2701-evb
-+          - const: mediatek,mt2701
++              - amarula,vyasa-rk3288
++              - asus,rk3288-tinker
++              - radxa,rock2-square
++              - chipspark,popmetal-rk3288
++              - netxeon,r89
++              - firefly,firefly-rk3288
++              - firefly,firefly-rk3288-beta
++              - firefly,firefly-rk3288-reload
++              - mqmaker,miqi
++              - rockchip,rk3288-fennec
++          - const: rockchip,rk3288
++
++      - description: Phytec phyCORE-RK3288 Rapid Development Kit
++        items:
++          - const: phytec,rk3288-pcm-947
++          - const: phytec,rk3288-phycore-som
++          - const: rockchip,rk3288
++
++      - description: Google Mickey (Asus Chromebit CS10)
++        items:
++          - const: google,veyron-mickey-rev8
++          - const: google,veyron-mickey-rev7
++          - const: google,veyron-mickey-rev6
++          - const: google,veyron-mickey-rev5
++          - const: google,veyron-mickey-rev4
++          - const: google,veyron-mickey-rev3
++          - const: google,veyron-mickey-rev2
++          - const: google,veyron-mickey-rev1
++          - const: google,veyron-mickey-rev0
++          - const: google,veyron-mickey
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Minnie (Asus Chromebook Flip C100P)
++        items:
++          - const: google,veyron-minnie-rev4
++          - const: google,veyron-minnie-rev3
++          - const: google,veyron-minnie-rev2
++          - const: google,veyron-minnie-rev1
++          - const: google,veyron-minnie-rev0
++          - const: google,veyron-minnie
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Pinky (dev-board)
++        items:
++          - const: google,veyron-pinky-rev2
++          - const: google,veyron-pinky
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Speedy (Asus C201 Chromebook)
++        items:
++          - const: google,veyron-speedy-rev9
++          - const: google,veyron-speedy-rev8
++          - const: google,veyron-speedy-rev7
++          - const: google,veyron-speedy-rev6
++          - const: google,veyron-speedy-rev5
++          - const: google,veyron-speedy-rev4
++          - const: google,veyron-speedy-rev3
++          - const: google,veyron-speedy-rev2
++          - const: google,veyron-speedy
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Jaq (Haier Chromebook 11 and more)
++        items:
++          - const: google,veyron-jaq-rev5
++          - const: google,veyron-jaq-rev4
++          - const: google,veyron-jaq-rev3
++          - const: google,veyron-jaq-rev2
++          - const: google,veyron-jaq-rev1
++          - const: google,veyron-jaq
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Jerry (Hisense Chromebook C11 and more)
++        items:
++          - const: google,veyron-jerry-rev7
++          - const: google,veyron-jerry-rev6
++          - const: google,veyron-jerry-rev5
++          - const: google,veyron-jerry-rev4
++          - const: google,veyron-jerry-rev3
++          - const: google,veyron-jerry
++          - const: google,veyron
++          - const: rockchip,rk3288
++
++      - description: Google Brain (dev-board)
++        items:
++          - const: google,veyron-brain-rev0
++          - const: google,veyron-brain
++          - const: google,veyron
++          - const: rockchip,rk3288
 +
 +      - items:
 +          - enum:
-+              - mediatek,mt2712-evb
-+          - const: mediatek,mt2712
-+      - items:
-+          - enum:
-+              - mediatek,mt6580-evbp1
-+          - const: mediatek,mt6580
-+      - items:
-+          - enum:
-+              - mundoreader,bq-aquaris5
-+          - const: mediatek,mt6589
-+      - items:
-+          - enum:
-+              - mediatek,mt6592-evb
-+          - const: mediatek,mt6592
-+      - items:
-+          - enum:
-+              - mediatek,mt6755-evb
-+          - const: mediatek,mt6755
-+      - items:
-+          - enum:
-+              - mediatek,mt6765-evb
-+          - const: mediatek,mt6765
-+      - items:
-+          - enum:
-+              - mediatek,mt6795-evb
-+          - const: mediatek,mt6795
-+      - items:
-+          - enum:
-+              - archermind,mt6797-x20-dev
-+              - mediatek,mt6797-evb
-+          - const: mediatek,mt6797
-+      - items:
-+          - enum:
-+              - mediatek,mt7622-rfb1
-+          - const: mediatek,mt7622
-+      - items:
-+          - enum:
-+              - mediatek,mt7623a-rfb-emmc
-+              - mediatek,mt7623a-rfb-nand
-+              - mediatek,mt7623n-rfb-emmc
-+              - bananapi,bpi-r2
-+          - const: mediatek,mt7623
-+        description: Also referred to as MT7623N SoC
++              - rockchip,kylin-rk3036
++          - const: rockchip,rk3036
 +
 +      - items:
-+          - const: mediatek,mt7623a
++          - enum:
++              - haoyu,marsboard-rk3066
++              - mundoreader,bq-curie2
++              - chipspark,rayeager-px2
++              - rikomagic,mk80
++          - const: rockchip,rk3066a
++
 +      - items:
 +          - enum:
-+              - mediatek,mt8127-moose
-+          - const: mediatek,mt8127
++              - radxa,rock
++          - const: rockchip,rk3188
++
++      - items:
++          - const: rockchip,px3-evb
++          - const: rockchip,px3
++          - const: rockchip,rk3188
++
 +      - items:
 +          - enum:
-+              - mediatek,mt8135-evbp1
-+          - const: mediatek,mt8135
++              - firefly,roc-rk3328-cc
++              - pine64,rock64
++              - rockchip,rk3328-evb
++          - const: rockchip,rk3328
++
 +      - items:
 +          - enum:
-+              - mediatek,mt8173-evb
-+          - const: mediatek,mt8173
++              - geekbuying,geekbox
++              - rockchip,rk3368-evb-act8846
++              - rockchip,r88
++              - tsd,rk3368-uq7-haikou
++              - tronsmart,orion-r68-meta
++          - const: rockchip,rk3368
++
++      - items:
++          - enum:
++              - geekbuying,geekbox
++              - rockchip,rk3368-evb-act8846
++              - rockchip,r88
++              - tsd,rk3368-uq7-haikou
++              - tronsmart,orion-r68-meta
++          - const: rockchip,rk3368
++
++      - items:
++          - const: rockchip,px5-evb
++          - const: rockchip,px5
++          - const: rockchip,rk3368
++
++      - items:
++          - enum:
++              - firefly,firefly-rk3399
++              - rockchip,rk3399-evb
++              - rockchip,rk3399-sapphire
++              - rockchip,rk3399-sapphire-excavator
++              - tsd,rk3399-q7-haikou
++              - vamrs,ficus
++          - const: rockchip,rk3399
++
++      - description: Google Bob (Asus Chromebook Flip C101PA)
++        items:
++          - const: google,bob-rev13
++          - const: google,bob-rev12
++          - const: google,bob-rev11
++          - const: google,bob-rev10
++          - const: google,bob-rev9
++          - const: google,bob-rev8
++          - const: google,bob-rev7
++          - const: google,bob-rev6
++          - const: google,bob-rev5
++          - const: google,bob-rev4
++          - const: google,bob
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - description: Google Gru (dev-board)
++        items:
++          - const: google,gru-rev15
++          - const: google,gru-rev14
++          - const: google,gru-rev13
++          - const: google,gru-rev12
++          - const: google,gru-rev11
++          - const: google,gru-rev10
++          - const: google,gru-rev9
++          - const: google,gru-rev8
++          - const: google,gru-rev7
++          - const: google,gru-rev6
++          - const: google,gru-rev5
++          - const: google,gru-rev4
++          - const: google,gru-rev3
++          - const: google,gru-rev2
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - description: Google Kevin (Samsung Chromebook Plus)
++        items:
++          - const: google,kevin-rev15
++          - const: google,kevin-rev14
++          - const: google,kevin-rev13
++          - const: google,kevin-rev12
++          - const: google,kevin-rev11
++          - const: google,kevin-rev10
++          - const: google,kevin-rev9
++          - const: google,kevin-rev8
++          - const: google,kevin-rev7
++          - const: google,kevin-rev6
++          - const: google,kevin
++          - const: google,gru
++          - const: rockchip,rk3399
++
++      - items:
++          - enum:
++              - rockchip,rv1108-evb
++          - const: rockchip,rv1108
++
++      - items:
++          - enum:
++              - rockchip,rk3228-evb
++          - const: rockchip,rk3228
++
++      - items:
++          - enum:
++              - rockchip,rk3229-evb
++          - const: rockchip,rk3229
 +...
 -- 
 2.17.1
