@@ -1,67 +1,68 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 5 Oct 2018 15:33:30 +0530
-Subject: [PATCH] arm64: defconfig: Enable TI_SCI related configs
-Message-ID: <20181005100330.16914-1-lokeshvutla@ti.com>
+From: david.hernandezsanchez@st.com (David HERNANDEZ SANCHEZ)
+Date: Fri, 5 Oct 2018 10:08:46 +0000
+Subject: [PATCH 3/3] ARM: dts: stm32: add thermal sensor support on STM32MP157c
+In-Reply-To: <1538734081-26585-1-git-send-email-david.hernandezsanchez@st.com>
+References: <1538734081-26585-1-git-send-email-david.hernandezsanchez@st.com>
+Message-ID: <1538734081-26585-4-git-send-email-david.hernandezsanchez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable TI System Control Interface (TI_SCI) Message Protocol library
-and it's relevant power management drivers using this library.
+Add configuration on DT for thermal sensor driver
 
-TI's AM6 SoC uses this TI_SCI library to communicate to its system
-controller(DMSC). While at it, enable TI_MESSAGE_MANAGER mailbox driver
-using which this communication happens.
+Signed-off-by: David Hernandez Sanchez <david.hernandezsanchez@st.com>
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-- Based on next tag: next-20181005
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index 661be94..e90b9f6 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -84,6 +84,31 @@
+ 		};
+ 	};
 
- arch/arm64/configs/defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
++			thermal-sensors = <&dts>;
++
++			trips {
++				cpu_alert1: cpu-alert1 {
++					temperature = <85000>;
++					hysteresis = <0>;
++					type = "passive";
++				};
++
++				cpu-crit {
++					temperature = <120000>;
++					hysteresis = <0>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++			};
++		};
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -908,6 +933,16 @@
+ 			status = "disabled";
+ 		};
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 0baf31ca069f..4b3844480a77 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -118,6 +118,7 @@ CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
- CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
- CONFIG_ARM_SCPI_CPUFREQ=y
- CONFIG_ARM_TEGRA186_CPUFREQ=y
-+CONFIG_TI_SCI_PROTOCOL=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -593,6 +594,7 @@ CONFIG_COMMON_CLK_CS2000_CP=y
- CONFIG_COMMON_CLK_S2MPS11=y
- CONFIG_CLK_QORIQ=y
- CONFIG_COMMON_CLK_PWM=y
-+CONFIG_TI_SCI_CLK=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_QCOM_CLK_SMD_RPM=y
- CONFIG_IPQ_GCC_8074=y
-@@ -604,6 +606,7 @@ CONFIG_HWSPINLOCK_QCOM=y
- CONFIG_ARM_MHU=y
- CONFIG_PLATFORM_MHU=y
- CONFIG_BCM2835_MBOX=y
-+CONFIG_TI_MESSAGE_MANAGER=y
- CONFIG_QCOM_APCS_IPC=y
- CONFIG_ROCKCHIP_IOMMU=y
- CONFIG_TEGRA_IOMMU_SMMU=y
-@@ -624,6 +627,7 @@ CONFIG_ARCH_TEGRA_186_SOC=y
- CONFIG_ARCH_TEGRA_194_SOC=y
- CONFIG_ARCH_K3_AM6_SOC=y
- CONFIG_SOC_TI=y
-+CONFIG_TI_SCI_PM_DOMAINS=y
- CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
- CONFIG_EXTCON_USB_GPIO=y
- CONFIG_EXTCON_USBC_CROS_EC=y
-@@ -643,6 +647,7 @@ CONFIG_PWM_RCAR=m
- CONFIG_PWM_ROCKCHIP=y
- CONFIG_PWM_SAMSUNG=y
- CONFIG_PWM_TEGRA=m
-+CONFIG_RESET_TI_SCI=y
- CONFIG_PHY_XGENE=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_PHY_HI6220_USB=y
--- 
-2.19.0
++		dts: thermal at 50028000 {
++			compatible = "st,stm32-thermal";
++			reg = <0x50028000 0x100>;
++			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&rcc TMPSENS>;
++			clock-names = "pclk";
++			#thermal-sensor-cells = <0>;
++			status = "disabled";
++		};
++
+ 		cryp1: cryp at 54001000 {
+ 			compatible = "st,stm32mp1-cryp";
+ 			reg = <0x54001000 0x400>;
+--
+2.7.4
