@@ -1,36 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Oct 2018 14:16:02 +0100
-Subject: [RFC PATCH] skb: Define NET_IP_ALIGN based on
- CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-In-Reply-To: <CAKv+Gu9MBJ0w+23XMg+w_EYEf0Hx8dkW-w-rf4Bzu_c3GN_YiQ@mail.gmail.com>
-References: <20181004173631.3nchegr6rm3jgz24@xylophone.i.decadent.org.uk>
- <CAKv+Gu9MBJ0w+23XMg+w_EYEf0Hx8dkW-w-rf4Bzu_c3GN_YiQ@mail.gmail.com>
-Message-ID: <20181005131601.GE14398@arm.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Fri, 5 Oct 2018 15:22:38 +0200
+Subject: [PATCH V5 00/24] mmc: mmci: add sdmmc variant for stm32
+Message-ID: <1538745782-27446-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2018 at 07:43:59PM +0200, Ard Biesheuvel wrote:
-> (+ Arnd, Russell, Catalin, Will)
-> 
-> On 4 October 2018 at 19:36, Ben Hutchings <ben.hutchings@codethink.co.uk> wrote:
-> > NET_IP_ALIGN is supposed to be defined as 0 if DMA writes to an
-> > unaligned buffer would be more expensive than CPU access to unaligned
-> > header fields, and otherwise defined as 2.
-> >
-> > Currently only ppc64 and x86 configurations define it to be 0.
-> > However several other architectures (conditionally) define
-> > CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS, which seems to imply that
-> > NET_IP_ALIGN should be 0.
-> >
-> > Remove the overriding definitions for ppc64 and x86 and define
-> > NET_IP_ALIGN solely based on CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS.
-> >
-> > Signed-off-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
-> 
-> While this makes sense for arm64, I don't think it is appropriate for
-> ARM per se.
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Agreed that this makes sense for arm64, and I'd be happy to take a patch
-defining it as 0 there.
+The goal of this serie is to add support of sdmmc for stm32.
+Be to able to add this new variant it is needed to do some changes in
+mmci core:
+-Internalize specific needs of legacy dmaengine.
+-Create and setup dma_priv pointer.
+-Create generic callbacks which share some features (like cookie...)
+ and call specific needs.
 
-Will
+change v5:
+-error management in mmci_dmae_setup and qcom_dma_setup
+ mmci_dmae_setup: fail when tx & rx are not defined.
+ qcom_dma_setup: faill if one of channels is not defined.
+-define mmci_variant_init following CONFIG_DMA_ENGINE state.
+-squash dma_setup/dma_release callback.
+
+change v4:
+-checkpatch fix bool to u8
+-add use_dma variable to fallback to pio mode
+-move to optional reset with dt binding note for sdmmc
+-separate patch for DT doc
+
+change v3:
+-remove __dma_inprogress rename
+-remove bad space at end of "st,use-ckin"
+
+change v2:
+-rename to mmci_prep/unprep_data
+-rename specific dma engine structure to mmci_dmae_next/priv
+-follow "_" recommandation
+-remove dma prefixe of mmci_dmae_priv fields
+
+Ludovic Barre (24):
+  mmc: mmci: Change struct members from bool to u8
+  mmc: mmci: create common mmci_dma_setup/release
+  mmc: mmci: introduce dma_priv pointer to mmci_host
+  mmc: mmci: merge prepare data functions
+  mmc: mmci: add prepare/unprepare_data callbacks
+  mmc: mmci: add get_next_data callback
+  mmc: mmci: add dma_start callback
+  mmc: mmci: add dma_finalize callback
+  mmc: mmci: add dma_error callback
+  mmc: mmci: add validate_data callback
+  mmc: mmci: add set_clk/pwrreg callbacks
+  mmc: mmci: add datactrl block size variant property
+  mmc: mmci: expand startbiterr to irqmask and error check
+  mmc: mmci: add variant properties to define cpsm & cmdresp bits
+  mmc: mmci: add variant property to define dpsm bit
+  mmc: mmci: add variant property to define irq pio mask
+  mmc: mmci: add variant property to write datactrl before command
+  mmc: mmci: add variant property to not read datacnt
+  dt-bindings: mmci: add optional reset property
+  mmc: mmci: add optional reset property
+  mmc: mmci: add clock divider for stm32 sdmmc
+  mmc: mmci: add stm32 sdmmc registers
+  dt-bindings: mmci: add stm32 sdmmc variant
+  mmc: mmci: add stm32 sdmmc variant
+
+ Documentation/devicetree/bindings/mmc/mmci.txt |  11 +
+ drivers/mmc/host/Kconfig                       |  10 +
+ drivers/mmc/host/Makefile                      |   1 +
+ drivers/mmc/host/mmci.c                        | 616 +++++++++++++++++--------
+ drivers/mmc/host/mmci.h                        | 186 ++++++--
+ drivers/mmc/host/mmci_qcom_dml.c               |  16 +-
+ drivers/mmc/host/mmci_stm32_sdmmc.c            | 282 +++++++++++
+ 7 files changed, 904 insertions(+), 218 deletions(-)
+ create mode 100644 drivers/mmc/host/mmci_stm32_sdmmc.c
+
+-- 
+2.7.4
