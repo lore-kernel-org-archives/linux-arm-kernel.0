@@ -1,68 +1,81 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri,  5 Oct 2018 16:02:33 +0100
-Subject: [RFC PATCH 0/2] ACPI / PPTT: ids for caches
-Message-ID: <20181005150235.13846-1-james.morse@arm.com>
+Date: Fri,  5 Oct 2018 16:02:34 +0100
+Subject: [RFC PATCH 1/2] ACPI / processor: Add helper to convert acpi_id to a
+ phys_cpuid
+In-Reply-To: <20181005150235.13846-1-james.morse@arm.com>
+References: <20181005150235.13846-1-james.morse@arm.com>
+Message-ID: <20181005150235.13846-2-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+The PPTT parsing code only has access to an acpi_id, we need a hardware
+property, preferably the corresponding phys_cpuid_t.
 
-To get resctrl working on arm64, we need to generate 'id's for caches.
-This is this value that shows up in, e.g.:
-| /sys/devices/system/cpu/cpu0/cache/index3/id
+acpi_get_cpuid() requires us to have the acpi_handle, which would imply
+we already have the acpi_device or acpi_processor structure. This call
+is useful when the CPU may not have been mapped, e.g. when walking the
+namespace.
 
-This value needs to be unique for each level of cache, but doesn't
-need to be contiguous. (there may be gaps, it may not start at 0).
-Details in Documentation/x86/intel_rdt_ui.txt::Cache IDs
+The PPTT is parsed after CPUs have been discovered and mapped, add a
+helper to walk the possible CPUs and test whether the acpi_processor
+matches our acpi_id.
 
-resctrl receives these values back via its schemata file. e.g.:
-| echo "L3:0=fff;1=fff" > /sys/fs/resctrl/p1/schemata
-Where 0 and 1 are the ids of two caches in the system.
+Signed-off-by: James Morse <james.morse@arm.com>
 
-These values become ABI, and are likely to be baked into shell scripts.
-We want a value that is the same over reboots, and should be the same
-on identical hardware, even if the PPTT is generated in a different
-order. The hardware doesn't give us any indication of which caches are
-shared, so this information must come from firmware tables.
-
-This series generates an id from the PPTT topology, based on the lowest
-MPIDR of the cpus that share a cache.
-
-The remaining problems with this approach are:
- * the 32bit ID field is full of MPIDR.Aff{0-3}. We don't have space to
-   hide 'i/d/unified', so can only generate ids for unified caches. If we
-   ever get an Aff4 (plenty of RES0 space in there) we can no longer generate
-   an id. Having all these bits accounted for in the initial version doesn't
-   feel like a good ABI choice.
-
-* Existing software is going to assume caches are numbered 0,1,2. This was
-  documented as not guaranteed, and its likely never going to be the case
-  if we generate ids like this.
-
-* The table walk is recursive.
-
-
-Fixes for the first two require extra-code to compact the ID range, which would
-require us generating all the IDs up front, not from hotplug callbacks as has
-to happen today.
-
-Alternatively, we could try and change the abi to provide a u64 as the
-cache id. The size isn't documented, and for resctrl userspace can treat
-it as a string.
-
-Better ideas welcome!
-
-Thanks,
-
-James Morse (2):
-  ACPI / processor: Add helper to convert acpi_id to a phys_cpuid
-  ACPI / PPTT: cacheinfo: Label caches based on fw_token
-
- arch/arm64/include/asm/acpi.h |  6 +++
- drivers/acpi/pptt.c           | 81 +++++++++++++++++++++++++++++++++++
- drivers/acpi/processor_core.c | 16 +++++++
+---
+I'm not entirely sure what 'mapping processors' is about, so may have the
+wrong end of the stick here.
+---
+ drivers/acpi/processor_core.c | 16 ++++++++++++++++
  include/acpi/processor.h      |  1 +
- 4 files changed, 104 insertions(+)
+ 2 files changed, 17 insertions(+)
 
+diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+index 8c0a54d50d0e..333547bf7845 100644
+--- a/drivers/acpi/processor_core.c
++++ b/drivers/acpi/processor_core.c
+@@ -9,7 +9,9 @@
+  *	Yinghai Lu <yinghai@kernel.org>
+  *	Jiang Liu <jiang.liu@intel.com>
+  */
++#include <linux/percpu.h>
+ #include <linux/export.h>
++#include <linux/cpumask.h>
+ #include <linux/acpi.h>
+ #include <acpi/processor.h>
+ 
+@@ -263,6 +265,20 @@ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
+ }
+ EXPORT_SYMBOL_GPL(acpi_get_cpuid);
+ 
++phys_cpuid_t acpi_id_to_phys_cpuid(u32 acpi_id)
++{
++	int cpu;
++	struct acpi_processor *pr;
++
++	for_each_possible_cpu(cpu) {
++		pr = per_cpu(processors, cpu);
++		if (pr && pr->acpi_id == acpi_id)
++			return pr->phys_id;
++	}
++
++	return PHYS_CPUID_INVALID;
++}
++
+ #ifdef CONFIG_ACPI_HOTPLUG_IOAPIC
+ static int get_ioapic_id(struct acpi_subtable_header *entry, u32 gsi_base,
+ 			 u64 *phys_addr, int *ioapic_id)
+diff --git a/include/acpi/processor.h b/include/acpi/processor.h
+index 1194a4c78d55..9235b41a9d52 100644
+--- a/include/acpi/processor.h
++++ b/include/acpi/processor.h
+@@ -333,6 +333,7 @@ phys_cpuid_t acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
+ phys_cpuid_t acpi_map_madt_entry(u32 acpi_id);
+ int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id);
+ int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
++phys_cpuid_t acpi_id_to_phys_cpuid(u32 acpi_id);
+ 
+ #ifdef CONFIG_ACPI_CPPC_LIB
+ extern int acpi_cppc_processor_probe(struct acpi_processor *pr);
 -- 
 2.18.0
