@@ -1,125 +1,53 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 5 Oct 2018 15:47:12 +0200
-Subject: [PATCH V5 02/24] mmc: mmci: create common mmci_dma_setup/release
-In-Reply-To: <1538745782-27446-3-git-send-email-ludovic.Barre@st.com>
-References: <1538745782-27446-1-git-send-email-ludovic.Barre@st.com>
- <1538745782-27446-3-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAPDyKFogS_74csmZm5_M3D-JFNn_8fi2sxcHpRwVxZOqZhndVg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri,  5 Oct 2018 14:49:16 +0100
+Subject: [PATCH] arm64: mm: Use #ifdef for the __PAGETABLE_P?D_FOLDED defines
+Message-ID: <20181005134916.12937-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2018 at 15:22, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
->
-> This patch creates a common mmci_dma_setup/release which calls
-> dma_setup/release callbacks of mmci_host_ops and manages
-> common features like use_dma... If there is a fallbacks to
-> pio mode, dma functions must check use_dma.
->
-> error management:
-> -mmci_dmae_setup fail if Tx and Rx dma channels are not defined
-> -qcom_dma_setup fail if one of both dma channels is not defined,
->  Qcom has no specific resource to release, just mmci dmae resource.
+__is_defined(__PAGETABLE_P?D_FOLDED) doesn't quite work as intended
+as these symbols are internal to asm-generic and aren't defined in the
+way kconfig expects. This makes them always evaluate to false.
+Switch to #ifdef.
 
-Makes perfect sense!
+Signed-off-by: James Morse <james.morse@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+---
 
-[...]
+ arch/arm64/include/asm/pgtable.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-> +void mmci_dma_setup(struct mmci_host *host)
-> +{
-> +       if (!host->ops || !host->ops->dma_setup)
-> +               return;
-> +
-> +       if (host->ops->dma_setup(host)) {
-> +               mmci_dma_release(host);
-
-Please remove this and let the variants clean up themselves. That
-makes it more straight forward.
-
-> +               return;
-> +       }
-> +
-> +       host->use_dma = true;
-> +}
-> +
-
-[...]
-
-> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-> index 01e6c6b..9b0a960 100644
-> --- a/drivers/mmc/host/mmci.h
-> +++ b/drivers/mmc/host/mmci.h
-> @@ -273,7 +273,8 @@ struct variant_data {
->
->  /* mmci variant callbacks */
->  struct mmci_host_ops {
-> -       void (*dma_setup)(struct mmci_host *host);
-> +       int (*dma_setup)(struct mmci_host *host);
-> +       void (*dma_release)(struct mmci_host *host);
->  };
->
->  struct mmci_host_next {
-> @@ -323,6 +324,7 @@ struct mmci_host {
->         unsigned int            size;
->         int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
->
-> +       u8                      use_dma:1;
->  #ifdef CONFIG_DMA_ENGINE
->         /* DMA stuff */
->         struct dma_chan         *dma_current;
-> @@ -336,3 +338,14 @@ struct mmci_host {
->  #endif
->  };
->
-> +#ifdef CONFIG_DMA_ENGINE
-> +void mmci_variant_init(struct mmci_host *host);
-> +#else
-> +static inline void mmci_variant_init(struct mmci_host *host)
-> +{
-> +}
-> +#endif
-
-This can be kept in mmci.c instead.
-
-> +
-> +int mmci_dmae_setup(struct mmci_host *host);
-> +void mmci_dmae_release(struct mmci_host *host);
-> +
-> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
-> index be3fab5..aa070a9 100644
-> --- a/drivers/mmc/host/mmci_qcom_dml.c
-> +++ b/drivers/mmc/host/mmci_qcom_dml.c
-> @@ -119,19 +119,22 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
->  }
->
->  /* Initialize the dml hardware connected to SD Card controller */
-> -static void qcom_dma_setup(struct mmci_host *host)
-> +static int qcom_dma_setup(struct mmci_host *host)
->  {
->         u32 config;
->         void __iomem *base;
->         int consumer_id, producer_id;
->         struct device_node *np = host->mmc->parent->of_node;
->
-> +       if (mmci_dmae_setup(host))
-> +               return -EINVAL;
-> +
->         consumer_id = of_get_dml_pipe_index(np, "tx");
->         producer_id = of_get_dml_pipe_index(np, "rx");
->
->         if (producer_id < 0 || consumer_id < 0) {
->                 host->variant->qcom_dml = false;
-> -               return;
-> +               return -EINVAL;
-
-This relies on error handling to be done by mmci_dma_setup(), which as
-stated, feels a bit wrong.
-
-I would rather just call mmci_dmae_realease() here, before returning -EINVAL.
-
-[...]
-
-Otherwise, this looks good to me now.
-
-Kind regards
-Uffe
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index b58f764babf8..50b1ef8584c0 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -445,10 +445,12 @@ static inline bool in_swapper_pgdir(void *addr)
+ 
+ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+ {
+-	if (__is_defined(__PAGETABLE_PMD_FOLDED) && in_swapper_pgdir(pmdp)) {
++#ifdef __PAGETABLE_PMD_FOLDED
++	if (in_swapper_pgdir(pmdp)) {
+ 		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
+ 		return;
+ 	}
++#endif /* __PAGETABLE_PMD_FOLDED */
+ 
+ 	WRITE_ONCE(*pmdp, pmd);
+ 
+@@ -503,10 +505,12 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+ 
+ static inline void set_pud(pud_t *pudp, pud_t pud)
+ {
+-	if (__is_defined(__PAGETABLE_PUD_FOLDED) && in_swapper_pgdir(pudp)) {
++#ifdef __PAGETABLE_PUD_FOLDED
++	if (in_swapper_pgdir(pudp)) {
+ 		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
+ 		return;
+ 	}
++#endif /* __PAGETABLE_PUD_FOLDED */
+ 
+ 	WRITE_ONCE(*pudp, pud);
+ 
+-- 
+2.19.0
