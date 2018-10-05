@@ -1,115 +1,32 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 5 Oct 2018 16:54:31 +0100
-Subject: [RFC PATCH 0/2] ACPI / PPTT: ids for caches
-In-Reply-To: <da8a4ae0-b63c-d27f-1f54-af19f058881c@codeaurora.org>
-References: <20181005150235.13846-1-james.morse@arm.com>
- <da8a4ae0-b63c-d27f-1f54-af19f058881c@codeaurora.org>
-Message-ID: <8cfc967e-f386-15f5-8fec-33e6a3b9571e@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Oct 2018 17:43:03 +0200
+Subject: [GIT PULL] Allwinner H3/H5 changes for 4.20, bis
+In-Reply-To: <20181004193630.lbxyiecochf5cdfq@flea>
+References: <20181004193630.lbxyiecochf5cdfq@flea>
+Message-ID: <CAK8P3a121EMnah1rKx7H8Bu1MrH_ZLyq3kNMM3U6eo13Gpx6yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffrey,
+On Thu, Oct 4, 2018 at 9:36 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Hi Arnd, Olof,
+>
+> Here is a second attempt at the previous PR for the H3 and H5 changes,
+> hopefully with the right SoB this time. It replaces the previous one.
 
-On 05/10/18 16:20, Jeffrey Hugo wrote:
-> On 10/5/2018 9:02 AM, James Morse wrote:
->> To get resctrl working on arm64, we need to generate 'id's for caches.
->> This is this value that shows up in, e.g.:
->> | /sys/devices/system/cpu/cpu0/cache/index3/id
->>
->> This value needs to be unique for each level of cache, but doesn't
->> need to be contiguous. (there may be gaps, it may not start at 0).
->> Details in Documentation/x86/intel_rdt_ui.txt::Cache IDs
->>
->> resctrl receives these values back via its schemata file. e.g.:
->> | echo "L3:0=fff;1=fff" > /sys/fs/resctrl/p1/schemata
->> Where 0 and 1 are the ids of two caches in the system.
->>
->> These values become ABI, and are likely to be baked into shell scripts.
->> We want a value that is the same over reboots, and should be the same
->> on identical hardware, even if the PPTT is generated in a different
->> order. The hardware doesn't give us any indication of which caches are
->> shared, so this information must come from firmware tables.
->>
->> This series generates an id from the PPTT topology, based on the lowest
->> MPIDR of the cpus that share a cache.
->>
->> The remaining problems with this approach are:
->> ? * the 32bit ID field is full of MPIDR.Aff{0-3}. We don't have space to
->> ??? hide 'i/d/unified', so can only generate ids for unified caches. If we
->> ??? ever get an Aff4 (plenty of RES0 space in there) we can no longer generate
->> ??? an id. Having all these bits accounted for in the initial version doesn't
->> ??? feel like a good ABI choice.
->>
->> * Existing software is going to assume caches are numbered 0,1,2. This was
->> ?? documented as not guaranteed, and its likely never going to be the case
->> ?? if we generate ids like this.
->>
->> * The table walk is recursive.
->>
->>
->> Fixes for the first two require extra-code to compact the ID range, which would
->> require us generating all the IDs up front, not from hotplug callbacks as has
->> to happen today.
->>
->> Alternatively, we could try and change the abi to provide a u64 as the
->> cache id. The size isn't documented, and for resctrl userspace can treat
->> it as a string.
->>
->> Better ideas welcome!
-> 
-> I'm sorry, I'm not familiar with this resctrl, and therefore I don't quite feel
-> like I have a handle on what we need out of the ids file (and the Documentation
-> you pointed to doesn't seem to clarify it for me).
+Hi Maxime,
 
-> Lets assume we have a trivial 4 core system.? Each core has a private L1i and
-> L1d cache.? Cores 0/1 and 2/3 share a L2.? Cores 0-3 share L3.
+I'm not completely sure about this, we generally try not to rebase the
+branches, and the previous version is now deep in the git history of the
+next/dt branch.
 
-The i/d caches wouldn't get an ID, because we can't easily generate unique
-values for these. (with this scheme, all the id bits are in use for shared
-unified caches).
+Obviously having a missing signoff is also bad, but I think keeping
+the old version of your branch is better in this case. Merging the
+new branch on top of next/dt would give us a proper signoff chain on
+each patch, but would not remove the patches with the missing
+signoff. Instead we'd have lots of duplicate commits, which is probably
+worse.
 
-Cores 0 and 1 should show the same ID for their L2, 2 and 3 should show a
-different ID. Cores 0-3 should all show the same id for L3.
+Olof, do you have any other ideas?
 
-
-> If we are assigning ids in the range 1-N, what might we expect the id of each
-> cache to be?
-> 
-> Is this sane (each unique cache instance has a unique id), or have I misunderstood?
-> CPU0 L1i - 1
-> CPU0 L1d - 2
-> CPU1 L1i - 3
-> CPU1 L1d - 4
-> CPU2 L1i - 5
-> CPU2 L1d - 6
-> CPU3 L1i - 7
-> CPU3 L1d - 8
-
-> CPU0/1 L2 - 9
-> CPU2/3 L2 - 10
-
-> ?????? L3 - 11
-
-This would be sane. We don't need to continue the numbering between L1/L2/L3.
-The id only needs to be unique at that level.
-
-
-The problem is generating these numbers if only some of the CPUs are online, or
-if the acpi tables are generated by firmware at power-on and have a different
-layout every time.
-We don't even want to rely on linux's cpu numbering.
-
-The suggestion here is to use the smallest MPIDR, as that's as hardware property
-that won't change even if the tables are generated differently every boot.
-
-Assuming two clusters in your example above, it would look like:
-
-| CPU0/1 (cluster 0) L2 - 0x0
-| CPU2/3 (cluster 1) L2 - 0x100
-|                    L3 - 0x0
-
-
-
-Thanks,
-
-James
+       Arnd
