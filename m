@@ -1,219 +1,202 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:38 -0500
-Subject: [PATCH 26/36] dt-bindings: arm: Convert QCom board/soc bindings to
- json-schema
+Date: Fri,  5 Oct 2018 11:58:25 -0500
+Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-27-robh@kernel.org>
+Message-ID: <20181005165848.3474-14-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert QCom SoC bindings to DT schema format using json-schema.
+Convert ARM PMU binding to DT schema format using json-schema.
 
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/qcom.txt          |  57 --------
- .../devicetree/bindings/arm/qcom.yaml         | 125 ++++++++++++++++++
- 2 files changed, 125 insertions(+), 57 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
- create mode 100644 Documentation/devicetree/bindings/arm/qcom.yaml
+ Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
+ .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
+ 2 files changed, 96 insertions(+), 70 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
 
-diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
+diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
 deleted file mode 100644
-index ee532e705d6c..000000000000
---- a/Documentation/devicetree/bindings/arm/qcom.txt
+index 13611a8199bb..000000000000
+--- a/Documentation/devicetree/bindings/arm/pmu.txt
 +++ /dev/null
-@@ -1,57 +0,0 @@
--QCOM device tree bindings
---------------------------
+@@ -1,70 +0,0 @@
+-* ARM Performance Monitor Units
 -
--Some qcom based bootloaders identify the dtb blob based on a set of
--device properties like SoC and platform and revisions of those components.
--To support this scheme, we encode this information into the board compatible
--string.
+-ARM cores often have a PMU for counting cpu and cache events like cache misses
+-and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
+-representation in the device tree should be done as under:-
 -
--Each board must specify a top-level board compatible string with the following
--format:
+-Required properties:
 -
--	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
+-- compatible : should be one of
+-	"apm,potenza-pmu"
+-	"arm,armv8-pmuv3"
+-	"arm,cortex-a73-pmu"
+-	"arm,cortex-a72-pmu"
+-	"arm,cortex-a57-pmu"
+-	"arm,cortex-a53-pmu"
+-	"arm,cortex-a35-pmu"
+-	"arm,cortex-a17-pmu"
+-	"arm,cortex-a15-pmu"
+-	"arm,cortex-a12-pmu"
+-	"arm,cortex-a9-pmu"
+-	"arm,cortex-a8-pmu"
+-	"arm,cortex-a7-pmu"
+-	"arm,cortex-a5-pmu"
+-	"arm,arm11mpcore-pmu"
+-	"arm,arm1176-pmu"
+-	"arm,arm1136-pmu"
+-	"brcm,vulcan-pmu"
+-	"cavium,thunder-pmu"
+-	"qcom,scorpion-pmu"
+-	"qcom,scorpion-mp-pmu"
+-	"qcom,krait-pmu"
+-- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+-               interrupt (PPI) then 1 interrupt should be specified.
 -
--The 'SoC' and 'board' elements are required. All other elements are optional.
+-Optional properties:
 -
--The 'SoC' element must be one of the following strings:
+-- interrupt-affinity : When using SPIs, specifies a list of phandles to CPU
+-                       nodes corresponding directly to the affinity of
+-		       the SPIs listed in the interrupts property.
 -
--	apq8016
--	apq8074
--	apq8084
--	apq8096
--	msm8916
--	msm8974
--	msm8992
--	msm8994
--	msm8996
--	mdm9615
--	ipq8074
--	sdm845
+-                       When using a PPI, specifies a list of phandles to CPU
+-		       nodes corresponding to the set of CPUs which have
+-		       a PMU of this type signalling the PPI listed in the
+-		       interrupts property, unless this is already specified
+-		       by the PPI interrupt specifier itself (in which case
+-		       the interrupt-affinity property shouldn't be present).
 -
--The 'board' element must be one of the following strings:
+-                       This property should be present when there is more than
+-		       a single SPI.
 -
--	cdp
--	liquid
--	dragonboard
--	mtp
--	sbc
--	hk01
 -
--The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
--where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
--as v1. If all versions of the 'board_version' elements match, then a
--wildcard '*' should be used, e.g. 'v*'.
+-- qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
+-                     events.
 -
--The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
+-- secure-reg-access : Indicates that the ARMv7 Secure Debug Enable Register
+-		      (SDER) is accessible. This will cause the driver to do
+-		      any setup required that is only possible in ARMv7 secure
+-		      state. If not present the ARMv7 SDER will not be touched,
+-		      which means the PMU may fail to operate unless external
+-		      code (bootloader or security monitor) has performed the
+-		      appropriate initialisation. Note that this property is
+-		      not valid for non-ARMv7 CPUs or ARMv7 CPUs booting Linux
+-		      in Non-secure state.
 -
--Examples:
+-Example:
 -
--	"qcom,msm8916-v1-cdp-pm8916-v2.1"
--
--A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
--2.1.
--
--	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
--
--A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
--foundry 2.
-diff --git a/Documentation/devicetree/bindings/arm/qcom.yaml b/Documentation/devicetree/bindings/arm/qcom.yaml
+-pmu {
+-        compatible = "arm,cortex-a9-pmu";
+-        interrupts = <100 101>;
+-};
+diff --git a/Documentation/devicetree/bindings/arm/pmu.yaml b/Documentation/devicetree/bindings/arm/pmu.yaml
 new file mode 100644
-index 000000000000..d8fcd8deed5c
+index 000000000000..0dbb9e0566af
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/qcom.yaml
-@@ -0,0 +1,125 @@
++++ b/Documentation/devicetree/bindings/arm/pmu.yaml
+@@ -0,0 +1,96 @@
 +# SPDX-License-Identifier: None
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/bindings/arm/qcom.yaml#
++$id: http://devicetree.org/schemas/bindings/arm/pmu.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: QCOM device tree bindings
++title: ARM Performance Monitor Units
 +
 +maintainers:
-+  - Stephen Boyd <sboyd@codeaurora.org>
-+
-+description: |
-+  Some qcom based bootloaders identify the dtb blob based on a set of
-+  device properties like SoC and platform and revisions of those components.
-+  To support this scheme, we encode this information into the board compatible
-+  string.
-+
-+  Each board must specify a top-level board compatible string with the following
-+  format:
-+
-+  	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
-+
-+  The 'SoC' and 'board' elements are required. All other elements are optional.
-+
-+  The 'SoC' element must be one of the following strings:
-+
-+  	apq8016
-+  	apq8074
-+  	apq8084
-+  	apq8096
-+  	msm8916
-+  	msm8974
-+  	msm8992
-+  	msm8994
-+  	msm8996
-+  	mdm9615
-+  	ipq8074
-+  	sdm845
-+
-+  The 'board' element must be one of the following strings:
-+
-+  	cdp
-+  	liquid
-+  	dragonboard
-+  	mtp
-+  	sbc
-+  	hk01
-+
-+  The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
-+  where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
-+  as v1. If all versions of the 'board_version' elements match, then a
-+  wildcard '*' should be used, e.g. 'v*'.
-+
-+  The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
-+
-+  Examples:
-+
-+  	"qcom,msm8916-v1-cdp-pm8916-v2.1"
-+
-+  A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
-+  2.1.
-+
-+  	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
-+
-+  A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
-+  foundry 2.
++  - Mark Rutland <mark.rutland@arm.com>
++  - Will Deacon <will.deacon@arm.com>
++description: |+
++  ARM cores often have a PMU for counting cpu and cache events like cache misses
++  and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
++  representation in the device tree should be done as under:-
 +
 +properties:
 +  compatible:
++    items:
++      - enum:
++          - apm,potenza-pmu
++          - arm,armv8-pmuv3
++          - arm,cortex-a73-pmu
++          - arm,cortex-a72-pmu
++          - arm,cortex-a57-pmu
++          - arm,cortex-a53-pmu
++          - arm,cortex-a35-pmu
++          - arm,cortex-a17-pmu
++          - arm,cortex-a15-pmu
++          - arm,cortex-a12-pmu
++          - arm,cortex-a9-pmu
++          - arm,cortex-a8-pmu
++          - arm,cortex-a7-pmu
++          - arm,cortex-a5-pmu
++          - arm,arm11mpcore-pmu
++          - arm,arm1176-pmu
++          - arm,arm1136-pmu
++          - brcm,vulcan-pmu
++          - cavium,thunder-pmu
++          - qcom,scorpion-pmu
++          - qcom,scorpion-mp-pmu
++          - qcom,krait-pmu
++  interrupts:
 +    oneOf:
-+      - items:
-+          - enum:
-+              - qcom,apq8016-sbc
-+          - const: qcom,apq8016
++      - maxItems: 1
++      - minItems: 2
++        maxItems: 8
++        description: 1 interrupt per core.
 +
-+      - items:
-+          - enum:
-+              - qcom,apq8064-cm-qs600
-+              - qcom,apq8064-ifc6410
-+          - const: qcom,apq8064
++  interrupts-extended:
++    $ref: '#/properties/interrupts'
 +
-+      - items:
-+          - enum:
-+              - qcom,apq8074-dragonboard
-+          - const: qcom,apq8074
++  interrupt-affinity:
++    description:
++      When using SPIs, specifies a list of phandles to CPU
++      nodes corresponding directly to the affinity of
++      the SPIs listed in the interrupts property.
 +
-+      - items:
-+          - enum:
-+              - qcom,apq8060-dragonboard
-+              - qcom,msm8660-surf
-+          - const: qcom,msm8660
++      When using a PPI, specifies a list of phandles to CPU
++      nodes corresponding to the set of CPUs which have
++      a PMU of this type signalling the PPI listed in the
++      interrupts property, unless this is already specified
++      by the PPI interrupt specifier itself (in which case
++      the interrupt-affinity property shouldn't be present).
 +
-+      - items:
-+          - enum:
-+              - qcom,apq8084-mtp
-+              - qcom,apq8084-sbc
-+          - const: qcom,apq8084
++      This property should be present when there is more than
++      a single SPI.
 +
-+      - items:
-+          - enum:
-+              - qcom,msm8960-cdp
-+          - const: qcom,msm8960
++  qcom,no-pc-write:
++    type: boolean
++    description:
++      Indicates that this PMU doesn't support the 0xc and 0xd events.
 +
-+      - items:
-+          - const: qcom,msm8916-mtp/1
-+          - const: qcom,msm8916-mtp
-+          - const: qcom,msm8916
++  secure-reg-access:
++    type: boolean
++    description:
++      Indicates that the ARMv7 Secure Debug Enable Register
++      (SDER) is accessible. This will cause the driver to do
++      any setup required that is only possible in ARMv7 secure
++      state. If not present the ARMv7 SDER will not be touched,
++      which means the PMU may fail to operate unless external
++      code (bootloader or security monitor) has performed the
++      appropriate initialisation. Note that this property is
++      not valid for non-ARMv7 CPUs or ARMv7 CPUs booting Linux
++      in Non-secure state.
 +
-+      - items:
-+          - const: qcom,msm8996-mtp
++required:
++  - compatible
 +
-+      - items:
-+          - const: qcom,ipq4019
-+
-+      - items:
-+          - enum:
-+              - qcom,ipq8064-ap148
-+          - const: qcom,ipq8064
-+
-+      - items:
-+          - enum:
-+              - qcom,ipq8074-hk01
-+          - const: qcom,ipq8074
++oneOf:
++  - required:
++      - interrupts
++  - required:
++      - interrupts-extended
 +
 +...
 -- 
