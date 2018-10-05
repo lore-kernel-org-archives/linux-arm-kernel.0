@@ -1,53 +1,46 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri,  5 Oct 2018 14:49:16 +0100
-Subject: [PATCH] arm64: mm: Use #ifdef for the __PAGETABLE_P?D_FOLDED defines
-Message-ID: <20181005134916.12937-1-james.morse@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 5 Oct 2018 15:54:03 +0200
+Subject: [PATCH] mmc: meson-mx-sdio: mark expected switch fall-through
+In-Reply-To: <20181005100903.GA32057@embeddedor.com>
+References: <20181005100903.GA32057@embeddedor.com>
+Message-ID: <CAPDyKFo6g9dHDBuL4FL2HW5DSAmwtbVKRFOcTAKxFkyQkDDQiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__is_defined(__PAGETABLE_P?D_FOLDED) doesn't quite work as intended
-as these symbols are internal to asm-generic and aren't defined in the
-way kconfig expects. This makes them always evaluate to false.
-Switch to #ifdef.
+On 5 October 2018 at 12:09, Gustavo A. R. Silva <gustavo@embeddedor.com> wrote:
+> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
+> where we are expecting to fall through.
+>
+> Notice that in this particular case, I replaced the "fall-through:"
+> comment with a proper "fall through", which is what GCC is
+> expecting to find.
+>
+> Addresses-Coverity-ID: 1373880 ("Missing break in switch")
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 
-Signed-off-by: James Morse <james.morse@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
----
 
- arch/arm64/include/asm/pgtable.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Applied for next, thanks!
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index b58f764babf8..50b1ef8584c0 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -445,10 +445,12 @@ static inline bool in_swapper_pgdir(void *addr)
- 
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
--	if (__is_defined(__PAGETABLE_PMD_FOLDED) && in_swapper_pgdir(pmdp)) {
-+#ifdef __PAGETABLE_PMD_FOLDED
-+	if (in_swapper_pgdir(pmdp)) {
- 		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
- 		return;
- 	}
-+#endif /* __PAGETABLE_PMD_FOLDED */
- 
- 	WRITE_ONCE(*pmdp, pmd);
- 
-@@ -503,10 +505,12 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- 
- static inline void set_pud(pud_t *pudp, pud_t pud)
- {
--	if (__is_defined(__PAGETABLE_PUD_FOLDED) && in_swapper_pgdir(pudp)) {
-+#ifdef __PAGETABLE_PUD_FOLDED
-+	if (in_swapper_pgdir(pudp)) {
- 		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
- 		return;
- 	}
-+#endif /* __PAGETABLE_PUD_FOLDED */
- 
- 	WRITE_ONCE(*pudp, pud);
- 
--- 
-2.19.0
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/meson-mx-sdio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/meson-mx-sdio.c b/drivers/mmc/host/meson-mx-sdio.c
+> index 2cfec33..abe253c 100644
+> --- a/drivers/mmc/host/meson-mx-sdio.c
+> +++ b/drivers/mmc/host/meson-mx-sdio.c
+> @@ -294,7 +294,7 @@ static void meson_mx_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         switch (ios->power_mode) {
+>         case MMC_POWER_OFF:
+>                 vdd = 0;
+> -               /* fall-through: */
+> +               /* fall through */
+>         case MMC_POWER_UP:
+>                 if (!IS_ERR(mmc->supply.vmmc)) {
+>                         host->error = mmc_regulator_set_ocr(mmc,
+> --
+> 2.7.4
+>
