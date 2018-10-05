@@ -1,59 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Oct 2018 17:29:41 +0200
-Subject: [GIT PULL 1/3] Rockchip ARM64 devicetree updates for 4.20 - round2
-In-Reply-To: <11931084.yfuDoSsS8u@phil>
-References: <2559110.ail6FZQ9dJ@phil>
- <CAK8P3a1EKduDFqJOsXq6W9r=0+-fyrfyTnwPeHEp1BDVRxNk_g@mail.gmail.com>
- <11931084.yfuDoSsS8u@phil>
-Message-ID: <CAK8P3a0hkuupjwKmNORK9d7FBJkAXgbd2Oi-vvKAwT0NbXYNOA@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 5 Oct 2018 17:31:04 +0200
+Subject: [PATCH 12/12] arm64: dts: allwinner: bananapi-m64: Bananapi
+ S070WV20-CT16 DSI panel
+In-Reply-To: <CAMty3ZBb25EBF85oGYZFMGkW1F8DwojfwWp=UKhoTrJZmQkjZQ@mail.gmail.com>
+References: <20180927114850.24565-1-jagan@amarulasolutions.com>
+ <20180927114850.24565-13-jagan@amarulasolutions.com>
+ <20180927171747.wqdt5eiwktyyoefz@flea>
+ <CAMty3ZBb25EBF85oGYZFMGkW1F8DwojfwWp=UKhoTrJZmQkjZQ@mail.gmail.com>
+Message-ID: <20181005153104.xxv5vxinvawz3hic@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 6:15 PM Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Donnerstag, 4. Oktober 2018, 16:18:06 CEST schrieb Arnd Bergmann:
-> > On Wed, Oct 3, 2018 at 3:38 AM Heiko Stuebner <heiko@sntech.de> wrote:
+On Thu, Oct 04, 2018 at 09:33:59PM +0530, Jagan Teki wrote:
+> On Thu, Sep 27, 2018 at 10:47 PM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
 > >
+> > On Thu, Sep 27, 2018 at 05:18:50PM +0530, Jagan Teki wrote:
+> > > This patch add support for Bananapi S070WV20-CT16 DSI panel to
+> > > BPI-M64 board.
 > > >
-> > > The following changes since commit 78f26da3ffbce0ea3692a89fe3f5487cb8dda068:
+> > > DSI panel connected via board DSI port with,
+> > > - DC1SW as AVDD supply
+> > > - DCDC1 as DVDD supply
+> > > - PD6 gpio for reset pin
+> > > - PD5 gpio for backlight enable pin
+> > > - PD7 gpio for backlight vdd supply
 > > >
-> > >   arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board (2018-09-10 19:16:26 +0200)
+> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > ---
+> > >  .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 42 +++++++++++++++++++
+> > >  1 file changed, 42 insertions(+)
 > > >
-> > > are available in the Git repository at:
+> > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> > > index ef1c90401bb2..c0be949be68d 100644
+> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> > > @@ -45,6 +45,7 @@
+> > >  #include "sun50i-a64.dtsi"
 > > >
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64-2
+> > >  #include <dt-bindings/gpio/gpio.h>
+> > > +#include <dt-bindings/pwm/pwm.h>
 > > >
-> > > for you to fetch changes up to e78d53c7b2873e0724eb765a88ccde42560b0e05:
+> > >  / {
+> > >       model = "BananaPi-M64";
+> > > @@ -56,6 +57,24 @@
+> > >               serial1 = &uart1;
+> > >       };
 > > >
-> > >   arm64: dts: rockchip: enable display nodes on rk3328-rock64 (2018-09-28 13:18:37 +0200)
-> > >
-> > > ----------------------------------------------------------------
-> > > Some additional new boards, the rk3399-based RockPro64 from Pine64, as well
-> > > as the Vamrs Rock960. Another big feature is display support including hdmi
-> > > and the Innosilicon hdmiphy on the rk3328, right now enabled on the rock64.
-> > > The rock64 also got its spi-nor and spdif enabled. On the px30 we can see
-> > > dwc2-based usb support now and finally some misc fixes, like for a new dtc
-> > > warning, missing address and size cells and microSD fix on sapphire.
+> > > +     vdd_bl: regulator at 0 {
+> > > +             compatible = "regulator-fixed";
+> > > +             regulator-name = "bl-3v3";
+> > > +             regulator-min-microvolt = <3300000>;
+> > > +             regulator-max-microvolt = <3300000>;
+> > > +             gpio = <&pio 3 7 GPIO_ACTIVE_HIGH>; /* PD7 */
+> > > +             enable-active-high;
+> > > +     };
+> > > +
+> > > +     backlight_dsi: backlight-dsi {
+> > > +             compatible = "pwm-backlight";
+> > > +             pwms = <&r_pwm 0 50000 PWM_POLARITY_INVERTED>;
+> > > +             brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
 > >
-> > Nice to see those new boards!
-> >
-> > What about the bugfixes though, shouldn't at least the sapphire microSD fix
-> > be merged into 4.19 and possibly backported to stable kernels?
-> >
-> > I've pulled this into next/dt for now, please have a look at whether we
-> > also want some of them in the fixes branch for 4.19. Thanks,
->
-> The fixes aren't that critical:
-> - the dtc warning stems from the updated dtc that will get merged
->   into 4.20, so doesn't affect current kernels
-> - the first board using a dsi-display at all is still in flight, so the
->   missing -*cells aren't really causing issues on old kernels
-> - and finally I think Vicente is the only actual user of a sapphire
->   board (they are rk3399 eval boards after all) and he's using new
->   kernels and is still making new things work on that board.
->
-> So I'd think it we can save stable-maintainers time for breakage that
-> affects bigger crowds ;-)
+> > The brightness levels should be increasing linearly from a user point
+> > of view. Usually, with a PWM backlight, a quadratic rule works much
+> > better.
+> 
+> Does that mean, 0 40 80 ...
 
-Ok, thanks for checking!
+No, that means 1 2 4 8 16 32 etc..
 
-       Arnd
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181005/688278f3/attachment.sig>
