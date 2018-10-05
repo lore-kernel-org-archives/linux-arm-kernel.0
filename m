@@ -1,51 +1,134 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 5 Oct 2018 15:23:01 +0200
-Subject: [PATCH V5 23/24] dt-bindings: mmci: add stm32 sdmmc variant
+Date: Fri, 5 Oct 2018 15:22:53 +0200
+Subject: [PATCH V5 15/24] mmc: mmci: add variant property to define dpsm bit
 In-Reply-To: <1538745782-27446-1-git-send-email-ludovic.Barre@st.com>
 References: <1538745782-27446-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1538745782-27446-24-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1538745782-27446-16-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds properties for stm32 sdmmc variant.
+This patch adds datactrl variant property to define
+dpsm enable bit. Needed to support the STM32 variant
+(STM32 has no dpsm enable bit).
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/mmc/mmci.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/mmc/host/mmci.c | 15 ++++++++++++---
+ drivers/mmc/host/mmci.h |  2 ++
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-index 4e69b25..6d3c626 100644
---- a/Documentation/devicetree/bindings/mmc/mmci.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-@@ -16,8 +16,10 @@ Optional properties:
- - arm,primecell-periphid : contains the PrimeCell Peripheral ID, it overrides
-                            the ID provided by the HW
- - resets                 : phandle to internal reset line.
-+			   Should be defined for sdmmc variant.
- - vqmmc-supply           : phandle to the regulator device tree node, mentioned
-                            as the VCCQ/VDD_IO supply in the eMMC/SD specs.
-+specific for ux500 variant:
- - st,sig-dir-dat0        : bus signal direction pin used for DAT[0].
- - st,sig-dir-dat2        : bus signal direction pin used for DAT[2].
- - st,sig-dir-dat31       : bus signal direction pin used for DAT[3] and DAT[1].
-@@ -25,6 +27,14 @@ Optional properties:
- - st,sig-dir-cmd         : cmd signal direction pin used for CMD.
- - st,sig-pin-fbclk       : feedback clock signal pin used.
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 0b4dc66..db9c4fe 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -56,6 +56,7 @@ static struct variant_data variant_arm = {
+ 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
+ 	.datalength_bits	= 16,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.pwrreg_powerup		= MCI_PWR_UP,
+ 	.f_max			= 100000000,
+ 	.reversed_irq_handling	= true,
+@@ -74,6 +75,7 @@ static struct variant_data variant_arm_extended_fifo = {
+ 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
+ 	.datalength_bits	= 16,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.pwrreg_powerup		= MCI_PWR_UP,
+ 	.f_max			= 100000000,
+ 	.mmcimask1		= true,
+@@ -92,6 +94,7 @@ static struct variant_data variant_arm_extended_fifo_hwfc = {
+ 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
+ 	.datalength_bits	= 16,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.pwrreg_powerup		= MCI_PWR_UP,
+ 	.f_max			= 100000000,
+ 	.mmcimask1		= true,
+@@ -111,6 +114,7 @@ static struct variant_data variant_u300 = {
+ 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
+ 	.datalength_bits	= 16,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio			= true,
+ 	.pwrreg_powerup		= MCI_PWR_ON,
+@@ -135,6 +139,7 @@ static struct variant_data variant_nomadik = {
+ 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
+ 	.datalength_bits	= 24,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -162,6 +167,7 @@ static struct variant_data variant_ux500 = {
+ 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
+ 	.datalength_bits	= 24,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -194,6 +200,7 @@ static struct variant_data variant_ux500v2 = {
+ 	.datactrl_mask_ddrmode	= MCI_DPSM_ST_DDRMODE,
+ 	.datalength_bits	= 24,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -226,6 +233,7 @@ static struct variant_data variant_stm32 = {
+ 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
+ 	.datalength_bits	= 24,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
+ 	.st_sdio		= true,
+ 	.st_clkdiv		= true,
+@@ -252,6 +260,7 @@ static struct variant_data variant_qcom = {
+ 	.blksz_datactrl4	= true,
+ 	.datalength_bits	= 24,
+ 	.datactrl_blocksz	= 11,
++	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
+ 	.pwrreg_powerup		= MCI_PWR_UP,
+ 	.f_max			= 208000000,
+ 	.explicit_mclk_control	= true,
+@@ -970,11 +979,11 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	BUG_ON(1 << blksz_bits != data->blksz);
  
-+specific for sdmmc variant:
-+- st,sig-dir             : signal direction polarity used for cmd, dat0 dat123.
-+- st,neg-edge            : data & command phase relation, generated on
-+                           sd clock falling edge.
-+- st,use-ckin            : use ckin pin from an external driver to sample
-+                           the receive data (example: with voltage
-+			   switch transceiver).
-+
- Deprecated properties:
- - mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
- - mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
+ 	if (variant->blksz_datactrl16)
+-		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
++		datactrl = variant->datactrl_dpsm_enable | (data->blksz << 16);
+ 	else if (variant->blksz_datactrl4)
+-		datactrl = MCI_DPSM_ENABLE | (data->blksz << 4);
++		datactrl = variant->datactrl_dpsm_enable | (data->blksz << 4);
+ 	else
+-		datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
++		datactrl = variant->datactrl_dpsm_enable | blksz_bits << 4;
+ 
+ 	if (data->flags & MMC_DATA_READ)
+ 		datactrl |= MCI_DPSM_DIRECTION;
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index e601dda..e41dd94 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -222,6 +222,7 @@ struct mmci_host;
+  *		     register
+  * @datactrl_mask_sdio: SDIO enable mask in datactrl register
+  * @datactrl_blksz: block size in power of two
++ * @datactrl_dpsm_enable: enable value for DPSM
+  * @pwrreg_powerup: power up value for MMCIPOWER register
+  * @f_max: maximum clk frequency supported by the controller.
+  * @signal_direction: input/out direction of bus signals can be indicated
+@@ -258,6 +259,7 @@ struct variant_data {
+ 	unsigned int		datactrl_mask_ddrmode;
+ 	unsigned int		datactrl_mask_sdio;
+ 	unsigned int		datactrl_blocksz;
++	unsigned int		datactrl_dpsm_enable;
+ 	u8			st_sdio:1;
+ 	u8			st_clkdiv:1;
+ 	u8			blksz_datactrl16:1;
 -- 
 2.7.4
