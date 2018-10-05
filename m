@@ -1,37 +1,47 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Fri,  5 Oct 2018 14:45:05 -0700
-Subject: [PATCH i2c-next v7 3/5] dt-bindings: i2c: aspeed: Add
- 'bus-timeout-ms' property as an optional property
-In-Reply-To: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
-References: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20181005214507.26315-4-jae.hyun.yoo@linux.intel.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Fri,  5 Oct 2018 23:59:51 +0200
+Subject: [PATCH v3 2/2] drm/sun4i: tcon: prevent tcon->panel dereference if
+ NULL
+In-Reply-To: <20181005215951.99003-1-giulio.benetti@micronovasrl.com>
+References: <20181004195605.txvbkshvxklyzxyb@flea>
+ <20181005215951.99003-1-giulio.benetti@micronovasrl.com>
+Message-ID: <20181005215951.99003-2-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds 'bus-timeout-ms' property as an optional property
-which can be used for setting the bus timeout value of an adapter.
-With this patch, the bus timeout value can be set through this
-property at the probing time of this module. Still the bus timeout
-value can be set by an I2C_TIMEOUT ioctl on cdev at runtime too.
+If tcon->panel pointer is NULL, trying to dereference from it
+(i.e. tcon->panel->connector) will cause a null pointer dereference.
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Add tcon->panel null pointer check before calling
+sun4i_tcon0_mode_set_dithering().
+
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Fixes: f11adcecbd5f ("drm/sun4i: tcon: Add dithering support for
+                      RGB565/RGB666 LCD panels")
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/i2c/i2c-aspeed.txt | 3 +++
- 1 file changed, 3 insertions(+)
+Changes V1->V2:
+* None
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-index 8fbd8633a387..ce1f07620368 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-@@ -17,6 +17,9 @@ Optional Properties:
- 		  specified
- - multi-master	: states that there is another master active on this bus.
+Changes V2->V3:
+* Rewrite commit log
+
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index e4b3bd0307ef..f949287d926c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -491,7 +491,8 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
  
-+- bus-timeout-ms: bus timeout in milliseconds defaults to 1 second when not
-+		  specified.
-+
- Example:
+ 	/* Set dithering if needed */
+-	sun4i_tcon0_mode_set_dithering(tcon, tcon->panel->connector);
++	if (tcon->panel)
++		sun4i_tcon0_mode_set_dithering(tcon, tcon->panel->connector);
  
- i2c {
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
 -- 
-2.19.0
+2.17.1
