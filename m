@@ -1,25 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Oct 2018 17:44:41 +0200
-Subject: [GIT PULL] updates for DT 32bit for v4.20 round 2
-In-Reply-To: <6cd94d4a-63d0-5959-2fe2-c0c084f38ad7@gmail.com>
-References: <6cd94d4a-63d0-5959-2fe2-c0c084f38ad7@gmail.com>
-Message-ID: <CAK8P3a1ARJr-PCwD1DXouCUq=eAkEib46-A+f_C8+G9TzaKkAQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Oct 2018 10:04:40 -0500
+Subject: [PATCH] arm64: defconfig: Enable SERIAL_8250_OMAP
+In-Reply-To: <20181005100140.16716-1-lokeshvutla@ti.com>
+References: <20181005100140.16716-1-lokeshvutla@ti.com>
+Message-ID: <20181005150440.6efkltod3nri6roy@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 5, 2018 at 10:28 AM Matthias Brugger <matthias.bgg@gmail.com> wrote:
->
-> Hi Arnd,
-> Hi Olof,
->
-> Please have a look on the commits below. They are the second round of the
-> arm 32 bit device tree patches. The pull request is based on the first one
-> (v4.19-next-dts32) that you already merged.
->
-> Add binding description for devices from
-> MT7623. Clock controller, iommu, JPEG Decoder
-> and SMI conotroller.
+On 10:01-20181005, Lokesh Vutla wrote:
+> Enabling CONFIG_SERIAL_8250_OMAP that is used by TI's
+> AM6 SoC.
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+> - Based on next tag: next-20181005
+> 
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 030186c180aa..0baf31ca069f 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -288,6 +288,7 @@ CONFIG_SERIAL_8250_EXTENDED=y
+>  CONFIG_SERIAL_8250_SHARE_IRQ=y
+>  CONFIG_SERIAL_8250_BCM2835AUX=y
+>  CONFIG_SERIAL_8250_DW=y
+> +CONFIG_SERIAL_8250_OMAP=y
+>  CONFIG_SERIAL_8250_MT6577=y
+>  CONFIG_SERIAL_8250_UNIPHIER=y
+>  CONFIG_SERIAL_OF_PLATFORM=y
 
-Thanks for the followup, pulled into next/dt now.
+Olof, any chance to get this for v4.20?
 
-      Arnd
+Acked-by: Nishanth Menon <nm@ti.com>
+-- 
+Regards,
+Nishanth Menon
