@@ -1,36 +1,91 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Fri, 5 Oct 2018 10:12:10 +0200
-Subject: [PATCH] nvmem: lpc18xx_eeprom: fix compile warning
-In-Reply-To: <cbd5708c-e06a-acfd-80af-34222bc2be1f@linaro.org>
-References: <20181005070313.GA2217@embeddedor.com>
- <cbd5708c-e06a-acfd-80af-34222bc2be1f@linaro.org>
-Message-ID: <b9d48751-13eb-0fbe-0bd7-12578816799b@embeddedor.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  5 Oct 2018 10:13:25 +0200
+Subject: [RFC PATCH 1/9] kernel: add support for patchable function pointers
+In-Reply-To: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181005081333.15018-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a function pointer abstraction that can be implemented by the arch
+in a manner that avoids the downsides of function pointers, i.e., the
+fact that they are typically located in a writable data section, and
+their vulnerability to Spectre like defects.
 
+The FFP (or fast function pointer) is callable as a function, since
+the generic incarnation is simply that. However, due to the fact that
+C does not distinguish between functions and function pointers at the
+call site, the architecture can instead emit it as a patchable sequence
+of instructions consisting of ordinary branches.
 
-On 10/5/18 10:06 AM, Srinivas Kandagatla wrote:
-> 
-> 
-> On 05/10/18 08:03, Gustavo A. R. Silva wrote:
->> Fix the following warning by removing unused variable ret:
->>
->> drivers/nvmem/lpc18xx_eeprom.c: In function ?lpc18xx_eeprom_remove?:
->> drivers/nvmem/lpc18xx_eeprom.c:258:6: warning: unused variable ?ret?
->> [-Wunused-variable]
->> ?? int ret;
->> ?????? ^~~
->>
->> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> 
-> There is already a patch submitted fix this
-> 
-> ?https://lore.kernel.org/patchwork/patch/995032/
-> 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/Kconfig        |  3 ++
+ include/linux/ffp.h | 43 ++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
 
-Oh, good to know.
-
-Thanks, Srini.
---
-Gustavo
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 6801123932a5..2af3442a61d3 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -862,6 +862,9 @@ config HAVE_ARCH_PREL32_RELOCATIONS
+ 	  architectures, and don't require runtime relocation on relocatable
+ 	  kernels.
+ 
++config HAVE_ARCH_FFP
++	bool
++
+ source "kernel/gcov/Kconfig"
+ 
+ source "scripts/gcc-plugins/Kconfig"
+diff --git a/include/linux/ffp.h b/include/linux/ffp.h
+new file mode 100644
+index 000000000000..8fc3b4c9b38f
+--- /dev/null
++++ b/include/linux/ffp.h
+@@ -0,0 +1,43 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#ifndef __LINUX_FFP_H
++#define __LINUX_FFP_H
++
++#include <linux/types.h>
++#include <linux/compiler.h>
++
++#ifdef CONFIG_HAVE_ARCH_FFP
++#include <asm/ffp.h>
++#else
++
++struct ffp {
++	void	(**fn)(void);
++	void	(*default_fn)(void);
++};
++
++#define DECLARE_FFP(_fn, _def)						\
++	extern typeof(_def) *_fn;					\
++	extern struct ffp const __ffp_ ## _fn
++
++#define DEFINE_FFP(_fn, _def)						\
++	typeof(_def) *_fn = &_def;					\
++	struct ffp const __ffp_ ## _fn					\
++		= { (void(**)(void))&_fn, (void(*)(void))&_def };	\
++	EXPORT_SYMBOL(__ffp_ ## _fn)
++
++static inline void ffp_set_target(const struct ffp *m, void *new_fn)
++{
++	WRITE_ONCE(*m->fn, new_fn);
++}
++
++static inline void ffp_reset_target(const struct ffp *m)
++{
++	WRITE_ONCE(*m->fn, m->default_fn);
++}
++
++#endif
++
++#define SET_FFP(_fn, _new)	ffp_set_target(&__ffp_ ## _fn, _new)
++#define RESET_FFP(_fn)		ffp_reset_target(&__ffp_ ## _fn)
++
++#endif
+-- 
+2.11.0
