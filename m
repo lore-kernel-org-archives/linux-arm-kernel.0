@@ -1,313 +1,528 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:20 -0500
-Subject: [PATCH 08/36] dt-bindings: Add a writing DT schemas how-to and
- annotated example
+Date: Fri,  5 Oct 2018 11:58:34 -0500
+Subject: [PATCH 22/36] dt-bindings: arm: Convert FSL board/soc bindings to
+ json-schema
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-9-robh@kernel.org>
+Message-ID: <20181005165848.3474-23-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a how-to doc on writing DT schema documentation. This gives a
-description of each section and details on how to validate the DT schema
-file. The DT schema are written using json-schema vocabulary in a YAML
-encoded document. Using jsonschema gives us access to existing tooling.
-A YAML encoding gives us something easy to edit. The example is
-annotated to help explain what each section does.
+Convert Freescale SoC bindings to DT schema format using json-schema.
 
-This example is just the tip of the iceberg, but is it the part most
-developers writing bindings will interact with. Backing all this up
-are meta-schema (to validate the binding schemas), some DT core schema,
-YAML encoded DT output with dtc, and a small number of python scripts to
-run validation.
-
+Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/example-schema.yaml   | 155 ++++++++++++++++++
- Documentation/devicetree/writing-schema.md    | 111 +++++++++++++
- 2 files changed, 266 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/example-schema.yaml
- create mode 100644 Documentation/devicetree/writing-schema.md
+ .../devicetree/bindings/arm/armadeus.txt      |   6 -
+ Documentation/devicetree/bindings/arm/bhf.txt |   6 -
+ .../bindings/arm/compulab-boards.txt          |  25 ---
+ Documentation/devicetree/bindings/arm/fsl.txt | 185 ------------------
+ .../devicetree/bindings/arm/fsl.yaml          | 166 ++++++++++++++++
+ .../devicetree/bindings/arm/i2se.txt          |  22 ---
+ .../devicetree/bindings/arm/olimex.txt        |  10 -
+ .../devicetree/bindings/arm/technologic.txt   |  23 ---
+ 8 files changed, 166 insertions(+), 277 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/armadeus.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/bhf.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/fsl.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/fsl.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/i2se.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/olimex.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/technologic.txt
 
-diff --git a/Documentation/devicetree/bindings/example-schema.yaml b/Documentation/devicetree/bindings/example-schema.yaml
+diff --git a/Documentation/devicetree/bindings/arm/armadeus.txt b/Documentation/devicetree/bindings/arm/armadeus.txt
+deleted file mode 100644
+index 9821283ff516..000000000000
+--- a/Documentation/devicetree/bindings/arm/armadeus.txt
++++ /dev/null
+@@ -1,6 +0,0 @@
+-Armadeus i.MX Platforms Device Tree Bindings
+------------------------------------------------
+-
+-APF51: i.MX51 based module.
+-Required root node properties:
+-    - compatible = "armadeus,imx51-apf51", "fsl,imx51";
+diff --git a/Documentation/devicetree/bindings/arm/bhf.txt b/Documentation/devicetree/bindings/arm/bhf.txt
+deleted file mode 100644
+index 886b503caf9c..000000000000
+--- a/Documentation/devicetree/bindings/arm/bhf.txt
++++ /dev/null
+@@ -1,6 +0,0 @@
+-Beckhoff Automation Platforms Device Tree Bindings
+---------------------------------------------------
+-
+-CX9020 Embedded PC
+-Required root node properties:
+-    - compatible = "bhf,cx9020", "fsl,imx53";
+diff --git a/Documentation/devicetree/bindings/arm/compulab-boards.txt b/Documentation/devicetree/bindings/arm/compulab-boards.txt
+deleted file mode 100644
+index 42a10285af9c..000000000000
+--- a/Documentation/devicetree/bindings/arm/compulab-boards.txt
++++ /dev/null
+@@ -1,25 +0,0 @@
+-CompuLab SB-SOM is a multi-module baseboard capable of carrying:
+- - CM-T43
+- - CM-T54
+- - CM-QS600
+- - CL-SOM-AM57x
+- - CL-SOM-iMX7
+-modules with minor modifications to the SB-SOM assembly.
+-
+-Required root node properties:
+-    - compatible = should be "compulab,sb-som"
+-
+-Compulab CL-SOM-iMX7 is a miniature System-on-Module (SoM) based on
+-Freescale i.MX7 ARM Cortex-A7 System-on-Chip.
+-
+-Required root node properties:
+-    - compatible = "compulab,cl-som-imx7", "fsl,imx7d";
+-
+-Compulab SBC-iMX7 is a single board computer based on the
+-Freescale i.MX7 system-on-chip. SBC-iMX7 is implemented with
+-the CL-SOM-iMX7 System-on-Module providing most of the functions,
+-and SB-SOM-iMX7 carrier board providing additional peripheral
+-functions and connectors.
+-
+-Required root node properties:
+-    - compatible = "compulab,sbc-imx7", "compulab,cl-som-imx7", "fsl,imx7d";
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+deleted file mode 100644
+index 1e775aaa5c5b..000000000000
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ /dev/null
+@@ -1,185 +0,0 @@
+-Freescale i.MX Platforms Device Tree Bindings
+------------------------------------------------
+-
+-i.MX23 Evaluation Kit
+-Required root node properties:
+-    - compatible = "fsl,imx23-evk", "fsl,imx23";
+-
+-i.MX25 Product Development Kit
+-Required root node properties:
+-    - compatible = "fsl,imx25-pdk", "fsl,imx25";
+-
+-i.MX27 Product Development Kit
+-Required root node properties:
+-    - compatible = "fsl,imx27-pdk", "fsl,imx27";
+-
+-i.MX28 Evaluation Kit
+-Required root node properties:
+-    - compatible = "fsl,imx28-evk", "fsl,imx28";
+-
+-i.MX51 Babbage Board
+-Required root node properties:
+-    - compatible = "fsl,imx51-babbage", "fsl,imx51";
+-
+-i.MX53 Automotive Reference Design Board
+-Required root node properties:
+-    - compatible = "fsl,imx53-ard", "fsl,imx53";
+-
+-i.MX53 Evaluation Kit
+-Required root node properties:
+-    - compatible = "fsl,imx53-evk", "fsl,imx53";
+-
+-i.MX53 Quick Start Board
+-Required root node properties:
+-    - compatible = "fsl,imx53-qsb", "fsl,imx53";
+-
+-i.MX53 Smart Mobile Reference Design Board
+-Required root node properties:
+-    - compatible = "fsl,imx53-smd", "fsl,imx53";
+-
+-i.MX6 Quad Armadillo2 Board
+-Required root node properties:
+-    - compatible = "fsl,imx6q-arm2", "fsl,imx6q";
+-
+-i.MX6 Quad SABRE Lite Board
+-Required root node properties:
+-    - compatible = "fsl,imx6q-sabrelite", "fsl,imx6q";
+-
+-i.MX6 Quad SABRE Smart Device Board
+-Required root node properties:
+-    - compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
+-
+-i.MX6 Quad SABRE Automotive Board
+-Required root node properties:
+-    - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
+-
+-i.MX6SLL EVK board
+-Required root node properties:
+-    - compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
+-
+-Generic i.MX boards
+--------------------
+-
+-No iomux setup is done for these boards, so this must have been configured
+-by the bootloader for boards to work with the generic bindings.
+-
+-i.MX27 generic board
+-Required root node properties:
+-    - compatible = "fsl,imx27";
+-
+-i.MX51 generic board
+-Required root node properties:
+-    - compatible = "fsl,imx51";
+-
+-i.MX53 generic board
+-Required root node properties:
+-    - compatible = "fsl,imx53";
+-
+-i.MX6q generic board
+-Required root node properties:
+-    - compatible = "fsl,imx6q";
+-
+-Freescale Vybrid Platform Device Tree Bindings
+-----------------------------------------------
+-
+-For the Vybrid SoC familiy all variants with DDR controller are supported,
+-which is the VF5xx and VF6xx series. Out of historical reasons, in most
+-places the kernel uses vf610 to refer to the whole familiy.
+-The compatible string "fsl,vf610m4" is used for the secondary Cortex-M4
+-core support.
+-
+-Required root node compatible property (one of them):
+-    - compatible = "fsl,vf500";
+-    - compatible = "fsl,vf510";
+-    - compatible = "fsl,vf600";
+-    - compatible = "fsl,vf610";
+-    - compatible = "fsl,vf610m4";
+-
+-Freescale LS1021A Platform Device Tree Bindings
+-------------------------------------------------
+-
+-Required root node compatible properties:
+-  - compatible = "fsl,ls1021a";
+-
+-Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
+-----------------------------------------------------------------
+-
+-LS1012A SoC
+-Required root node properties:
+-    - compatible = "fsl,ls1012a";
+-
+-LS1012A ARMv8 based RDB Board
+-Required root node properties:
+-    - compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
+-
+-LS1012A ARMv8 based FRDM Board
+-Required root node properties:
+-    - compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
+-
+-LS1012A ARMv8 based QDS Board
+-Required root node properties:
+-    - compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
+-
+-LS1043A SoC
+-Required root node properties:
+-    - compatible = "fsl,ls1043a";
+-
+-LS1043A ARMv8 based RDB Board
+-Required root node properties:
+-    - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
+-
+-LS1043A ARMv8 based QDS Board
+-Required root node properties:
+-    - compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
+-
+-LS1046A SoC
+-Required root node properties:
+-    - compatible = "fsl,ls1046a";
+-
+-LS1046A ARMv8 based QDS Board
+-Required root node properties:
+-    - compatible = "fsl,ls1046a-qds", "fsl,ls1046a";
+-
+-LS1046A ARMv8 based RDB Board
+-Required root node properties:
+-    - compatible = "fsl,ls1046a-rdb", "fsl,ls1046a";
+-
+-LS1088A SoC
+-Required root node properties:
+-    - compatible = "fsl,ls1088a";
+-
+-LS1088A ARMv8 based QDS Board
+-Required root node properties:
+-    - compatible = "fsl,ls1088a-qds", "fsl,ls1088a";
+-
+-LS1088A ARMv8 based RDB Board
+-Required root node properties:
+-    - compatible = "fsl,ls1088a-rdb", "fsl,ls1088a";
+-
+-LS2080A SoC
+-Required root node properties:
+-    - compatible = "fsl,ls2080a";
+-
+-LS2080A ARMv8 based Simulator model
+-Required root node properties:
+-    - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
+-
+-LS2080A ARMv8 based QDS Board
+-Required root node properties:
+-    - compatible = "fsl,ls2080a-qds", "fsl,ls2080a";
+-
+-LS2080A ARMv8 based RDB Board
+-Required root node properties:
+-    - compatible = "fsl,ls2080a-rdb", "fsl,ls2080a";
+-
+-LS2088A SoC
+-Required root node properties:
+-    - compatible = "fsl,ls2088a";
+-
+-LS2088A ARMv8 based QDS Board
+-Required root node properties:
+-    - compatible = "fsl,ls2088a-qds", "fsl,ls2088a";
+-
+-LS2088A ARMv8 based RDB Board
+-Required root node properties:
+-    - compatible = "fsl,ls2088a-rdb", "fsl,ls2088a";
+diff --git a/Documentation/devicetree/bindings/arm/fsl.yaml b/Documentation/devicetree/bindings/arm/fsl.yaml
 new file mode 100644
-index 000000000000..4cbdbf59695f
+index 000000000000..5241fa92e3d1
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/example-schema.yaml
-@@ -0,0 +1,155 @@
-+# SPDX-License-Identifier: BSD-2-Clause
-+# Copyright 2018 Linaro Ltd.
++++ b/Documentation/devicetree/bindings/arm/fsl.yaml
+@@ -0,0 +1,166 @@
++# SPDX-License-Identifier: None
 +%YAML 1.2
 +---
-+# All the top-level keys are standard json-schema keywords except for
-+# 'maintainers' and 'select'
++$id: http://devicetree.org/schemas/bindings/arm/fsl.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+# $id is a unique idenifier based on the filename
-+$id: "http://devicetree.org/schemas/example-schema.yaml#"
-+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
-+
-+title: An example schema annotated with jsonschema details
++title: Freescale i.MX Platforms Device Tree Bindings
 +
 +maintainers:
-+  - Rob Herring <robh@kernel.org>
-+
-+description: |
-+  A more detailed multi-line description of the binding.
-+
-+  Details about the hardware device and any links to datasheets can go here.
-+
-+  Literal blocks are marked with the '|' at the beginning. The end is marked by
-+  indentation less than the first line of the literal block.
-+
-+select: false
-+  # 'select' is a schema applied to a DT node to determine if this binding
-+  # schema should be applied to the node. It is optional and by default the
-+  # possible compatible strings are extracted and used to match.
++  - Shawn Guo <shawn.guo@freescale.com>
++  - Shaohui Xie <Shaohui.Xie@nxp.com>
 +
 +properties:
-+  # A dictionary of DT properties for this binding schema
++  $nodename:
++    const: '/'
 +  compatible:
-+    # More complicated schema can use oneOf (XOR), anyOf (OR), or allOf (AND)
-+    # to handle different conditions.
-+    # In this case, it's needed to handle a variable number of values as there
-+    # isn't another way to express a constraint of the last string value.
-+    # The boolean schema must be a list of schemas.
 +    oneOf:
-+      - items:
-+          # items is a list of possible values for the property. The number of
-+          # values is determined by the number of elements in the list.
-+          # Order in lists is significant, order in dicts is not
-+          # Must be one of the 1st enums followed by the 2nd enum
-+          #
-+          # Each element in items should be 'enum' or 'const'
++      - description: i.MX23 based Boards
++        items:
 +          - enum:
-+              - vendor,soc4-ip
-+              - vendor,soc3-ip
-+              - vendor,soc2-ip
++              - fsl,imx23-evk
++              - olimex,imx23-olinuxino
++          - const: fsl,imx23
++
++      - description: i.MX25 Product Development Kit
++        items:
 +          - enum:
-+              - vendor,soc1-ip
-+        # additionalItems being false is implied
-+        # minItems/maxItems equal to 2 is implied
++              - fsl,imx25-pdk
++          - const: fsl,imx25
++
++      - description: i.MX27 Product Development Kit
++        items:
++          - enum:
++              - fsl,imx27-pdk
++          - const: fsl,imx27
++
++      - description: i.MX28 based Boards
++        items:
++          - enum:
++              - fsl,imx28-evk
++              - i2se,duckbill
++              - i2se,duckbill-2
++              - technologic,imx28-ts4600
++          - const: fsl,imx28
 +      - items:
-+          # 'const' is just a special case of an enum with a single possible value
-+          - const: vendor,soc1-ip
++          - enum:
++              - i2se,duckbill-2-485
++              - i2se,duckbill-2-enocean
++              - i2se,duckbill-2-spi
++          - const: i2se,duckbill-2
++          - const: fsl,imx28
 +
-+  reg:
-+    # The description of each element defines the order and implicitly defines
-+    # the number of reg entries
-+    items:
-+      - description: core registers
-+      - description: aux registers
-+    # minItems/maxItems equal to 2 is implied
++      - description: i.MX51 Babbage Board
++        items:
++          - enum:
++              - armadeus,imx51-apf51
++              - fsl,imx51-babbage
++              - technologic,imx51-ts4800
++          - const: fsl,imx51
 +
-+  reg-names:
-+    # The core schema enforces this is a string array
-+    items:
-+      - const: core
-+      - const: aux
++      - description: i.MX53 Boards
++        items:
++          - enum:
++              - bhf,cx9020
++              - fsl,imx53-ard
++              - fsl,imx53-evk
++              - fsl,imx53-qsb
++              - fsl,imx53-smd
++          - const: fsl,imx53
 +
-+  clocks:
-+    maxItems: 1
-+    # Only a single entry, so just need to set the max number of items.
-+    description: hello
++      - description: i.MX6Q based Boards
++        items:
++          - enum:
++              - fsl,imx6q-arm2
++              - fsl,imx6q-sabrelite
++              - fsl,imx6q-sabresd
++              - fsl,imx6q-sabreauto
++              - technologic,imx6q-ts4900
++              - technologic,imx6q-ts7970
++          - const: fsl,imx6q
 +
-+  clock-names:
-+    items:
-+      - const: bus
++      - description: i.MX6DL based Boards
++        items:
++          - enum:
++              - technologic,imx6dl-ts4900
++              - technologic,imx6dl-ts7970
++          - const: fsl,imx6dl
 +
-+  interrupts:
-+    # Either 1 or 2 interrupts can be present
-+    minItems: 1
-+    maxItems: 2
-+    items:
-+      - description: tx or combined interrupt
-+      - description: rx interrupt
++      - description: i.MX6SLL based Boards
++        items:
++          - enum:
++              - fsl,imx6sll-evk
++          - const: fsl,imx6sll
 +
-+    description:
-+      A variable number of interrupts warrants a description of what conditions
-+      affect the number of interrupts. Otherwise, descriptions on standard
-+      properties are not necessary.
++      - description:
++          Compulab SBC-iMX7 is a single board computer based on the
++          Freescale i.MX7 system-on-chip. SBC-iMX7 is implemented with
++          the CL-SOM-iMX7 System-on-Module providing most of the functions,
++          and SB-SOM-iMX7 carrier board providing additional peripheral
++          functions and connectors.
++        items:
++          - const: compulab,sbc-imx7
++          - const: compulab,cl-som-imx7
++          - const: fsl,imx7d
 +
-+  interrupt-names:
-+    # minItems must be specified here because the default would be 2
-+    minItems: 1
-+    maxItems: 2
-+    items:
-+      - const: "tx irq"
-+      - const: "rx irq"
++      - description:
++          Freescale Vybrid Platform Device Tree Bindings
 +
-+  # Property names starting with '#' must be quoted
-+  '#interrupt-cells':
-+    # A simple case where the value must always be '2'.
-+    # The core schema handles that this must be a single integer.
-+    const: 2
++          For the Vybrid SoC familiy all variants with DDR controller are supported,
++          which is the VF5xx and VF6xx series. Out of historical reasons, in most
++          places the kernel uses vf610 to refer to the whole familiy.
++          The compatible string "fsl,vf610m4" is used for the secondary Cortex-M4
++          core support.
++        items:
++          - enum:
++              - fsl,vf500
++              - fsl,vf510
++              - fsl,vf600
++              - fsl,vf610
++              - fsl,vf610m4
 +
-+  interrupt-controller: true
-+    # The core checks this is a boolean, so just have to list it here to be
-+    # valid for this binding.
++      - description: LS1021A based Boards
++        items:
++          - enum:
++              - fsl,ls1012a-rdb
++              - fsl,ls1012a-frdm
++              - fsl,ls1012a-qds
++          - const: fsl,ls1021a
 +
-+  clock-frequency:
-+    # The type is set in the core schema. Per device schema only need to set
-+    # constraints on the possible values.
-+    minimum: 100
-+    maximum: 400000
-+    # The value that should be used if the property is not present
-+    default: 200
++      - description: LS1043A based Boards
++        items:
++          - enum:
++              - fsl,ls1043a-rdb
++              - fsl,ls1043a-qds
++          - const: fsl,ls1043a
 +
-+  foo-gpios:
-+    maxItems: 1
-+    description: A connection of the 'foo' gpio line.
++      - description: LS1046A based Boards
++        items:
++          - enum:
++              - fsl,ls1046a-qds
++              - fsl,ls1046a-rdb
++          - const: fsl,ls1046a
 +
-+  vendor,int-property:
-+    description: Vendor specific properties must have a description
-+    allOf:
-+      - $ref: "/schemas/types.yaml#/definitions/uint32"
-+      - enum: [2, 4, 6, 8, 10]
++      - description: LS1088A based Boards
++        items:
++          - enum:
++              - fsl,ls1088a-qds
++              - fsl,ls1088a-rdb
++          - const: fsl,ls1088a
 +
-+  vendor,bool-property:
-+    description: Vendor specific properties must have a description
-+    type: boolean
++      - description: LS2080A based Boards
++        items:
++          - enum:
++              - fsl,ls2080a-simu
++              - fsl,ls2080a-qds
++              - fsl,ls2080a-rdb
++          - const: fsl,ls2080a
 +
-+  vendor,string-array-property:
-+    description: Vendor specific properties may refer to core schema
-+    allOf:
-+      - $ref: '/schemas/types.yaml#/definitions/stringarray'
-+      - maxItems: 2
++      - description: LS2088A based Boards
++        items:
++          - enum:
++              - fsl,ls2088a-qds
++              - fsl,ls2088a-rdb
++          - const: fsl,ls2088a
 +
-+required:
-+  - compatible
-+  - reg
-+  - interrupts
-+  - interrupt-controller
-+
-+examples:
-+  - |
-+    node at 1000 {
-+          compatible = "vendor,soc4-ip", "vendor,soc1-ip";
-+          reg = <0x1000 0x80>,
-+                <0x3000 0x80>;
-+          reg-names = "core", "aux";
-+          interrupts = <10>;
-+          interrupt-controller;
-+    };
-diff --git a/Documentation/devicetree/writing-schema.md b/Documentation/devicetree/writing-schema.md
-new file mode 100644
-index 000000000000..b1d9798ca3e4
---- /dev/null
-+++ b/Documentation/devicetree/writing-schema.md
-@@ -0,0 +1,111 @@
-+# Writing DeviceTree Bindings in json-schema
-+
-+Devicetree bindings are written using json-schema vocabulary. Schema files are
-+written in a JSON compatible subset of YAML. YAML is used instead of JSON as it
-+considered more human readable and has some advantages such as allowing
-+comments (Prefixed with '#').
-+
-+## Schema Contents
-+
-+Each schema doc is a structured json-schema which is defined by a set of
-+top-level properties:
-+
-+- __$id__ - A json-schema unique identifier string. The string must be a valid
-+URI typically containing the binding's filename and path. DT schema it must
-+begin with "http://devicetree.org/schema/". The URL is used for non file local
-+"$ref" lookups. A URL is used even for local files, and there may not actually
-+be files present at those locations.
-+
-+- __$schema__ - Indicates the meta-schema the schema file adheres to.
-+
-+- __title__ - A one line description on the contents of the binding schema.
-+
-+- __maintainers__ - A DT specific property. Contains a list of email address(es)
-+for maintainers of this binding.
-+
-+- __description__ - Optional. A multi-line text block containing any detailed
-+information about this binding. It should contain things such as what the block
-+or device does, standards the device conforms to, and links to datasheets for
-+more information.
-+
-+- __select__ - Optional. A json-schema to match nodes for applying the schema.
-+By default, nodes are matched against their possible compatible string values
-+or node name and select is not necessary.
-+
-+- __properties__ - A set of sub-schema defining all the DT properties for the
-+binding. The exact schema depends on the type of property. A property can also
-+define a child DT node with child properties defined under it.
-+
-+- __patternProperties__ - Optional. Similar to 'properties', but names are regex.
-+
-+- __required__ - A list of DT properties from the 'properties' section that
-+must always be present.
-+
-+- __examples__ - Optional. A list of one or more DTS hunks implementing the
-+binding.
-+
-+Unless noted otherwise, all properties are required.
-+
-+## Property Schema
-+
-+The 'properties' section of the schema contains all the DT properties for a
-+binding. Each property contains a set of constraints using json-schema
-+vocabulary for that property. The properties schemas are what is used for
-+validation of DT files.
-+
-+For common properties, only additional constraints not covered by the common
-+binding schema need to be defined such as how many values are valid or what
-+possible values are valid.
-+
-+Vendor specific properties will typically need more detailed schema. With the
-+exception of boolean properties, they should have a reference to a type in
-+schemas/types.yaml. A "description" property is always required.
-+
-+The Devicetree schemas don't exactly match the YAML encoded DT data produced by
-+dtc. They are simplified to make them more compact and avoid a bunch of
-+boilerplate. The tools process the schema files to produce the final schema for
-+validation. There are currently 2 transformations the tools perform.
-+
-+The default for arrays in json-schema is they are variable sized and allow more
-+entries than explicitly defined. This can be restricted by defining 'minItems',
-+'maxItems', and 'additionalItems'. However, for DeviceTree Schemas, a fixed
-+size is desired in most cases, so these properties are added based on the
-+number of entries in an 'items' list.
-+
-+The YAML Devicetree format also makes all string values an array and scalar
-+values a matrix (in order to define groupings) even when only a single value
-+is present. Single entries in schemas are fixed up to match this encoding.
-+
-+## Testing
-+
-+### Dependencies
-+
-+The DT schema project must be installed in order to validate the DT schema
-+binding documents and validate DTS files using the DT schema. The DT schema
-+project can be installed with pip:
-+
-+`pip3 install git+https://github.com/robherring/yaml-bindings.git at master --process-dependency-links`
-+
-+dtc must also be built with YAML output support enabled. This requires that
-+libyaml and its headers be installed on the host system.
-+
-+### Running checks
-+
-+The DT schema binding documents must be validated using the meta-schema (the
-+schema for the schema) to ensure they are both valid json-schema and valid
-+binding schema. All of the DT binding documents can be validated using the
-+`dt_binding_check` target:
-+
-+`make dt_binding_check`
-+
-+In order to perform validation of DT source files, use the `dtbs_check` target:
-+
-+`make dtbs_check`
-+
-+This will first run the `dt_binding_check` which generates the processed schema.
-+
-+## json-schema Resources
-+
-+[JSON-Schema Specifications](http://json-schema.org/)
-+
-+[Using JSON Schema Book](http://usingjsonschema.com/)
++...
+diff --git a/Documentation/devicetree/bindings/arm/i2se.txt b/Documentation/devicetree/bindings/arm/i2se.txt
+deleted file mode 100644
+index dbd54a3aa07d..000000000000
+--- a/Documentation/devicetree/bindings/arm/i2se.txt
++++ /dev/null
+@@ -1,22 +0,0 @@
+-I2SE Device Tree Bindings
+--------------------------
+-
+-Duckbill Board
+-Required root node properties:
+-    - compatible = "i2se,duckbill", "fsl,imx28";
+-
+-Duckbill 2 Board
+-Required root node properties:
+-    - compatible = "i2se,duckbill-2", "fsl,imx28";
+-
+-Duckbill 2 485 Board
+-Required root node properties:
+-    - compatible = "i2se,duckbill-2-485", "i2se,duckbill-2", "fsl,imx28";
+-
+-Duckbill 2 EnOcean Board
+-Required root node properties:
+-    - compatible = "i2se,duckbill-2-enocean", "i2se,duckbill-2", "fsl,imx28";
+-
+-Duckbill 2 SPI Board
+-Required root node properties:
+-    - compatible = "i2se,duckbill-2-spi", "i2se,duckbill-2", "fsl,imx28";
+diff --git a/Documentation/devicetree/bindings/arm/olimex.txt b/Documentation/devicetree/bindings/arm/olimex.txt
+deleted file mode 100644
+index d726aeca56be..000000000000
+--- a/Documentation/devicetree/bindings/arm/olimex.txt
++++ /dev/null
+@@ -1,10 +0,0 @@
+-Olimex Device Tree Bindings
+----------------------------
+-
+-SAM9-L9260 Board
+-Required root node properties:
+-    - compatible = "olimex,sam9-l9260", "atmel,at91sam9260";
+-
+-i.MX23 Olinuxino Low Cost Board
+-Required root node properties:
+-    - compatible = "olimex,imx23-olinuxino", "fsl,imx23";
+diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
+deleted file mode 100644
+index f1cedc00dcab..000000000000
+--- a/Documentation/devicetree/bindings/arm/technologic.txt
++++ /dev/null
+@@ -1,23 +0,0 @@
+-Technologic Systems Platforms Device Tree Bindings
+---------------------------------------------------
+-
+-TS-4600 is a System-on-Module based on the Freescale i.MX28 System-on-Chip.
+-It can be mounted on a carrier board providing additional peripheral connectors.
+-Required root node properties:
+-	- compatible = "technologic,imx28-ts4600", "fsl,imx28"
+-
+-TS-4800 board
+-Required root node properties:
+-	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
+-
+-TS-4900 is a System-on-Module based on the Freescale i.MX6 System-on-Chip.
+-It can be mounted on a carrier board providing additional peripheral connectors.
+-Required root node properties:
+-	- compatible = "technologic,imx6dl-ts4900", "fsl,imx6dl"
+-	- compatible = "technologic,imx6q-ts4900", "fsl,imx6q"
+-
+-TS-7970 is a System-on-Module based on the Freescale i.MX6 System-on-Chip.
+-It can be mounted on a carrier board providing additional peripheral connectors.
+-Required root node properties:
+-	- compatible = "technologic,imx6dl-ts7970", "fsl,imx6dl"
+-	- compatible = "technologic,imx6q-ts7970", "fsl,imx6q"
 -- 
 2.17.1
