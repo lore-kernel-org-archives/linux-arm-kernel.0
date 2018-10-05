@@ -1,10 +1,8 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Fri,  5 Oct 2018 14:45:07 -0700
-Subject: [PATCH i2c-next v7 5/5] i2c: aspeed: Add bus idle waiting logic for
+Date: Fri,  5 Oct 2018 14:45:02 -0700
+Subject: [PATCH i2c-next v7 0/5] i2c: aspeed: Add bus idle waiting logic for
  multi-master use cases
-In-Reply-To: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
-References: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20181005214507.26315-6-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,115 +10,60 @@ In multi-master environment, this driver's master cannot know
 exactly when peer master sends data to this driver's slave so a
 case can be happened that this master tries to send data through
 the master_xfer function but slave data from peer master is still
-being processed by this driver.
+being processed by this driver. To prevent state corruption in the
+case, this patch adds checking code if any slave operation is
+ongoing and it waits up to the bus timeout duration before starting
+a master_xfer operation.
 
-To prevent any state corruption in the case, this patch adds
-checking code if any slave operation is ongoing and it waits up to
-the bus timeout duration before starting a master_xfer operation.
+To support this change, it introduces changes on i2c-core-base to
+make that able to read the bus timeout and master transfer retries
+count values from device tree properties.
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
- drivers/i2c/busses/i2c-aspeed.c | 53 +++++++++++++++++++++++----------
- 1 file changed, 38 insertions(+), 15 deletions(-)
+Please review this patch set.
 
-diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-index 833b6b6a4c7e..8d60d7e5b323 100644
---- a/drivers/i2c/busses/i2c-aspeed.c
-+++ b/drivers/i2c/busses/i2c-aspeed.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/clk.h>
- #include <linux/completion.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/errno.h>
- #include <linux/i2c.h>
-@@ -115,6 +116,9 @@
- /* 0x18 : I2CD Slave Device Address Register   */
- #define ASPEED_I2CD_DEV_ADDR_MASK			GENMASK(6, 0)
- 
-+/* Busy checking */
-+#define ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US		(10 * 1000)
-+
- enum aspeed_i2c_master_state {
- 	ASPEED_I2C_MASTER_INACTIVE,
- 	ASPEED_I2C_MASTER_START,
-@@ -156,6 +160,8 @@ struct aspeed_i2c_bus {
- 	int				cmd_err;
- 	/* Protected only by i2c_lock_bus */
- 	int				master_xfer_result;
-+	/* Multi-master */
-+	bool				multi_master;
- #if IS_ENABLED(CONFIG_I2C_SLAVE)
- 	struct i2c_client		*slave;
- 	enum aspeed_i2c_slave_state	slave_state;
-@@ -596,27 +602,42 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
- 	return irq_remaining ? IRQ_NONE : IRQ_HANDLED;
- }
- 
-+static int aspeed_i2c_check_bus_busy(struct aspeed_i2c_bus *bus)
-+{
-+	ktime_t timeout;
-+
-+	if (bus->multi_master) {
-+		might_sleep();
-+		timeout = ktime_add_ms(ktime_get(),
-+				       jiffies_to_msecs(bus->adap.timeout));
-+	}
-+
-+	for (;;) {
-+		if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
-+		      ASPEED_I2CD_BUS_BUSY_STS) &&
-+		    bus->slave_state == ASPEED_I2C_SLAVE_STOP)
-+			return 0;
-+		if (!bus->multi_master)
-+			break;
-+		if (ktime_compare(ktime_get(), timeout) > 0)
-+			break;
-+		usleep_range((ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US >> 2) + 1,
-+			     ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US);
-+	}
-+
-+	return aspeed_i2c_recover_bus(bus);
-+}
-+
- static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
- 				  struct i2c_msg *msgs, int num)
- {
- 	struct aspeed_i2c_bus *bus = i2c_get_adapdata(adap);
- 	unsigned long time_left, flags;
--	int ret = 0;
- 
--	spin_lock_irqsave(&bus->lock, flags);
--	bus->cmd_err = 0;
--
--	/* If bus is busy, attempt recovery. We assume a single master
--	 * environment.
--	 */
--	if (readl(bus->base + ASPEED_I2C_CMD_REG) & ASPEED_I2CD_BUS_BUSY_STS) {
--		spin_unlock_irqrestore(&bus->lock, flags);
--		ret = aspeed_i2c_recover_bus(bus);
--		if (ret)
--			return ret;
--		spin_lock_irqsave(&bus->lock, flags);
--	}
-+	if (aspeed_i2c_check_bus_busy(bus))
-+		return -EAGAIN;
- 
-+	spin_lock_irqsave(&bus->lock, flags);
- 	bus->cmd_err = 0;
- 	bus->msgs = msgs;
- 	bus->msgs_index = 0;
-@@ -827,7 +848,9 @@ static int aspeed_i2c_init(struct aspeed_i2c_bus *bus,
- 	if (ret < 0)
- 		return ret;
- 
--	if (!of_property_read_bool(pdev->dev.of_node, "multi-master"))
-+	if (of_property_read_bool(pdev->dev.of_node, "multi-master"))
-+		bus->multi_master = true;
-+	else
- 		fun_ctrl_reg |= ASPEED_I2CD_MULTI_MASTER_DIS;
- 
- 	/* Enable Master Mode */
+Thanks,
+
+-Jae
+
+Changes since v6:
+- Changed the 'timeout-ms' property name to 'bus-timeout-ms'.
+
+Changes since v5:
+- Changed using of property reading API to device_property_read_u32.
+
+Changes since v4:
+- Moved the property reading code into i2c-base-core and changed the
+  property name to 'timeout-ms'. Also, added '#retries' property reading
+  code.
+- Changed bus busy checking logic to make that check slave_state instead
+  of 'Transfer Mode State Machine' reg value.
+
+Changes since v3:
+- Changed the property name to 'timeout' and made it use the
+  default setting in i2c-core when not specified.
+
+Changes since v2:
+- Changed the property name to 'aspeed,timeout' and made it to
+  update the adapter's timeout configuration.
+
+Changes since v1:
+- Changed define names of timeout related.
+
+Jae Hyun Yoo (5):
+  dt-bindings: i2c: Add 'bus-timeout-ms' and '#retries' properties as
+    common optional
+  i2c: core: Add support reading of 'bus-timeout-ms' and '#retries'
+    properties
+  dt-bindings: i2c: aspeed: Add 'bus-timeout-ms' property as an optional
+    property
+  i2c: aspeed: Remove hard-coded bus timeout value setting
+  i2c: aspeed: Add bus idle waiting logic for multi-master use cases
+
+ .../devicetree/bindings/i2c/i2c-aspeed.txt    |  3 ++
+ Documentation/devicetree/bindings/i2c/i2c.txt |  6 +++
+ drivers/i2c/busses/i2c-aspeed.c               | 54 +++++++++++++------
+ drivers/i2c/i2c-core-base.c                   | 12 ++++-
+ 4 files changed, 57 insertions(+), 18 deletions(-)
+
 -- 
 2.19.0
