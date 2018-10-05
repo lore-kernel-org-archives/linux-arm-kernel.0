@@ -1,30 +1,65 @@
 From: pankaj.bansal@nxp.com (Pankaj Bansal)
-Date: Fri,  5 Oct 2018 14:25:03 +0530
-Subject: [PATCH 0/2] add i2c controlled qixis driver
-Message-ID: <20181005085505.29024-1-pankaj.bansal@nxp.com>
+Date: Fri,  5 Oct 2018 14:25:04 +0530
+Subject: [PATCH 1/2] dt-bindings: soc: fsl: Document Qixis FPGA usage
+In-Reply-To: <20181005085505.29024-1-pankaj.bansal@nxp.com>
+References: <20181005085505.29024-1-pankaj.bansal@nxp.com>
+Message-ID: <20181005085505.29024-2-pankaj.bansal@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus, so add qixis
-driver which is basically an i2c client driver to control FPGA.
+an FPGA-based system controller, called ?Qixis?, which
+manages several critical system features, including:
+? Reset sequencing
+? Power supply configuration
+? Board configuration
+? hardware configuration
 
-This driver is essential to control MDIO mux multiplexing.
+The qixis registers are accessible over one or more system-specific
+interfaces, typically I2C, JTAG or an embedded processor.
 
-Cc: Varun Sethi <V.Sethi@nxp.com>
+Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+---
+ .../bindings/soc/fsl/qixis_ctrl.txt          | 33 ++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-Pankaj Bansal (2):
-  dt-bindings: soc: fsl: Document Qixis FPGA usage
-  fsl: add i2c controlled qixis driver
-
- .../bindings/soc/fsl/qixis_ctrl.txt           | 33 ++++++++
- drivers/soc/fsl/Kconfig                       |  9 +++
- drivers/soc/fsl/Makefile                      |  1 +
- drivers/soc/fsl/qixis_ctrl.c                  | 75 +++++++++++++++++++
- include/linux/fsl/qixis_ctrl.h                | 20 +++++
- 5 files changed, 138 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/fsl/qixis_ctrl.txt
- create mode 100644 drivers/soc/fsl/qixis_ctrl.c
- create mode 100644 include/linux/fsl/qixis_ctrl.h
-
+diff --git a/Documentation/devicetree/bindings/soc/fsl/qixis_ctrl.txt b/Documentation/devicetree/bindings/soc/fsl/qixis_ctrl.txt
+new file mode 100644
+index 000000000000..bc2950cab71d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/fsl/qixis_ctrl.txt
+@@ -0,0 +1,33 @@
++* QIXIS FPGA block
++
++an FPGA-based system controller, called ?Qixis?, which
++manages several critical system features, including:
++? Configuration switch monitoring
++? Power on/off sequencing
++? Reset sequencing
++? Power supply configuration
++? Board configuration
++? hardware configuration
++? Background power data collection (DCM)
++? Fault monitoring
++? RCW bypass SRAM (replace flash RCW with internal RCW) (NOR only)
++? Dedicated functional validation blocks (POSt/IRS, triggered event, and so on)
++? I2C master for remote board control even with no DUT available
++
++The qixis registers are accessible over one or more system-specific interfaces,
++typically I2C, JTAG or an embedded processor.
++
++Required properties:
++
++ - compatible : string, must contain "fsl,fpga-qixis-i2c"
++ - reg : i2c address of the qixis device.
++
++Examples:
++	/* The FPGA node */
++        fpga at 66 {
++		compatible = "fsl,lx2160aqds-fpga", "fsl,fpga-qixis-i2c";
++		reg = <0x66>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	}
++
 -- 
 2.17.1
