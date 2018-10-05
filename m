@@ -1,29 +1,64 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 5 Oct 2018 18:15:20 +0200
-Subject: [RFC PATCH 2/4] i2c: core: remove level of indentation in
- i2c_transfer
-In-Reply-To: <20180920161423.13990-3-wsa+renesas@sang-engineering.com>
-References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
- <20180920161423.13990-3-wsa+renesas@sang-engineering.com>
-Message-ID: <20181005161520.wos3xiws6a6buzqz@ninjato>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Fri,  5 Oct 2018 10:16:39 -0600
+Subject: [PATCH 2/5] ARM: mm: make use of new memblocks_present() helper
+In-Reply-To: <20181005161642.2462-1-logang@deltatee.com>
+References: <20181005161642.2462-1-logang@deltatee.com>
+Message-ID: <20181005161642.2462-3-logang@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 06:14:21PM +0200, Wolfram Sang wrote:
-> Using the common kernel pattern to bail out at the beginning if some
-> conditions are not met, we can save a level of indentation. No
-> functional change.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cleanup the arm_memory_present() function seeing it's very
+similar to other arches.
 
-I think we can have this clean up already.
+The new memblocks_present() helper checks for node ids which the
+arm version did not. However, this is equivalent seeing
+HAVE_MEMBLOCK_NODE_MAP should be false in this arch and therefore
+memblock_get_region_node() should return 0.
 
-Applied to for-next, thanks!
+Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Philip Derrin <philip@cog.systems>
+Cc: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/mm/init.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181005/c127de5e/attachment.sig>
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 0cc8e04295a4..e2710dd7446f 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -201,21 +201,6 @@ int pfn_valid(unsigned long pfn)
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+ 
+-#ifndef CONFIG_SPARSEMEM
+-static void __init arm_memory_present(void)
+-{
+-}
+-#else
+-static void __init arm_memory_present(void)
+-{
+-	struct memblock_region *reg;
+-
+-	for_each_memblock(memory, reg)
+-		memory_present(0, memblock_region_memory_base_pfn(reg),
+-			       memblock_region_memory_end_pfn(reg));
+-}
+-#endif
+-
+ static bool arm_memblock_steal_permitted = true;
+ 
+ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+@@ -317,7 +302,7 @@ void __init bootmem_init(void)
+ 	 * Sparsemem tries to allocate bootmem in memory_present(),
+ 	 * so must be done after the fixed reservations
+ 	 */
+-	arm_memory_present();
++	memblocks_present();
+ 
+ 	/*
+ 	 * sparse_init() needs the bootmem allocator up and running.
+-- 
+2.19.0
