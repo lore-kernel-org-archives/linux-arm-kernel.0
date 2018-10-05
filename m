@@ -1,39 +1,52 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Fri, 5 Oct 2018 10:51:13 -0500
-Subject: [PATCH 2/2] pwm: Kconfig: Enable TI ECAP driver for ARCH_K3
-In-Reply-To: <20181003170658.3835-3-vigneshr@ti.com>
-References: <20181003170658.3835-1-vigneshr@ti.com>
- <20181003170658.3835-3-vigneshr@ti.com>
-Message-ID: <ef269f60-b92d-c8af-77b2-d3d299814b5c@ti.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 5 Oct 2018 17:52:01 +0200
+Subject: [GIT PULL] Allwinner H3/H5 changes for 4.20, bis
+In-Reply-To: <CAK8P3a121EMnah1rKx7H8Bu1MrH_ZLyq3kNMM3U6eo13Gpx6yg@mail.gmail.com>
+References: <20181004193630.lbxyiecochf5cdfq@flea>
+ <CAK8P3a121EMnah1rKx7H8Bu1MrH_ZLyq3kNMM3U6eo13Gpx6yg@mail.gmail.com>
+Message-ID: <20181005155201.que3qp6ljyd7f74m@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2018 12:06 PM, Vignesh R wrote:
-> K3 devices have the same ECAP IP as OMAP SoC. Enable driver to be built
-> for K3 devices.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->  drivers/pwm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 504d252716f2..0c7bc6f554cf 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -447,7 +447,7 @@ config PWM_TEGRA
->  
->  config  PWM_TIECAP
->  	tristate "ECAP PWM support"
-> -	depends on ARCH_OMAP2PLUS || ARCH_DAVINCI_DA8XX || ARCH_KEYSTONE
-> +	depends on ARCH_OMAP2PLUS || ARCH_DAVINCI_DA8XX || ARCH_KEYSTONE || ARCH_K3
->  	help
->  	  PWM driver support for the ECAP APWM controller found on AM33XX
->  	  TI SOC
-> 
+Hi!
 
-Minor, perhaps calling out AM33XX specifically in the help text is no
-longer needed and a bit confusing.
+On Fri, Oct 05, 2018 at 05:43:03PM +0200, Arnd Bergmann wrote:
+> On Thu, Oct 4, 2018 at 9:36 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > Hi Arnd, Olof,
+> >
+> > Here is a second attempt at the previous PR for the H3 and H5 changes,
+> > hopefully with the right SoB this time. It replaces the previous one.
+> 
+> I'm not completely sure about this, we generally try not to rebase the
+> branches, and the previous version is now deep in the git history of the
+> next/dt branch.
+> 
+> Obviously having a missing signoff is also bad, but I think keeping
+> the old version of your branch is better in this case. Merging the
+> new branch on top of next/dt would give us a proper signoff chain on
+> each patch, but would not remove the patches with the missing
+> signoff. Instead we'd have lots of duplicate commits, which is probably
+> worse.
 
-Andrew
+I definitely understand that. The issue went since Chen-Yu was the
+initial committer, but due to last minute issues in some patches in
+that branch, I rebased it to drop those patches and sent it.
+
+So commits carrying Chen-Yu's SoB were now committed by me. I'm not
+sure if it makes it better, but anyway... It's up to you, and sorry
+for that mess :/
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181005/30ded2a3/attachment.sig>
