@@ -1,54 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 5 Oct 2018 21:13:08 +0200
-Subject: [RFC PATCH 1/9] kernel: add support for patchable function
- pointers
-In-Reply-To: <CAHmME9pcQF=FvKRuxnqrJ5R1pvtUVbx3DXvXiUX5HywS2Xgj3A@mail.gmail.com>
-References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
- <20181005081333.15018-2-ard.biesheuvel@linaro.org>
- <20181005141433.GS19272@hirez.programming.kicks-ass.net>
- <9E0E08C8-0DFC-4E50-A4FA-73208835EF9E@amacapital.net>
- <CAKv+Gu9z503ZJXcsG+9Ys240BZiB-+GB=kNY4VGWpjvdzN4JtA@mail.gmail.com>
- <CALCETrWaewXsdJsf3SocgZ0ggnvZk86L+5-LWPRbjdnG2mB7jw@mail.gmail.com>
- <CAKv+Gu-oHBtgGbWXJu6+z4+BNhBZyY5VvF_v6cJJUGk_5YX1eQ@mail.gmail.com>
- <CALCETrU=fm+ZG4WZJfG-5GwL7kv5_GS1aZYu=L42d5BuSbhJDQ@mail.gmail.com>
- <CAKv+Gu8eHPEsUbkhN=61z9FvhdCo2e3VOdemp4g0bzdO1EJFYQ@mail.gmail.com>
- <CALCETrVMBULVP9qEQDVuisxAMzdheM1qQ97AZFs-xcO0eaXiiA@mail.gmail.com>
- <CAHmME9pgJ_2GGDUVsbQXcNRfh3yACqFG+5uemFRMZkb8LdH95g@mail.gmail.com>
- <CALCETrWjCY2Wceiqu99C+g5RdnrZuRujYO_+jBvuJFRB1LTG4w@mail.gmail.com>
- <CAHmME9pcQF=FvKRuxnqrJ5R1pvtUVbx3DXvXiUX5HywS2Xgj3A@mail.gmail.com>
-Message-ID: <E75F755E-E447-4302-BFBD-095FC45B991E@linaro.org>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Fri,  5 Oct 2018 14:30:40 -0500
+Subject: [GIT PULL v2] for-next updates for soc/fsl drivers for v4.20 take 2
+Message-ID: <20181005193040.28598-1-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi arm-soc maintainers,
 
+Please merge the following updates for next.
 
-> On 5 Oct 2018, at 20:28, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> 
-> Hey Andy,
-> 
->> On Fri, Oct 5, 2018 at 7:44 PM Andy Lutomirski <luto@kernel.org> wrote:
->> I *think* the only change to Zinc per se would be that the calls like
->> chacha20_simd() would be static calls or patchable functions or
->> whatever we want to call them.  And there could be a debugfs to
->> override the default selection.
-> 
-> Yea, right, exactly. It turns out this is really easy to do with the
-> way it's structured now. I'd actually experimented considerably with
-> using the static keys a while back, but couldn't find any performance
-> difference on any platform at all (four ARM microarchitectures, three
-> MIPS, various random intel, an old powerpc), so went with the simplest
-> solution. But we can certainly play with more elaborate patching
-> mechanisms later on and see how those turn out. Also, even with the
-> simple bools as we have now, it's quite easy to make all the
-> parameters toggle-able.
-> 
->> Ard, I don't think that sticking this in udev rules makes sense.  The
->> kernel has bascially complete information as to what the right choice
->> is, and that will change over time as the implementation gets tuned,
->> and the udev rules will never get updated in sync.
-> 
-> Yes, I agree with this.
-> 
-> 
+v2: updated tree to include dependency patches by merging soc-fsl-fix-v4.19-2
 
-I am not referring to udev rules. I just mean the current way that udev autoloads modules based on CPU features.
+Regards,
+Leo
+
+The following changes since commit 56740a7167cbbbda99ebfd3e8b4e4d51ae39bd06:
+
+  Merge tag 'soc-fsl-fix-v4.19-2' into HEAD (2018-10-05 13:58:35 -0500)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-next-v4.20-2
+
+for you to fetch changes up to 6d06009cb216d071e955b3814086595851627910:
+
+  soc: fsl: qbman: add interrupt coalesce changing APIs (2018-10-05 14:06:56 -0500)
+
+----------------------------------------------------------------
+NXP/FSL SoC drivers updates for v4.20 take 2
+
+- Update qbman driver to better work with CPU hotplug
+- Add Kconfig dependency of 64-bit DMA addressing for qbman driver
+- Use last reponse to determine valid bit for qbman driver
+- Defer bman_portals probe if bman is not probed
+- Add interrupt coalescing APIs to qbman driver
+
+----------------------------------------------------------------
+Laurentiu Tudor (1):
+      soc: fsl: bman_portals: defer probe after bman's probe
+
+Madalin Bucur (2):
+      soc: fsl: qbman: replace CPU 0 with any online CPU in hotplug handlers
+      soc: fsl: qbman: add interrupt coalesce changing APIs
+
+Roy Pledge (3):
+      soc: fsl: qbman: Check if CPU is offline when initializing portals
+      soc: fsl: qbman: Add 64 bit DMA addressing requirement to QBMan
+      soc: fsl: qbman: Use last response to determine valid bit
+
+ drivers/soc/fsl/qbman/Kconfig       |  2 +-
+ drivers/soc/fsl/qbman/bman.c        |  6 ++---
+ drivers/soc/fsl/qbman/bman_portal.c | 14 ++++++++--
+ drivers/soc/fsl/qbman/dpaa_sys.h    | 20 ++++++++++++++
+ drivers/soc/fsl/qbman/qman.c        | 53 ++++++++++++++++++++++++++++++++-----
+ drivers/soc/fsl/qbman/qman_portal.c |  6 +++--
+ include/soc/fsl/qman.h              | 28 ++++++++++++++++++++
+ 7 files changed, 114 insertions(+), 15 deletions(-)
