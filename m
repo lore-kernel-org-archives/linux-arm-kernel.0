@@ -1,131 +1,175 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Fri,  5 Oct 2018 09:47:42 +0100
-Subject: [PATCH v5 05/17] arm64/cpufeature: detect pointer authentication
+Date: Fri,  5 Oct 2018 09:47:45 +0100
+Subject: [PATCH v5 08/17] arm64: expose user PAC bit positions via ptrace
 In-Reply-To: <20181005084754.20950-1-kristina.martsenko@arm.com>
 References: <20181005084754.20950-1-kristina.martsenko@arm.com>
-Message-ID: <20181005084754.20950-6-kristina.martsenko@arm.com>
+Message-ID: <20181005084754.20950-9-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Rutland <mark.rutland@arm.com>
 
-So that we can dynamically handle the presence of pointer authentication
-functionality, wire up probing code in cpufeature.c.
+When pointer authentication is in use, data/instruction pointers have a
+number of PAC bits inserted into them. The number and position of these
+bits depends on the configured TCR_ELx.TxSZ and whether tagging is
+enabled. ARMv8.3 allows tagging to differ for instruction and data
+pointers.
 
->From ARMv8.3 onwards, ID_AA64ISAR1 is no longer entirely RES0, and now
-has four fields describing the presence of pointer authentication
-functionality:
+For userspace debuggers to unwind the stack and/or to follow pointer
+chains, they need to be able to remove the PAC bits before attempting to
+use a pointer.
 
-* APA - address authentication present, using an architected algorithm
-* API - address authentication present, using an IMP DEF algorithm
-* GPA - generic authentication present, using an architected algorithm
-* GPI - generic authentication present, using an IMP DEF algorithm
+This patch adds a new structure with masks describing the location of
+the PAC bits in userspace instruction and data pointers (i.e. those
+addressable via TTBR0), which userspace can query via PTRACE_GETREGSET.
+By clearing these bits from pointers (and replacing them with the value
+of bit 55), userspace can acquire the PAC-less versions.
 
-For the moment we only care about address authentication, so we only
-need to check APA and API. It is assumed that if all CPUs support an IMP
-DEF algorithm, the same algorithm is used across all CPUs.
-
-Note that when we implement KVM support, we will also need to ensure
-that CPUs have uniform support for GPA and GPI.
+This new regset is exposed when the kernel is built with (user) pointer
+authentication support, and the feature is enabled. Otherwise, it is
+hidden.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-[kristina: update cpucap numbers]
+[kristina: cpus_have_cap -> cpus_have_const_cap]
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  5 ++++-
- arch/arm64/kernel/cpufeature.c   | 47 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/pointer_auth.h |  8 ++++++++
+ arch/arm64/include/uapi/asm/ptrace.h  |  7 +++++++
+ arch/arm64/kernel/ptrace.c            | 38 +++++++++++++++++++++++++++++++++++
+ include/uapi/linux/elf.h              |  1 +
+ 4 files changed, 54 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index ae1f70450fb2..276d4c95aa3c 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -51,7 +51,10 @@
- #define ARM64_SSBD				30
- #define ARM64_MISMATCHED_CACHE_TYPE		31
- #define ARM64_HAS_STAGE2_FWB			32
-+#define ARM64_HAS_ADDRESS_AUTH_ARCH		33
-+#define ARM64_HAS_ADDRESS_AUTH_IMP_DEF		34
-+#define ARM64_HAS_ADDRESS_AUTH			35
+diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+index 2aefedc31d9e..15486079e9ec 100644
+--- a/arch/arm64/include/asm/pointer_auth.h
++++ b/arch/arm64/include/asm/pointer_auth.h
+@@ -2,9 +2,11 @@
+ #ifndef __ASM_POINTER_AUTH_H
+ #define __ASM_POINTER_AUTH_H
  
--#define ARM64_NCAPS				33
-+#define ARM64_NCAPS				36
++#include <linux/bitops.h>
+ #include <linux/random.h>
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e238b7932096..0dd171c7d71e 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -142,6 +142,10 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_PTR_AUTH),
-+		       FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_API_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE_IF_IS_ENABLED(CONFIG_ARM64_PTR_AUTH),
-+		       FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_APA_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
- 	ARM64_FTR_END,
- };
-@@ -1035,6 +1039,22 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
- 	WARN_ON(val & (7 << 27 | 7 << 21));
+ #include <asm/cpufeature.h>
++#include <asm/memory.h>
+ #include <asm/sysreg.h>
+ 
+ #ifdef CONFIG_ARM64_PTR_AUTH
+@@ -49,6 +51,12 @@ static inline void ptrauth_keys_switch(struct ptrauth_keys *keys)
+ 	__ptrauth_key_install(APIA, keys->apia);
  }
  
++/*
++ * The EL0 pointer bits used by a pointer authentication code.
++ * This is dependent on TBI0 being enabled, or bits 63:56 would also apply.
++ */
++#define ptrauth_pac_mask() 	GENMASK(54, VA_BITS)
++
+ #define mm_ctx_ptrauth_init(ctx) \
+ 	ptrauth_keys_init(&(ctx)->ptrauth_keys)
+ 
+diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+index 98c4ce55d9c3..4994d718771a 100644
+--- a/arch/arm64/include/uapi/asm/ptrace.h
++++ b/arch/arm64/include/uapi/asm/ptrace.h
+@@ -228,6 +228,13 @@ struct user_sve_header {
+ 		  SVE_PT_SVE_OFFSET + SVE_PT_SVE_SIZE(vq, flags)	\
+ 		: SVE_PT_FPSIMD_OFFSET + SVE_PT_FPSIMD_SIZE(vq, flags))
+ 
++/* pointer authentication masks (NT_ARM_PAC_MASK) */
++
++struct user_pac_mask {
++	__u64		data_mask;
++	__u64		insn_mask;
++};
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* _UAPI__ASM_PTRACE_H */
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 6219486fa25f..cb8246f8c603 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -46,6 +46,7 @@
+ #include <asm/debug-monitors.h>
+ #include <asm/fpsimd.h>
+ #include <asm/pgtable.h>
++#include <asm/pointer_auth.h>
+ #include <asm/stacktrace.h>
+ #include <asm/syscall.h>
+ #include <asm/traps.h>
+@@ -958,6 +959,30 @@ static int sve_set(struct task_struct *target,
+ 
+ #endif /* CONFIG_ARM64_SVE */
+ 
 +#ifdef CONFIG_ARM64_PTR_AUTH
-+static bool has_address_auth(const struct arm64_cpu_capabilities *entry,
-+			     int __unused)
++static int pac_mask_get(struct task_struct *target,
++			const struct user_regset *regset,
++			unsigned int pos, unsigned int count,
++			void *kbuf, void __user *ubuf)
 +{
-+	u64 isar1 = read_sanitised_ftr_reg(SYS_ID_AA64ISAR1_EL1);
-+	bool api, apa;
++	/*
++	 * The PAC bits can differ across data and instruction pointers
++	 * depending on TCR_EL1.TBID*, which we may make use of in future, so
++	 * we expose separate masks.
++	 */
++	unsigned long mask = ptrauth_pac_mask();
++	struct user_pac_mask uregs = {
++		.data_mask = mask,
++		.insn_mask = mask,
++	};
 +
-+	apa = cpuid_feature_extract_unsigned_field(isar1,
-+					ID_AA64ISAR1_APA_SHIFT) > 0;
-+	api = cpuid_feature_extract_unsigned_field(isar1,
-+					ID_AA64ISAR1_API_SHIFT) > 0;
++	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
++		return -EINVAL;
 +
-+	return apa || api;
++	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
 +}
 +#endif /* CONFIG_ARM64_PTR_AUTH */
 +
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
-@@ -1222,6 +1242,33 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.cpu_enable = cpu_enable_hw_dbm,
+ enum aarch64_regset {
+ 	REGSET_GPR,
+ 	REGSET_FPR,
+@@ -970,6 +995,9 @@ enum aarch64_regset {
+ #ifdef CONFIG_ARM64_SVE
+ 	REGSET_SVE,
+ #endif
++#ifdef CONFIG_ARM64_PTR_AUTH
++	REGSET_PAC_MASK,
++#endif
+ };
+ 
+ static const struct user_regset aarch64_regsets[] = {
+@@ -1039,6 +1067,16 @@ static const struct user_regset aarch64_regsets[] = {
+ 		.get_size = sve_get_size,
  	},
  #endif
 +#ifdef CONFIG_ARM64_PTR_AUTH
-+	{
-+		.desc = "Address authentication (architected algorithm)",
-+		.capability = ARM64_HAS_ADDRESS_AUTH_ARCH,
-+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.sys_reg = SYS_ID_AA64ISAR1_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64ISAR1_APA_SHIFT,
-+		.min_field_value = ID_AA64ISAR1_APA_ARCHITECTED,
-+		.matches = has_cpuid_feature,
++	[REGSET_PAC_MASK] = {
++		.core_note_type = NT_ARM_PAC_MASK,
++		.n = sizeof(struct user_pac_mask) / sizeof(u64),
++		.size = sizeof(u64),
++		.align = sizeof(u64),
++		.get = pac_mask_get,
++		/* this cannot be set dynamically */
 +	},
-+	{
-+		.desc = "Address authentication (IMP DEF algorithm)",
-+		.capability = ARM64_HAS_ADDRESS_AUTH_IMP_DEF,
-+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.sys_reg = SYS_ID_AA64ISAR1_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64ISAR1_API_SHIFT,
-+		.min_field_value = ID_AA64ISAR1_API_IMP_DEF,
-+		.matches = has_cpuid_feature,
-+	},
-+	{
-+		.capability = ARM64_HAS_ADDRESS_AUTH,
-+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.matches = has_address_auth,
-+	},
-+#endif /* CONFIG_ARM64_PTR_AUTH */
- 	{},
++#endif
  };
  
+ static const struct user_regset_view user_aarch64_view = {
+diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
+index c5358e0ae7c5..3f23273d690c 100644
+--- a/include/uapi/linux/elf.h
++++ b/include/uapi/linux/elf.h
+@@ -420,6 +420,7 @@ typedef struct elf64_shdr {
+ #define NT_ARM_HW_WATCH	0x403		/* ARM hardware watchpoint registers */
+ #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
+ #define NT_ARM_SVE	0x405		/* ARM Scalable Vector Extension registers */
++#define NT_ARM_PAC_MASK		0x406	/* ARM pointer authentication code masks */
+ #define NT_ARC_V2	0x600		/* ARCv2 accumulator/extra registers */
+ #define NT_VMCOREDD	0x700		/* Vmcore Device Dump Note */
+ #define NT_MIPS_DSP	0x800		/* MIPS DSP ASE registers */
 -- 
 2.11.0
