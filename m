@@ -1,42 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Oct 2018 17:37:45 +0200
-Subject: [GIT PULL] for-next updates for soc/fsl drivers for v4.20 take 2
-In-Reply-To: <20181004164715.14646-1-leoyang.li@nxp.com>
-References: <20181004164715.14646-1-leoyang.li@nxp.com>
-Message-ID: <CAK8P3a3uM0_wO-wf7h+1UkUXUSTVtWSrmX_RLVzAC8e3LCuseg@mail.gmail.com>
+Date: Fri, 5 Oct 2018 17:44:41 +0200
+Subject: [GIT PULL] updates for DT 32bit for v4.20 round 2
+In-Reply-To: <6cd94d4a-63d0-5959-2fe2-c0c084f38ad7@gmail.com>
+References: <6cd94d4a-63d0-5959-2fe2-c0c084f38ad7@gmail.com>
+Message-ID: <CAK8P3a1ARJr-PCwD1DXouCUq=eAkEib46-A+f_C8+G9TzaKkAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 6:47 PM Li Yang <leoyang.li@nxp.com> wrote:
+On Fri, Oct 5, 2018 at 10:28 AM Matthias Brugger <matthias.bgg@gmail.com> wrote:
 >
-> Hi arm-soc maintainers,
+> Hi Arnd,
+> Hi Olof,
 >
-> Please merge the following updates for next.
+> Please have a look on the commits below. They are the second round of the
+> arm 32 bit device tree patches. The pull request is based on the first one
+> (v4.19-next-dts32) that you already merged.
 >
-> PS.  One of the patches is depending on the last pull request for fixes to build
-> https://patchwork.kernel.org/patch/10622883/
-> I didn't include the fix patches directly in this pull request to prevent a
-> complicated merge.  Please let me know if there is a more preferred approach
-> to deal with dependencies between pull requests.
+> Add binding description for devices from
+> MT7623. Clock controller, iommu, JPEG Decoder
+> and SMI conotroller.
 
-Sorry, I'd rather not pull it like this, because that would result in a
-broken branch on my side that fails to build until it gets merged with
-the other one.
+Thanks for the followup, pulled into next/dt now.
 
-I think the best way to handle this is for you to:
-
-- start a branch on the afa86d264a7c commit that you already sent me
-  for 4.20.
-- merge the soc-fsl-fix-v4.19-2 branch that you sent me for 4.19 into
-  that branch
-- rebase all patches from tags/soc-fsl-next-v4.20-2 on top of the merge
-- resend the pull request with the new branch
-
-This will result in a bisectable (i.e. each commit builds and works) branch
-that also merges cleanly with my fixes branch.
-
-Generally speaking, every branch you send must work standalone,
-and each commit in that branch can only depend on work that
-comes earlier in that branch.
-
-       Arnd
+      Arnd
