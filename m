@@ -1,65 +1,197 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 5 Oct 2018 15:53:25 +0100
-Subject: [PATCH] arm64: mm: Use #ifdef for the  __PAGETABLE_P?D_FOLDED
- defines
-In-Reply-To: <20181005134916.12937-1-james.morse@arm.com>
-References: <20181005134916.12937-1-james.morse@arm.com>
-Message-ID: <20181005145324.e3o6i3zeszilzuzx@blommer>
+From: vkoul@kernel.org (Vinod)
+Date: Fri, 5 Oct 2018 20:27:06 +0530
+Subject: [PATCH v3 2/2] dmaengine: uniphier-mdmac: add UniPhier MIO DMAC
+ driver
+In-Reply-To: <1536799869-10643-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1536799869-10643-1-git-send-email-yamada.masahiro@socionext.com>
+ <1536799869-10643-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20181005145706.GM2372@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2018 at 02:49:16PM +0100, James Morse wrote:
-> __is_defined(__PAGETABLE_P?D_FOLDED) doesn't quite work as intended
-> as these symbols are internal to asm-generic and aren't defined in the
-> way kconfig expects. This makes them always evaluate to false.
-> Switch to #ifdef.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> CC: Mark Rutland <mark.rutland@arm.com>
+On 13-09-18, 09:51, Masahiro Yamada wrote:
 
-Sorry for the bogus cleanup.
+> +#define UNIPHIER_MDMAC_CH_IRQ_STAT	0x010	// current hw status (RO)
+> +#define UNIPHIER_MDMAC_CH_IRQ_REQ	0x014	// latched STAT (WOC)
+> +#define UNIPHIER_MDMAC_CH_IRQ_EN	0x018	// IRQ enable mask
+> +#define UNIPHIER_MDMAC_CH_IRQ_DET	0x01c	// REQ & EN (RO)
+> +#define   UNIPHIER_MDMAC_CH_IRQ__ABORT		BIT(13)
+> +#define   UNIPHIER_MDMAC_CH_IRQ__DONE		BIT(1)
 
-FWIW: Acked-by: Mark Rutland <mark.rutland@arm.com>
+why notation if UNIPHIER_MDMAC_CH_IRQ__FOO ?
 
-Mark.
+> +#define UNIPHIER_MDMAC_CH_SRC_MODE	0x020	// mode of source
+> +#define UNIPHIER_MDMAC_CH_DEST_MODE	0x024	// mode of destination
+> +#define   UNIPHIER_MDMAC_CH_MODE__ADDR_INC	(0 << 4)
+> +#define   UNIPHIER_MDMAC_CH_MODE__ADDR_DEC	(1 << 4)
+> +#define   UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED	(2 << 4)
+> +#define UNIPHIER_MDMAC_CH_SRC_ADDR	0x028	// source address
+> +#define UNIPHIER_MDMAC_CH_DEST_ADDR	0x02c	// destination address
+> +#define UNIPHIER_MDMAC_CH_SIZE		0x030	// transfer bytes
 
-> ---
-> 
->  arch/arm64/include/asm/pgtable.h | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index b58f764babf8..50b1ef8584c0 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -445,10 +445,12 @@ static inline bool in_swapper_pgdir(void *addr)
->  
->  static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
->  {
-> -	if (__is_defined(__PAGETABLE_PMD_FOLDED) && in_swapper_pgdir(pmdp)) {
-> +#ifdef __PAGETABLE_PMD_FOLDED
-> +	if (in_swapper_pgdir(pmdp)) {
->  		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
->  		return;
->  	}
-> +#endif /* __PAGETABLE_PMD_FOLDED */
->  
->  	WRITE_ONCE(*pmdp, pmd);
->  
-> @@ -503,10 +505,12 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
->  
->  static inline void set_pud(pud_t *pudp, pud_t pud)
->  {
-> -	if (__is_defined(__PAGETABLE_PUD_FOLDED) && in_swapper_pgdir(pudp)) {
-> +#ifdef __PAGETABLE_PUD_FOLDED
-> +	if (in_swapper_pgdir(pudp)) {
->  		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
->  		return;
->  	}
-> +#endif /* __PAGETABLE_PUD_FOLDED */
->  
->  	WRITE_ONCE(*pudp, pud);
->  
-> -- 
-> 2.19.0
-> 
+Please use /* comment */ style for these
+
+> +/* mc->vc.lock must be held by caller */
+> +static struct uniphier_mdmac_desc *__uniphier_mdmac_next_desc(
+> +						struct uniphier_mdmac_chan *mc)
+
+this can be made to look better by:
+
+static struct uniphier_mdmac_desc *
+__uniphier_mdmac_next_desc(struct uniphier_mdmac_chan *mc)
+
+Btw why leading __ for function name here and other places?
+
+> +{
+> +	struct virt_dma_desc *vd;
+> +
+> +	vd = vchan_next_desc(&mc->vc);
+> +	if (!vd) {
+> +		mc->md = NULL;
+> +		return NULL;
+> +	}
+> +
+> +	list_del(&vd->node);
+> +
+> +	mc->md = to_uniphier_mdmac_desc(vd);
+> +
+> +	return mc->md;
+> +}
+> +
+> +/* mc->vc.lock must be held by caller */
+> +static void __uniphier_mdmac_handle(struct uniphier_mdmac_chan *mc,
+> +				    struct uniphier_mdmac_desc *md)
+
+please align this to previous line opening brace (hint checkpatch with
+--strict option will give you the warning)
+
+> +static irqreturn_t uniphier_mdmac_interrupt(int irq, void *dev_id)
+> +{
+> +	struct uniphier_mdmac_chan *mc = dev_id;
+> +	struct uniphier_mdmac_desc *md;
+> +	irqreturn_t ret = IRQ_HANDLED;
+> +	u32 irq_stat;
+> +
+> +	spin_lock(&mc->vc.lock);
+> +
+> +	irq_stat = readl(mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_DET);
+> +
+> +	/*
+> +	 * Some channels share a single interrupt line. If the IRQ status is 0,
+> +	 * this is probably triggered by a different channel.
+> +	 */
+> +	if (!irq_stat) {
+> +		ret = IRQ_NONE;
+> +		goto out;
+> +	}
+> +
+> +	/* write 1 to clear */
+> +	writel(irq_stat, mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_REQ);
+> +
+> +	/*
+> +	 * UNIPHIER_MDMAC_CH_IRQ__DONE interrupt is asserted even when the DMA
+> +	 * is aborted.  To distinguish the normal completion and the abort,
+                     ^^^^
+double space..
+
+> +static int uniphier_mdmac_config(struct dma_chan *chan,
+> +				 struct dma_slave_config *config)
+> +{
+> +	/* Nothing in struct dma_slave_config is configurable. */
+> +	return 0;
+> +}
+
+I dont think config callback is mandatory, so we can drop this
+
+> +static enum dma_status uniphier_mdmac_tx_status(struct dma_chan *chan,
+> +						dma_cookie_t cookie,
+> +						struct dma_tx_state *txstate)
+> +{
+> +	struct virt_dma_chan *vc;
+> +	struct virt_dma_desc *vd;
+> +	struct uniphier_mdmac_chan *mc;
+> +	struct uniphier_mdmac_desc *md = NULL;
+> +	enum dma_status stat;
+> +	unsigned long flags;
+> +
+> +	stat = dma_cookie_status(chan, cookie, txstate);
+> +	/* Return immediately if we do not need to compute the residue. */
+> +	if (stat == DMA_COMPLETE || !txstate)
+> +		return stat;
+> +
+> +	vc = to_virt_chan(chan);
+> +
+> +	spin_lock_irqsave(&vc->lock, flags);
+> +
+> +	mc = to_uniphier_mdmac_chan(vc);
+> +
+> +	if (mc->md && mc->md->vd.tx.cookie == cookie)
+> +		md = mc->md;
+> +
+> +	if (!md) {
+> +		vd = vchan_find_desc(vc, cookie);
+> +		if (vd)
+> +			md = to_uniphier_mdmac_desc(vd);
+> +	}
+
+in both of these cases you are calling __uniphier_mdmac_get_residue()
+which reads the register and updates. But I think you should read
+register only in the first case when descriptor is submitted and not in
+latter case when descriptor is queued
+
+> +static int uniphier_mdmac_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct uniphier_mdmac_device *mdev;
+> +	struct dma_device *ddev;
+> +	struct resource *res;
+> +	int nr_chans, ret, i;
+> +
+> +	nr_chans = platform_irq_count(pdev);
+> +	if (nr_chans < 0)
+> +		return nr_chans;
+> +
+> +	ret = dma_set_mask(dev, DMA_BIT_MASK(32));
+> +	if (ret)
+> +		return ret;
+> +
+> +	mdev = devm_kzalloc(dev, struct_size(mdev, channels, nr_chans),
+> +			    GFP_KERNEL);
+> +	if (!mdev)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	mdev->reg_base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(mdev->reg_base))
+> +		return PTR_ERR(mdev->reg_base);
+> +
+> +	mdev->clk = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(mdev->clk)) {
+> +		dev_err(dev, "failed to get clock\n");
+> +		return PTR_ERR(mdev->clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(mdev->clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ddev = &mdev->ddev;
+> +	ddev->dev = dev;
+> +	dma_cap_set(DMA_PRIVATE, ddev->cap_mask);
+> +	ddev->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
+> +	ddev->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
+
+undefined?
+
+> +static int uniphier_mdmac_remove(struct platform_device *pdev)
+> +{
+> +	struct uniphier_mdmac_device *mdev = platform_get_drvdata(pdev);
+> +
+> +	of_dma_controller_free(pdev->dev.of_node);
+> +	dma_async_device_unregister(&mdev->ddev);
+> +	clk_disable_unprepare(mdev->clk);
+
+at this point your irq is registered and can be fired, the tasklets are
+not killed :(
+-- 
+~Vinod
