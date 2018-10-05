@@ -1,34 +1,50 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Fri, 5 Oct 2018 09:03:13 +0200
-Subject: [PATCH] nvmem: lpc18xx_eeprom: fix compile warning
-Message-ID: <20181005070313.GA2217@embeddedor.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Fri, 5 Oct 2018 15:09:59 +1000
+Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <20181005050627.GL32578@linaro.org>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-7-takahiro.akashi@linaro.org>
+ <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
+ <6a8d3ddb-c3bc-c044-4d6c-55e110d89e72@gmail.com>
+ <20181005050627.GL32578@linaro.org>
+Message-ID: <20181005050959.GP7004@umbus.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following warning by removing unused variable ret:
+On Fri, Oct 05, 2018 at 02:06:29PM +0900, AKASHI, Takahiro wrote:
+[snip]
+> > >> +{
+> > >> +       return (strlen(prop_name) + 1) +
+> > >> +               sizeof(struct fdt_property) +
+> > >> +               FDT_TAGALIGN(len);
+> > > 
+> > > Looks like you are using this to calculate how much space you need to
+> > > allocate in addition to the current DTB for a couple of new or
+> > > replaced properties. I'm not sure that this calculation is completely
+> > > accurate. And it is strange there doesn't seem to be any libfdt
+> > > function for this already. It would be simpler to just add some fixed
+> > > additional amount.
+> > > 
+> > > Maybe David G has comments on this?
+> 
+> I'm not quit sure why it's not that accurate, but as I said in a reply to
+> David's comment, I will take your suggestion.
 
-drivers/nvmem/lpc18xx_eeprom.c: In function ?lpc18xx_eeprom_remove?:
-drivers/nvmem/lpc18xx_eeprom.c:258:6: warning: unused variable ?ret?
-[-Wunused-variable]
-  int ret;
-      ^~~
+I think it is accurate, but it is not robust.  It might not be
+accurate if we ever make further tweaks to the libfdt format.  libfdt
+is supposed to abstract those changes away, but if you make
+assumptions like this, you break that abstraction.
 
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
----
- drivers/nvmem/lpc18xx_eeprom.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
-index b42dbad..66cff1e 100644
---- a/drivers/nvmem/lpc18xx_eeprom.c
-+++ b/drivers/nvmem/lpc18xx_eeprom.c
-@@ -255,7 +255,6 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
- static int lpc18xx_eeprom_remove(struct platform_device *pdev)
- {
- 	struct lpc18xx_eeprom_dev *eeprom = platform_get_drvdata(pdev);
--	int ret;
- 
- 	clk_disable_unprepare(eeprom->clk);
- 
 -- 
-2.7.4
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181005/2cdcd3fd/attachment.sig>
