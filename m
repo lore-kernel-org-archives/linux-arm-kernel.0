@@ -1,23 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 Oct 2018 17:20:26 +0100
-Subject: [PATCH] arm64: mm: Use #ifdef for the __PAGETABLE_P?D_FOLDED
- defines
-In-Reply-To: <20181005134916.12937-1-james.morse@arm.com>
-References: <20181005134916.12937-1-james.morse@arm.com>
-Message-ID: <20181005162025.k66s44z5ljc6ghsu@mbp>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  5 Oct 2018 18:16:58 +0200
+Subject: [PATCH] hugetlb: fix ARM 3level page tables
+Message-ID: <20181005161722.904274-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2018 at 02:49:16PM +0100, James Morse wrote:
-> __is_defined(__PAGETABLE_P?D_FOLDED) doesn't quite work as intended
-> as these symbols are internal to asm-generic and aren't defined in the
-> way kconfig expects. This makes them always evaluate to false.
-> Switch to #ifdef.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> CC: Mark Rutland <mark.rutland@arm.com>
+The check for __HAVE_ARCH_HUGE_PTEP_GET comes before the definition,
+leading to an extraneous definition of huge_ptep_get:
 
-Applied. Thanks.
+In file included from arch/arm/include/asm/hugetlb.h:28,
+                 from include/linux/hugetlb.h:456,
+                 from arch/arm/kvm/../../../virt/kvm/arm/mmu.c:22:
+arch/arm/include/asm/hugetlb-3level.h:33:21: error: redefinition of 'huge_ptep_get'
+ static inline pte_t huge_ptep_get(pte_t *ptep)
 
+Change the header file inclusions to be in the correct order for
+this to work.
+
+Fixes: bb1d18ffc7ae ("hugetlb: introduce generic version of huge_ptep_get")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/include/asm/hugetlb.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/hugetlb.h b/arch/arm/include/asm/hugetlb.h
+index 3fcef21ff2c2..b67256c22b08 100644
+--- a/arch/arm/include/asm/hugetlb.h
++++ b/arch/arm/include/asm/hugetlb.h
+@@ -23,9 +23,8 @@
+ #define _ASM_ARM_HUGETLB_H
+ 
+ #include <asm/page.h>
+-#include <asm-generic/hugetlb.h>
+-
+ #include <asm/hugetlb-3level.h>
++#include <asm-generic/hugetlb.h>
+ 
+ static inline int is_hugepage_only_range(struct mm_struct *mm,
+ 					 unsigned long addr, unsigned long len)
 -- 
-Catalin
+2.18.0
