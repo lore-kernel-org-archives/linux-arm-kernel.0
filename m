@@ -1,31 +1,28 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 5 Oct 2018 16:37:04 +0200
-Subject: [PATCH 2/2] ARM: ixp4xx: include linux/mtd/platnand.h
-In-Reply-To: <20180926130458.2406549-2-arnd@arndb.de>
-References: <20180926130458.2406549-1-arnd@arndb.de>
- <20180926130458.2406549-2-arnd@arndb.de>
-Message-ID: <20181005163704.12661da6@xps13>
+Date: Fri, 5 Oct 2018 16:37:50 +0200
+Subject: [PATCH] [v2] ARM: omap1: add nand_chip declaration
+In-Reply-To: <20180926142029.619397-1-arnd@arndb.de>
+References: <20180926142029.619397-1-arnd@arndb.de>
+Message-ID: <20181005163750.01fddf10@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-Arnd Bergmann <arnd@arndb.de> wrote on Wed, 26 Sep 2018 15:04:39 +0200:
+Arnd Bergmann <arnd@arndb.de> wrote on Wed, 26 Sep 2018 16:20:16 +0200:
 
-> The platform_nand_data structure definition is required for ixdp425
-> but has now moved to a new header file:
+> Recent MTD changes caused a minor build regression on OMAP1:
 > 
-> arch/arm/mach-ixp4xx/ixdp425-setup.c:98:15: error: variable 'ixdp425_flash_nand_data' has initializer but incomplete type
->  static struct platform_nand_data ixdp425_flash_nand_data = {
->                ^~~~~~~~~~~~~~~~~~
-> arch/arm/mach-ixp4xx/ixdp425-setup.c:99:3: error: 'struct platform_nand_data' has no member named 'chip'
+> In file included from arch/arm/mach-omap1/devices.c:31:
+> arch/arm/mach-omap1/common.h:85:39: error: 'struct nand_chip' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
 > 
-> Fixes: 19cf5dfa3a31 ("mtd: rawnand: Move platform_nand_xxx definitions out of rawnand.h")
+> Fixes: 1002aed789bc ("mtd: rawnand: plat_nand: Pass a nand_chip object to all platform_nand_ctrl hooks")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ----
+> v2: remove unused linux/mtd/mtd.h inclusion
 > ---
 
-Sorry for the delay, squashed in nand/next with the commit introducing
-the regression.
+Also squashed in nand/next with the failing commit.
 
 Thanks,
 Miqu?l
