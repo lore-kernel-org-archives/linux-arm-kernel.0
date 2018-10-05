@@ -1,134 +1,61 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:47 -0500
-Subject: [PATCH 35/36] dt-bindings: arm: Convert Xilinx board/soc bindings to
- json-schema
+Date: Fri,  5 Oct 2018 11:58:42 -0500
+Subject: [PATCH 30/36] dt-bindings: arm: Convert CSR SiRF board/soc bindings
+ to json-schema
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-36-robh@kernel.org>
+Message-ID: <20181005165848.3474-31-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert Xilinx SoC bindings to DT schema format using json-schema.
+Convert CSR SiRF SoC bindings to DT schema format using json-schema.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: Barry Song <baohua@kernel.org>
 Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/xilinx.txt        | 83 -------------------
- .../devicetree/bindings/arm/xilinx.yaml       | 81 ++++++++++++++++++
- 2 files changed, 81 insertions(+), 83 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/xilinx.txt
- create mode 100644 Documentation/devicetree/bindings/arm/xilinx.yaml
+ .../devicetree/bindings/arm/sirf.txt          | 11 --------
+ .../devicetree/bindings/arm/sirf.yaml         | 27 +++++++++++++++++++
+ 2 files changed, 27 insertions(+), 11 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/sirf.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/sirf.yaml
 
-diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
+diff --git a/Documentation/devicetree/bindings/arm/sirf.txt b/Documentation/devicetree/bindings/arm/sirf.txt
 deleted file mode 100644
-index 26fe5ecc4332..000000000000
---- a/Documentation/devicetree/bindings/arm/xilinx.txt
+index 7b28ee6fee91..000000000000
+--- a/Documentation/devicetree/bindings/arm/sirf.txt
 +++ /dev/null
-@@ -1,83 +0,0 @@
--Xilinx Zynq Platforms Device Tree Bindings
--
--Boards with Zynq-7000 SOC based on an ARM Cortex A9 processor
--shall have the following properties.
+@@ -1,11 +0,0 @@
+-CSR SiRFprimaII and SiRFmarco device tree bindings.
+-========================================
 -
 -Required root node properties:
--    - compatible = "xlnx,zynq-7000";
--
--Additional compatible strings:
--
--- Adapteva Parallella board
--  "adapteva,parallella"
--
--- Avnet MicroZed board
--  "avnet,zynq-microzed"
--  "xlnx,zynq-microzed"
--
--- Avnet ZedBoard board
--  "avnet,zynq-zed"
--  "xlnx,zynq-zed"
--
--- Digilent Zybo board
--  "digilent,zynq-zybo"
--
--- Digilent Zybo Z7 board
--  "digilent,zynq-zybo-z7"
--
--- Xilinx CC108 internal board
--  "xlnx,zynq-cc108"
--
--- Xilinx ZC702 internal board
--  "xlnx,zynq-zc702"
--
--- Xilinx ZC706 internal board
--  "xlnx,zynq-zc706"
--
--- Xilinx ZC770 internal board, with different FMC cards
--  "xlnx,zynq-zc770-xm010"
--  "xlnx,zynq-zc770-xm011"
--  "xlnx,zynq-zc770-xm012"
--  "xlnx,zynq-zc770-xm013"
--
-----------------------------------------------------------------
--
--Xilinx Zynq UltraScale+ MPSoC Platforms Device Tree Bindings
--
--Boards with ZynqMP SOC based on an ARM Cortex A53 processor
--shall have the following properties.
--
--Required root node properties:
--    - compatible = "xlnx,zynqmp";
--
--
--Additional compatible strings:
--
--- Xilinx internal board zc1232
--  "xlnx,zynqmp-zc1232-revA", "xlnx,zynqmp-zc1232"
--
--- Xilinx internal board zc1254
--  "xlnx,zynqmp-zc1254-revA", "xlnx,zynqmp-zc1254"
--
--- Xilinx internal board zc1275
--  "xlnx,zynqmp-zc1275-revA", "xlnx,zynqmp-zc1275"
--
--- Xilinx internal board zc1751
--  "xlnx,zynqmp-zc1751"
--
--- Xilinx 96boards compatible board zcu100
--  "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100"
--
--- Xilinx evaluation board zcu102
--  "xlnx,zynqmp-zcu102-revA", "xlnx,zynqmp-zcu102"
--  "xlnx,zynqmp-zcu102-revB", "xlnx,zynqmp-zcu102"
--  "xlnx,zynqmp-zcu102-rev1.0", "xlnx,zynqmp-zcu102"
--
--- Xilinx evaluation board zcu104
--  "xlnx,zynqmp-zcu104-revA", "xlnx,zynqmp-zcu104"
--
--- Xilinx evaluation board zcu106
--  "xlnx,zynqmp-zcu106-revA", "xlnx,zynqmp-zcu106"
--
--- Xilinx evaluation board zcu111
--  "xlnx,zynqmp-zcu111-revA", "xlnx,zynqmp-zcu111"
-diff --git a/Documentation/devicetree/bindings/arm/xilinx.yaml b/Documentation/devicetree/bindings/arm/xilinx.yaml
+-    - compatible:
+-    - "sirf,atlas6-cb" : atlas6 "cb" evaluation board
+-    - "sirf,atlas6" : atlas6 device based board
+-    - "sirf,atlas7-cb" : atlas7 "cb" evaluation board
+-    - "sirf,atlas7" : atlas7 device based board
+-    - "sirf,prima2-cb" : prima2 "cb" evaluation board
+-    - "sirf,prima2" : prima2 device based board
+diff --git a/Documentation/devicetree/bindings/arm/sirf.yaml b/Documentation/devicetree/bindings/arm/sirf.yaml
 new file mode 100644
-index 000000000000..dd227bccf015
+index 000000000000..5675b3efda96
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/xilinx.yaml
-@@ -0,0 +1,81 @@
++++ b/Documentation/devicetree/bindings/arm/sirf.yaml
+@@ -0,0 +1,27 @@
++# SPDX-License-Identifier: None
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/soc/arm/xilinx.yaml#
++$id: http://devicetree.org/schemas/bindings/arm/sirf.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: Xilinx Zynq Platforms Device Tree Bindings
++title: CSR SiRFprimaII and SiRFmarco device tree bindings.
 +
 +maintainers:
-+  - Michal Simek <michal.simek@xilinx.com>
-+
-+description: |
-+  Xilinx boards with Zynq-7000 SOC or Zynq UltraScale+ MPSoC
++  - Binghua Duan <binghua.duan@csr.com>
++  - Barry Song <Baohua.Song@csr.com>
 +
 +properties:
 +  $nodename:
@@ -136,67 +63,14 @@ index 000000000000..dd227bccf015
 +  compatible:
 +    oneOf:
 +      - items:
-+          - enum:
-+              - adapteva,parallella
-+              - digilent,zynq-zybo
-+              - digilent,zynq-zybo-z7
-+              - xlnx,zynq-cc108
-+              - xlnx,zynq-zc702
-+              - xlnx,zynq-zc706
-+              - xlnx,zynq-zc770-xm010
-+              - xlnx,zynq-zc770-xm011
-+              - xlnx,zynq-zc770-xm012
-+              - xlnx,zynq-zc770-xm013
-+          - const: xlnx,zynq-7000
-+
++          - const: sirf,atlas6-cb
++          - const: sirf,atlas6
 +      - items:
-+          - const: avnet,zynq-microzed
-+          - const: xlnx,zynq-microzed
-+          - const: xlnx,zynq-7000
-+
++          - const: sirf,atlas7-cb
++          - const: sirf,atlas7
 +      - items:
-+          - const: avnet,zynq-zed
-+          - const: xlnx,zynq-zed
-+          - const: xlnx,zynq-7000
-+
-+      - items:
-+          - enum:
-+              - xlnx,zynqmp-zc1751
-+          - const: xlnx,zynqmp
-+
-+      - description: Xilinx internal board zc1232
-+        items:
-+          - const: xlnx,zynqmp-zc1232-revA
-+          - const: xlnx,zynqmp-zc1232
-+          - const: xlnx,zynqmp
-+
-+      - description: Xilinx internal board zc1254
-+        items:
-+          - const: xlnx,zynqmp-zc1254-revA
-+          - const: xlnx,zynqmp-zc1254
-+          - const: xlnx,zynqmp
-+
-+      - description: Xilinx internal board zc1275
-+        items:
-+          - const: xlnx,zynqmp-zc1275-revA
-+          - const: xlnx,zynqmp-zc1275
-+          - const: xlnx,zynqmp
-+
-+      - description: Xilinx 96boards compatible board zcu100
-+        items:
-+          - const: xlnx,zynqmp-zcu100-revC
-+          - const: xlnx,zynqmp-zcu100
-+          - const: xlnx,zynqmp
-+
-+      - description: Xilinx evaluation board zcu102
-+        items:
-+          - enum:
-+              - xlnx,zynqmp-zcu102-revA
-+              - xlnx,zynqmp-zcu102-revB
-+              - xlnx,zynqmp-zcu102-rev1.0
-+          - const: xlnx,zynqmp-zcu102
-+          - const: xlnx,zynqmp
-+
++          - const: sirf,prima2-cb
++          - const: sirf,prima2
 +...
 -- 
 2.17.1
