@@ -1,76 +1,89 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:42 -0500
-Subject: [PATCH 30/36] dt-bindings: arm: Convert CSR SiRF board/soc bindings
- to json-schema
+Date: Fri,  5 Oct 2018 11:58:43 -0500
+Subject: [PATCH 31/36] dt-bindings: arm: Convert SPEAr board/soc bindings to
+ json-schema
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-31-robh@kernel.org>
+Message-ID: <20181005165848.3474-32-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert CSR SiRF SoC bindings to DT schema format using json-schema.
+Convert SPEAr SoC bindings to DT schema format using json-schema.
 
+Cc: Viresh Kumar <vireshk@kernel.org>
+Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Barry Song <baohua@kernel.org>
 Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/sirf.txt          | 11 --------
- .../devicetree/bindings/arm/sirf.yaml         | 27 +++++++++++++++++++
- 2 files changed, 27 insertions(+), 11 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/sirf.txt
- create mode 100644 Documentation/devicetree/bindings/arm/sirf.yaml
+ .../devicetree/bindings/arm/spear.txt         | 26 -------------------
+ .../devicetree/bindings/arm/spear.yaml        | 25 ++++++++++++++++++
+ 2 files changed, 25 insertions(+), 26 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/spear.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/spear.yaml
 
-diff --git a/Documentation/devicetree/bindings/arm/sirf.txt b/Documentation/devicetree/bindings/arm/sirf.txt
+diff --git a/Documentation/devicetree/bindings/arm/spear.txt b/Documentation/devicetree/bindings/arm/spear.txt
 deleted file mode 100644
-index 7b28ee6fee91..000000000000
---- a/Documentation/devicetree/bindings/arm/sirf.txt
+index 0d42949df6c2..000000000000
+--- a/Documentation/devicetree/bindings/arm/spear.txt
 +++ /dev/null
-@@ -1,11 +0,0 @@
--CSR SiRFprimaII and SiRFmarco device tree bindings.
--========================================
+@@ -1,26 +0,0 @@
+-ST SPEAr Platforms Device Tree Bindings
+----------------------------------------
 -
--Required root node properties:
--    - compatible:
--    - "sirf,atlas6-cb" : atlas6 "cb" evaluation board
--    - "sirf,atlas6" : atlas6 device based board
--    - "sirf,atlas7-cb" : atlas7 "cb" evaluation board
--    - "sirf,atlas7" : atlas7 device based board
--    - "sirf,prima2-cb" : prima2 "cb" evaluation board
--    - "sirf,prima2" : prima2 device based board
-diff --git a/Documentation/devicetree/bindings/arm/sirf.yaml b/Documentation/devicetree/bindings/arm/sirf.yaml
+-Boards with the ST SPEAr600 SoC shall have the following properties:
+-Required root node property:
+-compatible = "st,spear600";
+-
+-Boards with the ST SPEAr300 SoC shall have the following properties:
+-Required root node property:
+-compatible = "st,spear300";
+-
+-Boards with the ST SPEAr310 SoC shall have the following properties:
+-Required root node property:
+-compatible = "st,spear310";
+-
+-Boards with the ST SPEAr320 SoC shall have the following properties:
+-Required root node property:
+-compatible = "st,spear320";
+-
+-Boards with the ST SPEAr1310 SoC shall have the following properties:
+-Required root node property:
+-compatible = "st,spear1310";
+-
+-Boards with the ST SPEAr1340 SoC shall have the following properties:
+-Required root node property:
+-compatible = "st,spear1340";
+diff --git a/Documentation/devicetree/bindings/arm/spear.yaml b/Documentation/devicetree/bindings/arm/spear.yaml
 new file mode 100644
-index 000000000000..5675b3efda96
+index 000000000000..6ce8ef979390
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/sirf.yaml
-@@ -0,0 +1,27 @@
++++ b/Documentation/devicetree/bindings/arm/spear.yaml
+@@ -0,0 +1,25 @@
 +# SPDX-License-Identifier: None
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/bindings/arm/sirf.yaml#
++$id: http://devicetree.org/schemas/bindings/arm/spear.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: CSR SiRFprimaII and SiRFmarco device tree bindings.
++title: ST SPEAr Platforms Device Tree Bindings
 +
 +maintainers:
-+  - Binghua Duan <binghua.duan@csr.com>
-+  - Barry Song <Baohua.Song@csr.com>
++  - Viresh Kumar <vireshk@kernel.org>
++  - Stefan Roese <sr@denx.de>
 +
 +properties:
 +  $nodename:
 +    const: '/'
 +  compatible:
-+    oneOf:
-+      - items:
-+          - const: sirf,atlas6-cb
-+          - const: sirf,atlas6
-+      - items:
-+          - const: sirf,atlas7-cb
-+          - const: sirf,atlas7
-+      - items:
-+          - const: sirf,prima2-cb
-+          - const: sirf,prima2
++    items:
++      - enum:
++          - st,spear600
++          - st,spear300
++          - st,spear310
++          - st,spear320
++          - st,spear1310
++          - st,spear1340
 +...
 -- 
 2.17.1
