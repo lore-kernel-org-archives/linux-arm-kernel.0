@@ -1,74 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:36 -0500
-Subject: [PATCH 24/36] dt-bindings: arm: Convert TI nspire board/soc bindings
- to json-schema
-In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
-References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-25-robh@kernel.org>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Fri, 5 Oct 2018 12:55:41 -0500
+Subject: [GIT PULL] for-next updates for soc/fsl drivers for v4.20 take 2
+In-Reply-To: <CAK8P3a3uM0_wO-wf7h+1UkUXUSTVtWSrmX_RLVzAC8e3LCuseg@mail.gmail.com>
+References: <20181004164715.14646-1-leoyang.li@nxp.com>
+ <CAK8P3a3uM0_wO-wf7h+1UkUXUSTVtWSrmX_RLVzAC8e3LCuseg@mail.gmail.com>
+Message-ID: <CADRPPNS458HcoCAQYj+jzm1O5BmVemxK4o4gdVBU2q1atJJVag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert TI NSpire SoC bindings to DT schema format using json-schema.
+On Fri, Oct 5, 2018 at 10:40 AM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Thu, Oct 4, 2018 at 6:47 PM Li Yang <leoyang.li@nxp.com> wrote:
+> >
+> > Hi arm-soc maintainers,
+> >
+> > Please merge the following updates for next.
+> >
+> > PS.  One of the patches is depending on the last pull request for fixes to build
+> > https://patchwork.kernel.org/patch/10622883/
+> > I didn't include the fix patches directly in this pull request to prevent a
+> > complicated merge.  Please let me know if there is a more preferred approach
+> > to deal with dependencies between pull requests.
+>
+> Sorry, I'd rather not pull it like this, because that would result in a
+> broken branch on my side that fails to build until it gets merged with
+> the other one.
+>
+> I think the best way to handle this is for you to:
+>
+> - start a branch on the afa86d264a7c commit that you already sent me
+>   for 4.20.
+> - merge the soc-fsl-fix-v4.19-2 branch that you sent me for 4.19 into
+>   that branch
+> - rebase all patches from tags/soc-fsl-next-v4.20-2 on top of the merge
+> - resend the pull request with the new branch
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/nspire.txt        | 14 -----------
- .../devicetree/bindings/arm/ti/nspire.yaml    | 24 +++++++++++++++++++
- 2 files changed, 24 insertions(+), 14 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/nspire.txt
- create mode 100644 Documentation/devicetree/bindings/arm/ti/nspire.yaml
+Thanks Arnd!   Will resubmit with this approach.
 
-diff --git a/Documentation/devicetree/bindings/arm/nspire.txt b/Documentation/devicetree/bindings/arm/nspire.txt
-deleted file mode 100644
-index 4d08518bd176..000000000000
---- a/Documentation/devicetree/bindings/arm/nspire.txt
-+++ /dev/null
-@@ -1,14 +0,0 @@
--TI-NSPIRE calculators
--
--Required properties:
--- compatible: Compatible property value should contain "ti,nspire".
--	CX models should have "ti,nspire-cx"
--	Touchpad models should have "ti,nspire-tp"
--	Clickpad models should have "ti,nspire-clp"
--
--Example:
--
--/ {
--	model = "TI-NSPIRE CX";
--	compatible = "ti,nspire-cx";
--	...
-diff --git a/Documentation/devicetree/bindings/arm/ti/nspire.yaml b/Documentation/devicetree/bindings/arm/ti/nspire.yaml
-new file mode 100644
-index 000000000000..882f79f95942
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/ti/nspire.yaml
-@@ -0,0 +1,24 @@
-+# SPDX-License-Identifier: None
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/bindings/arm/nspire.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
-+
-+title: TI-NSPIRE calculators
-+
-+maintainers:
-+  - Daniel Tang <dt.tangr@gmail.com>
-+
-+properties:
-+  $nodename:
-+    const: '/'
-+  compatible:
-+    items:
-+      - enum:
-+          # CX models
-+          - ti,nspire-cx
-+          # Touchpad models
-+          - ti,nspire-tp
-+          # Clickpad models
-+          - ti,nspire-clp
-+...
--- 
-2.17.1
+>
+> This will result in a bisectable (i.e. each commit builds and works) branch
+> that also merges cleanly with my fixes branch.
+>
+> Generally speaking, every branch you send must work standalone,
+> and each commit in that branch can only depend on work that
+> comes earlier in that branch.
+>
+>        Arnd
