@@ -1,197 +1,77 @@
-From: vkoul@kernel.org (Vinod)
-Date: Fri, 5 Oct 2018 20:27:06 +0530
-Subject: [PATCH v3 2/2] dmaengine: uniphier-mdmac: add UniPhier MIO DMAC
- driver
-In-Reply-To: <1536799869-10643-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1536799869-10643-1-git-send-email-yamada.masahiro@socionext.com>
- <1536799869-10643-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20181005145706.GM2372@vkoul-mobl>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 5 Oct 2018 16:57:57 +0200
+Subject: [RFC PATCH 1/9] kernel: add support for patchable function
+ pointers
+In-Reply-To: <20181005141433.GS19272@hirez.programming.kicks-ass.net>
+References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+ <20181005081333.15018-2-ard.biesheuvel@linaro.org>
+ <20181005141433.GS19272@hirez.programming.kicks-ass.net>
+Message-ID: <CAKv+Gu-Gkf2jJ+Nn65pT=HDH6S8wceuXU_RrDpatc=biNx9ROA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-09-18, 09:51, Masahiro Yamada wrote:
+On 5 October 2018 at 16:14, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, Oct 05, 2018 at 10:13:25AM +0200, Ard Biesheuvel wrote:
+>> diff --git a/include/linux/ffp.h b/include/linux/ffp.h
+>> new file mode 100644
+>> index 000000000000..8fc3b4c9b38f
+>> --- /dev/null
+>> +++ b/include/linux/ffp.h
+>> @@ -0,0 +1,43 @@
+>> +/* SPDX-License-Identifier: GPL-2.0 */
+>> +
+>> +#ifndef __LINUX_FFP_H
+>> +#define __LINUX_FFP_H
+>> +
+>> +#include <linux/types.h>
+>> +#include <linux/compiler.h>
+>> +
+>> +#ifdef CONFIG_HAVE_ARCH_FFP
+>> +#include <asm/ffp.h>
+>> +#else
+>> +
+>> +struct ffp {
+>> +     void    (**fn)(void);
+>> +     void    (*default_fn)(void);
+>> +};
+>> +
+>> +#define DECLARE_FFP(_fn, _def)                                               \
+>> +     extern typeof(_def) *_fn;                                       \
+>> +     extern struct ffp const __ffp_ ## _fn
+>> +
+>> +#define DEFINE_FFP(_fn, _def)                                                \
+>> +     typeof(_def) *_fn = &_def;                                      \
+>> +     struct ffp const __ffp_ ## _fn                                  \
+>> +             = { (void(**)(void))&_fn, (void(*)(void))&_def };       \
+>> +     EXPORT_SYMBOL(__ffp_ ## _fn)
+>> +
+>> +static inline void ffp_set_target(const struct ffp *m, void *new_fn)
+>> +{
+>> +     WRITE_ONCE(*m->fn, new_fn);
+>> +}
+>> +
+>> +static inline void ffp_reset_target(const struct ffp *m)
+>> +{
+>> +     WRITE_ONCE(*m->fn, m->default_fn);
+>> +}
+>> +
+>> +#endif
+>> +
+>> +#define SET_FFP(_fn, _new)   ffp_set_target(&__ffp_ ## _fn, _new)
+>> +#define RESET_FFP(_fn)               ffp_reset_target(&__ffp_ ## _fn)
+>> +
+>> +#endif
+>
+> I don't understand this interface. There is no wrapper for the call
+> site, so how are we going to patch all call-sites when you update the
+> target?
 
-> +#define UNIPHIER_MDMAC_CH_IRQ_STAT	0x010	// current hw status (RO)
-> +#define UNIPHIER_MDMAC_CH_IRQ_REQ	0x014	// latched STAT (WOC)
-> +#define UNIPHIER_MDMAC_CH_IRQ_EN	0x018	// IRQ enable mask
-> +#define UNIPHIER_MDMAC_CH_IRQ_DET	0x01c	// REQ & EN (RO)
-> +#define   UNIPHIER_MDMAC_CH_IRQ__ABORT		BIT(13)
-> +#define   UNIPHIER_MDMAC_CH_IRQ__DONE		BIT(1)
+This is the generic implementation, and in this case, it is just a
+function pointer which gets dereferenced and called indirectly at each
+call site.
 
-why notation if UNIPHIER_MDMAC_CH_IRQ__FOO ?
+In the arch specific implementations (for ones where it matters, see
+2/9), it is more like a PLT entry, which gets called from each call
+site, and which can be patched to point to another function.
 
-> +#define UNIPHIER_MDMAC_CH_SRC_MODE	0x020	// mode of source
-> +#define UNIPHIER_MDMAC_CH_DEST_MODE	0x024	// mode of destination
-> +#define   UNIPHIER_MDMAC_CH_MODE__ADDR_INC	(0 << 4)
-> +#define   UNIPHIER_MDMAC_CH_MODE__ADDR_DEC	(1 << 4)
-> +#define   UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED	(2 << 4)
-> +#define UNIPHIER_MDMAC_CH_SRC_ADDR	0x028	// source address
-> +#define UNIPHIER_MDMAC_CH_DEST_ADDR	0x02c	// destination address
-> +#define UNIPHIER_MDMAC_CH_SIZE		0x030	// transfer bytes
-
-Please use /* comment */ style for these
-
-> +/* mc->vc.lock must be held by caller */
-> +static struct uniphier_mdmac_desc *__uniphier_mdmac_next_desc(
-> +						struct uniphier_mdmac_chan *mc)
-
-this can be made to look better by:
-
-static struct uniphier_mdmac_desc *
-__uniphier_mdmac_next_desc(struct uniphier_mdmac_chan *mc)
-
-Btw why leading __ for function name here and other places?
-
-> +{
-> +	struct virt_dma_desc *vd;
-> +
-> +	vd = vchan_next_desc(&mc->vc);
-> +	if (!vd) {
-> +		mc->md = NULL;
-> +		return NULL;
-> +	}
-> +
-> +	list_del(&vd->node);
-> +
-> +	mc->md = to_uniphier_mdmac_desc(vd);
-> +
-> +	return mc->md;
-> +}
-> +
-> +/* mc->vc.lock must be held by caller */
-> +static void __uniphier_mdmac_handle(struct uniphier_mdmac_chan *mc,
-> +				    struct uniphier_mdmac_desc *md)
-
-please align this to previous line opening brace (hint checkpatch with
---strict option will give you the warning)
-
-> +static irqreturn_t uniphier_mdmac_interrupt(int irq, void *dev_id)
-> +{
-> +	struct uniphier_mdmac_chan *mc = dev_id;
-> +	struct uniphier_mdmac_desc *md;
-> +	irqreturn_t ret = IRQ_HANDLED;
-> +	u32 irq_stat;
-> +
-> +	spin_lock(&mc->vc.lock);
-> +
-> +	irq_stat = readl(mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_DET);
-> +
-> +	/*
-> +	 * Some channels share a single interrupt line. If the IRQ status is 0,
-> +	 * this is probably triggered by a different channel.
-> +	 */
-> +	if (!irq_stat) {
-> +		ret = IRQ_NONE;
-> +		goto out;
-> +	}
-> +
-> +	/* write 1 to clear */
-> +	writel(irq_stat, mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_REQ);
-> +
-> +	/*
-> +	 * UNIPHIER_MDMAC_CH_IRQ__DONE interrupt is asserted even when the DMA
-> +	 * is aborted.  To distinguish the normal completion and the abort,
-                     ^^^^
-double space..
-
-> +static int uniphier_mdmac_config(struct dma_chan *chan,
-> +				 struct dma_slave_config *config)
-> +{
-> +	/* Nothing in struct dma_slave_config is configurable. */
-> +	return 0;
-> +}
-
-I dont think config callback is mandatory, so we can drop this
-
-> +static enum dma_status uniphier_mdmac_tx_status(struct dma_chan *chan,
-> +						dma_cookie_t cookie,
-> +						struct dma_tx_state *txstate)
-> +{
-> +	struct virt_dma_chan *vc;
-> +	struct virt_dma_desc *vd;
-> +	struct uniphier_mdmac_chan *mc;
-> +	struct uniphier_mdmac_desc *md = NULL;
-> +	enum dma_status stat;
-> +	unsigned long flags;
-> +
-> +	stat = dma_cookie_status(chan, cookie, txstate);
-> +	/* Return immediately if we do not need to compute the residue. */
-> +	if (stat == DMA_COMPLETE || !txstate)
-> +		return stat;
-> +
-> +	vc = to_virt_chan(chan);
-> +
-> +	spin_lock_irqsave(&vc->lock, flags);
-> +
-> +	mc = to_uniphier_mdmac_chan(vc);
-> +
-> +	if (mc->md && mc->md->vd.tx.cookie == cookie)
-> +		md = mc->md;
-> +
-> +	if (!md) {
-> +		vd = vchan_find_desc(vc, cookie);
-> +		if (vd)
-> +			md = to_uniphier_mdmac_desc(vd);
-> +	}
-
-in both of these cases you are calling __uniphier_mdmac_get_residue()
-which reads the register and updates. But I think you should read
-register only in the first case when descriptor is submitted and not in
-latter case when descriptor is queued
-
-> +static int uniphier_mdmac_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct uniphier_mdmac_device *mdev;
-> +	struct dma_device *ddev;
-> +	struct resource *res;
-> +	int nr_chans, ret, i;
-> +
-> +	nr_chans = platform_irq_count(pdev);
-> +	if (nr_chans < 0)
-> +		return nr_chans;
-> +
-> +	ret = dma_set_mask(dev, DMA_BIT_MASK(32));
-> +	if (ret)
-> +		return ret;
-> +
-> +	mdev = devm_kzalloc(dev, struct_size(mdev, channels, nr_chans),
-> +			    GFP_KERNEL);
-> +	if (!mdev)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	mdev->reg_base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(mdev->reg_base))
-> +		return PTR_ERR(mdev->reg_base);
-> +
-> +	mdev->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(mdev->clk)) {
-> +		dev_err(dev, "failed to get clock\n");
-> +		return PTR_ERR(mdev->clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(mdev->clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ddev = &mdev->ddev;
-> +	ddev->dev = dev;
-> +	dma_cap_set(DMA_PRIVATE, ddev->cap_mask);
-> +	ddev->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
-> +	ddev->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
-
-undefined?
-
-> +static int uniphier_mdmac_remove(struct platform_device *pdev)
-> +{
-> +	struct uniphier_mdmac_device *mdev = platform_get_drvdata(pdev);
-> +
-> +	of_dma_controller_free(pdev->dev.of_node);
-> +	dma_async_device_unregister(&mdev->ddev);
-> +	clk_disable_unprepare(mdev->clk);
-
-at this point your irq is registered and can be fired, the tasklets are
-not killed :(
--- 
-~Vinod
+So we replace a single indirect call with a direct call plus a direct jump.
