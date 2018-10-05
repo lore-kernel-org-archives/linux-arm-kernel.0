@@ -1,58 +1,70 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Fri,  5 Oct 2018 14:30:40 -0500
-Subject: [GIT PULL v2] for-next updates for soc/fsl drivers for v4.20 take 2
-Message-ID: <20181005193040.28598-1-leoyang.li@nxp.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Oct 2018 15:14:53 -0500
+Subject: [PATCH 4/4] firmware: ti_sci: Add helper apis to mange resources
+In-Reply-To: <20181005143006.18284-5-lokeshvutla@ti.com>
+References: <20181005143006.18284-1-lokeshvutla@ti.com>
+ <20181005143006.18284-5-lokeshvutla@ti.com>
+Message-ID: <20181005201453.g3p2jhpigcvijpce@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm-soc maintainers,
+On 14:30-20181005, Lokesh Vutla wrote:
+> +struct ti_sci_resource *
+> +devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
+> +			    struct device *dev, char *of_prop)
+> +{
+> +	u32 resource_type, resource_subtype;
+> +	struct ti_sci_resource *res;
+> +	int sets, i, ret;
+> +
+> +	res = devm_kzalloc(dev, sizeof(*res), GFP_KERNEL);
+> +	if (!res)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	sets = of_property_count_elems_of_size(dev_of_node(dev), of_prop,
+> +					       sizeof(u32));
+> +	if (sets < 0) {
+> +		dev_err(dev, "%s resource type ids not available\n", of_prop);
+> +		return ERR_PTR(sets);
+> +	}
+> +
+> +	res->sets = sets / 2;
+> +
+> +	res->desc = devm_kcalloc(dev, res->sets, sizeof(*res->desc),
+> +				 GFP_KERNEL);
+> +	if (!res->desc)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	for (i = 0; i < res->sets; i++) {
+> +		ret = of_property_read_u32_index(dev_of_node(dev), of_prop,
+> +						 i * 2, &resource_type);
+> +		if (ret)
+> +			return ERR_PTR(-EINVAL);
+> +
+> +		ret = of_property_read_u32_index(dev_of_node(dev), of_prop,
+> +						 (i * 2) + 1,
+> +						 &resource_subtype);
+> +		if (ret)
+> +			return ERR_PTR(-EINVAL);
+> +
+> +		ret = handle->ops.rm_core_ops.get_range(handle, resource_type,
+> +							resource_subtype,
+> +							&res->desc[i].start,
+> +							&res->desc[i].num);
+> +		if (ret) {
+> +			dev_err(dev, "type %d subtype %d not allocated for host %d\n",
+> +				resource_type, resource_subtype,
+> +				handle_to_ti_sci_info(handle)->host_id);
+> +			return ERR_PTR(ret);
+> +		}
+> +
+> +		dev_dbg(dev, "res type = %d, subtype = %d, start = %d, num = %d\n",
+> +			resource_type, resource_subtype, res->desc[i].start,
+> +			res->desc[i].num);
 
-Please merge the following updates for next.
+NAK. Where is the binding for this? What is this decoding? Please don't
+decode binding without having an official binding.
 
-v2: updated tree to include dependency patches by merging soc-fsl-fix-v4.19-2
-
+-- 
 Regards,
-Leo
-
-The following changes since commit 56740a7167cbbbda99ebfd3e8b4e4d51ae39bd06:
-
-  Merge tag 'soc-fsl-fix-v4.19-2' into HEAD (2018-10-05 13:58:35 -0500)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-next-v4.20-2
-
-for you to fetch changes up to 6d06009cb216d071e955b3814086595851627910:
-
-  soc: fsl: qbman: add interrupt coalesce changing APIs (2018-10-05 14:06:56 -0500)
-
-----------------------------------------------------------------
-NXP/FSL SoC drivers updates for v4.20 take 2
-
-- Update qbman driver to better work with CPU hotplug
-- Add Kconfig dependency of 64-bit DMA addressing for qbman driver
-- Use last reponse to determine valid bit for qbman driver
-- Defer bman_portals probe if bman is not probed
-- Add interrupt coalescing APIs to qbman driver
-
-----------------------------------------------------------------
-Laurentiu Tudor (1):
-      soc: fsl: bman_portals: defer probe after bman's probe
-
-Madalin Bucur (2):
-      soc: fsl: qbman: replace CPU 0 with any online CPU in hotplug handlers
-      soc: fsl: qbman: add interrupt coalesce changing APIs
-
-Roy Pledge (3):
-      soc: fsl: qbman: Check if CPU is offline when initializing portals
-      soc: fsl: qbman: Add 64 bit DMA addressing requirement to QBMan
-      soc: fsl: qbman: Use last response to determine valid bit
-
- drivers/soc/fsl/qbman/Kconfig       |  2 +-
- drivers/soc/fsl/qbman/bman.c        |  6 ++---
- drivers/soc/fsl/qbman/bman_portal.c | 14 ++++++++--
- drivers/soc/fsl/qbman/dpaa_sys.h    | 20 ++++++++++++++
- drivers/soc/fsl/qbman/qman.c        | 53 ++++++++++++++++++++++++++++++++-----
- drivers/soc/fsl/qbman/qman_portal.c |  6 +++--
- include/soc/fsl/qman.h              | 28 ++++++++++++++++++++
- 7 files changed, 114 insertions(+), 15 deletions(-)
+Nishanth Menon
