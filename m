@@ -1,76 +1,61 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:43 -0500
-Subject: [PATCH 31/36] dt-bindings: arm: Convert SPEAr board/soc bindings to
- json-schema
+Date: Fri,  5 Oct 2018 11:58:36 -0500
+Subject: [PATCH 24/36] dt-bindings: arm: Convert TI nspire board/soc bindings
+ to json-schema
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-32-robh@kernel.org>
+Message-ID: <20181005165848.3474-25-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert SPEAr SoC bindings to DT schema format using json-schema.
+Convert TI NSpire SoC bindings to DT schema format using json-schema.
 
-Cc: Viresh Kumar <vireshk@kernel.org>
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/spear.txt         | 26 -------------------
- .../devicetree/bindings/arm/spear.yaml        | 25 ++++++++++++++++++
- 2 files changed, 25 insertions(+), 26 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/spear.txt
- create mode 100644 Documentation/devicetree/bindings/arm/spear.yaml
+ .../devicetree/bindings/arm/nspire.txt        | 14 -----------
+ .../devicetree/bindings/arm/ti/nspire.yaml    | 24 +++++++++++++++++++
+ 2 files changed, 24 insertions(+), 14 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/nspire.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/ti/nspire.yaml
 
-diff --git a/Documentation/devicetree/bindings/arm/spear.txt b/Documentation/devicetree/bindings/arm/spear.txt
+diff --git a/Documentation/devicetree/bindings/arm/nspire.txt b/Documentation/devicetree/bindings/arm/nspire.txt
 deleted file mode 100644
-index 0d42949df6c2..000000000000
---- a/Documentation/devicetree/bindings/arm/spear.txt
+index 4d08518bd176..000000000000
+--- a/Documentation/devicetree/bindings/arm/nspire.txt
 +++ /dev/null
-@@ -1,26 +0,0 @@
--ST SPEAr Platforms Device Tree Bindings
-----------------------------------------
+@@ -1,14 +0,0 @@
+-TI-NSPIRE calculators
 -
--Boards with the ST SPEAr600 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear600";
+-Required properties:
+-- compatible: Compatible property value should contain "ti,nspire".
+-	CX models should have "ti,nspire-cx"
+-	Touchpad models should have "ti,nspire-tp"
+-	Clickpad models should have "ti,nspire-clp"
 -
--Boards with the ST SPEAr300 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear300";
+-Example:
 -
--Boards with the ST SPEAr310 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear310";
--
--Boards with the ST SPEAr320 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear320";
--
--Boards with the ST SPEAr1310 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear1310";
--
--Boards with the ST SPEAr1340 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear1340";
-diff --git a/Documentation/devicetree/bindings/arm/spear.yaml b/Documentation/devicetree/bindings/arm/spear.yaml
+-/ {
+-	model = "TI-NSPIRE CX";
+-	compatible = "ti,nspire-cx";
+-	...
+diff --git a/Documentation/devicetree/bindings/arm/ti/nspire.yaml b/Documentation/devicetree/bindings/arm/ti/nspire.yaml
 new file mode 100644
-index 000000000000..6ce8ef979390
+index 000000000000..882f79f95942
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/spear.yaml
-@@ -0,0 +1,25 @@
++++ b/Documentation/devicetree/bindings/arm/ti/nspire.yaml
+@@ -0,0 +1,24 @@
 +# SPDX-License-Identifier: None
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/bindings/arm/spear.yaml#
++$id: http://devicetree.org/schemas/bindings/arm/nspire.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: ST SPEAr Platforms Device Tree Bindings
++title: TI-NSPIRE calculators
 +
 +maintainers:
-+  - Viresh Kumar <vireshk@kernel.org>
-+  - Stefan Roese <sr@denx.de>
++  - Daniel Tang <dt.tangr@gmail.com>
 +
 +properties:
 +  $nodename:
@@ -78,12 +63,12 @@ index 000000000000..6ce8ef979390
 +  compatible:
 +    items:
 +      - enum:
-+          - st,spear600
-+          - st,spear300
-+          - st,spear310
-+          - st,spear320
-+          - st,spear1310
-+          - st,spear1340
++          # CX models
++          - ti,nspire-cx
++          # Touchpad models
++          - ti,nspire-tp
++          # Clickpad models
++          - ti,nspire-clp
 +...
 -- 
 2.17.1
