@@ -1,54 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Oct 2018 14:34:29 +0100
-Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
- armv8_pmuv3 events.
-In-Reply-To: <CAKTKpr4a12FHkMtFNueWqQbAhT4TLw_4DLDrOD6Tjsbno28U3A@mail.gmail.com>
-References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
- <20181001142914.GD9716@arm.com>
- <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
- <CAKTKpr5+p=X6QcRp+tsxYYgirwWW=cfs7GOKyKegutEfM_W2vg@mail.gmail.com>
- <20181004122207.GE4065@arm.com>
- <CAKTKpr4a12FHkMtFNueWqQbAhT4TLw_4DLDrOD6Tjsbno28U3A@mail.gmail.com>
-Message-ID: <20181005133428.GF14398@arm.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Fri, 5 Oct 2018 15:37:06 +0200
+Subject: [RFC PATCH 0/9] patchable function pointers for pluggable crypto
+ routines
+In-Reply-To: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181005133705.GA4588@zx2c4.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2018 at 01:09:33AM +0530, Ganapatrao Kulkarni wrote:
-> On Thu, Oct 4, 2018 at 5:51 PM Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Oct 04, 2018 at 11:12:09AM +0530, Ganapatrao Kulkarni wrote:
-> > > can you please pull this patch?
-> >
-> > I still don't like the idea of just removing events like this, especially
-> > when other architectures (including some x86 and Power CPUs afaict) playa
-> > similar games for generic events, and these events do actually appear in
-> > user code.
-> >
-> > I also don't understand why you remove the TLB events. I think that logic
-> > would imply we should remove all of the events, because we can't distinguish
-> > prefetches from reads either. If we want to be consistent, then I think
-> > we should just remove the OP_WRITE events for L1D and BPU -- would you be
-> > ok with that instead?
-> 
-> IIUC, dTLB-load-misses is mapped to
-> ARMV8_PMUV3_PERFCTR_L1D_TLB_REFILL(event 0x05) and dTLB-loads is
-> mapped to ARMV8_PMUV3_PERFCTR_L1D_TLB(0x25). Which are as per spec,
-> counts TLB access/misses for both memory-read operation and
-> memory-write operation.
-> 
-> IMO, It won't help in keeping these events, knowingly that their
-> mapping is not accurate, only thing i can say to users is , dont use
-> events that are marked as "Hardware cache event"
+Hi Ard,
 
-Right, but my point is that all of the events are inaccurate by this line
-of reasoning, because we don't support PREFETCH for any of them. So I'd
-rather just drop the duplicate events from the WRITE entries, like other
-CPUs and architectures do.
+On Fri, Oct 5, 2018 at 10:13 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> At the moment, the Zinc library [1] is being proposed as a solution for that,
+> and while it does address the usability problems, it does a lot more than
+> that, and what we end up with is a lot less flexible than what we have now.
+>
+> Currently, arch specific implementations (based on SIMD or optimized
+> assembler) live in arch/*/crypto, where each sub-community is in charge
+> of its own specialized versions of the various primitives (although still
+> under the purview of the crypto maintainer). Any proposal to change this
+> model should be judged on its own merit, and not blindly accepted as the
+> fallout of cleaning up some library code.
+>
+> Also, Zinc removes the possibility to plug different versions of a routine,
+> and instead, keeps all versions in the same module. Currently, the kernel's
+> module support permits user land to take charge of the policies that decide
+> which version to use in which context (by loading or blacklisting modules).
 
-I'm about to pack my desk up because we're moving office, but I pushed out
-some patches I hacked up on my perf/updates branch:
+I think this explanation misunderstands many of the design goals of Zinc and
+also points to why going your direction instead is a bad idea that will cause
+even more problems down the road.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/log/?h=perf/updates
+Zinc does several important things:
 
-I'll post them to the list next week if it's not the merge window.
+- Introduces direct C function calls throughout, as a central way of being
+  implemented and as a central way of being used by consumers of the
+  API. This has various obvious benefits for the consumers of the API,
+  but it also has big benefits for the developers of the library as
+  well. Namely, it keeps the relationship between different parts
+  extremely clear and direct. It's an explicit choice for simplicity.
+  And by being the simpler and more direct solution, it also gives gcc
+  an important opportunity to optimize and inline.
 
-Will
+- Reorganizes crypto routines so that they're grouped together by
+  primitive. This again leads to a much simpler design and layout,
+  making it more obvious what's happening, and making things generally
+  cleaner. It is not only useful and clearer for developers, but it
+  also makes contributors and auditors more easily aware of what
+  implementations are available.
+
+- Has higher standards for code and implementations that are introduced.
+  Zinc prefers code that has been formally verified, that has been in
+  widespread usage and has received many eyeballs and fuzzing hours,
+  that has been fuzzed extensively, that is simple in design, that comes
+  from well-known high-quality authors -- in roughly but not precisely
+  that order of preference. That's a bit different from the current
+  practices of the existing crypto API.
+
+- Has a simpler mechanism that is just as effective for choosing
+  available implementations. This is, again, more obvious and direct
+  than the present crypto API's module approach, leads to smaller code
+  size, and has the potential of being just as flexible with the
+  inevitable desire for nobs, adjustable from userspace, from
+  kernelspace, or from elsewhere.
+
+- Is designed to promote collaboration with the larger cryptography
+  community and with academia, which will yield better implementations
+  and for assurance.
+
+- Can easily be extracted to userspace libraries (perhaps a future
+  libzinc could be easily based on it), which makes testing and fuzzing
+  using tools like libfuzzer and afl more accessible.
+
+- Has faster implementations than the current crypto API.
+
+- Has, again, a very strong focus on being simple and minimal, as
+  opposed to bloated and complicated, so that it's actually possible to
+  understand and audit the library.
+
+Therefore, I think this patch goes in exactly the wrong direction. I
+mean, if you want to introduce dynamic patching as a means for making
+the crypto API's dynamic dispatch stuff not as slow in a post-spectre
+world, sure, go for it; that may very well be a good idea. But
+presenting it as an alternative to Zinc very widely misses the point and
+serves to prolong a series of bad design choices, which are now able to
+be rectified by putting energy into Zinc instead.
+
+Jason
