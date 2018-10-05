@@ -1,30 +1,27 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Fri, 5 Oct 2018 13:43:55 -0700
-Subject: [PATCH i2c-next v6 1/5] dt-bindings: i2c: Add 'timeout-ms' and
- '#retries' properties as common optional
-In-Reply-To: <20181005203930.GA12987@bogus>
-References: <20181004204322.20665-1-jae.hyun.yoo@linux.intel.com>
- <20181004204322.20665-2-jae.hyun.yoo@linux.intel.com>
- <20181005203930.GA12987@bogus>
-Message-ID: <842d268d-9e38-3c81-1b66-a0527206092b@linux.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 Oct 2018 15:53:21 -0500
+Subject: [PATCH v4 01/10] dt-bindings: phy: add binding for Allwinner H6
+ USB2 PHY
+In-Reply-To: <20181004122855.22981-2-icenowy@aosc.io>
+References: <20181004122855.22981-1-icenowy@aosc.io>
+ <20181004122855.22981-2-icenowy@aosc.io>
+Message-ID: <20181005205321.GA2217@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 10/5/2018 1:39 PM, Rob Herring wrote:
-> On Thu, Oct 04, 2018 at 01:43:18PM -0700, Jae Hyun Yoo wrote:
->> +++ b/Documentation/devicetree/bindings/i2c/i2c.txt
->> @@ -80,6 +80,12 @@ wants to support one of the below features, it should adapt the bindings below.
->>   	Names of map programmable addresses.
->>   	It can contain any map needing another address than default one.
->>   
->> +- timeout-ms
+On Thu,  4 Oct 2018 20:28:46 +0800, Icenowy Zheng wrote:
+> The USB2.0 PHY on Allwinner H6 is similar to the ones on the ones on
+> older SoCs, but with holes in PHY number (USB1 and USB2 are missing, in
+> which USB1 is a USB3 PHY).
 > 
-> bus-timeout-ms in case we have some other timeout needed.
+> Add binding for the PHY.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> New patch in v4.
+> 
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
 > 
 
-Agreed. I'll change it like you suggested.
-
-Thanks,
-Jae
+Reviewed-by: Rob Herring <robh@kernel.org>
