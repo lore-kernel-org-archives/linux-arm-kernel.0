@@ -1,218 +1,128 @@
-From: takahiro.akashi@linaro.org (AKASHI, Takahiro)
-Date: Fri, 5 Oct 2018 14:06:29 +0900
-Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
- properties
-In-Reply-To: <6a8d3ddb-c3bc-c044-4d6c-55e110d89e72@gmail.com>
-References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
- <20180928064841.14117-7-takahiro.akashi@linaro.org>
- <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
- <6a8d3ddb-c3bc-c044-4d6c-55e110d89e72@gmail.com>
-Message-ID: <20181005050627.GL32578@linaro.org>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 5 Oct 2018 10:55:32 +0530
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+In-Reply-To: <20180928131935.GE1577@brain-police>
+References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+ <20180615165232.GE2202@arm.com>
+ <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
+ <20180627163749.GA8729@arm.com>
+ <CAFp+6iFNhk7xZRHp0hNb2S7Cdn3muvsWqTEX-vjPGmxM8TNM9A@mail.gmail.com>
+ <20180928131935.GE1577@brain-police>
+Message-ID: <CAFp+6iERHTqwurj0y4PVkmVEdSZHqEVUqsgy-ry-ua7-_XAVRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frank,
+Hi Will,
 
-# I haven't reply to your comments.
+On Fri, Sep 28, 2018 at 6:49 PM Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Vivek,
+>
+> On Thu, Sep 20, 2018 at 05:11:53PM +0530, Vivek Gautam wrote:
+> > On Wed, Jun 27, 2018 at 10:07 PM Will Deacon <will.deacon@arm.com> wrote:
+> > > On Tue, Jun 19, 2018 at 02:04:44PM +0530, Vivek Gautam wrote:
+> > > > On Fri, Jun 15, 2018 at 10:22 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > > > On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
+> > > > >> Qualcomm SoCs have an additional level of cache called as
+> > > > >> System cache or Last level cache[1]. This cache sits right
+> > > > >> before the DDR, and is tightly coupled with the memory
+> > > > >> controller.
+> > > > >> The cache is available to all the clients present in the
+> > > > >> SoC system. The clients request their slices from this system
+> > > > >> cache, make it active, and can then start using it. For these
+> > > > >> clients with smmu, to start using the system cache for
+> > > > >> dma buffers and related page tables [2], few of the memory
+> > > > >> attributes need to be set accordingly.
+> > > > >> This change makes the related memory Outer-Shareable, and
+> > > > >> updates the MAIR with necessary protection.
+> > > > >>
+> > > > >> The MAIR attribute requirements are:
+> > > > >>     Inner Cacheablity = 0
+> > > > >>     Outer Cacheablity = 1, Write-Back Write Allocate
+> > > > >>     Outer Shareablity = 1
+> > > > >
+> > > > > Hmm, so is this cache coherent with the CPU or not?
+> > > >
+> > > > Thanks for reviewing.
+> > > > Yes, this LLC is cache coherent with CPU, so we mark for Outer-cacheable.
+> > > > The different masters such as GPU as able to allocated and activate a slice
+> > > > in this Last Level Cache.
+> > >
+> > > What I mean is, for example, if the CPU writes some data using Normal, Inner
+> > > Shareable, Inner/Outer Cacheable, Inner/Outer Write-back, Non-transient
+> > > Read/Write-allocate and a device reads that data using your MAIR encoding
+> > > above, is the device guaranteed to see the CPU writes after the CPU has
+> > > executed a DSB instruction?
+> >
+> > No, these MAIR configurations don't guarantee that devices will have
+> > coherent view
+> > of what CPU writes. Not all devices can snoop into CPU caches (only IO-Coherent
+> > devices can).
+> > So a normal cached memory configuration in CPU MMU tables, and SMMU page tables
+> > is valid only for few devices that are IO-coherent.
+> >
+> > Moreover, CPU can lookup in system cache, and so do all devices;
+> > allocation will depend on h/w configurations and memory attributes.
+> > So anything that CPU caches in system cache will be coherently visible
+> > to devices.
+> >
+> > >
+> > > I don't think so, because the ARM ARM would say that there's a mismatch on
+> > > the Inner Cacheability attribute.
+> > >
+> > > > > Why don't normal
+> > > > > non-cacheable mappings allocated in the LLC by default?
+> > > >
+> > > > Sorry, I couldn't fully understand your question here.
+> > > > Few of the masters on qcom socs are not io-coherent, so for them
+> > > > the IC has to be marked as 0.
+> > >
+> > > By IC you mean Inner Cacheability? In your MAIR encoding above, it is zero
+> > > so I don't understand the problem. What goes wrong if non-coherent devices
+> > > use your MAIR encoding for their DMA buffers?
+> > >
+> > > > But they are able to use the LLC with OC marked as 1.
+> > >
+> > > The issue here is that whatever attributes we put in the SMMU need to align
+> > > with the attributes used by the CPU in order to avoid introducing mismatched
+> > > aliases.
+> >
+> > Not really, right?
+> > Devices can use Inner non-Cacheable, Outer-cacheable (IC=0, OC=1) to allocate
+> > into the system cache (as these devices don't want to allocate in
+> > their inner caches),
+> > and the CPU will have a coherent view of these buffers/page-tables.
+> > This should be
+> > a normal cached non-IO-Coherent memory.
+> >
+> > But anything that CPU writes using Normal, Inner Shareable,
+> > Inner/Outer Cacheable,
+> > Inner/Outer Write-back, Non-transient Read/Write-allocate, may not be visible
+> > to the device.
+> >
+> > Also added Jordan, and Pratik to this thread.
+>
+> Sorry, but I'm still completely confused.
+>
+> If you only end up with mismatched memory attributes in the non-coherent
+> case, then why can't you just follow my suggestion to override the
+> attributes for non-coherent mappings on your SoC?
 
-On Fri, Sep 28, 2018 at 02:13:58PM -0700, Frank Rowand wrote:
-> On 09/28/18 06:44, Rob Herring wrote:
-> > +David Gibson
-> > 
-> > On Fri, Sep 28, 2018 at 1:48 AM AKASHI Takahiro
-> > <takahiro.akashi@linaro.org> wrote:
-> >>
-> >> These functions will be used later to handle kexec-specific properties
-> >> in arm64's kexec_file implementation.
-> 
-> As I requested in version 14:
-> 
->   The intent of the helper functions is related to properties whose values are
->    tuples of the same format as the "reg" property of the "/memory" nodes.  For
->    example, the "linux,usable-memory-range" and "linux,elfcoredhr" properties of
->    the "/chosen" node.
-> 
->    The patch header and the function names should be updated to reflect this intent.
+As seen in downstream kernels there are few non-coherent devices which
+would not want to allocate in system cache, and therefore would want
+Inner/Outer non-cached memory.
+So, we may want to either override the attributes per-device, or as
+you suggested
+we may want to introduce another memory type 'sys-cached' that can be
+added with its separate infra.
+Thanks.
 
-I agree regarding the patch header.
+[...]
 
-> 
-> >>
-> >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Frank Rowand <frowand.list@gmail.com>
-> >> Cc: devicetree at vger.kernel.org
-> >> ---
-> 
-> Missing list of changes since version 14.
+Best regards
+Vivek
 
-Sorry for the inconvenience, but a whole change list goes into
-the cover letter, not individual patches.
 
-> 
-> >>  drivers/of/fdt.c       | 56 ++++++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/of_fdt.h |  4 +++
-> >>  2 files changed, 60 insertions(+)
-> >>
-> >> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> >> index 800ad252cf9c..c65c31562ccb 100644
-> >> --- a/drivers/of/fdt.c
-> >> +++ b/drivers/of/fdt.c
-> >> @@ -25,6 +25,7 @@
-> >>  #include <linux/debugfs.h>
-> >>  #include <linux/serial_core.h>
-> >>  #include <linux/sysfs.h>
-> >> +#include <linux/types.h>
-> >>
-> >>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
-> >>  #include <asm/page.h>
-> >> @@ -1323,3 +1324,58 @@ late_initcall(of_fdt_raw_init);
-> >>  #endif
-> >>
-> >>  #endif /* CONFIG_OF_EARLY_FLATTREE */
-> 
-> In v14 I requested:
-> 
->    Please add comment:
-> 
->    /* helper functions for arm64 kexec */
-
-Okay.
-
-> 
-> >> +
-> >> +#define FDT_ALIGN(x, a)        (((x) + (a) - 1) & ~((a) - 1))
-> >> +#define FDT_TAGALIGN(x)        (FDT_ALIGN((x), FDT_TAGSIZE))
-> >> +
-> >> +int fdt_prop_len(const char *prop_name, int len)
-> 
-> In v14, I requested:
-> 
->    Please rename as fdt_len_added_prop()
-
-Anyhow, I will drop this function, preferring to new
-fdt_[address|size]_cells().
-
-> I'm not really happy with my suggested name, but do not have a
-> better one yet.  As Rob notes, maybe David G will have a helpful
-> comment.
-> 
-> >> +{
-> >> +       return (strlen(prop_name) + 1) +
-> >> +               sizeof(struct fdt_property) +
-> >> +               FDT_TAGALIGN(len);
-> > 
-> > Looks like you are using this to calculate how much space you need to
-> > allocate in addition to the current DTB for a couple of new or
-> > replaced properties. I'm not sure that this calculation is completely
-> > accurate. And it is strange there doesn't seem to be any libfdt
-> > function for this already. It would be simpler to just add some fixed
-> > additional amount.
-> > 
-> > Maybe David G has comments on this?
-
-I'm not quit sure why it's not that accurate, but as I said in a reply to
-David's comment, I will take your suggestion.
-
-> >> +}
-> >> +
-> > 
-> > The rest of this should go in drivers/of/fdt_address.c. Ultimately, it
-> > should go into libfdt, but I'm fine with having it in the kernel for
-> > now.
-> > 
-> >> +static void fill_property(void *buf, u64 val64, int cells)
-> 
-> In v14 I requested:
-> 
-> Please rename as cpu64_to_fdt_cells()
-
-I don't mind, but this function may be dropped if Rob sticks to
-u-boot's fdt_pack_reg() over my fdt_setprop_reg().
-
-> 
-> >> +{
-> >> +       __be32 val32;
-> >> +
-> >> +       while (cells) {
-> >> +               val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
-> >> +               memcpy(buf, &val32, sizeof(val32));
-> >> +               buf += sizeof(val32);
-> > 
-> > This is kind of hard to read. I would copy u-boot's fdt_pack_reg function.
-> > 
-> > BTW, for purposes of moving to libfdt, we'll need the authors'
-> > (Masahiro Yamada and Hans de Goede) permission to dual license.
-> > 
-> >> +       }
-> >> +}
-> >> +
-> >> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-> >> +                                               u64 addr, u64 size)
-> >> +{
-> >> +       int addr_cells, size_cells;
-> 
-> unsigned
-
-fdt_[address|size]_cell() returns an int.
-
-> 
-> >> +       char buf[sizeof(__be32) * 2 * 2];
-> >> +               /* assume dt_root_[addr|size]_cells <= 2 */
-> >> +       void *prop;
-> >> +       size_t buf_size;
-> >> +
-> >> +       addr_cells = fdt_address_cells(fdt, 0);
-> >> +       if (addr_cells < 0)
-> >> +               return addr_cells;
-> >> +       size_cells = fdt_size_cells(fdt, 0);
-> >> +       if (size_cells < 0)
-> >> +               return size_cells;
-> >> +
-> >> +       /* if *_cells >= 2, cells can hold 64-bit values anyway */
-> >> +       if ((addr_cells == 1) && (addr > U32_MAX))
-> >> +               return -FDT_ERR_BADVALUE;
-> >> +
-> >> +       if ((size_cells == 1) && (size > U32_MAX))
-> >> +               return -FDT_ERR_BADVALUE;
-> 
-> In v14 I requested:
-> 
->    Should also check that base + size does not wrap around.
-
-Okay, I will start discussion, as you have suggested, in devicetree-spec ML.
-
-Thanks,
--Takahiro Akashi
-
-> 
-> >> +
-> >> +       buf_size = (addr_cells + size_cells) * sizeof(u32);
-> >> +       prop = buf;
-> >> +
-> >> +       fill_property(prop, addr, addr_cells);
-> >> +       prop += addr_cells * sizeof(u32);
-> >> +
-> >> +       fill_property(prop, size, size_cells);
-> >> +
-> >> +       return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
-> >> +}
-> >> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> >> index b9cd9ebdf9b9..842af6ea92ea 100644
-> >> --- a/include/linux/of_fdt.h
-> >> +++ b/include/linux/of_fdt.h
-> >> @@ -108,5 +108,9 @@ static inline void unflatten_device_tree(void) {}
-> >>  static inline void unflatten_and_copy_device_tree(void) {}
-> >>  #endif /* CONFIG_OF_EARLY_FLATTREE */
-> >>
-> >> +int fdt_prop_len(const char *prop_name, int len);
-> >> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-> >> +                                               u64 addr, u64 size);
-> >> +
-> >>  #endif /* __ASSEMBLY__ */
-> >>  #endif /* _LINUX_OF_FDT_H */
-> >> --
-> >> 2.19.0
-> >>
-> > 
-> 
+--
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
