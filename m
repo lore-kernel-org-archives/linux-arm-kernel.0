@@ -1,127 +1,155 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  5 Oct 2018 11:58:16 -0500
-Subject: [PATCH 04/36] dt-bindings: arm: fsl: Move DCFG and SCFG bindings to
- their own docs
+Date: Fri,  5 Oct 2018 11:58:13 -0500
+Subject: [PATCH 01/36] dt-bindings: arm: alpine: Move CPU control related
+ binding to cpu-enable-method/al, alpine-smp
 In-Reply-To: <20181005165848.3474-1-robh@kernel.org>
 References: <20181005165848.3474-1-robh@kernel.org>
-Message-ID: <20181005165848.3474-5-robh@kernel.org>
+Message-ID: <20181005165848.3474-2-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to convert board-level bindings to json-schema, move
-various misc SoC bindings out to their own file.
+It is best practice to have 1 binding per file, so board level bindings
+should be separate for various misc SoC bindings. Move the Alpine CPU
+control to al,alpine-smp and we can also remove a cross reference.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../arm/freescale/fsl,layerscape-dcfg.txt     | 19 +++++++++
- .../arm/freescale/fsl,layerscape-scfg.txt     | 19 +++++++++
- Documentation/devicetree/bindings/arm/fsl.txt | 39 -------------------
- 3 files changed, 38 insertions(+), 39 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-dcfg.txt
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-scfg.txt
+ .../devicetree/bindings/arm/al,alpine.txt     | 72 -------------------
+ .../arm/cpu-enable-method/al,alpine-smp       | 34 ++++++++-
+ 2 files changed, 31 insertions(+), 75 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-dcfg.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-dcfg.txt
-new file mode 100644
-index 000000000000..b5cb374dc47d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-dcfg.txt
-@@ -0,0 +1,19 @@
-+Freescale DCFG
-+
-+DCFG is the device configuration unit, that provides general purpose
-+configuration and status for the device. Such as setting the secondary
-+core start address and release the secondary core from holdoff and startup.
-+
-+Required properties:
-+  - compatible: Should contain a chip-specific compatible string,
-+	Chip-specific strings are of the form "fsl,<chip>-dcfg",
-+	The following <chip>s are known to be supported:
-+	ls1012a, ls1021a, ls1043a, ls1046a, ls2080a.
-+
-+  - reg : should contain base address and length of DCFG memory-mapped registers
-+
-+Example:
-+	dcfg: dcfg at 1ee0000 {
-+		compatible = "fsl,ls1021a-dcfg";
-+		reg = <0x0 0x1ee0000 0x0 0x10000>;
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-scfg.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-scfg.txt
-new file mode 100644
-index 000000000000..0ab67b0b216d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,layerscape-scfg.txt
-@@ -0,0 +1,19 @@
-+Freescale SCFG
-+
-+SCFG is the supplemental configuration unit, that provides SoC specific
-+configuration and status registers for the chip. Such as getting PEX port
-+status.
-+
-+Required properties:
-+  - compatible: Should contain a chip-specific compatible string,
-+	Chip-specific strings are of the form "fsl,<chip>-scfg",
-+	The following <chip>s are known to be supported:
-+	ls1012a, ls1021a, ls1043a, ls1046a, ls2080a.
-+
-+  - reg: should contain base address and length of SCFG memory-mapped registers
-+
-+Example:
-+	scfg: scfg at 1570000 {
-+		compatible = "fsl,ls1021a-scfg";
-+		reg = <0x0 0x1570000 0x0 0x10000>;
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 8a1baa2b9723..1e775aaa5c5b 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -101,45 +101,6 @@ Freescale LS1021A Platform Device Tree Bindings
- Required root node compatible properties:
-   - compatible = "fsl,ls1021a";
+diff --git a/Documentation/devicetree/bindings/arm/al,alpine.txt b/Documentation/devicetree/bindings/arm/al,alpine.txt
+index f404a4f9b165..d00debe2e86f 100644
+--- a/Documentation/devicetree/bindings/arm/al,alpine.txt
++++ b/Documentation/devicetree/bindings/arm/al,alpine.txt
+@@ -14,75 +14,3 @@ compatible: must contain "al,alpine"
  
--Freescale SoC-specific Device Tree Bindings
---------------------------------------------
+ 	...
+ }
 -
--Freescale SCFG
--  SCFG is the supplemental configuration unit, that provides SoC specific
--configuration and status registers for the chip. Such as getting PEX port
--status.
--  Required properties:
--  - compatible: Should contain a chip-specific compatible string,
--	Chip-specific strings are of the form "fsl,<chip>-scfg",
--	The following <chip>s are known to be supported:
--	ls1012a, ls1021a, ls1043a, ls1046a, ls2080a.
+-* CPU node:
 -
--  - reg: should contain base address and length of SCFG memory-mapped registers
+-The Alpine platform includes cortex-a15 cores.
+-enable-method: must be "al,alpine-smp" to allow smp  [1]
 -
 -Example:
--	scfg: scfg at 1570000 {
--		compatible = "fsl,ls1021a-scfg";
--		reg = <0x0 0x1570000 0x0 0x10000>;
+-
+-cpus {
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+-	enable-method = "al,alpine-smp";
+-
+-	cpu at 0 {
+-		compatible = "arm,cortex-a15";
+-		device_type = "cpu";
+-		reg = <0>;
 -	};
 -
--Freescale DCFG
--  DCFG is the device configuration unit, that provides general purpose
--configuration and status for the device. Such as setting the secondary
--core start address and release the secondary core from holdoff and startup.
--  Required properties:
--  - compatible: Should contain a chip-specific compatible string,
--	Chip-specific strings are of the form "fsl,<chip>-dcfg",
--	The following <chip>s are known to be supported:
--	ls1012a, ls1021a, ls1043a, ls1046a, ls2080a.
+-	cpu at 1 {
+-		compatible = "arm,cortex-a15";
+-		device_type = "cpu";
+-		reg = <1>;
+-	};
 -
--  - reg : should contain base address and length of DCFG memory-mapped registers
+-	cpu at 2 {
+-		compatible = "arm,cortex-a15";
+-		device_type = "cpu";
+-		reg = <2>;
+-	};
+-
+-	cpu at 3 {
+-		compatible = "arm,cortex-a15";
+-		device_type = "cpu";
+-		reg = <3>;
+-	};
+-};
+-
+-
+-* Alpine CPU resume registers
+-
+-The CPU resume register are used to define required resume address after
+-reset.
+-
+-Properties:
+-- compatible : Should contain "al,alpine-cpu-resume".
+-- reg : Offset and length of the register set for the device
 -
 -Example:
--	dcfg: dcfg at 1ee0000 {
--		compatible = "fsl,ls1021a-dcfg";
--		reg = <0x0 0x1ee0000 0x0 0x10000>;
--	};
 -
- Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
- ----------------------------------------------------------------
+-cpu_resume {
+-	compatible = "al,alpine-cpu-resume";
+-	reg = <0xfbff5ed0 0x30>;
+-};
+-
+-* Alpine System-Fabric Service Registers
+-
+-The System-Fabric Service Registers allow various operation on CPU and
+-system fabric, like powering CPUs off.
+-
+-Properties:
+-- compatible : Should contain "al,alpine-sysfabric-service" and "syscon".
+-- reg : Offset and length of the register set for the device
+-
+-Example:
+-
+-nb_service {
+-        compatible = "al,alpine-sysfabric-service", "syscon";
+-        reg = <0xfb070000 0x10000>;
+-};
+-
+-[1] arm/cpu-enable-method/al,alpine-smp
+diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
+index c2e0cc5e4cfd..35e5afb6d9ad 100644
+--- a/Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
++++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
+@@ -14,7 +14,28 @@ Related properties:	(none)
  
+ Note:
+ This enable method requires valid nodes compatible with
+-"al,alpine-cpu-resume" and "al,alpine-nb-service"[1].
++"al,alpine-cpu-resume" and "al,alpine-nb-service".
++
++
++* Alpine CPU resume registers
++
++The CPU resume register are used to define required resume address after
++reset.
++
++Properties:
++- compatible : Should contain "al,alpine-cpu-resume".
++- reg : Offset and length of the register set for the device
++
++
++* Alpine System-Fabric Service Registers
++
++The System-Fabric Service Registers allow various operation on CPU and
++system fabric, like powering CPUs off.
++
++Properties:
++- compatible : Should contain "al,alpine-sysfabric-service" and "syscon".
++- reg : Offset and length of the register set for the device
++
+ 
+ Example:
+ 
+@@ -48,5 +69,12 @@ cpus {
+ 	};
+ };
+ 
+---
+-[1] arm/al,alpine.txt
++cpu_resume {
++	compatible = "al,alpine-cpu-resume";
++	reg = <0xfbff5ed0 0x30>;
++};
++
++nb_service {
++        compatible = "al,alpine-sysfabric-service", "syscon";
++        reg = <0xfb070000 0x10000>;
++};
 -- 
 2.17.1
