@@ -1,39 +1,54 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  5 Oct 2018 10:13:31 +0200
-Subject: [RFC PATCH 7/9] crypto: crct10dif/generic - switch crypto API driver
- to core library
+Date: Fri,  5 Oct 2018 10:13:27 +0200
+Subject: [RFC PATCH 3/9] crypto: crc-t10dif - make crc_t10dif a static inline
 In-Reply-To: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
 References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181005081333.15018-8-ard.biesheuvel@linaro.org>
+Message-ID: <20181005081333.15018-4-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+crc_t10dif() is a trivial wrapper around crc_t10dif_update() so move
+it into the header file as a static inline function.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- crypto/crct10dif_generic.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/linux/crc-t10dif.h | 6 +++++-
+ lib/crc-t10dif.c           | 6 ------
+ 2 files changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/crypto/crct10dif_generic.c b/crypto/crct10dif_generic.c
-index 8e94e29dc6fc..9ea4242c4921 100644
---- a/crypto/crct10dif_generic.c
-+++ b/crypto/crct10dif_generic.c
-@@ -53,7 +53,7 @@ static int chksum_update(struct shash_desc *desc, const u8 *data,
- {
- 	struct chksum_desc_ctx *ctx = shash_desc_ctx(desc);
+diff --git a/include/linux/crc-t10dif.h b/include/linux/crc-t10dif.h
+index 6bb0c0bf357b..4dfe09ff4cf2 100644
+--- a/include/linux/crc-t10dif.h
++++ b/include/linux/crc-t10dif.h
+@@ -10,7 +10,11 @@
  
--	ctx->crc = crc_t10dif_generic(ctx->crc, data, length);
-+	ctx->crc = crc_t10dif_update(ctx->crc, data, length);
- 	return 0;
+ extern __u16 crc_t10dif_generic(__u16 crc, const unsigned char *buffer,
+ 				size_t len);
+-extern __u16 crc_t10dif(unsigned char const *, size_t);
+ extern __u16 crc_t10dif_update(__u16 crc, unsigned char const *, size_t);
+ 
++static inline __u16 crc_t10dif(const unsigned char *buffer, size_t len)
++{
++	return crc_t10dif_update(0, buffer, len);
++}
++
+ #endif
+diff --git a/lib/crc-t10dif.c b/lib/crc-t10dif.c
+index 4d0d47c1ffbd..036ee664c9e1 100644
+--- a/lib/crc-t10dif.c
++++ b/lib/crc-t10dif.c
+@@ -81,12 +81,6 @@ __u16 crc_t10dif_update(__u16 crc, const unsigned char *buffer, size_t len)
  }
+ EXPORT_SYMBOL(crc_t10dif_update);
  
-@@ -68,7 +68,7 @@ static int chksum_final(struct shash_desc *desc, u8 *out)
- static int __chksum_finup(__u16 *crcp, const u8 *data, unsigned int len,
- 			u8 *out)
+-__u16 crc_t10dif(const unsigned char *buffer, size_t len)
+-{
+-	return crc_t10dif_update(0, buffer, len);
+-}
+-EXPORT_SYMBOL(crc_t10dif);
+-
+ static int __init crc_t10dif_mod_init(void)
  {
--	*(__u16 *)out = crc_t10dif_generic(*crcp, data, len);
-+	*(__u16 *)out = crc_t10dif_update(*crcp, data, len);
- 	return 0;
- }
- 
+ 	crypto_register_notifier(&crc_t10dif_nb);
 -- 
 2.11.0
