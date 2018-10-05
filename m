@@ -1,44 +1,24 @@
-From: rppt@linux.vnet.ibm.com (Mike Rapoport)
-Date: Fri, 05 Oct 2018 18:05:01 +0300
-Subject: [PATCH] memblock: stop using implicit alignement to
- SMP_CACHE_BYTES
-In-Reply-To: <8891277c7de92e93d3bfc409df95810ee6f103cd.camel@kernel.crashing.org>
-References: <1538687224-17535-1-git-send-email-rppt@linux.vnet.ibm.com>
- <8891277c7de92e93d3bfc409df95810ee6f103cd.camel@kernel.crashing.org>
-Message-ID: <59C9470E-F718-4A11-BC65-FD68901723AC@linux.vnet.ibm.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 5 Oct 2018 20:40:22 +0530
+Subject: [PATCH] arm64: dts: k3-am65-wakeup: Fix wakeup_uart reg address
+In-Reply-To: <20180927050146.17847-1-vigneshr@ti.com>
+References: <20180927050146.17847-1-vigneshr@ti.com>
+Message-ID: <8dc7a5d5-3e21-c2be-fde1-3f2bc6396bec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On October 5, 2018 6:25:38 AM GMT+03:00, Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
->On Fri, 2018-10-05 at 00:07 +0300, Mike Rapoport wrote:
->> When a memblock allocation APIs are called with align = 0, the
->alignment is
->> implicitly set to SMP_CACHE_BYTES.
->> 
->> Replace all such uses of memblock APIs with the 'align' parameter
->explicitly
->> set to SMP_CACHE_BYTES and stop implicit alignment assignment in the
->> memblock internal allocation functions.
->> 
->> For the case when memblock APIs are used via helper functions, e.g.
->like
->> iommu_arena_new_node() in Alpha, the helper functions were detected
->with
->> Coccinelle's help and then manually examined and updated where
->appropriate.
->> 
->> The direct memblock APIs users were updated using the semantic patch
->below:
->
->What is the purpose of this ? It sounds rather counter-intuitive...
+On Thursday 27 September 2018 10:31 AM, Vignesh R wrote:
+> cbass_wakeup interconnect which is the parent of wakeup_uart node
+> defines address-cells=1 and size-cells=1, therefore fix up reg property
+> of wakeup_uart node accordingly. Otherwise, this UART instance fails to
+> probe if enabled.
+> 
+> Fixes: 4201af2544b3 ("arm64: dts: ti: am654: Add uart nodes")
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Why?
-I think it actually more intuitive to explicitly set alignment to SMP_CACHE_BYTES rather than use align = 0 because deeply inside allocator it will be implicitly reset to SMP_CACHE_BYTES...
+Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
 
->Ben.
-
--- 
-Sincerely yours,
-Mike.
+Thanks and regards,
+Lokesh
