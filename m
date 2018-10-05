@@ -1,48 +1,123 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Fri, 5 Oct 2018 12:55:41 -0500
-Subject: [GIT PULL] for-next updates for soc/fsl drivers for v4.20 take 2
-In-Reply-To: <CAK8P3a3uM0_wO-wf7h+1UkUXUSTVtWSrmX_RLVzAC8e3LCuseg@mail.gmail.com>
-References: <20181004164715.14646-1-leoyang.li@nxp.com>
- <CAK8P3a3uM0_wO-wf7h+1UkUXUSTVtWSrmX_RLVzAC8e3LCuseg@mail.gmail.com>
-Message-ID: <CADRPPNS458HcoCAQYj+jzm1O5BmVemxK4o4gdVBU2q1atJJVag@mail.gmail.com>
+From: luto@kernel.org (Andy Lutomirski)
+Date: Fri, 5 Oct 2018 11:00:58 -0700
+Subject: [RFC PATCH 0/9] patchable function pointers for pluggable crypto
+ routines
+In-Reply-To: <CAKv+Gu_fFvoXmWscnx=dF7ovc2qXJgBnDte3Z8Co9Y4TzDfwbQ@mail.gmail.com>
+References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+ <20181005133705.GA4588@zx2c4.com>
+ <CAKv+Gu-f4uKBF=gtFcNJEeoC2L4qShX0+3p7kVhjTn0tR+3Gng@mail.gmail.com>
+ <CALCETrVxv1fHt6WE4ZpvVEwtfsKQ19gRrhhA40zwCXGMk+DTLQ@mail.gmail.com>
+ <CAKv+Gu_fFvoXmWscnx=dF7ovc2qXJgBnDte3Z8Co9Y4TzDfwbQ@mail.gmail.com>
+Message-ID: <CALCETrXv5vYxV+R4xAiKXMgHYeeDE5y4_Oj8Jx6pFiFq5+tXOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 5, 2018 at 10:40 AM Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Oct 5, 2018 at 10:28 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 >
-> On Thu, Oct 4, 2018 at 6:47 PM Li Yang <leoyang.li@nxp.com> wrote:
+> On 5 October 2018 at 19:26, Andy Lutomirski <luto@kernel.org> wrote:
+> > On Fri, Oct 5, 2018 at 10:15 AM Ard Biesheuvel
+> > <ard.biesheuvel@linaro.org> wrote:
+> >>
+> >> On 5 October 2018 at 15:37, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+> >> ...
+> >> > Therefore, I think this patch goes in exactly the wrong direction. I
+> >> > mean, if you want to introduce dynamic patching as a means for making
+> >> > the crypto API's dynamic dispatch stuff not as slow in a post-spectre
+> >> > world, sure, go for it; that may very well be a good idea. But
+> >> > presenting it as an alternative to Zinc very widely misses the point and
+> >> > serves to prolong a series of bad design choices, which are now able to
+> >> > be rectified by putting energy into Zinc instead.
+> >> >
+> >>
+> >> This series has nothing to do with dynamic dispatch: the call sites
+> >> call crypto functions using ordinary function calls (although my
+> >> example uses CRC-T10DIF), and these calls are redirected via what is
+> >> essentially a PLT entry, so that we can supsersede those routines at
+> >> runtime.
 > >
-> > Hi arm-soc maintainers,
+> > If you really want to do it PLT-style, then just do:
 > >
-> > Please merge the following updates for next.
+> > extern void whatever_func(args);
 > >
-> > PS.  One of the patches is depending on the last pull request for fixes to build
-> > https://patchwork.kernel.org/patch/10622883/
-> > I didn't include the fix patches directly in this pull request to prevent a
-> > complicated merge.  Please let me know if there is a more preferred approach
-> > to deal with dependencies between pull requests.
+> > Call it like:
+> > whatever_func(args here);
+> >
+> > And rig up something to emit asm like:
+> >
+> > GLOBAL(whatever_func)
+> >   jmpq default_whatever_func
+> > ENDPROC(whatever_func)
+> >
+> > Architectures without support can instead do:
+> >
+> > void whatever_func(args)
+> > {
+> >   READ_ONCE(patchable_function_struct_for_whatever_func->ptr)(args);
+> > }
+> >
+> > and patch the asm function for basic support.  It will be slower than
+> > necessary, but maybe the relocation trick could be used on top of this
+> > to redirect the call to whatever_func directly to the target for
+> > architectures that want to squeeze out the last bit of performance.
+> > This might actually be the best of all worlds: easy implementation on
+> > all architectures, no inline asm, and the totally non-magical version
+> > works with okay performance.
+> >
+> > (Is this what your code is doing?  I admit I didn't follow all the way
+> > through all the macros.)
 >
-> Sorry, I'd rather not pull it like this, because that would result in a
-> broken branch on my side that fails to build until it gets merged with
-> the other one.
->
-> I think the best way to handle this is for you to:
->
-> - start a branch on the afa86d264a7c commit that you already sent me
->   for 4.20.
-> - merge the soc-fsl-fix-v4.19-2 branch that you sent me for 4.19 into
->   that branch
-> - rebase all patches from tags/soc-fsl-next-v4.20-2 on top of the merge
-> - resend the pull request with the new branch
+> Basically
 
-Thanks Arnd!   Will resubmit with this approach.
+Adding Josh Poimboeuf.
 
->
-> This will result in a bisectable (i.e. each commit builds and works) branch
-> that also merges cleanly with my fixes branch.
->
-> Generally speaking, every branch you send must work standalone,
-> and each commit in that branch can only depend on work that
-> comes earlier in that branch.
->
->        Arnd
+Here's a sketch of how this could work for better performance.  For a
+static call "foo" that returns void and takes no arguments, the
+generic implementation does something like this:
+
+extern void foo(void);
+
+struct static_call {
+  void (*target)(void);
+
+  /* arch-specific part containing an array of struct static_call_site */
+};
+
+void foo(void)
+{
+  READ_ONCE(__static_call_foo->target)();
+}
+
+Arch code overrides it to:
+
+GLOBAL(foo)
+  jmpq *__static_call_foo(%rip)
+ENDPROC(foo)
+
+and some extra asm to emit a static_call_site object saying that the
+address "foo" is a jmp/call instruction where the operand is at offset
+1 into the instruction.  (Or whatever the offset is.)
+
+The patch code is like:
+
+void set_static_call(struct static_call *call, void *target)
+{
+  /* take a spinlock? */
+  WRITE_ONCE(call->target, target);
+  arch_set_static_call(call, target);
+}
+
+and the arch code patches the call site if needed.
+
+On x86, an even better implementation would have objtool make a bunch
+of additional static_call_site objects for each call to foo, and
+arch_set_static_call() would update all of them, too.  Using
+text_poke_bp() if needed, and "if needed" can maybe be clever and
+check the alignment of the instruction.  I admit that I never actually
+remember the full rules for atomically patching an instruction on x86
+SMP.  (Hmm.  This will be really epically slow.  Maybe we don't care.
+Or we could finally optimize text_poke, etc to take a list of pokes to
+do and do them as a batch.  But that's not a prerequisite for the rest
+of this.)
+
+What do you all think?
