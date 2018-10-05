@@ -1,89 +1,106 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Fri, 5 Oct 2018 15:37:06 +0200
-Subject: [RFC PATCH 0/9] patchable function pointers for pluggable crypto
- routines
-In-Reply-To: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
-References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181005133705.GA4588@zx2c4.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 5 Oct 2018 08:23:57 -0500
+Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <20181005030849.GK32578@linaro.org>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-7-takahiro.akashi@linaro.org>
+ <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
+ <20181005030849.GK32578@linaro.org>
+Message-ID: <CAL_Jsq+wXU8PCyJhaTKE7ezZhiD0KARUFXVzQBk0ZptEEK7ubQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On Fri, Oct 5, 2018 at 10:13 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> At the moment, the Zinc library [1] is being proposed as a solution for that,
-> and while it does address the usability problems, it does a lot more than
-> that, and what we end up with is a lot less flexible than what we have now.
+On Thu, Oct 4, 2018 at 10:07 PM AKASHI, Takahiro
+<takahiro.akashi@linaro.org> wrote:
 >
-> Currently, arch specific implementations (based on SIMD or optimized
-> assembler) live in arch/*/crypto, where each sub-community is in charge
-> of its own specialized versions of the various primitives (although still
-> under the purview of the crypto maintainer). Any proposal to change this
-> model should be judged on its own merit, and not blindly accepted as the
-> fallout of cleaning up some library code.
+> Rob,
 >
-> Also, Zinc removes the possibility to plug different versions of a routine,
-> and instead, keeps all versions in the same module. Currently, the kernel's
-> module support permits user land to take charge of the policies that decide
-> which version to use in which context (by loading or blacklisting modules).
+> # I haven't replied to this comment yet.
+>
+> On Fri, Sep 28, 2018 at 08:44:42AM -0500, Rob Herring wrote:
+> > +David Gibson
+> >
+> > On Fri, Sep 28, 2018 at 1:48 AM AKASHI Takahiro
+> > <takahiro.akashi@linaro.org> wrote:
+> > >
+> > > These functions will be used later to handle kexec-specific properties
+> > > in arm64's kexec_file implementation.
+> > >
+> > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Frank Rowand <frowand.list@gmail.com>
+> > > Cc: devicetree at vger.kernel.org
+> > > ---
+> > >  drivers/of/fdt.c       | 56 ++++++++++++++++++++++++++++++++++++++++++
+> > >  include/linux/of_fdt.h |  4 +++
+> > >  2 files changed, 60 insertions(+)
+> > >
+> > > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> > > index 800ad252cf9c..c65c31562ccb 100644
+> > > --- a/drivers/of/fdt.c
+> > > +++ b/drivers/of/fdt.c
+> > > @@ -25,6 +25,7 @@
+> > >  #include <linux/debugfs.h>
+> > >  #include <linux/serial_core.h>
+> > >  #include <linux/sysfs.h>
+> > > +#include <linux/types.h>
+> > >
+> > >  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+> > >  #include <asm/page.h>
+> > > @@ -1323,3 +1324,58 @@ late_initcall(of_fdt_raw_init);
+> > >  #endif
+> > >
+> > >  #endif /* CONFIG_OF_EARLY_FLATTREE */
+> > > +
+> > > +#define FDT_ALIGN(x, a)        (((x) + (a) - 1) & ~((a) - 1))
+> > > +#define FDT_TAGALIGN(x)        (FDT_ALIGN((x), FDT_TAGSIZE))
+> > > +
+> > > +int fdt_prop_len(const char *prop_name, int len)
+> > > +{
+> > > +       return (strlen(prop_name) + 1) +
+> > > +               sizeof(struct fdt_property) +
+> > > +               FDT_TAGALIGN(len);
+> >
+> > Looks like you are using this to calculate how much space you need to
+> > allocate in addition to the current DTB for a couple of new or
+> > replaced properties. I'm not sure that this calculation is completely
+> > accurate. And it is strange there doesn't seem to be any libfdt
+> > function for this already. It would be simpler to just add some fixed
+> > additional amount.
+> >
+> > Maybe David G has comments on this?
+> >
+> > > +}
+> > > +
+> >
+> > The rest of this should go in drivers/of/fdt_address.c. Ultimately, it
+> > should go into libfdt, but I'm fine with having it in the kernel for
+> > now.
+>
+> I'd like to have this function in the kernel for now.
+>
+> > > +static void fill_property(void *buf, u64 val64, int cells)
+> > > +{
+> > > +       __be32 val32;
+> > > +
+> > > +       while (cells) {
+> > > +               val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+> > > +               memcpy(buf, &val32, sizeof(val32));
+> > > +               buf += sizeof(val32);
+> >
+> > This is kind of hard to read. I would copy u-boot's fdt_pack_reg function.
+>
+> Are you sure?
+> I originally implemented this function in a similar way that fdt_pack_reg()
+> was, but, you suggested, in your past comment[1], that we'd be better to
+> have of_read_number()-like implementation.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/579118.html
 
-I think this explanation misunderstands many of the design goals of Zinc and
-also points to why going your direction instead is a bad idea that will cause
-even more problems down the road.
+Yeah, you're right. Plus, I'm not sure the u-boot one would work for
+unaligned accesses with armv5 and earlier h/w.
 
-Zinc does several important things:
+My only comment then is I think you can drop the U32_MAX masking.
 
-- Introduces direct C function calls throughout, as a central way of being
-  implemented and as a central way of being used by consumers of the
-  API. This has various obvious benefits for the consumers of the API,
-  but it also has big benefits for the developers of the library as
-  well. Namely, it keeps the relationship between different parts
-  extremely clear and direct. It's an explicit choice for simplicity.
-  And by being the simpler and more direct solution, it also gives gcc
-  an important opportunity to optimize and inline.
-
-- Reorganizes crypto routines so that they're grouped together by
-  primitive. This again leads to a much simpler design and layout,
-  making it more obvious what's happening, and making things generally
-  cleaner. It is not only useful and clearer for developers, but it
-  also makes contributors and auditors more easily aware of what
-  implementations are available.
-
-- Has higher standards for code and implementations that are introduced.
-  Zinc prefers code that has been formally verified, that has been in
-  widespread usage and has received many eyeballs and fuzzing hours,
-  that has been fuzzed extensively, that is simple in design, that comes
-  from well-known high-quality authors -- in roughly but not precisely
-  that order of preference. That's a bit different from the current
-  practices of the existing crypto API.
-
-- Has a simpler mechanism that is just as effective for choosing
-  available implementations. This is, again, more obvious and direct
-  than the present crypto API's module approach, leads to smaller code
-  size, and has the potential of being just as flexible with the
-  inevitable desire for nobs, adjustable from userspace, from
-  kernelspace, or from elsewhere.
-
-- Is designed to promote collaboration with the larger cryptography
-  community and with academia, which will yield better implementations
-  and for assurance.
-
-- Can easily be extracted to userspace libraries (perhaps a future
-  libzinc could be easily based on it), which makes testing and fuzzing
-  using tools like libfuzzer and afl more accessible.
-
-- Has faster implementations than the current crypto API.
-
-- Has, again, a very strong focus on being simple and minimal, as
-  opposed to bloated and complicated, so that it's actually possible to
-  understand and audit the library.
-
-Therefore, I think this patch goes in exactly the wrong direction. I
-mean, if you want to introduce dynamic patching as a means for making
-the crypto API's dynamic dispatch stuff not as slow in a post-spectre
-world, sure, go for it; that may very well be a good idea. But
-presenting it as an alternative to Zinc very widely misses the point and
-serves to prolong a series of bad design choices, which are now able to
-be rectified by putting energy into Zinc instead.
-
-Jason
+Rob
