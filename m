@@ -1,140 +1,42 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 5 Oct 2018 17:33:14 +0200
-Subject: [PATCH V5 02/24] mmc: mmci: create common mmci_dma_setup/release
-In-Reply-To: <CAPDyKFogS_74csmZm5_M3D-JFNn_8fi2sxcHpRwVxZOqZhndVg@mail.gmail.com>
-References: <1538745782-27446-1-git-send-email-ludovic.Barre@st.com>
- <1538745782-27446-3-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFogS_74csmZm5_M3D-JFNn_8fi2sxcHpRwVxZOqZhndVg@mail.gmail.com>
-Message-ID: <adccdd2f-0525-67b9-35d0-718accc5a7ed@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Oct 2018 17:37:45 +0200
+Subject: [GIT PULL] for-next updates for soc/fsl drivers for v4.20 take 2
+In-Reply-To: <20181004164715.14646-1-leoyang.li@nxp.com>
+References: <20181004164715.14646-1-leoyang.li@nxp.com>
+Message-ID: <CAK8P3a3uM0_wO-wf7h+1UkUXUSTVtWSrmX_RLVzAC8e3LCuseg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 4, 2018 at 6:47 PM Li Yang <leoyang.li@nxp.com> wrote:
+>
+> Hi arm-soc maintainers,
+>
+> Please merge the following updates for next.
+>
+> PS.  One of the patches is depending on the last pull request for fixes to build
+> https://patchwork.kernel.org/patch/10622883/
+> I didn't include the fix patches directly in this pull request to prevent a
+> complicated merge.  Please let me know if there is a more preferred approach
+> to deal with dependencies between pull requests.
 
+Sorry, I'd rather not pull it like this, because that would result in a
+broken branch on my side that fails to build until it gets merged with
+the other one.
 
-On 10/05/2018 03:47 PM, Ulf Hansson wrote:
-> On 5 October 2018 at 15:22, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch creates a common mmci_dma_setup/release which calls
->> dma_setup/release callbacks of mmci_host_ops and manages
->> common features like use_dma... If there is a fallbacks to
->> pio mode, dma functions must check use_dma.
->>
->> error management:
->> -mmci_dmae_setup fail if Tx and Rx dma channels are not defined
->> -qcom_dma_setup fail if one of both dma channels is not defined,
->>   Qcom has no specific resource to release, just mmci dmae resource.
-> 
-> Makes perfect sense!
-> 
-> [...]
-> 
->> +void mmci_dma_setup(struct mmci_host *host)
->> +{
->> +       if (!host->ops || !host->ops->dma_setup)
->> +               return;
->> +
->> +       if (host->ops->dma_setup(host)) {
->> +               mmci_dma_release(host);
-> 
-> Please remove this and let the variants clean up themselves. That
-> makes it more straight forward.
+I think the best way to handle this is for you to:
 
-This common call was not such a good idea.
-Ok, I will back on first idea.
+- start a branch on the afa86d264a7c commit that you already sent me
+  for 4.20.
+- merge the soc-fsl-fix-v4.19-2 branch that you sent me for 4.19 into
+  that branch
+- rebase all patches from tags/soc-fsl-next-v4.20-2 on top of the merge
+- resend the pull request with the new branch
 
-> 
->> +               return;
->> +       }
->> +
->> +       host->use_dma = true;
->> +}
->> +
-> 
-> [...]
-> 
->> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
->> index 01e6c6b..9b0a960 100644
->> --- a/drivers/mmc/host/mmci.h
->> +++ b/drivers/mmc/host/mmci.h
->> @@ -273,7 +273,8 @@ struct variant_data {
->>
->>   /* mmci variant callbacks */
->>   struct mmci_host_ops {
->> -       void (*dma_setup)(struct mmci_host *host);
->> +       int (*dma_setup)(struct mmci_host *host);
->> +       void (*dma_release)(struct mmci_host *host);
->>   };
->>
->>   struct mmci_host_next {
->> @@ -323,6 +324,7 @@ struct mmci_host {
->>          unsigned int            size;
->>          int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
->>
->> +       u8                      use_dma:1;
->>   #ifdef CONFIG_DMA_ENGINE
->>          /* DMA stuff */
->>          struct dma_chan         *dma_current;
->> @@ -336,3 +338,14 @@ struct mmci_host {
->>   #endif
->>   };
->>
->> +#ifdef CONFIG_DMA_ENGINE
->> +void mmci_variant_init(struct mmci_host *host);
->> +#else
->> +static inline void mmci_variant_init(struct mmci_host *host)
->> +{
->> +}
->> +#endif
-> 
-> This can be kept in mmci.c instead.
+This will result in a bisectable (i.e. each commit builds and works) branch
+that also merges cleanly with my fixes branch.
 
-OK
+Generally speaking, every branch you send must work standalone,
+and each commit in that branch can only depend on work that
+comes earlier in that branch.
 
-> 
->> +
->> +int mmci_dmae_setup(struct mmci_host *host);
->> +void mmci_dmae_release(struct mmci_host *host);
->> +
->> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
->> index be3fab5..aa070a9 100644
->> --- a/drivers/mmc/host/mmci_qcom_dml.c
->> +++ b/drivers/mmc/host/mmci_qcom_dml.c
->> @@ -119,19 +119,22 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
->>   }
->>
->>   /* Initialize the dml hardware connected to SD Card controller */
->> -static void qcom_dma_setup(struct mmci_host *host)
->> +static int qcom_dma_setup(struct mmci_host *host)
->>   {
->>          u32 config;
->>          void __iomem *base;
->>          int consumer_id, producer_id;
->>          struct device_node *np = host->mmc->parent->of_node;
->>
->> +       if (mmci_dmae_setup(host))
->> +               return -EINVAL;
->> +
->>          consumer_id = of_get_dml_pipe_index(np, "tx");
->>          producer_id = of_get_dml_pipe_index(np, "rx");
->>
->>          if (producer_id < 0 || consumer_id < 0) {
->>                  host->variant->qcom_dml = false;
->> -               return;
->> +               return -EINVAL;
-> 
-> This relies on error handling to be done by mmci_dma_setup(), which as
-> stated, feels a bit wrong.
-> 
-> I would rather just call mmci_dmae_realease() here, before returning -EINVAL.
-
-OK
-
-> 
-> [...]
-> 
-> Otherwise, this looks good to me now.
-> 
-> Kind regards
-> Uffe
-> 
+       Arnd
