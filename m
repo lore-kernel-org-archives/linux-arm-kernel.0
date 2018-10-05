@@ -1,88 +1,58 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 5 Oct 2018 20:07:25 +0200
-Subject: [PATCH 19/36] dt-bindings: arm: Convert Atmel board/soc bindings
- to json-schema
-In-Reply-To: <20181005165848.3474-20-robh@kernel.org>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-20-robh@kernel.org>
-Message-ID: <20181005180725.GH5626@piout.net>
+From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
+Date: Fri, 5 Oct 2018 20:09:03 +0200
+Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
+In-Reply-To: <CAFqt6zYH4Aczu8AYke8AfGuMS70SJXCMn-n8X8C_Tz03gTjn8g@mail.gmail.com>
+References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
+ <20181003200003.GA9965@bombadil.infradead.org>
+ <20181003221444.GZ30658@n2100.armlinux.org.uk>
+ <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
+ <20181004123400.GC30658@n2100.armlinux.org.uk>
+ <CAFqt6zZPOM17QwmcWKF3F1gqkJm=2PxvuJ3naWuRXZGHc2HrEQ@mail.gmail.com>
+ <20181004181736.GB20842@bombadil.infradead.org>
+ <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
+ <CANiq72mkTP_m20vqei-cpN+ypQ_gU472qn5m68vb_4Nqj5afMQ@mail.gmail.com>
+ <CAFqt6zaFc_GenhfvsD0VPfepR-jjXypj+4CgNEuHMVq1WXV+8w@mail.gmail.com>
+ <CANiq72kVJn7985EET067Dgj+z0dwb0x2MTUnREMWKCVU6=WnJA@mail.gmail.com>
+ <CAFqt6zZ4sPjtb5BaDfwc5tZv+vMj6ao3NJZ_3quX9AH5pCMwJg@mail.gmail.com>
+ <CANiq72m9u1PL9X+dPNLxgkhvttj=4ijLyM2sFex=Kws7wswKzw@mail.gmail.com>
+ <CAFqt6zYH4Aczu8AYke8AfGuMS70SJXCMn-n8X8C_Tz03gTjn8g@mail.gmail.com>
+Message-ID: <CANiq72kRAZE9SyM4EkpaBZH03Ex0Z=4Pk2iOuc2jBDKTfKjHQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Oct 5, 2018 at 2:11 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+>
+> On Fri, Oct 5, 2018 at 4:19 PM Miguel Ojeda
+> <miguel.ojeda.sandonis@gmail.com> wrote:
+> >
+> >   1. Introduce the vmf_* API
+> >   2. Change all PF-users users to that (leaving all non-PF ones
+> > untouched!) -- if this is too big, you can split this patch into
+> > several patches, one per subsystem, etc.
+>
+> We are done with step 2. All the PF-users are converted to use
+> vmf_insert_page. ( Ref - linux-next-20181005)
 
-On 05/10/2018 11:58:31-0500, Rob Herring wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.yaml b/Documentation/devicetree/bindings/arm/atmel-at91.yaml
-> new file mode 100644
-> index 000000000000..f788315b94fa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.yaml
-> @@ -0,0 +1,132 @@
-> +# SPDX-License-Identifier: None
-> +%YAML 1.2
-> +---
-> +$id: http://devicetree.org/schemas/bindings/arm/atmel-at91.yaml#
-> +$schema: http://devicetree.org/meta-schemas/core.yaml#
-> +
-> +title: Atmel AT91 device tree bindings.
-> +
-> +maintainers:
-> +  - Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> +  - Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+They are not supposed to be "steps". You did it with 70+ commits (!!)
+over the course of several months. Why a tree wasn't created, stuff
+developed there, and when done, submitted it for review?
 
-Jean-Christophe has not been active for years, I'd mention Ludovic
-instead.
+> >
+> > Otherwise, if you want to pursue Matthew's idea:
+> >
+> >   4. Introduce the vm_insert_range (possibly leveraging
+> > vm_insert_page, or not; you have to see what is best).
+> >   5. Replace those callers that can take advantage of vm_insert_range
+> >   6. Remove vm_insert_page and replace callers with vm_insert_range
+> > (only if it is not worth to keep vm_insert_range, again justifying it
+> > *on its own merits*)
+>
+> Step 4 to 6, going to do it.  It is part of plan now :-)
+>
 
-> +description: |
-> +  Boards with a SoC of the Atmel AT91 or SMART family shall have the following
-> +
-> +properties:
-> +  $nodename:
-> +    const: '/'
-> +  compatible:
-> +    oneOf:
-> +      - items:
-> +          - const: atmel,at91rm9200
-> +      - items:
-> +          - enum:
-> +              - olimex,sam9-l9260
-> +          - enum:
-> +              - atmel,at91sam9260
-> +              - atmel,at91sam9261
-> +              - atmel,at91sam9263
-> +              - atmel,at91sam9g20
-> +              - atmel,at91sam9g45
-> +              - atmel,at91sam9n12
-> +              - atmel,at91sam9rl
-> +              - atmel,at91sam9xe
-> +          - const: atmel,at91sam9
-> +
-> +      - items:
-> +          - enum:
-> +              - atmel,at91sam9g15
-> +              - atmel,at91sam9g25
-> +              - atmel,at91sam9g35
-> +              - atmel,at91sam9x25
-> +              - atmel,at91sam9x35
-> +          - const: atmel,at91sam9x5
-> +          - const: atmel,at91sam9
-> +
-> +      - items:
-> +          - const: atmel,sama5d27
-> +          - const: atmel,sama5d2
-> +          - const: atmel,sama5
-> +
-> +      - description: Nattis v2 board with Natte v2 power board
-> +        items:
-> +          - const: axentia,nattis-2
-> +          - const: axentia,natte-2
-> +          - const: axentia,linea
+Fine, but you haven't answered to the other parts of my email: you
+don't explain why you choose one alternative over the others, you
+simply keep changing the approach.
 
-Shouldn't we have the board specific compatibles in a separate file to
-avoid mixing everything with the SoC compatibles?
-
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Cheers,
+Miguel
