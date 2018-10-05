@@ -1,38 +1,102 @@
 From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Fri,  5 Oct 2018 15:56:58 -0500
-Subject: [PATCHv4 0/2] iommu/arm-smmu: Add Stratix10 SMMU Support
-Message-ID: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
+Date: Fri,  5 Oct 2018 15:57:00 -0500
+Subject: [PATCHv4 2/2] iommu/arm-smmu: Get clock config from device tree
+In-Reply-To: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <1538773020-27784-3-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <thor.thayer@linux.intel.com>
 
-Add SMMU support for the Stratix10 SOCFPGA. This patch requires
-clock enables for the master TBUs and therefore has a dependency
-on patches currently being reviewed.
+Currently the clocks are specified in a structure as well as
+in the device tree. Since all the information about clocks can be
+pulled from the device tree, parse the device tree for the clock
+information if specified.
 
-This patchset is dependent on the patch series [1]
-
-v4  Address Vivek's comment.
-    Abandon dependency on [2] (no recent activity/reviews)
-    Implement device tree parsing of clock on top of [1].
-v3  Address comment from Robin and change dependency on device
-    tree bulk clock patches [2].
-v2  Change to dependency on [1].
-
-[1] [v16,0/5] iommu/arm-smmu: Add runtime pm/sleep support
+This patch is dependent upon the following patch series that
+adds clocks to the driver.
+"[v16,0/5] iommu/arm-smmu: Add runtime pm/sleep support"
 https://patchwork.kernel.org/cover/10581891/
 
-[2] [PATCH V6 0/4] clk: new APIs to handle all available clocks
-https://lkml.org/lkml/2018/8/31/97
+particularly this patch which adds the clocks:
+"[v16,1/5] iommu/arm-smmu: Add pm_runtime/sleep ops"
+https://patchwork.kernel.org/patch/10581899/
 
-Thor Thayer (2):
-  arm64: dts: stratix10: Add Stratix10 SMMU support
-  iommu/arm-smmu: Get clock config from device tree
+Request testing on different platforms for verification.
+This patch was tested on a Stratix10 SOCFPGA.
 
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 29 ++++++++++++++++++++++
- drivers/iommu/arm-smmu.c                          | 30 ++++++++++++++++++++---
- 2 files changed, 56 insertions(+), 3 deletions(-)
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+---
+v4  Change dependency on pending patch series that adds clocks.
+    Add code for parsing device tree for the clocks.
+v3  Change dependency on device tree bulk clock patches.
+v2  Add structure for SOCFPGA and add dependency on clock patch.
+---
+ drivers/iommu/arm-smmu.c | 30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index d315ca637097..3dd10663b09c 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -44,6 +44,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_clk.h>
+ #include <linux/of_device.h>
+ #include <linux/of_iommu.h>
+ #include <linux/pci.h>
+@@ -2139,6 +2140,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+ 	const struct arm_smmu_match_data *data;
+ 	struct device *dev = &pdev->dev;
+ 	bool legacy_binding;
++	const char **parent_names;
+ 
+ 	if (of_property_read_u32(dev->of_node, "#global-interrupts",
+ 				 &smmu->num_global_irqs)) {
+@@ -2149,9 +2151,25 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+ 	data = of_device_get_match_data(dev);
+ 	smmu->version = data->version;
+ 	smmu->model = data->model;
+-	smmu->num_clks = data->num_clks;
+-
+-	arm_smmu_fill_clk_data(smmu, data->clks);
++	smmu->num_clks = of_clk_get_parent_count(dev->of_node);
++	/* check to see if clocks were specified in DT */
++	if (smmu->num_clks) {
++		unsigned int i;
++
++		parent_names = kmalloc_array(smmu->num_clks,
++					     sizeof(*parent_names),
++					     GFP_KERNEL);
++		if (!parent_names)
++			goto fail_clk_name;
++
++		for (i = 0; i < smmu->num_clks; i++) {
++			if (of_property_read_string_index(dev->of_node,
++							  "clock-names", i,
++							  &parent_names[i]))
++				goto fail_clk_name;
++		}
++		arm_smmu_fill_clk_data(smmu, parent_names);
++	}
+ 
+ 	parse_driver_options(smmu);
+ 
+@@ -2171,6 +2189,12 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+ 		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
+ 
+ 	return 0;
++
++fail_clk_name:
++	kfree(parent_names);
++	/* clock-names required for clocks in devm_clk_bulk_get() */
++	dev_err(dev, "Error: clock-name required in device tree\n");
++	return -ENOMEM;
+ }
+ 
+ static void arm_smmu_bus_init(void)
 -- 
 2.7.4
