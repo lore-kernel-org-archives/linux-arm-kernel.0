@@ -1,87 +1,91 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Fri, 5 Oct 2018 09:20:09 -0600
-Subject: [RFC PATCH 0/2] ACPI / PPTT: ids for caches
-In-Reply-To: <20181005150235.13846-1-james.morse@arm.com>
-References: <20181005150235.13846-1-james.morse@arm.com>
-Message-ID: <da8a4ae0-b63c-d27f-1f54-af19f058881c@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 5 Oct 2018 17:24:03 +0200
+Subject: [RFC PATCH 1/9] kernel: add support for patchable function
+ pointers
+In-Reply-To: <9E0E08C8-0DFC-4E50-A4FA-73208835EF9E@amacapital.net>
+References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+ <20181005081333.15018-2-ard.biesheuvel@linaro.org>
+ <20181005141433.GS19272@hirez.programming.kicks-ass.net>
+ <9E0E08C8-0DFC-4E50-A4FA-73208835EF9E@amacapital.net>
+Message-ID: <CAKv+Gu9z503ZJXcsG+9Ys240BZiB-+GB=kNY4VGWpjvdzN4JtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/5/2018 9:02 AM, James Morse wrote:
-> Hi guys,
-> 
-> To get resctrl working on arm64, we need to generate 'id's for caches.
-> This is this value that shows up in, e.g.:
-> | /sys/devices/system/cpu/cpu0/cache/index3/id
-> 
-> This value needs to be unique for each level of cache, but doesn't
-> need to be contiguous. (there may be gaps, it may not start at 0).
-> Details in Documentation/x86/intel_rdt_ui.txt::Cache IDs
-> 
-> resctrl receives these values back via its schemata file. e.g.:
-> | echo "L3:0=fff;1=fff" > /sys/fs/resctrl/p1/schemata
-> Where 0 and 1 are the ids of two caches in the system.
-> 
-> These values become ABI, and are likely to be baked into shell scripts.
-> We want a value that is the same over reboots, and should be the same
-> on identical hardware, even if the PPTT is generated in a different
-> order. The hardware doesn't give us any indication of which caches are
-> shared, so this information must come from firmware tables.
-> 
-> This series generates an id from the PPTT topology, based on the lowest
-> MPIDR of the cpus that share a cache.
-> 
-> The remaining problems with this approach are:
->   * the 32bit ID field is full of MPIDR.Aff{0-3}. We don't have space to
->     hide 'i/d/unified', so can only generate ids for unified caches. If we
->     ever get an Aff4 (plenty of RES0 space in there) we can no longer generate
->     an id. Having all these bits accounted for in the initial version doesn't
->     feel like a good ABI choice.
-> 
-> * Existing software is going to assume caches are numbered 0,1,2. This was
->    documented as not guaranteed, and its likely never going to be the case
->    if we generate ids like this.
-> 
-> * The table walk is recursive.
-> 
-> 
-> Fixes for the first two require extra-code to compact the ID range, which would
-> require us generating all the IDs up front, not from hotplug callbacks as has
-> to happen today.
-> 
-> Alternatively, we could try and change the abi to provide a u64 as the
-> cache id. The size isn't documented, and for resctrl userspace can treat
-> it as a string.
-> 
-> Better ideas welcome!
+On 5 October 2018 at 17:08, Andy Lutomirski <luto@amacapital.net> wrote:
+>
+>
+>> On Oct 5, 2018, at 7:14 AM, Peter Zijlstra <peterz@infradead.org> wrote:
+>>
+>>> On Fri, Oct 05, 2018 at 10:13:25AM +0200, Ard Biesheuvel wrote:
+>>> diff --git a/include/linux/ffp.h b/include/linux/ffp.h
+>>> new file mode 100644
+>>> index 000000000000..8fc3b4c9b38f
+>>> --- /dev/null
+>>> +++ b/include/linux/ffp.h
+>>> @@ -0,0 +1,43 @@
+>>> +/* SPDX-License-Identifier: GPL-2.0 */
+>>> +
+>>> +#ifndef __LINUX_FFP_H
+>>> +#define __LINUX_FFP_H
+>>> +
+>>> +#include <linux/types.h>
+>>> +#include <linux/compiler.h>
+>>> +
+>>> +#ifdef CONFIG_HAVE_ARCH_FFP
+>>> +#include <asm/ffp.h>
+>>> +#else
+>>> +
+>>> +struct ffp {
+>>> +    void    (**fn)(void);
+>>> +    void    (*default_fn)(void);
+>>> +};
+>>> +
+>>> +#define DECLARE_FFP(_fn, _def)                        \
+>>> +    extern typeof(_def) *_fn;                    \
+>>> +    extern struct ffp const __ffp_ ## _fn
+>>> +
+>>> +#define DEFINE_FFP(_fn, _def)                        \
+>>> +    typeof(_def) *_fn = &_def;                    \
+>>> +    struct ffp const __ffp_ ## _fn                    \
+>>> +        = { (void(**)(void))&_fn, (void(*)(void))&_def };    \
+>>> +    EXPORT_SYMBOL(__ffp_ ## _fn)
+>>> +
+>>> +static inline void ffp_set_target(const struct ffp *m, void *new_fn)
+>>> +{
+>>> +    WRITE_ONCE(*m->fn, new_fn);
+>>> +}
+>>> +
+>>> +static inline void ffp_reset_target(const struct ffp *m)
+>>> +{
+>>> +    WRITE_ONCE(*m->fn, m->default_fn);
+>>> +}
+>>> +
+>>> +#endif
+>>> +
+>>> +#define SET_FFP(_fn, _new)    ffp_set_target(&__ffp_ ## _fn, _new)
+>>> +#define RESET_FFP(_fn)        ffp_reset_target(&__ffp_ ## _fn)
+>>> +
+>>> +#endif
+>>
+>> I don't understand this interface. There is no wrapper for the call
+>> site, so how are we going to patch all call-sites when you update the
+>> target?
+>
+> I?m also confused.
+>
+> Anyway, we have patchable functions on x86. They?re called PVOPs, and they?re way overcomplicated.
+>
+> I?ve proposed a better way that should generate better code, be more portable, and be more maintainable.  It goes like this.
+>
+> To call the function, you literally just call  the default implementation.  It *might* be necessary to call a nonexistent wrapper to avoid annoying optimizations. At build time, the kernel is built with relocations, so the object files contain relocation entries for the call. We collect these entries into a table. If we?re using the ?nonexistent wrapper? approach, we can link in a .S or linker script to alias them to the default implementation.
+>
+> To patch them, we just patch them. It can?t necessarily be done concurrently because nothing forces the right alignment. But we can do it at boot time and module load time. (Maybe we can patch at runtime on architectures with appropriate instruction alignment.  Or we ask gcc for an extension to align calls to a function.)
+>
+> Most of the machinery already exists: this is roughly how the module loader resolves calls outside of a module.
 
-I'm sorry, I'm not familiar with this resctrl, and therefore I don't 
-quite feel like I have a handle on what we need out of the ids file (and 
-the Documentation you pointed to doesn't seem to clarify it for me).
+Yeah nothing is ever simple on x86 :-(
 
-Lets assume we have a trivial 4 core system.  Each core has a private 
-L1i and L1d cache.  Cores 0/1 and 2/3 share a L2.  Cores 0-3 share L3.
-
-If we are assigning ids in the range 1-N, what might we expect the id of 
-each cache to be?
-
-Is this sane (each unique cache instance has a unique id), or have I 
-misunderstood?
-CPU0 L1i - 1
-CPU0 L1d - 2
-CPU1 L1i - 3
-CPU1 L1d - 4
-CPU2 L1i - 5
-CPU2 L1d - 6
-CPU3 L1i - 7
-CPU3 L1d - 8
-CPU0/1 L2 - 9
-CPU2/3 L2 - 10
-        L3 - 11
-
--- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+So are you saying the approach i use in patch #2 (which would
+translate to emitting a jmpq instruction pointing to the default
+implementation, and patching it at runtime to point elsewhere) would
+not fly on x86?
