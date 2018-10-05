@@ -1,80 +1,32 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 5 Oct 2018 12:31:45 -0500
-Subject: [PATCH 00/12] error handling and pciehp maintenance
-In-Reply-To: <20181004221137.GB21834@localhost.localdomain>
-References: <20180918235848.26694-1-keith.busch@intel.com>
- <20181004214015.GK120535@bhelgaas-glaptop.roam.corp.google.com>
- <20181004221137.GB21834@localhost.localdomain>
-Message-ID: <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Fri, 5 Oct 2018 19:37:44 +0200
+Subject: [RFC PATCH 1/9] kernel: add support for patchable function
+ pointers
+In-Reply-To: <CALCETrVMBULVP9qEQDVuisxAMzdheM1qQ97AZFs-xcO0eaXiiA@mail.gmail.com>
+References: <20181005081333.15018-1-ard.biesheuvel@linaro.org>
+ <20181005081333.15018-2-ard.biesheuvel@linaro.org>
+ <20181005141433.GS19272@hirez.programming.kicks-ass.net>
+ <9E0E08C8-0DFC-4E50-A4FA-73208835EF9E@amacapital.net>
+ <CAKv+Gu9z503ZJXcsG+9Ys240BZiB-+GB=kNY4VGWpjvdzN4JtA@mail.gmail.com>
+ <CALCETrWaewXsdJsf3SocgZ0ggnvZk86L+5-LWPRbjdnG2mB7jw@mail.gmail.com>
+ <CAKv+Gu-oHBtgGbWXJu6+z4+BNhBZyY5VvF_v6cJJUGk_5YX1eQ@mail.gmail.com>
+ <CALCETrU=fm+ZG4WZJfG-5GwL7kv5_GS1aZYu=L42d5BuSbhJDQ@mail.gmail.com>
+ <CAKv+Gu8eHPEsUbkhN=61z9FvhdCo2e3VOdemp4g0bzdO1EJFYQ@mail.gmail.com>
+ <CALCETrVMBULVP9qEQDVuisxAMzdheM1qQ97AZFs-xcO0eaXiiA@mail.gmail.com>
+Message-ID: <CAHmME9pgJ_2GGDUVsbQXcNRfh3yACqFG+5uemFRMZkb8LdH95g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc arm64 folks, LKML: This conversation is about this patch:
+On Fri, Oct 5, 2018 at 7:29 PM Andy Lutomirski <luto@kernel.org> wrote:
+> (None of this is to say that I disagree with Jason, though -- I'm not
+> entirely convinced that this makes sense for Zinc.  But maybe it can
+> be done in a way that makes everyone happy.)
 
-  https://lore.kernel.org/linux-pci/20180918235848.26694-3-keith.busch at intel.com
+Zinc indeed will continue to push in the simpler and more minimal
+direction. Down the line I'm open to trying and benching a few
+different ways of going about it with dynamic patching -- something
+that will be pretty easy to experiment with given the lean structure
+of Zinc -- but for the initial merge I intend to do it the way it is,
+which is super fast and pretty straightforward to follow.
 
-which fixes some PCIe AER error injection bugs, but also makes the error
-injector dependent on DYNAMIC_FTRACE_WITH_REGS, which not all arches
-support.  Note that this question is only about the error *injection*
-module used for testing.  It doesn't affect AER support itself.]
-
-On Thu, Oct 04, 2018 at 04:11:37PM -0600, Keith Busch wrote:
-> On Thu, Oct 04, 2018 at 04:40:15PM -0500, Bjorn Helgaas wrote:
-> > On Tue, Sep 18, 2018 at 05:58:36PM -0600, Keith Busch wrote:
-> > > I ran into a lot of trouble testing error handling, and this series is
-> > > just trying to simplify some things. The first 4 fix up aer_inject, and
-> > > the rest are cleanup to make better use of kernel APIs.
-> > > 
-> > > Keith Busch (12):
-> > >   PCI: Set PCI bus accessors to noinline
-> > >   PCI/AER: Covertly inject errors
-> > >   PCI/AER: Reuse existing service device lookup
-> > >   PCI/AER: Abstract AER interrupt handling
-> > >   PCI/AER: Remove dead code
-> > >   PCI/AER: Remove error source from aer struct
-> > >   PCI/AER: Use kfifo for tracking events
-> > >   PCI/AER: Use kfifo helper inserting locked elements
-> > >   PCI/AER: Don't read upstream ports below fatal errors
-> > >   PCI/AER: Use threaded IRQ for bottom half
-> > >   PCI/AER: Use managed resource allocations
-> > >   PCI/pciehp: Use device managed allocations
-> > > 
-> > >  drivers/pci/access.c              |   4 +-
-> > >  drivers/pci/hotplug/pciehp_core.c |  14 +-
-> > >  drivers/pci/hotplug/pciehp_hpc.c  |  48 ++----
-> > >  drivers/pci/pcie/Kconfig          |   2 +-
-> > >  drivers/pci/pcie/aer.c            | 219 ++++++---------------------
-> > >  drivers/pci/pcie/aer_inject.c     | 306 ++++++++++++++++++++------------------
-> > >  drivers/pci/pcie/portdrv.h        |   4 -
-> > >  drivers/pci/pcie/portdrv_core.c   |   1 +
-> > >  8 files changed, 227 insertions(+), 371 deletions(-)
-> > 
-> > Thanks a lot for doing this!  I applied these to pci/hotplug for
-> > v4.20, except for "PCI/AER: Don't read upstream ports below fatal
-> > errors", which seems to be already there via another posting, and
-> > "PCI/pciehp: Use device managed allocations", which needs a few
-> > tweaks.
-> 
-> Sounds good, and thanks for applying!
-> 
-> In case this went unnoticed, patch 2's aer_inject using ftrace hooks
-> to pci config accessors is really cool and fixes several kernel crashes
-> I encountered, but it may not work on every architecture. I'm not sure
-> how widely aer_inject is used, so maybe there are no concerns with the
-> DYNAMIC_FTRACE_WITH_REGS dependency, but I just want to reemphasize that
-> dependency in case there are valid objections.
-
-Oh, indeed, I hadn't noticed this arch dependency.  AFAICT, the new
-DYNAMIC_FTRACE_WITH_REGS dependency means aer_inject will work only
-on these arches:
-
-  arm		# if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-  powerpc	# if PPC64 && CPU_LITTLE_ENDIAN
-  riscv		# ARCH_RV64I only
-  s390
-  x86
-
-Notably missing is arm64, which has DYNAMIC_FTRACE but not
-DYNAMIC_FTRACE_WITH_REGS.
-
-Bjorn
+Jason
