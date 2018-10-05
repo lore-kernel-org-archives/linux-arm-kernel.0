@@ -1,90 +1,79 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Fri,  5 Oct 2018 09:47:40 +0100
-Subject: [PATCH v5 03/17] arm64/kvm: hide ptrauth from guests
+Date: Fri,  5 Oct 2018 09:47:43 +0100
+Subject: [PATCH v5 06/17] asm-generic: mm_hooks: allow hooks to be overridden
+ individually
 In-Reply-To: <20181005084754.20950-1-kristina.martsenko@arm.com>
 References: <20181005084754.20950-1-kristina.martsenko@arm.com>
-Message-ID: <20181005084754.20950-4-kristina.martsenko@arm.com>
+Message-ID: <20181005084754.20950-7-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Rutland <mark.rutland@arm.com>
 
-In subsequent patches we're going to expose ptrauth to the host kernel
-and userspace, but things are a bit trickier for guest kernels. For the
-time being, let's hide ptrauth from KVM guests.
+Currently, an architecture must either implement all of the mm hooks
+itself, or use all of those provided by the asm-generic implementation.
+When an architecture only needs to override a single hook, it must copy
+the stub implementations from the asm-generic version.
 
-Regardless of how well-behaved the guest kernel is, guest userspace
-could attempt to use ptrauth instructions, triggering a trap to EL2,
-resulting in noise from kvm_handle_unknown_ec(). So let's write up a
-handler for the PAC trap, which silently injects an UNDEF into the
-guest, as if the feature were really missing.
+To avoid this repetition, allow each hook to be overridden indiviually,
+by placing each under an #ifndef block. As architectures providing their
+own hooks can't include this file today, this shouldn't adversely affect
+any existing hooks.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-[kristina: fix comment]
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arch at vger.kernel.org
 ---
- arch/arm64/kvm/handle_exit.c | 18 ++++++++++++++++++
- arch/arm64/kvm/sys_regs.c    |  8 ++++++++
- 2 files changed, 26 insertions(+)
+ include/asm-generic/mm_hooks.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index e5e741bfffe1..53759b3c165d 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -173,6 +173,23 @@ static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return 1;
+diff --git a/include/asm-generic/mm_hooks.h b/include/asm-generic/mm_hooks.h
+index 8ac4e68a12f0..2b3ee15d3702 100644
+--- a/include/asm-generic/mm_hooks.h
++++ b/include/asm-generic/mm_hooks.h
+@@ -7,31 +7,42 @@
+ #ifndef _ASM_GENERIC_MM_HOOKS_H
+ #define _ASM_GENERIC_MM_HOOKS_H
+ 
++#ifndef arch_dup_mmap
+ static inline int arch_dup_mmap(struct mm_struct *oldmm,
+ 				struct mm_struct *mm)
+ {
+ 	return 0;
  }
++#endif
  
-+/*
-+ * Guest usage of a ptrauth instruction (which the guest EL1 did not turn into
-+ * a NOP).
-+ */
-+static int kvm_handle_ptrauth(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	/*
-+	 * We don't currently support ptrauth in a guest, and we mask the ID
-+	 * registers to prevent well-behaved guests from trying to make use of
-+	 * it.
-+	 *
-+	 * Inject an UNDEF, as if the feature really isn't present.
-+	 */
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
++#ifndef arch_exit_mmap
+ static inline void arch_exit_mmap(struct mm_struct *mm)
+ {
+ }
++#endif
+ 
++#ifndef arch_unmap
+ static inline void arch_unmap(struct mm_struct *mm,
+ 			struct vm_area_struct *vma,
+ 			unsigned long start, unsigned long end)
+ {
+ }
++#endif
+ 
++#ifndef arch_bprm_mm_init
+ static inline void arch_bprm_mm_init(struct mm_struct *mm,
+ 				     struct vm_area_struct *vma)
+ {
+ }
++#endif
+ 
++#ifndef arch_vma_access_permitted
+ static inline bool arch_vma_access_permitted(struct vm_area_struct *vma,
+ 		bool write, bool execute, bool foreign)
+ {
+ 	/* by default, allow everything */
+ 	return true;
+ }
++#endif
 +
- static exit_handle_fn arm_exit_handlers[] = {
- 	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
- 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
-@@ -195,6 +212,7 @@ static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_FP_ASIMD]	= handle_no_fpsimd,
-+	[ESR_ELx_EC_PAC]	= kvm_handle_ptrauth,
- };
- 
- static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 22fbbdbece3c..1ca592d38c3c 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1040,6 +1040,14 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
- 			kvm_debug("SVE unsupported for guests, suppressing\n");
- 
- 		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-+	} else if (id == SYS_ID_AA64ISAR1_EL1) {
-+		const u64 ptrauth_mask = (0xfUL << ID_AA64ISAR1_APA_SHIFT) |
-+					 (0xfUL << ID_AA64ISAR1_API_SHIFT) |
-+					 (0xfUL << ID_AA64ISAR1_GPA_SHIFT) |
-+					 (0xfUL << ID_AA64ISAR1_GPI_SHIFT);
-+		if (val & ptrauth_mask)
-+			kvm_debug("ptrauth unsupported for guests, suppressing\n");
-+		val &= ~ptrauth_mask;
- 	} else if (id == SYS_ID_AA64MMFR1_EL1) {
- 		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
- 			kvm_debug("LORegions unsupported for guests, suppressing\n");
+ #endif	/* _ASM_GENERIC_MM_HOOKS_H */
 -- 
 2.11.0
