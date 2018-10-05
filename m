@@ -1,68 +1,37 @@
 From: david.hernandezsanchez@st.com (David HERNANDEZ SANCHEZ)
-Date: Fri, 5 Oct 2018 10:08:46 +0000
-Subject: [PATCH 3/3] ARM: dts: stm32: add thermal sensor support on STM32MP157c
-In-Reply-To: <1538734081-26585-1-git-send-email-david.hernandezsanchez@st.com>
-References: <1538734081-26585-1-git-send-email-david.hernandezsanchez@st.com>
-Message-ID: <1538734081-26585-4-git-send-email-david.hernandezsanchez@st.com>
+Date: Fri, 5 Oct 2018 10:08:44 +0000
+Subject: [PATCH 0/3] Introduce STM32 thermal driver
+Message-ID: <1538734081-26585-1-git-send-email-david.hernandezsanchez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add configuration on DT for thermal sensor driver
+This series adds support for STMicroelectronics Digital Temperature
+Sensor (DTS), used on some STM32 SoCs.
 
-Signed-off-by: David Hernandez Sanchez <david.hernandezsanchez@st.com>
+Driver is based on thermal sysfs and it has been tested OK on a 4.19-rc5 linux
+release.
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 661be94..e90b9f6 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -84,6 +84,31 @@
- 		};
- 	};
+Please feel free to contact me back for further information
+and to discuss about this implementation.
 
-+	thermal-zones {
-+		cpu_thermal: cpu-thermal {
-+			polling-delay-passive = <0>;
-+			polling-delay = <0>;
-+			thermal-sensors = <&dts>;
-+
-+			trips {
-+				cpu_alert1: cpu-alert1 {
-+					temperature = <85000>;
-+					hysteresis = <0>;
-+					type = "passive";
-+				};
-+
-+				cpu-crit {
-+					temperature = <120000>;
-+					hysteresis = <0>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+			};
-+		};
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -908,6 +933,16 @@
- 			status = "disabled";
- 		};
+Br,
+David HERNANDEZ SANCHEZ
 
-+		dts: thermal at 50028000 {
-+			compatible = "st,stm32-thermal";
-+			reg = <0x50028000 0x100>;
-+			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&rcc TMPSENS>;
-+			clock-names = "pclk";
-+			#thermal-sensor-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		cryp1: cryp at 54001000 {
- 			compatible = "st,stm32mp1-cryp";
- 			reg = <0x54001000 0x400>;
+David Hernandez Sanchez (3):
+  dt-bindings: stm32-thermal: add binding documentation
+  thermal: add stm32 thermal driver
+  ARM: dts: stm32: add thermal sensor support on STM32MP157c
+
+ .../devicetree/bindings/thermal/stm32-thermal.txt  |  61 ++
+ arch/arm/boot/dts/stm32mp157c.dtsi                 |  35 +
+ drivers/thermal/Kconfig                            |   2 +-
+ drivers/thermal/Makefile                           |   2 +-
+ drivers/thermal/st/Kconfig                         |  14 +
+ drivers/thermal/st/Makefile                        |   1 +
+ drivers/thermal/st/stm_thermal.c                   | 760 +++++++++++++++++++++
+ 7 files changed, 873 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/stm32-thermal.txt
+ create mode 100644 drivers/thermal/st/stm_thermal.c
+
 --
 2.7.4
