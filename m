@@ -1,85 +1,107 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 5 Oct 2018 21:30:48 +0800
-Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.20
-In-Reply-To: <CAK8P3a0PgysCBZSr8UqtTU6RGvo4WTzvRwhFfu4jYbCa_UUBnA@mail.gmail.com>
-References: <20181001072003.16238-1-shawnguo@kernel.org>
- <20181001072003.16238-5-shawnguo@kernel.org>
- <CAK8P3a1wMGK1TrquSw_g0TdugsET2o3MRKnx+dV96ZgY5yDqgw@mail.gmail.com>
- <CAOMZO5D=6pBmN_qz+wEHuzSDn6_UrB05yFAT6BUrSYzi4hMHuQ@mail.gmail.com>
- <CAK8P3a0PgysCBZSr8UqtTU6RGvo4WTzvRwhFfu4jYbCa_UUBnA@mail.gmail.com>
-Message-ID: <20181005133047.GC3587@dragon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 5 Oct 2018 15:54:08 +0200
+Subject: [PATCH V5 01/24] mmc: mmci: Change struct members from bool to u8
+In-Reply-To: <1538745782-27446-2-git-send-email-ludovic.Barre@st.com>
+References: <1538745782-27446-1-git-send-email-ludovic.Barre@st.com>
+ <1538745782-27446-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFrohvfQ7NhaX9J4ntJO6rPXg=p5GDkEq3u1_9NV0cM1mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 05:38:11PM +0200, Arnd Bergmann wrote:
-> On Wed, Oct 3, 2018 at 4:15 PM Fabio Estevam <festevam@gmail.com> wrote:
-> >
-> > Hi Arnd,
-> >
-> > On Mon, Oct 1, 2018 at 1:26 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > > Please add explanations for why we don't set those
-> > > any more, and keep them separate from patches that
-> > > just move options around.
-> >
-> > I did as suggested and sent a v2.
-> 
-> Looks good, thanks for respinning these.
+On 5 October 2018 at 15:22, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> Recent versions of checkpatch have a new warning based on a documented
+> preference of Linus to not use bool in structures due to wasted space and
+> the size of bool is implementation dependent.  For more information, see
+> the email thread at https://lkml.org/lkml/2017/11/21/384
+>
+> fix checkpatch --strict issues:
+> -CHECK: Avoid using bool structure members because of possible alignment
+>  issues - see: https://lkml.org/lkml/2017/11/21/384
+> -WARNING: Avoid using bool as bitfield. Prefer bool bitfields as
+>  unsigned int or u<8|16|32>
+>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 
-Arnd,
+Applied for next, thanks!
 
-I just updated the pull request with v2 patches from Fabio.  Please pull
-again, thanks.
+Kind regards
+Uffe
 
-Shawn
-
-
-The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
-
-  Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.20
-
-for you to fetch changes up to 35d3cbe84544da74e39e1cec01374092467e3119:
-
-  ARM: imx_v6_v7_defconfig: Select CONFIG_TMPFS_POSIX_ACL (2018-10-05 21:19:22 +0800)
-
-----------------------------------------------------------------
-i.MX defconfig update for 4.20:
- - A series from Fabio to synchronize i.MX defconfig files with
-   savedefconfig.
- - Enable CONFIG_TMPFS_POSIX_ACL to fix ACL applying failures seen with
-   starting weston from sddm as unprivileged user.
- - Enable MC13783/MC13892 ADC driver by default.
- - Select CONFIG_ARM_CPUIDLE by default to support generic ARM cpuidle
-   driver which is useful for i.MX platforms like i.MX7S/D.
- - Built in usbnet drivers to support NFS mount via USB Ethernet dongle
-   on SoCs which have no native Ethernet controller, such as i.MX6 SLL
-   and i.MX7 ULP.
-
-----------------------------------------------------------------
-Anson Huang (1):
-      ARM: imx_v6_v7_defconfig: select CONFIG_ARM_CPUIDLE by default
-
-Fabio Estevam (8):
-      ARM: imx_v6_v7_defconfig: Select CONFIG_SENSORS_MC13783_ADC
-      ARM: imx_v6_v7_defconfig: Re-sync defconfig
-      ARM: imx_v6_v7_defconfig: Remove unneeded options
-      ARM: mxs_defconfig: Re-sync defconfig
-      ARM: mxs_defconfig: Remove unneeded options
-      ARM: imx_v4_v5_defconfig: Re-sync defconfig
-      ARM: imx_v4_v5_defconfig: Remove unneeded options
-      ARM: imx_v6_v7_defconfig: Select CONFIG_TMPFS_POSIX_ACL
-
-Leonard Crestez (1):
-      ARM: imx_v6_v7_defconfig: Make usbnet drivers builtin for boot
-
-Robin Gong (1):
-      ARM: imx_v6_v7_defconfig: add CONFIG_FW_LOADER_USER_HELPER
-
- arch/arm/configs/imx_v4_v5_defconfig | 18 +++++++---------
- arch/arm/configs/imx_v6_v7_defconfig | 41 ++++++++++++++++++++----------------
- arch/arm/configs/mxs_defconfig       | 19 +++++++----------
- 3 files changed, 39 insertions(+), 39 deletions(-)
+> ---
+>  drivers/mmc/host/mmci.h | 32 ++++++++++++++++----------------
+>  1 file changed, 16 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> index 21aaf9a..01e6c6b 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -248,24 +248,24 @@ struct variant_data {
+>         unsigned int            data_cmd_enable;
+>         unsigned int            datactrl_mask_ddrmode;
+>         unsigned int            datactrl_mask_sdio;
+> -       bool                    st_sdio;
+> -       bool                    st_clkdiv;
+> -       bool                    blksz_datactrl16;
+> -       bool                    blksz_datactrl4;
+> +       u8                      st_sdio:1;
+> +       u8                      st_clkdiv:1;
+> +       u8                      blksz_datactrl16:1;
+> +       u8                      blksz_datactrl4:1;
+>         u32                     pwrreg_powerup;
+>         u32                     f_max;
+> -       bool                    signal_direction;
+> -       bool                    pwrreg_clkgate;
+> -       bool                    busy_detect;
+> +       u8                      signal_direction:1;
+> +       u8                      pwrreg_clkgate:1;
+> +       u8                      busy_detect:1;
+>         u32                     busy_dpsm_flag;
+>         u32                     busy_detect_flag;
+>         u32                     busy_detect_mask;
+> -       bool                    pwrreg_nopower;
+> -       bool                    explicit_mclk_control;
+> -       bool                    qcom_fifo;
+> -       bool                    qcom_dml;
+> -       bool                    reversed_irq_handling;
+> -       bool                    mmcimask1;
+> +       u8                      pwrreg_nopower:1;
+> +       u8                      explicit_mclk_control:1;
+> +       u8                      qcom_fifo:1;
+> +       u8                      qcom_dml:1;
+> +       u8                      reversed_irq_handling:1;
+> +       u8                      mmcimask1:1;
+>         u32                     start_err;
+>         u32                     opendrain;
+>         void (*init)(struct mmci_host *host);
+> @@ -290,7 +290,7 @@ struct mmci_host {
+>         struct mmc_data         *data;
+>         struct mmc_host         *mmc;
+>         struct clk              *clk;
+> -       bool                    singleirq;
+> +       u8                      singleirq:1;
+>
+>         spinlock_t              lock;
+>
+> @@ -304,7 +304,7 @@ struct mmci_host {
+>         u32                     datactrl_reg;
+>         u32                     busy_status;
+>         u32                     mask1_reg;
+> -       bool                    vqmmc_enabled;
+> +       u8                      vqmmc_enabled:1;
+>         struct mmci_platform_data *plat;
+>         struct mmci_host_ops    *ops;
+>         struct variant_data     *variant;
+> @@ -330,7 +330,7 @@ struct mmci_host {
+>         struct dma_chan         *dma_tx_channel;
+>         struct dma_async_tx_descriptor  *dma_desc_current;
+>         struct mmci_host_next   next_data;
+> -       bool                    dma_in_progress;
+> +       u8                      dma_in_progress:1;
+>
+>  #define dma_inprogress(host)   ((host)->dma_in_progress)
+>  #endif
+> --
+> 2.7.4
+>
