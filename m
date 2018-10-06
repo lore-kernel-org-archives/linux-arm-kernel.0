@@ -1,32 +1,30 @@
-From: naresh.kamboju@linaro.org (Naresh Kamboju)
-Date: Sat, 6 Oct 2018 00:50:05 -0700
-Subject: [PATCH] hugetlb: fix ARM 3level page tables
-In-Reply-To: <20181005161722.904274-1-arnd@arndb.de>
-References: <20181005161722.904274-1-arnd@arndb.de>
-Message-ID: <CA+G9fYs-z-CQ+HgFcosYsNphAmU2rG56PTFqO48T-pZ_63Ujuw@mail.gmail.com>
+From: zhangshaokun@hisilicon.com (Shaokun Zhang)
+Date: Sat, 6 Oct 2018 15:57:38 +0800
+Subject: [PATCH] arm64: perf: Fix typos in comment
+Message-ID: <1538812658-9290-1-git-send-email-zhangshaokun@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Fix up one typos: Onl -> Only
 
-On Fri, 5 Oct 2018 at 09:17, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> The check for __HAVE_ARCH_HUGE_PTEP_GET comes before the definition,
-> leading to an extraneous definition of huge_ptep_get:
->
-> In file included from arch/arm/include/asm/hugetlb.h:28,
->                  from include/linux/hugetlb.h:456,
->                  from arch/arm/kvm/../../../virt/kvm/arm/mmu.c:22:
-> arch/arm/include/asm/hugetlb-3level.h:33:21: error: redefinition of 'huge_ptep_get'
->  static inline pte_t huge_ptep_get(pte_t *ptep)
->
-> Change the header file inclusions to be in the correct order for
-> this to work.
->
-> Fixes: bb1d18ffc7ae ("hugetlb: introduce generic version of huge_ptep_get")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com> 
+Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+---
+ arch/arm64/kernel/perf_event.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I have noticed this build error on linux next tree for arm32 build.
-Thanks for the fix.
-
-- Naresh
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 8e38d52..316e74b 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1003,7 +1003,7 @@ static int __armv8_pmuv3_map_event(struct perf_event *event,
+ 	if (armv8pmu_event_is_64bit(event))
+ 		event->hw.flags |= ARMPMU_EVT_64BIT;
+ 
+-	/* Onl expose micro/arch events supported by this PMU */
++	/* Only expose micro/arch events supported by this PMU */
+ 	if ((hw_event_id > 0) && (hw_event_id < ARMV8_PMUV3_MAX_COMMON_EVENTS)
+ 	    && test_bit(hw_event_id, armpmu->pmceid_bitmap)) {
+ 		return hw_event_id;
+-- 
+2.7.4
