@@ -1,82 +1,32 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Sat, 6 Oct 2018 13:08:58 +0530
-Subject: [PATCH 4/4] firmware: ti_sci: Add helper apis to mange resources
-In-Reply-To: <20181005201453.g3p2jhpigcvijpce@kahuna>
-References: <20181005143006.18284-1-lokeshvutla@ti.com>
- <20181005143006.18284-5-lokeshvutla@ti.com>
- <20181005201453.g3p2jhpigcvijpce@kahuna>
-Message-ID: <176f77cf-d295-0f37-ea9d-26f76f6d79c7@ti.com>
+From: naresh.kamboju@linaro.org (Naresh Kamboju)
+Date: Sat, 6 Oct 2018 00:50:05 -0700
+Subject: [PATCH] hugetlb: fix ARM 3level page tables
+In-Reply-To: <20181005161722.904274-1-arnd@arndb.de>
+References: <20181005161722.904274-1-arnd@arndb.de>
+Message-ID: <CA+G9fYs-z-CQ+HgFcosYsNphAmU2rG56PTFqO48T-pZ_63Ujuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd,
 
+On Fri, 5 Oct 2018 at 09:17, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> The check for __HAVE_ARCH_HUGE_PTEP_GET comes before the definition,
+> leading to an extraneous definition of huge_ptep_get:
+>
+> In file included from arch/arm/include/asm/hugetlb.h:28,
+>                  from include/linux/hugetlb.h:456,
+>                  from arch/arm/kvm/../../../virt/kvm/arm/mmu.c:22:
+> arch/arm/include/asm/hugetlb-3level.h:33:21: error: redefinition of 'huge_ptep_get'
+>  static inline pte_t huge_ptep_get(pte_t *ptep)
+>
+> Change the header file inclusions to be in the correct order for
+> this to work.
+>
+> Fixes: bb1d18ffc7ae ("hugetlb: introduce generic version of huge_ptep_get")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On 10/6/2018 1:44 AM, Nishanth Menon wrote:
-> On 14:30-20181005, Lokesh Vutla wrote:
->> +struct ti_sci_resource *
->> +devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
->> +			    struct device *dev, char *of_prop)
->> +{
->> +	u32 resource_type, resource_subtype;
->> +	struct ti_sci_resource *res;
->> +	int sets, i, ret;
->> +
->> +	res = devm_kzalloc(dev, sizeof(*res), GFP_KERNEL);
->> +	if (!res)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	sets = of_property_count_elems_of_size(dev_of_node(dev), of_prop,
->> +					       sizeof(u32));
->> +	if (sets < 0) {
->> +		dev_err(dev, "%s resource type ids not available\n", of_prop);
->> +		return ERR_PTR(sets);
->> +	}
->> +
->> +	res->sets = sets / 2;
->> +
->> +	res->desc = devm_kcalloc(dev, res->sets, sizeof(*res->desc),
->> +				 GFP_KERNEL);
->> +	if (!res->desc)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	for (i = 0; i < res->sets; i++) {
->> +		ret = of_property_read_u32_index(dev_of_node(dev), of_prop,
->> +						 i * 2, &resource_type);
->> +		if (ret)
->> +			return ERR_PTR(-EINVAL);
->> +
->> +		ret = of_property_read_u32_index(dev_of_node(dev), of_prop,
->> +						 (i * 2) + 1,
->> +						 &resource_subtype);
->> +		if (ret)
->> +			return ERR_PTR(-EINVAL);
->> +
->> +		ret = handle->ops.rm_core_ops.get_range(handle, resource_type,
->> +							resource_subtype,
->> +							&res->desc[i].start,
->> +							&res->desc[i].num);
->> +		if (ret) {
->> +			dev_err(dev, "type %d subtype %d not allocated for host %d\n",
->> +				resource_type, resource_subtype,
->> +				handle_to_ti_sci_info(handle)->host_id);
->> +			return ERR_PTR(ret);
->> +		}
->> +
->> +		dev_dbg(dev, "res type = %d, subtype = %d, start = %d, num = %d\n",
->> +			resource_type, resource_subtype, res->desc[i].start,
->> +			res->desc[i].num);
-> 
-> NAK. Where is the binding for this? What is this decoding? Please don't
-> decode binding without having an official binding.
+I have noticed this build error on linux next tree for arm32 build.
+Thanks for the fix.
 
-This is a helper library for the clients to get resource range from DT
-and is not compulsory for clients to use this library to managing these
-resources. So in my understanding DT bindings should go into the client
-DT doc as posted here[1].  If you really insist I can add these details
-in ti,sci documentation but not sure if we are doing the same for all
-other helper apis.
-
-[1] https://patchwork.kernel.org/patch/10629215/
-
-Thanks and regards,
-Lokesh
+- Naresh
