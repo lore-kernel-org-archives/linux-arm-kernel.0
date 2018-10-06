@@ -1,94 +1,41 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Sat, 6 Oct 2018 09:30:19 -0700
-Subject: [PATCH] Documentation/arm64: HugeTLB page implementation
-In-Reply-To: <20181005143458.17875-1-punit.agrawal@arm.com>
-References: <20181005143458.17875-1-punit.agrawal@arm.com>
-Message-ID: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Sat, 6 Oct 2018 11:34:32 -0500
+Subject: [PATCH 4/4] firmware: ti_sci: Add helper apis to mange resources
+In-Reply-To: <176f77cf-d295-0f37-ea9d-26f76f6d79c7@ti.com>
+References: <20181005143006.18284-1-lokeshvutla@ti.com>
+ <20181005143006.18284-5-lokeshvutla@ti.com>
+ <20181005201453.g3p2jhpigcvijpce@kahuna>
+ <176f77cf-d295-0f37-ea9d-26f76f6d79c7@ti.com>
+Message-ID: <20181006163432.z5skpgfm7oqoiuaf@akan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-Just some minor stuff (below).
-
-On 10/5/18 7:34 AM, Punit Agrawal wrote:
-> Arm v8 architecture supports multiple page sizes - 4k, 16k and
-> 64k. Based on the active page size, the Linux port supports
-> corresponding hugepage sizes at PMD and PUD(4k only) levels.
+On 13:08-20181006, Lokesh Vutla wrote:
 > 
-> In addition, the architecture also supports caching larger sized
-> ranges (composed of multiple entries) at the PTE and PMD level in the
-> TLBs using the contiguous bit. The Linux port makes use of this
-> architectural support to enable additional hugepage sizes.
 > 
-> Describe the two different types of hugepages supported by the arm64
-> kernel and the hugepage sizes enabled by each.
+> On 10/6/2018 1:44 AM, Nishanth Menon wrote:
+> > NAK. Where is the binding for this? What is this decoding? Please don't
+> > decode binding without having an official binding.
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> ---
->  Documentation/arm64/hugetlbpage.txt | 39 +++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->  create mode 100644 Documentation/arm64/hugetlbpage.txt
-> 
-> diff --git a/Documentation/arm64/hugetlbpage.txt b/Documentation/arm64/hugetlbpage.txt
-> new file mode 100644
-> index 000000000000..64ee24b88d27
-> --- /dev/null
-> +++ b/Documentation/arm64/hugetlbpage.txt
-> @@ -0,0 +1,39 @@
-> +HugeTLBpage on ARM64
-> +====================
-> +
-> +Hugepage relies on making efficient use of TLBs to improve performance of
-> +address translations. The benefit depends on both -
-> +
-> +  - the size of hugepages
-> +  - size of entries supported by the TLBs
-> +
-> +The ARM64 port supports two flavours of hugepages.
-> +
-> +1) Block mappings at the pud/pmd level
-> +--------------------------------------
-> +
-> +These are regular hugepages where a pmd or a pud page table entry points to a
-> +block of memory. Regardless of the supported size of entries in TLB, block
-> +mappings reduces the depth of page table walk needed to translate hugepage
+> This is a helper library for the clients to get resource range from DT
+> and is not compulsory for clients to use this library to managing these
+> resources. So in my understanding DT bindings should go into the client
+> DT doc as posted here[1].  If you really insist I can add these details
 
-            reduce
+Thanks.. Please get the binding approved before we discuss
+implementation in driver.
 
-> +addresses.
-> +
-> +2) Using the Contiguous bit
-> +---------------------------
-> +
-> +The architecture provides a contiguous bit in the translation table entries
-> +(D4.5.3, ARM DDI 0487C.a) that hints to the mmu to indicate that it is one of a
+> in ti,sci documentation but not sure if we are doing the same for all
+> other helper apis.
 
-preferably                                     MMU
+the core TISCI device does'nt require any ranges property. these need to
+be parsed and handled in corresponding tisci drivers? I don't see the
+benefit in dealing with OF parsing in generic TISCI firmware driver.
+yes, there might be a little similarities, but really we'd have to argue
+strongly why it needs to belong to the firmware driver. So far it looks
+like just a single irq-chip driver seems to need it, I cant see the
+argument for it getting caught up in that path.
 
-> +contiguous set of entries that can be cached in a single TLB entry.
-> +
-> +The contiguous bit is used in Linux to increase the mapping size at the pmd and
-> +pte (last) level. The number of supported contiguous entries vary by page size
-
-                                                                varies
-
-> +and level of the page table.
-> +
-> +
-> +
-> +The following hugepage sizes are supported -
-> +
-> +         CONT PTE    PMD    CONT PMD    PUD
-> +         --------    ---    --------    ---
-> +  4K:         64K     2M         32M     1G
-> +  16K:         2M    32M          1G
-> +  64K:         2M   512M         16G
-> 
-
-
-thanks,
--- 
-~Randy
+--
+Regards,
+Nishanth Menon
