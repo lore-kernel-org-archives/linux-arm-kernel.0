@@ -1,72 +1,114 @@
-From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
-Date: Sat, 6 Oct 2018 12:49:42 +0200
-Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
-In-Reply-To: <CAFqt6zZCCPFE3sQ3u_gjiN8wwd99nwWatk9JRsiGxbCwhi91mg@mail.gmail.com>
-References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
- <20181003200003.GA9965@bombadil.infradead.org>
- <20181003221444.GZ30658@n2100.armlinux.org.uk>
- <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
- <20181004123400.GC30658@n2100.armlinux.org.uk>
- <CAFqt6zZPOM17QwmcWKF3F1gqkJm=2PxvuJ3naWuRXZGHc2HrEQ@mail.gmail.com>
- <20181004181736.GB20842@bombadil.infradead.org>
- <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
- <CANiq72mkTP_m20vqei-cpN+ypQ_gU472qn5m68vb_4Nqj5afMQ@mail.gmail.com>
- <CAFqt6zaFc_GenhfvsD0VPfepR-jjXypj+4CgNEuHMVq1WXV+8w@mail.gmail.com>
- <CANiq72kVJn7985EET067Dgj+z0dwb0x2MTUnREMWKCVU6=WnJA@mail.gmail.com>
- <CAFqt6zZ4sPjtb5BaDfwc5tZv+vMj6ao3NJZ_3quX9AH5pCMwJg@mail.gmail.com>
- <CANiq72m9u1PL9X+dPNLxgkhvttj=4ijLyM2sFex=Kws7wswKzw@mail.gmail.com>
- <CAFqt6zYH4Aczu8AYke8AfGuMS70SJXCMn-n8X8C_Tz03gTjn8g@mail.gmail.com>
- <CANiq72kRAZE9SyM4EkpaBZH03Ex0Z=4Pk2iOuc2jBDKTfKjHQg@mail.gmail.com>
- <CAFqt6zZCCPFE3sQ3u_gjiN8wwd99nwWatk9JRsiGxbCwhi91mg@mail.gmail.com>
-Message-ID: <CANiq72k-e_j67==VdrayqggjAd7MAfpaJS-_0=jkmh4OWynukQ@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sat, 6 Oct 2018 12:54:01 +0200
+Subject: [PATCH 27/36] dt-bindings: arm: Convert Realtek board/soc
+ bindings to json-schema
+In-Reply-To: <20181005165848.3474-28-robh@kernel.org>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-28-robh@kernel.org>
+Message-ID: <41eb7b19-dd26-16e2-bd80-b8b7d6f52f94@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 6, 2018 at 7:11 AM Souptick Joarder <jrdr.linux@gmail.com> wrote:
->
-> On Fri, Oct 5, 2018 at 11:39 PM Miguel Ojeda
-> <miguel.ojeda.sandonis@gmail.com> wrote:
-> > They are not supposed to be "steps". You did it with 70+ commits (!!)
-> > over the course of several months. Why a tree wasn't created, stuff
-> > developed there, and when done, submitted it for review?
->
-> Because we already have a plan for entire vm_fault_t migration and
-> the * instruction * was to send one patch per driver.
+Am 05.10.18 um 18:58 schrieb Rob Herring:
+> Convert Realtek SoC bindings to DT schema format using json-schema.
 
-The instruction?
+YAML (2x)
 
-> >
-> > Fine, but you haven't answered to the other parts of my email: you
-> > don't explain why you choose one alternative over the others, you
-> > simply keep changing the approach.
->
-> We are going in circles here. That you want to convert vm_insert_page
-> to vmf_insert_page for the PF case is fine and understood. However,
-> you don't *need* to introduce a new name for the remaining non-PF
-> cases if the function is going to be the exact same thing as before.
-> You say "The final goal is to remove vm_insert_page", but you haven't
-> justified *why* you need to remove that name.
->
-> I think I have given that answer. If we don't remove vm_insert_page,
-> future #PF caller will have option to use it. But those should be
-> restricted. How are we going to restrict vm_insert_page in one half
-> of kernel when other half is still using it  ?? Is there any way ? ( I don't
-> know)
+> 
+> Cc: "Andreas F?rber" <afaerber@suse.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../devicetree/bindings/arm/realtek.txt       | 22 ----------------
+>  .../devicetree/bindings/arm/realtek.yaml      | 25 +++++++++++++++++++
+>  2 files changed, 25 insertions(+), 22 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/realtek.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/realtek.yaml
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/realtek.txt b/Documentation/devicetree/bindings/arm/realtek.txt
+> deleted file mode 100644
+> index 95839e19ae92..000000000000
+> --- a/Documentation/devicetree/bindings/arm/realtek.txt
+> +++ /dev/null
+> @@ -1,22 +0,0 @@
+> -Realtek platforms device tree bindings
+> ---------------------------------------
+> -
+> -
+> -RTD1295 SoC
+> -===========
+> -
+> -Required root node properties:
+> -
+> - - compatible :  must contain "realtek,rtd1295"
+> -
+> -
+> -Root node property compatible must contain, depending on board:
+> -
+> - - MeLE V9: "mele,v9"
+> - - ProBox2 AVA: "probox2,ava"
+> - - Zidoo X9S: "zidoo,x9s"
+> -
+> -
+> -Example:
+> -
+> -    compatible = "zidoo,x9s", "realtek,rtd1295";
+> diff --git a/Documentation/devicetree/bindings/arm/realtek.yaml b/Documentation/devicetree/bindings/arm/realtek.yaml
+> new file mode 100644
+> index 000000000000..9e3bb3249c77
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/realtek.yaml
+> @@ -0,0 +1,25 @@
+> +# SPDX-License-Identifier: None
 
-Ah, so that is what you are concerned about: future misuses. Well, I
-don't really see the problem. There are only ~18 calls to
-vm_insert_page() in the entire kernel: checking if people is using it
-properly for a while should be easy. As long as the new behavior is
-documented properly, it should be fine. If you are really concerned
-about mistakes being made, then fine, we can rename it as I suggested.
+What is the expected license for such bindings?
+You did not add such a line for actions.yaml.
 
-Now, the new vm_insert_range() is another topic. It simplifies a few
-of the callers and buys us the rename at the same time, so I am also
-OK with it.
+> +%YAML 1.2
+> +---
+> +$id: http://devicetree.org/schemas/bindings/arm/realtek.yaml#
+> +$schema: http://devicetree.org/meta-schemas/core.yaml#
+> +
+> +title: Realtek platforms device tree bindings
+> +
+> +maintainers:
+> +  - Andreas F?rber <afaerber@suse.de>
+> +
+> +description: |+
 
-As you see, I am not against the changes -- it is just that they
-should clearly justified. :-) It wasn't clear what your problem with
-the current vm_insert_page() is.
+"|+"?
 
-Cheers,
-Miguel
+> +  RTD1295 SoC
+> +
+> +properties:
+> +  $nodename:
+> +    const: '/'
+> +  compatible:
+> +    items:
+> +      - enum:
+> +          - mele,v9
+> +          - probox2,ava
+> +          - zidoo,x9s
+> +      - const: realtek,rtd1295
+> +...
+
+That does not look like a full "PATCH" yet? It also confuses me whether
+or when leading dashes are necessary - for Actions Semi "items" had one.
+
+I have preparations on my GitHub staging tree for three more SoCs, so we
+should prepare the structure to ease adding SoCs and avoid re-indenting
+patches - adding SoCs was much easier in the original flat text format.
+Please also consider for other vendors.
+
+Same comment as for Actions: We're losing a human description of the
+enum values.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
