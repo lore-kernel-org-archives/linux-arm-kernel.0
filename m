@@ -1,189 +1,72 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 6 Oct 2018 12:40:52 +0200
-Subject: [PATCH 15/36] dt-bindings: arm: Convert Actions Semi bindings to
- jsonschema
-In-Reply-To: <20181005165848.3474-16-robh@kernel.org>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-16-robh@kernel.org>
-Message-ID: <c4909f78-bfa1-9253-e436-1159392b45a9@suse.de>
+From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
+Date: Sat, 6 Oct 2018 12:49:42 +0200
+Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
+In-Reply-To: <CAFqt6zZCCPFE3sQ3u_gjiN8wwd99nwWatk9JRsiGxbCwhi91mg@mail.gmail.com>
+References: <20181003185854.GA1174@jordon-HP-15-Notebook-PC>
+ <20181003200003.GA9965@bombadil.infradead.org>
+ <20181003221444.GZ30658@n2100.armlinux.org.uk>
+ <CAFqt6zYHhmPwUdaCZX-BuAvaVwA-x1W39tz+Q50-nbEaW2cYVg@mail.gmail.com>
+ <20181004123400.GC30658@n2100.armlinux.org.uk>
+ <CAFqt6zZPOM17QwmcWKF3F1gqkJm=2PxvuJ3naWuRXZGHc2HrEQ@mail.gmail.com>
+ <20181004181736.GB20842@bombadil.infradead.org>
+ <CAFqt6zaN0PQHkjuwFf8VriROLy7qrPDu-iNE=VPiXJw8C7GpQg@mail.gmail.com>
+ <CANiq72mkTP_m20vqei-cpN+ypQ_gU472qn5m68vb_4Nqj5afMQ@mail.gmail.com>
+ <CAFqt6zaFc_GenhfvsD0VPfepR-jjXypj+4CgNEuHMVq1WXV+8w@mail.gmail.com>
+ <CANiq72kVJn7985EET067Dgj+z0dwb0x2MTUnREMWKCVU6=WnJA@mail.gmail.com>
+ <CAFqt6zZ4sPjtb5BaDfwc5tZv+vMj6ao3NJZ_3quX9AH5pCMwJg@mail.gmail.com>
+ <CANiq72m9u1PL9X+dPNLxgkhvttj=4ijLyM2sFex=Kws7wswKzw@mail.gmail.com>
+ <CAFqt6zYH4Aczu8AYke8AfGuMS70SJXCMn-n8X8C_Tz03gTjn8g@mail.gmail.com>
+ <CANiq72kRAZE9SyM4EkpaBZH03Ex0Z=4Pk2iOuc2jBDKTfKjHQg@mail.gmail.com>
+ <CAFqt6zZCCPFE3sQ3u_gjiN8wwd99nwWatk9JRsiGxbCwhi91mg@mail.gmail.com>
+Message-ID: <CANiq72k-e_j67==VdrayqggjAd7MAfpaJS-_0=jkmh4OWynukQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Sat, Oct 6, 2018 at 7:11 AM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+>
+> On Fri, Oct 5, 2018 at 11:39 PM Miguel Ojeda
+> <miguel.ojeda.sandonis@gmail.com> wrote:
+> > They are not supposed to be "steps". You did it with 70+ commits (!!)
+> > over the course of several months. Why a tree wasn't created, stuff
+> > developed there, and when done, submitted it for review?
+>
+> Because we already have a plan for entire vm_fault_t migration and
+> the * instruction * was to send one patch per driver.
 
-Am 05.10.18 um 18:58 schrieb Rob Herring:
-> Convert Actions Semi SoC bindings to DT schema format using json-schema.
+The instruction?
 
-This sounds like the next Yanny vs. Laurel... I fail to see any json. ;)
+> >
+> > Fine, but you haven't answered to the other parts of my email: you
+> > don't explain why you choose one alternative over the others, you
+> > simply keep changing the approach.
+>
+> We are going in circles here. That you want to convert vm_insert_page
+> to vmf_insert_page for the PF case is fine and understood. However,
+> you don't *need* to introduce a new name for the remaining non-PF
+> cases if the function is going to be the exact same thing as before.
+> You say "The final goal is to remove vm_insert_page", but you haven't
+> justified *why* you need to remove that name.
+>
+> I think I have given that answer. If we don't remove vm_insert_page,
+> future #PF caller will have option to use it. But those should be
+> restricted. How are we going to restrict vm_insert_page in one half
+> of kernel when other half is still using it  ?? Is there any way ? ( I don't
+> know)
 
-Also, it may help my understanding to be CC'ed on the cover letter, too?
+Ah, so that is what you are concerned about: future misuses. Well, I
+don't really see the problem. There are only ~18 calls to
+vm_insert_page() in the entire kernel: checking if people is using it
+properly for a while should be easy. As long as the new behavior is
+documented properly, it should be fine. If you are really concerned
+about mistakes being made, then fine, we can rename it as I suggested.
 
-> 
-> Cc: "Andreas F?rber" <afaerber@suse.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/arm/actions.txt       | 56 -------------------
->  .../devicetree/bindings/arm/actions.yaml      | 34 +++++++++++
->  2 files changed, 34 insertions(+), 56 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/actions.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/actions.yaml
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/actions.txt b/Documentation/devicetree/bindings/arm/actions.txt
-> deleted file mode 100644
-> index d54f33c4e0da..000000000000
-> --- a/Documentation/devicetree/bindings/arm/actions.txt
-> +++ /dev/null
-> @@ -1,56 +0,0 @@
-> -Actions Semi platforms device tree bindings
-> --------------------------------------------
-> -
-> -
-> -S500 SoC
-> -========
-> -
-> -Required root node properties:
-> -
-> - - compatible :  must contain "actions,s500"
-> -
-> -
-> -Modules:
-> -
-> -Root node property compatible must contain, depending on module:
-> -
-> - - LeMaker Guitar: "lemaker,guitar"
-> -
-> -
-> -Boards:
-> -
-> -Root node property compatible must contain, depending on board:
-> -
-> - - Allo.com Sparky: "allo,sparky"
-> - - Cubietech CubieBoard6: "cubietech,cubieboard6"
-> - - LeMaker Guitar Base Board rev. B: "lemaker,guitar-bb-rev-b", "lemaker,guitar"
-> -
-> -
-> -S700 SoC
-> -========
-> -
-> -Required root node properties:
-> -
-> -- compatible :  must contain "actions,s700"
-> -
-> -
-> -Boards:
-> -
-> -Root node property compatible must contain, depending on board:
-> -
-> - - Cubietech CubieBoard7: "cubietech,cubieboard7"
-> -
-> -
-> -S900 SoC
-> -========
-> -
-> -Required root node properties:
-> -
-> -- compatible :  must contain "actions,s900"
-> -
-> -
-> -Boards:
-> -
-> -Root node property compatible must contain, depending on board:
-> -
-> - - uCRobotics Bubblegum-96: "ucrobotics,bubblegum-96"
-> diff --git a/Documentation/devicetree/bindings/arm/actions.yaml b/Documentation/devicetree/bindings/arm/actions.yaml
-> new file mode 100644
-> index 000000000000..af9345a228b4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/actions.yaml
-> @@ -0,0 +1,34 @@
-> +%YAML 1.2
-> +---
-> +$id: http://devicetree.org/schemas/soc/arm/actions.yaml#
-> +$schema: http://devicetree.org/meta-schemas/core.yaml#
+Now, the new vm_insert_range() is another topic. It simplifies a few
+of the callers and buys us the rename at the same time, so I am also
+OK with it.
 
-404 for the schema. Where does one find an explanation?
+As you see, I am not against the changes -- it is just that they
+should clearly justified. :-) It wasn't clear what your problem with
+the current vm_insert_page() is.
 
-> +
-> +title: Actions Semi platforms device tree bindings
-> +
-> +maintainers:
-> +  - Andreas F?rber <afaerber@suse.de>
-
-Mani is now officially reviewer and the closest I have to a
-co-maintainer. I suggest we add him here in some form. I assume this is
-independent of MAINTAINERS patterns though, or will get_maintainers.pl
-parse this, too?
-
-> +
-> +description: |
-
-Does the | have any meaning, or a stray typo?
-
-> +  The Actions Semi S500 is a quad-core ARM Cortex-A9 SoC. The Actions Semi
-> +  S900 is a quad-core ARM Cortex-A53 SoC.
-
-You forgot the S700 as another quad-core Cortex-A53 SoC.
-Also, arm or Arm rather than ARM these days?
-
-> +
-> +properties:
-> +  compatible:
-> +    oneOf:
-> +      - items:
-> +          - enum:
-> +              - lemaker,guitar-bb-rev-b
-> +          - enum:
-> +              - lemaker,guitar
-> +              - allo,sparky
-> +              - cubietech,cubieboard6
-> +          - const: actions,s500
-> +        minItems: 2
-> +        maxItems: 3
-> +        additionalItems: false
-
-Objection. You've managed to turn a perfectly human-comprehensible text
-into a machine-parseable representation incomprehensible for humans.
-
-First, there should remain some free-text explanation of the values
-defined here. Are comments allowed after the value or indented maybe?
-Alternatively we could have a per-vendor file ? la vendor-prefixes.txt,
-but that would seem inefficient.
-
-Next, the above items construct is horrible. What about nested oneOf:
-
-+      - items:
-+          - oneOf:
-+              - items:
-+                  - enum:
-+                      - lemaker,guitar-bb-rev-b
-+                  - const: lemaker,guitar
-+              - items:
-+                  - enum:
-+                      - allo,sparky
-+                      - cubietech,cubieboard6
-+          - const: actions,s500
-
-This grouping is much clearer to me and hopefully to anyone adding
-further base boards for the module.
-We will have the same issue for the BPi-S64 module with S700 below.
-
-> +      - items:
-> +          - const: cubietech,cubieboard7
-> +          - const: actions,s700
-> +      - items:
-> +          - const: ucrobotics,bubblegum-96
-> +          - const: actions,s900
-
-Please make the board compatible an enum, even if only one is listed
-today. That makes it clearer where/how (and easier) to add new boards.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Cheers,
+Miguel
