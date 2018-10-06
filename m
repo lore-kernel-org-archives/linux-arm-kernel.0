@@ -1,292 +1,122 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Sat, 6 Oct 2018 07:09:40 +0000
-Subject: [RFC PATCH 2/2] dmaengine: xilinx_dma: Add Xilinx AXI MCDMA
- Engine driver support
-In-Reply-To: <20180821154635.GG2388@vkoul-mobl>
-References: <1533059173-21405-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1533059173-21405-3-git-send-email-radhey.shyam.pandey@xilinx.com>
- <20180821154635.GG2388@vkoul-mobl>
-Message-ID: <SN4PR0201MB363074E44B3E6A67B9D5ECD4C7E40@SN4PR0201MB3630.namprd02.prod.outlook.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Sat, 6 Oct 2018 12:58:11 +0530
+Subject: [PATCH 1/2] dt-bindings: irqchip: Introduce TISCI Interrupt router
+ bindings
+In-Reply-To: <20181006072812.15814-1-lokeshvutla@ti.com>
+References: <20181006072812.15814-1-lokeshvutla@ti.com>
+Message-ID: <20181006072812.15814-2-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review.
+Add the DT binding documentation for Interrupt router driver.
 
-> On 31-07-18, 23:16, Radhey Shyam Pandey wrote:
-> >  struct xilinx_dma_config {
-> > @@ -402,6 +470,7 @@ struct xilinx_dma_config {
-> >  	int (*clk_init)(struct platform_device *pdev, struct clk **axi_clk,
-> >  			struct clk **tx_clk, struct clk **txs_clk,
-> >  			struct clk **rx_clk, struct clk **rxs_clk);
-> > +	irqreturn_t (*irq_handler)(int irq, void *data);
-> 
-> this sounds like a preparatory change?
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ .../interrupt-controller/ti,sci-intr.txt      | 83 +++++++++++++++++++
+ MAINTAINERS                                   |  1 +
+ 2 files changed, 84 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
 
-Yes, I will split it in a separate patch.
-> 
-> > +	} else if (chan->xdev->dma_config->dmatype ==
-> XDMA_TYPE_AXIMCDMA) {
-> > +		/* Allocate the buffer descriptors. */
-> > +		chan->seg_mv = dma_zalloc_coherent(chan->dev,
-> > +						  sizeof(*chan->seg_mv) *
-> > +						  XILINX_DMA_NUM_DESCS,
-> > +						  &chan->seg_p,
-> GFP_KERNEL);
-> > +		if (!chan->seg_mv) {
-> > +			dev_err(chan->dev,
-> > +				"unable to allocate channel %d descriptors\n",
-> > +				chan->id);
-> > +			return -ENOMEM;
-> > +		}
-> > +		for (i = 0; i < XILINX_DMA_NUM_DESCS; i++) {
-> > +			chan->seg_mv[i].hw.next_desc =
-> > +			lower_32_bits(chan->seg_p + sizeof(*chan->seg_mv) *
-> > +				((i + 1) % XILINX_DMA_NUM_DESCS));
-> > +			chan->seg_mv[i].hw.next_desc_msb =
-> > +			upper_32_bits(chan->seg_p + sizeof(*chan->seg_mv) *
-> > +				((i + 1) % XILINX_DMA_NUM_DESCS));
-> > +			chan->seg_mv[i].phys = chan->seg_p +
-> > +				sizeof(*chan->seg_v) * i;
-> > +			list_add_tail(&chan->seg_mv[i].node,
-> > +				      &chan->free_seg_list);
-> > +		}
-> 
-> only change with this and previous one seems to be use of seg_mv instead
-> of seg_v right? if so, can you try to modularise this..
-Agree. I will modularise it.
-
-> 
-> >  /**
-> > + * xilinx_mcdma_start_transfer - Starts MCDMA transfer
-> > + * @chan: Driver specific channel struct pointer
-> > + */
-> > +static void xilinx_mcdma_start_transfer(struct xilinx_dma_chan *chan)
-> > +{
-> > +	struct xilinx_dma_tx_descriptor *head_desc, *tail_desc;
-> > +	struct xilinx_axidma_tx_segment *tail_segment;
-> > +	u32 reg;
-> > +
-> > +	if (chan->err)
-> > +		return;
-> > +
-> > +	if (!chan->idle)
-> > +		return;
-> > +
-> > +	if (list_empty(&chan->pending_list))
-> > +		return;
-> 
-> okay i was thinking that we need lock here, but then this is called with
-> lock held, worth mentioning in the comment though..
-Ok. Will add.
-
-> 
-> > +static irqreturn_t xilinx_mcdma_irq_handler(int irq, void *data)
-> > +{
-> > +	struct xilinx_dma_chan *chan = data;
-> > +	u32 status, ser_offset, chan_sermask, chan_offset = 0, chan_id;
-> > +
-> > +	if (chan->direction == DMA_DEV_TO_MEM)
-> > +		ser_offset = XILINX_MCDMA_RXINT_SER_OFFSET;
-> > +	else
-> > +		ser_offset = XILINX_MCDMA_TXINT_SER_OFFSET;
-> > +
-> > +	/* Read the channel id raising the interrupt*/
-> > +	chan_sermask = dma_ctrl_read(chan, ser_offset);
-> > +	chan_id = ffs(chan_sermask);
-> > +
-> > +	if (!chan_id)
-> > +		return IRQ_NONE;
-> > +
-> > +	if (chan->direction == DMA_DEV_TO_MEM)
-> > +		chan_offset = XILINX_DMA_MAX_CHANS_PER_DEVICE / 2;
-> > +
-> > +	chan_offset = chan_offset + (chan_id - 1);
-> > +	chan = chan->xdev->chan[chan_offset];
-> > +	/* Read the status and ack the interrupts. */
-> > +	status = dma_ctrl_read(chan,
-> XILINX_MCDMA_CHAN_SR_OFFSET(chan->tdest));
-> > +	if (!(status & XILINX_MCDMA_IRQ_ALL_MASK))
-> > +		return IRQ_NONE;
-> > +
-> > +	dma_ctrl_write(chan, XILINX_MCDMA_CHAN_SR_OFFSET(chan-
-> >tdest),
-> > +		       status & XILINX_MCDMA_IRQ_ALL_MASK);
-> > +
-> > +	if (status & XILINX_MCDMA_IRQ_ERR_MASK) {
-> > +		dev_err(chan->dev, "Channel %p has errors %x cdr %x tdr
-> %x\n",
-> > +			chan, dma_ctrl_read(chan,
-> > +			XILINX_MCDMA_CH_ERR_OFFSET),
-> dma_ctrl_read(chan,
-> > +			XILINX_MCDMA_CHAN_CDESC_OFFSET(chan->tdest)),
-> > +			dma_ctrl_read(chan,
-> > +				      XILINX_MCDMA_CHAN_TDESC_OFFSET
-> > +				      (chan->tdest)));
-> 
-> this looks very hard to read, please start each dma_ctrl_read() from a
-> new line to make it better
-
-Ok . will change.
-> 
-> > +		chan->err = true;
-> > +	}
-> > +
-> > +	if (status & XILINX_MCDMA_IRQ_DELAY_MASK) {
-> > +		/*
-> > +		 * Device takes too long to do the transfer when user requires
-> > +		 * responsiveness.
-> > +		 */
-> > +		dev_dbg(chan->dev, "Inter-packet latency too long\n");
-> 
-> so we just log it..?
-For now yes. It will be used later when MCDMA is used by the network client.
-
-> 
-> > +	}
-> > +
-> > +	if (status & XILINX_MCDMA_IRQ_IOC_MASK) {
-> > +		spin_lock(&chan->lock);
-> > +		xilinx_dma_complete_descriptor(chan);
-> > +		chan->idle = true;
-> > +		chan->start_transfer(chan);
-> > +		spin_unlock(&chan->lock);
-> > +	}
-> > +
-> > +	tasklet_schedule(&chan->tasklet);
-> > +	return IRQ_HANDLED;
-> > +
-> 
-> bogus empty line...
-Will fix.
-> 
-> > +static struct dma_async_tx_descriptor *xilinx_mcdma_prep_slave_sg(
-> > +	struct dma_chan *dchan, struct scatterlist *sgl, unsigned int sg_len,
-> > +	enum dma_transfer_direction direction, unsigned long flags,
-> > +	void *context)
-> 
-> indent is pretty bad here too :(
-Will fix.
-> 
-> > +{
-> > +	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-> > +	struct xilinx_dma_tx_descriptor *desc;
-> > +	struct xilinx_aximcdma_tx_segment *segment = NULL;
-> > +	u32 *app_w = (u32 *)context;
-> > +	struct scatterlist *sg;
-> > +	size_t copy;
-> > +	size_t sg_used;
-> > +	unsigned int i;
-> > +
-> > +	if (!is_slave_direction(direction))
-> > +		return NULL;
-> > +
-> > +	/* Allocate a transaction descriptor. */
-> > +	desc = xilinx_dma_alloc_tx_descriptor(chan);
-> > +	if (!desc)
-> > +		return NULL;
-> > +
-> > +	dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
-> > +	desc->async_tx.tx_submit = xilinx_dma_tx_submit;
-> > +
-> > +	/* Build transactions using information in the scatter gather list */
-> > +	for_each_sg(sgl, sg, sg_len, i) {
-> > +		sg_used = 0;
-> > +
-> > +		/* Loop until the entire scatterlist entry is used */
-> > +		while (sg_used < sg_dma_len(sg)) {
-> > +			struct xilinx_aximcdma_desc_hw *hw;
-> > +
-> > +			/* Get a free segment */
-> > +			segment = xilinx_aximcdma_alloc_tx_segment(chan);
-> > +			if (!segment)
-> > +				goto error;
-> > +
-> > +			/*
-> > +			 * Calculate the maximum number of bytes to transfer,
-> > +			 * making sure it is less than the hw limit
-> > +			 */
-> > +			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
-> > +				     XILINX_DMA_MAX_TRANS_LEN);
-> > +			hw = &segment->hw;
-> > +
-> > +			/* Fill in the descriptor */
-> > +			xilinx_aximcdma_buf(chan, hw, sg_dma_address(sg),
-> > +					    sg_used);
-> > +			hw->control = copy;
-> > +
-> > +			if (chan->direction == DMA_MEM_TO_DEV) {
-> > +				if (app_w)
-> 
-> why not make condition as: chan->direction == DMA_MEM_TO_DEV &&
-> app_w
-Ok . will change.
-
-> 
-> > +					memcpy(hw->app, app_w, sizeof(u32)
-> *
-> > +					       XILINX_DMA_NUM_APP_WORDS);
-> > +			}
-> > +
-> > +			sg_used += copy;
-> > +			/*
-> > +			 * Insert the segment into the descriptor segments
-> > +			 * list.
-> > +			 */
-> > +			list_add_tail(&segment->node, &desc->segments);
-> > +		}
-> > +	}
-> > +
-> > +	segment = list_first_entry(&desc->segments,
-> > +				   struct xilinx_aximcdma_tx_segment, node);
-> > +	desc->async_tx.phys = segment->phys;
-> > +
-> > +	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
-> > +	if (chan->direction == DMA_MEM_TO_DEV) {
-> > +		segment->hw.control |= XILINX_MCDMA_BD_SOP;
-> > +		segment = list_last_entry(&desc->segments,
-> > +					  struct xilinx_aximcdma_tx_segment,
-> > +					  node);
-> > +		segment->hw.control |= XILINX_MCDMA_BD_EOP;
-> > +	}
-> > +
-> > +	return &desc->async_tx;
-> > +
-> > +error:
-> > +	xilinx_dma_free_tx_descriptor(chan, desc);
-> 
-> will it free the ones allocated here or all descriptors?
-
-It will free single descriptor and all its segments.
-> 
-> >  /**
-> >   * xilinx_dma_prep_slave_sg - prepare descriptors for a DMA_SLAVE
-> transaction
-> > @@ -2422,12 +2827,16 @@ static int xilinx_dma_chan_probe(struct
-> xilinx_dma_device *xdev,
-> >
-> >  	if (of_device_is_compatible(node, "xlnx,axi-vdma-mm2s-channel") ||
-> >  	    of_device_is_compatible(node, "xlnx,axi-dma-mm2s-channel") ||
-> > -	    of_device_is_compatible(node, "xlnx,axi-cdma-channel")) {
-> > +	    of_device_is_compatible(node, "xlnx,axi-cdma-channel") ||
-> > +	    of_device_is_compatible(node, "xlnx,axi-mcdma-mm2s-channel")) {
-> 
-> this is not scaling, maybe you should use data with each
-> compatible to check for specific things..
-Yes, we can reuse axidma s2mm and mm2 channel nodes. MCDMA stuff can
-be selectively programmed based on xilinx_dma_config.dmatype.
-
-> 
-> > +static const struct xilinx_dma_config aximcdma_config = {
-> > +	.dmatype = XDMA_TYPE_AXIMCDMA,
-> > +	.clk_init = axidma_clk_init,
-> > +	.irq_handler = xilinx_mcdma_irq_handler,
-> > +};
-> >  static const struct xilinx_dma_config axicdma_config = {
-> >  	.dmatype = XDMA_TYPE_CDMA,
-> >  	.clk_init = axicdma_clk_init,
-> > +	.irq_handler = xilinx_dma_irq_handler,
-> 
-> this should be in preparatory patch
-Yes.
-> --
-> ~Vinod
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+new file mode 100644
+index 000000000000..681ca53cc5fb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+@@ -0,0 +1,83 @@
++Texas Instruments K3 Interrupt Router
++=====================================
++
++The Interrupt Router (INTR) module provides a mechanism to mux M
++interrupt inputs to N interrupt outputs, where all M inputs are selectable
++to be driven per N output. There is one register per output (MUXCNTL_N) that
++controls the selection.
++
++
++                                 Interrupt Router
++                             +----------------------+
++                             |  Inputs     Outputs  |
++        +-------+            | +------+             |
++        | GPIO  |----------->| | irq0 |             |       Host IRQ
++        +-------+            | +------+             |      controller
++                             |    .        +-----+  |      +-------+
++        +-------+            |    .        |  0  |  |----->|  GIC  |
++        | INTA  |----------->|    .        +-----+  |      +-------+
++        +-------+            |    .          .      |
++                             | +------+      .      |
++                             | | irqM |    +-----+  |
++                             | +------+    |  N  |  |
++                             |             +-----+  |
++                             +----------------------+
++
++Configuration of these MUXCNTL_N registers is done by a system controller
++(like the Device Memory and Security Controller on K3 AM654 SoC). System
++controller will keep track of the used and unused registers within the Router.
++Driver should request the system controller to get the range of GIC IRQs
++assigned to the requesting hosts. It is the drivers responsibility to keep
++track of GIC IRQs.
++
++Communication between the host processor running an OS and the system
++controller happens through a protocol called TI System Control Interface
++(TISCI protocol). For more details refer:
++Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
++
++TISCI Interrupt Router Node:
++----------------------------
++- compatible:		Must be "ti,sci-intr".
++- interrupt-controller:	Identifies the node as an interrupt controller
++- #interrupt-cells:	Specifies the number of cells needed to encode an
++			interrupt source. The value should be 3.
++			First cell should contain the TISCI device ID of source
++			Second cell should contain the interrupt source offset
++			within the device
++			Third cell specifies the trigger type as defined
++			in interrupts.txt in this directory.
++- interrupt-parent:	phandle of irq parent for TISCI intr. The parent must
++			use the same interrupt-cells format as GIC.
++- ti,sci:		Phandle to TI-SCI compatible System controller node.
++- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
++- ti,sci-rm-range-girq:	Tuple corresponding to unique TISCI resource type that
++			defines the dst host irq ranges assigned to this
++			interrupt router from this host context.
++			Tuple should be of format <type subtype>.
++
++Example:
++--------
++The following example demonstrates both interrupt router node and the consumer
++node(main gpio) on the AM654 SoC:
++
++main_intr: interrupt-controller at 1 {
++	compatible = "ti,sci-intr";
++	interrupt-controller;
++	interrupt-parent = <&gic>;
++	#interrupt-cells = <3>;
++	ti,sci = <&dmsc>;
++	ti,sci-dst-id = <56>;
++	ti,sci-rm-range-girq = <0xb 0x1>;
++};
++
++main_gpio0:  main_gpio0 at 600000 {
++	...
++	interrupt-parent = <&main_intr>;
++	interrupts = <57 256 IRQ_TYPE_EDGE_RISING>,
++			<57 257 IRQ_TYPE_EDGE_RISING>,
++			<57 258 IRQ_TYPE_EDGE_RISING>,
++			<57 259 IRQ_TYPE_EDGE_RISING>,
++			<57 260 IRQ_TYPE_EDGE_RISING>,
++			<57 261 IRQ_TYPE_EDGE_RISING>;
++	...
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 29c08106bd22..a23778b68d74 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -14625,6 +14625,7 @@ F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
+ F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+ F:	drivers/clk/keystone/sci-clk.c
+ F:	drivers/reset/reset-ti-sci.c
++F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+ 
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+ M:	Hans Verkuil <hverkuil@xs4all.nl>
+-- 
+2.19.0
