@@ -1,39 +1,41 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Sun,  7 Oct 2018 00:18:34 +0300
-Subject: [PATCH v2 4/6] arm64: dts: allwinner: a64: sopine: enable power
- supplies
+Date: Sun,  7 Oct 2018 00:18:31 +0300
+Subject: [PATCH v2 1/6] dt-bindings: power: supply: axp20x: add AXP813 AC
+ power DT binding
 In-Reply-To: <20181006211836.28253-1-oskari@lemmela.net>
 References: <20181004193410.7265-1-oskari@lemmela.net>
  <20181006211836.28253-1-oskari@lemmela.net>
-Message-ID: <20181006211836.28253-5-oskari@lemmela.net>
+Message-ID: <20181006211836.28253-2-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sopine baseboard have ACIN and battery connectors.
+The AXP803/AXP813 AC power supply can limit input current and voltage.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 ---
- .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../devicetree/bindings/power/supply/axp20x_ac_power.txt       | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index c21f2331add6..335cf2263d19 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -69,6 +69,14 @@
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+index 826e8a879121..7a1fb532abe5 100644
+--- a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
++++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+@@ -4,6 +4,7 @@ Required Properties:
+  - compatible: One of:
+ 			"x-powers,axp202-ac-power-supply"
+ 			"x-powers,axp221-ac-power-supply"
++			"x-powers,axp813-ac-power-supply"
  
-+&ac_power_supply {
-+	status = "okay";
-+};
+ This node is a subnode of the axp20x PMIC.
+ 
+@@ -13,6 +14,8 @@ reading ADC channels from the AXP20X ADC.
+ The AXP22X is only able to tell if an AC power supply is present and
+ usable.
+ 
++AXP813/AXP803 are able to limit current and supply voltage
 +
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
+ Example:
+ 
+ &axp209 {
 -- 
 2.17.1
