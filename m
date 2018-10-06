@@ -1,107 +1,94 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Sat, 6 Oct 2018 11:29:29 -0500
-Subject: [PATCH 1/2] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-In-Reply-To: <20181006072812.15814-2-lokeshvutla@ti.com>
-References: <20181006072812.15814-1-lokeshvutla@ti.com>
- <20181006072812.15814-2-lokeshvutla@ti.com>
-Message-ID: <20181006162929.u6uh4ffn6gm3incf@akan>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Sat, 6 Oct 2018 09:30:19 -0700
+Subject: [PATCH] Documentation/arm64: HugeTLB page implementation
+In-Reply-To: <20181005143458.17875-1-punit.agrawal@arm.com>
+References: <20181005143458.17875-1-punit.agrawal@arm.com>
+Message-ID: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:58-20181006, Lokesh Vutla wrote:
-> Add the DT binding documentation for Interrupt router driver.
+Hi,
+Just some minor stuff (below).
+
+On 10/5/18 7:34 AM, Punit Agrawal wrote:
+> Arm v8 architecture supports multiple page sizes - 4k, 16k and
+> 64k. Based on the active page size, the Linux port supports
+> corresponding hugepage sizes at PMD and PUD(4k only) levels.
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> In addition, the architecture also supports caching larger sized
+> ranges (composed of multiple entries) at the PTE and PMD level in the
+> TLBs using the contiguous bit. The Linux port makes use of this
+> architectural support to enable additional hugepage sizes.
+> 
+> Describe the two different types of hugepages supported by the arm64
+> kernel and the hugepage sizes enabled by each.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jonathan Corbet <corbet@lwn.net>
 > ---
->  .../interrupt-controller/ti,sci-intr.txt      | 83 +++++++++++++++++++
->  MAINTAINERS                                   |  1 +
->  2 files changed, 84 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>  Documentation/arm64/hugetlbpage.txt | 39 +++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/arm64/hugetlbpage.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> diff --git a/Documentation/arm64/hugetlbpage.txt b/Documentation/arm64/hugetlbpage.txt
 > new file mode 100644
-> index 000000000000..681ca53cc5fb
+> index 000000000000..64ee24b88d27
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
-> @@ -0,0 +1,83 @@
-> +Texas Instruments K3 Interrupt Router
-> +=====================================
+> +++ b/Documentation/arm64/hugetlbpage.txt
+> @@ -0,0 +1,39 @@
+> +HugeTLBpage on ARM64
+> +====================
 > +
-> +The Interrupt Router (INTR) module provides a mechanism to mux M
-> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
-> +to be driven per N output. There is one register per output (MUXCNTL_N) that
-> +controls the selection.
+> +Hugepage relies on making efficient use of TLBs to improve performance of
+> +address translations. The benefit depends on both -
 > +
+> +  - the size of hugepages
+> +  - size of entries supported by the TLBs
 > +
-> +                                 Interrupt Router
-> +                             +----------------------+
-> +                             |  Inputs     Outputs  |
-> +        +-------+            | +------+             |
-> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
-> +        +-------+            | +------+             |      controller
-> +                             |    .        +-----+  |      +-------+
-> +        +-------+            |    .        |  0  |  |----->|  GIC  |
-> +        | INTA  |----------->|    .        +-----+  |      +-------+
-> +        +-------+            |    .          .      |
-> +                             | +------+      .      |
-> +                             | | irqM |    +-----+  |
-> +                             | +------+    |  N  |  |
-> +                             |             +-----+  |
-> +                             +----------------------+
+> +The ARM64 port supports two flavours of hugepages.
 > +
-> +Configuration of these MUXCNTL_N registers is done by a system controller
-> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
-> +controller will keep track of the used and unused registers within the Router.
-> +Driver should request the system controller to get the range of GIC IRQs
-> +assigned to the requesting hosts. It is the drivers responsibility to keep
-> +track of GIC IRQs.
+> +1) Block mappings at the pud/pmd level
+> +--------------------------------------
 > +
-> +Communication between the host processor running an OS and the system
-> +controller happens through a protocol called TI System Control Interface
-> +(TISCI protocol). For more details refer:
-> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> +
-> +TISCI Interrupt Router Node:
-> +----------------------------
-> +- compatible:		Must be "ti,sci-intr".
-> +- interrupt-controller:	Identifies the node as an interrupt controller
-> +- #interrupt-cells:	Specifies the number of cells needed to encode an
-> +			interrupt source. The value should be 3.
-> +			First cell should contain the TISCI device ID of source
-> +			Second cell should contain the interrupt source offset
-> +			within the device
-> +			Third cell specifies the trigger type as defined
-> +			in interrupts.txt in this directory.
-> +- interrupt-parent:	phandle of irq parent for TISCI intr. The parent must
-> +			use the same interrupt-cells format as GIC.
-> +- ti,sci:		Phandle to TI-SCI compatible System controller node.
-> +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
-> +- ti,sci-rm-range-girq:	Tuple corresponding to unique TISCI resource type that
-> +			defines the dst host irq ranges assigned to this
-> +			interrupt router from this host context.
-> +			Tuple should be of format <type subtype>.
-> +
+> +These are regular hugepages where a pmd or a pud page table entry points to a
+> +block of memory. Regardless of the supported size of entries in TLB, block
+> +mappings reduces the depth of page table walk needed to translate hugepage
 
-Rob, DT maintainers,
+            reduce
 
-I'd like a feedback from DT maintainers on this 'range' topic.
+> +addresses.
+> +
+> +2) Using the Contiguous bit
+> +---------------------------
+> +
+> +The architecture provides a contiguous bit in the translation table entries
+> +(D4.5.3, ARM DDI 0487C.a) that hints to the mmu to indicate that it is one of a
 
-TISCI Firmware [1] currently seems to define a type corresponding to a
-device ID[2]. in AM6 device, for example, this is different, however
-have a 1 to 1 correspondence. However, there is expectation that type will
-end up as device ID in a future SoC.
+preferably                                     MMU
 
-While this is subject to much debate internally, I'd like some feedback if this
-is OK from Device tree representation - it is true that Firmware does
-look at it as type, however in some future SoC, it could be that the
-values themselves may correspond one to one with a device id -> The
-original wish was that types might be something reusable across SoCs,
-but that is turning out to be more of a theoretical wish than any thing
-practical.
+> +contiguous set of entries that can be cached in a single TLB entry.
+> +
+> +The contiguous bit is used in Linux to increase the mapping size at the pmd and
+> +pte (last) level. The number of supported contiguous entries vary by page size
 
-[1]http://software-dl.ti.com/tisci/esd/latest/5_soc_doc/am6x/resasg_types.html
-[2]http://software-dl.ti.com/tisci/esd/latest/5_soc_doc/am6x/devices.html
+                                                                varies
+
+> +and level of the page table.
+> +
+> +
+> +
+> +The following hugepage sizes are supported -
+> +
+> +         CONT PTE    PMD    CONT PMD    PUD
+> +         --------    ---    --------    ---
+> +  4K:         64K     2M         32M     1G
+> +  16K:         2M    32M          1G
+> +  64K:         2M   512M         16G
+> 
+
+
+thanks,
 -- 
-Regards,
-Nishanth Menon
+~Randy
