@@ -1,33 +1,22 @@
 From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Sat,  6 Oct 2018 04:56:56 +0200
-Subject: [PATCH net-next v7 15/28] zinc: Poly1305 ARM and ARM64 implementations
+Date: Sat,  6 Oct 2018 04:57:04 +0200
+Subject: [PATCH net-next v7 23/28] zinc: import Bernstein and Schwabe's
+ Curve25519 ARM implementation
 In-Reply-To: <20181006025709.4019-1-Jason@zx2c4.com>
 References: <20181006025709.4019-1-Jason@zx2c4.com>
-Message-ID: <20181006025709.4019-16-Jason@zx2c4.com>
+Message-ID: <20181006025709.4019-24-Jason@zx2c4.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These wire Andy Polyakov's implementations up to the kernel. We make a
-few small changes to the assembly:
+This comes from Dan Bernstein and Peter Schwabe's public domain NEON
+code, and is included here in raw form so that subsequent commits that
+fix these up for the kernel can see how it has changed. This code does
+have some entirely cosmetic formatting differences, adding indentation
+and so forth, so that when we actually port it for use in the kernel in
+the subsequent commit, it's obvious what's changed in the process.
 
-- Entries and exits use the proper kernel convention macro.
-- CPU feature checking is done in C by the glue code, so that has been
-  removed from the assembly.
-- The function names have been renamed to fit kernel conventions.
-- Labels have been renamed to fit kernel conventions.
-- The neon code can jump to the scalar code when it makes sense to do
-  so.
-
-The NEON code uses base 2^26, while the scalar code uses base 2^64 on 64-bit
-and base 2^32 on 32-bit. If we hit the unfortunate situation of using NEON
-and then having to go back to scalar -- because the user is silly and has
-called the update function from two separate contexts -- then we need to
-convert back to the original base before proceeding. It is possible to
-reason that the initial reduction below is sufficient given the
-implementation invariants. However, for an avoidance of doubt and because
-this is not performance critical, we do the full reduction anyway. This
-conversion is found in the glue code, and a proof of correctness may be
-easily obtained from Z3: <https://xn--4db.cc/ltPtHCKN/py>.
+This code originates from SUPERCOP 20180818, available at
+<https://bench.cr.yp.to/supercop.html>.
 
 Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
 Cc: Russell King <linux@armlinux.org.uk>
@@ -41,868 +30,2120 @@ Cc: Linus Torvalds <torvalds@linux-foundation.org>
 Cc: kernel-hardening at lists.openwall.com
 Cc: linux-crypto at vger.kernel.org
 ---
- lib/zinc/Makefile                             |   2 +
- lib/zinc/poly1305/poly1305-arm-glue.c         | 140 +++++++++++++++++
- ...ly1305-arm-cryptogams.S => poly1305-arm.S} | 147 ++++++------------
- ...05-arm64-cryptogams.S => poly1305-arm64.S} | 127 +++++----------
- lib/zinc/poly1305/poly1305.c                  |   2 +
- 5 files changed, 231 insertions(+), 187 deletions(-)
- create mode 100644 lib/zinc/poly1305/poly1305-arm-glue.c
- rename lib/zinc/poly1305/{poly1305-arm-cryptogams.S => poly1305-arm.S} (91%)
- rename lib/zinc/poly1305/{poly1305-arm64-cryptogams.S => poly1305-arm64.S} (89%)
+ lib/zinc/curve25519/curve25519-arm-supercop.S | 2105 +++++++++++++++++
+ 1 file changed, 2105 insertions(+)
+ create mode 100644 lib/zinc/curve25519/curve25519-arm-supercop.S
 
-diff --git a/lib/zinc/Makefile b/lib/zinc/Makefile
-index a8943d960b6a..c09fd3de60f9 100644
---- a/lib/zinc/Makefile
-+++ b/lib/zinc/Makefile
-@@ -12,4 +12,6 @@ obj-$(CONFIG_ZINC_CHACHA20) += zinc_chacha20.o
- 
- zinc_poly1305-y := poly1305/poly1305.o
- zinc_poly1305-$(CONFIG_ZINC_ARCH_X86_64) += poly1305/poly1305-x86_64.o
-+zinc_poly1305-$(CONFIG_ZINC_ARCH_ARM) += poly1305/poly1305-arm.o
-+zinc_poly1305-$(CONFIG_ZINC_ARCH_ARM64) += poly1305/poly1305-arm64.o
- obj-$(CONFIG_ZINC_POLY1305) += zinc_poly1305.o
-diff --git a/lib/zinc/poly1305/poly1305-arm-glue.c b/lib/zinc/poly1305/poly1305-arm-glue.c
+diff --git a/lib/zinc/curve25519/curve25519-arm-supercop.S b/lib/zinc/curve25519/curve25519-arm-supercop.S
 new file mode 100644
-index 000000000000..f4f08ecffbf6
+index 000000000000..f33b85fef382
 --- /dev/null
-+++ b/lib/zinc/poly1305/poly1305-arm-glue.c
-@@ -0,0 +1,140 @@
-+// SPDX-License-Identifier: GPL-2.0 OR MIT
++++ b/lib/zinc/curve25519/curve25519-arm-supercop.S
+@@ -0,0 +1,2105 @@
 +/*
-+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
++ * Public domain code from Daniel J. Bernstein and Peter Schwabe, from
++ * SUPERCOP's curve25519/neon2/scalarmult.s.
 + */
 +
-+#include <asm/hwcap.h>
-+#include <asm/neon.h>
-+
-+asmlinkage void poly1305_init_arm(void *ctx, const u8 key[16]);
-+asmlinkage void poly1305_blocks_arm(void *ctx, const u8 *inp, const size_t len,
-+				    const u32 padbit);
-+asmlinkage void poly1305_emit_arm(void *ctx, u8 mac[16], const u32 nonce[4]);
-+asmlinkage void poly1305_blocks_neon(void *ctx, const u8 *inp, const size_t len,
-+				     const u32 padbit);
-+asmlinkage void poly1305_emit_neon(void *ctx, u8 mac[16], const u32 nonce[4]);
-+
-+static bool poly1305_use_neon __ro_after_init;
-+static bool *const poly1305_nobs[] __initconst = { &poly1305_use_neon };
-+
-+static void __init poly1305_fpu_init(void)
-+{
-+#if defined(CONFIG_ZINC_ARCH_ARM64)
-+	poly1305_use_neon = elf_hwcap & HWCAP_ASIMD;
-+#elif defined(CONFIG_ZINC_ARCH_ARM)
-+	poly1305_use_neon = elf_hwcap & HWCAP_NEON;
-+#endif
-+}
-+
-+#if defined(CONFIG_ZINC_ARCH_ARM64)
-+struct poly1305_arch_internal {
-+	union {
-+		u32 h[5];
-+		struct {
-+			u64 h0, h1, h2;
-+		};
-+	};
-+	u64 is_base2_26;
-+	u64 r[2];
-+};
-+#elif defined(CONFIG_ZINC_ARCH_ARM)
-+struct poly1305_arch_internal {
-+	union {
-+		u32 h[5];
-+		struct {
-+			u64 h0, h1;
-+			u32 h2;
-+		} __packed;
-+	};
-+	u32 r[4];
-+	u32 is_base2_26;
-+};
-+#endif
-+
-+/* The NEON code uses base 2^26, while the scalar code uses base 2^64 on 64-bit
-+ * and base 2^32 on 32-bit. If we hit the unfortunate situation of using NEON
-+ * and then having to go back to scalar -- because the user is silly and has
-+ * called the update function from two separate contexts -- then we need to
-+ * convert back to the original base before proceeding. The below function is
-+ * written for 64-bit integers, and so we have to swap words at the end on
-+ * big-endian 32-bit. It is possible to reason that the initial reduction below
-+ * is sufficient given the implementation invariants. However, for an avoidance
-+ * of doubt and because this is not performance critical, we do the full
-+ * reduction anyway.
-+ */
-+static void convert_to_base2_64(void *ctx)
-+{
-+	struct poly1305_arch_internal *state = ctx;
-+	u32 cy;
-+
-+	if (!IS_ENABLED(CONFIG_KERNEL_MODE_NEON) || !state->is_base2_26)
-+		return;
-+
-+	cy = state->h[0] >> 26; state->h[0] &= 0x3ffffff; state->h[1] += cy;
-+	cy = state->h[1] >> 26; state->h[1] &= 0x3ffffff; state->h[2] += cy;
-+	cy = state->h[2] >> 26; state->h[2] &= 0x3ffffff; state->h[3] += cy;
-+	cy = state->h[3] >> 26; state->h[3] &= 0x3ffffff; state->h[4] += cy;
-+	state->h0 = ((u64)state->h[2] << 52) | ((u64)state->h[1] << 26) | state->h[0];
-+	state->h1 = ((u64)state->h[4] << 40) | ((u64)state->h[3] << 14) | (state->h[2] >> 12);
-+	state->h2 = state->h[4] >> 24;
-+	if (IS_ENABLED(CONFIG_ZINC_ARCH_ARM) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)) {
-+		state->h0 = rol64(state->h0, 32);
-+		state->h1 = rol64(state->h1, 32);
-+	}
-+#define ULT(a, b) ((a ^ ((a ^ b) | ((a - b) ^ b))) >> (sizeof(a) * 8 - 1))
-+	cy = (state->h2 >> 2) + (state->h2 & ~3ULL);
-+	state->h2 &= 3;
-+	state->h0 += cy;
-+	state->h1 += (cy = ULT(state->h0, cy));
-+	state->h2 += ULT(state->h1, cy);
-+#undef ULT
-+	state->is_base2_26 = 0;
-+}
-+
-+static inline bool poly1305_init_arch(void *ctx,
-+				      const u8 key[POLY1305_KEY_SIZE])
-+{
-+	poly1305_init_arm(ctx, key);
-+	return true;
-+}
-+
-+static inline bool poly1305_blocks_arch(void *ctx, const u8 *inp,
-+					size_t len, const u32 padbit,
-+					simd_context_t *simd_context)
-+{
-+	/* SIMD disables preemption, so relax after processing each page. */
-+	BUILD_BUG_ON(PAGE_SIZE < POLY1305_BLOCK_SIZE ||
-+		     PAGE_SIZE % POLY1305_BLOCK_SIZE);
-+
-+	if (!IS_ENABLED(CONFIG_KERNEL_MODE_NEON) || !poly1305_use_neon ||
-+	    !simd_use(simd_context)) {
-+		convert_to_base2_64(ctx);
-+		poly1305_blocks_arm(ctx, inp, len, padbit);
-+		return true;
-+	}
-+
-+	for (;;) {
-+		const size_t bytes = min_t(size_t, len, PAGE_SIZE);
-+
-+		poly1305_blocks_neon(ctx, inp, bytes, padbit);
-+		len -= bytes;
-+		if (!len)
-+			break;
-+		inp += bytes;
-+		simd_relax(simd_context);
-+	}
-+	return true;
-+}
-+
-+static inline bool poly1305_emit_arch(void *ctx, u8 mac[POLY1305_MAC_SIZE],
-+				      const u32 nonce[4],
-+				      simd_context_t *simd_context)
-+{
-+	if (!IS_ENABLED(CONFIG_KERNEL_MODE_NEON) || !poly1305_use_neon ||
-+	    !simd_use(simd_context)) {
-+		convert_to_base2_64(ctx);
-+		poly1305_emit_arm(ctx, mac, nonce);
-+	} else
-+		poly1305_emit_neon(ctx, mac, nonce);
-+	return true;
-+}
-diff --git a/lib/zinc/poly1305/poly1305-arm-cryptogams.S b/lib/zinc/poly1305/poly1305-arm.S
-similarity index 91%
-rename from lib/zinc/poly1305/poly1305-arm-cryptogams.S
-rename to lib/zinc/poly1305/poly1305-arm.S
-index 884b465030e4..4a0e9d451119 100644
---- a/lib/zinc/poly1305/poly1305-arm-cryptogams.S
-+++ b/lib/zinc/poly1305/poly1305-arm.S
-@@ -1,9 +1,12 @@
- /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
- /*
-+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-  * Copyright (C) 2006-2017 CRYPTOGAMS by <appro@openssl.org>. All Rights Reserved.
-+ *
-+ * This is based in part on Andy Polyakov's implementation from CRYPTOGAMS.
-  */
- 
--#include "arm_arch.h"
-+#include <linux/linkage.h>
- 
- .text
- #if defined(__thumb2__)
-@@ -13,13 +16,8 @@
- .code	32
- #endif
- 
--.globl	poly1305_emit
--.globl	poly1305_blocks
--.globl	poly1305_init
--.type	poly1305_init,%function
- .align	5
--poly1305_init:
--.Lpoly1305_init:
-+ENTRY(poly1305_init_arm)
- 	stmdb	sp!,{r4-r11}
- 
- 	eor	r3,r3,r3
-@@ -38,10 +36,6 @@ poly1305_init:
- 	moveq	r0,#0
- 	beq	.Lno_key
- 
--#if	__ARM_MAX_ARCH__>=7
--	adr	r11,.Lpoly1305_init
--	ldr	r12,.LOPENSSL_armcap
--#endif
- 	ldrb	r4,[r1,#0]
- 	mov	r10,#0x0fffffff
- 	ldrb	r5,[r1,#1]
-@@ -56,12 +50,6 @@ poly1305_init:
- 	ldrb	r7,[r1,#6]
- 	and	r4,r4,r10
- 
--#if	__ARM_MAX_ARCH__>=7
--	ldr	r12,[r11,r12]		@ OPENSSL_armcap_P
--# ifdef	__APPLE__
--	ldr	r12,[r12]
--# endif
--#endif
- 	ldrb	r8,[r1,#7]
- 	orr	r5,r5,r6,lsl#8
- 	ldrb	r6,[r1,#8]
-@@ -71,35 +59,6 @@ poly1305_init:
- 	ldrb	r8,[r1,#10]
- 	and	r5,r5,r3
- 
--#if	__ARM_MAX_ARCH__>=7
--	tst	r12,#ARMV7_NEON		@ check for NEON
--# ifdef	__APPLE__
--	adr	r9,poly1305_blocks_neon
--	adr	r11,poly1305_blocks
--#  ifdef __thumb2__
--	it	ne
--#  endif
--	movne	r11,r9
--	adr	r12,poly1305_emit
--	adr	r10,poly1305_emit_neon
--#  ifdef __thumb2__
--	it	ne
--#  endif
--	movne	r12,r10
--# else
--#  ifdef __thumb2__
--	itete	eq
--#  endif
--	addeq	r12,r11,#(poly1305_emit-.Lpoly1305_init)
--	addne	r12,r11,#(poly1305_emit_neon-.Lpoly1305_init)
--	addeq	r11,r11,#(poly1305_blocks-.Lpoly1305_init)
--	addne	r11,r11,#(poly1305_blocks_neon-.Lpoly1305_init)
--# endif
--# ifdef	__thumb2__
--	orr	r12,r12,#1	@ thumb-ify address
--	orr	r11,r11,#1
--# endif
--#endif
- 	ldrb	r9,[r1,#11]
- 	orr	r6,r6,r7,lsl#8
- 	ldrb	r7,[r1,#12]
-@@ -118,26 +77,20 @@ poly1305_init:
- 	str	r6,[r0,#8]
- 	and	r7,r7,r3
- 	str	r7,[r0,#12]
--#if	__ARM_MAX_ARCH__>=7
--	stmia	r2,{r11,r12}		@ fill functions table
--	mov	r0,#1
--#else
--	mov	r0,#0
--#endif
- .Lno_key:
- 	ldmia	sp!,{r4-r11}
--#if	__ARM_ARCH__>=5
-+#if __LINUX_ARM_ARCH__ >= 5
- 	bx	lr				@ bx	lr
- #else
- 	tst	lr,#1
- 	moveq	pc,lr			@ be binary compatible with V4, yet
- 	.word	0xe12fff1e			@ interoperable with Thumb ISA:-)
- #endif
--.size	poly1305_init,.-poly1305_init
--.type	poly1305_blocks,%function
-+ENDPROC(poly1305_init_arm)
-+
- .align	5
--poly1305_blocks:
--.Lpoly1305_blocks:
-+ENTRY(poly1305_blocks_arm)
-+.Lpoly1305_blocks_arm:
- 	stmdb	sp!,{r3-r11,lr}
- 
- 	ands	r2,r2,#-16
-@@ -158,11 +111,11 @@ poly1305_blocks:
- 	b	.Loop
- 
- .Loop:
--#if __ARM_ARCH__<7
-+#if __LINUX_ARM_ARCH__ < 7
- 	ldrb	r0,[lr],#16		@ load input
--# ifdef	__thumb2__
-+#ifdef	__thumb2__
- 	it	hi
--# endif
-+#endif
- 	addhi	r8,r8,#1		@ 1<<128
- 	ldrb	r1,[lr,#-15]
- 	ldrb	r2,[lr,#-14]
-@@ -201,19 +154,19 @@ poly1305_blocks:
- 	orr	r3,r2,r3,lsl#24
- #else
- 	ldr	r0,[lr],#16		@ load input
--# ifdef	__thumb2__
-+#ifdef	__thumb2__
- 	it	hi
--# endif
-+#endif
- 	addhi	r8,r8,#1		@ padbit
- 	ldr	r1,[lr,#-12]
- 	ldr	r2,[lr,#-8]
- 	ldr	r3,[lr,#-4]
--# ifdef	__ARMEB__
-+#ifdef	__ARMEB__
- 	rev	r0,r0
- 	rev	r1,r1
- 	rev	r2,r2
- 	rev	r3,r3
--# endif
-+#endif
- 	adds	r4,r4,r0		@ accumulate input
- 	str	lr,[sp,#8]		@ offload input pointer
- 	adcs	r5,r5,r1
-@@ -283,7 +236,7 @@ poly1305_blocks:
- 	stmia	r0,{r4-r8}		@ store the result
- 
- .Lno_data:
--#if	__ARM_ARCH__>=5
-+#if __LINUX_ARM_ARCH__ >= 5
- 	ldmia	sp!,{r3-r11,pc}
- #else
- 	ldmia	sp!,{r3-r11,lr}
-@@ -291,13 +244,12 @@ poly1305_blocks:
- 	moveq	pc,lr			@ be binary compatible with V4, yet
- 	.word	0xe12fff1e			@ interoperable with Thumb ISA:-)
- #endif
--.size	poly1305_blocks,.-poly1305_blocks
--.type	poly1305_emit,%function
-+ENDPROC(poly1305_blocks_arm)
-+
- .align	5
--poly1305_emit:
-+ENTRY(poly1305_emit_arm)
- 	stmdb	sp!,{r4-r11}
- .Lpoly1305_emit_enter:
--
- 	ldmia	r0,{r3-r7}
- 	adds	r8,r3,#5		@ compare to modulus
- 	adcs	r9,r4,#0
-@@ -332,13 +284,13 @@ poly1305_emit:
- 	adcs	r5,r5,r10
- 	adc	r6,r6,r11
- 
--#if __ARM_ARCH__>=7
--# ifdef __ARMEB__
-+#if __LINUX_ARM_ARCH__ >= 7
-+#ifdef __ARMEB__
- 	rev	r3,r3
- 	rev	r4,r4
- 	rev	r5,r5
- 	rev	r6,r6
--# endif
-+#endif
- 	str	r3,[r1,#0]
- 	str	r4,[r1,#4]
- 	str	r5,[r1,#8]
-@@ -377,20 +329,22 @@ poly1305_emit:
- 	strb	r6,[r1,#15]
- #endif
- 	ldmia	sp!,{r4-r11}
--#if	__ARM_ARCH__>=5
-+#if __LINUX_ARM_ARCH__ >= 5
- 	bx	lr				@ bx	lr
- #else
- 	tst	lr,#1
- 	moveq	pc,lr			@ be binary compatible with V4, yet
- 	.word	0xe12fff1e			@ interoperable with Thumb ISA:-)
- #endif
--.size	poly1305_emit,.-poly1305_emit
--#if	__ARM_MAX_ARCH__>=7
-+ENDPROC(poly1305_emit_arm)
-+
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
- .fpu	neon
- 
--.type	poly1305_init_neon,%function
- .align	5
--poly1305_init_neon:
-+ENTRY(poly1305_init_neon)
-+.Lpoly1305_init_neon:
- 	ldr	r4,[r0,#20]		@ load key base 2^32
- 	ldr	r5,[r0,#24]
- 	ldr	r6,[r0,#28]
-@@ -600,11 +554,10 @@ poly1305_init_neon:
- 	vst1.32		{d8[1]},[r7]
- 
- 	bx	lr				@ bx	lr
--.size	poly1305_init_neon,.-poly1305_init_neon
-+ENDPROC(poly1305_init_neon)
- 
--.type	poly1305_blocks_neon,%function
- .align	5
--poly1305_blocks_neon:
-+ENTRY(poly1305_blocks_neon)
- 	ldr	ip,[r0,#36]		@ is_base2_26
- 	ands	r2,r2,#-16
- 	beq	.Lno_data_neon
-@@ -612,7 +565,7 @@ poly1305_blocks_neon:
- 	cmp	r2,#64
- 	bhs	.Lenter_neon
- 	tst	ip,ip			@ is_base2_26?
--	beq	.Lpoly1305_blocks
-+	beq	.Lpoly1305_blocks_arm
- 
- .Lenter_neon:
- 	stmdb	sp!,{r4-r7}
-@@ -622,7 +575,7 @@ poly1305_blocks_neon:
- 	bne	.Lbase2_26_neon
- 
- 	stmdb	sp!,{r1-r3,lr}
--	bl	poly1305_init_neon
-+	bl	.Lpoly1305_init_neon
- 
- 	ldr	r4,[r0,#0]		@ load hash value base 2^32
- 	ldr	r5,[r0,#4]
-@@ -686,12 +639,12 @@ poly1305_blocks_neon:
- 	sub		r2,r2,#16
- 	add		r4,r1,#32
- 
--# ifdef	__ARMEB__
-+#ifdef	__ARMEB__
- 	vrev32.8	q10,q10
- 	vrev32.8	q13,q13
- 	vrev32.8	q11,q11
- 	vrev32.8	q12,q12
--# endif
-+#endif
- 	vsri.u32	d28,d26,#8	@ base 2^32 -> base 2^26
- 	vshl.u32	d26,d26,#18
- 
-@@ -735,12 +688,12 @@ poly1305_blocks_neon:
- 	addhi		r7,r0,#(48+1*9*4)
- 	addhi		r6,r0,#(48+3*9*4)
- 
--# ifdef	__ARMEB__
-+#ifdef	__ARMEB__
- 	vrev32.8	q10,q10
- 	vrev32.8	q13,q13
- 	vrev32.8	q11,q11
- 	vrev32.8	q12,q12
--# endif
-+#endif
- 	vsri.u32	q14,q13,#8		@ base 2^32 -> base 2^26
- 	vshl.u32	q13,q13,#18
- 
-@@ -866,12 +819,12 @@ poly1305_blocks_neon:
- 
- 	vld4.32		{d20,d22,d24,d26},[r1]	@ inp[0:1]
- 	add		r1,r1,#64
--# ifdef	__ARMEB__
-+#ifdef	__ARMEB__
- 	vrev32.8	q10,q10
- 	vrev32.8	q11,q11
- 	vrev32.8	q12,q12
- 	vrev32.8	q13,q13
--# endif
-+#endif
- 
- 	@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
- 	@ lazy reduction interleaved with base 2^32 -> base 2^26 of
-@@ -1086,11 +1039,10 @@ poly1305_blocks_neon:
- 	ldmia	sp!,{r4-r7}
- .Lno_data_neon:
- 	bx	lr					@ bx	lr
--.size	poly1305_blocks_neon,.-poly1305_blocks_neon
-+ENDPROC(poly1305_blocks_neon)
- 
--.type	poly1305_emit_neon,%function
- .align	5
--poly1305_emit_neon:
-+ENTRY(poly1305_emit_neon)
- 	ldr	ip,[r0,#36]		@ is_base2_26
- 
- 	stmdb	sp!,{r4-r11}
-@@ -1144,12 +1096,12 @@ poly1305_emit_neon:
- 	adcs	r5,r5,r10
- 	adc	r6,r6,r11
- 
--# ifdef __ARMEB__
-+#ifdef __ARMEB__
- 	rev	r3,r3
- 	rev	r4,r4
- 	rev	r5,r5
- 	rev	r6,r6
--# endif
-+#endif
- 	str	r3,[r1,#0]		@ store the result
- 	str	r4,[r1,#4]
- 	str	r5,[r1,#8]
-@@ -1157,16 +1109,9 @@ poly1305_emit_neon:
- 
- 	ldmia	sp!,{r4-r11}
- 	bx	lr				@ bx	lr
--.size	poly1305_emit_neon,.-poly1305_emit_neon
-+ENDPROC(poly1305_emit_neon)
- 
- .align	5
- .Lzeros:
- .long	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
--.LOPENSSL_armcap:
--.word	OPENSSL_armcap_P-.Lpoly1305_init
--#endif
--.asciz	"Poly1305 for ARMv4/NEON, CRYPTOGAMS by <appro@openssl.org>"
--.align	2
--#if	__ARM_MAX_ARCH__>=7
--.comm   OPENSSL_armcap_P,4,4
- #endif
-diff --git a/lib/zinc/poly1305/poly1305-arm64-cryptogams.S b/lib/zinc/poly1305/poly1305-arm64.S
-similarity index 89%
-rename from lib/zinc/poly1305/poly1305-arm64-cryptogams.S
-rename to lib/zinc/poly1305/poly1305-arm64.S
-index 0ecb50a83ec0..5f4e7fb0a836 100644
---- a/lib/zinc/poly1305/poly1305-arm64-cryptogams.S
-+++ b/lib/zinc/poly1305/poly1305-arm64.S
-@@ -1,21 +1,16 @@
- /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
- /*
-+ * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-  * Copyright (C) 2006-2017 CRYPTOGAMS by <appro@openssl.org>. All Rights Reserved.
-+ *
-+ * This is based in part on Andy Polyakov's implementation from CRYPTOGAMS.
-  */
- 
--#include "arm_arch.h"
--
-+#include <linux/linkage.h>
- .text
- 
--// forward "declarations" are required for Apple
--
--.globl	poly1305_blocks
--.globl	poly1305_emit
--
--.globl	poly1305_init
--.type	poly1305_init,%function
- .align	5
--poly1305_init:
-+ENTRY(poly1305_init_arm)
- 	cmp	x1,xzr
- 	stp	xzr,xzr,[x0]		// zero hash value
- 	stp	xzr,xzr,[x0,#16]	// [along with is_base2_26]
-@@ -23,18 +18,10 @@ poly1305_init:
- 	csel	x0,xzr,x0,eq
- 	b.eq	.Lno_key
- 
--#ifdef	__ILP32__
--	ldrsw	x11,.LOPENSSL_armcap_P
--#else
--	ldr	x11,.LOPENSSL_armcap_P
--#endif
--	adr	x10,.LOPENSSL_armcap_P
--
- 	ldp	x7,x8,[x1]		// load key
- 	mov	x9,#0xfffffffc0fffffff
- 	movk	x9,#0x0fff,lsl#48
--	ldr	w17,[x10,x11]
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x7,x7			// flip bytes
- 	rev	x8,x8
- #endif
-@@ -43,30 +30,12 @@ poly1305_init:
- 	and	x8,x8,x9		// &=0ffffffc0ffffffc
- 	stp	x7,x8,[x0,#32]	// save key value
- 
--	tst	w17,#ARMV7_NEON
--
--	adr	x12,poly1305_blocks
--	adr	x7,poly1305_blocks_neon
--	adr	x13,poly1305_emit
--	adr	x8,poly1305_emit_neon
--
--	csel	x12,x12,x7,eq
--	csel	x13,x13,x8,eq
--
--#ifdef	__ILP32__
--	stp	w12,w13,[x2]
--#else
--	stp	x12,x13,[x2]
--#endif
--
--	mov	x0,#1
- .Lno_key:
- 	ret
--.size	poly1305_init,.-poly1305_init
-+ENDPROC(poly1305_init_arm)
- 
--.type	poly1305_blocks,%function
- .align	5
--poly1305_blocks:
-+ENTRY(poly1305_blocks_arm)
- 	ands	x2,x2,#-16
- 	b.eq	.Lno_data
- 
-@@ -80,7 +49,7 @@ poly1305_blocks:
- .Loop:
- 	ldp	x10,x11,[x1],#16	// load input
- 	sub	x2,x2,#16
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x10,x10
- 	rev	x11,x11
- #endif
-@@ -126,11 +95,10 @@ poly1305_blocks:
- 
- .Lno_data:
- 	ret
--.size	poly1305_blocks,.-poly1305_blocks
-+ENDPROC(poly1305_blocks_arm)
- 
--.type	poly1305_emit,%function
- .align	5
--poly1305_emit:
-+ENTRY(poly1305_emit_arm)
- 	ldp	x4,x5,[x0]		// load hash base 2^64
- 	ldr	x6,[x0,#16]
- 	ldp	x10,x11,[x2]	// load nonce
-@@ -144,23 +112,23 @@ poly1305_emit:
- 	csel	x4,x4,x12,eq
- 	csel	x5,x5,x13,eq
- 
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	ror	x10,x10,#32		// flip nonce words
- 	ror	x11,x11,#32
- #endif
- 	adds	x4,x4,x10		// accumulate nonce
- 	adc	x5,x5,x11
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x4,x4			// flip output bytes
- 	rev	x5,x5
- #endif
- 	stp	x4,x5,[x1]		// write result
- 
- 	ret
--.size	poly1305_emit,.-poly1305_emit
--.type	poly1305_mult,%function
-+ENDPROC(poly1305_emit_arm)
-+
- .align	5
--poly1305_mult:
-+__poly1305_mult:
- 	mul	x12,x4,x7		// h0*r0
- 	umulh	x13,x4,x7
- 
-@@ -193,11 +161,8 @@ poly1305_mult:
- 	adc	x6,x6,xzr
- 
- 	ret
--.size	poly1305_mult,.-poly1305_mult
- 
--.type	poly1305_splat,%function
--.align	5
--poly1305_splat:
-+__poly1305_splat:
- 	and	x12,x4,#0x03ffffff	// base 2^64 -> base 2^26
- 	ubfx	x13,x4,#26,#26
- 	extr	x14,x5,x4,#52
-@@ -220,15 +185,14 @@ poly1305_splat:
- 	str	w15,[x0,#16*8]	// s4
- 
- 	ret
--.size	poly1305_splat,.-poly1305_splat
- 
--.type	poly1305_blocks_neon,%function
-+#ifdef CONFIG_KERNEL_MODE_NEON
- .align	5
--poly1305_blocks_neon:
-+ENTRY(poly1305_blocks_neon)
- 	ldr	x17,[x0,#24]
- 	cmp	x2,#128
- 	b.hs	.Lblocks_neon
--	cbz	x17,poly1305_blocks
-+	cbz	x17,poly1305_blocks_arm
- 
- .Lblocks_neon:
- 	stp	x29,x30,[sp,#-80]!
-@@ -268,7 +232,7 @@ poly1305_blocks_neon:
- 	adcs	x5,x5,xzr
- 	adc	x6,x6,xzr
- 
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x12,x12
- 	rev	x13,x13
- #endif
-@@ -276,7 +240,7 @@ poly1305_blocks_neon:
- 	adcs	x5,x5,x13
- 	adc	x6,x6,x3
- 
--	bl	poly1305_mult
-+	bl	__poly1305_mult
- 	ldr	x30,[sp,#8]
- 
- 	cbz	x3,.Lstore_base2_64_neon
-@@ -314,7 +278,7 @@ poly1305_blocks_neon:
- 	ldp	x12,x13,[x1],#16	// load input
- 	sub	x2,x2,#16
- 	add	x9,x8,x8,lsr#2	// s1 = r1 + (r1 >> 2)
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x12,x12
- 	rev	x13,x13
- #endif
-@@ -322,7 +286,7 @@ poly1305_blocks_neon:
- 	adcs	x5,x5,x13
- 	adc	x6,x6,x3
- 
--	bl	poly1305_mult
-+	bl	__poly1305_mult
- 
- .Linit_neon:
- 	and	x10,x4,#0x03ffffff	// base 2^64 -> base 2^26
-@@ -349,19 +313,19 @@ poly1305_blocks_neon:
- 	mov	x5,x8
- 	mov	x6,xzr
- 	add	x0,x0,#48+12
--	bl	poly1305_splat
-+	bl	__poly1305_splat
- 
--	bl	poly1305_mult		// r^2
-+	bl	__poly1305_mult		// r^2
- 	sub	x0,x0,#4
--	bl	poly1305_splat
-+	bl	__poly1305_splat
- 
--	bl	poly1305_mult		// r^3
-+	bl	__poly1305_mult		// r^3
- 	sub	x0,x0,#4
--	bl	poly1305_splat
-+	bl	__poly1305_splat
- 
--	bl	poly1305_mult		// r^4
-+	bl	__poly1305_mult		// r^4
- 	sub	x0,x0,#4
--	bl	poly1305_splat
-+	bl	__poly1305_splat
- 	ldr	x30,[sp,#8]
- 
- 	add	x16,x1,#32
-@@ -399,7 +363,7 @@ poly1305_blocks_neon:
- 	lsl	x3,x3,#24
- 	add	x15,x0,#48
- 
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x8,x8
- 	rev	x12,x12
- 	rev	x9,x9
-@@ -435,7 +399,7 @@ poly1305_blocks_neon:
- 	ld1	{v4.4s,v5.4s,v6.4s,v7.4s},[x15],#64
- 	ld1	{v8.4s},[x15]
- 
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x8,x8
- 	rev	x12,x12
- 	rev	x9,x9
-@@ -496,7 +460,7 @@ poly1305_blocks_neon:
- 	umull	v20.2d,v14.2s,v1.s[2]
- 	ldp	x9,x13,[x16],#48
- 	umull	v19.2d,v14.2s,v0.s[2]
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x8,x8
- 	rev	x12,x12
- 	rev	x9,x9
-@@ -561,7 +525,7 @@ poly1305_blocks_neon:
- 	umlal	v23.2d,v11.2s,v3.s[0]
- 	umlal	v20.2d,v11.2s,v8.s[0]
- 	umlal	v21.2d,v11.2s,v0.s[0]
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x8,x8
- 	rev	x12,x12
- 	rev	x9,x9
-@@ -801,13 +765,12 @@ poly1305_blocks_neon:
- .Lno_data_neon:
- 	ldr	x29,[sp],#80
- 	ret
--.size	poly1305_blocks_neon,.-poly1305_blocks_neon
-+ENDPROC(poly1305_blocks_neon)
- 
--.type	poly1305_emit_neon,%function
- .align	5
--poly1305_emit_neon:
-+ENTRY(poly1305_emit_neon)
- 	ldr	x17,[x0,#24]
--	cbz	x17,poly1305_emit
-+	cbz	x17,poly1305_emit_arm
- 
- 	ldp	w10,w11,[x0]		// load hash value base 2^26
- 	ldp	w12,w13,[x0,#8]
-@@ -840,30 +803,22 @@ poly1305_emit_neon:
- 	csel	x4,x4,x12,eq
- 	csel	x5,x5,x13,eq
- 
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	ror	x10,x10,#32		// flip nonce words
- 	ror	x11,x11,#32
- #endif
- 	adds	x4,x4,x10		// accumulate nonce
- 	adc	x5,x5,x11
--#ifdef	__ARMEB__
-+#ifdef	__AARCH64EB__
- 	rev	x4,x4			// flip output bytes
- 	rev	x5,x5
- #endif
- 	stp	x4,x5,[x1]		// write result
- 
- 	ret
--.size	poly1305_emit_neon,.-poly1305_emit_neon
-+ENDPROC(poly1305_emit_neon)
- 
- .align	5
- .Lzeros:
- .long	0,0,0,0,0,0,0,0
--.LOPENSSL_armcap_P:
--#ifdef	__ILP32__
--.long	OPENSSL_armcap_P-.
--#else
--.quad	OPENSSL_armcap_P-.
- #endif
--.byte	80,111,108,121,49,51,48,53,32,102,111,114,32,65,82,77,118,56,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
--.align	2
--.align	2
-diff --git a/lib/zinc/poly1305/poly1305.c b/lib/zinc/poly1305/poly1305.c
-index 51af7045cac8..9dc85f62e806 100644
---- a/lib/zinc/poly1305/poly1305.c
-+++ b/lib/zinc/poly1305/poly1305.c
-@@ -18,6 +18,8 @@
- 
- #if defined(CONFIG_ZINC_ARCH_X86_64)
- #include "poly1305-x86_64-glue.c"
-+#elif defined(CONFIG_ZINC_ARCH_ARM) || defined(CONFIG_ZINC_ARCH_ARM64)
-+#include "poly1305-arm-glue.c"
- #else
- static inline bool poly1305_init_arch(void *ctx,
- 				      const u8 key[POLY1305_KEY_SIZE])
++.fpu neon
++.text
++.align 4
++.global _crypto_scalarmult_curve25519_neon2
++.global crypto_scalarmult_curve25519_neon2
++.type _crypto_scalarmult_curve25519_neon2 STT_FUNC
++.type crypto_scalarmult_curve25519_neon2 STT_FUNC
++	_crypto_scalarmult_curve25519_neon2:
++	crypto_scalarmult_curve25519_neon2:
++	vpush		{q4, q5, q6, q7}
++	mov		r12, sp
++	sub		sp, sp, #736
++	and		sp, sp, #0xffffffe0
++	strd		r4, [sp, #0]
++	strd		r6, [sp, #8]
++	strd		r8, [sp, #16]
++	strd		r10, [sp, #24]
++	str		r12, [sp, #480]
++	str		r14, [sp, #484]
++	mov		r0, r0
++	mov		r1, r1
++	mov		r2, r2
++	add		r3, sp, #32
++	ldr		r4, =0
++	ldr		r5, =254
++	vmov.i32	q0, #1
++	vshr.u64	q1, q0, #7
++	vshr.u64	q0, q0, #8
++	vmov.i32	d4, #19
++	vmov.i32	d5, #38
++	add		r6, sp, #512
++	vst1.8		{d2-d3}, [r6, : 128]
++	add		r6, sp, #528
++	vst1.8		{d0-d1}, [r6, : 128]
++	add		r6, sp, #544
++	vst1.8		{d4-d5}, [r6, : 128]
++	add		r6, r3, #0
++	vmov.i32	q2, #0
++	vst1.8		{d4-d5}, [r6, : 128]!
++	vst1.8		{d4-d5}, [r6, : 128]!
++	vst1.8		d4, [r6, : 64]
++	add		r6, r3, #0
++	ldr		r7, =960
++	sub		r7, r7, #2
++	neg		r7, r7
++	sub		r7, r7, r7, LSL #7
++	str		r7, [r6]
++	add		r6, sp, #704
++	vld1.8		{d4-d5}, [r1]!
++	vld1.8		{d6-d7}, [r1]
++	vst1.8		{d4-d5}, [r6, : 128]!
++	vst1.8		{d6-d7}, [r6, : 128]
++	sub		r1, r6, #16
++	ldrb		r6, [r1]
++	and		r6, r6, #248
++	strb		r6, [r1]
++	ldrb		r6, [r1, #31]
++	and		r6, r6, #127
++	orr		r6, r6, #64
++	strb		r6, [r1, #31]
++	vmov.i64	q2, #0xffffffff
++	vshr.u64	q3, q2, #7
++	vshr.u64	q2, q2, #6
++	vld1.8		{d8}, [r2]
++	vld1.8		{d10}, [r2]
++	add		r2, r2, #6
++	vld1.8		{d12}, [r2]
++	vld1.8		{d14}, [r2]
++	add		r2, r2, #6
++	vld1.8		{d16}, [r2]
++	add		r2, r2, #4
++	vld1.8		{d18}, [r2]
++	vld1.8		{d20}, [r2]
++	add		r2, r2, #6
++	vld1.8		{d22}, [r2]
++	add		r2, r2, #2
++	vld1.8		{d24}, [r2]
++	vld1.8		{d26}, [r2]
++	vshr.u64	q5, q5, #26
++	vshr.u64	q6, q6, #3
++	vshr.u64	q7, q7, #29
++	vshr.u64	q8, q8, #6
++	vshr.u64	q10, q10, #25
++	vshr.u64	q11, q11, #3
++	vshr.u64	q12, q12, #12
++	vshr.u64	q13, q13, #38
++	vand		q4, q4, q2
++	vand		q6, q6, q2
++	vand		q8, q8, q2
++	vand		q10, q10, q2
++	vand		q2, q12, q2
++	vand		q5, q5, q3
++	vand		q7, q7, q3
++	vand		q9, q9, q3
++	vand		q11, q11, q3
++	vand		q3, q13, q3
++	add		r2, r3, #48
++	vadd.i64	q12, q4, q1
++	vadd.i64	q13, q10, q1
++	vshr.s64	q12, q12, #26
++	vshr.s64	q13, q13, #26
++	vadd.i64	q5, q5, q12
++	vshl.i64	q12, q12, #26
++	vadd.i64	q14, q5, q0
++	vadd.i64	q11, q11, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q15, q11, q0
++	vsub.i64	q4, q4, q12
++	vshr.s64	q12, q14, #25
++	vsub.i64	q10, q10, q13
++	vshr.s64	q13, q15, #25
++	vadd.i64	q6, q6, q12
++	vshl.i64	q12, q12, #25
++	vadd.i64	q14, q6, q1
++	vadd.i64	q2, q2, q13
++	vsub.i64	q5, q5, q12
++	vshr.s64	q12, q14, #26
++	vshl.i64	q13, q13, #25
++	vadd.i64	q14, q2, q1
++	vadd.i64	q7, q7, q12
++	vshl.i64	q12, q12, #26
++	vadd.i64	q15, q7, q0
++	vsub.i64	q11, q11, q13
++	vshr.s64	q13, q14, #26
++	vsub.i64	q6, q6, q12
++	vshr.s64	q12, q15, #25
++	vadd.i64	q3, q3, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q14, q3, q0
++	vadd.i64	q8, q8, q12
++	vshl.i64	q12, q12, #25
++	vadd.i64	q15, q8, q1
++	add		r2, r2, #8
++	vsub.i64	q2, q2, q13
++	vshr.s64	q13, q14, #25
++	vsub.i64	q7, q7, q12
++	vshr.s64	q12, q15, #26
++	vadd.i64	q14, q13, q13
++	vadd.i64	q9, q9, q12
++	vtrn.32		d12, d14
++	vshl.i64	q12, q12, #26
++	vtrn.32		d13, d15
++	vadd.i64	q0, q9, q0
++	vadd.i64	q4, q4, q14
++	vst1.8		d12, [r2, : 64]!
++	vshl.i64	q6, q13, #4
++	vsub.i64	q7, q8, q12
++	vshr.s64	q0, q0, #25
++	vadd.i64	q4, q4, q6
++	vadd.i64	q6, q10, q0
++	vshl.i64	q0, q0, #25
++	vadd.i64	q8, q6, q1
++	vadd.i64	q4, q4, q13
++	vshl.i64	q10, q13, #25
++	vadd.i64	q1, q4, q1
++	vsub.i64	q0, q9, q0
++	vshr.s64	q8, q8, #26
++	vsub.i64	q3, q3, q10
++	vtrn.32		d14, d0
++	vshr.s64	q1, q1, #26
++	vtrn.32		d15, d1
++	vadd.i64	q0, q11, q8
++	vst1.8		d14, [r2, : 64]
++	vshl.i64	q7, q8, #26
++	vadd.i64	q5, q5, q1
++	vtrn.32		d4, d6
++	vshl.i64	q1, q1, #26
++	vtrn.32		d5, d7
++	vsub.i64	q3, q6, q7
++	add		r2, r2, #16
++	vsub.i64	q1, q4, q1
++	vst1.8		d4, [r2, : 64]
++	vtrn.32		d6, d0
++	vtrn.32		d7, d1
++	sub		r2, r2, #8
++	vtrn.32		d2, d10
++	vtrn.32		d3, d11
++	vst1.8		d6, [r2, : 64]
++	sub		r2, r2, #24
++	vst1.8		d2, [r2, : 64]
++	add		r2, r3, #96
++	vmov.i32	q0, #0
++	vmov.i64	d2, #0xff
++	vmov.i64	d3, #0
++	vshr.u32	q1, q1, #7
++	vst1.8		{d2-d3}, [r2, : 128]!
++	vst1.8		{d0-d1}, [r2, : 128]!
++	vst1.8		d0, [r2, : 64]
++	add		r2, r3, #144
++	vmov.i32	q0, #0
++	vst1.8		{d0-d1}, [r2, : 128]!
++	vst1.8		{d0-d1}, [r2, : 128]!
++	vst1.8		d0, [r2, : 64]
++	add		r2, r3, #240
++	vmov.i32	q0, #0
++	vmov.i64	d2, #0xff
++	vmov.i64	d3, #0
++	vshr.u32	q1, q1, #7
++	vst1.8		{d2-d3}, [r2, : 128]!
++	vst1.8		{d0-d1}, [r2, : 128]!
++	vst1.8		d0, [r2, : 64]
++	add		r2, r3, #48
++	add		r6, r3, #192
++	vld1.8		{d0-d1}, [r2, : 128]!
++	vld1.8		{d2-d3}, [r2, : 128]!
++	vld1.8		{d4}, [r2, : 64]
++	vst1.8		{d0-d1}, [r6, : 128]!
++	vst1.8		{d2-d3}, [r6, : 128]!
++	vst1.8		d4, [r6, : 64]
++._mainloop:
++	mov		r2, r5, LSR #3
++	and		r6, r5, #7
++	ldrb		r2, [r1, r2]
++	mov		r2, r2, LSR r6
++	and		r2, r2, #1
++	str		r5, [sp, #488]
++	eor		r4, r4, r2
++	str		r2, [sp, #492]
++	neg		r2, r4
++	add		r4, r3, #96
++	add		r5, r3, #192
++	add		r6, r3, #144
++	vld1.8		{d8-d9}, [r4, : 128]!
++	add		r7, r3, #240
++	vld1.8		{d10-d11}, [r5, : 128]!
++	veor		q6, q4, q5
++	vld1.8		{d14-d15}, [r6, : 128]!
++	vdup.i32	q8, r2
++	vld1.8		{d18-d19}, [r7, : 128]!
++	veor		q10, q7, q9
++	vld1.8		{d22-d23}, [r4, : 128]!
++	vand		q6, q6, q8
++	vld1.8		{d24-d25}, [r5, : 128]!
++	vand		q10, q10, q8
++	vld1.8		{d26-d27}, [r6, : 128]!
++	veor		q4, q4, q6
++	vld1.8		{d28-d29}, [r7, : 128]!
++	veor		q5, q5, q6
++	vld1.8		{d0}, [r4, : 64]
++	veor		q6, q7, q10
++	vld1.8		{d2}, [r5, : 64]
++	veor		q7, q9, q10
++	vld1.8		{d4}, [r6, : 64]
++	veor		q9, q11, q12
++	vld1.8		{d6}, [r7, : 64]
++	veor		q10, q0, q1
++	sub		r2, r4, #32
++	vand		q9, q9, q8
++	sub		r4, r5, #32
++	vand		q10, q10, q8
++	sub		r5, r6, #32
++	veor		q11, q11, q9
++	sub		r6, r7, #32
++	veor		q0, q0, q10
++	veor		q9, q12, q9
++	veor		q1, q1, q10
++	veor		q10, q13, q14
++	veor		q12, q2, q3
++	vand		q10, q10, q8
++	vand		q8, q12, q8
++	veor		q12, q13, q10
++	veor		q2, q2, q8
++	veor		q10, q14, q10
++	veor		q3, q3, q8
++	vadd.i32	q8, q4, q6
++	vsub.i32	q4, q4, q6
++	vst1.8		{d16-d17}, [r2, : 128]!
++	vadd.i32	q6, q11, q12
++	vst1.8		{d8-d9}, [r5, : 128]!
++	vsub.i32	q4, q11, q12
++	vst1.8		{d12-d13}, [r2, : 128]!
++	vadd.i32	q6, q0, q2
++	vst1.8		{d8-d9}, [r5, : 128]!
++	vsub.i32	q0, q0, q2
++	vst1.8		d12, [r2, : 64]
++	vadd.i32	q2, q5, q7
++	vst1.8		d0, [r5, : 64]
++	vsub.i32	q0, q5, q7
++	vst1.8		{d4-d5}, [r4, : 128]!
++	vadd.i32	q2, q9, q10
++	vst1.8		{d0-d1}, [r6, : 128]!
++	vsub.i32	q0, q9, q10
++	vst1.8		{d4-d5}, [r4, : 128]!
++	vadd.i32	q2, q1, q3
++	vst1.8		{d0-d1}, [r6, : 128]!
++	vsub.i32	q0, q1, q3
++	vst1.8		d4, [r4, : 64]
++	vst1.8		d0, [r6, : 64]
++	add		r2, sp, #544
++	add		r4, r3, #96
++	add		r5, r3, #144
++	vld1.8		{d0-d1}, [r2, : 128]
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vld1.8		{d4-d5}, [r5, : 128]!
++	vzip.i32	q1, q2
++	vld1.8		{d6-d7}, [r4, : 128]!
++	vld1.8		{d8-d9}, [r5, : 128]!
++	vshl.i32	q5, q1, #1
++	vzip.i32	q3, q4
++	vshl.i32	q6, q2, #1
++	vld1.8		{d14}, [r4, : 64]
++	vshl.i32	q8, q3, #1
++	vld1.8		{d15}, [r5, : 64]
++	vshl.i32	q9, q4, #1
++	vmul.i32	d21, d7, d1
++	vtrn.32		d14, d15
++	vmul.i32	q11, q4, q0
++	vmul.i32	q0, q7, q0
++	vmull.s32	q12, d2, d2
++	vmlal.s32	q12, d11, d1
++	vmlal.s32	q12, d12, d0
++	vmlal.s32	q12, d13, d23
++	vmlal.s32	q12, d16, d22
++	vmlal.s32	q12, d7, d21
++	vmull.s32	q10, d2, d11
++	vmlal.s32	q10, d4, d1
++	vmlal.s32	q10, d13, d0
++	vmlal.s32	q10, d6, d23
++	vmlal.s32	q10, d17, d22
++	vmull.s32	q13, d10, d4
++	vmlal.s32	q13, d11, d3
++	vmlal.s32	q13, d13, d1
++	vmlal.s32	q13, d16, d0
++	vmlal.s32	q13, d17, d23
++	vmlal.s32	q13, d8, d22
++	vmull.s32	q1, d10, d5
++	vmlal.s32	q1, d11, d4
++	vmlal.s32	q1, d6, d1
++	vmlal.s32	q1, d17, d0
++	vmlal.s32	q1, d8, d23
++	vmull.s32	q14, d10, d6
++	vmlal.s32	q14, d11, d13
++	vmlal.s32	q14, d4, d4
++	vmlal.s32	q14, d17, d1
++	vmlal.s32	q14, d18, d0
++	vmlal.s32	q14, d9, d23
++	vmull.s32	q11, d10, d7
++	vmlal.s32	q11, d11, d6
++	vmlal.s32	q11, d12, d5
++	vmlal.s32	q11, d8, d1
++	vmlal.s32	q11, d19, d0
++	vmull.s32	q15, d10, d8
++	vmlal.s32	q15, d11, d17
++	vmlal.s32	q15, d12, d6
++	vmlal.s32	q15, d13, d5
++	vmlal.s32	q15, d19, d1
++	vmlal.s32	q15, d14, d0
++	vmull.s32	q2, d10, d9
++	vmlal.s32	q2, d11, d8
++	vmlal.s32	q2, d12, d7
++	vmlal.s32	q2, d13, d6
++	vmlal.s32	q2, d14, d1
++	vmull.s32	q0, d15, d1
++	vmlal.s32	q0, d10, d14
++	vmlal.s32	q0, d11, d19
++	vmlal.s32	q0, d12, d8
++	vmlal.s32	q0, d13, d17
++	vmlal.s32	q0, d6, d6
++	add		r2, sp, #512
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmull.s32	q3, d16, d7
++	vmlal.s32	q3, d10, d15
++	vmlal.s32	q3, d11, d14
++	vmlal.s32	q3, d12, d9
++	vmlal.s32	q3, d13, d8
++	add		r2, sp, #528
++	vld1.8		{d8-d9}, [r2, : 128]
++	vadd.i64	q5, q12, q9
++	vadd.i64	q6, q15, q9
++	vshr.s64	q5, q5, #26
++	vshr.s64	q6, q6, #26
++	vadd.i64	q7, q10, q5
++	vshl.i64	q5, q5, #26
++	vadd.i64	q8, q7, q4
++	vadd.i64	q2, q2, q6
++	vshl.i64	q6, q6, #26
++	vadd.i64	q10, q2, q4
++	vsub.i64	q5, q12, q5
++	vshr.s64	q8, q8, #25
++	vsub.i64	q6, q15, q6
++	vshr.s64	q10, q10, #25
++	vadd.i64	q12, q13, q8
++	vshl.i64	q8, q8, #25
++	vadd.i64	q13, q12, q9
++	vadd.i64	q0, q0, q10
++	vsub.i64	q7, q7, q8
++	vshr.s64	q8, q13, #26
++	vshl.i64	q10, q10, #25
++	vadd.i64	q13, q0, q9
++	vadd.i64	q1, q1, q8
++	vshl.i64	q8, q8, #26
++	vadd.i64	q15, q1, q4
++	vsub.i64	q2, q2, q10
++	vshr.s64	q10, q13, #26
++	vsub.i64	q8, q12, q8
++	vshr.s64	q12, q15, #25
++	vadd.i64	q3, q3, q10
++	vshl.i64	q10, q10, #26
++	vadd.i64	q13, q3, q4
++	vadd.i64	q14, q14, q12
++	add		r2, r3, #288
++	vshl.i64	q12, q12, #25
++	add		r4, r3, #336
++	vadd.i64	q15, q14, q9
++	add		r2, r2, #8
++	vsub.i64	q0, q0, q10
++	add		r4, r4, #8
++	vshr.s64	q10, q13, #25
++	vsub.i64	q1, q1, q12
++	vshr.s64	q12, q15, #26
++	vadd.i64	q13, q10, q10
++	vadd.i64	q11, q11, q12
++	vtrn.32		d16, d2
++	vshl.i64	q12, q12, #26
++	vtrn.32		d17, d3
++	vadd.i64	q1, q11, q4
++	vadd.i64	q4, q5, q13
++	vst1.8		d16, [r2, : 64]!
++	vshl.i64	q5, q10, #4
++	vst1.8		d17, [r4, : 64]!
++	vsub.i64	q8, q14, q12
++	vshr.s64	q1, q1, #25
++	vadd.i64	q4, q4, q5
++	vadd.i64	q5, q6, q1
++	vshl.i64	q1, q1, #25
++	vadd.i64	q6, q5, q9
++	vadd.i64	q4, q4, q10
++	vshl.i64	q10, q10, #25
++	vadd.i64	q9, q4, q9
++	vsub.i64	q1, q11, q1
++	vshr.s64	q6, q6, #26
++	vsub.i64	q3, q3, q10
++	vtrn.32		d16, d2
++	vshr.s64	q9, q9, #26
++	vtrn.32		d17, d3
++	vadd.i64	q1, q2, q6
++	vst1.8		d16, [r2, : 64]
++	vshl.i64	q2, q6, #26
++	vst1.8		d17, [r4, : 64]
++	vadd.i64	q6, q7, q9
++	vtrn.32		d0, d6
++	vshl.i64	q7, q9, #26
++	vtrn.32		d1, d7
++	vsub.i64	q2, q5, q2
++	add		r2, r2, #16
++	vsub.i64	q3, q4, q7
++	vst1.8		d0, [r2, : 64]
++	add		r4, r4, #16
++	vst1.8		d1, [r4, : 64]
++	vtrn.32		d4, d2
++	vtrn.32		d5, d3
++	sub		r2, r2, #8
++	sub		r4, r4, #8
++	vtrn.32		d6, d12
++	vtrn.32		d7, d13
++	vst1.8		d4, [r2, : 64]
++	vst1.8		d5, [r4, : 64]
++	sub		r2, r2, #24
++	sub		r4, r4, #24
++	vst1.8		d6, [r2, : 64]
++	vst1.8		d7, [r4, : 64]
++	add		r2, r3, #240
++	add		r4, r3, #96
++	vld1.8		{d0-d1}, [r4, : 128]!
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vld1.8		{d4}, [r4, : 64]
++	add		r4, r3, #144
++	vld1.8		{d6-d7}, [r4, : 128]!
++	vtrn.32		q0, q3
++	vld1.8		{d8-d9}, [r4, : 128]!
++	vshl.i32	q5, q0, #4
++	vtrn.32		q1, q4
++	vshl.i32	q6, q3, #4
++	vadd.i32	q5, q5, q0
++	vadd.i32	q6, q6, q3
++	vshl.i32	q7, q1, #4
++	vld1.8		{d5}, [r4, : 64]
++	vshl.i32	q8, q4, #4
++	vtrn.32		d4, d5
++	vadd.i32	q7, q7, q1
++	vadd.i32	q8, q8, q4
++	vld1.8		{d18-d19}, [r2, : 128]!
++	vshl.i32	q10, q2, #4
++	vld1.8		{d22-d23}, [r2, : 128]!
++	vadd.i32	q10, q10, q2
++	vld1.8		{d24}, [r2, : 64]
++	vadd.i32	q5, q5, q0
++	add		r2, r3, #192
++	vld1.8		{d26-d27}, [r2, : 128]!
++	vadd.i32	q6, q6, q3
++	vld1.8		{d28-d29}, [r2, : 128]!
++	vadd.i32	q8, q8, q4
++	vld1.8		{d25}, [r2, : 64]
++	vadd.i32	q10, q10, q2
++	vtrn.32		q9, q13
++	vadd.i32	q7, q7, q1
++	vadd.i32	q5, q5, q0
++	vtrn.32		q11, q14
++	vadd.i32	q6, q6, q3
++	add		r2, sp, #560
++	vadd.i32	q10, q10, q2
++	vtrn.32		d24, d25
++	vst1.8		{d12-d13}, [r2, : 128]
++	vshl.i32	q6, q13, #1
++	add		r2, sp, #576
++	vst1.8		{d20-d21}, [r2, : 128]
++	vshl.i32	q10, q14, #1
++	add		r2, sp, #592
++	vst1.8		{d12-d13}, [r2, : 128]
++	vshl.i32	q15, q12, #1
++	vadd.i32	q8, q8, q4
++	vext.32		d10, d31, d30, #0
++	vadd.i32	q7, q7, q1
++	add		r2, sp, #608
++	vst1.8		{d16-d17}, [r2, : 128]
++	vmull.s32	q8, d18, d5
++	vmlal.s32	q8, d26, d4
++	vmlal.s32	q8, d19, d9
++	vmlal.s32	q8, d27, d3
++	vmlal.s32	q8, d22, d8
++	vmlal.s32	q8, d28, d2
++	vmlal.s32	q8, d23, d7
++	vmlal.s32	q8, d29, d1
++	vmlal.s32	q8, d24, d6
++	vmlal.s32	q8, d25, d0
++	add		r2, sp, #624
++	vst1.8		{d14-d15}, [r2, : 128]
++	vmull.s32	q2, d18, d4
++	vmlal.s32	q2, d12, d9
++	vmlal.s32	q2, d13, d8
++	vmlal.s32	q2, d19, d3
++	vmlal.s32	q2, d22, d2
++	vmlal.s32	q2, d23, d1
++	vmlal.s32	q2, d24, d0
++	add		r2, sp, #640
++	vst1.8		{d20-d21}, [r2, : 128]
++	vmull.s32	q7, d18, d9
++	vmlal.s32	q7, d26, d3
++	vmlal.s32	q7, d19, d8
++	vmlal.s32	q7, d27, d2
++	vmlal.s32	q7, d22, d7
++	vmlal.s32	q7, d28, d1
++	vmlal.s32	q7, d23, d6
++	vmlal.s32	q7, d29, d0
++	add		r2, sp, #656
++	vst1.8		{d10-d11}, [r2, : 128]
++	vmull.s32	q5, d18, d3
++	vmlal.s32	q5, d19, d2
++	vmlal.s32	q5, d22, d1
++	vmlal.s32	q5, d23, d0
++	vmlal.s32	q5, d12, d8
++	add		r2, sp, #672
++	vst1.8		{d16-d17}, [r2, : 128]
++	vmull.s32	q4, d18, d8
++	vmlal.s32	q4, d26, d2
++	vmlal.s32	q4, d19, d7
++	vmlal.s32	q4, d27, d1
++	vmlal.s32	q4, d22, d6
++	vmlal.s32	q4, d28, d0
++	vmull.s32	q8, d18, d7
++	vmlal.s32	q8, d26, d1
++	vmlal.s32	q8, d19, d6
++	vmlal.s32	q8, d27, d0
++	add		r2, sp, #576
++	vld1.8		{d20-d21}, [r2, : 128]
++	vmlal.s32	q7, d24, d21
++	vmlal.s32	q7, d25, d20
++	vmlal.s32	q4, d23, d21
++	vmlal.s32	q4, d29, d20
++	vmlal.s32	q8, d22, d21
++	vmlal.s32	q8, d28, d20
++	vmlal.s32	q5, d24, d20
++	add		r2, sp, #576
++	vst1.8		{d14-d15}, [r2, : 128]
++	vmull.s32	q7, d18, d6
++	vmlal.s32	q7, d26, d0
++	add		r2, sp, #656
++	vld1.8		{d30-d31}, [r2, : 128]
++	vmlal.s32	q2, d30, d21
++	vmlal.s32	q7, d19, d21
++	vmlal.s32	q7, d27, d20
++	add		r2, sp, #624
++	vld1.8		{d26-d27}, [r2, : 128]
++	vmlal.s32	q4, d25, d27
++	vmlal.s32	q8, d29, d27
++	vmlal.s32	q8, d25, d26
++	vmlal.s32	q7, d28, d27
++	vmlal.s32	q7, d29, d26
++	add		r2, sp, #608
++	vld1.8		{d28-d29}, [r2, : 128]
++	vmlal.s32	q4, d24, d29
++	vmlal.s32	q8, d23, d29
++	vmlal.s32	q8, d24, d28
++	vmlal.s32	q7, d22, d29
++	vmlal.s32	q7, d23, d28
++	add		r2, sp, #608
++	vst1.8		{d8-d9}, [r2, : 128]
++	add		r2, sp, #560
++	vld1.8		{d8-d9}, [r2, : 128]
++	vmlal.s32	q7, d24, d9
++	vmlal.s32	q7, d25, d31
++	vmull.s32	q1, d18, d2
++	vmlal.s32	q1, d19, d1
++	vmlal.s32	q1, d22, d0
++	vmlal.s32	q1, d24, d27
++	vmlal.s32	q1, d23, d20
++	vmlal.s32	q1, d12, d7
++	vmlal.s32	q1, d13, d6
++	vmull.s32	q6, d18, d1
++	vmlal.s32	q6, d19, d0
++	vmlal.s32	q6, d23, d27
++	vmlal.s32	q6, d22, d20
++	vmlal.s32	q6, d24, d26
++	vmull.s32	q0, d18, d0
++	vmlal.s32	q0, d22, d27
++	vmlal.s32	q0, d23, d26
++	vmlal.s32	q0, d24, d31
++	vmlal.s32	q0, d19, d20
++	add		r2, sp, #640
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmlal.s32	q2, d18, d7
++	vmlal.s32	q2, d19, d6
++	vmlal.s32	q5, d18, d6
++	vmlal.s32	q5, d19, d21
++	vmlal.s32	q1, d18, d21
++	vmlal.s32	q1, d19, d29
++	vmlal.s32	q0, d18, d28
++	vmlal.s32	q0, d19, d9
++	vmlal.s32	q6, d18, d29
++	vmlal.s32	q6, d19, d28
++	add		r2, sp, #592
++	vld1.8		{d18-d19}, [r2, : 128]
++	add		r2, sp, #512
++	vld1.8		{d22-d23}, [r2, : 128]
++	vmlal.s32	q5, d19, d7
++	vmlal.s32	q0, d18, d21
++	vmlal.s32	q0, d19, d29
++	vmlal.s32	q6, d18, d6
++	add		r2, sp, #528
++	vld1.8		{d6-d7}, [r2, : 128]
++	vmlal.s32	q6, d19, d21
++	add		r2, sp, #576
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmlal.s32	q0, d30, d8
++	add		r2, sp, #672
++	vld1.8		{d20-d21}, [r2, : 128]
++	vmlal.s32	q5, d30, d29
++	add		r2, sp, #608
++	vld1.8		{d24-d25}, [r2, : 128]
++	vmlal.s32	q1, d30, d28
++	vadd.i64	q13, q0, q11
++	vadd.i64	q14, q5, q11
++	vmlal.s32	q6, d30, d9
++	vshr.s64	q4, q13, #26
++	vshr.s64	q13, q14, #26
++	vadd.i64	q7, q7, q4
++	vshl.i64	q4, q4, #26
++	vadd.i64	q14, q7, q3
++	vadd.i64	q9, q9, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q15, q9, q3
++	vsub.i64	q0, q0, q4
++	vshr.s64	q4, q14, #25
++	vsub.i64	q5, q5, q13
++	vshr.s64	q13, q15, #25
++	vadd.i64	q6, q6, q4
++	vshl.i64	q4, q4, #25
++	vadd.i64	q14, q6, q11
++	vadd.i64	q2, q2, q13
++	vsub.i64	q4, q7, q4
++	vshr.s64	q7, q14, #26
++	vshl.i64	q13, q13, #25
++	vadd.i64	q14, q2, q11
++	vadd.i64	q8, q8, q7
++	vshl.i64	q7, q7, #26
++	vadd.i64	q15, q8, q3
++	vsub.i64	q9, q9, q13
++	vshr.s64	q13, q14, #26
++	vsub.i64	q6, q6, q7
++	vshr.s64	q7, q15, #25
++	vadd.i64	q10, q10, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q14, q10, q3
++	vadd.i64	q1, q1, q7
++	add		r2, r3, #144
++	vshl.i64	q7, q7, #25
++	add		r4, r3, #96
++	vadd.i64	q15, q1, q11
++	add		r2, r2, #8
++	vsub.i64	q2, q2, q13
++	add		r4, r4, #8
++	vshr.s64	q13, q14, #25
++	vsub.i64	q7, q8, q7
++	vshr.s64	q8, q15, #26
++	vadd.i64	q14, q13, q13
++	vadd.i64	q12, q12, q8
++	vtrn.32		d12, d14
++	vshl.i64	q8, q8, #26
++	vtrn.32		d13, d15
++	vadd.i64	q3, q12, q3
++	vadd.i64	q0, q0, q14
++	vst1.8		d12, [r2, : 64]!
++	vshl.i64	q7, q13, #4
++	vst1.8		d13, [r4, : 64]!
++	vsub.i64	q1, q1, q8
++	vshr.s64	q3, q3, #25
++	vadd.i64	q0, q0, q7
++	vadd.i64	q5, q5, q3
++	vshl.i64	q3, q3, #25
++	vadd.i64	q6, q5, q11
++	vadd.i64	q0, q0, q13
++	vshl.i64	q7, q13, #25
++	vadd.i64	q8, q0, q11
++	vsub.i64	q3, q12, q3
++	vshr.s64	q6, q6, #26
++	vsub.i64	q7, q10, q7
++	vtrn.32		d2, d6
++	vshr.s64	q8, q8, #26
++	vtrn.32		d3, d7
++	vadd.i64	q3, q9, q6
++	vst1.8		d2, [r2, : 64]
++	vshl.i64	q6, q6, #26
++	vst1.8		d3, [r4, : 64]
++	vadd.i64	q1, q4, q8
++	vtrn.32		d4, d14
++	vshl.i64	q4, q8, #26
++	vtrn.32		d5, d15
++	vsub.i64	q5, q5, q6
++	add		r2, r2, #16
++	vsub.i64	q0, q0, q4
++	vst1.8		d4, [r2, : 64]
++	add		r4, r4, #16
++	vst1.8		d5, [r4, : 64]
++	vtrn.32		d10, d6
++	vtrn.32		d11, d7
++	sub		r2, r2, #8
++	sub		r4, r4, #8
++	vtrn.32		d0, d2
++	vtrn.32		d1, d3
++	vst1.8		d10, [r2, : 64]
++	vst1.8		d11, [r4, : 64]
++	sub		r2, r2, #24
++	sub		r4, r4, #24
++	vst1.8		d0, [r2, : 64]
++	vst1.8		d1, [r4, : 64]
++	add		r2, r3, #288
++	add		r4, r3, #336
++	vld1.8		{d0-d1}, [r2, : 128]!
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vsub.i32	q0, q0, q1
++	vld1.8		{d2-d3}, [r2, : 128]!
++	vld1.8		{d4-d5}, [r4, : 128]!
++	vsub.i32	q1, q1, q2
++	add		r5, r3, #240
++	vld1.8		{d4}, [r2, : 64]
++	vld1.8		{d6}, [r4, : 64]
++	vsub.i32	q2, q2, q3
++	vst1.8		{d0-d1}, [r5, : 128]!
++	vst1.8		{d2-d3}, [r5, : 128]!
++	vst1.8		d4, [r5, : 64]
++	add		r2, r3, #144
++	add		r4, r3, #96
++	add		r5, r3, #144
++	add		r6, r3, #192
++	vld1.8		{d0-d1}, [r2, : 128]!
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vsub.i32	q2, q0, q1
++	vadd.i32	q0, q0, q1
++	vld1.8		{d2-d3}, [r2, : 128]!
++	vld1.8		{d6-d7}, [r4, : 128]!
++	vsub.i32	q4, q1, q3
++	vadd.i32	q1, q1, q3
++	vld1.8		{d6}, [r2, : 64]
++	vld1.8		{d10}, [r4, : 64]
++	vsub.i32	q6, q3, q5
++	vadd.i32	q3, q3, q5
++	vst1.8		{d4-d5}, [r5, : 128]!
++	vst1.8		{d0-d1}, [r6, : 128]!
++	vst1.8		{d8-d9}, [r5, : 128]!
++	vst1.8		{d2-d3}, [r6, : 128]!
++	vst1.8		d12, [r5, : 64]
++	vst1.8		d6, [r6, : 64]
++	add		r2, r3, #0
++	add		r4, r3, #240
++	vld1.8		{d0-d1}, [r4, : 128]!
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vld1.8		{d4}, [r4, : 64]
++	add		r4, r3, #336
++	vld1.8		{d6-d7}, [r4, : 128]!
++	vtrn.32		q0, q3
++	vld1.8		{d8-d9}, [r4, : 128]!
++	vshl.i32	q5, q0, #4
++	vtrn.32		q1, q4
++	vshl.i32	q6, q3, #4
++	vadd.i32	q5, q5, q0
++	vadd.i32	q6, q6, q3
++	vshl.i32	q7, q1, #4
++	vld1.8		{d5}, [r4, : 64]
++	vshl.i32	q8, q4, #4
++	vtrn.32		d4, d5
++	vadd.i32	q7, q7, q1
++	vadd.i32	q8, q8, q4
++	vld1.8		{d18-d19}, [r2, : 128]!
++	vshl.i32	q10, q2, #4
++	vld1.8		{d22-d23}, [r2, : 128]!
++	vadd.i32	q10, q10, q2
++	vld1.8		{d24}, [r2, : 64]
++	vadd.i32	q5, q5, q0
++	add		r2, r3, #288
++	vld1.8		{d26-d27}, [r2, : 128]!
++	vadd.i32	q6, q6, q3
++	vld1.8		{d28-d29}, [r2, : 128]!
++	vadd.i32	q8, q8, q4
++	vld1.8		{d25}, [r2, : 64]
++	vadd.i32	q10, q10, q2
++	vtrn.32		q9, q13
++	vadd.i32	q7, q7, q1
++	vadd.i32	q5, q5, q0
++	vtrn.32		q11, q14
++	vadd.i32	q6, q6, q3
++	add		r2, sp, #560
++	vadd.i32	q10, q10, q2
++	vtrn.32		d24, d25
++	vst1.8		{d12-d13}, [r2, : 128]
++	vshl.i32	q6, q13, #1
++	add		r2, sp, #576
++	vst1.8		{d20-d21}, [r2, : 128]
++	vshl.i32	q10, q14, #1
++	add		r2, sp, #592
++	vst1.8		{d12-d13}, [r2, : 128]
++	vshl.i32	q15, q12, #1
++	vadd.i32	q8, q8, q4
++	vext.32		d10, d31, d30, #0
++	vadd.i32	q7, q7, q1
++	add		r2, sp, #608
++	vst1.8		{d16-d17}, [r2, : 128]
++	vmull.s32	q8, d18, d5
++	vmlal.s32	q8, d26, d4
++	vmlal.s32	q8, d19, d9
++	vmlal.s32	q8, d27, d3
++	vmlal.s32	q8, d22, d8
++	vmlal.s32	q8, d28, d2
++	vmlal.s32	q8, d23, d7
++	vmlal.s32	q8, d29, d1
++	vmlal.s32	q8, d24, d6
++	vmlal.s32	q8, d25, d0
++	add		r2, sp, #624
++	vst1.8		{d14-d15}, [r2, : 128]
++	vmull.s32	q2, d18, d4
++	vmlal.s32	q2, d12, d9
++	vmlal.s32	q2, d13, d8
++	vmlal.s32	q2, d19, d3
++	vmlal.s32	q2, d22, d2
++	vmlal.s32	q2, d23, d1
++	vmlal.s32	q2, d24, d0
++	add		r2, sp, #640
++	vst1.8		{d20-d21}, [r2, : 128]
++	vmull.s32	q7, d18, d9
++	vmlal.s32	q7, d26, d3
++	vmlal.s32	q7, d19, d8
++	vmlal.s32	q7, d27, d2
++	vmlal.s32	q7, d22, d7
++	vmlal.s32	q7, d28, d1
++	vmlal.s32	q7, d23, d6
++	vmlal.s32	q7, d29, d0
++	add		r2, sp, #656
++	vst1.8		{d10-d11}, [r2, : 128]
++	vmull.s32	q5, d18, d3
++	vmlal.s32	q5, d19, d2
++	vmlal.s32	q5, d22, d1
++	vmlal.s32	q5, d23, d0
++	vmlal.s32	q5, d12, d8
++	add		r2, sp, #672
++	vst1.8		{d16-d17}, [r2, : 128]
++	vmull.s32	q4, d18, d8
++	vmlal.s32	q4, d26, d2
++	vmlal.s32	q4, d19, d7
++	vmlal.s32	q4, d27, d1
++	vmlal.s32	q4, d22, d6
++	vmlal.s32	q4, d28, d0
++	vmull.s32	q8, d18, d7
++	vmlal.s32	q8, d26, d1
++	vmlal.s32	q8, d19, d6
++	vmlal.s32	q8, d27, d0
++	add		r2, sp, #576
++	vld1.8		{d20-d21}, [r2, : 128]
++	vmlal.s32	q7, d24, d21
++	vmlal.s32	q7, d25, d20
++	vmlal.s32	q4, d23, d21
++	vmlal.s32	q4, d29, d20
++	vmlal.s32	q8, d22, d21
++	vmlal.s32	q8, d28, d20
++	vmlal.s32	q5, d24, d20
++	add		r2, sp, #576
++	vst1.8		{d14-d15}, [r2, : 128]
++	vmull.s32	q7, d18, d6
++	vmlal.s32	q7, d26, d0
++	add		r2, sp, #656
++	vld1.8		{d30-d31}, [r2, : 128]
++	vmlal.s32	q2, d30, d21
++	vmlal.s32	q7, d19, d21
++	vmlal.s32	q7, d27, d20
++	add		r2, sp, #624
++	vld1.8		{d26-d27}, [r2, : 128]
++	vmlal.s32	q4, d25, d27
++	vmlal.s32	q8, d29, d27
++	vmlal.s32	q8, d25, d26
++	vmlal.s32	q7, d28, d27
++	vmlal.s32	q7, d29, d26
++	add		r2, sp, #608
++	vld1.8		{d28-d29}, [r2, : 128]
++	vmlal.s32	q4, d24, d29
++	vmlal.s32	q8, d23, d29
++	vmlal.s32	q8, d24, d28
++	vmlal.s32	q7, d22, d29
++	vmlal.s32	q7, d23, d28
++	add		r2, sp, #608
++	vst1.8		{d8-d9}, [r2, : 128]
++	add		r2, sp, #560
++	vld1.8		{d8-d9}, [r2, : 128]
++	vmlal.s32	q7, d24, d9
++	vmlal.s32	q7, d25, d31
++	vmull.s32	q1, d18, d2
++	vmlal.s32	q1, d19, d1
++	vmlal.s32	q1, d22, d0
++	vmlal.s32	q1, d24, d27
++	vmlal.s32	q1, d23, d20
++	vmlal.s32	q1, d12, d7
++	vmlal.s32	q1, d13, d6
++	vmull.s32	q6, d18, d1
++	vmlal.s32	q6, d19, d0
++	vmlal.s32	q6, d23, d27
++	vmlal.s32	q6, d22, d20
++	vmlal.s32	q6, d24, d26
++	vmull.s32	q0, d18, d0
++	vmlal.s32	q0, d22, d27
++	vmlal.s32	q0, d23, d26
++	vmlal.s32	q0, d24, d31
++	vmlal.s32	q0, d19, d20
++	add		r2, sp, #640
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmlal.s32	q2, d18, d7
++	vmlal.s32	q2, d19, d6
++	vmlal.s32	q5, d18, d6
++	vmlal.s32	q5, d19, d21
++	vmlal.s32	q1, d18, d21
++	vmlal.s32	q1, d19, d29
++	vmlal.s32	q0, d18, d28
++	vmlal.s32	q0, d19, d9
++	vmlal.s32	q6, d18, d29
++	vmlal.s32	q6, d19, d28
++	add		r2, sp, #592
++	vld1.8		{d18-d19}, [r2, : 128]
++	add		r2, sp, #512
++	vld1.8		{d22-d23}, [r2, : 128]
++	vmlal.s32	q5, d19, d7
++	vmlal.s32	q0, d18, d21
++	vmlal.s32	q0, d19, d29
++	vmlal.s32	q6, d18, d6
++	add		r2, sp, #528
++	vld1.8		{d6-d7}, [r2, : 128]
++	vmlal.s32	q6, d19, d21
++	add		r2, sp, #576
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmlal.s32	q0, d30, d8
++	add		r2, sp, #672
++	vld1.8		{d20-d21}, [r2, : 128]
++	vmlal.s32	q5, d30, d29
++	add		r2, sp, #608
++	vld1.8		{d24-d25}, [r2, : 128]
++	vmlal.s32	q1, d30, d28
++	vadd.i64	q13, q0, q11
++	vadd.i64	q14, q5, q11
++	vmlal.s32	q6, d30, d9
++	vshr.s64	q4, q13, #26
++	vshr.s64	q13, q14, #26
++	vadd.i64	q7, q7, q4
++	vshl.i64	q4, q4, #26
++	vadd.i64	q14, q7, q3
++	vadd.i64	q9, q9, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q15, q9, q3
++	vsub.i64	q0, q0, q4
++	vshr.s64	q4, q14, #25
++	vsub.i64	q5, q5, q13
++	vshr.s64	q13, q15, #25
++	vadd.i64	q6, q6, q4
++	vshl.i64	q4, q4, #25
++	vadd.i64	q14, q6, q11
++	vadd.i64	q2, q2, q13
++	vsub.i64	q4, q7, q4
++	vshr.s64	q7, q14, #26
++	vshl.i64	q13, q13, #25
++	vadd.i64	q14, q2, q11
++	vadd.i64	q8, q8, q7
++	vshl.i64	q7, q7, #26
++	vadd.i64	q15, q8, q3
++	vsub.i64	q9, q9, q13
++	vshr.s64	q13, q14, #26
++	vsub.i64	q6, q6, q7
++	vshr.s64	q7, q15, #25
++	vadd.i64	q10, q10, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q14, q10, q3
++	vadd.i64	q1, q1, q7
++	add		r2, r3, #288
++	vshl.i64	q7, q7, #25
++	add		r4, r3, #96
++	vadd.i64	q15, q1, q11
++	add		r2, r2, #8
++	vsub.i64	q2, q2, q13
++	add		r4, r4, #8
++	vshr.s64	q13, q14, #25
++	vsub.i64	q7, q8, q7
++	vshr.s64	q8, q15, #26
++	vadd.i64	q14, q13, q13
++	vadd.i64	q12, q12, q8
++	vtrn.32		d12, d14
++	vshl.i64	q8, q8, #26
++	vtrn.32		d13, d15
++	vadd.i64	q3, q12, q3
++	vadd.i64	q0, q0, q14
++	vst1.8		d12, [r2, : 64]!
++	vshl.i64	q7, q13, #4
++	vst1.8		d13, [r4, : 64]!
++	vsub.i64	q1, q1, q8
++	vshr.s64	q3, q3, #25
++	vadd.i64	q0, q0, q7
++	vadd.i64	q5, q5, q3
++	vshl.i64	q3, q3, #25
++	vadd.i64	q6, q5, q11
++	vadd.i64	q0, q0, q13
++	vshl.i64	q7, q13, #25
++	vadd.i64	q8, q0, q11
++	vsub.i64	q3, q12, q3
++	vshr.s64	q6, q6, #26
++	vsub.i64	q7, q10, q7
++	vtrn.32		d2, d6
++	vshr.s64	q8, q8, #26
++	vtrn.32		d3, d7
++	vadd.i64	q3, q9, q6
++	vst1.8		d2, [r2, : 64]
++	vshl.i64	q6, q6, #26
++	vst1.8		d3, [r4, : 64]
++	vadd.i64	q1, q4, q8
++	vtrn.32		d4, d14
++	vshl.i64	q4, q8, #26
++	vtrn.32		d5, d15
++	vsub.i64	q5, q5, q6
++	add		r2, r2, #16
++	vsub.i64	q0, q0, q4
++	vst1.8		d4, [r2, : 64]
++	add		r4, r4, #16
++	vst1.8		d5, [r4, : 64]
++	vtrn.32		d10, d6
++	vtrn.32		d11, d7
++	sub		r2, r2, #8
++	sub		r4, r4, #8
++	vtrn.32		d0, d2
++	vtrn.32		d1, d3
++	vst1.8		d10, [r2, : 64]
++	vst1.8		d11, [r4, : 64]
++	sub		r2, r2, #24
++	sub		r4, r4, #24
++	vst1.8		d0, [r2, : 64]
++	vst1.8		d1, [r4, : 64]
++	add		r2, sp, #544
++	add		r4, r3, #144
++	add		r5, r3, #192
++	vld1.8		{d0-d1}, [r2, : 128]
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vld1.8		{d4-d5}, [r5, : 128]!
++	vzip.i32	q1, q2
++	vld1.8		{d6-d7}, [r4, : 128]!
++	vld1.8		{d8-d9}, [r5, : 128]!
++	vshl.i32	q5, q1, #1
++	vzip.i32	q3, q4
++	vshl.i32	q6, q2, #1
++	vld1.8		{d14}, [r4, : 64]
++	vshl.i32	q8, q3, #1
++	vld1.8		{d15}, [r5, : 64]
++	vshl.i32	q9, q4, #1
++	vmul.i32	d21, d7, d1
++	vtrn.32		d14, d15
++	vmul.i32	q11, q4, q0
++	vmul.i32	q0, q7, q0
++	vmull.s32	q12, d2, d2
++	vmlal.s32	q12, d11, d1
++	vmlal.s32	q12, d12, d0
++	vmlal.s32	q12, d13, d23
++	vmlal.s32	q12, d16, d22
++	vmlal.s32	q12, d7, d21
++	vmull.s32	q10, d2, d11
++	vmlal.s32	q10, d4, d1
++	vmlal.s32	q10, d13, d0
++	vmlal.s32	q10, d6, d23
++	vmlal.s32	q10, d17, d22
++	vmull.s32	q13, d10, d4
++	vmlal.s32	q13, d11, d3
++	vmlal.s32	q13, d13, d1
++	vmlal.s32	q13, d16, d0
++	vmlal.s32	q13, d17, d23
++	vmlal.s32	q13, d8, d22
++	vmull.s32	q1, d10, d5
++	vmlal.s32	q1, d11, d4
++	vmlal.s32	q1, d6, d1
++	vmlal.s32	q1, d17, d0
++	vmlal.s32	q1, d8, d23
++	vmull.s32	q14, d10, d6
++	vmlal.s32	q14, d11, d13
++	vmlal.s32	q14, d4, d4
++	vmlal.s32	q14, d17, d1
++	vmlal.s32	q14, d18, d0
++	vmlal.s32	q14, d9, d23
++	vmull.s32	q11, d10, d7
++	vmlal.s32	q11, d11, d6
++	vmlal.s32	q11, d12, d5
++	vmlal.s32	q11, d8, d1
++	vmlal.s32	q11, d19, d0
++	vmull.s32	q15, d10, d8
++	vmlal.s32	q15, d11, d17
++	vmlal.s32	q15, d12, d6
++	vmlal.s32	q15, d13, d5
++	vmlal.s32	q15, d19, d1
++	vmlal.s32	q15, d14, d0
++	vmull.s32	q2, d10, d9
++	vmlal.s32	q2, d11, d8
++	vmlal.s32	q2, d12, d7
++	vmlal.s32	q2, d13, d6
++	vmlal.s32	q2, d14, d1
++	vmull.s32	q0, d15, d1
++	vmlal.s32	q0, d10, d14
++	vmlal.s32	q0, d11, d19
++	vmlal.s32	q0, d12, d8
++	vmlal.s32	q0, d13, d17
++	vmlal.s32	q0, d6, d6
++	add		r2, sp, #512
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmull.s32	q3, d16, d7
++	vmlal.s32	q3, d10, d15
++	vmlal.s32	q3, d11, d14
++	vmlal.s32	q3, d12, d9
++	vmlal.s32	q3, d13, d8
++	add		r2, sp, #528
++	vld1.8		{d8-d9}, [r2, : 128]
++	vadd.i64	q5, q12, q9
++	vadd.i64	q6, q15, q9
++	vshr.s64	q5, q5, #26
++	vshr.s64	q6, q6, #26
++	vadd.i64	q7, q10, q5
++	vshl.i64	q5, q5, #26
++	vadd.i64	q8, q7, q4
++	vadd.i64	q2, q2, q6
++	vshl.i64	q6, q6, #26
++	vadd.i64	q10, q2, q4
++	vsub.i64	q5, q12, q5
++	vshr.s64	q8, q8, #25
++	vsub.i64	q6, q15, q6
++	vshr.s64	q10, q10, #25
++	vadd.i64	q12, q13, q8
++	vshl.i64	q8, q8, #25
++	vadd.i64	q13, q12, q9
++	vadd.i64	q0, q0, q10
++	vsub.i64	q7, q7, q8
++	vshr.s64	q8, q13, #26
++	vshl.i64	q10, q10, #25
++	vadd.i64	q13, q0, q9
++	vadd.i64	q1, q1, q8
++	vshl.i64	q8, q8, #26
++	vadd.i64	q15, q1, q4
++	vsub.i64	q2, q2, q10
++	vshr.s64	q10, q13, #26
++	vsub.i64	q8, q12, q8
++	vshr.s64	q12, q15, #25
++	vadd.i64	q3, q3, q10
++	vshl.i64	q10, q10, #26
++	vadd.i64	q13, q3, q4
++	vadd.i64	q14, q14, q12
++	add		r2, r3, #144
++	vshl.i64	q12, q12, #25
++	add		r4, r3, #192
++	vadd.i64	q15, q14, q9
++	add		r2, r2, #8
++	vsub.i64	q0, q0, q10
++	add		r4, r4, #8
++	vshr.s64	q10, q13, #25
++	vsub.i64	q1, q1, q12
++	vshr.s64	q12, q15, #26
++	vadd.i64	q13, q10, q10
++	vadd.i64	q11, q11, q12
++	vtrn.32		d16, d2
++	vshl.i64	q12, q12, #26
++	vtrn.32		d17, d3
++	vadd.i64	q1, q11, q4
++	vadd.i64	q4, q5, q13
++	vst1.8		d16, [r2, : 64]!
++	vshl.i64	q5, q10, #4
++	vst1.8		d17, [r4, : 64]!
++	vsub.i64	q8, q14, q12
++	vshr.s64	q1, q1, #25
++	vadd.i64	q4, q4, q5
++	vadd.i64	q5, q6, q1
++	vshl.i64	q1, q1, #25
++	vadd.i64	q6, q5, q9
++	vadd.i64	q4, q4, q10
++	vshl.i64	q10, q10, #25
++	vadd.i64	q9, q4, q9
++	vsub.i64	q1, q11, q1
++	vshr.s64	q6, q6, #26
++	vsub.i64	q3, q3, q10
++	vtrn.32		d16, d2
++	vshr.s64	q9, q9, #26
++	vtrn.32		d17, d3
++	vadd.i64	q1, q2, q6
++	vst1.8		d16, [r2, : 64]
++	vshl.i64	q2, q6, #26
++	vst1.8		d17, [r4, : 64]
++	vadd.i64	q6, q7, q9
++	vtrn.32		d0, d6
++	vshl.i64	q7, q9, #26
++	vtrn.32		d1, d7
++	vsub.i64	q2, q5, q2
++	add		r2, r2, #16
++	vsub.i64	q3, q4, q7
++	vst1.8		d0, [r2, : 64]
++	add		r4, r4, #16
++	vst1.8		d1, [r4, : 64]
++	vtrn.32		d4, d2
++	vtrn.32		d5, d3
++	sub		r2, r2, #8
++	sub		r4, r4, #8
++	vtrn.32		d6, d12
++	vtrn.32		d7, d13
++	vst1.8		d4, [r2, : 64]
++	vst1.8		d5, [r4, : 64]
++	sub		r2, r2, #24
++	sub		r4, r4, #24
++	vst1.8		d6, [r2, : 64]
++	vst1.8		d7, [r4, : 64]
++	add		r2, r3, #336
++	add		r4, r3, #288
++	vld1.8		{d0-d1}, [r2, : 128]!
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vadd.i32	q0, q0, q1
++	vld1.8		{d2-d3}, [r2, : 128]!
++	vld1.8		{d4-d5}, [r4, : 128]!
++	vadd.i32	q1, q1, q2
++	add		r5, r3, #288
++	vld1.8		{d4}, [r2, : 64]
++	vld1.8		{d6}, [r4, : 64]
++	vadd.i32	q2, q2, q3
++	vst1.8		{d0-d1}, [r5, : 128]!
++	vst1.8		{d2-d3}, [r5, : 128]!
++	vst1.8		d4, [r5, : 64]
++	add		r2, r3, #48
++	add		r4, r3, #144
++	vld1.8		{d0-d1}, [r4, : 128]!
++	vld1.8		{d2-d3}, [r4, : 128]!
++	vld1.8		{d4}, [r4, : 64]
++	add		r4, r3, #288
++	vld1.8		{d6-d7}, [r4, : 128]!
++	vtrn.32		q0, q3
++	vld1.8		{d8-d9}, [r4, : 128]!
++	vshl.i32	q5, q0, #4
++	vtrn.32		q1, q4
++	vshl.i32	q6, q3, #4
++	vadd.i32	q5, q5, q0
++	vadd.i32	q6, q6, q3
++	vshl.i32	q7, q1, #4
++	vld1.8		{d5}, [r4, : 64]
++	vshl.i32	q8, q4, #4
++	vtrn.32		d4, d5
++	vadd.i32	q7, q7, q1
++	vadd.i32	q8, q8, q4
++	vld1.8		{d18-d19}, [r2, : 128]!
++	vshl.i32	q10, q2, #4
++	vld1.8		{d22-d23}, [r2, : 128]!
++	vadd.i32	q10, q10, q2
++	vld1.8		{d24}, [r2, : 64]
++	vadd.i32	q5, q5, q0
++	add		r2, r3, #240
++	vld1.8		{d26-d27}, [r2, : 128]!
++	vadd.i32	q6, q6, q3
++	vld1.8		{d28-d29}, [r2, : 128]!
++	vadd.i32	q8, q8, q4
++	vld1.8		{d25}, [r2, : 64]
++	vadd.i32	q10, q10, q2
++	vtrn.32		q9, q13
++	vadd.i32	q7, q7, q1
++	vadd.i32	q5, q5, q0
++	vtrn.32		q11, q14
++	vadd.i32	q6, q6, q3
++	add		r2, sp, #560
++	vadd.i32	q10, q10, q2
++	vtrn.32		d24, d25
++	vst1.8		{d12-d13}, [r2, : 128]
++	vshl.i32	q6, q13, #1
++	add		r2, sp, #576
++	vst1.8		{d20-d21}, [r2, : 128]
++	vshl.i32	q10, q14, #1
++	add		r2, sp, #592
++	vst1.8		{d12-d13}, [r2, : 128]
++	vshl.i32	q15, q12, #1
++	vadd.i32	q8, q8, q4
++	vext.32		d10, d31, d30, #0
++	vadd.i32	q7, q7, q1
++	add		r2, sp, #608
++	vst1.8		{d16-d17}, [r2, : 128]
++	vmull.s32	q8, d18, d5
++	vmlal.s32	q8, d26, d4
++	vmlal.s32	q8, d19, d9
++	vmlal.s32	q8, d27, d3
++	vmlal.s32	q8, d22, d8
++	vmlal.s32	q8, d28, d2
++	vmlal.s32	q8, d23, d7
++	vmlal.s32	q8, d29, d1
++	vmlal.s32	q8, d24, d6
++	vmlal.s32	q8, d25, d0
++	add		r2, sp, #624
++	vst1.8		{d14-d15}, [r2, : 128]
++	vmull.s32	q2, d18, d4
++	vmlal.s32	q2, d12, d9
++	vmlal.s32	q2, d13, d8
++	vmlal.s32	q2, d19, d3
++	vmlal.s32	q2, d22, d2
++	vmlal.s32	q2, d23, d1
++	vmlal.s32	q2, d24, d0
++	add		r2, sp, #640
++	vst1.8		{d20-d21}, [r2, : 128]
++	vmull.s32	q7, d18, d9
++	vmlal.s32	q7, d26, d3
++	vmlal.s32	q7, d19, d8
++	vmlal.s32	q7, d27, d2
++	vmlal.s32	q7, d22, d7
++	vmlal.s32	q7, d28, d1
++	vmlal.s32	q7, d23, d6
++	vmlal.s32	q7, d29, d0
++	add		r2, sp, #656
++	vst1.8		{d10-d11}, [r2, : 128]
++	vmull.s32	q5, d18, d3
++	vmlal.s32	q5, d19, d2
++	vmlal.s32	q5, d22, d1
++	vmlal.s32	q5, d23, d0
++	vmlal.s32	q5, d12, d8
++	add		r2, sp, #672
++	vst1.8		{d16-d17}, [r2, : 128]
++	vmull.s32	q4, d18, d8
++	vmlal.s32	q4, d26, d2
++	vmlal.s32	q4, d19, d7
++	vmlal.s32	q4, d27, d1
++	vmlal.s32	q4, d22, d6
++	vmlal.s32	q4, d28, d0
++	vmull.s32	q8, d18, d7
++	vmlal.s32	q8, d26, d1
++	vmlal.s32	q8, d19, d6
++	vmlal.s32	q8, d27, d0
++	add		r2, sp, #576
++	vld1.8		{d20-d21}, [r2, : 128]
++	vmlal.s32	q7, d24, d21
++	vmlal.s32	q7, d25, d20
++	vmlal.s32	q4, d23, d21
++	vmlal.s32	q4, d29, d20
++	vmlal.s32	q8, d22, d21
++	vmlal.s32	q8, d28, d20
++	vmlal.s32	q5, d24, d20
++	add		r2, sp, #576
++	vst1.8		{d14-d15}, [r2, : 128]
++	vmull.s32	q7, d18, d6
++	vmlal.s32	q7, d26, d0
++	add		r2, sp, #656
++	vld1.8		{d30-d31}, [r2, : 128]
++	vmlal.s32	q2, d30, d21
++	vmlal.s32	q7, d19, d21
++	vmlal.s32	q7, d27, d20
++	add		r2, sp, #624
++	vld1.8		{d26-d27}, [r2, : 128]
++	vmlal.s32	q4, d25, d27
++	vmlal.s32	q8, d29, d27
++	vmlal.s32	q8, d25, d26
++	vmlal.s32	q7, d28, d27
++	vmlal.s32	q7, d29, d26
++	add		r2, sp, #608
++	vld1.8		{d28-d29}, [r2, : 128]
++	vmlal.s32	q4, d24, d29
++	vmlal.s32	q8, d23, d29
++	vmlal.s32	q8, d24, d28
++	vmlal.s32	q7, d22, d29
++	vmlal.s32	q7, d23, d28
++	add		r2, sp, #608
++	vst1.8		{d8-d9}, [r2, : 128]
++	add		r2, sp, #560
++	vld1.8		{d8-d9}, [r2, : 128]
++	vmlal.s32	q7, d24, d9
++	vmlal.s32	q7, d25, d31
++	vmull.s32	q1, d18, d2
++	vmlal.s32	q1, d19, d1
++	vmlal.s32	q1, d22, d0
++	vmlal.s32	q1, d24, d27
++	vmlal.s32	q1, d23, d20
++	vmlal.s32	q1, d12, d7
++	vmlal.s32	q1, d13, d6
++	vmull.s32	q6, d18, d1
++	vmlal.s32	q6, d19, d0
++	vmlal.s32	q6, d23, d27
++	vmlal.s32	q6, d22, d20
++	vmlal.s32	q6, d24, d26
++	vmull.s32	q0, d18, d0
++	vmlal.s32	q0, d22, d27
++	vmlal.s32	q0, d23, d26
++	vmlal.s32	q0, d24, d31
++	vmlal.s32	q0, d19, d20
++	add		r2, sp, #640
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmlal.s32	q2, d18, d7
++	vmlal.s32	q2, d19, d6
++	vmlal.s32	q5, d18, d6
++	vmlal.s32	q5, d19, d21
++	vmlal.s32	q1, d18, d21
++	vmlal.s32	q1, d19, d29
++	vmlal.s32	q0, d18, d28
++	vmlal.s32	q0, d19, d9
++	vmlal.s32	q6, d18, d29
++	vmlal.s32	q6, d19, d28
++	add		r2, sp, #592
++	vld1.8		{d18-d19}, [r2, : 128]
++	add		r2, sp, #512
++	vld1.8		{d22-d23}, [r2, : 128]
++	vmlal.s32	q5, d19, d7
++	vmlal.s32	q0, d18, d21
++	vmlal.s32	q0, d19, d29
++	vmlal.s32	q6, d18, d6
++	add		r2, sp, #528
++	vld1.8		{d6-d7}, [r2, : 128]
++	vmlal.s32	q6, d19, d21
++	add		r2, sp, #576
++	vld1.8		{d18-d19}, [r2, : 128]
++	vmlal.s32	q0, d30, d8
++	add		r2, sp, #672
++	vld1.8		{d20-d21}, [r2, : 128]
++	vmlal.s32	q5, d30, d29
++	add		r2, sp, #608
++	vld1.8		{d24-d25}, [r2, : 128]
++	vmlal.s32	q1, d30, d28
++	vadd.i64	q13, q0, q11
++	vadd.i64	q14, q5, q11
++	vmlal.s32	q6, d30, d9
++	vshr.s64	q4, q13, #26
++	vshr.s64	q13, q14, #26
++	vadd.i64	q7, q7, q4
++	vshl.i64	q4, q4, #26
++	vadd.i64	q14, q7, q3
++	vadd.i64	q9, q9, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q15, q9, q3
++	vsub.i64	q0, q0, q4
++	vshr.s64	q4, q14, #25
++	vsub.i64	q5, q5, q13
++	vshr.s64	q13, q15, #25
++	vadd.i64	q6, q6, q4
++	vshl.i64	q4, q4, #25
++	vadd.i64	q14, q6, q11
++	vadd.i64	q2, q2, q13
++	vsub.i64	q4, q7, q4
++	vshr.s64	q7, q14, #26
++	vshl.i64	q13, q13, #25
++	vadd.i64	q14, q2, q11
++	vadd.i64	q8, q8, q7
++	vshl.i64	q7, q7, #26
++	vadd.i64	q15, q8, q3
++	vsub.i64	q9, q9, q13
++	vshr.s64	q13, q14, #26
++	vsub.i64	q6, q6, q7
++	vshr.s64	q7, q15, #25
++	vadd.i64	q10, q10, q13
++	vshl.i64	q13, q13, #26
++	vadd.i64	q14, q10, q3
++	vadd.i64	q1, q1, q7
++	add		r2, r3, #240
++	vshl.i64	q7, q7, #25
++	add		r4, r3, #144
++	vadd.i64	q15, q1, q11
++	add		r2, r2, #8
++	vsub.i64	q2, q2, q13
++	add		r4, r4, #8
++	vshr.s64	q13, q14, #25
++	vsub.i64	q7, q8, q7
++	vshr.s64	q8, q15, #26
++	vadd.i64	q14, q13, q13
++	vadd.i64	q12, q12, q8
++	vtrn.32		d12, d14
++	vshl.i64	q8, q8, #26
++	vtrn.32		d13, d15
++	vadd.i64	q3, q12, q3
++	vadd.i64	q0, q0, q14
++	vst1.8		d12, [r2, : 64]!
++	vshl.i64	q7, q13, #4
++	vst1.8		d13, [r4, : 64]!
++	vsub.i64	q1, q1, q8
++	vshr.s64	q3, q3, #25
++	vadd.i64	q0, q0, q7
++	vadd.i64	q5, q5, q3
++	vshl.i64	q3, q3, #25
++	vadd.i64	q6, q5, q11
++	vadd.i64	q0, q0, q13
++	vshl.i64	q7, q13, #25
++	vadd.i64	q8, q0, q11
++	vsub.i64	q3, q12, q3
++	vshr.s64	q6, q6, #26
++	vsub.i64	q7, q10, q7
++	vtrn.32		d2, d6
++	vshr.s64	q8, q8, #26
++	vtrn.32		d3, d7
++	vadd.i64	q3, q9, q6
++	vst1.8		d2, [r2, : 64]
++	vshl.i64	q6, q6, #26
++	vst1.8		d3, [r4, : 64]
++	vadd.i64	q1, q4, q8
++	vtrn.32		d4, d14
++	vshl.i64	q4, q8, #26
++	vtrn.32		d5, d15
++	vsub.i64	q5, q5, q6
++	add		r2, r2, #16
++	vsub.i64	q0, q0, q4
++	vst1.8		d4, [r2, : 64]
++	add		r4, r4, #16
++	vst1.8		d5, [r4, : 64]
++	vtrn.32		d10, d6
++	vtrn.32		d11, d7
++	sub		r2, r2, #8
++	sub		r4, r4, #8
++	vtrn.32		d0, d2
++	vtrn.32		d1, d3
++	vst1.8		d10, [r2, : 64]
++	vst1.8		d11, [r4, : 64]
++	sub		r2, r2, #24
++	sub		r4, r4, #24
++	vst1.8		d0, [r2, : 64]
++	vst1.8		d1, [r4, : 64]
++	ldr		r2, [sp, #488]
++	ldr		r4, [sp, #492]
++	subs		r5, r2, #1
++	bge		._mainloop
++	add		r1, r3, #144
++	add		r2, r3, #336
++	vld1.8		{d0-d1}, [r1, : 128]!
++	vld1.8		{d2-d3}, [r1, : 128]!
++	vld1.8		{d4}, [r1, : 64]
++	vst1.8		{d0-d1}, [r2, : 128]!
++	vst1.8		{d2-d3}, [r2, : 128]!
++	vst1.8		d4, [r2, : 64]
++	ldr		r1, =0
++._invertloop:
++	add		r2, r3, #144
++	ldr		r4, =0
++	ldr		r5, =2
++	cmp		r1, #1
++	ldreq		r5, =1
++	addeq		r2, r3, #336
++	addeq		r4, r3, #48
++	cmp		r1, #2
++	ldreq		r5, =1
++	addeq		r2, r3, #48
++	cmp		r1, #3
++	ldreq		r5, =5
++	addeq		r4, r3, #336
++	cmp		r1, #4
++	ldreq		r5, =10
++	cmp		r1, #5
++	ldreq		r5, =20
++	cmp		r1, #6
++	ldreq		r5, =10
++	addeq		r2, r3, #336
++	addeq		r4, r3, #336
++	cmp		r1, #7
++	ldreq		r5, =50
++	cmp		r1, #8
++	ldreq		r5, =100
++	cmp		r1, #9
++	ldreq		r5, =50
++	addeq		r2, r3, #336
++	cmp		r1, #10
++	ldreq		r5, =5
++	addeq		r2, r3, #48
++	cmp		r1, #11
++	ldreq		r5, =0
++	addeq		r2, r3, #96
++	add		r6, r3, #144
++	add		r7, r3, #288
++	vld1.8		{d0-d1}, [r6, : 128]!
++	vld1.8		{d2-d3}, [r6, : 128]!
++	vld1.8		{d4}, [r6, : 64]
++	vst1.8		{d0-d1}, [r7, : 128]!
++	vst1.8		{d2-d3}, [r7, : 128]!
++	vst1.8		d4, [r7, : 64]
++	cmp		r5, #0
++	beq		._skipsquaringloop
++._squaringloop:
++	add		r6, r3, #288
++	add		r7, r3, #288
++	add		r8, r3, #288
++	vmov.i32	q0, #19
++	vmov.i32	q1, #0
++	vmov.i32	q2, #1
++	vzip.i32	q1, q2
++	vld1.8		{d4-d5}, [r7, : 128]!
++	vld1.8		{d6-d7}, [r7, : 128]!
++	vld1.8		{d9}, [r7, : 64]
++	vld1.8		{d10-d11}, [r6, : 128]!
++	add		r7, sp, #416
++	vld1.8		{d12-d13}, [r6, : 128]!
++	vmul.i32	q7, q2, q0
++	vld1.8		{d8}, [r6, : 64]
++	vext.32		d17, d11, d10, #1
++	vmul.i32	q9, q3, q0
++	vext.32		d16, d10, d8, #1
++	vshl.u32	q10, q5, q1
++	vext.32		d22, d14, d4, #1
++	vext.32		d24, d18, d6, #1
++	vshl.u32	q13, q6, q1
++	vshl.u32	d28, d8, d2
++	vrev64.i32	d22, d22
++	vmul.i32	d1, d9, d1
++	vrev64.i32	d24, d24
++	vext.32		d29, d8, d13, #1
++	vext.32		d0, d1, d9, #1
++	vrev64.i32	d0, d0
++	vext.32		d2, d9, d1, #1
++	vext.32		d23, d15, d5, #1
++	vmull.s32	q4, d20, d4
++	vrev64.i32	d23, d23
++	vmlal.s32	q4, d21, d1
++	vrev64.i32	d2, d2
++	vmlal.s32	q4, d26, d19
++	vext.32		d3, d5, d15, #1
++	vmlal.s32	q4, d27, d18
++	vrev64.i32	d3, d3
++	vmlal.s32	q4, d28, d15
++	vext.32		d14, d12, d11, #1
++	vmull.s32	q5, d16, d23
++	vext.32		d15, d13, d12, #1
++	vmlal.s32	q5, d17, d4
++	vst1.8		d8, [r7, : 64]!
++	vmlal.s32	q5, d14, d1
++	vext.32		d12, d9, d8, #0
++	vmlal.s32	q5, d15, d19
++	vmov.i64	d13, #0
++	vmlal.s32	q5, d29, d18
++	vext.32		d25, d19, d7, #1
++	vmlal.s32	q6, d20, d5
++	vrev64.i32	d25, d25
++	vmlal.s32	q6, d21, d4
++	vst1.8		d11, [r7, : 64]!
++	vmlal.s32	q6, d26, d1
++	vext.32		d9, d10, d10, #0
++	vmlal.s32	q6, d27, d19
++	vmov.i64	d8, #0
++	vmlal.s32	q6, d28, d18
++	vmlal.s32	q4, d16, d24
++	vmlal.s32	q4, d17, d5
++	vmlal.s32	q4, d14, d4
++	vst1.8		d12, [r7, : 64]!
++	vmlal.s32	q4, d15, d1
++	vext.32		d10, d13, d12, #0
++	vmlal.s32	q4, d29, d19
++	vmov.i64	d11, #0
++	vmlal.s32	q5, d20, d6
++	vmlal.s32	q5, d21, d5
++	vmlal.s32	q5, d26, d4
++	vext.32		d13, d8, d8, #0
++	vmlal.s32	q5, d27, d1
++	vmov.i64	d12, #0
++	vmlal.s32	q5, d28, d19
++	vst1.8		d9, [r7, : 64]!
++	vmlal.s32	q6, d16, d25
++	vmlal.s32	q6, d17, d6
++	vst1.8		d10, [r7, : 64]
++	vmlal.s32	q6, d14, d5
++	vext.32		d8, d11, d10, #0
++	vmlal.s32	q6, d15, d4
++	vmov.i64	d9, #0
++	vmlal.s32	q6, d29, d1
++	vmlal.s32	q4, d20, d7
++	vmlal.s32	q4, d21, d6
++	vmlal.s32	q4, d26, d5
++	vext.32		d11, d12, d12, #0
++	vmlal.s32	q4, d27, d4
++	vmov.i64	d10, #0
++	vmlal.s32	q4, d28, d1
++	vmlal.s32	q5, d16, d0
++	sub		r6, r7, #32
++	vmlal.s32	q5, d17, d7
++	vmlal.s32	q5, d14, d6
++	vext.32		d30, d9, d8, #0
++	vmlal.s32	q5, d15, d5
++	vld1.8		{d31}, [r6, : 64]!
++	vmlal.s32	q5, d29, d4
++	vmlal.s32	q15, d20, d0
++	vext.32		d0, d6, d18, #1
++	vmlal.s32	q15, d21, d25
++	vrev64.i32	d0, d0
++	vmlal.s32	q15, d26, d24
++	vext.32		d1, d7, d19, #1
++	vext.32		d7, d10, d10, #0
++	vmlal.s32	q15, d27, d23
++	vrev64.i32	d1, d1
++	vld1.8		{d6}, [r6, : 64]
++	vmlal.s32	q15, d28, d22
++	vmlal.s32	q3, d16, d4
++	add		r6, r6, #24
++	vmlal.s32	q3, d17, d2
++	vext.32		d4, d31, d30, #0
++	vmov		d17, d11
++	vmlal.s32	q3, d14, d1
++	vext.32		d11, d13, d13, #0
++	vext.32		d13, d30, d30, #0
++	vmlal.s32	q3, d15, d0
++	vext.32		d1, d8, d8, #0
++	vmlal.s32	q3, d29, d3
++	vld1.8		{d5}, [r6, : 64]
++	sub		r6, r6, #16
++	vext.32		d10, d6, d6, #0
++	vmov.i32	q1, #0xffffffff
++	vshl.i64	q4, q1, #25
++	add		r7, sp, #512
++	vld1.8		{d14-d15}, [r7, : 128]
++	vadd.i64	q9, q2, q7
++	vshl.i64	q1, q1, #26
++	vshr.s64	q10, q9, #26
++	vld1.8		{d0}, [r6, : 64]!
++	vadd.i64	q5, q5, q10
++	vand		q9, q9, q1
++	vld1.8		{d16}, [r6, : 64]!
++	add		r6, sp, #528
++	vld1.8		{d20-d21}, [r6, : 128]
++	vadd.i64	q11, q5, q10
++	vsub.i64	q2, q2, q9
++	vshr.s64	q9, q11, #25
++	vext.32		d12, d5, d4, #0
++	vand		q11, q11, q4
++	vadd.i64	q0, q0, q9
++	vmov		d19, d7
++	vadd.i64	q3, q0, q7
++	vsub.i64	q5, q5, q11
++	vshr.s64	q11, q3, #26
++	vext.32		d18, d11, d10, #0
++	vand		q3, q3, q1
++	vadd.i64	q8, q8, q11
++	vadd.i64	q11, q8, q10
++	vsub.i64	q0, q0, q3
++	vshr.s64	q3, q11, #25
++	vand		q11, q11, q4
++	vadd.i64	q3, q6, q3
++	vadd.i64	q6, q3, q7
++	vsub.i64	q8, q8, q11
++	vshr.s64	q11, q6, #26
++	vand		q6, q6, q1
++	vadd.i64	q9, q9, q11
++	vadd.i64	d25, d19, d21
++	vsub.i64	q3, q3, q6
++	vshr.s64	d23, d25, #25
++	vand		q4, q12, q4
++	vadd.i64	d21, d23, d23
++	vshl.i64	d25, d23, #4
++	vadd.i64	d21, d21, d23
++	vadd.i64	d25, d25, d21
++	vadd.i64	d4, d4, d25
++	vzip.i32	q0, q8
++	vadd.i64	d12, d4, d14
++	add		r6, r8, #8
++	vst1.8		d0, [r6, : 64]
++	vsub.i64	d19, d19, d9
++	add		r6, r6, #16
++	vst1.8		d16, [r6, : 64]
++	vshr.s64	d22, d12, #26
++	vand		q0, q6, q1
++	vadd.i64	d10, d10, d22
++	vzip.i32	q3, q9
++	vsub.i64	d4, d4, d0
++	sub		r6, r6, #8
++	vst1.8		d6, [r6, : 64]
++	add		r6, r6, #16
++	vst1.8		d18, [r6, : 64]
++	vzip.i32	q2, q5
++	sub		r6, r6, #32
++	vst1.8		d4, [r6, : 64]
++	subs		r5, r5, #1
++	bhi		._squaringloop
++._skipsquaringloop:
++	mov		r2, r2
++	add		r5, r3, #288
++	add		r6, r3, #144
++	vmov.i32	q0, #19
++	vmov.i32	q1, #0
++	vmov.i32	q2, #1
++	vzip.i32	q1, q2
++	vld1.8		{d4-d5}, [r5, : 128]!
++	vld1.8		{d6-d7}, [r5, : 128]!
++	vld1.8		{d9}, [r5, : 64]
++	vld1.8		{d10-d11}, [r2, : 128]!
++	add		r5, sp, #416
++	vld1.8		{d12-d13}, [r2, : 128]!
++	vmul.i32	q7, q2, q0
++	vld1.8		{d8}, [r2, : 64]
++	vext.32		d17, d11, d10, #1
++	vmul.i32	q9, q3, q0
++	vext.32		d16, d10, d8, #1
++	vshl.u32	q10, q5, q1
++	vext.32		d22, d14, d4, #1
++	vext.32		d24, d18, d6, #1
++	vshl.u32	q13, q6, q1
++	vshl.u32	d28, d8, d2
++	vrev64.i32	d22, d22
++	vmul.i32	d1, d9, d1
++	vrev64.i32	d24, d24
++	vext.32		d29, d8, d13, #1
++	vext.32		d0, d1, d9, #1
++	vrev64.i32	d0, d0
++	vext.32		d2, d9, d1, #1
++	vext.32		d23, d15, d5, #1
++	vmull.s32	q4, d20, d4
++	vrev64.i32	d23, d23
++	vmlal.s32	q4, d21, d1
++	vrev64.i32	d2, d2
++	vmlal.s32	q4, d26, d19
++	vext.32		d3, d5, d15, #1
++	vmlal.s32	q4, d27, d18
++	vrev64.i32	d3, d3
++	vmlal.s32	q4, d28, d15
++	vext.32		d14, d12, d11, #1
++	vmull.s32	q5, d16, d23
++	vext.32		d15, d13, d12, #1
++	vmlal.s32	q5, d17, d4
++	vst1.8		d8, [r5, : 64]!
++	vmlal.s32	q5, d14, d1
++	vext.32		d12, d9, d8, #0
++	vmlal.s32	q5, d15, d19
++	vmov.i64	d13, #0
++	vmlal.s32	q5, d29, d18
++	vext.32		d25, d19, d7, #1
++	vmlal.s32	q6, d20, d5
++	vrev64.i32	d25, d25
++	vmlal.s32	q6, d21, d4
++	vst1.8		d11, [r5, : 64]!
++	vmlal.s32	q6, d26, d1
++	vext.32		d9, d10, d10, #0
++	vmlal.s32	q6, d27, d19
++	vmov.i64	d8, #0
++	vmlal.s32	q6, d28, d18
++	vmlal.s32	q4, d16, d24
++	vmlal.s32	q4, d17, d5
++	vmlal.s32	q4, d14, d4
++	vst1.8		d12, [r5, : 64]!
++	vmlal.s32	q4, d15, d1
++	vext.32		d10, d13, d12, #0
++	vmlal.s32	q4, d29, d19
++	vmov.i64	d11, #0
++	vmlal.s32	q5, d20, d6
++	vmlal.s32	q5, d21, d5
++	vmlal.s32	q5, d26, d4
++	vext.32		d13, d8, d8, #0
++	vmlal.s32	q5, d27, d1
++	vmov.i64	d12, #0
++	vmlal.s32	q5, d28, d19
++	vst1.8		d9, [r5, : 64]!
++	vmlal.s32	q6, d16, d25
++	vmlal.s32	q6, d17, d6
++	vst1.8		d10, [r5, : 64]
++	vmlal.s32	q6, d14, d5
++	vext.32		d8, d11, d10, #0
++	vmlal.s32	q6, d15, d4
++	vmov.i64	d9, #0
++	vmlal.s32	q6, d29, d1
++	vmlal.s32	q4, d20, d7
++	vmlal.s32	q4, d21, d6
++	vmlal.s32	q4, d26, d5
++	vext.32		d11, d12, d12, #0
++	vmlal.s32	q4, d27, d4
++	vmov.i64	d10, #0
++	vmlal.s32	q4, d28, d1
++	vmlal.s32	q5, d16, d0
++	sub		r2, r5, #32
++	vmlal.s32	q5, d17, d7
++	vmlal.s32	q5, d14, d6
++	vext.32		d30, d9, d8, #0
++	vmlal.s32	q5, d15, d5
++	vld1.8		{d31}, [r2, : 64]!
++	vmlal.s32	q5, d29, d4
++	vmlal.s32	q15, d20, d0
++	vext.32		d0, d6, d18, #1
++	vmlal.s32	q15, d21, d25
++	vrev64.i32	d0, d0
++	vmlal.s32	q15, d26, d24
++	vext.32		d1, d7, d19, #1
++	vext.32		d7, d10, d10, #0
++	vmlal.s32	q15, d27, d23
++	vrev64.i32	d1, d1
++	vld1.8		{d6}, [r2, : 64]
++	vmlal.s32	q15, d28, d22
++	vmlal.s32	q3, d16, d4
++	add		r2, r2, #24
++	vmlal.s32	q3, d17, d2
++	vext.32		d4, d31, d30, #0
++	vmov		d17, d11
++	vmlal.s32	q3, d14, d1
++	vext.32		d11, d13, d13, #0
++	vext.32		d13, d30, d30, #0
++	vmlal.s32	q3, d15, d0
++	vext.32		d1, d8, d8, #0
++	vmlal.s32	q3, d29, d3
++	vld1.8		{d5}, [r2, : 64]
++	sub		r2, r2, #16
++	vext.32		d10, d6, d6, #0
++	vmov.i32	q1, #0xffffffff
++	vshl.i64	q4, q1, #25
++	add		r5, sp, #512
++	vld1.8		{d14-d15}, [r5, : 128]
++	vadd.i64	q9, q2, q7
++	vshl.i64	q1, q1, #26
++	vshr.s64	q10, q9, #26
++	vld1.8		{d0}, [r2, : 64]!
++	vadd.i64	q5, q5, q10
++	vand		q9, q9, q1
++	vld1.8		{d16}, [r2, : 64]!
++	add		r2, sp, #528
++	vld1.8		{d20-d21}, [r2, : 128]
++	vadd.i64	q11, q5, q10
++	vsub.i64	q2, q2, q9
++	vshr.s64	q9, q11, #25
++	vext.32		d12, d5, d4, #0
++	vand		q11, q11, q4
++	vadd.i64	q0, q0, q9
++	vmov		d19, d7
++	vadd.i64	q3, q0, q7
++	vsub.i64	q5, q5, q11
++	vshr.s64	q11, q3, #26
++	vext.32		d18, d11, d10, #0
++	vand		q3, q3, q1
++	vadd.i64	q8, q8, q11
++	vadd.i64	q11, q8, q10
++	vsub.i64	q0, q0, q3
++	vshr.s64	q3, q11, #25
++	vand		q11, q11, q4
++	vadd.i64	q3, q6, q3
++	vadd.i64	q6, q3, q7
++	vsub.i64	q8, q8, q11
++	vshr.s64	q11, q6, #26
++	vand		q6, q6, q1
++	vadd.i64	q9, q9, q11
++	vadd.i64	d25, d19, d21
++	vsub.i64	q3, q3, q6
++	vshr.s64	d23, d25, #25
++	vand		q4, q12, q4
++	vadd.i64	d21, d23, d23
++	vshl.i64	d25, d23, #4
++	vadd.i64	d21, d21, d23
++	vadd.i64	d25, d25, d21
++	vadd.i64	d4, d4, d25
++	vzip.i32	q0, q8
++	vadd.i64	d12, d4, d14
++	add		r2, r6, #8
++	vst1.8		d0, [r2, : 64]
++	vsub.i64	d19, d19, d9
++	add		r2, r2, #16
++	vst1.8		d16, [r2, : 64]
++	vshr.s64	d22, d12, #26
++	vand		q0, q6, q1
++	vadd.i64	d10, d10, d22
++	vzip.i32	q3, q9
++	vsub.i64	d4, d4, d0
++	sub		r2, r2, #8
++	vst1.8		d6, [r2, : 64]
++	add		r2, r2, #16
++	vst1.8		d18, [r2, : 64]
++	vzip.i32	q2, q5
++	sub		r2, r2, #32
++	vst1.8		d4, [r2, : 64]
++	cmp		r4, #0
++	beq		._skippostcopy
++	add		r2, r3, #144
++	mov		r4, r4
++	vld1.8		{d0-d1}, [r2, : 128]!
++	vld1.8		{d2-d3}, [r2, : 128]!
++	vld1.8		{d4}, [r2, : 64]
++	vst1.8		{d0-d1}, [r4, : 128]!
++	vst1.8		{d2-d3}, [r4, : 128]!
++	vst1.8		d4, [r4, : 64]
++._skippostcopy:
++	cmp		r1, #1
++	bne		._skipfinalcopy
++	add		r2, r3, #288
++	add		r4, r3, #144
++	vld1.8		{d0-d1}, [r2, : 128]!
++	vld1.8		{d2-d3}, [r2, : 128]!
++	vld1.8		{d4}, [r2, : 64]
++	vst1.8		{d0-d1}, [r4, : 128]!
++	vst1.8		{d2-d3}, [r4, : 128]!
++	vst1.8		d4, [r4, : 64]
++._skipfinalcopy:
++	add		r1, r1, #1
++	cmp		r1, #12
++	blo		._invertloop
++	add		r1, r3, #144
++	ldr		r2, [r1], #4
++	ldr		r3, [r1], #4
++	ldr		r4, [r1], #4
++	ldr		r5, [r1], #4
++	ldr		r6, [r1], #4
++	ldr		r7, [r1], #4
++	ldr		r8, [r1], #4
++	ldr		r9, [r1], #4
++	ldr		r10, [r1], #4
++	ldr		r1, [r1]
++	add		r11, r1, r1, LSL #4
++	add		r11, r11, r1, LSL #1
++	add		r11, r11, #16777216
++	mov		r11, r11, ASR #25
++	add		r11, r11, r2
++	mov		r11, r11, ASR #26
++	add		r11, r11, r3
++	mov		r11, r11, ASR #25
++	add		r11, r11, r4
++	mov		r11, r11, ASR #26
++	add		r11, r11, r5
++	mov		r11, r11, ASR #25
++	add		r11, r11, r6
++	mov		r11, r11, ASR #26
++	add		r11, r11, r7
++	mov		r11, r11, ASR #25
++	add		r11, r11, r8
++	mov		r11, r11, ASR #26
++	add		r11, r11, r9
++	mov		r11, r11, ASR #25
++	add		r11, r11, r10
++	mov		r11, r11, ASR #26
++	add		r11, r11, r1
++	mov		r11, r11, ASR #25
++	add		r2, r2, r11
++	add		r2, r2, r11, LSL #1
++	add		r2, r2, r11, LSL #4
++	mov		r11, r2, ASR #26
++	add		r3, r3, r11
++	sub		r2, r2, r11, LSL #26
++	mov		r11, r3, ASR #25
++	add		r4, r4, r11
++	sub		r3, r3, r11, LSL #25
++	mov		r11, r4, ASR #26
++	add		r5, r5, r11
++	sub		r4, r4, r11, LSL #26
++	mov		r11, r5, ASR #25
++	add		r6, r6, r11
++	sub		r5, r5, r11, LSL #25
++	mov		r11, r6, ASR #26
++	add		r7, r7, r11
++	sub		r6, r6, r11, LSL #26
++	mov		r11, r7, ASR #25
++	add		r8, r8, r11
++	sub		r7, r7, r11, LSL #25
++	mov		r11, r8, ASR #26
++	add		r9, r9, r11
++	sub		r8, r8, r11, LSL #26
++	mov		r11, r9, ASR #25
++	add		r10, r10, r11
++	sub		r9, r9, r11, LSL #25
++	mov		r11, r10, ASR #26
++	add		r1, r1, r11
++	sub		r10, r10, r11, LSL #26
++	mov		r11, r1, ASR #25
++	sub		r1, r1, r11, LSL #25
++	add		r2, r2, r3, LSL #26
++	mov		r3, r3, LSR #6
++	add		r3, r3, r4, LSL #19
++	mov		r4, r4, LSR #13
++	add		r4, r4, r5, LSL #13
++	mov		r5, r5, LSR #19
++	add		r5, r5, r6, LSL #6
++	add		r6, r7, r8, LSL #25
++	mov		r7, r8, LSR #7
++	add		r7, r7, r9, LSL #19
++	mov		r8, r9, LSR #13
++	add		r8, r8, r10, LSL #12
++	mov		r9, r10, LSR #20
++	add		r1, r9, r1, LSL #6
++	str		r2, [r0], #4
++	str		r3, [r0], #4
++	str		r4, [r0], #4
++	str		r5, [r0], #4
++	str		r6, [r0], #4
++	str		r7, [r0], #4
++	str		r8, [r0], #4
++	str		r1, [r0]
++	ldrd		r4, [sp, #0]
++	ldrd		r6, [sp, #8]
++	ldrd		r8, [sp, #16]
++	ldrd		r10, [sp, #24]
++	ldr		r12, [sp, #480]
++	ldr		r14, [sp, #484]
++	ldr		r0, =0
++	mov		sp, r12
++	vpop		{q4, q5, q6, q7}
++	bx		lr
 -- 
 2.19.0
