@@ -1,125 +1,60 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 5 Oct 2018 22:50:16 -0700
-Subject: [PATCH 7/7] Documentation: devicetree: Add Xilinx R5 rproc binding
-In-Reply-To: <1534403190-28523-8-git-send-email-jliang@xilinx.com>
-References: <1534403190-28523-1-git-send-email-jliang@xilinx.com>
- <1534403190-28523-8-git-send-email-jliang@xilinx.com>
-Message-ID: <20181006055016.GB9450@builder>
+Date: Fri, 5 Oct 2018 23:22:32 -0700
+Subject: [PATCH] samples/rpmsg: Introduce a module parameter for message
+ count
+In-Reply-To: <20180911174643.26199-1-s-anna@ti.com>
+References: <20180911174643.26199-1-s-anna@ti.com>
+Message-ID: <20181006062231.GF12063@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 16 Aug 00:06 PDT 2018, Wendy Liang wrote:
+On Tue 11 Sep 10:46 PDT 2018, Suman Anna wrote:
 
-> Add device tree binding for Xilinx Cortex-r5 remoteproc.
+> The current rpmsg_client_sample uses a fixed number of messages to
+> be sent to each instance. This is currently set at 100. Introduce
+> an optional module parameter 'count' so that the number of messages
+> to be exchanged can be made flexible.
 > 
-> Signed-off-by: Wendy Liang <jliang@xilinx.com>
-> ---
->  .../remoteproc/xlnx,zynqmp-r5-remoteproc.txt       | 81 ++++++++++++++++++++++
->  1 file changed, 81 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
-> new file mode 100644
-> index 0000000..3940019
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
-> @@ -0,0 +1,81 @@
-> +Xilinx ARM Cortex A53-R5 remoteproc driver
-> +==========================================
-> +
-> +ZynqMP family of devices use two Cortex R5 processors to help with various
-> +low power / real time tasks.
-> +
-> +This driver requires specific ZynqMP hardware design.
-> +
-> +ZynqMP R5 RemoteProc Device Node:
-> +=================================
-> +A zynqmp_r5_remoteproc device node is used to represent a R5 IP instance
-> +within ZynqMP SoC.
-> +
-> +Required properties:
-> +--------------------
-> + - compatible : Should be "xlnx,zynqmp-r5-remoteproc-1.0"
 
-What is 1.0?
+Rather than sending N messages as fast as possible to any sample channel
+that comes up, how about making the sample create a debugfs entry that
+we can write messages to from user space?
 
-> + - reg : Address and length of the register set for the device. It
-> +        contains in the same order as described reg-names
-> + - reg-names: Contain the register set names.
-> +              "tcm_a" and "tcm_b" for TCM memories.
-> +              If the user uses the remoteproc driver with the RPMsg kernel
-> +              driver,"ipi" for the IPI register used to communicate with RPU
-> +              is also required.
-> +              Otherwise, if user only uses the remoteproc driver to boot RPU
-> +              firmware, "ipi" is not required.
-> + - tcm-pnode-id: TCM resources power nodes IDs which are used to request TCM
-> +                 resources for the remoteproc driver to access.
-> + - rpu-pnode-id : RPU power node id which is used by the remoteproc driver
-> +                  to start RPU or shut it down.
-> +
-> +Optional properties:
-> +--------------------
-> + - core_conf : R5 core configuration (valid string - split0 or split1 or
-> +               lock-step), default is lock-step.
-> + - memory-region: memories regions for RPU executable and DMA memory.
-> + - interrupts : Interrupt mapping for remoteproc IPI. It is required if the
-> +                user uses the remoteproc driver with the RPMsg kernel driver.
-> + - interrupt-parent : Phandle for the interrupt controller. It is required if
-> +                      the user uses the remoteproc driver with the RPMsg kernel
-> +                      kernel driver.
-> +
-> +Example:
-> +--------
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +		rproc_0_fw_reserved: rproc at 3ed000000 {
-> +			compatible = "rproc-prog-memory";
-> +			no-map;
-> +			reg = <0x0 0x3ed00000 0x0 0x40000>;
-> +		};
-> +		rproc_0_dma_reserved: rproc at 3ed400000 {
-> +			compatible = "shared-dma-pool";
-> +			no-map;
-> +			reg = <0x0 0x3ed40000 0x0 0x80000>;
-> +		};
-> +	};
-> +
-> +	firmware {
-> +		zynqmp_firmware: zynqmp-firmware {
-> +			compatible = "xlnx,zynqmp-firmware";
-> +			method = "smc";
-> +		};
-> +	};
-> +
-> +	zynqmp-r5-remoteproc at 0 {
-
-remoteproc at ffe00000 {
-
-> +		compatible = "xlnx,zynqmp-r5-remoteproc-1.0";
-> +		reg = <0x0 0xFFE00000 0x0 0x10000>,
-> +			<0x0 0xFFE20000 0x0 0x10000>,
-> +			<0x0 0xff340000 0x0 0x100>;
-
-Make all addresses lowercase, rather than mixing case.
-
-> +		reg-names = "tcm_a", "tcm_b", "ipi";
-> +		dma-ranges;
-> +		core_conf = "split0";
-> +		memory-region = <&rproc_0_fw_reserved>,
-> +				<&rproc_0_dma_reserved>;
-> +		tcm-pnode-id = <0xf>, <0x10>;
-> +		rpu-pnode-id = <0x7>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 29 4>;
-
-interrutps = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-
-> +	} ;
-> -- 
-> 2.7.4
-> 
+That would make it possible to improve the handling of multiple
+remoteprocs and would allow for a variation in message lengths etc.
 
 Regards,
 Bjorn
+
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>  samples/rpmsg/rpmsg_client_sample.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/samples/rpmsg/rpmsg_client_sample.c b/samples/rpmsg/rpmsg_client_sample.c
+> index f161dfd3e70a..9b6b27ea504f 100644
+> --- a/samples/rpmsg/rpmsg_client_sample.c
+> +++ b/samples/rpmsg/rpmsg_client_sample.c
+> @@ -22,7 +22,9 @@
+>  #include <linux/rpmsg.h>
+>  
+>  #define MSG		"hello world!"
+> -#define MSG_LIMIT	100
+> +
+> +static int count = 100;
+> +module_param(count, int, 0644);
+>  
+>  struct instance_data {
+>  	int rx_count;
+> @@ -41,7 +43,7 @@ static int rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
+>  		       data, len,  true);
+>  
+>  	/* samples should not live forever */
+> -	if (idata->rx_count >= MSG_LIMIT) {
+> +	if (idata->rx_count >= count) {
+>  		dev_info(&rpdev->dev, "goodbye!\n");
+>  		return 0;
+>  	}
+> -- 
+> 2.18.0
+> 
