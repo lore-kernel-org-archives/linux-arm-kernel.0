@@ -1,110 +1,77 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:38:38 +0200
-Subject: [PATCH v2 02/29] clk: sunxi-ng: Adjust MP clock parent rate when
- allowed
+Date: Sun,  7 Oct 2018 11:38:39 +0200
+Subject: [PATCH v2 03/29] clk: sunxi-ng: Use u64 for calculation of NM rate
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-3-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently MP clocks don't consider adjusting parent rate even if they
-are allowed to do so. Such behaviour considerably lowers amount of
-possible rates, which is very inconvenient when such clock is used for
-pixel clock, for example.
+Allwinner H6 SoC has multiplier N range between 1 and 254. Since parent
+rate is 24MHz, intermediate result when calculating final rate easily
+overflows 32 bit variable.
 
-In order to improve the situation, adjusting parent rate is considered
-when allowed.
+Because of that, introduce function for calculating clock rate which
+uses 64 bit variable for intermediate result.
 
-This code is inspired by clk_divider_bestdiv() function, which does
-basically the same thing for different clock type.
+Fixes: 6174a1e24b0d ("clk: sunxi-ng: Add N-M-factor clock support")
+Fixes: ee28648cb2b4 ("clk: sunxi-ng: Remove the use of rational computations")
 
+CC: <stable@vger.kernel.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_mp.c | 64 +++++++++++++++++++++++++++++++++--
- 1 file changed, 62 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu_nm.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
-index 5d0af4051737..0357349eb767 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.c
-+++ b/drivers/clk/sunxi-ng/ccu_mp.c
-@@ -40,6 +40,61 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
- 	*p = best_p;
- }
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+index 6fe3c14f7b2d..424d8635b053 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -19,6 +19,17 @@ struct _ccu_nm {
+ 	unsigned long	m, min_m, max_m;
+ };
  
-+static unsigned long ccu_mp_find_best_with_parent_adj(struct clk_hw *hw,
-+						      unsigned long *parent,
-+						      unsigned long rate,
-+						      unsigned int max_m,
-+						      unsigned int max_p)
++static unsigned long ccu_nm_calc_rate(unsigned long parent,
++				      unsigned long n, unsigned long m)
 +{
-+	unsigned long parent_rate_saved;
-+	unsigned long parent_rate, now;
-+	unsigned long best_rate = 0;
-+	unsigned int _m, _p, div;
-+	unsigned long maxdiv;
++	u64 rate = parent;
 +
-+	parent_rate_saved = *parent;
++	rate *= n;
++	do_div(rate, m);
 +
-+	/*
-+	 * The maximum divider we can use without overflowing
-+	 * unsigned long in rate * m * p below
-+	 */
-+	maxdiv = max_m * max_p;
-+	maxdiv = min(ULONG_MAX / rate, maxdiv);
-+
-+	for (_p = 1; _p <= max_p; _p <<= 1) {
-+		for (_m = 1; _m <= max_m; _m++) {
-+			div = _m * _p;
-+
-+			if (div > maxdiv)
-+				break;
-+
-+			if (rate * div == parent_rate_saved) {
-+				/*
-+				 * It's the most ideal case if the requested
-+				 * rate can be divided from parent clock without
-+				 * needing to change parent rate, so return the
-+				 * divider immediately.
-+				 */
-+				*parent = parent_rate_saved;
-+				return rate;
-+			}
-+
-+			parent_rate = clk_hw_round_rate(hw, rate * div);
-+			now = parent_rate / div;
-+
-+			if (now <= rate && now > best_rate) {
-+				best_rate = now;
-+				*parent = parent_rate;
-+
-+				if (now == rate)
-+					return rate;
-+			}
-+		}
-+	}
-+
-+	return best_rate;
++	return rate;
 +}
 +
- static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
- 				       struct clk_hw *hw,
- 				       unsigned long *parent_rate,
-@@ -56,8 +111,13 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
- 	max_m = cmp->m.max ?: 1 << cmp->m.width;
- 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+ 			     struct _ccu_nm *nm)
+ {
+@@ -28,7 +39,8 @@ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
  
--	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
--	rate = *parent_rate / p / m;
-+	if (!(clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT)) {
-+		ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
-+		rate = *parent_rate / p / m;
-+	} else {
-+		rate = ccu_mp_find_best_with_parent_adj(hw, parent_rate, rate,
-+							max_m, max_p);
-+	}
+ 	for (_n = nm->min_n; _n <= nm->max_n; _n++) {
+ 		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
+-			unsigned long tmp_rate = parent * _n  / _m;
++			unsigned long tmp_rate = ccu_nm_calc_rate(parent,
++								  _n, _m);
  
- 	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate /= cmp->fixed_post_div;
+ 			if (tmp_rate > rate)
+ 				continue;
+@@ -100,7 +112,7 @@ static unsigned long ccu_nm_recalc_rate(struct clk_hw *hw,
+ 	if (ccu_sdm_helper_is_enabled(&nm->common, &nm->sdm))
+ 		rate = ccu_sdm_helper_read_rate(&nm->common, &nm->sdm, m, n);
+ 	else
+-		rate = parent_rate * n / m;
++		rate = ccu_nm_calc_rate(parent_rate, n, m);
+ 
+ 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate /= nm->fixed_post_div;
+@@ -149,7 +161,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
+ 
+ 	ccu_nm_find_best(*parent_rate, rate, &_nm);
+-	rate = *parent_rate * _nm.n / _nm.m;
++	rate = ccu_nm_calc_rate(*parent_rate, _nm.n, _nm.m);
+ 
+ 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate /= nm->fixed_post_div;
 -- 
 2.19.0
