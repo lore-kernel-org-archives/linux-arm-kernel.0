@@ -1,47 +1,67 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:38:47 +0200
-Subject: [PATCH v2 11/29] drm/sun4i: Fix DE2 mixer size
+Date: Sun,  7 Oct 2018 11:38:41 +0200
+Subject: [PATCH v2 05/29] dt-bindings: clock: sun8i-de2: Add H6 DE3 clock
+ description
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-12-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DE2 mixer is always 0x6000 bytes in size on all known SoCs.
+This commit adds necessary description and dt includes for H6 DE3 clock.
+It is very similar to others, but memory region has some additional
+registers not found in DE2.
 
-While at it, introduce a macro for that.
-
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 2 +-
- drivers/gpu/drm/sun4i/sun8i_mixer.h | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
+ include/dt-bindings/clock/sun8i-de2.h                 | 3 +++
+ include/dt-bindings/reset/sun8i-de2.h                 | 1 +
+ 3 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 71c0f6dc8a49..7beb3065a522 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -460,7 +460,7 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
- 	base = sun8i_blender_base(mixer);
+diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+index e94582e8b8a9..41a52c2acffd 100644
+--- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
++++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+@@ -1,5 +1,5 @@
+-Allwinner Display Engine 2.0 Clock Control Binding
+---------------------------------------------------
++Allwinner Display Engine 2.0/3.0 Clock Control Binding
++------------------------------------------------------
  
- 	/* Reset the registers */
--	for (i = 0x0; i < 0x20000; i += 4)
-+	for (i = 0; i < DE2_MIXER_UNIT_SIZE; i += 4)
- 		regmap_write(mixer->engine.regs, i, 0);
+ Required properties :
+ - compatible: must contain one of the following compatibles:
+@@ -8,6 +8,7 @@ Required properties :
+ 		- "allwinner,sun8i-v3s-de2-clk"
+ 		- "allwinner,sun50i-a64-de2-clk"
+ 		- "allwinner,sun50i-h5-de2-clk"
++		- "allwinner,sun50i-h6-de3-clk"
  
- 	/* Enable the mixer */
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index 208e8219d2be..e2aa42e8f715 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -29,6 +29,8 @@
+ - reg: Must contain the registers base address and length
+ - clocks: phandle to the clocks feeding the display engine subsystem.
+diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
+index 3bed63b524aa..7768f73b051e 100644
+--- a/include/dt-bindings/clock/sun8i-de2.h
++++ b/include/dt-bindings/clock/sun8i-de2.h
+@@ -15,4 +15,7 @@
+ #define CLK_MIXER1		7
+ #define CLK_WB			8
  
- #define DE2_MIXER_GLOBAL_DBUFF_ENABLE		BIT(0)
- 
-+#define DE2_MIXER_UNIT_SIZE			0x6000
++#define CLK_BUS_ROT		9
++#define CLK_ROT			10
 +
- #define DE2_BLD_BASE				0x1000
- #define DE2_CH_BASE				0x2000
- #define DE2_CH_SIZE				0x1000
+ #endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
+index 9526017432f0..1c36a6ac86d6 100644
+--- a/include/dt-bindings/reset/sun8i-de2.h
++++ b/include/dt-bindings/reset/sun8i-de2.h
+@@ -10,5 +10,6 @@
+ #define RST_MIXER0	0
+ #define RST_MIXER1	1
+ #define RST_WB		2
++#define RST_ROT		3
+ 
+ #endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
 -- 
 2.19.0
