@@ -1,62 +1,26 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:39:05 +0200
-Subject: [PATCH v2 29/29] arm64: dts: allwinner: h6: Enable HDMI output on
- Pine H64 board
+From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Sun, 07 Oct 2018 11:50:52 +0200
+Subject: [linux-sunxi] [PATCH v2 00/29] Allwinner H6 DE3 and HDMI support
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-30-jernej.skrabec@siol.net>
+Message-ID: <3147828.SFUzx6Pm4T@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pine H64 board has HDMI type A connector.
+Dne nedelja, 07. oktober 2018 ob 11:38:36 CEST je Jernej Skrabec napisal(a):
+> This series adds support for Display Engine 3.0 and HDMI 2.0a, which
+> can be found on H6 SoC.
+> 
+> Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
+> displaying and processing 10-bit and AFBC formats, which are not yet
+> supported by this series.
+> 
+> This series is based on linux-next at next-20180828, which has working
+> R40 display pipeline support. I'll rebase series on later linux-next, if
+> needed, once R40 display pipeline support is reintroduced.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 25 +++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Sorry, I forgot to update above text. It is based on next-20181004 and R40 
+HDMI support is already fixed.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-index 48daec7f78ba..36db21314996 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -21,6 +21,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -41,6 +52,20 @@
- 	};
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
--- 
-2.19.0
+Best regards,
+Jernej
