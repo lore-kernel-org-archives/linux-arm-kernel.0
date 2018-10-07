@@ -1,59 +1,106 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:38:54 +0200
-Subject: [PATCH v2 18/29] drm/sun4i: dw-hdmi: Add quirk for setting TMDS clock
+Date: Sun,  7 Oct 2018 11:38:53 +0200
+Subject: [PATCH v2 17/29] drm/sun4i: dw-hdmi: Make mode_valid function
+ configurable
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-19-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-18-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that H6 HDMI BSP kernel driver doesn't change TMDS rate at
-all. At this point it is not clear whether it is just not necessary or
-it would cause some kind of issues.
-
-Add a quirk for it.
+Since it is not possible to access sun8i-dw-hdmi driver private data
+inside mode_valid function, make it configurable. That way different
+versions of HDMI controllers can set different function, depending on
+it's limitations.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 5 ++++-
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h | 1 +
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 18 ++++++++++++++----
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h |  6 ++++++
+ 2 files changed, 20 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-index ec122136ee9d..e9e93f174b35 100644
+index ed2983770e9c..ec122136ee9d 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-@@ -165,7 +165,9 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
- 		goto err_disable_clk_tmds;
- 	}
+@@ -5,6 +5,7 @@
  
--	drm_encoder_helper_add(encoder, &sun8i_dw_hdmi_encoder_helper_funcs);
-+	if (hdmi->quirks->set_rate)
-+		drm_encoder_helper_add(encoder,
-+				       &sun8i_dw_hdmi_encoder_helper_funcs);
- 	drm_encoder_init(drm, encoder, &sun8i_dw_hdmi_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
+ #include <linux/component.h>
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
  
-@@ -235,6 +237,7 @@ static int sun8i_dw_hdmi_remove(struct platform_device *pdev)
- 
- static const struct sun8i_dw_hdmi_quirks sun8i_a83t_quirks = {
- 	.mode_valid = sun8i_dw_hdmi_mode_valid_a83t,
-+	.set_rate = true,
+ #include <drm/drm_of.h>
+@@ -33,8 +34,8 @@ static const struct drm_encoder_funcs sun8i_dw_hdmi_encoder_funcs = {
  };
  
+ static enum drm_mode_status
+-sun8i_dw_hdmi_mode_valid(struct drm_connector *connector,
+-			 const struct drm_display_mode *mode)
++sun8i_dw_hdmi_mode_valid_a83t(struct drm_connector *connector,
++			      const struct drm_display_mode *mode)
+ {
+ 	if (mode->clock > 297000)
+ 		return MODE_CLOCK_HIGH;
+@@ -102,6 +103,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->dev = &pdev->dev;
+ 	encoder = &hdmi->encoder;
+ 
++	hdmi->quirks = of_device_get_match_data(dev);
++
+ 	encoder->possible_crtcs =
+ 		sun8i_dw_hdmi_find_possible_crtcs(drm, dev->of_node);
+ 	/*
+@@ -168,7 +171,7 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 
+ 	sun8i_hdmi_phy_init(hdmi->phy);
+ 
+-	plat_data->mode_valid = &sun8i_dw_hdmi_mode_valid;
++	plat_data->mode_valid = hdmi->quirks->mode_valid;
+ 	plat_data->phy_ops = sun8i_hdmi_phy_get_ops();
+ 	plat_data->phy_name = "sun8i_dw_hdmi_phy";
+ 	plat_data->phy_data = hdmi->phy;
+@@ -230,8 +233,15 @@ static int sun8i_dw_hdmi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct sun8i_dw_hdmi_quirks sun8i_a83t_quirks = {
++	.mode_valid = sun8i_dw_hdmi_mode_valid_a83t,
++};
++
  static const struct of_device_id sun8i_dw_hdmi_dt_ids[] = {
+-	{ .compatible = "allwinner,sun8i-a83t-dw-hdmi" },
++	{
++		.compatible = "allwinner,sun8i-a83t-dw-hdmi",
++		.data = &sun8i_a83t_quirks,
++	},
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_dw_hdmi_dt_ids);
 diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-index a645b8bc9f58..f9eb663865a4 100644
+index 7fdc1ecd2892..a645b8bc9f58 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
 +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-@@ -173,6 +173,7 @@ struct sun8i_hdmi_phy {
- struct sun8i_dw_hdmi_quirks {
- 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
- 					   const struct drm_display_mode *mode);
-+	bool set_rate;
+@@ -170,6 +170,11 @@ struct sun8i_hdmi_phy {
+ 	struct sun8i_hdmi_phy_variant	*variant;
  };
  
++struct sun8i_dw_hdmi_quirks {
++	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
++					   const struct drm_display_mode *mode);
++};
++
  struct sun8i_dw_hdmi {
+ 	struct clk			*clk_tmds;
+ 	struct device			*dev;
+@@ -178,6 +183,7 @@ struct sun8i_dw_hdmi {
+ 	struct sun8i_hdmi_phy		*phy;
+ 	struct dw_hdmi_plat_data	plat_data;
+ 	struct regulator		*regulator;
++	const struct sun8i_dw_hdmi_quirks *quirks;
+ 	struct reset_control		*rst_ctrl;
+ };
+ 
 -- 
 2.19.0
