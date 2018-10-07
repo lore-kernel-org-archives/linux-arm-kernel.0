@@ -1,48 +1,62 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:39:03 +0200
-Subject: [PATCH v2 27/29] drm: sun4i: add support for H6 TCON TOP
+Date: Sun,  7 Oct 2018 11:39:02 +0200
+Subject: [PATCH v2 26/29] dt-bindings: display: sun4i-drm: document H6 TCON TOP
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-28-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-27-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Icenowy Zheng <icenowy@aosc.io>
 
-The TCON TOP on Allwinner H6 SoC is a cut down version of the R40 TCON
-TOP, which dropped TCON_TV1 and DSI (which do not exist on H6).
+Allwinner H6 SoC has a cut down version of TCON TOP.
 
-Add support for it.
+Add binding documentation for it.
 
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+[expanded description]
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../bindings/display/sunxi/sun4i-drm.txt           | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-index ed13233cad88..d0f1767ec6fc 100644
---- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-@@ -279,12 +279,20 @@ const struct sun8i_tcon_top_quirks sun8i_r40_tcon_top_quirks = {
- 	.has_dsi	= true,
- };
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 478b288eebd9..f426bdb42f18 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -228,24 +228,26 @@ It allows display pipeline to be configured in very different ways:
+                  \ [3] TCON-TV1 [1] - TVE1/RGB
  
-+const struct sun8i_tcon_top_quirks sun50i_h6_tcon_top_quirks = {
-+	/* Nothing special */
-+};
-+
- /* sun4i_drv uses this list to check if a device node is a TCON TOP */
- const struct of_device_id sun8i_tcon_top_of_table[] = {
- 	{
- 		.compatible = "allwinner,sun8i-r40-tcon-top",
- 		.data = &sun8i_r40_tcon_top_quirks
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-h6-tcon-top",
-+		.data = &sun50i_h6_tcon_top_quirks
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
+ Note that both TCON TOP references same physical unit. Both mixers can be
+-connected to any TCON.
++connected to any TCON. Not all TCON TOP variants support all features.
+ 
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-r40-tcon-top
++    * allwinner,sun50i-h6-tcon-top
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandle to the clocks feeding the TCON TOP
+     * bus: TCON TOP interface clock
+     * tcon-tv0: TCON TV0 clock
+-    * tve0: TVE0 clock
+-    * tcon-tv1: TCON TV1 clock
+-    * tve1: TVE0 clock
+-    * dsi: MIPI DSI clock
++    * tve0: TVE0 clock (R40 only)
++    * tcon-tv1: TCON TV1 clock (R40 only)
++    * tve1: TVE0 clock (R40 only)
++    * dsi: MIPI DSI clock (R40 only)
+   - clock-names: clock name mentioned above
+   - resets: phandle to the reset line driving the TCON TOP
+   - #clock-cells : must contain 1
+   - clock-output-names: Names of clocks created for TCON TV0 channel clock,
+-    TCON TV1 channel clock and DSI channel clock, in that order.
++    TCON TV1 channel clock (R40 only) and DSI channel clock (R40 only), in
++    that order.
+ 
+ - ports: A ports node with endpoint definitions as defined in
+     Documentation/devicetree/bindings/media/video-interfaces.txt. 6 ports should
 -- 
 2.19.0
