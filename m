@@ -1,455 +1,49 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Sun, 07 Oct 2018 20:47:28 +0200
-Subject: [PATCH 01/14] phy: phy-pxa-usb: add a new driver
-In-Reply-To: <f36abb62-e8a4-e69f-4732-95a0db466034@ti.com>
-References: <20180822204307.13251-1-lkundrak@v3.sk>
- <20180822204307.13251-2-lkundrak@v3.sk>
- <f36abb62-e8a4-e69f-4732-95a0db466034@ti.com>
-Message-ID: <1981ce54ce960d21976ce71b08a8779bfeb13be4.camel@v3.sk>
+From: alex@ghiti.fr (Alex Ghiti)
+Date: Sun, 7 Oct 2018 18:59:44 +0000
+Subject: [PATCH] hugetlb: fix ARM 3level page tables
+In-Reply-To: <20181005161722.904274-1-arnd@arndb.de>
+References: <20181005161722.904274-1-arnd@arndb.de>
+Message-ID: <65728e32-d527-5f38-a93c-5a8d9cfbd492@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-09-25 at 10:53 +0530, Kishon Vijay Abraham I wrote:
-> 
-> On Thursday 23 August 2018 02:12 AM, Lubomir Rintel wrote:
-> > Turned from arch/arm/mach-mmp/devices.c into a proper PHY driver,
-> > so
-> > that in can be instantiated from a DT.
-> > 
-> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> 
-> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> If this has to be merged via linux-phy tree, please let me know.
+Thanks Arnd, this change intervened in v5, that seemed straightforward 
+enough...Sorry about that, and thanks for your fix.
 
-Yes, either linux-phy or the usb tree.
+Alex
 
-The EHCI patches have already been pulled into the usb tree, presumably
-because they got an Ack from Alan Stern. That includes "USB: EHCI:
-ehci-mv: use phy-pxa-usb" that depends on this. Perhaps the  rest of
-the patches can go via the same tree?
 
-I haven't submitted a patchset that would have dependencies spanning
-across different subsystems before. I don't know what's usually done in
-such cases. Advice welcome.
-
-Greg?
-
-> Thanks
-> Kishon
-
-Thank you
-Lubo
-
-> 
-> > ---
-> >  drivers/phy/marvell/Kconfig       |  11 +
-> >  drivers/phy/marvell/Makefile      |   1 +
-> >  drivers/phy/marvell/phy-pxa-usb.c | 345
-> > ++++++++++++++++++++++++++++++
-> >  3 files changed, 357 insertions(+)
-> >  create mode 100644 drivers/phy/marvell/phy-pxa-usb.c
-> > 
-> > diff --git a/drivers/phy/marvell/Kconfig
-> > b/drivers/phy/marvell/Kconfig
-> > index 68e321225400..6fb4b56e4c14 100644
-> > --- a/drivers/phy/marvell/Kconfig
-> > +++ b/drivers/phy/marvell/Kconfig
-> > @@ -59,3 +59,14 @@ config PHY_PXA_28NM_USB2
-> >  	  The PHY driver will be used by Marvell udc/ehci/otg driver.
-> >  
-> >  	  To compile this driver as a module, choose M here.
-> > +
-> > +config PHY_PXA_USB
-> > +	tristate "Marvell PXA USB PHY Driver"
-> > +	depends on ARCH_PXA || ARCH_MMP
-> > +	select GENERIC_PHY
-> > +	help
-> > +	  Enable this to support Marvell PXA USB PHY driver for Marvell
-> > +	  SoC. This driver will do the PHY initialization and shutdown.
-> > +	  The PHY driver will be used by Marvell udc/ehci/otg driver.
-> > +
-> > +	  To compile this driver as a module, choose M here.
-> > diff --git a/drivers/phy/marvell/Makefile
-> > b/drivers/phy/marvell/Makefile
-> > index 5c3ec5d10e0d..3975b144f8ec 100644
-> > --- a/drivers/phy/marvell/Makefile
-> > +++ b/drivers/phy/marvell/Makefile
-> > @@ -6,3 +6,4 @@ obj-$(CONFIG_PHY_MVEBU_CP110_COMPHY)	+= phy-
-> > mvebu-cp110-comphy.o
-> >  obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
-> >  obj-$(CONFIG_PHY_PXA_28NM_HSIC)		+= phy-pxa-28nm-hsic.o
-> >  obj-$(CONFIG_PHY_PXA_28NM_USB2)		+= phy-pxa-28nm-usb2.o
-> > +obj-$(CONFIG_PHY_PXA_USB)		+= phy-pxa-usb.o
-> > diff --git a/drivers/phy/marvell/phy-pxa-usb.c
-> > b/drivers/phy/marvell/phy-pxa-usb.c
-> > new file mode 100644
-> > index 000000000000..87ff7550b912
-> > --- /dev/null
-> > +++ b/drivers/phy/marvell/phy-pxa-usb.c
-> > @@ -0,0 +1,345 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Copyright (C) 2011 Marvell International Ltd. All rights
-> > reserved.
-> > + * Copyright (C) 2018 Lubomir Rintel <lkundrak@v3.sk>
-> > + */
-> > +
-> > +#include <dt-bindings/phy/phy.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/io.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/phy/phy.h>
-> > +#include <linux/platform_device.h>
-> > +
-> > +/* phy regs */
-> > +#define UTMI_REVISION		0x0
-> > +#define UTMI_CTRL		0x4
-> > +#define UTMI_PLL		0x8
-> > +#define UTMI_TX			0xc
-> > +#define UTMI_RX			0x10
-> > +#define UTMI_IVREF		0x14
-> > +#define UTMI_T0			0x18
-> > +#define UTMI_T1			0x1c
-> > +#define UTMI_T2			0x20
-> > +#define UTMI_T3			0x24
-> > +#define UTMI_T4			0x28
-> > +#define UTMI_T5			0x2c
-> > +#define UTMI_RESERVE		0x30
-> > +#define UTMI_USB_INT		0x34
-> > +#define UTMI_DBG_CTL		0x38
-> > +#define UTMI_OTG_ADDON		0x3c
-> > +
-> > +/* For UTMICTRL Register */
-> > +#define UTMI_CTRL_USB_CLK_EN                    (1 << 31)
-> > +/* pxa168 */
-> > +#define UTMI_CTRL_SUSPEND_SET1                  (1 << 30)
-> > +#define UTMI_CTRL_SUSPEND_SET2                  (1 << 29)
-> > +#define UTMI_CTRL_RXBUF_PDWN                    (1 << 24)
-> > +#define UTMI_CTRL_TXBUF_PDWN                    (1 << 11)
-> > +
-> > +#define UTMI_CTRL_INPKT_DELAY_SHIFT             30
-> > +#define UTMI_CTRL_INPKT_DELAY_SOF_SHIFT		28
-> > +#define UTMI_CTRL_PU_REF_SHIFT			20
-> > +#define UTMI_CTRL_ARC_PULLDN_SHIFT              12
-> > +#define UTMI_CTRL_PLL_PWR_UP_SHIFT              1
-> > +#define UTMI_CTRL_PWR_UP_SHIFT                  0
-> > +
-> > +/* For UTMI_PLL Register */
-> > +#define UTMI_PLL_PLLCALI12_SHIFT		29
-> > +#define UTMI_PLL_PLLCALI12_MASK			(0x3 << 29)
-> > +
-> > +#define UTMI_PLL_PLLVDD18_SHIFT			27
-> > +#define UTMI_PLL_PLLVDD18_MASK			(0x3 << 27)
-> > +
-> > +#define UTMI_PLL_PLLVDD12_SHIFT			25
-> > +#define UTMI_PLL_PLLVDD12_MASK			(0x3 << 25)
-> > +
-> > +#define UTMI_PLL_CLK_BLK_EN_SHIFT               24
-> > +#define CLK_BLK_EN                              (0x1 << 24)
-> > +#define PLL_READY                               (0x1 << 23)
-> > +#define KVCO_EXT                                (0x1 << 22)
-> > +#define VCOCAL_START                            (0x1 << 21)
-> > +
-> > +#define UTMI_PLL_KVCO_SHIFT			15
-> > +#define UTMI_PLL_KVCO_MASK                      (0x7 << 15)
-> > +
-> > +#define UTMI_PLL_ICP_SHIFT			12
-> > +#define UTMI_PLL_ICP_MASK                       (0x7 << 12)
-> > +
-> > +#define UTMI_PLL_FBDIV_SHIFT                    4
-> > +#define UTMI_PLL_FBDIV_MASK                     (0xFF << 4)
-> > +
-> > +#define UTMI_PLL_REFDIV_SHIFT                   0
-> > +#define UTMI_PLL_REFDIV_MASK                    (0xF << 0)
-> > +
-> > +/* For UTMI_TX Register */
-> > +#define UTMI_TX_REG_EXT_FS_RCAL_SHIFT		27
-> > +#define UTMI_TX_REG_EXT_FS_RCAL_MASK		(0xf << 27)
-> > +
-> > +#define UTMI_TX_REG_EXT_FS_RCAL_EN_SHIFT	26
-> > +#define UTMI_TX_REG_EXT_FS_RCAL_EN_MASK		(0x1 << 26)
-> > +
-> > +#define UTMI_TX_TXVDD12_SHIFT                   22
-> > +#define UTMI_TX_TXVDD12_MASK                    (0x3 << 22)
-> > +
-> > +#define UTMI_TX_CK60_PHSEL_SHIFT                17
-> > +#define UTMI_TX_CK60_PHSEL_MASK                 (0xf << 17)
-> > +
-> > +#define UTMI_TX_IMPCAL_VTH_SHIFT                14
-> > +#define UTMI_TX_IMPCAL_VTH_MASK                 (0x7 << 14)
-> > +
-> > +#define REG_RCAL_START                          (0x1 << 12)
-> > +
-> > +#define UTMI_TX_LOW_VDD_EN_SHIFT                11
-> > +
-> > +#define UTMI_TX_AMP_SHIFT			0
-> > +#define UTMI_TX_AMP_MASK			(0x7 << 0)
-> > +
-> > +/* For UTMI_RX Register */
-> > +#define UTMI_REG_SQ_LENGTH_SHIFT                15
-> > +#define UTMI_REG_SQ_LENGTH_MASK                 (0x3 << 15)
-> > +
-> > +#define UTMI_RX_SQ_THRESH_SHIFT                 4
-> > +#define UTMI_RX_SQ_THRESH_MASK                  (0xf << 4)
-> > +
-> > +#define UTMI_OTG_ADDON_OTG_ON			(1 << 0)
-> > +
-> > +enum pxa_usb_phy_version {
-> > +	PXA_USB_PHY_MMP2,
-> > +	PXA_USB_PHY_PXA910,
-> > +	PXA_USB_PHY_PXA168,
-> > +};
-> > +
-> > +struct pxa_usb_phy {
-> > +	struct phy *phy;
-> > +	void __iomem *base;
-> > +	enum pxa_usb_phy_version version;
-> > +};
-> > +
-> > +/*****************************************************************
-> > ************
-> > + * The registers read/write routines
-> > +
-> > *******************************************************************
-> > **********/
-> > +
-> > +static unsigned int u2o_get(void __iomem *base, unsigned int
-> > offset)
-> > +{
-> > +	return readl_relaxed(base + offset);
-> > +}
-> > +
-> > +static void u2o_set(void __iomem *base, unsigned int offset,
-> > +		unsigned int value)
-> > +{
-> > +	u32 reg;
-> > +
-> > +	reg = readl_relaxed(base + offset);
-> > +	reg |= value;
-> > +	writel_relaxed(reg, base + offset);
-> > +	readl_relaxed(base + offset);
-> > +}
-> > +
-> > +static void u2o_clear(void __iomem *base, unsigned int offset,
-> > +		unsigned int value)
-> > +{
-> > +	u32 reg;
-> > +
-> > +	reg = readl_relaxed(base + offset);
-> > +	reg &= ~value;
-> > +	writel_relaxed(reg, base + offset);
-> > +	readl_relaxed(base + offset);
-> > +}
-> > +
-> > +static void u2o_write(void __iomem *base, unsigned int offset,
-> > +		unsigned int value)
-> > +{
-> > +	writel_relaxed(value, base + offset);
-> > +	readl_relaxed(base + offset);
-> > +}
-> > +
-> > +static int pxa_usb_phy_init(struct phy *phy)
-> > +{
-> > +	struct pxa_usb_phy *pxa_usb_phy = phy_get_drvdata(phy);
-> > +	void __iomem *base = pxa_usb_phy->base;
-> > +	int loops;
-> > +
-> > +	dev_info(&phy->dev, "initializing Marvell PXA USB PHY");
-> > +
-> > +	/* Initialize the USB PHY power */
-> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA910) {
-> > +		u2o_set(base, UTMI_CTRL,
-> > (1<<UTMI_CTRL_INPKT_DELAY_SOF_SHIFT)
-> > +			| (1<<UTMI_CTRL_PU_REF_SHIFT));
-> > +	}
-> > +
-> > +	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
-> > +	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
-> > +
-> > +	/* UTMI_PLL settings */
-> > +	u2o_clear(base, UTMI_PLL, UTMI_PLL_PLLVDD18_MASK
-> > +		| UTMI_PLL_PLLVDD12_MASK | UTMI_PLL_PLLCALI12_MASK
-> > +		| UTMI_PLL_FBDIV_MASK | UTMI_PLL_REFDIV_MASK
-> > +		| UTMI_PLL_ICP_MASK | UTMI_PLL_KVCO_MASK);
-> > +
-> > +	u2o_set(base, UTMI_PLL, 0xee<<UTMI_PLL_FBDIV_SHIFT
-> > +		| 0xb<<UTMI_PLL_REFDIV_SHIFT |
-> > 3<<UTMI_PLL_PLLVDD18_SHIFT
-> > +		| 3<<UTMI_PLL_PLLVDD12_SHIFT |
-> > 3<<UTMI_PLL_PLLCALI12_SHIFT
-> > +		| 1<<UTMI_PLL_ICP_SHIFT | 3<<UTMI_PLL_KVCO_SHIFT);
-> > +
-> > +	/* UTMI_TX */
-> > +	u2o_clear(base, UTMI_TX, UTMI_TX_REG_EXT_FS_RCAL_EN_MASK
-> > +		| UTMI_TX_TXVDD12_MASK | UTMI_TX_CK60_PHSEL_MASK
-> > +		| UTMI_TX_IMPCAL_VTH_MASK |
-> > UTMI_TX_REG_EXT_FS_RCAL_MASK
-> > +		| UTMI_TX_AMP_MASK);
-> > +	u2o_set(base, UTMI_TX, 3<<UTMI_TX_TXVDD12_SHIFT
-> > +		| 4<<UTMI_TX_CK60_PHSEL_SHIFT |
-> > 4<<UTMI_TX_IMPCAL_VTH_SHIFT
-> > +		| 8<<UTMI_TX_REG_EXT_FS_RCAL_SHIFT |
-> > 3<<UTMI_TX_AMP_SHIFT);
-> > +
-> > +	/* UTMI_RX */
-> > +	u2o_clear(base, UTMI_RX, UTMI_RX_SQ_THRESH_MASK
-> > +		| UTMI_REG_SQ_LENGTH_MASK);
-> > +	u2o_set(base, UTMI_RX, 7<<UTMI_RX_SQ_THRESH_SHIFT
-> > +		| 2<<UTMI_REG_SQ_LENGTH_SHIFT);
-> > +
-> > +	/* UTMI_IVREF */
-> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168) {
-> > +		/*
-> > +		 * fixing Microsoft Altair board interface with NEC hub
-> > issue -
-> > +		 * Set UTMI_IVREF from 0x4a3 to 0x4bf
-> > +		 */
-> > +		u2o_write(base, UTMI_IVREF, 0x4bf);
-> > +	}
-> > +
-> > +	/* toggle VCOCAL_START bit of UTMI_PLL */
-> > +	udelay(200);
-> > +	u2o_set(base, UTMI_PLL, VCOCAL_START);
-> > +	udelay(40);
-> > +	u2o_clear(base, UTMI_PLL, VCOCAL_START);
-> > +
-> > +	/* toggle REG_RCAL_START bit of UTMI_TX */
-> > +	udelay(400);
-> > +	u2o_set(base, UTMI_TX, REG_RCAL_START);
-> > +	udelay(40);
-> > +	u2o_clear(base, UTMI_TX, REG_RCAL_START);
-> > +	udelay(400);
-> > +
-> > +	/* Make sure PHY PLL is ready */
-> > +	loops = 0;
-> > +	while ((u2o_get(base, UTMI_PLL) & PLL_READY) == 0) {
-> > +		mdelay(1);
-> > +		loops++;
-> > +		if (loops > 100) {
-> > +			dev_warn(&phy->dev, "calibrate timeout,
-> > UTMI_PLL %x\n",
-> > +						u2o_get(base,
-> > UTMI_PLL));
-> > +			break;
-> > +		}
-> > +	}
-> > +
-> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168) {
-> > +		u2o_set(base, UTMI_RESERVE, 1 << 5);
-> > +		/* Turn on UTMI PHY OTG extension */
-> > +		u2o_write(base, UTMI_OTG_ADDON, 1);
-> > +	}
-> > +
-> > +	return 0;
-> > +
-> > +}
-> > +
-> > +static int pxa_usb_phy_exit(struct phy *phy)
-> > +{
-> > +	struct pxa_usb_phy *pxa_usb_phy = phy_get_drvdata(phy);
-> > +	void __iomem *base = pxa_usb_phy->base;
-> > +
-> > +	dev_info(&phy->dev, "deinitializing Marvell PXA USB PHY");
-> > +
-> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168)
-> > +		u2o_clear(base, UTMI_OTG_ADDON, UTMI_OTG_ADDON_OTG_ON);
-> > +
-> > +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_RXBUF_PDWN);
-> > +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_TXBUF_PDWN);
-> > +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_USB_CLK_EN);
-> > +	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
-> > +	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct phy_ops pxa_usb_phy_ops = {
-> > +	.init	= pxa_usb_phy_init,
-> > +	.exit	= pxa_usb_phy_exit,
-> > +	.owner	= THIS_MODULE,
-> > +};
-> > +
-> > +static const struct of_device_id pxa_usb_phy_of_match[] = {
-> > +	{
-> > +		.compatible = "marvell,mmp2-usb-phy",
-> > +		.data = (void *)PXA_USB_PHY_MMP2,
-> > +	}, {
-> > +		.compatible = "marvell,pxa910-usb-phy",
-> > +		.data = (void *)PXA_USB_PHY_PXA910,
-> > +	}, {
-> > +		.compatible = "marvell,pxa168-usb-phy",
-> > +		.data = (void *)PXA_USB_PHY_PXA168,
-> > +	},
-> > +	{ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, pxa_usb_phy_of_match);
-> > +
-> > +static int pxa_usb_phy_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct resource *resource;
-> > +	struct pxa_usb_phy *pxa_usb_phy;
-> > +	struct phy_provider *provider;
-> > +	const struct of_device_id *of_id;
-> > +
-> > +	pxa_usb_phy = devm_kzalloc(dev, sizeof(struct pxa_usb_phy),
-> > GFP_KERNEL);
-> > +	if (!pxa_usb_phy)
-> > +		return -ENOMEM;
-> > +
-> > +	of_id = of_match_node(pxa_usb_phy_of_match, dev->of_node);
-> > +	if (of_id)
-> > +		pxa_usb_phy->version = (enum pxa_usb_phy_version)of_id-
-> > >data;
-> > +	else
-> > +		pxa_usb_phy->version = PXA_USB_PHY_MMP2;
-> > +
-> > +	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	pxa_usb_phy->base = devm_ioremap_resource(dev, resource);
-> > +	if (IS_ERR(pxa_usb_phy->base)) {
-> > +		dev_err(dev, "failed to remap PHY regs\n");
-> > +		return PTR_ERR(pxa_usb_phy->base);
-> > +	}
-> > +
-> > +	pxa_usb_phy->phy = devm_phy_create(dev, NULL,
-> > &pxa_usb_phy_ops);
-> > +	if (IS_ERR(pxa_usb_phy->phy)) {
-> > +		dev_err(dev, "failed to create PHY\n");
-> > +		return PTR_ERR(pxa_usb_phy->phy);
-> > +	}
-> > +
-> > +	phy_set_drvdata(pxa_usb_phy->phy, pxa_usb_phy);
-> > +	provider = devm_of_phy_provider_register(dev,
-> > of_phy_simple_xlate);
-> > +	if (IS_ERR(provider)) {
-> > +		dev_err(dev, "failed to register PHY provider\n");
-> > +		return PTR_ERR(provider);
-> > +	}
-> > +
-> > +	if (!dev->of_node) {
-> > +		phy_create_lookup(pxa_usb_phy->phy, "usb", "mv-udc");
-> > +		phy_create_lookup(pxa_usb_phy->phy, "usb", "pxa-
-> > u2oehci");
-> > +		phy_create_lookup(pxa_usb_phy->phy, "usb", "mv-otg");
-> > +	}
-> > +
-> > +	dev_info(dev, "Marvell PXA USB PHY");
-> > +	return 0;
-> > +}
-> > +
-> > +static struct platform_driver pxa_usb_phy_driver = {
-> > +	.probe		= pxa_usb_phy_probe,
-> > +	.driver		= {
-> > +		.name	= "pxa-usb-phy",
-> > +		.of_match_table = pxa_usb_phy_of_match,
-> > +	},
-> > +};
-> > +module_platform_driver(pxa_usb_phy_driver);
-> > +
-> > +MODULE_AUTHOR("Lubomir Rintel <lkundrak@v3.sk>");
-> > +MODULE_DESCRIPTION("Marvell PXA USB PHY Driver");
-> > +MODULE_LICENSE("GPL v2");
-> > 
+On 10/05/2018 04:16 PM, Arnd Bergmann wrote:
+> The check for __HAVE_ARCH_HUGE_PTEP_GET comes before the definition,
+> leading to an extraneous definition of huge_ptep_get:
+>
+> In file included from arch/arm/include/asm/hugetlb.h:28,
+>                   from include/linux/hugetlb.h:456,
+>                   from arch/arm/kvm/../../../virt/kvm/arm/mmu.c:22:
+> arch/arm/include/asm/hugetlb-3level.h:33:21: error: redefinition of 'huge_ptep_get'
+>   static inline pte_t huge_ptep_get(pte_t *ptep)
+>
+> Change the header file inclusions to be in the correct order for
+> this to work.
+>
+> Fixes: bb1d18ffc7ae ("hugetlb: introduce generic version of huge_ptep_get")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   arch/arm/include/asm/hugetlb.h | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/hugetlb.h b/arch/arm/include/asm/hugetlb.h
+> index 3fcef21ff2c2..b67256c22b08 100644
+> --- a/arch/arm/include/asm/hugetlb.h
+> +++ b/arch/arm/include/asm/hugetlb.h
+> @@ -23,9 +23,8 @@
+>   #define _ASM_ARM_HUGETLB_H
+>   
+>   #include <asm/page.h>
+> -#include <asm-generic/hugetlb.h>
+> -
+>   #include <asm/hugetlb-3level.h>
+> +#include <asm-generic/hugetlb.h>
+>   
+>   static inline int is_hugepage_only_range(struct mm_struct *mm,
+>   					 unsigned long addr, unsigned long len)
