@@ -1,222 +1,455 @@
-From: vkoul@kernel.org (Vinod)
-Date: Sun, 7 Oct 2018 21:30:30 +0530
-Subject: [PATCH v3 4/7] dmaengine: stm32-dma: Add DMA/MDMA chaining support
-In-Reply-To: <1538139715-24406-5-git-send-email-pierre-yves.mordret@st.com>
-References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
- <1538139715-24406-5-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20181007160030.GB2372@vkoul-mobl>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Sun, 07 Oct 2018 20:47:28 +0200
+Subject: [PATCH 01/14] phy: phy-pxa-usb: add a new driver
+In-Reply-To: <f36abb62-e8a4-e69f-4732-95a0db466034@ti.com>
+References: <20180822204307.13251-1-lkundrak@v3.sk>
+ <20180822204307.13251-2-lkundrak@v3.sk>
+ <f36abb62-e8a4-e69f-4732-95a0db466034@ti.com>
+Message-ID: <1981ce54ce960d21976ce71b08a8779bfeb13be4.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
-> This patch adds support of DMA/MDMA chaining support.
-> It introduces an intermediate transfer between peripherals and STM32 DMA.
-> This intermediate transfer is triggered by SW for single M2D transfer and
-> by STM32 DMA IP for all other modes (sg, cyclic) and direction (D2M).
+On Tue, 2018-09-25 at 10:53 +0530, Kishon Vijay Abraham I wrote:
 > 
-> A generic SRAM allocator is used for this intermediate buffer
-> Each DMA channel will be able to define its SRAM needs to achieve chaining
-> feature : (2 ^ order) * PAGE_SIZE.
-> For cyclic, SRAM buffer is derived from period length (rounded on
-> PAGE_SIZE).
+> On Thursday 23 August 2018 02:12 AM, Lubomir Rintel wrote:
+> > Turned from arch/arm/mach-mmp/devices.c into a proper PHY driver,
+> > so
+> > that in can be instantiated from a DT.
+> > 
+> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> 
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> If this has to be merged via linux-phy tree, please let me know.
 
-So IIUC, you chain two dma txns together and transfer data via an SRAM?
+Yes, either linux-phy or the usb tree.
+
+The EHCI patches have already been pulled into the usb tree, presumably
+because they got an Ack from Alan Stern. That includes "USB: EHCI:
+ehci-mv: use phy-pxa-usb" that depends on this. Perhaps the  rest of
+the patches can go via the same tree?
+
+I haven't submitted a patchset that would have dependencies spanning
+across different subsystems before. I don't know what's usually done in
+such cases. Advice welcome.
+
+Greg?
+
+> Thanks
+> Kishon
+
+Thank you
+Lubo
 
 > 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->   Version history:
->     v3:
->        * Solve KBuild warning
->     v2:
->     v1:
->        * Initial
-> ---
-> ---
->  drivers/dma/stm32-dma.c | 879 ++++++++++++++++++++++++++++++++++++++++++------
-
-that is a lot of change for a driver, consider splitting it up
-logically in smaller changes...
-
->  1 file changed, 772 insertions(+), 107 deletions(-)
-> 
-> diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-> index 379e8d5..85e81c4 100644
-> --- a/drivers/dma/stm32-dma.c
-> +++ b/drivers/dma/stm32-dma.c
-> @@ -15,11 +15,14 @@
->  #include <linux/dmaengine.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/err.h>
-> +#include <linux/genalloc.h>
->  #include <linux/init.h>
-> +#include <linux/iopoll.h>
->  #include <linux/jiffies.h>
->  #include <linux/list.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/of_device.h>
->  #include <linux/of_dma.h>
->  #include <linux/platform_device.h>
-> @@ -118,6 +121,7 @@
->  #define STM32_DMA_FIFO_THRESHOLD_FULL			0x03
->  
->  #define STM32_DMA_MAX_DATA_ITEMS	0xffff
-> +#define STM32_DMA_SRAM_GRANULARITY	PAGE_SIZE
->  /*
->   * Valid transfer starts from @0 to @0xFFFE leading to unaligned scatter
->   * gather at boundary. Thus it's safer to round down this value on FIFO
-> @@ -135,6 +139,12 @@
->  /* DMA Features */
->  #define STM32_DMA_THRESHOLD_FTR_MASK	GENMASK(1, 0)
->  #define STM32_DMA_THRESHOLD_FTR_GET(n)	((n) & STM32_DMA_THRESHOLD_FTR_MASK)
-> +#define STM32_DMA_MDMA_CHAIN_FTR_MASK	BIT(2)
-> +#define STM32_DMA_MDMA_CHAIN_FTR_GET(n)	(((n) & STM32_DMA_MDMA_CHAIN_FTR_MASK) \
-> +					 >> 2)
-> +#define STM32_DMA_MDMA_SRAM_SIZE_MASK	GENMASK(4, 3)
-> +#define STM32_DMA_MDMA_SRAM_SIZE_GET(n)	(((n) & STM32_DMA_MDMA_SRAM_SIZE_MASK) \
-> +					 >> 3)
->  
->  enum stm32_dma_width {
->  	STM32_DMA_BYTE,
-> @@ -176,15 +186,31 @@ struct stm32_dma_chan_reg {
->  	u32 dma_sfcr;
->  };
->  
-> +struct stm32_dma_mdma_desc {
-> +	struct sg_table sgt;
-> +	struct dma_async_tx_descriptor *desc;
-> +};
-> +
-> +struct stm32_dma_mdma {
-> +	struct dma_chan *chan;
-> +	enum dma_transfer_direction dir;
-> +	dma_addr_t sram_buf;
-> +	u32 sram_period;
-> +	u32 num_sgs;
-> +};
-> +
->  struct stm32_dma_sg_req {
-> -	u32 len;
-> +	struct scatterlist stm32_sgl_req;
->  	struct stm32_dma_chan_reg chan_reg;
-> +	struct stm32_dma_mdma_desc m_desc;
->  };
->  
->  struct stm32_dma_desc {
->  	struct virt_dma_desc vdesc;
->  	bool cyclic;
->  	u32 num_sgs;
-> +	dma_addr_t dma_buf;
-> +	void *dma_buf_cpu;
->  	struct stm32_dma_sg_req sg_req[];
->  };
->  
-> @@ -201,6 +227,10 @@ struct stm32_dma_chan {
->  	u32 threshold;
->  	u32 mem_burst;
->  	u32 mem_width;
-> +	struct stm32_dma_mdma mchan;
-> +	u32 use_mdma;
-> +	u32 sram_size;
-> +	u32 residue_after_drain;
->  };
->  
->  struct stm32_dma_device {
-> @@ -210,6 +240,7 @@ struct stm32_dma_device {
->  	struct reset_control *rst;
->  	bool mem2mem;
->  	struct stm32_dma_chan chan[STM32_DMA_MAX_CHANNELS];
-> +	struct gen_pool *sram_pool;
->  };
->  
->  static struct stm32_dma_device *stm32_dma_get_dev(struct stm32_dma_chan *chan)
-> @@ -497,11 +528,15 @@ static void stm32_dma_stop(struct stm32_dma_chan *chan)
->  static int stm32_dma_terminate_all(struct dma_chan *c)
->  {
->  	struct stm32_dma_chan *chan = to_stm32_dma_chan(c);
-> +	struct stm32_dma_mdma *mchan = &chan->mchan;
->  	unsigned long flags;
->  	LIST_HEAD(head);
->  
->  	spin_lock_irqsave(&chan->vchan.lock, flags);
->  
-> +	if (chan->use_mdma)
-> +		dmaengine_terminate_async(mchan->chan);
-> +
->  	if (chan->busy) {
->  		stm32_dma_stop(chan);
->  		chan->desc = NULL;
-> @@ -514,9 +549,96 @@ static int stm32_dma_terminate_all(struct dma_chan *c)
->  	return 0;
->  }
->  
-> +static u32 stm32_dma_get_remaining_bytes(struct stm32_dma_chan *chan)
-> +{
-> +	u32 dma_scr, width, ndtr;
-> +	struct stm32_dma_device *dmadev = stm32_dma_get_dev(chan);
-> +
-> +	dma_scr = stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id));
-> +	width = STM32_DMA_SCR_PSIZE_GET(dma_scr);
-> +	ndtr = stm32_dma_read(dmadev, STM32_DMA_SNDTR(chan->id));
-> +
-> +	return ndtr << width;
-> +}
-> +
-> +static int stm32_dma_mdma_drain(struct stm32_dma_chan *chan)
-> +{
-> +	struct stm32_dma_mdma *mchan = &chan->mchan;
-> +	struct stm32_dma_sg_req *sg_req;
-> +	struct dma_device *ddev = mchan->chan->device;
-> +	struct dma_async_tx_descriptor *desc = NULL;
-> +	enum dma_status status;
-> +	dma_addr_t src_buf, dst_buf;
-> +	u32 mdma_residue, mdma_wrote, dma_to_write, len;
-> +	struct dma_tx_state state;
-> +	int ret;
-> +
-> +	/* DMA/MDMA chain: drain remaining data in SRAM */
-> +
-> +	/* Get the residue on MDMA side */
-> +	status = dmaengine_tx_status(mchan->chan, mchan->chan->cookie, &state);
-> +	if (status == DMA_COMPLETE)
-> +		return status;
-> +
-> +	mdma_residue = state.residue;
-> +	sg_req = &chan->desc->sg_req[chan->next_sg - 1];
-> +	len = sg_dma_len(&sg_req->stm32_sgl_req);
-> +
-> +	/*
-> +	 * Total = mdma blocks * sram_period + rest (< sram_period)
-> +	 * so mdma blocks * sram_period = len - mdma residue - rest
-> +	 */
-> +	mdma_wrote = len - mdma_residue - (len % mchan->sram_period);
-> +
-> +	/* Remaining data stuck in SRAM */
-> +	dma_to_write = mchan->sram_period - stm32_dma_get_remaining_bytes(chan);
-> +	if (dma_to_write > 0) {
-> +		/* Stop DMA current operation */
-> +		stm32_dma_disable_chan(chan);
-> +
-> +		/* Terminate current MDMA to initiate a new one */
-> +		dmaengine_terminate_all(mchan->chan);
-> +
-> +		/* Double buffer management */
-> +		src_buf = mchan->sram_buf +
-> +			  ((mdma_wrote / mchan->sram_period) & 0x1) *
-> +			  mchan->sram_period;
-> +		dst_buf = sg_dma_address(&sg_req->stm32_sgl_req) + mdma_wrote;
-> +
-> +		desc = ddev->device_prep_dma_memcpy(mchan->chan,
-> +						    dst_buf, src_buf,
-> +						    dma_to_write,
-> +						    DMA_PREP_INTERRUPT);
-
-why would you do that?
-
-If at all you need to create anothe txn, I think it would be good to
-prepare a new descriptor and chain it, not call the dmaengine APIs..
-
--- 
-~Vinod
+> > ---
+> >  drivers/phy/marvell/Kconfig       |  11 +
+> >  drivers/phy/marvell/Makefile      |   1 +
+> >  drivers/phy/marvell/phy-pxa-usb.c | 345
+> > ++++++++++++++++++++++++++++++
+> >  3 files changed, 357 insertions(+)
+> >  create mode 100644 drivers/phy/marvell/phy-pxa-usb.c
+> > 
+> > diff --git a/drivers/phy/marvell/Kconfig
+> > b/drivers/phy/marvell/Kconfig
+> > index 68e321225400..6fb4b56e4c14 100644
+> > --- a/drivers/phy/marvell/Kconfig
+> > +++ b/drivers/phy/marvell/Kconfig
+> > @@ -59,3 +59,14 @@ config PHY_PXA_28NM_USB2
+> >  	  The PHY driver will be used by Marvell udc/ehci/otg driver.
+> >  
+> >  	  To compile this driver as a module, choose M here.
+> > +
+> > +config PHY_PXA_USB
+> > +	tristate "Marvell PXA USB PHY Driver"
+> > +	depends on ARCH_PXA || ARCH_MMP
+> > +	select GENERIC_PHY
+> > +	help
+> > +	  Enable this to support Marvell PXA USB PHY driver for Marvell
+> > +	  SoC. This driver will do the PHY initialization and shutdown.
+> > +	  The PHY driver will be used by Marvell udc/ehci/otg driver.
+> > +
+> > +	  To compile this driver as a module, choose M here.
+> > diff --git a/drivers/phy/marvell/Makefile
+> > b/drivers/phy/marvell/Makefile
+> > index 5c3ec5d10e0d..3975b144f8ec 100644
+> > --- a/drivers/phy/marvell/Makefile
+> > +++ b/drivers/phy/marvell/Makefile
+> > @@ -6,3 +6,4 @@ obj-$(CONFIG_PHY_MVEBU_CP110_COMPHY)	+= phy-
+> > mvebu-cp110-comphy.o
+> >  obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
+> >  obj-$(CONFIG_PHY_PXA_28NM_HSIC)		+= phy-pxa-28nm-hsic.o
+> >  obj-$(CONFIG_PHY_PXA_28NM_USB2)		+= phy-pxa-28nm-usb2.o
+> > +obj-$(CONFIG_PHY_PXA_USB)		+= phy-pxa-usb.o
+> > diff --git a/drivers/phy/marvell/phy-pxa-usb.c
+> > b/drivers/phy/marvell/phy-pxa-usb.c
+> > new file mode 100644
+> > index 000000000000..87ff7550b912
+> > --- /dev/null
+> > +++ b/drivers/phy/marvell/phy-pxa-usb.c
+> > @@ -0,0 +1,345 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (C) 2011 Marvell International Ltd. All rights
+> > reserved.
+> > + * Copyright (C) 2018 Lubomir Rintel <lkundrak@v3.sk>
+> > + */
+> > +
+> > +#include <dt-bindings/phy/phy.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/phy/phy.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +/* phy regs */
+> > +#define UTMI_REVISION		0x0
+> > +#define UTMI_CTRL		0x4
+> > +#define UTMI_PLL		0x8
+> > +#define UTMI_TX			0xc
+> > +#define UTMI_RX			0x10
+> > +#define UTMI_IVREF		0x14
+> > +#define UTMI_T0			0x18
+> > +#define UTMI_T1			0x1c
+> > +#define UTMI_T2			0x20
+> > +#define UTMI_T3			0x24
+> > +#define UTMI_T4			0x28
+> > +#define UTMI_T5			0x2c
+> > +#define UTMI_RESERVE		0x30
+> > +#define UTMI_USB_INT		0x34
+> > +#define UTMI_DBG_CTL		0x38
+> > +#define UTMI_OTG_ADDON		0x3c
+> > +
+> > +/* For UTMICTRL Register */
+> > +#define UTMI_CTRL_USB_CLK_EN                    (1 << 31)
+> > +/* pxa168 */
+> > +#define UTMI_CTRL_SUSPEND_SET1                  (1 << 30)
+> > +#define UTMI_CTRL_SUSPEND_SET2                  (1 << 29)
+> > +#define UTMI_CTRL_RXBUF_PDWN                    (1 << 24)
+> > +#define UTMI_CTRL_TXBUF_PDWN                    (1 << 11)
+> > +
+> > +#define UTMI_CTRL_INPKT_DELAY_SHIFT             30
+> > +#define UTMI_CTRL_INPKT_DELAY_SOF_SHIFT		28
+> > +#define UTMI_CTRL_PU_REF_SHIFT			20
+> > +#define UTMI_CTRL_ARC_PULLDN_SHIFT              12
+> > +#define UTMI_CTRL_PLL_PWR_UP_SHIFT              1
+> > +#define UTMI_CTRL_PWR_UP_SHIFT                  0
+> > +
+> > +/* For UTMI_PLL Register */
+> > +#define UTMI_PLL_PLLCALI12_SHIFT		29
+> > +#define UTMI_PLL_PLLCALI12_MASK			(0x3 << 29)
+> > +
+> > +#define UTMI_PLL_PLLVDD18_SHIFT			27
+> > +#define UTMI_PLL_PLLVDD18_MASK			(0x3 << 27)
+> > +
+> > +#define UTMI_PLL_PLLVDD12_SHIFT			25
+> > +#define UTMI_PLL_PLLVDD12_MASK			(0x3 << 25)
+> > +
+> > +#define UTMI_PLL_CLK_BLK_EN_SHIFT               24
+> > +#define CLK_BLK_EN                              (0x1 << 24)
+> > +#define PLL_READY                               (0x1 << 23)
+> > +#define KVCO_EXT                                (0x1 << 22)
+> > +#define VCOCAL_START                            (0x1 << 21)
+> > +
+> > +#define UTMI_PLL_KVCO_SHIFT			15
+> > +#define UTMI_PLL_KVCO_MASK                      (0x7 << 15)
+> > +
+> > +#define UTMI_PLL_ICP_SHIFT			12
+> > +#define UTMI_PLL_ICP_MASK                       (0x7 << 12)
+> > +
+> > +#define UTMI_PLL_FBDIV_SHIFT                    4
+> > +#define UTMI_PLL_FBDIV_MASK                     (0xFF << 4)
+> > +
+> > +#define UTMI_PLL_REFDIV_SHIFT                   0
+> > +#define UTMI_PLL_REFDIV_MASK                    (0xF << 0)
+> > +
+> > +/* For UTMI_TX Register */
+> > +#define UTMI_TX_REG_EXT_FS_RCAL_SHIFT		27
+> > +#define UTMI_TX_REG_EXT_FS_RCAL_MASK		(0xf << 27)
+> > +
+> > +#define UTMI_TX_REG_EXT_FS_RCAL_EN_SHIFT	26
+> > +#define UTMI_TX_REG_EXT_FS_RCAL_EN_MASK		(0x1 << 26)
+> > +
+> > +#define UTMI_TX_TXVDD12_SHIFT                   22
+> > +#define UTMI_TX_TXVDD12_MASK                    (0x3 << 22)
+> > +
+> > +#define UTMI_TX_CK60_PHSEL_SHIFT                17
+> > +#define UTMI_TX_CK60_PHSEL_MASK                 (0xf << 17)
+> > +
+> > +#define UTMI_TX_IMPCAL_VTH_SHIFT                14
+> > +#define UTMI_TX_IMPCAL_VTH_MASK                 (0x7 << 14)
+> > +
+> > +#define REG_RCAL_START                          (0x1 << 12)
+> > +
+> > +#define UTMI_TX_LOW_VDD_EN_SHIFT                11
+> > +
+> > +#define UTMI_TX_AMP_SHIFT			0
+> > +#define UTMI_TX_AMP_MASK			(0x7 << 0)
+> > +
+> > +/* For UTMI_RX Register */
+> > +#define UTMI_REG_SQ_LENGTH_SHIFT                15
+> > +#define UTMI_REG_SQ_LENGTH_MASK                 (0x3 << 15)
+> > +
+> > +#define UTMI_RX_SQ_THRESH_SHIFT                 4
+> > +#define UTMI_RX_SQ_THRESH_MASK                  (0xf << 4)
+> > +
+> > +#define UTMI_OTG_ADDON_OTG_ON			(1 << 0)
+> > +
+> > +enum pxa_usb_phy_version {
+> > +	PXA_USB_PHY_MMP2,
+> > +	PXA_USB_PHY_PXA910,
+> > +	PXA_USB_PHY_PXA168,
+> > +};
+> > +
+> > +struct pxa_usb_phy {
+> > +	struct phy *phy;
+> > +	void __iomem *base;
+> > +	enum pxa_usb_phy_version version;
+> > +};
+> > +
+> > +/*****************************************************************
+> > ************
+> > + * The registers read/write routines
+> > +
+> > *******************************************************************
+> > **********/
+> > +
+> > +static unsigned int u2o_get(void __iomem *base, unsigned int
+> > offset)
+> > +{
+> > +	return readl_relaxed(base + offset);
+> > +}
+> > +
+> > +static void u2o_set(void __iomem *base, unsigned int offset,
+> > +		unsigned int value)
+> > +{
+> > +	u32 reg;
+> > +
+> > +	reg = readl_relaxed(base + offset);
+> > +	reg |= value;
+> > +	writel_relaxed(reg, base + offset);
+> > +	readl_relaxed(base + offset);
+> > +}
+> > +
+> > +static void u2o_clear(void __iomem *base, unsigned int offset,
+> > +		unsigned int value)
+> > +{
+> > +	u32 reg;
+> > +
+> > +	reg = readl_relaxed(base + offset);
+> > +	reg &= ~value;
+> > +	writel_relaxed(reg, base + offset);
+> > +	readl_relaxed(base + offset);
+> > +}
+> > +
+> > +static void u2o_write(void __iomem *base, unsigned int offset,
+> > +		unsigned int value)
+> > +{
+> > +	writel_relaxed(value, base + offset);
+> > +	readl_relaxed(base + offset);
+> > +}
+> > +
+> > +static int pxa_usb_phy_init(struct phy *phy)
+> > +{
+> > +	struct pxa_usb_phy *pxa_usb_phy = phy_get_drvdata(phy);
+> > +	void __iomem *base = pxa_usb_phy->base;
+> > +	int loops;
+> > +
+> > +	dev_info(&phy->dev, "initializing Marvell PXA USB PHY");
+> > +
+> > +	/* Initialize the USB PHY power */
+> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA910) {
+> > +		u2o_set(base, UTMI_CTRL,
+> > (1<<UTMI_CTRL_INPKT_DELAY_SOF_SHIFT)
+> > +			| (1<<UTMI_CTRL_PU_REF_SHIFT));
+> > +	}
+> > +
+> > +	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
+> > +	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
+> > +
+> > +	/* UTMI_PLL settings */
+> > +	u2o_clear(base, UTMI_PLL, UTMI_PLL_PLLVDD18_MASK
+> > +		| UTMI_PLL_PLLVDD12_MASK | UTMI_PLL_PLLCALI12_MASK
+> > +		| UTMI_PLL_FBDIV_MASK | UTMI_PLL_REFDIV_MASK
+> > +		| UTMI_PLL_ICP_MASK | UTMI_PLL_KVCO_MASK);
+> > +
+> > +	u2o_set(base, UTMI_PLL, 0xee<<UTMI_PLL_FBDIV_SHIFT
+> > +		| 0xb<<UTMI_PLL_REFDIV_SHIFT |
+> > 3<<UTMI_PLL_PLLVDD18_SHIFT
+> > +		| 3<<UTMI_PLL_PLLVDD12_SHIFT |
+> > 3<<UTMI_PLL_PLLCALI12_SHIFT
+> > +		| 1<<UTMI_PLL_ICP_SHIFT | 3<<UTMI_PLL_KVCO_SHIFT);
+> > +
+> > +	/* UTMI_TX */
+> > +	u2o_clear(base, UTMI_TX, UTMI_TX_REG_EXT_FS_RCAL_EN_MASK
+> > +		| UTMI_TX_TXVDD12_MASK | UTMI_TX_CK60_PHSEL_MASK
+> > +		| UTMI_TX_IMPCAL_VTH_MASK |
+> > UTMI_TX_REG_EXT_FS_RCAL_MASK
+> > +		| UTMI_TX_AMP_MASK);
+> > +	u2o_set(base, UTMI_TX, 3<<UTMI_TX_TXVDD12_SHIFT
+> > +		| 4<<UTMI_TX_CK60_PHSEL_SHIFT |
+> > 4<<UTMI_TX_IMPCAL_VTH_SHIFT
+> > +		| 8<<UTMI_TX_REG_EXT_FS_RCAL_SHIFT |
+> > 3<<UTMI_TX_AMP_SHIFT);
+> > +
+> > +	/* UTMI_RX */
+> > +	u2o_clear(base, UTMI_RX, UTMI_RX_SQ_THRESH_MASK
+> > +		| UTMI_REG_SQ_LENGTH_MASK);
+> > +	u2o_set(base, UTMI_RX, 7<<UTMI_RX_SQ_THRESH_SHIFT
+> > +		| 2<<UTMI_REG_SQ_LENGTH_SHIFT);
+> > +
+> > +	/* UTMI_IVREF */
+> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168) {
+> > +		/*
+> > +		 * fixing Microsoft Altair board interface with NEC hub
+> > issue -
+> > +		 * Set UTMI_IVREF from 0x4a3 to 0x4bf
+> > +		 */
+> > +		u2o_write(base, UTMI_IVREF, 0x4bf);
+> > +	}
+> > +
+> > +	/* toggle VCOCAL_START bit of UTMI_PLL */
+> > +	udelay(200);
+> > +	u2o_set(base, UTMI_PLL, VCOCAL_START);
+> > +	udelay(40);
+> > +	u2o_clear(base, UTMI_PLL, VCOCAL_START);
+> > +
+> > +	/* toggle REG_RCAL_START bit of UTMI_TX */
+> > +	udelay(400);
+> > +	u2o_set(base, UTMI_TX, REG_RCAL_START);
+> > +	udelay(40);
+> > +	u2o_clear(base, UTMI_TX, REG_RCAL_START);
+> > +	udelay(400);
+> > +
+> > +	/* Make sure PHY PLL is ready */
+> > +	loops = 0;
+> > +	while ((u2o_get(base, UTMI_PLL) & PLL_READY) == 0) {
+> > +		mdelay(1);
+> > +		loops++;
+> > +		if (loops > 100) {
+> > +			dev_warn(&phy->dev, "calibrate timeout,
+> > UTMI_PLL %x\n",
+> > +						u2o_get(base,
+> > UTMI_PLL));
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168) {
+> > +		u2o_set(base, UTMI_RESERVE, 1 << 5);
+> > +		/* Turn on UTMI PHY OTG extension */
+> > +		u2o_write(base, UTMI_OTG_ADDON, 1);
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +}
+> > +
+> > +static int pxa_usb_phy_exit(struct phy *phy)
+> > +{
+> > +	struct pxa_usb_phy *pxa_usb_phy = phy_get_drvdata(phy);
+> > +	void __iomem *base = pxa_usb_phy->base;
+> > +
+> > +	dev_info(&phy->dev, "deinitializing Marvell PXA USB PHY");
+> > +
+> > +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168)
+> > +		u2o_clear(base, UTMI_OTG_ADDON, UTMI_OTG_ADDON_OTG_ON);
+> > +
+> > +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_RXBUF_PDWN);
+> > +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_TXBUF_PDWN);
+> > +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_USB_CLK_EN);
+> > +	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
+> > +	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct phy_ops pxa_usb_phy_ops = {
+> > +	.init	= pxa_usb_phy_init,
+> > +	.exit	= pxa_usb_phy_exit,
+> > +	.owner	= THIS_MODULE,
+> > +};
+> > +
+> > +static const struct of_device_id pxa_usb_phy_of_match[] = {
+> > +	{
+> > +		.compatible = "marvell,mmp2-usb-phy",
+> > +		.data = (void *)PXA_USB_PHY_MMP2,
+> > +	}, {
+> > +		.compatible = "marvell,pxa910-usb-phy",
+> > +		.data = (void *)PXA_USB_PHY_PXA910,
+> > +	}, {
+> > +		.compatible = "marvell,pxa168-usb-phy",
+> > +		.data = (void *)PXA_USB_PHY_PXA168,
+> > +	},
+> > +	{ },
+> > +};
+> > +MODULE_DEVICE_TABLE(of, pxa_usb_phy_of_match);
+> > +
+> > +static int pxa_usb_phy_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *dev = &pdev->dev;
+> > +	struct resource *resource;
+> > +	struct pxa_usb_phy *pxa_usb_phy;
+> > +	struct phy_provider *provider;
+> > +	const struct of_device_id *of_id;
+> > +
+> > +	pxa_usb_phy = devm_kzalloc(dev, sizeof(struct pxa_usb_phy),
+> > GFP_KERNEL);
+> > +	if (!pxa_usb_phy)
+> > +		return -ENOMEM;
+> > +
+> > +	of_id = of_match_node(pxa_usb_phy_of_match, dev->of_node);
+> > +	if (of_id)
+> > +		pxa_usb_phy->version = (enum pxa_usb_phy_version)of_id-
+> > >data;
+> > +	else
+> > +		pxa_usb_phy->version = PXA_USB_PHY_MMP2;
+> > +
+> > +	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	pxa_usb_phy->base = devm_ioremap_resource(dev, resource);
+> > +	if (IS_ERR(pxa_usb_phy->base)) {
+> > +		dev_err(dev, "failed to remap PHY regs\n");
+> > +		return PTR_ERR(pxa_usb_phy->base);
+> > +	}
+> > +
+> > +	pxa_usb_phy->phy = devm_phy_create(dev, NULL,
+> > &pxa_usb_phy_ops);
+> > +	if (IS_ERR(pxa_usb_phy->phy)) {
+> > +		dev_err(dev, "failed to create PHY\n");
+> > +		return PTR_ERR(pxa_usb_phy->phy);
+> > +	}
+> > +
+> > +	phy_set_drvdata(pxa_usb_phy->phy, pxa_usb_phy);
+> > +	provider = devm_of_phy_provider_register(dev,
+> > of_phy_simple_xlate);
+> > +	if (IS_ERR(provider)) {
+> > +		dev_err(dev, "failed to register PHY provider\n");
+> > +		return PTR_ERR(provider);
+> > +	}
+> > +
+> > +	if (!dev->of_node) {
+> > +		phy_create_lookup(pxa_usb_phy->phy, "usb", "mv-udc");
+> > +		phy_create_lookup(pxa_usb_phy->phy, "usb", "pxa-
+> > u2oehci");
+> > +		phy_create_lookup(pxa_usb_phy->phy, "usb", "mv-otg");
+> > +	}
+> > +
+> > +	dev_info(dev, "Marvell PXA USB PHY");
+> > +	return 0;
+> > +}
+> > +
+> > +static struct platform_driver pxa_usb_phy_driver = {
+> > +	.probe		= pxa_usb_phy_probe,
+> > +	.driver		= {
+> > +		.name	= "pxa-usb-phy",
+> > +		.of_match_table = pxa_usb_phy_of_match,
+> > +	},
+> > +};
+> > +module_platform_driver(pxa_usb_phy_driver);
+> > +
+> > +MODULE_AUTHOR("Lubomir Rintel <lkundrak@v3.sk>");
+> > +MODULE_DESCRIPTION("Marvell PXA USB PHY Driver");
+> > +MODULE_LICENSE("GPL v2");
+> > 
