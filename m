@@ -1,26 +1,39 @@
-From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Sun, 07 Oct 2018 11:50:52 +0200
-Subject: [linux-sunxi] [PATCH v2 00/29] Allwinner H6 DE3 and HDMI support
-In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
-References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <3147828.SFUzx6Pm4T@jernej-laptop>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Sun, 7 Oct 2018 12:36:51 +0000
+Subject: [PATCH V8 0/3] soc: imx: add scu firmware api support
+In-Reply-To: <20180930132759.GP26692@dragon>
+References: <1538268516-24678-1-git-send-email-aisheng.dong@nxp.com>
+ <20180930072628.GN26692@dragon> <20180930132759.GP26692@dragon>
+Message-ID: <AM0PR04MB421150896A65871B0D3AD4E480E50@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne nedelja, 07. oktober 2018 ob 11:38:36 CEST je Jernej Skrabec napisal(a):
-> This series adds support for Display Engine 3.0 and HDMI 2.0a, which
-> can be found on H6 SoC.
-> 
-> Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
-> displaying and processing 10-bit and AFBC formats, which are not yet
-> supported by this series.
-> 
-> This series is based on linux-next at next-20180828, which has working
-> R40 display pipeline support. I'll rebase series on later linux-next, if
-> needed, once R40 display pipeline support is reintroduced.
+Hi Shawn,
 
-Sorry, I forgot to update above text. It is based on next-20181004 and R40 
-HDMI support is already fixed.
+> > >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 183 ++++++
+> > >  drivers/firmware/Kconfig                           |   1 +
+> > >  drivers/firmware/Makefile                          |   1 +
+> > >  drivers/firmware/imx/Kconfig                       |  11 +
+> > >  drivers/firmware/imx/Makefile                      |   2 +
+> > >  drivers/firmware/imx/imx-scu.c                     | 270
+> +++++++++
+> > >  drivers/firmware/imx/misc.c                        |  99 ++++
+> > >  include/soc/imx/scu/ipc.h                          |  59 ++
+> > >  include/soc/imx/scu/sci.h                          |  17 +
+> > >  include/soc/imx/scu/svc/misc.h                     |  55 ++
+> > >  include/soc/imx/scu/types.h                        | 617
+> +++++++++++++++++++++
+> 
+> ... I'm not sure the scu folder should be created under include/soc/imx/ or
+> include/linux/firmware/imx/ like meson platform.  I would like to hear more
+> opinions.
+> 
 
-Best regards,
-Jernej
+I guess include/Linux/firmware/imx would be better.
+I will resend a patch series with this updated.
+If any issue please let me know.
+
+Regards
+Dong Aisheng
+
+> Shawn
