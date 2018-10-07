@@ -1,60 +1,54 @@
-From: jonas@orbital-systems.com (Jonas Danielsson)
-Date: Sun,  7 Oct 2018 14:57:45 +0200
-Subject: [PATCH] power: reset: at91-reset: enable I-cache for at91sam9260_reset
-Message-ID: <20181007125815.8392-1-jonas@threetimestwo.org>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Sun,  7 Oct 2018 21:04:40 +0800
+Subject: [PATCH V9 0/3] soc: imx: add scu firmware api support
+Message-ID: <1538917483-1818-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Danielsson <jonas@orbital-systems.com>
+Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+(e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+dedicated Cortex-M core to provide power, clock, Pad, and resource
+management. Communication between the host processor running
+an OS and the system controller happens through a SCU protocol.
+This patchset adds the SCU APIs which is implemented based on MU
+and will be used by different system components.
 
-This fixes a bug where our embedded system (AT91SAM9260 based) would
-hang at reboot. At the most we managed 16 boot loops without a hang.
+It mainly consists of below parts:
+1) SCU IPC
+   Basic IPC mechanism implemention based on mailbox which is used
+   for communication between AP and SCU firmware.
+2) SCU IPC Service API
 
-With this patch applied the problem has not been observed and the board
-has managed above 250 boot loops.
+v8->v9:
+ * only scu headfile path update from include/soc/imx to
+   include/linux/firmware/imx
 
-The AT91SAM9260 datasheet tells us that with the instruction cache
-disabled all instructions are fetched from SDRAM. And we have an errata
-telling us we must power down the SDRAM before issuing cpu reset.
+Dong Aisheng (3):
+  dt-bindings: arm: fsl: add scu binding doc
+  firmware: imx: add SCU firmware driver support
+  firmware: imx: add misc svc support
 
-This means we need the instruction cache enabled in at91sam9260_reset()
-At the moment it is being disabled in cpu_proc_fin() which is called from
-arch/arm/kernel/reboot.c.
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 183 ++++++
+ drivers/firmware/Kconfig                           |   1 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/imx/Kconfig                       |  11 +
+ drivers/firmware/imx/Makefile                      |   2 +
+ drivers/firmware/imx/imx-scu.c                     | 269 +++++++++
+ drivers/firmware/imx/misc.c                        |  99 ++++
+ include/linux/firmware/imx/ipc.h                   |  59 ++
+ include/linux/firmware/imx/sci.h                   |  17 +
+ include/linux/firmware/imx/svc/misc.h              |  55 ++
+ include/linux/firmware/imx/types.h                 | 617 +++++++++++++++++++++
+ 11 files changed, 1314 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+ create mode 100644 drivers/firmware/imx/Kconfig
+ create mode 100644 drivers/firmware/imx/Makefile
+ create mode 100644 drivers/firmware/imx/imx-scu.c
+ create mode 100644 drivers/firmware/imx/misc.c
+ create mode 100644 include/linux/firmware/imx/ipc.h
+ create mode 100644 include/linux/firmware/imx/sci.h
+ create mode 100644 include/linux/firmware/imx/svc/misc.h
+ create mode 100644 include/linux/firmware/imx/types.h
 
-Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
----
- drivers/power/reset/at91-reset.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-index f44a9ffcc2ab..78972bba64df 100644
---- a/drivers/power/reset/at91-reset.c
-+++ b/drivers/power/reset/at91-reset.c
-@@ -50,14 +50,24 @@ static void __iomem *at91_ramc_base[2], *at91_rstc_base;
- static struct clk *sclk;
- 
- /*
--* unless the SDRAM is cleanly shutdown before we hit the
-+* Errata 43.1.7.1 RSTC: Reset during SDRAM Accesses
-+*
-+* Unless the SDRAM is cleanly shutdown before we hit the
- * reset register it can be left driving the data bus and
- * killing the chance of a subsequent boot from NAND
-+*
-+* Since we are disabling SDRAM need to make sure that the
-+* instruction cache is enabled.
- */
- static int at91sam9260_restart(struct notifier_block *this, unsigned long mode,
- 			       void *cmd)
- {
- 	asm volatile(
-+		/* Enable I-cache */
-+		"mrc	p15, 0, r0, c1, c0, 0\n\t"
-+		"orr	r0, r0, #4096\n\t" /* CR_I (bit 12) */
-+		"mcr	p15, 0, r0, c1, c0, 0\n\t"
-+
- 		/* Align to cache lines */
- 		".balign 32\n\t"
- 
 -- 
-2.14.4
+2.7.4
