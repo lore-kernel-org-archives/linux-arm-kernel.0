@@ -1,75 +1,447 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:38:52 +0200
-Subject: [PATCH v2 16/29] drm/sun4i: Not all DW HDMI controllers has scrambled
- addresses
+Date: Sun,  7 Oct 2018 11:38:49 +0200
+Subject: [PATCH v2 13/29] drm/sun4i: Add basic support for DE3
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-17-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-14-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently supported Allwinner SoCs with DW HDMI controller have
-scrambled addresses and read lock. However, that is not true in general.
-For example, A80 and H6 have normal addresses and normal read access.
+Display Engine 3 is an upgrade of DE2 with new features like support for
+10 bit color formats and support for AFBC.
 
-Move code for unscrambling addresses and unlocking read access to it's
-own function and call it from init function.
+Most of DE2 code works with DE3, except some small details.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Implement basic support for DE3. Support for 10 bit colort formats and
+AFBC, among others missing features, will be added later.
+
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_csc.c       | 83 +++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.c     | 38 +++++++----
+ drivers/gpu/drm/sun4i/sun8i_mixer.h     | 33 +++++++++-
+ drivers/gpu/drm/sun4i/sun8i_ui_scaler.c | 10 ++-
+ drivers/gpu/drm/sun4i/sun8i_ui_scaler.h |  1 +
+ drivers/gpu/drm/sun4i/sun8i_vi_layer.c  |  8 +++
+ drivers/gpu/drm/sun4i/sun8i_vi_layer.h  |  2 +
+ drivers/gpu/drm/sun4i/sun8i_vi_scaler.c | 19 +++++-
+ drivers/gpu/drm/sun4i/sun8i_vi_scaler.h | 23 +++++++
+ 9 files changed, 201 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 471993097ced..365cb5a9fb77 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -279,8 +279,21 @@ static const struct dw_hdmi_phy_ops sun8i_hdmi_phy_ops = {
- 	.setup_hpd = &dw_hdmi_phy_setup_hpd,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.c b/drivers/gpu/drm/sun4i/sun8i_csc.c
+index 755b60bae408..e0e8bf263792 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_csc.c
++++ b/drivers/gpu/drm/sun4i/sun8i_csc.c
+@@ -34,6 +34,41 @@ static const u32 yvu2rgb[] = {
+ 	0x000004A8, 0x00000000, 0x00000813, 0xFFFBAC4A,
  };
  
-+static void sun8i_hdmi_phy_unlock(struct sun8i_hdmi_phy *phy)
-+{
-+	/* enable read access to HDMI controller */
-+	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
-+		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
++/*
++ * DE3 has a bit different CSC units. Factors are in two's complement format.
++ * First three factors in a row are multiplication factors which have 17 bits
++ * for fractional part. Fourth value in a row is comprised of two factors.
++ * Upper 16 bits represents difference, which is subtracted from the input
++ * value before multiplication and lower 16 bits represents constant, which
++ * is addes at the end.
++ *
++ * x' = c00 * (x + d0) + c01 * (y + d1) + c02 * (z + d2) + const0
++ * y' = c10 * (x + d0) + c11 * (y + d1) + c12 * (z + d2) + const1
++ * z' = c20 * (x + d0) + c21 * (y + d1) + c22 * (z + d2) + const2
++ *
++ * Please note that above formula is true only for Blender CSC. Other DE3 CSC
++ * units takes only positive value for difference. From what can be deducted
++ * from BSP driver code, those units probably automatically assume that
++ * difference has to be subtracted.
++ *
++ * Layout of factors in table:
++ * c00 c01 c02 [d0 const0]
++ * c10 c11 c12 [d1 const1]
++ * c20 c21 c22 [d2 const2]
++ */
 +
-+	/* unscramble register offsets */
-+	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
-+		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
-+}
++static const u32 yuv2rgb_de3[] = {
++	0x0002542a, 0x00000000, 0x0003312a, 0xffc00000,
++	0x0002542a, 0xffff376b, 0xfffe5fc3, 0xfe000000,
++	0x0002542a, 0x000408d3, 0x00000000, 0xfe000000,
++};
 +
- static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
++static const u32 yvu2rgb_de3[] = {
++	0x0002542a, 0x0003312a, 0x00000000, 0xffc00000,
++	0x0002542a, 0xfffe5fc3, 0xffff376b, 0xfe000000,
++	0x0002542a, 0x00000000, 0x000408d3, 0xfe000000,
++};
++
+ static void sun8i_csc_set_coefficients(struct regmap *map, u32 base,
+ 				       enum sun8i_csc_mode mode)
  {
-+	sun8i_hdmi_phy_unlock(phy);
-+
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
- 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK,
- 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK);
-@@ -298,6 +311,8 @@ static void sun8i_hdmi_phy_init_h3(struct sun8i_hdmi_phy *phy)
- {
- 	unsigned int val;
- 
-+	sun8i_hdmi_phy_unlock(phy);
-+
- 	regmap_write(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG, 0);
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG,
- 			   SUN8I_HDMI_PHY_ANA_CFG1_ENBI,
-@@ -372,14 +387,6 @@ static void sun8i_hdmi_phy_init_h3(struct sun8i_hdmi_phy *phy)
- 
- void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
- {
--	/* enable read access to HDMI controller */
--	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
--		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
--
--	/* unscramble register offsets */
--	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
--		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
--
- 	phy->variant->phy_init(phy);
+@@ -61,6 +96,28 @@ static void sun8i_csc_set_coefficients(struct regmap *map, u32 base,
+ 	}
  }
  
++static void sun8i_de3_ccsc_set_coefficients(struct regmap *map, int layer,
++					    enum sun8i_csc_mode mode)
++{
++	const u32 *table;
++	u32 base_reg;
++
++	switch (mode) {
++	case SUN8I_CSC_MODE_YUV2RGB:
++		table = yuv2rgb_de3;
++		break;
++	case SUN8I_CSC_MODE_YVU2RGB:
++		table = yvu2rgb_de3;
++		break;
++	default:
++		DRM_WARN("Wrong CSC mode specified.\n");
++		return;
++	}
++
++	base_reg = DE3_MIXER_BLEND_CSC_COEFF(DE3_BLD_BASE, layer, 0, 0);
++	regmap_bulk_write(map, base_reg, table, 12);
++}
++
+ static void sun8i_csc_enable(struct regmap *map, u32 base, bool enable)
+ {
+ 	u32 val;
+@@ -73,11 +130,32 @@ static void sun8i_csc_enable(struct regmap *map, u32 base, bool enable)
+ 	regmap_update_bits(map, DE2_CSC_CTRL(base), DE2_CSC_CTRL_EN, val);
+ }
+ 
++static void sun8i_de3_ccsc_enable(struct regmap *map, int layer, bool enable)
++{
++	u32 val, mask;
++
++	mask = DE3_MIXER_BLEND_CSC_CTL_EN(layer);
++
++	if (enable)
++		val = mask;
++	else
++		val = 0;
++
++	regmap_update_bits(map, DE3_MIXER_BLEND_CSC_CTL(DE3_BLD_BASE),
++			   mask, val);
++}
++
+ void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
+ 				     enum sun8i_csc_mode mode)
+ {
+ 	u32 base;
+ 
++	if (mixer->cfg->is_de3) {
++		sun8i_de3_ccsc_set_coefficients(mixer->engine.regs,
++						layer, mode);
++		return;
++	}
++
+ 	base = ccsc_base[mixer->cfg->ccsc][layer];
+ 
+ 	sun8i_csc_set_coefficients(mixer->engine.regs, base, mode);
+@@ -87,6 +165,11 @@ void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable)
+ {
+ 	u32 base;
+ 
++	if (mixer->cfg->is_de3) {
++		sun8i_de3_ccsc_enable(mixer->engine.regs, layer, enable);
++		return;
++	}
++
+ 	base = ccsc_base[mixer->cfg->ccsc][layer];
+ 
+ 	sun8i_csc_enable(mixer->engine.regs, base, enable);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 2cb24d987005..64daeb017d10 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -459,17 +459,33 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 
+ 	base = sun8i_blender_base(mixer);
+ 
+-	/* Reset the registers */
+-	for (i = 0; i < DE2_MIXER_UNIT_SIZE; i += 4)
+-		regmap_write(mixer->engine.regs, i, 0);
+-	/* Disable unused sub-engines */
+-	regmap_write(mixer->engine.regs, DE2_MIXER_FCE_EN, 0);
+-	regmap_write(mixer->engine.regs, DE2_MIXER_BWS_EN, 0);
+-	regmap_write(mixer->engine.regs, DE2_MIXER_LTI_EN, 0);
+-	regmap_write(mixer->engine.regs, DE2_MIXER_PEAK_EN, 0);
+-	regmap_write(mixer->engine.regs, DE2_MIXER_ASE_EN, 0);
+-	regmap_write(mixer->engine.regs, DE2_MIXER_FCC_EN, 0);
+-	regmap_write(mixer->engine.regs, DE2_MIXER_DCSC_EN, 0);
++	/* Reset registers and disable unused sub-engines */
++	if (mixer->cfg->is_de3) {
++		for (i = 0; i < DE3_MIXER_UNIT_SIZE; i += 4)
++			regmap_write(mixer->engine.regs, i, 0);
++
++		regmap_write(mixer->engine.regs, DE3_MIXER_FCE_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_PEAK_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_LCTI_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_BLS_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_FCC_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_DNS_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_DRC_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_FMT_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_CDC0_EN, 0);
++		regmap_write(mixer->engine.regs, DE3_MIXER_CDC1_EN, 0);
++	} else {
++		for (i = 0; i < DE2_MIXER_UNIT_SIZE; i += 4)
++			regmap_write(mixer->engine.regs, i, 0);
++
++		regmap_write(mixer->engine.regs, DE2_MIXER_FCE_EN, 0);
++		regmap_write(mixer->engine.regs, DE2_MIXER_BWS_EN, 0);
++		regmap_write(mixer->engine.regs, DE2_MIXER_LTI_EN, 0);
++		regmap_write(mixer->engine.regs, DE2_MIXER_PEAK_EN, 0);
++		regmap_write(mixer->engine.regs, DE2_MIXER_ASE_EN, 0);
++		regmap_write(mixer->engine.regs, DE2_MIXER_FCC_EN, 0);
++		regmap_write(mixer->engine.regs, DE2_MIXER_DCSC_EN, 0);
++	}
+ 
+ 	/* Enable the mixer */
+ 	regmap_write(mixer->engine.regs, DE2_MIXER_GLOBAL_CTL,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index f26ee6af6cba..4dcc85f0a53e 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -30,11 +30,16 @@
+ #define DE2_MIXER_GLOBAL_DBUFF_ENABLE		BIT(0)
+ 
+ #define DE2_MIXER_UNIT_SIZE			0x6000
++#define DE3_MIXER_UNIT_SIZE			0x3000
+ 
+ #define DE2_BLD_BASE				0x1000
+ #define DE2_CH_BASE				0x2000
+ #define DE2_CH_SIZE				0x1000
+ 
++#define DE3_BLD_BASE				0x0800
++#define DE3_CH_BASE				0x1000
++#define DE3_CH_SIZE				0x0800
++
+ #define DE2_MIXER_BLEND_PIPE_CTL(base)		((base) + 0)
+ #define DE2_MIXER_BLEND_ATTR_FCOLOR(base, x)	((base) + 0x4 + 0x10 * (x))
+ #define DE2_MIXER_BLEND_ATTR_INSIZE(base, x)	((base) + 0x8 + 0x10 * (x))
+@@ -49,6 +54,11 @@
+ #define DE2_MIXER_BLEND_CK_MAX(base, x)		((base) + 0xc0 + 0x04 * (x))
+ #define DE2_MIXER_BLEND_CK_MIN(base, x)		((base) + 0xe0 + 0x04 * (x))
+ #define DE2_MIXER_BLEND_OUTCTL(base)		((base) + 0xfc)
++#define DE3_MIXER_BLEND_CSC_CTL(base)		((base) + 0x100)
++#define DE3_MIXER_BLEND_CSC_COEFF(base, layer, x, y) \
++	((base) + 0x110 + (layer) * 0x30 +  (x) * 0x10 + 4 * (y))
++#define DE3_MIXER_BLEND_CSC_CONST(base, layer, i) \
++	((base) + 0x110 + (layer) * 0x30 +  (i) * 0x10 + 0x0c)
+ 
+ #define DE2_MIXER_BLEND_PIPE_CTL_EN_MSK		GENMASK(12, 8)
+ #define DE2_MIXER_BLEND_PIPE_CTL_EN(pipe)	BIT(8 + pipe)
+@@ -63,6 +73,9 @@
+ 
+ #define DE2_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
+ 
++#define DE3_MIXER_BLEND_CSC_CTL_EN(ch)		BIT(ch)
++#define DE3_MIXER_BLEND_CSC_CONST_VAL(d, c)	(((d) << 16) | ((c) & 0xffff))
++
+ #define DE2_MIXER_FBFMT_ARGB8888	0
+ #define DE2_MIXER_FBFMT_ABGR8888	1
+ #define DE2_MIXER_FBFMT_RGBA8888	2
+@@ -112,6 +125,17 @@
+ #define DE2_MIXER_FCC_EN			0xaa000
+ #define DE2_MIXER_DCSC_EN			0xb0000
+ 
++#define DE3_MIXER_FCE_EN			0x70000
++#define DE3_MIXER_PEAK_EN			0x70800
++#define DE3_MIXER_LCTI_EN			0x71000
++#define DE3_MIXER_BLS_EN			0x71800
++#define DE3_MIXER_FCC_EN			0x72000
++#define DE3_MIXER_DNS_EN			0x80000
++#define DE3_MIXER_DRC_EN			0xa0000
++#define DE3_MIXER_FMT_EN			0xa8000
++#define DE3_MIXER_CDC0_EN			0xd0000
++#define DE3_MIXER_CDC1_EN			0xd8000
++
+ struct de2_fmt_info {
+ 	u32			drm_fmt;
+ 	u32			de2_fmt;
+@@ -133,6 +157,7 @@ struct de2_fmt_info {
+  *	are invalid.
+  * @mod_rate: module clock rate that needs to be set in order to have
+  *	a functional block.
++ * @is_de3: true, if this is next gen display engine 3.0, false otherwise.
+  */
+ struct sun8i_mixer_cfg {
+ 	int		vi_num;
+@@ -140,6 +165,7 @@ struct sun8i_mixer_cfg {
+ 	int		scaler_mask;
+ 	int		ccsc;
+ 	unsigned long	mod_rate;
++	bool		is_de3;
+ };
+ 
+ struct sun8i_mixer {
+@@ -162,13 +188,16 @@ engine_to_sun8i_mixer(struct sunxi_engine *engine)
+ static inline u32
+ sun8i_blender_base(struct sun8i_mixer *mixer)
+ {
+-	return DE2_BLD_BASE;
++	return mixer->cfg->is_de3 ? DE3_BLD_BASE : DE2_BLD_BASE;
+ }
+ 
+ static inline u32
+ sun8i_channel_base(struct sun8i_mixer *mixer, int channel)
+ {
+-	return DE2_CH_BASE + channel * DE2_CH_SIZE;
++	if (mixer->cfg->is_de3)
++		return DE3_CH_BASE + channel * DE3_CH_SIZE;
++	else
++		return DE2_CH_BASE + channel * DE2_CH_SIZE;
+ }
+ 
+ const struct de2_fmt_info *sun8i_mixer_format_info(u32 format);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_ui_scaler.c b/drivers/gpu/drm/sun4i/sun8i_ui_scaler.c
+index 59dfe2deae8f..680b4ee08ab0 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_ui_scaler.c
++++ b/drivers/gpu/drm/sun4i/sun8i_ui_scaler.c
+@@ -93,8 +93,14 @@ static u32 sun8i_ui_scaler_base(struct sun8i_mixer *mixer, int channel)
+ {
+ 	int vi_num = mixer->cfg->vi_num;
+ 
+-	return DE2_VI_SCALER_UNIT_BASE + DE2_VI_SCALER_UNIT_SIZE * vi_num +
+-	       DE2_UI_SCALER_UNIT_SIZE * (channel - vi_num);
++	if (mixer->cfg->is_de3)
++		return DE3_VI_SCALER_UNIT_BASE +
++		       DE3_VI_SCALER_UNIT_SIZE * vi_num +
++		       DE3_UI_SCALER_UNIT_SIZE * (channel - vi_num);
++	else
++		return DE2_VI_SCALER_UNIT_BASE +
++		       DE2_VI_SCALER_UNIT_SIZE * vi_num +
++		       DE2_UI_SCALER_UNIT_SIZE * (channel - vi_num);
+ }
+ 
+ static int sun8i_ui_scaler_coef_index(unsigned int step)
+diff --git a/drivers/gpu/drm/sun4i/sun8i_ui_scaler.h b/drivers/gpu/drm/sun4i/sun8i_ui_scaler.h
+index 8db18053e6ee..427241ff1f47 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_ui_scaler.h
++++ b/drivers/gpu/drm/sun4i/sun8i_ui_scaler.h
+@@ -12,6 +12,7 @@
+ #include "sun8i_mixer.h"
+ 
+ #define DE2_UI_SCALER_UNIT_SIZE 0x10000
++#define DE3_UI_SCALER_UNIT_SIZE 0x08000
+ 
+ /* this two macros assumes 16 fractional bits which is standard in DRM */
+ #define DE2_UI_SCALER_SCALE_MIN			1
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+index 8ea07f34ad5b..7b7ac8bdf75f 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+@@ -202,6 +202,14 @@ static int sun8i_vi_layer_update_formats(struct sun8i_mixer *mixer, int channel,
+ 			   DE2_MIXER_CHAN_VI_LAYER_ATTR(ch_base, overlay),
+ 			   DE2_MIXER_CHAN_VI_LAYER_ATTR_RGB_MODE, val);
+ 
++	/* It seems that YUV formats use global alpha setting. */
++	if (mixer->cfg->is_de3)
++		regmap_update_bits(mixer->engine.regs,
++				   DE2_MIXER_CHAN_VI_LAYER_ATTR(ch_base,
++								overlay),
++				   DE3_MIXER_CHAN_VI_LAYER_ATTR_ALPHA_MASK,
++				   DE3_MIXER_CHAN_VI_LAYER_ATTR_ALPHA(0xff));
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_layer.h b/drivers/gpu/drm/sun4i/sun8i_vi_layer.h
+index dfda659e309c..eb3988a153f9 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_layer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_layer.h
+@@ -30,6 +30,8 @@
+ #define DE2_MIXER_CHAN_VI_LAYER_ATTR_RGB_MODE		BIT(15)
+ #define DE2_MIXER_CHAN_VI_LAYER_ATTR_FBFMT_OFFSET	8
+ #define DE2_MIXER_CHAN_VI_LAYER_ATTR_FBFMT_MASK		GENMASK(12, 8)
++#define DE3_MIXER_CHAN_VI_LAYER_ATTR_ALPHA_MASK	GENMASK(31, 24)
++#define DE3_MIXER_CHAN_VI_LAYER_ATTR_ALPHA(x)		((x) << 24)
+ 
+ struct sun8i_mixer;
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
+index b69ebca221c3..b1953569cccb 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.c
+@@ -835,7 +835,12 @@ static const u32 bicubic4coefftab32[480] = {
+ 
+ static u32 sun8i_vi_scaler_base(struct sun8i_mixer *mixer, int channel)
+ {
+-	return DE2_VI_SCALER_UNIT_BASE + DE2_VI_SCALER_UNIT_SIZE * channel;
++	if (mixer->cfg->is_de3)
++		return DE3_VI_SCALER_UNIT_BASE +
++		       DE3_VI_SCALER_UNIT_SIZE * channel;
++	else
++		return DE2_VI_SCALER_UNIT_BASE +
++		       DE2_VI_SCALER_UNIT_SIZE * channel;
+ }
+ 
+ static int sun8i_vi_scaler_coef_index(unsigned int step)
+@@ -950,6 +955,18 @@ void sun8i_vi_scaler_setup(struct sun8i_mixer *mixer, int layer,
+ 		cvphase = vphase;
+ 	}
+ 
++	if (mixer->cfg->is_de3) {
++		u32 val;
++
++		if (format->hsub == 1 && format->vsub == 1)
++			val = DE3_SCALER_VSU_SCALE_MODE_UI;
++		else
++			val = DE3_SCALER_VSU_SCALE_MODE_NORMAL;
++
++		regmap_write(mixer->engine.regs,
++			     DE3_SCALER_VSU_SCALE_MODE(base), val);
++	}
++
+ 	regmap_write(mixer->engine.regs,
+ 		     DE2_SCALER_VSU_OUTSIZE(base), outsize);
+ 	regmap_write(mixer->engine.regs,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h
+index b3168cae59b8..a9cf4b1ce642 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_scaler.h
+@@ -15,6 +15,9 @@
+ #define DE2_VI_SCALER_UNIT_BASE 0x20000
+ #define DE2_VI_SCALER_UNIT_SIZE 0x20000
+ 
++#define DE3_VI_SCALER_UNIT_BASE 0x20000
++#define DE3_VI_SCALER_UNIT_SIZE 0x08000
++
+ /* this two macros assumes 16 fractional bits which is standard in DRM */
+ #define DE2_VI_SCALER_SCALE_MIN			1
+ #define DE2_VI_SCALER_SCALE_MAX			((1UL << 20) - 1)
+@@ -25,6 +28,11 @@
+ #define DE2_VI_SCALER_SIZE(w, h)		(((h) - 1) << 16 | ((w) - 1))
+ 
+ #define DE2_SCALER_VSU_CTRL(base)		((base) + 0x0)
++#define DE3_SCALER_VSU_SCALE_MODE(base)		((base) + 0x10)
++#define DE3_SCALER_VSU_DIR_THR(base)		((base) + 0x20)
++#define DE3_SCALER_VSU_EDGE_THR(base)		((base) + 0x24)
++#define DE3_SCALER_VSU_EDSCL_CTRL(base)		((base) + 0x28)
++#define DE3_SCALER_VSU_ANGLE_THR(base)		((base) + 0x2c)
+ #define DE2_SCALER_VSU_OUTSIZE(base)		((base) + 0x40)
+ #define DE2_SCALER_VSU_YINSIZE(base)		((base) + 0x80)
+ #define DE2_SCALER_VSU_YHSTEP(base)		((base) + 0x88)
+@@ -46,6 +54,21 @@
+ #define DE2_SCALER_VSU_CTRL_EN			BIT(0)
+ #define DE2_SCALER_VSU_CTRL_COEFF_RDY		BIT(4)
+ 
++#define DE3_SCALER_VSU_SUB_ZERO_DIR_THR(x)	(((x) << 24) & 0xFF)
++#define DE3_SCALER_VSU_ZERO_DIR_THR(x)		(((x) << 16) & 0xFF)
++#define DE3_SCALER_VSU_HORZ_DIR_THR(x)		(((x) << 8) & 0xFF)
++#define DE3_SCALER_VSU_VERT_DIR_THR(x)		((x) & 0xFF)
++
++#define DE3_SCALER_VSU_SCALE_MODE_UI		0
++#define DE3_SCALER_VSU_SCALE_MODE_NORMAL	1
++#define DE3_SCALER_VSU_SCALE_MODE_ED_SCALE	2
++
++#define DE3_SCALER_VSU_EDGE_SHIFT(x)		(((x) << 16) & 0xF)
++#define DE3_SCALER_VSU_EDGE_OFFSET(x)		((x) & 0xFF)
++
++#define DE3_SCALER_VSU_ANGLE_SHIFT(x)		(((x) << 16) & 0xF)
++#define DE3_SCALER_VSU_ANGLE_OFFSET(x)		((x) & 0xFF)
++
+ void sun8i_vi_scaler_enable(struct sun8i_mixer *mixer, int layer, bool enable);
+ void sun8i_vi_scaler_setup(struct sun8i_mixer *mixer, int layer,
+ 			   u32 src_w, u32 src_h, u32 dst_w, u32 dst_h,
 -- 
 2.19.0
