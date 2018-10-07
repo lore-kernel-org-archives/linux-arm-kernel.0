@@ -1,62 +1,63 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:39:02 +0200
-Subject: [PATCH v2 26/29] dt-bindings: display: sun4i-drm: document H6 TCON TOP
+Date: Sun,  7 Oct 2018 11:38:56 +0200
+Subject: [PATCH v2 20/29] drm/sun4i: Add support for H6 DW HDMI controller
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-27-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-21-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+H6 has DW HDMI 2.0b controller v2.12a.
 
-Allwinner H6 SoC has a cut down version of TCON TOP.
+It supports 4K at 60 Hz and HDCP 2.2.
 
-Add binding documentation for it.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-[expanded description]
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- .../bindings/display/sunxi/sun4i-drm.txt           | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 478b288eebd9..f426bdb42f18 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -228,24 +228,26 @@ It allows display pipeline to be configured in very different ways:
-                  \ [3] TCON-TV1 [1] - TVE1/RGB
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index e9e93f174b35..0306a51e1b35 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -43,6 +43,17 @@ sun8i_dw_hdmi_mode_valid_a83t(struct drm_connector *connector,
+ 	return MODE_OK;
+ }
  
- Note that both TCON TOP references same physical unit. Both mixers can be
--connected to any TCON.
-+connected to any TCON. Not all TCON TOP variants support all features.
++static enum drm_mode_status
++sun8i_dw_hdmi_mode_valid_h6(struct drm_connector *connector,
++			    const struct drm_display_mode *mode)
++{
++	/* This is max for HDMI 2.0b (4K at 60Hz) */
++	if (mode->clock > 594000)
++		return MODE_CLOCK_HIGH;
++
++	return MODE_OK;
++}
++
+ static bool sun8i_dw_hdmi_node_is_tcon_top(struct device_node *node)
+ {
+ 	return IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
+@@ -240,11 +251,19 @@ static const struct sun8i_dw_hdmi_quirks sun8i_a83t_quirks = {
+ 	.set_rate = true,
+ };
  
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun8i-r40-tcon-top
-+    * allwinner,sun50i-h6-tcon-top
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandle to the clocks feeding the TCON TOP
-     * bus: TCON TOP interface clock
-     * tcon-tv0: TCON TV0 clock
--    * tve0: TVE0 clock
--    * tcon-tv1: TCON TV1 clock
--    * tve1: TVE0 clock
--    * dsi: MIPI DSI clock
-+    * tve0: TVE0 clock (R40 only)
-+    * tcon-tv1: TCON TV1 clock (R40 only)
-+    * tve1: TVE0 clock (R40 only)
-+    * dsi: MIPI DSI clock (R40 only)
-   - clock-names: clock name mentioned above
-   - resets: phandle to the reset line driving the TCON TOP
-   - #clock-cells : must contain 1
-   - clock-output-names: Names of clocks created for TCON TV0 channel clock,
--    TCON TV1 channel clock and DSI channel clock, in that order.
-+    TCON TV1 channel clock (R40 only) and DSI channel clock (R40 only), in
-+    that order.
- 
- - ports: A ports node with endpoint definitions as defined in
-     Documentation/devicetree/bindings/media/video-interfaces.txt. 6 ports should
++static const struct sun8i_dw_hdmi_quirks sun50i_h6_quirks = {
++	.mode_valid = sun8i_dw_hdmi_mode_valid_h6,
++};
++
+ static const struct of_device_id sun8i_dw_hdmi_dt_ids[] = {
+ 	{
+ 		.compatible = "allwinner,sun8i-a83t-dw-hdmi",
+ 		.data = &sun8i_a83t_quirks,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-h6-dw-hdmi",
++		.data = &sun50i_h6_quirks,
++	},
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_dw_hdmi_dt_ids);
 -- 
 2.19.0
