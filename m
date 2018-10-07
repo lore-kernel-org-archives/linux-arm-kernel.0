@@ -1,30 +1,57 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:38:44 +0200
-Subject: [PATCH v2 08/29] drm/sun4i: Add compatible for H6 display engine
+Date: Sun,  7 Oct 2018 11:38:43 +0200
+Subject: [PATCH v2 07/29] dt-bindings: display: sun4i-drm: Add H6 display
+ engine compatibles
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-9-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-8-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H6 is first Allwinner SoC which supports 10 bit colors, HDR and AFBC.
+This commit adds compatibles used in H6 display pipeline, namely for
+display engine, mixer and TV TCON.
 
+H6 display engine is somewhat similar to R40, just less TCONs and
+mixer support more features.
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 1e41c3f5fd6d..1ca7b70cbbfa 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -406,6 +406,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
- 	{ .compatible = "allwinner,sun9i-a80-display-engine" },
- 	{ .compatible = "allwinner,sun50i-a64-display-engine" },
-+	{ .compatible = "allwinner,sun50i-h6-display-engine" },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_drv_of_table);
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 7854fff4fc16..62c83b351344 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -158,6 +158,7 @@ Required properties:
+    * allwinner,sun9i-a80-tcon-tv
+    * "allwinner,sun50i-a64-tcon-lcd", "allwinner,sun8i-a83t-tcon-lcd"
+    * "allwinner,sun50i-a64-tcon-tv", "allwinner,sun8i-a83t-tcon-tv"
++   * allwinner,sun50i-h6-tcon-tv, allwinner,sun8i-r40-tcon-tv
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+  - clocks: phandles to the clocks feeding the TCON.
+@@ -381,6 +382,7 @@ Required properties:
+     * allwinner,sun8i-v3s-de2-mixer
+     * allwinner,sun50i-a64-de2-mixer-0
+     * allwinner,sun50i-a64-de2-mixer-1
++    * allwinner,sun50i-h6-de3-mixer-0
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+     * bus: the mixer interface clock
+@@ -415,9 +417,10 @@ Required properties:
+     * allwinner,sun8i-v3s-display-engine
+     * allwinner,sun9i-a80-display-engine
+     * allwinner,sun50i-a64-display-engine
++    * allwinner,sun50i-h6-display-engine
+ 
+   - allwinner,pipelines: list of phandle to the display engine
+-    frontends (DE 1.0) or mixers (DE 2.0) available.
++    frontends (DE 1.0) or mixers (DE 2.0/3.0) available.
+ 
+ Example:
+ 
 -- 
 2.19.0
