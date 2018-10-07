@@ -1,40 +1,112 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  7 Oct 2018 11:39:00 +0200
-Subject: [PATCH v2 24/29] drm/sun4i: Initialize registers in tcon-top driver
+Date: Sun,  7 Oct 2018 11:39:01 +0200
+Subject: [PATCH v2 25/29] drm: sun4i: add quirks for TCON TOP
 In-Reply-To: <20181007093905.11253-1-jernej.skrabec@siol.net>
 References: <20181007093905.11253-1-jernej.skrabec@siol.net>
-Message-ID: <20181007093905.11253-25-jernej.skrabec@siol.net>
+Message-ID: <20181007093905.11253-26-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that TCON TOP registers in H6 SoC have non-zero reset
-value. This may cause issues if bits are not changed during
-configuration.
+From: Icenowy Zheng <icenowy@aosc.io>
 
-To prevent that, initialize registers to 0.
+Some SoCs, such as H6, doesn't have a full-featured TCON TOP.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Add quirks support for TCON TOP.
+
+Currently the presence of TCON_TV1 and DSI is controlled via the quirks
+structure.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 43 ++++++++++++++++++++------
+ 1 file changed, 34 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-index 3040a79f298f..37158548b447 100644
+index 37158548b447..ed13233cad88 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-@@ -167,6 +167,13 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
- 		goto err_assert_reset;
- 	}
+@@ -9,11 +9,17 @@
+ #include <linux/component.h>
+ #include <linux/device.h>
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/platform_device.h>
  
-+	/*
-+	 * At least on H6, some registers have some bits set by default
-+	 * which may cause issues. Clear them here.
-+	 */
-+	writel(0, regs + TCON_TOP_PORT_SEL_REG);
-+	writel(0, regs + TCON_TOP_GATE_SRC_REG);
+ #include "sun8i_tcon_top.h"
+ 
++struct sun8i_tcon_top_quirks {
++	bool has_tcon_tv1;
++	bool has_dsi;
++};
 +
- 	/*
- 	 * TCON TOP has two muxes, which select parent clock for each TCON TV
- 	 * channel clock. Parent could be either TCON TV or TVE clock. For now
+ static bool sun8i_tcon_top_node_is_tcon_top(struct device_node *node)
+ {
+ 	return !!of_match_node(sun8i_tcon_top_of_table, node);
+@@ -121,10 +127,13 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct clk_hw_onecell_data *clk_data;
+ 	struct sun8i_tcon_top *tcon_top;
++	const struct sun8i_tcon_top_quirks *quirks;
+ 	struct resource *res;
+ 	void __iomem *regs;
+ 	int ret, i;
+ 
++	quirks = of_device_get_match_data(&pdev->dev);
++
+ 	tcon_top = devm_kzalloc(dev, sizeof(*tcon_top), GFP_KERNEL);
+ 	if (!tcon_top)
+ 		return -ENOMEM;
+@@ -187,15 +196,23 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+ 					     &tcon_top->reg_lock,
+ 					     TCON_TOP_TCON_TV0_GATE, 0);
+ 
+-	clk_data->hws[CLK_TCON_TOP_TV1] =
+-		sun8i_tcon_top_register_gate(dev, "tcon-tv1", regs,
+-					     &tcon_top->reg_lock,
+-					     TCON_TOP_TCON_TV1_GATE, 1);
++	if (quirks->has_tcon_tv1) {
++		clk_data->hws[CLK_TCON_TOP_TV1] =
++			sun8i_tcon_top_register_gate(dev, "tcon-tv1", regs,
++						     &tcon_top->reg_lock,
++						     TCON_TOP_TCON_TV1_GATE, 1);
++	} else {
++		clk_data->hws[CLK_TCON_TOP_TV1] = NULL;
++	}
+ 
+-	clk_data->hws[CLK_TCON_TOP_DSI] =
+-		sun8i_tcon_top_register_gate(dev, "dsi", regs,
+-					     &tcon_top->reg_lock,
+-					     TCON_TOP_TCON_DSI_GATE, 2);
++	if (quirks->has_dsi) {
++		clk_data->hws[CLK_TCON_TOP_DSI] =
++			sun8i_tcon_top_register_gate(dev, "dsi", regs,
++						     &tcon_top->reg_lock,
++						     TCON_TOP_TCON_DSI_GATE, 2);
++	} else {
++		clk_data->hws[CLK_TCON_TOP_DSI] = NULL;
++	}
+ 
+ 	for (i = 0; i < CLK_NUM; i++)
+ 		if (IS_ERR(clk_data->hws[i])) {
+@@ -257,9 +274,17 @@ static int sun8i_tcon_top_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++const struct sun8i_tcon_top_quirks sun8i_r40_tcon_top_quirks = {
++	.has_tcon_tv1	= true,
++	.has_dsi	= true,
++};
++
+ /* sun4i_drv uses this list to check if a device node is a TCON TOP */
+ const struct of_device_id sun8i_tcon_top_of_table[] = {
+-	{ .compatible = "allwinner,sun8i-r40-tcon-top" },
++	{
++		.compatible = "allwinner,sun8i-r40-tcon-top",
++		.data = &sun8i_r40_tcon_top_quirks
++	},
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
 -- 
 2.19.0
