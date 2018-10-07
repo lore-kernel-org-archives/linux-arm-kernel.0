@@ -1,39 +1,60 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sun, 7 Oct 2018 12:36:51 +0000
-Subject: [PATCH V8 0/3] soc: imx: add scu firmware api support
-In-Reply-To: <20180930132759.GP26692@dragon>
-References: <1538268516-24678-1-git-send-email-aisheng.dong@nxp.com>
- <20180930072628.GN26692@dragon> <20180930132759.GP26692@dragon>
-Message-ID: <AM0PR04MB421150896A65871B0D3AD4E480E50@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: jonas@orbital-systems.com (Jonas Danielsson)
+Date: Sun,  7 Oct 2018 14:57:45 +0200
+Subject: [PATCH] power: reset: at91-reset: enable I-cache for at91sam9260_reset
+Message-ID: <20181007125815.8392-1-jonas@threetimestwo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+From: Jonas Danielsson <jonas@orbital-systems.com>
 
-> > >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 183 ++++++
-> > >  drivers/firmware/Kconfig                           |   1 +
-> > >  drivers/firmware/Makefile                          |   1 +
-> > >  drivers/firmware/imx/Kconfig                       |  11 +
-> > >  drivers/firmware/imx/Makefile                      |   2 +
-> > >  drivers/firmware/imx/imx-scu.c                     | 270
-> +++++++++
-> > >  drivers/firmware/imx/misc.c                        |  99 ++++
-> > >  include/soc/imx/scu/ipc.h                          |  59 ++
-> > >  include/soc/imx/scu/sci.h                          |  17 +
-> > >  include/soc/imx/scu/svc/misc.h                     |  55 ++
-> > >  include/soc/imx/scu/types.h                        | 617
-> +++++++++++++++++++++
-> 
-> ... I'm not sure the scu folder should be created under include/soc/imx/ or
-> include/linux/firmware/imx/ like meson platform.  I would like to hear more
-> opinions.
-> 
+This fixes a bug where our embedded system (AT91SAM9260 based) would
+hang at reboot. At the most we managed 16 boot loops without a hang.
 
-I guess include/Linux/firmware/imx would be better.
-I will resend a patch series with this updated.
-If any issue please let me know.
+With this patch applied the problem has not been observed and the board
+has managed above 250 boot loops.
 
-Regards
-Dong Aisheng
+The AT91SAM9260 datasheet tells us that with the instruction cache
+disabled all instructions are fetched from SDRAM. And we have an errata
+telling us we must power down the SDRAM before issuing cpu reset.
 
-> Shawn
+This means we need the instruction cache enabled in at91sam9260_reset()
+At the moment it is being disabled in cpu_proc_fin() which is called from
+arch/arm/kernel/reboot.c.
+
+Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
+---
+ drivers/power/reset/at91-reset.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index f44a9ffcc2ab..78972bba64df 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -50,14 +50,24 @@ static void __iomem *at91_ramc_base[2], *at91_rstc_base;
+ static struct clk *sclk;
+ 
+ /*
+-* unless the SDRAM is cleanly shutdown before we hit the
++* Errata 43.1.7.1 RSTC: Reset during SDRAM Accesses
++*
++* Unless the SDRAM is cleanly shutdown before we hit the
+ * reset register it can be left driving the data bus and
+ * killing the chance of a subsequent boot from NAND
++*
++* Since we are disabling SDRAM need to make sure that the
++* instruction cache is enabled.
+ */
+ static int at91sam9260_restart(struct notifier_block *this, unsigned long mode,
+ 			       void *cmd)
+ {
+ 	asm volatile(
++		/* Enable I-cache */
++		"mrc	p15, 0, r0, c1, c0, 0\n\t"
++		"orr	r0, r0, #4096\n\t" /* CR_I (bit 12) */
++		"mcr	p15, 0, r0, c1, c0, 0\n\t"
++
+ 		/* Align to cache lines */
+ 		".balign 32\n\t"
+ 
+-- 
+2.14.4
