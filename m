@@ -1,89 +1,98 @@
-From: dave.stevenson@raspberrypi.org (Dave Stevenson)
-Date: Mon, 8 Oct 2018 18:20:17 +0100
-Subject: [PATCH] staging: bcm2835-camera: remove extraneous setting of
- dev->colourfx.enable
-In-Reply-To: <663860283.72238.1539018547916@email.1und1.de>
-References: <20181008145012.31312-1-colin.king@canonical.com>
- <d753df4f-e812-c366-0b1d-9ff804da0ab5@i2se.com>
- <CAAoAYcO=qp7yb7392B_6wks2j2TaoxYXHtQPyH0kMkFMi+JW-A@mail.gmail.com>
- <663860283.72238.1539018547916@email.1und1.de>
-Message-ID: <CAAoAYcNMJd2429fZWd_E3w=MhBdZDADNtHkVtf1__VVcjSEBTg@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 8 Oct 2018 12:23:16 -0500
+Subject: [PATCH 00/12] error handling and pciehp maintenance
+In-Reply-To: <20181008161847.GA30971@localhost.localdomain>
+References: <20180918235848.26694-1-keith.busch@intel.com>
+ <20181004214015.GK120535@bhelgaas-glaptop.roam.corp.google.com>
+ <20181004221137.GB21834@localhost.localdomain>
+ <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
+ <20181008161847.GA30971@localhost.localdomain>
+Message-ID: <20181008172316.GM120535@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Oct 2018 at 18:09, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->
-> Hi Dave,
->
-> > Dave Stevenson <dave.stevenson@raspberrypi.org> hat am 8. Oktober 2018 um 18:51 geschrieben:
-> >
-> >
-> >  Hi Stefan.
-> >
-> > Thanks for forwarding as the linux-rpi-kernel list hasn't sent it to me as yet.
->
-> AFAIK every mail with more than 5 recipients will be delayed.
->
-> >
-> > On Mon, 8 Oct 2018 at 16:48, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > >
-> > > Hi Colin,
-> > >
-> > > Am 08.10.2018 um 16:50 schrieb Colin King:
-> > > > From: Colin Ian King <colin.king@canonical.com>
-> > > >
-> > > > Currently dev->colourfx.enable is being set twice, hence the first
-> > > > occurrance is redundant and can be removed, so remove it. This minor
-> > > > issue was introduced by commit 7b3ad5abf027 ("staging: Import the
-> > > > BCM2835 MMAL-based V4L2 camera driver.").
-> > > >
-> > > > Detected by CoverityScan CID#1419711 ("Unused value")
-> > > >
-> > > > Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> > > > ---
-> > > >  drivers/staging/vc04_services/bcm2835-camera/controls.c | 1 -
-> > > >  1 file changed, 1 deletion(-)
-> > > >
-> > > > diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > > > index a2c55cb2192a..99831dd4365d 100644
-> > > > --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > > > +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > > > @@ -588,7 +588,6 @@ static int ctrl_set_colfx(struct bm2835_mmal_dev *dev,
-> > > >
-> > > >       control = &dev->component[MMAL_COMPONENT_CAMERA]->control;
-> > > >
-> > > > -     dev->colourfx.enable = (ctrl->val & 0xff00) >> 8;
-> > > >       dev->colourfx.enable = ctrl->val & 0xff;
-> > > >
-> > > >       ret = vchiq_mmal_port_parameter_set(dev->instance, control,
-> > >
-> > > as long as the current behavior is correct, i'm okay with this patch.
-> > > But the byte masking looks suspicious, so i hope Dave can clarify that.
-> >
-> > It's writing to the wrong structure member.
-> > The function is used on the V4L2 control V4L2_CID_COLORFX_CBCR, which
-> > is defined as:
-> > V4L2_CID_COLORFX_CBCR (integer)
-> > Determines the Cb and Cr coefficients for V4L2_COLORFX_SET_CBCR color
-> > effect. Bits [7:0] of the supplied 32 bit value are interpreted as Cr
-> > component, bits [15:8] as Cb component and bits [31:16] must be zero.
-> >
-> > ctrl->val should therefore be setting dev->colourfx.u and
-> > dev->colourfx.v with those masks. dev->colourfx.enable field should
-> > have been set when going through ctrl_set_image_effect for contol
-> > V4L2_CID_COLORFX set to V4L2_COLORFX_SET_CBCR.
-> >
-> > I've confirmed with qv4l2 that that is what is wrong. That's only been
-> > lurking there for almost 5 years - shows how often these weirder
-> > effects get used.
-> > I don't mind whether Colin's patch gets merged and then fixed up, or
-> > drop Colin's patch and apply the correct logic via a new patch.
->
-> no this patch shouldn't be applied. Does it mean you want to send the proper one?
+On Mon, Oct 08, 2018 at 10:18:47AM -0600, Keith Busch wrote:
+> On Fri, Oct 05, 2018 at 12:31:45PM -0500, Bjorn Helgaas wrote:
+> > [+cc arm64 folks, LKML: This conversation is about this patch:
+> > 
+> >   https://lore.kernel.org/linux-pci/20180918235848.26694-3-keith.busch at intel.com
+> > 
+> > which fixes some PCIe AER error injection bugs, but also makes the error
+> > injector dependent on DYNAMIC_FTRACE_WITH_REGS, which not all arches
+> > support.  Note that this question is only about the error *injection*
+> > module used for testing.  It doesn't affect AER support itself.]
+> > 
+> > On Thu, Oct 04, 2018 at 04:11:37PM -0600, Keith Busch wrote:
+> > > On Thu, Oct 04, 2018 at 04:40:15PM -0500, Bjorn Helgaas wrote:
+> > > > On Tue, Sep 18, 2018 at 05:58:36PM -0600, Keith Busch wrote:
+> > > > > I ran into a lot of trouble testing error handling, and this series is
+> > > > > just trying to simplify some things. The first 4 fix up aer_inject, and
+> > > > > the rest are cleanup to make better use of kernel APIs.
+> > > > > 
+> > > > > Keith Busch (12):
+> > > > >   PCI: Set PCI bus accessors to noinline
+> > > > >   PCI/AER: Covertly inject errors
+> > > > >   PCI/AER: Reuse existing service device lookup
+> > > > >   PCI/AER: Abstract AER interrupt handling
+> > > > >   PCI/AER: Remove dead code
+> > > > >   PCI/AER: Remove error source from aer struct
+> > > > >   PCI/AER: Use kfifo for tracking events
+> > > > >   PCI/AER: Use kfifo helper inserting locked elements
+> > > > >   PCI/AER: Don't read upstream ports below fatal errors
+> > > > >   PCI/AER: Use threaded IRQ for bottom half
+> > > > >   PCI/AER: Use managed resource allocations
+> > > > >   PCI/pciehp: Use device managed allocations
+> > > > > 
+> > > > >  drivers/pci/access.c              |   4 +-
+> > > > >  drivers/pci/hotplug/pciehp_core.c |  14 +-
+> > > > >  drivers/pci/hotplug/pciehp_hpc.c  |  48 ++----
+> > > > >  drivers/pci/pcie/Kconfig          |   2 +-
+> > > > >  drivers/pci/pcie/aer.c            | 219 ++++++---------------------
+> > > > >  drivers/pci/pcie/aer_inject.c     | 306 ++++++++++++++++++++------------------
+> > > > >  drivers/pci/pcie/portdrv.h        |   4 -
+> > > > >  drivers/pci/pcie/portdrv_core.c   |   1 +
+> > > > >  8 files changed, 227 insertions(+), 371 deletions(-)
+> > > > 
+> > > > Thanks a lot for doing this!  I applied these to pci/hotplug for
+> > > > v4.20, except for "PCI/AER: Don't read upstream ports below fatal
+> > > > errors", which seems to be already there via another posting, and
+> > > > "PCI/pciehp: Use device managed allocations", which needs a few
+> > > > tweaks.
+> > > 
+> > > Sounds good, and thanks for applying!
+> > > 
+> > > In case this went unnoticed, patch 2's aer_inject using ftrace hooks
+> > > to pci config accessors is really cool and fixes several kernel crashes
+> > > I encountered, but it may not work on every architecture. I'm not sure
+> > > how widely aer_inject is used, so maybe there are no concerns with the
+> > > DYNAMIC_FTRACE_WITH_REGS dependency, but I just want to reemphasize that
+> > > dependency in case there are valid objections.
+> > 
+> > Oh, indeed, I hadn't noticed this arch dependency.  AFAICT, the new
+> > DYNAMIC_FTRACE_WITH_REGS dependency means aer_inject will work only
+> > on these arches:
+> > 
+> >   arm		# if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+> >   powerpc	# if PPC64 && CPU_LITTLE_ENDIAN
+> >   riscv		# ARCH_RV64I only
+> >   s390
+> >   x86
+> > 
+> > Notably missing is arm64, which has DYNAMIC_FTRACE but not
+> > DYNAMIC_FTRACE_WITH_REGS.
+> > 
+> > Bjorn
+> 
+> Looks like the kbuild bot found an ARM kernel config that has
+> DYNAMIC_FTRACE_WITH_REGS set, and then the module can't compile
+> there. I'll need to update this patch regardless, and I think the right
+> thing to do is maintain the "old" way with conditional compiling for
+> any arch specific features.
 
-Want to - not really. Ought to - I guess so.
-I've got a bunch of checkpatch and other fixes to come too, so once
-I've got a mainline kernel build back up and running I'll roll them
-all up and blitz the list.
+Sounds messy, but probably the best route.
 
-  Dave
+I dropped these patches for now:
+
+  PCI/AER: Covertly inject errors with ftrace hooks
+  PCI/AER: Reuse existing pcie_port_find_device() interface
+  PCI/AER: Abstract AER interrupt handling
