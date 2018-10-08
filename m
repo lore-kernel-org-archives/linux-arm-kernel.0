@@ -1,98 +1,67 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 8 Oct 2018 12:23:16 -0500
-Subject: [PATCH 00/12] error handling and pciehp maintenance
-In-Reply-To: <20181008161847.GA30971@localhost.localdomain>
-References: <20180918235848.26694-1-keith.busch@intel.com>
- <20181004214015.GK120535@bhelgaas-glaptop.roam.corp.google.com>
- <20181004221137.GB21834@localhost.localdomain>
- <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
- <20181008161847.GA30971@localhost.localdomain>
-Message-ID: <20181008172316.GM120535@bhelgaas-glaptop.roam.corp.google.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 8 Oct 2018 18:23:37 +0100
+Subject: [PATCH v6 2/9] PCI: mediatek: Fixup class ID for MT7622 as
+ PCI_CLASS_BRIDGE_PCI
+In-Reply-To: <1538969088-7136-3-git-send-email-honghui.zhang@mediatek.com>
+References: <1538969088-7136-1-git-send-email-honghui.zhang@mediatek.com>
+ <1538969088-7136-3-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20181008172337.GA13538@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2018 at 10:18:47AM -0600, Keith Busch wrote:
-> On Fri, Oct 05, 2018 at 12:31:45PM -0500, Bjorn Helgaas wrote:
-> > [+cc arm64 folks, LKML: This conversation is about this patch:
-> > 
-> >   https://lore.kernel.org/linux-pci/20180918235848.26694-3-keith.busch at intel.com
-> > 
-> > which fixes some PCIe AER error injection bugs, but also makes the error
-> > injector dependent on DYNAMIC_FTRACE_WITH_REGS, which not all arches
-> > support.  Note that this question is only about the error *injection*
-> > module used for testing.  It doesn't affect AER support itself.]
-> > 
-> > On Thu, Oct 04, 2018 at 04:11:37PM -0600, Keith Busch wrote:
-> > > On Thu, Oct 04, 2018 at 04:40:15PM -0500, Bjorn Helgaas wrote:
-> > > > On Tue, Sep 18, 2018 at 05:58:36PM -0600, Keith Busch wrote:
-> > > > > I ran into a lot of trouble testing error handling, and this series is
-> > > > > just trying to simplify some things. The first 4 fix up aer_inject, and
-> > > > > the rest are cleanup to make better use of kernel APIs.
-> > > > > 
-> > > > > Keith Busch (12):
-> > > > >   PCI: Set PCI bus accessors to noinline
-> > > > >   PCI/AER: Covertly inject errors
-> > > > >   PCI/AER: Reuse existing service device lookup
-> > > > >   PCI/AER: Abstract AER interrupt handling
-> > > > >   PCI/AER: Remove dead code
-> > > > >   PCI/AER: Remove error source from aer struct
-> > > > >   PCI/AER: Use kfifo for tracking events
-> > > > >   PCI/AER: Use kfifo helper inserting locked elements
-> > > > >   PCI/AER: Don't read upstream ports below fatal errors
-> > > > >   PCI/AER: Use threaded IRQ for bottom half
-> > > > >   PCI/AER: Use managed resource allocations
-> > > > >   PCI/pciehp: Use device managed allocations
-> > > > > 
-> > > > >  drivers/pci/access.c              |   4 +-
-> > > > >  drivers/pci/hotplug/pciehp_core.c |  14 +-
-> > > > >  drivers/pci/hotplug/pciehp_hpc.c  |  48 ++----
-> > > > >  drivers/pci/pcie/Kconfig          |   2 +-
-> > > > >  drivers/pci/pcie/aer.c            | 219 ++++++---------------------
-> > > > >  drivers/pci/pcie/aer_inject.c     | 306 ++++++++++++++++++++------------------
-> > > > >  drivers/pci/pcie/portdrv.h        |   4 -
-> > > > >  drivers/pci/pcie/portdrv_core.c   |   1 +
-> > > > >  8 files changed, 227 insertions(+), 371 deletions(-)
-> > > > 
-> > > > Thanks a lot for doing this!  I applied these to pci/hotplug for
-> > > > v4.20, except for "PCI/AER: Don't read upstream ports below fatal
-> > > > errors", which seems to be already there via another posting, and
-> > > > "PCI/pciehp: Use device managed allocations", which needs a few
-> > > > tweaks.
-> > > 
-> > > Sounds good, and thanks for applying!
-> > > 
-> > > In case this went unnoticed, patch 2's aer_inject using ftrace hooks
-> > > to pci config accessors is really cool and fixes several kernel crashes
-> > > I encountered, but it may not work on every architecture. I'm not sure
-> > > how widely aer_inject is used, so maybe there are no concerns with the
-> > > DYNAMIC_FTRACE_WITH_REGS dependency, but I just want to reemphasize that
-> > > dependency in case there are valid objections.
-> > 
-> > Oh, indeed, I hadn't noticed this arch dependency.  AFAICT, the new
-> > DYNAMIC_FTRACE_WITH_REGS dependency means aer_inject will work only
-> > on these arches:
-> > 
-> >   arm		# if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-> >   powerpc	# if PPC64 && CPU_LITTLE_ENDIAN
-> >   riscv		# ARCH_RV64I only
-> >   s390
-> >   x86
-> > 
-> > Notably missing is arm64, which has DYNAMIC_FTRACE but not
-> > DYNAMIC_FTRACE_WITH_REGS.
-> > 
-> > Bjorn
+On Mon, Oct 08, 2018 at 11:24:41AM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> Looks like the kbuild bot found an ARM kernel config that has
-> DYNAMIC_FTRACE_WITH_REGS set, and then the module can't compile
-> there. I'll need to update this patch regardless, and I think the right
-> thing to do is maintain the "old" way with conditional compiling for
-> any arch specific features.
+> The PCIe controller of MT7622 has TYPE 1 configuration space type, but
+> the HW default class type values is invalid.
+> 
+> The commit 101c92dc80c8 ("PCI: mediatek: Set up vendor ID and class
+> type for MT7622") have set the class ID for MT7622 as
+> PCI_CLASS_BRIDGE_HOST, but it's not workable for MT7622:
+> 
+> In __pci_bus_assign_resources, the framework only setup bridge's
+> resource window only if class type is PCI_CLASS_BRIDGE_PCI. Or it
+> will leave the subordinary PCIe device's MMIO window un-touched.
+> 
+> Fixup the class type to PCI_CLASS_BRIDGE_PCI as most of the controller
+> driver do.
 
-Sounds messy, but probably the best route.
+I think that this patch is correct but the commit log fails to pin point
+the problem. The IP you are programming is a root port, that's why you
+have to have the proper class code, the patch looks fine but I would
+like to peek Bjorn's brain on this since it is a fundamental concept.
 
-I dropped these patches for now:
+If the kernel does not assign resources unless it detects a
+PCI_CLASS_BRIDGE_PCI this means that for components that are
+actually PCI_CLASS_BRIDGE_HOST their register set must come
+preprogrammed unless I am missing something.
 
-  PCI/AER: Covertly inject errors with ftrace hooks
-  PCI/AER: Reuse existing pcie_port_find_device() interface
-  PCI/AER: Abstract AER interrupt handling
+I would like to get to the bottom of this since it is a fundamental
+enumeration concept.
+
+Thanks,
+Lorenzo
+
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  drivers/pci/controller/pcie-mediatek.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> index 288b8e2..bcdac9b 100644
+> --- a/drivers/pci/controller/pcie-mediatek.c
+> +++ b/drivers/pci/controller/pcie-mediatek.c
+> @@ -432,7 +432,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+>  		val = PCI_VENDOR_ID_MEDIATEK;
+>  		writew(val, port->base + PCIE_CONF_VEND_ID);
+>  
+> -		val = PCI_CLASS_BRIDGE_HOST;
+> +		val = PCI_CLASS_BRIDGE_PCI;
+>  		writew(val, port->base + PCIE_CONF_CLASS_ID);
+>  	}
+>  
+> -- 
+> 2.6.4
+> 
