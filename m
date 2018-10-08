@@ -1,65 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Oct 2018 17:18:18 +0100
-Subject: [PATCH] KVM: arm64: remove the unnecessary function check
-In-Reply-To: <1535708579-12233-1-git-send-email-zhangshaokun@hisilicon.com>
-References: <1535708579-12233-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <afbb853e-ef22-dde4-d17d-6802264f1ce9@arm.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 8 Oct 2018 11:33:46 -0500
+Subject: [PATCH] samples/rpmsg: Introduce a module parameter for message
+ count
+In-Reply-To: <20181006062231.GF12063@builder>
+References: <20180911174643.26199-1-s-anna@ti.com>
+ <20181006062231.GF12063@builder>
+Message-ID: <d14448ad-21c1-0a1a-0264-2efece209fc6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/18 10:42, Shaokun Zhang wrote:
-> init_common_resources always return 0 and it is redundant to check the
-> return value, let's make it void to simplify the code.
+Hi Bjorn,
+
+On 10/06/2018 01:22 AM, Bjorn Andersson wrote:
+> On Tue 11 Sep 10:46 PDT 2018, Suman Anna wrote:
 > 
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> ---
->   virt/kvm/arm/arm.c | 8 ++------
->   1 file changed, 2 insertions(+), 6 deletions(-)
+>> The current rpmsg_client_sample uses a fixed number of messages to
+>> be sent to each instance. This is currently set at 100. Introduce
+>> an optional module parameter 'count' so that the number of messages
+>> to be exchanged can be made flexible.
+>>
 > 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index c92053b..66a29c9 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1406,13 +1406,11 @@ static inline void hyp_cpu_pm_exit(void)
->   }
->   #endif
->   
-> -static int init_common_resources(void)
-> +static void init_common_resources(void)
->   {
->   	/* set size of VMID supported by CPU */
->   	kvm_vmid_bits = kvm_get_vmid_bits();
->   	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-> -
-> -	return 0;
->   }
->   
->   static int init_subsystems(void)
-> @@ -1655,9 +1653,7 @@ int kvm_arch_init(void *opaque)
->   		}
->   	}
->   
-> -	err = init_common_resources();
-> -	if (err)
-> -		return err;
-> +	init_common_resources();
->   
->   	in_hyp_mode = is_kernel_in_hyp_mode();
->   
+> Rather than sending N messages as fast as possible to any sample channel
+> that comes up, how about making the sample create a debugfs entry that
+> we can write messages to from user space?
+
+This sample demonstrates a kernel-level rpmsg usage, and I would prefer
+to maintain the current simplicity, and not add in any userspace
+interaction. That perhaps can be done as a different sample. I use this
+sample to serve as the basic test for checking the rpmsg transport
+functionality with multiple remoteprocs and/or multiple instances per
+remoteproc at the same time. The count parameter helps me with both
+early Silicon development, as well as exercising increased message
+exchanges so that the vring buffers are cycled.
+
 > 
+> That would make it possible to improve the handling of multiple
+> remoteprocs and would allow for a variation in message lengths etc.
 
-Although I agree this looks pretty superfluous at the moment, I'd rather 
-keep init_common_resources as it is at the moment, as we may well end-up 
-with more stuff in it, which could fail.
+FWIW, this already support multiple instances from the same remoteproc
+or different remoteproc.
 
-Another possibility would be to merge everything in init_subsystems, but 
-that'd require careful investigation, specially with the stuff that is 
-currently pending for 4.20.
+regards
+Suman
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Regards,
+> Bjorn
+> 
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>>  samples/rpmsg/rpmsg_client_sample.c | 6 ++++--
+>>  1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/samples/rpmsg/rpmsg_client_sample.c b/samples/rpmsg/rpmsg_client_sample.c
+>> index f161dfd3e70a..9b6b27ea504f 100644
+>> --- a/samples/rpmsg/rpmsg_client_sample.c
+>> +++ b/samples/rpmsg/rpmsg_client_sample.c
+>> @@ -22,7 +22,9 @@
+>>  #include <linux/rpmsg.h>
+>>  
+>>  #define MSG		"hello world!"
+>> -#define MSG_LIMIT	100
+>> +
+>> +static int count = 100;
+>> +module_param(count, int, 0644);
+>>  
+>>  struct instance_data {
+>>  	int rx_count;
+>> @@ -41,7 +43,7 @@ static int rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
+>>  		       data, len,  true);
+>>  
+>>  	/* samples should not live forever */
+>> -	if (idata->rx_count >= MSG_LIMIT) {
+>> +	if (idata->rx_count >= count) {
+>>  		dev_info(&rpdev->dev, "goodbye!\n");
+>>  		return 0;
+>>  	}
+>> -- 
+>> 2.18.0
+>>
