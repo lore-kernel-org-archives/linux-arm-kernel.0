@@ -1,93 +1,120 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 8 Oct 2018 12:49:13 -0700
-Subject: [PATCH v2] Documentation/arm64: HugeTLB page implementation
-In-Reply-To: <20181008100355.31820-1-punit.agrawal@arm.com>
-References: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
- <20181008100355.31820-1-punit.agrawal@arm.com>
-Message-ID: <67f4ceb7-d41c-ab7a-4d5e-c147dadf6860@infradead.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 8 Oct 2018 21:19:32 +0100
+Subject: [PATCH 1/4] dt-bindings: add compatibles for AXP803 AC and
+ battery power supplies
+In-Reply-To: <20181004193410.7265-2-oskari@lemmela.net>
+References: <20181004193410.7265-1-oskari@lemmela.net>
+ <20181004193410.7265-2-oskari@lemmela.net>
+Message-ID: <20181008211932.16a51643@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/8/18 3:03 AM, Punit Agrawal wrote:
-> Arm v8 architecture supports multiple page sizes - 4k, 16k and
-> 64k. Based on the active page size, the Linux port supports
-> corresponding hugepage sizes at PMD and PUD(4k only) levels.
-> 
-> In addition, the architecture also supports caching larger sized
-> ranges (composed of multiple entries) at the PTE and PMD level in the
-> TLBs using the contiguous bit. The Linux port makes use of this
-> architectural support to enable additional hugepage sizes.
-> 
-> Describe the two different types of hugepages supported by the arm64
-> kernel and the hugepage sizes enabled by each.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jonathan Corbet <corbet@lwn.net>
+On Thu,  4 Oct 2018 22:34:07 +0300
+Oskari Lemmela <oskari@lemmela.net> wrote:
 
-Acked-by: Randy Dunlap <rdunlap@infradead.org>
+> AXP803 PMIC is register compatible with AXP813.
+> 
+> AXP803/AXP813 are capable to limit input current and supply voltage.
+> 
+> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+Hi Oskari,
 
-Thanks.
+It would be better to split this up as different aspects are going
+to ideally be applied through different kernel trees.
+
+I know that already got commented on for the later patch but just wanted
+to point out it applies here as well.
+
+One comment inline about avoiding wildcards given the propensity of
+hardware manufacturers to confuse us on their naming schemes.
+
+Jonathan
 
 > ---
-> Hi,
+>  Documentation/devicetree/bindings/gpio/gpio-axp209.txt        | 3 ++-
+>  Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt      | 3 ++-
+>  .../devicetree/bindings/power/supply/axp20x_ac_power.txt      | 4 ++++
+>  .../devicetree/bindings/power/supply/axp20x_battery.txt       | 1 +
+>  4 files changed, 9 insertions(+), 2 deletions(-)
 > 
-> This version incorporates the feedback on v1.
-> 
-> Thanks,
-> Punit
-> 
->  Documentation/arm64/hugetlbpage.txt | 38 +++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->  create mode 100644 Documentation/arm64/hugetlbpage.txt
-> 
-> diff --git a/Documentation/arm64/hugetlbpage.txt b/Documentation/arm64/hugetlbpage.txt
-> new file mode 100644
-> index 000000000000..cfae87dc653b
-> --- /dev/null
-> +++ b/Documentation/arm64/hugetlbpage.txt
-> @@ -0,0 +1,38 @@
-> +HugeTLBpage on ARM64
-> +====================
-> +
-> +Hugepage relies on making efficient use of TLBs to improve performance of
-> +address translations. The benefit depends on both -
-> +
-> +  - the size of hugepages
-> +  - size of entries supported by the TLBs
-> +
-> +The ARM64 port supports two flavours of hugepages.
-> +
-> +1) Block mappings at the pud/pmd level
-> +--------------------------------------
-> +
-> +These are regular hugepages where a pmd or a pud page table entry points to a
-> +block of memory. Regardless of the supported size of entries in TLB, block
-> +mappings reduce the depth of page table walk needed to translate hugepage
-> +addresses.
-> +
-> +2) Using the Contiguous bit
-> +---------------------------
-> +
-> +The architecture provides a contiguous bit in the translation table entries
-> +(D4.5.3, ARM DDI 0487C.a) that hints to the MMU to indicate that it is one of a
-> +contiguous set of entries that can be cached in a single TLB entry.
-> +
-> +The contiguous bit is used in Linux to increase the mapping size at the pmd and
-> +pte (last) level. The number of supported contiguous entries varies by page size
-> +and level of the page table.
-> +
-> +
-> +The following hugepage sizes are supported -
-> +
-> +         CONT PTE    PMD    CONT PMD    PUD
-> +         --------    ---    --------    ---
-> +  4K:         64K     2M         32M     1G
-> +  16K:         2M    32M          1G
-> +  64K:         2M   512M         16G
-> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+> index fc42b2caa06d..da3c0efb5e76 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+> @@ -11,6 +11,7 @@ This driver employs the per-pin muxing pattern.
+>  Required properties:
+>  - compatible: Should be one of:
+>  	- "x-powers,axp209-gpio"
+> +	- "x-powers,axp803-gpio"
+>  	- "x-powers,axp813-gpio"
+>  - #gpio-cells: Should be two. The first cell is the pin number and the
+>    second is the GPIO flags.
+> @@ -67,7 +68,7 @@ GPIO0	|	gpio_in, gpio_out, ldo, adc
+>  GPIO1	|	gpio_in, gpio_out, ldo, adc
+>  GPIO2	|	gpio_in, gpio_out
+>  
+> -axp813
+> +axp8x3
+Avoid wild cards like this.   It if far too common to have a hardware
+manufacturer not keep to what seems like an established naming convention
+and introduce something entirely different in the middle of an existing
+series of names.
 
-
--- 
-~Randy
+>  ------
+>  GPIO	|	Functions
+>  ------------------------
+> diff --git a/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
+> index 7a6313913923..247616099171 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
+> @@ -4,6 +4,7 @@ Required properties:
+>    - compatible: should be one of:
+>      - "x-powers,axp209-adc",
+>      - "x-powers,axp221-adc",
+> +    - "x-powers,axp803-adc",
+>      - "x-powers,axp813-adc",
+>    - #io-channel-cells: should be 1,
+>  
+> @@ -39,7 +40,7 @@ AXP22x
+>   2 | batt_chrg_i
+>   3 | batt_dischrg_i
+>  
+> -AXP813
+> +AXP8x3
+>  ------
+>   0 | pmic_temp
+>   1 | gpio0_v
+> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> index 826e8a879121..97276a71e961 100644
+> --- a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> @@ -4,6 +4,8 @@ Required Properties:
+>   - compatible: One of:
+>  			"x-powers,axp202-ac-power-supply"
+>  			"x-powers,axp221-ac-power-supply"
+> +			"x-powers,axp803-ac-power-supply"
+> +			"x-powers,axp813-ac-power-supply"
+>  
+>  This node is a subnode of the axp20x PMIC.
+>  
+> @@ -13,6 +15,8 @@ reading ADC channels from the AXP20X ADC.
+>  The AXP22X is only able to tell if an AC power supply is present and
+>  usable.
+>  
+> +The AXP8X3 is able to limit current and supply voltage
+> +
+>  Example:
+>  
+>  &axp209 {
+> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+> index 41916f69902c..780ebd7e3b84 100644
+> --- a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+> @@ -4,6 +4,7 @@ Required Properties:
+>   - compatible, one of:
+>  			"x-powers,axp209-battery-power-supply"
+>  			"x-powers,axp221-battery-power-supply"
+> +			"x-powers,axp803-battery-power-supply"
+>  			"x-powers,axp813-battery-power-supply"
+>  
+>  This node is a subnode of its respective PMIC DT node.
