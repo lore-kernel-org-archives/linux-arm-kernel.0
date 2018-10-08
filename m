@@ -1,92 +1,379 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 8 Oct 2018 10:36:59 -0400
-Subject: [PATCH 3/6] tracing: Add tp_pstore cmdline to have tracepoints
- go to pstore
-In-Reply-To: <08f1fadc-3ce7-4bef-ba17-e038b8450fc8@codeaurora.org>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <f65e9fa6e047b9b14d4f64362f9fe1f89b306050.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <CAEXW_YRQtJb=3V0RKHSAejfQXKssh5qBp7nmD1OUC-wTyqGDEQ@mail.gmail.com>
- <1f546234-bd7b-448a-3666-3f8baa249608@codeaurora.org>
- <08f1fadc-3ce7-4bef-ba17-e038b8450fc8@codeaurora.org>
-Message-ID: <20181008103659.5bc14b28@gandalf.local.home>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 8 Oct 2018 16:39:44 +0200
+Subject: [PATCH] video: fbdev: remove dead old CLPS711x LCD support driver
+References: <CGME20181008143946eucas1p1c0180243a556c88a3a2186ebc17737cb@eucas1p1.samsung.com>
+Message-ID: <20181008143946eucas1p1c0180243a556c88a3a2186ebc17737cb~bqRCEWq7m0204102041eucas1p1z@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Oct 2018 19:46:15 +0530
-Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+Since commit c86f51737f8d ("ARM: clps711x: Switch to MULTIPLATFORM")
+ARCH_CLPS711X depends on ARCH_MULTIPLATFORM to be enabled so the old
+CLPS711x LCD support driver (enabled by the FB_CLPS711X_OLD config
+option) can't be selected any longer. Remove all FB_CLPS711XX_OLD
+code as it has been dead for over 2 years now. Please note that the
+new CLPS711x LCD support driver (enabled by the FB_CLPS711X config
+option) is still available in the kernel tree.
 
-> Hi Joel,
-> 
-> Sorry for the long delay in updating this thread.
-> But I just observed one weird behaviour in ftrace-ramoops when I was 
-> trying to use binary record instead of rendering text for event-ramoops.
-> 
-> Even though we set the ftrace-size in device tree for ramoops, the 
-> actual ftrace-ramoops record seems to have more records than specified size.
-> Is this expected or some bug?
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/video/fbdev/Kconfig      |    7 
+ drivers/video/fbdev/Makefile     |    1 
+ drivers/video/fbdev/clps711xfb.c |  314 ---------------------------------------
+ 3 files changed, 322 deletions(-)
 
-If ftrace-ramoops is using logic similar to the ftrace ring buffer,
-then yes, it will be able to store more events than specified. The
-ftrace ring buffer is broken up into pages, and everything is rounded
-up to the nearest page (note, the data may be smaller than a page,
-because each page also contains a header).
-
-> 
-> Below is the ftrace-ramoops size passed in dtsi for db410c and we can 
-> see that the ftrace record is more.
-> 
-> # cat /sys/module/ramoops/parameters/ftrace_size
-> 131072
-
-I'm assuming this too is like the ftrace ring buffer, where the size is
-per cpu (and why you do a search per cpu below).
-
-> #
-> # cat /sys/fs/pstore/ftrace-ramoops-0 | wc -c
-> 560888
-> #
-> # cat /sys/fs/pstore/ftrace-ramoops-0 | grep CPU:0 | wc -c
-> 137758
-> #
-> # cat /sys/fs/pstore/ftrace-ramoops-0 | grep CPU:1 | wc -c
-> 140560
-> #
-> # cat /sys/fs/pstore/ftrace-ramoops-0 | grep CPU:2 | wc -c
-> 141174
-> #
-> # cat /sys/fs/pstore/ftrace-ramoops-0 | grep CPU:3 | wc -c
-> 141396
-> #
-> 
-
-If you are using binary record, isn't this what you want? The
-ftrace_size is the size of how much binary data is stored. When you
-translate the binary into human text, the text should be bigger.
-
-> I don't see this in console or dmesg ramoops and also with the 
-> event-ramoops which I have posted since we don't use binary record, only 
-> ftrace-ramoops uses binary record to store trace data.
-> 
-> Also regarding the warning on "event_call->event.funcs->trace()" call,
-> I see it everytime without spinlock. Also we see output_printk using 
-> spinlock when making this call. I could not find a way to pass event 
-> buffer size and allocate in pstore. Steven can give some hints with this 
-> I guess.
-> 
-> Steven Rostedt gave some reviews about using raw_spinlocks for this call 
-> earlier in this thread. So is it right to not use spinlocks for trace 
-> events?
-
-Correct.
-
-> 
-> One difference I see in ftrace-ramoops and event-ramoops is that 
-> ftrace-ramoops  is not started on boot and event-ramoops logging can be 
-> enabled from boot (late initcall however).
-> 
-> Do let me know if you have any way to avoid this warning which is a race 
-> I think without spinlock.
-
-I guess I need to look at that code again too.
-
--- Steve
+Index: b/drivers/video/fbdev/Kconfig
+===================================================================
+--- a/drivers/video/fbdev/Kconfig	2018-10-08 12:57:36.743642088 +0200
++++ b/drivers/video/fbdev/Kconfig	2018-10-08 16:05:55.075926618 +0200
+@@ -8,12 +8,6 @@ config FB_CMDLINE
+ config FB_NOTIFY
+ 	bool
+ 
+-config FB_CLPS711X_OLD
+-	tristate
+-	select FB_CFB_FILLRECT
+-	select FB_CFB_COPYAREA
+-	select FB_CFB_IMAGEBLIT
+-
+ menuconfig FB
+ 	tristate "Support for frame buffer devices"
+ 	select FB_CMDLINE
+@@ -338,7 +332,6 @@ config FB_ACORN
+ config FB_CLPS711X
+ 	tristate "CLPS711X LCD support"
+ 	depends on FB && (ARCH_CLPS711X || COMPILE_TEST)
+-	select FB_CLPS711X_OLD if ARCH_CLPS711X && !ARCH_MULTIPLATFORM
+ 	select BACKLIGHT_LCD_SUPPORT
+ 	select FB_MODE_HELPERS
+ 	select FB_SYS_FILLRECT
+Index: b/drivers/video/fbdev/Makefile
+===================================================================
+--- a/drivers/video/fbdev/Makefile	2018-09-03 18:11:52.693791712 +0200
++++ b/drivers/video/fbdev/Makefile	2018-10-08 16:05:33.391926072 +0200
+@@ -14,7 +14,6 @@ obj-$(CONFIG_FB_WMT_GE_ROPS)   += wmt_ge
+ obj-$(CONFIG_FB_AMIGA)            += amifb.o c2p_planar.o
+ obj-$(CONFIG_FB_ARC)              += arcfb.o
+ obj-$(CONFIG_FB_CLPS711X)	  += clps711x-fb.o
+-obj-$(CONFIG_FB_CLPS711X_OLD)	  += clps711xfb.o
+ obj-$(CONFIG_FB_CYBER2000)        += cyber2000fb.o
+ obj-$(CONFIG_FB_GRVGA)            += grvga.o
+ obj-$(CONFIG_FB_PM2)              += pm2fb.o
+Index: b/drivers/video/fbdev/clps711xfb.c
+===================================================================
+--- a/drivers/video/fbdev/clps711xfb.c	2018-09-03 18:11:52.705791712 +0200
++++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+@@ -1,314 +0,0 @@
+-/*
+- *  linux/drivers/video/clps711xfb.c
+- *
+- *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+- *  Framebuffer driver for the CLPS7111 and EP7212 processors.
+- */
+-#include <linux/mm.h>
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/slab.h>
+-#include <linux/fb.h>
+-#include <linux/init.h>
+-#include <linux/delay.h>
+-#include <linux/platform_device.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/mach-types.h>
+-#include <linux/uaccess.h>
+-
+-struct fb_info	*cfb;
+-
+-#define CMAP_MAX_SIZE	16
+-
+-/*
+- * LCD AC Prescale.  This comes from the LCD panel manufacturers specifications.
+- * This determines how many clocks + 1 of CL1 before the M signal toggles.
+- * The number of lines on the display must not be divisible by this number.
+- */
+-static unsigned int lcd_ac_prescale = 13;
+-
+-/*
+- *    Set a single color register. Return != 0 for invalid regno.
+- */
+-static int
+-clps7111fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+-		     u_int transp, struct fb_info *info)
+-{
+-	unsigned int level, mask, shift, pal;
+-
+-	if (regno >= (1 << info->var.bits_per_pixel))
+-		return 1;
+-
+-	/* gray = 0.30*R + 0.58*G + 0.11*B */
+-	level = (red * 77 + green * 151 + blue * 28) >> 20;
+-
+-	/*
+-	 * On an LCD, a high value is dark, while a low value is light. 
+-	 * So we invert the level.
+-	 *
+-	 * This isn't true on all machines, so we only do it on EDB7211.
+-	 *  --rmk
+-	 */
+-	if (machine_is_edb7211()) {
+-		level = 15 - level;
+-	}
+-
+-	shift = 4 * (regno & 7);
+-	level <<= shift;
+-	mask  = 15 << shift;
+-	level &= mask;
+-
+-	regno = regno < 8 ? PALLSW : PALMSW;
+-
+-	pal = clps_readl(regno);
+-	pal = (pal & ~mask) | level;
+-	clps_writel(pal, regno);
+-
+-	return 0;
+-}
+-
+-/*
+- * Validate the purposed mode.
+- */	
+-static int
+-clps7111fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+-{
+-	var->transp.msb_right	= 0;
+-	var->transp.offset	= 0;
+-	var->transp.length	= 0;
+-	var->red.msb_right	= 0;
+-	var->red.offset		= 0;
+-	var->red.length		= var->bits_per_pixel;
+-	var->green		= var->red;
+-	var->blue		= var->red;
+-
+-	if (var->bits_per_pixel > 4) 
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+-/*
+- * Set the hardware state.
+- */ 
+-static int 
+-clps7111fb_set_par(struct fb_info *info)
+-{
+-	unsigned int lcdcon, syscon, pixclock;
+-
+-	switch (info->var.bits_per_pixel) {
+-	case 1:
+-		info->fix.visual = FB_VISUAL_MONO01;
+-		break;
+-	case 2:
+-		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
+-		break;
+-	case 4:
+-		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
+-		break;
+-	}
+-
+-	info->fix.line_length = info->var.xres_virtual * info->var.bits_per_pixel / 8;
+-
+-	lcdcon = (info->var.xres_virtual * info->var.yres_virtual * info->var.bits_per_pixel) / 128 - 1;
+-	lcdcon |= ((info->var.xres_virtual / 16) - 1) << 13;
+-	lcdcon |= lcd_ac_prescale << 25;
+-
+-	/*
+-	 * Calculate pixel prescale value from the pixclock.  This is:
+-	 *  36.864MHz / pixclock_mhz - 1.
+-	 * However, pixclock is in picoseconds, so this ends up being:
+-	 *  36864000 * pixclock_ps / 10^12 - 1
+-	 * and this will overflow the 32-bit math.  We perform this as
+-	 * (9 * 4096000 == 36864000):
+-	 *  pixclock_ps * 9 * (4096000 / 10^12) - 1
+-	 */
+-	pixclock = 9 * info->var.pixclock / 244140 - 1;
+-	lcdcon |= pixclock << 19;
+-
+-	if (info->var.bits_per_pixel == 4)
+-		lcdcon |= LCDCON_GSMD;
+-	if (info->var.bits_per_pixel >= 2)
+-		lcdcon |= LCDCON_GSEN;
+-
+-	/*
+-	 * LCDCON must only be changed while the LCD is disabled
+-	 */
+-	syscon = clps_readl(SYSCON1);
+-	clps_writel(syscon & ~SYSCON1_LCDEN, SYSCON1);
+-	clps_writel(lcdcon, LCDCON);
+-	clps_writel(syscon | SYSCON1_LCDEN, SYSCON1);
+-	return 0;
+-}
+-
+-static int clps7111fb_blank(int blank, struct fb_info *info)
+-{
+-	/* Enable/Disable LCD controller. */
+-	if (blank)
+-		clps_writel(clps_readl(SYSCON1) & ~SYSCON1_LCDEN, SYSCON1);
+-	else
+-		clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN, SYSCON1);
+-
+-	return 0;
+-}
+-
+-static struct fb_ops clps7111fb_ops = {
+-	.owner		= THIS_MODULE,
+-	.fb_check_var	= clps7111fb_check_var,
+-	.fb_set_par	= clps7111fb_set_par,
+-	.fb_setcolreg	= clps7111fb_setcolreg,
+-	.fb_blank	= clps7111fb_blank,
+-	.fb_fillrect	= cfb_fillrect,
+-	.fb_copyarea	= cfb_copyarea,
+-	.fb_imageblit	= cfb_imageblit,
+-};
+-
+-static void clps711x_guess_lcd_params(struct fb_info *info)
+-{
+-	unsigned int lcdcon, syscon, size;
+-	unsigned long phys_base = PAGE_OFFSET;
+-	void *virt_base = (void *)PAGE_OFFSET;
+-
+-	info->var.xres_virtual	 = 640;
+-	info->var.yres_virtual	 = 240;
+-	info->var.bits_per_pixel = 4;
+-	info->var.activate	 = FB_ACTIVATE_NOW;
+-	info->var.height	 = -1;
+-	info->var.width		 = -1;
+-	info->var.pixclock	 = 93006; /* 10.752MHz pixel clock */
+-
+-	/*
+-	 * If the LCD controller is already running, decode the values
+-	 * in LCDCON to xres/yres/bpp/pixclock/acprescale
+-	 */
+-	syscon = clps_readl(SYSCON1);
+-	if (syscon & SYSCON1_LCDEN) {
+-		lcdcon = clps_readl(LCDCON);
+-
+-		/*
+-		 * Decode GSMD and GSEN bits to bits per pixel
+-		 */
+-		switch (lcdcon & (LCDCON_GSMD | LCDCON_GSEN)) {
+-		case LCDCON_GSMD | LCDCON_GSEN:
+-			info->var.bits_per_pixel = 4;
+-			break;
+-
+-		case LCDCON_GSEN:
+-			info->var.bits_per_pixel = 2;
+-			break;
+-
+-		default:
+-			info->var.bits_per_pixel = 1;
+-			break;
+-		}
+-
+-		/*
+-		 * Decode xres/yres
+-		 */
+-		info->var.xres_virtual = (((lcdcon >> 13) & 0x3f) + 1) * 16;
+-		info->var.yres_virtual = (((lcdcon & 0x1fff) + 1) * 128) /
+-					  (info->var.xres_virtual *
+-					   info->var.bits_per_pixel);
+-
+-		/*
+-		 * Calculate pixclock
+-		 */
+-		info->var.pixclock = (((lcdcon >> 19) & 0x3f) + 1) * 244140 / 9;
+-
+-		/*
+-		 * Grab AC prescale
+-		 */
+-		lcd_ac_prescale = (lcdcon >> 25) & 0x1f;
+-	}
+-
+-	info->var.xres = info->var.xres_virtual;
+-	info->var.yres = info->var.yres_virtual;
+-	info->var.grayscale = info->var.bits_per_pixel > 1;
+-
+-	size = info->var.xres * info->var.yres * info->var.bits_per_pixel / 8;
+-
+-	/*
+-	 * Might be worth checking to see if we can use the on-board
+-	 * RAM if size here...
+-	 * CLPS7110 - no on-board SRAM
+-	 * EP7212   - 38400 bytes
+-	 */
+-	if (size <= 38400) {
+-		printk(KERN_INFO "CLPS711xFB: could use on-board SRAM?\n");
+-	}
+-
+-	if ((syscon & SYSCON1_LCDEN) == 0) {
+-		/*
+-		 * The display isn't running.  Ensure that
+-		 * the display memory is empty.
+-		 */
+-		memset(virt_base, 0, size);
+-	}
+-
+-	info->screen_base    = virt_base;
+-	info->fix.smem_start = phys_base;
+-	info->fix.smem_len   = PAGE_ALIGN(size);
+-	info->fix.type       = FB_TYPE_PACKED_PIXELS;
+-}
+-
+-static int clps711x_fb_probe(struct platform_device *pdev)
+-{
+-	int err = -ENOMEM;
+-
+-	if (fb_get_options("clps711xfb", NULL))
+-		return -ENODEV;
+-
+-	cfb = kzalloc(sizeof(*cfb), GFP_KERNEL);
+-	if (!cfb)
+-		goto out;
+-
+-	strcpy(cfb->fix.id, "clps711x");
+-
+-	cfb->fbops		= &clps7111fb_ops;
+-	cfb->flags		= FBINFO_DEFAULT;
+-
+-	clps711x_guess_lcd_params(cfb);
+-
+-	fb_alloc_cmap(&cfb->cmap, CMAP_MAX_SIZE, 0);
+-
+-	err = register_framebuffer(cfb);
+-
+-out:	return err;
+-}
+-
+-static int clps711x_fb_remove(struct platform_device *pdev)
+-{
+-	unregister_framebuffer(cfb);
+-	kfree(cfb);
+-
+-	return 0;
+-}
+-
+-static struct platform_driver clps711x_fb_driver = {
+-	.driver	= {
+-		.name	= "video-clps711x",
+-	},
+-	.probe	= clps711x_fb_probe,
+-	.remove	= clps711x_fb_remove,
+-};
+-module_platform_driver(clps711x_fb_driver);
+-
+-MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
+-MODULE_DESCRIPTION("CLPS711X framebuffer driver");
+-MODULE_LICENSE("GPL");
