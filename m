@@ -1,64 +1,90 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 8 Oct 2018 10:58:50 +0100
-Subject: ARM: Call syscall_trace_exit even when system call skipped
-In-Reply-To: <CACGkJdt0CteRK84U9Qp0hCOxhOwHTmbkuDstxmVaAaPMedyHiw@mail.gmail.com>
-References: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
- <20180313235850.GA18373@altlinux.org>
- <CAGXu5jKY+uqi53YPhuptwb72zm=mpAaZ1YgCHN7BAGgXWyvqbw@mail.gmail.com>
- <162293d1df0.2772.8578bc6afb023d3c4d0bd68fb35b28aa@members.leeds.ac.uk>
- <CAGXu5jKVQu9BrL6S9XY_qpNqZOPmie7e=EEXcsJB9eX9wvs+kQ@mail.gmail.com>
- <20180929230337.GA3640@obsidian>
- <CACGkJdt0CteRK84U9Qp0hCOxhOwHTmbkuDstxmVaAaPMedyHiw@mail.gmail.com>
-Message-ID: <dcb6cd23-df85-9a1d-ff5d-5ce08f66aec5@arm.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 8 Oct 2018 15:29:05 +0530
+Subject: [PATCH v6 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
+ driver
+In-Reply-To: <CADYwmhHdTuK-z4GcGCYypYo2dvvPj7udihPcMmTkHTSU2fOWWw@mail.gmail.com>
+References: <20180621063338.20093-1-ganapatrao.kulkarni@cavium.com>
+ <20180621063338.20093-3-ganapatrao.kulkarni@cavium.com>
+ <CADYwmhHdTuK-z4GcGCYypYo2dvvPj7udihPcMmTkHTSU2fOWWw@mail.gmail.com>
+Message-ID: <CAKTKpr7nq7jfXzHmTd-EX6b3MDefa6B5i--Zn=yUZV7MqS2ywA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/18 08:11, Eugene Syromyatnikov wrote:
-> On Sun, Sep 30, 2018 at 1:03 AM Eugene Syromyatnikov <evgsyr@gmail.com> wrote:
->>
->> On Thu, Mar 15, 2018 at 01:14:31PM -0700, Kees Cook wrote:
->>> On Thu, Mar 15, 2018 at 3:38 AM,  <T.E.Baldwin99@members.leeds.ac.uk> wrote:
->>>> On 15 March 2018 00:45:01 Kees Cook <keescook@chromium.org> wrote:
->>>>
->>>>>>> --- a/arch/arm/kernel/entry-common.S
->>>>>>> +++ b/arch/arm/kernel/entry-common.S
->>>>>>> @@ -288,16 +288,15 @@ __sys_trace:
->>>>>>>       cmp     scno, #-1                       @ skip the syscall?
->>>>>>>       bne     2b
->>>>>>>       add     sp, sp, #S_OFF                  @ restore stack
->>>>>>> -     b       ret_slow_syscall
->>>>>>>
->>>>>>> -__sys_trace_return:
->>>>>>> -     str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
->>>>>>> +__sys_trace_return_nosave:
->>>>>>> +     enable_irq_notrace
->>>>>
->>>>>
->>>>> Why is __sys_trace_return_nosave the correct destination here? The
->>>>> original handle set up for lr a few lines above is for
->>>>> __sys_trace_return. It's not clear to me why this change is made?
->>>>
->>>>
->>>> __sys_trace_return stores the current r0 value on the stack which will
->>>> reloaded on exit to user mode. However if skipping a system call r0 is -1
->>>> and storing it would destroy the users r0 value, unlike the case where the
->>>> system call is made and r0 is the return value.
->>>>
->>>> The enabling of interrupts is redundant for this purpose, the reuse of code
->>>> is a size optimization.
->>>
->>> Ah right. Cool, thanks!
->>>
->>> Reviewed-by: Kees Cook <keescook@chromium.org>
->>> Tested-by: Kees Cook <keescook@chromium.org>
->>
->> Tested-by: Eugene Syromyatnikov <evgsyr@gmail.com>
-> 
-> Hello, is anything else required regarding this patch? Thanks.
+Hi Pranith,
 
-I believe you need to drop it into Russell's patch tracker [1]. 
+On Sat, Jul 7, 2018 at 11:22 AM Pranith Kumar <pranith.foss@gmail.com> wrote:
+>
+> Hi Ganapatrao,
+>
+>
+> On Wed, Jun 20, 2018 at 11:33 PM, Ganapatrao Kulkarni
+> <ganapatrao.kulkarni@cavium.com> wrote:
+>
+> > +
+> > +enum thunderx2_uncore_l3_events {
+> > +       L3_EVENT_NONE,
+> > +       L3_EVENT_NBU_CANCEL,
+> > +       L3_EVENT_DIB_RETRY,
+> > +       L3_EVENT_DOB_RETRY,
+> > +       L3_EVENT_DIB_CREDIT_RETRY,
+> > +       L3_EVENT_DOB_CREDIT_RETRY,
+> > +       L3_EVENT_FORCE_RETRY,
+> > +       L3_EVENT_IDX_CONFLICT_RETRY,
+> > +       L3_EVENT_EVICT_CONFLICT_RETRY,
+> > +       L3_EVENT_BANK_CONFLICT_RETRY,
+> > +       L3_EVENT_FILL_ENTRY_RETRY,
+> > +       L3_EVENT_EVICT_NOT_READY_RETRY,
+> > +       L3_EVENT_L3_RETRY,
+> > +       L3_EVENT_READ_REQ,
+> > +       L3_EVENT_WRITE_BACK_REQ,
+> > +       L3_EVENT_INVALIDATE_NWRITE_REQ,
+> > +       L3_EVENT_INV_REQ,
+> > +       L3_EVENT_SELF_REQ,
+> > +       L3_EVENT_REQ,
+> > +       L3_EVENT_EVICT_REQ,
+> > +       L3_EVENT_INVALIDATE_NWRITE_HIT,
+> > +       L3_EVENT_INVALIDATE_HIT,
+> > +       L3_EVENT_SELF_HIT,
+> > +       L3_EVENT_READ_HIT,
+> > +       L3_EVENT_MAX,
+> > +};
+> > +
+> > +enum thunderx2_uncore_dmc_events {
+> > +       DMC_EVENT_NONE,
+> > +       DMC_EVENT_COUNT_CYCLES,
+> > +       DMC_EVENT_RES2,
+> > +       DMC_EVENT_RES3,
+> > +       DMC_EVENT_RES4,
+> > +       DMC_EVENT_RES5,
+> > +       DMC_EVENT_RES6,
+> > +       DMC_EVENT_RES7,
+> > +       DMC_EVENT_RES8,
+> > +       DMC_EVENT_READ_64B_TXNS,
+> > +       DMC_EVENT_READ_BELOW_64B_TXNS,
+> > +       DMC_EVENT_WRITE_TXNS,
+> > +       DMC_EVENT_TXN_CYCLES,
+> > +       DMC_EVENT_DATA_TRANSFERS,
+> > +       DMC_EVENT_CANCELLED_READ_TXNS,
+> > +       DMC_EVENT_CONSUMED_READ_TXNS,
+> > +       DMC_EVENT_MAX,
+> > +};
+>
+> Can you please provide a link to where these counters are documented?
+> It is not clear what each counter does especially for the L3C events.
 
-[1] http://www.armlinux.org.uk/developer/patches/
+I will add brief description of each event in Documentation.
+>
+> Also, what counter do you need to use to get L3 hit/miss ratio? I
+> think this is the most useful counter related to L3.
 
-Cheers
-Vladimir
+L3C cache Hit Ratio = (L3_READ_HIT + L3_INV_N_WRITE_HIT +
+L3_INVALIDATE_HIT) / (L3_READ_REQ + L3_INV_N_WRITE_REQ +
+L3_INVALIDATE_REQ)
+
+>
+> Thanks,
+> --
+> Pranith
+
+thanks
+Ganapat
