@@ -1,117 +1,40 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 8 Oct 2018 22:03:46 +0800
-Subject: [shawnguo:imx/drivers 9/10]
- drivers/firmware/imx/imx-scu.c:180:3-9: preceding lock on line 165 (fwd)
-In-Reply-To: <alpine.DEB.2.20.1810081032450.2815@hadrien>
-References: <alpine.DEB.2.20.1810081032450.2815@hadrien>
-Message-ID: <20181008140344.GQ3587@dragon>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Oct 2018 09:05:58 -0500
+Subject: [PATCH 29/36] dt-bindings: arm: Convert Renesas board/soc
+ bindings to json-schema
+In-Reply-To: <20181008080220.rmxk57ckdfmwuk62@verge.net.au>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-30-robh@kernel.org>
+ <20181008080220.rmxk57ckdfmwuk62@verge.net.au>
+Message-ID: <CAL_Jsq+8EwYzBmzSWL0q0YB3rP-xdrZreRnt1Rj-h=D8OTNVwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+On Mon, Oct 8, 2018 at 3:02 AM Simon Horman <horms@verge.net.au> wrote:
+>
+> On Fri, Oct 05, 2018 at 11:58:41AM -0500, Rob Herring wrote:
+> > Convert Renesas SoC bindings to DT schema format using json-schema.
+> >
+> > Cc: Simon Horman <horms@verge.net.au>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: linux-renesas-soc at vger.kernel.org
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+>
+> This seems fine to me other than that it does not seem
+> to apply cleanly to next.
+>
+> shmobile.txt sees a couple of updates per release cycle so from my point of
+> view it would ideal if this change could hit -rc1 to allow patches for
+> v4.21 to be accepted smoothly (already one from Sergei will need rebasing).
 
-On Mon, Oct 08, 2018 at 10:33:31AM +0200, Julia Lawall wrote:
-> Hello,
-> 
-> It looks like an unlock is needed before line 180.
+When we get to the point of merging (which isn't going to be 4.20),
+you and other maintainers can probably take all these patches. Other
+than the few restructuring patches, the only dependency is the build
+support which isn't a dependency to apply it, but build it. I plan to
+build any patches as part of reviewing at least early on. OTOH, the
+build support is small enough and self contained that maybe it can
+just be applied for 4.20.
 
-Ah, yes.  I just appended the following change to the original commit.
-
-Thanks for the report. 
-
-Shawn
-
-
-diff --git a/drivers/firmware/imx/imx-scu.c b/drivers/firmware/imx/imx-scu.c
-index 06c9b8e01a8c..2bb1a19c413f 100644
---- a/drivers/firmware/imx/imx-scu.c
-+++ b/drivers/firmware/imx/imx-scu.c
-@@ -176,6 +176,7 @@ int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
-                if (!wait_for_completion_timeout(&sc_ipc->done,
-                                                 MAX_RX_TIMEOUT)) {
-                        dev_err(sc_ipc->dev, "RPC send msg timeout\n");
-+                       mutex_unlock(&sc_ipc->lock);
-                        return -ETIMEDOUT;
-                }
-
-
-
-> 
-> julia
-> 
-> ---------- Forwarded message ----------
-> Date: Mon, 8 Oct 2018 15:25:21 +0800
-> From: kbuild test robot <lkp@intel.com>
-> To: kbuild at 01.org
-> Cc: Julia Lawall <julia.lawall@lip6.fr>
-> Subject: [shawnguo:imx/drivers 9/10] drivers/firmware/imx/imx-scu.c:180:3-9:
->     preceding lock on line 165
-> 
-> CC: kbuild-all at 01.org
-> CC: linux-arm-kernel at lists.infradead.org
-> TO: Dong Aisheng <aisheng.dong@nxp.com>
-> CC: Shawn Guo <shawnguo@kernel.org>
-> CC: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/drivers
-> head:   a8b96789a795af1127f722c3b1cd243ea16270ae
-> commit: d41a5a155f7b716941583cab7db703a2e4c6172c [9/10] firmware: imx: add SCU firmware driver support
-> :::::: branch date: 8 days ago
-> :::::: commit date: 8 days ago
-> 
-> >> drivers/firmware/imx/imx-scu.c:180:3-9: preceding lock on line 165
-> 
-> # https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?id=d41a5a155f7b716941583cab7db703a2e4c6172c
-> git remote add shawnguo https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-> git remote update shawnguo
-> git checkout d41a5a155f7b716941583cab7db703a2e4c6172c
-> vim +180 drivers/firmware/imx/imx-scu.c
-> 
-> d41a5a15 Dong Aisheng 2018-09-30  153
-> d41a5a15 Dong Aisheng 2018-09-30  154  /*
-> d41a5a15 Dong Aisheng 2018-09-30  155   * RPC command/response
-> d41a5a15 Dong Aisheng 2018-09-30  156   */
-> d41a5a15 Dong Aisheng 2018-09-30  157  int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
-> d41a5a15 Dong Aisheng 2018-09-30  158  {
-> d41a5a15 Dong Aisheng 2018-09-30  159  	struct imx_sc_rpc_msg *hdr;
-> d41a5a15 Dong Aisheng 2018-09-30  160  	int ret;
-> d41a5a15 Dong Aisheng 2018-09-30  161
-> d41a5a15 Dong Aisheng 2018-09-30  162  	if (WARN_ON(!sc_ipc || !msg))
-> d41a5a15 Dong Aisheng 2018-09-30  163  		return -EINVAL;
-> d41a5a15 Dong Aisheng 2018-09-30  164
-> d41a5a15 Dong Aisheng 2018-09-30 @165  	mutex_lock(&sc_ipc->lock);
-> d41a5a15 Dong Aisheng 2018-09-30  166  	reinit_completion(&sc_ipc->done);
-> d41a5a15 Dong Aisheng 2018-09-30  167
-> d41a5a15 Dong Aisheng 2018-09-30  168  	sc_ipc->msg = msg;
-> d41a5a15 Dong Aisheng 2018-09-30  169  	sc_ipc->count = 0;
-> d41a5a15 Dong Aisheng 2018-09-30  170  	ret = imx_scu_ipc_write(sc_ipc, msg);
-> d41a5a15 Dong Aisheng 2018-09-30  171  	if (ret < 0) {
-> d41a5a15 Dong Aisheng 2018-09-30  172  		dev_err(sc_ipc->dev, "RPC send msg failed: %d\n", ret);
-> d41a5a15 Dong Aisheng 2018-09-30  173  		goto out;
-> d41a5a15 Dong Aisheng 2018-09-30  174  	}
-> d41a5a15 Dong Aisheng 2018-09-30  175
-> d41a5a15 Dong Aisheng 2018-09-30  176  	if (have_resp) {
-> d41a5a15 Dong Aisheng 2018-09-30  177  		if (!wait_for_completion_timeout(&sc_ipc->done,
-> d41a5a15 Dong Aisheng 2018-09-30  178  						 MAX_RX_TIMEOUT)) {
-> d41a5a15 Dong Aisheng 2018-09-30  179  			dev_err(sc_ipc->dev, "RPC send msg timeout\n");
-> d41a5a15 Dong Aisheng 2018-09-30 @180  			return -ETIMEDOUT;
-> d41a5a15 Dong Aisheng 2018-09-30  181  		}
-> d41a5a15 Dong Aisheng 2018-09-30  182
-> d41a5a15 Dong Aisheng 2018-09-30  183  		/* response status is stored in hdr->func field */
-> d41a5a15 Dong Aisheng 2018-09-30  184  		hdr = msg;
-> d41a5a15 Dong Aisheng 2018-09-30  185  		ret = hdr->func;
-> d41a5a15 Dong Aisheng 2018-09-30  186  	}
-> d41a5a15 Dong Aisheng 2018-09-30  187
-> d41a5a15 Dong Aisheng 2018-09-30  188  out:
-> d41a5a15 Dong Aisheng 2018-09-30  189  	mutex_unlock(&sc_ipc->lock);
-> d41a5a15 Dong Aisheng 2018-09-30  190
-> d41a5a15 Dong Aisheng 2018-09-30  191  	dev_dbg(sc_ipc->dev, "RPC SVC done\n");
-> d41a5a15 Dong Aisheng 2018-09-30  192
-> d41a5a15 Dong Aisheng 2018-09-30  193  	return imx_sc_to_linux_errno(ret);
-> d41a5a15 Dong Aisheng 2018-09-30  194  }
-> d41a5a15 Dong Aisheng 2018-09-30  195  EXPORT_SYMBOL(imx_scu_call_rpc);
-> d41a5a15 Dong Aisheng 2018-09-30  196
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Rob
