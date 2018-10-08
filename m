@@ -1,53 +1,63 @@
-From: evgsyr@gmail.com (Eugene Syromyatnikov)
-Date: Mon, 8 Oct 2018 13:00:52 +0200
-Subject: ARM: Call syscall_trace_exit even when system call skipped
-In-Reply-To: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
-Message-ID: <20181008110047.GA3426@asgard.redhat.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
+Date: Mon,  8 Oct 2018 16:41:38 +0530
+Subject: [PATCH v4 0/5] spi: spi-mem: Add driver for NXP FlexSPI controller
+Message-ID: <1538997103-11152-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
+- Add driver for NXP FlexSPI host controller
 
-On at least x86 and ARM64, and as documented in the ptrace man page
-a skipped system call will still cause a syscall exit ptrace stop.
+ FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
+ which supports two SPI channels and up to 4 external devices.
+ Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
+ i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
+ bidirectional data lines.
 
-Previous to this commit 32-bit ARM did not, resulting in strace
-being confused when seccomp skips system calls.
+- Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
+ filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
+ LX2160ARDB is having two NOR slave device connected on single bus A
+ i.e. A0 and A1 (CS0 and CS1).
+ LX2160AQDS is having two NOR slave device connected on separate buses
+ one flash on A0 and second on B1 i.e. (CS0 and CS3).
+ Verified this driver on following SPI NOR flashes:
+   Micron, mt35xu512aba[3], [Read - 1 bit mode]
+   Cypress, s25fl512s, [Read - 1/2/4 bit mode]
 
-This change also impacts programs that use ptrace to skip system calls.
+[1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
+[2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?series=9721
+[3] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=63445
 
-Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
-Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
-Signed-off-by: Eugene Syromyatnikov <evgsyr@gmail.com>
-Reviewed-by: Kees Cook <keescook@chromium.org>
-Tested-by: Kees Cook <keescook@chromium.org>
-Tested-by: Eugene Syromyatnikov <evgsyr@gmail.com>
----
-KernelVersion: 4.19-rc7
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 746565a..0465d65 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -296,16 +296,15 @@ __sys_trace:
- 	cmp	scno, #-1			@ skip the syscall?
- 	bne	2b
- 	add	sp, sp, #S_OFF			@ restore stack
--	b	ret_slow_syscall
- 
--__sys_trace_return:
--	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-+__sys_trace_return_nosave:
-+	enable_irq_notrace
- 	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
- 
--__sys_trace_return_nosave:
--	enable_irq_notrace
-+__sys_trace_return:
-+	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
- 	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
+Yogesh Gaur (5):
+  spi: spi-mem: Add driver for NXP FlexSPI controller
+  dt-bindings: spi: add binding file for NXP FlexSPI controller
+  arm64: dts: lx2160a: add FlexSPI node property
+  arm64: defconfig: enable NXP FlexSPI driver
+  MAINTAINERS: add maintainers for the NXP FlexSPI driver
+
+Changes for v4:
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+- Incorporated binding file review comments of Rob Herring.
+Changes for v3:
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+Changes for v2:
+- Incorporated Boris review comments and drop below patches as per the comments.
+ - Patch 'spi: add slave device size in spi_device struct'
+ - Patch 'spi: add flags for octal I/O data transfer'
+- Incorporated DTS and Binding file review comments of Shawn Guo and Rob Herring.
+
+ .../devicetree/bindings/spi/spi-nxp-fspi.txt       |   39 +
+ MAINTAINERS                                        |    6 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  |   22 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     |   12 +
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/spi/Kconfig                                |   10 +
+ drivers/spi/Makefile                               |    1 +
+ drivers/spi/spi-nxp-fspi.c                         | 1157 ++++++++++++++++++++
+ 8 files changed, 1248 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+ create mode 100644 drivers/spi/spi-nxp-fspi.c
+
 -- 
-2.1.4
+2.7.4
