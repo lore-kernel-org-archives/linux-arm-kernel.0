@@ -1,66 +1,53 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Mon, 8 Oct 2018 11:21:42 -0700
-Subject: [PATCH v6 0/4] drivers: clk: Add ZynqMP clock driver support
-Message-ID: <1539022906-18073-1-git-send-email-jollys@xilinx.com>
+From: evgsyr@gmail.com (Eugene Syromyatnikov)
+Date: Mon, 8 Oct 2018 20:26:48 +0200
+Subject: ARM: Call syscall_trace_exit even when system call skipped
+In-Reply-To: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
+Message-ID: <20181008182645.GA14856@obsidian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds CCF compliant clock driver for ZynqMP.Clock driver queries 
-supported clock information from firmware and regiters pll and output clocks with CCF.
+From: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
 
-This patch series is earlier reveiwed as part of FW patchset (https://patchwork.kernel.org/cover/10555405/). 
-FW driver from that patchset is merged. This patchset contains only clock driver and is based on top of 
-xilinx firmware patch set available in below tree:
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=next/drivers
+On at least x86 and ARM64, and as documented in the ptrace man page
+a skipped system call will still cause a syscall exit ptrace stop.
 
-v6:
- - Updated eemi return payload type to be u32 instead of le32 and Eemi ops in FW driver will be updated to take care of endianess
- - Added Stephen's review tag
+Previous to this commit 32-bit ARM did not, resulting in strace
+being confused when seccomp skips system calls.
+
+This change also impacts programs that use ptrace to skip system calls.
+
+Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
+Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
+Signed-off-by: Eugene Syromyatnikov <evgsyr@gmail.com>
+Reviewed-by: Kees Cook <keescook@chromium.org>
+Tested-by: Kees Cook <keescook@chromium.org>
+Tested-by: Eugene Syromyatnikov <evgsyr@gmail.com>
+---
+KernelVersion: 4.19-rc7
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 746565a..0465d65 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -296,16 +296,15 @@ __sys_trace:
+ 	cmp	scno, #-1			@ skip the syscall?
+ 	bne	2b
+ 	add	sp, sp, #S_OFF			@ restore stack
+-	b	ret_slow_syscall
  
-v5:
- - Added "Acked-by: Olof Johansson <olof@lixom.net>" for patches
+-__sys_trace_return:
+-	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
++__sys_trace_return_nosave:
++	enable_irq_notrace
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
  
-v4:
- - Fixed minor review comments received for v3 patchset
- 
-v3:
- - Added check to pass only valid ioctls for ioctl eemi api
- - Added eemi documentation including ioctl details
-
-Jolly Shah (1):
-  drivers: clk: Add ZynqMP clock driver
-
-Rajan Vaja (3):
-  Documentation: xilinx: Add documentation for eemi APIs
-  firmware: xilinx: Add zynqmp IOCTL API for device control
-  dt-bindings: clock: Add bindings for ZynqMP clock driver
-
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  53 ++
- Documentation/xilinx/eemi.txt                      |  67 ++
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/zynqmp/Kconfig                         |  10 +
- drivers/clk/zynqmp/Makefile                        |   4 +
- drivers/clk/zynqmp/clk-gate-zynqmp.c               | 144 +++++
- drivers/clk/zynqmp/clk-mux-zynqmp.c                | 141 ++++
- drivers/clk/zynqmp/clk-zynqmp.h                    |  68 ++
- drivers/clk/zynqmp/clkc.c                          | 716 +++++++++++++++++++++
- drivers/clk/zynqmp/divider.c                       | 217 +++++++
- drivers/clk/zynqmp/pll.c                           | 335 ++++++++++
- drivers/firmware/xilinx/zynqmp.c                   |  42 ++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
- include/linux/firmware/xlnx-zynqmp.h               |   5 +-
- 15 files changed, 1919 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/xilinx/eemi.txt
- create mode 100644 drivers/clk/zynqmp/Kconfig
- create mode 100644 drivers/clk/zynqmp/Makefile
- create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
- create mode 100644 drivers/clk/zynqmp/clkc.c
- create mode 100644 drivers/clk/zynqmp/divider.c
- create mode 100644 drivers/clk/zynqmp/pll.c
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
-
+-__sys_trace_return_nosave:
+-	enable_irq_notrace
++__sys_trace_return:
++	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
 -- 
-2.7.4
+2.1.4
