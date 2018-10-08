@@ -1,61 +1,89 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon,  8 Oct 2018 22:46:31 +0530
-Subject: [PATCH] dmaengine: owl: Fix warnings generated during build
-Message-ID: <20181008171631.5603-1-manivannan.sadhasivam@linaro.org>
+From: dave.stevenson@raspberrypi.org (Dave Stevenson)
+Date: Mon, 8 Oct 2018 18:20:17 +0100
+Subject: [PATCH] staging: bcm2835-camera: remove extraneous setting of
+ dev->colourfx.enable
+In-Reply-To: <663860283.72238.1539018547916@email.1und1.de>
+References: <20181008145012.31312-1-colin.king@canonical.com>
+ <d753df4f-e812-c366-0b1d-9ff804da0ab5@i2se.com>
+ <CAAoAYcO=qp7yb7392B_6wks2j2TaoxYXHtQPyH0kMkFMi+JW-A@mail.gmail.com>
+ <663860283.72238.1539018547916@email.1und1.de>
+Message-ID: <CAAoAYcNMJd2429fZWd_E3w=MhBdZDADNtHkVtf1__VVcjSEBTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following warnings are generated when compiled with W=1,
+On Mon, 8 Oct 2018 at 18:09, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>
+> Hi Dave,
+>
+> > Dave Stevenson <dave.stevenson@raspberrypi.org> hat am 8. Oktober 2018 um 18:51 geschrieben:
+> >
+> >
+> >  Hi Stefan.
+> >
+> > Thanks for forwarding as the linux-rpi-kernel list hasn't sent it to me as yet.
+>
+> AFAIK every mail with more than 5 recipients will be delayed.
+>
+> >
+> > On Mon, 8 Oct 2018 at 16:48, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > >
+> > > Hi Colin,
+> > >
+> > > Am 08.10.2018 um 16:50 schrieb Colin King:
+> > > > From: Colin Ian King <colin.king@canonical.com>
+> > > >
+> > > > Currently dev->colourfx.enable is being set twice, hence the first
+> > > > occurrance is redundant and can be removed, so remove it. This minor
+> > > > issue was introduced by commit 7b3ad5abf027 ("staging: Import the
+> > > > BCM2835 MMAL-based V4L2 camera driver.").
+> > > >
+> > > > Detected by CoverityScan CID#1419711 ("Unused value")
+> > > >
+> > > > Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> > > > ---
+> > > >  drivers/staging/vc04_services/bcm2835-camera/controls.c | 1 -
+> > > >  1 file changed, 1 deletion(-)
+> > > >
+> > > > diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> > > > index a2c55cb2192a..99831dd4365d 100644
+> > > > --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> > > > +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> > > > @@ -588,7 +588,6 @@ static int ctrl_set_colfx(struct bm2835_mmal_dev *dev,
+> > > >
+> > > >       control = &dev->component[MMAL_COMPONENT_CAMERA]->control;
+> > > >
+> > > > -     dev->colourfx.enable = (ctrl->val & 0xff00) >> 8;
+> > > >       dev->colourfx.enable = ctrl->val & 0xff;
+> > > >
+> > > >       ret = vchiq_mmal_port_parameter_set(dev->instance, control,
+> > >
+> > > as long as the current behavior is correct, i'm okay with this patch.
+> > > But the byte masking looks suspicious, so i hope Dave can clarify that.
+> >
+> > It's writing to the wrong structure member.
+> > The function is used on the V4L2 control V4L2_CID_COLORFX_CBCR, which
+> > is defined as:
+> > V4L2_CID_COLORFX_CBCR (integer)
+> > Determines the Cb and Cr coefficients for V4L2_COLORFX_SET_CBCR color
+> > effect. Bits [7:0] of the supplied 32 bit value are interpreted as Cr
+> > component, bits [15:8] as Cb component and bits [31:16] must be zero.
+> >
+> > ctrl->val should therefore be setting dev->colourfx.u and
+> > dev->colourfx.v with those masks. dev->colourfx.enable field should
+> > have been set when going through ctrl_set_image_effect for contol
+> > V4L2_CID_COLORFX set to V4L2_COLORFX_SET_CBCR.
+> >
+> > I've confirmed with qv4l2 that that is what is wrong. That's only been
+> > lurking there for almost 5 years - shows how often these weirder
+> > effects get used.
+> > I don't mind whether Colin's patch gets merged and then fixed up, or
+> > drop Colin's patch and apply the correct logic via a new patch.
+>
+> no this patch shouldn't be applied. Does it mean you want to send the proper one?
 
-drivers/dma/owl-dma.c:170: warning: Function parameter or member 'cyclic'
-not described in 'owl_dma_txd'
-drivers/dma/owl-dma.c:198: warning: Function parameter or member 'cfg' not
-described in 'owl_dma_vchan'
-drivers/dma/owl-dma.c:198: warning: Function parameter or member 'drq' not
-described in 'owl_dma_vchan'
-drivers/dma/owl-dma.c:225: warning: Function parameter or member 'irq' not
-described in 'owl_dma'
+Want to - not really. Ought to - I guess so.
+I've got a bunch of checkpatch and other fixes to come too, so once
+I've got a mainline kernel build back up and running I'll roll them
+all up and blitz the list.
 
-Fix this by adding comments for relevant struct members to appear in
-kernel-doc.
-
-Fixes: d64e1b3f5cce ("dmaengine: owl: Add Slave and Cyclic mode support for
-Actions Semi Owl S900 SoC")
-
-Reported-by: Vinod Koul <vinod.koul@linaro.org>
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- drivers/dma/owl-dma.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/dma/owl-dma.c b/drivers/dma/owl-dma.c
-index 1d26db4c9229..90bbcef99ef8 100644
---- a/drivers/dma/owl-dma.c
-+++ b/drivers/dma/owl-dma.c
-@@ -162,6 +162,7 @@ struct owl_dma_lli {
-  * struct owl_dma_txd - Wrapper for struct dma_async_tx_descriptor
-  * @vd: virtual DMA descriptor
-  * @lli_list: link list of lli nodes
-+ * @cyclic: flag to indicate cyclic transfers
-  */
- struct owl_dma_txd {
- 	struct virt_dma_desc	vd;
-@@ -188,6 +189,8 @@ struct owl_dma_pchan {
-  * @vc: wrappped virtual channel
-  * @pchan: the physical channel utilized by this channel
-  * @txd: active transaction on this channel
-+ * @cfg: slave configuration for this channel
-+ * @drq: physical DMA request ID for this channel
-  */
- struct owl_dma_vchan {
- 	struct virt_dma_chan	vc;
-@@ -204,6 +207,7 @@ struct owl_dma_vchan {
-  * @clk: clock for the DMA controller
-  * @lock: a lock to use when change DMA controller global register
-  * @lli_pool: a pool for the LLI descriptors
-+ * @irq: interrupt ID for the DMA controller
-  * @nr_pchans: the number of physical channels
-  * @pchans: array of data for the physical channels
-  * @nr_vchans: the number of physical channels
--- 
-2.17.1
+  Dave
