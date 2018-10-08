@@ -1,90 +1,111 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 8 Oct 2018 10:33:31 +0200 (CEST)
-Subject: [shawnguo:imx/drivers 9/10] drivers/firmware/imx/imx-scu.c:180:3-9:
- preceding lock on line 165 (fwd)
-Message-ID: <alpine.DEB.2.20.1810081032450.2815@hadrien>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 8 Oct 2018 10:51:12 +0200
+Subject: [PATCH v2 25/29] drm: sun4i: add quirks for TCON TOP
+In-Reply-To: <20181007093905.11253-26-jernej.skrabec@siol.net>
+References: <20181007093905.11253-1-jernej.skrabec@siol.net>
+ <20181007093905.11253-26-jernej.skrabec@siol.net>
+Message-ID: <20181008085112.mejpwvl3dpu7sopy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sun, Oct 07, 2018 at 11:39:01AM +0200, Jernej Skrabec wrote:
+> From: Icenowy Zheng <icenowy@aosc.io>
+> 
+> Some SoCs, such as H6, doesn't have a full-featured TCON TOP.
+> 
+> Add quirks support for TCON TOP.
+> 
+> Currently the presence of TCON_TV1 and DSI is controlled via the quirks
+> structure.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 43 ++++++++++++++++++++------
+>  1 file changed, 34 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> index 37158548b447..ed13233cad88 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> @@ -9,11 +9,17 @@
+>  #include <linux/component.h>
+>  #include <linux/device.h>
+>  #include <linux/module.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_graph.h>
+>  #include <linux/platform_device.h>
+>  
+>  #include "sun8i_tcon_top.h"
+>  
+> +struct sun8i_tcon_top_quirks {
+> +	bool has_tcon_tv1;
+> +	bool has_dsi;
+> +};
+> +
+>  static bool sun8i_tcon_top_node_is_tcon_top(struct device_node *node)
+>  {
+>  	return !!of_match_node(sun8i_tcon_top_of_table, node);
+> @@ -121,10 +127,13 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct clk_hw_onecell_data *clk_data;
+>  	struct sun8i_tcon_top *tcon_top;
+> +	const struct sun8i_tcon_top_quirks *quirks;
+>  	struct resource *res;
+>  	void __iomem *regs;
+>  	int ret, i;
+>  
+> +	quirks = of_device_get_match_data(&pdev->dev);
+> +
+>  	tcon_top = devm_kzalloc(dev, sizeof(*tcon_top), GFP_KERNEL);
+>  	if (!tcon_top)
+>  		return -ENOMEM;
+> @@ -187,15 +196,23 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+>  					     &tcon_top->reg_lock,
+>  					     TCON_TOP_TCON_TV0_GATE, 0);
+>  
+> -	clk_data->hws[CLK_TCON_TOP_TV1] =
+> -		sun8i_tcon_top_register_gate(dev, "tcon-tv1", regs,
+> -					     &tcon_top->reg_lock,
+> -					     TCON_TOP_TCON_TV1_GATE, 1);
+> +	if (quirks->has_tcon_tv1) {
+> +		clk_data->hws[CLK_TCON_TOP_TV1] =
+> +			sun8i_tcon_top_register_gate(dev, "tcon-tv1", regs,
+> +						     &tcon_top->reg_lock,
+> +						     TCON_TOP_TCON_TV1_GATE, 1);
+> +	} else {
+> +		clk_data->hws[CLK_TCON_TOP_TV1] = NULL;
+> +	}
+>  
+> -	clk_data->hws[CLK_TCON_TOP_DSI] =
+> -		sun8i_tcon_top_register_gate(dev, "dsi", regs,
+> -					     &tcon_top->reg_lock,
+> -					     TCON_TOP_TCON_DSI_GATE, 2);
+> +	if (quirks->has_dsi) {
+> +		clk_data->hws[CLK_TCON_TOP_DSI] =
+> +			sun8i_tcon_top_register_gate(dev, "dsi", regs,
+> +						     &tcon_top->reg_lock,
+> +						     TCON_TOP_TCON_DSI_GATE, 2);
+> +	} else {
+> +		clk_data->hws[CLK_TCON_TOP_DSI] = NULL;
 
-It looks like an unlock is needed before line 180.
+clk_data has been kzalloc'd so its content is already NULL.
 
-julia
+And you shouldn't have brackets for single line blocks.
 
----------- Forwarded message ----------
-Date: Mon, 8 Oct 2018 15:25:21 +0800
-From: kbuild test robot <lkp@intel.com>
-To: kbuild at 01.org
-Cc: Julia Lawall <julia.lawall@lip6.fr>
-Subject: [shawnguo:imx/drivers 9/10] drivers/firmware/imx/imx-scu.c:180:3-9:
-    preceding lock on line 165
+with that fixed,
 
-CC: kbuild-all at 01.org
-CC: linux-arm-kernel at lists.infradead.org
-TO: Dong Aisheng <aisheng.dong@nxp.com>
-CC: Shawn Guo <shawnguo@kernel.org>
-CC: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/drivers
-head:   a8b96789a795af1127f722c3b1cd243ea16270ae
-commit: d41a5a155f7b716941583cab7db703a2e4c6172c [9/10] firmware: imx: add SCU firmware driver support
-:::::: branch date: 8 days ago
-:::::: commit date: 8 days ago
+Maxime
 
->> drivers/firmware/imx/imx-scu.c:180:3-9: preceding lock on line 165
-
-# https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?id=d41a5a155f7b716941583cab7db703a2e4c6172c
-git remote add shawnguo https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-git remote update shawnguo
-git checkout d41a5a155f7b716941583cab7db703a2e4c6172c
-vim +180 drivers/firmware/imx/imx-scu.c
-
-d41a5a15 Dong Aisheng 2018-09-30  153
-d41a5a15 Dong Aisheng 2018-09-30  154  /*
-d41a5a15 Dong Aisheng 2018-09-30  155   * RPC command/response
-d41a5a15 Dong Aisheng 2018-09-30  156   */
-d41a5a15 Dong Aisheng 2018-09-30  157  int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
-d41a5a15 Dong Aisheng 2018-09-30  158  {
-d41a5a15 Dong Aisheng 2018-09-30  159  	struct imx_sc_rpc_msg *hdr;
-d41a5a15 Dong Aisheng 2018-09-30  160  	int ret;
-d41a5a15 Dong Aisheng 2018-09-30  161
-d41a5a15 Dong Aisheng 2018-09-30  162  	if (WARN_ON(!sc_ipc || !msg))
-d41a5a15 Dong Aisheng 2018-09-30  163  		return -EINVAL;
-d41a5a15 Dong Aisheng 2018-09-30  164
-d41a5a15 Dong Aisheng 2018-09-30 @165  	mutex_lock(&sc_ipc->lock);
-d41a5a15 Dong Aisheng 2018-09-30  166  	reinit_completion(&sc_ipc->done);
-d41a5a15 Dong Aisheng 2018-09-30  167
-d41a5a15 Dong Aisheng 2018-09-30  168  	sc_ipc->msg = msg;
-d41a5a15 Dong Aisheng 2018-09-30  169  	sc_ipc->count = 0;
-d41a5a15 Dong Aisheng 2018-09-30  170  	ret = imx_scu_ipc_write(sc_ipc, msg);
-d41a5a15 Dong Aisheng 2018-09-30  171  	if (ret < 0) {
-d41a5a15 Dong Aisheng 2018-09-30  172  		dev_err(sc_ipc->dev, "RPC send msg failed: %d\n", ret);
-d41a5a15 Dong Aisheng 2018-09-30  173  		goto out;
-d41a5a15 Dong Aisheng 2018-09-30  174  	}
-d41a5a15 Dong Aisheng 2018-09-30  175
-d41a5a15 Dong Aisheng 2018-09-30  176  	if (have_resp) {
-d41a5a15 Dong Aisheng 2018-09-30  177  		if (!wait_for_completion_timeout(&sc_ipc->done,
-d41a5a15 Dong Aisheng 2018-09-30  178  						 MAX_RX_TIMEOUT)) {
-d41a5a15 Dong Aisheng 2018-09-30  179  			dev_err(sc_ipc->dev, "RPC send msg timeout\n");
-d41a5a15 Dong Aisheng 2018-09-30 @180  			return -ETIMEDOUT;
-d41a5a15 Dong Aisheng 2018-09-30  181  		}
-d41a5a15 Dong Aisheng 2018-09-30  182
-d41a5a15 Dong Aisheng 2018-09-30  183  		/* response status is stored in hdr->func field */
-d41a5a15 Dong Aisheng 2018-09-30  184  		hdr = msg;
-d41a5a15 Dong Aisheng 2018-09-30  185  		ret = hdr->func;
-d41a5a15 Dong Aisheng 2018-09-30  186  	}
-d41a5a15 Dong Aisheng 2018-09-30  187
-d41a5a15 Dong Aisheng 2018-09-30  188  out:
-d41a5a15 Dong Aisheng 2018-09-30  189  	mutex_unlock(&sc_ipc->lock);
-d41a5a15 Dong Aisheng 2018-09-30  190
-d41a5a15 Dong Aisheng 2018-09-30  191  	dev_dbg(sc_ipc->dev, "RPC SVC done\n");
-d41a5a15 Dong Aisheng 2018-09-30  192
-d41a5a15 Dong Aisheng 2018-09-30  193  	return imx_sc_to_linux_errno(ret);
-d41a5a15 Dong Aisheng 2018-09-30  194  }
-d41a5a15 Dong Aisheng 2018-09-30  195  EXPORT_SYMBOL(imx_scu_call_rpc);
-d41a5a15 Dong Aisheng 2018-09-30  196
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/afdf40ee/attachment.sig>
