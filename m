@@ -1,25 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Oct 2018 22:11:09 +0100
-Subject: next-20181008 build: 2 failures 22 warnings (next-20181008)
-In-Reply-To: <E1g9cV0-0008Sg-4U@optimist>
-References: <E1g9cV0-0008Sg-4U@optimist>
-Message-ID: <20181008211109.GA4440@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  8 Oct 2018 23:15:51 +0200
+Subject: [PATCH 0/3] crypto: use unaligned accessors in aligned fast paths
+Message-ID: <20181008211554.5355-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2018 at 09:51:30PM +0100, Build bot for Mark Brown wrote:
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS behaves a bit counterintuitively
+on ARM: we set it for architecture revisions v6 and up, which support
+any alignment for load/store instructions that operate on bytes, half
+words or words. However, load/store double word and load store multiple
+instructions still require 32-bit alignment, and using them on unaligned
+quantities results in costly alignment traps that have to be fixed up by
+the kernel's fixup code.
 
-Today's -next fails to build an arm64 defconfig due to:
+Fortunately, the unaligned accessors do the right thing here: on
+architectures that really tolerate any misalignment, they simply resolve
+to the aligned accessors, while on ARMv6+ (which uses the packed struct
+wrappers for unaligned accesses), they result in load/store sequences
+that avoid the instructions that require 32-bit alignment.
 
-> 	arm64-defconfig
-> ../drivers/acpi/numa.c:34:23: fatal error: asm/kaslr.h: No such file or directory
+Since there is not really a downside to using the unaligned accessors on
+aligned paths for architectures other than ARM that define
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS, let's switch to them in a couple
+of places in the crypto code.
 
-caused by 3a387c6d96e69 (x86/kaslr, ACPI/NUMA: Fix KASLR build error)
-which adds the inclusion unconditionally.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/f0000753/attachment.sig>
+Note that all patches are against code that has been observed to be emitted
+with ldm or ldrd instructions when building ARM's multi_v7_defconfig.
+
+Ard Biesheuvel (3):
+  crypto: memneq - use unaligned accessors for aligned fast path
+  crypto: crypto_xor - use unaligned accessors for aligned fast path
+  crypto: siphash - drop _aligned variants
+
+ crypto/algapi.c         |   7 +-
+ crypto/memneq.c         |  24 +++--
+ include/crypto/algapi.h |  11 +-
+ include/linux/siphash.h | 106 +++++++++-----------
+ lib/siphash.c           | 103 ++-----------------
+ 5 files changed, 83 insertions(+), 168 deletions(-)
+
+-- 
+2.11.0
