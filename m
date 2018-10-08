@@ -1,27 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 8 Oct 2018 17:51:00 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-udoo: Add Pincfgs for UART4
-In-Reply-To: <1538663639-3427-1-git-send-email-kueffner.markus@gmail.com>
-References: <1538663639-3427-1-git-send-email-kueffner.markus@gmail.com>
-Message-ID: <CAOMZO5BqL5Tfd0+KmN2DiJdoWLSYWSWyppw8qdrb-G_by_68Tw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 8 Oct 2018 22:11:09 +0100
+Subject: next-20181008 build: 2 failures 22 warnings (next-20181008)
+In-Reply-To: <E1g9cV0-0008Sg-4U@optimist>
+References: <E1g9cV0-0008Sg-4U@optimist>
+Message-ID: <20181008211109.GA4440@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 11:35 AM Markus Kueffner
-<kueffner.markus@gmail.com> wrote:
->
-> From: Markus Kueffner <kueffner.markus@gmail.com>
->
-> Add Pincfgs for UART4 to enable Communication with the onboard SAM3X
->
-> Signed-off-by: Markus Kueffner <kueffner.markus@gmail.com>
+On Mon, Oct 08, 2018 at 09:51:30PM +0100, Build bot for Mark Brown wrote:
 
-Looks good as per the schematics:
+Today's -next fails to build an arm64 defconfig due to:
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+> 	arm64-defconfig
+> ../drivers/acpi/numa.c:34:23: fatal error: asm/kaslr.h: No such file or directory
 
-> +&uart4 { // iMX6-Arduino internal serial port - ttymxc3
-
-Minor nit: // style comment should be avoided.
-
-Actually the whole comment could de dropped IMHO.
+caused by 3a387c6d96e69 (x86/kaslr, ACPI/NUMA: Fix KASLR build error)
+which adds the inclusion unconditionally.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/f0000753/attachment.sig>
