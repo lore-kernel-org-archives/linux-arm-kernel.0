@@ -1,44 +1,37 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 8 Oct 2018 17:48:03 +0200
-Subject: [PATCH] staging: bcm2835-camera: remove extraneous setting of
- dev->colourfx.enable
-In-Reply-To: <20181008145012.31312-1-colin.king@canonical.com>
-References: <20181008145012.31312-1-colin.king@canonical.com>
-Message-ID: <d753df4f-e812-c366-0b1d-9ff804da0ab5@i2se.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  8 Oct 2018 17:57:43 +0200
+Subject: [PATCH] pinctrl: mediatek: select GPIOLIB
+Message-ID: <20181008155803.3322412-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+Removing the linux/gpio.h include means we no longer have a declaration
+of gpiochip_lock_as_irq() when CONFIG_GPIOLIB is disabled:
 
-Am 08.10.2018 um 16:50 schrieb Colin King:
-> From: Colin Ian King <colin.king@canonical.com>
->
-> Currently dev->colourfx.enable is being set twice, hence the first
-> occurrance is redundant and can be removed, so remove it. This minor
-> issue was introduced by commit 7b3ad5abf027 ("staging: Import the
-> BCM2835 MMAL-based V4L2 camera driver.").
->
-> Detected by CoverityScan CID#1419711 ("Unused value")
->
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/staging/vc04_services/bcm2835-camera/controls.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> index a2c55cb2192a..99831dd4365d 100644
-> --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> @@ -588,7 +588,6 @@ static int ctrl_set_colfx(struct bm2835_mmal_dev *dev,
->  
->  	control = &dev->component[MMAL_COMPONENT_CAMERA]->control;
->  
-> -	dev->colourfx.enable = (ctrl->val & 0xff00) >> 8;
->  	dev->colourfx.enable = ctrl->val & 0xff;
->  
->  	ret = vchiq_mmal_port_parameter_set(dev->instance, control,
+drivers/pinctrl/mediatek/mtk-eint.c: In function 'mtk_eint_irq_request_resources':
+drivers/pinctrl/mediatek/mtk-eint.c:247:8: error: implicit declaration of function 'gpiochip_lock_as_irq'; did you mean 'spin_lock_irq'? [-Werror=implicit-function-declaration]
+drivers/pinctrl/mediatek/mtk-eint.c: In function 'mtk_eint_irq_release_resources':
+drivers/pinctrl/mediatek/mtk-eint.c:272:2: error: implicit declaration of function 'gpiochip_unlock_as_irq'; did you mean 'spin_unlock_irq'? [-Werror=implicit-function-declaration]
 
-as long as the current behavior is correct, i'm okay with this patch.
-But the byte masking looks suspicious, so i hope Dave can clarify that.
+Select it explictly instead.
 
-Thanks Stefan
+Fixes: 1c5fb66afa2a ("pinctrl: Include <linux/gpio/driver.h> nothing else")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/pinctrl/mediatek/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
+index 05be5ddafec4..9d142e1da567 100644
+--- a/drivers/pinctrl/mediatek/Kconfig
++++ b/drivers/pinctrl/mediatek/Kconfig
+@@ -4,6 +4,7 @@ menu "MediaTek pinctrl drivers"
+ config EINT_MTK
+ 	bool "MediaTek External Interrupt Support"
+ 	depends on PINCTRL_MTK || PINCTRL_MTK_MOORE || COMPILE_TEST
++	select GPIOLIB
+ 	select IRQ_DOMAIN
+ 
+ config PINCTRL_MTK
+-- 
+2.18.0
