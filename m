@@ -1,32 +1,68 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 8 Oct 2018 20:03:38 +0200
-Subject: [PATCH v8 02/10] edac: synopsys: Rename the static functions to
- a shorter name
-In-Reply-To: <DM6PR02MB52274CC51BE196CF18C97834C1E60@DM6PR02MB5227.namprd02.prod.outlook.com>
-References: <1538667328-9465-1-git-send-email-manish.narani@xilinx.com>
- <1538667328-9465-3-git-send-email-manish.narani@xilinx.com>
- <20181004203540.GD5149@zn.tnic>
- <DM6PR02MB52274CC51BE196CF18C97834C1E60@DM6PR02MB5227.namprd02.prod.outlook.com>
-Message-ID: <20181008180338.GB5919@zn.tnic>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 8 Oct 2018 11:08:16 -0700
+Subject: ARM: Call syscall_trace_exit even when system call skipped
+In-Reply-To: <20181008110047.GA3426@asgard.redhat.com>
+References: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
+ <20181008110047.GA3426@asgard.redhat.com>
+Message-ID: <CAGXu5jK1Jkxg6gkOV9GqW4FE96UNoOaG3-f5JVq6h9gnk53ohg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2018 at 01:45:28PM +0000, Manish Narani wrote:
-> >  /**
-> > - * synps_edac_get_eccstate - Return the controller ecc enable/disable status
-> > - * @base:	Pointer to the ddr memory controller base address
-> > + * get_ecc_state - Return the controller ECC enable/disable status
-> 
-> Nit: ecc --> ECC correction can be moved to Comments correction patch. Minor. Can keep it here too. 
-> 
+On Mon, Oct 8, 2018 at 4:00 AM, Eugene Syromyatnikov <evgsyr@gmail.com> wrote:
+> From: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
+>
+> On at least x86 and ARM64, and as documented in the ptrace man page
+> a skipped system call will still cause a syscall exit ptrace stop.
+>
+> Previous to this commit 32-bit ARM did not, resulting in strace
+> being confused when seccomp skips system calls.
+>
+> This change also impacts programs that use ptrace to skip system calls.
+>
+> Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
+> Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
+> Signed-off-by: Eugene Syromyatnikov <evgsyr@gmail.com>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> Tested-by: Kees Cook <keescook@chromium.org>
+> Tested-by: Eugene Syromyatnikov <evgsyr@gmail.com>
+> ---
+> KernelVersion: 4.19-rc7
 
-All fixed except this one - this one can remain here because the patch
-is touching the line anyway.
+Did this actually make it into the patch tracker? I don't see it in Incoming...
 
-Thx.
+-Kees
+
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 746565a..0465d65 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -296,16 +296,15 @@ __sys_trace:
+>         cmp     scno, #-1                       @ skip the syscall?
+>         bne     2b
+>         add     sp, sp, #S_OFF                  @ restore stack
+> -       b       ret_slow_syscall
+>
+> -__sys_trace_return:
+> -       str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
+> +__sys_trace_return_nosave:
+> +       enable_irq_notrace
+>         mov     r0, sp
+>         bl      syscall_trace_exit
+>         b       ret_slow_syscall
+>
+> -__sys_trace_return_nosave:
+> -       enable_irq_notrace
+> +__sys_trace_return:
+> +       str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
+>         mov     r0, sp
+>         bl      syscall_trace_exit
+>         b       ret_slow_syscall
+> --
+> 2.1.4
+>
+
+
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Kees Cook
+Pixel Security
