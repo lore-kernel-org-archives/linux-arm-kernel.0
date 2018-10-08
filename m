@@ -1,34 +1,49 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue,  9 Oct 2018 00:44:10 +0530
-Subject: [PATCH 4/5] pinctrl: mediatek: pinctrl-mtk-common-v2: Make eint_m u16
+Date: Tue,  9 Oct 2018 00:44:09 +0530
+Subject: [PATCH 3/5] arm64: dts: mediatek: x20: Add pinmux support for UART1
 In-Reply-To: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
 References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181008191411.32555-5-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181008191411.32555-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For SoC's which lacks EINT support, U16_MAX is assigned to both eint_m
-and eint_n through macro NO_EINT_SUPPORT. This will generate integer
-overflow warning because eint_m is declared as u8 type. Hence modify
-the eint_m type to u16.
+Add pinmux support for UART1 on MediatekX20 Development board based
+on Mediatek MT6797 SoC.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts | 2 ++
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi        | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-index 991c1c56670c..6d24522739d9 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-@@ -154,7 +154,7 @@ struct mtk_func_desc {
-  * @eitn_n:		the eint number for this pin
-  */
- struct mtk_eint_desc {
--	u8 eint_m;
-+	u16 eint_m;
- 	u16 eint_n;
- };
+diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+index 742938a1a548..13939d55b85b 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+@@ -30,4 +30,6 @@
  
+ &uart1 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>;
+ };
+diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+index 231230d32d09..a64bb84bdec3 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+@@ -141,6 +141,13 @@
+ 			    "iocfgr", "iocfgt";
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++
++		uart1_pins_a: uart1 {
++			pins1 {
++				pinmux = <MT6797_GPIO232__FUNC_URXD1>,
++					 <MT6797_GPIO233__FUNC_UTXD1>;
++			};
++		};
+ 	};
+ 
+ 	scpsys: scpsys at 10006000 {
 -- 
 2.17.1
