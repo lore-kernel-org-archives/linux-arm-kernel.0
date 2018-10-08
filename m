@@ -1,37 +1,132 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  8 Oct 2018 17:57:43 +0200
-Subject: [PATCH] pinctrl: mediatek: select GPIOLIB
-Message-ID: <20181008155803.3322412-1-arnd@arndb.de>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Mon, 8 Oct 2018 18:58:29 +0300
+Subject: [PATCH v11 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20180929181844.87fd7560cc560f268df3c7b4@magewell.com>
+References: <1537951420-24752-1-git-send-email-yong.deng@magewell.com>
+ <20180928101937.wdlrgezxoqzua5ke@paasikivi.fi.intel.com>
+ <20180929181844.87fd7560cc560f268df3c7b4@magewell.com>
+Message-ID: <20181008155829.jxxz4mjmeuu4hzki@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing the linux/gpio.h include means we no longer have a declaration
-of gpiochip_lock_as_irq() when CONFIG_GPIOLIB is disabled:
+Hi Yong,
 
-drivers/pinctrl/mediatek/mtk-eint.c: In function 'mtk_eint_irq_request_resources':
-drivers/pinctrl/mediatek/mtk-eint.c:247:8: error: implicit declaration of function 'gpiochip_lock_as_irq'; did you mean 'spin_lock_irq'? [-Werror=implicit-function-declaration]
-drivers/pinctrl/mediatek/mtk-eint.c: In function 'mtk_eint_irq_release_resources':
-drivers/pinctrl/mediatek/mtk-eint.c:272:2: error: implicit declaration of function 'gpiochip_unlock_as_irq'; did you mean 'spin_unlock_irq'? [-Werror=implicit-function-declaration]
+On Sat, Sep 29, 2018 at 06:18:44PM +0800, Yong wrote:
+> Hi Sakari,
+> 
+> On Fri, 28 Sep 2018 13:19:37 +0300
+> Sakari Ailus <sakari.ailus@linux.intel.com> wrote:
+> 
+> > Hi Yong,
+> > 
+> > Thanks for the update! This looks pretty good; some small bits to fix
+> > still, please see my comments below.
+> > 
+> > On Wed, Sep 26, 2018 at 04:43:40PM +0800, Yong Deng wrote:
+> > > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > > interface and CSI1 is used for parallel interface. This is not
+> > > documented in datasheet but by test and guess.
+> > > 
+> > > This patch implement a v4l2 framework driver for it.
+> > > 
+> > > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > > ISP's support are not included in this patch.
+> > > 
+> 
+> ...
+> 
+> > > +
+> > > +static void sun6i_csi_v4l2_cleanup(struct sun6i_csi *csi)
+> > > +{
+> > > +	v4l2_async_notifier_unregister(&csi->notifier);
+> > > +	v4l2_async_notifier_cleanup(&csi->notifier);
+> > > +	sun6i_video_cleanup(&csi->video);
+> > > +	v4l2_device_unregister(&csi->v4l2_dev);
+> > > +	media_device_unregister(&csi->media_dev);
+> > 
+> > Please unregister the media device as first.
+> 
+> I notice that the release order of intel ipu3 is:
+>     cio2_notifier_exit(cio2);
+>     cio2_fbpt_exit_dummy(cio2);
+>     for (i = 0; i < CIO2_QUEUES; i++) 
+>         cio2_queue_exit(cio2, &cio2->queue[i]);
+>     v4l2_device_unregister(&cio2->v4l2_dev);
+>     media_device_unregister(&cio2->media_dev);
+>     media_device_cleanup(&cio2->media_dev);
+>     mutex_destroy(&cio2->lock);
 
-Select it explictly instead.
+Well, yeah... this doesn't make a big difference after all. Unregistering
+the media device first is still preferred.
 
-Fixes: 1c5fb66afa2a ("pinctrl: Include <linux/gpio/driver.h> nothing else")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pinctrl/mediatek/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+> 
+> > 
+> > You're missing freeing the control handler.
+> > 
+> > > +	media_device_cleanup(&csi->media_dev);
+> > > +}
+> > > +
+> > > +static int sun6i_csi_v4l2_init(struct sun6i_csi *csi)
+> > > +{
+> > > +	int ret;
+> > > +
+> > > +	csi->media_dev.dev = csi->dev;
+> > > +	strlcpy(csi->media_dev.model, "Allwinner Video Capture Device",
+> > > +		sizeof(csi->media_dev.model));
+> > 
+> > strscpy, please.
+> > 
+> > > +	csi->media_dev.hw_revision = 0;
+> > > +
+> > > +	media_device_init(&csi->media_dev);
+> > > +
+> > > +	ret = v4l2_ctrl_handler_init(&csi->ctrl_handler, 0);
+> > 
+> > Do you need controls? The driver doesn't appear to register any.
+> 
+> Some one suggest this. They want the drver can pass control queries to 
+> the subdev.
 
-diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
-index 05be5ddafec4..9d142e1da567 100644
---- a/drivers/pinctrl/mediatek/Kconfig
-+++ b/drivers/pinctrl/mediatek/Kconfig
-@@ -4,6 +4,7 @@ menu "MediaTek pinctrl drivers"
- config EINT_MTK
- 	bool "MediaTek External Interrupt Support"
- 	depends on PINCTRL_MTK || PINCTRL_MTK_MOORE || COMPILE_TEST
-+	select GPIOLIB
- 	select IRQ_DOMAIN
- 
- config PINCTRL_MTK
+If you need that, it should be done in the user space instead. The imx
+staging driver does so but it is not supported by the control framework:
+you may only call v4l2_ctrl_handler_free() for the purpose of freeing the
+resources of the control handler --- not while it is still accessible from
+the user space.
+
+> 
+> > 
+> > > +	if (ret) {
+> > > +		dev_err(csi->dev, "V4L2 controls handler init failed (%d)\n",
+> > > +			ret);
+> > > +		goto clean_media;
+> > > +	}
+> > > +
+> > > +	csi->v4l2_dev.mdev = &csi->media_dev;
+> > > +	csi->v4l2_dev.ctrl_handler = &csi->ctrl_handler;
+> > > +	ret = v4l2_device_register(csi->dev, &csi->v4l2_dev);
+> > > +	if (ret) {
+> > > +		dev_err(csi->dev, "V4L2 device registration failed (%d)\n",
+> 
+> ...
+> 
+> > > +
+> > > +/*
+> > > + * PHYS_OFFSET isn't available on all architectures. In order to
+> > > + * accomodate for COMPILE_TEST, let's define it to something dumb.
+> > > + */
+> > > +#ifndef PHYS_OFFSET
+> > 
+> > How about:
+> > 
+> > #if !defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
+> 
+> Do you mean:
+> #if defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
+
+Oh, yes. Indeed.
+
 -- 
-2.18.0
+Kind regards,
+
+Sakari Ailus
+sakari.ailus at linux.intel.com
