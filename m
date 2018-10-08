@@ -1,177 +1,148 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 Oct 2018 02:46:02 +0800
-Subject: [stericsson:ux500-mcde 9/9] drivers/gpu/drm/mcde/mcde_dsi.c:570:2:
- note: in expansion of macro 'dev_info'
-Message-ID: <201810090258.6mZVssy6%fengguang.wu@intel.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon,  8 Oct 2018 20:31:13 +0200
+Subject: [PATCH 4.18 093/168] perf annotate: Fix parsing aarch64 branch
+ instructions after objdump update
+In-Reply-To: <20181008175620.043587728@linuxfoundation.org>
+References: <20181008175620.043587728@linuxfoundation.org>
+Message-ID: <20181008175623.594562370@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-mcde
-head:   d74bab74ec7c93c05538d1d600dba240e00798e2
-commit: d74bab74ec7c93c05538d1d600dba240e00798e2 [9/9] drm/mcde: Add new driver for ST-Ericsson MCDE
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d74bab74ec7c93c05538d1d600dba240e00798e2
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+4.18-stable review patch.  If anyone has any objections, please let me know.
 
-All warnings (new ones prefixed by >>):
+------------------
 
-   In file included from include/linux/platform_device.h:14:0,
-                    from drivers/gpu/drm/mcde/mcde_dsi.c:2:
-   drivers/gpu/drm/mcde/mcde_dsi.c: In function 'mcde_dsi_host_transfer':
-   drivers/gpu/drm/mcde/mcde_dsi.c:571:4: warning: format '%d' expects argument of type 'int', but argument 4 has type 'size_t {aka long unsigned int}' [-Wformat=]
-       "message to channel %d, %d bytes",
-       ^
-   include/linux/device.h:1335:22: note: in definition of macro 'dev_fmt'
-    #define dev_fmt(fmt) fmt
-                         ^~~
->> drivers/gpu/drm/mcde/mcde_dsi.c:570:2: note: in expansion of macro 'dev_info'
-     dev_info(d->dev,
-     ^~~~~~~~
+From: Kim Phillips <kim.phillips@arm.com>
 
-vim +/dev_info +570 drivers/gpu/drm/mcde/mcde_dsi.c
+[ Upstream commit 4e67b2a5df5d3f341776d12ee575e00ca3ef92de ]
 
-   544	
-   545	#define MCDE_DSI_HOST_IS_READ(type)			    \
-   546	        ((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
-   547		 (type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
-   548		 (type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
-   549		 (type == MIPI_DSI_DCS_READ))
-   550	
-   551	static ssize_t mcde_dsi_host_transfer(struct mipi_dsi_host *host,
-   552					      const struct mipi_dsi_msg *msg)
-   553	{
-   554		struct mcde_dsi *d = host_to_mcde_dsi(host);
-   555		const u32 loop_delay_us = 10; /* us */
-   556		const u8 *tx = msg->tx_buf;
-   557		u32 loop_counter;
-   558		size_t txlen;
-   559		u32 val;
-   560		int ret;
-   561		int i;
-   562	
-   563		txlen = msg->tx_len;
-   564		if (txlen > 12) {
-   565			dev_err(d->dev,
-   566				"dunno how to write more than 12 bytes yet\n");
-   567			return -EIO;
-   568		}
-   569	
- > 570		dev_info(d->dev,
-   571			 "message to channel %d, %d bytes",
-   572			 msg->channel,
-   573			 txlen);
-   574	
-   575		/* Command "nature" */
-   576		if (MCDE_DSI_HOST_IS_READ(msg->type))
-   577			/* MCTL_MAIN_DATA_CTL already set up */
-   578			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_READ;
-   579		else
-   580			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_WRITE;
-   581		/*
-   582		 * More than 2 bytes will not fit in a single packet, so it's
-   583		 * time to set the "long not short" bit. One byte is used by
-   584		 * the MIPI DCS command leaving just one byte for the payload
-   585		 * in a short package.
-   586		 */
-   587		if (mipi_dsi_packet_format_is_long(msg->type))
-   588			val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT;
-   589		val |= 0 << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_SHIFT;
-   590		/* Add one to the length for the MIPI DCS command */
-   591		val |= txlen
-   592			<< DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_SHIFT;
-   593		val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN;
-   594	        val |= msg->type << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_SHIFT;
-   595		writel(val, d->regs + DSI_DIRECT_CMD_MAIN_SETTINGS);
-   596	
-   597		/* MIPI DCS command is part of the data */
-   598		if (txlen > 0) {
-   599			val = 0;
-   600			for (i = 0; i < 4 && i < txlen; i++)
-   601				val |= tx[i] << (i & 3) * 8;
-   602		}
-   603		writel(val, d->regs + DSI_DIRECT_CMD_WRDAT0);
-   604		if (txlen > 4) {
-   605			val = 0;
-   606			for (i = 0; i < 4 && (i + 4) < txlen; i++)
-   607				val |= tx[i + 4] << (i & 3) * 8;
-   608			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT1);
-   609		}
-   610		if (txlen > 8) {
-   611			val = 0;
-   612			for (i = 0; i < 4 && (i + 8) < txlen; i++)
-   613				val |= tx[i + 8] << (i & 3) * 8;
-   614			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT2);
-   615		}
-   616		if (txlen > 12) {
-   617			val = 0;
-   618			for (i = 0; i < 4 && (i + 12) < txlen; i++)
-   619				val |= tx[i + 12] << (i & 3) * 8;
-   620			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT3);
-   621		}
-   622	
-   623		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
-   624		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
-   625		/* Send command */
-   626		writel(1, d->regs + DSI_DIRECT_CMD_SEND);
-   627	
-   628		loop_counter = 1000 * 1000 / loop_delay_us;
-   629		while (!(readl(d->regs + DSI_DIRECT_CMD_STS) &
-   630			 DSI_DIRECT_CMD_STS_WRITE_COMPLETED)
-   631		       && --loop_counter)
-   632			usleep_range(loop_delay_us, (loop_delay_us * 3) / 2);
-   633	
-   634		if (!loop_counter) {
-   635	                dev_err(d->dev, "DSI write timeout!\n");
-   636	                return -ETIME;
-   637	        }
-   638	
-   639		val = readl(d->regs + DSI_DIRECT_CMD_STS);
-   640		if (val & DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED) {
-   641			val >>= DSI_DIRECT_CMD_STS_ACK_VAL_SHIFT;
-   642			dev_err(d->dev, "error during transmission: %04x\n",
-   643				val);
-   644			return -EIO;
-   645		}
-   646	
-   647		if (!MCDE_DSI_HOST_IS_READ(msg->type)) {
-   648			/* Return number of bytes written */
-   649			if (mipi_dsi_packet_format_is_long(msg->type))
-   650				ret = 4 + txlen;
-   651			else
-   652				ret = 4;
-   653		} else {
-   654			/* OK this is a read command, get the response */
-   655			u32 rdsz;
-   656			u32 rddat;
-   657			u8 *rx = msg->rx_buf;
-   658	
-   659			rdsz = readl(d->regs + DSI_DIRECT_CMD_RD_PROPERTY);
-   660			rdsz &= DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE_MASK;
-   661			rddat = readl(d->regs + DSI_DIRECT_CMD_RDDAT);
-   662			for (i = 0; i < 4 && i < rdsz; i++)
-   663				rx[i] = (rddat >> (i * 8)) & 0xff;
-   664			ret = rdsz;
-   665		}
-   666	
-   667		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
-   668		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
-   669	
-   670		return ret;
-   671	}
-   672	
+Starting with binutils 2.28, aarch64 objdump adds comments to the
+disassembly output to show the alternative names of a condition code
+[1].
 
+It is assumed that commas in objdump comments could occur in other
+arches now or in the future, so this fix is arch-independent.
+
+The fix could have been done with arm64 specific jump__parse and
+jump__scnprintf functions, but the jump__scnprintf instruction would
+have to have its comment character be a literal, since the scnprintf
+functions cannot receive a struct arch easily.
+
+This inconvenience also applies to the generic jump__scnprintf, which is
+why we add a raw_comment pointer to struct ins_operands, so the __parse
+function assigns it to be re-used by its corresponding __scnprintf
+function.
+
+Example differences in 'perf annotate --stdio2' output on an aarch64
+perf.data file:
+
+BEFORE: ? b.cs   ffff200008133d1c <unwind_frame+0x18c>  // b.hs, dffff7ecc47b
+AFTER : ? b.cs   18c
+
+BEFORE: ? b.cc   ffff200008d8d9cc <get_alloc_profile+0x31c>  // b.lo, b.ul, dffff727295b
+AFTER : ? b.cc   31c
+
+The branch target labels 18c and 31c also now appear in the output:
+
+BEFORE:        add    x26, x29, #0x80
+AFTER : 18c:   add    x26, x29, #0x80
+
+BEFORE:        add    x21, x21, #0x8
+AFTER : 31c:   add    x21, x21, #0x8
+
+The Fixes: tag below is added so stable branches will get the update; it
+doesn't necessarily mean that commit was broken at the time, rather it
+didn't withstand the aarch64 objdump update.
+
+Tested no difference in output for sample x86_64, power arch perf.data files.
+
+[1] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bb7eff5206e4795ac79c177a80fe9f4630aaf730
+
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+Tested-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Anton Blanchard <anton@samba.org>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Taeung Song <treeze.taeung@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Fixes: b13bbeee5ee6 ("perf annotate: Fix branch instruction with multiple operands")
+Link: http://lkml.kernel.org/r/20180827125340.a2f7e291901d17cea05daba4 at arm.com
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61064 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181009/f9312647/attachment-0001.gz>
+ tools/perf/util/annotate.c |   22 +++++++++++++++++++++-
+ tools/perf/util/annotate.h |    1 +
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+
+--- a/tools/perf/util/annotate.c
++++ b/tools/perf/util/annotate.c
+@@ -281,7 +281,19 @@ bool ins__is_call(const struct ins *ins)
+ 	return ins->ops == &call_ops || ins->ops == &s390_call_ops;
+ }
+ 
+-static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *ops, struct map_symbol *ms)
++/*
++ * Prevents from matching commas in the comment section, e.g.:
++ * ffff200008446e70:       b.cs    ffff2000084470f4 <generic_exec_single+0x314>  // b.hs, b.nlast
++ */
++static inline const char *validate_comma(const char *c, struct ins_operands *ops)
++{
++	if (ops->raw_comment && c > ops->raw_comment)
++		return NULL;
++
++	return c;
++}
++
++static int jump__parse(struct arch *arch, struct ins_operands *ops, struct map_symbol *ms)
+ {
+ 	struct map *map = ms->map;
+ 	struct symbol *sym = ms->sym;
+@@ -290,6 +302,10 @@ static int jump__parse(struct arch *arch
+ 	};
+ 	const char *c = strchr(ops->raw, ',');
+ 	u64 start, end;
++
++	ops->raw_comment = strchr(ops->raw, arch->objdump.comment_char);
++	c = validate_comma(c, ops);
++
+ 	/*
+ 	 * Examples of lines to parse for the _cpp_lex_token@@Base
+ 	 * function:
+@@ -309,6 +325,7 @@ static int jump__parse(struct arch *arch
+ 		ops->target.addr = strtoull(c, NULL, 16);
+ 		if (!ops->target.addr) {
+ 			c = strchr(c, ',');
++			c = validate_comma(c, ops);
+ 			if (c++ != NULL)
+ 				ops->target.addr = strtoull(c, NULL, 16);
+ 		}
+@@ -366,9 +383,12 @@ static int jump__scnprintf(struct ins *i
+ 		return scnprintf(bf, size, "%-6s %s", ins->name, ops->target.sym->name);
+ 
+ 	c = strchr(ops->raw, ',');
++	c = validate_comma(c, ops);
++
+ 	if (c != NULL) {
+ 		const char *c2 = strchr(c + 1, ',');
+ 
++		c2 = validate_comma(c2, ops);
+ 		/* check for 3-op insn */
+ 		if (c2 != NULL)
+ 			c = c2;
+--- a/tools/perf/util/annotate.h
++++ b/tools/perf/util/annotate.h
+@@ -21,6 +21,7 @@ struct ins {
+ 
+ struct ins_operands {
+ 	char	*raw;
++	char	*raw_comment;
+ 	struct {
+ 		char	*raw;
+ 		char	*name;
