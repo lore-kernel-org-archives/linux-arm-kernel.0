@@ -1,36 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 08 Oct 2018 14:50:03 +0200
-Subject: [PATCH 1/7] clocksource: exynos_mct: Remove dead code
+Date: Mon, 08 Oct 2018 14:50:08 +0200
+Subject: [PATCH 6/7] arm64: dts: exynos: Mark arch_timer device as
+ not-fw-configured on TM2(e)
 In-Reply-To: <20181008125009.3721-1-m.szyprowski@samsung.com>
 References: <20181008125009.3721-1-m.szyprowski@samsung.com>
- <CGME20181008125046eucas1p1e0304c8c22a4ac128a8e507c86442a37@eucas1p1.samsung.com>
-Message-ID: <20181008125009.3721-2-m.szyprowski@samsung.com>
+ <CGME20181008125050eucas1p1caae30a4e791190e6c731816e36832ab@eucas1p1.samsung.com>
+Message-ID: <20181008125009.3721-7-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos Multi-Core Timer driver is used only on device-tree based
-systems, so remove non-dt related code.
+TM2(e) boards use old firmware, which some PCSI requirements and doesn't
+properly configure arch virtual timers, so add property indicating this
+state. This enables respective workarounds in the timer driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/clocksource/exynos_mct.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 7a244b681876..43b335ff4a96 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -581,11 +581,7 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
- 	 * timer irqs are specified after the four global timer
- 	 * irqs are specified.
- 	 */
--#ifdef CONFIG_OF
- 	nr_irqs = of_irq_count(np);
--#else
--	nr_irqs = 0;
--#endif
- 	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
- 		mct_irqs[i] = irq_of_parse_and_map(np, i);
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+index 2606c2ab6456..ded0fb6c5936 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+@@ -1265,6 +1265,7 @@
+ };
+ 
+ &timer {
++	arm,cpu-registers-not-fw-configured;
+ 	clock-frequency = <24000000>;
+ };
  
 -- 
 2.17.1
