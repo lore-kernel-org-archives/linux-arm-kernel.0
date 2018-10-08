@@ -1,219 +1,177 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Mon, 8 Oct 2018 11:21:45 -0700
-Subject: [PATCH v6 3/4] dt-bindings: clock: Add bindings for ZynqMP clock
- driver
-In-Reply-To: <1539022906-18073-1-git-send-email-jollys@xilinx.com>
-References: <1539022906-18073-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1539022906-18073-4-git-send-email-jollys@xilinx.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 9 Oct 2018 02:46:02 +0800
+Subject: [stericsson:ux500-mcde 9/9] drivers/gpu/drm/mcde/mcde_dsi.c:570:2:
+ note: in expansion of macro 'dev_info'
+Message-ID: <201810090258.6mZVssy6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajan Vaja <rajan.vaja@xilinx.com>
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-mcde
+head:   d74bab74ec7c93c05538d1d600dba240e00798e2
+commit: d74bab74ec7c93c05538d1d600dba240e00798e2 [9/9] drm/mcde: Add new driver for ST-Ericsson MCDE
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout d74bab74ec7c93c05538d1d600dba240e00798e2
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-Add documentation to describe Xilinx ZynqMP clock driver
-bindings.
+All warnings (new ones prefixed by >>):
 
-Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-Signed-off-by: Jolly Shah <jollys@xilinx.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Stephen Boyd <sboyd@kernel.org>
+   In file included from include/linux/platform_device.h:14:0,
+                    from drivers/gpu/drm/mcde/mcde_dsi.c:2:
+   drivers/gpu/drm/mcde/mcde_dsi.c: In function 'mcde_dsi_host_transfer':
+   drivers/gpu/drm/mcde/mcde_dsi.c:571:4: warning: format '%d' expects argument of type 'int', but argument 4 has type 'size_t {aka long unsigned int}' [-Wformat=]
+       "message to channel %d, %d bytes",
+       ^
+   include/linux/device.h:1335:22: note: in definition of macro 'dev_fmt'
+    #define dev_fmt(fmt) fmt
+                         ^~~
+>> drivers/gpu/drm/mcde/mcde_dsi.c:570:2: note: in expansion of macro 'dev_info'
+     dev_info(d->dev,
+     ^~~~~~~~
+
+vim +/dev_info +570 drivers/gpu/drm/mcde/mcde_dsi.c
+
+   544	
+   545	#define MCDE_DSI_HOST_IS_READ(type)			    \
+   546	        ((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
+   547		 (type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
+   548		 (type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
+   549		 (type == MIPI_DSI_DCS_READ))
+   550	
+   551	static ssize_t mcde_dsi_host_transfer(struct mipi_dsi_host *host,
+   552					      const struct mipi_dsi_msg *msg)
+   553	{
+   554		struct mcde_dsi *d = host_to_mcde_dsi(host);
+   555		const u32 loop_delay_us = 10; /* us */
+   556		const u8 *tx = msg->tx_buf;
+   557		u32 loop_counter;
+   558		size_t txlen;
+   559		u32 val;
+   560		int ret;
+   561		int i;
+   562	
+   563		txlen = msg->tx_len;
+   564		if (txlen > 12) {
+   565			dev_err(d->dev,
+   566				"dunno how to write more than 12 bytes yet\n");
+   567			return -EIO;
+   568		}
+   569	
+ > 570		dev_info(d->dev,
+   571			 "message to channel %d, %d bytes",
+   572			 msg->channel,
+   573			 txlen);
+   574	
+   575		/* Command "nature" */
+   576		if (MCDE_DSI_HOST_IS_READ(msg->type))
+   577			/* MCTL_MAIN_DATA_CTL already set up */
+   578			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_READ;
+   579		else
+   580			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_WRITE;
+   581		/*
+   582		 * More than 2 bytes will not fit in a single packet, so it's
+   583		 * time to set the "long not short" bit. One byte is used by
+   584		 * the MIPI DCS command leaving just one byte for the payload
+   585		 * in a short package.
+   586		 */
+   587		if (mipi_dsi_packet_format_is_long(msg->type))
+   588			val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT;
+   589		val |= 0 << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_SHIFT;
+   590		/* Add one to the length for the MIPI DCS command */
+   591		val |= txlen
+   592			<< DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_SHIFT;
+   593		val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN;
+   594	        val |= msg->type << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_SHIFT;
+   595		writel(val, d->regs + DSI_DIRECT_CMD_MAIN_SETTINGS);
+   596	
+   597		/* MIPI DCS command is part of the data */
+   598		if (txlen > 0) {
+   599			val = 0;
+   600			for (i = 0; i < 4 && i < txlen; i++)
+   601				val |= tx[i] << (i & 3) * 8;
+   602		}
+   603		writel(val, d->regs + DSI_DIRECT_CMD_WRDAT0);
+   604		if (txlen > 4) {
+   605			val = 0;
+   606			for (i = 0; i < 4 && (i + 4) < txlen; i++)
+   607				val |= tx[i + 4] << (i & 3) * 8;
+   608			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT1);
+   609		}
+   610		if (txlen > 8) {
+   611			val = 0;
+   612			for (i = 0; i < 4 && (i + 8) < txlen; i++)
+   613				val |= tx[i + 8] << (i & 3) * 8;
+   614			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT2);
+   615		}
+   616		if (txlen > 12) {
+   617			val = 0;
+   618			for (i = 0; i < 4 && (i + 12) < txlen; i++)
+   619				val |= tx[i + 12] << (i & 3) * 8;
+   620			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT3);
+   621		}
+   622	
+   623		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   624		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   625		/* Send command */
+   626		writel(1, d->regs + DSI_DIRECT_CMD_SEND);
+   627	
+   628		loop_counter = 1000 * 1000 / loop_delay_us;
+   629		while (!(readl(d->regs + DSI_DIRECT_CMD_STS) &
+   630			 DSI_DIRECT_CMD_STS_WRITE_COMPLETED)
+   631		       && --loop_counter)
+   632			usleep_range(loop_delay_us, (loop_delay_us * 3) / 2);
+   633	
+   634		if (!loop_counter) {
+   635	                dev_err(d->dev, "DSI write timeout!\n");
+   636	                return -ETIME;
+   637	        }
+   638	
+   639		val = readl(d->regs + DSI_DIRECT_CMD_STS);
+   640		if (val & DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED) {
+   641			val >>= DSI_DIRECT_CMD_STS_ACK_VAL_SHIFT;
+   642			dev_err(d->dev, "error during transmission: %04x\n",
+   643				val);
+   644			return -EIO;
+   645		}
+   646	
+   647		if (!MCDE_DSI_HOST_IS_READ(msg->type)) {
+   648			/* Return number of bytes written */
+   649			if (mipi_dsi_packet_format_is_long(msg->type))
+   650				ret = 4 + txlen;
+   651			else
+   652				ret = 4;
+   653		} else {
+   654			/* OK this is a read command, get the response */
+   655			u32 rdsz;
+   656			u32 rddat;
+   657			u8 *rx = msg->rx_buf;
+   658	
+   659			rdsz = readl(d->regs + DSI_DIRECT_CMD_RD_PROPERTY);
+   660			rdsz &= DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE_MASK;
+   661			rddat = readl(d->regs + DSI_DIRECT_CMD_RDDAT);
+   662			for (i = 0; i < 4 && i < rdsz; i++)
+   663				rx[i] = (rddat >> (i * 8)) & 0xff;
+   664			ret = rdsz;
+   665		}
+   666	
+   667		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   668		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   669	
+   670		return ret;
+   671	}
+   672	
+
 ---
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  53 ++++++++++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 +++++++++++++++++++++
- 2 files changed, 169 insertions(+)
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
-
-diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-index 1b431d9..614bac5 100644
---- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-+++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-@@ -17,6 +17,53 @@ Required properties:
- 		  - "smc" : SMC #0, following the SMCCC
- 		  - "hvc" : HVC #0, following the SMCCC
- 
-+--------------------------------------------------------------------------
-+Device Tree Clock bindings for the Zynq Ultrascale+ MPSoC controlled using
-+Zynq MPSoC firmware interface
-+--------------------------------------------------------------------------
-+The clock controller is a h/w block of Zynq Ultrascale+ MPSoC clock
-+tree. It reads required input clock frequencies from the devicetree and acts
-+as clock provider for all clock consumers of PS clocks.
-+
-+See clock_bindings.txt for more information on the generic clock bindings.
-+
-+Required properties:
-+ - #clock-cells:	Must be 1
-+ - compatible:		Must contain:	"xlnx,zynqmp-clk"
-+ - clocks:		List of clock specifiers which are external input
-+			clocks to the given clock controller. Please refer
-+			the next section to find the input clocks for a
-+			given controller.
-+ - clock-names:		List of clock names which are exteral input clocks
-+			to the given clock controller. Please refer to the
-+			clock bindings for more details.
-+
-+Input clocks for zynqmp Ultrascale+ clock controller:
-+
-+The Zynq UltraScale+ MPSoC has one primary and four alternative reference clock
-+inputs. These required clock inputs are:
-+ - pss_ref_clk (PS reference clock)
-+ - video_clk (reference clock for video system )
-+ - pss_alt_ref_clk (alternative PS reference clock)
-+ - aux_ref_clk
-+ - gt_crx_ref_clk (transceiver reference clock)
-+
-+The following strings are optional parameters to the 'clock-names' property in
-+order to provide an optional (E)MIO clock source:
-+ - swdt0_ext_clk
-+ - swdt1_ext_clk
-+ - gem0_emio_clk
-+ - gem1_emio_clk
-+ - gem2_emio_clk
-+ - gem3_emio_clk
-+ - mio_clk_XX		# with XX = 00..77
-+ - mio_clk_50_or_51	#for the mux clock to gem tsu from 50 or 51
-+
-+
-+Output clocks are registered based on clock information received
-+from firmware. Output clocks indexes are mentioned in
-+include/dt-bindings/clock/xlnx,zynqmp-clk.h.
-+
- -------
- Example
- -------
-@@ -25,5 +72,11 @@ firmware {
- 	zynqmp_firmware: zynqmp-firmware {
- 		compatible = "xlnx,zynqmp-firmware";
- 		method = "smc";
-+		zynqmp_clk: clock-controller {
-+			#clock-cells = <1>;
-+			compatible = "xlnx,zynqmp-clk";
-+			clocks = <&pss_ref_clk>, <&video_clk>, <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
-+			clock-names = "pss_ref_clk", "video_clk", "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
-+		};
- 	};
- };
-diff --git a/include/dt-bindings/clock/xlnx,zynqmp-clk.h b/include/dt-bindings/clock/xlnx,zynqmp-clk.h
-new file mode 100644
-index 0000000..4aebe6e
---- /dev/null
-+++ b/include/dt-bindings/clock/xlnx,zynqmp-clk.h
-@@ -0,0 +1,116 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Xilinx Zynq MPSoC Firmware layer
-+ *
-+ *  Copyright (C) 2014-2018 Xilinx, Inc.
-+ *
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_ZYNQMP_H
-+#define _DT_BINDINGS_CLK_ZYNQMP_H
-+
-+#define IOPLL			0
-+#define RPLL			1
-+#define APLL			2
-+#define DPLL			3
-+#define VPLL			4
-+#define IOPLL_TO_FPD		5
-+#define RPLL_TO_FPD		6
-+#define APLL_TO_LPD		7
-+#define DPLL_TO_LPD		8
-+#define VPLL_TO_LPD		9
-+#define ACPU			10
-+#define ACPU_HALF		11
-+#define DBF_FPD			12
-+#define DBF_LPD			13
-+#define DBG_TRACE		14
-+#define DBG_TSTMP		15
-+#define DP_VIDEO_REF		16
-+#define DP_AUDIO_REF		17
-+#define DP_STC_REF		18
-+#define GDMA_REF		19
-+#define DPDMA_REF		20
-+#define DDR_REF			21
-+#define SATA_REF		22
-+#define PCIE_REF		23
-+#define GPU_REF			24
-+#define GPU_PP0_REF		25
-+#define GPU_PP1_REF		26
-+#define TOPSW_MAIN		27
-+#define TOPSW_LSBUS		28
-+#define GTGREF0_REF		29
-+#define LPD_SWITCH		30
-+#define LPD_LSBUS		31
-+#define USB0_BUS_REF		32
-+#define USB1_BUS_REF		33
-+#define USB3_DUAL_REF		34
-+#define USB0			35
-+#define USB1			36
-+#define CPU_R5			37
-+#define CPU_R5_CORE		38
-+#define CSU_SPB			39
-+#define CSU_PLL			40
-+#define PCAP			41
-+#define IOU_SWITCH		42
-+#define GEM_TSU_REF		43
-+#define GEM_TSU			44
-+#define GEM0_REF		45
-+#define GEM1_REF		46
-+#define GEM2_REF		47
-+#define GEM3_REF		48
-+#define GEM0_TX			49
-+#define GEM1_TX			50
-+#define GEM2_TX			51
-+#define GEM3_TX			52
-+#define QSPI_REF		53
-+#define SDIO0_REF		54
-+#define SDIO1_REF		55
-+#define UART0_REF		56
-+#define UART1_REF		57
-+#define SPI0_REF		58
-+#define SPI1_REF		59
-+#define NAND_REF		60
-+#define I2C0_REF		61
-+#define I2C1_REF		62
-+#define CAN0_REF		63
-+#define CAN1_REF		64
-+#define CAN0			65
-+#define CAN1			66
-+#define DLL_REF			67
-+#define ADMA_REF		68
-+#define TIMESTAMP_REF		69
-+#define AMS_REF			70
-+#define PL0_REF			71
-+#define PL1_REF			72
-+#define PL2_REF			73
-+#define PL3_REF			74
-+#define WDT			75
-+#define IOPLL_INT		76
-+#define IOPLL_PRE_SRC		77
-+#define IOPLL_HALF		78
-+#define IOPLL_INT_MUX		79
-+#define IOPLL_POST_SRC		80
-+#define RPLL_INT		81
-+#define RPLL_PRE_SRC		82
-+#define RPLL_HALF		83
-+#define RPLL_INT_MUX		84
-+#define RPLL_POST_SRC		85
-+#define APLL_INT		86
-+#define APLL_PRE_SRC		87
-+#define APLL_HALF		88
-+#define APLL_INT_MUX		89
-+#define APLL_POST_SRC		90
-+#define DPLL_INT		91
-+#define DPLL_PRE_SRC		92
-+#define DPLL_HALF		93
-+#define DPLL_INT_MUX		94
-+#define DPLL_POST_SRC		95
-+#define VPLL_INT		96
-+#define VPLL_PRE_SRC		97
-+#define VPLL_HALF		98
-+#define VPLL_INT_MUX		99
-+#define VPLL_POST_SRC		100
-+#define CAN0_MIO		101
-+#define CAN1_MIO		102
-+
-+#endif
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61064 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181009/f9312647/attachment-0001.gz>
