@@ -1,88 +1,65 @@
-From: keith.busch@intel.com (Keith Busch)
-Date: Mon, 8 Oct 2018 10:18:47 -0600
-Subject: [PATCH 00/12] error handling and pciehp maintenance
-In-Reply-To: <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
-References: <20180918235848.26694-1-keith.busch@intel.com>
- <20181004214015.GK120535@bhelgaas-glaptop.roam.corp.google.com>
- <20181004221137.GB21834@localhost.localdomain>
- <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20181008161847.GA30971@localhost.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Oct 2018 17:18:18 +0100
+Subject: [PATCH] KVM: arm64: remove the unnecessary function check
+In-Reply-To: <1535708579-12233-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1535708579-12233-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <afbb853e-ef22-dde4-d17d-6802264f1ce9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2018 at 12:31:45PM -0500, Bjorn Helgaas wrote:
-> [+cc arm64 folks, LKML: This conversation is about this patch:
+On 31/08/18 10:42, Shaokun Zhang wrote:
+> init_common_resources always return 0 and it is redundant to check the
+> return value, let's make it void to simplify the code.
 > 
->   https://lore.kernel.org/linux-pci/20180918235848.26694-3-keith.busch at intel.com
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> ---
+>   virt/kvm/arm/arm.c | 8 ++------
+>   1 file changed, 2 insertions(+), 6 deletions(-)
 > 
-> which fixes some PCIe AER error injection bugs, but also makes the error
-> injector dependent on DYNAMIC_FTRACE_WITH_REGS, which not all arches
-> support.  Note that this question is only about the error *injection*
-> module used for testing.  It doesn't affect AER support itself.]
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index c92053b..66a29c9 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1406,13 +1406,11 @@ static inline void hyp_cpu_pm_exit(void)
+>   }
+>   #endif
+>   
+> -static int init_common_resources(void)
+> +static void init_common_resources(void)
+>   {
+>   	/* set size of VMID supported by CPU */
+>   	kvm_vmid_bits = kvm_get_vmid_bits();
+>   	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+> -
+> -	return 0;
+>   }
+>   
+>   static int init_subsystems(void)
+> @@ -1655,9 +1653,7 @@ int kvm_arch_init(void *opaque)
+>   		}
+>   	}
+>   
+> -	err = init_common_resources();
+> -	if (err)
+> -		return err;
+> +	init_common_resources();
+>   
+>   	in_hyp_mode = is_kernel_in_hyp_mode();
+>   
 > 
-> On Thu, Oct 04, 2018 at 04:11:37PM -0600, Keith Busch wrote:
-> > On Thu, Oct 04, 2018 at 04:40:15PM -0500, Bjorn Helgaas wrote:
-> > > On Tue, Sep 18, 2018 at 05:58:36PM -0600, Keith Busch wrote:
-> > > > I ran into a lot of trouble testing error handling, and this series is
-> > > > just trying to simplify some things. The first 4 fix up aer_inject, and
-> > > > the rest are cleanup to make better use of kernel APIs.
-> > > > 
-> > > > Keith Busch (12):
-> > > >   PCI: Set PCI bus accessors to noinline
-> > > >   PCI/AER: Covertly inject errors
-> > > >   PCI/AER: Reuse existing service device lookup
-> > > >   PCI/AER: Abstract AER interrupt handling
-> > > >   PCI/AER: Remove dead code
-> > > >   PCI/AER: Remove error source from aer struct
-> > > >   PCI/AER: Use kfifo for tracking events
-> > > >   PCI/AER: Use kfifo helper inserting locked elements
-> > > >   PCI/AER: Don't read upstream ports below fatal errors
-> > > >   PCI/AER: Use threaded IRQ for bottom half
-> > > >   PCI/AER: Use managed resource allocations
-> > > >   PCI/pciehp: Use device managed allocations
-> > > > 
-> > > >  drivers/pci/access.c              |   4 +-
-> > > >  drivers/pci/hotplug/pciehp_core.c |  14 +-
-> > > >  drivers/pci/hotplug/pciehp_hpc.c  |  48 ++----
-> > > >  drivers/pci/pcie/Kconfig          |   2 +-
-> > > >  drivers/pci/pcie/aer.c            | 219 ++++++---------------------
-> > > >  drivers/pci/pcie/aer_inject.c     | 306 ++++++++++++++++++++------------------
-> > > >  drivers/pci/pcie/portdrv.h        |   4 -
-> > > >  drivers/pci/pcie/portdrv_core.c   |   1 +
-> > > >  8 files changed, 227 insertions(+), 371 deletions(-)
-> > > 
-> > > Thanks a lot for doing this!  I applied these to pci/hotplug for
-> > > v4.20, except for "PCI/AER: Don't read upstream ports below fatal
-> > > errors", which seems to be already there via another posting, and
-> > > "PCI/pciehp: Use device managed allocations", which needs a few
-> > > tweaks.
-> > 
-> > Sounds good, and thanks for applying!
-> > 
-> > In case this went unnoticed, patch 2's aer_inject using ftrace hooks
-> > to pci config accessors is really cool and fixes several kernel crashes
-> > I encountered, but it may not work on every architecture. I'm not sure
-> > how widely aer_inject is used, so maybe there are no concerns with the
-> > DYNAMIC_FTRACE_WITH_REGS dependency, but I just want to reemphasize that
-> > dependency in case there are valid objections.
-> 
-> Oh, indeed, I hadn't noticed this arch dependency.  AFAICT, the new
-> DYNAMIC_FTRACE_WITH_REGS dependency means aer_inject will work only
-> on these arches:
-> 
->   arm		# if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
->   powerpc	# if PPC64 && CPU_LITTLE_ENDIAN
->   riscv		# ARCH_RV64I only
->   s390
->   x86
-> 
-> Notably missing is arm64, which has DYNAMIC_FTRACE but not
-> DYNAMIC_FTRACE_WITH_REGS.
-> 
-> Bjorn
 
-Looks like the kbuild bot found an ARM kernel config that has
-DYNAMIC_FTRACE_WITH_REGS set, and then the module can't compile
-there. I'll need to update this patch regardless, and I think the right
-thing to do is maintain the "old" way with conditional compiling for
-any arch specific features.
+Although I agree this looks pretty superfluous at the moment, I'd rather 
+keep init_common_resources as it is at the moment, as we may well end-up 
+with more stuff in it, which could fail.
+
+Another possibility would be to merge everything in init_subsystems, but 
+that'd require careful investigation, specially with the stuff that is 
+currently pending for 4.20.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
