@@ -1,73 +1,88 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 8 Oct 2018 17:03:27 +0100
-Subject: 4.19-rcX: WARN_ON() arch/arm64/kernel/setup.c:271
- reserve_memblock_reserved_regions
-In-Reply-To: <20181008151138.GA19635@harukaze>
-References: <20181008151138.GA19635@harukaze>
-Message-ID: <47fa0375-ed69-0cbc-9dcb-0cafb9184f24@arm.com>
+From: keith.busch@intel.com (Keith Busch)
+Date: Mon, 8 Oct 2018 10:18:47 -0600
+Subject: [PATCH 00/12] error handling and pciehp maintenance
+In-Reply-To: <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
+References: <20180918235848.26694-1-keith.busch@intel.com>
+ <20181004214015.GK120535@bhelgaas-glaptop.roam.corp.google.com>
+ <20181004221137.GB21834@localhost.localdomain>
+ <20181005173145.GL120535@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20181008161847.GA30971@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo!
-
-On 08/10/2018 16:11, Paolo Pisati wrote:
-> This on my dragonboard 410c:
+On Fri, Oct 05, 2018 at 12:31:45PM -0500, Bjorn Helgaas wrote:
+> [+cc arm64 folks, LKML: This conversation is about this patch:
 > 
-> ...
-> [    0.170657] WARNING: CPU: 2 PID: 1 at arch/arm64/kernel/setup.c:271 reserve_memblock_reserved_regions+0xd4/0x150
-> [    0.170666] Modules linked in:
-> [    0.170680] CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc7-dirty #3
-> [    0.170687] Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
-> [    0.170696] pstate: 20000005 (nzCv daif -PAN -UAO)
-> [    0.170707] pc : reserve_memblock_reserved_regions+0xd4/0x150
-> [    0.170718] lr : reserve_memblock_reserved_regions+0xcc/0x150
-> [    0.170725] sp : ffff000008033d30
+>   https://lore.kernel.org/linux-pci/20180918235848.26694-3-keith.busch at intel.com
+> 
+> which fixes some PCIe AER error injection bugs, but also makes the error
+> injector dependent on DYNAMIC_FTRACE_WITH_REGS, which not all arches
+> support.  Note that this question is only about the error *injection*
+> module used for testing.  It doesn't affect AER support itself.]
+> 
+> On Thu, Oct 04, 2018 at 04:11:37PM -0600, Keith Busch wrote:
+> > On Thu, Oct 04, 2018 at 04:40:15PM -0500, Bjorn Helgaas wrote:
+> > > On Tue, Sep 18, 2018 at 05:58:36PM -0600, Keith Busch wrote:
+> > > > I ran into a lot of trouble testing error handling, and this series is
+> > > > just trying to simplify some things. The first 4 fix up aer_inject, and
+> > > > the rest are cleanup to make better use of kernel APIs.
+> > > > 
+> > > > Keith Busch (12):
+> > > >   PCI: Set PCI bus accessors to noinline
+> > > >   PCI/AER: Covertly inject errors
+> > > >   PCI/AER: Reuse existing service device lookup
+> > > >   PCI/AER: Abstract AER interrupt handling
+> > > >   PCI/AER: Remove dead code
+> > > >   PCI/AER: Remove error source from aer struct
+> > > >   PCI/AER: Use kfifo for tracking events
+> > > >   PCI/AER: Use kfifo helper inserting locked elements
+> > > >   PCI/AER: Don't read upstream ports below fatal errors
+> > > >   PCI/AER: Use threaded IRQ for bottom half
+> > > >   PCI/AER: Use managed resource allocations
+> > > >   PCI/pciehp: Use device managed allocations
+> > > > 
+> > > >  drivers/pci/access.c              |   4 +-
+> > > >  drivers/pci/hotplug/pciehp_core.c |  14 +-
+> > > >  drivers/pci/hotplug/pciehp_hpc.c  |  48 ++----
+> > > >  drivers/pci/pcie/Kconfig          |   2 +-
+> > > >  drivers/pci/pcie/aer.c            | 219 ++++++---------------------
+> > > >  drivers/pci/pcie/aer_inject.c     | 306 ++++++++++++++++++++------------------
+> > > >  drivers/pci/pcie/portdrv.h        |   4 -
+> > > >  drivers/pci/pcie/portdrv_core.c   |   1 +
+> > > >  8 files changed, 227 insertions(+), 371 deletions(-)
+> > > 
+> > > Thanks a lot for doing this!  I applied these to pci/hotplug for
+> > > v4.20, except for "PCI/AER: Don't read upstream ports below fatal
+> > > errors", which seems to be already there via another posting, and
+> > > "PCI/pciehp: Use device managed allocations", which needs a few
+> > > tweaks.
+> > 
+> > Sounds good, and thanks for applying!
+> > 
+> > In case this went unnoticed, patch 2's aer_inject using ftrace hooks
+> > to pci config accessors is really cool and fixes several kernel crashes
+> > I encountered, but it may not work on every architecture. I'm not sure
+> > how widely aer_inject is used, so maybe there are no concerns with the
+> > DYNAMIC_FTRACE_WITH_REGS dependency, but I just want to reemphasize that
+> > dependency in case there are valid objections.
+> 
+> Oh, indeed, I hadn't noticed this arch dependency.  AFAICT, the new
+> DYNAMIC_FTRACE_WITH_REGS dependency means aer_inject will work only
+> on these arches:
+> 
+>   arm		# if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+>   powerpc	# if PPC64 && CPU_LITTLE_ENDIAN
+>   riscv		# ARCH_RV64I only
+>   s390
+>   x86
+> 
+> Notably missing is arm64, which has DYNAMIC_FTRACE but not
+> DYNAMIC_FTRACE_WITH_REGS.
+> 
+> Bjorn
 
-> [    0.170899] Call trace:
-> [    0.170910]  reserve_memblock_reserved_regions+0xd4/0x150
-> [    0.170921]  do_one_initcall+0x58/0x170
-> [    0.170931]  kernel_init_freeable+0x1a4/0x264
-> [    0.170942]  kernel_init+0x10/0x108
-> [    0.170952]  ret_from_fork+0x10/0x18
-> [    0.170962] ---[ end trace c7ce9242331f7319 ]---
-> [    0.170974] name: reserved res: [mem 0xbff00000-0xbfffffff flags 0x200]
-
-John Stultz saw this on Hikey,
-
-> that memory region corresponds to the ramoops node:
-
-... it was the ramoops description too.
-
-There is a patch:
-https://www.spinics.net/lists/arm-kernel/msg675580.html
-
-Which I need to re-spin.
-
-This is happening because your reserved-memory isn't described as memory. I
-mistakenly believed no-one would do this, and I really didn't want to walk both
-them memory and reserved lists at the same time!
-
-mm/page_alloc.c:zero_resv_unavail() has a comment about this:
-|	* Once memblock is changed so such behaviour is not allowed: i.e.
-|	* list of "reserved" memory must be a subset of list of "memory", then
-|	* this code can be removed.
-
-
-> According to the comment in reserve_memblock_reserved_regions():
-
-> and the reserved-memory region evades this condition, but i'm not entirely sure how to
-> properly fix this - any idea?
-
-Ideally reserved-memory would be described as memory. If you need it to be
-removed from the linear map (e.g. because it needs special memory attributes),
-use the binding's 'nomap' property. This causes
-early_init_dt_reserve_memory_arch() to remove the memory instead of marking it
-reserved.
-
-But! DT's that have this reserved-but-not-memory are already out there, so we
-should work around this in the kernel.
-
-
-Thanks,
-
-James
+Looks like the kbuild bot found an ARM kernel config that has
+DYNAMIC_FTRACE_WITH_REGS set, and then the module can't compile
+there. I'll need to update this patch regardless, and I think the right
+thing to do is maintain the "old" way with conditional compiling for
+any arch specific features.
