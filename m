@@ -1,100 +1,39 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  8 Oct 2018 14:19:18 +0200
-Subject: [PATCH] of: base: Change logic in of_alias_get_alias_list()
-Message-ID: <e879d07e97b7f7fc46543315e9fb1b4bc8b7a352.1539001154.git.michal.simek@xilinx.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 08 Oct 2018 14:50:05 +0200
+Subject: [PATCH 3/7] clocksource: Change CPU hotplug priority of exynos_mct
+ driver
+In-Reply-To: <20181008125009.3721-1-m.szyprowski@samsung.com>
+References: <20181008125009.3721-1-m.szyprowski@samsung.com>
+ <CGME20181008125047eucas1p1bbd0c4759612b6df8fbe25f759e03130@eucas1p1.samsung.com>
+Message-ID: <20181008125009.3721-4-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check compatible string first before setting up bit in bitmap to also
-cover cases that allocated bitfield is not big enough.
-Show warning about it but let driver to continue to work with allocated
-bitfield to keep at least some devices (included console which
-is commonly close to serial0) to work.
+Exynos Multi-Core Timer driver (exynos_mct) must be started before
+ARM Architected Timers (arch_timer), because both timers share common
+hardware block and turning on MCT is needed to get ARM Architected
+Timer working properly.
 
-Fixes: b1078c355d76 ("of: base: Introduce of_alias_get_alias_list() to check alias IDs")
-Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
+ include/linux/cpuhotplug.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I have looked at it and I don't think there should be necessary to
-report error immediately back with partially initialized bitfield.
-The reason is that still there could be a console device which is most
-likely below that max limit and it is worth to return at least that nbits
-properly filled.
-It will also enable cases that you can still continue to use aliases
-higher then fields prepared for devices without alias.
-
-To be fixed patches are present in tty-next branch.
-
----
- drivers/of/base.c                  | 22 ++++++++++++----------
- drivers/tty/serial/xilinx_uartps.c |  2 +-
- 2 files changed, 13 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 908de45f966b..0b9611e196d1 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -1953,13 +1953,15 @@ int of_alias_get_id(struct device_node *np, const char *stem)
-  * The function travels the lookup table to record alias ids for the given
-  * device match structures and alias stem.
-  *
-- * Return:	0 or -ENOSYS when !CONFIG_OF
-+ * Return:	0 or -ENOSYS when !CONFIG_OF or
-+ *		-EINVAL if alias ID is greater then allocated nbits
-  */
- int of_alias_get_alias_list(const struct of_device_id *matches,
- 			     const char *stem, unsigned long *bitmap,
- 			     unsigned int nbits)
- {
- 	struct alias_prop *app;
-+	int ret = 0;
- 
- 	/* Zero bitmap field to make sure that all the time it is clean */
- 	bitmap_zero(bitmap, nbits);
-@@ -1976,21 +1978,21 @@ int of_alias_get_alias_list(const struct of_device_id *matches,
- 			continue;
- 		}
- 
--		if (app->id >= nbits) {
--			pr_debug("%s: ID %d greater then bitmap field %d\n",
--				__func__, app->id, nbits);
--			continue;
--		}
--
- 		if (of_match_node(matches, app->np)) {
- 			pr_debug("%s: Allocated ID %d\n", __func__, app->id);
--			set_bit(app->id, bitmap);
-+
-+			if (app->id >= nbits) {
-+				pr_warn("%s: ID %d >= than bitmap field %d\n",
-+					__func__, app->id, nbits);
-+				ret = -EINVAL;
-+			} else {
-+				set_bit(app->id, bitmap);
-+			}
- 		}
--		/* Alias exists but is not compatible with matches */
- 	}
- 	mutex_unlock(&of_mutex);
- 
--	return 0;
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(of_alias_get_alias_list);
- 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index d452dceb0cb3..29a18103182d 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1393,7 +1393,7 @@ static int cdns_get_id(struct platform_device *pdev)
- 	if (!alias_bitmap_initialized) {
- 		ret = of_alias_get_alias_list(cdns_uart_of_match, "serial",
- 					      alias_bitmap, MAX_UART_INSTANCES);
--		if (ret) {
-+		if (ret && ret != -EINVAL) {
- 			mutex_unlock(&bitmap_lock);
- 			return ret;
- 		}
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index caf40ad0bbc6..5d9e4a6ea299 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -115,10 +115,10 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_ARM_ACPI_STARTING,
+ 	CPUHP_AP_PERF_ARM_STARTING,
+ 	CPUHP_AP_ARM_L2X0_STARTING,
++	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+ 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+ 	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
+ 	CPUHP_AP_JCORE_TIMER_STARTING,
+-	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+ 	CPUHP_AP_ARM_TWD_STARTING,
+ 	CPUHP_AP_QCOM_TIMER_STARTING,
+ 	CPUHP_AP_ARMADA_TIMER_STARTING,
 -- 
-1.9.1
+2.17.1
