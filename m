@@ -1,40 +1,41 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 8 Oct 2018 21:10:53 +0200
-Subject: [PATCH v4 1/5] spi: spi-mem: Add driver for NXP FlexSPI controller
-In-Reply-To: <1538997103-11152-2-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1538997103-11152-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1538997103-11152-2-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <20181008211053.71171cff@bbrezillon>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue,  9 Oct 2018 00:44:06 +0530
+Subject: [PATCH 0/5] Add initial pinctrl support for MT6797 SoC
+Message-ID: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  8 Oct 2018 16:41:39 +0530
-Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+This patchset adds initial pinctrl support for Mediatek MT6797 SoC.
+The pinctrl driver is based on the vendor binding as like MT6765 and
+implements only GPIO and pinmux functionalities.
 
-> +/* Registers used by the driver */
-> +#define FSPI_MCR0			0x00
-> +#define FSPI_MCR0_AHB_TIMEOUT_MASK	GENMASK(31, 24)
-> +#define FSPI_MCR0_IP_TIMEOUT_MASK	GENMASK(23, 16)
+The devicetree binding doc is not added because it does not exist for
+MT6765 and I'm not sure about the structure of it.
 
-You never mask the IP_TIMEOUT val, so you don't need a _MASK macro
-here. Just define
+This patchset has been tested on 96Boards MediatekX20 development board.
 
-#define FSPI_MCR0_IP_TIMEOUT(x)		((x) < 16)
+Thanks,
+Mani
 
-The same goes for any field that you don't need to mask.
+Manivannan Sadhasivam (5):
+  dt-bindings: pinctrl: Add devicetree constants for MT6797 SoC
+  arm64: dts: mediatek: mt6797: Add pinctrl support
+  arm64: dts: mediatek: x20: Add pinmux support for UART1
+  pinctrl: mediatek: pinctrl-mtk-common-v2: Make eint_m u16
+  pinctrl: mediatek: Add initial pinctrl driver for MT6797 SoC
 
-The only case you might need a mask def is when you have the following
-pattern:
+ .../boot/dts/mediatek/mt6797-x20-dev.dts      |    2 +
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi      |   21 +
+ drivers/pinctrl/mediatek/Kconfig              |    7 +
+ drivers/pinctrl/mediatek/Makefile             |    1 +
+ drivers/pinctrl/mediatek/pinctrl-mt6797.c     |   82 +
+ .../pinctrl/mediatek/pinctrl-mtk-common-v2.h  |    2 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h | 2430 +++++++++++++++++
+ include/dt-bindings/pinctrl/mt6797-pinfunc.h  | 1368 ++++++++++
+ 8 files changed, 3912 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt6797.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+ create mode 100644 include/dt-bindings/pinctrl/mt6797-pinfunc.h
 
-	val = readl(reg);
-	val &= ~XXXX_MASK;
-	val |= XXXX(new_field_val);
-	writel(val, reg);
-
-> +#define FSPI_MCR0_LEARN_EN_MASK		BIT(15)
-> +#define FSPI_MCR0_SCRFRUN_EN_MASK	BIT(14)
-> +#define FSPI_MCR0_OCTCOMB_EN_MASK	BIT(13)
-
-Drop the _MASK suffix for any single-bit field:
-
-#define FSPI_MCR0_OCTCOMB_EN		BIT(13)
+-- 
+2.17.1
