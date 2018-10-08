@@ -1,82 +1,138 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 8 Oct 2018 11:33:46 -0500
-Subject: [PATCH] samples/rpmsg: Introduce a module parameter for message
- count
-In-Reply-To: <20181006062231.GF12063@builder>
-References: <20180911174643.26199-1-s-anna@ti.com>
- <20181006062231.GF12063@builder>
-Message-ID: <d14448ad-21c1-0a1a-0264-2efece209fc6@ti.com>
+From: rk.katana.steel@gmail.com (=?UTF-8?Q?Ren=C3=A9_Kjellerup?=)
+Date: Mon, 8 Oct 2018 09:34:49 -0700
+Subject: Adding a Basic DT for the Linksys ea6500 v2 wireless home router
+In-Reply-To: <86f391e5-9e38-c8b0-4753-4646c322c9bc@hauke-m.de>
+References: <CACE8ZKbUhFyWg5oK1B8+aWAa0tdqKf5Kokj80+8x1X2EUaA_DQ@mail.gmail.com>
+ <CACE8ZKZEpQjOW6CSvUuM9xhjtkSCF0bYxcfQ3htSabC=rVJcTA@mail.gmail.com>
+ <86f391e5-9e38-c8b0-4753-4646c322c9bc@hauke-m.de>
+Message-ID: <CACE8ZKb5CxEBAdCdGAhwaQHC9_nHBjTTVwxdDOXRayqgz0FK5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Hauke,
 
-On 10/06/2018 01:22 AM, Bjorn Andersson wrote:
-> On Tue 11 Sep 10:46 PDT 2018, Suman Anna wrote:
-> 
->> The current rpmsg_client_sample uses a fixed number of messages to
->> be sent to each instance. This is currently set at 100. Introduce
->> an optional module parameter 'count' so that the number of messages
->> to be exchanged can be made flexible.
->>
-> 
-> Rather than sending N messages as fast as possible to any sample channel
-> that comes up, how about making the sample create a debugfs entry that
-> we can write messages to from user space?
+Updated the file header per your suggestion.
 
-This sample demonstrates a kernel-level rpmsg usage, and I would prefer
-to maintain the current simplicity, and not add in any userspace
-interaction. That perhaps can be done as a different sample. I use this
-sample to serve as the basic test for checking the rpmsg transport
-functionality with multiple remoteprocs and/or multiple instances per
-remoteproc at the same time. The count parameter helps me with both
-early Silicon development, as well as exercising increased message
-exchanges so that the vring buffers are cycled.
+>From e97c15ef78d2535c23f32ebbec43bced72b5eaf7 Mon Sep 17 00:00:00 2001
+From: Rene Kjellerup <rk.katana.steel@gmail.com>
+Date: Mon, 1 Oct 2018 14:11:56 -0700
+Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA6500 V2
 
-> 
-> That would make it possible to improve the handling of multiple
-> remoteprocs and would allow for a variation in message lengths etc.
+It's wireless home router based on BCM4708A0 with BCM4360 + BCM4331
+wireless chipsets. The 5GHz chip currently isn't supported only due
+to missing compatible firmware.
 
-FWIW, this already support multiple instances from the same remoteproc
-or different remoteproc.
+the DTS here was based on the Linksys EA6300 V1 DTS, only changing
+the model strings
 
-regards
-Suman
+Signed-off-by: Rene Kjellerup <rk.katana.steel@gmail.com>
+---
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts | 47 +++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b5bd3de87c33..adf8f28f5e44 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -88,6 +88,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+     bcm4708-asus-rt-ac68u.dtb \
+     bcm4708-buffalo-wzr-1750dhp.dtb \
+     bcm4708-linksys-ea6300-v1.dtb \
++    bcm4708-linksys-ea6500-v2.dtb \
+     bcm4708-luxul-xap-1510.dtb \
+     bcm4708-luxul-xwc-1000.dtb \
+     bcm4708-netgear-r6250.dtb \
+diff --git a/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+b/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+new file mode 100644
+index 000000000000..8a434d2a4b72
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+@@ -0,0 +1,47 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++/*
++ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
++ * Copyright (C) 2018 Rene Kjellerup <rk.katana.steel@gmail.com>
++ *
++ * this DTS was originally based on bcm4708-linksys-ea6300-v1.dts
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
++
++/ {
++    compatible = "linksys,ea6500-v2", "brcm,bcm4708";
++    model = "Linksys EA6500 V2";
++
++    chosen {
++        bootargs = "console=ttyS0,115200";
++    };
++
++    memory {
++        reg = <0x00000000 0x08000000>;
++    };
++
++    gpio-keys {
++        compatible = "gpio-keys";
++        #address-cells = <1>;
++        #size-cells = <0>;
++
++        wps {
++            label = "WPS";
++            linux,code = <KEY_WPS_BUTTON>;
++            gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++        };
++
++        restart {
++            label = "Reset";
++            linux,code = <KEY_RESTART>;
++            gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++        };
++    };
++};
++
++&usb3_phy {
++    status = "okay";
++};
+-- 
+2.16.4
+
+On Sun, Oct 7, 2018 at 2:08 PM Hauke Mehrtens <hauke@hauke-m.de> wrote:
+>
+> On 10/04/2018 11:08 PM, Ren? Kjellerup wrote:
+> > Hi Hauke,
+> >
+> > thank you for suggesting adding the dts patch to mainline kernel,
+> > so here it is.
+> > I feel Rafal technically still have the copyrights, this is pretty
+> > much just a few string updates for the ea6500v2. However with this
+> > dts in latest OpenWrt 18.06 loads and installs on my device.
+> >
+> > I will be available to do more testing should it be required.
+> >
+> > Regrads
+> > Rene Kjellerup
+> > --
+> > -- as life grows older, I gain experience.
+> > -- http://www.alchemiestick.net/
+> >
+>
+> Hi Rene,
+>
+> Please send you patch inline in the mail and not as an attachment, I
+> would suggest to use "git send-email" for sending the patch.
+>
+> Adding Rafal as copyright owner is ok, like you did it now. You could
+> mention in the file header on which dts file this is based.
+>
+> Hauke
+>
 
 
-> 
-> Regards,
-> Bjorn
-> 
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>  samples/rpmsg/rpmsg_client_sample.c | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/samples/rpmsg/rpmsg_client_sample.c b/samples/rpmsg/rpmsg_client_sample.c
->> index f161dfd3e70a..9b6b27ea504f 100644
->> --- a/samples/rpmsg/rpmsg_client_sample.c
->> +++ b/samples/rpmsg/rpmsg_client_sample.c
->> @@ -22,7 +22,9 @@
->>  #include <linux/rpmsg.h>
->>  
->>  #define MSG		"hello world!"
->> -#define MSG_LIMIT	100
->> +
->> +static int count = 100;
->> +module_param(count, int, 0644);
->>  
->>  struct instance_data {
->>  	int rx_count;
->> @@ -41,7 +43,7 @@ static int rpmsg_sample_cb(struct rpmsg_device *rpdev, void *data, int len,
->>  		       data, len,  true);
->>  
->>  	/* samples should not live forever */
->> -	if (idata->rx_count >= MSG_LIMIT) {
->> +	if (idata->rx_count >= count) {
->>  		dev_info(&rpdev->dev, "goodbye!\n");
->>  		return 0;
->>  	}
->> -- 
->> 2.18.0
->>
+-- 
+-- as life grows older, I gain experience.
+-- http://www.alchemiestick.net/apps/
