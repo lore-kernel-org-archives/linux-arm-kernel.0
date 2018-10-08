@@ -1,91 +1,95 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 8 Oct 2018 09:31:31 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC SoC Updates for v4.20
-In-Reply-To: <CAK8P3a0Uq+kmSs8Gq9EtqiVOrc6A+92Yc5mcU70Dounx=yycgQ@mail.gmail.com>
-References: <cover.1538127537.git.horms+renesas@verge.net.au>
- <CAK8P3a0NreOTfL6L+w2WHnC5uf3jELf6ud_wdBZ7iAU3yuf4VA@mail.gmail.com>
- <CAMuHMdWF2XwWbb0-f_RuSYnFfQzLKNW7Foq9XM7cha3QVU+kHg@mail.gmail.com>
- <CAK8P3a22freS+j7hmB_bzFTq83eDrUidrV=mmaRYfYAV7gbwAQ@mail.gmail.com>
- <CAMuHMdWQ0aiLCra-DQrSQ+UB977PCZ7yNa9U_tT7Da7VuAyVXw@mail.gmail.com>
- <CAMuHMdUGJAMoVstt-UMMREwc5+NtwAe+qLmNZ9b9i1k3M8k=gQ@mail.gmail.com>
- <CAK8P3a0Uq+kmSs8Gq9EtqiVOrc6A+92Yc5mcU70Dounx=yycgQ@mail.gmail.com>
-Message-ID: <20181008073131.f7ayp2tnyavp7xph@verge.net.au>
+From: quentin.schulz@bootlin.com (Quentin Schulz)
+Date: Mon, 8 Oct 2018 09:33:12 +0200
+Subject: [PATCH v2 5/6] mfd: axp20x: add support AXP803 AC and battery
+ power supplies
+In-Reply-To: <20181006211836.28253-6-oskari@lemmela.net>
+References: <20181004193410.7265-1-oskari@lemmela.net>
+ <20181006211836.28253-1-oskari@lemmela.net>
+ <20181006211836.28253-6-oskari@lemmela.net>
+Message-ID: <20181008073312.otdz25ttvew6fzk2@qschulz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 04, 2018 at 05:36:15PM +0200, Arnd Bergmann wrote:
-> On Thu, Oct 4, 2018 at 9:58 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > On Tue, Oct 2, 2018 at 2:31 PM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > > On Tue, Oct 2, 2018 at 2:18 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > On Tue, Oct 2, 2018 at 10:31 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > > > > On Fri, Sep 28, 2018 at 10:10 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > > > On Fri, Sep 28, 2018 at 12:21 PM Simon Horman
-> > > > > > <horms+renesas@verge.net.au> wrote:
-> > > > > > > * Add support for RZ/G2E (r8a774c0) and RZ/G2M (r8a774a1) SoCs
-> > > > > > > * Enable Compare Match Timer (CMT) and Timer Unit (TMU)
-> > > > > > >   for Renesas SoCs
-> > > > > > > * Remove no longer needed ARCH_SHMOBILE Kconfig symbol
-> > > > > >
-> > > > > > The ARCH_SHMOBILE removal and cleanup is fine, but I wonder about
-> > > > > > the newly added symbols for specific SoCs. I see you already have a
-> > > > > > couple of those, but the other manufacturers don't.
-> > > > > >
-> > > > > > I think what happened here is that I tried to reject those additions
-> > > > > > normally, but I never noticed yours. From what I see in drivers,
-> > > > > > you have additional symbols depending on these in clk, pinctrl,
-> > > > > > drivers/soc, and the dtb files, so at the very least we can't
-> > > > > > just drop the config options, but I'd still like to see this work
-> > > > > > more like other platforms.
-> > > > >
-> > > > > The main motivation for SoC-specific controls is to avoid including pinctrl
-> > > > > and (to a lesser extent) clock tables for unused SoCs.  Each pinctrl driver
-> > > > > consumes a few tens of KiB, each clock driver a few KiB.
-> > > > > If we remove the SoC-specific ARCH_* controls, the user has to configure
-> > > > > both pinctrl and clock driver selections, thus trading one user-visible
-> > > > > symbol for two new user-visible symbols (except for RZ/A and RZ/N,
-> > > > > where the pinctrl symbols are already visible, to allow reducing kernel
-> > > > > size).
-> > > > > Perhaps that is acceptable?
-> > > >
-> > > > It's definitely fine with me. I understand that this is less user friendly,
-> > > > but it does address my concern about consistency between the platforms.
-> > > >
-> > > > > For the smaller parts in drivers/soc/, removing SoC-specific dependencies
-> > > > > may be viable for R-Car and RZ/G Socs, but not for e.g. RZ/A.  The latter
-> > > > > may be used without external RAM, and can run with a few MiB of internal
-> > > > > SRAM, and XIP (with a still out-of-tree patch).
-> > > > > So at least a family-specific dependency is worth to keep.  For now, RZ/A
-> > > > > is arm32 only, though.
-> > > > >
-> > > > > Note that on arm64, there are no family-specific Kconfig symbols yet.
-> > > > > We just have ARCH_RENESAS, which is also set on arm32.
-> > > > > So either we introduce e.g. ARCH_RCAR_GEN3 (cfr. ARCH_RCAR_GEN1 and
-> > > > > ARCH_RCAR_GEN2 or arm32), or use "ARCH_RENESAS && ARM64" for e.g. RST_RCAR
-> > > > > in drivers/soc/renesas/Kconfig, which currently depends on all R-Car Gen3
-> > > > > (and RZ/G2) SoCs explicitly.
-> > > > > Choosing the latter option means we may need to migrate to the former option
-> > > > > later, once other families appear (e.g. RZ/A SoCs may start using
-> > > > > Cortex-A53 instead of Cortex-A9 cores).
-> > > >
-> > > > Maybe introducing a hidden ARCH_RCAR_GEN3 makes sense here, and
-> > > > that can start out with the same value as ARCH_RENESAS. I think
-> > > > if we want to add 64-bit RZ/A support later, having a separate top-level
-> > > > symbol for that is also reasonable: as you explained this is rather
-> > > > sensitive to memory usage, and that is enough reason to deviate from
-> > > > what we do elsewhere.
-> > > >
-> > > > > For the DTB files, I believe we can just remove the dependencies, and
-> > > > > always build all DTBs.
-> > > >
-> > > > Yes, that seems best, and consistent with how we handle other
-> > > > manufacturers.
-> > >
-> > > OK, I'll put it on my list.
-> >
-> > Given the current time in the cycle, we can no longer do this for v4.20.
-> > Hence, can you please accept Simon's PR as-is, to enable us to move
-> > forward?
-> 
-> Fair enough, pulled into next/soc now.
+Hi Oskari,
 
-Thanks Arnd!
+On Sun, Oct 07, 2018 at 12:18:35AM +0300, Oskari Lemmela wrote:
+> AXP803 is compatible with AXP813.
+> Adding needed cells for AC and battery power supplies.
+> 
+> AXP813 AC power supply cell added.
+> 
+> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> ---
+>  drivers/mfd/axp20x.c       | 22 +++++++++++++++++++++-
+>  include/linux/mfd/axp20x.h |  1 +
+>  2 files changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 0be511dd93d0..215f0b009728 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -731,8 +731,23 @@ static const struct mfd_cell axp803_cells[] = {
+>  		.name			= "axp221-pek",
+>  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+>  		.resources		= axp803_pek_resources,
+> +	}, {
+> +		.name			= "axp20x-regulator"
+> +	}, {
+> +		.name			= "axp20x-gpio",
+> +		.of_compatible		= "x-powers,axp813-gpio",
+> +	}, {
+> +		.name			= "axp813-adc",
+> +		.of_compatible		= "x-powers,axp813-adc",
+> +	}, {
+> +		.name		= "axp20x-battery-power-supply",
+> +		.of_compatible	= "x-powers,axp813-battery-power-supply",
+> +	}, {
+> +		.name           = "axp20x-ac-power-supply",
+> +		.of_compatible  = "x-powers,axp813-ac-power-supply",
+> +		.num_resources  = ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> +		.resources      = axp20x_ac_power_supply_resources,
+>  	},
+> -	{	.name			= "axp20x-regulator" },
+>  };
+>  
+>  static const struct mfd_cell axp806_self_working_cells[] = {
+> @@ -778,6 +793,11 @@ static const struct mfd_cell axp813_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-battery-power-supply",
+>  		.of_compatible	= "x-powers,axp813-battery-power-supply",
+> +	}, {
+> +		.name           = "axp20x-ac-power-supply",
+> +		.of_compatible  = "x-powers,axp813-ac-power-supply",
+> +		.num_resources  = ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> +		.resources      = axp20x_ac_power_supply_resources,
+
+I'll let Maxime or Chen-Yu tell you what they want but I think we could
+have two different commits, one for AXP803 and one for AXP813. I don't
+think we care about having one commit per added resource for the axp803
+though.
+
+>  	},
+>  };
+>  
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 517e60eecbcb..2302b620d238 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -266,6 +266,7 @@ enum axp20x_variants {
+>  #define AXP288_RT_BATT_V_H		0xa0
+>  #define AXP288_RT_BATT_V_L		0xa1
+>  
+> +#define AXP813_ACIN_PATH_CTRL		0x3a
+
+You're not using it in this patch, please keep this change in the commit
+where its use is introduced.
+
+Thanks,
+Quentin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/40abd802/attachment.sig>
