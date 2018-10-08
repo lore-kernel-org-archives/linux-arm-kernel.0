@@ -1,40 +1,34 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Mon,  8 Oct 2018 21:19:02 +0300
-Subject: [PATCH v3 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
- power DT binding
+Date: Mon,  8 Oct 2018 21:19:03 +0300
+Subject: [PATCH v3 2/7] ARM: dts: axp81x: add AC power supply subnode
 In-Reply-To: <20181008181908.9456-1-oskari@lemmela.net>
 References: <20181008181908.9456-1-oskari@lemmela.net>
-Message-ID: <20181008181908.9456-2-oskari@lemmela.net>
+Message-ID: <20181008181908.9456-3-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP803/AXP813 AC power supply can limit input current and voltage.
+Add AC power supply subnode for AXP81X PMIC.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 ---
- .../devicetree/bindings/power/supply/axp20x_ac_power.txt       | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/axp81x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-index 826e8a879121..7a1fb532abe5 100644
---- a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-+++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-@@ -4,6 +4,7 @@ Required Properties:
-  - compatible: One of:
- 			"x-powers,axp202-ac-power-supply"
- 			"x-powers,axp221-ac-power-supply"
-+			"x-powers,axp813-ac-power-supply"
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index 043c717dcef1..bd83962d3627 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -48,6 +48,11 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
  
- This node is a subnode of the axp20x PMIC.
- 
-@@ -13,6 +14,8 @@ reading ADC channels from the AXP20X ADC.
- The AXP22X is only able to tell if an AC power supply is present and
- usable.
- 
-+AXP813/AXP803 are able to limit current and supply voltage
++	ac_power_supply: ac-power-supply {
++		compatible = "x-powers,axp813-ac-power-supply";
++		status = "disabled";
++	};
 +
- Example:
- 
- &axp209 {
+ 	axp_adc: adc {
+ 		compatible = "x-powers,axp813-adc";
+ 		#io-channel-cells = <1>;
 -- 
 2.17.1
