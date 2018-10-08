@@ -1,110 +1,90 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 8 Oct 2018 08:34:59 +0000
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <153898445180.119890.15025812558797341532@swboyd.mtv.corp.google.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
- <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
- <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
- <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
- <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
- <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
- <153898445180.119890.15025812558797341532@swboyd.mtv.corp.google.com>
-Message-ID: <DB3PR0402MB391664354775DF42E90E67C9F5E60@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Mon, 8 Oct 2018 10:33:31 +0200 (CEST)
+Subject: [shawnguo:imx/drivers 9/10] drivers/firmware/imx/imx-scu.c:180:3-9:
+ preceding lock on line 165 (fwd)
+Message-ID: <alpine.DEB.2.20.1810081032450.2815@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+It looks like an unlock is needed before line 180.
 
-Anson Huang
-Best Regards!
+julia
 
+---------- Forwarded message ----------
+Date: Mon, 8 Oct 2018 15:25:21 +0800
+From: kbuild test robot <lkp@intel.com>
+To: kbuild at 01.org
+Cc: Julia Lawall <julia.lawall@lip6.fr>
+Subject: [shawnguo:imx/drivers 9/10] drivers/firmware/imx/imx-scu.c:180:3-9:
+    preceding lock on line 165
 
-> -----Original Message-----
-> From: Stephen Boyd <sboyd@kernel.org>
-> Sent: Monday, October 8, 2018 3:41 PM
-> To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
-> Anson Huang <anson.huang@nxp.com>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
-> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
-> Cc: dl-linux-imx <linux-imx@nxp.com>
-> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-> 
-> Quoting Anson Huang (2018-09-03 00:20:53)
-> > > > On 08/31/2018 03:29 AM, Stephen Boyd wrote:
-> > > > > Quoting Peng Fan (2018-08-12 18:15:41)
-> > > > >> Hi Anson,
-> > > > >>
-> > > > >>>>> -----Original Message-----
-> > > > >>>>> From: Anson Huang
-> > > > >>>>> Sent: 2018?8?8? 12:39
-> > > > >>>>> To: shawnguo at kernel.org; s.hauer at pengutronix.de;
-> > > > >>>>> kernel at pengutronix.de; Fabio Estevam
-> > > > >>>>> <fabio.estevam@nxp.com>; mturquette at baylibre.com;
-> > > > >>>>> sboyd at kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > > >>>>> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
-> > > > >>>>> Cc: dl-linux-imx <linux-imx@nxp.com>
-> > > > >>>>> Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on
-> > > > >>>>> array
-> > > > >>>>>
-> > > > >>>>> Clock framework will enable those clocks registered with
-> > > > >>>>> CLK_IS_CRITICAL flag, so no need to have clks_init_on array
-> > > > >>>>> during clock
-> > > > >>>> initialization now.
-> > > > >>>>
-> > > > >>>> Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
-> > > > >>>> or "init-on-arrary=<xxx>"
-> > > > >>>> and enable those clocks?
-> > > > >>>
-> > > > >>> Parsing the clocks arrays from dtb is another way of enabling
-> > > > >>> critical clocks, but for current i.MX6/7 platforms, we
-> > > > >>> implement it in same way as most of other SoCs, currently I
-> > > > >>> did NOT see any necessity of putting them in dtb, just adding
-> > > > >>> flag during clock registering is more simple, if there is any
-> > > > >>> special requirement for different clocks set to be enabled,
-> > > > >>> then we can add support to enable
-> > > the method of parsing critical-clocks from dtb. Just my two cents.
-> > > > >>
-> > > > >> Thinking about OP-TEE want to use one device, but it's clocks
-> > > > >> are registered by Linux, because there is no module in Linux
-> > > > >> side use it, it will shutdown the clock, which cause OP-TEE
-> > > > >> could not access the
-> > > device.
-> > > > >>
-> > > > >> Then people have to modify clk code to add CLK_IS_CRITICAL flag
-> > > > >> to make sure the clocks are not shutdown by Linux.
-> > > > >>
-> > > > >> However adding a new property in clk node and let driver code
-> > > > >> parse the dts, there is no need to modify clk driver code when
-> > > > >> OP-TEE needs
-> > > another device clock.
-> > > > >>
-> > > > >
-> > > > > If OP-TEE needs linux to keep things on then why can't the
-> > > > > OP-TEE driver in Linux probe, acquire clocks, and keep the clks enabled
-> forever?
-> > > >
-> > > > Sounds reasonable, but how could this be done without introducing
-> > > > platform-specific stuff in the OP-TEE driver?
-> > > >
-> > >
-> > > Why is that a goal?
-> >
-> > I do NOT think we should consider such case in this patch series,
-> > whatever OP-TEE needs for its own feature, it should do necessary operations
-> either in its driver or somewhere else by adding new patch.
-> >
-> 
-> Why can't we add clks to the op-tee node in DT's /firmware container?
-> Then any clks in there can be turned on forever and left enabled by the linux
-> driver?
- 
-I did NOT run op-tee with Linux-next kernel before, can you advise more? And I think if op-tee has such requirement,
-can we have another patch to cover it? I believe all other i.MX platforms also have same
-requirements if considering op-tee support, so I think it should be another topic, what do you think?
+CC: kbuild-all at 01.org
+CC: linux-arm-kernel at lists.infradead.org
+TO: Dong Aisheng <aisheng.dong@nxp.com>
+CC: Shawn Guo <shawnguo@kernel.org>
+CC: Sascha Hauer <s.hauer@pengutronix.de>
 
-Anson. 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/drivers
+head:   a8b96789a795af1127f722c3b1cd243ea16270ae
+commit: d41a5a155f7b716941583cab7db703a2e4c6172c [9/10] firmware: imx: add SCU firmware driver support
+:::::: branch date: 8 days ago
+:::::: commit date: 8 days ago
+
+>> drivers/firmware/imx/imx-scu.c:180:3-9: preceding lock on line 165
+
+# https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?id=d41a5a155f7b716941583cab7db703a2e4c6172c
+git remote add shawnguo https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+git remote update shawnguo
+git checkout d41a5a155f7b716941583cab7db703a2e4c6172c
+vim +180 drivers/firmware/imx/imx-scu.c
+
+d41a5a15 Dong Aisheng 2018-09-30  153
+d41a5a15 Dong Aisheng 2018-09-30  154  /*
+d41a5a15 Dong Aisheng 2018-09-30  155   * RPC command/response
+d41a5a15 Dong Aisheng 2018-09-30  156   */
+d41a5a15 Dong Aisheng 2018-09-30  157  int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
+d41a5a15 Dong Aisheng 2018-09-30  158  {
+d41a5a15 Dong Aisheng 2018-09-30  159  	struct imx_sc_rpc_msg *hdr;
+d41a5a15 Dong Aisheng 2018-09-30  160  	int ret;
+d41a5a15 Dong Aisheng 2018-09-30  161
+d41a5a15 Dong Aisheng 2018-09-30  162  	if (WARN_ON(!sc_ipc || !msg))
+d41a5a15 Dong Aisheng 2018-09-30  163  		return -EINVAL;
+d41a5a15 Dong Aisheng 2018-09-30  164
+d41a5a15 Dong Aisheng 2018-09-30 @165  	mutex_lock(&sc_ipc->lock);
+d41a5a15 Dong Aisheng 2018-09-30  166  	reinit_completion(&sc_ipc->done);
+d41a5a15 Dong Aisheng 2018-09-30  167
+d41a5a15 Dong Aisheng 2018-09-30  168  	sc_ipc->msg = msg;
+d41a5a15 Dong Aisheng 2018-09-30  169  	sc_ipc->count = 0;
+d41a5a15 Dong Aisheng 2018-09-30  170  	ret = imx_scu_ipc_write(sc_ipc, msg);
+d41a5a15 Dong Aisheng 2018-09-30  171  	if (ret < 0) {
+d41a5a15 Dong Aisheng 2018-09-30  172  		dev_err(sc_ipc->dev, "RPC send msg failed: %d\n", ret);
+d41a5a15 Dong Aisheng 2018-09-30  173  		goto out;
+d41a5a15 Dong Aisheng 2018-09-30  174  	}
+d41a5a15 Dong Aisheng 2018-09-30  175
+d41a5a15 Dong Aisheng 2018-09-30  176  	if (have_resp) {
+d41a5a15 Dong Aisheng 2018-09-30  177  		if (!wait_for_completion_timeout(&sc_ipc->done,
+d41a5a15 Dong Aisheng 2018-09-30  178  						 MAX_RX_TIMEOUT)) {
+d41a5a15 Dong Aisheng 2018-09-30  179  			dev_err(sc_ipc->dev, "RPC send msg timeout\n");
+d41a5a15 Dong Aisheng 2018-09-30 @180  			return -ETIMEDOUT;
+d41a5a15 Dong Aisheng 2018-09-30  181  		}
+d41a5a15 Dong Aisheng 2018-09-30  182
+d41a5a15 Dong Aisheng 2018-09-30  183  		/* response status is stored in hdr->func field */
+d41a5a15 Dong Aisheng 2018-09-30  184  		hdr = msg;
+d41a5a15 Dong Aisheng 2018-09-30  185  		ret = hdr->func;
+d41a5a15 Dong Aisheng 2018-09-30  186  	}
+d41a5a15 Dong Aisheng 2018-09-30  187
+d41a5a15 Dong Aisheng 2018-09-30  188  out:
+d41a5a15 Dong Aisheng 2018-09-30  189  	mutex_unlock(&sc_ipc->lock);
+d41a5a15 Dong Aisheng 2018-09-30  190
+d41a5a15 Dong Aisheng 2018-09-30  191  	dev_dbg(sc_ipc->dev, "RPC SVC done\n");
+d41a5a15 Dong Aisheng 2018-09-30  192
+d41a5a15 Dong Aisheng 2018-09-30  193  	return imx_sc_to_linux_errno(ret);
+d41a5a15 Dong Aisheng 2018-09-30  194  }
+d41a5a15 Dong Aisheng 2018-09-30  195  EXPORT_SYMBOL(imx_scu_call_rpc);
+d41a5a15 Dong Aisheng 2018-09-30  196
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
