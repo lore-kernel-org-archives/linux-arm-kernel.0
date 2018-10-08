@@ -1,90 +1,83 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 8 Oct 2018 15:29:05 +0530
-Subject: [PATCH v6 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <CADYwmhHdTuK-z4GcGCYypYo2dvvPj7udihPcMmTkHTSU2fOWWw@mail.gmail.com>
-References: <20180621063338.20093-1-ganapatrao.kulkarni@cavium.com>
- <20180621063338.20093-3-ganapatrao.kulkarni@cavium.com>
- <CADYwmhHdTuK-z4GcGCYypYo2dvvPj7udihPcMmTkHTSU2fOWWw@mail.gmail.com>
-Message-ID: <CAKTKpr7nq7jfXzHmTd-EX6b3MDefa6B5i--Zn=yUZV7MqS2ywA@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon,  8 Oct 2018 11:03:55 +0100
+Subject: [PATCH v2] Documentation/arm64: HugeTLB page implementation
+In-Reply-To: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
+References: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
+Message-ID: <20181008100355.31820-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pranith,
+Arm v8 architecture supports multiple page sizes - 4k, 16k and
+64k. Based on the active page size, the Linux port supports
+corresponding hugepage sizes at PMD and PUD(4k only) levels.
 
-On Sat, Jul 7, 2018 at 11:22 AM Pranith Kumar <pranith.foss@gmail.com> wrote:
->
-> Hi Ganapatrao,
->
->
-> On Wed, Jun 20, 2018 at 11:33 PM, Ganapatrao Kulkarni
-> <ganapatrao.kulkarni@cavium.com> wrote:
->
-> > +
-> > +enum thunderx2_uncore_l3_events {
-> > +       L3_EVENT_NONE,
-> > +       L3_EVENT_NBU_CANCEL,
-> > +       L3_EVENT_DIB_RETRY,
-> > +       L3_EVENT_DOB_RETRY,
-> > +       L3_EVENT_DIB_CREDIT_RETRY,
-> > +       L3_EVENT_DOB_CREDIT_RETRY,
-> > +       L3_EVENT_FORCE_RETRY,
-> > +       L3_EVENT_IDX_CONFLICT_RETRY,
-> > +       L3_EVENT_EVICT_CONFLICT_RETRY,
-> > +       L3_EVENT_BANK_CONFLICT_RETRY,
-> > +       L3_EVENT_FILL_ENTRY_RETRY,
-> > +       L3_EVENT_EVICT_NOT_READY_RETRY,
-> > +       L3_EVENT_L3_RETRY,
-> > +       L3_EVENT_READ_REQ,
-> > +       L3_EVENT_WRITE_BACK_REQ,
-> > +       L3_EVENT_INVALIDATE_NWRITE_REQ,
-> > +       L3_EVENT_INV_REQ,
-> > +       L3_EVENT_SELF_REQ,
-> > +       L3_EVENT_REQ,
-> > +       L3_EVENT_EVICT_REQ,
-> > +       L3_EVENT_INVALIDATE_NWRITE_HIT,
-> > +       L3_EVENT_INVALIDATE_HIT,
-> > +       L3_EVENT_SELF_HIT,
-> > +       L3_EVENT_READ_HIT,
-> > +       L3_EVENT_MAX,
-> > +};
-> > +
-> > +enum thunderx2_uncore_dmc_events {
-> > +       DMC_EVENT_NONE,
-> > +       DMC_EVENT_COUNT_CYCLES,
-> > +       DMC_EVENT_RES2,
-> > +       DMC_EVENT_RES3,
-> > +       DMC_EVENT_RES4,
-> > +       DMC_EVENT_RES5,
-> > +       DMC_EVENT_RES6,
-> > +       DMC_EVENT_RES7,
-> > +       DMC_EVENT_RES8,
-> > +       DMC_EVENT_READ_64B_TXNS,
-> > +       DMC_EVENT_READ_BELOW_64B_TXNS,
-> > +       DMC_EVENT_WRITE_TXNS,
-> > +       DMC_EVENT_TXN_CYCLES,
-> > +       DMC_EVENT_DATA_TRANSFERS,
-> > +       DMC_EVENT_CANCELLED_READ_TXNS,
-> > +       DMC_EVENT_CONSUMED_READ_TXNS,
-> > +       DMC_EVENT_MAX,
-> > +};
->
-> Can you please provide a link to where these counters are documented?
-> It is not clear what each counter does especially for the L3C events.
+In addition, the architecture also supports caching larger sized
+ranges (composed of multiple entries) at the PTE and PMD level in the
+TLBs using the contiguous bit. The Linux port makes use of this
+architectural support to enable additional hugepage sizes.
 
-I will add brief description of each event in Documentation.
->
-> Also, what counter do you need to use to get L3 hit/miss ratio? I
-> think this is the most useful counter related to L3.
+Describe the two different types of hugepages supported by the arm64
+kernel and the hugepage sizes enabled by each.
 
-L3C cache Hit Ratio = (L3_READ_HIT + L3_INV_N_WRITE_HIT +
-L3_INVALIDATE_HIT) / (L3_READ_REQ + L3_INV_N_WRITE_REQ +
-L3_INVALIDATE_REQ)
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Jonathan Corbet <corbet@lwn.net>
+---
+Hi,
 
->
-> Thanks,
-> --
-> Pranith
+This version incorporates the feedback on v1.
 
-thanks
-Ganapat
+Thanks,
+Punit
+
+ Documentation/arm64/hugetlbpage.txt | 38 +++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 Documentation/arm64/hugetlbpage.txt
+
+diff --git a/Documentation/arm64/hugetlbpage.txt b/Documentation/arm64/hugetlbpage.txt
+new file mode 100644
+index 000000000000..cfae87dc653b
+--- /dev/null
++++ b/Documentation/arm64/hugetlbpage.txt
+@@ -0,0 +1,38 @@
++HugeTLBpage on ARM64
++====================
++
++Hugepage relies on making efficient use of TLBs to improve performance of
++address translations. The benefit depends on both -
++
++  - the size of hugepages
++  - size of entries supported by the TLBs
++
++The ARM64 port supports two flavours of hugepages.
++
++1) Block mappings at the pud/pmd level
++--------------------------------------
++
++These are regular hugepages where a pmd or a pud page table entry points to a
++block of memory. Regardless of the supported size of entries in TLB, block
++mappings reduce the depth of page table walk needed to translate hugepage
++addresses.
++
++2) Using the Contiguous bit
++---------------------------
++
++The architecture provides a contiguous bit in the translation table entries
++(D4.5.3, ARM DDI 0487C.a) that hints to the MMU to indicate that it is one of a
++contiguous set of entries that can be cached in a single TLB entry.
++
++The contiguous bit is used in Linux to increase the mapping size at the pmd and
++pte (last) level. The number of supported contiguous entries varies by page size
++and level of the page table.
++
++
++The following hugepage sizes are supported -
++
++         CONT PTE    PMD    CONT PMD    PUD
++         --------    ---    --------    ---
++  4K:         64K     2M         32M     1G
++  16K:         2M    32M          1G
++  64K:         2M   512M         16G
+-- 
+2.18.0
