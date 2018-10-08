@@ -1,83 +1,47 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon,  8 Oct 2018 11:03:55 +0100
-Subject: [PATCH v2] Documentation/arm64: HugeTLB page implementation
-In-Reply-To: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
-References: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
-Message-ID: <20181008100355.31820-1-punit.agrawal@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 8 Oct 2018 12:18:28 +0200
+Subject: [PATCH v2 10/29] drm/sun4i: Rename DE2 registers related macros
+In-Reply-To: <20181007093905.11253-11-jernej.skrabec@siol.net>
+References: <20181007093905.11253-1-jernej.skrabec@siol.net>
+ <20181007093905.11253-11-jernej.skrabec@siol.net>
+Message-ID: <20181008101828.hb4xtppbexwalbkk@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arm v8 architecture supports multiple page sizes - 4k, 16k and
-64k. Based on the active page size, the Linux port supports
-corresponding hugepage sizes at PMD and PUD(4k only) levels.
-
-In addition, the architecture also supports caching larger sized
-ranges (composed of multiple entries) at the PTE and PMD level in the
-TLBs using the contiguous bit. The Linux port makes use of this
-architectural support to enable additional hugepage sizes.
-
-Describe the two different types of hugepages supported by the arm64
-kernel and the hugepage sizes enabled by each.
-
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jonathan Corbet <corbet@lwn.net>
----
 Hi,
 
-This version incorporates the feedback on v1.
+On Sun, Oct 07, 2018 at 11:38:46AM +0200, Jernej Skrabec wrote:
+> In preparation to introduce DE3 support, change prefix from "SUN8I_" to
+> "DE2_". Current prefix suggest that it's valid only for one family,
+> whereas in reality, DE2 unit is used also on sun50i family.
+> Additionally, it will be easier to distinguish DE3 specific macros by
+> using "DE3_" prefix.
+> 
+> No functional change in this commit.
 
-Thanks,
-Punit
+I'm not too sure about this one. There's basically two ways to look at
+this: you described the first one, and the second one would be to
+treat it as we do for the compatibles: the IP was introduced on one
+SoC family, and then got used on some other ones.
 
- Documentation/arm64/hugetlbpage.txt | 38 +++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/arm64/hugetlbpage.txt
+Trying to always match the one you have however have a quite big
+maintainance cost, as can be shown by your patch: you always have to
+adapt comments, function names, defines, etc. This creates a lot of
+useless churns (ie, non-functional changes) in the drivers, that need
+to be written in the first place, and then reviewed.
 
-diff --git a/Documentation/arm64/hugetlbpage.txt b/Documentation/arm64/hugetlbpage.txt
-new file mode 100644
-index 000000000000..cfae87dc653b
---- /dev/null
-+++ b/Documentation/arm64/hugetlbpage.txt
-@@ -0,0 +1,38 @@
-+HugeTLBpage on ARM64
-+====================
-+
-+Hugepage relies on making efficient use of TLBs to improve performance of
-+address translations. The benefit depends on both -
-+
-+  - the size of hugepages
-+  - size of entries supported by the TLBs
-+
-+The ARM64 port supports two flavours of hugepages.
-+
-+1) Block mappings at the pud/pmd level
-+--------------------------------------
-+
-+These are regular hugepages where a pmd or a pud page table entry points to a
-+block of memory. Regardless of the supported size of entries in TLB, block
-+mappings reduce the depth of page table walk needed to translate hugepage
-+addresses.
-+
-+2) Using the Contiguous bit
-+---------------------------
-+
-+The architecture provides a contiguous bit in the translation table entries
-+(D4.5.3, ARM DDI 0487C.a) that hints to the MMU to indicate that it is one of a
-+contiguous set of entries that can be cached in a single TLB entry.
-+
-+The contiguous bit is used in Linux to increase the mapping size at the pmd and
-+pte (last) level. The number of supported contiguous entries varies by page size
-+and level of the page table.
-+
-+
-+The following hugepage sizes are supported -
-+
-+         CONT PTE    PMD    CONT PMD    PUD
-+         --------    ---    --------    ---
-+  4K:         64K     2M         32M     1G
-+  16K:         2M    32M          1G
-+  64K:         2M   512M         16G
+It's just not worth it.
+
+Maxime
+
 -- 
-2.18.0
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/627caabe/attachment.sig>
