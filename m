@@ -1,98 +1,100 @@
-From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Mon, 8 Oct 2018 09:44:09 +0200
-Subject: [PATCH v2 6/6] power: supply: add AC power supply driver for
- AXP813
-In-Reply-To: <20181006211836.28253-7-oskari@lemmela.net>
-References: <20181004193410.7265-1-oskari@lemmela.net>
- <20181006211836.28253-1-oskari@lemmela.net>
- <20181006211836.28253-7-oskari@lemmela.net>
-Message-ID: <20181008074409.5g73zrfm6nbn6vpp@qschulz>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 Oct 2018 09:47:29 +0200
+Subject: [PATCH 29/36] dt-bindings: arm: Convert Renesas board/soc
+ bindings to json-schema
+In-Reply-To: <20181005165848.3474-30-robh@kernel.org>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-30-robh@kernel.org>
+Message-ID: <CAMuHMdU=rBV4b3EcenvtMPevx14pvTDcnQ7VDg02VZFiFuU-uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oskari,
+Hi Rob,
 
-On Sun, Oct 07, 2018 at 12:18:36AM +0300, Oskari Lemmela wrote:
-> AXP813 and AXP803 PMICs can control input current and
-> minimum voltage.
-> 
-> Both of these values are configurable.
-> 
-> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> ---
->  drivers/power/supply/axp20x_ac_power.c | 92 ++++++++++++++++++++++++++
->  1 file changed, 92 insertions(+)
-> 
-> diff --git a/drivers/power/supply/axp20x_ac_power.c b/drivers/power/supply/axp20x_ac_power.c
-> index 0771f951b11f..92a92354f6f0 100644
-> --- a/drivers/power/supply/axp20x_ac_power.c
-> +++ b/drivers/power/supply/axp20x_ac_power.c
-> @@ -27,6 +27,16 @@
->  #define AXP20X_PWR_STATUS_ACIN_PRESENT	BIT(7)
->  #define AXP20X_PWR_STATUS_ACIN_AVAIL	BIT(6)
->  
-> +#define AXP813_VHOLD_MASK		GENMASK(5, 3)
-> +#define AXP813_VHOLD_UV_TO_BIT(x)	((((x) / 100000) - 40) << 3)
-> +#define AXP813_VHOLD_REG_TO_UV(x)	\
-> +	(((((x) & AXP813_VHOLD_MASK) >> 3) + 40) * 100000)
-> +
-> +#define AXP813_CURR_LIMIT_MASK		GENMASK(2, 0)
-> +#define AXP813_CURR_LIMIT_UA_TO_BIT(x)	(((x) / 500000) - 3)
-> +#define AXP813_CURR_LIMIT_REG_TO_UA(x)	\
-> +	((((x) & AXP813_CURR_LIMIT_MASK) + 3) * 500000)
-> +
->  #define DRVNAME "axp20x-ac-power-supply"
->  
->  struct axp20x_ac_power {
-> @@ -102,6 +112,55 @@ static int axp20x_ac_power_get_property(struct power_supply *psy,
->  
->  		return 0;
->  
-> +	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
-> +		ret = regmap_read(power->regmap, AXP813_ACIN_PATH_CTRL, &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		val->intval = AXP813_VHOLD_REG_TO_UV(reg);
-> +
-> +		return 0;
-> +
-> +	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
-> +		ret = regmap_read(power->regmap, AXP813_ACIN_PATH_CTRL, &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		val->intval = AXP813_CURR_LIMIT_REG_TO_UA(reg);
-> +
-> +		return 0;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static int axp20x_ac_power_set_property(struct power_supply *psy,
-> +					enum power_supply_property psp,
-> +					const union power_supply_propval *val)
-> +{
+On Fri, Oct 5, 2018 at 6:59 PM Rob Herring <robh@kernel.org> wrote:
+> Convert Renesas SoC bindings to DT schema format using json-schema.
+>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Argh, missed this one in the first version. Since you're introducing it
-with the AXP813 and it isn't used with the AXP20X, I'd name it
-axp813_ac_power_set_property. I'll let Maxime or Chen-Yu confirm though.
+Thanks for your patch!
 
-With the modification in the header from the previous patch in this
-patch,
+Note that this will need a rebase, as more SoCs/boards have been added
+in -next.
 
-Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.yaml
+> @@ -0,0 +1,205 @@
+> +# SPDX-License-Identifier: None
 
-Thanks!
-Quentin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/7bf32116/attachment.sig>
+The old file didn't have an SPDX header, so it was GPL-2.0, implicitly?
+
+> +%YAML 1.2
+> +---
+> +$id: http://devicetree.org/schemas/bindings/arm/shmobile.yaml#
+> +$schema: http://devicetree.org/meta-schemas/core.yaml#
+> +
+> +title: Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
+> +
+> +maintainers:
+> +  - Geert Uytterhoeven <geert+renesas@glider.be>
+
+Simon Horman <horms@verge.net.au> (supporter:ARM/SHMOBILE ARM ARCHITECTURE)
+Magnus Damm <magnus.damm@gmail.com> (supporter:ARM/SHMOBILE ARM ARCHITECTURE)
+
+You had it right in the CC list, though...
+
+> +      - description: RZ/G1M (R8A77430)
+> +        items:
+> +          - enum:
+> +              # iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-G20D-Qseven)
+> +              - iwave,g20d
+> +          - const: iwave,g20m
+> +          - const: renesas,r8a7743
+> +
+> +      - items:
+> +          - enum:
+> +              # iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
+> +              - iwave,g20m
+> +          - const: renesas,r8a7743
+> +
+> +      - description: RZ/G1N (R8A77440)
+> +        items:
+> +          - enum:
+> +              - renesas,sk-rzg1m # SK-RZG1M (YR8A77430S000BE)
+
+This board belongs under the RZ/G1M section above
+(see also the 7743 in the part number).
+
+> +          - const: renesas,r8a7744
+
+> +      - description: Kingfisher (SBEV-RCAR-KF-M03)
+> +        items:
+> +          - const: shimafuji,kingfisher
+> +          - enum:
+> +              - renesas,h3ulcb
+> +              - renesas,m3ulcb
+> +          - enum:
+> +              - renesas,r8a7795
+> +              - renesas,r8a7796
+
+This looks a bit funny: all other entries have the "const" last, and
+use it for the
+SoC number. May be correct, though.
+To clarify, this is an extension board that can fit both the [HM]3ULCB
+boards (actually also the new M3NULCB, I think).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
