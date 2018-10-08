@@ -1,169 +1,44 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Mon, 08 Oct 2018 17:41:02 +0200
-Subject: Patch "perf annotate: Fix parsing aarch64 branch instructions after
- objdump update" has been added to the 4.18-stable tree
-Message-ID: <15390132623119@kroah.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 8 Oct 2018 17:48:03 +0200
+Subject: [PATCH] staging: bcm2835-camera: remove extraneous setting of
+ dev->colourfx.enable
+In-Reply-To: <20181008145012.31312-1-colin.king@canonical.com>
+References: <20181008145012.31312-1-colin.king@canonical.com>
+Message-ID: <d753df4f-e812-c366-0b1d-9ff804da0ab5@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Colin,
 
-This is a note to let you know that I've just added the patch titled
+Am 08.10.2018 um 16:50 schrieb Colin King:
+> From: Colin Ian King <colin.king@canonical.com>
+>
+> Currently dev->colourfx.enable is being set twice, hence the first
+> occurrance is redundant and can be removed, so remove it. This minor
+> issue was introduced by commit 7b3ad5abf027 ("staging: Import the
+> BCM2835 MMAL-based V4L2 camera driver.").
+>
+> Detected by CoverityScan CID#1419711 ("Unused value")
+>
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/staging/vc04_services/bcm2835-camera/controls.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> index a2c55cb2192a..99831dd4365d 100644
+> --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> @@ -588,7 +588,6 @@ static int ctrl_set_colfx(struct bm2835_mmal_dev *dev,
+>  
+>  	control = &dev->component[MMAL_COMPONENT_CAMERA]->control;
+>  
+> -	dev->colourfx.enable = (ctrl->val & 0xff00) >> 8;
+>  	dev->colourfx.enable = ctrl->val & 0xff;
+>  
+>  	ret = vchiq_mmal_port_parameter_set(dev->instance, control,
 
-    perf annotate: Fix parsing aarch64 branch instructions after objdump update
+as long as the current behavior is correct, i'm okay with this patch.
+But the byte masking looks suspicious, so i hope Dave can clarify that.
 
-to the 4.18-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
-
-The filename of the patch is:
-     perf-annotate-fix-parsing-aarch64-branch-instructions-after-objdump-update.patch
-and it can be found in the queue-4.18 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From foo at baz Mon Oct  8 17:39:53 CEST 2018
-From: Kim Phillips <kim.phillips@arm.com>
-Date: Mon, 27 Aug 2018 12:53:40 -0500
-Subject: perf annotate: Fix parsing aarch64 branch instructions after objdump update
-
-From: Kim Phillips <kim.phillips@arm.com>
-
-[ Upstream commit 4e67b2a5df5d3f341776d12ee575e00ca3ef92de ]
-
-Starting with binutils 2.28, aarch64 objdump adds comments to the
-disassembly output to show the alternative names of a condition code
-[1].
-
-It is assumed that commas in objdump comments could occur in other
-arches now or in the future, so this fix is arch-independent.
-
-The fix could have been done with arm64 specific jump__parse and
-jump__scnprintf functions, but the jump__scnprintf instruction would
-have to have its comment character be a literal, since the scnprintf
-functions cannot receive a struct arch easily.
-
-This inconvenience also applies to the generic jump__scnprintf, which is
-why we add a raw_comment pointer to struct ins_operands, so the __parse
-function assigns it to be re-used by its corresponding __scnprintf
-function.
-
-Example differences in 'perf annotate --stdio2' output on an aarch64
-perf.data file:
-
-BEFORE: ? b.cs   ffff200008133d1c <unwind_frame+0x18c>  // b.hs, dffff7ecc47b
-AFTER : ? b.cs   18c
-
-BEFORE: ? b.cc   ffff200008d8d9cc <get_alloc_profile+0x31c>  // b.lo, b.ul, dffff727295b
-AFTER : ? b.cc   31c
-
-The branch target labels 18c and 31c also now appear in the output:
-
-BEFORE:        add    x26, x29, #0x80
-AFTER : 18c:   add    x26, x29, #0x80
-
-BEFORE:        add    x21, x21, #0x8
-AFTER : 31c:   add    x21, x21, #0x8
-
-The Fixes: tag below is added so stable branches will get the update; it
-doesn't necessarily mean that commit was broken at the time, rather it
-didn't withstand the aarch64 objdump update.
-
-Tested no difference in output for sample x86_64, power arch perf.data files.
-
-[1] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bb7eff5206e4795ac79c177a80fe9f4630aaf730
-
-Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-Tested-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Anton Blanchard <anton@samba.org>
-Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Taeung Song <treeze.taeung@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Fixes: b13bbeee5ee6 ("perf annotate: Fix branch instruction with multiple operands")
-Link: http://lkml.kernel.org/r/20180827125340.a2f7e291901d17cea05daba4 at arm.com
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- tools/perf/util/annotate.c |   22 +++++++++++++++++++++-
- tools/perf/util/annotate.h |    1 +
- 2 files changed, 22 insertions(+), 1 deletion(-)
-
---- a/tools/perf/util/annotate.c
-+++ b/tools/perf/util/annotate.c
-@@ -281,7 +281,19 @@ bool ins__is_call(const struct ins *ins)
- 	return ins->ops == &call_ops || ins->ops == &s390_call_ops;
- }
- 
--static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *ops, struct map_symbol *ms)
-+/*
-+ * Prevents from matching commas in the comment section, e.g.:
-+ * ffff200008446e70:       b.cs    ffff2000084470f4 <generic_exec_single+0x314>  // b.hs, b.nlast
-+ */
-+static inline const char *validate_comma(const char *c, struct ins_operands *ops)
-+{
-+	if (ops->raw_comment && c > ops->raw_comment)
-+		return NULL;
-+
-+	return c;
-+}
-+
-+static int jump__parse(struct arch *arch, struct ins_operands *ops, struct map_symbol *ms)
- {
- 	struct map *map = ms->map;
- 	struct symbol *sym = ms->sym;
-@@ -290,6 +302,10 @@ static int jump__parse(struct arch *arch
- 	};
- 	const char *c = strchr(ops->raw, ',');
- 	u64 start, end;
-+
-+	ops->raw_comment = strchr(ops->raw, arch->objdump.comment_char);
-+	c = validate_comma(c, ops);
-+
- 	/*
- 	 * Examples of lines to parse for the _cpp_lex_token@@Base
- 	 * function:
-@@ -309,6 +325,7 @@ static int jump__parse(struct arch *arch
- 		ops->target.addr = strtoull(c, NULL, 16);
- 		if (!ops->target.addr) {
- 			c = strchr(c, ',');
-+			c = validate_comma(c, ops);
- 			if (c++ != NULL)
- 				ops->target.addr = strtoull(c, NULL, 16);
- 		}
-@@ -366,9 +383,12 @@ static int jump__scnprintf(struct ins *i
- 		return scnprintf(bf, size, "%-6s %s", ins->name, ops->target.sym->name);
- 
- 	c = strchr(ops->raw, ',');
-+	c = validate_comma(c, ops);
-+
- 	if (c != NULL) {
- 		const char *c2 = strchr(c + 1, ',');
- 
-+		c2 = validate_comma(c2, ops);
- 		/* check for 3-op insn */
- 		if (c2 != NULL)
- 			c = c2;
---- a/tools/perf/util/annotate.h
-+++ b/tools/perf/util/annotate.h
-@@ -21,6 +21,7 @@ struct ins {
- 
- struct ins_operands {
- 	char	*raw;
-+	char	*raw_comment;
- 	struct {
- 		char	*raw;
- 		char	*name;
-
-
-Patches currently in stable-queue which might be from kim.phillips at arm.com are
-
-queue-4.18/perf-annotate-properly-interpret-indirect-call.patch
-queue-4.18/perf-annotate-fix-parsing-aarch64-branch-instructions-after-objdump-update.patch
+Thanks Stefan
