@@ -1,32 +1,41 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 Oct 2018 02:17:59 +0800
-Subject: [PATCH v4 2/2] PCI: amlogic: Add the Amlogic Meson PCIe
- controller driver
-In-Reply-To: <1538999834-156423-3-git-send-email-hanjie.lin@amlogic.com>
-References: <1538999834-156423-3-git-send-email-hanjie.lin@amlogic.com>
-Message-ID: <201810090208.N3NrdpgK%fengguang.wu@intel.com>
+From: oskari@lemmela.net (Oskari Lemmela)
+Date: Mon,  8 Oct 2018 21:19:01 +0300
+Subject: [PATCH v3 0/7] AXP8x3 AC and battery power supply support
+Message-ID: <20181008181908.9456-1-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yue,
+AXP813 AC power supply support with input current and
+voltage limiting support.
 
-I love your patch! Perhaps something to improve:
+AXP803 AC and battery power supply support.
 
-[auto build test WARNING on pci/next]
-[also build test WARNING on v4.19-rc7 next-20181008]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Changes in v3:
+* Reorder ac_power_supply DT node
+* Rename axp20x_ac_power_set_property function
+* Split mfd commit 
 
-url:    https://github.com/0day-ci/linux/commits/Hanjie-Lin/add-the-Amlogic-Meson-PCIe-controller-driver/20181009-001429
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
+Changes in v2:
+* Reuse axp813 compatibles for axp803
+* Refactor axp20x_ac_power.c
 
+Oskari Lemmela (7):
+  dt-bindings: power: supply: axp20x: add AXP813 AC power DT binding
+  ARM: dts: axp81x: add AC power supply subnode
+  arm64: dts: allwinner: axp803: add AC and battery power supplies
+  arm64: dts: allwinner: a64: sopine: enable power supplies
+  power: supply: add AC power supply driver for AXP813
+  mfd: axp20x: Add AC power supply cell for AXP813
+  mfd: axp20x: Add supported cells for AXP803
 
-coccinelle warnings: (new ones prefixed by >>)
+ .../bindings/power/supply/axp20x_ac_power.txt |  3 +
+ arch/arm/boot/dts/axp81x.dtsi                 |  5 +
+ arch/arm64/boot/dts/allwinner/axp803.dtsi     | 31 +++++++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  8 ++
+ drivers/mfd/axp20x.c                          | 22 ++++-
+ drivers/power/supply/axp20x_ac_power.c        | 92 +++++++++++++++++++
+ include/linux/mfd/axp20x.h                    |  1 +
+ 7 files changed, 161 insertions(+), 1 deletion(-)
 
->> drivers/pci/controller/dwc/pci-meson.c:190:1-3: WARNING: PTR_ERR_OR_ZERO can be used
-   drivers/pci/controller/dwc/pci-meson.c:267:1-3: WARNING: PTR_ERR_OR_ZERO can be used
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+2.17.1
