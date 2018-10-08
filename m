@@ -1,101 +1,169 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 8 Oct 2018 21:06:02 +0530
-Subject: [PATCH 0/3] spi-nor: Add Octal SPI support
-In-Reply-To: <20181004131732.4c9e2ae9@bbrezillon>
-References: <20181003165603.2579-1-vigneshr@ti.com>
- <20181003212017.653e739f@bbrezillon>
- <1074d503-71ef-2998-7096-de6135bb965d@ti.com>
- <20181004131732.4c9e2ae9@bbrezillon>
-Message-ID: <e4af1014-2008-440c-a017-bb8e7e960d3b@ti.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Mon, 08 Oct 2018 17:41:02 +0200
+Subject: Patch "perf annotate: Fix parsing aarch64 branch instructions after
+ objdump update" has been added to the 4.18-stable tree
+Message-ID: <15390132623119@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
 
-Sorry I missed this mail.
+This is a note to let you know that I've just added the patch titled
 
-On Thursday 04 October 2018 04:47 PM, Boris Brezillon wrote:
-> On Thu, 4 Oct 2018 16:05:36 +0530
-> Vignesh R <vigneshr@ti.com> wrote:
-> 
->>>>
->>>>  .../devicetree/bindings/mtd/cadence-quadspi.txt       |  1 +
->>>>  drivers/mtd/spi-nor/cadence-quadspi.c                 |  9 +++++++++  
->>>
->>> On a slightly different topic, do you plan to convert the Cadence
->>> driver to spi-mem? And if you don't, is it because you don't have time
->>> or because some features are missing in spi-mem (I remember you
->>> mentioned a few things back when you were reviewing the spi-mem series)?
->>>   
->>
->> I do not have plans to convert cadence QSPI driver to spi-mem yet,
->> mainly due to lack of time. Also, not sure if original author Marek and
->> other altera people are okay with that.
->>
->> I see couple of issues in the way of conversion:
->> 1. I would wait to know what direction would direct mapping APIs[1] go
->> before starting spi-mem conversion for Cadence QSPI driver. Else, we
->> have may to re write again if direct mapping APIs are merged.
-> 
-> I'd suggest reviewing the proposal I posted so that you can influence
-> the design of this new API ;-).
-> 
+    perf annotate: Fix parsing aarch64 branch instructions after objdump update
 
-I did take a look and proposal seems fine. Will try to prototype and
-test cadence QSPI driver with these. Thanks for the patches!
+to the 4.18-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+
+The filename of the patch is:
+     perf-annotate-fix-parsing-aarch64-branch-instructions-after-objdump-update.patch
+and it can be found in the queue-4.18 subdirectory.
+
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
 
 
->> 2. New Cadence OSPI IP has an integrated PHY to support high throughput
->> OSPI flashes operating up 200MHz in Octal DDR mode. In order to work
->> with such flashes, PHY DLLs need to be calibrated. Highly simplified
->> calibration sequence is as below(See [2] for actual sequence):
->> -Read flash ID at low speed and store it.
->> -Enable PHY and set DLLs to a defined initial value
->> -Increment RX DLL value
->> -Read flash ID and check for correctness of data read
->> -repeat above two steps until a band of passing values is obtained for
->> RX DLL where flash ID is correctly read.
->> -DLL needs to set to middle of the passing band.
-> 
-> Is the Read ID operation hardcoded or do you just use it as a way to
-> trigger predictable transfers on the IO bus?
-> 
+>From foo at baz Mon Oct  8 17:39:53 CEST 2018
+From: Kim Phillips <kim.phillips@arm.com>
+Date: Mon, 27 Aug 2018 12:53:40 -0500
+Subject: perf annotate: Fix parsing aarch64 branch instructions after objdump update
 
-Just a way to trigger predictable data reads.
+From: Kim Phillips <kim.phillips@arm.com>
 
->>
->> I am trying to figure out how to fit this into the spi-mem framework as
->> controller would to need to store READ ID opcode and expected JEDEC ID
->> before starting calibration sequence.
-> 
-> I think this should be split in 2:
-> 
-> - the SPI NOR framework passing the operation to use to do the
->   calibration (here a READ ID)
-> - the SPI controller framework replaying the same operation with
->   different DLL configs until it finds the best match
-> 
-> So, it would basically be added as a new hook:
-> 
-> 	int (*calibrate)(struct spi_mem *mem,
-> 			 const struct spi_mem_op *tmpl);
-> 
-> and a new function provided by the spi-mem API
-> 
-> int spi_mem_calibrate(struct spi_mem *mem,
-> 		      const struct spi_mem_op *tmpl);
-> 
-> and calibration outcome would be somehow attached to the spi_mem
-> object.
-> 
-> This way we stay memory agnostic but still provide the necessary blocks
-> at the spi-mem level to do such callibrations.
-> 
-> Would that work?
-> 
+[ Upstream commit 4e67b2a5df5d3f341776d12ee575e00ca3ef92de ]
 
-That would work and hopefully is not intrusive to spi-mem framework.
+Starting with binutils 2.28, aarch64 objdump adds comments to the
+disassembly output to show the alternative names of a condition code
+[1].
 
--- 
-Regards
-Vignesh
+It is assumed that commas in objdump comments could occur in other
+arches now or in the future, so this fix is arch-independent.
+
+The fix could have been done with arm64 specific jump__parse and
+jump__scnprintf functions, but the jump__scnprintf instruction would
+have to have its comment character be a literal, since the scnprintf
+functions cannot receive a struct arch easily.
+
+This inconvenience also applies to the generic jump__scnprintf, which is
+why we add a raw_comment pointer to struct ins_operands, so the __parse
+function assigns it to be re-used by its corresponding __scnprintf
+function.
+
+Example differences in 'perf annotate --stdio2' output on an aarch64
+perf.data file:
+
+BEFORE: ? b.cs   ffff200008133d1c <unwind_frame+0x18c>  // b.hs, dffff7ecc47b
+AFTER : ? b.cs   18c
+
+BEFORE: ? b.cc   ffff200008d8d9cc <get_alloc_profile+0x31c>  // b.lo, b.ul, dffff727295b
+AFTER : ? b.cc   31c
+
+The branch target labels 18c and 31c also now appear in the output:
+
+BEFORE:        add    x26, x29, #0x80
+AFTER : 18c:   add    x26, x29, #0x80
+
+BEFORE:        add    x21, x21, #0x8
+AFTER : 31c:   add    x21, x21, #0x8
+
+The Fixes: tag below is added so stable branches will get the update; it
+doesn't necessarily mean that commit was broken at the time, rather it
+didn't withstand the aarch64 objdump update.
+
+Tested no difference in output for sample x86_64, power arch perf.data files.
+
+[1] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bb7eff5206e4795ac79c177a80fe9f4630aaf730
+
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+Tested-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Anton Blanchard <anton@samba.org>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Taeung Song <treeze.taeung@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Fixes: b13bbeee5ee6 ("perf annotate: Fix branch instruction with multiple operands")
+Link: http://lkml.kernel.org/r/20180827125340.a2f7e291901d17cea05daba4 at arm.com
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ tools/perf/util/annotate.c |   22 +++++++++++++++++++++-
+ tools/perf/util/annotate.h |    1 +
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+
+--- a/tools/perf/util/annotate.c
++++ b/tools/perf/util/annotate.c
+@@ -281,7 +281,19 @@ bool ins__is_call(const struct ins *ins)
+ 	return ins->ops == &call_ops || ins->ops == &s390_call_ops;
+ }
+ 
+-static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *ops, struct map_symbol *ms)
++/*
++ * Prevents from matching commas in the comment section, e.g.:
++ * ffff200008446e70:       b.cs    ffff2000084470f4 <generic_exec_single+0x314>  // b.hs, b.nlast
++ */
++static inline const char *validate_comma(const char *c, struct ins_operands *ops)
++{
++	if (ops->raw_comment && c > ops->raw_comment)
++		return NULL;
++
++	return c;
++}
++
++static int jump__parse(struct arch *arch, struct ins_operands *ops, struct map_symbol *ms)
+ {
+ 	struct map *map = ms->map;
+ 	struct symbol *sym = ms->sym;
+@@ -290,6 +302,10 @@ static int jump__parse(struct arch *arch
+ 	};
+ 	const char *c = strchr(ops->raw, ',');
+ 	u64 start, end;
++
++	ops->raw_comment = strchr(ops->raw, arch->objdump.comment_char);
++	c = validate_comma(c, ops);
++
+ 	/*
+ 	 * Examples of lines to parse for the _cpp_lex_token@@Base
+ 	 * function:
+@@ -309,6 +325,7 @@ static int jump__parse(struct arch *arch
+ 		ops->target.addr = strtoull(c, NULL, 16);
+ 		if (!ops->target.addr) {
+ 			c = strchr(c, ',');
++			c = validate_comma(c, ops);
+ 			if (c++ != NULL)
+ 				ops->target.addr = strtoull(c, NULL, 16);
+ 		}
+@@ -366,9 +383,12 @@ static int jump__scnprintf(struct ins *i
+ 		return scnprintf(bf, size, "%-6s %s", ins->name, ops->target.sym->name);
+ 
+ 	c = strchr(ops->raw, ',');
++	c = validate_comma(c, ops);
++
+ 	if (c != NULL) {
+ 		const char *c2 = strchr(c + 1, ',');
+ 
++		c2 = validate_comma(c2, ops);
+ 		/* check for 3-op insn */
+ 		if (c2 != NULL)
+ 			c = c2;
+--- a/tools/perf/util/annotate.h
++++ b/tools/perf/util/annotate.h
+@@ -21,6 +21,7 @@ struct ins {
+ 
+ struct ins_operands {
+ 	char	*raw;
++	char	*raw_comment;
+ 	struct {
+ 		char	*raw;
+ 		char	*name;
+
+
+Patches currently in stable-queue which might be from kim.phillips at arm.com are
+
+queue-4.18/perf-annotate-properly-interpret-indirect-call.patch
+queue-4.18/perf-annotate-fix-parsing-aarch64-branch-instructions-after-objdump-update.patch
