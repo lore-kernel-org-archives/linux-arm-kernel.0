@@ -1,49 +1,39 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  8 Oct 2018 14:17:19 +0200
-Subject: [PATCH] serial: uartps: Do not allow use aliases >= MAX_UART_INSTANCES
-Message-ID: <01aec25ae2cee7857d92140e98fde1da28393937.1539001037.git.michal.simek@xilinx.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 8 Oct 2018 14:32:40 +0200
+Subject: [PATCH v3 1/5] spi: spi-mem: Add driver for NXP FlexSPI controller
+In-Reply-To: <AM2PR04MB1027555CED1534472C6B8A3C99E60@AM2PR04MB1027.eurprd04.prod.outlook.com>
+References: <1537525323-20730-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1537525323-20730-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20180929174023.51b1e284@bbrezillon>
+ <AM2PR04MB1027555CED1534472C6B8A3C99E60@AM2PR04MB1027.eurprd04.prod.outlook.com>
+Message-ID: <20181008143240.00e784a8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aliases >= MAX_UART_INSTANCES is no problem to find out and use but in
-error path is necessary skip clearing bits in bitmap to ensure that only
-bits in allocated bitmap are handled and nothing beyond that.
-Without this patch when for example serial90 alias is used then in error
-patch bit 90 is clear in 32bit wide bitmap.
+On Mon, 8 Oct 2018 11:21:13 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+> > > +static void nxp_fspi_read_ahb(struct nxp_fspi *f, const struct
+> > > +spi_mem_op *op) {
+> > > +	u32 len = op->data.nbytes;
+> > > +
+> > > +	/* Read out the data directly from the AHB buffer. */
+> > > +	memcpy_fromio(op->data.buf.in, (f->ahb_addr + op->addr.val), len);  
+> > 
+> > Don't know if it's supported, but if it is, I recommend using DMA to do this copy,
+> > because otherwise you might stall the CPU for quite a long time if the flash is
+> > operating in a low-speed mode, and RT maintainers will complain about that at
+> > some point ;-).
+> >   
+> Read using DMA is not supported by the controller in AHB mode, only supported in IP mode.
+> Have to use memcpy_fromio() calls. Maximum data size can be read in single call is 0x800 using AHB read.
+> 
 
-Based on tty-next tree.
+Still, blocking the CPU until the SPI controller has read 0x800 bytes
+is enough to make you miss a real-time deadline. Don't you have a
+controller that supports mem2mem transfers (I'm pretty sure a mem2mem
+DMA transfer would do the trick here)?
 
----
- drivers/tty/serial/xilinx_uartps.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Regards,
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index e82d1d56399f..29a18103182d 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1673,7 +1673,8 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	uart_unregister_driver(cdns_uart_data->cdns_uart_driver);
- err_out_id:
- 	mutex_lock(&bitmap_lock);
--	clear_bit(cdns_uart_data->id, bitmap);
-+	if (cdns_uart_data->id < MAX_UART_INSTANCES)
-+		clear_bit(cdns_uart_data->id, bitmap);
- 	mutex_unlock(&bitmap_lock);
- 	return rc;
- }
-@@ -1698,7 +1699,8 @@ static int cdns_uart_remove(struct platform_device *pdev)
- 	rc = uart_remove_one_port(cdns_uart_data->cdns_uart_driver, port);
- 	port->mapbase = 0;
- 	mutex_lock(&bitmap_lock);
--	clear_bit(cdns_uart_data->id, bitmap);
-+	if (cdns_uart_data->id < MAX_UART_INSTANCES)
-+		clear_bit(cdns_uart_data->id, bitmap);
- 	mutex_unlock(&bitmap_lock);
- 	clk_disable_unprepare(cdns_uart_data->uartclk);
- 	clk_disable_unprepare(cdns_uart_data->pclk);
--- 
-1.9.1
+Boris
