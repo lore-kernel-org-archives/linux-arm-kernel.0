@@ -1,346 +1,179 @@
-From: aleksandr.aleksandrov@emlid.com (Aleksandr Aleksandrov)
-Date: Mon,  8 Oct 2018 18:20:42 +0300
-Subject: [PATCH v3] arm64: new board - Emlid Neutis N5
-In-Reply-To: <1539012044-29998-1-git-send-email-aleksandr.aleksandrov@emlid.com>
-References: <1538745949-13188-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539012044-29998-1-git-send-email-aleksandr.aleksandrov@emlid.com>
-Message-ID: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 8 Oct 2018 20:58:59 +0530
+Subject: [PATCH 1/2] dt-bindings: irqchip: Introduce TISCI Interrupt
+ router bindings
+In-Reply-To: <7e7e7778-c67d-5fc1-6b4a-52a7089a9691@arm.com>
+References: <20181006072812.15814-1-lokeshvutla@ti.com>
+ <20181006072812.15814-2-lokeshvutla@ti.com>
+ <86tvlztmt1.wl-marc.zyngier@arm.com>
+ <8a05f735-01bd-5c2d-fcfa-dcc00adffd0b@ti.com>
+ <7e7e7778-c67d-5fc1-6b4a-52a7089a9691@arm.com>
+Message-ID: <bd356e10-48df-3a07-51d0-feae5735a862@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emlid Neutis N5 is a SoM based on Allwinner H5, has a WiFi & BT
-module, DDR3 RAM and eMMC.
 
-- add neutis n5 dtsi file for SoM needs
-- add neutis devboard dts file
-- add neutis devboard target to dtb makefile
-- new vendor prefix - emlid
 
-Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
----
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../sun50i-h5-emlid-neutis-n5-devboard.dts         | 184 +++++++++++++++++++++
- .../dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi   |  96 +++++++++++
- 4 files changed, 282 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi
+On Monday 08 October 2018 07:25 PM, Marc Zyngier wrote:
+> On 08/10/18 10:46, Lokesh Vutla wrote:
+>> Hi Marc,
+>>
+>> On Saturday 06 October 2018 03:32 PM, Marc Zyngier wrote:
+>>> On Sat, 06 Oct 2018 08:28:11 +0100,
+>>> Lokesh Vutla <lokeshvutla@ti.com> wrote:
+>>>>
+>>>> Add the DT binding documentation for Interrupt router driver.
+>>>>
+>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>>> ---
+>>>>     .../interrupt-controller/ti,sci-intr.txt      | 83 +++++++++++++++++++
+>>>>     MAINTAINERS                                   |  1 +
+>>>>     2 files changed, 84 insertions(+)
+>>>>     create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>>>> new file mode 100644
+>>>> index 000000000000..681ca53cc5fb
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>>>> @@ -0,0 +1,83 @@
+>>>> +Texas Instruments K3 Interrupt Router
+>>>> +=====================================
+>>>> +
+>>>> +The Interrupt Router (INTR) module provides a mechanism to mux M
+>>>> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
+>>>> +to be driven per N output. There is one register per output (MUXCNTL_N) that
+>>>> +controls the selection.
+>>>> +
+>>>> +
+>>>> +                                 Interrupt Router
+>>>> +                             +----------------------+
+>>>> +                             |  Inputs     Outputs  |
+>>>> +        +-------+            | +------+             |
+>>>> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
+>>>> +        +-------+            | +------+             |      controller
+>>>> +                             |    .        +-----+  |      +-------+
+>>>> +        +-------+            |    .        |  0  |  |----->|  GIC  |
+>>>> +        | INTA  |----------->|    .        +-----+  |      +-------+
+>>>> +        +-------+            |    .          .      |
+>>>> +                             | +------+      .      |
+>>>> +                             | | irqM |    +-----+  |
+>>>> +                             | +------+    |  N  |  |
+>>>> +                             |             +-----+  |
+>>>> +                             +----------------------+
+>>>> +
+>>>> +Configuration of these MUXCNTL_N registers is done by a system controller
+>>>> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
+>>>> +controller will keep track of the used and unused registers within the Router.
+>>>> +Driver should request the system controller to get the range of GIC IRQs
+>>>> +assigned to the requesting hosts. It is the drivers responsibility to keep
+>>>> +track of GIC IRQs.
+>>>
+>>> I would drop the GIC here, and replace it by "parent interrupt
+>>> controller", as nothing here is GIC specific
+>>>
+>>>> +
+>>>> +Communication between the host processor running an OS and the system
+>>>> +controller happens through a protocol called TI System Control Interface
+>>>> +(TISCI protocol). For more details refer:
+>>>> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>>>> +
+>>>> +TISCI Interrupt Router Node:
+>>>> +----------------------------
+>>>> +- compatible:		Must be "ti,sci-intr".
+>>>> +- interrupt-controller:	Identifies the node as an interrupt controller
+>>>> +- #interrupt-cells:	Specifies the number of cells needed to encode an
+>>>> +			interrupt source. The value should be 3.
+>>>> +			First cell should contain the TISCI device ID of source
+>>>> +			Second cell should contain the interrupt source offset
+>>>> +			within the device
+>>>> +			Third cell specifies the trigger type as defined
+>>>> +			in interrupts.txt in this directory.
+>>>
+>>> Are all trigger types supported?
+>>
+>> Nope, only level interrupts are supported. Will fix it in v2.
+>>
+>>>
+>>>> +- interrupt-parent:	phandle of irq parent for TISCI intr. The parent must
+>>>> +			use the same interrupt-cells format as GIC.
+>>>
+>>> Why that constraint? From what I can see, the two are fairly
+>>> independent, and the constraint looks more of a Linux driver issue
+>>> than a DT constraint.
+>>
+>> Driver when calling irq_domain_alloc_irqs_parent(), the fwspec node that gets
+>> passed assumes that parent is gic. parameters are filled in with such
+>> assumption. Do you suggest anything to make it more generic?
+> 
+> As I said, that's a Linux driver issue, not a DT specification at all.
+> It is not worth it trying to generalize it in the driver implementation,
+> but the DT spec it self should be generic enough.
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 2c3fc51..2336e44 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -112,6 +112,7 @@ edt	Emerging Display Technologies
- eeti	eGalax_eMPIA Technology Inc
- elan	Elan Microelectronic Corp.
- embest	Shenzhen Embest Technology Co., Ltd.
-+emlid	Emlid, Ltd.
- emmicro	EM Microelectronic
- emtrion	emtrion GmbH
- energymicro	Silicon Laboratories (formerly Energy Micro AS)
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 9ffa7a0..eefe74c 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -8,6 +8,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-emlid-neutis-n5-devboard.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-libretech-all-h3-cc.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
-new file mode 100644
-index 0000000..493947c
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
-@@ -0,0 +1,184 @@
-+/*
-+ * Copyright (C) 2018 Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-h5-emlid-neutis-n5.dtsi"
-+
-+/ {
-+	model = "Emlid Neutis N5 Developer board";
-+	compatible = "emlid,emlid-neutis-n5-devboard",
-+		"emlid,emlid-neutis-n5",
-+		"allwinner,sun50i-h5";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
-+	reg_usb0_vbus: usb0-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb0-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&r_pio 0 9 GPIO_ACTIVE_HIGH>;   /* PL9 */
-+		status = "okay";
-+	};
-+
-+	vdd_cpux: gpio-regulator {
-+		compatible = "regulator-gpio";
-+		pinctrl-names = "default";
-+		regulator-name = "vdd-cpux";
-+		regulator-type = "voltage";
-+		regulator-boot-on;
-+		regulator-always-on;
-+		regulator-min-microvolt = <1100000>;
-+		regulator-max-microvolt = <1300000>;
-+		regulator-ramp-delay = <50>; /* 4ms */
-+		gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-+		gpios-states = <0x1>;
-+		states = <1100000 0x0
-+			  1300000 0x1>;
-+	};
-+};
-+
-+&codec {
-+	allwinner,audio-routing =
-+		"Line Out", "LINEOUT",
-+		"LINEIN", "Line In",
-+		"MIC1", "Mic",
-+		"MIC2", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
-+};
-+
-+&de {
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&emac {
-+	phy-handle = <&int_mii_phy>;
-+	phy-mode = "mii";
-+	allwinner,leds-active-low;
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
-+&mmc0 {
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb0_id_det-gpios = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi
-new file mode 100644
-index 0000000..8e1e37d
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi
-@@ -0,0 +1,96 @@
-+/*
-+ * Copyright (C) 2018 Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		reset-gpios = <&pio 2 7 GPIO_ACTIVE_LOW>; /* PC7 */
-+		post-power-on-delay-ms = <200>;
-+	};
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&reg_vcc3v3>;
-+	vqmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 5 IRQ_TYPE_LEVEL_LOW>;	/* PL5 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-+	status = "okay";
-+};
--- 
-2.7.4
+okay, will fix it in next version.
+
+> 
+>>
+>>>
+>>>> +- ti,sci:		Phandle to TI-SCI compatible System controller node.
+>>>> +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
+>>>> +- ti,sci-rm-range-girq:	Tuple corresponding to unique TISCI resource type that
+>>>> +			defines the dst host irq ranges assigned to this
+>>>> +			interrupt router from this host context.
+>>>> +			Tuple should be of format <type subtype>.
+>>>> +
+>>
+>> Thanks a lot for the review. Also, I need a suggestion regarding one more
+>> interrupt controller(Interrupt Aggregator) on the same SoC controlled by
+>> TISCI_PROTOCOL.
+>>
+>> The Interrupt Aggregator (INTA) provides a centralized machine
+>> which handles the termination of system events to that they can
+>> be coherently processed by the host(s) in the system. Integration looks
+>> something similar https://pastebin.ubuntu.com/p/T32vbrwsch/ .
+>>
+>> Configuration of the Intmap registers that maps global events to vint is done
+>> by a system controller (like the Device Memory and Security Controller on K3
+>> AM654 SoC). Driver should request the system controller to get the range
+>> of global events and vints assigned to the requesting host. Management
+>> of these requested resources should be handled by driver and requests
+>> system controller to map specific global event to vint, bit pair.
+> 
+> I'm sorry, but I really have no idea what the global events and the
+> vints are. Maybe you should describe what this is all about, and maybe
+> provide a pointer to some documentation...
+
+Sorry I should have done that earlier. TRM is available here[1], Section 9.3 
+talks about Interrupt Router, Section 10.2.7 talks about Interrupt aggregator. 
+Documentation for TISCI IRQ management is available here[2].
+
+
+[1] http://www.ti.com/lit/ug/spruid7a/spruid7a.pdf
+[2] http://downloads.ti.com/tisci/esd/latest/2_tisci_msgs/rm/rm_irq.html
+
+> 
+>>
+>> There can be cases such that IRQ routes can involve both INTR and INTA like below:
+>> 	IP ---> INTA ---> INTR ----> GIC.
+>>
+>> In these cases TISCI involves only one message with parametes(source id, source
+>> offset, inta_id, dst id) for configuring IRQ route till the destination. Co
+>> processor will detect there is INTR in the IRQ path and configure that as well.
+>>
+>> Right now I kind of differentiated this scenario in INTA driver by passing a
+>> flag(TI_SCI_EVENT) to INTR driver. If such flag comes, INTR driver should avoid
+>> calling ti_sci api for configuring. Do you think this is the right direction or
+>> do you suggest a better solution.
+> 
+> Frankly, it mostly indicates that the firmware does too much, and should
+> be more flexible.
+> 
+>> If I am not clear in the above description, I can post an RFC for INTA driver
+>> for continuing this discussion.
+> 
+> That'd be preferable, IMO. Please provide definitions for all the above
+
+Sure, will try to post the consolidated series asap. Thanks a lot for the help.
+
+Regards,
+Lokesh
