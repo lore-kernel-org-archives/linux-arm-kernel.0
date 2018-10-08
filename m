@@ -1,64 +1,53 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon,  8 Oct 2018 12:56:41 +0200
-Subject: [PATCH] ARM: dts: socfgpa: remove ethernet aliases from dtsi
-Message-ID: <20181008105641.11505-1-s.trumtrar@pengutronix.de>
+From: evgsyr@gmail.com (Eugene Syromyatnikov)
+Date: Mon, 8 Oct 2018 13:00:52 +0200
+Subject: ARM: Call syscall_trace_exit even when system call skipped
+In-Reply-To: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
+Message-ID: <20181008110047.GA3426@asgard.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all boards use two ethernet devices and/or use them in different
-order. As almost all in-tree boards already define their own ethernet
-aliases, remove them from the dtsi and add the aliases to the two boards,
-that are missing their own definition.
+From: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+On at least x86 and ARM64, and as documented in the ptrace man page
+a skipped system call will still cause a syscall exit ptrace stop.
+
+Previous to this commit 32-bit ARM did not, resulting in strace
+being confused when seccomp skips system calls.
+
+This change also impacts programs that use ptrace to skip system calls.
+
+Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
+Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
+Signed-off-by: Eugene Syromyatnikov <evgsyr@gmail.com>
+Reviewed-by: Kees Cook <keescook@chromium.org>
+Tested-by: Kees Cook <keescook@chromium.org>
+Tested-by: Eugene Syromyatnikov <evgsyr@gmail.com>
 ---
- arch/arm/boot/dts/socfpga.dtsi                    | 2 --
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 4 ++++
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts   | 4 ++++
- 3 files changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index b38f8c240558..068aefa15391 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -22,8 +22,6 @@
- 	#size-cells = <1>;
+KernelVersion: 4.19-rc7
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 746565a..0465d65 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -296,16 +296,15 @@ __sys_trace:
+ 	cmp	scno, #-1			@ skip the syscall?
+ 	bne	2b
+ 	add	sp, sp, #S_OFF			@ restore stack
+-	b	ret_slow_syscall
  
- 	aliases {
--		ethernet0 = &gmac0;
--		ethernet1 = &gmac1;
- 		serial0 = &uart0;
- 		serial1 = &uart1;
- 		timer0 = &timer0;
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-index b280e6494193..48821bcd3eb0 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -20,6 +20,10 @@
- 	model = "Terasic DE-0(Atlas)";
- 	compatible = "terasic,de0-atlas", "altr,socfpga-cyclone5", "altr,socfpga";
+-__sys_trace_return:
+-	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
++__sys_trace_return_nosave:
++	enable_irq_notrace
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
  
-+	aliases {
-+		ethernet0 = &gmac1;
-+	};
-+
- 	chosen {
- 		bootargs = "earlyprintk";
- 		stdout-path = "serial0:115200n8";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-index 53bf99eef66d..d0aede5ed558 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-@@ -21,6 +21,10 @@
- 	model = "EBV SOCrates";
- 	compatible = "ebv,socrates", "altr,socfpga-cyclone5", "altr,socfpga";
- 
-+	aliases {
-+		ethernet0 = &gmac1;
-+	};
-+
- 	chosen {
- 		bootargs = "console=ttyS0,115200";
- 	};
+-__sys_trace_return_nosave:
+-	enable_irq_notrace
++__sys_trace_return:
++	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
 -- 
-2.19.0
+2.1.4
