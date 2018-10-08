@@ -1,132 +1,73 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Mon, 8 Oct 2018 18:58:29 +0300
-Subject: [PATCH v11 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20180929181844.87fd7560cc560f268df3c7b4@magewell.com>
-References: <1537951420-24752-1-git-send-email-yong.deng@magewell.com>
- <20180928101937.wdlrgezxoqzua5ke@paasikivi.fi.intel.com>
- <20180929181844.87fd7560cc560f268df3c7b4@magewell.com>
-Message-ID: <20181008155829.jxxz4mjmeuu4hzki@paasikivi.fi.intel.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 8 Oct 2018 17:03:27 +0100
+Subject: 4.19-rcX: WARN_ON() arch/arm64/kernel/setup.c:271
+ reserve_memblock_reserved_regions
+In-Reply-To: <20181008151138.GA19635@harukaze>
+References: <20181008151138.GA19635@harukaze>
+Message-ID: <47fa0375-ed69-0cbc-9dcb-0cafb9184f24@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi Paolo!
 
-On Sat, Sep 29, 2018 at 06:18:44PM +0800, Yong wrote:
-> Hi Sakari,
-> 
-> On Fri, 28 Sep 2018 13:19:37 +0300
-> Sakari Ailus <sakari.ailus@linux.intel.com> wrote:
-> 
-> > Hi Yong,
-> > 
-> > Thanks for the update! This looks pretty good; some small bits to fix
-> > still, please see my comments below.
-> > 
-> > On Wed, Sep 26, 2018 at 04:43:40PM +0800, Yong Deng wrote:
-> > > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> > > interface and CSI1 is used for parallel interface. This is not
-> > > documented in datasheet but by test and guess.
-> > > 
-> > > This patch implement a v4l2 framework driver for it.
-> > > 
-> > > Currently, the driver only support the parallel interface. MIPI-CSI2,
-> > > ISP's support are not included in this patch.
-> > > 
+On 08/10/2018 16:11, Paolo Pisati wrote:
+> This on my dragonboard 410c:
 > 
 > ...
-> 
-> > > +
-> > > +static void sun6i_csi_v4l2_cleanup(struct sun6i_csi *csi)
-> > > +{
-> > > +	v4l2_async_notifier_unregister(&csi->notifier);
-> > > +	v4l2_async_notifier_cleanup(&csi->notifier);
-> > > +	sun6i_video_cleanup(&csi->video);
-> > > +	v4l2_device_unregister(&csi->v4l2_dev);
-> > > +	media_device_unregister(&csi->media_dev);
-> > 
-> > Please unregister the media device as first.
-> 
-> I notice that the release order of intel ipu3 is:
->     cio2_notifier_exit(cio2);
->     cio2_fbpt_exit_dummy(cio2);
->     for (i = 0; i < CIO2_QUEUES; i++) 
->         cio2_queue_exit(cio2, &cio2->queue[i]);
->     v4l2_device_unregister(&cio2->v4l2_dev);
->     media_device_unregister(&cio2->media_dev);
->     media_device_cleanup(&cio2->media_dev);
->     mutex_destroy(&cio2->lock);
+> [    0.170657] WARNING: CPU: 2 PID: 1 at arch/arm64/kernel/setup.c:271 reserve_memblock_reserved_regions+0xd4/0x150
+> [    0.170666] Modules linked in:
+> [    0.170680] CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc7-dirty #3
+> [    0.170687] Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
+> [    0.170696] pstate: 20000005 (nzCv daif -PAN -UAO)
+> [    0.170707] pc : reserve_memblock_reserved_regions+0xd4/0x150
+> [    0.170718] lr : reserve_memblock_reserved_regions+0xcc/0x150
+> [    0.170725] sp : ffff000008033d30
 
-Well, yeah... this doesn't make a big difference after all. Unregistering
-the media device first is still preferred.
+> [    0.170899] Call trace:
+> [    0.170910]  reserve_memblock_reserved_regions+0xd4/0x150
+> [    0.170921]  do_one_initcall+0x58/0x170
+> [    0.170931]  kernel_init_freeable+0x1a4/0x264
+> [    0.170942]  kernel_init+0x10/0x108
+> [    0.170952]  ret_from_fork+0x10/0x18
+> [    0.170962] ---[ end trace c7ce9242331f7319 ]---
+> [    0.170974] name: reserved res: [mem 0xbff00000-0xbfffffff flags 0x200]
 
-> 
-> > 
-> > You're missing freeing the control handler.
-> > 
-> > > +	media_device_cleanup(&csi->media_dev);
-> > > +}
-> > > +
-> > > +static int sun6i_csi_v4l2_init(struct sun6i_csi *csi)
-> > > +{
-> > > +	int ret;
-> > > +
-> > > +	csi->media_dev.dev = csi->dev;
-> > > +	strlcpy(csi->media_dev.model, "Allwinner Video Capture Device",
-> > > +		sizeof(csi->media_dev.model));
-> > 
-> > strscpy, please.
-> > 
-> > > +	csi->media_dev.hw_revision = 0;
-> > > +
-> > > +	media_device_init(&csi->media_dev);
-> > > +
-> > > +	ret = v4l2_ctrl_handler_init(&csi->ctrl_handler, 0);
-> > 
-> > Do you need controls? The driver doesn't appear to register any.
-> 
-> Some one suggest this. They want the drver can pass control queries to 
-> the subdev.
+John Stultz saw this on Hikey,
 
-If you need that, it should be done in the user space instead. The imx
-staging driver does so but it is not supported by the control framework:
-you may only call v4l2_ctrl_handler_free() for the purpose of freeing the
-resources of the control handler --- not while it is still accessible from
-the user space.
+> that memory region corresponds to the ramoops node:
 
-> 
-> > 
-> > > +	if (ret) {
-> > > +		dev_err(csi->dev, "V4L2 controls handler init failed (%d)\n",
-> > > +			ret);
-> > > +		goto clean_media;
-> > > +	}
-> > > +
-> > > +	csi->v4l2_dev.mdev = &csi->media_dev;
-> > > +	csi->v4l2_dev.ctrl_handler = &csi->ctrl_handler;
-> > > +	ret = v4l2_device_register(csi->dev, &csi->v4l2_dev);
-> > > +	if (ret) {
-> > > +		dev_err(csi->dev, "V4L2 device registration failed (%d)\n",
-> 
-> ...
-> 
-> > > +
-> > > +/*
-> > > + * PHYS_OFFSET isn't available on all architectures. In order to
-> > > + * accomodate for COMPILE_TEST, let's define it to something dumb.
-> > > + */
-> > > +#ifndef PHYS_OFFSET
-> > 
-> > How about:
-> > 
-> > #if !defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
-> 
-> Do you mean:
-> #if defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
+... it was the ramoops description too.
 
-Oh, yes. Indeed.
+There is a patch:
+https://www.spinics.net/lists/arm-kernel/msg675580.html
 
--- 
-Kind regards,
+Which I need to re-spin.
 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+This is happening because your reserved-memory isn't described as memory. I
+mistakenly believed no-one would do this, and I really didn't want to walk both
+them memory and reserved lists at the same time!
+
+mm/page_alloc.c:zero_resv_unavail() has a comment about this:
+|	* Once memblock is changed so such behaviour is not allowed: i.e.
+|	* list of "reserved" memory must be a subset of list of "memory", then
+|	* this code can be removed.
+
+
+> According to the comment in reserve_memblock_reserved_regions():
+
+> and the reserved-memory region evades this condition, but i'm not entirely sure how to
+> properly fix this - any idea?
+
+Ideally reserved-memory would be described as memory. If you need it to be
+removed from the linear map (e.g. because it needs special memory attributes),
+use the binding's 'nomap' property. This causes
+early_init_dt_reserve_memory_arch() to remove the memory instead of marking it
+reserved.
+
+But! DT's that have this reserved-but-not-memory are already out there, so we
+should work around this in the kernel.
+
+
+Thanks,
+
+James
