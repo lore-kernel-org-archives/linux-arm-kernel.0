@@ -1,158 +1,592 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 8 Oct 2018 15:32:16 +0100
-Subject: [PATCH v2 2/2] PCI: controller: dwc: add UniPhier PCIe host
- controller support
-In-Reply-To: <dbb43a92-b5c0-0d26-3db0-3dbbccb12b98@ti.com>
-References: <b869b273-e681-0b8c-52f5-6e02f9de5485@synopsys.com>
- <20180926213135.A4B4.4A936039@socionext.com>
- <20180927164426.ECD6.4A936039@socionext.com>
- <20180928110640.GA18840@e107981-ln.cambridge.arm.com>
- <bb081d21-7c03-0357-4294-7e92d95d838c@arm.com>
- <20180928154350.GC24460@e107981-ln.cambridge.arm.com>
- <dbb43a92-b5c0-0d26-3db0-3dbbccb12b98@ti.com>
-Message-ID: <20181008143215.GA9596@e107981-ln.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 8 Oct 2018 22:34:20 +0800
+Subject: [PATCH v2] ARM: dts: Add support for Liebherr's BK4 device
+ (vf610 based)
+In-Reply-To: <20180927221831.23659-1-lukma@denx.de>
+References: <20180921152726.31742-1-lukma@denx.de>
+ <20180927221831.23659-1-lukma@denx.de>
+Message-ID: <20181008143416.GR3587@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2018 at 11:15:59AM +0530, Kishon Vijay Abraham I wrote:
-> Hi Lorenzo,
+On Fri, Sep 28, 2018 at 12:18:31AM +0200, Lukasz Majewski wrote:
+> This commit adds DTS support for BK4 device from Liebherr. It
+> uses vf610 SoC from NXP.
 > 
-> On Friday 28 September 2018 09:13 PM, Lorenzo Pieralisi wrote:
-> > On Fri, Sep 28, 2018 at 02:17:16PM +0100, Marc Zyngier wrote:
-> >> On 28/09/18 12:06, Lorenzo Pieralisi wrote:
-> >>> [+Murali, Marc]
-> >>>
-> >>> On Thu, Sep 27, 2018 at 04:44:26PM +0900, Kunihiko Hayashi wrote:
-> >>>> Hi Lorenzo, Gustavo,
-> >>>>
-> >>>> On Wed, 26 Sep 2018 21:31:36 +0900 <hayashi.kunihiko@socionext.com> wrote:
-> >>>>
-> >>>>> Hi Lorenzo, Gustavo,
-> >>>>>
-> >>>>> Thank you for reviewing.
-> >>>>>
-> >>>>> On Tue, 25 Sep 2018 18:53:01 +0100
-> >>>>> Gustavo Pimentel <gustavo.pimentel@synopsys.com> wrote:
-> >>>>>
-> >>>>>> On 25/09/2018 17:14, Lorenzo Pieralisi wrote:
-> >>>>>>> [+Gustavo, please have a look at INTX/MSI management]
-> >>>>>>>
-> >>>>>>> On Thu, Sep 06, 2018 at 06:40:32PM +0900, Kunihiko Hayashi wrote:
-> >>>>>>>> This introduces specific glue layer for UniPhier platform to support
-> >>>>>>>> PCIe host controller that is based on the DesignWare PCIe core, and
-> >>>>>>>> this driver supports Root Complex (host) mode.
-> >>>>>>>
-> >>>>>>> Please read this thread and apply it to next versions:
-> >>>>>>>
-> >>>>>>> https://urldefense.proofpoint.com/v2/url?u=https-3A__marc.info_-3Fl-3Dlinux-2Dpci-26m-3D150905742808166-26w-3D2&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=bkWxpLoW-f-E3EdiDCCa0_h0PicsViasSlvIpzZvPxs&m=H8UNDDUGQnQnqfWr4CBios689dJcjxu4qeTTRGulLmU&s=CgcXc_2LThyOpW-4bCriJNo9H1lzROEdy_cG9p-Y5hU&e=
-> >>>>>
-> >>>>> I also found this thread in previous linux-pci, and I think it's helpful for me.
-> >>>>> I'll check it carefully.
-> >>>>
-> >>>> [snip]
-> >>>>
-> >>>>>>>> +	ret = devm_request_irq(dev, pp->irq, uniphier_pcie_irq_handler,
-> >>>>>>>> +			       IRQF_SHARED, "pcie", priv);
-> >>>>>>>
-> >>>>>>> This is wrong, you should set-up a chained IRQ for INTX.
-> >>>>>>>
-> >>>>>>> I *think* that
-> >>>>>>>
-> >>>>>>> ks_pcie_setup_interrupts()
-> >>>>>>>
-> >>>>>>> is a good example to start with but I wonder whether it is worth
-> >>>>>>> generalizing the INTX approach to designware as a whole as it was
-> >>>>>>> done for MSIs.
-> >>>>>>>
-> >>>>>>> Thoughts ?
-> >>>>>>
-> >>>>>> From what I understood this is for legacy IRQ, right?
-> >>>>>
-> >>>>> Yes. For legacy IRQ.
-> >>>>>
-> >>>>>> Like you (Lorenzo) said there is 2 drivers (pci-keystone-dw.c and pci-dra7xx.c)
-> >>>>>> that uses it and can be use as a template for handling this type of interrupts.
-> >>>>>>
-> >>>>>> We can try to pass some kind of generic INTX function to the DesignWare host
-> >>>>>> library to handling this, but this will require some help from keystone and
-> >>>>>> dra7xx maintainers, since my setup doesn't have legacy IRQ HW support.
-> >>>>>
-> >>>>> Now I think it's difficult to make a template for INTX function,
-> >>>>> and at first, I'll try to re-write this part with reference to pci-keystone-dw.c.
-> >>>>
-> >>>> I understand that there are 2 types of interrupt and the drivers.
-> >>>>
-> >>>> One like pci-keystone-dw.c is:
-> >>>>
-> >>>>  - there are 4 interrupts for legacy,
-> >>>>  - invoke handlers for each interrupt, and handle the interrupt,
-> >>>>  - call irq_set_chained_handler_and_data() to make a chain of the interrupts
-> >>>>   when initializing
-> >>>>
-> >>>> The other like pci-dra7xx.c is:
-> >>>>
-> >>>>  - there is 1 IRQ for legacy as a parent,
-> >>>>  - check an interrupt factor register, and handle the interrupt correspond
-> >>>>    to the factor,
-> >>>>  - call request_irq() for the parent IRQ and irq_domain_add_linear() for
-> >>>>    the factor when initializing
-> >>>>
-> >>>> The pcie-uniphier.c is the same type as the latter (like pci-dra7xx.c).
-> >>>>
-> >>>> However, in pci-dra7xx.c, MSI and legacy IRQ share the same interrupt number,
-> >>>> so the same handler is called and the handler divides these IRQs.
-> >>>> (found in dra7xx_pcie_msi_irq_handler())
-> >>>>
-> >>>> In pcie-uniphier.c, MSI and legacy IRQ are independent.
-> >>>> Therefore it's necessary to prepare the handler for the legacy IRQ.
-> >>>>
-> >>>> I think that it's difficult to apply the way of pci-keystone-dw.c, and
-> >>>> uniphier_pcie_irq_handler() and calling devm_request_irq() are still
-> >>>> necessary to handle legacy IRQ.
-> >>>
-> >>> I do not think it is difficult, the difference is that keystone has
-> >>> 1 GIC irq line allocated per legacy IRQ, your set-up has one for
-> >>> all INTX.
-> >>>
-> >>> *However*, I would like some clarifications from Murali on this code
-> >>> in drivers/pci/controller/dwc/pci-keystone.c:
-> >>>
-> >>> static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
-> >>> {
-> >>> 	unsigned int irq = irq_desc_get_irq(desc);
-> >>> 	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
-> >>> 	struct dw_pcie *pci = ks_pcie->pci;
-> >>> 	struct device *dev = pci->dev;
-> >>> 	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
-> >>>
-> >>> Here the IRQ numbers are virtual IRQs, is it correct to consider
-> >>> the virq numbers as sequential values ? The "offset" is used to
-> >>> handle the PCI controller interrupt registers, so it must be a value
-> >>> between 0-3 IIUC.
-> >>
-> >> There is absolutely no reason why virtual interrupt numbers should be
-> >> contiguous. Shake the allocator hard enough, and you'll see gaps appearing.
-> >>
-> >> In general, the only thing that makes sense is to compute this offset based
-> >> on the hwirq which is HW-specific.
-> > 
-> > That was my understanding and why I asked, which means that keystone
-> > code can break (unless I read it wrong) and Murali will send me a fix as
-> > soon as possible please to get it right (and Kunihiko will base his
-> > code on this discussion).
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> ---
+> Changes for v2:
 > 
-> I had cleaned up legacy interrupt handling in keystone driver [1] which was
-> also required for TI's AM654 Platform.
+> - Rename enet_ext and audio_ext oscillator names
+> - Move regulators from simple-bus (and rename to reg_3p3v: regulator-3p3v)
+> - Add stdout-path property to chosen node
+> - Move iomuxc node to the end (as it is so large)
+> - Sort with alphabetical order
+> - Rename the default pinctrl to "hog"
+> - Move LED pins definition from "hog" to "led" group
+> - Add more descriptive names to default pins pinmux definition
+> - Use spi-slave property to describe node working in this mode
+> - Rename the spidev3 node to slave
+> - Introduce new compatible name (lwn,bk4) for spidev driver (to avoid
+>   confusion)
+> - Update some compatibles to match current kernel
+> ---
+>  arch/arm/boot/dts/Makefile      |   1 +
+>  arch/arm/boot/dts/vf610-bk4.dts | 499 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 500 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/vf610-bk4.dts
 > 
-> But I guess the same issue will occur in MSI interrupt handling. I'll fix that
-> up in the next version. Btw can you review [2] so that I can fix any other
-> comments that you may have.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b5bd3de87c33..e6f159895fa9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -577,6 +577,7 @@ dtb-$(CONFIG_SOC_LS1021A) += \
+>  	ls1021a-twr.dtb
+>  dtb-$(CONFIG_SOC_VF610) += \
+>  	vf500-colibri-eval-v3.dtb \
+> +	vf610-bk4.dtb \
+>  	vf610-colibri-eval-v3.dtb \
+>  	vf610m4-colibri.dtb \
+>  	vf610-cosmic.dtb \
+> diff --git a/arch/arm/boot/dts/vf610-bk4.dts b/arch/arm/boot/dts/vf610-bk4.dts
+> new file mode 100644
+> index 000000000000..78c5723d6f64
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/vf610-bk4.dts
+> @@ -0,0 +1,499 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Copyright 2018
+> + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
+> + */
+> +
+> +/dts-v1/;
+> +#include "vf610.dtsi"
+> +
+> +/ {
+> +	model = "Liebherr BK4 controller";
+> +	compatible = "lwn,bk4", "fsl,vf610";
+> +
+> +	chosen {
+> +		stdout-path = &uart1;
+> +	};
+> +
+> +	memory at 80000000 {
+> +		reg = <0x80000000 0x8000000>;
+> +	};
+> +
+> +	audio_ext: oscillator-audio {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <24576000>;
+> +	};
+> +
+> +	enet_ext: oscillator-ethernet {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <50000000>;
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_leds>;
+> +
+> +		/* LED D5 */
+> +		led0: heartbeat {
+> +			label = "heartbeat";
+> +			gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+> +
+> +	reg_3p3v: regulator-3p3v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3P3V";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	reg_vcc_3v3_mcu: regulator-vcc_3v3_mcu {
 
-Hi Kishon,
+We usually use hyphen rather than underscore in node name for all cases.
+In this case, naming it regulator-vcc3v3mcu looks good to me.
 
-yes I will, I am getting there (sorry for the delay), I don't think we
-can make it v4.20 material but let me first have a look, maybe we can
-split it up and simplify its merge.
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_3v3_mcu";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +};
+> +
+> +&adc0 {
+> +	vref-supply = <&reg_vcc_3v3_mcu>;
+> +	status = "okay";
+> +};
+> +
+> +&adc1 {
+> +	vref-supply = <&reg_vcc_3v3_mcu>;
+> +	status = "okay";
+> +};
+> +
+> +&can0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_can0>;
+> +	status = "okay";
+> +};
+> +
+> +&can1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_can1>;
+> +	status = "okay";
+> +};
+> +
+> +&clks {
+> +	clocks = <&sxosc>, <&fxosc>, <&enet_ext>, <&audio_ext>;
+> +	clock-names = "sxosc", "fxosc", "enet_ext", "audio_ext";
+> +};
+> +
+> +&dspi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_dspi0>;
+> +	bus-num = <0>;
+> +	status = "okay";
+> +
+> +	spidev0 at 0 {
+> +		compatible = "lwn,bk4";
+> +		spi-max-frequency = <30000000>;
+> +		reg = <0>;
+> +		fsl,spi-cs-sck-delay = <200>;
+> +		fsl,spi-sck-cs-delay = <400>;
+> +	};
+> +};
+> +
+> +&dspi3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_dspi3>;
+> +	bus-num = <3>;
+> +	status = "okay";
+> +	spi-slave;
+> +
+> +	slave at 0 {
+> +		compatible = "lwn,bk4";
+> +		spi-max-frequency = <30000000>;
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&edma0 {
+> +	status = "okay";
+> +};
+> +
+> +&edma1 {
+> +	status = "okay";
+> +};
+> +
+> +&esdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&gpio3 2 GPIO_ACTIVE_LOW>;
+> +	status = "okay";
+> +};
+> +
+> +&fec0 {
+> +	phy-mode = "rmii";
+> +	phy-handle = <&ethphy0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec0>;
+> +	status = "okay";
+> +
+> +	mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 
-Thanks,
-Lorenzo
+Please have a newline between properties and child node.
+
+> +		ethphy0: ethernet-phy at 1 {
+> +			reg = <1>;
+> +			clocks = <&clks VF610_CLK_ENET_50M>;
+> +			clock-names = "rmii-ref";
+> +		};
+> +	};
+> +};
+> +
+> +&fec1 {
+> +	phy-mode = "rmii";
+> +	phy-handle = <&ethphy1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec1>;
+> +	status = "okay";
+> +
+> +	mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+Ditto
+
+> +		ethphy1: ethernet-phy at 1 {
+> +			reg = <1>;
+> +			clocks = <&clks VF610_CLK_ENET_50M>;
+> +			clock-names = "rmii-ref";
+> +		};
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <400000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +
+> +	eeprom: eeprom at 50 {
+
+It might be better to label the node with model name as below.
+
+	24c256: eeprom
+
+> +		compatible = "atmel,24c256";
+> +		reg = <0x50>;
+> +	};
+> +
+> +	rtc: rtc at 68 {
+
+	m41t62: rtc
+
+> +		compatible = "st,m41t62";
+> +		reg = <0x68>;
+> +	};
+> +};
+> +
+> +&nfc {
+> +	assigned-clocks = <&clks VF610_CLK_NFC>;
+> +	assigned-clock-rates = <33000000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_nfc>;
+> +	status = "okay";
+> +
+> +	nand at 0 {
+> +		compatible = "fsl,vf610-nfc-nandcs";
+> +		reg = <0>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		nand-bus-width = <16>;
+> +		nand-ecc-mode = "hw";
+> +		nand-ecc-strength = <24>;
+> +		nand-ecc-step-size = <2048>;
+> +		nand-on-flash-bbt;
+> +	};
+> +};
+> +
+> +&qspi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_qspi0>;
+> +	status = "okay";
+> +
+> +	flash0: n25q128a13 at 0 {
+
+Node name should be generic and label name should be specific.
+
+	n25q128a13_0: flash at 0
+
+> +		compatible = "n25q128a13", "jedec,spi-nor";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		spi-max-frequency = <66000000>;
+> +		spi-rx-bus-width = <4>;
+> +		reg = <0>;
+> +	};
+> +
+> +	flash1: n25q128a13 at 1 {
+
+	n25q128a13_1: flash at 1
+
+> +		compatible = "n25q128a13", "jedec,spi-nor";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		spi-max-frequency = <66000000>;
+> +		spi-rx-bus-width = <2>;
+> +		reg = <1>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart0>;
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	status = "okay";
+> +};
+> +
+> +&usbdev0 {
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usbmisc0 {
+> +	status = "okay";
+> +};
+> +
+> +&usbmisc1 {
+> +	status = "okay";
+> +};
+> +
+> +&usbphy0 {
+> +	status = "okay";
+> +};
+> +
+> +&usbphy1 {
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	pinctrl_hog: hoggrp {
+> +		fsl,pins = <
+> +			/* One_Wire_PSU_EN */
+> +			VF610_PAD_PTC29__GPIO_102		0x1183
+> +			/* SPI ENABLE */
+> +			VF610_PAD_PTB26__GPIO_96		0x1183
+> +			/* EB control */
+> +			VF610_PAD_PTE14__GPIO_119		0x1183
+> +			VF610_PAD_PTE4__GPIO_109		0x1181
+> +			/* Feedback_Lines */
+> +			VF610_PAD_PTC31__GPIO_104		0x1181
+> +			VF610_PAD_PTA7__GPIO_134		0x1181
+> +			VF610_PAD_PTD9__GPIO_88		0x1181
+> +			VF610_PAD_PTE1__GPIO_106		0x1183
+> +			VF610_PAD_PTB2__GPIO_24		0x1181
+> +			VF610_PAD_PTB3__GPIO_25		0x1181
+> +			VF610_PAD_PTB1__GPIO_23		0x1181
+> +			/* SDHC Enable */
+> +			VF610_PAD_PTE19__GPIO_124		0x1183
+> +			/* SDHC Overcurrent */
+> +			VF610_PAD_PTB23__GPIO_93		0x1181
+> +			/* GPI */
+> +			VF610_PAD_PTE2__GPIO_107		0x1181
+> +			VF610_PAD_PTE3__GPIO_108		0x1181
+> +			VF610_PAD_PTE5__GPIO_110		0x1181
+> +			VF610_PAD_PTE6__GPIO_111		0x1181
+> +			/* GPO */
+> +			VF610_PAD_PTE0__GPIO_105		0x1183
+> +			VF610_PAD_PTE7__GPIO_112		0x1183
+> +			/* RS485 Control */
+> +			VF610_PAD_PTB8__GPIO_30		0x1183
+> +			VF610_PAD_PTB9__GPIO_31		0x1183
+> +			VF610_PAD_PTE8__GPIO_113		0x1183
+> +			/* MPBUS MPB_EN */
+> +			VF610_PAD_PTE28__GPIO_133		0x1183
+> +			/* MISC */
+> +			VF610_PAD_PTE10__GPIO_115		0x1183
+> +			VF610_PAD_PTE11__GPIO_116		0x1183
+> +			VF610_PAD_PTE17__GPIO_122		0x1183
+> +			VF610_PAD_PTC30__GPIO_103		0x1183
+> +			VF610_PAD_PTB0__GPIO_22		0x1181
+> +			/* RESETINFO */
+> +			VF610_PAD_PTE26__GPIO_131		0x1183
+> +			VF610_PAD_PTD6__GPIO_85		0x1181
+> +			VF610_PAD_PTE27__GPIO_132		0x1181
+> +			VF610_PAD_PTE13__GPIO_118		0x1181
+> +			VF610_PAD_PTE21__GPIO_126		0x1181
+> +			VF610_PAD_PTE22__GPIO_127		0x1181
+> +			/* EE_5V_EN */
+> +			VF610_PAD_PTE18__GPIO_123		0x1183
+> +			/* EE_5V_OC_N */
+> +			VF610_PAD_PTE25__GPIO_130		0x1181
+> +		>;
+> +	};
+> +
+> +	pinctrl_can0: can0grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTB14__CAN0_RX		0x1181
+> +			VF610_PAD_PTB15__CAN0_TX		0x1182
+> +		>;
+> +	};
+> +
+> +	pinctrl_can1: can1grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTB16__CAN1_RX		0x1181
+> +			VF610_PAD_PTB17__CAN1_TX		0x1182
+> +		>;
+> +	};
+> +
+> +	pinctrl_dspi0: dspi0grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTB18__DSPI0_CS1		0x1182
+> +			VF610_PAD_PTB19__DSPI0_CS0		0x1182
+> +			VF610_PAD_PTB20__DSPI0_SIN		0x1181
+> +			VF610_PAD_PTB21__DSPI0_SOUT		0x1182
+> +			VF610_PAD_PTB22__DSPI0_SCK		0x1182
+> +		>;
+> +	};
+> +
+> +	pinctrl_dspi3: dspi3grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTD10__DSPI3_CS0		0x1181
+> +			VF610_PAD_PTD11__DSPI3_SIN		0x1181
+> +			VF610_PAD_PTD12__DSPI3_SOUT		0x1182
+> +			VF610_PAD_PTD13__DSPI3_SCK		0x1181
+> +		>;
+> +	};
+> +
+> +	pinctrl_esdhc1: esdhc1grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTA24__ESDHC1_CLK		0x31ef
+> +			VF610_PAD_PTA25__ESDHC1_CMD		0x31ef
+> +			VF610_PAD_PTA26__ESDHC1_DAT0		0x31ef
+> +			VF610_PAD_PTA27__ESDHC1_DAT1		0x31ef
+> +			VF610_PAD_PTA28__ESDHC1_DATA2		0x31ef
+> +			VF610_PAD_PTA29__ESDHC1_DAT3		0x31ef
+> +			VF610_PAD_PTB28__GPIO_98		0x219d
+> +		>;
+> +	};
+> +
+> +	pinctrl_fec0: fec0grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTA6__RMII_CLKIN		0x30dd
+> +			VF610_PAD_PTC0__ENET_RMII0_MDC		0x30de
+> +			VF610_PAD_PTC1__ENET_RMII0_MDIO	0x30df
+> +			VF610_PAD_PTC2__ENET_RMII0_CRS		0x30dd
+> +			VF610_PAD_PTC3__ENET_RMII0_RXD1	0x30dd
+> +			VF610_PAD_PTC4__ENET_RMII0_RXD0	0x30dd
+> +			VF610_PAD_PTC5__ENET_RMII0_RXER	0x30dd
+> +			VF610_PAD_PTC6__ENET_RMII0_TXD1	0x30de
+> +			VF610_PAD_PTC7__ENET_RMII0_TXD0	0x30de
+> +			VF610_PAD_PTC8__ENET_RMII0_TXEN	0x30de
+> +		>;
+> +	};
+> +
+> +	pinctrl_fec1: fec1grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTC9__ENET_RMII1_MDC		0x30de
+> +			VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30df
+> +			VF610_PAD_PTC11__ENET_RMII1_CRS	0x30dd
+> +			VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30dd
+> +			VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30dd
+> +			VF610_PAD_PTC14__ENET_RMII1_RXER	0x30dd
+> +			VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30de
+> +			VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30de
+> +			VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30de
+> +		>;
+> +	};
+> +
+> +	pinctrl_gpio_leds: gpio_leds {
+
+gpioledsgrp would be more consistent to others.
+
+> +		fsl,pins = <
+> +			/* Heart bit LED */
+> +			VF610_PAD_PTE12__GPIO_117	0x1183
+> +			/* LEDS */
+> +			VF610_PAD_PTE15__GPIO_120	0x1183
+> +			VF610_PAD_PTA12__GPIO_5	0x1183
+> +			VF610_PAD_PTA16__GPIO_6	0x1183
+> +			VF610_PAD_PTE9__GPIO_114	0x1183
+> +			VF610_PAD_PTE20__GPIO_125	0x1183
+> +			VF610_PAD_PTE23__GPIO_128	0x1183
+> +			VF610_PAD_PTE16__GPIO_121	0x1183
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c2: i2c2grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTA22__I2C2_SCL               0x34df
+> +			VF610_PAD_PTA23__I2C2_SDA               0x34df
+> +		>;
+> +	};
+> +
+> +	pinctrl_nfc: nfcgrp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTD23__NF_IO7		0x28df
+> +			VF610_PAD_PTD22__NF_IO6		0x28df
+> +			VF610_PAD_PTD21__NF_IO5		0x28df
+> +			VF610_PAD_PTD20__NF_IO4		0x28df
+> +			VF610_PAD_PTD19__NF_IO3		0x28df
+> +			VF610_PAD_PTD18__NF_IO2		0x28df
+> +			VF610_PAD_PTD17__NF_IO1		0x28df
+> +			VF610_PAD_PTD16__NF_IO0		0x28df
+> +			VF610_PAD_PTB24__NF_WE_B		0x28c2
+> +			VF610_PAD_PTB25__NF_CE0_B		0x28c2
+> +			VF610_PAD_PTB27__NF_RE_B		0x28c2
+> +			VF610_PAD_PTC26__NF_RB_B		0x283d
+> +			VF610_PAD_PTC27__NF_ALE		0x28c2
+> +			VF610_PAD_PTC28__NF_CLE		0x28c2
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart0: uart0grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTB10__UART0_TX		0x21a2
+> +			VF610_PAD_PTB11__UART0_RX		0x21a1
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart1: uart1grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTB4__UART1_TX		0x21a2
+> +			VF610_PAD_PTB5__UART1_RX		0x21a1
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart2: uart2grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTB6__UART2_TX		0x21a2
+> +			VF610_PAD_PTB7__UART2_RX		0x21a1
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart3: uart3grp {
+> +		fsl,pins = <
+> +			VF610_PAD_PTA20__UART3_TX		0x21a2
+> +			VF610_PAD_PTA21__UART3_RX		0x21a1
+> +		>;
+> +	};
+> +
+> +	pinctrl_qspi0: qspi0grp {
+
+This one is out of alphabetic order.
+
+Shawn
+
+> +		fsl,pins = <
+> +			VF610_PAD_PTD0__QSPI0_A_QSCK	0x397f
+> +			VF610_PAD_PTD1__QSPI0_A_CS0	0x397f
+> +			VF610_PAD_PTD2__QSPI0_A_DATA3	0x397f
+> +			VF610_PAD_PTD3__QSPI0_A_DATA2	0x397f
+> +			VF610_PAD_PTD4__QSPI0_A_DATA1	0x397f
+> +			VF610_PAD_PTD5__QSPI0_A_DATA0	0x397f
+> +			VF610_PAD_PTD7__QSPI0_B_QSCK	0x397f
+> +			VF610_PAD_PTD8__QSPI0_B_CS0	0x397f
+> +			VF610_PAD_PTD11__QSPI0_B_DATA1	0x397f
+> +			VF610_PAD_PTD12__QSPI0_B_DATA0	0x397f
+> +		>;
+> +	};
+> +};
+> -- 
+> 2.11.0
+> 
