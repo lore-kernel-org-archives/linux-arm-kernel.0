@@ -1,103 +1,30 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Mon, 8 Oct 2018 11:02:17 +0800
-Subject: [PATCH v5 1/9] PCI: mediatek: Using slot's devfn for compare to
- fix mtk_pcie_find_port logic
-In-Reply-To: <20181002105945.GA27736@e107981-ln.cambridge.arm.com>
-References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
- <1538129080-8206-2-git-send-email-honghui.zhang@mediatek.com>
- <20181001143641.GB13049@red-moon>
- <20181002105945.GA27736@e107981-ln.cambridge.arm.com>
-Message-ID: <1538967737.6246.5.camel@mhfsdcap03>
+From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
+Date: Mon,  8 Oct 2018 11:14:24 +0800
+Subject: [PATCH 0/4] dts/layerscape-pci: removed unsuitable compatible string
+Message-ID: <20181008031428.25293-1-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-10-02 at 11:59 +0100, Lorenzo Pieralisi wrote:
-> On Mon, Oct 01, 2018 at 03:36:41PM +0100, Lorenzo Pieralisi wrote:
-> > On Fri, Sep 28, 2018 at 06:04:32PM +0800, honghui.zhang at mediatek.com wrote:
-> > > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > 
-> > > The Mediatek's host controller has two slots, each with it's own control
-> > > registers. The host driver need to identify which slot was connected
-> > > in order to access the device's configuration space. There's problem
-> > > for current host driver to find out which slot was connected to for
-> > > a given EP device.
-> > > 
-> > > Assuming each slot have connect with one EP device as below:
-> > > 
-> > >                 host bridge
-> > >   bus 0 --> __________|_______
-> > >            |                  |
-> > >            |                  |
-> > >          slot 0             slot 1
-> > >   bus 1 -->|        bus 2 --> |
-> > >            |                  |
-> > >          EP 0               EP 1
-> > > 
-> > > During PCI enumeration, system software will scan all the PCI device
-> > > starting from devfn 0. So it will get the proper port for slot0 and
-> > > slot1 device when using PCI_SLOT(devfn) for match. But it will get
-> > > the wrong slot for EP1: The devfn will be start from 0 when scanning
-> > > EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
-> > > for port0's slot value. So the host driver should not using EP's devfn
-> > > but the slot's devfn(the slot which EP was connected to) for match.
-> > > 
-> > > This patch fix the mtk_pcie_find_port's logic by using the slot's
-> > > devfn for match if finding device connected to the subordinate bus.
-> > > 
-> > > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > ---
-> > >  drivers/pci/controller/pcie-mediatek.c | 17 ++++++++++++++++-
-> > >  1 file changed, 16 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> > > index 9999dae..264e03f 100644
-> > > --- a/drivers/pci/controller/pcie-mediatek.c
-> > > +++ b/drivers/pci/controller/pcie-mediatek.c
-> > > @@ -337,10 +337,25 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
-> > >  {
-> > >  	struct mtk_pcie *pcie = bus->sysdata;
-> > >  	struct mtk_pcie_port *port;
-> > > +	struct pci_dev *dev = NULL;
-> > > +
-> > > +	/*
-> > > +	 * Walk the bus hierarchy to get the devfn value
-> > > +	 * of the port in the root bus.
-> > > +	 */
-> > > +	while (bus && bus->number) {
-> > > +		dev = bus->self;
-> > > +		bus = dev->bus;
-> > 
-> > If you add:
-> > 
-> > devfn = dev->devfn;
-> > 
-> > here
-> > 
-> > > +	}
-> > > +
-> > > +	list_for_each_entry(port, &pcie->ports, list) {
-> > > +		/* Using slot's devfn to compare for subordinary bus. */
-> > > +		if (dev)
-> > > +			devfn = dev->devfn;
-> > 
-> > You can remove this ugly hunk altogether (and dev initialization
-> > to NULL).
-> 
-> Hi Honghui,
-> 
-> if you can make this change I would merge this series, it has been
-> been in the mailing lists for a while, I can make that change too
-> just let me know please.
-> 
+From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Hi, Lorenzo, sorry for the late reply.
+Removed the compatible string "snps,dw-pcie" from FSL layerscape-pci compatible
+string list.
 
-I tried your advise and it works fine.
+Hou Zhiqiang (4):
+  doc/layerscape-pci: update the PCIe compatible strings
+  doc/layerscape-pci: removed unsuitable compatible string
+  dts/arm/ls1021a: Clean PCIe controller compatible strings
+  dts/arm64/layerscape: Clean PCIe controller compatible strings
 
-I will send another version to fix this, as well as to add a fix tag in
-the commit message of patch 6.
+ .../devicetree/bindings/pci/layerscape-pci.txt       |  7 ++++---
+ arch/arm/boot/dts/ls1021a.dtsi                       |  4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi       |  2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       |  6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi       |  6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi       |  6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi       |  8 ++++----
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi       | 12 ++++--------
+ 8 files changed, 24 insertions(+), 27 deletions(-)
 
-thanks
-
-> Thanks,
-> Lorenzo
+-- 
+2.17.1
