@@ -1,62 +1,40 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Mon,  8 Oct 2018 21:19:04 +0300
-Subject: [PATCH v3 3/7] arm64: dts: allwinner: axp803: add AC and battery
- power supplies
+Date: Mon,  8 Oct 2018 21:19:02 +0300
+Subject: [PATCH v3 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
+ power DT binding
 In-Reply-To: <20181008181908.9456-1-oskari@lemmela.net>
 References: <20181008181908.9456-1-oskari@lemmela.net>
-Message-ID: <20181008181908.9456-4-oskari@lemmela.net>
+Message-ID: <20181008181908.9456-2-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AXP803 is compatible with AXP813. Add DT nodes ADC, GPIO,
-AC and battery power supplies.
+The AXP803/AXP813 AC power supply can limit input current and voltage.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 ---
- arch/arm64/boot/dts/allwinner/axp803.dtsi | 31 +++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ .../devicetree/bindings/power/supply/axp20x_ac_power.txt       | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-index e5eae8bafc42..128177178615 100644
---- a/arch/arm64/boot/dts/allwinner/axp803.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-@@ -49,6 +49,37 @@
- 	interrupt-controller;
- 	#interrupt-cells = <1>;
+diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+index 826e8a879121..7a1fb532abe5 100644
+--- a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
++++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+@@ -4,6 +4,7 @@ Required Properties:
+  - compatible: One of:
+ 			"x-powers,axp202-ac-power-supply"
+ 			"x-powers,axp221-ac-power-supply"
++			"x-powers,axp813-ac-power-supply"
  
-+	ac_power_supply: ac-power-supply {
-+		compatible = "x-powers,axp813-ac-power-supply";
-+		status = "disabled";
-+	};
+ This node is a subnode of the axp20x PMIC.
+ 
+@@ -13,6 +14,8 @@ reading ADC channels from the AXP20X ADC.
+ The AXP22X is only able to tell if an AC power supply is present and
+ usable.
+ 
++AXP813/AXP803 are able to limit current and supply voltage
 +
-+	axp_adc: adc {
-+		compatible = "x-powers,axp813-adc";
-+		#io-channel-cells = <1>;
-+	};
-+
-+	axp_gpio: gpio {
-+		compatible = "x-powers,axp813-gpio";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		gpio0_ldo: gpio0-ldo {
-+			pins = "GPIO0";
-+			function = "ldo";
-+		};
-+
-+		gpio1_ldo: gpio1-ldo {
-+			pins = "GPIO1";
-+			function = "ldo";
-+		};
-+	};
-+
-+	battery_power_supply: battery-power-supply {
-+		compatible = "x-powers,axp813-battery-power-supply";
-+		status = "disabled";
-+	};
-+
- 	regulators {
- 		/* Default work frequency for buck regulators */
- 		x-powers,dcdc-freq = <3000>;
+ Example:
+ 
+ &axp209 {
 -- 
 2.17.1
