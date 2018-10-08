@@ -1,95 +1,39 @@
-From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Mon, 8 Oct 2018 09:33:12 +0200
-Subject: [PATCH v2 5/6] mfd: axp20x: add support AXP803 AC and battery
- power supplies
-In-Reply-To: <20181006211836.28253-6-oskari@lemmela.net>
-References: <20181004193410.7265-1-oskari@lemmela.net>
- <20181006211836.28253-1-oskari@lemmela.net>
- <20181006211836.28253-6-oskari@lemmela.net>
-Message-ID: <20181008073312.otdz25ttvew6fzk2@qschulz>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 8 Oct 2018 15:33:07 +0800
+Subject: [PATCH V9 0/3] soc: imx: add scu firmware api support
+In-Reply-To: <1538917483-1818-1-git-send-email-aisheng.dong@nxp.com>
+References: <1538917483-1818-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181008073304.GP3587@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oskari,
-
-On Sun, Oct 07, 2018 at 12:18:35AM +0300, Oskari Lemmela wrote:
-> AXP803 is compatible with AXP813.
-> Adding needed cells for AC and battery power supplies.
+On Sun, Oct 07, 2018 at 09:04:40PM +0800, Dong Aisheng wrote:
+> Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+> (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+> dedicated Cortex-M core to provide power, clock, Pad, and resource
+> management. Communication between the host processor running
+> an OS and the system controller happens through a SCU protocol.
+> This patchset adds the SCU APIs which is implemented based on MU
+> and will be used by different system components.
 > 
-> AXP813 AC power supply cell added.
+> It mainly consists of below parts:
+> 1) SCU IPC
+>    Basic IPC mechanism implemention based on mailbox which is used
+>    for communication between AP and SCU firmware.
+> 2) SCU IPC Service API
 > 
-> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> ---
->  drivers/mfd/axp20x.c       | 22 +++++++++++++++++++++-
->  include/linux/mfd/axp20x.h |  1 +
->  2 files changed, 22 insertions(+), 1 deletion(-)
+> v8->v9:
+>  * only scu headfile path update from include/soc/imx to
+>    include/linux/firmware/imx
 > 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 0be511dd93d0..215f0b009728 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -731,8 +731,23 @@ static const struct mfd_cell axp803_cells[] = {
->  		.name			= "axp221-pek",
->  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
->  		.resources		= axp803_pek_resources,
-> +	}, {
-> +		.name			= "axp20x-regulator"
-> +	}, {
-> +		.name			= "axp20x-gpio",
-> +		.of_compatible		= "x-powers,axp813-gpio",
-> +	}, {
-> +		.name			= "axp813-adc",
-> +		.of_compatible		= "x-powers,axp813-adc",
-> +	}, {
-> +		.name		= "axp20x-battery-power-supply",
-> +		.of_compatible	= "x-powers,axp813-battery-power-supply",
-> +	}, {
-> +		.name           = "axp20x-ac-power-supply",
-> +		.of_compatible  = "x-powers,axp813-ac-power-supply",
-> +		.num_resources  = ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> +		.resources      = axp20x_ac_power_supply_resources,
->  	},
-> -	{	.name			= "axp20x-regulator" },
->  };
->  
->  static const struct mfd_cell axp806_self_working_cells[] = {
-> @@ -778,6 +793,11 @@ static const struct mfd_cell axp813_cells[] = {
->  	}, {
->  		.name		= "axp20x-battery-power-supply",
->  		.of_compatible	= "x-powers,axp813-battery-power-supply",
-> +	}, {
-> +		.name           = "axp20x-ac-power-supply",
-> +		.of_compatible  = "x-powers,axp813-ac-power-supply",
-> +		.num_resources  = ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> +		.resources      = axp20x_ac_power_supply_resources,
+> Dong Aisheng (3):
+>   dt-bindings: arm: fsl: add scu binding doc
+>   firmware: imx: add SCU firmware driver support
+>   firmware: imx: add misc svc support
 
-I'll let Maxime or Chen-Yu tell you what they want but I think we could
-have two different commits, one for AXP803 and one for AXP813. I don't
-think we care about having one commit per added resource for the axp803
-though.
+Applied all, thanks.
 
->  	},
->  };
->  
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index 517e60eecbcb..2302b620d238 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -266,6 +266,7 @@ enum axp20x_variants {
->  #define AXP288_RT_BATT_V_H		0xa0
->  #define AXP288_RT_BATT_V_L		0xa1
->  
-> +#define AXP813_ACIN_PATH_CTRL		0x3a
+I'm waiting for the MAINTAINERS update to send another pull request to
+arm-soc folks.
 
-You're not using it in this patch, please keep this change in the commit
-where its use is introduced.
-
-Thanks,
-Quentin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/40abd802/attachment.sig>
+Shawn
