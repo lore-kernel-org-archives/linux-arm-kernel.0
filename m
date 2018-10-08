@@ -1,72 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 8 Oct 2018 14:17:33 +0100
-Subject: [PATCH 4/7] clocksource: arch_timer: Add support for
- not-fw-configured timer on ARM64
-In-Reply-To: <20181008125009.3721-5-m.szyprowski@samsung.com>
-References: <20181008125009.3721-1-m.szyprowski@samsung.com>
- <CGME20181008125048eucas1p229a94c202596ddd0a65009c15d9e3001@eucas1p2.samsung.com>
- <20181008125009.3721-5-m.szyprowski@samsung.com>
-Message-ID: <e9624612-4a94-b9bc-f5ec-0f16d5b12323@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 8 Oct 2018 08:30:38 -0500
+Subject: [PATCH 22/36] dt-bindings: arm: Convert FSL board/soc bindings to
+ json-schema
+In-Reply-To: <20181008070142.GM3587@dragon>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-23-robh@kernel.org>
+ <20181008070142.GM3587@dragon>
+Message-ID: <CAL_JsqJu0AGH7VizWJJVB2UnFhWKwMVTm-EznOfhDVabgQUA_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Mark Rutland
+On Mon, Oct 8, 2018 at 2:02 AM Shawn Guo <shawnguo@kernel.org> wrote:
+>
+> On Fri, Oct 05, 2018 at 11:58:34AM -0500, Rob Herring wrote:
+> > Convert Freescale SoC bindings to DT schema format using json-schema.
 
-Hi Marek,
+> > +properties:
+> > +  $nodename:
+> > +    const: '/'
+> > +  compatible:
+> > +    oneOf:
+> > +      - description: i.MX23 based Boards
+> > +        items:
+> > +          - enum:
+> > +              - fsl,imx23-evk
+> > +              - olimex,imx23-olinuxino
+> > +          - const: fsl,imx23
+> > +
+> > +      - description: i.MX25 Product Development Kit
+> > +        items:
+> > +          - enum:
+> > +              - fsl,imx25-pdk
+> > +          - const: fsl,imx25
+> > +
+> > +      - description: i.MX27 Product Development Kit
+> > +        items:
+> > +          - enum:
+> > +              - fsl,imx27-pdk
+> > +          - const: fsl,imx27
+> > +
+> > +      - description: i.MX28 based Boards
+> > +        items:
+> > +          - enum:
+> > +              - fsl,imx28-evk
+> > +              - i2se,duckbill
+> > +              - i2se,duckbill-2
+> > +              - technologic,imx28-ts4600
+> > +          - const: fsl,imx28
+> > +      - items:
+>
+> The schema is new to me.  This line looks unusual to me, so you may want
+> to double check.
 
-On 08/10/18 13:50, Marek Szyprowski wrote:
-> Use common infrastructure for ARM Architected Timers erratum to enable
-> support for systems with broken CPU firmware (timer registers not
-> properly configured). This mode has been already availabled on ARM
-> (32bits) architecture. This enables to run Linux kernel on ARM64 boards
-> using physical architected timers instead of the virtual ones. Examples
-> of such system with broken firmware are Samsung Exynos5433 SoC based
-> TM2(e) boards, which is already deployed for years and updating firmware
-> is not possible.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->   drivers/clocksource/Kconfig          | 11 +++++++++++
->   drivers/clocksource/arm_arch_timer.c | 15 ++++++++++++---
->   2 files changed, 23 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index a11f4ba98b05..a30752579b03 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -364,6 +364,17 @@ config ARM64_ERRATUM_858921
->   	  The workaround will be dynamically enabled when an affected
->   	  core is detected.
->   
-> +config ARCH_TIMER_REGISTERS_NOT_FW_CONFIGURED
-> +	bool "Workaround for arch timer registers not configured by firmware"
-> +	default y
-> +	select ARM_ARCH_TIMER_OOL_WORKAROUND
-> +	depends on ARM_ARCH_TIMER && ARM64
-> +	help
-> +	  This option enables a workaround for boards, on which arch timer
-> +	  registers are not properly configured by the board firmware.
-> +	  The workaround will be dynamically enabled when an affected
-> +	  board is detected.
-> +
+It's fine. There's just no description schema on this one as it's a
+continuation of the previous one (logically, but not from a schema
+perspective). Perhaps add "i.MX28 I2SE Duckbill 2 based boards".
 
-I'm sorry, but I'm strongly pushing back on this.
-
-This horrible hack was accepted with the express condition that it would 
-be limited to ARMv7 platforms (on the ground that we never really 
-documented the arch timer boot requirements on that version of the 
-architecture), and would never proliferate on arm64. From day 1, we 
-established what the boot protocol was, and we mandated that either:
-
-- kernel is entered at EL2 on all CPUs
-- cntvoff_el2 is zeroed on all CPUs
-
-and we've got most people to fix their firmware, or live with the 
-consequences. If these machines cannot receive a non-broken firmware, 
-what are the odds that they will receive a mainline kernel?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> > +          - enum:
+> > +              - i2se,duckbill-2-485
+> > +              - i2se,duckbill-2-enocean
+> > +              - i2se,duckbill-2-spi
+> > +          - const: i2se,duckbill-2
+> > +          - const: fsl,imx28
+> > +
+> > +      - description: i.MX51 Babbage Board
