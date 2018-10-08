@@ -1,30 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 8 Oct 2018 14:30:09 +0800
-Subject: [PATCH 06/36] dt-bindings: arm: zte: Move sysctrl bindings to
- their own doc
-In-Reply-To: <20181005165848.3474-7-robh@kernel.org>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-7-robh@kernel.org>
-Message-ID: <20181008063007.GL3587@dragon>
+From: andrea.merello@gmail.com (Andrea Merello)
+Date: Mon, 8 Oct 2018 08:46:41 +0200
+Subject: [PATCH v5 4/7] dmaengine: xilinx_dma: program hardware supported
+ buffer length
+In-Reply-To: <20181002145647.GG19792@vkoul-mobl>
+References: <20180907062502.8241-1-andrea.merello@gmail.com>
+ <20180907062502.8241-4-andrea.merello@gmail.com>
+ <20180918162508.GD2613@vkoul-mobl>
+ <CAN8YU5OySuzAyQ=Buad=Jidhes28koV52Gi-QJ-qOiG5TFBO=Q@mail.gmail.com>
+ <20181002145647.GG19792@vkoul-mobl>
+Message-ID: <CAN8YU5Psx=O5n3HTEoTd4h3qvXDCUbDGjCEetKvxDWso=oL10g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2018 at 11:58:18AM -0500, Rob Herring wrote:
-> In preparation to convert board-level bindings to json-schema, move
-> various misc SoC bindings out to their own file.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Jun Nie <jun.nie@linaro.org>
-> Cc: Baoyou Xie <baoyou.xie@linaro.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/arm/zte-sysctrl.txt   | 30 +++++++++++++++++++
+On Tue, Oct 2, 2018 at 4:56 PM Vinod <vkoul@kernel.org> wrote:
+>
+> On 28-09-18, 08:53, Andrea Merello wrote:
+> > On Tue, Sep 18, 2018 at 6:25 PM Vinod <vkoul@kernel.org> wrote:
+>
+> > > > @@ -964,7 +968,7 @@ static int xilinx_dma_calc_copysize(struct xilinx_dma_chan *chan,
+> > > >                                   int size, int done)
+> > > >  {
+> > > >       size_t copy = min_t(size_t, size - done,
+> > > > -                  XILINX_DMA_MAX_TRANS_LEN);
+> > > > +                         chan->xdev->max_buffer_len);
+> > >
+> > > hmm why not add max_buffer_len in patch 1 again, and then use default
+> > > len as XILINX_DMA_MAX_TRANS_LEN and add multiple lengths here :)
+> >
+> > Sorry, I'm not getting your point. Could you please elaborate the "add
+> > multiple lengths here" thing ?
+>
+> IIRC (sorry been travelling and vacation), add
+> chan->xdev->max_buffer_len in patch 1 and initialize it to
+> XILINX_DMA_MAX_TRANS_LEN. Then in subsequent patches update the length.
 
-zte,sysctrl.txt to be consistent with other files like
-fsl,layerscape-dcfg.txt?  I'm fine with either way, but just want to
-see more consistent naming convention?  Other than that,
+Ah ok. IMO introducing max_buffer_len seems more related to what 4/7
+does (actually getting the max transfer len from DT,  thus it is not
+constant anymore) rather than to what 1/7 does (commonizing the
+calculation of transfer len as it is).. This is why I've introduced it
+in 4/7..
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+.. But if you prefer this way, I'll change this :) .. Maybe we can
+change 1/7 commit message so that this change looks less off-topic..
+But I have not found a very good title yet.. Something like "Prepare
+for DMA copy size calculation rework" ?
+
+> --
+> ~Vinod
