@@ -1,111 +1,114 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 8 Oct 2018 17:05:46 +0200
-Subject: [linux-sunxi] Re: [PATCH 07/12] drm/sun4i: sun6i_mipi_dsi: Fix
- TCON DRQ set bits
-In-Reply-To: <45dbebe9-d0bd-4a1c-f8ee-3afd64cf35f9@openedev.com>
-References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-8-jagan@amarulasolutions.com>
- <20180927165853.dpluekbqzat663q7@flea>
- <CAMty3ZDUxqokipNqnn6c618pebdVBWc8Pfzaz+4+SYqR42Yerg@mail.gmail.com>
- <20181002132008.qtatwtbb3ldu75ay@flea>
- <45dbebe9-d0bd-4a1c-f8ee-3afd64cf35f9@openedev.com>
-Message-ID: <20181008150546.xob5es7gkn7t6kie@flea>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 8 Oct 2018 10:07:32 -0500
+Subject: [PATCH] of: base: Change logic in of_alias_get_alias_list()
+In-Reply-To: <e879d07e97b7f7fc46543315e9fb1b4bc8b7a352.1539001154.git.michal.simek@xilinx.com>
+References: <e879d07e97b7f7fc46543315e9fb1b4bc8b7a352.1539001154.git.michal.simek@xilinx.com>
+Message-ID: <CAL_JsqLNMM6mS1oy1voDAibRk1Srcp7i8e3pESTnM957Rxp4ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 08:52:06AM +0530, Jagan Teki wrote:
-> On Tuesday 02 October 2018 06:50 PM, Maxime Ripard wrote:
-> > On Thu, Sep 27, 2018 at 11:15:50PM +0530, Jagan Teki wrote:
-> > > On Thu, Sep 27, 2018 at 10:28 PM Maxime Ripard
-> > > <maxime.ripard@bootlin.com> wrote:
-> > > > 
-> > > > On Thu, Sep 27, 2018 at 05:18:45PM +0530, Jagan Teki wrote:
-> > > > > TCON DRQ set bits for non-burst DSI mode can computed via
-> > > > > horizontal front porch instead of front porch + sync timings.
-> > > > > 
-> > > > > Since there no documentation for TCON_DRQ_REG(0x7c) register
-> > > > > this change is taken as reference from BPI-M64-bsp.
-> > > > 
-> > > > Detailing more what the issue is would be great.
-> > > > 
-> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > ---
-> > > > >   drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
-> > > > >   1 file changed, 2 insertions(+), 2 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > index 599284971ab6..9918fdb990ff 100644
-> > > > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > @@ -367,9 +367,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
-> > > > >        struct mipi_dsi_device *device = dsi->device;
-> > > > >        u32 val = 0;
-> > > > 
-> > > > The computation here is in the A64 driver:
-> > > > 
-> > > > if ((panel->lcd_ht - panel->lcd_x - panel->lcd_hbp) < 21) {
-> > > >          dsi_dev[sel]->dsi_tcon_drq.bits.drq_mode = 0;
-> > > > } else {
-> > > >          dsi_dev[sel]->dsi_tcon_drq.bits.drq_set =
-> > > >                  (panel->lcd_ht-panel->lcd_x-panel->lcd_hbp-20) *
-> > > >                  dsi_pixel_bits[panel->lcd_dsi_format]/(8*4);
-> > > > }
-> > > > 
-> > > > It is testing that the sync + front porch is smaller than 21, and
-> > > > otherwise sets the drq.
-> > > > 
-> > > > > -     if ((mode->hsync_end - mode->hdisplay) > 20) {
-> > > > 
-> > > > My code here is testing that the difference between hsync_end and
-> > > > hdisplay is superior to 20, and sets the DRQ if true. The condition is
-> > > > reversed, but otherwise, that difference is the front porch plus the
-> > > > sync length.
-> > > 
-> > > True, I understand this, but does drq setting here is specific to SoC?
-> > > I thought of finding DRQ in A31 BSP but I couldn't find the code. do
-> > > you have bsp somewhere in github?
-> > > 
-> > > > 
-> > > > > +     if ((mode->hsync_start - mode->hdisplay) > 20) {
-> > > > 
-> > > > However, you are testing for just the front porch, unlike what your
-> > > > commit log is saying, and unlike what allwinner's code is saying. So
-> > > > this deserves some explanation.
-> > > 
-> > > but A64 is doing this, do you think it's completely A64 specific or
-> > > testing panel with front porch drq?
-> > 
-> > See the above code excerpt:
-> > panel->lcd_ht - panel->lcd_x - panel->lcd_hbp
-> > 
-> > This is hsync + front porch. Not the sole front porch. So no, it's not
-> > doing this.
-> 
-> => panel->lcd_ht - panel->lcd_x - panel->lcd_hbp
-> 
-> from drivers/video/sunxi/disp2/disp/de/disp_lcd.c
-> timmings->hor_front_porch= panel_info->lcd_ht-panel_info->lcd_hbp -
-> panel_info->lcd_x;
-> 
-> => (timmings->hor_front_porch + panel->lcd_hbp + panel->lcd_x) -
-> panel->lcd_x - panel->hbp
-> => timmings->hor_front_porch
-> => mode->hsync_start - mode->hdisplay
-> 
-> This is simply a front porch.
+On Mon, Oct 8, 2018 at 7:19 AM Michal Simek <michal.simek@xilinx.com> wrote:
+>
+> Check compatible string first before setting up bit in bitmap to also
+> cover cases that allocated bitfield is not big enough.
+> Show warning about it but let driver to continue to work with allocated
+> bitfield to keep at least some devices (included console which
+> is commonly close to serial0) to work.
+>
+> Fixes: b1078c355d76 ("of: base: Introduce of_alias_get_alias_list() to check alias IDs")
+> Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>
+> I have looked at it and I don't think there should be necessary to
+> report error immediately back with partially initialized bitfield.
+> The reason is that still there could be a console device which is most
+> likely below that max limit and it is worth to return at least that nbits
+> properly filled.
+> It will also enable cases that you can still continue to use aliases
+> higher then fields prepared for devices without alias.
 
-And this should be in your commit log as well.
+Seems reasonable. Plus if you had a new dtb which added an alias
+greater than what the OS version supports, you would break that
+system.
 
-Maxime
+>
+> To be fixed patches are present in tty-next branch.
+>
+> ---
+>  drivers/of/base.c                  | 22 ++++++++++++----------
+>  drivers/tty/serial/xilinx_uartps.c |  2 +-
+>  2 files changed, 13 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 908de45f966b..0b9611e196d1 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -1953,13 +1953,15 @@ int of_alias_get_id(struct device_node *np, const char *stem)
+>   * The function travels the lookup table to record alias ids for the given
+>   * device match structures and alias stem.
+>   *
+> - * Return:     0 or -ENOSYS when !CONFIG_OF
+> + * Return:     0 or -ENOSYS when !CONFIG_OF or
+> + *             -EINVAL if alias ID is greater then allocated nbits
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181008/8ad5b941/attachment.sig>
+I think EOVERFLOW or ERANGE would be better as those are less common
+and I take EINVAL as the caller made an error.
+
+>   */
+>  int of_alias_get_alias_list(const struct of_device_id *matches,
+>                              const char *stem, unsigned long *bitmap,
+>                              unsigned int nbits)
+>  {
+>         struct alias_prop *app;
+> +       int ret = 0;
+>
+>         /* Zero bitmap field to make sure that all the time it is clean */
+>         bitmap_zero(bitmap, nbits);
+> @@ -1976,21 +1978,21 @@ int of_alias_get_alias_list(const struct of_device_id *matches,
+>                         continue;
+>                 }
+>
+> -               if (app->id >= nbits) {
+> -                       pr_debug("%s: ID %d greater then bitmap field %d\n",
+> -                               __func__, app->id, nbits);
+> -                       continue;
+> -               }
+> -
+>                 if (of_match_node(matches, app->np)) {
+>                         pr_debug("%s: Allocated ID %d\n", __func__, app->id);
+> -                       set_bit(app->id, bitmap);
+> +
+> +                       if (app->id >= nbits) {
+> +                               pr_warn("%s: ID %d >= than bitmap field %d\n",
+> +                                       __func__, app->id, nbits);
+> +                               ret = -EINVAL;
+> +                       } else {
+> +                               set_bit(app->id, bitmap);
+> +                       }
+>                 }
+> -               /* Alias exists but is not compatible with matches */
+>         }
+>         mutex_unlock(&of_mutex);
+>
+> -       return 0;
+> +       return ret;
+>  }
+>  EXPORT_SYMBOL_GPL(of_alias_get_alias_list);
+>
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index d452dceb0cb3..29a18103182d 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -1393,7 +1393,7 @@ static int cdns_get_id(struct platform_device *pdev)
+>         if (!alias_bitmap_initialized) {
+>                 ret = of_alias_get_alias_list(cdns_uart_of_match, "serial",
+>                                               alias_bitmap, MAX_UART_INSTANCES);
+> -               if (ret) {
+> +               if (ret && ret != -EINVAL) {
+>                         mutex_unlock(&bitmap_lock);
+>                         return ret;
+>                 }
+> --
+> 1.9.1
+>
