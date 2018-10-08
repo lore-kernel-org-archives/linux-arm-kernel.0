@@ -1,42 +1,54 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Mon,  8 Oct 2018 16:41:43 +0530
-Subject: [PATCH v4 5/5] MAINTAINERS: add maintainers for the NXP FlexSPI driver
-In-Reply-To: <1538997103-11152-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1538997103-11152-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1538997103-11152-6-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 8 Oct 2018 13:51:08 +0200
+Subject: [PATCHv5 0/6] Add support for UHS-I on Exynos5422 odroid boards
+In-Reply-To: <20180927140738.1006-1-linux.amoon@gmail.com>
+References: <20180927140738.1006-1-linux.amoon@gmail.com>
+Message-ID: <CAPDyKFp-gnxqknz1ic5jrQ2G0M3X9rMVgj9sWeOiWOX+S7VODw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add maintainers for the NXP FlexSPI driver
+On 27 September 2018 at 16:07, Anand Moon <linux.amoon@gmail.com> wrote:
+> This is series v4 since my previous patches were incomplete with driver
+> changes missing.
+>
+> v5 changes.
+> drop the cd-gpios wp-gpio gpio pin setting, just add the pinctrl
+> configration to support write protect.
+>
+> v4 changes.
+> squash cd-gpios and wp-gpio changes into single patch.
+> change the subject prefix to "ARM: dts: exynos:"
+>
+> These changes add UHS-I tuning for dw_mmc-exynos driver.
+>
+> Rebased on Krzysztof branch next/dt
+> [0] git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git
+>
+> Anand Moon (6):
+>   ARM: dts: exynos: Added UHS-I bus speed support
+>   ARM: dts: exynos: fix regulator min values of LDO13 for Odroid XU3/XU4
+>   ARM: dts: exynos: update maximum frequency for sdcard to 200MHz
+>   ARM: dts: exynos: Add pin configuration for SD write protect on Odroid
+>     XU3/XU4
+>   ARM: dts: exynos: update maximum frequency for emmc to 200MHz
+>   mmc: dw_mmc-exynos: Add tuning for sdr and ddr timing for USH-I mode
+>
+>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  7 +++++++
+>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi      |  8 ++++++--
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+>  drivers/mmc/host/dw_mmc-exynos.c                   | 11 +++++++++++
+>  4 files changed, 25 insertions(+), 2 deletions(-)
+>
+> --
+> 2.17.1
+>
 
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
-Changes for v4:
-- None
-Changes for v3:
-- None
-Changes for v2:
-- None
+Anand,
 
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+I have applied the mmc patch for next, thanks!
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9d5eeff..2696898 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10228,6 +10228,12 @@ L:	linux-nfc at lists.01.org (moderated for non-subscribers)
- S:	Supported
- F:	drivers/nfc/nxp-nci
- 
-+NXP FSPI DRIVER
-+M:	Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-+L:	linux-spi at vger.kernel.org
-+S:	Maintained
-+F:	drivers/spi/spi-nxp-fspi.c
-+
- OBJTOOL
- M:	Josh Poimboeuf <jpoimboe@redhat.com>
- M:	Peter Zijlstra <peterz@infradead.org>
--- 
-2.7.4
+In regards to the DTS changes, I assume the soc maintainers will pick
+them up, but maybe you need to resend them separately.
+
+Kind regards
+Uffe
