@@ -1,63 +1,61 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Sun, 07 Oct 2018 19:27:50 -0700
-Subject: [PATCH v5 4/4] drivers: clk: Add ZynqMP clock driver
-In-Reply-To: <1538173080-7597-5-git-send-email-jollys@xilinx.com>
-References: <1538173080-7597-1-git-send-email-jollys@xilinx.com>
- <1538173080-7597-5-git-send-email-jollys@xilinx.com>
-Message-ID: <153896567067.119890.7785076104115447392@swboyd.mtv.corp.google.com>
+From: houlong.wei@mediatek.com (houlong wei)
+Date: Mon, 8 Oct 2018 10:29:06 +0800
+Subject: [PATCH v25 2/2] soc: mediatek: Add Mediatek CMDQ helper
+In-Reply-To: <7040427b-f580-ec33-8afa-35dcf5735abb@gmail.com>
+References: <1538212903-14331-1-git-send-email-houlong.wei@mediatek.com>
+ <1538212903-14331-3-git-send-email-houlong.wei@mediatek.com>
+ <7040427b-f580-ec33-8afa-35dcf5735abb@gmail.com>
+Message-ID: <1538965746.4271.20.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jolly Shah (2018-09-28 15:18:00)
-> diff --git a/drivers/clk/zynqmp/clkc.c b/drivers/clk/zynqmp/clkc.c
-> new file mode 100644
-> index 0000000..1b07d77
-> --- /dev/null
-> +++ b/drivers/clk/zynqmp/clkc.c
-> @@ -0,0 +1,716 @@
-[...]
-> + * @type:      Clock type: CLK_TYPE_OUTPUT or CLK_TYPE_EXTERNAL
-> + *
-> + * Return: 0 on success else error code
-> + */
-> +static int zynqmp_get_clock_type(u32 clk_id, u32 *type)
-> +{
-> +       int ret;
-> +
-> +       ret = zynqmp_is_valid_clock(clk_id);
-> +       if (ret == 1) {
-> +               *type = clock[clk_id].type;
-> +               return 0;
-> +       }
-> +
-> +       return ret == 0 ? -EINVAL : ret;
-> +}
-> +
-> +/**
-> + * zynqmp_pm_clock_get_num_clocks() - Get number of clocks in system
-> + * @nclocks:   Number of clocks in system/board.
-> + *
-> + * Call firmware API to get number of clocks.
-> + *
-> + * Return: 0 on success else error code.
-> + */
-> +static int zynqmp_pm_clock_get_num_clocks(u32 *nclocks)
-> +{
-> +       struct zynqmp_pm_query_data qdata = {0};
-> +       __le32 ret_payload[PAYLOAD_ARG_CNT];
+On Sat, 2018-09-29 at 20:50 +0800, Matthias Brugger wrote:
+> 
+> On 29/09/2018 11:21, Houlong Wei wrote:
+> [...]
+> 
+> > +static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, enum cmdq_code code,
+> > +				   u32 arg_a, u32 arg_b)
+> > +{
+> > +	u64 *cmd_ptr;
+> > +
+> > +	if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
+> > +		pkt->cmd_buf_size += CMDQ_INST_SIZE;
+> 
+> Can you plesae provide some example code of a driver that will use this API, I
+> still don't understand why you need to update the cmd_buf_size here.
 
-I asked about endianess but this isn't the right fix. Just marking
-something as __le32 but then not using that type and just passing it to
-some function that takes a u32 pointer doesn't work. So is the firmware
-side always little endian? If so, maybe the ioctls can do the byte swap
-and then the kernel API can be native CPU endian while the firmware
-layer can be aware that things may need swapping. I'm suggesting that
-this type is just u32 and then the eemi_ops functions accept u32 and do
-the swapping themselves.
+In our previous design, when appending a new command to buffer and the
+buffer gets overflow, we will re-allocate a larger buffer to use.
+CK.Hu had concern about the performance of buffer re-allocation. Please
+refer:
+http://lists.infradead.org/pipermail/linux-mediatek/2018-June/013797.html
+One of his suggestions is that the consumer dynamically allocates buffer
+with a initial size. Because the consumer doesn't know how to calculate
+the buffer size. So we increase cmdq_buf_size here, that will help the
+consumer get the buffer size in developing phase. In release driver
+code, consumer passes a constant value to function call
+cmdq_pkt_create(client, cmdq_buffer_size), cmdq_buffer_size is the
+specified command queue buffer size.
 
-If you put back u32 here and elsewhere in this patch you can have my
+> 
+> > +		WARN_ON(1);
+> 
+> can we add some debug information:
+> WARN_ON(1, "%s: buffer size too small for the amount of commands", __func__);
+> 
+> Would it make sense to use WARN_ONCE()?
+> 
+Yes, I will add debug information and use WARN_ONCE().
 
-Reviewed-by: Stephen Boyd <sboyd@kernel.org>
-
-The fix to the underlying ops for endian correctness can come later, so
-don't feel like it needs to be fixed right now.
+> > +		return -ENOMEM;
+> > +	}
+> > +	cmd_ptr = pkt->va_base + pkt->cmd_buf_size;
+> > +	(*cmd_ptr) = (u64)((code << CMDQ_OP_CODE_SHIFT) | arg_a) << 32 | arg_b;
+> > +	pkt->cmd_buf_size += CMDQ_INST_SIZE;
+> > +
+> > +	return 0;
+> > +}
+> 
+> Thanks,
+> Matthias
