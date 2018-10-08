@@ -1,282 +1,144 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 08 Oct 2018 11:45:19 +0200
-Subject: [PATCH 28/36] dt-bindings: arm: Convert Rockchip board/soc
- bindings to json-schema
-In-Reply-To: <20181005165848.3474-29-robh@kernel.org>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-29-robh@kernel.org>
-Message-ID: <1857752.ZLvpeyYpZr@phil>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 8 Oct 2018 15:16:58 +0530
+Subject: [PATCH 1/2] dt-bindings: irqchip: Introduce TISCI Interrupt
+ router bindings
+In-Reply-To: <86tvlztmt1.wl-marc.zyngier@arm.com>
+References: <20181006072812.15814-1-lokeshvutla@ti.com>
+ <20181006072812.15814-2-lokeshvutla@ti.com>
+ <86tvlztmt1.wl-marc.zyngier@arm.com>
+Message-ID: <8a05f735-01bd-5c2d-fcfa-dcc00adffd0b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Marc,
 
-either I'm misunderstanding that, or something did go a bit wrong during
-the conversion, as pointed out below:
-
-Am Freitag, 5. Oktober 2018, 18:58:40 CEST schrieb Rob Herring:
-> Convert Rockchip SoC bindings to DT schema format using json-schema.
+On Saturday 06 October 2018 03:32 PM, Marc Zyngier wrote:
+> On Sat, 06 Oct 2018 08:28:11 +0100,
+> Lokesh Vutla <lokeshvutla@ti.com> wrote:
+>>
+>> Add the DT binding documentation for Interrupt router driver.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>>   .../interrupt-controller/ti,sci-intr.txt      | 83 +++++++++++++++++++
+>>   MAINTAINERS                                   |  1 +
+>>   2 files changed, 84 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>> new file mode 100644
+>> index 000000000000..681ca53cc5fb
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>> @@ -0,0 +1,83 @@
+>> +Texas Instruments K3 Interrupt Router
+>> +=====================================
+>> +
+>> +The Interrupt Router (INTR) module provides a mechanism to mux M
+>> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
+>> +to be driven per N output. There is one register per output (MUXCNTL_N) that
+>> +controls the selection.
+>> +
+>> +
+>> +                                 Interrupt Router
+>> +                             +----------------------+
+>> +                             |  Inputs     Outputs  |
+>> +        +-------+            | +------+             |
+>> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
+>> +        +-------+            | +------+             |      controller
+>> +                             |    .        +-----+  |      +-------+
+>> +        +-------+            |    .        |  0  |  |----->|  GIC  |
+>> +        | INTA  |----------->|    .        +-----+  |      +-------+
+>> +        +-------+            |    .          .      |
+>> +                             | +------+      .      |
+>> +                             | | irqM |    +-----+  |
+>> +                             | +------+    |  N  |  |
+>> +                             |             +-----+  |
+>> +                             +----------------------+
+>> +
+>> +Configuration of these MUXCNTL_N registers is done by a system controller
+>> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
+>> +controller will keep track of the used and unused registers within the Router.
+>> +Driver should request the system controller to get the range of GIC IRQs
+>> +assigned to the requesting hosts. It is the drivers responsibility to keep
+>> +track of GIC IRQs.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/arm/rockchip.txt      | 220 ----------------
->  .../devicetree/bindings/arm/rockchip.yaml     | 242 ++++++++++++++++++
->  2 files changed, 242 insertions(+), 220 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/rockchip.yaml
+> I would drop the GIC here, and replace it by "parent interrupt
+> controller", as nothing here is GIC specific
 > 
-
-
-
-> +properties:
-> +  $nodename:
-> +    const: '/'
-> +  compatible:
-> +    oneOf:
-> +      - items:
-> +          - enum:
-> +              - amarula,vyasa-rk3288
-> +              - asus,rk3288-tinker
-> +              - radxa,rock2-square
-> +              - chipspark,popmetal-rk3288
-> +              - netxeon,r89
-> +              - firefly,firefly-rk3288
-> +              - firefly,firefly-rk3288-beta
-> +              - firefly,firefly-rk3288-reload
-> +              - mqmaker,miqi
-> +              - rockchip,rk3288-fennec
-> +          - const: rockchip,rk3288
-
-These are very much distinct boards, so shouldn't they also get
-individual entries including their existing description like the phytec
-or google boards below?
-
-Similarly why is it an enum for those, while the Google boards get a
-const for each compatible string?
-
-
-Most non-google boards below also lost their description and where lumped
-together into combined entries. Was that intentional?
-
-
-Thanks
-Heiko
-
-> +
-> +      - description: Phytec phyCORE-RK3288 Rapid Development Kit
-> +        items:
-> +          - const: phytec,rk3288-pcm-947
-> +          - const: phytec,rk3288-phycore-som
-> +          - const: rockchip,rk3288
-> +
-> +      - description: Google Mickey (Asus Chromebit CS10)
-> +        items:
-> +          - const: google,veyron-mickey-rev8
-> +          - const: google,veyron-mickey-rev7
-> +          - const: google,veyron-mickey-rev6
-> +          - const: google,veyron-mickey-rev5
-> +          - const: google,veyron-mickey-rev4
-> +          - const: google,veyron-mickey-rev3
-> +          - const: google,veyron-mickey-rev2
-> +          - const: google,veyron-mickey-rev1
-> +          - const: google,veyron-mickey-rev0
-> +          - const: google,veyron-mickey
-> +          - const: google,veyron
-> +          - const: rockchip,rk3288
-> +
-> +      - description: Google Minnie (Asus Chromebook Flip C100P)
-> +        items:
-> +          - const: google,veyron-minnie-rev4
-> +          - const: google,veyron-minnie-rev3
-> +          - const: google,veyron-minnie-rev2
-> +          - const: google,veyron-minnie-rev1
-> +          - const: google,veyron-minnie-rev0
-> +          - const: google,veyron-minnie
-> +          - const: google,veyron
-> +          - const: rockchip,rk3288
-> +
-> +      - description: Google Pinky (dev-board)
-> +        items:
-> +          - const: google,veyron-pinky-rev2
-> +          - const: google,veyron-pinky
-> +          - const: google,veyron
-> +          - const: rockchip,rk3288
-> +
-> +      - description: Google Speedy (Asus C201 Chromebook)
-> +        items:
-> +          - const: google,veyron-speedy-rev9
-> +          - const: google,veyron-speedy-rev8
-> +          - const: google,veyron-speedy-rev7
-> +          - const: google,veyron-speedy-rev6
-> +          - const: google,veyron-speedy-rev5
-> +          - const: google,veyron-speedy-rev4
-> +          - const: google,veyron-speedy-rev3
-> +          - const: google,veyron-speedy-rev2
-> +          - const: google,veyron-speedy
-> +          - const: google,veyron
-> +          - const: rockchip,rk3288
-> +
-> +      - description: Google Jaq (Haier Chromebook 11 and more)
-> +        items:
-> +          - const: google,veyron-jaq-rev5
-> +          - const: google,veyron-jaq-rev4
-> +          - const: google,veyron-jaq-rev3
-> +          - const: google,veyron-jaq-rev2
-> +          - const: google,veyron-jaq-rev1
-> +          - const: google,veyron-jaq
-> +          - const: google,veyron
-> +          - const: rockchip,rk3288
-> +
-> +      - description: Google Jerry (Hisense Chromebook C11 and more)
-> +        items:
-> +          - const: google,veyron-jerry-rev7
-> +          - const: google,veyron-jerry-rev6
-> +          - const: google,veyron-jerry-rev5
-> +          - const: google,veyron-jerry-rev4
-> +          - const: google,veyron-jerry-rev3
-> +          - const: google,veyron-jerry
-> +          - const: google,veyron
-> +          - const: rockchip,rk3288
-> +
-> +      - description: Google Brain (dev-board)
-> +        items:
-> +          - const: google,veyron-brain-rev0
-> +          - const: google,veyron-brain
-> +          - const: google,veyron
-> +          - const: rockchip,rk3288
-> +
-> +      - items:
-> +          - enum:
-> +              - rockchip,kylin-rk3036
-> +          - const: rockchip,rk3036
-> +
-> +      - items:
-> +          - enum:
-> +              - haoyu,marsboard-rk3066
-> +              - mundoreader,bq-curie2
-> +              - chipspark,rayeager-px2
-> +              - rikomagic,mk80
-> +          - const: rockchip,rk3066a
-> +
-> +      - items:
-> +          - enum:
-> +              - radxa,rock
-> +          - const: rockchip,rk3188
-> +
-> +      - items:
-> +          - const: rockchip,px3-evb
-> +          - const: rockchip,px3
-> +          - const: rockchip,rk3188
-> +
-> +      - items:
-> +          - enum:
-> +              - firefly,roc-rk3328-cc
-> +              - pine64,rock64
-> +              - rockchip,rk3328-evb
-> +          - const: rockchip,rk3328
-> +
-> +      - items:
-> +          - enum:
-> +              - geekbuying,geekbox
-> +              - rockchip,rk3368-evb-act8846
-> +              - rockchip,r88
-> +              - tsd,rk3368-uq7-haikou
-> +              - tronsmart,orion-r68-meta
-> +          - const: rockchip,rk3368
-> +
-> +      - items:
-> +          - enum:
-> +              - geekbuying,geekbox
-> +              - rockchip,rk3368-evb-act8846
-> +              - rockchip,r88
-> +              - tsd,rk3368-uq7-haikou
-> +              - tronsmart,orion-r68-meta
-> +          - const: rockchip,rk3368
-> +
-> +      - items:
-> +          - const: rockchip,px5-evb
-> +          - const: rockchip,px5
-> +          - const: rockchip,rk3368
-> +
-> +      - items:
-> +          - enum:
-> +              - firefly,firefly-rk3399
-> +              - rockchip,rk3399-evb
-> +              - rockchip,rk3399-sapphire
-> +              - rockchip,rk3399-sapphire-excavator
-> +              - tsd,rk3399-q7-haikou
-> +              - vamrs,ficus
-> +          - const: rockchip,rk3399
-> +
-> +      - description: Google Bob (Asus Chromebook Flip C101PA)
-> +        items:
-> +          - const: google,bob-rev13
-> +          - const: google,bob-rev12
-> +          - const: google,bob-rev11
-> +          - const: google,bob-rev10
-> +          - const: google,bob-rev9
-> +          - const: google,bob-rev8
-> +          - const: google,bob-rev7
-> +          - const: google,bob-rev6
-> +          - const: google,bob-rev5
-> +          - const: google,bob-rev4
-> +          - const: google,bob
-> +          - const: google,gru
-> +          - const: rockchip,rk3399
-> +
-> +      - description: Google Gru (dev-board)
-> +        items:
-> +          - const: google,gru-rev15
-> +          - const: google,gru-rev14
-> +          - const: google,gru-rev13
-> +          - const: google,gru-rev12
-> +          - const: google,gru-rev11
-> +          - const: google,gru-rev10
-> +          - const: google,gru-rev9
-> +          - const: google,gru-rev8
-> +          - const: google,gru-rev7
-> +          - const: google,gru-rev6
-> +          - const: google,gru-rev5
-> +          - const: google,gru-rev4
-> +          - const: google,gru-rev3
-> +          - const: google,gru-rev2
-> +          - const: google,gru
-> +          - const: rockchip,rk3399
-> +
-> +      - description: Google Kevin (Samsung Chromebook Plus)
-> +        items:
-> +          - const: google,kevin-rev15
-> +          - const: google,kevin-rev14
-> +          - const: google,kevin-rev13
-> +          - const: google,kevin-rev12
-> +          - const: google,kevin-rev11
-> +          - const: google,kevin-rev10
-> +          - const: google,kevin-rev9
-> +          - const: google,kevin-rev8
-> +          - const: google,kevin-rev7
-> +          - const: google,kevin-rev6
-> +          - const: google,kevin
-> +          - const: google,gru
-> +          - const: rockchip,rk3399
-> +
-> +      - items:
-> +          - enum:
-> +              - rockchip,rv1108-evb
-> +          - const: rockchip,rv1108
-> +
-> +      - items:
-> +          - enum:
-> +              - rockchip,rk3228-evb
-> +          - const: rockchip,rk3228
-> +
-> +      - items:
-> +          - enum:
-> +              - rockchip,rk3229-evb
-> +          - const: rockchip,rk3229
-> +...
+>> +
+>> +Communication between the host processor running an OS and the system
+>> +controller happens through a protocol called TI System Control Interface
+>> +(TISCI protocol). For more details refer:
+>> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>> +
+>> +TISCI Interrupt Router Node:
+>> +----------------------------
+>> +- compatible:		Must be "ti,sci-intr".
+>> +- interrupt-controller:	Identifies the node as an interrupt controller
+>> +- #interrupt-cells:	Specifies the number of cells needed to encode an
+>> +			interrupt source. The value should be 3.
+>> +			First cell should contain the TISCI device ID of source
+>> +			Second cell should contain the interrupt source offset
+>> +			within the device
+>> +			Third cell specifies the trigger type as defined
+>> +			in interrupts.txt in this directory.
 > 
+> Are all trigger types supported?
+
+Nope, only level interrupts are supported. Will fix it in v2.
+
+> 
+>> +- interrupt-parent:	phandle of irq parent for TISCI intr. The parent must
+>> +			use the same interrupt-cells format as GIC.
+> 
+> Why that constraint? From what I can see, the two are fairly
+> independent, and the constraint looks more of a Linux driver issue
+> than a DT constraint.
+
+Driver when calling irq_domain_alloc_irqs_parent(), the fwspec node that gets 
+passed assumes that parent is gic. parameters are filled in with such 
+assumption. Do you suggest anything to make it more generic?
+
+> 
+>> +- ti,sci:		Phandle to TI-SCI compatible System controller node.
+>> +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
+>> +- ti,sci-rm-range-girq:	Tuple corresponding to unique TISCI resource type that
+>> +			defines the dst host irq ranges assigned to this
+>> +			interrupt router from this host context.
+>> +			Tuple should be of format <type subtype>.
+>> +
+
+Thanks a lot for the review. Also, I need a suggestion regarding one more 
+interrupt controller(Interrupt Aggregator) on the same SoC controlled by 
+TISCI_PROTOCOL.
+
+The Interrupt Aggregator (INTA) provides a centralized machine
+which handles the termination of system events to that they can
+be coherently processed by the host(s) in the system. Integration looks 
+something similar https://pastebin.ubuntu.com/p/T32vbrwsch/ .
+
+Configuration of the Intmap registers that maps global events to vint is done
+by a system controller (like the Device Memory and Security Controller on K3
+AM654 SoC). Driver should request the system controller to get the range
+of global events and vints assigned to the requesting host. Management
+of these requested resources should be handled by driver and requests
+system controller to map specific global event to vint, bit pair.
+
+There can be cases such that IRQ routes can involve both INTR and INTA like below:
+	IP ---> INTA ---> INTR ----> GIC.
+
+In these cases TISCI involves only one message with parametes(source id, source 
+offset, inta_id, dst id) for configuring IRQ route till the destination. Co 
+processor will detect there is INTR in the IRQ path and configure that as well.
+
+Right now I kind of differentiated this scenario in INTA driver by passing a 
+flag(TI_SCI_EVENT) to INTR driver. If such flag comes, INTR driver should avoid 
+calling ti_sci api for configuring. Do you think this is the right direction or 
+do you suggest a better solution.
+
+If I am not clear in the above description, I can post an RFC for INTA driver 
+for continuing this discussion.
+
+Thanks and regards,
+Lokesh
