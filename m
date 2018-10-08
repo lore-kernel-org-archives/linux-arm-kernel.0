@@ -1,82 +1,156 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 8 Oct 2018 19:09:07 +0200 (CEST)
-Subject: [PATCH] staging: bcm2835-camera: remove extraneous setting of
- dev->colourfx.enable
-In-Reply-To: <CAAoAYcO=qp7yb7392B_6wks2j2TaoxYXHtQPyH0kMkFMi+JW-A@mail.gmail.com>
-References: <20181008145012.31312-1-colin.king@canonical.com>
- <d753df4f-e812-c366-0b1d-9ff804da0ab5@i2se.com>
- <CAAoAYcO=qp7yb7392B_6wks2j2TaoxYXHtQPyH0kMkFMi+JW-A@mail.gmail.com>
-Message-ID: <663860283.72238.1539018547916@email.1und1.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Oct 2018 18:15:24 +0100
+Subject: [PATCHv3 0/6] atomics: generate atomic headers / instrument arm64
+In-Reply-To: <20180904104830.2975-1-mark.rutland@arm.com>
+References: <20180904104830.2975-1-mark.rutland@arm.com>
+Message-ID: <20181008171523.rw34hyaqap2yb3py@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Tue, Sep 04, 2018 at 11:48:24AM +0100, Mark Rutland wrote:
+> Hi Ingo,
+> 
+> As previously requested, this is a (trivial) rebase of the remaining generated
+> atomic patches atop of v4.19-rc2, avoiding any potential conflict with Peter's
+> ldsem atomic cleanup patch that got taken through the tty tree.
+> 
+> Are you still happy to pick this up? Full blurb below.
 
-> Dave Stevenson <dave.stevenson@raspberrypi.org> hat am 8. Oktober 2018 um 18:51 geschrieben:
-> 
-> 
->  Hi Stefan.
-> 
-> Thanks for forwarding as the linux-rpi-kernel list hasn't sent it to me as yet.
+Ping!
 
-AFAIK every mail with more than 5 recipients will be delayed.
+Do you have any comments, or would you be happy to queue this?
 
-> 
-> On Mon, 8 Oct 2018 at 16:48, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> >
-> > Hi Colin,
-> >
-> > Am 08.10.2018 um 16:50 schrieb Colin King:
-> > > From: Colin Ian King <colin.king@canonical.com>
-> > >
-> > > Currently dev->colourfx.enable is being set twice, hence the first
-> > > occurrance is redundant and can be removed, so remove it. This minor
-> > > issue was introduced by commit 7b3ad5abf027 ("staging: Import the
-> > > BCM2835 MMAL-based V4L2 camera driver.").
-> > >
-> > > Detected by CoverityScan CID#1419711 ("Unused value")
-> > >
-> > > Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> > > ---
-> > >  drivers/staging/vc04_services/bcm2835-camera/controls.c | 1 -
-> > >  1 file changed, 1 deletion(-)
-> > >
-> > > diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > > index a2c55cb2192a..99831dd4365d 100644
-> > > --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > > +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > > @@ -588,7 +588,6 @@ static int ctrl_set_colfx(struct bm2835_mmal_dev *dev,
-> > >
-> > >       control = &dev->component[MMAL_COMPONENT_CAMERA]->control;
-> > >
-> > > -     dev->colourfx.enable = (ctrl->val & 0xff00) >> 8;
-> > >       dev->colourfx.enable = ctrl->val & 0xff;
-> > >
-> > >       ret = vchiq_mmal_port_parameter_set(dev->instance, control,
-> >
-> > as long as the current behavior is correct, i'm okay with this patch.
-> > But the byte masking looks suspicious, so i hope Dave can clarify that.
-> 
-> It's writing to the wrong structure member.
-> The function is used on the V4L2 control V4L2_CID_COLORFX_CBCR, which
-> is defined as:
-> V4L2_CID_COLORFX_CBCR (integer)
-> Determines the Cb and Cr coefficients for V4L2_COLORFX_SET_CBCR color
-> effect. Bits [7:0] of the supplied 32 bit value are interpreted as Cr
-> component, bits [15:8] as Cb component and bits [31:16] must be zero.
-> 
-> ctrl->val should therefore be setting dev->colourfx.u and
-> dev->colourfx.v with those masks. dev->colourfx.enable field should
-> have been set when going through ctrl_set_image_effect for contol
-> V4L2_CID_COLORFX set to V4L2_COLORFX_SET_CBCR.
-> 
-> I've confirmed with qv4l2 that that is what is wrong. That's only been
-> lurking there for almost 5 years - shows how often these weirder
-> effects get used.
-> I don't mind whether Colin's patch gets merged and then fixed up, or
-> drop Colin's patch and apply the correct logic via a new patch.
+I'm happy to resend come rc1, if you'd prefer?
 
-no this patch shouldn't be applied. Does it mean you want to send the proper one?
+Thanks,
+Mark.
 
+> This series scripts the generation of the various atomic headers, to ensure
+> that the various atomic APIs remain consistent, reducing the risk of human
+> error, and simplifying future rework. This fleshes out the instrumented atomics
+> such that arm64 can be migrated over to them.
 > 
->   Dave
+> Since v1 [1]:
+> * Use 'p' instead of 'I' for pointer to base int type
+> * Use Peter's patch for ldsem
+> * Rename atomic acquire/release barriers
+> * Handle xchg/cmpxchg variants
+> * Typo fixes
+> * Migrate arm64 to instrumented atomics
+> 
+> Since v2 [4]:
+> * rebase to v4.19-rc2 to solve potential conflicts with ldsem patch
+> 
+> The series is based on my atomic API cleanup patches [2], which have been
+> queued in the tip locking/core branch.
+> 
+> The first six patches clean up some issues with the existing atomic
+> instrumentation, with patch six introducing the header generation
+> infrastructure. The subsequent three patches migrate to each generated header
+> in turn, with the final patch moving arm64 over to the instrumented atomics.
+> 
+> The scripts themselves are mostly POSIX sh (modulo local), without bashisms,
+> and work in dash and bash.
+> 
+> Per Linus request that it is possible to use git grep to inspect the atomic
+> headers [3], the headers are committed (and not generated by kbuild). Since we
+> now expand the fallback definitions inline, each *should* be easier to find
+> with grep. Each header also has a comment at the top with a path to the script
+> used to generate it. 
+> 
+> That scripting comes to ~900 lines, and replaces ~1700 lines of hand-written
+> boilerplate with ~4700 lines of generated code. Some of that increase in line
+> count is due to filling in missing portions of the API (e.g. adding all the
+> ordering variants to the instrumented atomics), while some of that is due to
+> expanding fallbacks in place, and consistently spreading these across multiple
+> lines.
+> 
+> I've build-tested this for x86_64 and arm64 (with and without LSE), and given
+> this some basic boot testing.
+> 
+> I've pushed the series out to my atomics/generated branch [3], based atop of
+> v4.19-rc2.
+> 
+> Thanks,
+> Mark.
+> 
+> [1] https://lkml.kernel.org/r/20180529180746.29684-1-mark.rutland at arm.com
+> [2] https://lkml.kernel.org/r/20180621121321.4761-1-mark.rutland at arm.com
+> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git atomics/generated
+> [4] https://lkml.kernel.org/r/20180625105952.3756-1-mark.rutland at arm.com
+> 
+> Mark Rutland (6):
+>   atomics: add common header generation files
+>   atomics: switch to generated fallbacks
+>   atomics: switch to generated atomic-long
+>   atomics: switch to generated instrumentation
+>   atomics: check generated headers are up-to-date
+>   arm64: use instrumented atomics
+> 
+>  Kbuild                                       |   18 +-
+>  MAINTAINERS                                  |    1 +
+>  arch/arm64/include/asm/atomic.h              |  237 +--
+>  arch/arm64/include/asm/atomic_ll_sc.h        |   28 +-
+>  arch/arm64/include/asm/atomic_lse.h          |   38 +-
+>  arch/arm64/include/asm/cmpxchg.h             |   60 +-
+>  arch/arm64/include/asm/sync_bitops.h         |   16 +-
+>  include/asm-generic/atomic-instrumented.h    | 1688 ++++++++++++++++---
+>  include/asm-generic/atomic-long.h            | 1173 ++++++++++---
+>  include/linux/atomic-fallback.h              | 2294 ++++++++++++++++++++++++++
+>  include/linux/atomic.h                       | 1241 +-------------
+>  scripts/atomic/atomic-tbl.sh                 |  186 +++
+>  scripts/atomic/atomics.tbl                   |   41 +
+>  scripts/atomic/check-atomics.sh              |   19 +
+>  scripts/atomic/fallbacks/acquire             |    9 +
+>  scripts/atomic/fallbacks/add_negative        |   16 +
+>  scripts/atomic/fallbacks/add_unless          |   16 +
+>  scripts/atomic/fallbacks/andnot              |    7 +
+>  scripts/atomic/fallbacks/dec                 |    7 +
+>  scripts/atomic/fallbacks/dec_and_test        |   15 +
+>  scripts/atomic/fallbacks/dec_if_positive     |   15 +
+>  scripts/atomic/fallbacks/dec_unless_positive |   14 +
+>  scripts/atomic/fallbacks/fence               |   11 +
+>  scripts/atomic/fallbacks/fetch_add_unless    |   23 +
+>  scripts/atomic/fallbacks/inc                 |    7 +
+>  scripts/atomic/fallbacks/inc_and_test        |   15 +
+>  scripts/atomic/fallbacks/inc_not_zero        |   14 +
+>  scripts/atomic/fallbacks/inc_unless_negative |   14 +
+>  scripts/atomic/fallbacks/read_acquire        |    7 +
+>  scripts/atomic/fallbacks/release             |    8 +
+>  scripts/atomic/fallbacks/set_release         |    7 +
+>  scripts/atomic/fallbacks/sub_and_test        |   16 +
+>  scripts/atomic/fallbacks/try_cmpxchg         |   11 +
+>  scripts/atomic/gen-atomic-fallback.sh        |  181 ++
+>  scripts/atomic/gen-atomic-instrumented.sh    |  182 ++
+>  scripts/atomic/gen-atomic-long.sh            |  101 ++
+>  36 files changed, 5909 insertions(+), 1827 deletions(-)
+>  create mode 100644 include/linux/atomic-fallback.h
+>  create mode 100755 scripts/atomic/atomic-tbl.sh
+>  create mode 100644 scripts/atomic/atomics.tbl
+>  create mode 100755 scripts/atomic/check-atomics.sh
+>  create mode 100644 scripts/atomic/fallbacks/acquire
+>  create mode 100644 scripts/atomic/fallbacks/add_negative
+>  create mode 100644 scripts/atomic/fallbacks/add_unless
+>  create mode 100644 scripts/atomic/fallbacks/andnot
+>  create mode 100644 scripts/atomic/fallbacks/dec
+>  create mode 100644 scripts/atomic/fallbacks/dec_and_test
+>  create mode 100644 scripts/atomic/fallbacks/dec_if_positive
+>  create mode 100644 scripts/atomic/fallbacks/dec_unless_positive
+>  create mode 100644 scripts/atomic/fallbacks/fence
+>  create mode 100644 scripts/atomic/fallbacks/fetch_add_unless
+>  create mode 100644 scripts/atomic/fallbacks/inc
+>  create mode 100644 scripts/atomic/fallbacks/inc_and_test
+>  create mode 100644 scripts/atomic/fallbacks/inc_not_zero
+>  create mode 100644 scripts/atomic/fallbacks/inc_unless_negative
+>  create mode 100644 scripts/atomic/fallbacks/read_acquire
+>  create mode 100644 scripts/atomic/fallbacks/release
+>  create mode 100644 scripts/atomic/fallbacks/set_release
+>  create mode 100644 scripts/atomic/fallbacks/sub_and_test
+>  create mode 100644 scripts/atomic/fallbacks/try_cmpxchg
+>  create mode 100755 scripts/atomic/gen-atomic-fallback.sh
+>  create mode 100755 scripts/atomic/gen-atomic-instrumented.sh
+>  create mode 100755 scripts/atomic/gen-atomic-long.sh
+> 
+> -- 
+> 2.11.0
+> 
