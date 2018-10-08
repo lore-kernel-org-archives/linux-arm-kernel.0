@@ -1,115 +1,69 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 08 Oct 2018 17:09:42 +0200
-Subject: [PATCH v2 18/29] drm/sun4i: dw-hdmi: Add quirk for setting TMDS
- clock
-In-Reply-To: <20181008091406.yjs2u22fmj72e4rj@flea>
-References: <20181007093905.11253-1-jernej.skrabec@siol.net>
- <20181007093905.11253-19-jernej.skrabec@siol.net>
- <20181008091406.yjs2u22fmj72e4rj@flea>
-Message-ID: <8016466.hta3A6eauk@jernej-laptop>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Mon, 8 Oct 2018 17:11:38 +0200
+Subject: 4.19-rcX: WARN_ON() arch/arm64/kernel/setup.c:271
+ reserve_memblock_reserved_regions
+Message-ID: <20181008151138.GA19635@harukaze>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ponedeljek, 08. oktober 2018 ob 11:14:06 CEST je Maxime Ripard napisal(a):
-> Hi,
-> 
-> On Sun, Oct 07, 2018 at 11:38:54AM +0200, Jernej Skrabec wrote:
-> > It turns out that H6 HDMI BSP kernel driver doesn't change TMDS rate at
-> > all. At this point it is not clear whether it is just not necessary or
-> > it would cause some kind of issues.
-> > 
-> > Add a quirk for it.
-> > 
-> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 5 ++++-
-> >  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h | 1 +
-> >  2 files changed, 5 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> > b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c index ec122136ee9d..e9e93f174b35
-> > 100644
-> > --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> > @@ -165,7 +165,9 @@ static int sun8i_dw_hdmi_bind(struct device *dev,
-> > struct device *master,> 
-> >  		goto err_disable_clk_tmds;
-> >  	
-> >  	}
-> > 
-> > -	drm_encoder_helper_add(encoder, &sun8i_dw_hdmi_encoder_helper_funcs);
-> > +	if (hdmi->quirks->set_rate)
-> > +		drm_encoder_helper_add(encoder,
-> > +				       &sun8i_dw_hdmi_encoder_helper_funcs);
-> 
-> That seems a bit backward, it only works because we only have mode_set
-> at the moment, and the only thing it does is changing the clock
-> rate. As soon as we change one of these two assumptions, the code will
-> break.
-> 
-> Why not just return in mode_set if that boolean is true?
+This on my dragonboard 410c:
 
-My original intention was to optimize execution time a bit. If there is no 
-helpers registered, there is no need to call callback which does nothing. But 
-your way is probably more reasonable approach.
+...
+[    0.170657] WARNING: CPU: 2 PID: 1 at arch/arm64/kernel/setup.c:271 reserve_memblock_reserved_regions+0xd4/0x150
+[    0.170666] Modules linked in:
+[    0.170680] CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc7-dirty #3
+[    0.170687] Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
+[    0.170696] pstate: 20000005 (nzCv daif -PAN -UAO)
+[    0.170707] pc : reserve_memblock_reserved_regions+0xd4/0x150
+[    0.170718] lr : reserve_memblock_reserved_regions+0xcc/0x150
+[    0.170725] sp : ffff000008033d30
+[    0.170731] x29: ffff000008033d30 x28: ffff000009048050
+[    0.170744] x27: ffff000009048078 x26: ffff000008f871b0
+[    0.170755] x25: 0000000000000000 x24: 0000000000488020
+[    0.170767] x23: 00000000bfffffff x22: ffff000008f3ca28
+[    0.170778] x21: ffff000008e61840 x20: ffff0000090e9000
+[    0.170789] x19: ffff80003a218e00 x18: 0000000000000000
+[    0.170800] x17: 0000000000000000 x16: 0000000000000000
+[    0.170811] x15: 0000000000000000 x14: 0000000000000400
+[    0.170822] x13: 0000000000000000 x12: 0000000000000028
+[    0.170833] x11: 0101010101010101 x10: 7f7f7f7f7f7f7f7f
+[    0.170844] x9 : 0000000000000000 x8 : ffff80003a218e80
+[    0.170855] x7 : 0000000000000000 x6 : ffff80003d9ffc70
+[    0.170866] x5 : 0000000000000000 x4 : 00000000bfffffff
+[    0.170877] x3 : 00000000bff00000 x2 : 0000000000000000
+[    0.170888] x1 : ffff800009ff0000 x0 : 0000000000000000
+[    0.170899] Call trace:
+[    0.170910]  reserve_memblock_reserved_regions+0xd4/0x150
+[    0.170921]  do_one_initcall+0x58/0x170
+[    0.170931]  kernel_init_freeable+0x1a4/0x264
+[    0.170942]  kernel_init+0x10/0x108
+[    0.170952]  ret_from_fork+0x10/0x18
+[    0.170962] ---[ end trace c7ce9242331f7319 ]---
+[    0.170974] name: reserved res: [mem 0xbff00000-0xbfffffff flags 0x200]
+...
 
-However, I'm pretty sure that even older HDMI controller doesn't need this 
-rate changing code. All tests shown that changing HDMI controller divider 
-doesn't have an effect on video or audio output. It's only there because BSP 
-kernel driver set rate and AW engineer said it's necessary.
+that memory region corresponds to the ramoops node:
 
-> 
-> >  	drm_encoder_init(drm, encoder, &sun8i_dw_hdmi_encoder_funcs,
-> >  	
-> >  			 DRM_MODE_ENCODER_TMDS, NULL);
-> > 
-> > @@ -235,6 +237,7 @@ static int sun8i_dw_hdmi_remove(struct platform_device
-> > *pdev)> 
-> >  static const struct sun8i_dw_hdmi_quirks sun8i_a83t_quirks = {
-> >  
-> >  	.mode_valid = sun8i_dw_hdmi_mode_valid_a83t,
-> > 
-> > +	.set_rate = true,
-> > 
-> >  };
-> >  
-> >  static const struct of_device_id sun8i_dw_hdmi_dt_ids[] = {
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-> > b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h index a645b8bc9f58..f9eb663865a4
-> > 100644
-> > --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-> > +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-> > @@ -173,6 +173,7 @@ struct sun8i_hdmi_phy {
-> > 
-> >  struct sun8i_dw_hdmi_quirks {
-> >  
-> >  	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
-> >  	
-> >  					   const struct drm_display_mode *mode);
-> > 
-> > +	bool set_rate;
-> 
-> This triggers a check in checkpatch. You should address them (and
-> there's several in your series).
+        reserved-memory {
+                ramoops at bff00000{
+                        compatible = "ramoops";
+                        reg = <0x0 0xbff00000 0x0 0x100000>;
 
-Till now we used bools in driver internal structures in spite of this 
-warnings. So should we start using unsigned int? Or maybe bitfield with 
-unsigned int as a base according to https://lkml.org/lkml/2017/11/21/384
+                        record-size = <0x20000>;
+                        console-size = <0x20000>;
+                        ftrace-size = <0x20000>;
+                };
+        };
 
-As far as other issues reported by strict checkpatch go, most of them are DT 
-lines over 80 charachters. This was tolerated till now. Last type of issues is 
-that macro parameters weren't enclosed with braces. These issues won't be 
-reported anymore in new series because sun8i_csc.h won't be touched if I drop 
-patch which renames DE2 register macros (but original issue will remain).
+According to the comment in reserve_memblock_reserved_regions():
 
-Best regards,
-Jernej
+               /*
+                 * We expected memblock_reserve() regions to conflict with
+                 * memory created by request_standard_resources().
+                 */
 
-> 
-> With both addressed,
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> 
-> Thanks!
+and the reserved-memory region evades this condition, but i'm not entirely sure how to
+properly fix this - any idea?
+-- 
+bye,
+p.
