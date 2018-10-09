@@ -1,139 +1,129 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Tue,  9 Oct 2018 13:52:10 +0000 (UTC)
-Subject: [PATCH v3 19/24] powerpc/nohash/64: do not include pte-common.h
+Date: Tue,  9 Oct 2018 13:52:02 +0000 (UTC)
+Subject: [PATCH v3 15/24] powerpc/mm: move __P and __S tables in the common
+ pgtable.h
 In-Reply-To: <cover.1539092111.git.christophe.leroy@c-s.fr>
 References: <cover.1539092111.git.christophe.leroy@c-s.fr>
-Message-ID: <f442fba83ab8488ec73c4f060fdb134f425b7598.1539092112.git.christophe.leroy@c-s.fr>
+Message-ID: <bbf9c5cc3b44c70bec26b6cfa898cd59c1c08c2c.1539092112.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nohash/64 only uses book3e PTE flags, so it doesn't need pte-common.h
-
-This also allows to drop PAGE_SAO and H_PAGE_4K_PFN from pte_common.h
-as they are only used by PPC64
+__P and __S flags are the same for all platform and should remain
+as is in the future, so avoid duplication.
 
 Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/include/asm/nohash/64/pgtable.h | 16 ++++++++++++-
- arch/powerpc/include/asm/nohash/pgtable.h    | 27 +++++++++++++++++++++
- arch/powerpc/include/asm/pte-common.h        | 35 ----------------------------
- 3 files changed, 42 insertions(+), 36 deletions(-)
+ arch/powerpc/include/asm/book3s/64/pgtable.h | 20 --------------------
+ arch/powerpc/include/asm/pgtable.h           | 19 +++++++++++++++++++
+ arch/powerpc/include/asm/pte-common.h        | 20 --------------------
+ 3 files changed, 19 insertions(+), 40 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/nohash/64/pgtable.h b/arch/powerpc/include/asm/nohash/64/pgtable.h
-index b7d65d4b61be..9ccea94b3d4e 100644
---- a/arch/powerpc/include/asm/nohash/64/pgtable.h
-+++ b/arch/powerpc/include/asm/nohash/64/pgtable.h
-@@ -89,7 +89,21 @@
-  * Include the PTE bits definitions
+diff --git a/arch/powerpc/include/asm/book3s/64/pgtable.h b/arch/powerpc/include/asm/book3s/64/pgtable.h
+index f80f436834a1..cf8dbd5f8f03 100644
+--- a/arch/powerpc/include/asm/book3s/64/pgtable.h
++++ b/arch/powerpc/include/asm/book3s/64/pgtable.h
+@@ -151,8 +151,6 @@
+  * Write permissions imply read permissions for now (we could make write-only
+  * pages on BookE but we don't bother for now). Execute permission control is
+  * possible on platforms that define _PAGE_EXEC
+- *
+- * Note due to the way vm flags are laid out, the bits are XWR
   */
- #include <asm/nohash/pte-book3e.h>
--#include <asm/pte-common.h>
-+
-+#define _PAGE_HWWRITE	0
-+#define _PAGE_SAO	0
-+#define _PAGE_RO 0
-+#define _PAGE_NA 0
-+#define _PAGE_HUGE 0
-+
-+#define PTE_RPN_MASK	(~((1UL << PTE_RPN_SHIFT) - 1))
-+
-+/* _PAGE_CHG_MASK masks of bits that are to be preserved across
-+ * pgprot changes
-+ */
-+#define _PAGE_CHG_MASK	(PTE_RPN_MASK | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_SPECIAL)
-+
-+#define H_PAGE_4K_PFN 0
+ #define PAGE_NONE	__pgprot(_PAGE_BASE | _PAGE_PRIVILEGED)
+ #define PAGE_SHARED	__pgprot(_PAGE_BASE | _PAGE_RW)
+@@ -162,24 +160,6 @@
+ #define PAGE_READONLY	__pgprot(_PAGE_BASE | _PAGE_READ)
+ #define PAGE_READONLY_X	__pgprot(_PAGE_BASE | _PAGE_READ | _PAGE_EXEC)
  
+-#define __P000	PAGE_NONE
+-#define __P001	PAGE_READONLY
+-#define __P010	PAGE_COPY
+-#define __P011	PAGE_COPY
+-#define __P100	PAGE_READONLY_X
+-#define __P101	PAGE_READONLY_X
+-#define __P110	PAGE_COPY_X
+-#define __P111	PAGE_COPY_X
+-
+-#define __S000	PAGE_NONE
+-#define __S001	PAGE_READONLY
+-#define __S010	PAGE_SHARED
+-#define __S011	PAGE_SHARED
+-#define __S100	PAGE_READONLY_X
+-#define __S101	PAGE_READONLY_X
+-#define __S110	PAGE_SHARED_X
+-#define __S111	PAGE_SHARED_X
+-
+ /* Permission masks used for kernel mappings */
+ #define PAGE_KERNEL	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RW)
+ #define PAGE_KERNEL_NC	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | \
+diff --git a/arch/powerpc/include/asm/pgtable.h b/arch/powerpc/include/asm/pgtable.h
+index 14c79a7dc855..fb4b85bba110 100644
+--- a/arch/powerpc/include/asm/pgtable.h
++++ b/arch/powerpc/include/asm/pgtable.h
+@@ -20,6 +20,25 @@ struct mm_struct;
+ #include <asm/nohash/pgtable.h>
+ #endif /* !CONFIG_PPC_BOOK3S */
+ 
++/* Note due to the way vm flags are laid out, the bits are XWR */
++#define __P000	PAGE_NONE
++#define __P001	PAGE_READONLY
++#define __P010	PAGE_COPY
++#define __P011	PAGE_COPY
++#define __P100	PAGE_READONLY_X
++#define __P101	PAGE_READONLY_X
++#define __P110	PAGE_COPY_X
++#define __P111	PAGE_COPY_X
++
++#define __S000	PAGE_NONE
++#define __S001	PAGE_READONLY
++#define __S010	PAGE_SHARED
++#define __S011	PAGE_SHARED
++#define __S100	PAGE_READONLY_X
++#define __S101	PAGE_READONLY_X
++#define __S110	PAGE_SHARED_X
++#define __S111	PAGE_SHARED_X
++
  #ifndef __ASSEMBLY__
- /* pte_clear moved to later in this file */
-diff --git a/arch/powerpc/include/asm/nohash/pgtable.h b/arch/powerpc/include/asm/nohash/pgtable.h
-index 8de3b7eb88b0..d3feeac19467 100644
---- a/arch/powerpc/include/asm/nohash/pgtable.h
-+++ b/arch/powerpc/include/asm/nohash/pgtable.h
-@@ -8,6 +8,33 @@
- #include <asm/nohash/32/pgtable.h>
- #endif
  
-+/* Permission masks used for kernel mappings */
-+#define PAGE_KERNEL	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RW)
-+#define PAGE_KERNEL_NC	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | _PAGE_NO_CACHE)
-+#define PAGE_KERNEL_NCG	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | \
-+				 _PAGE_NO_CACHE | _PAGE_GUARDED)
-+#define PAGE_KERNEL_X	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RWX)
-+#define PAGE_KERNEL_RO	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RO)
-+#define PAGE_KERNEL_ROX	__pgprot(_PAGE_BASE | _PAGE_KERNEL_ROX)
-+
-+/* Protection used for kernel text. We want the debuggers to be able to
-+ * set breakpoints anywhere, so don't write protect the kernel text
-+ * on platforms where such control is possible.
-+ */
-+#if defined(CONFIG_KGDB) || defined(CONFIG_XMON) || defined(CONFIG_BDI_SWITCH) ||\
-+	defined(CONFIG_KPROBES) || defined(CONFIG_DYNAMIC_FTRACE)
-+#define PAGE_KERNEL_TEXT	PAGE_KERNEL_X
-+#else
-+#define PAGE_KERNEL_TEXT	PAGE_KERNEL_ROX
-+#endif
-+
-+/* Make modules code happy. We don't set RO yet */
-+#define PAGE_KERNEL_EXEC	PAGE_KERNEL_X
-+
-+/* Advertise special mapping type for AGP */
-+#define PAGE_AGP		(PAGE_KERNEL_NC)
-+#define HAVE_PAGE_AGP
-+
- #ifndef __ASSEMBLY__
- 
- /* Generic accessors to PTE bits */
+ #include <asm/tlbflush.h>
 diff --git a/arch/powerpc/include/asm/pte-common.h b/arch/powerpc/include/asm/pte-common.h
-index cce60b3ba7d4..4d594039bca5 100644
+index 5a5ba43bdf98..4860dae76dae 100644
 --- a/arch/powerpc/include/asm/pte-common.h
 +++ b/arch/powerpc/include/asm/pte-common.h
-@@ -14,9 +14,6 @@
- #ifndef _PAGE_WRITETHRU
- #define _PAGE_WRITETHRU	0
- #endif
--#ifndef _PAGE_SAO
--#define _PAGE_SAO	0
--#endif
- /* _PAGE_RO and _PAGE_RW shall not be defined at the same time */
- #ifndef _PAGE_RO
- #define _PAGE_RO 0
-@@ -61,35 +58,3 @@
+@@ -139,8 +139,6 @@ static inline bool pte_user(pte_t pte)
+  * Write permissions imply read permissions for now (we could make write-only
+  * pages on BookE but we don't bother for now). Execute permission control is
+  * possible on platforms that define _PAGE_EXEC
+- *
+- * Note due to the way vm flags are laid out, the bits are XWR
   */
- #define _PAGE_CHG_MASK	(PTE_RPN_MASK | _PAGE_DIRTY | \
-                          _PAGE_ACCESSED | _PAGE_SPECIAL)
+ #define PAGE_NONE	__pgprot(_PAGE_BASE | _PAGE_NA)
+ #define PAGE_SHARED	__pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_RW)
+@@ -153,24 +151,6 @@ static inline bool pte_user(pte_t pte)
+ #define PAGE_READONLY_X	__pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_RO | \
+ 				 _PAGE_EXEC)
+ 
+-#define __P000	PAGE_NONE
+-#define __P001	PAGE_READONLY
+-#define __P010	PAGE_COPY
+-#define __P011	PAGE_COPY
+-#define __P100	PAGE_READONLY_X
+-#define __P101	PAGE_READONLY_X
+-#define __P110	PAGE_COPY_X
+-#define __P111	PAGE_COPY_X
 -
--/* Permission masks used for kernel mappings */
--#define PAGE_KERNEL	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RW)
--#define PAGE_KERNEL_NC	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | \
--				 _PAGE_NO_CACHE)
--#define PAGE_KERNEL_NCG	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | \
--				 _PAGE_NO_CACHE | _PAGE_GUARDED)
--#define PAGE_KERNEL_X	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RWX)
--#define PAGE_KERNEL_RO	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RO)
--#define PAGE_KERNEL_ROX	__pgprot(_PAGE_BASE | _PAGE_KERNEL_ROX)
+-#define __S000	PAGE_NONE
+-#define __S001	PAGE_READONLY
+-#define __S010	PAGE_SHARED
+-#define __S011	PAGE_SHARED
+-#define __S100	PAGE_READONLY_X
+-#define __S101	PAGE_READONLY_X
+-#define __S110	PAGE_SHARED_X
+-#define __S111	PAGE_SHARED_X
 -
--/* Protection used for kernel text. We want the debuggers to be able to
-- * set breakpoints anywhere, so don't write protect the kernel text
-- * on platforms where such control is possible.
-- */
--#if defined(CONFIG_KGDB) || defined(CONFIG_XMON) || defined(CONFIG_BDI_SWITCH) ||\
--	defined(CONFIG_KPROBES) || defined(CONFIG_DYNAMIC_FTRACE)
--#define PAGE_KERNEL_TEXT	PAGE_KERNEL_X
--#else
--#define PAGE_KERNEL_TEXT	PAGE_KERNEL_ROX
--#endif
--
--/* Make modules code happy. We don't set RO yet */
--#define PAGE_KERNEL_EXEC	PAGE_KERNEL_X
--
--/* Advertise special mapping type for AGP */
--#define PAGE_AGP		(PAGE_KERNEL_NC)
--#define HAVE_PAGE_AGP
--
--#ifndef H_PAGE_4K_PFN
--#define H_PAGE_4K_PFN 0
--#endif
+ /* Permission masks used for kernel mappings */
+ #define PAGE_KERNEL	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RW)
+ #define PAGE_KERNEL_NC	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | \
 -- 
 2.13.3
