@@ -1,19 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 9 Oct 2018 08:09:46 -0300
-Subject: [PATCH v3] ARM: dts: Add support for Liebherr's BK4 device (vf610
- based)
-In-Reply-To: <20181009105028.17971-1-lukma@denx.de>
-References: <20180921152726.31742-1-lukma@denx.de>
- <20181009105028.17971-1-lukma@denx.de>
-Message-ID: <CAOMZO5C86vXGAvcXxsTk3nJFf_J3eqVBkkgMG13VGOqO=MJFOw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 9 Oct 2018 13:18:27 +0200
+Subject: [PATCH V6 00/23] mmc: mmci: add sdmmc variant for stm32
+In-Reply-To: <cb919bf8-caa2-b2fe-fee4-ae2f0f4c04b5@st.com>
+References: <1539000535-13261-1-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFp0oHHS=bkXj_AbiLmbNxW07pFnk-4m9kwQtYkh_ogKgw@mail.gmail.com>
+ <cb919bf8-caa2-b2fe-fee4-ae2f0f4c04b5@st.com>
+Message-ID: <CAPDyKFp4DEtavAqDg-ymaCcus+Hddv0OrgfS54HsTX+aWdzN+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2018 at 7:50 AM Lukasz Majewski <lukma@denx.de> wrote:
+On 9 October 2018 at 09:54, Ludovic BARRE <ludovic.barre@st.com> wrote:
+> hi Ulf
 >
-> This commit adds DTS support for BK4 device from Liebherr. It
-> uses vf610 SoC from NXP.
+> On 10/09/2018 09:30 AM, Ulf Hansson wrote:
+>>
+>> Applied for next, thanks!
+>>
+>> FYI, I made little fixup of the help text in the Kconfig for the last
+>> patch.
 >
-> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+>
+> Thanks for your review.
+> Did you had a feedback on Qcom platform tests?
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Nope. I am leaving the tests for Qcom platforms to be done by
+kernelci, let's see what the reports are.
+
+Kind regards
+Uffe
