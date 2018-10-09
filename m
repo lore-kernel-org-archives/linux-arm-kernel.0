@@ -1,27 +1,40 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 9 Oct 2018 17:34:24 +0100
-Subject: [PATCH v2 1/2] arm/arm64: KVM: rename function
- kvm_arch_dev_ioctl_check_extension()
-In-Reply-To: <1539002088-21215-2-git-send-email-gengdongjiu@huawei.com>
-References: <1539002088-21215-1-git-send-email-gengdongjiu@huawei.com>
- <1539002088-21215-2-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <e5e5f84b-4664-7ba0-9462-5b69a987fd9d@arm.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Tue, 09 Oct 2018 18:43:41 +0200
+Subject: [PATCH 3/5] spi: pxa2xx: use an enum for type
+In-Reply-To: <87d0t64mkk.fsf@belgarion.home>
+References: <20180910115935.163121-1-lkundrak@v3.sk>
+ <20180910115935.163121-4-lkundrak@v3.sk> <87d0t64mkk.fsf@belgarion.home>
+Message-ID: <04b4e7779325de995371685f094f3762c30793a8.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/10/18 13:34, Dongjiu Geng wrote:
-> Rename kvm_arch_dev_ioctl_check_extension() to
-> kvm_arch_vm_ioctl_check_extension(), because it does
-> not have any relationship with device.
+On Fri, 2018-09-21 at 22:34 +0200, Robert Jarzmik wrote:
+> Lubomir Rintel <lkundrak@v3.sk> writes:
 > 
-> Renaming this function can make code readable.
+> > That seems to be the correct type.
+> Okay, but what happens here when adev_id->driver_data is a value out
+> of enum
+> range ? Does the following assignment make sense ?
+> > +		type = (enum pxa_ssp_type)adev_id->driver_data;
 
-+1. The current name is not really intuitive.
+No change in behavior. In standard C the enum type is compatible with
+an integer type (char or larger), thus type would just hold a value
+outside the rank of an enum.
 
+But why would that happen? What we can get here is just the constants
+from pxa2xx_spi_acpi_match[], all of them of enum pxa_ssp_type type.
+
+> As a side note, could you join for the next throw to the review :
+>  - Jarkko Nikula <jarkko.nikula@linux.intel.com>
+>  - Mika Westerberg <mika.westerberg@linux.intel.com>
 > 
-> Cc: James Morse <james.morse@arm.com>
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> Even if they are Intel, I think they have worked a lot on this driver
+> for Intel
+> platforms.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Will do.
+
+> Cheers.
+
+Thanks,
+Lubo
