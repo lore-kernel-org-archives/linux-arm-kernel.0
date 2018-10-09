@@ -1,143 +1,124 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Tue,  9 Oct 2018 13:51:50 +0000 (UTC)
-Subject: [PATCH v3 09/24] powerpc/mm: move some nohash pte helpers in
- nohash/[32:64]/pgtable.h
+Date: Tue,  9 Oct 2018 13:51:54 +0000 (UTC)
+Subject: [PATCH v3 11/24] powerpc/mm: don't use _PAGE_EXEC for calling
+ hash_preload()
 In-Reply-To: <cover.1539092111.git.christophe.leroy@c-s.fr>
 References: <cover.1539092111.git.christophe.leroy@c-s.fr>
-Message-ID: <6310a4420057a307b2be9555a14da7cd261ee848.1539092112.git.christophe.leroy@c-s.fr>
+Message-ID: <c796cfe3c0b6b008f8e215db55afef14aad0da0f.1539092112.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow their use in nohash/32/pgtable.h, we have to move the
-following helpers in nohash/[32:64]/pgtable.h:
-- pte_mkwrite()
-- pte_mkdirty()
-- pte_mkyoung()
-- pte_wrprotect()
+The 'access' parameter of hash_preload() is either 0 or _PAGE_EXEC.
+Among the two versions of hash_preload(), only the PPC64 one is
+doing something with this 'access' parameter.
 
-Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
+In order to remove the use of _PAGE_EXEC outside platform code,
+'access' parameter is replaced by 'is_exec' which will be either
+true of false, and the PPC64 version of hash_preload() creates
+the access flag based on 'is_exec'.
+
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/include/asm/nohash/32/pgtable.h | 28 ++++++++++++++++++++++++++++
- arch/powerpc/include/asm/nohash/64/pgtable.h | 20 ++++++++++++++++++++
- arch/powerpc/include/asm/nohash/pgtable.h    | 28 ----------------------------
- 3 files changed, 48 insertions(+), 28 deletions(-)
+ arch/powerpc/mm/hash_utils_64.c | 3 ++-
+ arch/powerpc/mm/mem.c           | 9 +++++----
+ arch/powerpc/mm/mmu_decl.h      | 2 +-
+ arch/powerpc/mm/pgtable_32.c    | 2 +-
+ arch/powerpc/mm/ppc_mmu_32.c    | 2 +-
+ 5 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/nohash/32/pgtable.h b/arch/powerpc/include/asm/nohash/32/pgtable.h
-index a7f44498ab6f..4373f8c44b6d 100644
---- a/arch/powerpc/include/asm/nohash/32/pgtable.h
-+++ b/arch/powerpc/include/asm/nohash/32/pgtable.h
-@@ -136,6 +136,34 @@ extern int icache_44x_need_flush;
- #define pte_clear(mm, addr, ptep) \
- 	do { pte_update(ptep, ~0, 0); } while (0)
+diff --git a/arch/powerpc/mm/hash_utils_64.c b/arch/powerpc/mm/hash_utils_64.c
+index 8ff03c7205a0..854edc3722e0 100644
+--- a/arch/powerpc/mm/hash_utils_64.c
++++ b/arch/powerpc/mm/hash_utils_64.c
+@@ -1482,7 +1482,7 @@ static bool should_hash_preload(struct mm_struct *mm, unsigned long ea)
+ #endif
  
-+static inline pte_t pte_mkwrite(pte_t pte)
-+{
-+	pte_basic_t ptev;
-+
-+	ptev = pte_val(pte) & ~_PAGE_RO;
-+	ptev |= _PAGE_RW;
-+	return __pte(ptev);
-+}
-+
-+static inline pte_t pte_mkdirty(pte_t pte)
-+{
-+	return __pte(pte_val(pte) | _PAGE_DIRTY);
-+}
-+
-+static inline pte_t pte_mkyoung(pte_t pte)
-+{
-+	return __pte(pte_val(pte) | _PAGE_ACCESSED);
-+}
-+
-+static inline pte_t pte_wrprotect(pte_t pte)
-+{
-+	pte_basic_t ptev;
-+
-+	ptev = pte_val(pte) & ~(_PAGE_RW | _PAGE_HWWRITE);
-+	ptev |= _PAGE_RO;
-+	return __pte(ptev);
-+}
-+
- #define pmd_none(pmd)		(!pmd_val(pmd))
- #define	pmd_bad(pmd)		(pmd_val(pmd) & _PMD_BAD)
- #define	pmd_present(pmd)	(pmd_val(pmd) & _PMD_PRESENT_MASK)
-diff --git a/arch/powerpc/include/asm/nohash/64/pgtable.h b/arch/powerpc/include/asm/nohash/64/pgtable.h
-index 513b6e9e62c6..72dac522aa66 100644
---- a/arch/powerpc/include/asm/nohash/64/pgtable.h
-+++ b/arch/powerpc/include/asm/nohash/64/pgtable.h
-@@ -94,6 +94,26 @@
- #ifndef __ASSEMBLY__
- /* pte_clear moved to later in this file */
- 
-+static inline pte_t pte_mkwrite(pte_t pte)
-+{
-+	return __pte(pte_val(pte) | _PAGE_RW);
-+}
-+
-+static inline pte_t pte_mkdirty(pte_t pte)
-+{
-+	return __pte(pte_val(pte) | _PAGE_DIRTY);
-+}
-+
-+static inline pte_t pte_mkyoung(pte_t pte)
-+{
-+	return __pte(pte_val(pte) | _PAGE_ACCESSED);
-+}
-+
-+static inline pte_t pte_wrprotect(pte_t pte)
-+{
-+	return __pte(pte_val(pte) & ~_PAGE_RW);
-+}
-+
- #define PMD_BAD_BITS		(PTE_TABLE_SIZE-1)
- #define PUD_BAD_BITS		(PMD_TABLE_SIZE-1)
- 
-diff --git a/arch/powerpc/include/asm/nohash/pgtable.h b/arch/powerpc/include/asm/nohash/pgtable.h
-index 5b82e44c4231..c746e9e784cd 100644
---- a/arch/powerpc/include/asm/nohash/pgtable.h
-+++ b/arch/powerpc/include/asm/nohash/pgtable.h
-@@ -77,15 +77,6 @@ static inline unsigned long pte_pfn(pte_t pte)	{
- 	return pte_val(pte) >> PTE_RPN_SHIFT; }
- 
- /* Generic modifiers for PTE bits */
--static inline pte_t pte_wrprotect(pte_t pte)
--{
--	pte_basic_t ptev;
--
--	ptev = pte_val(pte) & ~(_PAGE_RW | _PAGE_HWWRITE);
--	ptev |= _PAGE_RO;
--	return __pte(ptev);
--}
--
- static inline pte_t pte_mkclean(pte_t pte)
+ void hash_preload(struct mm_struct *mm, unsigned long ea,
+-		  unsigned long access, unsigned long trap)
++		  bool is_exec, unsigned long trap)
  {
- 	return __pte(pte_val(pte) & ~(_PAGE_DIRTY | _PAGE_HWWRITE));
-@@ -96,25 +87,6 @@ static inline pte_t pte_mkold(pte_t pte)
- 	return __pte(pte_val(pte) & ~_PAGE_ACCESSED);
- }
+ 	int hugepage_shift;
+ 	unsigned long vsid;
+@@ -1490,6 +1490,7 @@ void hash_preload(struct mm_struct *mm, unsigned long ea,
+ 	pte_t *ptep;
+ 	unsigned long flags;
+ 	int rc, ssize, update_flags = 0;
++	unsigned long access = _PAGE_PRESENT | _PAGE_READ | (is_exec ? _PAGE_EXEC : 0);
  
--static inline pte_t pte_mkwrite(pte_t pte)
--{
--	pte_basic_t ptev;
--
--	ptev = pte_val(pte) & ~_PAGE_RO;
--	ptev |= _PAGE_RW;
--	return __pte(ptev);
--}
--
--static inline pte_t pte_mkdirty(pte_t pte)
--{
--	return __pte(pte_val(pte) | _PAGE_DIRTY);
--}
--
--static inline pte_t pte_mkyoung(pte_t pte)
--{
--	return __pte(pte_val(pte) | _PAGE_ACCESSED);
--}
--
- static inline pte_t pte_mkspecial(pte_t pte)
+ 	BUG_ON(REGION_ID(ea) != USER_REGION_ID);
+ 
+diff --git a/arch/powerpc/mm/mem.c b/arch/powerpc/mm/mem.c
+index cb421aeb7674..dd949d6649a2 100644
+--- a/arch/powerpc/mm/mem.c
++++ b/arch/powerpc/mm/mem.c
+@@ -509,7 +509,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
+ 	 * We don't need to worry about _PAGE_PRESENT here because we are
+ 	 * called with either mm->page_table_lock held or ptl lock held
+ 	 */
+-	unsigned long access, trap;
++	unsigned long trap;
++	bool is_exec;
+ 
+ 	if (radix_enabled()) {
+ 		prefetch((void *)address);
+@@ -531,16 +532,16 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
+ 	trap = current->thread.regs ? TRAP(current->thread.regs) : 0UL;
+ 	switch (trap) {
+ 	case 0x300:
+-		access = 0UL;
++		is_exec = false;
+ 		break;
+ 	case 0x400:
+-		access = _PAGE_EXEC;
++		is_exec = true;
+ 		break;
+ 	default:
+ 		return;
+ 	}
+ 
+-	hash_preload(vma->vm_mm, address, access, trap);
++	hash_preload(vma->vm_mm, address, is_exec, trap);
+ #endif /* CONFIG_PPC_STD_MMU */
+ #if (defined(CONFIG_PPC_BOOK3E_64) || defined(CONFIG_PPC_FSL_BOOK3E)) \
+ 	&& defined(CONFIG_HUGETLB_PAGE)
+diff --git a/arch/powerpc/mm/mmu_decl.h b/arch/powerpc/mm/mmu_decl.h
+index e5d779eed181..dd7f9b951d25 100644
+--- a/arch/powerpc/mm/mmu_decl.h
++++ b/arch/powerpc/mm/mmu_decl.h
+@@ -82,7 +82,7 @@ static inline void _tlbivax_bcast(unsigned long address, unsigned int pid,
+ #else /* CONFIG_PPC_MMU_NOHASH */
+ 
+ extern void hash_preload(struct mm_struct *mm, unsigned long ea,
+-			 unsigned long access, unsigned long trap);
++			 bool is_exec, unsigned long trap);
+ 
+ 
+ extern void _tlbie(unsigned long address);
+diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
+index 0bbc7b7d8a05..01f348938328 100644
+--- a/arch/powerpc/mm/pgtable_32.c
++++ b/arch/powerpc/mm/pgtable_32.c
+@@ -261,7 +261,7 @@ static void __init __mapin_ram_chunk(unsigned long offset, unsigned long top)
+ 		map_kernel_page(v, p, ktext ? PAGE_KERNEL_TEXT : PAGE_KERNEL);
+ #ifdef CONFIG_PPC_STD_MMU_32
+ 		if (ktext)
+-			hash_preload(&init_mm, v, 0, 0x300);
++			hash_preload(&init_mm, v, false, 0x300);
+ #endif
+ 		v += PAGE_SIZE;
+ 		p += PAGE_SIZE;
+diff --git a/arch/powerpc/mm/ppc_mmu_32.c b/arch/powerpc/mm/ppc_mmu_32.c
+index bea6c544e38f..38a793bfca37 100644
+--- a/arch/powerpc/mm/ppc_mmu_32.c
++++ b/arch/powerpc/mm/ppc_mmu_32.c
+@@ -163,7 +163,7 @@ void __init setbat(int index, unsigned long virt, phys_addr_t phys,
+  * Preload a translation in the hash table
+  */
+ void hash_preload(struct mm_struct *mm, unsigned long ea,
+-		  unsigned long access, unsigned long trap)
++		  bool is_exec, unsigned long trap)
  {
- 	return __pte(pte_val(pte) | _PAGE_SPECIAL);
+ 	pmd_t *pmd;
+ 
 -- 
 2.13.3
