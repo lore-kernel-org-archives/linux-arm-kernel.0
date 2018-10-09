@@ -1,28 +1,27 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 9 Oct 2018 10:19:45 +0200
-Subject: [PATCH 3/7] clocksource: Change CPU hotplug priority of
- exynos_mct driver
-In-Reply-To: <20181008125009.3721-4-m.szyprowski@samsung.com>
-References: <CGME20181008125047eucas1p1bbd0c4759612b6df8fbe25f759e03130@eucas1p1.samsung.com>
- <20181008125009.3721-1-m.szyprowski@samsung.com>
- <20181008125009.3721-4-m.szyprowski@samsung.com>
-Message-ID: <CAJKOXPc5uB0cnwvcN5SinmajKgb=O-bGgrmRHCThNndFwLGeyw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 09 Oct 2018 10:29:56 +0200
+Subject: [PATCH 0/2] arm64: dts: meson: s400: emmc updates
+In-Reply-To: <20181002084341.5487-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Tue, 2 Oct 2018 10:43:39 +0200")
+References: <20181002084341.5487-1-jbrunet@baylibre.com>
+Message-ID: <7hbm834j5n.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Oct 2018 at 14:50, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->
-> Exynos Multi-Core Timer driver (exynos_mct) must be started before
-> ARM Architected Timers (arch_timer), because both timers share common
-> hardware block and turning on MCT is needed to get ARM Architected
-> Timer working properly.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  include/linux/cpuhotplug.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> This patchset adds the emmc pwrseq to the emmc node and disable the device
+> by default, since eMMC is not the default option for this board.
+>
+> Jerome Brunet (2):
+>   arm64: dts: meson-axg: s400: add missing emmc pwrseq
+>   arm64: dts: meson-axg: s400: disable emmc
 
-Best regards,
-Krzysztof
+Appled to v4.20/dt64.
+
+Thanks.
+
+Kevin
+
+P.S.  Looks like I forgot to reply when I applied these, but these are
+      already submitted to arm-soc and merged.
