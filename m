@@ -1,67 +1,114 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Tue,  9 Oct 2018 13:51:47 +0000 (UTC)
-Subject: [PATCH v3 08/24] powerpc/mm: don't use _PAGE_EXEC in book3s/32
+Date: Tue,  9 Oct 2018 13:51:41 +0000 (UTC)
+Subject: [PATCH v3 05/24] powerpc: don't use ioremap_prot() nor __ioremap()
+ unless really needed.
 In-Reply-To: <cover.1539092111.git.christophe.leroy@c-s.fr>
 References: <cover.1539092111.git.christophe.leroy@c-s.fr>
-Message-ID: <e42a7ae712905eb9b023725fe59132ba5d9ac23b.1539092112.git.christophe.leroy@c-s.fr>
+Message-ID: <bdf8fabb99484508c1e474eea5e7988c79c4c95d.1539092111.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-book3s/32 doesn't define _PAGE_EXEC, so no need to use it.
+In many places, ioremap_prot() and __ioremap() can be replaced with
+higher level functions like ioremap(), ioremap_coherent(),
+ioremap_cache(), ioremap_wc() ...
 
-All other platforms define _PAGE_EXEC so no need to check
-it is not NUL when not book3s/32.
-
-Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/include/asm/book3s/32/pgtable.h | 2 +-
- arch/powerpc/mm/pgtable.c                    | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/powerpc/kernel/btext.c               | 2 +-
+ arch/powerpc/kernel/crash_dump.c          | 2 +-
+ arch/powerpc/platforms/85xx/smp.c         | 4 ++--
+ arch/powerpc/platforms/pasemi/dma_lib.c   | 2 +-
+ arch/powerpc/platforms/ps3/spu.c          | 3 +--
+ arch/powerpc/sysdev/fsl_85xx_cache_sram.c | 8 ++++----
+ 6 files changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/book3s/32/pgtable.h b/arch/powerpc/include/asm/book3s/32/pgtable.h
-index 7a9f0ed599ff..3127cc529aa1 100644
---- a/arch/powerpc/include/asm/book3s/32/pgtable.h
-+++ b/arch/powerpc/include/asm/book3s/32/pgtable.h
-@@ -234,7 +234,7 @@ static inline void __ptep_set_access_flags(struct vm_area_struct *vma,
- 					   int psize)
- {
- 	unsigned long set = pte_val(entry) &
--		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW | _PAGE_EXEC);
-+		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW);
- 	unsigned long clr = ~pte_val(entry) & _PAGE_RO;
+diff --git a/arch/powerpc/kernel/btext.c b/arch/powerpc/kernel/btext.c
+index b2072d5bbf2b..b4241ed1456e 100644
+--- a/arch/powerpc/kernel/btext.c
++++ b/arch/powerpc/kernel/btext.c
+@@ -163,7 +163,7 @@ void btext_map(void)
+ 	offset = ((unsigned long) dispDeviceBase) - base;
+ 	size = dispDeviceRowBytes * dispDeviceRect[3] + offset
+ 		+ dispDeviceRect[0];
+-	vbase = __ioremap(base, size, pgprot_val(pgprot_noncached_wc(__pgprot(0))));
++	vbase = ioremap_wc(base, size);
+ 	if (!vbase)
+ 		return;
+ 	logicalDisplayBase = vbase + offset;
+diff --git a/arch/powerpc/kernel/crash_dump.c b/arch/powerpc/kernel/crash_dump.c
+index d10ad258d41a..bbdc4706c159 100644
+--- a/arch/powerpc/kernel/crash_dump.c
++++ b/arch/powerpc/kernel/crash_dump.c
+@@ -110,7 +110,7 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
+ 		vaddr = __va(paddr);
+ 		csize = copy_oldmem_vaddr(vaddr, buf, csize, offset, userbuf);
+ 	} else {
+-		vaddr = __ioremap(paddr, PAGE_SIZE, 0);
++		vaddr = ioremap_cache(paddr, PAGE_SIZE);
+ 		csize = copy_oldmem_vaddr(vaddr, buf, csize, offset, userbuf);
+ 		iounmap(vaddr);
+ 	}
+diff --git a/arch/powerpc/platforms/85xx/smp.c b/arch/powerpc/platforms/85xx/smp.c
+index 7e966f4cf19a..fff72425727a 100644
+--- a/arch/powerpc/platforms/85xx/smp.c
++++ b/arch/powerpc/platforms/85xx/smp.c
+@@ -216,8 +216,8 @@ static int smp_85xx_start_cpu(int cpu)
  
- 	pte_update(ptep, clr, set);
-diff --git a/arch/powerpc/mm/pgtable.c b/arch/powerpc/mm/pgtable.c
-index aee04b209b51..f97d9c3760e3 100644
---- a/arch/powerpc/mm/pgtable.c
-+++ b/arch/powerpc/mm/pgtable.c
-@@ -73,7 +73,7 @@ static struct page *maybe_pte_to_page(pte_t pte)
- 	return page;
- }
+ 	/* Map the spin table */
+ 	if (ioremappable)
+-		spin_table = ioremap_prot(*cpu_rel_addr,
+-			sizeof(struct epapr_spin_table), _PAGE_COHERENT);
++		spin_table = ioremap_coherent(*cpu_rel_addr,
++					      sizeof(struct epapr_spin_table));
+ 	else
+ 		spin_table = phys_to_virt(*cpu_rel_addr);
  
--#if defined(CONFIG_PPC_STD_MMU) || _PAGE_EXEC == 0
-+#ifdef CONFIG_PPC_BOOK3S
+diff --git a/arch/powerpc/platforms/pasemi/dma_lib.c b/arch/powerpc/platforms/pasemi/dma_lib.c
+index c80f72c370ae..53384eb42a76 100644
+--- a/arch/powerpc/platforms/pasemi/dma_lib.c
++++ b/arch/powerpc/platforms/pasemi/dma_lib.c
+@@ -576,7 +576,7 @@ int pasemi_dma_init(void)
+ 		res.start = 0xfd800000;
+ 		res.end = res.start + 0x1000;
+ 	}
+-	dma_status = __ioremap(res.start, resource_size(&res), 0);
++	dma_status = ioremap_cache(res.start, resource_size(&res));
+ 	pci_dev_put(iob_pdev);
  
- /* Server-style MMU handles coherency when hashing if HW exec permission
-  * is supposed per page (currently 64-bit only). If not, then, we always
-@@ -106,7 +106,7 @@ static pte_t set_access_flags_filter(pte_t pte, struct vm_area_struct *vma,
- 	return pte;
- }
+ 	for (i = 0; i < MAX_TXCH; i++)
+diff --git a/arch/powerpc/platforms/ps3/spu.c b/arch/powerpc/platforms/ps3/spu.c
+index b54850845466..7746c2a3c509 100644
+--- a/arch/powerpc/platforms/ps3/spu.c
++++ b/arch/powerpc/platforms/ps3/spu.c
+@@ -215,8 +215,7 @@ static int __init setup_areas(struct spu *spu)
+ 		goto fail_ioremap;
+ 	}
  
--#else /* defined(CONFIG_PPC_STD_MMU) || _PAGE_EXEC == 0 */
-+#else /* CONFIG_PPC_BOOK3S */
+-	spu->local_store = (__force void *)ioremap_prot(spu->local_store_phys,
+-		LS_SIZE, pgprot_val(pgprot_noncached_wc(__pgprot(0))));
++	spu->local_store = (__force void *)ioremap_wc(spu->local_store_phys, LS_SIZE);
  
- /* Embedded type MMU with HW exec support. This is a bit more complicated
-  * as we don't have two bits to spare for _PAGE_EXEC and _PAGE_HWEXEC so
-@@ -179,7 +179,7 @@ static pte_t set_access_flags_filter(pte_t pte, struct vm_area_struct *vma,
- 	return __pte(pte_val(pte) | _PAGE_EXEC);
- }
+ 	if (!spu->local_store) {
+ 		pr_debug("%s:%d: ioremap local_store failed\n",
+diff --git a/arch/powerpc/sysdev/fsl_85xx_cache_sram.c b/arch/powerpc/sysdev/fsl_85xx_cache_sram.c
+index 00ccf3e4fcb4..15cbdd4fde06 100644
+--- a/arch/powerpc/sysdev/fsl_85xx_cache_sram.c
++++ b/arch/powerpc/sysdev/fsl_85xx_cache_sram.c
+@@ -107,11 +107,11 @@ int __init instantiate_cache_sram(struct platform_device *dev,
+ 		goto out_free;
+ 	}
  
--#endif /* !(defined(CONFIG_PPC_STD_MMU) || _PAGE_EXEC == 0) */
-+#endif /* CONFIG_PPC_BOOK3S */
- 
- /*
-  * set_pte stores a linux PTE into the linux page table.
+-	cache_sram->base_virt = ioremap_prot(cache_sram->base_phys,
+-				cache_sram->size, _PAGE_COHERENT | PAGE_KERNEL);
++	cache_sram->base_virt = ioremap_coherent(cache_sram->base_phys,
++						 cache_sram->size);
+ 	if (!cache_sram->base_virt) {
+-		dev_err(&dev->dev, "%pOF: ioremap_prot failed\n",
+-				dev->dev.of_node);
++		dev_err(&dev->dev, "%pOF: ioremap_coherent failed\n",
++			dev->dev.of_node);
+ 		ret = -ENOMEM;
+ 		goto out_release;
+ 	}
 -- 
 2.13.3
