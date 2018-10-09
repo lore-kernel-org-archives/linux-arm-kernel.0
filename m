@@ -1,34 +1,29 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 9 Oct 2018 22:56:14 +0000
-Subject: [PATCH v10 4/5] clk: imx: add imx composite clock
-In-Reply-To: <1539074230-27277-5-git-send-email-abel.vesa@nxp.com>
-References: <1539074230-27277-1-git-send-email-abel.vesa@nxp.com>
- <1539074230-27277-5-git-send-email-abel.vesa@nxp.com>
-Message-ID: <5c0cc4de8403fca17431a9382f7e34e8003f497b.camel@nxp.com>
+From: paul.burton@mips.com (Paul Burton)
+Date: Tue, 9 Oct 2018 23:01:40 +0000
+Subject: [PATCH] memblock: stop using implicit alignement to
+ SMP_CACHE_BYTES
+In-Reply-To: <1538687224-17535-1-git-send-email-rppt@linux.vnet.ibm.com>
+References: <1538687224-17535-1-git-send-email-rppt@linux.vnet.ibm.com>
+Message-ID: <20181009230137.rju3lm2saou5xsa4@pburton-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-10-09 at 08:37 +0000, Abel Vesa wrote:
-> +struct clk *imx_clk_composite_8m_flags(const char *name,
-> +					const char **parent_names,
-> +					int num_parents, void __iomem *reg,
-> +					unsigned long flags);
-> +
-> +#define __imx_clk_composite_8m(name, parent_names, reg, flags) \
-> +	imx_clk_composite_8m_flags(name, parent_names, \
-> +		ARRAY_SIZE(parent_names), reg, \
-> +		flags | CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE)
-> +
-> +#define imx_clk_composite_8m(name, parent_names, reg) \
-> +	__imx_clk_composite_8m(name, parent_names, reg, 0)
-> +
-> +#define imx_clk_composite_8m_critical(name, parent_names, reg) \
-> +	__imx_clk_composite_8m(name, parent_names, reg, CLK_IS_CRITICAL)
+Hi Mike,
 
-Does anyone else think that the "8m" would be prettier next to imx
-rather than as a suffix? Using imx8m_clk_composite* and
-imx7ulp_clk_composite* makes more sense to me.
+On Fri, Oct 05, 2018 at 12:07:04AM +0300, Mike Rapoport wrote:
+> When a memblock allocation APIs are called with align = 0, the alignment is
+> implicitly set to SMP_CACHE_BYTES.
+> 
+> Replace all such uses of memblock APIs with the 'align' parameter explicitly
+> set to SMP_CACHE_BYTES and stop implicit alignment assignment in the
+> memblock internal allocation functions.
+> 
+>%
+> 
+> Suggested-by: Michal Hocko <mhocko@suse.com>
+> Signed-off-by: Mike Rapoport <rppt@linux.vnet.ibm.com>
 
---
-Regards,
-Leonard
+  Acked-by: Paul Burton <paul.burton@mips.com> # MIPS part
+
+Thanks,
+    Paul
