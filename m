@@ -1,40 +1,61 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Tue, 9 Oct 2018 21:53:44 +0800
-Subject: [PATCH] arm64: mm: Drop the unused cpu parameter
-In-Reply-To: <20181009115704.GC6248@arm.com>
-References: <1538815744-27408-1-git-send-email-zhangshaokun@hisilicon.com>
- <20181009115704.GC6248@arm.com>
-Message-ID: <95d1728d-2e48-0b05-e25f-fc9b03e9c31c@hisilicon.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 9 Oct 2018 16:14:42 +0200
+Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
+In-Reply-To: <5dc1dc4d-de60-43b9-aab6-3b3bb6a22a4b@arm.com>
+References: <20181002123909.GS18290@dhcp22.suse.cz>
+ <fae68a4e-b14b-8342-940c-ea5ef3c978af@arm.com>
+ <20181003065833.GD18290@dhcp22.suse.cz>
+ <7f0488b5-053f-0954-9b95-8c0890ef5597@arm.com>
+ <20181003105926.GA4714@dhcp22.suse.cz>
+ <34b25855-fcef-61ed-312d-2011f80bdec4@arm.com>
+ <20181003114842.GD4714@dhcp22.suse.cz>
+ <d42cc88b-6bab-797c-f263-2dce650ea3ab@arm.com>
+ <20181003133609.GG4714@dhcp22.suse.cz>
+ <5dc1dc4d-de60-43b9-aab6-3b3bb6a22a4b@arm.com>
+Message-ID: <20181009141442.GT8528@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri 05-10-18 13:04:43, Anshuman Khandual wrote:
+> Does the following sound close enough to what you are looking for ?
 
-On 2018/10/9 19:57, Will Deacon wrote:
-> On Sat, Oct 06, 2018 at 04:49:04PM +0800, Shaokun Zhang wrote:
->> Cpu parameter is never used in flush_context, remove it.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
->> ---
->>  arch/arm64/mm/context.c | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Curious, but does this actually result in better code generation, or does
-> GCC already figure out that the parameter is unused?
-> 
+I do not think so
 
-No hint from GCC compiler, the unused parameter is found when debug one
-context switch issue and analyze the code. It is redundant and harmless
-to remove it, a trivial patch.
+> diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
+> index 9df1d59..070c419 100644
+> --- a/include/linux/hugetlb.h
+> +++ b/include/linux/hugetlb.h
+> @@ -504,6 +504,13 @@ static inline bool hugepage_migration_supported(struct hstate *h)
+>         return arch_hugetlb_migration_supported(h);
+>  }
+>  
+> +static inline bool hugepage_movable_required(struct hstate *h)
+> +{
+> +       if (hstate_is_gigantic(h))
+> +               return true;
+> +       return false;
+> +}
+> +
 
-Thanks,
-Shaokun
+Apart from naming (hugepage_movable_supported?) the above doesn't do the
+most essential thing to query whether the hugepage migration is
+supported at all. Apart from that i would expect the logic to be revers.
+We do not really support giga pages migration enough to support them in
+movable zone.
+> @@ -1652,6 +1655,9 @@ struct page *alloc_huge_page_nodemask(struct hstate *h, int preferred_nid,
+>  {
+>         gfp_t gfp_mask = htlb_alloc_mask(h);
+>  
+> +       if (hugepage_movable_required(h))
+> +               gfp_mask |= __GFP_MOVABLE;
+> +
 
-> Will
-> 
-> .
-> 
+And besides that this really want to live in htlb_alloc_mask because
+this is really an allocation policy. It would be unmap_and_move_huge_page
+to call hugepage_migration_supported. The later is the one to allow for
+an arch specific override.
+
+Makes sense?
+-- 
+Michal Hocko
+SUSE Labs
