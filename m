@@ -1,283 +1,104 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 9 Oct 2018 02:48:10 +0000
-Subject: [PATCH V4 2/2] firmware: imx: add SCU power domain driver
-In-Reply-To: <20181009005342.GX3587@dragon>
-References: <1538917807-1921-1-git-send-email-aisheng.dong@nxp.com>
- <1538917807-1921-3-git-send-email-aisheng.dong@nxp.com>
- <20181009005342.GX3587@dragon>
-Message-ID: <AM0PR04MB4211DA481116D36C864CEDE980E70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Tue, 9 Oct 2018 11:08:15 +0800
+Subject: [PATCH v6 2/9] PCI: mediatek: Fixup class ID for MT7622 as
+ PCI_CLASS_BRIDGE_PCI
+In-Reply-To: <20181008172337.GA13538@e107981-ln.cambridge.arm.com>
+References: <1538969088-7136-1-git-send-email-honghui.zhang@mediatek.com>
+ <1538969088-7136-3-git-send-email-honghui.zhang@mediatek.com>
+ <20181008172337.GA13538@e107981-ln.cambridge.arm.com>
+Message-ID: <1539054495.6246.31.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Tuesday, October 9, 2018 8:54 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; ulf.hansson at linaro.org;
-> dongas86 at gmail.com; khilman at kernel.org; linux-pm at vger.kernel.org;
-> rjw at rjwysocki.net; dl-linux-imx <linux-imx@nxp.com>;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; Sascha
-> Hauer <s.hauer@pengutronix.de>
-> Subject: Re: [PATCH V4 2/2] firmware: imx: add SCU power domain driver
+On Mon, 2018-10-08 at 18:23 +0100, Lorenzo Pieralisi wrote:
+> On Mon, Oct 08, 2018 at 11:24:41AM +0800, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > 
+> > The PCIe controller of MT7622 has TYPE 1 configuration space type, but
+> > the HW default class type values is invalid.
+> > 
+> > The commit 101c92dc80c8 ("PCI: mediatek: Set up vendor ID and class
+> > type for MT7622") have set the class ID for MT7622 as
+> > PCI_CLASS_BRIDGE_HOST, but it's not workable for MT7622:
+> > 
+> > In __pci_bus_assign_resources, the framework only setup bridge's
+> > resource window only if class type is PCI_CLASS_BRIDGE_PCI. Or it
+> > will leave the subordinary PCIe device's MMIO window un-touched.
+> > 
+> > Fixup the class type to PCI_CLASS_BRIDGE_PCI as most of the controller
+> > driver do.
 > 
-> On Sun, Oct 07, 2018 at 09:10:07PM +0800, Dong Aisheng wrote:
-> > Some i.MX SoCs contain a system controller that is responsible for
-> > controlling the state of the IPs that are present. Communication
-> > between the host processor running an OS and the system controller
-> > happens through a SCU protocol. This patch adds SCU protocol based
-> > power domains drivers.
-> >
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > Cc: Kevin Hilman <khilman@kernel.org>
-> > Cc: linux-pm at vger.kernel.org
-> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
-> @Sascha, are you okay with this?
+> I think that this patch is correct but the commit log fails to pin point
+> the problem. The IP you are programming is a root port, that's why you
+> have to have the proper class code, the patch looks fine but I would
+> like to peek Bjorn's brain on this since it is a fundamental concept.
 > 
 
-Yes, it would be good if we can have Sasha's sign offs.
+I'm a bit confused with the concepts of PCI_CLASS_BRIDGE_HOST and
+PCI_CLASS_BRIDGE_PCI, from PCI express spec,
+4.0r1.0(PCI_Express_Base_4.0r1.0_September-27-2017-c), Host Bridge is
+"part of a Root Complex that connects a host CPU or CPUs to a
+Hierarchy". While Root Complex defines as "A defined System Element that
+includes at least one Host Bridge, Root port, or Root complex Integrated
+Endpoint".
 
+But according to my understanding, most of the root port IPs integrated
+with a "PCI_CLASS_BRIDGE_PCI", which has type 1 configuration space and
+could be saw as a pci device when using lspci.
+
+And for MT7622, it integrated with block of internal control registers,
+type 1 configuration space, and is considered as a root complex.
+
+I'm not sure which CLASS type it should have:
+>From PCI_Code-ID_r_1_10__v8-Nov_2017, class type of
+0x0604(PCI_CLASS_BRIDGE_PCI) is defined as a PCI-to-PCI bridge, not
+literally suitable for MT7622(which is a root complex)(In my personal
+opinion). But it is the only workable CLASS type for MT7622 in current
+kernel.
+
+> If the kernel does not assign resources unless it detects a
+> PCI_CLASS_BRIDGE_PCI this means that for components that are
+> actually PCI_CLASS_BRIDGE_HOST their register set must come
+> preprogrammed unless I am missing something.
+> 
+
+In the function pci_request_resource_alignment, it will by pass the
+resource assignment for PCI_CLASS_BRIDGE_HOST, though I'm not figured
+out why.
+
+> I would like to get to the bottom of this since it is a fundamental
+> enumeration concept.
+> 
+
+Do you like me to re-write the commit message for this patch and put the
+above information in? Or just not mention the PCI_CLASS_BRIDGE_HOST
+assign resource routine?
+
+Thanks
+
+> Thanks,
+> Lorenzo
+> 
+> > 
+> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > Acked-by: Ryder Lee <ryder.lee@mediatek.com>
 > > ---
-> > ChangeLog:
-> > v3->v4:
-> >  * update firmware headfile patch from include/soc/imx to
-> >    include/linux/firmware/imx
-> > v2->v3:
-> >  * name of structures/enums updated with imx_sc prefix
-> > v1->v2:
-> >  * move into drivers/firmware/imx
-> >  * Implement sc_pm_set_resource_power_mode() API in the driver instead
-> >    of call it via SCU API according to Sascha's suggestion
-> > ---
-> >  drivers/firmware/imx/Kconfig  |   6 ++
-> >  drivers/firmware/imx/Makefile |   3 +-
-> >  drivers/firmware/imx/scu-pd.c | 167
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 175 insertions(+), 1 deletion(-)  create mode 100644
-> > drivers/firmware/imx/scu-pd.c
-> >
-> > diff --git a/drivers/firmware/imx/Kconfig
-> > b/drivers/firmware/imx/Kconfig index b170c28..6a7a7c2 100644
-> > --- a/drivers/firmware/imx/Kconfig
-> > +++ b/drivers/firmware/imx/Kconfig
-> > @@ -9,3 +9,9 @@ config IMX_SCU
-> >
-> >  	  This driver manages the IPC interface between host CPU and the
-> >  	  SCU firmware running on M4.
-> > +
-> > +config IMX_SCU_PD
-> > +	bool "IMX SCU Power Domain driver"
-> > +	depends on IMX_SCU
-> > +	help
-> > +	  The System Controller Firmware (SCFW) based power domain driver.
-> > diff --git a/drivers/firmware/imx/Makefile
-> > b/drivers/firmware/imx/Makefile index 0ac04df..1b2e15b 100644
-> > --- a/drivers/firmware/imx/Makefile
-> > +++ b/drivers/firmware/imx/Makefile
-> > @@ -1,2 +1,3 @@
-> >  # SPDX-License-Identifier: GPL-2.0
-> > -obj-$(CONFIG_IMX_SCU)	+= imx-scu.o misc.o
-> > +obj-$(CONFIG_IMX_SCU)		+= imx-scu.o misc.o
-> > +obj-$(CONFIG_IMX_SCU_PD)	+= scu-pd.o
-> > diff --git a/drivers/firmware/imx/scu-pd.c
-> > b/drivers/firmware/imx/scu-pd.c new file mode 100644 index
-> > 0000000..af5b9e4
-> > --- /dev/null
-> > +++ b/drivers/firmware/imx/scu-pd.c
-> > @@ -0,0 +1,167 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > + * Copyright 2017~2018 NXP
-> > + *	Dong Aisheng <aisheng.dong@nxp.com>
-> > + *
-> > + * Implementation of the SCU based Power Domains  */
-> > +
-> > +#define pr_fmt(fmt) "scu_pd: " fmt
-> > +
-> > +#include <linux/firmware/imx/sci.h>
-> > +#include <linux/io.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/pm.h>
-> > +#include <linux/pm_domain.h>
-> > +#include <linux/slab.h>
-> > +
-> > +struct imx_sc_pm_domain {
-> > +	struct generic_pm_domain pd;
-> > +	u32 rsrc_id;
-> > +};
-> > +
-> > +static struct imx_sc_ipc *pm_ipc_handle;
-> > +
-> > +/* SCU Power Mode Protocol definition */ struct
-> > +imx_sc_msg_req_set_resource_power_mode {
-> > +	struct imx_sc_rpc_msg hdr;
-> > +	u16 resource;
-> > +	u8 mode;
-> > +} __packed;
-> > +
-> > +static int imx_sc_pd_power(struct generic_pm_domain *domain, bool
-> > +power_on) {
-> > +	struct imx_sc_msg_req_set_resource_power_mode msg;
-> > +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-> > +	struct imx_sc_pm_domain *pd;
-> > +	int ret;
-> > +
-> > +	pd = container_of(domain, struct imx_sc_pm_domain, pd);
-> > +
-> > +	hdr->ver = IMX_SC_RPC_VERSION;
-> > +	hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
-> > +	hdr->func = (uint8_t)IMX_SC_PM_FUNC_SET_RESOURCE_POWER_MODE;
-> > +	hdr->size = 2;
-> > +
-> > +	msg.resource = pd->rsrc_id;
-> > +	msg.mode = power_on ? IMX_SC_PM_PW_MODE_ON :
-> IMX_SC_PM_PW_MODE_LP;
-> > +
-> > +	ret = imx_scu_call_rpc(pm_ipc_handle, &msg, true);
-> > +	if (ret)
-> > +		pr_err("failed to power %s resource %d ret %d\n",
-> > +			power_on ? "up" : "off", pd->rsrc_id, ret);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int imx_sc_pd_power_on(struct generic_pm_domain *domain) {
-> > +	return imx_sc_pd_power(domain, true); }
-> > +
-> > +static int imx_sc_pd_power_off(struct generic_pm_domain *domain) {
-> > +	return imx_sc_pd_power(domain, false); }
-> > +
-> > +static struct generic_pm_domain *imx_sc_pm_add_one_domain(
-> > +					struct device_node *np,
-> > +					struct generic_pm_domain *genpd_parent) {
-> > +	struct imx_sc_pm_domain *imx_sc_pd;
-> > +	u32 rsrc_id;
-> > +	int ret;
-> > +
-> > +	imx_sc_pd = kzalloc(sizeof(*imx_sc_pd), GFP_KERNEL);
-> > +	if (!imx_sc_pd)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	if (!of_property_read_u32(np, "reg", &rsrc_id)) {
-> > +		if (rsrc_id > IMX_SC_R_LAST) {
-> > +			pr_warn("%pOF: invalid rsrc id %d found", np, rsrc_id);
-> > +			ret = -EINVAL;
-> > +			goto err;
-> > +		}
-> > +		imx_sc_pd->rsrc_id = rsrc_id;
-> > +	} else {
-> > +		imx_sc_pd->rsrc_id = IMX_SC_R_LAST;
-> > +	}
-> > +
-> > +	if (imx_sc_pd->rsrc_id != IMX_SC_R_LAST) {
-> > +		imx_sc_pd->pd.power_off = imx_sc_pd_power_off;
-> > +		imx_sc_pd->pd.power_on = imx_sc_pd_power_on;
-> > +	}
-> > +
-> > +	imx_sc_pd->pd.name = np->name;
-> > +
-> > +	ret = pm_genpd_init(&imx_sc_pd->pd, NULL, true);
-> > +	if (ret < 0)
-> > +		goto err;
-> > +
-> > +	if (genpd_parent) {
-> > +		ret = pm_genpd_add_subdomain(genpd_parent, &imx_sc_pd->pd);
-> > +		if (ret)
-> > +			goto err;
-> > +	}
-> > +
-> > +	ret = of_genpd_add_provider_simple(np, &imx_sc_pd->pd);
-> > +	if (!ret)
-> > +		return &imx_sc_pd->pd;
-> > +
-> > +	pm_genpd_remove_subdomain(genpd_parent, &imx_sc_pd->pd);
-> > +
-> > +err:
-> > +	pr_warn("failed to add PM domain %pOF: %d\n", np, ret);
-> > +	kfree(imx_sc_pd);
-> > +	return ERR_PTR(ret);
-> > +}
-> > +
-> > +static void imx_sc_pm_add_pm_domains(struct device_node *parent,
-> > +				     struct generic_pm_domain *genpd_parent) {
-> > +	struct generic_pm_domain *pd;
-> > +	struct device_node *np;
-> > +
-> > +	for_each_child_of_node(parent, np) {
-> > +		pd = imx_sc_pm_add_one_domain(np, genpd_parent);
-> > +		if (!IS_ERR(pd))
-> > +			imx_sc_pm_add_pm_domains(np, pd);
-> > +	}
-> > +}
-> > +
-> > +static int imx_sc_pd_probe(struct platform_device *pdev) {
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	int ret;
-> > +
-> > +	ret = imx_scu_get_handle(&pm_ipc_handle);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	imx_sc_pm_add_pm_domains(np, NULL);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id imx_sc_pd_match[] = {
-> > +	{ .compatible = "fsl,scu-pd", },
-> 
-> Has the compatible been documented?  We used to encode a soc name in the
-> compatible to specify the programming model of particular hardware block.
-> Is this power domain block generic enough with no need of doing so?
-> 
-
-Yes, it's a generic binding and has been documented in SCU binding doc.
-See:
-https://www.spinics.net/lists/arm-kernel/msg680738.html
-
-Regards
-Dong Aisheng
-
-> Shawn
-> 
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> > +static struct platform_driver imx_sc_pd_driver = {
-> > +	.driver = {
-> > +		.name = "imx-scu-pd",
-> > +		.of_match_table = imx_sc_pd_match,
-> > +	},
-> > +	.probe = imx_sc_pd_probe,
-> > +};
-> > +builtin_platform_driver(imx_sc_pd_driver);
-> > +
-> > +MODULE_AUTHOR("Dong Aisheng <aisheng.dong@nxp.com>");
-> > +MODULE_DESCRIPTION("IMX SCU Power Domain driver");
-> > +MODULE_LICENSE("GPL v2");
-> > --
-> > 2.7.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
-> >
-> s.infradead.org%2Fmailman%2Flistinfo%2Flinux-arm-kernel&amp;data=02%7C
-> >
-> 01%7Caisheng.dong%40nxp.com%7Ce7cc7fda44ad4f62bc3d08d62d81c3e2%
-> 7C686ea
-> >
-> 1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636746432705451877&amp;
-> sdata=30j
-> > 5I%2Fek2U5vujNu2Yzj1Wbsh0BvbxriRFcXUjDOeg4%3D&amp;reserved=0
+> >  drivers/pci/controller/pcie-mediatek.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> > index 288b8e2..bcdac9b 100644
+> > --- a/drivers/pci/controller/pcie-mediatek.c
+> > +++ b/drivers/pci/controller/pcie-mediatek.c
+> > @@ -432,7 +432,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+> >  		val = PCI_VENDOR_ID_MEDIATEK;
+> >  		writew(val, port->base + PCIE_CONF_VEND_ID);
+> >  
+> > -		val = PCI_CLASS_BRIDGE_HOST;
+> > +		val = PCI_CLASS_BRIDGE_PCI;
+> >  		writew(val, port->base + PCIE_CONF_CLASS_ID);
+> >  	}
+> >  
+> > -- 
+> > 2.6.4
+> > 
