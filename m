@@ -1,101 +1,40 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 9 Oct 2018 17:29:06 +0530
-Subject: [PATCH 21/36] dt-bindings: arm: Convert TI davinci board/soc
- bindings to json-schema
-In-Reply-To: <20181005165848.3474-22-robh@kernel.org>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-22-robh@kernel.org>
-Message-ID: <e8aeb321-9f9a-8636-2f1d-f5082e635fb1@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  9 Oct 2018 13:26:10 +0100
+Subject: [GIT PULL 0/1] KVM/arm updates for 4.19-rc8
+Message-ID: <20181009122611.85534-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 October 2018 10:28 PM, Rob Herring wrote:
-> Convert TI Davinci SoC bindings to DT schema format using json-schema.
-> 
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/arm/davinci.txt       | 25 ------------------
->  .../bindings/arm/ti/ti,davinci.yaml           | 26 +++++++++++++++++++
->  2 files changed, 26 insertions(+), 25 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/davinci.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/davinci.txt b/Documentation/devicetree/bindings/arm/davinci.txt
-> deleted file mode 100644
-> index 715622c36260..000000000000
-> --- a/Documentation/devicetree/bindings/arm/davinci.txt
-> +++ /dev/null
-> @@ -1,25 +0,0 @@
-> -Texas Instruments DaVinci Platforms Device Tree Bindings
-> ---------------------------------------------------------
-> -
-> -DA850/OMAP-L138/AM18x Evaluation Module (EVM) board
-> -Required root node properties:
-> -    - compatible = "ti,da850-evm", "ti,da850";
-> -
-> -DA850/OMAP-L138/AM18x L138/C6748 Development Kit (LCDK) board
-> -Required root node properties:
-> -    - compatible = "ti,da850-lcdk", "ti,da850";
-> -
-> -EnBW AM1808 based CMC board
-> -Required root node properties:
-> -    - compatible = "enbw,cmc", "ti,da850;
-> -
-> -LEGO MINDSTORMS EV3 (AM1808 based)
-> -Required root node properties:
-> -    - compatible = "lego,ev3", "ti,da850";
-> -
-> -Generic DaVinci Boards
-> -----------------------
-> -
-> -DA850/OMAP-L138/AM18x generic board
-> -Required root node properties:
-> -    - compatible = "ti,da850";
-> diff --git a/Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml b/Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
-> new file mode 100644
-> index 000000000000..2675cae91a60
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
-> @@ -0,0 +1,26 @@
-> +# SPDX-License-Identifier: None
-> +%YAML 1.2
-> +---
-> +$id: http://devicetree.org/schemas/bindings/arm/davinci.yaml#
-> +$schema: http://devicetree.org/meta-schemas/core.yaml#
-> +
-> +title: Texas Instruments DaVinci Platforms Device Tree Bindings
-> +
-> +maintainers:
-> +  - Sekhar Nori <nsekhar@ti.com>
-> +description: |
-> +  DA850/OMAP-L138/AM18x based boards
-> +
-> +
-> +properties:
-> +  $nodename:
-> +    const: '/'
-> +  compatible:
-> +    items:
-> +      - enum:
-> +          - ti,da850-evm
-> +          - ti,da850-lcdk
-> +          - enbw,cmc
-> +          - lego,ev3
+Paolo, Radim,
 
-The boards had some reasonable human readable description earlier, which
-has been lost now. Is there a way to bring that back?
+This is hopefully the last 4.19 update for KVM/arm. A single patch,
+but one that fixes a rather silly 32bit bug (which I thought I had
+fixed before sending the original 4.19 PR, but obviously didn't).
 
-Apart from that, looks good to me.
+Please pull,
 
-Thanks,
-Sekhar
+	M.
 
-> +      - const: ti,da850
-> +...
-> -- 
-> 2.17.1
-> 
+The following changes since commit 7876320f88802b22d4e2daf7eb027dd14175a0f8:
+
+  Linux 4.19-rc4 (2018-09-16 11:52:37 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-fixes-for-4.19-2
+
+for you to fetch changes up to ec876f4b252c4084acad259ce3e65ad97f44f040:
+
+  ARM: KVM: Correctly order SGI register entries in the cp15 array (2018-10-09 11:55:47 +0100)
+
+----------------------------------------------------------------
+KVM/arm fixes for 4.19, take #2
+
+- Correctly order GICv3 SGI registers in the cp15 array
+
+----------------------------------------------------------------
+Marc Zyngier (1):
+      ARM: KVM: Correctly order SGI register entries in the cp15 array
+
+ arch/arm/kvm/coproc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
