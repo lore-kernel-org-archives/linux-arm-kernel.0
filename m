@@ -1,124 +1,123 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Tue,  9 Oct 2018 13:51:54 +0000 (UTC)
-Subject: [PATCH v3 11/24] powerpc/mm: don't use _PAGE_EXEC for calling
- hash_preload()
+Date: Tue,  9 Oct 2018 13:52:00 +0000 (UTC)
+Subject: [PATCH v3 14/24] powerpc/mm: drop unused page flags
 In-Reply-To: <cover.1539092111.git.christophe.leroy@c-s.fr>
 References: <cover.1539092111.git.christophe.leroy@c-s.fr>
-Message-ID: <c796cfe3c0b6b008f8e215db55afef14aad0da0f.1539092112.git.christophe.leroy@c-s.fr>
+Message-ID: <c9ed39487e7dcce213aeb2a5c4ed69d1234b7cbb.1539092112.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'access' parameter of hash_preload() is either 0 or _PAGE_EXEC.
-Among the two versions of hash_preload(), only the PPC64 one is
-doing something with this 'access' parameter.
+The following page flags in pte-common.h can be dropped:
 
-In order to remove the use of _PAGE_EXEC outside platform code,
-'access' parameter is replaced by 'is_exec' which will be either
-true of false, and the PPC64 version of hash_preload() creates
-the access flag based on 'is_exec'.
+_PAGE_ENDIAN is only used in mm/fsl_booke_mmu.c and is defined in
+asm/nohash/32/pte-fsl-booke.h
 
+_PAGE_4K_PFN is nowhere defined nor used
+
+_PAGE_READ, _PAGE_WRITE and _PAGE_PTE are only defined and used
+in book3s/64
+
+The following page flags in book3s/64/pgtable.h can be dropped as
+they are not used on this platform nor by common code.
+
+_PAGE_NA, _PAGE_RO, _PAGE_USER and _PAGE_PSIZE
+
+Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/mm/hash_utils_64.c | 3 ++-
- arch/powerpc/mm/mem.c           | 9 +++++----
- arch/powerpc/mm/mmu_decl.h      | 2 +-
- arch/powerpc/mm/pgtable_32.c    | 2 +-
- arch/powerpc/mm/ppc_mmu_32.c    | 2 +-
- 5 files changed, 10 insertions(+), 8 deletions(-)
+ arch/powerpc/include/asm/book3s/64/pgtable.h | 10 +---------
+ arch/powerpc/include/asm/pte-common.h        | 17 +----------------
+ 2 files changed, 2 insertions(+), 25 deletions(-)
 
-diff --git a/arch/powerpc/mm/hash_utils_64.c b/arch/powerpc/mm/hash_utils_64.c
-index 8ff03c7205a0..854edc3722e0 100644
---- a/arch/powerpc/mm/hash_utils_64.c
-+++ b/arch/powerpc/mm/hash_utils_64.c
-@@ -1482,7 +1482,7 @@ static bool should_hash_preload(struct mm_struct *mm, unsigned long ea)
- #endif
- 
- void hash_preload(struct mm_struct *mm, unsigned long ea,
--		  unsigned long access, unsigned long trap)
-+		  bool is_exec, unsigned long trap)
- {
- 	int hugepage_shift;
- 	unsigned long vsid;
-@@ -1490,6 +1490,7 @@ void hash_preload(struct mm_struct *mm, unsigned long ea,
- 	pte_t *ptep;
- 	unsigned long flags;
- 	int rc, ssize, update_flags = 0;
-+	unsigned long access = _PAGE_PRESENT | _PAGE_READ | (is_exec ? _PAGE_EXEC : 0);
- 
- 	BUG_ON(REGION_ID(ea) != USER_REGION_ID);
- 
-diff --git a/arch/powerpc/mm/mem.c b/arch/powerpc/mm/mem.c
-index cb421aeb7674..dd949d6649a2 100644
---- a/arch/powerpc/mm/mem.c
-+++ b/arch/powerpc/mm/mem.c
-@@ -509,7 +509,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
- 	 * We don't need to worry about _PAGE_PRESENT here because we are
- 	 * called with either mm->page_table_lock held or ptl lock held
- 	 */
--	unsigned long access, trap;
-+	unsigned long trap;
-+	bool is_exec;
- 
- 	if (radix_enabled()) {
- 		prefetch((void *)address);
-@@ -531,16 +532,16 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
- 	trap = current->thread.regs ? TRAP(current->thread.regs) : 0UL;
- 	switch (trap) {
- 	case 0x300:
--		access = 0UL;
-+		is_exec = false;
- 		break;
- 	case 0x400:
--		access = _PAGE_EXEC;
-+		is_exec = true;
- 		break;
- 	default:
- 		return;
- 	}
- 
--	hash_preload(vma->vm_mm, address, access, trap);
-+	hash_preload(vma->vm_mm, address, is_exec, trap);
- #endif /* CONFIG_PPC_STD_MMU */
- #if (defined(CONFIG_PPC_BOOK3E_64) || defined(CONFIG_PPC_FSL_BOOK3E)) \
- 	&& defined(CONFIG_HUGETLB_PAGE)
-diff --git a/arch/powerpc/mm/mmu_decl.h b/arch/powerpc/mm/mmu_decl.h
-index e5d779eed181..dd7f9b951d25 100644
---- a/arch/powerpc/mm/mmu_decl.h
-+++ b/arch/powerpc/mm/mmu_decl.h
-@@ -82,7 +82,7 @@ static inline void _tlbivax_bcast(unsigned long address, unsigned int pid,
- #else /* CONFIG_PPC_MMU_NOHASH */
- 
- extern void hash_preload(struct mm_struct *mm, unsigned long ea,
--			 unsigned long access, unsigned long trap);
-+			 bool is_exec, unsigned long trap);
- 
- 
- extern void _tlbie(unsigned long address);
-diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
-index 0bbc7b7d8a05..01f348938328 100644
---- a/arch/powerpc/mm/pgtable_32.c
-+++ b/arch/powerpc/mm/pgtable_32.c
-@@ -261,7 +261,7 @@ static void __init __mapin_ram_chunk(unsigned long offset, unsigned long top)
- 		map_kernel_page(v, p, ktext ? PAGE_KERNEL_TEXT : PAGE_KERNEL);
- #ifdef CONFIG_PPC_STD_MMU_32
- 		if (ktext)
--			hash_preload(&init_mm, v, 0, 0x300);
-+			hash_preload(&init_mm, v, false, 0x300);
- #endif
- 		v += PAGE_SIZE;
- 		p += PAGE_SIZE;
-diff --git a/arch/powerpc/mm/ppc_mmu_32.c b/arch/powerpc/mm/ppc_mmu_32.c
-index bea6c544e38f..38a793bfca37 100644
---- a/arch/powerpc/mm/ppc_mmu_32.c
-+++ b/arch/powerpc/mm/ppc_mmu_32.c
-@@ -163,7 +163,7 @@ void __init setbat(int index, unsigned long virt, phys_addr_t phys,
-  * Preload a translation in the hash table
+diff --git a/arch/powerpc/include/asm/book3s/64/pgtable.h b/arch/powerpc/include/asm/book3s/64/pgtable.h
+index c8564762b6f0..f80f436834a1 100644
+--- a/arch/powerpc/include/asm/book3s/64/pgtable.h
++++ b/arch/powerpc/include/asm/book3s/64/pgtable.h
+@@ -14,10 +14,6 @@
   */
- void hash_preload(struct mm_struct *mm, unsigned long ea,
--		  unsigned long access, unsigned long trap)
-+		  bool is_exec, unsigned long trap)
- {
- 	pmd_t *pmd;
+ #define _PAGE_BIT_SWAP_TYPE	0
  
+-#define _PAGE_NA		0
+-#define _PAGE_RO		0
+-#define _PAGE_USER		0
+-
+ #define _PAGE_EXEC		0x00001 /* execute permission */
+ #define _PAGE_WRITE		0x00002 /* write access allowed */
+ #define _PAGE_READ		0x00004	/* read access allowed */
+@@ -123,10 +119,6 @@
+ #define _PAGE_KERNEL_RWX	(_PAGE_PRIVILEGED | _PAGE_DIRTY |	\
+ 				 _PAGE_RW | _PAGE_EXEC)
+ /*
+- * No page size encoding in the linux PTE
+- */
+-#define _PAGE_PSIZE		0
+-/*
+  * _PAGE_CHG_MASK masks of bits that are to be preserved across
+  * pgprot changes
+  */
+@@ -149,7 +141,7 @@
+  * pages. We always set _PAGE_COHERENT when SMP is enabled or
+  * the processor might need it for DMA coherency.
+  */
+-#define _PAGE_BASE_NC	(_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_PSIZE)
++#define _PAGE_BASE_NC	(_PAGE_PRESENT | _PAGE_ACCESSED)
+ #define _PAGE_BASE	(_PAGE_BASE_NC)
+ 
+ /* Permission masks used to generate the __P and __S table,
+diff --git a/arch/powerpc/include/asm/pte-common.h b/arch/powerpc/include/asm/pte-common.h
+index bef56141a549..5a5ba43bdf98 100644
+--- a/arch/powerpc/include/asm/pte-common.h
++++ b/arch/powerpc/include/asm/pte-common.h
+@@ -14,18 +14,12 @@
+ #ifndef _PAGE_EXEC
+ #define _PAGE_EXEC	0
+ #endif
+-#ifndef _PAGE_ENDIAN
+-#define _PAGE_ENDIAN	0
+-#endif
+ #ifndef _PAGE_COHERENT
+ #define _PAGE_COHERENT	0
+ #endif
+ #ifndef _PAGE_WRITETHRU
+ #define _PAGE_WRITETHRU	0
+ #endif
+-#ifndef _PAGE_4K_PFN
+-#define _PAGE_4K_PFN		0
+-#endif
+ #ifndef _PAGE_SAO
+ #define _PAGE_SAO	0
+ #endif
+@@ -39,9 +33,6 @@
+ #define _PAGE_RW 0
+ #endif
+ 
+-#ifndef _PAGE_PTE
+-#define _PAGE_PTE 0
+-#endif
+ /* At least one of _PAGE_PRIVILEGED or _PAGE_USER must be defined */
+ #ifndef _PAGE_PRIVILEGED
+ #define _PAGE_PRIVILEGED 0
+@@ -122,7 +113,7 @@ static inline bool pte_user(pte_t pte)
+ 
+ /* Mask of bits returned by pte_pgprot() */
+ #define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_COHERENT | _PAGE_NO_CACHE | \
+-			 _PAGE_WRITETHRU | _PAGE_ENDIAN | _PAGE_4K_PFN | \
++			 _PAGE_WRITETHRU | \
+ 			 _PAGE_USER | _PAGE_ACCESSED | _PAGE_RO | _PAGE_NA | \
+ 			 _PAGE_PRIVILEGED | \
+ 			 _PAGE_RW | _PAGE_HWWRITE | _PAGE_DIRTY | _PAGE_EXEC)
+@@ -208,12 +199,6 @@ static inline bool pte_user(pte_t pte)
+ #define PAGE_AGP		(PAGE_KERNEL_NC)
+ #define HAVE_PAGE_AGP
+ 
+-#ifndef _PAGE_READ
+-/* if not defined, we should not find _PAGE_WRITE too */
+-#define _PAGE_READ 0
+-#define _PAGE_WRITE _PAGE_RW
+-#endif
+-
+ #ifndef H_PAGE_4K_PFN
+ #define H_PAGE_4K_PFN 0
+ #endif
 -- 
 2.13.3
