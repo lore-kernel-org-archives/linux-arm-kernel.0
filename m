@@ -1,72 +1,52 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 9 Oct 2018 13:29:49 +0200
-Subject: [PATCH v6 0/4] drivers: clk: Add ZynqMP clock driver support
-In-Reply-To: <1539022906-18073-1-git-send-email-jollys@xilinx.com>
-References: <1539022906-18073-1-git-send-email-jollys@xilinx.com>
-Message-ID: <65353e3c-035b-30ee-f93c-041885e112b6@xilinx.com>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Tue,  9 Oct 2018 13:20:21 +0200
+Subject: [PATCH v2 3/3] ARM: socfpga: Turn on ARM errata for L2 cache
+In-Reply-To: <20181009112021.756-1-peron.clem@gmail.com>
+References: <20181009112021.756-1-peron.clem@gmail.com>
+Message-ID: <20181009112021.756-3-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8.10.2018 20:21, Jolly Shah wrote:
-> This patchset adds CCF compliant clock driver for ZynqMP.Clock driver queries 
-> supported clock information from firmware and regiters pll and output clocks with CCF.
-> 
-> This patch series is earlier reveiwed as part of FW patchset (https://patchwork.kernel.org/cover/10555405/). 
-> FW driver from that patchset is merged. This patchset contains only clock driver and is based on top of 
-> xilinx firmware patch set available in below tree:
-> https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=next/drivers
-> 
-> v6:
->  - Updated eemi return payload type to be u32 instead of le32 and Eemi ops in FW driver will be updated to take care of endianess
->  - Added Stephen's review tag
->  
-> v5:
->  - Added "Acked-by: Olof Johansson <olof@lixom.net>" for patches
->  
-> v4:
->  - Fixed minor review comments received for v3 patchset
->  
-> v3:
->  - Added check to pass only valid ioctls for ioctl eemi api
->  - Added eemi documentation including ioctl details
-> 
-> Jolly Shah (1):
->   drivers: clk: Add ZynqMP clock driver
-> 
-> Rajan Vaja (3):
->   Documentation: xilinx: Add documentation for eemi APIs
->   firmware: xilinx: Add zynqmp IOCTL API for device control
->   dt-bindings: clock: Add bindings for ZynqMP clock driver
-> 
->  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  53 ++
->  Documentation/xilinx/eemi.txt                      |  67 ++
->  drivers/clk/Kconfig                                |   1 +
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/zynqmp/Kconfig                         |  10 +
->  drivers/clk/zynqmp/Makefile                        |   4 +
->  drivers/clk/zynqmp/clk-gate-zynqmp.c               | 144 +++++
->  drivers/clk/zynqmp/clk-mux-zynqmp.c                | 141 ++++
->  drivers/clk/zynqmp/clk-zynqmp.h                    |  68 ++
->  drivers/clk/zynqmp/clkc.c                          | 716 +++++++++++++++++++++
->  drivers/clk/zynqmp/divider.c                       | 217 +++++++
->  drivers/clk/zynqmp/pll.c                           | 335 ++++++++++
->  drivers/firmware/xilinx/zynqmp.c                   |  42 ++
->  include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
->  include/linux/firmware/xlnx-zynqmp.h               |   5 +-
->  15 files changed, 1919 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/xilinx/eemi.txt
->  create mode 100644 drivers/clk/zynqmp/Kconfig
->  create mode 100644 drivers/clk/zynqmp/Makefile
->  create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
->  create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
->  create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
->  create mode 100644 drivers/clk/zynqmp/clkc.c
->  create mode 100644 drivers/clk/zynqmp/divider.c
->  create mode 100644 drivers/clk/zynqmp/pll.c
->  create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
-> 
+From: Dinh Nguyen <dinguyen@kernel.org>
 
-Applied all.
+Turn on these ARM and PL310 errata for SoCFPGA:
 
-Thanks,
-Michal
+ARM_ERRATA_754322
+ARM_ERRATA_764369
+ARM_ERRATA_775420
+
+PL310_ERRATA_588369
+PL310_ERRATA_727915
+PL310_ERRATA_753970
+PL310_ERRATA_769419
+
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+---
+
+ v2: 
+        - Remove fixes tag in commit log
+
+ arch/arm/mach-socfpga/Kconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 4adb901dd5eb..a04660918d71 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -11,6 +11,13 @@ menuconfig ARCH_SOCFPGA
+ 	select HAVE_ARM_TWD if SMP
+ 	select MFD_SYSCON
+ 	select PCI_DOMAINS if PCI
++	select ARM_ERRATA_754322
++	select ARM_ERRATA_764369 if SMP
++	select ARM_ERRATA_775420
++	select PL310_ERRATA_588369
++	select PL310_ERRATA_727915
++	select PL310_ERRATA_753970 if PL310
++	select PL310_ERRATA_769419
+ 
+ if ARCH_SOCFPGA
+ config SOCFPGA_SUSPEND
+-- 
+2.17.1
