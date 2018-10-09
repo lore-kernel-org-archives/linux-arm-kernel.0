@@ -1,76 +1,75 @@
-From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Tue,  9 Oct 2018 13:52:14 +0000 (UTC)
-Subject: [PATCH v3 21/24] powerpc/mm: Define platform default caches related
- flags
-In-Reply-To: <cover.1539092111.git.christophe.leroy@c-s.fr>
-References: <cover.1539092111.git.christophe.leroy@c-s.fr>
-Message-ID: <66ab295549a362f8b79921e2accd8e4fbe47f35f.1539092112.git.christophe.leroy@c-s.fr>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue,  9 Oct 2018 19:35:21 +0530
+Subject: [PATCH 5/6] arm64: dts: hisilicon: poplar: Standardize LED labels and
+ triggers
+In-Reply-To: <20181009140522.6492-1-manivannan.sadhasivam@linaro.org>
+References: <20181009140522.6492-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181009140522.6492-6-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cache related flags like _PAGE_COHERENT and _PAGE_WRITETHRU
-are defined on most platforms. The platforms not defining
-them don't define any alternative. So we can give them a NUL
-value directly for those platforms directly.
+For all 96Boards, the following standard is used for onboard LEDs.
 
-Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
-Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+device-name:green:user1  default-trigger: heartbeat
+device-name:green:user2  default-trigger: mmc0/disk-activity
+                                          (onboard-storage)
+device-name:green:user3  default-trigger: mmc1 (SD-card)
+device-name:green:user4  default-trigger: none, panic-indicator
+device-name:yellow:wlan  default-trigger: phy0tx
+device-name:blue:bt      default-trigger: hci0-power
+
+So lets adopt the same for Poplar, which is one of the 96Boards
+Enterprise edition platform.
+
+Due to absence of WLAN and BT support, corresponding LED nodes are not
+considered.
+
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/powerpc/include/asm/nohash/32/pte-40x.h |  3 +++
- arch/powerpc/include/asm/nohash/32/pte-8xx.h |  4 ++++
- arch/powerpc/include/asm/pte-common.h        | 11 -----------
- 3 files changed, 7 insertions(+), 11 deletions(-)
+ .../arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/nohash/32/pte-40x.h b/arch/powerpc/include/asm/nohash/32/pte-40x.h
-index ab043b3e9b99..7a8b3c94592f 100644
---- a/arch/powerpc/include/asm/nohash/32/pte-40x.h
-+++ b/arch/powerpc/include/asm/nohash/32/pte-40x.h
-@@ -53,6 +53,9 @@
- /* No page size encoding in the linux PTE */
- #define _PAGE_PSIZE		0
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+index d30f6eb8a5ee..f6f3e928a54e 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+@@ -35,30 +35,31 @@
+ 		compatible = "gpio-leds";
  
-+/* cache related flags non existing on 40x */
-+#define _PAGE_COHERENT	0
-+
- #define _PAGE_KERNEL_RO		0
- #define _PAGE_KERNEL_ROX	_PAGE_EXEC
- #define _PAGE_KERNEL_RW		(_PAGE_DIRTY | _PAGE_RW | _PAGE_HWWRITE)
-diff --git a/arch/powerpc/include/asm/nohash/32/pte-8xx.h b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
-index b899c3c877ac..2b4669b3badb 100644
---- a/arch/powerpc/include/asm/nohash/32/pte-8xx.h
-+++ b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
-@@ -46,6 +46,10 @@
- #define _PAGE_NA	0x0200	/* Supervisor NA, User no access */
- #define _PAGE_RO	0x0600	/* Supervisor RO, User no access */
+ 		user-led0 {
+-			label = "USER-LED0";
++			label = "hi3798cv200-poplar:green:user1";
+ 			gpios = <&gpio6 3 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "heartbeat";
+ 			default-state = "off";
+ 		};
  
-+/* cache related flags non existing on 8xx */
-+#define _PAGE_COHERENT	0
-+#define _PAGE_WRITETHRU	0
-+
- #define _PAGE_KERNEL_RO		(_PAGE_PRIVILEGED | _PAGE_RO)
- #define _PAGE_KERNEL_ROX	(_PAGE_PRIVILEGED | _PAGE_RO | _PAGE_EXEC)
- #define _PAGE_KERNEL_RW		(_PAGE_PRIVILEGED | _PAGE_DIRTY)
-diff --git a/arch/powerpc/include/asm/pte-common.h b/arch/powerpc/include/asm/pte-common.h
-index 1a2102f8b1e7..ff01368a175a 100644
---- a/arch/powerpc/include/asm/pte-common.h
-+++ b/arch/powerpc/include/asm/pte-common.h
-@@ -1,17 +1,6 @@
- /* SPDX-License-Identifier: GPL-2.0 */
- /* Included from asm/pgtable-*.h only ! */
+ 		user-led1 {
+-			label = "USER-LED1";
++			label = "hi3798cv200-poplar:green:user2";
+ 			gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "mmc0";
+ 			default-state = "off";
+ 		};
  
--/*
-- * Some bits are only used on some cpu families... Make sure that all
-- * the undefined gets a sensible default
-- */
--#ifndef _PAGE_COHERENT
--#define _PAGE_COHERENT	0
--#endif
--#ifndef _PAGE_WRITETHRU
--#define _PAGE_WRITETHRU	0
--#endif
--
- /* Location of the PFN in the PTE. Most 32-bit platforms use the same
-  * as _PAGE_SHIFT here (ie, naturally aligned).
-  * Platform who don't just pre-define the value so we don't override it here
+ 		user-led2 {
+-			label = "USER-LED2";
++			label = "hi3798cv200-poplar:green:user3";
+ 			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "none";
++			linux,default-trigger = "mmc1";
+ 			default-state = "off";
+ 		};
+ 
+ 		user-led3 {
+-			label = "USER-LED3";
++			label = "hi3798cv200-poplar:green:user4";
+ 			gpios = <&gpio10 6 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "cpu0";
++			linux,default-trigger = "none";
++			panic-indicator;
+ 			default-state = "off";
+ 		};
+ 	};
 -- 
-2.13.3
+2.17.1
