@@ -1,70 +1,51 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 9 Oct 2018 14:25:17 +0100
-Subject: [PATCH] arm64: mm: Use #ifdef for the __PAGETABLE_P?D_FOLDED
- defines
-In-Reply-To: <CAMuHMdUFzHUJk7dT9CqF1uCg3bPr-Mh6LWTj6RpdcXLPRQkFEw@mail.gmail.com>
-References: <20181005134916.12937-1-james.morse@arm.com>
- <CAMuHMdUFzHUJk7dT9CqF1uCg3bPr-Mh6LWTj6RpdcXLPRQkFEw@mail.gmail.com>
-Message-ID: <5eeebac5-b296-219d-f768-f81eaeec5498@arm.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Tue, 9 Oct 2018 15:46:06 +0200
+Subject: [PATCH v3 1/7] dt-bindings: stm32-dma: Add DMA/MDMA chaining
+ support bindings
+In-Reply-To: <20181009085757.GI2372@vkoul-mobl>
+References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
+ <1538139715-24406-2-git-send-email-pierre-yves.mordret@st.com>
+ <20181007145722.GY2372@vkoul-mobl>
+ <5d7a218c-9e96-3931-88ab-0b4dcb3ec4e5@st.com>
+ <20181009085757.GI2372@vkoul-mobl>
+Message-ID: <b6079edc-66df-90eb-7da1-74af4e2dcdd5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert!
 
-On 09/10/2018 13:37, Geert Uytterhoeven wrote:
-> On Fri, Oct 5, 2018 at 3:55 PM James Morse <james.morse@arm.com> wrote:
->> __is_defined(__PAGETABLE_P?D_FOLDED) doesn't quite work as intended
->> as these symbols are internal to asm-generic and aren't defined in the
->> way kconfig expects. This makes them always evaluate to false.
->> Switch to #ifdef.
 
-> This is now e9ed821be48600ea ("arm64: mm: Use #ifdef for the
-> __PAGETABLE_P?D_FOLDED defines") in arm64/for-next/core.
+On 10/09/2018 10:57 AM, Vinod wrote:
+> Hi Pierre,
 > 
-> If CONFIG_DEBUG_VIRTUAL=y, it prints a few times during boot on
-> several R-Car Gen3 platforms:
+> On 09-10-18, 09:18, Pierre Yves MORDRET wrote:
+> 
+>>>>  * DMA client
+>>>> @@ -68,7 +84,16 @@ channel: a phandle to the DMA controller plus the following four integer cells:
+>>>>  	0x1: 1/2 full FIFO
+>>>>  	0x2: 3/4 full FIFO
+>>>>  	0x3: full FIFO
+>>>> -
+>>>> + -bit 2: Intermediate M2M transfer from/to DDR to/from SRAM throughout MDMA
+>>>> +	0: MDMA not used to generate an intermediate M2M transfer
+>>>> +	1: MDMA used to generate an intermediate M2M transfer.
+>>>> + -bit 3-4: indicated SRAM Buffer size in (2^order)*PAGE_SIZE.
+>>>> +	PAGE_SIZE is given by Linux at 4KiB: include/asm-generic/page.h.
+>>>> +	Order is given by those 2 bits starting at 0.
+>>>> +	Valid only whether Intermediate M2M transfer is set.
+>>>
+>>> why do we need this as a property?
+>>
+>> In some UC, we need more than 4KiB in case of chaining for better performances.
+>> Chaining has to be enabled by client if performance is at sacks.
+> 
+> Okay if that is the case why is the user not taking care of this?
+> Creating DMA txn and chaining them up and starting the chain? Why would
+> dmaengine driver need to do that?
+> 
 
-Aha, I didn't test this with debug-virtual ... and the new __pa() to setup the
-fixmap for swapper is what is causing this:
-
->From arch/arm64/mm/mmu.c:
-| void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd)
-| {
-| 	pgd_t *fixmap_pgdp;
-|
-|	spin_lock(&swapper_pgdir_lock);
-|	fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
-|	WRITE_ONCE(*fixmap_pgdp, pgd);
-
-This patch is just exposing the problem on your configuration, its commit
-2330b7ca78350efcb ("arm64/mm: use fixmap to modify swapper_pg_dir") that missed
-this.
-
-We always know pgdp here will point within swapper_pg_dir, so I think its fair
-to switch this to the __pa_symbol() version. This fixes it for me:
---------------------------%<--------------------------
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 6f0e2edcc114..6deb836a102a 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -74,7 +74,7 @@ void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd)
-        pgd_t *fixmap_pgdp;
-
-        spin_lock(&swapper_pgdir_lock);
--       fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
-+       fixmap_pgdp = pgd_set_fixmap(__pa_symbol(pgdp));
-        WRITE_ONCE(*fixmap_pgdp, pgd);
-        /*
-         * We need dsb(ishst) here to ensure the page-table-walker sees
---------------------------%<--------------------------
-
-(which I will post shortly).
-
-Passing not-a-symbol-name to __pa_symbol() doesn't look nice, but lm_alias()
-would do this too. Manually calculating the offset in swapper_pg_dir is some
-logic that is already wrapped up in pgd_set_fixmap().
-
-
-Thanks!
-
-James
+User is using standard DMA API (single, sg or cyclic) and is agnostic on what is
+behind the scene(almost). As driver I just fulfill the request to transfer what
+he wants. My driver scatters transfer into SDRAM chunks defined by user.
+Unfortunately all transfer are not % the SDRAM size given in DT. This very last
+txn is to flush the last expected bytes.
+Whatever user set for chaining(bit 2) the DMA API remains the same at its side.
