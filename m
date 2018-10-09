@@ -1,42 +1,129 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 9 Oct 2018 14:27:57 +0530
-Subject: [PATCH v3 1/7] dt-bindings: stm32-dma: Add DMA/MDMA chaining
- support bindings
-In-Reply-To: <5d7a218c-9e96-3931-88ab-0b4dcb3ec4e5@st.com>
-References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
- <1538139715-24406-2-git-send-email-pierre-yves.mordret@st.com>
- <20181007145722.GY2372@vkoul-mobl>
- <5d7a218c-9e96-3931-88ab-0b4dcb3ec4e5@st.com>
-Message-ID: <20181009085757.GI2372@vkoul-mobl>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Oct 2018 02:04:54 -0700
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <a143edd3c0de2ba98b64e642b4384edf4323be2b.camel@upb.ro>
+References: <20180911225440.GL4185@dell> <20180912073355.GB2557@piout.net>
+ <20180912084143.GN4185@dell>
+ <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
+ <20180912105407.GR4185@dell> <20180912111757.GC2760@piout.net>
+ <20180912114352.GT4185@dell> <20180912121420.GE2760@piout.net>
+ <20180912131248.GA21544@dell>
+ <a143edd3c0de2ba98b64e642b4384edf4323be2b.camel@upb.ro>
+Message-ID: <20181009090454.GD4939@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pierre,
+On Wed, 12 Sep 2018, Radu Pirea wrote:
 
-On 09-10-18, 09:18, Pierre Yves MORDRET wrote:
-
-> >>  * DMA client
-> >> @@ -68,7 +84,16 @@ channel: a phandle to the DMA controller plus the following four integer cells:
-> >>  	0x1: 1/2 full FIFO
-> >>  	0x2: 3/4 full FIFO
-> >>  	0x3: full FIFO
-> >> -
-> >> + -bit 2: Intermediate M2M transfer from/to DDR to/from SRAM throughout MDMA
-> >> +	0: MDMA not used to generate an intermediate M2M transfer
-> >> +	1: MDMA used to generate an intermediate M2M transfer.
-> >> + -bit 3-4: indicated SRAM Buffer size in (2^order)*PAGE_SIZE.
-> >> +	PAGE_SIZE is given by Linux at 4KiB: include/asm-generic/page.h.
-> >> +	Order is given by those 2 bits starting at 0.
-> >> +	Valid only whether Intermediate M2M transfer is set.
+> On Wed, 2018-09-12 at 14:12 +0100, Lee Jones wrote:
+> > On Wed, 12 Sep 2018, Alexandre Belloni wrote:
 > > 
-> > why do we need this as a property?
+> > > On 12/09/2018 12:43:52+0100, Lee Jones wrote:
+> > > > > > But ... we can't have it both ways.  *Either* it's a true
+> > > > > > MFD, in
+> > > > > > which case it can/should have 2 separate compatible strings
+> > > > > > which can
+> > > > > > be specified directly from the DT.  *Or* it's not an MFD.  In
+> > > > > > the
+> > > > > > latter case, which I think we're all agreeing on (else we'd
+> > > > > > have 2
+> > > > > > compatible strings), MFD is not the place to handle this (my
+> > > > > > original
+> > > > > > point).
+> > > > > > 
+> > > > > 
+> > > > > If that is what bothers you, then let's move it out of mfd.
+> > > > 
+> > > > As I've already mentioned.  I don't just want it moved out of MFD
+> > > > and
+> > > > shoved somewhere else.  My aim is to fix this properly.
+> > > > 
+> > > 
+> > > If it is out of MFD, then I'm not sure why you would care too much
+> > > about
+> > > it as you won't be maintaining that code. And I still this what was
+> > > done
+> > > was correct but I'm open to test what you suggest.
+> > 
+> > I care for the kernel in general, not just the areas I'm responsible
+> > for.  I guess I'm just that kinda guy! ;)
 > 
-> In some UC, we need more than 4KiB in case of chaining for better performances.
-> Chaining has to be enabled by client if performance is at sacks.
+> Well, Lee, like you, I think this driver should not be a MFD driver,
+> but Alex has a good point of view. 
+> 
+> > 
+> > > > > > So ... this is a USART device which can do SPI, right?
+> > > > > > 
+> > > > > > My current thinking is that; as this is a USART device first
+> > > > > > &
+> > > > > > foremost, the USART should be probed in the first instance
+> > > > > > regardless,
+> > > > > > then if SPI mode is specified it (the USART driver) registers
+> > > > > > the SPI
+> > > > > > platform driver (as MFD does currently) and exits gracefully,
+> > > > > > allowing
+> > > > > > the SPI driver to take over.
+> > > > > > 
+> > > > > > Spanner in the works: is it physically possible to change the
+> > > > > > mode at
+> > > > > > run-time?  :s
+> > > > > 
+> > > > > Yes it is possible but on Linux that will not happen without
+> > > > > probing
+> > > > > the drivers again.
+> > > > 
+> > > > Not sure I understand what you mean.
+> > > 
+> > > I was just commenting on changing the mode at runtime.
+> > 
+> > Oh I see.  My question was relating to whether the H/W is physically
+> > capable of changing modes on-the-fly, rather than how Linux would
+> > handle that.  If this is something we'd wish to support, then it
+> > would
+> > have to be a single driver, which is why I was asking.  By separating
+> > the drivers this way, we are blocking that as a
+> > possibility.  Although
+> > I guess the OP has already thought about that and made the decision
+> > not to support it.
+> 
+> Is possible to change modes on-the-fly, but you have no reason to do
+> that. On the PCB you will have a SPI slave or a serial console :)
+> Anyway, the current form of the driver, and through this I want to say
+> "this ugly hack", allows the user to switch from serial to SPI mode by
+> adding only one property to the device tree node of USART. If the
+> driver were in his first form, a simple SPI driver, how you will make a
+> dtsi file for an IP like this? You will add two nodes for the same IP
+> in dtsi and will take care to enable correct node in dts?
+> I think this driver is only a tradeoff between having an ugly hack in
+> kernel or having an messy device tree.
+> 
+> > 
+> > > > I'm suggesting that you use the same platform_* interfaces MFD
+> > > > uses to
+> > > > register the SPI driver if SPI mode has been selected.  Only do
+> > > > so
+> > > > from the appropriate driver i.e. USART.
+> > > 
+> > > Yeah, I understood that but I didn't comment because I'm not sure
+> > > this
+> > > will work yet.
+> > 
+> > Other drivers already do this.
+> 
+> Can you give me an example please?
 
-Okay if that is the case why is the user not taking care of this?
-Creating DMA txn and chaining them up and starting the chain? Why would
-dmaengine driver need to do that?
+Sorry for the delay, I have been on vacation.
+
+Grep for 'platform_device_add' in drivers/
+
+> I am open to suggestions.
+> 
+> Sorry for that acked-by. There was a lot of "reviewed-by", "acked-by",
+> etc in a single version and I messed up :).
+> 
 
 -- 
-~Vinod
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
