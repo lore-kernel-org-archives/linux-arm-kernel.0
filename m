@@ -1,196 +1,283 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 9 Oct 2018 02:38:22 +0000
-Subject: [shawnguo:imx/drivers 9/10]
- drivers/firmware/imx/imx-scu.c:180:3-9: preceding lock on line 165 (fwd)
-In-Reply-To: <20181008140344.GQ3587@dragon>
-References: <alpine.DEB.2.20.1810081032450.2815@hadrien>
- <20181008140344.GQ3587@dragon>
-Message-ID: <AM0PR04MB4211AA92D6F2415D544714F080E70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Date: Tue, 9 Oct 2018 02:48:10 +0000
+Subject: [PATCH V4 2/2] firmware: imx: add SCU power domain driver
+In-Reply-To: <20181009005342.GX3587@dragon>
+References: <1538917807-1921-1-git-send-email-aisheng.dong@nxp.com>
+ <1538917807-1921-3-git-send-email-aisheng.dong@nxp.com>
+ <20181009005342.GX3587@dragon>
+Message-ID: <AM0PR04MB4211DA481116D36C864CEDE980E70@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, October 8, 2018 10:04 PM
-> To: Julia Lawall <julia.lawall@lip6.fr>
-> Cc: A.s. Dong <aisheng.dong@nxp.com>; Sascha Hauer
-> <s.hauer@pengutronix.de>; linux-arm-kernel at lists.infradead.org;
-> kbuild-all at 01.org
-> Subject: Re: [shawnguo:imx/drivers 9/10]
-> drivers/firmware/imx/imx-scu.c:180:3-9: preceding lock on line 165 (fwd)
+> Sent: Tuesday, October 9, 2018 8:54 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; ulf.hansson at linaro.org;
+> dongas86 at gmail.com; khilman at kernel.org; linux-pm at vger.kernel.org;
+> rjw at rjwysocki.net; dl-linux-imx <linux-imx@nxp.com>;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; Sascha
+> Hauer <s.hauer@pengutronix.de>
+> Subject: Re: [PATCH V4 2/2] firmware: imx: add SCU power domain driver
 > 
-> Hi Julia,
-> 
-> On Mon, Oct 08, 2018 at 10:33:31AM +0200, Julia Lawall wrote:
-> > Hello,
+> On Sun, Oct 07, 2018 at 09:10:07PM +0800, Dong Aisheng wrote:
+> > Some i.MX SoCs contain a system controller that is responsible for
+> > controlling the state of the IPs that are present. Communication
+> > between the host processor running an OS and the system controller
+> > happens through a SCU protocol. This patch adds SCU protocol based
+> > power domains drivers.
 > >
-> > It looks like an unlock is needed before line 180.
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Cc: Kevin Hilman <khilman@kernel.org>
+> > Cc: linux-pm at vger.kernel.org
+> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > 
-> Ah, yes.  I just appended the following change to the original commit.
+> @Sascha, are you okay with this?
 > 
 
-Shawn,
-Thanks for the change.
+Yes, it would be good if we can have Sasha's sign offs.
 
-Julia,
-Thanks for the report.
+> > ---
+> > ChangeLog:
+> > v3->v4:
+> >  * update firmware headfile patch from include/soc/imx to
+> >    include/linux/firmware/imx
+> > v2->v3:
+> >  * name of structures/enums updated with imx_sc prefix
+> > v1->v2:
+> >  * move into drivers/firmware/imx
+> >  * Implement sc_pm_set_resource_power_mode() API in the driver instead
+> >    of call it via SCU API according to Sascha's suggestion
+> > ---
+> >  drivers/firmware/imx/Kconfig  |   6 ++
+> >  drivers/firmware/imx/Makefile |   3 +-
+> >  drivers/firmware/imx/scu-pd.c | 167
+> > ++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 175 insertions(+), 1 deletion(-)  create mode 100644
+> > drivers/firmware/imx/scu-pd.c
+> >
+> > diff --git a/drivers/firmware/imx/Kconfig
+> > b/drivers/firmware/imx/Kconfig index b170c28..6a7a7c2 100644
+> > --- a/drivers/firmware/imx/Kconfig
+> > +++ b/drivers/firmware/imx/Kconfig
+> > @@ -9,3 +9,9 @@ config IMX_SCU
+> >
+> >  	  This driver manages the IPC interface between host CPU and the
+> >  	  SCU firmware running on M4.
+> > +
+> > +config IMX_SCU_PD
+> > +	bool "IMX SCU Power Domain driver"
+> > +	depends on IMX_SCU
+> > +	help
+> > +	  The System Controller Firmware (SCFW) based power domain driver.
+> > diff --git a/drivers/firmware/imx/Makefile
+> > b/drivers/firmware/imx/Makefile index 0ac04df..1b2e15b 100644
+> > --- a/drivers/firmware/imx/Makefile
+> > +++ b/drivers/firmware/imx/Makefile
+> > @@ -1,2 +1,3 @@
+> >  # SPDX-License-Identifier: GPL-2.0
+> > -obj-$(CONFIG_IMX_SCU)	+= imx-scu.o misc.o
+> > +obj-$(CONFIG_IMX_SCU)		+= imx-scu.o misc.o
+> > +obj-$(CONFIG_IMX_SCU_PD)	+= scu-pd.o
+> > diff --git a/drivers/firmware/imx/scu-pd.c
+> > b/drivers/firmware/imx/scu-pd.c new file mode 100644 index
+> > 0000000..af5b9e4
+> > --- /dev/null
+> > +++ b/drivers/firmware/imx/scu-pd.c
+> > @@ -0,0 +1,167 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017~2018 NXP
+> > + *	Dong Aisheng <aisheng.dong@nxp.com>
+> > + *
+> > + * Implementation of the SCU based Power Domains  */
+> > +
+> > +#define pr_fmt(fmt) "scu_pd: " fmt
+> > +
+> > +#include <linux/firmware/imx/sci.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/pm.h>
+> > +#include <linux/pm_domain.h>
+> > +#include <linux/slab.h>
+> > +
+> > +struct imx_sc_pm_domain {
+> > +	struct generic_pm_domain pd;
+> > +	u32 rsrc_id;
+> > +};
+> > +
+> > +static struct imx_sc_ipc *pm_ipc_handle;
+> > +
+> > +/* SCU Power Mode Protocol definition */ struct
+> > +imx_sc_msg_req_set_resource_power_mode {
+> > +	struct imx_sc_rpc_msg hdr;
+> > +	u16 resource;
+> > +	u8 mode;
+> > +} __packed;
+> > +
+> > +static int imx_sc_pd_power(struct generic_pm_domain *domain, bool
+> > +power_on) {
+> > +	struct imx_sc_msg_req_set_resource_power_mode msg;
+> > +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
+> > +	struct imx_sc_pm_domain *pd;
+> > +	int ret;
+> > +
+> > +	pd = container_of(domain, struct imx_sc_pm_domain, pd);
+> > +
+> > +	hdr->ver = IMX_SC_RPC_VERSION;
+> > +	hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
+> > +	hdr->func = (uint8_t)IMX_SC_PM_FUNC_SET_RESOURCE_POWER_MODE;
+> > +	hdr->size = 2;
+> > +
+> > +	msg.resource = pd->rsrc_id;
+> > +	msg.mode = power_on ? IMX_SC_PM_PW_MODE_ON :
+> IMX_SC_PM_PW_MODE_LP;
+> > +
+> > +	ret = imx_scu_call_rpc(pm_ipc_handle, &msg, true);
+> > +	if (ret)
+> > +		pr_err("failed to power %s resource %d ret %d\n",
+> > +			power_on ? "up" : "off", pd->rsrc_id, ret);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int imx_sc_pd_power_on(struct generic_pm_domain *domain) {
+> > +	return imx_sc_pd_power(domain, true); }
+> > +
+> > +static int imx_sc_pd_power_off(struct generic_pm_domain *domain) {
+> > +	return imx_sc_pd_power(domain, false); }
+> > +
+> > +static struct generic_pm_domain *imx_sc_pm_add_one_domain(
+> > +					struct device_node *np,
+> > +					struct generic_pm_domain *genpd_parent) {
+> > +	struct imx_sc_pm_domain *imx_sc_pd;
+> > +	u32 rsrc_id;
+> > +	int ret;
+> > +
+> > +	imx_sc_pd = kzalloc(sizeof(*imx_sc_pd), GFP_KERNEL);
+> > +	if (!imx_sc_pd)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	if (!of_property_read_u32(np, "reg", &rsrc_id)) {
+> > +		if (rsrc_id > IMX_SC_R_LAST) {
+> > +			pr_warn("%pOF: invalid rsrc id %d found", np, rsrc_id);
+> > +			ret = -EINVAL;
+> > +			goto err;
+> > +		}
+> > +		imx_sc_pd->rsrc_id = rsrc_id;
+> > +	} else {
+> > +		imx_sc_pd->rsrc_id = IMX_SC_R_LAST;
+> > +	}
+> > +
+> > +	if (imx_sc_pd->rsrc_id != IMX_SC_R_LAST) {
+> > +		imx_sc_pd->pd.power_off = imx_sc_pd_power_off;
+> > +		imx_sc_pd->pd.power_on = imx_sc_pd_power_on;
+> > +	}
+> > +
+> > +	imx_sc_pd->pd.name = np->name;
+> > +
+> > +	ret = pm_genpd_init(&imx_sc_pd->pd, NULL, true);
+> > +	if (ret < 0)
+> > +		goto err;
+> > +
+> > +	if (genpd_parent) {
+> > +		ret = pm_genpd_add_subdomain(genpd_parent, &imx_sc_pd->pd);
+> > +		if (ret)
+> > +			goto err;
+> > +	}
+> > +
+> > +	ret = of_genpd_add_provider_simple(np, &imx_sc_pd->pd);
+> > +	if (!ret)
+> > +		return &imx_sc_pd->pd;
+> > +
+> > +	pm_genpd_remove_subdomain(genpd_parent, &imx_sc_pd->pd);
+> > +
+> > +err:
+> > +	pr_warn("failed to add PM domain %pOF: %d\n", np, ret);
+> > +	kfree(imx_sc_pd);
+> > +	return ERR_PTR(ret);
+> > +}
+> > +
+> > +static void imx_sc_pm_add_pm_domains(struct device_node *parent,
+> > +				     struct generic_pm_domain *genpd_parent) {
+> > +	struct generic_pm_domain *pd;
+> > +	struct device_node *np;
+> > +
+> > +	for_each_child_of_node(parent, np) {
+> > +		pd = imx_sc_pm_add_one_domain(np, genpd_parent);
+> > +		if (!IS_ERR(pd))
+> > +			imx_sc_pm_add_pm_domains(np, pd);
+> > +	}
+> > +}
+> > +
+> > +static int imx_sc_pd_probe(struct platform_device *pdev) {
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	int ret;
+> > +
+> > +	ret = imx_scu_get_handle(&pm_ipc_handle);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	imx_sc_pm_add_pm_domains(np, NULL);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id imx_sc_pd_match[] = {
+> > +	{ .compatible = "fsl,scu-pd", },
+> 
+> Has the compatible been documented?  We used to encode a soc name in the
+> compatible to specify the programming model of particular hardware block.
+> Is this power domain block generic enough with no need of doing so?
+> 
+
+Yes, it's a generic binding and has been documented in SCU binding doc.
+See:
+https://www.spinics.net/lists/arm-kernel/msg680738.html
 
 Regards
 Dong Aisheng
 
-> Thanks for the report.
-> 
 > Shawn
 > 
-> 
-> diff --git a/drivers/firmware/imx/imx-scu.c b/drivers/firmware/imx/imx-scu.c
-> index 06c9b8e01a8c..2bb1a19c413f 100644
-> --- a/drivers/firmware/imx/imx-scu.c
-> +++ b/drivers/firmware/imx/imx-scu.c
-> @@ -176,6 +176,7 @@ int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void
-> *msg, bool have_resp)
->                 if (!wait_for_completion_timeout(&sc_ipc->done,
->                                                  MAX_RX_TIMEOUT))
-> {
->                         dev_err(sc_ipc->dev, "RPC send msg timeout\n");
-> +                       mutex_unlock(&sc_ipc->lock);
->                         return -ETIMEDOUT;
->                 }
-> 
-> 
-> 
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +static struct platform_driver imx_sc_pd_driver = {
+> > +	.driver = {
+> > +		.name = "imx-scu-pd",
+> > +		.of_match_table = imx_sc_pd_match,
+> > +	},
+> > +	.probe = imx_sc_pd_probe,
+> > +};
+> > +builtin_platform_driver(imx_sc_pd_driver);
+> > +
+> > +MODULE_AUTHOR("Dong Aisheng <aisheng.dong@nxp.com>");
+> > +MODULE_DESCRIPTION("IMX SCU Power Domain driver");
+> > +MODULE_LICENSE("GPL v2");
+> > --
+> > 2.7.4
 > >
-> > julia
 > >
-> > ---------- Forwarded message ----------
-> > Date: Mon, 8 Oct 2018 15:25:21 +0800
-> > From: kbuild test robot <lkp@intel.com>
-> > To: kbuild at 01.org
-> > Cc: Julia Lawall <julia.lawall@lip6.fr>
-> > Subject: [shawnguo:imx/drivers 9/10]
-> drivers/firmware/imx/imx-scu.c:180:3-9:
-> >     preceding lock on line 165
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
 > >
-> > CC: kbuild-all at 01.org
-> > CC: linux-arm-kernel at lists.infradead.org
-> > TO: Dong Aisheng <aisheng.dong@nxp.com>
-> > CC: Shawn Guo <shawnguo@kernel.org>
-> > CC: Sascha Hauer <s.hauer@pengutronix.de>
+> s.infradead.org%2Fmailman%2Flistinfo%2Flinux-arm-kernel&amp;data=02%7C
 > >
-> > tree:
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgit.ke
-> rnel.org%2Fpub%2Fscm%2Flinux%2Fkernel%2Fgit%2Fshawnguo%2Flinux.git&
-> amp;data=02%7C01%7Caisheng.dong%40nxp.com%7Cab375197b905451892f
-> e08d62d26ea99%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C63
-> 6746042526127632&amp;sdata=TPqf6Nii5H4qap9aq7kAq3dHcU03FFdpISVY
-> NVNl6QU%3D&amp;reserved=0 imx/drivers
-> > head:   a8b96789a795af1127f722c3b1cd243ea16270ae
-> > commit: d41a5a155f7b716941583cab7db703a2e4c6172c [9/10] firmware:
-> imx:
-> > add SCU firmware driver support
-> > :::::: branch date: 8 days ago
-> > :::::: commit date: 8 days ago
+> 01%7Caisheng.dong%40nxp.com%7Ce7cc7fda44ad4f62bc3d08d62d81c3e2%
+> 7C686ea
 > >
-> > >> drivers/firmware/imx/imx-scu.c:180:3-9: preceding lock on line 165
-> >
-> > #
-> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgit
-> > .kernel.org%2Fpub%2Fscm%2Flinux%2Fkernel%2Fgit%2Fshawnguo%2Flinux.
-> git%
-> >
-> 2Fcommit%2F%3Fid%3Dd41a5a155f7b716941583cab7db703a2e4c6172c&a
-> mp;data=0
-> >
-> 2%7C01%7Caisheng.dong%40nxp.com%7Cab375197b905451892fe08d62d26
-> ea99%7C6
-> >
-> 86ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636746042526137637&
-> amp;sdata
-> > =A7MgLV5IgT68DrG85ejuPjiXNxhn2ILojs4PXtQOKWQ%3D&amp;reserved=0
-> > git remote add shawnguo
-> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgit
-> > .kernel.org%2Fpub%2Fscm%2Flinux%2Fkernel%2Fgit%2Fshawnguo%2Flinux.
-> git&
-> >
-> amp;data=02%7C01%7Caisheng.dong%40nxp.com%7Cab375197b905451892f
-> e08d62d
-> >
-> 26ea99%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636746042
-> 526137637
-> >
-> &amp;sdata=hCoJSx3HbDh3FVc4qgE3MTN0AFqgqkAemhn%2FEhMpMJs%3D
-> &amp;reserv
-> > ed=0
-> > git remote update shawnguo
-> > git checkout d41a5a155f7b716941583cab7db703a2e4c6172c
-> > vim +180 drivers/firmware/imx/imx-scu.c
-> >
-> > d41a5a15 Dong Aisheng 2018-09-30  153
-> > d41a5a15 Dong Aisheng 2018-09-30  154  /*
-> > d41a5a15 Dong Aisheng 2018-09-30  155   * RPC command/response
-> > d41a5a15 Dong Aisheng 2018-09-30  156   */
-> > d41a5a15 Dong Aisheng 2018-09-30  157  int imx_scu_call_rpc(struct
-> > imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
-> > d41a5a15 Dong Aisheng 2018-09-30  158  {
-> > d41a5a15 Dong Aisheng 2018-09-30  159  	struct imx_sc_rpc_msg *hdr;
-> > d41a5a15 Dong Aisheng 2018-09-30  160  	int ret;
-> > d41a5a15 Dong Aisheng 2018-09-30  161
-> > d41a5a15 Dong Aisheng 2018-09-30  162  	if (WARN_ON(!sc_ipc
-> || !msg))
-> > d41a5a15 Dong Aisheng 2018-09-30  163  		return -EINVAL;
-> > d41a5a15 Dong Aisheng 2018-09-30  164
-> > d41a5a15 Dong Aisheng 2018-09-30 @165  	mutex_lock(&sc_ipc->lock);
-> > d41a5a15 Dong Aisheng 2018-09-30  166
-> 	reinit_completion(&sc_ipc->done);
-> > d41a5a15 Dong Aisheng 2018-09-30  167
-> > d41a5a15 Dong Aisheng 2018-09-30  168  	sc_ipc->msg = msg;
-> > d41a5a15 Dong Aisheng 2018-09-30  169  	sc_ipc->count = 0;
-> > d41a5a15 Dong Aisheng 2018-09-30  170  	ret =
-> imx_scu_ipc_write(sc_ipc, msg);
-> > d41a5a15 Dong Aisheng 2018-09-30  171  	if (ret < 0) {
-> > d41a5a15 Dong Aisheng 2018-09-30  172  		dev_err(sc_ipc->dev,
-> "RPC send msg failed: %d\n", ret);
-> > d41a5a15 Dong Aisheng 2018-09-30  173  		goto out;
-> > d41a5a15 Dong Aisheng 2018-09-30  174  	}
-> > d41a5a15 Dong Aisheng 2018-09-30  175
-> > d41a5a15 Dong Aisheng 2018-09-30  176  	if (have_resp) {
-> > d41a5a15 Dong Aisheng 2018-09-30  177  		if
-> (!wait_for_completion_timeout(&sc_ipc->done,
-> > d41a5a15 Dong Aisheng 2018-09-30  178
-> MAX_RX_TIMEOUT)) {
-> > d41a5a15 Dong Aisheng 2018-09-30  179  			dev_err(sc_ipc->dev,
-> "RPC send msg timeout\n");
-> > d41a5a15 Dong Aisheng 2018-09-30 @180  			return
-> -ETIMEDOUT;
-> > d41a5a15 Dong Aisheng 2018-09-30  181  		}
-> > d41a5a15 Dong Aisheng 2018-09-30  182
-> > d41a5a15 Dong Aisheng 2018-09-30  183  		/* response status is
-> stored in hdr->func field */
-> > d41a5a15 Dong Aisheng 2018-09-30  184  		hdr = msg;
-> > d41a5a15 Dong Aisheng 2018-09-30  185  		ret = hdr->func;
-> > d41a5a15 Dong Aisheng 2018-09-30  186  	}
-> > d41a5a15 Dong Aisheng 2018-09-30  187
-> > d41a5a15 Dong Aisheng 2018-09-30  188  out:
-> > d41a5a15 Dong Aisheng 2018-09-30  189
-> 	mutex_unlock(&sc_ipc->lock);
-> > d41a5a15 Dong Aisheng 2018-09-30  190
-> > d41a5a15 Dong Aisheng 2018-09-30  191  	dev_dbg(sc_ipc->dev, "RPC
-> SVC done\n");
-> > d41a5a15 Dong Aisheng 2018-09-30  192
-> > d41a5a15 Dong Aisheng 2018-09-30  193  	return
-> imx_sc_to_linux_errno(ret);
-> > d41a5a15 Dong Aisheng 2018-09-30  194  }
-> > d41a5a15 Dong Aisheng 2018-09-30  195
-> > EXPORT_SYMBOL(imx_scu_call_rpc);
-> > d41a5a15 Dong Aisheng 2018-09-30  196
-> >
-> > ---
-> > 0-DAY kernel test infrastructure                Open Source Technology
-> Center
-> >
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flists.0
-> 1.org%2Fpipermail%2Fkbuild-all&amp;data=02%7C01%7Caisheng.dong%40nx
-> p.com%7Cab375197b905451892fe08d62d26ea99%7C686ea1d3bc2b4c6fa92
-> cd99c5c301635%7C0%7C0%7C636746042526137637&amp;sdata=kFIkXanllJ
-> YfAie3xzsWvMcaylyTAbYpwYvUP23N5jA%3D&amp;reserved=0
-> Intel Corporation
+> 1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636746432705451877&amp;
+> sdata=30j
+> > 5I%2Fek2U5vujNu2Yzj1Wbsh0BvbxriRFcXUjDOeg4%3D&amp;reserved=0
