@@ -1,57 +1,154 @@
-From: imirkin@alum.mit.edu (Ilia Mirkin)
-Date: Tue, 9 Oct 2018 13:56:04 -0400
-Subject: [PATCH v2 15/29] drm/bridge/synopsys: dw-hdmi: Enable workaround
- for v2.12a
-In-Reply-To: <3616158.EzHeIcd69b@avalon>
-References: <20181007093905.11253-1-jernej.skrabec@siol.net>
- <20181007093905.11253-16-jernej.skrabec@siol.net> <3616158.EzHeIcd69b@avalon>
-Message-ID: <CAKb7Uvgmv4-t0g=b-Xsimn9AiRL1L4sQ51vu5xMTFKNdDC9bLw@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 9 Oct 2018 18:58:59 +0100
+Subject: [RFC PATCH 2/2] ACPI / PPTT: cacheinfo: Label caches based on
+ fw_token
+In-Reply-To: <a68abfd2-1e28-d9e7-919a-8b3133db4d20@arm.com>
+References: <20181005150235.13846-1-james.morse@arm.com>
+ <20181005150235.13846-3-james.morse@arm.com>
+ <a68abfd2-1e28-d9e7-919a-8b3133db4d20@arm.com>
+Message-ID: <10e15b8d-c0c2-b73a-de31-f87ae0d86469@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2018 at 1:40 PM Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->
-> Hi Jernej,
->
-> Thank you for the patch.
->
-> On Sunday, 7 October 2018 12:38:51 EEST Jernej Skrabec wrote:
-> > It turns out that even new DW HDMI controllers exhibits same magenta
-> > line issues as older versions.
-> >
-> > Enable workaround for v2.12a.
->
-> This doesn't affect the platforms I maintain, so I can't really test this, but
-> I'm wondering whether there could be other platforms using a v2.12a DW HDMI
-> that wouldn't need the workaround.
->
-> My platforms use a previous version, namely v2.01a. The workaround for that
-> version has been enabled by
->
-> commit 9c305eb442f3b371fc722ade827bbf673514123e
-> Author: Neil Armstrong <narmstrong@baylibre.com>
-> Date:   Fri Feb 23 12:44:37 2018 +0100
->
->     drm: bridge: dw-hdmi: Fix overflow workaround for Amlogic Meson GX SoCs
->
-> I haven't paid too much attention to the patch back then, and have now double-
-> checked the HDMI output on R-Car Gen3. Enabling the workaround doesn't cause
-> any regression, and reverting the commit doesn't cause any issue either. I
-> thus wonder whether we shouldn't enable the workaround with count = 1 in the
-> default case instead of adding new IP core versions to the list. It would be
-> nice if someone from Synopsys could comment on this.
+Hi Jeremy,
 
-I hope this comment isn't *incredibly* off-topic, but we encountered a
-similar issue with NVIDIA (and I believe AMD) hardware a while back,
-related to HDMI. This was due to infoframes not being sent, but
-(perhaps) HDMI Audio being enabled.
+On 09/10/2018 17:45, Jeremy Linton wrote:
+> On 10/05/2018 10:02 AM, James Morse wrote:
+>> The resctrl ABI requires caches to have a unique id. This number must
+>> be unique across all caches at this level, but doesn't need to be
+>> contiguous. (there may be gaps, it may not start at 0).
+>> See Documentation/x86/intel_rdt_ui.txt::Cache IDs
+>>
+>> We want a value that is the same over reboots, and should be the same
+>> on identical hardware, even if the PPTT is generated in a different
+>> order. The hardware doesn't give us any indication of which caches are
+>> shared, so this information must come from firmware tables.
+>>
+>> Starting with a cacheinfo's fw_token, we walk the table to find all
+>> CPUs that share this cpu_node (and thus cache), and take the lowest
+>> physical id to use as the id for the cache. On arm64 this value
+>> corresponds to the MPIDR.
+>>
+>> This is only done for unified caches, as instruction/data caches would
+>> generate the same id using this scheme.
 
-This was a single vertical(!) line. It was described as "purple", but
-not sure that's distinguishable from "magenta" by most people. [ Fixed
-by a522946174 on nouveau, sample bug report
-https://bugs.freedesktop.org/show_bug.cgi?id=79912 ]
+>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+>> index d1e26cb599bf..9478f8c28158 100644
+>> --- a/drivers/acpi/pptt.c
+>> +++ b/drivers/acpi/pptt.c
+>> @@ -341,6 +341,84 @@ static struct acpi_pptt_cache
+>> *acpi_find_cache_node(struct acpi_table_header *ta
+>> ? /* total number of attributes checked by the properties code */
+>> ? #define PPTT_CHECKED_ATTRIBUTES 4
+>> ? +/**
+>> + * acpi_pptt_min_physid_from_cpu_node() - Recursivly find @min_physid for all
+>> + * leaf CPUs below @cpu_node.
+>> + * @table_hdr:??? Pointer to the head of the PPTT table
+>> + * @cpu_node:??? The point in the toplogy to start the walk
+>> + * @min_physid:??? The min_physid to update with leaf CPUs.
+>> + */
+>> +void acpi_pptt_min_physid_from_cpu_node(struct acpi_table_header *table_hdr,
+>> +??????????????????? struct acpi_pptt_processor *cpu_node,
+>> +??????????????????? phys_cpuid_t *min_physid)
+>> +{
+>> +??? bool leaf = true;
+>> +??? u32 acpi_processor_id;
+>> +??? phys_cpuid_t cpu_node_phys_id;
+>> +??? struct acpi_subtable_header *iter;
+>> +??? struct acpi_pptt_processor *iter_node;
+>> +??? u32 target_node = ACPI_PTR_DIFF(cpu_node, table_hdr);
+>> +??? u32 proc_sz = sizeof(struct acpi_pptt_processor *);
+>> +??? unsigned long table_end = (unsigned long)table_hdr + table_hdr->length;
+>> +
+>> +??? /*
+>> +???? * Walk the PPTT, looking for nodes that reference cpu_node
+>> +???? * as parent.
+>> +???? */
+>> +??? iter = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
+>> +???????????????? sizeof(struct acpi_table_pptt));
+>> +
+>> +??? while ((unsigned long)iter + proc_sz < table_end) {
+>> +??????? iter_node = (struct acpi_pptt_processor *)iter;
+>> +
+>> +??????? if (iter->type == ACPI_PPTT_TYPE_PROCESSOR &&
+>> +??????????? iter_node->parent == target_node) {
+>> +??????????? leaf = false;
+>> +??????????? acpi_pptt_min_physid_from_cpu_node(table_hdr, iter_node,
+>> +?????????????????????????????? min_physid);
+>> +??????? }
+>> +
+>> +??????? if (iter->length == 0)
+>> +??????????? return;
+>> +??????? iter = ACPI_ADD_PTR(struct acpi_subtable_header, iter,
+>> +??????????????????? iter->length);
+>> +??? }
+>> +
+>> +??? if (leaf && cpu_node->flags & ACPI_PPTT_ACPI_PROCESSOR_ID_VALID) {
+>> +??????? acpi_processor_id = cpu_node->acpi_processor_id;
+>> +??????? cpu_node_phys_id = acpi_id_to_phys_cpuid(acpi_processor_id);
+>> +??????? *min_physid = min(*min_physid, cpu_node_phys_id);
+>> +??? }
+>> +}
+> 
+> Tho me, is seems a reliable way to acquire a stable id.
+> 
+> My only hangup here is with the recursion (which was avoided elsewhere in this
+> code despite considerable simplification in a couple places). In a reasonable
+> table the tree depth should be quite limited (and not contain any branch loops)
+> but it seems a needless risk. How much worse is the non-recursive version?
 
-Cheers,
+I haven't tried, this was just to get the discussion about the cache ids going.
 
-  -ilia
+The neatest way I can think of would be to find each cpu, then walk up the
+parent pointers to see if this node is on the path. This avoids allocating
+memory to hold the stuff we haven't done yet when walking down/around.
+
+
+> Also, the first version of the PPTT spec can be read that
+> ACPI_PPTT_ACPI_PROCESSOR_ID_VALID should _not_ be set on leaf nodes. So IMHO a
+> better check is just whether the leaf's processor_id is valid in the MADT.
+> Hopefully this flag becomes more reliable in time...
+
+It can be set for a non-leaf entry, I assumed it would always be set for a leaf.
+Is anyone doing this with a PPTT table?
+
+
+>> +static void acpi_pptt_label_cache(struct cacheinfo *this_leaf)
+>> +{
+>> +??? acpi_status status;
+>> +??? struct acpi_table_header *table;
+>> +??? struct acpi_pptt_processor *cpu_node;
+>> +??? phys_cpuid_t min_physid = PHYS_CPUID_INVALID;
+>> +
+>> +??? /* Affinity based IDs for non-unified caches would not be unique */
+>> +??? if (this_leaf->type != CACHE_TYPE_UNIFIED)
+>> +??????? return;
+>> +
+>> +??? if (!this_leaf->fw_token)
+>> +??????? return;
+>> +??? cpu_node = this_leaf->fw_token;
+>> +
+>> +??? status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
+>> +??? if (ACPI_FAILURE(status))
+>> +??????? return;
+>> +
+>> +??? acpi_pptt_min_physid_from_cpu_node(table, cpu_node, &min_physid);
+>> +??? acpi_put_table(table);
+>> +
+>> +??? WARN_ON_ONCE(min_physid == PHYS_CPUID_INVALID);
+>> +
+>> +??? this_leaf->id = ARCH_PHYSID_TO_U32(min_physid);
+>> +??? this_leaf->attributes |= CACHE_ID;
+>> +}
+> 
+> To me its seems a little odd to be acpi_get_table()ing inside the PPTT parse
+> routines because we lost the reference via the call to
+> update_cache_properties(). Rather if this routine were called from
+> cache_setup_acpi_cpu() the table could be passed in.
+
+Makes sense. This was just the last point the type could be set.
+
+
+Thanks,
+
+James
