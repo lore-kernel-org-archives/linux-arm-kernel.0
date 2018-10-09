@@ -1,79 +1,72 @@
-From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Tue,  9 Oct 2018 13:28:37 +0200
-Subject: [PATCH] ARM: debug: enable UART1 for socfpga Cyclone5
-Message-ID: <20181009112837.2517-1-peron.clem@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 9 Oct 2018 13:29:49 +0200
+Subject: [PATCH v6 0/4] drivers: clk: Add ZynqMP clock driver support
+In-Reply-To: <1539022906-18073-1-git-send-email-jollys@xilinx.com>
+References: <1539022906-18073-1-git-send-email-jollys@xilinx.com>
+Message-ID: <65353e3c-035b-30ee-f93c-041885e112b6@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cyclone5 and Arria10 doesn't have the same memory map for UART1.
+On 8.10.2018 20:21, Jolly Shah wrote:
+> This patchset adds CCF compliant clock driver for ZynqMP.Clock driver queries 
+> supported clock information from firmware and regiters pll and output clocks with CCF.
+> 
+> This patch series is earlier reveiwed as part of FW patchset (https://patchwork.kernel.org/cover/10555405/). 
+> FW driver from that patchset is merged. This patchset contains only clock driver and is based on top of 
+> xilinx firmware patch set available in below tree:
+> https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=next/drivers
+> 
+> v6:
+>  - Updated eemi return payload type to be u32 instead of le32 and Eemi ops in FW driver will be updated to take care of endianess
+>  - Added Stephen's review tag
+>  
+> v5:
+>  - Added "Acked-by: Olof Johansson <olof@lixom.net>" for patches
+>  
+> v4:
+>  - Fixed minor review comments received for v3 patchset
+>  
+> v3:
+>  - Added check to pass only valid ioctls for ioctl eemi api
+>  - Added eemi documentation including ioctl details
+> 
+> Jolly Shah (1):
+>   drivers: clk: Add ZynqMP clock driver
+> 
+> Rajan Vaja (3):
+>   Documentation: xilinx: Add documentation for eemi APIs
+>   firmware: xilinx: Add zynqmp IOCTL API for device control
+>   dt-bindings: clock: Add bindings for ZynqMP clock driver
+> 
+>  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  53 ++
+>  Documentation/xilinx/eemi.txt                      |  67 ++
+>  drivers/clk/Kconfig                                |   1 +
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/zynqmp/Kconfig                         |  10 +
+>  drivers/clk/zynqmp/Makefile                        |   4 +
+>  drivers/clk/zynqmp/clk-gate-zynqmp.c               | 144 +++++
+>  drivers/clk/zynqmp/clk-mux-zynqmp.c                | 141 ++++
+>  drivers/clk/zynqmp/clk-zynqmp.h                    |  68 ++
+>  drivers/clk/zynqmp/clkc.c                          | 716 +++++++++++++++++++++
+>  drivers/clk/zynqmp/divider.c                       | 217 +++++++
+>  drivers/clk/zynqmp/pll.c                           | 335 ++++++++++
+>  drivers/firmware/xilinx/zynqmp.c                   |  42 ++
+>  include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
+>  include/linux/firmware/xlnx-zynqmp.h               |   5 +-
+>  15 files changed, 1919 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/xilinx/eemi.txt
+>  create mode 100644 drivers/clk/zynqmp/Kconfig
+>  create mode 100644 drivers/clk/zynqmp/Makefile
+>  create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
+>  create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
+>  create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
+>  create mode 100644 drivers/clk/zynqmp/clkc.c
+>  create mode 100644 drivers/clk/zynqmp/divider.c
+>  create mode 100644 drivers/clk/zynqmp/pll.c
+>  create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
+> 
 
-Split the SOCFPGA_UART1 into 2 options to allow debugging on UART1 for Cylone5.
+Applied all.
 
-Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
----
- arch/arm/Kconfig.debug | 23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f6fcb8a79889..25ebdcefe403 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1079,14 +1079,21 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on SOCFPGA(Cyclone 5 and Arria 5) based platforms.
- 
--	config DEBUG_SOCFPGA_UART1
-+	config DEBUG_SOCFPGA_ARRIA10_UART1
- 		depends on ARCH_SOCFPGA
--		bool "Use SOCFPGA UART1 for low-level debug"
-+		bool "Use SOCFPGA Arria10 UART1 for low-level debug"
- 		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want kernel low-level debugging support
- 		  on SOCFPGA(Arria 10) based platforms.
- 
-+	config DEBUG_SOCFPGA_CYCLONE5_UART1
-+		depends on ARCH_SOCFPGA
-+		bool "Use SOCFPGA Cyclone 5 UART1 for low-level debug"
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on SOCFPGA(Cyclone 5 and Arria 5) based platforms.
- 
- 	config DEBUG_SUN9I_UART0
- 		bool "Kernel low-level debugging messages via sun9i UART0"
-@@ -1647,7 +1654,8 @@ config DEBUG_UART_PHYS
- 	default 0xfe800000 if ARCH_IOP32X
- 	default 0xff690000 if DEBUG_RK32_UART2
- 	default 0xffc02000 if DEBUG_SOCFPGA_UART0
--	default 0xffc02100 if DEBUG_SOCFPGA_UART1
-+	default 0xffc02100 if DEBUG_SOCFPGA_ARRIA10_UART1
-+	default 0xffc03000 if DEBUG_SOCFPGA_CYCLONE5_UART1
- 	default 0xffd82340 if ARCH_IOP13XX
- 	default 0xffe40000 if DEBUG_RCAR_GEN1_SCIF0
- 	default 0xffe42000 if DEBUG_RCAR_GEN1_SCIF2
-@@ -1754,7 +1762,8 @@ config DEBUG_UART_VIRT
- 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
- 	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
- 	default 0xfec02000 if DEBUG_SOCFPGA_UART0
--	default 0xfec02100 if DEBUG_SOCFPGA_UART1
-+	default 0xfec02100 if DEBUG_SOCFPGA_ARRIA10_UART1
-+	default 0xfec03000 if DEBUG_SOCFPGA_CYCLONE5_UART1
- 	default 0xfec12000 if (DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE) && ARCH_MVEBU
- 	default 0xfec12100 if DEBUG_MVEBU_UART1_ALTERNATE
- 	default 0xfec10000 if DEBUG_SIRFATLAS7_UART0
-@@ -1803,9 +1812,9 @@ config DEBUG_UART_8250_WORD
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	depends on DEBUG_UART_8250_SHIFT >= 2
- 	default y if DEBUG_PICOXCELL_UART || \
--		DEBUG_SOCFPGA_UART0 || DEBUG_SOCFPGA_UART1 || \
--		DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
--		DEBUG_ALPINE_UART0 || \
-+		DEBUG_SOCFPGA_UART0 || DEBUG_SOCFPGA_ARRIA10_UART1 || \
-+		DEBUG_SOCFPGA_CYCLONE5_UART1 || DEBUG_KEYSTONE_UART0 || \
-+		DEBUG_KEYSTONE_UART1 || DEBUG_ALPINE_UART0 || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_BCM_IPROC_UART3 || \
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
--- 
-2.17.1
+Thanks,
+Michal
