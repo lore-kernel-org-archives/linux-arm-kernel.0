@@ -1,33 +1,38 @@
 From: joel@joelfernandes.org (Joel Fernandes (Google))
-Date: Mon,  8 Oct 2018 22:47:50 -0700
-Subject: [PATCH 5/7] dmaengine: stm32-dma: fix DMA IRQ status handling
+Date: Mon,  8 Oct 2018 22:47:52 -0700
+Subject: [PATCH 7/7] dmaengine: stm32-dma: properly mask irq bits
 In-Reply-To: <20181009054752.145978-1-joel@joelfernandes.org>
 References: <20181009054752.145978-1-joel@joelfernandes.org>
-Message-ID: <20181009054752.145978-6-joel@joelfernandes.org>
+Message-ID: <20181009054752.145978-8-joel@joelfernandes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pierre Yves MORDRET <pierre-yves.mordret@st.com>
 
-Update the way Transfer Complete and Half Transfer Complete status are
-acknowledge. Even if HTI is not enabled its status is shown when reading
-registers, driver has to clear it gently and not raise an error.
+A single register of the controller holds the information for four dma
+channels.
+The functions stm32_dma_irq_status() don't mask the relevant bits after
+the shift, thus adjacent channel's status is also reported in the returned
+value.
+Fixed by masking the value before returning it.
+
+Similarly, the function stm32_dma_irq_clear() don't mask the input value
+before shifting it, thus an incorrect input value could disable the
+interrupts of adjacent channels.
+Fixed by masking the input value before using it.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
 Signed-off-by: Vinod Koul <vinod.koul@intel.com>
 ---
- drivers/dma/stm32-dma.c | 29 +++++++++++++++++++++++++----
- 1 file changed, 25 insertions(+), 4 deletions(-)
+ drivers/dma/stm32-dma.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index 21ad359a5a59..b40486454a2c 100644
+index 05a2974cd2c0..8c5807362a25 100644
 --- a/drivers/dma/stm32-dma.c
 +++ b/drivers/dma/stm32-dma.c
-@@ -34,9 +34,14 @@
- #define STM32_DMA_LIFCR			0x0008 /* DMA Low Int Flag Clear Reg */
- #define STM32_DMA_HIFCR			0x000c /* DMA High Int Flag Clear Reg */
- #define STM32_DMA_TCI			BIT(5) /* Transfer Complete Interrupt */
-+#define STM32_DMA_HTI			BIT(4) /* Half Transfer Interrupt */
+@@ -38,6 +38,10 @@
  #define STM32_DMA_TEI			BIT(3) /* Transfer Error Interrupt */
  #define STM32_DMA_DMEI			BIT(2) /* Direct Mode Error Interrupt */
  #define STM32_DMA_FEI			BIT(0) /* FIFO Error Interrupt */
@@ -38,39 +43,22 @@ index 21ad359a5a59..b40486454a2c 100644
  
  /* DMA Stream x Configuration Register */
  #define STM32_DMA_SCR(x)		(0x0010 + 0x18 * (x)) /* x = 0..7 */
-@@ -643,13 +648,29 @@ static irqreturn_t stm32_dma_chan_irq(int irq, void *devid)
- 	status = stm32_dma_irq_status(chan);
- 	scr = stm32_dma_read(dmadev, STM32_DMA_SCR(chan->id));
+@@ -405,7 +409,7 @@ static u32 stm32_dma_irq_status(struct stm32_dma_chan *chan)
  
--	if ((status & STM32_DMA_TCI) && (scr & STM32_DMA_SCR_TCIE)) {
-+	if (status & STM32_DMA_TCI) {
- 		stm32_dma_irq_clear(chan, STM32_DMA_TCI);
--		stm32_dma_handle_chan_done(chan);
--
--	} else {
-+		if (scr & STM32_DMA_SCR_TCIE)
-+			stm32_dma_handle_chan_done(chan);
-+		status &= ~STM32_DMA_TCI;
-+	}
-+	if (status & STM32_DMA_HTI) {
-+		stm32_dma_irq_clear(chan, STM32_DMA_HTI);
-+		status &= ~STM32_DMA_HTI;
-+	}
-+	if (status & STM32_DMA_FEI) {
-+		stm32_dma_irq_clear(chan, STM32_DMA_FEI);
-+		status &= ~STM32_DMA_FEI;
-+		if (!(scr & STM32_DMA_SCR_EN))
-+			dev_err(chan2dev(chan), "FIFO Error\n");
-+		else
-+			dev_dbg(chan2dev(chan), "FIFO over/underrun\n");
-+	}
-+	if (status) {
- 		stm32_dma_irq_clear(chan, status);
- 		dev_err(chan2dev(chan), "DMA error: status=0x%08x\n", status);
-+		if (!(scr & STM32_DMA_SCR_EN))
-+			dev_err(chan2dev(chan), "chan disabled by HW\n");
- 	}
+ 	flags = dma_isr >> (((chan->id & 2) << 3) | ((chan->id & 1) * 6));
  
- 	spin_unlock(&chan->vchan.lock);
+-	return flags;
++	return flags & STM32_DMA_MASKI;
+ }
+ 
+ static void stm32_dma_irq_clear(struct stm32_dma_chan *chan, u32 flags)
+@@ -420,6 +424,7 @@ static void stm32_dma_irq_clear(struct stm32_dma_chan *chan, u32 flags)
+ 	 * If (ch % 4) is 2 or 3, left shift the mask by 16 bits.
+ 	 * If (ch % 4) is 1 or 3, additionally left shift the mask by 6 bits.
+ 	 */
++	flags &= STM32_DMA_MASKI;
+ 	dma_ifcr = flags << (((chan->id & 2) << 3) | ((chan->id & 1) * 6));
+ 
+ 	if (chan->id & 4)
 -- 
 2.19.0.605.g01d371f741-goog
