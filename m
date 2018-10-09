@@ -1,264 +1,146 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 9 Oct 2018 11:44:28 -0600
-Subject: [PATCH v3 2/2] treewide: use bus_find_device_by_fwnode
-In-Reply-To: <1539080245-25818-2-git-send-email-svellattu@mvista.com>
-References: <1539080245-25818-1-git-send-email-svellattu@mvista.com>
- <1539080245-25818-2-git-send-email-svellattu@mvista.com>
-Message-ID: <20181009174428.GB2182@xps15>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Tue, 9 Oct 2018 10:47:15 -0700
+Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <20181009003733.GN32578@linaro.org>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-7-takahiro.akashi@linaro.org>
+ <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
+ <20181005030849.GK32578@linaro.org>
+ <CAL_Jsq+wXU8PCyJhaTKE7ezZhiD0KARUFXVzQBk0ZptEEK7ubQ@mail.gmail.com>
+ <20181009003733.GN32578@linaro.org>
+Message-ID: <c65e42ce-1a98-7680-3a09-1f737eb26763@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2018 at 03:47:25PM +0530, Silesh C V wrote:
-> Use bus_find_device_by_fwnode helper to find the device having a
-> specific firmware node on a bus.
+On 10/08/18 17:37, AKASHI, Takahiro wrote:
+> On Fri, Oct 05, 2018 at 08:23:57AM -0500, Rob Herring wrote:
+>> On Thu, Oct 4, 2018 at 10:07 PM AKASHI, Takahiro
+>> <takahiro.akashi@linaro.org> wrote:
+>>>
+>>> Rob,
+>>>
+>>> # I haven't replied to this comment yet.
+>>>
+>>> On Fri, Sep 28, 2018 at 08:44:42AM -0500, Rob Herring wrote:
+>>>> +David Gibson
+>>>>
+>>>> On Fri, Sep 28, 2018 at 1:48 AM AKASHI Takahiro
+>>>> <takahiro.akashi@linaro.org> wrote:
+>>>>>
+>>>>> These functions will be used later to handle kexec-specific properties
+>>>>> in arm64's kexec_file implementation.
+>>>>>
+>>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>>> Cc: Frank Rowand <frowand.list@gmail.com>
+>>>>> Cc: devicetree at vger.kernel.org
+>>>>> ---
+>>>>>  drivers/of/fdt.c       | 56 ++++++++++++++++++++++++++++++++++++++++++
+>>>>>  include/linux/of_fdt.h |  4 +++
+>>>>>  2 files changed, 60 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>>>>> index 800ad252cf9c..c65c31562ccb 100644
+>>>>> --- a/drivers/of/fdt.c
+>>>>> +++ b/drivers/of/fdt.c
+>>>>> @@ -25,6 +25,7 @@
+>>>>>  #include <linux/debugfs.h>
+>>>>>  #include <linux/serial_core.h>
+>>>>>  #include <linux/sysfs.h>
+>>>>> +#include <linux/types.h>
+>>>>>
+>>>>>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+>>>>>  #include <asm/page.h>
+>>>>> @@ -1323,3 +1324,58 @@ late_initcall(of_fdt_raw_init);
+>>>>>  #endif
+>>>>>
+>>>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>>>> +
+>>>>> +#define FDT_ALIGN(x, a)        (((x) + (a) - 1) & ~((a) - 1))
+>>>>> +#define FDT_TAGALIGN(x)        (FDT_ALIGN((x), FDT_TAGSIZE))
+>>>>> +
+>>>>> +int fdt_prop_len(const char *prop_name, int len)
+>>>>> +{
+>>>>> +       return (strlen(prop_name) + 1) +
+>>>>> +               sizeof(struct fdt_property) +
+>>>>> +               FDT_TAGALIGN(len);
+>>>>
+>>>> Looks like you are using this to calculate how much space you need to
+>>>> allocate in addition to the current DTB for a couple of new or
+>>>> replaced properties. I'm not sure that this calculation is completely
+>>>> accurate. And it is strange there doesn't seem to be any libfdt
+>>>> function for this already. It would be simpler to just add some fixed
+>>>> additional amount.
+>>>>
+>>>> Maybe David G has comments on this?
+>>>>
+>>>>> +}
+>>>>> +
+>>>>
+>>>> The rest of this should go in drivers/of/fdt_address.c. Ultimately, it
+>>>> should go into libfdt, but I'm fine with having it in the kernel for
+>>>> now.
+>>>
+>>> I'd like to have this function in the kernel for now.
+>>>
+>>>>> +static void fill_property(void *buf, u64 val64, int cells)
+>>>>> +{
+>>>>> +       __be32 val32;
+>>>>> +
+>>>>> +       while (cells) {
+>>>>> +               val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+>>>>> +               memcpy(buf, &val32, sizeof(val32));
+>>>>> +               buf += sizeof(val32);
+>>>>
+>>>> This is kind of hard to read. I would copy u-boot's fdt_pack_reg function.
+>>>
+>>> Are you sure?
+>>> I originally implemented this function in a similar way that fdt_pack_reg()
+>>> was, but, you suggested, in your past comment[1], that we'd be better to
+>>> have of_read_number()-like implementation.
+>>>
+>>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/579118.html
+>>
+>> Yeah, you're right. Plus, I'm not sure the u-boot one would work for
+>> unaligned accesses with armv5 and earlier h/w.
+>>
+>> My only comment then is I think you can drop the U32_MAX masking.
 > 
-> Signed-off-by: Silesh C V <svellattu@mvista.com>
-> Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
-> Changes since v2:
-> 	- Add Reviewed-by tags
+> Okay, then I will leave this function, yet renaming it to
+> cpu64_to_fdt_cells() after Frank's comment.
+
+I have second guessed myself and do not like the name I suggested
+because what the function really does is either cpu32 to be32 or
+cpu64 to be64.
+
+I agree with Rob that readability is important here.  Instead of
+having a fill_property() function, how about having inline code,
+something like (untested even for thinkos):
+
+	prop = buf;
+
+	if (addr_cells == 1) {
+		*(__be32 *)prop = cpu32_to_be32(addr);
+		prop += 4;
+	} else {
+		*(__be64 *)prop = cpu64_to_be64(addr);
+		prop += 8;
+	}
+
+	if (size_cells == 1)
+		*(__be32 *)prop = cpu32_to_be32(size);
+	else
+		*(__be64 *)prop = cpu64_to_be64(size);
+
+You might want to also give Rob a chance to bike shed on this
+suggestion.
+
+-Frank
+
 > 
->  drivers/hwtracing/coresight/of_coresight.c         | 14 ++++----------
->  drivers/i2c/i2c-core-of.c                          |  9 ++-------
->  drivers/infiniband/hw/hns/hns_roce_hw_v1.c         |  8 +-------
->  drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |  8 +-------
->  drivers/nvmem/core.c                               |  7 +------
->  drivers/of/of_mdio.c                               |  8 +-------
->  drivers/of/platform.c                              |  7 +------
->  drivers/spi/spi.c                                  | 10 +++-------
->  8 files changed, 14 insertions(+), 57 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index 6880bee..8193b50 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -17,12 +17,6 @@
->  #include <linux/cpumask.h>
->  #include <asm/smp_plat.h>
->  
-> -
-> -static int of_dev_node_match(struct device *dev, void *data)
-> -{
-> -	return dev->of_node == data;
-> -}
-> -
->  static struct device *
->  of_coresight_get_endpoint_device(struct device_node *endpoint)
->  {
-> @@ -32,8 +26,8 @@ static int of_dev_node_match(struct device *dev, void *data)
->  	 * If we have a non-configurable replicator, it will be found on the
->  	 * platform bus.
->  	 */
-> -	dev = bus_find_device(&platform_bus_type, NULL,
-> -			      endpoint, of_dev_node_match);
-> +	dev = bus_find_device_by_fwnode(&platform_bus_type, NULL,
-> +					&endpoint->fwnode);
->  	if (dev)
->  		return dev;
->  
-> @@ -41,8 +35,8 @@ static int of_dev_node_match(struct device *dev, void *data)
->  	 * We have a configurable component - circle through the AMBA bus
->  	 * looking for the device that matches the endpoint node.
->  	 */
-> -	return bus_find_device(&amba_bustype, NULL,
-> -			       endpoint, of_dev_node_match);
-> +	return bus_find_device_by_fwnode(&amba_bustype, NULL,
-> +					&endpoint->fwnode);
-
-This doesn't apply on linux-next.  This late in the cycle you may want to rebase
-your work on that tree.
-
-Otherwise and for the coresight part:
-
-Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
-Mathieu
-
->  }
->  
->  static void of_coresight_get_ports(const struct device_node *node,
-> diff --git a/drivers/i2c/i2c-core-of.c b/drivers/i2c/i2c-core-of.c
-> index 6cb7ad6..2b8ef8d 100644
-> --- a/drivers/i2c/i2c-core-of.c
-> +++ b/drivers/i2c/i2c-core-of.c
-> @@ -116,18 +116,13 @@ void of_i2c_register_devices(struct i2c_adapter *adap)
->  	of_node_put(bus);
->  }
->  
-> -static int of_dev_node_match(struct device *dev, void *data)
-> -{
-> -	return dev->of_node == data;
-> -}
-> -
->  /* must call put_device() when done with returned i2c_client device */
->  struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
->  {
->  	struct device *dev;
->  	struct i2c_client *client;
->  
-> -	dev = bus_find_device(&i2c_bus_type, NULL, node, of_dev_node_match);
-> +	dev = bus_find_device_by_fwnode(&i2c_bus_type, NULL, &node->fwnode);
->  	if (!dev)
->  		return NULL;
->  
-> @@ -145,7 +140,7 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
->  	struct device *dev;
->  	struct i2c_adapter *adapter;
->  
-> -	dev = bus_find_device(&i2c_bus_type, NULL, node, of_dev_node_match);
-> +	dev = bus_find_device_by_fwnode(&i2c_bus_type, NULL, &node->fwnode);
->  	if (!dev)
->  		return NULL;
->  
-> diff --git a/drivers/infiniband/hw/hns/hns_roce_hw_v1.c b/drivers/infiniband/hw/hns/hns_roce_hw_v1.c
-> index 081aa91..b0d418e 100644
-> --- a/drivers/infiniband/hw/hns/hns_roce_hw_v1.c
-> +++ b/drivers/infiniband/hw/hns/hns_roce_hw_v1.c
-> @@ -4832,19 +4832,13 @@ static void hns_roce_v1_cleanup_eq_table(struct hns_roce_dev *hr_dev)
->  };
->  MODULE_DEVICE_TABLE(acpi, hns_roce_acpi_match);
->  
-> -static int hns_roce_node_match(struct device *dev, void *fwnode)
-> -{
-> -	return dev->fwnode == fwnode;
-> -}
-> -
->  static struct
->  platform_device *hns_roce_find_pdev(struct fwnode_handle *fwnode)
->  {
->  	struct device *dev;
->  
->  	/* get the 'device' corresponding to the matching 'fwnode' */
-> -	dev = bus_find_device(&platform_bus_type, NULL,
-> -			      fwnode, hns_roce_node_match);
-> +	dev = bus_find_device_by_fwnode(&platform_bus_type, NULL, fwnode);
->  	/* get the platform device */
->  	return dev ? to_platform_device(dev) : NULL;
->  }
-> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-> index 16294cd..d5d7c88 100644
-> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-> @@ -758,17 +758,11 @@ struct dsaf_misc_op *hns_misc_op_get(struct dsaf_device *dsaf_dev)
->  	return (void *)misc_op;
->  }
->  
-> -static int hns_dsaf_dev_match(struct device *dev, void *fwnode)
-> -{
-> -	return dev->fwnode == fwnode;
-> -}
-> -
->  struct
->  platform_device *hns_dsaf_find_platform_device(struct fwnode_handle *fwnode)
->  {
->  	struct device *dev;
->  
-> -	dev = bus_find_device(&platform_bus_type, NULL,
-> -			      fwnode, hns_dsaf_dev_match);
-> +	dev = bus_find_device_by_fwnode(&platform_bus_type, NULL, fwnode);
->  	return dev ? to_platform_device(dev) : NULL;
->  }
-> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-> index aa16578..b62f236 100644
-> --- a/drivers/nvmem/core.c
-> +++ b/drivers/nvmem/core.c
-> @@ -262,11 +262,6 @@ static void nvmem_release(struct device *dev)
->  	.name		= "nvmem",
->  };
->  
-> -static int of_nvmem_match(struct device *dev, void *nvmem_np)
-> -{
-> -	return dev->of_node == nvmem_np;
-> -}
-> -
->  static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
->  {
->  	struct device *d;
-> @@ -274,7 +269,7 @@ static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
->  	if (!nvmem_np)
->  		return NULL;
->  
-> -	d = bus_find_device(&nvmem_bus_type, NULL, nvmem_np, of_nvmem_match);
-> +	d = bus_find_device_by_fwnode(&nvmem_bus_type, NULL, &nvmem_np->fwnode);
->  
->  	if (!d)
->  		return NULL;
-> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-> index e92391d..2906a6b 100644
-> --- a/drivers/of/of_mdio.c
-> +++ b/drivers/of/of_mdio.c
-> @@ -282,12 +282,6 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
->  }
->  EXPORT_SYMBOL(of_mdiobus_register);
->  
-> -/* Helper function for of_phy_find_device */
-> -static int of_phy_match(struct device *dev, void *phy_np)
-> -{
-> -	return dev->of_node == phy_np;
-> -}
-> -
->  /**
->   * of_phy_find_device - Give a PHY node, find the phy_device
->   * @phy_np: Pointer to the phy's device tree node
-> @@ -303,7 +297,7 @@ struct phy_device *of_phy_find_device(struct device_node *phy_np)
->  	if (!phy_np)
->  		return NULL;
->  
-> -	d = bus_find_device(&mdio_bus_type, NULL, phy_np, of_phy_match);
-> +	d = bus_find_device_by_fwnode(&mdio_bus_type, NULL, &phy_np->fwnode);
->  	if (d) {
->  		mdiodev = to_mdio_device(d);
->  		if (mdiodev->flags & MDIO_DEVICE_FLAG_PHY)
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 6c59673..36dd58e 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -37,11 +37,6 @@
->  	{} /* Empty terminated list */
->  };
->  
-> -static int of_dev_node_match(struct device *dev, void *data)
-> -{
-> -	return dev->of_node == data;
-> -}
-> -
->  /**
->   * of_find_device_by_node - Find the platform_device associated with a node
->   * @np: Pointer to device tree node
-> @@ -55,7 +50,7 @@ struct platform_device *of_find_device_by_node(struct device_node *np)
->  {
->  	struct device *dev;
->  
-> -	dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
-> +	dev = bus_find_device_by_fwnode(&platform_bus_type, NULL, &np->fwnode);
->  	return dev ? to_platform_device(dev) : NULL;
->  }
->  EXPORT_SYMBOL(of_find_device_by_node);
-> diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-> index 9da0bc5..97128a5 100644
-> --- a/drivers/spi/spi.c
-> +++ b/drivers/spi/spi.c
-> @@ -3324,16 +3324,12 @@ int spi_write_then_read(struct spi_device *spi,
->  /*-------------------------------------------------------------------------*/
->  
->  #if IS_ENABLED(CONFIG_OF_DYNAMIC)
-> -static int __spi_of_device_match(struct device *dev, void *data)
-> -{
-> -	return dev->of_node == data;
-> -}
-> -
->  /* must call put_device() when done with returned spi_device device */
->  static struct spi_device *of_find_spi_device_by_node(struct device_node *node)
->  {
-> -	struct device *dev = bus_find_device(&spi_bus_type, NULL, node,
-> -						__spi_of_device_match);
-> +	struct device *dev = bus_find_device_by_fwnode(&spi_bus_type, NULL,
-> +							&node->fwnode);
-> +
->  	return dev ? to_spi_device(dev) : NULL;
->  }
->  
-> -- 
-> 1.9.1
+> Thanks,
+> -Takahiro Akashi
+>>
+>> Rob
 > 
