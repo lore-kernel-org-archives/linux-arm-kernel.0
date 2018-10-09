@@ -1,39 +1,66 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 10 Oct 2018 00:56:25 +0800
-Subject: [stericsson:ux500-mcde 9/9] mcde_dsi.c:(.init.text+0x0): multiple
- definition of `init_module'
-Message-ID: <201810100018.ozbwAlaQ%fengguang.wu@intel.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 9 Oct 2018 18:22:52 +0100
+Subject: [PATCH v2 2/2] arm/arm64: KVM: enable 32 bits kvm vcpu events
+ support
+In-Reply-To: <1539002088-21215-3-git-send-email-gengdongjiu@huawei.com>
+References: <1539002088-21215-1-git-send-email-gengdongjiu@huawei.com>
+ <1539002088-21215-3-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <3e6a7a5f-3ff9-b7db-b1f6-87a8fdf5c20c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-mcde
-head:   d74bab74ec7c93c05538d1d600dba240e00798e2
-commit: d74bab74ec7c93c05538d1d600dba240e00798e2 [9/9] drm/mcde: Add new driver for ST-Ericsson MCDE
-config: sparc64-allmodconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d74bab74ec7c93c05538d1d600dba240e00798e2
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
-All errors (new ones prefixed by >>):
 
-   drivers/gpu/drm/mcde/mcde_dsi.o: In function `mcde_dsi_driver_init':
->> mcde_dsi.c:(.init.text+0x0): multiple definition of `init_module'
-   drivers/gpu/drm/mcde/mcde_drv.o:mcde_drv.c:(.init.text+0x0): first defined here
-   drivers/gpu/drm/mcde/mcde_dsi.o: In function `mcde_dsi_driver_exit':
->> mcde_dsi.c:(.exit.text+0x0): multiple definition of `cleanup_module'
-   drivers/gpu/drm/mcde/mcde_drv.o:mcde_drv.c:(.exit.text+0x0): first defined here
+On 08/10/18 13:34, Dongjiu Geng wrote:
+> The commit 539aee0edb9f ("KVM: arm64: Share the parts of
+> get/set events useful to 32bit") shares the get/set events
+> helper for arm64 and arm32, it is better also share the check
+> for vcpu events capability to enable 32 bit kvm vcpu events
+> support.
+> 
+> User space will check whether KVM supports vcpu events through
+> KVM_CAP_VCPU_EVENTS IOCTL.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 55262 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181010/ba6c73e7/attachment-0001.gz>
+nit: User space will check whether KVM supports vcpu events by checking
+the KVM_CAP_VCPU_EVENTS extension.
+
+> 
+> Cc: James Morse <james.morse@arm.com>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+
+Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
+
+> ---
+> For the 32 bits kvm migration, it needs to enable the vcpu events,
+> this patch will enable it. The user space QEMU patch is here:
+> https://patchwork.ozlabs.org/patch/975615/
+> ---
+>   arch/arm64/kvm/reset.c | 1 -
+>   virt/kvm/arm/arm.c     | 1 +
+>   2 files changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index fd37c53..e50245e 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -82,7 +82,6 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>   		break;
+>   	case KVM_CAP_SET_GUEST_DEBUG:
+>   	case KVM_CAP_VCPU_ATTRIBUTES:
+> -	case KVM_CAP_VCPU_EVENTS:
+>   		r = 1;
+>   		break;
+>   	default:
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 40e79ea..64e5d97 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -212,6 +212,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>   	case KVM_CAP_READONLY_MEM:
+>   	case KVM_CAP_MP_STATE:
+>   	case KVM_CAP_IMMEDIATE_EXIT:
+> +	case KVM_CAP_VCPU_EVENTS:
+>   		r = 1;
+>   		break;
+>   	case KVM_CAP_ARM_SET_DEVICE_ADDR:
+> 
