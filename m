@@ -1,54 +1,65 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 9 Oct 2018 13:08:26 -0500
-Subject: [PATCH] ARM: dts: socfgpa: remove ethernet aliases from dtsi
-In-Reply-To: <20181008105641.11505-1-s.trumtrar@pengutronix.de>
-References: <20181008105641.11505-1-s.trumtrar@pengutronix.de>
-Message-ID: <1a9a28a4-1fb0-9c0e-9722-3b9e51cccde6@kernel.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 9 Oct 2018 13:14:02 -0500
+Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
+In-Reply-To: <20181009115713.GE6248@arm.com>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-14-robh@kernel.org>
+ <20181009115713.GE6248@arm.com>
+Message-ID: <CAL_JsqLeG3WUa2peOWFGUoMuonWaWJoU-7A6d8cqXp-_e3B3XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 9, 2018 at 6:57 AM Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Rob,
+>
+> On Fri, Oct 05, 2018 at 11:58:25AM -0500, Rob Herring wrote:
+> > Convert ARM PMU binding to DT schema format using json-schema.
+> >
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
+> >  .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
+> >  2 files changed, 96 insertions(+), 70 deletions(-)
+> >  delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
+> >  create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
+>
+> [...]
+>
+> > -- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+> > -               interrupt (PPI) then 1 interrupt should be specified.
+>
+> [...]
+>
+> > +  interrupts:
+> > +    oneOf:
+> > +      - maxItems: 1
+> > +      - minItems: 2
+> > +        maxItems: 8
+> > +        description: 1 interrupt per core.
+> > +
+> > +  interrupts-extended:
+> > +    $ref: '#/properties/interrupts'
+>
+> This seems like a semantic different between the two representations, or am
+> I missing something here? Specifically, both the introduction of
+> interrupts-extended and also dropping any mention of using a single per-cpu
+> interrupt (the single combined case is no longer support by Linux; not sure
+> if you want to keep it in the binding).
 
+'interrupts-extended' was implied before as it is always supported and
+outside the scope of the binding. But now it is needed to validate
+bindings. There must be some use of it and that's why I added it.
+However, thinking some more about this, I think it may be better to
+have the tools add this in automatically whenever we have an
+interrupts property.
 
-On 10/08/2018 05:56 AM, Steffen Trumtrar wrote:
-> Not all boards use two ethernet devices and/or use them in different
-> order. As almost all in-tree boards already define their own ethernet
-> aliases, remove them from the dtsi and add the aliases to the two boards,
-> that are missing their own definition.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi                    | 2 --
->  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 4 ++++
->  arch/arm/boot/dts/socfpga_cyclone5_socrates.dts   | 4 ++++
->  3 files changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index b38f8c240558..068aefa15391 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -22,8 +22,6 @@
->  	#size-cells = <1>;
->  
->  	aliases {
-> -		ethernet0 = &gmac0;
-> -		ethernet1 = &gmac1;
->  		serial0 = &uart0;
->  		serial1 = &uart1;
->  		timer0 = &timer0;
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> index b280e6494193..48821bcd3eb0 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+I guess the single interrupt case is less obvious now with no
+description (it's the first list item of 'oneOf'). The schema If the
+single interrupt is not supported, then we can drop it here.
 
-This file was renamed to socfpga_cyclone5_de0_nano_soc.dts.
-
-error: arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts: No such file
-or directory
-error: patch failed: arch/arm/boot/dts/socfpga_cyclone5_socrates.dts:21
-error: arch/arm/boot/dts/socfpga_cyclone5_socrates.dts: patch does not apply
-
-
-Do you mind if I rebase this patch based on the updated arm-soc tree?
-
-Thanks,
-Dinh
+Rob
