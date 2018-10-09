@@ -1,85 +1,114 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 9 Oct 2018 08:25:39 +0800
-Subject: [PATCH v4 2/5] dt-bindings: spi: add binding file for NXP
- FlexSPI controller
-In-Reply-To: <1538997103-11152-3-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1538997103-11152-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1538997103-11152-3-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <20181009002537.GV3587@dragon>
+From: takahiro.akashi@linaro.org (AKASHI, Takahiro)
+Date: Tue, 9 Oct 2018 09:37:37 +0900
+Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <CAL_Jsq+wXU8PCyJhaTKE7ezZhiD0KARUFXVzQBk0ZptEEK7ubQ@mail.gmail.com>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-7-takahiro.akashi@linaro.org>
+ <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
+ <20181005030849.GK32578@linaro.org>
+ <CAL_Jsq+wXU8PCyJhaTKE7ezZhiD0KARUFXVzQBk0ZptEEK7ubQ@mail.gmail.com>
+Message-ID: <20181009003733.GN32578@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2018 at 04:41:40PM +0530, Yogesh Gaur wrote:
-> Add binding file for NXP FlexSPI controller
+On Fri, Oct 05, 2018 at 08:23:57AM -0500, Rob Herring wrote:
+> On Thu, Oct 4, 2018 at 10:07 PM AKASHI, Takahiro
+> <takahiro.akashi@linaro.org> wrote:
+> >
+> > Rob,
+> >
+> > # I haven't replied to this comment yet.
+> >
+> > On Fri, Sep 28, 2018 at 08:44:42AM -0500, Rob Herring wrote:
+> > > +David Gibson
+> > >
+> > > On Fri, Sep 28, 2018 at 1:48 AM AKASHI Takahiro
+> > > <takahiro.akashi@linaro.org> wrote:
+> > > >
+> > > > These functions will be used later to handle kexec-specific properties
+> > > > in arm64's kexec_file implementation.
+> > > >
+> > > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > > Cc: Frank Rowand <frowand.list@gmail.com>
+> > > > Cc: devicetree at vger.kernel.org
+> > > > ---
+> > > >  drivers/of/fdt.c       | 56 ++++++++++++++++++++++++++++++++++++++++++
+> > > >  include/linux/of_fdt.h |  4 +++
+> > > >  2 files changed, 60 insertions(+)
+> > > >
+> > > > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> > > > index 800ad252cf9c..c65c31562ccb 100644
+> > > > --- a/drivers/of/fdt.c
+> > > > +++ b/drivers/of/fdt.c
+> > > > @@ -25,6 +25,7 @@
+> > > >  #include <linux/debugfs.h>
+> > > >  #include <linux/serial_core.h>
+> > > >  #include <linux/sysfs.h>
+> > > > +#include <linux/types.h>
+> > > >
+> > > >  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+> > > >  #include <asm/page.h>
+> > > > @@ -1323,3 +1324,58 @@ late_initcall(of_fdt_raw_init);
+> > > >  #endif
+> > > >
+> > > >  #endif /* CONFIG_OF_EARLY_FLATTREE */
+> > > > +
+> > > > +#define FDT_ALIGN(x, a)        (((x) + (a) - 1) & ~((a) - 1))
+> > > > +#define FDT_TAGALIGN(x)        (FDT_ALIGN((x), FDT_TAGSIZE))
+> > > > +
+> > > > +int fdt_prop_len(const char *prop_name, int len)
+> > > > +{
+> > > > +       return (strlen(prop_name) + 1) +
+> > > > +               sizeof(struct fdt_property) +
+> > > > +               FDT_TAGALIGN(len);
+> > >
+> > > Looks like you are using this to calculate how much space you need to
+> > > allocate in addition to the current DTB for a couple of new or
+> > > replaced properties. I'm not sure that this calculation is completely
+> > > accurate. And it is strange there doesn't seem to be any libfdt
+> > > function for this already. It would be simpler to just add some fixed
+> > > additional amount.
+> > >
+> > > Maybe David G has comments on this?
+> > >
+> > > > +}
+> > > > +
+> > >
+> > > The rest of this should go in drivers/of/fdt_address.c. Ultimately, it
+> > > should go into libfdt, but I'm fine with having it in the kernel for
+> > > now.
+> >
+> > I'd like to have this function in the kernel for now.
+> >
+> > > > +static void fill_property(void *buf, u64 val64, int cells)
+> > > > +{
+> > > > +       __be32 val32;
+> > > > +
+> > > > +       while (cells) {
+> > > > +               val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+> > > > +               memcpy(buf, &val32, sizeof(val32));
+> > > > +               buf += sizeof(val32);
+> > >
+> > > This is kind of hard to read. I would copy u-boot's fdt_pack_reg function.
+> >
+> > Are you sure?
+> > I originally implemented this function in a similar way that fdt_pack_reg()
+> > was, but, you suggested, in your past comment[1], that we'd be better to
+> > have of_read_number()-like implementation.
+> >
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/579118.html
 > 
-> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> ---
-> Changes for v4:
-> - Incorporated Rob review comments.
-> Changes for v3:
-> - Removed node property 'big-endian'.
-> Changes for v2:
-> - Incorporated Rob review comments.
+> Yeah, you're right. Plus, I'm not sure the u-boot one would work for
+> unaligned accesses with armv5 and earlier h/w.
 > 
->  .../devicetree/bindings/spi/spi-nxp-fspi.txt       | 39 ++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-> new file mode 100644
-> index 0000000..402e2b7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-> @@ -0,0 +1,39 @@
-> +* NXP Flex Serial Peripheral Interface (FSPI)
-> +
-> +Required properties:
-> +  - compatible : Should be "nxp,lx2160a-fspi"
-> +  - reg :        First contains the register location and length,
-> +                 Second contains the memory mapping address and length
-> +  - reg-names :  Should contain the resource reg names:
-> +	         - fspi_base: configuration register address space
-> +                 - fspi_mmap: memory mapped address space
-> +  - interrupts : Should contain the interrupt for the device
-> +
-> +Required SPI slave node properties:
-> +  - reg :        There are two buses (A and B) with two chip selects each.
-> +                 This encodes to which bus and CS the flash is connected:
-> +                 - <0>: Bus A, CS 0
-> +                 - <1>: Bus A, CS 1
-> +                 - <2>: Bus B, CS 0
-> +                 - <3>: Bus B, CS 1
-> +
-> +Example showing the usage of two SPI NOR slave devices on bus A:
-> +
-> +spi0: flexspi at 20c0000 {
+> My only comment then is I think you can drop the U32_MAX masking.
 
-It seems that Rob's comment on node name in v3 review gets overlooked?
+Okay, then I will leave this function, yet renaming it to
+cpu64_to_fdt_cells() after Frank's comment.
 
-Shawn
-
-> +	compatible = "nxp,lx2160a-fspi";
-> +	reg = <0x0 0x20c0000 0x0 0x10000>, <0x0 0x20000000 0x0 0x10000000>;
-> +	reg-names = "fspi_base", "fspi_mmap";
-> +	interrupts = <0 25 0x4>; /* Level high type */
-> +	clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-> +	clock-names = "fspi_en", "fspi";
-> +
-> +	mt35xu512aba0: flash at 0 {
-> +		reg = <0>;
-> +		....
-> +	};
-> +
-> +	mt35xu512aba1: flash at 1 {
-> +		reg = <1>;
-> +		....
-> +	};
-> +};
-> -- 
-> 2.7.4
+Thanks,
+-Takahiro Akashi
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Rob
