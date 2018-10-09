@@ -1,31 +1,73 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  9 Oct 2018 14:47:03 +0100
-Subject: [PATCH v2 0/3] arm64: cpufeature: Fix handling of CTR_EL0
-Message-ID: <20181009134707.3479-1-suzuki.poulose@arm.com>
+Date: Tue,  9 Oct 2018 14:47:05 +0100
+Subject: [PATCH v2 1/3] arm64: cpufeature: ctr: Fix cpu capability check for
+ late CPUs
+In-Reply-To: <20181009134707.3479-1-suzuki.poulose@arm.com>
+References: <20181009134707.3479-1-suzuki.poulose@arm.com>
+Message-ID: <20181009134707.3479-3-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series makes sure that we handle the CTR_EL0 field mismatches
-properly, especially for the IDC field. Also, skip trapping CTR
-accesses on a CPU if it matches the safe value.
+The matches() routine for a capability must honor the "scope"
+passed to it and return the proper results.
+i.e, when passed with SCOPE_LOCAL_CPU, it should check the
+status of the capability on the current CPU. This is used by
+verify_local_cpu_capabilities() on a late secondary CPU to make
+sure that it's compliant with the established system features.
+However, ARM64_HAS_CACHE_{IDC/DIC} always checks the system wide
+registers and this could mean that a late secondary CPU could return
+"true" (since the CPU hasn't updated the system wide registers yet)
+and thus lead the system in an inconsistent state, where
+the system assumes it has IDC/DIC feature, while the new CPU
+doesn't.
 
-Applies on arm64 for-next/core.
+Fixes: commit 6ae4b6e0578886eb36 ("arm64: Add support for new control bits CTR_EL0.DIC and CTR_EL0.IDC")
+Cc: Philip Elcan <pelcan@codeaurora.org>
+Cc: Shanker Donthineni <shankerd@codeaurora.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-Changes since v1
- - Fix wrong hunk in has_cache_idc()
- - Allow a late secondary CPU with raw CTR_EL0.IDC = 0 and effective
-   CTR_EL0.IDC = 1, to boot on a system without IDC available.
-
-Suzuki K Poulose (3):
-  arm64: cpufeature: ctr: Fix cpu capability check for late CPUs
-  arm64: cpufeature: Fix handling of CTR_EL0.IDC field
-  arm64: cpufeature: Trap CTR_EL0 access only where it is necessary
-
- arch/arm64/include/asm/cache.h | 40 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu_errata.c | 34 +++++++++++++++++++++++++----
- arch/arm64/kernel/cpufeature.c | 35 +++++++++++++++++++++++++----
- arch/arm64/kernel/cpuinfo.c    | 10 ++++++++-
- 4 files changed, 110 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 00e7c313f088..ba16bb7762ca 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -854,15 +854,29 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+ }
+ 
+ static bool has_cache_idc(const struct arm64_cpu_capabilities *entry,
+-			  int __unused)
++			  int scope)
+ {
+-	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_IDC_SHIFT);
++	u64 ctr;
++
++	if (scope == SCOPE_SYSTEM)
++		ctr = arm64_ftr_reg_ctrel0.sys_val;
++	else
++		ctr = read_cpuid_cachetype();
++
++	return ctr & BIT(CTR_IDC_SHIFT);
+ }
+ 
+ static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
+-			  int __unused)
++			  int scope)
+ {
+-	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
++	u64 ctr;
++
++	if (scope == SCOPE_SYSTEM)
++		ctr = arm64_ftr_reg_ctrel0.sys_val;
++	else
++		ctr = read_cpuid_cachetype();
++
++	return ctr & BIT(CTR_DIC_SHIFT);
+ }
+ 
+ static bool __maybe_unused
 -- 
 2.19.0
