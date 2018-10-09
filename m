@@ -1,42 +1,19 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue,  9 Oct 2018 17:38:37 +0200
-Subject: [PATCH] config: arm: ezx: remove PROVE_LOCKING from defconfig
-References: <CGME20181009153845eucas1p2875e0bc30471919adc89f63e57a8d7f2@eucas1p2.samsung.com>
-Message-ID: <20181009153845eucas1p2875e0bc30471919adc89f63e57a8d7f2~b_t016W_j0771107711eucas1p2k@eucas1p2.samsung.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 9 Oct 2018 17:43:59 +0200
+Subject: [PATCH] Doc: lockdep: add information about performance impact
+In-Reply-To: <20181009153935eucas1p2dec146575ed5fefd4a0b2b6cb9bac056~b_ujkjRd31303013030eucas1p2C@eucas1p2.samsung.com>
+References: <CGME20181009153935eucas1p2dec146575ed5fefd4a0b2b6cb9bac056@eucas1p2.samsung.com>
+ <20181009153935eucas1p2dec146575ed5fefd4a0b2b6cb9bac056~b_ujkjRd31303013030eucas1p2C@eucas1p2.samsung.com>
+Message-ID: <20181009154359.GB5728@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PROVE_LOCKING enables LOCKDEP, which causes big overhead on cache and
-bus transactions.
+On Tue, Oct 09, 2018 at 05:39:27PM +0200, Lukasz Luba wrote:
+> This patch add some warning related to performance drop.
+> It should be mentioned that this is not for free
+> and the platfrom resources (cache, bus interconnect, etc.)
+> will be used more frequently.
 
-On some ARM big.LITTLE architecutres (Exynos 5433) the overhead is really big.
-The overhead can be measures using hackbench which will speed up
-by x3 times (11sec -> 3.4sec).
-When you check transaction on cache or buses, the results are way higher
-than normal for the same hackbench test:
-L1d cache invalidations: 26mln vs 4mln
-L2u cache invalidations: 42mln vs 12mln
-bus cyc/access: 30cyc/access vs. 20cyc/access
-context switch is x3 times cheaper
+To me this reads a bit like: water is wet.
 
-Enable this option only when you have some locking issue to investigate.
-
-Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
----
- arch/arm/configs/ezx_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/ezx_defconfig b/arch/arm/configs/ezx_defconfig
-index 484e51f..ddfb44c 100644
---- a/arch/arm/configs/ezx_defconfig
-+++ b/arch/arm/configs/ezx_defconfig
-@@ -367,7 +367,6 @@ CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_DEBUG_RT_MUTEXES=y
--CONFIG_PROVE_LOCKING=y
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
- CONFIG_CRYPTO_NULL=m
--- 
-2.7.4
+Is this really needed?
