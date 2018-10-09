@@ -1,106 +1,45 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 9 Oct 2018 13:48:50 +0200
-Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC CLK changes for v4.20
-Message-ID: <86e1c3a5-c507-172c-534e-5ff0070044e8@monstr.eu>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Oct 2018 12:50:49 +0100
+Subject: [PATCH v2] Documentation/arm64: HugeTLB page implementation
+In-Reply-To: <87ftxf7812.fsf@e105922-lin.cambridge.arm.com>
+References: <97e4e5fb-24ed-0545-414a-6a0c0116e6b8@infradead.org>
+ <20181008100355.31820-1-punit.agrawal@arm.com>
+ <67f4ceb7-d41c-ab7a-4d5e-c147dadf6860@infradead.org>
+ <87ftxf7812.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20181009115049.GA6248@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 09, 2018 at 11:02:01AM +0100, Punit Agrawal wrote:
+> Randy Dunlap <rdunlap@infradead.org> writes:
+> 
+> > On 10/8/18 3:03 AM, Punit Agrawal wrote:
+> >> Arm v8 architecture supports multiple page sizes - 4k, 16k and
+> >> 64k. Based on the active page size, the Linux port supports
+> >> corresponding hugepage sizes at PMD and PUD(4k only) levels.
+> >> 
+> >> In addition, the architecture also supports caching larger sized
+> >> ranges (composed of multiple entries) at the PTE and PMD level in the
+> >> TLBs using the contiguous bit. The Linux port makes use of this
+> >> architectural support to enable additional hugepage sizes.
+> >> 
+> >> Describe the two different types of hugepages supported by the arm64
+> >> kernel and the hugepage sizes enabled by each.
+> >> 
+> >> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Jonathan Corbet <corbet@lwn.net>
+> >
+> > Acked-by: Randy Dunlap <rdunlap@infradead.org>
+> 
+> Thanks!
+> 
+> Catalin, Will - I assume you'll pick this up at some point? Or do arm64
+> documentation patches get routed by another tree?
 
-I know it is a little bit late but please consider pulling these soc clk
-changes to your tree. They are based on
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=zynq/firmware
-branch that's why please take this changes via arm-soc tree as was
-agreed with Olof.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-All patches were reviewed by appropriate maintainers.
+Catalin can pick this up for 4.20.
 
-Thanks,
-Michal
-
-The following changes since commit e60f02ddb4d2e29b0eb30dbe55475822c4bf3818:
-
-  firmware: xilinx: Add debugfs for query data API (2018-09-26 08:47:37
-+0200)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-clk-for-v4.20
-
-for you to fetch changes up to 3fde0e16d016ecb273f0fa404b5d56b947fc0576:
-
-  drivers: clk: Add ZynqMP clock driver (2018-10-09 13:29:19 +0200)
-
-----------------------------------------------------------------
-arm64: zynqmp: SoC CLK changes for v4.20
-
-This patchset adds CCF compliant clock driver for ZynqMP.
-Clock driver queries supported clock information from firmware
-and regiters pll and output clocks with CCF.
-
-----------------------------------------------------------------
-Jolly Shah (1):
-      drivers: clk: Add ZynqMP clock driver
-
-Rajan Vaja (3):
-      Documentation: xilinx: Add documentation for eemi APIs
-      firmware: xilinx: Add zynqmp IOCTL API for device control
-      dt-bindings: clock: Add bindings for ZynqMP clock driver
-
- Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt |  53 ++++++++++
- Documentation/xilinx/eemi.txt
-   |  67 +++++++++++++
- drivers/clk/Kconfig
-   |   1 +
- drivers/clk/Makefile
-   |   1 +
- drivers/clk/zynqmp/Kconfig
-   |  10 ++
- drivers/clk/zynqmp/Makefile
-   |   4 +
- drivers/clk/zynqmp/clk-gate-zynqmp.c
-   | 144 ++++++++++++++++++++++++++
- drivers/clk/zynqmp/clk-mux-zynqmp.c
-   | 141 ++++++++++++++++++++++++++
- drivers/clk/zynqmp/clk-zynqmp.h
-   |  68 +++++++++++++
- drivers/clk/zynqmp/clkc.c
-   | 716
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/zynqmp/divider.c
-   | 217 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/zynqmp/pll.c
-   | 335 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/firmware/xilinx/zynqmp.c
-   |  42 ++++++++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h
-   | 116 +++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h
-   |   5 +-
- 15 files changed, 1919 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/xilinx/eemi.txt
- create mode 100644 drivers/clk/zynqmp/Kconfig
- create mode 100644 drivers/clk/zynqmp/Makefile
- create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
- create mode 100644 drivers/clk/zynqmp/clkc.c
- create mode 100644 drivers/clk/zynqmp/divider.c
- create mode 100644 drivers/clk/zynqmp/pll.c
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181009/40867021/attachment.sig>
+Will
