@@ -1,114 +1,143 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Tue,  9 Oct 2018 13:51:41 +0000 (UTC)
-Subject: [PATCH v3 05/24] powerpc: don't use ioremap_prot() nor __ioremap()
- unless really needed.
+Date: Tue,  9 Oct 2018 13:51:50 +0000 (UTC)
+Subject: [PATCH v3 09/24] powerpc/mm: move some nohash pte helpers in
+ nohash/[32:64]/pgtable.h
 In-Reply-To: <cover.1539092111.git.christophe.leroy@c-s.fr>
 References: <cover.1539092111.git.christophe.leroy@c-s.fr>
-Message-ID: <bdf8fabb99484508c1e474eea5e7988c79c4c95d.1539092111.git.christophe.leroy@c-s.fr>
+Message-ID: <6310a4420057a307b2be9555a14da7cd261ee848.1539092112.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In many places, ioremap_prot() and __ioremap() can be replaced with
-higher level functions like ioremap(), ioremap_coherent(),
-ioremap_cache(), ioremap_wc() ...
+In order to allow their use in nohash/32/pgtable.h, we have to move the
+following helpers in nohash/[32:64]/pgtable.h:
+- pte_mkwrite()
+- pte_mkdirty()
+- pte_mkyoung()
+- pte_wrprotect()
 
+Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/kernel/btext.c               | 2 +-
- arch/powerpc/kernel/crash_dump.c          | 2 +-
- arch/powerpc/platforms/85xx/smp.c         | 4 ++--
- arch/powerpc/platforms/pasemi/dma_lib.c   | 2 +-
- arch/powerpc/platforms/ps3/spu.c          | 3 +--
- arch/powerpc/sysdev/fsl_85xx_cache_sram.c | 8 ++++----
- 6 files changed, 10 insertions(+), 11 deletions(-)
+ arch/powerpc/include/asm/nohash/32/pgtable.h | 28 ++++++++++++++++++++++++++++
+ arch/powerpc/include/asm/nohash/64/pgtable.h | 20 ++++++++++++++++++++
+ arch/powerpc/include/asm/nohash/pgtable.h    | 28 ----------------------------
+ 3 files changed, 48 insertions(+), 28 deletions(-)
 
-diff --git a/arch/powerpc/kernel/btext.c b/arch/powerpc/kernel/btext.c
-index b2072d5bbf2b..b4241ed1456e 100644
---- a/arch/powerpc/kernel/btext.c
-+++ b/arch/powerpc/kernel/btext.c
-@@ -163,7 +163,7 @@ void btext_map(void)
- 	offset = ((unsigned long) dispDeviceBase) - base;
- 	size = dispDeviceRowBytes * dispDeviceRect[3] + offset
- 		+ dispDeviceRect[0];
--	vbase = __ioremap(base, size, pgprot_val(pgprot_noncached_wc(__pgprot(0))));
-+	vbase = ioremap_wc(base, size);
- 	if (!vbase)
- 		return;
- 	logicalDisplayBase = vbase + offset;
-diff --git a/arch/powerpc/kernel/crash_dump.c b/arch/powerpc/kernel/crash_dump.c
-index d10ad258d41a..bbdc4706c159 100644
---- a/arch/powerpc/kernel/crash_dump.c
-+++ b/arch/powerpc/kernel/crash_dump.c
-@@ -110,7 +110,7 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
- 		vaddr = __va(paddr);
- 		csize = copy_oldmem_vaddr(vaddr, buf, csize, offset, userbuf);
- 	} else {
--		vaddr = __ioremap(paddr, PAGE_SIZE, 0);
-+		vaddr = ioremap_cache(paddr, PAGE_SIZE);
- 		csize = copy_oldmem_vaddr(vaddr, buf, csize, offset, userbuf);
- 		iounmap(vaddr);
- 	}
-diff --git a/arch/powerpc/platforms/85xx/smp.c b/arch/powerpc/platforms/85xx/smp.c
-index 7e966f4cf19a..fff72425727a 100644
---- a/arch/powerpc/platforms/85xx/smp.c
-+++ b/arch/powerpc/platforms/85xx/smp.c
-@@ -216,8 +216,8 @@ static int smp_85xx_start_cpu(int cpu)
+diff --git a/arch/powerpc/include/asm/nohash/32/pgtable.h b/arch/powerpc/include/asm/nohash/32/pgtable.h
+index a7f44498ab6f..4373f8c44b6d 100644
+--- a/arch/powerpc/include/asm/nohash/32/pgtable.h
++++ b/arch/powerpc/include/asm/nohash/32/pgtable.h
+@@ -136,6 +136,34 @@ extern int icache_44x_need_flush;
+ #define pte_clear(mm, addr, ptep) \
+ 	do { pte_update(ptep, ~0, 0); } while (0)
  
- 	/* Map the spin table */
- 	if (ioremappable)
--		spin_table = ioremap_prot(*cpu_rel_addr,
--			sizeof(struct epapr_spin_table), _PAGE_COHERENT);
-+		spin_table = ioremap_coherent(*cpu_rel_addr,
-+					      sizeof(struct epapr_spin_table));
- 	else
- 		spin_table = phys_to_virt(*cpu_rel_addr);
++static inline pte_t pte_mkwrite(pte_t pte)
++{
++	pte_basic_t ptev;
++
++	ptev = pte_val(pte) & ~_PAGE_RO;
++	ptev |= _PAGE_RW;
++	return __pte(ptev);
++}
++
++static inline pte_t pte_mkdirty(pte_t pte)
++{
++	return __pte(pte_val(pte) | _PAGE_DIRTY);
++}
++
++static inline pte_t pte_mkyoung(pte_t pte)
++{
++	return __pte(pte_val(pte) | _PAGE_ACCESSED);
++}
++
++static inline pte_t pte_wrprotect(pte_t pte)
++{
++	pte_basic_t ptev;
++
++	ptev = pte_val(pte) & ~(_PAGE_RW | _PAGE_HWWRITE);
++	ptev |= _PAGE_RO;
++	return __pte(ptev);
++}
++
+ #define pmd_none(pmd)		(!pmd_val(pmd))
+ #define	pmd_bad(pmd)		(pmd_val(pmd) & _PMD_BAD)
+ #define	pmd_present(pmd)	(pmd_val(pmd) & _PMD_PRESENT_MASK)
+diff --git a/arch/powerpc/include/asm/nohash/64/pgtable.h b/arch/powerpc/include/asm/nohash/64/pgtable.h
+index 513b6e9e62c6..72dac522aa66 100644
+--- a/arch/powerpc/include/asm/nohash/64/pgtable.h
++++ b/arch/powerpc/include/asm/nohash/64/pgtable.h
+@@ -94,6 +94,26 @@
+ #ifndef __ASSEMBLY__
+ /* pte_clear moved to later in this file */
  
-diff --git a/arch/powerpc/platforms/pasemi/dma_lib.c b/arch/powerpc/platforms/pasemi/dma_lib.c
-index c80f72c370ae..53384eb42a76 100644
---- a/arch/powerpc/platforms/pasemi/dma_lib.c
-+++ b/arch/powerpc/platforms/pasemi/dma_lib.c
-@@ -576,7 +576,7 @@ int pasemi_dma_init(void)
- 		res.start = 0xfd800000;
- 		res.end = res.start + 0x1000;
- 	}
--	dma_status = __ioremap(res.start, resource_size(&res), 0);
-+	dma_status = ioremap_cache(res.start, resource_size(&res));
- 	pci_dev_put(iob_pdev);
++static inline pte_t pte_mkwrite(pte_t pte)
++{
++	return __pte(pte_val(pte) | _PAGE_RW);
++}
++
++static inline pte_t pte_mkdirty(pte_t pte)
++{
++	return __pte(pte_val(pte) | _PAGE_DIRTY);
++}
++
++static inline pte_t pte_mkyoung(pte_t pte)
++{
++	return __pte(pte_val(pte) | _PAGE_ACCESSED);
++}
++
++static inline pte_t pte_wrprotect(pte_t pte)
++{
++	return __pte(pte_val(pte) & ~_PAGE_RW);
++}
++
+ #define PMD_BAD_BITS		(PTE_TABLE_SIZE-1)
+ #define PUD_BAD_BITS		(PMD_TABLE_SIZE-1)
  
- 	for (i = 0; i < MAX_TXCH; i++)
-diff --git a/arch/powerpc/platforms/ps3/spu.c b/arch/powerpc/platforms/ps3/spu.c
-index b54850845466..7746c2a3c509 100644
---- a/arch/powerpc/platforms/ps3/spu.c
-+++ b/arch/powerpc/platforms/ps3/spu.c
-@@ -215,8 +215,7 @@ static int __init setup_areas(struct spu *spu)
- 		goto fail_ioremap;
- 	}
+diff --git a/arch/powerpc/include/asm/nohash/pgtable.h b/arch/powerpc/include/asm/nohash/pgtable.h
+index 5b82e44c4231..c746e9e784cd 100644
+--- a/arch/powerpc/include/asm/nohash/pgtable.h
++++ b/arch/powerpc/include/asm/nohash/pgtable.h
+@@ -77,15 +77,6 @@ static inline unsigned long pte_pfn(pte_t pte)	{
+ 	return pte_val(pte) >> PTE_RPN_SHIFT; }
  
--	spu->local_store = (__force void *)ioremap_prot(spu->local_store_phys,
--		LS_SIZE, pgprot_val(pgprot_noncached_wc(__pgprot(0))));
-+	spu->local_store = (__force void *)ioremap_wc(spu->local_store_phys, LS_SIZE);
+ /* Generic modifiers for PTE bits */
+-static inline pte_t pte_wrprotect(pte_t pte)
+-{
+-	pte_basic_t ptev;
+-
+-	ptev = pte_val(pte) & ~(_PAGE_RW | _PAGE_HWWRITE);
+-	ptev |= _PAGE_RO;
+-	return __pte(ptev);
+-}
+-
+ static inline pte_t pte_mkclean(pte_t pte)
+ {
+ 	return __pte(pte_val(pte) & ~(_PAGE_DIRTY | _PAGE_HWWRITE));
+@@ -96,25 +87,6 @@ static inline pte_t pte_mkold(pte_t pte)
+ 	return __pte(pte_val(pte) & ~_PAGE_ACCESSED);
+ }
  
- 	if (!spu->local_store) {
- 		pr_debug("%s:%d: ioremap local_store failed\n",
-diff --git a/arch/powerpc/sysdev/fsl_85xx_cache_sram.c b/arch/powerpc/sysdev/fsl_85xx_cache_sram.c
-index 00ccf3e4fcb4..15cbdd4fde06 100644
---- a/arch/powerpc/sysdev/fsl_85xx_cache_sram.c
-+++ b/arch/powerpc/sysdev/fsl_85xx_cache_sram.c
-@@ -107,11 +107,11 @@ int __init instantiate_cache_sram(struct platform_device *dev,
- 		goto out_free;
- 	}
- 
--	cache_sram->base_virt = ioremap_prot(cache_sram->base_phys,
--				cache_sram->size, _PAGE_COHERENT | PAGE_KERNEL);
-+	cache_sram->base_virt = ioremap_coherent(cache_sram->base_phys,
-+						 cache_sram->size);
- 	if (!cache_sram->base_virt) {
--		dev_err(&dev->dev, "%pOF: ioremap_prot failed\n",
--				dev->dev.of_node);
-+		dev_err(&dev->dev, "%pOF: ioremap_coherent failed\n",
-+			dev->dev.of_node);
- 		ret = -ENOMEM;
- 		goto out_release;
- 	}
+-static inline pte_t pte_mkwrite(pte_t pte)
+-{
+-	pte_basic_t ptev;
+-
+-	ptev = pte_val(pte) & ~_PAGE_RO;
+-	ptev |= _PAGE_RW;
+-	return __pte(ptev);
+-}
+-
+-static inline pte_t pte_mkdirty(pte_t pte)
+-{
+-	return __pte(pte_val(pte) | _PAGE_DIRTY);
+-}
+-
+-static inline pte_t pte_mkyoung(pte_t pte)
+-{
+-	return __pte(pte_val(pte) | _PAGE_ACCESSED);
+-}
+-
+ static inline pte_t pte_mkspecial(pte_t pte)
+ {
+ 	return __pte(pte_val(pte) | _PAGE_SPECIAL);
 -- 
 2.13.3
