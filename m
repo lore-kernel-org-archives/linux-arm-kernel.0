@@ -1,109 +1,70 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Tue, 9 Oct 2018 09:18:25 +0200
-Subject: [PATCH v3 1/7] dt-bindings: stm32-dma: Add DMA/MDMA chaining
- support bindings
-In-Reply-To: <20181007145722.GY2372@vkoul-mobl>
-References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
- <1538139715-24406-2-git-send-email-pierre-yves.mordret@st.com>
- <20181007145722.GY2372@vkoul-mobl>
-Message-ID: <5d7a218c-9e96-3931-88ab-0b4dcb3ec4e5@st.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 9 Oct 2018 09:18:53 +0200
+Subject: [PATCH] of: base: Change logic in of_alias_get_alias_list()
+In-Reply-To: <CAL_JsqLNMM6mS1oy1voDAibRk1Srcp7i8e3pESTnM957Rxp4ow@mail.gmail.com>
+References: <e879d07e97b7f7fc46543315e9fb1b4bc8b7a352.1539001154.git.michal.simek@xilinx.com>
+ <CAL_JsqLNMM6mS1oy1voDAibRk1Srcp7i8e3pESTnM957Rxp4ow@mail.gmail.com>
+Message-ID: <2bbc70c9-21b0-dfa2-ddea-554afb2c4f89@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod
-
-On 10/07/2018 04:57 PM, Vinod wrote:
-> On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
->> From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+On 8.10.2018 17:07, Rob Herring wrote:
+> On Mon, Oct 8, 2018 at 7:19 AM Michal Simek <michal.simek@xilinx.com> wrote:
 >>
->> This patch adds dma bindings to support DMA/MDMA chaining transfer.
->> 1 bit is to manage both DMA FIFO Threshold
->> 1 bit is to manage DMA/MDMA Chaining features.
->> 2 bits are used to specify SDRAM size to use for DMA/MDMA chaining.
-> 
-> Please do mention which specific bits?
-
-This is written below into DMA Client section. But I can put some words here.
-
-> 
->> The size in bytes of a certain order is given by the formula:
->>     (2 ^ order) * PAGE_SIZE.
->> The order is given by those 2 bits.
->> For cyclic, whether chaining is chosen, any value above 1 can be set :
->> SRAM buffer size will rely on period size and not on this DT value.
+>> Check compatible string first before setting up bit in bitmap to also
+>> cover cases that allocated bitfield is not big enough.
+>> Show warning about it but let driver to continue to work with allocated
+>> bitfield to keep at least some devices (included console which
+>> is commonly close to serial0) to work.
 >>
->> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+>> Fixes: b1078c355d76 ("of: base: Introduce of_alias_get_alias_list() to check alias IDs")
+>> Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 >> ---
->>   Version history:
->>     v3:
->>     v2:
->>        * rework content
->>     v1:
->>        * Initial
->> ---
->> ---
->>  .../devicetree/bindings/dma/stm32-dma.txt          | 27 +++++++++++++++++++++-
->>  1 file changed, 26 insertions(+), 1 deletion(-)
 >>
->> diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
->> index c5f5190..2bac8c7 100644
->> --- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
->> +++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
->> @@ -17,6 +17,12 @@ Optional properties:
->>  - resets: Reference to a reset controller asserting the DMA controller
->>  - st,mem2mem: boolean; if defined, it indicates that the controller supports
->>    memory-to-memory transfer
->> +- dmas: A list of eight dma specifiers, one for each entry in dma-names.
->> +  Refer to stm32-mdma.txt for more details.
->> +- dma-names: should contain "ch0", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6" and
->> +  "ch7" and represents each STM32 DMA channel connected to a STM32 MDMA one.
->> +- memory-region : phandle to a node describing memory to be used for
->> +  M2M intermediate transfer between DMA and MDMA.
->>  
->>  Example:
->>  
->> @@ -36,6 +42,16 @@ Example:
->>  		st,mem2mem;
->>  		resets = <&rcc 150>;
->>  		dma-requests = <8>;
->> +		dmas = <&mdma1 8 0x10 0x1200000a 0x40026408 0x00000020 1>,
->> +		       <&mdma1 9 0x10 0x1200000a 0x40026408 0x00000800 1>,
->> +		       <&mdma1 10 0x10 0x1200000a 0x40026408 0x00200000 1>,
->> +		       <&mdma1 11 0x10 0x1200000a 0x40026408 0x08000000 1>,
->> +		       <&mdma1 12 0x10 0x1200000a 0x4002640C 0x00000020 1>,
->> +		       <&mdma1 13 0x10 0x1200000a 0x4002640C 0x00000800 1>,
->> +		       <&mdma1 14 0x10 0x1200000a 0x4002640C 0x00200000 1>,
->> +		       <&mdma1 15 0x10 0x1200000a 0x4002640C 0x08000000 1>;
->> +		dma-names = "ch0", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7";
->> +		memory-region = <&sram_dmapool>;
->>  	};
->>  
->>  * DMA client
->> @@ -68,7 +84,16 @@ channel: a phandle to the DMA controller plus the following four integer cells:
->>  	0x1: 1/2 full FIFO
->>  	0x2: 3/4 full FIFO
->>  	0x3: full FIFO
->> -
->> + -bit 2: Intermediate M2M transfer from/to DDR to/from SRAM throughout MDMA
->> +	0: MDMA not used to generate an intermediate M2M transfer
->> +	1: MDMA used to generate an intermediate M2M transfer.
->> + -bit 3-4: indicated SRAM Buffer size in (2^order)*PAGE_SIZE.
->> +	PAGE_SIZE is given by Linux at 4KiB: include/asm-generic/page.h.
->> +	Order is given by those 2 bits starting at 0.
->> +	Valid only whether Intermediate M2M transfer is set.
+>> I have looked at it and I don't think there should be necessary to
+>> report error immediately back with partially initialized bitfield.
+>> The reason is that still there could be a console device which is most
+>> likely below that max limit and it is worth to return at least that nbits
+>> properly filled.
+>> It will also enable cases that you can still continue to use aliases
+>> higher then fields prepared for devices without alias.
 > 
-> why do we need this as a property?
+> Seems reasonable. Plus if you had a new dtb which added an alias
+> greater than what the OS version supports, you would break that
+> system.
 
-In some UC, we need more than 4KiB in case of chaining for better performances.
-Chaining has to be enabled by client if performance is at sacks.
+I was checking that with our uart ps driver before I send this patch and
+I found out that there is no reason not to support these cases.
+Driver will simply find out ids which are free and ready for devices
+which don't have alias.
 
 > 
->> +	For cyclic, whether Intermediate M2M transfer is chosen, any value can
->> +	be set: SRAM buffer size will rely on period size and not on this DT
->> +	value.
->>  
->>  Example:
->>  
->> -- 
->> 2.7.4
+>>
+>> To be fixed patches are present in tty-next branch.
+>>
+>> ---
+>>  drivers/of/base.c                  | 22 ++++++++++++----------
+>>  drivers/tty/serial/xilinx_uartps.c |  2 +-
+>>  2 files changed, 13 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/of/base.c b/drivers/of/base.c
+>> index 908de45f966b..0b9611e196d1 100644
+>> --- a/drivers/of/base.c
+>> +++ b/drivers/of/base.c
+>> @@ -1953,13 +1953,15 @@ int of_alias_get_id(struct device_node *np, const char *stem)
+>>   * The function travels the lookup table to record alias ids for the given
+>>   * device match structures and alias stem.
+>>   *
+>> - * Return:     0 or -ENOSYS when !CONFIG_OF
+>> + * Return:     0 or -ENOSYS when !CONFIG_OF or
+>> + *             -EINVAL if alias ID is greater then allocated nbits
 > 
+> I think EOVERFLOW or ERANGE would be better as those are less common
+> and I take EINVAL as the caller made an error.
+
+That's a good point I was also thinking if EINVAL is good reaction on
+this case. I will use EOVERFLOW if there is no issue with it.
+
+Thanks,
+Michal
