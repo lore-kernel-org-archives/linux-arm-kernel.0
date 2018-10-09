@@ -1,37 +1,58 @@
 From: joel@joelfernandes.org (Joel Fernandes (Google))
-Date: Mon,  8 Oct 2018 22:47:45 -0700
-Subject: [PATCH 0/7] NULL pointer deref fix for stm32-dma
-Message-ID: <20181009054752.145978-1-joel@joelfernandes.org>
+Date: Mon,  8 Oct 2018 22:47:47 -0700
+Subject: [PATCH 2/7] dmaengine: stm32-dma: fix incomplete configuration in
+ cyclic mode
+In-Reply-To: <20181009054752.145978-1-joel@joelfernandes.org>
+References: <20181009054752.145978-1-joel@joelfernandes.org>
+Message-ID: <20181009054752.145978-3-joel@joelfernandes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Pierre Yves MORDRET <pierre-yves.mordret@st.com>
 
-While looking at android-4.14, I found a NULL pointer deref with
-stm32-dma driver using Coccicheck errors. I found that upstream had a
-bunch of patches on stm32-dma that have fixed this and other issues, I
-applied these patches cleanly onto Android 4.14. I believe these should
-goto stable and flow into Android 4.14 from there, but I haven't tested
-this since I have no hardware to do so.
+When in cyclic mode, the configuration is updated after having started the
+DMA hardware (STM32_DMA_SCR_EN) leading to incomplete configuration of
+SMxAR registers.
 
-Atleast I can say that the coccicheck error below goes away when running:
-make coccicheck MODE=report
-./drivers/dma/stm32-dma.c:567:18-24: ERROR: chan -> desc is NULL but dereferenced.
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+---
+ drivers/dma/stm32-dma.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Anyway, please consider this series for 4.14 stable, I have CC'd the
-author and others, thanks.
-
-Pierre Yves MORDRET (7):
-  dmaengine: stm32-dma: threshold manages with bitfield feature
-  dmaengine: stm32-dma: fix incomplete configuration in cyclic mode
-  dmaengine: stm32-dma: fix typo and reported checkpatch warnings
-  dmaengine: stm32-dma: Improve memory burst management
-  dmaengine: stm32-dma: fix DMA IRQ status handling
-  dmaengine: stm32-dma: fix max items per transfer
-  dmaengine: stm32-dma: properly mask irq bits
-
- drivers/dma/stm32-dma.c | 287 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 240 insertions(+), 47 deletions(-)
-
+diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
+index 4099948b6914..fae7de54f00a 100644
+--- a/drivers/dma/stm32-dma.c
++++ b/drivers/dma/stm32-dma.c
+@@ -441,6 +441,8 @@ static void stm32_dma_dump_reg(struct stm32_dma_chan *chan)
+ 	dev_dbg(chan2dev(chan), "SFCR:  0x%08x\n", sfcr);
+ }
+ 
++static void stm32_dma_configure_next_sg(struct stm32_dma_chan *chan);
++
+ static void stm32_dma_start_transfer(struct stm32_dma_chan *chan)
+ {
+ 	struct stm32_dma_device *dmadev = stm32_dma_get_dev(chan);
+@@ -483,6 +485,9 @@ static void stm32_dma_start_transfer(struct stm32_dma_chan *chan)
+ 	if (status)
+ 		stm32_dma_irq_clear(chan, status);
+ 
++	if (chan->desc->cyclic)
++		stm32_dma_configure_next_sg(chan);
++
+ 	stm32_dma_dump_reg(chan);
+ 
+ 	/* Start DMA */
+@@ -576,8 +581,7 @@ static void stm32_dma_issue_pending(struct dma_chan *c)
+ 	if (vchan_issue_pending(&chan->vchan) && !chan->desc && !chan->busy) {
+ 		dev_dbg(chan2dev(chan), "vchan %p: issued\n", &chan->vchan);
+ 		stm32_dma_start_transfer(chan);
+-		if (chan->desc->cyclic)
+-			stm32_dma_configure_next_sg(chan);
++
+ 	}
+ 	spin_unlock_irqrestore(&chan->vchan.lock, flags);
+ }
 -- 
 2.19.0.605.g01d371f741-goog
