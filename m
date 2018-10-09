@@ -1,137 +1,170 @@
-From: sunnyliangjy@gmail.com (Wendy Liang)
-Date: Tue, 9 Oct 2018 11:25:49 -0700
-Subject: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <1515109891-17133-3-git-send-email-jliang@xilinx.com>
-References: <1515109891-17133-1-git-send-email-jliang@xilinx.com>
- <1515109891-17133-3-git-send-email-jliang@xilinx.com>
-Message-ID: <CAA07jV8EinRQGtfhLchrZLkbkdRao7hugPD=02CO7MMv06WUSQ@mail.gmail.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Tue, 9 Oct 2018 12:34:51 -0600
+Subject: [RFC PATCH 2/2] ACPI / PPTT: cacheinfo: Label caches based on
+ fw_token
+In-Reply-To: <10e15b8d-c0c2-b73a-de31-f87ae0d86469@arm.com>
+References: <20181005150235.13846-1-james.morse@arm.com>
+ <20181005150235.13846-3-james.morse@arm.com>
+ <a68abfd2-1e28-d9e7-919a-8b3133db4d20@arm.com>
+ <10e15b8d-c0c2-b73a-de31-f87ae0d86469@arm.com>
+Message-ID: <236eab50-e1d0-e2f5-fb69-95451c4ccc7e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 4, 2018 at 3:53 PM Wendy Liang <wendy.liang@xilinx.com> wrote:
->
-> Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block
-> in ZynqMP SoC used for the communication between various processor
-> systems.
->
-> Signed-off-by: Wendy Liang <jliang@xilinx.com>
-> ---
->  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 104 +++++++++++++++++++++
->  1 file changed, 104 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-> new file mode 100644
-> index 0000000..5e270a3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-> @@ -0,0 +1,104 @@
-> +Xilinx IPI Mailbox Controller
-> +========================================
-> +
-> +The Xilinx IPI(Inter Processor Interrupt) mailbox controller is to manage
-> +messaging between two Xilinx Zynq UltraScale+ MPSoC IPI agents. Each IPI
-> +agent owns registers used for notification and buffers for message.
-> +
-> +               +-------------------------------------+
-> +               | Xilinx ZynqMP IPI Controller        |
-> +               +-------------------------------------+
-> +    +--------------------------------------------------+
-> +ATF                    |                     |
-> +                       |                     |
-> +                       |                     |
-> +    +--------------------------+             |
-> +                       |                     |
-> +                       |                     |
-> +    +--------------------------------------------------+
-> +            +------------------------------------------+
-> +            |  +----------------+   +----------------+ |
-> +Hardware    |  |  IPI Agent     |   |  IPI Buffers   | |
-> +            |  |  Registers     |   |                | |
-> +            |  |                |   |                | |
-> +            |  +----------------+   +----------------+ |
-> +            |                                          |
-> +            | Xilinx IPI Agent Block                   |
-> +            +------------------------------------------+
-> +
-> +
-> +Controller Device Node:
-> +===========================
-> +Required properties:
-> +--------------------
-> +- compatible:          Shall be: "xlnx,zynqmp-ipi-mailbox"
-> +- reg:                 IPI buffers address ranges
-> +- reg-names:           Names of the reg resources. It should have:
-> +                       * local_request_region
-> +                         - IPI request msg buffer written by local and read
-> +                           by remote
-> +                       * local_response_region
-> +                         - IPI response msg buffer written by local and read
-> +                           by remote
-> +                       * remote_request_region
-> +                         - IPI request msg buffer written by remote and read
-> +                           by local
-> +                       * remote_response_region
-> +                         - IPI response msg buffer written by remote and read
-> +                           by local
-> +- #mbox-cells:         Shall be 1. It contains:
-> +                       * tx(0) or rx(1) channel
-> +- xlnx,ipi-ids:                Xilinx IPI agent IDs of the two peers of the
-> +                       Xilinx IPI communication channel.
-> +- interrupt-parent:    Phandle for the interrupt controller
-> +- interrupts:          Interrupt information corresponding to the
-> +                       interrupt-names property.
-> +
-> +Optional properties:
-> +--------------------
-> +- method:              The method of accessing the IPI agent registers.
-> +                       Permitted values are: "smc" and "hvc". Default is
-> +                       "smc".
-> +
-> +Example:
-> +===========================
-> +       /* APU<->RPU0 IPI mailbox controller */
-> +       ipi_mailbox_rpu0: mailbox at ff90400 {
-> +               compatible = "xlnx,zynqmp-ipi-mailbox";
-> +               reg = <0x0 0xff990400 0x0 0x20>,
-> +                     <0x0 0xff990420 0x0 0x20>,
-> +                     <0x0 0xff990080 0x0 0x20>,
-> +                     <0x0 0xff9900a0 0x0 0x20>;
-> +               reg-names = "local_request_region", "local_response_region",
-> +                           "remote_request_region", "remote_response_region";
-> +               #mbox-cells = <1>;
-> +               xlnx-ipi-ids = <0 1>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <0 29 4>;
-> +       };
-> +       /* APU<->RPU1 IPI mailbox controller */
-> +       ipi_mailbox_rpu1: mailbox at ff990440 {
-> +               compatible = "xlnx,zynqmp-ipi-mailbox";
-> +               reg = <0x0 0xff990440 0x0 0x20>,
-> +                     <0x0 0xff990460 0x0 0x20>,
-> +                     <0x0 0xff990280 0x0 0x20>,
-> +                     <0x0 0xff9902a0 0x0 0x20>;
-> +               reg-names = "local_request_region", "local_response_region",
-> +                           "remote_request_region", "remote_response_region";
-> +               #mbox-cells = <1>;
-> +               xlnx-ipi-ids = <0 2>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <0 29 4>;
-> +       };
-The Xilinx IPI hardware one IPI agent contains multiple IPI mailboxes.
-Please make ipi mailbox as subnodes to the IPI agent device node.
-> +       rpu0 {
-> +               ...
-> +               mboxes = <&ipi_mailbox_rpu0 0>,
-> +                        <&ipi_mailbox_rpu0 1>;
-> +               mbox-names = "tx", "rx";
-> +       };
-> +       rpu1 {
-> +               ...
-> +               mboxes = <&ipi_mailbox_rpu1 0>,
-> +                        <&ipi_mailbox_rpu1 1>;
-> +               mbox-names = "tx", "rx";
-> +       };
-> --
-> 2.7.4
->
+On 10/9/2018 11:58 AM, James Morse wrote:
+> Hi Jeremy,
+> 
+> On 09/10/2018 17:45, Jeremy Linton wrote:
+>> On 10/05/2018 10:02 AM, James Morse wrote:
+>>> The resctrl ABI requires caches to have a unique id. This number must
+>>> be unique across all caches at this level, but doesn't need to be
+>>> contiguous. (there may be gaps, it may not start at 0).
+>>> See Documentation/x86/intel_rdt_ui.txt::Cache IDs
+>>>
+>>> We want a value that is the same over reboots, and should be the same
+>>> on identical hardware, even if the PPTT is generated in a different
+>>> order. The hardware doesn't give us any indication of which caches are
+>>> shared, so this information must come from firmware tables.
+>>>
+>>> Starting with a cacheinfo's fw_token, we walk the table to find all
+>>> CPUs that share this cpu_node (and thus cache), and take the lowest
+>>> physical id to use as the id for the cache. On arm64 this value
+>>> corresponds to the MPIDR.
+>>>
+>>> This is only done for unified caches, as instruction/data caches would
+>>> generate the same id using this scheme.
+> 
+>>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+>>> index d1e26cb599bf..9478f8c28158 100644
+>>> --- a/drivers/acpi/pptt.c
+>>> +++ b/drivers/acpi/pptt.c
+>>> @@ -341,6 +341,84 @@ static struct acpi_pptt_cache
+>>> *acpi_find_cache_node(struct acpi_table_header *ta
+>>>  ? /* total number of attributes checked by the properties code */
+>>>  ? #define PPTT_CHECKED_ATTRIBUTES 4
+>>>  ? +/**
+>>> + * acpi_pptt_min_physid_from_cpu_node() - Recursivly find @min_physid for all
+>>> + * leaf CPUs below @cpu_node.
+>>> + * @table_hdr:??? Pointer to the head of the PPTT table
+>>> + * @cpu_node:??? The point in the toplogy to start the walk
+>>> + * @min_physid:??? The min_physid to update with leaf CPUs.
+>>> + */
+>>> +void acpi_pptt_min_physid_from_cpu_node(struct acpi_table_header *table_hdr,
+>>> +??????????????????? struct acpi_pptt_processor *cpu_node,
+>>> +??????????????????? phys_cpuid_t *min_physid)
+>>> +{
+>>> +??? bool leaf = true;
+>>> +??? u32 acpi_processor_id;
+>>> +??? phys_cpuid_t cpu_node_phys_id;
+>>> +??? struct acpi_subtable_header *iter;
+>>> +??? struct acpi_pptt_processor *iter_node;
+>>> +??? u32 target_node = ACPI_PTR_DIFF(cpu_node, table_hdr);
+>>> +??? u32 proc_sz = sizeof(struct acpi_pptt_processor *);
+>>> +??? unsigned long table_end = (unsigned long)table_hdr + table_hdr->length;
+>>> +
+>>> +??? /*
+>>> +???? * Walk the PPTT, looking for nodes that reference cpu_node
+>>> +???? * as parent.
+>>> +???? */
+>>> +??? iter = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
+>>> +???????????????? sizeof(struct acpi_table_pptt));
+>>> +
+>>> +??? while ((unsigned long)iter + proc_sz < table_end) {
+>>> +??????? iter_node = (struct acpi_pptt_processor *)iter;
+>>> +
+>>> +??????? if (iter->type == ACPI_PPTT_TYPE_PROCESSOR &&
+>>> +??????????? iter_node->parent == target_node) {
+>>> +??????????? leaf = false;
+>>> +??????????? acpi_pptt_min_physid_from_cpu_node(table_hdr, iter_node,
+>>> +?????????????????????????????? min_physid);
+>>> +??????? }
+>>> +
+>>> +??????? if (iter->length == 0)
+>>> +??????????? return;
+>>> +??????? iter = ACPI_ADD_PTR(struct acpi_subtable_header, iter,
+>>> +??????????????????? iter->length);
+>>> +??? }
+>>> +
+>>> +??? if (leaf && cpu_node->flags & ACPI_PPTT_ACPI_PROCESSOR_ID_VALID) {
+>>> +??????? acpi_processor_id = cpu_node->acpi_processor_id;
+>>> +??????? cpu_node_phys_id = acpi_id_to_phys_cpuid(acpi_processor_id);
+>>> +??????? *min_physid = min(*min_physid, cpu_node_phys_id);
+>>> +??? }
+>>> +}
+>>
+>> Tho me, is seems a reliable way to acquire a stable id.
+>>
+>> My only hangup here is with the recursion (which was avoided elsewhere in this
+>> code despite considerable simplification in a couple places). In a reasonable
+>> table the tree depth should be quite limited (and not contain any branch loops)
+>> but it seems a needless risk. How much worse is the non-recursive version?
+> 
+> I haven't tried, this was just to get the discussion about the cache ids going.
+> 
+> The neatest way I can think of would be to find each cpu, then walk up the
+> parent pointers to see if this node is on the path. This avoids allocating
+> memory to hold the stuff we haven't done yet when walking down/around.
+> 
+> 
+>> Also, the first version of the PPTT spec can be read that
+>> ACPI_PPTT_ACPI_PROCESSOR_ID_VALID should _not_ be set on leaf nodes. So IMHO a
+>> better check is just whether the leaf's processor_id is valid in the MADT.
+>> Hopefully this flag becomes more reliable in time...
+> 
+> It can be set for a non-leaf entry, I assumed it would always be set for a leaf.
+> Is anyone doing this with a PPTT table?
+
+QDF2400 takes a strict interpretation of the spec, and does not set the 
+flag for leaf nodes.  I believe there are other implementations which do 
+set the flag for leaf nodes.
+
+> 
+> 
+>>> +static void acpi_pptt_label_cache(struct cacheinfo *this_leaf)
+>>> +{
+>>> +??? acpi_status status;
+>>> +??? struct acpi_table_header *table;
+>>> +??? struct acpi_pptt_processor *cpu_node;
+>>> +??? phys_cpuid_t min_physid = PHYS_CPUID_INVALID;
+>>> +
+>>> +??? /* Affinity based IDs for non-unified caches would not be unique */
+>>> +??? if (this_leaf->type != CACHE_TYPE_UNIFIED)
+>>> +??????? return;
+>>> +
+>>> +??? if (!this_leaf->fw_token)
+>>> +??????? return;
+>>> +??? cpu_node = this_leaf->fw_token;
+>>> +
+>>> +??? status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
+>>> +??? if (ACPI_FAILURE(status))
+>>> +??????? return;
+>>> +
+>>> +??? acpi_pptt_min_physid_from_cpu_node(table, cpu_node, &min_physid);
+>>> +??? acpi_put_table(table);
+>>> +
+>>> +??? WARN_ON_ONCE(min_physid == PHYS_CPUID_INVALID);
+>>> +
+>>> +??? this_leaf->id = ARCH_PHYSID_TO_U32(min_physid);
+>>> +??? this_leaf->attributes |= CACHE_ID;
+>>> +}
+>>
+>> To me its seems a little odd to be acpi_get_table()ing inside the PPTT parse
+>> routines because we lost the reference via the call to
+>> update_cache_properties(). Rather if this routine were called from
+>> cache_setup_acpi_cpu() the table could be passed in.
+> 
+> Makes sense. This was just the last point the type could be set.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+
+
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
