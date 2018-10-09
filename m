@@ -1,70 +1,59 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 9 Oct 2018 09:18:53 +0200
-Subject: [PATCH] of: base: Change logic in of_alias_get_alias_list()
-In-Reply-To: <CAL_JsqLNMM6mS1oy1voDAibRk1Srcp7i8e3pESTnM957Rxp4ow@mail.gmail.com>
-References: <e879d07e97b7f7fc46543315e9fb1b4bc8b7a352.1539001154.git.michal.simek@xilinx.com>
- <CAL_JsqLNMM6mS1oy1voDAibRk1Srcp7i8e3pESTnM957Rxp4ow@mail.gmail.com>
-Message-ID: <2bbc70c9-21b0-dfa2-ddea-554afb2c4f89@xilinx.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Tue, 9 Oct 2018 09:22:49 +0200
+Subject: [PATCH v3 2/7] dt-bindings: stm32-dmamux: Add one cell to support
+ DMA/MDMA chain
+In-Reply-To: <20181007145805.GZ2372@vkoul-mobl>
+References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
+ <1538139715-24406-3-git-send-email-pierre-yves.mordret@st.com>
+ <20181007145805.GZ2372@vkoul-mobl>
+Message-ID: <20eafd84-7bb8-0019-94e2-3f46a894edf1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8.10.2018 17:07, Rob Herring wrote:
-> On Mon, Oct 8, 2018 at 7:19 AM Michal Simek <michal.simek@xilinx.com> wrote:
+
+
+On 10/07/2018 04:58 PM, Vinod wrote:
+> On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
+>> From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 >>
->> Check compatible string first before setting up bit in bitmap to also
->> cover cases that allocated bitfield is not big enough.
->> Show warning about it but let driver to continue to work with allocated
->> bitfield to keep at least some devices (included console which
->> is commonly close to serial0) to work.
+>> Add one cell to support DMA/MDMA chaining.
 >>
->> Fixes: b1078c355d76 ("of: base: Introduce of_alias_get_alias_list() to check alias IDs")
->> Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 >> ---
->>
->> I have looked at it and I don't think there should be necessary to
->> report error immediately back with partially initialized bitfield.
->> The reason is that still there could be a console device which is most
->> likely below that max limit and it is worth to return at least that nbits
->> properly filled.
->> It will also enable cases that you can still continue to use aliases
->> higher then fields prepared for devices without alias.
-> 
-> Seems reasonable. Plus if you had a new dtb which added an alias
-> greater than what the OS version supports, you would break that
-> system.
-
-I was checking that with our uart ps driver before I send this patch and
-I found out that there is no reason not to support these cases.
-Driver will simply find out ids which are free and ready for devices
-which don't have alias.
-
-> 
->>
->> To be fixed patches are present in tty-next branch.
->>
+>>   Version history:
+>>     v3:
+>>     v2:
+>>        * rework content
+>>     v1:
+>>        * Initial
 >> ---
->>  drivers/of/base.c                  | 22 ++++++++++++----------
->>  drivers/tty/serial/xilinx_uartps.c |  2 +-
->>  2 files changed, 13 insertions(+), 11 deletions(-)
+>> ---
+>>  Documentation/devicetree/bindings/dma/stm32-dmamux.txt | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
 >>
->> diff --git a/drivers/of/base.c b/drivers/of/base.c
->> index 908de45f966b..0b9611e196d1 100644
->> --- a/drivers/of/base.c
->> +++ b/drivers/of/base.c
->> @@ -1953,13 +1953,15 @@ int of_alias_get_id(struct device_node *np, const char *stem)
->>   * The function travels the lookup table to record alias ids for the given
->>   * device match structures and alias stem.
->>   *
->> - * Return:     0 or -ENOSYS when !CONFIG_OF
->> + * Return:     0 or -ENOSYS when !CONFIG_OF or
->> + *             -EINVAL if alias ID is greater then allocated nbits
+>> diff --git a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+>> index 1b893b2..5e92b59 100644
+>> --- a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+>> +++ b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+>> @@ -4,9 +4,9 @@ Required properties:
+>>  - compatible:	"st,stm32h7-dmamux"
+>>  - reg:		Memory map for accessing module
+>>  - #dma-cells:	Should be set to <3>.
+>> -		First parameter is request line number.
+>> -		Second is DMA channel configuration
+>> -		Third is Fifo threshold
+>> +-		First parameter is request line number.
+>> +-		Second is DMA channel configuration
+>> +-		Third is a 32bit bitfield
 > 
-> I think EOVERFLOW or ERANGE would be better as those are less common
-> and I take EINVAL as the caller made an error.
+> please separate out formatting changes and actual change proposed..
 
-That's a good point I was also thinking if EINVAL is good reaction on
-this case. I will use EOVERFLOW if there is no issue with it.
+Yes. sorry. my bad.
 
-Thanks,
-Michal
+> 
+>>  		For more details about the three cells, please see
+>>  		stm32-dma.txt documentation binding file
+>>  - dma-masters:	Phandle pointing to the DMA controllers.
+>> -- 
+>> 2.7.4
+> 
