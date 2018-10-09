@@ -1,170 +1,65 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Tue, 9 Oct 2018 12:34:51 -0600
-Subject: [RFC PATCH 2/2] ACPI / PPTT: cacheinfo: Label caches based on
- fw_token
-In-Reply-To: <10e15b8d-c0c2-b73a-de31-f87ae0d86469@arm.com>
-References: <20181005150235.13846-1-james.morse@arm.com>
- <20181005150235.13846-3-james.morse@arm.com>
- <a68abfd2-1e28-d9e7-919a-8b3133db4d20@arm.com>
- <10e15b8d-c0c2-b73a-de31-f87ae0d86469@arm.com>
-Message-ID: <236eab50-e1d0-e2f5-fb69-95451c4ccc7e@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 10 Oct 2018 02:49:05 +0800
+Subject: [xlnx:master 1870/2013]
+ drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c:130:21: warning:
+ cast from pointer to integer of different size
+Message-ID: <201810100203.5q7gpxzS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/9/2018 11:58 AM, James Morse wrote:
-> Hi Jeremy,
-> 
-> On 09/10/2018 17:45, Jeremy Linton wrote:
->> On 10/05/2018 10:02 AM, James Morse wrote:
->>> The resctrl ABI requires caches to have a unique id. This number must
->>> be unique across all caches at this level, but doesn't need to be
->>> contiguous. (there may be gaps, it may not start at 0).
->>> See Documentation/x86/intel_rdt_ui.txt::Cache IDs
->>>
->>> We want a value that is the same over reboots, and should be the same
->>> on identical hardware, even if the PPTT is generated in a different
->>> order. The hardware doesn't give us any indication of which caches are
->>> shared, so this information must come from firmware tables.
->>>
->>> Starting with a cacheinfo's fw_token, we walk the table to find all
->>> CPUs that share this cpu_node (and thus cache), and take the lowest
->>> physical id to use as the id for the cache. On arm64 this value
->>> corresponds to the MPIDR.
->>>
->>> This is only done for unified caches, as instruction/data caches would
->>> generate the same id using this scheme.
-> 
->>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
->>> index d1e26cb599bf..9478f8c28158 100644
->>> --- a/drivers/acpi/pptt.c
->>> +++ b/drivers/acpi/pptt.c
->>> @@ -341,6 +341,84 @@ static struct acpi_pptt_cache
->>> *acpi_find_cache_node(struct acpi_table_header *ta
->>>  ? /* total number of attributes checked by the properties code */
->>>  ? #define PPTT_CHECKED_ATTRIBUTES 4
->>>  ? +/**
->>> + * acpi_pptt_min_physid_from_cpu_node() - Recursivly find @min_physid for all
->>> + * leaf CPUs below @cpu_node.
->>> + * @table_hdr:??? Pointer to the head of the PPTT table
->>> + * @cpu_node:??? The point in the toplogy to start the walk
->>> + * @min_physid:??? The min_physid to update with leaf CPUs.
->>> + */
->>> +void acpi_pptt_min_physid_from_cpu_node(struct acpi_table_header *table_hdr,
->>> +??????????????????? struct acpi_pptt_processor *cpu_node,
->>> +??????????????????? phys_cpuid_t *min_physid)
->>> +{
->>> +??? bool leaf = true;
->>> +??? u32 acpi_processor_id;
->>> +??? phys_cpuid_t cpu_node_phys_id;
->>> +??? struct acpi_subtable_header *iter;
->>> +??? struct acpi_pptt_processor *iter_node;
->>> +??? u32 target_node = ACPI_PTR_DIFF(cpu_node, table_hdr);
->>> +??? u32 proc_sz = sizeof(struct acpi_pptt_processor *);
->>> +??? unsigned long table_end = (unsigned long)table_hdr + table_hdr->length;
->>> +
->>> +??? /*
->>> +???? * Walk the PPTT, looking for nodes that reference cpu_node
->>> +???? * as parent.
->>> +???? */
->>> +??? iter = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
->>> +???????????????? sizeof(struct acpi_table_pptt));
->>> +
->>> +??? while ((unsigned long)iter + proc_sz < table_end) {
->>> +??????? iter_node = (struct acpi_pptt_processor *)iter;
->>> +
->>> +??????? if (iter->type == ACPI_PPTT_TYPE_PROCESSOR &&
->>> +??????????? iter_node->parent == target_node) {
->>> +??????????? leaf = false;
->>> +??????????? acpi_pptt_min_physid_from_cpu_node(table_hdr, iter_node,
->>> +?????????????????????????????? min_physid);
->>> +??????? }
->>> +
->>> +??????? if (iter->length == 0)
->>> +??????????? return;
->>> +??????? iter = ACPI_ADD_PTR(struct acpi_subtable_header, iter,
->>> +??????????????????? iter->length);
->>> +??? }
->>> +
->>> +??? if (leaf && cpu_node->flags & ACPI_PPTT_ACPI_PROCESSOR_ID_VALID) {
->>> +??????? acpi_processor_id = cpu_node->acpi_processor_id;
->>> +??????? cpu_node_phys_id = acpi_id_to_phys_cpuid(acpi_processor_id);
->>> +??????? *min_physid = min(*min_physid, cpu_node_phys_id);
->>> +??? }
->>> +}
->>
->> Tho me, is seems a reliable way to acquire a stable id.
->>
->> My only hangup here is with the recursion (which was avoided elsewhere in this
->> code despite considerable simplification in a couple places). In a reasonable
->> table the tree depth should be quite limited (and not contain any branch loops)
->> but it seems a needless risk. How much worse is the non-recursive version?
-> 
-> I haven't tried, this was just to get the discussion about the cache ids going.
-> 
-> The neatest way I can think of would be to find each cpu, then walk up the
-> parent pointers to see if this node is on the path. This avoids allocating
-> memory to hold the stuff we haven't done yet when walking down/around.
-> 
-> 
->> Also, the first version of the PPTT spec can be read that
->> ACPI_PPTT_ACPI_PROCESSOR_ID_VALID should _not_ be set on leaf nodes. So IMHO a
->> better check is just whether the leaf's processor_id is valid in the MADT.
->> Hopefully this flag becomes more reliable in time...
-> 
-> It can be set for a non-leaf entry, I assumed it would always be set for a leaf.
-> Is anyone doing this with a PPTT table?
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   7ea1af329aee531681b87b1fba5496337bff680f
+commit: 74788b36bff8a38bd9070823a3e5e03dcb77c99c [1870/2013] staging: clocking-wizard: Add support for dynamic reconfiguration
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        git checkout 74788b36bff8a38bd9070823a3e5e03dcb77c99c
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-QDF2400 takes a strict interpretation of the spec, and does not set the 
-flag for leaf nodes.  I believe there are other implementations which do 
-set the flag for leaf nodes.
+All warnings (new ones prefixed by >>):
 
-> 
-> 
->>> +static void acpi_pptt_label_cache(struct cacheinfo *this_leaf)
->>> +{
->>> +??? acpi_status status;
->>> +??? struct acpi_table_header *table;
->>> +??? struct acpi_pptt_processor *cpu_node;
->>> +??? phys_cpuid_t min_physid = PHYS_CPUID_INVALID;
->>> +
->>> +??? /* Affinity based IDs for non-unified caches would not be unique */
->>> +??? if (this_leaf->type != CACHE_TYPE_UNIFIED)
->>> +??????? return;
->>> +
->>> +??? if (!this_leaf->fw_token)
->>> +??????? return;
->>> +??? cpu_node = this_leaf->fw_token;
->>> +
->>> +??? status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
->>> +??? if (ACPI_FAILURE(status))
->>> +??????? return;
->>> +
->>> +??? acpi_pptt_min_physid_from_cpu_node(table, cpu_node, &min_physid);
->>> +??? acpi_put_table(table);
->>> +
->>> +??? WARN_ON_ONCE(min_physid == PHYS_CPUID_INVALID);
->>> +
->>> +??? this_leaf->id = ARCH_PHYSID_TO_U32(min_physid);
->>> +??? this_leaf->attributes |= CACHE_ID;
->>> +}
->>
->> To me its seems a little odd to be acpi_get_table()ing inside the PPTT parse
->> routines because we lost the reference via the call to
->> update_cache_properties(). Rather if this routine were called from
->> cache_setup_acpi_cpu() the table could be passed in.
-> 
-> Makes sense. This was just the last point the type could be set.
-> 
-> 
-> Thanks,
-> 
-> James
-> 
+   drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c: In function 'clk_wzrd_recalc_rate':
+>> drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c:130:21: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+       (void __iomem *)((u64)divider->base + divider->offset);
+                        ^
+>> drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c:130:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+       (void __iomem *)((u64)divider->base + divider->offset);
+       ^
+   drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c: In function 'clk_wzrd_dynamic_reconfig':
+   drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c:150:21: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+       (void __iomem *)((u64)divider->base + divider->offset);
+                        ^
+   drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c:150:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+       (void __iomem *)((u64)divider->base + divider->offset);
+       ^
 
+vim +130 drivers/staging/clocking-wizard/clk-xlnx-clock-wizard.c
 
--- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+   124	
+   125	static unsigned long clk_wzrd_recalc_rate(struct clk_hw *hw,
+   126						  unsigned long parent_rate)
+   127	{
+   128		struct clk_wzrd_divider *divider = to_clk_wzrd_divider(hw);
+   129		void __iomem *div_addr =
+ > 130				(void __iomem *)((u64)divider->base + divider->offset);
+   131		unsigned int val;
+   132	
+   133		val = readl(div_addr) >> divider->shift;
+   134		val &= div_mask(divider->width);
+   135	
+   136		return divider_recalc_rate(hw, parent_rate, val, divider->table,
+   137				divider->flags);
+   138	}
+   139	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62126 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181010/c6472d3b/attachment-0001.gz>
