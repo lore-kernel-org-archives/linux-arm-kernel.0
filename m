@@ -1,27 +1,38 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 09 Oct 2018 10:29:56 +0200
-Subject: [PATCH 0/2] arm64: dts: meson: s400: emmc updates
-In-Reply-To: <20181002084341.5487-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Tue, 2 Oct 2018 10:43:39 +0200")
-References: <20181002084341.5487-1-jbrunet@baylibre.com>
-Message-ID: <7hbm834j5n.fsf@baylibre.com>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Tue, 9 Oct 2018 08:37:24 +0000
+Subject: [PATCH v10 0/5] Add i.MX8MQ clock driver
+Message-ID: <1539074230-27277-1-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+Changes since v9:
+ * Replaced DIV_ROUND_UP_ULL with DIV_ROUND_UP
+ * Renamed the entire composite to composite-8m
 
-> This patchset adds the emmc pwrseq to the emmc node and disable the device
-> by default, since eMMC is not the default option for this board.
->
-> Jerome Brunet (2):
->   arm64: dts: meson-axg: s400: add missing emmc pwrseq
->   arm64: dts: meson-axg: s400: disable emmc
+Abel Vesa (1):
+  clk: imx: add imx composite clock
 
-Appled to v4.20/dt64.
+Lucas Stach (4):
+  dt-bindings: add binding for i.MX8MQ CCM
+  clk: imx: add fractional PLL output clock
+  clk: imx: add SCCG PLL type
+  clk: imx: add clock driver for i.MX8MQ CCM
 
-Thanks.
+ .../devicetree/bindings/clock/imx8mq-clock.txt     |  20 +
+ drivers/clk/imx/Makefile                           |   6 +-
+ drivers/clk/imx/clk-composite-8m.c                 | 181 +++++++
+ drivers/clk/imx/clk-frac-pll.c                     | 215 ++++++++
+ drivers/clk/imx/clk-imx8mq.c                       | 602 +++++++++++++++++++++
+ drivers/clk/imx/clk-sccg-pll.c                     | 237 ++++++++
+ drivers/clk/imx/clk.h                              |  64 +++
+ include/dt-bindings/clock/imx8mq-clock.h           | 395 ++++++++++++++
+ 8 files changed, 1719 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+ create mode 100644 drivers/clk/imx/clk-composite-8m.c
+ create mode 100644 drivers/clk/imx/clk-frac-pll.c
+ create mode 100644 drivers/clk/imx/clk-imx8mq.c
+ create mode 100644 drivers/clk/imx/clk-sccg-pll.c
+ create mode 100644 include/dt-bindings/clock/imx8mq-clock.h
 
-Kevin
-
-P.S.  Looks like I forgot to reply when I applied these, but these are
-      already submitted to arm-soc and merged.
+-- 
+2.7.4
