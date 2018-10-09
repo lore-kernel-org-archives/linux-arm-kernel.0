@@ -1,52 +1,44 @@
 From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Tue,  9 Oct 2018 13:20:21 +0200
-Subject: [PATCH v2 3/3] ARM: socfpga: Turn on ARM errata for L2 cache
-In-Reply-To: <20181009112021.756-1-peron.clem@gmail.com>
-References: <20181009112021.756-1-peron.clem@gmail.com>
-Message-ID: <20181009112021.756-3-peron.clem@gmail.com>
+Date: Tue,  9 Oct 2018 13:20:19 +0200
+Subject: [PATCH v2 1/3] ARM: socfpga: Clean unused functions
+Message-ID: <20181009112021.756-1-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@kernel.org>
+These functions are unused externally, removed them and declare
+the one used locally as static.
 
-Turn on these ARM and PL310 errata for SoCFPGA:
-
-ARM_ERRATA_754322
-ARM_ERRATA_764369
-ARM_ERRATA_775420
-
-PL310_ERRATA_588369
-PL310_ERRATA_727915
-PL310_ERRATA_753970
-PL310_ERRATA_769419
-
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
 ---
+ arch/arm/mach-socfpga/core.h    | 2 --
+ arch/arm/mach-socfpga/socfpga.c | 2 +-
+ 2 files changed, 1 insertion(+), 3 deletions(-)
 
- v2: 
-        - Remove fixes tag in commit log
-
- arch/arm/mach-socfpga/Kconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-index 4adb901dd5eb..a04660918d71 100644
---- a/arch/arm/mach-socfpga/Kconfig
-+++ b/arch/arm/mach-socfpga/Kconfig
-@@ -11,6 +11,13 @@ menuconfig ARCH_SOCFPGA
- 	select HAVE_ARM_TWD if SMP
- 	select MFD_SYSCON
- 	select PCI_DOMAINS if PCI
-+	select ARM_ERRATA_754322
-+	select ARM_ERRATA_764369 if SMP
-+	select ARM_ERRATA_775420
-+	select PL310_ERRATA_588369
-+	select PL310_ERRATA_727915
-+	select PL310_ERRATA_753970 if PL310
-+	select PL310_ERRATA_769419
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 65e1817d8afe..92cae0a9213f 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -34,8 +34,6 @@
  
- if ARCH_SOCFPGA
- config SOCFPGA_SUSPEND
+ #define RSTMGR_MPUMODRST_CPU1		0x2     /* CPU1 Reset */
+ 
+-extern void socfpga_init_clocks(void);
+-extern void socfpga_sysmgr_init(void);
+ void socfpga_init_l2_ecc(void);
+ void socfpga_init_ocram_ecc(void);
+ void socfpga_init_arria10_l2_ecc(void);
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index dde14f7bf2c3..5fb6f79059a8 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -32,7 +32,7 @@ void __iomem *rst_manager_base_addr;
+ void __iomem *sdr_ctl_base_addr;
+ unsigned long socfpga_cpu1start_addr;
+ 
+-void __init socfpga_sysmgr_init(void)
++static void __init socfpga_sysmgr_init(void)
+ {
+ 	struct device_node *np;
+ 
 -- 
 2.17.1
