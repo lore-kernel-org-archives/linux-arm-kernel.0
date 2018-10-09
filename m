@@ -1,8 +1,8 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue,  9 Oct 2018 17:36:58 +0200
-Subject: [PATCH] config: arm: moxart: remove PROVE_LOCKING from defconfig
-References: <CGME20181009153711eucas1p29688c4724f8b9d81a3096dd97a363083@eucas1p2.samsung.com>
-Message-ID: <20181009153711eucas1p29688c4724f8b9d81a3096dd97a363083~b_scuHGMD0310103101eucas1p2i@eucas1p2.samsung.com>
+Date: Tue,  9 Oct 2018 17:36:12 +0200
+Subject: [PATCH] config: arm: omap2: remove PROVE_LOCKING from defconfig
+References: <CGME20181009153624eucas1p2ad30aea33ad1c869f11bd9ca1156d9af@eucas1p2.samsung.com>
+Message-ID: <20181009153624eucas1p2ad30aea33ad1c869f11bd9ca1156d9af~b_rxQW8J90311703117eucas1p2U@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,20 +23,20 @@ Enable this option only when you have some locking issue to investigate.
 
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- arch/arm/configs/moxart_defconfig | 1 -
+ arch/arm/configs/omap2plus_defconfig | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/configs/moxart_defconfig b/arch/arm/configs/moxart_defconfig
-index 2da0d9e..5740d47 100644
---- a/arch/arm/configs/moxart_defconfig
-+++ b/arch/arm/configs/moxart_defconfig
-@@ -136,7 +136,6 @@ CONFIG_DEBUG_SHIRQ=y
- CONFIG_DETECT_HUNG_TASK=y
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_DEBUG_PREEMPT is not set
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 6491419..1bbfd76 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -536,7 +536,6 @@ CONFIG_DEBUG_INFO_SPLIT=y
+ CONFIG_DEBUG_INFO_DWARF4=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_SCHEDSTATS=y
 -CONFIG_PROVE_LOCKING=y
- CONFIG_DMA_API_DEBUG=y
- CONFIG_KGDB=y
- CONFIG_DEBUG_LL=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ CONFIG_SECURITY=y
+ CONFIG_CRYPTO_MICHAEL_MIC=y
 -- 
 2.7.4
