@@ -1,94 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Oct 2018 12:35:10 +0200
-Subject: [PATCH V4 2/2] firmware: imx: add SCU power domain driver
-In-Reply-To: <1538917807-1921-3-git-send-email-aisheng.dong@nxp.com>
-References: <1538917807-1921-1-git-send-email-aisheng.dong@nxp.com>
- <1538917807-1921-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20181009103510.nsnfkx67djuvois6@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 9 Oct 2018 11:38:33 +0100
+Subject: [PATCH] kasan: avoid out-of-bounds in unwind_frame
+In-Reply-To: <1539079863-19645-1-git-send-email-chunhui.li@mediatek.com>
+References: <1539079863-19645-1-git-send-email-chunhui.li@mediatek.com>
+Message-ID: <20181009103833.sk2jyhl77f5fb64r@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
-
-Looks mostly ok to me, some minor comments inside.
-
-On Sun, Oct 07, 2018 at 09:10:07PM +0800, Dong Aisheng wrote:
-> Some i.MX SoCs contain a system controller that is responsible for
-> controlling the state of the IPs that are present. Communication
-> between the host processor running an OS and the system controller
-> happens through a SCU protocol. This patch adds SCU protocol based
-> power domains drivers.
+On Tue, Oct 09, 2018 at 06:11:03PM +0800, Chunhui Li wrote:
+> From: "chunhui.li" <chunhui.li@mediatek.com>
 > 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: linux-pm at vger.kernel.org
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>    kasan detect unwind_frame out-of-bounds error when one task
+> dump another, log as below
+> BUG: KASAN: out-of-bounds in unwind_frame+0x140/0x20c Read of
+> size 8 at addr ffffffea1e2378e0 by task AnrMonitorThrea/1111
+> avoid kasan out-of-bounds error by disable kasan for stacktrace.c
+
+This doesn't look right. Since unwind_frame uses READ_ONCE_NOCHECK(),
+we should never perform an access that KASAN complains about.
+
+I don't think that we should completely disable instrumentation of
+stacktrace.c.
+
+Can you please figure out precisely which line KASAN is complaining
+about? i.e. use scripts/faddr2line.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: chunhui.li <chunhui.li@mediatek.com>
 > ---
-> +static struct generic_pm_domain *imx_sc_pm_add_one_domain(
-> +					struct device_node *np,
-> +					struct generic_pm_domain *genpd_parent)
-> +{
-> +	struct imx_sc_pm_domain *imx_sc_pd;
-> +	u32 rsrc_id;
-> +	int ret;
+>  arch/arm64/kernel/Makefile | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 95ac737..606d0e2 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -57,6 +57,8 @@ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+>  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+>  arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+>  
+> +KASAN_SANITIZE_stacktrace.o := n
 > +
-> +	imx_sc_pd = kzalloc(sizeof(*imx_sc_pd), GFP_KERNEL);
-> +	if (!imx_sc_pd)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	if (!of_property_read_u32(np, "reg", &rsrc_id)) {
-> +		if (rsrc_id > IMX_SC_R_LAST) {
-
-Should this be >= instead?
-
-> +			pr_warn("%pOF: invalid rsrc id %d found", np, rsrc_id);
-> +			ret = -EINVAL;
-> +			goto err;
-> +		}
-> +		imx_sc_pd->rsrc_id = rsrc_id;
-> +	} else {
-> +		imx_sc_pd->rsrc_id = IMX_SC_R_LAST;
-> +	}
-> +
-> +	if (imx_sc_pd->rsrc_id != IMX_SC_R_LAST) {
-> +		imx_sc_pd->pd.power_off = imx_sc_pd_power_off;
-> +		imx_sc_pd->pd.power_on = imx_sc_pd_power_on;
-> +	}
-
-Can be moved into the property exists test above.
-
-> +
-> +	imx_sc_pd->pd.name = np->name;
-> +
-> +	ret = pm_genpd_init(&imx_sc_pd->pd, NULL, true);
-> +	if (ret < 0)
-> +		goto err;
-> +
-> +	if (genpd_parent) {
-> +		ret = pm_genpd_add_subdomain(genpd_parent, &imx_sc_pd->pd);
-> +		if (ret)
-> +			goto err;
-> +	}
-> +
-> +	ret = of_genpd_add_provider_simple(np, &imx_sc_pd->pd);
-> +	if (!ret)
-> +		return &imx_sc_pd->pd;
-> +
-> +	pm_genpd_remove_subdomain(genpd_parent, &imx_sc_pd->pd);
-> +
-> +err:
-> +	pr_warn("failed to add PM domain %pOF: %d\n", np, ret);
-
-You have a struct device *, you should use dev_* functions.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  obj-y					+= $(arm64-obj-y) vdso/ probes/
+>  obj-m					+= $(arm64-obj-m)
+>  head-y					:= head.o
+> -- 
+> 1.9.1
+> 
