@@ -1,93 +1,127 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Tue, 9 Oct 2018 10:17:39 +0200
-Subject: [PATCH v3 3/7] dt-bindings: stm32-mdma: Add DMA/MDMA chaining
- support bindings
-In-Reply-To: <20181007145930.GA2372@vkoul-mobl>
-References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
- <1538139715-24406-4-git-send-email-pierre-yves.mordret@st.com>
- <20181007145930.GA2372@vkoul-mobl>
-Message-ID: <31f5a087-6a83-76ff-dc5c-29e8ecc95744@st.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 9 Oct 2018 10:19:08 +0200
+Subject: [PATCH 2/7] clocksource: exynos_mct: Add arch_timer cooperation
+ mode for ARM64
+In-Reply-To: <20181008125009.3721-3-m.szyprowski@samsung.com>
+References: <CGME20181008125047eucas1p23e520d778ad5f18aba57b21641d4cb4c@eucas1p2.samsung.com>
+ <20181008125009.3721-1-m.szyprowski@samsung.com>
+ <20181008125009.3721-3-m.szyprowski@samsung.com>
+Message-ID: <CAJKOXPeAt_fwVCkCw-8iGprB8Y=Dxj=hx5UyJw1kjsbmMwh2pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 8 Oct 2018 at 14:50, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+> To get ARM Architected Timers working on Samsung Exynos SoCs, one has to
+> first configure and enable Exynos Multi-Core Timer, because they both
+> share some common hardware blocks. This patch adds a mode of cooperation
+> with arch_timer driver, so kernel can use CP15 based timer interface via
+> arch_timer driver, which is mandatory on ARM64. In such mode driver only
+> configures MCT registers and starts the timer but don't register any
+> clocksource or events in the system. Those are left to be handled by
+> arch_timer driver.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/clocksource/exynos_mct.c | 28 ++++++++++++++++++++++------
+>  1 file changed, 22 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 43b335ff4a96..05b201ed8ef5 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -57,6 +57,7 @@
+>  #define TICK_BASE_CNT  1
+>
+>  enum {
+> +       MCT_INT_NONE = 0,
+>         MCT_INT_SPI,
+>         MCT_INT_PPI
+>  };
+> @@ -238,6 +239,9 @@ static int __init exynos4_clocksource_init(void)
+>  {
+>         exynos4_mct_frc_start();
+>
+> +       if (!mct_int_type)
+> +               return 0;
+> +
+>  #if defined(CONFIG_ARM)
+>         exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+>         exynos4_delay_timer.freq = clk_rate;
+> @@ -343,6 +347,9 @@ static struct irqaction mct_comp_event_irq = {
+>
+>  static int exynos4_clockevent_init(void)
+>  {
+> +       if (!mct_int_type)
+> +               return 0;
+> +
+>         mct_comp_device.cpumask = cpumask_of(0);
+>         clockevents_config_and_register(&mct_comp_device, clk_rate,
+>                                         0xf, 0xffffffff);
+> @@ -476,12 +483,12 @@ static int exynos4_mct_starting_cpu(unsigned int cpu)
+>
+>                 irq_force_affinity(evt->irq, cpumask_of(cpu));
+>                 enable_irq(evt->irq);
+> -       } else {
+> +       } else if (mct_int_type == MCT_INT_PPI) {
+>                 enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+>         }
+> -       clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
+> -                                       0xf, 0x7fffffff);
+> -
+> +       if (mct_int_type)
+> +               clockevents_config_and_register(evt,
+> +                              clk_rate / (TICK_BASE_CNT + 1), 0xf, 0x7fffffff);
+>         return 0;
+>  }
+>
+> @@ -496,7 +503,7 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
+>                 if (evt->irq != -1)
+>                         disable_irq_nosync(evt->irq);
+>                 exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+> -       } else {
+> +       } else if (mct_int_type == MCT_INT_PPI) {
+>                 disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+>         }
+>         return 0;
+> @@ -529,7 +536,7 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+>                                          &percpu_mct_tick);
+>                 WARN(err, "MCT: can't request IRQ %d (%d)\n",
+>                      mct_irqs[MCT_L0_IRQ], err);
+> -       } else {
+> +       } else if (mct_int_type == MCT_INT_SPI) {
+>                 for_each_possible_cpu(cpu) {
+>                         int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
+>                         struct mct_clock_event_device *pcpu_mevt =
 
+The error path of cpuhp_setup_state() does not look correct because
+request_percpu_irq() was not called. The error path looks suspicious
+also for MCT_INT_SPI path - the IRQs were allocated with regular
+request_irq but are freed with percpu version.
 
-On 10/07/2018 04:59 PM, Vinod wrote:
-> On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
->> From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->>
->> This patch adds the description of the 2 properties needed to support M2M
->> transfer triggered by STM32 DMA when his transfer is complete.
->>
->> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
->> ---
->>   Version history:
->>     v3:
->>     v2:
->>        * rework content
->>     v1:
->>        * Initial
->> ---
->> ---
->>  Documentation/devicetree/bindings/dma/stm32-mdma.txt | 12 ++++++++----
->>  1 file changed, 8 insertions(+), 4 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
->> index d18772d..27c2812 100644
->> --- a/Documentation/devicetree/bindings/dma/stm32-mdma.txt
->> +++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
->> @@ -10,7 +10,7 @@ Required properties:
->>  - interrupts: Should contain the MDMA interrupt.
->>  - clocks: Should contain the input clock of the DMA instance.
->>  - resets: Reference to a reset controller asserting the DMA controller.
->> -- #dma-cells : Must be <5>. See DMA client paragraph for more details.
->> +- #dma-cells : Must be <6>. See DMA client paragraph for more details.
-> 
-> can you update the example for 6 cells?
+> @@ -573,6 +580,15 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
+>
+>         mct_int_type = int_type;
+>
+> +       if (IS_ENABLED(CONFIG_ARM64) && IS_ENABLED(CONFIG_ARM_ARCH_TIMER)) {
+> +               struct device_node *np = of_find_compatible_node(NULL, NULL,
+> +                                                            "arm,armv8-timer");
+> +               if (np) {
+> +                       mct_int_type = MCT_INT_NONE;
+> +                       of_node_put(np);
 
-of course.
+In this case, later the mct_irqs are being assigned but totally not
+used. Are they needed?
 
-> 
-> Also what happens to dts using 5 cells..
+Best regards,
+Krzysztof
 
-They are not managed, but it should. I will update this flaw. Thanks for
-pointing this out.
-
-> 
->>  
->>  Optional properties:
->>  - dma-channels: Number of DMA channels supported by the controller.
->> @@ -26,7 +26,7 @@ Example:
->>  		interrupts = <122>;
->>  		clocks = <&timer_clk>;
->>  		resets = <&rcc 992>;
->> -		#dma-cells = <5>;
->> +		#dma-cells = <6>;
->>  		dma-channels = <16>;
->>  		dma-requests = <32>;
->>  		st,ahb-addr-masks = <0x20000000>, <0x00000000>;
->> @@ -35,8 +35,8 @@ Example:
->>  * DMA client
->>  
->>  DMA clients connected to the STM32 MDMA controller must use the format
->> -described in the dma.txt file, using a five-cell specifier for each channel:
->> -a phandle to the MDMA controller plus the following five integer cells:
->> +described in the dma.txt file, using a six-cell specifier for each channel:
->> +a phandle to the MDMA controller plus the following six integer cells:
->>  
->>  1. The request line number
->>  2. The priority level
->> @@ -76,6 +76,10 @@ a phandle to the MDMA controller plus the following five integer cells:
->>     if no HW ack signal is used by the MDMA client
->>  5. A 32bit mask specifying the value to be written to acknowledge the request
->>     if no HW ack signal is used by the MDMA client
->> +6. A bitfield value specifying if the MDMA client wants to generate M2M
->> +   transfer with HW trigger (1) or not (0). This bitfield should be only
->> +   enabled for M2M transfer triggered by STM32 DMA client. The memory devices
->> +   involved in this kind of transfer are SRAM and DDR.
->>  
->>  Example:
->>  
->> -- 
->> 2.7.4
-> 
+> +               }
+> +       }
+> +
+>         /* This driver uses only one global timer interrupt */
+>         mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
+>
+> --
+> 2.17.1
+>
