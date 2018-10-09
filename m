@@ -1,154 +1,230 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 9 Oct 2018 18:58:59 +0100
-Subject: [RFC PATCH 2/2] ACPI / PPTT: cacheinfo: Label caches based on
- fw_token
-In-Reply-To: <a68abfd2-1e28-d9e7-919a-8b3133db4d20@arm.com>
-References: <20181005150235.13846-1-james.morse@arm.com>
- <20181005150235.13846-3-james.morse@arm.com>
- <a68abfd2-1e28-d9e7-919a-8b3133db4d20@arm.com>
-Message-ID: <10e15b8d-c0c2-b73a-de31-f87ae0d86469@arm.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Tue, 9 Oct 2018 11:02:29 -0700
+Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <20181005050627.GL32578@linaro.org>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-7-takahiro.akashi@linaro.org>
+ <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
+ <6a8d3ddb-c3bc-c044-4d6c-55e110d89e72@gmail.com>
+ <20181005050627.GL32578@linaro.org>
+Message-ID: <bd3d0472-1bd7-52ed-b9f6-b5edae8c8b6d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
-
-On 09/10/2018 17:45, Jeremy Linton wrote:
-> On 10/05/2018 10:02 AM, James Morse wrote:
->> The resctrl ABI requires caches to have a unique id. This number must
->> be unique across all caches at this level, but doesn't need to be
->> contiguous. (there may be gaps, it may not start at 0).
->> See Documentation/x86/intel_rdt_ui.txt::Cache IDs
->>
->> We want a value that is the same over reboots, and should be the same
->> on identical hardware, even if the PPTT is generated in a different
->> order. The hardware doesn't give us any indication of which caches are
->> shared, so this information must come from firmware tables.
->>
->> Starting with a cacheinfo's fw_token, we walk the table to find all
->> CPUs that share this cpu_node (and thus cache), and take the lowest
->> physical id to use as the id for the cache. On arm64 this value
->> corresponds to the MPIDR.
->>
->> This is only done for unified caches, as instruction/data caches would
->> generate the same id using this scheme.
-
->> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
->> index d1e26cb599bf..9478f8c28158 100644
->> --- a/drivers/acpi/pptt.c
->> +++ b/drivers/acpi/pptt.c
->> @@ -341,6 +341,84 @@ static struct acpi_pptt_cache
->> *acpi_find_cache_node(struct acpi_table_header *ta
->> ? /* total number of attributes checked by the properties code */
->> ? #define PPTT_CHECKED_ATTRIBUTES 4
->> ? +/**
->> + * acpi_pptt_min_physid_from_cpu_node() - Recursivly find @min_physid for all
->> + * leaf CPUs below @cpu_node.
->> + * @table_hdr:??? Pointer to the head of the PPTT table
->> + * @cpu_node:??? The point in the toplogy to start the walk
->> + * @min_physid:??? The min_physid to update with leaf CPUs.
->> + */
->> +void acpi_pptt_min_physid_from_cpu_node(struct acpi_table_header *table_hdr,
->> +??????????????????? struct acpi_pptt_processor *cpu_node,
->> +??????????????????? phys_cpuid_t *min_physid)
->> +{
->> +??? bool leaf = true;
->> +??? u32 acpi_processor_id;
->> +??? phys_cpuid_t cpu_node_phys_id;
->> +??? struct acpi_subtable_header *iter;
->> +??? struct acpi_pptt_processor *iter_node;
->> +??? u32 target_node = ACPI_PTR_DIFF(cpu_node, table_hdr);
->> +??? u32 proc_sz = sizeof(struct acpi_pptt_processor *);
->> +??? unsigned long table_end = (unsigned long)table_hdr + table_hdr->length;
->> +
->> +??? /*
->> +???? * Walk the PPTT, looking for nodes that reference cpu_node
->> +???? * as parent.
->> +???? */
->> +??? iter = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
->> +???????????????? sizeof(struct acpi_table_pptt));
->> +
->> +??? while ((unsigned long)iter + proc_sz < table_end) {
->> +??????? iter_node = (struct acpi_pptt_processor *)iter;
->> +
->> +??????? if (iter->type == ACPI_PPTT_TYPE_PROCESSOR &&
->> +??????????? iter_node->parent == target_node) {
->> +??????????? leaf = false;
->> +??????????? acpi_pptt_min_physid_from_cpu_node(table_hdr, iter_node,
->> +?????????????????????????????? min_physid);
->> +??????? }
->> +
->> +??????? if (iter->length == 0)
->> +??????????? return;
->> +??????? iter = ACPI_ADD_PTR(struct acpi_subtable_header, iter,
->> +??????????????????? iter->length);
->> +??? }
->> +
->> +??? if (leaf && cpu_node->flags & ACPI_PPTT_ACPI_PROCESSOR_ID_VALID) {
->> +??????? acpi_processor_id = cpu_node->acpi_processor_id;
->> +??????? cpu_node_phys_id = acpi_id_to_phys_cpuid(acpi_processor_id);
->> +??????? *min_physid = min(*min_physid, cpu_node_phys_id);
->> +??? }
->> +}
+On 10/04/18 22:06, AKASHI, Takahiro wrote:
+> Frank,
 > 
-> Tho me, is seems a reliable way to acquire a stable id.
+> # I haven't reply to your comments.
 > 
-> My only hangup here is with the recursion (which was avoided elsewhere in this
-> code despite considerable simplification in a couple places). In a reasonable
-> table the tree depth should be quite limited (and not contain any branch loops)
-> but it seems a needless risk. How much worse is the non-recursive version?
-
-I haven't tried, this was just to get the discussion about the cache ids going.
-
-The neatest way I can think of would be to find each cpu, then walk up the
-parent pointers to see if this node is on the path. This avoids allocating
-memory to hold the stuff we haven't done yet when walking down/around.
-
-
-> Also, the first version of the PPTT spec can be read that
-> ACPI_PPTT_ACPI_PROCESSOR_ID_VALID should _not_ be set on leaf nodes. So IMHO a
-> better check is just whether the leaf's processor_id is valid in the MADT.
-> Hopefully this flag becomes more reliable in time...
-
-It can be set for a non-leaf entry, I assumed it would always be set for a leaf.
-Is anyone doing this with a PPTT table?
-
-
->> +static void acpi_pptt_label_cache(struct cacheinfo *this_leaf)
->> +{
->> +??? acpi_status status;
->> +??? struct acpi_table_header *table;
->> +??? struct acpi_pptt_processor *cpu_node;
->> +??? phys_cpuid_t min_physid = PHYS_CPUID_INVALID;
->> +
->> +??? /* Affinity based IDs for non-unified caches would not be unique */
->> +??? if (this_leaf->type != CACHE_TYPE_UNIFIED)
->> +??????? return;
->> +
->> +??? if (!this_leaf->fw_token)
->> +??????? return;
->> +??? cpu_node = this_leaf->fw_token;
->> +
->> +??? status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
->> +??? if (ACPI_FAILURE(status))
->> +??????? return;
->> +
->> +??? acpi_pptt_min_physid_from_cpu_node(table, cpu_node, &min_physid);
->> +??? acpi_put_table(table);
->> +
->> +??? WARN_ON_ONCE(min_physid == PHYS_CPUID_INVALID);
->> +
->> +??? this_leaf->id = ARCH_PHYSID_TO_U32(min_physid);
->> +??? this_leaf->attributes |= CACHE_ID;
->> +}
+> On Fri, Sep 28, 2018 at 02:13:58PM -0700, Frank Rowand wrote:
+>> On 09/28/18 06:44, Rob Herring wrote:
+>>> +David Gibson
+>>>
+>>> On Fri, Sep 28, 2018 at 1:48 AM AKASHI Takahiro
+>>> <takahiro.akashi@linaro.org> wrote:
+>>>>
+>>>> These functions will be used later to handle kexec-specific properties
+>>>> in arm64's kexec_file implementation.
+>>
+>> As I requested in version 14:
+>>
+>>   The intent of the helper functions is related to properties whose values are
+>>    tuples of the same format as the "reg" property of the "/memory" nodes.  For
+>>    example, the "linux,usable-memory-range" and "linux,elfcoredhr" properties of
+>>    the "/chosen" node.
+>>
+>>    The patch header and the function names should be updated to reflect this intent.
 > 
-> To me its seems a little odd to be acpi_get_table()ing inside the PPTT parse
-> routines because we lost the reference via the call to
-> update_cache_properties(). Rather if this routine were called from
-> cache_setup_acpi_cpu() the table could be passed in.
+> I agree regarding the patch header.
+> 
+>>
+>>>>
+>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>> Cc: Frank Rowand <frowand.list@gmail.com>
+>>>> Cc: devicetree at vger.kernel.org
+>>>> ---
+>>
+>> Missing list of changes since version 14.
+> 
+> Sorry for the inconvenience, but a whole change list goes into
+> the cover letter, not individual patches.
 
-Makes sense. This was just the last point the type could be set.
+That works for me, but please add us to the distro list for the cover letter.
 
 
-Thanks,
+>>>>  drivers/of/fdt.c       | 56 ++++++++++++++++++++++++++++++++++++++++++
+>>>>  include/linux/of_fdt.h |  4 +++
+>>>>  2 files changed, 60 insertions(+)
+>>>>
+>>>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>>>> index 800ad252cf9c..c65c31562ccb 100644
+>>>> --- a/drivers/of/fdt.c
+>>>> +++ b/drivers/of/fdt.c
+>>>> @@ -25,6 +25,7 @@
+>>>>  #include <linux/debugfs.h>
+>>>>  #include <linux/serial_core.h>
+>>>>  #include <linux/sysfs.h>
+>>>> +#include <linux/types.h>
+>>>>
+>>>>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+>>>>  #include <asm/page.h>
+>>>> @@ -1323,3 +1324,58 @@ late_initcall(of_fdt_raw_init);
+>>>>  #endif
+>>>>
+>>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>
+>> In v14 I requested:
+>>
+>>    Please add comment:
+>>
+>>    /* helper functions for arm64 kexec */
+> 
+> Okay.
+> 
+>>
+>>>> +
+>>>> +#define FDT_ALIGN(x, a)        (((x) + (a) - 1) & ~((a) - 1))
+>>>> +#define FDT_TAGALIGN(x)        (FDT_ALIGN((x), FDT_TAGSIZE))
+>>>> +
+>>>> +int fdt_prop_len(const char *prop_name, int len)
+>>
+>> In v14, I requested:
+>>
+>>    Please rename as fdt_len_added_prop()
+> 
+> Anyhow, I will drop this function, preferring to new
+> fdt_[address|size]_cells().
+> 
+>> I'm not really happy with my suggested name, but do not have a
+>> better one yet.  As Rob notes, maybe David G will have a helpful
+>> comment.
+>>
+>>>> +{
+>>>> +       return (strlen(prop_name) + 1) +
+>>>> +               sizeof(struct fdt_property) +
+>>>> +               FDT_TAGALIGN(len);
+>>>
+>>> Looks like you are using this to calculate how much space you need to
+>>> allocate in addition to the current DTB for a couple of new or
+>>> replaced properties. I'm not sure that this calculation is completely
+>>> accurate. And it is strange there doesn't seem to be any libfdt
+>>> function for this already. It would be simpler to just add some fixed
+>>> additional amount.
+>>>
+>>> Maybe David G has comments on this?
+> 
+> I'm not quit sure why it's not that accurate, but as I said in a reply to
+> David's comment, I will take your suggestion.
+> 
+>>>> +}
+>>>> +
+>>>
+>>> The rest of this should go in drivers/of/fdt_address.c. Ultimately, it
+>>> should go into libfdt, but I'm fine with having it in the kernel for
+>>> now.
+>>>
+>>>> +static void fill_property(void *buf, u64 val64, int cells)
+>>
+>> In v14 I requested:
+>>
+>> Please rename as cpu64_to_fdt_cells()
+> 
+> I don't mind, but this function may be dropped if Rob sticks to
+> u-boot's fdt_pack_reg() over my fdt_setprop_reg().
 
-James
+I have another comment a couple of minutes ago in the longer thread
+about this function.
+
+
+>>
+>>>> +{
+>>>> +       __be32 val32;
+>>>> +
+>>>> +       while (cells) {
+>>>> +               val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+>>>> +               memcpy(buf, &val32, sizeof(val32));
+>>>> +               buf += sizeof(val32);
+>>>
+>>> This is kind of hard to read. I would copy u-boot's fdt_pack_reg function.
+>>>
+>>> BTW, for purposes of moving to libfdt, we'll need the authors'
+>>> (Masahiro Yamada and Hans de Goede) permission to dual license.
+>>>
+>>>> +       }
+>>>> +}
+>>>> +
+>>>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+>>>> +                                               u64 addr, u64 size)
+>>>> +{
+>>>> +       int addr_cells, size_cells;
+>>
+>> unsigned
+> 
+> fdt_[address|size]_cell() returns an int.
+
+I stand corrected.  They take advantage of the fact that valid values
+are in the range 0..4 and return a negative value for error.
+
+
+>>>> +       char buf[sizeof(__be32) * 2 * 2];
+>>>> +               /* assume dt_root_[addr|size]_cells <= 2 */
+>>>> +       void *prop;
+>>>> +       size_t buf_size;
+>>>> +
+>>>> +       addr_cells = fdt_address_cells(fdt, 0);
+>>>> +       if (addr_cells < 0)
+>>>> +               return addr_cells;
+>>>> +       size_cells = fdt_size_cells(fdt, 0);
+>>>> +       if (size_cells < 0)
+>>>> +               return size_cells;
+>>>> +
+>>>> +       /* if *_cells >= 2, cells can hold 64-bit values anyway */
+>>>> +       if ((addr_cells == 1) && (addr > U32_MAX))
+>>>> +               return -FDT_ERR_BADVALUE;
+>>>> +
+>>>> +       if ((size_cells == 1) && (size > U32_MAX))
+>>>> +               return -FDT_ERR_BADVALUE;
+>>
+>> In v14 I requested:
+>>
+>>    Should also check that base + size does not wrap around.
+> 
+> Okay, I will start discussion, as you have suggested, in devicetree-spec ML.
+> 
+> Thanks,
+> -Takahiro Akashi
+> 
+>>
+>>>> +
+>>>> +       buf_size = (addr_cells + size_cells) * sizeof(u32);
+>>>> +       prop = buf;
+>>>> +
+>>>> +       fill_property(prop, addr, addr_cells);
+>>>> +       prop += addr_cells * sizeof(u32);
+>>>> +
+>>>> +       fill_property(prop, size, size_cells);
+>>>> +
+>>>> +       return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
+>>>> +}
+>>>> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+>>>> index b9cd9ebdf9b9..842af6ea92ea 100644
+>>>> --- a/include/linux/of_fdt.h
+>>>> +++ b/include/linux/of_fdt.h
+>>>> @@ -108,5 +108,9 @@ static inline void unflatten_device_tree(void) {}
+>>>>  static inline void unflatten_and_copy_device_tree(void) {}
+>>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>>>
+>>>> +int fdt_prop_len(const char *prop_name, int len);
+>>>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+>>>> +                                               u64 addr, u64 size);
+>>>> +
+>>>>  #endif /* __ASSEMBLY__ */
+>>>>  #endif /* _LINUX_OF_FDT_H */
+>>>> --
+>>>> 2.19.0
+>>>>
+>>>
+>>
+> 
