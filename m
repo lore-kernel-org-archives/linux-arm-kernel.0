@@ -1,160 +1,248 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Oct 2018 16:26:10 +0100
-Subject: [PATCH] arm64: Fix /proc/iomem for reserved but not memory regions
-In-Reply-To: <20181009110830.13331-1-james.morse@arm.com>
-References: <20181009110830.13331-1-james.morse@arm.com>
-Message-ID: <20181009152610.GA9259@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 9 Oct 2018 16:28:00 +0100
+Subject: [PATCH v15 11/16] arm64: kexec_file: allow for loading
+ Image-format kernel
+In-Reply-To: <20180928064841.14117-12-takahiro.akashi@linaro.org>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-12-takahiro.akashi@linaro.org>
+Message-ID: <20181009152759.x24xuiwb3zsg4jx7@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Fri, Sep 28, 2018 at 03:48:36PM +0900, AKASHI Takahiro wrote:
+> This patch provides kexec_file_ops for "Image"-format kernel. In this
+> implementation, a binary is always loaded with a fixed offset identified
+> in text_offset field of its header.
+> 
+> Regarding signature verification for trusted boot, this patch doesn't
+> contains CONFIG_KEXEC_VERIFY_SIG support, which is to be added later
+> in this series, but file-attribute-based verification is still a viable
+> option by enabling IMA security subsystem.
+> 
+> You can sign(label) a to-be-kexec'ed kernel image on target file system
+> with:
+>     $ evmctl ima_sign --key /path/to/private_key.pem Image
+> 
+> On live system, you must have IMA enforced with, at least, the following
+> security policy:
+>     "appraise func=KEXEC_KERNEL_CHECK appraise_type=imasig"
+> 
+> See more details about IMA here:
+>     https://sourceforge.net/p/linux-ima/wiki/Home/
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/include/asm/kexec.h         |  28 +++++++
+>  arch/arm64/kernel/Makefile             |   2 +-
+>  arch/arm64/kernel/kexec_image.c        | 108 +++++++++++++++++++++++++
+>  arch/arm64/kernel/machine_kexec_file.c |   1 +
+>  4 files changed, 138 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/kernel/kexec_image.c
+> 
+> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> index 157b2897d911..5e673481b3a3 100644
+> --- a/arch/arm64/include/asm/kexec.h
+> +++ b/arch/arm64/include/asm/kexec.h
+> @@ -101,6 +101,34 @@ struct kimage_arch {
+>  	unsigned long dtb_mem;
+>  };
+>  
+> +/**
+> + * struct arm64_image_header - arm64 kernel image header
+> + * See Documentation/arm64/booting.txt for details
+> + *
+> + * @mz_magic: DOS header magic number ('MZ', optional)
 
-On Tue, Oct 09, 2018 at 12:08:30PM +0100, James Morse wrote:
-> We describe ranges of 'reserved' memory to userspace via /proc/iomem.
-> commit 50d7ba36b916 ("arm64: export memblock_reserve()d regions via
-> /proc/iomem") updated the logic to export regions that were reserved
-> because their contents should be preserved. This allowed kexec-tools
-> to tell the difference between 'reserved' memory that must be
-> preserved and not overwritten, (e.g. the ACPI tables), and 'nomap'
-> memory that must not be touched without knowing the memory-attributes
-> (e.g. RAS CPER regions).
-> 
-> Because kexec-tools generates the kdump /proc/vmcore elf headers
-> from this file, the difference matters for 'reserved' memory, which
-> should be included in the /proc/vmcore, while 'nomap' should not.
-> (previously we only described 'nomap', which meant kexec could
-> overwrite 'reserved' memory by accident).
-> 
-> The above commit wrongly assumed that memblock_reserve() would not
-> be used to reserve regions that aren't memory. It turns out this is
-> exactly what early_init_dt_reserve_memory_arch() will do if it finds
-> a DT reserved-memory that was also carved out of the memory node.
-> The ramoops description on hikey and dragonboard-410c both do this.
-> 
-> This surprises reserve_memblock_reserved_regions() which finds a
-> reserved-memory range wasn't previously described as memory. It generates
-> a warning and describes the region as reserved. (adding this entry was
-> expected to fail and return the conflicting memory resource)
-> 
-> To work around this on systems with shipped DT files that do this,
-> reserve_memblock_reserved_regions() needs to cope with reserved
-> regions that aren't memory, which means we must walk two lists at once.
-> 
-> We can't use walk_system_ram_res() and reserve_region_with_split()
-> together, as the former hands its callback a copied resource on
-> the stack, where as the latter expects the in-tree resource to be
-> provided.
-> 
-> Allocate an array of struct resources during request_standard_resources()
-> so that we have all the 'System RAM' regions on hand.
-> 
-> We walk the reserved_mem_region, using mem_idx as a cursor in the
-> array of 'System RAM'. Adjacent memblock_reserved() regions will be merged,
-> so we consider multiple System RAM regions for one span of
-> memblock_reserved(). We don't always move the cursor as multiple
-> memblock_reserved() regions may exist in one System RAM region.
+Please just call this code0. If CONFIG_EFI is disabled, it is not 'MZ'.
 
-The last 3 paragraphs here are just describing the code, which I don't think
-you need to bother with in the commit message. If you want to justify not
-using walk_system_ram_res(), I'd do that in a comment.
-
-> @@ -244,8 +252,11 @@ static void __init request_standard_resources(void)
->  static int __init reserve_memblock_reserved_regions(void)
->  {
->  	phys_addr_t start, end, roundup_end = 0;
-> -	struct resource *mem, *res;
-> -	u64 i;
-> +	struct resource *mem;
-> +	u64 i, mem_idx = 0;
+> + * @code1: Instruction (branch to stext)
+> + * @text_offset: Image load offset
+> + * @image_size: Effective image size
+> + * @flags: Bit-field flags
+> + * @reserved: Reserved
+> + * @magic: Magic number
+> + * @pe_header: Offset to PE COFF header (optional)
+> + **/
 > +
-> +	if (!standard_resources)
-> +		return 0;
+> +struct arm64_image_header {
+> +	__le16 mz_magic; /* also code0 */
+> +	__le16 pad;
+
+Likewise, just have __le32 code0 here, please.
+
+> +	__le32 code1;
+> +	__le64 text_offset;
+> +	__le64 image_size;
+> +	__le64 flags;
+> +	__le64 reserved[3];
+> +	__le32 magic;
+> +	__le32 pe_header;
+> +};
+> +
+> +extern const struct kexec_file_ops kexec_image_ops;
+> +
+>  struct kimage;
 >  
->  	for_each_reserved_mem_region(i, &start, &end) {
->  		if (end <= roundup_end)
-> @@ -255,24 +266,25 @@ static int __init reserve_memblock_reserved_regions(void)
->  		end = __pfn_to_phys(PFN_UP(end)) - 1;
->  		roundup_end = end;
->  
-> -		res = kzalloc(sizeof(*res), GFP_ATOMIC);
-> -		if (WARN_ON(!res))
-> -			return -ENOMEM;
-> -		res->start = start;
-> -		res->end = end;
-> -		res->name  = "reserved";
-> -		res->flags = IORESOURCE_MEM;
-> +		while (start > standard_resources[mem_idx].end) {
-> +			mem_idx++;
-> +			if (mem_idx >= num_standard_resources)
-> +				return 0; /* no more 'System RAM' */
+>  extern int arch_kimage_file_post_load_cleanup(struct kimage *image);
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 030a39bff117..48868255f09c 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -51,7 +51,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+>  arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+>  arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
+>  					   cpu-reset.o
+> -arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
+> +arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
+>  arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+>  arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+>  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
+> new file mode 100644
+> index 000000000000..d64f5e9f9d22
+> --- /dev/null
+> +++ b/arch/arm64/kernel/kexec_image.c
+> @@ -0,0 +1,108 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Kexec image loader
+> +
+> + * Copyright (C) 2018 Linaro Limited
+> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> + */
+> +
+> +#define pr_fmt(fmt)	"kexec_file(Image): " fmt
+> +
+> +#include <linux/err.h>
+> +#include <linux/errno.h>
+> +#include <linux/kernel.h>
+> +#include <linux/kexec.h>
+> +#include <linux/string.h>
+> +#include <asm/boot.h>
+> +#include <asm/byteorder.h>
+> +#include <asm/cpufeature.h>
+> +#include <asm/memory.h>
+> +
+> +static int image_probe(const char *kernel_buf, unsigned long kernel_len)
+> +{
+> +	const struct arm64_image_header *h;
+> +
+> +	h = (const struct arm64_image_header *)(kernel_buf);
+> +
+> +	if (!h || (kernel_len < sizeof(*h)) ||
+> +			memcmp(&h->magic, ARM64_MAGIC, sizeof(h->magic)))
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+> +
+> +static void *image_load(struct kimage *image,
+> +				char *kernel, unsigned long kernel_len,
+> +				char *initrd, unsigned long initrd_len,
+> +				char *cmdline, unsigned long cmdline_len)
+> +{
+> +	struct arm64_image_header *h;
+> +	u64 flags, value;
+> +	struct kexec_buf kbuf;
+> +	unsigned long text_offset;
+> +	struct kexec_segment *kernel_segment;
+> +	int ret;
+> +
+> +	/* Don't support old kernel */
+> +	h = (struct arm64_image_header *)kernel;
+> +	if (!h->text_offset)
+> +		return ERR_PTR(-EINVAL);
 
-It might just be me, but I find the control flow here pretty hard to reason
-about. In fact, the way I managed to understand it was by writing my own
-implementation and gradually figuring out why you need all of the checks
-that you have here :)
+It's entirely valid for TEXT_OFFSET to be zero when
+RANDOMIZE_TEXT_OFFSET is selected.
 
-The version I came up with is below, which I think I prefer, but I would
-say that wouldn't I? What do you think? Is there something I've missed?
+I think you meant to check image_size here.
 
-It's fairly "dumb" compared to your code (i.e. it always looks at all the
-reserved regions) but this is __init code, so I don't think it matters.
+We could do with a better comment, too, e.g.
 
-Will
+	/*
+	 * We require a kernel with an unambiguous Image header. Per
+	 * Documentation/booting.txt, this is the case when image_size
+	 * is non-zero (practically speaking, since v3.17).
+	 */
+	if (!h->image_size)
+		return ERR_PTR(-EINVAL);
 
---->8
+> +
+> +	/* Check cpu features */
+> +	flags = le64_to_cpu(h->flags);
+> +	value = head_flag_field(flags, HEAD_FLAG_BE);
+> +	if (((value == HEAD_FLAG_BE) && !IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)) ||
+> +	    ((value != HEAD_FLAG_BE) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)))
+> +		if (!system_supports_mixed_endian())
+> +			return ERR_PTR(-EINVAL);
 
-@@ -243,36 +251,26 @@ static void __init request_standard_resources(void)
- 
- static int __init reserve_memblock_reserved_regions(void)
- {
--	phys_addr_t start, end, roundup_end = 0;
--	struct resource *mem, *res;
--	u64 i;
--
--	for_each_reserved_mem_region(i, &start, &end) {
--		if (end <= roundup_end)
--			continue; /* done already */
--
--		start = __pfn_to_phys(PFN_DOWN(start));
--		end = __pfn_to_phys(PFN_UP(end)) - 1;
--		roundup_end = end;
--
--		res = kzalloc(sizeof(*res), GFP_ATOMIC);
--		if (WARN_ON(!res))
--			return -ENOMEM;
--		res->start = start;
--		res->end = end;
--		res->name  = "reserved";
--		res->flags = IORESOURCE_MEM;
--
--		mem = request_resource_conflict(&iomem_resource, res);
--		/*
--		 * We expected memblock_reserve() regions to conflict with
--		 * memory created by request_standard_resources().
--		 */
--		if (WARN_ON_ONCE(!mem))
-+	u64 i, j;
-+
-+	for (i = 0; i < num_standard_resources; ++i) {
-+		struct resource *mem = &standard_resources[i];
-+		phys_addr_t r_start, r_end, mem_size = mem->end - mem->start;
-+
-+		if (!memblock_is_region_reserved(mem->start, mem_size))
- 			continue;
--		kfree(res);
- 
--		reserve_region_with_split(mem, start, end, "reserved");
-+		for_each_reserved_mem_region(j, &r_start, &r_end) {
-+			resource_size_t start, end;
-+
-+			start = max(PFN_PHYS(PFN_DOWN(r_start)), mem->start);
-+			end = min(PFN_PHYS(PFN_UP(r_end)), mem->end);
-+
-+			if (start > mem->end || end < mem->start)
-+				continue;
-+
-+			reserve_region_with_split(mem, start, end, "reserved");
-+		}
- 	}
- 
- 	return 0;
+I think this can be simplified:
+
+	bool be_image = head_flag_field(flags, HEAD_FLAG_BE);
+	bool be_kernel = IS_ENABLED(CONFIG_CPU_BIG_ENDIAN);
+
+	if ((be_image != be_kernel) && !system_supports_mixed_endian)
+	    		return ERR_PTR(-EINVAL);
+
+... though do we need to police this at all? It's arguably policy given
+the new image has to be signed anyway), and there are other fields that
+could fall into that category in future.
+
+> +
+> +	value = head_flag_field(flags, HEAD_FLAG_PAGE_SIZE);
+> +	if (((value == HEAD_FLAG_PAGE_SIZE_4K) &&
+> +			!system_supports_4kb_granule()) ||
+> +	    ((value == HEAD_FLAG_PAGE_SIZE_64K) &&
+> +			!system_supports_64kb_granule()) ||
+> +	    ((value == HEAD_FLAG_PAGE_SIZE_16K) &&
+> +			!system_supports_16kb_granule()))
+> +		return ERR_PTR(-EINVAL);
+
+... likewise here?
+
+> +
+> +	/* Load the kernel */
+> +	kbuf.image = image;
+> +	kbuf.buf_min = 0;
+> +	kbuf.buf_max = ULONG_MAX;
+> +	kbuf.top_down = false;
+> +
+> +	kbuf.buffer = kernel;
+> +	kbuf.bufsz = kernel_len;
+> +	kbuf.mem = 0;
+> +	kbuf.memsz = le64_to_cpu(h->image_size);
+> +	text_offset = le64_to_cpu(h->text_offset);
+> +	kbuf.buf_align = MIN_KIMG_ALIGN;
+> +
+> +	/* Adjust kernel segment with TEXT_OFFSET */
+> +	kbuf.memsz += text_offset;
+
+It's very surprising at first glance to add text_offset here, then undo
+that below. This should have a better comment explaining what we're
+doing.
+
+> +
+> +	ret = kexec_add_buffer(&kbuf);
+> +	if (ret)
+> +		return ERR_PTR(ret);
+> +
+> +	kernel_segment = &image->segment[image->nr_segments - 1];
+
+I'm confused here. When/how can the image have muliple segments?
+
+> +	kernel_segment->mem += text_offset;
+> +	kernel_segment->memsz -= text_offset;
+> +	image->start = kernel_segment->mem;
+
+As above, I don't like the fact that we're altering the result of
+kexec_add_buffer here. It feels fragile, even if it works today.
+
+Can we teach the core kexec buffer code that we need an offset from an
+aligned base?
+
+Thanks,
+Mark.
