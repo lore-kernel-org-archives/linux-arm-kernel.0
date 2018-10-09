@@ -1,83 +1,94 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 9 Oct 2018 12:20:29 +0200
-Subject: [PATCH v3 1/2] Driver core: add bus_find_device_by_fwnode
-In-Reply-To: <1539080245-25818-1-git-send-email-svellattu@mvista.com>
-References: <1539080245-25818-1-git-send-email-svellattu@mvista.com>
-Message-ID: <CAJZ5v0joQi-N=-6TUMUQXQbxYtvS2AOLJD3KUqUAL-w9hJTQeg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 9 Oct 2018 12:35:10 +0200
+Subject: [PATCH V4 2/2] firmware: imx: add SCU power domain driver
+In-Reply-To: <1538917807-1921-3-git-send-email-aisheng.dong@nxp.com>
+References: <1538917807-1921-1-git-send-email-aisheng.dong@nxp.com>
+ <1538917807-1921-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181009103510.nsnfkx67djuvois6@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2018 at 12:18 PM Silesh C V <svellattu@mvista.com> wrote:
->
-> Some drivers need to find the device on a bus having a specific firmware
-> node. Currently, such drivers have their own implementations to do this.
-> Provide a helper similar to bus_find_device_by_name so that each driver
-> does not have to reinvent this.
->
-> Signed-off-by: Silesh C V <svellattu@mvista.com>
+Hi Dong,
 
-Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Looks mostly ok to me, some minor comments inside.
 
+On Sun, Oct 07, 2018 at 09:10:07PM +0800, Dong Aisheng wrote:
+> Some i.MX SoCs contain a system controller that is responsible for
+> controlling the state of the IPs that are present. Communication
+> between the host processor running an OS and the system controller
+> happens through a SCU protocol. This patch adds SCU protocol based
+> power domains drivers.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: linux-pm at vger.kernel.org
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
-> Changes since v2:
->         - make use of dev_fwnode in match_fwnode.
->
->  drivers/base/bus.c     | 20 ++++++++++++++++++++
->  include/linux/device.h |  3 +++
->  2 files changed, 23 insertions(+)
->
-> diff --git a/drivers/base/bus.c b/drivers/base/bus.c
-> index 8bfd27e..a2f39db 100644
-> --- a/drivers/base/bus.c
-> +++ b/drivers/base/bus.c
-> @@ -17,6 +17,7 @@
->  #include <linux/string.h>
->  #include <linux/mutex.h>
->  #include <linux/sysfs.h>
-> +#include <linux/property.h>
->  #include "base.h"
->  #include "power/power.h"
->
-> @@ -373,6 +374,25 @@ struct device *bus_find_device_by_name(struct bus_type *bus,
->  }
->  EXPORT_SYMBOL_GPL(bus_find_device_by_name);
->
-> +static int match_fwnode(struct device *dev, void *fwnode)
+> +static struct generic_pm_domain *imx_sc_pm_add_one_domain(
+> +					struct device_node *np,
+> +					struct generic_pm_domain *genpd_parent)
 > +{
-> +       return dev_fwnode(dev) == fwnode;
-> +}
+> +	struct imx_sc_pm_domain *imx_sc_pd;
+> +	u32 rsrc_id;
+> +	int ret;
 > +
-> +/**
-> + * bus_find_device_by_fwnode - device iterator for locating a particular device
-> + * having a specific firmware node
-> + * @bus: bus type
-> + * @start: Device to begin with
-> + * @fwnode: firmware node of the device to match
-> + */
-> +struct device *bus_find_device_by_fwnode(struct bus_type *bus, struct device *start,
-> +                                       struct fwnode_handle *fwnode)
-> +{
-> +       return bus_find_device(bus, start, (void *)fwnode, match_fwnode);
-> +}
-> +EXPORT_SYMBOL_GPL(bus_find_device_by_fwnode);
+> +	imx_sc_pd = kzalloc(sizeof(*imx_sc_pd), GFP_KERNEL);
+> +	if (!imx_sc_pd)
+> +		return ERR_PTR(-ENOMEM);
 > +
->  /**
->   * subsys_find_device_by_id - find a device with a specific enumeration number
->   * @subsys: subsystem
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index 8f88254..09384f6 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -171,6 +171,9 @@ struct device *bus_find_device(struct bus_type *bus, struct device *start,
->  struct device *bus_find_device_by_name(struct bus_type *bus,
->                                        struct device *start,
->                                        const char *name);
-> +struct device *bus_find_device_by_fwnode(struct bus_type *bus,
-> +                                      struct device *start,
-> +                                      struct fwnode_handle *fwnode);
->  struct device *subsys_find_device_by_id(struct bus_type *bus, unsigned int id,
->                                         struct device *hint);
->  int bus_for_each_drv(struct bus_type *bus, struct device_driver *start,
-> --
-> 1.9.1
->
+> +	if (!of_property_read_u32(np, "reg", &rsrc_id)) {
+> +		if (rsrc_id > IMX_SC_R_LAST) {
+
+Should this be >= instead?
+
+> +			pr_warn("%pOF: invalid rsrc id %d found", np, rsrc_id);
+> +			ret = -EINVAL;
+> +			goto err;
+> +		}
+> +		imx_sc_pd->rsrc_id = rsrc_id;
+> +	} else {
+> +		imx_sc_pd->rsrc_id = IMX_SC_R_LAST;
+> +	}
+> +
+> +	if (imx_sc_pd->rsrc_id != IMX_SC_R_LAST) {
+> +		imx_sc_pd->pd.power_off = imx_sc_pd_power_off;
+> +		imx_sc_pd->pd.power_on = imx_sc_pd_power_on;
+> +	}
+
+Can be moved into the property exists test above.
+
+> +
+> +	imx_sc_pd->pd.name = np->name;
+> +
+> +	ret = pm_genpd_init(&imx_sc_pd->pd, NULL, true);
+> +	if (ret < 0)
+> +		goto err;
+> +
+> +	if (genpd_parent) {
+> +		ret = pm_genpd_add_subdomain(genpd_parent, &imx_sc_pd->pd);
+> +		if (ret)
+> +			goto err;
+> +	}
+> +
+> +	ret = of_genpd_add_provider_simple(np, &imx_sc_pd->pd);
+> +	if (!ret)
+> +		return &imx_sc_pd->pd;
+> +
+> +	pm_genpd_remove_subdomain(genpd_parent, &imx_sc_pd->pd);
+> +
+> +err:
+> +	pr_warn("failed to add PM domain %pOF: %d\n", np, ret);
+
+You have a struct device *, you should use dev_* functions.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
