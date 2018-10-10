@@ -1,77 +1,90 @@
 From: kernel@esmil.dk (Emil Renner Berthing)
-Date: Wed, 10 Oct 2018 11:00:37 +0200
-Subject: [PATCH 6/7] spi: rockchip: directly use direction constants
+Date: Wed, 10 Oct 2018 11:00:38 +0200
+Subject: [PATCH 7/7] spi: rockchip: simplify spi enable logic
 In-Reply-To: <20181010090038.20834-1-kernel@esmil.dk>
 References: <20181010090038.20834-1-kernel@esmil.dk>
-Message-ID: <20181010090038.20834-7-kernel@esmil.dk>
+Message-ID: <20181010090038.20834-8-kernel@esmil.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma direction for the tx and rx dma channels never
-change, so just use the constants directly rather
-than storing them in device data.
+Let the dma/non-dma code paths handle the spi enable
+flag themselves. This removes some logic to determine
+if the flag should be turned on before or after dma
+and also don't leave the spi enabled if the dma path
+fails.
 
 Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
 ---
- drivers/spi/spi-rockchip.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ drivers/spi/spi-rockchip.c | 28 +++++++++-------------------
+ 1 file changed, 9 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 1d8bf45304a5..1044849a352d 100644
+index 1044849a352d..51ef632bca52 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -164,7 +164,6 @@ enum rockchip_ssi_type {
+@@ -379,6 +379,8 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
+ {
+ 	int remain = 0;
  
- struct rockchip_spi_dma_data {
- 	struct dma_chan *ch;
--	enum dma_transfer_direction direction;
- 	dma_addr_t addr;
- };
++	spi_enable_chip(rs, 1);
++
+ 	do {
+ 		if (rs->tx) {
+ 			remain = rs->tx_end - rs->tx;
+@@ -501,6 +503,8 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ 		dma_async_issue_pending(rs->dma_rx.ch);
+ 	}
  
-@@ -454,7 +453,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
++	spi_enable_chip(rs, 1);
++
+ 	if (txdesc) {
+ 		spin_lock_irqsave(&rs->lock, flags);
+ 		rs->state |= TXBUSY;
+@@ -509,7 +513,8 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ 		dma_async_issue_pending(rs->dma_tx.ch);
+ 	}
  
- 	rxdesc = NULL;
- 	if (rs->rx) {
--		rxconf.direction = rs->dma_rx.direction;
-+		rxconf.direction = DMA_DEV_TO_MEM;
- 		rxconf.src_addr = rs->dma_rx.addr;
- 		rxconf.src_addr_width = rs->n_bytes;
- 		rxconf.src_maxburst = 1;
-@@ -463,7 +462,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 		rxdesc = dmaengine_prep_slave_sg(
- 				rs->dma_rx.ch,
- 				rs->rx_sg.sgl, rs->rx_sg.nents,
--				rs->dma_rx.direction, DMA_PREP_INTERRUPT);
-+				DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
- 		if (!rxdesc)
- 			return -EINVAL;
+-	return 0;
++	/* 1 means the transfer is in progress */
++	return 1;
+ }
  
-@@ -473,7 +472,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ static void rockchip_spi_config(struct rockchip_spi *rs)
+@@ -592,7 +597,6 @@ static int rockchip_spi_transfer_one(
+ 		struct spi_device *spi,
+ 		struct spi_transfer *xfer)
+ {
+-	int ret = 0;
+ 	struct rockchip_spi *rs = spi_master_get_devdata(master);
  
- 	txdesc = NULL;
- 	if (rs->tx) {
--		txconf.direction = rs->dma_tx.direction;
-+		txconf.direction = DMA_MEM_TO_DEV;
- 		txconf.dst_addr = rs->dma_tx.addr;
- 		txconf.dst_addr_width = rs->n_bytes;
- 		txconf.dst_maxburst = rs->fifo_len / 2;
-@@ -482,7 +481,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 		txdesc = dmaengine_prep_slave_sg(
- 				rs->dma_tx.ch,
- 				rs->tx_sg.sgl, rs->tx_sg.nents,
--				rs->dma_tx.direction, DMA_PREP_INTERRUPT);
-+				DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT);
- 		if (!txdesc) {
- 			if (rxdesc)
- 				dmaengine_terminate_sync(rs->dma_rx.ch);
-@@ -778,8 +777,6 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 	if (rs->dma_tx.ch && rs->dma_rx.ch) {
- 		rs->dma_tx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_TXDR);
- 		rs->dma_rx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_RXDR);
--		rs->dma_tx.direction = DMA_MEM_TO_DEV;
--		rs->dma_rx.direction = DMA_DEV_TO_MEM;
+ 	WARN_ON(readl_relaxed(rs->regs + ROCKCHIP_SPI_SSIENR) &&
+@@ -636,24 +640,10 @@ static int rockchip_spi_transfer_one(
  
- 		master->can_dma = rockchip_spi_can_dma;
- 		master->dma_tx = rs->dma_tx.ch;
+ 	rockchip_spi_config(rs);
+ 
+-	if (rs->use_dma) {
+-		if (rs->tmode == CR0_XFM_RO) {
+-			/* rx: dma must be prepared first */
+-			ret = rockchip_spi_prepare_dma(rs);
+-			spi_enable_chip(rs, 1);
+-		} else {
+-			/* tx or tr: spi must be enabled first */
+-			spi_enable_chip(rs, 1);
+-			ret = rockchip_spi_prepare_dma(rs);
+-		}
+-		/* successful DMA prepare means the transfer is in progress */
+-		ret = ret ? ret : 1;
+-	} else {
+-		spi_enable_chip(rs, 1);
+-		ret = rockchip_spi_pio_transfer(rs);
+-	}
++	if (rs->use_dma)
++		return rockchip_spi_prepare_dma(rs);
+ 
+-	return ret;
++	return rockchip_spi_pio_transfer(rs);
+ }
+ 
+ static bool rockchip_spi_can_dma(struct spi_master *master,
 -- 
 2.19.1
