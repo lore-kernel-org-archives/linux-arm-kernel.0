@@ -1,69 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 10 Oct 2018 13:59:27 -0500
-Subject: [Question] directory for SoC-related DT binding
-In-Reply-To: <93cd9c43-6fe3-c691-005b-e27cf101c7d6@i2se.com>
-References: <CAK7LNATaD=G8BW316fkBWM2A+YXgP5tabaySR2Fs49Za_0p=3Q@mail.gmail.com>
- <CABGGisx-iLr+CQ=JjmHEe5J_Qqpf0yrgOmSOHa74GnfwE_RKsA@mail.gmail.com>
- <93cd9c43-6fe3-c691-005b-e27cf101c7d6@i2se.com>
-Message-ID: <CAL_JsqK_MDQvePhEGJsk5CRQuzkOo+s3QjF7hcNZp_dVsbc9zQ@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 10 Oct 2018 14:05:43 -0500
+Subject: [PATCH v3 2/2] treewide: use bus_find_device_by_fwnode
+In-Reply-To: <CALabi0FgQWGL8KMpCKt9N6Kkoig77LxOsea3Oe47tk5nOH10-Q@mail.gmail.com>
+References: <1539080245-25818-1-git-send-email-svellattu@mvista.com>
+ <1539080245-25818-2-git-send-email-svellattu@mvista.com>
+ <20181009174428.GB2182@xps15>
+ <CALabi0FgQWGL8KMpCKt9N6Kkoig77LxOsea3Oe47tk5nOH10-Q@mail.gmail.com>
+Message-ID: <CAL_JsqJsF0Zr=chBQ_Euq+27TJftpSR5dpi-tYyiwEFdsEh6vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 7:04 AM Stefan Wahren <stefan.wahren@i2se.com> wrote:
+On Tue, Oct 9, 2018 at 9:59 PM Silesh C V <svellattu@mvista.com> wrote:
 >
-> Hi,
+> Hello Mathieu,
 >
-> Am 10.10.2018 um 13:19 schrieb Rob Herring:
-> > On Wed, Oct 10, 2018 at 6:08 AM Masahiro Yamada
-> > <yamada.masahiro@socionext.com> wrote:
-> >> Hi,
-> >>
-> >>
-> >> I see a bunch of vendor (or SoC) names in
-> >> Documentation/device/bindings/arm/
-> >>
-> >> ./Documentation/devicetree/bindings/arm/altera
-> >> ./Documentation/devicetree/bindings/arm/amlogic
-> > Yeah, it's kind of a mixture of board/soc bindings mostly with some
-> > ARM architecture, ARM, Ltd. IP, and SoC system reg bindings.
+> On Tue, Oct 9, 2018 at 11:14 PM Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
 > >
-> > Eventually, I'd like to not split board bindings by arch and maybe we
-> > should move all the system/misc reg bindings out.
 > >
-> > [,,,]
-> >
-> >> I also see some vendor names in
-> >> Documentation/device/bindings/soc/
-> >>
-> >> ./Documentation/devicetree/bindings/soc/bcm
-> >> ./Documentation/devicetree/bindings/soc/dove
-> >> ./Documentation/devicetree/bindings/soc/fsl
-> >> ./Documentation/devicetree/bindings/soc/mediatek
-> >> ./Documentation/devicetree/bindings/soc/qcom
-> >> ./Documentation/devicetree/bindings/soc/rockchip
-> >> ./Documentation/devicetree/bindings/soc/ti
-> >> ./Documentation/devicetree/bindings/soc/xilinx
-> >> ./Documentation/devicetree/bindings/soc/zte
-> > This I believe is mostly SoC system reg bindings though there's
-> > probably a few other things.
-> >
-> >> Confusingly, I see bcm, mediatek, rockchip
-> >> in both locations.
-> >>
-> >> Is there any rule to choose one than the other?
-> > Top-level SoC/board bindings in arm/ and anything else elsewhere ideally.
+> > This doesn't apply on linux-next.  This late in the cycle you may want to rebase
+> > your work on that tree.
 >
-> in case of Documentation/devicetree/bindings/soc/bcm the directory
-> contains SoC / board bindings, cpu-enable and a firmware binding.
->
-> Is there any action required?
+> OK. Will send v4 after rebasing onto linux-next.
 
-If there's a better location based on class/function, then moving them
-would be nice.
-
-> Btw the Broadcom SoC / boards from this directory has been left out for
-> the yaml conversion [1] was this intended?
-
-Yes, I'm not planning to convert all bindings for everyone myself.
+That doesn't help anything unless you are targeting 4.21. If you are
+it would be easiest to apply patch 1 in 4.20 and split this patch by
+subsystem for 4.21. That avoids any cross subsystem dependencies.
 
 Rob
