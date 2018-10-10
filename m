@@ -1,52 +1,76 @@
-From: vkoul@kernel.org (Vinod)
-Date: Wed, 10 Oct 2018 09:33:43 +0530
-Subject: [PATCH v3 4/7] dmaengine: stm32-dma: Add DMA/MDMA chaining support
-In-Reply-To: <e9cedfdd-ad90-9123-03bb-34a2e84059c5@st.com>
-References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
- <1538139715-24406-5-git-send-email-pierre-yves.mordret@st.com>
- <20181007160030.GB2372@vkoul-mobl>
- <e9cedfdd-ad90-9123-03bb-34a2e84059c5@st.com>
-Message-ID: <20181010040343.GO2372@vkoul-mobl>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 10 Oct 2018 12:22:40 +0800
+Subject: [PATCH v2 2/2] arm/arm64: KVM: enable 32 bits kvm vcpu events
+ support
+In-Reply-To: <3e6a7a5f-3ff9-b7db-b1f6-87a8fdf5c20c@arm.com>
+References: <1539002088-21215-1-git-send-email-gengdongjiu@huawei.com>
+ <1539002088-21215-3-git-send-email-gengdongjiu@huawei.com>
+ <3e6a7a5f-3ff9-b7db-b1f6-87a8fdf5c20c@arm.com>
+Message-ID: <f733b63b-b949-9082-3b23-aba47774d734@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-10-18, 10:40, Pierre Yves MORDRET wrote:
+Hi Suzuki
+
+On 2018/10/10 1:22, Suzuki K Poulose wrote:
 > 
 > 
-> On 10/07/2018 06:00 PM, Vinod wrote:
-> > On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
-> >> This patch adds support of DMA/MDMA chaining support.
-> >> It introduces an intermediate transfer between peripherals and STM32 DMA.
-> >> This intermediate transfer is triggered by SW for single M2D transfer and
-> >> by STM32 DMA IP for all other modes (sg, cyclic) and direction (D2M).
-> >>
-> >> A generic SRAM allocator is used for this intermediate buffer
-> >> Each DMA channel will be able to define its SRAM needs to achieve chaining
-> >> feature : (2 ^ order) * PAGE_SIZE.
-> >> For cyclic, SRAM buffer is derived from period length (rounded on
-> >> PAGE_SIZE).
-> > 
-> > So IIUC, you chain two dma txns together and transfer data via an SRAM?
+> On 08/10/18 13:34, Dongjiu Geng wrote:
+>> The commit 539aee0edb9f ("KVM: arm64: Share the parts of
+>> get/set events useful to 32bit") shares the get/set events
+>> helper for arm64 and arm32, it is better also share the check
+>> for vcpu events capability to enable 32 bit kvm vcpu events
+>> support.
+>>
+>> User space will check whether KVM supports vcpu events through
+>> KVM_CAP_VCPU_EVENTS IOCTL.
 > 
-> Correct. one DMA is DMAv2 (stm32-dma) and the other is MDMA(stm32-mdma).
-> Intermediate transfer is between device and memory.
-> This intermediate transfer is using SDRAM.
+> nit: User space will check whether KVM supports vcpu events by checking
+> the KVM_CAP_VCPU_EVENTS extension.
 
-Ah so you use dma calls to setup mdma xtfers? I dont think that is a
-good idea. How do you know you should use mdma for subsequent transfer?
+  Thanks for the pointing out, I will update it.
 
-
-> >>  drivers/dma/stm32-dma.c | 879 ++++++++++++++++++++++++++++++++++++++++++------
-> > 
-> > that is a lot of change for a driver, consider splitting it up
-> > logically in smaller changes...
-> > 
 > 
-> This feature is rather monolithic. Difficult to split up.
-> All the code is required at once.
-
-It can be enabled at last but split up logically. Intrusive changes to a
-driver make it hard to review..
-
--- 
-~Vinod
+>>
+>> Cc: James Morse <james.morse@arm.com>
+>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> 
+> Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+>> ---
+>> For the 32 bits kvm migration, it needs to enable the vcpu events,
+>> this patch will enable it. The user space QEMU patch is here:
+>> https://patchwork.ozlabs.org/patch/975615/
+>> ---
+>> ? arch/arm64/kvm/reset.c | 1 -
+>> ? virt/kvm/arm/arm.c???? | 1 +
+>> ? 2 files changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+>> index fd37c53..e50245e 100644
+>> --- a/arch/arm64/kvm/reset.c
+>> +++ b/arch/arm64/kvm/reset.c
+>> @@ -82,7 +82,6 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>> ????????? break;
+>> ????? case KVM_CAP_SET_GUEST_DEBUG:
+>> ????? case KVM_CAP_VCPU_ATTRIBUTES:
+>> -??? case KVM_CAP_VCPU_EVENTS:
+>> ????????? r = 1;
+>> ????????? break;
+>> ????? default:
+>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>> index 40e79ea..64e5d97 100644
+>> --- a/virt/kvm/arm/arm.c
+>> +++ b/virt/kvm/arm/arm.c
+>> @@ -212,6 +212,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>> ????? case KVM_CAP_READONLY_MEM:
+>> ????? case KVM_CAP_MP_STATE:
+>> ????? case KVM_CAP_IMMEDIATE_EXIT:
+>> +??? case KVM_CAP_VCPU_EVENTS:
+>> ????????? r = 1;
+>> ????????? break;
+>> ????? case KVM_CAP_ARM_SET_DEVICE_ADDR:
+>>
+> 
+> .
+> 
