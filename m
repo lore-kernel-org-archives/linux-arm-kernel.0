@@ -1,65 +1,51 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:09:35 +0200
-Subject: [PATCH 10/11] spi: pxa2xx: Add ready signal
-In-Reply-To: <20181010170936.316862-1-lkundrak@v3.sk>
-References: <20181010170936.316862-1-lkundrak@v3.sk>
-Message-ID: <20181010170936.316862-11-lkundrak@v3.sk>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 10 Oct 2018 20:06:42 +0200
+Subject: [PATCH] clk: mvebu: armada-37xx-tbg: Balance devm_clk_get in probe
+In-Reply-To: <153919299293.119890.9655297515756412545@swboyd.mtv.corp.google.com>
+ (Stephen Boyd's message of "Wed, 10 Oct 2018 10:36:32 -0700")
+References: <20180914153421.7090-1-gregory.clement@bootlin.com>
+ <153919299293.119890.9655297515756412545@swboyd.mtv.corp.google.com>
+Message-ID: <87va69he19.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Strobe a GPIO line when the slave TX FIFO is filled. This is how the
-Embedded Controller on an OLPC XO-1.75 machine, that happens to be a SPI
-master, learns that it can initiate a transaction.
+Hi Stephen,
+ 
+ On mer., oct. 10 2018, Stephen Boyd <sboyd@kernel.org> wrote:
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
----
- drivers/spi/spi-pxa2xx.c | 12 ++++++++++++
- drivers/spi/spi-pxa2xx.h |  3 +++
- 2 files changed, 15 insertions(+)
+> Quoting Gregory CLEMENT (2018-09-14 08:34:21)
+>> The parent clock is get only to have its name, and then the clock is no
+>> more used, so we can safely free it using devm_clk_put.
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+>> ---
+>>  drivers/clk/mvebu/armada-37xx-tbg.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>> 
+>> diff --git a/drivers/clk/mvebu/armada-37xx-tbg.c b/drivers/clk/mvebu/armada-37xx-tbg.c
+>> index 71f30149e80e..caaa91a41683 100644
+>> --- a/drivers/clk/mvebu/armada-37xx-tbg.c
+>> +++ b/drivers/clk/mvebu/armada-37xx-tbg.c
+>> @@ -102,6 +102,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
+>>                 return -EINVAL;
+>>         }
+>>         parent_name = __clk_get_name(parent);
+>> +       devm_clk_put(dev, parent);
+>
+> So then why use devm_clk_get()? Please replace both so tha
+> devm_clk_put() doesn't need to be used..
 
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 3848842d68fd..a3b4b12c1077 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -1079,6 +1079,9 @@ static int pxa2xx_spi_transfer_one(struct spi_controller *master,
- 	if (spi_controller_is_slave(master)) {
- 		while (drv_data->write(drv_data))
- 			;
-+		gpiod_set_value(drv_data->gpiod_ready, 1);
-+		udelay(1);
-+		gpiod_set_value(drv_data->gpiod_ready, 0);
- 	}
- 
- 	/*
-@@ -1784,6 +1787,15 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	if (platform_info->is_slave) {
-+		drv_data->gpiod_ready = devm_gpiod_get_optional(dev,
-+						"ready", GPIOD_OUT_LOW);
-+		if (IS_ERR(drv_data->gpiod_ready)) {
-+			status = (int)PTR_ERR(drv_data->gpiod_ready);
-+			goto out_error_clock_enabled;
-+		}
-+	}
-+
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_active(&pdev->dev);
-diff --git a/drivers/spi/spi-pxa2xx.h b/drivers/spi/spi-pxa2xx.h
-index 513c53aaeab2..4e324da66ef7 100644
---- a/drivers/spi/spi-pxa2xx.h
-+++ b/drivers/spi/spi-pxa2xx.h
-@@ -64,6 +64,9 @@ struct driver_data {
- 
- 	/* GPIOs for chip selects */
- 	struct gpio_desc **cs_gpiods;
-+
-+	/* Optional slave FIFO ready signal */
-+	struct gpio_desc *gpiod_ready;
- };
- 
- struct chip_data {
+Indeed between the successful devm_clk_get and the devm_clk_put we don't
+exit the function in error so I can use clk_get and clk_put.
+
+Gregory
+
+>
+>>  
+>>         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>         reg = devm_ioremap_resource(dev, res);
+
 -- 
-2.19.0
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
