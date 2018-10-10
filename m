@@ -1,134 +1,80 @@
-From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 10 Oct 2018 15:07:29 +0300
-Subject: [PATCH v3 14/22] dpaa_eth: fix iova handling for sg frames
-In-Reply-To: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
-References: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
-Message-ID: <20181010120737.30300-12-laurentiu.tudor@nxp.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Oct 2018 13:07:51 +0100
+Subject: [Question] directory for SoC-related DT binding
+In-Reply-To: <CAK7LNATaD=G8BW316fkBWM2A+YXgP5tabaySR2Fs49Za_0p=3Q@mail.gmail.com>
+References: <CAK7LNATaD=G8BW316fkBWM2A+YXgP5tabaySR2Fs49Za_0p=3Q@mail.gmail.com>
+Message-ID: <20181010120751.GP30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+On Wed, Oct 10, 2018 at 08:07:52PM +0900, Masahiro Yamada wrote:
+> Hi,
+> 
+> 
+> I see a bunch of vendor (or SoC) names in
+> Documentation/device/bindings/arm/
+> 
+> ./Documentation/devicetree/bindings/arm/altera
+> ./Documentation/devicetree/bindings/arm/amlogic
+> ./Documentation/devicetree/bindings/arm/apm
+> ./Documentation/devicetree/bindings/arm/bcm
+> ./Documentation/devicetree/bindings/arm/calxeda
+> ./Documentation/devicetree/bindings/arm/freescale
+> ./Documentation/devicetree/bindings/arm/hisilicon
+> ./Documentation/devicetree/bindings/arm/keystone
+> ./Documentation/devicetree/bindings/arm/marvell
+> ./Documentation/devicetree/bindings/arm/mediatek
+> ./Documentation/devicetree/bindings/arm/mrvl
+> ./Documentation/devicetree/bindings/arm/msm
+> ./Documentation/devicetree/bindings/arm/npcm
+> ./Documentation/devicetree/bindings/arm/nxp
+> ./Documentation/devicetree/bindings/arm/omap
+> ./Documentation/devicetree/bindings/arm/rockchip
+> ./Documentation/devicetree/bindings/arm/samsung
+> ./Documentation/devicetree/bindings/arm/stm32
+> ./Documentation/devicetree/bindings/arm/sunxi
+> ./Documentation/devicetree/bindings/arm/tegra
+> ./Documentation/devicetree/bindings/arm/ti
+> ./Documentation/devicetree/bindings/arm/uniphier
+> ./Documentation/devicetree/bindings/arm/ux500
+> ./Documentation/devicetree/bindings/arm/vt8500
 
-The driver relies on the no longer valid assumption that dma addresses
-(iovas) are identical to physical addressees and uses phys_to_virt() to
-make iova -> vaddr conversions. Fix this also for scatter-gather frames
-using the iova -> phys conversion function added in the previous patch.
-While at it, clean-up a redundant dpaa_bpid2pool() and pass the bp
-as parameter.
+These are for arch/arm/mach-* and are the DT root descriptions for the
+various boards and SoCs.
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
----
- .../net/ethernet/freescale/dpaa/dpaa_eth.c    | 41 +++++++++++--------
- 1 file changed, 24 insertions(+), 17 deletions(-)
+> I also see some vendor names in
+> Documentation/device/bindings/soc/
+> 
+> ./Documentation/devicetree/bindings/soc/bcm
+> ./Documentation/devicetree/bindings/soc/dove
+> ./Documentation/devicetree/bindings/soc/fsl
+> ./Documentation/devicetree/bindings/soc/mediatek
+> ./Documentation/devicetree/bindings/soc/qcom
+> ./Documentation/devicetree/bindings/soc/rockchip
+> ./Documentation/devicetree/bindings/soc/ti
+> ./Documentation/devicetree/bindings/soc/xilinx
+> ./Documentation/devicetree/bindings/soc/zte
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-index a9227456f67e..ea814feb4666 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-@@ -1646,14 +1646,17 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
- 
- 	if (unlikely(qm_fd_get_format(fd) == qm_fd_sg)) {
- 		nr_frags = skb_shinfo(skb)->nr_frags;
--		dma_unmap_single(dev, addr,
--				 qm_fd_get_offset(fd) + DPAA_SGT_SIZE,
--				 dma_dir);
- 
- 		/* The sgt buffer has been allocated with netdev_alloc_frag(),
- 		 * it's from lowmem.
- 		 */
--		sgt = phys_to_virt(addr + qm_fd_get_offset(fd));
-+		sgt = phys_to_virt(dpaa_iova_to_phys(dev,
-+						     addr +
-+						     qm_fd_get_offset(fd)));
-+
-+		dma_unmap_single(dev, addr,
-+				 qm_fd_get_offset(fd) + DPAA_SGT_SIZE,
-+				 dma_dir);
- 
- 		/* sgt[0] is from lowmem, was dma_map_single()-ed */
- 		dma_unmap_single(dev, qm_sg_addr(&sgt[0]),
-@@ -1668,7 +1671,7 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
- 		}
- 
- 		/* Free the page frag that we allocated on Tx */
--		skb_free_frag(phys_to_virt(addr));
-+		skb_free_frag(skbh);
- 	} else {
- 		dma_unmap_single(dev, addr,
- 				 skb_tail_pointer(skb) - (u8 *)skbh, dma_dir);
-@@ -1729,14 +1732,14 @@ static struct sk_buff *contig_fd_to_skb(const struct dpaa_priv *priv,
-  * The page fragment holding the S/G Table is recycled here.
-  */
- static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
--				    const struct qm_fd *fd)
-+				    const struct qm_fd *fd,
-+				    struct dpaa_bp *dpaa_bp,
-+				    void *vaddr)
- {
- 	ssize_t fd_off = qm_fd_get_offset(fd);
--	dma_addr_t addr = qm_fd_addr(fd);
- 	const struct qm_sg_entry *sgt;
- 	struct page *page, *head_page;
--	struct dpaa_bp *dpaa_bp;
--	void *vaddr, *sg_vaddr;
-+	void *sg_vaddr;
- 	int frag_off, frag_len;
- 	struct sk_buff *skb;
- 	dma_addr_t sg_addr;
-@@ -1745,7 +1748,6 @@ static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
- 	int *count_ptr;
- 	int i;
- 
--	vaddr = phys_to_virt(addr);
- 	WARN_ON(!IS_ALIGNED((unsigned long)vaddr, SMP_CACHE_BYTES));
- 
- 	/* Iterate through the SGT entries and add data buffers to the skb */
-@@ -1756,14 +1758,18 @@ static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
- 		WARN_ON(qm_sg_entry_is_ext(&sgt[i]));
- 
- 		sg_addr = qm_sg_addr(&sgt[i]);
--		sg_vaddr = phys_to_virt(sg_addr);
--		WARN_ON(!IS_ALIGNED((unsigned long)sg_vaddr,
--				    SMP_CACHE_BYTES));
- 
- 		/* We may use multiple Rx pools */
- 		dpaa_bp = dpaa_bpid2pool(sgt[i].bpid);
--		if (!dpaa_bp)
-+		if (!dpaa_bp) {
-+			pr_info("%s: fail to get dpaa_bp for sg bpid %d\n",
-+				__func__, sgt[i].bpid);
- 			goto free_buffers;
-+		}
-+		sg_vaddr = phys_to_virt(dpaa_iova_to_phys(dpaa_bp->dev,
-+							  sg_addr));
-+		WARN_ON(!IS_ALIGNED((unsigned long)sg_vaddr,
-+				    SMP_CACHE_BYTES));
- 
- 		count_ptr = this_cpu_ptr(dpaa_bp->percpu_count);
- 		dma_unmap_single(dpaa_bp->dev, sg_addr, dpaa_bp->size,
-@@ -1835,10 +1841,11 @@ static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
- 	/* free all the SG entries */
- 	for (i = 0; i < DPAA_SGT_MAX_ENTRIES ; i++) {
- 		sg_addr = qm_sg_addr(&sgt[i]);
--		sg_vaddr = phys_to_virt(sg_addr);
--		skb_free_frag(sg_vaddr);
- 		dpaa_bp = dpaa_bpid2pool(sgt[i].bpid);
- 		if (dpaa_bp) {
-+			sg_addr = dpaa_iova_to_phys(dpaa_bp->dev, sg_addr);
-+			sg_vaddr = phys_to_virt(sg_addr);
-+			skb_free_frag(sg_vaddr);
- 			count_ptr = this_cpu_ptr(dpaa_bp->percpu_count);
- 			(*count_ptr)--;
- 		}
-@@ -2325,7 +2332,7 @@ static enum qman_cb_dqrr_result rx_default_dqrr(struct qman_portal *portal,
- 	if (likely(fd_format == qm_fd_contig))
- 		skb = contig_fd_to_skb(priv, fd, dpaa_bp, vaddr);
- 	else
--		skb = sg_fd_to_skb(priv, fd);
-+		skb = sg_fd_to_skb(priv, fd, dpaa_bp, vaddr);
- 	if (!skb)
- 		return qman_cb_dqrr_consume;
- 
+These are for individual drivers in drivers/soc/
+
+> Confusingly, I see bcm, mediatek, rockchip
+> in both locations.
+
+Correct, because one is for the SoC and board as a whole, the other is
+for some subset of the SoC handled via drivers/soc - for example, with
+Broadcom, there's a Raspberry PI power domain driver in drivers/soc,
+which is described by
+
+ Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
+
+whereas
+
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+
+describes the bindings for the root DT node BCM2835 as used on the
+Raspberry Pi amongst other boards.
+
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
