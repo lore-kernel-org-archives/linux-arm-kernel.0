@@ -1,50 +1,48 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 10 Oct 2018 12:09:44 +0200
-Subject: [PATCH] config: arm: exynos: remove PROVE_LOCKING from defconfig
-In-Reply-To: <20181010095639eucas1p2aa4f4906cac34deb0cfb14383199e3c5~cNsaskok62622626226eucas1p2n@eucas1p2.samsung.com>
-References: <CGME20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a@eucas1p1.samsung.com>
- <20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a~b_qPT4nMA1415514155eucas1p16@eucas1p1.samsung.com>
- <CAJKOXPeSLxeHR-n0yAqbYMi4y9sZhX0Omk=C6-8du7x27X4aWA@mail.gmail.com>
- <20181010095639eucas1p2aa4f4906cac34deb0cfb14383199e3c5~cNsaskok62622626226eucas1p2n@eucas1p2.samsung.com>
-Message-ID: <CAJKOXPfRcNQb2yd0oaLStDDcQZBV+MXnhWesSBvOCyT7mCd+FA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Oct 2018 11:18:40 +0100
+Subject: [PATCH] Doc: lockdep: add information about performance impact
+In-Reply-To: <20181009155818.GD9259@arm.com>
+References: <CGME20181009153935eucas1p2dec146575ed5fefd4a0b2b6cb9bac056@eucas1p2.samsung.com>
+ <20181009153935eucas1p2dec146575ed5fefd4a0b2b6cb9bac056~b_ujkjRd31303013030eucas1p2C@eucas1p2.samsung.com>
+ <20181009154359.GB5728@hirez.programming.kicks-ass.net>
+ <20181009155818.GD9259@arm.com>
+Message-ID: <20181010101840.GM30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Oct 2018 at 11:56, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->
-> Hi Krzysztof,
->
-> Is it still valid that the Exynos has locking issues?
+On Tue, Oct 09, 2018 at 04:58:18PM +0100, Will Deacon wrote:
+> On Tue, Oct 09, 2018 at 05:43:59PM +0200, Peter Zijlstra wrote:
+> > On Tue, Oct 09, 2018 at 05:39:27PM +0200, Lukasz Luba wrote:
+> > > This patch add some warning related to performance drop.
+> > > It should be mentioned that this is not for free
+> > > and the platfrom resources (cache, bus interconnect, etc.)
+> > > will be used more frequently.
+> > 
+> > To me this reads a bit like: water is wet.
+> > 
+> > Is this really needed?
+> 
+> I don't think so -- this is a debug option under "kernel hacking". Surely
+> the perf hit comes with the territory.
 
-The prepare lock of clocks was not solved entirely. We just
-implemented a set of workarounds.
+Indeed it does - since adding debug code means additional instructions,
+more cache pressure and, therefore, slower execution.
 
-> Or is it enabled 'just-in-case'?
+I've already said to people... turn on all debug options for development,
+and when you move to performance evaluation and optimisation for the
+production version, evaluate and turn off debug options.
 
-Yes, all debugging features are implemented just in case to spot any
-issue as early as possible.
+Unfortunately, turning off PROVE_LOCKING in the defconfigs is going
+to have a negative impact on the automated build/boot testing that
+systems like kernelci.org do for us - these are primarily based
+around the defconfigs, which means we're going to end up building
+with PROVE_LOCKING disabled.  This means kernelci.org will be less
+likely to catch locking issues.
 
-> On arm64 the config misses that setting.
-> Should be enabled there as well?
+Forcing PROVE_LOCKING on also doesn't make sense - there may be (rare)
+bugs, eg race conditions, uncovered by having that disabled.
 
-Because it is a shared defconfig among all platforms and apparently no
-one wanted to convincing others to enable it.
-
-> You have introduced this entry a year ago, probably during bug
-> investigation.
-
-Actually not, I enabled it much later after issues where discovered.
-
-> The issue is in lockdep, the setting which enables it in Exynos
-> is prove_locking. For now, just get rid of the second.
-> My tests showed lockdep impact and not other minor debug features
-> enabled.
-
-You did not reply directly to my comment - you disabled all debug for
-locking. It seems you are unaware of this so I question your test
-results. If you run tests on this patch, then basically you compared
-existing config with a config stripped out of debugging around locks.
-I understand that this is not what you wanted...
-
-Best regards,
-Krzysztof
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
