@@ -1,92 +1,53 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 10 Oct 2018 17:33:52 +0900
-Subject: [PATCH 1/2] media: v4l: Add definitions for the HEVC slice format
- and controls
-In-Reply-To: <20180828080240.10982-2-paul.kocialkowski@bootlin.com>
-References: <20180828080240.10982-1-paul.kocialkowski@bootlin.com>
- <20180828080240.10982-2-paul.kocialkowski@bootlin.com>
-Message-ID: <CAAFQd5An1htKNpNJmwHAzw6Oz+Z=T_MuBg+T=_yMbT7SkkokBw@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 10 Oct 2018 08:42:58 +0000
+Subject: [PATCH V4 2/2] firmware: imx: add SCU power domain driver
+In-Reply-To: <AM0PR04MB4211AEE1258E2813B635D05A80E70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1538917807-1921-1-git-send-email-aisheng.dong@nxp.com>
+ <1538917807-1921-3-git-send-email-aisheng.dong@nxp.com>
+ <20181009103510.nsnfkx67djuvois6@pengutronix.de>
+ <AM0PR04MB42118ACA68B91B0C7D51C0C780E70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB4211AEE1258E2813B635D05A80E70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <VI1PR04MB4222A73357E1FE6F6394C9EA80E00@VI1PR04MB4222.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Sascha,
 
-On Tue, Aug 28, 2018 at 5:02 PM Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
->
-> This introduces the required definitions for HEVC decoding support with
-> stateless VPUs. The controls associated to the HEVC slice format provide
-> the required meta-data for decoding slices extracted from the bitstream.
->
+> Hi Sascha,
+> 
+> > > > +
+> > > > +	ret = of_genpd_add_provider_simple(np, &imx_sc_pd->pd);
+> > > > +	if (!ret)
+> > > > +		return &imx_sc_pd->pd;
+> > > > +
+> > > > +	pm_genpd_remove_subdomain(genpd_parent, &imx_sc_pd->pd);
+> > > > +
+> > > > +err:
+> > > > +	pr_warn("failed to add PM domain %pOF: %d\n", np, ret);
+> > >
+> > > You have a struct device *, you should use dev_* functions.
+> >
+> > Good suggestion.
+> >
+> 
+> A bit more thinking of it.
+> 
+> It may be not quite suitable to use dev_* here for print functions as we need
+> pass in a pointer of struct device for debug purpose only.
+> And we need change other two places as well which are in the same situation.
+> 
+> In current patch, we already define the print format at the top of the file.
+> #define pr_fmt(fmt) "scu_pd: " fmt
+> As SCU PD has only one device, it may does not help too much to use dev_*
+> functions.
+> 
+> Do you think it's reasonable?
+> 
+> If you're okay with this, I will drop this change and resend with other things
+> updated according to your suggestions.
+> 
 
-Sorry for being late to the party. Please see my comments inline. Only
-high level, because I don't know too much about HEVC.
+Are you okay with this?
 
-[snip]
-> +``V4L2_CID_MPEG_VIDEO_HEVC_SPS (struct)``
-> +    Specifies the Sequence Parameter Set fields (as extracted from the
-> +    bitstream) for the associated HEVC slice data.
-> +    The bitstream parameters are defined according to the ISO/IEC 23008-2 and
-> +    ITU-T Rec. H.265 specifications.
-> +
-> +.. c:type:: v4l2_ctrl_hevc_sps
-> +
-> +.. cssclass:: longtable
-> +
-> +.. flat-table:: struct v4l2_ctrl_hevc_sps
-> +    :header-rows:  0
-> +    :stub-columns: 0
-> +    :widths:       1 1 2
-> +
-> +    * - __u8
-> +      - ``chroma_format_idc``
-> +      - Syntax description inherited from the specification.
-
-I wonder if it wouldn't make sense to instead document this in C code
-using kernel-doc and then have the kernel-doc included in the sphinx
-doc. It seems to be possible, according to
-https://www.kernel.org/doc/html/latest/doc-guide/kernel-doc.html .
-
-Such approach would have the advantage of the person looking through C
-cross reference being able to actually see the documentation of the
-struct in question and also making it easier to ensure the relevant C
-code and documentation are in sync. (Although this is UAPI so it would
-be unlikely to change too often or at all.)
-
-[snip]
-> +``V4L2_CID_MPEG_VIDEO_HEVC_SLICE_PARAMS (struct)``
-> +    Specifies various slice-specific parameters, especially from the NAL unit
-> +    header, general slice segment header and weighted prediction parameter
-> +    parts of the bitstream.
-> +    The bitstream parameters are defined according to the ISO/IEC 23008-2 and
-> +    ITU-T Rec. H.265 specifications.
-
-In the Chromium H.264 controls, we define this as an array control, so
-that we can include multiple slices in one buffer and each entry of
-the array has an offset field pointing to the part of the buffer that
-contains corresponding slice data. I've mentioned this in the
-discussion on Alex's stateless decoder interface documentation, so
-let's keep the discussion there, though.
-
-[snip]
-> @@ -1696,6 +1708,11 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
->         case V4L2_CTRL_TYPE_H264_DECODE_PARAMS:
->                 return 0;
->
-> +       case V4L2_CTRL_TYPE_HEVC_SPS:
-> +       case V4L2_CTRL_TYPE_HEVC_PPS:
-> +       case V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS:
-> +               return 0;
-> +
-
-I wonder to what extent we should be validating this. I can see 3 options:
-1) Defer validation to drivers completely. - Potentially error prone
-and leading to a lot of code duplication?
-2) Validate completely. - Might need solving some interesting
-problems, e.g. validating reference frame indices in DPB against
-current state of respective VB2 queue...
-3) Validate only what we can easily do, defer more complicated
-validation to the drivers. - Potentially a good middle ground?
-
-Best regards,
-Tomasz
+Regards
+Dong Aisheng
