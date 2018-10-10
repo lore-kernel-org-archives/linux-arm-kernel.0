@@ -1,28 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Oct 2018 13:53:46 +0200
-Subject: [PATCH] pinctrl: mediatek: select GPIOLIB
-In-Reply-To: <20181008155803.3322412-1-arnd@arndb.de>
-References: <20181008155803.3322412-1-arnd@arndb.de>
-Message-ID: <CACRpkdYwGyMosmwW9YkMSKs4VCet7c0itwx0jUKOXnGMkS2g9w@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 10 Oct 2018 14:04:14 +0200
+Subject: [Question] directory for SoC-related DT binding
+In-Reply-To: <CABGGisx-iLr+CQ=JjmHEe5J_Qqpf0yrgOmSOHa74GnfwE_RKsA@mail.gmail.com>
+References: <CAK7LNATaD=G8BW316fkBWM2A+YXgP5tabaySR2Fs49Za_0p=3Q@mail.gmail.com>
+ <CABGGisx-iLr+CQ=JjmHEe5J_Qqpf0yrgOmSOHa74GnfwE_RKsA@mail.gmail.com>
+Message-ID: <93cd9c43-6fe3-c691-005b-e27cf101c7d6@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 8, 2018 at 5:58 PM Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
 
-> Removing the linux/gpio.h include means we no longer have a declaration
-> of gpiochip_lock_as_irq() when CONFIG_GPIOLIB is disabled:
+Am 10.10.2018 um 13:19 schrieb Rob Herring:
+> On Wed, Oct 10, 2018 at 6:08 AM Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> Hi,
+>>
+>>
+>> I see a bunch of vendor (or SoC) names in
+>> Documentation/device/bindings/arm/
+>>
+>> ./Documentation/devicetree/bindings/arm/altera
+>> ./Documentation/devicetree/bindings/arm/amlogic
+> Yeah, it's kind of a mixture of board/soc bindings mostly with some
+> ARM architecture, ARM, Ltd. IP, and SoC system reg bindings.
 >
-> drivers/pinctrl/mediatek/mtk-eint.c: In function 'mtk_eint_irq_request_resources':
-> drivers/pinctrl/mediatek/mtk-eint.c:247:8: error: implicit declaration of function 'gpiochip_lock_as_irq'; did you mean 'spin_lock_irq'? [-Werror=implicit-function-declaration]
-> drivers/pinctrl/mediatek/mtk-eint.c: In function 'mtk_eint_irq_release_resources':
-> drivers/pinctrl/mediatek/mtk-eint.c:272:2: error: implicit declaration of function 'gpiochip_unlock_as_irq'; did you mean 'spin_unlock_irq'? [-Werror=implicit-function-declaration]
+> Eventually, I'd like to not split board bindings by arch and maybe we
+> should move all the system/misc reg bindings out.
 >
-> Select it explictly instead.
+> [,,,]
 >
-> Fixes: 1c5fb66afa2a ("pinctrl: Include <linux/gpio/driver.h> nothing else")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> I also see some vendor names in
+>> Documentation/device/bindings/soc/
+>>
+>> ./Documentation/devicetree/bindings/soc/bcm
+>> ./Documentation/devicetree/bindings/soc/dove
+>> ./Documentation/devicetree/bindings/soc/fsl
+>> ./Documentation/devicetree/bindings/soc/mediatek
+>> ./Documentation/devicetree/bindings/soc/qcom
+>> ./Documentation/devicetree/bindings/soc/rockchip
+>> ./Documentation/devicetree/bindings/soc/ti
+>> ./Documentation/devicetree/bindings/soc/xilinx
+>> ./Documentation/devicetree/bindings/soc/zte
+> This I believe is mostly SoC system reg bindings though there's
+> probably a few other things.
+>
+>> Confusingly, I see bcm, mediatek, rockchip
+>> in both locations.
+>>
+>> Is there any rule to choose one than the other?
+> Top-level SoC/board bindings in arm/ and anything else elsewhere ideally.
 
-Patch applied.
+in case of Documentation/devicetree/bindings/soc/bcm the directory
+contains SoC / board bindings, cpu-enable and a firmware binding.
 
-Yours,
-Linus Walleij
+Is there any action required?
+
+Btw the Broadcom SoC / boards from this directory has been left out for
+the yaml conversion [1] was this intended?
+
+[1] - https://lwn.net/Articles/767723/
+
+>
+> Rob
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
