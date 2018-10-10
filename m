@@ -1,42 +1,31 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 10 Oct 2018 15:43:22 +0100
-Subject: [PATCH] arm64: mm: Use __pa_symbol() for set_swapper_pgd()
-Message-ID: <20181010144322.14363-1-james.morse@arm.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Wed, 10 Oct 2018 17:44:07 +0300
+Subject: [PATCH] iommu: arm-smmu: handle client iommu translation fault
+ handlers
+Message-ID: <20181010144407.23336-1-stanimir.varbanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 2330b7ca78350efcb ("arm64/mm: use fixmap to modify
-swapper_pg_dir") modifies the swapper_pg_dir via the fixmap
-as the kernel page tables have been moved to a read-only
-part of the kernel mapping.
+Call iommu client translation fault handler(s).
 
-Using __pa() to setup the fixmap causes CONFIG_DEBUG_VIRTUAL
-to fire, as this function is used on the kernel-image swapper
-address. The in_swapper_pgdir() test before each call of this
-function means set_swapper_pgd() will only ever be called when
-pgdp points somewhere in the kernel-image mapping of
-swapper_pd_dir. Use __pa_symbol().
-
-Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: James Morse <james.morse@arm.com>
-CC: Jun Yao <yaojun8558363@gmail.com>
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iommu/arm-smmu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 6f0e2edcc114..6deb836a102a 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -74,7 +74,7 @@ void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd)
- 	pgd_t *fixmap_pgdp;
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 066f4c8daf4e..02a8aab0cc59 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -568,6 +568,9 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+ 			    fsr, iova, fsynr, cfg->cbndx);
  
- 	spin_lock(&swapper_pgdir_lock);
--	fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
-+	fixmap_pgdp = pgd_set_fixmap(__pa_symbol(pgdp));
- 	WRITE_ONCE(*fixmap_pgdp, pgd);
- 	/*
- 	 * We need dsb(ishst) here to ensure the page-table-walker sees
+ 	writel(fsr, cb_base + ARM_SMMU_CB_FSR);
++
++	report_iommu_fault(domain, smmu->dev, iova, 0);
++
+ 	return IRQ_HANDLED;
+ }
+ 
 -- 
-2.19.0
+2.17.1
