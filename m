@@ -1,56 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Oct 2018 10:26:18 +0100
-Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH] kasan: avoid
- out-of-bounds in unwind_frame
-In-Reply-To: <193a2b2efdaf41f39cb35a72feb3b39e@MTKMBS32N1.mediatek.inc>
-References: <1539079863-19645-1-git-send-email-chunhui.li@mediatek.com>
- <20181009103833.sk2jyhl77f5fb64r@lakrids.cambridge.arm.com>
- <193a2b2efdaf41f39cb35a72feb3b39e@MTKMBS32N1.mediatek.inc>
-Message-ID: <20181010092618.pwkrqqw7br7762rs@lakrids.cambridge.arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 10 Oct 2018 11:39:07 +0200
+Subject: [PATCH 1/4] mm/hugetlb: Enable PUD level huge page migration
+In-Reply-To: <b722d14e-d14f-f45d-5722-685d4f21f6e4@arm.com>
+References: <20181003065833.GD18290@dhcp22.suse.cz>
+ <7f0488b5-053f-0954-9b95-8c0890ef5597@arm.com>
+ <20181003105926.GA4714@dhcp22.suse.cz>
+ <34b25855-fcef-61ed-312d-2011f80bdec4@arm.com>
+ <20181003114842.GD4714@dhcp22.suse.cz>
+ <d42cc88b-6bab-797c-f263-2dce650ea3ab@arm.com>
+ <20181003133609.GG4714@dhcp22.suse.cz>
+ <5dc1dc4d-de60-43b9-aab6-3b3bb6a22a4b@arm.com>
+ <20181009141442.GT8528@dhcp22.suse.cz>
+ <b722d14e-d14f-f45d-5722-685d4f21f6e4@arm.com>
+Message-ID: <20181010093907.GF5873@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 06:45:17AM +0000, Chunhui Li (???) wrote:
-> Hi Mark,
-> 
-> kasan detect out-of-bounds in stacktrace.c line 70, it's already over READ_ONCE_NOCHECK, but still crash
-> kernel-4.9/arch/arm64/kernel/stacktrace.c
-> 69frame->sp = fp + 0x10;
-> 70frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
-> 
-> we test on Android platform, kernel-4.9 build with clang 6.0.2, we will do experiment to clarify whether compiler related issue.
-> 
-> READ_ONCE_NOCHECK->__read_once_size_nocheck with __no_sanitize_address if enable CONFIG_KASAN
-> 
-> kernel-4.9/include/linux/compiler-gcc.h
-> #define __no_sanitize_address __attribute__((no_sanitize_address))
-> 
-> kernel-4.9/include/linux/compiler-clang.h
-> #define __no_sanitize_address __attribute__((no_sanitize("address")))
+On Wed 10-10-18 08:39:22, Anshuman Khandual wrote:
+[...]
+> diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
+> index 9df1d59..4bcbf1e 100644
+> --- a/include/linux/hugetlb.h
+> +++ b/include/linux/hugetlb.h
+> @@ -504,6 +504,16 @@ static inline bool hugepage_migration_supported(struct hstate *h)
+>         return arch_hugetlb_migration_supported(h);
+>  }
+>  
+> +static inline bool hugepage_movable_supported(struct hstate *h)
+> +{
+> +       if (!hugepage_migration_supported(h)) --> calls arch override restricting the set
+> +               return false;
+> +
+> +       if (hstate_is_gigantic(h)	--------> restricts the set further
+> +               return false;
+> +       return true;
+> +}
+> +
+>  static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
+>                                            struct mm_struct *mm, pte_t *pte)
+>  {
+> @@ -600,6 +610,11 @@ static inline bool hugepage_migration_supported(struct hstate *h)
+>         return false;
+>  }
+>  
+> +static inline bool hugepage_movable_supported(struct hstate *h)
+> +{
+> +       return false;
+> +}
+> +
+>  static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
+>                                            struct mm_struct *mm, pte_t *pte)
+>  {
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index 3c21775..a5a111d 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -919,7 +919,7 @@ static struct page *dequeue_huge_page_nodemask(struct hstate *h, gfp_t gfp_mask,
+>  /* Movability of hugepages depends on migration support. */
+>  static inline gfp_t htlb_alloc_mask(struct hstate *h)
+>  {
+> -       if (hugepage_migration_supported(h))
+> +       if (hugepage_movable_supported(h))
+>                 return GFP_HIGHUSER_MOVABLE;
+>         else
+>                 return GFP_HIGHUSER;
 
-If READ_ONCE_NOCHECK() isn't working as intended, then this is a
-compiler issue, and there are bigger problems regardless.
+Exactly what I've had in mind. It would be great to have a comment in
+hugepage_movable_supported to explain why we are not supporting giga
+pages even though they are migrateable and why we need that distinction.
 
-If we need to workaround some compiler issue, that should be done in the
-implementation of READ_ONCE_NOCHECK().
+> The above patch is in addition to the following later patch in the series.
+[...]
+> diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
+> index 9c1b77f..9df1d59 100644
+> --- a/include/linux/hugetlb.h
+> +++ b/include/linux/hugetlb.h
+> @@ -479,18 +479,29 @@ static inline pgoff_t basepage_index(struct page *page)
+>  extern int dissolve_free_huge_page(struct page *page);
+>  extern int dissolve_free_huge_pages(unsigned long start_pfn,
+>                                     unsigned long end_pfn);
+> -static inline bool hugepage_migration_supported(struct hstate *h)
+> -{
+> +
+>  #ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
+> +#ifndef arch_hugetlb_migration_supported
+> +static inline bool arch_hugetlb_migration_supported(struct hstate *h)
+> +{
+>         if ((huge_page_shift(h) == PMD_SHIFT) ||
+>                 (huge_page_shift(h) == PUD_SHIFT) ||
+>                         (huge_page_shift(h) == PGDIR_SHIFT))
+>                 return true;
+>         else
+>                 return false;
+> +}
+> +#endif
+>  #else
+> +static inline bool arch_hugetlb_migration_supported(struct hstate *h)
+> +{
+>         return false;
+> +}
+>  #endif
+> +
+> +static inline bool hugepage_migration_supported(struct hstate *h)
+> +{
+> +       return arch_hugetlb_migration_supported(h);
+>  }
 
-Please note that there are other issues with using clang to compile the
-kernel; at minimum 7.0.0 is required to build a mainline kernel (and
-even then, the LSE atomics have to be explicitly disabled), so if this
-only affects 6.0.x, I don't think we need to carry any workaround
-upstream.
+Yes making hugepage_migration_supported to have an arch override is
+definitely the right thing to do. Whether the above approach rather than
+a weak symbol is better is a matter of taste and I do not feel strongly
+about that.
 
-> there is patch from internet, avoid kasan by wrapping with kasan_disable_current, it seems better.
-> https://lore.kernel.org/patchwork/patch/644463
-> such as:
-> +kasan_disable_current();
->   // access fp
-> +kasan_enable_current();
-
-Please note that the solution later in the thread [1] was to use
-READ_ONCE_NOCHECK().
-
-Thanks,
-Mark.
-
-[1] https://lore.kernel.org/patchwork/patch/644463/#829858
+-- 
+Michal Hocko
+SUSE Labs
