@@ -1,100 +1,50 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 10 Oct 2018 15:29:51 +0530
-Subject: [PATCH 6/9] PM / OPP: dt-bindings: Add opp-interconnect-bw
-In-Reply-To: <0998a374-6cb0-9218-d2e3-92f8ee9861ed@linaro.org>
-References: <20180827151112.25211-1-jcrouse@codeaurora.org>
- <20180827151112.25211-7-jcrouse@codeaurora.org>
- <0998a374-6cb0-9218-d2e3-92f8ee9861ed@linaro.org>
-Message-ID: <20181010095951.hgeiy7yxsqi6behd@vireshk-i7>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 10 Oct 2018 12:09:44 +0200
+Subject: [PATCH] config: arm: exynos: remove PROVE_LOCKING from defconfig
+In-Reply-To: <20181010095639eucas1p2aa4f4906cac34deb0cfb14383199e3c5~cNsaskok62622626226eucas1p2n@eucas1p2.samsung.com>
+References: <CGME20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a@eucas1p1.samsung.com>
+ <20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a~b_qPT4nMA1415514155eucas1p16@eucas1p1.samsung.com>
+ <CAJKOXPeSLxeHR-n0yAqbYMi4y9sZhX0Omk=C6-8du7x27X4aWA@mail.gmail.com>
+ <20181010095639eucas1p2aa4f4906cac34deb0cfb14383199e3c5~cNsaskok62622626226eucas1p2n@eucas1p2.samsung.com>
+Message-ID: <CAJKOXPfRcNQb2yd0oaLStDDcQZBV+MXnhWesSBvOCyT7mCd+FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-09-18, 11:23, Georgi Djakov wrote:
-> On 08/27/2018 06:11 PM, Jordan Crouse wrote:
-> > Add the "opp-interconnect-bw" property to specify the
-> > average and peak bandwidth for an interconnect path for
-> > a specific operating power point. A separate bandwidth
-> > pair can be specified for each of the interconnects
-> > defined for the device by appending the interconnect
-> > name to the property.
-> > 
-> > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> > ---
-> >  Documentation/devicetree/bindings/opp/opp.txt | 36 +++++++++++++++++++
-> >  1 file changed, 36 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
-> > index c396c4c0af92..d714c084f36d 100644
-> > --- a/Documentation/devicetree/bindings/opp/opp.txt
-> > +++ b/Documentation/devicetree/bindings/opp/opp.txt
-> > @@ -170,6 +170,11 @@ Optional properties:
-> >    functioning of the current device at the current OPP (where this property is
-> >    present).
-> >  
-> > +- opp-interconnect-bw-<name>: This is an array of pairs specifying the average
-> > +  and peak bandwidth in bytes per second for the interconnect path known by
-> > +  'name'.  This should match the name(s) specified by interconnect-names in the
-> > +  device definition.
-> > +
-> >  Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
-> >  
-> >  / {
-> > @@ -543,3 +548,34 @@ Example 6: opp-microvolt-<name>, opp-microamp-<name>:
-> >  		};
-> >  	};
-> >  };
-> > +
-> > +Example 7: opp-interconnect-bw:
-> > +(example: leaf device with frequency and BW quotas)
-> > +
-> > +/ {
-> > +	soc {
-> > +		gpu at 5000000 {
-> > +			...
-> > +			interconnects = <&qnoc 26 &qnoc 512>;
-> > +			interconnect-names = "port0";
-> > +			...
-> > +			operating-points-v2 = <&gpu_opp_table>;
-> > +		};
-> > +	};
-> > +
-> > +	gpu_opp_table: opp_table0 {
-> > +		compatible = "operating-points-v2";
-> > +
-> > +		opp-710000000 {
-> > +			op-hz = /bits/ 64 <710000000>;
-> > +			/* Set peak bandwidth @ 7216000 KB/s */
-> > +			opp-interconnect-bw-port0 = /bits/ 64 <0 7216000000>;
-> 
-> This seems a bit long. I would suggest the following instead.
-> If there is only one path:
-> 	/* average bandwidth = 0 KB/s,  peak bandwidth = 7216000 KB/s */
-> 	opp-bw-KBps = <0 7216000>;
-> or 	
-> 	opp-bw-MBps = <0 7216>;
-> 
-> If there are multiple paths:
-> 	opp-bw-KBps-port0 = <0 7216000>;
-> 	opp-bw-KBps-port1 = <0 1000000>;
-> 
-> The above follows a convention similar to opp-microvolt, where at
-> runtime the platform can pick a <name> and a matching opp-bw-KBps-<name>
-> property. If the platform doesn't pick a specific <name> or <name> does
-> not match with any of the opp-bw-KBps-<name> properties, then
-> opp-bw-KBps shall be used if present.
-> For now supporting only KBps values seems enough to cover all present
-> platforms, so we can start with this and based on the requirements of
-> future platforms we can add MBps etc.
+On Wed, 10 Oct 2018 at 11:56, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+>
+> Hi Krzysztof,
+>
+> Is it still valid that the Exynos has locking issues?
 
-+1
+The prepare lock of clocks was not solved entirely. We just
+implemented a set of workarounds.
 
-And yes I am fine with such bindings getting introduced to the OPP
-core.
+> Or is it enabled 'just-in-case'?
 
-I am not sure if this would fit well, but have a look at
-"required-opps" property in OPP bindings and see if that can be used
-instead of adding new bindings here. Again, I am not sure if that
-should be done :)
+Yes, all debugging features are implemented just in case to spot any
+issue as early as possible.
 
--- 
-viresh
+> On arm64 the config misses that setting.
+> Should be enabled there as well?
+
+Because it is a shared defconfig among all platforms and apparently no
+one wanted to convincing others to enable it.
+
+> You have introduced this entry a year ago, probably during bug
+> investigation.
+
+Actually not, I enabled it much later after issues where discovered.
+
+> The issue is in lockdep, the setting which enables it in Exynos
+> is prove_locking. For now, just get rid of the second.
+> My tests showed lockdep impact and not other minor debug features
+> enabled.
+
+You did not reply directly to my comment - you disabled all debug for
+locking. It seems you are unaware of this so I question your test
+results. If you run tests on this patch, then basically you compared
+existing config with a config stripped out of debugging around locks.
+I understand that this is not what you wanted...
+
+Best regards,
+Krzysztof
