@@ -1,36 +1,80 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 10 Oct 2018 15:07:30 +0300
-Subject: [PATCH v3 15/22] dpaa_eth: fix SG frame cleanup
+Date: Wed, 10 Oct 2018 15:07:36 +0300
+Subject: [PATCH v3 21/22] arm64: dts: ls104x: make dma-coherent global to the
+ SoC
 In-Reply-To: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
 References: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
-Message-ID: <20181010120737.30300-13-laurentiu.tudor@nxp.com>
+Message-ID: <20181010120737.30300-19-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Fix issue with the entry indexing in the sg frame cleanup code being
-off-by-1. This problem showed up when doing some basic iperf tests and
-manifested in traffic coming to a halt.
+These SoCs are really completely dma coherent in their entirety so add
+the dma-coherent property at the soc level in the device tree and drop
+the instances where it's specifically added to a few select devices.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- drivers/net/ethernet/freescale/dpaa/dpaa_eth.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 5 +----
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-index ea814feb4666..ebf982283062 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-@@ -1663,7 +1663,7 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
- 				 qm_sg_entry_get_len(&sgt[0]), dma_dir);
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index ccadc40a36f4..9fb3ac0fa87c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -215,6 +215,7 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
++		dma-coherent;
  
- 		/* remaining pages were mapped with skb_frag_dma_map() */
--		for (i = 1; i < nr_frags; i++) {
-+		for (i = 1; i <= nr_frags; i++) {
- 			WARN_ON(qm_sg_entry_is_ext(&sgt[i]));
+ 		clockgen: clocking at 1ee1000 {
+ 			compatible = "fsl,ls1043a-clockgen";
+@@ -680,7 +681,6 @@
+ 			reg-names = "ahci", "sata-ecc";
+ 			interrupts = <0 69 0x4>;
+ 			clocks = <&clockgen 4 0>;
+-			dma-coherent;
+ 		};
  
- 			dma_unmap_page(dev, qm_sg_addr(&sgt[i]),
+ 		msi1: msi-controller1 at 1571000 {
+@@ -715,7 +715,6 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-			dma-coherent;
+ 			iommu-map = <0 &mmu 0 1>;
+ 			num-lanes = <4>;
+ 			bus-range = <0x0 0xff>;
+@@ -741,7 +740,6 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-			dma-coherent;
+ 			iommu-map = <0 &mmu 0 1>;
+ 			num-lanes = <2>;
+ 			bus-range = <0x0 0xff>;
+@@ -767,7 +765,6 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-			dma-coherent;
+ 			iommu-map = <0 &mmu 0 1>;
+ 			num-lanes = <2>;
+ 			bus-range = <0x0 0xff>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index a12d33362554..f19cf6087235 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -188,6 +188,7 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
++		dma-coherent;
+ 
+ 		ddr: memory-controller at 1080000 {
+ 			compatible = "fsl,qoriq-memory-controller";
 -- 
 2.17.1
