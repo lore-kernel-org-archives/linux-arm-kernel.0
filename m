@@ -1,35 +1,80 @@
-From: rwahl@gmx.de (Ronald Wahl)
-Date: Wed, 10 Oct 2018 15:54:54 +0200
-Subject: [PATCH resend] clk: at91: Fix division by zero in PLL recalc_rate()
-Message-ID: <trinity-9c3a7e1f-73af-4a1a-b82c-cafd5aefa5e4-1539179694006@3c-app-gmx-bs12>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 10 Oct 2018 16:09:25 +0200
+Subject: [PATCH v7 7/8] arm64: update
+ Documentation/arm64/tagged-pointers.txt
+In-Reply-To: <20181003173256.GG12998@arrakis.emea.arm.com>
+References: <cover.1538485901.git.andreyknvl@google.com>
+ <47a464307d4df3c0cb65f88d1fe83f9a741dd74b.1538485901.git.andreyknvl@google.com>
+ <20181003173256.GG12998@arrakis.emea.arm.com>
+Message-ID: <CAAeHK+yPCRNAOSi6OpYC_Tdbo9SoXRVRbx8pjXNq96v8csO-Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a982e45dc150 ("clk: at91: PLL recalc_rate() now using cached MUL
-and DIV values") removed a check that prevents a division by zero. This
-now causes a stacktrace when booting the kernel on a at91 platform if
-the PLL DIV register contains zero. This commit reintroduces this check.
+On Wed, Oct 3, 2018 at 7:32 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Oct 02, 2018 at 03:12:42PM +0200, Andrey Konovalov wrote:
+>> diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
+>> index a25a99e82bb1..ae877d185fdb 100644
+>> --- a/Documentation/arm64/tagged-pointers.txt
+>> +++ b/Documentation/arm64/tagged-pointers.txt
+>> @@ -17,13 +17,21 @@ this byte for application use.
+>>  Passing tagged addresses to the kernel
+>>  --------------------------------------
+>>
+>> -All interpretation of userspace memory addresses by the kernel assumes
+>> -an address tag of 0x00.
+>> +Some initial work for supporting non-zero address tags passed to the
+>> +kernel has been done. As of now, the kernel supports tags in:
+>
+> With my maintainer hat on, the above statement leads me to think this
+> new ABI is work in progress, so not yet suitable for upstream.
 
-Fixes: a982e45dc150 ("clk: at91: PLL recalc_rate() now using cached...")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Ronald Wahl <rwahl@gmx.de>
----
- drivers/clk/at91/clk-pll.c | 3 +++
- 1 file changed, 3 insertions(+)
+OK, I think we can just say "The kernel supports tags in:" here. Will do in v8.
 
-diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-index 72b6091eb7b9..dc7fbc796cb6 100644
---- a/drivers/clk/at91/clk-pll.c
-+++ b/drivers/clk/at91/clk-pll.c
-@@ -133,6 +133,9 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
- {
- 	struct clk_pll *pll = to_clk_pll(hw);
- 
-+	if (!pll->div || !pll->mul)
-+		return 0;
-+
- 	return (parent_rate / pll->div) * (pll->mul + 1);
- }
- 
--- 
-2.17.1
+>
+> Also, how is user space supposed to know that it can now pass tagged
+> pointers into the kernel? An ABI change (or relaxation), needs to be
+> advertised by the kernel, usually via a new HWCAP bit (e.g. HWCAP_TBI).
+> Once we have a HWCAP bit in place, we need to be pretty clear about
+> which syscalls can and cannot cope with tagged pointers. The "as of now"
+> implies potential further relaxation which, again, would need to be
+> advertised to user in some (additional) way.
+
+How exactly should I do that? Something like this [1]? Or is it only
+for hardware specific things and for this patchset I need to do
+something else?
+
+[1] https://github.com/torvalds/linux/commit/7206dc93a58fb76421c4411eefa3c003337bcb2d
+
+>
+>> -This includes, but is not limited to, addresses found in:
+>> +  - user fault addresses
+>
+> While the kernel currently supports this in some way (by clearing the
+> tag exception entry, el0_da), the above implies (at least to me) that
+> sigcontext.fault_address would contain the tagged address. That's not
+> the case (unless I missed it in your patches).
+
+I'll update the doc to reflect this in v8.
+
+>
+>> - - pointer arguments to system calls, including pointers in structures
+>> -   passed to system calls,
+>> +  - pointer arguments (including pointers in structures), which don't
+>> +    describe virtual memory ranges, passed to system calls
+>
+> I think we need to be more precise here...
+
+In what way?
+
+>
+>> +All other interpretations of userspace memory addresses by the kernel
+>> +assume an address tag of 0x00. This includes, but is not limited to,
+>> +addresses found in:
+>> +
+>> + - pointer arguments (including pointers in structures), which describe
+>> +   virtual memory ranges, passed to memory system calls (mmap, mprotect,
+>> +   etc.)
+>
+> ...and probably a full list here.
+
+Will add a full list in v8.
