@@ -1,38 +1,37 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Wed, 10 Oct 2018 19:05:06 +0200
-Subject: Clock configuration for the SAMA5D2 NAND controller
-Message-ID: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Oct 2018 18:08:37 +0100
+Subject: [PATCH] iommu: arm-smmu: handle client iommu translation fault
+ handlers
+In-Reply-To: <20181010144407.23336-1-stanimir.varbanov@linaro.org>
+References: <20181010144407.23336-1-stanimir.varbanov@linaro.org>
+Message-ID: <20181010170837.GC16512@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Oct 10, 2018 at 05:44:07PM +0300, Stanimir Varbanov wrote:
+> Call iommu client translation fault handler(s).
+> 
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> ---
+>  drivers/iommu/arm-smmu.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 066f4c8daf4e..02a8aab0cc59 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -568,6 +568,9 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+>  			    fsr, iova, fsynr, cfg->cbndx);
+>  
+>  	writel(fsr, cb_base + ARM_SMMU_CB_FSR);
+> +
+> +	report_iommu_fault(domain, smmu->dev, iova, 0);
 
-While evaluating a new flash memory chip for my product based on a SAMA5D2
-chip, I tried to update my software to use the latest device tree bindings.
+Who's using this? Generally, the callback here isn't so useful because it's
+called in irq context. We also don't enable stalling since 3714ce1d6655.
 
-Until now, I was using the legacy bindings for the NAND controller, that
-preserved the timings configured by the bootloader in the EBI registers. The
-bindings introduced in Linux 4.13 are used together with the NAND driver to
-reconfigure the timings of the memory interface to match the speed profile
-declared by some NAND components.
+We previously had fairly detailed discussions on the list with Rob Clark
+about alternative ways to design this, but I don't remember where it ended
+up.
 
-However, when comparing the timings in the registers, there was a large
-difference between what I calculated by hand in the past and the values
-configured by the drivers. The difference was in fact a 2 factor.
-
-For me, the issue is due to the clock configuration declared in the SAMA5D2
-device tree: The reference clock used by the nand-controller driver is the
-clock for its parent node, which is directly the Master Clock. And on my
-end, what I understood when writing the clock settings for my bootloader was
-that the reference clock was the HSMC clock, which derives from the H32MX
-clock, which runs at half the rate of the Master Clock.
-
-The documentation for the SAMA5D2 is not very precise on this topic, so I
-would like to have some feedback. Is the clock used as a reference for the
-chip select configuration registers the Master Clock itself, or is it the
-peripheral clock for the HSMC module ?
-
-
-Best regards,
--- 
-Romain Izard
+Will
