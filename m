@@ -1,60 +1,73 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Oct 2018 17:49:19 +0100
-Subject: livelock with hrtimer cpu_base->lock
-In-Reply-To: <8f671ebb6b331cd00ce17d111f28c548@codeaurora.org>
-References: <8f671ebb6b331cd00ce17d111f28c548@codeaurora.org>
-Message-ID: <20181010164919.GA16512@arm.com>
+Date: Wed, 10 Oct 2018 17:50:49 +0100
+Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
+In-Reply-To: <CAL_JsqLeG3WUa2peOWFGUoMuonWaWJoU-7A6d8cqXp-_e3B3XA@mail.gmail.com>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-14-robh@kernel.org>
+ <20181009115713.GE6248@arm.com>
+ <CAL_JsqLeG3WUa2peOWFGUoMuonWaWJoU-7A6d8cqXp-_e3B3XA@mail.gmail.com>
+Message-ID: <20181010165048.GB16512@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prasad,
+On Tue, Oct 09, 2018 at 01:14:02PM -0500, Rob Herring wrote:
+> On Tue, Oct 9, 2018 at 6:57 AM Will Deacon <will.deacon@arm.com> wrote:
+> >
+> > Hi Rob,
+> >
+> > On Fri, Oct 05, 2018 at 11:58:25AM -0500, Rob Herring wrote:
+> > > Convert ARM PMU binding to DT schema format using json-schema.
+> > >
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Cc: devicetree at vger.kernel.org
+> > > Signed-off-by: Rob Herring <robh@kernel.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
+> > >  .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
+> > >  2 files changed, 96 insertions(+), 70 deletions(-)
+> > >  delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
+> > >  create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
+> >
+> > [...]
+> >
+> > > -- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+> > > -               interrupt (PPI) then 1 interrupt should be specified.
+> >
+> > [...]
+> >
+> > > +  interrupts:
+> > > +    oneOf:
+> > > +      - maxItems: 1
+> > > +      - minItems: 2
+> > > +        maxItems: 8
+> > > +        description: 1 interrupt per core.
+> > > +
+> > > +  interrupts-extended:
+> > > +    $ref: '#/properties/interrupts'
+> >
+> > This seems like a semantic different between the two representations, or am
+> > I missing something here? Specifically, both the introduction of
+> > interrupts-extended and also dropping any mention of using a single per-cpu
+> > interrupt (the single combined case is no longer support by Linux; not sure
+> > if you want to keep it in the binding).
+> 
+> 'interrupts-extended' was implied before as it is always supported and
+> outside the scope of the binding. But now it is needed to validate
+> bindings. There must be some use of it and that's why I added it.
+> However, thinking some more about this, I think it may be better to
+> have the tools add this in automatically whenever we have an
+> interrupts property.
 
-On Tue, Oct 09, 2018 at 01:56:14PM -0700, Sodagudi Prasad wrote:
-> This is regarding - thread "try to fix contention between expire_timers and
-> try_to_del_timer_sync".
-> https://lkml.org/lkml/2017/7/28/172
-> 
-> I think this live lockup issue was discussed earlier but the final set of
-> changes were not concluded.
+To be honest, if you'd included that in the commit message I'd have been
+happy :)
 
-Well we basically need a way to pick a value for CPU_RELAX_WFE_THRESHOLD.
-Do you have any ideas? It could be determined at runtime if necessary.
+> I guess the single interrupt case is less obvious now with no
+> description (it's the first list item of 'oneOf'). The schema If the
+> single interrupt is not supported, then we can drop it here.
 
-> I would like to check whether you have new updates on this issue or not.
-> This problem is observed with 4.14 .64 stable kernel too.
-> We see this problem 2 times in overnight testing.
-> 
-> I have to add the following code to avoid live lock. I am thinking that
-> fixing this at the cpu_relax() level.
-> 
-> +++ b/kernel/time/hrtimer.c
-> @@ -52,6 +52,7 @@
->  #include <linux/timer.h>
->  #include <linux/freezer.h>
->  #include <linux/compat.h>
-> +#include <linux/delay.h>
-> 
->  #include <linux/uaccess.h>
-> 
-> @@ -152,6 +153,7 @@ struct hrtimer_clock_base *lock_hrtimer_base(const
-> struct hrtimer *timer,
-> raw_spin_unlock_irqrestore(&base->cpu_base->lock, *flags);
->                 }
->                 cpu_relax();
-> +               udelay(1);
->         }
->  }
-> 
-> @@ -1067,6 +1069,7 @@ int hrtimer_cancel(struct hrtimer *timer)
->                 if (ret >= 0)
->                         return ret;
->                 cpu_relax();
-> +               udelay(1);
->         }
->  }
->  EXPORT_SYMBOL_GPL(hrtimer_cancel);
-
-This is just another bodge and likely to hurt in places where 1us is
-excessive because there isn't contention.
+Well the description says "1 interrupt per core" which is incorrect. I also
+don't understand why maxItems is 8.
 
 Will
