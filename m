@@ -1,55 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 10 Oct 2018 20:01:49 +0530
-Subject: [PATCH 5/9] arm64: dts: sdm845: Add gpu and gmu device nodes
-In-Reply-To: <20181010142905.GB9977@jcrouse-lnx.qualcomm.com>
-References: <20180827151112.25211-1-jcrouse@codeaurora.org>
- <20180827151112.25211-6-jcrouse@codeaurora.org>
- <20181010094628.wejfgmvcv6stzoco@vireshk-i7>
- <20181010142905.GB9977@jcrouse-lnx.qualcomm.com>
-Message-ID: <20181010143149.4e3ct3efkuwxa2hw@vireshk-i7>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Wed, 10 Oct 2018 15:39:07 +0100
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <20181010141017.GA2881@asgard.redhat.com>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad>
+ <20181010141017.GA2881@asgard.redhat.com>
+Message-ID: <7aac1a08-8948-1a04-cbd3-fbc6a53f9ff0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-10-18, 08:29, Jordan Crouse wrote:
-> On Wed, Oct 10, 2018 at 03:16:28PM +0530, Viresh Kumar wrote:
-> > On 27-08-18, 09:11, Jordan Crouse wrote:
-> > > Add the nodes to describe the Adreno GPU and GMU devices.
-> > > 
-> > > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> > > ---
-> > >  arch/arm64/boot/dts/qcom/sdm845.dtsi | 121 +++++++++++++++++++++++++++
-> > >  1 file changed, 121 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> > > index cdaabeb3c995..10db0ceb3699 100644
-> > > --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> > > +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> > > @@ -192,6 +192,59 @@
-> > >  		method = "smc";
-> > >  	};
-> > >  
-> > > +gpu_opp_table: adreno-opp-table {
-> > > +		compatible = "operating-points-v2-qcom-level";
-> > > +
-> > > +		opp-710000000 {
-> > > +			opp-hz = /bits/ 64 <710000000>;
-> > > +			qcom,level = <416>;
-> > 
-> > What is qcom,level here ? Is it different than the RPM voting thing ?
-> > 
-> > If not then you need to follow what Rajendra, Niklas are doing as
-> > well. There needs to be a genpd which needs to carry this value and
-> > the gpu's table will have required-opps entry to point to it.
-> 
-> I don't think it is the same (we have some special considerations here)
-> but I missed the new work from the other folks and I want to review it
-> before I conclude one way or the other. Is there a link to the latest
-> and greatest that I can use to get caught up?
+On 10/10/18 15:10, Eugene Syromiatnikov wrote:
+>  * What's the reasoning behind capping syscall arguments to 32 bit? x32
+>    and MIPS N32 do not have such a restriction (and do not need special
+>    wrappers for syscalls that pass 64-bit values as a result, except
+>    when they do,  as it is the case for preadv2 on x32); moreover, that
+>    would lead to insurmountable difficulties for AArch64 ILP32 tracers
+>    that try to trace LP64 tracees, as it would be impossible to pass
+>    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
 
-lkml.kernel.org/r/20180627045234.27403-1-rnayak at codeaurora.org
+but that's necessarily the case for all ilp32 abis:
+the userspace syscall function receives 32bit
+arguments so even if the kernel abi takes 64bit
+args you cannot use that from c code. (the libc
+does not even know which args should be sign or
+zero extended.)
 
-+Rajendra/Niklas, please review Jordan's work as well to see if the
-qcom,level thing is similar to what you guys are using.
+process_vm_readv/writev is limited by the ilp32
+iovec struct, not by the syscall arguments.
 
--- 
-viresh
+ptrace is specified to take void* addr argument,
+and void* is 32bit on all ilp32 targets.
+so again on the c language level there is no
+way around the 32bit limitation.
