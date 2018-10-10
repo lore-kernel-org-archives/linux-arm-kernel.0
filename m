@@ -1,24 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Oct 2018 19:20:19 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-udoo: Add Pincfgs for UART4
-In-Reply-To: <20181010081904.GA23397@armhf-buildhost.asgard.net>
-References: <1538663639-3427-1-git-send-email-kueffner.markus@gmail.com>
- <CAOMZO5BqL5Tfd0+KmN2DiJdoWLSYWSWyppw8qdrb-G_by_68Tw@mail.gmail.com>
- <20181010081904.GA23397@armhf-buildhost.asgard.net>
-Message-ID: <CAOMZO5DfM6QRwVNTSLgcdm5Ujm=8=uKRYh=eotExxABbQ-sTng@mail.gmail.com>
+From: sunnyliangjy@gmail.com (Wendy Liang)
+Date: Wed, 10 Oct 2018 15:53:47 -0700
+Subject: [PATCH v4 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+In-Reply-To: <20181010095741.GA14472@e107155-lin>
+References: <1539155912-29760-1-git-send-email-wendy.liang@xilinx.com>
+ <1539155912-29760-3-git-send-email-wendy.liang@xilinx.com>
+ <20181010095741.GA14472@e107155-lin>
+Message-ID: <CAA07jV_FWxMRq=4hmTdCXJG6e3=-8AejfpKxmh9KUi9KQDH7yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 5:19 AM Markus Kueffner
-<kueffner.markus@gmail.com> wrote:
+On Wed, Oct 10, 2018 at 2:59 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
 >
-> From b25738867245688e0a1eafeb78379efc6a73b66e Mon Sep 17 00:00:00 2001
-> From: Markus Kueffner <kueffner.markus@gmail.com>
-> Date: Wed, 10 Oct 2018 08:32:09 +0200
-> Subject: [PATCH v2] ARM: dts: imx6qdl-udoo: Add Pincfgs for UART4
+> On Wed, Oct 10, 2018 at 12:18:32AM -0700, Wendy Liang wrote:
+> > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block
+> > in ZynqMP SoC used for the communication between various processor
+> > systems.
+> >
+> > Signed-off-by: Wendy Liang <wendy.liang@xilinx.com>
 >
-> Add Pincfgs for UART4 to enable Communication with the onboard SAM3X
+> [...]
 >
-> Signed-off-by: Markus Kueffner <kueffner.markus@gmail.com>
+> > +Optional properties:
+> > +--------------------
+> > +- method:              The method of accessing the IPI agent registers.
+> > +                       Permitted values are: "smc" and "hvc". Default is
+> > +                       "smc".
+>
+> You are mixing the hardware messaging based mailbox and the software
+> "smc/hvc" based mailbox together here. Please keep them separated.
+> IIUC smc/hvc based mailcox is used for "tx" or too keep it simple in
+> one direction and hardware based is used for "rx" or the other direction
+> for communication.
+>
+Hi Sudeep,
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Thanks for your comments.
+
+The IPI hardware block has both buffers and registers. The hardware
+block has dedicated
+buffers for each mailboxes, and thus, in the implementation, we directly access
+the buffers from IPI driver. However, the controller registers are
+shared between
+mailboxes in the hardware, as the ATF will also access the registers,
+we need to use
+SMC/HVC to access the registers (control or ISR). And the SMC/HVC here is for
+the register access.
+
+I am not clear on smc/hvc based mailbox is used for tx, and hardware
+based is used
+for  "rx". As for both TX and RX, we need to write/read the registers
+(through SMC) and
+write/read the buffers provided by the IPI hardware block directly.
+
+Thanks,
+Wendy
+
+> You *should not* mix them as single unit. Also lots of other vendor need
+> SMC/HVC based mailbox. So make it generic and keep it separate.
+>
+> --
+> Regards,
+> Sudeep
