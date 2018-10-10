@@ -1,61 +1,42 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Wed, 10 Oct 2018 11:29:27 +0100
-Subject: [PATCH 2/2] iommu/arm-smmu-v3: Remove unnecessary wrapper function
+Date: Wed, 10 Oct 2018 11:29:26 +0100
+Subject: [PATCH 1/2] iommu/arm-smmu-v3: Add SPDX header
 In-Reply-To: <1539167367-20471-1-git-send-email-andrew.murray@arm.com>
 References: <1539167367-20471-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1539167367-20471-3-git-send-email-andrew.murray@arm.com>
+Message-ID: <1539167367-20471-2-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify the code by removing an unnecessary wrapper function.
-
-This was left behind by commit 2f657add07a8
-("iommu/arm-smmu-v3: Specialise CMD_SYNC handling")
+Replace license text with SDPX header
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index c7bd18e..6947ccf 100644
+index db402e8..c7bd18e 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1371,15 +1371,11 @@ static irqreturn_t arm_smmu_combined_irq_handler(int irq, void *dev)
- }
- 
- /* IO_PGTABLE API */
--static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
--{
--	arm_smmu_cmdq_issue_sync(smmu);
--}
--
- static void arm_smmu_tlb_sync(void *cookie)
- {
- 	struct arm_smmu_domain *smmu_domain = cookie;
--	__arm_smmu_tlb_sync(smmu_domain->smmu);
-+
-+	arm_smmu_cmdq_issue_sync(smmu_domain->smmu);
- }
- 
- static void arm_smmu_tlb_inv_context(void *cookie)
-@@ -1404,7 +1400,7 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- 	 * to guarantee those are observed before the TLBI. Do be careful, 007.
- 	 */
- 	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
--	__arm_smmu_tlb_sync(smmu);
-+	arm_smmu_cmdq_issue_sync(smmu);
- }
- 
- static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
-@@ -1793,7 +1789,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
- 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
- 
- 	if (smmu)
--		__arm_smmu_tlb_sync(smmu);
-+		arm_smmu_cmdq_issue_sync(smmu);
- }
- 
- static phys_addr_t
+@@ -1,18 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * IOMMU API for ARM architected SMMUv3 implementations.
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- *
+  * Copyright (C) 2015 ARM Limited
+  *
+  * Author: Will Deacon <will.deacon@arm.com>
 -- 
 2.7.4
