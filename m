@@ -1,93 +1,69 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 10 Oct 2018 13:51:24 -0500
-Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
-In-Reply-To: <20181010165048.GB16512@arm.com>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-14-robh@kernel.org>
- <20181009115713.GE6248@arm.com>
- <CAL_JsqLeG3WUa2peOWFGUoMuonWaWJoU-7A6d8cqXp-_e3B3XA@mail.gmail.com>
- <20181010165048.GB16512@arm.com>
-Message-ID: <CAL_Jsq+NExxsksmhA6z5_eTutVkm_NFthayvHz-vvq1gkSeXNA@mail.gmail.com>
+Date: Wed, 10 Oct 2018 13:59:27 -0500
+Subject: [Question] directory for SoC-related DT binding
+In-Reply-To: <93cd9c43-6fe3-c691-005b-e27cf101c7d6@i2se.com>
+References: <CAK7LNATaD=G8BW316fkBWM2A+YXgP5tabaySR2Fs49Za_0p=3Q@mail.gmail.com>
+ <CABGGisx-iLr+CQ=JjmHEe5J_Qqpf0yrgOmSOHa74GnfwE_RKsA@mail.gmail.com>
+ <93cd9c43-6fe3-c691-005b-e27cf101c7d6@i2se.com>
+Message-ID: <CAL_JsqK_MDQvePhEGJsk5CRQuzkOo+s3QjF7hcNZp_dVsbc9zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 11:50 AM Will Deacon <will.deacon@arm.com> wrote:
+On Wed, Oct 10, 2018 at 7:04 AM Stefan Wahren <stefan.wahren@i2se.com> wrote:
 >
-> On Tue, Oct 09, 2018 at 01:14:02PM -0500, Rob Herring wrote:
-> > On Tue, Oct 9, 2018 at 6:57 AM Will Deacon <will.deacon@arm.com> wrote:
-> > >
-> > > Hi Rob,
-> > >
-> > > On Fri, Oct 05, 2018 at 11:58:25AM -0500, Rob Herring wrote:
-> > > > Convert ARM PMU binding to DT schema format using json-schema.
-> > > >
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > > Cc: devicetree at vger.kernel.org
-> > > > Signed-off-by: Rob Herring <robh@kernel.org>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
-> > > >  .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
-> > > >  2 files changed, 96 insertions(+), 70 deletions(-)
-> > > >  delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
-> > > >  create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
-> > >
-> > > [...]
-> > >
-> > > > -- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
-> > > > -               interrupt (PPI) then 1 interrupt should be specified.
-> > >
-> > > [...]
-> > >
-> > > > +  interrupts:
-> > > > +    oneOf:
-> > > > +      - maxItems: 1
-> > > > +      - minItems: 2
-> > > > +        maxItems: 8
-> > > > +        description: 1 interrupt per core.
-> > > > +
-> > > > +  interrupts-extended:
-> > > > +    $ref: '#/properties/interrupts'
-> > >
-> > > This seems like a semantic different between the two representations, or am
-> > > I missing something here? Specifically, both the introduction of
-> > > interrupts-extended and also dropping any mention of using a single per-cpu
-> > > interrupt (the single combined case is no longer support by Linux; not sure
-> > > if you want to keep it in the binding).
+> Hi,
+>
+> Am 10.10.2018 um 13:19 schrieb Rob Herring:
+> > On Wed, Oct 10, 2018 at 6:08 AM Masahiro Yamada
+> > <yamada.masahiro@socionext.com> wrote:
+> >> Hi,
+> >>
+> >>
+> >> I see a bunch of vendor (or SoC) names in
+> >> Documentation/device/bindings/arm/
+> >>
+> >> ./Documentation/devicetree/bindings/arm/altera
+> >> ./Documentation/devicetree/bindings/arm/amlogic
+> > Yeah, it's kind of a mixture of board/soc bindings mostly with some
+> > ARM architecture, ARM, Ltd. IP, and SoC system reg bindings.
 > >
-> > 'interrupts-extended' was implied before as it is always supported and
-> > outside the scope of the binding. But now it is needed to validate
-> > bindings. There must be some use of it and that's why I added it.
-> > However, thinking some more about this, I think it may be better to
-> > have the tools add this in automatically whenever we have an
-> > interrupts property.
+> > Eventually, I'd like to not split board bindings by arch and maybe we
+> > should move all the system/misc reg bindings out.
+> >
+> > [,,,]
+> >
+> >> I also see some vendor names in
+> >> Documentation/device/bindings/soc/
+> >>
+> >> ./Documentation/devicetree/bindings/soc/bcm
+> >> ./Documentation/devicetree/bindings/soc/dove
+> >> ./Documentation/devicetree/bindings/soc/fsl
+> >> ./Documentation/devicetree/bindings/soc/mediatek
+> >> ./Documentation/devicetree/bindings/soc/qcom
+> >> ./Documentation/devicetree/bindings/soc/rockchip
+> >> ./Documentation/devicetree/bindings/soc/ti
+> >> ./Documentation/devicetree/bindings/soc/xilinx
+> >> ./Documentation/devicetree/bindings/soc/zte
+> > This I believe is mostly SoC system reg bindings though there's
+> > probably a few other things.
+> >
+> >> Confusingly, I see bcm, mediatek, rockchip
+> >> in both locations.
+> >>
+> >> Is there any rule to choose one than the other?
+> > Top-level SoC/board bindings in arm/ and anything else elsewhere ideally.
 >
-> To be honest, if you'd included that in the commit message I'd have been
-> happy :)
+> in case of Documentation/devicetree/bindings/soc/bcm the directory
+> contains SoC / board bindings, cpu-enable and a firmware binding.
 >
-> > I guess the single interrupt case is less obvious now with no
-> > description (it's the first list item of 'oneOf'). The schema If the
-> > single interrupt is not supported, then we can drop it here.
->
-> Well the description says "1 interrupt per core" which is incorrect.
+> Is there any action required?
 
-You are reading the schema wrong. There are 2 cases supported as
-defined by each '-'. The 2nd case is all the keywords until the
-indentation decreases. So 'description' is just description of the 2nd
-case. The first case is just "maxItems: 1". I probably didn't put a
-description because why write in free form text what the schema says
-(other than of course no one knows json-schema...).
+If there's a better location based on class/function, then moving them
+would be nice.
 
-YAML combines the best of Makefiles and python. You can't have tabs
-and Indentation is significant. :)
+> Btw the Broadcom SoC / boards from this directory has been left out for
+> the yaml conversion [1] was this intended?
 
-> I also
-> don't understand why maxItems is 8.
-
-Humm, I probably just made that up based on GICv2 limitations. What
-should it be? If there's not any inherit maximum, can we put something
-reasonable? There's not really any way to express that it should match
-the number of cores in the system.
+Yes, I'm not planning to convert all bindings for everyone myself.
 
 Rob
