@@ -1,29 +1,25 @@
-From: paul.burton@mips.com (Paul Burton)
-Date: Tue, 9 Oct 2018 23:01:40 +0000
-Subject: [PATCH] memblock: stop using implicit alignement to
- SMP_CACHE_BYTES
-In-Reply-To: <1538687224-17535-1-git-send-email-rppt@linux.vnet.ibm.com>
-References: <1538687224-17535-1-git-send-email-rppt@linux.vnet.ibm.com>
-Message-ID: <20181009230137.rju3lm2saou5xsa4@pburton-laptop>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Tue, 9 Oct 2018 17:00:03 -0700
+Subject: [PATCH i2c-next v7 3/5] dt-bindings: i2c: aspeed: Add
+ 'bus-timeout-ms' property as an optional property
+In-Reply-To: <20181005214507.26315-4-jae.hyun.yoo@linux.intel.com>
+References: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
+ <20181005214507.26315-4-jae.hyun.yoo@linux.intel.com>
+Message-ID: <CAFd5g44WcAE5oJCmRQKsRmbrfYPx55kdaT6xW1hzCoYAR5YQNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Fri, Oct 5, 2018 at 2:45 PM Jae Hyun Yoo
+<jae.hyun.yoo@linux.intel.com> wrote:
+>
+> This commit adds 'bus-timeout-ms' property as an optional property
+> which can be used for setting the bus timeout value of an adapter.
+> With this patch, the bus timeout value can be set through this
+> property at the probing time of this module. Still the bus timeout
+> value can be set by an I2C_TIMEOUT ioctl on cdev at runtime too.
+>
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 
-On Fri, Oct 05, 2018 at 12:07:04AM +0300, Mike Rapoport wrote:
-> When a memblock allocation APIs are called with align = 0, the alignment is
-> implicitly set to SMP_CACHE_BYTES.
-> 
-> Replace all such uses of memblock APIs with the 'align' parameter explicitly
-> set to SMP_CACHE_BYTES and stop implicit alignment assignment in the
-> memblock internal allocation functions.
-> 
->%
-> 
-> Suggested-by: Michal Hocko <mhocko@suse.com>
-> Signed-off-by: Mike Rapoport <rppt@linux.vnet.ibm.com>
+Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
 
-  Acked-by: Paul Burton <paul.burton@mips.com> # MIPS part
-
-Thanks,
-    Paul
+Thanks for putting all the work in to do it this way!
