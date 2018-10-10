@@ -1,35 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Oct 2018 15:52:33 +0100
-Subject: [PATCH] arm64: mm: Use __pa_symbol() for set_swapper_pgd()
-In-Reply-To: <20181010144322.14363-1-james.morse@arm.com>
-References: <20181010144322.14363-1-james.morse@arm.com>
-Message-ID: <20181010145233.GB17340@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 10 Oct 2018 16:57:36 +0200
+Subject: [PATCH 1/4] drm/sun4i: tcon: Support an active-low DE signal
+ with RGB interface
+In-Reply-To: <20181010114134.8211-1-contact@paulk.fr>
+References: <20181010114134.8211-1-contact@paulk.fr>
+Message-ID: <20181010145736.l6zpohvvd4b5qngr@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 03:43:22PM +0100, James Morse wrote:
-> commit 2330b7ca78350efcb ("arm64/mm: use fixmap to modify
-> swapper_pg_dir") modifies the swapper_pg_dir via the fixmap
-> as the kernel page tables have been moved to a read-only
-> part of the kernel mapping.
+On Wed, Oct 10, 2018 at 01:41:31PM +0200, Paul Kocialkowski wrote:
+> Some panels need an active-low data enable (DE) signal for the RGB
+> interface. This requires flipping a bit in the TCON0 polarity register
+> when setting up the mode for the RGB interface.
 > 
-> Using __pa() to setup the fixmap causes CONFIG_DEBUG_VIRTUAL
-> to fire, as this function is used on the kernel-image swapper
-> address. The in_swapper_pgdir() test before each call of this
-> function means set_swapper_pgd() will only ever be called when
-> pgdp points somewhere in the kernel-image mapping of
-> swapper_pd_dir. Use __pa_symbol().
+> Add a new helper function to match specific bus flags and use it to set
+> the polarity inversion bit for the DE signal when required.
 > 
-> Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> CC: Jun Yao <yaojun8558363@gmail.com>
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > ---
->  arch/arm64/mm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++--
+>  drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
+>  2 files changed, 27 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 3fb084f802e2..d249a462ec09 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -78,6 +78,24 @@ static int sun4i_tcon_get_pixel_depth(const struct drm_encoder *encoder)
+>  	return -EINVAL;
+>  }
+>  
+> +static bool sun4i_tcon_match_bus_flags(const struct drm_encoder *encoder,
+> +				       u32 bus_flags)
+> +{
+> +	struct drm_connector *connector;
+> +	struct drm_display_info *info;
+> +
+> +	connector = sun4i_tcon_get_connector(encoder);
+> +	if (!connector)
+> +		return false;
+> +
+> +	info = &connector->display_info;
+> +
+> +	if ((info->bus_flags & bus_flags) == bus_flags)
+> +		return true;
+> +
+> +	return false;
+> +}
+> +
+>  static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
+>  					  bool enabled)
+>  {
+> @@ -415,6 +433,7 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
+>  }
+>  
+>  static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+> +				     const struct drm_encoder *encoder,
+>  				     const struct drm_display_mode *mode)
+>  {
+>  	unsigned int bp, hsync, vsync;
+> @@ -474,8 +493,13 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+>  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+>  		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+>  
+> +	if (sun4i_tcon_match_bus_flags(encoder, DRM_BUS_FLAG_DE_LOW))
+> +		val |= SUN4I_TCON0_IO_POL_DE_NEGATIVE;
+> +
 
-Since this only affects for-next/core, Catalin should pick this up for 4.20.
+There's other flags in use in that function, you should also migrate
+them (ideally by splitting that new function into a separate patch).
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Maxime
 
-Will
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
