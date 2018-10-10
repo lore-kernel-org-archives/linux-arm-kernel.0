@@ -1,34 +1,60 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 10 Oct 2018 20:25:58 +0200
-Subject: [PATCH / PULL 4/4] arm64: exynos: Enable generic power domain support
-In-Reply-To: <20181010182558.7034-1-krzk@kernel.org>
-References: <20181010182558.7034-1-krzk@kernel.org>
-Message-ID: <20181010182558.7034-5-krzk@kernel.org>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Wed, 10 Oct 2018 18:40:03 +0000
+Subject: [PATCH v4 0/3] drivers: soc: xilinx: Add support for ZynqMP PM
+ driver
+In-Reply-To: <1536953990-12755-1-git-send-email-jollys@xilinx.com>
+References: <1536953990-12755-1-git-send-email-jollys@xilinx.com>
+Message-ID: <BL2PR02MB21301ABF94BB130154868CE8B8E00@BL2PR02MB2130.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Szyprowski <m.szyprowski@samsung.com>
+Ping for comments
 
-Generic power domains are needed to enable support for Exynos power
-domains.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 393d2b524284..3b8e7e6ea6fb 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -67,6 +67,7 @@ config ARCH_EXYNOS
- 	select HAVE_S3C_RTC if RTC_CLASS
- 	select PINCTRL
- 	select PINCTRL_EXYNOS
-+	select PM_GENERIC_DOMAINS if PM
- 	select SOC_SAMSUNG
- 	help
- 	  This enables support for ARMv8 based Samsung Exynos SoC family.
--- 
-2.17.1
+> -----Original Message-----
+> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> owner at vger.kernel.org] On Behalf Of Jolly Shah
+> Sent: Friday, September 14, 2018 12:40 PM
+> To: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
+> geert+renesas at glider.be; bjorn.andersson at linaro.org;
+> sean.wang at mediatek.com; m.szyprowski at samsung.com; Michal Simek
+> <michals@xilinx.com>; robh+dt at kernel.org; mark.rutland at arm.com
+> Cc: Rajan Vaja <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
+> <JOLLYS@xilinx.com>
+> Subject: [PATCH v4 0/3] drivers: soc: xilinx: Add support for ZynqMP PM driver
+> 
+> Add ZynqMP PM driver. PM driver provides power management support for
+> ZynqMP.
+> 
+> This patch series is based on top of Xilinx firmware patch set:
+> https://patchwork.kernel.org/cover/10598195/
+> 
+> v4:
+>  - Minor fixes to address v3 review comments
+> 
+> v3:
+>  - Updated DT bindings as per v2 review comments
+> 
+> v2:
+>  - Rebased on top of latest firmware driver patch series
+>  - Updated driver to use shared interrupt instead of mailbox
+> 
+> Rajan Vaja (3):
+>   dt-bindings: soc: Add ZynqMP PM bindings
+>   firmware: xilinx: Implement ZynqMP power management APIs
+>   drivers: soc: xilinx: Add ZynqMP PM driver
+> 
+>  .../bindings/power/reset/xlnx,zynqmp-power.txt     |  22 +++
+>  drivers/firmware/xilinx/zynqmp.c                   |  29 ++++
+>  drivers/soc/xilinx/Kconfig                         |  11 ++
+>  drivers/soc/xilinx/Makefile                        |   1 +
+>  drivers/soc/xilinx/zynqmp_power.c                  | 178 +++++++++++++++++++++
+>  include/linux/firmware/xlnx-zynqmp.h               |  20 +++
+>  6 files changed, 261 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
+>  create mode 100644 drivers/soc/xilinx/zynqmp_power.c
+> 
+> --
+> 2.7.4
