@@ -1,80 +1,47 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 10 Oct 2018 16:09:25 +0200
-Subject: [PATCH v7 7/8] arm64: update
- Documentation/arm64/tagged-pointers.txt
-In-Reply-To: <20181003173256.GG12998@arrakis.emea.arm.com>
-References: <cover.1538485901.git.andreyknvl@google.com>
- <47a464307d4df3c0cb65f88d1fe83f9a741dd74b.1538485901.git.andreyknvl@google.com>
- <20181003173256.GG12998@arrakis.emea.arm.com>
-Message-ID: <CAAeHK+yPCRNAOSi6OpYC_Tdbo9SoXRVRbx8pjXNq96v8csO-Wg@mail.gmail.com>
+From: esyr@redhat.com (Eugene Syromiatnikov)
+Date: Wed, 10 Oct 2018 16:10:21 +0200
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <20180724173957.GA22106@yury-thinkpad>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad>
+Message-ID: <20181010141017.GA2881@asgard.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 3, 2018 at 7:32 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Oct 02, 2018 at 03:12:42PM +0200, Andrey Konovalov wrote:
->> diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
->> index a25a99e82bb1..ae877d185fdb 100644
->> --- a/Documentation/arm64/tagged-pointers.txt
->> +++ b/Documentation/arm64/tagged-pointers.txt
->> @@ -17,13 +17,21 @@ this byte for application use.
->>  Passing tagged addresses to the kernel
->>  --------------------------------------
->>
->> -All interpretation of userspace memory addresses by the kernel assumes
->> -an address tag of 0x00.
->> +Some initial work for supporting non-zero address tags passed to the
->> +kernel has been done. As of now, the kernel supports tags in:
->
-> With my maintainer hat on, the above statement leads me to think this
-> new ABI is work in progress, so not yet suitable for upstream.
+On Tue, Jul 24, 2018 at 08:39:57PM +0300, Yury Norov wrote:
+> Hi all,
+> 
+> + Pavel Machek, Palmer Dabbelt, Wookey.
+> 
+> On Wed, May 16, 2018 at 11:18:45AM +0300, Yury Norov wrote:
+> > This series enables AARCH64 with ILP32 mode.
+> > 
+> > As supporting work, it introduces ARCH_32BIT_OFF_T configuration
+> > option that is enabled for existing 32-bit architectures but disabled
+> > for new arches (so 64-bit off_t userspace type is used by new userspace).
+> > Also it deprecates getrlimit and setrlimit syscalls prior to prlimit64.
+> > 
+> > Based on kernel v4.16. Tested with LTP, glibc testsuite, trinity, lmbench,
+> > CPUSpec.
 
-OK, I think we can just say "The kernel supports tags in:" here. Will do in v8.
+> This is the update of the series based on 4.17 kernel
+> https://github.com/norov/linux/tree/ilp32-4.17
 
->
-> Also, how is user space supposed to know that it can now pass tagged
-> pointers into the kernel? An ABI change (or relaxation), needs to be
-> advertised by the kernel, usually via a new HWCAP bit (e.g. HWCAP_TBI).
-> Once we have a HWCAP bit in place, we need to be pretty clear about
-> which syscalls can and cannot cope with tagged pointers. The "as of now"
-> implies potential further relaxation which, again, would need to be
-> advertised to user in some (additional) way.
+Hello.
 
-How exactly should I do that? Something like this [1]? Or is it only
-for hardware specific things and for this patchset I need to do
-something else?
+I have some questions regarding AArch64 ILP32 implementation for which I
+failed to find an answer myself:
+ * How ptrace() tracer is supposed to distinguish between ILP32 and LP64
+   tracees? For MIPS N32 and x32 this is possible based on syscall
+   number, but for AArch64 ILP32 I do not see such a sign. There's also
+   ARM_ip is employed for signalling entering/exiting, I wonder whether
+   it's possible to employ it also for signalling tracee's personality.
+ * What's the reasoning behind capping syscall arguments to 32 bit? x32
+   and MIPS N32 do not have such a restriction (and do not need special
+   wrappers for syscalls that pass 64-bit values as a result, except
+   when they do,  as it is the case for preadv2 on x32); moreover, that
+   would lead to insurmountable difficulties for AArch64 ILP32 tracers
+   that try to trace LP64 tracees, as it would be impossible to pass
+   64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
 
-[1] https://github.com/torvalds/linux/commit/7206dc93a58fb76421c4411eefa3c003337bcb2d
-
->
->> -This includes, but is not limited to, addresses found in:
->> +  - user fault addresses
->
-> While the kernel currently supports this in some way (by clearing the
-> tag exception entry, el0_da), the above implies (at least to me) that
-> sigcontext.fault_address would contain the tagged address. That's not
-> the case (unless I missed it in your patches).
-
-I'll update the doc to reflect this in v8.
-
->
->> - - pointer arguments to system calls, including pointers in structures
->> -   passed to system calls,
->> +  - pointer arguments (including pointers in structures), which don't
->> +    describe virtual memory ranges, passed to system calls
->
-> I think we need to be more precise here...
-
-In what way?
-
->
->> +All other interpretations of userspace memory addresses by the kernel
->> +assume an address tag of 0x00. This includes, but is not limited to,
->> +addresses found in:
->> +
->> + - pointer arguments (including pointers in structures), which describe
->> +   virtual memory ranges, passed to memory system calls (mmap, mprotect,
->> +   etc.)
->
-> ...and probably a full list here.
-
-Will add a full list in v8.
+Thank you.
