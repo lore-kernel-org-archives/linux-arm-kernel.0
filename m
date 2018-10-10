@@ -1,22 +1,24 @@
-From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
-Date: Wed, 10 Oct 2018 23:57:14 +0200
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Oct 2018 19:20:19 -0300
 Subject: [PATCH] ARM: dts: imx6qdl-udoo: Add Pincfgs for UART4
-In-Reply-To: <20181008060500.GI3587@dragon>
+In-Reply-To: <20181010081904.GA23397@armhf-buildhost.asgard.net>
 References: <1538663639-3427-1-git-send-email-kueffner.markus@gmail.com>
- <20181008060500.GI3587@dragon>
-Message-ID: <b032e50b-c189-8f9f-739e-30afb6ddfb33@maciej.szmigiero.name>
+ <CAOMZO5BqL5Tfd0+KmN2DiJdoWLSYWSWyppw8qdrb-G_by_68Tw@mail.gmail.com>
+ <20181010081904.GA23397@armhf-buildhost.asgard.net>
+Message-ID: <CAOMZO5DfM6QRwVNTSLgcdm5Ujm=8=uKRYh=eotExxABbQ-sTng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.2018 08:05, Shawn Guo wrote:
-> Add a few udoo board users for comment.
-> 
-> On Thu, Oct 04, 2018 at 04:33:59PM +0200, Markus Kueffner wrote:
->> From: Markus Kueffner <kueffner.markus@gmail.com>
->>
->> Add Pincfgs for UART4 to enable Communication with the onboard SAM3X
+On Wed, Oct 10, 2018 at 5:19 AM Markus Kueffner
+<kueffner.markus@gmail.com> wrote:
+>
+> From b25738867245688e0a1eafeb78379efc6a73b66e Mon Sep 17 00:00:00 2001
+> From: Markus Kueffner <kueffner.markus@gmail.com>
+> Date: Wed, 10 Oct 2018 08:32:09 +0200
+> Subject: [PATCH v2] ARM: dts: imx6qdl-udoo: Add Pincfgs for UART4
+>
+> Add Pincfgs for UART4 to enable Communication with the onboard SAM3X
+>
+> Signed-off-by: Markus Kueffner <kueffner.markus@gmail.com>
 
-Although I can't test this patch on a real board, verifying it with
-UDOO schematic and docs suggests that this change does make sense.
-
-Maciej
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
