@@ -1,132 +1,125 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:22:54 +0200
-Subject: [PATCH 09/15] Platform: OLPC: add a regulator for the DCON
+Date: Wed, 10 Oct 2018 19:22:56 +0200
+Subject: [PATCH 11/15] x86,
+ olpc: Use a correct version when making up a battery node
 In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
 References: <20181010172300.317643-1-lkundrak@v3.sk>
-Message-ID: <20181010172300.317643-10-lkundrak@v3.sk>
+Message-ID: <20181010172300.317643-12-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All OLPC ECs are able to turn the power to the DCON on an off. Use the
-regulator framework to expose the functionality.
+The XO-1 and XO-1.5 batteries apparently differ in an ability to report
+ambient temperature. Add a different compatible string to the 1.5
+battery.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- drivers/platform/olpc/Kconfig   |  1 +
- drivers/platform/olpc/olpc-ec.c | 65 +++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
+ arch/x86/platform/olpc/olpc_dt.c | 59 +++++++++++++++++++++++---------
+ 1 file changed, 42 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/platform/olpc/Kconfig b/drivers/platform/olpc/Kconfig
-index 7c643d24ad0f..c5a872fb286f 100644
---- a/drivers/platform/olpc/Kconfig
-+++ b/drivers/platform/olpc/Kconfig
-@@ -6,6 +6,7 @@ config OLPC
- 	select OF
- 	select OF_PROMTREE if X86
- 	select IRQ_DOMAIN
-+	select REGULATOR
- 	help
- 	  Add support for detecting the unique features of the OLPC
- 	  XO hardware.
-diff --git a/drivers/platform/olpc/olpc-ec.c b/drivers/platform/olpc/olpc-ec.c
-index b9d9a9897dd5..8f82922631a9 100644
---- a/drivers/platform/olpc/olpc-ec.c
-+++ b/drivers/platform/olpc/olpc-ec.c
-@@ -14,6 +14,7 @@
- #include <linux/workqueue.h>
- #include <linux/module.h>
- #include <linux/list.h>
-+#include <linux/regulator/driver.h>
- #include <linux/olpc-ec.h>
+diff --git a/arch/x86/platform/olpc/olpc_dt.c b/arch/x86/platform/olpc/olpc_dt.c
+index d6ee92986920..6e54e116b0c5 100644
+--- a/arch/x86/platform/olpc/olpc_dt.c
++++ b/arch/x86/platform/olpc/olpc_dt.c
+@@ -218,10 +218,28 @@ static u32 __init olpc_dt_get_board_revision(void)
+ 	return be32_to_cpu(rev);
+ }
  
- struct ec_cmd_desc {
-@@ -34,6 +35,10 @@ struct olpc_ec_priv {
- 	struct work_struct worker;
- 	struct mutex cmd_lock;
- 
-+	/* DCON regulator */
-+	struct regulator_dev *dcon_rdev;
-+	bool dcon_enabled;
+-void __init olpc_dt_fixup(void)
++int olpc_dt_compatible_match(phandle node, const char *compat)
+ {
+-	int r;
+ 	char buf[64];
++	int plen;
++	char *p;
++	int len;
 +
- 	/* Pending EC commands */
- 	struct list_head cmd_q;
- 	spinlock_t cmd_q_lock;
-@@ -347,9 +352,60 @@ static struct dentry *olpc_ec_setup_debugfs(void)
- 
- #endif /* CONFIG_DEBUG_FS */
- 
-+static int olpc_ec_set_dcon_power(struct olpc_ec_priv *ec, bool state)
-+{
-+	unsigned char ec_byte = state;
-+	int ret;
-+
-+	if (ec->dcon_enabled == state)
++	plen = olpc_dt_getproperty(node, "compatible", buf, sizeof(buf));
++	if (plen <= 0)
 +		return 0;
 +
-+	ret = olpc_ec_cmd(EC_DCON_POWER_MODE, &ec_byte, 1, NULL, 0);
-+	if (ret == 0)
-+		ec->dcon_enabled = state;
-+
-+	return ret;
-+}
-+
-+static int dcon_regulator_enable(struct regulator_dev *rdev)
-+{
-+	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
-+
-+	return olpc_ec_set_dcon_power(ec, 1);
-+}
-+
-+static int dcon_regulator_disable(struct regulator_dev *rdev)
-+{
-+	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
-+
-+	return olpc_ec_set_dcon_power(ec, 0);
-+}
-+
-+static int dcon_regulator_is_enabled(struct regulator_dev *rdev)
-+{
-+	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
-+
-+	return ec->dcon_enabled;
-+}
-+
-+static struct regulator_ops dcon_regulator_ops = {
-+	.enable		= dcon_regulator_enable,
-+	.disable	= dcon_regulator_disable,
-+	.is_enabled	= dcon_regulator_is_enabled,
-+};
-+
-+static const struct regulator_desc dcon_desc = {
-+	.name	= "dcon",
-+	.id	= 0,
-+	.ops	= &dcon_regulator_ops,
-+	.type	= REGULATOR_VOLTAGE,
-+	.owner	= THIS_MODULE,
-+};
-+
- static int olpc_ec_probe(struct platform_device *pdev)
- {
- 	struct olpc_ec_priv *ec;
-+	struct regulator_config config = { };
- 	int err;
- 
- 	if (!ec_driver)
-@@ -378,6 +434,15 @@ static int olpc_ec_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
-+	config.dev = pdev->dev.parent;
-+	config.driver_data = ec;
-+	ec->dcon_enabled = true;
-+	ec->dcon_rdev = devm_regulator_register(&pdev->dev, &dcon_desc, &config);
-+	if (IS_ERR(ec->dcon_rdev)) {
-+		dev_err(&pdev->dev, "failed to register DCON regulator\n");
-+		return PTR_ERR(ec->dcon_rdev);
++	len = strlen(compat);
++	for (p = buf; p < buf + plen; p += strlen(p) + 1) {
++		if (strcmp(p, compat) == 0)
++			return 1;
 +	}
 +
- 	ec->dbgfs_dir = olpc_ec_setup_debugfs();
++	return 0;
++}
++
++void __init olpc_dt_fixup(void)
++{
+ 	phandle node;
+ 	u32 board_rev;
  
- 	return err;
+@@ -229,32 +247,33 @@ void __init olpc_dt_fixup(void)
+ 	if (!node)
+ 		return;
+ 
+-	/*
+-	 * If the battery node has a compatible property, we are running a new
+-	 * enough firmware and don't have fixups to make.
+-	 */
+-	r = olpc_dt_getproperty(node, "compatible", buf, sizeof(buf));
+-	if (r > 0)
+-		return;
+-
+-	pr_info("PROM DT: Old firmware detected, applying fixes\n");
+-
+-	/* Add olpc,xo1-battery compatible marker to battery node */
+-	olpc_dt_interpret("\" /battery at 0\" find-device"
+-		" \" olpc,xo1-battery\" +compatible"
+-		" device-end");
+-
+ 	board_rev = olpc_dt_get_board_revision();
+ 	if (!board_rev)
+ 		return;
+ 
+ 	if (board_rev >= olpc_board_pre(0xd0)) {
++		if (olpc_dt_compatible_match(node, "olpc,xo1.5-battery"))
++			return;
++
++		/* Add olpc,xo1.5-battery compatible marker to battery node */
++		olpc_dt_interpret("\" /battery at 0\" find-device"
++			" \" olpc,xo1.5-battery\" +compatible"
++			" device-end");
++
++		/* We're running a very old firmware if this is missing. */
++		if (olpc_dt_compatible_match(node, "olpc,xo1-battery"))
++			return;
++
+ 		/* XO-1.5: add dcon device */
+ 		olpc_dt_interpret("\" /pci/display at 1\" find-device"
+ 			" new-device"
+ 			" \" dcon\" device-name \" olpc,xo1-dcon\" +compatible"
+ 			" finish-device device-end");
+ 	} else {
++		/* We're running a very old firmware if this is missing. */
++		if (olpc_dt_compatible_match(node, "olpc,xo1-battery"))
++			return;
++
+ 		/* XO-1: add dcon device, mark RTC as olpc,xo1-rtc */
+ 		olpc_dt_interpret("\" /pci/display at 1,1\" find-device"
+ 			" new-device"
+@@ -264,6 +283,11 @@ void __init olpc_dt_fixup(void)
+ 			" \" olpc,xo1-rtc\" +compatible"
+ 			" device-end");
+ 	}
++
++	/* Add olpc,xo1-battery compatible marker to battery node */
++	olpc_dt_interpret("\" /battery at 0\" find-device"
++		" \" olpc,xo1-battery\" +compatible"
++		" device-end");
+ }
+ 
+ void __init olpc_dt_build_devicetree(void)
+@@ -289,6 +313,7 @@ void __init olpc_dt_build_devicetree(void)
+ /* A list of DT node/bus matches that we want to expose as platform devices */
+ static struct of_device_id __initdata of_ids[] = {
+ 	{ .compatible = "olpc,xo1-battery" },
++	{ .compatible = "olpc,xo1.5-battery" },
+ 	{ .compatible = "olpc,xo1-dcon" },
+ 	{ .compatible = "olpc,xo1-rtc" },
+ 	{},
 -- 
 2.19.0
