@@ -1,92 +1,30 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Oct 2018 13:09:55 +0100
-Subject: [Question] directory for SoC-related DT binding
-In-Reply-To: <93cd9c43-6fe3-c691-005b-e27cf101c7d6@i2se.com>
-References: <CAK7LNATaD=G8BW316fkBWM2A+YXgP5tabaySR2Fs49Za_0p=3Q@mail.gmail.com>
- <CABGGisx-iLr+CQ=JjmHEe5J_Qqpf0yrgOmSOHa74GnfwE_RKsA@mail.gmail.com>
- <93cd9c43-6fe3-c691-005b-e27cf101c7d6@i2se.com>
-Message-ID: <20181010120955.GQ30658@n2100.armlinux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 10 Oct 2018 14:39:18 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77990: Add DMA properties to
+ MSIOF nodes
+In-Reply-To: <1539070730-20349-1-git-send-email-ykaneko0929@gmail.com>
+References: <1539070730-20349-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <CAMuHMdUhEt87dggNbZHjsDu0ZVjOSxbaZBDbA4nND+e_3o40tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 02:04:14PM +0200, Stefan Wahren wrote:
-> Hi,
-> 
-> Am 10.10.2018 um 13:19 schrieb Rob Herring:
-> > On Wed, Oct 10, 2018 at 6:08 AM Masahiro Yamada
-> > <yamada.masahiro@socionext.com> wrote:
-> >> Hi,
-> >>
-> >>
-> >> I see a bunch of vendor (or SoC) names in
-> >> Documentation/device/bindings/arm/
-> >>
-> >> ./Documentation/devicetree/bindings/arm/altera
-> >> ./Documentation/devicetree/bindings/arm/amlogic
-> > Yeah, it's kind of a mixture of board/soc bindings mostly with some
-> > ARM architecture, ARM, Ltd. IP, and SoC system reg bindings.
-> >
-> > Eventually, I'd like to not split board bindings by arch and maybe we
-> > should move all the system/misc reg bindings out.
-> >
-> > [,,,]
-> >
-> >> I also see some vendor names in
-> >> Documentation/device/bindings/soc/
-> >>
-> >> ./Documentation/devicetree/bindings/soc/bcm
-> >> ./Documentation/devicetree/bindings/soc/dove
-> >> ./Documentation/devicetree/bindings/soc/fsl
-> >> ./Documentation/devicetree/bindings/soc/mediatek
-> >> ./Documentation/devicetree/bindings/soc/qcom
-> >> ./Documentation/devicetree/bindings/soc/rockchip
-> >> ./Documentation/devicetree/bindings/soc/ti
-> >> ./Documentation/devicetree/bindings/soc/xilinx
-> >> ./Documentation/devicetree/bindings/soc/zte
-> > This I believe is mostly SoC system reg bindings though there's
-> > probably a few other things.
-> >
-> >> Confusingly, I see bcm, mediatek, rockchip
-> >> in both locations.
-> >>
-> >> Is there any rule to choose one than the other?
-> > Top-level SoC/board bindings in arm/ and anything else elsewhere ideally.
-> 
-> in case of Documentation/devicetree/bindings/soc/bcm the directory
-> contains SoC / board bindings, cpu-enable and a firmware binding.
+On Tue, Oct 9, 2018 at 9:39 AM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> This patch adds DMA properties to the MSIOF device nodes of R8A77990 SoC.
+>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
-I think you're confused there...
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+on Ebisu using a 25LC040 EEPROM
+https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git/tree/arch/arm64/boot/dts/renesas/r8a77990-ebisu-cn41-msiof0-25lc040.dtso?h=topic/renesas-overlays
 
-$ ls -1 Documentation/devicetree/bindings/soc/bcm/
-brcm,bcm2835-vchiq.txt
-raspberrypi,bcm2835-power.txt
+Gr{oetje,eeting}s,
 
-Doesn't look like SoC/board bindings to me...
-
-whereas:
-
-$ ls -1 Documentation/devicetree/bindings/arm/bcm/
-brcm,bcm11351-cpu-method.txt
-brcm,bcm11351.txt
-brcm,bcm21664.txt
-brcm,bcm23550-cpu-method.txt
-brcm,bcm23550.txt
-brcm,bcm2835.txt
-brcm,bcm4708.txt
-brcm,bcm63138.txt
-brcm,brcmstb.txt
-brcm,cygnus.txt
-brcm,hr2.txt
-brcm,ns2.txt
-brcm,nsp-cpu-method.txt
-brcm,nsp.txt
-brcm,stingray.txt
-brcm,vulcan-soc.txt
-raspberrypi,bcm2835-firmware.txt
-
-does fit with your description, except for the directory path...
+                        Geert
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
