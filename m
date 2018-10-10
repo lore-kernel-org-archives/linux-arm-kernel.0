@@ -1,104 +1,132 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:22:59 +0200
-Subject: [PATCH 14/15] power: supply: olpc_battery: Avoid using platform_info
+Date: Wed, 10 Oct 2018 19:22:54 +0200
+Subject: [PATCH 09/15] Platform: OLPC: add a regulator for the DCON
 In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
 References: <20181010172300.317643-1-lkundrak@v3.sk>
-Message-ID: <20181010172300.317643-15-lkundrak@v3.sk>
+Message-ID: <20181010172300.317643-10-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This wouldn't work on the DT-based ARM platform. Let's read the EC version
-directly from the EC driver instead.
-
-This makes the driver no longer x86 specific.
+All OLPC ECs are able to turn the power to the DCON on an off. Use the
+regulator framework to expose the functionality.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- drivers/power/supply/Kconfig        |  2 +-
- drivers/power/supply/olpc_battery.c | 35 +++++++++++++++++++++--------
- 2 files changed, 27 insertions(+), 10 deletions(-)
+ drivers/platform/olpc/Kconfig   |  1 +
+ drivers/platform/olpc/olpc-ec.c | 65 +++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
 
-diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
-index ff6dab0bf0dd..f0361e4dd457 100644
---- a/drivers/power/supply/Kconfig
-+++ b/drivers/power/supply/Kconfig
-@@ -151,7 +151,7 @@ config BATTERY_PMU
- 
- config BATTERY_OLPC
- 	tristate "One Laptop Per Child battery"
--	depends on X86_32 && OLPC
-+	depends on OLPC
+diff --git a/drivers/platform/olpc/Kconfig b/drivers/platform/olpc/Kconfig
+index 7c643d24ad0f..c5a872fb286f 100644
+--- a/drivers/platform/olpc/Kconfig
++++ b/drivers/platform/olpc/Kconfig
+@@ -6,6 +6,7 @@ config OLPC
+ 	select OF
+ 	select OF_PROMTREE if X86
+ 	select IRQ_DOMAIN
++	select REGULATOR
  	help
- 	  Say Y to enable support for the battery on the OLPC laptop.
- 
-diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
-index 2a2d7cc995f0..dde9863e5c4a 100644
---- a/drivers/power/supply/olpc_battery.c
-+++ b/drivers/power/supply/olpc_battery.c
-@@ -20,8 +20,6 @@
- #include <linux/sched.h>
+ 	  Add support for detecting the unique features of the OLPC
+ 	  XO hardware.
+diff --git a/drivers/platform/olpc/olpc-ec.c b/drivers/platform/olpc/olpc-ec.c
+index b9d9a9897dd5..8f82922631a9 100644
+--- a/drivers/platform/olpc/olpc-ec.c
++++ b/drivers/platform/olpc/olpc-ec.c
+@@ -14,6 +14,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/module.h>
+ #include <linux/list.h>
++#include <linux/regulator/driver.h>
  #include <linux/olpc-ec.h>
- #include <linux/of.h>
--#include <asm/olpc.h>
--
  
- #define EC_BAT_VOLTAGE	0x10	/* uint16_t,	*9.76/32,    mV   */
- #define EC_BAT_CURRENT	0x11	/* int16_t,	*15.625/120, mA   */
-@@ -57,6 +55,7 @@ struct olpc_battery_data {
- 	struct power_supply *olpc_ac;
- 	struct power_supply *olpc_bat;
- 	char bat_serial[17];
-+	int new_proto;
- };
+ struct ec_cmd_desc {
+@@ -34,6 +35,10 @@ struct olpc_ec_priv {
+ 	struct work_struct worker;
+ 	struct mutex cmd_lock;
  
- /*********************************************************************
-@@ -100,7 +99,7 @@ static const struct power_supply_desc olpc_ac_desc = {
- static int olpc_bat_get_status(struct olpc_battery_data *data,
- 		union power_supply_propval *val, uint8_t ec_byte)
- {
--	if (olpc_platform_info.ecver > 0x44) {
-+	if (data->new_proto) {
- 		if (ec_byte & (BAT_STAT_CHARGING | BAT_STAT_TRICKLE))
- 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
- 		else if (ec_byte & BAT_STAT_DISCHARGING)
-@@ -608,14 +607,32 @@ static int olpc_battery_probe(struct platform_device *pdev)
- 	struct power_supply_config psy_cfg = {};
- 	struct olpc_battery_data *data;
- 	uint8_t status;
-+	unsigned char ecver[1];
++	/* DCON regulator */
++	struct regulator_dev *dcon_rdev;
++	bool dcon_enabled;
++
+ 	/* Pending EC commands */
+ 	struct list_head cmd_q;
+ 	spinlock_t cmd_q_lock;
+@@ -347,9 +352,60 @@ static struct dentry *olpc_ec_setup_debugfs(void)
+ 
+ #endif /* CONFIG_DEBUG_FS */
+ 
++static int olpc_ec_set_dcon_power(struct olpc_ec_priv *ec, bool state)
++{
++	unsigned char ec_byte = state;
 +	int ret;
 +
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+	platform_set_drvdata(pdev, data);
++	if (ec->dcon_enabled == state)
++		return 0;
 +
-+	/* See if the EC is already there and get the EC revision */
-+	ret = olpc_ec_cmd(EC_FIRMWARE_REV, NULL, 0, ecver, ARRAY_SIZE(ecver));
-+	if (ret) {
-+		if (ret == -ENODEV)
-+			return -EPROBE_DEFER;
-+		return ret;
-+	}
++	ret = olpc_ec_cmd(EC_DCON_POWER_MODE, &ec_byte, 1, NULL, 0);
++	if (ret == 0)
++		ec->dcon_enabled = state;
++
++	return ret;
++}
++
++static int dcon_regulator_enable(struct regulator_dev *rdev)
++{
++	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
++
++	return olpc_ec_set_dcon_power(ec, 1);
++}
++
++static int dcon_regulator_disable(struct regulator_dev *rdev)
++{
++	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
++
++	return olpc_ec_set_dcon_power(ec, 0);
++}
++
++static int dcon_regulator_is_enabled(struct regulator_dev *rdev)
++{
++	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
++
++	return ec->dcon_enabled;
++}
++
++static struct regulator_ops dcon_regulator_ops = {
++	.enable		= dcon_regulator_enable,
++	.disable	= dcon_regulator_disable,
++	.is_enabled	= dcon_regulator_is_enabled,
++};
++
++static const struct regulator_desc dcon_desc = {
++	.name	= "dcon",
++	.id	= 0,
++	.ops	= &dcon_regulator_ops,
++	.type	= REGULATOR_VOLTAGE,
++	.owner	= THIS_MODULE,
++};
++
+ static int olpc_ec_probe(struct platform_device *pdev)
+ {
+ 	struct olpc_ec_priv *ec;
++	struct regulator_config config = { };
+ 	int err;
  
--	/*
--	 * We've seen a number of EC protocol changes; this driver requires
--	 * the latest EC protocol, supported by 0x44 and above.
--	 */
--	if (olpc_platform_info.ecver < 0x44) {
-+	if (ecver[0] > 0x44) {
-+		/* XO 1 or 1.5 with a new EC firmware. */
-+		data->new_proto = 1;
-+	} else if (ecver[0] < 0x44) {
-+		/*
-+		 * We've seen a number of EC protocol changes; this driver
-+		 * requires the latest EC protocol, supported by 0x44 and above.
-+		 */
- 		printk(KERN_NOTICE "OLPC EC version 0x%02x too old for "
--			"battery driver.\n", olpc_platform_info.ecver);
-+			"battery driver.\n", ecver[0]);
- 		return -ENXIO;
+ 	if (!ec_driver)
+@@ -378,6 +434,15 @@ static int olpc_ec_probe(struct platform_device *pdev)
+ 		return err;
  	}
  
++	config.dev = pdev->dev.parent;
++	config.driver_data = ec;
++	ec->dcon_enabled = true;
++	ec->dcon_rdev = devm_regulator_register(&pdev->dev, &dcon_desc, &config);
++	if (IS_ERR(ec->dcon_rdev)) {
++		dev_err(&pdev->dev, "failed to register DCON regulator\n");
++		return PTR_ERR(ec->dcon_rdev);
++	}
++
+ 	ec->dbgfs_dir = olpc_ec_setup_debugfs();
+ 
+ 	return err;
 -- 
 2.19.0
