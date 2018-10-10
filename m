@@ -1,54 +1,53 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:22:48 +0200
-Subject: [PATCH 03/15] dt-bindings: olpc,
- xo1.75-ec: Add OLPC XO-1.75 EC bindings
+Date: Wed, 10 Oct 2018 19:22:47 +0200
+Subject: [PATCH 02/15] Revert "platform/olpc: Make ec explicitly non-modular"
 In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
 References: <20181010172300.317643-1-lkundrak@v3.sk>
-Message-ID: <20181010172300.317643-4-lkundrak@v3.sk>
+Message-ID: <20181010172300.317643-3-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OLPC XO-1.75 Embedded Controller is a SPI master that uses extra
-signals for handshaking. It needs to know when is the slave (Linux)
-side's TX FIFO ready for transfer (the ready-gpio signal on the SPI
-controller node) and when does it wish to respond with a command (the
-cmd-gpio property).
+It doesn't make sense to always have this built-in, e.g. on ARM
+multiplatform kernels. A better way to address the problem the original
+commit aimed to solve is to fix Kconfig.
+
+This reverts commit f48d1496b8537d75776478c6942dd87f34d7f270.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- .../bindings/misc/olpc,xo1.75-ec.txt          | 24 +++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt
+ drivers/platform/olpc/olpc-ec.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt b/Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt
-new file mode 100644
-index 000000000000..14385fee65d2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt
-@@ -0,0 +1,24 @@
-+OLPC XO-1.75 Embedded Controller
+diff --git a/drivers/platform/olpc/olpc-ec.c b/drivers/platform/olpc/olpc-ec.c
+index 374a8028fec7..f99b183d5296 100644
+--- a/drivers/platform/olpc/olpc-ec.c
++++ b/drivers/platform/olpc/olpc-ec.c
+@@ -1,8 +1,6 @@
+ /*
+  * Generic driver for the OLPC Embedded Controller.
+  *
+- * Author: Andres Salomon <dilinger@queued.net>
+- *
+  * Copyright (C) 2011-2012 One Laptop per Child Foundation.
+  *
+  * Licensed under the GPL v2 or later.
+@@ -14,7 +12,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/workqueue.h>
+-#include <linux/init.h>
++#include <linux/module.h>
+ #include <linux/list.h>
+ #include <linux/olpc-ec.h>
+ #include <asm/olpc.h>
+@@ -328,4 +326,8 @@ static int __init olpc_ec_init_module(void)
+ {
+ 	return platform_driver_register(&olpc_ec_plat_driver);
+ }
 +
-+Required properties:
-+- compatible: Should be "olpc,xo1.75-ec".
-+- cmd-gpio: gpio specifier of the CMD pin
+ arch_initcall(olpc_ec_init_module);
 +
-+The embedded controller requires the SPI controller driver to signal readiness
-+to receive a transfer (that is, when TX FIFO contains the response data) by
-+strobing the ACK pin with the ready signal. See the "ready-gpio" property of the
-+SSP binding as documented in:
-+<Documentation/devicetree/bindings/spi/spi-pxa2xx.txt>.
-+
-+Example:
-+	&ssp3 {
-+		spi-slave;
-+		status = "okay";
-+		ready-gpio = <&gpio 125 GPIO_ACTIVE_HIGH>;
-+
-+		slave {
-+			compatible = "olpc,xo1.75-ec";
-+			spi-cpha;
-+			cmd-gpio = <&gpio 155 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
++MODULE_AUTHOR("Andres Salomon <dilinger@queued.net>");
++MODULE_LICENSE("GPL");
 -- 
 2.19.0
