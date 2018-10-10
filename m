@@ -1,28 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Oct 2018 09:17:19 +0200
-Subject: [PATCH V3 2/2] pinctrl: bcm: add Northstar driver
-In-Reply-To: <20180926193103.21241-2-zajec5@gmail.com>
-References: <20180926193103.21241-1-zajec5@gmail.com>
- <20180926193103.21241-2-zajec5@gmail.com>
-Message-ID: <CACRpkdYpfunUSZSoiMTBoO3yQyas6g0s2uxbxovqXy9MRYiOLQ@mail.gmail.com>
+From: wendy.liang@xilinx.com (Wendy Liang)
+Date: Wed, 10 Oct 2018 00:18:30 -0700
+Subject: [PATCH v4 0/2] Xilinx ZynqMP IPI Mailbox Controller Driver
+Message-ID: <1539155912-29760-1-git-send-email-wendy.liang@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 9:31 PM Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+Introduce mailbox controller driver for ZynqMP IPI(Inter-processor
+interrupt) IP core.
 
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
->
-> This driver provides support for Northstar mux controller. It differs
-> from Northstar Plus one so a new binding and driver were needed.
->
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
-> V2: Define more pins, groups, functions
->     Simplify ns_pinctrl_set_mux() as Northstar uses 1:1 mapping
-> V3: Support 3 different bindings and different sets of pins, groups
->     and functions. This requires building arrays dynamically on init.
+As the device tree bindings have been updated. Do not have "Reviewed-by"
+nor "Acked-by" in the dt-bindings commit.
 
-Patch applied.
+v4:
+ - make IPI mailboxes as subnodes to the IPI agent device node to properly
+   describe the hardware.
 
-Yours,
-Linus Walleij
+v3:
+ - add NULL entry to of_device_id of IPI controller
+
+v2:
+ - change SPDX-License-Identifier license text style in .c file
+ - replace xlnx-ipi-ids with xlnx,ipi-ids
+
+Wendy Liang (2):
+  mailbox: ZynqMP IPI mailbox controller
+  dt-bindings: mailbox: Add Xilinx IPI Mailbox
+
+ .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 128 ++++
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/zynqmp-ipi-mailbox.c               | 762 +++++++++++++++++++++
+ include/linux/mailbox/zynqmp-ipi-message.h         |  24 +
+ 5 files changed, 924 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+ create mode 100644 drivers/mailbox/zynqmp-ipi-mailbox.c
+ create mode 100644 include/linux/mailbox/zynqmp-ipi-message.h
+
+-- 
+2.7.4
