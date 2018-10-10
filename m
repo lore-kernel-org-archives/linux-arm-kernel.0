@@ -1,66 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 10 Oct 2018 11:42:30 +0100
-Subject: [PATCH 2/2] iommu/arm-smmu-v3: Remove unnecessary wrapper function
-In-Reply-To: <1539167367-20471-3-git-send-email-andrew.murray@arm.com>
-References: <1539167367-20471-1-git-send-email-andrew.murray@arm.com>
- <1539167367-20471-3-git-send-email-andrew.murray@arm.com>
-Message-ID: <0ec6edcf-1ac6-7dfd-c494-a006ab9538b1@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 10 Oct 2018 20:07:52 +0900
+Subject: [Question] directory for SoC-related DT binding
+Message-ID: <CAK7LNATaD=G8BW316fkBWM2A+YXgP5tabaySR2Fs49Za_0p=3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/18 11:29, Andrew Murray wrote:
-> Simplify the code by removing an unnecessary wrapper function.
-> 
-> This was left behind by commit 2f657add07a8
-> ("iommu/arm-smmu-v3: Specialise CMD_SYNC handling")
+Hi,
 
-Oops, sorry about that ;)
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+I see a bunch of vendor (or SoC) names in
+Documentation/device/bindings/arm/
 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->   drivers/iommu/arm-smmu-v3.c | 12 ++++--------
->   1 file changed, 4 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index c7bd18e..6947ccf 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1371,15 +1371,11 @@ static irqreturn_t arm_smmu_combined_irq_handler(int irq, void *dev)
->   }
->   
->   /* IO_PGTABLE API */
-> -static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
-> -{
-> -	arm_smmu_cmdq_issue_sync(smmu);
-> -}
-> -
->   static void arm_smmu_tlb_sync(void *cookie)
->   {
->   	struct arm_smmu_domain *smmu_domain = cookie;
-> -	__arm_smmu_tlb_sync(smmu_domain->smmu);
-> +
-> +	arm_smmu_cmdq_issue_sync(smmu_domain->smmu);
->   }
->   
->   static void arm_smmu_tlb_inv_context(void *cookie)
-> @@ -1404,7 +1400,7 @@ static void arm_smmu_tlb_inv_context(void *cookie)
->   	 * to guarantee those are observed before the TLBI. Do be careful, 007.
->   	 */
->   	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> -	__arm_smmu_tlb_sync(smmu);
-> +	arm_smmu_cmdq_issue_sync(smmu);
->   }
->   
->   static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
-> @@ -1793,7 +1789,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
->   	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
->   
->   	if (smmu)
-> -		__arm_smmu_tlb_sync(smmu);
-> +		arm_smmu_cmdq_issue_sync(smmu);
->   }
->   
->   static phys_addr_t
-> 
+./Documentation/devicetree/bindings/arm/altera
+./Documentation/devicetree/bindings/arm/amlogic
+./Documentation/devicetree/bindings/arm/apm
+./Documentation/devicetree/bindings/arm/bcm
+./Documentation/devicetree/bindings/arm/calxeda
+./Documentation/devicetree/bindings/arm/freescale
+./Documentation/devicetree/bindings/arm/hisilicon
+./Documentation/devicetree/bindings/arm/keystone
+./Documentation/devicetree/bindings/arm/marvell
+./Documentation/devicetree/bindings/arm/mediatek
+./Documentation/devicetree/bindings/arm/mrvl
+./Documentation/devicetree/bindings/arm/msm
+./Documentation/devicetree/bindings/arm/npcm
+./Documentation/devicetree/bindings/arm/nxp
+./Documentation/devicetree/bindings/arm/omap
+./Documentation/devicetree/bindings/arm/rockchip
+./Documentation/devicetree/bindings/arm/samsung
+./Documentation/devicetree/bindings/arm/stm32
+./Documentation/devicetree/bindings/arm/sunxi
+./Documentation/devicetree/bindings/arm/tegra
+./Documentation/devicetree/bindings/arm/ti
+./Documentation/devicetree/bindings/arm/uniphier
+./Documentation/devicetree/bindings/arm/ux500
+./Documentation/devicetree/bindings/arm/vt8500
+
+
+I also see some vendor names in
+Documentation/device/bindings/soc/
+
+./Documentation/devicetree/bindings/soc/bcm
+./Documentation/devicetree/bindings/soc/dove
+./Documentation/devicetree/bindings/soc/fsl
+./Documentation/devicetree/bindings/soc/mediatek
+./Documentation/devicetree/bindings/soc/qcom
+./Documentation/devicetree/bindings/soc/rockchip
+./Documentation/devicetree/bindings/soc/ti
+./Documentation/devicetree/bindings/soc/xilinx
+./Documentation/devicetree/bindings/soc/zte
+
+
+
+Confusingly, I see bcm, mediatek, rockchip
+in both locations.
+
+Is there any rule to choose one than the other?
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
