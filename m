@@ -1,34 +1,46 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Wed, 10 Oct 2018 15:39:07 +0100
-Subject: [PATCH v9 00/24] ILP32 for ARM64
-In-Reply-To: <20181010141017.GA2881@asgard.redhat.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180724173957.GA22106@yury-thinkpad>
- <20181010141017.GA2881@asgard.redhat.com>
-Message-ID: <7aac1a08-8948-1a04-cbd3-fbc6a53f9ff0@arm.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Wed, 10 Oct 2018 09:42:15 -0500
+Subject: [PATCH 0/4] Add SOCFPGA System Manager
+In-Reply-To: <1537826946-18942-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1537826946-18942-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <021aaa02-1138-e538-3d02-ff639541d0f3@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/18 15:10, Eugene Syromiatnikov wrote:
->  * What's the reasoning behind capping syscall arguments to 32 bit? x32
->    and MIPS N32 do not have such a restriction (and do not need special
->    wrappers for syscalls that pass 64-bit values as a result, except
->    when they do,  as it is the case for preadv2 on x32); moreover, that
->    would lead to insurmountable difficulties for AArch64 ILP32 tracers
->    that try to trace LP64 tracees, as it would be impossible to pass
->    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
+Hi
+On 09/24/2018 05:09 PM, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
+> 
+> Add MFD driver for ARM64 SOCFPGA System Manager to steer
+> System Manager calls appropriately.
+> The SOCFPGA System Manager includes registers from several
+> SOC peripherals.
+> 
+> On ARM32, syscon handles this aggregated register grouping.
+> Redirect System Manager calls to syscon for ARM32 SOCFPGA
+> systems.
+> 
+> The ARM64 System Manager can only be accessed from priority
+> level EL3 so this new MFD driver handles the calls to EL3.
+> 
+> Thor Thayer (4):
+>    mfd: altera-sysmgr: Add SOCFPGA System Manager abstraction
+>    ARM: socfpga_defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
+>    arm64: defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
+>    net: stmmac: socfpga: Convert to shared System Manager driver
+> 
+>   MAINTAINERS                                        |   6 +
+>   arch/arm/configs/socfpga_defconfig                 |   1 +
+>   arch/arm64/configs/defconfig                       |   1 +
+>   drivers/mfd/Kconfig                                |   9 +
+>   drivers/mfd/Makefile                               |   1 +
+>   drivers/mfd/altera-sysmgr.c                        | 310 +++++++++++++++++++++
+>   .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |   4 +-
+>   include/linux/mfd/altera-sysmgr.h                  | 113 ++++++++
+>   8 files changed, 444 insertions(+), 1 deletion(-)
+>   create mode 100644 drivers/mfd/altera-sysmgr.c
+>   create mode 100644 include/linux/mfd/altera-sysmgr.h
+> 
+Gentle ping.
 
-but that's necessarily the case for all ilp32 abis:
-the userspace syscall function receives 32bit
-arguments so even if the kernel abi takes 64bit
-args you cannot use that from c code. (the libc
-does not even know which args should be sign or
-zero extended.)
-
-process_vm_readv/writev is limited by the ilp32
-iovec struct, not by the syscall arguments.
-
-ptrace is specified to take void* addr argument,
-and void* is 32bit on all ilp32 targets.
-so again on the c language level there is no
-way around the 32bit limitation.
+Thor
