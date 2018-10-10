@@ -1,46 +1,42 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Wed, 10 Oct 2018 09:42:15 -0500
-Subject: [PATCH 0/4] Add SOCFPGA System Manager
-In-Reply-To: <1537826946-18942-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1537826946-18942-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <021aaa02-1138-e538-3d02-ff639541d0f3@linux.intel.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 10 Oct 2018 15:43:22 +0100
+Subject: [PATCH] arm64: mm: Use __pa_symbol() for set_swapper_pgd()
+Message-ID: <20181010144322.14363-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-On 09/24/2018 05:09 PM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
-> 
-> Add MFD driver for ARM64 SOCFPGA System Manager to steer
-> System Manager calls appropriately.
-> The SOCFPGA System Manager includes registers from several
-> SOC peripherals.
-> 
-> On ARM32, syscon handles this aggregated register grouping.
-> Redirect System Manager calls to syscon for ARM32 SOCFPGA
-> systems.
-> 
-> The ARM64 System Manager can only be accessed from priority
-> level EL3 so this new MFD driver handles the calls to EL3.
-> 
-> Thor Thayer (4):
->    mfd: altera-sysmgr: Add SOCFPGA System Manager abstraction
->    ARM: socfpga_defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
->    arm64: defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
->    net: stmmac: socfpga: Convert to shared System Manager driver
-> 
->   MAINTAINERS                                        |   6 +
->   arch/arm/configs/socfpga_defconfig                 |   1 +
->   arch/arm64/configs/defconfig                       |   1 +
->   drivers/mfd/Kconfig                                |   9 +
->   drivers/mfd/Makefile                               |   1 +
->   drivers/mfd/altera-sysmgr.c                        | 310 +++++++++++++++++++++
->   .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |   4 +-
->   include/linux/mfd/altera-sysmgr.h                  | 113 ++++++++
->   8 files changed, 444 insertions(+), 1 deletion(-)
->   create mode 100644 drivers/mfd/altera-sysmgr.c
->   create mode 100644 include/linux/mfd/altera-sysmgr.h
-> 
-Gentle ping.
+commit 2330b7ca78350efcb ("arm64/mm: use fixmap to modify
+swapper_pg_dir") modifies the swapper_pg_dir via the fixmap
+as the kernel page tables have been moved to a read-only
+part of the kernel mapping.
 
-Thor
+Using __pa() to setup the fixmap causes CONFIG_DEBUG_VIRTUAL
+to fire, as this function is used on the kernel-image swapper
+address. The in_swapper_pgdir() test before each call of this
+function means set_swapper_pgd() will only ever be called when
+pgdp points somewhere in the kernel-image mapping of
+swapper_pd_dir. Use __pa_symbol().
+
+Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: James Morse <james.morse@arm.com>
+CC: Jun Yao <yaojun8558363@gmail.com>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 6f0e2edcc114..6deb836a102a 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -74,7 +74,7 @@ void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd)
+ 	pgd_t *fixmap_pgdp;
+ 
+ 	spin_lock(&swapper_pgdir_lock);
+-	fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
++	fixmap_pgdp = pgd_set_fixmap(__pa_symbol(pgdp));
+ 	WRITE_ONCE(*fixmap_pgdp, pgd);
+ 	/*
+ 	 * We need dsb(ishst) here to ensure the page-table-walker sees
+-- 
+2.19.0
