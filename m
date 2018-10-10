@@ -1,41 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 10 Oct 2018 15:16:28 +0530
-Subject: [PATCH 5/9] arm64: dts: sdm845: Add gpu and gmu device nodes
-In-Reply-To: <20180827151112.25211-6-jcrouse@codeaurora.org>
-References: <20180827151112.25211-1-jcrouse@codeaurora.org>
- <20180827151112.25211-6-jcrouse@codeaurora.org>
-Message-ID: <20181010094628.wejfgmvcv6stzoco@vireshk-i7>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 10 Oct 2018 10:46:37 +0100
+Subject: [RFC PATCH 2/2] ACPI / PPTT: cacheinfo: Label caches based on
+ fw_token
+In-Reply-To: <236eab50-e1d0-e2f5-fb69-95451c4ccc7e@codeaurora.org>
+References: <20181005150235.13846-1-james.morse@arm.com>
+ <20181005150235.13846-3-james.morse@arm.com>
+ <a68abfd2-1e28-d9e7-919a-8b3133db4d20@arm.com>
+ <10e15b8d-c0c2-b73a-de31-f87ae0d86469@arm.com>
+ <236eab50-e1d0-e2f5-fb69-95451c4ccc7e@codeaurora.org>
+Message-ID: <20181010094637.GA13498@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-08-18, 09:11, Jordan Crouse wrote:
-> Add the nodes to describe the Adreno GPU and GMU devices.
-> 
-> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> ---
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 121 +++++++++++++++++++++++++++
->  1 file changed, 121 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index cdaabeb3c995..10db0ceb3699 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -192,6 +192,59 @@
->  		method = "smc";
->  	};
->  
-> +gpu_opp_table: adreno-opp-table {
-> +		compatible = "operating-points-v2-qcom-level";
-> +
-> +		opp-710000000 {
-> +			opp-hz = /bits/ 64 <710000000>;
-> +			qcom,level = <416>;
+On Tue, Oct 09, 2018 at 12:34:51PM -0600, Jeffrey Hugo wrote:
+> On 10/9/2018 11:58 AM, James Morse wrote:
+> >
+> > It can be set for a non-leaf entry, I assumed it would always be set for a leaf.
+> > Is anyone doing this with a PPTT table?
+>
+> QDF2400 takes a strict interpretation of the spec, and does not set the flag
+> for leaf nodes.  I believe there are other implementations which do set the
+> flag for leaf nodes.
+>
 
-What is qcom,level here ? Is it different than the RPM voting thing ?
+IIRC, based on the discussions when this was added, the ACPI Processor
+ID  *must be* valid for the lead nodes.T he flag bit corresponding
+to that should be considered as don't care as it's always guaranteed
+to be valid.
 
-If not then you need to follow what Rajendra, Niklas are doing as
-well. There needs to be a genpd which needs to carry this value and
-the gpu's table will have required-opps entry to point to it.
-
--- 
-viresh
+--
+Regards,
+Sudeep
