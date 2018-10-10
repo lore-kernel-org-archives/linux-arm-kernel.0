@@ -1,47 +1,246 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 10 Oct 2018 15:07:34 +0300
-Subject: [PATCH v3 19/22] arm64: dts: ls104x: add missing dma ranges property
+Date: Wed, 10 Oct 2018 15:07:23 +0300
+Subject: [PATCH v3 08/22] soc/fsl/qbman_portals: add APIs to retrieve the
+ probing status
 In-Reply-To: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
 References: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
-Message-ID: <20181010120737.30300-17-laurentiu.tudor@nxp.com>
+Message-ID: <20181010120737.30300-6-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-These chips have a 48-bit address size so make sure that the dma-ranges
-reflects this. Otherwise the linux kernel's dma sub-system will set
-the default dma masks to full 64-bit, badly breaking dmas.
+Add a couple of new APIs to check the probing status of the required
+cpu bound qman and bman portals:
+ 'int bman_portals_probed()' and 'int qman_portals_probed()'.
+They return the following values.
+ *  1 if qman/bman portals were all probed correctly
+ *  0 if qman/bman portals were not yet probed
+ * -1 if probing of qman/bman portals failed
+Portals are considered successful probed if no error occurred during
+the probing of any of the portals and if enough portals were probed
+to have one available for each cpu.
+The error handling paths were slightly rearranged in order to fit this
+new functionality without being too intrusive.
+Drivers that use qman/bman portal driver services are required to use
+these APIs before calling any functions exported by these drivers or
+otherwise they will crash the kernel.
+First user will be the dpaa1 ethernet driver, coming in a subsequent
+patch.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/soc/fsl/qbman/bman_portal.c | 22 ++++++++++++++++++----
+ drivers/soc/fsl/qbman/qman_portal.c | 23 +++++++++++++++++++----
+ include/soc/fsl/bman.h              |  8 ++++++++
+ include/soc/fsl/qman.h              |  9 +++++++++
+ 4 files changed, 54 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 1f9b385007a8..0e8fc8f29997 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -214,6 +214,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
+diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
+index f9edd28894fd..6f184a3f51f3 100644
+--- a/drivers/soc/fsl/qbman/bman_portal.c
++++ b/drivers/soc/fsl/qbman/bman_portal.c
+@@ -32,6 +32,7 @@
  
- 		clockgen: clocking at 1ee1000 {
- 			compatible = "fsl,ls1043a-clockgen";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 22bf3975492a..29b07bdd4207 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -187,6 +187,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
+ static struct bman_portal *affine_bportals[NR_CPUS];
+ static struct cpumask portal_cpus;
++static int __bman_portals_probed;
+ /* protect bman global registers and global data shared among portals */
+ static DEFINE_SPINLOCK(bman_lock);
  
- 		ddr: memory-controller at 1080000 {
- 			compatible = "fsl,qoriq-memory-controller";
+@@ -85,6 +86,12 @@ static int bman_online_cpu(unsigned int cpu)
+ 	return 0;
+ }
+ 
++int bman_portals_probed(void)
++{
++	return __bman_portals_probed;
++}
++EXPORT_SYMBOL_GPL(bman_portals_probed);
++
+ static int bman_portal_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -102,8 +109,10 @@ static int bman_portal_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
+-	if (!pcfg)
++	if (!pcfg) {
++		__bman_portals_probed = -1;
+ 		return -ENOMEM;
++	}
+ 
+ 	pcfg->dev = dev;
+ 
+@@ -111,14 +120,14 @@ static int bman_portal_probe(struct platform_device *pdev)
+ 					     DPAA_PORTAL_CE);
+ 	if (!addr_phys[0]) {
+ 		dev_err(dev, "Can't get %pOF property 'reg::CE'\n", node);
+-		return -ENXIO;
++		goto err_ioremap1;
+ 	}
+ 
+ 	addr_phys[1] = platform_get_resource(pdev, IORESOURCE_MEM,
+ 					     DPAA_PORTAL_CI);
+ 	if (!addr_phys[1]) {
+ 		dev_err(dev, "Can't get %pOF property 'reg::CI'\n", node);
+-		return -ENXIO;
++		goto err_ioremap1;
+ 	}
+ 
+ 	pcfg->cpu = -1;
+@@ -126,7 +135,7 @@ static int bman_portal_probe(struct platform_device *pdev)
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+ 		dev_err(dev, "Can't get %pOF IRQ'\n", node);
+-		return -ENXIO;
++		goto err_ioremap1;
+ 	}
+ 	pcfg->irq = irq;
+ 
+@@ -154,6 +163,9 @@ static int bman_portal_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	cpumask_set_cpu(cpu, &portal_cpus);
++	if (!__bman_portals_probed &&
++	    cpumask_weight(&portal_cpus) == num_online_cpus())
++		__bman_portals_probed = 1;
+ 	spin_unlock(&bman_lock);
+ 	pcfg->cpu = cpu;
+ 
+@@ -173,6 +185,8 @@ static int bman_portal_probe(struct platform_device *pdev)
+ err_ioremap2:
+ 	memunmap(pcfg->addr_virt_ce);
+ err_ioremap1:
++	 __bman_portals_probed = -1;
++
+ 	return -ENXIO;
+ }
+ 
+diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
+index eef93cab84f1..c003f54a21e4 100644
+--- a/drivers/soc/fsl/qbman/qman_portal.c
++++ b/drivers/soc/fsl/qbman/qman_portal.c
+@@ -39,6 +39,7 @@ EXPORT_SYMBOL(qman_dma_portal);
+ #define CONFIG_FSL_DPA_PIRQ_FAST  1
+ 
+ static struct cpumask portal_cpus;
++static int __qman_portals_probed;
+ /* protect qman global registers and global data shared among portals */
+ static DEFINE_SPINLOCK(qman_lock);
+ 
+@@ -219,6 +220,12 @@ static int qman_online_cpu(unsigned int cpu)
+ 	return 0;
+ }
+ 
++int qman_portals_probed(void)
++{
++	return __qman_portals_probed;
++}
++EXPORT_SYMBOL_GPL(qman_portals_probed);
++
+ static int qman_portal_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -238,8 +245,10 @@ static int qman_portal_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
+-	if (!pcfg)
++	if (!pcfg) {
++		__qman_portals_probed = -1;
+ 		return -ENOMEM;
++	}
+ 
+ 	pcfg->dev = dev;
+ 
+@@ -247,19 +256,20 @@ static int qman_portal_probe(struct platform_device *pdev)
+ 					     DPAA_PORTAL_CE);
+ 	if (!addr_phys[0]) {
+ 		dev_err(dev, "Can't get %pOF property 'reg::CE'\n", node);
+-		return -ENXIO;
++		goto err_ioremap1;
+ 	}
+ 
+ 	addr_phys[1] = platform_get_resource(pdev, IORESOURCE_MEM,
+ 					     DPAA_PORTAL_CI);
+ 	if (!addr_phys[1]) {
+ 		dev_err(dev, "Can't get %pOF property 'reg::CI'\n", node);
+-		return -ENXIO;
++		goto err_ioremap1;
+ 	}
+ 
+ 	err = of_property_read_u32(node, "cell-index", &val);
+ 	if (err) {
+ 		dev_err(dev, "Can't get %pOF property 'cell-index'\n", node);
++		__qman_portals_probed = -1;
+ 		return err;
+ 	}
+ 	pcfg->channel = val;
+@@ -267,7 +277,7 @@ static int qman_portal_probe(struct platform_device *pdev)
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+ 		dev_err(dev, "Can't get %pOF IRQ\n", node);
+-		return -ENXIO;
++		goto err_ioremap1;
+ 	}
+ 	pcfg->irq = irq;
+ 
+@@ -312,6 +322,9 @@ static int qman_portal_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	cpumask_set_cpu(cpu, &portal_cpus);
++	if (!__qman_portals_probed &&
++	    cpumask_weight(&portal_cpus) == num_online_cpus())
++		__qman_portals_probed = 1;
+ 	spin_unlock(&qman_lock);
+ 	pcfg->cpu = cpu;
+ 
+@@ -336,6 +349,8 @@ static int qman_portal_probe(struct platform_device *pdev)
+ err_ioremap2:
+ 	memunmap(pcfg->addr_virt_ce);
+ err_ioremap1:
++	__qman_portals_probed = -1;
++
+ 	return -ENXIO;
+ }
+ 
+diff --git a/include/soc/fsl/bman.h b/include/soc/fsl/bman.h
+index 5b99cb2ea5ef..173e4049d963 100644
+--- a/include/soc/fsl/bman.h
++++ b/include/soc/fsl/bman.h
+@@ -133,5 +133,13 @@ int bman_acquire(struct bman_pool *pool, struct bm_buffer *bufs, u8 num);
+  * failed to probe or 0 if the bman driver did not probed yet.
+  */
+ int bman_is_probed(void);
++/**
++ * bman_portals_probed - Check if all cpu bound bman portals are probed
++ *
++ * Returns 1 if all the required cpu bound bman portals successfully probed,
++ * -1 if probe errors appeared or 0 if the bman portals did not yet finished
++ * probing.
++ */
++int bman_portals_probed(void);
+ 
+ #endif	/* __FSL_BMAN_H */
+diff --git a/include/soc/fsl/qman.h b/include/soc/fsl/qman.h
+index 597783b8a3a0..7732e48081eb 100644
+--- a/include/soc/fsl/qman.h
++++ b/include/soc/fsl/qman.h
+@@ -1194,4 +1194,13 @@ int qman_release_cgrid(u32 id);
+  */
+ int qman_is_probed(void);
+ 
++/**
++ * qman_portals_probed - Check if all cpu bound qman portals are probed
++ *
++ * Returns 1 if all the required cpu bound qman portals successfully probed,
++ * -1 if probe errors appeared or 0 if the qman portals did not yet finished
++ * probing.
++ */
++int qman_portals_probed(void);
++
+ #endif	/* __FSL_QMAN_H */
 -- 
 2.17.1
