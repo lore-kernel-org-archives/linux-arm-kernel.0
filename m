@@ -1,40 +1,34 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 10 Oct 2018 20:25:57 +0200
-Subject: [GIT PULL 3/4] ARM: exynos: soc/mach for v4.20, second round
+Date: Wed, 10 Oct 2018 20:25:58 +0200
+Subject: [PATCH / PULL 4/4] arm64: exynos: Enable generic power domain support
 In-Reply-To: <20181010182558.7034-1-krzk@kernel.org>
 References: <20181010182558.7034-1-krzk@kernel.org>
-Message-ID: <20181010182558.7034-4-krzk@kernel.org>
+Message-ID: <20181010182558.7034-5-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Marek Szyprowski <m.szyprowski@samsung.com>
 
-On top of previous pull request.
+Generic power domains are needed to enable support for Exynos power
+domains.
 
-Best regards,
-Krzysztof
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-The following changes since commit f30858439e7db9ce9847eaedf440635fc6349c6e:
-
-  ARM: s3c24xx: Restore proper usage of pr_info/pr_cont (2018-09-19 19:11:17 +0200)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.20-2
-
-for you to fetch changes up to 6862fdf2201ab67cd962dbf0643d37db909f4860:
-
-  ARM: samsung: Limit SAMSUNG_PM_CHECK config option to non-Exynos platforms (2018-10-01 18:42:48 +0200)
-
-----------------------------------------------------------------
-Samsung mach/soc changes for v4.20, second round
-
-1. Disable SAMSUNG_PM_CHECK Kconfig feature incompatible with Exynos.
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (1):
-      ARM: samsung: Limit SAMSUNG_PM_CHECK config option to non-Exynos platforms
-
- arch/arm/plat-samsung/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 393d2b524284..3b8e7e6ea6fb 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -67,6 +67,7 @@ config ARCH_EXYNOS
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select PINCTRL
+ 	select PINCTRL_EXYNOS
++	select PM_GENERIC_DOMAINS if PM
+ 	select SOC_SAMSUNG
+ 	help
+ 	  This enables support for ARMv8 based Samsung Exynos SoC family.
+-- 
+2.17.1
