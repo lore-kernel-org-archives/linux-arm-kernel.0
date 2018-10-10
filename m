@@ -1,32 +1,33 @@
-From: svellattu@mvista.com (Silesh C V)
-Date: Wed, 10 Oct 2018 08:28:20 +0530
-Subject: [PATCH v3 2/2] treewide: use bus_find_device_by_fwnode
-In-Reply-To: <20181009174428.GB2182@xps15>
-References: <1539080245-25818-1-git-send-email-svellattu@mvista.com>
- <1539080245-25818-2-git-send-email-svellattu@mvista.com>
- <20181009174428.GB2182@xps15>
-Message-ID: <CALabi0FgQWGL8KMpCKt9N6Kkoig77LxOsea3Oe47tk5nOH10-Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Oct 2018 09:16:26 +0200
+Subject: [PATCH V3 1/2] dt-bindings: pinctrl: document Broadcom Northstar
+ pin mux controller
+In-Reply-To: <20180926193103.21241-1-zajec5@gmail.com>
+References: <20180926193103.21241-1-zajec5@gmail.com>
+Message-ID: <CACRpkdb8MRQN4z=7ZMs8Y3nbUTjDSLqdFNK_AUozut726JwogA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mathieu,
+On Wed, Sep 26, 2018 at 9:31 PM Rafa? Mi?ecki <zajec5@gmail.com> wrote:
 
-On Tue, Oct 9, 2018 at 11:14 PM Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 >
+> Northstar has mux controller just like Northstar Plus and Northstar2.
+> It's a bit different though (different registers & pins) so it requires
+> its own binding.
 >
-> This doesn't apply on linux-next.  This late in the cycle you may want to rebase
-> your work on that tree.
+> It's needed to allow other block bindings specify required mux setup.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> V2: Use "cru_gpio_control"
+>     Add more functions & groups
+>     Include Florian's Reviewed-by
+> V3: Use 3 different bindings as available pins depend on the chipset.
+>     Strings match Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
 
-OK. Will send v4 after rebasing onto linux-next.
+Patch applied.
 
->
-> Otherwise and for the coresight part:
->
-> Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->
-
-Thanks.
-
-Regards,
-Silesh.
+Yours,
+Linus Walleij
