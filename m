@@ -1,42 +1,47 @@
-From: ronald.wahl@raritan.com (Ronald WAHL)
-Date: Wed, 10 Oct 2018 10:31:31 +0000
-Subject: [PATCH] clk: at91: Fix division by zero in PLL recalc_rate()
-Message-ID: <fd2a1c19-8cb5-4db0-a2bb-6b0129162029@raritan.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 10 Oct 2018 11:31:43 +0100
+Subject: [PATCH] Doc: lockdep: add information about performance impact
+In-Reply-To: <20181009160633eucas1p1a597c95256e64bf01de32366afdc59dd~b-GGjOUFN2705527055eucas1p1b@eucas1p1.samsung.com>
+References: <CGME20181009153935eucas1p2dec146575ed5fefd4a0b2b6cb9bac056@eucas1p2.samsung.com>
+ <20181009153935eucas1p2dec146575ed5fefd4a0b2b6cb9bac056~b_ujkjRd31303013030eucas1p2C@eucas1p2.samsung.com>
+ <20181009154359.GB5728@hirez.programming.kicks-ass.net>
+ <20181009160633eucas1p1a597c95256e64bf01de32366afdc59dd~b-GGjOUFN2705527055eucas1p1b@eucas1p1.samsung.com>
+Message-ID: <8a6bed3c-dac5-7031-eedd-2eb5bcc18478@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a982e45dc150 ("clk: at91: PLL recalc_rate() now using cached MUL
-and DIV values") removed a check that prevents a division by zero. This
-now causes a stacktrace when booting the kernel on a at91 platform if
-the PLL DIV register contains zero. This commit reintroduces this check.
+On 09/10/18 17:06, Lukasz Luba wrote:
+> Hi Peter,
+> 
+> On 10/09/2018 05:43 PM, Peter Zijlstra wrote:
+>> On Tue, Oct 09, 2018 at 05:39:27PM +0200, Lukasz Luba wrote:
+>>> This patch add some warning related to performance drop.
+>>> It should be mentioned that this is not for free
+>>> and the platfrom resources (cache, bus interconnect, etc.)
+>>> will be used more frequently.
+>>
+>> To me this reads a bit like: water is wet.
+>>
+>> Is this really needed?
+>>
+>>
+> Well, it would be good to know what is the performance drop
+> (10% or 20% or x3 times) when you are enabling different debug options.
+> I have spent some time analyzing these cache and bus strange behavior.
+> Now the developers would know that LOCKDEP might cause constant trashing
+> of your cache in some use cases.
 
-Fixes: a982e45dc150 ("clk: at91: PLL recalc_rate() now using cached...")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
----
- drivers/clk/at91/clk-pll.c | 3 +++
- 1 file changed, 3 insertions(+)
+Fair enough, but this is the wrong place for that. Anyone who's got as 
+far as reading how the internals of lockdep work can probably already 
+figure out that that brings a non-trivial overhead, whereas Joe 
+Developer wondering why his kernel is slow seems unlikely to happen 
+across this document by chance. And the people shipping devices with 
+PROVE_LOCKING enabled because it happened to mask some tricky bug, well, 
+they know what they did ;)
 
-diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-index 72b6091eb7b9..dc7fbc796cb6 100644
---- a/drivers/clk/at91/clk-pll.c
-+++ b/drivers/clk/at91/clk-pll.c
-@@ -133,6 +133,9 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
- {
- struct clk_pll *pll = to_clk_pll(hw);
+If you want to highlight to unwitting users that a tweaking a particular 
+config knob has a significant performance hit, at least put the warning 
+next to said knob, i.e. in the Kconfig help. For an example, DMA debug 
+comes to mind.
 
-+if (!pll->div || !pll->mul)
-+return 0;
-+
- return (parent_rate / pll->div) * (pll->mul + 1);
- }
-
---
-2.17.1
-
-________________________________
-
-Ce message, ainsi que tous les fichiers joints ? ce message, peuvent contenir des informations sensibles et/ ou confidentielles ne devant pas ?tre divulgu?es. Si vous n'?tes pas le destinataire de ce message (ou que vous recevez ce message par erreur), nous vous remercions de le notifier imm?diatement ? son exp?diteur, et de d?truire ce message. Toute copie, divulgation, modification, utilisation ou diffusion, non autoris?e, directe ou indirecte, de tout ou partie de ce message, est strictement interdite.
-
-
-This e-mail, and any document attached hereby, may contain confidential and/or privileged information. If you are not the intended recipient (or have received this e-mail in error) please notify the sender immediately and destroy this e-mail. Any unauthorized, direct or indirect, copying, disclosure, distribution or other use of the material or parts thereof is strictly forbidden.
+Robin.
