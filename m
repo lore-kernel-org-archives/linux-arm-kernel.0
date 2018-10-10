@@ -1,26 +1,42 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Wed, 10 Oct 2018 06:33:59 +0200
-Subject: next-20181008 build: 2 failures 22 warnings (next-20181008)
-In-Reply-To: <20181010152704.337ee630@canb.auug.org.au>
-References: <E1g9cV0-0008Sg-4U@optimist> <20181008211109.GA4440@sirena.org.uk>
- <20181008213018.GL6490@zn.tnic>
- <20181010152704.337ee630@canb.auug.org.au>
-Message-ID: <20181010043358.GA5924@zn.tnic>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 10 Oct 2018 07:37:44 +0200
+Subject: [PATCH v10 4/5] clk: imx: add imx composite clock
+In-Reply-To: <5c0cc4de8403fca17431a9382f7e34e8003f497b.camel@nxp.com>
+References: <1539074230-27277-1-git-send-email-abel.vesa@nxp.com>
+ <1539074230-27277-5-git-send-email-abel.vesa@nxp.com>
+ <5c0cc4de8403fca17431a9382f7e34e8003f497b.camel@nxp.com>
+Message-ID: <20181010053744.5pxrlcdxmmyisu62@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 03:27:04PM +1100, Stephen Rothwell wrote:
-> I have added that to linux-next today (pending this or something else
-> turning up in the tip tree).
+On Tue, Oct 09, 2018 at 10:56:14PM +0000, Leonard Crestez wrote:
+> On Tue, 2018-10-09 at 08:37 +0000, Abel Vesa wrote:
+> > +struct clk *imx_clk_composite_8m_flags(const char *name,
+> > +					const char **parent_names,
+> > +					int num_parents, void __iomem *reg,
+> > +					unsigned long flags);
+> > +
+> > +#define __imx_clk_composite_8m(name, parent_names, reg, flags) \
+> > +	imx_clk_composite_8m_flags(name, parent_names, \
+> > +		ARRAY_SIZE(parent_names), reg, \
+> > +		flags | CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE)
+> > +
+> > +#define imx_clk_composite_8m(name, parent_names, reg) \
+> > +	__imx_clk_composite_8m(name, parent_names, reg, 0)
+> > +
+> > +#define imx_clk_composite_8m_critical(name, parent_names, reg) \
+> > +	__imx_clk_composite_8m(name, parent_names, reg, CLK_IS_CRITICAL)
+> 
+> Does anyone else think that the "8m" would be prettier next to imx
+> rather than as a suffix? Using imx8m_clk_composite* and
+> imx7ulp_clk_composite* makes more sense to me.
 
-Thx.
++1
 
-I have queued a fixed version in the meantime:
-
-https://git.kernel.org/tip/9d94e8b1d4f94a3c4cee5ad11a1be460cd070839
+Sascha
 
 -- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
