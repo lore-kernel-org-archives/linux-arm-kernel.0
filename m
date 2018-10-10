@@ -1,65 +1,32 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Wed, 10 Oct 2018 09:02:36 +0200
-Subject: [PATCH v3 4/7] dmaengine: stm32-dma: Add DMA/MDMA chaining support
-In-Reply-To: <20181010040343.GO2372@vkoul-mobl>
-References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
- <1538139715-24406-5-git-send-email-pierre-yves.mordret@st.com>
- <20181007160030.GB2372@vkoul-mobl>
- <e9cedfdd-ad90-9123-03bb-34a2e84059c5@st.com>
- <20181010040343.GO2372@vkoul-mobl>
-Message-ID: <d64da587-a680-20c4-7139-f59fd1f299bc@st.com>
+From: svellattu@mvista.com (Silesh C V)
+Date: Wed, 10 Oct 2018 08:28:20 +0530
+Subject: [PATCH v3 2/2] treewide: use bus_find_device_by_fwnode
+In-Reply-To: <20181009174428.GB2182@xps15>
+References: <1539080245-25818-1-git-send-email-svellattu@mvista.com>
+ <1539080245-25818-2-git-send-email-svellattu@mvista.com>
+ <20181009174428.GB2182@xps15>
+Message-ID: <CALabi0FgQWGL8KMpCKt9N6Kkoig77LxOsea3Oe47tk5nOH10-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Mathieu,
 
+On Tue, Oct 9, 2018 at 11:14 PM Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+>
+>
+> This doesn't apply on linux-next.  This late in the cycle you may want to rebase
+> your work on that tree.
 
-On 10/10/2018 06:03 AM, Vinod wrote:
-> On 09-10-18, 10:40, Pierre Yves MORDRET wrote:
->>
->>
->> On 10/07/2018 06:00 PM, Vinod wrote:
->>> On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
->>>> This patch adds support of DMA/MDMA chaining support.
->>>> It introduces an intermediate transfer between peripherals and STM32 DMA.
->>>> This intermediate transfer is triggered by SW for single M2D transfer and
->>>> by STM32 DMA IP for all other modes (sg, cyclic) and direction (D2M).
->>>>
->>>> A generic SRAM allocator is used for this intermediate buffer
->>>> Each DMA channel will be able to define its SRAM needs to achieve chaining
->>>> feature : (2 ^ order) * PAGE_SIZE.
->>>> For cyclic, SRAM buffer is derived from period length (rounded on
->>>> PAGE_SIZE).
->>>
->>> So IIUC, you chain two dma txns together and transfer data via an SRAM?
->>
->> Correct. one DMA is DMAv2 (stm32-dma) and the other is MDMA(stm32-mdma).
->> Intermediate transfer is between device and memory.
->> This intermediate transfer is using SDRAM.
-> 
-> Ah so you use dma calls to setup mdma xtfers? I dont think that is a
-> good idea. How do you know you should use mdma for subsequent transfer?
-> 
+OK. Will send v4 after rebasing onto linux-next.
 
-When user bindings told to setup chaining intermediate MDMA transfers are always
-triggers.
-For instance if a user requests a Dev2Mem transfer with chaining. From client
-pov this is still a prep_slave_sg. Internally DMAv2 is setup in cyclic mode (in
-double buffer mode indeed => 2 buffer of PAGE_SIZE/2) and destination is SDRAM.
-DMAv2 will flip/flop on those 2 buffers.
-At the same time DMAv2 driver prepares a MDMA SG that will fetch data from those
-2 buffers in SDRAM and fills final destination memory.
+>
+> Otherwise and for the coresight part:
+>
+> Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>
 
-> 
->>>>  drivers/dma/stm32-dma.c | 879 ++++++++++++++++++++++++++++++++++++++++++------
->>>
->>> that is a lot of change for a driver, consider splitting it up
->>> logically in smaller changes...
->>>
->>
->> This feature is rather monolithic. Difficult to split up.
->> All the code is required at once.
-> 
-> It can be enabled at last but split up logically. Intrusive changes to a
-> driver make it hard to review..
-> 
-Ok. I will to think about it how to proceed.
+Thanks.
+
+Regards,
+Silesh.
