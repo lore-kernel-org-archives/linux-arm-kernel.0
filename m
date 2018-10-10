@@ -1,31 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Oct 2018 17:57:41 +0100
-Subject: [PATCH] arm64: mm: Use __pa_symbol() for set_swapper_pgd()
-In-Reply-To: <20181010144322.14363-1-james.morse@arm.com>
-References: <20181010144322.14363-1-james.morse@arm.com>
-Message-ID: <20181010165740.GD212880@arrakis.emea.arm.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 10 Oct 2018 10:00:01 -0700
+Subject: [PATCH 4/4] firmware: ti_sci: Add helper apis to mange resources
+In-Reply-To: <20181006163432.z5skpgfm7oqoiuaf@akan>
+References: <20181005143006.18284-1-lokeshvutla@ti.com>
+ <20181005143006.18284-5-lokeshvutla@ti.com>
+ <20181005201453.g3p2jhpigcvijpce@kahuna>
+ <176f77cf-d295-0f37-ea9d-26f76f6d79c7@ti.com>
+ <20181006163432.z5skpgfm7oqoiuaf@akan>
+Message-ID: <0d559577-00a6-27d2-cb9a-64b162f58691@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 03:43:22PM +0100, James Morse wrote:
-> commit 2330b7ca78350efcb ("arm64/mm: use fixmap to modify
-> swapper_pg_dir") modifies the swapper_pg_dir via the fixmap
-> as the kernel page tables have been moved to a read-only
-> part of the kernel mapping.
+10/6/2018 9:34 AM, Nishanth Menon wrote:
+> On 13:08-20181006, Lokesh Vutla wrote:
+>>
+>>
+>> On 10/6/2018 1:44 AM, Nishanth Menon wrote:
+>>> NAK. Where is the binding for this? What is this decoding? Please don't
+>>> decode binding without having an official binding.
+>>
+>> This is a helper library for the clients to get resource range from DT
+>> and is not compulsory for clients to use this library to managing these
+>> resources. So in my understanding DT bindings should go into the client
+>> DT doc as posted here[1].  If you really insist I can add these details
 > 
-> Using __pa() to setup the fixmap causes CONFIG_DEBUG_VIRTUAL
-> to fire, as this function is used on the kernel-image swapper
-> address. The in_swapper_pgdir() test before each call of this
-> function means set_swapper_pgd() will only ever be called when
-> pgdp points somewhere in the kernel-image mapping of
-> swapper_pd_dir. Use __pa_symbol().
-> 
-> Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> CC: Jun Yao <yaojun8558363@gmail.com>
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Thanks.. Please get the binding approved before we discuss
+> implementation in driver.
+>
+Absolutely. Infact there is no rush to post driver patches before the
+DT binding are approved. Lets stick to the usual flow.
 
-Applied. Thanks.
-
--- 
-Catalin
+Regards,
+Santosh
