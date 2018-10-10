@@ -1,90 +1,139 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 10 Oct 2018 15:07:18 +0300
-Subject: [PATCH v3 00/22] SMMU enablement for NXP LS1043A and LS1046A
-Message-ID: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
+Date: Wed, 10 Oct 2018 15:07:28 +0300
+Subject: [PATCH v3 13/22] dpaa_eth: fix iova handling for contiguous frames
+In-Reply-To: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
+References: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
+Message-ID: <20181010120737.30300-11-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-This patch series adds SMMU support for NXP LS1043A and LS1046A chips
-and consists mostly in important driver fixes and the required device
-tree updates. It touches several subsystems and consists of three main
-parts:
- - changes in soc/drivers/fsl/qbman drivers adding iommu mapping of
-   reserved memory areas, fixes and defered probe support
- - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
-   consisting in misc dma mapping related fixes and probe ordering
- - addition of the actual arm smmu device tree node together with
-   various adjustments to the device trees
+The driver relies on the no longer valid assumption that dma addresses
+(iovas) are identical to physical addressees and uses phys_to_virt() to
+make iova -> vaddr conversions. Fix this by adding a function that does
+proper iova -> phys conversions using the iommu api and update the code
+to use it.
+Also, a dma_unmap_single() call had to be moved further down the code
+because iova -> vaddr conversions were required before the unmap.
+For now only the contiguous frame case is handled and the SG case is
+split in a following patch.
+While at it, clean-up a redundant dpaa_bpid2pool() and pass the bp
+as parameter.
 
-Performance impact
+Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
+---
+ .../net/ethernet/freescale/dpaa/dpaa_eth.c    | 44 ++++++++++---------
+ 1 file changed, 24 insertions(+), 20 deletions(-)
 
-    Running iperf benchmarks in a back-to-back setup (both sides
-    having smmu enabled) on a 10GBps port show an important
-    networking performance degradation of around 40% (9.48Gbps
-    linerate vs 5.45Gbps) and around 30%-35% with iommu.strict=1.
-    If you need performance but without SMMU support you can use
-    "iommu.passthrough=1" to disable SMMU.
-
-The patch set is based on net-next so, if generally agreed, I'd suggest
-to get the patches through the netdev tree after getting all the Acks.
-
-Changes in v3:
- - redesigned the badly broken logic behind qbman portal probe
-   checking APIs. Updated commit message with details
- - dropped few patches that were picked through arm-soc tree [2]
- - added Madalin's Ack [1] for fsl/fman and dpaa_eth
-
-[1] https://lkml.org/lkml/2018/9/27/831
-[2] [PATCH 05/23] soc/fsl/qbman: add APIs to retrieve the probing status
-    [PATCH 06/23] soc/fsl/qman_portals: defer probe after qman's probe
-    [PATCH 07/23] soc/fsl/bman_portals: defer probe after bman's probe
-
-Changes in v2:
- - dropped confusing comments in smmu interrupt property (Robin)
- - add an intermediate usb simple-bus to fix dma size issue (Robin)
- - use defines instead of numbers in smmu interrupt definition
- - drop double iommu_get_domain_for_dev() call in few qbman patches
-
-Laurentiu Tudor (22):
-  soc/fsl/qman: fixup liodns only on ppc targets
-  soc/fsl/bman: map FBPR area in the iommu
-  soc/fsl/qman: map FQD and PFDR areas in the iommu
-  soc/fsl/qman-portal: map CENA area in the iommu
-  soc/fsl/qbman: add APIs to retrieve the probing status
-  soc/fsl/qman_portals: defer probe after qman's probe
-  soc/fsl/bman_portals: defer probe after bman's probe
-  soc/fsl/qbman_portals: add APIs to retrieve the probing status
-  fsl/fman: backup and restore ICID registers
-  fsl/fman: add API to get the device behind a fman port
-  dpaa_eth: defer probing after qbman
-  dpaa_eth: base dma mappings on the fman rx port
-  dpaa_eth: fix iova handling for contiguous frames
-  dpaa_eth: fix iova handling for sg frames
-  dpaa_eth: fix SG frame cleanup
-  arm64: dts: ls1046a: add smmu node
-  arm64: dts: ls1043a: add smmu node
-  arm64: dts: ls104xa: set mask to drop TBU ID from StreamID
-  arm64: dts: ls104x: add missing dma ranges property
-  arm64: dts: ls104x: add iommu-map to pci controllers
-  arm64: dts: ls104x: make dma-coherent global to the SoC
-  arm64: dts: ls104x: use a pseudo-bus to constrain usb dma size
-
- .../arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 106 ++++++++++----
- .../arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 102 ++++++++++---
- .../net/ethernet/freescale/dpaa/dpaa_eth.c    | 136 ++++++++++++------
- drivers/net/ethernet/freescale/fman/fman.c    |  35 ++++-
- drivers/net/ethernet/freescale/fman/fman.h    |   4 +
- .../net/ethernet/freescale/fman/fman_port.c   |  14 ++
- .../net/ethernet/freescale/fman/fman_port.h   |   2 +
- drivers/soc/fsl/qbman/bman_ccsr.c             |  22 +++
- drivers/soc/fsl/qbman/bman_portal.c           |  32 ++++-
- drivers/soc/fsl/qbman/qman_ccsr.c             |  28 ++++
- drivers/soc/fsl/qbman/qman_portal.c           |  48 ++++++-
- include/soc/fsl/bman.h                        |  16 +++
- include/soc/fsl/qman.h                        |  17 +++
- 13 files changed, 455 insertions(+), 107 deletions(-)
-
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+index 0dc0267844ca..a9227456f67e 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+@@ -50,6 +50,7 @@
+ #include <linux/highmem.h>
+ #include <linux/percpu.h>
+ #include <linux/dma-mapping.h>
++#include <linux/iommu.h>
+ #include <linux/sort.h>
+ #include <soc/fsl/bman.h>
+ #include <soc/fsl/qman.h>
+@@ -1595,6 +1596,17 @@ static int dpaa_eth_refill_bpools(struct dpaa_priv *priv)
+ 	return 0;
+ }
+ 
++static phys_addr_t dpaa_iova_to_phys(struct device *dev, dma_addr_t addr)
++{
++	struct iommu_domain *domain;
++
++	domain = iommu_get_domain_for_dev(dev);
++	if (domain)
++		return iommu_iova_to_phys(domain, addr);
++	else
++		return addr;
++}
++
+ /* Cleanup function for outgoing frame descriptors that were built on Tx path,
+  * either contiguous frames or scatter/gather ones.
+  * Skb freeing is not handled here.
+@@ -1617,7 +1629,7 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
+ 	int nr_frags, i;
+ 	u64 ns;
+ 
+-	skbh = (struct sk_buff **)phys_to_virt(addr);
++	skbh = (struct sk_buff **)phys_to_virt(dpaa_iova_to_phys(dev, addr));
+ 	skb = *skbh;
+ 
+ 	if (priv->tx_tstamp && skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
+@@ -1687,25 +1699,21 @@ static u8 rx_csum_offload(const struct dpaa_priv *priv, const struct qm_fd *fd)
+  * accommodate the shared info area of the skb.
+  */
+ static struct sk_buff *contig_fd_to_skb(const struct dpaa_priv *priv,
+-					const struct qm_fd *fd)
++					const struct qm_fd *fd,
++					struct dpaa_bp *dpaa_bp,
++					void *vaddr)
+ {
+ 	ssize_t fd_off = qm_fd_get_offset(fd);
+-	dma_addr_t addr = qm_fd_addr(fd);
+-	struct dpaa_bp *dpaa_bp;
+ 	struct sk_buff *skb;
+-	void *vaddr;
+ 
+-	vaddr = phys_to_virt(addr);
+ 	WARN_ON(!IS_ALIGNED((unsigned long)vaddr, SMP_CACHE_BYTES));
+ 
+-	dpaa_bp = dpaa_bpid2pool(fd->bpid);
+-	if (!dpaa_bp)
+-		goto free_buffer;
+-
+ 	skb = build_skb(vaddr, dpaa_bp->size +
+ 			SKB_DATA_ALIGN(sizeof(struct skb_shared_info)));
+-	if (WARN_ONCE(!skb, "Build skb failure on Rx\n"))
+-		goto free_buffer;
++	if (WARN_ONCE(!skb, "Build skb failure on Rx\n")) {
++		skb_free_frag(vaddr);
++		return NULL;
++	}
+ 	WARN_ON(fd_off != priv->rx_headroom);
+ 	skb_reserve(skb, fd_off);
+ 	skb_put(skb, qm_fd_get_length(fd));
+@@ -1713,10 +1721,6 @@ static struct sk_buff *contig_fd_to_skb(const struct dpaa_priv *priv,
+ 	skb->ip_summed = rx_csum_offload(priv, fd);
+ 
+ 	return skb;
+-
+-free_buffer:
+-	skb_free_frag(vaddr);
+-	return NULL;
+ }
+ 
+ /* Build an skb with the data of the first S/G entry in the linear portion and
+@@ -2303,12 +2307,12 @@ static enum qman_cb_dqrr_result rx_default_dqrr(struct qman_portal *portal,
+ 	if (!dpaa_bp)
+ 		return qman_cb_dqrr_consume;
+ 
+-	dma_unmap_single(dpaa_bp->dev, addr, dpaa_bp->size, DMA_FROM_DEVICE);
+-
+ 	/* prefetch the first 64 bytes of the frame or the SGT start */
+-	vaddr = phys_to_virt(addr);
++	vaddr = phys_to_virt(dpaa_iova_to_phys(dpaa_bp->dev, addr));
+ 	prefetch(vaddr + qm_fd_get_offset(fd));
+ 
++	dma_unmap_single(dpaa_bp->dev, addr, dpaa_bp->size, DMA_FROM_DEVICE);
++
+ 	/* The only FD types that we may receive are contig and S/G */
+ 	WARN_ON((fd_format != qm_fd_contig) && (fd_format != qm_fd_sg));
+ 
+@@ -2319,7 +2323,7 @@ static enum qman_cb_dqrr_result rx_default_dqrr(struct qman_portal *portal,
+ 	(*count_ptr)--;
+ 
+ 	if (likely(fd_format == qm_fd_contig))
+-		skb = contig_fd_to_skb(priv, fd);
++		skb = contig_fd_to_skb(priv, fd, dpaa_bp, vaddr);
+ 	else
+ 		skb = sg_fd_to_skb(priv, fd);
+ 	if (!skb)
 -- 
 2.17.1
