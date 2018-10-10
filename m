@@ -1,63 +1,95 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 10 Oct 2018 11:18:57 +0200
-Subject: [PATCH] config: arm: exynos: remove PROVE_LOCKING from defconfig
-In-Reply-To: <20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a~b_qPT4nMA1415514155eucas1p16@eucas1p1.samsung.com>
-References: <CGME20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a@eucas1p1.samsung.com>
- <20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a~b_qPT4nMA1415514155eucas1p16@eucas1p1.samsung.com>
-Message-ID: <CAJKOXPeSLxeHR-n0yAqbYMi4y9sZhX0Omk=C6-8du7x27X4aWA@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Wed, 10 Oct 2018 09:19:14 +0000
+Subject: [PATCH 32/36] dt-bindings: arm: Convert ST STi board/soc bindings
+ to json-schema
+In-Reply-To: <20181005165848.3474-33-robh@kernel.org>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-33-robh@kernel.org>
+Message-ID: <34e8ddcb-4b33-9082-b242-9ab2dee8eb7c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 9 Oct 2018 at 17:34, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->
-> PROVE_LOCKING enables LOCKDEP, which causes big overhead on cache and
-> bus transactions.
->
-> On some ARM big.LITTLE architecutres (Exynos 5433) the overhead is really big.
-> The overhead can be measures using hackbench test which will speed up
-> by x3 times (11sec -> 3.4sec).
-> When you check transaction on cache or buses, the results are way higher
-> than normal for the same hackbench test:
-> L1d cache invalidations: 26mln vs 4mln
-> L2u cache invalidations: 42mln vs 12mln
-> bus cyc/access: 30cyc/access vs. 20cyc/access
-> context switch is x3 times cheaper
->
-> Enable this option only when you have some locking issue to investigate.
->
-> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+Hi Rob
+
+On 10/05/2018 06:58 PM, Rob Herring wrote:
+> Convert ST STi SoC bindings to DT schema format using json-schema.
+> 
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
 > ---
->  arch/arm/configs/exynos_defconfig | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 27ea6dfc..fbf52f3 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -324,7 +324,6 @@ CONFIG_MAGIC_SYSRQ=y
->  CONFIG_DEBUG_KERNEL=y
->  CONFIG_SOFTLOCKUP_DETECTOR=y
->  # CONFIG_DETECT_HUNG_TASK is not set
-> -CONFIG_PROVE_LOCKING=y
+>  Documentation/devicetree/bindings/arm/sti.txt | 23 -------------------
+>  .../devicetree/bindings/arm/sti.yaml          | 23 +++++++++++++++++++
+>  2 files changed, 23 insertions(+), 23 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/sti.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/sti.yaml
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
+> deleted file mode 100644
+> index 8d27f6b084c7..000000000000
+> --- a/Documentation/devicetree/bindings/arm/sti.txt
+> +++ /dev/null
+> @@ -1,23 +0,0 @@
+> -ST STi Platforms Device Tree Bindings
+> ----------------------------------------
+> -
+> -Boards with the ST STiH415 SoC shall have the following properties:
+> -Required root node property:
+> -compatible = "st,stih415";
+> -
+> -Boards with the ST STiH416 SoC shall have the following properties:
+> -Required root node property:
+> -compatible = "st,stih416";
+> -
+> -Boards with the ST STiH407 SoC shall have the following properties:
+> -Required root node property:
+> -compatible = "st,stih407";
+> -
+> -Boards with the ST STiH410 SoC shall have the following properties:
+> -Required root node property:
+> -compatible = "st,stih410";
+> -
+> -Boards with the ST STiH418 SoC shall have the following properties:
+> -Required root node property:
+> -compatible = "st,stih418";
+> -
+> diff --git a/Documentation/devicetree/bindings/arm/sti.yaml b/Documentation/devicetree/bindings/arm/sti.yaml
+> new file mode 100644
+> index 000000000000..10814334cfc9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/sti.yaml
+> @@ -0,0 +1,23 @@
+> +# SPDX-License-Identifier: None
+> +%YAML 1.2
+> +---
+> +$id: http://devicetree.org/schemas/bindings/arm/sti.yaml#
+> +$schema: http://devicetree.org/meta-schemas/core.yaml#
+> +
+> +title: ST STi Platforms Device Tree Bindings
+> +
+> +maintainers:
+> +  - Maxime Coquelin <maxime.coquelin@st.com>
 
-You just disabled all debugging around locks (so also basic checks).
-You did not describe this in the message... and it also makes me
-wonder what were you testing? Kernel without any lock debugging (so
-this patch) or kernel without lockdep only (not this patch).
+Maxime has left STMicroelectronics, you can replace its email by mine
+Patrice Chotard <patrice.chotard@st.com>
 
-As for the reason behind this change, I am not sure. We had locking
-issues and this change really helped us to spot them. Most of the
-issues are solved so maybe this is not needed anymore but on the other
-hand - this is development/debugging config, not a distro-ready. It
-might serve as a reference for distro configs but clearly it is not
-for production.
 
-Best regards,
-Krzysztof
+Thanks
 
->  CONFIG_DEBUG_ATOMIC_SLEEP=y
->  CONFIG_DEBUG_USER=y
->  CONFIG_CRYPTO_RSA=m
-> --
-> 2.7.4
->
+Patrice
+
+> +
+> +properties:
+> +  $nodename:
+> +    const: '/'
+> +  compatible:
+> +    items:
+> +      - enum:
+> +          - st,stih415
+> +          - st,stih416
+> +          - st,stih407
+> +          - st,stih410
+> +          - st,stih418
+> +...
+> 
