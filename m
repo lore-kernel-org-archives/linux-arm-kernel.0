@@ -1,125 +1,100 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:22:56 +0200
-Subject: [PATCH 11/15] x86,
- olpc: Use a correct version when making up a battery node
+Date: Wed, 10 Oct 2018 19:23:00 +0200
+Subject: [PATCH 15/15] power: supply: olpc_battery: Add OLPC XO 1.75 support
 In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
 References: <20181010172300.317643-1-lkundrak@v3.sk>
-Message-ID: <20181010172300.317643-12-lkundrak@v3.sk>
+Message-ID: <20181010172300.317643-16-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The XO-1 and XO-1.5 batteries apparently differ in an ability to report
-ambient temperature. Add a different compatible string to the 1.5
-battery.
+The battery and the protocol are essentially the same as OLPC XO 1.5,
+but the responses from the EC are LSB first.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- arch/x86/platform/olpc/olpc_dt.c | 59 +++++++++++++++++++++++---------
- 1 file changed, 42 insertions(+), 17 deletions(-)
+ drivers/power/supply/olpc_battery.c | 23 ++++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/platform/olpc/olpc_dt.c b/arch/x86/platform/olpc/olpc_dt.c
-index d6ee92986920..6e54e116b0c5 100644
---- a/arch/x86/platform/olpc/olpc_dt.c
-+++ b/arch/x86/platform/olpc/olpc_dt.c
-@@ -218,10 +218,28 @@ static u32 __init olpc_dt_get_board_revision(void)
- 	return be32_to_cpu(rev);
+diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
+index dde9863e5c4a..2adf33b9f641 100644
+--- a/drivers/power/supply/olpc_battery.c
++++ b/drivers/power/supply/olpc_battery.c
+@@ -56,6 +56,7 @@ struct olpc_battery_data {
+ 	struct power_supply *olpc_bat;
+ 	char bat_serial[17];
+ 	int new_proto;
++	int little_endian;
+ };
+ 
+ /*********************************************************************
+@@ -321,6 +322,14 @@ static int olpc_bat_get_voltage_max_design(union power_supply_propval *val)
+ 	return ret;
  }
  
--void __init olpc_dt_fixup(void)
-+int olpc_dt_compatible_match(phandle node, const char *compat)
- {
--	int r;
- 	char buf[64];
-+	int plen;
-+	char *p;
-+	int len;
-+
-+	plen = olpc_dt_getproperty(node, "compatible", buf, sizeof(buf));
-+	if (plen <= 0)
-+		return 0;
-+
-+	len = strlen(compat);
-+	for (p = buf; p < buf + plen; p += strlen(p) + 1) {
-+		if (strcmp(p, compat) == 0)
-+			return 1;
-+	}
-+
-+	return 0;
++static s16 ecword_to_cpu(struct olpc_battery_data *data, u16 ec_byte)
++{
++	if (data->little_endian)
++		return le16_to_cpu(ec_byte);
++	else
++		return be16_to_cpu(ec_byte);
 +}
 +
-+void __init olpc_dt_fixup(void)
-+{
- 	phandle node;
- 	u32 board_rev;
+ /*********************************************************************
+  *		Battery properties
+  *********************************************************************/
+@@ -393,7 +402,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
+ 		if (ret)
+ 			return ret;
  
-@@ -229,32 +247,33 @@ void __init olpc_dt_fixup(void)
- 	if (!node)
- 		return;
+-		val->intval = (s16)be16_to_cpu(ec_word) * 9760L / 32;
++		val->intval = ecword_to_cpu(data, ec_word) * 9760L / 32;
+ 		break;
+ 	case POWER_SUPPLY_PROP_CURRENT_AVG:
+ 	case POWER_SUPPLY_PROP_CURRENT_NOW:
+@@ -401,7 +410,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
+ 		if (ret)
+ 			return ret;
  
--	/*
--	 * If the battery node has a compatible property, we are running a new
--	 * enough firmware and don't have fixups to make.
--	 */
--	r = olpc_dt_getproperty(node, "compatible", buf, sizeof(buf));
--	if (r > 0)
--		return;
--
--	pr_info("PROM DT: Old firmware detected, applying fixes\n");
--
--	/* Add olpc,xo1-battery compatible marker to battery node */
--	olpc_dt_interpret("\" /battery at 0\" find-device"
--		" \" olpc,xo1-battery\" +compatible"
--		" device-end");
--
- 	board_rev = olpc_dt_get_board_revision();
- 	if (!board_rev)
- 		return;
+-		val->intval = (s16)be16_to_cpu(ec_word) * 15625L / 120;
++		val->intval = ecword_to_cpu(data, ec_word) * 15625L / 120;
+ 		break;
+ 	case POWER_SUPPLY_PROP_CAPACITY:
+ 		ret = olpc_ec_cmd(EC_BAT_SOC, NULL, 0, &ec_byte, 1);
+@@ -432,21 +441,21 @@ static int olpc_bat_get_property(struct power_supply *psy,
+ 		if (ret)
+ 			return ret;
  
- 	if (board_rev >= olpc_board_pre(0xd0)) {
-+		if (olpc_dt_compatible_match(node, "olpc,xo1.5-battery"))
-+			return;
-+
-+		/* Add olpc,xo1.5-battery compatible marker to battery node */
-+		olpc_dt_interpret("\" /battery at 0\" find-device"
-+			" \" olpc,xo1.5-battery\" +compatible"
-+			" device-end");
-+
-+		/* We're running a very old firmware if this is missing. */
-+		if (olpc_dt_compatible_match(node, "olpc,xo1-battery"))
-+			return;
-+
- 		/* XO-1.5: add dcon device */
- 		olpc_dt_interpret("\" /pci/display at 1\" find-device"
- 			" new-device"
- 			" \" dcon\" device-name \" olpc,xo1-dcon\" +compatible"
- 			" finish-device device-end");
- 	} else {
-+		/* We're running a very old firmware if this is missing. */
-+		if (olpc_dt_compatible_match(node, "olpc,xo1-battery"))
-+			return;
-+
- 		/* XO-1: add dcon device, mark RTC as olpc,xo1-rtc */
- 		olpc_dt_interpret("\" /pci/display at 1,1\" find-device"
- 			" new-device"
-@@ -264,6 +283,11 @@ void __init olpc_dt_fixup(void)
- 			" \" olpc,xo1-rtc\" +compatible"
- 			" device-end");
- 	}
-+
-+	/* Add olpc,xo1-battery compatible marker to battery node */
-+	olpc_dt_interpret("\" /battery at 0\" find-device"
-+		" \" olpc,xo1-battery\" +compatible"
-+		" device-end");
- }
+-		val->intval = (s16)be16_to_cpu(ec_word) * 10 / 256;
++		val->intval = ecword_to_cpu(data, ec_word) * 10 / 256;
+ 		break;
+ 	case POWER_SUPPLY_PROP_TEMP_AMBIENT:
+ 		ret = olpc_ec_cmd(EC_AMB_TEMP, NULL, 0, (void *)&ec_word, 2);
+ 		if (ret)
+ 			return ret;
  
- void __init olpc_dt_build_devicetree(void)
-@@ -289,6 +313,7 @@ void __init olpc_dt_build_devicetree(void)
- /* A list of DT node/bus matches that we want to expose as platform devices */
- static struct of_device_id __initdata of_ids[] = {
- 	{ .compatible = "olpc,xo1-battery" },
-+	{ .compatible = "olpc,xo1.5-battery" },
- 	{ .compatible = "olpc,xo1-dcon" },
- 	{ .compatible = "olpc,xo1-rtc" },
- 	{},
+-		val->intval = (int)be16_to_cpu(ec_word) * 10 / 256;
++		val->intval = (int)ecword_to_cpu(data, ec_word) * 10 / 256;
+ 		break;
+ 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+ 		ret = olpc_ec_cmd(EC_BAT_ACR, NULL, 0, (void *)&ec_word, 2);
+ 		if (ret)
+ 			return ret;
+ 
+-		val->intval = (s16)be16_to_cpu(ec_word) * 6250 / 15;
++		val->intval = ecword_to_cpu(data, ec_word) * 6250 / 15;
+ 		break;
+ 	case POWER_SUPPLY_PROP_SERIAL_NUMBER:
+ 		ret = olpc_ec_cmd(EC_BAT_SERIAL, NULL, 0, (void *)&ser_buf, 8);
+@@ -626,6 +635,10 @@ static int olpc_battery_probe(struct platform_device *pdev)
+ 	if (ecver[0] > 0x44) {
+ 		/* XO 1 or 1.5 with a new EC firmware. */
+ 		data->new_proto = 1;
++	} else if (of_find_compatible_node(NULL, NULL, "olpc,xo1.75-ec")) {
++		/* XO 1.75 */
++		data->new_proto = 1;
++		data->little_endian = 1;
+ 	} else if (ecver[0] < 0x44) {
+ 		/*
+ 		 * We've seen a number of EC protocol changes; this driver
 -- 
 2.19.0
