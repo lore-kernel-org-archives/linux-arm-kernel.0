@@ -1,39 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 10 Oct 2018 07:37:44 +0200
-Subject: [PATCH v10 4/5] clk: imx: add imx composite clock
-In-Reply-To: <5c0cc4de8403fca17431a9382f7e34e8003f497b.camel@nxp.com>
-References: <1539074230-27277-1-git-send-email-abel.vesa@nxp.com>
- <1539074230-27277-5-git-send-email-abel.vesa@nxp.com>
- <5c0cc4de8403fca17431a9382f7e34e8003f497b.camel@nxp.com>
-Message-ID: <20181010053744.5pxrlcdxmmyisu62@pengutronix.de>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 10 Oct 2018 07:49:45 +0200
+Subject: [PATCH] ARM: dts: socfgpa: remove ethernet aliases from dtsi
+In-Reply-To: <1a9a28a4-1fb0-9c0e-9722-3b9e51cccde6@kernel.org>
+References: <20181008105641.11505-1-s.trumtrar@pengutronix.de>
+ <1a9a28a4-1fb0-9c0e-9722-3b9e51cccde6@kernel.org>
+Message-ID: <20181010054945.t7256v432byiin4j@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2018 at 10:56:14PM +0000, Leonard Crestez wrote:
-> On Tue, 2018-10-09 at 08:37 +0000, Abel Vesa wrote:
-> > +struct clk *imx_clk_composite_8m_flags(const char *name,
-> > +					const char **parent_names,
-> > +					int num_parents, void __iomem *reg,
-> > +					unsigned long flags);
-> > +
-> > +#define __imx_clk_composite_8m(name, parent_names, reg, flags) \
-> > +	imx_clk_composite_8m_flags(name, parent_names, \
-> > +		ARRAY_SIZE(parent_names), reg, \
-> > +		flags | CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE)
-> > +
-> > +#define imx_clk_composite_8m(name, parent_names, reg) \
-> > +	__imx_clk_composite_8m(name, parent_names, reg, 0)
-> > +
-> > +#define imx_clk_composite_8m_critical(name, parent_names, reg) \
-> > +	__imx_clk_composite_8m(name, parent_names, reg, CLK_IS_CRITICAL)
+On Tue, Oct 09, 2018 at 01:08:26PM -0500, Dinh Nguyen wrote:
 > 
-> Does anyone else think that the "8m" would be prettier next to imx
-> rather than as a suffix? Using imx8m_clk_composite* and
-> imx7ulp_clk_composite* makes more sense to me.
+> 
+> On 10/08/2018 05:56 AM, Steffen Trumtrar wrote:
+> > Not all boards use two ethernet devices and/or use them in different
+> > order. As almost all in-tree boards already define their own ethernet
+> > aliases, remove them from the dtsi and add the aliases to the two boards,
+> > that are missing their own definition.
+> > 
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/socfpga.dtsi                    | 2 --
+> >  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 4 ++++
+> >  arch/arm/boot/dts/socfpga_cyclone5_socrates.dts   | 4 ++++
+> >  3 files changed, 8 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > index b38f8c240558..068aefa15391 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -22,8 +22,6 @@
+> >  	#size-cells = <1>;
+> >  
+> >  	aliases {
+> > -		ethernet0 = &gmac0;
+> > -		ethernet1 = &gmac1;
+> >  		serial0 = &uart0;
+> >  		serial1 = &uart1;
+> >  		timer0 = &timer0;
+> > diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+> > index b280e6494193..48821bcd3eb0 100644
+> > --- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+> > +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+> 
+> This file was renamed to socfpga_cyclone5_de0_nano_soc.dts.
+> 
+> error: arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts: No such file
+> or directory
+> error: patch failed: arch/arm/boot/dts/socfpga_cyclone5_socrates.dts:21
+> error: arch/arm/boot/dts/socfpga_cyclone5_socrates.dts: patch does not apply
+> 
 
-+1
+:(
 
-Sascha
+> 
+> Do you mind if I rebase this patch based on the updated arm-soc tree?
+> 
+
+No, go ahead.
+
+Thanks,
+Steffen
 
 -- 
 Pengutronix e.K.                           |                             |
