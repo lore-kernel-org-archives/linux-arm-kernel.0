@@ -1,50 +1,43 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 10 Oct 2018 18:30:13 +0100
-Subject: [PATCH 1/6] arm64: perf: Reject stand-alone CHAIN events for PMUv3
-In-Reply-To: <1539189115-16221-2-git-send-email-will.deacon@arm.com>
-References: <1539189115-16221-1-git-send-email-will.deacon@arm.com>
- <1539189115-16221-2-git-send-email-will.deacon@arm.com>
-Message-ID: <3fdfb5d5-b667-e797-3605-7557cc810f90@arm.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Wed, 10 Oct 2018 19:26:56 +0200
+Subject: [PATCH 3/5] spi: pxa2xx: use an enum for type
+In-Reply-To: <87d0t64mkk.fsf@belgarion.home>
+References: <20180910115935.163121-1-lkundrak@v3.sk>
+ <20180910115935.163121-4-lkundrak@v3.sk> <87d0t64mkk.fsf@belgarion.home>
+Message-ID: <817b05ed7a619e9c46594f395ebc02d7cde9fc24.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will
-
-On 10/10/18 17:31, Will Deacon wrote:
-> It doesn't make sense for a perf event to be configured as a CHAIN event
-> in isolation, so extend the arm_pmu structure with a ->filter_match()
-> function to allow the backend PMU implementation to reject CHAIN events
-> early.
+On Fri, 2018-09-21 at 22:34 +0200, Robert Jarzmik wrote:
+> Lubomir Rintel <lkundrak@v3.sk> writes:
 > 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-
-
-> ---
->   arch/arm64/kernel/perf_event.c | 7 +++++++
->   drivers/perf/arm_pmu.c         | 8 +++++++-
->   include/linux/perf/arm_pmu.h   | 1 +
->   3 files changed, 15 insertions(+), 1 deletion(-)
+> > That seems to be the correct type.
+> Okay, but what happens here when adev_id->driver_data is a value out
+> of enum
+> range ? Does the following assignment make sense ?
+> > +		type = (enum pxa_ssp_type)adev_id->driver_data;
 > 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 8e38d5267f22..e213f8e867f6 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -966,6 +966,12 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
->   	return 0;
->   }
->   
-> +static int armv8pmu_filter_match(struct perf_event *event)
-> +{
-> +	unsigned long evtype = event->hw.config_base & ARMV8_PMU_EVTYPE_EVENT;
-> +	return evtype != ARMV8_PMUV3_PERFCTR_CHAIN;
-> +}
-> +
+> As a side note, could you join for the next throw to the review :
+>  - Jarkko Nikula <jarkko.nikula@linux.intel.com>
+>  - Mika Westerberg <mika.westerberg@linux.intel.com>
 
-The patch looks correct. I guess we could handle it via the existing
-map_event(), avoiding another arch specific callback.
+Argh, of course I forgot. My apologies.
 
-Either way,
+Jarkko & Mika, I'm wondering if you could take a look at the [1] thread
+and tell me what you think. (I can forward it to you via e-mail too, if
+you're not subscribed to lists it has been Cc'd to, if that would be
+more convenient).
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+[1] [PATCH 0/11] spi: pxa2xx: add DT and slave mode support"
+    https://lore.kernel.org/lkml/20181010170936.316862-1-lkundrak at v3.sk/T/#t
+
+Thanks
+Lubo
+
+> 
+> Even if they are Intel, I think they have worked a lot on this driver
+> for Intel
+> platforms.
+> 
+> Cheers.
+> 
