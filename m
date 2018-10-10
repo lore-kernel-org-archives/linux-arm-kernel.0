@@ -1,95 +1,56 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Wed, 10 Oct 2018 09:19:14 +0000
-Subject: [PATCH 32/36] dt-bindings: arm: Convert ST STi board/soc bindings
- to json-schema
-In-Reply-To: <20181005165848.3474-33-robh@kernel.org>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-33-robh@kernel.org>
-Message-ID: <34e8ddcb-4b33-9082-b242-9ab2dee8eb7c@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Oct 2018 10:26:18 +0100
+Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH] kasan: avoid
+ out-of-bounds in unwind_frame
+In-Reply-To: <193a2b2efdaf41f39cb35a72feb3b39e@MTKMBS32N1.mediatek.inc>
+References: <1539079863-19645-1-git-send-email-chunhui.li@mediatek.com>
+ <20181009103833.sk2jyhl77f5fb64r@lakrids.cambridge.arm.com>
+ <193a2b2efdaf41f39cb35a72feb3b39e@MTKMBS32N1.mediatek.inc>
+Message-ID: <20181010092618.pwkrqqw7br7762rs@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
-
-On 10/05/2018 06:58 PM, Rob Herring wrote:
-> Convert ST STi SoC bindings to DT schema format using json-schema.
+On Wed, Oct 10, 2018 at 06:45:17AM +0000, Chunhui Li (???) wrote:
+> Hi Mark,
 > 
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/arm/sti.txt | 23 -------------------
->  .../devicetree/bindings/arm/sti.yaml          | 23 +++++++++++++++++++
->  2 files changed, 23 insertions(+), 23 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/sti.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/sti.yaml
+> kasan detect out-of-bounds in stacktrace.c line 70, it's already over READ_ONCE_NOCHECK, but still crash
+> kernel-4.9/arch/arm64/kernel/stacktrace.c
+> 69frame->sp = fp + 0x10;
+> 70frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
-> deleted file mode 100644
-> index 8d27f6b084c7..000000000000
-> --- a/Documentation/devicetree/bindings/arm/sti.txt
-> +++ /dev/null
-> @@ -1,23 +0,0 @@
-> -ST STi Platforms Device Tree Bindings
-> ----------------------------------------
-> -
-> -Boards with the ST STiH415 SoC shall have the following properties:
-> -Required root node property:
-> -compatible = "st,stih415";
-> -
-> -Boards with the ST STiH416 SoC shall have the following properties:
-> -Required root node property:
-> -compatible = "st,stih416";
-> -
-> -Boards with the ST STiH407 SoC shall have the following properties:
-> -Required root node property:
-> -compatible = "st,stih407";
-> -
-> -Boards with the ST STiH410 SoC shall have the following properties:
-> -Required root node property:
-> -compatible = "st,stih410";
-> -
-> -Boards with the ST STiH418 SoC shall have the following properties:
-> -Required root node property:
-> -compatible = "st,stih418";
-> -
-> diff --git a/Documentation/devicetree/bindings/arm/sti.yaml b/Documentation/devicetree/bindings/arm/sti.yaml
-> new file mode 100644
-> index 000000000000..10814334cfc9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/sti.yaml
-> @@ -0,0 +1,23 @@
-> +# SPDX-License-Identifier: None
-> +%YAML 1.2
-> +---
-> +$id: http://devicetree.org/schemas/bindings/arm/sti.yaml#
-> +$schema: http://devicetree.org/meta-schemas/core.yaml#
-> +
-> +title: ST STi Platforms Device Tree Bindings
-> +
-> +maintainers:
-> +  - Maxime Coquelin <maxime.coquelin@st.com>
-
-Maxime has left STMicroelectronics, you can replace its email by mine
-Patrice Chotard <patrice.chotard@st.com>
-
-
-Thanks
-
-Patrice
-
-> +
-> +properties:
-> +  $nodename:
-> +    const: '/'
-> +  compatible:
-> +    items:
-> +      - enum:
-> +          - st,stih415
-> +          - st,stih416
-> +          - st,stih407
-> +          - st,stih410
-> +          - st,stih418
-> +...
+> we test on Android platform, kernel-4.9 build with clang 6.0.2, we will do experiment to clarify whether compiler related issue.
 > 
+> READ_ONCE_NOCHECK->__read_once_size_nocheck with __no_sanitize_address if enable CONFIG_KASAN
+> 
+> kernel-4.9/include/linux/compiler-gcc.h
+> #define __no_sanitize_address __attribute__((no_sanitize_address))
+> 
+> kernel-4.9/include/linux/compiler-clang.h
+> #define __no_sanitize_address __attribute__((no_sanitize("address")))
+
+If READ_ONCE_NOCHECK() isn't working as intended, then this is a
+compiler issue, and there are bigger problems regardless.
+
+If we need to workaround some compiler issue, that should be done in the
+implementation of READ_ONCE_NOCHECK().
+
+Please note that there are other issues with using clang to compile the
+kernel; at minimum 7.0.0 is required to build a mainline kernel (and
+even then, the LSE atomics have to be explicitly disabled), so if this
+only affects 6.0.x, I don't think we need to carry any workaround
+upstream.
+
+> there is patch from internet, avoid kasan by wrapping with kasan_disable_current, it seems better.
+> https://lore.kernel.org/patchwork/patch/644463
+> such as:
+> +kasan_disable_current();
+>   // access fp
+> +kasan_enable_current();
+
+Please note that the solution later in the thread [1] was to use
+READ_ONCE_NOCHECK().
+
+Thanks,
+Mark.
+
+[1] https://lore.kernel.org/patchwork/patch/644463/#829858
