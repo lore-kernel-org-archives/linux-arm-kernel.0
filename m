@@ -1,40 +1,36 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 10 Oct 2018 20:25:55 +0200
-Subject: [GIT PULL 1/4] ARM: dts: exynos: Second round for v4.20
+Date: Wed, 10 Oct 2018 20:25:56 +0200
+Subject: [GIT PULL 2/4] arm64: dts: exynos: Stuff for v4.20
 In-Reply-To: <20181010182558.7034-1-krzk@kernel.org>
 References: <20181010182558.7034-1-krzk@kernel.org>
-Message-ID: <20181010182558.7034-2-krzk@kernel.org>
+Message-ID: <20181010182558.7034-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-On top of previous pull request.
-
-Best regards,
-Krzysztof
-
-
-The following changes since commit ff1e37c6809daab75f7b2dea1efe69330e8eb65b:
-
-  ARM: dts: exynos: Correct audio subsystem parent clock on Peach Chromebooks (2018-09-24 18:55:16 +0200)
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
 are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.20-3
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.20
 
-for you to fetch changes up to 48ab742ce3b0312f2ee23ed825d3c8820eda7acf:
+for you to fetch changes up to 2352ae1306974528d11fb9c7dbf2cf91e0dd2c31:
 
-  ARM: dts: exynos: Add pin configuration for SD write protect on Odroid XU (2018-10-01 18:51:51 +0200)
-
-----------------------------------------------------------------
-Samsung DTS ARM changes for v4.20, second round
-
-Add proper configuration for Odroid XU SD write-protect pin.
+  arm64: ARM: dts: exynos: Remove double SD card detect pin inversion on TM2 (2018-09-24 19:30:54 +0200)
 
 ----------------------------------------------------------------
+Samsung DTS ARM64 changes for v4.20
+
+1. Use graph between USB-PHY and MUIC.
+2. Cleanup of SD card detect pin level.
+
+----------------------------------------------------------------
+Andrzej Hajda (1):
+      arm64: dts: exynos: Add OF graph between USB-PHY and MUIC
+
 Krzysztof Kozlowski (1):
-      ARM: dts: exynos: Add pin configuration for SD write protect on Odroid XU
+      arm64: ARM: dts: exynos: Remove double SD card detect pin inversion on TM2
 
- arch/arm/boot/dts/exynos5410-odroidxu.dts | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
