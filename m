@@ -1,76 +1,76 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 10 Oct 2018 12:22:40 +0800
-Subject: [PATCH v2 2/2] arm/arm64: KVM: enable 32 bits kvm vcpu events
- support
-In-Reply-To: <3e6a7a5f-3ff9-b7db-b1f6-87a8fdf5c20c@arm.com>
-References: <1539002088-21215-1-git-send-email-gengdongjiu@huawei.com>
- <1539002088-21215-3-git-send-email-gengdongjiu@huawei.com>
- <3e6a7a5f-3ff9-b7db-b1f6-87a8fdf5c20c@arm.com>
-Message-ID: <f733b63b-b949-9082-3b23-aba47774d734@huawei.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 10 Oct 2018 15:27:04 +1100
+Subject: next-20181008 build: 2 failures 22 warnings (next-20181008)
+In-Reply-To: <20181008213018.GL6490@zn.tnic>
+References: <E1g9cV0-0008Sg-4U@optimist> <20181008211109.GA4440@sirena.org.uk>
+ <20181008213018.GL6490@zn.tnic>
+Message-ID: <20181010152704.337ee630@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki
+Hi Borislav,
 
-On 2018/10/10 1:22, Suzuki K Poulose wrote:
+On Mon, 8 Oct 2018 23:30:18 +0200 Borislav Petkov <bp@suse.de> wrote:
+>
+> On Mon, Oct 08, 2018 at 10:11:09PM +0100, Mark Brown wrote:
+> > caused by 3a387c6d96e69 (x86/kaslr, ACPI/NUMA: Fix KASLR build error)
+> > which adds the inclusion unconditionally.  
 > 
+> This should fix it:
 > 
-> On 08/10/18 13:34, Dongjiu Geng wrote:
->> The commit 539aee0edb9f ("KVM: arm64: Share the parts of
->> get/set events useful to 32bit") shares the get/set events
->> helper for arm64 and arm32, it is better also share the check
->> for vcpu events capability to enable 32 bit kvm vcpu events
->> support.
->>
->> User space will check whether KVM supports vcpu events through
->> KVM_CAP_VCPU_EVENTS IOCTL.
+> ---
+>  arch/x86/include/asm/kaslr.h | 2 --
+>  drivers/acpi/numa.c          | 4 +++-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> nit: User space will check whether KVM supports vcpu events by checking
-> the KVM_CAP_VCPU_EVENTS extension.
+> diff --git a/arch/x86/include/asm/kaslr.h b/arch/x86/include/asm/kaslr.h
+> index 95ef3fc01d12..db7ba2feb947 100644
+> --- a/arch/x86/include/asm/kaslr.h
+> +++ b/arch/x86/include/asm/kaslr.h
+> @@ -6,10 +6,8 @@ unsigned long kaslr_get_random_long(const char *purpose);
+>  
+>  #ifdef CONFIG_RANDOMIZE_MEMORY
+>  void kernel_randomize_memory(void);
+> -void kaslr_check_padding(void);
+>  #else
+>  static inline void kernel_randomize_memory(void) { }
+> -static inline void kaslr_check_padding(void) { }
+>  #endif /* CONFIG_RANDOMIZE_MEMORY */
+>  
+>  #endif
+> diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+> index 4408e37600ef..ba62004f4d86 100644
+> --- a/drivers/acpi/numa.c
+> +++ b/drivers/acpi/numa.c
+> @@ -32,7 +32,6 @@
+>  #include <linux/numa.h>
+>  #include <linux/nodemask.h>
+>  #include <linux/topology.h>
+> -#include <asm/kaslr.h>
+>  
+>  static nodemask_t nodes_found_map = NODE_MASK_NONE;
+>  
+> @@ -433,6 +432,9 @@ acpi_table_parse_srat(enum acpi_srat_type id,
+>  					    handler, max_entries);
+>  }
+>  
+> +/* To be overridden by architectures */
+> +void __init __weak kaslr_check_padding(void) { }
+> +
+>  int __init acpi_numa_init(void)
+>  {
+>  	int cnt = 0;
 
-  Thanks for the pointing out, I will update it.
+I have added that to linux-next today (pending this or something else
+turning up in the tip tree).
 
-> 
->>
->> Cc: James Morse <james.morse@arm.com>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> 
-> Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
->> ---
->> For the 32 bits kvm migration, it needs to enable the vcpu events,
->> this patch will enable it. The user space QEMU patch is here:
->> https://patchwork.ozlabs.org/patch/975615/
->> ---
->> ? arch/arm64/kvm/reset.c | 1 -
->> ? virt/kvm/arm/arm.c???? | 1 +
->> ? 2 files changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index fd37c53..e50245e 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -82,7 +82,6 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->> ????????? break;
->> ????? case KVM_CAP_SET_GUEST_DEBUG:
->> ????? case KVM_CAP_VCPU_ATTRIBUTES:
->> -??? case KVM_CAP_VCPU_EVENTS:
->> ????????? r = 1;
->> ????????? break;
->> ????? default:
->> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->> index 40e79ea..64e5d97 100644
->> --- a/virt/kvm/arm/arm.c
->> +++ b/virt/kvm/arm/arm.c
->> @@ -212,6 +212,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->> ????? case KVM_CAP_READONLY_MEM:
->> ????? case KVM_CAP_MP_STATE:
->> ????? case KVM_CAP_IMMEDIATE_EXIT:
->> +??? case KVM_CAP_VCPU_EVENTS:
->> ????????? r = 1;
->> ????????? break;
->> ????? case KVM_CAP_ARM_SET_DEVICE_ADDR:
->>
-> 
-> .
-> 
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181010/db7f4bad/attachment-0001.sig>
