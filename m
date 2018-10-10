@@ -1,27 +1,47 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Tue, 9 Oct 2018 17:08:00 -0700
-Subject: [PATCH i2c-next v7 5/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-In-Reply-To: <20181005214507.26315-6-jae.hyun.yoo@linux.intel.com>
-References: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
- <20181005214507.26315-6-jae.hyun.yoo@linux.intel.com>
-Message-ID: <CAFd5g45JkK4BnGR7yOA3eCazTZ86FyUaNdi81Ew6VBbKxS3EZA@mail.gmail.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 10 Oct 2018 11:30:16 +1100
+Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <bd3d0472-1bd7-52ed-b9f6-b5edae8c8b6d@gmail.com>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-7-takahiro.akashi@linaro.org>
+ <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
+ <6a8d3ddb-c3bc-c044-4d6c-55e110d89e72@gmail.com>
+ <20181005050627.GL32578@linaro.org>
+ <bd3d0472-1bd7-52ed-b9f6-b5edae8c8b6d@gmail.com>
+Message-ID: <20181010003016.GH7004@umbus.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 5, 2018 at 2:45 PM Jae Hyun Yoo
-<jae.hyun.yoo@linux.intel.com> wrote:
->
-> In multi-master environment, this driver's master cannot know
-> exactly when peer master sends data to this driver's slave so a
-> case can be happened that this master tries to send data through
-> the master_xfer function but slave data from peer master is still
-> being processed by this driver.
->
-> To prevent any state corruption in the case, this patch adds
-> checking code if any slave operation is ongoing and it waits up to
-> the bus timeout duration before starting a master_xfer operation.
->
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+On Tue, Oct 09, 2018 at 11:02:29AM -0700, Frank Rowand wrote:
+> On 10/04/18 22:06, AKASHI, Takahiro wrote:
+[snip]
+> >>>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+> >>>> +                                               u64 addr, u64 size)
+> >>>> +{
+> >>>> +       int addr_cells, size_cells;
+> >>
+> >> unsigned
+> > 
+> > fdt_[address|size]_cell() returns an int.
+> 
+> I stand corrected.  They take advantage of the fact that valid values
+> are in the range 0..4 and return a negative value for error.
 
-Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+I'm not sure if the spec formally defines that these values will fit
+in a positive 'int'.  But if addresses are 8GiB each, you're going to
+have much bigger problems putting it in a device tree than this
+function.
+
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181010/6840e7e7/attachment.sig>
