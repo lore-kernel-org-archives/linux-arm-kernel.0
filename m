@@ -1,73 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Oct 2018 17:50:49 +0100
-Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
-In-Reply-To: <CAL_JsqLeG3WUa2peOWFGUoMuonWaWJoU-7A6d8cqXp-_e3B3XA@mail.gmail.com>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-14-robh@kernel.org>
- <20181009115713.GE6248@arm.com>
- <CAL_JsqLeG3WUa2peOWFGUoMuonWaWJoU-7A6d8cqXp-_e3B3XA@mail.gmail.com>
-Message-ID: <20181010165048.GB16512@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Oct 2018 17:53:17 +0100
+Subject: [PATCH] Revert "arm64: uaccess: implement unsafe accessors"
+In-Reply-To: <20181010155544.19125-1-james.morse@arm.com>
+References: <20181010155544.19125-1-james.morse@arm.com>
+Message-ID: <20181010165316.GB212880@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2018 at 01:14:02PM -0500, Rob Herring wrote:
-> On Tue, Oct 9, 2018 at 6:57 AM Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > Hi Rob,
-> >
-> > On Fri, Oct 05, 2018 at 11:58:25AM -0500, Rob Herring wrote:
-> > > Convert ARM PMU binding to DT schema format using json-schema.
-> > >
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > Cc: devicetree at vger.kernel.org
-> > > Signed-off-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > >  Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
-> > >  .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
-> > >  2 files changed, 96 insertions(+), 70 deletions(-)
-> > >  delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
-> > >  create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
-> >
-> > [...]
-> >
-> > > -- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
-> > > -               interrupt (PPI) then 1 interrupt should be specified.
-> >
-> > [...]
-> >
-> > > +  interrupts:
-> > > +    oneOf:
-> > > +      - maxItems: 1
-> > > +      - minItems: 2
-> > > +        maxItems: 8
-> > > +        description: 1 interrupt per core.
-> > > +
-> > > +  interrupts-extended:
-> > > +    $ref: '#/properties/interrupts'
-> >
-> > This seems like a semantic different between the two representations, or am
-> > I missing something here? Specifically, both the introduction of
-> > interrupts-extended and also dropping any mention of using a single per-cpu
-> > interrupt (the single combined case is no longer support by Linux; not sure
-> > if you want to keep it in the binding).
+On Wed, Oct 10, 2018 at 04:55:44PM +0100, James Morse wrote:
+> This reverts commit a1f33941f7e103bcf471eaf8461b212223c642d6.
 > 
-> 'interrupts-extended' was implied before as it is always supported and
-> outside the scope of the binding. But now it is needed to validate
-> bindings. There must be some use of it and that's why I added it.
-> However, thinking some more about this, I think it may be better to
-> have the tools add this in automatically whenever we have an
-> interrupts property.
+> The unsafe accessors allow the PAN enable/disable calls to be made
+> once for a group of accesses. Adding these means we can now have
+> sequences that look like this:
+> 
+> | user_access_begin();
+> | unsafe_put_user(static-value, x, err);
+> | unsafe_put_user(helper-that-sleeps(), x, err);
+> | user_access_end();
+> 
+> Calling schedule() without taking an exception doesn't switch the
+> PSTATE or TTBRs. We can switch out of a uaccess-enabled region, and
+> run other code with uaccess enabled for a different thread.
+> 
+> We can also switch from uaccess-disabled code back into this region,
+> meaning the unsafe_put_user()s will fault.
+> 
+> For software-PAN, threads that do this will get stuck as
+> handle_mm_fault() will determine the page has already been mapped in,
+> but we fault again as the page tables aren't loaded.
+> 
+> To solve this we need code in __switch_to() that save/restores the
+> PAN state.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> CC: Julien Thierry <julien.thierry@arm.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-To be honest, if you'd included that in the commit message I'd have been
-happy :)
+Applied. Thanks.
 
-> I guess the single interrupt case is less obvious now with no
-> description (it's the first list item of 'oneOf'). The schema If the
-> single interrupt is not supported, then we can drop it here.
-
-Well the description says "1 interrupt per core" which is incorrect. I also
-don't understand why maxItems is 8.
-
-Will
+-- 
+Catalin
