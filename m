@@ -1,61 +1,67 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 10 Oct 2018 15:07:25 +0300
-Subject: [PATCH v3 10/22] fsl/fman: add API to get the device behind a fman
- port
+Date: Wed, 10 Oct 2018 15:07:26 +0300
+Subject: [PATCH v3 11/22] dpaa_eth: defer probing after qbman
 In-Reply-To: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
 References: <20181010120737.30300-1-laurentiu.tudor@nxp.com>
-Message-ID: <20181010120737.30300-8-laurentiu.tudor@nxp.com>
+Message-ID: <20181010120737.30300-9-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Add an API that retrieves the 'struct device' that the specified fman
-port probed against. The new API will be used in a subsequent iommu
-enablement related patch.
+Enabling SMMU altered the order of device probing causing the dpaa1
+ethernet driver to get probed before qbman and causing a boot crash.
+Add predictability in the probing order by deferring the ethernet
+driver probe after qbman and portals by using the recently introduced
+qbman APIs.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- drivers/net/ethernet/freescale/fman/fman_port.c | 14 ++++++++++++++
- drivers/net/ethernet/freescale/fman/fman_port.h |  2 ++
- 2 files changed, 16 insertions(+)
+ .../net/ethernet/freescale/dpaa/dpaa_eth.c    | 31 +++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/drivers/net/ethernet/freescale/fman/fman_port.c b/drivers/net/ethernet/freescale/fman/fman_port.c
-index ee82ee1384eb..bd76c9730692 100644
---- a/drivers/net/ethernet/freescale/fman/fman_port.c
-+++ b/drivers/net/ethernet/freescale/fman/fman_port.c
-@@ -1728,6 +1728,20 @@ u32 fman_port_get_qman_channel_id(struct fman_port *port)
- }
- EXPORT_SYMBOL(fman_port_get_qman_channel_id);
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+index 6e0f47f2c8a3..1ca4cfb79961 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+@@ -2764,6 +2764,37 @@ static int dpaa_eth_probe(struct platform_device *pdev)
+ 	int err = 0, i, channel;
+ 	struct device *dev;
  
-+/**
-+ * fman_port_get_device
-+ * port:	Pointer to the FMan port device
-+ *
-+ * Get the 'struct device' associated to the specified FMan port device
-+ *
-+ * Return: pointer to associated 'struct device'
-+ */
-+struct device *fman_port_get_device(struct fman_port *port)
-+{
-+	return port->dev;
-+}
-+EXPORT_SYMBOL(fman_port_get_device);
++	err = bman_is_probed();
++	if (!err)
++		return -EPROBE_DEFER;
++	if (err < 0) {
++		dev_err(&pdev->dev, "failing probe due to bman probe error\n");
++		return -ENODEV;
++	}
++	err = qman_is_probed();
++	if (!err)
++		return -EPROBE_DEFER;
++	if (err < 0) {
++		dev_err(&pdev->dev, "failing probe due to qman probe error\n");
++		return -ENODEV;
++	}
++	err = bman_portals_probed();
++	if (!err)
++		return -EPROBE_DEFER;
++	if (err < 0) {
++		dev_err(&pdev->dev,
++			"failing probe due to bman portals probe error\n");
++		return -ENODEV;
++	}
++	err = qman_portals_probed();
++	if (!err)
++		return -EPROBE_DEFER;
++	if (err < 0) {
++		dev_err(&pdev->dev,
++			"failing probe due to qman portals probe error\n");
++		return -ENODEV;
++	}
 +
- int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset)
- {
- 	if (port->buffer_offsets.hash_result_offset == ILLEGAL_BASE)
-diff --git a/drivers/net/ethernet/freescale/fman/fman_port.h b/drivers/net/ethernet/freescale/fman/fman_port.h
-index 9dbb69f40121..82f12661a46d 100644
---- a/drivers/net/ethernet/freescale/fman/fman_port.h
-+++ b/drivers/net/ethernet/freescale/fman/fman_port.h
-@@ -157,4 +157,6 @@ int fman_port_get_tstamp(struct fman_port *port, const void *data, u64 *tstamp);
- 
- struct fman_port *fman_port_bind(struct device *dev);
- 
-+struct device *fman_port_get_device(struct fman_port *port);
-+
- #endif /* __FMAN_PORT_H */
+ 	/* device used for DMA mapping */
+ 	dev = pdev->dev.parent;
+ 	err = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(40));
 -- 
 2.17.1
