@@ -1,100 +1,57 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:22:50 +0200
-Subject: [PATCH 05/15] Platform: OLPC: Move OLPC config symbol out of x86 tree
+Date: Wed, 10 Oct 2018 19:22:57 +0200
+Subject: [PATCH 12/15] power: supply: olpc_battery: Use DT to get battery
+ version
 In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
 References: <20181010172300.317643-1-lkundrak@v3.sk>
-Message-ID: <20181010172300.317643-6-lkundrak@v3.sk>
+Message-ID: <20181010172300.317643-13-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are ARM OLPC machines that use mostly the same drivers, including
-EC infrastructure, DCON and Battery.
-
-While at that, fix Kconfig to allow building this as a module.
+Avoid using the x86 OLPC platform specific call to get the board
+version. It won't work on FDT-based ARM MMP2 platform.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- arch/x86/Kconfig                  | 11 -----------
- drivers/input/mouse/Kconfig       |  2 +-
- drivers/platform/Kconfig          |  2 ++
- drivers/platform/olpc/Kconfig     | 11 +++++++++++
- drivers/staging/olpc_dcon/Kconfig |  2 +-
- 5 files changed, 15 insertions(+), 13 deletions(-)
- create mode 100644 drivers/platform/olpc/Kconfig
+ drivers/power/supply/olpc_battery.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 1a0be022f91d..be6af341a718 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -2729,17 +2729,6 @@ config SCx200HR_TIMER
- 	  processor goes idle (as is done by the scheduler).  The
- 	  other workaround is idle=poll boot option.
+diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
+index 5a97e42a3547..540d44bf536f 100644
+--- a/drivers/power/supply/olpc_battery.c
++++ b/drivers/power/supply/olpc_battery.c
+@@ -19,6 +19,7 @@
+ #include <linux/jiffies.h>
+ #include <linux/sched.h>
+ #include <linux/olpc-ec.h>
++#include <linux/of.h>
+ #include <asm/olpc.h>
  
--config OLPC
--	bool "One Laptop Per Child support"
--	depends on !X86_PAE
--	select GPIOLIB
--	select OF
--	select OF_PROMTREE
--	select IRQ_DOMAIN
--	---help---
--	  Add support for detecting the unique features of the OLPC
--	  XO hardware.
+ 
+@@ -622,11 +623,13 @@ static int olpc_battery_probe(struct platform_device *pdev)
+ 	olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc, NULL);
+ 	if (IS_ERR(olpc_ac))
+ 		return PTR_ERR(olpc_ac);
 -
- config OLPC_XO1_PM
- 	bool "OLPC XO-1 Power Management"
- 	depends on OLPC && MFD_CS5535 && PM_SLEEP
-diff --git a/drivers/input/mouse/Kconfig b/drivers/input/mouse/Kconfig
-index 566a1e3aa504..58034892a4df 100644
---- a/drivers/input/mouse/Kconfig
-+++ b/drivers/input/mouse/Kconfig
-@@ -165,7 +165,7 @@ config MOUSE_PS2_TOUCHKIT
+-	if (olpc_board_at_least(olpc_board_pre(0xd0))) { /* XO-1.5 */
++	if (of_property_match_string(pdev->dev.of_node, "compatible",
++					"olpc,xo1.5-battery") >= 0) {
++		/* XO-1.5 */
+ 		olpc_bat_desc.properties = olpc_xo15_bat_props;
+ 		olpc_bat_desc.num_properties = ARRAY_SIZE(olpc_xo15_bat_props);
+-	} else { /* XO-1 */
++	} else {
++		/* XO-1 */
+ 		olpc_bat_desc.properties = olpc_xo1_bat_props;
+ 		olpc_bat_desc.num_properties = ARRAY_SIZE(olpc_xo1_bat_props);
+ 	}
+@@ -672,6 +675,7 @@ static int olpc_battery_remove(struct platform_device *pdev)
  
- config MOUSE_PS2_OLPC
- 	bool "OLPC PS/2 mouse protocol extension"
--	depends on MOUSE_PS2 && OLPC
-+	depends on MOUSE_PS2 && X86 && OLPC
- 	help
- 	  Say Y here if you have an OLPC XO-1 laptop (with built-in
- 	  PS/2 touchpad/tablet device).  The manufacturer calls the
-diff --git a/drivers/platform/Kconfig b/drivers/platform/Kconfig
-index d4c2e424a700..4313d73d3618 100644
---- a/drivers/platform/Kconfig
-+++ b/drivers/platform/Kconfig
-@@ -10,3 +10,5 @@ source "drivers/platform/goldfish/Kconfig"
- source "drivers/platform/chrome/Kconfig"
- 
- source "drivers/platform/mellanox/Kconfig"
-+
-+source "drivers/platform/olpc/Kconfig"
-diff --git a/drivers/platform/olpc/Kconfig b/drivers/platform/olpc/Kconfig
-new file mode 100644
-index 000000000000..7b736c9e67ac
---- /dev/null
-+++ b/drivers/platform/olpc/Kconfig
-@@ -0,0 +1,11 @@
-+config OLPC
-+	tristate "One Laptop Per Child support"
-+	depends on X86 || ARM || COMPILE_TEST
-+	depends on !X86_PAE
-+	select GPIOLIB
-+	select OF
-+	select OF_PROMTREE if X86
-+	select IRQ_DOMAIN
-+	help
-+	  Add support for detecting the unique features of the OLPC
-+	  XO hardware.
-diff --git a/drivers/staging/olpc_dcon/Kconfig b/drivers/staging/olpc_dcon/Kconfig
-index c91a56f77bcb..07f9f1de8667 100644
---- a/drivers/staging/olpc_dcon/Kconfig
-+++ b/drivers/staging/olpc_dcon/Kconfig
-@@ -1,6 +1,6 @@
- config FB_OLPC_DCON
- 	tristate "One Laptop Per Child Display CONtroller support"
--	depends on OLPC && FB
-+	depends on X86 && OLPC && FB
- 	depends on I2C
- 	depends on (GPIO_CS5535 || GPIO_CS5535=n)
- 	select BACKLIGHT_CLASS_DEVICE
+ static const struct of_device_id olpc_battery_ids[] = {
+ 	{ .compatible = "olpc,xo1-battery" },
++	{ .compatible = "olpc,xo1.5-battery" },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, olpc_battery_ids);
 -- 
 2.19.0
