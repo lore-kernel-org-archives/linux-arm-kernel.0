@@ -1,34 +1,50 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 10 Oct 2018 10:36:32 -0700
-Subject: [PATCH] clk: mvebu: armada-37xx-tbg: Balance devm_clk_get in probe
-In-Reply-To: <20180914153421.7090-1-gregory.clement@bootlin.com>
-References: <20180914153421.7090-1-gregory.clement@bootlin.com>
-Message-ID: <153919299293.119890.9655297515756412545@swboyd.mtv.corp.google.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 10 Oct 2018 18:30:13 +0100
+Subject: [PATCH 1/6] arm64: perf: Reject stand-alone CHAIN events for PMUv3
+In-Reply-To: <1539189115-16221-2-git-send-email-will.deacon@arm.com>
+References: <1539189115-16221-1-git-send-email-will.deacon@arm.com>
+ <1539189115-16221-2-git-send-email-will.deacon@arm.com>
+Message-ID: <3fdfb5d5-b667-e797-3605-7557cc810f90@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2018-09-14 08:34:21)
-> The parent clock is get only to have its name, and then the clock is no
-> more used, so we can safely free it using devm_clk_put.
+Hi Will
+
+On 10/10/18 17:31, Will Deacon wrote:
+> It doesn't make sense for a perf event to be configured as a CHAIN event
+> in isolation, so extend the arm_pmu structure with a ->filter_match()
+> function to allow the backend PMU implementation to reject CHAIN events
+> early.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+
+
 > ---
->  drivers/clk/mvebu/armada-37xx-tbg.c | 1 +
->  1 file changed, 1 insertion(+)
+>   arch/arm64/kernel/perf_event.c | 7 +++++++
+>   drivers/perf/arm_pmu.c         | 8 +++++++-
+>   include/linux/perf/arm_pmu.h   | 1 +
+>   3 files changed, 15 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/clk/mvebu/armada-37xx-tbg.c b/drivers/clk/mvebu/armada-37xx-tbg.c
-> index 71f30149e80e..caaa91a41683 100644
-> --- a/drivers/clk/mvebu/armada-37xx-tbg.c
-> +++ b/drivers/clk/mvebu/armada-37xx-tbg.c
-> @@ -102,6 +102,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
->                 return -EINVAL;
->         }
->         parent_name = __clk_get_name(parent);
-> +       devm_clk_put(dev, parent);
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 8e38d5267f22..e213f8e867f6 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -966,6 +966,12 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>   	return 0;
+>   }
+>   
+> +static int armv8pmu_filter_match(struct perf_event *event)
+> +{
+> +	unsigned long evtype = event->hw.config_base & ARMV8_PMU_EVTYPE_EVENT;
+> +	return evtype != ARMV8_PMUV3_PERFCTR_CHAIN;
+> +}
+> +
 
-So then why use devm_clk_get()? Please replace both so tha
-devm_clk_put() doesn't need to be used..
+The patch looks correct. I guess we could handle it via the existing
+map_event(), avoiding another arch specific callback.
 
->  
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->         reg = devm_ioremap_resource(dev, res);
+Either way,
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
