@@ -1,56 +1,65 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:09:26 +0200
-Subject: [PATCH v2 01/11] dt-bindings: spi/spi-pxa2xx: add PXA2xx SSP SPI
- Controller
+Date: Wed, 10 Oct 2018 19:09:35 +0200
+Subject: [PATCH 10/11] spi: pxa2xx: Add ready signal
 In-Reply-To: <20181010170936.316862-1-lkundrak@v3.sk>
 References: <20181010170936.316862-1-lkundrak@v3.sk>
-Message-ID: <20181010170936.316862-2-lkundrak@v3.sk>
+Message-ID: <20181010170936.316862-11-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the SPI controller found on Marvel MMP2 and perhaps more
-platforms.
+Strobe a GPIO line when the slave TX FIFO is filled. This is how the
+Embedded Controller on an OLPC XO-1.75 machine, that happens to be a SPI
+master, learns that it can initiate a transaction.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-
 ---
-Changes since v1:
-- s/ssp at d4035000/spi at d4035000/
+ drivers/spi/spi-pxa2xx.c | 12 ++++++++++++
+ drivers/spi/spi-pxa2xx.h |  3 +++
+ 2 files changed, 15 insertions(+)
 
- .../devicetree/bindings/spi/spi-pxa2xx.txt    | 24 +++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
-new file mode 100644
-index 000000000000..0335a9bd2e8a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
-@@ -0,0 +1,24 @@
-+PXA2xx SSP SPI Controller
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 3848842d68fd..a3b4b12c1077 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -1079,6 +1079,9 @@ static int pxa2xx_spi_transfer_one(struct spi_controller *master,
+ 	if (spi_controller_is_slave(master)) {
+ 		while (drv_data->write(drv_data))
+ 			;
++		gpiod_set_value(drv_data->gpiod_ready, 1);
++		udelay(1);
++		gpiod_set_value(drv_data->gpiod_ready, 0);
+ 	}
+ 
+ 	/*
+@@ -1784,6 +1787,15 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	if (platform_info->is_slave) {
++		drv_data->gpiod_ready = devm_gpiod_get_optional(dev,
++						"ready", GPIOD_OUT_LOW);
++		if (IS_ERR(drv_data->gpiod_ready)) {
++			status = (int)PTR_ERR(drv_data->gpiod_ready);
++			goto out_error_clock_enabled;
++		}
++	}
 +
-+Required properties:
-+- compatible: Must be "marvell,mmp2-ssp".
-+- reg: Offset and length of the device's register set.
-+- interrupts: Should be the interrupt number.
-+- clocks: Should contain a single entry describing the clock input.
-+- #address-cells:  Number of cells required to define a chip select address.
-+- #size-cells: Should be zero.
+ 	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+ 	pm_runtime_use_autosuspend(&pdev->dev);
+ 	pm_runtime_set_active(&pdev->dev);
+diff --git a/drivers/spi/spi-pxa2xx.h b/drivers/spi/spi-pxa2xx.h
+index 513c53aaeab2..4e324da66ef7 100644
+--- a/drivers/spi/spi-pxa2xx.h
++++ b/drivers/spi/spi-pxa2xx.h
+@@ -64,6 +64,9 @@ struct driver_data {
+ 
+ 	/* GPIOs for chip selects */
+ 	struct gpio_desc **cs_gpiods;
 +
-+Optional properties:
-+- cs-gpios: list of GPIO chip selects. See the SPI bus bindings,
-+  Documentation/devicetree/bindings/spi/spi-bus.txt
-+
-+Child nodes represent devices on the SPI bus
-+  See ../spi/spi-bus.txt
-+
-+Example:
-+	ssp1: spi at d4035000 {
-+		compatible = "marvell,mmp2-ssp";
-+		reg = <0xd4035000 0x1000>;
-+		clocks = <&soc_clocks MMP2_CLK_SSP0>;
-+		interrupts = <0>;
-+	};
++	/* Optional slave FIFO ready signal */
++	struct gpio_desc *gpiod_ready;
+ };
+ 
+ struct chip_data {
 -- 
 2.19.0
