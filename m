@@ -1,43 +1,66 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 10 Oct 2018 19:26:56 +0200
-Subject: [PATCH 3/5] spi: pxa2xx: use an enum for type
-In-Reply-To: <87d0t64mkk.fsf@belgarion.home>
-References: <20180910115935.163121-1-lkundrak@v3.sk>
- <20180910115935.163121-4-lkundrak@v3.sk> <87d0t64mkk.fsf@belgarion.home>
-Message-ID: <817b05ed7a619e9c46594f395ebc02d7cde9fc24.camel@v3.sk>
+Date: Wed, 10 Oct 2018 19:09:36 +0200
+Subject: [PATCH 11/11] spi: pxa2xx: Deal with the leftover garbage in TXFIFO
+In-Reply-To: <20181010170936.316862-1-lkundrak@v3.sk>
+References: <20181010170936.316862-1-lkundrak@v3.sk>
+Message-ID: <20181010170936.316862-12-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-09-21 at 22:34 +0200, Robert Jarzmik wrote:
-> Lubomir Rintel <lkundrak@v3.sk> writes:
-> 
-> > That seems to be the correct type.
-> Okay, but what happens here when adev_id->driver_data is a value out
-> of enum
-> range ? Does the following assignment make sense ?
-> > +		type = (enum pxa_ssp_type)adev_id->driver_data;
-> 
-> As a side note, could you join for the next throw to the review :
->  - Jarkko Nikula <jarkko.nikula@linux.intel.com>
->  - Mika Westerberg <mika.westerberg@linux.intel.com>
+There doesn't seem to be a way to empty TXFIFO on MMP2. The datasheet is
+super-secret and the method described in Armada 16x manual won't work:
 
-Argh, of course I forgot. My apologies.
+  "The TXFIFO and RXFIFO are cleared to 0b0 when the SSPx port is reset or
+  disabled (by writing a 0b0 to the <Synchronous Serial Port Enable> field
+  in the SSP Control Register 0)."
 
-Jarkko & Mika, I'm wondering if you could take a look at the [1] thread
-and tell me what you think. (I can forward it to you via e-mail too, if
-you're not subscribed to lists it has been Cc'd to, if that would be
-more convenient).
+  # devmem 0xd4037008           # read SSSR
+  0x0000F204
+  # devmem 0xd4037000 32 0x80   # SSE off in SSCR0
+  # devmem 0xd4037000 32 0x87   # SSE on
+  # devmem 0xd4037008
+  0x0000F204
+         ^ TXFIFO level is still 2. Sigh.
 
-[1] [PATCH 0/11] spi: pxa2xx: add DT and slave mode support"
-    https://lore.kernel.org/lkml/20181010170936.316862-1-lkundrak at v3.sk/T/#t
+The OLPC 1.75 boot firmware leaves two bytes in the TXFIFO. Those are
+basically throwaway bytes used in response to the messages from the EC.
+The OLPC kernel copes with this by power-cycling the hardware. Perhaps
+the firmware should do this instead.
 
-Thanks
-Lubo
+Other than that, there's not much we can do other than complain loudly
+until the garbage gets drained and discard the actual data... For the
+OLPC EC this will work just fine and pushing more data to TXFIFO would
+break further transactions.
 
-> 
-> Even if they are Intel, I think they have worked a lot on this driver
-> for Intel
-> platforms.
-> 
-> Cheers.
-> 
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+---
+ drivers/spi/spi-pxa2xx.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index a3b4b12c1077..2662b99d4439 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -1076,6 +1076,20 @@ static int pxa2xx_spi_transfer_one(struct spi_controller *master,
+ 			pxa2xx_spi_write(drv_data, SSTO, chip->timeout);
+ 	}
+ 
++	if (drv_data->ssp_type == MMP2_SSP) {
++		u8 tx_level = (pxa2xx_spi_read(drv_data, SSSR)
++					& SSSR_TFL_MASK) >> 8;
++
++		if (tx_level) {
++			/* On MMP2, flipping SSE doesn't to empty TXFIFO. */
++			dev_warn(&spi->dev, "%d bytes of garbage in TXFIFO!\n",
++								tx_level);
++			if (tx_level > transfer->len)
++				tx_level = transfer->len;
++			drv_data->tx += tx_level;
++		}
++	}
++
+ 	if (spi_controller_is_slave(master)) {
+ 		while (drv_data->write(drv_data))
+ 			;
+-- 
+2.19.0
