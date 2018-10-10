@@ -1,25 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Oct 2018 11:08:58 +0200
-Subject: [PATCH] MAINTAINERS: update entry for Mediatek pin controller
-In-Reply-To: <98b17a3b47f75d4f3f17dae81a087b4163fcd857.1538652946.git.sean.wang@mediatek.com>
-References: <98b17a3b47f75d4f3f17dae81a087b4163fcd857.1538652946.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkda8fK5p2OsG170pbU23TsAJ3bbyUmwCxrs86v5=-Zzoyw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 10 Oct 2018 11:18:57 +0200
+Subject: [PATCH] config: arm: exynos: remove PROVE_LOCKING from defconfig
+In-Reply-To: <20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a~b_qPT4nMA1415514155eucas1p16@eucas1p1.samsung.com>
+References: <CGME20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a@eucas1p1.samsung.com>
+ <20181009153439eucas1p19956dc093074fb7603ad4b39d7cd215a~b_qPT4nMA1415514155eucas1p16@eucas1p1.samsung.com>
+Message-ID: <CAJKOXPeSLxeHR-n0yAqbYMi4y9sZhX0Omk=C6-8du7x27X4aWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 4, 2018 at 1:40 PM <sean.wang@mediatek.com> wrote:
-
-> From: Sean Wang <sean.wang@mediatek.com>
+On Tue, 9 Oct 2018 at 17:34, Lukasz Luba <l.luba@partner.samsung.com> wrote:
 >
-> Add all source files under drivers/pinctrl/mediatek for the entry and
-> change the address to a permanent one since I have a personal leave
-> over the next few months and the address would be suspended for a while.
+> PROVE_LOCKING enables LOCKDEP, which causes big overhead on cache and
+> bus transactions.
 >
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@kernel.org>
+> On some ARM big.LITTLE architecutres (Exynos 5433) the overhead is really big.
+> The overhead can be measures using hackbench test which will speed up
+> by x3 times (11sec -> 3.4sec).
+> When you check transaction on cache or buses, the results are way higher
+> than normal for the same hackbench test:
+> L1d cache invalidations: 26mln vs 4mln
+> L2u cache invalidations: 42mln vs 12mln
+> bus cyc/access: 30cyc/access vs. 20cyc/access
+> context switch is x3 times cheaper
+>
+> Enable this option only when you have some locking issue to investigate.
+>
+> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 27ea6dfc..fbf52f3 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -324,7 +324,6 @@ CONFIG_MAGIC_SYSRQ=y
+>  CONFIG_DEBUG_KERNEL=y
+>  CONFIG_SOFTLOCKUP_DETECTOR=y
+>  # CONFIG_DETECT_HUNG_TASK is not set
+> -CONFIG_PROVE_LOCKING=y
 
-Patch applied.
+You just disabled all debugging around locks (so also basic checks).
+You did not describe this in the message... and it also makes me
+wonder what were you testing? Kernel without any lock debugging (so
+this patch) or kernel without lockdep only (not this patch).
 
-Yoiurs,
-Linus Walleij
+As for the reason behind this change, I am not sure. We had locking
+issues and this change really helped us to spot them. Most of the
+issues are solved so maybe this is not needed anymore but on the other
+hand - this is development/debugging config, not a distro-ready. It
+might serve as a reference for distro configs but clearly it is not
+for production.
+
+Best regards,
+Krzysztof
+
+>  CONFIG_DEBUG_ATOMIC_SLEEP=y
+>  CONFIG_DEBUG_USER=y
+>  CONFIG_CRYPTO_RSA=m
+> --
+> 2.7.4
+>
