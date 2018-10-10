@@ -1,30 +1,39 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 10 Oct 2018 14:05:43 -0500
-Subject: [PATCH v3 2/2] treewide: use bus_find_device_by_fwnode
-In-Reply-To: <CALabi0FgQWGL8KMpCKt9N6Kkoig77LxOsea3Oe47tk5nOH10-Q@mail.gmail.com>
-References: <1539080245-25818-1-git-send-email-svellattu@mvista.com>
- <1539080245-25818-2-git-send-email-svellattu@mvista.com>
- <20181009174428.GB2182@xps15>
- <CALabi0FgQWGL8KMpCKt9N6Kkoig77LxOsea3Oe47tk5nOH10-Q@mail.gmail.com>
-Message-ID: <CAL_JsqJsF0Zr=chBQ_Euq+27TJftpSR5dpi-tYyiwEFdsEh6vQ@mail.gmail.com>
+Date: Wed, 10 Oct 2018 14:26:39 -0500
+Subject: [PATCH 0/15] Add support for OLPC XO 1.75 Embedded Controller
+In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+Message-ID: <CAL_Jsq+MYBrkZ=OEv3avxC_NZ+q3+stOF8CsHeXUsomKZD9+AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2018 at 9:59 PM Silesh C V <svellattu@mvista.com> wrote:
+On Wed, Oct 10, 2018 at 12:23 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
 >
-> Hello Mathieu,
+> Hi.
 >
-> On Tue, Oct 9, 2018 at 11:14 PM Mathieu Poirier
-> <mathieu.poirier@linaro.org> wrote:
-> >
-> >
-> > This doesn't apply on linux-next.  This late in the cycle you may want to rebase
-> > your work on that tree.
+> This patchset adds support for the Embedded Controller on an OLPC XO
+> 1.75 machine. OLPC XO 1.75 is a MMP2 based ARM laptop. It plugs into
+> the existing OLPC platform infrastructure, currently used by the x86
+> based models.
 >
-> OK. Will send v4 after rebasing onto linux-next.
+> The EC operates in SPI master mode, meaning the SOC is the SPI slave. It
+> uses extra handshake signal to signal readiness of SOC to accept data
+> from EC and to initiate a transaction if SOC wishes to submit data.
+>
+> The SPI slave support for MMP2 was submitted separately:
+> https://lore.kernel.org/lkml/20181010170936.316862-1-lkundrak at v3.sk/T/#t
+>
+> THe "power: supply: olpc_battery: correct the temperature" patch was
+> already sent out separately, but I'm including it because the last
+> commit of the set depends on it.
+>
+> Tested to work on an OLPC XO 1.75 and also tested not to break x86
+> support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
+> unlikely this breaks it when XO 1 works.
 
-That doesn't help anything unless you are targeting 4.21. If you are
-it would be easiest to apply patch 1 in 4.20 and split this patch by
-subsystem for 4.21. That avoids any cross subsystem dependencies.
+I asked this on the OLPC devel list recently, but I don't think my
+message ever got past the moderator. Could you generate a DT dump from
+/proc/device-tree of an XO 1 and send to me? I have some DT changes
+planned and need to see if they'd be okay for x86 OLPC.
 
 Rob
