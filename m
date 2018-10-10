@@ -1,37 +1,36 @@
 From: kernel@esmil.dk (Emil Renner Berthing)
-Date: Wed, 10 Oct 2018 11:00:32 +0200
-Subject: [PATCH 1/7] spi: rockchip: initialize dma_slave_config properly
-In-Reply-To: <20181010090038.20834-1-kernel@esmil.dk>
-References: <20181010090038.20834-1-kernel@esmil.dk>
-Message-ID: <20181010090038.20834-2-kernel@esmil.dk>
+Date: Wed, 10 Oct 2018 11:00:31 +0200
+Subject: [PATCH 0/7] Enable spi dma on Rockchip RK3399
+Message-ID: <20181010090038.20834-1-kernel@esmil.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Huibin Hong <huibin.hong@rock-chips.com>
+Hi all,
 
-The rxconf and txconf structs are allocated on the
-stack, so make sure we zero them before filling out
-the relevant fields.
+The first three patches in this series enable spi dma on rk3399,
+while the remaining patches are meant to be decreasingly obvious
+cleanups to the rockchip spi driver.
 
-Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
-Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
----
- drivers/spi/spi-rockchip.c | 3 +++
- 1 file changed, 3 insertions(+)
+Unfortunately I only have rk3399-gru-kevin hardware to test
+this on, so it would be nice if someone would test this on
+other rockchips.
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index fdcf3076681b..185bbdce62b1 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -445,6 +445,9 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 	struct dma_slave_config rxconf, txconf;
- 	struct dma_async_tx_descriptor *rxdesc, *txdesc;
- 
-+	memset(&rxconf, 0, sizeof(rxconf));
-+	memset(&txconf, 0, sizeof(txconf));
-+
- 	spin_lock_irqsave(&rs->lock, flags);
- 	rs->state &= ~RXBUSY;
- 	rs->state &= ~TXBUSY;
+/Emil
+
+Emil Renner Berthing (5):
+  arm64: dts: rockchip: add rk3399 SPI DMAs
+  spi: rockchip: remove unneeded dma_caps
+  spi: rockchip: mark use_dma as bool
+  spi: rockchip: directly use direction constants
+  spi: rockchip: simplify spi enable logic
+
+Huibin Hong (2):
+  spi: rockchip: initialize dma_slave_config properly
+  spi: rockchip: adjust dma watermark and burstlen
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++
+ drivers/spi/spi-rockchip.c               | 62 +++++++++---------------
+ 2 files changed, 32 insertions(+), 40 deletions(-)
+
 -- 
 2.19.1
