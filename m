@@ -1,26 +1,92 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 10 Oct 2018 16:59:37 +0200
-Subject: [PATCH 3/4] ARM: dts: sun7i: Add pinmux configuration for LCD0
- RGB888 pins
-In-Reply-To: <20181010114134.8211-3-contact@paulk.fr>
-References: <20181010114134.8211-1-contact@paulk.fr>
- <20181010114134.8211-3-contact@paulk.fr>
-Message-ID: <20181010145937.lkknbbrt5vznjlat@flea>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 10 Oct 2018 16:02:24 +0100
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
+In-Reply-To: <0a276103-15fb-807c-5379-1a35de789290@codeaurora.org>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-3-georgi.djakov@linaro.org>
+ <20180925180215.GA12435@bogus>
+ <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
+ <20180926144830.GB25838@e107155-lin>
+ <fa74c24f-1f22-f11f-60fe-5a4489d9c7c2@codeaurora.org>
+ <20181002111758.GC1086@e107155-lin>
+ <c17450ce-fc25-e792-b91b-51106f032542@codeaurora.org>
+ <20181003093346.GA12570@e107155-lin>
+ <0a276103-15fb-807c-5379-1a35de789290@codeaurora.org>
+Message-ID: <20181010150224.GA3583@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 01:41:33PM +0200, Paul Kocialkowski wrote:
-> This adds the pin muxing definition for configuring the PD pins in LCD0
-> mode for a RGB888 format to the sun7i device-tree.
+On Wed, Oct 03, 2018 at 11:06:45AM -0700, Saravana Kannan wrote:
 > 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> 
+> On 10/03/2018 02:33 AM, Sudeep Holla wrote:
+> > On Tue, Oct 02, 2018 at 11:56:56AM -0700, Saravana Kannan wrote:
+> > > On 10/02/2018 04:17 AM, Sudeep Holla wrote:
+> > [...]
+> > 
+> > > > Yes, I do understand I have made the same point multiple time and it's
+> > > > intentional. We need to get the fragmented f/w support story fixed.
+> > > > Different ARM vendors are doing different things in f/w and ARM sees the
+> > > > same fragmentation story as before. We have come up with new specification
+> > > > and my annoying multiple emails are just to constantly remind the same.
+> > > > 
+> > > > I do understand we have existing implementations to consider, but fixing
+> > > > the functionality in arbitrary way is not a good design and it better
+> > > > to get them fixed for future.
+> > > I believe the fragmentation you are referring to is? in the
+> > > interface/communication protocol. I see the benefit of standardizing that as
+> > > long as the standard actually turns out to be good. But that's completely
+> > > separate from what the FW can/can't do. Asking to standardize what the FW
+> > > can/can't do doesn't seem realistic as each chip vendor will have different
+> > > priorities - power, performance, cost, chip area, etc. It's the conflation
+> > > of these separate topics that doesn't help IMHO.
+> > I agree on interface/communication protocol fragmentation and firmware
+> > can implement whatever the vendor wish. What I was also referring was
+> > the mix-n-match approach which should be avoided.
+> > 
+> > e.g. Device A and B's PM is managed completely by firmware using OSPM hints
+> > Suppose Device X's PM is dependent on Device A and B, in which case it's
+> > simpler and cleaner to leave Device X PM to firmware. Reading the state
+> > of A and B and using that as hint for X is just overhead which firmware
+> > can manage better. That was my main concern here: A=CPU and B=some other
+> > device and X is inter-connect to which A and B are connected.
+> > 
+> > If CPU OPPs are obtained from f/w and this inter-connect from DT, mapping
+> > then is a mess and that's what I was concerned. I am sorry if that's not
+> > the scenario here, I may have mistaken then.
+> > 
+> What you are asking would be an ideal case, but this is not an ideal world.
 
-OUr policy so far has been that if there's no user for that pin group,
-we won't merge it in order not to cripple the DTSI with useless groups.
+Agreed.
 
-Maxime
+> There are tons of constraints for each chip vendor. Saying you can't mix and
+> match makes perfect the enemy of the good.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+We can have endless debate on that.
+
+> Adding FW support for A and B might make them optimal.
+
+OK...
+
+> But adding support for X might not be possible for
+> multiple real world constraints (chip area, cost, time to market, etc).
+
+but is not a good design though. If f/w blindly changes DVFS for X based
+on OS request, then there's possibility for clkscrew kind of exploits
+still though moving A/B to f/w was to avoid it. The chances are low but
+not zero.
+
+> Saying "either do it all or do nothing" is going to hold back a lot progress
+> that can come in increments. Heck, we do the same thing in the kernel. We'll
+> add basic simple features first and then improve on them. Why is it suddenly
+> frowned up if a FW/HW follows the same approach? I'll just have to agree to
+> disagree with you on this view point.
+>
+
+I agree on adding basic and then improve on that policy. But it's not
+fair to compare this mix-'n'-match approach to that. Sorry but I
+disagree with the comparison here.
+
+--
+Regards,
+Sudeep
