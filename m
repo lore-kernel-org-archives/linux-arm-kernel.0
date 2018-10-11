@@ -1,163 +1,130 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 11 Oct 2018 18:12:33 +0100
-Subject: [PATCH v6 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <CAKTKpr5iFHVbfOq1d1E=bcwxK4=UdExXh=QyyyJ_zE4s_5bz=w@mail.gmail.com>
-References: <20180621063338.20093-1-ganapatrao.kulkarni@cavium.com>
- <20180621063338.20093-3-ganapatrao.kulkarni@cavium.com>
- <c77e9601-71ca-ff09-f21d-b2493ca7c40b@arm.com>
- <CAKTKpr41udk9dGyLVZjO5pj_J7sf_sU_Td3t2R60UMxJatDDXA@mail.gmail.com>
- <3e9ab774-71db-d81d-5f0a-15fe942dfdb0@arm.com>
- <CAKTKpr5iFHVbfOq1d1E=bcwxK4=UdExXh=QyyyJ_zE4s_5bz=w@mail.gmail.com>
-Message-ID: <57165c0c-1a26-0886-0831-56baeb7cfa19@arm.com>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Thu, 11 Oct 2018 17:25:39 +0000
+Subject: [PATCH v2] arm64: dts: lx2160a: enable eSDHC controller
+In-Reply-To: <20181011063522.7767-1-yinbo.zhu@nxp.com>
+References: <20181011063522.7767-1-yinbo.zhu@nxp.com>
+Message-ID: <AMSPR04MB503AE4F55B3FAE7E77842218FE10@AMSPR04MB503.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganpatrao,
 
-On 11/10/18 17:06, Ganapatrao Kulkarni wrote:
-> On Thu, Oct 11, 2018 at 2:43 PM Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->>
->> Hi Ganapatrao,
->>
->> On 11/10/18 07:39, Ganapatrao Kulkarni wrote:
->>>>> +
->>>>> +/*
->>>>> + * We must NOT create groups containing events from multiple hardware PMUs,
->>>>> + * although mixing different software and hardware PMUs is allowed.
->>>>> + */
->>>>> +static bool thunderx2_uncore_validate_event_group(struct perf_event *event)
->>>>> +{
->>>>> +     struct pmu *pmu = event->pmu;
->>>>> +     struct perf_event *leader = event->group_leader;
->>>>> +     struct perf_event *sibling;
->>>>> +     int counters = 0;
->>>>> +
->>>>> +     if (leader->pmu != event->pmu && !is_software_event(leader))
->>>>> +             return false;
->>>>> +
->>>>> +     for_each_sibling_event(sibling, event->group_leader) {
->>>>> +             if (is_software_event(sibling))
->>>>> +                     continue;
->>>>> +             if (sibling->pmu != pmu)
->>>>> +                     return false;
->>>>> +             counters++;
->>>>> +     }
->>>>
->>>> The above loop will not account for :
->>>> 1) The leader event
->>>> 2) The event that we are about to add.
->>>>
->>>> So you need to allocate counters for both the above to make sure we can
->>>> accommodate the events.
->>>
->>> Is leader also part of sibling list?
->>
->> No.
+
+> -----Original Message-----
+> From: Yinbo Zhu <yinbo.zhu@nxp.com>
+> Sent: Thursday, October 11, 2018 1:35 AM
+> To: Yinbo Zhu <yinbo.zhu@nxp.com>; Y.b. Lu <yangbo.lu@nxp.com>; linux-
+> mmc at vger.kernel.org; Adrian Hunter <adrian.hunter@intel.com>;
+> ulf.hansson at linaro.org; Leo Li <leoyang.li@nxp.com>
+> Cc: Xiaobo Xie <xiaobo.xie@nxp.com>; devicetree at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: [PATCH v2] arm64: dts: lx2160a: enable eSDHC controller
 > 
-> not sure, what you are expecting here,
-
-
-The purpose of the validate_group is to ensure if a group of events can
-be scheduled together. That implies, if the new event is added to the
-group, do we have enough counters to profile. So, you have :
-
-1 (leader) + number-of-siblings-in-the-group + 1(this_new) events
-
-But you only account for the number-of-siblings.
-
-> this function is inline with other perf driver code added in driver/perf
-
-No, it is not. arm-cci, arm-dsu-pmu, arm-pmu, all do separate accounting
-for leader, siblings and the "new event".
-
->>>> Are we guaranteed that the counter0 is always allocated ? What if the
->>>> event is deleted and there are other events active ? A better check
+> There are two eSDHC controllers in lx2160a. This patch is to enable eSDHC for
+> RDB and QDS board.
 > 
-> timer will be active/restarted, till last bit is cleared( till last
-> counter is released).
+> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
+> ---
+> Change in v2:
+> 		squash all lx2160a esdhc dts patch into the original patch
 
-Ok, so you kick off the timer when you start the first active event,
-which is assumed to be on the counter0 and the timeout handler would
-restart the counters when at least one event is active, as you don't
-have a PMU pmu_{enable/disable} call back. But I am still not convinced
-that assuming the "first counter" is always 0. I would rather use:
-bitmap_weight() == 1 check.
+Hi Yinbo,
 
->>>> would be :
->>>>           if (find_last_bit(...) != pmu_uncore->uncore_dev->max_counters)
->>>>
->>> IIUC, find_last_bit will return  zero if none of the counters are
->>> active and we want to start timer for first active counter.
->>>
->>
->> Well, if that was the case, how do you know if the bit zero is the only
->> bit set ?
->>
->> AFAICS, lib/find_bit.c has :
->>
->> unsigned long find_last_bit(const unsigned long *addr, unsigned long size)
->> {
->>           if (size) {
->>                   unsigned long val = BITMAP_LAST_WORD_MASK(size);
->>                   unsigned long idx = (size-1) / BITS_PER_LONG;
->>
->>                   do {
->>                           val &= addr[idx];
->>                           if (val)
->>                                   return idx * BITS_PER_LONG + __fls(val);
->>
->>                           val = ~0ul;
->>                   } while (idx--);
->>           }
->>           return size;
->> }
->>
->>
->> It returns "size" when it can't find a set bit.
+What I meant is that the eSDHC nodes should be squashed into the patches adding these device tree.  I don't see a good reason that SDHC nodes should be a separate patch for now, especially when the original patch is still being reviewed and could be changing.
+https://lore.kernel.org/patchwork/patch/995433/
+https://lore.kernel.org/patchwork/patch/995434/
+
+Regards,
+Leo
 > 
-> before start, alloc_counter is called to set, it seems we never hit
-> case where at-least one bit is not set.
-> timer will be started for first bit set and will continue till all
-> bits are cleared.
->>
->>
-
->>>>> +static enum hrtimer_restart thunderx2_uncore_hrtimer_callback(
->>>>> +             struct hrtimer *hrt)
->>>>> +{
->>>>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
->>>>> +     unsigned long irqflags;
->>>>> +     int idx;
->>>>> +     bool restart_timer = false;
->>>>> +
->>>>> +     pmu_uncore = container_of(hrt, struct thunderx2_pmu_uncore_channel,
->>>>> +                     hrtimer);
->>>>> +
->>>>> +     raw_spin_lock_irqsave(&pmu_uncore->uncore_dev->lock, irqflags);
->>>>> +     for_each_set_bit(idx, pmu_uncore->active_counters,
->>>>> +                     pmu_uncore->uncore_dev->max_counters) {
->>>>> +             struct perf_event *event = pmu_uncore->events[idx];
->>>>
->>>> Do we need to check if the "event" is not NULL ? Couldn't this race with
->>>> an event_del() operation ?
->>>
->>> i dont think so, i have not come across any such race condition during
->>> my testing.
->>
->> Thinking about it further, we may not hit it, as the PMU is "disable"d,
->> before "add/del", which implies that the IRQ won't be triggered.
-
-Taking another look, since you don't have pmu_disable/enable callbacks,
-the events could still be running. However, you are protected by the
-free_counter() which holds the uncore_dev->lock to prevent the race.
-
->>
->> Btw, in general, not hitting a race condition doesn't prove there cannot
->> be a race ;)
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts |    8 ++++++
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |   15 ++++++++++++
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    |   25
+> +++++++++++++++++++++
+>  3 files changed, 48 insertions(+), 0 deletions(-)
 > 
-> want to avoid, unnecessary defensive programming.
-
-Of course.
-
-Suzuki
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+> b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+> index bc30173..b58b96c 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+> @@ -294,6 +294,14 @@
+>  	status = "okay";
+>  };
+> 
+> +&esdhc0 {
+> +	status = "okay";
+> +};
+> +
+> +&esdhc1 {
+> +	status = "okay";
+> +};
+> +
+>  &dspi0 {
+>  	dflash0: n25q128a {
+>  		#address-cells = <1>;
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> index 53b0e80..cbe8919 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> @@ -170,6 +170,21 @@
+>  	status = "okay";
+>  };
+> 
+> +&esdhc0 {
+> +	sd-uhs-sdr104;
+> +	sd-uhs-sdr50;
+> +	sd-uhs-sdr25;
+> +	sd-uhs-sdr12;
+> +	status = "okay";
+> +};
+> +
+> +&esdhc1 {
+> +	mmc-hs200-1_8v;
+> +	mmc-hs400-1_8v;
+> +	bus-width = <8>;
+> +	status = "okay";
+> +};
+> +
+>  &fspi {
+>  	status = "okay";
+>  	nxp,fspi-has-second-chip;
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> index fa4a1f8..174544a 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> @@ -356,6 +356,31 @@
+>  			little-endian;
+>  		};
+> 
+> +		esdhc0: esdhc at 2140000 {
+> +			compatible = "fsl,esdhc";
+> +			reg = <0x0 0x2140000 0x0 0x10000>;
+> +			interrupts = <0 28 0x4>; /* Level high type */
+> +			clocks = <&clockgen 4 1>;
+> +			voltage-ranges = <1800 1800 3300 3300>;
+> +			sdhci,auto-cmd12;
+> +			little-endian;
+> +			bus-width = <4>;
+> +			status = "disabled";
+> +		};
+> +
+> +		esdhc1: esdhc at 2150000 {
+> +			compatible = "fsl,esdhc";
+> +			reg = <0x0 0x2150000 0x0 0x10000>;
+> +			interrupts = <0 63 0x4>; /* Level high type */
+> +			clocks = <&clockgen 4 1>;
+> +			voltage-ranges = <1800 1800 3300 3300>;
+> +			sdhci,auto-cmd12;
+> +			broken-cd;
+> +			little-endian;
+> +			bus-width = <4>;
+> +			status = "disabled";
+> +		};
+> +
+>  		gpio0: gpio at 2300000 {
+>  			compatible = "fsl,ls2080a-gpio", "fsl,qoriq-gpio";
+>  			reg = <0x0 0x2300000 0x0 0x10000>;
+> --
+> 1.7.1
