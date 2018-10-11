@@ -1,59 +1,31 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Thu, 11 Oct 2018 12:42:24 +0200
-Subject: [PATCH 0/15] Add support for OLPC XO 1.75 Embedded Controller
-In-Reply-To: <CAL_Jsq+MYBrkZ=OEv3avxC_NZ+q3+stOF8CsHeXUsomKZD9+AA@mail.gmail.com>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <CAL_Jsq+MYBrkZ=OEv3avxC_NZ+q3+stOF8CsHeXUsomKZD9+AA@mail.gmail.com>
-Message-ID: <40e6a8575d4bdc43cc069e561e12f404983c5567.camel@v3.sk>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Thu, 11 Oct 2018 15:07:33 -0400
+Subject: [PATCH v3 0/2] rename function name and enable 32bit vcpu events
+Message-ID: <1539284855-4035-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-10-10 at 14:26 -0500, Rob Herring wrote:
-> On Wed, Oct 10, 2018 at 12:23 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
-> > Hi.
-> > 
-> > This patchset adds support for the Embedded Controller on an OLPC XO
-> > 1.75 machine. OLPC XO 1.75 is a MMP2 based ARM laptop. It plugs into
-> > the existing OLPC platform infrastructure, currently used by the x86
-> > based models.
-> > 
-> > The EC operates in SPI master mode, meaning the SOC is the SPI slave. It
-> > uses extra handshake signal to signal readiness of SOC to accept data
-> > from EC and to initiate a transaction if SOC wishes to submit data.
-> > 
-> > The SPI slave support for MMP2 was submitted separately:
-> > https://lore.kernel.org/lkml/20181010170936.316862-1-lkundrak at v3.sk/T/#t
-> > 
-> > THe "power: supply: olpc_battery: correct the temperature" patch was
-> > already sent out separately, but I'm including it because the last
-> > commit of the set depends on it.
-> > 
-> > Tested to work on an OLPC XO 1.75 and also tested not to break x86
-> > support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
-> > unlikely this breaks it when XO 1 works.
-> 
-> I asked this on the OLPC devel list recently, but I don't think my
-> message ever got past the moderator. Could you generate a DT dump from
-> /proc/device-tree of an XO 1 and send to me? I have some DT changes
-> planned and need to see if they'd be okay for x86 OLPC.
+Rename the kvm_arch_dev_ioctl_check_extension() to 
+kvm_arch_vm_ioctl_check_extension, because the name
+is not reasonable; 
 
-The /proc/device-tree tarball: http://v3.sk/~lkundrak/olpc/xo1.tar
-(Mirror: https://people.freedesktop.org/~lkundrak/olpc/xo1.tar)
+Enable the 32 bit vcpu events support.
 
-My distro's dtc crashes with this (could be related to your recent dtc
-fixes), the git tip needs -f to work around some funny property names.
-I figure a raw data as opposed to a dts/dtb dump would be a better
-idea.
+Change since v2:
+1. Address Suzuki's comments to update the patch commit messages
 
-Also, there's no phandles, so it's of rather limited use. If you need
-those, then I can share a dump directly from ofw instead or patch the
-kernel to fabricate and expose the phandle properties.
+change since v1:
+1. Update patch commit messages.
 
-This is with the latest firmware. I guess the exact version is
-somewhere within the device tree.
+Dongjiu Geng (2):
+  arm/arm64: KVM: rename function kvm_arch_dev_ioctl_check_extension()
+  arm/arm64: KVM: enable 32 bits kvm vcpu events support
 
-> 
-> Rob
+ arch/arm/include/asm/kvm_host.h   | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 2 +-
+ arch/arm64/kvm/reset.c            | 5 ++---
+ virt/kvm/arm/arm.c                | 3 ++-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-Cheers
-Lubo
+-- 
+1.9.1
