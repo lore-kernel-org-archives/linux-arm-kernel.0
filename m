@@ -1,15 +1,21 @@
-From: adam.cottrel@veea.com (Adam Cottrel)
-Date: Thu, 11 Oct 2018 12:34:07 +0000
-Subject: Pros and Cons of IOMMU (vs SWIOTLB)
-Message-ID: <DM6PR04MB4059A2D8891052FA5DBC051AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 11 Oct 2018 21:12:01 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-udoo: Add Pincfgs for UART4
+In-Reply-To: <20181010081904.GA23397@armhf-buildhost.asgard.net>
+References: <1538663639-3427-1-git-send-email-kueffner.markus@gmail.com>
+ <CAOMZO5BqL5Tfd0+KmN2DiJdoWLSYWSWyppw8qdrb-G_by_68Tw@mail.gmail.com>
+ <20181010081904.GA23397@armhf-buildhost.asgard.net>
+Message-ID: <20181011131159.GA3587@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 10, 2018 at 10:19:04AM +0200, Markus Kueffner wrote:
+> From: Markus Kueffner <kueffner.markus@gmail.com>
+> Date: Wed, 10 Oct 2018 08:32:09 +0200
+> Subject: [PATCH v2] ARM: dts: imx6qdl-udoo: Add Pincfgs for UART4
+> 
+> Add Pincfgs for UART4 to enable Communication with the onboard SAM3X
+> 
+> Signed-off-by: Markus Kueffner <kueffner.markus@gmail.com>
 
-I have just enabled IOMMU support on my ARM Cavium SoC within the DT. However, I cannot see any benefits (or disadvantages) of doing so...
-
-Can anyone tell me the benefits of using a hardware IOMMU (vs SWIOTLB) for DMA transfers?
-
-Best,
-Adam
+Applied, thanks.
