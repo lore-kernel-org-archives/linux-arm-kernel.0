@@ -1,153 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Oct 2018 17:19:17 +0100
-Subject: [PATCH] arm64: Fix /proc/iomem for reserved but not memory regions
-In-Reply-To: <b9cf5aea-d055-d8fe-25fa-6648644b0ff9@arm.com>
-References: <20181009110830.13331-1-james.morse@arm.com>
- <20181009152610.GA9259@arm.com>
- <b9cf5aea-d055-d8fe-25fa-6648644b0ff9@arm.com>
-Message-ID: <20181011161917.GB17000@arm.com>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Thu, 11 Oct 2018 10:24:33 -0600
+Subject: [PATCH 5/5] RISC-V: Implement sparsemem
+In-Reply-To: <20181011133730.GB7276@lst.de>
+References: <20181005161642.2462-1-logang@deltatee.com>
+ <20181005161642.2462-6-logang@deltatee.com> <20181011133730.GB7276@lst.de>
+Message-ID: <8cea5ffa-5fbf-8ea2-b673-20e2d09a910d@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2018 at 09:28:33AM +0100, James Morse wrote:
-> I think your:
-> | end = min(PFN_PHYS(PFN_UP(r_end)), mem->end);
+
+
+On 2018-10-11 7:37 a.m., Christoph Hellwig wrote:
+>> +/*
+>> + * Log2 of the upper bound of the size of a struct page. Used for sizing
+>> + * the vmemmap region only, does not affect actual memory footprint.
+>> + * We don't use sizeof(struct page) directly since taking its size here
+>> + * requires its definition to be available at this point in the inclusion
+>> + * chain, and it may not be a power of 2 in the first place.
+>> + */
+>> +#define STRUCT_PAGE_MAX_SHIFT	6
 > 
-> Needs to be:
-> | end = min(PFN_PHYS(PFN_UP(r_end)) - 1, mem->end);
+> I know this is copied from arm64, but wouldn't this be a good time
+> to move this next to the struct page defintion?
+> 
+> Also this:
+> 
+> arch/arm64/mm/init.c:   BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
+> 
+> should move to comment code (or would have to be duplicated for riscv)
 
-Good spot! Full patch below.
+Makes sense. Where is a good place for the BUILD_BUG_ON in common code?
 
-Will
+I've queued up changes for your other feedback.
 
---->8
+Thanks,
 
->From 5f85f02de3fb630aaee0b809a0f3df3faaddcac7 Mon Sep 17 00:00:00 2001
-From: Will Deacon <will.deacon@arm.com>
-Date: Thu, 11 Oct 2018 11:29:14 +0100
-Subject: [PATCH] arm64: Fix /proc/iomem for reserved but not memory regions
-
-We describe ranges of 'reserved' memory to userspace via /proc/iomem.
-Commit 50d7ba36b916 ("arm64: export memblock_reserve()d regions via
-/proc/iomem") updated the logic to export regions that were reserved
-because their contents should be preserved. This allowed kexec-tools
-to tell the difference between 'reserved' memory that must be
-preserved and not overwritten, (e.g. the ACPI tables), and 'nomap'
-memory that must not be touched without knowing the memory-attributes
-(e.g. RAS CPER regions).
-
-The above commit wrongly assumed that memblock_reserve() would not
-be used to reserve regions that aren't memory. It turns out this is
-exactly what early_init_dt_reserve_memory_arch() will do if it finds
-a DT reserved-memory that was also carved out of the memory node, which
-results in a WARN_ON_ONCE() and the region being reserved instead of
-ignored. The ramoops description on hikey and dragonboard-410c both do
-this, so we can't simply write this configuration off as "buggy firmware".
-
-Avoid this issue by rewriting reserve_memblock_reserved_regions() so
-that only the portions of reserved regions which overlap with mapped
-memory are actually reserved.
-
-Fixes: 50d7ba36b916 ("arm64: export memblock_reserve()d regions via /proc/iomem")
-Reported-by: John Stultz <john.stultz@linaro.org>
-Reported-by: Paolo Pisati <p.pisati@gmail.com>
-CC: Akashi Takahiro <takahiro.akashi@linaro.org>
-CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/setup.c | 56 +++++++++++++++++++++++------------------------
- 1 file changed, 27 insertions(+), 29 deletions(-)
-
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 5b4fac434c84..a478bbb2b2ff 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -64,6 +64,9 @@
- #include <asm/xen/hypervisor.h>
- #include <asm/mmu_context.h>
- 
-+static int num_standard_resources;
-+static struct resource *standard_resources;
-+
- phys_addr_t __fdt_pointer __initdata;
- 
- /*
-@@ -206,14 +209,19 @@ static void __init request_standard_resources(void)
- {
- 	struct memblock_region *region;
- 	struct resource *res;
-+	unsigned long i = 0;
- 
- 	kernel_code.start   = __pa_symbol(_text);
- 	kernel_code.end     = __pa_symbol(__init_begin - 1);
- 	kernel_data.start   = __pa_symbol(_sdata);
- 	kernel_data.end     = __pa_symbol(_end - 1);
- 
-+	num_standard_resources = memblock.memory.cnt;
-+	standard_resources = alloc_bootmem_low(num_standard_resources *
-+					       sizeof(*standard_resources));
-+
- 	for_each_memblock(memory, region) {
--		res = alloc_bootmem_low(sizeof(*res));
-+		res = &standard_resources[i++];
- 		if (memblock_is_nomap(region)) {
- 			res->name  = "reserved";
- 			res->flags = IORESOURCE_MEM;
-@@ -243,36 +251,26 @@ static void __init request_standard_resources(void)
- 
- static int __init reserve_memblock_reserved_regions(void)
- {
--	phys_addr_t start, end, roundup_end = 0;
--	struct resource *mem, *res;
--	u64 i;
--
--	for_each_reserved_mem_region(i, &start, &end) {
--		if (end <= roundup_end)
--			continue; /* done already */
--
--		start = __pfn_to_phys(PFN_DOWN(start));
--		end = __pfn_to_phys(PFN_UP(end)) - 1;
--		roundup_end = end;
--
--		res = kzalloc(sizeof(*res), GFP_ATOMIC);
--		if (WARN_ON(!res))
--			return -ENOMEM;
--		res->start = start;
--		res->end = end;
--		res->name  = "reserved";
--		res->flags = IORESOURCE_MEM;
--
--		mem = request_resource_conflict(&iomem_resource, res);
--		/*
--		 * We expected memblock_reserve() regions to conflict with
--		 * memory created by request_standard_resources().
--		 */
--		if (WARN_ON_ONCE(!mem))
-+	u64 i, j;
-+
-+	for (i = 0; i < num_standard_resources; ++i) {
-+		struct resource *mem = &standard_resources[i];
-+		phys_addr_t r_start, r_end, mem_size = mem->end - mem->start;
-+
-+		if (!memblock_is_region_reserved(mem->start, mem_size))
- 			continue;
--		kfree(res);
- 
--		reserve_region_with_split(mem, start, end, "reserved");
-+		for_each_reserved_mem_region(j, &r_start, &r_end) {
-+			resource_size_t start, end;
-+
-+			start = max(PFN_PHYS(PFN_DOWN(r_start)), mem->start);
-+			end = min(PFN_PHYS(PFN_UP(r_end)) - 1, mem->end);
-+
-+			if (start > mem->end || end < mem->start)
-+				continue;
-+
-+			reserve_region_with_split(mem, start, end, "reserved");
-+		}
- 	}
- 
- 	return 0;
--- 
-2.1.4
+Logan
