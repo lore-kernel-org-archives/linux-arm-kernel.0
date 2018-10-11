@@ -1,77 +1,39 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 11 Oct 2018 15:20:11 +0200
-Subject: [PATCH v3] arm64: new board - Emlid Neutis N5
-In-Reply-To: <9398571539259289@myt4-929fb874f3f2.qloud-c.yandex.net>
-References: <1538745949-13188-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539012044-29998-1-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <20181010144957.exrlupoph7ovsmdw@flea>
- <9398571539259289@myt4-929fb874f3f2.qloud-c.yandex.net>
-Message-ID: <2d09d6c0-0404-589d-2c34-da846cff4fb8@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Oct 2018 15:24:27 +0200
+Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.20
+In-Reply-To: <20181005133047.GC3587@dragon>
+References: <20181001072003.16238-1-shawnguo@kernel.org>
+ <20181001072003.16238-5-shawnguo@kernel.org>
+ <CAK8P3a1wMGK1TrquSw_g0TdugsET2o3MRKnx+dV96ZgY5yDqgw@mail.gmail.com>
+ <CAOMZO5D=6pBmN_qz+wEHuzSDn6_UrB05yFAT6BUrSYzi4hMHuQ@mail.gmail.com>
+ <CAK8P3a0PgysCBZSr8UqtTU6RGvo4WTzvRwhFfu4jYbCa_UUBnA@mail.gmail.com>
+ <20181005133047.GC3587@dragon>
+Message-ID: <CAK8P3a1UqJ5-Wa3zjcKLnmGXA=jnKZ0F1kbC0crB4EZz5VF+UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aleksandr,
-
-Please keep your replies in text-only format, not HTML.
-
-Am 11.10.18 um 14:01 schrieb aleksandr.aleksandrov at emlid.com:
->>     ?+/ {
->>     ?+ model = "Emlid Neutis N5 Developer board";
->>     ?+ compatible = "emlid,emlid-neutis-n5-devboard",
->>     ?+ "emlid,emlid-neutis-n5",
+On 10/5/18, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Wed, Oct 03, 2018 at 05:38:11PM +0200, Arnd Bergmann wrote:
+>> On Wed, Oct 3, 2018 at 4:15 PM Fabio Estevam <festevam@gmail.com> wrote:
+>> >
+>> > Hi Arnd,
+>> >
+>> > On Mon, Oct 1, 2018 at 1:26 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>> >
+>> > > Please add explanations for why we don't set those
+>> > > any more, and keep them separate from patches that
+>> > > just move options around.
+>> >
+>> > I did as suggested and sent a v2.
 >>
->> Do you need the two emlid there? What comes before the comma is the
->> vendor, while what is after is the model.
-> ?
-> I think emlid-neutis-n5 module could be useful in the future, no need
-> this now.
+>> Looks good, thanks for respinning these.
+>
+> Arnd,
+>
+> I just updated the pull request with v2 patches from Fabio.  Please pull
+> again, thanks.
 
-You misunderstand: The point would be to use, e.g., "emlid,neutis-n5"
-instead of "emlid,emlid-neutis-n5" with duplicate "emlid,emlid-". It is
-orthogonal to having multiple compatible strings.
 
->> ?+&uart1 {
->> ?+ pinctrl-names = "default";
->> ?+ pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
->> ?+ status = "okay";
->> ?+};
->>
->> I guess this is for bluetooth? Have you tested serdev drivers?
->>
-> Yes, bluetooth is connected over uart1.
-> You mean if I have tested bluetooth stack via serial device?
+Pulled into next/defconfig now. Thanks!
 
-Not quite, we're missing a child node within uart1 for a serdev driver.
-Is there no such driver yet for your Bluetooth chipset, or did you not
-yet check?
-
-> Bluez works stably with bcm43xx over uart 1500000 baud rate.
-> ?
->>
->> Also, I have a general comments, and it really depends on what your
->> intention about the board ecosystem is. Do you expect the SOM to be
->> swappable in multiple boards, or do you expect to send it as something
->> that is just fixed into a daughter board?
->>
->> In the former case, you probably want to use overlays instead. In the
->> latter, you're fine.
->>
-> Right, we expect the SoM to be swappable. I agree, to use overlays is
-> more convenient, but
-> the devboard DT file will be a reference for the overlays and the future
-> boards based on Neutis.
-
-What about just keeping the common nodes enabled in a SoM .dts, so that
-the average board doesn't need an Overlay for booting?
-
-@Maxime/Rob, is it possible to merge .dtso files these days? If not,
-could that be considered in the big dts Makefile refactoring? :)
-
-Cheers,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+     Arnd
