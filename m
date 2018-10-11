@@ -1,93 +1,20 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 11 Oct 2018 17:22:29 -0500
-Subject: [PATCH V3 1/2] dt-bindings: pinctrl: document Broadcom Northstar
- pin mux controller
-In-Reply-To: <20180926193103.21241-1-zajec5@gmail.com>
-References: <20180926193103.21241-1-zajec5@gmail.com>
-Message-ID: <20181011222229.GA7470@bogus>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 11 Oct 2018 15:47:27 -0700
+Subject: [PATCH i2c-next v7 3/5] dt-bindings: i2c: aspeed: Add
+ 'bus-timeout-ms' property as an optional property
+In-Reply-To: <20181011221219.GA31991@bogus>
+References: <20181005214507.26315-1-jae.hyun.yoo@linux.intel.com>
+ <20181005214507.26315-4-jae.hyun.yoo@linux.intel.com>
+ <20181011221219.GA31991@bogus>
+Message-ID: <071f5e0d-5a9b-fc48-4a65-e53cbd123f01@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 09:31:02PM +0200, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 10/11/2018 3:12 PM, Rob Herring wrote:
 > 
-> Northstar has mux controller just like Northstar Plus and Northstar2.
-> It's a bit different though (different registers & pins) so it requires
-> its own binding.
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > 
-> It's needed to allow other block bindings specify required mux setup.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> V2: Use "cru_gpio_control"
->     Add more functions & groups
->     Include Florian's Reviewed-by
-> V3: Use 3 different bindings as available pins depend on the chipset.
->     Strings match Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
-> ---
->  .../bindings/pinctrl/brcm,bcm4708-pinmux.txt       | 42 ++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
-> new file mode 100644
-> index 000000000000..af906f196e8c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
-> @@ -0,0 +1,42 @@
-> +Broadcom Northstar pins mux controller
-> +
-> +Some of Northstar SoCs's pins can be used for various purposes thanks to the mux
-> +controller. This binding allows describing mux controller and listing available
-> +functions. They can be referenced later by other bindings to let system
-> +configure controller correctly.
-> +
-> +A list of pins varies across chipsets so few bindings are available.
-> +
-> +Required properties:
-> +- compatible: must be one of:
-> +	"brcm,bcm4708-pinmux"
-> +	"brcm,bcm4709-pinmux"
-> +	"brcm,bcm53012-pinmux"
-> +- reg: iomem address range of CRU (Central Resource Unit) pin registers
 
-Perhaps 'cru' in the compatible if that's what the h/w is called?
+Thanks much for your review, Rob!
 
-Also, if this is a sub-block, then it should be a child of the block 
-which should be defined here.
-
-> +- reg-names: "cru_gpio_control" - the only needed & supported reg right now
-> +
-> +Functions and their groups available for all chipsets:
-> +- "spi": "spi_grp"
-> +- "i2c": "i2c_grp"
-> +- "pwm": "pwm0_grp", "pwm1_grp", "pwm2_grp", "pwm3_grp"
-> +- "uart1": "uart1_grp"
-> +
-> +Additionally available on BCM4709 and BCM53012:
-> +- "mdio": "mdio_grp"
-> +- "uart2": "uart2_grp"
-> +- "sdio": "sdio_pwr_grp", "sdio_1p8v_grp"
-> +
-> +For documentation of subnodes see:
-> +Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> +
-> +Example:
-> +	pinctrl at 1800c1c0 {
-> +		compatible = "brcm,bcm4708-pinmux";
-> +		reg = <0x1800c1c0 0x24>;
-> +		reg-names = "cru_gpio_control";
-> +
-> +		spi {
-
-You'll find this now causes dtc warnings. 'spi' is reserved for SPI 
-controller nodes. So 'spi-pins' perhaps.
-
-> +			function = "spi";
-> +			groups = "spi_grp";
-> +		};
-> +	};
-> -- 
-> 2.13.7
-> 
+-Jae
