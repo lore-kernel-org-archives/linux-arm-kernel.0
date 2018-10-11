@@ -1,48 +1,37 @@
-From: rick.p.edgecombe@intel.com (Rick Edgecombe)
-Date: Thu, 11 Oct 2018 16:31:17 -0700
-Subject: [PATCH v2 7/7] s390/modules: Add rlimit checking for s390 modules
-In-Reply-To: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
+From: dave.hansen@intel.com (Dave Hansen)
+Date: Thu, 11 Oct 2018 16:47:29 -0700
+Subject: [PATCH v2 4/7] arm64/modules: Add rlimit checking for arm64
+ modules
+In-Reply-To: <20181011233117.7883-5-rick.p.edgecombe@intel.com>
 References: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
-Message-ID: <20181011233117.7883-8-rick.p.edgecombe@intel.com>
+ <20181011233117.7883-5-rick.p.edgecombe@intel.com>
+Message-ID: <25951d99-8ba7-5c9e-938e-baf92395f9e0@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds in the rlimit checking for the s390 module allocator.
+On 10/11/2018 04:31 PM, Rick Edgecombe wrote:
+> +	if (check_inc_mod_rlimit(size))
+> +		return NULL;
+> +
+>  	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
+>  				module_alloc_base + MODULES_VSIZE,
+>  				gfp_mask, PAGE_KERNEL_EXEC, 0,
+> @@ -65,6 +68,8 @@ void *module_alloc(unsigned long size)
+>  		return NULL;
+>  	}
+>  
+> +	update_mod_rlimit(p, size);
 
-This has not been tested.
+Is there a reason we couldn't just rename all of the existing per-arch
+module_alloc() calls to be called, say, "arch_module_alloc()", then put
+this new rlimit code in a generic helper that does:
 
-Signed-off-by: Rick Edgecombe <rick.p.edgecombe@intel.com>
----
- arch/s390/kernel/module.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/s390/kernel/module.c b/arch/s390/kernel/module.c
-index d298d3cb46d0..6c2356a72b63 100644
---- a/arch/s390/kernel/module.c
-+++ b/arch/s390/kernel/module.c
-@@ -32,12 +32,22 @@
- 
- void *module_alloc(unsigned long size)
- {
-+	void *p;
-+
- 	if (PAGE_ALIGN(size) > MODULES_LEN)
- 		return NULL;
--	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
-+
-+	if (check_inc_mod_rlimit(size))
-+		return NULL;
-+
-+	p = __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
- 				    GFP_KERNEL, PAGE_KERNEL_EXEC,
- 				    0, NUMA_NO_NODE,
- 				    __builtin_return_address(0));
-+
-+	update_mod_rlimit(p, size);
-+
-+	return p;
- }
- 
- void module_arch_freeing_init(struct module *mod)
--- 
-2.17.1
+	if (check_inc_mod_rlimit(size))
+		return NULL;
+
+	p = arch_module_alloc(...);
+
+	...
+
+	update_mod_rlimit(p, size);
