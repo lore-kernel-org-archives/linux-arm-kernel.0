@@ -1,35 +1,153 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Thu, 11 Oct 2018 18:13:26 +0200
-Subject: [PATCH 10/11] spi: pxa2xx: Add ready signal
-In-Reply-To: <CAMuHMdXmsw3jjp8wFuuK_Vz8kwCP4=L59sc4kZafXzrb=hKv7g@mail.gmail.com>
-References: <20181010170936.316862-1-lkundrak@v3.sk>
- <20181010170936.316862-11-lkundrak@v3.sk>
- <CAMuHMdXmsw3jjp8wFuuK_Vz8kwCP4=L59sc4kZafXzrb=hKv7g@mail.gmail.com>
-Message-ID: <a13569d534e4393abff2ac704cee45df2bcd9656.camel@v3.sk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Oct 2018 17:19:17 +0100
+Subject: [PATCH] arm64: Fix /proc/iomem for reserved but not memory regions
+In-Reply-To: <b9cf5aea-d055-d8fe-25fa-6648644b0ff9@arm.com>
+References: <20181009110830.13331-1-james.morse@arm.com>
+ <20181009152610.GA9259@arm.com>
+ <b9cf5aea-d055-d8fe-25fa-6648644b0ff9@arm.com>
+Message-ID: <20181011161917.GB17000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-10-11 at 09:28 +0200, Geert Uytterhoeven wrote:
-> Hi Lubomir,
+On Thu, Oct 11, 2018 at 09:28:33AM +0100, James Morse wrote:
+> I think your:
+> | end = min(PFN_PHYS(PFN_UP(r_end)), mem->end);
 > 
-> On Wed, Oct 10, 2018 at 7:10 PM Lubomir Rintel <lkundrak@v3.sk>
-> wrote:
-> > Strobe a GPIO line when the slave TX FIFO is filled. This is how
-> > the
-> > Embedded Controller on an OLPC XO-1.75 machine, that happens to be
-> > a SPI
-> > master, learns that it can initiate a transaction.
-> > 
-> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> 
-> Thanks for your patch!
-> 
-> I'm repeating my comments on the RFC below:
+> Needs to be:
+> | end = min(PFN_PHYS(PFN_UP(r_end)) - 1, mem->end);
 
-Ah, sorry for not addressing those; it somehow slipped through my
-fingers. I'll wait a while to collect more feedback before sending v2
-and then I'll include fixes for those.
+Good spot! Full patch below.
 
-Thanks for the review.
+Will
 
-Lubo
+--->8
+
+>From 5f85f02de3fb630aaee0b809a0f3df3faaddcac7 Mon Sep 17 00:00:00 2001
+From: Will Deacon <will.deacon@arm.com>
+Date: Thu, 11 Oct 2018 11:29:14 +0100
+Subject: [PATCH] arm64: Fix /proc/iomem for reserved but not memory regions
+
+We describe ranges of 'reserved' memory to userspace via /proc/iomem.
+Commit 50d7ba36b916 ("arm64: export memblock_reserve()d regions via
+/proc/iomem") updated the logic to export regions that were reserved
+because their contents should be preserved. This allowed kexec-tools
+to tell the difference between 'reserved' memory that must be
+preserved and not overwritten, (e.g. the ACPI tables), and 'nomap'
+memory that must not be touched without knowing the memory-attributes
+(e.g. RAS CPER regions).
+
+The above commit wrongly assumed that memblock_reserve() would not
+be used to reserve regions that aren't memory. It turns out this is
+exactly what early_init_dt_reserve_memory_arch() will do if it finds
+a DT reserved-memory that was also carved out of the memory node, which
+results in a WARN_ON_ONCE() and the region being reserved instead of
+ignored. The ramoops description on hikey and dragonboard-410c both do
+this, so we can't simply write this configuration off as "buggy firmware".
+
+Avoid this issue by rewriting reserve_memblock_reserved_regions() so
+that only the portions of reserved regions which overlap with mapped
+memory are actually reserved.
+
+Fixes: 50d7ba36b916 ("arm64: export memblock_reserve()d regions via /proc/iomem")
+Reported-by: John Stultz <john.stultz@linaro.org>
+Reported-by: Paolo Pisati <p.pisati@gmail.com>
+CC: Akashi Takahiro <takahiro.akashi@linaro.org>
+CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: James Morse <james.morse@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/setup.c | 56 +++++++++++++++++++++++------------------------
+ 1 file changed, 27 insertions(+), 29 deletions(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 5b4fac434c84..a478bbb2b2ff 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -64,6 +64,9 @@
+ #include <asm/xen/hypervisor.h>
+ #include <asm/mmu_context.h>
+ 
++static int num_standard_resources;
++static struct resource *standard_resources;
++
+ phys_addr_t __fdt_pointer __initdata;
+ 
+ /*
+@@ -206,14 +209,19 @@ static void __init request_standard_resources(void)
+ {
+ 	struct memblock_region *region;
+ 	struct resource *res;
++	unsigned long i = 0;
+ 
+ 	kernel_code.start   = __pa_symbol(_text);
+ 	kernel_code.end     = __pa_symbol(__init_begin - 1);
+ 	kernel_data.start   = __pa_symbol(_sdata);
+ 	kernel_data.end     = __pa_symbol(_end - 1);
+ 
++	num_standard_resources = memblock.memory.cnt;
++	standard_resources = alloc_bootmem_low(num_standard_resources *
++					       sizeof(*standard_resources));
++
+ 	for_each_memblock(memory, region) {
+-		res = alloc_bootmem_low(sizeof(*res));
++		res = &standard_resources[i++];
+ 		if (memblock_is_nomap(region)) {
+ 			res->name  = "reserved";
+ 			res->flags = IORESOURCE_MEM;
+@@ -243,36 +251,26 @@ static void __init request_standard_resources(void)
+ 
+ static int __init reserve_memblock_reserved_regions(void)
+ {
+-	phys_addr_t start, end, roundup_end = 0;
+-	struct resource *mem, *res;
+-	u64 i;
+-
+-	for_each_reserved_mem_region(i, &start, &end) {
+-		if (end <= roundup_end)
+-			continue; /* done already */
+-
+-		start = __pfn_to_phys(PFN_DOWN(start));
+-		end = __pfn_to_phys(PFN_UP(end)) - 1;
+-		roundup_end = end;
+-
+-		res = kzalloc(sizeof(*res), GFP_ATOMIC);
+-		if (WARN_ON(!res))
+-			return -ENOMEM;
+-		res->start = start;
+-		res->end = end;
+-		res->name  = "reserved";
+-		res->flags = IORESOURCE_MEM;
+-
+-		mem = request_resource_conflict(&iomem_resource, res);
+-		/*
+-		 * We expected memblock_reserve() regions to conflict with
+-		 * memory created by request_standard_resources().
+-		 */
+-		if (WARN_ON_ONCE(!mem))
++	u64 i, j;
++
++	for (i = 0; i < num_standard_resources; ++i) {
++		struct resource *mem = &standard_resources[i];
++		phys_addr_t r_start, r_end, mem_size = mem->end - mem->start;
++
++		if (!memblock_is_region_reserved(mem->start, mem_size))
+ 			continue;
+-		kfree(res);
+ 
+-		reserve_region_with_split(mem, start, end, "reserved");
++		for_each_reserved_mem_region(j, &r_start, &r_end) {
++			resource_size_t start, end;
++
++			start = max(PFN_PHYS(PFN_DOWN(r_start)), mem->start);
++			end = min(PFN_PHYS(PFN_UP(r_end)) - 1, mem->end);
++
++			if (start > mem->end || end < mem->start)
++				continue;
++
++			reserve_region_with_split(mem, start, end, "reserved");
++		}
+ 	}
+ 
+ 	return 0;
+-- 
+2.1.4
