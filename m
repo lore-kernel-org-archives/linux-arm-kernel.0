@@ -1,531 +1,131 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 11 Oct 2018 12:09:19 +0530
-Subject: [PATCH v6 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <c77e9601-71ca-ff09-f21d-b2493ca7c40b@arm.com>
-References: <20180621063338.20093-1-ganapatrao.kulkarni@cavium.com>
- <20180621063338.20093-3-ganapatrao.kulkarni@cavium.com>
- <c77e9601-71ca-ff09-f21d-b2493ca7c40b@arm.com>
-Message-ID: <CAKTKpr41udk9dGyLVZjO5pj_J7sf_sU_Td3t2R60UMxJatDDXA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 11 Oct 2018 09:23:49 +0200
+Subject: [PATCH 07/11] spi: Deal with slaves that return from
+ transfer_one() unfinished
+In-Reply-To: <20181010170936.316862-8-lkundrak@v3.sk>
+References: <20181010170936.316862-1-lkundrak@v3.sk>
+ <20181010170936.316862-8-lkundrak@v3.sk>
+Message-ID: <CAMuHMdXht0icaRCaJWy2GcVny=EVZ2FOfXW7s=hKFizi6sE-8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi Lubomir,
 
-On Wed, Oct 10, 2018 at 3:22 PM Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+On Wed, Oct 10, 2018 at 7:10 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
+> Some drivers, such as spi-pxa2xx return from the transfer_one callback
+> immediately, idicating that the transfer will be finished asynchronously.
 >
-> Hi Ganapatrao,
+> Normally, spi_transfer_one_message() synchronously waits for the
+> transfer to finish with wait_for_completion_timeout(). For slaves, we
+> don't want the transaction to time out as it can complete in a long time
+> in future. Use wait_for_completion_interruptible() instead.
 >
-> On 21/06/18 07:33, Ganapatrao Kulkarni wrote:
-> > This patch adds a perf driver for the PMU UNCORE devices DDR4 Memory
-> > Controller(DMC) and Level 3 Cache(L3C).
-> >
-> > ThunderX2 has 8 independent DMC PMUs to capture performance events
-> > corresponding to 8 channels of DDR4 Memory Controller and 16 independent
-> > L3C PMUs to capture events corresponding to 16 tiles of L3 cache.
-> > Each PMU supports up to 4 counters. All counters lack overflow interrupt
-> > and are sampled periodically.
-> >
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > ---
-> >   drivers/perf/Kconfig         |   8 +
-> >   drivers/perf/Makefile        |   1 +
-> >   drivers/perf/thunderx2_pmu.c | 949 +++++++++++++++++++++++++++++++++++++++++++
-> >   include/linux/cpuhotplug.h   |   1 +
-> >   4 files changed, 959 insertions(+)
-> >   create mode 100644 drivers/perf/thunderx2_pmu.c
-> >
->
->
-> > +
-> > +/*
-> > + * DMC and L3 counter interface is muxed across all channels.
-> > + * hence we need to select the channel before accessing counter
-> > + * data/control registers.
-> > + *
-> > + *  L3 Tile and DMC channel selection is through SMC call
-> > + *  SMC call arguments,
-> > + *   x0 = THUNDERX2_SMC_CALL_ID      (Vendor SMC call Id)
-> > + *   x1 = THUNDERX2_SMC_SET_CHANNEL  (Id to set DMC/L3C channel)
-> > + *   x2 = Node id
-> > + *   x3 = DMC(1)/L3C(0)
-> > + *   x4 = channel Id
-> > + */
-> > +static void uncore_select_channel(struct perf_event *event)
-> > +{
-> > +     struct arm_smccc_res res;
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore =
-> > +             pmu_to_thunderx2_pmu_uncore(event->pmu);
-> > +     struct thunderx2_pmu_uncore_dev *uncore_dev =
-> > +             pmu_uncore->uncore_dev;
-> > +
-> > +     arm_smccc_smc(THUNDERX2_SMC_CALL_ID, THUNDERX2_SMC_SET_CHANNEL,
-> > +                     uncore_dev->node, uncore_dev->type,
-> > +                     pmu_uncore->channel, 0, 0, 0, &res);
-> > +     if (res.a0) {
-> > +             dev_err(uncore_dev->dev,
-> > +                     "SMC to Select channel failed for PMU UNCORE[%s]\n",
-> > +                             pmu_uncore->uncore_dev->name);
-> > +     }
-> > +}
-> > +
->
-> > +static void uncore_start_event_l3c(struct perf_event *event, int flags)
-> > +{
-> > +     u32 val;
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +
-> > +     /* event id encoded in bits [07:03] */
-> > +     val = GET_EVENTID(event) << 3;
-> > +     reg_writel(val, hwc->config_base);
-> > +     local64_set(&hwc->prev_count, 0);
-> > +     reg_writel(0, hwc->event_base);
-> > +}
-> > +
-> > +static void uncore_stop_event_l3c(struct perf_event *event)
-> > +{
-> > +     reg_writel(0, event->hw.config_base);
-> > +}
-> > +
-> > +static void uncore_start_event_dmc(struct perf_event *event, int flags)
-> > +{
-> > +     u32 val;
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     int idx = GET_COUNTERID(event);
-> > +     int event_type = GET_EVENTID(event);
-> > +
-> > +     /* enable and start counters.
-> > +      * 8 bits for each counter, bits[05:01] of a counter to set event type.
-> > +      */
-> > +     val = reg_readl(hwc->config_base);
-> > +     val &= ~DMC_EVENT_CFG(idx, 0x1f);
-> > +     val |= DMC_EVENT_CFG(idx, event_type);
-> > +     reg_writel(val, hwc->config_base);
-> > +     local64_set(&hwc->prev_count, 0);
-> > +     reg_writel(0, hwc->event_base);
-> > +}
-> > +
-> > +static void uncore_stop_event_dmc(struct perf_event *event)
-> > +{
-> > +     u32 val;
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     int idx = GET_COUNTERID(event);
-> > +
-> > +     /* clear event type(bits[05:01]) to stop counter */
-> > +     val = reg_readl(hwc->config_base);
-> > +     val &= ~DMC_EVENT_CFG(idx, 0x1f);
-> > +     reg_writel(val, hwc->config_base);
-> > +}
-> > +
-> > +static void init_cntr_base_l3c(struct perf_event *event,
-> > +             struct thunderx2_pmu_uncore_dev *uncore_dev)
-> > +{
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +
-> > +     /* counter ctrl/data reg offset at 8 */
-> > +     hwc->config_base = (unsigned long)uncore_dev->base
-> > +             + L3C_COUNTER_CTL + (8 * GET_COUNTERID(event));
-> > +     hwc->event_base =  (unsigned long)uncore_dev->base
-> > +             + L3C_COUNTER_DATA + (8 * GET_COUNTERID(event));
-> > +}
-> > +
-> > +static void init_cntr_base_dmc(struct perf_event *event,
-> > +             struct thunderx2_pmu_uncore_dev *uncore_dev)
-> > +{
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +
-> > +     hwc->config_base = (unsigned long)uncore_dev->base
-> > +             + DMC_COUNTER_CTL;
-> > +     /* counter data reg offset at 0xc */
-> > +     hwc->event_base = (unsigned long)uncore_dev->base
-> > +             + DMC_COUNTER_DATA + (0xc * GET_COUNTERID(event));
-> > +}
-> > +
-> > +static void thunderx2_uncore_update(struct perf_event *event)
-> > +{
-> > +     s64 prev, new = 0;
-> > +     u64 delta;
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
-> > +     enum thunderx2_uncore_type type;
-> > +
-> > +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
-> > +     type = pmu_uncore->uncore_dev->type;
-> > +
-> > +     pmu_uncore->uncore_dev->select_channel(event);
-> > +
-> > +     new = reg_readl(hwc->event_base);
-> > +     prev = local64_xchg(&hwc->prev_count, new);
-> > +
-> > +     /* handles rollover of 32 bit counter */
-> > +     delta = (u32)(((1UL << 32) - prev) + new);
-> > +     local64_add(delta, &event->count);
-> > +}
-> > +
->
->
-> > +
-> > +/*
-> > + * We must NOT create groups containing events from multiple hardware PMUs,
-> > + * although mixing different software and hardware PMUs is allowed.
-> > + */
-> > +static bool thunderx2_uncore_validate_event_group(struct perf_event *event)
-> > +{
-> > +     struct pmu *pmu = event->pmu;
-> > +     struct perf_event *leader = event->group_leader;
-> > +     struct perf_event *sibling;
-> > +     int counters = 0;
-> > +
-> > +     if (leader->pmu != event->pmu && !is_software_event(leader))
-> > +             return false;
-> > +
-> > +     for_each_sibling_event(sibling, event->group_leader) {
-> > +             if (is_software_event(sibling))
-> > +                     continue;
-> > +             if (sibling->pmu != pmu)
-> > +                     return false;
-> > +             counters++;
-> > +     }
->
-> The above loop will not account for :
-> 1) The leader event
-> 2) The event that we are about to add.
->
-> So you need to allocate counters for both the above to make sure we can
-> accommodate the events.
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 
-Is leader also part of sibling list?
->
-> > +
-> > +     /*
-> > +      * If the group requires more counters than the HW has,
-> > +      * it cannot ever be scheduled.
-> > +      */
-> > +     return counters < UNCORE_MAX_COUNTERS;
-> > +}
-> > +
->
->
-> > +
-> > +static void thunderx2_uncore_start(struct perf_event *event, int flags)
-> > +{
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
-> > +     struct thunderx2_pmu_uncore_dev *uncore_dev;
-> > +     unsigned long irqflags;
-> > +
-> > +     hwc->state = 0;
-> > +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
-> > +     uncore_dev = pmu_uncore->uncore_dev;
-> > +
-> > +     raw_spin_lock_irqsave(&uncore_dev->lock, irqflags);
-> > +     uncore_dev->select_channel(event);
-> > +     uncore_dev->start_event(event, flags);
-> > +     raw_spin_unlock_irqrestore(&uncore_dev->lock, irqflags);
-> > +
-> > +     perf_event_update_userpage(event);
-> > +
-> > +     if (!find_last_bit(pmu_uncore->active_counters,
-> > +                             pmu_uncore->uncore_dev->max_counters)) {
->
-> Are we guaranteed that the counter0 is always allocated ? What if the
-> event is deleted and there are other events active ? A better check
-> would be :
->         if (find_last_bit(...) != pmu_uncore->uncore_dev->max_counters)
->
-IIUC, find_last_bit will return  zero if none of the counters are
-active and we want to start timer for first active counter.
+Thanks for your patch!
 
-> > +             hrtimer_start(&pmu_uncore->hrtimer,
-> > +                     ns_to_ktime(uncore_dev->hrtimer_interval),
-> > +                     HRTIMER_MODE_REL_PINNED);
-> > +     }
-> > +}
+> --- a/drivers/spi/spi.c
+> +++ b/drivers/spi/spi.c
+> @@ -993,6 +993,44 @@ static int spi_map_msg(struct spi_controller *ctlr, struct spi_message *msg)
+>         return __spi_map_msg(ctlr, msg);
+>  }
 >
->
-> > +
-> > +static void thunderx2_uncore_stop(struct perf_event *event, int flags)
-> > +{
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
-> > +     struct thunderx2_pmu_uncore_dev *uncore_dev;
-> > +     unsigned long irqflags;
-> > +
-> > +     if (hwc->state & PERF_HES_UPTODATE)
-> > +             return;
-> > +
-> > +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
-> > +     uncore_dev = pmu_uncore->uncore_dev;
-> > +
-> > +     raw_spin_lock_irqsave(&uncore_dev->lock, irqflags);
-> > +
-> > +     uncore_dev->select_channel(event);
-> > +     uncore_dev->stop_event(event);
-> > +
-> > +     WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
-> > +     hwc->state |= PERF_HES_STOPPED;
-> > +     if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
->
-> We already check the UPTODATE flag above, we could skip that
-> flag check here ?
+> +static int spi_transfer_wait(struct spi_controller *ctlr,
+> +                            struct spi_message *msg,
+> +                            struct spi_transfer *xfer)
+> +{
+> +       struct spi_statistics *statm = &ctlr->statistics;
+> +       struct spi_statistics *stats = &msg->spi->statistics;
+> +       unsigned long long ms = 1;
+> +
+> +       if (spi_controller_is_slave(ctlr)) {
+> +               if (wait_for_completion_interruptible(&ctlr->xfer_completion)) {
+> +                       dev_dbg(&msg->spi->dev, "SPI transfer interrupted\n");
+> +                       return -EINTR;
 
-ok, thanks.
->
-> > +             thunderx2_uncore_update(event);
-> > +             hwc->state |= PERF_HES_UPTODATE;
-> > +     }
-> > +     raw_spin_unlock_irqrestore(&uncore_dev->lock, irqflags);
-> > +}
-> > +
-> > +static int thunderx2_uncore_add(struct perf_event *event, int flags)
-> > +{
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
-> > +     struct thunderx2_pmu_uncore_dev *uncore_dev;
-> > +
-> > +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
-> > +     uncore_dev = pmu_uncore->uncore_dev;
-> > +
-> > +     /* Allocate a free counter */
-> > +     hwc->idx  = alloc_counter(pmu_uncore);
-> > +     if (hwc->idx < 0)
-> > +             return -EAGAIN;
-> > +
-> > +     pmu_uncore->events[hwc->idx] = event;
-> > +     /* set counter control and data registers base address */
-> > +     uncore_dev->init_cntr_base(event, uncore_dev);
-> > +
-> > +     hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
-> > +     if (flags & PERF_EF_START)
-> > +             thunderx2_uncore_start(event, flags);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static void thunderx2_uncore_del(struct perf_event *event, int flags)
-> > +{
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore =
-> > +                     pmu_to_thunderx2_pmu_uncore(event->pmu);
-> > +     struct hw_perf_event *hwc = &event->hw;
-> > +
-> > +     thunderx2_uncore_stop(event, PERF_EF_UPDATE);
-> > +
-> > +     /* clear the assigned counter */
-> > +     free_counter(pmu_uncore, GET_COUNTERID(event));
-> > +
-> > +     perf_event_update_userpage(event);
-> > +     pmu_uncore->events[hwc->idx] = NULL;
-> > +     hwc->idx = -1;
-> > +}
-> > +
-> > +static void thunderx2_uncore_read(struct perf_event *event)
-> > +{
-> > +     unsigned long irqflags;
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore =
-> > +                     pmu_to_thunderx2_pmu_uncore(event->pmu);
-> > +
-> > +     raw_spin_lock_irqsave(&pmu_uncore->uncore_dev->lock, irqflags);
-> > +     thunderx2_uncore_update(event);
-> > +     raw_spin_unlock_irqrestore(&pmu_uncore->uncore_dev->lock, irqflags);
-> > +}
-> > +
-> > +static enum hrtimer_restart thunderx2_uncore_hrtimer_callback(
-> > +             struct hrtimer *hrt)
-> > +{
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
-> > +     unsigned long irqflags;
-> > +     int idx;
-> > +     bool restart_timer = false;
-> > +
-> > +     pmu_uncore = container_of(hrt, struct thunderx2_pmu_uncore_channel,
-> > +                     hrtimer);
-> > +
-> > +     raw_spin_lock_irqsave(&pmu_uncore->uncore_dev->lock, irqflags);
-> > +     for_each_set_bit(idx, pmu_uncore->active_counters,
-> > +                     pmu_uncore->uncore_dev->max_counters) {
-> > +             struct perf_event *event = pmu_uncore->events[idx];
->
-> Do we need to check if the "event" is not NULL ? Couldn't this race with
-> an event_del() operation ?
+Why not setting msg->status = -EINTR here, but returning an error? ...
 
-i dont think so, i have not come across any such race condition during
-my testing.
-
+> +               }
+> +       } else {
+> +               ms = 8LL * 1000LL * xfer->len;
+> +               do_div(ms, xfer->speed_hz);
+> +               ms += ms + 200; /* some tolerance */
+> +
+> +               if (ms > UINT_MAX)
+> +                       ms = UINT_MAX;
+> +
+> +               ms = wait_for_completion_timeout(&ctlr->xfer_completion,
+> +                                                msecs_to_jiffies(ms));
+> +
+> +               if (ms == 0) {
+> +                       SPI_STATISTICS_INCREMENT_FIELD(statm,
+> +                                                      timedout);
+> +                       SPI_STATISTICS_INCREMENT_FIELD(stats,
+> +                                                      timedout);
+> +                       dev_err(&msg->spi->dev,
+> +                               "SPI transfer timed out\n");
+> +                       msg->status = -ETIMEDOUT;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  /*
+>   * spi_transfer_one_message - Default implementation of transfer_one_message()
+>   *
+> @@ -1006,7 +1044,6 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
+>         struct spi_transfer *xfer;
+>         bool keep_cs = false;
+>         int ret = 0;
+> -       unsigned long long ms = 1;
+>         struct spi_statistics *statm = &ctlr->statistics;
+>         struct spi_statistics *stats = &msg->spi->statistics;
 >
-> > +
-> > +             thunderx2_uncore_update(event);
-> > +             restart_timer = true;
-> > +     }
-> > +     raw_spin_unlock_irqrestore(&pmu_uncore->uncore_dev->lock, irqflags);
-> > +
-> > +     if (restart_timer)
-> > +             hrtimer_forward_now(hrt,
-> > +                     ns_to_ktime(
-> > +                             pmu_uncore->uncore_dev->hrtimer_interval));
-> > +
-> > +     return restart_timer ? HRTIMER_RESTART : HRTIMER_NORESTART;
-> > +}
-> > +
-> > +static int thunderx2_pmu_uncore_register(
-> > +             struct thunderx2_pmu_uncore_channel *pmu_uncore)
-> > +{
-> > +     struct device *dev = pmu_uncore->uncore_dev->dev;
-> > +     char *name = pmu_uncore->uncore_dev->name;
-> > +     int channel = pmu_uncore->channel;
-> > +
-> > +     /* Perf event registration */
-> > +     pmu_uncore->pmu = (struct pmu) {
-> > +             .attr_groups    = pmu_uncore->uncore_dev->attr_groups,
-> > +             .task_ctx_nr    = perf_invalid_context,
-> > +             .event_init     = thunderx2_uncore_event_init,
-> > +             .add            = thunderx2_uncore_add,
-> > +             .del            = thunderx2_uncore_del,
-> > +             .start          = thunderx2_uncore_start,
-> > +             .stop           = thunderx2_uncore_stop,
-> > +             .read           = thunderx2_uncore_read,
+> @@ -1035,28 +1072,11 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
+>                                 goto out;
+>                         }
 >
-> You must fill in the module field of the PMU to prevent this module from
-> being unloaded while it is in use.
-
-thanks, i will add it.
+> -                       if (ret > 0) {
+> -                               ret = 0;
+> -                               ms = 8LL * 1000LL * xfer->len;
+> -                               do_div(ms, xfer->speed_hz);
+> -                               ms += ms + 200; /* some tolerance */
+> -
+> -                               if (ms > UINT_MAX)
+> -                                       ms = UINT_MAX;
+> +                       if (ret > 0)
+> +                               ret = spi_transfer_wait(ctlr, msg, xfer);
 >
-> > +     };
-> > +
-> > +     pmu_uncore->pmu.name = devm_kasprintf(dev, GFP_KERNEL,
-> > +                     "%s_%d", name, channel);
-> > +
-> > +     return perf_pmu_register(&pmu_uncore->pmu, pmu_uncore->pmu.name, -1);
-> > +}
-> > +
-> > +static int thunderx2_pmu_uncore_add(struct thunderx2_pmu_uncore_dev *uncore_dev,
-> > +             int channel)
-> > +{
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
-> > +     int ret, cpu;
-> > +
-> > +     pmu_uncore = devm_kzalloc(uncore_dev->dev, sizeof(*pmu_uncore),
-> > +                     GFP_KERNEL);
-> > +     if (!pmu_uncore)
-> > +             return -ENOMEM;
-> > +
-> > +     cpu = cpumask_any_and(cpumask_of_node(uncore_dev->node),
-> > +                     cpu_online_mask);
-> > +     if (cpu >= nr_cpu_ids)
-> > +             return -EINVAL;
->
-> Do we need to fail this here ? We could always add this back when a CPU
-> comes online (e.g, maxcpus=n). We do have cpu-hotplug call backs anyway.
+> -                               ms = wait_for_completion_timeout(&ctlr->xfer_completion,
+> -                                                                msecs_to_jiffies(ms));
+> -                       }
+> -
+> -                       if (ms == 0) {
+> -                               SPI_STATISTICS_INCREMENT_FIELD(statm,
+> -                                                              timedout);
+> -                               SPI_STATISTICS_INCREMENT_FIELD(stats,
+> -                                                              timedout);
+> -                               dev_err(&msg->spi->dev,
+> -                                       "SPI transfer timed out\n");
+> -                               msg->status = -ETIMEDOUT;
+> -                       }
+> +                       if (ret < 0)
+> +                               return ret;
 
-we want to fail, since we dont have any cpu to serve.
+... which will return here, skipping all finalization and cleanup below?
 
->
-> > +static acpi_status thunderx2_pmu_uncore_dev_add(acpi_handle handle, u32 level,
-> > +                                 void *data, void **return_value)
-> > +{
-> > +     struct thunderx2_pmu_uncore_dev *uncore_dev;
-> > +     struct acpi_device *adev;
-> > +     enum thunderx2_uncore_type type;
-> > +     int channel;
-> > +
-> > +     if (acpi_bus_get_device(handle, &adev))
-> > +             return AE_OK;
-> > +     if (acpi_bus_get_status(adev) || !adev->status.present)
-> > +             return AE_OK;
-> > +
-> > +     type = get_uncore_device_type(adev);
-> > +     if (type == PMU_TYPE_INVALID)
-> > +             return AE_OK;
-> > +
-> > +     uncore_dev = init_pmu_uncore_dev((struct device *)data, handle,
-> > +                     adev, type);
-> > +
-> > +     if (!uncore_dev)
-> > +             return AE_ERROR;
-> > +
-> > +     for (channel = 0; channel < uncore_dev->max_channels; channel++) {
-> > +             if (thunderx2_pmu_uncore_add(uncore_dev, channel)) {
-> > +                     /* Can't add the PMU device, abort */
-> > +                     return AE_ERROR;
-> > +             }
-> > +     }
-> > +     return AE_OK;
-> > +}
-> > +
-> > +static int thunderx2_uncore_pmu_offline_cpu(unsigned int cpu,
-> > +             struct hlist_node *node)
-> > +{
-> > +     int new_cpu;
-> > +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
-> > +
-> > +     pmu_uncore = hlist_entry_safe(node,
-> > +                     struct thunderx2_pmu_uncore_channel, node);
-> > +     if (cpu != pmu_uncore->cpu)
-> > +             return 0;
-> > +
-> > +     new_cpu = cpumask_any_and(
-> > +                     cpumask_of_node(pmu_uncore->uncore_dev->node),
-> > +                     cpu_online_mask);
-> > +     if (new_cpu >= nr_cpu_ids)
-> > +             return 0;
-> > +
-> > +     pmu_uncore->cpu = new_cpu;
-> > +     perf_pmu_migrate_context(&pmu_uncore->pmu, cpu, new_cpu);
-> > +     return 0;
-> > +}
-> > +
-> > +static const struct acpi_device_id thunderx2_uncore_acpi_match[] = {
-> > +     {"CAV901C", 0},
-> > +     {},
-> > +};
-> > +MODULE_DEVICE_TABLE(acpi, thunderx2_uncore_acpi_match);
-> > +
-> > +static int thunderx2_uncore_probe(struct platform_device *pdev)
-> > +{
-> > +     struct device *dev = &pdev->dev;
-> > +     acpi_handle handle;
-> > +     acpi_status status;
-> > +
-> > +     set_dev_node(dev, acpi_get_node(ACPI_HANDLE(dev)));
-> > +
-> > +     /* Make sure firmware supports DMC/L3C set channel smc call */
-> > +     if (test_uncore_select_channel_early(dev))
-> > +             return -ENODEV;
-> > +
-> > +     if (!has_acpi_companion(dev))
-> > +             return -ENODEV;
-> > +
-> > +     handle = ACPI_HANDLE(dev);
-> > +     if (!handle)
-> > +             return -EINVAL;
-> > +
-> > +     /* Walk through the tree for all PMU UNCORE devices */
-> > +     status = acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, 1,
-> > +                                  thunderx2_pmu_uncore_dev_add,
-> > +                                  NULL, dev, NULL);
-> > +     if (ACPI_FAILURE(status)) {
-> > +             dev_err(dev, "failed to probe PMU devices\n");
-> > +             return_ACPI_STATUS(status);
-> > +     }
-> > +
-> > +     dev_info(dev, "node%d: pmu uncore registered\n", dev_to_node(dev));
-> > +     return 0;
-> > +}
-> > +
-> > +static struct platform_driver thunderx2_uncore_driver = {
-> > +     .probe = thunderx2_uncore_probe,
-> > +     .driver = {
-> > +             .name           = "thunderx2-uncore-pmu",
-> > +             .acpi_match_table = ACPI_PTR(thunderx2_uncore_acpi_match),
-> > +     },
-> > +};
->
-> Don't we need to unregister the pmu's when we remove the module ?
+>                 } else {
+>                         if (xfer->len)
+>                                 dev_err(&msg->spi->dev,
 
-it is built in module at present, no unload is supported.
-Anyway i am adding in next version , since i am going for loadable module.
+Gr{oetje,eeting}s,
 
->
-> Suzuki
+                        Geert
 
-thanks
-Ganapat
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
