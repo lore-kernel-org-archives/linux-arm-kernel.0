@@ -1,68 +1,95 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Oct 2018 15:56:11 +0100 (BST)
-Subject: Applied "spi: rockchip: initialize dma_slave_config properly" to the
- spi tree
-In-Reply-To: <20181010090038.20834-2-kernel@esmil.dk>
-Message-ID: <20181011145611.E2B9B11223ED@debutante.sirena.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 11 Oct 2018 17:05:07 +0200
+Subject: [PATCH v9 05/11] of: base: Add of_get_cpu_state_node() to get
+ idle states for a CPU node
+In-Reply-To: <20181010150331.GB4844@e107155-lin>
+References: <20181003143824.13059-1-ulf.hansson@linaro.org>
+ <20181003143824.13059-6-ulf.hansson@linaro.org>
+ <20181010150331.GB4844@e107155-lin>
+Message-ID: <CAPDyKFq7bNJM5Y4y78tnOEvg7ntmYFtJoDvFH8uR2yUUK9o4HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 10 October 2018 at 17:03, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On Wed, Oct 03, 2018 at 04:38:18PM +0200, Ulf Hansson wrote:
+>> The CPU's idle state nodes are currently parsed at the common cpuidle DT
+>> library, but also when initializing back-end data for the arch specific CPU
+>> operations, as in the PSCI driver case.
+>>
+>> To avoid open-coding, let's introduce of_get_cpu_state_node(), which takes
+>> the device node for the CPU and the index to the requested idle state node,
+>> as in-parameters. In case a corresponding idle state node is found, it
+>> returns the node with the refcount incremented for it, else it returns
+>> NULL.
+>>
+>> Moreover, for ARM, there are two generic methods, to describe the CPU's
+>> idle states, either via the flattened description through the
+>> "cpu-idle-states" binding [1] or via the hierarchical layout, using the
+>> "power-domains" and the "domain-idle-states" bindings [2]. Hence, let's
+>> take both options into account.
+>>
+>> [1]
+>> Documentation/devicetree/bindings/arm/idle-states.txt
+>> [2]
+>> Documentation/devicetree/bindings/arm/psci.txt
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: Lina Iyer <ilina@codeaurora.org>
+>> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+>> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  drivers/of/base.c  | 35 +++++++++++++++++++++++++++++++++++
+>>  include/linux/of.h |  8 ++++++++
+>>  2 files changed, 43 insertions(+)
+>>
+>> diff --git a/drivers/of/base.c b/drivers/of/base.c
+>> index 74eaedd5b860..bf1d5fa34899 100644
+>> --- a/drivers/of/base.c
+>> +++ b/drivers/of/base.c
+>> @@ -424,6 +424,41 @@ int of_cpu_node_to_id(struct device_node *cpu_node)
+>>  }
+>>  EXPORT_SYMBOL(of_cpu_node_to_id);
+>>
+>> +/**
+>> + * of_get_cpu_state_node - Get CPU's idle state node at the given index
+>> + *
+>> + * @cpu_node: The device node for the CPU
+>> + * @index: The index in the list of the idle states
+>> + *
+>> + * Two generic methods can be used to describe a CPU's idle states, either via
+>> + * a flattened description through the "cpu-idle-states" binding or via the
+>> + * hierarchical layout, using the "power-domains" and the "domain-idle-states"
+>> + * bindings. This function check for both and returns the idle state node for
+>> + * the requested index.
+>> + *
+>> + * In case and idle state node is found at index, the refcount incremented for
+>> + * it, so call of_node_put() on it when done. Returns NULL if not found.
+>> + */
+>> +struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
+>
+> No strong opinion but I am wondering if it makes sense to get cpu
+> logical index and fetch the cpu of_node here to contain the refcount on
+> it within this function while we are trying to consolidate. I do see
+> that may not be so useful in psci.c but keeping refcount for cpu of_node
+> here keeps the user free from that.
 
-   spi: rockchip: initialize dma_slave_config properly
+I see your point.
 
-has been applied to the spi tree at
+However, I am hesitating doing that change, as it would be a waste for
+the psci case, but I also think that it may becomes a bit less
+straight forward to use this helper function.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+Although, no strong opinions from my side either, but since Rob is
+happy with this, there is no need to change it, I think.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+>
+> I am fine as it is if there are reasons not to do that.
+>
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+Right.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From dd8fd2cbc73f8650f651da71fc61a6e4f30c1566 Mon Sep 17 00:00:00 2001
-From: Huibin Hong <huibin.hong@rock-chips.com>
-Date: Wed, 10 Oct 2018 11:00:32 +0200
-Subject: [PATCH] spi: rockchip: initialize dma_slave_config properly
-
-The rxconf and txconf structs are allocated on the
-stack, so make sure we zero them before filling out
-the relevant fields.
-
-Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
-Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-rockchip.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index fdcf3076681b..185bbdce62b1 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -445,6 +445,9 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 	struct dma_slave_config rxconf, txconf;
- 	struct dma_async_tx_descriptor *rxdesc, *txdesc;
- 
-+	memset(&rxconf, 0, sizeof(rxconf));
-+	memset(&txconf, 0, sizeof(txconf));
-+
- 	spin_lock_irqsave(&rs->lock, flags);
- 	rs->state &= ~RXBUSY;
- 	rs->state &= ~TXBUSY;
--- 
-2.19.0.rc2
+Kind regards
+Uffe
