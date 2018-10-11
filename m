@@ -1,23 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Oct 2018 15:27:39 +0200
-Subject: [PATCH / PULL 4/4] arm64: exynos: Enable generic power domain
- support
-In-Reply-To: <20181010182558.7034-5-krzk@kernel.org>
-References: <20181010182558.7034-1-krzk@kernel.org>
- <20181010182558.7034-5-krzk@kernel.org>
-Message-ID: <CAK8P3a3Zm0TA2LUenrmDusPpCMa2c1B3-TY3VSjYzaM26_=t5g@mail.gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 11 Oct 2018 15:30:09 +0200
+Subject: [PATCH 1/5] mm/sparse: add common helper to mark all memblocks
+ present
+In-Reply-To: <20181005161642.2462-2-logang@deltatee.com>
+References: <20181005161642.2462-1-logang@deltatee.com>
+ <20181005161642.2462-2-logang@deltatee.com>
+Message-ID: <20181011133009.GA7276@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/18, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> From: Marek Szyprowski <m.szyprowski@samsung.com>
->
-> Generic power domains are needed to enable support for Exynos power
-> domains.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> +	for_each_memblock(memory, reg) {
+> +		int nid = memblock_get_region_node(reg);
+> +
+> +		memory_present(nid, memblock_region_memory_base_pfn(reg),
+> +			       memblock_region_memory_end_pfn(reg));
 
-Applied to next/soc, thanks!
+Any reason you have a local variable for the node id while you happily
+get away without one for the others?  Why not simply:
 
-      Arnd
+	for_each_memblock(memory, reg) {
+		memory_present(memblock_get_region_node(reg)
+			       memblock_region_memory_base_pfn(reg),
+			       memblock_region_memory_end_pfn(reg));
+	}
