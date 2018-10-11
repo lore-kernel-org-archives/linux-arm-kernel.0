@@ -1,87 +1,141 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Thu, 11 Oct 2018 11:49:18 +0000
-Subject: [PATCH v3 2/3] perf: add arm64 smmuv3 pmu driver
-In-Reply-To: <d649de4e-e0cc-4188-5e56-fea1488b9d6b@arm.com>
-References: <20180921150803.25444-1-shameerali.kolothum.thodi@huawei.com>
- <20180921150803.25444-3-shameerali.kolothum.thodi@huawei.com>
- <d649de4e-e0cc-4188-5e56-fea1488b9d6b@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83879AD29@FRAEML521-MBX.china.huawei.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 11 Oct 2018 15:03:36 +0300
+Subject: [RFC] mmc: host: sdhci-msm: Use the interconnect API
+Message-ID: <20181011120336.9129-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The interconnect API provides an interface for consumer drivers to express
+their bandwidth needs in the SoC. This data is aggregated and the on-chip
+interconnect hardware is configured to the appropriate power/performance
+profile.
 
+Use the interconnect API to get() the path between the endpoints used for
+data transfers by the SD host controller and report the needed bandwidth
+based on the clock rate, bus width and mode.
 
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: 11 October 2018 12:26
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>;
-> lorenzo.pieralisi at arm.com
-> Cc: will.deacon at arm.com; mark.rutland at arm.com; Guohanjun (Hanjun Guo)
-> <guohanjun@huawei.com>; John Garry <john.garry@huawei.com>;
-> pabba at codeaurora.org; vkilari at codeaurora.org; rruigrok at codeaurora.org;
-> linux-acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Linuxarm <linuxarm@huawei.com>;
-> neil.m.leeder at gmail.com
-> Subject: Re: [PATCH v3 2/3] perf: add arm64 smmuv3 pmu driver
-> 
-> Hi Shameer,
-> 
-> One more thing...
-> 
-> On 21/09/18 16:08, Shameer Kolothum wrote:
-> [...]
-> > +static int smmu_pmu_probe(struct platform_device *pdev)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu;
-> > +	struct resource *res_0, *res_1;
-> > +	u32 cfgr, reg_size;
-> > +	u64 ceid_64[2];
-> > +	int irq, err;
-> > +	char *name;
-> > +	struct device *dev = &pdev->dev;
-> > +
-> > +	smmu_pmu = devm_kzalloc(dev, sizeof(*smmu_pmu), GFP_KERNEL);
-> > +	if (!smmu_pmu)
-> > +		return -ENOMEM;
-> > +
-> > +	smmu_pmu->dev = dev;
-> > +
-> > +	platform_set_drvdata(pdev, smmu_pmu);
-> > +	smmu_pmu->pmu = (struct pmu) {
-> > +		.task_ctx_nr    = perf_invalid_context,
-> > +		.pmu_enable	= smmu_pmu_enable,
-> > +		.pmu_disable	= smmu_pmu_disable,
-> > +		.event_init	= smmu_pmu_event_init,
-> > +		.add		= smmu_pmu_event_add,
-> > +		.del		= smmu_pmu_event_del,
-> > +		.start		= smmu_pmu_event_start,
-> > +		.stop		= smmu_pmu_event_stop,
-> > +		.read		= smmu_pmu_event_read,
-> > +		.attr_groups	= smmu_pmu_attr_grps,
-> > +	};
-> > +
-> > +	res_0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	smmu_pmu->reg_base = devm_ioremap_resource(dev, res_0);
-> 
-> We still need to solve the resource-claiming issue when one (or both) of
-> the PMCG pages belongs to the parent device's register space. I recall
-> we chucked a few nascent ideas about before; did anyone manage to come
-> up with anything concrete?
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+---
 
-Right. We had an early version of an evaluation board where we had this issue, 
-but this has been fixed in an updated revision and is not a priority for now. 
+This depends on the interconnect API: https://lkml.org/lkml/2018/8/31/444
 
-Agree that this is an issue as the spec doesn?t forbid using parent SMMU register
-space and it looks like not an easy one to solve either. The initial idea was setting
-the PMCG as a child dev, but that didn?t help.
+TODO: Use macros for converting and rounding to icc units instead of
+converting between kilobits and kilobytes in the consumer drivers.
 
-I had an off list discussion with Lorenzo on this, but nothing concrete.
+ drivers/mmc/host/sdhci-msm.c | 46 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 44 insertions(+), 2 deletions(-)
 
-Lorenzo, 
-
-Please update if you have any new ideas/thoughts on this.
-
-Thanks,
-Shameer
-
-> Robin.
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index 3cc8bfee6c18..8ca99ccdb035 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -20,6 +20,7 @@
+ #include <linux/mmc/mmc.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
++#include <linux/interconnect.h>
+ #include <linux/iopoll.h>
+ #include <linux/regulator/consumer.h>
+ 
+@@ -258,6 +259,7 @@ struct sdhci_msm_host {
+ 	bool mci_removed;
+ 	const struct sdhci_msm_variant_ops *var_ops;
+ 	const struct sdhci_msm_offset *offset;
++	struct icc_path *path;
+ };
+ 
+ static const struct sdhci_msm_offset *sdhci_priv_msm_offset(struct sdhci_host *host)
+@@ -1627,6 +1629,30 @@ static const struct sdhci_msm_variant_info sdhci_msm_v5_var = {
+ 	.offset = &sdhci_msm_v5_offset,
+ };
+ 
++static int sdhci_msm_icc_update(struct sdhci_msm_host *msm_host)
++{
++	struct sdhci_host *host = dev_get_drvdata(&msm_host->pdev->dev);
++	struct mmc_host *mmc = host->mmc;
++	struct mmc_ios *ios = &mmc->ios;
++	unsigned char bus_width = 1 << ios->bus_width;
++	u32 bw;
++
++	/* calculate the needed bandwidth */
++	bw = host->clock;
++
++	if (host->timing == MMC_TIMING_UHS_DDR50 ||
++	    host->timing == MMC_TIMING_MMC_DDR52) {
++		bw *= 2;
++	}
++
++	if (bus_width == 4)
++		bw /= 2;
++	else if (bus_width == 1)
++		bw /= 8;
++
++	return icc_set(msm_host->path, 0, bw / 1000);
++}
++
+ static const struct of_device_id sdhci_msm_dt_match[] = {
+ 	{.compatible = "qcom,sdhci-msm-v4", .data = &sdhci_msm_mci_var},
+ 	{.compatible = "qcom,sdhci-msm-v5", .data = &sdhci_msm_v5_var},
+@@ -1698,16 +1724,27 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ 
+ 	msm_host->saved_tuning_phase = INVALID_TUNING_PHASE;
+ 
++	msm_host->path = of_icc_get(&pdev->dev, "sdhc-mem");
++	if (IS_ERR(msm_host->path)) {
++		ret = PTR_ERR(msm_host->path);
++		goto pltfm_free;
++	}
++	ret = sdhci_msm_icc_update(msm_host);
++	if (ret) {
++		dev_warn(&pdev->dev, "Interconnect setup failed (%d)\n", ret);
++		goto icc_disable;
++	}
++
+ 	/* Setup SDCC bus voter clock. */
+ 	msm_host->bus_clk = devm_clk_get(&pdev->dev, "bus");
+ 	if (!IS_ERR(msm_host->bus_clk)) {
+ 		/* Vote for max. clk rate for max. performance */
+ 		ret = clk_set_rate(msm_host->bus_clk, INT_MAX);
+ 		if (ret)
+-			goto pltfm_free;
++			goto icc_disable;
+ 		ret = clk_prepare_enable(msm_host->bus_clk);
+ 		if (ret)
+-			goto pltfm_free;
++			goto icc_disable;
+ 	}
+ 
+ 	/* Setup main peripheral bus clock */
+@@ -1883,6 +1920,8 @@ static int sdhci_msm_probe(struct platform_device *pdev)
+ bus_clk_disable:
+ 	if (!IS_ERR(msm_host->bus_clk))
+ 		clk_disable_unprepare(msm_host->bus_clk);
++icc_disable:
++	icc_put(msm_host->path);
+ pltfm_free:
+ 	sdhci_pltfm_free(pdev);
+ 	return ret;
+@@ -1902,6 +1941,7 @@ static int sdhci_msm_remove(struct platform_device *pdev)
+ 	pm_runtime_disable(&pdev->dev);
+ 	pm_runtime_put_noidle(&pdev->dev);
+ 
++	icc_put(msm_host->path);
+ 	clk_bulk_disable_unprepare(ARRAY_SIZE(msm_host->bulk_clks),
+ 				   msm_host->bulk_clks);
+ 	if (!IS_ERR(msm_host->bus_clk))
+@@ -1917,6 +1957,7 @@ static int sdhci_msm_runtime_suspend(struct device *dev)
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+ 
++	icc_set(msm_host->path, 0, 0);
+ 	clk_bulk_disable_unprepare(ARRAY_SIZE(msm_host->bulk_clks),
+ 				   msm_host->bulk_clks);
+ 
+@@ -1929,6 +1970,7 @@ static int sdhci_msm_runtime_resume(struct device *dev)
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+ 
++	sdhci_msm_icc_update(msm_host);
+ 	return clk_bulk_prepare_enable(ARRAY_SIZE(msm_host->bulk_clks),
+ 				       msm_host->bulk_clks);
+ }
