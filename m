@@ -1,46 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Oct 2018 16:20:49 +0200
-Subject: [PATCH] MAINTAINERS: Assign myself as a maintainer of ARM/LPC18XX
- architecture
-In-Reply-To: <CAK8P3a3pbpEX1BjKvn179pTYtYEtiQnd=SmD5NYkAtpdZAonkA@mail.gmail.com>
-References: <20181011123116.24885-1-vz@mleia.com>
- <CAK8P3a3pbpEX1BjKvn179pTYtYEtiQnd=SmD5NYkAtpdZAonkA@mail.gmail.com>
-Message-ID: <5bd0530d-13d9-d25d-d0f4-f48e39174991@linaro.org>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 11 Oct 2018 15:23:05 +0100
+Subject: [RFC 17/17] arm64: compile the kernel with ptrauth
+ -msign-return-address
+In-Reply-To: <20181005084754.20950-18-kristina.martsenko@arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-18-kristina.martsenko@arm.com>
+Message-ID: <d0e36e1f-fa1a-f4ab-5a83-11e095801fef@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2018 16:11, Arnd Bergmann wrote:
-> On 10/11/18, Vladimir Zapolskiy <vz@mleia.com> wrote:
->> To all appearance Joachim Eastwood abandoned the maintenance of NXP
->> LPC18xx/LPC43xx archtecture about two years ago, and for me it would be
->> possible to continue the support, fortunately the quality of platform
->> drivers written by Joachim is exceptionally high.
->>
->> The change is based on https://lkml.org/lkml/2018/9/24/1398 discussion.
->>
->> At the same time two redundant explicit driver file paths are dropped
->> from the list, clk-lpc18xx* drivers are covered by "lpc18xx" search
->> pattern and timer-lpc32xx driver is covered by "lpc32xx" pattern and it
->> goes into ARM/LPC32XX entry, which is also under my wing, in other words
->> LPC18xx/LPC43xx clocksource and CCF drivers will remain maintained.
->>
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> Cc: Joachim Eastwood <manabian@gmail.com>
->> ---
-> 
-> I could not automatically apply this with 'git am', not sure what the
-> problem was, but I managed to apply it by patching the file manually.
-> 
-> Thanks for taking over the platform!
+Hi Kristina,
 
-Yes, thanks !
+On 05/10/18 09:47, Kristina Martsenko wrote:
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 106039d25e2f..dbcd43ea99d8 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -56,6 +56,10 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+>  KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+>  KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+>  
+> +ifeq ($(CONFIG_ARM64_PTR_AUTH),y)
+> +KBUILD_CFLAGS	+= -msign-return-address=all
+> +endif
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Should not it be done via cc-option so old toolchains keep working [1]?
 
+[1]
+$ aarch64-linux-gnu-gcc --version
+aarch64-linux-gnu-gcc (Linaro GCC 2014.11) 4.9.3 20141031 (prerelease)
+Copyright (C) 2014 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+$ aarch64-linux-gnu-gcc -msign-return-address=all
+aarch64-linux-gnu-gcc: error: unrecognized command line option '-msign-return-address=all'
+...
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Cheers
+Vladimir
