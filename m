@@ -1,84 +1,100 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Thu, 11 Oct 2018 14:21:17 -0600
-Subject: [PATCH 5/5] RISC-V: Implement sparsemem
-In-Reply-To: <83cfd2d7-b840-b0c6-594e-8b39be8177c1@deltatee.com>
-References: <20181005161642.2462-1-logang@deltatee.com>
- <20181005161642.2462-6-logang@deltatee.com> <20181011133730.GB7276@lst.de>
- <8cea5ffa-5fbf-8ea2-b673-20e2d09a910d@deltatee.com>
- <83cfd2d7-b840-b0c6-594e-8b39be8177c1@deltatee.com>
-Message-ID: <cfb2af87-7e47-539c-d149-2599f23b663a@deltatee.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 11 Oct 2018 16:36:01 -0400 (EDT)
+Subject: [PATCH] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
+In-Reply-To: <20181011111652.31840-1-vincent.whitchurch@axis.com>
+References: <20181011111652.31840-1-vincent.whitchurch@axis.com>
+Message-ID: <nycvar.YSQ.7.76.1810111621450.1498@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 11 Oct 2018, Vincent Whitchurch wrote:
 
-
-On 2018-10-11 12:45 p.m., Logan Gunthorpe wrote:
-> Ok, I spoke too soon...
+> ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
+> ldr/str instructions in copy_{from/to}_user.  They are currently
+> unnecessarily using single ldr/str instructions and can use ldm/stm
+> instructions instead like memcpy does (but with appropriate fixup
+> tables).
 > 
-> Having this define next to the struct page definition works great for
-> riscv. However, making that happen in arm64 seems to be a nightmare. The
-> include chain in arm64 is tangled up so much that including mm_types
-> where this is needed seems to be extremely difficult.
+> function                                     old     new   delta
+> arm_copy_from_user                           924     824    -100
+> __copy_to_user_std                           936     824    -112
+> 
+> This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
+> about 4% on my Cortex-A9.
+> 
+> before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
+> before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
+> before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
+> before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
+> before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
+> before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
+> before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
+> before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
+> before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
+> before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
+> 
+>  after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
+> 
+> Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+> ---
 
-Sorry for all the unnecessary churn but I've figured it out. Just had to
-realize we only need mm_types.h to be included where
-STRUCT_PAGE_MAX_SHIFT is finally expanded. Thus we only need it in one
-more spot (fixmap.h). See below.
+[...]
 
-Thanks,
+> index a826df3d3814..7751072d409a 100644
+> --- a/arch/arm/lib/copy_from_user.S
+> +++ b/arch/arm/lib/copy_from_user.S
+> @@ -34,13 +34,19 @@
+>   *	Number of bytes NOT copied.
+>   */
+>  
+> +#ifdef CONFIG_CPU_USE_DOMAINS
+>  #ifndef CONFIG_THUMB2_KERNEL
+>  #define LDR1W_SHIFT	0
+>  #else
+>  #define LDR1W_SHIFT	1
+>  #endif
+> +#else
+> +#define LDR1W_SHIFT	0
+> +#endif
+> +
+>  #define STR1W_SHIFT	0
+>  
+> +#ifdef CONFIG_CPU_USE_DOMAINS
+>  	.macro ldr1w ptr reg abort
 
-Logan
+I'd suggest you do the grouping differently. The LDR1W_SHIFT and 
+STR1W_SHIFT definitions are direct properties of the ldr1w and str1w 
+macro implementations, and not necessarily whether you have 
+CONFIG_CPU_USE_DOMAINS defined.
 
---
+In other words, I'd prefer to see:
+
+#ifdef CONFIG_CPU_USE_DOMAINS
+
+#define LDR1W_SHIFT ...
+#define STR1W_SHIFT ...
+
+	.macro ldr1w ...
+	...
+
+#else
+
+#define LDR1W_SHIFT ...
+#define STR1W_SHIFT ...
+
+	.macro ldr1w ...
+	...
+
+#endif
 
 
-diff --git a/arch/arm64/include/asm/memory.h
-b/arch/arm64/include/asm/memory.h
-index b96442960aea..f0a5c9531e8b 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -34,15 +34,6 @@
-  */
- #define PCI_IO_SIZE            SZ_16M
-
--/*
-- * Log2 of the upper bound of the size of a struct page. Used for sizing
-- * the vmemmap region only, does not affect actual memory footprint.
-- * We don't use sizeof(struct page) directly since taking its size here
-- * requires its definition to be available at this point in the inclusion
-- * chain, and it may not be a power of 2 in the first place.
-- */
--#define STRUCT_PAGE_MAX_SHIFT  6
--
- /*
-  * VMEMMAP_SIZE - allows the whole linear region to be covered by
-  *                a struct page array
-diff --git a/include/asm-generic/fixmap.h b/include/asm-generic/fixmap.h
-index 827e4d3bbc7a..8cc7b09c1bc7 100644
---- a/include/asm-generic/fixmap.h
-+++ b/include/asm-generic/fixmap.h
-@@ -16,6 +16,7 @@
- #define __ASM_GENERIC_FIXMAP_H
-
- #include <linux/bug.h>
-+#include <linux/mm_types.h>
-
- #define __fix_to_virt(x)       (FIXADDR_TOP - ((x) << PAGE_SHIFT))
- #define __virt_to_fix(x)       ((FIXADDR_TOP - ((x)&PAGE_MASK)) >>
-PAGE_SHIFT)
-diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
-index 5ed8f6292a53..d1c3cde8c201 100644
---- a/include/linux/mm_types.h
-+++ b/include/linux/mm_types.h
-@@ -206,6 +206,11 @@ struct page {
- #endif
- } _struct_page_alignment;
-
-+/*
-+ * Used for sizing the vmemmap region on some architectures.
-+ */
-+#define STRUCT_PAGE_MAX_SHIFT  ilog2(roundup_pow_of_two(sizeof(struct
-page)))
-+
- #define PAGE_FRAG_CACHE_MAX_SIZE       __ALIGN_MASK(32768, ~PAGE_MASK)
- #define PAGE_FRAG_CACHE_MAX_ORDER      get_order(PAGE_FRAG_CACHE_MAX_SIZE)
+Nicolas
