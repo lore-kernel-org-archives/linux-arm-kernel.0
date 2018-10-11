@@ -1,35 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Oct 2018 16:06:01 +0200
-Subject: [GIT PULL 2/4] arm64: dts: exynos: Stuff for v4.20
-In-Reply-To: <20181010182558.7034-3-krzk@kernel.org>
-References: <20181010182558.7034-1-krzk@kernel.org>
- <20181010182558.7034-3-krzk@kernel.org>
-Message-ID: <CAK8P3a02M-1sPeRY+gfouVJptxSGWuB714C3YwgXuT4O=NMauQ@mail.gmail.com>
+Date: Thu, 11 Oct 2018 16:07:04 +0200
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.20, part 3, take 2
+In-Reply-To: <20181010151002.10645-1-dinguyen@kernel.org>
+References: <20181010151002.10645-1-dinguyen@kernel.org>
+Message-ID: <CAK8P3a3vrTR1oDuvh-oEiOTUQJM+nvy1HxenTGN3PXg0+eszvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/18, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> The following changes since commit
-> 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+On 10/10/18, Dinh Nguyen <dinguyen@kernel.org> wrote:
+> Hi Arnd, Kevin, and Olof:
 >
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> Please pull in these additional patches for v4.20.
+>
+> Thanks,
+> Dinh
+>
+> The following changes since commit
+> 20373e0cb8f7d540ae082a8026f5ae7c27cc6cb3:
+>
+>   ARM: dts: socfpga: add timer resets for SoCFPGA platform (2018-09-17
+> 10:11:28 -0500)
 >
 > are available in the Git repository at:
 >
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git
-> tags/samsung-dt64-4.20
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
+> tags/socfpga_updates_for_v4.20_part3
 >
-> for you to fetch changes up to 2352ae1306974528d11fb9c7dbf2cf91e0dd2c31:
+> for you to fetch changes up to 2a44d6511a0104e9ff628e73cf4381e5664a8219:
 >
->   arm64: ARM: dts: exynos: Remove double SD card detect pin inversion on TM2
-> (2018-09-24 19:30:54 +0200)
+>   ARM: dts: socfgpa: remove ethernet aliases from dtsi (2018-10-09 13:40:28
+> -0500)
 >
 > ----------------------------------------------------------------
-> Samsung DTS ARM64 changes for v4.20
->
-> 1. Use graph between USB-PHY and MUIC.
-> 2. Cleanup of SD card detect pin level.
+> SoCFPGA DTS updates for v4.20, part 3
+> - Add ethernet aliases for Stratix10
+> - Move ethernet aliases from socfpga dtsi
+> - Correct system manager register size for Stratix10
+> - Correct SDRAM node address for Arria10
+
 
 Pulled into next/dt, thanks!
 
-     Arnd
+      Arnd
