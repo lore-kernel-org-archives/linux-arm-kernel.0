@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Oct 2018 15:56:00 +0100 (BST)
-Subject: Applied "spi: rockchip: mark use_dma as bool" to the spi tree
-In-Reply-To: <20181010090038.20834-6-kernel@esmil.dk>
-Message-ID: <20181011145600.9F3DC11223ED@debutante.sirena.org.uk>
+Date: Thu, 11 Oct 2018 15:56:04 +0100 (BST)
+Subject: Applied "spi: rockchip: remove unneeded dma_caps" to the spi tree
+In-Reply-To: <20181010090038.20834-5-kernel@esmil.dk>
+Message-ID: <20181011145604.4721E11223ED@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: rockchip: mark use_dma as bool
+   spi: rockchip: remove unneeded dma_caps
 
 has been applied to the spi tree at
 
@@ -33,45 +33,40 @@ to this mail.
 Thanks,
 Mark
 
->From f340b920511a666b02d371e88801d3817ea7a880 Mon Sep 17 00:00:00 2001
+>From 058f7c509e84abd36f988d4e16432366bd793d8f Mon Sep 17 00:00:00 2001
 From: Emil Renner Berthing <kernel@esmil.dk>
-Date: Wed, 10 Oct 2018 11:00:36 +0200
-Subject: [PATCH] spi: rockchip: mark use_dma as bool
+Date: Wed, 10 Oct 2018 11:00:35 +0200
+Subject: [PATCH] spi: rockchip: remove unneeded dma_caps
 
-The driver data has a u32 field use_dma which is
-only ever used as a boolean, so change its type
-to reflect that.
+We no longer need the dma_caps since the dma driver
+already clamps the burst length to the hardware limit,
+so don't request and store dma_caps in device data.
 
 Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-rockchip.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/spi/spi-rockchip.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 6a53b940f2f5..99943aa71bc1 100644
+index 2f825702cd90..6a53b940f2f5 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -202,7 +202,7 @@ struct rockchip_spi {
- 
- 	bool cs_asserted[ROCKCHIP_SPI_MAX_CS_NUM];
- 
--	u32 use_dma;
-+	bool use_dma;
- 	struct sg_table tx_sg;
+@@ -207,7 +207,6 @@ struct rockchip_spi {
  	struct sg_table rx_sg;
  	struct rockchip_spi_dma_data dma_rx;
-@@ -628,9 +628,9 @@ static int rockchip_spi_transfer_one(
+ 	struct rockchip_spi_dma_data dma_tx;
+-	struct dma_slave_caps dma_caps;
+ };
  
- 	/* we need prepare dma before spi was enabled */
- 	if (master->can_dma && master->can_dma(master, spi, xfer))
--		rs->use_dma = 1;
-+		rs->use_dma = true;
- 	else
--		rs->use_dma = 0;
-+		rs->use_dma = false;
+ static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
+@@ -774,7 +773,6 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 	}
  
- 	rockchip_spi_config(rs);
- 
+ 	if (rs->dma_tx.ch && rs->dma_rx.ch) {
+-		dma_get_slave_caps(rs->dma_rx.ch, &(rs->dma_caps));
+ 		rs->dma_tx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_TXDR);
+ 		rs->dma_rx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_RXDR);
+ 		rs->dma_tx.direction = DMA_MEM_TO_DEV;
 -- 
 2.19.0.rc2
