@@ -1,72 +1,170 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Thu, 11 Oct 2018 11:00:38 +0000
-Subject: [PATCH v4 2/5] dt-bindings: spi: add binding file for NXP FlexSPI
- controller
-In-Reply-To: <1539255519-1408-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1539255519-1408-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1539255519-1408-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Thu, 11 Oct 2018 13:16:52 +0200
+Subject: [PATCH] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
+Message-ID: <20181011111652.31840-1-vincent.whitchurch@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding file for NXP FlexSPI controller
+ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
+ldr/str instructions in copy_{from/to}_user.  They are currently
+unnecessarily using single ldr/str instructions and can use ldm/stm
+instructions instead like memcpy does (but with appropriate fixup
+tables).
 
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+function                                     old     new   delta
+arm_copy_from_user                           924     824    -100
+__copy_to_user_std                           936     824    -112
+
+This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
+about 4% on my Cortex-A9.
+
+before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
+before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
+before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
+before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
+
+ after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
+ after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
+
+Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
 ---
-Changes for v4:
-- Incorporated Rob review comments.
-Changes for v3:
-- Removed node property 'big-endian'.
-Changes for v2:
-- Incorporated Rob review comments.
+ arch/arm/include/asm/assembler.h |  6 ++++--
+ arch/arm/lib/copy_from_user.S    | 23 +++++++++++++++++++++++
+ arch/arm/lib/copy_to_user.S      | 19 +++++++++++++++++++
+ 3 files changed, 46 insertions(+), 2 deletions(-)
 
- .../devicetree/bindings/spi/spi-nxp-fspi.txt       | 39 ++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-new file mode 100644
-index 0000000..2cd67eb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-@@ -0,0 +1,39 @@
-+* NXP Flex Serial Peripheral Interface (FSPI)
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index b17ee03d280b..da16d31c7ef9 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -243,13 +243,15 @@
+ 	.endm
+ #endif
+ 
+-#define USER(x...)				\
++#define USERL(l, x...)				\
+ 9999:	x;					\
+ 	.pushsection __ex_table,"a";		\
+ 	.align	3;				\
+-	.long	9999b,9001f;			\
++	.long	9999b,l;			\
+ 	.popsection
+ 
++#define USER(x...)	USERL(9001f, x)
 +
-+Required properties:
-+  - compatible : Should be "nxp,lx2160a-fspi"
-+  - reg :        First contains the register location and length,
-+                 Second contains the memory mapping address and length
-+  - reg-names :  Should contain the resource reg names:
-+	         - fspi_base: configuration register address space
-+                 - fspi_mmap: memory mapped address space
-+  - interrupts : Should contain the interrupt for the device
+ #ifdef CONFIG_SMP
+ #define ALT_SMP(instr...)					\
+ 9998:	instr
+diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
+index a826df3d3814..7751072d409a 100644
+--- a/arch/arm/lib/copy_from_user.S
++++ b/arch/arm/lib/copy_from_user.S
+@@ -34,13 +34,19 @@
+  *	Number of bytes NOT copied.
+  */
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
+ #ifndef CONFIG_THUMB2_KERNEL
+ #define LDR1W_SHIFT	0
+ #else
+ #define LDR1W_SHIFT	1
+ #endif
++#else
++#define LDR1W_SHIFT	0
++#endif
 +
-+Required SPI slave node properties:
-+  - reg :        There are two buses (A and B) with two chip selects each.
-+                 This encodes to which bus and CS the flash is connected:
-+                 - <0>: Bus A, CS 0
-+                 - <1>: Bus A, CS 1
-+                 - <2>: Bus B, CS 0
-+                 - <3>: Bus B, CS 1
+ #define STR1W_SHIFT	0
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
+ 	.macro ldr1w ptr reg abort
+ 	ldrusr	\reg, \ptr, 4, abort=\abort
+ 	.endm
+@@ -60,6 +66,23 @@
+ 	.macro ldr1b ptr reg cond=al abort
+ 	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
++#else
++	.macro ldr1w ptr reg abort
++	USERL(\abort, W(ldr) \reg, [\ptr], #4)
++	.endm
 +
-+Example showing the usage of two SPI NOR slave devices on bus A:
++	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
++	.endm
 +
-+fspi0: spi at 20c0000 {
-+	compatible = "nxp,lx2160a-fspi";
-+	reg = <0x0 0x20c0000 0x0 0x10000>, <0x0 0x20000000 0x0 0x10000000>;
-+	reg-names = "fspi_base", "fspi_mmap";
-+	interrupts = <0 25 0x4>; /* Level high type */
-+	clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+	clock-names = "fspi_en", "fspi";
++	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
 +
-+	mt35xu512aba0: flash at 0 {
-+		reg = <0>;
-+		....
-+	};
++	.macro ldr1b ptr reg cond=al abort
++	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
++	.endm
++#endif
+ 
+ 	.macro str1w ptr reg abort
+ 	W(str) \reg, [\ptr], #4
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index caf5019d8161..3149446bc21e 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -35,11 +35,16 @@
+  */
+ 
+ #define LDR1W_SHIFT	0
 +
-+	mt35xu512aba1: flash at 1 {
-+		reg = <1>;
-+		....
-+	};
-+};
++#ifdef CONFIG_CPU_USE_DOMAINS
+ #ifndef CONFIG_THUMB2_KERNEL
+ #define STR1W_SHIFT	0
+ #else
+ #define STR1W_SHIFT	1
+ #endif
++#else
++#define STR1W_SHIFT	0
++#endif
+ 
+ 	.macro ldr1w ptr reg abort
+ 	W(ldr) \reg, [\ptr], #4
+@@ -57,6 +62,7 @@
+ 	ldr\cond\()b \reg, [\ptr], #1
+ 	.endm
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
+ 	.macro str1w ptr reg abort
+ 	strusr	\reg, \ptr, 4, abort=\abort
+ 	.endm
+@@ -75,6 +81,19 @@
+ 	.macro str1b ptr reg cond=al abort
+ 	strusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
++#else
++	.macro str1w ptr reg abort
++	USERL(\abort, W(str) \reg, [\ptr], #4)
++	.endm
++
++	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
++
++	.macro str1b ptr reg cond=al abort
++	USERL(\abort, str\cond\()b \reg, [\ptr], #1)
++	.endm
++#endif
+ 
+ 	.macro enter reg1 reg2
+ 	mov	r3, #0
 -- 
-2.7.4
+2.11.0
