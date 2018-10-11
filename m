@@ -1,118 +1,73 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 11 Oct 2018 16:44:07 +0200
-Subject: [PATCH v9 04/11] dt: psci: Update DT bindings to support
- hierarchical PSCI states
-In-Reply-To: <20181010150312.GA4844@e107155-lin>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <20181003143824.13059-5-ulf.hansson@linaro.org>
- <20181010150312.GA4844@e107155-lin>
-Message-ID: <CAPDyKFqP3wbd+5rvLcscNf1LUSZDROLqafsLq0Kyh0KziRJrZQ@mail.gmail.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Thu, 11 Oct 2018 08:54:56 -0600
+Subject: [Freedreno] [PATCH 5/9] arm64: dts: sdm845: Add gpu and gmu
+ device nodes
+In-Reply-To: <20181011050216.4ba5i3ghh5rbvjbl@vireshk-i7>
+References: <20180827151112.25211-1-jcrouse@codeaurora.org>
+ <20180827151112.25211-6-jcrouse@codeaurora.org>
+ <20181010094628.wejfgmvcv6stzoco@vireshk-i7>
+ <20181010142905.GB9977@jcrouse-lnx.qualcomm.com>
+ <20181010143149.4e3ct3efkuwxa2hw@vireshk-i7>
+ <20181010144856.GC9977@jcrouse-lnx.qualcomm.com>
+ <20181010145139.nvalsr2ij2lj53dh@vireshk-i7>
+ <20181010151006.GD9977@jcrouse-lnx.qualcomm.com>
+ <20181011050216.4ba5i3ghh5rbvjbl@vireshk-i7>
+Message-ID: <20181011145456.GG9977@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Raju
+On Thu, Oct 11, 2018 at 10:32:16AM +0530, Viresh Kumar wrote:
+> On 10-10-18, 09:10, Jordan Crouse wrote:
+> > On Wed, Oct 10, 2018 at 08:21:39PM +0530, Viresh Kumar wrote:
+> > > On 10-10-18, 08:48, Jordan Crouse wrote:
+> > > > qcom,level comes straight from:
+> > > > 
+> > > > https://lore.kernel.org/lkml/20180627045234.27403-2-rnayak at codeaurora.org/
+> > > > 
+> > > > But in this case instead of using the CPU to program the RPMh we are passing
+> > > > the value to a microprocessor (the GMU) and that will do the vote on our behalf
+> > > > (Technically we use the value to look up the vote in the cmd-db database and
+> > > > pass that to the GMU)
+> > > > 
+> > > > This is why the qcom,level was added in the first place so we could at least
+> > > > share the nomenclature with the rpmhd if not the implementation.
+> > > 
+> > > How you actually pass the vote to the underlying hardware, RPMh or
+> > > GMU, is irrelevant to the whole thing. What is important is how we
+> > > describe that in DT and how we represent the whole thing.
+> > > 
+> > > We have chosen genpd + OPP to do this and same should be used by you
+> > > as well. Another benefit is that the genpd core will do vote
+> > > aggregation for you here.
+> > 
+> > I'm not sure what you are suggesting? The vote is represented in DT exactly as
+> > described in the bindings. 
+> 
+> Look at how Rajendra has done it to see the difference.
+> 
+> https://lore.kernel.org/lkml/20180627045234.27403-3-rnayak at codeaurora.org/
 
-On 10 October 2018 at 17:03, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On Wed, Oct 03, 2018 at 04:38:17PM +0200, Ulf Hansson wrote:
->> From: Lina Iyer <lina.iyer@linaro.org>
->>
->> Update DT bindings to represent hierarchical CPU and CPU PM domain idle
->> states for PSCI. Also update the PSCI examples to clearly show how
->> flattened and hierarchical idle states can be represented in DT.
->>
->> Cc: Lina Iyer <ilina@codeaurora.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Reviewed-by: Rob Herring <robh@kernel.org>
->> Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  .../devicetree/bindings/arm/psci.txt          | 156 ++++++++++++++++++
->>  1 file changed, 156 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
->> index a2c4f1d52492..17aa3d3a1c8e 100644
->> --- a/Documentation/devicetree/bindings/arm/psci.txt
->> +++ b/Documentation/devicetree/bindings/arm/psci.txt
->> @@ -105,7 +105,163 @@ Case 3: PSCI v0.2 and PSCI v0.1.
->>               ...
->>       };
->>
->> +ARM systems can have multiple cores sometimes in hierarchical arrangement.
->> +This often, but not always, maps directly to the processor power topology of
->> +the system. Individual nodes in a topology have their own specific power states
->> +and can be better represented in DT hierarchically.
->> +
->> +For these cases, the definitions of the idle states for the CPUs and the CPU
->> +topology, must conform to the domain idle state specification [3]. The domain
->> +idle states themselves, must be compatible with the defined 'domain-idle-state'
->> +binding [1], and also need to specify the arm,psci-suspend-param property for
->> +each idle state.
->> +
->> +DT allows representing CPUs and CPU idle states in two different ways -
->> +
->> +The flattened model as given in Example 1, lists CPU's idle states followed by
->> +the domain idle state that the CPUs may choose. Note that the idle states are
->> +all compatible with "arm,idle-state".
->> +
->> +Example 2 represents the hierarchical model of CPUs and domain idle states.
->> +CPUs define their domain provider in their psci DT node. The domain controls
->> +the power to the CPU and possibly other h/w blocks that would enter an idle
->> +state along with the CPU. The CPU's idle states may therefore be considered as
->> +the domain's idle states and have the compatible "arm,idle-state". Such domains
->> +may also be embedded within another domain that may represent common h/w blocks
->> +between these CPUs. The idle states of the CPU topology shall be represented as
->> +the domain's idle states.
->> +
->> +In PSCI firmware v1.0, the OS-Initiated mode is introduced. In order to use it,
->> +the hierarchical representation must be used.
->> +
->> +Example 1: Flattened representation of CPU and domain idle states
->
-> [...]
->
->> +Example 2: Hierarchical representation of CPU and domain idle states
->
-> I understand that this may not be of interest for this series, but do
-> we need to add any suggestions on how to arrive Flattened representation
-> of CPU idle states from its hierarchical representation. If the DT has
-> latter and PSCI call returns as PC mode only for idle. We need to deal
-> with that case.
+The GPU domain is completely controlled by the GMU hardware and is powered
+independently of the CPU. For various reasons the GMU can't come up with
+the vote itself so we need to construct a vote and send it during
+initialization. For this we duplicate the code that rmphd does to query the
+cmd-db and build the values using qcom,level as a guide. This is necessary
+copypasta as the alternative would be to add the hooks into genpd or add a
+side hook into the rpmhd to get the values we need and none of that is worth
+it for a few lines of walking an array.
 
-For sure, I think this is valid comment for this series (or at least
-v8 which contains the hole set).
+qcom,level serves the purpose for us in this case because we can get the value
+we need and construct the vote. If we move to using required-opp, thats just
+another step of parsing for the driver and it establishes a relationship with
+rmphd on the CPU that shouldn't exist.
 
-The approach I have taken, so far, is to closely tie the support for
-PSCI OSI mode to the hierarchical representation in DT of the idle
-states. Simply because of changing as little as possible, in a first
-step, then build on top.
+I do see a good argument for using the symbolic bindings (i.e.
+RPMH_REGULATOR_LEVEL_TURBO_L1) and we can do that easily but beyond that I
+don't think that we need the extra parsing step.
 
-However, in the offlist discussion I had with Lorenzo, he raised a
-concern, very similar to what you are bringing up here. There are
-indeed platform configurations, using PSCI PC mode, which would
-benefit from the using the hierarchical representation. BTW, that is
-kind of what Raju just tried to get working for QCOM SDM845 [1], but
-let's discuss that separately.
+Thanks,
+Jordan
 
-The conclusion I made, is that no matter of we are using the PC mode
-or the OSI mode, the hierarchical representation shall just work.
-
-To me, this means that I have to re-work the series, such that the
-PSCI driver (and cpuidle), dynamically in runtime, can agree on which
-of the idle states that are "shared among a group of CPUs" and which
-are CPU specific. Exactly how, I am still exploring a few different
-approaches on.
-
-Does it make sense?
-
-So, when it comes to the updated DT bindings in regards to $subject
-patch, I think it's good as is. Or do you think there is something
-that needs to be clarified?
-
-Thanks for reviewing!
-
-Kind regards
-Uffe
-
-[1]
-https://lkml.org/lkml/2018/10/11/28
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
