@@ -1,43 +1,42 @@
-From: horia.geanta@nxp.com (Horia Geanta)
-Date: Thu, 11 Oct 2018 10:04:31 +0000
-Subject: [PATCH 5/5] arm64: dts: add LX2160ARDB board support
-References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
- <1534747636-20064-6-git-send-email-vabhav.sharma@nxp.com>
- <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
- <1dd3074eabb496155c4d1abb83c82c52529a656a.camel@buserror.net>
-Message-ID: <VI1PR0402MB34852BFA7E8E44E9B867D76F98E10@VI1PR0402MB3485.eurprd04.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 11 Oct 2018 12:24:24 +0200
+Subject: [GIT PULL 3/5 v2] firmware: tegra: Changes for v4.20-rc1
+In-Reply-To: <20180927205942.30878-3-thierry.reding@gmail.com>
+References: <20180927205942.30878-3-thierry.reding@gmail.com>
+Message-ID: <20181011102424.22720-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/29/2018 3:31 AM, Scott Wood wrote:
-> On Tue, 2018-08-21 at 15:45 -0500, Rob Herring wrote:
->> On Mon, Aug 20, 2018 at 1:52 PM Vabhav Sharma <vabhav.sharma@nxp.com> wrote:
->>> +/ {
->>> +       model = "NXP Layerscape LX2160ARDB";
->>> +       compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
->>> +
->>> +       aliases {
->>> +               crypto = &crypto;
->>
->> Drop this. Aliases should be numbered, and this is not a standard
->> alias name either.
-> 
-> Is this a new rule?  In any case, U-Boot looks for a "crypto" alias.
-> 
-(Replying here, I did not see a follow-up).
+Hi ARM SoC maintainers,
 
-Indeed, U-boot relies on the "crypto" alias.
-This is true for all SoCs with CAAM crypto engine, a pretty lengthy list.
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-Could you please clarify?
-Also: Is numbering needed even when there is a single instance of the block?
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-Looking at a recent discussion
-https://lore.kernel.org/patchwork/patch/991718
-I see the proposal is for the ID to be optional:
-> Alias names are often suffixed with a numeric ID, especially when there may
-> be multiple instances of the same type. The ID typically corresponds to the
-[...]
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-firmware-2
+
+for you to fetch changes up to 00cba11fab58407a0017fc55476ea764161c5f07:
+
+  firmware: tegra: bpmp: Implement suspend/resume support (2018-10-10 16:47:22 +0200)
+
+This took longer than I anticipated because I managed to somehow break
+my git tree along the way. This is equivalent to the first pull request
+except that it also fixes the warning that Arnd reported.
 
 Thanks,
-Horia
+Thierry
+
+----------------------------------------------------------------
+firmware: tegra: Changes for v4.20-rc1
+
+This contains a fix for suspend/resume support for the BPMP found on
+Tegra186 and Tegra194.
+
+----------------------------------------------------------------
+Thierry Reding (1):
+      firmware: tegra: bpmp: Implement suspend/resume support
+
+ drivers/firmware/tegra/bpmp.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
