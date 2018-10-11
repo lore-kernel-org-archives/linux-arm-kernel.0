@@ -1,603 +1,2494 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 12 Oct 2018 01:41:03 +0900
-Subject: [PATCH v4 2/2] dmaengine: uniphier-mdmac: add UniPhier MIO DMAC driver
-In-Reply-To: <1539276063-5103-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1539276063-5103-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1539276063-5103-3-git-send-email-yamada.masahiro@socionext.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 11 Oct 2018 22:14:29 +0530
+Subject: [PATCH 5/5] pinctrl: mediatek: Add initial pinctrl driver for
+ MT6797 SoC
+In-Reply-To: <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
+References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
+ <20181008191411.32555-6-manivannan.sadhasivam@linaro.org>
+ <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
+Message-ID: <20181011164429.GA18174@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIO DMAC (Media IO DMA Controller) is used in UniPhier LD4,
-Pro4, and sLD8 SoCs.
+On Thu, Oct 11, 2018 at 05:50:19PM +0200, Matthias Brugger wrote:
+> 
+> 
+> On 08/10/2018 21:14, Manivannan Sadhasivam wrote:
+> > Add initial pinctrl driver for Mediatek MT6797 SoC supporting only
+> > GPIO and pinmux configurations.
+> > 
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> >  drivers/pinctrl/mediatek/Kconfig              |    7 +
+> >  drivers/pinctrl/mediatek/Makefile             |    1 +
+> >  drivers/pinctrl/mediatek/pinctrl-mt6797.c     |   82 +
+> >  drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h | 2430 +++++++++++++++++
+> >  4 files changed, 2520 insertions(+)
+> >  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt6797.c
+> >  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+> > 
+> [...]
+> > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+> > new file mode 100644
+> > index 000000000000..8949d2a15c39
+> > --- /dev/null
+> > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+> > @@ -0,0 +1,2430 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +/*
+> > + * Based on pinctrl-mtk-mt6765.h
+> > + *
+> > + * Copyright (C) 2018 MediaTek Inc.
+> > + *
+> > + * Author: ZH Chen <zh.chen@mediatek.com>
+> > + *
+> > + * Copyright (c) 2018 Manivannan Sadhasivam
+> > + */
+> > +
+> > +#ifndef __PINCTRL_MTK_MT6797_H
+> > +#define __PINCTRL_MTK_MT6797_H
+> > +
+> > +#include "pinctrl-paris.h"
+> > +
+> > +static const struct mtk_pin_desc mtk_pins_mt6797[] = {
+> > +	MTK_PIN(
+> > +		0, "GPIO0",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> 
+> As far as I have seen, you put all pins in driving group 3, but from the public
+> available "Functional Specification" (page 51-81) I can see that there exist
+> several driving groups:
+> 2/4/6/8 mA (DRV_GRP3)
+> 4/8/12/16 mA (not sure which group this is)
+> 2/4/6/8/10/12/14/16 mA (DRV_GRP4).
+>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Not sure about that. But I derived the configuration from DRV_CFGx
+registers available in "Application Software Register Table - Part 1"
+from page no: 906.
 
-Changes in v4:
- - Use C style comments instead of C++ ones
- - Move long return types to the previous line
- - Remove distracting double-underscore prefixing
- - Fix a double-spacing between sentences
- - Remove the empty ->device_config hook
- - Fix residue calculation
- - Fix ->{src,dst}_addr_widths
- - Add ->device_free_chan_resources() hook
- - Make sure to stop the hardware in .remove hook
-   and avoid memory leak
+This register supports 2/4/6/8mA and this belongs to DRV_GRP2/DRV_GRP3
+[1].
 
-Changes in v3:
- - Get residue from on-flight chunk
- - Use GFP_NOWAIT instead of GFP_KERNEL in prep_slave_sg
- - Use device_config hook
- - Add NULL pointer check for txstate
+Still I'm not fully confident of my choice here. Maybe Sean can throw
+some inputs!
 
-Changes in v2:
- - Use platform_irq_count() to get the number of channels
+Thanks,
+Mani
 
- MAINTAINERS                  |   1 +
- drivers/dma/Kconfig          |  11 +
- drivers/dma/Makefile         |   1 +
- drivers/dma/uniphier-mdmac.c | 506 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 519 insertions(+)
- create mode 100644 drivers/dma/uniphier-mdmac.c
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c#n40
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e38ba7e..847fa12 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2192,6 +2192,7 @@ F:	arch/arm/mm/cache-uniphier.c
- F:	arch/arm64/boot/dts/socionext/uniphier*
- F:	drivers/bus/uniphier-system-bus.c
- F:	drivers/clk/uniphier/
-+F:	drivers/dmaengine/uniphier-mdmac.c
- F:	drivers/gpio/gpio-uniphier.c
- F:	drivers/i2c/busses/i2c-uniphier*
- F:	drivers/irqchip/irq-uniphier-aidet.c
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index dacf3f4..8b8c7f0 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -576,6 +576,17 @@ config TIMB_DMA
- 	help
- 	  Enable support for the Timberdale FPGA DMA engine.
- 
-+config UNIPHIER_MDMAC
-+	tristate "UniPhier MIO DMAC"
-+	depends on ARCH_UNIPHIER || COMPILE_TEST
-+	depends on OF
-+	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+	help
-+	  Enable support for the MIO DMAC (Media I/O DMA controller) on the
-+	  UniPhier platform.  This DMA controller is used as the external
-+	  DMA engine of the SD/eMMC controllers of the LD4, Pro4, sLD8 SoCs.
-+
- config XGENE_DMA
- 	tristate "APM X-Gene DMA support"
- 	depends on ARCH_XGENE || COMPILE_TEST
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index c91702d..973a170 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -69,6 +69,7 @@ obj-$(CONFIG_TXX9_DMAC) += txx9dmac.o
- obj-$(CONFIG_TEGRA20_APB_DMA) += tegra20-apb-dma.o
- obj-$(CONFIG_TEGRA210_ADMA) += tegra210-adma.o
- obj-$(CONFIG_TIMB_DMA) += timb_dma.o
-+obj-$(CONFIG_UNIPHIER_MDMAC) += uniphier-mdmac.o
- obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
- obj-$(CONFIG_ZX_DMA) += zx_dma.o
- obj-$(CONFIG_ST_FDMA) += st_fdma.o
-diff --git a/drivers/dma/uniphier-mdmac.c b/drivers/dma/uniphier-mdmac.c
-new file mode 100644
-index 0000000..ec65a7430
---- /dev/null
-+++ b/drivers/dma/uniphier-mdmac.c
-@@ -0,0 +1,506 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (C) 2018 Socionext Inc.
-+//   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+
-+#include <linux/bits.h>
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
-+#include <linux/interrupt.h>
-+#include <linux/iopoll.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_dma.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/types.h>
-+
-+#include "virt-dma.h"
-+
-+/* registers common for all channels */
-+#define UNIPHIER_MDMAC_CMD		0x000	/* issue DMA start/abort */
-+#define   UNIPHIER_MDMAC_CMD_ABORT		BIT(31) /* 1: abort, 0: start */
-+
-+/* per-channel registers */
-+#define UNIPHIER_MDMAC_CH_OFFSET	0x100
-+#define UNIPHIER_MDMAC_CH_STRIDE	0x040
-+
-+#define UNIPHIER_MDMAC_CH_IRQ_STAT	0x010	/* current hw status (RO) */
-+#define UNIPHIER_MDMAC_CH_IRQ_REQ	0x014	/* latched STAT (WOC) */
-+#define UNIPHIER_MDMAC_CH_IRQ_EN	0x018	/* IRQ enable mask */
-+#define UNIPHIER_MDMAC_CH_IRQ_DET	0x01c	/* REQ & EN (RO) */
-+#define   UNIPHIER_MDMAC_CH_IRQ__ABORT		BIT(13)
-+#define   UNIPHIER_MDMAC_CH_IRQ__DONE		BIT(1)
-+#define UNIPHIER_MDMAC_CH_SRC_MODE	0x020	/* mode of source */
-+#define UNIPHIER_MDMAC_CH_DEST_MODE	0x024	/* mode of destination */
-+#define   UNIPHIER_MDMAC_CH_MODE__ADDR_INC	(0 << 4)
-+#define   UNIPHIER_MDMAC_CH_MODE__ADDR_DEC	(1 << 4)
-+#define   UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED	(2 << 4)
-+#define UNIPHIER_MDMAC_CH_SRC_ADDR	0x028	/* source address */
-+#define UNIPHIER_MDMAC_CH_DEST_ADDR	0x02c	/* destination address */
-+#define UNIPHIER_MDMAC_CH_SIZE		0x030	/* transfer bytes */
-+
-+#define UNIPHIER_MDMAC_SLAVE_BUSWIDTHS \
-+	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
-+	 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
-+	 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
-+	 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
-+
-+struct uniphier_mdmac_desc {
-+	struct virt_dma_desc vd;
-+	struct scatterlist *sgl;
-+	unsigned int sg_len;
-+	unsigned int sg_cur;
-+	enum dma_transfer_direction dir;
-+};
-+
-+struct uniphier_mdmac_chan {
-+	struct virt_dma_chan vc;
-+	struct uniphier_mdmac_device *mdev;
-+	struct uniphier_mdmac_desc *md;
-+	void __iomem *reg_ch_base;
-+	unsigned int chan_id;
-+};
-+
-+struct uniphier_mdmac_device {
-+	struct dma_device ddev;
-+	struct clk *clk;
-+	void __iomem *reg_base;
-+	struct uniphier_mdmac_chan channels[0];
-+};
-+
-+static struct uniphier_mdmac_chan *
-+to_uniphier_mdmac_chan(struct virt_dma_chan *vc)
-+{
-+	return container_of(vc, struct uniphier_mdmac_chan, vc);
-+}
-+
-+static struct uniphier_mdmac_desc *
-+to_uniphier_mdmac_desc(struct virt_dma_desc *vd)
-+{
-+	return container_of(vd, struct uniphier_mdmac_desc, vd);
-+}
-+
-+/* mc->vc.lock must be held by caller */
-+static struct uniphier_mdmac_desc *
-+uniphier_mdmac_next_desc(struct uniphier_mdmac_chan *mc)
-+{
-+	struct virt_dma_desc *vd;
-+
-+	vd = vchan_next_desc(&mc->vc);
-+	if (!vd) {
-+		mc->md = NULL;
-+		return NULL;
-+	}
-+
-+	list_del(&vd->node);
-+
-+	mc->md = to_uniphier_mdmac_desc(vd);
-+
-+	return mc->md;
-+}
-+
-+/* mc->vc.lock must be held by caller */
-+static void uniphier_mdmac_handle(struct uniphier_mdmac_chan *mc,
-+				  struct uniphier_mdmac_desc *md)
-+{
-+	struct uniphier_mdmac_device *mdev = mc->mdev;
-+	struct scatterlist *sg;
-+	u32 irq_flag = UNIPHIER_MDMAC_CH_IRQ__DONE;
-+	u32 src_mode, src_addr, dest_mode, dest_addr, chunk_size;
-+
-+	sg = &md->sgl[md->sg_cur];
-+
-+	if (md->dir == DMA_MEM_TO_DEV) {
-+		src_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_INC;
-+		src_addr = sg_dma_address(sg);
-+		dest_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED;
-+		dest_addr = 0;
-+	} else {
-+		src_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED;
-+		src_addr = 0;
-+		dest_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_INC;
-+		dest_addr = sg_dma_address(sg);
-+	}
-+
-+	chunk_size = sg_dma_len(sg);
-+
-+	writel(src_mode, mc->reg_ch_base + UNIPHIER_MDMAC_CH_SRC_MODE);
-+	writel(dest_mode, mc->reg_ch_base + UNIPHIER_MDMAC_CH_DEST_MODE);
-+	writel(src_addr, mc->reg_ch_base + UNIPHIER_MDMAC_CH_SRC_ADDR);
-+	writel(dest_addr, mc->reg_ch_base + UNIPHIER_MDMAC_CH_DEST_ADDR);
-+	writel(chunk_size, mc->reg_ch_base + UNIPHIER_MDMAC_CH_SIZE);
-+
-+	/* write 1 to clear */
-+	writel(irq_flag, mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_REQ);
-+
-+	writel(irq_flag, mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_EN);
-+
-+	writel(BIT(mc->chan_id), mdev->reg_base + UNIPHIER_MDMAC_CMD);
-+}
-+
-+/* mc->vc.lock must be held by caller */
-+static void uniphier_mdmac_start(struct uniphier_mdmac_chan *mc)
-+{
-+	struct uniphier_mdmac_desc *md;
-+
-+	md = uniphier_mdmac_next_desc(mc);
-+	if (md)
-+		uniphier_mdmac_handle(mc, md);
-+}
-+
-+/* mc->vc.lock must be held by caller */
-+static int uniphier_mdmac_abort(struct uniphier_mdmac_chan *mc)
-+{
-+	struct uniphier_mdmac_device *mdev = mc->mdev;
-+	u32 irq_flag = UNIPHIER_MDMAC_CH_IRQ__ABORT;
-+	u32 val;
-+
-+	/* write 1 to clear */
-+	writel(irq_flag, mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_REQ);
-+
-+	writel(UNIPHIER_MDMAC_CMD_ABORT | BIT(mc->chan_id),
-+	       mdev->reg_base + UNIPHIER_MDMAC_CMD);
-+
-+	/*
-+	 * Abort should be accepted soon. We poll the bit here instead of
-+	 * waiting for the interrupt.
-+	 */
-+	return readl_poll_timeout(mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_REQ,
-+				  val, val & irq_flag, 0, 20);
-+}
-+
-+static irqreturn_t uniphier_mdmac_interrupt(int irq, void *dev_id)
-+{
-+	struct uniphier_mdmac_chan *mc = dev_id;
-+	struct uniphier_mdmac_desc *md;
-+	irqreturn_t ret = IRQ_HANDLED;
-+	u32 irq_stat;
-+
-+	spin_lock(&mc->vc.lock);
-+
-+	irq_stat = readl(mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_DET);
-+
-+	/*
-+	 * Some channels share a single interrupt line. If the IRQ status is 0,
-+	 * this is probably triggered by a different channel.
-+	 */
-+	if (!irq_stat) {
-+		ret = IRQ_NONE;
-+		goto out;
-+	}
-+
-+	/* write 1 to clear */
-+	writel(irq_stat, mc->reg_ch_base + UNIPHIER_MDMAC_CH_IRQ_REQ);
-+
-+	/*
-+	 * UNIPHIER_MDMAC_CH_IRQ__DONE interrupt is asserted even when the DMA
-+	 * is aborted. To distinguish the normal completion and the abort,
-+	 * check mc->md. If it is NULL, we are aborting.
-+	 */
-+	md = mc->md;
-+	if (!md)
-+		goto out;
-+
-+	md->sg_cur++;
-+
-+	if (md->sg_cur >= md->sg_len) {
-+		vchan_cookie_complete(&md->vd);
-+		md = uniphier_mdmac_next_desc(mc);
-+		if (!md)
-+			goto out;
-+	}
-+
-+	uniphier_mdmac_handle(mc, md);
-+
-+out:
-+	spin_unlock(&mc->vc.lock);
-+
-+	return ret;
-+}
-+
-+static void uniphier_mdmac_free_chan_resources(struct dma_chan *chan)
-+{
-+	vchan_free_chan_resources(to_virt_chan(chan));
-+}
-+
-+static struct dma_async_tx_descriptor *
-+uniphier_mdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
-+			     unsigned int sg_len,
-+			     enum dma_transfer_direction direction,
-+			     unsigned long flags, void *context)
-+{
-+	struct virt_dma_chan *vc = to_virt_chan(chan);
-+	struct uniphier_mdmac_desc *md;
-+
-+	if (!is_slave_direction(direction))
-+		return NULL;
-+
-+	md = kzalloc(sizeof(*md), GFP_NOWAIT);
-+	if (!md)
-+		return NULL;
-+
-+	md->sgl = sgl;
-+	md->sg_len = sg_len;
-+	md->dir = direction;
-+
-+	return vchan_tx_prep(vc, &md->vd, flags);
-+}
-+
-+static int uniphier_mdmac_terminate_all(struct dma_chan *chan)
-+{
-+	struct virt_dma_chan *vc = to_virt_chan(chan);
-+	struct uniphier_mdmac_chan *mc = to_uniphier_mdmac_chan(vc);
-+	unsigned long flags;
-+	int ret = 0;
-+	LIST_HEAD(head);
-+
-+	spin_lock_irqsave(&vc->lock, flags);
-+
-+	if (mc->md) {
-+		vchan_terminate_vdesc(&mc->md->vd);
-+		mc->md = NULL;
-+		ret = uniphier_mdmac_abort(mc);
-+	}
-+	vchan_get_all_descriptors(vc, &head);
-+
-+	spin_unlock_irqrestore(&vc->lock, flags);
-+
-+	vchan_dma_desc_free_list(vc, &head);
-+
-+	return ret;
-+}
-+
-+static void uniphier_mdmac_synchronize(struct dma_chan *chan)
-+{
-+	vchan_synchronize(to_virt_chan(chan));
-+}
-+
-+static enum dma_status uniphier_mdmac_tx_status(struct dma_chan *chan,
-+						dma_cookie_t cookie,
-+						struct dma_tx_state *txstate)
-+{
-+	struct virt_dma_chan *vc;
-+	struct virt_dma_desc *vd;
-+	struct uniphier_mdmac_chan *mc;
-+	struct uniphier_mdmac_desc *md = NULL;
-+	enum dma_status stat;
-+	unsigned long flags;
-+	int i;
-+
-+	stat = dma_cookie_status(chan, cookie, txstate);
-+	/* Return immediately if we do not need to compute the residue. */
-+	if (stat == DMA_COMPLETE || !txstate)
-+		return stat;
-+
-+	vc = to_virt_chan(chan);
-+
-+	spin_lock_irqsave(&vc->lock, flags);
-+
-+	mc = to_uniphier_mdmac_chan(vc);
-+
-+	if (mc->md && mc->md->vd.tx.cookie == cookie) {
-+		/* residue from the on-flight chunk */
-+		txstate->residue = readl(mc->reg_ch_base +
-+					 UNIPHIER_MDMAC_CH_SIZE);
-+		md = mc->md;
-+	}
-+
-+	if (!md) {
-+		vd = vchan_find_desc(vc, cookie);
-+		if (vd)
-+			md = to_uniphier_mdmac_desc(vd);
-+	}
-+
-+	if (md) {
-+		/* residue from the queued chunks */
-+		for (i = md->sg_cur; i < md->sg_len; i++)
-+			txstate->residue += sg_dma_len(&md->sgl[i]);
-+	}
-+
-+	spin_unlock_irqrestore(&vc->lock, flags);
-+
-+	return stat;
-+}
-+
-+static void uniphier_mdmac_issue_pending(struct dma_chan *chan)
-+{
-+	struct virt_dma_chan *vc = to_virt_chan(chan);
-+	struct uniphier_mdmac_chan *mc = to_uniphier_mdmac_chan(vc);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&vc->lock, flags);
-+
-+	if (vchan_issue_pending(vc) && !mc->md)
-+		uniphier_mdmac_start(mc);
-+
-+	spin_unlock_irqrestore(&vc->lock, flags);
-+}
-+
-+static void uniphier_mdmac_desc_free(struct virt_dma_desc *vd)
-+{
-+	kfree(to_uniphier_mdmac_desc(vd));
-+}
-+
-+static int uniphier_mdmac_chan_init(struct platform_device *pdev,
-+				    struct uniphier_mdmac_device *mdev,
-+				    int chan_id)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct uniphier_mdmac_chan *mc = &mdev->channels[chan_id];
-+	char *irq_name;
-+	int irq, ret;
-+
-+	irq = platform_get_irq(pdev, chan_id);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "failed to get IRQ number for ch%d\n",
-+			chan_id);
-+		return irq;
-+	}
-+
-+	irq_name = devm_kasprintf(dev, GFP_KERNEL, "uniphier-mio-dmac-ch%d",
-+				  chan_id);
-+	if (!irq_name)
-+		return -ENOMEM;
-+
-+	ret = devm_request_irq(dev, irq, uniphier_mdmac_interrupt,
-+			       IRQF_SHARED, irq_name, mc);
-+	if (ret)
-+		return ret;
-+
-+	mc->mdev = mdev;
-+	mc->reg_ch_base = mdev->reg_base + UNIPHIER_MDMAC_CH_OFFSET +
-+					UNIPHIER_MDMAC_CH_STRIDE * chan_id;
-+	mc->chan_id = chan_id;
-+	mc->vc.desc_free = uniphier_mdmac_desc_free;
-+	vchan_init(&mc->vc, &mdev->ddev);
-+
-+	return 0;
-+}
-+
-+static int uniphier_mdmac_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct uniphier_mdmac_device *mdev;
-+	struct dma_device *ddev;
-+	struct resource *res;
-+	int nr_chans, ret, i;
-+
-+	nr_chans = platform_irq_count(pdev);
-+	if (nr_chans < 0)
-+		return nr_chans;
-+
-+	ret = dma_set_mask(dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
-+
-+	mdev = devm_kzalloc(dev, struct_size(mdev, channels, nr_chans),
-+			    GFP_KERNEL);
-+	if (!mdev)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mdev->reg_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(mdev->reg_base))
-+		return PTR_ERR(mdev->reg_base);
-+
-+	mdev->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(mdev->clk)) {
-+		dev_err(dev, "failed to get clock\n");
-+		return PTR_ERR(mdev->clk);
-+	}
-+
-+	ret = clk_prepare_enable(mdev->clk);
-+	if (ret)
-+		return ret;
-+
-+	ddev = &mdev->ddev;
-+	ddev->dev = dev;
-+	dma_cap_set(DMA_PRIVATE, ddev->cap_mask);
-+	ddev->src_addr_widths = UNIPHIER_MDMAC_SLAVE_BUSWIDTHS;
-+	ddev->dst_addr_widths = UNIPHIER_MDMAC_SLAVE_BUSWIDTHS;
-+	ddev->directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM);
-+	ddev->residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
-+	ddev->device_free_chan_resources = uniphier_mdmac_free_chan_resources;
-+	ddev->device_prep_slave_sg = uniphier_mdmac_prep_slave_sg;
-+	ddev->device_terminate_all = uniphier_mdmac_terminate_all;
-+	ddev->device_synchronize = uniphier_mdmac_synchronize;
-+	ddev->device_tx_status = uniphier_mdmac_tx_status;
-+	ddev->device_issue_pending = uniphier_mdmac_issue_pending;
-+	INIT_LIST_HEAD(&ddev->channels);
-+
-+	for (i = 0; i < nr_chans; i++) {
-+		ret = uniphier_mdmac_chan_init(pdev, mdev, i);
-+		if (ret)
-+			goto disable_clk;
-+	}
-+
-+	ret = dma_async_device_register(ddev);
-+	if (ret)
-+		goto disable_clk;
-+
-+	ret = of_dma_controller_register(dev->of_node, of_dma_xlate_by_chan_id,
-+					 ddev);
-+	if (ret)
-+		goto unregister_dmac;
-+
-+	platform_set_drvdata(pdev, mdev);
-+
-+	return 0;
-+
-+unregister_dmac:
-+	dma_async_device_unregister(ddev);
-+disable_clk:
-+	clk_disable_unprepare(mdev->clk);
-+
-+	return ret;
-+}
-+
-+static int uniphier_mdmac_remove(struct platform_device *pdev)
-+{
-+	struct uniphier_mdmac_device *mdev = platform_get_drvdata(pdev);
-+	struct dma_chan *chan;
-+	int ret;
-+
-+	/*
-+	 * Before reaching here, almost all descriptors have been freed by the
-+	 * ->device_free_chan_resources() hook. However, each channel might
-+	 * be still holding one descriptor that was on-flight at that moment.
-+	 * Terminate it to make sure this hardware is no longer running. Then,
-+	 * free the channel resources once again to avoid memory leak.
-+	 */
-+	list_for_each_entry(chan, &mdev->ddev.channels, device_node) {
-+		ret = dmaengine_terminate_sync(chan);
-+		if (ret)
-+			return ret;
-+		uniphier_mdmac_free_chan_resources(chan);
-+	}
-+
-+	of_dma_controller_free(pdev->dev.of_node);
-+	dma_async_device_unregister(&mdev->ddev);
-+	clk_disable_unprepare(mdev->clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id uniphier_mdmac_match[] = {
-+	{ .compatible = "socionext,uniphier-mio-dmac" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, uniphier_mdmac_match);
-+
-+static struct platform_driver uniphier_mdmac_driver = {
-+	.probe = uniphier_mdmac_probe,
-+	.remove = uniphier_mdmac_remove,
-+	.driver = {
-+		.name = "uniphier-mio-dmac",
-+		.of_match_table = uniphier_mdmac_match,
-+	},
-+};
-+module_platform_driver(uniphier_mdmac_driver);
-+
-+MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier MIO DMAC driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.7.4
+> Regards,
+> Matthias
+> 
+> > +		MTK_FUNCTION(0, "GPIO0"),
+> > +		MTK_FUNCTION(1, "CSI0A_L0P_T0A")
+> > +	),
+> > +	MTK_PIN(
+> > +		1, "GPIO1",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO1"),
+> > +		MTK_FUNCTION(1, "CSI0A_L0N_T0B")
+> > +	),
+> > +	MTK_PIN(
+> > +		2, "GPIO2",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO2"),
+> > +		MTK_FUNCTION(1, "CSI0A_L1P_T0C")
+> > +	),
+> > +	MTK_PIN(
+> > +		3, "GPIO3",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO3"),
+> > +		MTK_FUNCTION(1, "CSI0A_L1N_T1A")
+> > +	),
+> > +	MTK_PIN(
+> > +		4, "GPIO4",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO4"),
+> > +		MTK_FUNCTION(1, "CSI0A_L2P_T1B")
+> > +	),
+> > +	MTK_PIN(
+> > +		5, "GPIO5",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO5"),
+> > +		MTK_FUNCTION(1, "CSI0A_L2N_T1C")
+> > +	),
+> > +	MTK_PIN(
+> > +		6, "GPIO6",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO6"),
+> > +		MTK_FUNCTION(1, "CSI0B_L0P_T0A")
+> > +	),
+> > +	MTK_PIN(
+> > +		7, "GPIO7",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO7"),
+> > +		MTK_FUNCTION(1, "CSI0B_L0N_T0B")
+> > +	),
+> > +	MTK_PIN(
+> > +		8, "GPIO8",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO8"),
+> > +		MTK_FUNCTION(1, "CSI0B_L1P_T0C")
+> > +	),
+> > +	MTK_PIN(
+> > +		9, "GPIO9",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO9"),
+> > +		MTK_FUNCTION(1, "CSI0B_L1N_T1A")
+> > +	),
+> > +	MTK_PIN(
+> > +		10, "GPIO10",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO10"),
+> > +		MTK_FUNCTION(1, "CSI1A_L0P_T0A")
+> > +	),
+> > +	MTK_PIN(
+> > +		11, "GPIO11",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO11"),
+> > +		MTK_FUNCTION(1, "CSI1A_L0N_T0B")
+> > +	),
+> > +	MTK_PIN(
+> > +		12, "GPIO12",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO12"),
+> > +		MTK_FUNCTION(1, "CSI1A_L1P_T0C")
+> > +	),
+> > +	MTK_PIN(
+> > +		13, "GPIO13",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO13"),
+> > +		MTK_FUNCTION(1, "CSI1A_L1N_T1A")
+> > +	),
+> > +	MTK_PIN(
+> > +		14, "GPIO14",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO14"),
+> > +		MTK_FUNCTION(1, "CSI1A_L2P_T1B")
+> > +	),
+> > +	MTK_PIN(
+> > +		15, "GPIO15",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO15"),
+> > +		MTK_FUNCTION(1, "CSI1A_L2N_T1C")
+> > +	),
+> > +	MTK_PIN(
+> > +		16, "GPIO16",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO16"),
+> > +		MTK_FUNCTION(1, "CSI1B_L0P_T0A")
+> > +	),
+> > +	MTK_PIN(
+> > +		17, "GPIO17",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO17"),
+> > +		MTK_FUNCTION(1, "CSI1B_L0N_T0B")
+> > +	),
+> > +	MTK_PIN(
+> > +		18, "GPIO18",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO18"),
+> > +		MTK_FUNCTION(1, "CSI1B_L1P_T0C")
+> > +	),
+> > +	MTK_PIN(
+> > +		19, "GPIO19",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO19"),
+> > +		MTK_FUNCTION(1, "CSI1B_L1N_T1A")
+> > +	),
+> > +	MTK_PIN(
+> > +		20, "GPIO20",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO20"),
+> > +		MTK_FUNCTION(1, "CSI1B_L2P_T1B")
+> > +	),
+> > +	MTK_PIN(
+> > +		21, "GPIO21",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO21"),
+> > +		MTK_FUNCTION(1, "CSI1B_L2N_T1C")
+> > +	),
+> > +	MTK_PIN(
+> > +		22, "GPIO22",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO22"),
+> > +		MTK_FUNCTION(1, "CSI2_L0P_T0A")
+> > +	),
+> > +	MTK_PIN(
+> > +		23, "GPIO23",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO23"),
+> > +		MTK_FUNCTION(1, "CSI2_L0N_T0B")
+> > +	),
+> > +	MTK_PIN(
+> > +		24, "GPIO24",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO24"),
+> > +		MTK_FUNCTION(1, "CSI2_L1P_T0C")
+> > +	),
+> > +	MTK_PIN(
+> > +		25, "GPIO25",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO25"),
+> > +		MTK_FUNCTION(1, "CSI2_L1N_T1A")
+> > +	),
+> > +	MTK_PIN(
+> > +		26, "GPIO26",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO26"),
+> > +		MTK_FUNCTION(1, "CSI2_L2P_T1B")
+> > +	),
+> > +	MTK_PIN(
+> > +		27, "GPIO27",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO27"),
+> > +		MTK_FUNCTION(1, "CSI2_L2N_T1C")
+> > +	),
+> > +	MTK_PIN(
+> > +		28, "GPIO28",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO28"),
+> > +		MTK_FUNCTION(1, "SPI5_CLK_A"),
+> > +		MTK_FUNCTION(2, "IRTX_OUT"),
+> > +		MTK_FUNCTION(3, "UDI_TDO"),
+> > +		MTK_FUNCTION(4, "SCP_JTAG_TDO"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TDO"),
+> > +		MTK_FUNCTION(6, "PWM_A"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTDO")
+> > +	),
+> > +	MTK_PIN(
+> > +		29, "GPIO29",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO29"),
+> > +		MTK_FUNCTION(1, "SPI5_MI_A"),
+> > +		MTK_FUNCTION(2, "DAP_SIB1_SWD"),
+> > +		MTK_FUNCTION(3, "UDI_TMS"),
+> > +		MTK_FUNCTION(4, "SCP_JTAG_TMS"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TMS"),
+> > +		MTK_FUNCTION(6, "CONN_MCU_AICE_TMSC"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTMS")
+> > +	),
+> > +	MTK_PIN(
+> > +		30, "GPIO30",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO30"),
+> > +		MTK_FUNCTION(1, "CMMCLK0"),
+> > +		MTK_FUNCTION(7, "MD_CLKM0")
+> > +	),
+> > +	MTK_PIN(
+> > +		31, "GPIO31",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO31"),
+> > +		MTK_FUNCTION(1, "CMMCLK1"),
+> > +		MTK_FUNCTION(7, "MD_CLKM1")
+> > +	),
+> > +	MTK_PIN(
+> > +		32, "GPIO32",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO32"),
+> > +		MTK_FUNCTION(1, "SPI5_CS_A"),
+> > +		MTK_FUNCTION(2, "DAP_SIB1_SWCK"),
+> > +		MTK_FUNCTION(3, "UDI_TCK_XI"),
+> > +		MTK_FUNCTION(4, "SCP_JTAG_TCK"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TCK"),
+> > +		MTK_FUNCTION(6, "CONN_MCU_AICE_TCKC"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		33, "GPIO33",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO33"),
+> > +		MTK_FUNCTION(1, "SPI5_MO_A"),
+> > +		MTK_FUNCTION(2, "CMFLASH"),
+> > +		MTK_FUNCTION(3, "UDI_TDI"),
+> > +		MTK_FUNCTION(4, "SCP_JTAG_TDI"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TDI"),
+> > +		MTK_FUNCTION(6, "MD_URXD0"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTDI")
+> > +	),
+> > +	MTK_PIN(
+> > +		34, "GPIO34",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO34"),
+> > +		MTK_FUNCTION(1, "CMFLASH"),
+> > +		MTK_FUNCTION(2, "CLKM0"),
+> > +		MTK_FUNCTION(3, "UDI_NTRST"),
+> > +		MTK_FUNCTION(4, "SCP_JTAG_TRSTN"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TRST_B"),
+> > +		MTK_FUNCTION(6, "MD_UTXD0"),
+> > +		MTK_FUNCTION(7, "C2K_DM_JTINTP")
+> > +	),
+> > +	MTK_PIN(
+> > +		35, "GPIO35",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO35"),
+> > +		MTK_FUNCTION(1, "CMMCLK3"),
+> > +		MTK_FUNCTION(2, "CLKM1"),
+> > +		MTK_FUNCTION(3, "MD_URXD1"),
+> > +		MTK_FUNCTION(4, "PTA_RXD"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_DBGACK_N"),
+> > +		MTK_FUNCTION(6, "PWM_B"),
+> > +		MTK_FUNCTION(7, "PCC_PPC_IO")
+> > +	),
+> > +	MTK_PIN(
+> > +		36, "GPIO36",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO36"),
+> > +		MTK_FUNCTION(1, "CMMCLK2"),
+> > +		MTK_FUNCTION(2, "CLKM2"),
+> > +		MTK_FUNCTION(3, "MD_UTXD1"),
+> > +		MTK_FUNCTION(4, "PTA_TXD"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_DBGI_N"),
+> > +		MTK_FUNCTION(6, "PWM_C"),
+> > +		MTK_FUNCTION(7, "EXT_FRAME_SYNC")
+> > +	),
+> > +	MTK_PIN(
+> > +		37, "GPIO37",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO37"),
+> > +		MTK_FUNCTION(1, "SCL0_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		38, "GPIO38",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO38"),
+> > +		MTK_FUNCTION(1, "SDA0_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		39, "GPIO39",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO39"),
+> > +		MTK_FUNCTION(1, "DPI_D0"),
+> > +		MTK_FUNCTION(2, "SPI1_CLK_A"),
+> > +		MTK_FUNCTION(3, "PCM0_SYNC"),
+> > +		MTK_FUNCTION(4, "I2S0_LRCK"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TRST_B"),
+> > +		MTK_FUNCTION(6, "URXD3"),
+> > +		MTK_FUNCTION(7, "C2K_NTRST")
+> > +	),
+> > +	MTK_PIN(
+> > +		40, "GPIO40",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO40"),
+> > +		MTK_FUNCTION(1, "DPI_D1"),
+> > +		MTK_FUNCTION(2, "SPI1_MI_A"),
+> > +		MTK_FUNCTION(3, "PCM0_CLK"),
+> > +		MTK_FUNCTION(4, "I2S0_BCK"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TDO"),
+> > +		MTK_FUNCTION(6, "UTXD3"),
+> > +		MTK_FUNCTION(7, "C2K_TCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		41, "GPIO41",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO41"),
+> > +		MTK_FUNCTION(1, "DPI_D2"),
+> > +		MTK_FUNCTION(2, "SPI1_CS_A"),
+> > +		MTK_FUNCTION(3, "PCM0_DO"),
+> > +		MTK_FUNCTION(4, "I2S3_DO"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_DBGACK_N"),
+> > +		MTK_FUNCTION(6, "URTS3"),
+> > +		MTK_FUNCTION(7, "C2K_TDI")
+> > +	),
+> > +	MTK_PIN(
+> > +		42, "GPIO42",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO42"),
+> > +		MTK_FUNCTION(1, "DPI_D3"),
+> > +		MTK_FUNCTION(2, "SPI1_MO_A"),
+> > +		MTK_FUNCTION(3, "PCM0_DI"),
+> > +		MTK_FUNCTION(4, "I2S0_DI"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TDI"),
+> > +		MTK_FUNCTION(6, "UCTS3"),
+> > +		MTK_FUNCTION(7, "C2K_TMS")
+> > +	),
+> > +	MTK_PIN(
+> > +		43, "GPIO43",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO43"),
+> > +		MTK_FUNCTION(1, "DPI_D4"),
+> > +		MTK_FUNCTION(2, "SPI2_CLK_A"),
+> > +		MTK_FUNCTION(3, "PCM1_SYNC"),
+> > +		MTK_FUNCTION(4, "I2S2_LRCK"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TMS"),
+> > +		MTK_FUNCTION(6, "CONN_MCU_AICE_TMSC"),
+> > +		MTK_FUNCTION(7, "C2K_TDO")
+> > +	),
+> > +	MTK_PIN(
+> > +		44, "GPIO44",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO44"),
+> > +		MTK_FUNCTION(1, "DPI_D5"),
+> > +		MTK_FUNCTION(2, "SPI2_MI_A"),
+> > +		MTK_FUNCTION(3, "PCM1_CLK"),
+> > +		MTK_FUNCTION(4, "I2S2_BCK"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_TCK"),
+> > +		MTK_FUNCTION(6, "CONN_MCU_AICE_TCKC"),
+> > +		MTK_FUNCTION(7, "C2K_RTCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		45, "GPIO45",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO45"),
+> > +		MTK_FUNCTION(1, "DPI_D6"),
+> > +		MTK_FUNCTION(2, "SPI2_CS_A"),
+> > +		MTK_FUNCTION(3, "PCM1_DI"),
+> > +		MTK_FUNCTION(4, "I2S2_DI"),
+> > +		MTK_FUNCTION(5, "CONN_MCU_DBGI_N"),
+> > +		MTK_FUNCTION(6, "MD_URXD0")
+> > +	),
+> > +	MTK_PIN(
+> > +		46, "GPIO46",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO46"),
+> > +		MTK_FUNCTION(1, "DPI_D7"),
+> > +		MTK_FUNCTION(2, "SPI2_MO_A"),
+> > +		MTK_FUNCTION(3, "PCM1_DO0"),
+> > +		MTK_FUNCTION(4, "I2S1_DO"),
+> > +		MTK_FUNCTION(5, "ANT_SEL0"),
+> > +		MTK_FUNCTION(6, "MD_UTXD0")
+> > +	),
+> > +	MTK_PIN(
+> > +		47, "GPIO47",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO47"),
+> > +		MTK_FUNCTION(1, "DPI_D8"),
+> > +		MTK_FUNCTION(2, "CLKM0"),
+> > +		MTK_FUNCTION(3, "PCM1_DO1"),
+> > +		MTK_FUNCTION(4, "I2S0_MCK"),
+> > +		MTK_FUNCTION(5, "ANT_SEL1"),
+> > +		MTK_FUNCTION(6, "PTA_RXD"),
+> > +		MTK_FUNCTION(7, "C2K_URXD0")
+> > +	),
+> > +	MTK_PIN(
+> > +		48, "GPIO48",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO48"),
+> > +		MTK_FUNCTION(1, "DPI_D9"),
+> > +		MTK_FUNCTION(2, "CLKM1"),
+> > +		MTK_FUNCTION(3, "CMFLASH"),
+> > +		MTK_FUNCTION(4, "I2S2_MCK"),
+> > +		MTK_FUNCTION(5, "ANT_SEL2"),
+> > +		MTK_FUNCTION(6, "PTA_TXD"),
+> > +		MTK_FUNCTION(7, "C2K_UTXD0")
+> > +	),
+> > +	MTK_PIN(
+> > +		49, "GPIO49",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO49"),
+> > +		MTK_FUNCTION(1, "DPI_D10"),
+> > +		MTK_FUNCTION(2, "MD_INT1_C2K_UIM1_HOT_PLUG_IN"),
+> > +		MTK_FUNCTION(3, "PWM_C"),
+> > +		MTK_FUNCTION(4, "IRTX_OUT"),
+> > +		MTK_FUNCTION(5, "ANT_SEL3"),
+> > +		MTK_FUNCTION(6, "MD_URXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		50, "GPIO50",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO50"),
+> > +		MTK_FUNCTION(1, "DPI_D11"),
+> > +		MTK_FUNCTION(2, "MD_INT2"),
+> > +		MTK_FUNCTION(3, "PWM_D"),
+> > +		MTK_FUNCTION(4, "CLKM2"),
+> > +		MTK_FUNCTION(5, "ANT_SEL4"),
+> > +		MTK_FUNCTION(6, "MD_UTXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		51, "GPIO51",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO51"),
+> > +		MTK_FUNCTION(1, "DPI_DE"),
+> > +		MTK_FUNCTION(2, "SPI4_CLK_A"),
+> > +		MTK_FUNCTION(3, "IRTX_OUT"),
+> > +		MTK_FUNCTION(4, "SCL0_1"),
+> > +		MTK_FUNCTION(5, "ANT_SEL5"),
+> > +		MTK_FUNCTION(7, "C2K_UTXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		52, "GPIO52",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO52"),
+> > +		MTK_FUNCTION(1, "DPI_CK"),
+> > +		MTK_FUNCTION(2, "SPI4_MI_A"),
+> > +		MTK_FUNCTION(3, "SPI4_MO_A"),
+> > +		MTK_FUNCTION(4, "SDA0_1"),
+> > +		MTK_FUNCTION(5, "ANT_SEL6"),
+> > +		MTK_FUNCTION(7, "C2K_URXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		53, "GPIO53",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO53"),
+> > +		MTK_FUNCTION(1, "DPI_HSYNC"),
+> > +		MTK_FUNCTION(2, "SPI4_CS_A"),
+> > +		MTK_FUNCTION(3, "CMFLASH"),
+> > +		MTK_FUNCTION(4, "SCL1_1"),
+> > +		MTK_FUNCTION(5, "ANT_SEL7"),
+> > +		MTK_FUNCTION(6, "MD_URXD2"),
+> > +		MTK_FUNCTION(7, "PCC_PPC_IO")
+> > +	),
+> > +	MTK_PIN(
+> > +		54, "GPIO54",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO54"),
+> > +		MTK_FUNCTION(1, "DPI_VSYNC"),
+> > +		MTK_FUNCTION(2, "SPI4_MO_A"),
+> > +		MTK_FUNCTION(3, "SPI4_MI_A"),
+> > +		MTK_FUNCTION(4, "SDA1_1"),
+> > +		MTK_FUNCTION(5, "PWM_A"),
+> > +		MTK_FUNCTION(6, "MD_UTXD2"),
+> > +		MTK_FUNCTION(7, "EXT_FRAME_SYNC")
+> > +	),
+> > +	MTK_PIN(
+> > +		55, "GPIO55",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO55"),
+> > +		MTK_FUNCTION(1, "SCL1_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		56, "GPIO56",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO56"),
+> > +		MTK_FUNCTION(1, "SDA1_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		57, "GPIO57",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO57"),
+> > +		MTK_FUNCTION(1, "SPI0_CLK"),
+> > +		MTK_FUNCTION(2, "SCL0_2"),
+> > +		MTK_FUNCTION(3, "PWM_B"),
+> > +		MTK_FUNCTION(4, "UTXD3"),
+> > +		MTK_FUNCTION(5, "PCM0_SYNC")
+> > +	),
+> > +	MTK_PIN(
+> > +		58, "GPIO58",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO58"),
+> > +		MTK_FUNCTION(1, "SPI0_MI"),
+> > +		MTK_FUNCTION(2, "SPI0_MO"),
+> > +		MTK_FUNCTION(3, "SDA1_2"),
+> > +		MTK_FUNCTION(4, "URXD3"),
+> > +		MTK_FUNCTION(5, "PCM0_CLK")
+> > +	),
+> > +	MTK_PIN(
+> > +		59, "GPIO59",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO59"),
+> > +		MTK_FUNCTION(1, "SPI0_MO"),
+> > +		MTK_FUNCTION(2, "SPI0_MI"),
+> > +		MTK_FUNCTION(3, "PWM_C"),
+> > +		MTK_FUNCTION(4, "URTS3"),
+> > +		MTK_FUNCTION(5, "PCM0_DO")
+> > +	),
+> > +	MTK_PIN(
+> > +		60, "GPIO60",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO60"),
+> > +		MTK_FUNCTION(1, "SPI0_CS"),
+> > +		MTK_FUNCTION(2, "SDA0_2"),
+> > +		MTK_FUNCTION(3, "SCL1_2"),
+> > +		MTK_FUNCTION(4, "UCTS3"),
+> > +		MTK_FUNCTION(5, "PCM0_DI")
+> > +	),
+> > +	MTK_PIN(
+> > +		61, "GPIO61",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO61"),
+> > +		MTK_FUNCTION(1, "EINT0"),
+> > +		MTK_FUNCTION(2, "IDDIG"),
+> > +		MTK_FUNCTION(3, "SPI4_CLK_B"),
+> > +		MTK_FUNCTION(4, "I2S0_LRCK"),
+> > +		MTK_FUNCTION(5, "PCM0_SYNC"),
+> > +		MTK_FUNCTION(7, "C2K_EINT0")
+> > +	),
+> > +	MTK_PIN(
+> > +		62, "GPIO62",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO62"),
+> > +		MTK_FUNCTION(1, "EINT1"),
+> > +		MTK_FUNCTION(2, "USB_DRVVBUS"),
+> > +		MTK_FUNCTION(3, "SPI4_MI_B"),
+> > +		MTK_FUNCTION(4, "I2S0_BCK"),
+> > +		MTK_FUNCTION(5, "PCM0_CLK"),
+> > +		MTK_FUNCTION(7, "C2K_EINT1")
+> > +	),
+> > +	MTK_PIN(
+> > +		63, "GPIO63",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO63"),
+> > +		MTK_FUNCTION(1, "EINT2"),
+> > +		MTK_FUNCTION(2, "IRTX_OUT"),
+> > +		MTK_FUNCTION(3, "SPI4_MO_B"),
+> > +		MTK_FUNCTION(4, "I2S0_MCK"),
+> > +		MTK_FUNCTION(5, "PCM0_DI"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT0")
+> > +	),
+> > +	MTK_PIN(
+> > +		64, "GPIO64",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO64"),
+> > +		MTK_FUNCTION(1, "EINT3"),
+> > +		MTK_FUNCTION(2, "CMFLASH"),
+> > +		MTK_FUNCTION(3, "SPI4_CS_B"),
+> > +		MTK_FUNCTION(4, "I2S0_DI"),
+> > +		MTK_FUNCTION(5, "PCM0_DO"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT1")
+> > +	),
+> > +	MTK_PIN(
+> > +		65, "GPIO65",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO65"),
+> > +		MTK_FUNCTION(1, "EINT4"),
+> > +		MTK_FUNCTION(2, "CLKM0"),
+> > +		MTK_FUNCTION(3, "SPI5_CLK_B"),
+> > +		MTK_FUNCTION(4, "I2S1_LRCK"),
+> > +		MTK_FUNCTION(5, "PWM_A"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT2")
+> > +	),
+> > +	MTK_PIN(
+> > +		66, "GPIO66",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO66"),
+> > +		MTK_FUNCTION(1, "EINT5"),
+> > +		MTK_FUNCTION(2, "CLKM1"),
+> > +		MTK_FUNCTION(3, "SPI5_MI_B"),
+> > +		MTK_FUNCTION(4, "I2S1_BCK"),
+> > +		MTK_FUNCTION(5, "PWM_B"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT3")
+> > +	),
+> > +	MTK_PIN(
+> > +		67, "GPIO67",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO67"),
+> > +		MTK_FUNCTION(1, "EINT6"),
+> > +		MTK_FUNCTION(2, "CLKM2"),
+> > +		MTK_FUNCTION(3, "SPI5_MO_B"),
+> > +		MTK_FUNCTION(4, "I2S1_MCK"),
+> > +		MTK_FUNCTION(5, "PWM_C"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A0")
+> > +	),
+> > +	MTK_PIN(
+> > +		68, "GPIO68",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO68"),
+> > +		MTK_FUNCTION(1, "EINT7"),
+> > +		MTK_FUNCTION(2, "CLKM3"),
+> > +		MTK_FUNCTION(3, "SPI5_CS_B"),
+> > +		MTK_FUNCTION(4, "I2S1_DO"),
+> > +		MTK_FUNCTION(5, "PWM_D"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A1")
+> > +	),
+> > +	MTK_PIN(
+> > +		69, "GPIO69",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO69"),
+> > +		MTK_FUNCTION(1, "I2S0_LRCK"),
+> > +		MTK_FUNCTION(2, "I2S3_LRCK"),
+> > +		MTK_FUNCTION(3, "I2S1_LRCK"),
+> > +		MTK_FUNCTION(4, "I2S2_LRCK"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A2")
+> > +	),
+> > +	MTK_PIN(
+> > +		70, "GPIO70",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO70"),
+> > +		MTK_FUNCTION(1, "I2S0_BCK"),
+> > +		MTK_FUNCTION(2, "I2S3_BCK"),
+> > +		MTK_FUNCTION(3, "I2S1_BCK"),
+> > +		MTK_FUNCTION(4, "I2S2_BCK"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A3")
+> > +	),
+> > +	MTK_PIN(
+> > +		71, "GPIO71",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO71"),
+> > +		MTK_FUNCTION(1, "I2S0_MCK"),
+> > +		MTK_FUNCTION(2, "I2S3_MCK"),
+> > +		MTK_FUNCTION(3, "I2S1_MCK"),
+> > +		MTK_FUNCTION(4, "I2S2_MCK"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A4")
+> > +	),
+> > +	MTK_PIN(
+> > +		72, "GPIO72",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO72"),
+> > +		MTK_FUNCTION(1, "I2S0_DI"),
+> > +		MTK_FUNCTION(2, "I2S0_DI"),
+> > +		MTK_FUNCTION(3, "I2S2_DI"),
+> > +		MTK_FUNCTION(4, "I2S2_DI"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A5")
+> > +	),
+> > +	MTK_PIN(
+> > +		73, "GPIO73",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO73"),
+> > +		MTK_FUNCTION(1, "I2S3_DO"),
+> > +		MTK_FUNCTION(2, "I2S3_DO"),
+> > +		MTK_FUNCTION(3, "I2S1_DO"),
+> > +		MTK_FUNCTION(4, "I2S1_DO"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A6")
+> > +	),
+> > +	MTK_PIN(
+> > +		74, "GPIO74",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO74"),
+> > +		MTK_FUNCTION(1, "SCL3_0"),
+> > +		MTK_FUNCTION(7, "AUXIF_CLK1")
+> > +	),
+> > +	MTK_PIN(
+> > +		75, "GPIO75",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO75"),
+> > +		MTK_FUNCTION(1, "SDA3_0"),
+> > +		MTK_FUNCTION(7, "AUXIF_ST1")
+> > +	),
+> > +	MTK_PIN(
+> > +		76, "GPIO76",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO76"),
+> > +		MTK_FUNCTION(1, "CONN_HRST_B"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT0")
+> > +	),
+> > +	MTK_PIN(
+> > +		77, "GPIO77",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO77"),
+> > +		MTK_FUNCTION(1, "CONN_TOP_CLK"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT1")
+> > +	),
+> > +	MTK_PIN(
+> > +		78, "GPIO78",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO78"),
+> > +		MTK_FUNCTION(1, "CONN_TOP_DATA"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT2")
+> > +	),
+> > +	MTK_PIN(
+> > +		79, "GPIO79",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO79"),
+> > +		MTK_FUNCTION(1, "CONN_WB_PTA"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT3")
+> > +	),
+> > +	MTK_PIN(
+> > +		80, "GPIO80",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO80"),
+> > +		MTK_FUNCTION(1, "CONN_WF_HB0"),
+> > +		MTK_FUNCTION(7, "C2K_EINT0")
+> > +	),
+> > +	MTK_PIN(
+> > +		81, "GPIO81",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO81"),
+> > +		MTK_FUNCTION(1, "CONN_WF_HB1"),
+> > +		MTK_FUNCTION(7, "C2K_EINT1")
+> > +	),
+> > +	MTK_PIN(
+> > +		82, "GPIO82",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO82"),
+> > +		MTK_FUNCTION(1, "CONN_WF_HB2"),
+> > +		MTK_FUNCTION(7, "MD_CLKM0")
+> > +	),
+> > +	MTK_PIN(
+> > +		83, "GPIO83",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO83"),
+> > +		MTK_FUNCTION(1, "CONN_BT_CLK"),
+> > +		MTK_FUNCTION(7, "MD_CLKM1")
+> > +	),
+> > +	MTK_PIN(
+> > +		84, "GPIO84",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO84"),
+> > +		MTK_FUNCTION(1, "CONN_BT_DATA")
+> > +	),
+> > +	MTK_PIN(
+> > +		85, "GPIO85",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO85"),
+> > +		MTK_FUNCTION(1, "EINT8"),
+> > +		MTK_FUNCTION(2, "I2S1_LRCK"),
+> > +		MTK_FUNCTION(3, "I2S2_LRCK"),
+> > +		MTK_FUNCTION(4, "URXD1"),
+> > +		MTK_FUNCTION(5, "MD_URXD0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A7")
+> > +	),
+> > +	MTK_PIN(
+> > +		86, "GPIO86",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO86"),
+> > +		MTK_FUNCTION(1, "EINT9"),
+> > +		MTK_FUNCTION(2, "I2S1_BCK"),
+> > +		MTK_FUNCTION(3, "I2S2_BCK"),
+> > +		MTK_FUNCTION(4, "UTXD1"),
+> > +		MTK_FUNCTION(5, "MD_UTXD0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A8")
+> > +	),
+> > +	MTK_PIN(
+> > +		87, "GPIO87",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO87"),
+> > +		MTK_FUNCTION(1, "EINT10"),
+> > +		MTK_FUNCTION(2, "I2S1_MCK"),
+> > +		MTK_FUNCTION(3, "I2S2_MCK"),
+> > +		MTK_FUNCTION(4, "URTS1"),
+> > +		MTK_FUNCTION(5, "MD_URXD1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A9")
+> > +	),
+> > +	MTK_PIN(
+> > +		88, "GPIO88",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO88"),
+> > +		MTK_FUNCTION(1, "EINT11"),
+> > +		MTK_FUNCTION(2, "I2S1_DO"),
+> > +		MTK_FUNCTION(3, "I2S2_DI"),
+> > +		MTK_FUNCTION(4, "UCTS1"),
+> > +		MTK_FUNCTION(5, "MD_UTXD1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A10")
+> > +	),
+> > +	MTK_PIN(
+> > +		89, "GPIO89",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO89"),
+> > +		MTK_FUNCTION(1, "EINT12"),
+> > +		MTK_FUNCTION(2, "IRTX_OUT"),
+> > +		MTK_FUNCTION(3, "CLKM0"),
+> > +		MTK_FUNCTION(4, "PCM1_SYNC"),
+> > +		MTK_FUNCTION(5, "URTS0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A11")
+> > +	),
+> > +	MTK_PIN(
+> > +		90, "GPIO90",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO90"),
+> > +		MTK_FUNCTION(1, "EINT13"),
+> > +		MTK_FUNCTION(2, "CMFLASH"),
+> > +		MTK_FUNCTION(3, "CLKM1"),
+> > +		MTK_FUNCTION(4, "PCM1_CLK"),
+> > +		MTK_FUNCTION(5, "UCTS0"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT0")
+> > +	),
+> > +	MTK_PIN(
+> > +		91, "GPIO91",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO91"),
+> > +		MTK_FUNCTION(1, "EINT14"),
+> > +		MTK_FUNCTION(2, "PWM_A"),
+> > +		MTK_FUNCTION(3, "CLKM2"),
+> > +		MTK_FUNCTION(4, "PCM1_DI"),
+> > +		MTK_FUNCTION(5, "SDA0_3"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT1")
+> > +	),
+> > +	MTK_PIN(
+> > +		92, "GPIO92",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO92"),
+> > +		MTK_FUNCTION(1, "EINT15"),
+> > +		MTK_FUNCTION(2, "PWM_B"),
+> > +		MTK_FUNCTION(3, "CLKM3"),
+> > +		MTK_FUNCTION(4, "PCM1_DO0"),
+> > +		MTK_FUNCTION(5, "SCL0_3")
+> > +	),
+> > +	MTK_PIN(
+> > +		93, "GPIO93",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO93"),
+> > +		MTK_FUNCTION(1, "EINT16"),
+> > +		MTK_FUNCTION(2, "IDDIG"),
+> > +		MTK_FUNCTION(3, "CLKM4"),
+> > +		MTK_FUNCTION(4, "PCM1_DO1"),
+> > +		MTK_FUNCTION(5, "MD_INT2"),
+> > +		MTK_FUNCTION(7, "DROP_ZONE")
+> > +	),
+> > +	MTK_PIN(
+> > +		94, "GPIO94",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO94"),
+> > +		MTK_FUNCTION(1, "USB_DRVVBUS"),
+> > +		MTK_FUNCTION(2, "PWM_C"),
+> > +		MTK_FUNCTION(3, "CLKM5")
+> > +	),
+> > +	MTK_PIN(
+> > +		95, "GPIO95",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO95"),
+> > +		MTK_FUNCTION(1, "SDA2_0"),
+> > +		MTK_FUNCTION(7, "AUXIF_ST0")
+> > +	),
+> > +	MTK_PIN(
+> > +		96, "GPIO96",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO96"),
+> > +		MTK_FUNCTION(1, "SCL2_0"),
+> > +		MTK_FUNCTION(7, "AUXIF_CLK0")
+> > +	),
+> > +	MTK_PIN(
+> > +		97, "GPIO97",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO97"),
+> > +		MTK_FUNCTION(1, "URXD0"),
+> > +		MTK_FUNCTION(2, "UTXD0"),
+> > +		MTK_FUNCTION(3, "MD_URXD0"),
+> > +		MTK_FUNCTION(4, "MD_URXD1"),
+> > +		MTK_FUNCTION(5, "MD_URXD2"),
+> > +		MTK_FUNCTION(6, "C2K_URXD0"),
+> > +		MTK_FUNCTION(7, "C2K_URXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		98, "GPIO98",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO98"),
+> > +		MTK_FUNCTION(1, "UTXD0"),
+> > +		MTK_FUNCTION(2, "URXD0"),
+> > +		MTK_FUNCTION(3, "MD_UTXD0"),
+> > +		MTK_FUNCTION(4, "MD_UTXD1"),
+> > +		MTK_FUNCTION(5, "MD_UTXD2"),
+> > +		MTK_FUNCTION(6, "C2K_UTXD0"),
+> > +		MTK_FUNCTION(7, "C2K_UTXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		99, "GPIO99",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO99"),
+> > +		MTK_FUNCTION(1, "RTC32K_CK")
+> > +	),
+> > +	MTK_PIN(
+> > +		100, "GPIO100",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO100"),
+> > +		MTK_FUNCTION(1, "SRCLKENAI0")
+> > +	),
+> > +	MTK_PIN(
+> > +		101, "GPIO101",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO101"),
+> > +		MTK_FUNCTION(1, "SRCLKENAI1")
+> > +	),
+> > +	MTK_PIN(
+> > +		102, "GPIO102",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO102"),
+> > +		MTK_FUNCTION(1, "SRCLKENA0")
+> > +	),
+> > +	MTK_PIN(
+> > +		103, "GPIO103",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO103"),
+> > +		MTK_FUNCTION(1, "SRCLKENA1")
+> > +	),
+> > +	MTK_PIN(
+> > +		104, "GPIO104",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO104"),
+> > +		MTK_FUNCTION(1, "SYSRSTB")
+> > +	),
+> > +	MTK_PIN(
+> > +		105, "GPIO105",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO105"),
+> > +		MTK_FUNCTION(1, "WATCHDOG")
+> > +	),
+> > +	MTK_PIN(
+> > +		106, "GPIO106",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO106"),
+> > +		MTK_FUNCTION(1, "KPROW0"),
+> > +		MTK_FUNCTION(2, "CMFLASH"),
+> > +		MTK_FUNCTION(3, "CLKM4"),
+> > +		MTK_FUNCTION(4, "TP_GPIO0_AO"),
+> > +		MTK_FUNCTION(5, "IRTX_OUT")
+> > +	),
+> > +	MTK_PIN(
+> > +		107, "GPIO107",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO107"),
+> > +		MTK_FUNCTION(1, "KPROW1"),
+> > +		MTK_FUNCTION(2, "IDDIG"),
+> > +		MTK_FUNCTION(3, "CLKM5"),
+> > +		MTK_FUNCTION(4, "TP_GPIO1_AO"),
+> > +		MTK_FUNCTION(5, "I2S1_BCK"),
+> > +		MTK_FUNCTION(7, "DAP_SIB1_SWD")
+> > +	),
+> > +	MTK_PIN(
+> > +		108, "GPIO108",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO108"),
+> > +		MTK_FUNCTION(1, "KPROW2"),
+> > +		MTK_FUNCTION(2, "USB_DRVVBUS"),
+> > +		MTK_FUNCTION(3, "PWM_A"),
+> > +		MTK_FUNCTION(4, "CMFLASH"),
+> > +		MTK_FUNCTION(5, "I2S1_LRCK"),
+> > +		MTK_FUNCTION(7, "DAP_SIB1_SWCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		109, "GPIO109",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO109"),
+> > +		MTK_FUNCTION(1, "KPCOL0")
+> > +	),
+> > +	MTK_PIN(
+> > +		110, "GPIO110",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO110"),
+> > +		MTK_FUNCTION(1, "KPCOL1"),
+> > +		MTK_FUNCTION(2, "SDA1_3"),
+> > +		MTK_FUNCTION(3, "PWM_B"),
+> > +		MTK_FUNCTION(4, "CLKM0"),
+> > +		MTK_FUNCTION(5, "I2S1_DO"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT3")
+> > +	),
+> > +	MTK_PIN(
+> > +		111, "GPIO111",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO111"),
+> > +		MTK_FUNCTION(1, "KPCOL2"),
+> > +		MTK_FUNCTION(2, "SCL1_3"),
+> > +		MTK_FUNCTION(3, "PWM_C"),
+> > +		MTK_FUNCTION(4, "DISP_PWM"),
+> > +		MTK_FUNCTION(5, "I2S1_MCK"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT2")
+> > +	),
+> > +	MTK_PIN(
+> > +		112, "GPIO112",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO112"),
+> > +		MTK_FUNCTION(1, "MD_INT1_C2K_UIM1_HOT_PLUG_IN"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT1")
+> > +	),
+> > +	MTK_PIN(
+> > +		113, "GPIO113",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO113"),
+> > +		MTK_FUNCTION(1, "MD_INT0_C2K_UIM0_HOT_PLUG_IN"),
+> > +		MTK_FUNCTION(7, "C2K_DM_EINT0")
+> > +	),
+> > +	MTK_PIN(
+> > +		114, "GPIO114",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO114"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT0")
+> > +	),
+> > +	MTK_PIN(
+> > +		115, "GPIO115",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO115"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT1")
+> > +	),
+> > +	MTK_PIN(
+> > +		116, "GPIO116",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO116"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT2")
+> > +	),
+> > +	MTK_PIN(
+> > +		117, "GPIO117",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO117"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT3")
+> > +	),
+> > +	MTK_PIN(
+> > +		118, "GPIO118",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO118"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT4")
+> > +	),
+> > +	MTK_PIN(
+> > +		119, "GPIO119",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO119"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT5")
+> > +	),
+> > +	MTK_PIN(
+> > +		120, "GPIO120",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO120"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT6")
+> > +	),
+> > +	MTK_PIN(
+> > +		121, "GPIO121",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO121"),
+> > +		MTK_FUNCTION(1, "MSDC0_DAT7")
+> > +	),
+> > +	MTK_PIN(
+> > +		122, "GPIO122",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO122"),
+> > +		MTK_FUNCTION(1, "MSDC0_CMD")
+> > +	),
+> > +	MTK_PIN(
+> > +		123, "GPIO123",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO123"),
+> > +		MTK_FUNCTION(1, "MSDC0_CLK")
+> > +	),
+> > +	MTK_PIN(
+> > +		124, "GPIO124",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO124"),
+> > +		MTK_FUNCTION(1, "MSDC0_DSL")
+> > +	),
+> > +	MTK_PIN(
+> > +		125, "GPIO125",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO125"),
+> > +		MTK_FUNCTION(1, "MSDC0_RSTB")
+> > +	),
+> > +	MTK_PIN(
+> > +		126, "GPIO126",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO126"),
+> > +		MTK_FUNCTION(1, "MD1_SIM1_SCLK"),
+> > +		MTK_FUNCTION(2, "MD1_SIM2_SCLK"),
+> > +		MTK_FUNCTION(3, "C2K_UIM0_CLK"),
+> > +		MTK_FUNCTION(4, "C2K_UIM1_CLK")
+> > +	),
+> > +	MTK_PIN(
+> > +		127, "GPIO127",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO127"),
+> > +		MTK_FUNCTION(1, "MD1_SIM1_SRST"),
+> > +		MTK_FUNCTION(2, "MD1_SIM2_SRST"),
+> > +		MTK_FUNCTION(3, "C2K_UIM0_RST"),
+> > +		MTK_FUNCTION(4, "C2K_UIM1_RST")
+> > +	),
+> > +	MTK_PIN(
+> > +		128, "GPIO128",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO128"),
+> > +		MTK_FUNCTION(1, "MD1_SIM1_SIO"),
+> > +		MTK_FUNCTION(2, "MD1_SIM2_SIO"),
+> > +		MTK_FUNCTION(3, "C2K_UIM0_IO"),
+> > +		MTK_FUNCTION(4, "C2K_UIM1_IO")
+> > +	),
+> > +	MTK_PIN(
+> > +		129, "GPIO129",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO129"),
+> > +		MTK_FUNCTION(1, "MSDC1_CMD"),
+> > +		MTK_FUNCTION(2, "CONN_DSP_JMS"),
+> > +		MTK_FUNCTION(3, "LTE_JTAG_TMS"),
+> > +		MTK_FUNCTION(4, "UDI_TMS"),
+> > +		MTK_FUNCTION(5, "C2K_TMS")
+> > +	),
+> > +	MTK_PIN(
+> > +		130, "GPIO130",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO130"),
+> > +		MTK_FUNCTION(1, "MSDC1_DAT0"),
+> > +		MTK_FUNCTION(2, "CONN_DSP_JDI"),
+> > +		MTK_FUNCTION(3, "LTE_JTAG_TDI"),
+> > +		MTK_FUNCTION(4, "UDI_TDI"),
+> > +		MTK_FUNCTION(5, "C2K_TDI")
+> > +	),
+> > +	MTK_PIN(
+> > +		131, "GPIO131",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO131"),
+> > +		MTK_FUNCTION(1, "MSDC1_DAT1"),
+> > +		MTK_FUNCTION(2, "CONN_DSP_JDO"),
+> > +		MTK_FUNCTION(3, "LTE_JTAG_TDO"),
+> > +		MTK_FUNCTION(4, "UDI_TDO"),
+> > +		MTK_FUNCTION(5, "C2K_TDO")
+> > +	),
+> > +	MTK_PIN(
+> > +		132, "GPIO132",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO132"),
+> > +		MTK_FUNCTION(1, "MSDC1_DAT2"),
+> > +		MTK_FUNCTION(5, "C2K_RTCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		133, "GPIO133",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO133"),
+> > +		MTK_FUNCTION(1, "MSDC1_DAT3"),
+> > +		MTK_FUNCTION(2, "CONN_DSP_JINTP"),
+> > +		MTK_FUNCTION(3, "LTE_JTAG_TRSTN"),
+> > +		MTK_FUNCTION(4, "UDI_NTRST"),
+> > +		MTK_FUNCTION(5, "C2K_NTRST")
+> > +	),
+> > +	MTK_PIN(
+> > +		134, "GPIO134",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO134"),
+> > +		MTK_FUNCTION(1, "MSDC1_CLK"),
+> > +		MTK_FUNCTION(2, "CONN_DSP_JCK"),
+> > +		MTK_FUNCTION(3, "LTE_JTAG_TCK"),
+> > +		MTK_FUNCTION(4, "UDI_TCK_XI"),
+> > +		MTK_FUNCTION(5, "C2K_TCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		135, "GPIO135",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO135"),
+> > +		MTK_FUNCTION(1, "TDM_LRCK"),
+> > +		MTK_FUNCTION(2, "I2S0_LRCK"),
+> > +		MTK_FUNCTION(3, "CLKM0"),
+> > +		MTK_FUNCTION(4, "PCM1_SYNC"),
+> > +		MTK_FUNCTION(5, "PWM_A"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A12")
+> > +	),
+> > +	MTK_PIN(
+> > +		136, "GPIO136",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO136"),
+> > +		MTK_FUNCTION(1, "TDM_BCK"),
+> > +		MTK_FUNCTION(2, "I2S0_BCK"),
+> > +		MTK_FUNCTION(3, "CLKM1"),
+> > +		MTK_FUNCTION(4, "PCM1_CLK"),
+> > +		MTK_FUNCTION(5, "PWM_B"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A13")
+> > +	),
+> > +	MTK_PIN(
+> > +		137, "GPIO137",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO137"),
+> > +		MTK_FUNCTION(1, "TDM_MCK"),
+> > +		MTK_FUNCTION(2, "I2S0_MCK"),
+> > +		MTK_FUNCTION(3, "CLKM2"),
+> > +		MTK_FUNCTION(4, "PCM1_DI"),
+> > +		MTK_FUNCTION(5, "IRTX_OUT"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A14")
+> > +	),
+> > +	MTK_PIN(
+> > +		138, "GPIO138",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO138"),
+> > +		MTK_FUNCTION(1, "TDM_DATA0"),
+> > +		MTK_FUNCTION(2, "I2S0_DI"),
+> > +		MTK_FUNCTION(3, "CLKM3"),
+> > +		MTK_FUNCTION(4, "PCM1_DO0"),
+> > +		MTK_FUNCTION(5, "PWM_C"),
+> > +		MTK_FUNCTION(6, "SDA3_1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A15")
+> > +	),
+> > +	MTK_PIN(
+> > +		139, "GPIO139",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO139"),
+> > +		MTK_FUNCTION(1, "TDM_DATA1"),
+> > +		MTK_FUNCTION(2, "I2S3_DO"),
+> > +		MTK_FUNCTION(3, "CLKM4"),
+> > +		MTK_FUNCTION(4, "PCM1_DO1"),
+> > +		MTK_FUNCTION(5, "ANT_SEL2"),
+> > +		MTK_FUNCTION(6, "SCL3_1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A16")
+> > +	),
+> > +	MTK_PIN(
+> > +		140, "GPIO140",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO140"),
+> > +		MTK_FUNCTION(1, "TDM_DATA2"),
+> > +		MTK_FUNCTION(2, "DISP_PWM"),
+> > +		MTK_FUNCTION(3, "CLKM5"),
+> > +		MTK_FUNCTION(4, "SDA1_4"),
+> > +		MTK_FUNCTION(5, "ANT_SEL1"),
+> > +		MTK_FUNCTION(6, "URXD3"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A17")
+> > +	),
+> > +	MTK_PIN(
+> > +		141, "GPIO141",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO141"),
+> > +		MTK_FUNCTION(1, "TDM_DATA3"),
+> > +		MTK_FUNCTION(2, "CMFLASH"),
+> > +		MTK_FUNCTION(3, "IRTX_OUT"),
+> > +		MTK_FUNCTION(4, "SCL1_4"),
+> > +		MTK_FUNCTION(5, "ANT_SEL0"),
+> > +		MTK_FUNCTION(6, "UTXD3"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A18")
+> > +	),
+> > +	MTK_PIN(
+> > +		142, "GPIO142",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO142"),
+> > +		MTK_FUNCTION(1, "PWRAP_SPI0_MI"),
+> > +		MTK_FUNCTION(2, "PWRAP_SPI0_MO")
+> > +	),
+> > +	MTK_PIN(
+> > +		143, "GPIO143",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO143"),
+> > +		MTK_FUNCTION(1, "PWRAP_SPI0_MO"),
+> > +		MTK_FUNCTION(2, "PWRAP_SPI0_MI")
+> > +	),
+> > +	MTK_PIN(
+> > +		144, "GPIO144",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO144"),
+> > +		MTK_FUNCTION(1, "PWRAP_SPI0_CK")
+> > +	),
+> > +	MTK_PIN(
+> > +		145, "GPIO145",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO145"),
+> > +		MTK_FUNCTION(1, "PWRAP_SPI0_CSN")
+> > +	),
+> > +	MTK_PIN(
+> > +		146, "GPIO146",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO146"),
+> > +		MTK_FUNCTION(1, "AUD_CLK_MOSI")
+> > +	),
+> > +	MTK_PIN(
+> > +		147, "GPIO147",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO147"),
+> > +		MTK_FUNCTION(1, "AUD_DAT_MISO"),
+> > +		MTK_FUNCTION(2, "AUD_DAT_MOSI"),
+> > +		MTK_FUNCTION(3, "VOW_DAT_MISO")
+> > +	),
+> > +	MTK_PIN(
+> > +		148, "GPIO148",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO148"),
+> > +		MTK_FUNCTION(1, "AUD_DAT_MOSI"),
+> > +		MTK_FUNCTION(2, "AUD_DAT_MISO")
+> > +	),
+> > +	MTK_PIN(
+> > +		149, "GPIO149",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO149"),
+> > +		MTK_FUNCTION(1, "VOW_CLK_MISO")
+> > +	),
+> > +	MTK_PIN(
+> > +		150, "GPIO150",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO150"),
+> > +		MTK_FUNCTION(1, "ANC_DAT_MOSI")
+> > +	),
+> > +	MTK_PIN(
+> > +		151, "GPIO151",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO151"),
+> > +		MTK_FUNCTION(1, "SCL6_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		152, "GPIO152",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO152"),
+> > +		MTK_FUNCTION(1, "SDA6_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		153, "GPIO153",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO153"),
+> > +		MTK_FUNCTION(1, "SCL7_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		154, "GPIO154",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO154"),
+> > +		MTK_FUNCTION(1, "SDA7_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		155, "GPIO155",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO155"),
+> > +		MTK_FUNCTION(1, "MD1_SIM2_SCLK"),
+> > +		MTK_FUNCTION(2, "MD1_SIM1_SCLK"),
+> > +		MTK_FUNCTION(3, "C2K_UIM0_CLK"),
+> > +		MTK_FUNCTION(4, "C2K_UIM1_CLK")
+> > +	),
+> > +	MTK_PIN(
+> > +		156, "GPIO156",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO156"),
+> > +		MTK_FUNCTION(1, "MD1_SIM2_SRST"),
+> > +		MTK_FUNCTION(2, "MD1_SIM1_SRST"),
+> > +		MTK_FUNCTION(3, "C2K_UIM0_RST"),
+> > +		MTK_FUNCTION(4, "C2K_UIM1_RST")
+> > +	),
+> > +	MTK_PIN(
+> > +		157, "GPIO157",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO157"),
+> > +		MTK_FUNCTION(1, "MD1_SIM2_SIO"),
+> > +		MTK_FUNCTION(2, "MD1_SIM1_SIO"),
+> > +		MTK_FUNCTION(3, "C2K_UIM0_IO"),
+> > +		MTK_FUNCTION(4, "C2K_UIM1_IO")
+> > +	),
+> > +	MTK_PIN(
+> > +		158, "GPIO158",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO158"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP0")
+> > +	),
+> > +	MTK_PIN(
+> > +		159, "GPIO159",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO159"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN0")
+> > +	),
+> > +	MTK_PIN(
+> > +		160, "GPIO160",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO160"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP1")
+> > +	),
+> > +	MTK_PIN(
+> > +		161, "GPIO161",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO161"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN1")
+> > +	),
+> > +	MTK_PIN(
+> > +		162, "GPIO162",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO162"),
+> > +		MTK_FUNCTION(1, "MIPI_TCP")
+> > +	),
+> > +	MTK_PIN(
+> > +		163, "GPIO163",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO163"),
+> > +		MTK_FUNCTION(1, "MIPI_TCN")
+> > +	),
+> > +	MTK_PIN(
+> > +		164, "GPIO164",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO164"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP2")
+> > +	),
+> > +	MTK_PIN(
+> > +		165, "GPIO165",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO165"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN2")
+> > +	),
+> > +	MTK_PIN(
+> > +		166, "GPIO166",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO166"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP3")
+> > +	),
+> > +	MTK_PIN(
+> > +		167, "GPIO167",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO167"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN3")
+> > +	),
+> > +	MTK_PIN(
+> > +		168, "GPIO168",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO168"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP0_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		169, "GPIO169",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO169"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN0_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		170, "GPIO170",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO170"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP1_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		171, "GPIO171",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO171"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN1_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		172, "GPIO172",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO172"),
+> > +		MTK_FUNCTION(1, "MIPI_TCP_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		173, "GPIO173",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO173"),
+> > +		MTK_FUNCTION(1, "MIPI_TCN_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		174, "GPIO174",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO174"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP2_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		175, "GPIO175",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO175"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN2_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		176, "GPIO176",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO176"),
+> > +		MTK_FUNCTION(1, "MIPI_TDP3_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		177, "GPIO177",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO177"),
+> > +		MTK_FUNCTION(1, "MIPI_TDN3_A")
+> > +	),
+> > +	MTK_PIN(
+> > +		178, "GPIO178",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO178"),
+> > +		MTK_FUNCTION(1, "DISP_PWM"),
+> > +		MTK_FUNCTION(2, "PWM_D"),
+> > +		MTK_FUNCTION(3, "CLKM5"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A19")
+> > +	),
+> > +	MTK_PIN(
+> > +		179, "GPIO179",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO179"),
+> > +		MTK_FUNCTION(1, "DSI_TE0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A20")
+> > +	),
+> > +	MTK_PIN(
+> > +		180, "GPIO180",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO180"),
+> > +		MTK_FUNCTION(1, "LCM_RST"),
+> > +		MTK_FUNCTION(2, "DSI_TE1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A21")
+> > +	),
+> > +	MTK_PIN(
+> > +		181, "GPIO181",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO181"),
+> > +		MTK_FUNCTION(1, "IDDIG"),
+> > +		MTK_FUNCTION(2, "DSI_TE1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A22")
+> > +	),
+> > +	MTK_PIN(
+> > +		182, "GPIO182",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO182"),
+> > +		MTK_FUNCTION(1, "TESTMODE")
+> > +	),
+> > +	MTK_PIN(
+> > +		183, "GPIO183",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO183"),
+> > +		MTK_FUNCTION(1, "RFIC0_BSI_CK"),
+> > +		MTK_FUNCTION(2, "SPM_BSI_CK"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B27")
+> > +	),
+> > +	MTK_PIN(
+> > +		184, "GPIO184",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO184"),
+> > +		MTK_FUNCTION(1, "RFIC0_BSI_EN"),
+> > +		MTK_FUNCTION(2, "SPM_BSI_EN"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B28")
+> > +	),
+> > +	MTK_PIN(
+> > +		185, "GPIO185",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO185"),
+> > +		MTK_FUNCTION(1, "RFIC0_BSI_D0"),
+> > +		MTK_FUNCTION(2, "SPM_BSI_D0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B29")
+> > +	),
+> > +	MTK_PIN(
+> > +		186, "GPIO186",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO186"),
+> > +		MTK_FUNCTION(1, "RFIC0_BSI_D1"),
+> > +		MTK_FUNCTION(2, "SPM_BSI_D1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B30")
+> > +	),
+> > +	MTK_PIN(
+> > +		187, "GPIO187",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO187"),
+> > +		MTK_FUNCTION(1, "RFIC0_BSI_D2"),
+> > +		MTK_FUNCTION(2, "SPM_BSI_D2"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B31")
+> > +	),
+> > +	MTK_PIN(
+> > +		188, "GPIO188",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO188"),
+> > +		MTK_FUNCTION(1, "MIPI0_SCLK"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B32")
+> > +	),
+> > +	MTK_PIN(
+> > +		189, "GPIO189",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO189"),
+> > +		MTK_FUNCTION(1, "MIPI0_SDATA")
+> > +	),
+> > +	MTK_PIN(
+> > +		190, "GPIO190",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO190"),
+> > +		MTK_FUNCTION(1, "MIPI1_SCLK")
+> > +	),
+> > +	MTK_PIN(
+> > +		191, "GPIO191",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO191"),
+> > +		MTK_FUNCTION(1, "MIPI1_SDATA")
+> > +	),
+> > +	MTK_PIN(
+> > +		192, "GPIO192",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO192"),
+> > +		MTK_FUNCTION(1, "BPI_BUS4")
+> > +	),
+> > +	MTK_PIN(
+> > +		193, "GPIO193",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO193"),
+> > +		MTK_FUNCTION(1, "BPI_BUS5"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B0")
+> > +	),
+> > +	MTK_PIN(
+> > +		194, "GPIO194",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO194"),
+> > +		MTK_FUNCTION(1, "BPI_BUS6"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B1")
+> > +	),
+> > +	MTK_PIN(
+> > +		195, "GPIO195",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO195"),
+> > +		MTK_FUNCTION(1, "BPI_BUS7"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B2")
+> > +	),
+> > +	MTK_PIN(
+> > +		196, "GPIO196",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO196"),
+> > +		MTK_FUNCTION(1, "BPI_BUS8"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B3")
+> > +	),
+> > +	MTK_PIN(
+> > +		197, "GPIO197",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO197"),
+> > +		MTK_FUNCTION(1, "BPI_BUS9"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B4")
+> > +	),
+> > +	MTK_PIN(
+> > +		198, "GPIO198",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO198"),
+> > +		MTK_FUNCTION(1, "BPI_BUS10"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B5")
+> > +	),
+> > +	MTK_PIN(
+> > +		199, "GPIO199",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO199"),
+> > +		MTK_FUNCTION(1, "BPI_BUS11"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B6")
+> > +	),
+> > +	MTK_PIN(
+> > +		200, "GPIO200",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO200"),
+> > +		MTK_FUNCTION(1, "BPI_BUS12"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B7")
+> > +	),
+> > +	MTK_PIN(
+> > +		201, "GPIO201",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO201"),
+> > +		MTK_FUNCTION(1, "BPI_BUS13"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B8")
+> > +	),
+> > +	MTK_PIN(
+> > +		202, "GPIO202",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO202"),
+> > +		MTK_FUNCTION(1, "BPI_BUS14"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B9")
+> > +	),
+> > +	MTK_PIN(
+> > +		203, "GPIO203",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO203"),
+> > +		MTK_FUNCTION(1, "BPI_BUS15"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B10")
+> > +	),
+> > +	MTK_PIN(
+> > +		204, "GPIO204",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO204"),
+> > +		MTK_FUNCTION(1, "BPI_BUS16"),
+> > +		MTK_FUNCTION(2, "PA_VM0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B11")
+> > +	),
+> > +	MTK_PIN(
+> > +		205, "GPIO205",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO205"),
+> > +		MTK_FUNCTION(1, "BPI_BUS17"),
+> > +		MTK_FUNCTION(2, "PA_VM1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B12")
+> > +	),
+> > +	MTK_PIN(
+> > +		206, "GPIO206",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO206"),
+> > +		MTK_FUNCTION(1, "BPI_BUS18"),
+> > +		MTK_FUNCTION(2, "TX_SWAP0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B13")
+> > +	),
+> > +	MTK_PIN(
+> > +		207, "GPIO207",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO207"),
+> > +		MTK_FUNCTION(1, "BPI_BUS19"),
+> > +		MTK_FUNCTION(2, "TX_SWAP1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B14")
+> > +	),
+> > +	MTK_PIN(
+> > +		208, "GPIO208",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO208"),
+> > +		MTK_FUNCTION(1, "BPI_BUS20"),
+> > +		MTK_FUNCTION(2, "TX_SWAP2"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B15")
+> > +	),
+> > +	MTK_PIN(
+> > +		209, "GPIO209",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO209"),
+> > +		MTK_FUNCTION(1, "BPI_BUS21"),
+> > +		MTK_FUNCTION(2, "TX_SWAP3"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B16")
+> > +	),
+> > +	MTK_PIN(
+> > +		210, "GPIO210",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO210"),
+> > +		MTK_FUNCTION(1, "BPI_BUS22"),
+> > +		MTK_FUNCTION(2, "DET_BPI0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B17")
+> > +	),
+> > +	MTK_PIN(
+> > +		211, "GPIO211",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO211"),
+> > +		MTK_FUNCTION(1, "BPI_BUS23"),
+> > +		MTK_FUNCTION(2, "DET_BPI1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B18")
+> > +	),
+> > +	MTK_PIN(
+> > +		212, "GPIO212",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO212"),
+> > +		MTK_FUNCTION(1, "BPI_BUS0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B19")
+> > +	),
+> > +	MTK_PIN(
+> > +		213, "GPIO213",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO213"),
+> > +		MTK_FUNCTION(1, "BPI_BUS1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B20")
+> > +	),
+> > +	MTK_PIN(
+> > +		214, "GPIO214",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO214"),
+> > +		MTK_FUNCTION(1, "BPI_BUS2"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B21")
+> > +	),
+> > +	MTK_PIN(
+> > +		215, "GPIO215",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO215"),
+> > +		MTK_FUNCTION(1, "BPI_BUS3"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B22")
+> > +	),
+> > +	MTK_PIN(
+> > +		216, "GPIO216",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO216"),
+> > +		MTK_FUNCTION(1, "MIPI2_SCLK"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B23")
+> > +	),
+> > +	MTK_PIN(
+> > +		217, "GPIO217",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO217"),
+> > +		MTK_FUNCTION(1, "MIPI2_SDATA"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B24")
+> > +	),
+> > +	MTK_PIN(
+> > +		218, "GPIO218",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO218"),
+> > +		MTK_FUNCTION(1, "MIPI3_SCLK"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B25")
+> > +	),
+> > +	MTK_PIN(
+> > +		219, "GPIO219",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO219"),
+> > +		MTK_FUNCTION(1, "MIPI3_SDATA"),
+> > +		MTK_FUNCTION(7, "DBG_MON_B26")
+> > +	),
+> > +	MTK_PIN(
+> > +		220, "GPIO220",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO220"),
+> > +		MTK_FUNCTION(1, "CONN_WF_IP")
+> > +	),
+> > +	MTK_PIN(
+> > +		221, "GPIO221",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO221"),
+> > +		MTK_FUNCTION(1, "CONN_WF_IN")
+> > +	),
+> > +	MTK_PIN(
+> > +		222, "GPIO222",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO222"),
+> > +		MTK_FUNCTION(1, "CONN_WF_QP")
+> > +	),
+> > +	MTK_PIN(
+> > +		223, "GPIO223",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO223"),
+> > +		MTK_FUNCTION(1, "CONN_WF_QN")
+> > +	),
+> > +	MTK_PIN(
+> > +		224, "GPIO224",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO224"),
+> > +		MTK_FUNCTION(1, "CONN_BT_IP")
+> > +	),
+> > +	MTK_PIN(
+> > +		225, "GPIO225",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO225"),
+> > +		MTK_FUNCTION(1, "CONN_BT_IN")
+> > +	),
+> > +	MTK_PIN(
+> > +		226, "GPIO226",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO226"),
+> > +		MTK_FUNCTION(1, "CONN_BT_QP")
+> > +	),
+> > +	MTK_PIN(
+> > +		227, "GPIO227",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO227"),
+> > +		MTK_FUNCTION(1, "CONN_BT_QN")
+> > +	),
+> > +	MTK_PIN(
+> > +		228, "GPIO228",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO228"),
+> > +		MTK_FUNCTION(1, "CONN_GPS_IP")
+> > +	),
+> > +	MTK_PIN(
+> > +		229, "GPIO229",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO229"),
+> > +		MTK_FUNCTION(1, "CONN_GPS_IN")
+> > +	),
+> > +	MTK_PIN(
+> > +		230, "GPIO230",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO230"),
+> > +		MTK_FUNCTION(1, "CONN_GPS_QP")
+> > +	),
+> > +	MTK_PIN(
+> > +		231, "GPIO231",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO231"),
+> > +		MTK_FUNCTION(1, "CONN_GPS_QN")
+> > +	),
+> > +	MTK_PIN(
+> > +		232, "GPIO232",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO232"),
+> > +		MTK_FUNCTION(1, "URXD1"),
+> > +		MTK_FUNCTION(2, "UTXD1"),
+> > +		MTK_FUNCTION(3, "MD_URXD0"),
+> > +		MTK_FUNCTION(4, "MD_URXD1"),
+> > +		MTK_FUNCTION(5, "MD_URXD2"),
+> > +		MTK_FUNCTION(6, "C2K_URXD0"),
+> > +		MTK_FUNCTION(7, "C2K_URXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		233, "GPIO233",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO233"),
+> > +		MTK_FUNCTION(1, "UTXD1"),
+> > +		MTK_FUNCTION(2, "URXD1"),
+> > +		MTK_FUNCTION(3, "MD_UTXD0"),
+> > +		MTK_FUNCTION(4, "MD_UTXD1"),
+> > +		MTK_FUNCTION(5, "MD_UTXD2"),
+> > +		MTK_FUNCTION(6, "C2K_UTXD0"),
+> > +		MTK_FUNCTION(7, "C2K_UTXD1")
+> > +	),
+> > +	MTK_PIN(
+> > +		234, "GPIO234",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO234"),
+> > +		MTK_FUNCTION(1, "SPI1_CLK_B"),
+> > +		MTK_FUNCTION(2, "TP_UTXD1_AO"),
+> > +		MTK_FUNCTION(3, "SCL4_1"),
+> > +		MTK_FUNCTION(4, "UTXD0"),
+> > +		MTK_FUNCTION(6, "PWM_A"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A23")
+> > +	),
+> > +	MTK_PIN(
+> > +		235, "GPIO235",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO235"),
+> > +		MTK_FUNCTION(1, "SPI1_MI_B"),
+> > +		MTK_FUNCTION(2, "SPI1_MO_B"),
+> > +		MTK_FUNCTION(3, "SDA4_1"),
+> > +		MTK_FUNCTION(4, "URXD0"),
+> > +		MTK_FUNCTION(6, "CLKM0"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A24")
+> > +	),
+> > +	MTK_PIN(
+> > +		236, "GPIO236",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO236"),
+> > +		MTK_FUNCTION(1, "SPI1_MO_B"),
+> > +		MTK_FUNCTION(2, "SPI1_MI_B"),
+> > +		MTK_FUNCTION(3, "SCL5_1"),
+> > +		MTK_FUNCTION(4, "URTS0"),
+> > +		MTK_FUNCTION(6, "PWM_B"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A25")
+> > +	),
+> > +	MTK_PIN(
+> > +		237, "GPIO237",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO237"),
+> > +		MTK_FUNCTION(1, "SPI1_CS_B"),
+> > +		MTK_FUNCTION(2, "TP_URXD1_AO"),
+> > +		MTK_FUNCTION(3, "SDA5_1"),
+> > +		MTK_FUNCTION(4, "UCTS0"),
+> > +		MTK_FUNCTION(6, "CLKM1"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A26")
+> > +	),
+> > +	MTK_PIN(
+> > +		238, "GPIO238",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO238"),
+> > +		MTK_FUNCTION(1, "SDA4_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		239, "GPIO239",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO239"),
+> > +		MTK_FUNCTION(1, "SCL4_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		240, "GPIO240",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO240"),
+> > +		MTK_FUNCTION(1, "SDA5_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		241, "GPIO241",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +				MTK_FUNCTION(0, "GPIO241"),
+> > +		MTK_FUNCTION(1, "SCL5_0")
+> > +	),
+> > +	MTK_PIN(
+> > +		242, "GPIO242",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO242"),
+> > +		MTK_FUNCTION(1, "SPI2_CLK_B"),
+> > +		MTK_FUNCTION(2, "TP_UTXD2_AO"),
+> > +		MTK_FUNCTION(3, "SCL4_2"),
+> > +		MTK_FUNCTION(4, "UTXD1"),
+> > +		MTK_FUNCTION(5, "URTS3"),
+> > +		MTK_FUNCTION(6, "PWM_C"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A27")
+> > +	),
+> > +	MTK_PIN(
+> > +		243, "GPIO243",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO243"),
+> > +		MTK_FUNCTION(1, "SPI2_MI_B"),
+> > +		MTK_FUNCTION(2, "SPI2_MO_B"),
+> > +		MTK_FUNCTION(3, "SDA4_2"),
+> > +		MTK_FUNCTION(4, "URXD1"),
+> > +		MTK_FUNCTION(5, "UCTS3"),
+> > +		MTK_FUNCTION(6, "CLKM2"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A28")
+> > +	),
+> > +	MTK_PIN(
+> > +		244, "GPIO244",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO244"),
+> > +		MTK_FUNCTION(1, "SPI2_MO_B"),
+> > +		MTK_FUNCTION(2, "SPI2_MI_B"),
+> > +		MTK_FUNCTION(3, "SCL5_2"),
+> > +		MTK_FUNCTION(4, "URTS1"),
+> > +		MTK_FUNCTION(5, "UTXD3"),
+> > +		MTK_FUNCTION(6, "PWM_D"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A29")
+> > +	),
+> > +	MTK_PIN(
+> > +		245, "GPIO245",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO245"),
+> > +		MTK_FUNCTION(1, "SPI2_CS_B"),
+> > +		MTK_FUNCTION(2, "TP_URXD2_AO"),
+> > +		MTK_FUNCTION(3, "SDA5_2"),
+> > +		MTK_FUNCTION(4, "UCTS1"),
+> > +		MTK_FUNCTION(5, "URXD3"),
+> > +		MTK_FUNCTION(6, "CLKM3"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A30")
+> > +	),
+> > +	MTK_PIN(
+> > +		246, "GPIO246",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO246"),
+> > +		MTK_FUNCTION(1, "I2S1_LRCK"),
+> > +		MTK_FUNCTION(2, "I2S2_LRCK"),
+> > +		MTK_FUNCTION(3, "I2S0_LRCK"),
+> > +		MTK_FUNCTION(4, "I2S3_LRCK"),
+> > +		MTK_FUNCTION(5, "PCM0_SYNC"),
+> > +		MTK_FUNCTION(6, "SPI5_CLK_C"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A31")
+> > +	),
+> > +	MTK_PIN(
+> > +		247, "GPIO247",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO247"),
+> > +		MTK_FUNCTION(1, "I2S1_BCK"),
+> > +		MTK_FUNCTION(2, "I2S2_BCK"),
+> > +		MTK_FUNCTION(3, "I2S0_BCK"),
+> > +		MTK_FUNCTION(4, "I2S3_BCK"),
+> > +		MTK_FUNCTION(5, "PCM0_CLK"),
+> > +		MTK_FUNCTION(6, "SPI5_MI_C"),
+> > +		MTK_FUNCTION(7, "DBG_MON_A32")
+> > +	),
+> > +	MTK_PIN(
+> > +		248, "GPIO248",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO248"),
+> > +		MTK_FUNCTION(1, "I2S2_DI"),
+> > +		MTK_FUNCTION(2, "I2S2_DI"),
+> > +		MTK_FUNCTION(3, "I2S0_DI"),
+> > +		MTK_FUNCTION(4, "I2S0_DI"),
+> > +		MTK_FUNCTION(5, "PCM0_DI"),
+> > +		MTK_FUNCTION(6, "SPI5_CS_C")
+> > +	),
+> > +	MTK_PIN(
+> > +		249, "GPIO249",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO249"),
+> > +		MTK_FUNCTION(1, "I2S1_DO"),
+> > +		MTK_FUNCTION(2, "I2S1_DO"),
+> > +		MTK_FUNCTION(3, "I2S3_DO"),
+> > +		MTK_FUNCTION(4, "I2S3_DO"),
+> > +		MTK_FUNCTION(5, "PCM0_DO"),
+> > +		MTK_FUNCTION(6, "SPI5_MO_C"),
+> > +		MTK_FUNCTION(7, "TRAP_SRAM_PWR_BYPASS")
+> > +	),
+> > +	MTK_PIN(
+> > +		250, "GPIO250",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO250"),
+> > +		MTK_FUNCTION(1, "SPI3_MI"),
+> > +		MTK_FUNCTION(2, "SPI3_MO"),
+> > +		MTK_FUNCTION(3, "IRTX_OUT"),
+> > +		MTK_FUNCTION(6, "TP_URXD1_AO"),
+> > +		MTK_FUNCTION(7, "DROP_ZONE")
+> > +	),
+> > +	MTK_PIN(
+> > +		251, "GPIO251",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO251"),
+> > +		MTK_FUNCTION(1, "SPI3_MO"),
+> > +		MTK_FUNCTION(2, "SPI3_MI"),
+> > +		MTK_FUNCTION(3, "CMFLASH"),
+> > +		MTK_FUNCTION(6, "TP_UTXD1_AO"),
+> > +		MTK_FUNCTION(7, "C2K_RTCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		252, "GPIO252",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO252"),
+> > +		MTK_FUNCTION(1, "SPI3_CLK"),
+> > +		MTK_FUNCTION(2, "SCL0_4"),
+> > +		MTK_FUNCTION(3, "PWM_D"),
+> > +		MTK_FUNCTION(7, "C2K_TMS")
+> > +	),
+> > +	MTK_PIN(
+> > +		253, "GPIO253",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO253"),
+> > +		MTK_FUNCTION(1, "SPI3_CS"),
+> > +		MTK_FUNCTION(2, "SDA0_4"),
+> > +		MTK_FUNCTION(3, "PWM_A"),
+> > +		MTK_FUNCTION(7, "C2K_TCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		254, "GPIO254",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO254"),
+> > +		MTK_FUNCTION(1, "I2S1_MCK"),
+> > +		MTK_FUNCTION(2, "I2S2_MCK"),
+> > +		MTK_FUNCTION(3, "I2S0_MCK"),
+> > +		MTK_FUNCTION(4, "I2S3_MCK"),
+> > +		MTK_FUNCTION(5, "CLKM0"),
+> > +		MTK_FUNCTION(7, "C2K_TDI")
+> > +	),
+> > +	MTK_PIN(
+> > +		255, "GPIO255",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO255"),
+> > +		MTK_FUNCTION(1, "CLKM1"),
+> > +		MTK_FUNCTION(2, "DISP_PWM"),
+> > +		MTK_FUNCTION(3, "PWM_B"),
+> > +		MTK_FUNCTION(6, "TP_GPIO1_AO"),
+> > +		MTK_FUNCTION(7, "C2K_TDO")
+> > +	),
+> > +	MTK_PIN(
+> > +		256, "GPIO256",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO256"),
+> > +		MTK_FUNCTION(1, "CLKM2"),
+> > +		MTK_FUNCTION(2, "IRTX_OUT"),
+> > +		MTK_FUNCTION(3, "PWM_C"),
+> > +		MTK_FUNCTION(6, "TP_GPIO0_AO"),
+> > +		MTK_FUNCTION(7, "C2K_NTRST")
+> > +	),
+> > +	MTK_PIN(
+> > +		257, "GPIO257",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO257"),
+> > +		MTK_FUNCTION(1, "IO_JTAG_TMS"),
+> > +		MTK_FUNCTION(2, "LTE_JTAG_TMS"),
+> > +		MTK_FUNCTION(3, "DFD_TMS"),
+> > +		MTK_FUNCTION(4, "DAP_SIB1_SWD"),
+> > +		MTK_FUNCTION(5, "ANC_JTAG_TMS"),
+> > +		MTK_FUNCTION(6, "SCP_JTAG_TMS"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTMS")
+> > +	),
+> > +	MTK_PIN(
+> > +		258, "GPIO258",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO258"),
+> > +		MTK_FUNCTION(1, "IO_JTAG_TCK"),
+> > +		MTK_FUNCTION(2, "LTE_JTAG_TCK"),
+> > +		MTK_FUNCTION(3, "DFD_TCK_XI"),
+> > +		MTK_FUNCTION(4, "DAP_SIB1_SWCK"),
+> > +		MTK_FUNCTION(5, "ANC_JTAG_TCK"),
+> > +		MTK_FUNCTION(6, "SCP_JTAG_TCK"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTCK")
+> > +	),
+> > +	MTK_PIN(
+> > +		259, "GPIO259",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO259"),
+> > +		MTK_FUNCTION(1, "IO_JTAG_TDI"),
+> > +		MTK_FUNCTION(2, "LTE_JTAG_TDI"),
+> > +		MTK_FUNCTION(3, "DFD_TDI"),
+> > +		MTK_FUNCTION(5, "ANC_JTAG_TDI"),
+> > +		MTK_FUNCTION(6, "SCP_JTAG_TDI"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTDI")
+> > +	),
+> > +	MTK_PIN(
+> > +		260, "GPIO260",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO260"),
+> > +		MTK_FUNCTION(1, "IO_JTAG_TDO"),
+> > +		MTK_FUNCTION(2, "LTE_JTAG_TDO"),
+> > +		MTK_FUNCTION(3, "DFD_TDO"),
+> > +		MTK_FUNCTION(5, "ANC_JTAG_TDO"),
+> > +		MTK_FUNCTION(6, "SCP_JTAG_TDO"),
+> > +		MTK_FUNCTION(7, "C2K_DM_OTDO")
+> > +	),
+> > +	MTK_PIN(
+> > +		261, "GPIO261",
+> > +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+> > +		DRV_GRP3,
+> > +		MTK_FUNCTION(0, "GPIO261"),
+> > +		MTK_FUNCTION(2, "LTE_JTAG_TRSTN"),
+> > +		MTK_FUNCTION(3, "DFD_NTRST"),
+> > +		MTK_FUNCTION(5, "ANC_JTAG_TRSTN"),
+> > +		MTK_FUNCTION(6, "SCP_JTAG_TRSTN"),
+> > +		MTK_FUNCTION(7, "C2K_DM_JTINTP")
+> > +	),
+> > +};
+> > +
+> > +#endif /* __PINCTRL_MTK_MT6797_H */
+> > +
+> > 
