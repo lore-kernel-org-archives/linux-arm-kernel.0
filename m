@@ -1,272 +1,362 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 11 Oct 2018 10:13:21 +0100
-Subject: [PATCH v6 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <CAKTKpr41udk9dGyLVZjO5pj_J7sf_sU_Td3t2R60UMxJatDDXA@mail.gmail.com>
-References: <20180621063338.20093-1-ganapatrao.kulkarni@cavium.com>
- <20180621063338.20093-3-ganapatrao.kulkarni@cavium.com>
- <c77e9601-71ca-ff09-f21d-b2493ca7c40b@arm.com>
- <CAKTKpr41udk9dGyLVZjO5pj_J7sf_sU_Td3t2R60UMxJatDDXA@mail.gmail.com>
-Message-ID: <3e9ab774-71db-d81d-5f0a-15fe942dfdb0@arm.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Thu, 11 Oct 2018 17:21:25 +0800
+Subject: [PATCH v4 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <bc425f1926ddc1b426be5902bf3595ff556670d3.camel@baylibre.com>
+References: <20180809070724.11935-1-yixun.lan@amlogic.com>
+ <20180809070724.11935-4-yixun.lan@amlogic.com>
+ <bc425f1926ddc1b426be5902bf3595ff556670d3.camel@baylibre.com>
+Message-ID: <ac66138a-1778-cea9-b725-66af84453613@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganapatrao,
-
-On 11/10/18 07:39, Ganapatrao Kulkarni wrote:
->>> +
->>> +/*
->>> + * We must NOT create groups containing events from multiple hardware PMUs,
->>> + * although mixing different software and hardware PMUs is allowed.
->>> + */
->>> +static bool thunderx2_uncore_validate_event_group(struct perf_event *event)
->>> +{
->>> +     struct pmu *pmu = event->pmu;
->>> +     struct perf_event *leader = event->group_leader;
->>> +     struct perf_event *sibling;
->>> +     int counters = 0;
->>> +
->>> +     if (leader->pmu != event->pmu && !is_software_event(leader))
->>> +             return false;
->>> +
->>> +     for_each_sibling_event(sibling, event->group_leader) {
->>> +             if (is_software_event(sibling))
->>> +                     continue;
->>> +             if (sibling->pmu != pmu)
->>> +                     return false;
->>> +             counters++;
->>> +     }
+On 2018/8/10 20:47, Jerome Brunet wrote:
+> On Thu, 2018-08-09 at 15:07 +0800, Yixun Lan wrote:
+>> The patch will add a MMC clock controller driver which used by MMC or NAND,
+>> It provide a mux and divider clock, and three phase clocks - core, tx, tx.
 >>
->> The above loop will not account for :
->> 1) The leader event
->> 2) The event that we are about to add.
+>> Two clocks are provided as the parent of MMC clock controller from
+>> upper layer clock controller - eg "amlogic,axg-clkc" in AXG platform.
 >>
->> So you need to allocate counters for both the above to make sure we can
->> accommodate the events.
+>> To specify which clock the MMC or NAND driver may consume,
+>> the preprocessor macros in the dt-bindings/clock/amlogic,mmc-clkc.h header
+>> can be used in the device tree sources.
+>>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  drivers/clk/meson/Kconfig    |  10 ++
+>>  drivers/clk/meson/Makefile   |   1 +
+>>  drivers/clk/meson/mmc-clkc.c | 275 +++++++++++++++++++++++++++++++++++
+>>  3 files changed, 286 insertions(+)
+>>  create mode 100644 drivers/clk/meson/mmc-clkc.c
+>>
+>> diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
+>> index efaa70f682b4..8b8ccbcfed1d 100644
+>> --- a/drivers/clk/meson/Kconfig
+>> +++ b/drivers/clk/meson/Kconfig
+>> @@ -15,6 +15,16 @@ config COMMON_CLK_MESON_AO
+>>  	select COMMON_CLK_REGMAP_MESON
+>>  	select RESET_CONTROLLER
+>>  
+>> +config COMMON_CLK_MMC_MESON
+>> +	tristate "Meson MMC Sub Clock Controller Driver"
+>> +	depends on COMMON_CLK_AMLOGIC
+>> +	select MFD_SYSCON
+>> +	select REGMAP
+>> +	help
+>> +	  Support for the MMC sub clock controller on Amlogic Meson Platform,
+>> +	  which include S905 (GXBB, GXL), A113D/X (AXG) devices.
+>> +	  Say Y if you want this clock enabled.
+>> +
+>>  config COMMON_CLK_REGMAP_MESON
+>>  	bool
+>>  	select REGMAP
+>> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
+>> index 39ce5661b654..31c16d524a4b 100644
+>> --- a/drivers/clk/meson/Makefile
+>> +++ b/drivers/clk/meson/Makefile
+>> @@ -9,4 +9,5 @@ obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
+>>  obj-$(CONFIG_COMMON_CLK_GXBB)	 += gxbb.o gxbb-aoclk.o gxbb-aoclk-32k.o
+>>  obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o axg-aoclk.o
+>>  obj-$(CONFIG_COMMON_CLK_AXG_AUDIO)	+= axg-audio.o
+>> +obj-$(CONFIG_COMMON_CLK_MMC_MESON) 	+= mmc-clkc.o
+>>  obj-$(CONFIG_COMMON_CLK_REGMAP_MESON)	+= clk-regmap.o
+>> diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
+>> new file mode 100644
+>> index 000000000000..6aa055f7e62c
+>> --- /dev/null
+>> +++ b/drivers/clk/meson/mmc-clkc.c
+>> @@ -0,0 +1,275 @@
+>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>> +/*
+>> + * Amlogic Meson MMC Sub Clock Controller Driver
+>> + *
+>> + * Copyright (c) 2017 Baylibre SAS.
+>> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+>> + *
+>> + * Copyright (c) 2018 Amlogic, inc.
+>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/module.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/platform_device.h>
+>> +#include <dt-bindings/clock/amlogic,mmc-clkc.h>
+>> +
+>> +#include "clkc.h"
+>> +
+>> +/* clock ID used by internal driver */
+>> +#define CLKID_MMC_MUX			0
+>> +
+>> +#define SD_EMMC_CLOCK			0
+>> +#define   CLK_DIV_MASK			GENMASK(5, 0)
+>> +#define   CLK_SRC_MASK			GENMASK(7, 6)
+>> +#define   CLK_CORE_PHASE_MASK		GENMASK(9, 8)
+>> +#define   CLK_TX_PHASE_MASK		GENMASK(11, 10)
+>> +#define   CLK_RX_PHASE_MASK		GENMASK(13, 12)
+>> +#define   CLK_V2_TX_DELAY_MASK		GENMASK(19, 16)
+>> +#define   CLK_V2_RX_DELAY_MASK		GENMASK(23, 20)
+>> +#define   CLK_V2_ALWAYS_ON		BIT(24)
+>> +
+>> +#define   CLK_V3_TX_DELAY_MASK		GENMASK(21, 16)
+>> +#define   CLK_V3_RX_DELAY_MASK		GENMASK(27, 22)
+>> +#define   CLK_V3_ALWAYS_ON		BIT(28)
+>> +
+>> +#define   CLK_DELAY_STEP_PS		200
+>> +#define   CLK_PHASE_STEP		30
+>> +#define   CLK_PHASE_POINT_NUM		(360 / CLK_PHASE_STEP)
+>> +
+>> +#define MUX_CLK_NUM_PARENTS		2
+>> +#define MMC_MAX_CLKS			5
+>> +
+>> +struct mmc_clkc_data {
+>> +	struct meson_clk_phase_delay_data	tx;
+>> +	struct meson_clk_phase_delay_data	rx;
+>> +};
+>> +
+>> +static struct clk_regmap_mux_data mmc_clkc_mux_data = {
+>> +	.offset		= SD_EMMC_CLOCK,
+>> +	.mask		= 0x3,
+>> +	.shift		= 6,
+>> +	.flags		= CLK_DIVIDER_ROUND_CLOSEST,
+>> +};
+>> +
+>> +static struct clk_regmap_div_data mmc_clkc_div_data = {
+>> +	.offset		= SD_EMMC_CLOCK,
+>> +	.shift		= 0,
+>> +	.width		= 6,
+>> +	.flags		= CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
+>> +};
+>> +
+>> +static struct meson_clk_phase_delay_data mmc_clkc_core_phase_delay = {
+>> +	.phase_mask	= CLK_CORE_PHASE_MASK,
+>> +};
+>> +
+>> +static const struct mmc_clkc_data mmc_clkc_gx_data = {
+>> +	{
+>> +		.phase_mask	= CLK_TX_PHASE_MASK,
+>> +		.delay_mask	= CLK_V2_TX_DELAY_MASK,
+>> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
+>> +	},
+>> +	{
+>> +		.phase_mask	= CLK_RX_PHASE_MASK,
+>> +		.delay_mask	= CLK_V2_RX_DELAY_MASK,
+>> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
+>> +	},
+>> +};
+>> +
+>> +static const struct mmc_clkc_data mmc_clkc_axg_data = {
+>> +	{
+>> +		.phase_mask	= CLK_TX_PHASE_MASK,
+>> +		.delay_mask	= CLK_V3_TX_DELAY_MASK,
+>> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
+>> +	},
+>> +	{
+>> +		.phase_mask	= CLK_RX_PHASE_MASK,
+>> +		.delay_mask	= CLK_V3_RX_DELAY_MASK,
+>> +		.delay_step_ps	= CLK_DELAY_STEP_PS,
+>> +	},
+>> +};
+>> +
+>> +static const struct of_device_id mmc_clkc_match_table[] = {
+>> +	{
+>> +		.compatible	= "amlogic,gx-mmc-clkc",
+>> +		.data		= &mmc_clkc_gx_data
+>> +	},
+>> +	{
+>> +		.compatible	= "amlogic,axg-mmc-clkc",
+>> +		.data		= &mmc_clkc_axg_data
+>> +	},
+>> +	{}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, mmc_clkc_match_table);
+>> +
+>> +static struct clk_regmap *
+>> +mmc_clkc_register_clk(struct device *dev, struct regmap *map,
+>> +		      struct clk_init_data *init,
+>> +		      const char *suffix, void *data)
+>> +{
+>> +	struct clk_regmap *clk;
+>> +	char *name;
+>> +	int ret;
+>> +
+>> +	clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
+>> +	if (!clk)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	name = kasprintf(GFP_KERNEL, "%s#%s", dev_name(dev), suffix);
+>> +	if (!name)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	init->name = name;
+>> +
+>> +	clk->map = map;
+>> +	clk->data = data;
+>> +	clk->hw.init = init;
+>> +
+>> +	ret = devm_clk_hw_register(dev, &clk->hw);
+>> +	if (ret)
+>> +		clk = ERR_PTR(ret);
+>> +
+>> +	kfree(name);
+>> +	return clk;
+>> +}
+>> +
+>> +static struct clk_regmap *mmc_clkc_register_mux(struct device *dev,
+>> +						struct regmap *map)
+>> +{
+>> +	const char *parent_names[MUX_CLK_NUM_PARENTS];
+>> +	struct clk_init_data init;
+>> +	struct clk_regmap *mux;
+>> +	struct clk *clk;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
+>> +		char name[8];
+>> +
+>> +		snprintf(name, sizeof(name), "clkin%d", i);
+>> +		clk = devm_clk_get(dev, name);
+>> +		if (IS_ERR(clk)) {
+>> +			if (clk != ERR_PTR(-EPROBE_DEFER))
+>> +				dev_err(dev, "Missing clock %s\n", name);
+>> +			return ERR_PTR((long)clk);
+>> +		}
+>> +
+>> +		parent_names[i] = __clk_get_name(clk);
+>> +	}
+>> +
+>> +	init.ops = &clk_regmap_mux_ops;
+>> +	init.flags = CLK_SET_RATE_PARENT;
+>> +	init.parent_names = parent_names;
+>> +	init.num_parents = MUX_CLK_NUM_PARENTS;
+>> +
+>> +	mux = mmc_clkc_register_clk(dev, map, &init, "mux", &mmc_clkc_mux_data);
+>> +	if (IS_ERR(mux))
+>> +		dev_err(dev, "Mux clock registration failed\n");
+>> +
+>> +	return mux;
+>> +}
+>> +
+>> +static struct clk_regmap *
+>> +mmc_clkc_register_other_clk(struct device *dev, struct regmap *map,
 > 
-> Is leader also part of sibling list?
-
-No.
-
->>> +static void thunderx2_uncore_start(struct perf_event *event, int flags)
->>> +{
->>> +     struct hw_perf_event *hwc = &event->hw;
->>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
->>> +     struct thunderx2_pmu_uncore_dev *uncore_dev;
->>> +     unsigned long irqflags;
->>> +
->>> +     hwc->state = 0;
->>> +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
->>> +     uncore_dev = pmu_uncore->uncore_dev;
->>> +
->>> +     raw_spin_lock_irqsave(&uncore_dev->lock, irqflags);
->>> +     uncore_dev->select_channel(event);
->>> +     uncore_dev->start_event(event, flags);
->>> +     raw_spin_unlock_irqrestore(&uncore_dev->lock, irqflags);
->>> +
->>> +     perf_event_update_userpage(event);
->>> +
->>> +     if (!find_last_bit(pmu_uncore->active_counters,
->>> +                             pmu_uncore->uncore_dev->max_counters)) {
->>
->> Are we guaranteed that the counter0 is always allocated ? What if the
->> event is deleted and there are other events active ? A better check
->> would be :
->>          if (find_last_bit(...) != pmu_uncore->uncore_dev->max_counters)
->>
-> IIUC, find_last_bit will return  zero if none of the counters are
-> active and we want to start timer for first active counter.
+> This is a poor name. It does not help understand what the function does.
+> mmc_clkc_register_clk_with_parent or whatever helps understand what's going on
 > 
-
-Well, if that was the case, how do you know if the bit zero is the only
-bit set ?
-
-AFAICS, lib/find_bit.c has :
-
-unsigned long find_last_bit(const unsigned long *addr, unsigned long size)
-{
-         if (size) {
-                 unsigned long val = BITMAP_LAST_WORD_MASK(size);
-                 unsigned long idx = (size-1) / BITS_PER_LONG;
-
-                 do {
-                         val &= addr[idx];
-                         if (val)
-                                 return idx * BITS_PER_LONG + __fls(val);
-
-                         val = ~0ul;
-                 } while (idx--);
-         }
-         return size;
-}
-
-
-It returns "size" when it can't find a set bit.
-
-
->>> +             thunderx2_uncore_update(event);
->>> +             hwc->state |= PERF_HES_UPTODATE;
->>> +     }
->>> +     raw_spin_unlock_irqrestore(&uncore_dev->lock, irqflags);
->>> +}
->>> +
->>> +static int thunderx2_uncore_add(struct perf_event *event, int flags)
->>> +{
->>> +     struct hw_perf_event *hwc = &event->hw;
->>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
->>> +     struct thunderx2_pmu_uncore_dev *uncore_dev;
->>> +
->>> +     pmu_uncore = pmu_to_thunderx2_pmu_uncore(event->pmu);
->>> +     uncore_dev = pmu_uncore->uncore_dev;
->>> +
->>> +     /* Allocate a free counter */
->>> +     hwc->idx  = alloc_counter(pmu_uncore);
->>> +     if (hwc->idx < 0)
->>> +             return -EAGAIN;
->>> +
->>> +     pmu_uncore->events[hwc->idx] = event;
->>> +     /* set counter control and data registers base address */
->>> +     uncore_dev->init_cntr_base(event, uncore_dev);
->>> +
->>> +     hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
->>> +     if (flags & PERF_EF_START)
->>> +             thunderx2_uncore_start(event, flags);
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +static void thunderx2_uncore_del(struct perf_event *event, int flags)
->>> +{
->>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore =
->>> +                     pmu_to_thunderx2_pmu_uncore(event->pmu);
->>> +     struct hw_perf_event *hwc = &event->hw;
->>> +
->>> +     thunderx2_uncore_stop(event, PERF_EF_UPDATE);
->>> +
->>> +     /* clear the assigned counter */
->>> +     free_counter(pmu_uncore, GET_COUNTERID(event));
->>> +
->>> +     perf_event_update_userpage(event);
->>> +     pmu_uncore->events[hwc->idx] = NULL;
->>> +     hwc->idx = -1;
->>> +}
->>> +
->>> +static void thunderx2_uncore_read(struct perf_event *event)
->>> +{
->>> +     unsigned long irqflags;
->>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore =
->>> +                     pmu_to_thunderx2_pmu_uncore(event->pmu);
->>> +
->>> +     raw_spin_lock_irqsave(&pmu_uncore->uncore_dev->lock, irqflags);
->>> +     thunderx2_uncore_update(event);
->>> +     raw_spin_unlock_irqrestore(&pmu_uncore->uncore_dev->lock, irqflags);
->>> +}
->>> +
->>> +static enum hrtimer_restart thunderx2_uncore_hrtimer_callback(
->>> +             struct hrtimer *hrt)
->>> +{
->>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
->>> +     unsigned long irqflags;
->>> +     int idx;
->>> +     bool restart_timer = false;
->>> +
->>> +     pmu_uncore = container_of(hrt, struct thunderx2_pmu_uncore_channel,
->>> +                     hrtimer);
->>> +
->>> +     raw_spin_lock_irqsave(&pmu_uncore->uncore_dev->lock, irqflags);
->>> +     for_each_set_bit(idx, pmu_uncore->active_counters,
->>> +                     pmu_uncore->uncore_dev->max_counters) {
->>> +             struct perf_event *event = pmu_uncore->events[idx];
->>
->> Do we need to check if the "event" is not NULL ? Couldn't this race with
->> an event_del() operation ?
+OK, I will repleace it with mmc_clkc_register_clk_with_parent(). Thanks for your review.
+>> +			    char *suffix, char *parent_suffix,
 > 
-> i dont think so, i have not come across any such race condition during
-> my testing.
-
-Thinking about it further, we may not hit it, as the PMU is "disable"d,
-before "add/del", which implies that the IRQ won't be triggered.
-
-Btw, in general, not hitting a race condition doesn't prove there cannot
-be a race ;)
-
->>> +static int thunderx2_pmu_uncore_register(
->>> +             struct thunderx2_pmu_uncore_channel *pmu_uncore)
->>> +{
->>> +     struct device *dev = pmu_uncore->uncore_dev->dev;
->>> +     char *name = pmu_uncore->uncore_dev->name;
->>> +     int channel = pmu_uncore->channel;
->>> +
->>> +     /* Perf event registration */
->>> +     pmu_uncore->pmu = (struct pmu) {
->>> +             .attr_groups    = pmu_uncore->uncore_dev->attr_groups,
->>> +             .task_ctx_nr    = perf_invalid_context,
->>> +             .event_init     = thunderx2_uncore_event_init,
->>> +             .add            = thunderx2_uncore_add,
->>> +             .del            = thunderx2_uncore_del,
->>> +             .start          = thunderx2_uncore_start,
->>> +             .stop           = thunderx2_uncore_stop,
->>> +             .read           = thunderx2_uncore_read,
->>
->> You must fill in the module field of the PMU to prevent this module from
->> being unloaded while it is in use.
+> You should not have to rebuild the parent name once again.
+> Pass the clk_hw* of the parent and get the name from it.
 > 
-> thanks, i will add it.
->>
->>> +     };
->>> +
->>> +     pmu_uncore->pmu.name = devm_kasprintf(dev, GFP_KERNEL,
->>> +                     "%s_%d", name, channel);
->>> +
->>> +     return perf_pmu_register(&pmu_uncore->pmu, pmu_uncore->pmu.name, -1);
->>> +}
->>> +
->>> +static int thunderx2_pmu_uncore_add(struct thunderx2_pmu_uncore_dev *uncore_dev,
->>> +             int channel)
->>> +{
->>> +     struct thunderx2_pmu_uncore_channel *pmu_uncore;
->>> +     int ret, cpu;
->>> +
->>> +     pmu_uncore = devm_kzalloc(uncore_dev->dev, sizeof(*pmu_uncore),
->>> +                     GFP_KERNEL);
->>> +     if (!pmu_uncore)
->>> +             return -ENOMEM;
->>> +
->>> +     cpu = cpumask_any_and(cpumask_of_node(uncore_dev->node),
->>> +                     cpu_online_mask);
->>> +     if (cpu >= nr_cpu_ids)
->>> +             return -EINVAL;
->>
->> Do we need to fail this here ? We could always add this back when a CPU
->> comes online (e.g, maxcpus=n). We do have cpu-hotplug call backs anyway.
+yes, mmc_clkc_register_clk_with_parent() can use parent's hw.init->name directly.
+>> +			    unsigned long flags,
+>> +			    const struct clk_ops *ops, void *data)
+>> +{
+>> +	struct clk_init_data init;
+>> +	struct clk_regmap *clk;
+>> +	char *parent;
+>> +
+>> +	parent = kasprintf(GFP_KERNEL, "%s#%s", dev_name(dev), parent_suffix);
+>> +	if (!parent)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	init.ops = ops;
+>> +	init.flags = flags;
+>> +	init.parent_names = (const char* const []){ parent, };
+>> +	init.num_parents = 1;
+>> +
+>> +	clk = mmc_clkc_register_clk(dev, map, &init, suffix, data);
+>> +	if (IS_ERR(clk))
+>> +		dev_err(dev, "Core %s clock registration failed\n", suffix);
+>> +
+>> +	kfree(parent);
+>> +	return clk;
+>> +}
+>> +
+>> +static int mmc_clkc_probe(struct platform_device *pdev)
+>> +{
+>> +	struct clk_hw_onecell_data *onecell_data;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct mmc_clkc_data *data;
+>> +	struct regmap *map;
+>> +	struct clk_regmap *mux, *div, *core, *rx, *tx;
 > 
-> we want to fail, since we dont have any cpu to serve.
+> Do you really need all this ? or could store them in your onecell_data->hws
+> table as you go ?
 > 
-
-I understand that. We can bring up CPUs later from userspace. e.g, on a
-system like ThunderX, to speed up the booting, one could add "maxcpus=8"
-which forces the kernel to only bring up the first 8 CPUs and the rest
-are brought up by the userspace. So, one of the DMC/L3 doesn't have a
-supported CPU booted up during the driver probe, you will not bring
-the PMU up and hence won't be able to use them even after the CPUs are
-brought up later. You can take a look at the arm_dsu_pmu, where we
-handle a similar situation via dsu_pmu_cpu_online().
-
-
->>> +static struct platform_driver thunderx2_uncore_driver = {
->>> +     .probe = thunderx2_uncore_probe,
->>> +     .driver = {
->>> +             .name           = "thunderx2-uncore-pmu",
->>> +             .acpi_match_table = ACPI_PTR(thunderx2_uncore_acpi_match),
->>> +     },
->>> +};
->>
->> Don't we need to unregister the pmu's when we remove the module ?
+3 of them can be removed. Then one local variable will be shared several times. 
+>> +
+>> +	data = (struct mmc_clkc_data *)of_device_get_match_data(dev);
+>> +	if (!data)
+>> +		return -ENODEV;
+>> +
+>> +	map = syscon_node_to_regmap(dev->of_node);
+>> +	if (IS_ERR(map)) {
+>> +		dev_err(dev, "could not find mmc clock controller\n");
+>> +		return PTR_ERR(map);
+>> +	}
+>> +
+>> +	onecell_data = devm_kzalloc(dev, sizeof(*onecell_data) +
+>> +				    sizeof(*onecell_data->hws) * MMC_MAX_CLKS,
+>> +				    GFP_KERNEL);
+>> +	if (!onecell_data)
+>> +		return -ENOMEM;
+>> +
+>> +	mux = mmc_clkc_register_mux(dev, map);
+>> +	if (IS_ERR(mux))
+>> +		return PTR_ERR(mux);
+>> +
+>> +	div = mmc_clkc_register_other_clk(dev, map, "div", "mux",
+>> +					  CLK_SET_RATE_PARENT,
+>> +					  &clk_regmap_divider_ops,
+>> +					  &mmc_clkc_div_data);
+>> +	if (IS_ERR(div))
+>> +		return PTR_ERR(div);
+>> +
+>> +	core = mmc_clkc_register_other_clk(dev, map, "core", "div",
+>> +					   CLK_SET_RATE_PARENT,
+>> +					   &meson_clk_phase_delay_ops,
+>> +					   &mmc_clkc_core_phase_delay);
+>> +	if (IS_ERR(core))
+>> +		return PTR_ERR(core);
+>> +
+>> +	rx = mmc_clkc_register_other_clk(dev, map, "rx", "core", 0,
+>> +					 &meson_clk_phase_delay_ops,
+>> +					 &data->rx);
+>> +	if (IS_ERR(rx))
+>> +		return PTR_ERR(rx);
+>> +
+>> +	tx = mmc_clkc_register_other_clk(dev, map, "tx", "core", 0,
+>> +					 &meson_clk_phase_delay_ops,
+>> +					 &data->tx);
+>> +	if (IS_ERR(tx))
+>> +		return PTR_ERR(tx);
+>> +
+>> +	onecell_data->hws[CLKID_MMC_MUX]		= &mux->hw,
+>> +	onecell_data->hws[CLKID_MMC_DIV]		= &div->hw,
+>> +	onecell_data->hws[CLKID_MMC_PHASE_CORE]		= &core->hw,
+>> +	onecell_data->hws[CLKID_MMC_PHASE_RX]		= &rx->hw,
+>> +	onecell_data->hws[CLKID_MMC_PHASE_TX]		= &tx->hw,
+>> +	onecell_data->num				= MMC_MAX_CLKS;
+>> +
+>> +	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
+>> +					   onecell_data);
+>> +}
+>> +
+>> +static struct platform_driver mmc_clkc_driver = {
+>> +	.probe		= mmc_clkc_probe,
+>> +	.driver		= {
+>> +		.name	= "meson-mmc-clkc",
+>> +		.of_match_table = of_match_ptr(mmc_clkc_match_table),
+>> +	},
+>> +};
+>> +
+>> +module_platform_driver(mmc_clkc_driver);
 > 
-> it is built in module at present, no unload is supported.
-> Anyway i am adding in next version , since i am going for loadable module.
-
-Ok
-
-
-Suzuki
+> 
+> .
+> 
