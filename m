@@ -1,42 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 11 Oct 2018 12:24:24 +0200
-Subject: [GIT PULL 3/5 v2] firmware: tegra: Changes for v4.20-rc1
-In-Reply-To: <20180927205942.30878-3-thierry.reding@gmail.com>
-References: <20180927205942.30878-3-thierry.reding@gmail.com>
-Message-ID: <20181011102424.22720-1-thierry.reding@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 11 Oct 2018 12:33:40 +0200
+Subject: [PATCH V6 00/23] mmc: mmci: add sdmmc variant for stm32
+In-Reply-To: <CAPDyKFp4DEtavAqDg-ymaCcus+Hddv0OrgfS54HsTX+aWdzN+w@mail.gmail.com>
+References: <1539000535-13261-1-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFp0oHHS=bkXj_AbiLmbNxW07pFnk-4m9kwQtYkh_ogKgw@mail.gmail.com>
+ <cb919bf8-caa2-b2fe-fee4-ae2f0f4c04b5@st.com>
+ <CAPDyKFp4DEtavAqDg-ymaCcus+Hddv0OrgfS54HsTX+aWdzN+w@mail.gmail.com>
+Message-ID: <CAPDyKFqTNUihEk-i+t4OU1Eq5iBS57XZ4d8P2QbecgW_uT6NnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On 9 October 2018 at 13:18, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 9 October 2018 at 09:54, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>> hi Ulf
+>>
+>> On 10/09/2018 09:30 AM, Ulf Hansson wrote:
+>>>
+>>> Applied for next, thanks!
+>>>
+>>> FYI, I made little fixup of the help text in the Kconfig for the last
+>>> patch.
+>>
+>>
+>> Thanks for your review.
+>> Did you had a feedback on Qcom platform tests?
+>
+> Nope. I am leaving the tests for Qcom platforms to be done by
+> kernelci, let's see what the reports are.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+FYI:
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+https://kernelci.org/boot/id/5bbdcd2b59b5147001b435a4/
 
-are available in the Git repository at:
+Looks good!
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-firmware-2
-
-for you to fetch changes up to 00cba11fab58407a0017fc55476ea764161c5f07:
-
-  firmware: tegra: bpmp: Implement suspend/resume support (2018-10-10 16:47:22 +0200)
-
-This took longer than I anticipated because I managed to somehow break
-my git tree along the way. This is equivalent to the first pull request
-except that it also fixes the warning that Arnd reported.
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-firmware: tegra: Changes for v4.20-rc1
-
-This contains a fix for suspend/resume support for the BPMP found on
-Tegra186 and Tegra194.
-
-----------------------------------------------------------------
-Thierry Reding (1):
-      firmware: tegra: bpmp: Implement suspend/resume support
-
- drivers/firmware/tegra/bpmp.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Kind regards
+Uffe
