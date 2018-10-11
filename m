@@ -1,87 +1,103 @@
-From: rppt@linux.vnet.ibm.com (Mike Rapoport)
-Date: Thu, 11 Oct 2018 09:08:50 +0300
-Subject: [PATCH] memblock: stop using implicit alignement to
- SMP_CACHE_BYTES
-In-Reply-To: <20181005151934.87226fa92825c3002a475413@linux-foundation.org>
-References: <1538687224-17535-1-git-send-email-rppt@linux.vnet.ibm.com>
- <20181005151934.87226fa92825c3002a475413@linux-foundation.org>
-Message-ID: <20181011060850.GA19822@rapoport-lnx>
+From: yinbo.zhu@nxp.com (Yinbo Zhu)
+Date: Thu, 11 Oct 2018 14:35:22 +0800
+Subject: [PATCH v2] arm64: dts: lx2160a: enable eSDHC controller
+Message-ID: <20181011063522.7767-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 05, 2018 at 03:19:34PM -0700, Andrew Morton wrote:
-> On Fri,  5 Oct 2018 00:07:04 +0300 Mike Rapoport <rppt@linux.vnet.ibm.com> wrote:
-> 
-> > When a memblock allocation APIs are called with align = 0, the alignment is
-> > implicitly set to SMP_CACHE_BYTES.
-> > 
-> > Replace all such uses of memblock APIs with the 'align' parameter explicitly
-> > set to SMP_CACHE_BYTES and stop implicit alignment assignment in the
-> > memblock internal allocation functions.
-> > 
-> > For the case when memblock APIs are used via helper functions, e.g. like
-> > iommu_arena_new_node() in Alpha, the helper functions were detected with
-> > Coccinelle's help and then manually examined and updated where appropriate.
-> > 
-> > ...
-> >
-> > --- a/mm/memblock.c
-> > +++ b/mm/memblock.c
-> > @@ -1298,9 +1298,6 @@ static phys_addr_t __init memblock_alloc_range_nid(phys_addr_t size,
-> >  {
-> >  	phys_addr_t found;
-> >  
-> > -	if (!align)
-> > -		align = SMP_CACHE_BYTES;
-> > -
-> 
-> Can we add a WARN_ON_ONCE(!align) here?  To catch unconverted code
-> which sneaks in later on.
+There are two eSDHC controllers in lx2160a. This patch is to
+enable eSDHC for RDB and QDS board.
 
-Here it goes:
-
->From baec825c58e8bc11371433d3a4b20b2216877a50 Mon Sep 17 00:00:00 2001
-From: Mike Rapoport <rppt@linux.vnet.ibm.com>
-Date: Mon, 8 Oct 2018 11:22:10 +0300
-Subject: [PATCH] memblock: warn if zero alignment was requested
-
-After update of all memblock users to explicitly specify SMP_CACHE_BYTES
-alignment rather than use 0, it is still possible that uncovered users
-may sneak in. Add a WARN_ON_ONCE for such cases.
-
-Signed-off-by: Mike Rapoport <rppt@linux.vnet.ibm.com>
+Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
 ---
- mm/memblock.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Change in v2:
+		squash all lx2160a esdhc dts patch into the original patch
 
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 0bbae56..5fefc70 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1298,6 +1298,9 @@ static phys_addr_t __init memblock_alloc_range_nid(phys_addr_t size,
- {
- 	phys_addr_t found;
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts |    8 ++++++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |   15 ++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    |   25 +++++++++++++++++++++
+ 3 files changed, 48 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+index bc30173..b58b96c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+@@ -294,6 +294,14 @@
+ 	status = "okay";
+ };
  
-+	if (WARN_ON_ONCE(!align))
-+		align = SMP_CACHE_BYTES;
++&esdhc0 {
++	status = "okay";
++};
 +
- 	found = memblock_find_in_range_node(size, align, start, end, nid,
- 					    flags);
- 	if (found && !memblock_reserve(found, size)) {
-@@ -1420,6 +1423,9 @@ static void * __init memblock_alloc_internal(
- 	if (WARN_ON_ONCE(slab_is_available()))
- 		return kzalloc_node(size, GFP_NOWAIT, nid);
++&esdhc1 {
++	status = "okay";
++};
++
+ &dspi0 {
+ 	dflash0: n25q128a {
+ 		#address-cells = <1>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+index 53b0e80..cbe8919 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+@@ -170,6 +170,21 @@
+ 	status = "okay";
+ };
  
-+	if (WARN_ON_ONCE(!align))
-+		align = SMP_CACHE_BYTES;
++&esdhc0 {
++	sd-uhs-sdr104;
++	sd-uhs-sdr50;
++	sd-uhs-sdr25;
++	sd-uhs-sdr12;
++	status = "okay";
++};
 +
- 	if (max_addr > memblock.current_limit)
- 		max_addr = memblock.current_limit;
- again:
++&esdhc1 {
++	mmc-hs200-1_8v;
++	mmc-hs400-1_8v;
++	bus-width = <8>;
++	status = "okay";
++};
++
+ &fspi {
+ 	status = "okay";
+ 	nxp,fspi-has-second-chip;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+index fa4a1f8..174544a 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+@@ -356,6 +356,31 @@
+ 			little-endian;
+ 		};
+ 
++		esdhc0: esdhc at 2140000 {
++			compatible = "fsl,esdhc";
++			reg = <0x0 0x2140000 0x0 0x10000>;
++			interrupts = <0 28 0x4>; /* Level high type */
++			clocks = <&clockgen 4 1>;
++			voltage-ranges = <1800 1800 3300 3300>;
++			sdhci,auto-cmd12;
++			little-endian;
++			bus-width = <4>;
++			status = "disabled";
++		};
++
++		esdhc1: esdhc at 2150000 {
++			compatible = "fsl,esdhc";
++			reg = <0x0 0x2150000 0x0 0x10000>;
++			interrupts = <0 63 0x4>; /* Level high type */
++			clocks = <&clockgen 4 1>;
++			voltage-ranges = <1800 1800 3300 3300>;
++			sdhci,auto-cmd12;
++			broken-cd;
++			little-endian;
++			bus-width = <4>;
++			status = "disabled";
++		};
++
+ 		gpio0: gpio at 2300000 {
+ 			compatible = "fsl,ls2080a-gpio", "fsl,qoriq-gpio";
+ 			reg = <0x0 0x2300000 0x0 0x10000>;
 -- 
-2.7.4
-
-
--- 
-Sincerely yours,
-Mike.
+1.7.1
