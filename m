@@ -1,50 +1,37 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 11 Oct 2018 18:54:06 +0100
-Subject: [PATCH 02/10] swiotlb: mark is_swiotlb_buffer static
-In-Reply-To: <20181008080246.20543-3-hch@lst.de>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-3-hch@lst.de>
-Message-ID: <bfd45ad6-901d-c9a6-2264-4f93684c0fa1@arm.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Thu, 11 Oct 2018 19:59:15 +0200
+Subject: [PATCH v2 01/11] dt-bindings: spi/spi-pxa2xx: add PXA2xx SSP
+ SPI Controller
+In-Reply-To: <20181011142719.GE25351@sirena.org.uk>
+References: <20181010170936.316862-1-lkundrak@v3.sk>
+ <20181010170936.316862-2-lkundrak@v3.sk>
+ <20181011142719.GE25351@sirena.org.uk>
+Message-ID: <8cafa3f97fbe2a01ccf968b39469751b449e324b.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/18 09:02, Christoph Hellwig wrote:
-
-I agree there isn't really a good reason for external code to ever be 
-poking at this, despite it being helpful for arch code trying to hack 
-around awful coherency issues ;)
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->   include/linux/swiotlb.h | 1 -
->   kernel/dma/swiotlb.c    | 2 +-
->   2 files changed, 1 insertion(+), 2 deletions(-)
+On Thu, 2018-10-11 at 15:27 +0100, Mark Brown wrote:
+> On Wed, Oct 10, 2018 at 07:09:26PM +0200, Lubomir Rintel wrote:
+> > This is the SPI controller found on Marvel MMP2 and perhaps more
+> > platforms.
 > 
-> diff --git a/include/linux/swiotlb.h b/include/linux/swiotlb.h
-> index 965be92c33b5..7ef541ce8f34 100644
-> --- a/include/linux/swiotlb.h
-> +++ b/include/linux/swiotlb.h
-> @@ -121,7 +121,6 @@ static inline unsigned int swiotlb_max_segment(void) { return 0; }
->   #endif
->   
->   extern void swiotlb_print_info(void);
-> -extern int is_swiotlb_buffer(phys_addr_t paddr);
->   extern void swiotlb_set_max_segment(unsigned int);
->   
->   extern const struct dma_map_ops swiotlb_dma_ops;
-> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
-> index 9062b14bc7f4..26d3af52956f 100644
-> --- a/kernel/dma/swiotlb.c
-> +++ b/kernel/dma/swiotlb.c
-> @@ -429,7 +429,7 @@ void __init swiotlb_exit(void)
->   	max_segment = 0;
->   }
->   
-> -int is_swiotlb_buffer(phys_addr_t paddr)
-> +static int is_swiotlb_buffer(phys_addr_t paddr)
->   {
->   	return paddr >= io_tlb_start && paddr < io_tlb_end;
->   }
+> *Way* more.
 > 
+> Please use subject lines matching the style for the subsystem.  This
+> makes it easier for people to identify relevant patches.
+
+Thanks for the response.
+
+I'm a little confused here. Why I chose this subject line is because I
+did this:
+
+  git log --no-merges Documentation/devicetree/bindings/
+
+to figure out what's the typical subject for the DT binding changes.
+
+I also believed that's the right way to get Rob Herring's and Mark
+Rutland's attention. Do the device tree binding documentation typically
+go in with the associated drivers, or via their tree ("OPEN FIRMWARE
+AND FLATTENED DEVICE TREE BINDINGS" in MAINTIANERS)?
+
+Lubo
