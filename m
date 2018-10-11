@@ -1,46 +1,39 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Thu, 11 Oct 2018 11:30:07 -0600
-Subject: [PATCH 5/5] RISC-V: Implement sparsemem
-In-Reply-To: <8cea5ffa-5fbf-8ea2-b673-20e2d09a910d@deltatee.com>
-References: <20181005161642.2462-1-logang@deltatee.com>
- <20181005161642.2462-6-logang@deltatee.com> <20181011133730.GB7276@lst.de>
- <8cea5ffa-5fbf-8ea2-b673-20e2d09a910d@deltatee.com>
-Message-ID: <8ebf1a13-ec4e-c546-641c-f8dcb1f6c44d@deltatee.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 11 Oct 2018 18:49:22 +0100
+Subject: [PATCH 01/10] swiotlb: remove a pointless comment
+In-Reply-To: <20181008080246.20543-2-hch@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-2-hch@lst.de>
+Message-ID: <d2af8feb-c616-fe7c-62c2-80d73bd75e53@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/10/18 09:02, Christoph Hellwig wrote:
+> This comments describes an aspect of the map_sg interface that isn't
+> even exploited by swiotlb.
 
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-On 2018-10-11 10:24 a.m., Logan Gunthorpe wrote:
-> On 2018-10-11 7:37 a.m., Christoph Hellwig wrote:
->>> +/*
->>> + * Log2 of the upper bound of the size of a struct page. Used for sizing
->>> + * the vmemmap region only, does not affect actual memory footprint.
->>> + * We don't use sizeof(struct page) directly since taking its size here
->>> + * requires its definition to be available at this point in the inclusion
->>> + * chain, and it may not be a power of 2 in the first place.
->>> + */
->>> +#define STRUCT_PAGE_MAX_SHIFT	6
->>
->> I know this is copied from arm64, but wouldn't this be a good time
->> to move this next to the struct page defintion?
->>
->> Also this:
->>
->> arch/arm64/mm/init.c:   BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
->>
->> should move to comment code (or would have to be duplicated for riscv)
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>   kernel/dma/swiotlb.c | 6 ------
+>   1 file changed, 6 deletions(-)
 > 
-> Makes sense. Where is a good place for the BUILD_BUG_ON in common code?
-
-Never mind. Seems like it's pretty trivial to do this:
-
-#define STRUCT_PAGE_MAX_SHIFT \
-    ilog2(roundup_pow_of_two(sizeof(struct page)))
-
-So the BUILD_BUG_ON becomes unnecessary.
-
-The comment saying it can't be done is really misleading as it wasn't
-actually difficult.
-
-Logan
+> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+> index 4f8a6dbf0b60..9062b14bc7f4 100644
+> --- a/kernel/dma/swiotlb.c
+> +++ b/kernel/dma/swiotlb.c
+> @@ -925,12 +925,6 @@ swiotlb_sync_single_for_device(struct device *hwdev, dma_addr_t dev_addr,
+>    * appropriate dma address and length.  They are obtained via
+>    * sg_dma_{address,length}(SG).
+>    *
+> - * NOTE: An implementation may be able to use a smaller number of
+> - *       DMA address/length pairs than there are SG table elements.
+> - *       (for example via virtual mapping capabilities)
+> - *       The routine returns the number of addr/length pairs actually
+> - *       used, at most nents.
+> - *
+>    * Device ownership issues as mentioned above for swiotlb_map_page are the
+>    * same here.
+>    */
+> 
