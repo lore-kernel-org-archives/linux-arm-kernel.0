@@ -1,38 +1,151 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Thu, 11 Oct 2018 10:24:33 -0600
-Subject: [PATCH 5/5] RISC-V: Implement sparsemem
-In-Reply-To: <20181011133730.GB7276@lst.de>
-References: <20181005161642.2462-1-logang@deltatee.com>
- <20181005161642.2462-6-logang@deltatee.com> <20181011133730.GB7276@lst.de>
-Message-ID: <8cea5ffa-5fbf-8ea2-b673-20e2d09a910d@deltatee.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 12 Oct 2018 01:27:15 +0900
+Subject: [PATCH v3 2/2] dmaengine: uniphier-mdmac: add UniPhier MIO DMAC
+ driver
+In-Reply-To: <20181006162246.GO2372@vkoul-mobl>
+References: <1536799869-10643-1-git-send-email-yamada.masahiro@socionext.com>
+ <1536799869-10643-3-git-send-email-yamada.masahiro@socionext.com>
+ <20181005145706.GM2372@vkoul-mobl>
+ <CAK7LNASF5Ct+ONWnRqZwstg+htAo0buG19HOGM-EV2EPe1NSbQ@mail.gmail.com>
+ <20181006162246.GO2372@vkoul-mobl>
+Message-ID: <CAK7LNASmbRF1zvs_zbS1Ux3SKmAS5Ew9kVYPMagoO1Uf-WPUPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Oct 7, 2018 at 1:23 AM Vinod <vkoul@kernel.org> wrote:
+> > > > +static int uniphier_mdmac_probe(struct platform_device *pdev)
+> > > > +{
+> > > > +     struct device *dev = &pdev->dev;
+> > > > +     struct uniphier_mdmac_device *mdev;
+> > > > +     struct dma_device *ddev;
+> > > > +     struct resource *res;
+> > > > +     int nr_chans, ret, i;
+> > > > +
+> > > > +     nr_chans = platform_irq_count(pdev);
+> > > > +     if (nr_chans < 0)
+> > > > +             return nr_chans;
+> > > > +
+> > > > +     ret = dma_set_mask(dev, DMA_BIT_MASK(32));
+> > > > +     if (ret)
+> > > > +             return ret;
+> > > > +
+> > > > +     mdev = devm_kzalloc(dev, struct_size(mdev, channels, nr_chans),
+> > > > +                         GFP_KERNEL);
+> > > > +     if (!mdev)
+> > > > +             return -ENOMEM;
+> > > > +
+> > > > +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > +     mdev->reg_base = devm_ioremap_resource(dev, res);
+> > > > +     if (IS_ERR(mdev->reg_base))
+> > > > +             return PTR_ERR(mdev->reg_base);
+> > > > +
+> > > > +     mdev->clk = devm_clk_get(dev, NULL);
+> > > > +     if (IS_ERR(mdev->clk)) {
+> > > > +             dev_err(dev, "failed to get clock\n");
+> > > > +             return PTR_ERR(mdev->clk);
+> > > > +     }
+> > > > +
+> > > > +     ret = clk_prepare_enable(mdev->clk);
+> > > > +     if (ret)
+> > > > +             return ret;
+> > > > +
+> > > > +     ddev = &mdev->ddev;
+> > > > +     ddev->dev = dev;
+> > > > +     dma_cap_set(DMA_PRIVATE, ddev->cap_mask);
+> > > > +     ddev->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
+> > > > +     ddev->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
+> > >
+> > > undefined?
+> >
+> > Precisely, I do not know the *_addr_widths.
+>
+> This is "your" controller, you know the capability!
+
+No, I do not.
+
+I wrote this driver, but the hardware-internal is not fully documented
+in the datasheet.
+I can see the functionality only from the software point of view.
 
 
-On 2018-10-11 7:37 a.m., Christoph Hellwig wrote:
->> +/*
->> + * Log2 of the upper bound of the size of a struct page. Used for sizing
->> + * the vmemmap region only, does not affect actual memory footprint.
->> + * We don't use sizeof(struct page) directly since taking its size here
->> + * requires its definition to be available at this point in the inclusion
->> + * chain, and it may not be a power of 2 in the first place.
->> + */
->> +#define STRUCT_PAGE_MAX_SHIFT	6
-> 
-> I know this is copied from arm64, but wouldn't this be a good time
-> to move this next to the struct page defintion?
-> 
-> Also this:
-> 
-> arch/arm64/mm/init.c:   BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
-> 
-> should move to comment code (or would have to be duplicated for riscv)
+> >
+> > As far as I read dmaengine/provider.rst
+> > this represents the data bytes that are read/written at a time.
+> >
+> > Really I do not know (care about) the transfer width.
+> >
+> > As I commented in v2, the connection of the device side is hard-wired.
+> > The transfer width cannot be observed from SW view.
+> >
+> > What should I do?
+>
+> Add the widths that are supported by the controller
 
-Makes sense. Where is a good place for the BUILD_BUG_ON in common code?
+To my best knowledge, this DMA engine is connected to a 32-bit bus.
+So, 4 bytes are read/written at a time.
 
-I've queued up changes for your other feedback.
+This HW allows to set the transfer size by byte granularity.
+So, it would be possible to access the data bus
+by 1-byte, 2-bytes, 3-bytes as well.
 
-Thanks,
+I will set the OR of 1, 2, 3, 4 bytes.
 
-Logan
+
+
+
+
+> > > > +static int uniphier_mdmac_remove(struct platform_device *pdev)
+> > > > +{
+> > > > +     struct uniphier_mdmac_device *mdev = platform_get_drvdata(pdev);
+> > > > +
+> > > > +     of_dma_controller_free(pdev->dev.of_node);
+> > > > +     dma_async_device_unregister(&mdev->ddev);
+> > > > +     clk_disable_unprepare(mdev->clk);
+> > >
+> > > at this point your irq is registered and can be fired, the tasklets are
+> > > not killed :(
+> >
+> >
+> > Please let me clarify the concerns here.
+> >
+> > Before the .remove hook is called, all the consumers should
+> > have already put the dma channels.
+> > So, no new descriptor is coming in.
+> >
+> > However,
+> >
+> > Some already-issued descriptors might be remaining, and being processed.
+> >
+> > [1] This DMA engine might be still running
+> >     when clk_disable_unprepare() is being called.
+> >     The register access with its clock disabled
+> >     would cause the system crash.
+>
+> Yes and dmaengine may fire a spurious irq..
+> >
+> > [2] vchan_cookie_complete() might being called at this point
+> >     and schedule the tasklet.
+> >     It might call uniphier_mdmac_desc_free() after
+> >     the reference disapperrs.
+> >
+> > Is this correct?
+>
+> Correct :)
+>
+> > Do you have recommendation
+> > for module removal guideline?
+>
+> Yes please free up or disable irq explictly, ensure pending irqs have
+> completed and then ensure all the tasklets are killed and in this order
+> for obvious reasons
+
+Also, need to free up the left-over descriptor(s) right?
+Just killing the tasklets may result in memory leak.
+
+Please let know if the implementation in v4 is wrong.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
