@@ -1,103 +1,51 @@
 From: peng.ma@nxp.com (Peng Ma)
-Date: Thu, 11 Oct 2018 17:46:50 +0800
-Subject: [PATCH 2/7] dmaengine: fsldma: Adding macro FSL_DMA_IN/OUT implement
- for ARM platform
+Date: Thu, 11 Oct 2018 17:46:53 +0800
+Subject: [PATCH 5/7] arm64: dts: ls1043a: add qdma device tree nodes
 In-Reply-To: <20181011094655.45707-1-peng.ma@nxp.com>
 References: <20181011094655.45707-1-peng.ma@nxp.com>
-Message-ID: <20181011094655.45707-2-peng.ma@nxp.com>
+Message-ID: <20181011094655.45707-5-peng.ma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wen He <wen.he_1@nxp.com>
+add the qDMA device tree nodes for LS1043A devices.
 
-This patch add the macro FSL_DMA_IN/OUT implement for ARM platform.
-
-Signed-off-by: Wen He <wen.he_1@nxp.com>
+Signed-off-by: Peng Ma <peng.ma@nxp.com>
 ---
- drivers/dma/fsldma.h |   57 +++++++++++++++++++++++++++++++++----------------
- 1 files changed, 38 insertions(+), 19 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/dma/fsldma.h b/drivers/dma/fsldma.h
-index 982845b..1dc64c9 100644
---- a/drivers/dma/fsldma.h
-+++ b/drivers/dma/fsldma.h
-@@ -196,39 +196,58 @@ struct fsldma_chan {
- #define to_fsl_desc(lh) container_of(lh, struct fsl_desc_sw, node)
- #define tx_to_fsl_desc(tx) container_of(tx, struct fsl_desc_sw, async_tx)
- 
-+#ifdef	CONFIG_PPC
-+#define fsl_ioread32(p)		in_le32(p)
-+#define fsl_ioread32be(p)	in_be32(p)
-+#define fsl_iowrite32(v, p)	out_le32(p, v)
-+#define fsl_iowrite32be(v, p)	out_be32(p, v)
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 7881e3d..49c6655 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -734,6 +734,28 @@
+ 					<0000 0 0 3 &gic 0 156 0x4>,
+ 					<0000 0 0 4 &gic 0 157 0x4>;
+ 		};
 +
- #ifndef __powerpc64__
--static u64 in_be64(const u64 __iomem *addr)
-+static u64 fsl_ioread64(const u64 __iomem *addr)
- {
--	return ((u64)in_be32((u32 __iomem *)addr) << 32) |
--		(in_be32((u32 __iomem *)addr + 1));
-+	return ((u64)in_le32((u32 __iomem *)addr + 1) << 32) |
-+		(in_le32((u32 __iomem *)addr));
- }
- 
--static void out_be64(u64 __iomem *addr, u64 val)
-+static void fsl_iowrite64(u64 val, u64 __iomem *addr)
- {
--	out_be32((u32 __iomem *)addr, val >> 32);
--	out_be32((u32 __iomem *)addr + 1, (u32)val);
-+	out_le32((u32 __iomem *)addr + 1, val >> 32);
-+	out_le32((u32 __iomem *)addr, (u32)val);
- }
- 
--/* There is no asm instructions for 64 bits reverse loads and stores */
--static u64 in_le64(const u64 __iomem *addr)
-+static u64 fsl_ioread64be(const u64 __iomem *addr)
- {
--	return ((u64)in_le32((u32 __iomem *)addr + 1) << 32) |
--		(in_le32((u32 __iomem *)addr));
-+	return ((u64)in_be32((u32 __iomem *)addr) << 32) |
-+		(in_be32((u32 __iomem *)addr + 1));
- }
- 
--static void out_le64(u64 __iomem *addr, u64 val)
-+static void fsl_iowrite64be(u64 val, u64 __iomem *addr)
- {
--	out_le32((u32 __iomem *)addr + 1, val >> 32);
--	out_le32((u32 __iomem *)addr, (u32)val);
-+	out_be32((u32 __iomem *)addr, val >> 32);
-+	out_be32((u32 __iomem *)addr + 1, (u32)val);
- }
- #endif
-+#endif
- 
--#define FSL_DMA_IN(fsl_chan, addr, width)				\
--		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
--			in_be##width(addr) : in_le##width(addr))
--#define FSL_DMA_OUT(fsl_chan, addr, val, width)			\
--		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
--			out_be##width(addr, val) : out_le##width(addr, val))
-+#if defined(CONFIG_ARM64) || defined(CONFIG_ARM)
-+#define fsl_ioread32(p)		ioread32(p)
-+#define fsl_ioread32be(p)	ioread32be(p)
-+#define fsl_iowrite32(v, p)	iowrite32(v, p)
-+#define fsl_iowrite32be(v, p)	iowrite32be(v, p)
-+#define fsl_ioread64(p)		ioread64(p)
-+#define fsl_ioread64be(p)	ioread64be(p)
-+#define fsl_iowrite64(v, p)	iowrite64(v, p)
-+#define fsl_iowrite64be(v, p)	iowrite64be(v, p)
-+#endif
++		qdma: qdma at 8380000 {
++			compatible = "fsl,ls1021a-qdma", "fsl,ls1043a-qdma";
++			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
++			      <0x0 0x8390000 0x0 0x10000>, /* Status regs */
++			      <0x0 0x83a0000 0x0 0x40000>; /* Block regs */
++			interrupts = <0 153 0x4>,
++				     <0 39 0x4>,
++				     <0 40 0x4>,
++				     <0 41 0x4>,
++				     <0 42 0x4>;
++			interrupt-names = "qdma-error", "qdma-queue0",
++				"qdma-queue1", "qdma-queue2", "qdma-queue3";
++			channels = <8>;
++			block-number = <1>;
++			block-offset = <0x10000>;
++			queues = <2>;
++			status-sizes = <64>;
++			queue-sizes = <64 64>;
++			big-endian;
++		};
 +
-+#define FSL_DMA_IN(fsl_dma, addr, width)			\
-+		(((fsl_dma)->feature & FSL_DMA_BIG_ENDIAN) ?	\
-+			fsl_ioread##width##be(addr) : fsl_ioread##width(addr))
-+
-+#define FSL_DMA_OUT(fsl_dma, addr, val, width)			\
-+		(((fsl_dma)->feature & FSL_DMA_BIG_ENDIAN) ?	\
-+			fsl_iowrite##width##be(val, addr) : fsl_iowrite	\
-+		##width(val, addr))
+ 	};
  
- #define DMA_TO_CPU(fsl_chan, d, width)					\
- 		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
+ 	firmware {
 -- 
 1.7.1
