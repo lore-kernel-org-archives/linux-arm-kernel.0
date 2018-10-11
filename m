@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Oct 2018 15:56:04 +0100 (BST)
-Subject: Applied "spi: rockchip: remove unneeded dma_caps" to the spi tree
-In-Reply-To: <20181010090038.20834-5-kernel@esmil.dk>
-Message-ID: <20181011145604.4721E11223ED@debutante.sirena.org.uk>
+Date: Thu, 11 Oct 2018 15:55:53 +0100 (BST)
+Subject: Applied "spi: rockchip: simplify spi enable logic" to the spi tree
+In-Reply-To: <20181010090038.20834-8-kernel@esmil.dk>
+Message-ID: <20181011145553.07C8111223ED@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: rockchip: remove unneeded dma_caps
+   spi: rockchip: simplify spi enable logic
 
 has been applied to the spi tree at
 
@@ -33,40 +33,90 @@ to this mail.
 Thanks,
 Mark
 
->From 058f7c509e84abd36f988d4e16432366bd793d8f Mon Sep 17 00:00:00 2001
+>From a3c174021ce780f5d2e9b2105e2cb4903a37226d Mon Sep 17 00:00:00 2001
 From: Emil Renner Berthing <kernel@esmil.dk>
-Date: Wed, 10 Oct 2018 11:00:35 +0200
-Subject: [PATCH] spi: rockchip: remove unneeded dma_caps
+Date: Wed, 10 Oct 2018 11:00:38 +0200
+Subject: [PATCH] spi: rockchip: simplify spi enable logic
 
-We no longer need the dma_caps since the dma driver
-already clamps the burst length to the hardware limit,
-so don't request and store dma_caps in device data.
+Let the dma/non-dma code paths handle the spi enable
+flag themselves. This removes some logic to determine
+if the flag should be turned on before or after dma
+and also don't leave the spi enabled if the dma path
+fails.
 
 Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-rockchip.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/spi/spi-rockchip.c | 28 +++++++++-------------------
+ 1 file changed, 9 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 2f825702cd90..6a53b940f2f5 100644
+index 6fa809da61dd..ffa564fbf970 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -207,7 +207,6 @@ struct rockchip_spi {
- 	struct sg_table rx_sg;
- 	struct rockchip_spi_dma_data dma_rx;
- 	struct rockchip_spi_dma_data dma_tx;
--	struct dma_slave_caps dma_caps;
- };
+@@ -379,6 +379,8 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
+ {
+ 	int remain = 0;
  
- static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
-@@ -774,7 +773,6 @@ static int rockchip_spi_probe(struct platform_device *pdev)
++	spi_enable_chip(rs, 1);
++
+ 	do {
+ 		if (rs->tx) {
+ 			remain = rs->tx_end - rs->tx;
+@@ -498,6 +500,8 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ 		dma_async_issue_pending(rs->dma_rx.ch);
  	}
  
- 	if (rs->dma_tx.ch && rs->dma_rx.ch) {
--		dma_get_slave_caps(rs->dma_rx.ch, &(rs->dma_caps));
- 		rs->dma_tx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_TXDR);
- 		rs->dma_rx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_RXDR);
- 		rs->dma_tx.direction = DMA_MEM_TO_DEV;
++	spi_enable_chip(rs, 1);
++
+ 	if (txdesc) {
+ 		spin_lock_irqsave(&rs->lock, flags);
+ 		rs->state |= TXBUSY;
+@@ -506,7 +510,8 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ 		dma_async_issue_pending(rs->dma_tx.ch);
+ 	}
+ 
+-	return 0;
++	/* 1 means the transfer is in progress */
++	return 1;
+ }
+ 
+ static void rockchip_spi_config(struct rockchip_spi *rs)
+@@ -589,7 +594,6 @@ static int rockchip_spi_transfer_one(
+ 		struct spi_device *spi,
+ 		struct spi_transfer *xfer)
+ {
+-	int ret = 0;
+ 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+ 
+ 	WARN_ON(readl_relaxed(rs->regs + ROCKCHIP_SPI_SSIENR) &&
+@@ -633,24 +637,10 @@ static int rockchip_spi_transfer_one(
+ 
+ 	rockchip_spi_config(rs);
+ 
+-	if (rs->use_dma) {
+-		if (rs->tmode == CR0_XFM_RO) {
+-			/* rx: dma must be prepared first */
+-			ret = rockchip_spi_prepare_dma(rs);
+-			spi_enable_chip(rs, 1);
+-		} else {
+-			/* tx or tr: spi must be enabled first */
+-			spi_enable_chip(rs, 1);
+-			ret = rockchip_spi_prepare_dma(rs);
+-		}
+-		/* successful DMA prepare means the transfer is in progress */
+-		ret = ret ? ret : 1;
+-	} else {
+-		spi_enable_chip(rs, 1);
+-		ret = rockchip_spi_pio_transfer(rs);
+-	}
++	if (rs->use_dma)
++		return rockchip_spi_prepare_dma(rs);
+ 
+-	return ret;
++	return rockchip_spi_pio_transfer(rs);
+ }
+ 
+ static bool rockchip_spi_can_dma(struct spi_master *master,
 -- 
 2.19.0.rc2
