@@ -1,138 +1,26 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 11 Oct 2018 17:41:26 +0100
-Subject: [PATCH v9 04/11] dt: psci: Update DT bindings to support
- hierarchical PSCI states
-In-Reply-To: <CAPDyKFqP3wbd+5rvLcscNf1LUSZDROLqafsLq0Kyh0KziRJrZQ@mail.gmail.com>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <20181003143824.13059-5-ulf.hansson@linaro.org>
- <20181010150312.GA4844@e107155-lin>
- <CAPDyKFqP3wbd+5rvLcscNf1LUSZDROLqafsLq0Kyh0KziRJrZQ@mail.gmail.com>
-Message-ID: <20181011164126.GD28583@e107155-lin>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 12 Oct 2018 01:41:01 +0900
+Subject: [PATCH v4 0/2] dmaengine: add UniPhier MIO DMAC driver
+Message-ID: <1539276063-5103-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2018 at 04:44:07PM +0200, Ulf Hansson wrote:
-> +Raju
->
-> On 10 October 2018 at 17:03, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> > On Wed, Oct 03, 2018 at 04:38:17PM +0200, Ulf Hansson wrote:
-> >> From: Lina Iyer <lina.iyer@linaro.org>
-> >>
-> >> Update DT bindings to represent hierarchical CPU and CPU PM domain idle
-> >> states for PSCI. Also update the PSCI examples to clearly show how
-> >> flattened and hierarchical idle states can be represented in DT.
-> >>
-> >> Cc: Lina Iyer <ilina@codeaurora.org>
-> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> >> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> Reviewed-by: Rob Herring <robh@kernel.org>
-> >> Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
-> >> ---
-> >>  .../devicetree/bindings/arm/psci.txt          | 156 ++++++++++++++++++
-> >>  1 file changed, 156 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-> >> index a2c4f1d52492..17aa3d3a1c8e 100644
-> >> --- a/Documentation/devicetree/bindings/arm/psci.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/psci.txt
-> >> @@ -105,7 +105,163 @@ Case 3: PSCI v0.2 and PSCI v0.1.
-> >>               ...
-> >>       };
-> >>
-> >> +ARM systems can have multiple cores sometimes in hierarchical arrangement.
-> >> +This often, but not always, maps directly to the processor power topology of
-> >> +the system. Individual nodes in a topology have their own specific power states
-> >> +and can be better represented in DT hierarchically.
-> >> +
-> >> +For these cases, the definitions of the idle states for the CPUs and the CPU
-> >> +topology, must conform to the domain idle state specification [3]. The domain
-> >> +idle states themselves, must be compatible with the defined 'domain-idle-state'
-> >> +binding [1], and also need to specify the arm,psci-suspend-param property for
-> >> +each idle state.
-> >> +
-> >> +DT allows representing CPUs and CPU idle states in two different ways -
-> >> +
-> >> +The flattened model as given in Example 1, lists CPU's idle states followed by
-> >> +the domain idle state that the CPUs may choose. Note that the idle states are
-> >> +all compatible with "arm,idle-state".
-> >> +
-> >> +Example 2 represents the hierarchical model of CPUs and domain idle states.
-> >> +CPUs define their domain provider in their psci DT node. The domain controls
-> >> +the power to the CPU and possibly other h/w blocks that would enter an idle
-> >> +state along with the CPU. The CPU's idle states may therefore be considered as
-> >> +the domain's idle states and have the compatible "arm,idle-state". Such domains
-> >> +may also be embedded within another domain that may represent common h/w blocks
-> >> +between these CPUs. The idle states of the CPU topology shall be represented as
-> >> +the domain's idle states.
-> >> +
-> >> +In PSCI firmware v1.0, the OS-Initiated mode is introduced. In order to use it,
-> >> +the hierarchical representation must be used.
-> >> +
-> >> +Example 1: Flattened representation of CPU and domain idle states
-> >
-> > [...]
-> >
-> >> +Example 2: Hierarchical representation of CPU and domain idle states
-> >
-> > I understand that this may not be of interest for this series, but do
-> > we need to add any suggestions on how to arrive Flattened representation
-> > of CPU idle states from its hierarchical representation. If the DT has
-> > latter and PSCI call returns as PC mode only for idle. We need to deal
-> > with that case.
->
-> For sure, I think this is valid comment for this series (or at least
-> v8 which contains the hole set).
->
+1/2: DT-binding
+2/2: driver
 
-Thanks.
 
-> The approach I have taken, so far, is to closely tie the support for
-> PSCI OSI mode to the hierarchical representation in DT of the idle
-> states. Simply because of changing as little as possible, in a first
-> step, then build on top.
->
+Masahiro Yamada (2):
+  dt-bindings: dmaengine: add DT binding for UniPhier MIO DMAC
+  dmaengine: uniphier-mdmac: add UniPhier MIO DMAC driver
 
-That's fine. I just want a note in the bindings to state that we can use
-the hierarchical representation and generate flattened list for PC.
+ .../devicetree/bindings/dma/uniphier-mio-dmac.txt  |  25 +
+ MAINTAINERS                                        |   1 +
+ drivers/dma/Kconfig                                |  11 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/uniphier-mdmac.c                       | 506 +++++++++++++++++++++
+ 5 files changed, 544 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/uniphier-mio-dmac.txt
+ create mode 100644 drivers/dma/uniphier-mdmac.c
 
-> However, in the offlist discussion I had with Lorenzo, he raised a
-> concern, very similar to what you are bringing up here. There are
-> indeed platform configurations, using PSCI PC mode, which would
-> benefit from the using the hierarchical representation. BTW, that is
-> kind of what Raju just tried to get working for QCOM SDM845 [1], but
-> let's discuss that separately.
->
-
-OK, we can discuss details in that thread, but I don't even see the PSCI
-domains there.
-
-> The conclusion I made, is that no matter of we are using the PC mode
-> or the OSI mode, the hierarchical representation shall just work.
->
-
-Indeed.
-
-> To me, this means that I have to re-work the series, such that the
-> PSCI driver (and cpuidle), dynamically in runtime, can agree on which
-> of the idle states that are "shared among a group of CPUs" and which
-> are CPU specific. Exactly how, I am still exploring a few different
-> approaches on.
->
-> Does it make sense?
->
-
-Yes
-
-> So, when it comes to the updated DT bindings in regards to $subject
-> patch, I think it's good as is. Or do you think there is something
-> that needs to be clarified?
->
-
-Yes, nearly there. Just thought good to add a note that the representation
-has no affinity towards any PSCI idle state mechanism(PC or OSI). So
-that it's never assumed or misunderstood.
-
---
-Regards,
-Sudeep
+-- 
+2.7.4
