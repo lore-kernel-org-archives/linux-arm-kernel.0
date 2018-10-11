@@ -1,49 +1,33 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Thu, 11 Oct 2018 14:17:28 +0200
-Subject: [PATCH V6 00/23] mmc: mmci: add sdmmc variant for stm32
-In-Reply-To: <CAPDyKFqTNUihEk-i+t4OU1Eq5iBS57XZ4d8P2QbecgW_uT6NnA@mail.gmail.com>
-References: <1539000535-13261-1-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFp0oHHS=bkXj_AbiLmbNxW07pFnk-4m9kwQtYkh_ogKgw@mail.gmail.com>
- <cb919bf8-caa2-b2fe-fee4-ae2f0f4c04b5@st.com>
- <CAPDyKFp4DEtavAqDg-ymaCcus+Hddv0OrgfS54HsTX+aWdzN+w@mail.gmail.com>
- <CAPDyKFqTNUihEk-i+t4OU1Eq5iBS57XZ4d8P2QbecgW_uT6NnA@mail.gmail.com>
-Message-ID: <00baaa9b-f630-1e59-0074-7d6fd35eff06@st.com>
+From: sbates@raithlin.com (Stephen  Bates)
+Date: Thu, 11 Oct 2018 12:18:20 +0000
+Subject: [PATCH 5/5] RISC-V: Implement sparsemem
+In-Reply-To: <mhng-c93e2f59-7121-4964-bd61-3c4c02044cf3@palmer-si-x1c4>
+References: <20181005161642.2462-6-logang@deltatee.com>
+ <mhng-c93e2f59-7121-4964-bd61-3c4c02044cf3@palmer-si-x1c4>
+Message-ID: <15C8B877-4BBE-47E1-98D1-945E9355E757@raithlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Ulf
+Palmer
 
-On 10/11/2018 12:33 PM, Ulf Hansson wrote:
-> On 9 October 2018 at 13:18, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 9 October 2018 at 09:54, Ludovic BARRE <ludovic.barre@st.com> wrote:
->>> hi Ulf
->>>
->>> On 10/09/2018 09:30 AM, Ulf Hansson wrote:
->>>>
->>>> Applied for next, thanks!
->>>>
->>>> FYI, I made little fixup of the help text in the Kconfig for the last
->>>> patch.
->>>
->>>
->>> Thanks for your review.
->>> Did you had a feedback on Qcom platform tests?
->>
->> Nope. I am leaving the tests for Qcom platforms to be done by
->> kernelci, let's see what the reports are.
-> 
-> FYI:
-> 
-> https://kernelci.org/boot/id/5bbdcd2b59b5147001b435a4/
-> 
-> Looks good!
+> I don't really know anything about this, but you're welcome to add a
+>    
+>    Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
 
-Thanks for the boot tests on qcom
+Thanks. I think it would be good to get someone who's familiar with linux/mm to take a look.
+    
+> if you think it'll help.  I'm assuming you're targeting a different tree for 
+> the patch set, in which case it's probably best to keep this together with the 
+> rest of it.
 
-BR
-Ludo
+No I think this series should be pulled by the RISC-V maintainer. The other patches in this series just refactor some code and need to be ACK'ed by their ARCH developers but I suspect the series should be pulled into RISC-V. That said since it does touch other arch should it be pulled by mm? 
 
-> 
-> Kind regards
-> Uffe
-> 
+BTW note that RISC-V SPARSEMEM support is pretty useful for all manner of things and not just the p2pdma discussed in the cover.
+    
+> Thanks for porting your stuff to RISC-V!
+
+You bet ;-)
+
+Stephen
+    
+    
