@@ -1,177 +1,96 @@
-From: vincent.whitchurch@axis.com (Vincent Whitchurch)
-Date: Fri, 12 Oct 2018 15:14:06 +0200
-Subject: [PATCH v2] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
-Message-ID: <20181012131406.18601-1-vincent.whitchurch@axis.com>
+From: john.garry@huawei.com (John Garry)
+Date: Fri, 12 Oct 2018 14:25:49 +0100
+Subject: [PATCH] perf tools: Store ids for events with their own cpus
+ perf_event__synthesize_event_update_cpus
+In-Reply-To: <20181009100049.GF6499@krava>
+References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
+ <20180927160210.GF6916@krava>
+ <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
+ <20181002111621.GA6357@krava> <20181003113643.GA31725@krava>
+ <594506a2-8cb3-3d09-82ab-5cb6d8c31ed0@huawei.com>
+ <20181003141627.GA6341@krava> <20181003212052.GA32371@krava>
+ <d071bb27-5533-da2f-9f8f-808183e04794@huawei.com>
+ <20181009100049.GF6499@krava>
+Message-ID: <31101407-0bcd-2fbf-361e-43cbcb81cd19@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
-ldr/str instructions in copy_{from/to}_user.  They are currently
-unnecessarily using single ldr/str instructions and can use ldm/stm
-instructions instead like memcpy does (but with appropriate fixup
-tables).
+On 09/10/2018 11:00, Jiri Olsa wrote:
+> On Thu, Oct 04, 2018 at 10:20:39AM +0100, John Garry wrote:
+>
+> SNIP
+>
+>>> We synthesize an update event that needs to touch the evsel
+>>> id array, which is not defined at that time. Fixing this by
+>>> forcing the id allocation for events with theeir own cpus.
 
-This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
-about 4% on my Cortex-A9.
+/s/theeir/their/
 
-before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
-before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
-before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
-before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
-before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
-before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
-before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
-before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
-before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
-before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
+>>>
+>>> Reported-by: John Garry <john.garry@huawei.com>
+>>> Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
+>>
+>> Tested-by: John Garry <john.garry@huawei.com>
+>>
+>> In terms of adding to stable, LT v4.14 is not affected, but 4.18.x is.
+>>
+>> Thanks,
+>> John
+>
+> Arnaldo, could you please pick up this one
+>
 
- after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
- after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
- after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
- after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
- after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
- after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
- after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
- after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
- after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
- after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
+Just a friendly reminder on this patch.
 
-Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
----
-v2: Group *_SHIFT #defines with respective .macro implementations
+How about re-send with an updated commit message also?
 
- arch/arm/include/asm/assembler.h |  6 ++++--
- arch/arm/lib/copy_from_user.S    | 27 ++++++++++++++++++++++++++-
- arch/arm/lib/copy_to_user.S      | 31 ++++++++++++++++++++++++++-----
- 3 files changed, 56 insertions(+), 8 deletions(-)
+Thanks,
+John
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index b17ee03d280b..da16d31c7ef9 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -243,13 +243,15 @@
- 	.endm
- #endif
- 
--#define USER(x...)				\
-+#define USERL(l, x...)				\
- 9999:	x;					\
- 	.pushsection __ex_table,"a";		\
- 	.align	3;				\
--	.long	9999b,9001f;			\
-+	.long	9999b,l;			\
- 	.popsection
- 
-+#define USER(x...)	USERL(9001f, x)
-+
- #ifdef CONFIG_SMP
- #define ALT_SMP(instr...)					\
- 9998:	instr
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index a826df3d3814..fca3a7037725 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -34,12 +34,13 @@
-  *	Number of bytes NOT copied.
-  */
- 
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+
- #ifndef CONFIG_THUMB2_KERNEL
- #define LDR1W_SHIFT	0
- #else
- #define LDR1W_SHIFT	1
- #endif
--#define STR1W_SHIFT	0
- 
- 	.macro ldr1w ptr reg abort
- 	ldrusr	\reg, \ptr, 4, abort=\abort
-@@ -61,6 +62,30 @@
- 	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
- 	.endm
- 
-+#else
-+
-+#define LDR1W_SHIFT	0
-+
-+	.macro ldr1w ptr reg abort
-+	USERL(\abort, W(ldr) \reg, [\ptr], #4)
-+	.endm
-+
-+	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
-+	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
-+	.endm
-+
-+	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-+	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
-+	.endm
-+
-+	.macro ldr1b ptr reg cond=al abort
-+	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
-+	.endm
-+
-+#endif /* CONFIG_CPU_USE_DOMAINS */
-+
-+#define STR1W_SHIFT	0
-+
- 	.macro str1w ptr reg abort
- 	W(str) \reg, [\ptr], #4
- 	.endm
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index caf5019d8161..d6fe31fb9bc4 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -35,11 +35,6 @@
-  */
- 
- #define LDR1W_SHIFT	0
--#ifndef CONFIG_THUMB2_KERNEL
--#define STR1W_SHIFT	0
--#else
--#define STR1W_SHIFT	1
--#endif
- 
- 	.macro ldr1w ptr reg abort
- 	W(ldr) \reg, [\ptr], #4
-@@ -57,6 +52,14 @@
- 	ldr\cond\()b \reg, [\ptr], #1
- 	.endm
- 
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+
-+#ifndef CONFIG_THUMB2_KERNEL
-+#define STR1W_SHIFT	0
-+#else
-+#define STR1W_SHIFT	1
-+#endif
-+
- 	.macro str1w ptr reg abort
- 	strusr	\reg, \ptr, 4, abort=\abort
- 	.endm
-@@ -76,6 +79,24 @@
- 	strusr	\reg, \ptr, 1, \cond, abort=\abort
- 	.endm
- 
-+#else
-+
-+#define STR1W_SHIFT	0
-+
-+	.macro str1w ptr reg abort
-+	USERL(\abort, W(str) \reg, [\ptr], #4)
-+	.endm
-+
-+	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-+	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
-+	.endm
-+
-+	.macro str1b ptr reg cond=al abort
-+	USERL(\abort, str\cond\()b \reg, [\ptr], #1)
-+	.endm
-+
-+#endif /* CONFIG_CPU_USE_DOMAINS */
-+
- 	.macro enter reg1 reg2
- 	mov	r3, #0
- 	stmdb	sp!, {r0, r2, r3, \reg1, \reg2}
--- 
-2.11.0
+> thanks,
+> jirka
+>
+>>
+>>> Signed-off-by: Jiri Olsa <jolsa@kernel.org>
+>>> ---
+>>>  tools/perf/builtin-report.c | 1 +
+>>>  tools/perf/util/evsel.c     | 3 +++
+>>>  2 files changed, 4 insertions(+)
+>>>
+>>> diff --git a/tools/perf/builtin-report.c b/tools/perf/builtin-report.c
+>>> index c0703979c51d..257c9c18cb7e 100644
+>>> --- a/tools/perf/builtin-report.c
+>>> +++ b/tools/perf/builtin-report.c
+>>> @@ -980,6 +980,7 @@ int cmd_report(int argc, const char **argv)
+>>>  			.id_index	 = perf_event__process_id_index,
+>>>  			.auxtrace_info	 = perf_event__process_auxtrace_info,
+>>>  			.auxtrace	 = perf_event__process_auxtrace,
+>>> +			.event_update	 = perf_event__process_event_update,
+>>>  			.feature	 = process_feature_event,
+>>>  			.ordered_events	 = true,
+>>>  			.ordering_requires_timestamps = true,
+>>> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+>>> index ac6cfb8b085e..7a0d5fbaf3c1 100644
+>>> --- a/tools/perf/util/evsel.c
+>>> +++ b/tools/perf/util/evsel.c
+>>> @@ -1088,6 +1088,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
+>>>  		attr->exclude_user   = 1;
+>>>  	}
+>>>
+>>> +	if (evsel->own_cpus)
+>>> +		evsel->attr.read_format |= PERF_FORMAT_ID;
+>>> +
+>>>  	/*
+>>>  	 * Apply event specific term settings,
+>>>  	 * it overloads any global configuration.
+>>>
+>>
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> .
+>
