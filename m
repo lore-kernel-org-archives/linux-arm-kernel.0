@@ -1,42 +1,23 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 12 Oct 2018 13:14:08 +0200
-Subject: [PATCH v6 09/18] ACPI / APEI: Let the notification helper
- specify the fixmap slot
-In-Reply-To: <20180921221705.6478-10-james.morse@arm.com>
-References: <20180921221705.6478-1-james.morse@arm.com>
- <20180921221705.6478-10-james.morse@arm.com>
-Message-ID: <20181012111408.GC580@zn.tnic>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 12 Oct 2018 13:19:27 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77990: Add DMA properties to
+ MSIOF nodes
+In-Reply-To: <CAMuHMdUhEt87dggNbZHjsDu0ZVjOSxbaZBDbA4nND+e_3o40tQ@mail.gmail.com>
+References: <1539070730-20349-1-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdUhEt87dggNbZHjsDu0ZVjOSxbaZBDbA4nND+e_3o40tQ@mail.gmail.com>
+Message-ID: <20181012111926.5fgzedqv7rp7z625@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 11:16:56PM +0100, James Morse wrote:
-> ghes_copy_tofrom_phys() uses a different fixmap slot depending on in_nmi().
-> This doesn't work when we have multiple NMI-like notifications, that
-> can interrupt each other.
+On Wed, Oct 10, 2018 at 02:39:18PM +0200, Geert Uytterhoeven wrote:
+> On Tue, Oct 9, 2018 at 9:39 AM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> > This patch adds DMA properties to the MSIOF device nodes of R8A77990 SoC.
+> >
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 > 
-> As with the locking, move the chosen fixmap_idx to the notification helper.
-> This only matters for NMI-like notifications, anything calling
-> ghes_proc() can use the IRQ fixmap slot as its already holding an irqsave
-> spinlock.
-> 
-> This lets us collapse the ghes_ioremap_pfn_*() helpers.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> 
-> The fixmap-idx and vaddr are passed back to ghes_unmap()
-> to allow ioremap() to be used in process context in the
-> future.
-> ---
->  drivers/acpi/apei/ghes.c | 76 ++++++++++++++--------------------------
->  1 file changed, 27 insertions(+), 49 deletions(-)
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> on Ebisu using a 25LC040 EEPROM
+> https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git/tree/arch/arm64/boot/dts/renesas/r8a77990-ebisu-cn41-msiof0-25lc040.dtso?h=topic/renesas-overlays
 
-Nice.
-
-Reviewed-by: Borislav Petkov <bp@suse.de>
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Thanks, applied for v4.21.
