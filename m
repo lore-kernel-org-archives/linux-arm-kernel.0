@@ -1,46 +1,47 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 12 Oct 2018 13:43:57 +1100
-Subject: next-20181008 build: 2 failures 22 warnings (next-20181008)
-In-Reply-To: <20181012103758.51c7befa@canb.auug.org.au>
-References: <E1g9cV0-0008Sg-4U@optimist> <20181008211109.GA4440@sirena.org.uk>
- <20181008213018.GL6490@zn.tnic>
- <20181010152704.337ee630@canb.auug.org.au>
- <20181010043358.GA5924@zn.tnic>
- <20181012103758.51c7befa@canb.auug.org.au>
-Message-ID: <20181012134357.51bfd026@canb.auug.org.au>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri, 12 Oct 2018 09:08:58 +0530
+Subject: [PATCH 0/4] Add clock support for Hi3670 SoC
+In-Reply-To: <20180921060103.21370-1-manivannan.sadhasivam@linaro.org>
+References: <20180921060103.21370-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181012033857.GA5438@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Fri, 12 Oct 2018 10:37:58 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->
-> On Wed, 10 Oct 2018 06:33:59 +0200 Borislav Petkov <bp@suse.de> wrote:
-> >
-> > On Wed, Oct 10, 2018 at 03:27:04PM +1100, Stephen Rothwell wrote:  
-> > > I have added that to linux-next today (pending this or something else
-> > > turning up in the tip tree).    
-> > 
-> > I have queued a fixed version in the meantime:
-> > 
-> > https://git.kernel.org/tip/9d94e8b1d4f94a3c4cee5ad11a1be460cd070839  
+On Thu, Sep 20, 2018 at 11:00:59PM -0700, Manivannan Sadhasivam wrote:
+> This patchset adds clock support for Hi3670 SoC from HiSilicon utilizing
+> the HiSi common clock code. While adding clock support, let's remove the
+> fixed clock for UART and source SoC clock on HiKey970 board.
 > 
-> OK, I will use that until it turns up in the tip auto-latest branch.
+> This patchset has been verified on HiKey970 board.
+>
 
-It turns out that I can't use that since it is mostly already in the
-tip tree as commit
+Hi,
 
-  3a387c6d96e6 ("x86/kaslr, ACPI/NUMA: Fix KASLR build error")
+Any update on this series?
 
-So I will stick with my incremental patch for now.
+Thanks,
+Mani
 
--- 
-Cheers,
-Stephen Rothwell
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/2ee2a938/attachment.sig>
+> Thanks,
+> Mani
+> 
+> Manivannan Sadhasivam (4):
+>   dt-bindings: clk: hisilicon: Add bindings for Hi3670 clk
+>   arm64: dts: hisilicon: Add clock nodes for Hi3670 SoC
+>   arm64: dts: hisilicon: Source SoC clock for UART6
+>   clk: hisilicon: Add clock driver for Hi3670 SoC
+> 
+>  .../bindings/clock/hi3670-clock.txt           |   43 +
+>  arch/arm64/boot/dts/hisilicon/hi3670.dtsi     |   48 +-
+>  drivers/clk/hisilicon/Kconfig                 |    7 +
+>  drivers/clk/hisilicon/Makefile                |    1 +
+>  drivers/clk/hisilicon/clk-hi3670.c            | 1016 +++++++++++++++++
+>  include/dt-bindings/clock/hi3670-clock.h      |  348 ++++++
+>  6 files changed, 1458 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hi3670-clock.txt
+>  create mode 100644 drivers/clk/hisilicon/clk-hi3670.c
+>  create mode 100644 include/dt-bindings/clock/hi3670-clock.h
+> 
+> -- 
+> 2.17.1
+> 
