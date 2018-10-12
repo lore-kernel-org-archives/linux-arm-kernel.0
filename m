@@ -1,172 +1,100 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 12 Oct 2018 14:19:38 +0200
-Subject: [PATCH v4 1/2] arm64: dts: allwinner: new board - Emlid Neutis N5
-In-Reply-To: <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
-References: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539339841-22235-1-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
-Message-ID: <b47c5458-683e-3e96-0bbe-f9db84579c77@suse.de>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 12 Oct 2018 14:36:10 +0200
+Subject: [PATCH v2 0/2] pwm: sysfs: fix exporting PWM channel
+In-Reply-To: <ad0206b8-2cda-a147-1b71-8e2eced06e61@i2se.com>
+References: <1538400237-28766-1-git-send-email-fabrice.gasnier@st.com>
+ <20181012115500.GD31561@ulmo> <ad0206b8-2cda-a147-1b71-8e2eced06e61@i2se.com>
+Message-ID: <b56bc059-573f-545e-da45-51765f8937a7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/12/2018 02:15 PM, Stefan Wahren wrote:
+> Am 12.10.2018 um 13:55 schrieb Thierry Reding:
+>> On Mon, Oct 01, 2018 at 03:23:55PM +0200, Fabrice Gasnier wrote:
+>>> Since commit 7e5d1fd75c3d ("pwm: Set class for exported channels in sysfs")
+>>> - it's not possible to export more than one PWM channel
+>>> - ABI has changed, as a side effect. It may cause bad behavior as pwmchip
+>>>   attributes are wrongly added to pwm channels and report wrong values.
+>>> See [1] and [2].
+>>>
+>>> One purpose of the original patch is to send uevents to udev, when exporting a
+>>> PWM channel through the sysfs. This series:
+>>> - Reverts the original patch.
+>>> - Proposes a new way to send notifications to be used by udev rules.
+>>>
+>>> - With this series:
+>>> $ echo 0 > /sys/class/pwm/pwmchip0/export
+>>> $ ls /sys/class/pwm
+>>> pwmchip0 pwmchip4
+>>>
+>>> $ ls /sys/class/pwm/pwmchip0/pwm0/
+>>> capture     enable      polarity    uevent
+>>> duty_cycle  period      power
+>>>
+>>> - Without this series:
+>>> $ echo 0 > /sys/class/pwm/pwmchip0/export
+>>> $ ls /sys/class/pwm
+>>> pwm0 pwmchip0 pwmchip4
+>>>
+>>> $ ls /sys/class/pwm/pwmchip0/pwm0/
+>>> capture     duty_cycle  export      period      power       uevent
+>>> device      enable      npwm        polarity    subsystem   unexport
+>>>
+>>> - Backtrace when exporting a 2nd channel (0) on a separate pwmchip device:
+>>> $ echo 0 > /sys/class/pwm/pwmchip4/export
+>>> [   95.286558] sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+>>> [   95.293630] CPU: 0 PID: 54 Comm: sh Not tainted 4.19.0-rc6-00013-g00b49b0 #151
+>>> [   95.301344] Hardware name: STM32 (Device Tree Support)
+>>> [   95.306833] [<0000c155>] (unwind_backtrace) from [<0000b273>] (show_stack+0xb/0xc)
+>>> [   95.315136] [<0000b273>] (show_stack) from [<00092455>] (sysfs_warn_dup+0x31/0x48)
+>>> [   95.323247] [<00092455>] (sysfs_warn_dup) from [<00092635>] (sysfs_do_create_link_sd+0x75/0x88)
+>>> [   95.332539] [<00092635>] (sysfs_do_create_link_sd) from [<00125823>] (device_add+0x133/0x3b0)
+>>> [   95.341694] [<00125823>] (device_add) from [<001059ed>] (export_store+0xb5/0x12c)
+>>> [   95.349761] [<001059ed>] (export_store) from [<00091911>] (kernfs_fop_write+0x87/0xda)
+>>> [   95.358150] [<00091911>] (kernfs_fop_write) from [<0005beb1>] (__vfs_write+0x1d/0xe0)
+>>> [   95.366295] [<0005beb1>] (__vfs_write) from [<0005bfe7>] (vfs_write+0x4f/0x7c)
+>>> [   95.374053] [<0005bfe7>] (vfs_write) from [<0005c0bf>] (ksys_write+0x33/0x70)
+>>> [   95.381708] [<0005c0bf>] (ksys_write) from [<00009001>] (ret_fast_syscall+0x1/0x58)
+>>> [   95.389682] Exception stack(0x01bcffa8 to 0x01bcfff0)
+>>> [   95.394946] ffa0:                   00000000 00c4883c 00000001 00c4e590 00000002 00000004
+>>> [   95.403639] ffc0: 00000000 00c4883c 00c4cbe8 00000004 00000002 00000020 00000000 00c4d008
+>>> [   95.412223] ffe0: 00c29151 00c4cbe8 00c17833 00c13c0c
+>>> -sh: write error: File exists
+>>>
+>>> [1] https://lkml.org/lkml/2018/9/25/713
+>>> [2] https://lkml.org/lkml/2018/9/25/447
+>>>
+>>> ---
+>>> Changes in v2:
+>>> - update revert commit message
+>>> - new patch 2/2 to propose uevent notification (change) on pwmchip
+>>>
+>>> Fabrice Gasnier (2):
+>>>   Revert "pwm: Set class for exported channels in sysfs"
+>>>   pwm: send a uevent on the pwmchip device upon channel sysfs (un)export
+>>>
+>>>  drivers/pwm/sysfs.c | 12 +++++++++++-
+>>>  1 file changed, 11 insertions(+), 1 deletion(-)
+>> Both patches applied, thanks. What do you think would be the importance
+>> of getting this into stable kernels? We can't get one of the patches in
+>> without the other, so they'd both have to be backported. The second one
+>> is still fairly small, so would qualify for stable, I think.
+> I think the revert patch should go to stable, because it fixes a regression.
+> 
+
 Hi,
 
-Am 12.10.18 um 12:23 schrieb Aleksandr Aleksandrov:
-> Emlid Neutis N5 is a SoM based on Allwinner H5, has a WiFi & BT
-> module, DDR3 RAM and eMMC.
-> 
-> - add neutis n5 dtsi file for SoM needs
-> - add neutis devboard dts file
-> - add neutis devboard target to dtb makefile
-> 
-> Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> ---
->  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
->  .../sun50i-h5-emlid-neutis-n5-devboard.dts         | 147 +++++++++++++++++++++
->  .../dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi   |  59 +++++++++
->  3 files changed, 207 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index 9ffa7a0..eefe74c 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -8,6 +8,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-emlid-neutis-n5-devboard.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-libretech-all-h3-cc.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
-> new file mode 100644
-> index 0000000..1086029
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
-> @@ -0,0 +1,147 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR X11)
+Thierry, Thanks for taking these.
+I also think at least the 1st patch (revert) should be backported in
+stable branch. Not taking the second one may lead to another issue for
+the users that now expect uevents. This is replacement patch to the
+original one. So, I'd advise to push both: revert + replacement patch.
 
-Note that the new SPDX identifier would be "GPL-2.0-or-later", but both
-are still valid.
+Fabrice
 
-I stumbled over "X11", should that be "MIT" instead?
-
-Also, is this combined comment style of SPDX + copyright acceptable?
-
-Same nits in the .dtsi file.
-
-> + *
-> + * Copyright (C) 2018 Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sun50i-h5-emlid-neutis-n5.dtsi"
-> +
-> +/ {
-> +	model = "Emlid Neutis N5 Developer board";
-> +	compatible = "emlid,neutis-n5-devboard",
-> +		     "emlid,neutis-n5",
-
-You are lacking bindings definitions for these new identifiers. The
-vendor prefix should be patch 1/3, the SoM/board compatibles 2/3 and
-this .dts[i] patch 3/3, so that only vendor prefixes and compatibles
-that are defined and don't result in checkpatch.pl warnings get used.
-
-One more nit below...
-
-> +		     "allwinner,sun50i-h5";
-[...]
-> +&de {
-> +	status = "okay";
-> +};
-> +
-> +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci2 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci3 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci1 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci2 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci3 {
-> +	status = "okay";
-> +};
-
-'o' is out of alphabetical order here.
-
-Otherwise looks okay to me.
-
-Regards,
-Andreas
-
-> +
-> +&emac {
-> +	phy-handle = <&int_mii_phy>;
-> +	phy-mode = "mii";
-> +	allwinner,leds-active-low;
-> +	status = "okay";
-> +};
-> +
-> +&hdmi {
-> +	status = "okay";
-> +};
-> +
-> +&hdmi_out {
-> +	hdmi_out_con: endpoint {
-> +		remote-endpoint = <&hdmi_con_in>;
-> +	};
-> +};
-> +
-> +&mmc0 {
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&usb_otg {
-> +	dr_mode = "otg";
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	usb0_id_det-gpios = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
-> +	usb0_vbus-supply = <&reg_usb0_vbus>;
-> +	status = "okay";
-> +};
-[snip]
-
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> Thanks
+>>
+>> However, given that it's taken a long time for somebody to notice this,
+>> I'm not sure if this is something that people care about too much in the
+>> stable kernels>>
+>> Thierry
