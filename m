@@ -1,119 +1,46 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 12 Oct 2018 10:52:42 +0200
-Subject: [PATCH 0/3] spi-nor: Add Octal SPI support
-In-Reply-To: <e4af1014-2008-440c-a017-bb8e7e960d3b@ti.com>
-References: <20181003165603.2579-1-vigneshr@ti.com>
- <20181003212017.653e739f@bbrezillon>
- <1074d503-71ef-2998-7096-de6135bb965d@ti.com>
- <20181004131732.4c9e2ae9@bbrezillon>
- <e4af1014-2008-440c-a017-bb8e7e960d3b@ti.com>
-Message-ID: <20181012105242.519a70b9@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Oct 2018 10:50:08 +0100
+Subject: [PATCH v5 01/17] arm64: add pointer authentication register bits
+In-Reply-To: <20181012085605.GB11847@arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-2-kristina.martsenko@arm.com>
+ <20181011162814.GC17000@arm.com>
+ <20181012085352.xi6rkcpm62iqd6ru@lakrids.cambridge.arm.com>
+ <20181012085605.GB11847@arm.com>
+Message-ID: <20181012095008.swtk4gazlrc6rwdj@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vignesh,
+On Fri, Oct 12, 2018 at 09:56:05AM +0100, Will Deacon wrote:
+> On Fri, Oct 12, 2018 at 09:53:54AM +0100, Mark Rutland wrote:
+> > On Thu, Oct 11, 2018 at 05:28:14PM +0100, Will Deacon wrote:
+> > > On Fri, Oct 05, 2018 at 09:47:38AM +0100, Kristina Martsenko wrote:
+> > 
+> > > > +#define ESR_ELx_EC_PAC		(0x09)
+> > > 
+> > > Really minor nit: but shouldn't this be ESR_EL2_EC_PAC, since this trap
+> > > can't occur at EL1 afaict?
+> > 
+> > It can also be taken to EL3 dependent on SCR_EL3.API.
+> > 
+> > We use ESR_ELx_EC_<foo> for other exceptions that can't be taken to EL1
+> > (e.g. ESR_ELx_EC_SMC{32,64}), so I think it would be more consistent to
+> > leave this as ESR_ELx_EC_PAC rather than ESR_EL2_EC_PAC.
+> 
+> Fair enough, but if we grow a different EC for ESR_EL1 that uses encoding
+> 0x09, this all falls apart.
 
-On Mon, 8 Oct 2018 21:06:02 +0530
-Vignesh R <vigneshr@ti.com> wrote:
+We haven't had overlapping encodings so far, and if we did, we'd want to
+apply some policy to all of these definitions, no?
 
-> Hi Boris,
-> 
-> Sorry I missed this mail.
-> 
-> On Thursday 04 October 2018 04:47 PM, Boris Brezillon wrote:
-> > On Thu, 4 Oct 2018 16:05:36 +0530
-> > Vignesh R <vigneshr@ti.com> wrote:
-> >   
-> >>>>
-> >>>>  .../devicetree/bindings/mtd/cadence-quadspi.txt       |  1 +
-> >>>>  drivers/mtd/spi-nor/cadence-quadspi.c                 |  9 +++++++++    
-> >>>
-> >>> On a slightly different topic, do you plan to convert the Cadence
-> >>> driver to spi-mem? And if you don't, is it because you don't have time
-> >>> or because some features are missing in spi-mem (I remember you
-> >>> mentioned a few things back when you were reviewing the spi-mem series)?
-> >>>     
-> >>
-> >> I do not have plans to convert cadence QSPI driver to spi-mem yet,
-> >> mainly due to lack of time. Also, not sure if original author Marek and
-> >> other altera people are okay with that.
-> >>
-> >> I see couple of issues in the way of conversion:
-> >> 1. I would wait to know what direction would direct mapping APIs[1] go
-> >> before starting spi-mem conversion for Cadence QSPI driver. Else, we
-> >> have may to re write again if direct mapping APIs are merged.  
-> > 
-> > I'd suggest reviewing the proposal I posted so that you can influence
-> > the design of this new API ;-).
-> >   
-> 
-> I did take a look and proposal seems fine. Will try to prototype and
-> test cadence QSPI driver with these. Thanks for the patches!
+> At the very list, maybe we should comment those that are EL2 or higher
+> with /* EL2 and above */ or just fix the misnomer and drop the useless
+> _ELx_ part of the names completely.
 
-That's great news! Let me know how it goes, and don't hesitate to ask
-if you have any questions.
+A comment sounds fine to me.
 
-> 
-> 
-> >> 2. New Cadence OSPI IP has an integrated PHY to support high throughput
-> >> OSPI flashes operating up 200MHz in Octal DDR mode. In order to work
-> >> with such flashes, PHY DLLs need to be calibrated. Highly simplified
-> >> calibration sequence is as below(See [2] for actual sequence):
-> >> -Read flash ID at low speed and store it.
-> >> -Enable PHY and set DLLs to a defined initial value
-> >> -Increment RX DLL value
-> >> -Read flash ID and check for correctness of data read
-> >> -repeat above two steps until a band of passing values is obtained for
-> >> RX DLL where flash ID is correctly read.
-> >> -DLL needs to set to middle of the passing band.  
-> > 
-> > Is the Read ID operation hardcoded or do you just use it as a way to
-> > trigger predictable transfers on the IO bus?
-> >   
-> 
-> Just a way to trigger predictable data reads.
-
-Good.
-
-
-> 
-> >>
-> >> I am trying to figure out how to fit this into the spi-mem framework as
-> >> controller would to need to store READ ID opcode and expected JEDEC ID
-> >> before starting calibration sequence.  
-> > 
-> > I think this should be split in 2:
-> > 
-> > - the SPI NOR framework passing the operation to use to do the
-> >   calibration (here a READ ID)
-> > - the SPI controller framework replaying the same operation with
-> >   different DLL configs until it finds the best match
-> > 
-> > So, it would basically be added as a new hook:
-> > 
-> > 	int (*calibrate)(struct spi_mem *mem,
-> > 			 const struct spi_mem_op *tmpl);
-> > 
-> > and a new function provided by the spi-mem API
-> > 
-> > int spi_mem_calibrate(struct spi_mem *mem,
-> > 		      const struct spi_mem_op *tmpl);
-> > 
-> > and calibration outcome would be somehow attached to the spi_mem
-> > object.
-> > 
-> > This way we stay memory agnostic but still provide the necessary blocks
-> > at the spi-mem level to do such callibrations.
-> > 
-> > Would that work?
-> >   
-> 
-> That would work and hopefully is not intrusive to spi-mem framework.
-> 
-
-Okay. Don't hesitate to post a proposal along those lines and I'll try
-to review it.
+I'm not sure that s/_ELx// buys us any clarity, though; I don't think
+that ESR_EC_PAC is clearly more constrained than ESR_ELx_EC_PAC.
 
 Thanks,
-
-Boris
+Mark.
