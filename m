@@ -1,67 +1,51 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 12 Oct 2018 11:57:02 +0200
-Subject: [PATCH v6 06/18] KVM: arm/arm64: Add kvm_ras.h to collect kvm
- specific RAS plumbing
-In-Reply-To: <20180921221705.6478-7-james.morse@arm.com>
-References: <20180921221705.6478-1-james.morse@arm.com>
- <20180921221705.6478-7-james.morse@arm.com>
-Message-ID: <20181012095702.GC12328@zn.tnic>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 12 Oct 2018 11:57:43 +0200
+Subject: [PATCH v3] arm64: new board - Emlid Neutis N5
+In-Reply-To: <20181012093523.GA29014@imagebutcher>
+References: <1538745949-13188-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539012044-29998-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <20181010144957.exrlupoph7ovsmdw@flea>
+ <9398571539259289@myt4-929fb874f3f2.qloud-c.yandex.net>
+ <2d09d6c0-0404-589d-2c34-da846cff4fb8@suse.de>
+ <20181012093523.GA29014@imagebutcher>
+Message-ID: <20181012095743.llxqyggkhtnsbpaf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 11:16:53PM +0100, James Morse wrote:
-> To split up APEIs in_nmi() path, we need any nmi-like callers to always
-> be in_nmi(). KVM shouldn't have to know about this, pull the RAS plumbing
-> out into a header file.
+On Fri, Oct 12, 2018 at 12:35:23PM +0300, Aleksandr Aleksandrov wrote:
+> > >> ?+&uart1 {
+> > >> ?+ pinctrl-names = "default";
+> > >> ?+ pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> > >> ?+ status = "okay";
+> > >> ?+};
+> > >>
+> > >> I guess this is for bluetooth? Have you tested serdev drivers?
+> > >>
+> > > Yes, bluetooth is connected over uart1.
+> > > You mean if I have tested bluetooth stack via serial device?
+> > 
+> > Not quite, we're missing a child node within uart1 for a serdev driver.
+> > Is there no such driver yet for your Bluetooth chipset, or did you not
+> > yet check?
 > 
-> Currently guest synchronous external aborts are claimed as RAS
-> notifications by handle_guest_sea(), which is hidden in the arch codes
-> mm/fault.c. 32bit gets a dummy declaration in system_misc.h.
+> Got it. I haven't checked a serdev driver.
 > 
-> There is going to be more of this in the future if/when we support
-> the SError-based firmware-first notification mechanism and/or
-> kernel-first notifications for both synchronous external abort and
-> SError. Each of these will come with some Kconfig symbols and a
-> handful of header files.
-> 
-> Create a header file for all this.
-> 
-> This patch gives handle_guest_sea() a 'kvm_' prefix, and moves the
-> declarations to kvm_ras.h as preparation for a future patch that moves
-> the ACPI-specific RAS code out of mm/fault.c.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-> ---
->  arch/arm/include/asm/kvm_ras.h       | 14 ++++++++++++++
->  arch/arm/include/asm/system_misc.h   |  5 -----
->  arch/arm64/include/asm/kvm_ras.h     | 11 +++++++++++
->  arch/arm64/include/asm/system_misc.h |  2 --
->  arch/arm64/mm/fault.c                |  2 +-
->  virt/kvm/arm/mmu.c                   |  4 ++--
->  6 files changed, 28 insertions(+), 10 deletions(-)
->  create mode 100644 arch/arm/include/asm/kvm_ras.h
->  create mode 100644 arch/arm64/include/asm/kvm_ras.h
-> 
-> diff --git a/arch/arm/include/asm/kvm_ras.h b/arch/arm/include/asm/kvm_ras.h
-> new file mode 100644
-> index 000000000000..aaff56bf338f
-> --- /dev/null
-> +++ b/arch/arm/include/asm/kvm_ras.h
-> @@ -0,0 +1,14 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (C) 2018 - Arm Ltd
+> Maxim, the SoM can't be run without a motherboard. According to your last message
+> I don't change dts files, right?
 
-checkpatch is complaining for some reason:
+Yep, that works for me.
 
-WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
-#66: FILE: arch/arm/include/asm/kvm_ras.h:1:
-+// SPDX-License-Identifier: GPL-2.0
+Maxime
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/44e7f915/attachment.sig>
