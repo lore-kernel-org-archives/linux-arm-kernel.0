@@ -1,37 +1,91 @@
-From: dave.hansen@intel.com (Dave Hansen)
-Date: Thu, 11 Oct 2018 16:47:29 -0700
-Subject: [PATCH v2 4/7] arm64/modules: Add rlimit checking for arm64
- modules
-In-Reply-To: <20181011233117.7883-5-rick.p.edgecombe@intel.com>
+From: jannh@google.com (Jann Horn)
+Date: Fri, 12 Oct 2018 02:35:28 +0200
+Subject: [PATCH v2 1/7] modules: Create rlimit for module space
+In-Reply-To: <20181011233117.7883-2-rick.p.edgecombe@intel.com>
 References: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
- <20181011233117.7883-5-rick.p.edgecombe@intel.com>
-Message-ID: <25951d99-8ba7-5c9e-938e-baf92395f9e0@intel.com>
+ <20181011233117.7883-2-rick.p.edgecombe@intel.com>
+Message-ID: <CAG48ez2fWg64nGxDXUQS3695KpVNrakAbarXJnYPd6xv5wOD+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2018 04:31 PM, Rick Edgecombe wrote:
-> +	if (check_inc_mod_rlimit(size))
-> +		return NULL;
+On Fri, Oct 12, 2018 at 1:40 AM Rick Edgecombe
+<rick.p.edgecombe@intel.com> wrote:
+> This introduces a new rlimit, RLIMIT_MODSPACE, which limits the amount of
+> module space a user can use. The intention is to be able to limit module space
+> allocations that may come from un-privlidged users inserting e/BPF filters.
+
+Note that in some configurations (iirc e.g. the default Ubuntu
+config), normal users can use the subuid mechanism (the /etc/subuid
+config file and the /usr/bin/newuidmap setuid helper) to gain access
+to 65536 UIDs, which means that in such a configuration,
+RLIMIT_MODSPACE*65537 is the actual limit for one user. (Same thing
+applies to RLIMIT_MEMLOCK.)
+
+Also, it is probably possible to waste a few times as much virtual
+memory as permitted by the limit by deliberately fragmenting virtual
+memory?
+
+> There is unfortunately no cross platform place to perform this accounting
+> during allocation in the module space, so instead two helpers are created to be
+> inserted into the various arch?s that implement module_alloc. These
+> helpers perform the checks and help with tracking. The intention is that they
+> an be added to the various arch?s as easily as possible.
+
+nit: s/an/can/
+
+[...]
+> diff --git a/kernel/module.c b/kernel/module.c
+> index 6746c85511fe..2ef9ed95bf60 100644
+> --- a/kernel/module.c
+> +++ b/kernel/module.c
+> @@ -2110,9 +2110,139 @@ static void free_module_elf(struct module *mod)
+>  }
+>  #endif /* CONFIG_LIVEPATCH */
+>
+> +struct mod_alloc_user {
+> +       struct rb_node node;
+> +       unsigned long addr;
+> +       unsigned long pages;
+> +       kuid_t uid;
+> +};
 > +
->  	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
->  				module_alloc_base + MODULES_VSIZE,
->  				gfp_mask, PAGE_KERNEL_EXEC, 0,
-> @@ -65,6 +68,8 @@ void *module_alloc(unsigned long size)
->  		return NULL;
->  	}
->  
-> +	update_mod_rlimit(p, size);
+> +static struct rb_root alloc_users = RB_ROOT;
+> +static DEFINE_SPINLOCK(alloc_users_lock);
 
-Is there a reason we couldn't just rename all of the existing per-arch
-module_alloc() calls to be called, say, "arch_module_alloc()", then put
-this new rlimit code in a generic helper that does:
+Why all the rbtree stuff instead of stashing a pointer in struct
+vmap_area, or something like that?
 
+[...]
+> +int check_inc_mod_rlimit(unsigned long size)
+> +{
+> +       struct user_struct *user = get_current_user();
+> +       unsigned long modspace_pages = rlimit(RLIMIT_MODSPACE) >> PAGE_SHIFT;
+> +       unsigned long cur_pages = atomic_long_read(&user->module_vm);
+> +       unsigned long new_pages = get_mod_page_cnt(size);
+> +
+> +       if (rlimit(RLIMIT_MODSPACE) != RLIM_INFINITY
+> +                       && cur_pages + new_pages > modspace_pages) {
+> +               free_uid(user);
+> +               return 1;
+> +       }
+> +
+> +       atomic_long_add(new_pages, &user->module_vm);
+> +
+> +       if (atomic_long_read(&user->module_vm) > modspace_pages) {
+> +               atomic_long_sub(new_pages, &user->module_vm);
+> +               free_uid(user);
+> +               return 1;
+> +       }
+> +
+> +       free_uid(user);
 
-	if (check_inc_mod_rlimit(size))
-		return NULL;
+If you drop the reference on the user_struct, an attacker with two
+UIDs can charge module allocations to UID A, keep the associated
+sockets alive as UID B, and then log out and back in again as UID A.
+At that point, nobody is charged for the module space anymore. If you
+look at the eBPF implementation, you'll see that
+bpf_prog_charge_memlock() actually stores a refcounted pointer to the
+user_struct.
 
-	p = arch_module_alloc(...);
-
-	...
-
-	update_mod_rlimit(p, size);
+> +       return 0;
+> +}
