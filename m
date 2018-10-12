@@ -1,56 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Oct 2018 17:31:17 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.19
-Message-ID: <CAK8P3a0V3ddscW3x94rU0Yfh3HuTWhuhTsaKhKVy85+8ygf3Lg@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 12 Oct 2018 08:32:54 -0700
+Subject: [PATCH] ASoC: sun4i-i2s: don't try to start up or shut down DAI if
+ it's active
+Message-ID: <20181012153254.10844-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 17b57b1883c1285f3d0dc2266e8f79286a7bef38:
+Otherwise we may end up with shutting down I2S if shutdown() was
+called for capture substream, but playback is still running.
 
-  Linux 4.19-rc6 (2018-09-30 07:15:35 -0700)
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ sound/soc/sunxi/sun4i-i2s.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/armsoc-fixes-4.19
-
-for you to fetch changes up to 3f4258bbe0363b3d5330b93de0e86b7796ff1a74:
-
-  Merge tag 'soc-fsl-fix-v4.19-2' of
-git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux into fixes
-(2018-10-04 18:01:20 +0200)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 4.19
-
-Two last minute bugfixes, both for NXP platforms:
-
-* The Layerscape 'qbman' infrastructure suffers from probe ordering
-  bugs in some configurations, a two-patch series adds a hotfix for
-  this. 4.20 will have a longer set of patches to rework it.
-
-* The old imx53-qsb board regressed in 4.19 after the addition
-  of cpufreq support, adding a set of explicit operating points
-  fixes this.
-
-----------------------------------------------------------------
-Arnd Bergmann (2):
-      Merge tag 'imx-fixes-4.19-2' of
-git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'soc-fsl-fix-v4.19-2' of
-git://git.kernel.org/.../leo/linux into fixes
-
-Laurentiu Tudor (2):
-      soc: fsl: qbman: add APIs to retrieve the probing status
-      soc: fsl: qman_portals: defer probe after qman's probe
-
-Sascha Hauer (1):
-      ARM: dts: imx53-qsb: disable 1.2GHz OPP
-
- arch/arm/boot/dts/imx53-qsb-common.dtsi | 11 +++++++++++
- drivers/soc/fsl/qbman/bman_ccsr.c       | 11 +++++++++++
- drivers/soc/fsl/qbman/qman_ccsr.c       | 11 +++++++++++
- drivers/soc/fsl/qbman/qman_portal.c     |  8 ++++++++
- include/soc/fsl/bman.h                  |  8 ++++++++
- include/soc/fsl/qman.h                  |  8 ++++++++
- 6 files changed, 57 insertions(+)
+diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+index a9ea329dc046..787b67c4f845 100644
+--- a/sound/soc/sunxi/sun4i-i2s.c
++++ b/sound/soc/sunxi/sun4i-i2s.c
+@@ -649,6 +649,9 @@ static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+ {
+ 	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+ 
++	if (dai->active)
++		return 0;
++
+ 	/* Enable the whole hardware block */
+ 	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+ 			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
+@@ -667,6 +670,9 @@ static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
+ {
+ 	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+ 
++	if (dai->active)
++		return;
++
+ 	clk_disable_unprepare(i2s->mod_clk);
+ 
+ 	/* Disable our output lines */
+-- 
+2.19.0
