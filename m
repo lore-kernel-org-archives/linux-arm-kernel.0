@@ -1,48 +1,87 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Fri, 12 Oct 2018 14:59:16 -0400 (EDT)
-Subject: ARM64 KVM crash
-In-Reply-To: <b3355304-5144-b17a-c39c-866e197e3cc6@arm.com>
-References: <alpine.LRH.2.02.1810121204120.16008@file01.intranet.prod.int.rdu2.redhat.com>
- <b3355304-5144-b17a-c39c-866e197e3cc6@arm.com>
-Message-ID: <alpine.LRH.2.02.1810121453380.14664@file01.intranet.prod.int.rdu2.redhat.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Fri, 12 Oct 2018 21:09:01 +0200
+Subject: [RFT PATCH] mmc: pwrseq_simple: Fix incorrect handling of GPIO bitmap
+In-Reply-To: <20180925192433.1377-1-jmkrzyszt@gmail.com>
+References: <20180925192433.1377-1-jmkrzyszt@gmail.com>
+Message-ID: <20181012190901.1243-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit b9762bebc633 ("gpiolib: Pass bitmaps, not integer arrays, to
+get/set array") changed the way GPIO values are passed to
+gpiod_get/set_array_value() and friends.  The new code introduced into
+mmc_pwrseq_simple_set_gpios_value() incorrectly interpretes the 'value'
+argument as a bitmap of GPIO values and assigns it directly to the
+'values' bitmap variable passed to gpiod_set_array_value_cansleep()
+instead of filling that bitmap with bits equal to the 'value' argument.
+As a result, only member 0 of the array is handled correctly.
+
+Moreover, wrong assumption is taken about the 'values' bitmap size not
+exceding the number of bits of the 'value' argument type.
+
+Fix it.
+
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+---
+Hi,
+
+I think that patch has been missed while we were resolving issues 
+related to GPIO fast bitmap processing.  Since all issues other than the 
+one addreessed by this patch have been been hopefully identified and 
+fixed, GPIO tree seems now to be in good shape in regard to that. 
+However, I believe pwrseq_simple is still broken.  Hence, I'm 
+resubmitting this patch to Ulf for inclusion in MMC tree, Cc: many other 
+people who are kindly requested to test it if possible.
+
+I've identified the following DT files representing devices which may be 
+affected (have more than one GPIO assigned to pwrseq_simple):
+- arch/arm/boot/dts/imx6qdl-sr-som-brcm.dtsi
+- arch/arm/boot/dts/exynos5250-snow-common.dtsi
+- arch/arm/boot/dts/imx6sl-warp.dts
+- arch/arm/boot/dts/omap3-igep0030.dts
+- arch/arm/boot/dts/omap3-igep0020.dts
+- arch/arm/boot/dts/rk3036-kylin.dts
+- arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+
+Please start with checking if pwrseq_simple from linux-next works for 
+you and if not, please test if this patch fixes the issue.
+
+Thanks,
+Janusz
 
 
-On Fri, 12 Oct 2018, Marc Zyngier wrote:
+ drivers/mmc/core/pwrseq_simple.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-> Right. But how is that related to KVM? See below:
-> 
-> > [75476.680725]  find_next_and_bit+0xc/0x70
-> > [75476.680728]  find_busiest_group+0x128/0x938
-> > [75476.680730]  load_balance+0x148/0x848
-> > [75476.680732]  pick_next_task_fair+0x1d4/0x568
-> > [75476.680734]  __schedule+0xe8/0x4b0
-> > [75476.680736]  schedule+0x38/0xa0
-> > [75476.680739]  kvm_vcpu_block+0x88/0x180
-> > [75476.680742]  kvm_handle_wfx+0x80/0xb8
-> > [75476.680744]  handle_exit+0x138/0x1b8
-> 
-> The guest is exiting because it has executed a blocking WFI, so KVM's
-> job is done and we're calling schedule(). The scheduler then starts
-> doing its job of picking the next victim.
-> 
-> At this stage, the kernel indeed blows up. But this doesn't immediately
-> seem to be KVM's fault. It is far more likely that the scheduler has
-> messed something up in its own data structure, which is even worse :-(.
-> 
-> I'd suggest you get in touch with the scheduler guys to see if they have
-> any insight. Also, trying to come up with a reproducer would be
-> extremely useful.
-> 
-> Thanks,
-> 
-> 	M.
-
-I use this machine most of the time without KVM - and it crashed when I 
-started KVM - so I assume that KVM had something to do with it. Perhaps it 
-corrupts random memory? I may try to run some KVM stress for many days to 
-test if I reproduce it.
-
-Mikulas
+diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+index 7f882a2bb872..ece34c734693 100644
+--- a/drivers/mmc/core/pwrseq_simple.c
++++ b/drivers/mmc/core/pwrseq_simple.c
+@@ -40,13 +40,22 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+ 	struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
+ 
+ 	if (!IS_ERR(reset_gpios)) {
+-		DECLARE_BITMAP(values, BITS_PER_TYPE(value));
++		unsigned long *values;
+ 		int nvalues = reset_gpios->ndescs;
+ 
+-		values[0] = value;
++		values = bitmap_alloc(nvalues, GFP_KERNEL);
++		if (!values)
++			return;
++
++		if (value)
++			bitmap_fill(values, nvalues);
++		else
++			bitmap_zero(values, nvalues);
+ 
+ 		gpiod_set_array_value_cansleep(nvalues, reset_gpios->desc,
+ 					       reset_gpios->info, values);
++
++		kfree(values);
+ 	}
+ }
+ 
+-- 
+2.16.4
