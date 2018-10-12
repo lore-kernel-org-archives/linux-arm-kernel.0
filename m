@@ -1,31 +1,34 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 12 Oct 2018 23:57:36 +0900
-Subject: [PATCH 0/2] mmc: uniphier-sd: two bug-fixes
-Message-ID: <1539356258-12374-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Fri, 12 Oct 2018 23:57:38 +0900
+Subject: [PATCH 2/2] mmc: uniphier-sd: avoid using broken DMA RX channel
+In-Reply-To: <1539356258-12374-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1539356258-12374-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1539356258-12374-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In further testing in uniphier-sd.c,
-I found my stupid mistakes.
+host->chan_rx is NULL when UNIPHIER_SD_CAP_BROKEN_DMA_RX quirk flag
+is set. In this case, it should not set up DMA.
 
-Ulf,
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Can you squash this series into
-3fd784f745dd
-"mmc: uniphier-sd: add UniPhier SD/eMMC controller driver"
-if you have a chance to do rebase?
+ drivers/mmc/host/uniphier-sd.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Of course, it is OK to apply this series
-on top of your next branch if it is too late.
-
-
-
-Masahiro Yamada (2):
-  mmc: uniphier-sd: fix DMA disabling
-  mmc: uniphier-sd: avoid using broken DMA RX channel
-
- drivers/mmc/host/uniphier-sd.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/mmc/host/uniphier-sd.c b/drivers/mmc/host/uniphier-sd.c
+index 10d49aa..1ee9fd0 100644
+--- a/drivers/mmc/host/uniphier-sd.c
++++ b/drivers/mmc/host/uniphier-sd.c
+@@ -251,6 +251,9 @@ static void uniphier_sd_internal_dma_start(struct tmio_mmc_host *host,
+ 	u32 dma_mode;
+ 	int sg_len;
+ 
++	if ((data->flags & MMC_DATA_READ) && !host->chan_rx)
++		goto force_pio;
++
+ 	if (WARN_ON(host->sg_len != 1))
+ 		goto force_pio;
+ 
 -- 
 2.7.4
