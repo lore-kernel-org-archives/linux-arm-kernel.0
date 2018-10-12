@@ -1,57 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Oct 2018 18:05:50 +0100
-Subject: [PATCH 10/10] arm64: use the generic swiotlb_dma_ops
-In-Reply-To: <20181012144049.GA28925@lst.de>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-11-hch@lst.de>
- <8ae57670-ced9-5ebb-caf5-cc99f15fdf22@arm.com>
- <20181012144049.GA28925@lst.de>
-Message-ID: <20181012170549.GD60150@arrakis.emea.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 12 Oct 2018 19:14:39 +0200
+Subject: [PATCH v6 13/18] ACPI / APEI: Don't update struct ghes' flags in
+ read/clear estatus
+In-Reply-To: <20180921221705.6478-14-james.morse@arm.com>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-14-james.morse@arm.com>
+Message-ID: <20181012171439.GF580@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 04:40:49PM +0200, Christoph Hellwig wrote:
-> On Fri, Oct 12, 2018 at 02:01:00PM +0100, Robin Murphy wrote:
-> > On 08/10/18 09:02, Christoph Hellwig wrote:
-> >> Now that the generic swiotlb code supports non-coherent DMA we can switch
-> >> to it for arm64.  For that we need to refactor the existing
-> >> alloc/free/mmap/pgprot helpers to be used as the architecture hooks,
-> >> and implement the standard arch_sync_dma_for_{device,cpu} hooks for
-> >> cache maintaincance in the streaming dma hooks, which also implies
-> >> using the generic dma_coherent flag in struct device.
-> >>
-> >> Note that we need to keep the old is_device_dma_coherent function around
-> >> for now, so that the shared arm/arm64 Xen code keeps working.
-> >
-> > OK, so when I said last night that it boot-tested OK, that much was true, 
-> > but then I shut the board down as I left and got a megasplosion of bad page 
-> > state BUGs, e.g.:
+On Fri, Sep 21, 2018 at 11:17:00PM +0100, James Morse wrote:
+> ghes_read_estatus() sets a flag in struct ghes if the buffer of
+> CPER records needs to be cleared once the records have been
+> processed. This global flags value is a problem if a struct ghes
+> can be processed concurrently, as happens at probe time if an
+> NMI arrives for the same error source.
 > 
-> I think this is because I am passing the wrong address to
-> dma_direct_free_pages.  Please try this patch on top:
+> The GHES_TO_CLEAR flags was only set at the same time as
+> buffer_paddr, which is now owned by the caller and passed to
+> ghes_clear_estatus(). Use this as the flag.
 > 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 3c75d69b54e7..4f0f92856c4c 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -126,10 +126,12 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
->  void arch_dma_free(struct device *dev, size_t size, void *vaddr,
->  		dma_addr_t dma_handle, unsigned long attrs)
->  {
-> -	if (__free_from_pool(vaddr, PAGE_ALIGN(size)))
-> -		return;
-> -	vunmap(vaddr);
-> -	dma_direct_free_pages(dev, size, vaddr, dma_handle, attrs);
-> +	if (!__free_from_pool(vaddr, PAGE_ALIGN(size)))
-> +		void *kaddr = phys_to_virt(dma_to_phys(dev, dma_handle));
-> +
-> +		vunmap(vaddr);
-> +		dma_direct_free_pages(dev, size, kaddr, dma_handle, attrs);
-> +	}
->  }
->  
->  long arch_dma_coherent_to_pfn(struct device *dev, void *cpu_addr,
+> A non-zero buf_paddr returned by ghes_read_estatus() means
+> ghes_clear_estatus() will clear this address. ghes_read_estatus()
+> already checks for a read of error_status_address being zero,
+> so we can never get CPER records written at zero.
+> 
+> After this ghes_clear_estatus() no longer needs the struct ghes.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  drivers/acpi/apei/ghes.c | 26 ++++++++++++--------------
+>  include/acpi/ghes.h      |  1 -
+>  2 files changed, 12 insertions(+), 15 deletions(-)
 
-With this fix:
+Nice.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Borislav Petkov <bp@suse.de>
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
