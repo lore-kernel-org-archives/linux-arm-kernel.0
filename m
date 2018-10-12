@@ -1,27 +1,26 @@
-From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Fri, 12 Oct 2018 21:32:32 +0200
-Subject: [PATCH v3 2/7] ARM: dts: axp81x: add AC power supply subnode
-In-Reply-To: <20181008181908.9456-3-oskari@lemmela.net>
-References: <20181008181908.9456-1-oskari@lemmela.net>
- <20181008181908.9456-3-oskari@lemmela.net>
-Message-ID: <20181012193232.6qak2xwzean5hgk7@qschulz>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Oct 2018 14:33:34 -0500
+Subject: [PATCH v2 1/2] dt-bindings: i2c-omap: Add new compatible for
+ AM654 SoCs
+In-Reply-To: <20180928052557.21663-2-vigneshr@ti.com>
+References: <20180928052557.21663-1-vigneshr@ti.com>
+ <20180928052557.21663-2-vigneshr@ti.com>
+Message-ID: <20181012193334.GA29966@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oskari,
-
-On Mon, Oct 08, 2018 at 09:19:03PM +0300, Oskari Lemmela wrote:
-> Add AC power supply subnode for AXP81X PMIC.
+On Fri, 28 Sep 2018 10:55:56 +0530, Vignesh R wrote:
+> AM654 SoCs have same I2C IP as OMAP SoCs. Add new compatible to
+> handle AM654 SoCs. While at that reformat the existing compatible list
+> for older SoCs to list one valid compatible per line.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+> 
+> v2: Reformat compatible existing compatible list.
+> 
+>  Documentation/devicetree/bindings/i2c/i2c-omap.txt | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 > 
 
-Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
-
-Thanks,
-Quentin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/318d606e/attachment.sig>
+Reviewed-by: Rob Herring <robh@kernel.org>
