@@ -1,111 +1,28 @@
-From: rick.p.edgecombe@intel.com (Edgecombe, Rick P)
-Date: Fri, 12 Oct 2018 17:04:46 +0000
-Subject: [PATCH v2 1/7] modules: Create rlimit for module space
-In-Reply-To: <CAG48ez2fWg64nGxDXUQS3695KpVNrakAbarXJnYPd6xv5wOD+A@mail.gmail.com>
-References: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
- <20181011233117.7883-2-rick.p.edgecombe@intel.com>
- <CAG48ez2fWg64nGxDXUQS3695KpVNrakAbarXJnYPd6xv5wOD+A@mail.gmail.com>
-Message-ID: <7b0714e26c7c2216721641d7df16a49687927e37.camel@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Oct 2018 18:04:56 +0100
+Subject: [PATCH 08/10] swiotlb: don't dip into swiotlb pool for coherent
+ allocations
+In-Reply-To: <20181008080246.20543-9-hch@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-9-hch@lst.de>
+Message-ID: <20181012170456.GC60150@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-10-12 at 02:35 +0200, Jann Horn wrote:
-> On Fri, Oct 12, 2018 at 1:40 AM Rick Edgecombe
-> <rick.p.edgecombe@intel.com> wrote:
-> > This introduces a new rlimit, RLIMIT_MODSPACE, which limits the amount of
-> > module space a user can use. The intention is to be able to limit module
-> > space
-> > allocations that may come from un-privlidged users inserting e/BPF filters.
+On Mon, Oct 08, 2018 at 10:02:44AM +0200, Christoph Hellwig wrote:
+> All architectures that support swiotlb also have a zone that backs up
+> these less than full addressing allocations (usually ZONE_DMA32).
 > 
-> Note that in some configurations (iirc e.g. the default Ubuntu
-> config), normal users can use the subuid mechanism (the /etc/subuid
-> config file and the /usr/bin/newuidmap setuid helper) to gain access
-> to 65536 UIDs, which means that in such a configuration,
-> RLIMIT_MODSPACE*65537 is the actual limit for one user. (Same thing
-> applies to RLIMIT_MEMLOCK.)
-Ah, that is a problem. There is only room for about 130,000 filters on x86 with
-KASLR, so it couldn't really be set small enough.
-
-I'll have to look into what this is. Thanks for pointing it out.
-
-> Also, it is probably possible to waste a few times as much virtual
-> memory as permitted by the limit by deliberately fragmenting virtual
-> memory?
-Good point. I guess if the first point can be addressed somehow, this one could
-maybe be solved by just picking a lower limit.
-
-Any thoughts on if instead of all this there was just a system wide limit on BPF
-JIT module space usage?
-
-> > There is unfortunately no cross platform place to perform this accounting
-> > during allocation in the module space, so instead two helpers are created to
-> > be
-> > inserted into the various arch?s that implement module_alloc. These
-> > helpers perform the checks and help with tracking. The intention is that
-> > they
-> > an be added to the various arch?s as easily as possible.
+> Because of that it is rather pointless to fall back to the global swiotlb
+> buffer if the normal dma direct allocation failed - the only thing this
+> will do is to eat up bounce buffers that would be more useful to serve
+> streaming mappings.
 > 
-> nit: s/an/can/
-> 
-> [...]
-> > diff --git a/kernel/module.c b/kernel/module.c
-> > index 6746c85511fe..2ef9ed95bf60 100644
-> > --- a/kernel/module.c
-> > +++ b/kernel/module.c
-> > @@ -2110,9 +2110,139 @@ static void free_module_elf(struct module *mod)
-> >  }
-> >  #endif /* CONFIG_LIVEPATCH */it 
-> > 
-> > +struct mod_alloc_user {
-> > +       struct rb_node node;
-> > +       unsigned long addr;
-> > +       unsigned long pages;
-> > +       kuid_t uid;
-> > +};
-> > +
-> > +static struct rb_root alloc_users = RB_ROOT;
-> > +static DEFINE_SPINLOCK(alloc_users_lock);
-> 
-> Why all the rbtree stuff instead of stashing a pointer in struct
-> vmap_area, or something like that?
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arm64/mm/dma-mapping.c |   6 +--
+>  include/linux/swiotlb.h     |   5 --
+>  kernel/dma/swiotlb.c        | 105 +-----------------------------------
+>  3 files changed, 5 insertions(+), 111 deletions(-)
 
-Since the tracking was not for all vmalloc usage, the intention was to not bloat
-the structure for other usages likes stacks. I thought usually there wouldn't be
-nearly as much module space allocations as there would be kernel stacks, but I
-didn't do any actual measurements on the tradeoffs.
-
-> [...]
-> > +int check_inc_mod_rlimit(unsigned long size)
-> > +{
-> > +       struct user_struct *user = get_current_user();
-> > +       unsigned long modspace_pages = rlimit(RLIMIT_MODSPACE) >>
-> > PAGE_SHIFT;
-> > +       unsigned long cur_pages = atomic_long_read(&user->module_vm);
-> > +       unsigned long new_pages = get_mod_page_cnt(size);
-> > +
-> > +       if (rlimit(RLIMIT_MODSPACE) != RLIM_INFINITY
-> > +                       && cur_pages + new_pages > modspace_pages) {
-> > +               free_uid(user);
-> > +               return 1;
-> > +       }
-> > +
-> > +       atomic_long_add(new_pages, &user->module_vm);
-> > +
-> > +       if (atomic_long_read(&user->module_vm) > modspace_pages) {
-> > +               atomic_long_sub(new_pages, &user->module_vm);
-> > +               free_uid(user);
-> > +               return 1;
-> > +       }
-> > +
-> > +       free_uid(user);
-> 
-> If you drop the reference on the user_struct, an attacker with two
-> UIDs can charge module allocations to UID A, keep the associated
-> sockets alive as UID B, and then log out and back in again as UID A.
-> At that point, nobody is charged for the module space anymore. If you
-> look at the eBPF implementation, you'll see that
-> bpf_prog_charge_memlock() actually stores a refcounted pointer to the
-> user_struct.
-Ok, I'll take a look. Thanks Jann.
-> > +       return 0;
-> > +}
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
