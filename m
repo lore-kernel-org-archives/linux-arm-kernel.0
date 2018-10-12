@@ -1,65 +1,142 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 Oct 2018 11:29:56 -0500
-Subject: [RFC PATCH v2 1/4] dt: bindings: Add SD tap value properties
- details for 'xlnx,zynqmp-8.9a'
-In-Reply-To: <1537435845-6682-2-git-send-email-manish.narani@xilinx.com>
-References: <1537435845-6682-1-git-send-email-manish.narani@xilinx.com>
- <1537435845-6682-2-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20181012162956.GA7339@bogus>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 12 Oct 2018 18:37:56 +0200
+Subject: [PATCH v6 10/18] ACPI / APEI: preparatory split of ghes->estatus
+In-Reply-To: <20180921221705.6478-11-james.morse@arm.com>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-11-james.morse@arm.com>
+Message-ID: <20181012163756.GD580@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 03:00:42PM +0530, Manish Narani wrote:
-> Add documentation for MIO bank required property and Tap Delays optional
-> properties in devicetree bindings.
+Nitpick:
+
+Subject: Re: [PATCH v6 10/18] ACPI / APEI: preparatory split of ghes->estatus
+
+Pls have an active formulation in your Subject and start it with a capital
+letter, i.e., something like:
+
+	"Split ghes->estatus in preparation for... "
+
+On Fri, Sep 21, 2018 at 11:16:57PM +0100, James Morse wrote:
+> The NMI-like notifications scribble over ghes->estatus, before
+> copying it somewhere else. If this interrupts the ghes_probe() code
+> calling ghes_proc() on each struct ghes, the data is corrupted.
 > 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> We want the NMI-like notifications to use a queued estatus entry
+
+Pls formulate commit messages in passive voice.
+
+> from the beginning. To that end, break up any use of "ghes->estatus"
+> so that all functions take the estatus as an argument.
+> 
+> This patch is just moving code around, no change in behaviour.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 > ---
->  .../devicetree/bindings/mmc/arasan,sdhci.txt          | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+>  drivers/acpi/apei/ghes.c | 82 ++++++++++++++++++++++------------------
+>  1 file changed, 45 insertions(+), 37 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index 72769e0..6cc95fa 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -27,6 +27,7 @@ Required Properties for "arasan,sdhci-5.1":
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index adf7fd402813..586689cbc0fd 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -298,7 +298,9 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+>  	}
+>  }
 >  
->  Required Properties for "xlnx,zynqmp-8.9a":
->    - xlnx,device_id: SD controller device ID. Must be either <0> or <1>.
-> +  - xlnx,mio-bank: The value will be 0/1/2 depending on MIO bank selection.
+> -static int ghes_read_estatus(struct ghes *ghes, int silent, int fixmap_idx)
+> +static int ghes_read_estatus(struct ghes *ghes,
+> +			     struct acpi_hest_generic_status *estatus,
+
+acpi_hest_generic_status - geez, could this name have been any longer ?!
+
+> +			     int silent, int fixmap_idx)
+>  {
+>  	struct acpi_hest_generic *g = ghes->generic;
+>  	u64 buf_paddr;
+> @@ -316,26 +318,26 @@ static int ghes_read_estatus(struct ghes *ghes, int silent, int fixmap_idx)
+>  	if (!buf_paddr)
+>  		return -ENOENT;
 >  
->  Optional Properties:
->    - arasan,soc-ctl-syscon: A phandle to a syscon device (see ../mfd/syscon.txt)
-> @@ -44,6 +45,24 @@ Optional Properties:
->    - xlnx,int-clock-stable-broken: when present, the controller always reports
->      that the internal clock is stable even when it is not.
+> -	ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
+> -			      sizeof(*ghes->estatus), 1, fixmap_idx);
+> -	if (!ghes->estatus->block_status)
+> +	ghes_copy_tofrom_phys(estatus, buf_paddr,
+> +			      sizeof(*estatus), 1, fixmap_idx);
+
+Yeah, let that line stick out - it is easier to follow the code this
+way.
+
+> +	if (!estatus->block_status)
+>  		return -ENOENT;
 >  
-> +Optional Properties for "xlnx,zynqmp-8.9a":
-> + - xlnx,itap-delay-sd-hsd: Input Tap Delay for SD HS.
-> + - xlnx,itap-delay-sdr25: Input Tap Delay for SDR25.
-> + - xlnx,itap-delay-sdr50: Input Tap Delay for SDR50.
-> + - xlnx,itap-delay-sdr104: Input Tap Delay for SDR104.
-> + - xlnx,itap-delay-sd-ddr50: Input Tap Delay for SD DDR50.
-> + - xlnx,itap-delay-mmc-hsd: Input Tap Delay for MMC HS.
-> + - xlnx,itap-delay-mmc-ddr52: Input Tap Delay for MMC DDR52.
-> + - xlnx,itap-delay-mmc-hs200: Input Tap Delay for MMC HS200.
-> + - xlnx,otap-delay-sd-hsd: Output Tap Delay for SD HS.
-> + - xlnx,otap-delay-sdr25: Output Tap Delay for SDR25.
-> + - xlnx,otap-delay-sdr50: Output Tap Delay for SDR50.
-> + - xlnx,otap-delay-sdr104: Output Tap Delay for SDR104.
-> + - xlnx,otap-delay-sd-ddr50: Output Tap Delay for DDR50.
-> + - xlnx,otap-delay-mmc-hsd: Output Tap Delay for MMC HS.
-> + - xlnx,otap-delay-mmc-ddr52: Output Tap Delay for MMC DDR52.
-> + - xlnx,otap-delay-mmc-hs200: Output Tap Delay for MMC HS200.
+>  	ghes->buffer_paddr = buf_paddr;
+>  	ghes->flags |= GHES_TO_CLEAR;
+>  
+>  	rc = -EIO;
+> -	len = cper_estatus_len(ghes->estatus);
+> -	if (len < sizeof(*ghes->estatus))
+> +	len = cper_estatus_len(estatus);
+> +	if (len < sizeof(*estatus))
+>  		goto err_read_block;
+>  	if (len > ghes->generic->error_block_length)
+>  		goto err_read_block;
+> -	if (cper_estatus_check_header(ghes->estatus))
+> +	if (cper_estatus_check_header(estatus))
+>  		goto err_read_block;
+> -	ghes_copy_tofrom_phys(ghes->estatus + 1,
+> -			      buf_paddr + sizeof(*ghes->estatus),
+> -			      len - sizeof(*ghes->estatus), 1, fixmap_idx);
+> -	if (cper_estatus_check(ghes->estatus))
+> +	ghes_copy_tofrom_phys(estatus + 1,
+> +			      buf_paddr + sizeof(*estatus),
+> +			      len - sizeof(*estatus), 1, fixmap_idx);
+> +	if (cper_estatus_check(estatus))
+>  		goto err_read_block;
+>  	rc = 0;
+>  
+> @@ -346,13 +348,15 @@ static int ghes_read_estatus(struct ghes *ghes, int silent, int fixmap_idx)
+>  	return rc;
+>  }
+>  
+> -static void ghes_clear_estatus(struct ghes *ghes, int fixmap_idx)
+> +static void ghes_clear_estatus(struct ghes *ghes,
+> +			       struct acpi_hest_generic_status *estatus,
+> +			       int fixmap_idx)
+>  {
+> -	ghes->estatus->block_status = 0;
+> +	estatus->block_status = 0;
+>  	if (!(ghes->flags & GHES_TO_CLEAR))
+>  		return;
 
-type, values, units for all of these?
+<---- newline here.
 
-Perhaps combine to pairs of values for input and output delays?
+> -	ghes_copy_tofrom_phys(ghes->estatus, ghes->buffer_paddr,
+> -			      sizeof(ghes->estatus->block_status), 0, fixmap_idx);
+> +	ghes_copy_tofrom_phys(estatus, ghes->buffer_paddr,
+> +			      sizeof(estatus->block_status), 0, fixmap_idx);
+>  	ghes->flags &= ~GHES_TO_CLEAR;
+>  }
+>  
+> @@ -518,9 +522,10 @@ static int ghes_print_estatus(const char *pfx,
+>  	return 0;
+>  }
+>  
+> -static void __ghes_panic(struct ghes *ghes)
+> +static void __ghes_panic(struct ghes *ghes,
+> +			 struct acpi_hest_generic_status *estatus)
 
-> +
->  Example:
->  	sdhci at e0100000 {
->  		compatible = "arasan,sdhci-8.9a";
-> -- 
-> 2.1.1
-> 
+Yeah, let that one stick out too. That struct naming needs slimming.
+
+>  {
+> -	__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
+> +	__ghes_print_estatus(KERN_EMERG, ghes->generic, estatus);
+>  
+>  	/* reboot to log the error! */
+>  	if (!panic_timeout)
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
