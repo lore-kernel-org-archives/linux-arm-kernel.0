@@ -1,96 +1,60 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 12 Oct 2018 14:25:49 +0100
-Subject: [PATCH] perf tools: Store ids for events with their own cpus
- perf_event__synthesize_event_update_cpus
-In-Reply-To: <20181009100049.GF6499@krava>
-References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
- <20180927160210.GF6916@krava>
- <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
- <20181002111621.GA6357@krava> <20181003113643.GA31725@krava>
- <594506a2-8cb3-3d09-82ab-5cb6d8c31ed0@huawei.com>
- <20181003141627.GA6341@krava> <20181003212052.GA32371@krava>
- <d071bb27-5533-da2f-9f8f-808183e04794@huawei.com>
- <20181009100049.GF6499@krava>
-Message-ID: <31101407-0bcd-2fbf-361e-43cbcb81cd19@huawei.com>
+From: aleksandr.aleksandrov@emlid.com (Aleksandr Aleksandrov)
+Date: Fri, 12 Oct 2018 16:39:14 +0300
+Subject: [PATCH v4 1/2] arm64: dts: allwinner: new board - Emlid Neutis N5
+In-Reply-To: <b47c5458-683e-3e96-0bbe-f9db84579c77@suse.de>
+References: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539339841-22235-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <b47c5458-683e-3e96-0bbe-f9db84579c77@suse.de>
+Message-ID: <20181012133914.GA32670@imagebutcher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2018 11:00, Jiri Olsa wrote:
-> On Thu, Oct 04, 2018 at 10:20:39AM +0100, John Garry wrote:
->
-> SNIP
->
->>> We synthesize an update event that needs to touch the evsel
->>> id array, which is not defined at that time. Fixing this by
->>> forcing the id allocation for events with theeir own cpus.
+Hi Andreas,
 
-/s/theeir/their/
+Thanks for your feedback!
 
->>>
->>> Reported-by: John Garry <john.garry@huawei.com>
->>> Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
->>
->> Tested-by: John Garry <john.garry@huawei.com>
->>
->> In terms of adding to stable, LT v4.14 is not affected, but 4.18.x is.
->>
->> Thanks,
->> John
->
-> Arnaldo, could you please pick up this one
->
+> > + *
+> > + * Copyright (C) 2018 Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "sun50i-h5-emlid-neutis-n5.dtsi"
+> > +
+> > +/ {
+> > +	model = "Emlid Neutis N5 Developer board";
+> > +	compatible = "emlid,neutis-n5-devboard",
+> > +		     "emlid,neutis-n5",
+> 
+> You are lacking bindings definitions for these new identifiers. The
+> vendor prefix should be patch 1/3, the SoM/board compatibles 2/3 and
+> this .dts[i] patch 3/3, so that only vendor prefixes and compatibles
+> that are defined and don't result in checkpatch.pl warnings get used.
 
-Just a friendly reminder on this patch.
+Patch 2/3:
 
-How about re-send with an updated commit message also?
+commit 46dcb8632b36644cb20e6b35ede12ff0088a60eb
+Author: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+Date:   Fri Oct 12 16:22:28 2018 +0300
 
-Thanks,
-John
+    dt-bindings: arm: sunxi: emlid,neutis-n5(-devboard)
+    
+    sunxi: add new compatibles for Emlid Neutis Dev board and SoM module
+    
+    Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
 
-> thanks,
-> jirka
->
->>
->>> Signed-off-by: Jiri Olsa <jolsa@kernel.org>
->>> ---
->>>  tools/perf/builtin-report.c | 1 +
->>>  tools/perf/util/evsel.c     | 3 +++
->>>  2 files changed, 4 insertions(+)
->>>
->>> diff --git a/tools/perf/builtin-report.c b/tools/perf/builtin-report.c
->>> index c0703979c51d..257c9c18cb7e 100644
->>> --- a/tools/perf/builtin-report.c
->>> +++ b/tools/perf/builtin-report.c
->>> @@ -980,6 +980,7 @@ int cmd_report(int argc, const char **argv)
->>>  			.id_index	 = perf_event__process_id_index,
->>>  			.auxtrace_info	 = perf_event__process_auxtrace_info,
->>>  			.auxtrace	 = perf_event__process_auxtrace,
->>> +			.event_update	 = perf_event__process_event_update,
->>>  			.feature	 = process_feature_event,
->>>  			.ordered_events	 = true,
->>>  			.ordering_requires_timestamps = true,
->>> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
->>> index ac6cfb8b085e..7a0d5fbaf3c1 100644
->>> --- a/tools/perf/util/evsel.c
->>> +++ b/tools/perf/util/evsel.c
->>> @@ -1088,6 +1088,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
->>>  		attr->exclude_user   = 1;
->>>  	}
->>>
->>> +	if (evsel->own_cpus)
->>> +		evsel->attr.read_format |= PERF_FORMAT_ID;
->>> +
->>>  	/*
->>>  	 * Apply event specific term settings,
->>>  	 * it overloads any global configuration.
->>>
->>
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> .
->
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index e4beec3..a907e52 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -19,3 +19,5 @@ using one of the following compatible strings:
+   allwinner,sun9i-a80
+   allwinner,sun50i-a64
+   nextthing,gr8
++  emlid,neutis-n5
++  emlid,neutis-n5-devboard
+
+Is this right place for the neutis compatibles?
+
+Aleksandr
