@@ -1,163 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 12 Oct 2018 11:22:30 +0100
-Subject: [PATCH v6 2/9] PCI: mediatek: Fixup class ID for MT7622 as
- PCI_CLASS_BRIDGE_PCI
-In-Reply-To: <1539331289.6246.61.camel@mhfsdcap03>
-References: <1538969088-7136-1-git-send-email-honghui.zhang@mediatek.com>
- <1538969088-7136-3-git-send-email-honghui.zhang@mediatek.com>
- <20181008172337.GA13538@e107981-ln.cambridge.arm.com>
- <1539054495.6246.31.camel@mhfsdcap03>
- <20181011113748.GA3574@e107981-ln.cambridge.arm.com>
- <1539331289.6246.61.camel@mhfsdcap03>
-Message-ID: <20181012102230.GA23257@e107981-ln.cambridge.arm.com>
+From: aleksandr.aleksandrov@emlid.com (Aleksandr Aleksandrov)
+Date: Fri, 12 Oct 2018 13:23:57 +0300
+Subject: [PATCH v4 0/2] Neutis N5 support
+In-Reply-To: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+References: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+Message-ID: <1539339841-22235-1-git-send-email-aleksandr.aleksandrov@emlid.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 04:01:29PM +0800, Honghui Zhang wrote:
-> On Thu, 2018-10-11 at 12:38 +0100, Lorenzo Pieralisi wrote:
-> > On Tue, Oct 09, 2018 at 11:08:15AM +0800, Honghui Zhang wrote:
-> > > On Mon, 2018-10-08 at 18:23 +0100, Lorenzo Pieralisi wrote:
-> > > > On Mon, Oct 08, 2018 at 11:24:41AM +0800, honghui.zhang at mediatek.com wrote:
-> > > > > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > > > > 
-> > > > > The PCIe controller of MT7622 has TYPE 1 configuration space type, but
-> > > > > the HW default class type values is invalid.
-> > > > > 
-> > > > > The commit 101c92dc80c8 ("PCI: mediatek: Set up vendor ID and class
-> > > > > type for MT7622") have set the class ID for MT7622 as
-> > > > > PCI_CLASS_BRIDGE_HOSTe, but it's not workable for MT7622:
-> > > > > 
-> > > > > In __pci_bus_assign_resources, the framework only setup bridge's
-> > > > > resource window only if class type is PCI_CLASS_BRIDGE_PCI. Or it
-> > > > > will leave the subordinary PCIe device's MMIO window un-touched.
-> > 
-> > Can you please provide me with a full log of the issue ?
-> > 
-> > What is the bug this patch is actually fixing ?
-> > 
-> > > > > Fixup the class type to PCI_CLASS_BRIDGE_PCI as most of the controller
-> > > > > driver do.
-> > > > 
-> > > > I think that this patch is correct but the commit log fails to pin point
-> > > > the problem. The IP you are programming is a root port, that's why you
-> > > > have to have the proper class code, the patch looks fine but I would
-> > > > like to peek Bjorn's brain on this since it is a fundamental concept.
-> > > > 
-> > > 
-> > > I'm a bit confused with the concepts of PCI_CLASS_BRIDGE_HOST and
-> > > PCI_CLASS_BRIDGE_PCI, from PCI express spec,
-> > > 4.0r1.0(PCI_Express_Base_4.0r1.0_September-27-2017-c), Host Bridge is
-> > > "part of a Root Complex that connects a host CPU or CPUs to a
-> > > Hierarchy". While Root Complex defines as "A defined System Element that
-> > > includes at least one Host Bridge, Root port, or Root complex Integrated
-> > > Endpoint".
-> > > 
-> > > But according to my understanding, most of the root port IPs integrated
-> > > with a "PCI_CLASS_BRIDGE_PCI", which has type 1 configuration space and
-> > > could be saw as a pci device when using lspci.
-> > > 
-> > > And for MT7622, it integrated with block of internal control registers,
-> > > type 1 configuration space, and is considered as a root complex.
-> > 
-> > I assume you mean a type 1 config header here. I do not think it
-> > is mandatory for a host bridge to have a type 1 config header
-> > (and related bridge windows + primary/secondary/subordinate bus
-> > numbers) but I do not know how the IP you are programming is
-> > designed.
-> 
-> Yes, MT7622 has the type 1 config header and related bridge windows and
-> primary/secondary/subordinate bus numbers.
-> 
-> > 
-> > If the host bridge needs its memory window to be configured you can
-> > easily do that in the driver (with driver specific code) without
-> > requiring the generic PCI resource core to do that for you, the host
-> > bridge is the root of the bus I do not see any reason why it should
-> > be up to core PCI code to assign it, it is preprogrammed.
-> > 
-> Thanks for explain this.
-> Yes, the MT7622 bridge needs its memory window to be configured but I
-> prefer the PCI resource core to do this for the following reasons:
-> 1. MTK have MT7622 and MT2712, they pretty much using the same IP, but
-> have different memory window base. Currently we using device tree to
-> pass the memory window base. Take using of PCI resource core code to
-> parse and assign those resource will release the burden of driver.
-> 2. I do not want to re-implement the resource parse code to get the
-> memory base from device node. And hard code the memory base in driver is
-> not quite elegant.
-> 3. Most of the host driver which I referenced are using the PCI resource
-> core to help with it's memory window configure, I guess following the
-> majority way maybe better even they may have slit different of the IP
-> design from MTK.
-> 4. Passing the memory base in device node make it more flexible to
-> change the memory window base (in the HW acceptable range) in case of
-> some special EP device required some special PCI address range.
-> 5. MT7622 and MT2712 have the pretty much same IP only MT7622's HW has
-> set the class type to an un-proper class type. Set it to the same values
-> as MT2712 is an easy way to fix.
+This patch addes Neutis N5 support.
+Emlid Neutis N5 is a SoM based on Allwinner H5.
+The patch includes device tree file for Dev board
+and dtsi file for SoM needs.
 
-We do what needs to be done. From what you are saying, your IP
-implements a config 1 type header and that defines it as a PCI-to-PCI
-bridge (eg a root port, of sorts).
+Changes from v1: separate dts file: dtsi for SoM
+and motherboard dts file that inlcudes dtsi file.
 
-The points you are making above are software, I understand them but
-that's not what we are discussing here.
+Changes from v2 (5 oct 2018):
+- makefile: dtb-$(CONFIG_ARCH_SUNXI) - ordered alphabetically
 
-I want you to define the class of your IP according to what your IP
-is and it seems _reasonable_ to me to define the IP as a PCI-to-PCI
-bridge class from the information you are providing.
+Changes from v3 (12 oct 2018):
+- fix commit prefix for 1/2 patch
+- use an SPDX header instead of the full license text
+- compatible: "emlid,neutis-n5" instead of "emlid,emlid-neutis-n5"
 
-I would like you to:
+Aleksandr Aleksandrov (2):
+  arm64: dts: allwinner: new board - Emlid Neutis N5
+  doc: devicetree: vendor-prefixes: new vendor - Emlid
 
-1) Rewrite the commit log and explain why your IP needs class
-   reprogramming. I do not care about driver software complexity,
-   I want you to describe how HW works. I do not want you to define
-   a class for your IP because that makes the driver simpler, I want
-   you to define a class for your IP to describe to the kernel what
-   that IP really is, which is different things.
-2) Define and report the bug you are fixing in the commit log
-3) Provide a Fixes: tag pointing at the faulty commit
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../sun50i-h5-emlid-neutis-n5-devboard.dts         | 147 +++++++++++++++++++++
+ .../dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi   |  59 +++++++++
+ 4 files changed, 208 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi
 
-Thanks for your time providing information.
-
-Lorenzo
-
-> thanks.
-> > > I'm not sure which CLASS type it should have:
-> > > From PCI_Code-ID_r_1_10__v8-Nov_2017, class type of
-> > > 0x0604(PCI_CLASS_BRIDGE_PCI) is defined as a PCI-to-PCI bridge, not
-> > > literally suitable for MT7622(which is a root complex)(In my personal
-> > > opinion). But it is the only workable CLASS type for MT7622 in current
-> > > kernel.
-> > > 
-> > > > If the kernel does not assign resources unless it detects a
-> > > > PCI_CLASS_BRIDGE_PCI this means that for components that are
-> > > > actually PCI_CLASS_BRIDGE_HOST their register set must come
-> > > > preprogrammed unless I am missing something.
-> > > > 
-> > > 
-> > > In the function pci_request_resource_alignment, it will by pass the
-> > > resource assignment for PCI_CLASS_BRIDGE_HOST, though I'm not figured
-> > > out why.
-> > > 
-> > > > I would like to get to the bottom of this since it is a fundamental
-> > > > enumeration concept.
-> > > > 
-> > > 
-> > > Do you like me to re-write the commit message for this patch and put the
-> > > above information in? Or just not mention the PCI_CLASS_BRIDGE_HOST
-> > > assign resource routine?
-> > 
-> > I want to understand where the problem is and whether it is right to
-> > define the component as a PCI bridge rather than a host bridge.
-> > 
-> 
-> I will update the commit message (put some of the above reasons in the
-> commit message) and send a new version of this patch if it's acceptable
-> for you.
-> 
-> Thanks
-> > Lorenzo
-> 
-> 
-> 
+-- 
+2.7.4
