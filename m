@@ -1,33 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Oct 2018 09:56:05 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Oct 2018 09:53:54 +0100
 Subject: [PATCH v5 01/17] arm64: add pointer authentication register bits
-In-Reply-To: <20181012085352.xi6rkcpm62iqd6ru@lakrids.cambridge.arm.com>
+In-Reply-To: <20181011162814.GC17000@arm.com>
 References: <20181005084754.20950-1-kristina.martsenko@arm.com>
  <20181005084754.20950-2-kristina.martsenko@arm.com>
  <20181011162814.GC17000@arm.com>
- <20181012085352.xi6rkcpm62iqd6ru@lakrids.cambridge.arm.com>
-Message-ID: <20181012085605.GB11847@arm.com>
+Message-ID: <20181012085352.xi6rkcpm62iqd6ru@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 09:53:54AM +0100, Mark Rutland wrote:
-> On Thu, Oct 11, 2018 at 05:28:14PM +0100, Will Deacon wrote:
-> > On Fri, Oct 05, 2018 at 09:47:38AM +0100, Kristina Martsenko wrote:
-> 
-> > > +#define ESR_ELx_EC_PAC		(0x09)
-> > 
-> > Really minor nit: but shouldn't this be ESR_EL2_EC_PAC, since this trap
-> > can't occur at EL1 afaict?
-> 
-> It can also be taken to EL3 dependent on SCR_EL3.API.
-> 
-> We use ESR_ELx_EC_<foo> for other exceptions that can't be taken to EL1
-> (e.g. ESR_ELx_EC_SMC{32,64}), so I think it would be more consistent to
-> leave this as ESR_ELx_EC_PAC rather than ESR_EL2_EC_PAC.
+On Thu, Oct 11, 2018 at 05:28:14PM +0100, Will Deacon wrote:
+> On Fri, Oct 05, 2018 at 09:47:38AM +0100, Kristina Martsenko wrote:
 
-Fair enough, but if we grow a different EC for ESR_EL1 that uses encoding
-0x09, this all falls apart. At the very list, maybe we should comment those
-that are EL2 or higher with /* EL2 and above */ or just fix the misnomer and
-drop the useless _ELx_ part of the names completely.
+> > +#define ESR_ELx_EC_PAC		(0x09)
+> 
+> Really minor nit: but shouldn't this be ESR_EL2_EC_PAC, since this trap
+> can't occur at EL1 afaict?
 
-Will
+It can also be taken to EL3 dependent on SCR_EL3.API.
+
+We use ESR_ELx_EC_<foo> for other exceptions that can't be taken to EL1
+(e.g. ESR_ELx_EC_SMC{32,64}), so I think it would be more consistent to
+leave this as ESR_ELx_EC_PAC rather than ESR_EL2_EC_PAC.
+
+Thanks,
+Mark.
