@@ -1,87 +1,29 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Fri, 12 Oct 2018 21:09:01 +0200
-Subject: [RFT PATCH] mmc: pwrseq_simple: Fix incorrect handling of GPIO bitmap
-In-Reply-To: <20180925192433.1377-1-jmkrzyszt@gmail.com>
-References: <20180925192433.1377-1-jmkrzyszt@gmail.com>
-Message-ID: <20181012190901.1243-1-jmkrzyszt@gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 12 Oct 2018 14:24:09 -0500
+Subject: [PATCH 1/2] perf: arm_spe: Enable automatic DT loading
+Message-ID: <20181012192409.3819792-1-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b9762bebc633 ("gpiolib: Pass bitmaps, not integer arrays, to
-get/set array") changed the way GPIO values are passed to
-gpiod_get/set_array_value() and friends.  The new code introduced into
-mmc_pwrseq_simple_set_gpios_value() incorrectly interpretes the 'value'
-argument as a bitmap of GPIO values and assigns it directly to the
-'values' bitmap variable passed to gpiod_set_array_value_cansleep()
-instead of filling that bitmap with bits equal to the 'value' argument.
-As a result, only member 0 of the array is handled correctly.
+When built as a module, the spe driver isn't automatically
+loaded on DT systems. Add the MODULE_DEVICE_TABLE entry.
 
-Moreover, wrong assumption is taken about the 'values' bitmap size not
-exceding the number of bits of the 'value' argument type.
-
-Fix it.
-
-Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
-Hi,
+ drivers/perf/arm_spe_pmu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-I think that patch has been missed while we were resolving issues 
-related to GPIO fast bitmap processing.  Since all issues other than the 
-one addreessed by this patch have been been hopefully identified and 
-fixed, GPIO tree seems now to be in good shape in regard to that. 
-However, I believe pwrseq_simple is still broken.  Hence, I'm 
-resubmitting this patch to Ulf for inclusion in MMC tree, Cc: many other 
-people who are kindly requested to test it if possible.
-
-I've identified the following DT files representing devices which may be 
-affected (have more than one GPIO assigned to pwrseq_simple):
-- arch/arm/boot/dts/imx6qdl-sr-som-brcm.dtsi
-- arch/arm/boot/dts/exynos5250-snow-common.dtsi
-- arch/arm/boot/dts/imx6sl-warp.dts
-- arch/arm/boot/dts/omap3-igep0030.dts
-- arch/arm/boot/dts/omap3-igep0020.dts
-- arch/arm/boot/dts/rk3036-kylin.dts
-- arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-
-Please start with checking if pwrseq_simple from linux-next works for 
-you and if not, please test if this patch fixes the issue.
-
-Thanks,
-Janusz
-
-
- drivers/mmc/core/pwrseq_simple.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index 7f882a2bb872..ece34c734693 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -40,13 +40,22 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
- 	struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
+diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
+index 54ec278d2fc4..18d61077b157 100644
+--- a/drivers/perf/arm_spe_pmu.c
++++ b/drivers/perf/arm_spe_pmu.c
+@@ -1169,6 +1169,7 @@ static const struct of_device_id arm_spe_pmu_of_match[] = {
+ 	{ .compatible = "arm,statistical-profiling-extension-v1", .data = (void *)1 },
+ 	{ /* Sentinel */ },
+ };
++MODULE_DEVICE_TABLE(of, arm_spe_pmu_of_match);
  
- 	if (!IS_ERR(reset_gpios)) {
--		DECLARE_BITMAP(values, BITS_PER_TYPE(value));
-+		unsigned long *values;
- 		int nvalues = reset_gpios->ndescs;
- 
--		values[0] = value;
-+		values = bitmap_alloc(nvalues, GFP_KERNEL);
-+		if (!values)
-+			return;
-+
-+		if (value)
-+			bitmap_fill(values, nvalues);
-+		else
-+			bitmap_zero(values, nvalues);
- 
- 		gpiod_set_array_value_cansleep(nvalues, reset_gpios->desc,
- 					       reset_gpios->info, values);
-+
-+		kfree(values);
- 	}
- }
- 
+ static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
+ {
 -- 
-2.16.4
+2.14.3
