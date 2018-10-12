@@ -1,40 +1,57 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Oct 2018 16:45:34 +0100
-Subject: livelock with hrtimer cpu_base->lock
-In-Reply-To: <63fae7b2ef8dc4cc67928329cf7fcb60@codeaurora.org>
-References: <8f671ebb6b331cd00ce17d111f28c548@codeaurora.org>
- <20181010164919.GA16512@arm.com>
- <63fae7b2ef8dc4cc67928329cf7fcb60@codeaurora.org>
-Message-ID: <20181012154534.GA11387@arm.com>
+Date: Fri, 12 Oct 2018 16:46:29 +0100
+Subject: [GIT PULL] Couple more arm64 fixes for 4.19
+Message-ID: <20181012154629.GB11387@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 05:55:28AM -0700, Sodagudi Prasad wrote:
-> On 2018-10-10 09:49, Will Deacon wrote:
-> >On Tue, Oct 09, 2018 at 01:56:14PM -0700, Sodagudi Prasad wrote:
-> >>This is regarding - thread "try to fix contention between expire_timers
-> >>and
-> >>try_to_del_timer_sync".
-> >>https://lkml.org/lkml/2017/7/28/172
-> >>
-> >>I think this live lockup issue was discussed earlier but the final set
-> >>of
-> >>changes were not concluded.
-> >
-> >Well we basically need a way to pick a value for CPU_RELAX_WFE_THRESHOLD.
-> >Do you have any ideas? It could be determined at runtime if necessary.
-> >
-> 
-> Please share what are values need to be tried for CPU_RELAX_WFE_THRESHOLD.
-> 
->  It would be great if it can be determined from runtime.  Please let me know
-> if any testing need to be done with dynamic detection patch.
+Hi Greg,
 
-I was actually hoping you'd have some ideas about how to write the patch. I
-don't have a good feel for how to determine this threshold, and you have
-hardware that needs it...
+Please pull these two arm64 fixes for 4.19. One of them fixes a nasty
+WARN() that has started triggering because we assumed that memory
+reservations from firmware would always correspond to regions of the
+physical address space that we have mapped as memory. Unfortunately,
+some existing device-tree files break this assumption and we need to
+continue supporting them. The other fix addresses an issue where a
+CHAIN PMU event can be requested as a 32-bit counter via perf, which
+makes no sense in isolation since these events are intended to be used
+in conjunction with another event when creating a 64-bit counter.
 
-One avenue of exploration might be to tune the fallback to WFE based on
-what percentage of the eventstream period we've been polling, e.g. 50%.
+This is summarised in the tag.
+
+Cheers,
 
 Will
+
+--->8
+
+The following changes since commit 0238df646e6224016a45505d2c111a24669ebe21:
+
+  Linux 4.19-rc7 (2018-10-07 17:26:02 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to ca2b497253ad01c80061a1f3ee9eb91b5d54a849:
+
+  arm64: perf: Reject stand-alone CHAIN events for PMUv3 (2018-10-12 15:25:17 +0100)
+
+----------------------------------------------------------------
+More arm64 fixes
+
+- Reject CHAIN PMU events when they are not part of a 64-bit counter
+
+- Fix WARN_ON_ONCE() that triggers for reserved regions that don't
+  correspond to mapped memory
+
+----------------------------------------------------------------
+Will Deacon (2):
+      arm64: Fix /proc/iomem for reserved but not memory regions
+      arm64: perf: Reject stand-alone CHAIN events for PMUv3
+
+ arch/arm64/kernel/perf_event.c |  7 ++++++
+ arch/arm64/kernel/setup.c      | 56 ++++++++++++++++++++----------------------
+ drivers/perf/arm_pmu.c         |  8 +++++-
+ include/linux/perf/arm_pmu.h   |  1 +
+ 4 files changed, 42 insertions(+), 30 deletions(-)
