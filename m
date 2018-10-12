@@ -1,77 +1,31 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Fri, 12 Oct 2018 09:29:59 +0530
-Subject: [PATCH V2 5/5] arm64/mm: Enable HugeTLB migration for contiguous bit
- HugeTLB pages
-In-Reply-To: <1539316799-6064-1-git-send-email-anshuman.khandual@arm.com>
-References: <1539316799-6064-1-git-send-email-anshuman.khandual@arm.com>
-Message-ID: <1539316799-6064-6-git-send-email-anshuman.khandual@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 12 Oct 2018 13:25:24 +0900
+Subject: [PATCH v2 2/2] dt-bindings: uniphier: move cache-uniphier.txt to
+ vendor directory
+In-Reply-To: <1539318324-4938-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1539318324-4938-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1539318324-4938-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let arm64 subscribe to the previously added framework in which architecture
-can inform whether a given huge page size is supported for migration. This
-just overrides the default function arch_hugetlb_migration_supported() and
-enables migration for all possible HugeTLB page sizes on arm64. With this,
-HugeTLB migration support on arm64 now covers all possible HugeTLB options.
+Now, the Socionext vendor directory is available at
+Documentation/devicetree/bindings/arm/socionext/
 
-        CONT PTE    PMD    CONT PMD    PUD
-        --------    ---    --------    ---
-4K:        64K      2M        32M      1G
-16K:        2M     32M         1G
-64K:        2M    512M        16G
+Move cache-uniphier.txt over to it.
 
-Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- arch/arm64/include/asm/hugetlb.h |  5 +++++
- arch/arm64/mm/hugetlbpage.c      | 20 ++++++++++++++++++++
- 2 files changed, 25 insertions(+)
 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index e73f685..656f70e 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -20,6 +20,11 @@
- 
- #include <asm/page.h>
- 
-+#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
-+#define arch_hugetlb_migration_supported arch_hugetlb_migration_supported
-+extern bool arch_hugetlb_migration_supported(struct hstate *h);
-+#endif
-+
- static inline pte_t huge_ptep_get(pte_t *ptep)
- {
- 	return READ_ONCE(*ptep);
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 4eafd9f..28f4795 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -27,6 +27,26 @@
- #include <asm/tlbflush.h>
- #include <asm/pgalloc.h>
- 
-+#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
-+bool arch_hugetlb_migration_supported(struct hstate *h)
-+{
-+	size_t pagesize = huge_page_size(h);
-+
-+	switch (pagesize) {
-+#ifdef CONFIG_ARM64_4K_PAGES
-+	case PUD_SIZE:
-+#endif
-+	case PMD_SIZE:
-+	case CONT_PMD_SIZE:
-+	case CONT_PTE_SIZE:
-+		return true;
-+	}
-+	pr_warn("%s: unrecognized huge page size 0x%lx\n",
-+			__func__, pagesize);
-+	return false;
-+}
-+#endif
-+
- int pmd_huge(pmd_t pmd)
- {
- 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
+Changes in v2:
+  - New patch
+
+ .../devicetree/bindings/arm/{uniphier => socionext}/cache-uniphier.txt    | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/arm/{uniphier => socionext}/cache-uniphier.txt (100%)
+
+diff --git a/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt b/Documentation/devicetree/bindings/arm/socionext/cache-uniphier.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
+rename to Documentation/devicetree/bindings/arm/socionext/cache-uniphier.txt
 -- 
 2.7.4
