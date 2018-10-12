@@ -1,121 +1,77 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 12 Oct 2018 12:37:46 +0200
-Subject: revisit arm64 per-task stack canaries
-In-Reply-To: <20180213180436.GA21758@arm.com>
-References: <CAKv+Gu9RAXhMAwKJgNAZEBZRMNfpyDNS-rxa+U2EpNxEVq77vQ@mail.gmail.com>
- <20180213125201.otz3cse4wftcq4fe@lakrids.cambridge.arm.com>
- <CAKv+Gu-WVMnk2AhB9ziupL-TQoR8gZ121mkQAV9mvbgjirhbmg@mail.gmail.com>
- <20180213180436.GA21758@arm.com>
-Message-ID: <CAKv+Gu_q9mbjHhuU8g_nM6vBS_F3ypAvnuKLAg-Oaf+2wf2ePw@mail.gmail.com>
+From: adam.cottrel@veea.com (Adam Cottrel)
+Date: Fri, 12 Oct 2018 09:48:01 +0000
+Subject: DMA remote memcpy requests
+In-Reply-To: <20181012090937.GA12289@arm.com>
+References: <DM6PR04MB405938028EC04FBD07F3D96AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
+ <20181012090937.GA12289@arm.com>
+Message-ID: <DM6PR04MB4059742D494D96FC11674A50F2E20@DM6PR04MB4059.namprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Arnd)
+Hi Will,
 
-On 13 February 2018 at 19:04, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> On Tue, Feb 13, 2018 at 01:56:49PM +0000, Ard Biesheuvel wrote:
->> On 13 February 2018 at 12:52, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Tue, Feb 13, 2018 at 12:36:02PM +0000, Ard Biesheuvel wrote:
->> >> Instead, I have proposed a proof of concept [0] where the compiler
->> >> emits an instruction sequence that loads the canary directly from the
->> >> task struct, which is the per-thread data structure maintained by the
->> >> kernel. Accessing that can be done safely without any of the
->> >> limitations per-CPU variables have. The task struct pointer is kept in
->> >> system register sp_el0 while running in the kernel.
->> >
->> > My major concern here is being tied to using sysregs in a particular
->> > way. We might want to fiddle with that in future (e.g. using the
->> > platform register as an optimization, or switching to a different sysreg
->> > due to architectural extensions).
->> >
->>
->> Yes. Also, there is a disparity between userland (using tpidr_el0) and
->> kernel (using sp_el0), and perhaps it would make more sense to switch
->> to tpidr_el0 in the kernel as well. But the general objection remains.
->
-> Indeed, and I share Mark's view that we don't want to commit to a specific
-> sequence here. Ideally, we'd have a way to pass whatever thunk we need to
-> the compiler and have the freedom to implement it as we see fit (and to
-> change that implementation at a whim).
->
->> >> The purpose of this email to reach agreement between the various
->> >> stakeholders (mainly the arm64 linux maintainers and the ARM GCC
->> >> maintainers) on a way to proceed with implementing this in GCC.
->> >
->> > Would it be possible to have an always inline function to get the
->> > canary, which GCC would implicitly fold into functions as necessary?
->> >
->> > ... then we could have something in a header, like:
->> >
->> > static __always_inline unsigned long get_task_canary(void)
->> > {
->> >         return current->canary;
->> > }
->> >
->> > ... which we could change in future as needs change.
->> >
->>
->> This is a question to the compiler folks, I suppose, but I'd venture a
->> guess that this is rather hard. Perhaps a true function call would be
->> better if it is done in a way that can be optimized by LTO (this is of
->> course assuming that by GCC 9, this is something we are likely to use
->> in the kernel)
->>
->> An alternative could be to decide to rely on a GCC plugin instead
->> (although this would not be my preference). My poc implementation is a
->> bit clunky, but I did not spend a lot of time on it. If we can refine
->> it to replace the high/lo ref to __stack_chk_guard with something more
->> robust, then we remain in control of which register and/or symbol ref
->> we use and we don't paint ourselves into a corner.
->
-> I'm wary of our ability to maintain a GCC plugin in the kernel source tree.
-> I would *much* prefer to have proper support in the compiler.
->
+Thank you for getting back to me.
 
-Hello all,
+> [+Robin and Cavium folks -- it's usually best to cc people as well as  mailing
+> the list]
+I will remember this for future. Thanks for the advice.
 
-Ramana, Arnd, Mark and I spoke about this again at Linaro Connect in
-Vancouver, and Ramana is still volunteering to work on the GCC side
-changes if we can agree on a way to parameterize this.
+> > I am using the ATH10K on Linux 14.4 with an Arm Cavium processor.
+> > During heavy loading, I am seeing that target initiated DMA requests
+> > are being silently dropped under extreme IO memory pressure and it is
+> > proving very difficult to isolate the root cause.
+> 
+> Is this ThunderX 1 or 2 or something else? Can you reproduce the issue with
+> mainline?
+I am using:-
+        model = "Cavium ThunderX CN81XX board";
+        compatible = "cavium,thunder-81xx";
 
-To recap, my proof of concept was based on using the task struct
-pointer directly (which we keep in sp_el0 in the kernel). That way, we
-don't care about per-CPU vars and preemption etc, since the stack
-canary value is tied to the task anyway, regardless on which CPU it
-executes.
+Yes - the issue can be reproduced on the mainline, but here is a link to the code branch that I am using:-
+https://elixir.bootlin.com/linux/v4.14.4/source/drivers/net/wireless/ath/ath10k
 
-So my suggestion was to turn this (the current sequence emitted by the compiler)
+> > The ATH10K firmware uses the DMA API to set up phy_addr_t pointers
+> > (32-bit) which are then copied to a shared ring buffer. The target
+> > then initiates the memcpy operation (for target-to-host reads), but I
+> > do not have any means of debugging the target directly, and so I am
+> > looking for software hooks on the host that might help debug this complex
+> problem.
+> 
+> How does the firmware use the DMA API, or are you referring to a driver? If
+> the latter, could you point us to the code, please? Is it using the streaming
+> API, or is this a coherent allocation?
+The code is using the ARM64 DMA API. It cuts corners in places (!!) but for the most part, it follows the rules. In local tests, I have added memory barriers (e.g. dmb(SY)) and even put in low-level flush/invalidate calls (DC CIVAC) to try and eliminate cache-coherency type problems.
 
-adrp    x0, __stack__chk_guard
-ldr     x0, [x0, :lo12:__stack_chk_guard]
+The receive fault can be observed in the Rx handler which can be found on line 528 of ce.c:-
+https://elixir.bootlin.com/linux/v4.14.4/source/drivers/net/wireless/ath/ath10k/ce.c
 
-into this
+The memory is allocated by the Rx post buffer function which is on line 760 of pci.c:-
+https://elixir.bootlin.com/linux/v4.14.4/source/drivers/net/wireless/ath/ath10k/pci.c
 
-mrs     x0, <sysreg>
-ldr     x0, [x0, :lo12:<offset>]
+To better observe the fault, I made the following change:-
+ + On allocation, I use memset to clear the skb->data (pci.c::770)
+ + On receive, I check that the data is not zero (ce.c::555)
+ + If the data is not yet written, I exit the Rx IRQ handler and try again.
 
-where 'sysreg' and 'offset' are the names of 1) a system register and
-2) an absolute ELF symbol, respectively.
+In tests, the code works as expected under normal operation, however once I start to simulate a heavy memory pressure situation then the Rx handler starts to fail. This failure (if allowed to continue) will eventually tear down the entire module and crash the target firmware because presumably they are seeing similar dropouts on the transmit path.
 
-At Ramana's request (and with Arnd's help) I looked into whether we
-can provide offsetof(struct task_struct, stack_canary) as a bare
-number on the GCC command line instead, but this is turning out to be
-rather cumbersome, given that we need to run the compiler to find the
-offset in the first place. (The most promising approach would be to
-generate a file and include it with @filename so its contents are
-parsed as command line options but even that is rather fiddly to add
-into our build system)
+When the fault is happening, if I poll the target registers (e.g. write counters over MMIO) I can see that they are still sending us new messages. In other words, they have silently failed to send the data, or rather we have silently failed to accept the memory copy. I am not able to access the target firmware directly, but I have been reliably informed that the DMA memcpy operation is initiated by the target.
 
-My approach of exposing the offset via the linker script works fine,
-and we wouldn't even need a separate GCC command line option in that
-case: we could just settle on __stack_chk_guard_sysreg_offset and
-stipulate that it is exposed as an absolute ELF symbol in the range
-[0..1023] when -mstack-protector-guard=<sysreg> is passed to GCC.
+My memory pressure test uses a large dd copy to create a lot of dirty memory pages. This always creates the fault, however without any memory pressure the code runs beautifully...
 
-Ramana, could you elaborate on your preference for a bare number on
-the command line? Do you see any alternatives?
+> > Please can someone explain the low-level operation of DMA once it
+> > becomes a target initiated memcpy function?
+> 
+> I think we need a better handle on the issue first.
 
-Thanks,
-Ard.
+I fully agree - please tell me what you want to know :-D
+
+> > p.s. I have tested with and without the IOMMU, and I have eliminated
+> > issues such as cache coherency being the root cause.
+> 
+> Right, not sure how the SMMU would help here.
+
+Understood, and thanks for taking the time to reply, and I look forward to hearing your thoughts as I would like to fix this issue once and for all.
+
+Best,
+Adam
