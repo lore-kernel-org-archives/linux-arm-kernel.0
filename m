@@ -1,80 +1,167 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 12 Oct 2018 09:12:02 -0500
-Subject: [PATCH v6 2/9] PCI: mediatek: Fixup class ID for MT7622 as
- PCI_CLASS_BRIDGE_PCI
-In-Reply-To: <20181012102230.GA23257@e107981-ln.cambridge.arm.com>
-References: <1538969088-7136-1-git-send-email-honghui.zhang@mediatek.com>
- <1538969088-7136-3-git-send-email-honghui.zhang@mediatek.com>
- <20181008172337.GA13538@e107981-ln.cambridge.arm.com>
- <1539054495.6246.31.camel@mhfsdcap03>
- <20181011113748.GA3574@e107981-ln.cambridge.arm.com>
- <1539331289.6246.61.camel@mhfsdcap03>
- <20181012102230.GA23257@e107981-ln.cambridge.arm.com>
-Message-ID: <20181012141202.GV5906@bhelgaas-glaptop.roam.corp.google.com>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Fri, 12 Oct 2018 16:27:50 +0200
+Subject: [PATCH] ARM: Make aligned 2-byte getuser()/putuser() atomic on ARMv6+
+Message-ID: <20181012142750.15653-1-vincent.whitchurch@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 11:22:30AM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Oct 12, 2018 at 04:01:29PM +0800, Honghui Zhang wrote:
->> On Thu, 2018-10-11 at 12:38 +0100, Lorenzo Pieralisi wrote:
->>> On Tue, Oct 09, 2018 at 11:08:15AM +0800, Honghui Zhang wrote:
->>>> On Mon, 2018-10-08 at 18:23 +0100, Lorenzo Pieralisi wrote:
->>>>> On Mon, Oct 08, 2018 at 11:24:41AM +0800, honghui.zhang at mediatek.com wrote:
->>>>>> From: Honghui Zhang <honghui.zhang@mediatek.com>
->>>>>> 
->>>>>> The PCIe controller of MT7622 has TYPE 1 configuration
->>>>>> space type, but the HW default class type values is
->>>>>> invalid.
->>>>>> 
->>>>>> The commit 101c92dc80c8 ("PCI: mediatek: Set up vendor ID
->>>>>> and class type for MT7622") have set the class ID for
->>>>>> MT7622 as PCI_CLASS_BRIDGE_HOSTe, but it's not workable
->>>>>> for MT7622:
->>>>>> 
->>>>>> In __pci_bus_assign_resources, the framework only setup
->>>>>> bridge's resource window only if class type is
->>>>>> PCI_CLASS_BRIDGE_PCI. Or it will leave the subordinary PCIe
->>>>>> device's MMIO window un-touched.
+getuser() and putuser() (and there underscored variants) use two
+strb[t]/ldrb[t] instructions when they are asked to get/put 16-bits.
+This means that the read/write is not atomic even when performed to a
+16-bit-aligned address.
 
-I think __pci_bus_assign_resources() should be testing dev->hdr_type
-instead of dev->class.  The connection between "Header Type" and the
-layout of the rest of the header is very explicit (PCI r3.0 sec 6.1,
-PCIe r4.0 sec 7.5.1.1.9), and the reason for the switch statement in
-__pci_bus_assign_resources() is precisely to determine which layout to
-use.
+This leads to problems with vhost: vhost uses __getuser() to read the
+vring's 16-bit avail.index field, and if it happens to observe a partial
+update of the index, wrong descriptors will be used which will lead to a
+breakdown of the virtio communication.  A similar problem exists for
+__putuser() which is used to write to the vring's used.index field.
 
-There are several other uses of dev->class in setup-bus.c that I think
-should also be changed to use dev->hdr_type.
+The reason these functions use strb[t]/ldrb[t] is because strht/ldrht
+instructions did not exist until ARMv6T2/ARMv7.  So we should be easily
+able to fix this on ARMv7.  Also, since all ARMv6 processors also don't
+actually use the unprivileged instructions anymore for uaccess (since
+CONFIG_CPU_USE_DOMAINS is not used) we can easily fix them too.
 
-If we make these changes in setup-bus.c, I suspect the class code you
-assign won't matter too much.  There are a few other tests of the
-class code to figure out whether to leave certain things untouched.
-These seem a little hacky to me, but we're probably stuck with them
-for now, so you should look and see whether they apply to your
-situation.
+Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+---
+ arch/arm/include/asm/uaccess.h | 18 ++++++++++++++++++
+ arch/arm/lib/getuser.S         | 11 +++++++++++
+ arch/arm/lib/putuser.S         | 20 ++++++++++----------
+ 3 files changed, 39 insertions(+), 10 deletions(-)
 
->>>> And for MT7622, it integrated with block of internal control
->>>> registers, type 1 configuration space, and is considered as a
->>>> root complex.
->>> 
->>> I assume you mean a type 1 config header here. I do not think it
->>> is mandatory for a host bridge to have a type 1 config header (and
->>> related bridge windows + primary/secondary/subordinate bus
->>> numbers) but I do not know how the IP you are programming is
->>> designed.
-
-It is definitely not mandatory for a host bridge to have a type 1
-header.  I'm not even sure that would make sense: the "Primary Bus
-Number" would not apply to a host bridge (since a host bridge's
-primary bus is some sort of CPU bus, not a PCI bus), and a type 1
-device cannot perform address translation between its primary and
-secondary buses, while a host bridge can.
-
-A Root Port is a type 1 device where the primary bus is logically
-internal to the Root Complex.  A host bridge bridges from the CPU bus
-to that internal bus and might perform address translation.  The Root
-Port must be a PCI device.  A host bridge, being a bridge *to* the PCI
-domain, is not itself generally programmed via PCI config space and
-might not even be visible as a device in PCI config space.
-
-Bjorn
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 5451e1f05a19..696b69091a36 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -315,6 +315,13 @@ do {									\
+ #define __get_user_asm_byte(x, addr, err)			\
+ 	__get_user_asm(x, addr, err, ldrb)
+ 
++#if __LINUX_ARM_ARCH__ >= 6
++
++#define __get_user_asm_half(x, addr, err)			\
++	__get_user_asm(x, addr, err, ldrh)
++
++#else
++
+ #ifndef __ARMEB__
+ #define __get_user_asm_half(x, __gu_addr, err)			\
+ ({								\
+@@ -333,6 +340,8 @@ do {									\
+ })
+ #endif
+ 
++#endif /* __LINUX_ARM_ARCH__ >= 6 */
++
+ #define __get_user_asm_word(x, addr, err)			\
+ 	__get_user_asm(x, addr, err, ldr)
+ #endif
+@@ -406,6 +415,13 @@ do {									\
+ #define __put_user_asm_byte(x, __pu_addr, err)			\
+ 	__put_user_asm(x, __pu_addr, err, strb)
+ 
++#if __LINUX_ARM_ARCH__ >= 6
++
++#define __put_user_asm_half(x, __pu_addr, err)			\
++	__put_user_asm(x, __pu_addr, err, strh)
++
++#else
++
+ #ifndef __ARMEB__
+ #define __put_user_asm_half(x, __pu_addr, err)			\
+ ({								\
+@@ -422,6 +438,8 @@ do {									\
+ })
+ #endif
+ 
++#endif /* __LINUX_ARM_ARCH__ >= 6 */
++
+ #define __put_user_asm_word(x, __pu_addr, err)			\
+ 	__put_user_asm(x, __pu_addr, err, str)
+ 
+diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+index 746e7801dcdf..b2e4bc3a635e 100644
+--- a/arch/arm/lib/getuser.S
++++ b/arch/arm/lib/getuser.S
+@@ -42,6 +42,12 @@ _ASM_NOKPROBE(__get_user_1)
+ 
+ ENTRY(__get_user_2)
+ 	check_uaccess r0, 2, r1, r2, __get_user_bad
++#if __LINUX_ARM_ARCH__ >= 6
++
++2: TUSER(ldrh)	r2, [r0]
++
++#else
++
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ rb	.req	ip
+ 2:	ldrbt	r2, [r0], #1
+@@ -56,6 +62,9 @@ rb	.req	r0
+ #else
+ 	orr	r2, rb, r2, lsl #8
+ #endif
++
++#endif /* __LINUX_ARM_ARCH__ >= 6 */
++
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_2)
+@@ -145,7 +154,9 @@ _ASM_NOKPROBE(__get_user_bad8)
+ .pushsection __ex_table, "a"
+ 	.long	1b, __get_user_bad
+ 	.long	2b, __get_user_bad
++#if __LINUX_ARM_ARCH__ < 6
+ 	.long	3b, __get_user_bad
++#endif
+ 	.long	4b, __get_user_bad
+ 	.long	5b, __get_user_bad8
+ 	.long	6b, __get_user_bad8
+diff --git a/arch/arm/lib/putuser.S b/arch/arm/lib/putuser.S
+index 38d660d3705f..515eeaa9975c 100644
+--- a/arch/arm/lib/putuser.S
++++ b/arch/arm/lib/putuser.S
+@@ -41,16 +41,13 @@ ENDPROC(__put_user_1)
+ 
+ ENTRY(__put_user_2)
+ 	check_uaccess r0, 2, r1, ip, __put_user_bad
+-	mov	ip, r2, lsr #8
+-#ifdef CONFIG_THUMB2_KERNEL
+-#ifndef __ARMEB__
+-2: TUSER(strb)	r2, [r0]
+-3: TUSER(strb)	ip, [r0, #1]
++#if __LINUX_ARM_ARCH__ >= 6
++
++2: TUSER(strh)	r2, [r0]
++
+ #else
+-2: TUSER(strb)	ip, [r0]
+-3: TUSER(strb)	r2, [r0, #1]
+-#endif
+-#else	/* !CONFIG_THUMB2_KERNEL */
++
++	mov	ip, r2, lsr #8
+ #ifndef __ARMEB__
+ 2: TUSER(strb)	r2, [r0], #1
+ 3: TUSER(strb)	ip, [r0]
+@@ -58,7 +55,8 @@ ENTRY(__put_user_2)
+ 2: TUSER(strb)	ip, [r0], #1
+ 3: TUSER(strb)	r2, [r0]
+ #endif
+-#endif	/* CONFIG_THUMB2_KERNEL */
++
++#endif /* __LINUX_ARM_ARCH__ >= 6 */
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__put_user_2)
+@@ -91,7 +89,9 @@ ENDPROC(__put_user_bad)
+ .pushsection __ex_table, "a"
+ 	.long	1b, __put_user_bad
+ 	.long	2b, __put_user_bad
++#if __LINUX_ARM_ARCH__ < 6
+ 	.long	3b, __put_user_bad
++#endif
+ 	.long	4b, __put_user_bad
+ 	.long	5b, __put_user_bad
+ 	.long	6b, __put_user_bad
+-- 
+2.11.0
