@@ -1,56 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 Oct 2018 09:46:58 -0500
-Subject: [PATCH v3 2/7] dt-bindings: stm32-dmamux: Add one cell to
- support DMA/MDMA chain
-In-Reply-To: <1538139715-24406-3-git-send-email-pierre-yves.mordret@st.com>
-References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
- <1538139715-24406-3-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20181012144658.GA30093@bogus>
+From: colin.king@canonical.com (Colin King)
+Date: Fri, 12 Oct 2018 15:48:32 +0100
+Subject: [PATCH] [media] exynos4-is: fix spelling mistake ACTURATOR -> ACTUATOR
+Message-ID: <20181012144832.20722-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 03:01:50PM +0200, Pierre-Yves MORDRET wrote:
-> From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> 
-> Add one cell to support DMA/MDMA chaining.
+From: Colin Ian King <colin.king@canonical.com>
 
-You aren't adding a cell. Is the change compatible with existing users 
-(if you mask bits)?
+Trivial fix to spelling mistake in macro name and text string
+ERROR_SENSOR_ACTURATOR_INIT_FAIL -> ERROR_SENSOR_ACTUATOR_INIT_FAIL
 
-> 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/media/platform/exynos4-is/fimc-is-errno.c | 4 ++--
+ drivers/media/platform/exynos4-is/fimc-is-errno.h | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Author S-o-b missing.
-
-> ---
->   Version history:
->     v3:
->     v2:
->        * rework content
->     v1:
->        * Initial
-> ---
-> ---
->  Documentation/devicetree/bindings/dma/stm32-dmamux.txt | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-> index 1b893b2..5e92b59 100644
-> --- a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-> +++ b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-> @@ -4,9 +4,9 @@ Required properties:
->  - compatible:	"st,stm32h7-dmamux"
->  - reg:		Memory map for accessing module
->  - #dma-cells:	Should be set to <3>.
-> -		First parameter is request line number.
-> -		Second is DMA channel configuration
-> -		Third is Fifo threshold
-> +-		First parameter is request line number.
-> +-		Second is DMA channel configuration
-> +-		Third is a 32bit bitfield
->  		For more details about the three cells, please see
->  		stm32-dma.txt documentation binding file
->  - dma-masters:	Phandle pointing to the DMA controllers.
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/media/platform/exynos4-is/fimc-is-errno.c b/drivers/media/platform/exynos4-is/fimc-is-errno.c
+index e050e63fe358..bbb08576492e 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is-errno.c
++++ b/drivers/media/platform/exynos4-is/fimc-is-errno.c
+@@ -90,8 +90,8 @@ const char *fimc_is_param_strerr(unsigned int error)
+ 		return "ERROR_SENSOR_INVALID_SIZE";
+ 	case ERROR_SENSOR_INVALID_SETTING:
+ 		return "ERROR_SENSOR_INVALID_SETTING";
+-	case ERROR_SENSOR_ACTURATOR_INIT_FAIL:
+-		return "ERROR_SENSOR_ACTURATOR_INIT_FAIL";
++	case ERROR_SENSOR_ACTUATOR_INIT_FAIL:
++		return "ERROR_SENSOR_ACTUATOR_INIT_FAIL";
+ 	case ERROR_SENSOR_INVALID_AF_POS:
+ 		return "ERROR_SENSOR_INVALID_AF_POS";
+ 	case ERROR_SENSOR_UNSUPPORT_FUNC:
+diff --git a/drivers/media/platform/exynos4-is/fimc-is-errno.h b/drivers/media/platform/exynos4-is/fimc-is-errno.h
+index ef981e74513a..77f4fc860be5 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is-errno.h
++++ b/drivers/media/platform/exynos4-is/fimc-is-errno.h
+@@ -189,7 +189,7 @@ enum fimc_is_error {
+ 	ERROR_SENSOR_INVALID_EXPOSURETIME,
+ 	ERROR_SENSOR_INVALID_SIZE,
+ 	ERROR_SENSOR_INVALID_SETTING,
+-	ERROR_SENSOR_ACTURATOR_INIT_FAIL,
++	ERROR_SENSOR_ACTUATOR_INIT_FAIL,
+ 	ERROR_SENSOR_INVALID_AF_POS,
+ 	ERROR_SENSOR_UNSUPPORT_FUNC,
+ 	ERROR_SENSOR_UNSUPPORT_PERI,
+-- 
+2.17.1
