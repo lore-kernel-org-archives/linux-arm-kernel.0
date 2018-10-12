@@ -1,27 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 12 Oct 2018 09:53:54 +0100
-Subject: [PATCH v5 01/17] arm64: add pointer authentication register bits
-In-Reply-To: <20181011162814.GC17000@arm.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <20181005084754.20950-2-kristina.martsenko@arm.com>
- <20181011162814.GC17000@arm.com>
-Message-ID: <20181012085352.xi6rkcpm62iqd6ru@lakrids.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Oct 2018 10:09:38 +0100
+Subject: DMA remote memcpy requests
+In-Reply-To: <DM6PR04MB405938028EC04FBD07F3D96AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
+References: <DM6PR04MB405938028EC04FBD07F3D96AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
+Message-ID: <20181012090937.GA12289@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2018 at 05:28:14PM +0100, Will Deacon wrote:
-> On Fri, Oct 05, 2018 at 09:47:38AM +0100, Kristina Martsenko wrote:
+Hi Adam,
 
-> > +#define ESR_ELx_EC_PAC		(0x09)
-> 
-> Really minor nit: but shouldn't this be ESR_EL2_EC_PAC, since this trap
-> can't occur at EL1 afaict?
+[+Robin and Cavium folks -- it's usually best to cc people as well as
+ mailing the list]
 
-It can also be taken to EL3 dependent on SCR_EL3.API.
+On Thu, Oct 11, 2018 at 07:28:37AM +0000, Adam Cottrel wrote:
+> I am using the ATH10K on Linux 14.4 with an Arm Cavium processor. During
+> heavy loading, I am seeing that target initiated DMA requests are being
+> silently dropped under extreme IO memory pressure and it is proving very
+> difficult to isolate the root cause.
 
-We use ESR_ELx_EC_<foo> for other exceptions that can't be taken to EL1
-(e.g. ESR_ELx_EC_SMC{32,64}), so I think it would be more consistent to
-leave this as ESR_ELx_EC_PAC rather than ESR_EL2_EC_PAC.
+Is this ThunderX 1 or 2 or something else? Can you reproduce the issue with
+mainline?
 
-Thanks,
-Mark.
+> The ATH10K firmware uses the DMA API to set up phy_addr_t pointers
+> (32-bit) which are then copied to a shared ring buffer. The target then
+> initiates the memcpy operation (for target-to-host reads), but I do not
+> have any means of debugging the target directly, and so I am looking for
+> software hooks on the host that might help debug this complex problem.
+
+How does the firmware use the DMA API, or are you referring to a driver? If
+the latter, could you point us to the code, please? Is it using the
+streaming API, or is this a coherent allocation?
+
+> Please can someone explain the low-level operation of DMA once it becomes
+> a target initiated memcpy function?
+
+I think we need a better handle on the issue first.
+
+> p.s. I have tested with and without the IOMMU, and I have eliminated
+> issues such as cache coherency being the root cause.
+
+Right, not sure how the SMMU would help here.
+
+Will
