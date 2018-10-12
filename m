@@ -1,29 +1,26 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 12 Oct 2018 14:24:09 -0500
-Subject: [PATCH 1/2] perf: arm_spe: Enable automatic DT loading
-Message-ID: <20181012192409.3819792-1-jeremy.linton@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 12 Oct 2018 14:28:56 -0500
+Subject: [PATCH v2] of: base: Change logic in of_alias_get_alias_list()
+In-Reply-To: <1bc1488a4cbf21fafc64269958ba3ed04e0a3c1c.1539322989.git.michal.simek@xilinx.com>
+References: <1bc1488a4cbf21fafc64269958ba3ed04e0a3c1c.1539322989.git.michal.simek@xilinx.com>
+Message-ID: <CAL_JsqKTGmrQx+siHQprMAvX1M-p08Qkv0nEwAARK3NJz-wobg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When built as a module, the spe driver isn't automatically
-loaded on DT systems. Add the MODULE_DEVICE_TABLE entry.
+On Fri, Oct 12, 2018 at 12:43 AM Michal Simek <michal.simek@xilinx.com> wrote:
+>
+> Check compatible string first before setting up bit in bitmap to also
+> cover cases that allocated bitfield is not big enough.
+> Show warning about it but let driver to continue to work with allocated
+> bitfield to keep at least some devices (included console which
+> is commonly close to serial0) to work.
+>
+> Fixes: b1078c355d76 ("of: base: Introduce of_alias_get_alias_list() to check alias IDs")
+> Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>
+> Changes in v2:
+>  - Use EOVERFLOW instead of EINVAL - Rob
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- drivers/perf/arm_spe_pmu.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 54ec278d2fc4..18d61077b157 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -1169,6 +1169,7 @@ static const struct of_device_id arm_spe_pmu_of_match[] = {
- 	{ .compatible = "arm,statistical-profiling-extension-v1", .data = (void *)1 },
- 	{ /* Sentinel */ },
- };
-+MODULE_DEVICE_TABLE(of, arm_spe_pmu_of_match);
- 
- static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
- {
--- 
-2.14.3
+Reviewed-by: Rob Herring <robh@kernel.org>
