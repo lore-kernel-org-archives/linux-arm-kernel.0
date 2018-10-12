@@ -1,101 +1,83 @@
-From: Michal.Vokac@ysoft.com (=?iso-8859-2?Q?Vok=E1=E8_Michal?=)
-Date: Fri, 12 Oct 2018 12:44:21 +0000
-Subject: [PATCH v2 0/2] pwm: sysfs: fix exporting PWM channel
-In-Reply-To: <b56bc059-573f-545e-da45-51765f8937a7@st.com>
-References: <1538400237-28766-1-git-send-email-fabrice.gasnier@st.com>
- <20181012115500.GD31561@ulmo> <ad0206b8-2cda-a147-1b71-8e2eced06e61@i2se.com>
- <b56bc059-573f-545e-da45-51765f8937a7@st.com>
-Message-ID: <d58f077b-a486-31cb-d299-4ec556e91c08@ysoft.com>
+From: psodagud@codeaurora.org (Sodagudi Prasad)
+Date: Fri, 12 Oct 2018 05:55:28 -0700
+Subject: livelock with hrtimer cpu_base->lock
+In-Reply-To: <20181010164919.GA16512@arm.com>
+References: <8f671ebb6b331cd00ce17d111f28c548@codeaurora.org>
+ <20181010164919.GA16512@arm.com>
+Message-ID: <63fae7b2ef8dc4cc67928329cf7fcb60@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.10.2018 14:36, Fabrice Gasnier wrote:
-> On 10/12/2018 02:15 PM, Stefan Wahren wrote:
->> Am 12.10.2018 um 13:55 schrieb Thierry Reding:
->>> On Mon, Oct 01, 2018 at 03:23:55PM +0200, Fabrice Gasnier wrote:
->>>> Since commit 7e5d1fd75c3d ("pwm: Set class for exported channels in sysfs")
->>>> - it's not possible to export more than one PWM channel
->>>> - ABI has changed, as a side effect. It may cause bad behavior as pwmchip
->>>>    attributes are wrongly added to pwm channels and report wrong values.
->>>> See [1] and [2].
->>>>
->>>> One purpose of the original patch is to send uevents to udev, when exporting a
->>>> PWM channel through the sysfs. This series:
->>>> - Reverts the original patch.
->>>> - Proposes a new way to send notifications to be used by udev rules.
->>>>
->>>> - With this series:
->>>> $ echo 0 > /sys/class/pwm/pwmchip0/export
->>>> $ ls /sys/class/pwm
->>>> pwmchip0 pwmchip4
->>>>
->>>> $ ls /sys/class/pwm/pwmchip0/pwm0/
->>>> capture     enable      polarity    uevent
->>>> duty_cycle  period      power
->>>>
->>>> - Without this series:
->>>> $ echo 0 > /sys/class/pwm/pwmchip0/export
->>>> $ ls /sys/class/pwm
->>>> pwm0 pwmchip0 pwmchip4
->>>>
->>>> $ ls /sys/class/pwm/pwmchip0/pwm0/
->>>> capture     duty_cycle  export      period      power       uevent
->>>> device      enable      npwm        polarity    subsystem   unexport
->>>>
->>>> - Backtrace when exporting a 2nd channel (0) on a separate pwmchip device:
->>>> $ echo 0 > /sys/class/pwm/pwmchip4/export
->>>> [   95.286558] sysfs: cannot create duplicate filename '/class/pwm/pwm0'
->>>> [   95.293630] CPU: 0 PID: 54 Comm: sh Not tainted 4.19.0-rc6-00013-g00b49b0 #151
->>>> [   95.301344] Hardware name: STM32 (Device Tree Support)
->>>> [   95.306833] [<0000c155>] (unwind_backtrace) from [<0000b273>] (show_stack+0xb/0xc)
->>>> [   95.315136] [<0000b273>] (show_stack) from [<00092455>] (sysfs_warn_dup+0x31/0x48)
->>>> [   95.323247] [<00092455>] (sysfs_warn_dup) from [<00092635>] (sysfs_do_create_link_sd+0x75/0x88)
->>>> [   95.332539] [<00092635>] (sysfs_do_create_link_sd) from [<00125823>] (device_add+0x133/0x3b0)
->>>> [   95.341694] [<00125823>] (device_add) from [<001059ed>] (export_store+0xb5/0x12c)
->>>> [   95.349761] [<001059ed>] (export_store) from [<00091911>] (kernfs_fop_write+0x87/0xda)
->>>> [   95.358150] [<00091911>] (kernfs_fop_write) from [<0005beb1>] (__vfs_write+0x1d/0xe0)
->>>> [   95.366295] [<0005beb1>] (__vfs_write) from [<0005bfe7>] (vfs_write+0x4f/0x7c)
->>>> [   95.374053] [<0005bfe7>] (vfs_write) from [<0005c0bf>] (ksys_write+0x33/0x70)
->>>> [   95.381708] [<0005c0bf>] (ksys_write) from [<00009001>] (ret_fast_syscall+0x1/0x58)
->>>> [   95.389682] Exception stack(0x01bcffa8 to 0x01bcfff0)
->>>> [   95.394946] ffa0:                   00000000 00c4883c 00000001 00c4e590 00000002 00000004
->>>> [   95.403639] ffc0: 00000000 00c4883c 00c4cbe8 00000004 00000002 00000020 00000000 00c4d008
->>>> [   95.412223] ffe0: 00c29151 00c4cbe8 00c17833 00c13c0c
->>>> -sh: write error: File exists
->>>>
->>>> [1] https://lkml.org/lkml/2018/9/25/713
->>>> [2] https://lkml.org/lkml/2018/9/25/447
->>>>
->>>> ---
->>>> Changes in v2:
->>>> - update revert commit message
->>>> - new patch 2/2 to propose uevent notification (change) on pwmchip
->>>>
->>>> Fabrice Gasnier (2):
->>>>    Revert "pwm: Set class for exported channels in sysfs"
->>>>    pwm: send a uevent on the pwmchip device upon channel sysfs (un)export
->>>>
->>>>   drivers/pwm/sysfs.c | 12 +++++++++++-
->>>>   1 file changed, 11 insertions(+), 1 deletion(-)
->>> Both patches applied, thanks. What do you think would be the importance
->>> of getting this into stable kernels? We can't get one of the patches in
->>> without the other, so they'd both have to be backported. The second one
->>> is still fairly small, so would qualify for stable, I think.
->> I think the revert patch should go to stable, because it fixes a regression.
->>
+On 2018-10-10 09:49, Will Deacon wrote:
+> Hi Prasad,
 > 
-> Hi,
+> On Tue, Oct 09, 2018 at 01:56:14PM -0700, Sodagudi Prasad wrote:
+>> This is regarding - thread "try to fix contention between 
+>> expire_timers and
+>> try_to_del_timer_sync".
+>> https://lkml.org/lkml/2017/7/28/172
+>> 
+>> I think this live lockup issue was discussed earlier but the final set 
+>> of
+>> changes were not concluded.
 > 
-> Thierry, Thanks for taking these.
-> I also think at least the 1st patch (revert) should be backported in
-> stable branch. Not taking the second one may lead to another issue for
-> the users that now expect uevents. This is replacement patch to the
-> original one. So, I'd advise to push both: revert + replacement patch.
+> Well we basically need a way to pick a value for 
+> CPU_RELAX_WFE_THRESHOLD.
+> Do you have any ideas? It could be determined at runtime if necessary.
+> 
+Hi Will,
 
-I also vote for pushing both.
-M.
+Please share what are values need to be tried for 
+CPU_RELAX_WFE_THRESHOLD.
 
->>> However, given that it's taken a long time for somebody to notice this,
->>> I'm not sure if this is something that people care about too much in the
->>> stable kernels>>
->>> Thierry
+  It would be great if it can be determined from runtime.  Please let me 
+know
+if any testing need to be done with dynamic detection patch.
+
+-Thanks, Prasad
+
+>> I would like to check whether you have new updates on this issue or 
+>> not.
+>> This problem is observed with 4.14 .64 stable kernel too.
+>> We see this problem 2 times in overnight testing.
+>> 
+>> I have to add the following code to avoid live lock. I am thinking 
+>> that
+>> fixing this at the cpu_relax() level.
+>> 
+>> +++ b/kernel/time/hrtimer.c
+>> @@ -52,6 +52,7 @@
+>>  #include <linux/timer.h>
+>>  #include <linux/freezer.h>
+>>  #include <linux/compat.h>
+>> +#include <linux/delay.h>
+>> 
+>>  #include <linux/uaccess.h>
+>> 
+>> @@ -152,6 +153,7 @@ struct hrtimer_clock_base *lock_hrtimer_base(const
+>> struct hrtimer *timer,
+>> raw_spin_unlock_irqrestore(&base->cpu_base->lock, *flags);
+>>                 }
+>>                 cpu_relax();
+>> +               udelay(1);
+>>         }
+>>  }
+>> 
+>> @@ -1067,6 +1069,7 @@ int hrtimer_cancel(struct hrtimer *timer)
+>>                 if (ret >= 0)
+>>                         return ret;
+>>                 cpu_relax();
+>> +               udelay(1);
+>>         }
+>>  }
+>>  EXPORT_SYMBOL_GPL(hrtimer_cancel);
+> 
+> This is just another bodge and likely to hurt in places where 1us is
+> excessive because there isn't contention.
+> 
+> Will
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+Linux Foundation Collaborative Project
