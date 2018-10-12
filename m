@@ -1,26 +1,43 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 12 Oct 2018 14:28:56 -0500
-Subject: [PATCH v2] of: base: Change logic in of_alias_get_alias_list()
-In-Reply-To: <1bc1488a4cbf21fafc64269958ba3ed04e0a3c1c.1539322989.git.michal.simek@xilinx.com>
-References: <1bc1488a4cbf21fafc64269958ba3ed04e0a3c1c.1539322989.git.michal.simek@xilinx.com>
-Message-ID: <CAL_JsqKTGmrQx+siHQprMAvX1M-p08Qkv0nEwAARK3NJz-wobg@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 12 Oct 2018 14:29:37 -0500
+Subject: [PATCH 2/2] arm64: acpi: Prepare for longer MADTs
+Message-ID: <20181012192937.3819951-1-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 12:43 AM Michal Simek <michal.simek@xilinx.com> wrote:
->
-> Check compatible string first before setting up bit in bitmap to also
-> cover cases that allocated bitfield is not big enough.
-> Show warning about it but let driver to continue to work with allocated
-> bitfield to keep at least some devices (included console which
-> is commonly close to serial0) to work.
->
-> Fixes: b1078c355d76 ("of: base: Introduce of_alias_get_alias_list() to check alias IDs")
-> Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
->
-> Changes in v2:
->  - Use EOVERFLOW instead of EINVAL - Rob
+The BAD_MADT_GICC_ENTRY check is a little too strict because
+it rejects MADT entries that don't match the currently known
+lengths. We should remove this restriction to avoid problems
+if the table length changes. Future code which might depend on
+additional fields should be written to validate those fields
+before using them, rather than trying to globally check
+known MADT version lengths.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/include/asm/acpi.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 709208dfdc8b..4d0946bd485a 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -22,12 +22,12 @@
+ #include <asm/tlbflush.h>
+ 
+ /* Macros for consistency checks of the GICC subtable of MADT */
+-#define ACPI_MADT_GICC_LENGTH	\
+-	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
++#define ACPI_MADT_GICC_MIN_LENGTH   ACPI_OFFSET(  \
++	struct acpi_madt_generic_interrupt, efficiency_class)
+ 
+ #define BAD_MADT_GICC_ENTRY(entry, end)					\
+-	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
+-	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
++	(!(entry) || (entry)->header.length < ACPI_MADT_GICC_MIN_LENGTH || \
++	(unsigned long)(entry) + (entry)->header.length > (end))
+ 
+ /* Basic configuration for ACPI */
+ #ifdef	CONFIG_ACPI
+-- 
+2.14.3
