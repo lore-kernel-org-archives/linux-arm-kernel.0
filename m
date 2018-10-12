@@ -1,81 +1,35 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 12 Oct 2018 12:02:12 +0200
-Subject: [PATCH v6 07/18] arm64: KVM/mm: Move SEA handling behind a
- single 'claim' interface
-In-Reply-To: <20180921221705.6478-8-james.morse@arm.com>
-References: <20180921221705.6478-1-james.morse@arm.com>
- <20180921221705.6478-8-james.morse@arm.com>
-Message-ID: <20181012100212.GA580@zn.tnic>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 12 Oct 2018 18:03:42 +0800
+Subject: [PATCH v3 2/2] drm/sun4i: tcon: prevent tcon->panel dereference
+ if NULL
+In-Reply-To: <20181008092111.qcufr4o7cy3nnj4b@flea>
+References: <20181004195605.txvbkshvxklyzxyb@flea>
+ <20181005215951.99003-1-giulio.benetti@micronovasrl.com>
+ <20181005215951.99003-2-giulio.benetti@micronovasrl.com>
+ <20181008092111.qcufr4o7cy3nnj4b@flea>
+Message-ID: <CAGb2v66FVixU-Ax=KkH5J-ivQ146RUK2DWDwBqDRYqHtpOod9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 11:16:54PM +0100, James Morse wrote:
-> To split up APEIs in_nmi() path, we need the nmi-like callers to always
-> be in_nmi(). Add a helper to do the work and claim the notification.
-> 
-> When KVM or the arch code takes an exception that might be a RAS
-> notification, it asks the APEI firmware-first code whether it wants
-> to claim the exception. We can then go on to see if (a future)
-> kernel-first mechanism wants to claim the notification, before
-> falling through to the existing default behaviour.
-> 
-> The NOTIFY_SEA code was merged before we had multiple, possibly
-> interacting, NMI-like notifications and the need to consider kernel
-> first in the future. Make the 'claiming' behaviour explicit.
-> 
-> As we're restructuring the APEI code to allow multiple NMI-like
-> notifications, any notification that might interrupt interrupts-masked
-> code must always be wrapped in nmi_enter()/nmi_exit(). This allows APEI
-> to use in_nmi() to use the right fixmap entries.
-> 
-> We mask SError over this window to prevent an asynchronous RAS error
-> arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+On Mon, Oct 8, 2018 at 5:21 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Fri, Oct 05, 2018 at 11:59:51PM +0200, Giulio Benetti wrote:
+> > If tcon->panel pointer is NULL, trying to dereference from it
+> > (i.e. tcon->panel->connector) will cause a null pointer dereference.
+> >
+> > Add tcon->panel null pointer check before calling
+> > sun4i_tcon0_mode_set_dithering().
+> >
+> > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> > Fixes: f11adcecbd5f ("drm/sun4i: tcon: Add dithering support for
+> >                       RGB565/RGB666 LCD panels")
+> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Applied both, thanks!
 
-...
+I think this one could have been applied to drm-misc-next-fixes,
+as the bug was only recently introduced.
 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index ed46dc188b22..a9b8bba014b5 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -28,8 +28,10 @@
->  #include <linux/smp.h>
->  #include <linux/serial_core.h>
->  
-> +#include <acpi/ghes.h>
->  #include <asm/cputype.h>
->  #include <asm/cpu_ops.h>
-> +#include <asm/daifflags.h>
->  #include <asm/pgtable.h>
->  #include <asm/smp_plat.h>
->  
-> @@ -257,3 +259,30 @@ pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
->  		return __pgprot(PROT_NORMAL_NC);
->  	return __pgprot(PROT_DEVICE_nGnRnE);
->  }
-> +
-> +/*
-> + * Claim Synchronous External Aborts as a firmware first notification.
-> + *
-> + * Used by KVM and the arch do_sea handler.
-> + * @regs may be NULL when called from process context.
-> + */
-> +int apei_claim_sea(struct pt_regs *regs)
-> +{
-> +	int err = -ENOENT;
-> +	unsigned long current_flags = arch_local_save_flags();
-> +
-> +	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
-> +		return err;
+We'll have to make sure it gets backported somehow.
 
-I don't know what side effects arch_local_save_flags() has on ARM but if
-we return here, it looks to me like useless work.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+ChenYu
