@@ -1,57 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Oct 2018 16:46:29 +0100
-Subject: [GIT PULL] Couple more arm64 fixes for 4.19
-Message-ID: <20181012154629.GB11387@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 12 Oct 2018 16:45:35 +0100
+Subject: [PATCH v3 1/2] arm/arm64: KVM: rename function
+ kvm_arch_dev_ioctl_check_extension()
+In-Reply-To: <1539284855-4035-2-git-send-email-gengdongjiu@huawei.com>
+References: <1539284855-4035-1-git-send-email-gengdongjiu@huawei.com>
+ <1539284855-4035-2-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <5743b2ce-232f-f7e9-b5e7-3fd017575d78@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Dongjiu Geng,
 
-Please pull these two arm64 fixes for 4.19. One of them fixes a nasty
-WARN() that has started triggering because we assumed that memory
-reservations from firmware would always correspond to regions of the
-physical address space that we have mapped as memory. Unfortunately,
-some existing device-tree files break this assumption and we need to
-continue supporting them. The other fix addresses an issue where a
-CHAIN PMU event can be requested as a 32-bit counter via perf, which
-makes no sense in isolation since these events are intended to be used
-in conjunction with another event when creating a 64-bit counter.
+On 11/10/2018 20:07, Dongjiu Geng wrote:
+> Rename kvm_arch_dev_ioctl_check_extension() to
+> kvm_arch_vm_ioctl_check_extension(), because it does
+> not have any relationship with device.
+> 
+> Renaming this function can make code readable.
 
-This is summarised in the tag.
+Lots of things in the kernel are misnamed, its not normally worth fixing them.
 
-Cheers,
+But it confused me, so:
+Acked-by: James Morse <james.morse@arm.com>
 
-Will
 
---->8
+Thanks,
 
-The following changes since commit 0238df646e6224016a45505d2c111a24669ebe21:
-
-  Linux 4.19-rc7 (2018-10-07 17:26:02 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to ca2b497253ad01c80061a1f3ee9eb91b5d54a849:
-
-  arm64: perf: Reject stand-alone CHAIN events for PMUv3 (2018-10-12 15:25:17 +0100)
-
-----------------------------------------------------------------
-More arm64 fixes
-
-- Reject CHAIN PMU events when they are not part of a 64-bit counter
-
-- Fix WARN_ON_ONCE() that triggers for reserved regions that don't
-  correspond to mapped memory
-
-----------------------------------------------------------------
-Will Deacon (2):
-      arm64: Fix /proc/iomem for reserved but not memory regions
-      arm64: perf: Reject stand-alone CHAIN events for PMUv3
-
- arch/arm64/kernel/perf_event.c |  7 ++++++
- arch/arm64/kernel/setup.c      | 56 ++++++++++++++++++++----------------------
- drivers/perf/arm_pmu.c         |  8 +++++-
- include/linux/perf/arm_pmu.h   |  1 +
- 4 files changed, 42 insertions(+), 30 deletions(-)
+James
