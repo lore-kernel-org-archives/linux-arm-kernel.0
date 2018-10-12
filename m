@@ -1,51 +1,39 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 12 Oct 2018 16:40:49 +0200
-Subject: [PATCH 10/10] arm64: use the generic swiotlb_dma_ops
-In-Reply-To: <8ae57670-ced9-5ebb-caf5-cc99f15fdf22@arm.com>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-11-hch@lst.de>
- <8ae57670-ced9-5ebb-caf5-cc99f15fdf22@arm.com>
-Message-ID: <20181012144049.GA28925@lst.de>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Oct 2018 09:42:04 -0500
+Subject: [PATCH v3 1/7] dt-bindings: stm32-dma: Add DMA/MDMA chaining
+ support bindings
+In-Reply-To: <1538139715-24406-2-git-send-email-pierre-yves.mordret@st.com>
+References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
+ <1538139715-24406-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20181012144204.GA13615@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 02:01:00PM +0100, Robin Murphy wrote:
-> On 08/10/18 09:02, Christoph Hellwig wrote:
->> Now that the generic swiotlb code supports non-coherent DMA we can switch
->> to it for arm64.  For that we need to refactor the existing
->> alloc/free/mmap/pgprot helpers to be used as the architecture hooks,
->> and implement the standard arch_sync_dma_for_{device,cpu} hooks for
->> cache maintaincance in the streaming dma hooks, which also implies
->> using the generic dma_coherent flag in struct device.
->>
->> Note that we need to keep the old is_device_dma_coherent function around
->> for now, so that the shared arm/arm64 Xen code keeps working.
->
-> OK, so when I said last night that it boot-tested OK, that much was true, 
-> but then I shut the board down as I left and got a megasplosion of bad page 
-> state BUGs, e.g.:
+On Fri, Sep 28, 2018 at 03:01:49PM +0200, Pierre-Yves MORDRET wrote:
+> From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> 
+> This patch adds dma bindings to support DMA/MDMA chaining transfer.
+> 1 bit is to manage both DMA FIFO Threshold
+> 1 bit is to manage DMA/MDMA Chaining features.
+> 2 bits are used to specify SDRAM size to use for DMA/MDMA chaining.
+> The size in bytes of a certain order is given by the formula:
+>     (2 ^ order) * PAGE_SIZE.
+> The order is given by those 2 bits.
+> For cyclic, whether chaining is chosen, any value above 1 can be set :
+> SRAM buffer size will rely on period size and not on this DT value.
+> 
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 
-I think this is because I am passing the wrong address to
-dma_direct_free_pages.  Please try this patch on top:
+Missing author S-o-b.
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 3c75d69b54e7..4f0f92856c4c 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -126,10 +126,12 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
- void arch_dma_free(struct device *dev, size_t size, void *vaddr,
- 		dma_addr_t dma_handle, unsigned long attrs)
- {
--	if (__free_from_pool(vaddr, PAGE_ALIGN(size)))
--		return;
--	vunmap(vaddr);
--	dma_direct_free_pages(dev, size, vaddr, dma_handle, attrs);
-+	if (!__free_from_pool(vaddr, PAGE_ALIGN(size)))
-+		void *kaddr = phys_to_virt(dma_to_phys(dev, dma_handle));
-+
-+		vunmap(vaddr);
-+		dma_direct_free_pages(dev, size, kaddr, dma_handle, attrs);
-+	}
- }
- 
- long arch_dma_coherent_to_pfn(struct device *dev, void *cpu_addr,
+> ---
+>   Version history:
+>     v3:
+>     v2:
+>        * rework content
+>     v1:
+>        * Initial
+> ---
+> ---
+>  .../devicetree/bindings/dma/stm32-dma.txt          | 27 +++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
