@@ -1,29 +1,26 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Oct 2018 16:45:35 +0100
-Subject: [PATCH v3 1/2] arm/arm64: KVM: rename function
- kvm_arch_dev_ioctl_check_extension()
-In-Reply-To: <1539284855-4035-2-git-send-email-gengdongjiu@huawei.com>
-References: <1539284855-4035-1-git-send-email-gengdongjiu@huawei.com>
- <1539284855-4035-2-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <5743b2ce-232f-f7e9-b5e7-3fd017575d78@arm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 12 Oct 2018 09:03:29 -0700
+Subject: [PATCH 0/4] Add clock support for Hi3670 SoC
+In-Reply-To: <20181012033857.GA5438@Mani-XPS-13-9360>
+References: <20180921060103.21370-1-manivannan.sadhasivam@linaro.org>
+ <20181012033857.GA5438@Mani-XPS-13-9360>
+Message-ID: <153936020982.5275.4942701350789062401@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu Geng,
-
-On 11/10/2018 20:07, Dongjiu Geng wrote:
-> Rename kvm_arch_dev_ioctl_check_extension() to
-> kvm_arch_vm_ioctl_check_extension(), because it does
-> not have any relationship with device.
+Quoting Manivannan Sadhasivam (2018-10-11 20:38:58)
+> On Thu, Sep 20, 2018 at 11:00:59PM -0700, Manivannan Sadhasivam wrote:
+> > This patchset adds clock support for Hi3670 SoC from HiSilicon utilizing
+> > the HiSi common clock code. While adding clock support, let's remove the
+> > fixed clock for UART and source SoC clock on HiKey970 board.
+> > 
+> > This patchset has been verified on HiKey970 board.
+> >
 > 
-> Renaming this function can make code readable.
+> Hi,
+> 
+> Any update on this series?
+> 
 
-Lots of things in the kernel are misnamed, its not normally worth fixing them.
-
-But it confused me, so:
-Acked-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+Can I merge the clk driver part by itself? Are you looking for an ack
+from clk maintainers?
