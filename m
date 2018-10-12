@@ -1,154 +1,119 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 12 Oct 2018 11:43:11 +0200
-Subject: [PATCH v9 04/11] dt: psci: Update DT bindings to support
- hierarchical PSCI states
-In-Reply-To: <20181011164126.GD28583@e107155-lin>
-References: <20181003143824.13059-1-ulf.hansson@linaro.org>
- <20181003143824.13059-5-ulf.hansson@linaro.org>
- <20181010150312.GA4844@e107155-lin>
- <CAPDyKFqP3wbd+5rvLcscNf1LUSZDROLqafsLq0Kyh0KziRJrZQ@mail.gmail.com>
- <20181011164126.GD28583@e107155-lin>
-Message-ID: <CAPDyKFq3=E=qDkozsu-MupEL_Efpdq62Z3aMWwGQWc+OdzPq8w@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 12 Oct 2018 10:52:42 +0200
+Subject: [PATCH 0/3] spi-nor: Add Octal SPI support
+In-Reply-To: <e4af1014-2008-440c-a017-bb8e7e960d3b@ti.com>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003212017.653e739f@bbrezillon>
+ <1074d503-71ef-2998-7096-de6135bb965d@ti.com>
+ <20181004131732.4c9e2ae9@bbrezillon>
+ <e4af1014-2008-440c-a017-bb8e7e960d3b@ti.com>
+Message-ID: <20181012105242.519a70b9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2018 at 18:41, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On Thu, Oct 11, 2018 at 04:44:07PM +0200, Ulf Hansson wrote:
->> +Raju
->>
->> On 10 October 2018 at 17:03, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> > On Wed, Oct 03, 2018 at 04:38:17PM +0200, Ulf Hansson wrote:
->> >> From: Lina Iyer <lina.iyer@linaro.org>
->> >>
->> >> Update DT bindings to represent hierarchical CPU and CPU PM domain idle
->> >> states for PSCI. Also update the PSCI examples to clearly show how
->> >> flattened and hierarchical idle states can be represented in DT.
->> >>
->> >> Cc: Lina Iyer <ilina@codeaurora.org>
->> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> >> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
->> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> >> Reviewed-by: Rob Herring <robh@kernel.org>
->> >> Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
->> >> ---
->> >>  .../devicetree/bindings/arm/psci.txt          | 156 ++++++++++++++++++
->> >>  1 file changed, 156 insertions(+)
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
->> >> index a2c4f1d52492..17aa3d3a1c8e 100644
->> >> --- a/Documentation/devicetree/bindings/arm/psci.txt
->> >> +++ b/Documentation/devicetree/bindings/arm/psci.txt
->> >> @@ -105,7 +105,163 @@ Case 3: PSCI v0.2 and PSCI v0.1.
->> >>               ...
->> >>       };
->> >>
->> >> +ARM systems can have multiple cores sometimes in hierarchical arrangement.
->> >> +This often, but not always, maps directly to the processor power topology of
->> >> +the system. Individual nodes in a topology have their own specific power states
->> >> +and can be better represented in DT hierarchically.
->> >> +
->> >> +For these cases, the definitions of the idle states for the CPUs and the CPU
->> >> +topology, must conform to the domain idle state specification [3]. The domain
->> >> +idle states themselves, must be compatible with the defined 'domain-idle-state'
->> >> +binding [1], and also need to specify the arm,psci-suspend-param property for
->> >> +each idle state.
->> >> +
->> >> +DT allows representing CPUs and CPU idle states in two different ways -
->> >> +
->> >> +The flattened model as given in Example 1, lists CPU's idle states followed by
->> >> +the domain idle state that the CPUs may choose. Note that the idle states are
->> >> +all compatible with "arm,idle-state".
->> >> +
->> >> +Example 2 represents the hierarchical model of CPUs and domain idle states.
->> >> +CPUs define their domain provider in their psci DT node. The domain controls
->> >> +the power to the CPU and possibly other h/w blocks that would enter an idle
->> >> +state along with the CPU. The CPU's idle states may therefore be considered as
->> >> +the domain's idle states and have the compatible "arm,idle-state". Such domains
->> >> +may also be embedded within another domain that may represent common h/w blocks
->> >> +between these CPUs. The idle states of the CPU topology shall be represented as
->> >> +the domain's idle states.
->> >> +
->> >> +In PSCI firmware v1.0, the OS-Initiated mode is introduced. In order to use it,
->> >> +the hierarchical representation must be used.
->> >> +
->> >> +Example 1: Flattened representation of CPU and domain idle states
->> >
->> > [...]
->> >
->> >> +Example 2: Hierarchical representation of CPU and domain idle states
->> >
->> > I understand that this may not be of interest for this series, but do
->> > we need to add any suggestions on how to arrive Flattened representation
->> > of CPU idle states from its hierarchical representation. If the DT has
->> > latter and PSCI call returns as PC mode only for idle. We need to deal
->> > with that case.
->>
->> For sure, I think this is valid comment for this series (or at least
->> v8 which contains the hole set).
->>
->
-> Thanks.
->
->> The approach I have taken, so far, is to closely tie the support for
->> PSCI OSI mode to the hierarchical representation in DT of the idle
->> states. Simply because of changing as little as possible, in a first
->> step, then build on top.
->>
->
-> That's fine. I just want a note in the bindings to state that we can use
-> the hierarchical representation and generate flattened list for PC.
+Hi Vignesh,
 
-OK, let's discuss it below.
+On Mon, 8 Oct 2018 21:06:02 +0530
+Vignesh R <vigneshr@ti.com> wrote:
 
->
->> However, in the offlist discussion I had with Lorenzo, he raised a
->> concern, very similar to what you are bringing up here. There are
->> indeed platform configurations, using PSCI PC mode, which would
->> benefit from the using the hierarchical representation. BTW, that is
->> kind of what Raju just tried to get working for QCOM SDM845 [1], but
->> let's discuss that separately.
->>
->
-> OK, we can discuss details in that thread, but I don't even see the PSCI
-> domains there.
->
->> The conclusion I made, is that no matter of we are using the PC mode
->> or the OSI mode, the hierarchical representation shall just work.
->>
->
-> Indeed.
->
->> To me, this means that I have to re-work the series, such that the
->> PSCI driver (and cpuidle), dynamically in runtime, can agree on which
->> of the idle states that are "shared among a group of CPUs" and which
->> are CPU specific. Exactly how, I am still exploring a few different
->> approaches on.
->>
->> Does it make sense?
->>
->
-> Yes
+> Hi Boris,
+> 
+> Sorry I missed this mail.
+> 
+> On Thursday 04 October 2018 04:47 PM, Boris Brezillon wrote:
+> > On Thu, 4 Oct 2018 16:05:36 +0530
+> > Vignesh R <vigneshr@ti.com> wrote:
+> >   
+> >>>>
+> >>>>  .../devicetree/bindings/mtd/cadence-quadspi.txt       |  1 +
+> >>>>  drivers/mtd/spi-nor/cadence-quadspi.c                 |  9 +++++++++    
+> >>>
+> >>> On a slightly different topic, do you plan to convert the Cadence
+> >>> driver to spi-mem? And if you don't, is it because you don't have time
+> >>> or because some features are missing in spi-mem (I remember you
+> >>> mentioned a few things back when you were reviewing the spi-mem series)?
+> >>>     
+> >>
+> >> I do not have plans to convert cadence QSPI driver to spi-mem yet,
+> >> mainly due to lack of time. Also, not sure if original author Marek and
+> >> other altera people are okay with that.
+> >>
+> >> I see couple of issues in the way of conversion:
+> >> 1. I would wait to know what direction would direct mapping APIs[1] go
+> >> before starting spi-mem conversion for Cadence QSPI driver. Else, we
+> >> have may to re write again if direct mapping APIs are merged.  
+> > 
+> > I'd suggest reviewing the proposal I posted so that you can influence
+> > the design of this new API ;-).
+> >   
+> 
+> I did take a look and proposal seems fine. Will try to prototype and
+> test cadence QSPI driver with these. Thanks for the patches!
 
-Great!
+That's great news! Let me know how it goes, and don't hesitate to ask
+if you have any questions.
 
->
->> So, when it comes to the updated DT bindings in regards to $subject
->> patch, I think it's good as is. Or do you think there is something
->> that needs to be clarified?
->>
->
-> Yes, nearly there. Just thought good to add a note that the representation
-> has no affinity towards any PSCI idle state mechanism(PC or OSI). So
-> that it's never assumed or misunderstood.
+> 
+> 
+> >> 2. New Cadence OSPI IP has an integrated PHY to support high throughput
+> >> OSPI flashes operating up 200MHz in Octal DDR mode. In order to work
+> >> with such flashes, PHY DLLs need to be calibrated. Highly simplified
+> >> calibration sequence is as below(See [2] for actual sequence):
+> >> -Read flash ID at low speed and store it.
+> >> -Enable PHY and set DLLs to a defined initial value
+> >> -Increment RX DLL value
+> >> -Read flash ID and check for correctness of data read
+> >> -repeat above two steps until a band of passing values is obtained for
+> >> RX DLL where flash ID is correctly read.
+> >> -DLL needs to set to middle of the passing band.  
+> > 
+> > Is the Read ID operation hardcoded or do you just use it as a way to
+> > trigger predictable transfers on the IO bus?
+> >   
+> 
+> Just a way to trigger predictable data reads.
 
-I understand your point. However, I think the following sentence still
-makes sense (exist in the suggest change above).
+Good.
 
-"In PSCI firmware v1.0, the OS-Initiated mode is introduced. In order
-to use it, the hierarchical representation must be used."
 
-How about if I add: "For the default platform-coordinated mode, both
-representations are viable options."
+> 
+> >>
+> >> I am trying to figure out how to fit this into the spi-mem framework as
+> >> controller would to need to store READ ID opcode and expected JEDEC ID
+> >> before starting calibration sequence.  
+> > 
+> > I think this should be split in 2:
+> > 
+> > - the SPI NOR framework passing the operation to use to do the
+> >   calibration (here a READ ID)
+> > - the SPI controller framework replaying the same operation with
+> >   different DLL configs until it finds the best match
+> > 
+> > So, it would basically be added as a new hook:
+> > 
+> > 	int (*calibrate)(struct spi_mem *mem,
+> > 			 const struct spi_mem_op *tmpl);
+> > 
+> > and a new function provided by the spi-mem API
+> > 
+> > int spi_mem_calibrate(struct spi_mem *mem,
+> > 		      const struct spi_mem_op *tmpl);
+> > 
+> > and calibration outcome would be somehow attached to the spi_mem
+> > object.
+> > 
+> > This way we stay memory agnostic but still provide the necessary blocks
+> > at the spi-mem level to do such callibrations.
+> > 
+> > Would that work?
+> >   
+> 
+> That would work and hopefully is not intrusive to spi-mem framework.
+> 
 
-Kind regards
-Uffe
+Okay. Don't hesitate to post a proposal along those lines and I'll try
+to review it.
+
+Thanks,
+
+Boris
