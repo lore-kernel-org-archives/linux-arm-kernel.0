@@ -1,75 +1,122 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Oct 2018 18:18:28 +0100
-Subject: [PATCH v6 07/18] arm64: KVM/mm: Move SEA handling behind a single
- 'claim' interface
-In-Reply-To: <20181012100212.GA580@zn.tnic>
-References: <20180921221705.6478-1-james.morse@arm.com>
- <20180921221705.6478-8-james.morse@arm.com> <20181012100212.GA580@zn.tnic>
-Message-ID: <6cd00d26-df00-b5d9-5144-073672efe87a@arm.com>
+From: jannh@google.com (Jann Horn)
+Date: Fri, 12 Oct 2018 19:22:46 +0200
+Subject: [PATCH v2 1/7] modules: Create rlimit for module space
+In-Reply-To: <7b0714e26c7c2216721641d7df16a49687927e37.camel@intel.com>
+References: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
+ <20181011233117.7883-2-rick.p.edgecombe@intel.com>
+ <CAG48ez2fWg64nGxDXUQS3695KpVNrakAbarXJnYPd6xv5wOD+A@mail.gmail.com>
+ <7b0714e26c7c2216721641d7df16a49687927e37.camel@intel.com>
+Message-ID: <CAG48ez0XfGFAWDYa75COMPCsKqqGfBFOtcNuGD4_dubGf2YeAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Fri, Oct 12, 2018 at 7:04 PM Edgecombe, Rick P
+<rick.p.edgecombe@intel.com> wrote:
+> On Fri, 2018-10-12 at 02:35 +0200, Jann Horn wrote:
+> > On Fri, Oct 12, 2018 at 1:40 AM Rick Edgecombe
+> > <rick.p.edgecombe@intel.com> wrote:
+> > > This introduces a new rlimit, RLIMIT_MODSPACE, which limits the amount of
+> > > module space a user can use. The intention is to be able to limit module
+> > > space
+> > > allocations that may come from un-privlidged users inserting e/BPF filters.
+> >
+> > Note that in some configurations (iirc e.g. the default Ubuntu
+> > config), normal users can use the subuid mechanism (the /etc/subuid
+> > config file and the /usr/bin/newuidmap setuid helper) to gain access
+> > to 65536 UIDs, which means that in such a configuration,
+> > RLIMIT_MODSPACE*65537 is the actual limit for one user. (Same thing
+> > applies to RLIMIT_MEMLOCK.)
+> Ah, that is a problem. There is only room for about 130,000 filters on x86 with
+> KASLR, so it couldn't really be set small enough.
+>
+> I'll have to look into what this is. Thanks for pointing it out.
+>
+> > Also, it is probably possible to waste a few times as much virtual
+> > memory as permitted by the limit by deliberately fragmenting virtual
+> > memory?
+> Good point. I guess if the first point can be addressed somehow, this one could
+> maybe be solved by just picking a lower limit.
+>
+> Any thoughts on if instead of all this there was just a system wide limit on BPF
+> JIT module space usage?
 
-On 12/10/2018 11:02, Borislav Petkov wrote:
-> On Fri, Sep 21, 2018 at 11:16:54PM +0100, James Morse wrote:
->> To split up APEIs in_nmi() path, we need the nmi-like callers to always
->> be in_nmi(). Add a helper to do the work and claim the notification.
->>
->> When KVM or the arch code takes an exception that might be a RAS
->> notification, it asks the APEI firmware-first code whether it wants
->> to claim the exception. We can then go on to see if (a future)
->> kernel-first mechanism wants to claim the notification, before
->> falling through to the existing default behaviour.
->>
->> The NOTIFY_SEA code was merged before we had multiple, possibly
->> interacting, NMI-like notifications and the need to consider kernel
->> first in the future. Make the 'claiming' behaviour explicit.
->>
->> As we're restructuring the APEI code to allow multiple NMI-like
->> notifications, any notification that might interrupt interrupts-masked
->> code must always be wrapped in nmi_enter()/nmi_exit(). This allows APEI
->> to use in_nmi() to use the right fixmap entries.
->>
->> We mask SError over this window to prevent an asynchronous RAS error
->> arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
+That does sound more robust to me. And at least on systems that don't
+compile out the BPF interpreter, everything should be more or less
+fine then...
 
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index ed46dc188b22..a9b8bba014b5 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -257,3 +259,30 @@ pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
->>  		return __pgprot(PROT_NORMAL_NC);
->>  	return __pgprot(PROT_DEVICE_nGnRnE);
->>  }
->> +
->> +/*
->> + * Claim Synchronous External Aborts as a firmware first notification.
->> + *
->> + * Used by KVM and the arch do_sea handler.
->> + * @regs may be NULL when called from process context.
->> + */
->> +int apei_claim_sea(struct pt_regs *regs)
->> +{
->> +	int err = -ENOENT;
->> +	unsigned long current_flags = arch_local_save_flags();
->> +
->> +	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
->> +		return err;
-> 
-> I don't know what side effects arch_local_save_flags() has on ARM but if
+> > > There is unfortunately no cross platform place to perform this accounting
+> > > during allocation in the module space, so instead two helpers are created to
+> > > be
+> > > inserted into the various arch?s that implement module_alloc. These
+> > > helpers perform the checks and help with tracking. The intention is that
+> > > they
+> > > an be added to the various arch?s as easily as possible.
+> >
+> > nit: s/an/can/
+> >
+> > [...]
+> > > diff --git a/kernel/module.c b/kernel/module.c
+> > > index 6746c85511fe..2ef9ed95bf60 100644
+> > > --- a/kernel/module.c
+> > > +++ b/kernel/module.c
+> > > @@ -2110,9 +2110,139 @@ static void free_module_elf(struct module *mod)
+> > >  }
+> > >  #endif /* CONFIG_LIVEPATCH */it
+> > >
+> > > +struct mod_alloc_user {
+> > > +       struct rb_node node;
+> > > +       unsigned long addr;
+> > > +       unsigned long pages;
+> > > +       kuid_t uid;
+> > > +};
+> > > +
+> > > +static struct rb_root alloc_users = RB_ROOT;
+> > > +static DEFINE_SPINLOCK(alloc_users_lock);
+> >
+> > Why all the rbtree stuff instead of stashing a pointer in struct
+> > vmap_area, or something like that?
+>
+> Since the tracking was not for all vmalloc usage, the intention was to not bloat
+> the structure for other usages likes stacks. I thought usually there wouldn't be
+> nearly as much module space allocations as there would be kernel stacks, but I
+> didn't do any actual measurements on the tradeoffs.
 
-It reads the current 'masked' state for IRQs, debug exceptions and 'SError'.
+I imagine that one extra pointer in there - pointing to your struct
+mod_alloc_user - would probably not be terrible. 8 bytes more per
+kernel stack shouldn't be so bad?
 
-
-> we return here, it looks to me like useless work.
-
-Yes. I lazily assume the compiler will rip that out as the value is never used.
-But in this case it can't, because its wrapped in asm-volatile, so it doesn't
-know it has no side-effects.
-
-I'll move it further down.
-
-Thanks!
-
-James
+> > [...]
+> > > +int check_inc_mod_rlimit(unsigned long size)
+> > > +{
+> > > +       struct user_struct *user = get_current_user();
+> > > +       unsigned long modspace_pages = rlimit(RLIMIT_MODSPACE) >>
+> > > PAGE_SHIFT;
+> > > +       unsigned long cur_pages = atomic_long_read(&user->module_vm);
+> > > +       unsigned long new_pages = get_mod_page_cnt(size);
+> > > +
+> > > +       if (rlimit(RLIMIT_MODSPACE) != RLIM_INFINITY
+> > > +                       && cur_pages + new_pages > modspace_pages) {
+> > > +               free_uid(user);
+> > > +               return 1;
+> > > +       }
+> > > +
+> > > +       atomic_long_add(new_pages, &user->module_vm);
+> > > +
+> > > +       if (atomic_long_read(&user->module_vm) > modspace_pages) {
+> > > +               atomic_long_sub(new_pages, &user->module_vm);
+> > > +               free_uid(user);
+> > > +               return 1;
+> > > +       }
+> > > +
+> > > +       free_uid(user);
+> >
+> > If you drop the reference on the user_struct, an attacker with two
+> > UIDs can charge module allocations to UID A, keep the associated
+> > sockets alive as UID B, and then log out and back in again as UID A.
+> > At that point, nobody is charged for the module space anymore. If you
+> > look at the eBPF implementation, you'll see that
+> > bpf_prog_charge_memlock() actually stores a refcounted pointer to the
+> > user_struct.
+> Ok, I'll take a look. Thanks Jann.
+> > > +       return 0;
+> > > +}
