@@ -1,51 +1,81 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 12 Oct 2018 11:57:43 +0200
-Subject: [PATCH v3] arm64: new board - Emlid Neutis N5
-In-Reply-To: <20181012093523.GA29014@imagebutcher>
-References: <1538745949-13188-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539012044-29998-1-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <20181010144957.exrlupoph7ovsmdw@flea>
- <9398571539259289@myt4-929fb874f3f2.qloud-c.yandex.net>
- <2d09d6c0-0404-589d-2c34-da846cff4fb8@suse.de>
- <20181012093523.GA29014@imagebutcher>
-Message-ID: <20181012095743.llxqyggkhtnsbpaf@flea>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 12 Oct 2018 12:02:12 +0200
+Subject: [PATCH v6 07/18] arm64: KVM/mm: Move SEA handling behind a
+ single 'claim' interface
+In-Reply-To: <20180921221705.6478-8-james.morse@arm.com>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-8-james.morse@arm.com>
+Message-ID: <20181012100212.GA580@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 12:35:23PM +0300, Aleksandr Aleksandrov wrote:
-> > >> ?+&uart1 {
-> > >> ?+ pinctrl-names = "default";
-> > >> ?+ pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> > >> ?+ status = "okay";
-> > >> ?+};
-> > >>
-> > >> I guess this is for bluetooth? Have you tested serdev drivers?
-> > >>
-> > > Yes, bluetooth is connected over uart1.
-> > > You mean if I have tested bluetooth stack via serial device?
-> > 
-> > Not quite, we're missing a child node within uart1 for a serdev driver.
-> > Is there no such driver yet for your Bluetooth chipset, or did you not
-> > yet check?
+On Fri, Sep 21, 2018 at 11:16:54PM +0100, James Morse wrote:
+> To split up APEIs in_nmi() path, we need the nmi-like callers to always
+> be in_nmi(). Add a helper to do the work and claim the notification.
 > 
-> Got it. I haven't checked a serdev driver.
+> When KVM or the arch code takes an exception that might be a RAS
+> notification, it asks the APEI firmware-first code whether it wants
+> to claim the exception. We can then go on to see if (a future)
+> kernel-first mechanism wants to claim the notification, before
+> falling through to the existing default behaviour.
 > 
-> Maxim, the SoM can't be run without a motherboard. According to your last message
-> I don't change dts files, right?
+> The NOTIFY_SEA code was merged before we had multiple, possibly
+> interacting, NMI-like notifications and the need to consider kernel
+> first in the future. Make the 'claiming' behaviour explicit.
+> 
+> As we're restructuring the APEI code to allow multiple NMI-like
+> notifications, any notification that might interrupt interrupts-masked
+> code must always be wrapped in nmi_enter()/nmi_exit(). This allows APEI
+> to use in_nmi() to use the right fixmap entries.
+> 
+> We mask SError over this window to prevent an asynchronous RAS error
+> arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 
-Yep, that works for me.
+...
 
-Maxime
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index ed46dc188b22..a9b8bba014b5 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -28,8 +28,10 @@
+>  #include <linux/smp.h>
+>  #include <linux/serial_core.h>
+>  
+> +#include <acpi/ghes.h>
+>  #include <asm/cputype.h>
+>  #include <asm/cpu_ops.h>
+> +#include <asm/daifflags.h>
+>  #include <asm/pgtable.h>
+>  #include <asm/smp_plat.h>
+>  
+> @@ -257,3 +259,30 @@ pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
+>  		return __pgprot(PROT_NORMAL_NC);
+>  	return __pgprot(PROT_DEVICE_nGnRnE);
+>  }
+> +
+> +/*
+> + * Claim Synchronous External Aborts as a firmware first notification.
+> + *
+> + * Used by KVM and the arch do_sea handler.
+> + * @regs may be NULL when called from process context.
+> + */
+> +int apei_claim_sea(struct pt_regs *regs)
+> +{
+> +	int err = -ENOENT;
+> +	unsigned long current_flags = arch_local_save_flags();
+> +
+> +	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+> +		return err;
+
+I don't know what side effects arch_local_save_flags() has on ARM but if
+we return here, it looks to me like useless work.
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/44e7f915/attachment.sig>
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
