@@ -1,39 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 12 Oct 2018 17:03:41 +0800
-Subject: [linux-sunxi] [PATCH v2 04/29] clk: sunxi-ng: h6: Set video PLLs
- limits
-In-Reply-To: <a303145c-b123-d912-91d7-9830dec3244e@openedev.com>
-References: <20181007093905.11253-1-jernej.skrabec@siol.net>
- <20181007093905.11253-5-jernej.skrabec@siol.net>
- <a303145c-b123-d912-91d7-9830dec3244e@openedev.com>
-Message-ID: <CAGb2v64GM4JBx4SqjpWgAw3kEKA9m2-7trwiok8fy+xOQGV7Eg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Oct 2018 09:56:05 +0100
+Subject: [PATCH v5 01/17] arm64: add pointer authentication register bits
+In-Reply-To: <20181012085352.xi6rkcpm62iqd6ru@lakrids.cambridge.arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-2-kristina.martsenko@arm.com>
+ <20181011162814.GC17000@arm.com>
+ <20181012085352.xi6rkcpm62iqd6ru@lakrids.cambridge.arm.com>
+Message-ID: <20181012085605.GB11847@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 4:14 PM Jagan Teki <jagan@openedev.com> wrote:
->
-> On Sunday 07 October 2018 03:08 PM, Jernej Skrabec wrote:
-> > Video PLL factors can be set in a way that final PLL rate is outside
-> > stable range. H6 user manual specifically says that N factor should not
-> > be below 12. While it doesn't says anything about maximum stable rate, it
->
-> Manual says "In application, PLL_FACTOR_N should be more than or equal
-> to 11" can't it be 11?
+On Fri, Oct 12, 2018 at 09:53:54AM +0100, Mark Rutland wrote:
+> On Thu, Oct 11, 2018 at 05:28:14PM +0100, Will Deacon wrote:
+> > On Fri, Oct 05, 2018 at 09:47:38AM +0100, Kristina Martsenko wrote:
+> 
+> > > +#define ESR_ELx_EC_PAC		(0x09)
+> > 
+> > Really minor nit: but shouldn't this be ESR_EL2_EC_PAC, since this trap
+> > can't occur at EL1 afaict?
+> 
+> It can also be taken to EL3 dependent on SCR_EL3.API.
+> 
+> We use ESR_ELx_EC_<foo> for other exceptions that can't be taken to EL1
+> (e.g. ESR_ELx_EC_SMC{32,64}), so I think it would be more consistent to
+> leave this as ESR_ELx_EC_PAC rather than ESR_EL2_EC_PAC.
 
-PLL_FACTOR_N is the raw value, which starts from 0.
-That translates to an actual factor of 12 used in the calculations.
+Fair enough, but if we grow a different EC for ESR_EL1 that uses encoding
+0x09, this all falls apart. At the very list, maybe we should comment those
+that are EL2 or higher with /* EL2 and above */ or just fix the misnomer and
+drop the useless _ELx_ part of the names completely.
 
-> > is clear that PLL doesn't work at 6.096 GHz (254 * 24 MHz).
-> >
-> > Set minimum allowed PLL video rate to 288 MHz (12 * 24 MHz) and maximum
-> > to 2.4 GHz, which is maximum in BSP driver.
->
-> Is this max freq from here [1]
->
-> [1]
-> https://github.com/Allwinner-Homlet/H6-BSP4.9-linux/blob/master/drivers/clk/sunxi/clk-sun50iw6.c#L164
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Will
