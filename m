@@ -1,26 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 Oct 2018 14:33:34 -0500
-Subject: [PATCH v2 1/2] dt-bindings: i2c-omap: Add new compatible for
- AM654 SoCs
-In-Reply-To: <20180928052557.21663-2-vigneshr@ti.com>
-References: <20180928052557.21663-1-vigneshr@ti.com>
- <20180928052557.21663-2-vigneshr@ti.com>
-Message-ID: <20181012193334.GA29966@bogus>
+From: quentin.schulz@bootlin.com (Quentin Schulz)
+Date: Fri, 12 Oct 2018 21:33:16 +0200
+Subject: [PATCH v3 3/7] arm64: dts: allwinner: axp803: add AC and battery
+ power supplies
+In-Reply-To: <20181008181908.9456-4-oskari@lemmela.net>
+References: <20181008181908.9456-1-oskari@lemmela.net>
+ <20181008181908.9456-4-oskari@lemmela.net>
+Message-ID: <20181012193316.p7ph7qfl6x5mao4o@qschulz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Sep 2018 10:55:56 +0530, Vignesh R wrote:
-> AM654 SoCs have same I2C IP as OMAP SoCs. Add new compatible to
-> handle AM654 SoCs. While at that reformat the existing compatible list
-> for older SoCs to list one valid compatible per line.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
-> 
-> v2: Reformat compatible existing compatible list.
-> 
->  Documentation/devicetree/bindings/i2c/i2c-omap.txt | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
+Hi Oskari,
+
+On Mon, Oct 08, 2018 at 09:19:04PM +0300, Oskari Lemmela wrote:
+> AXP803 is compatible with AXP813. Add DT nodes ADC, GPIO,
+> AC and battery power supplies.
 > 
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+
+Thanks,
+Quentin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/caf77312/attachment.sig>
