@@ -1,44 +1,46 @@
-From: peng.ma@nxp.com (Peng Ma)
-Date: Fri, 12 Oct 2018 02:25:25 +0000
-Subject: [PATCH 7/7] dt-bindings: fsl-qdma: Add NXP Layerscpae qDMA
- controller bindings
-In-Reply-To: <20181011220845.GA20860@bogus>
-References: <20181011094655.45707-1-peng.ma@nxp.com>
- <20181011094655.45707-7-peng.ma@nxp.com> <20181011220845.GA20860@bogus>
-Message-ID: <VI1PR04MB44310889ACCA73AFB29CAEEFEDE20@VI1PR04MB4431.eurprd04.prod.outlook.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 12 Oct 2018 13:43:57 +1100
+Subject: next-20181008 build: 2 failures 22 warnings (next-20181008)
+In-Reply-To: <20181012103758.51c7befa@canb.auug.org.au>
+References: <E1g9cV0-0008Sg-4U@optimist> <20181008211109.GA4440@sirena.org.uk>
+ <20181008213018.GL6490@zn.tnic>
+ <20181010152704.337ee630@canb.auug.org.au>
+ <20181010043358.GA5924@zn.tnic>
+ <20181012103758.51c7befa@canb.auug.org.au>
+Message-ID: <20181012134357.51bfd026@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Boris,
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 2018?10?12? 6:09
-> To: Peng Ma <peng.ma@nxp.com>
-> Cc: vkoul at kernel.org; Leo Li <leoyang.li@nxp.com>; mark.rutland at arm.com;
-> shawnguo at kernel.org; dan.j.williams at intel.com; zw at zh-kernel.org;
-> dmaengine at vger.kernel.org; devicetree at vger.kernel.org;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linuxppc-dev at lists.ozlabs.org
-> Subject: Re: [PATCH 7/7] dt-bindings: fsl-qdma: Add NXP Layerscpae qDMA
-> controller bindings
-> 
-> On Thu, Oct 11, 2018 at 05:46:55PM +0800, Peng Ma wrote:
-> > Document the devicetree bindings for NXP Layerscape qDMA controller
-> > which could be found on NXP QorIQ Layerscape SoCs.
+On Fri, 12 Oct 2018 10:37:58 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> On Wed, 10 Oct 2018 06:33:59 +0200 Borislav Petkov <bp@suse.de> wrote:
 > >
-> > Signed-off-by: Peng Ma <peng.ma@nxp.com>
+> > On Wed, Oct 10, 2018 at 03:27:04PM +1100, Stephen Rothwell wrote:  
+> > > I have added that to linux-next today (pending this or something else
+> > > turning up in the tip tree).    
+> > 
+> > I have queued a fixed version in the meantime:
+> > 
+> > https://git.kernel.org/tip/9d94e8b1d4f94a3c4cee5ad11a1be460cd070839  
 > 
-> What happened to the version from Wen He that was on v7 and that I already
-> gave my Reviewed-by on?
+> OK, I will use that until it turns up in the tip auto-latest branch.
 
-[Peng Ma] the dma owner is changed and qdma driver made some changes, so I need send those patch again to review!
+It turns out that I can't use that since it is mostly already in the
+tip tree as commit
 
-Best regards
-	Peng Ma
-> 
-> > ---
-> >  Documentation/devicetree/bindings/dma/fsl-qdma.txt |   53
-> ++++++++++++++++++++
-> >  1 files changed, 53 insertions(+), 0 deletions(-)  create mode 100644
-> > Documentation/devicetree/bindings/dma/fsl-qdma.txt
+  3a387c6d96e6 ("x86/kaslr, ACPI/NUMA: Fix KASLR build error")
+
+So I will stick with my incremental patch for now.
+
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/2ee2a938/attachment.sig>
