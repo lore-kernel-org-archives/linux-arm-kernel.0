@@ -1,43 +1,28 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 12 Oct 2018 14:29:37 -0500
-Subject: [PATCH 2/2] arm64: acpi: Prepare for longer MADTs
-Message-ID: <20181012192937.3819951-1-jeremy.linton@arm.com>
+From: quentin.schulz@bootlin.com (Quentin Schulz)
+Date: Fri, 12 Oct 2018 21:32:08 +0200
+Subject: [PATCH v3 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
+ power DT binding
+In-Reply-To: <20181008181908.9456-2-oskari@lemmela.net>
+References: <20181008181908.9456-1-oskari@lemmela.net>
+ <20181008181908.9456-2-oskari@lemmela.net>
+Message-ID: <20181012193208.7rq4ukonobqkgrlk@qschulz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BAD_MADT_GICC_ENTRY check is a little too strict because
-it rejects MADT entries that don't match the currently known
-lengths. We should remove this restriction to avoid problems
-if the table length changes. Future code which might depend on
-additional fields should be written to validate those fields
-before using them, rather than trying to globally check
-known MADT version lengths.
+Hi Oskari,
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/include/asm/acpi.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On Mon, Oct 08, 2018 at 09:19:02PM +0300, Oskari Lemmela wrote:
+> The AXP803/AXP813 AC power supply can limit input current and voltage.
+> 
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 709208dfdc8b..4d0946bd485a 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -22,12 +22,12 @@
- #include <asm/tlbflush.h>
- 
- /* Macros for consistency checks of the GICC subtable of MADT */
--#define ACPI_MADT_GICC_LENGTH	\
--	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
-+#define ACPI_MADT_GICC_MIN_LENGTH   ACPI_OFFSET(  \
-+	struct acpi_madt_generic_interrupt, efficiency_class)
- 
- #define BAD_MADT_GICC_ENTRY(entry, end)					\
--	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
--	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
-+	(!(entry) || (entry)->header.length < ACPI_MADT_GICC_MIN_LENGTH || \
-+	(unsigned long)(entry) + (entry)->header.length > (end))
- 
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
--- 
-2.14.3
+Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+
+Thanks,
+Quentin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/ff8c10ae/attachment.sig>
