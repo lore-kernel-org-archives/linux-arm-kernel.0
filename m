@@ -1,39 +1,26 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Oct 2018 12:35:48 +0100
-Subject: [PATCH v3 2/2] arm/arm64: KVM: enable 32 bits kvm vcpu events
- support
-In-Reply-To: <1539284855-4035-3-git-send-email-gengdongjiu@huawei.com>
-References: <1539284855-4035-1-git-send-email-gengdongjiu@huawei.com>
- <1539284855-4035-3-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <51a366e2-1e40-8aac-4fe3-604b74542f29@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Oct 2018 06:39:55 -0500
+Subject: [PATCH v4 2/2] doc: devicetree: vendor-prefixes: new vendor -
+ Emlid
+In-Reply-To: <1539339841-22235-3-git-send-email-aleksandr.aleksandrov@emlid.com>
+References: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539339841-22235-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539339841-22235-3-git-send-email-aleksandr.aleksandrov@emlid.com>
+Message-ID: <20181012113955.GA25152@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu Geng,
+On Fri, Oct 12, 2018 at 01:23:59PM +0300, Aleksandr Aleksandrov wrote:
 
-On 11/10/2018 20:07, Dongjiu Geng wrote:
-> The commit 539aee0edb9f ("KVM: arm64: Share the parts of
-> get/set events useful to 32bit") shares the get/set events
-> helper for arm64 and arm32, 
+Commit message?
 
-Oops. I evidently didn't test this bit. Looks like I just depended on the symbol
-to be defined, I didn't check the CAP was exposed.
+"dt-bindings: vendor-prefix: ..." is the preferred subject prefix.
 
+> Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-> it is better also share the check
-> for vcpu events capability to enable 32 bit kvm vcpu events
-> support.
+With that,
 
-not just better, necessary for correctly-written user-space to know the feature
-is supported. This last bit would be clearer as: "but forgot to share the cap
-extension code."
-
-
-Thanks for catching this!
-
-Acked-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+Acked-by: Rob Herring <robh@kernel.org>
