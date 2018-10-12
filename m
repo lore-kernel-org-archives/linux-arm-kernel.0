@@ -1,167 +1,46 @@
-From: vincent.whitchurch@axis.com (Vincent Whitchurch)
-Date: Fri, 12 Oct 2018 16:27:50 +0200
-Subject: [PATCH] ARM: Make aligned 2-byte getuser()/putuser() atomic on ARMv6+
-Message-ID: <20181012142750.15653-1-vincent.whitchurch@axis.com>
+From: jeyu@kernel.org (Jessica Yu)
+Date: Fri, 12 Oct 2018 16:32:54 +0200
+Subject: [PATCH v2 4/7] arm64/modules: Add rlimit checking for arm64
+ modules
+In-Reply-To: <25951d99-8ba7-5c9e-938e-baf92395f9e0@intel.com>
+References: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
+ <20181011233117.7883-5-rick.p.edgecombe@intel.com>
+ <25951d99-8ba7-5c9e-938e-baf92395f9e0@intel.com>
+Message-ID: <20181012143254.idy65qbvaaw5k3ge@linux-8ccs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-getuser() and putuser() (and there underscored variants) use two
-strb[t]/ldrb[t] instructions when they are asked to get/put 16-bits.
-This means that the read/write is not atomic even when performed to a
-16-bit-aligned address.
++++ Dave Hansen [11/10/18 16:47 -0700]:
+>On 10/11/2018 04:31 PM, Rick Edgecombe wrote:
+>> +	if (check_inc_mod_rlimit(size))
+>> +		return NULL;
+>> +
+>>  	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
+>>  				module_alloc_base + MODULES_VSIZE,
+>>  				gfp_mask, PAGE_KERNEL_EXEC, 0,
+>> @@ -65,6 +68,8 @@ void *module_alloc(unsigned long size)
+>>  		return NULL;
+>>  	}
+>>
+>> +	update_mod_rlimit(p, size);
+>
+>Is there a reason we couldn't just rename all of the existing per-arch
+>module_alloc() calls to be called, say, "arch_module_alloc()", then put
+>this new rlimit code in a generic helper that does:
+>
+>
+>	if (check_inc_mod_rlimit(size))
+>		return NULL;
+>
+>	p = arch_module_alloc(...);
+>
+>	...
+>
+>	update_mod_rlimit(p, size);
+>
 
-This leads to problems with vhost: vhost uses __getuser() to read the
-vring's 16-bit avail.index field, and if it happens to observe a partial
-update of the index, wrong descriptors will be used which will lead to a
-breakdown of the virtio communication.  A similar problem exists for
-__putuser() which is used to write to the vring's used.index field.
+I second this suggestion. Just make module_{alloc,memfree} generic,
+non-weak functions that call the rlimit helpers in addition to the
+arch-specific arch_module_{alloc,memfree} functions.
 
-The reason these functions use strb[t]/ldrb[t] is because strht/ldrht
-instructions did not exist until ARMv6T2/ARMv7.  So we should be easily
-able to fix this on ARMv7.  Also, since all ARMv6 processors also don't
-actually use the unprivileged instructions anymore for uaccess (since
-CONFIG_CPU_USE_DOMAINS is not used) we can easily fix them too.
-
-Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
----
- arch/arm/include/asm/uaccess.h | 18 ++++++++++++++++++
- arch/arm/lib/getuser.S         | 11 +++++++++++
- arch/arm/lib/putuser.S         | 20 ++++++++++----------
- 3 files changed, 39 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 5451e1f05a19..696b69091a36 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -315,6 +315,13 @@ do {									\
- #define __get_user_asm_byte(x, addr, err)			\
- 	__get_user_asm(x, addr, err, ldrb)
- 
-+#if __LINUX_ARM_ARCH__ >= 6
-+
-+#define __get_user_asm_half(x, addr, err)			\
-+	__get_user_asm(x, addr, err, ldrh)
-+
-+#else
-+
- #ifndef __ARMEB__
- #define __get_user_asm_half(x, __gu_addr, err)			\
- ({								\
-@@ -333,6 +340,8 @@ do {									\
- })
- #endif
- 
-+#endif /* __LINUX_ARM_ARCH__ >= 6 */
-+
- #define __get_user_asm_word(x, addr, err)			\
- 	__get_user_asm(x, addr, err, ldr)
- #endif
-@@ -406,6 +415,13 @@ do {									\
- #define __put_user_asm_byte(x, __pu_addr, err)			\
- 	__put_user_asm(x, __pu_addr, err, strb)
- 
-+#if __LINUX_ARM_ARCH__ >= 6
-+
-+#define __put_user_asm_half(x, __pu_addr, err)			\
-+	__put_user_asm(x, __pu_addr, err, strh)
-+
-+#else
-+
- #ifndef __ARMEB__
- #define __put_user_asm_half(x, __pu_addr, err)			\
- ({								\
-@@ -422,6 +438,8 @@ do {									\
- })
- #endif
- 
-+#endif /* __LINUX_ARM_ARCH__ >= 6 */
-+
- #define __put_user_asm_word(x, __pu_addr, err)			\
- 	__put_user_asm(x, __pu_addr, err, str)
- 
-diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-index 746e7801dcdf..b2e4bc3a635e 100644
---- a/arch/arm/lib/getuser.S
-+++ b/arch/arm/lib/getuser.S
-@@ -42,6 +42,12 @@ _ASM_NOKPROBE(__get_user_1)
- 
- ENTRY(__get_user_2)
- 	check_uaccess r0, 2, r1, r2, __get_user_bad
-+#if __LINUX_ARM_ARCH__ >= 6
-+
-+2: TUSER(ldrh)	r2, [r0]
-+
-+#else
-+
- #ifdef CONFIG_CPU_USE_DOMAINS
- rb	.req	ip
- 2:	ldrbt	r2, [r0], #1
-@@ -56,6 +62,9 @@ rb	.req	r0
- #else
- 	orr	r2, rb, r2, lsl #8
- #endif
-+
-+#endif /* __LINUX_ARM_ARCH__ >= 6 */
-+
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_2)
-@@ -145,7 +154,9 @@ _ASM_NOKPROBE(__get_user_bad8)
- .pushsection __ex_table, "a"
- 	.long	1b, __get_user_bad
- 	.long	2b, __get_user_bad
-+#if __LINUX_ARM_ARCH__ < 6
- 	.long	3b, __get_user_bad
-+#endif
- 	.long	4b, __get_user_bad
- 	.long	5b, __get_user_bad8
- 	.long	6b, __get_user_bad8
-diff --git a/arch/arm/lib/putuser.S b/arch/arm/lib/putuser.S
-index 38d660d3705f..515eeaa9975c 100644
---- a/arch/arm/lib/putuser.S
-+++ b/arch/arm/lib/putuser.S
-@@ -41,16 +41,13 @@ ENDPROC(__put_user_1)
- 
- ENTRY(__put_user_2)
- 	check_uaccess r0, 2, r1, ip, __put_user_bad
--	mov	ip, r2, lsr #8
--#ifdef CONFIG_THUMB2_KERNEL
--#ifndef __ARMEB__
--2: TUSER(strb)	r2, [r0]
--3: TUSER(strb)	ip, [r0, #1]
-+#if __LINUX_ARM_ARCH__ >= 6
-+
-+2: TUSER(strh)	r2, [r0]
-+
- #else
--2: TUSER(strb)	ip, [r0]
--3: TUSER(strb)	r2, [r0, #1]
--#endif
--#else	/* !CONFIG_THUMB2_KERNEL */
-+
-+	mov	ip, r2, lsr #8
- #ifndef __ARMEB__
- 2: TUSER(strb)	r2, [r0], #1
- 3: TUSER(strb)	ip, [r0]
-@@ -58,7 +55,8 @@ ENTRY(__put_user_2)
- 2: TUSER(strb)	ip, [r0], #1
- 3: TUSER(strb)	r2, [r0]
- #endif
--#endif	/* CONFIG_THUMB2_KERNEL */
-+
-+#endif /* __LINUX_ARM_ARCH__ >= 6 */
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__put_user_2)
-@@ -91,7 +89,9 @@ ENDPROC(__put_user_bad)
- .pushsection __ex_table, "a"
- 	.long	1b, __put_user_bad
- 	.long	2b, __put_user_bad
-+#if __LINUX_ARM_ARCH__ < 6
- 	.long	3b, __put_user_bad
-+#endif
- 	.long	4b, __put_user_bad
- 	.long	5b, __put_user_bad
- 	.long	6b, __put_user_bad
--- 
-2.11.0
+Jessica
