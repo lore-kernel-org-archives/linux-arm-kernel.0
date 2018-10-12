@@ -1,56 +1,38 @@
-From: adam.cottrel@veea.com (Adam Cottrel)
-Date: Fri, 12 Oct 2018 11:07:35 +0000
-Subject: DMA remote memcpy requests
-In-Reply-To: <20181012110326.GA6721@hc>
-References: <DM6PR04MB405938028EC04FBD07F3D96AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181012090937.GA12289@arm.com>
- <DM6PR04MB4059742D494D96FC11674A50F2E20@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181012110326.GA6721@hc>
-Message-ID: <DM6PR04MB4059733345F887226D8392F4F2E20@DM6PR04MB4059.namprd04.prod.outlook.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 12 Oct 2018 13:08:19 +0200
+Subject: [PATCH v6 08/18] ACPI / APEI: Move locking to the notification
+ helper
+In-Reply-To: <20180921221705.6478-9-james.morse@arm.com>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-9-james.morse@arm.com>
+Message-ID: <20181012110819.GB580@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jan,
+On Fri, Sep 21, 2018 at 11:16:55PM +0100, James Morse wrote:
+> ghes_copy_tofrom_phys() takes different locks depending on in_nmi().
+> This doesn't work when we have multiple NMI-like notifications, that
+> can interrupt each other.
+> 
+> Now that NOTIFY_SEA is always called as an NMI, move the lock-taking
+> to the notification helper. The helper will always know which lock
+> to take. This avoids ghes_copy_tofrom_phys() taking a guess based
+> on in_nmi().
+> 
+> This splits NOTIFY_NMI and NOTIFY_SEA to use different locks. All
+> the other notifications use ghes_proc(), and are called in process
+> or IRQ context. Move the spin_lock_irqsave() around their ghes_proc()
+> calls.
 
-> what is the exact hardware revision (shown in /proc/cpuinfo) ?
+Right, should ghes_proc() be renamed to ghes_proc_irq() now, to be
+absolutely clear on the processing context it is operating in?
 
-cat /proc/cpuinfo
+Other than that:
 
-processor       : 0
-BogoMIPS        : 200.00
-Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
-CPU implementer : 0x43
-CPU architecture: 8
-CPU variant     : 0x0
-CPU part        : 0x0a2
-CPU revision    : 2
+Reviewed-by: Borislav Petkov <bp@suse.de>
 
-processor       : 1
-BogoMIPS        : 200.00
-Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
-CPU implementer : 0x43
-CPU architecture: 8
-CPU variant     : 0x0
-CPU part        : 0x0a2
-CPU revision    : 2
+-- 
+Regards/Gruss,
+    Boris.
 
-processor       : 2
-BogoMIPS        : 200.00
-Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
-CPU implementer : 0x43
-CPU architecture: 8
-CPU variant     : 0x0
-CPU part        : 0x0a2
-CPU revision    : 2
-
-processor       : 3
-BogoMIPS        : 200.00
-Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
-CPU implementer : 0x43
-CPU architecture: 8
-CPU variant     : 0x0
-CPU part        : 0x0a2
-CPU revision    : 2
-
-Best,
-Adam
+Good mailing practices for 400: avoid top-posting and trim the reply.
