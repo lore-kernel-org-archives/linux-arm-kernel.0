@@ -1,24 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Oct 2018 18:09:05 +0200
-Subject: [PATCH] ASoC: sun4i-i2s: don't try to start up or shut down DAI
- if it's active
-In-Reply-To: <20181012153254.10844-1-anarsoul@gmail.com>
-References: <20181012153254.10844-1-anarsoul@gmail.com>
-Message-ID: <20181012160905.GA2340@sirena.org.uk>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Sat, 13 Oct 2018 00:12:47 +0800
+Subject: [PATCH v4 0/2] rename function name and enable 32bit vcpu events
+Message-ID: <20181012161249.9236-1-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 08:32:54AM -0700, Vasily Khoruzhick wrote:
-> Otherwise we may end up with shutting down I2S if shutdown() was
-> called for capture substream, but playback is still running.
+Rename the kvm_arch_dev_ioctl_check_extension() to 
+kvm_arch_vm_ioctl_check_extension, because the name
+is not readable;
 
-Would it be cleaner and more robust to use runtime PM?  I'm wondering
-what happens if some of the configuration stuff turns out to also need
-some of the clocks for example.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181012/99d71b37/attachment-0001.sig>
+Enable the 32 bit vcpu events support.
+
+Change since v3:
+1. Address James's comments to update the patch commit messages
+
+Change since v2:
+1. Address Suzuki's comments to update the patch commit messages
+
+change since v1:
+1. Update patch commit messages.
+
+Dongjiu Geng (2):
+  arm/arm64: KVM: rename function kvm_arch_dev_ioctl_check_extension()
+  arm/arm64: KVM: enable 32 bits kvm vcpu events support
+
+ arch/arm/include/asm/kvm_host.h   | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 2 +-
+ arch/arm64/kvm/reset.c            | 5 ++---
+ virt/kvm/arm/arm.c                | 3 ++-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+
+-- 
+1.9.1
