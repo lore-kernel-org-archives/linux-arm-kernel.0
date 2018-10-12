@@ -1,22 +1,21 @@
-From: gregkh@linuxfoundation.org (gregkh)
-Date: Fri, 12 Oct 2018 17:42:39 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.19
-In-Reply-To: <CAK8P3a0V3ddscW3x94rU0Yfh3HuTWhuhTsaKhKVy85+8ygf3Lg@mail.gmail.com>
-References: <CAK8P3a0V3ddscW3x94rU0Yfh3HuTWhuhTsaKhKVy85+8ygf3Lg@mail.gmail.com>
-Message-ID: <20181012154239.GB25940@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 12 Oct 2018 10:44:54 -0500
+Subject: [PATCH v3 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
+ power DT binding
+In-Reply-To: <20181008181908.9456-2-oskari@lemmela.net>
+References: <20181008181908.9456-1-oskari@lemmela.net>
+ <20181008181908.9456-2-oskari@lemmela.net>
+Message-ID: <20181012154454.GA15048@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 05:31:17PM +0200, Arnd Bergmann wrote:
-> The following changes since commit 17b57b1883c1285f3d0dc2266e8f79286a7bef38:
+On Mon,  8 Oct 2018 21:19:02 +0300, Oskari Lemmela wrote:
+> The AXP803/AXP813 AC power supply can limit input current and voltage.
 > 
->   Linux 4.19-rc6 (2018-09-30 07:15:35 -0700)
+> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> ---
+>  .../devicetree/bindings/power/supply/axp20x_ac_power.txt       | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-> tags/armsoc-fixes-4.19
 
-Now merged, thanks.
-
-greg k-h
+Reviewed-by: Rob Herring <robh@kernel.org>
