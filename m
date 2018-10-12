@@ -1,97 +1,177 @@
-From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
-Date: Fri, 12 Oct 2018 13:05:50 +0000
-Subject: [RESEND PATCH v5 8/9] pwm: add documentation for pwm push-pull
- mode
-In-Reply-To: <20181012121552.GE31561@ulmo>
-References: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
- <1535461286-12308-9-git-send-email-claudiu.beznea@microchip.com>
- <20181012121552.GE31561@ulmo>
-Message-ID: <f4a1f9e3-b3a8-2847-f13e-bb07dab400e6@microchip.com>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Fri, 12 Oct 2018 15:14:06 +0200
+Subject: [PATCH v2] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
+Message-ID: <20181012131406.18601-1-vincent.whitchurch@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
+ldr/str instructions in copy_{from/to}_user.  They are currently
+unnecessarily using single ldr/str instructions and can use ldm/stm
+instructions instead like memcpy does (but with appropriate fixup
+tables).
 
+This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
+about 4% on my Cortex-A9.
 
-On 12.10.2018 15:15, Thierry Reding wrote:
-> On Tue, Aug 28, 2018 at 04:01:25PM +0300, Claudiu Beznea wrote:
->> Add documentation for PWM push-pull mode.
->>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> Reviewed-by: Rob Herring <robh@kernel.org>
->> ---
->>  Documentation/devicetree/bindings/pwm/pwm.txt |  2 ++
->>  Documentation/pwm.txt                         | 16 ++++++++++++++++
->>  include/dt-bindings/pwm/pwm.h                 |  1 +
->>  3 files changed, 19 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
->> index 7c8aaac43f92..6a60c0fca112 100644
->> --- a/Documentation/devicetree/bindings/pwm/pwm.txt
->> +++ b/Documentation/devicetree/bindings/pwm/pwm.txt
->> @@ -49,6 +49,8 @@ Optionally, the pwm-specifier can encode a number of flags (defined in
->>  - PWM_MODE_COMPLEMENTARY: PWM complementary working mode (for PWM channels
->>  with two outputs); if not specified, the default for PWM channel will be
->>  used
->> +- PWM_MODE_PUSH_PULL: PWM push-pull working modes (for PWM channels with
->> +two outputs); if not specified the default for PWM channel will be used
-> 
-> What if somebody has this in the DT:
-> 
-> 	PWM_MODE_COMPLEMENTARY | PWM_MODE_PUSH_PULL
-> 
-> which one takes precedence, or do we reject it?
+before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
+before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
+before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
+before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
 
-The first valid one will be selected.
+ after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
+ after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
 
-In patch 1/1 from this series, changes added to of_pwm_xlate_with_flags()
-function, there is this code:
+Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+---
+v2: Group *_SHIFT #defines with respective .macro implementations
 
-+		for (modebit = PWMC_MODE_COMPLEMENTARY_BIT;
-+		     modebit < PWMC_MODE_CNT; modebit++) {
-+			unsigned long mode = BIT(modebit);
+ arch/arm/include/asm/assembler.h |  6 ++++--
+ arch/arm/lib/copy_from_user.S    | 27 ++++++++++++++++++++++++++-
+ arch/arm/lib/copy_to_user.S      | 31 ++++++++++++++++++++++++++-----
+ 3 files changed, 56 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index b17ee03d280b..da16d31c7ef9 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -243,13 +243,15 @@
+ 	.endm
+ #endif
+ 
+-#define USER(x...)				\
++#define USERL(l, x...)				\
+ 9999:	x;					\
+ 	.pushsection __ex_table,"a";		\
+ 	.align	3;				\
+-	.long	9999b,9001f;			\
++	.long	9999b,l;			\
+ 	.popsection
+ 
++#define USER(x...)	USERL(9001f, x)
 +
-+			if ((args->args[2] & mode) &&
-+			    pwm_mode_valid(pwm, mode)) {
-+				pwm->args.mode = mode;
-+				break;
-+			}
-+		}
-
-And since the modes bits are defined as follows:
-
-enum {
-	PWMC_MODE_NORMAL_BIT,
-	PWMC_MODE_COMPLEMENTARY_BIT,
-	PWMC_MODE_PUSH_PULL_BIT,
-	PWMC_MODE_CNT,
-};
-
-in your proposed scenario: PWM_MODE_COMPLEMENTARY | PWM_MODE_PUSH_PULL
-the PWM_MODE_COMPLEMENTARY mode will be selected since it is the first
-valid one.
-
-> 
-> Wouldn't it be preferable to either move the modes into an extra field
-> within the flags field, or perhaps even add another field?
-
-This approach was proposed in version 2 of this series and based on the
-discussions I had with Rob Herring [1] I decided to use the remaining space
-from cell specific to PWM flags.
-
-Thank you,
-Claudiu Beznea
-
-[1] https://lkml.org/lkml/2018/1/22/655
-
-> 
-> I guess since Rob's already acked this, that concern may be unfounded.
-> 
-> Thierry
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+ #ifdef CONFIG_SMP
+ #define ALT_SMP(instr...)					\
+ 9998:	instr
+diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
+index a826df3d3814..fca3a7037725 100644
+--- a/arch/arm/lib/copy_from_user.S
++++ b/arch/arm/lib/copy_from_user.S
+@@ -34,12 +34,13 @@
+  *	Number of bytes NOT copied.
+  */
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
++
+ #ifndef CONFIG_THUMB2_KERNEL
+ #define LDR1W_SHIFT	0
+ #else
+ #define LDR1W_SHIFT	1
+ #endif
+-#define STR1W_SHIFT	0
+ 
+ 	.macro ldr1w ptr reg abort
+ 	ldrusr	\reg, \ptr, 4, abort=\abort
+@@ -61,6 +62,30 @@
+ 	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
+ 
++#else
++
++#define LDR1W_SHIFT	0
++
++	.macro ldr1w ptr reg abort
++	USERL(\abort, W(ldr) \reg, [\ptr], #4)
++	.endm
++
++	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
++	.endm
++
++	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
++
++	.macro ldr1b ptr reg cond=al abort
++	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
++	.endm
++
++#endif /* CONFIG_CPU_USE_DOMAINS */
++
++#define STR1W_SHIFT	0
++
+ 	.macro str1w ptr reg abort
+ 	W(str) \reg, [\ptr], #4
+ 	.endm
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index caf5019d8161..d6fe31fb9bc4 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -35,11 +35,6 @@
+  */
+ 
+ #define LDR1W_SHIFT	0
+-#ifndef CONFIG_THUMB2_KERNEL
+-#define STR1W_SHIFT	0
+-#else
+-#define STR1W_SHIFT	1
+-#endif
+ 
+ 	.macro ldr1w ptr reg abort
+ 	W(ldr) \reg, [\ptr], #4
+@@ -57,6 +52,14 @@
+ 	ldr\cond\()b \reg, [\ptr], #1
+ 	.endm
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
++
++#ifndef CONFIG_THUMB2_KERNEL
++#define STR1W_SHIFT	0
++#else
++#define STR1W_SHIFT	1
++#endif
++
+ 	.macro str1w ptr reg abort
+ 	strusr	\reg, \ptr, 4, abort=\abort
+ 	.endm
+@@ -76,6 +79,24 @@
+ 	strusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
+ 
++#else
++
++#define STR1W_SHIFT	0
++
++	.macro str1w ptr reg abort
++	USERL(\abort, W(str) \reg, [\ptr], #4)
++	.endm
++
++	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
++
++	.macro str1b ptr reg cond=al abort
++	USERL(\abort, str\cond\()b \reg, [\ptr], #1)
++	.endm
++
++#endif /* CONFIG_CPU_USE_DOMAINS */
++
+ 	.macro enter reg1 reg2
+ 	mov	r3, #0
+ 	stmdb	sp!, {r0, r2, r3, \reg1, \reg2}
+-- 
+2.11.0
