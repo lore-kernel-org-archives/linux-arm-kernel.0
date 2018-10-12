@@ -1,122 +1,148 @@
-From: jannh@google.com (Jann Horn)
-Date: Fri, 12 Oct 2018 19:22:46 +0200
-Subject: [PATCH v2 1/7] modules: Create rlimit for module space
-In-Reply-To: <7b0714e26c7c2216721641d7df16a49687927e37.camel@intel.com>
-References: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
- <20181011233117.7883-2-rick.p.edgecombe@intel.com>
- <CAG48ez2fWg64nGxDXUQS3695KpVNrakAbarXJnYPd6xv5wOD+A@mail.gmail.com>
- <7b0714e26c7c2216721641d7df16a49687927e37.camel@intel.com>
-Message-ID: <CAG48ez0XfGFAWDYa75COMPCsKqqGfBFOtcNuGD4_dubGf2YeAQ@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 12 Oct 2018 19:25:34 +0200
+Subject: [PATCH v6 14/18] ACPI / APEI: Split ghes_read_estatus() to read
+ CPER length
+In-Reply-To: <20180921221705.6478-15-james.morse@arm.com>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-15-james.morse@arm.com>
+Message-ID: <20181012172533.GG580@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 7:04 PM Edgecombe, Rick P
-<rick.p.edgecombe@intel.com> wrote:
-> On Fri, 2018-10-12 at 02:35 +0200, Jann Horn wrote:
-> > On Fri, Oct 12, 2018 at 1:40 AM Rick Edgecombe
-> > <rick.p.edgecombe@intel.com> wrote:
-> > > This introduces a new rlimit, RLIMIT_MODSPACE, which limits the amount of
-> > > module space a user can use. The intention is to be able to limit module
-> > > space
-> > > allocations that may come from un-privlidged users inserting e/BPF filters.
-> >
-> > Note that in some configurations (iirc e.g. the default Ubuntu
-> > config), normal users can use the subuid mechanism (the /etc/subuid
-> > config file and the /usr/bin/newuidmap setuid helper) to gain access
-> > to 65536 UIDs, which means that in such a configuration,
-> > RLIMIT_MODSPACE*65537 is the actual limit for one user. (Same thing
-> > applies to RLIMIT_MEMLOCK.)
-> Ah, that is a problem. There is only room for about 130,000 filters on x86 with
-> KASLR, so it couldn't really be set small enough.
->
-> I'll have to look into what this is. Thanks for pointing it out.
->
-> > Also, it is probably possible to waste a few times as much virtual
-> > memory as permitted by the limit by deliberately fragmenting virtual
-> > memory?
-> Good point. I guess if the first point can be addressed somehow, this one could
-> maybe be solved by just picking a lower limit.
->
-> Any thoughts on if instead of all this there was just a system wide limit on BPF
-> JIT module space usage?
+On Fri, Sep 21, 2018 at 11:17:01PM +0100, James Morse wrote:
+> ghes_read_estatus() reads the record address, then the record's
+> header, then performs some sanity checks before reading the
+> records into the provided estatus buffer.
+> 
+> We either need to know the size of the records before we call
+> ghes_read_estatus(), or always provide a worst-case sized buffer,
+> as happens today.
+> 
+> Add a function to peek at the record's header to find the size. This
+> will let the NMI path allocate the right amount of memory before reading
+> the records, instead of using the worst-case size, and having to copy
+> the records.
+> 
+> Split ghes_read_estatus() to create ghes_peek_estatus() which
+> returns the address and size of the CPER records.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  drivers/acpi/apei/ghes.c | 55 ++++++++++++++++++++++++++++++----------
+>  1 file changed, 41 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 3028487d43a3..055176ed68ac 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -298,11 +298,12 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+>  	}
+>  }
+>  
+> -static int ghes_read_estatus(struct ghes *ghes,
+> -			     struct acpi_hest_generic_status *estatus,
+> -			     u64 *buf_paddr, int fixmap_idx)
+> +/* read the CPER block returning its address and size */
 
-That does sound more robust to me. And at least on systems that don't
-compile out the BPF interpreter, everything should be more or less
-fine then...
+Make that comment a proper sentence:
 
-> > > There is unfortunately no cross platform place to perform this accounting
-> > > during allocation in the module space, so instead two helpers are created to
-> > > be
-> > > inserted into the various arch?s that implement module_alloc. These
-> > > helpers perform the checks and help with tracking. The intention is that
-> > > they
-> > > an be added to the various arch?s as easily as possible.
-> >
-> > nit: s/an/can/
-> >
-> > [...]
-> > > diff --git a/kernel/module.c b/kernel/module.c
-> > > index 6746c85511fe..2ef9ed95bf60 100644
-> > > --- a/kernel/module.c
-> > > +++ b/kernel/module.c
-> > > @@ -2110,9 +2110,139 @@ static void free_module_elf(struct module *mod)
-> > >  }
-> > >  #endif /* CONFIG_LIVEPATCH */it
-> > >
-> > > +struct mod_alloc_user {
-> > > +       struct rb_node node;
-> > > +       unsigned long addr;
-> > > +       unsigned long pages;
-> > > +       kuid_t uid;
-> > > +};
-> > > +
-> > > +static struct rb_root alloc_users = RB_ROOT;
-> > > +static DEFINE_SPINLOCK(alloc_users_lock);
-> >
-> > Why all the rbtree stuff instead of stashing a pointer in struct
-> > vmap_area, or something like that?
->
-> Since the tracking was not for all vmalloc usage, the intention was to not bloat
-> the structure for other usages likes stacks. I thought usually there wouldn't be
-> nearly as much module space allocations as there would be kernel stacks, but I
-> didn't do any actual measurements on the tradeoffs.
+"./* ... Read the CPER ... and size. */
 
-I imagine that one extra pointer in there - pointing to your struct
-mod_alloc_user - would probably not be terrible. 8 bytes more per
-kernel stack shouldn't be so bad?
+> +static int ghes_peek_estatus(struct ghes *ghes, int fixmap_idx,
+> +			     u64 *buf_paddr, u32 *buf_len)
+>  {
 
-> > [...]
-> > > +int check_inc_mod_rlimit(unsigned long size)
-> > > +{
-> > > +       struct user_struct *user = get_current_user();
-> > > +       unsigned long modspace_pages = rlimit(RLIMIT_MODSPACE) >>
-> > > PAGE_SHIFT;
-> > > +       unsigned long cur_pages = atomic_long_read(&user->module_vm);
-> > > +       unsigned long new_pages = get_mod_page_cnt(size);
-> > > +
-> > > +       if (rlimit(RLIMIT_MODSPACE) != RLIM_INFINITY
-> > > +                       && cur_pages + new_pages > modspace_pages) {
-> > > +               free_uid(user);
-> > > +               return 1;
-> > > +       }
-> > > +
-> > > +       atomic_long_add(new_pages, &user->module_vm);
-> > > +
-> > > +       if (atomic_long_read(&user->module_vm) > modspace_pages) {
-> > > +               atomic_long_sub(new_pages, &user->module_vm);
-> > > +               free_uid(user);
-> > > +               return 1;
-> > > +       }
-> > > +
-> > > +       free_uid(user);
-> >
-> > If you drop the reference on the user_struct, an attacker with two
-> > UIDs can charge module allocations to UID A, keep the associated
-> > sockets alive as UID B, and then log out and back in again as UID A.
-> > At that point, nobody is charged for the module space anymore. If you
-> > look at the eBPF implementation, you'll see that
-> > bpf_prog_charge_memlock() actually stores a refcounted pointer to the
-> > user_struct.
-> Ok, I'll take a look. Thanks Jann.
-> > > +       return 0;
-> > > +}
+I find the functionality split a bit strange:
+
+ghes_peek_estatus() does peek *and* verify sizes. The latter belongs
+maybe better in ghes_read_estatus(). Together with the
+cper_estatus_check_header() call. Or maybe into a separate
+
+	__ghes_check_estatus()
+
+to separate it all nicely.
+
+>  	struct acpi_hest_generic *g = ghes->generic;
+> +	struct acpi_hest_generic_status estatus;
+>  	u32 len;
+>  	int rc;
+>  
+> @@ -317,26 +318,23 @@ static int ghes_read_estatus(struct ghes *ghes,
+>  	if (!*buf_paddr)
+>  		return -ENOENT;
+>  
+> -	ghes_copy_tofrom_phys(estatus, *buf_paddr,
+> -			      sizeof(*estatus), 1, fixmap_idx);
+> -	if (!estatus->block_status) {
+> +	ghes_copy_tofrom_phys(&estatus, *buf_paddr,
+> +			      sizeof(estatus), 1, fixmap_idx);
+> +	if (!estatus.block_status) {
+>  		*buf_paddr = 0;
+>  		return -ENOENT;
+>  	}
+>  
+>  	rc = -EIO;
+> -	len = cper_estatus_len(estatus);
+> -	if (len < sizeof(*estatus))
+> +	len = cper_estatus_len(&estatus);
+> +	if (len < sizeof(estatus))
+>  		goto err_read_block;
+>  	if (len > ghes->generic->error_block_length)
+>  		goto err_read_block;
+> -	if (cper_estatus_check_header(estatus))
+> -		goto err_read_block;
+> -	ghes_copy_tofrom_phys(estatus + 1,
+> -			      *buf_paddr + sizeof(*estatus),
+> -			      len - sizeof(*estatus), 1, fixmap_idx);
+> -	if (cper_estatus_check(estatus))
+> +	if (cper_estatus_check_header(&estatus))
+>  		goto err_read_block;
+> +	*buf_len = len;
+> +
+>  	rc = 0;
+>  
+>  err_read_block:
+> @@ -346,6 +344,35 @@ static int ghes_read_estatus(struct ghes *ghes,
+>  	return rc;
+>  }
+>  
+> +static int __ghes_read_estatus(struct acpi_hest_generic_status *estatus,
+> +			       u64 buf_paddr, size_t buf_len,
+> +			       int fixmap_idx)
+> +{
+> +	ghes_copy_tofrom_phys(estatus, buf_paddr, buf_len, 1, fixmap_idx);
+> +	if (cper_estatus_check(estatus)) {
+> +		if (printk_ratelimit())
+> +			pr_warning(FW_WARN GHES_PFX
+> +				   "Failed to read error status block!\n");
+
+Then you won't have to have two identical messages:
+
+	"Failed to read error status block!\n"
+
+which, when one sees them, is hard to figure out where exactly in the
+code that happened.
+
+> +		return -EIO;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int ghes_read_estatus(struct ghes *ghes,
+> +			     struct acpi_hest_generic_status *estatus,
+> +			     u64 *buf_paddr, int fixmap_idx)
+> +{
+> +	int rc;
+> +	u32 buf_len;
+> +
+> +	rc = ghes_peek_estatus(ghes, fixmap_idx, buf_paddr, &buf_len);
+
+Also, if we have a __ghes_read_estatus() helper now, maybe prefixing
+ghes_peek_estatus() with "__" would make sense too...
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
