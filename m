@@ -1,86 +1,188 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 Oct 2018 09:52:51 -0500
-Subject: [PATCH v3 0/4] drivers: soc: xilinx: Add support for ZynqMP
- power domain driver
-In-Reply-To: <BL2PR02MB2130719D4A82F429745DDBEEB8E00@BL2PR02MB2130.namprd02.prod.outlook.com>
-References: <1538688221-9823-1-git-send-email-jollys@xilinx.com>
- <BL2PR02MB2130719D4A82F429745DDBEEB8E00@BL2PR02MB2130.namprd02.prod.outlook.com>
-Message-ID: <20181012145251.GA6489@bogus>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 12 Oct 2018 10:55:34 -0400 (EDT)
+Subject: [PATCH v2] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
+In-Reply-To: <20181012131406.18601-1-vincent.whitchurch@axis.com>
+References: <20181012131406.18601-1-vincent.whitchurch@axis.com>
+Message-ID: <nycvar.YSQ.7.76.1810121051060.1498@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 06:41:44PM +0000, Jolly Shah wrote:
-> Ping for comments
+On Fri, 12 Oct 2018, Vincent Whitchurch wrote:
 
-Please see my comments on other ZynqMP firmware patches. In summary, I 
-need to see a complete binding, not piecemeal additions.
+> ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
+> ldr/str instructions in copy_{from/to}_user.  They are currently
+> unnecessarily using single ldr/str instructions and can use ldm/stm
+> instructions instead like memcpy does (but with appropriate fixup
+> tables).
+> 
+> This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
+> about 4% on my Cortex-A9.
+> 
+> before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
+> before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
+> before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
+> before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
+> before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
+> before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
+> before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
+> before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
+> before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
+> before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
+> 
+>  after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
+>  after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
+> 
+> Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+> ---
+> v2: Group *_SHIFT #defines with respective .macro implementations
 
-Rob
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
+Please submit your patch here:
+http://www.arm.linux.org.uk/developer/patches/
+
+>  arch/arm/include/asm/assembler.h |  6 ++++--
+>  arch/arm/lib/copy_from_user.S    | 27 ++++++++++++++++++++++++++-
+>  arch/arm/lib/copy_to_user.S      | 31 ++++++++++++++++++++++++++-----
+>  3 files changed, 56 insertions(+), 8 deletions(-)
 > 
-> Thanks,
-> Jolly Shah
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index b17ee03d280b..da16d31c7ef9 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -243,13 +243,15 @@
+>  	.endm
+>  #endif
+>  
+> -#define USER(x...)				\
+> +#define USERL(l, x...)				\
+>  9999:	x;					\
+>  	.pushsection __ex_table,"a";		\
+>  	.align	3;				\
+> -	.long	9999b,9001f;			\
+> +	.long	9999b,l;			\
+>  	.popsection
+>  
+> +#define USER(x...)	USERL(9001f, x)
+> +
+>  #ifdef CONFIG_SMP
+>  #define ALT_SMP(instr...)					\
+>  9998:	instr
+> diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
+> index a826df3d3814..fca3a7037725 100644
+> --- a/arch/arm/lib/copy_from_user.S
+> +++ b/arch/arm/lib/copy_from_user.S
+> @@ -34,12 +34,13 @@
+>   *	Number of bytes NOT copied.
+>   */
+>  
+> +#ifdef CONFIG_CPU_USE_DOMAINS
+> +
+>  #ifndef CONFIG_THUMB2_KERNEL
+>  #define LDR1W_SHIFT	0
+>  #else
+>  #define LDR1W_SHIFT	1
+>  #endif
+> -#define STR1W_SHIFT	0
+>  
+>  	.macro ldr1w ptr reg abort
+>  	ldrusr	\reg, \ptr, 4, abort=\abort
+> @@ -61,6 +62,30 @@
+>  	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
+>  	.endm
+>  
+> +#else
+> +
+> +#define LDR1W_SHIFT	0
+> +
+> +	.macro ldr1w ptr reg abort
+> +	USERL(\abort, W(ldr) \reg, [\ptr], #4)
+> +	.endm
+> +
+> +	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
+> +	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
+> +	.endm
+> +
+> +	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
+> +	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
+> +	.endm
+> +
+> +	.macro ldr1b ptr reg cond=al abort
+> +	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
+> +	.endm
+> +
+> +#endif /* CONFIG_CPU_USE_DOMAINS */
+> +
+> +#define STR1W_SHIFT	0
+> +
+>  	.macro str1w ptr reg abort
+>  	W(str) \reg, [\ptr], #4
+>  	.endm
+> diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+> index caf5019d8161..d6fe31fb9bc4 100644
+> --- a/arch/arm/lib/copy_to_user.S
+> +++ b/arch/arm/lib/copy_to_user.S
+> @@ -35,11 +35,6 @@
+>   */
+>  
+>  #define LDR1W_SHIFT	0
+> -#ifndef CONFIG_THUMB2_KERNEL
+> -#define STR1W_SHIFT	0
+> -#else
+> -#define STR1W_SHIFT	1
+> -#endif
+>  
+>  	.macro ldr1w ptr reg abort
+>  	W(ldr) \reg, [\ptr], #4
+> @@ -57,6 +52,14 @@
+>  	ldr\cond\()b \reg, [\ptr], #1
+>  	.endm
+>  
+> +#ifdef CONFIG_CPU_USE_DOMAINS
+> +
+> +#ifndef CONFIG_THUMB2_KERNEL
+> +#define STR1W_SHIFT	0
+> +#else
+> +#define STR1W_SHIFT	1
+> +#endif
+> +
+>  	.macro str1w ptr reg abort
+>  	strusr	\reg, \ptr, 4, abort=\abort
+>  	.endm
+> @@ -76,6 +79,24 @@
+>  	strusr	\reg, \ptr, 1, \cond, abort=\abort
+>  	.endm
+>  
+> +#else
+> +
+> +#define STR1W_SHIFT	0
+> +
+> +	.macro str1w ptr reg abort
+> +	USERL(\abort, W(str) \reg, [\ptr], #4)
+> +	.endm
+> +
+> +	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
+> +	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
+> +	.endm
+> +
+> +	.macro str1b ptr reg cond=al abort
+> +	USERL(\abort, str\cond\()b \reg, [\ptr], #1)
+> +	.endm
+> +
+> +#endif /* CONFIG_CPU_USE_DOMAINS */
+> +
+>  	.macro enter reg1 reg2
+>  	mov	r3, #0
+>  	stmdb	sp!, {r0, r2, r3, \reg1, \reg2}
+> -- 
+> 2.11.0
 > 
-> > -----Original Message-----
-> > From: Jolly Shah [mailto:jolly.shah at xilinx.com]
-> > Sent: Thursday, October 04, 2018 2:24 PM
-> > To: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
-> > geert+renesas at glider.be; bjorn.andersson at linaro.org;
-> > sean.wang at mediatek.com; m.szyprowski at samsung.com; Michal Simek
-> > <michals@xilinx.com>; robh+dt at kernel.org; mark.rutland at arm.com
-> > Cc: Rajan Vaja <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
-> > <JOLLYS@xilinx.com>
-> > Subject: [PATCH v3 0/4] drivers: soc: xilinx: Add support for ZynqMP power
-> > domain driver
-> > 
-> > The zynqmp power domain driver communicates the usage requirements for
-> > logical power domains / devices to the platform FW.
-> > FW is responsible for choosing appropriate power states, taking Linux' usage
-> > information into account.
-> > 
-> > This patch series is based on top of Xilinx firmware patch set:
-> > https://patchwork.kernel.org/cover/10555405/
-> > 
-> > v3:
-> >  - Changed binding to have FW node as a power controller as suggested by Rob
-> >  - Updated FW driver to register it as mfd child devices from firmware probe
-> >  - Move bindings location as suggested
-> > 
-> > v2:
-> >  - Rebased on top of latest firmware driver patch series
-> >  - Updated driver name from zynqmp-genpd to zynqmp-power-controller
-> >  - Updated device tree bindings to move power controller node under firmware
-> > node
-> > 
-> > Jolly Shah (1):
-> >   drivers: soc: xilinx: Add ZynqMP power domain driver
-> > 
-> > Rajan Vaja (3):
-> >   dt-bindings: power: Add ZynqMP power domain bindings
-> >   firmware: xilinx: Add APIs to control node status/power
-> >   firmware: xilinx: Add node IDs for zynqmp firmware
-> > 
-> >  .../bindings/power/xlnx,zynqmp-genpd.txt           |  34 ++
-> >  drivers/firmware/xilinx/Kconfig                    |   1 +
-> >  drivers/firmware/xilinx/zynqmp.c                   |  73 ++++
-> >  drivers/soc/xilinx/Kconfig                         |   9 +
-> >  drivers/soc/xilinx/Makefile                        |   2 +
-> >  drivers/soc/xilinx/zynqmp_pm_domains.c             | 403
-> > +++++++++++++++++++++
-> >  include/dt-bindings/power/xlnx-zynqmp-power.h      |  39 ++
-> >  include/linux/firmware/xlnx-zynqmp.h               |  98 +++++
-> >  8 files changed, 659 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/power/xlnx,zynqmp-
-> > genpd.txt
-> >  create mode 100644 drivers/soc/xilinx/zynqmp_pm_domains.c
-> >  create mode 100644 include/dt-bindings/power/xlnx-zynqmp-power.h
-> > 
-> > --
-> > 2.7.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
