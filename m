@@ -1,68 +1,59 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 12 Oct 2018 22:23:30 +0200
-Subject: [PATCH v4 1/2] arm64: dts: allwinner: new board - Emlid Neutis N5
-In-Reply-To: <20181012133914.GA32670@imagebutcher>
-References: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539339841-22235-1-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <b47c5458-683e-3e96-0bbe-f9db84579c77@suse.de>
- <20181012133914.GA32670@imagebutcher>
-Message-ID: <20181012202330.tdwedsof2bsnxkxn@flea>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 13 Oct 2018 05:35:15 +0800
+Subject: [arm-platforms:irq/generic_handle_domain_irq 8/29]
+ arch/powerpc/sysdev/mpic.c:605:12: error: 'NUM_ISA_INTERRUPTS' undeclared;
+ did you mean 'H_INTERRUPT'?
+Message-ID: <201810130541.BnMvRGZo%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 04:39:14PM +0300, Aleksandr Aleksandrov wrote:
-> Hi Andreas,
-> 
-> Thanks for your feedback!
-> 
-> > > + *
-> > > + * Copyright (C) 2018 Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> > > + */
-> > > +
-> > > +/dts-v1/;
-> > > +
-> > > +#include "sun50i-h5-emlid-neutis-n5.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "Emlid Neutis N5 Developer board";
-> > > +	compatible = "emlid,neutis-n5-devboard",
-> > > +		     "emlid,neutis-n5",
-> > 
-> > You are lacking bindings definitions for these new identifiers. The
-> > vendor prefix should be patch 1/3, the SoM/board compatibles 2/3 and
-> > this .dts[i] patch 3/3, so that only vendor prefixes and compatibles
-> > that are defined and don't result in checkpatch.pl warnings get used.
-> 
-> Patch 2/3:
-> 
-> commit 46dcb8632b36644cb20e6b35ede12ff0088a60eb
-> Author: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> Date:   Fri Oct 12 16:22:28 2018 +0300
-> 
->     dt-bindings: arm: sunxi: emlid,neutis-n5(-devboard)
->     
->     sunxi: add new compatibles for Emlid Neutis Dev board and SoM module
->     
->     Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index e4beec3..a907e52 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -19,3 +19,5 @@ using one of the following compatible strings:
->    allwinner,sun9i-a80
->    allwinner,sun50i-a64
->    nextthing,gr8
-> +  emlid,neutis-n5
-> +  emlid,neutis-n5-devboard
-> 
-> Is this right place for the neutis compatibles?
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/generic_handle_domain_irq
+head:   ce79686e608f93452f13339a5cadaa6836fe82b8
+commit: cbd3df331c399ae034a1966d67be0cce252ba44f [8/29] irqdomain: Kill irq_domain_add_legacy_isa
+config: powerpc-maple_defconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout cbd3df331c399ae034a1966d67be0cce252ba44f
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=powerpc 
 
-No, those are for SoCs compatible. I'm not sure we ever created a
-board compatible files.
+All errors (new ones prefixed by >>):
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+   arch/powerpc/sysdev/mpic.c: In function 'mpic_find':
+>> arch/powerpc/sysdev/mpic.c:605:12: error: 'NUM_ISA_INTERRUPTS' undeclared (first use in this function); did you mean 'H_INTERRUPT'?
+     if (irq < NUM_ISA_INTERRUPTS)
+               ^~~~~~~~~~~~~~~~~~
+               H_INTERRUPT
+   arch/powerpc/sysdev/mpic.c:605:12: note: each undeclared identifier is reported only once for each function it appears in
+
+vim +605 arch/powerpc/sysdev/mpic.c
+
+14cf11af Paul Mackerras         2005-09-26  601  
+14cf11af Paul Mackerras         2005-09-26  602  /* Find an mpic associated with a given linux interrupt */
+d69a78d7 Tony Breeds            2009-04-07  603  static struct mpic *mpic_find(unsigned int irq)
+14cf11af Paul Mackerras         2005-09-26  604  {
+0ebfff14 Benjamin Herrenschmidt 2006-07-03 @605  	if (irq < NUM_ISA_INTERRUPTS)
+14cf11af Paul Mackerras         2005-09-26  606  		return NULL;
+7df2457d Olof Johansson         2007-01-28  607  
+ec775d0e Thomas Gleixner        2011-03-25  608  	return irq_get_chip_data(irq);
+d69a78d7 Tony Breeds            2009-04-07  609  }
+7df2457d Olof Johansson         2007-01-28  610  
+
+:::::: The code at line 605 was first introduced by commit
+:::::: 0ebfff1491ef85d41ddf9c633834838be144f69f [POWERPC] Add new interrupt mapping core and change platforms to use it
+
+:::::: TO: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+:::::: CC: Paul Mackerras <paulus@samba.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 17278 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181013/5116d4d2/attachment-0001.gz>
