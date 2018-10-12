@@ -1,35 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 12 Oct 2018 18:03:42 +0800
-Subject: [PATCH v3 2/2] drm/sun4i: tcon: prevent tcon->panel dereference
- if NULL
-In-Reply-To: <20181008092111.qcufr4o7cy3nnj4b@flea>
-References: <20181004195605.txvbkshvxklyzxyb@flea>
- <20181005215951.99003-1-giulio.benetti@micronovasrl.com>
- <20181005215951.99003-2-giulio.benetti@micronovasrl.com>
- <20181008092111.qcufr4o7cy3nnj4b@flea>
-Message-ID: <CAGb2v66FVixU-Ax=KkH5J-ivQ146RUK2DWDwBqDRYqHtpOod9w@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 12 Oct 2018 11:13:30 +0100
+Subject: [PATCH v9 04/11] dt: psci: Update DT bindings to support
+ hierarchical PSCI states
+In-Reply-To: <CAPDyKFq3=E=qDkozsu-MupEL_Efpdq62Z3aMWwGQWc+OdzPq8w@mail.gmail.com>
+References: <20181003143824.13059-1-ulf.hansson@linaro.org>
+ <20181003143824.13059-5-ulf.hansson@linaro.org>
+ <20181010150312.GA4844@e107155-lin>
+ <CAPDyKFqP3wbd+5rvLcscNf1LUSZDROLqafsLq0Kyh0KziRJrZQ@mail.gmail.com>
+ <20181011164126.GD28583@e107155-lin>
+ <CAPDyKFq3=E=qDkozsu-MupEL_Efpdq62Z3aMWwGQWc+OdzPq8w@mail.gmail.com>
+Message-ID: <20181012101330.GA31003@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 8, 2018 at 5:21 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Fri, Oct 12, 2018 at 11:43:11AM +0200, Ulf Hansson wrote:
+> On 11 October 2018 at 18:41, Sudeep Holla <sudeep.holla@arm.com> wrote:
+[...]
+
+> > Yes, nearly there. Just thought good to add a note that the representation
+> > has no affinity towards any PSCI idle state mechanism(PC or OSI). So
+> > that it's never assumed or misunderstood.
 >
-> On Fri, Oct 05, 2018 at 11:59:51PM +0200, Giulio Benetti wrote:
-> > If tcon->panel pointer is NULL, trying to dereference from it
-> > (i.e. tcon->panel->connector) will cause a null pointer dereference.
-> >
-> > Add tcon->panel null pointer check before calling
-> > sun4i_tcon0_mode_set_dithering().
-> >
-> > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> > Fixes: f11adcecbd5f ("drm/sun4i: tcon: Add dithering support for
-> >                       RGB565/RGB666 LCD panels")
-> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> I understand your point. However, I think the following sentence still
+> makes sense (exist in the suggest change above).
 >
-> Applied both, thanks!
+> "In PSCI firmware v1.0, the OS-Initiated mode is introduced. In order
+> to use it, the hierarchical representation must be used."
+>
+> How about if I add: "For the default platform-coordinated mode, both
+> representations are viable options."
+>
+I would also add couple of things, how about this order:
 
-I think this one could have been applied to drm-misc-next-fixes,
-as the bug was only recently introduced.
+In PSCI firmware v1.0, the OS-Initiated mode is introduced. However the
+flattened vs hierarchical DT representation of power domains is orthogonal
+to OS-Initiated vs platform-coordinated PSCI CPU suspend modes and
+should be considered independent of each other.
 
-We'll have to make sure it gets backported somehow.
+The hierarchical representation helps and makes it easy to implement
+OSI mode and OS implementations may choose to mandate it.
 
-ChenYu
+For the default platform-coordinated mode, both representations are
+viable options.
+
+--
+Regards,
+Sudeep
