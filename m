@@ -1,67 +1,102 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Sat, 13 Oct 2018 18:08:10 +0200
-Subject: [PATCH] clk: meson-gxbb: set fclk_div3 as CLK_IS_CRITICAL
-In-Reply-To: <1539425086-10997-1-git-send-email-christianshewitt@gmail.com>
-References: <1539425086-10997-1-git-send-email-christianshewitt@gmail.com>
-Message-ID: <20181013160810.88481.14237@resonance>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 13 Oct 2018 09:53:27 -0700
+Subject: [PATCH v2 7/9] arm64: dts: allwinner: a64: add nodes necessary for
+ analog sound support
+In-Reply-To: <20181013165329.13363-1-anarsoul@gmail.com>
+References: <20181013165329.13363-1-anarsoul@gmail.com>
+Message-ID: <20181013165329.13363-8-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Christian Hewitt (2018-10-13 12:04:46)
-> On the Khadas VIM2 (GXM) and LePotato (GXL) board there are problems
-> with reboot; e.g. a ~60 second delay between issuing reboot and the
-> board power cycling (and in some OS configurations reboot will fail
-> and require manual power cycling).
-> 
-> Similar to 'commit c987ac6f1f088663b6dad39281071aeb31d450a8 ("clk:
-> meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL")' the SCPI Cortex-M4
-> Co-Processor seems to depend on FCLK_DIV3 being operational.
-> 
-> Bisect gives 'commit 05f814402d6174369b3b29832cbb5eb5ed287059 ("clk:
-> meson: add fdiv clock gates") between 4.16 and 4.16-rc1 as the first
-> bad commit. This added support for the missing clock gates before the
-> fixed PLL fixed dividers (FCLK_DIVx) and the clock framework which
-> disabled all the unused fixed dividers, thus it disabled a critical
-> clock path for the SCPI Co-Processor.
-> 
-> This change simply sets the FCLK_DIV3 gate as critical to ensure
-> nothing can disable it.
+Add nodes for i2s, digital and analog parts of audiocodec on A64
 
-I'm a bit skeptical of this. If FCLK_DIV3 is gated at run-time, there is
-no side effect other than long and/or failed reboot?
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 58 +++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-Seems like someone should be managing this clock, and simply leaving it
-on all the time isn't necessarily the right approach. Any chance that
-you can dig into this behavior to better understand it?
-
-It's easy to solve issues by leaving clocks on all the time, but this
-becomes a problem later on when trying to tune a device for power.
-
-Also, if this commit really is the right fix, it should include a
-comment for FCLK_DIV3 stating why the CLK_IS_CRITICAL flag was set,
-which may be helpful later on to know if it is safe to remove it. Same
-is true for FCLK_DIV2 in c987ac6f1f088663b6dad39281071aeb31d450a8.
-
-Regards,
-Mike
-
-> 
-> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
-> ---
->  drivers/clk/meson/gxbb.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index 86d3ae5..4c8925d 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -509,6 +509,7 @@ static struct clk_fixed_factor gxbb_fclk_div3_div = {
->                 .ops = &clk_fixed_factor_ops,
->                 .parent_names = (const char *[]){ "fixed_pll" },
->                 .num_parents = 1,
-> +               .flags = CLK_IS_CRITICAL,
->         },
->  };
->  
-> -- 
-> 2.7.4
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index d3daf90a8715..d066ed59f27a 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -157,6 +157,34 @@
+ 		compatible = "linux,spdif-dit";
+ 	};
+ 
++	sound: sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "sun50i-a64-audio";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,frame-master = <&cpudai>;
++		simple-audio-card,bitclock-master = <&cpudai>;
++		simple-audio-card,mclk-fs = <512>;
++		simple-audio-card,aux-devs = <&codec_analog>;
++		simple-audio-card,routing =
++				"Left DAC", "AIF1 Slot 0 Left",
++				"Right DAC", "AIF1 Slot 0 Right",
++				"AIF1 Slot 0 Left ADC", "Left ADC",
++				"AIF1 Slot 0 Right ADC", "Right ADC",
++				"Left ADC", "ADC",
++				"Right ADC", "ADC",
++				"MIC1", "Mic",
++				"MIC2", "Headset Mic";
++		status = "disabled";
++
++		cpudai: simple-audio-card,cpu {
++			sound-dai = <&dai>;
++		};
++
++		link_codec: simple-audio-card,codec {
++			sound-dai = <&codec>;
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+@@ -522,6 +550,30 @@
+ 			status = "disabled";
+ 		};
+ 
++		dai: dai@1c22c00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun50i-a64-codec-i2s";
++			reg = <0x01c22c00 0x200>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "apb", "mod";
++			resets = <&ccu RST_BUS_CODEC>;
++			reset-names = "rst";
++			dmas = <&dma 15>, <&dma 15>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
++		codec: codec at 1c22e00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-a33-codec";
++			reg = <0x01c22e00 0x600>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "bus", "mod";
++			status = "disabled";
++		};
++
+ 		uart0: serial at 1c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+@@ -715,6 +767,12 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		codec_analog: codec-analog at 1f015c0 {
++			compatible = "allwinner,sun50i-a64-codec-analog";
++			reg = <0x01f015c0 0x4>;
++			status = "disabled";
++		};
++
+ 		r_i2c: i2c at 1f02400 {
+ 			compatible = "allwinner,sun50i-a64-i2c",
+ 				     "allwinner,sun6i-a31-i2c";
+-- 
+2.19.0
