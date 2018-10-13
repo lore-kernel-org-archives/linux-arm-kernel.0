@@ -1,69 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 13 Oct 2018 10:22:17 +0100
-Subject: ARM64 KVM crash
-In-Reply-To: <alpine.LRH.2.02.1810121453380.14664@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1810121204120.16008@file01.intranet.prod.int.rdu2.redhat.com>
- <b3355304-5144-b17a-c39c-866e197e3cc6@arm.com>
- <alpine.LRH.2.02.1810121453380.14664@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <86h8hqtd4m.wl-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 13 Oct 2018 10:34:11 +0100
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <20181013021416.GE21972@asgard.redhat.com>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad>
+ <20181010141017.GA2881@asgard.redhat.com>
+ <20181010153655.GA212880@arrakis.emea.arm.com>
+ <20181013021416.GE21972@asgard.redhat.com>
+Message-ID: <20181013093411.o3id6yzkspsxr5jt@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Oct 2018 19:59:16 +0100,
-Mikulas Patocka <mpatocka@redhat.com> wrote:
+On Sat, Oct 13, 2018 at 04:14:16AM +0200, Eugene Syromiatnikov wrote:
+> On Wed, Oct 10, 2018 at 04:36:56PM +0100, Catalin Marinas wrote:
+> > On Wed, Oct 10, 2018 at 04:10:21PM +0200, Eugene Syromiatnikov wrote:
+> > > I have some questions regarding AArch64 ILP32 implementation for which I
+> > > failed to find an answer myself:
+> > >  * How ptrace() tracer is supposed to distinguish between ILP32 and LP64
+> > >    tracees? For MIPS N32 and x32 this is possible based on syscall
+> > >    number, but for AArch64 ILP32 I do not see such a sign. There's also
+> > >    ARM_ip is employed for signalling entering/exiting, I wonder whether
+> > >    it's possible to employ it also for signalling tracee's personality.
+> > 
+> > With the current implementation, I don't think you can distinguish. From
+> > the kernel perspective, the register set is the same. What is the
+> > use-case for this?
 > 
+> Err, a ptrace()-based tracer trying to trace a process, for example?
+
+I first thought it wouldn't matter for ptrace-based tracers since the
+syscall numbers are (mostly) the same. But the arguments layout in
+register is indeed different, so I see your point now about having to
+distinguish.
+
+> > We could add a new regset to expose the ILP32 state (NT_ARM_..., I can't
+> > think of a name now but probably not PER* as this implies PER_LINUX_...
+> > which is independent from TIF_32BIT_*).
 > 
+> So that would require an additional ptrace() call on each syscall stop,
+> is that correct?
+
+The ILP32 state does not change at run-time, so it could only do a
+ptrace() call once and save the information. No need to re-read it on
+each syscall stop.
+
+We could set a high bit in the syscall number reported to the ptrace
+caller (though not changing the syscall ABI) but I haven't thought of
+other consequences. For example, can the ptrace caller change the
+syscall number?
+
+> > >  * What's the reasoning behind capping syscall arguments to 32 bit? x32
+> > >    and MIPS N32 do not have such a restriction (and do not need special
+> > >    wrappers for syscalls that pass 64-bit values as a result, except
+> > >    when they do,  as it is the case for preadv2 on x32); moreover, that
+> > >    would lead to insurmountable difficulties for AArch64 ILP32 tracers
+> > >    that try to trace LP64 tracees, as it would be impossible to pass
+> > >    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
+> > 
+> > We've attempted in earlier versions to allow a mix of 32 and 64-bit
+> > register values from ILP32 but it got pretty complicated. The entry code
+> > would need to know which registers need zeroing of the top 32-bit
 > 
-> On Fri, 12 Oct 2018, Marc Zyngier wrote:
-> 
-> > Right. But how is that related to KVM? See below:
-> > 
-> > > [75476.680725]  find_next_and_bit+0xc/0x70
-> > > [75476.680728]  find_busiest_group+0x128/0x938
-> > > [75476.680730]  load_balance+0x148/0x848
-> > > [75476.680732]  pick_next_task_fair+0x1d4/0x568
-> > > [75476.680734]  __schedule+0xe8/0x4b0
-> > > [75476.680736]  schedule+0x38/0xa0
-> > > [75476.680739]  kvm_vcpu_block+0x88/0x180
-> > > [75476.680742]  kvm_handle_wfx+0x80/0xb8
-> > > [75476.680744]  handle_exit+0x138/0x1b8
-> > 
-> > The guest is exiting because it has executed a blocking WFI, so KVM's
-> > job is done and we're calling schedule(). The scheduler then starts
-> > doing its job of picking the next victim.
-> > 
-> > At this stage, the kernel indeed blows up. But this doesn't immediately
-> > seem to be KVM's fault. It is far more likely that the scheduler has
-> > messed something up in its own data structure, which is even worse :-(.
-> > 
-> > I'd suggest you get in touch with the scheduler guys to see if they have
-> > any insight. Also, trying to come up with a reproducer would be
-> > extremely useful.
-> > 
-> > Thanks,
-> > 
-> > 	M.
-> 
-> I use this machine most of the time without KVM - and it crashed when I 
-> started KVM - so I assume that KVM had something to do with it. Perhaps it 
-> corrupts random memory? I may try to run some KVM stress for many days to 
-> test if I reproduce it.
+> If kernel specifies 64-bit wide registers for syscalls, then it's the
+> caller's (libc's) responsibility to properly sign-extend arguments when
+> needed, and glibc, for example, already has proper type definitions that
+> aimed to handle this.
 
-One thing I know for sure is that if you use a tap (such as macvtap)
-to give networking to your VMs, the Ethernet driver on the 8040 (such
-as on your MacchiatoBin) will happily corrupt memory (you can witness
-that without running KVM at all). Something to do with the sbk being
-freed early.
-
-I've reported this issue several times, only to hear the wind
-blowing. At this stage, I've shelved it. There is enough decent and
-maintained platforms around not to worry about the unmaintained stuff.
-
-Now, if you can give me a reproducer, I'll happily investigate.
-
-Thanks,
-
-	M.
+We tried, see my other reply.
 
 -- 
-Jazz is not dead, it just smell funny.
+Catalin
