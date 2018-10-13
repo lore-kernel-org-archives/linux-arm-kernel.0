@@ -1,34 +1,42 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Sat, 13 Oct 2018 13:22:46 +0300
-Subject: [PATCH] irqchip/irq-mvebu-sei: Fix a NULL vs IS_ERR() bug in probe
-Message-ID: <20181013102246.GD16086@mwanda>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Sat, 13 Oct 2018 12:56:54 +0200
+Subject: [PATCH] drm/rockchip: psr: do not dereference encoder before it is
+ null checked.
+Message-ID: <20181013105654.11827-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The devm_ioremap_resource() function never returns NULL, it returns
-error pointers.
+'encoder' is deferenced before it is null sanity checked, hence we
+potentially have a null pointer dereference bug. Instead, initialise
+drm_drv from encoder->dev->dev_private after we are sure 'encoder' is
+not null.
 
-Fixes: 61ce8d8d8a81 ("irqchip/irq-mvebu-sei: Add new driver for Marvell SEI")
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Fixes: 5182c1a556d7f ("drm/rockchip: add an common abstracted PSR driver")
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
- drivers/irqchip/irq-mvebu-sei.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-mvebu-sei.c b/drivers/irqchip/irq-mvebu-sei.c
-index 566d69a2edbc..add4c9c934c8 100644
---- a/drivers/irqchip/irq-mvebu-sei.c
-+++ b/drivers/irqchip/irq-mvebu-sei.c
-@@ -384,9 +384,9 @@ static int mvebu_sei_probe(struct platform_device *pdev)
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+index 1635485955d3..22a70ab6e214 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+@@ -226,12 +226,14 @@ EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
+ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+ 			int (*psr_set)(struct drm_encoder *, bool enable))
+ {
+-	struct rockchip_drm_private *drm_drv = encoder->dev->dev_private;
++	struct rockchip_drm_private *drm_drv;
+ 	struct psr_drv *psr;
  
- 	sei->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	sei->base = devm_ioremap_resource(sei->dev, sei->res);
--	if (!sei->base) {
-+	if (IS_ERR(sei->base)) {
- 		dev_err(sei->dev, "Failed to remap SEI resource\n");
--		return -ENODEV;
-+		return PTR_ERR(sei->base);
- 	}
+ 	if (!encoder || !psr_set)
+ 		return -EINVAL;
  
- 	/* Retrieve the SEI capabilities with the interrupt ranges */
++	drm_drv = encoder->dev->dev_private;
++
+ 	psr = kzalloc(sizeof(struct psr_drv), GFP_KERNEL);
+ 	if (!psr)
+ 		return -ENOMEM;
 -- 
-2.18.0
+2.19.1
