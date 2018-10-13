@@ -1,39 +1,180 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Sat, 13 Oct 2018 11:08:45 +0300
-Subject: [PATCH v4 4/7] arm64: dts: allwinner: a64: sopine: enable power
- supplies
+Date: Sat, 13 Oct 2018 11:08:46 +0300
+Subject: [PATCH v4 5/7] power: supply: add AC power supply driver for AXP813
 In-Reply-To: <20181013080848.29894-1-oskari@lemmela.net>
 References: <20181013080848.29894-1-oskari@lemmela.net>
-Message-ID: <20181013080848.29894-5-oskari@lemmela.net>
+Message-ID: <20181013080848.29894-6-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sopine baseboard have ACIN and battery connectors.
+AXP813 and AXP803 PMICs can control input current and
+minimum voltage.
+
+Both of these values are configurable.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/power/supply/axp20x_ac_power.c | 92 ++++++++++++++++++++++++++
+ include/linux/mfd/axp20x.h             |  1 +
+ 2 files changed, 93 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index c21f2331add6..335cf2263d19 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -69,6 +69,14 @@
- 	};
+diff --git a/drivers/power/supply/axp20x_ac_power.c b/drivers/power/supply/axp20x_ac_power.c
+index 0771f951b11f..059a97d6e14c 100644
+--- a/drivers/power/supply/axp20x_ac_power.c
++++ b/drivers/power/supply/axp20x_ac_power.c
+@@ -27,6 +27,16 @@
+ #define AXP20X_PWR_STATUS_ACIN_PRESENT	BIT(7)
+ #define AXP20X_PWR_STATUS_ACIN_AVAIL	BIT(6)
+ 
++#define AXP813_VHOLD_MASK		GENMASK(5, 3)
++#define AXP813_VHOLD_UV_TO_BIT(x)	((((x) / 100000) - 40) << 3)
++#define AXP813_VHOLD_REG_TO_UV(x)	\
++	(((((x) & AXP813_VHOLD_MASK) >> 3) + 40) * 100000)
++
++#define AXP813_CURR_LIMIT_MASK		GENMASK(2, 0)
++#define AXP813_CURR_LIMIT_UA_TO_BIT(x)	(((x) / 500000) - 3)
++#define AXP813_CURR_LIMIT_REG_TO_UA(x)	\
++	((((x) & AXP813_CURR_LIMIT_MASK) + 3) * 500000)
++
+ #define DRVNAME "axp20x-ac-power-supply"
+ 
+ struct axp20x_ac_power {
+@@ -102,6 +112,55 @@ static int axp20x_ac_power_get_property(struct power_supply *psy,
+ 
+ 		return 0;
+ 
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
++		ret = regmap_read(power->regmap, AXP813_ACIN_PATH_CTRL, &reg);
++		if (ret)
++			return ret;
++
++		val->intval = AXP813_VHOLD_REG_TO_UV(reg);
++
++		return 0;
++
++	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
++		ret = regmap_read(power->regmap, AXP813_ACIN_PATH_CTRL, &reg);
++		if (ret)
++			return ret;
++
++		val->intval = AXP813_CURR_LIMIT_REG_TO_UA(reg);
++
++		return 0;
++
++	default:
++		return -EINVAL;
++	}
++
++	return -EINVAL;
++}
++
++static int axp813_ac_power_set_property(struct power_supply *psy,
++					enum power_supply_property psp,
++					const union power_supply_propval *val)
++{
++	struct axp20x_ac_power *power = power_supply_get_drvdata(psy);
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
++		if (val->intval < 4000000 || val->intval > 4700000)
++			return -EINVAL;
++
++		return regmap_update_bits(power->regmap, AXP813_ACIN_PATH_CTRL,
++					  AXP813_VHOLD_MASK,
++					  AXP813_VHOLD_UV_TO_BIT(val->intval));
++
++	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
++		if (val->intval < 1500000 || val->intval > 4000000)
++			return -EINVAL;
++
++		return regmap_update_bits(power->regmap, AXP813_ACIN_PATH_CTRL,
++					  AXP813_CURR_LIMIT_MASK,
++					  AXP813_CURR_LIMIT_UA_TO_BIT
++					  (val->intval));
++
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -109,6 +168,13 @@ static int axp20x_ac_power_get_property(struct power_supply *psy,
+ 	return -EINVAL;
+ }
+ 
++static int axp813_ac_power_prop_writeable(struct power_supply *psy,
++					  enum power_supply_property psp)
++{
++	return psp == POWER_SUPPLY_PROP_VOLTAGE_MIN ||
++	       psp == POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT;
++}
++
+ static enum power_supply_property axp20x_ac_power_properties[] = {
+ 	POWER_SUPPLY_PROP_HEALTH,
+ 	POWER_SUPPLY_PROP_PRESENT,
+@@ -123,6 +189,14 @@ static enum power_supply_property axp22x_ac_power_properties[] = {
+ 	POWER_SUPPLY_PROP_ONLINE,
  };
  
-+&ac_power_supply {
-+	status = "okay";
++static enum power_supply_property axp813_ac_power_properties[] = {
++	POWER_SUPPLY_PROP_HEALTH,
++	POWER_SUPPLY_PROP_PRESENT,
++	POWER_SUPPLY_PROP_ONLINE,
++	POWER_SUPPLY_PROP_VOLTAGE_MIN,
++	POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
 +};
 +
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
+ static const struct power_supply_desc axp20x_ac_power_desc = {
+ 	.name = "axp20x-ac",
+ 	.type = POWER_SUPPLY_TYPE_MAINS,
+@@ -139,6 +213,16 @@ static const struct power_supply_desc axp22x_ac_power_desc = {
+ 	.get_property = axp20x_ac_power_get_property,
  };
+ 
++static const struct power_supply_desc axp813_ac_power_desc = {
++	.name = "axp813-ac",
++	.type = POWER_SUPPLY_TYPE_MAINS,
++	.properties = axp813_ac_power_properties,
++	.num_properties = ARRAY_SIZE(axp813_ac_power_properties),
++	.property_is_writeable = axp813_ac_power_prop_writeable,
++	.get_property = axp20x_ac_power_get_property,
++	.set_property = axp813_ac_power_set_property,
++};
++
+ struct axp_data {
+ 	const struct power_supply_desc	*power_desc;
+ 	bool				acin_adc;
+@@ -154,6 +238,11 @@ static const struct axp_data axp22x_data = {
+ 	.acin_adc = false,
+ };
+ 
++static const struct axp_data axp813_data = {
++	.power_desc = &axp813_ac_power_desc,
++	.acin_adc = false,
++};
++
+ static int axp20x_ac_power_probe(struct platform_device *pdev)
+ {
+ 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+@@ -234,6 +323,9 @@ static const struct of_device_id axp20x_ac_power_match[] = {
+ 	}, {
+ 		.compatible = "x-powers,axp221-ac-power-supply",
+ 		.data = &axp22x_data,
++	}, {
++		.compatible = "x-powers,axp813-ac-power-supply",
++		.data = &axp813_data,
+ 	}, { /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_ac_power_match);
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index 517e60eecbcb..2302b620d238 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -266,6 +266,7 @@ enum axp20x_variants {
+ #define AXP288_RT_BATT_V_H		0xa0
+ #define AXP288_RT_BATT_V_L		0xa1
+ 
++#define AXP813_ACIN_PATH_CTRL		0x3a
+ #define AXP813_ADC_RATE			0x85
+ 
+ /* Fuel Gauge */
 -- 
 2.17.1
