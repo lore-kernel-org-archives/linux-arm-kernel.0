@@ -1,97 +1,88 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sat, 13 Oct 2018 13:43:12 +0000
-Subject: [PATCH v9 00/24] ILP32 for ARM64
-In-Reply-To: <20181013093411.o3id6yzkspsxr5jt@mbp>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180724173957.GA22106@yury-thinkpad>
- <20181010141017.GA2881@asgard.redhat.com>
- <20181010153655.GA212880@arrakis.emea.arm.com>
- <20181013021416.GE21972@asgard.redhat.com>
- <20181013093411.o3id6yzkspsxr5jt@mbp>
-Message-ID: <20181013134303.GA12721@yury-thinkpad>
+From: lantianyu1986@gmail.com (lantianyu1986 at gmail.com)
+Date: Sat, 13 Oct 2018 22:53:51 +0800
+Subject: [PATCH V4 00/15] x86/KVM/Hyper-v: Add HV ept tlb range flush
+ hypercall support in KVM
+Message-ID: <20181013145406.4911-1-Tianyu.Lan@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 10:34:11AM +0100, Catalin Marinas wrote:
-> 
-> Lines: 73
-> 
-> External Email
-> 
-> On Sat, Oct 13, 2018 at 04:14:16AM +0200, Eugene Syromiatnikov wrote:
-> > On Wed, Oct 10, 2018 at 04:36:56PM +0100, Catalin Marinas wrote:
-> > > On Wed, Oct 10, 2018 at 04:10:21PM +0200, Eugene Syromiatnikov wrote:
-> > > > I have some questions regarding AArch64 ILP32 implementation for which I
-> > > > failed to find an answer myself:
-> > > >  * How ptrace() tracer is supposed to distinguish between ILP32 and LP64
-> > > >    tracees? For MIPS N32 and x32 this is possible based on syscall
-> > > >    number, but for AArch64 ILP32 I do not see such a sign. There's also
-> > > >    ARM_ip is employed for signalling entering/exiting, I wonder whether
-> > > >    it's possible to employ it also for signalling tracee's personality.
-> > >
-> > > With the current implementation, I don't think you can distinguish. From
-> > > the kernel perspective, the register set is the same. What is the
-> > > use-case for this?
-> >
-> > Err, a ptrace()-based tracer trying to trace a process, for example?
-> 
-> I first thought it wouldn't matter for ptrace-based tracers since the
-> syscall numbers are (mostly) the same. But the arguments layout in
-> register is indeed different, so I see your point now about having to
-> distinguish.
-> 
-> > > We could add a new regset to expose the ILP32 state (NT_ARM_..., I can't
-> > > think of a name now but probably not PER* as this implies PER_LINUX_...
-> > > which is independent from TIF_32BIT_*).
-> >
-> > So that would require an additional ptrace() call on each syscall stop,
-> > is that correct?
-> 
-> The ILP32 state does not change at run-time, so it could only do a
-> ptrace() call once and save the information. No need to re-read it on
-> each syscall stop.
-> 
-> We could set a high bit in the syscall number reported to the ptrace
-> caller (though not changing the syscall ABI) but I haven't thought of
-> other consequences. For example, can the ptrace caller change the
-> syscall number?
+From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-I believe, /proc/PID/auxv is enough to distinguish between arm64, ilp32
-and aarch32 ABis. If no, I think it's better to do it there.
+For nested memory virtualization, Hyper-v doesn't set write-protect
+L1 hypervisor EPT page directory and page table node to track changes 
+while it relies on guest to tell it changes via HvFlushGuestAddressLlist
+hypercall. HvFlushGuestAddressLlist hypercall provides a way to flush
+EPT page table with ranges which are specified by L1 hypervisor.
 
-I don't have ILP32 machine available at the moment, but I'll check it soon. 
+If L1 hypervisor uses INVEPT or HvFlushGuestAddressSpace hypercall to
+flush EPT tlb, Hyper-V will invalidate associated EPT shadow page table
+and sync L1's EPT table when next EPT page fault is triggered.
+HvFlushGuestAddressLlist hypercall helps to avoid such redundant EPT
+page fault and synchronization of shadow page table.
 
-> > > >  * What's the reasoning behind capping syscall arguments to 32 bit? x32
-> > > >    and MIPS N32 do not have such a restriction (and do not need special
-> > > >    wrappers for syscalls that pass 64-bit values as a result, except
-> > > >    when they do,  as it is the case for preadv2 on x32); moreover, that
-> > > >    would lead to insurmountable difficulties for AArch64 ILP32 tracers
-> > > >    that try to trace LP64 tracees, as it would be impossible to pass
-> > > >    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
-> > >
-> > > We've attempted in earlier versions to allow a mix of 32 and 64-bit
-> > > register values from ILP32 but it got pretty complicated. The entry code
-> > > would need to know which registers need zeroing of the top 32-bit
-> >
-> > If kernel specifies 64-bit wide registers for syscalls, then it's the
-> > caller's (libc's) responsibility to properly sign-extend arguments when
-> > needed, and glibc, for example, already has proper type definitions that
-> > aimed to handle this.
-> 
-> We tried, see my other reply.
 
-A couple of links to recall the story:
-https://www.spinics.net/lists/linux-s390/msg11593.html
-http://linux-kernel.2935.n7.nabble.com/RFC6-PATCH-v6-00-21-ILP32-for-ARM64-td1345105.html
+Change since v3:
+	1) Remove code of updating "tlbs_dirty" in kvm_flush_remote_tlbs_with_range()
+	2) Remove directly tlb flush in the kvm_handle_hva_range()
+	3) Move tlb flush in kvm_set_pte_rmapp() to kvm_mmu_notifier_change_pte()
+	4) Combine Vitaly's "don't pass EPT configuration info to
+vmx_hv_remote_flush_tlb()" fix
 
-Cover-letter of the series has links to previous discussions.
+Change since v2:
+       1) Fix comment in the kvm_flush_remote_tlbs_with_range()
+       2) Move HV_MAX_FLUSH_PAGES and HV_MAX_FLUSH_REP_COUNT to
+	hyperv-tlfs.h.
+       3) Calculate HV_MAX_FLUSH_REP_COUNT in the macro definition
+       4) Use HV_MAX_FLUSH_REP_COUNT to define length of gpa_list in
+	struct hv_guest_mapping_flush_list.
 
-I would also notice that even if we pass 64-bit parameters in a single
-register, we cannot avoid using the compat layer. It looks more natural
-not to split the 64-bit register, but from performance point of view
-there is almost no difference, either we split registers or not (2.6%
-for empty syscall, as I measured). And the cost of overcomplication was
-considered too much. So we chose to stick to more standard compat layer
-and gain in maintainability. 
+Change since v1:
+       1) Convert "end_gfn" of struct kvm_tlb_range to "pages" in order
+          to avoid confusion as to whether "end_gfn" is inclusive or exlusive.
+       2) Add hyperv tlb range struct and replace kvm tlb range struct
+          with new struct in order to avoid using kvm struct in the hyperv
+	  code directly.
 
-Yury
+
+
+Lan Tianyu (15):
+  KVM: Add tlb_remote_flush_with_range callback in kvm_x86_ops
+  KVM/MMU: Add tlb flush with range helper function
+  KVM: Replace old tlb flush function with new one to flush a specified
+    range.
+  KVM: Make kvm_set_spte_hva() return int
+  KVM/MMU: Move tlb flush in kvm_set_pte_rmapp() to
+    kvm_mmu_notifier_change_pte()
+  KVM/MMU: Flush tlb directly in the kvm_set_pte_rmapp()
+  KVM/MMU: Flush tlb directly in the kvm_zap_gfn_range()
+  KVM/MMU: Flush tlb directly in kvm_mmu_zap_collapsible_spte()
+  KVM: Add flush_link and parent_pte in the struct kvm_mmu_page
+  KVM: Add spte's point in the struct kvm_mmu_page
+  KVM/MMU: Replace tlb flush function with range list flush function
+  x86/hyper-v: Add HvFlushGuestAddressList hypercall support
+  x86/Hyper-v: Add trace in the
+    hyperv_nested_flush_guest_mapping_range()
+  KVM/VMX: Change hv flush logic when ept tables are mismatched.
+  KVM/VMX: Add hv tlb range flush support
+
+ arch/arm/include/asm/kvm_host.h     |   2 +-
+ arch/arm64/include/asm/kvm_host.h   |   2 +-
+ arch/mips/include/asm/kvm_host.h    |   2 +-
+ arch/mips/kvm/mmu.c                 |   3 +-
+ arch/powerpc/include/asm/kvm_host.h |   2 +-
+ arch/powerpc/kvm/book3s.c           |   3 +-
+ arch/powerpc/kvm/e500_mmu_host.c    |   3 +-
+ arch/x86/hyperv/nested.c            |  85 ++++++++++++++++++++++
+ arch/x86/include/asm/hyperv-tlfs.h  |  32 +++++++++
+ arch/x86/include/asm/kvm_host.h     |  12 +++-
+ arch/x86/include/asm/mshyperv.h     |  16 +++++
+ arch/x86/include/asm/trace/hyperv.h |  14 ++++
+ arch/x86/kvm/mmu.c                  | 138 ++++++++++++++++++++++++++++++------
+ arch/x86/kvm/paging_tmpl.h          |  10 ++-
+ arch/x86/kvm/vmx.c                  |  70 +++++++++++++++---
+ virt/kvm/arm/mmu.c                  |   6 +-
+ virt/kvm/kvm_main.c                 |   5 +-
+ 17 files changed, 360 insertions(+), 45 deletions(-)
+
+-- 
+2.14.4
