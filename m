@@ -1,83 +1,102 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 12 Oct 2018 20:32:21 -0700
-Subject: [PATCH 01/10] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+Date: Fri, 12 Oct 2018 20:32:28 -0700
+Subject: [PATCH 08/10] arm64: dts: allwinner: a64: add nodes necessary for
+ analog sound support
 In-Reply-To: <20181013033230.6506-1-anarsoul@gmail.com>
 References: <20181013033230.6506-1-anarsoul@gmail.com>
-Message-ID: <20181013033230.6506-2-anarsoul@gmail.com>
+Message-ID: <20181013033230.6506-9-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+Add nodes for i2s, digital and analog parts of audiocodec on A64
 
-The I2S block used for the audio codec in the A64 differs from other 3
-I2S modules in A64 and isn't compatible with H3. But it is very similar
-to what is found in A10(sun4i). However, its TX FIFO is
-located at a different address.
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../devicetree/bindings/sound/sun4i-i2s.txt   |  2 ++
- sound/soc/sunxi/sun4i-i2s.c                   | 21 +++++++++++++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 58 +++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-index b9d50d6cdef3..9d81f965f666 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-@@ -10,6 +10,7 @@ Required properties:
-    - "allwinner,sun6i-a31-i2s"
-    - "allwinner,sun8i-a83t-i2s"
-    - "allwinner,sun8i-h3-i2s"
-+   - "allwinner,sun50i-a64-i2s"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the I2S interrupt.
-@@ -26,6 +27,7 @@ Required properties for the following compatibles:
- 	- "allwinner,sun6i-a31-i2s"
- 	- "allwinner,sun8i-a83t-i2s"
- 	- "allwinner,sun8i-h3-i2s"
-+	- "allwinner,sun50i-a64-i2s"
- - resets: phandle to the reset line for this codec
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index d3daf90a8715..ad59384203ad 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -157,6 +157,34 @@
+ 		compatible = "linux,spdif-dit";
+ 	};
  
- Example:
-diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index ed30d30ac720..787b67c4f845 100644
---- a/sound/soc/sunxi/sun4i-i2s.c
-+++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -967,6 +967,23 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
- 	.field_rxchansel	= REG_FIELD(SUN8I_I2S_RX_CHAN_SEL_REG, 0, 2),
- };
- 
-+static const struct sun4i_i2s_quirks sun50i_a64_i2s_quirks = {
-+	.has_reset		= true,
-+	.reg_offset_txdata	= SUN8I_I2S_FIFO_TX_REG,
-+	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
-+	.has_slave_select_bit	= true,
-+	.field_clkdiv_mclk_en	= REG_FIELD(SUN4I_I2S_CLK_DIV_REG, 7, 7),
-+	.field_fmt_wss		= REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
-+	.field_fmt_sr		= REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
-+	.field_fmt_bclk		= REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
-+	.field_fmt_lrclk	= REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
-+	.field_fmt_mode		= REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
-+	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
-+	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
-+	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
-+	.field_rxchansel	= REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
-+};
++	sound: sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "sun50i-a64-audio";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,frame-master = <&cpudai>;
++		simple-audio-card,bitclock-master = <&cpudai>;
++		simple-audio-card,mclk-fs = <512>;
++		simple-audio-card,aux-devs = <&codec_analog>;
++		simple-audio-card,routing =
++				"Left DAC", "AIF1 Slot 0 Left",
++				"Right DAC", "AIF1 Slot 0 Right",
++				"AIF1 Slot 0 Left ADC", "Left ADC",
++				"AIF1 Slot 0 Right ADC", "Right ADC",
++				"Left ADC", "ADC",
++				"Right ADC", "ADC",
++				"MIC1", "Mic",
++				"MIC2", "Headset Mic";
++		status = "disabled";
 +
- static int sun4i_i2s_init_regmap_fields(struct device *dev,
- 					struct sun4i_i2s *i2s)
- {
-@@ -1175,6 +1192,10 @@ static const struct of_device_id sun4i_i2s_match[] = {
- 		.compatible = "allwinner,sun8i-h3-i2s",
- 		.data = &sun8i_h3_i2s_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-a64-i2s",
-+		.data = &sun50i_a64_i2s_quirks,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sun4i_i2s_match);
++		cpudai: simple-audio-card,cpu {
++			sound-dai = <&dai>;
++		};
++
++		link_codec: simple-audio-card,codec {
++			sound-dai = <&codec>;
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+@@ -522,6 +550,30 @@
+ 			status = "disabled";
+ 		};
+ 
++		dai: dai@1c22c00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun50i-a64-i2s";
++			reg = <0x01c22c00 0x200>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "apb", "mod";
++			resets = <&ccu RST_BUS_CODEC>;
++			reset-names = "rst";
++			dmas = <&dma 15>, <&dma 15>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
++		codec: codec at 1c22e00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-a33-codec";
++			reg = <0x01c22e00 0x600>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "bus", "mod";
++			status = "disabled";
++		};
++
+ 		uart0: serial at 1c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+@@ -715,6 +767,12 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		codec_analog: codec-analog at 1f015c0 {
++			compatible = "allwinner,sun50i-a64-codec-analog";
++			reg = <0x01f015c0 0x4>;
++			status = "disabled";
++		};
++
+ 		r_i2c: i2c at 1f02400 {
+ 			compatible = "allwinner,sun50i-a64-i2c",
+ 				     "allwinner,sun6i-a31-i2c";
 -- 
 2.19.0
