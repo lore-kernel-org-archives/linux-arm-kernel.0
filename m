@@ -1,45 +1,47 @@
-From: jannh@google.com (Jann Horn)
-Date: Sat, 13 Oct 2018 02:09:09 +0200
-Subject: [PATCH v2 1/7] modules: Create rlimit for module space
-In-Reply-To: <657e6d0ada18e8ca0350bc6b3a80c49b3c0b341c.camel@intel.com>
-References: <20181011233117.7883-1-rick.p.edgecombe@intel.com>
- <20181011233117.7883-2-rick.p.edgecombe@intel.com>
- <CAG48ez2fWg64nGxDXUQS3695KpVNrakAbarXJnYPd6xv5wOD+A@mail.gmail.com>
- <7b0714e26c7c2216721641d7df16a49687927e37.camel@intel.com>
- <CAG48ez0XfGFAWDYa75COMPCsKqqGfBFOtcNuGD4_dubGf2YeAQ@mail.gmail.com>
- <657e6d0ada18e8ca0350bc6b3a80c49b3c0b341c.camel@intel.com>
-Message-ID: <CAG48ez383rjt+v_DvLF902X33od_SwMh8dZ-6=w1DZ-YPZ_U9Q@mail.gmail.com>
+From: esyr@redhat.com (Eugene Syromiatnikov)
+Date: Sat, 13 Oct 2018 04:07:31 +0200
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <7aac1a08-8948-1a04-cbd3-fbc6a53f9ff0@arm.com>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad>
+ <20181010141017.GA2881@asgard.redhat.com>
+ <7aac1a08-8948-1a04-cbd3-fbc6a53f9ff0@arm.com>
+Message-ID: <20181013020731.GD21972@asgard.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 2:04 AM Edgecombe, Rick P
-<rick.p.edgecombe@intel.com> wrote:
-> On Fri, 2018-10-12 at 19:22 +0200, Jann Horn wrote:
-> > On Fri, Oct 12, 2018 at 7:04 PM Edgecombe, Rick P
-> > <rick.p.edgecombe@intel.com> wrote:
-> > > On Fri, 2018-10-12 at 02:35 +0200, Jann Horn wrote:
-> > > > Why all the rbtree stuff instead of stashing a pointer in struct
-> > > > vmap_area, or something like that?
-> > >
-> > > Since the tracking was not for all vmalloc usage, the intention was to not
-> > > bloat
-> > > the structure for other usages likes stacks. I thought usually there
-> > > wouldn't be
-> > > nearly as much module space allocations as there would be kernel stacks, but
-> > > I
-> > > didn't do any actual measurements on the tradeoffs.
-> >
-> > I imagine that one extra pointer in there - pointing to your struct
-> > mod_alloc_user - would probably not be terrible. 8 bytes more per
-> > kernel stack shouldn't be so bad?
->
-> I looked into this and it starts to look a little messy. The nommu.c version of
-> vmalloc doesn't use or expose access to vmap_area or vm_struct. So it starts to
-> look like a bunch of IFDEFs to remove the rlimit in the nommu case or making a
-> stand in that maintains pretend vm struct's in nommu.c. I had actually
-> previously tried to at least pull the allocations size from vmalloc structs, but it broke on nommu.
->
-> Thought I would check back and see. How important do you think this is?
+On Wed, Oct 10, 2018 at 03:39:07PM +0100, Szabolcs Nagy wrote:
+> On 10/10/18 15:10, Eugene Syromiatnikov wrote:
+> >  * What's the reasoning behind capping syscall arguments to 32 bit? x32
+> >    and MIPS N32 do not have such a restriction (and do not need special
+> >    wrappers for syscalls that pass 64-bit values as a result, except
+> >    when they do,  as it is the case for preadv2 on x32); moreover, that
+> >    would lead to insurmountable difficulties for AArch64 ILP32 tracers
+> >    that try to trace LP64 tracees, as it would be impossible to pass
+> >    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
+> 
+> but that's necessarily the case for all ilp32 abis:
+> the userspace syscall function receives 32bit
+> arguments so even if the kernel abi takes 64bit
+> args you cannot use that from c code. (the libc
+> does not even know which args should be sign or
+> zero extended.)
 
-I don't think it's important - I just thought that it would be nice to
-avoid the extra complexity if it is easily avoidable.
+glibc's syscall() prototype has kernel_ulong_t as its arguments (more
+specifically, to __syscall_ulong_t, which is 64-bit wide on x32; it
+should also have kernel_long_t as its return type instead of long,
+but that's another story), so it works perfectly fine in case of x32.
+
+> process_vm_readv/writev is limited by the ilp32
+> iovec struct, not by the syscall arguments.
+
+Right, on x32/N32 this issue is worked around by the usage of the respective
+x86_64/N64 call, and it looks like another thing that is impossible
+with AArch64 ilp32.
+
+> ptrace is specified to take void* addr argument,
+> and void* is 32bit on all ilp32 targets.
+> so again on the c language level there is no
+> way around the 32bit limitation.
+
+Which is an issue.
