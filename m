@@ -1,42 +1,35 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Sat, 13 Oct 2018 11:08:42 +0300
-Subject: [PATCH v4 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
- power DT binding
+Date: Sat, 13 Oct 2018 11:08:47 +0300
+Subject: [PATCH v4 6/7] mfd: axp20x: Add AC power supply cell for AXP813
 In-Reply-To: <20181013080848.29894-1-oskari@lemmela.net>
 References: <20181013080848.29894-1-oskari@lemmela.net>
-Message-ID: <20181013080848.29894-2-oskari@lemmela.net>
+Message-ID: <20181013080848.29894-7-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP803/AXP813 AC power supply can limit input current and voltage.
+As axp20x-ac-power-supply now supports AXP813, add a cell for it.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-Reviewed-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
 ---
- .../devicetree/bindings/power/supply/axp20x_ac_power.txt       | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/mfd/axp20x.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-index 826e8a879121..7a1fb532abe5 100644
---- a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-+++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-@@ -4,6 +4,7 @@ Required Properties:
-  - compatible: One of:
- 			"x-powers,axp202-ac-power-supply"
- 			"x-powers,axp221-ac-power-supply"
-+			"x-powers,axp813-ac-power-supply"
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 0be511dd93d0..dfc3cff1d08b 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -778,6 +778,11 @@ static const struct mfd_cell axp813_cells[] = {
+ 	}, {
+ 		.name		= "axp20x-battery-power-supply",
+ 		.of_compatible	= "x-powers,axp813-battery-power-supply",
++	}, {
++		.name		= "axp20x-ac-power-supply",
++		.of_compatible	= "x-powers,axp813-ac-power-supply",
++		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
++		.resources	= axp20x_ac_power_supply_resources,
+ 	},
+ };
  
- This node is a subnode of the axp20x PMIC.
- 
-@@ -13,6 +14,8 @@ reading ADC channels from the AXP20X ADC.
- The AXP22X is only able to tell if an AC power supply is present and
- usable.
- 
-+AXP813/AXP803 are able to limit current and supply voltage
-+
- Example:
- 
- &axp209 {
 -- 
 2.17.1
