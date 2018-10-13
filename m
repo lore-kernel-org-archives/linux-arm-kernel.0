@@ -1,44 +1,97 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sat, 13 Oct 2018 13:33:54 +0000
-Subject: [PATCH V6 0/4] clk: new APIs to handle all available clocks
-In-Reply-To: <AM0PR04MB42119BD28DDB7826DEE577F180E60@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1535690756-22234-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211EF6D783562BA8C8D690380010@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211A3900BC5A2DF857F7451801F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <7e612f6f-e9d2-2f6f-1903-3a6bcf1b65ba@linux.intel.com>
- <AM0PR04MB4211B170CAC1B3F9E7356AF980130@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB42119BD28DDB7826DEE577F180E60@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211DBDC8D0684442A927CE580E30@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sat, 13 Oct 2018 13:43:12 +0000
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <20181013093411.o3id6yzkspsxr5jt@mbp>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad>
+ <20181010141017.GA2881@asgard.redhat.com>
+ <20181010153655.GA212880@arrakis.emea.arm.com>
+ <20181013021416.GE21972@asgard.redhat.com>
+ <20181013093411.o3id6yzkspsxr5jt@mbp>
+Message-ID: <20181013134303.GA12721@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping
-
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Monday, October 8, 2018 6:43 PM
-> To: thor.thayer at linux.intel.com; linux-clk at vger.kernel.org; sboyd at kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> mturquette at baylibre.com; shawnguo at kernel.org; dl-linux-imx
-> <linux-imx@nxp.com>; hdegoede at redhat.com
-> Subject: RE: [PATCH V6 0/4] clk: new APIs to handle all available clocks
+On Sat, Oct 13, 2018 at 10:34:11AM +0100, Catalin Marinas wrote:
 > 
-> Hi Stephen,
+> Lines: 73
 > 
-> Gently ping again..
+> External Email
 > 
-> > > >
-> > > Just checking on the status of this patch. The clock routines
-> > > (patches
-> > > 1-3) are useful for one of my drivers but if they aren't accepted or
-> > > will take a long time to be accepted, I'll need to refactor my driver.
+> On Sat, Oct 13, 2018 at 04:14:16AM +0200, Eugene Syromiatnikov wrote:
+> > On Wed, Oct 10, 2018 at 04:36:56PM +0100, Catalin Marinas wrote:
+> > > On Wed, Oct 10, 2018 at 04:10:21PM +0200, Eugene Syromiatnikov wrote:
+> > > > I have some questions regarding AArch64 ILP32 implementation for which I
+> > > > failed to find an answer myself:
+> > > >  * How ptrace() tracer is supposed to distinguish between ILP32 and LP64
+> > > >    tracees? For MIPS N32 and x32 this is possible based on syscall
+> > > >    number, but for AArch64 ILP32 I do not see such a sign. There's also
+> > > >    ARM_ip is employed for signalling entering/exiting, I wonder whether
+> > > >    it's possible to employ it also for signalling tracee's personality.
 > > >
+> > > With the current implementation, I don't think you can distinguish. From
+> > > the kernel perspective, the register set is the same. What is the
+> > > use-case for this?
 > >
-> > Thanks for this information.
-> >
-> > Stephen,
-> > Would you help to proceed this?
-> >
+> > Err, a ptrace()-based tracer trying to trace a process, for example?
 > 
-> Regards
-> Dong Aisheng
+> I first thought it wouldn't matter for ptrace-based tracers since the
+> syscall numbers are (mostly) the same. But the arguments layout in
+> register is indeed different, so I see your point now about having to
+> distinguish.
+> 
+> > > We could add a new regset to expose the ILP32 state (NT_ARM_..., I can't
+> > > think of a name now but probably not PER* as this implies PER_LINUX_...
+> > > which is independent from TIF_32BIT_*).
+> >
+> > So that would require an additional ptrace() call on each syscall stop,
+> > is that correct?
+> 
+> The ILP32 state does not change at run-time, so it could only do a
+> ptrace() call once and save the information. No need to re-read it on
+> each syscall stop.
+> 
+> We could set a high bit in the syscall number reported to the ptrace
+> caller (though not changing the syscall ABI) but I haven't thought of
+> other consequences. For example, can the ptrace caller change the
+> syscall number?
+
+I believe, /proc/PID/auxv is enough to distinguish between arm64, ilp32
+and aarch32 ABis. If no, I think it's better to do it there.
+
+I don't have ILP32 machine available at the moment, but I'll check it soon. 
+
+> > > >  * What's the reasoning behind capping syscall arguments to 32 bit? x32
+> > > >    and MIPS N32 do not have such a restriction (and do not need special
+> > > >    wrappers for syscalls that pass 64-bit values as a result, except
+> > > >    when they do,  as it is the case for preadv2 on x32); moreover, that
+> > > >    would lead to insurmountable difficulties for AArch64 ILP32 tracers
+> > > >    that try to trace LP64 tracees, as it would be impossible to pass
+> > > >    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
+> > >
+> > > We've attempted in earlier versions to allow a mix of 32 and 64-bit
+> > > register values from ILP32 but it got pretty complicated. The entry code
+> > > would need to know which registers need zeroing of the top 32-bit
+> >
+> > If kernel specifies 64-bit wide registers for syscalls, then it's the
+> > caller's (libc's) responsibility to properly sign-extend arguments when
+> > needed, and glibc, for example, already has proper type definitions that
+> > aimed to handle this.
+> 
+> We tried, see my other reply.
+
+A couple of links to recall the story:
+https://www.spinics.net/lists/linux-s390/msg11593.html
+http://linux-kernel.2935.n7.nabble.com/RFC6-PATCH-v6-00-21-ILP32-for-ARM64-td1345105.html
+
+Cover-letter of the series has links to previous discussions.
+
+I would also notice that even if we pass 64-bit parameters in a single
+register, we cannot avoid using the compat layer. It looks more natural
+not to split the 64-bit register, but from performance point of view
+there is almost no difference, either we split registers or not (2.6%
+for empty syscall, as I measured). And the cost of overcomplication was
+considered too much. So we chose to stick to more standard compat layer
+and gain in maintainability. 
+
+Yury
