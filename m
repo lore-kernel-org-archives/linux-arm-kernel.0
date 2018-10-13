@@ -1,50 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 13 Oct 2018 10:20:09 +0100
-Subject: [PATCH v9 00/24] ILP32 for ARM64
-In-Reply-To: <20181013020731.GD21972@asgard.redhat.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180724173957.GA22106@yury-thinkpad>
- <20181010141017.GA2881@asgard.redhat.com>
- <7aac1a08-8948-1a04-cbd3-fbc6a53f9ff0@arm.com>
- <20181013020731.GD21972@asgard.redhat.com>
-Message-ID: <20181013092009.gzxorufk4tqrzked@mbp>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 13 Oct 2018 10:22:17 +0100
+Subject: ARM64 KVM crash
+In-Reply-To: <alpine.LRH.2.02.1810121453380.14664@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1810121204120.16008@file01.intranet.prod.int.rdu2.redhat.com>
+ <b3355304-5144-b17a-c39c-866e197e3cc6@arm.com>
+ <alpine.LRH.2.02.1810121453380.14664@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <86h8hqtd4m.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 04:07:31AM +0200, Eugene Syromiatnikov wrote:
-> On Wed, Oct 10, 2018 at 03:39:07PM +0100, Szabolcs Nagy wrote:
-> > On 10/10/18 15:10, Eugene Syromiatnikov wrote:
-> > >  * What's the reasoning behind capping syscall arguments to 32 bit? x32
-> > >    and MIPS N32 do not have such a restriction (and do not need special
-> > >    wrappers for syscalls that pass 64-bit values as a result, except
-> > >    when they do,  as it is the case for preadv2 on x32); moreover, that
-> > >    would lead to insurmountable difficulties for AArch64 ILP32 tracers
-> > >    that try to trace LP64 tracees, as it would be impossible to pass
-> > >    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
-> > 
-> > but that's necessarily the case for all ilp32 abis:
-> > the userspace syscall function receives 32bit
-> > arguments so even if the kernel abi takes 64bit
-> > args you cannot use that from c code. (the libc
-> > does not even know which args should be sign or
-> > zero extended.)
+On Fri, 12 Oct 2018 19:59:16 +0100,
+Mikulas Patocka <mpatocka@redhat.com> wrote:
 > 
-> glibc's syscall() prototype has kernel_ulong_t as its arguments (more
-> specifically, to __syscall_ulong_t, which is 64-bit wide on x32; it
-> should also have kernel_long_t as its return type instead of long,
-> but that's another story), so it works perfectly fine in case of x32.
+> 
+> 
+> On Fri, 12 Oct 2018, Marc Zyngier wrote:
+> 
+> > Right. But how is that related to KVM? See below:
+> > 
+> > > [75476.680725]  find_next_and_bit+0xc/0x70
+> > > [75476.680728]  find_busiest_group+0x128/0x938
+> > > [75476.680730]  load_balance+0x148/0x848
+> > > [75476.680732]  pick_next_task_fair+0x1d4/0x568
+> > > [75476.680734]  __schedule+0xe8/0x4b0
+> > > [75476.680736]  schedule+0x38/0xa0
+> > > [75476.680739]  kvm_vcpu_block+0x88/0x180
+> > > [75476.680742]  kvm_handle_wfx+0x80/0xb8
+> > > [75476.680744]  handle_exit+0x138/0x1b8
+> > 
+> > The guest is exiting because it has executed a blocking WFI, so KVM's
+> > job is done and we're calling schedule(). The scheduler then starts
+> > doing its job of picking the next victim.
+> > 
+> > At this stage, the kernel indeed blows up. But this doesn't immediately
+> > seem to be KVM's fault. It is far more likely that the scheduler has
+> > messed something up in its own data structure, which is even worse :-(.
+> > 
+> > I'd suggest you get in touch with the scheduler guys to see if they have
+> > any insight. Also, trying to come up with a reproducer would be
+> > extremely useful.
+> > 
+> > Thanks,
+> > 
+> > 	M.
+> 
+> I use this machine most of the time without KVM - and it crashed when I 
+> started KVM - so I assume that KVM had something to do with it. Perhaps it 
+> corrupts random memory? I may try to run some KVM stress for many days to 
+> test if I reproduce it.
 
-This would have been my preferred approach but the libc community were
-not entirely happy with it as it breaks POSIX compatibility:
+One thing I know for sure is that if you use a tap (such as macvtap)
+to give networking to your VMs, the Ethernet driver on the 8040 (such
+as on your MacchiatoBin) will happily corrupt memory (you can witness
+that without running KVM at all). Something to do with the sbk being
+freed early.
 
-https://sourceware.org/bugzilla/show_bug.cgi?id=16437
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323348.html
+I've reported this issue several times, only to hear the wind
+blowing. At this stage, I've shelved it. There is enough decent and
+maintained platforms around not to worry about the unmaintained stuff.
 
-(there are other threads around x32 and people arguing whether POSIX is
-wrong)
+Now, if you can give me a reproducer, I'll happily investigate.
 
-Some sometime around version 4 or 5 of this series, we made the move
-(back) to compat-like ABI.
+Thanks,
+
+	M.
 
 -- 
-Catalin
+Jazz is not dead, it just smell funny.
