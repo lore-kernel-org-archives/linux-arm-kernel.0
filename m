@@ -1,60 +1,67 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 14 Oct 2018 00:07:53 +0800
-Subject: [arm-platforms:irq/generic_handle_domain_irq 4/30]
- arch/mips/lantiq/xway/dma.c:255:34: error: array type has incomplete element
- type 'struct of_device_id'
-Message-ID: <201810140029.pketKugh%fengguang.wu@intel.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Sat, 13 Oct 2018 18:08:10 +0200
+Subject: [PATCH] clk: meson-gxbb: set fclk_div3 as CLK_IS_CRITICAL
+In-Reply-To: <1539425086-10997-1-git-send-email-christianshewitt@gmail.com>
+References: <1539425086-10997-1-git-send-email-christianshewitt@gmail.com>
+Message-ID: <20181013160810.88481.14237@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/generic_handle_domain_irq
-head:   f98d407b9c291bed866c2194b547782083eaf6f8
-commit: 35391f5df33ee69e0d2ba0b794bac62712fe2020 [4/30] mips: Do not include linux/irqdomain.h from asm/irq.h
-config: mips-xway_defconfig (attached as .config)
-compiler: mips-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 35391f5df33ee69e0d2ba0b794bac62712fe2020
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=mips 
+Quoting Christian Hewitt (2018-10-13 12:04:46)
+> On the Khadas VIM2 (GXM) and LePotato (GXL) board there are problems
+> with reboot; e.g. a ~60 second delay between issuing reboot and the
+> board power cycling (and in some OS configurations reboot will fail
+> and require manual power cycling).
+> 
+> Similar to 'commit c987ac6f1f088663b6dad39281071aeb31d450a8 ("clk:
+> meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL")' the SCPI Cortex-M4
+> Co-Processor seems to depend on FCLK_DIV3 being operational.
+> 
+> Bisect gives 'commit 05f814402d6174369b3b29832cbb5eb5ed287059 ("clk:
+> meson: add fdiv clock gates") between 4.16 and 4.16-rc1 as the first
+> bad commit. This added support for the missing clock gates before the
+> fixed PLL fixed dividers (FCLK_DIVx) and the clock framework which
+> disabled all the unused fixed dividers, thus it disabled a critical
+> clock path for the SCPI Co-Processor.
+> 
+> This change simply sets the FCLK_DIV3 gate as critical to ensure
+> nothing can disable it.
 
-All errors (new ones prefixed by >>):
+I'm a bit skeptical of this. If FCLK_DIV3 is gated at run-time, there is
+no side effect other than long and/or failed reboot?
 
->> arch/mips/lantiq/xway/dma.c:255:34: error: array type has incomplete element type 'struct of_device_id'
-    static const struct of_device_id dma_match[] = {
-                                     ^~~~~~~~~
->> arch/mips/lantiq/xway/dma.c:256:4: error: field name not in record or union initializer
-     { .compatible = "lantiq,dma-xway" },
-       ^
-   arch/mips/lantiq/xway/dma.c:256:4: note: (near initialization for 'dma_match')
->> arch/mips/lantiq/xway/dma.c:255:34: error: 'dma_match' defined but not used [-Werror=unused-variable]
-    static const struct of_device_id dma_match[] = {
-                                     ^~~~~~~~~
-   cc1: all warnings being treated as errors
+Seems like someone should be managing this clock, and simply leaving it
+on all the time isn't necessarily the right approach. Any chance that
+you can dig into this behavior to better understand it?
 
-vim +255 arch/mips/lantiq/xway/dma.c
+It's easy to solve issues by leaving clocks on all the time, but this
+becomes a problem later on when trying to tune a device for power.
 
-dfec1a82 John Crispin 2011-05-06  254  
-ddd4eeca John Crispin 2012-04-12 @255  static const struct of_device_id dma_match[] = {
-ddd4eeca John Crispin 2012-04-12 @256  	{ .compatible = "lantiq,dma-xway" },
-ddd4eeca John Crispin 2012-04-12  257  	{},
-ddd4eeca John Crispin 2012-04-12  258  };
-ddd4eeca John Crispin 2012-04-12  259  
+Also, if this commit really is the right fix, it should include a
+comment for FCLK_DIV3 stating why the CLK_IS_CRITICAL flag was set,
+which may be helpful later on to know if it is safe to remove it. Same
+is true for FCLK_DIV2 in c987ac6f1f088663b6dad39281071aeb31d450a8.
 
-:::::: The code at line 255 was first introduced by commit
-:::::: ddd4eeca961cc6b1d57e0ca2f264403d690b6882 MIPS: lantiq: convert dma to platform driver
+Regards,
+Mike
 
-:::::: TO: John Crispin <blogic@openwrt.org>
-:::::: CC: Ralf Baechle <ralf@linux-mips.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 16469 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181014/b1fc0212/attachment.gz>
+> 
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+> ---
+>  drivers/clk/meson/gxbb.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+> index 86d3ae5..4c8925d 100644
+> --- a/drivers/clk/meson/gxbb.c
+> +++ b/drivers/clk/meson/gxbb.c
+> @@ -509,6 +509,7 @@ static struct clk_fixed_factor gxbb_fclk_div3_div = {
+>                 .ops = &clk_fixed_factor_ops,
+>                 .parent_names = (const char *[]){ "fixed_pll" },
+>                 .num_parents = 1,
+> +               .flags = CLK_IS_CRITICAL,
+>         },
+>  };
+>  
+> -- 
+> 2.7.4
