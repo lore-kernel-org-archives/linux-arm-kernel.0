@@ -1,45 +1,34 @@
-From: christianshewitt@gmail.com (Christian Hewitt)
-Date: Sat, 13 Oct 2018 14:04:46 +0400
-Subject: [PATCH] clk: meson-gxbb: set fclk_div3 as CLK_IS_CRITICAL
-Message-ID: <1539425086-10997-1-git-send-email-christianshewitt@gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Sat, 13 Oct 2018 13:22:46 +0300
+Subject: [PATCH] irqchip/irq-mvebu-sei: Fix a NULL vs IS_ERR() bug in probe
+Message-ID: <20181013102246.GD16086@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Khadas VIM2 (GXM) and LePotato (GXL) board there are problems
-with reboot; e.g. a ~60 second delay between issuing reboot and the
-board power cycling (and in some OS configurations reboot will fail
-and require manual power cycling).
+The devm_ioremap_resource() function never returns NULL, it returns
+error pointers.
 
-Similar to 'commit c987ac6f1f088663b6dad39281071aeb31d450a8 ("clk:
-meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL")' the SCPI Cortex-M4
-Co-Processor seems to depend on FCLK_DIV3 being operational.
-
-Bisect gives 'commit 05f814402d6174369b3b29832cbb5eb5ed287059 ("clk:
-meson: add fdiv clock gates") between 4.16 and 4.16-rc1 as the first
-bad commit. This added support for the missing clock gates before the
-fixed PLL fixed dividers (FCLK_DIVx) and the clock framework which
-disabled all the unused fixed dividers, thus it disabled a critical
-clock path for the SCPI Co-Processor.
-
-This change simply sets the FCLK_DIV3 gate as critical to ensure
-nothing can disable it.
-
-Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+Fixes: 61ce8d8d8a81 ("irqchip/irq-mvebu-sei: Add new driver for Marvell SEI")
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
- drivers/clk/meson/gxbb.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-mvebu-sei.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index 86d3ae5..4c8925d 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -509,6 +509,7 @@ static struct clk_fixed_factor gxbb_fclk_div3_div = {
- 		.ops = &clk_fixed_factor_ops,
- 		.parent_names = (const char *[]){ "fixed_pll" },
- 		.num_parents = 1,
-+		.flags = CLK_IS_CRITICAL,
- 	},
- };
+diff --git a/drivers/irqchip/irq-mvebu-sei.c b/drivers/irqchip/irq-mvebu-sei.c
+index 566d69a2edbc..add4c9c934c8 100644
+--- a/drivers/irqchip/irq-mvebu-sei.c
++++ b/drivers/irqchip/irq-mvebu-sei.c
+@@ -384,9 +384,9 @@ static int mvebu_sei_probe(struct platform_device *pdev)
  
+ 	sei->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	sei->base = devm_ioremap_resource(sei->dev, sei->res);
+-	if (!sei->base) {
++	if (IS_ERR(sei->base)) {
+ 		dev_err(sei->dev, "Failed to remap SEI resource\n");
+-		return -ENODEV;
++		return PTR_ERR(sei->base);
+ 	}
+ 
+ 	/* Retrieve the SEI capabilities with the interrupt ranges */
 -- 
-2.7.4
+2.18.0
