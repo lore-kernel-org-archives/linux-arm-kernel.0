@@ -1,42 +1,42 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Sat, 13 Oct 2018 12:56:54 +0200
-Subject: [PATCH] drm/rockchip: psr: do not dereference encoder before it is
- null checked.
-Message-ID: <20181013105654.11827-1-enric.balletbo@collabora.com>
+From: christianshewitt@gmail.com (Christian Hewitt)
+Date: Sat, 13 Oct 2018 16:07:06 +0400
+Subject: [PATCH] ARM64: dts: meson-gxl-s905x-khadas-vim enable Bluetooth
+Message-ID: <1539432427-11779-1-git-send-email-christianshewitt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'encoder' is deferenced before it is null sanity checked, hence we
-potentially have a null pointer dereference bug. Instead, initialise
-drm_drv from encoder->dev->dev_private after we are sure 'encoder' is
-not null.
+This enables Bluetooth support for the following models:
 
-Fixes: 5182c1a556d7f ("drm/rockchip: add an common abstracted PSR driver")
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+- Khadas VIM basic (AP6212) using firmware BCM43438A1.hcd
+- Khadas VIM pro (AP6255) using firmware BCM4345C0.hcd
+
+The AP6212 module used on the VIM basic has an ID clash with another
+device. To get Bluetooth working you either need to apply a kernel
+patch to drivers/bluetooth/btbcm.c so 0x2209 loads BCM43438A1 or the
+BCM43438A1.hcd firmware must be renamed to BCM43430A1.hcd.
+
+Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
 ---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
- drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-index 1635485955d3..22a70ab6e214 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-@@ -226,12 +226,14 @@ EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
- int rockchip_drm_psr_register(struct drm_encoder *encoder,
- 			int (*psr_set)(struct drm_encoder *, bool enable))
- {
--	struct rockchip_drm_private *drm_drv = encoder->dev->dev_private;
-+	struct rockchip_drm_private *drm_drv;
- 	struct psr_drv *psr;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+index d32cf38..7e0717d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+@@ -187,6 +187,13 @@
+ 	};
+ };
  
- 	if (!encoder || !psr_set)
- 		return -EINVAL;
- 
-+	drm_drv = encoder->dev->dev_private;
++&uart_A {
++	bluetooth {
++		compatible = "brcm,bcm43438-bt";
++		shutdown-gpios = <&gpio GPIOX_17 GPIO_ACTIVE_HIGH>;
++	};
++};
 +
- 	psr = kzalloc(sizeof(struct psr_drv), GFP_KERNEL);
- 	if (!psr)
- 		return -ENOMEM;
+ /* This is brought out on the Linux_RX (18) and Linux_TX (19) pins: */
+ &uart_AO {
+ 	status = "okay";
 -- 
-2.19.1
+2.7.4
