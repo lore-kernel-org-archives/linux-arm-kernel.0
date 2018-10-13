@@ -1,50 +1,50 @@
-From: oskari@lemmela.net (Oskari Lemmela)
-Date: Sat, 13 Oct 2018 11:08:48 +0300
-Subject: [PATCH v4 7/7] mfd: axp20x: Add supported cells for AXP803
-In-Reply-To: <20181013080848.29894-1-oskari@lemmela.net>
-References: <20181013080848.29894-1-oskari@lemmela.net>
-Message-ID: <20181013080848.29894-8-oskari@lemmela.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 13 Oct 2018 10:20:09 +0100
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <20181013020731.GD21972@asgard.redhat.com>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad>
+ <20181010141017.GA2881@asgard.redhat.com>
+ <7aac1a08-8948-1a04-cbd3-fbc6a53f9ff0@arm.com>
+ <20181013020731.GD21972@asgard.redhat.com>
+Message-ID: <20181013092009.gzxorufk4tqrzked@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AXP803 is compatible with AXP813.
-Adding cells for GPIO, ADC, AC and battery power supplies.
+On Sat, Oct 13, 2018 at 04:07:31AM +0200, Eugene Syromiatnikov wrote:
+> On Wed, Oct 10, 2018 at 03:39:07PM +0100, Szabolcs Nagy wrote:
+> > On 10/10/18 15:10, Eugene Syromiatnikov wrote:
+> > >  * What's the reasoning behind capping syscall arguments to 32 bit? x32
+> > >    and MIPS N32 do not have such a restriction (and do not need special
+> > >    wrappers for syscalls that pass 64-bit values as a result, except
+> > >    when they do,  as it is the case for preadv2 on x32); moreover, that
+> > >    would lead to insurmountable difficulties for AArch64 ILP32 tracers
+> > >    that try to trace LP64 tracees, as it would be impossible to pass
+> > >    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
+> > 
+> > but that's necessarily the case for all ilp32 abis:
+> > the userspace syscall function receives 32bit
+> > arguments so even if the kernel abi takes 64bit
+> > args you cannot use that from c code. (the libc
+> > does not even know which args should be sign or
+> > zero extended.)
+> 
+> glibc's syscall() prototype has kernel_ulong_t as its arguments (more
+> specifically, to __syscall_ulong_t, which is 64-bit wide on x32; it
+> should also have kernel_long_t as its return type instead of long,
+> but that's another story), so it works perfectly fine in case of x32.
 
-Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
----
- drivers/mfd/axp20x.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+This would have been my preferred approach but the libc community were
+not entirely happy with it as it breaks POSIX compatibility:
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index dfc3cff1d08b..e415b967d38c 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -728,11 +728,26 @@ static const struct mfd_cell axp288_cells[] = {
- 
- static const struct mfd_cell axp803_cells[] = {
- 	{
-+		.name		= "axp20x-gpio",
-+		.of_compatible	= "x-powers,axp813-gpio",
-+	}, {
- 		.name			= "axp221-pek",
- 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
- 		.resources		= axp803_pek_resources,
- 	},
- 	{	.name			= "axp20x-regulator" },
-+	{
-+		.name		= "axp813-adc",
-+		.of_compatible	= "x-powers,axp813-adc",
-+	}, {
-+		.name		= "axp20x-battery-power-supply",
-+		.of_compatible	= "x-powers,axp813-battery-power-supply",
-+	}, {
-+		.name		= "axp20x-ac-power-supply",
-+		.of_compatible	= "x-powers,axp813-ac-power-supply",
-+		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-+		.resources	= axp20x_ac_power_supply_resources,
-+	},
- };
- 
- static const struct mfd_cell axp806_self_working_cells[] = {
+https://sourceware.org/bugzilla/show_bug.cgi?id=16437
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323348.html
+
+(there are other threads around x32 and people arguing whether POSIX is
+wrong)
+
+Some sometime around version 4 or 5 of this series, we made the move
+(back) to compat-like ABI.
+
 -- 
-2.17.1
+Catalin
