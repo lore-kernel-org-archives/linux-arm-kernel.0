@@ -1,71 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 13 Oct 2018 10:26:11 +0800
-Subject: [PATCH v4 1/2] arm64: dts: allwinner: new board - Emlid Neutis N5
-In-Reply-To: <20181012202330.tdwedsof2bsnxkxn@flea>
-References: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539339841-22235-1-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <b47c5458-683e-3e96-0bbe-f9db84579c77@suse.de>
- <20181012133914.GA32670@imagebutcher>
- <20181012202330.tdwedsof2bsnxkxn@flea>
-Message-ID: <CAGb2v67406+vo_eF6-UvA0hPSx50kyXWTtcaeiOoXaz8uM1TQA@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 12 Oct 2018 20:32:20 -0700
+Subject: [PATCH 00/10] Add support for audiocodec in Allwinner A64
+Message-ID: <20181013033230.6506-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 4:23 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Fri, Oct 12, 2018 at 04:39:14PM +0300, Aleksandr Aleksandrov wrote:
-> > Hi Andreas,
-> >
-> > Thanks for your feedback!
-> >
-> > > > + *
-> > > > + * Copyright (C) 2018 Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> > > > + */
-> > > > +
-> > > > +/dts-v1/;
-> > > > +
-> > > > +#include "sun50i-h5-emlid-neutis-n5.dtsi"
-> > > > +
-> > > > +/ {
-> > > > + model = "Emlid Neutis N5 Developer board";
-> > > > + compatible = "emlid,neutis-n5-devboard",
-> > > > +              "emlid,neutis-n5",
-> > >
-> > > You are lacking bindings definitions for these new identifiers. The
-> > > vendor prefix should be patch 1/3, the SoM/board compatibles 2/3 and
-> > > this .dts[i] patch 3/3, so that only vendor prefixes and compatibles
-> > > that are defined and don't result in checkpatch.pl warnings get used.
-> >
-> > Patch 2/3:
-> >
-> > commit 46dcb8632b36644cb20e6b35ede12ff0088a60eb
-> > Author: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> > Date:   Fri Oct 12 16:22:28 2018 +0300
-> >
-> >     dt-bindings: arm: sunxi: emlid,neutis-n5(-devboard)
-> >
-> >     sunxi: add new compatibles for Emlid Neutis Dev board and SoM module
-> >
-> >     Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> > index e4beec3..a907e52 100644
-> > --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> > +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> > @@ -19,3 +19,5 @@ using one of the following compatible strings:
-> >    allwinner,sun9i-a80
-> >    allwinner,sun50i-a64
-> >    nextthing,gr8
-> > +  emlid,neutis-n5
-> > +  emlid,neutis-n5-devboard
-> >
-> > Is this right place for the neutis compatibles?
->
-> No, those are for SoCs compatible. I'm not sure we ever created a
-> board compatible files.
+This series adds Allwinner A64 audiocodec support into sun4i-i2s,
+sun8i-codec drivers, introduces new sun50i-codec-analog driver and enables
+sound on Pine64, SoPine boards and Pinebook.
 
-We never did. We don't even have all vendor prefixes in, only the ones
-that seem more popular, and actually have an identifiable website.
+I2S for audiocodec in A64 is different from other 3 I2S modules but
+similar to one in A10, digital part of codec is compatible with A33 and
+analog controls part is completely different from other SoCs - it shares
+only few bits in few registers, so adding support for it into existing
+sun8i-codec-analog would mean duplicating all the widgets, controls and
+some routes and making it hard to read. Therefore it makes sense to
+introduce new driver.
 
-ChenYu
+Marcus Cooper (1):
+  ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+
+Vasily Khoruzhick (9):
+  ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
+  ASoC: sun8i-codec: add support for speaker amp GPIO
+  ASoC: sun8i-codec-analog: split regmap code into separate driver
+  ASoC: sunxi: Add bindings for A64 codec's analog path controls
+  ASoC: sunxi: Add support for Allwinner A64 codec's analog path
+    controls
+  ASoC: sunxi: allow the sun8i-codec driver to be built on ARM64
+  arm64: dts: allwinner: a64: add nodes necessary for analog sound
+    support
+  arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
+  arm64: dts: allwinner: a64: enable sound on Pinebook
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt   |   2 +
+ .../bindings/sound/sun50i-codec-analog.txt    |  14 +
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  30 ++
+ .../dts/allwinner/sun50i-a64-pinebook.dts     |  33 ++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  30 ++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  58 +++
+ sound/soc/sunxi/Kconfig                       |  17 +-
+ sound/soc/sunxi/Makefile                      |   2 +
+ sound/soc/sunxi/sun4i-i2s.c                   |  21 +
+ sound/soc/sunxi/sun50i-codec-analog.c         | 451 ++++++++++++++++++
+ sound/soc/sunxi/sun8i-codec-analog.c          |  79 +--
+ sound/soc/sunxi/sun8i-codec.c                 |  61 ++-
+ sound/soc/sunxi/sunxi-adda-pr-regmap.c        | 102 ++++
+ sound/soc/sunxi/sunxi-adda-pr-regmap.h        |   7 +
+ 14 files changed, 824 insertions(+), 83 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+ create mode 100644 sound/soc/sunxi/sun50i-codec-analog.c
+ create mode 100644 sound/soc/sunxi/sunxi-adda-pr-regmap.c
+ create mode 100644 sound/soc/sunxi/sunxi-adda-pr-regmap.h
+
+-- 
+2.19.0
