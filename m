@@ -1,42 +1,70 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 12 Oct 2018 20:32:25 -0700
-Subject: [PATCH 05/10] ASoC: dt-binding: Add bindings for Allwinner A64
- codec's analog path controls
+Date: Fri, 12 Oct 2018 20:32:30 -0700
+Subject: [PATCH 10/10] arm64: dts: allwinner: a64: enable sound on Pinebook
 In-Reply-To: <20181013033230.6506-1-anarsoul@gmail.com>
 References: <20181013033230.6506-1-anarsoul@gmail.com>
-Message-ID: <20181013033230.6506-6-anarsoul@gmail.com>
+Message-ID: <20181013033230.6506-11-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The internal codec on Allwinner A64 is split into 2 parts. The
-analog path controls are routed through an embedded custom register
-bus accessed through the PRCM block just as on A23/A33/H3.
-
-Add a binding for this hardware.
+This commit enables I2S, digital and analog parts of audiocodec on
+Pinebook
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../bindings/sound/sun50i-codec-analog.txt           | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 33 +++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
-new file mode 100644
-index 000000000000..4f8ad0e04d20
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
-@@ -0,0 +1,12 @@
-+* Allwinner A64 Codec Analog Controls
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index e2e426334cfe..3145459722c7 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -76,6 +76,19 @@
+ 	};
+ };
+ 
++&codec {
++	allwinner,pa-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
 +
-+Required properties:
-+- compatible: must be one of the following compatibles:
-+		- "allwinner,sun50i-a64-codec-analog"
-+- reg: must contain the registers location and length
++&codec_analog {
++	status = "okay";
++};
 +
-+Example:
-+	codec_analog: codec-analog at 1f015c0 {
-+		compatible = "allwinner,sun50i-a64-codec-analog";
-+		reg = <0x01f015c0 0x4>;
-+	};
++&dai {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	phys = <&usbphy 0>;
+ 	phy-names = "usb";
+@@ -278,6 +291,26 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
+ };
+ 
++&sound {
++	status = "okay";
++	simple-audio-card,widgets = "Microphone", "Microphone Jack",
++				    "Headphone", "Headphone Jack";
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"Speaker", "LINEOUT",
++			"Headphone Jack", "HP",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Left ADC", "ADC",
++			"Right ADC", "ADC",
++			"Mic", "MBIAS",
++			"MIC1", "Mic",
++			"Headset Mic", "Microphone Jack",
++			"Microphone Jack", "HBIAS",
++			"MIC2", "Headset Mic";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.19.0
