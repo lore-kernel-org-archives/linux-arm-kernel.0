@@ -1,35 +1,50 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Sat, 13 Oct 2018 11:08:47 +0300
-Subject: [PATCH v4 6/7] mfd: axp20x: Add AC power supply cell for AXP813
+Date: Sat, 13 Oct 2018 11:08:48 +0300
+Subject: [PATCH v4 7/7] mfd: axp20x: Add supported cells for AXP803
 In-Reply-To: <20181013080848.29894-1-oskari@lemmela.net>
 References: <20181013080848.29894-1-oskari@lemmela.net>
-Message-ID: <20181013080848.29894-7-oskari@lemmela.net>
+Message-ID: <20181013080848.29894-8-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As axp20x-ac-power-supply now supports AXP813, add a cell for it.
+AXP803 is compatible with AXP813.
+Adding cells for GPIO, ADC, AC and battery power supplies.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
 ---
- drivers/mfd/axp20x.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mfd/axp20x.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 0be511dd93d0..dfc3cff1d08b 100644
+index dfc3cff1d08b..e415b967d38c 100644
 --- a/drivers/mfd/axp20x.c
 +++ b/drivers/mfd/axp20x.c
-@@ -778,6 +778,11 @@ static const struct mfd_cell axp813_cells[] = {
- 	}, {
- 		.name		= "axp20x-battery-power-supply",
- 		.of_compatible	= "x-powers,axp813-battery-power-supply",
+@@ -728,11 +728,26 @@ static const struct mfd_cell axp288_cells[] = {
+ 
+ static const struct mfd_cell axp803_cells[] = {
+ 	{
++		.name		= "axp20x-gpio",
++		.of_compatible	= "x-powers,axp813-gpio",
++	}, {
+ 		.name			= "axp221-pek",
+ 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+ 		.resources		= axp803_pek_resources,
+ 	},
+ 	{	.name			= "axp20x-regulator" },
++	{
++		.name		= "axp813-adc",
++		.of_compatible	= "x-powers,axp813-adc",
++	}, {
++		.name		= "axp20x-battery-power-supply",
++		.of_compatible	= "x-powers,axp813-battery-power-supply",
 +	}, {
 +		.name		= "axp20x-ac-power-supply",
 +		.of_compatible	= "x-powers,axp813-ac-power-supply",
 +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
 +		.resources	= axp20x_ac_power_supply_resources,
- 	},
++	},
  };
  
+ static const struct mfd_cell axp806_self_working_cells[] = {
 -- 
 2.17.1
