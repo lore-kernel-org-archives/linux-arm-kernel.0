@@ -1,102 +1,62 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 13 Oct 2018 09:53:27 -0700
-Subject: [PATCH v2 7/9] arm64: dts: allwinner: a64: add nodes necessary for
- analog sound support
-In-Reply-To: <20181013165329.13363-1-anarsoul@gmail.com>
-References: <20181013165329.13363-1-anarsoul@gmail.com>
-Message-ID: <20181013165329.13363-8-anarsoul@gmail.com>
+Date: Sat, 13 Oct 2018 09:53:20 -0700
+Subject: [PATCH v2 0/9] Add support for audiocodec in Allwinner A64
+Message-ID: <20181013165329.13363-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for i2s, digital and analog parts of audiocodec on A64
+This series adds Allwinner A64 audiocodec support into sun4i-i2s,
+sun8i-codec drivers, introduces new sun50i-codec-analog driver and enables
+sound on Pine64, SoPine boards and Pinebook.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 58 +++++++++++++++++++
- 1 file changed, 58 insertions(+)
+I2S for audiocodec in A64 is different from other 3 I2S modules but
+similar to one in A10, digital part of codec is compatible with A33 and
+analog controls part is completely different from other SoCs - it shares
+only few bits in few registers, so adding support for it into existing
+sun8i-codec-analog would mean duplicating all the widgets, controls and
+some routes and making it hard to read. Therefore it makes sense to
+introduce new driver.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index d3daf90a8715..d066ed59f27a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -157,6 +157,34 @@
- 		compatible = "linux,spdif-dit";
- 	};
- 
-+	sound: sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "sun50i-a64-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,frame-master = <&cpudai>;
-+		simple-audio-card,bitclock-master = <&cpudai>;
-+		simple-audio-card,mclk-fs = <512>;
-+		simple-audio-card,aux-devs = <&codec_analog>;
-+		simple-audio-card,routing =
-+				"Left DAC", "AIF1 Slot 0 Left",
-+				"Right DAC", "AIF1 Slot 0 Right",
-+				"AIF1 Slot 0 Left ADC", "Left ADC",
-+				"AIF1 Slot 0 Right ADC", "Right ADC",
-+				"Left ADC", "ADC",
-+				"Right ADC", "ADC",
-+				"MIC1", "Mic",
-+				"MIC2", "Headset Mic";
-+		status = "disabled";
-+
-+		cpudai: simple-audio-card,cpu {
-+			sound-dai = <&dai>;
-+		};
-+
-+		link_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
-@@ -522,6 +550,30 @@
- 			status = "disabled";
- 		};
- 
-+		dai: dai@1c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun50i-a64-codec-i2s";
-+			reg = <0x01c22c00 0x200>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			reset-names = "rst";
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		codec: codec at 1c22e00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a33-codec";
-+			reg = <0x01c22e00 0x600>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "bus", "mod";
-+			status = "disabled";
-+		};
-+
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
-@@ -715,6 +767,12 @@
- 			#reset-cells = <1>;
- 		};
- 
-+		codec_analog: codec-analog at 1f015c0 {
-+			compatible = "allwinner,sun50i-a64-codec-analog";
-+			reg = <0x01f015c0 0x4>;
-+			status = "disabled";
-+		};
-+
- 		r_i2c: i2c at 1f02400 {
- 			compatible = "allwinner,sun50i-a64-i2c",
- 				     "allwinner,sun6i-a31-i2c";
+v2: - Use simple-amplifier for speaker amp on Pinebook
+    - Rename sun50i-a64-i2s to sun50i-a64-codec-i2s to preserve compatible
+      string for other 3 I2S modules in A64 in case if there's any
+      incompatibility with H3
+
+Marcus Cooper (1):
+  ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+
+Vasily Khoruzhick (8):
+  ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
+  ASoC: sun8i-codec-analog: split regmap code into separate driver
+  ASoC: dt-binding: Add bindings for Allwinner A64 codec's analog path
+    controls
+  ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path
+    controls
+  ASoC: sunxi: allow the sun8i-codec driver to be built on ARM64
+  arm64: dts: allwinner: a64: add nodes necessary for analog sound
+    support
+  arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
+  arm64: dts: allwinner: a64: enable sound on Pinebook
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt   |   2 +
+ .../bindings/sound/sun50i-codec-analog.txt    |  12 +
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  30 ++
+ .../dts/allwinner/sun50i-a64-pinebook.dts     |  42 ++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  30 ++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  58 +++
+ sound/soc/sunxi/Kconfig                       |  17 +-
+ sound/soc/sunxi/Makefile                      |   2 +
+ sound/soc/sunxi/sun4i-i2s.c                   |  21 +
+ sound/soc/sunxi/sun50i-codec-analog.c         | 444 ++++++++++++++++++
+ sound/soc/sunxi/sun8i-codec-analog.c          |  79 +---
+ sound/soc/sunxi/sun8i-codec.c                 |  35 +-
+ sound/soc/sunxi/sunxi-adda-pr-regmap.c        | 102 ++++
+ sound/soc/sunxi/sunxi-adda-pr-regmap.h        |   7 +
+ 14 files changed, 798 insertions(+), 83 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+ create mode 100644 sound/soc/sunxi/sun50i-codec-analog.c
+ create mode 100644 sound/soc/sunxi/sunxi-adda-pr-regmap.c
+ create mode 100644 sound/soc/sunxi/sunxi-adda-pr-regmap.h
+
 -- 
 2.19.0
