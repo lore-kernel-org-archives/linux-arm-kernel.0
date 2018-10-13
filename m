@@ -1,62 +1,71 @@
-From: esyr@redhat.com (Eugene Syromiatnikov)
-Date: Sat, 13 Oct 2018 04:14:16 +0200
-Subject: [PATCH v9 00/24] ILP32 for ARM64
-In-Reply-To: <20181010153655.GA212880@arrakis.emea.arm.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180724173957.GA22106@yury-thinkpad>
- <20181010141017.GA2881@asgard.redhat.com>
- <20181010153655.GA212880@arrakis.emea.arm.com>
-Message-ID: <20181013021416.GE21972@asgard.redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 13 Oct 2018 10:26:11 +0800
+Subject: [PATCH v4 1/2] arm64: dts: allwinner: new board - Emlid Neutis N5
+In-Reply-To: <20181012202330.tdwedsof2bsnxkxn@flea>
+References: <1539012044-29998-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539339841-22235-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <b47c5458-683e-3e96-0bbe-f9db84579c77@suse.de>
+ <20181012133914.GA32670@imagebutcher>
+ <20181012202330.tdwedsof2bsnxkxn@flea>
+Message-ID: <CAGb2v67406+vo_eF6-UvA0hPSx50kyXWTtcaeiOoXaz8uM1TQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 04:36:56PM +0100, Catalin Marinas wrote:
-> On Wed, Oct 10, 2018 at 04:10:21PM +0200, Eugene Syromiatnikov wrote:
-> > I have some questions regarding AArch64 ILP32 implementation for which I
-> > failed to find an answer myself:
-> >  * How ptrace() tracer is supposed to distinguish between ILP32 and LP64
-> >    tracees? For MIPS N32 and x32 this is possible based on syscall
-> >    number, but for AArch64 ILP32 I do not see such a sign. There's also
-> >    ARM_ip is employed for signalling entering/exiting, I wonder whether
-> >    it's possible to employ it also for signalling tracee's personality.
-> 
-> With the current implementation, I don't think you can distinguish. From
-> the kernel perspective, the register set is the same. What is the
-> use-case for this?
+On Sat, Oct 13, 2018 at 4:23 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Fri, Oct 12, 2018 at 04:39:14PM +0300, Aleksandr Aleksandrov wrote:
+> > Hi Andreas,
+> >
+> > Thanks for your feedback!
+> >
+> > > > + *
+> > > > + * Copyright (C) 2018 Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+> > > > + */
+> > > > +
+> > > > +/dts-v1/;
+> > > > +
+> > > > +#include "sun50i-h5-emlid-neutis-n5.dtsi"
+> > > > +
+> > > > +/ {
+> > > > + model = "Emlid Neutis N5 Developer board";
+> > > > + compatible = "emlid,neutis-n5-devboard",
+> > > > +              "emlid,neutis-n5",
+> > >
+> > > You are lacking bindings definitions for these new identifiers. The
+> > > vendor prefix should be patch 1/3, the SoM/board compatibles 2/3 and
+> > > this .dts[i] patch 3/3, so that only vendor prefixes and compatibles
+> > > that are defined and don't result in checkpatch.pl warnings get used.
+> >
+> > Patch 2/3:
+> >
+> > commit 46dcb8632b36644cb20e6b35ede12ff0088a60eb
+> > Author: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+> > Date:   Fri Oct 12 16:22:28 2018 +0300
+> >
+> >     dt-bindings: arm: sunxi: emlid,neutis-n5(-devboard)
+> >
+> >     sunxi: add new compatibles for Emlid Neutis Dev board and SoM module
+> >
+> >     Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> > index e4beec3..a907e52 100644
+> > --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> > +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> > @@ -19,3 +19,5 @@ using one of the following compatible strings:
+> >    allwinner,sun9i-a80
+> >    allwinner,sun50i-a64
+> >    nextthing,gr8
+> > +  emlid,neutis-n5
+> > +  emlid,neutis-n5-devboard
+> >
+> > Is this right place for the neutis compatibles?
+>
+> No, those are for SoCs compatible. I'm not sure we ever created a
+> board compatible files.
 
-Err, a ptrace()-based tracer trying to trace a process, for example?
+We never did. We don't even have all vendor prefixes in, only the ones
+that seem more popular, and actually have an identifiable website.
 
-> We could add a new regset to expose the ILP32 state (NT_ARM_..., I can't
-> think of a name now but probably not PER* as this implies PER_LINUX_...
-> which is independent from TIF_32BIT_*).
-
-So that would require an additional ptrace() call on each syscall stop,
-is that correct?
-
-> >  * What's the reasoning behind capping syscall arguments to 32 bit? x32
-> >    and MIPS N32 do not have such a restriction (and do not need special
-> >    wrappers for syscalls that pass 64-bit values as a result, except
-> >    when they do,  as it is the case for preadv2 on x32); moreover, that
-> >    would lead to insurmountable difficulties for AArch64 ILP32 tracers
-> >    that try to trace LP64 tracees, as it would be impossible to pass
-> >    64-bit addresses to process_vm_{read,write} or ptrace PEEK/POKE.
-> 
-> We've attempted in earlier versions to allow a mix of 32 and 64-bit
-> register values from ILP32 but it got pretty complicated. The entry code
-> would need to know which registers need zeroing of the top 32-bit
-
-If kernel specifies 64-bit wide registers for syscalls, then it's the
-caller's (libc's) responsibility to properly sign-extend arguments when
-needed, and glibc, for example, already has proper type definitions that
-aimed to handle this.
-
-> and the generic unistd.h wrapper hacks were not very nice.
-
-They are already implemented in glibc during x32 introduction period.
-
-> Some past discussions:
-> 
-> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1211716.html
-> 
-> -- 
-> Catalin
+ChenYu
