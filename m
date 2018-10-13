@@ -1,95 +1,95 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 12 Oct 2018 20:32:23 -0700
-Subject: [PATCH 03/10] ASoC: sun8i-codec: add support for speaker amp GPIO
+Date: Fri, 12 Oct 2018 20:32:22 -0700
+Subject: [PATCH 02/10] ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
 In-Reply-To: <20181013033230.6506-1-anarsoul@gmail.com>
 References: <20181013033230.6506-1-anarsoul@gmail.com>
-Message-ID: <20181013033230.6506-4-anarsoul@gmail.com>
+Message-ID: <20181013033230.6506-3-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards may have external amplifier for speaker that is controlled
-via GPIO, add support for it in similar way as it's done in sun4i-codec
+BCLK / LRCK ratio should be sample size * channels, but it was
+hardcoded to 32 (0x1 is 32 as per A33 and A64 datasheets).
+
+Calculate it basing on sample size and number of channels.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../bindings/sound/sun8i-a33-codec.txt        |  3 +++
- sound/soc/sunxi/sun8i-codec.c                 | 27 +++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ sound/soc/sunxi/sun8i-codec.c | 35 ++++++++++++++++++++++++++++++-----
+ 1 file changed, 30 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt b/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
-index 2ca3d138528e..21ab72b29ee4 100644
---- a/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
-+++ b/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
-@@ -25,6 +25,9 @@ Required properties:
-    - "bus": the parent APB clock for this controller
-    - "mod": the parent module clock
- 
-+Optional properties:
-+- allwinner,pa-gpios: gpio to enable external amplifier
-+
- Here is an example to add a sound card and the codec binding on sun8i SoCs that
- are similar to A33 using simple-card:
- 
 diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index e681e194ad4c..96879dad3425 100644
+index fb37dd927e33..e681e194ad4c 100644
 --- a/sound/soc/sunxi/sun8i-codec.c
 +++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -24,6 +24,7 @@
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
-+#include <linux/gpio/consumer.h>
+@@ -52,7 +52,6 @@
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV		13
+ #define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV		9
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV		6
+-#define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16		(1 << 6)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ		4
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16		(1 << 4)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_DATA_FMT		2
+@@ -257,8 +256,8 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+ }
  
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
-@@ -97,8 +98,22 @@ struct sun8i_codec {
- 	struct regmap	*regmap;
- 	struct clk	*clk_module;
- 	struct clk	*clk_bus;
-+	struct gpio_desc *gpio_pa;
+ struct sun8i_codec_clk_div {
+-	u8	div;
+-	u8	val;
++	unsigned int	div;
++	u8		val;
  };
  
-+static int sun8i_codec_spk_event(struct snd_soc_dapm_widget *w,
-+				 struct snd_kcontrol *k, int event)
+ static const struct sun8i_codec_clk_div sun8i_codec_bclk_div[] = {
+@@ -300,12 +299,33 @@ static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
+ 	return best_val;
+ }
+ 
++static const struct sun8i_codec_clk_div sun8i_codec_lrck_div[] = {
++	{ .div = 16,	.val = 0 },
++	{ .div = 32,	.val = 1 },
++	{ .div = 64,	.val = 2 },
++	{ .div = 128,	.val = 3 },
++	{ .div = 256,	.val = 4 },
++};
++
++static int sun8i_codec_get_lrck_div(unsigned int channels,
++				    unsigned int word_size)
 +{
-+	struct snd_soc_component *component =
-+		snd_soc_dapm_to_component(w->dapm);
-+	struct sun8i_codec *scodec = snd_soc_component_get_drvdata(component);
++	unsigned int div = word_size * channels;
++	int i;
 +
-+	gpiod_set_value_cansleep(scodec->gpio_pa,
-+				 !!SND_SOC_DAPM_EVENT_ON(event));
++	for (i = 0; i < ARRAY_SIZE(sun8i_codec_lrck_div); i++)
++		if (sun8i_codec_lrck_div[i].div == div)
++			return sun8i_codec_lrck_div[i].val;
 +
-+	return 0;
++	return -EINVAL;
 +}
 +
- static int sun8i_codec_runtime_resume(struct device *dev)
+ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 				 struct snd_pcm_hw_params *params,
+ 				 struct snd_soc_dai *dai)
  {
- 	struct sun8i_codec *scodec = dev_get_drvdata(dev);
-@@ -432,6 +447,9 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
- 	SOC_MIXER_ARRAY("Right Digital ADC Mixer", SND_SOC_NOPM, 0, 0,
- 			sun8i_input_mixer_controls),
+ 	struct sun8i_codec *scodec = snd_soc_component_get_drvdata(dai->component);
+-	int sample_rate;
++	int sample_rate, lrck_div;
+ 	u8 bclk_div;
  
-+	/* Speaker */
-+	SND_SOC_DAPM_SPK("Speaker", sun8i_codec_spk_event),
-+
- 	/* Clocks */
- 	SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
- 			    SUN8I_MOD_CLK_ENA_AIF1, 0, NULL, 0),
-@@ -570,6 +588,15 @@ static int sun8i_codec_probe(struct platform_device *pdev)
- 		return PTR_ERR(scodec->clk_bus);
- 	}
+ 	/*
+@@ -321,9 +341,14 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
+ 			   bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
  
-+	scodec->gpio_pa = devm_gpiod_get_optional(&pdev->dev, "allwinner,pa",
-+						  GPIOD_OUT_LOW);
-+	if (IS_ERR(scodec->gpio_pa)) {
-+		ret = PTR_ERR(scodec->gpio_pa);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "Failed to get pa gpio: %d\n", ret);
-+		return ret;
-+	}
++	lrck_div = sun8i_codec_get_lrck_div(params_channels(params),
++					    params_physical_width(params));
++	if (lrck_div < 0)
++		return lrck_div;
 +
- 	res_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res_base);
- 	if (IS_ERR(base)) {
+ 	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
+-			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
++			   lrck_div << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV);
+ 
+ 	sample_rate = sun8i_codec_get_hw_rate(params);
+ 	if (sample_rate < 0)
 -- 
 2.19.0
