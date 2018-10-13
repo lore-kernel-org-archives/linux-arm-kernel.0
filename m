@@ -1,33 +1,117 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 13 Oct 2018 09:53:26 -0700
-Subject: [PATCH v2 6/9] ASoC: sunxi: allow the sun8i-codec driver to be built
- on ARM64
+Date: Sat, 13 Oct 2018 09:53:28 -0700
+Subject: [PATCH v2 8/9] arm64: dts: allwinner: a64: enable sound on Pine64 and
+ SoPine
 In-Reply-To: <20181013165329.13363-1-anarsoul@gmail.com>
 References: <20181013165329.13363-1-anarsoul@gmail.com>
-Message-ID: <20181013165329.13363-7-anarsoul@gmail.com>
+Message-ID: <20181013165329.13363-9-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 uses the same digital codec part as in A33, so we need
-to build this driver on ARM64 as well.
+This commit enables I2S, digital and analog parts of audiocodec on
+Pine64 and SoPine boards.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- sound/soc/sunxi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 30 +++++++++++++++++++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts | 30 +++++++++++++++++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-index da1aac68ab03..0f992bdf1a10 100644
---- a/sound/soc/sunxi/Kconfig
-+++ b/sound/soc/sunxi/Kconfig
-@@ -12,7 +12,7 @@ config SND_SUN4I_CODEC
- config SND_SUN8I_CODEC
- 	tristate "Allwinner SUN8I audio codec"
- 	depends on OF
--	depends on MACH_SUN8I || COMPILE_TEST
-+	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
- 	select REGMAP_MMIO
- 	help
- 	  This option enables the digital part of the internal audio codec for
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 1b9b92e541d2..902f988d0a9e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -64,6 +64,18 @@
+ 	};
+ };
+ 
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -238,6 +250,24 @@
+ 	status = "disabled";
+ };
+ 
++&sound {
++	status = "okay";
++	simple-audio-card,widgets = "Microphone", "Microphone Jack",
++				    "Headphone", "Headphone Jack";
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"Speaker", "LINEOUT",
++			"Headphone Jack", "HP",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Left ADC", "ADC",
++			"Right ADC", "ADC",
++			"Headset Mic", "Microphone Jack",
++			"Microphone Jack", "HBIAS",
++			"MIC2", "Headset Mic";
++};
++
+ /* On Exp and Euler connectors */
+ &uart0 {
+ 	pinctrl-names = "default";
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+index c21f2331add6..b131b7aec24e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+@@ -69,6 +69,18 @@
+ 	};
+ };
+ 
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -138,6 +150,24 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
+ };
+ 
++&sound {
++	status = "okay";
++	simple-audio-card,widgets = "Microphone", "Microphone Jack",
++				    "Headphone", "Headphone Jack";
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"Speaker", "LINEOUT",
++			"Headphone Jack", "HP",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Left ADC", "ADC",
++			"Right ADC", "ADC",
++			"Headset Mic", "Microphone Jack",
++			"Microphone Jack", "HBIAS",
++			"MIC2", "Headset Mic";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.19.0
