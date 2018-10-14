@@ -1,74 +1,121 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 15 Oct 2018 18:36:52 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
- corruption on Hi16xx soc
-In-Reply-To: <20181015172146.GD31305@brain-police>
-References: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
- <20181015172146.GD31305@brain-police>
-Message-ID: <5fa2a259-b070-f8de-77d3-73eb8ac14d59@arm.com>
+From: valentin.schneider@arm.com (Valentin Schneider)
+Date: Sun, 14 Oct 2018 19:00:21 +0100
+Subject: [BUG] hikey960: psci: Failure to boot CPU after hotplug
+Message-ID: <cf313cf7-c416-2693-8a9d-0d6f122f2018@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/18 18:21, Will Deacon wrote:
-> On Mon, Oct 15, 2018 at 04:36:16PM +0800, Zhen Lei wrote:
->> ITS translation register map:
->> 0x0000-0x003C	Reserved
->> 0x0040		GITS_TRANSLATER
->> 0x0044-0xFFFC	Reserved
->>
->> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
->> expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
->> data will be written to MSIAddress each time.
->>
->> MSIAddr: |----4bytes----|----4bytes----|
->> 	 |    MSIData   |    IMPDEF    |
->>
->> There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
->> But it will overwrite the 4 bytes memory following "sync_count". It's very
->> luckly that the previous and the next neighbour of "sync_count" are both aligned
->> by 8 bytes, so no problem is met now.
->>
->> It's good to explicitly add a workaround:
->> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
->>     aligned by 8 bytes.
->> 2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
->>
->> There is no functional change.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   drivers/iommu/arm-smmu-v3.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 5059d09..a07bc0d 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -586,7 +586,10 @@ struct arm_smmu_device {
->>   
->>   	struct arm_smmu_strtab_cfg	strtab_cfg;
->>   
->> +	union {
->> +	u64				padding; /* workaround for Hisilicon */
->>   	u32				sync_count;
->> +	} __attribute__((aligned(8)));
-> 
-> Won't this already be aligned by the ABI?
-> 
-> Anyway, you'll need to swizzle things for big-endian, I suspect. Maybe you
-> can do something clever like making sync_count an array of two elements
-> and determining the offset based on the endianness. Or just keep it simple
-> like we do for things like struct qrwlock and struct qspinlock and use
-> #ifdefs.
+Hi folks,
 
-I don't think so - the CPUs should only ever be making word accesses to 
-the u32 member, while the SMMU expects to be writing little-endian data 
-to an ITS, so AFAICS the data word will always be at the lower address 
-either way.
+I was cleaning up some hotplug torture test, and happened to run that on my
+HiKey960 which resulted in a failure.
 
-Although now that it's come up, the pre-existing issue of whether the 
-byte order *within* that u32 comes out correct after its round-trip 
-through the SMMU is something I need to run away and hurriedly think 
-about...
+Turns out just a few hotplug operations are needed to trigger this, so I
+boiled it down to this small script:
 
-Robin.
+for ((i = 0; i < 4; i++)); do
+    echo "OFF $i"
+    echo 0 > /sys/devices/system/cpu/cpu$i/online
+    echo "ON $i"
+    echo 1 > /sys/devices/system/cpu/cpu$i/online
+    echo
+done
+
+Running this results in:
+
+----->8-----
+OFF 0
+[   80.819925] CPU0: shutdown
+[   80.823851] psci: CPU0 killed.
+ON 0
+[   80.841609] Detected VIPT I-cache on CPU0
+[   80.845730] CPU0: Booted secondary processor 0x0000000000 [0x410fd034]
+
+OFF 1
+[   80.927340] CPU1: shutdown
+[   80.930204] psci: CPU1 killed.
+ON 1
+[   80.948701] Detected VIPT I-cache on CPU1
+[   80.952810] CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+
+OFF 2
+[   81.023079] CPU2: shutdown
+[   81.026465] psci: CPU2 killed.
+ON 2
+[   81.036281] Detected VIPT I-cache on CPU2
+[   81.040402] CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+
+OFF 3
+[   81.103528] CPU3: shutdown
+[   81.106382] psci: CPU3 killed.
+ON 3
+[   81.121835] Detected VIPT I-cache on CPU3
+[   81.125975] CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+----->8-----
+
+
+Now, if I run this for CPUs [4-7], I eventually get this (takes a few tries):
+
+
+----->8-----
+OFF 4
+[   73.149855] CPU4: shutdown
+[   73.152628] psci: CPU4 killed.
+ON 4
+[   73.157491] Detected VIPT I-cache on CPU4
+[   73.161509] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
+[   73.173813] arch_timer: CPU4: Trapping CNTVCT access
+[   73.178782] CPU4: Booted secondary processor 0x0000000100 [0x410fd091]
+
+OFF 5
+[   73.261245] CPU5: shutdown
+[   73.264043] psci: CPU5 killed.
+ON 5
+[   74.272375] CPU5: failed to come online
+[   74.276264] CPU5: failed in unknown state : 0x0
+./hotplug.sh: line 8: echo: write error: Input/output error
+
+OFF 6
+[   74.311066] CPU6: shutdown
+[   74.313829] psci: CPU6 killed.
+ON 6
+[   74.318544] Detected VIPT I-cache on CPU6
+[   74.322590] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU6: 0x00000000101122
+[   74.334884] arch_timer: CPU6: Trapping CNTVCT access
+[   74.339854] CPU6: Booted secondary processor 0x0000000102 [0x410fd091]
+
+OFF 7
+[   74.394989] CPU7: shutdown
+[   74.397770] psci: CPU7 killed.
+ON 7
+[   74.402295] Detected VIPT I-cache on CPU7
+[   74.406475] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU7: 0x00000000101122
+[   74.418748] arch_timer: CPU7: Trapping CNTVCT access
+[   74.423709] CPU7: Booted secondary processor 0x0000000103 [0x410fd091]
+----->8-----
+
+
+Trying to online CPU5 yet again yields a slightly different result:
+
+
+----->8-----
+[   74.528657] psci: failed to boot CPU5 (-22)
+[   74.534577] CPU5: failed to boot: -22
+[   74.538291] CPU5: failed in unknown state : 0x0
+./hotplug.sh: line 8: echo: write error: Invalid argument
+----->8-----
+
+It doesn't seem tied to any particular big CPU - I've that happen for 4 & 7.
+It happens both on mainline (4.19-rc7, 3a27203102eb) and on linux-next
+(774ea0551a29). I tried bisecting this but it's a bit tricky since the
+mainline support for HiKey960 is relatively recent - as far as I can tell,
+that issue has always been there on this board.
+
+I wanted to have a bit of fun and investigate that myself, but psci is alien
+to me and I don't really know where to look at past "psci_cpu_on()".
+
+I'm running UEFI/ATF on that board, if that's of any help.
+
+
+Cheers,
+Valentin
