@@ -1,44 +1,92 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Sat, 13 Oct 2018 12:36:21 -0700
-Subject: [PATCH v9 00/24] ILP32 for ARM64
-In-Reply-To: <20180516081910.10067-1-ynorov@caviumnetworks.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
-Message-ID: <CALCETrVuabkb5ZQOSgQQTEq8CrS602NBpAkE2=4n982r1f5reQ@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 14 Oct 2018 10:41:29 +0800
+Subject: [PATCH v4 07/10] dt-bindings: phy: add binding for Allwinner
+ USB3 PHY
+In-Reply-To: <20181005205855.GA2458@bogus>
+References: <20181004122855.22981-1-icenowy@aosc.io>
+ <20181004122855.22981-8-icenowy@aosc.io> <20181005205855.GA2458@bogus>
+Message-ID: <92e92f817d4df753d654124514e89c62f40d52eb.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 1:19 AM Yury Norov <ynorov@caviumnetworks.com> wrote:
->
-> This series enables AARCH64 with ILP32 mode.
->
-> As supporting work, it introduces ARCH_32BIT_OFF_T configuration
-> option that is enabled for existing 32-bit architectures but disabled
-> for new arches (so 64-bit off_t userspace type is used by new userspace).
-> Also it deprecates getrlimit and setrlimit syscalls prior to prlimit64.
+? 2018-10-05?? 15:58 -0500?Rob Herring???
+> On Thu, Oct 04, 2018 at 08:28:52PM +0800, Icenowy Zheng wrote:
+> > The new Allwinner H6 SoC contains a USB3 PHY that is wired to the
+> > external USB3 pins of the SoC.
+> > 
+> > Add a device tree binding for the PHY.
+> > 
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+> > Changes in v4:
+> > - Changed Vbus regulator property to vbus-supply.
+> > 
+> > Changes in v3:
+> > - Added Chen-Yu's Review tag.
+> > 
+> > No changes in v2, v1.
+> > 
+> >  .../bindings/phy/sun50i-usb3-phy.txt          | 23
+> > +++++++++++++++++++
+> >  1 file changed, 23 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/phy/sun50i-
+> > usb3-phy.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/phy/sun50i-usb3-
+> > phy.txt b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+> > new file mode 100644
+> > index 000000000000..9f49c6b8c7e7
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+> > @@ -0,0 +1,23 @@
+> > +Allwinner sun50i USB3 PHY
+> > +-----------------------
+> > +
+> > +Required properties:
+> > +- compatible : should be one of
+> > +  * allwinner,sun60i-h6-usb3-phy
+> > +- reg : a list of offset + length pairs
+> > +- #phy-cells : from the generic phy bindings, must be 0
+> > +- clocks : phandle + clock specifier for the phy clock
+> > +- resets : phandle + reset specifier for the phy reset
+> > +
+> > +Optional Properties:
+> > +- vbus-supply : a phandle to a regulator that provides power to
+> > VBUS.
+> 
+> This belongs in a connector node as it is part of the connector
+> unless 
+> the phy physically needs Vbus for power.
+> 
+> But others have done this, so all the phys can just be wrong...
 
-A few thoughts:
+How should we reference the connector?
 
-1. I've never been able to shake the feeling that x32 should not need
-kernel support at all.  As far as I can tell, the kernel support is an
-enormous amount of code and complexity to deal with exactly two
-issues.  First, ILP32 only has 32-bit pointers, so there needs to be a
-way to tell the kernel to only use the lower 4 GB of user address
-space.  That part is easy.  Second, ILP32 user code is highly unlikely
-to end up with the same struct layout as ILP64 code.  The latter seems
-like it should be solved entirely in userspace by adding a way to
-annotate a structure as being a kernel ABI structure and getting the
-toolchain to lay it out as if it were ILP64 even though the target is
-ILP32.
+Via OF graph or simply a property in PHY node?
 
-2. I think you should make a conscious decision as to whether the
-ILP32-ness of a syscall is a property of the task or of the syscall.
-On x86, x32-ness is a property of the syscall, but historically it
-also got rather entangled with the state of the task, and the result
-was a mess.  It looks like you're making it be a property of the task,
-which is fine, but you're making it impossible for very clever ILP32
-libraries to include little ILP64 stubs that do fancy things with full
-64-bit syscalls.
-
-3. Make very certain that you aren't exploitable by malicious
-processes that set the high bits in ILP32 syscall args.  x86 compat
-has issues like that in the past.
+> 
+> > +
+> > +Example:
+> > +	usb3phy: phy at 5210000 {
+> 
+> usb-phy@
+> 
+> > +		compatible = "allwinner,sun50i-h6-usb3-phy";
+> > +		reg = <0x5210000 0x10000>;
+> > +		clocks = <&ccu CLK_USB_PHY1>;
+> > +		resets = <&ccu RST_USB_PHY1>;
+> > +		#phy-cells = <0>;
+> > +		status = "disabled";
+> 
+> Don't show status in examples.
+> 
+> > +	};
+> > -- 
+> > 2.18.0
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
