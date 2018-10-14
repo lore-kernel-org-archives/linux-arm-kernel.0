@@ -1,59 +1,191 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sun, 14 Oct 2018 14:34:47 +0000
-Subject: [PATCH V2 1/4] arm64: imx: add imx8qxp support
+Date: Sun, 14 Oct 2018 14:34:56 +0000
+Subject: [PATCH V2 3/4] arm64: dts: imx: add imx8qxp mek support
 In-Reply-To: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
 References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1539527419-23613-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1539527419-23613-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx8qxp support.
+Add imx8qxp mek board support.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-v1->v2:
- * update CONFIG option name
----
- arch/arm64/Kconfig.platforms | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ Documentation/devicetree/bindings/arm/fsl.txt |   4 +
+ arch/arm64/boot/dts/freescale/Makefile        |   1 +
+ arch/arm64/boot/dts/freescale/imx8qxp-mek.dts | 134 ++++++++++++++++++++++++++
+ 3 files changed, 139 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 393d2b5..c7324b1 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -139,6 +139,28 @@ config ARCH_MVEBU
- 	   - Armada 7K SoC Family
- 	   - Armada 8K SoC Family
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index baeb1fc..704472b 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -97,6 +97,10 @@ i.MX7 SabreSD Board
+ Required root node properties:
+     - compatible = "fsl,imx7d-sdb", "fsl,imx7d";
  
-+config ARCH_MXC
-+	bool "ARMv8 based NXP i.MX SoC family"
-+	select GPIOLIB
-+	select PINCTRL
-+	select PM
-+	select PM_GENERIC_DOMAINS
-+	select SOC_BUS
-+	help
-+	  This enables support for the ARMv8 based SoCs in the
-+	  NXP i.MX family.
++i.MX8QXP MEK Board
++Required root node properties:
++    - compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
 +
-+config SOC_IMX8QXP
-+	bool "i.MX8QXP"
-+	depends on ARCH_MXC
-+	select IMX_MBOX
-+	select IMX_SCU
-+	select IMX_SCU_PD
-+	select MXC_CLK_SCU
-+	select PINCTRL_IMX8QXP
-+	help
-+	  This enables support for NXP i.MX8QXP SoC.
+ Generic i.MX boards
+ -------------------
+ 
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 86e18ad..cff87f3 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
++dtb-$(CONFIG_SOC_IMX8QXP) += imx8qxp-mek.dtb
+diff --git a/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
+new file mode 100644
+index 0000000..04e3a42
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
+@@ -0,0 +1,134 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright 2017~2018 NXP
++ */
 +
- config ARCH_QCOM
- 	bool "Qualcomm Platforms"
- 	select GPIOLIB
++/dts-v1/;
++
++#include "imx8qxp.dtsi"
++
++/ {
++	model = "Freescale i.MX8QXP MEK";
++	compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
++
++	chosen {
++		stdout-path = &dma_lpuart0;
++	};
++
++	reg_usdhc2_vmmc: usdhc2-vmmc {
++		compatible = "regulator-fixed";
++		regulator-name = "SD1_SPWR";
++		regulator-min-microvolt = <3000000>;
++		regulator-max-microvolt = <3000000>;
++		gpio = <&lsio_gpio4 19 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&dma_lpuart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_lpuart0>;
++	status = "okay";
++};
++
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1>;
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethphy0>;
++	fsl,magic-packet;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			at803x,eee-disabled;
++			at803x,vddio-1p8v;
++			reg = <0>;
++		};
++
++		ethphy1: ethernet-phy at 1 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			at803x,eee-disabled;
++			at803x,vddio-1p8v;
++			reg = <1>;
++		};
++	};
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	bus-width = <4>;
++	vmmc-supply = <&reg_usdhc2_vmmc>;
++	cd-gpios = <&lsio_gpio4 22 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&lsio_gpio4 21 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_fec1: fec1grp {
++		fsl,pins = <
++			SC_P_ENET0_MDC_CONN_ENET0_MDC			0x06000020
++			SC_P_ENET0_MDIO_CONN_ENET0_MDIO			0x06000020
++			SC_P_ENET0_RGMII_TX_CTL_CONN_ENET0_RGMII_TX_CTL	0x06000020
++			SC_P_ENET0_RGMII_TXC_CONN_ENET0_RGMII_TXC	0x06000020
++			SC_P_ENET0_RGMII_TXD0_CONN_ENET0_RGMII_TXD0	0x06000020
++			SC_P_ENET0_RGMII_TXD1_CONN_ENET0_RGMII_TXD1	0x06000020
++			SC_P_ENET0_RGMII_TXD2_CONN_ENET0_RGMII_TXD2	0x06000020
++			SC_P_ENET0_RGMII_TXD3_CONN_ENET0_RGMII_TXD3	0x06000020
++			SC_P_ENET0_RGMII_RXC_CONN_ENET0_RGMII_RXC	0x06000020
++			SC_P_ENET0_RGMII_RX_CTL_CONN_ENET0_RGMII_RX_CTL	0x06000020
++			SC_P_ENET0_RGMII_RXD0_CONN_ENET0_RGMII_RXD0	0x06000020
++			SC_P_ENET0_RGMII_RXD1_CONN_ENET0_RGMII_RXD1	0x06000020
++			SC_P_ENET0_RGMII_RXD2_CONN_ENET0_RGMII_RXD2	0x06000020
++			SC_P_ENET0_RGMII_RXD3_CONN_ENET0_RGMII_RXD3	0x06000020
++		>;
++	};
++
++	pinctrl_lpuart0: lpuart0grp {
++		fsl,pins = <
++			SC_P_UART0_RX_ADMA_UART0_RX			0x06000020
++			SC_P_UART0_TX_ADMA_UART0_TX			0x06000020
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			SC_P_EMMC0_CLK_CONN_EMMC0_CLK			0x06000041
++			SC_P_EMMC0_CMD_CONN_EMMC0_CMD			0x00000021
++			SC_P_EMMC0_DATA0_CONN_EMMC0_DATA0		0x00000021
++			SC_P_EMMC0_DATA1_CONN_EMMC0_DATA1		0x00000021
++			SC_P_EMMC0_DATA2_CONN_EMMC0_DATA2		0x00000021
++			SC_P_EMMC0_DATA3_CONN_EMMC0_DATA3		0x00000021
++			SC_P_EMMC0_DATA4_CONN_EMMC0_DATA4		0x00000021
++			SC_P_EMMC0_DATA5_CONN_EMMC0_DATA5		0x00000021
++			SC_P_EMMC0_DATA6_CONN_EMMC0_DATA6		0x00000021
++			SC_P_EMMC0_DATA7_CONN_EMMC0_DATA7		0x00000021
++			SC_P_EMMC0_STROBE_CONN_EMMC0_STROBE		0x00000041
++		>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			SC_P_USDHC1_CLK_CONN_USDHC1_CLK			0x06000041
++			SC_P_USDHC1_CMD_CONN_USDHC1_CMD			0x00000021
++			SC_P_USDHC1_DATA0_CONN_USDHC1_DATA0		0x00000021
++			SC_P_USDHC1_DATA1_CONN_USDHC1_DATA1		0x00000021
++			SC_P_USDHC1_DATA2_CONN_USDHC1_DATA2		0x00000021
++			SC_P_USDHC1_DATA3_CONN_USDHC1_DATA3		0x00000021
++			SC_P_USDHC1_VSELECT_CONN_USDHC1_VSELECT		0x00000021
++		>;
++	};
++};
 -- 
 2.7.4
