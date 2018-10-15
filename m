@@ -1,53 +1,95 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 15 Oct 2018 18:37:06 +0530
-Subject: [PATCH 04/19] PCI: keystone: Do not initiate link training multiple
- times
+Date: Mon, 15 Oct 2018 18:37:04 +0530
+Subject: [PATCH 02/19] PCI: keystone: Use quirk to set MRRS for PCI host bridge
 In-Reply-To: <20181015130721.5535-1-kishon@ti.com>
 References: <20181015130721.5535-1-kishon@ti.com>
-Message-ID: <20181015130721.5535-5-kishon@ti.com>
+Message-ID: <20181015130721.5535-3-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 886bc5ceb5cc3ad4b219502d72 ("PCI: designware: Add generic
-dw_pcie_wait_for_link()") while adding a generic dw_pcie_wait_for_link()
-performed a special handling (initiate link training multiple times) for
-keystone which is not required. This also resulted in unncessarily waiting
-for more time to establish the link even when no PCI device is connected.
-
-Remove it and make it look similar to other dwc based PCIe drivers.
+Reuse the already existing quirk to set MRRS for PCI host bridge
+instead of explicitly setting MRRS in ks_pcie_host_init.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 37 +++++++++--------------
+ 1 file changed, 15 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index afb948372077..aa7e706fc37d 100644
+index 7d43e10a03b0..5d9c5d199ada 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -87,19 +87,17 @@ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+@@ -43,7 +43,7 @@
+ static void quirk_limit_mrrs(struct pci_dev *dev)
  {
- 	struct dw_pcie *pci = ks_pcie->pci;
- 	struct device *dev = pci->dev;
--	unsigned int retries;
+ 	struct pci_bus *bus = dev->bus;
+-	struct pci_dev *bridge = bus->self;
++	struct pci_dev *bridge;
+ 	static const struct pci_device_id rc_pci_devids[] = {
+ 		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2HK),
+ 		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+@@ -57,7 +57,7 @@ static void quirk_limit_mrrs(struct pci_dev *dev)
+ 	};
  
- 	if (dw_pcie_link_up(pci)) {
- 		dev_info(dev, "Link already up\n");
- 		return 0;
+ 	if (pci_is_root_bus(bus))
+-		return;
++		bridge = dev;
+ 
+ 	/* look for the host bridge */
+ 	while (!pci_is_root_bus(bus)) {
+@@ -65,18 +65,19 @@ static void quirk_limit_mrrs(struct pci_dev *dev)
+ 		bus = bus->parent;
  	}
  
-+	ks_dw_pcie_initiate_link_train(ks_pcie);
+-	if (bridge) {
+-		/*
+-		 * Keystone PCI controller has a h/w limitation of
+-		 * 256 bytes maximum read request size.  It can't handle
+-		 * anything higher than this.  So force this limit on
+-		 * all downstream devices.
+-		 */
+-		if (pci_match_id(rc_pci_devids, bridge)) {
+-			if (pcie_get_readrq(dev) > 256) {
+-				dev_info(&dev->dev, "limiting MRRS to 256\n");
+-				pcie_set_readrq(dev, 256);
+-			}
++	if (!bridge)
++		return;
 +
- 	/* check if the link is up or not */
--	for (retries = 0; retries < 5; retries++) {
--		ks_dw_pcie_initiate_link_train(ks_pcie);
--		if (!dw_pcie_wait_for_link(pci))
--			return 0;
--	}
-+	if (!dw_pcie_wait_for_link(pci))
-+		return 0;
++	/*
++	 * Keystone PCI controller has a h/w limitation of
++	 * 256 bytes maximum read request size.  It can't handle
++	 * anything higher than this.  So force this limit on
++	 * all downstream devices.
++	 */
++	if (pci_match_id(rc_pci_devids, bridge)) {
++		if (pcie_get_readrq(dev) > 256) {
++			dev_info(&dev->dev, "limiting MRRS to 256\n");
++			pcie_set_readrq(dev, 256);
+ 		}
+ 	}
+ }
+@@ -264,7 +265,6 @@ static int __init ks_pcie_host_init(struct pcie_port *pp)
+ {
+ 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+ 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
+-	u32 val;
  
- 	dev_err(dev, "phy link never came up\n");
- 	return -ETIMEDOUT;
+ 	ks_pcie_establish_link(ks_pcie);
+ 	ks_dw_pcie_setup_rc_app_regs(ks_pcie);
+@@ -275,13 +275,6 @@ static int __init ks_pcie_host_init(struct pcie_port *pp)
+ 	/* update the Vendor ID */
+ 	writew(ks_pcie->device_id, pci->dbi_base + PCI_DEVICE_ID);
+ 
+-	/* update the DEV_STAT_CTRL to publish right mrrs */
+-	val = readl(pci->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
+-	val &= ~PCI_EXP_DEVCTL_READRQ;
+-	/* set the mrrs to 256 bytes */
+-	val |= BIT(12);
+-	writel(val, pci->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
+-
+ 	/*
+ 	 * PCIe access errors that result into OCP errors are caught by ARM as
+ 	 * "External aborts"
 -- 
 2.17.1
