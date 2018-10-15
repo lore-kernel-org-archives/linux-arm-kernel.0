@@ -1,48 +1,46 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Mon, 15 Oct 2018 12:14:09 +0000
-Subject: [PATCH v2 2/7] spi: spi-mem: add support for octal I/O data transfer
+Date: Mon, 15 Oct 2018 12:14:39 +0000
+Subject: [PATCH v2 7/7] arm64: dts: lx2160a: update fspi node
 In-Reply-To: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 References: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1539605534-22302-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1539605534-22302-8-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for octal I/O data transfer in spi-mem framework.
+Flash mt35xu512aba connected to FlexSPI controller supports
+1-1-8/1-8-8 protocol.
+Added flag spi-rx-bus-width and spi-tx-bus-width with values as
+8 and 8 respectively for both flashes connected at CS0 and CS1.
 
 Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
 Changes for v2:
- Patch added in v2 version.
+ Make spi-tx-bus-width as 8.
 
- drivers/spi/spi-mem.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/spi/spi-mem.c b/drivers/spi/spi-mem.c
-index c6bdea7..6fa95f8 100644
---- a/drivers/spi/spi-mem.c
-+++ b/drivers/spi/spi-mem.c
-@@ -12,7 +12,7 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+index 3b20c97..24cc41c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+@@ -45,6 +45,8 @@
+ 		m25p,fast-read;
+ 		spi-max-frequency = <20000000>;
+ 		reg = <0>;
++		spi-rx-bus-width = <8>;
++		spi-tx-bus-width = <8>;
+ 	};
  
- #include "internals.h"
+ 	mt35xu512aba1: flash at 1 {
+@@ -54,6 +56,8 @@
+ 		m25p,fast-read;
+ 		spi-max-frequency = <20000000>;
+ 		reg = <1>;
++		spi-rx-bus-width = <8>;
++		spi-tx-bus-width = <8>;
+ 	};
+ };
  
--#define SPI_MEM_MAX_BUSWIDTH		4
-+#define SPI_MEM_MAX_BUSWIDTH		8
- 
- /**
-  * spi_controller_dma_map_mem_op_data() - DMA-map the buffer attached to a
-@@ -121,6 +121,13 @@ static int spi_check_buswidth_req(struct spi_mem *mem, u8 buswidth, bool tx)
- 
- 		break;
- 
-+	case 8:
-+		if ((tx && (mode & SPI_TX_OCTAL)) ||
-+		    (!tx && (mode & SPI_RX_OCTAL)))
-+			return 0;
-+
-+		break;
-+
- 	default:
- 		break;
- 	}
 -- 
 2.7.4
