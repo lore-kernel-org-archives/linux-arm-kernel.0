@@ -1,38 +1,67 @@
-From: adam.cottrel@veea.com (Adam Cottrel)
-Date: Mon, 15 Oct 2018 15:24:55 +0000
-Subject: DMA remote memcpy requests
-In-Reply-To: <20181015150912.GA8789@hc>
-References: <DM6PR04MB405938028EC04FBD07F3D96AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181012090937.GA12289@arm.com>
- <DM6PR04MB4059742D494D96FC11674A50F2E20@DM6PR04MB4059.namprd04.prod.outlook.com>
- <b56bf98f-5055-fb85-7807-e45d495369f3@arm.com>
- <DM6PR04MB405918E803AF4FCC34B12083F2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181015150912.GA8789@hc>
-Message-ID: <DM6PR04MB4059991247828ADBD6133D2FF2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 15 Oct 2018 17:26:18 +0200
+Subject: [PATCH v2 2/6] clocksource: exynos_mct: Fix error path in timer
+ resources initialization
+In-Reply-To: <20181015123112.9379-3-m.szyprowski@samsung.com>
+References: <CGME20181015123135eucas1p18df135504c9476cead8da6463226cdec@eucas1p1.samsung.com>
+ <20181015123112.9379-1-m.szyprowski@samsung.com>
+ <20181015123112.9379-3-m.szyprowski@samsung.com>
+Message-ID: <CAJKOXPfUHOmMmwty0v-vSvr_110tGU5roo2DduJWPWu5q_to0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jan,
+On Mon, 15 Oct 2018 at 14:31, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+> While freeing interrupt handlers in error path, don't assume that all
+> requested interrupts are per-processor interrupts and properly release
+> standard interrupts too.
 
-> from your description this sound like it:
-> - only happens under memory pressure
-> - only happens when you combine atheros DMA with something else (or
-> does
->   the MMC stress test trigger any faults on its own?)
-> 
-> With that I would look through all the allocations in the atheros driver and
-> especially look for any missing error handling. But that's just my 2 cents,
-> maybe Robin or Will can give better advise here...
+Thanks for fixing!
 
-That is good advice.
+> Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
 
->From what I can see, there are checks made on every alloc, however, it is possible that the failure is silently handled.
+It is a bug so how about:
+Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+?
 
-For example, memory is allocated with __GFP_IGNORE and the error flag is lost because the called returned void...
+> Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-I have put in a lot of debug code to look for this type of fault - it is possible that I have missed the exact point of failure...
+Anyway I am fine so:
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Is there some kind of queue of outstanding remote DMA requests? And if so, is it possible that the request queue can overflow in some way?
+Best regards,
+Krzysztof
 
-Best,
-Adam
+> ---
+>  drivers/clocksource/exynos_mct.c | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 43b335ff4a96..a379f11fad2d 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -562,7 +562,19 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+>         return 0;
+>
+>  out_irq:
+> -       free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
+> +       if (mct_int_type == MCT_INT_PPI) {
+> +               free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
+> +       } else {
+> +               for_each_possible_cpu(cpu) {
+> +                       struct mct_clock_event_device *pcpu_mevt =
+> +                               per_cpu_ptr(&percpu_mct_tick, cpu);
+> +
+> +                       if (pcpu_mevt->evt.irq != -1) {
+> +                               free_irq(pcpu_mevt->evt.irq, pcpu_mevt);
+> +                               pcpu_mevt->evt.irq = -1;
+> +                       }
+> +               }
+> +       }
+>         return err;
+>  }
+>
+> --
+> 2.17.1
+>
