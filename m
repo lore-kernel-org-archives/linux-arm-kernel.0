@@ -1,49 +1,38 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 15 Oct 2018 11:23:44 -0400 (EDT)
-Subject: [PATCH v2] usb: host: ohci-at91: fix request of irq for optional
- gpio
-In-Reply-To: <20181015090001.5195-1-tudor.ambarus@microchip.com>
-Message-ID: <Pine.LNX.4.44L0.1810151123330.1394-100000@iolanthe.rowland.org>
+From: adam.cottrel@veea.com (Adam Cottrel)
+Date: Mon, 15 Oct 2018 15:24:55 +0000
+Subject: DMA remote memcpy requests
+In-Reply-To: <20181015150912.GA8789@hc>
+References: <DM6PR04MB405938028EC04FBD07F3D96AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
+ <20181012090937.GA12289@arm.com>
+ <DM6PR04MB4059742D494D96FC11674A50F2E20@DM6PR04MB4059.namprd04.prod.outlook.com>
+ <b56bf98f-5055-fb85-7807-e45d495369f3@arm.com>
+ <DM6PR04MB405918E803AF4FCC34B12083F2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
+ <20181015150912.GA8789@hc>
+Message-ID: <DM6PR04MB4059991247828ADBD6133D2FF2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Oct 2018 Tudor.Ambarus at microchip.com wrote:
+Dear Jan,
 
-> atmel,oc-gpio is optional. Request its irq only when atmel,oc is set
-> in device tree.
+> from your description this sound like it:
+> - only happens under memory pressure
+> - only happens when you combine atheros DMA with something else (or
+> does
+>   the MMC stress test trigger any faults on its own?)
 > 
-> devm_gpiod_get_index_optional returns NULL if -ENOENT. Check its
-> return value for NULL before error, because it is more probable that
-> atmel,oc is not set.
-> 
-> This fixes the following errors on boards where atmel,oc is not set in
-> device tree:
-> [    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
-> [    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
-> [    0.970000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
-> 
-> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-> ---
-> v2: fix typos in commit message s/it's/its, s/probably/probable
-> 
-> Based on https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git,
-> usb-next branch.
-> 
->  drivers/usb/host/ohci-at91.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index e98673954020..ec6739ef3129 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -551,6 +551,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  		pdata->overcurrent_pin[i] =
->  			devm_gpiod_get_index_optional(&pdev->dev, "atmel,oc",
->  						      i, GPIOD_IN);
-> +		if (!pdata->overcurrent_pin[i])
-> +			continue;
->  		if (IS_ERR(pdata->overcurrent_pin[i])) {
->  			err = PTR_ERR(pdata->overcurrent_pin[i]);
->  			dev_err(&pdev->dev, "unable to claim gpio \"overcurrent\": %d\n", err);
+> With that I would look through all the allocations in the atheros driver and
+> especially look for any missing error handling. But that's just my 2 cents,
+> maybe Robin or Will can give better advise here...
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+That is good advice.
+
+>From what I can see, there are checks made on every alloc, however, it is possible that the failure is silently handled.
+
+For example, memory is allocated with __GFP_IGNORE and the error flag is lost because the called returned void...
+
+I have put in a lot of debug code to look for this type of fault - it is possible that I have missed the exact point of failure...
+
+Is there some kind of queue of outstanding remote DMA requests? And if so, is it possible that the request queue can overflow in some way?
+
+Best,
+Adam
