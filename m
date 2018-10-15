@@ -1,37 +1,24 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 15 Oct 2018 20:55:00 +0200
-Subject: [PATCH v2] ARM: error out if compiling ARMv6 using Clang before 8.0
-Message-ID: <20181015185500.679-1-stefan@agner.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 15 Oct 2018 14:11:12 -0500
+Subject: [PATCH 2/3] dt-bindings: cadence-quadspi: Add new compatible for
+ AM654 SoC
+In-Reply-To: <20181003165603.2579-3-vigneshr@ti.com>
+References: <20181003165603.2579-1-vigneshr@ti.com>
+ <20181003165603.2579-3-vigneshr@ti.com>
+Message-ID: <20181015191112.GA6923@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel passes the ArmV6K architecture to the compiler when
-using the multi platform selection and enabling ARMv6. Clang
-older than version 8.0 emit assembly with an non-existing CPU,
-which then makes the GNU assembler fail. Warn users when
-compiling ARMv6 using Clang before 8.0.
+On Wed, 3 Oct 2018 22:26:02 +0530, Vignesh R wrote:
+> AM654 SoC has Cadence Octal SPI controller, which is similar to Cadence
+> QSPI controller but supports Octal IO(x8 data lines) and Double Data
+> Rate(DDR) mode. Add new compatible to support OSPI controller on TI's
+> AM654 SoCs.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/cadence-quadspi.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
 
-Suggested-by: Russell King <linux@armlinux.org.uk>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Link: https://github.com/ClangBuiltLinux/linux/issues/55
----
- include/linux/compiler-clang.h | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
-index b1ce500fe8b3..9df8713bef38 100644
---- a/include/linux/compiler-clang.h
-+++ b/include/linux/compiler-clang.h
-@@ -3,6 +3,10 @@
- #error "Please don't include <linux/compiler-clang.h> directly, include <linux/compiler.h> instead."
- #endif
- 
-+#if defined(CONFIG_ARCH_MULTI_V6) && CONFIG_CLANG_VERSION < 80000
-+#error "Sorry, your compiler is too old - please upgrade it."
-+#endif
-+
- /* Some compiler specific definitions are overwritten here
-  * for Clang compiler
-  */
--- 
-2.19.1
+Reviewed-by: Rob Herring <robh@kernel.org>
