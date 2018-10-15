@@ -1,40 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 15 Oct 2018 14:31:10 +0200
-Subject: [PATCH v2 4/6] clocksource: Change CPU hotplug priority of
- exynos_mct driver
+Date: Mon, 15 Oct 2018 14:31:12 +0200
+Subject: [PATCH v2 6/6] arm64: platform: Add enable Exynos Multi-Core Timer
+ driver
 In-Reply-To: <20181015123112.9379-1-m.szyprowski@samsung.com>
 References: <20181015123112.9379-1-m.szyprowski@samsung.com>
- <CGME20181015123136eucas1p2f7d4ae86ba3547b891749b01514cd335@eucas1p2.samsung.com>
-Message-ID: <20181015123112.9379-5-m.szyprowski@samsung.com>
+ <CGME20181015123137eucas1p1cf043644b9b40e15c9d2f221f26bef51@eucas1p1.samsung.com>
+Message-ID: <20181015123112.9379-7-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos Multi-Core Timer driver (exynos_mct) must be started before
-ARM Architected Timers (arch_timer), because both timers share common
-hardware block and turning on MCT is needed to get ARM Architected
-Timer working properly.
+On Exynos SoCs enabling MCT driver is required even if ARM Architected
+Timer driver is used to for managing timer hardware and clock source
+events.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- include/linux/cpuhotplug.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index caf40ad0bbc6..5d9e4a6ea299 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -115,10 +115,10 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_ARM_ACPI_STARTING,
- 	CPUHP_AP_PERF_ARM_STARTING,
- 	CPUHP_AP_ARM_L2X0_STARTING,
-+	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
- 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
- 	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
- 	CPUHP_AP_JCORE_TIMER_STARTING,
--	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
- 	CPUHP_AP_ARM_TWD_STARTING,
- 	CPUHP_AP_QCOM_TIMER_STARTING,
- 	CPUHP_AP_ARMADA_TIMER_STARTING,
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 51bc479334a4..7cc687580fad 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -62,6 +62,7 @@ config ARCH_BRCMSTB
+ config ARCH_EXYNOS
+ 	bool "ARMv8 based Samsung Exynos SoC family"
+ 	select COMMON_CLK_SAMSUNG
++	select CLKSRC_EXYNOS_MCT
+ 	select EXYNOS_PM_DOMAINS if PM_GENERIC_DOMAINS
+ 	select EXYNOS_PMU
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
 -- 
 2.17.1
