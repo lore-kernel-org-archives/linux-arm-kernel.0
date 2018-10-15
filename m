@@ -1,135 +1,108 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 15 Oct 2018 09:33:35 +0000
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <153937368201.5275.2313781259297807972@swboyd.mtv.corp.google.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
- <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
- <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
- <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
- <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
- <153898445180.119890.15025812558797341532@swboyd.mtv.corp.google.com>
- <DB3PR0402MB391664354775DF42E90E67C9F5E60@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <153937368201.5275.2313781259297807972@swboyd.mtv.corp.google.com>
-Message-ID: <DB3PR0402MB39169A3BA844F7833B62FF55F5FD0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Oct 2018 11:40:53 +0200
+Subject: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+In-Reply-To: <AM0PR04MB421179CEB214D46BCDE6ACF280FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
+ <1539527419-23613-3-git-send-email-aisheng.dong@nxp.com>
+ <20181015065859.lxevjroly435hlaq@pengutronix.de>
+ <AM0PR04MB42117867A50BB18D8127BE8080FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20181015082751.ytuleg67p5pgtnov@pengutronix.de>
+ <AM0PR04MB421179CEB214D46BCDE6ACF280FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20181015094053.7bpydkdhyds25n3u@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stephen
-
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Stephen Boyd <sboyd@kernel.org>
-> Sent: Saturday, October 13, 2018 3:48 AM
-> To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
-> Anson Huang <anson.huang@nxp.com>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
-> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
-> Cc: dl-linux-imx <linux-imx@nxp.com>
-> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-> 
-> Quoting Anson Huang (2018-10-08 01:34:59)
-> > > Quoting Anson Huang (2018-09-03 00:20:53)
-> > > > > > On 08/31/2018 03:29 AM, Stephen Boyd wrote:
-> > > > > > > Quoting Peng Fan (2018-08-12 18:15:41)
-> > > > > > >> Hi Anson,
-> > > > > > >>
-> > > > > > >>>>> -----Original Message-----
-> > > > > > >>>>> From: Anson Huang
-> > > > > > >>>>> Sent: 2018?8?8? 12:39
-> > > > > > >>>>> To: shawnguo at kernel.org; s.hauer at pengutronix.de;
-> > > > > > >>>>> kernel at pengutronix.de; Fabio Estevam
-> > > > > > >>>>> <fabio.estevam@nxp.com>; mturquette at baylibre.com;
-> > > > > > >>>>> sboyd at kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > > > > >>>>> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
-> > > > > > >>>>> Cc: dl-linux-imx <linux-imx@nxp.com>
-> > > > > > >>>>> Subject: [PATCH 2/2] clk: imx: imx7d: remove
-> > > > > > >>>>> clks_init_on array
-> > > > > > >>>>>
-> > > > > > >>>>> Clock framework will enable those clocks registered with
-> > > > > > >>>>> CLK_IS_CRITICAL flag, so no need to have clks_init_on
-> > > > > > >>>>> array during clock
-> > > > > > >>>> initialization now.
-> > > > > > >>>>
-> > > > > > >>>> Will it be more flexible to parse dts saying "critical-clocks =
-> <xxx>"
-> > > > > > >>>> or "init-on-arrary=<xxx>"
-> > > > > > >>>> and enable those clocks?
-> > > > > > >>>
-> > > > > > >>> Parsing the clocks arrays from dtb is another way of
-> > > > > > >>> enabling critical clocks, but for current i.MX6/7
-> > > > > > >>> platforms, we implement it in same way as most of other
-> > > > > > >>> SoCs, currently I did NOT see any necessity of putting
-> > > > > > >>> them in dtb, just adding flag during clock registering is
-> > > > > > >>> more simple, if there is any special requirement for
-> > > > > > >>> different clocks set to be enabled, then we can add
-> > > > > > >>> support to enable
-> > > > > the method of parsing critical-clocks from dtb. Just my two cents.
-> > > > > > >>
-> > > > > > >> Thinking about OP-TEE want to use one device, but it's
-> > > > > > >> clocks are registered by Linux, because there is no module
-> > > > > > >> in Linux side use it, it will shutdown the clock, which
-> > > > > > >> cause OP-TEE could not access the
-> > > > > device.
-> > > > > > >>
-> > > > > > >> Then people have to modify clk code to add CLK_IS_CRITICAL
-> > > > > > >> flag to make sure the clocks are not shutdown by Linux.
-> > > > > > >>
-> > > > > > >> However adding a new property in clk node and let driver
-> > > > > > >> code parse the dts, there is no need to modify clk driver
-> > > > > > >> code when OP-TEE needs
-> > > > > another device clock.
-> > > > > > >>
-> > > > > > >
-> > > > > > > If OP-TEE needs linux to keep things on then why can't the
-> > > > > > > OP-TEE driver in Linux probe, acquire clocks, and keep the
-> > > > > > > clks enabled
-> > > forever?
-> > > > > >
-> > > > > > Sounds reasonable, but how could this be done without
-> > > > > > introducing platform-specific stuff in the OP-TEE driver?
-> > > > > >
-> > > > >
-> > > > > Why is that a goal?
+On Mon, Oct 15, 2018 at 09:03:04AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Monday, October 15, 2018 4:28 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; Mark Rutland
+> > <mark.rutland@arm.com>; dongas86 at gmail.com; devicetree at vger.kernel.org;
+> > catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > Subject: Re: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+> > 
+> > On Mon, Oct 15, 2018 at 08:08:31AM +0000, A.s. Dong wrote:
+> > > > > +		imx8qx-pm {
+> > > > > +			compatible = "fsl,scu-pd";
 > > > >
-> > > > I do NOT think we should consider such case in this patch series,
-> > > > whatever OP-TEE needs for its own feature, it should do necessary
-> > > > operations
-> > > either in its driver or somewhere else by adding new patch.
+> > > > I missed this earlier, but there should be a i.MX8qp specific
+> > > > compatible as the SCU API might change for future SoCs.
 > > > >
 > > >
-> > > Why can't we add clks to the op-tee node in DT's /firmware container?
-> > > Then any clks in there can be turned on forever and left enabled by
-> > > the linux driver?
-> >
-> > I did NOT run op-tee with Linux-next kernel before, can you advise more?
+> > > We still do not see that requirement up till now. Not sure if it would
+> > > be possible in the future. I see low possibilities.
+> > > SCU IPC is designed to be generic to all MX8 SCU firmwares.
+> > 
+> > And i.MX9? i.MX10?
+> > 
 > 
-> Neither have I, so I can't advise more.
-> 
-> > And I think if op-tee has such requirement, can we have another patch
-> > to cover it?
-> 
-> Yes.
-> 
-> 
-> > I believe all other i.MX platforms also have same requirements if
-> > considering op-tee support, so I think it should be another topic, what do you
-> think?
-> >
-> 
-> I'm going to drop these patches from my review queue. Please resend them
-> and please include the op-tee patches too.
+> MX8DM MX8DXP
 
+I was not talking about existing SoCs, I was talking about future SoCs.
 
-I do NOT know how to include the op-tee patch to meet special requirement, should
-the op-tee related patch be added later when someone actually add the op-tee support for i.MX7?
-It should NOT block this patch set, do you think we can add this patch set first?
+> 
+> > > Even it changes, SCU firmware version control may helps.
+> > 
+> > It's not the first time that the position of the version field changes with a
+> > newer version.
+> > 
+> 
+> I understand your worry. 
+> Up till now all SCU firmware based SoCs are all using one generic IPC driver internally.
+> And I have not heard a possible changing in the future.
+> I double checked the SCU firmware implementation that the IPC
+> Is deigned to be platform independent. So it's less to be changed.
+> So I wonder if this could be over worried.
+> Even it is changed, (quite less probility), we still can user version
+> To distinguish them, just like arm,scpi , arm,scmi. Right?
 
-Anson.
+You can still add and use a generic compatible, but does it hurt when
+you add a SoC specific one that you *can* use should you have to?
+
+> 
+> > >
+> > > > > +			compatible = "fsl,imx7ulp-lpuart";
+> > > > > +			compatible = "fsl,imx7ulp-lpi2c";
+> > > > > +			compatible = "fsl,imx7d-usdhc";
+> > > >
+> > > > All these lack the most specific imx8qp compatible.
+> > > >
+> > >
+> > > Adding them requires binding doc update as well.
+> > > S I suppose they could be added later when the QXP specific features
+> > > are really supported by the drivers.
+> > > Do you think it's okay?
+> > 
+> > Newer Kernels should work with older device trees, so once you roll out these
+> > compatibles it's too late already.
+> > 
+> 
+> The backwards compatible string is used to guarantee a basic function.
+> Even we add qxp specific compatible string later, it still can work with
+> backwards function. So I'm not quite get what the real problem is.
+> And this is the initial support that we don't expect the full features
+> with such an early device tree, right?
+
+By not adding a SoC compatible you lose the possibility to add a SoC
+specific fixup without changing the device tree or you have to work with
+quirks like:
+
+https://elixir.bootlin.com/linux/latest/source/drivers/clocksource/timer-imx-gpt.c#L521
+
+or
+
+https://elixir.bootlin.com/linux/latest/source/drivers/spi/spi-imx.c#L1182
+
+So far we have added new compatibles with each new SoC type for good
+reasons, so why should we change this?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
