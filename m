@@ -1,26 +1,90 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 15 Oct 2018 09:31:19 +0200
-Subject: [PATCH v2 6/9] ASoC: sunxi: allow the sun8i-codec driver to be
- built on ARM64
-In-Reply-To: <20181013165329.13363-7-anarsoul@gmail.com>
-References: <20181013165329.13363-1-anarsoul@gmail.com>
- <20181013165329.13363-7-anarsoul@gmail.com>
-Message-ID: <20181015073119.fgsixra3nw3aannd@flea>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Oct 2018 09:32:07 +0200
+Subject: [PATCH V4 05/11] clk: imx: scu: add scu clock gate
+In-Reply-To: <1539504194-28289-6-git-send-email-aisheng.dong@nxp.com>
+References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
+ <1539504194-28289-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181015073207.66npcgegibl2rybb@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 09:53:26AM -0700, Vasily Khoruzhick wrote:
-> Allwinner A64 uses the same digital codec part as in A33, so we need
-> to build this driver on ARM64 as well.
-> 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+On Sun, Oct 14, 2018 at 08:07:56AM +0000, A.s. Dong wrote:
+> +/* Write to the LPCG bits. */
+> +static int clk_gate_scu_enable(struct clk_hw *hw)
+> +{
+> +	struct clk_gate_scu *gate = to_clk_gate_scu(hw);
+> +	u32 reg;
+> +
+> +	if (gate->reg) {
+> +		reg = readl(gate->reg);
+> +		reg &= ~(CLK_GATE_SCU_LPCG_MASK << gate->bit_idx);
+> +		if (gate->hw_gate)
+> +			reg |= (CLK_GATE_SCU_LPCG_HW_SEL |
+> +				CLK_GATE_SCU_LPCG_SW_SEL) << gate->bit_idx;
+> +		else
+> +			reg |= (CLK_GATE_SCU_LPCG_SW_SEL << gate->bit_idx);
+> +		writel(reg, gate->reg);
+> +	}
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+These register manipulations look like they need locking.
 
-Thanks!
-Maxime
+> +
+> +	return 0;
+> +}
+> +
+> +struct clk_hw *clk_register_gate_scu(const char *name, const char *parent_name,
+> +				     unsigned long flags, u32 rsrc_id,
+> +				     u8 clk_type, void __iomem *reg,
+> +				     u8 bit_idx, bool hw_gate)
+> +{
+> +	struct clk_gate_scu *gate;
+> +	struct clk_init_data init;
+> +	struct clk_hw *hw;
+> +	int ret;
+> +
+> +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> +	if (!gate)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	gate->rsrc_id = rsrc_id;
+> +	gate->clk_type = clk_type;
+> +	if (reg) {
+> +		gate->reg = ioremap((phys_addr_t)reg, SZ_64K);
+
+ioremap never takes a void __iomem * as argument. Given that you have to
+cast it here to another type and to void __iomem * when calling this
+function is a clear sign that the type of this variable is poorly
+chosen.
+
+> +		if (!gate->reg) {
+> +			kfree(gate);
+> +			return ERR_PTR(-ENOMEM);
+> +		}
+> +	}
+> +
+> +	gate->bit_idx = bit_idx;
+> +	gate->hw_gate = hw_gate;
+> +
+> +	init.name = name;
+> +	init.ops = &clk_gate_scu_ops;
+> +	init.flags = flags;
+> +	init.parent_names = parent_name ? &parent_name : NULL;
+> +	init.num_parents = parent_name ? 1 : 0;
+> +
+> +	gate->hw.init = &init;
+> +
+> +	hw = &gate->hw;
+> +	ret = clk_hw_register(NULL, hw);
+> +	if (ret) {
+> +		iounmap(gate->reg);
+
+Is iounmap on a NULL pointer allowed? Otherwise the error path is wrong
+here.
+
+Sascha
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
