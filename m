@@ -1,37 +1,58 @@
 From: vkoul@kernel.org (Vinod)
-Date: Mon, 15 Oct 2018 22:40:10 +0530
-Subject: [PATCH] dmaengine: owl: Fix warnings generated during build
-In-Reply-To: <20181008171631.5603-1-manivannan.sadhasivam@linaro.org>
-References: <20181008171631.5603-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181015171010.GL2400@vkoul-mobl>
+Date: Mon, 15 Oct 2018 22:44:03 +0530
+Subject: [PATCH v3 4/7] dmaengine: stm32-dma: Add DMA/MDMA chaining support
+In-Reply-To: <d64da587-a680-20c4-7139-f59fd1f299bc@st.com>
+References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
+ <1538139715-24406-5-git-send-email-pierre-yves.mordret@st.com>
+ <20181007160030.GB2372@vkoul-mobl>
+ <e9cedfdd-ad90-9123-03bb-34a2e84059c5@st.com>
+ <20181010040343.GO2372@vkoul-mobl>
+ <d64da587-a680-20c4-7139-f59fd1f299bc@st.com>
+Message-ID: <20181015171403.GM2400@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-10-18, 22:46, Manivannan Sadhasivam wrote:
-> Following warnings are generated when compiled with W=1,
+On 10-10-18, 09:02, Pierre Yves MORDRET wrote:
 > 
-> drivers/dma/owl-dma.c:170: warning: Function parameter or member 'cyclic'
-> not described in 'owl_dma_txd'
-> drivers/dma/owl-dma.c:198: warning: Function parameter or member 'cfg' not
-> described in 'owl_dma_vchan'
-> drivers/dma/owl-dma.c:198: warning: Function parameter or member 'drq' not
-> described in 'owl_dma_vchan'
-> drivers/dma/owl-dma.c:225: warning: Function parameter or member 'irq' not
-> described in 'owl_dma'
 > 
-> Fix this by adding comments for relevant struct members to appear in
-> kernel-doc.
+> On 10/10/2018 06:03 AM, Vinod wrote:
+> > On 09-10-18, 10:40, Pierre Yves MORDRET wrote:
+> >>
+> >>
+> >> On 10/07/2018 06:00 PM, Vinod wrote:
+> >>> On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
+> >>>> This patch adds support of DMA/MDMA chaining support.
+> >>>> It introduces an intermediate transfer between peripherals and STM32 DMA.
+> >>>> This intermediate transfer is triggered by SW for single M2D transfer and
+> >>>> by STM32 DMA IP for all other modes (sg, cyclic) and direction (D2M).
+> >>>>
+> >>>> A generic SRAM allocator is used for this intermediate buffer
+> >>>> Each DMA channel will be able to define its SRAM needs to achieve chaining
+> >>>> feature : (2 ^ order) * PAGE_SIZE.
+> >>>> For cyclic, SRAM buffer is derived from period length (rounded on
+> >>>> PAGE_SIZE).
+> >>>
+> >>> So IIUC, you chain two dma txns together and transfer data via an SRAM?
+> >>
+> >> Correct. one DMA is DMAv2 (stm32-dma) and the other is MDMA(stm32-mdma).
+> >> Intermediate transfer is between device and memory.
+> >> This intermediate transfer is using SDRAM.
+> > 
+> > Ah so you use dma calls to setup mdma xtfers? I dont think that is a
+> > good idea. How do you know you should use mdma for subsequent transfer?
+> > 
 > 
-> Fixes: d64e1b3f5cce ("dmaengine: owl: Add Slave and Cyclic mode support for
-> Actions Semi Owl S900 SoC")
-> 
+> When user bindings told to setup chaining intermediate MDMA transfers are always
+> triggers.
+> For instance if a user requests a Dev2Mem transfer with chaining. From client
+> pov this is still a prep_slave_sg. Internally DMAv2 is setup in cyclic mode (in
+> double buffer mode indeed => 2 buffer of PAGE_SIZE/2) and destination is SDRAM.
+> DMAv2 will flip/flop on those 2 buffers.
+> At the same time DMAv2 driver prepares a MDMA SG that will fetch data from those
+> 2 buffers in SDRAM and fills final destination memory.
 
-This empty line is not required
+I am not able to follow is why does it need to be internal, why should
+the client not set the two transfers and trigger them?
 
-> Reported-by: Vinod Koul <vinod.koul@linaro.org>
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-
-
-Applied after removing the bogus empty line, thanks
 -- 
 ~Vinod
