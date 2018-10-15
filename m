@@ -1,43 +1,54 @@
-From: Tudor.Ambarus@microchip.com (Tudor.Ambarus at microchip.com)
-Date: Mon, 15 Oct 2018 08:34:04 +0000
-Subject: [PATCH] usb: host: ohci-at91: fix request of irq for optional gpio
-Message-ID: <20181015083344.4157-1-tudor.ambarus@microchip.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Mon, 15 Oct 2018 16:36:16 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
+ corruption on Hi16xx soc
+Message-ID: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel,oc-gpio is optional. Request it's irq only when atmel,oc is set
-in device tree.
+ITS translation register map:
+0x0000-0x003C	Reserved
+0x0040		GITS_TRANSLATER
+0x0044-0xFFFC	Reserved
 
-devm_gpiod_get_index_optional returns NULL if -ENOENT. Check its
-return value for NULL before error, because it is more probably that
-atmel,oc is not set.
+The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
+expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
+data will be written to MSIAddress each time.
 
-This fixes the following errors on boards where atmel,oc is not set in
-device tree:
-[    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
-[    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
-[    0.970000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
+MSIAddr: |----4bytes----|----4bytes----|
+	 |    MSIData   |    IMPDEF    |
 
-Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
+But it will overwrite the 4 bytes memory following "sync_count". It's very
+luckly that the previous and the next neighbour of "sync_count" are both aligned
+by 8 bytes, so no problem is met now.
+
+It's good to explicitly add a workaround:
+1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
+   aligned by 8 bytes.
+2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
+
+There is no functional change.
+
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
-Based on https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git,
-usb-next branch.
+ drivers/iommu/arm-smmu-v3.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
- drivers/usb/host/ohci-at91.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index e98673954020..ec6739ef3129 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -551,6 +551,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- 		pdata->overcurrent_pin[i] =
- 			devm_gpiod_get_index_optional(&pdev->dev, "atmel,oc",
- 						      i, GPIOD_IN);
-+		if (!pdata->overcurrent_pin[i])
-+			continue;
- 		if (IS_ERR(pdata->overcurrent_pin[i])) {
- 			err = PTR_ERR(pdata->overcurrent_pin[i]);
- 			dev_err(&pdev->dev, "unable to claim gpio \"overcurrent\": %d\n", err);
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 5059d09..a07bc0d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -586,7 +586,10 @@ struct arm_smmu_device {
+ 
+ 	struct arm_smmu_strtab_cfg	strtab_cfg;
+ 
++	union {
++	u64				padding; /* workaround for Hisilicon */
+ 	u32				sync_count;
++	} __attribute__((aligned(8)));
+ 
+ 	/* IOMMU core code handle */
+ 	struct iommu_device		iommu;
 -- 
-2.9.4
+1.8.3
