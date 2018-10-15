@@ -1,62 +1,43 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 15 Oct 2018 10:01:01 -0700
-Subject: [PATCH 2/3] clk: imx6q: optionally get CCM inputs via standard
- clock handles
-In-Reply-To: <AM0PR04MB4211DE29E5644C8C9A33278780310@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <20180731102009.6710-1-l.stach@pengutronix.de>
- <20180731102009.6710-2-l.stach@pengutronix.de>
- <AM0PR04MB4211DE29E5644C8C9A33278780310@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <153962286120.5275.13550019093922282541@swboyd.mtv.corp.google.com>
+From: vkoul@kernel.org (Vinod)
+Date: Mon, 15 Oct 2018 22:30:45 +0530
+Subject: [PATCH 0/7] NULL pointer deref fix for stm32-dma
+In-Reply-To: <20181009054752.145978-1-joel@joelfernandes.org>
+References: <20181009054752.145978-1-joel@joelfernandes.org>
+Message-ID: <20181015170045.GI2400@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-08-21 01:56:09)
-> Hi Lucas,
-> 
-> > -----Original Message-----
-> > From: Lucas Stach <l.stach@pengutronix.de>
-> > Sent: Tuesday, July 31, 2018 6:20 PM
-> 
-> [...]
-> 
-> > When specifying external clock inputs to the CCM the current code requires
-> > the clocks to be in a "clocks" child node of the DT root.
-> > This is not really conformant with DT best practices.
-> > 
-> > To avoid the need to deviate from those best practices, allow the clock inputs
-> > to be specifies via standard clock handles. This is in line with how drivers of
-> > the later CCM driver revisions on newer i.MX SoCs handle this.
-> > 
-> > As we can't retroactively change the DT binding, allow this as an option with a
-> > fallback to the old way of how this has been handled.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> >  .../devicetree/bindings/clock/imx6q-clock.txt |  5 +++++
-> >  drivers/clk/imx/clk-imx6q.c                   | 22 ++++++++++++++-----
-> >  2 files changed, 22 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> > b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> > index a45ca67a9d5f..ce6aa9920c05 100644
-> > --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> > +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> > @@ -6,6 +6,11 @@ Required properties:
-> >  - interrupts: Should contain CCM interrupt
-> >  - #clock-cells: Should be <1>
-> > 
-> > +Optional properties:
-> > +- clocks: list of clock specifiers, must contain an entry for each entry
-> > +          in clock-names
-> > +- clock-names: valid names are "osc", "ckil", "ckil", "anaclk1" and "anaclk2"
-> 
-> A minor issue: 
-> The third name should be "ckih1".
-> 
-> Otherwise:
-> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
+Hi Joel,
 
-Is this going to be resent? I don't see anything new and there are
-review comments on this patch series so I'm dropping it from the clk
-review queue. Please resend.
+On 08-10-18, 22:47, Joel Fernandes (Google) wrote:
+> Hi Greg,
+> 
+> While looking at android-4.14, I found a NULL pointer deref with
+> stm32-dma driver using Coccicheck errors. I found that upstream had a
+> bunch of patches on stm32-dma that have fixed this and other issues, I
+> applied these patches cleanly onto Android 4.14. I believe these should
+> goto stable and flow into Android 4.14 from there, but I haven't tested
+> this since I have no hardware to do so.
+> 
+> Atleast I can say that the coccicheck error below goes away when running:
+> make coccicheck MODE=report
+> ./drivers/dma/stm32-dma.c:567:18-24: ERROR: chan -> desc is NULL but dereferenced.
+> 
+> Anyway, please consider this series for 4.14 stable, I have CC'd the
+> author and others, thanks.
+> 
+> Pierre Yves MORDRET (7):
+>   dmaengine: stm32-dma: threshold manages with bitfield feature
+>   dmaengine: stm32-dma: fix incomplete configuration in cyclic mode
+>   dmaengine: stm32-dma: fix typo and reported checkpatch warnings
+>   dmaengine: stm32-dma: Improve memory burst management
+>   dmaengine: stm32-dma: fix DMA IRQ status handling
+>   dmaengine: stm32-dma: fix max items per transfer
+>   dmaengine: stm32-dma: properly mask irq bits
+
+It would be good to only cherry pick fixes for this. I do not feel that
+some of them which are adding or enhancing driver belong to stable.
+
+Thanks
+-- 
+~Vinod
