@@ -1,181 +1,269 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Mon, 15 Oct 2018 11:57:02 -0600
-Subject: [PATCH v2 6/6] RISC-V: Implement sparsemem
-In-Reply-To: <20181015175702.9036-1-logang@deltatee.com>
-References: <20181015175702.9036-1-logang@deltatee.com>
-Message-ID: <20181015175702.9036-7-logang@deltatee.com>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Mon, 15 Oct 2018 10:54:22 -0700
+Subject: [RFC PATCH v2 10/12] crypto: arm/nhpoly1305 - add NEON-accelerated
+ NHPoly1305
+In-Reply-To: <20181015175424.97147-1-ebiggers@kernel.org>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+Message-ID: <20181015175424.97147-11-ebiggers@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements sparsemem support for risc-v which helps pave the
-way for memory hotplug and eventually P2P support.
+From: Eric Biggers <ebiggers@google.com>
 
-We introduce Kconfig options for virtual and physical address bits which
-are used to calculate the size of the vmemmap and set the
-MAX_PHYSMEM_BITS.
+Add an ARM NEON implementation of NHPoly1305, an ?-almost-?-universal
+hash function used in the Adiantum encryption mode.  For now, only the
+NH portion is actually NEON-accelerated; the Poly1305 part is less
+performance-critical so is just implemented in C.
 
-The vmemmap is located directly before the VMALLOC region and sized
-such that we can allocate enough pages to populate all the virtual
-address space in the system (similar to the way it's done in arm64).
-
-During initialization, call memblocks_present() and sparse_init(),
-and provide a stub for vmemmap_populate() (all of which is similar to
-arm64).
-
-Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
-Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
-Cc: Albert Ou <aou@eecs.berkeley.edu>
-Cc: Andrew Waterman <andrew@sifive.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Michael Clark <michaeljclark@mac.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Zong Li <zong@andestech.com>
+Signed-off-by: Eric Biggers <ebiggers@google.com>
 ---
- arch/riscv/Kconfig                 | 23 +++++++++++++++++++++++
- arch/riscv/include/asm/pgtable.h   | 21 +++++++++++++++++----
- arch/riscv/include/asm/sparsemem.h | 11 +++++++++++
- arch/riscv/kernel/setup.c          |  4 +++-
- arch/riscv/mm/init.c               |  8 ++++++++
- 5 files changed, 62 insertions(+), 5 deletions(-)
- create mode 100644 arch/riscv/include/asm/sparsemem.h
+ arch/arm/crypto/Kconfig                |   5 ++
+ arch/arm/crypto/Makefile               |   2 +
+ arch/arm/crypto/nh-neon-core.S         | 116 +++++++++++++++++++++++++
+ arch/arm/crypto/nhpoly1305-neon-glue.c |  78 +++++++++++++++++
+ 4 files changed, 201 insertions(+)
+ create mode 100644 arch/arm/crypto/nh-neon-core.S
+ create mode 100644 arch/arm/crypto/nhpoly1305-neon-glue.c
 
-diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
-index a344980287a5..a1b5d758a542 100644
---- a/arch/riscv/Kconfig
-+++ b/arch/riscv/Kconfig
-@@ -52,12 +52,32 @@ config ZONE_DMA32
- 	bool
- 	default y if 64BIT
+diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+index cc932d9bba561..458562a34aabe 100644
+--- a/arch/arm/crypto/Kconfig
++++ b/arch/arm/crypto/Kconfig
+@@ -122,4 +122,9 @@ config CRYPTO_CHACHA20_NEON
+ 	select CRYPTO_BLKCIPHER
+ 	select CRYPTO_CHACHA20
  
-+config VA_BITS
-+	int
-+	default 32 if 32BIT
-+	default 39 if 64BIT
++config CRYPTO_NHPOLY1305_NEON
++	tristate "NEON accelerated NHPoly1305 hash function (for Adiantum)"
++	depends on KERNEL_MODE_NEON
++	select CRYPTO_NHPOLY1305
 +
-+config PA_BITS
-+	int
-+	default 34 if 32BIT
-+	default 56 if 64BIT
-+
- config PAGE_OFFSET
- 	hex
- 	default 0xC0000000 if 32BIT && MAXPHYSMEM_2GB
- 	default 0xffffffff80000000 if 64BIT && MAXPHYSMEM_2GB
- 	default 0xffffffe000000000 if 64BIT && MAXPHYSMEM_128GB
+ endif
+diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+index 005482ff95047..b65d6bfab8e6b 100644
+--- a/arch/arm/crypto/Makefile
++++ b/arch/arm/crypto/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
+ obj-$(CONFIG_CRYPTO_SHA256_ARM) += sha256-arm.o
+ obj-$(CONFIG_CRYPTO_SHA512_ARM) += sha512-arm.o
+ obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha-neon.o
++obj-$(CONFIG_CRYPTO_NHPOLY1305_NEON) += nhpoly1305-neon.o
  
-+config ARCH_FLATMEM_ENABLE
-+	def_bool y
-+
-+config ARCH_SPARSEMEM_ENABLE
-+	def_bool y
-+	select SPARSEMEM_VMEMMAP_ENABLE
-+
-+config ARCH_SELECT_MEMORY_MODEL
-+	def_bool ARCH_SPARSEMEM_ENABLE
-+
- config STACKTRACE_SUPPORT
- 	def_bool y
+ ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
+ ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
+@@ -53,6 +54,7 @@ ghash-arm-ce-y	:= ghash-ce-core.o ghash-ce-glue.o
+ crct10dif-arm-ce-y	:= crct10dif-ce-core.o crct10dif-ce-glue.o
+ crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+ chacha-neon-y := chacha-neon-core.o chacha-neon-glue.o
++nhpoly1305-neon-y := nh-neon-core.o nhpoly1305-neon-glue.o
  
-@@ -92,6 +112,9 @@ config PGTABLE_LEVELS
- config HAVE_KPROBES
- 	def_bool n
- 
-+config HAVE_ARCH_PFN_VALID
-+	def_bool y
+ ifdef REGENERATE_ARM_CRYPTO
+ quiet_cmd_perl = PERL    $@
+diff --git a/arch/arm/crypto/nh-neon-core.S b/arch/arm/crypto/nh-neon-core.S
+new file mode 100644
+index 0000000000000..434d80ab531c2
+--- /dev/null
++++ b/arch/arm/crypto/nh-neon-core.S
+@@ -0,0 +1,116 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * NH - ?-almost-universal hash function, NEON accelerated version
++ *
++ * Copyright 2018 Google LLC
++ *
++ * Author: Eric Biggers <ebiggers@google.com>
++ */
 +
- menu "Platform type"
- 
- choice
-diff --git a/arch/riscv/include/asm/pgtable.h b/arch/riscv/include/asm/pgtable.h
-index 16301966d65b..e1162336f5ea 100644
---- a/arch/riscv/include/asm/pgtable.h
-+++ b/arch/riscv/include/asm/pgtable.h
-@@ -89,6 +89,23 @@ extern pgd_t swapper_pg_dir[];
- #define __S110	PAGE_SHARED_EXEC
- #define __S111	PAGE_SHARED_EXEC
- 
-+#define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
-+#define VMALLOC_END      (PAGE_OFFSET - 1)
-+#define VMALLOC_START    (PAGE_OFFSET - VMALLOC_SIZE)
++#include <linux/linkage.h>
++
++	.text
++	.fpu		neon
++
++	KEY		.req	r0
++	MESSAGE		.req	r1
++	MESSAGE_LEN	.req	r2
++	HASH		.req	r3
++
++	PASS0_SUMS	.req	q0
++	PASS0_SUM_A	.req	d0
++	PASS0_SUM_B	.req	d1
++	PASS1_SUMS	.req	q1
++	PASS1_SUM_A	.req	d2
++	PASS1_SUM_B	.req	d3
++	PASS2_SUMS	.req	q2
++	PASS2_SUM_A	.req	d4
++	PASS2_SUM_B	.req	d5
++	PASS3_SUMS	.req	q3
++	PASS3_SUM_A	.req	d6
++	PASS3_SUM_B	.req	d7
++	K0		.req	q4
++	K1		.req	q5
++	K2		.req	q6
++	K3		.req	q7
++	T0		.req	q8
++	T0_L		.req	d16
++	T0_H		.req	d17
++	T1		.req	q9
++	T1_L		.req	d18
++	T1_H		.req	d19
++	T2		.req	q10
++	T2_L		.req	d20
++	T2_H		.req	d21
++	T3		.req	q11
++	T3_L		.req	d22
++	T3_H		.req	d23
++
++.macro _nh_stride	k0, k1, k2, k3
++
++	// Load next message stride
++	vld1.8		{T3}, [MESSAGE]!
++
++	// Load next key stride
++	vld1.32		{\k3}, [KEY]!
++
++	// Add message words to key words
++	vadd.u32	T0, T3, \k0
++	vadd.u32	T1, T3, \k1
++	vadd.u32	T2, T3, \k2
++	vadd.u32	T3, T3, \k3
++
++	// Multiply 32x32 => 64 and accumulate
++	vmlal.u32	PASS0_SUMS, T0_L, T0_H
++	vmlal.u32	PASS1_SUMS, T1_L, T1_H
++	vmlal.u32	PASS2_SUMS, T2_L, T2_H
++	vmlal.u32	PASS3_SUMS, T3_L, T3_H
++.endm
 +
 +/*
-+ * Roughly size the vmemmap space to be large enough to fit enough
-+ * struct pages to map half the virtual address space. Then
-+ * position vmemmap directly below the VMALLOC region.
++ * void nh_neon(const u32 *key, const u8 *message, size_t message_len,
++ *		u8 hash[NH_HASH_BYTES])
++ *
++ * It's guaranteed that message_len % 16 == 0.
 + */
-+#define VMEMMAP_SHIFT \
-+	(CONFIG_VA_BITS - PAGE_SHIFT - 1 + STRUCT_PAGE_MAX_SHIFT)
-+#define VMEMMAP_SIZE	(1UL << VMEMMAP_SHIFT)
-+#define VMEMMAP_END	(VMALLOC_START - 1)
-+#define VMEMMAP_START	(VMALLOC_START - VMEMMAP_SIZE)
++ENTRY(nh_neon)
 +
-+#define vmemmap		((struct page *)VMEMMAP_START)
++	vld1.32		{K0,K1}, [KEY]!
++	  vmov.u64	PASS0_SUMS, #0
++	  vmov.u64	PASS1_SUMS, #0
++	vld1.32		{K2}, [KEY]!
++	  vmov.u64	PASS2_SUMS, #0
++	  vmov.u64	PASS3_SUMS, #0
 +
- /*
-  * ZERO_PAGE is a global shared page that is always zero,
-  * used for zero-mapped memory areas, etc.
-@@ -411,10 +428,6 @@ static inline void pgtable_cache_init(void)
- 	/* No page table caches to initialize */
- }
- 
--#define VMALLOC_SIZE     (KERN_VIRT_SIZE >> 1)
--#define VMALLOC_END      (PAGE_OFFSET - 1)
--#define VMALLOC_START    (PAGE_OFFSET - VMALLOC_SIZE)
--
- /*
-  * Task size is 0x40000000000 for RV64 or 0xb800000 for RV32.
-  * Note that PGDIR_SIZE must evenly divide TASK_SIZE.
-diff --git a/arch/riscv/include/asm/sparsemem.h b/arch/riscv/include/asm/sparsemem.h
++	subs		MESSAGE_LEN, MESSAGE_LEN, #64
++	blt		.Lloop4_done
++.Lloop4:
++	_nh_stride	K0, K1, K2, K3
++	_nh_stride	K1, K2, K3, K0
++	_nh_stride	K2, K3, K0, K1
++	_nh_stride	K3, K0, K1, K2
++	subs		MESSAGE_LEN, MESSAGE_LEN, #64
++	bge		.Lloop4
++
++.Lloop4_done:
++	ands		MESSAGE_LEN, MESSAGE_LEN, #63
++	beq		.Ldone
++	_nh_stride	K0, K1, K2, K3
++
++	subs		MESSAGE_LEN, MESSAGE_LEN, #16
++	beq		.Ldone
++	_nh_stride	K1, K2, K3, K0
++
++	subs		MESSAGE_LEN, MESSAGE_LEN, #16
++	beq		.Ldone
++	_nh_stride	K2, K3, K0, K1
++
++.Ldone:
++	// Sum the accumulators for each pass, then store the sums to 'hash'
++	vadd.u64	T0_L, PASS0_SUM_A, PASS0_SUM_B
++	vadd.u64	T0_H, PASS1_SUM_A, PASS1_SUM_B
++	vadd.u64	T1_L, PASS2_SUM_A, PASS2_SUM_B
++	vadd.u64	T1_H, PASS3_SUM_A, PASS3_SUM_B
++	vst1.8		{T0-T1}, [HASH]
++	bx		lr
++ENDPROC(nh_neon)
+diff --git a/arch/arm/crypto/nhpoly1305-neon-glue.c b/arch/arm/crypto/nhpoly1305-neon-glue.c
 new file mode 100644
-index 000000000000..215530b24336
+index 0000000000000..df48a00f4c50f
 --- /dev/null
-+++ b/arch/riscv/include/asm/sparsemem.h
-@@ -0,0 +1,11 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
++++ b/arch/arm/crypto/nhpoly1305-neon-glue.c
+@@ -0,0 +1,78 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * NHPoly1305 - ?-almost-?-universal hash function for Adiantum
++ * (NEON accelerated version)
++ *
++ * Copyright 2018 Google LLC
++ */
 +
-+#ifndef __ASM_SPARSEMEM_H
-+#define __ASM_SPARSEMEM_H
++#include <asm/neon.h>
++#include <asm/simd.h>
++#include <crypto/internal/hash.h>
++#include <crypto/nhpoly1305.h>
++#include <linux/module.h>
 +
-+#ifdef CONFIG_SPARSEMEM
-+#define MAX_PHYSMEM_BITS	CONFIG_PA_BITS
-+#define SECTION_SIZE_BITS	30
-+#endif /* CONFIG_SPARSEMEM */
++asmlinkage void nh_neon(const u32 *key, const u8 *message, size_t message_len,
++			u8 hash[NH_HASH_BYTES]);
 +
-+#endif /* __ASM_SPARSEMEM_H */
-diff --git a/arch/riscv/kernel/setup.c b/arch/riscv/kernel/setup.c
-index b2d26d9d8489..494c380e4ea6 100644
---- a/arch/riscv/kernel/setup.c
-+++ b/arch/riscv/kernel/setup.c
-@@ -205,6 +205,9 @@ static void __init setup_bootmem(void)
- 		                  PFN_PHYS(end_pfn - start_pfn),
- 		                  &memblock.memory, 0);
- 	}
-+
-+	memblocks_present();
-+	sparse_init();
- }
- 
- void __init setup_arch(char **cmdline_p)
-@@ -239,4 +242,3 @@ void __init setup_arch(char **cmdline_p)
- 
- 	riscv_fill_hwcap();
- }
--
-diff --git a/arch/riscv/mm/init.c b/arch/riscv/mm/init.c
-index 58a522f9bcc3..5d529878667c 100644
---- a/arch/riscv/mm/init.c
-+++ b/arch/riscv/mm/init.c
-@@ -70,3 +70,11 @@ void free_initrd_mem(unsigned long start, unsigned long end)
- {
- }
- #endif /* CONFIG_BLK_DEV_INITRD */
-+
-+#ifdef CONFIG_SPARSEMEM
-+int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node,
-+			       struct vmem_altmap *altmap)
++static void _nh_neon(const u32 *key, const u8 *message, size_t message_len,
++		     __le64 hash[NH_NUM_PASSES])
 +{
-+	return vmemmap_populate_basepages(start, end, node);
++	nh_neon(key, message, message_len, (u8 *)hash);
 +}
-+#endif
++
++static int nhpoly1305_neon_update(struct shash_desc *desc,
++				  const u8 *src, unsigned int srclen)
++{
++	if (srclen < 64 || !may_use_simd())
++		return crypto_nhpoly1305_update(desc, src, srclen);
++
++	do {
++		unsigned int n = min_t(unsigned int, srclen, PAGE_SIZE);
++
++		kernel_neon_begin();
++		crypto_nhpoly1305_update_helper(desc, src, n, _nh_neon);
++		kernel_neon_end();
++		src += n;
++		srclen -= n;
++	} while (srclen);
++	return 0;
++}
++
++static struct shash_alg nhpoly1305_alg = {
++	.digestsize	= POLY1305_DIGEST_SIZE,
++	.init		= crypto_nhpoly1305_init,
++	.update		= nhpoly1305_neon_update,
++	.final		= crypto_nhpoly1305_final,
++	.setkey		= crypto_nhpoly1305_setkey,
++	.descsize	= sizeof(struct nhpoly1305_state),
++	.base		= {
++		.cra_name		= "nhpoly1305",
++		.cra_driver_name	= "nhpoly1305-neon",
++		.cra_priority		= 200,
++		.cra_ctxsize		= sizeof(struct nhpoly1305_key),
++		.cra_module		= THIS_MODULE,
++	},
++};
++
++static int __init nhpoly1305_mod_init(void)
++{
++	if (!(elf_hwcap & HWCAP_NEON))
++		return -ENODEV;
++
++	return crypto_register_shash(&nhpoly1305_alg);
++}
++
++static void __exit nhpoly1305_mod_exit(void)
++{
++	crypto_unregister_shash(&nhpoly1305_alg);
++}
++
++module_init(nhpoly1305_mod_init);
++module_exit(nhpoly1305_mod_exit);
++
++MODULE_DESCRIPTION("NHPoly1305 ?-almost-?-universal hash function (NEON-accelerated)");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Eric Biggers <ebiggers@google.com>");
++MODULE_ALIAS_CRYPTO("nhpoly1305");
++MODULE_ALIAS_CRYPTO("nhpoly1305-neon");
 -- 
-2.19.0
+2.19.1.331.ge82ca0e54c-goog
