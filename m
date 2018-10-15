@@ -1,107 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 15 Oct 2018 17:22:37 +0200
-Subject: [PATCH v2] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
- non-Exynos platforms
-In-Reply-To: <20181015135055eucas1p2fdb917790b3690dd52ee7b9aa19ea677~dzHYfFW2j0676906769eucas1p2c@eucas1p2.samsung.com>
-References: <CGME20181015135055eucas1p2fdb917790b3690dd52ee7b9aa19ea677@eucas1p2.samsung.com>
- <20181015135055eucas1p2fdb917790b3690dd52ee7b9aa19ea677~dzHYfFW2j0676906769eucas1p2c@eucas1p2.samsung.com>
-Message-ID: <CAJKOXPdR0q_2DGbMrroqNcVfCPSkh0=ry=yyb9qmSDFf+TWbFg@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 15 Oct 2018 11:23:44 -0400 (EDT)
+Subject: [PATCH v2] usb: host: ohci-at91: fix request of irq for optional
+ gpio
+In-Reply-To: <20181015090001.5195-1-tudor.ambarus@microchip.com>
+Message-ID: <Pine.LNX.4.44L0.1810151123330.1394-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Oct 2018 at 15:50, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> "Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
-> config option) is not working properly (debug messages are not
-> displayed after resume) on Exynos platforms because GPIOs restore
-> code is not implemented.
->
-> Add PLAT_S3C24XX, ARCH_S3C64XX and ARCH_S5PV210 dependencies to
-> SAMSUNG_PM_DEBUG config option to hide it on Exynos platforms.
-> Then convert Exynos code to not require <plat/pm-common.h>
-> header (use pr_debug() directly instead of S3C_PMDBG() macro and
-> remove redundant s3c_pm_*() calls).
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+On Mon, 15 Oct 2018 Tudor.Ambarus at microchip.com wrote:
+
+> atmel,oc-gpio is optional. Request its irq only when atmel,oc is set
+> in device tree.
+> 
+> devm_gpiod_get_index_optional returns NULL if -ENOENT. Check its
+> return value for NULL before error, because it is more probable that
+> atmel,oc is not set.
+> 
+> This fixes the following errors on boards where atmel,oc is not set in
+> device tree:
+> [    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
+> [    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
+> [    0.970000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
+> 
+> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 > ---
-> v2:
-> - convert Exynos code to not require <plat/pm-common.h> header
->
-> Should by applied on top of "[PATCH] ARM: EXYNOS: remove no longer
-> needed s3c_pm_check_*() calls".
->
->  arch/arm/mach-exynos/suspend.c |   14 ++++----------
->  arch/arm/plat-samsung/Kconfig  |    3 ++-
->  2 files changed, 6 insertions(+), 11 deletions(-)
->
-> Index: b/arch/arm/mach-exynos/suspend.c
-> ===================================================================
-> --- a/arch/arm/mach-exynos/suspend.c    2018-10-15 15:11:15.296187842 +0200
-> +++ b/arch/arm/mach-exynos/suspend.c    2018-10-15 15:22:54.656205454 +0200
-> @@ -30,8 +30,6 @@
->  #include <asm/smp_scu.h>
->  #include <asm/suspend.h>
->
-> -#include <plat/pm-common.h>
-> -
->  #include "common.h"
->
->  #define REG_TABLE_END (-1U)
-> @@ -490,11 +488,9 @@ static int exynos_suspend_enter(suspend_
->  {
->         int ret;
->
-> -       s3c_pm_debug_init();
-> -
-> -       S3C_PMDBG("%s: suspending the system...\n", __func__);
-> +       pr_debug("%s: suspending the system...\n", __func__);
->
-> -       S3C_PMDBG("%s: wakeup masks: %08x,%08x\n", __func__,
-> +       pr_debug("%s: wakeup masks: %08x,%08x\n", __func__,
->                         exynos_irqwake_intmask, exynos_get_eint_wake_mask());
->
->         if (exynos_irqwake_intmask == -1U
-> @@ -504,7 +500,6 @@ static int exynos_suspend_enter(suspend_
->                 return -EINVAL;
->         }
->
-> -       s3c_pm_save_uarts();
->         if (pm_data->pm_prepare)
->                 pm_data->pm_prepare();
->         flush_cache_all();
-> @@ -517,12 +512,11 @@ static int exynos_suspend_enter(suspend_
->
->         if (pm_data->pm_resume_prepare)
->                 pm_data->pm_resume_prepare();
-> -       s3c_pm_restore_uarts();
->
-> -       S3C_PMDBG("%s: wakeup stat: %08x\n", __func__,
-> +       pr_debug("%s: wakeup stat: %08x\n", __func__,
->                         pmu_raw_readl(S5P_WAKEUP_STAT));
->
-> -       S3C_PMDBG("%s: resuming the system...\n", __func__);
-> +       pr_debug("%s: resuming the system...\n", __func__);
->
->         return 0;
->  }
-> Index: b/arch/arm/plat-samsung/Kconfig
-> ===================================================================
-> --- a/arch/arm/plat-samsung/Kconfig     2018-10-15 15:16:22.804195586 +0200
-> +++ b/arch/arm/plat-samsung/Kconfig     2018-10-15 15:16:22.800195586 +0200
-> @@ -238,7 +238,8 @@ comment "Power management"
->
->  config SAMSUNG_PM_DEBUG
->         bool "Samsung PM Suspend debug"
-> -       depends on PM && DEBUG_KERNEL
-> +       depends on DEBUG_KERNEL
+> v2: fix typos in commit message s/it's/its, s/probably/probable
+> 
+> Based on https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git,
+> usb-next branch.
+> 
+>  drivers/usb/host/ohci-at91.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index e98673954020..ec6739ef3129 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -551,6 +551,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+>  		pdata->overcurrent_pin[i] =
+>  			devm_gpiod_get_index_optional(&pdev->dev, "atmel,oc",
+>  						      i, GPIOD_IN);
+> +		if (!pdata->overcurrent_pin[i])
+> +			continue;
+>  		if (IS_ERR(pdata->overcurrent_pin[i])) {
+>  			err = PTR_ERR(pdata->overcurrent_pin[i]);
+>  			dev_err(&pdev->dev, "unable to claim gpio \"overcurrent\": %d\n", err);
 
-I don't get this change - why moving PM to line below?
-
-Best regards,
-Krzysztof
-
-> +       depends on PM && (PLAT_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210)
->         depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
->         help
->           Say Y here if you want verbose debugging from the PM Suspend and
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
