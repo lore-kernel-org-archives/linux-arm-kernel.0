@@ -1,75 +1,120 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 15 Oct 2018 19:43:44 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 15/29] drm/bridge/synopsys: dw-hdmi:
- Enable workaround for v2.12a
-In-Reply-To: <3616158.EzHeIcd69b@avalon>
-References: <20181007093905.11253-1-jernej.skrabec@siol.net>
- <20181007093905.11253-16-jernej.skrabec@siol.net> <3616158.EzHeIcd69b@avalon>
-Message-ID: <1599508.L0GctDr0rS@jernej-laptop>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Mon, 15 Oct 2018 10:54:13 -0700
+Subject: [RFC PATCH v2 01/12] crypto: chacha20-generic - add HChaCha20 library
+ function
+In-Reply-To: <20181015175424.97147-1-ebiggers@kernel.org>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+Message-ID: <20181015175424.97147-2-ebiggers@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Eric Biggers <ebiggers@google.com>
 
-Dne torek, 09. oktober 2018 ob 19:40:44 CEST je Laurent Pinchart napisal(a):
-> Hi Jernej,
-> 
-> Thank you for the patch.
-> 
-> On Sunday, 7 October 2018 12:38:51 EEST Jernej Skrabec wrote:
-> > It turns out that even new DW HDMI controllers exhibits same magenta
-> > line issues as older versions.
-> > 
-> > Enable workaround for v2.12a.
-> 
-> This doesn't affect the platforms I maintain, so I can't really test this,
-> but I'm wondering whether there could be other platforms using a v2.12a DW
-> HDMI that wouldn't need the workaround.
-> 
-> My platforms use a previous version, namely v2.01a. The workaround for that
-> version has been enabled by
-> 
-> commit 9c305eb442f3b371fc722ade827bbf673514123e
-> Author: Neil Armstrong <narmstrong@baylibre.com>
-> Date:   Fri Feb 23 12:44:37 2018 +0100
-> 
->     drm: bridge: dw-hdmi: Fix overflow workaround for Amlogic Meson GX SoCs
-> 
-> I haven't paid too much attention to the patch back then, and have now
-> double- checked the HDMI output on R-Car Gen3. Enabling the workaround
-> doesn't cause any regression, and reverting the commit doesn't cause any
-> issue either. I thus wonder whether we shouldn't enable the workaround with
-> count = 1 in the default case instead of adding new IP core versions to the
-> list. It would be nice if someone from Synopsys could comment on this.
+Refactor the unkeyed permutation part of chacha20_block() into its own
+function, then add hchacha20_block() which is the ChaCha equivalent of
+HSalsa20 and is an intermediate step towards XChaCha20 (see
+https://cr.yp.to/snuffle/xsalsa-20081128.pdf).  HChaCha20 skips the
+final addition of the initial state, and outputs only certain words of
+the state.  It should not be used for streaming directly.
 
-I was thinking about that too, or even having parameter in dw_hdmi_plat_data 
-which would tell how many times to repeat workaround procedure for a specific 
-platform. But this might be an overkill.
+Signed-off-by: Eric Biggers <ebiggers@google.com>
+---
+ include/crypto/chacha20.h |  2 ++
+ lib/chacha20.c            | 50 ++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 46 insertions(+), 6 deletions(-)
 
-Best regards,
-Jernej
-
-> 
-> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
-> > 5971976284bf..df1c7a2d6961 100644
-> > --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > @@ -1664,6 +1664,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi
-> > 
-> > *hdmi) case 0x131a:
-> >  	case 0x132a:
-> > 
-> >  	case 0x201a:
-> > +	case 0x212a:
-> >  		count = 1;
-> >  		break;
-> >  	
-> >  	default:
+diff --git a/include/crypto/chacha20.h b/include/crypto/chacha20.h
+index f76302d99e2be..fbec4e6a87890 100644
+--- a/include/crypto/chacha20.h
++++ b/include/crypto/chacha20.h
+@@ -19,6 +19,8 @@ struct chacha20_ctx {
+ };
+ 
+ void chacha20_block(u32 *state, u8 *stream);
++void hchacha20_block(const u32 *in, u32 *out);
++
+ void crypto_chacha20_init(u32 *state, struct chacha20_ctx *ctx, u8 *iv);
+ int crypto_chacha20_setkey(struct crypto_skcipher *tfm, const u8 *key,
+ 			   unsigned int keysize);
+diff --git a/lib/chacha20.c b/lib/chacha20.c
+index d907fec6a9ed1..6a484e16171d1 100644
+--- a/lib/chacha20.c
++++ b/lib/chacha20.c
+@@ -1,5 +1,5 @@
+ /*
+- * ChaCha20 256-bit cipher algorithm, RFC7539
++ * The "hash function" used as the core of the ChaCha20 stream cipher (RFC7539)
+  *
+  * Copyright (C) 2015 Martin Willi
+  *
+@@ -16,14 +16,10 @@
+ #include <asm/unaligned.h>
+ #include <crypto/chacha20.h>
+ 
+-void chacha20_block(u32 *state, u8 *stream)
++static void chacha20_permute(u32 *x)
+ {
+-	u32 x[16];
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(x); i++)
+-		x[i] = state[i];
+-
+ 	for (i = 0; i < 20; i += 2) {
+ 		x[0]  += x[4];    x[12] = rol32(x[12] ^ x[0],  16);
+ 		x[1]  += x[5];    x[13] = rol32(x[13] ^ x[1],  16);
+@@ -65,6 +61,25 @@ void chacha20_block(u32 *state, u8 *stream)
+ 		x[8]  += x[13];   x[7]  = rol32(x[7]  ^ x[8],   7);
+ 		x[9]  += x[14];   x[4]  = rol32(x[4]  ^ x[9],   7);
+ 	}
++}
++
++/**
++ * chacha20_block - generate one keystream block and increment block counter
++ * @state: input state matrix (16 32-bit words)
++ * @stream: output keystream block (64 bytes)
++ *
++ * This is the ChaCha20 core, a function from 64-byte strings to 64-byte
++ * strings.  The caller has already converted the endianness of the input.  This
++ * function also handles incrementing the block counter in the input matrix.
++ */
++void chacha20_block(u32 *state, u8 *stream)
++{
++	u32 x[16];
++	int i;
++
++	memcpy(x, state, 64);
++
++	chacha20_permute(x);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(x); i++)
+ 		put_unaligned_le32(x[i] + state[i], &stream[i * sizeof(u32)]);
+@@ -72,3 +87,26 @@ void chacha20_block(u32 *state, u8 *stream)
+ 	state[12]++;
+ }
+ EXPORT_SYMBOL(chacha20_block);
++
++/**
++ * hchacha20_block - abbreviated ChaCha20 core, for XChaCha20
++ * @in: input state matrix (16 32-bit words)
++ * @out: output (8 32-bit words)
++ *
++ * HChaCha20 is the ChaCha equivalent of HSalsa20 and is an intermediate step
++ * towards XChaCha20 (see https://cr.yp.to/snuffle/xsalsa-20081128.pdf).
++ * HChaCha20 skips the final addition of the initial state, and outputs only
++ * certain words of the state.  It should not be used for streaming directly.
++ */
++void hchacha20_block(const u32 *in, u32 *out)
++{
++	u32 x[16];
++
++	memcpy(x, in, 64);
++
++	chacha20_permute(x);
++
++	memcpy(&out[0], &x[0], 16);
++	memcpy(&out[4], &x[12], 16);
++}
++EXPORT_SYMBOL(hchacha20_block);
+-- 
+2.19.1.331.ge82ca0e54c-goog
