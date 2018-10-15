@@ -1,63 +1,48 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Mon, 15 Oct 2018 12:14:03 +0000
-Subject: [PATCH v2 1/7] spi: add support for octal I/O data transfer
+Date: Mon, 15 Oct 2018 12:14:09 +0000
+Subject: [PATCH v2 2/7] spi: spi-mem: add support for octal I/O data transfer
 In-Reply-To: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 References: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1539605534-22302-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1539605534-22302-3-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add flags for Octal I/O data transfer
-Required for the SPI controller which can do the data transfer (TX/RX)
-on 8 data lines e.g. NXP FlexSPI controller.
- SPI_TX_OCTAL: transmit with 8 wires
- SPI_RX_OCTAL: receive with 8 wires
+Add support for octal I/O data transfer in spi-mem framework.
 
 Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
 Changes for v2:
- Incorporated review comments of Boris.
+ Patch added in v2 version.
 
- drivers/spi/spi.c       | 6 ++++++
- include/linux/spi/spi.h | 2 ++
- 2 files changed, 8 insertions(+)
+ drivers/spi/spi-mem.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index ec395a6..80f672f 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -1573,6 +1573,9 @@ static int of_spi_parse_dt(struct spi_controller *ctlr, struct spi_device *spi,
- 		case 4:
- 			spi->mode |= SPI_TX_QUAD;
- 			break;
-+		case 8:
-+			spi->mode |= SPI_TX_OCTAL;
-+			break;
- 		default:
- 			dev_warn(&ctlr->dev,
- 				"spi-tx-bus-width %d not supported\n",
-@@ -1591,6 +1594,9 @@ static int of_spi_parse_dt(struct spi_controller *ctlr, struct spi_device *spi,
- 		case 4:
- 			spi->mode |= SPI_RX_QUAD;
- 			break;
-+		case 8:
-+			spi->mode |= SPI_RX_OCTAL;
-+			break;
- 		default:
- 			dev_warn(&ctlr->dev,
- 				"spi-rx-bus-width %d not supported\n",
-diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-index a64235e..2d21307 100644
---- a/include/linux/spi/spi.h
-+++ b/include/linux/spi/spi.h
-@@ -163,6 +163,8 @@ struct spi_device {
- #define	SPI_TX_QUAD	0x200			/* transmit with 4 wires */
- #define	SPI_RX_DUAL	0x400			/* receive with 2 wires */
- #define	SPI_RX_QUAD	0x800			/* receive with 4 wires */
-+#define	SPI_TX_OCTAL	0x1000			/* transmit with 8 wires */
-+#define	SPI_RX_OCTAL	0x2000			/* receive with 8 wires */
- 	int			irq;
- 	void			*controller_state;
- 	void			*controller_data;
+diff --git a/drivers/spi/spi-mem.c b/drivers/spi/spi-mem.c
+index c6bdea7..6fa95f8 100644
+--- a/drivers/spi/spi-mem.c
++++ b/drivers/spi/spi-mem.c
+@@ -12,7 +12,7 @@
+ 
+ #include "internals.h"
+ 
+-#define SPI_MEM_MAX_BUSWIDTH		4
++#define SPI_MEM_MAX_BUSWIDTH		8
+ 
+ /**
+  * spi_controller_dma_map_mem_op_data() - DMA-map the buffer attached to a
+@@ -121,6 +121,13 @@ static int spi_check_buswidth_req(struct spi_mem *mem, u8 buswidth, bool tx)
+ 
+ 		break;
+ 
++	case 8:
++		if ((tx && (mode & SPI_TX_OCTAL)) ||
++		    (!tx && (mode & SPI_RX_OCTAL)))
++			return 0;
++
++		break;
++
+ 	default:
+ 		break;
+ 	}
 -- 
 2.7.4
