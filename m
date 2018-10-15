@@ -1,39 +1,32 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 15 Oct 2018 14:04:43 +0200
-Subject: [PATCH V4 00/15] x86/KVM/Hyper-v: Add HV ept tlb range flush
- hypercall support in KVM
-In-Reply-To: <20181013145406.4911-1-Tianyu.Lan@microsoft.com>
-References: <20181013145406.4911-1-Tianyu.Lan@microsoft.com>
-Message-ID: <d9414a38-ca5c-4273-30dc-1fecd0f9268e@redhat.com>
+From: aleksandr.aleksandrov@emlid.com (Aleksandr Aleksandrov)
+Date: Mon, 15 Oct 2018 14:49:49 +0300
+Subject: [PATCH v5 1/2] dt-bindings: vendor-prefix: new vendor - Emlid
+In-Reply-To: <1539604192-17561-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+References: <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539604192-17561-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+Message-ID: <1539604192-17561-2-git-send-email-aleksandr.aleksandrov@emlid.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/2018 16:53, lantianyu1986 at gmail.com wrote:
-> From: Lan Tianyu <Tianyu.Lan@microsoft.com>
-> 
-> For nested memory virtualization, Hyper-v doesn't set write-protect
-> L1 hypervisor EPT page directory and page table node to track changes 
-> while it relies on guest to tell it changes via HvFlushGuestAddressLlist
-> hypercall. HvFlushGuestAddressLlist hypercall provides a way to flush
-> EPT page table with ranges which are specified by L1 hypervisor.
-> 
-> If L1 hypervisor uses INVEPT or HvFlushGuestAddressSpace hypercall to
-> flush EPT tlb, Hyper-V will invalidate associated EPT shadow page table
-> and sync L1's EPT table when next EPT page fault is triggered.
-> HvFlushGuestAddressLlist hypercall helps to avoid such redundant EPT
-> page fault and synchronization of shadow page table.
+Add vendor Emlid Ltd to vendor-prefixes.txt
 
-So I just told you that the first part is well understood but I must
-retract that; after carefully reviewing the whole series, I think one of
-us is actually very confused.
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-I am not afraid to say it can be me, but my understanding is that you're
-passing L1 GPAs to the hypercall and instead the spec says it expects L2
-GPAs.  (Consider that, because KVM's shadow paging code is shared
-between nested EPT and !EPT cases, every time you see gpa/gfn in the
-code it is for L1, while nested EPT GPAs are really what the code calls
-gva.)
-
-What's going on?
-
-Paolo
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2c3fc51..2336e44 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -112,6 +112,7 @@ edt	Emerging Display Technologies
+ eeti	eGalax_eMPIA Technology Inc
+ elan	Elan Microelectronic Corp.
+ embest	Shenzhen Embest Technology Co., Ltd.
++emlid	Emlid, Ltd.
+ emmicro	EM Microelectronic
+ emtrion	emtrion GmbH
+ energymicro	Silicon Laboratories (formerly Energy Micro AS)
+-- 
+2.7.4
