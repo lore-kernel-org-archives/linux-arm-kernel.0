@@ -1,32 +1,37 @@
-From: aleksandr.aleksandrov@emlid.com (Aleksandr Aleksandrov)
-Date: Mon, 15 Oct 2018 14:49:49 +0300
-Subject: [PATCH v5 1/2] dt-bindings: vendor-prefix: new vendor - Emlid
-In-Reply-To: <1539604192-17561-1-git-send-email-aleksandr.aleksandrov@emlid.com>
-References: <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
- <1539604192-17561-1-git-send-email-aleksandr.aleksandrov@emlid.com>
-Message-ID: <1539604192-17561-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+From: hannah@marvell.com (hannah at marvell.com)
+Date: Mon, 15 Oct 2018 15:00:45 +0300
+Subject: [PATCH 3/4] dt-bindings: iommu/arm,
+ smmu: add compatible string for Marvell
+In-Reply-To: <1539604846-21151-1-git-send-email-hannah@marvell.com>
+References: <1539604846-21151-1-git-send-email-hannah@marvell.com>
+Message-ID: <1539604846-21151-4-git-send-email-hannah@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add vendor Emlid Ltd to vendor-prefixes.txt
+From: Hanna Hawa <hannah@marvell.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Aleksandr Aleksandrov <aleksandr.aleksandrov@emlid.com>
+Add specific compatible string for Marvell usage due errata of
+accessing 64bit registers of ARM SMMU, in AP806.
+
+AP806 SOC use the generic ARM-MMU500, and there's no specific
+implementation of Marvell, this compatible is used for errata only.
+
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ Documentation/devicetree/bindings/iommu/arm,smmu.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 2c3fc51..2336e44 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -112,6 +112,7 @@ edt	Emerging Display Technologies
- eeti	eGalax_eMPIA Technology Inc
- elan	Elan Microelectronic Corp.
- embest	Shenzhen Embest Technology Co., Ltd.
-+emlid	Emlid, Ltd.
- emmicro	EM Microelectronic
- emtrion	emtrion GmbH
- energymicro	Silicon Laboratories (formerly Energy Micro AS)
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 8a6ffce..92d7263 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -16,6 +16,7 @@ conditions.
+                         "arm,mmu-400"
+                         "arm,mmu-401"
+                         "arm,mmu-500"
++                        "marvell,mmu-500"
+                         "cavium,smmu-v2"
+ 
+                   depending on the particular implementation and/or the
 -- 
-2.7.4
+1.9.1
