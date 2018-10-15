@@ -1,43 +1,51 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Mon, 15 Oct 2018 20:25:41 +1100
-Subject: [PATCH v3 06/24] powerpc/mm: properly set PAGE_KERNEL flags in
- ioremap()
-In-Reply-To: <20181014115810.Horde.99_1JiRv0nxT_Jq3cbpMhw1@messagerie.si.c-s.fr>
-References: <cover.1539092111.git.christophe.leroy@c-s.fr>
- <52bd80b06bae0d854d04501e1e136575b77fa9fa.1539092111.git.christophe.leroy@c-s.fr>
- <87d0sd19vm.fsf@concordia.ellerman.id.au>
- <87a7nh104q.fsf@concordia.ellerman.id.au>
- <20181014115810.Horde.99_1JiRv0nxT_Jq3cbpMhw1@messagerie.si.c-s.fr>
-Message-ID: <87zhvfzhm2.fsf@concordia.ellerman.id.au>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 15 Oct 2018 09:29:37 +0000
+Subject: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+In-Reply-To: <52eaa4ac563ad5114ebd99b286cdbe0495dba7ec.camel@nxp.com>
+References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
+ <1539527419-23613-3-git-send-email-aisheng.dong@nxp.com>
+ <CAOMZO5BEwNQy0HA80qOzm_w-c63tFK1eL+cOHNCxKYq9PHGsqw@mail.gmail.com>
+ <52eaa4ac563ad5114ebd99b286cdbe0495dba7ec.camel@nxp.com>
+Message-ID: <AM0PR04MB421145E95CE4F229A21999D180FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LEROY Christophe <christophe.leroy@c-s.fr> writes:
-> Michael Ellerman <mpe@ellerman.id.au> a ?crit?:
->> Michael Ellerman <mpe@ellerman.id.au> writes:
->>> Christophe Leroy <christophe.leroy@c-s.fr> writes:
->>>
->>>> Set PAGE_KERNEL directly in the caller and do not rely on a
->>>> hack adding PAGE_KERNEL flags when _PAGE_PRESENT is not set.
->>>>
->>>> As already done for PPC64, use pgprot_cache() helpers instead of
->>>> _PAGE_XXX flags in PPC32 ioremap() derived functions.
->>>>
->>>> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
->>>
->>> Something in here is breaking my p5020ds (both 32-bit and 64-bit):
->>
->> Oh duh.
->>
->> That's because I didn't take patch 4.
->>
->> It didn't have any acks, but I guess I'll just merge it rather than
->> breaking things.
->
-> Yes indeed. Maybe should I have followed it more carrefully to ensure  
-> it gets an ack.
+> -----Original Message-----
+> From: Leonard Crestez
+> Sent: Monday, October 15, 2018 3:30 PM
 
-That's OK, I should have paid more attention to what it was actually
-doing, I thought it was just a cleanup.
+> On Sun, 2018-10-14 at 20:13 -0300, Fabio Estevam wrote:
+> > > +               imx8qx-pm {
+> > > +                       compatible = "fsl,scu-pd";
+> > > +                       #address-cells = <1>;
+> > > +                       #size-cells = <0>;
+> > > +
+> > > +                       pd_lsio: lsio-power-domain {
+> > > +                               #power-domain-cells = <0>;
+> > > +                               #address-cells = <1>;
+> > > +                               #size-cells = <0>;
+> > > +
+> > > +                               pd_lsio_pwm0: lsio-pwm0 at 191 {
+> > > +                                       reg = <191>;
+> >
+> > The number after @ is in hex, so the reg property should be 0x191.
+> 
+> These are SC_R_* resource ids from include/linux/firmware/imx/types.h
+> and they are almost everywhere referenced as decimals.
+> 
+> Is this really not acceptable for DT?
+> 
 
-cheers
+I think the problem is mismatch as DT binding request the reg property value
+must be equal to the unit-address. 
+See:
+https://github.com/devicetree-org/devicetree-specification/releases
+
+It seems like a common issue in the kernel as I see many similar users.
+
+Regards
+Dong Aisheng
+
+> --
+> Regards,
+> Leonard
