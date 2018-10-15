@@ -1,60 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 15 Oct 2018 21:56:01 +0200
-Subject: [PATCH 6/6] arm64: dts: xilinx: ultra96: Standardize LED labels
- and triggers
-In-Reply-To: <7b94c09d-ecbd-e48e-6583-127566715a76@xilinx.com>
-References: <20181009140522.6492-1-manivannan.sadhasivam@linaro.org>
- <20181009140522.6492-7-manivannan.sadhasivam@linaro.org>
- <7b94c09d-ecbd-e48e-6583-127566715a76@xilinx.com>
-Message-ID: <20181015185147.GA29649@amd>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Mon, 15 Oct 2018 23:31:41 +0200
+Subject: [PATCH RESEND] usb: gadget: udc: atmel: handle at91sam9rl PMC
+Message-ID: <20181015213141.6699-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-10-10 09:25:24, Michal Simek wrote:
-> On 9.10.2018 16:05, Manivannan Sadhasivam wrote:
-> > For all 96Boards, the following standard is used for onboard LEDs.
-> > 
-> > device-name:green:user1  default-trigger: heartbeat
-> > device-name:green:user2  default-trigger: mmc0/disk-activity
-> >                                           (onboard-storage)
-> > device-name:green:user3  default-trigger: mmc1 (SD-card)
-> > device-name:green:user4  default-trigger: none, panic-indicator
+The at91sam9rl PMC is not quite the same as the at91sam9g45 one and now has
+its own compatible string. Add support for that.
 
-Actually, having one LED as heartbeat and second as panic indicator
-only... Could those be merged and remaining LED used to something
-useful?
+Fixes: 217bace8e548 ("ARM: dts: fix PMC compatible")
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Acked-by: Cristian Birsan <cristian.birsan@microchip.com>
+---
 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
+Hello Greg, 
 
-> > index eb5e8bddb610..565ceb390f99 100644
-> > --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> > +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> > @@ -57,29 +57,30 @@
-> >  	leds {
-> >  		compatible = "gpio-leds";
-> >  		ds2 {
-> > -			label = "ds2";
-> > +			label = "zynqmp-zcu100-revC:green:user1";
-> 
-> The purpose of this series should be standardize Led labels that's why I
-> would expect that leds will be called in the same way on all these
-> boards that's why I am not getting why there is board name.
-> 
-> green:user1 or just user1 should be enough.
+This is an urgent fix that was sent on sep. 10. Can you please assist?
 
-green:user1 is better. Also... I guess this should go to the LEDs
-list... and if you want to make names standard, maybe there's better
-naming than user1..user4?
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-									Pavel
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 17147b8c771e..8f267be1745d 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -2017,6 +2017,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 
+ 	udc->errata = match->data;
+ 	udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc");
++	if (IS_ERR(udc->pmc))
++		udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9rl-pmc");
+ 	if (IS_ERR(udc->pmc))
+ 		udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9x5-pmc");
+ 	if (udc->errata && IS_ERR(udc->pmc))
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/9fc335bc/attachment.sig>
+2.19.1
