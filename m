@@ -1,34 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 15 Oct 2018 14:31:12 +0200
-Subject: [PATCH v2 6/6] arm64: platform: Add enable Exynos Multi-Core Timer
- driver
-In-Reply-To: <20181015123112.9379-1-m.szyprowski@samsung.com>
-References: <20181015123112.9379-1-m.szyprowski@samsung.com>
- <CGME20181015123137eucas1p1cf043644b9b40e15c9d2f221f26bef51@eucas1p1.samsung.com>
-Message-ID: <20181015123112.9379-7-m.szyprowski@samsung.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Mon, 15 Oct 2018 12:14:33 +0000
+Subject: [PATCH v2 6/7] spi: nxp-fspi: add mode flag bit for octal support
+In-Reply-To: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1539605534-22302-7-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos SoCs enabling MCT driver is required even if ARM Architected
-Timer driver is used to for managing timer hardware and clock source
-events.
+Add mode flags for octal I/O data transfer support.
+NXP FlexSPI controller supports octal mode data transfer.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+Changes for v2:
+ None
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 51bc479334a4..7cc687580fad 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -62,6 +62,7 @@ config ARCH_BRCMSTB
- config ARCH_EXYNOS
- 	bool "ARMv8 based Samsung Exynos SoC family"
- 	select COMMON_CLK_SAMSUNG
-+	select CLKSRC_EXYNOS_MCT
- 	select EXYNOS_PM_DOMAINS if PM_GENERIC_DOMAINS
- 	select EXYNOS_PMU
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ drivers/spi/spi-nxp-fspi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-nxp-fspi.c b/drivers/spi/spi-nxp-fspi.c
+index 67eea88..c48ca94 100644
+--- a/drivers/spi/spi-nxp-fspi.c
++++ b/drivers/spi/spi-nxp-fspi.c
+@@ -993,8 +993,8 @@ static int nxp_fspi_probe(struct platform_device *pdev)
+ 	if (!ctlr)
+ 		return -ENOMEM;
+ 
+-	ctlr->mode_bits = SPI_RX_DUAL | SPI_RX_QUAD |
+-			  SPI_TX_DUAL | SPI_TX_QUAD;
++	ctlr->mode_bits = SPI_RX_DUAL | SPI_RX_QUAD | SPI_RX_OCTAL |
++			  SPI_TX_DUAL | SPI_TX_QUAD | SPI_TX_OCTAL;
+ 
+ 	f = spi_controller_get_devdata(ctlr);
+ 	f->dev = dev;
 -- 
-2.17.1
+2.7.4
