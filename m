@@ -1,25 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Oct 2018 16:18:00 +0200
-Subject: [PATCH 4/5] pinctrl: mediatek: pinctrl-mtk-common-v2: Make eint_m
- u16
-In-Reply-To: <20181008191411.32555-5-manivannan.sadhasivam@linaro.org>
-References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
- <20181008191411.32555-5-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdZAem09Qb_bUBk+QA5ngdjGTxqLxTtMMsSnO7rTME1Njw@mail.gmail.com>
+Date: Mon, 15 Oct 2018 16:27:10 +0200
+Subject: [RFT PATCH] mmc: pwrseq_simple: Fix incorrect handling of GPIO
+ bitmap
+In-Reply-To: <20181012190901.1243-1-jmkrzyszt@gmail.com>
+References: <20180925192433.1377-1-jmkrzyszt@gmail.com>
+ <20181012190901.1243-1-jmkrzyszt@gmail.com>
+Message-ID: <CACRpkdYB1Wz8VC3aDpB_4KQcdbE-_Fy48zF_idKDM0pqiOEnXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 8, 2018 at 9:14 PM Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
+On Fri, Oct 12, 2018 at 9:07 PM Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-> For SoC's which lacks EINT support, U16_MAX is assigned to both eint_m
-> and eint_n through macro NO_EINT_SUPPORT. This will generate integer
-> overflow warning because eint_m is declared as u8 type. Hence modify
-> the eint_m type to u16.
+> Commit b9762bebc633 ("gpiolib: Pass bitmaps, not integer arrays, to
+> get/set array") changed the way GPIO values are passed to
+> gpiod_get/set_array_value() and friends.  The new code introduced into
+> mmc_pwrseq_simple_set_gpios_value() incorrectly interpretes the 'value'
+> argument as a bitmap of GPIO values and assigns it directly to the
+> 'values' bitmap variable passed to gpiod_set_array_value_cansleep()
+> instead of filling that bitmap with bits equal to the 'value' argument.
+> As a result, only member 0 of the array is handled correctly.
 >
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Moreover, wrong assumption is taken about the 'values' bitmap size not
+> exceding the number of bits of the 'value' argument type.
+>
+> Fix it.
+>
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 
-Patch applied with Matthias' review tag, thanks!
+Patch applied with Ulf's and Marek's tags!
 
 Yours,
 Linus Walleij
