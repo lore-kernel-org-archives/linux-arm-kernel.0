@@ -1,124 +1,49 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 15 Oct 2018 13:22:12 +0200
-Subject: [PATCH] arm64: kprobe: make page to RO mode when allocate it
-In-Reply-To: <20181015111600.5479-1-anders.roxell@linaro.org>
-References: <20181015111600.5479-1-anders.roxell@linaro.org>
-Message-ID: <CAKv+Gu8gHxeb-XUBUhnni4YEEKEO+Fy-AKr+DHgbL96VvR8RoQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 15 Oct 2018 13:33:32 +0200
+Subject: [PATCH] mmc: tmio: simplify the DMA mode test
+In-Reply-To: <20181014223636.GH3260@kunai>
+References: <1539356588-18191-1-git-send-email-yamada.masahiro@socionext.com>
+ <20181014223636.GH3260@kunai>
+Message-ID: <20181015113332.uqnd4kmoabzto5kr@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Masami)
+On Mon, Oct 15, 2018 at 12:36:36AM +0200, Wolfram Sang wrote:
+> On Sat, Oct 13, 2018 at 12:03:08AM +0900, Masahiro Yamada wrote:
+> > host->chan_{rx,tx} represents the DMA capability of the platform.
+> > Even if DMA is supported, there are cases where we want to use PIO,
+> > for example, data length is short enough as commit 5f52c3552946
+> > ("mmc: tmio: use PIO for short transfers") mentioned.
+> > 
+> > Regarding the hardware control flow, we are interested in whether DMA
+> > is currently enabled or not, instead of whether the platform has the
+> > DMA capability.
+> > 
+> > Hence, the several conditionals in tmio_mmc_core.c end up with
+> > checking host->chan_{rx,tx} and !host->force_pio. This is not nice.
+> > 
+> > Let's flip the flag host->force_pio into host->dma_on.
+> > 
+> > host->dma_on represents whether the DMA is currently enabled or not.
+> > This flag is set false in the beginning of each command, then should
+> > be set true by tmio_mmc_start_dma() when the DMA is turned on.
+> > 
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> 
+> I like it. Much easier to read!
+> 
+> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-On 15 October 2018 at 13:16, Anders Roxell <anders.roxell@linaro.org> wrote:
-> Commit 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
-> has successfully identified code that leaves a page with W+X
-> permissions.
->
-> [    3.245140] arm64/mm: Found insecure W+X mapping at address (____ptrval____)/0xffff000000d90000
-> [    3.245771] WARNING: CPU: 0 PID: 1 at ../arch/arm64/mm/dump.c:232 note_page+0x410/0x420
-> [    3.246141] Modules linked in:
-> [    3.246653] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc5-next-20180928-00001-ge70ae259b853-dirty #62
-> [    3.247008] Hardware name: linux,dummy-virt (DT)
-> [    3.247347] pstate: 80000005 (Nzcv daif -PAN -UAO)
-> [    3.247623] pc : note_page+0x410/0x420
-> [    3.247898] lr : note_page+0x410/0x420
-> [    3.248071] sp : ffff00000804bcd0
-> [    3.248254] x29: ffff00000804bcd0 x28: ffff000009274000
-> [    3.248578] x27: ffff00000921a000 x26: ffff80007dfff000
-> [    3.248845] x25: ffff0000093f5000 x24: ffff000009526f6a
-> [    3.249109] x23: 0000000000000004 x22: ffff000000d91000
-> [    3.249396] x21: ffff000000d90000 x20: 0000000000000000
-> [    3.249661] x19: ffff00000804bde8 x18: 0000000000000400
-> [    3.249924] x17: 0000000000000000 x16: 0000000000000000
-> [    3.250271] x15: ffffffffffffffff x14: 295f5f5f5f6c6176
-> [    3.250594] x13: 7274705f5f5f5f28 x12: 2073736572646461
-> [    3.250941] x11: 20746120676e6970 x10: 70616d20582b5720
-> [    3.251252] x9 : 6572756365736e69 x8 : 3039643030303030
-> [    3.251519] x7 : 306666666678302f x6 : ffff0000095467b2
-> [    3.251802] x5 : 0000000000000000 x4 : 0000000000000000
-> [    3.252060] x3 : 0000000000000000 x2 : ffffffffffffffff
-> [    3.252323] x1 : 4d151327adc50b00 x0 : 0000000000000000
-> [    3.252664] Call trace:
-> [    3.252953]  note_page+0x410/0x420
-> [    3.253186]  walk_pgd+0x12c/0x238
-> [    3.253417]  ptdump_check_wx+0x68/0xf8
-> [    3.253637]  mark_rodata_ro+0x68/0x98
-> [    3.253847]  kernel_init+0x38/0x160
-> [    3.254103]  ret_from_fork+0x10/0x18
->
-> Reworked to that when allocate a page it sets mode RO. Inspired by
-> commit 63fef14fc98a ("kprobes/x86: Make insn buffer always ROX and use text_poke()").
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Co-developed-by: Arnd Bergmann <arnd@arndb.de>
-> Co-developed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> ---
->  arch/arm64/kernel/probes/kprobes.c | 27 ++++++++++++++++++++-------
->  1 file changed, 20 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> index 9b65132e789a..b842e908b423 100644
-> --- a/arch/arm64/kernel/probes/kprobes.c
-> +++ b/arch/arm64/kernel/probes/kprobes.c
-> @@ -23,7 +23,9 @@
->  #include <linux/slab.h>
->  #include <linux/stop_machine.h>
->  #include <linux/sched/debug.h>
-> +#include <linux/set_memory.h>
->  #include <linux/stringify.h>
-> +#include <linux/vmalloc.h>
->  #include <asm/traps.h>
->  #include <asm/ptrace.h>
->  #include <asm/cacheflush.h>
-> @@ -42,10 +44,21 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
->  static void __kprobes
->  post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
->
-> +static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
-> +{
-> +       void *addrs[1];
-> +       u32 insns[1];
-> +
-> +       addrs[0] = (void *)addr;
-> +       insns[0] = (u32)opcode;
-> +
-> +       return aarch64_insn_patch_text(addrs, insns, 1);
-> +}
-> +
->  static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
->  {
->         /* prepare insn slot */
-> -       p->ainsn.api.insn[0] = cpu_to_le32(p->opcode);
-> +       patch_text(p->ainsn.api.insn, p->opcode);
->
->         flush_icache_range((uintptr_t) (p->ainsn.api.insn),
->                            (uintptr_t) (p->ainsn.api.insn) +
-> @@ -118,15 +131,15 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->         return 0;
->  }
->
-> -static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
-> +void *alloc_insn_page(void)
->  {
-> -       void *addrs[1];
-> -       u32 insns[1];
-> +       void *page;
->
-> -       addrs[0] = (void *)addr;
-> -       insns[0] = (u32)opcode;
-> +       page = vmalloc_exec(PAGE_SIZE);
-> +       if (page)
-> +               set_memory_ro((unsigned long)page & PAGE_MASK, 1);
->
-> -       return aarch64_insn_patch_text(addrs, insns, 1);
-> +       return page;
->  }
->
->  /* arm kprobe: install breakpoint in text */
-> --
-> 2.19.1
->
+Tested on R-Car H3 ES1.0 and ES2.0, M3N, and H2. No regressions,
+especially no performance regressions (since "when to enable DMA" code
+was refactored).
+
+Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/eefce754/attachment.sig>
