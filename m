@@ -1,49 +1,74 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 15 Oct 2018 13:33:32 +0200
-Subject: [PATCH] mmc: tmio: simplify the DMA mode test
-In-Reply-To: <20181014223636.GH3260@kunai>
-References: <1539356588-18191-1-git-send-email-yamada.masahiro@socionext.com>
- <20181014223636.GH3260@kunai>
-Message-ID: <20181015113332.uqnd4kmoabzto5kr@ninjato>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Mon, 15 Oct 2018 11:47:55 +0000
+Subject: [PATCH v2 0/7] spi: add support for octal mode
+Message-ID: <1539603969-21076-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 12:36:36AM +0200, Wolfram Sang wrote:
-> On Sat, Oct 13, 2018 at 12:03:08AM +0900, Masahiro Yamada wrote:
-> > host->chan_{rx,tx} represents the DMA capability of the platform.
-> > Even if DMA is supported, there are cases where we want to use PIO,
-> > for example, data length is short enough as commit 5f52c3552946
-> > ("mmc: tmio: use PIO for short transfers") mentioned.
-> > 
-> > Regarding the hardware control flow, we are interested in whether DMA
-> > is currently enabled or not, instead of whether the platform has the
-> > DMA capability.
-> > 
-> > Hence, the several conditionals in tmio_mmc_core.c end up with
-> > checking host->chan_{rx,tx} and !host->force_pio. This is not nice.
-> > 
-> > Let's flip the flag host->force_pio into host->dma_on.
-> > 
-> > host->dma_on represents whether the DMA is currently enabled or not.
-> > This flag is set false in the beginning of each command, then should
-> > be set true by tmio_mmc_start_dma() when the DMA is turned on.
-> > 
-> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> 
-> I like it. Much easier to read!
-> 
-> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Add support for octal mode IO data transfer.
+Micron flash, mt35xu512aba, supports octal mode data transfer and
+NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
 
-Tested on R-Car H3 ES1.0 and ES2.0, M3N, and H2. No regressions,
-especially no performance regressions (since "when to enable DMA" code
-was refactored).
+Patch series
+* Add support for octal mode flags and parsing of same in spi driver.
+* Add opcodes for octal I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
+  Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
+* Add parsing logic for spi-mem framework and m25p80.c device file.
+* Add mode bit required for octal mode in nxp-fspi driver [2].
+* Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
 
-Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cherry pick below 2 patches (from: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git):
+    c639f871febe6667d9afce28108c634e5636c735 spi: spi-mem: Fix inverted logic in op sanity check
+    db122eb8a749a1eff038f9a282c620ab16c4be1d spi: spi-mem: Add extra sanity checks on the op param
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/eefce754/attachment.sig>
+Tested on LX2160ARDB target with nxp-fspi driver, below are
+Read performance number of 1-1-1 and 1-1-8 read protocol.
+
+ root at lxxx:~# cat /proc/mtd
+ dev:    size   erasesize  name
+ mtd0: 04000000 00001000 "spi0.0"
+ mtd1: 04000000 00001000 "spi0.1"
+ root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
+ Copied 16777216 bytes from address 0x00000000 in flash to 0read
+
+ real    0m2.792s
+ user    0m0.000s
+ sys     0m2.790s
+ root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
+ Copied 16777216 bytes from address 0x00000000 in flash to 0read
+
+ real    0m0.441s
+ user    0m0.000s
+ sys     0m0.440s
+ root at ls1012ardb:~#
+
+ Flash device MTD0 configured in 1-1-1 protocol.
+ Flash device MTD1 configured in 1-1-8 protocol.
+
+[1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384
+[2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70210
+
+Yogesh Gaur (7):
+  spi: add support for octal I/O data transfer
+  mtd: spi-nor: add opcodes for octal Read/Write commands
+  mtd: spi-nor: add octal read flag for flash mt35xu512aba
+  mtd: m25p80: add support of octal I/O transfer
+  spi: spi-mem: add support for octal I/O data transfer
+  spi: nxp-fspi: add mode flag bit for octal support
+  arm64: dts: lx2160a: update fspi node
+
+Changes for v2:
+ Incorporated review comments of Boris and Vignesh.
+
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  4 ++++
+ drivers/mtd/devices/m25p80.c                      |  9 ++++++++-
+ drivers/mtd/spi-nor/spi-nor.c                     | 15 ++++++++++++++-
+ drivers/spi/spi-mem.c                             |  9 ++++++++-
+ drivers/spi/spi-nxp-fspi.c                        |  4 ++--
+ drivers/spi/spi.c                                 |  6 ++++++
+ include/linux/mtd/spi-nor.h                       |  8 ++++++++
+ include/linux/spi/spi.h                           |  2 ++
+ 8 files changed, 52 insertions(+), 5 deletions(-)
+
+-- 
+2.7.4
