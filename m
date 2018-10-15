@@ -1,38 +1,22 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 15 Oct 2018 20:01:56 +0200
-Subject: [PATCH 10/14] ARM64: dts: hisilicon: Add interrupt names for the
- tsensors
-In-Reply-To: <20181015163115.GA25282@bogus>
-References: <1537866192-12320-1-git-send-email-daniel.lezcano@linaro.org>
- <1537866192-12320-11-git-send-email-daniel.lezcano@linaro.org>
- <20181015163115.GA25282@bogus>
-Message-ID: <9f9650d9-cae9-9dfb-ded3-4ba5834a6ffe@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 15 Oct 2018 13:24:02 -0500
+Subject: [PATCH 03/12] dt-bindings: sun6i-dsi: Add compatible for A64
+ MIPI DSI
+In-Reply-To: <20180927114850.24565-4-jagan@amarulasolutions.com>
+References: <20180927114850.24565-1-jagan@amarulasolutions.com>
+ <20180927114850.24565-4-jagan@amarulasolutions.com>
+Message-ID: <20181015182402.GA5988@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/2018 18:31, Rob Herring wrote:
-> On Tue, Sep 25, 2018 at 11:03:08AM +0200, Daniel Lezcano wrote:
->> Add the missing interrupts for the temperature sensors as well as
->> their names.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt | 8 ++++++--
+On Thu, 27 Sep 2018 17:18:41 +0530, Jagan Teki wrote:
+> The MIPI DSI controller on Allwinner A64 is similar to
+> Allwinner A31 without support of DSI mod clock.
 > 
-> Combine this and the previous binding change to 1 patch.
-
-Ok.
-
->>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi                       | 8 ++++++--
->>  2 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> And more checkpatch whitespace errors in this.
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Reviewed-by: Rob Herring <robh@kernel.org>
