@@ -1,34 +1,39 @@
 From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 15 Oct 2018 14:02:58 +0200
-Subject: [PATCH V4 2/15] KVM/MMU: Add tlb flush with range helper function
-In-Reply-To: <alpine.DEB.2.21.1810141014350.1438@nanos.tec.linutronix.de>
+Date: Mon, 15 Oct 2018 14:04:43 +0200
+Subject: [PATCH V4 00/15] x86/KVM/Hyper-v: Add HV ept tlb range flush
+ hypercall support in KVM
+In-Reply-To: <20181013145406.4911-1-Tianyu.Lan@microsoft.com>
 References: <20181013145406.4911-1-Tianyu.Lan@microsoft.com>
- <20181013145406.4911-3-Tianyu.Lan@microsoft.com>
- <4D709C3A-A91C-4CA7-922A-E77618EF21B4@oracle.com>
- <alpine.DEB.2.21.1810141014350.1438@nanos.tec.linutronix.de>
-Message-ID: <fc78b7f2-70aa-29fa-95ca-d599f76c8f1a@redhat.com>
+Message-ID: <d9414a38-ca5c-4273-30dc-1fecd0f9268e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2018 10:16, Thomas Gleixner wrote:
->>> +static inline bool kvm_available_flush_tlb_with_range(void)
->>> +{
->>> +	return kvm_x86_ops->tlb_remote_flush_with_range;
->>> +}
->> Seems that kvm_available_flush_tlb_with_range() is not used in this patch?
-> What's wrong with that? 
+On 13/10/2018 16:53, lantianyu1986 at gmail.com wrote:
+> From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 > 
-> It provides the implementation and later patches make use of it. It's a
-> sensible way to split patches into small, self contained entities.
+> For nested memory virtualization, Hyper-v doesn't set write-protect
+> L1 hypervisor EPT page directory and page table node to track changes 
+> while it relies on guest to tell it changes via HvFlushGuestAddressLlist
+> hypercall. HvFlushGuestAddressLlist hypercall provides a way to flush
+> EPT page table with ranges which are specified by L1 hypervisor.
+> 
+> If L1 hypervisor uses INVEPT or HvFlushGuestAddressSpace hypercall to
+> flush EPT tlb, Hyper-V will invalidate associated EPT shadow page table
+> and sync L1's EPT table when next EPT page fault is triggered.
+> HvFlushGuestAddressLlist hypercall helps to avoid such redundant EPT
+> page fault and synchronization of shadow page table.
 
-That's true, on the other hand I have indeed a concerns with this patch:
-this series is not bisectable at all, because all the new code is dead
-until the very last patch.  Uses of the new feature should come _after_
-the implementation.
+So I just told you that the first part is well understood but I must
+retract that; after carefully reviewing the whole series, I think one of
+us is actually very confused.
 
-I don't have any big problem with what Liran pointed out (and I can live
-with the unused static functions that would warn with -Wunused, too),
-but the above should be fixed in v5, basically by moving patches 12-15
-at the beginning of the series.
+I am not afraid to say it can be me, but my understanding is that you're
+passing L1 GPAs to the hypercall and instead the spec says it expects L2
+GPAs.  (Consider that, because KVM's shadow paging code is shared
+between nested EPT and !EPT cases, every time you see gpa/gfn in the
+code it is for L1, while nested EPT GPAs are really what the code calls
+gva.)
+
+What's going on?
 
 Paolo
