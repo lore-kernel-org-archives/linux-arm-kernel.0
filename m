@@ -1,61 +1,37 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Mon, 15 Oct 2018 15:34:57 +0300
-Subject: [PATCH v3 0/8] Support Trusted Foundations firmware on Tegra30
-In-Reply-To: <20180830180421.6415-1-digetx@gmail.com>
-References: <20180830180421.6415-1-digetx@gmail.com>
-Message-ID: <91e4af24-7be7-2dbc-577b-56a852cc21ff@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 15 Oct 2018 14:51:15 +0200
+Subject: [PATCH 0/2] mmc: uniphier-sd: two bug-fixes
+In-Reply-To: <20181015073339.GB981@kunai>
+References: <1539356258-12374-1-git-send-email-yamada.masahiro@socionext.com>
+ <20181014223311.GE3260@kunai>
+ <CAK7LNATPf4mEdH16eZzLg4x3tP-jvXcTWqqY0DgCpmGjt9x9zg@mail.gmail.com>
+ <20181015073339.GB981@kunai>
+Message-ID: <CAPDyKFpAa=ucJvTLhNi-fQ3Fvd1in8rstxQouPY+_k_bFoAjZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/30/18 9:04 PM, Dmitry Osipenko wrote:
-> Hello,
-> 
-> All consumer-grade Tegra30 devices, like Nexus 7 tablet; Ouya console and
-> others, use Trusted Foundations firmware that doesn't allow CPU to access
-> secure registers directly from the Linux kernel, these accesses shall be
-> done via the firmware calls. This patch-series adds a full-featured support
-> of the Trusted Foundations firmware that opens the door for supporting of
-> various Tegra30-based devices in the upstream Linux kernel.
-> 
-> Changelog:
-> 
-> v3:	- Implemented suspend-resume support.
-> 
-> 	- Reworked arm/firmware/trusted_foundations.c a tad. Now cache
-> 	  is getting properly initialized, cache enabling / disabling is
-> 	  supported.
-> 
-> v2:
-> 	- The "Don't apply CPU erratas in insecure mode" patch got some
-> 	  cleanup, in particular resolved the messiness in
-> 	  __tegra_cpu_reset_handler_data.
-> 
-> 	- Added a comment to tf_cache_write_sec(), justifying the warning
-> 	  message.
-> 
-> Dmitry Osipenko (8):
->   ARM: trusted_foundations: Implement L2 cache initialization callback
->   ARM: trusted_foundations: Make prepare_idle call to take mode argument
->   ARM: trusted_foundations: Provide information about whether firmware
->     is registered
->   ARM: tegra: Setup L2 cache using Trusted Foundations firmware
->   ARM: tegra: Don't apply CPU erratas in insecure mode
->   ARM: tegra: Always boot CPU in ARM-mode
->   ARM: tegra: Support L2 cache maintenance done via firmware
->   ARM: tegra: Add firmware calls required for suspend-resume
-> 
->  arch/arm/firmware/trusted_foundations.c    | 80 +++++++++++++++++++++-
->  arch/arm/include/asm/firmware.h            |  2 +-
->  arch/arm/include/asm/trusted_foundations.h | 13 ++++
->  arch/arm/mach-tegra/cpuidle-tegra114.c     |  3 +-
->  arch/arm/mach-tegra/pm.c                   | 43 ++++++++++++
->  arch/arm/mach-tegra/reset-handler.S        | 66 ++++++++++++++----
->  arch/arm/mach-tegra/reset.c                |  3 +
->  arch/arm/mach-tegra/reset.h                |  9 ++-
->  arch/arm/mach-tegra/sleep-tegra20.S        |  4 ++
->  arch/arm/mach-tegra/sleep.S                |  4 ++
->  arch/arm/mach-tegra/tegra.c                | 10 +++
->  11 files changed, 216 insertions(+), 21 deletions(-)
-> 
+On 15 October 2018 at 09:33, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+>> Some sub-systems rebase, and some do not.
+>> It is up to the sub-system maintainer.
+>
+> We used to have a very strict rule to not rebase anything which ends up
+> in linux-next. Dunno what happened to this rule but I liked it.
+>
+>> I know what you are saying, but this is how we develop in linux-next.
+>
+> I wonder about that...
+>
+>> You need to use "git rebase --onto".
+>
+> And what about lists with commit IDs tracking patches on their way
+> upstream? Yes, there is git-patch-id, yet I think it is easier to admit
+> that incremental changes happen anyway. I know Ulf view differs...
+>
 
-ping
+For this particular case I can avoid the re-base, as you prefer.
+However, in general can't commit to not rebase, as it depends on case
+by case basis.
+
+Kind regards
+Uffe
