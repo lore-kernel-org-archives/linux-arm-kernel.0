@@ -1,127 +1,125 @@
 From: hannah@marvell.com (hannah at marvell.com)
-Date: Mon, 15 Oct 2018 15:00:43 +0300
-Subject: [PATCH 1/4] iommu/arm-smmu: introduce wrapper for writeq/readq
+Date: Mon, 15 Oct 2018 15:00:44 +0300
+Subject: [PATCH 2/4] iommu/arm-smmu: Workaround for Marvell Armada-AP806 SoC
+ erratum #582743
 In-Reply-To: <1539604846-21151-1-git-send-email-hannah@marvell.com>
 References: <1539604846-21151-1-git-send-email-hannah@marvell.com>
-Message-ID: <1539604846-21151-2-git-send-email-hannah@marvell.com>
+Message-ID: <1539604846-21151-3-git-send-email-hannah@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanna Hawa <hannah@marvell.com>
 
-This patch introduce the smmu_writeq_relaxed/smmu_readq_relaxed
-helpers, as preparation to add specific Marvell work-around for
-accessing 64bit width registers of ARM SMMU.
+Due to erratum #582743, the Marvell Armada-AP806 can't access 64bit
+to ARM SMMUv2 registers.
+This patch split the writeq/readq to two accesses of writel/readl.
+
+Note that separate writes/reads to 2 is not problem regards to atomicity,
+because the driver use the readq/writeq while initialize the SMMU, report
+for SMMU fault, and use spinlock in one case (iova_to_phys).
 
 Signed-off-by: Hanna Hawa <hannah@marvell.com>
 ---
- drivers/iommu/arm-smmu.c | 36 +++++++++++++++++++++++++++---------
- 1 file changed, 27 insertions(+), 9 deletions(-)
+ Documentation/arm64/silicon-errata.txt |  2 ++
+ drivers/iommu/arm-smmu.c               | 33 +++++++++++++++++++++++++++++----
+ 2 files changed, 31 insertions(+), 4 deletions(-)
 
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 3b2f2dd..fc3f2a0 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -67,6 +67,8 @@ stable kernels.
+ | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
+ | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
+ |                |                 |                 |                             |
++| Marvell        | ARM-MMU-500     | #582743         | N/A                         |
++|                |                 |                 |                             |
+ | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
+ |                |                 |                 |                             |
+ | Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101 |
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fd1b80e..fccb1d4 100644
+index fccb1d4..d64f892 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -88,9 +88,11 @@
-  * therefore this actually makes more sense than it might first appear.
-  */
- #ifdef CONFIG_64BIT
--#define smmu_write_atomic_lq		writeq_relaxed
-+#define smmu_write_atomic_lq(smmu, val, reg)	\
-+					smmu_writeq_relaxed(smmu, val, reg)
- #else
--#define smmu_write_atomic_lq		writel_relaxed
-+#define smmu_write_atomic_lq(smmu, val, reg)	\
-+					writel_relaxed(val, reg)
- #endif
+@@ -119,6 +119,7 @@ enum arm_smmu_arch_version {
+ enum arm_smmu_implementation {
+ 	GENERIC_SMMU,
+ 	ARM_MMU500,
++	MRVL_MMU500,
+ 	CAVIUM_SMMUV2,
+ };
  
- /* Translation context bank */
-@@ -270,6 +272,19 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
- 	return container_of(dom, struct arm_smmu_domain, domain);
+@@ -276,13 +277,35 @@ static inline void smmu_writeq_relaxed(struct arm_smmu_device *smmu,
+ 				       u64 val,
+ 				       void __iomem *addr)
+ {
+-	writeq_relaxed(val, addr);
++	/*
++	 * Marvell Armada-AP806 erratum #582743.
++	 * Split all the writeq to double writel
++	 */
++	if (smmu->model != MRVL_MMU500) {
++		writeq_relaxed(val, addr);
++		return;
++	}
++
++	writel_relaxed(upper_32_bits(val), addr + 4);
++	writel_relaxed(lower_32_bits(val), addr);
  }
  
-+static inline void smmu_writeq_relaxed(struct arm_smmu_device *smmu,
-+				       u64 val,
-+				       void __iomem *addr)
-+{
-+	writeq_relaxed(val, addr);
-+}
+ static inline u64 smmu_readq_relaxed(struct arm_smmu_device *smmu,
+ 				     void __iomem *addr)
+ {
+-	return readq_relaxed(addr);
++	u64 val;
 +
-+static inline u64 smmu_readq_relaxed(struct arm_smmu_device *smmu,
-+				     void __iomem *addr)
-+{
-+	return readq_relaxed(addr);
-+}
++	/*
++	 * Marvell Armada-AP806 erratum #582743.
++	 * Split all the readq to double readl
++	 */
++	if (smmu->model != MRVL_MMU500)
++		return readq_relaxed(addr);
 +
++	val = (u64)readl_relaxed(addr + 4) << 32;
++	val |= readl_relaxed(addr);
++
++	return val;
+ }
+ 
  static void parse_driver_options(struct arm_smmu_device *smmu)
- {
- 	int i = 0;
-@@ -465,6 +480,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 					  size_t granule, bool leaf, void *cookie)
- {
- 	struct arm_smmu_domain *smmu_domain = cookie;
-+	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 	bool stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
- 	void __iomem *reg = ARM_SMMU_CB(smmu_domain->smmu, cfg->cbndx);
-@@ -483,7 +499,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 			iova >>= 12;
- 			iova |= (u64)cfg->asid << 48;
- 			do {
--				writeq_relaxed(iova, reg);
-+				smmu_writeq_relaxed(smmu, iova, reg);
- 				iova += granule >> 12;
- 			} while (size -= granule);
- 		}
-@@ -492,7 +508,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 			      ARM_SMMU_CB_S2_TLBIIPAS2;
- 		iova >>= 12;
- 		do {
--			smmu_write_atomic_lq(iova, reg);
-+			smmu_write_atomic_lq(smmu, iova, reg);
- 			iova += granule >> 12;
- 		} while (size -= granule);
- 	}
-@@ -548,7 +564,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
- 		return IRQ_NONE;
+@@ -1611,7 +1634,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	for (i = 0; i < smmu->num_mapping_groups; ++i)
+ 		arm_smmu_write_sme(smmu, i);
  
- 	fsynr = readl_relaxed(cb_base + ARM_SMMU_CB_FSYNR0);
--	iova = readq_relaxed(cb_base + ARM_SMMU_CB_FAR);
-+	iova = smmu_readq_relaxed(smmu, cb_base + ARM_SMMU_CB_FAR);
+-	if (smmu->model == ARM_MMU500) {
++	if (smmu->model == ARM_MMU500 || smmu->model == MRVL_MMU500) {
+ 		/*
+ 		 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
+ 		 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
+@@ -1640,7 +1663,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 		 * Disable MMU-500's not-particularly-beneficial next-page
+ 		 * prefetcher for the sake of errata #841119 and #826419.
+ 		 */
+-		if (smmu->model == ARM_MMU500) {
++		if (smmu->model == ARM_MMU500 || smmu->model == MRVL_MMU500) {
+ 			reg = readl_relaxed(cb_base + ARM_SMMU_CB_ACTLR);
+ 			reg &= ~ARM_MMU500_ACTLR_CPRE;
+ 			writel_relaxed(reg, cb_base + ARM_SMMU_CB_ACTLR);
+@@ -1923,6 +1946,7 @@ struct arm_smmu_match_data {
+ ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
+ ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
+ ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
++ARM_SMMU_MATCH_DATA(mrvl_mmu500, ARM_SMMU_V2, MRVL_MMU500);
+ ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
  
- 	dev_err_ratelimited(smmu->dev,
- 	"Unhandled context fault: fsr=0x%x, iova=0x%08lx, fsynr=0x%x, cb=%d\n",
-@@ -698,9 +714,11 @@ static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
- 		writel_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
- 		writel_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
- 	} else {
--		writeq_relaxed(cb->ttbr[0], cb_base + ARM_SMMU_CB_TTBR0);
-+		smmu_writeq_relaxed(smmu, cb->ttbr[0],
-+				    cb_base + ARM_SMMU_CB_TTBR0);
- 		if (stage1)
--			writeq_relaxed(cb->ttbr[1], cb_base + ARM_SMMU_CB_TTBR1);
-+			smmu_writeq_relaxed(smmu, cb->ttbr[1],
-+					    cb_base + ARM_SMMU_CB_TTBR1);
- 	}
- 
- 	/* MAIRs (stage-1 only) */
-@@ -1279,7 +1297,7 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 	/* ATS1 registers can only be written atomically */
- 	va = iova & ~0xfffUL;
- 	if (smmu->version == ARM_SMMU_V2)
--		smmu_write_atomic_lq(va, cb_base + ARM_SMMU_CB_ATS1PR);
-+		smmu_write_atomic_lq(smmu, va, cb_base + ARM_SMMU_CB_ATS1PR);
- 	else /* Register is only 32-bit in v1 */
- 		writel_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
- 
-@@ -1292,7 +1310,7 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 		return ops->iova_to_phys(ops, iova);
- 	}
- 
--	phys = readq_relaxed(cb_base + ARM_SMMU_CB_PAR);
-+	phys = smmu_readq_relaxed(smmu, cb_base + ARM_SMMU_CB_PAR);
- 	spin_unlock_irqrestore(&smmu_domain->cb_lock, flags);
- 	if (phys & CB_PAR_F) {
- 		dev_err(dev, "translation fault!\n");
+ static const struct of_device_id arm_smmu_of_match[] = {
+@@ -1931,6 +1955,7 @@ struct arm_smmu_match_data {
+ 	{ .compatible = "arm,mmu-400", .data = &smmu_generic_v1 },
+ 	{ .compatible = "arm,mmu-401", .data = &arm_mmu401 },
+ 	{ .compatible = "arm,mmu-500", .data = &arm_mmu500 },
++	{ .compatible = "marvell,mmu-500", .data = &mrvl_mmu500 },
+ 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
+ 	{ },
+ };
 -- 
 1.9.1
