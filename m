@@ -1,35 +1,26 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 15 Oct 2018 07:30:09 +0000
-Subject: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
-In-Reply-To: <CAOMZO5BEwNQy0HA80qOzm_w-c63tFK1eL+cOHNCxKYq9PHGsqw@mail.gmail.com>
-References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
- <1539527419-23613-3-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5BEwNQy0HA80qOzm_w-c63tFK1eL+cOHNCxKYq9PHGsqw@mail.gmail.com>
-Message-ID: <52eaa4ac563ad5114ebd99b286cdbe0495dba7ec.camel@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 15 Oct 2018 09:31:19 +0200
+Subject: [PATCH v2 6/9] ASoC: sunxi: allow the sun8i-codec driver to be
+ built on ARM64
+In-Reply-To: <20181013165329.13363-7-anarsoul@gmail.com>
+References: <20181013165329.13363-1-anarsoul@gmail.com>
+ <20181013165329.13363-7-anarsoul@gmail.com>
+Message-ID: <20181015073119.fgsixra3nw3aannd@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2018-10-14 at 20:13 -0300, Fabio Estevam wrote:
-> > +               imx8qx-pm {
-> > +                       compatible = "fsl,scu-pd";
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +
-> > +                       pd_lsio: lsio-power-domain {
-> > +                               #power-domain-cells = <0>;
-> > +                               #address-cells = <1>;
-> > +                               #size-cells = <0>;
-> > +
-> > +                               pd_lsio_pwm0: lsio-pwm0 at 191 {
-> > +                                       reg = <191>;
+On Sat, Oct 13, 2018 at 09:53:26AM -0700, Vasily Khoruzhick wrote:
+> Allwinner A64 uses the same digital codec part as in A33, so we need
+> to build this driver on ARM64 as well.
 > 
-> The number after @ is in hex, so the reg property should be 0x191.
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-These are SC_R_* resource ids from include/linux/firmware/imx/types.h
-and they are almost everywhere referenced as decimals.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Is this really not acceptable for DT?
+Thanks!
+Maxime
 
---
-Regards,
-Leonard
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
