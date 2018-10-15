@@ -1,115 +1,118 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 15 Oct 2018 16:35:25 +0530
-Subject: [PATCH 1/2] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-In-Reply-To: <20181006162929.u6uh4ffn6gm3incf@akan>
-References: <20181006072812.15814-1-lokeshvutla@ti.com>
- <20181006072812.15814-2-lokeshvutla@ti.com>
- <20181006162929.u6uh4ffn6gm3incf@akan>
-Message-ID: <c3dada07-d04f-a4c8-b8e3-bece678aea15@ti.com>
+From: anders.roxell@linaro.org (Anders Roxell)
+Date: Mon, 15 Oct 2018 13:16:00 +0200
+Subject: [PATCH] arm64: kprobe: make page to RO mode when allocate it
+Message-ID: <20181015111600.5479-1-anders.roxell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, DT maintainers,
+Commit 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
+has successfully identified code that leaves a page with W+X
+permissions.
 
-On Saturday 06 October 2018 09:59 PM, Nishanth Menon wrote:
-> On 12:58-20181006, Lokesh Vutla wrote:
->> Add the DT binding documentation for Interrupt router driver.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>   .../interrupt-controller/ti,sci-intr.txt      | 83 +++++++++++++++++++
->>   MAINTAINERS                                   |  1 +
->>   2 files changed, 84 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
->>
->> diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
->> new file mode 100644
->> index 000000000000..681ca53cc5fb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
->> @@ -0,0 +1,83 @@
->> +Texas Instruments K3 Interrupt Router
->> +=====================================
->> +
->> +The Interrupt Router (INTR) module provides a mechanism to mux M
->> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
->> +to be driven per N output. There is one register per output (MUXCNTL_N) that
->> +controls the selection.
->> +
->> +
->> +                                 Interrupt Router
->> +                             +----------------------+
->> +                             |  Inputs     Outputs  |
->> +        +-------+            | +------+             |
->> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
->> +        +-------+            | +------+             |      controller
->> +                             |    .        +-----+  |      +-------+
->> +        +-------+            |    .        |  0  |  |----->|  GIC  |
->> +        | INTA  |----------->|    .        +-----+  |      +-------+
->> +        +-------+            |    .          .      |
->> +                             | +------+      .      |
->> +                             | | irqM |    +-----+  |
->> +                             | +------+    |  N  |  |
->> +                             |             +-----+  |
->> +                             +----------------------+
->> +
->> +Configuration of these MUXCNTL_N registers is done by a system controller
->> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
->> +controller will keep track of the used and unused registers within the Router.
->> +Driver should request the system controller to get the range of GIC IRQs
->> +assigned to the requesting hosts. It is the drivers responsibility to keep
->> +track of GIC IRQs.
->> +
->> +Communication between the host processor running an OS and the system
->> +controller happens through a protocol called TI System Control Interface
->> +(TISCI protocol). For more details refer:
->> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->> +
->> +TISCI Interrupt Router Node:
->> +----------------------------
->> +- compatible:		Must be "ti,sci-intr".
->> +- interrupt-controller:	Identifies the node as an interrupt controller
->> +- #interrupt-cells:	Specifies the number of cells needed to encode an
->> +			interrupt source. The value should be 3.
->> +			First cell should contain the TISCI device ID of source
->> +			Second cell should contain the interrupt source offset
->> +			within the device
->> +			Third cell specifies the trigger type as defined
->> +			in interrupts.txt in this directory.
->> +- interrupt-parent:	phandle of irq parent for TISCI intr. The parent must
->> +			use the same interrupt-cells format as GIC.
->> +- ti,sci:		Phandle to TI-SCI compatible System controller node.
->> +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
->> +- ti,sci-rm-range-girq:	Tuple corresponding to unique TISCI resource type that
->> +			defines the dst host irq ranges assigned to this
->> +			interrupt router from this host context.
->> +			Tuple should be of format <type subtype>.
->> +
-> 
-> Rob, DT maintainers,
-> 
-> I'd like a feedback from DT maintainers on this 'range' topic.
-> 
-> TISCI Firmware [1] currently seems to define a type corresponding to a
-> device ID[2]. in AM6 device, for example, this is different, however
-> have a 1 to 1 correspondence. However, there is expectation that type will
-> end up as device ID in a future SoC.
-> 
-> While this is subject to much debate internally, I'd like some feedback if this
-> is OK from Device tree representation - it is true that Firmware does
-> look at it as type, however in some future SoC, it could be that the
-> values themselves may correspond one to one with a device id -> The
-> original wish was that types might be something reusable across SoCs,
-> but that is turning out to be more of a theoretical wish than any thing
-> practical.
-> 
-> [1]http://software-dl.ti.com/tisci/esd/latest/5_soc_doc/am6x/resasg_types.html
-> [2]http://software-dl.ti.com/tisci/esd/latest/5_soc_doc/am6x/devices.html
+[    3.245140] arm64/mm: Found insecure W+X mapping at address (____ptrval____)/0xffff000000d90000
+[    3.245771] WARNING: CPU: 0 PID: 1 at ../arch/arm64/mm/dump.c:232 note_page+0x410/0x420
+[    3.246141] Modules linked in:
+[    3.246653] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc5-next-20180928-00001-ge70ae259b853-dirty #62
+[    3.247008] Hardware name: linux,dummy-virt (DT)
+[    3.247347] pstate: 80000005 (Nzcv daif -PAN -UAO)
+[    3.247623] pc : note_page+0x410/0x420
+[    3.247898] lr : note_page+0x410/0x420
+[    3.248071] sp : ffff00000804bcd0
+[    3.248254] x29: ffff00000804bcd0 x28: ffff000009274000
+[    3.248578] x27: ffff00000921a000 x26: ffff80007dfff000
+[    3.248845] x25: ffff0000093f5000 x24: ffff000009526f6a
+[    3.249109] x23: 0000000000000004 x22: ffff000000d91000
+[    3.249396] x21: ffff000000d90000 x20: 0000000000000000
+[    3.249661] x19: ffff00000804bde8 x18: 0000000000000400
+[    3.249924] x17: 0000000000000000 x16: 0000000000000000
+[    3.250271] x15: ffffffffffffffff x14: 295f5f5f5f6c6176
+[    3.250594] x13: 7274705f5f5f5f28 x12: 2073736572646461
+[    3.250941] x11: 20746120676e6970 x10: 70616d20582b5720
+[    3.251252] x9 : 6572756365736e69 x8 : 3039643030303030
+[    3.251519] x7 : 306666666678302f x6 : ffff0000095467b2
+[    3.251802] x5 : 0000000000000000 x4 : 0000000000000000
+[    3.252060] x3 : 0000000000000000 x2 : ffffffffffffffff
+[    3.252323] x1 : 4d151327adc50b00 x0 : 0000000000000000
+[    3.252664] Call trace:
+[    3.252953]  note_page+0x410/0x420
+[    3.253186]  walk_pgd+0x12c/0x238
+[    3.253417]  ptdump_check_wx+0x68/0xf8
+[    3.253637]  mark_rodata_ro+0x68/0x98
+[    3.253847]  kernel_init+0x38/0x160
+[    3.254103]  ret_from_fork+0x10/0x18
 
-Any help on this topic?
+Reworked to that when allocate a page it sets mode RO. Inspired by
+commit 63fef14fc98a ("kprobes/x86: Make insn buffer always ROX and use text_poke()").
 
-Thanks and regards,
-Lokesh
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Co-developed-by: Arnd Bergmann <arnd@arndb.de>
+Co-developed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+---
+ arch/arm64/kernel/probes/kprobes.c | 27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-> 
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index 9b65132e789a..b842e908b423 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -23,7 +23,9 @@
+ #include <linux/slab.h>
+ #include <linux/stop_machine.h>
+ #include <linux/sched/debug.h>
++#include <linux/set_memory.h>
+ #include <linux/stringify.h>
++#include <linux/vmalloc.h>
+ #include <asm/traps.h>
+ #include <asm/ptrace.h>
+ #include <asm/cacheflush.h>
+@@ -42,10 +44,21 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+ static void __kprobes
+ post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
+ 
++static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
++{
++	void *addrs[1];
++	u32 insns[1];
++
++	addrs[0] = (void *)addr;
++	insns[0] = (u32)opcode;
++
++	return aarch64_insn_patch_text(addrs, insns, 1);
++}
++
+ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+ {
+ 	/* prepare insn slot */
+-	p->ainsn.api.insn[0] = cpu_to_le32(p->opcode);
++	patch_text(p->ainsn.api.insn, p->opcode);
+ 
+ 	flush_icache_range((uintptr_t) (p->ainsn.api.insn),
+ 			   (uintptr_t) (p->ainsn.api.insn) +
+@@ -118,15 +131,15 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ 	return 0;
+ }
+ 
+-static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
++void *alloc_insn_page(void)
+ {
+-	void *addrs[1];
+-	u32 insns[1];
++	void *page;
+ 
+-	addrs[0] = (void *)addr;
+-	insns[0] = (u32)opcode;
++	page = vmalloc_exec(PAGE_SIZE);
++	if (page)
++		set_memory_ro((unsigned long)page & PAGE_MASK, 1);
+ 
+-	return aarch64_insn_patch_text(addrs, insns, 1);
++	return page;
+ }
+ 
+ /* arm kprobe: install breakpoint in text */
+-- 
+2.19.1
