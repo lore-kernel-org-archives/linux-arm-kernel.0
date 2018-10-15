@@ -1,39 +1,45 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 15 Oct 2018 15:15:55 +0200
-Subject: mmc: mediatek: add MT8183 MMC driver support
-In-Reply-To: <1539415250-32337-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1539415250-32337-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFp3Wn9Wz8bmaSXFmNe0HOKCMcy7Pue3C7+9w5kq2AO0Sw@mail.gmail.com>
+Date: Mon, 15 Oct 2018 15:15:47 +0200
+Subject: [PATCH 2/2] mmc: uniphier-sd: avoid using broken DMA RX channel
+In-Reply-To: <1539356258-12374-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1539356258-12374-1-git-send-email-yamada.masahiro@socionext.com>
+ <1539356258-12374-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAPDyKFpYggUu2WDsR1CENKJDyCpZ1Nh+DrO3=oT1euGLNurxBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2018 at 09:20, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> this series of patch include below changes:
-> 1. Add MT8183 SoC support in Mediatek MMC DT bindings
-> 2. Fill mmc->actual_clock
-> 3. Fix cannot receive new request issue
-> 4. Tune CMD/DATA together to save tuning time
-> 5. Add MT8183 MMC driver support
-> 6. Refine the tuning method to drop too much redundant code
+On 12 October 2018 at 16:57, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> host->chan_rx is NULL when UNIPHIER_SD_CAP_BROKEN_DMA_RX quirk flag
+> is set. In this case, it should not set up DMA.
 >
-> Chaotian Jing (6):
->   mmc: dt-bindings: add support for MT8183 SoC
->   mmc: mediatek: fill the actual clock for mmc debugfs
->   mmc: mediatek: fix cannot receive new request when msdc_cmd_is_ready
->     fail
->   mmc: mediatek: tune CMD/DATA together
->   mmc: mediatek: add MT8183 MMC driver support
->   mmc: mediatek: drop too much code of tuning method
->
->  Documentation/devicetree/bindings/mmc/mtk-sd.txt |   1 +
->  drivers/mmc/host/mtk-sd.c                        | 292 ++++++++++++++++++++---
->  2 files changed, 254 insertions(+), 39 deletions(-)
->
-> --
-> 1.8.1.1.dirty
->
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
 Applied for next, thanks!
 
 Kind regards
 Uffe
+
+
+> ---
+>
+>  drivers/mmc/host/uniphier-sd.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/mmc/host/uniphier-sd.c b/drivers/mmc/host/uniphier-sd.c
+> index 10d49aa..1ee9fd0 100644
+> --- a/drivers/mmc/host/uniphier-sd.c
+> +++ b/drivers/mmc/host/uniphier-sd.c
+> @@ -251,6 +251,9 @@ static void uniphier_sd_internal_dma_start(struct tmio_mmc_host *host,
+>         u32 dma_mode;
+>         int sg_len;
+>
+> +       if ((data->flags & MMC_DATA_READ) && !host->chan_rx)
+> +               goto force_pio;
+> +
+>         if (WARN_ON(host->sg_len != 1))
+>                 goto force_pio;
+>
+> --
+> 2.7.4
+>
