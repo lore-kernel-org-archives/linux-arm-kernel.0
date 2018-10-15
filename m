@@ -1,127 +1,94 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 15 Oct 2018 18:37:15 +0530
-Subject: [PATCH 13/19] PCI: keystone: Cleanup configuration space access
+Date: Mon, 15 Oct 2018 18:37:21 +0530
+Subject: [PATCH 19/19] PCI: keystone: Cleanup macros defined in pci-keystone.c
 In-Reply-To: <20181015130721.5535-1-kishon@ti.com>
 References: <20181015130721.5535-1-kishon@ti.com>
-Message-ID: <20181015130721.5535-14-kishon@ti.com>
+Message-ID: <20181015130721.5535-20-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup configuration space access by removing ks_pcie_cfg_setup
-which has an unncessary check of "if (bus == 0)" which will never be the
-case of *_other_conf() and adding macros for configuring the CFG_SETUP
-register required for accessing the configuration space of the device.
+No functional change. Cleanup macros defined in pci-keystone.c
+by removing unused macros, grouping the macros and aligning
+it properly.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 70 +++++++----------------
- 1 file changed, 20 insertions(+), 50 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 41 +++++++++--------------
+ 1 file changed, 16 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index 891bdfc5921c..adf98dc0035c 100644
+index db40f60ce8ab..447718a3f755 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -45,7 +45,13 @@
+@@ -28,21 +28,14 @@
  
+ #include "pcie-designware.h"
+ 
+-#define DRIVER_NAME	"keystone-pcie"
+-
+ #define PCIE_VENDORID_MASK	0xffff
+ #define PCIE_DEVICEID_SHIFT	16
+ 
+-/* DEV_STAT_CTRL */
+-#define PCIE_CAP_BASE		0x70
+-
+-/* Application register defines */
+-#define LTSSM_EN_VAL		        BIT(0)
+-#define DBI_CS2				BIT(5)
+-#define OB_XLAT_EN_VAL		        BIT(1)
+-
  /* Application registers */
  #define CMD_STATUS			0x004
-+
++#define LTSSM_EN_VAL		        BIT(0)
++#define OB_XLAT_EN_VAL		        BIT(1)
++#define DBI_CS2				BIT(5)
+ 
  #define CFG_SETUP			0x008
-+#define CFG_BUS(x)			(((x) & 0xff) << 16)
-+#define CFG_DEVICE(x)			(((x) & 0x1f) << 8)
-+#define CFG_FUNC(x)			((x) & 0x7)
-+#define CFG_TYPE1			BIT(24)
-+
- #define OB_SIZE				0x030
- #define CFG_PCIM_WIN_SZ_IDX		3
- #define CFG_PCIM_WIN_CNT		32
-@@ -364,60 +370,21 @@ static void ks_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
- 	ks_pcie_app_writel(ks_pcie, CMD_STATUS, OB_XLAT_EN_VAL | val);
- }
+ #define CFG_BUS(x)			(((x) & 0xff) << 16)
+@@ -69,18 +62,16 @@
+ #define IRQ_STATUS			0x184
+ #define MSI_IRQ_OFFSET			4
  
--/**
-- * ks_pcie_cfg_setup() - Set up configuration space address for a device
-- *
-- * @ks_pcie: ptr to keystone_pcie structure
-- * @bus: Bus number the device is residing on
-- * @devfn: device, function number info
-- *
-- * Forms and returns the address of configuration space mapped in PCIESS
-- * address space 0.  Also configures CFG_SETUP for remote configuration space
-- * access.
-- *
-- * The address space has two regions to access configuration - local and remote.
-- * We access local region for bus 0 (as RC is attached on bus 0) and remote
-- * region for others with TYPE 1 access when bus > 1.  As for device on bus = 1,
-- * we will do TYPE 0 access as it will be on our secondary bus (logical).
-- * CFG_SETUP is needed only for remote configuration access.
-- */
--static void __iomem *ks_pcie_cfg_setup(struct keystone_pcie *ks_pcie, u8 bus,
--				       unsigned int devfn)
--{
--	u8 device = PCI_SLOT(devfn), function = PCI_FUNC(devfn);
--	struct dw_pcie *pci = ks_pcie->pci;
--	struct pcie_port *pp = &pci->pp;
--	u32 regval;
--
--	if (bus == 0)
--		return pci->dbi_base;
--
--	regval = (bus << 16) | (device << 8) | function;
--
--	/*
--	 * Since Bus#1 will be a virtual bus, we need to have TYPE0
--	 * access only.
--	 * TYPE 1
--	 */
--	if (bus != 1)
--		regval |= BIT(24);
--
--	ks_pcie_app_writel(ks_pcie, CFG_SETUP, regval);
--	return pp->va_cfg0_base;
--}
--
- static int ks_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 				 unsigned int devfn, int where, int size,
- 				 u32 *val)
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
- 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
--	u8 bus_num = bus->number;
--	void __iomem *addr;
-+	u32 reg;
+-/* Error IRQ bits */
+-#define ERR_AER		BIT(5)	/* ECRC error */
+-#define ERR_AXI		BIT(4)	/* AXI tag lookup fatal error */
+-#define ERR_CORR	BIT(3)	/* Correctable error */
+-#define ERR_NONFATAL	BIT(2)	/* Non-fatal error */
+-#define ERR_FATAL	BIT(1)	/* Fatal error */
+-#define ERR_SYS		BIT(0)	/* System (fatal, non-fatal, or correctable) */
+-#define ERR_IRQ_ALL	(ERR_AER | ERR_AXI | ERR_CORR | \
+-			 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
+ #define ERR_IRQ_STATUS			0x1c4
+ #define ERR_IRQ_ENABLE_SET		0x1c8
+-#define ERR_IRQ_ENABLE_CLR		0x1cc
++#define ERR_AER				BIT(5)	/* ECRC error */
++#define ERR_AXI				BIT(4)	/* AXI tag lookup fatal error */
++#define ERR_CORR			BIT(3)	/* Correctable error */
++#define ERR_NONFATAL			BIT(2)	/* Non-fatal error */
++#define ERR_FATAL			BIT(1)	/* Fatal error */
++#define ERR_SYS				BIT(0)	/* System error */
++#define ERR_IRQ_ALL			(ERR_AER | ERR_AXI | ERR_CORR | \
++					 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
  
--	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
-+	reg = CFG_BUS(bus->number) | CFG_DEVICE(PCI_SLOT(devfn)) |
-+		CFG_FUNC(PCI_FUNC(devfn));
-+	if (bus->parent->number != pp->root_bus_nr)
-+		reg |= CFG_TYPE1;
-+	ks_pcie_app_writel(ks_pcie, CFG_SETUP, reg);
+ #define OB_OFFSET_INDEX(n)		(0x200 + (8 * (n)))
+ #define OB_ENABLEN			BIT(0)
+@@ -89,12 +80,12 @@
  
--	return dw_pcie_read(addr + where, size, val);
-+	return dw_pcie_read(pp->va_cfg0_base + where, size, val);
- }
+ #define MAX_MSI_HOST_IRQS		8
+ /* PCIE controller device IDs */
+-#define PCIE_RC_K2HK		0xb008
+-#define PCIE_RC_K2E		0xb009
+-#define PCIE_RC_K2L		0xb00a
+-#define PCIE_RC_K2G		0xb00b
++#define PCIE_RC_K2HK			0xb008
++#define PCIE_RC_K2E			0xb009
++#define PCIE_RC_K2L			0xb00a
++#define PCIE_RC_K2G			0xb00b
  
- static int ks_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
-@@ -426,12 +393,15 @@ static int ks_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
- 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
--	u8 bus_num = bus->number;
--	void __iomem *addr;
-+	u32 reg;
+-#define to_keystone_pcie(x)	dev_get_drvdata((x)->dev)
++#define to_keystone_pcie(x)		dev_get_drvdata((x)->dev)
  
--	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
-+	reg = CFG_BUS(bus->number) | CFG_DEVICE(PCI_SLOT(devfn)) |
-+		CFG_FUNC(PCI_FUNC(devfn));
-+	if (bus->parent->number != pp->root_bus_nr)
-+		reg |= CFG_TYPE1;
-+	ks_pcie_app_writel(ks_pcie, CFG_SETUP, reg);
- 
--	return dw_pcie_write(addr + where, size, val);
-+	return dw_pcie_write(pp->va_cfg0_base + where, size, val);
- }
- 
- /**
+ struct keystone_pcie {
+ 	struct dw_pcie		*pci;
 -- 
 2.17.1
