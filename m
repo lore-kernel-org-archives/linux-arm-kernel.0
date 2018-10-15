@@ -1,70 +1,96 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 15 Oct 2018 16:08:52 +0800
-Subject: [PATCH v8 1/9] PCI: mediatek: Using slot's devfn for compare to fix
- mtk_pcie_find_port logic
+Date: Mon, 15 Oct 2018 16:08:58 +0800
+Subject: [PATCH v8 7/9] PCI: mediatek: Add system PM support for MT2712 and
+ MT7622
 In-Reply-To: <1539590940-13355-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1539590940-13355-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539590940-13355-2-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1539590940-13355-8-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The Mediatek's host controller has two slots, each with it's own control
-registers. The host driver need to identify which slot was connected
-in order to access the device's configuration space. There's problem
-for current host driver to find out which slot was connected to for
-a given EP device.
+In order to reduce the PCIe power consuming while system suspend,
+the physical layer should be gated. And the PCIe link should be
+re-established and the related control register values should be
+re-initialized after system resume.
 
-Assuming each slot have connect with one EP device as below:
-
-                host bridge
-  bus 0 --> __________|_______
-           |                  |
-           |                  |
-         slot 0             slot 1
-  bus 1 -->|        bus 2 --> |
-           |                  |
-         EP 0               EP 1
-
-During PCI enumeration, system software will scan all the PCI device
-starting from devfn 0. So it will get the proper port for slot0 and
-slot1 device when using PCI_SLOT(devfn) for match. But it will get
-the wrong slot for EP1: The devfn will be start from 0 when scanning
-EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
-for port0's slot value. So the host driver should not using EP's devfn
-but the slot's devfn(the slot which EP was connected to) for match.
-
-This patch fix the mtk_pcie_find_port's logic by using the slot's
-devfn for match if finding device connected to the subordinate bus.
+Register suspend_noirq & resume_noirq callback functions to allow
+PCIe to come up after resume from RAM.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 Acked-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/pci/controller/pcie-mediatek.c | 50 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 9999dae..288b8e2 100644
+index d3f4694..42cf2a4 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -337,6 +337,17 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
- {
- 	struct mtk_pcie *pcie = bus->sysdata;
- 	struct mtk_pcie_port *port;
-+	struct pci_dev *dev = NULL;
-+
-+	/*
-+	 * Walk the bus hierarchy to get the devfn value
-+	 * of the port in the root bus.
-+	 */
-+	while (bus && bus->number) {
-+		dev = bus->self;
-+		bus = dev->bus;
-+		devfn = dev->devfn;
-+	}
+@@ -1168,6 +1168,55 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	return err;
+ }
  
- 	list_for_each_entry(port, &pcie->ports, list)
- 		if (port->slot == PCI_SLOT(devfn))
++static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	struct mtk_pcie_port *port;
++
++	if (list_empty(&pcie->ports))
++		return 0;
++
++	list_for_each_entry(port, &pcie->ports, list) {
++		clk_disable_unprepare(port->pipe_ck);
++		clk_disable_unprepare(port->obff_ck);
++		clk_disable_unprepare(port->axi_ck);
++		clk_disable_unprepare(port->aux_ck);
++		clk_disable_unprepare(port->ahb_ck);
++		clk_disable_unprepare(port->sys_ck);
++		phy_power_off(port->phy);
++		phy_exit(port->phy);
++	}
++
++	clk_disable_unprepare(pcie->free_ck);
++
++	return 0;
++}
++
++static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	struct mtk_pcie_port *port, *tmp;
++
++	if (list_empty(&pcie->ports))
++		return 0;
++
++	clk_prepare_enable(pcie->free_ck);
++
++	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
++		mtk_pcie_enable_port(port);
++
++	/* In case of EP was removed while system suspend. */
++	if (list_empty(&pcie->ports))
++		clk_disable_unprepare(pcie->free_ck);
++
++	return 0;
++}
++
++static const struct dev_pm_ops mtk_pcie_pm_ops = {
++	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
++				      mtk_pcie_resume_noirq)
++};
++
+ static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+ 	.ops = &mtk_pcie_ops,
+ 	.startup = mtk_pcie_startup_port,
+@@ -1200,6 +1249,7 @@ static struct platform_driver mtk_pcie_driver = {
+ 		.name = "mtk-pcie",
+ 		.of_match_table = mtk_pcie_ids,
+ 		.suppress_bind_attrs = true,
++		.pm = &mtk_pcie_pm_ops,
+ 	},
+ };
+ builtin_platform_driver(mtk_pcie_driver);
 -- 
 2.6.4
