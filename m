@@ -1,34 +1,202 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Oct 2018 11:59:22 +0200
-Subject: [PATCH 2/4] arm64: renesas_defconfig: Enable scu-simple-card driver
+Date: Mon, 15 Oct 2018 11:59:24 +0200
+Subject: [PATCH 4/4] arm64: dts: renesas: ebisu: Enable Audio
 In-Reply-To: <20181015095924.25794-1-horms+renesas@verge.net.au>
 References: <20181015095924.25794-1-horms+renesas@verge.net.au>
-Message-ID: <20181015095924.25794-3-horms+renesas@verge.net.au>
+Message-ID: <20181015095924.25794-5-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the scu-simple-card which is used by
-the R-Car E3 (r8a77990) based Ebisu board.
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
+This patch enables Audio for the Ebisu board on R8A77990 SoC.
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+[simon: rebased]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-N.B: This is targeted at the devel branch of the renesas tree
-but not upstream where renesas_defconfig does not currently exist
----
- arch/arm64/configs/renesas_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 127 +++++++++++++++++++++++++
+ 1 file changed, 127 insertions(+)
 
-diff --git a/arch/arm64/configs/renesas_defconfig b/arch/arm64/configs/renesas_defconfig
-index f8fca4a777da..54cf065ad84c 100644
---- a/arch/arm64/configs/renesas_defconfig
-+++ b/arch/arm64/configs/renesas_defconfig
-@@ -241,6 +241,7 @@ CONFIG_SND_SOC=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_AK4613=y
- CONFIG_SND_SIMPLE_CARD=y
-+CONFIG_SND_SIMPLE_SCU_CARD=y
- CONFIG_SND_AUDIO_GRAPH_CARD=y
- CONFIG_USB=y
- CONFIG_USB_OTG=y
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index f342dd85b152..5490e94ce47b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -29,6 +29,16 @@
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
+ 
++	audio_clkout: audio-clkout {
++		/*
++		 * This is same as <&rcar_sound 0>
++		 * but needed to avoid cs2000/rcar_sound probe dead-lock
++		 */
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <11289600>;
++	};
++
+ 	cvbs-in {
+ 		compatible = "composite-video-connector";
+ 		label = "CVBS IN";
+@@ -128,6 +138,32 @@
+ 		regulator-always-on;
+ 	};
+ 
++	rsnd_ak4613: sound {
++		compatible = "simple-scu-audio-card";
++
++		simple-audio-card,name = "rsnd-ak4613";
++		simple-audio-card,format = "left_j";
++		simple-audio-card,bitclock-master = <&sndcpu>;
++		simple-audio-card,frame-master = <&sndcpu>;
++
++		simple-audio-card,prefix = "ak4613";
++		simple-audio-card,routing = "ak4613 Playback", "DAI0 Playback",
++		"DAI0 Capture", "ak4613 Capture";
++		sndcpu: simple-audio-card,cpu {
++			sound-dai = <&rcar_sound>;
++		};
++
++		sndcodec: simple-audio-card,codec {
++			sound-dai = <&ak4613>;
++		};
++	};
++
++	x12_clk: x12 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
+ 	x13_clk: x13 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+@@ -135,6 +171,10 @@
+ 	};
+ };
+ 
++&audio_clk_a {
++	clock-frequency = <22579200>;
++};
++
+ &avb {
+ 	pinctrl-0 = <&avb_pins>;
+ 	pinctrl-names = "default";
+@@ -270,6 +310,37 @@
+ 	};
+ };
+ 
++&i2c3 {
++	status = "okay";
++
++	ak4613: codec at 10 {
++		compatible = "asahi-kasei,ak4613";
++		#sound-dai-cells = <0>;
++		reg = <0x10>;
++		clocks = <&rcar_sound 3>;
++
++		asahi-kasei,in1-single-end;
++		asahi-kasei,in2-single-end;
++		asahi-kasei,out1-single-end;
++		asahi-kasei,out2-single-end;
++		asahi-kasei,out3-single-end;
++		asahi-kasei,out4-single-end;
++		asahi-kasei,out5-single-end;
++		asahi-kasei,out6-single-end;
++	};
++
++	cs2000: clk-multiplier at 4f {
++		#clock-cells = <0>;
++		compatible = "cirrus,cs2000-cp";
++		reg = <0x4f>;
++		clocks = <&audio_clkout>, <&x12_clk>;
++		clock-names = "clk_in", "ref_clk";
++
++		assigned-clocks = <&cs2000>;
++		assigned-clock-rates = <24576000>; /* 1/1 divide */
++	};
++};
++
+ &lvds0 {
+ 	status = "okay";
+ 
+@@ -321,6 +392,17 @@
+ 		function = "pwm5";
+ 	};
+ 
++	sound_pins: sound {
++		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data";
++		function = "ssi";
++	};
++
++	sound_clk_pins: sound_clk {
++		groups = "audio_clk_a", "audio_clk_b_a", "audio_clk_c_a",
++			 "audio_clkout_a", "audio_clkout1_a";
++		function = "audio_clk";
++	};
++
+ 	usb0_pins: usb {
+ 		groups = "usb0_b";
+ 		function = "usb0";
+@@ -346,6 +428,47 @@
+ 	status = "okay";
+ };
+ 
++&rcar_sound {
++	pinctrl-0 = <&sound_pins &sound_clk_pins>;
++	pinctrl-names = "default";
++
++	/* Single DAI */
++	#sound-dai-cells = <0>;
++
++	/* audio_clkout0/1/2/3 */
++	#clock-cells = <1>;
++	clock-frequency = <12288000 11289600>;
++	clkout-lr-synchronous;
++
++	status = "okay";
++
++	/* update <audio_clk_b> to <cs2000> */
++	clocks = <&cpg CPG_MOD 1005>,
++		 <&cpg CPG_MOD 1006>, <&cpg CPG_MOD 1007>,
++		 <&cpg CPG_MOD 1008>, <&cpg CPG_MOD 1009>,
++		 <&cpg CPG_MOD 1010>, <&cpg CPG_MOD 1011>,
++		 <&cpg CPG_MOD 1012>, <&cpg CPG_MOD 1013>,
++		 <&cpg CPG_MOD 1014>, <&cpg CPG_MOD 1015>,
++		 <&cpg CPG_MOD 1022>, <&cpg CPG_MOD 1023>,
++		 <&cpg CPG_MOD 1024>, <&cpg CPG_MOD 1025>,
++		 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
++		 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
++		 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
++		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++		 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
++		 <&audio_clk_a>, <&cs2000>, <&audio_clk_c>,
++		 <&cpg CPG_CORE R8A77990_CLK_ZA2>;
++
++	rcar_sound,dai {
++		dai0 {
++			playback = <&ssi0 &src0 &dvc0>;
++			capture  = <&ssi1 &src1 &dvc1>;
++		};
++	};
++
++};
++
+ &rwdt {
+ 	timeout-sec = <60>;
+ 	status = "okay";
+@@ -355,6 +478,10 @@
+ 	status = "okay";
+ };
+ 
++&ssi1 {
++	shared-pin;
++};
++
+ &usb2_phy0 {
+ 	pinctrl-0 = <&usb0_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.11.0
