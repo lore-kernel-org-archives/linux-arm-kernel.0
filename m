@@ -1,44 +1,48 @@
-From: aleksandr.aleksandrov@emlid.com (Aleksandr Aleksandrov)
-Date: Mon, 15 Oct 2018 14:49:48 +0300
-Subject: [PATCH v5 0/2] Neutis N5 support
-In-Reply-To: <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
-References: <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
-Message-ID: <1539604192-17561-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+From: hannah@marvell.com (hannah at marvell.com)
+Date: Mon, 15 Oct 2018 15:00:46 +0300
+Subject: [PATCH 4/4] arm64: dts: marvell: add smmu node for Armada-AP806
+In-Reply-To: <1539604846-21151-1-git-send-email-hannah@marvell.com>
+References: <1539604846-21151-1-git-send-email-hannah@marvell.com>
+Message-ID: <1539604846-21151-5-git-send-email-hannah@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addes Neutis N5 support.
-Emlid Neutis N5 is a SoM based on Allwinner H5.
-The patch includes device tree file for Dev board
-and dtsi file for SoM needs.
+From: Hanna Hawa <hannah@marvell.com>
 
-Changes from v1: separate dts file: dtsi for SoM
-and motherboard dts file that inlcudes dtsi file.
+Add SMMU node for Marvell Armada-AP806 SOC.
 
-Changes from v2 (5 oct 2018):
-- makefile: dtb-$(CONFIG_ARCH_SUNXI) - ordered alphabetically
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Changes from v3 (12 oct 2018):
-- fix commit prefix for 1/2 patch
-- use an SPDX header instead of the full license text
-- compatible: "emlid,neutis-n5" instead of "emlid,emlid-neutis-n5"
-
-Changes from v4 (15 oct 2018):
-- fix dt-bindings commit prefix
-- update license header for dts files
-- make interfaces be alphabetically in devboard dts file
-
-Aleksandr Aleksandrov (2):
-  dt-bindings: vendor-prefix: new vendor - Emlid
-  arm64: dts: allwinner: new board - Emlid Neutis N5
-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../sun50i-h5-emlid-neutis-n5-devboard.dts         | 149 +++++++++++++++++++++
- .../dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi   |  61 +++++++++
- 4 files changed, 212 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5-devboard.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-emlid-neutis-n5.dtsi
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 176e38d..b5758b6 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -97,6 +97,23 @@
+ 				interrupts = <17>;
+ 			};
+ 
++			smmu: iommu at 5000000 {
++				compatible = "marvell,mmu-500";
++				reg = <0x100000 0x100000>;
++				dma-coherent;
++				#iommu-cells = <1>;
++				#global-interrupts = <1>;
++				interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
+ 			odmi: odmi at 300000 {
+ 				compatible = "marvell,odmi-controller";
+ 				interrupt-controller;
 -- 
-2.7.4
+1.9.1
