@@ -1,37 +1,54 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 15 Oct 2018 10:24:50 +0200
-Subject: [PATCH v2 5/9] ASoC: sunxi: Add new driver for Allwinner A64
- codec's analog path controls
-In-Reply-To: <20181013165329.13363-6-anarsoul@gmail.com>
-References: <20181013165329.13363-1-anarsoul@gmail.com>
- <20181013165329.13363-6-anarsoul@gmail.com>
-Message-ID: <20181015082450.i56n5cppwgiu44ko@flea>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Oct 2018 10:27:51 +0200
+Subject: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+In-Reply-To: <AM0PR04MB42117867A50BB18D8127BE8080FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
+ <1539527419-23613-3-git-send-email-aisheng.dong@nxp.com>
+ <20181015065859.lxevjroly435hlaq@pengutronix.de>
+ <AM0PR04MB42117867A50BB18D8127BE8080FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20181015082751.ytuleg67p5pgtnov@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 09:53:25AM -0700, Vasily Khoruzhick wrote:
-> The internal codec on A64 is split into 2 parts. The analog path controls
-> are routed through an embedded custom register bus accessed through
-> the PRCM block.
+On Mon, Oct 15, 2018 at 08:08:31AM +0000, A.s. Dong wrote:
+> > > +		imx8qx-pm {
+> > > +			compatible = "fsl,scu-pd";
+> > 
+> > I missed this earlier, but there should be a i.MX8qp specific compatible as the
+> > SCU API might change for future SoCs.
+> > 
 > 
-> Add an ASoC component driver for it. This should be tied to the codec
-> audio card as an auxiliary device.
+> We still do not see that requirement up till now. Not sure if it would be
+> possible in the future. I see low possibilities.
+> SCU IPC is designed to be generic to all MX8 SCU firmwares.
+
+And i.MX9? i.MX10?
+
+> Even it changes, SCU firmware version control may helps.
+
+It's not the first time that the position of the version field changes with
+a newer version.
+
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > +			compatible = "fsl,imx7ulp-lpuart";
+> > > +			compatible = "fsl,imx7ulp-lpi2c";
+> > > +			compatible = "fsl,imx7d-usdhc";
+> > 
+> > All these lack the most specific imx8qp compatible.
+> > 
+> 
+> Adding them requires binding doc update as well.
+> S I suppose they could be added later when the QXP specific features are
+> really supported by the drivers.
+> Do you think it's okay?
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Newer Kernels should work with older device trees, so once you roll out
+these compatibles it's too late already.
 
-Thanks!
-Maxime
+Sascha
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/25091c2c/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
