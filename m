@@ -1,35 +1,89 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 15 Oct 2018 09:33:40 +0200
-Subject: [PATCH 0/2] mmc: uniphier-sd: two bug-fixes
-In-Reply-To: <CAK7LNATPf4mEdH16eZzLg4x3tP-jvXcTWqqY0DgCpmGjt9x9zg@mail.gmail.com>
-References: <1539356258-12374-1-git-send-email-yamada.masahiro@socionext.com>
- <20181014223311.GE3260@kunai>
- <CAK7LNATPf4mEdH16eZzLg4x3tP-jvXcTWqqY0DgCpmGjt9x9zg@mail.gmail.com>
-Message-ID: <20181015073339.GB981@kunai>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 15 Oct 2018 07:57:07 +0000
+Subject: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+In-Reply-To: <CAOMZO5BEwNQy0HA80qOzm_w-c63tFK1eL+cOHNCxKYq9PHGsqw@mail.gmail.com>
+References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
+ <1539527419-23613-3-git-send-email-aisheng.dong@nxp.com>
+ <CAOMZO5BEwNQy0HA80qOzm_w-c63tFK1eL+cOHNCxKYq9PHGsqw@mail.gmail.com>
+Message-ID: <AM0PR04MB4211ECC04FD48918E9DFBAB880FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Monday, October 15, 2018 7:14 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> <linux-arm-kernel@lists.infradead.org>; Dong Aisheng <dongas86@gmail.com>;
+> Sascha Hauer <kernel@pengutronix.de>; Shawn Guo <shawnguo@kernel.org>;
+> Fabio Estevam <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>;
+> Catalin Marinas <catalin.marinas@arm.com>; Will Deacon
+> <will.deacon@arm.com>; dl-linux-imx <linux-imx@nxp.com>; Mark Rutland
+> <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND FLATTENED
+> DEVICE TREE BINDINGS <devicetree@vger.kernel.org>
+> Subject: Re: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+> 
+> Hi Dong,
+> 
+> On Sun, Oct 14, 2018 at 11:35 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+> >
+> > Add imx8qxp support
+> 
+> You could probably expand the commit log by explaining a bit of what im8qxp
+> means.
+> 
 
-> Some sub-systems rebase, and some do not.
-> It is up to the sub-system maintainer.
+Got it, thanks for the suggestion.
 
-We used to have a very strict rule to not rebase anything which ends up
-in linux-next. Dunno what happened to this rule but I liked it.
+> > diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> > b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> > new file mode 100644
+> > index 0000000..e1d2578
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> > @@ -0,0 +1,861 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017~2018 NXP
+> 
+> I guess you meant "-" instead of "~".
+> 
+> > +       memory at 80000000 {
+> > +               device_type = "memory";
+> > +               reg = <0x00000000 0x80000000 0 0x40000000>;
+> > +       };
+> 
+> This should go to the board dts file instead as the memory size may vary from
+> board to board.
+> 
 
-> I know what you are saying, but this is how we develop in linux-next.
+That's right. Will change it.
 
-I wonder about that...
+> > +               imx8qx-pm {
+> > +                       compatible = "fsl,scu-pd";
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +
+> > +                       pd_lsio: lsio-power-domain {
+> > +                               #power-domain-cells = <0>;
+> > +                               #address-cells = <1>;
+> > +                               #size-cells = <0>;
+> > +
+> > +                               pd_lsio_pwm0: lsio-pwm0 at 191 {
+> > +                                       reg = <191>;
+> 
+> The number after @ is in hex, so the reg property should be 0x191.
 
-> You need to use "git rebase --onto".
+Thanks for the reminder.
+The PD ID is defined in DEC. So I will change them all into HEX later manually.
 
-And what about lists with commit IDs tracking patches on their way
-upstream? Yes, there is git-patch-id, yet I think it is easier to admit
-that incremental changes happen anyway. I know Ulf view differs...
+BTW, this seems like error prone and checkpatch can't report it.
+And I notice many similar users in kernel with the same issue:
+arch/arm/boot/dts/tps65910.dtsi
+arch/arm/boot/dts/tegra124-nyan.dtsi
+arch/arm/boot/dts/rk3288.dtsi
+...
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/36f0b364/attachment.sig>
+Regards
+Dong Aisheng
