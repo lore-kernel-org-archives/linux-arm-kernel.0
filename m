@@ -1,64 +1,135 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Mon, 15 Oct 2018 11:30:13 +0200
-Subject: [PATCH] dt-bindings: pinctrl: bcm4708-pinmux: improve example binding
-Message-ID: <20181015093013.31651-1-zajec5@gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Mon, 15 Oct 2018 09:33:35 +0000
+Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+In-Reply-To: <153937368201.5275.2313781259297807972@swboyd.mtv.corp.google.com>
+References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
+ <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
+ <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
+ <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
+ <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
+ <153898445180.119890.15025812558797341532@swboyd.mtv.corp.google.com>
+ <DB3PR0402MB391664354775DF42E90E67C9F5E60@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <153937368201.5275.2313781259297807972@swboyd.mtv.corp.google.com>
+Message-ID: <DB3PR0402MB39169A3BA844F7833B62FF55F5FD0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+Hi, Stephen
 
-Broadcom SoC pins are controlled using CRU ("Clock and Reset Unit" or
-"Central Resource Unit") registers. There are more CRU registers and
-functions so CRU should be represented as a separated block in DT.
+Anson Huang
+Best Regards!
 
-Moreover CRU is a sub-block of DMU ("Device Management Unit") so that
-one should also get its own node.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- .../bindings/pinctrl/brcm,bcm4708-pinmux.txt       | 31 ++++++++++++++++------
- 1 file changed, 23 insertions(+), 8 deletions(-)
+> -----Original Message-----
+> From: Stephen Boyd <sboyd@kernel.org>
+> Sent: Saturday, October 13, 2018 3:48 AM
+> To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
+> mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
+> Anson Huang <anson.huang@nxp.com>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
+> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
+> Cc: dl-linux-imx <linux-imx@nxp.com>
+> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+> 
+> Quoting Anson Huang (2018-10-08 01:34:59)
+> > > Quoting Anson Huang (2018-09-03 00:20:53)
+> > > > > > On 08/31/2018 03:29 AM, Stephen Boyd wrote:
+> > > > > > > Quoting Peng Fan (2018-08-12 18:15:41)
+> > > > > > >> Hi Anson,
+> > > > > > >>
+> > > > > > >>>>> -----Original Message-----
+> > > > > > >>>>> From: Anson Huang
+> > > > > > >>>>> Sent: 2018?8?8? 12:39
+> > > > > > >>>>> To: shawnguo at kernel.org; s.hauer at pengutronix.de;
+> > > > > > >>>>> kernel at pengutronix.de; Fabio Estevam
+> > > > > > >>>>> <fabio.estevam@nxp.com>; mturquette at baylibre.com;
+> > > > > > >>>>> sboyd at kernel.org; linux-arm-kernel at lists.infradead.org;
+> > > > > > >>>>> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
+> > > > > > >>>>> Cc: dl-linux-imx <linux-imx@nxp.com>
+> > > > > > >>>>> Subject: [PATCH 2/2] clk: imx: imx7d: remove
+> > > > > > >>>>> clks_init_on array
+> > > > > > >>>>>
+> > > > > > >>>>> Clock framework will enable those clocks registered with
+> > > > > > >>>>> CLK_IS_CRITICAL flag, so no need to have clks_init_on
+> > > > > > >>>>> array during clock
+> > > > > > >>>> initialization now.
+> > > > > > >>>>
+> > > > > > >>>> Will it be more flexible to parse dts saying "critical-clocks =
+> <xxx>"
+> > > > > > >>>> or "init-on-arrary=<xxx>"
+> > > > > > >>>> and enable those clocks?
+> > > > > > >>>
+> > > > > > >>> Parsing the clocks arrays from dtb is another way of
+> > > > > > >>> enabling critical clocks, but for current i.MX6/7
+> > > > > > >>> platforms, we implement it in same way as most of other
+> > > > > > >>> SoCs, currently I did NOT see any necessity of putting
+> > > > > > >>> them in dtb, just adding flag during clock registering is
+> > > > > > >>> more simple, if there is any special requirement for
+> > > > > > >>> different clocks set to be enabled, then we can add
+> > > > > > >>> support to enable
+> > > > > the method of parsing critical-clocks from dtb. Just my two cents.
+> > > > > > >>
+> > > > > > >> Thinking about OP-TEE want to use one device, but it's
+> > > > > > >> clocks are registered by Linux, because there is no module
+> > > > > > >> in Linux side use it, it will shutdown the clock, which
+> > > > > > >> cause OP-TEE could not access the
+> > > > > device.
+> > > > > > >>
+> > > > > > >> Then people have to modify clk code to add CLK_IS_CRITICAL
+> > > > > > >> flag to make sure the clocks are not shutdown by Linux.
+> > > > > > >>
+> > > > > > >> However adding a new property in clk node and let driver
+> > > > > > >> code parse the dts, there is no need to modify clk driver
+> > > > > > >> code when OP-TEE needs
+> > > > > another device clock.
+> > > > > > >>
+> > > > > > >
+> > > > > > > If OP-TEE needs linux to keep things on then why can't the
+> > > > > > > OP-TEE driver in Linux probe, acquire clocks, and keep the
+> > > > > > > clks enabled
+> > > forever?
+> > > > > >
+> > > > > > Sounds reasonable, but how could this be done without
+> > > > > > introducing platform-specific stuff in the OP-TEE driver?
+> > > > > >
+> > > > >
+> > > > > Why is that a goal?
+> > > >
+> > > > I do NOT think we should consider such case in this patch series,
+> > > > whatever OP-TEE needs for its own feature, it should do necessary
+> > > > operations
+> > > either in its driver or somewhere else by adding new patch.
+> > > >
+> > >
+> > > Why can't we add clks to the op-tee node in DT's /firmware container?
+> > > Then any clks in there can be turned on forever and left enabled by
+> > > the linux driver?
+> >
+> > I did NOT run op-tee with Linux-next kernel before, can you advise more?
+> 
+> Neither have I, so I can't advise more.
+> 
+> > And I think if op-tee has such requirement, can we have another patch
+> > to cover it?
+> 
+> Yes.
+> 
+> 
+> > I believe all other i.MX platforms also have same requirements if
+> > considering op-tee support, so I think it should be another topic, what do you
+> think?
+> >
+> 
+> I'm going to drop these patches from my review queue. Please resend them
+> and please include the op-tee patches too.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
-index af906f196e8c..0ce132c7e04c 100644
---- a/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
-@@ -30,13 +30,28 @@ For documentation of subnodes see:
- Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
- 
- Example:
--	pinctrl at 1800c1c0 {
--		compatible = "brcm,bcm4708-pinmux";
--		reg = <0x1800c1c0 0x24>;
--		reg-names = "cru_gpio_control";
--
--		spi {
--			function = "spi";
--			groups = "spi_grp";
-+	dmu at 1800c000 {
-+		compatible = "simple-bus";
-+		ranges = <0 0x1800c000 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		cru at 100 {
-+			compatible = "simple-bus";
-+			reg = <0x100 0x1a4>;
-+			ranges;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+ 			pin-controller at 1c0 {
-+				compatible = "brcm,bcm4708-pinmux";
-+				reg = <0x1c0 0x24>;
-+				reg-names = "cru_gpio_control";
-+
-+				spi-pins {
-+					function = "spi";
-+					groups = "spi_grp";
-+				};
-+			};
- 		};
- 	};
--- 
-2.13.7
+
+I do NOT know how to include the op-tee patch to meet special requirement, should
+the op-tee related patch be added later when someone actually add the op-tee support for i.MX7?
+It should NOT block this patch set, do you think we can add this patch set first?
+
+Anson.
