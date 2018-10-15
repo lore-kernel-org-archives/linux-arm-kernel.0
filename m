@@ -1,95 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 15 Oct 2018 20:01:38 +0200
-Subject: [PATCH 08/14] ARM64: dts: hisilicon: Add tsensor interrupt name
-In-Reply-To: <20181015162835.GA20955@bogus>
-References: <1537866192-12320-1-git-send-email-daniel.lezcano@linaro.org>
- <1537866192-12320-9-git-send-email-daniel.lezcano@linaro.org>
- <20181015162835.GA20955@bogus>
-Message-ID: <d2cb2fa0-b579-205c-1777-308da075b3fd@linaro.org>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Mon, 15 Oct 2018 11:56:59 -0600
+Subject: [PATCH v2 3/6] ARM: mm: make use of new memblocks_present() helper
+In-Reply-To: <20181015175702.9036-1-logang@deltatee.com>
+References: <20181015175702.9036-1-logang@deltatee.com>
+Message-ID: <20181015175702.9036-4-logang@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Cleanup the arm_memory_present() function seeing it's very
+similar to other arches.
 
-Hi Rob,
+The new memblocks_present() helper checks for node ids which the
+arm version did not. However, this is equivalent seeing
+HAVE_MEMBLOCK_NODE_MAP should be false in this arch and therefore
+memblock_get_region_node() should return 0.
 
-thanks for the review.
+Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Philip Derrin <philip@cog.systems>
+Cc: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/mm/init.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
 
-On 15/10/2018 18:28, Rob Herring wrote:
-> On Tue, Sep 25, 2018 at 11:03:06AM +0200, Daniel Lezcano wrote:
->> Add the interrupt names for the sensors, so the code can rely on them
->> instead of dealing with index which are prone to error.
->>
->> The name comes from the Hisilicon documentation found on internet.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>  .../bindings/thermal/hisilicon-thermal.txt         |  3 ++
->>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 63 +++++++++++-----------
->>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  1 +
->>  3 files changed, 36 insertions(+), 31 deletions(-)
-> 
-> Lots of whitespace errors reported by checkpatch.pl.
-
-Yeah, I don't know why but I have something bad with my emacs
-configuration when changing DT files. Will look at this.
-
->> diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
->> index cef716a..3edfae3 100644
->> --- a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
->> +++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
->> @@ -7,6 +7,7 @@
->>    region.
->>  - interrupt: The interrupt number to the cpu. Defines the interrupt used
->>    by /SOCTHERM/tsensor.
->> +- interrupt-names: The interrupt names for the different sensors
-> 
-> Need to define what the names are.
-> 
->>  - clock-names: Input clock name, should be 'thermal_clk'.
->>  - clocks: phandles for clock specified in "clock-names" property.
->>  - #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
->> @@ -18,6 +19,7 @@ for Hi6220:
->>  		compatible = "hisilicon,tsensor";
->>  		reg = <0x0 0xf7030700 0x0 0x1000>;
->>  		interrupts = <0 7 0x4>;
->> +		interrupt-names = "tsensor_intr";
-> 
-> That name seems pretty pointless.
-> 
->>  		clocks = <&sys_ctrl HI6220_TSENSOR_CLK>;
->>  		clock-names = "thermal_clk";
->>  		#thermal-sensor-cells = <1>;
->> @@ -28,5 +30,6 @@ for Hi3660:
->>  		compatible = "hisilicon,hi3660-tsensor";
->>  		reg = <0x0 0xfff30000 0x0 0x1000>;
->>  		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
->> +		interrupt-names = "tsensor_a73";
-> 
-> Just 'a73' is sufficient.
-
-This is the name defined in the board documentation to give a name to
-the interrupt when requesting it. This one appears in /proc/interrupts.
-
-I can replace the 'tsensor_intr' by 'tsensor', but if 'tsensor_a73' is
-replaced by 'a73' that may looks odd in /proc/interrupts to see an
-interrupts line with the 'a73' name.
-
-However this is the preparation for the multiple sensors support so we
-will have more interrupt names.
-
-Is it possible to keep these names ?
-
- - tsensor
- - tsensor_a73
- - tsensor_a57
- - tsensor_gpu
-
-
-
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 0cc8e04295a4..e2710dd7446f 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -201,21 +201,6 @@ int pfn_valid(unsigned long pfn)
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+ 
+-#ifndef CONFIG_SPARSEMEM
+-static void __init arm_memory_present(void)
+-{
+-}
+-#else
+-static void __init arm_memory_present(void)
+-{
+-	struct memblock_region *reg;
+-
+-	for_each_memblock(memory, reg)
+-		memory_present(0, memblock_region_memory_base_pfn(reg),
+-			       memblock_region_memory_end_pfn(reg));
+-}
+-#endif
+-
+ static bool arm_memblock_steal_permitted = true;
+ 
+ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+@@ -317,7 +302,7 @@ void __init bootmem_init(void)
+ 	 * Sparsemem tries to allocate bootmem in memory_present(),
+ 	 * so must be done after the fixed reservations
+ 	 */
+-	arm_memory_present();
++	memblocks_present();
+ 
+ 	/*
+ 	 * sparse_init() needs the bootmem allocator up and running.
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.19.0
