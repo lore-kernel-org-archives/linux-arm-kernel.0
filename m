@@ -1,87 +1,36 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 15 Oct 2018 13:27:37 +0000
-Subject: [PATCH v2 2/4] crypto: mxs-dcp - Add support for dcp clk
+Date: Mon, 15 Oct 2018 13:27:36 +0000
+Subject: [PATCH v2 1/4] dt-bindings: crypto: Mention clocks for mxs-dcp
 In-Reply-To: <cover.1539609921.git.leonard.crestez@nxp.com>
 References: <cover.1539609921.git.leonard.crestez@nxp.com>
-Message-ID: <fda62f939da082d640a27e506e7a3defac4f123f.1539609921.git.leonard.crestez@nxp.com>
+Message-ID: <cc337772e1b7ed0c0884b5035c1d0bd4adfee10f.1539609921.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6ull and 6sll the DCP block has a clock which needs to be explicitly
-enabled.
-
-Add minimal handling for this at probe/remove time.
+Explicit clock enabling is required on 6sll and 6ull so mention that
+standard clock bindings are used.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
- drivers/crypto/mxs-dcp.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ Documentation/devicetree/bindings/crypto/fsl-dcp.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/crypto/mxs-dcp.c b/drivers/crypto/mxs-dcp.c
-index 849a81ece079..fd13787a2a0e 100644
---- a/drivers/crypto/mxs-dcp.c
-+++ b/drivers/crypto/mxs-dcp.c
-@@ -18,10 +18,11 @@
- #include <linux/kthread.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/stmp_device.h>
-+#include <linux/clk.h>
+diff --git a/Documentation/devicetree/bindings/crypto/fsl-dcp.txt b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
+index 76a0b4e80e83..4e4d387e38a5 100644
+--- a/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
++++ b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
+@@ -4,10 +4,12 @@ Required properties:
+ - compatible : Should be "fsl,<soc>-dcp"
+ - reg : Should contain MXS DCP registers location and length
+ - interrupts : Should contain MXS DCP interrupt numbers, VMI IRQ and DCP IRQ
+                must be supplied, optionally Secure IRQ can be present, but
+ 	       is currently not implemented and not used.
++- clocks : Clock reference (only required on some SOCs: 6ull and 6sll).
++- clock-names : Must be "dcp".
  
- #include <crypto/aes.h>
- #include <crypto/sha.h>
- #include <crypto/internal/hash.h>
- #include <crypto/internal/skcipher.h>
-@@ -80,10 +81,11 @@ struct dcp {
+ Example:
  
- 	struct completion		completion[DCP_MAX_CHANS];
- 	spinlock_t			lock[DCP_MAX_CHANS];
- 	struct task_struct		*thread[DCP_MAX_CHANS];
- 	struct crypto_queue		queue[DCP_MAX_CHANS];
-+	struct clk *dcp_clk;
- };
- 
- enum dcp_chan {
- 	DCP_CHAN_HASH_SHA	= 0,
- 	DCP_CHAN_CRYPTO		= 2,
-@@ -1027,10 +1029,24 @@ static int mxs_dcp_probe(struct platform_device *pdev)
- 	sdcp->dev = dev;
- 	sdcp->base = devm_ioremap_resource(dev, iores);
- 	if (IS_ERR(sdcp->base))
- 		return PTR_ERR(sdcp->base);
- 
-+	/* DCP clock is optional, only used on some SOCs */
-+	sdcp->dcp_clk = devm_clk_get(dev, "dcp");
-+	if (IS_ERR(sdcp->dcp_clk)) {
-+		if (sdcp->dcp_clk != ERR_PTR(-ENOENT))
-+			return PTR_ERR(sdcp->dcp_clk);
-+		sdcp->dcp_clk = NULL;
-+	}
-+
-+	ret = clk_prepare(sdcp->dcp_clk);
-+	if (ret)
-+		return ret;
-+	ret = clk_enable(sdcp->dcp_clk);
-+	if (ret)
-+		return ret;
- 
- 	ret = devm_request_irq(dev, dcp_vmi_irq, mxs_dcp_irq, 0,
- 			       "dcp-vmi-irq", sdcp);
- 	if (ret) {
- 		dev_err(dev, "Failed to claim DCP VMI IRQ!\n");
-@@ -1168,10 +1184,12 @@ static int mxs_dcp_remove(struct platform_device *pdev)
- 		crypto_unregister_algs(dcp_aes_algs, ARRAY_SIZE(dcp_aes_algs));
- 
- 	kthread_stop(sdcp->thread[DCP_CHAN_HASH_SHA]);
- 	kthread_stop(sdcp->thread[DCP_CHAN_CRYPTO]);
- 
-+	clk_disable(sdcp->dcp_clk);
-+
- 	platform_set_drvdata(pdev, NULL);
- 
- 	global_sdcp = NULL;
- 
- 	return 0;
+ dcp at 80028000 {
+ 	compatible = "fsl,imx28-dcp", "fsl,imx23-dcp";
 -- 
 2.17.1
