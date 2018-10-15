@@ -1,103 +1,43 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 15 Oct 2018 10:32:08 +0200
-Subject: [RFT PATCH] mmc: pwrseq_simple: Fix incorrect handling of GPIO
- bitmap
-In-Reply-To: <20181012190901.1243-1-jmkrzyszt@gmail.com>
-References: <20180925192433.1377-1-jmkrzyszt@gmail.com>
- <CGME20181012190748epcas5p3dc41f6d0f9c69f22351209b2e7ea66f3@epcas5p3.samsung.com>
- <20181012190901.1243-1-jmkrzyszt@gmail.com>
-Message-ID: <20181015083209eucas1p2fb3d1961745fdb3007dec317c6441142~duxEkRvmp2005320053eucas1p2D@eucas1p2.samsung.com>
+From: Tudor.Ambarus@microchip.com (Tudor.Ambarus at microchip.com)
+Date: Mon, 15 Oct 2018 08:34:04 +0000
+Subject: [PATCH] usb: host: ohci-at91: fix request of irq for optional gpio
+Message-ID: <20181015083344.4157-1-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Janusz,
+atmel,oc-gpio is optional. Request it's irq only when atmel,oc is set
+in device tree.
 
-On 2018-10-12 21:09, Janusz Krzysztofik wrote:
-> Commit b9762bebc633 ("gpiolib: Pass bitmaps, not integer arrays, to
-> get/set array") changed the way GPIO values are passed to
-> gpiod_get/set_array_value() and friends.  The new code introduced into
-> mmc_pwrseq_simple_set_gpios_value() incorrectly interpretes the 'value'
-> argument as a bitmap of GPIO values and assigns it directly to the
-> 'values' bitmap variable passed to gpiod_set_array_value_cansleep()
-> instead of filling that bitmap with bits equal to the 'value' argument.
-> As a result, only member 0 of the array is handled correctly.
->
-> Moreover, wrong assumption is taken about the 'values' bitmap size not
-> exceding the number of bits of the 'value' argument type.
->
-> Fix it.
->
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
-> ---
-> Hi,
->
-> I think that patch has been missed while we were resolving issues 
-> related to GPIO fast bitmap processing.  Since all issues other than the 
-> one addreessed by this patch have been been hopefully identified and 
-> fixed, GPIO tree seems now to be in good shape in regard to that. 
-> However, I believe pwrseq_simple is still broken.  Hence, I'm 
-> resubmitting this patch to Ulf for inclusion in MMC tree, Cc: many other 
-> people who are kindly requested to test it if possible.
->
-> I've identified the following DT files representing devices which may be 
-> affected (have more than one GPIO assigned to pwrseq_simple):
-> - arch/arm/boot/dts/imx6qdl-sr-som-brcm.dtsi
-> - arch/arm/boot/dts/exynos5250-snow-common.dtsi
+devm_gpiod_get_index_optional returns NULL if -ENOENT. Check its
+return value for NULL before error, because it is more probably that
+atmel,oc is not set.
 
-On Samsung Snow Chromebook it doesn't change anything. Board boots and
-detects WiFi SDIO card before and after applying it on top on Linux
-next-20181012.
+This fixes the following errors on boards where atmel,oc is not set in
+device tree:
+[    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
+[    0.960000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
+[    0.970000] at91_ohci 500000.ohci: failed to request gpio "overcurrent" IRQ
 
-Tested-by: Marek Szyprowski <m.szyprowski
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+Based on https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git,
+usb-next branch.
 
-> - arch/arm/boot/dts/imx6sl-warp.dts
-> - arch/arm/boot/dts/omap3-igep0030.dts
-> - arch/arm/boot/dts/omap3-igep0020.dts
-> - arch/arm/boot/dts/rk3036-kylin.dts
-> - arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-> - arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
->
-> Please start with checking if pwrseq_simple from linux-next works for 
-> you and if not, please test if this patch fixes the issue.
->
-> Thanks,
-> Janusz
->
->
->  drivers/mmc/core/pwrseq_simple.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-> index 7f882a2bb872..ece34c734693 100644
-> --- a/drivers/mmc/core/pwrseq_simple.c
-> +++ b/drivers/mmc/core/pwrseq_simple.c
-> @@ -40,13 +40,22 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
->  	struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
->  
->  	if (!IS_ERR(reset_gpios)) {
-> -		DECLARE_BITMAP(values, BITS_PER_TYPE(value));
-> +		unsigned long *values;
->  		int nvalues = reset_gpios->ndescs;
->  
-> -		values[0] = value;
-> +		values = bitmap_alloc(nvalues, GFP_KERNEL);
-> +		if (!values)
-> +			return;
-> +
-> +		if (value)
-> +			bitmap_fill(values, nvalues);
-> +		else
-> +			bitmap_zero(values, nvalues);
->  
->  		gpiod_set_array_value_cansleep(nvalues, reset_gpios->desc,
->  					       reset_gpios->info, values);
-> +
-> +		kfree(values);
->  	}
->  }
->  
+ drivers/usb/host/ohci-at91.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Best regards
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index e98673954020..ec6739ef3129 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -551,6 +551,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 		pdata->overcurrent_pin[i] =
+ 			devm_gpiod_get_index_optional(&pdev->dev, "atmel,oc",
+ 						      i, GPIOD_IN);
++		if (!pdata->overcurrent_pin[i])
++			continue;
+ 		if (IS_ERR(pdata->overcurrent_pin[i])) {
+ 			err = PTR_ERR(pdata->overcurrent_pin[i]);
+ 			dev_err(&pdev->dev, "unable to claim gpio \"overcurrent\": %d\n", err);
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.9.4
