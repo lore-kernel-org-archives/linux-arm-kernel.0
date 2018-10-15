@@ -1,85 +1,98 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 15 Oct 2018 18:49:13 +0200
-Subject: [PATCH v6 17/18] mm/memory-failure: increase queued recovery
- work's priority
-In-Reply-To: <20180921221705.6478-18-james.morse@arm.com>
-References: <20180921221705.6478-1-james.morse@arm.com>
- <20180921221705.6478-18-james.morse@arm.com>
-Message-ID: <20181015164913.GE11434@zn.tnic>
+From: beagleboard@davidjohnsummers.uk (David Summers)
+Date: Mon, 15 Oct 2018 17:49:41 +0100
+Subject: [PATCH 1/3] Add the tinker board S to the device tree - just an
+ outline
+In-Reply-To: <20181015161214.GA13740@bogus>
+References: <20180922170236.8690-1-beagleboard@davidjohnsummers.uk>
+ <20180922170236.8690-2-beagleboard@davidjohnsummers.uk>
+ <20181015161214.GA13740@bogus>
+Message-ID: <93fc3eda-19b2-2b90-ccc8-4743200bf1b1@davidjohnsummers.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Peter.
+On 15/10/2018 17:12, Rob Herring wrote:
+> On Sat, Sep 22, 2018 at 06:02:34PM +0100, David Summers wrote:
+>
+> Commit message needed.
+>
+> Use subject prefixes that match the subsystem. 'dt-bindings: ...' for
+> binding docs. 'ARM: dts: ...' for ARM dts files.
+>
+>> Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
+>> ---
+>>   .../devicetree/bindings/arm/rockchip.txt      |   4 +
+> Bindings should be a separate patch.
+>
+>>   arch/arm/boot/dts/Makefile                    |   1 +
+>>   arch/arm/boot/dts/rk3288-tinker-s.dts         |  13 +
+>>   arch/arm/boot/dts/rk3288-tinker.dts           | 498 +----------------
+>>   arch/arm/boot/dts/rk3288-tinker.dtsi          | 504 ++++++++++++++++++
+>>   5 files changed, 524 insertions(+), 496 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/rk3288-tinker-s.dts
+>>   create mode 100644 arch/arm/boot/dts/rk3288-tinker.dtsi
+> Would be better to split the dts changes into 2 patches: restructuring
+> and add Tinker S board. Then we're not re-reviewing the existing stuff.
+>
+>> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+>> index acfd3c773dd0..037ce94c3a73 100644
+>> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+>> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+>> @@ -13,6 +13,10 @@ Rockchip platforms device tree bindings
+>>       Required root node properties:
+>>         - compatible = "asus,rk3288-tinker", "rockchip,rk3288";
+>>   
+>> +- Asus Tinker board S
+>> +    Required root node properties:
+>> +      - compatible = "asus,rk3288-tinker-s", "rockchip,rk3288";
+>> +
+>>   - Kylin RK3036 board:
+>>       Required root node properties:
+>>         - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index b5bd3de87c33..65c75265adfa 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -864,6 +864,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+>>   	rk3288-r89.dtb \
+>>   	rk3288-rock2-square.dtb \
+>>   	rk3288-tinker.dtb \
+>> +	rk3288-tinker-s.dtb \	
+>>   	rk3288-veyron-brain.dtb \
+>>   	rk3288-veyron-jaq.dtb \
+>>   	rk3288-veyron-jerry.dtb \
+>> diff --git a/arch/arm/boot/dts/rk3288-tinker-s.dts b/arch/arm/boot/dts/rk3288-tinker-s.dts
+>> new file mode 100644
+>> index 000000000000..5e1078c6a784
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/rk3288-tinker-s.dts
+>> @@ -0,0 +1,13 @@
+>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>> +/*
+>> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "rk3288-tinker.dtsi"
+>> +
+>> +/ {
+>> +	model = "Rockchip RK3288 Asus Tinker Board S";
+>> +	compatible = "asus,rk3288-tinker-s", "rockchip,rk3288";
+> Perhaps you should have 'asus,rk3288-tinker' as a fallback?
+>
+>> +};
 
-On Fri, Sep 21, 2018 at 11:17:04PM +0100, James Morse wrote:
-> arm64 can take an NMI-like error notification when user-space steps in
-> some corrupt memory. APEI's GHES code will call memory_failure_queue()
-> to schedule the recovery work. We then return to user-space, possibly
-> taking the fault again.
-> 
-> Currently the arch code unconditionally signals user-space from this
-> path, so we don't get stuck in this loop, but the affected process
-> never benefits from memory_failure()s recovery work. To fix this we
-> need to know the recovery work will run before we get back to user-space.
-> 
-> Increase the priority of the recovery work by scheduling it on the
-> system_highpri_wq, then try to bump the current task off this CPU
-> so that the recovery work starts immediately.
-> 
-> Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
-> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Tested-by: gengdongjiu <gengdongjiu@huawei.com>
-> CC: Xie XiuQi <xiexiuqi@huawei.com>
-> CC: gengdongjiu <gengdongjiu@huawei.com>
-> ---
->  mm/memory-failure.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/mm/memory-failure.c b/mm/memory-failure.c
-> index 0cd3de3550f0..4e7b115cea5a 100644
-> --- a/mm/memory-failure.c
-> +++ b/mm/memory-failure.c
-> @@ -56,6 +56,7 @@
->  #include <linux/memory_hotplug.h>
->  #include <linux/mm_inline.h>
->  #include <linux/memremap.h>
-> +#include <linux/preempt.h>
->  #include <linux/kfifo.h>
->  #include <linux/ratelimit.h>
->  #include <linux/page-isolation.h>
-> @@ -1454,6 +1455,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu, memory_failure_cpu);
->   */
->  void memory_failure_queue(unsigned long pfn, int flags)
->  {
-> +	int cpu = smp_processor_id();
->  	struct memory_failure_cpu *mf_cpu;
->  	unsigned long proc_flags;
->  	struct memory_failure_entry entry = {
-> @@ -1463,11 +1465,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
->  
->  	mf_cpu = &get_cpu_var(memory_failure_cpu);
->  	spin_lock_irqsave(&mf_cpu->lock, proc_flags);
-> -	if (kfifo_put(&mf_cpu->fifo, entry))
-> -		schedule_work_on(smp_processor_id(), &mf_cpu->work);
-> -	else
-> +	if (kfifo_put(&mf_cpu->fifo, entry)) {
-> +		queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
-> +		set_tsk_need_resched(current);
-> +		preempt_set_need_resched();
+Hi Rob,
 
-What guarantees the workqueue would run before the process? I see this:
+Heiko already had many of the same thoughts, he respan the patch here:
 
-``WQ_HIGHPRI``
-  Work items of a highpri wq are queued to the highpri
-  worker-pool of the target cpu.  Highpri worker-pools are
-  served by worker threads with elevated nice level.
+http://lists.infradead.org/pipermail/linux-rockchip/2018-September/021766.html
 
-but is that enough?
+Which you already reviewed ;)
 
--- 
-Regards/Gruss,
-    Boris.
+This was my first attempt at a kernel patch, so your thoughts are 
+appreciated.
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+David.
+
+P.S. Heiko revised patch accepted into 4.20.
