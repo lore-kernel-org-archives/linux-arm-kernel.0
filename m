@@ -1,48 +1,37 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Mon, 15 Oct 2018 11:48:25 +0000
-Subject: [PATCH v2 5/7] spi: spi-mem: add support for octal I/O data transfer
+Date: Mon, 15 Oct 2018 11:48:31 +0000
+Subject: [PATCH v2 6/7] spi: nxp-fspi: add mode flag bit for octal support
 In-Reply-To: <1539603969-21076-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 References: <1539603969-21076-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1539603969-21076-6-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1539603969-21076-7-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for octal I/O data transfer in spi-mem framework.
+Add mode flags for octal I/O data transfer support.
+NXP FlexSPI controller supports octal mode data transfer.
 
 Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
 Changes for v2:
- Patch added in v2 version.
+ None
 
- drivers/spi/spi-mem.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/spi/spi-nxp-fspi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/spi/spi-mem.c b/drivers/spi/spi-mem.c
-index c6bdea7..6fa95f8 100644
---- a/drivers/spi/spi-mem.c
-+++ b/drivers/spi/spi-mem.c
-@@ -12,7 +12,7 @@
+diff --git a/drivers/spi/spi-nxp-fspi.c b/drivers/spi/spi-nxp-fspi.c
+index 67eea88..c48ca94 100644
+--- a/drivers/spi/spi-nxp-fspi.c
++++ b/drivers/spi/spi-nxp-fspi.c
+@@ -993,8 +993,8 @@ static int nxp_fspi_probe(struct platform_device *pdev)
+ 	if (!ctlr)
+ 		return -ENOMEM;
  
- #include "internals.h"
+-	ctlr->mode_bits = SPI_RX_DUAL | SPI_RX_QUAD |
+-			  SPI_TX_DUAL | SPI_TX_QUAD;
++	ctlr->mode_bits = SPI_RX_DUAL | SPI_RX_QUAD | SPI_RX_OCTAL |
++			  SPI_TX_DUAL | SPI_TX_QUAD | SPI_TX_OCTAL;
  
--#define SPI_MEM_MAX_BUSWIDTH		4
-+#define SPI_MEM_MAX_BUSWIDTH		8
- 
- /**
-  * spi_controller_dma_map_mem_op_data() - DMA-map the buffer attached to a
-@@ -121,6 +121,13 @@ static int spi_check_buswidth_req(struct spi_mem *mem, u8 buswidth, bool tx)
- 
- 		break;
- 
-+	case 8:
-+		if ((tx && (mode & SPI_TX_OCTAL)) ||
-+		    (!tx && (mode & SPI_RX_OCTAL)))
-+			return 0;
-+
-+		break;
-+
- 	default:
- 		break;
- 	}
+ 	f = spi_controller_get_devdata(ctlr);
+ 	f->dev = dev;
 -- 
 2.7.4
