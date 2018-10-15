@@ -1,125 +1,79 @@
-From: hannah@marvell.com (hannah at marvell.com)
-Date: Mon, 15 Oct 2018 15:00:44 +0300
-Subject: [PATCH 2/4] iommu/arm-smmu: Workaround for Marvell Armada-AP806 SoC
- erratum #582743
-In-Reply-To: <1539604846-21151-1-git-send-email-hannah@marvell.com>
-References: <1539604846-21151-1-git-send-email-hannah@marvell.com>
-Message-ID: <1539604846-21151-3-git-send-email-hannah@marvell.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 15 Oct 2018 14:12:42 +0200
+Subject: [PATCH 4/7] clocksource: arch_timer: Add support for
+ not-fw-configured timer on ARM64
+In-Reply-To: <e9624612-4a94-b9bc-f5ec-0f16d5b12323@arm.com>
+References: <20181008125009.3721-1-m.szyprowski@samsung.com>
+ <CGME20181008125048eucas1p229a94c202596ddd0a65009c15d9e3001@eucas1p2.samsung.com>
+ <20181008125009.3721-5-m.szyprowski@samsung.com>
+ <e9624612-4a94-b9bc-f5ec-0f16d5b12323@arm.com>
+Message-ID: <20181015121243eucas1p1dd6093945310db315fc28092e2c91b6e~dxxpPrR4A1710517105eucas1p1W@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanna Hawa <hannah@marvell.com>
+Hi All,
 
-Due to erratum #582743, the Marvell Armada-AP806 can't access 64bit
-to ARM SMMUv2 registers.
-This patch split the writeq/readq to two accesses of writel/readl.
+On 2018-10-08 15:17, Marc Zyngier wrote:
+> + Mark Rutland
+>
+> Hi Marek,
+>
+> On 08/10/18 13:50, Marek Szyprowski wrote:
+>> Use common infrastructure for ARM Architected Timers erratum to enable
+>> support for systems with broken CPU firmware (timer registers not
+>> properly configured). This mode has been already availabled on ARM
+>> (32bits) architecture. This enables to run Linux kernel on ARM64 boards
+>> using physical architected timers instead of the virtual ones. Examples
+>> of such system with broken firmware are Samsung Exynos5433 SoC based
+>> TM2(e) boards, which is already deployed for years and updating firmware
+>> is not possible.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>> ? drivers/clocksource/Kconfig????????? | 11 +++++++++++
+>> ? drivers/clocksource/arm_arch_timer.c | 15 ++++++++++++---
+>> ? 2 files changed, 23 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index a11f4ba98b05..a30752579b03 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -364,6 +364,17 @@ config ARM64_ERRATUM_858921
+>> ??????? The workaround will be dynamically enabled when an affected
+>> ??????? core is detected.
+>> ? +config ARCH_TIMER_REGISTERS_NOT_FW_CONFIGURED
+>> +??? bool "Workaround for arch timer registers not configured by
+>> firmware"
+>> +??? default y
+>> +??? select ARM_ARCH_TIMER_OOL_WORKAROUND
+>> +??? depends on ARM_ARCH_TIMER && ARM64
+>> +??? help
+>> +????? This option enables a workaround for boards, on which arch timer
+>> +????? registers are not properly configured by the board firmware.
+>> +????? The workaround will be dynamically enabled when an affected
+>> +????? board is detected.
+>> +
+>
+> I'm sorry, but I'm strongly pushing back on this.
+>
+> This horrible hack was accepted with the express condition that it
+> would be limited to ARMv7 platforms (on the ground that we never
+> really documented the arch timer boot requirements on that version of
+> the architecture), and would never proliferate on arm64. From day 1,
+> we established what the boot protocol was, and we mandated that either:
+>
+> - kernel is entered at EL2 on all CPUs
+> - cntvoff_el2 is zeroed on all CPUs
+>
+> and we've got most people to fix their firmware, or live with the
+> consequences. If these machines cannot receive a non-broken firmware,
+> what are the odds that they will receive a mainline kernel?
 
-Note that separate writes/reads to 2 is not problem regards to atomicity,
-because the driver use the readq/writeq while initialize the SMMU, report
-for SMMU fault, and use spinlock in one case (iova_to_phys).
+Well, I know that the firmware is broken, but I cannot do anything about it.
+On the other hand updating kernel is still possible and mainline runs fine
+on TM2(e) boards. I will send v2 without this patch then.
 
-Signed-off-by: Hanna Hawa <hannah@marvell.com>
----
- Documentation/arm64/silicon-errata.txt |  2 ++
- drivers/iommu/arm-smmu.c               | 33 +++++++++++++++++++++++++++++----
- 2 files changed, 31 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 3b2f2dd..fc3f2a0 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -67,6 +67,8 @@ stable kernels.
- | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
- | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
- |                |                 |                 |                             |
-+| Marvell        | ARM-MMU-500     | #582743         | N/A                         |
-+|                |                 |                 |                             |
- | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
- |                |                 |                 |                             |
- | Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101 |
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fccb1d4..d64f892 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -119,6 +119,7 @@ enum arm_smmu_arch_version {
- enum arm_smmu_implementation {
- 	GENERIC_SMMU,
- 	ARM_MMU500,
-+	MRVL_MMU500,
- 	CAVIUM_SMMUV2,
- };
- 
-@@ -276,13 +277,35 @@ static inline void smmu_writeq_relaxed(struct arm_smmu_device *smmu,
- 				       u64 val,
- 				       void __iomem *addr)
- {
--	writeq_relaxed(val, addr);
-+	/*
-+	 * Marvell Armada-AP806 erratum #582743.
-+	 * Split all the writeq to double writel
-+	 */
-+	if (smmu->model != MRVL_MMU500) {
-+		writeq_relaxed(val, addr);
-+		return;
-+	}
-+
-+	writel_relaxed(upper_32_bits(val), addr + 4);
-+	writel_relaxed(lower_32_bits(val), addr);
- }
- 
- static inline u64 smmu_readq_relaxed(struct arm_smmu_device *smmu,
- 				     void __iomem *addr)
- {
--	return readq_relaxed(addr);
-+	u64 val;
-+
-+	/*
-+	 * Marvell Armada-AP806 erratum #582743.
-+	 * Split all the readq to double readl
-+	 */
-+	if (smmu->model != MRVL_MMU500)
-+		return readq_relaxed(addr);
-+
-+	val = (u64)readl_relaxed(addr + 4) << 32;
-+	val |= readl_relaxed(addr);
-+
-+	return val;
- }
- 
- static void parse_driver_options(struct arm_smmu_device *smmu)
-@@ -1611,7 +1634,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	for (i = 0; i < smmu->num_mapping_groups; ++i)
- 		arm_smmu_write_sme(smmu, i);
- 
--	if (smmu->model == ARM_MMU500) {
-+	if (smmu->model == ARM_MMU500 || smmu->model == MRVL_MMU500) {
- 		/*
- 		 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
- 		 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
-@@ -1640,7 +1663,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 		 * Disable MMU-500's not-particularly-beneficial next-page
- 		 * prefetcher for the sake of errata #841119 and #826419.
- 		 */
--		if (smmu->model == ARM_MMU500) {
-+		if (smmu->model == ARM_MMU500 || smmu->model == MRVL_MMU500) {
- 			reg = readl_relaxed(cb_base + ARM_SMMU_CB_ACTLR);
- 			reg &= ~ARM_MMU500_ACTLR_CPRE;
- 			writel_relaxed(reg, cb_base + ARM_SMMU_CB_ACTLR);
-@@ -1923,6 +1946,7 @@ struct arm_smmu_match_data {
- ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
- ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
- ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
-+ARM_SMMU_MATCH_DATA(mrvl_mmu500, ARM_SMMU_V2, MRVL_MMU500);
- ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
- 
- static const struct of_device_id arm_smmu_of_match[] = {
-@@ -1931,6 +1955,7 @@ struct arm_smmu_match_data {
- 	{ .compatible = "arm,mmu-400", .data = &smmu_generic_v1 },
- 	{ .compatible = "arm,mmu-401", .data = &arm_mmu401 },
- 	{ .compatible = "arm,mmu-500", .data = &arm_mmu500 },
-+	{ .compatible = "marvell,mmu-500", .data = &mrvl_mmu500 },
- 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
- 	{ },
- };
+Best regards
 -- 
-1.9.1
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
