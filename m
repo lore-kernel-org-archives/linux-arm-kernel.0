@@ -1,48 +1,43 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Mon, 15 Oct 2018 10:14:04 +0200
-Subject: [PATCH v3] ARM: dts: Add support for Liebherr's BK4 device
- (vf610 based)
-In-Reply-To: <20181012004027.GB3587@dragon>
-References: <20180921152726.31742-1-lukma@denx.de>
- <20181009105028.17971-1-lukma@denx.de>
- <20181012004027.GB3587@dragon>
-Message-ID: <20181015101404.52643184@jawa>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 15 Oct 2018 10:11:51 +0200
+Subject: [PATCH] ASoC: sun4i-i2s: don't try to start up or shut down DAI
+ if it's active
+In-Reply-To: <7437935.iAfLsdZGOz@anarsoul-thinkpad>
+References: <20181012153254.10844-1-anarsoul@gmail.com>
+ <20181012160905.GA2340@sirena.org.uk>
+ <7437935.iAfLsdZGOz@anarsoul-thinkpad>
+Message-ID: <20181015081151.rrn5xmso2hgckvh6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-> On Tue, Oct 09, 2018 at 12:50:28PM +0200, Lukasz Majewski wrote:
-> > This commit adds DTS support for BK4 device from Liebherr. It
-> > uses vf610 SoC from NXP.
+On Fri, Oct 12, 2018 at 09:28:56AM -0700, Vasily Khoruzhick wrote:
+> On Friday, October 12, 2018 9:09:05 AM PDT Mark Brown wrote:
+> > On Fri, Oct 12, 2018 at 08:32:54AM -0700, Vasily Khoruzhick wrote:
+> > > Otherwise we may end up with shutting down I2S if shutdown() was
+> > > called for capture substream, but playback is still running.
 > > 
-> > Signed-off-by: Lukasz Majewski <lukma@denx.de>  
+> > Would it be cleaner and more robust to use runtime PM?  I'm wondering
+> > what happens if some of the configuration stuff turns out to also need
+> > some of the clocks for example.
 > 
-> As v3 just incorporates a few minor improvements over v2, Stefan's
-> review tag should really be carried.  I applied the patch with Stefan
-> and Fabio's review tag added. 
-
-Thanks :-).
-
+> I guess. I'm not sure why this code was put into startup and shutdown 
+> callbacks in first place.
 > 
-> Shawn
+> Maybe Marcus or Maxime know?
 
+I can't really come up with a good explanation, so I guess there's
+none :)
 
+> As for configuration - only bus clock is necessary for configuration
+> and it's already enabled in runtime_resume() callback.
 
+Not really. Or at least, on the A64, yes, but shutting down the bus
+clock on older SoCs will reset the controller. I'd just put the enable
+bit on the runtime_pm hook.
 
-Best regards,
+Maxime
 
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/898426bd/attachment.sig>
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
