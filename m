@@ -1,51 +1,64 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 15 Oct 2018 09:29:37 +0000
-Subject: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
-In-Reply-To: <52eaa4ac563ad5114ebd99b286cdbe0495dba7ec.camel@nxp.com>
-References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
- <1539527419-23613-3-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5BEwNQy0HA80qOzm_w-c63tFK1eL+cOHNCxKYq9PHGsqw@mail.gmail.com>
- <52eaa4ac563ad5114ebd99b286cdbe0495dba7ec.camel@nxp.com>
-Message-ID: <AM0PR04MB421145E95CE4F229A21999D180FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Mon, 15 Oct 2018 11:30:13 +0200
+Subject: [PATCH] dt-bindings: pinctrl: bcm4708-pinmux: improve example binding
+Message-ID: <20181015093013.31651-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Leonard Crestez
-> Sent: Monday, October 15, 2018 3:30 PM
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-> On Sun, 2018-10-14 at 20:13 -0300, Fabio Estevam wrote:
-> > > +               imx8qx-pm {
-> > > +                       compatible = "fsl,scu-pd";
-> > > +                       #address-cells = <1>;
-> > > +                       #size-cells = <0>;
-> > > +
-> > > +                       pd_lsio: lsio-power-domain {
-> > > +                               #power-domain-cells = <0>;
-> > > +                               #address-cells = <1>;
-> > > +                               #size-cells = <0>;
-> > > +
-> > > +                               pd_lsio_pwm0: lsio-pwm0 at 191 {
-> > > +                                       reg = <191>;
-> >
-> > The number after @ is in hex, so the reg property should be 0x191.
-> 
-> These are SC_R_* resource ids from include/linux/firmware/imx/types.h
-> and they are almost everywhere referenced as decimals.
-> 
-> Is this really not acceptable for DT?
-> 
+Broadcom SoC pins are controlled using CRU ("Clock and Reset Unit" or
+"Central Resource Unit") registers. There are more CRU registers and
+functions so CRU should be represented as a separated block in DT.
 
-I think the problem is mismatch as DT binding request the reg property value
-must be equal to the unit-address. 
-See:
-https://github.com/devicetree-org/devicetree-specification/releases
+Moreover CRU is a sub-block of DMU ("Device Management Unit") so that
+one should also get its own node.
 
-It seems like a common issue in the kernel as I see many similar users.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ .../bindings/pinctrl/brcm,bcm4708-pinmux.txt       | 31 ++++++++++++++++------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
 
-Regards
-Dong Aisheng
-
-> --
-> Regards,
-> Leonard
+diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
+index af906f196e8c..0ce132c7e04c 100644
+--- a/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
++++ b/Documentation/devicetree/bindings/pinctrl/brcm,bcm4708-pinmux.txt
+@@ -30,13 +30,28 @@ For documentation of subnodes see:
+ Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+ 
+ Example:
+-	pinctrl at 1800c1c0 {
+-		compatible = "brcm,bcm4708-pinmux";
+-		reg = <0x1800c1c0 0x24>;
+-		reg-names = "cru_gpio_control";
+-
+-		spi {
+-			function = "spi";
+-			groups = "spi_grp";
++	dmu at 1800c000 {
++		compatible = "simple-bus";
++		ranges = <0 0x1800c000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		cru at 100 {
++			compatible = "simple-bus";
++			reg = <0x100 0x1a4>;
++			ranges;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++ 			pin-controller at 1c0 {
++				compatible = "brcm,bcm4708-pinmux";
++				reg = <0x1c0 0x24>;
++				reg-names = "cru_gpio_control";
++
++				spi-pins {
++					function = "spi";
++					groups = "spi_grp";
++				};
++			};
+ 		};
+ 	};
+-- 
+2.13.7
