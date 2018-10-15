@@ -1,102 +1,79 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 15 Oct 2018 09:09:32 -0700
-Subject: [PATCH v3 7/9] arm64: dts: allwinner: a64: add nodes necessary for
- analog sound support
+Date: Mon, 15 Oct 2018 09:09:34 -0700
+Subject: [PATCH v3 9/9] arm64: dts: allwinner: a64: enable sound on Pinebook
 In-Reply-To: <20181015160934.20948-1-anarsoul@gmail.com>
 References: <20181015160934.20948-1-anarsoul@gmail.com>
-Message-ID: <20181015160934.20948-8-anarsoul@gmail.com>
+Message-ID: <20181015160934.20948-10-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for i2s, digital and analog parts of audiocodec on A64
+This commit enables I2S, digital and analog parts of audiocodec on
+Pinebook
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 58 +++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 42 +++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index d3daf90a8715..d066ed59f27a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -157,6 +157,34 @@
- 		compatible = "linux,spdif-dit";
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index e2e426334cfe..8a3a24a09d4c 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -74,6 +74,23 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
  	};
- 
-+	sound: sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "sun50i-a64-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,frame-master = <&cpudai>;
-+		simple-audio-card,bitclock-master = <&cpudai>;
-+		simple-audio-card,mclk-fs = <512>;
-+		simple-audio-card,aux-devs = <&codec_analog>;
-+		simple-audio-card,routing =
-+				"Left DAC", "AIF1 Slot 0 Left",
-+				"Right DAC", "AIF1 Slot 0 Right",
-+				"AIF1 Slot 0 Left ADC", "Left ADC",
-+				"AIF1 Slot 0 Right ADC", "Right ADC",
-+				"Left ADC", "ADC",
-+				"Right ADC", "ADC",
-+				"MIC1", "Mic",
-+				"MIC2", "Headset Mic";
-+		status = "disabled";
 +
-+		cpudai: simple-audio-card,cpu {
-+			sound-dai = <&dai>;
-+		};
-+
-+		link_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+		};
++	speaker_amp: speaker_amp {
++		compatible = "simple-audio-amplifier";
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>;
 +	};
++};
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
-@@ -522,6 +550,30 @@
- 			status = "disabled";
- 		};
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
+ };
  
-+		dai: dai@1c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun50i-a64-codec-i2s";
-+			reg = <0x01c22c00 0x200>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			reset-names = "rst";
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		codec: codec at 1c22e00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a33-codec";
-+			reg = <0x01c22e00 0x600>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "bus", "mod";
-+			status = "disabled";
-+		};
-+
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
-@@ -715,6 +767,12 @@
- 			#reset-cells = <1>;
- 		};
+ &ehci0 {
+@@ -278,6 +295,31 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
+ };
  
-+		codec_analog: codec-analog at 1f015c0 {
-+			compatible = "allwinner,sun50i-a64-codec-analog";
-+			reg = <0x01f015c0 0x4>;
-+			status = "disabled";
-+		};
++&sound {
++	status = "okay";
++	simple-audio-card,widgets = "Microphone", "Microphone Jack",
++				    "Headphone", "Headphone Jack",
++				    "Speaker", "Internal Speaker";
++	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"INL", "LINEOUT",
++			"INR", "LINEOUT",
++			"Internal Speaker", "OUTL",
++			"Internal Speaker", "OUTR",
++			"Headphone Jack", "HP",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Left ADC", "ADC",
++			"Right ADC", "ADC",
++			"Mic", "MBIAS",
++			"MIC1", "Mic",
++			"Headset Mic", "Microphone Jack",
++			"Microphone Jack", "HBIAS",
++			"MIC2", "Headset Mic";
++};
 +
- 		r_i2c: i2c at 1f02400 {
- 			compatible = "allwinner,sun50i-a64-i2c",
- 				     "allwinner,sun6i-a31-i2c";
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.19.0
