@@ -1,162 +1,77 @@
-From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Sun, 14 Oct 2018 22:38:03 +0530
-Subject: [PATCH v5 6/6] arm64: dts: add LX2160ARDB board support
-In-Reply-To: <1539536883-1928-1-git-send-email-vabhav.sharma@nxp.com>
-References: <1539536883-1928-1-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <1539536883-1928-7-git-send-email-vabhav.sharma@nxp.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Mon, 15 Oct 2018 10:59:42 +0530
+Subject: [PATCH v9 0/6] EDAC: Enhancements to Synopsys EDAC driver
+Message-ID: <1539581388-23963-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LX2160A reference design board (RDB) is a high-performance
-computing, evaluation, and development platform with LX2160A
-SoC.
+This patch series enhances the current EDAC driver to support different
+platforms. This series adds support for ZynqMP DDRC controller in synopsys
+EDAC driver. This series also adds Device tree properties and relevant
+binding documentation.
 
-Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
-Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-Signed-off-by: Horia Geanta <horia.geanta@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
-Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
----
- arch/arm64/boot/dts/freescale/Makefile            |   1 +
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 119 ++++++++++++++++++++++
- 2 files changed, 120 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+Changes in v2:
+	- Moved checking of DDR_ECC_INTR_SUPPORT from (1/4) to (3/4) as it is
+	  a feature of ZynqMP DDRC
+	- The Binding Documentation in (2/4) is modified as per the review
+	  comments
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 86e18ad..445b72b 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-new file mode 100644
-index 0000000..6481e5f
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-@@ -0,0 +1,119 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Device Tree file for LX2160ARDB
-+//
-+// Copyright 2018 NXP
-+
-+/dts-v1/;
-+
-+#include "fsl-lx2160a.dtsi"
-+
-+/ {
-+	model = "NXP Layerscape LX2160ARDB";
-+	compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
-+
-+	aliases {
-+		crypto = &crypto;
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	sb_3v3: regulator-sb3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "MC34717-3.3VSB";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
-+&crypto {
-+	status = "okay";
-+};
-+
-+&esdhc0 {
-+	sd-uhs-sdr104;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr12;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	mmc-hs200-1_8v;
-+	mmc-hs400-1_8v;
-+	bus-width = <8>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	i2c-mux at 77 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+
-+			power-monitor at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			temperature-sensor at 4c {
-+				compatible = "nxp,sa56004";
-+				reg = <0x4c>;
-+				vcc-supply = <&sb_3v3>;
-+			};
-+
-+			temperature-sensor at 4d {
-+				compatible = "nxp,sa56004";
-+				reg = <0x4d>;
-+				vcc-supply = <&sb_3v3>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+
-+	rtc at 51 {
-+		compatible = "nxp,pcf2129";
-+		reg = <0x51>;
-+		// IRQ10_B
-+		interrupts = <0 150 0x4>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
+Changes in v3:
+	- The commit message in (2/4) is modified (Synopsys EDAC Driver -->
+	  ZynqMP DDRC)
+
+Changes in v4:
+	- Updated the commit message in (1/4)
+	- Renamed function pointer names removing 'synps_' in (1/4)
+	- Shortened unnecessary long lines as per the review comment on (1/4)
+
+Changes in v5:
+	- Updated the commit message in (2/4) and (4/4).
+	- Removed the unnecessary check for match data in probe() in (1/4)
+	- Some Indentation changes for better readability in (1/4) and (3/4)
+	- Removed repeated code in (3/4)
+	- Used 'zynq' and 'zynqmp' instead of 'synps_enh_edac' in function names
+
+Changes in v6:
+	- Splitted the patches according to functionalities
+	- Addressed code style comments from v5 review
+	- Moved the Error Injection to CONFIG_EDAC_DEBUG mode
+
+Changes in v7:
+	- Included DTS patch (6/7) which was missed in v6 patch set
+
+Changes in v8:
+	- patch (1/7) from v7 is split in to 3 different logically different patches
+		1. functional changes like code cleanup
+		2. functions renaming
+		3. comments cleanup
+	- Added a separate patch (4) for making always successful functions as void
+	- Corrected 'Too many parentheses' review comment in patch (5)
+	- Corrected comments as per the v7 review feedback
+	- Made dedicated functions for IRQ setup, IRQ enable and IRQ disable in patch (8)
+	- Addressed review comments in patch (10)
+
+Changes in v9:
+	- Added check for return value of of_device_get_match_data() function
+	  in (1/6).
+	- From v8 the first 5 patches are removed in this series as they are
+	  applied on:
+		https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/?h=edac-for-4.20-synps
+	- Updated Kconfig to check for ARCH_ZYNQMP instead of ARM64
+
+Manish Narani (6):
+  edac: synopsys: Add error handling for NULL in probe()
+  dt: bindings: Document ZynqMP DDRC in Synopsys documentation
+  edac: synopsys: Add macro defines for ZynqMP DDRC
+  edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
+  arm64: zynqmp: Add DDRC node
+  edac: synopsys: Add Error Injection support for ZynqMP DDRC
+
+ .../bindings/memory-controllers/synopsys.txt       |  27 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   7 +
+ drivers/edac/Kconfig                               |   2 +-
+ drivers/edac/synopsys_edac.c                       | 913 ++++++++++++++++++++-
+ 4 files changed, 920 insertions(+), 29 deletions(-)
+
 -- 
-2.7.4
+2.1.1
