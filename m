@@ -1,45 +1,95 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 15 Oct 2018 13:44:40 +0800
-Subject: [PATCH v7 2/9] PCI: mediatek: Fix class type for MT7622 as
- PCI_CLASS_BRIDGE_PCI
+Date: Mon, 15 Oct 2018 13:44:45 +0800
+Subject: [PATCH v7 7/9] PCI: mediatek: Add system PM support for MT2712 and
+ MT7622
 In-Reply-To: <1539582287-9171-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1539582287-9171-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539582287-9171-3-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1539582287-9171-8-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The commit 101c92dc80c8 ("PCI: mediatek: Set up vendor ID and class
-type for MT7622") have set the class type for MT7622 as un-properly
-value of PCI_CLASS_BRIDGE_HOST.
+In order to reduce the PCIe power consuming while system suspend,
+the physical layer should be gated. And the PCIe link should be
+re-established and the related control register values should be
+re-initialized after system resume.
 
-The PCIe controller of MT7622 is complexed with Root Port and PCI-to-PCI
-bridge, the bridge has type 1 configuration space header and related bridge
-windows. The HW default value of this bridge's class type is invalid. Fix
-its class type as PCI_CLASS_BRIDGE_PCI since it is HW defines.
-
-Making the bridge visiable to PCI framework by setting its class type
-properly will get its bridge windows configurated during PCI device
-enumerate.
+Register suspend_noirq & resume_noirq callback functions to allow
+PCIe to come up after resume from RAM.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/controller/pcie-mediatek.c | 50 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 288b8e2..bcdac9b 100644
+index d3f4694..42cf2a4 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -432,7 +432,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
- 		val = PCI_VENDOR_ID_MEDIATEK;
- 		writew(val, port->base + PCIE_CONF_VEND_ID);
+@@ -1168,6 +1168,55 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	return err;
+ }
  
--		val = PCI_CLASS_BRIDGE_HOST;
-+		val = PCI_CLASS_BRIDGE_PCI;
- 		writew(val, port->base + PCIE_CONF_CLASS_ID);
- 	}
- 
++static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	struct mtk_pcie_port *port;
++
++	if (list_empty(&pcie->ports))
++		return 0;
++
++	list_for_each_entry(port, &pcie->ports, list) {
++		clk_disable_unprepare(port->pipe_ck);
++		clk_disable_unprepare(port->obff_ck);
++		clk_disable_unprepare(port->axi_ck);
++		clk_disable_unprepare(port->aux_ck);
++		clk_disable_unprepare(port->ahb_ck);
++		clk_disable_unprepare(port->sys_ck);
++		phy_power_off(port->phy);
++		phy_exit(port->phy);
++	}
++
++	clk_disable_unprepare(pcie->free_ck);
++
++	return 0;
++}
++
++static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
++{
++	struct mtk_pcie *pcie = dev_get_drvdata(dev);
++	struct mtk_pcie_port *port, *tmp;
++
++	if (list_empty(&pcie->ports))
++		return 0;
++
++	clk_prepare_enable(pcie->free_ck);
++
++	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
++		mtk_pcie_enable_port(port);
++
++	/* In case of EP was removed while system suspend. */
++	if (list_empty(&pcie->ports))
++		clk_disable_unprepare(pcie->free_ck);
++
++	return 0;
++}
++
++static const struct dev_pm_ops mtk_pcie_pm_ops = {
++	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
++				      mtk_pcie_resume_noirq)
++};
++
+ static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+ 	.ops = &mtk_pcie_ops,
+ 	.startup = mtk_pcie_startup_port,
+@@ -1200,6 +1249,7 @@ static struct platform_driver mtk_pcie_driver = {
+ 		.name = "mtk-pcie",
+ 		.of_match_table = mtk_pcie_ids,
+ 		.suppress_bind_attrs = true,
++		.pm = &mtk_pcie_pm_ops,
+ 	},
+ };
+ builtin_platform_driver(mtk_pcie_driver);
 -- 
 2.6.4
