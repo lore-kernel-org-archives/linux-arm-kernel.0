@@ -1,37 +1,43 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Mon, 15 Oct 2018 12:14:33 +0000
-Subject: [PATCH v2 6/7] spi: nxp-fspi: add mode flag bit for octal support
+Date: Mon, 15 Oct 2018 12:14:27 +0000
+Subject: [PATCH v2 5/7] mtd: m25p80: add support of octal I/O transfer
 In-Reply-To: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 References: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1539605534-22302-7-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1539605534-22302-6-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mode flags for octal I/O data transfer support.
-NXP FlexSPI controller supports octal mode data transfer.
+Add support for octal I/O data transfer based on the controller (spi)
+mode.
+Assign hw-capability mask bits for octal transfer.
 
 Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
 Changes for v2:
- None
+ Incorporated review comments of Boris.
 
- drivers/spi/spi-nxp-fspi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/devices/m25p80.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-nxp-fspi.c b/drivers/spi/spi-nxp-fspi.c
-index 67eea88..c48ca94 100644
---- a/drivers/spi/spi-nxp-fspi.c
-+++ b/drivers/spi/spi-nxp-fspi.c
-@@ -993,8 +993,8 @@ static int nxp_fspi_probe(struct platform_device *pdev)
- 	if (!ctlr)
- 		return -ENOMEM;
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index cb14cf9..e5e632c 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -175,7 +175,14 @@ static int m25p_probe(struct spi_mem *spimem)
+ 	spi_mem_set_drvdata(spimem, flash);
+ 	flash->spimem = spimem;
  
--	ctlr->mode_bits = SPI_RX_DUAL | SPI_RX_QUAD |
--			  SPI_TX_DUAL | SPI_TX_QUAD;
-+	ctlr->mode_bits = SPI_RX_DUAL | SPI_RX_QUAD | SPI_RX_OCTAL |
-+			  SPI_TX_DUAL | SPI_TX_QUAD | SPI_TX_OCTAL;
+-	if (spi->mode & SPI_RX_QUAD) {
++	if (spi->mode & SPI_RX_OCTAL) {
++		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
++
++		if (spi->mode & SPI_TX_OCTAL)
++			hwcaps.mask |= (SNOR_HWCAPS_READ_1_8_8 |
++					SNOR_HWCAPS_PP_1_1_8 |
++					SNOR_HWCAPS_PP_1_8_8);
++	} else if (spi->mode & SPI_RX_QUAD) {
+ 		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
  
- 	f = spi_controller_get_devdata(ctlr);
- 	f->dev = dev;
+ 		if (spi->mode & SPI_TX_QUAD)
 -- 
 2.7.4
