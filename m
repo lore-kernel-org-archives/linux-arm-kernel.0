@@ -1,50 +1,23 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 15 Oct 2018 12:12:29 +0900
-Subject: [PATCH 0/2] mmc: uniphier-sd: two bug-fixes
-In-Reply-To: <20181014223311.GE3260@kunai>
-References: <1539356258-12374-1-git-send-email-yamada.masahiro@socionext.com>
- <20181014223311.GE3260@kunai>
-Message-ID: <CAK7LNATPf4mEdH16eZzLg4x3tP-jvXcTWqqY0DgCpmGjt9x9zg@mail.gmail.com>
+From: patch-notifications@ellerman.id.au (Michael Ellerman)
+Date: Mon, 15 Oct 2018 15:01:03 +1100 (AEDT)
+Subject: [v3,01/24] powerpc/32: Add ioremap_wt() and ioremap_coherent()
+In-Reply-To: <c454a5dbb215719991e3b0e6470309101d870fbb.1539092111.git.christophe.leroy@c-s.fr>
+Message-ID: <42YPr02vcGz9s7W@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 7:33 AM Wolfram Sang <wsa@the-dreams.de> wrote:
->
->
-> > In further testing in uniphier-sd.c,
-> > I found my stupid mistakes.
->
-> I don't have the uniphier HW but I still had a look at these patches.
-> You never know if there is something interesting for SDHI in there :)
->
-> > Can you squash this series into
-> > 3fd784f745dd
-> > "mmc: uniphier-sd: add UniPhier SD/eMMC controller driver"
-> > if you have a chance to do rebase?
->
-> Please don't rebase!
+On Tue, 2018-10-09 at 13:51:33 UTC, Christophe Leroy wrote:
+> Other arches have ioremap_wt() to map IO areas write-through.
+> Implement it on PPC as well in order to avoid drivers using
+> __ioremap(_PAGE_WRITETHRU)
+> 
+> Also implement ioremap_coherent() to avoid drivers using
+> __ioremap(_PAGE_COHERENT)
+> 
+> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 
-Some sub-systems rebase, and some do not.
-It is up to the sub-system maintainer.
+Series applied to powerpc next, thanks.
 
-I am not asking to rebase just for my two fixes.
-I see linux-mmc regularly rebase anyway.
+https://git.kernel.org/powerpc/c/86c391bd5f47101acf1f3e0abd9fe0
 
-I'd prefer cleaner git history
-if Ulf just happens to do one more rebase in this cycle.
-
-
-
-
-> We actually develop on top of mmc/next and rebasing
-> creates a lot of pain because we lose the base for that work.
-
-I know what you are saying, but this is how we develop in linux-next.
-You need to use "git rebase --onto".
-
-
-
-
---
-Best Regards
-Masahiro Yamada
+cheers
