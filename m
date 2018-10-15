@@ -1,65 +1,77 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 15 Oct 2018 13:44:41 +0800
-Subject: [PATCH v7 3/9] PCI: mediatek: Remove the redundant dev->pm_domain
- check
+Date: Mon, 15 Oct 2018 13:44:42 +0800
+Subject: [PATCH v7 4/9] PCI: mediatek: Convert to use pci_host_probe()
 In-Reply-To: <1539582287-9171-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1539582287-9171-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539582287-9171-4-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1539582287-9171-5-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-It's no needed to check whether device have pm_domain attached before
-calling the pm_runtime_XXX interface, remove it.
+Part of mtk_pcie_register_host is an open-coded version of
+pci_host_probe(). So instead of duplicating this code, use
+pci_host_probe() directly and remove mtk_pcie_register_host.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+ drivers/pci/controller/pcie-mediatek.c | 37 ++++++++--------------------------
+ 1 file changed, 8 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index bcdac9b..59fdb60 100644
+index 59fdb60..ead6005 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -225,10 +225,8 @@ static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
- 
- 	clk_disable_unprepare(pcie->free_ck);
- 
--	if (dev->pm_domain) {
--		pm_runtime_put_sync(dev);
--		pm_runtime_disable(dev);
--	}
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
- }
- 
- static void mtk_pcie_port_free(struct mtk_pcie_port *port)
-@@ -998,10 +996,8 @@ static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
- 		pcie->free_ck = NULL;
- 	}
- 
--	if (dev->pm_domain) {
--		pm_runtime_enable(dev);
--		pm_runtime_get_sync(dev);
--	}
-+	pm_runtime_enable(dev);
-+	pm_runtime_get_sync(dev);
- 
- 	/* enable top level clock */
- 	err = clk_prepare_enable(pcie->free_ck);
-@@ -1013,10 +1009,8 @@ static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
+@@ -1121,34 +1121,6 @@ static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
  	return 0;
- 
- err_free_ck:
--	if (dev->pm_domain) {
--		pm_runtime_put_sync(dev);
--		pm_runtime_disable(dev);
--	}
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
- 
- 	return err;
  }
+ 
+-static int mtk_pcie_register_host(struct pci_host_bridge *host)
+-{
+-	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
+-	struct pci_bus *child;
+-	int err;
+-
+-	host->busnr = pcie->busn.start;
+-	host->dev.parent = pcie->dev;
+-	host->ops = pcie->soc->ops;
+-	host->map_irq = of_irq_parse_and_map_pci;
+-	host->swizzle_irq = pci_common_swizzle;
+-	host->sysdata = pcie;
+-
+-	err = pci_scan_root_bus_bridge(host);
+-	if (err < 0)
+-		return err;
+-
+-	pci_bus_size_bridges(host->bus);
+-	pci_bus_assign_resources(host->bus);
+-
+-	list_for_each_entry(child, &host->bus->children, node)
+-		pcie_bus_configure_settings(child);
+-
+-	pci_bus_add_devices(host->bus);
+-
+-	return 0;
+-}
+-
+ static int mtk_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1175,7 +1147,14 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto put_resources;
+ 
+-	err = mtk_pcie_register_host(host);
++	host->busnr = pcie->busn.start;
++	host->dev.parent = pcie->dev;
++	host->ops = pcie->soc->ops;
++	host->map_irq = of_irq_parse_and_map_pci;
++	host->swizzle_irq = pci_common_swizzle;
++	host->sysdata = pcie;
++
++	err = pci_host_probe(host);
+ 	if (err)
+ 		goto put_resources;
+ 
 -- 
 2.6.4
