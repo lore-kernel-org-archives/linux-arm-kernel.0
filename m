@@ -1,84 +1,93 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 15 Oct 2018 09:09:26 -0700
-Subject: [PATCH v3 1/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+Date: Mon, 15 Oct 2018 09:09:27 -0700
+Subject: [PATCH v3 2/9] ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
 In-Reply-To: <20181015160934.20948-1-anarsoul@gmail.com>
 References: <20181015160934.20948-1-anarsoul@gmail.com>
-Message-ID: <20181015160934.20948-2-anarsoul@gmail.com>
+Message-ID: <20181015160934.20948-3-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+BCLK / LRCK ratio should be sample size * channels, but it was
+hardcoded to 32 (0x1 is 32 as per A33 and A64 datasheets).
 
-The I2S block used for the audio codec in the A64 differs from other 3
-I2S modules in A64 and isn't compatible with H3. But it is very similar
-to what is found in A10(sun4i). However, its TX FIFO is
-located at a different address.
+Calculate it basing on sample size and number of channels.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../devicetree/bindings/sound/sun4i-i2s.txt   |  2 ++
- sound/soc/sunxi/sun4i-i2s.c                   | 21 +++++++++++++++++++
- 2 files changed, 23 insertions(+)
+ sound/soc/sunxi/sun8i-codec.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-index b9d50d6cdef3..61e71c1729e0 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-@@ -10,6 +10,7 @@ Required properties:
-    - "allwinner,sun6i-a31-i2s"
-    - "allwinner,sun8i-a83t-i2s"
-    - "allwinner,sun8i-h3-i2s"
-+   - "allwinner,sun50i-a64-codec-i2s"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the I2S interrupt.
-@@ -26,6 +27,7 @@ Required properties for the following compatibles:
- 	- "allwinner,sun6i-a31-i2s"
- 	- "allwinner,sun8i-a83t-i2s"
- 	- "allwinner,sun8i-h3-i2s"
-+	- "allwinner,sun50i-a64-codec-i2s"
- - resets: phandle to the reset line for this codec
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index fb37dd927e33..2467fab94a19 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -24,6 +24,7 @@
+ #include <linux/io.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
++#include <linux/log2.h>
  
- Example:
-diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index ed30d30ac720..83374617962c 100644
---- a/sound/soc/sunxi/sun4i-i2s.c
-+++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -967,6 +967,23 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
- 	.field_rxchansel	= REG_FIELD(SUN8I_I2S_RX_CHAN_SEL_REG, 0, 2),
+ #include <sound/pcm_params.h>
+ #include <sound/soc.h>
+@@ -52,7 +53,6 @@
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV		13
+ #define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV		9
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV		6
+-#define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16		(1 << 6)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ		4
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16		(1 << 4)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_DATA_FMT		2
+@@ -257,8 +257,8 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+ }
+ 
+ struct sun8i_codec_clk_div {
+-	u8	div;
+-	u8	val;
++	unsigned int	div;
++	u8		val;
  };
  
-+static const struct sun4i_i2s_quirks sun50i_a64_codec_i2s_quirks = {
-+	.has_reset		= true,
-+	.reg_offset_txdata	= SUN8I_I2S_FIFO_TX_REG,
-+	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
-+	.has_slave_select_bit	= true,
-+	.field_clkdiv_mclk_en	= REG_FIELD(SUN4I_I2S_CLK_DIV_REG, 7, 7),
-+	.field_fmt_wss		= REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
-+	.field_fmt_sr		= REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
-+	.field_fmt_bclk		= REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
-+	.field_fmt_lrclk	= REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
-+	.field_fmt_mode		= REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
-+	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
-+	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
-+	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
-+	.field_rxchansel	= REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
-+};
+ static const struct sun8i_codec_clk_div sun8i_codec_bclk_div[] = {
+@@ -300,12 +300,23 @@ static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
+ 	return best_val;
+ }
+ 
++static int sun8i_codec_get_lrck_div(unsigned int channels,
++				    unsigned int word_size)
++{
++	unsigned int div = word_size * channels;
 +
- static int sun4i_i2s_init_regmap_fields(struct device *dev,
- 					struct sun4i_i2s *i2s)
++	if (div < 16 || div > 256)
++		return -EINVAL;
++
++	return ilog2(div) - 4;
++}
++
+ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 				 struct snd_pcm_hw_params *params,
+ 				 struct snd_soc_dai *dai)
  {
-@@ -1175,6 +1192,10 @@ static const struct of_device_id sun4i_i2s_match[] = {
- 		.compatible = "allwinner,sun8i-h3-i2s",
- 		.data = &sun8i_h3_i2s_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-a64-codec-i2s",
-+		.data = &sun50i_a64_codec_i2s_quirks,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sun4i_i2s_match);
+ 	struct sun8i_codec *scodec = snd_soc_component_get_drvdata(dai->component);
+-	int sample_rate;
++	int sample_rate, lrck_div;
+ 	u8 bclk_div;
+ 
+ 	/*
+@@ -321,9 +332,14 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
+ 			   bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
+ 
++	lrck_div = sun8i_codec_get_lrck_div(params_channels(params),
++					    params_physical_width(params));
++	if (lrck_div < 0)
++		return lrck_div;
++
+ 	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
+-			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
++			   lrck_div << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV);
+ 
+ 	sample_rate = sun8i_codec_get_hw_rate(params);
+ 	if (sample_rate < 0)
 -- 
 2.19.0
