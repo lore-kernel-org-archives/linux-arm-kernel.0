@@ -1,39 +1,49 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 15 Oct 2018 14:31:07 +0200
-Subject: [PATCH v2 1/6] clocksource: exynos_mct: Remove dead code
+Date: Mon, 15 Oct 2018 14:31:08 +0200
+Subject: [PATCH v2 2/6] clocksource: exynos_mct: Fix error path in timer
+ resources initialization
 In-Reply-To: <20181015123112.9379-1-m.szyprowski@samsung.com>
 References: <20181015123112.9379-1-m.szyprowski@samsung.com>
- <CGME20181015123134eucas1p2bca15d1e0f54c0a580c04d9af7411f68@eucas1p2.samsung.com>
-Message-ID: <20181015123112.9379-2-m.szyprowski@samsung.com>
+ <CGME20181015123135eucas1p18df135504c9476cead8da6463226cdec@eucas1p1.samsung.com>
+Message-ID: <20181015123112.9379-3-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos Multi-Core Timer driver is used only on device-tree based
-systems, so remove non-dt related code. In case of !CONFIG_OF
-the code is anyway equal because of_irq_count() has a stub
-returning 0.
+While freeing interrupt handlers in error path, don't assume that all
+requested interrupts are per-processor interrupts and properly release
+standard interrupts too.
 
+Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
+Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/clocksource/exynos_mct.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/clocksource/exynos_mct.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 7a244b681876..43b335ff4a96 100644
+index 43b335ff4a96..a379f11fad2d 100644
 --- a/drivers/clocksource/exynos_mct.c
 +++ b/drivers/clocksource/exynos_mct.c
-@@ -581,11 +581,7 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
- 	 * timer irqs are specified after the four global timer
- 	 * irqs are specified.
- 	 */
--#ifdef CONFIG_OF
- 	nr_irqs = of_irq_count(np);
--#else
--	nr_irqs = 0;
--#endif
- 	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
- 		mct_irqs[i] = irq_of_parse_and_map(np, i);
+@@ -562,7 +562,19 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+ 	return 0;
+ 
+ out_irq:
+-	free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
++	if (mct_int_type == MCT_INT_PPI) {
++		free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
++	} else {
++		for_each_possible_cpu(cpu) {
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			if (pcpu_mevt->evt.irq != -1) {
++				free_irq(pcpu_mevt->evt.irq, pcpu_mevt);
++				pcpu_mevt->evt.irq = -1;
++			}
++		}
++	}
+ 	return err;
+ }
  
 -- 
 2.17.1
