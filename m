@@ -1,61 +1,80 @@
 From: logang@deltatee.com (Logan Gunthorpe)
-Date: Mon, 15 Oct 2018 11:57:00 -0600
-Subject: [PATCH v2 4/6] arm64: mm: make use of new memblocks_present() helper
+Date: Mon, 15 Oct 2018 11:56:58 -0600
+Subject: [PATCH v2 2/6] mm/sparse: add common helper to mark all memblocks
+ present
 In-Reply-To: <20181015175702.9036-1-logang@deltatee.com>
 References: <20181015175702.9036-1-logang@deltatee.com>
-Message-ID: <20181015175702.9036-5-logang@deltatee.com>
+Message-ID: <20181015175702.9036-3-logang@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup the arm64_memory_present() function seeing it's very
-similar to other arches.
+Presently the arches arm64, arm and sh have a function which loops through
+each memblock and calls memory present. riscv will require a similar
+function.
 
-memblocks_present() is a direct replacement of arm64_memory_present()
+Introduce a common memblocks_present() function that can be used by
+all the arches. Subsequent patches will cleanup the arches that
+make use of this.
 
 Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: Vlastimil Babka <vbabka@suse.cz>
+Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
+Cc: Oscar Salvador <osalvador@suse.de>
 ---
- arch/arm64/mm/init.c | 20 +-------------------
- 1 file changed, 1 insertion(+), 19 deletions(-)
+ include/linux/mmzone.h |  6 ++++++
+ mm/sparse.c            | 14 ++++++++++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 6a0b5c5a61af..c51a944fe19f 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -296,24 +296,6 @@ int pfn_valid(unsigned long pfn)
- EXPORT_SYMBOL(pfn_valid);
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index d4b0c79d2924..26a026a45857 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -784,6 +784,12 @@ void memory_present(int nid, unsigned long start, unsigned long end);
+ static inline void memory_present(int nid, unsigned long start, unsigned long end) {}
  #endif
  
--#ifndef CONFIG_SPARSEMEM
--static void __init arm64_memory_present(void)
--{
--}
--#else
--static void __init arm64_memory_present(void)
--{
--	struct memblock_region *reg;
--
--	for_each_memblock(memory, reg) {
--		int nid = memblock_get_region_node(reg);
--
--		memory_present(nid, memblock_region_memory_base_pfn(reg),
--				memblock_region_memory_end_pfn(reg));
--	}
--}
--#endif
--
- static phys_addr_t memory_limit = PHYS_ADDR_MAX;
++#if defined(CONFIG_SPARSEMEM) && defined(CONFIG_HAVE_MEMBLOCK)
++void memblocks_present(void);
++#else
++static inline void memblocks_present(void) {}
++#endif
++
+ #ifdef CONFIG_HAVE_MEMORYLESS_NODES
+ int local_memory_node(int node_id);
+ #else
+diff --git a/mm/sparse.c b/mm/sparse.c
+index 10b07eea9a6e..90aec8331a03 100644
+--- a/mm/sparse.c
++++ b/mm/sparse.c
+@@ -5,6 +5,7 @@
+ #include <linux/mm.h>
+ #include <linux/slab.h>
+ #include <linux/mmzone.h>
++#include <linux/memblock.h>
+ #include <linux/bootmem.h>
+ #include <linux/compiler.h>
+ #include <linux/highmem.h>
+@@ -238,6 +239,19 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
+ 	}
+ }
  
++#ifdef CONFIG_HAVE_MEMBLOCK
++void __init memblocks_present(void)
++{
++	struct memblock_region *reg;
++
++	for_each_memblock(memory, reg) {
++		memory_present(memblock_get_region_node(reg),
++			       memblock_region_memory_base_pfn(reg),
++			       memblock_region_memory_end_pfn(reg));
++	}
++}
++#endif
++
  /*
-@@ -506,7 +488,7 @@ void __init bootmem_init(void)
- 	 * Sparsemem tries to allocate bootmem in memory_present(), so must be
- 	 * done after the fixed reservations.
- 	 */
--	arm64_memory_present();
-+	memblocks_present();
- 
- 	sparse_init();
- 	zone_sizes_init(min, max);
+  * Subtle, we encode the real pfn into the mem_map such that
+  * the identity pfn - section_mem_map will return the actual
 -- 
 2.19.0
