@@ -1,33 +1,38 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Mon, 15 Oct 2018 10:59:43 +0530
-Subject: [PATCH v9 1/6] edac: synopsys: Add error handling for NULL in probe()
+Date: Mon, 15 Oct 2018 10:59:47 +0530
+Subject: [PATCH v9 5/6] arm64: zynqmp: Add DDRC node
 In-Reply-To: <1539581388-23963-1-git-send-email-manish.narani@xilinx.com>
 References: <1539581388-23963-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1539581388-23963-2-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1539581388-23963-6-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function of_device_get_match_data() can return NULL in case of
-error. Add error handling for the same in probe().
+Add ddrc memory controller node in dts. The size mentioned in dts is
+0x30000, because we need to access DDR_QOS INTR registers located at
+0xFD090208 from this driver.
 
 Signed-off-by: Manish Narani <manish.narani@xilinx.com>
 ---
- drivers/edac/synopsys_edac.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
-index 1c3795d..0005ef3 100644
---- a/drivers/edac/synopsys_edac.c
-+++ b/drivers/edac/synopsys_edac.c
-@@ -477,6 +477,9 @@ static int mc_probe(struct platform_device *pdev)
- 		return PTR_ERR(baseaddr);
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 29ce234..a81d3b16 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -355,6 +355,13 @@
+ 			xlnx,bus-width = <64>;
+ 		};
  
- 	p_data = of_device_get_match_data(&pdev->dev);
-+	if (!p_data)
-+		return -ENODEV;
++		mc: memory-controller at fd070000 {
++			compatible = "xlnx,zynqmp-ddrc-2.40a";
++			reg = <0x0 0xfd070000 0x0 0x30000>;
++			interrupt-parent = <&gic>;
++			interrupts = <0 112 4>;
++		};
 +
- 	if (!p_data->get_ecc_state(baseaddr)) {
- 		edac_printk(KERN_INFO, EDAC_MC, "ECC not enabled\n");
- 		return -ENXIO;
+ 		gem0: ethernet at ff0b0000 {
+ 			compatible = "cdns,zynqmp-gem", "cdns,gem";
+ 			status = "disabled";
 -- 
 2.1.1
