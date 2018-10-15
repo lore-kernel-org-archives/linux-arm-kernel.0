@@ -1,23 +1,21 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 15 Oct 2018 10:18:36 +0200
-Subject: [PATCH v2 1/9] ASoC: sun4i-i2s: Add compatibility with A64 codec
- I2S
-In-Reply-To: <20181013165329.13363-2-anarsoul@gmail.com>
+Date: Mon, 15 Oct 2018 10:18:56 +0200
+Subject: [PATCH v2 4/9] ASoC: dt-binding: Add bindings for Allwinner A64
+ codec's analog path controls
+In-Reply-To: <20181013165329.13363-5-anarsoul@gmail.com>
 References: <20181013165329.13363-1-anarsoul@gmail.com>
- <20181013165329.13363-2-anarsoul@gmail.com>
-Message-ID: <20181015081836.onjczcsg5qwp6rbt@flea>
+ <20181013165329.13363-5-anarsoul@gmail.com>
+Message-ID: <20181015081856.yhug4axgoembmvqc@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 09:53:21AM -0700, Vasily Khoruzhick wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+On Sat, Oct 13, 2018 at 09:53:24AM -0700, Vasily Khoruzhick wrote:
+> The internal codec on Allwinner A64 is split into 2 parts. The
+> analog path controls are routed through an embedded custom register
+> bus accessed through the PRCM block just as on A23/A33/H3.
 > 
-> The I2S block used for the audio codec in the A64 differs from other 3
-> I2S modules in A64 and isn't compatible with H3. But it is very similar
-> to what is found in A10(sun4i). However, its TX FIFO is
-> located at a different address.
+> Add a binding for this hardware.
 > 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
 Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
@@ -34,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/6cdbe2ca/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181015/75e5605a/attachment.sig>
