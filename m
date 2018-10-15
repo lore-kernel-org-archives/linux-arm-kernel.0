@@ -1,74 +1,63 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Mon, 15 Oct 2018 12:13:57 +0000
-Subject: [PATCH v2 0/7] spi: add support for octal mode
-Message-ID: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Date: Mon, 15 Oct 2018 12:14:03 +0000
+Subject: [PATCH v2 1/7] spi: add support for octal I/O data transfer
+In-Reply-To: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1539605534-22302-2-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for octal mode IO data transfer.
-Micron flash, mt35xu512aba, supports octal mode data transfer and
-NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
+Add flags for Octal I/O data transfer
+Required for the SPI controller which can do the data transfer (TX/RX)
+on 8 data lines e.g. NXP FlexSPI controller.
+ SPI_TX_OCTAL: transmit with 8 wires
+ SPI_RX_OCTAL: receive with 8 wires
 
-Patch series
-* Add support for octal mode flags and parsing of same in spi driver.
-* Add parsing logic for spi-mem framework and m25p80.c device file.
-* Add opcodes for octal I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
-  Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
-* Add mode bit required for octal mode in nxp-fspi driver [2].
-* Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
-
-Cherry pick below 2 patches (from: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git):
-    c639f871febe6667d9afce28108c634e5636c735 spi: spi-mem: Fix inverted logic in op sanity check
-    db122eb8a749a1eff038f9a282c620ab16c4be1d spi: spi-mem: Add extra sanity checks on the op param
-
-Tested on LX2160ARDB target with nxp-fspi driver, below are
-Read performance number of 1-1-1 and 1-1-8 read protocol.
-
- root at lxxx:~# cat /proc/mtd
- dev:    size   erasesize  name
- mtd0: 04000000 00001000 "spi0.0"
- mtd1: 04000000 00001000 "spi0.1"
- root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
- Copied 16777216 bytes from address 0x00000000 in flash to 0read
-
- real    0m2.792s
- user    0m0.000s
- sys     0m2.790s
- root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
- Copied 16777216 bytes from address 0x00000000 in flash to 0read
-
- real    0m0.441s
- user    0m0.000s
- sys     0m0.440s
- root at ls1012ardb:~#
-
- Flash device MTD0 configured in 1-1-1 protocol.
- Flash device MTD1 configured in 1-1-8 protocol.
-
-[1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384
-[2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70210
-
-Yogesh Gaur (7):
-  spi: add support for octal I/O data transfer
-  spi: spi-mem: add support for octal I/O data transfer
-  mtd: spi-nor: add opcodes for octal Read/Write commands
-  mtd: spi-nor: add octal read flag for flash mt35xu512aba
-  mtd: m25p80: add support of octal I/O transfer
-  spi: nxp-fspi: add mode flag bit for octal support
-  arm64: dts: lx2160a: update fspi node
-
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+---
 Changes for v2:
- Incorporated review comments of Boris and Vignesh.
+ Incorporated review comments of Boris.
 
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  4 ++++
- drivers/mtd/devices/m25p80.c                      |  9 ++++++++-
- drivers/mtd/spi-nor/spi-nor.c                     | 15 ++++++++++++++-
- drivers/spi/spi-mem.c                             |  9 ++++++++-
- drivers/spi/spi-nxp-fspi.c                        |  4 ++--
- drivers/spi/spi.c                                 |  6 ++++++
- include/linux/mtd/spi-nor.h                       |  8 ++++++++
- include/linux/spi/spi.h                           |  2 ++
- 8 files changed, 52 insertions(+), 5 deletions(-)
+ drivers/spi/spi.c       | 6 ++++++
+ include/linux/spi/spi.h | 2 ++
+ 2 files changed, 8 insertions(+)
 
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index ec395a6..80f672f 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -1573,6 +1573,9 @@ static int of_spi_parse_dt(struct spi_controller *ctlr, struct spi_device *spi,
+ 		case 4:
+ 			spi->mode |= SPI_TX_QUAD;
+ 			break;
++		case 8:
++			spi->mode |= SPI_TX_OCTAL;
++			break;
+ 		default:
+ 			dev_warn(&ctlr->dev,
+ 				"spi-tx-bus-width %d not supported\n",
+@@ -1591,6 +1594,9 @@ static int of_spi_parse_dt(struct spi_controller *ctlr, struct spi_device *spi,
+ 		case 4:
+ 			spi->mode |= SPI_RX_QUAD;
+ 			break;
++		case 8:
++			spi->mode |= SPI_RX_OCTAL;
++			break;
+ 		default:
+ 			dev_warn(&ctlr->dev,
+ 				"spi-rx-bus-width %d not supported\n",
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index a64235e..2d21307 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -163,6 +163,8 @@ struct spi_device {
+ #define	SPI_TX_QUAD	0x200			/* transmit with 4 wires */
+ #define	SPI_RX_DUAL	0x400			/* receive with 2 wires */
+ #define	SPI_RX_QUAD	0x800			/* receive with 4 wires */
++#define	SPI_TX_OCTAL	0x1000			/* transmit with 8 wires */
++#define	SPI_RX_OCTAL	0x2000			/* receive with 8 wires */
+ 	int			irq;
+ 	void			*controller_state;
+ 	void			*controller_data;
 -- 
 2.7.4
