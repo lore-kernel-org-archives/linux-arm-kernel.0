@@ -1,216 +1,97 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 15 Oct 2018 17:40:49 +0200
-Subject: [PATCH 1/2] [RFC] arm64: renesas: Move SoC Kconfig symbols to
- drivers/soc/renesas/
-In-Reply-To: <20181011135448.sah5unjhclllvqty@verge.net.au>
-References: <20181011085508.5234-1-geert+renesas@glider.be>
- <20181011085508.5234-2-geert+renesas@glider.be>
- <20181011135448.sah5unjhclllvqty@verge.net.au>
-Message-ID: <20181015154048.hkmht7cml272xbcg@verge.net.au>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 15 Oct 2018 17:50:00 +0200
+Subject: [PATCH v3] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
+ non-Exynos platforms
+References: <CGME20181015155001eucas1p249f539be47eaff0d10ddc74e1f681b37@eucas1p2.samsung.com>
+Message-ID: <20181015155001eucas1p249f539be47eaff0d10ddc74e1f681b37~d0vYKtP7-2027420274eucas1p2g@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2018 at 03:54:55PM +0200, Simon Horman wrote:
-> On Thu, Oct 11, 2018 at 10:55:07AM +0200, Geert Uytterhoeven wrote:
-> > For consistency with other vendors, which have a single Kconfig symbol
-> > in arch/arm64/Kconfig.platforms.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > Note that drivers/clk/ is included before drivers/soc/.  Hence when
-> > COMPILE_TEST=y, questions will be asked about clock drivers before they
-> > can be auto-selected by SoC support.
-> > 
-> > Question: Should we introduce a family-specific Kconfig symbol for R-Car
-> > 	  Gen3 (ARCH_RCAR_GEN1), which could be used for enabling
-> 
-> s/1/3/?
-> 
-> > 	  RST_RCAR?
-> 
-> Given that it would be consistent with R-Car Gen 1 and 2,
-> that seems like a good idea to me.
+"Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
+config option) is not working properly (debug messages are not
+displayed after resume) on Exynos platforms because GPIOs restore
+code is not implemented.
 
-Hi Geert,
+Add PLAT_S3C24XX, ARCH_S3C64XX and ARCH_S5PV210 dependencies to
+SAMSUNG_PM_DEBUG config option to hide it on Exynos platforms.
+Then convert Exynos code to not require <plat/pm-common.h>
+header (use pr_debug() directly instead of S3C_PMDBG() macro and
+remove redundant s3c_pm_*() calls).
 
-there has been no other feedback on this series.
-How would you like to proceed?
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+v3:
+- don't move PM to the line below in Kconfig
 
-> 
-> > ---
-> >  arch/arm64/Kconfig.platforms | 54 ------------------------
-> >  drivers/soc/renesas/Kconfig  | 81 ++++++++++++++++++++++++++++++------
-> >  2 files changed, 68 insertions(+), 67 deletions(-)
-> > 
-> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> > index fecdfc70828c2ac3..e7f1659064f82790 100644
-> > --- a/arch/arm64/Kconfig.platforms
-> > +++ b/arch/arm64/Kconfig.platforms
-> > @@ -165,60 +165,6 @@ config ARCH_RENESAS
-> >  	help
-> >  	  This enables support for the ARMv8 based Renesas SoCs.
-> >  
-> > -config ARCH_R8A774A1
-> > -	bool "Renesas RZ/G2M SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas RZ/G2M SoC.
-> > -
-> > -config ARCH_R8A774C0
-> > -	bool "Renesas RZ/G2E SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas RZ/G2E SoC.
-> > -
-> > -config ARCH_R8A7795
-> > -	bool "Renesas R-Car H3 SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas R-Car H3 SoC.
-> > -
-> > -config ARCH_R8A7796
-> > -	bool "Renesas R-Car M3-W SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas R-Car M3-W SoC.
-> > -
-> > -config ARCH_R8A77965
-> > -	bool "Renesas R-Car M3-N SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas R-Car M3-N SoC.
-> > -
-> > -config ARCH_R8A77970
-> > -	bool "Renesas R-Car V3M SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas R-Car V3M SoC.
-> > -
-> > -config ARCH_R8A77980
-> > -	bool "Renesas R-Car V3H SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas R-Car V3H SoC.
-> > -
-> > -config ARCH_R8A77990
-> > -	bool "Renesas R-Car E3 SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas R-Car E3 SoC.
-> > -
-> > -config ARCH_R8A77995
-> > -	bool "Renesas R-Car D3 SoC Platform"
-> > -	depends on ARCH_RENESAS
-> > -	help
-> > -	  This enables support for the Renesas R-Car D3 SoC.
-> > -
-> >  config ARCH_ROCKCHIP
-> >  	bool "Rockchip Platforms"
-> >  	select ARCH_HAS_RESET_CONTROLLER
-> > diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
-> > index 407f02c80e8b721c..0ab62024fd20be56 100644
-> > --- a/drivers/soc/renesas/Kconfig
-> > +++ b/drivers/soc/renesas/Kconfig
-> > @@ -3,30 +3,85 @@ config SOC_RENESAS
-> >  	bool "Renesas SoC driver support" if COMPILE_TEST && !ARCH_RENESAS
-> >  	default y if ARCH_RENESAS
-> >  	select SOC_BUS
-> > -	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2 || \
-> > -			   ARCH_R8A774A1 || ARCH_R8A774C0 || ARCH_R8A7795 || \
-> > -			   ARCH_R8A7796 || ARCH_R8A77965 || ARCH_R8A77970 || \
-> > -			   ARCH_R8A77980 || ARCH_R8A77990 || ARCH_R8A77995
-> > +	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2
-> >  	select SYSC_R8A7743 if ARCH_R8A7743 || ARCH_R8A7744
-> >  	select SYSC_R8A7745 if ARCH_R8A7745
-> >  	select SYSC_R8A77470 if ARCH_R8A77470
-> > -	select SYSC_R8A774A1 if ARCH_R8A774A1
-> > -	select SYSC_R8A774C0 if ARCH_R8A774C0
-> >  	select SYSC_R8A7779 if ARCH_R8A7779
-> >  	select SYSC_R8A7790 if ARCH_R8A7790
-> >  	select SYSC_R8A7791 if ARCH_R8A7791 || ARCH_R8A7793
-> >  	select SYSC_R8A7792 if ARCH_R8A7792
-> >  	select SYSC_R8A7794 if ARCH_R8A7794
-> > -	select SYSC_R8A7795 if ARCH_R8A7795
-> > -	select SYSC_R8A7796 if ARCH_R8A7796
-> > -	select SYSC_R8A77965 if ARCH_R8A77965
-> > -	select SYSC_R8A77970 if ARCH_R8A77970
-> > -	select SYSC_R8A77980 if ARCH_R8A77980
-> > -	select SYSC_R8A77990 if ARCH_R8A77990
-> > -	select SYSC_R8A77995 if ARCH_R8A77995
-> >  
-> >  if SOC_RENESAS
-> >  
-> > +if ARM64
-> > +
-> > +config ARCH_R8A774A1
-> > +	bool "Renesas RZ/G2M SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A774A1
-> > +	help
-> > +	  This enables support for the Renesas RZ/G2M SoC.
-> > +
-> > +config ARCH_R8A774C0
-> > +	bool "Renesas RZ/G2E SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A774C0
-> > +	help
-> > +	  This enables support for the Renesas RZ/G2E SoC.
-> > +
-> > +config ARCH_R8A7795
-> > +	bool "Renesas R-Car H3 SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A7795
-> > +	help
-> > +	  This enables support for the Renesas R-Car H3 SoC.
-> > +
-> > +config ARCH_R8A7796
-> > +	bool "Renesas R-Car M3-W SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A7796
-> > +	help
-> > +	  This enables support for the Renesas R-Car M3-W SoC.
-> > +
-> > +config ARCH_R8A77965
-> > +	bool "Renesas R-Car M3-N SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A77965
-> > +	help
-> > +	  This enables support for the Renesas R-Car M3-N SoC.
-> > +
-> > +config ARCH_R8A77970
-> > +	bool "Renesas R-Car V3M SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A77970
-> > +	help
-> > +	  This enables support for the Renesas R-Car V3M SoC.
-> > +
-> > +config ARCH_R8A77980
-> > +	bool "Renesas R-Car V3H SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A77980
-> > +	help
-> > +	  This enables support for the Renesas R-Car V3H SoC.
-> > +
-> > +config ARCH_R8A77990
-> > +	bool "Renesas R-Car E3 SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A77990
-> > +	help
-> > +	  This enables support for the Renesas R-Car E3 SoC.
-> > +
-> > +config ARCH_R8A77995
-> > +	bool "Renesas R-Car D3 SoC Platform"
-> > +	select RST_RCAR
-> > +	select SYSC_R8A77995
-> > +	help
-> > +	  This enables support for the Renesas R-Car D3 SoC.
-> > +
-> > +endif # ARM64
-> > +
-> >  # SoC
-> >  config SYSC_R8A7743
-> >  	bool "RZ/G1M System Controller support" if COMPILE_TEST
-> > -- 
-> > 2.17.1
-> > 
-> 
+v2:
+- convert Exynos code to not require <plat/pm-common.h> header
+
+Should by applied on top of "[PATCH] ARM: EXYNOS: remove no longer
+needed s3c_pm_check_*() calls".
+
+ arch/arm/mach-exynos/suspend.c |   14 ++++----------
+ arch/arm/plat-samsung/Kconfig  |    1 +
+ 2 files changed, 5 insertions(+), 10 deletions(-)
+
+Index: b/arch/arm/mach-exynos/suspend.c
+===================================================================
+--- a/arch/arm/mach-exynos/suspend.c	2018-10-15 17:39:54.628412461 +0200
++++ b/arch/arm/mach-exynos/suspend.c	2018-10-15 17:39:54.624412461 +0200
+@@ -30,8 +30,6 @@
+ #include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+ 
+-#include <plat/pm-common.h>
+-
+ #include "common.h"
+ 
+ #define REG_TABLE_END (-1U)
+@@ -490,11 +488,9 @@ static int exynos_suspend_enter(suspend_
+ {
+ 	int ret;
+ 
+-	s3c_pm_debug_init();
+-
+-	S3C_PMDBG("%s: suspending the system...\n", __func__);
++	pr_debug("%s: suspending the system...\n", __func__);
+ 
+-	S3C_PMDBG("%s: wakeup masks: %08x,%08x\n", __func__,
++	pr_debug("%s: wakeup masks: %08x,%08x\n", __func__,
+ 			exynos_irqwake_intmask, exynos_get_eint_wake_mask());
+ 
+ 	if (exynos_irqwake_intmask == -1U
+@@ -504,7 +500,6 @@ static int exynos_suspend_enter(suspend_
+ 		return -EINVAL;
+ 	}
+ 
+-	s3c_pm_save_uarts();
+ 	if (pm_data->pm_prepare)
+ 		pm_data->pm_prepare();
+ 	flush_cache_all();
+@@ -517,12 +512,11 @@ static int exynos_suspend_enter(suspend_
+ 
+ 	if (pm_data->pm_resume_prepare)
+ 		pm_data->pm_resume_prepare();
+-	s3c_pm_restore_uarts();
+ 
+-	S3C_PMDBG("%s: wakeup stat: %08x\n", __func__,
++	pr_debug("%s: wakeup stat: %08x\n", __func__,
+ 			pmu_raw_readl(S5P_WAKEUP_STAT));
+ 
+-	S3C_PMDBG("%s: resuming the system...\n", __func__);
++	pr_debug("%s: resuming the system...\n", __func__);
+ 
+ 	return 0;
+ }
+Index: b/arch/arm/plat-samsung/Kconfig
+===================================================================
+--- a/arch/arm/plat-samsung/Kconfig	2018-10-15 17:39:54.628412461 +0200
++++ b/arch/arm/plat-samsung/Kconfig	2018-10-15 17:40:35.416413489 +0200
+@@ -239,6 +239,7 @@ comment "Power management"
+ config SAMSUNG_PM_DEBUG
+ 	bool "Samsung PM Suspend debug"
+ 	depends on PM && DEBUG_KERNEL
++	depends on PLAT_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210
+ 	depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
+ 	help
+ 	  Say Y here if you want verbose debugging from the PM Suspend and
