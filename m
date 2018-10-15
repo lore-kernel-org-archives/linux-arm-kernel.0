@@ -1,24 +1,107 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 15 Oct 2018 10:17:10 -0500
-Subject: [PATCH 2/5] dt-bindings: display: renesas: du: Document the
- r8a7744 bindings
-In-Reply-To: <1537553311-8831-3-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1537553311-8831-3-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20181015151710.GA23648@bogus>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 15 Oct 2018 17:22:37 +0200
+Subject: [PATCH v2] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
+ non-Exynos platforms
+In-Reply-To: <20181015135055eucas1p2fdb917790b3690dd52ee7b9aa19ea677~dzHYfFW2j0676906769eucas1p2c@eucas1p2.samsung.com>
+References: <CGME20181015135055eucas1p2fdb917790b3690dd52ee7b9aa19ea677@eucas1p2.samsung.com>
+ <20181015135055eucas1p2fdb917790b3690dd52ee7b9aa19ea677~dzHYfFW2j0676906769eucas1p2c@eucas1p2.samsung.com>
+Message-ID: <CAJKOXPdR0q_2DGbMrroqNcVfCPSkh0=ry=yyb9qmSDFf+TWbFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Sep 2018 19:08:28 +0100, Fabrizio Castro wrote:
-> From: Biju Das <biju.das@bp.renesas.com>
-> 
-> Document the RZ/G1N (R8A7744) SoC in the R-Car DU bindings.
-> 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On Mon, 15 Oct 2018 at 15:50, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> "Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
+> config option) is not working properly (debug messages are not
+> displayed after resume) on Exynos platforms because GPIOs restore
+> code is not implemented.
+>
+> Add PLAT_S3C24XX, ARCH_S3C64XX and ARCH_S5PV210 dependencies to
+> SAMSUNG_PM_DEBUG config option to hide it on Exynos platforms.
+> Then convert Exynos code to not require <plat/pm-common.h>
+> header (use pr_debug() directly instead of S3C_PMDBG() macro and
+> remove redundant s3c_pm_*() calls).
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > ---
->  Documentation/devicetree/bindings/display/renesas,du.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
+> v2:
+> - convert Exynos code to not require <plat/pm-common.h> header
+>
+> Should by applied on top of "[PATCH] ARM: EXYNOS: remove no longer
+> needed s3c_pm_check_*() calls".
+>
+>  arch/arm/mach-exynos/suspend.c |   14 ++++----------
+>  arch/arm/plat-samsung/Kconfig  |    3 ++-
+>  2 files changed, 6 insertions(+), 11 deletions(-)
+>
+> Index: b/arch/arm/mach-exynos/suspend.c
+> ===================================================================
+> --- a/arch/arm/mach-exynos/suspend.c    2018-10-15 15:11:15.296187842 +0200
+> +++ b/arch/arm/mach-exynos/suspend.c    2018-10-15 15:22:54.656205454 +0200
+> @@ -30,8 +30,6 @@
+>  #include <asm/smp_scu.h>
+>  #include <asm/suspend.h>
+>
+> -#include <plat/pm-common.h>
+> -
+>  #include "common.h"
+>
+>  #define REG_TABLE_END (-1U)
+> @@ -490,11 +488,9 @@ static int exynos_suspend_enter(suspend_
+>  {
+>         int ret;
+>
+> -       s3c_pm_debug_init();
+> -
+> -       S3C_PMDBG("%s: suspending the system...\n", __func__);
+> +       pr_debug("%s: suspending the system...\n", __func__);
+>
+> -       S3C_PMDBG("%s: wakeup masks: %08x,%08x\n", __func__,
+> +       pr_debug("%s: wakeup masks: %08x,%08x\n", __func__,
+>                         exynos_irqwake_intmask, exynos_get_eint_wake_mask());
+>
+>         if (exynos_irqwake_intmask == -1U
+> @@ -504,7 +500,6 @@ static int exynos_suspend_enter(suspend_
+>                 return -EINVAL;
+>         }
+>
+> -       s3c_pm_save_uarts();
+>         if (pm_data->pm_prepare)
+>                 pm_data->pm_prepare();
+>         flush_cache_all();
+> @@ -517,12 +512,11 @@ static int exynos_suspend_enter(suspend_
+>
+>         if (pm_data->pm_resume_prepare)
+>                 pm_data->pm_resume_prepare();
+> -       s3c_pm_restore_uarts();
+>
+> -       S3C_PMDBG("%s: wakeup stat: %08x\n", __func__,
+> +       pr_debug("%s: wakeup stat: %08x\n", __func__,
+>                         pmu_raw_readl(S5P_WAKEUP_STAT));
+>
+> -       S3C_PMDBG("%s: resuming the system...\n", __func__);
+> +       pr_debug("%s: resuming the system...\n", __func__);
+>
+>         return 0;
+>  }
+> Index: b/arch/arm/plat-samsung/Kconfig
+> ===================================================================
+> --- a/arch/arm/plat-samsung/Kconfig     2018-10-15 15:16:22.804195586 +0200
+> +++ b/arch/arm/plat-samsung/Kconfig     2018-10-15 15:16:22.800195586 +0200
+> @@ -238,7 +238,8 @@ comment "Power management"
+>
+>  config SAMSUNG_PM_DEBUG
+>         bool "Samsung PM Suspend debug"
+> -       depends on PM && DEBUG_KERNEL
+> +       depends on DEBUG_KERNEL
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+I don't get this change - why moving PM to line below?
+
+Best regards,
+Krzysztof
+
+> +       depends on PM && (PLAT_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210)
+>         depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
+>         help
+>           Say Y here if you want verbose debugging from the PM Suspend and
