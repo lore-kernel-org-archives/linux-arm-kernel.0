@@ -1,98 +1,62 @@
-From: beagleboard@davidjohnsummers.uk (David Summers)
-Date: Mon, 15 Oct 2018 17:49:41 +0100
-Subject: [PATCH 1/3] Add the tinker board S to the device tree - just an
- outline
-In-Reply-To: <20181015161214.GA13740@bogus>
-References: <20180922170236.8690-1-beagleboard@davidjohnsummers.uk>
- <20180922170236.8690-2-beagleboard@davidjohnsummers.uk>
- <20181015161214.GA13740@bogus>
-Message-ID: <93fc3eda-19b2-2b90-ccc8-4743200bf1b1@davidjohnsummers.uk>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 15 Oct 2018 10:01:01 -0700
+Subject: [PATCH 2/3] clk: imx6q: optionally get CCM inputs via standard
+ clock handles
+In-Reply-To: <AM0PR04MB4211DE29E5644C8C9A33278780310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20180731102009.6710-1-l.stach@pengutronix.de>
+ <20180731102009.6710-2-l.stach@pengutronix.de>
+ <AM0PR04MB4211DE29E5644C8C9A33278780310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <153962286120.5275.13550019093922282541@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/2018 17:12, Rob Herring wrote:
-> On Sat, Sep 22, 2018 at 06:02:34PM +0100, David Summers wrote:
->
-> Commit message needed.
->
-> Use subject prefixes that match the subsystem. 'dt-bindings: ...' for
-> binding docs. 'ARM: dts: ...' for ARM dts files.
->
->> Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
->> ---
->>   .../devicetree/bindings/arm/rockchip.txt      |   4 +
-> Bindings should be a separate patch.
->
->>   arch/arm/boot/dts/Makefile                    |   1 +
->>   arch/arm/boot/dts/rk3288-tinker-s.dts         |  13 +
->>   arch/arm/boot/dts/rk3288-tinker.dts           | 498 +----------------
->>   arch/arm/boot/dts/rk3288-tinker.dtsi          | 504 ++++++++++++++++++
->>   5 files changed, 524 insertions(+), 496 deletions(-)
->>   create mode 100644 arch/arm/boot/dts/rk3288-tinker-s.dts
->>   create mode 100644 arch/arm/boot/dts/rk3288-tinker.dtsi
-> Would be better to split the dts changes into 2 patches: restructuring
-> and add Tinker S board. Then we're not re-reviewing the existing stuff.
->
->> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
->> index acfd3c773dd0..037ce94c3a73 100644
->> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
->> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
->> @@ -13,6 +13,10 @@ Rockchip platforms device tree bindings
->>       Required root node properties:
->>         - compatible = "asus,rk3288-tinker", "rockchip,rk3288";
->>   
->> +- Asus Tinker board S
->> +    Required root node properties:
->> +      - compatible = "asus,rk3288-tinker-s", "rockchip,rk3288";
->> +
->>   - Kylin RK3036 board:
->>       Required root node properties:
->>         - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index b5bd3de87c33..65c75265adfa 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -864,6 +864,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->>   	rk3288-r89.dtb \
->>   	rk3288-rock2-square.dtb \
->>   	rk3288-tinker.dtb \
->> +	rk3288-tinker-s.dtb \	
->>   	rk3288-veyron-brain.dtb \
->>   	rk3288-veyron-jaq.dtb \
->>   	rk3288-veyron-jerry.dtb \
->> diff --git a/arch/arm/boot/dts/rk3288-tinker-s.dts b/arch/arm/boot/dts/rk3288-tinker-s.dts
->> new file mode 100644
->> index 000000000000..5e1078c6a784
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/rk3288-tinker-s.dts
->> @@ -0,0 +1,13 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "rk3288-tinker.dtsi"
->> +
->> +/ {
->> +	model = "Rockchip RK3288 Asus Tinker Board S";
->> +	compatible = "asus,rk3288-tinker-s", "rockchip,rk3288";
-> Perhaps you should have 'asus,rk3288-tinker' as a fallback?
->
->> +};
+Quoting A.s. Dong (2018-08-21 01:56:09)
+> Hi Lucas,
+> 
+> > -----Original Message-----
+> > From: Lucas Stach <l.stach@pengutronix.de>
+> > Sent: Tuesday, July 31, 2018 6:20 PM
+> 
+> [...]
+> 
+> > When specifying external clock inputs to the CCM the current code requires
+> > the clocks to be in a "clocks" child node of the DT root.
+> > This is not really conformant with DT best practices.
+> > 
+> > To avoid the need to deviate from those best practices, allow the clock inputs
+> > to be specifies via standard clock handles. This is in line with how drivers of
+> > the later CCM driver revisions on newer i.MX SoCs handle this.
+> > 
+> > As we can't retroactively change the DT binding, allow this as an option with a
+> > fallback to the old way of how this has been handled.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  .../devicetree/bindings/clock/imx6q-clock.txt |  5 +++++
+> >  drivers/clk/imx/clk-imx6q.c                   | 22 ++++++++++++++-----
+> >  2 files changed, 22 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> > b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> > index a45ca67a9d5f..ce6aa9920c05 100644
+> > --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> > +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> > @@ -6,6 +6,11 @@ Required properties:
+> >  - interrupts: Should contain CCM interrupt
+> >  - #clock-cells: Should be <1>
+> > 
+> > +Optional properties:
+> > +- clocks: list of clock specifiers, must contain an entry for each entry
+> > +          in clock-names
+> > +- clock-names: valid names are "osc", "ckil", "ckil", "anaclk1" and "anaclk2"
+> 
+> A minor issue: 
+> The third name should be "ckih1".
+> 
+> Otherwise:
+> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
 
-Hi Rob,
-
-Heiko already had many of the same thoughts, he respan the patch here:
-
-http://lists.infradead.org/pipermail/linux-rockchip/2018-September/021766.html
-
-Which you already reviewed ;)
-
-This was my first attempt at a kernel patch, so your thoughts are 
-appreciated.
-
-David.
-
-P.S. Heiko revised patch accepted into 4.20.
+Is this going to be resent? I don't see anything new and there are
+review comments on this patch series so I'm dropping it from the clk
+review queue. Please resend.
