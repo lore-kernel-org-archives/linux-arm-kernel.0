@@ -1,63 +1,48 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 15 Oct 2018 13:44:46 +0800
-Subject: [PATCH v7 8/9] PCI: mediatek: Save the GIC IRQ in mtk_pcie_port
+Date: Mon, 15 Oct 2018 13:44:44 +0800
+Subject: [PATCH v7 6/9] PCI: mediatek: Fixup enable MSI logic by enable MSI
+ after clock enabled
 In-Reply-To: <1539582287-9171-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1539582287-9171-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539582287-9171-9-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1539582287-9171-7-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Need to save the PCIe's GIC IRQ for dispose_irq, this is a prepare
-patch for add mediatek PCIe module support to tear down the IRQ, no
-functional changed.
+The commit 43e6409db64d ("PCI: mediatek: Add MSI support for MT2712 and
+MT7622") added MSI support but enable MSI in wrong place, clocks was not
+enabled when enable MSI. This patch fix this issue by calling
+mtk_pcie_enable_msi in mtk_pcie_startup_port_v2 since the clock was all
+enabled at that time.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/pci/controller/pcie-mediatek.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 42cf2a4..daba78f 100644
+index 654a63e..d3f4694 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -162,6 +162,7 @@ struct mtk_pcie_soc {
-  * @phy: pointer to PHY control block
-  * @lane: lane count
-  * @slot: port slot
-+ * @irq: GIC irq
-  * @irq_domain: legacy INTx IRQ domain
-  * @inner_domain: inner IRQ domain
-  * @msi_domain: MSI IRQ domain
-@@ -182,6 +183,7 @@ struct mtk_pcie_port {
- 	struct phy *phy;
- 	u32 lane;
- 	u32 slot;
-+	int irq;
- 	struct irq_domain *irq_domain;
- 	struct irq_domain *inner_domain;
- 	struct irq_domain *msi_domain;
-@@ -620,7 +622,7 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
- 	struct mtk_pcie *pcie = port->pcie;
- 	struct device *dev = pcie->dev;
- 	struct platform_device *pdev = to_platform_device(dev);
--	int err, irq;
-+	int err;
- 
- 	err = mtk_pcie_init_irq_domain(port, node);
- 	if (err) {
-@@ -628,8 +630,9 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
- 		return err;
+@@ -568,8 +568,6 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
+ 		ret = mtk_pcie_allocate_msi_domains(port);
+ 		if (ret)
+ 			return ret;
+-
+-		mtk_pcie_enable_msi(port);
  	}
  
--	irq = platform_get_irq(pdev, port->slot);
--	irq_set_chained_handler_and_data(irq, mtk_pcie_intr_handler, port);
-+	port->irq = platform_get_irq(pdev, port->slot);
-+	irq_set_chained_handler_and_data(port->irq,
-+					 mtk_pcie_intr_handler, port);
- 
  	return 0;
- }
+@@ -690,6 +688,9 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ 	val &= ~INTX_MASK;
+ 	writel(val, port->base + PCIE_INT_MASK);
+ 
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		mtk_pcie_enable_msi(port);
++
+ 	/* Set AHB to PCIe translation windows */
+ 	size = mem->end - mem->start;
+ 	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
 -- 
 2.6.4
