@@ -1,53 +1,85 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 15 Oct 2018 09:48:33 -0700
-Subject: [PATCH v4 5/6] arm64: dts: add QorIQ LX2160A SoC support
-In-Reply-To: <VI1PR04MB4800C0AB214B258793AF9ABAF3FD0@VI1PR04MB4800.eurprd04.prod.outlook.com>
-References: <1538615031-7507-1-git-send-email-vabhav.sharma@nxp.com>
- <1538615031-7507-6-git-send-email-vabhav.sharma@nxp.com>
- <20181008054510.GG3587@dragon>
- <VI1PR04MB4800C0AB214B258793AF9ABAF3FD0@VI1PR04MB4800.eurprd04.prod.outlook.com>
-Message-ID: <153962211360.5275.18031876744546062419@swboyd.mtv.corp.google.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 15 Oct 2018 18:49:13 +0200
+Subject: [PATCH v6 17/18] mm/memory-failure: increase queued recovery
+ work's priority
+In-Reply-To: <20180921221705.6478-18-james.morse@arm.com>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-18-james.morse@arm.com>
+Message-ID: <20181015164913.GE11434@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Vabhav Sharma (2018-10-14 19:58:15)
-> > > +
-> > > +   pmu {
-> > > +           compatible = "arm,cortex-a72-pmu";
-> > > +           interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
-> > > +   };
-> > > +
-> > > +   psci {
-> > > +           compatible = "arm,psci-0.2";
-> > > +           method = "smc";
-> > > +   };
-> > > +
-> > > +   memory at 80000000 {
-> > > +           // DRAM space - 1, size : 2 GB DRAM
-> > > +           device_type = "memory";
-> > > +           reg = <0x00000000 0x80000000 0 0x80000000>;
-> > > +   };
-> > > +
-> > > +   ddr1: memory-controller at 1080000 {
-> > > +           compatible = "fsl,qoriq-memory-controller";
-> > > +           reg = <0x0 0x1080000 0x0 0x1000>;
-> > > +           interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> > > +           little-endian;
-> > > +   };
-> > > +
-> > > +   ddr2: memory-controller at 1090000 {
-> > > +           compatible = "fsl,qoriq-memory-controller";
-> > > +           reg = <0x0 0x1090000 0x0 0x1000>;
-> > > +           interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-> > > +           little-endian;
-> > > +   };
-> > > +
-> > > +   sysclk: sysclk {
-> > 
-> > Name the node a bit generic like clock-xxx.
-> There is only one clock-unit, Bootloader(U-boot) require sysclk node during device tree fix-up as different platform support varied platform frequency as per reset configuration word used.
-> Referred other ARM based platform with one clock using name as x: x
++ Peter.
 
-Please add a comment above this node with this information. Newcomers
-reading this DTS file won't have any idea why this node is specially
-named and a comment will help tremendously here.
+On Fri, Sep 21, 2018 at 11:17:04PM +0100, James Morse wrote:
+> arm64 can take an NMI-like error notification when user-space steps in
+> some corrupt memory. APEI's GHES code will call memory_failure_queue()
+> to schedule the recovery work. We then return to user-space, possibly
+> taking the fault again.
+> 
+> Currently the arch code unconditionally signals user-space from this
+> path, so we don't get stuck in this loop, but the affected process
+> never benefits from memory_failure()s recovery work. To fix this we
+> need to know the recovery work will run before we get back to user-space.
+> 
+> Increase the priority of the recovery work by scheduling it on the
+> system_highpri_wq, then try to bump the current task off this CPU
+> so that the recovery work starts immediately.
+> 
+> Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Tested-by: gengdongjiu <gengdongjiu@huawei.com>
+> CC: Xie XiuQi <xiexiuqi@huawei.com>
+> CC: gengdongjiu <gengdongjiu@huawei.com>
+> ---
+>  mm/memory-failure.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+> 
+> diff --git a/mm/memory-failure.c b/mm/memory-failure.c
+> index 0cd3de3550f0..4e7b115cea5a 100644
+> --- a/mm/memory-failure.c
+> +++ b/mm/memory-failure.c
+> @@ -56,6 +56,7 @@
+>  #include <linux/memory_hotplug.h>
+>  #include <linux/mm_inline.h>
+>  #include <linux/memremap.h>
+> +#include <linux/preempt.h>
+>  #include <linux/kfifo.h>
+>  #include <linux/ratelimit.h>
+>  #include <linux/page-isolation.h>
+> @@ -1454,6 +1455,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu, memory_failure_cpu);
+>   */
+>  void memory_failure_queue(unsigned long pfn, int flags)
+>  {
+> +	int cpu = smp_processor_id();
+>  	struct memory_failure_cpu *mf_cpu;
+>  	unsigned long proc_flags;
+>  	struct memory_failure_entry entry = {
+> @@ -1463,11 +1465,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
+>  
+>  	mf_cpu = &get_cpu_var(memory_failure_cpu);
+>  	spin_lock_irqsave(&mf_cpu->lock, proc_flags);
+> -	if (kfifo_put(&mf_cpu->fifo, entry))
+> -		schedule_work_on(smp_processor_id(), &mf_cpu->work);
+> -	else
+> +	if (kfifo_put(&mf_cpu->fifo, entry)) {
+> +		queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
+> +		set_tsk_need_resched(current);
+> +		preempt_set_need_resched();
+
+What guarantees the workqueue would run before the process? I see this:
+
+``WQ_HIGHPRI``
+  Work items of a highpri wq are queued to the highpri
+  worker-pool of the target cpu.  Highpri worker-pools are
+  served by worker threads with elevated nice level.
+
+but is that enough?
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
