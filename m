@@ -1,64 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Oct 2018 18:21:46 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
- corruption on Hi16xx soc
-In-Reply-To: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20181015172146.GD31305@brain-police>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Mon, 15 Oct 2018 10:39:29 -0700 (PDT)
+Subject: [PATCH 5/5] RISC-V: Implement sparsemem
+In-Reply-To: <15C8B877-4BBE-47E1-98D1-945E9355E757@raithlin.com>
+Message-ID: <mhng-d8f1905a-8985-4797-b05b-b165b4ce91f1@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 04:36:16PM +0800, Zhen Lei wrote:
-> ITS translation register map:
-> 0x0000-0x003C	Reserved
-> 0x0040		GITS_TRANSLATER
-> 0x0044-0xFFFC	Reserved
+On Thu, 11 Oct 2018 05:18:20 PDT (-0700), sbates at raithlin.com wrote:
+> Palmer
 > 
-> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
-> expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
-> data will be written to MSIAddress each time.
+>> I don't really know anything about this, but you're welcome to add a
+>>    
+>>    Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
 > 
-> MSIAddr: |----4bytes----|----4bytes----|
-> 	 |    MSIData   |    IMPDEF    |
+> Thanks. I think it would be good to get someone who's familiar with linux/mm to take a look.
+>     
+>> if you think it'll help.  I'm assuming you're targeting a different tree for 
+>> the patch set, in which case it's probably best to keep this together with the 
+>> rest of it.
 > 
-> There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
-> But it will overwrite the 4 bytes memory following "sync_count". It's very
-> luckly that the previous and the next neighbour of "sync_count" are both aligned
-> by 8 bytes, so no problem is met now.
+> No I think this series should be pulled by the RISC-V maintainer. The other patches in this series just refactor some code and need to be ACK'ed by their ARCH developers but I suspect the series should be pulled into RISC-V. That said since it does touch other arch should it be pulled by mm? 
 > 
-> It's good to explicitly add a workaround:
-> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
->    aligned by 8 bytes.
-> 2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
-> 
-> There is no functional change.
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 5059d09..a07bc0d 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -586,7 +586,10 @@ struct arm_smmu_device {
->  
->  	struct arm_smmu_strtab_cfg	strtab_cfg;
->  
-> +	union {
-> +	u64				padding; /* workaround for Hisilicon */
->  	u32				sync_count;
-> +	} __attribute__((aligned(8)));
+> BTW note that RISC-V SPARSEMEM support is pretty useful for all manner of things and not just the p2pdma discussed in the cover.
 
-Won't this already be aligned by the ABI?
+Ah, OK -- I thought this was adding the support everywhere.  Do you mind 
+re-sending the patches with the various acks/reviews and I'll put in on 
+for-next?
 
-Anyway, you'll need to swizzle things for big-endian, I suspect. Maybe you
-can do something clever like making sync_count an array of two elements
-and determining the offset based on the endianness. Or just keep it simple
-like we do for things like struct qrwlock and struct qspinlock and use
-#ifdefs.
-
-Also -- you need a comment to explain this insanity :)
-
-Will
+>     
+>> Thanks for porting your stuff to RISC-V!
+> 
+> You bet ;-)
