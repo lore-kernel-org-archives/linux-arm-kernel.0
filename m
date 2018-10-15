@@ -1,49 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 16 Oct 2018 00:16:29 +0200
-Subject: [PATCH 1/2] ARM: copypage-fa: add kto and kfrom to input operands list
-Message-ID: <20181015221629.13924-1-stefan@agner.ch>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 Oct 2018 01:16:42 +0300
+Subject: [PATCH 1/5] dt-bindings: display: renesas: du: Document the
+ r8a77470 bindings
+In-Reply-To: <1537553311-8831-2-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1537553311-8831-2-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <21387491.YtWCBA7EHF@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When functions incoming parameters are not in input operands list gcc
-4.5 does not load the parameters into registers before calling this
-function but the inline assembly assumes valid addresses inside this
-function. This breaks the code because r0 and r1 are invalid when
-execution enters v4wb_copy_user_page ()
+Hi Fabrizio,
 
-Also the constant needs to be used as third input operand so account
-for that as well.
+Thank you for the patch.
 
-This fixes copypage-fa.c what has previously done before for the other
-copypage implementations in commit 9a40ac86152c ("ARM: 6164/1: Add kto
-and kfrom to input operands list.").
+On Friday, 21 September 2018 21:08:27 EEST Fabrizio Castro wrote:
+> Document the RZ/G1C (r8a77470) SoC in R-Car DU bindings.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/mm/copypage-fa.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-diff --git a/arch/arm/mm/copypage-fa.c b/arch/arm/mm/copypage-fa.c
-index d130a5ece5d5..ec6501308c60 100644
---- a/arch/arm/mm/copypage-fa.c
-+++ b/arch/arm/mm/copypage-fa.c
-@@ -22,7 +22,7 @@ fa_copy_user_page(void *kto, const void *kfrom)
- {
- 	asm("\
- 	stmfd	sp!, {r4, lr}			@ 2\n\
--	mov	r2, %0				@ 1\n\
-+	mov	r2, %2				@ 1\n\
- 1:	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
- 	stmia	r0, {r3, r4, ip, lr}		@ 4\n\
- 	mcr	p15, 0, r0, c7, c14, 1		@ 1   clean and invalidate D line\n\
-@@ -36,7 +36,7 @@ fa_copy_user_page(void *kto, const void *kfrom)
- 	mcr	p15, 0, r2, c7, c10, 4		@ 1   drain WB\n\
- 	ldmfd	sp!, {r4, pc}			@ 3"
- 	:
--	: "I" (PAGE_SIZE / 32));
-+	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 32));
- }
- 
- void fa_copy_user_highpage(struct page *to, struct page *from,
+and taken in my tree.
+
+> ---
+>  Documentation/devicetree/bindings/display/renesas,du.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/renesas,du.txt
+> b/Documentation/devicetree/bindings/display/renesas,du.txt index
+> ec9d34be..2b28ae2 100644
+> --- a/Documentation/devicetree/bindings/display/renesas,du.txt
+> +++ b/Documentation/devicetree/bindings/display/renesas,du.txt
+> @@ -5,6 +5,7 @@ Required Properties:
+>    - compatible: must be one of the following.
+>      - "renesas,du-r8a7743" for R8A7743 (RZ/G1M) compatible DU
+>      - "renesas,du-r8a7745" for R8A7745 (RZ/G1E) compatible DU
+> +    - "renesas,du-r8a77470" for R8A77470 (RZ/G1C) compatible DU
+>      - "renesas,du-r8a7779" for R8A7779 (R-Car H1) compatible DU
+>      - "renesas,du-r8a7790" for R8A7790 (R-Car H2) compatible DU
+>      - "renesas,du-r8a7791" for R8A7791 (R-Car M2-W) compatible DU
+> @@ -51,6 +52,7 @@ corresponding to each DU output.
+>  ---------------------------------------------------------------------------
+> -- R8A7743 (RZ/G1M)       DPAD 0         LVDS 0         -              -
+> R8A7745 (RZ/G1E)       DPAD 0         DPAD 1         -              - +
+> R8A77470 (RZ/G1C)      DPAD 0         DPAD 1         LVDS 0         -
+> R8A7779 (R-Car H1)     DPAD 0         DPAD 1         -              -
+> R8A7790 (R-Car H2)     DPAD 0         LVDS 0         LVDS 1         -
+> R8A7791 (R-Car M2-W)   DPAD 0         LVDS 0         -              -
+
 -- 
-2.19.1
+Regards,
+
+Laurent Pinchart
