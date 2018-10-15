@@ -1,63 +1,53 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 15 Oct 2018 18:37:07 +0530
-Subject: [PATCH 05/19] PCI: keystone: Remove unused argument from
- ks_dw_pcie_host_init()
+Date: Mon, 15 Oct 2018 18:37:06 +0530
+Subject: [PATCH 04/19] PCI: keystone: Do not initiate link training multiple
+ times
 In-Reply-To: <20181015130721.5535-1-kishon@ti.com>
 References: <20181015130721.5535-1-kishon@ti.com>
-Message-ID: <20181015130721.5535-6-kishon@ti.com>
+Message-ID: <20181015130721.5535-5-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Remove unused "msi_intc_np" argument from
-ks_dw_pcie_host_init().
+commit 886bc5ceb5cc3ad4b219502d72 ("PCI: designware: Add generic
+dw_pcie_wait_for_link()") while adding a generic dw_pcie_wait_for_link()
+performed a special handling (initiate link training multiple times) for
+keystone which is not required. This also resulted in unncessarily waiting
+for more time to establish the link even when no PCI device is connected.
+
+Remove it and make it look similar to other dwc based PCIe drivers.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone-dw.c | 3 +--
- drivers/pci/controller/dwc/pci-keystone.c    | 2 +-
- drivers/pci/controller/dwc/pci-keystone.h    | 3 +--
- 3 files changed, 3 insertions(+), 5 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pci/controller/dwc/pci-keystone-dw.c b/drivers/pci/controller/dwc/pci-keystone-dw.c
-index 0682213328e9..4bd6c6e2b177 100644
---- a/drivers/pci/controller/dwc/pci-keystone-dw.c
-+++ b/drivers/pci/controller/dwc/pci-keystone-dw.c
-@@ -439,8 +439,7 @@ void ks_dw_pcie_initiate_link_train(struct keystone_pcie *ks_pcie)
-  * and call dw_pcie_v3_65_host_init() API to initialize the Keystone
-  * PCI host controller.
-  */
--int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
--				struct device_node *msi_intc_np)
-+int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie)
- {
- 	struct dw_pcie *pci = ks_pcie->pci;
- 	struct pcie_port *pp = &pci->pp;
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index aa7e706fc37d..f87ade2de711 100644
+index afb948372077..aa7e706fc37d 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -341,7 +341,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+@@ -87,19 +87,17 @@ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+ {
+ 	struct dw_pcie *pci = ks_pcie->pci;
+ 	struct device *dev = pci->dev;
+-	unsigned int retries;
+ 
+ 	if (dw_pcie_link_up(pci)) {
+ 		dev_info(dev, "Link already up\n");
+ 		return 0;
  	}
  
- 	pp->ops = &keystone_pcie_host_ops;
--	ret = ks_dw_pcie_host_init(ks_pcie, ks_pcie->msi_intc_np);
-+	ret = ks_dw_pcie_host_init(ks_pcie);
- 	if (ret) {
- 		dev_err(dev, "failed to initialize host\n");
- 		return ret;
-diff --git a/drivers/pci/controller/dwc/pci-keystone.h b/drivers/pci/controller/dwc/pci-keystone.h
-index 8a13da391543..4eacc263f157 100644
---- a/drivers/pci/controller/dwc/pci-keystone.h
-+++ b/drivers/pci/controller/dwc/pci-keystone.h
-@@ -41,8 +41,7 @@ void ks_dw_pcie_enable_legacy_irqs(struct keystone_pcie *ks_pcie);
- void ks_dw_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie, int offset);
- void ks_dw_pcie_enable_error_irq(struct keystone_pcie *ks_pcie);
- irqreturn_t ks_dw_pcie_handle_error_irq(struct keystone_pcie *ks_pcie);
--int  ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
--			struct device_node *msi_intc_np);
-+int  ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie);
- int ks_dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 		unsigned int devfn, int where, int size, u32 val);
- int ks_dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
++	ks_dw_pcie_initiate_link_train(ks_pcie);
++
+ 	/* check if the link is up or not */
+-	for (retries = 0; retries < 5; retries++) {
+-		ks_dw_pcie_initiate_link_train(ks_pcie);
+-		if (!dw_pcie_wait_for_link(pci))
+-			return 0;
+-	}
++	if (!dw_pcie_wait_for_link(pci))
++		return 0;
+ 
+ 	dev_err(dev, "phy link never came up\n");
+ 	return -ETIMEDOUT;
 -- 
 2.17.1
