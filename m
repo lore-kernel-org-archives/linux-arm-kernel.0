@@ -1,129 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 15 Oct 2018 11:53:42 +0200
-Subject: [PATCH V4 05/11] clk: imx: scu: add scu clock gate
-In-Reply-To: <AM0PR04MB4211129386C9088C6AFEDAF580FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-6-git-send-email-aisheng.dong@nxp.com>
- <20181015073207.66npcgegibl2rybb@pengutronix.de>
- <AM0PR04MB4211129386C9088C6AFEDAF580FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <20181015095342.kjokajxyugugbtcw@pengutronix.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 15 Oct 2018 11:59:20 +0200
+Subject: [PATCH 0/4] arm64: renesas: ebisu: Enable Audio
+Message-ID: <20181015095924.25794-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 09:17:14AM +0000, A.s. Dong wrote:
-> > -----Original Message-----
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > Sent: Monday, October 15, 2018 3:32 PM
-> > To: A.s. Dong <aisheng.dong@nxp.com>
-> > Cc: linux-clk at vger.kernel.org; sboyd at kernel.org; mturquette at baylibre.com;
-> > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> > <fabio.estevam@nxp.com>; shawnguo at kernel.org;
-> > linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH V4 05/11] clk: imx: scu: add scu clock gate
-> > 
-> > On Sun, Oct 14, 2018 at 08:07:56AM +0000, A.s. Dong wrote:
-> > > +/* Write to the LPCG bits. */
-> > > +static int clk_gate_scu_enable(struct clk_hw *hw) {
-> > > +	struct clk_gate_scu *gate = to_clk_gate_scu(hw);
-> > > +	u32 reg;
-> > > +
-> > > +	if (gate->reg) {
-> > > +		reg = readl(gate->reg);
-> > > +		reg &= ~(CLK_GATE_SCU_LPCG_MASK << gate->bit_idx);
-> > > +		if (gate->hw_gate)
-> > > +			reg |= (CLK_GATE_SCU_LPCG_HW_SEL |
-> > > +				CLK_GATE_SCU_LPCG_SW_SEL) << gate->bit_idx;
-> > > +		else
-> > > +			reg |= (CLK_GATE_SCU_LPCG_SW_SEL << gate->bit_idx);
-> > > +		writel(reg, gate->reg);
-> > > +	}
-> > 
-> > These register manipulations look like they need locking.
-> > 
-> 
-> Unlike the legacy MX6&7 SoCs, each clock has a separate LPCG register.
-> Do we still need locking?
+Hi,
 
-Let's take PWM_0_LPCG as an example:
+This series describes R-Car audio for the R-Car E3 (r8a77990) and
+enables it on the Ebisu board which uses that SoC. It also enables the
+scu-simple-card driver in the relevant defconfigs, a dependency for
+enabling audio on the Ebisu board.
 
-+       clks[IMX8QXP_LSIO_PWM0_IPG_S_CLK]       = imx_clk_gate_scu("pwm_0_ipg_s_clk", "pwm_0_div", IMX_SC_R_PWM_0, IMX_SC_PM_CLK_PER, (void __iomem *)(PWM_0_LPCG), 0x10, 0);
-+       clks[IMX8QXP_LSIO_PWM0_IPG_SLV_CLK]     = imx_clk_gate_scu("pwm_0_ipg_slv_clk", "pwm_0_ipg_s_clk", IMX_SC_R_PWM_0, IMX_SC_PM_CLK_PER, (void __iomem *)(PWM_0_LPCG), 0x14, 0);
-+       clks[IMX8QXP_LSIO_PWM0_IPG_MSTR_CLK]    = imx_clk_gate2_scu("pwm_0_ipg_mstr_clk", "lsio_bus_clk_root", (void __iomem *)(PWM_0_LPCG), 0x18, 0);
-+       clks[IMX8QXP_LSIO_PWM0_HF_CLK]          = imx_clk_gate_scu("pwm_0_hf_clk", "pwm_0_ipg_slv_clk", IMX_SC_R_PWM_0, IMX_SC_PM_CLK_PER, (void __iomem *)(PWM_0_LPCG), 4, 0);
-+       clks[IMX8QXP_LSIO_PWM0_CLK]             = imx_clk_gate_scu("pwm_0_clk", "pwm_0_ipg_slv_clk", IMX_SC_R_PWM_0, IMX_SC_PM_CLK_PER, (void __iomem *)(PWM_0_LPCG), 0, 0);
+Other dependencies. It is safe to apply this series without them present:
+* "[PATCH 0/2] sh-pfc: r8a77990: Add Audio clock and SSI pins, groups and functions"
+  Required for audio be initialised at boot.
 
-This register is used in five different clocks.
+* "[PATCH] iommu/ipmmu-vmsa: Hook up r8a77990 DT matching code"
+  Required for Audio DMA. Without this patch present audio will
+  fall back to using PIO. Alternatively, the iommus properties
+  may be removed from audma0, which is added to DT of
+  patch 3 of this series.
 
-> 
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +struct clk_hw *clk_register_gate_scu(const char *name, const char
-> > *parent_name,
-> > > +				     unsigned long flags, u32 rsrc_id,
-> > > +				     u8 clk_type, void __iomem *reg,
-> > > +				     u8 bit_idx, bool hw_gate)
-> > > +{
-> > > +	struct clk_gate_scu *gate;
-> > > +	struct clk_init_data init;
-> > > +	struct clk_hw *hw;
-> > > +	int ret;
-> > > +
-> > > +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> > > +	if (!gate)
-> > > +		return ERR_PTR(-ENOMEM);
-> > > +
-> > > +	gate->rsrc_id = rsrc_id;
-> > > +	gate->clk_type = clk_type;
-> > > +	if (reg) {
-> > > +		gate->reg = ioremap((phys_addr_t)reg, SZ_64K);
-> > 
-> > ioremap never takes a void __iomem * as argument. Given that you have to
-> > cast it here to another type and to void __iomem * when calling this function
-> > is a clear sign that the type of this variable is poorly chosen.
-> > 
-> 
-> Good catch. I missed it.
-> Thanks for pointing it out.
-> Looks like I should use struct phy_addr_t for it by default.
-> 
-> > > +		if (!gate->reg) {
-> > > +			kfree(gate);
-> > > +			return ERR_PTR(-ENOMEM);
-> > > +		}
-> > > +	}
-> > > +
-> > > +	gate->bit_idx = bit_idx;
-> > > +	gate->hw_gate = hw_gate;
-> > > +
-> > > +	init.name = name;
-> > > +	init.ops = &clk_gate_scu_ops;
-> > > +	init.flags = flags;
-> > > +	init.parent_names = parent_name ? &parent_name : NULL;
-> > > +	init.num_parents = parent_name ? 1 : 0;
-> > > +
-> > > +	gate->hw.init = &init;
-> > > +
-> > > +	hw = &gate->hw;
-> > > +	ret = clk_hw_register(NULL, hw);
-> > > +	if (ret) {
-> > > +		iounmap(gate->reg);
-> > 
-> > Is iounmap on a NULL pointer allowed? Otherwise the error path is wrong
-> > here.
-> > 
-> 
-> If gate->reg is NULL, the execution seems can't reach here.
-> Am I missing something?
+Based on renesas-devel-20181012-v4.19-rc7
 
-Yes. gate->reg is only valid when the input parameter reg in non NULL.
+Simon Horman (2):
+  arm64: defconfig: Enable scu-simple-card driver
+  arm64: renesas_defconfig: Enable scu-simple-card driver
 
-Sascha
+Takeshi Kihara (1):
+  arm64: dts: renesas: ebisu: Enable Audio
 
+Yoshihiro Kaneko (1):
+  arm64: dts: renesas: r8a77990: Add Audio-DMAC and Sound device nodes
+
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 127 ++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi      | 271 +++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                   |   1 +
+ arch/arm64/configs/renesas_defconfig           |   1 +
+ 4 files changed, 400 insertions(+)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.11.0
