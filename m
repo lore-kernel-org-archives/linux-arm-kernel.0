@@ -1,23 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 15 Oct 2018 14:11:12 -0500
-Subject: [PATCH 2/3] dt-bindings: cadence-quadspi: Add new compatible for
- AM654 SoC
-In-Reply-To: <20181003165603.2579-3-vigneshr@ti.com>
-References: <20181003165603.2579-1-vigneshr@ti.com>
- <20181003165603.2579-3-vigneshr@ti.com>
-Message-ID: <20181015191112.GA6923@bogus>
+Date: Mon, 15 Oct 2018 14:12:51 -0500
+Subject: [PATCH 1/2] dt-bindings: pwm: tiecap: Add TI AM654 SoC specific
+ compatible
+In-Reply-To: <20181003170658.3835-2-vigneshr@ti.com>
+References: <20181003170658.3835-1-vigneshr@ti.com>
+ <20181003170658.3835-2-vigneshr@ti.com>
+Message-ID: <20181015191251.GA8949@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Oct 2018 22:26:02 +0530, Vignesh R wrote:
-> AM654 SoC has Cadence Octal SPI controller, which is similar to Cadence
-> QSPI controller but supports Octal IO(x8 data lines) and Double Data
-> Rate(DDR) mode. Add new compatible to support OSPI controller on TI's
-> AM654 SoCs.
+On Wed, 3 Oct 2018 22:36:57 +0530, Vignesh R wrote:
+> Add a new compatible string "ti,am654-ecap" to support PWM ECAP IP of
+> TI AM654 SoC.
 > 
 > Signed-off-by: Vignesh R <vigneshr@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 > ---
->  Documentation/devicetree/bindings/mtd/cadence-quadspi.txt | 1 +
+>  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 1 +
 >  1 file changed, 1 insertion(+)
 > 
 
