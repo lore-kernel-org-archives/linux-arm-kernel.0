@@ -1,40 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 Oct 2018 12:31:07 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Fix big-endian CMD_SYNC writes
-Message-ID: <e14feb6f7dedc90d181e20fbeaaba49156b03b09.1539689371.git.robin.murphy@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Oct 2018 13:35:44 +0200
+Subject: [PATCH 1/2] ARM: copypage-fa: add kto and kfrom to input operands
+ list
+In-Reply-To: <20181016084416.GF30658@n2100.armlinux.org.uk>
+References: <20181015221629.13924-1-stefan@agner.ch>
+ <CACRpkdaVGKLtE-whhK3oFgY+4xoy1JqWkcBW4UO0-hJs2B-QGg@mail.gmail.com>
+ <20181016084416.GF30658@n2100.armlinux.org.uk>
+Message-ID: <CACRpkdavnYDE42GOwsVqnLwqjVmLmkwJ=sQBjUFn=aFbqXqVPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we insert the sync sequence number into the CMD_SYNC.MSIData field,
-we do so in CPU-native byte order, before writing out the whole command
-as explicitly little-endian dwords. Thus on big-endian systems, the SMMU
-will receive and write back a byteswapped version of sync_nr, which would
-be perfect if it were targeting a similarly-little-endian ITS, but since
-it's actually writing back to memory being polled by the CPUs, they're
-going to end up seeing the wrong thing.
+On Tue, Oct 16, 2018 at 10:44 AM Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Oct 16, 2018 at 10:00:19AM +0200, Linus Walleij wrote:
 
-Since the SMMU doesn't care what the MSIData actually contains, the
-minimal-overhead solution is to simply add an extra byteswap initially,
-such that it then writes back the big-endian format directly.
+> > I am on deep waters with ARM assembly, admittedly. So I wanted to
+> > ask: OpenWRT has this cache patch:
+> > https://github.com/openwrt/openwrt/blob/master/target/linux/gemini/patches-4.14/0001-cache-patch-from-OpenWRT.patch
+> > I do not know why (sorry).
+> >
+> > Do you think that patch is actually a hack to hide the problem
+> > fixed with this patch? (OK maybe stupid question but...)
+>
+> No, it looks to me like a hack to make DMA cache handling "more
+> efficient" by cleaning/invalidating the entire cache when dealing
+> with large streaming buffers.
 
-Fixes: 37de98f8f1cf ("iommu/arm-smmu-v3: Use CMD_SYNC completion MSI")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Aha that makes a lot of sense.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index db402e8b068b..867ba548c2cc 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -952,7 +952,7 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
- 	struct arm_smmu_cmdq_ent ent = {
- 		.opcode = CMDQ_OP_CMD_SYNC,
- 		.sync	= {
--			.msiaddr = virt_to_phys(&smmu->sync_count),
-+			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
- 		},
- 	};
- 
--- 
-2.19.1.dirty
+I will attempt to drop it from OpenWRT in the next kernel upgrade
+unless benchmarks can show that it is worth it.
+
+Thanks Russell!
+
+Linus Walleij
