@@ -1,90 +1,32 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 16 Oct 2018 15:09:01 +0200
-Subject: [PATCH] ARM: dts: rv1108-evb: enable eMMC support
-In-Reply-To: <20181009213656.27719-1-otavio@ossystems.com.br>
-References: <20181009213656.27719-1-otavio@ossystems.com.br>
-Message-ID: <6815120.yyevdQbq0d@phil>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 16 Oct 2018 15:11:52 +0200
+Subject: [PATCH v2 3/6] clocksource: exynos_mct: Add arch_timer
+ cooperation mode for ARM64
+In-Reply-To: <20181015123112.9379-4-m.szyprowski@samsung.com>
+References: <CGME20181015123135eucas1p16a10ed68040141a714ab2977e2ad5e2d@eucas1p1.samsung.com>
+ <20181015123112.9379-1-m.szyprowski@samsung.com>
+ <20181015123112.9379-4-m.szyprowski@samsung.com>
+Message-ID: <CAJKOXPdPk-ATQd-3jzWariPek_WjG3TeLv-LJfzGWA9H7rY96Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Otavio,
-
-Am Dienstag, 9. Oktober 2018, 23:36:56 CEST schrieb Otavio Salvador:
-> Enable eMMC support for rv1108 evaluation board.
-> 
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+On Mon, 15 Oct 2018 at 14:31, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+> To get ARM Architected Timers working on Samsung Exynos SoCs, one has to
+> first configure and enable Exynos Multi-Core Timer, because they both
+> share some common hardware blocks. This patch adds a mode of cooperation
+> with arch_timer driver, so kernel can use CP15 based timer interface via
+> arch_timer driver, which is mandatory on ARM64. In such mode driver only
+> configures MCT registers and starts the timer but don't register any
+> clocksource or events in the system. Those are left to be handled by
+> arch_timer driver.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
-> 
->  arch/arm/boot/dts/rv1108-evb.dts |  8 ++++++++
->  arch/arm/boot/dts/rv1108.dtsi    | 29 +++++++++++++++++++++++++++++
->  2 files changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
-> index 70f0106d1252..f3c6f52c49e6 100644
-> --- a/arch/arm/boot/dts/rv1108-evb.dts
-> +++ b/arch/arm/boot/dts/rv1108-evb.dts
-> @@ -226,6 +226,14 @@
->  	status = "okay";
->  };
->  
-> +&emmc {
-> +	cap-mmc-highspeed;
-> +	supports-emmc;
-> +	non-removable;
-> +	num-slots = <1>;
+>  drivers/clocksource/exynos_mct.c | 52 +++++++++++++++++++++-----------
+>  1 file changed, 35 insertions(+), 17 deletions(-)
 
-num-slots should not be present anymore on new additions
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Also missing the pinctrl settings you're defining below?
-Aka pinctrl-0 = <&emmc_*>; + pinctrl-names = "default"
-
-
-Heiko
-
-> +	status = "okay";
-> +};
-> +
->  &u2phy {
->  	status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
-> index 76ea24636feb..f14a733d85f6 100644
-> --- a/arch/arm/boot/dts/rv1108.dtsi
-> +++ b/arch/arm/boot/dts/rv1108.dtsi
-> @@ -772,6 +772,35 @@
->  			};
->  		};
->  
-> +		emmc {
-> +			emmc_clk: emmc-clk {
-> +				rockchip,pins = <2 RK_PB6 RK_FUNC_1 &pcfg_pull_none_drv_8ma>;
-> +			};
-> +
-> +			emmc_cmd: emmc-cmd {
-> +				rockchip,pins = <2 RK_PB4 RK_FUNC_2 &pcfg_pull_up_drv_8ma>;
-> +			};
-> +
-> +			emmc_pwren: emmc-pwren {
-> +				rockchip,pins = <2 RK_PC2 RK_FUNC_2 &pcfg_pull_none>;
-> +			};
-> +
-> +			emmc_bus1: emmc-bus1 {
-> +				rockchip,pins = <2 RK_PA0 RK_FUNC_2 &pcfg_pull_up_drv_8ma>;
-> +			};
-> +
-> +			emmc_bus8: emmc-bus8 {
-> +				rockchip,pins = <2 RK_PA0 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
-> +						<2 RK_PA1 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
-> +						<2 RK_PA2 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
-> +						<2 RK_PA3 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
-> +						<2 RK_PA4 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
-> +						<2 RK_PA5 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
-> +						<2 RK_PA6 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
-> +						<2 RK_PA7 RK_FUNC_2 &pcfg_pull_up_drv_8ma>;
-> +			};
-> +		};
-> +
->  		sdmmc {
->  			sdmmc_clk: sdmmc-clk {
->  				rockchip,pins = <3 RK_PC4 RK_FUNC_1 &pcfg_pull_none_drv_4ma>;
-> 
+Best regards,
+Krzysztof
