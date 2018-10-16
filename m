@@ -1,23 +1,46 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 16 Oct 2018 15:00:20 +0200
-Subject: [PATCH] drm/rockchip: psr: do not dereference encoder before it
- is null checked.
-In-Reply-To: <20181013105654.11827-1-enric.balletbo@collabora.com>
-References: <20181013105654.11827-1-enric.balletbo@collabora.com>
-Message-ID: <6610441.t0YFBFda2e@phil>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 16 Oct 2018 15:04:52 +0200
+Subject: [PATCH v3] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
+ non-Exynos platforms
+In-Reply-To: <20181015155001eucas1p249f539be47eaff0d10ddc74e1f681b37~d0vYKtP7-2027420274eucas1p2g@eucas1p2.samsung.com>
+References: <CGME20181015155001eucas1p249f539be47eaff0d10ddc74e1f681b37@eucas1p2.samsung.com>
+ <20181015155001eucas1p249f539be47eaff0d10ddc74e1f681b37~d0vYKtP7-2027420274eucas1p2g@eucas1p2.samsung.com>
+Message-ID: <CAJKOXPcFnkwZfCg8q429L6HRfNxubTaoa+BRZ-1h3ti3Q2EAxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 13. Oktober 2018, 12:56:54 CEST schrieb Enric Balletbo i Serra:
-> 'encoder' is deferenced before it is null sanity checked, hence we
-> potentially have a null pointer dereference bug. Instead, initialise
-> drm_drv from encoder->dev->dev_private after we are sure 'encoder' is
-> not null.
-> 
-> Fixes: 5182c1a556d7f ("drm/rockchip: add an common abstracted PSR driver")
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+On Mon, 15 Oct 2018 at 17:50, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> "Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
+> config option) is not working properly (debug messages are not
+> displayed after resume) on Exynos platforms because GPIOs restore
+> code is not implemented.
+>
+> Add PLAT_S3C24XX, ARCH_S3C64XX and ARCH_S5PV210 dependencies to
+> SAMSUNG_PM_DEBUG config option to hide it on Exynos platforms.
+> Then convert Exynos code to not require <plat/pm-common.h>
+> header (use pr_debug() directly instead of S3C_PMDBG() macro and
+> remove redundant s3c_pm_*() calls).
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+> v3:
+> - don't move PM to the line below in Kconfig
+>
+> v2:
+> - convert Exynos code to not require <plat/pm-common.h> header
+>
+> Should by applied on top of "[PATCH] ARM: EXYNOS: remove no longer
+> needed s3c_pm_check_*() calls".
+>
+>  arch/arm/mach-exynos/suspend.c |   14 ++++----------
+>  arch/arm/plat-samsung/Kconfig  |    1 +
+>  2 files changed, 5 insertions(+), 10 deletions(-)
 
-added a stable-tag and applied to drm-misc-next
+Thanks. This and the other one (removing s3c_pm_check_*()) look OK
+although it is too late for another pull so this will wait for next
+cycle.
 
-Thanks
-Heiko
+Best regards,
+Krzysztof
