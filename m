@@ -1,118 +1,104 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Tue, 16 Oct 2018 18:44:43 +0800
-Subject: [PATCH v9 2/9] PCI: Using PCI configuration space header type instead
- of class type to assign resource
-In-Reply-To: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
+Date: Tue, 16 Oct 2018 18:44:41 +0800
+Subject: [PATCH v9 0/9] PCI: mediatek: fixup find_port, enable_msi and add PM,
+ module support
+Message-ID: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The PCI configuration space header type defines the layout of the rest
-of the header (PCI r3.0 sec 6.1, PCIe r4.0 sec 7.5.1.1.9) while the
-resource assignment is based on the configuration space layout instead
-of its class type. Using configuration space header type instead of
-class type for the resource assignment.
+This patchset includes misc patchs:
 
-Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/pci/pci.c       |  3 +--
- drivers/pci/probe.c     |  3 ---
- drivers/pci/setup-bus.c | 20 ++++++++++----------
- 3 files changed, 11 insertions(+), 15 deletions(-)
+The patch 1 fixup the mtk_pcie_find_port logic which will cause system
+could not touch the EP's configuration space that connected to PCIe slot 1.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 29ff961..7d379ca 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -5908,8 +5908,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
- 	 * to enable the kernel to reassign new resource
- 	 * window later on.
- 	 */
--	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
--	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
-+	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
- 		for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
- 			r = &dev->resource[i];
- 			if (!(r->flags & IORESOURCE_MEM))
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index ec78400..29a35c1 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1695,9 +1695,6 @@ int pci_setup_device(struct pci_dev *dev)
- 		break;
- 
- 	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
--		if (class != PCI_CLASS_BRIDGE_PCI)
--			goto bad;
--
- 		/*
- 		 * The PCI-to-PCI bridge spec requires that subtractive
- 		 * decoding (i.e. transparent) bridge must have programming
-diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-index 79b1824..69f90f4 100644
---- a/drivers/pci/setup-bus.c
-+++ b/drivers/pci/setup-bus.c
-@@ -182,7 +182,7 @@ static void __dev_sort_resources(struct pci_dev *dev,
- 	u16 class = dev->class >> 8;
- 
- 	/* Don't touch classless devices or host bridges or ioapics.  */
--	if (class == PCI_CLASS_NOT_DEFINED || class == PCI_CLASS_BRIDGE_HOST)
-+	if (class == PCI_CLASS_NOT_DEFINED)
- 		return;
- 
- 	/* Don't touch ioapic devices already enabled by firmware */
-@@ -1221,12 +1221,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
- 		if (!b)
- 			continue;
- 
--		switch (dev->class >> 8) {
--		case PCI_CLASS_BRIDGE_CARDBUS:
-+		switch (dev->hdr_type) {
-+		case PCI_HEADER_TYPE_CARDBUS:
- 			pci_bus_size_cardbus(b, realloc_head);
- 			break;
- 
--		case PCI_CLASS_BRIDGE_PCI:
-+		case PCI_HEADER_TYPE_BRIDGE:
- 		default:
- 			__pci_bus_size_bridges(b, realloc_head);
- 			break;
-@@ -1237,12 +1237,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
- 	if (pci_is_root_bus(bus))
- 		return;
- 
--	switch (bus->self->class >> 8) {
--	case PCI_CLASS_BRIDGE_CARDBUS:
-+	switch (bus->self->hdr_type) {
-+	case PCI_HEADER_TYPE_CARDBUS:
- 		/* don't size cardbuses yet. */
- 		break;
- 
--	case PCI_CLASS_BRIDGE_PCI:
-+	case PCI_HEADER_TYPE_BRIDGE:
- 		pci_bridge_check_ranges(bus);
- 		if (bus->self->is_hotplug_bridge) {
- 			additional_io_size  = pci_hotplug_io_size;
-@@ -1391,13 +1391,13 @@ void __pci_bus_assign_resources(const struct pci_bus *bus,
- 
- 		__pci_bus_assign_resources(b, realloc_head, fail_head);
- 
--		switch (dev->class >> 8) {
--		case PCI_CLASS_BRIDGE_PCI:
-+		switch (dev->hdr_type) {
-+		case PCI_HEADER_TYPE_BRIDGE:
- 			if (!pci_is_enabled(dev))
- 				pci_setup_bridge(b);
- 			break;
- 
--		case PCI_CLASS_BRIDGE_CARDBUS:
-+		case PCI_HEADER_TYPE_CARDBUS:
- 			pci_setup_cardbus(b);
- 			break;
- 
+The patch fixup the PCI core defect which assign resource base on device's class
+type. Logically, the resource assignment should base on PCIe configuration space
+layout instead of class type. So this patch using configuration header type for
+resource assignment, this patch is suggested by Bjorn.
+
+The patch 6 fixup the enable msi logic, the operation to enable MSI
+should be after system clock is enabled. Call mtk_pcie_enable_msi in
+mtk_pcie_startup_port_v2 since the clock was all enabled at that time.
+
+The patch 7 was rebased and refactor of the v4 patch[1], changes are:
+ -Add PM support for MT7622.
+ -Using mtk_pcie_enable_port to re-establish the link when resumed.
+ -Rebased on this patchset.
+
+The patch 9 add loadable kernel module support.
+
+[1] https://patchwork.kernel.org/patch/10479079
+
+Change since v8:
+ - Remove the patch (PCI: mediatek: Fix class type for MT7622 as PCI_CLASS_BRIDGE_PCI)
+ - Add patch 2 (PCI: Using PCI configuration space header type instead of class type
+   to assign resource)
+
+Change since v7:
+ - Add Acked-by tags from Ryder Lee.
+ - Add Fix tags for patch 2(Fix calss type for MT7622 as PCI_CLASS_BRIDGE_PCI)
+   and patch 6(Fixup enable MSI logic by enable MSI after clock enabled)
+
+Change since v6:
+ - Remove the pci_unmap_iospace when remove the device since the
+   devm_pci_remap_iospace is an devm_ version.
+ - Commit message changed for patch 2(Fix class type for MT7622 as PCI_CLASS_BRIDGE_PCI).
+ - Capitilizing "MSI" and "PM" in the patch title.
+
+Change since v5:
+ - A bit improvement of mtk_pcie_find_port suggest by Lorenzo.
+   MSI after clock enabled.
+ - Add Acked-by tags from Ryder.
+
+Change since v4:
+ - Add patch 2 to fixup class type for MT7622.
+ - Add patch 3 to remove the redundant dev->pm_domain check
+ - Add patch 4 to covert to use pci_host_probe
+ - Add patch 5 to re-arrange the function define, this is a prepare patch for
+   fixup the enable_msi logic, no functional changed have been made by this one.
+ - Add patch 8 to save the GIC IRQ in mtk_pcie_port as a prepare patch for tear
+   down the irq when remove the kernel module.
+ - Re-arrange the find_port flow suggest by Lorenzo to make the code parse easier
+   for the patch 1.
+ - Remove the .pm_support in mtk_pcie_soc in patch 7 since if system pm was not
+   supported, then those pm callbacks will never be executed for MT7622. So the
+   .pm_support is not needed.
+
+Change since v3:
+ - Remove pm_runtime_XXX ops in suspend and resume callbacks in the third patch.
+ - Rebase to 4.19-rc1.
+
+Change since v2:
+ - Fix the list_for_each_entry_safe parameter error.
+ - Add Ryder's Acked-by flag.
+
+Change since v1:
+ - A bit of code refact of the first patch suggested by Andy Shevchenko, and
+   commit message updated.
+
+Honghui Zhang (9):
+  PCI: mediatek: Using slot's devfn for compare to fix
+    mtk_pcie_find_port logic
+  PCI: Using PCI configuration space header type instead of class type
+    to assign resource
+  PCI: mediatek: Remove the redundant dev->pm_domain check
+  PCI: mediatek: Convert to use pci_host_probe()
+  PCI: mediatek: Move the mtk_pcie_startup_port_v2 function's define
+    after mtk_pcie_setup_irq
+  PCI: mediatek: Fixup enable MSI logic by enable MSI after clock
+    enabled
+  PCI: mediatek: Add system PM support for MT2712 and MT7622
+  PCI: mediatek: Save the GIC IRQ in mtk_pcie_port
+  PCI: mediatek: Add loadable kernel module support
+
+ drivers/pci/controller/Kconfig         |   2 +-
+ drivers/pci/controller/pcie-mediatek.c | 319 +++++++++++++++++++++------------
+ drivers/pci/pci.c                      |   3 +-
+ drivers/pci/probe.c                    |   3 -
+ drivers/pci/setup-bus.c                |  20 +--
+ 5 files changed, 215 insertions(+), 132 deletions(-)
+
 -- 
 2.6.4
