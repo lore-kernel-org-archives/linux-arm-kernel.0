@@ -1,44 +1,90 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Tue, 16 Oct 2018 15:41:44 +0200
-Subject: [PATCH] clk: rockchip: Fix static checker warning in
- rockchip_ddrclk_get_parent call
-Message-ID: <20181016134144.12461-1-enric.balletbo@collabora.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 16 Oct 2018 16:42:41 +0300
+Subject: [PATCH 2/3] driver core: add deferring probe reason to
+ devices_deferred property
+In-Reply-To: <20181016072244.1216-3-a.hajda@samsung.com>
+References: <CGME20181016072249eucas1p28855602564eb74a771fe521712962680@eucas1p2.samsung.com>
+ <20181016072244.1216-1-a.hajda@samsung.com>
+ <20181016072244.1216-3-a.hajda@samsung.com>
+Message-ID: <CAHp75VefP2qit3=s9E_uuOg4+J0Zk2OD-XjpVsWM7X3s2g-0wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the signedness bug returning '(-22)' on the return type by removing the
-sanity checker in rockchip_ddrclk_get_parent(). The function should return
-and unsigned value only and it's safe to remove the sanity checker as the
-core functions that call get_parent like clk_core_get_parent_by_index already
-ensures the validity of the clk index returned (index >= core->num_parents).
+On Tue, Oct 16, 2018 at 10:22 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
+>
+> /sys/kernel/debug/devices_deferred property contains list of deferred devices.
+> This list does not contain reason why the driver deferred probe, the patch
+> improves it.
+> The natural place to set the reason is probe_err function introduced recently,
+> ie. if probe_err will be called with -EPROBE_DEFER instead of printk the message
+> will be attached to deferred device and printed when user read devices_deferred
+> property.
 
-Fixes: a4f182bf81f18 ("clk: rockchip: add new clock-type for the ddrclk")
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
 
- drivers/clk/rockchip/clk-ddr.c | 4 ----
- 1 file changed, 4 deletions(-)
+> -       if (err != -EPROBE_DEFER) {
+> -               va_start(args, fmt);
+> +       va_start(args, fmt);
+>
+> -               vaf.fmt = fmt;
+> -               vaf.va = &args;
+> +       vaf.fmt = fmt;
+> +       vaf.va = &args;
+>
+> +       if (err != -EPROBE_DEFER)
+>                 __dev_printk(KERN_ERR, dev, &vaf);
+> -               va_end(args);
+> -       }
+> +       else
+> +               __deferred_probe_set_msg(dev, fmt, args);
+> +
+> +       va_end(args);
 
-diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
-index de00590af167..fd5c90371dbf 100644
---- a/drivers/clk/rockchip/clk-ddr.c
-+++ b/drivers/clk/rockchip/clk-ddr.c
-@@ -185,16 +185,12 @@ rockchip_ddrclk_sip_recalc_rate(struct clk_hw *hw,
- static u8 rockchip_ddrclk_get_parent(struct clk_hw *hw)
- {
- 	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
--	int num_parents = clk_hw_get_num_parents(hw);
- 	u32 val;
- 
- 	val = clk_readl(ddrclk->reg_base +
- 			ddrclk->mux_offset) >> ddrclk->mux_shift;
- 	val &= GENMASK(ddrclk->mux_width - 1, 0);
- 
--	if (val >= num_parents)
--		return -EINVAL;
--
- 	return val;
- }
- 
+Yeah, ping-pong style of programming (one patch "amends" something
+which had been introduced by another).
+That's why better to follow my comment for the patch 1.
+
+> +/*
+> + * __deferred_probe_set_msg() - Set defer probe reason message for device
+> + */
+> +void __deferred_probe_set_msg(const struct device *dev, const char *fmt,
+> +                                    va_list args)
+> +{
+> +       const int size = 128;
+> +       char **p;
+> +       int n;
+> +
+> +       mutex_lock(&deferred_probe_mutex);
+> +
+
+
+> +       p = &dev->p->deferred_probe_msg;
+> +       if (!*p) {
+> +               *p = kmalloc(size, GFP_KERNEL);
+> +               if (!*p)
+> +                       goto end;
+> +       }
+> +       n = snprintf(*p, size, "%s %s: ", dev_driver_string(dev), dev_name(dev));
+> +       if (n < size)
+> +               vsnprintf(*p + n, size - n, fmt, args);
+
+Perhaps kasprintf() instead of this huge plays around the size and allocation?
+
+>         list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
+> -               seq_printf(s, "%s\n", dev_name(curr->device));
+> +               if (curr->device->p->deferred_probe_msg)
+> +                       seq_puts(s, curr->device->p->deferred_probe_msg);
+> +               else
+> +                       seq_printf(s, "%s\n", dev_name(curr->device));
+
+I wouldn't care (much) about debugfs, though better to keep some order
+here, i.e. always print device name.
+
+Something like
+
+seq_printf(s, "%s\t%s\n", dev_name(), deferred_probe_msg ?: "");
+
+and remove that part from above __deferred_probe_set_msg().
+
 -- 
-2.19.1
+With Best Regards,
+Andy Shevchenko
