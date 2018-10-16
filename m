@@ -1,95 +1,59 @@
 From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Tue, 16 Oct 2018 17:15:15 +0800
-Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating SPIs
+Date: Tue, 16 Oct 2018 17:15:16 +0800
+Subject: [PATCH 4/4] dt-bindings/irqchip/mbigen: add example of MBIGEN
+ generate SPIs
 In-Reply-To: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
 References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
+Message-ID: <1539681316-19300-5-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now with
-5052875 ("irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller"),
-we can support MBIGEN to generate message based SPIs by writing GICD_SETSPIR.
-
-The first 64-pins of each MBIGEN chip is used to generate SPIs, and each
-MBIGEN chip has several MBIGEN nodes, every node has 128 pins for generating
-LPIs. The total pins are: 64(SPIs) + 128 * node_nr(LPIs). So we can translate
-the pin index in a unified way in mbigen_domain_translate().
-
-Also Add TYPE and VEC registers that used by generating SPIs, the driver can
-access them when MBIGEN is used to generate SPIs.
+Now MBIGEN can support to generate SPIs by writing
+GICD_SETSPIR. Add dt example to help document.
 
 Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
 ---
- drivers/irqchip/irq-mbigen.c | 21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ .../interrupt-controller/hisilicon,mbigen-v2.txt        | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index f05998f..37c1932 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -48,6 +48,7 @@
- #define MBIGEN_NODE_OFFSET		0x1000
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+index a6813a0..298c033 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+@@ -10,7 +10,7 @@ Hisilicon designed mbigen to collect and generate interrupt.
  
- /* offset of vector register in mbigen node */
-+#define REG_MBIGEN_SPI_VEC_OFFSET	0x500
- #define REG_MBIGEN_LPI_VEC_OFFSET	0x200
  
- /**
-@@ -62,6 +63,7 @@
-  * This register is used to configure interrupt
-  * trigger type
-  */
-+#define REG_MBIGEN_SPI_TYPE_OFFSET	0x400
- #define REG_MBIGEN_LPI_TYPE_OFFSET	0x0
+ Non-pci devices can connect to mbigen and generate the
+-interrupt by writing ITS register.
++interrupt by writing GICD or ITS register.
  
- /**
-@@ -79,6 +81,9 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
- {
- 	unsigned int nid, pin;
+ The mbigen chip and devices connect to mbigen have the following properties:
  
-+	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP)
-+		return (hwirq * 4 + REG_MBIGEN_SPI_VEC_OFFSET);
+@@ -64,6 +64,13 @@ Examples:
+ 				num-pins = <2>;
+ 				#interrupt-cells = <2>;
+ 			};
 +
- 	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
- 	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
- 	pin = hwirq % IRQS_PER_MBIGEN_NODE;
-@@ -92,6 +97,13 @@ static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
- {
- 	unsigned int nid, irq_ofst, ofst;
++			mbigen_spi_example:spi_example {
++				interrupt-controller;
++				msi-parent = <&gic>;
++				num-pins = <2>;
++				#interrupt-cells = <2>;
++			};
+ 	};
  
-+	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
-+		*mask = 1 << (hwirq % 32);
-+		ofst = hwirq / 32 * 4;
-+		*addr = ofst + REG_MBIGEN_SPI_TYPE_OFFSET;
-+		return;
-+	}
+ Devices connect to mbigen required properties:
+@@ -82,3 +89,11 @@ Examples:
+ 		interrupts =	<656 1>,
+ 				<657 1>;
+ 	};
 +
- 	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
- 	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
- 	irq_ofst = hwirq % IRQS_PER_MBIGEN_NODE;
-@@ -162,6 +174,12 @@ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
- 	u32 val;
- 
- 	base += get_mbigen_vec_reg(d->hwirq);
-+
-+	if (d->hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
-+		writel_relaxed(msg->data, base);
-+		return;
-+	}
-+
- 	val = readl_relaxed(base);
- 
- 	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
-@@ -182,8 +200,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
- 		if (fwspec->param_count != 2)
- 			return -EINVAL;
- 
--		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
--			(fwspec->param[0] < SPI_NUM_PER_MBIGEN_CHIP))
-+		if (fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM)
- 			return -EINVAL;
- 		else
- 			*hwirq = fwspec->param[0];
++	spi_example: spi0 at 0 {
++		compatible = "spi,example";
++		reg = <0 0 0 0>;
++		interrupt-parent = <&mbigen_spi_example>;
++		interrupts = <13 4>,
++			     <14 4>;
++	};
 -- 
 1.8.3
