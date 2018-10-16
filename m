@@ -1,25 +1,56 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 16 Oct 2018 17:36:31 -0500
-Subject: [PATCH 1/2] dt-bindings: spi: add stm32 qspi controller
-In-Reply-To: <1538725383-19781-2-git-send-email-ludovic.Barre@st.com>
-References: <1538725383-19781-1-git-send-email-ludovic.Barre@st.com>
- <1538725383-19781-2-git-send-email-ludovic.Barre@st.com>
-Message-ID: <20181016223631.GA19725@bogus>
+Date: Tue, 16 Oct 2018 17:38:54 -0500
+Subject: [PATCH 1/3] dt-bindings: stm32-thermal: add binding documentation
+In-Reply-To: <1538734081-26585-2-git-send-email-david.hernandezsanchez@st.com>
+References: <1538734081-26585-1-git-send-email-david.hernandezsanchez@st.com>
+ <1538734081-26585-2-git-send-email-david.hernandezsanchez@st.com>
+Message-ID: <20181016223854.GA23012@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Oct 2018 09:43:02 +0200, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This patch adds the documentation of device tree bindings
-> for the STM32 QSPI controller. It is a specialized communication
-> interface targeting single, dual or quad SPI Flash memories (NOR/NAND).
-> 
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
->  .../devicetree/bindings/spi/spi-stm32-qspi.txt     | 44 ++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-stm32-qspi.txt
+On Fri, 5 Oct 2018 10:08:45 +0000, David HERNANDEZ SANCHEZ wrote:
+> QWRkIHRoZXJtYWwgYmluZGluZyBkb2N1bWVudGF0aW9uIGZvciBTVE0zMiBEVFMgc2Vuc29yDQoN
+> ClNpZ25lZC1vZmYtYnk6IERhdmlkIEhlcm5hbmRleiBTYW5jaGV6IDxkYXZpZC5oZXJuYW5kZXpz
+> YW5jaGV6QHN0LmNvbT4NCg0KZGlmZiAtLWdpdCBhL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9i
+> aW5kaW5ncy90aGVybWFsL3N0bTMyLXRoZXJtYWwudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0
+> cmVlL2JpbmRpbmdzL3RoZXJtYWwvc3RtMzItdGhlcm1hbC50eHQNCm5ldyBmaWxlIG1vZGUgMTAw
+> NjQ0DQppbmRleCAwMDAwMDAwLi44YzBkNWE0DQotLS0gL2Rldi9udWxsDQorKysgYi9Eb2N1bWVu
+> dGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvdGhlcm1hbC9zdG0zMi10aGVybWFsLnR4dA0KQEAg
+> LTAsMCArMSw2MSBAQA0KK0JpbmRpbmcgZm9yIFRoZXJtYWwgU2Vuc29yIGZvciBTVE1pY3JvZWxl
+> Y3Ryb25pY3MgU1RNMzIgc2VyaWVzIG9mIFNvQ3MuDQorDQorT24gU1RNMzIgU29DcywgdGhlIERp
+> Z2l0YWwgVGVtcGVyYXR1cmUgU2Vuc29yIChEVFMpIGlzIGluIGNoYXJnZSBvZiBtYW5hZ2luZyBh
+> bg0KK2FuYWxvZyBibG9jayB3aGljaCBkZWxpdmVycyBhIGZyZXF1ZW5jeSBkZXBlbmRpbmcgb24g
+> dGhlIGludGVybmFsIFNvQydzDQordGVtcGVyYXR1cmUuIEJ5IHVzaW5nIGEgcmVmZXJlbmNlIGZy
+> ZXF1ZW5jeSwgRFRTIGlzIGFibGUgdG8gcHJvdmlkZSBhIHNhbXBsZQ0KK251bWJlciB3aGljaCBj
+> YW4gYmUgdHJhbnNsYXRlZCBpbnRvIGEgdGVtcGVyYXR1cmUgYnkgdGhlIHVzZXIuDQorDQorRFRT
+> IHByb3ZpZGVzIGludGVycnVwdCBub3RpZmljYXRpb24gbWVjaGFuaXNtIGJ5IHRocmVzaG9sZC4g
+> VGhpcyBtZWNoYW5pc20NCitvZmZlcnMgdHdvIHRlbXBlcmF0dXJlIHRyaXAgcG9pbnRzOiBwYXNz
+> aXZlIGFuZCBjcml0aWNhbC4gVGhlIGZpcnN0IGlzIGludGVuZGVkDQorZm9yIHBhc3NpdmUgY29v
+> bGluZyBub3RpZmljYXRpb24gd2hpbGUgdGhlIHNlY29uZCBpcyB1c2VkIGZvciBvdmVyLXRlbXBl
+> cmF0dXJlDQorcmVzZXQuDQorDQorUmVxdWlyZWQgcGFyYW1ldGVyczoNCistLS0tLS0tLS0tLS0t
+> LS0tLS0tDQorDQorY29tcGF0aWJsZTogCVNob3VsZCBiZSAic3Qsc3RtMzItdGhlcm1hbCINCity
+> ZWc6IAkJVGhpcyBzaG91bGQgYmUgdGhlIHBoeXNpY2FsIGJhc2UgYWRkcmVzcyBhbmQgbGVuZ3Ro
+> IG9mIHRoZQ0KKwkJc2Vuc29yJ3MgcmVnaXN0ZXJzLg0KK2Nsb2NrczogCVBoYW5kbGUgb2YgdGhl
+> IGNsb2NrIHVzZWQgYnkgdGhlIHRoZXJtYWwgc2Vuc29yLg0KKwkJICBTZWU6IERvY3VtZW50YXRp
+> b24vZGV2aWNldHJlZS9iaW5kaW5ncy9jbG9jay9jbG9jay1iaW5kaW5ncy50eHQNCitjbG9jay1u
+> YW1lczogCVNob3VsZCBiZSAicGNsayIgZm9yIHJlZ2lzdGVyIGFjY2VzcyBjbG9jayBhbmQgcmVm
+> ZXJlbmNlIGNsb2NrLg0KKwkJICBTZWU6IERvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5n
+> cy9yZXNvdXJjZS1uYW1lcy50eHQNCisjdGhlcm1hbC1zZW5zb3ItY2VsbHM6IFNob3VsZCBiZSAw
+> LiBTZWUgLi90aGVybWFsLnR4dCBmb3IgYSBkZXNjcmlwdGlvbi4NCitpbnRlcnJ1cHRzOglTdGFu
+> ZGFyZCB3YXkgdG8gZGVmaW5lIGludGVycnVwdCBudW1iZXIuDQorDQorRXhhbXBsZToNCisNCisJ
+> dGhlcm1hbC16b25lcyB7DQorCQljcHVfdGhlcm1hbDogY3B1LXRoZXJtYWwgew0KKwkJCXBvbGxp
+> bmctZGVsYXktcGFzc2l2ZSA9IDwwPjsNCisJCQlwb2xsaW5nLWRlbGF5ID0gPDA+Ow0KKw0KKwkJ
+> CXRoZXJtYWwtc2Vuc29ycyA9IDwmdGhlcm1hbD47DQorDQorCQkJdHJpcHMgew0KKwkJCQljcHVf
+> YWxlcnQxOiBjcHUtYWxlcnQxIHsNCisJCQkJCXRlbXBlcmF0dXJlID0gPDg1MDAwPjsNCisJCQkJ
+> CWh5c3RlcmVzaXMgPSA8MD47DQorCQkJCQl0eXBlID0gInBhc3NpdmUiOw0KKwkJCQl9Ow0KKw0K
+> KwkJCQljcHUtY3JpdDogY3B1LWNyaXQgew0KKwkJCQkJdGVtcGVyYXR1cmUgPSA8MTIwMDAwPjsN
+> CisJCQkJCWh5c3RlcmVzaXMgPSA8MD47DQorCQkJCQl0eXBlID0gImNyaXRpY2FsIjsNCisJCQkJ
+> fTsNCisJCQl9Ow0KKw0KKwkJCWNvb2xpbmctbWFwcyB7DQorCQkJfTsNCisJCX07DQorCX07DQor
+> DQorCXRoZXJtYWw6IHRoZXJtYWxANTAwMjgwMDAgew0KKwkJY29tcGF0aWJsZSA9ICJzdCxzdG0z
+> Mi10aGVybWFsIjsNCisJCXJlZyA9IDwweDUwMDI4MDAwIDB4MTAwPjsNCisJCWNsb2NrcyA9IDwm
+> cmNjIFRNUFNFTlM+Ow0KKwkJY2xvY2stbmFtZXMgPSAicGNsayI7DQorCQkjdGhlcm1hbC1zZW5z
+> b3ItY2VsbHMgPSA8MD47DQorCQlpbnRlcnJ1cHRzID0gPEdJQ19TUEkgMTQ3IElSUV9UWVBFX0xF
+> VkVMX0hJR0g+Ow0KKwl9Ow0KLS0NCjIuNy40DQo=
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
