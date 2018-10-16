@@ -1,50 +1,78 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Tue, 16 Oct 2018 18:44:47 +0800
-Subject: [PATCH v9 6/9] PCI: mediatek: Fixup enable MSI logic by enable MSI
- after clock enabled
+Date: Tue, 16 Oct 2018 18:44:45 +0800
+Subject: [PATCH v9 4/9] PCI: mediatek: Convert to use pci_host_probe()
 In-Reply-To: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539686690-24068-7-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1539686690-24068-5-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The commit 43e6409db64d ("PCI: mediatek: Add MSI support for MT2712 and
-MT7622") added MSI support but enable MSI in wrong place, clocks was not
-enabled when enable MSI. This patch fix this issue by calling
-mtk_pcie_enable_msi in mtk_pcie_startup_port_v2 since the clock was all
-enabled at that time.
+Part of mtk_pcie_register_host is an open-coded version of
+pci_host_probe(). So instead of duplicating this code, use
+pci_host_probe() directly and remove mtk_pcie_register_host.
 
-Fixes: 43e6409db64d ("PCI: mediatek: Add MSI support for MT2712 and MT7622")
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 Acked-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/pci/controller/pcie-mediatek.c | 37 ++++++++--------------------------
+ 1 file changed, 8 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 6967bb7..82d3d85 100644
+index 6080b29..9f12b17 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -568,8 +568,6 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
- 		ret = mtk_pcie_allocate_msi_domains(port);
- 		if (ret)
- 			return ret;
--
--		mtk_pcie_enable_msi(port);
- 	}
- 
+@@ -1121,34 +1121,6 @@ static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
  	return 0;
-@@ -690,6 +688,9 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
- 	val &= ~INTX_MASK;
- 	writel(val, port->base + PCIE_INT_MASK);
+ }
  
-+	if (IS_ENABLED(CONFIG_PCI_MSI))
-+		mtk_pcie_enable_msi(port);
+-static int mtk_pcie_register_host(struct pci_host_bridge *host)
+-{
+-	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
+-	struct pci_bus *child;
+-	int err;
+-
+-	host->busnr = pcie->busn.start;
+-	host->dev.parent = pcie->dev;
+-	host->ops = pcie->soc->ops;
+-	host->map_irq = of_irq_parse_and_map_pci;
+-	host->swizzle_irq = pci_common_swizzle;
+-	host->sysdata = pcie;
+-
+-	err = pci_scan_root_bus_bridge(host);
+-	if (err < 0)
+-		return err;
+-
+-	pci_bus_size_bridges(host->bus);
+-	pci_bus_assign_resources(host->bus);
+-
+-	list_for_each_entry(child, &host->bus->children, node)
+-		pcie_bus_configure_settings(child);
+-
+-	pci_bus_add_devices(host->bus);
+-
+-	return 0;
+-}
+-
+ static int mtk_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1175,7 +1147,14 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto put_resources;
+ 
+-	err = mtk_pcie_register_host(host);
++	host->busnr = pcie->busn.start;
++	host->dev.parent = pcie->dev;
++	host->ops = pcie->soc->ops;
++	host->map_irq = of_irq_parse_and_map_pci;
++	host->swizzle_irq = pci_common_swizzle;
++	host->sysdata = pcie;
 +
- 	/* Set AHB to PCIe translation windows */
- 	size = mem->end - mem->start;
- 	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
++	err = pci_host_probe(host);
+ 	if (err)
+ 		goto put_resources;
+ 
 -- 
 2.6.4
