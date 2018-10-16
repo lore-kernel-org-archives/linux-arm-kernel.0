@@ -1,148 +1,74 @@
-From: jonas@orbital-systems.com (Jonas Danielsson)
-Date: Tue, 16 Oct 2018 16:19:15 +0200
-Subject: [PATCH] power: reset: at91-reset: enable I-cache for
- at91sam9260_reset
-In-Reply-To: <4836921.pHbLXnhTfm@ws-140106>
-References: <20181007125815.8392-1-jonas@threetimestwo.org>
- <4836921.pHbLXnhTfm@ws-140106>
-Message-ID: <CALDOjzh4+gtFk2ezvY4MYCT_rhjUdhfjdYgNFakA=TaXk5Oo2Q@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue, 16 Oct 2018 19:51:38 +0530
+Subject: [PATCH] DT: rockchip: Fix stability issues with the
+ 'performance' governor on rock960
+In-Reply-To: <1539698431-12616-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1539698431-12616-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20181016142138.GA24727@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 4:03 PM Alexander Stein
-<alexander.stein@systec-electronic.com> wrote:
->
-> Do you have CONFIG_CPU_ICACHE_DISABLE enabled?
-> I wonder why I-cache is disabled. I know about this errata, AT91SAM9G20 is affected as well.
->
+On Tue, Oct 16, 2018 at 04:00:20PM +0200, Daniel Lezcano wrote:
+> When the performance governor is set as default, the rock960 hangs
+> around one minute after booting, whatever the activity is (idle, key
+> pressed, loaded, ...).
+> 
+> Based on the commit log found at https://patchwork.kernel.org/patch/10092377/
+> 
+> "vdd_log has no consumer and therefore will not be set to a specific
+> voltage. Still the PWM output pin gets configured and thence the vdd_log
+> output voltage will changed from it's default. Depending on the idle
+> state of the PWM this will slightly over or undervoltage the logic supply
+> of the RK3399 and cause instability with GbE (undervoltage) and PCIe
+> (overvoltage). Since the default value set by a voltage divider is the
+> correct supply voltage and we don't need to change it during runtime we
+> remove the rail from the devicetree completely so the PWM pin will not
+> be configured."
+> 
+> After removing the vdd-log from the rock960's specific DT, the board
+> does no longer hang and shows a stable behavior.
+> 
+> Apply the same change for the rock960 by removing the vdd-log from the
+> DT.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Hi Alexander!
+Tested on Rock960 v1.2 board, hence
 
-I just checked, we do not have CONFIG_CPU_ICACHE_DISABLE enabled.
-I wonder as well! If you have any idea I can try them out on my board tomorrow!
+Tested-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 
-The effect of enabling them is real. I have managed over 1000 reboots
-with this patch.
-And at the most 20 without.
+Thanks a ton!
 
-> Best regards,
-> Alexander
+Regards,
+Mani
 
-Jonas
-
->
-> On Sunday, October 7, 2018, 2:57:45 PM CEST Jonas Danielsson wrote:
-> > From: Jonas Danielsson <jonas@orbital-systems.com>
-> >
-> > This fixes a bug where our embedded system (AT91SAM9260 based) would
-> > hang at reboot. At the most we managed 16 boot loops without a hang.
-> >
-> > With this patch applied the problem has not been observed and the board
-> > has managed above 250 boot loops.
-> >
-> > The AT91SAM9260 datasheet tells us that with the instruction cache
-> > disabled all instructions are fetched from SDRAM. And we have an errata
-> > telling us we must power down the SDRAM before issuing cpu reset.
-> >
-> > This means we need the instruction cache enabled in at91sam9260_reset()
-> > At the moment it is being disabled in cpu_proc_fin() which is called from
-> > arch/arm/kernel/reboot.c.
-> >
-> > Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
-> > ---
-> >  drivers/power/reset/at91-reset.c | 12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-> > index f44a9ffcc2ab..78972bba64df 100644
-> > --- a/drivers/power/reset/at91-reset.c
-> > +++ b/drivers/power/reset/at91-reset.c
-> > @@ -50,14 +50,24 @@ static void __iomem *at91_ramc_base[2], *at91_rstc_base;
-> >  static struct clk *sclk;
-> >
-> >  /*
-> > -* unless the SDRAM is cleanly shutdown before we hit the
-> > +* Errata 43.1.7.1 RSTC: Reset during SDRAM Accesses
-> > +*
-> > +* Unless the SDRAM is cleanly shutdown before we hit the
-> >  * reset register it can be left driving the data bus and
-> >  * killing the chance of a subsequent boot from NAND
-> > +*
-> > +* Since we are disabling SDRAM need to make sure that the
-> > +* instruction cache is enabled.
-> >  */
-> >  static int at91sam9260_restart(struct notifier_block *this, unsigned long mode,
-> >                              void *cmd)
-> >  {
-> >       asm volatile(
-> > +             /* Enable I-cache */
-> > +             "mrc    p15, 0, r0, c1, c0, 0\n\t"
-> > +             "orr    r0, r0, #4096\n\t" /* CR_I (bit 12) */
-> > +             "mcr    p15, 0, r0, c1, c0, 0\n\t"
-> > +
-> >               /* Align to cache lines */
-> >               ".balign 32\n\t"
-> >
-> >
->
->
-> --
-> SYS TEC electronic GmbH
-> Am Windrad 2
-> 08468 Heinsdorfergrund
-> Germany
-> Telefon : +49 (0) 3765 38600-0
-> Fax     : +49 (0) 3765 38600-4100
-> Email   : alexander.stein at systec-electronic.com
-> Website : http://www.systec-electronic.com
->
-> Managing Director   : Dipl.-Phys. Siegmar Schmidt
-> Commercial registry : Amtsgericht Chemnitz, HRB 28082
-> USt.-Id Nr.         : DE150534010
->
-> Diese E-Mail enth?lt vertrauliche und/oder rechtlich gesch?tzte Informationen.
-> Wenn Sie nicht der richtige Adressat sind oder diese E-Mail irrt?mlich erhalten haben, informieren Sie bitte sofort den Absender und vernichten Sie diese Mail.
-> Das unerlaubte Kopieren sowie die unbefugte Weitergabe dieser Mail sind nicht gestattet.
->
-> This e-mail may contain confidential and/or privileged information.
-> If you are not the intended recipient (or have received this e-mail in error) please notify the sender immediately and destroy this e-mail.
-> Any unauthorized copying, disclosure or distribution of the material in this e-mail is strictly forbidden.
->
->
-
-
--- 
-
-
-
-
-
-
-JONAS DANIELSSON
-Software Developer
-
-+46 72 361 5022
-Malm? - Sweden
-
-ORBITAL SYSTEMS
-orbital-systems.com
-
-
-
-
-The information contained in this message is intended for the personal
-and confidential use of the designated recipients named above and may
-contain confidential and/or privileged material. If the reader of this
-message is not the intended recipient or an agent responsible for
-delivering it to the intended recipient, you are hereby notified that
-you have received this document in error, and that any review,
-dissemination, distribution, or copying of this message is strictly
-prohibited. If you have received this communication in error, please
-notify the sender immediately and delete this e-mail from your system.
-
-Although this transmission and any attachments are believed to be free
-of any virus or other defect that might affect any computer system
-into which it is received and opened, it is the responsibility of the
-recipient to ensure that it is virus free and no responsibility is
-accepted by ORBITAL SYSTEMS AB, its subsidiaries and affiliates, as
-applicable, for any loss or damage arising in any way.
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi | 12 ------------
+>  1 file changed, 12 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> index 6c8c4ab..56abbb0 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> @@ -57,18 +57,6 @@
+>  		regulator-always-on;
+>  		vin-supply = <&vcc_sys>;
+>  	};
+> -
+> -	vdd_log: vdd-log {
+> -		compatible = "pwm-regulator";
+> -		pwms = <&pwm2 0 25000 0>;
+> -		regulator-name = "vdd_log";
+> -		regulator-min-microvolt = <800000>;
+> -		regulator-max-microvolt = <1400000>;
+> -		regulator-always-on;
+> -		regulator-boot-on;
+> -		vin-supply = <&vcc_sys>;
+> -	};
+> -
+>  };
+>  
+>  &cpu_l0 {
+> -- 
+> 2.7.4
+> 
