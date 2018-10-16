@@ -1,44 +1,36 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 16 Oct 2018 15:57:44 +0000
-Subject: [PATCH v3 3/4] ARM: dts: imx6ull: Add dcp node
-In-Reply-To: <cover.1539705285.git.leonard.crestez@nxp.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 16 Oct 2018 13:03:47 -0300
+Subject: [PATCH v3 2/4] crypto: mxs-dcp - Add support for dcp clk
+In-Reply-To: <dcbcaf888bbd0a35dcf34228df2d9eb4fd762ea7.1539705286.git.leonard.crestez@nxp.com>
 References: <cover.1539705285.git.leonard.crestez@nxp.com>
-Message-ID: <ef03e230d0bb76d830c123bc47e6bd6e7bf17826.1539705286.git.leonard.crestez@nxp.com>
+ <dcbcaf888bbd0a35dcf34228df2d9eb4fd762ea7.1539705286.git.leonard.crestez@nxp.com>
+Message-ID: <CAOMZO5Ck846zd_Xo=9sVK0EAxNLsUsWiC59H2Ms6x8xoD8iwWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCP block on 6ull has no major differences other than requiring
-explicit clock enabling.
+Hi Leonard,
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/boot/dts/imx6ull.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On Tue, Oct 16, 2018 at 12:58 PM Leonard Crestez
+<leonard.crestez@nxp.com> wrote:
 
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index 796ed35d4ac9..f3668fe69eac 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -37,10 +37,20 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0x02200000 0x100000>;
- 			ranges;
- 
-+			dcp: crypto at 2280000 {
-+				compatible = "fsl,imx6ull-dcp", "fsl,imx28-dcp";
-+				reg = <0x02280000 0x4000>;
-+				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6ULL_CLK_DCP_CLK>;
-+				clock-names = "dcp";
-+			};
-+
- 			iomuxc_snvs: iomuxc-snvs at 2290000 {
- 				compatible = "fsl,imx6ull-iomuxc-snvs";
- 				reg = <0x02290000 0x4000>;
- 			};
- 
--- 
-2.17.1
+> +       /* DCP clock is optional, only used on some SOCs */
+> +       sdcp->dcp_clk = devm_clk_get(dev, "dcp");
+> +       if (IS_ERR(sdcp->dcp_clk)) {
+> +               if (sdcp->dcp_clk != ERR_PTR(-ENOENT))
+> +                       return PTR_ERR(sdcp->dcp_clk);
+> +               sdcp->dcp_clk = NULL;
+
+This dcp_clk assignment to NULL does not seem to be necessary.
+
+> +
+> +       ret = clk_prepare_enable(sdcp->dcp_clk);
+> +       if (ret)
+> +               return ret;
+>
+>         ret = devm_request_irq(dev, dcp_vmi_irq, mxs_dcp_irq, 0,
+>                                "dcp-vmi-irq", sdcp);
+>         if (ret) {
+>                 dev_err(dev, "Failed to claim DCP VMI IRQ!\n");
+
+In case of subsequent errors you should call
+clk_disable_unprepare(sdcp->dcp_clk).
