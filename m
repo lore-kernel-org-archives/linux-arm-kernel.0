@@ -1,154 +1,78 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue, 16 Oct 2018 16:56:21 +0200
-Subject: [PATCH 10/11] DT: arm: exynos: add support for thermal trip irq-mode
-In-Reply-To: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
-References: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181016145652eucas1p2939c6aa628ba099c9609a8cbc17db1a4@eucas1p2.samsung.com>
-Message-ID: <20181016145652eucas1p2939c6aa628ba099c9609a8cbc17db1a4~eHqQRcy8z2133821338eucas1p2W@eucas1p2.samsung.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 16 Oct 2018 17:09:14 +0200
+Subject: [PATCH 06/11] DT: arm64: exynos: add support for thermal trip
+ irq-mode
+In-Reply-To: <20181016145647eucas1p206c068806214535da339588d77cbdfa5~eHqLYh2dR2135021350eucas1p2K@eucas1p2.samsung.com>
+References: <CGME20181016145647eucas1p206c068806214535da339588d77cbdfa5@eucas1p2.samsung.com>
+ <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
+ <20181016145647eucas1p206c068806214535da339588d77cbdfa5~eHqLYh2dR2135021350eucas1p2K@eucas1p2.samsung.com>
+Message-ID: <CAJKOXPe4Jf3QVbQ6BFPFptkgvmmpNu+QCmDoD3JqhyYOidJ7vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for new flash which indicates
-that trip point triggers irq when temperature is met.
-Exynos5433 supports 8 trip point which will trigger irq.
-Above that number other trip points should be registered
-without 'irq-mode' flag.
-That will force the thermal framework to start polling
-the temperature sensor under configured conditions and
-handle the trip point.
+On Tue, 16 Oct 2018 at 16:56, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+>
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
----
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 40 +++++++++++++++-------
- 1 file changed, 28 insertions(+), 12 deletions(-)
+Hi Lukasz,
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 96e281c..dbce706ed 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -59,22 +59,26 @@
- 				cpu0_alert0: cpu-alert-0 {
- 					temperature = <50000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu0_alert1: cpu-alert-1 {
- 					temperature = <60000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu0_alert2: cpu-alert-2 {
- 					temperature = <70000>; /* millicelsius */
- 					hysteresis = <5000>; /* millicelsius */
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu0_crit0: cpu-crit-0 {
- 					temperature = <120000>; /* millicelsius */
- 					hysteresis = <0>; /* millicelsius */
- 					type = "critical";
-+					irq-mode;
- 				};
- 				/*
- 				 * Exynos542x supports only 4 trip-points
-@@ -142,22 +146,26 @@
- 				cpu1_alert0: cpu-alert-0 {
- 					temperature = <50000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu1_alert1: cpu-alert-1 {
- 					temperature = <60000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu1_alert2: cpu-alert-2 {
- 					temperature = <70000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu1_crit0: cpu-crit-0 {
- 					temperature = <120000>;
- 					hysteresis = <0>;
- 					type = "critical";
-+					irq-mode;
- 				};
- 				cpu1_alert3: cpu-alert-3 {
- 					temperature = <70000>;
-@@ -209,22 +217,26 @@
- 				cpu2_alert0: cpu-alert-0 {
- 					temperature = <50000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu2_alert1: cpu-alert-1 {
- 					temperature = <60000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu2_alert2: cpu-alert-2 {
- 					temperature = <70000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu2_crit0: cpu-crit-0 {
- 					temperature = <120000>;
- 					hysteresis = <0>;
- 					type = "critical";
-+					irq-mode;
- 				};
- 				cpu2_alert3: cpu-alert-3 {
- 					temperature = <70000>;
-@@ -276,22 +288,26 @@
- 				cpu3_alert0: cpu-alert-0 {
- 					temperature = <50000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu3_alert1: cpu-alert-1 {
- 					temperature = <60000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu3_alert2: cpu-alert-2 {
- 					temperature = <70000>;
- 					hysteresis = <5000>;
--					type = "active";
-+					type = "passive";
-+					irq-mode;
- 				};
- 				cpu3_crit0: cpu-crit-0 {
- 					temperature = <120000>;
- 					hysteresis = <0>;
- 					type = "critical";
-+					irq-mode;
- 				};
- 				cpu3_alert3: cpu-alert-3 {
- 					temperature = <70000>;
--- 
-2.7.4
+Thanks for patches.
+
+I did not receive the first patches in the series. It is okay (depends
+on the context) but in such case sending cover letter to all people is
+quite useful. It helps to understand the entire patchset. Since I did
+not get them, I really do not know:
+1. Whether DTS patches are independent?
+2. How this fits in the big picture of Exynos thermal?
+
+
+> This patch adds support for new flash which indicates
+
+What is "flash"?
+
+Please wrap your lines accordingly (75 characters like in
+submitting-patches.rst). Current wrapping makes it more difficult to
+read.
+
+> that trip point triggers irq when temperature is met.
+> Exynos5433 supports 8 trip point which will trigger irq.
+
+"Exynos5433 supports 8 trip points which trigger interrupt."
+(or IRQ but not irq)
+
+> Above that number other trip points should be registered
+> without 'irq-mode' flag.
+
+Why they should be registered without irq-mode?
+
+> That will force the thermal framework to start polling
+> the temperature sensor under configured conditions and
+> handle the trip point.
+
+How does it fit into existing polling mode?
+
+>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 105 ++++++++++++++++---------
+>  1 file changed, 70 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+> index fe3a0b1..c4330f6 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+> @@ -17,37 +17,44 @@ thermal-zones {
+>                         atlas0_alert_0: atlas0-alert-0 {
+>                                 temperature = <65000>;  /* millicelsius */
+>                                 hysteresis = <1000>;    /* millicelsius */
+> -                               type = "active";
+> +                               type = "passive";
+
+Change of active->passive looks irrelevant to this topic. Here and
+everywhere else.
+
+Best regards,
+Krzysztof
