@@ -1,26 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Oct 2018 10:03:09 +0200
-Subject: [PATCH] gpio: uniphier: include <linux/bits.h> instead of
- <linux/bitops.h>
-In-Reply-To: <1539663093-15923-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1539663093-15923-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkda-0nM1BHRza91=4tG5cKA7qL4H8wC3Syn9g37OJ0dUHQ@mail.gmail.com>
+Date: Tue, 16 Oct 2018 10:04:24 +0200
+Subject: [PATCH] pinctrl: sunxi: Fix a memory leak in
+ 'sunxi_pinctrl_build_state()'
+In-Reply-To: <20181016062228.19472-1-christophe.jaillet@wanadoo.fr>
+References: <20181016062228.19472-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <CACRpkdYFjz_9mvvikCCdpJh=6S8F-u+kuJ3n55brA8e7wPhHtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 6:12 AM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Tue, Oct 16, 2018 at 8:22 AM Christophe JAILLET
+<christophe.jaillet@wanadoo.fr> wrote:
 
-> The reason of including <linux/bitops.h> here is just for BIT() and
-> GENMASK macros.
+> If 'krealloc()' fails, 'pctl->functions' is set to NULL.
+> We should instead use a temp variable in order to be able to free the
+> previously allocated memeory, in case of OOM.
 >
-> Since commit 8bd9cb51daac8 ("locking/atomics, asm-generic: Move some
-> macros from <linux/bitops.h> to a new <linux/bits.h> file"),
-> <linux/bits.h> is enough for such compile-time macros.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 
-Patch applied.
+Patch applied with Maxime's ACK.
 
 Yours,
 Linus Walleij
