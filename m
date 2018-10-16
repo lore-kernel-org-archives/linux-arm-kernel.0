@@ -1,128 +1,83 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 16 Oct 2018 14:27:58 -0700
-Subject: [PATCH V4 04/11] clk: imx: scu: add scu clock gpr divider
-In-Reply-To: <1539504194-28289-5-git-send-email-aisheng.dong@nxp.com>
+Date: Tue, 16 Oct 2018 14:30:40 -0700
+Subject: [PATCH V4 08/11] clk: imx: scu: add scu clock gpr mux
+In-Reply-To: <1539504194-28289-9-git-send-email-aisheng.dong@nxp.com>
 References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <153972527843.5275.15123840961402192766@swboyd.mtv.corp.google.com>
+ <1539504194-28289-9-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <153972544065.5275.2030080128764662219@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-10-14 01:07:52)
+Quoting A.s. Dong (2018-10-14 01:08:06)
+> diff --git a/drivers/clk/imx/scu/clk-mux-gpr-scu.c b/drivers/clk/imx/scu/clk-mux-gpr-scu.c
+> new file mode 100644
+> index 0000000..2ad7a80
+> --- /dev/null
+> +++ b/drivers/clk/imx/scu/clk-mux-gpr-scu.c
+> @@ -0,0 +1,90 @@
+> +// SPDX-License-Identifier: GPL-2.0+
 > +/*
-> + * clk_divider_scu_recalc_rate - Get clock rate for a SCU clock
-> + * @hw: clock to get rate for
-> + * @parent_rate: parent rate provided by common clock framework
-> + *
-> + * Gets the current clock rate of a SCU clock. Returns the current
-> + * clock rate, or zero in failure.
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017~2018 NXP
+> + *     Dong Aisheng <aisheng.dong@nxp.com>
 > + */
-> +static unsigned long clk_divider_gpr_scu_recalc_rate(struct clk_hw *hw,
-> +                                                    unsigned long parent_rate)
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +
+> +#include "clk-scu.h"
+> +
+> +struct clk_mux_gpr_scu {
+> +       struct clk_hw hw;
+> +       u32     rsrc_id;
+> +       u8      gpr_id;
+> +};
+> +
+> +#define to_clk_mux_gpr_scu(_hw) container_of(_hw, struct clk_mux_gpr_scu, hw)
+> +
+> +static u8 clk_mux_gpr_scu_get_parent(struct clk_hw *hw)
 > +{
-> +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-> +       u32 val;
+> +       struct clk_mux_gpr_scu *gpr_mux = to_clk_mux_gpr_scu(hw);
+> +       u32 val = 0;
 > +       int ret;
 > +
-> +       ret = imx_sc_misc_get_control(ccm_ipc_handle, clk->rsrc_id,
-> +                                     clk->gpr_id, &val);
+> +       ret = imx_sc_misc_get_control(ccm_ipc_handle, gpr_mux->rsrc_id,
+> +                                     gpr_mux->gpr_id, &val);
 > +       if (ret) {
-> +               pr_err("%s: failed to get clock rate %d\n",
+> +               pr_err("%s: failed to get clock parent %d\n",
 > +                       clk_hw_get_name(hw), ret);
 > +               return 0;
 > +       }
 > +
-> +       return val ? parent_rate / 2 : parent_rate;
+> +       return (u8)val;
 
-I hope parent_rate can't be zero here.
+Nitpick: Please drop explicit casts.
 
 > +}
 > +
-> +/*
-> + * clk_divider_scu_round_rate - Round clock rate for a SCU clock
-> + * @hw: clock to round rate for
-> + * @rate: rate to round
-> + * @parent_rate: parent rate provided by common clock framework
-> + *
-> + * Round clock rate for a SCU clock according to parent rate
-> + */
-> +static long clk_divider_gpr_scu_round_rate(struct clk_hw *hw, unsigned long rate,
-> +                                          unsigned long *prate)
+> +static int clk_mux_gpr_scu_set_parent(struct clk_hw *hw, u8 index)
 > +{
-> +       if (rate < *prate)
-> +               rate = *prate / 2;
-> +       else
-> +               rate = *prate;
-> +
-> +       return rate;
-> +}
-> +
-> +/*
-> + * clk_divider_scu_set_rate - Set rate for a SCU clock
-> + * @hw: clock to change rate for
-> + * @rate: target rate for the clock
-> + * @parent_rate: rate of the clock parent
-> + *
-> + * Sets a clock frequency for a SCU clock. Returns the SCU
-> + * protocol status.
-> + */
-> +static int clk_divider_gpr_scu_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                                       unsigned long parent_rate)
-> +{
-> +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-> +       uint32_t val;
-> +
-> +       val = (rate < parent_rate) ? 1 : 0;
-
-Nitpick: Write it out as 
-
-	val = 0;
-	if (rate < parent_rate)
-		val = 1;
-
-> +
-> +       return imx_sc_misc_set_control(ccm_ipc_handle, clk->rsrc_id,
-> +                                      clk->gpr_id, val);
-> +}
-> +
-> +static const struct clk_ops clk_divider_gpr_scu_ops = {
-> +       .recalc_rate = clk_divider_gpr_scu_recalc_rate,
-> +       .round_rate = clk_divider_gpr_scu_round_rate,
-> +       .set_rate = clk_divider_gpr_scu_set_rate,
-> +};
-> +
-> +struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char *parent_name,
-> +                                      u32 rsrc_id, u8 gpr_id)
-> +{
-> +       struct clk_divider_gpr_scu *div;
-> +       struct clk_init_data init;
-> +       struct clk_hw *hw;
+> +       struct clk_mux_gpr_scu *gpr_mux = to_clk_mux_gpr_scu(hw);
 > +       int ret;
 > +
-> +       div = kzalloc(sizeof(*div), GFP_KERNEL);
-> +       if (!div)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       div->rsrc_id = rsrc_id;
-> +       div->gpr_id = gpr_id;
-> +
-> +       init.name = name;
-> +       init.ops = &clk_divider_gpr_scu_ops;
-> +       init.flags = CLK_GET_RATE_NOCACHE;
+> +       ret = imx_sc_misc_set_control(ccm_ipc_handle, gpr_mux->rsrc_id,
+> +                                     gpr_mux->gpr_id, index);
+> +       if (ret)
+> +               pr_err("%s: failed to set clock parent %d\n",
+> +                       clk_hw_get_name(hw), ret);
 
-Same NOCACHE comment.
+Nitpick: These printks are cluttering the code, any chance they can be
+removed and you can rely on callers to care if something failed?
 
-> +       init.parent_names = parent_name ? &parent_name : NULL;
-> +       init.num_parents = parent_name ? 1 : 0;
 > +
-> +       div->hw.init = &init;
-> +
-> +       hw = &div->hw;
-> +       ret = clk_hw_register(NULL, hw);
-> +       if (ret) {
-> +               kfree(div);
-> +               hw = ERR_PTR(ret);
-> +       }
-> +
-> +       return hw;
+> +       return ret;
 > +}
+> +
+> +static const struct clk_ops clk_mux_gpr_scu_ops = {
+> +       .get_parent = clk_mux_gpr_scu_get_parent,
+> +       .set_parent = clk_mux_gpr_scu_set_parent,
+> +};
+> +
+> +struct clk_hw *clk_register_mux_gpr_scu(const char *name, const char * const *parents,
