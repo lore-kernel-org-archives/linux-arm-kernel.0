@@ -1,108 +1,40 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 16 Oct 2018 15:19:36 +0000
-Subject: [PATCH 3/5] drm: rcar-du: Add r8a77470 support
-In-Reply-To: <1733512.u0bX59egiB@avalon>
-References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1537553311-8831-4-git-send-email-fabrizio.castro@bp.renesas.com>
- <1733512.u0bX59egiB@avalon>
-Message-ID: <TY1PR01MB177079522CBA3E2B4180C923C0FE0@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 16 Oct 2018 16:57:58 +0200
+Subject: [PATCH] MAINTAINERS: mediatek: Update SoC entry
+Message-ID: <20181016145758.12995-1-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Laurent,
+Add IRC channel and URL of the wiki.
+Also add soc drivers folder and regex to catch more
+mediatek components.
 
-Thank you for your feedback.
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ MAINTAINERS | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> Subject: Re: [PATCH 3/5] drm: rcar-du: Add r8a77470 support
->
-> Hi Fabrizio,
->
-> Thank you for the patch.
->
-> On Friday, 21 September 2018 21:08:29 EEST Fabrizio Castro wrote:
-> > Add RZ/G1C (a.k.a. r8a77470) support to the R-Car DU driver.
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> >  drivers/gpu/drm/rcar-du/rcar_du_drv.c | 26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> >
-> > diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> > b/drivers/gpu/drm/rcar-du/rcar_du_drv.c index 02aee6c..c07d3f1 100644
-> > --- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> > +++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> > @@ -77,6 +77,31 @@ static const struct rcar_du_device_info
-> > rzg1_du_r8a7745_info = { },
-> >  };
-> >
-> > +static const struct rcar_du_device_info rzg1_du_r8a77470_info = {
-> > +.gen = 2,
-> > +.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
-> > +  | RCAR_DU_FEATURE_EXT_CTRL_REGS,
->
-> The DU driver has recently gained two new feature flags,
-> RCAR_DU_FEATURE_INTERLACED and RCAR_DU_FEATURE_TVM_SYNC. I believe that both
-> should be set here. Could you please confirm (and test) ?
-
-I can confirm that both feature flags need to be set and all the test pass.
-Will send a new version for this.
-
->
-> > +.channels_mask = BIT(1) | BIT(0),
-> > +.routes = {
-> > +/*
-> > + * R8A77470 has two RGB outputs, one LVDS output, and
-> > + * one analog video output (unsupported)
->
-> I'd write this "and one (currently unsupported) analog video output" to match
-> the other device entries. With this fixed,
-
-Will fix this as well.
-
-Thanks,
-Fab
-
->
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->
-> > + */
-> > +[RCAR_DU_OUTPUT_DPAD0] = {
-> > +.possible_crtcs = BIT(0),
-> > +.port = 0,
-> > +},
-> > +[RCAR_DU_OUTPUT_DPAD1] = {
-> > +.possible_crtcs = BIT(1),
-> > +.port = 1,
-> > +},
-> > +[RCAR_DU_OUTPUT_LVDS0] = {
-> > +.possible_crtcs = BIT(0) | BIT(1),
-> > +.port = 2,
-> > +},
-> > +},
-> > +};
-> > +
-> >  static const struct rcar_du_device_info rcar_du_r8a7779_info = {
-> >  .gen = 2,
-> >  .features = 0,
-> > @@ -297,6 +322,7 @@ static const struct rcar_du_device_info
-> > rcar_du_r8a77970_info = { static const struct of_device_id
-> > rcar_du_of_table[] = {
-> >  { .compatible = "renesas,du-r8a7743", .data = &rzg1_du_r8a7743_info },
-> >  { .compatible = "renesas,du-r8a7745", .data = &rzg1_du_r8a7745_info },
-> > +{ .compatible = "renesas,du-r8a77470", .data = &rzg1_du_r8a77470_info },
-> >  { .compatible = "renesas,du-r8a7779", .data = &rcar_du_r8a7779_info },
-> >  { .compatible = "renesas,du-r8a7790", .data = &rcar_du_r8a7790_info },
-> >  { .compatible = "renesas,du-r8a7791", .data = &rcar_du_r8a7791_info },
->
-> --
-> Regards,
->
-> Laurent Pinchart
->
->
-
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6ac000cc006d..66782dad6487 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1676,13 +1676,17 @@ ARM/Mediatek SoC support
+ M:	Matthias Brugger <matthias.bgg@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
++W:	https://mtk.bcnfs.org/
++C:	irc://chat.freenode.net/linux-mediatek
+ S:	Maintained
+ F:	arch/arm/boot/dts/mt6*
+ F:	arch/arm/boot/dts/mt7*
+ F:	arch/arm/boot/dts/mt8*
+ F:	arch/arm/mach-mediatek/
+ F:	arch/arm64/boot/dts/mediatek/
++F:	drivers/soc/mediatek/
+ N:	mtk
++N:	mt[678]
+ K:	mediatek
+ 
+ ARM/Mediatek USB3 PHY DRIVER
+-- 
+2.19.1
