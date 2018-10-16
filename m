@@ -1,70 +1,35 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 16 Oct 2018 17:27:14 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
- corruption on Hi16xx soc
-In-Reply-To: <db0943c2-7a20-d0f9-0a2c-e37b57618761@arm.com>
-References: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
- <db0943c2-7a20-d0f9-0a2c-e37b57618761@arm.com>
-Message-ID: <5BC5AEF2.9030505@huawei.com>
+From: javierm@redhat.com (Javier Martinez Canillas)
+Date: Tue, 16 Oct 2018 11:32:34 +0200
+Subject: [PATCH 1/3] driver core: add probe_err log helper
+In-Reply-To: <20181016072244.1216-2-a.hajda@samsung.com>
+References: <20181016072244.1216-1-a.hajda@samsung.com>
+ <CGME20181016072249eucas1p2303b8c06a9f7c839a971fe065b0c752e@eucas1p2.samsung.com>
+ <20181016072244.1216-2-a.hajda@samsung.com>
+Message-ID: <a0dc2316-fb5d-31cf-7e21-442a2968f649@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Andrzej,
 
+On 10/16/2018 09:22 AM, Andrzej Hajda wrote:
+> During probe every time driver gets resource it should usually check for error
+> printk some message if it is not -EPROBE_DEFER and return the error. This
+> pattern is simple but requires adding few lines after any resource acquisition
+> code, as a result it is often omited or implemented only partially.
+> probe_err helps to replace such code seqences with simple call, so code:
+> 	if (err != -EPROBE_DEFER)
+> 		dev_err(dev, ...);
+> 	return err;
+> becomes:
+> 	return probe_err(dev, err, ...);
+> 
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> ---
 
-On 2018/10/15 21:52, Robin Murphy wrote:
-> On 15/10/18 09:36, Zhen Lei wrote:
->> ITS translation register map:
->> 0x0000-0x003C    Reserved
->> 0x0040        GITS_TRANSLATER
->> 0x0044-0xFFFC    Reserved
->>
->> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
->> expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
->> data will be written to MSIAddress each time.
->>
->> MSIAddr: |----4bytes----|----4bytes----|
->>      |    MSIData   |    IMPDEF    |
->>
->> There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
->> But it will overwrite the 4 bytes memory following "sync_count". It's very
->> luckly that the previous and the next neighbour of "sync_count" are both aligned
->> by 8 bytes, so no problem is met now.
->>
->> It's good to explicitly add a workaround:
->> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
->>     aligned by 8 bytes.
->> 2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
-> 
-> Surely the u64 member inherently makes the union, and thus the u32 member as well, 64-bit-aligned anyway?
+Reviewed-by: Javier Martinez Canillas <javierm@redhat.com>
 
-Yes, we really only need one step, "1." or "2.". As John Garry suggested, I will change it to "struct" mode.
-
-> 
-> Robin.
-> 
->> There is no functional change.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   drivers/iommu/arm-smmu-v3.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 5059d09..a07bc0d 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -586,7 +586,10 @@ struct arm_smmu_device {
->>         struct arm_smmu_strtab_cfg    strtab_cfg;
->>   +    union {
->> +    u64                padding; /* workaround for Hisilicon */
->>       u32                sync_count;
->> +    } __attribute__((aligned(8)));
->>         /* IOMMU core code handle */
->>       struct iommu_device        iommu;
->>
-> 
-> 
-
+Best regards,
 -- 
-Thanks!
-BestRegards
+Javier Martinez Canillas
+Software Engineer - Desktop Hardware Enablement
+Red Hat
