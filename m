@@ -1,17 +1,94 @@
-From: valentin.schneider@arm.com (Valentin Schneider)
-Date: Tue, 16 Oct 2018 11:01:30 +0100
-Subject: [BUG] hikey960: psci: Failure to boot CPU after hotplug
-In-Reply-To: <cf313cf7-c416-2693-8a9d-0d6f122f2018@arm.com>
-References: <cf313cf7-c416-2693-8a9d-0d6f122f2018@arm.com>
-Message-ID: <e842855e-e99a-378e-49ec-187384e1418c@arm.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 16 Oct 2018 18:02:41 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
+ corruption on Hi16xx soc
+In-Reply-To: <20181015124617.GA12972@e119886-lin.cambridge.arm.com>
+References: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
+ <20181015124617.GA12972@e119886-lin.cambridge.arm.com>
+Message-ID: <5BC5B741.4020801@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2018 19:00, Valentin Schneider wrote:
-> [...]
 
-This was initially sent on Sunday but only got delivered today. In the
-meantime I dug a bit deeper and I think it has to do with the firmware
-implementation of PSCI. I raised a ticket for ATF ([1]).
 
-[1]: https://github.com/ARM-software/tf-issues/issues/638
+On 2018/10/15 20:46, Andrew Murray wrote:
+> Hi Zhen,
+> 
+> On Mon, Oct 15, 2018 at 04:36:16PM +0800, Zhen Lei wrote:
+>> ITS translation register map:
+>> 0x0000-0x003C	Reserved
+>> 0x0040		GITS_TRANSLATER
+>> 0x0044-0xFFFC	Reserved
+>>
+>> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
+>> expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
+>> data will be written to MSIAddress each time.
+>>
+>> MSIAddr: |----4bytes----|----4bytes----|
+>> 	 |    MSIData   |    IMPDEF    |
+>>
+>> There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
+>> But it will overwrite the 4 bytes memory following "sync_count". It's very
+>> luckly that the previous and the next neighbour of "sync_count" are both aligned
+>> by 8 bytes, so no problem is met now.
+> 
+> My understanding is that MSI's are 32bit memory writes and as such the SMMU
+> performs a 32bit write in response to the MSI. If so then what is different
+> with the Hi16xx that causes a problem? Have you been able to able to adjust
+> the layout of the arm_smmu_device struct to demonstrate this?
+
+In normal, only 32bits MSIdata will be written into sync_count:
+|----4bytes----|----4bytes----|
+|  sync_count  |     xxxx     |
+
+But for Hi16xx, the ITS hardware will write extra 32bits IMDDEF data into "xxxx". If
+"xxxx" is the space of the next struct member, its value will be overwritten.
+
+> 
+> Thanks,
+> 
+> Andrew Murray
+> 
+>>
+>> It's good to explicitly add a workaround:
+>> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
+>>    aligned by 8 bytes.
+>> 2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
+>>
+>> There is no functional change.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 5059d09..a07bc0d 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -586,7 +586,10 @@ struct arm_smmu_device {
+>>  
+>>  	struct arm_smmu_strtab_cfg	strtab_cfg;
+>>  
+>> +	union {
+>> +	u64				padding; /* workaround for Hisilicon */
+>>  	u32				sync_count;
+>> +	} __attribute__((aligned(8)));
+>>  
+>>  	/* IOMMU core code handle */
+>>  	struct iommu_device		iommu;
+>> -- 
+>> 1.8.3
+>>
+>>
+>> _______________________________________________
+>> iommu mailing list
+>> iommu at lists.linux-foundation.org
+>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> 
+> .
+> 
+
+-- 
+Thanks!
+BestRegards
