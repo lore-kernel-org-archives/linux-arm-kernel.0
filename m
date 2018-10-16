@@ -1,25 +1,106 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Oct 2018 12:17:37 +0800
-Subject: [PATCH v4 7/7] mfd: axp20x: Add supported cells for AXP803
-In-Reply-To: <20181013080848.29894-8-oskari@lemmela.net>
-References: <20181013080848.29894-1-oskari@lemmela.net>
- <20181013080848.29894-8-oskari@lemmela.net>
-Message-ID: <CAGb2v66aJUYOkZL=b5TfnvLsbLk_mU8AQtR3BSBRM-49rh2yOA@mail.gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Tue, 16 Oct 2018 04:37:31 +0000
+Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+In-Reply-To: <153962195779.5275.17500455384946496344@swboyd.mtv.corp.google.com>
+References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
+ <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
+ <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
+ <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
+ <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
+ <153898445180.119890.15025812558797341532@swboyd.mtv.corp.google.com>
+ <DB3PR0402MB391664354775DF42E90E67C9F5E60@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <153937368201.5275.2313781259297807972@swboyd.mtv.corp.google.com>
+ <DB3PR0402MB39169A3BA844F7833B62FF55F5FD0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <153962195779.5275.17500455384946496344@swboyd.mtv.corp.google.com>
+Message-ID: <AM6PR0402MB39112C0451B6E241AEBAC0D7F5FE0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 4:09 PM Oskari Lemmela <oskari@lemmela.net> wrote:
->
-> AXP803 is compatible with AXP813.
-> Adding cells for GPIO, ADC, AC and battery power supplies.
+Hi, Stephen
 
-They are not _completely_ compatible. A better way to phrase this would be:
+Anson Huang
+Best Regards!
 
-Parts of the AXP803 are compatible with their counterparts on the AXP813.
-These include the GPIO, ADC, AC and battery power supplies.
 
-> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> -----Original Message-----
+> From: Stephen Boyd <sboyd@kernel.org>
+> Sent: Tuesday, October 16, 2018 12:46 AM
+> To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
+> mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
+> Anson Huang <anson.huang@nxp.com>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
+> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
+> Cc: dl-linux-imx <linux-imx@nxp.com>
+> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+> 
+> Quoting Anson Huang (2018-10-15 02:33:35)
+> > > > > >
+> > > > >
+> > > > > Why can't we add clks to the op-tee node in DT's /firmware container?
+> > > > > Then any clks in there can be turned on forever and left enabled
+> > > > > by the linux driver?
+> > > >
+> > > > I did NOT run op-tee with Linux-next kernel before, can you advise more?
+> > >
+> > > Neither have I, so I can't advise more.
+> > >
+> > > > And I think if op-tee has such requirement, can we have another
+> > > > patch to cover it?
+> > >
+> > > Yes.
+> > >
+> > >
+> > > > I believe all other i.MX platforms also have same requirements if
+> > > > considering op-tee support, so I think it should be another topic,
+> > > > what do you
+> > > think?
+> > > >
+> > >
+> > > I'm going to drop these patches from my review queue. Please resend
+> > > them and please include the op-tee patches too.
+> >
+> >
+> > I do NOT know how to include the op-tee patch to meet special
+> > requirement, should the op-tee related patch be added later when someone
+> actually add the op-tee support for i.MX7?
+> > It should NOT block this patch set, do you think we can add this patch set
+> first?
+> >
+> 
+> Please resend the two patches. In the commit text for the second patch,
+> describe the plan to remove CLK_IS_CRITICAL from these clks by adding an
+> OP-TEE device/driver to the kernel to keep these clks enabled. My
+> understanding is that there isn't an OP-TEE driver right now, but these clks are
+> used by the firmware and can't be turned off in Linux. If in the future we want
+> to be able to turn them on and off, we'll need to add them to an OP-TEE device
+> node and have that driver manage the clks.
+> 
+> How that will work when a system doesn't enable the OP-TEE driver I'm not
+> sure. We may need to develop some system whereby clks like this are handed
+> from the clk controller to the consumer driver when it's enabled for further
+> power managment, but if they're never handed off, they're kept on forever like
+> is done here. Anyway, please resend with a note about why these are marked
+> CLK_IS_CRITICAL.
+ 
+I think there is some misunderstanding here, this patch sets those critical clocks
+with CLK_IS_CRITICAL flag to let clock driver keep them always ON, as they are
+critical clocks and system (Linux kernel, NOT include op-tee) can NOT run normally
+if anyone of them is OFF.
 
-Otherwise,
+The question about op-tee is, there might be some special clocks needed by op-tee,
+for example, currently clk A, B and C are kept always ON for Linux kernel to run normally,
+but when op-tee is executing, it might need clk D to be ON, so I think the clk D is needed
+ONLY for op-tee, op-tee should have a driver or firmware to runtime ON/OFF clk D as needed.
+Since I do NOT know what clocks op-tee needs, so I will leave them to be added by op-tee
+owner, whoever enables op-tee, he should consider where to manage its special clocks,
+either in clk driver or op-tee driver/firmware.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+So do we still need to mention the op-tee related info in commit text? Actually, this patch
+is just to replace those always-ON clocks in clks_init_on array with CLK_IS_CRITICAL flag.
+Then no need to explicitly enable clocks in clks_init_on array and just rely on common clk
+framework which will enable all clocks with CLK_IS_CRITICAL flag set, it will align with all
+other i.MX SoCs clk driver.
+
+Anson.
