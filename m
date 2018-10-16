@@ -1,74 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Oct 2018 12:11:47 +0800
-Subject: [PATCH v4 3/7] arm64: dts: allwinner: axp803: add AC and battery
- power supplies
-In-Reply-To: <20181013080848.29894-4-oskari@lemmela.net>
-References: <20181013080848.29894-1-oskari@lemmela.net>
- <20181013080848.29894-4-oskari@lemmela.net>
-Message-ID: <CAGb2v66mUEOzN97655pz6EWvN4fu+b-bT02JhwrTE+Ru+6gR8Q@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 16 Oct 2018 13:11:33 +0900
+Subject: [PATCH] gpio: uniphier: include <linux/bits.h> instead of
+ <linux/bitops.h>
+Message-ID: <1539663093-15923-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 4:09 PM Oskari Lemmela <oskari@lemmela.net> wrote:
->
-> AXP803 is compatible with AXP813. Add DT nodes ADC, GPIO,
-> AC and battery power supplies.
->
-> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
-> ---
->  arch/arm64/boot/dts/allwinner/axp803.dtsi | 31 +++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-> index e5eae8bafc42..128177178615 100644
-> --- a/arch/arm64/boot/dts/allwinner/axp803.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-> @@ -49,6 +49,37 @@
->         interrupt-controller;
->         #interrupt-cells = <1>;
->
-> +       ac_power_supply: ac-power-supply {
-> +               compatible = "x-powers,axp813-ac-power-supply";
+The reason of including <linux/bitops.h> here is just for BIT() and
+GENMASK macros.
 
-Even though they seem to be compatible, please add a model specific
-compatible string in front for all the new nodes just in case. In
-this case it would be "x-powers,axp803-ac-power-supply".
+Since commit 8bd9cb51daac8 ("locking/atomics, asm-generic: Move some
+macros from <linux/bitops.h> to a new <linux/bits.h> file"),
+<linux/bits.h> is enough for such compile-time macros.
 
-ChenYu
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-> +               status = "disabled";
-> +       };
-> +
-> +       axp_adc: adc {
-> +               compatible = "x-powers,axp813-adc";
-> +               #io-channel-cells = <1>;
-> +       };
-> +
-> +       axp_gpio: gpio {
-> +               compatible = "x-powers,axp813-gpio";
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
-> +
-> +               gpio0_ldo: gpio0-ldo {
-> +                       pins = "GPIO0";
-> +                       function = "ldo";
-> +               };
-> +
-> +               gpio1_ldo: gpio1-ldo {
-> +                       pins = "GPIO1";
-> +                       function = "ldo";
-> +               };
-> +       };
-> +
-> +       battery_power_supply: battery-power-supply {
-> +               compatible = "x-powers,axp813-battery-power-supply";
-> +               status = "disabled";
-> +       };
-> +
->         regulators {
->                 /* Default work frequency for buck regulators */
->                 x-powers,dcdc-freq = <3000>;
-> --
-> 2.17.1
->
+ drivers/gpio/gpio-uniphier.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpio/gpio-uniphier.c b/drivers/gpio/gpio-uniphier.c
+index 7fdac90..74551cbd 100644
+--- a/drivers/gpio/gpio-uniphier.c
++++ b/drivers/gpio/gpio-uniphier.c
+@@ -12,7 +12,7 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/bitops.h>
++#include <linux/bits.h>
+ #include <linux/gpio/driver.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+-- 
+2.7.4
