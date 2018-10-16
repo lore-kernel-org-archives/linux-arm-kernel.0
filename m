@@ -1,41 +1,43 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue, 16 Oct 2018 17:54:46 +0200
-Subject: [PATCH 09/11] DT: arm: exynos: add support for thermal trip
- irq-mode
-In-Reply-To: <CAJKOXPdKoxB3aN+1y48WD9Gv2P6KvSFSiD6aCk+PimBooE3YWg@mail.gmail.com>
-References: <CGME20181016145651eucas1p1ea84684e37e67b4161548e6cff489cb8@eucas1p1.samsung.com>
- <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
- <20181016145651eucas1p1ea84684e37e67b4161548e6cff489cb8~eHqPK-tM31616816168eucas1p1y@eucas1p1.samsung.com>
- <CAJKOXPdKoxB3aN+1y48WD9Gv2P6KvSFSiD6aCk+PimBooE3YWg@mail.gmail.com>
-Message-ID: <20181016155448eucas1p26b5aaaf626771b42a2f8c54808391f43~eIc1fLmJw0976609766eucas1p2x@eucas1p2.samsung.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 16 Oct 2018 15:57:40 +0000
+Subject: [PATCH v3 0/4] Port mxs-dcp to imx6ull and imx6sll
+Message-ID: <cover.1539705285.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The DCP block is present on 6sll and 6ull but not enabled. The hardware is
+mostly compatible with 6sl, the only important difference is that explicit
+clock enabling is required.
 
-On 10/16/2018 05:13 PM, Krzysztof Kozlowski wrote:
-> On Tue, 16 Oct 2018 at 16:56, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->>
->> This patch adds support for new flash which indicates
->> that trip point triggers irq when temperature is met.
->> Exynos5433 supports 8 trip point which will trigger irq.
-> 
-> Exynos5420? 4 trip point
-Thanks, you are right. I will fix the comment in a few places.
-> 
-> BTW, I just noted that you skipped samsung-soc mailing list.
-> 
-> DTS patches always should go through arm-soc so in case of Exynos -
-> linux-samsung-soc mailing list. The list should be also CC-ed if you
-> touch other Exynos or Samsung related code and get_maintainers.pl
-> always point it. Because you skipped it, some people might miss your
-> patches and definitely Patchwork which I am using won't see them
-> (https://patchwork.kernel.org/project/linux-samsung-soc/list/).
-OK, I will push v2 through that list also.
+There were several issues with the functionality of this driver (it didn't
+even probe properly) but they are fixed in cryptodev/master by this series:
+    https://lore.kernel.org/patchwork/cover/994874/
 
-Regards,
-Lukasz
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
+---
+Changes since v2:
+ * Rename 6ull dcp node to crypto@*
+ * Use clk_prepare_enable on probe
+ * Fix not unpreparing on remove
+ * Realign dcp_clk struct member with rest of attributes (using tabs)
+ * Link to v2: https://lore.kernel.org/patchwork/cover/999795/
+
+Changes since v1:
+ * Add devicetree maintainers for dt-bindings
+ * Add a patch enabling in imx_v6_v7_defconfig. Since tcrypt now passes this
+shouldn't cause any issues
+ * Link to v1: https://lore.kernel.org/patchwork/cover/994893/
+
+Leonard Crestez (4):
+  dt-bindings: crypto: Mention clocks for mxs-dcp
+  crypto: mxs-dcp - Add support for dcp clk
+  ARM: dts: imx6ull: Add dcp node
+  ARM: imx_v6_v7_defconfig: Enable CRYPTO_DEV_MXS_DCP
+
+ .../devicetree/bindings/crypto/fsl-dcp.txt        |  2 ++
+ arch/arm/boot/dts/imx6ull.dtsi                    | 10 ++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig              |  1 +
+ drivers/crypto/mxs-dcp.c                          | 15 +++++++++++++++
+ 4 files changed, 28 insertions(+)
+
+-- 
+2.17.1
