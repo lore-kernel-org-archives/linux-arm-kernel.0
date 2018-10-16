@@ -1,67 +1,30 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 16 Oct 2018 12:47:22 +0200
-Subject: [PATCH] perf tools: Store ids for events with their own cpus
- perf_event__synthesize_event_update_cpus
-In-Reply-To: <d1cc40ee-4b09-35a8-86d2-bfc0eb78b9d5@huawei.com>
-References: <20181002111621.GA6357@krava> <20181003113643.GA31725@krava>
- <594506a2-8cb3-3d09-82ab-5cb6d8c31ed0@huawei.com>
- <20181003141627.GA6341@krava> <20181003212052.GA32371@krava>
- <d071bb27-5533-da2f-9f8f-808183e04794@huawei.com>
- <20181009100049.GF6499@krava>
- <31101407-0bcd-2fbf-361e-43cbcb81cd19@huawei.com>
- <20181015191502.GA2398@kernel.org>
- <d1cc40ee-4b09-35a8-86d2-bfc0eb78b9d5@huawei.com>
-Message-ID: <20181016104722.GA18450@krava>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 16 Oct 2018 12:00:26 +0100
+Subject: [PATCH v2 0/3] arm64: cpufeature: Fix handling of CTR_EL0
+In-Reply-To: <20181009134707.3479-1-suzuki.poulose@arm.com>
+References: <20181009134707.3479-1-suzuki.poulose@arm.com>
+Message-ID: <20181016110005.GF108539@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 10:10:20AM +0100, John Garry wrote:
-> On 15/10/2018 20:15, Arnaldo Carvalho de Melo wrote:
-> > Em Fri, Oct 12, 2018 at 02:25:49PM +0100, John Garry escreveu:
-> > > On 09/10/2018 11:00, Jiri Olsa wrote:
-> > > > On Thu, Oct 04, 2018 at 10:20:39AM +0100, John Garry wrote:
-> > > > 
-> > > > SNIP
-> > > > 
-> > > > > > We synthesize an update event that needs to touch the evsel
-> > > > > > id array, which is not defined at that time. Fixing this by
-> > > > > > forcing the id allocation for events with theeir own cpus.
-> > > 
-> > > /s/theeir/their/
-> > > 
-> > > > > > 
-> > > > > > Reported-by: John Garry <john.garry@huawei.com>
-> > > > > > Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
-> > > > > 
-> > > > > Tested-by: John Garry <john.garry@huawei.com>
-> > > > > 
-> > > > > In terms of adding to stable, LT v4.14 is not affected, but 4.18.x is.
-> > > > > 
-> > > > > Thanks,
-> > > > > John
-> > > > 
-> > > > Arnaldo, could you please pick up this one
-> > > > 
-> > > 
-> > > Just a friendly reminder on this patch.
-> > > 
-> > > How about re-send with an updated commit message also?
-> > 
-> > I'll fix up the commit message and apply, thanks.
-> > 
+On Tue, Oct 09, 2018 at 02:47:03PM +0100, Suzuki K. Poulose wrote:
+> This series makes sure that we handle the CTR_EL0 field mismatches
+> properly, especially for the IDC field. Also, skip trapping CTR
+> accesses on a CPU if it matches the safe value.
 > 
-> Much appreciated.
+> Applies on arm64 for-next/core.
 > 
-> BTW, I think that we should add a fixes tag. But I'm not sure if this patch
-> fixes the commit I bisected to earlier (bfd8f72c2778f5bd63d), or that same
-> commit just exposed some latent bug.
+> Changes since v1
+>  - Fix wrong hunk in has_cache_idc()
+>  - Allow a late secondary CPU with raw CTR_EL0.IDC = 0 and effective
+>    CTR_EL0.IDC = 1, to boot on a system without IDC available.
 > 
-> Jirka, Andi, Do you know?
+> Suzuki K Poulose (3):
+>   arm64: cpufeature: ctr: Fix cpu capability check for late CPUs
+>   arm64: cpufeature: Fix handling of CTR_EL0.IDC field
+>   arm64: cpufeature: Trap CTR_EL0 access only where it is necessary
 
-yes, that commit moved it to record, which resulted in this fault
+Queued for 4.20. Thanks.
 
-Arnaldo, could you please add:
-Fixes: bfd8f72c2778 ("perf record: Synthesize unit/scale/... in event update")
-
-thanks,
-jirka
+-- 
+Catalin
