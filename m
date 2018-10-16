@@ -1,102 +1,103 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 16 Oct 2018 15:57:41 +0200
-Subject: [PATCH 05/10] drm/sun4i: Explicitly list and check formats
- supported by the frontend
-In-Reply-To: <20180323100659.vojpyt7eazioevdj@flea>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-6-paul.kocialkowski@bootlin.com>
- <20180323100659.vojpyt7eazioevdj@flea>
-Message-ID: <23f66de8a3e55cba253b89328f0f268a7c4df29d.camel@paulk.fr>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 16 Oct 2018 15:58:41 +0200
+Subject: [PATCH 5/5] pinctrl: mediatek: Add initial pinctrl driver for
+ MT6797 SoC
+In-Reply-To: <20181011164429.GA18174@Mani-XPS-13-9360>
+References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
+ <20181008191411.32555-6-manivannan.sadhasivam@linaro.org>
+ <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
+ <20181011164429.GA18174@Mani-XPS-13-9360>
+Message-ID: <e7abee72-23a3-4716-baf0-484514bbb019@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Le vendredi 23 mars 2018 ? 11:06 +0100, Maxime Ripard a ?crit :
-> On Wed, Mar 21, 2018 at 04:28:59PM +0100, Paul Kocialkowski wrote:
-> > In order to check whether the frontend supports a specific format, an
-> > explicit list and a related helper are introduced.
-> > 
-> > They are then used to determine whether the frontend can actually support
-> > the requested format when it was selected to be used.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_backend.c  |  5 ++++
-> >  drivers/gpu/drm/sun4i/sun4i_frontend.c | 44 ++++++++++++++++++++++++++++++++++
-> >  drivers/gpu/drm/sun4i/sun4i_frontend.h |  1 +
-> >  3 files changed, 50 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > index 7703ba989743..1fad0714c70e 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > @@ -532,6 +532,11 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-> >  		struct drm_format_name_buf format_name;
-> >  
-> >  		if (sun4i_backend_plane_uses_frontend(plane_state)) {
-> > +			if (!sun4i_frontend_format_is_supported(fb->format->format)) {
-> > +				DRM_DEBUG_DRIVER("Frontend plane check failed\n");
-> > +				return -EINVAL;
-> > +			}
-> > +
+
+On 11/10/2018 18:44, Manivannan Sadhasivam wrote:
+> On Thu, Oct 11, 2018 at 05:50:19PM +0200, Matthias Brugger wrote:
+>>
+>>
+>> On 08/10/2018 21:14, Manivannan Sadhasivam wrote:
+>>> Add initial pinctrl driver for Mediatek MT6797 SoC supporting only
+>>> GPIO and pinmux configurations.
+>>>
+>>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+>>> ---
+>>>  drivers/pinctrl/mediatek/Kconfig              |    7 +
+>>>  drivers/pinctrl/mediatek/Makefile             |    1 +
+>>>  drivers/pinctrl/mediatek/pinctrl-mt6797.c     |   82 +
+>>>  drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h | 2430 +++++++++++++++++
+>>>  4 files changed, 2520 insertions(+)
+>>>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt6797.c
+>>>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+>>>
+>> [...]
+>>> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+>>> new file mode 100644
+>>> index 000000000000..8949d2a15c39
+>>> --- /dev/null
+>>> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+>>> @@ -0,0 +1,2430 @@
+>>> +/* SPDX-License-Identifier: GPL-2.0 */
+>>> +/*
+>>> + * Based on pinctrl-mtk-mt6765.h
+>>> + *
+>>> + * Copyright (C) 2018 MediaTek Inc.
+>>> + *
+>>> + * Author: ZH Chen <zh.chen@mediatek.com>
+>>> + *
+>>> + * Copyright (c) 2018 Manivannan Sadhasivam
+>>> + */
+>>> +
+>>> +#ifndef __PINCTRL_MTK_MT6797_H
+>>> +#define __PINCTRL_MTK_MT6797_H
+>>> +
+>>> +#include "pinctrl-paris.h"
+>>> +
+>>> +static const struct mtk_pin_desc mtk_pins_mt6797[] = {
+>>> +	MTK_PIN(
+>>> +		0, "GPIO0",
+>>> +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
+>>> +		DRV_GRP3,
+>>
+>> As far as I have seen, you put all pins in driving group 3, but from the public
+>> available "Functional Specification" (page 51-81) I can see that there exist
+>> several driving groups:
+>> 2/4/6/8 mA (DRV_GRP3)
+>> 4/8/12/16 mA (not sure which group this is)
+>> 2/4/6/8/10/12/14/16 mA (DRV_GRP4).
+>>
 > 
-> So you're checking if the frontend doesn't support it and if the
-> backend doesn't support it. Who supports it then? :)
+> Not sure about that. But I derived the configuration from DRV_CFGx
+> registers available in "Application Software Register Table - Part 1"
+> from page no: 906.
 > 
-> Like I was saying, this should be moved to the previous patch, within
-> sun4i_backend_plane_uses_frontend.
+> This register supports 2/4/6/8mA and this belongs to DRV_GRP2/DRV_GRP3
+> [1].
 
-You're right, this isn't the right place to put it.
-sun4i_backend_plane_uses_frontend should definitely guarantee that the
-format is supported.
+I can see other driving groups as defined in the "Functional Specification" [1]
+which gets also reflected in the "Application Software Register Table - Part 1"
+[2], see for example page 852.
 
-> > +static const uint32_t sun4i_frontend_formats[] = {
-> > +	/* RGB */
-> > +	DRM_FORMAT_XRGB8888,
-> > +	DRM_FORMAT_BGRX8888,
-> > +	/* YUV444 */
-> > +	DRM_FORMAT_YUV444,
-> > +	DRM_FORMAT_YVU444,
-> > +	/* YUV422 */
-> > +	DRM_FORMAT_YUYV,
-> > +	DRM_FORMAT_YVYU,
-> > +	DRM_FORMAT_UYVY,
-> > +	DRM_FORMAT_VYUY,
-> > +	DRM_FORMAT_NV16,
-> > +	DRM_FORMAT_NV61,
-> > +	DRM_FORMAT_YUV422,
-> > +	DRM_FORMAT_YVU422,
-> > +	/* YUV420 */
-> > +	DRM_FORMAT_NV12,
-> > +	DRM_FORMAT_NV21,
-> > +	DRM_FORMAT_YUV420,
-> > +	DRM_FORMAT_YVU420,
-> > +	/* YUV411 */
-> > +	DRM_FORMAT_YUV411,
-> > +	DRM_FORMAT_YVU411,
-> > +};
+CCing Mars, maybe he can help to clarify.
+
+Regards,
+Matthias
+
+[1]
+https://www.96boards.org/documentation/consumer/mediatekx20/additional-docs/docs/MT6797_Functional_Specification_V1_0.pdf
+[2]
+https://www.96boards.org/documentation/consumer/mediatekx20/additional-docs/docs/MT6797_Register_Table_Part_1.pdf
+
 > 
-> I think this list should reflect what the driver currently supports,
-> not what the hardware supports.
-
-Agreed, this should be updated with the follow-up patch that adds YUV
-support.
-
-Cheers,
-
-Paul
-
--- 
-Developer of free digital technology and hardware support.
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181016/1e66ee01/attachment.sig>
+> Still I'm not fully confident of my choice here. Maybe Sean can throw
+> some inputs!
+> 
+> Thanks,
+> Mani
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c#n40
+> 
+>> Regards,
+>> Matthias
+>>
