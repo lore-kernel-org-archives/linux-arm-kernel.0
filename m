@@ -1,18 +1,25 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Oct 2018 12:15:19 +0800
-Subject: [PATCH v4 6/7] mfd: axp20x: Add AC power supply cell for AXP813
-In-Reply-To: <20181013080848.29894-7-oskari@lemmela.net>
+Date: Tue, 16 Oct 2018 12:17:37 +0800
+Subject: [PATCH v4 7/7] mfd: axp20x: Add supported cells for AXP803
+In-Reply-To: <20181013080848.29894-8-oskari@lemmela.net>
 References: <20181013080848.29894-1-oskari@lemmela.net>
- <20181013080848.29894-7-oskari@lemmela.net>
-Message-ID: <CAGb2v678XQtLwu8RqCHT8pf4dS+7viyP6dOihgKd5AFZTJxYVg@mail.gmail.com>
+ <20181013080848.29894-8-oskari@lemmela.net>
+Message-ID: <CAGb2v66aJUYOkZL=b5TfnvLsbLk_mU8AQtR3BSBRM-49rh2yOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Oct 13, 2018 at 4:09 PM Oskari Lemmela <oskari@lemmela.net> wrote:
 >
-> As axp20x-ac-power-supply now supports AXP813, add a cell for it.
->
+> AXP803 is compatible with AXP813.
+> Adding cells for GPIO, ADC, AC and battery power supplies.
+
+They are not _completely_ compatible. A better way to phrase this would be:
+
+Parts of the AXP803 are compatible with their counterparts on the AXP813.
+These include the GPIO, ADC, AC and battery power supplies.
+
 > Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+
+Otherwise,
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
