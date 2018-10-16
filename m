@@ -1,114 +1,36 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 16 Oct 2018 09:16:26 +0200
-Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown
- hooks into pm_runtime hooks
-In-Reply-To: <20181016031141.16259-1-anarsoul@gmail.com>
-References: <20181016031141.16259-1-anarsoul@gmail.com>
-Message-ID: <20181016071626.m6jkoiixkvxks5ob@flea>
+Date: Tue, 16 Oct 2018 09:21:36 +0200
+Subject: [PATCH v5 0/2] Neutis N5 support
+In-Reply-To: <1539604192-17561-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+References: <1539339841-22235-2-git-send-email-aleksandr.aleksandrov@emlid.com>
+ <1539604192-17561-1-git-send-email-aleksandr.aleksandrov@emlid.com>
+Message-ID: <20181016072136.3belesnmrvbejiro@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 08:11:41PM -0700, Vasily Khoruzhick wrote:
-> startup() and shutdown() hooks are called for both substreams,
-> so stopping either substream when another is running breaks the
-> latter.
+On Mon, Oct 15, 2018 at 02:49:48PM +0300, Aleksandr Aleksandrov wrote:
+> This patch addes Neutis N5 support.
+> Emlid Neutis N5 is a SoM based on Allwinner H5.
+> The patch includes device tree file for Dev board
+> and dtsi file for SoM needs.
 > 
-> E.g. playback breaks if capture is stopped when playback is running.
+> Changes from v1: separate dts file: dtsi for SoM
+> and motherboard dts file that inlcudes dtsi file.
 > 
-> Move code from startup() and shutdown() to resume() and suspend()
-> hooks respectively to fix this issue
+> Changes from v2 (5 oct 2018):
+> - makefile: dtb-$(CONFIG_ARCH_SUNXI) - ordered alphabetically
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
-> v2: - rename from "ASoC: sun4i-i2s: don't try to start up
->                  or shut down DAI if it's active"
->     - move code from startup/shutdown hooks into pm_runtime
+> Changes from v3 (12 oct 2018):
+> - fix commit prefix for 1/2 patch
+> - use an SPDX header instead of the full license text
+> - compatible: "emlid,neutis-n5" instead of "emlid,emlid-neutis-n5"
 > 
->  sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
->  1 file changed, 25 insertions(+), 36 deletions(-)
-> 
-> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-> index a4aa931ebfae..daa6c08cffbc 100644
-> --- a/sound/soc/sunxi/sun4i-i2s.c
-> +++ b/sound/soc/sunxi/sun4i-i2s.c
-> @@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
->  	return 0;
->  }
->  
-> -static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
-> -			     struct snd_soc_dai *dai)
-> -{
-> -	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> -
-> -	/* Enable the whole hardware block */
-> -	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> -			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> -
-> -	/* Enable the first output line */
-> -	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> -			   SUN4I_I2S_CTRL_SDO_EN_MASK,
-> -			   SUN4I_I2S_CTRL_SDO_EN(0));
-> -
-> -
-> -	return clk_prepare_enable(i2s->mod_clk);
-> -}
-> -
-> -static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
-> -			       struct snd_soc_dai *dai)
-> -{
-> -	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> -
-> -	clk_disable_unprepare(i2s->mod_clk);
-> -
-> -	/* Disable our output lines */
-> -	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> -			   SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
-> -
-> -	/* Disable the whole hardware block */
-> -	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> -			   SUN4I_I2S_CTRL_GL_EN, 0);
-> -}
-> -
->  static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
->  				unsigned int freq, int dir)
->  {
-> @@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
->  	.hw_params	= sun4i_i2s_hw_params,
->  	.set_fmt	= sun4i_i2s_set_fmt,
->  	.set_sysclk	= sun4i_i2s_set_sysclk,
-> -	.shutdown	= sun4i_i2s_shutdown,
-> -	.startup	= sun4i_i2s_startup,
->  	.trigger	= sun4i_i2s_trigger,
->  };
->  
-> @@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
->  		goto err_disable_clk;
->  	}
->  
-> +	/* Enable the whole hardware block */
-> +	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> +			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> +
+> Changes from v4 (15 oct 2018):
+> - fix dt-bindings commit prefix
+> - update license header for dts files
+> - make interfaces be alphabetically in devboard dts file
 
-So this is definitely needed
-
-> +	/* Enable the first output line */
-> +	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> +			   SUN4I_I2S_CTRL_SDO_EN_MASK,
-> +			   SUN4I_I2S_CTRL_SDO_EN(0));
-> +
-> +	ret = clk_prepare_enable(i2s->mod_clk);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to enable module clock\n");
-> +		goto err_disable_clk;
-> +	}
-
-But we really don't want to enable the module clock before the
-playback / capture actually starts. And I'm guessing it would make
-more sense to keep the output enable configuration there as well,
-since it's likely that we will have support for it in the future, and
-we'll need additional information from ASoC when we'll do.
-
+Queued both for 4.21, thanks!
 Maxime
 
 -- 
