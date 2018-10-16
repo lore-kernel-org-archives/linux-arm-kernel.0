@@ -1,50 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Oct 2018 09:41:37 +0200
-Subject: [PATCH V3 1/2] dt-bindings: pinctrl: document Broadcom Northstar
- pin mux controller
-In-Reply-To: <7f08ed7bf11a22163bdfd56ff96a9262@milecki.pl>
-References: <20180926193103.21241-1-zajec5@gmail.com>
- <20181011222229.GA7470@bogus>
- <7f08ed7bf11a22163bdfd56ff96a9262@milecki.pl>
-Message-ID: <CACRpkdapyFnu=GAqEzK56+a5Gef+vcXsa7a6iJE=isi2MMWKTw@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 16 Oct 2018 09:43:51 +0200
+Subject: [PATCH v6 17/18] mm/memory-failure: increase queued recovery
+ work's priority
+In-Reply-To: <20181015164913.GE11434@zn.tnic>
+References: <20180921221705.6478-1-james.morse@arm.com>
+ <20180921221705.6478-18-james.morse@arm.com>
+ <20181015164913.GE11434@zn.tnic>
+Message-ID: <20181016074351.GC4030@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 10:56 AM Rafa? Mi?ecki <rafal@milecki.pl> wrote:
+On Mon, Oct 15, 2018 at 06:49:13PM +0200, Borislav Petkov wrote:
+> On Fri, Sep 21, 2018 at 11:17:04PM +0100, James Morse wrote:
+> > @@ -1463,11 +1465,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
+> >  
+> >  	mf_cpu = &get_cpu_var(memory_failure_cpu);
+> >  	spin_lock_irqsave(&mf_cpu->lock, proc_flags);
+> > -	if (kfifo_put(&mf_cpu->fifo, entry))
+> > -		schedule_work_on(smp_processor_id(), &mf_cpu->work);
+> > -	else
+> > +	if (kfifo_put(&mf_cpu->fifo, entry)) {
+> > +		queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
+> > +		set_tsk_need_resched(current);
+> > +		preempt_set_need_resched();
+> 
+> What guarantees the workqueue would run before the process? I see this:
+> 
+> ``WQ_HIGHPRI``
+>   Work items of a highpri wq are queued to the highpri
+>   worker-pool of the target cpu.  Highpri worker-pools are
+>   served by worker threads with elevated nice level.
+> 
+> but is that enough?
 
-> > Perhaps 'cru' in the compatible if that's what the h/w is called?
-> >
-> > Also, if this is a sub-block, then it should be a child of the block
-> > which should be defined here.
->
-> It took me some time to do some extra research on the whole CRU thing.
->
-> Valuable resources:
-> [1] bcm5301x_dmu.c (from the SDK)
-> [2] bcm5301x_pcie.c (from the SDK)
-> [3] https://patchwork.kernel.org/patch/7888651/
-> [4] https://patchwork.kernel.org/patch/5051471/
->
-> First of all CRU seems to be a sub-block of the DMU (which stands for
-> "Device Management Unit" according to the [1]). DMU seems to be
-> independent block at 0x1800c000 with a size of 0x1000.
->
-> It isn't actually clear what the CRU stands for. In Broadcom's case:
-> 1. According to the [3] it's "Clock and Reset Unit"
-> 2. According to the [4] it's a "central resource unit"
-> Other vendors seem to use CRU name for "Clock and Reset Unit".
->
-> In any case, you're right Rob, it's a sub-block, a set of random
-> registers that control SoC.
->
-> So I think that:
-> 1) We should have a node for DMU and CRU
-> 2) We should not include "cru" in bindings as pinmuxing seems to be part
->     of SoC that just happens to be controlled using CRU registers
+Nope. Nice just makes it more likely, but no guarantees what so ever.
 
-OK do you want me to revert the patches or do you want to
-fix this stuff on top of the patches that are already in the tree?
-I'm fine either way.
-
-Yours,
-Linus Walleij
+If you want to absolutely run something before we return to userspace,
+would not task_work() be what we're looking for?
