@@ -1,36 +1,51 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 16 Oct 2018 13:11:33 +0900
-Subject: [PATCH] gpio: uniphier: include <linux/bits.h> instead of
- <linux/bitops.h>
-Message-ID: <1539663093-15923-1-git-send-email-yamada.masahiro@socionext.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 16 Oct 2018 12:14:53 +0800
+Subject: [PATCH v4 4/7] arm64: dts: allwinner: a64: sopine: enable power
+ supplies
+In-Reply-To: <20181013080848.29894-5-oskari@lemmela.net>
+References: <20181013080848.29894-1-oskari@lemmela.net>
+ <20181013080848.29894-5-oskari@lemmela.net>
+Message-ID: <CAGb2v64HnH4UEUi2xRsAJS=EX0gTjikS+ai3M3WrG+6+A7P4JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reason of including <linux/bitops.h> here is just for BIT() and
-GENMASK macros.
+On Sat, Oct 13, 2018 at 4:09 PM Oskari Lemmela <oskari@lemmela.net> wrote:
+>
+> Sopine baseboard have ACIN and battery connectors.
 
-Since commit 8bd9cb51daac8 ("locking/atomics, asm-generic: Move some
-macros from <linux/bitops.h> to a new <linux/bits.h> file"),
-<linux/bits.h> is enough for such compile-time macros.
+The commit message should be more specific, like how the two connections
+from the PMIC are routed. In this case ACIN is routed from the SOM to
+the DC jack on the baseboard, while the battery pins are routed to a 3-pin
+connector next to the USB connectors.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+ChenYu
 
- drivers/gpio/gpio-uniphier.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpio/gpio-uniphier.c b/drivers/gpio/gpio-uniphier.c
-index 7fdac90..74551cbd 100644
---- a/drivers/gpio/gpio-uniphier.c
-+++ b/drivers/gpio/gpio-uniphier.c
-@@ -12,7 +12,7 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/bitops.h>
-+#include <linux/bits.h>
- #include <linux/gpio/driver.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
--- 
-2.7.4
+>
+> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+> ---
+>  .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+> index c21f2331add6..335cf2263d19 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+> @@ -69,6 +69,14 @@
+>         };
+>  };
+>
+> +&ac_power_supply {
+> +       status = "okay";
+> +};
+> +
+> +&battery_power_supply {
+> +       status = "okay";
+> +};
+> +
+>  &ehci0 {
+>         status = "okay";
+>  };
+> --
+> 2.17.1
+>
