@@ -1,78 +1,70 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Tue, 16 Oct 2018 18:44:45 +0800
-Subject: [PATCH v9 4/9] PCI: mediatek: Convert to use pci_host_probe()
+Date: Tue, 16 Oct 2018 18:44:42 +0800
+Subject: [PATCH v9 1/9] PCI: mediatek: Using slot's devfn for compare to fix
+ mtk_pcie_find_port logic
 In-Reply-To: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539686690-24068-5-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1539686690-24068-2-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Part of mtk_pcie_register_host is an open-coded version of
-pci_host_probe(). So instead of duplicating this code, use
-pci_host_probe() directly and remove mtk_pcie_register_host.
+The Mediatek's host controller has two slots, each with it's own control
+registers. The host driver need to identify which slot was connected
+in order to access the device's configuration space. There's problem
+for current host driver to find out which slot was connected to for
+a given EP device.
+
+Assuming each slot have connect with one EP device as below:
+
+                host bridge
+  bus 0 --> __________|_______
+           |                  |
+           |                  |
+         slot 0             slot 1
+  bus 1 -->|        bus 2 --> |
+           |                  |
+         EP 0               EP 1
+
+During PCI enumeration, system software will scan all the PCI device
+starting from devfn 0. So it will get the proper port for slot0 and
+slot1 device when using PCI_SLOT(devfn) for match. But it will get
+the wrong slot for EP1: The devfn will be start from 0 when scanning
+EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
+for port0's slot value. So the host driver should not using EP's devfn
+but the slot's devfn(the slot which EP was connected to) for match.
+
+This patch fix the mtk_pcie_find_port's logic by using the slot's
+devfn for match if finding device connected to the subordinate bus.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 Acked-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 37 ++++++++--------------------------
- 1 file changed, 8 insertions(+), 29 deletions(-)
+ drivers/pci/controller/pcie-mediatek.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 6080b29..9f12b17 100644
+index 9999dae..288b8e2 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -1121,34 +1121,6 @@ static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
- 	return 0;
- }
- 
--static int mtk_pcie_register_host(struct pci_host_bridge *host)
--{
--	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
--	struct pci_bus *child;
--	int err;
--
--	host->busnr = pcie->busn.start;
--	host->dev.parent = pcie->dev;
--	host->ops = pcie->soc->ops;
--	host->map_irq = of_irq_parse_and_map_pci;
--	host->swizzle_irq = pci_common_swizzle;
--	host->sysdata = pcie;
--
--	err = pci_scan_root_bus_bridge(host);
--	if (err < 0)
--		return err;
--
--	pci_bus_size_bridges(host->bus);
--	pci_bus_assign_resources(host->bus);
--
--	list_for_each_entry(child, &host->bus->children, node)
--		pcie_bus_configure_settings(child);
--
--	pci_bus_add_devices(host->bus);
--
--	return 0;
--}
--
- static int mtk_pcie_probe(struct platform_device *pdev)
+@@ -337,6 +337,17 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
  {
- 	struct device *dev = &pdev->dev;
-@@ -1175,7 +1147,14 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	if (err)
- 		goto put_resources;
- 
--	err = mtk_pcie_register_host(host);
-+	host->busnr = pcie->busn.start;
-+	host->dev.parent = pcie->dev;
-+	host->ops = pcie->soc->ops;
-+	host->map_irq = of_irq_parse_and_map_pci;
-+	host->swizzle_irq = pci_common_swizzle;
-+	host->sysdata = pcie;
+ 	struct mtk_pcie *pcie = bus->sysdata;
+ 	struct mtk_pcie_port *port;
++	struct pci_dev *dev = NULL;
 +
-+	err = pci_host_probe(host);
- 	if (err)
- 		goto put_resources;
++	/*
++	 * Walk the bus hierarchy to get the devfn value
++	 * of the port in the root bus.
++	 */
++	while (bus && bus->number) {
++		dev = bus->self;
++		bus = dev->bus;
++		devfn = dev->devfn;
++	}
  
+ 	list_for_each_entry(port, &pcie->ports, list)
+ 		if (port->slot == PCI_SLOT(devfn))
 -- 
 2.6.4
