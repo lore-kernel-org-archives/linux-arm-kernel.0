@@ -1,20 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Oct 2018 12:08:55 +0800
-Subject: [PATCH v4 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
- power DT binding
-In-Reply-To: <20181013080848.29894-2-oskari@lemmela.net>
-References: <20181013080848.29894-1-oskari@lemmela.net>
- <20181013080848.29894-2-oskari@lemmela.net>
-Message-ID: <CAGb2v64JbDOobhcaVsAgL5xQ_oZpkOK-t6ngDwMoYPPE=o3k1g@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 16 Oct 2018 13:09:58 +0900
+Subject: [PATCH] pinctrl: uniphier: include <linux/bits.h> instead of
+ <linux/bitops.h>
+Message-ID: <1539662998-15467-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 4:09 PM Oskari Lemmela <oskari@lemmela.net> wrote:
->
-> The AXP803/AXP813 AC power supply can limit input current and voltage.
->
-> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+The reason of including <linux/bitops.h> here is just for BIT() macro.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Since commit 8bd9cb51daac8 ("locking/atomics, asm-generic: Move some
+macros from <linux/bitops.h> to a new <linux/bits.h> file"),
+<linux/bits.h> is enough for such compile-time macros.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+ drivers/pinctrl/uniphier/pinctrl-uniphier.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier.h b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
+index 0a3d2ac..c63e3c8 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier.h
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
+@@ -16,7 +16,7 @@
+ #ifndef __PINCTRL_UNIPHIER_H__
+ #define __PINCTRL_UNIPHIER_H__
+ 
+-#include <linux/bitops.h>
++#include <linux/bits.h>
+ #include <linux/build_bug.h>
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+-- 
+2.7.4
