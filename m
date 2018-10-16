@@ -1,54 +1,119 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 16 Oct 2018 11:06:09 +0200
-Subject: [PATCH V3 1/2] dt-bindings: pinctrl: document Broadcom Northstar
- pin mux controller
-In-Reply-To: <CACRpkdapyFnu=GAqEzK56+a5Gef+vcXsa7a6iJE=isi2MMWKTw@mail.gmail.com>
-References: <20180926193103.21241-1-zajec5@gmail.com>
- <20181011222229.GA7470@bogus>
- <7f08ed7bf11a22163bdfd56ff96a9262@milecki.pl>
- <CACRpkdapyFnu=GAqEzK56+a5Gef+vcXsa7a6iJE=isi2MMWKTw@mail.gmail.com>
-Message-ID: <CACna6rwLas5m9kX6YEgv4=2_qq2KuHsh3eNfd5Atbw4Adx8w4g@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 16 Oct 2018 10:10:20 +0100
+Subject: [PATCH] perf tools: Store ids for events with their own cpus
+ perf_event__synthesize_event_update_cpus
+In-Reply-To: <20181015191502.GA2398@kernel.org>
+References: <20180927160210.GF6916@krava>
+ <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
+ <20181002111621.GA6357@krava> <20181003113643.GA31725@krava>
+ <594506a2-8cb3-3d09-82ab-5cb6d8c31ed0@huawei.com>
+ <20181003141627.GA6341@krava> <20181003212052.GA32371@krava>
+ <d071bb27-5533-da2f-9f8f-808183e04794@huawei.com>
+ <20181009100049.GF6499@krava>
+ <31101407-0bcd-2fbf-361e-43cbcb81cd19@huawei.com>
+ <20181015191502.GA2398@kernel.org>
+Message-ID: <d1cc40ee-4b09-35a8-86d2-bfc0eb78b9d5@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Oct 2018 at 09:41, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Oct 15, 2018 at 10:56 AM Rafa? Mi?ecki <rafal@milecki.pl> wrote:
+On 15/10/2018 20:15, Arnaldo Carvalho de Melo wrote:
+> Em Fri, Oct 12, 2018 at 02:25:49PM +0100, John Garry escreveu:
+>> On 09/10/2018 11:00, Jiri Olsa wrote:
+>>> On Thu, Oct 04, 2018 at 10:20:39AM +0100, John Garry wrote:
+>>>
+>>> SNIP
+>>>
+>>>>> We synthesize an update event that needs to touch the evsel
+>>>>> id array, which is not defined at that time. Fixing this by
+>>>>> forcing the id allocation for events with theeir own cpus.
+>>
+>> /s/theeir/their/
+>>
+>>>>>
+>>>>> Reported-by: John Garry <john.garry@huawei.com>
+>>>>> Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
+>>>>
+>>>> Tested-by: John Garry <john.garry@huawei.com>
+>>>>
+>>>> In terms of adding to stable, LT v4.14 is not affected, but 4.18.x is.
+>>>>
+>>>> Thanks,
+>>>> John
+>>>
+>>> Arnaldo, could you please pick up this one
+>>>
+>>
+>> Just a friendly reminder on this patch.
+>>
+>> How about re-send with an updated commit message also?
 >
-> > > Perhaps 'cru' in the compatible if that's what the h/w is called?
-> > >
-> > > Also, if this is a sub-block, then it should be a child of the block
-> > > which should be defined here.
-> >
-> > It took me some time to do some extra research on the whole CRU thing.
-> >
-> > Valuable resources:
-> > [1] bcm5301x_dmu.c (from the SDK)
-> > [2] bcm5301x_pcie.c (from the SDK)
-> > [3] https://patchwork.kernel.org/patch/7888651/
-> > [4] https://patchwork.kernel.org/patch/5051471/
-> >
-> > First of all CRU seems to be a sub-block of the DMU (which stands for
-> > "Device Management Unit" according to the [1]). DMU seems to be
-> > independent block at 0x1800c000 with a size of 0x1000.
-> >
-> > It isn't actually clear what the CRU stands for. In Broadcom's case:
-> > 1. According to the [3] it's "Clock and Reset Unit"
-> > 2. According to the [4] it's a "central resource unit"
-> > Other vendors seem to use CRU name for "Clock and Reset Unit".
-> >
-> > In any case, you're right Rob, it's a sub-block, a set of random
-> > registers that control SoC.
-> >
-> > So I think that:
-> > 1) We should have a node for DMU and CRU
-> > 2) We should not include "cru" in bindings as pinmuxing seems to be part
-> >     of SoC that just happens to be controlled using CRU registers
+> I'll fix up the commit message and apply, thanks.
 >
-> OK do you want me to revert the patches or do you want to
-> fix this stuff on top of the patches that are already in the tree?
-> I'm fine either way.
 
-I'm fine either way, thanks for taking care of my work!
+Much appreciated.
 
--- 
-Rafa?
+BTW, I think that we should add a fixes tag. But I'm not sure if this 
+patch fixes the commit I bisected to earlier (bfd8f72c2778f5bd63d), or 
+that same commit just exposed some latent bug.
+
+Jirka, Andi, Do you know?
+
+Thanks,
+John
+
+> - Arnaldo
+>
+>> Thanks,
+>> John
+>>
+>>> thanks,
+>>> jirka
+>>>
+>>>>
+>>>>> Signed-off-by: Jiri Olsa <jolsa@kernel.org>
+>>>>> ---
+>>>>>  tools/perf/builtin-report.c | 1 +
+>>>>>  tools/perf/util/evsel.c     | 3 +++
+>>>>>  2 files changed, 4 insertions(+)
+>>>>>
+>>>>> diff --git a/tools/perf/builtin-report.c b/tools/perf/builtin-report.c
+>>>>> index c0703979c51d..257c9c18cb7e 100644
+>>>>> --- a/tools/perf/builtin-report.c
+>>>>> +++ b/tools/perf/builtin-report.c
+>>>>> @@ -980,6 +980,7 @@ int cmd_report(int argc, const char **argv)
+>>>>>  			.id_index	 = perf_event__process_id_index,
+>>>>>  			.auxtrace_info	 = perf_event__process_auxtrace_info,
+>>>>>  			.auxtrace	 = perf_event__process_auxtrace,
+>>>>> +			.event_update	 = perf_event__process_event_update,
+>>>>>  			.feature	 = process_feature_event,
+>>>>>  			.ordered_events	 = true,
+>>>>>  			.ordering_requires_timestamps = true,
+>>>>> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+>>>>> index ac6cfb8b085e..7a0d5fbaf3c1 100644
+>>>>> --- a/tools/perf/util/evsel.c
+>>>>> +++ b/tools/perf/util/evsel.c
+>>>>> @@ -1088,6 +1088,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
+>>>>>  		attr->exclude_user   = 1;
+>>>>>  	}
+>>>>>
+>>>>> +	if (evsel->own_cpus)
+>>>>> +		evsel->attr.read_format |= PERF_FORMAT_ID;
+>>>>> +
+>>>>>  	/*
+>>>>>  	 * Apply event specific term settings,
+>>>>>  	 * it overloads any global configuration.
+>>>>>
+>>>>
+>>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>> .
+>>>
+>>
+>
+> .
+>
