@@ -1,84 +1,67 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue, 16 Oct 2018 16:56:18 +0200
-Subject: [PATCH 07/11] DT: arm64: exynos7: add support for thermal trip
- irq-mode
+Date: Tue, 16 Oct 2018 16:56:16 +0200
+Subject: [PATCH 05/11] Doc: DT: thermal: new irq-mode for trip point
 In-Reply-To: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
 References: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181016145648eucas1p275ad5f845a04e40e5b9d0bbea624f34a@eucas1p2.samsung.com>
-Message-ID: <20181016145648eucas1p275ad5f845a04e40e5b9d0bbea624f34a~eHqM4Yhz82489624896eucas1p25@eucas1p2.samsung.com>
+ <CGME20181016145646eucas1p1bd4607c80258df10777ed111cf889fbc@eucas1p1.samsung.com>
+Message-ID: <20181016145646eucas1p1bd4607c80258df10777ed111cf889fbc~eHqKU_F8K2225422254eucas1p1r@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for new flash which indicates
-that trip point triggers irq when temperature is met.
-Exynos5433 supports 8 trip point which will trigger irq.
-Above that number other trip points should be registered
-without 'irq-mode' flag.
-That will force the thermal framework to start polling
-the temperature sensor under configured conditions and
-handle the trip point.
+Thermal trip point gets new flag in DT: irq-mode.
+Trip point may have a new explicit flag which indicate
+irq support when the temperature is met (so the thermal framework
+deos not need set polling for it).
+It is useful for 'passive' cooling trip point,
+which now will not register for polling the temperature.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Update documentation about irq-mode for trip points.
+
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/thermal/thermal.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-index d3301b8..39185af 100644
---- a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-@@ -11,40 +11,48 @@ trips {
- 		temperature = <75000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-1 {
- 		temperature = <80000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-2 {
- 		temperature = <85000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-3 {
- 		temperature = <90000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-4 {
- 		temperature = <95000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-5 {
- 		temperature = <100000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-6 {
- 		temperature = <110000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-crit-0 {
- 		temperature = <115000>; /* millicelsius */
- 		hysteresis = <0>; /* millicelsius */
- 		type = "critical";
-+		irq-mode;
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
+index eb7ee91..c98a355 100644
+--- a/Documentation/devicetree/bindings/thermal/thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/thermal.txt
+@@ -90,6 +90,10 @@ Required properties:
+ 	"critical":	Hardware not reliable.
+   Type: string
+ 
++- irq-mode:		A flag indicating that trip rises irq, so there is no
++  Type: bool		need of polling in thermal framework.
++  Size: one cell
++
+ * Cooling device maps
+ 
+ The cooling device maps node is a node to describe how cooling devices
+@@ -256,16 +260,19 @@ thermal-zones {
+ 				temperature = <90000>; /* millicelsius */
+ 				hysteresis = <2000>; /* millicelsius */
+ 				type = "active";
++				irq-mode;
+ 			};
+ 			cpu_alert1: cpu-alert1 {
+ 				temperature = <100000>; /* millicelsius */
+ 				hysteresis = <2000>; /* millicelsius */
+ 				type = "passive";
++				irq-mode;
+ 			};
+ 			cpu_crit: cpu-crit {
+ 				temperature = <125000>; /* millicelsius */
+ 				hysteresis = <2000>; /* millicelsius */
+ 				type = "critical";
++				irq-mode;
+ 			};
+ 		};
+ 
 -- 
 2.7.4
