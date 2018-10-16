@@ -1,19 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Oct 2018 13:04:24 -0300
-Subject: [PATCH v3 3/4] ARM: dts: imx6ull: Add dcp node
-In-Reply-To: <ef03e230d0bb76d830c123bc47e6bd6e7bf17826.1539705286.git.leonard.crestez@nxp.com>
-References: <cover.1539705285.git.leonard.crestez@nxp.com>
- <ef03e230d0bb76d830c123bc47e6bd6e7bf17826.1539705286.git.leonard.crestez@nxp.com>
-Message-ID: <CAOMZO5A+Uc5in-PXnfe+XoFMtRmCxGOryXE9=mjB+aRHo+ZBEQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 16 Oct 2018 18:11:29 +0200
+Subject: [PATCH 0/7] NULL pointer deref fix for stm32-dma
+In-Reply-To: <20181009054752.145978-1-joel@joelfernandes.org>
+References: <20181009054752.145978-1-joel@joelfernandes.org>
+Message-ID: <20181016161129.GB17066@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 12:59 PM Leonard Crestez
-<leonard.crestez@nxp.com> wrote:
->
-> The DCP block on 6ull has no major differences other than requiring
-> explicit clock enabling.
->
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+On Mon, Oct 08, 2018 at 10:47:45PM -0700, Joel Fernandes (Google) wrote:
+> Hi Greg,
+> 
+> While looking at android-4.14, I found a NULL pointer deref with
+> stm32-dma driver using Coccicheck errors. I found that upstream had a
+> bunch of patches on stm32-dma that have fixed this and other issues, I
+> applied these patches cleanly onto Android 4.14. I believe these should
+> goto stable and flow into Android 4.14 from there, but I haven't tested
+> this since I have no hardware to do so.
+> 
+> Atleast I can say that the coccicheck error below goes away when running:
+> make coccicheck MODE=report
+> ./drivers/dma/stm32-dma.c:567:18-24: ERROR: chan -> desc is NULL but dereferenced.
+> 
+> Anyway, please consider this series for 4.14 stable, I have CC'd the
+> author and others, thanks.
+> 
+> Pierre Yves MORDRET (7):
+>   dmaengine: stm32-dma: threshold manages with bitfield feature
+>   dmaengine: stm32-dma: fix incomplete configuration in cyclic mode
+>   dmaengine: stm32-dma: fix typo and reported checkpatch warnings
+>   dmaengine: stm32-dma: Improve memory burst management
+>   dmaengine: stm32-dma: fix DMA IRQ status handling
+>   dmaengine: stm32-dma: fix max items per transfer
+>   dmaengine: stm32-dma: properly mask irq bits
+> 
+>  drivers/dma/stm32-dma.c | 287 +++++++++++++++++++++++++++++++++-------
+>  1 file changed, 240 insertions(+), 47 deletions(-)
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+
+I need git commit ids for all of these for what the patch in mainline
+is.
+
+Can you fix that up and resend them?
+
+thanks,
+
+greg k-h
