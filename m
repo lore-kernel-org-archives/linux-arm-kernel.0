@@ -1,36 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Oct 2018 13:35:44 +0200
-Subject: [PATCH 1/2] ARM: copypage-fa: add kto and kfrom to input operands
- list
-In-Reply-To: <20181016084416.GF30658@n2100.armlinux.org.uk>
-References: <20181015221629.13924-1-stefan@agner.ch>
- <CACRpkdaVGKLtE-whhK3oFgY+4xoy1JqWkcBW4UO0-hJs2B-QGg@mail.gmail.com>
- <20181016084416.GF30658@n2100.armlinux.org.uk>
-Message-ID: <CACRpkdavnYDE42GOwsVqnLwqjVmLmkwJ=sQBjUFn=aFbqXqVPw@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 16 Oct 2018 13:50:53 +0300
+Subject: [PATCH 2/2] arm64: dts: clearfog-gt-8k: 1G eth PHY reset signal
+In-Reply-To: <d02745d924c2ad65cbd1194fc35d12796613722d.1539687053.git.baruch@tkos.co.il>
+References: <d02745d924c2ad65cbd1194fc35d12796613722d.1539687053.git.baruch@tkos.co.il>
+Message-ID: <d7d0516199244af29efdd5231313a6519f5a4350.1539687053.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 10:44 AM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Oct 16, 2018 at 10:00:19AM +0200, Linus Walleij wrote:
+This reset signal controls the Marvell 1512 1G PHY.
 
-> > I am on deep waters with ARM assembly, admittedly. So I wanted to
-> > ask: OpenWRT has this cache patch:
-> > https://github.com/openwrt/openwrt/blob/master/target/linux/gemini/patches-4.14/0001-cache-patch-from-OpenWRT.patch
-> > I do not know why (sorry).
-> >
-> > Do you think that patch is actually a hack to hide the problem
-> > fixed with this patch? (OK maybe stupid question but...)
->
-> No, it looks to me like a hack to make DMA cache handling "more
-> efficient" by cleaning/invalidating the entire cache when dealing
-> with large streaming buffers.
+Note that current implementation queries the PHY over the MDIO bus
+(get_phy_device() call from of_mdiobus_register_phy()) before reset
+signal deassert. If the PHY reset signal is asserted at boot time, PHY
+registration fails. So current code relies on the bootloader to deassert
+the reset signal.
 
-Aha that makes a lot of sense.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-I will attempt to drop it from OpenWRT in the next kernel upgrade
-unless benchmarks can show that it is worth it.
-
-Thanks Russell!
-
-Linus Walleij
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+index af1310c53bc8..73df0ef5e0c4 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+@@ -337,6 +337,10 @@
+ 		 */
+ 		marvell,reg-init = <3 16 0 0x1017>;
+ 		reg = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp0_copper_eth_phy_reset>;
++		reset-gpios = <&cp1_gpio1 11 GPIO_ACTIVE_LOW>;
++		reset-assert-us = <10000>;
+ 	};
+ 
+ 	switch0: switch0 at 4 {
+-- 
+2.19.1
