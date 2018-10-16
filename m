@@ -1,102 +1,121 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 15 Oct 2018 20:02:37 -0700
-Subject: [PATCH v4 7/9] arm64: dts: allwinner: a64: add nodes necessary for
- analog sound support
-In-Reply-To: <20181016030239.15449-1-anarsoul@gmail.com>
-References: <20181016030239.15449-1-anarsoul@gmail.com>
-Message-ID: <20181016030239.15449-8-anarsoul@gmail.com>
+Date: Mon, 15 Oct 2018 20:11:41 -0700
+Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown hooks
+ into pm_runtime hooks
+Message-ID: <20181016031141.16259-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for i2s, digital and analog parts of audiocodec on A64
+startup() and shutdown() hooks are called for both substreams,
+so stopping either substream when another is running breaks the
+latter.
+
+E.g. playback breaks if capture is stopped when playback is running.
+
+Move code from startup() and shutdown() to resume() and suspend()
+hooks respectively to fix this issue
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 58 +++++++++++++++++++
- 1 file changed, 58 insertions(+)
+v2: - rename from "ASoC: sun4i-i2s: don't try to start up
+                 or shut down DAI if it's active"
+    - move code from startup/shutdown hooks into pm_runtime
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index d3daf90a8715..d066ed59f27a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -157,6 +157,34 @@
- 		compatible = "linux,spdif-dit";
- 	};
+ sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
+ 1 file changed, 25 insertions(+), 36 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+index a4aa931ebfae..daa6c08cffbc 100644
+--- a/sound/soc/sunxi/sun4i-i2s.c
++++ b/sound/soc/sunxi/sun4i-i2s.c
+@@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	return 0;
+ }
  
-+	sound: sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "sun50i-a64-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,frame-master = <&cpudai>;
-+		simple-audio-card,bitclock-master = <&cpudai>;
-+		simple-audio-card,mclk-fs = <512>;
-+		simple-audio-card,aux-devs = <&codec_analog>;
-+		simple-audio-card,routing =
-+				"Left DAC", "AIF1 Slot 0 Left",
-+				"Right DAC", "AIF1 Slot 0 Right",
-+				"AIF1 Slot 0 Left ADC", "Left ADC",
-+				"AIF1 Slot 0 Right ADC", "Right ADC",
-+				"Left ADC", "ADC",
-+				"Right ADC", "ADC",
-+				"MIC1", "Mic",
-+				"MIC2", "Headset Mic";
-+		status = "disabled";
-+
-+		cpudai: simple-audio-card,cpu {
-+			sound-dai = <&dai>;
-+		};
-+
-+		link_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
-@@ -522,6 +550,30 @@
- 			status = "disabled";
- 		};
+-static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+-			     struct snd_soc_dai *dai)
+-{
+-	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+-
+-	/* Enable the whole hardware block */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
+-
+-	/* Enable the first output line */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_SDO_EN_MASK,
+-			   SUN4I_I2S_CTRL_SDO_EN(0));
+-
+-
+-	return clk_prepare_enable(i2s->mod_clk);
+-}
+-
+-static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
+-			       struct snd_soc_dai *dai)
+-{
+-	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+-
+-	clk_disable_unprepare(i2s->mod_clk);
+-
+-	/* Disable our output lines */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
+-
+-	/* Disable the whole hardware block */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_GL_EN, 0);
+-}
+-
+ static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+ 				unsigned int freq, int dir)
+ {
+@@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
+ 	.hw_params	= sun4i_i2s_hw_params,
+ 	.set_fmt	= sun4i_i2s_set_fmt,
+ 	.set_sysclk	= sun4i_i2s_set_sysclk,
+-	.shutdown	= sun4i_i2s_shutdown,
+-	.startup	= sun4i_i2s_startup,
+ 	.trigger	= sun4i_i2s_trigger,
+ };
  
-+		dai: dai@1c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun50i-a64-codec-i2s";
-+			reg = <0x01c22c00 0x200>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			reset-names = "rst";
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		codec: codec at 1c22e00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a33-codec";
-+			reg = <0x01c22e00 0x600>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "bus", "mod";
-+			status = "disabled";
-+		};
-+
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
-@@ -715,6 +767,12 @@
- 			#reset-cells = <1>;
- 		};
+@@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
+ 		goto err_disable_clk;
+ 	}
  
-+		codec_analog: codec-analog at 1f015c0 {
-+			compatible = "allwinner,sun50i-a64-codec-analog";
-+			reg = <0x01f015c0 0x4>;
-+			status = "disabled";
-+		};
++	/* Enable the whole hardware block */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
 +
- 		r_i2c: i2c at 1f02400 {
- 			compatible = "allwinner,sun50i-a64-i2c",
- 				     "allwinner,sun6i-a31-i2c";
++	/* Enable the first output line */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_SDO_EN_MASK,
++			   SUN4I_I2S_CTRL_SDO_EN(0));
++
++	ret = clk_prepare_enable(i2s->mod_clk);
++	if (ret) {
++		dev_err(dev, "Failed to enable module clock\n");
++		goto err_disable_clk;
++	}
++
+ 	return 0;
+ 
+ err_disable_clk:
+@@ -880,6 +859,16 @@ static int sun4i_i2s_runtime_suspend(struct device *dev)
+ {
+ 	struct sun4i_i2s *i2s = dev_get_drvdata(dev);
+ 
++	clk_disable_unprepare(i2s->mod_clk);
++
++	/* Disable our output lines */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
++
++	/* Disable the whole hardware block */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_GL_EN, 0);
++
+ 	regcache_cache_only(i2s->regmap, true);
+ 
+ 	clk_disable_unprepare(i2s->bus_clk);
 -- 
 2.19.0
