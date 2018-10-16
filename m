@@ -1,46 +1,84 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue, 16 Oct 2018 16:56:12 +0200
-Subject: [PATCH 01/11] thermal: remove unused function parameter
+Date: Tue, 16 Oct 2018 16:56:18 +0200
+Subject: [PATCH 07/11] DT: arm64: exynos7: add support for thermal trip
+ irq-mode
 In-Reply-To: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
 References: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181016145640eucas1p10d60eaf07c6a4b0c539e46053d2ea7de@eucas1p1.samsung.com>
-Message-ID: <20181016145640eucas1p10d60eaf07c6a4b0c539e46053d2ea7de~eHqEkMsUc2218322183eucas1p19@eucas1p1.samsung.com>
+ <CGME20181016145648eucas1p275ad5f845a04e40e5b9d0bbea624f34a@eucas1p2.samsung.com>
+Message-ID: <20181016145648eucas1p275ad5f845a04e40e5b9d0bbea624f34a~eHqM4Yhz82489624896eucas1p25@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean unused parameter from internal framework function.
+This patch adds support for new flash which indicates
+that trip point triggers irq when temperature is met.
+Exynos5433 supports 8 trip point which will trigger irq.
+Above that number other trip points should be registered
+without 'irq-mode' flag.
+That will force the thermal framework to start polling
+the temperature sensor under configured conditions and
+handle the trip point.
 
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- drivers/thermal/thermal_core.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 6ab9823..2c6d72a 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -313,9 +313,7 @@ static void monitor_thermal_zone(struct thermal_zone_device *tz)
- 	mutex_unlock(&tz->lock);
- }
- 
--static void handle_non_critical_trips(struct thermal_zone_device *tz,
--				      int trip,
--				      enum thermal_trip_type trip_type)
-+static void handle_non_critical_trips(struct thermal_zone_device *tz, int trip)
- {
- 	tz->governor ? tz->governor->throttle(tz, trip) :
- 		       def_governor->throttle(tz, trip);
-@@ -416,7 +414,7 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
- 	if (type == THERMAL_TRIP_CRITICAL || type == THERMAL_TRIP_HOT)
- 		handle_critical_trips(tz, trip, type);
- 	else
--		handle_non_critical_trips(tz, trip, type);
-+		handle_non_critical_trips(tz, trip);
- 	/*
- 	 * Alright, we handled this trip successfully.
- 	 * So, start monitoring again.
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+index d3301b8..39185af 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+@@ -11,40 +11,48 @@ trips {
+ 		temperature = <75000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+ 		type = "passive";
++		irq-mode;
+ 	};
+ 	cpu-alert-1 {
+ 		temperature = <80000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+ 		type = "passive";
++		irq-mode;
+ 	};
+ 	cpu-alert-2 {
+ 		temperature = <85000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+ 		type = "passive";
++		irq-mode;
+ 	};
+ 	cpu-alert-3 {
+ 		temperature = <90000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+ 		type = "passive";
++		irq-mode;
+ 	};
+ 	cpu-alert-4 {
+ 		temperature = <95000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+ 		type = "passive";
++		irq-mode;
+ 	};
+ 	cpu-alert-5 {
+ 		temperature = <100000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+ 		type = "passive";
++		irq-mode;
+ 	};
+ 	cpu-alert-6 {
+ 		temperature = <110000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+ 		type = "passive";
++		irq-mode;
+ 	};
+ 	cpu-crit-0 {
+ 		temperature = <115000>; /* millicelsius */
+ 		hysteresis = <0>; /* millicelsius */
+ 		type = "critical";
++		irq-mode;
+ 	};
+ };
 -- 
 2.7.4
