@@ -1,46 +1,83 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Oct 2018 11:40:06 +0200
-Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
-In-Reply-To: <20180829121627eucas1p2f41ba35016ce90185f3cc08af1a67e23~PWge4MaXN2588725887eucas1p2h@eucas1p2.samsung.com>
-References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
- <20180824122308.3092-1-linus.walleij@linaro.org>
- <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
- <CACRpkdaGNhxY-xAAEL1Bu4EMr8x7qTGoM9s-At2v7Ev8PwOTDw@mail.gmail.com>
- <20180829095822eucas1p1fe4336ca7944765c01fc6ad1e941b8b0~PUn7YujBw3056130561eucas1p1_@eucas1p1.samsung.com>
- <20180829100152.GL907@e110455-lin.cambridge.arm.com>
- <20180829102320eucas1p28f05f1c765eb85195a06199bb68b87ce~PU9ukgvXA1734817348eucas1p2L@eucas1p2.samsung.com>
- <20180829110045.GN907@e110455-lin.cambridge.arm.com>
- <20180829121627eucas1p2f41ba35016ce90185f3cc08af1a67e23~PWge4MaXN2588725887eucas1p2h@eucas1p2.samsung.com>
-Message-ID: <CACRpkdYFh07=mghuss3reQ4+mbAOn6sU_R7ejbOHaJ9OtQ31+w@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 16 Oct 2018 17:41:14 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
+ corruption on Hi16xx soc
+In-Reply-To: <20181015172146.GD31305@brain-police>
+References: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
+ <20181015172146.GD31305@brain-police>
+Message-ID: <5BC5B23A.5040003@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 2:16 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
 
-> My question still stands: what is wrong/missing with dpi panel?
 
-Hopefully described with my other answer :)
+On 2018/10/16 1:21, Will Deacon wrote:
+> On Mon, Oct 15, 2018 at 04:36:16PM +0800, Zhen Lei wrote:
+>> ITS translation register map:
+>> 0x0000-0x003C	Reserved
+>> 0x0040		GITS_TRANSLATER
+>> 0x0044-0xFFFC	Reserved
+>>
+>> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
+>> expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
+>> data will be written to MSIAddress each time.
+>>
+>> MSIAddr: |----4bytes----|----4bytes----|
+>> 	 |    MSIData   |    IMPDEF    |
+>>
+>> There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
+>> But it will overwrite the 4 bytes memory following "sync_count". It's very
+>> luckly that the previous and the next neighbour of "sync_count" are both aligned
+>> by 8 bytes, so no problem is met now.
+>>
+>> It's good to explicitly add a workaround:
+>> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
+>>    aligned by 8 bytes.
+>> 2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
+>>
+>> There is no functional change.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 5059d09..a07bc0d 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -586,7 +586,10 @@ struct arm_smmu_device {
+>>  
+>>  	struct arm_smmu_strtab_cfg	strtab_cfg;
+>>  
+>> +	union {
+>> +	u64				padding; /* workaround for Hisilicon */
+>>  	u32				sync_count;
+>> +	} __attribute__((aligned(8)));
+> 
+> Won't this already be aligned by the ABI?
+> 
+> Anyway, you'll need to swizzle things for big-endian, I suspect. Maybe you
+> can do something clever like making sync_count an array of two elements
+> and determining the offset based on the endianness. Or just keep it simple
+> like we do for things like struct qrwlock and struct qspinlock and use
+> #ifdefs.
 
-> I did not analyze details, but pl111 output seems to be DPI compatible.
+This workaround is a special case, the sync_count is only written by ITS hardware,
+and is only read by software. Although Hisilicon ITS will write 8 bytes at
+MSIAddress(required it aligned by 8 bytes), but it can sure that the value of
+MSIdata will be written at the lower 4 bytes(the start address of sync_count).
+Because the type of sync_count is u32, so that CPU is also read the 4 bytes at
+the lower address.
 
-This patch set is not trying to support the electronic device
-PL111 at all. I am trying to support an emulator which has a
-half-done emulation of the PL111 registers.
+> 
+> Also -- you need a comment to explain this insanity :)
+> 
+> Will
+> 
+> .
+> 
 
-The other panels actually attached to real world instances
-of PL111 made in silicon, all have proper drivers in
-drivers/gpu/drm/panel already.
-
-All real electronics are already covered. They use:
-drivers/gpu/drm/panel/panel-arm-versatile.c
-drivers/gpu/drm/bridge/dumb-vga-dac.c
-
-All QEMU emulators are already covered (by making
-QEMU emulation behave like real hardware). It now
-uses DDC by way of dumb-vga-dac.c.
-
-This virtual display in this emulator is the missing final piece to
-convert the PL111 fbdev driver over to use DRM.
-
-Yours,
-Linus Walleij
+-- 
+Thanks!
+BestRegards
