@@ -1,67 +1,294 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue, 16 Oct 2018 16:56:16 +0200
-Subject: [PATCH 05/11] Doc: DT: thermal: new irq-mode for trip point
+Date: Tue, 16 Oct 2018 16:56:17 +0200
+Subject: [PATCH 06/11] DT: arm64: exynos: add support for thermal trip irq-mode
 In-Reply-To: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
 References: <1539701782-26852-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181016145646eucas1p1bd4607c80258df10777ed111cf889fbc@eucas1p1.samsung.com>
-Message-ID: <20181016145646eucas1p1bd4607c80258df10777ed111cf889fbc~eHqKU_F8K2225422254eucas1p1r@eucas1p1.samsung.com>
+ <CGME20181016145647eucas1p206c068806214535da339588d77cbdfa5@eucas1p2.samsung.com>
+Message-ID: <20181016145647eucas1p206c068806214535da339588d77cbdfa5~eHqLYh2dR2135021350eucas1p2K@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thermal trip point gets new flag in DT: irq-mode.
-Trip point may have a new explicit flag which indicate
-irq support when the temperature is met (so the thermal framework
-deos not need set polling for it).
-It is useful for 'passive' cooling trip point,
-which now will not register for polling the temperature.
+This patch adds support for new flash which indicates
+that trip point triggers irq when temperature is met.
+Exynos5433 supports 8 trip point which will trigger irq.
+Above that number other trip points should be registered
+without 'irq-mode' flag.
+That will force the thermal framework to start polling
+the temperature sensor under configured conditions and
+handle the trip point.
 
-Update documentation about irq-mode for trip points.
-
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
 Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- Documentation/devicetree/bindings/thermal/thermal.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 105 ++++++++++++++++---------
+ 1 file changed, 70 insertions(+), 35 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
-index eb7ee91..c98a355 100644
---- a/Documentation/devicetree/bindings/thermal/thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/thermal.txt
-@@ -90,6 +90,10 @@ Required properties:
- 	"critical":	Hardware not reliable.
-   Type: string
- 
-+- irq-mode:		A flag indicating that trip rises irq, so there is no
-+  Type: bool		need of polling in thermal framework.
-+  Size: one cell
-+
- * Cooling device maps
- 
- The cooling device maps node is a node to describe how cooling devices
-@@ -256,16 +260,19 @@ thermal-zones {
- 				temperature = <90000>; /* millicelsius */
- 				hysteresis = <2000>; /* millicelsius */
- 				type = "active";
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+index fe3a0b1..c4330f6 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+@@ -17,37 +17,44 @@ thermal-zones {
+ 			atlas0_alert_0: atlas0-alert-0 {
+ 				temperature = <65000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
 +				irq-mode;
  			};
- 			cpu_alert1: cpu-alert1 {
- 				temperature = <100000>; /* millicelsius */
- 				hysteresis = <2000>; /* millicelsius */
- 				type = "passive";
+ 			atlas0_alert_1: atlas0-alert-1 {
+ 				temperature = <70000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
 +				irq-mode;
  			};
- 			cpu_crit: cpu-crit {
- 				temperature = <125000>; /* millicelsius */
- 				hysteresis = <2000>; /* millicelsius */
- 				type = "critical";
+ 			atlas0_alert_2: atlas0-alert-2 {
+ 				temperature = <75000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas0_alert_3: atlas0-alert-3 {
+ 				temperature = <80000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas0_alert_4: atlas0-alert-4 {
+ 				temperature = <85000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas0_alert_5: atlas0-alert-5 {
+ 				temperature = <90000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas0_alert_6: atlas0-alert-6 {
+ 				temperature = <95000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
 +				irq-mode;
  			};
  		};
  
+@@ -98,37 +105,44 @@ thermal-zones {
+ 			atlas1_alert_0: atlas1-alert-0 {
+ 				temperature = <65000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas1_alert_1: atlas1-alert-1 {
+ 				temperature = <70000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas1_alert_2: atlas1-alert-2 {
+ 				temperature = <75000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas1_alert_3: atlas1-alert-3 {
+ 				temperature = <80000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas1_alert_4: atlas1-alert-4 {
+ 				temperature = <85000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas1_alert_5: atlas1-alert-5 {
+ 				temperature = <90000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			atlas1_alert_6: atlas1-alert-6 {
+ 				temperature = <95000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 		};
+ 	};
+@@ -141,37 +155,44 @@ thermal-zones {
+ 			g3d_alert_0: g3d-alert-0 {
+ 				temperature = <70000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			g3d_alert_1: g3d-alert-1 {
+ 				temperature = <75000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			g3d_alert_2: g3d-alert-2 {
+ 				temperature = <80000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			g3d_alert_3: g3d-alert-3 {
+ 				temperature = <85000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			g3d_alert_4: g3d-alert-4 {
+ 				temperature = <90000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			g3d_alert_5: g3d-alert-5 {
+ 				temperature = <95000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			g3d_alert_6: g3d-alert-6 {
+ 				temperature = <100000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 		};
+ 	};
+@@ -184,37 +205,44 @@ thermal-zones {
+ 			apollo_alert_0: apollo-alert-0 {
+ 				temperature = <65000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			apollo_alert_1: apollo-alert-1 {
+ 				temperature = <70000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			apollo_alert_2: apollo-alert-2 {
+ 				temperature = <75000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			apollo_alert_3: apollo-alert-3 {
+ 				temperature = <80000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			apollo_alert_4: apollo-alert-4 {
+ 				temperature = <85000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			apollo_alert_5: apollo-alert-5 {
+ 				temperature = <90000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			apollo_alert_6: apollo-alert-6 {
+ 				temperature = <95000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 		};
+ 
+@@ -255,37 +283,44 @@ thermal-zones {
+ 			isp_alert_0: isp-alert-0 {
+ 				temperature = <80000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			isp_alert_1: isp-alert-1 {
+ 				temperature = <85000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			isp_alert_2: isp-alert-2 {
+ 				temperature = <90000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			isp_alert_3: isp-alert-3 {
+ 				temperature = <95000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			isp_alert_4: isp-alert-4 {
+ 				temperature = <100000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			isp_alert_5: isp-alert-5 {
+ 				temperature = <105000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 			isp_alert_6: isp-alert-6 {
+ 				temperature = <110000>;	/* millicelsius */
+ 				hysteresis = <1000>;	/* millicelsius */
+-				type = "active";
++				type = "passive";
++				irq-mode;
+ 			};
+ 		};
+ 	};
 -- 
 2.7.4
