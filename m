@@ -1,39 +1,55 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 16 Oct 2018 13:50:53 +0300
-Subject: [PATCH 2/2] arm64: dts: clearfog-gt-8k: 1G eth PHY reset signal
-In-Reply-To: <d02745d924c2ad65cbd1194fc35d12796613722d.1539687053.git.baruch@tkos.co.il>
-References: <d02745d924c2ad65cbd1194fc35d12796613722d.1539687053.git.baruch@tkos.co.il>
-Message-ID: <d7d0516199244af29efdd5231313a6519f5a4350.1539687053.git.baruch@tkos.co.il>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 16 Oct 2018 13:49:45 +0200
+Subject: [PATCH v4 0/9] Add support for audiocodec in Allwinner A64
+In-Reply-To: <CA+E=qVdA06n3Q=UP_gp05Ah2tf2UC-hOUCS471D_D6d2v-yF2A@mail.gmail.com>
+References: <20181016030239.15449-1-anarsoul@gmail.com>
+ <20181016070843.j6vnmk6qij6rdjbm@flea>
+ <CA+E=qVdA06n3Q=UP_gp05Ah2tf2UC-hOUCS471D_D6d2v-yF2A@mail.gmail.com>
+Message-ID: <20181016114945.ghigmd5oxm2je7jc@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reset signal controls the Marvell 1512 1G PHY.
+On Tue, Oct 16, 2018 at 12:13:26AM -0700, Vasily Khoruzhick wrote:
+> On Tue, Oct 16, 2018, 00:09 Maxime Ripard <[1]maxime.ripard@bootlin.com> wrote:
+> 
+>     Hi,
+> 
+>     On Mon, Oct 15, 2018 at 08:02:30PM -0700, Vasily Khoruzhick wrote:
+>     > This series adds Allwinner A64 audiocodec support into sun4i-i2s,
+>     > sun8i-codec drivers, introduces new sun50i-codec-analog driver and
+>     enables
+>     > sound on Pine64, SoPine boards and Pinebook.
+>     >
+>     > I2S for audiocodec in A64 is different from other 3 I2S modules but
+>     > similar to one in A10, digital part of codec is compatible with A33 and
+>     > analog controls part is completely different from other SoCs - it shares
+>     > only few bits in few registers, so adding support for it into existing
+>     > sun8i-codec-analog would mean duplicating all the widgets, controls and
+>     > some routes and making it hard to read. Therefore it makes sense to
+>     > introduce new driver.
+>     >
+>     > v2: - Use simple-amplifier for speaker amp on Pinebook
+>     >? ? ?- Rename sun50i-a64-i2s to sun50i-a64-codec-i2s to preserve
+>     compatible
+>     >? ? ? ?string for other 3 I2S modules in A64 in case if there's any
+>     >? ? ? ?incompatibility with H3
+>     > v3: - renamed sunxi-adda-pr-regmap to sun8i-adda-pr-regmap
+>     >? ? ?- use ilog2() to calculate reg value for LRCK div instead of using a
+>     >? ? ? ?table
+>     > v4: - dts: don't use 'Mic' and 'Headset Mic' widgets from sun8i-codec,
+>     >? ? ? ?define our board-level widgets instead.
+> 
+>     You also need to collect the tags that are given by the various people
+>     involved in that review :)
+> 
+> 
+> My bad. Do you want me to send v5 with all the tags?
 
-Note that current implementation queries the PHY over the MDIO bus
-(get_phy_device() call from of_mdiobus_register_phy()) before reset
-signal deassert. If the PHY reset signal is asserted at boot time, PHY
-registration fails. So current code relies on the bootloader to deassert
-the reset signal.
+Yep, please, thankS!
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Maxime
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-index af1310c53bc8..73df0ef5e0c4 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-@@ -337,6 +337,10 @@
- 		 */
- 		marvell,reg-init = <3 16 0 0x1017>;
- 		reg = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cp0_copper_eth_phy_reset>;
-+		reset-gpios = <&cp1_gpio1 11 GPIO_ACTIVE_LOW>;
-+		reset-assert-us = <10000>;
- 	};
- 
- 	switch0: switch0 at 4 {
 -- 
-2.19.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
