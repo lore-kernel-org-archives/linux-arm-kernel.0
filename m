@@ -1,139 +1,69 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 16 Oct 2018 17:19:14 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
- corruption on Hi16xx soc
-In-Reply-To: <4583617a-49ad-00b5-97fc-1ea35568c5cd@huawei.com>
-References: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
- <4583617a-49ad-00b5-97fc-1ea35568c5cd@huawei.com>
-Message-ID: <5BC5AD12.1010701@huawei.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Tue, 16 Oct 2018 11:19:20 +0200
+Subject: [PATCH v3 4/7] dmaengine: stm32-dma: Add DMA/MDMA chaining support
+In-Reply-To: <20181015171403.GM2400@vkoul-mobl>
+References: <1538139715-24406-1-git-send-email-pierre-yves.mordret@st.com>
+ <1538139715-24406-5-git-send-email-pierre-yves.mordret@st.com>
+ <20181007160030.GB2372@vkoul-mobl>
+ <e9cedfdd-ad90-9123-03bb-34a2e84059c5@st.com>
+ <20181010040343.GO2372@vkoul-mobl>
+ <d64da587-a680-20c4-7139-f59fd1f299bc@st.com>
+ <20181015171403.GM2400@vkoul-mobl>
+Message-ID: <9a375fd3-964f-3d57-9d18-b010e20a4d42@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2018/10/15 19:17, John Garry wrote:
-> On 15/10/2018 09:36, Zhen Lei wrote:
->> ITS translation register map:
->> 0x0000-0x003C    Reserved
->> 0x0040        GITS_TRANSLATER
->> 0x0044-0xFFFC    Reserved
+On 10/15/18 7:14 PM, Vinod wrote:
+> On 10-10-18, 09:02, Pierre Yves MORDRET wrote:
 >>
-> 
-> Can you add a better opening than the ITS translation register map?
-
-OK
-
-> 
->> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
->> expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
->> data will be written to MSIAddress each time.
 >>
->> MSIAddr: |----4bytes----|----4bytes----|
->>      |    MSIData   |    IMPDEF    |
+>> On 10/10/2018 06:03 AM, Vinod wrote:
+>>> On 09-10-18, 10:40, Pierre Yves MORDRET wrote:
+>>>>
+>>>>
+>>>> On 10/07/2018 06:00 PM, Vinod wrote:
+>>>>> On 28-09-18, 15:01, Pierre-Yves MORDRET wrote:
+>>>>>> This patch adds support of DMA/MDMA chaining support.
+>>>>>> It introduces an intermediate transfer between peripherals and STM32 DMA.
+>>>>>> This intermediate transfer is triggered by SW for single M2D transfer and
+>>>>>> by STM32 DMA IP for all other modes (sg, cyclic) and direction (D2M).
+>>>>>>
+>>>>>> A generic SRAM allocator is used for this intermediate buffer
+>>>>>> Each DMA channel will be able to define its SRAM needs to achieve chaining
+>>>>>> feature : (2 ^ order) * PAGE_SIZE.
+>>>>>> For cyclic, SRAM buffer is derived from period length (rounded on
+>>>>>> PAGE_SIZE).
+>>>>>
+>>>>> So IIUC, you chain two dma txns together and transfer data via an SRAM?
+>>>>
+>>>> Correct. one DMA is DMAv2 (stm32-dma) and the other is MDMA(stm32-mdma).
+>>>> Intermediate transfer is between device and memory.
+>>>> This intermediate transfer is using SDRAM.
+>>>
+>>> Ah so you use dma calls to setup mdma xtfers? I dont think that is a
+>>> good idea. How do you know you should use mdma for subsequent transfer?
+>>>
 >>
->> There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
->> But it will overwrite the 4 bytes memory following "sync_count". It's very
+>> When user bindings told to setup chaining intermediate MDMA transfers are always
+>> triggers.
+>> For instance if a user requests a Dev2Mem transfer with chaining. From client
+>> pov this is still a prep_slave_sg. Internally DMAv2 is setup in cyclic mode (in
+>> double buffer mode indeed => 2 buffer of PAGE_SIZE/2) and destination is SDRAM.
+>> DMAv2 will flip/flop on those 2 buffers.
+>> At the same time DMAv2 driver prepares a MDMA SG that will fetch data from those
+>> 2 buffers in SDRAM and fills final destination memory.
 > 
-> I think arm_smmu_device.sync_count is better, or "sync_count member in the the smmu driver control struct".
-
-OK, I will use "struct" in v2.
-
-+	struct {
- 	u32				sync_count;
-+	u32				padding;
-+	} __attribute__((aligned(8)));
-
-> 
->> luckly that the previous and the next neighbour of "sync_count" are both aligned
-> 
-> /s/luckly/luckily or fortunately/
-
-OK, thanks
-
-> 
->> by 8 bytes, so no problem is met now.
->>
->> It's good to explicitly add a workaround:
->> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
->>    aligned by 8 bytes.
->> 2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
->>
->> There is no functional change.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 5059d09..a07bc0d 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -586,7 +586,10 @@ struct arm_smmu_device {
->>
->>      struct arm_smmu_strtab_cfg    strtab_cfg;
->>
->> +    union {
->> +    u64                padding; /* workaround for Hisilicon */
-> 
-> I think that a more detailed comment is required.
-
-OK, I will try to describe it more clearly.
-
-> 
->>      u32                sync_count;
-> 
-> Can you indent these 2 members? However - as discussed internally - this may have endian issue so better to declare full 64b struct.
-
-These indent is inherited, to keep aligning with other members.
-
-There is no endian issue, I have tested it on both little-endian and big-endian.
-
-$gdb vmlinux
-......
-(gdb) p &((struct arm_smmu_device *)0)->sync_count
-$1 = (u32 *) 0x4178
-(gdb) p &((struct arm_smmu_device *)0)->tst1
-$2 = (int *) 0x4170
-(gdb) p &((struct arm_smmu_device *)0)->tst2
-$3 = (int *) 0x4180
-
-------------testcase--------
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 5059d09..7c6f7ac 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -586,7 +586,14 @@ struct arm_smmu_device {
-
-        struct arm_smmu_strtab_cfg      strtab_cfg;
-
-+ int                         tst1;
-+
-+ union {
-+ u64                         padding;
-        u32                             sync_count;
-+ } __attribute__((aligned(8)));
-+
-+ int                         tst2;
-
-        /* IOMMU core code handle */
-        struct iommu_device             iommu;
-
-> 
->> +    } __attribute__((aligned(8)));
->>
->>      /* IOMMU core code handle */
->>      struct iommu_device        iommu;
->>
-> Thanks
-> 
-> 
-> 
-> 
-> .
+> I am not able to follow is why does it need to be internal, why should
+> the client not set the two transfers and trigger them?
 > 
 
--- 
-Thanks!
-BestRegards
+Client may use or not chaining: defined within DT. API and dynamic are same at
+driver client level. Moreover driver exposes only DMAv2 and not both DMAv2 and
+MDMA. This is totally hidden for client. If client sets both this would imply
+changing all drivers that may want use chaining. Even more to deal with DMAv2
+and MDMA at its level.
+Since DMAv2 deals with MDMA, all drivers are same as before. no changes required.
+
+Regards
