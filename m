@@ -1,136 +1,59 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 16 Oct 2018 14:26:23 -0700
-Subject: [PATCH V4 03/11] clk: imx: scu: add scu clock divider
-In-Reply-To: <1539504194-28289-4-git-send-email-aisheng.dong@nxp.com>
+Date: Tue, 16 Oct 2018 14:27:58 -0700
+Subject: [PATCH V4 04/11] clk: imx: scu: add scu clock gpr divider
+In-Reply-To: <1539504194-28289-5-git-send-email-aisheng.dong@nxp.com>
 References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <153972518358.5275.8551722631185725008@swboyd.mtv.corp.google.com>
+ <1539504194-28289-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <153972527843.5275.15123840961402192766@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-10-14 01:07:49)
-> diff --git a/drivers/clk/imx/scu/clk-divider-scu.c b/drivers/clk/imx/scu/clk-divider-scu.c
-> new file mode 100644
-> index 0000000..51cb816
-> --- /dev/null
-> +++ b/drivers/clk/imx/scu/clk-divider-scu.c
-> @@ -0,0 +1,176 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + * Copyright 2017~2018 NXP
-> + *     Dong Aisheng <aisheng.dong@nxp.com>
-> + *
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/jiffies.h>
-
-Is this used?
-
-> +#include <linux/slab.h>
-> +
-> +#include "clk-scu.h"
-> +
-> +struct clk_divider_scu {
-> +       struct clk_hw   hw;
-
-Nitpick: No idea why this is spaced out from clk_hw.
-
-> +       u32 rsrc_id;
-> +       u8 clk_type;
-> +};
-> +
-> +/* SCU Clock Protocol definitions */
-> +struct imx_sc_msg_req_set_clock_rate {
-> +       struct imx_sc_rpc_msg hdr;
-> +       u32 rate;
-> +       u16 resource;
-> +       u8 clk;
-> +} __packed;
-> +
-> +struct imx_sc_msg_req_get_clock_rate {
-> +       struct imx_sc_rpc_msg hdr;
-> +       u16 resource;
-> +       u8 clk;
-> +} __packed;
-> +
-> +struct imx_sc_msg_resp_get_clock_rate {
-> +       struct imx_sc_rpc_msg hdr;
-> +       u32 rate;
-> +} __packed;
-> +
-> +
-> +static inline struct clk_divider_scu *to_clk_divider_scu(struct clk_hw *hw)
-> +{
-> +       return container_of(hw, struct clk_divider_scu, hw);
-> +}
-> +
+Quoting A.s. Dong (2018-10-14 01:07:52)
 > +/*
 > + * clk_divider_scu_recalc_rate - Get clock rate for a SCU clock
 > + * @hw: clock to get rate for
-> + * @parent_rate: parent rate provided by common clock framework, not used
+> + * @parent_rate: parent rate provided by common clock framework
 > + *
 > + * Gets the current clock rate of a SCU clock. Returns the current
 > + * clock rate, or zero in failure.
 > + */
-> +static unsigned long clk_divider_scu_recalc_rate(struct clk_hw *hw,
-> +                                                 unsigned long parent_rate)
+> +static unsigned long clk_divider_gpr_scu_recalc_rate(struct clk_hw *hw,
+> +                                                    unsigned long parent_rate)
 > +{
-> +       struct clk_divider_scu *div = to_clk_divider_scu(hw);
-> +       struct imx_sc_msg_req_get_clock_rate msg;
-> +       struct imx_sc_msg_resp_get_clock_rate *resp;
-> +       struct imx_sc_rpc_msg *hdr = &msg.hdr;
+> +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
+> +       u32 val;
 > +       int ret;
 > +
-> +       hdr->ver = IMX_SC_RPC_VERSION;
-> +       hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
-> +       hdr->func = (uint8_t)IMX_SC_PM_FUNC_GET_CLOCK_RATE;
-> +       hdr->size = 2;
-> +
-> +       msg.resource = div->rsrc_id;
-> +       msg.clk = div->clk_type;
-> +
-> +       ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
+> +       ret = imx_sc_misc_get_control(ccm_ipc_handle, clk->rsrc_id,
+> +                                     clk->gpr_id, &val);
 > +       if (ret) {
 > +               pr_err("%s: failed to get clock rate %d\n",
 > +                       clk_hw_get_name(hw), ret);
 > +               return 0;
 > +       }
 > +
-> +       resp = (struct imx_sc_msg_resp_get_clock_rate *)&msg;
+> +       return val ? parent_rate / 2 : parent_rate;
 
-Does the response get written to the same place that the message is
-written? If so, it would be better to combine the different structs into
-a union that's always large enough to handle this? For example, it looks
-like there are only 16 + 8 bytes for the get_clock_rate structure, but
-then the response is returning the rate in 32 bytes. When we cast that
-here we're now getting an extra 8 bytes of stack, aren't we? Combining
-the different structures into one bigger structure would alleviate this
-and avoid the need for casting.
+I hope parent_rate can't be zero here.
 
-> +
-> +       return resp->rate;
 > +}
 > +
 > +/*
 > + * clk_divider_scu_round_rate - Round clock rate for a SCU clock
 > + * @hw: clock to round rate for
 > + * @rate: rate to round
-> + * @parent_rate: parent rate provided by common clock framework, not used
+> + * @parent_rate: parent rate provided by common clock framework
 > + *
-> + * Gets the current clock rate of a SCU clock. Returns the current
-> + * clock rate, or zero in failure.
+> + * Round clock rate for a SCU clock according to parent rate
 > + */
-> +static long clk_divider_scu_round_rate(struct clk_hw *hw, unsigned long rate,
-> +                                      unsigned long *parent_rate)
+> +static long clk_divider_gpr_scu_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                                          unsigned long *prate)
 > +{
-> +       /*
-> +        * Assume we support all the requested rate and let the SCU firmware
-> +        * to handle the left work
-> +        */
+> +       if (rate < *prate)
+> +               rate = *prate / 2;
+> +       else
+> +               rate = *prate;
+> +
 > +       return rate;
 > +}
 > +
@@ -138,51 +61,40 @@ and avoid the need for casting.
 > + * clk_divider_scu_set_rate - Set rate for a SCU clock
 > + * @hw: clock to change rate for
 > + * @rate: target rate for the clock
-> + * @parent_rate: rate of the clock parent, not used for SCU clocks
+> + * @parent_rate: rate of the clock parent
 > + *
 > + * Sets a clock frequency for a SCU clock. Returns the SCU
 > + * protocol status.
 > + */
-> +static int clk_divider_scu_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                                   unsigned long parent_rate)
+> +static int clk_divider_gpr_scu_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                                       unsigned long parent_rate)
 > +{
-> +       struct clk_divider_scu *div = to_clk_divider_scu(hw);
-> +       struct imx_sc_msg_req_set_clock_rate msg;
-> +       struct imx_sc_rpc_msg *hdr = &msg.hdr;
-> +       int ret;
+> +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
+> +       uint32_t val;
 > +
-> +       hdr->ver = IMX_SC_RPC_VERSION;
-> +       hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
-> +       hdr->func = (uint8_t)IMX_SC_PM_FUNC_SET_CLOCK_RATE;
+> +       val = (rate < parent_rate) ? 1 : 0;
 
-Are these casts necessary?
+Nitpick: Write it out as 
 
-> +       hdr->size = 3;
+	val = 0;
+	if (rate < parent_rate)
+		val = 1;
+
 > +
-> +       msg.rate = rate;
-> +       msg.resource = div->rsrc_id;
-> +       msg.clk = div->clk_type;
-> +
-> +       ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
-> +       if (ret)
-> +               pr_err("%s: failed to set clock rate %ld : ret %d\n",
-> +                       clk_hw_get_name(hw), rate, ret);
-> +
-> +       return 0;
+> +       return imx_sc_misc_set_control(ccm_ipc_handle, clk->rsrc_id,
+> +                                      clk->gpr_id, val);
 > +}
 > +
-> +static const struct clk_ops clk_divider_scu_ops = {
-> +       .recalc_rate = clk_divider_scu_recalc_rate,
-> +       .round_rate = clk_divider_scu_round_rate,
-> +       .set_rate = clk_divider_scu_set_rate,
+> +static const struct clk_ops clk_divider_gpr_scu_ops = {
+> +       .recalc_rate = clk_divider_gpr_scu_recalc_rate,
+> +       .round_rate = clk_divider_gpr_scu_round_rate,
+> +       .set_rate = clk_divider_gpr_scu_set_rate,
 > +};
 > +
-> +struct clk_hw *imx_clk_register_divider_scu(const char *name,
-> +                                           const char *parent_name,
-> +                                           u32 rsrc_id,
-> +                                           u8 clk_type)
+> +struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char *parent_name,
+> +                                      u32 rsrc_id, u8 gpr_id)
 > +{
-> +       struct clk_divider_scu *div;
+> +       struct clk_divider_gpr_scu *div;
 > +       struct clk_init_data init;
 > +       struct clk_hw *hw;
 > +       int ret;
@@ -192,16 +104,17 @@ Are these casts necessary?
 > +               return ERR_PTR(-ENOMEM);
 > +
 > +       div->rsrc_id = rsrc_id;
-> +       div->clk_type = clk_type;
+> +       div->gpr_id = gpr_id;
 > +
 > +       init.name = name;
-> +       init.ops = &clk_divider_scu_ops;
+> +       init.ops = &clk_divider_gpr_scu_ops;
 > +       init.flags = CLK_GET_RATE_NOCACHE;
 
-Why nocache? Please have a good reason and add a comment indicating why.
+Same NOCACHE comment.
 
 > +       init.parent_names = parent_name ? &parent_name : NULL;
 > +       init.num_parents = parent_name ? 1 : 0;
+> +
 > +       div->hw.init = &init;
 > +
 > +       hw = &div->hw;
