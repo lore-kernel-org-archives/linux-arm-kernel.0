@@ -1,106 +1,101 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 16 Oct 2018 04:37:31 +0000
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <153962195779.5275.17500455384946496344@swboyd.mtv.corp.google.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
- <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
- <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
- <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
- <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
- <153898445180.119890.15025812558797341532@swboyd.mtv.corp.google.com>
- <DB3PR0402MB391664354775DF42E90E67C9F5E60@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <153937368201.5275.2313781259297807972@swboyd.mtv.corp.google.com>
- <DB3PR0402MB39169A3BA844F7833B62FF55F5FD0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <153962195779.5275.17500455384946496344@swboyd.mtv.corp.google.com>
-Message-ID: <AM6PR0402MB39112C0451B6E241AEBAC0D7F5FE0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
+From: christianshewitt@gmail.com (Christian Hewitt)
+Date: Tue, 16 Oct 2018 08:54:05 +0400
+Subject: [PATCH] clk: meson-gxbb: set fclk_div3 as CLK_IS_CRITICAL
+In-Reply-To: <ed6a889eeec4e2809f0840c9e8188b5e4b24fa76.camel@baylibre.com>
+References: <1539425086-10997-1-git-send-email-christianshewitt@gmail.com>
+ <20181013160810.88481.14237@resonance>
+ <ed6a889eeec4e2809f0840c9e8188b5e4b24fa76.camel@baylibre.com>
+Message-ID: <8A3A1316-DC7F-4C5A-9DD8-C115EBB613BB@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stephen
-
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Stephen Boyd <sboyd@kernel.org>
-> Sent: Tuesday, October 16, 2018 12:46 AM
-> To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
-> Anson Huang <anson.huang@nxp.com>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
-> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
-> Cc: dl-linux-imx <linux-imx@nxp.com>
-> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+On 15 Oct 2018, at 9:07 pm, Jerome Brunet <jbrunet@baylibre.com> wrote:
 > 
-> Quoting Anson Huang (2018-10-15 02:33:35)
-> > > > > >
-> > > > >
-> > > > > Why can't we add clks to the op-tee node in DT's /firmware container?
-> > > > > Then any clks in there can be turned on forever and left enabled
-> > > > > by the linux driver?
-> > > >
-> > > > I did NOT run op-tee with Linux-next kernel before, can you advise more?
-> > >
-> > > Neither have I, so I can't advise more.
-> > >
-> > > > And I think if op-tee has such requirement, can we have another
-> > > > patch to cover it?
-> > >
-> > > Yes.
-> > >
-> > >
-> > > > I believe all other i.MX platforms also have same requirements if
-> > > > considering op-tee support, so I think it should be another topic,
-> > > > what do you
-> > > think?
-> > > >
-> > >
-> > > I'm going to drop these patches from my review queue. Please resend
-> > > them and please include the op-tee patches too.
-> >
-> >
-> > I do NOT know how to include the op-tee patch to meet special
-> > requirement, should the op-tee related patch be added later when someone
-> actually add the op-tee support for i.MX7?
-> > It should NOT block this patch set, do you think we can add this patch set
-> first?
-> >
+> On Sat, 2018-10-13 at 18:08 +0200, Michael Turquette wrote:
+>> Quoting Christian Hewitt (2018-10-13 12:04:46)
+>>> On the Khadas VIM2 (GXM) and LePotato (GXL) board there are problems
+>>> with reboot; e.g. a ~60 second delay between issuing reboot and the
+>>> board power cycling (and in some OS configurations reboot will fail
+>>> and require manual power cycling).
+>>> 
+>>> Similar to 'commit c987ac6f1f088663b6dad39281071aeb31d450a8 ("clk:
+>>> meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL")' the SCPI Cortex-M4
+>>> Co-Processor seems to depend on FCLK_DIV3 being operational.
+>>> 
+>>> Bisect gives 'commit 05f814402d6174369b3b29832cbb5eb5ed287059 ("clk:
+>>> meson: add fdiv clock gates") between 4.16 and 4.16-rc1 as the first
+>>> bad commit. This added support for the missing clock gates before the
+>>> fixed PLL fixed dividers (FCLK_DIVx) and the clock framework which
+>>> disabled all the unused fixed dividers, thus it disabled a critical
+>>> clock path for the SCPI Co-Processor.
+>>> 
+>>> This change simply sets the FCLK_DIV3 gate as critical to ensure
+>>> nothing can disable it.
+>> 
+>> I'm a bit skeptical of this. If FCLK_DIV3 is gated at run-time, there is
+>> no side effect other than long and/or failed reboot?
+>> 
+>> Seems like someone should be managing this clock, and simply leaving it
+>> on all the time isn't necessarily the right approach. Any chance that
+>> you can dig into this behavior to better understand it?
+>> 
+>> It's easy to solve issues by leaving clocks on all the time, but this
+>> becomes a problem later on when trying to tune a device for power.
 > 
-> Please resend the two patches. In the commit text for the second patch,
-> describe the plan to remove CLK_IS_CRITICAL from these clks by adding an
-> OP-TEE device/driver to the kernel to keep these clks enabled. My
-> understanding is that there isn't an OP-TEE driver right now, but these clks are
-> used by the firmware and can't be turned off in Linux. If in the future we want
-> to be able to turn them on and off, we'll need to add them to an OP-TEE device
-> node and have that driver manage the clks.
+> Hi Mike,
 > 
-> How that will work when a system doesn't enable the OP-TEE driver I'm not
-> sure. We may need to develop some system whereby clks like this are handed
-> from the clk controller to the consumer driver when it's enabled for further
-> power managment, but if they're never handed off, they're kept on forever like
-> is done here. Anyway, please resend with a note about why these are marked
-> CLK_IS_CRITICAL.
- 
-I think there is some misunderstanding here, this patch sets those critical clocks
-with CLK_IS_CRITICAL flag to let clock driver keep them always ON, as they are
-critical clocks and system (Linux kernel, NOT include op-tee) can NOT run normally
-if anyone of them is OFF.
+> I totally agree with you and, in perfect a world, I would prefer not to use this
+> CLK_IS_CRITICAL at all. It looks like a cheap fix for:
+> 
+> "this is required, I don't for what but it is, so please leave it on"
+> 
+> The problem is this issue is a regression. We added a few gates to better model
+> the clock tree a while ago. Before, those those clock were left enabled by the
+> bootloader.
+> 
+> Now that linux turn them off, we are learning a few things about what the FWs
+> are doing behind our backs.
+> 
+> Among the 5 clocks which got a new gates, only 2 needs to back the old way using
+> CLK_IS_CRITICAL, so this is still an improvement.
+> 
+>> 
+>> Also, if this commit really is the right fix, it should include a
+>> comment for FCLK_DIV3 stating why the CLK_IS_CRITICAL flag was set,
+>> which may be helpful later on to know if it is safe to remove it. Same
+>> is true for FCLK_DIV2 in c987ac6f1f088663b6dad39281071aeb31d450a8.
+> 
+> +1 There should be FIXME notice in the driver explaining why we put that flag in
+> the first place, so we can remove it as soon as a driver properly handle this
+> clock.
+> 
+> Christian, is Ok if I amend your patch, or do you prefer to post a v2 ?
+> Mike, with explained, is this change OK with you ?
 
-The question about op-tee is, there might be some special clocks needed by op-tee,
-for example, currently clk A, B and C are kept always ON for Linux kernel to run normally,
-but when op-tee is executing, it might need clk D to be ON, so I think the clk D is needed
-ONLY for op-tee, op-tee should have a driver or firmware to runtime ON/OFF clk D as needed.
-Since I do NOT know what clocks op-tee needs, so I will leave them to be added by op-tee
-owner, whoever enables op-tee, he should consider where to manage its special clocks,
-either in clk driver or op-tee driver/firmware.
+I?m happy for you to amend, it?s easier for me.
+Christian
 
-So do we still need to mention the op-tee related info in commit text? Actually, this patch
-is just to replace those always-ON clocks in clks_init_on array with CLK_IS_CRITICAL flag.
-Then no need to explicitly enable clocks in clks_init_on array and just rely on common clk
-framework which will enable all clocks with CLK_IS_CRITICAL flag set, it will align with all
-other i.MX SoCs clk driver.
-
-Anson.
+>> 
+>> Regards,
+>> Mike
+>> 
+>>> 
+>>> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+>>> ---
+>>> drivers/clk/meson/gxbb.c | 1 +
+>>> 1 file changed, 1 insertion(+)
+>>> 
+>>> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+>>> index 86d3ae5..4c8925d 100644
+>>> --- a/drivers/clk/meson/gxbb.c
+>>> +++ b/drivers/clk/meson/gxbb.c
+>>> @@ -509,6 +509,7 @@ static struct clk_fixed_factor gxbb_fclk_div3_div = {
+>>>                .ops = &clk_fixed_factor_ops,
+>>>                .parent_names = (const char *[]){ "fixed_pll" },
+>>>                .num_parents = 1,
+>>> +               .flags = CLK_IS_CRITICAL,
+>>>        },
+>>> };
+>>> 
+>>> -- 
+>>> 2.7.4
