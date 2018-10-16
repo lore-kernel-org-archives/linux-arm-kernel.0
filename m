@@ -1,103 +1,60 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 16 Oct 2018 15:58:41 +0200
-Subject: [PATCH 5/5] pinctrl: mediatek: Add initial pinctrl driver for
- MT6797 SoC
-In-Reply-To: <20181011164429.GA18174@Mani-XPS-13-9360>
-References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
- <20181008191411.32555-6-manivannan.sadhasivam@linaro.org>
- <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
- <20181011164429.GA18174@Mani-XPS-13-9360>
-Message-ID: <e7abee72-23a3-4716-baf0-484514bbb019@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 16 Oct 2018 16:00:20 +0200
+Subject: [PATCH] DT: rockchip: Fix stability issues with the 'performance'
+ governor on rock960
+Message-ID: <1539698431-12616-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When the performance governor is set as default, the rock960 hangs
+around one minute after booting, whatever the activity is (idle, key
+pressed, loaded, ...).
 
+Based on the commit log found at https://patchwork.kernel.org/patch/10092377/
 
-On 11/10/2018 18:44, Manivannan Sadhasivam wrote:
-> On Thu, Oct 11, 2018 at 05:50:19PM +0200, Matthias Brugger wrote:
->>
->>
->> On 08/10/2018 21:14, Manivannan Sadhasivam wrote:
->>> Add initial pinctrl driver for Mediatek MT6797 SoC supporting only
->>> GPIO and pinmux configurations.
->>>
->>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->>> ---
->>>  drivers/pinctrl/mediatek/Kconfig              |    7 +
->>>  drivers/pinctrl/mediatek/Makefile             |    1 +
->>>  drivers/pinctrl/mediatek/pinctrl-mt6797.c     |   82 +
->>>  drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h | 2430 +++++++++++++++++
->>>  4 files changed, 2520 insertions(+)
->>>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt6797.c
->>>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
->>>
->> [...]
->>> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
->>> new file mode 100644
->>> index 000000000000..8949d2a15c39
->>> --- /dev/null
->>> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
->>> @@ -0,0 +1,2430 @@
->>> +/* SPDX-License-Identifier: GPL-2.0 */
->>> +/*
->>> + * Based on pinctrl-mtk-mt6765.h
->>> + *
->>> + * Copyright (C) 2018 MediaTek Inc.
->>> + *
->>> + * Author: ZH Chen <zh.chen@mediatek.com>
->>> + *
->>> + * Copyright (c) 2018 Manivannan Sadhasivam
->>> + */
->>> +
->>> +#ifndef __PINCTRL_MTK_MT6797_H
->>> +#define __PINCTRL_MTK_MT6797_H
->>> +
->>> +#include "pinctrl-paris.h"
->>> +
->>> +static const struct mtk_pin_desc mtk_pins_mt6797[] = {
->>> +	MTK_PIN(
->>> +		0, "GPIO0",
->>> +		MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
->>> +		DRV_GRP3,
->>
->> As far as I have seen, you put all pins in driving group 3, but from the public
->> available "Functional Specification" (page 51-81) I can see that there exist
->> several driving groups:
->> 2/4/6/8 mA (DRV_GRP3)
->> 4/8/12/16 mA (not sure which group this is)
->> 2/4/6/8/10/12/14/16 mA (DRV_GRP4).
->>
-> 
-> Not sure about that. But I derived the configuration from DRV_CFGx
-> registers available in "Application Software Register Table - Part 1"
-> from page no: 906.
-> 
-> This register supports 2/4/6/8mA and this belongs to DRV_GRP2/DRV_GRP3
-> [1].
+"vdd_log has no consumer and therefore will not be set to a specific
+voltage. Still the PWM output pin gets configured and thence the vdd_log
+output voltage will changed from it's default. Depending on the idle
+state of the PWM this will slightly over or undervoltage the logic supply
+of the RK3399 and cause instability with GbE (undervoltage) and PCIe
+(overvoltage). Since the default value set by a voltage divider is the
+correct supply voltage and we don't need to change it during runtime we
+remove the rail from the devicetree completely so the PWM pin will not
+be configured."
 
-I can see other driving groups as defined in the "Functional Specification" [1]
-which gets also reflected in the "Application Software Register Table - Part 1"
-[2], see for example page 852.
+After removing the vdd-log from the rock960's specific DT, the board
+does no longer hang and shows a stable behavior.
 
-CCing Mars, maybe he can help to clarify.
+Apply the same change for the rock960 by removing the vdd-log from the
+DT.
 
-Regards,
-Matthias
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-[1]
-https://www.96boards.org/documentation/consumer/mediatekx20/additional-docs/docs/MT6797_Functional_Specification_V1_0.pdf
-[2]
-https://www.96boards.org/documentation/consumer/mediatekx20/additional-docs/docs/MT6797_Register_Table_Part_1.pdf
-
-> 
-> Still I'm not fully confident of my choice here. Maybe Sean can throw
-> some inputs!
-> 
-> Thanks,
-> Mani
-> 
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c#n40
-> 
->> Regards,
->> Matthias
->>
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+index 6c8c4ab..56abbb0 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+@@ -57,18 +57,6 @@
+ 		regulator-always-on;
+ 		vin-supply = <&vcc_sys>;
+ 	};
+-
+-	vdd_log: vdd-log {
+-		compatible = "pwm-regulator";
+-		pwms = <&pwm2 0 25000 0>;
+-		regulator-name = "vdd_log";
+-		regulator-min-microvolt = <800000>;
+-		regulator-max-microvolt = <1400000>;
+-		regulator-always-on;
+-		regulator-boot-on;
+-		vin-supply = <&vcc_sys>;
+-	};
+-
+ };
+ 
+ &cpu_l0 {
+-- 
+2.7.4
