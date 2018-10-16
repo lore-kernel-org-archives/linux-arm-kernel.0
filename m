@@ -1,222 +1,134 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Tue, 16 Oct 2018 13:49:20 +0100
-Subject: [PATCH v4 4/4] perf/smmuv3_pmu: Enable HiSilicon Erratum 162001800
- quirk
-In-Reply-To: <20181016124920.24708-1-shameerali.kolothum.thodi@huawei.com>
-References: <20181016124920.24708-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20181016124920.24708-5-shameerali.kolothum.thodi@huawei.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 16 Oct 2018 14:55:41 +0200
+Subject: [PATCH 1/3] driver core: add probe_err log helper
+In-Reply-To: <605bd00e-ed0d-4259-bdc3-1784b2b3b16a@samsung.com>
+References: <CGME20181016072249eucas1p2303b8c06a9f7c839a971fe065b0c752e@eucas1p2.samsung.com>
+ <20181016072244.1216-1-a.hajda@samsung.com>
+ <20181016072244.1216-2-a.hajda@samsung.com>
+ <CAHp75VfVxEkTzc=1hBrvc4K7r=L28vXipb=j9jSRJbTJE4GtLQ@mail.gmail.com>
+ <605bd00e-ed0d-4259-bdc3-1784b2b3b16a@samsung.com>
+Message-ID: <20181016125543eucas1p1f23b3482179a9cd465f509e0abf782c1~eGAecmAv93038330383eucas1p1j@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HiSilicon erratum 162001800 describes the limitation of
-SMMUv3 PMCG implementation on HiSilicon Hip08 platforms.
+On 16.10.2018 13:29, Andrzej Hajda wrote:
+> On 16.10.2018 13:01, Andy Shevchenko wrote:
+>> On Tue, Oct 16, 2018 at 10:22 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
+>>> During probe every time driver gets resource it should usually check for error
+>>> printk some message if it is not -EPROBE_DEFER and return the error. This
+>>> pattern is simple but requires adding few lines after any resource acquisition
+>>> code, as a result it is often omited or implemented only partially.
+>>> probe_err helps to replace such code seqences with simple call, so code:
+>>>         if (err != -EPROBE_DEFER)
+>>>                 dev_err(dev, ...);
+>>>         return err;
+>>> becomes:
+>>>         return probe_err(dev, err, ...);
+>>>
+>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> ---
+>>>  drivers/base/core.c    | 37 +++++++++++++++++++++++++++++++++++++
+>>>  include/linux/device.h |  2 ++
+>>>  2 files changed, 39 insertions(+)
+>>>
+>>> diff --git a/drivers/base/core.c b/drivers/base/core.c
+>>> index 04bbcd779e11..23fabefb217a 100644
+>>> --- a/drivers/base/core.c
+>>> +++ b/drivers/base/core.c
+>>> @@ -3067,6 +3067,43 @@ define_dev_printk_level(_dev_info, KERN_INFO);
+>>>
+>>>  #endif
+>>>
+>>> +/**
+>>> + * probe_err - probe error check and log helper
+>>> + * @dev: the pointer to the struct device
+>>> + * @err: error value to test
+>>> + * @fmt: printf-style format string
+>>> + * @...: arguments as specified in the format string
+>>> + *
+>>> + * This helper implements common pattern present in probe functions for error
+>>> + * checking: print message if the error is not -EPROBE_DEFER and propagate it.
+>>> + * It replaces code sequence:
+>>> + *     if (err != -EPROBE_DEFER)
+>>> + *             dev_err(dev, ...);
+>>> + *     return err;
+>>> + * with
+>>> + *     return probe_err(dev, err, ...);
+>>> + *
+>>> + * Returns @err.
+>>> + *
+>>> + */
+>>> +int probe_err(const struct device *dev, int err, const char *fmt, ...)
+>>> +{
+>>> +       struct va_format vaf;
+>>> +       va_list args;
+>>> +
+>>> +       if (err != -EPROBE_DEFER) {
+>> Why not
+>>
+>> if (err == ...)
+>>  return err;
+>>
+>> ...
+>> return err;
+>>
+>> ?
+>>
+>> Better to read, better to maintain. No?
+> Yes, anyway next patch will re-factor it anyway.
+>
+>>> +               va_start(args, fmt);
+>>> +
+>>> +               vaf.fmt = fmt;
+>>> +               vaf.va = &args;
+>>> +
+>>> +               __dev_printk(KERN_ERR, dev, &vaf);
+>> It would be nice to print an error code as well, wouldn't it?
+> Hmm, on probe fail error is printed anyway (with exception of
+> EPROBE_DEFER, ENODEV and ENXIO):
+> ??? "probe of %s failed with error %d\n"
+> On the other side currently some drivers prints the error code anyway
+> via dev_err or similar, so I guess during conversion to probe_err it
+> should be removed then.
+>
+> If we add error code to probe_err is it OK to report it this way?
+> ??? dev_err(dev, "%V, %d\n", &vaf, err);
 
-On these platforms, the PMCG event counter registers
-(SMMU_PMCG_EVCNTRn) are read only and as a result it is
-not possible to set the initial counter period value on
-event monitor start.
+Ups, I forgot that message passed to probe_err will contain already
+newline character.
+So the err must be before message passed to probe_err, for example:
+??? dev_err(dev, "err=%d: %V\n", err, &vaf);
+Is it OK? Or better leave this part of the patch as is?
 
-To work around this, the current value of the counter is
-read and is used for delta calculations. This increases
-the possibility of reporting incorrect values if counter
-overflow happens and counter passes the initial value.
+Regards
+Andrzej
 
-OEM information from ACPI header is used to identify the
-affected hardware platform.
-
-Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
----
- drivers/perf/arm_smmuv3_pmu.c | 137 +++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 130 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/perf/arm_smmuv3_pmu.c b/drivers/perf/arm_smmuv3_pmu.c
-index d927ef8..519545e 100644
---- a/drivers/perf/arm_smmuv3_pmu.c
-+++ b/drivers/perf/arm_smmuv3_pmu.c
-@@ -96,6 +96,8 @@
- 
- #define SMMU_PA_SHIFT                   12
- 
-+#define SMMU_PMU_OPT_EVCNTR_RDONLY	(1 << 0)
-+
- static int cpuhp_state_num;
- 
- struct smmu_pmu {
-@@ -111,10 +113,55 @@ struct smmu_pmu {
- 	struct device *dev;
- 	void __iomem *reg_base;
- 	void __iomem *reloc_base;
-+	u32 options;
- 	u64 counter_present_mask;
- 	u64 counter_mask;
- };
- 
-+struct erratum_acpi_oem_info {
-+	char oem_id[ACPI_OEM_ID_SIZE + 1];
-+	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
-+	u32 oem_revision;
-+};
-+
-+static struct erratum_acpi_oem_info hisi_162001800_oem_info[] = {
-+	/*
-+	 * Note that trailing spaces are required to properly match
-+	 * the OEM table information.
-+	 */
-+	{
-+		.oem_id         = "HISI  ",
-+		.oem_table_id   = "HIP08   ",
-+		.oem_revision   = 0,
-+	},
-+	{ /* Sentinel indicating the end of the OEM array */ },
-+};
-+
-+enum smmu_pmu_erratum_match_type {
-+	se_match_acpi_oem,
-+};
-+
-+void hisi_erratum_evcntr_rdonly(struct smmu_pmu *smmu_pmu)
-+{
-+	smmu_pmu->options |= SMMU_PMU_OPT_EVCNTR_RDONLY;
-+}
-+
-+struct smmu_pmu_erratum_wa {
-+	enum smmu_pmu_erratum_match_type match_type;
-+	const void *id;	/* Indicate the Erratum ID */
-+	const char *desc_str;
-+	void (*enable)(struct smmu_pmu *smmu_pmu);
-+};
-+
-+static const struct smmu_pmu_erratum_wa smmu_pmu_wa[] = {
-+	{
-+		.match_type = se_match_acpi_oem,
-+		.id = hisi_162001800_oem_info,
-+		.desc_str = "HiSilicon erratum 162001800",
-+		.enable = hisi_erratum_evcntr_rdonly,
-+	},
-+};
-+
- #define to_smmu_pmu(p) (container_of(p, struct smmu_pmu, pmu))
- 
- #define SMMU_PMU_EVENT_ATTR_EXTRACTOR(_name, _config, _start, _end)        \
-@@ -224,15 +271,20 @@ static void smmu_pmu_set_period(struct smmu_pmu *smmu_pmu,
- 	u32 idx = hwc->idx;
- 	u64 new;
- 
--	/*
--	 * We limit the max period to half the max counter value of the counter
--	 * size, so that even in the case of extreme interrupt latency the
--	 * counter will (hopefully) not wrap past its initial value.
--	 */
--	new = smmu_pmu->counter_mask >> 1;
-+	if (smmu_pmu->options & SMMU_PMU_OPT_EVCNTR_RDONLY) {
-+		new = smmu_pmu_counter_get_value(smmu_pmu, idx);
-+	} else {
-+		/*
-+		 * We limit the max period to half the max counter value
-+		 * of the counter size, so that even in the case of extreme
-+		 * interrupt latency the counter will (hopefully) not wrap
-+		 * past its initial value.
-+		 */
-+		new = smmu_pmu->counter_mask >> 1;
-+		smmu_pmu_counter_set_value(smmu_pmu, idx, new);
-+	}
- 
- 	local64_set(&hwc->prev_count, new);
--	smmu_pmu_counter_set_value(smmu_pmu, idx, new);
- }
- 
- static void smmu_pmu_get_event_filter(struct perf_event *event, u32 *span,
-@@ -670,6 +722,69 @@ static void smmu_pmu_reset(struct smmu_pmu *smmu_pmu)
- 		       smmu_pmu->reloc_base + SMMU_PMCG_OVSCLR0);
- }
- 
-+typedef bool (*se_match_fn_t)(const struct smmu_pmu_erratum_wa *,
-+			      const void *);
-+
-+bool smmu_pmu_check_acpi_erratum(const struct smmu_pmu_erratum_wa *wa,
-+				const void *arg)
-+{
-+	static const struct erratum_acpi_oem_info empty_oem_info = {};
-+	const struct erratum_acpi_oem_info *info = wa->id;
-+	const struct acpi_table_header *hdr = arg;
-+
-+	/* Iterate over the ACPI OEM info array, looking for a match */
-+	while (memcmp(info, &empty_oem_info, sizeof(*info))) {
-+		if (!memcmp(info->oem_id, hdr->oem_id, ACPI_OEM_ID_SIZE) &&
-+		    !memcmp(info->oem_table_id, hdr->oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
-+		    info->oem_revision == hdr->oem_revision)
-+			return true;
-+
-+		info++;
-+	}
-+
-+	return false;
-+
-+}
-+
-+static void smmu_pmu_enable_errata(struct smmu_pmu *smmu_pmu,
-+				enum smmu_pmu_erratum_match_type type,
-+				se_match_fn_t match_fn,
-+				void *arg)
-+{
-+	const struct smmu_pmu_erratum_wa *wa = smmu_pmu_wa;
-+
-+	for (; wa->desc_str; wa++) {
-+		if (wa->match_type != type)
-+			continue;
-+
-+		if (match_fn(wa, arg)) {
-+			if (wa->enable) {
-+				wa->enable(smmu_pmu);
-+				dev_info(smmu_pmu->dev,
-+					"Enabling workaround for %s\n",
-+					 wa->desc_str);
-+			}
-+		}
-+	}
-+}
-+
-+static void smmu_pmu_check_workarounds(struct smmu_pmu *smmu_pmu,
-+				  enum smmu_pmu_erratum_match_type type,
-+				  void *arg)
-+{
-+	se_match_fn_t match_fn = NULL;
-+
-+	switch (type) {
-+	case se_match_acpi_oem:
-+		match_fn = smmu_pmu_check_acpi_erratum;
-+		break;
-+	default:
-+		return;
-+	}
-+
-+	smmu_pmu_enable_errata(smmu_pmu, type, match_fn, arg);
-+}
-+
- static int smmu_pmu_probe(struct platform_device *pdev)
- {
- 	struct smmu_pmu *smmu_pmu;
-@@ -678,6 +793,7 @@ static int smmu_pmu_probe(struct platform_device *pdev)
- 	u64 ceid_64[2];
- 	int irq, err;
- 	char *name;
-+	struct acpi_table_header *table;
- 	struct device *dev = &pdev->dev;
- 
- 	smmu_pmu = devm_kzalloc(dev, sizeof(*smmu_pmu), GFP_KERNEL);
-@@ -749,6 +865,13 @@ static int smmu_pmu_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
-+	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_IORT, 0, &table))) {
-+		dev_err(dev, "IORT get failed, PMU @%pa\n", &res_0->start);
-+		return -EINVAL;
-+	}
-+
-+	smmu_pmu_check_workarounds(smmu_pmu, se_match_acpi_oem, table);
-+
- 	/* Pick one CPU to be the preferred one to use */
- 	smmu_pmu->on_cpu = get_cpu();
- 	WARN_ON(irq_set_affinity(smmu_pmu->irq, cpumask_of(smmu_pmu->on_cpu)));
--- 
-2.7.4
+>
+> Regards
+> Andrzej
+>
+>>> +               va_end(args);
+>>> +       }
+>>> +
+>>> +       return err;
+>>> +}
+>>> +
+>>>  static inline bool fwnode_is_primary(struct fwnode_handle *fwnode)
+>>>  {
+>>>         return fwnode && !IS_ERR(fwnode->secondary);
+>>> diff --git a/include/linux/device.h b/include/linux/device.h
+>>> index 90224e75ade4..06c2c797d132 100644
+>>> --- a/include/linux/device.h
+>>> +++ b/include/linux/device.h
+>>> @@ -1577,6 +1577,8 @@ do {                                                                      \
+>>>         WARN_ONCE(condition, "%s %s: " format, \
+>>>                         dev_driver_string(dev), dev_name(dev), ## arg)
+>>>
+>>> +int probe_err(const struct device *dev, int err, const char *fmt, ...);
+>>> +
+>>>  /* Create alias, so I can be autoloaded. */
+>>>  #define MODULE_ALIAS_CHARDEV(major,minor) \
+>>>         MODULE_ALIAS("char-major-" __stringify(major) "-" __stringify(minor))
+>>> --
+>>> 2.18.0
+>>>
