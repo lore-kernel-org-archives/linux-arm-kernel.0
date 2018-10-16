@@ -1,178 +1,224 @@
-From: adam.cottrel@veea.com (Adam Cottrel)
-Date: Tue, 16 Oct 2018 16:52:08 +0000
-Subject: DMA remote memcpy requests
-In-Reply-To: <DM6PR07MB4923F3328079199090D6D2CA9EFE0@DM6PR07MB4923.namprd07.prod.outlook.com>
-References: <DM6PR04MB405938028EC04FBD07F3D96AF2E10@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181012090937.GA12289@arm.com>
- <DM6PR04MB4059742D494D96FC11674A50F2E20@DM6PR04MB4059.namprd04.prod.outlook.com>
- <b56bf98f-5055-fb85-7807-e45d495369f3@arm.com>,
- <DM6PR04MB405918E803AF4FCC34B12083F2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
- <DM6PR07MB4923F3328079199090D6D2CA9EFE0@DM6PR07MB4923.namprd07.prod.outlook.com>
-Message-ID: <DM6PR04MB40591E6193F3B77698B09552F2FE0@DM6PR04MB4059.namprd04.prod.outlook.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 16 Oct 2018 18:06:56 +0100
+Subject: [PATCH 11/19] PCI: keystone: Cleanup PHY handling
+In-Reply-To: <20181015130721.5535-12-kishon@ti.com>
+References: <20181015130721.5535-1-kishon@ti.com>
+ <20181015130721.5535-12-kishon@ti.com>
+Message-ID: <20181016170656.GD16390@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sunil,
+On Mon, Oct 15, 2018 at 06:37:13PM +0530, Kishon Vijay Abraham I wrote:
+> Cleanup PHY handling by using devm_phy_optional_get to get PHYs if
+> the PHYs are optional, creating a device link between the PHY device
+> and the controller device and disable PHY on error cases here.
+> Also invoke phy_reset() as part of initializing PHY.
 
-That is a great suggestion. Can someone advise on how to turn off the SMMU for testing purposes?
+Hi Kishon,
 
-Best,
-Adam
+it is a bit of nitpicking, I know it is annoying but when I read "Also"
+in commit logs there is almost certainly a reason to split the patch
+into logical standalone entities, this one looks like one.
 
-From: Goutham, Sunil <Sunil.Goutham@cavium.com> 
-Sent: 16 October 2018 17:51
-To: Adam Cottrel <adam.cottrel@veea.com>; Robin Murphy <robin.murphy@arm.com>; Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org; rric at kernel.org; Jan Glauber <Jan.Glauber@cavium.com>; Nair, Jayachandran <Jayachandran.Nair@cavium.com>; Goutham, Sunil <Sunil.Goutham@cavium.com>
-Subject: Re: DMA remote memcpy requests
+Every patch must be a self-contained change that, in case we have to
+revert it, must not affect other patches.
 
-Hi Adam,
-
-Is it possible for you to disable SMMU and do the same test ?
-It might help in narrowing down whether transaction is lost at PCIeRC itself or
-SMMU translation.
+There are some more patches in the series that would benefit from
+splitting so I kindly ask you to go through them and repost, we
+should still be able to hit v4.20.
 
 Thanks,
-Sunil.
+Lorenzo
 
-
-Sent from my Samsung Galaxy smartphone.
-
-
--------- Original message --------
-From: Adam Cottrel <mailto:adam.cottrel@veea.com> 
-Date: 15/10/2018 20:04 (GMT+05:30) 
-To: Robin Murphy <mailto:robin.murphy@arm.com>, Will Deacon <mailto:will.deacon@arm.com> 
-Cc: mailto:linux-arm-kernel at lists.infradead.org, mailto:rric at kernel.org, Jan Glauber <mailto:Jan.Glauber@cavium.com>, "Nair, Jayachandran" <mailto:Jayachandran.Nair@cavium.com>, "Goutham, Sunil" <mailto:Sunil.Goutham@cavium.com> 
-Subject: RE: DMA remote memcpy requests 
-
-External Email
-
-Dear Robin/Jan/Will,
-
-Any thoughts on what I can do to further diagnose the root cause?
-
-Best,
-Adam
-
-> -----Original Message-----
-> From: Robin Murphy <mailto:robin.murphy@arm.com>
-> Sent: 12 October 2018 11:47
-> To: Adam Cottrel <mailto:adam.cottrel@veea.com>; Will Deacon
-> <mailto:will.deacon@arm.com>
-> Cc: mailto:linux-arm-kernel at lists.infradead.org; mailto:rric at kernel.org;
-> mailto:jglauber at cavium.com; mailto:jnair at caviumnetworks.com; mailto:sgoutham at cavium.com
-> Subject: Re: DMA remote memcpy requests
->
-> On 12/10/18 10:48, Adam Cottrel wrote:
-> > Hi Will,
-> >
-> > Thank you for getting back to me.
-> >
-> >> [+Robin and Cavium folks -- it's usually best to cc people as well as
-> >> mailing the list]
-> > I will remember this for future. Thanks for the advice.
-> >
-> >>> I am using the ATH10K on Linux 14.4 with an Arm Cavium processor.
-> >>> During heavy loading, I am seeing that target initiated DMA requests
-> >>> are being silently dropped under extreme IO memory pressure and it
-> >>> is proving very difficult to isolate the root cause.
-> >>
-> >> Is this ThunderX 1 or 2 or something else? Can you reproduce the
-> >> issue with mainline?
-> > I am using:-
-> >????????? model = "Cavium ThunderX CN81XX board";
-> >????????? compatible = "cavium,thunder-81xx";
-> >
-> > Yes - the issue can be reproduced on the mainline, but here is a link
-> > to the code branch that I am using:-
-> > https://elixir.bootlin.com/linux/v4.14.4/source/drivers/net/wireless/a
-> > th/ath10k
-> >
-> >>> The ATH10K firmware uses the DMA API to set up phy_addr_t pointers
-> >>> (32-bit) which are then copied to a shared ring buffer. The target
->
-> That's the first alarm bell - phys_addr_t is still going to be 64-bit on any arm64
-> platform. If the device is expecting 32-bit addresses but somehow doesn't
-> have its DMA mask set appropriately, then if you have more than 3GB or so
-> of RAM there's the potential for addresses to get truncated such that the
-> DMA *does* happen, but to the wrong place.
->
-> However, with SMMU translation enabled (i.e. not just passthrough), then
-> I'd expect that same situation to cause more or less all DMA to fail, so if
-> you've successfully tested that setup it must be something much more
-> subtle :/
->
-> >>> then initiates the memcpy operation (for target-to-host reads), but
-> >>> I do not have any means of debugging the target directly, and so I
-> >>> am looking for software hooks on the host that might help debug this
-> >>> complex
-> >> problem.
-> >>
-> >> How does the firmware use the DMA API, or are you referring to a
-> >> driver? If the latter, could you point us to the code, please? Is it
-> >> using the streaming API, or is this a coherent allocation?
-> > The code is using the ARM64 DMA API. It cuts corners in places (!!) but for
-> the most part, it follows the rules. In local tests, I have added memory
-> barriers (e.g. dmb(SY)) and even put in low-level flush/invalidate calls (DC
-> CIVAC) to try and eliminate cache-coherency type problems.
-> >
-> > The receive fault can be observed in the Rx handler which can be found
-> > on line 528 of ce.c:-
-> > https://elixir.bootlin.com/linux/v4.14.4/source/drivers/net/wireless/a
-> > th/ath10k/ce.c
-> >
-> > The memory is allocated by the Rx post buffer function which is on
-> > line 760 of pci.c:-
-> > https://elixir.bootlin.com/linux/v4.14.4/source/drivers/net/wireless/a
-> > th/ath10k/pci.c
-> >
-> > To better observe the fault, I made the following change:-
-> >?? + On allocation, I use memset to clear the skb->data (pci.c::770)
-> >?? + On receive, I check that the data is not zero (ce.c::555)
-> >?? + If the data is not yet written, I exit the Rx IRQ handler and try again.
-> >
-> > In tests, the code works as expected under normal operation, however
-> once I start to simulate a heavy memory pressure situation then the Rx
-> handler starts to fail. This failure (if allowed to continue) will eventually tear
-> down the entire module and crash the target firmware because presumably
-> they are seeing similar dropouts on the transmit path.
-> >
-> > When the fault is happening, if I poll the target registers (e.g. write
-> counters over MMIO) I can see that they are still sending us new messages.
-> In other words, they have silently failed to send the data, or rather we have
-> silently failed to accept the memory copy. I am not able to access the target
-> firmware directly, but I have been reliably informed that the DMA memcpy
-> operation is initiated by the target.
-> >
-> > My memory pressure test uses a large dd copy to create a lot of dirty
-> memory pages. This always creates the fault, however without any memory
-> pressure the code runs beautifully...
->
-> Are you able to characterise whether it's actually the memory pressure itself
-> that changes the behaviour (e.g. difficulty in allocating new SKBs), or is it just
-> that there's suddenly a lot more work going on in general? Those aren't
-> exactly the most powerful CPU cores, and with only
-> 2 or 4 of them it doesn't seem impossible that the system could simply get
-> loaded to the point where it can't keep up and starts dropping things on the
-> floor.
->
-> Robin.
->
-> >>> Please can someone explain the low-level operation of DMA once it
-> >>> becomes a target initiated memcpy function?
-> >>
-> >> I think we need a better handle on the issue first.
-> >
-> > I fully agree - please tell me what you want to know :-D
-> >
-> >>> p.s. I have tested with and without the IOMMU, and I have eliminated
-> >>> issues such as cache coherency being the root cause.
-> >>
-> >> Right, not sure how the SMMU would help here.
-> >
-> > Understood, and thanks for taking the time to reply, and I look forward to
-> hearing your thoughts as I would like to fix this issue once and for all.
-> >
-> > Best,
-> > Adam
-> >
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/controller/dwc/pci-keystone.c | 126 +++++++++++++++++++---
+>  1 file changed, 110 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+> index e22328f89c84..bf37609ad75b 100644
+> --- a/drivers/pci/controller/dwc/pci-keystone.c
+> +++ b/drivers/pci/controller/dwc/pci-keystone.c
+> @@ -105,6 +105,9 @@ struct keystone_pcie {
+>  
+>  	int			num_msi_host_irqs;
+>  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
+> +	int			num_lanes;
+> +	struct phy		**phy;
+> +	struct device_link	**link;
+>  	struct			device_node *msi_intc_np;
+>  	struct irq_domain	*legacy_irq_domain;
+>  	struct device_node	*np;
+> @@ -880,22 +883,61 @@ static const struct dw_pcie_ops ks_pcie_dw_pcie_ops = {
+>  	.link_up = ks_pcie_link_up,
+>  };
+>  
+> -static int __exit ks_pcie_remove(struct platform_device *pdev)
+> +static void ks_pcie_disable_phy(struct keystone_pcie *ks_pcie)
+>  {
+> -	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+> +	int num_lanes = ks_pcie->num_lanes;
+>  
+> -	clk_disable_unprepare(ks_pcie->clk);
+> +	while (num_lanes--) {
+> +		phy_power_off(ks_pcie->phy[num_lanes]);
+> +		phy_exit(ks_pcie->phy[num_lanes]);
+> +	}
+> +}
+> +
+> +static int ks_pcie_enable_phy(struct keystone_pcie *ks_pcie)
+> +{
+> +	int i;
+> +	int ret;
+> +	int num_lanes = ks_pcie->num_lanes;
+> +
+> +	for (i = 0; i < num_lanes; i++) {
+> +		ret = phy_reset(ks_pcie->phy[i]);
+> +		if (ret < 0)
+> +			goto err_phy;
+> +
+> +		ret = phy_init(ks_pcie->phy[i]);
+> +		if (ret < 0)
+> +			goto err_phy;
+> +
+> +		ret = phy_power_on(ks_pcie->phy[i]);
+> +		if (ret < 0) {
+> +			phy_exit(ks_pcie->phy[i]);
+> +			goto err_phy;
+> +		}
+> +	}
+>  
+>  	return 0;
+> +
+> +err_phy:
+> +	while (--i >= 0) {
+> +		phy_power_off(ks_pcie->phy[i]);
+> +		phy_exit(ks_pcie->phy[i]);
+> +	}
+> +
+> +	return ret;
+>  }
+>  
+>  static int __init ks_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+>  	struct dw_pcie *pci;
+>  	struct keystone_pcie *ks_pcie;
+> -	struct phy *phy;
+> +	struct device_link **link;
+> +	struct phy **phy;
+> +	u32 num_lanes;
+> +	char name[10];
+>  	int ret;
+> +	int i;
+>  
+>  	ks_pcie = devm_kzalloc(dev, sizeof(*ks_pcie), GFP_KERNEL);
+>  	if (!ks_pcie)
+> @@ -908,29 +950,59 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>  	pci->dev = dev;
+>  	pci->ops = &ks_pcie_dw_pcie_ops;
+>  
+> -	ks_pcie->pci = pci;
+> +	ret = of_property_read_u32(np, "num-lanes", &num_lanes);
+> +	if (ret)
+> +		num_lanes = 1;
+>  
+> -	/* initialize SerDes Phy if present */
+> -	phy = devm_phy_get(dev, "pcie-phy");
+> -	if (PTR_ERR_OR_ZERO(phy) == -EPROBE_DEFER)
+> -		return PTR_ERR(phy);
+> +	phy = devm_kzalloc(dev, sizeof(*phy) * num_lanes, GFP_KERNEL);
+> +	if (!phy)
+> +		return -ENOMEM;
+>  
+> -	if (!IS_ERR_OR_NULL(phy)) {
+> -		ret = phy_init(phy);
+> -		if (ret < 0)
+> -			return ret;
+> +	link = devm_kzalloc(dev, sizeof(*link) * num_lanes, GFP_KERNEL);
+> +	if (!link)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < num_lanes; i++) {
+> +		snprintf(name, sizeof(name), "pcie-phy%d", i);
+> +		phy[i] = devm_phy_optional_get(dev, name);
+> +		if (IS_ERR(phy[i])) {
+> +			ret = PTR_ERR(phy[i]);
+> +			goto err_link;
+> +		}
+> +
+> +		if (!phy[i])
+> +			continue;
+> +
+> +		link[i] = device_link_add(dev, &phy[i]->dev, DL_FLAG_STATELESS);
+> +		if (!link[i]) {
+> +			ret = -EINVAL;
+> +			goto err_link;
+> +		}
+> +	}
+> +
+> +	ks_pcie->np = np;
+> +	ks_pcie->pci = pci;
+> +	ks_pcie->link = link;
+> +	ks_pcie->num_lanes = num_lanes;
+> +	ks_pcie->phy = phy;
+> +
+> +	ret = ks_pcie_enable_phy(ks_pcie);
+> +	if (ret) {
+> +		dev_err(dev, "failed to enable phy\n");
+> +		goto err_link;
+>  	}
+>  
+> -	ks_pcie->np = dev->of_node;
+>  	platform_set_drvdata(pdev, ks_pcie);
+>  	ks_pcie->clk = devm_clk_get(dev, "pcie");
+>  	if (IS_ERR(ks_pcie->clk)) {
+>  		dev_err(dev, "Failed to get pcie rc clock\n");
+> -		return PTR_ERR(ks_pcie->clk);
+> +		ret = PTR_ERR(ks_pcie->clk);
+> +		goto err_phy;
+>  	}
+> +
+>  	ret = clk_prepare_enable(ks_pcie->clk);
+>  	if (ret)
+> -		return ret;
+> +		goto err_phy;
+>  
+>  	ret = ks_pcie_add_pcie_port(ks_pcie, pdev);
+>  	if (ret < 0)
+> @@ -940,9 +1012,31 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>  fail_clk:
+>  	clk_disable_unprepare(ks_pcie->clk);
+>  
+> +err_phy:
+> +	ks_pcie_disable_phy(ks_pcie);
+> +
+> +err_link:
+> +	while (--i >= 0 && link[i])
+> +		device_link_del(link[i]);
+> +
+>  	return ret;
+>  }
+>  
+> +static int __exit ks_pcie_remove(struct platform_device *pdev)
+> +{
+> +	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+> +	struct device_link **link = ks_pcie->link;
+> +	int num_lanes = ks_pcie->num_lanes;
+> +
+> +	clk_disable_unprepare(ks_pcie->clk);
+> +	ks_pcie_disable_phy(ks_pcie);
+> +
+> +	while (num_lanes--)
+> +		device_link_del(link[num_lanes]);
+> +
+> +	return 0;
+> +}
+> +
+>  static struct platform_driver ks_pcie_driver __refdata = {
+>  	.probe  = ks_pcie_probe,
+>  	.remove = __exit_p(ks_pcie_remove),
+> -- 
+> 2.17.1
+> 
