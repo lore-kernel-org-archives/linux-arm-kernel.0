@@ -1,132 +1,66 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 16 Oct 2018 15:53:55 +0100
-Subject: [PATCH v9 2/9] PCI: Using PCI configuration space header type
- instead of class type to assign resource
-In-Reply-To: <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
-References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
- <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20181016145355.GB16390@e107981-ln.cambridge.arm.com>
+From: l.luba@partner.samsung.com (Lukasz Luba)
+Date: Tue, 16 Oct 2018 16:56:11 +0200
+Subject: [PATCH 00/11] thermal: add new flag irq-mode for trip point
+References: <CGME20181016145637eucas1p2dfa78042b9fd4fd27af7cc8537b7f485@eucas1p2.samsung.com>
+Message-ID: <20181016145637eucas1p2dfa78042b9fd4fd27af7cc8537b7f485~eHqCoEO-42133821338eucas1p2F@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 06:44:43PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> The PCI configuration space header type defines the layout of the rest
-> of the header (PCI r3.0 sec 6.1, PCIe r4.0 sec 7.5.1.1.9) while the
-> resource assignment is based on the configuration space layout instead
-> of its class type. Using configuration space header type instead of
-> class type for the resource assignment.
-> 
-> Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  drivers/pci/pci.c       |  3 +--
->  drivers/pci/probe.c     |  3 ---
->  drivers/pci/setup-bus.c | 20 ++++++++++----------
->  3 files changed, 11 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 29ff961..7d379ca 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -5908,8 +5908,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
->  	 * to enable the kernel to reassign new resource
->  	 * window later on.
->  	 */
-> -	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
-> -	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
-> +	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
->  		for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
->  			r = &dev->resource[i];
->  			if (!(r->flags & IORESOURCE_MEM))
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index ec78400..29a35c1 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1695,9 +1695,6 @@ int pci_setup_device(struct pci_dev *dev)
->  		break;
->  
->  	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
-> -		if (class != PCI_CLASS_BRIDGE_PCI)
-> -			goto bad;
-> -
->  		/*
->  		 * The PCI-to-PCI bridge spec requires that subtractive
->  		 * decoding (i.e. transparent) bridge must have programming
-> diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-> index 79b1824..69f90f4 100644
-> --- a/drivers/pci/setup-bus.c
-> +++ b/drivers/pci/setup-bus.c
-> @@ -182,7 +182,7 @@ static void __dev_sort_resources(struct pci_dev *dev,
->  	u16 class = dev->class >> 8;
->  
->  	/* Don't touch classless devices or host bridges or ioapics.  */
-> -	if (class == PCI_CLASS_NOT_DEFINED || class == PCI_CLASS_BRIDGE_HOST)
-> +	if (class == PCI_CLASS_NOT_DEFINED)
+Hi all,
 
-I think this check has been there since the first initial git commit,
-whether that's _really_ needed or not in the current kernel it is very
-hard to say.
+This patch set adds new flag and mechanism in thermal trip point in DT.
+The current situation with 'passive' (passive cooling - DVFS)
+trip point is that it enables polling mode in thermal framework.
+If the device supports irqs fired when the desired temerature is met,
+thermal framwork should be notifed from driver's irq routine.
+This is sufficent and there is no need of polling.
+As a workaround, people declare trip point as 'active'
+(active cooling, i.e. fan) to bypass polling mode setup in thermal
+framework.
 
-I am not that sure it is safe to remove it, especially given that we are at
--rc8 and close to a release, it would be good if this patch could sit in
-next to give it some exposure to testing before merging it upstream.
+With this patch set trip point 'passive' declared in DT with explicit flag:
+'irq-mode;' will not register itself as polling mode.
 
-Lorenzo
+A good example is Exynos4 SoC family, where there is 4 HW supported
+trip points and there is a need of 6. The rest 2 are declared as 'passive'
+without 'irq-mode;' flag, thus polling needed.
 
->  		return;
->  
->  	/* Don't touch ioapic devices already enabled by firmware */
-> @@ -1221,12 +1221,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
->  		if (!b)
->  			continue;
->  
-> -		switch (dev->class >> 8) {
-> -		case PCI_CLASS_BRIDGE_CARDBUS:
-> +		switch (dev->hdr_type) {
-> +		case PCI_HEADER_TYPE_CARDBUS:
->  			pci_bus_size_cardbus(b, realloc_head);
->  			break;
->  
-> -		case PCI_CLASS_BRIDGE_PCI:
-> +		case PCI_HEADER_TYPE_BRIDGE:
->  		default:
->  			__pci_bus_size_bridges(b, realloc_head);
->  			break;
-> @@ -1237,12 +1237,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
->  	if (pci_is_root_bus(bus))
->  		return;
->  
-> -	switch (bus->self->class >> 8) {
-> -	case PCI_CLASS_BRIDGE_CARDBUS:
-> +	switch (bus->self->hdr_type) {
-> +	case PCI_HEADER_TYPE_CARDBUS:
->  		/* don't size cardbuses yet. */
->  		break;
->  
-> -	case PCI_CLASS_BRIDGE_PCI:
-> +	case PCI_HEADER_TYPE_BRIDGE:
->  		pci_bridge_check_ranges(bus);
->  		if (bus->self->is_hotplug_bridge) {
->  			additional_io_size  = pci_hotplug_io_size;
-> @@ -1391,13 +1391,13 @@ void __pci_bus_assign_resources(const struct pci_bus *bus,
->  
->  		__pci_bus_assign_resources(b, realloc_head, fail_head);
->  
-> -		switch (dev->class >> 8) {
-> -		case PCI_CLASS_BRIDGE_PCI:
-> +		switch (dev->hdr_type) {
-> +		case PCI_HEADER_TYPE_BRIDGE:
->  			if (!pci_is_enabled(dev))
->  				pci_setup_bridge(b);
->  			break;
->  
-> -		case PCI_CLASS_BRIDGE_CARDBUS:
-> +		case PCI_HEADER_TYPE_CARDBUS:
->  			pci_setup_cardbus(b);
->  			break;
->  
-> -- 
-> 2.6.4
-> 
+It does not break existing design for trip points which do not have 'irq-mode'
+flag - they will use polling.
+
+For consistency this flag should be added to all trip point types('active',
+'passive', 'hot', 'critical') when need (meaning, when irq will notify thermal
+framework).
+
+Regards,
+Lukasz Luba
+
+Lukasz Luba (11):
+  thermal: remove unused function parameter
+  thermal: add irq-mode configuration for trip point
+  thermal: add new sysfs file for irq-mode
+  Doc: thermal: new irq-mode for trip point
+  Doc: DT: thermal: new irq-mode for trip point
+  DT: arm64: exynos: add support for thermal trip irq-mode
+  DT: arm64: exynos7: add support for thermal trip irq-mode
+  DT: arm: exynos4: add support for thermal trip irq-mode
+  DT: arm: exynos: add support for thermal trip irq-mode
+  DT: arm: exynos: add support for thermal trip irq-mode
+  DT: arm: exynos: add support for thermal trip irq-mode
+
+ .../devicetree/bindings/thermal/thermal.txt        |   7 ++
+ Documentation/thermal/sysfs-api.txt                |   9 ++
+ arch/arm/boot/dts/exynos4-cpu-thermal.dtsi         |  10 +-
+ arch/arm/boot/dts/exynos5410-odroidxu.dts          |  10 +-
+ arch/arm/boot/dts/exynos5420-trip-points.dtsi      |  10 +-
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  40 +++++---
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     | 105 ++++++++++++++-------
+ .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   8 ++
+ drivers/thermal/of-thermal.c                       |  17 ++++
+ drivers/thermal/thermal_core.c                     |  16 ++--
+ drivers/thermal/thermal_sysfs.c                    |  53 ++++++++++-
+ include/linux/thermal.h                            |   5 +
+ 12 files changed, 226 insertions(+), 64 deletions(-)
+
+-- 
+2.7.4
