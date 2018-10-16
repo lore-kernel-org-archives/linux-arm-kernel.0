@@ -1,115 +1,67 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 15 Oct 2018 20:02:38 -0700
-Subject: [PATCH v4 8/9] arm64: dts: allwinner: a64: enable sound on Pine64 and
- SoPine
-In-Reply-To: <20181016030239.15449-1-anarsoul@gmail.com>
-References: <20181016030239.15449-1-anarsoul@gmail.com>
-Message-ID: <20181016030239.15449-9-anarsoul@gmail.com>
+Date: Mon, 15 Oct 2018 20:02:30 -0700
+Subject: [PATCH v4 0/9] Add support for audiocodec in Allwinner A64
+Message-ID: <20181016030239.15449-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables I2S, digital and analog parts of audiocodec on
-Pine64 and SoPine boards.
+This series adds Allwinner A64 audiocodec support into sun4i-i2s,
+sun8i-codec drivers, introduces new sun50i-codec-analog driver and enables
+sound on Pine64, SoPine boards and Pinebook.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 29 +++++++++++++++++++
- .../allwinner/sun50i-a64-sopine-baseboard.dts | 29 +++++++++++++++++++
- 2 files changed, 58 insertions(+)
+I2S for audiocodec in A64 is different from other 3 I2S modules but
+similar to one in A10, digital part of codec is compatible with A33 and
+analog controls part is completely different from other SoCs - it shares
+only few bits in few registers, so adding support for it into existing
+sun8i-codec-analog would mean duplicating all the widgets, controls and
+some routes and making it hard to read. Therefore it makes sense to
+introduce new driver.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 1b9b92e541d2..2d67da43fcc9 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -64,6 +64,18 @@
- 	};
- };
- 
-+&codec {
-+	status = "okay";
-+};
-+
-+&codec_analog {
-+	status = "okay";
-+};
-+
-+&dai {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -238,6 +250,23 @@
- 	status = "disabled";
- };
- 
-+&sound {
-+	status = "okay";
-+	simple-audio-card,widgets = "Microphone", "Microphone Jack",
-+				    "Headphone", "Headphone Jack";
-+	simple-audio-card,routing =
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right",
-+			"Speaker", "LINEOUT",
-+			"Headphone Jack", "HP",
-+			"AIF1 Slot 0 Left ADC", "Left ADC",
-+			"AIF1 Slot 0 Right ADC", "Right ADC",
-+			"Left ADC", "ADC",
-+			"Right ADC", "ADC",
-+			"Microphone Jack", "HBIAS",
-+			"MIC2", "Microphone Jack";
-+};
-+
- /* On Exp and Euler connectors */
- &uart0 {
- 	pinctrl-names = "default";
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index c21f2331add6..a556b1733c9a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -69,6 +69,18 @@
- 	};
- };
- 
-+&codec {
-+	status = "okay";
-+};
-+
-+&codec_analog {
-+	status = "okay";
-+};
-+
-+&dai {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -138,6 +150,23 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
- };
- 
-+&sound {
-+	status = "okay";
-+	simple-audio-card,widgets = "Microphone", "Microphone Jack",
-+				    "Headphone", "Headphone Jack";
-+	simple-audio-card,routing =
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right",
-+			"Speaker", "LINEOUT",
-+			"Headphone Jack", "HP",
-+			"AIF1 Slot 0 Left ADC", "Left ADC",
-+			"AIF1 Slot 0 Right ADC", "Right ADC",
-+			"Left ADC", "ADC",
-+			"Right ADC", "ADC",
-+			"Microphone Jack", "HBIAS",
-+			"MIC2", "Microphone Jack";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+v2: - Use simple-amplifier for speaker amp on Pinebook
+    - Rename sun50i-a64-i2s to sun50i-a64-codec-i2s to preserve compatible
+      string for other 3 I2S modules in A64 in case if there's any
+      incompatibility with H3
+v3: - renamed sunxi-adda-pr-regmap to sun8i-adda-pr-regmap
+    - use ilog2() to calculate reg value for LRCK div instead of using a
+      table
+v4: - dts: don't use 'Mic' and 'Headset Mic' widgets from sun8i-codec,
+      define our board-level widgets instead.
+
+Marcus Cooper (1):
+  ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+
+Vasily Khoruzhick (8):
+  ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
+  ASoC: sun8i-codec-analog: split regmap code into separate driver
+  ASoC: dt-binding: Add bindings for Allwinner A64 codec's analog path
+    controls
+  ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path
+    controls
+  ASoC: sunxi: allow the sun8i-codec driver to be built on ARM64
+  arm64: dts: allwinner: a64: add nodes necessary for analog sound
+    support
+  arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
+  arm64: dts: allwinner: a64: enable sound on Pinebook
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt   |   2 +
+ .../bindings/sound/sun50i-codec-analog.txt    |  12 +
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  29 ++
+ .../dts/allwinner/sun50i-a64-pinebook.dts     |  42 ++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  29 ++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  58 +++
+ sound/soc/sunxi/Kconfig                       |  17 +-
+ sound/soc/sunxi/Makefile                      |   2 +
+ sound/soc/sunxi/sun4i-i2s.c                   |  21 +
+ sound/soc/sunxi/sun50i-codec-analog.c         | 444 ++++++++++++++++++
+ sound/soc/sunxi/sun8i-adda-pr-regmap.c        | 102 ++++
+ sound/soc/sunxi/sun8i-adda-pr-regmap.h        |   7 +
+ sound/soc/sunxi/sun8i-codec-analog.c          |  79 +---
+ sound/soc/sunxi/sun8i-codec.c                 |  26 +-
+ 14 files changed, 787 insertions(+), 83 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+ create mode 100644 sound/soc/sunxi/sun50i-codec-analog.c
+ create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.c
+ create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.h
+
 -- 
 2.19.0
