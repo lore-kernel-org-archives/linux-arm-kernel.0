@@ -1,123 +1,67 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Tue, 16 Oct 2018 18:44:50 +0800
-Subject: [PATCH v9 9/9] PCI: mediatek: Add loadable kernel module support
-In-Reply-To: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1539686690-24068-10-git-send-email-honghui.zhang@mediatek.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Tue, 16 Oct 2018 12:47:22 +0200
+Subject: [PATCH] perf tools: Store ids for events with their own cpus
+ perf_event__synthesize_event_update_cpus
+In-Reply-To: <d1cc40ee-4b09-35a8-86d2-bfc0eb78b9d5@huawei.com>
+References: <20181002111621.GA6357@krava> <20181003113643.GA31725@krava>
+ <594506a2-8cb3-3d09-82ab-5cb6d8c31ed0@huawei.com>
+ <20181003141627.GA6341@krava> <20181003212052.GA32371@krava>
+ <d071bb27-5533-da2f-9f8f-808183e04794@huawei.com>
+ <20181009100049.GF6499@krava>
+ <31101407-0bcd-2fbf-361e-43cbcb81cd19@huawei.com>
+ <20181015191502.GA2398@kernel.org>
+ <d1cc40ee-4b09-35a8-86d2-bfc0eb78b9d5@huawei.com>
+Message-ID: <20181016104722.GA18450@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Tue, Oct 16, 2018 at 10:10:20AM +0100, John Garry wrote:
+> On 15/10/2018 20:15, Arnaldo Carvalho de Melo wrote:
+> > Em Fri, Oct 12, 2018 at 02:25:49PM +0100, John Garry escreveu:
+> > > On 09/10/2018 11:00, Jiri Olsa wrote:
+> > > > On Thu, Oct 04, 2018 at 10:20:39AM +0100, John Garry wrote:
+> > > > 
+> > > > SNIP
+> > > > 
+> > > > > > We synthesize an update event that needs to touch the evsel
+> > > > > > id array, which is not defined at that time. Fixing this by
+> > > > > > forcing the id allocation for events with theeir own cpus.
+> > > 
+> > > /s/theeir/their/
+> > > 
+> > > > > > 
+> > > > > > Reported-by: John Garry <john.garry@huawei.com>
+> > > > > > Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
+> > > > > 
+> > > > > Tested-by: John Garry <john.garry@huawei.com>
+> > > > > 
+> > > > > In terms of adding to stable, LT v4.14 is not affected, but 4.18.x is.
+> > > > > 
+> > > > > Thanks,
+> > > > > John
+> > > > 
+> > > > Arnaldo, could you please pick up this one
+> > > > 
+> > > 
+> > > Just a friendly reminder on this patch.
+> > > 
+> > > How about re-send with an updated commit message also?
+> > 
+> > I'll fix up the commit message and apply, thanks.
+> > 
+> 
+> Much appreciated.
+> 
+> BTW, I think that we should add a fixes tag. But I'm not sure if this patch
+> fixes the commit I bisected to earlier (bfd8f72c2778f5bd63d), or that same
+> commit just exposed some latent bug.
+> 
+> Jirka, Andi, Do you know?
 
-Implement remove callback function for Mediatek PCIe driver to add
-loadable kernel module support.
+yes, that commit moved it to record, which resulted in this fault
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-Reviewed-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/controller/Kconfig         |  2 +-
- drivers/pci/controller/pcie-mediatek.c | 51 +++++++++++++++++++++++++++++++++-
- 2 files changed, 51 insertions(+), 2 deletions(-)
+Arnaldo, could you please add:
+Fixes: bfd8f72c2778 ("perf record: Synthesize unit/scale/... in event update")
 
-diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
-index 028b287..465790f 100644
---- a/drivers/pci/controller/Kconfig
-+++ b/drivers/pci/controller/Kconfig
-@@ -231,7 +231,7 @@ config PCIE_ROCKCHIP_EP
- 	  available to support GEN2 with 4 slots.
- 
- config PCIE_MEDIATEK
--	bool "MediaTek PCIe controller"
-+	tristate "MediaTek PCIe controller"
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
- 	depends on OF
- 	depends on PCI_MSI_IRQ_DOMAIN
-diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 7f3b8a0..2a1f97c 100644
---- a/drivers/pci/controller/pcie-mediatek.c
-+++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -15,6 +15,7 @@
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/msi.h>
-+#include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
-@@ -532,6 +533,27 @@ static void mtk_pcie_enable_msi(struct mtk_pcie_port *port)
- 	writel(val, port->base + PCIE_INT_MASK);
- }
- 
-+static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
-+{
-+	struct mtk_pcie_port *port, *tmp;
-+
-+	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-+		irq_set_chained_handler_and_data(port->irq, NULL, NULL);
-+
-+		if (port->irq_domain)
-+			irq_domain_remove(port->irq_domain);
-+
-+		if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+			if (port->msi_domain)
-+				irq_domain_remove(port->msi_domain);
-+			if (port->inner_domain)
-+				irq_domain_remove(port->inner_domain);
-+		}
-+
-+		irq_dispose_mapping(port->irq);
-+	}
-+}
-+
- static int mtk_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
- 			     irq_hw_number_t hwirq)
- {
-@@ -1171,6 +1193,31 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
- 
-+
-+static void mtk_pcie_free_resources(struct mtk_pcie *pcie)
-+{
-+	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-+	struct list_head *windows = &host->windows;
-+
-+	pci_free_resource_list(windows);
-+}
-+
-+static int mtk_pcie_remove(struct platform_device *pdev)
-+{
-+	struct mtk_pcie *pcie = platform_get_drvdata(pdev);
-+	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-+
-+	pci_stop_root_bus(host->bus);
-+	pci_remove_root_bus(host->bus);
-+	mtk_pcie_free_resources(pcie);
-+
-+	mtk_pcie_irq_teardown(pcie);
-+
-+	mtk_pcie_put_resources(pcie);
-+
-+	return 0;
-+}
-+
- static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
- {
- 	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-@@ -1248,6 +1295,7 @@ static const struct of_device_id mtk_pcie_ids[] = {
- 
- static struct platform_driver mtk_pcie_driver = {
- 	.probe = mtk_pcie_probe,
-+	.remove = mtk_pcie_remove,
- 	.driver = {
- 		.name = "mtk-pcie",
- 		.of_match_table = mtk_pcie_ids,
-@@ -1255,4 +1303,5 @@ static struct platform_driver mtk_pcie_driver = {
- 		.pm = &mtk_pcie_pm_ops,
- 	},
- };
--builtin_platform_driver(mtk_pcie_driver);
-+module_platform_driver(mtk_pcie_driver);
-+MODULE_LICENSE("GPL v2");
--- 
-2.6.4
+thanks,
+jirka
