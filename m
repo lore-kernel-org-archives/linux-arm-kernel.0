@@ -1,93 +1,21 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 16 Oct 2018 15:24:35 -0700
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <AM6PR0402MB39112C0451B6E241AEBAC0D7F5FE0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
- <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
- <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
- <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
- <153898445180.119890.15025812558797341532@swboyd.mtv.corp.google.com>
- <DB3PR0402MB391664354775DF42E90E67C9F5E60@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <153937368201.5275.2313781259297807972@swboyd.mtv.corp.google.com>
- <DB3PR0402MB39169A3BA844F7833B62FF55F5FD0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <153962195779.5275.17500455384946496344@swboyd.mtv.corp.google.com>
- <AM6PR0402MB39112C0451B6E241AEBAC0D7F5FE0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
-Message-ID: <153972867573.5275.6495417473527509224@swboyd.mtv.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 16 Oct 2018 17:32:49 -0500
+Subject: [PATCH 1/2] of: Add vendor prefix for Menlo Systems GmbH
+In-Reply-To: <20181004224227.16836-1-marex@denx.de>
+References: <20181004224227.16836-1-marex@denx.de>
+Message-ID: <20181016223249.GA14545@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Anson Huang (2018-10-15 21:37:31)
-> Hi, Stephen
+On Fri,  5 Oct 2018 00:42:26 +0200, Marek Vasut wrote:
+> Add vendor prefix for Menlo Systems GmbH, http://www.menlosystems.com/ .
 > 
-> Anson Huang
-> Best Regards!
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> 
-> > -----Original Message-----
-> > From: Stephen Boyd <sboyd@kernel.org>
-> > Sent: Tuesday, October 16, 2018 12:46 AM
-> > To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> > mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
-> > Anson Huang <anson.huang@nxp.com>; Fabio Estevam
-> > <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
-> > Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
-> > Cc: dl-linux-imx <linux-imx@nxp.com>
-> > Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-> > 
-> > Quoting Anson Huang (2018-10-15 02:33:35)
-> > > > > > >
-> > > > > >
-> > > > > > Why can't we add clks to the op-tee node in DT's /firmware container?
-> > > > > > Then any clks in there can be turned on forever and left enabled
-> > > > > > by the linux driver?
-> > > > >
-> > > > > I did NOT run op-tee with Linux-next kernel before, can you advise more?
-> > > >
-> > > > Neither have I, so I can't advise more.
-> > > >
-> > > > > And I think if op-tee has such requirement, can we have another
-> > > > > patch to cover it?
-> > > >
-> > > > Yes.
-> > > >
-> > > >
-> > > > > I believe all other i.MX platforms also have same requirements if
-> > > > > considering op-tee support, so I think it should be another topic,
-> > > > > what do you
-> > > > think?
-> > > > >
-> > > >
-> > > > I'm going to drop these patches from my review queue. Please resend
-> > > > them and please include the op-tee patches too.
-> > >
-> > >
-> > > I do NOT know how to include the op-tee patch to meet special
-> > > requirement, should the op-tee related patch be added later when someone
-> > actually add the op-tee support for i.MX7?
-> > > It should NOT block this patch set, do you think we can add this patch set
-> > first?
-> > >
-> > 
-> > Please resend the two patches. In the commit text for the second patch,
-> > describe the plan to remove CLK_IS_CRITICAL from these clks by adding an
-> > OP-TEE device/driver to the kernel to keep these clks enabled. My
-> > understanding is that there isn't an OP-TEE driver right now, but these clks are
-> > used by the firmware and can't be turned off in Linux. If in the future we want
-> > to be able to turn them on and off, we'll need to add them to an OP-TEE device
-> > node and have that driver manage the clks.
-> > 
-> > How that will work when a system doesn't enable the OP-TEE driver I'm not
-> > sure. We may need to develop some system whereby clks like this are handed
-> > from the clk controller to the consumer driver when it's enabled for further
-> > power managment, but if they're never handed off, they're kept on forever like
-> > is done here. Anyway, please resend with a note about why these are marked
-> > CLK_IS_CRITICAL.
->  
-> I think there is some misunderstanding here, this patch sets those critical clocks
-> with CLK_IS_CRITICAL flag to let clock driver keep them always ON, as they are
-> critical clocks and system (Linux kernel, NOT include op-tee) can NOT run normally
-> if anyone of them is OFF.
 
-Ok it sounds like OP-TEE usage completely orthogonal here? I'll go apply
-these refactorings then.
+Reviewed-by: Rob Herring <robh@kernel.org>
