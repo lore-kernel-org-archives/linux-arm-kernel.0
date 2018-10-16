@@ -1,119 +1,122 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 16 Oct 2018 10:10:20 +0100
-Subject: [PATCH] perf tools: Store ids for events with their own cpus
- perf_event__synthesize_event_update_cpus
-In-Reply-To: <20181015191502.GA2398@kernel.org>
-References: <20180927160210.GF6916@krava>
- <4ac88076-60fa-4509-7fa0-2f99d73174d2@huawei.com>
- <20181002111621.GA6357@krava> <20181003113643.GA31725@krava>
- <594506a2-8cb3-3d09-82ab-5cb6d8c31ed0@huawei.com>
- <20181003141627.GA6341@krava> <20181003212052.GA32371@krava>
- <d071bb27-5533-da2f-9f8f-808183e04794@huawei.com>
- <20181009100049.GF6499@krava>
- <31101407-0bcd-2fbf-361e-43cbcb81cd19@huawei.com>
- <20181015191502.GA2398@kernel.org>
-Message-ID: <d1cc40ee-4b09-35a8-86d2-bfc0eb78b9d5@huawei.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 16 Oct 2018 11:09:11 +0200
+Subject: [PATCH] PM / AVS: SmartReflex: remove unused function
+In-Reply-To: <20181006164059.16106-1-u.kleine-koenig@pengutronix.de>
+References: <20181006164059.16106-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <10339961.29dihbgRqp@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/2018 20:15, Arnaldo Carvalho de Melo wrote:
-> Em Fri, Oct 12, 2018 at 02:25:49PM +0100, John Garry escreveu:
->> On 09/10/2018 11:00, Jiri Olsa wrote:
->>> On Thu, Oct 04, 2018 at 10:20:39AM +0100, John Garry wrote:
->>>
->>> SNIP
->>>
->>>>> We synthesize an update event that needs to touch the evsel
->>>>> id array, which is not defined at that time. Fixing this by
->>>>> forcing the id allocation for events with theeir own cpus.
->>
->> /s/theeir/their/
->>
->>>>>
->>>>> Reported-by: John Garry <john.garry@huawei.com>
->>>>> Link: http://lkml.kernel.org/n/tip-8x4n7o34yheigoxm1jibflm6 at git.kernel.org
->>>>
->>>> Tested-by: John Garry <john.garry@huawei.com>
->>>>
->>>> In terms of adding to stable, LT v4.14 is not affected, but 4.18.x is.
->>>>
->>>> Thanks,
->>>> John
->>>
->>> Arnaldo, could you please pick up this one
->>>
->>
->> Just a friendly reminder on this patch.
->>
->> How about re-send with an updated commit message also?
->
-> I'll fix up the commit message and apply, thanks.
->
+On Saturday, October 6, 2018 6:40:59 PM CEST Uwe Kleine-K?nig wrote:
+> From: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> 
+> omap_sr_register_pmic() was introduced in 2010 in commit
+> 
+> 	984aa6dbf4ca ("OMAP3: PM: Adding smartreflex driver support.")
+> 
+> . There was never any caller of this function in mainline resulting in a
+> warning
+> 
+> 	sr_init: No PMIC hook to init smartreflex
+> 
+> for each machine where this driver is enabled. So remove the unused
+> function and the pr_warn.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> ---
+> Hello,
+> 
+> I didn't test this change, didn't even try to compile it. Just read a
+> report[1] that this warning is annoying on an Marvell Armada based
+> machine running a Debian kernel.
+> 
+> Best regards
+> Uwe
+> 
+> [1] https://lists.debian.org/d6abf9d1-14bf-86fc-58a0-0f11ff1ac345 at quickline.ch
+> 
+>  drivers/power/avs/smartreflex.c   | 31 -------------------------------
+>  include/linux/power/smartreflex.h |  5 -----
+>  2 files changed, 36 deletions(-)
+> 
+> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
+> index cb0237143dbe..d29b6313cafc 100644
+> --- a/drivers/power/avs/smartreflex.c
+> +++ b/drivers/power/avs/smartreflex.c
+> @@ -36,7 +36,6 @@
+>  static LIST_HEAD(sr_list);
+>  
+>  static struct omap_sr_class_data *sr_class;
+> -static struct omap_sr_pmic_data *sr_pmic_data;
+>  static struct dentry		*sr_dbg_dir;
+>  
+>  static inline void sr_write_reg(struct omap_sr *sr, unsigned offset, u32 value)
+> @@ -779,25 +778,6 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
+>  	sr_class->disable(sr, 1);
+>  }
+>  
+> -/**
+> - * omap_sr_register_pmic() - API to register pmic specific info.
+> - * @pmic_data:	The structure containing pmic specific data.
+> - *
+> - * This API is to be called from the PMIC specific code to register with
+> - * smartreflex driver pmic specific info. Currently the only info required
+> - * is the smartreflex init on the PMIC side.
+> - */
+> -void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data)
+> -{
+> -	if (!pmic_data) {
+> -		pr_warn("%s: Trying to register NULL PMIC data structure with smartreflex\n",
+> -			__func__);
+> -		return;
+> -	}
+> -
+> -	sr_pmic_data = pmic_data;
+> -}
+> -
+>  /* PM Debug FS entries to enable and disable smartreflex. */
+>  static int omap_sr_autocomp_show(void *data, u64 *val)
+>  {
+> @@ -1064,17 +1044,6 @@ static int __init sr_init(void)
+>  {
+>  	int ret = 0;
+>  
+> -	/*
+> -	 * sr_init is a late init. If by then a pmic specific API is not
+> -	 * registered either there is no need for anything to be done on
+> -	 * the PMIC side or somebody has forgotten to register a PMIC
+> -	 * handler. Warn for the second condition.
+> -	 */
+> -	if (sr_pmic_data && sr_pmic_data->sr_pmic_init)
+> -		sr_pmic_data->sr_pmic_init();
+> -	else
+> -		pr_warn("%s: No PMIC hook to init smartreflex\n", __func__);
+> -
+>  	ret = platform_driver_register(&smartreflex_driver);
+>  	if (ret) {
+>  		pr_err("%s: platform driver register failed for SR\n",
+> diff --git a/include/linux/power/smartreflex.h b/include/linux/power/smartreflex.h
+> index 7b81dad712de..a586976f4784 100644
+> --- a/include/linux/power/smartreflex.h
+> +++ b/include/linux/power/smartreflex.h
+> @@ -303,9 +303,6 @@ void omap_sr_enable(struct voltagedomain *voltdm);
+>  void omap_sr_disable(struct voltagedomain *voltdm);
+>  void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
+>  
+> -/* API to register the pmic specific data with the smartreflex driver. */
+> -void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data);
+> -
+>  /* Smartreflex driver hooks to be called from Smartreflex class driver */
+>  int sr_enable(struct omap_sr *sr, unsigned long volt);
+>  void sr_disable(struct omap_sr *sr);
+> @@ -320,7 +317,5 @@ static inline void omap_sr_enable(struct voltagedomain *voltdm) {}
+>  static inline void omap_sr_disable(struct voltagedomain *voltdm) {}
+>  static inline void omap_sr_disable_reset_volt(
+>  		struct voltagedomain *voltdm) {}
+> -static inline void omap_sr_register_pmic(
+> -		struct omap_sr_pmic_data *pmic_data) {}
+>  #endif
+>  #endif
+> 
 
-Much appreciated.
-
-BTW, I think that we should add a fixes tag. But I'm not sure if this 
-patch fixes the commit I bisected to earlier (bfd8f72c2778f5bd63d), or 
-that same commit just exposed some latent bug.
-
-Jirka, Andi, Do you know?
-
-Thanks,
-John
-
-> - Arnaldo
->
->> Thanks,
->> John
->>
->>> thanks,
->>> jirka
->>>
->>>>
->>>>> Signed-off-by: Jiri Olsa <jolsa@kernel.org>
->>>>> ---
->>>>>  tools/perf/builtin-report.c | 1 +
->>>>>  tools/perf/util/evsel.c     | 3 +++
->>>>>  2 files changed, 4 insertions(+)
->>>>>
->>>>> diff --git a/tools/perf/builtin-report.c b/tools/perf/builtin-report.c
->>>>> index c0703979c51d..257c9c18cb7e 100644
->>>>> --- a/tools/perf/builtin-report.c
->>>>> +++ b/tools/perf/builtin-report.c
->>>>> @@ -980,6 +980,7 @@ int cmd_report(int argc, const char **argv)
->>>>>  			.id_index	 = perf_event__process_id_index,
->>>>>  			.auxtrace_info	 = perf_event__process_auxtrace_info,
->>>>>  			.auxtrace	 = perf_event__process_auxtrace,
->>>>> +			.event_update	 = perf_event__process_event_update,
->>>>>  			.feature	 = process_feature_event,
->>>>>  			.ordered_events	 = true,
->>>>>  			.ordering_requires_timestamps = true,
->>>>> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
->>>>> index ac6cfb8b085e..7a0d5fbaf3c1 100644
->>>>> --- a/tools/perf/util/evsel.c
->>>>> +++ b/tools/perf/util/evsel.c
->>>>> @@ -1088,6 +1088,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
->>>>>  		attr->exclude_user   = 1;
->>>>>  	}
->>>>>
->>>>> +	if (evsel->own_cpus)
->>>>> +		evsel->attr.read_format |= PERF_FORMAT_ID;
->>>>> +
->>>>>  	/*
->>>>>  	 * Apply event specific term settings,
->>>>>  	 * it overloads any global configuration.
->>>>>
->>>>
->>>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>> .
->>>
->>
->
-> .
->
+Applied, thanks!
