@@ -1,62 +1,50 @@
-From: pramod.kumar_1@nxp.com (Pramod Kumar)
-Date: Tue, 16 Oct 2018 07:40:29 +0000
-Subject: [PATCH] arm64: dts: ls1012a: Add FRWY-LS1012A board support
-Message-ID: <20181016074102.10126-1-pramod.kumar_1@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Oct 2018 09:41:37 +0200
+Subject: [PATCH V3 1/2] dt-bindings: pinctrl: document Broadcom Northstar
+ pin mux controller
+In-Reply-To: <7f08ed7bf11a22163bdfd56ff96a9262@milecki.pl>
+References: <20180926193103.21241-1-zajec5@gmail.com>
+ <20181011222229.GA7470@bogus>
+ <7f08ed7bf11a22163bdfd56ff96a9262@milecki.pl>
+Message-ID: <CACRpkdapyFnu=GAqEzK56+a5Gef+vcXsa7a6iJE=isi2MMWKTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1012A-FRWY is an ls1012a based SoC board.
-Key features of this board are  Micro SD, USB 3.0,
-upto 1GB DDR, UART
+On Mon, Oct 15, 2018 at 10:56 AM Rafa? Mi?ecki <rafal@milecki.pl> wrote:
 
-Signed-off-by: Pramod Kumar <pramod.kumar_1@nxp.com>
----
- arch/arm64/boot/dts/freescale/Makefile        |  1 +
- .../boot/dts/freescale/fsl-ls1012a-frwy.dts   | 25 +++++++++++++++++++
- 2 files changed, 26 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
+> > Perhaps 'cru' in the compatible if that's what the h/w is called?
+> >
+> > Also, if this is a sub-block, then it should be a child of the block
+> > which should be defined here.
+>
+> It took me some time to do some extra research on the whole CRU thing.
+>
+> Valuable resources:
+> [1] bcm5301x_dmu.c (from the SDK)
+> [2] bcm5301x_pcie.c (from the SDK)
+> [3] https://patchwork.kernel.org/patch/7888651/
+> [4] https://patchwork.kernel.org/patch/5051471/
+>
+> First of all CRU seems to be a sub-block of the DMU (which stands for
+> "Device Management Unit" according to the [1]). DMU seems to be
+> independent block at 0x1800c000 with a size of 0x1000.
+>
+> It isn't actually clear what the CRU stands for. In Broadcom's case:
+> 1. According to the [3] it's "Clock and Reset Unit"
+> 2. According to the [4] it's a "central resource unit"
+> Other vendors seem to use CRU name for "Clock and Reset Unit".
+>
+> In any case, you're right Rob, it's a sub-block, a set of random
+> registers that control SoC.
+>
+> So I think that:
+> 1) We should have a node for DMU and CRU
+> 2) We should not include "cru" in bindings as pinmuxing seems to be part
+>     of SoC that just happens to be controlled using CRU registers
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 86e18adb695a..25a9fb766438 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frwy.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
-new file mode 100644
-index 000000000000..8749634c55ee
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
-@@ -0,0 +1,25 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Device Tree file for Freescale LS1012A FRWY Board.
-+ *
-+ * Copyright 2018 NXP
-+ *
-+ * Pramod Kumar <pramod.kumar_1@nxp.com>
-+ *
-+ */
-+/dts-v1/;
-+
-+#include "fsl-ls1012a.dtsi"
-+
-+/ {
-+	model = "LS1012A FRWY Board";
-+	compatible = "fsl,ls1012a-frwy", "fsl,ls1012a";
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
--- 
-2.17.1
+OK do you want me to revert the patches or do you want to
+fix this stuff on top of the patches that are already in the tree?
+I'm fine either way.
+
+Yours,
+Linus Walleij
