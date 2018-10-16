@@ -1,79 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Oct 2018 11:08:00 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: eliminate a potential memory
- corruption on Hi16xx soc
-In-Reply-To: <5fa2a259-b070-f8de-77d3-73eb8ac14d59@arm.com>
-References: <1539592576-24352-1-git-send-email-thunder.leizhen@huawei.com>
- <20181015172146.GD31305@brain-police>
- <5fa2a259-b070-f8de-77d3-73eb8ac14d59@arm.com>
-Message-ID: <20181016100800.GA28150@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 16 Oct 2018 11:15:04 +0100
+Subject: [PATCH 1/2] arm64: dts: meson: fix reserve memory regions
+In-Reply-To: <06a189c5-d5b0-d5cd-d3b2-e2ed21721aeb@baylibre.com>
+References: <20181015162833.7544-1-jbrunet@baylibre.com>
+ <20181015162833.7544-2-jbrunet@baylibre.com>
+ <20181015164214.hpqz7zear2c44ijd@lakrids.cambridge.arm.com>
+ <06a189c5-d5b0-d5cd-d3b2-e2ed21721aeb@baylibre.com>
+Message-ID: <20181016101503.ktumdffk4nlxb34t@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 06:36:52PM +0100, Robin Murphy wrote:
-> On 15/10/18 18:21, Will Deacon wrote:
-> >On Mon, Oct 15, 2018 at 04:36:16PM +0800, Zhen Lei wrote:
-> >>ITS translation register map:
-> >>0x0000-0x003C	Reserved
-> >>0x0040		GITS_TRANSLATER
-> >>0x0044-0xFFFC	Reserved
-> >>
-> >>The standard GITS_TRANSLATER register in ITS is only 4 bytes, but Hisilicon
-> >>expands the next 4 bytes to carry some IMPDEF information. That means, 8 bytes
-> >>data will be written to MSIAddress each time.
-> >>
-> >>MSIAddr: |----4bytes----|----4bytes----|
-> >>	 |    MSIData   |    IMPDEF    |
-> >>
-> >>There is no problem for ITS, because the next 4 bytes space is reserved in ITS.
-> >>But it will overwrite the 4 bytes memory following "sync_count". It's very
-> >>luckly that the previous and the next neighbour of "sync_count" are both aligned
-> >>by 8 bytes, so no problem is met now.
-> >>
-> >>It's good to explicitly add a workaround:
-> >>1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is always
-> >>    aligned by 8 bytes.
-> >>2. Add a "u64" union member to make sure the 4 bytes padding is always exist.
-> >>
-> >>There is no functional change.
-> >>
-> >>Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> >>---
-> >>  drivers/iommu/arm-smmu-v3.c | 3 +++
-> >>  1 file changed, 3 insertions(+)
-> >>
-> >>diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> >>index 5059d09..a07bc0d 100644
-> >>--- a/drivers/iommu/arm-smmu-v3.c
-> >>+++ b/drivers/iommu/arm-smmu-v3.c
-> >>@@ -586,7 +586,10 @@ struct arm_smmu_device {
-> >>  	struct arm_smmu_strtab_cfg	strtab_cfg;
-> >>+	union {
-> >>+	u64				padding; /* workaround for Hisilicon */
-> >>  	u32				sync_count;
-> >>+	} __attribute__((aligned(8)));
-> >
-> >Won't this already be aligned by the ABI?
-> >
-> >Anyway, you'll need to swizzle things for big-endian, I suspect. Maybe you
-> >can do something clever like making sync_count an array of two elements
-> >and determining the offset based on the endianness. Or just keep it simple
-> >like we do for things like struct qrwlock and struct qspinlock and use
-> >#ifdefs.
+On Tue, Oct 16, 2018 at 10:23:50AM +0200, Neil Armstrong wrote:
+> Hi Mark,
 > 
-> I don't think so - the CPUs should only ever be making word accesses to the
-> u32 member, while the SMMU expects to be writing little-endian data to an
-> ITS, so AFAICS the data word will always be at the lower address either way.
+> On 15/10/2018 18:42, Mark Rutland wrote:
+> > On Mon, Oct 15, 2018 at 06:28:32PM +0200, Jerome Brunet wrote:
+> >> Since commit 50d7ba36b916 ("arm64: export memblock_reserve()d regions via /proc/iomem")
+> >> was merged Amlogic's boards using mainline u-boot started showing the
+> >> following warning:
+> >>
+> >> WARNING: CPU: 0 PID: 1 at arch/arm64/kernel/setup.c:271 reserve_memblock_reserved_regions+0xd8/0x144
+> >> Modules linked in:
+> >> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc7-00263-g385684b3eb27-dirty #254
+> >> pstate: 40000005 (nZcv daif -PAN -UAO)
+> >> pc : reserve_memblock_reserved_regions+0xd8/0x144
+> >> lr : reserve_memblock_reserved_regions+0xd0/0x144
+> >> [...]
+> >>
+> >> This is due to u-boot setting some /reservedmem/ region while our
+> >> dts declares reserved memory on the same region with no-map.
+> >>
+> >> The conflict produce the warning. This is fixed by using /reservedmem/
+> >> in our dts as well, which is probably something we should have done from
+> >> the beginning.
+> > 
+> > A /memreserve/ does not ensure no-map, and the kernel will map regions
+> > which are described in a memory node and only protected with a
+> > /memreserve/ entry.
+> > 
+> > Is it safe for the kernel to map these? e.g. speculative fetches won't
+> > trigger a TrustZone controller to reboot the system?
+> > 
+> > ... or are they not in memory nodes to begin with?
+> 
+> Do you ask if these memory zones are protected by an Hardware
+> Protection on the AXI bus
 
-Yes, thanks. I'd actually got the union layout wrong in my head and not
-realised that both member will start at the same address. Ok, so that works.
+Yes.
 
-> Although now that it's come up, the pre-existing issue of whether the byte
-> order *within* that u32 comes out correct after its round-trip through the
-> SMMU is something I need to run away and hurriedly think about...
+> instead of simply protected by the ARM TZ MMU entries ?
 
-Ha, oops! Everything going into the command queue is swabbed, so I guess we
-need to swab the data again in smp_cond_load_acquire(). I'll leave it with
-you...
+The secure world MMU has no impact whatsoever on SW running in the
+normal world.
 
-Will
+Only the HW (like a TZC on the bus) can enforce restrictions.
+
+> In the later case, a speculative fetch won't fail, is that right ?
+> These zones are mapped on the DDR, and seems to be simply protected by the MMU
+> from the ATF code, there are other HW protected RAM zones we haven't modeled.
+
+If the bus does not protect these ranges, a speculative fetch from the
+normal world will not fail.
+
+However, this means that the normal world can trivially escalate
+privilege to the secure world, and any bug in normal world software
+could corrupt secure world SW. So I *hope* there is some protection in
+place.
+
+> BTW Can the Cortex-A53 do speculative fetches ? I thought no.
+
+I believe COrtex-A53 can prefetch, so yes.
+
+Thanks,
+Mark.
