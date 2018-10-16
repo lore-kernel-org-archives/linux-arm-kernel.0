@@ -1,57 +1,74 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 16 Oct 2018 14:09:49 +0200
-Subject: [PATCH 2/2] ARM: copypage: do not use naked functions
-In-Reply-To: <20181016083341.GE30658@n2100.armlinux.org.uk>
-References: <20181015222621.14673-1-stefan@agner.ch>
- <nycvar.YSQ.7.76.1810151831040.1498@knanqh.ubzr>
- <20181015224152.GA30658@n2100.armlinux.org.uk>
- <4e598f27e3dc7ae9fd96a6cf097d1154@agner.ch>
- <nycvar.YSQ.7.76.1810151908450.1498@knanqh.ubzr>
- <20181016083341.GE30658@n2100.armlinux.org.uk>
-Message-ID: <473d9036247c467d1d3c0573ebad09c1@agner.ch>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 16 Oct 2018 14:17:54 +0200
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
+ SPI NOR flash memories
+In-Reply-To: <20181016140411.3f06e449@bbrezillon>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+ <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181016140411.3f06e449@bbrezillon>
+Message-ID: <20181016141754.38dfcf90@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2018 10:33, Russell King - ARM Linux wrote:
-> On Mon, Oct 15, 2018 at 07:27:43PM -0400, Nicolas Pitre wrote:
->> It's hard to see what that commit was actually fixing, but the operands
->> usage is wrong as explained already. Maybe the generated code has been
->> OK for all those years but that is due to luck rather than correctness.
-> ...
->> No idea. Maybe Russell remembers?
->> Maybe digging into the mailing list archive might tell.
-> 
-> I found this as a reply to the patch by Mikael Pettersson:
-> 
-> I've tested and verified that this bit enables a gcc-4.5 compiled kernel
-> to boot on TS-119 (Kirkwood) when combined with my fix for __naked.
-> With neither or only one of the patches applied, the kernel oopses hard
-> in copy_user_page() as it tries to start /sbin/init.
-> ...
-> - the asm() bodies of these __naked functions have inadequate input
->   parameter constraints, in particular they fail to declare any
->   dependencies on the functions' formal parameters; gcc-4.5 sees this
->   and skips the parameter setup before calling these functions, causing
->   runtime crashes; Khem's patch (this one) fixes that
->   (copypage-xscale.c already had correct asm() constraints so it works
->   with only the __naked fix, these other copypage-*.c files need both
->   patches to work)
-> 
-> So, while wrong to the GCC manual, it's fixing a bug that is present
-> with gcc-4.5 and who-knows what other GCC versions.  Reverting the
-> commit has the chance to cause regressions with GCC.
+On Tue, 16 Oct 2018 14:04:11 +0200
+Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 
-The build system requires at least GCC 4.6 currently, so we do not have
-to deal with 4.5.
-
+> On Tue, 16 Oct 2018 09:51:47 +0000
+> Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 > 
-> It looks like any change here needs to be validated on a range of
-> GCC versions, because there are versions of GCC known not to follow
-> it's manual!
+> > Hi Tudor,
+> > 
+> > This patch is breaking the 1-4-4 Read protocol for the spansion flash "s25fl512s".
+> > 
+> > Without this patch read request command for Quad mode, 4-byte enable, is coming as 0xEC i.e. SPINOR_OP_READ_1_4_4_4B.
+> > But after applying this patch, read request command for Quad mode is coming as 0x6C i.e. SPINOR_OP_READ_1_1_4_4B.
+> > 
+> > This flash also supports non-uniform erase.
+> > Can you please check and provide some suggestion?  
+> 
+> Are you sure the regression comes from this patch? I suspect your bug
+> comes from 41fe242979e4 ("mtd: spi-nor: fsl-quadspi: fix read error for
+> flash size larger than 16MB").
 
-The commit message as well as the above message sounds more like it was
-a newly introduced behavior in 4.5. I would suggest to at least check
-4.6 to make sure it has been corrected.
+I guess you're testing with an fsl-qspi controller, right? Can you try
+with this patch?
 
---
-Stefan
+--->8---
+
+diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+index 1ff3430f82c8..c47fe70c9f98 100644
+--- a/drivers/mtd/spi-nor/fsl-quadspi.c
++++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+@@ -477,9 +477,6 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+ {
+        switch (cmd) {
+-       case SPINOR_OP_READ_1_1_4:
+-       case SPINOR_OP_READ_1_1_4_4B:
+-               return SEQID_READ;
+        case SPINOR_OP_WREN:
+                return SEQID_WREN;
+        case SPINOR_OP_WRDI:
+@@ -490,8 +487,6 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+                return SEQID_SE;
+        case SPINOR_OP_CHIP_ERASE:
+                return SEQID_CHIP_ERASE;
+-       case SPINOR_OP_PP:
+-               return SEQID_PP;
+        case SPINOR_OP_RDID:
+                return SEQID_RDID;
+        case SPINOR_OP_WRSR:
+@@ -503,7 +498,11 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+        case SPINOR_OP_BRWR:
+                return SEQID_BRWR;
+        default:
+-               if (cmd == q->nor[0].erase_opcode)
++               if (cmd == q->nor[0].read_opcode)
++                       return SEQID_READ;
++               else if (cmd == q->nor[0].program_opcode)
++                       return SEQID_PP;
++               else if (cmd == q->nor[0].erase_opcode)
+                        return SEQID_SE;
+                dev_err(q->dev, "Unsupported cmd 0x%.2x\n", cmd);
+                break;
