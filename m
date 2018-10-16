@@ -1,70 +1,79 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 16 Oct 2018 12:01:49 +0900
-Subject: [PATCH 3/3] i2c: uniphier-f: fix race condition when IRQ is cleared
-In-Reply-To: <1539658909-26691-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1539658909-26691-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1539658909-26691-4-git-send-email-yamada.masahiro@socionext.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 15 Oct 2018 20:02:39 -0700
+Subject: [PATCH v4 9/9] arm64: dts: allwinner: a64: enable sound on Pinebook
+In-Reply-To: <20181016030239.15449-1-anarsoul@gmail.com>
+References: <20181016030239.15449-1-anarsoul@gmail.com>
+Message-ID: <20181016030239.15449-10-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current IRQ handler clears all the IRQ status bits when it bails
-out. This is dangerous because it might clear away the status bits
-that have just been set while processing the current handler. If this
-happens, the IRQ event for the latest transfer is lost forever.
+This commit enables I2S, digital and analog parts of audiocodec on
+Pinebook
 
-The IRQ status bits must be cleared *before* the next transfer is
-kicked.
-
-Fixes: 6a62974b667f ("i2c: uniphier_f: add UniPhier FIFO-builtin I2C driver")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 42 +++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
- drivers/i2c/busses/i2c-uniphier-f.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
-index 0677153..dd38474 100644
---- a/drivers/i2c/busses/i2c-uniphier-f.c
-+++ b/drivers/i2c/busses/i2c-uniphier-f.c
-@@ -143,9 +143,10 @@ static void uniphier_fi2c_set_irqs(struct uniphier_fi2c_priv *priv)
- 	writel(priv->enabled_irqs, priv->membase + UNIPHIER_FI2C_IE);
- }
- 
--static void uniphier_fi2c_clear_irqs(struct uniphier_fi2c_priv *priv)
-+static void uniphier_fi2c_clear_irqs(struct uniphier_fi2c_priv *priv,
-+				     u32 mask)
- {
--	writel(-1, priv->membase + UNIPHIER_FI2C_IC);
-+	writel(mask, priv->membase + UNIPHIER_FI2C_IC);
- }
- 
- static void uniphier_fi2c_stop(struct uniphier_fi2c_priv *priv)
-@@ -172,6 +173,8 @@ static irqreturn_t uniphier_fi2c_interrupt(int irq, void *dev_id)
- 		"interrupt: enabled_irqs=%04x, irq_status=%04x\n",
- 		priv->enabled_irqs, irq_status);
- 
-+	uniphier_fi2c_clear_irqs(priv, irq_status);
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index e2e426334cfe..b426a6e2b485 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -74,6 +74,23 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+ 	};
 +
- 	if (irq_status & UNIPHIER_FI2C_INT_STOP)
- 		goto complete;
++	speaker_amp: speaker_amp {
++		compatible = "simple-audio-amplifier";
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
+ };
  
-@@ -250,8 +253,6 @@ static irqreturn_t uniphier_fi2c_interrupt(int irq, void *dev_id)
- 	}
+ &ehci0 {
+@@ -278,6 +295,31 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
+ };
  
- handled:
--	uniphier_fi2c_clear_irqs(priv);
--
- 	spin_unlock(&priv->lock);
- 
- 	return IRQ_HANDLED;
-@@ -340,7 +341,7 @@ static int uniphier_fi2c_master_xfer_one(struct i2c_adapter *adap,
- 		priv->flags |= UNIPHIER_FI2C_STOP;
- 
- 	reinit_completion(&priv->comp);
--	uniphier_fi2c_clear_irqs(priv);
-+	uniphier_fi2c_clear_irqs(priv, U32_MAX);
- 	writel(UNIPHIER_FI2C_RST_TBRST | UNIPHIER_FI2C_RST_RBRST,
- 	       priv->membase + UNIPHIER_FI2C_RST);	/* reset TX/RX FIFO */
- 
++&sound {
++	status = "okay";
++	simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
++				    "Microphone", "Internal Microphone Right",
++				    "Headphone", "Headphone Jack",
++				    "Speaker", "Internal Speaker";
++	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"INL", "LINEOUT",
++			"INR", "LINEOUT",
++			"Internal Speaker", "OUTL",
++			"Internal Speaker", "OUTR",
++			"Headphone Jack", "HP",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Left ADC", "ADC",
++			"Right ADC", "ADC",
++			"Internal Microphone Left", "MBIAS",
++			"MIC1", "Internal Microphone Left",
++			"Internal Microphone Right", "HBIAS",
++			"MIC2", "Internal Microphone Right";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
-2.7.4
+2.19.0
