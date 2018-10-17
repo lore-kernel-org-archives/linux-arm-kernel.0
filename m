@@ -1,270 +1,196 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 17 Oct 2018 09:48:53 +0000
-Subject: [PATCH v4 3/4] perf/smmuv3: Add MSI irq support
-In-Reply-To: <201810171145.mGVw4SgU%fengguang.wu@intel.com>
-References: <20181016124920.24708-4-shameerali.kolothum.thodi@huawei.com>
- <201810171145.mGVw4SgU%fengguang.wu@intel.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83879F3FB@FRAEML521-MBX.china.huawei.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 17 Oct 2018 11:52:37 +0200
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
+ SPI NOR flash memories
+In-Reply-To: <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+ <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
+ <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
+ <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181017090724.12f2cd79@bbrezillon>
+ <20181017091045.124e0266@bbrezillon>
+ <20181017092941.3658bd9a@bbrezillon>
+ <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+Message-ID: <20181017115237.07310b74@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 17 Oct 2018 07:46:30 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
+> Hi Boris,
+> 
+> > -----Original Message-----
+> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> > Sent: Wednesday, October 17, 2018 1:00 PM
+> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> > Cc: Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>; Tudor Ambarus
+> > <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
+> > dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
+> > linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
+> > cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; linux-arm-
+> > kernel at lists.infradead.org; Cristian.Birsan at microchip.com
+> > Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
+> > NOR flash memories
+> > 
+> > On Wed, 17 Oct 2018 09:10:45 +0200
+> > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> >   
+> > > On Wed, 17 Oct 2018 09:07:24 +0200
+> > > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> > >  
+> > > > On Wed, 17 Oct 2018 02:07:43 +0000
+> > > > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> > > >  
+> > > > > >  
+> > > > > Actually there is no entry of s25fs512s in current spi-nor.c file.
+> > > > > For my connected flash part, jedec ID read points to s25fl512s. I
+> > > > > have asked my board team to confirm the name of exact connected
+> > > > > flash part. When I check the data sheet of s25fs512s, it also
+> > > > > points to the same Jedec ID information. { "s25fl512s",
+> > > > > INFO(0x010220, 0x4d00, 256
+> > > > > * 1024, 256, ....}
+> > > > >
+> > > > > But as stated earlier, if I skip reading SFDP or read using 1-1-1
+> > > > > protocol then read are always correct. For 1-4-4 protocol read are
+> > > > > wrong and on further debugging found that Read code of 0x6C is
+> > > > > being send as opcode instead of 0xEC.
+> > > > >
+> > > > > If I revert this patch, reads are working fine.  
+> > > >
+> > > > Can you try with the following patch?
+> > > >  
+> > >
+> > > Hm, nevermind. The problem is actually not related to 4B vs non-4B
+> > > mode but 1-1-4 vs 1-4-4 modes.  
+> Yes, that's only I have stated in my first mail that instead of 1-4-4 mode read opcode is being sent for 1-1-4 mode.
+> > >  
+> > 
+> > Can you try with this patch applied?
+> >   
+> With suggested patch, read for protocol 1-4-4 working correctly.
+> 
+> 	[    1.625360] m25p80 spi0.0: found s25fl512s, expected m25p80                                                                   
+> 	[    1.631094] m25p80 spi0.0: failed to parse SMPT (err = -22)                                                                   
+> 	[    1.636661] 261 8c4c780 opcode(read:eb, pp:2, erase:d8)                                                                       
+> 	[    1.641878] 266 8c4c780 opcode(read:ec, pp:12, erase:dc)                                                                      
+> 	[    1.647200] m25p80 spi0.0: s25fl512s (65536 Kbytes)         
+> 
 
-> -----Original Message-----
-> From: kbuild test robot [mailto:lkp at intel.com]
-> Sent: 17 October 2018 04:36
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> Cc: kbuild-all at 01.org; lorenzo.pieralisi at arm.com; robin.murphy at arm.com;
-> jean-philippe.brucker at arm.com; will.deacon at arm.com;
-> mark.rutland at arm.com; Guohanjun (Hanjun Guo) <guohanjun@huawei.com>;
-> John Garry <john.garry@huawei.com>; pabba at codeaurora.org;
-> vkilari at codeaurora.org; rruigrok at codeaurora.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Linuxarm <linuxarm@huawei.com>;
-> neil.m.leeder at gmail.com
-> Subject: Re: [PATCH v4 3/4] perf/smmuv3: Add MSI irq support
-> 
-> Hi Shameer,
-> 
-> Thank you for the patch! Yet something to improve:
-> 
-> [auto build test ERROR on linux-sof-driver/master]
-> [also build test ERROR on v4.19-rc8 next-20181016]
-> [if your patch is applied to the wrong git tree, please drop us a note to help
-> improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Shameer-Kolothum/arm64-
-> SMMUv3-PMU-driver-with-IORT-support/20181017-063949
-> base:   https://github.com/thesofproject/linux master
-> config: sh-allmodconfig (attached as .config)
-> compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-
-> tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         GCC_VERSION=7.2.0 make.cross ARCH=sh
-> 
-> All error/warnings (new ones prefixed by >>):
-> 
->    In file included from include/linux/kernel.h:11:0,
->                     from include/linux/list.h:9,
->                     from include/linux/resource_ext.h:17,
->                     from include/linux/acpi.h:26,
->                     from drivers//perf/arm_smmuv3_pmu.c:37:
->    drivers//perf/arm_smmuv3_pmu.c: In function
-> 'smmu_pmu_counter_set_value':
->    include/linux/bitops.h:7:24: warning: left shift count >= width of type [-Wshift-
-> count-overflow]
->     #define BIT(nr)   (1UL << (nr))
->                            ^
->    drivers//perf/arm_smmuv3_pmu.c:152:31: note: in expansion of macro 'BIT'
->      if (smmu_pmu->counter_mask & BIT(32))
->                                   ^~~
->    drivers//perf/arm_smmuv3_pmu.c: In function
-> 'smmu_pmu_counter_get_value':
->    include/linux/bitops.h:7:24: warning: left shift count >= width of type [-Wshift-
-> count-overflow]
->     #define BIT(nr)   (1UL << (nr))
->                            ^
->    drivers//perf/arm_smmuv3_pmu.c:162:31: note: in expansion of macro 'BIT'
->      if (smmu_pmu->counter_mask & BIT(32))
->                                   ^~~
->    drivers//perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_free_msis':
-> >> drivers//perf/arm_smmuv3_pmu.c:601:2: error: implicit declaration of
-> function 'platform_msi_domain_free_irqs'; did you mean
-> 'platform_get_device_id'? [-Werror=implicit-function-declaration]
->      platform_msi_domain_free_irqs(dev);
->      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Okay, let's try this one to see why the SMPT parsing fails.
 
-Ok. This is probably because of the COMPILE_TEST added to patch #2 and
-this one will have dependency on PCI/PCI_MSI. I will remove that in next
-revision.
-
-Thanks,
-Shameer
-
->      platform_get_device_id
->    drivers//perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_setup_msi':
-> >> drivers//perf/arm_smmuv3_pmu.c:632:8: error: implicit declaration of
-> function 'platform_msi_domain_alloc_irqs'; did you mean
-> 'platform_device_alloc'? [-Werror=implicit-function-declaration]
->      ret = platform_msi_domain_alloc_irqs(dev, 1, smmu_pmu_write_msi_msg);
->            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->            platform_device_alloc
->    In file included from include/linux/list.h:9:0,
->                     from include/linux/resource_ext.h:17,
->                     from include/linux/acpi.h:26,
->                     from drivers//perf/arm_smmuv3_pmu.c:37:
->    include/linux/msi.h:114:38: error: 'struct device' has no member named
-> 'msi_list'
->     #define dev_to_msi_list(dev)  (&(dev)->msi_list)
->                                          ^
->    include/linux/kernel.h:961:26: note: in definition of macro 'container_of'
->      void *__mptr = (void *)(ptr);     \
->                              ^~~
->    include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
->      list_entry((ptr)->next, type, member)
->      ^~~~~~~~~~
->    include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
->      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
->      ^~~~~~~~~~~~~~~~
->    include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
->      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
->                       ^~~~~~~~~~~~~~~
-> >> drivers//perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro
-> 'first_msi_entry'
->      desc = first_msi_entry(dev);
->             ^~~~~~~~~~~~~~~
->    In file included from include/linux/ioport.h:13:0,
->                     from include/linux/acpi.h:25,
->                     from drivers//perf/arm_smmuv3_pmu.c:37:
->    include/linux/msi.h:114:38: error: 'struct device' has no member named
-> 'msi_list'
->     #define dev_to_msi_list(dev)  (&(dev)->msi_list)
->                                          ^
->    include/linux/compiler.h:316:19: note: in definition of macro
-> '__compiletime_assert'
->       bool __cond = !(condition);    \
->                       ^~~~~~~~~
->    include/linux/compiler.h:339:2: note: in expansion of macro
-> '_compiletime_assert'
->      _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->      ^~~~~~~~~~~~~~~~~~~
->    include/linux/build_bug.h:45:37: note: in expansion of macro
-> 'compiletime_assert'
->     #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
->                                         ^~~~~~~~~~~~~~~~~~
->    include/linux/kernel.h:962:2: note: in expansion of macro
-> 'BUILD_BUG_ON_MSG'
->      BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
->      ^~~~~~~~~~~~~~~~
->    include/linux/kernel.h:962:20: note: in expansion of macro '__same_type'
->      BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
->                        ^~~~~~~~~~~
->    include/linux/list.h:366:2: note: in expansion of macro 'container_of'
->      container_of(ptr, type, member)
->      ^~~~~~~~~~~~
->    include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
->      list_entry((ptr)->next, type, member)
->      ^~~~~~~~~~
->    include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
->      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
->      ^~~~~~~~~~~~~~~~
->    include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
->      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
->                       ^~~~~~~~~~~~~~~
-> >> drivers//perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro
-> 'first_msi_entry'
->      desc = first_msi_entry(dev);
->             ^~~~~~~~~~~~~~~
->    include/linux/msi.h:114:38: error: 'struct device' has no member named
-> 'msi_list'
->     #define dev_to_msi_list(dev)  (&(dev)->msi_list)
->                                          ^
->    include/linux/compiler.h:316:19: note: in definition of macro
-> '__compiletime_assert'
->       bool __cond = !(condition);    \
->                       ^~~~~~~~~
->    include/linux/compiler.h:339:2: note: in expansion of macro
-> '_compiletime_assert'
->      _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->      ^~~~~~~~~~~~~~~~~~~
->    include/linux/build_bug.h:45:37: note: in expansion of macro
-> 'compiletime_assert'
->     #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
->                                         ^~~~~~~~~~~~~~~~~~
->    include/linux/kernel.h:962:2: note: in expansion of macro
-> 'BUILD_BUG_ON_MSG'
->      BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
->      ^~~~~~~~~~~~~~~~
->    include/linux/kernel.h:963:6: note: in expansion of macro '__same_type'
->         !__same_type(*(ptr), void),   \
->          ^~~~~~~~~~~
->    include/linux/list.h:366:2: note: in expansion of macro 'container_of'
->      container_of(ptr, type, member)
->      ^~~~~~~~~~~~
->    include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
->      list_entry((ptr)->next, type, member)
->      ^~~~~~~~~~
->    include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
->      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
->      ^~~~~~~~~~~~~~~~
->    include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
->      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
->                       ^~~~~~~~~~~~~~~
-> >> drivers//perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro
-> 'first_msi_entry'
->      desc = first_msi_entry(dev);
->             ^~~~~~~~~~~~~~~
->    drivers//perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_probe':
->    drivers//perf/arm_smmuv3_pmu.c:745:64: warning: format '%llx' expects
-> argument of type 'long long unsigned int', but argument 4 has type
-> 'resource_size_t {aka unsigned int}' [-Wformat=]
->      name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "smmuv3_pmcg_%llx",
->                                                                 ~~~^
->                                                                 %x
->    cc1: some warnings being treated as errors
-> 
-> vim +601 drivers//perf/arm_smmuv3_pmu.c
-> 
->    596
->    597	static void smmu_pmu_free_msis(void *data)
->    598	{
->    599		struct device *dev = data;
->    600
->  > 601		platform_msi_domain_free_irqs(dev);
->    602	}
->    603
->    604	static void smmu_pmu_write_msi_msg(struct msi_desc *desc, struct
-> msi_msg *msg)
->    605	{
->    606		phys_addr_t doorbell;
->    607		struct device *dev = msi_desc_to_dev(desc);
->    608		struct smmu_pmu *pmu = dev_get_drvdata(dev);
->    609
->    610		doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
->    611		doorbell &= MSI_CFG0_ADDR_MASK;
->    612
->    613		writeq_relaxed(doorbell, pmu->reg_base +
-> SMMU_PMCG_IRQ_CFG0);
->    614		writel_relaxed(msg->data, pmu->reg_base +
-> SMMU_PMCG_IRQ_CFG1);
->    615		writel_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE,
->    616			       pmu->reg_base + SMMU_PMCG_IRQ_CFG2);
->    617	}
->    618
->    619	static void smmu_pmu_setup_msi(struct smmu_pmu *pmu)
->    620	{
->    621		struct msi_desc *desc;
->    622		struct device *dev = pmu->dev;
->    623		int ret;
->    624
->    625		/* Clear MSI address reg */
->    626		writeq_relaxed(0, pmu->reg_base +
-> SMMU_PMCG_IRQ_CFG0);
->    627
->    628		/* MSI supported or not */
->    629		if (!(readl(pmu->reg_base + SMMU_PMCG_CFGR) &
-> SMMU_PMCG_CFGR_MSI))
->    630			return;
->    631
->  > 632		ret = platform_msi_domain_alloc_irqs(dev, 1,
-> smmu_pmu_write_msi_msg);
->    633		if (ret) {
->    634			dev_warn(dev, "failed to allocate MSIs\n");
->    635			return;
->    636		}
->    637
->  > 638		desc = first_msi_entry(dev);
->    639		if (desc)
->    640			pmu->irq = desc->irq;
->    641
->    642		/* Add callback to free MSIs on teardown */
->    643		devm_add_action(dev, smmu_pmu_free_msis, dev);
->    644	}
->    645
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+--->8---
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 9407ca5f9443..564882c87641 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -2855,23 +2855,31 @@ static u8 spi_nor_smpt_read_dummy(const struct spi_nor *nor, const u32 settings)
+  * spi_nor_get_map_in_use() - get the configuration map in use
+  * @nor:       pointer to a 'struct spi_nor'
+  * @smpt:      pointer to the sector map parameter table
++ * @smpt_len:  number of entries in the smpt array
+  */
+-static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
++static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
++                                        u32 smpt_len)
+ {
+        const u32 *ret = NULL;
+-       u32 i, addr;
++       u32 i, addr, nmaps;
+        int err;
+        u8 addr_width, read_opcode, read_dummy;
+        u8 read_data_mask, data_byte, map_id;
++       bool map_id_is_valid = false;
+ 
+        addr_width = nor->addr_width;
+        read_dummy = nor->read_dummy;
+        read_opcode = nor->read_opcode;
+ 
++       for (i = 0; i < smpt_len; i++)
++               pr_info("%s:%i smpt[%d] = %08x\n", __func__, __LINE__, i, smpt[i]);
++
+        map_id = 0;
+-       i = 0;
+        /* Determine if there are any optional Detection Command Descriptors */
+-       while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
++       for (i = 0; i < smpt_len; i++) {
++               if (!(smpt[i] & SMPT_DESC_TYPE_MAP))
++                       break;
++
+                read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
+                nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
+                nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
+@@ -2887,18 +2895,40 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
+                 * Configuration that is currently in use.
+                 */
+                map_id = map_id << 1 | !!(data_byte & read_data_mask);
++               map_id_is_valid = true;
+                i = i + 2;
+        }
+ 
++       if (map_id_is_valid)
++               pr_info("%s:%i map_id = %d\n", __func__, __LINE__, map_id);
++       else
++               pr_info("%s:%i no map_id\n", __func__, __LINE__);
++
+        /* Find the matching configuration map */
+-       while (SMPT_MAP_ID(smpt[i]) != map_id) {
+-               if (smpt[i] & SMPT_DESC_END)
+-                       goto out;
++       for (nmaps = 0; i < smpt_len; nmaps++) {
++               if (!(smpt[i] & SMPT_DESC_TYPE_MAP))
++                       continue;
++
++               if (!map_id_is_valid) {
++                       /*
++                        * Command descriptors are optional but if we didn't
++                        * find any, we should ensure we have only one map.
++                        */
++                       if (nmaps) {
++                               ret = NULL;
++                               break;
++                       }
++
++                       ret = smpt + i;
++               } else if (map_id == SMPT_MAP_ID(smpt[i])) {
++                       ret = smpt + i;
++                       break;
++               }
++
+                /* increment the table index to the next map */
+                i += SMPT_MAP_REGION_COUNT(smpt[i]) + 1;
+        }
+ 
+-       ret = smpt + i;
+        /* fall through */
+ out:
+        nor->addr_width = addr_width;
+@@ -3020,7 +3050,7 @@ static int spi_nor_parse_smpt(struct spi_nor *nor,
+        for (i = 0; i < smpt_header->length; i++)
+                smpt[i] = le32_to_cpu(smpt[i]);
+ 
+-       sector_map = spi_nor_get_map_in_use(nor, smpt);
++       sector_map = spi_nor_get_map_in_use(nor, smpt, smpt_header->length);
+        if (!sector_map) {
+                ret = -EINVAL;
+                goto out;
+@@ -3132,6 +3162,17 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
+                switch (SFDP_PARAM_HEADER_ID(param_header)) {
+                case SFDP_SECTOR_MAP_ID:
+                        err = spi_nor_parse_smpt(nor, param_header);
++                       if (err) {
++                               dev_warn(dev,
++                                        "failed to parse SMPT (err = %d)\n",
++                                        err);
++                               /*
++                                * SMPT parsing is optional, let's not drop
++                                * all information we extracted so far just
++                                * because it failed.
++                                */
++                               err = 0;
++                       }
+                        break;
+ 
+                default:
