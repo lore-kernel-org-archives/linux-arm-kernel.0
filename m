@@ -1,116 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Oct 2018 12:53:00 +0100 (BST)
-Subject: Applied "ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio" to the
- asoc tree
-In-Reply-To: <20181017073813.14127-3-anarsoul@gmail.com>
-Message-ID: <20181017115300.2BFDB11224C4@debutante.sirena.org.uk>
+From: aneesh.kumar@linux.ibm.com (Aneesh Kumar K.V)
+Date: Wed, 17 Oct 2018 17:23:38 +0530
+Subject: Crash on FSL Book3E due to pte_pgprot()? (was Re: [PATCH v3
+ 12/24] powerpc/mm: use pte helpers in generic code)
+In-Reply-To: <6ec9cf4b-abd2-8244-4780-4564a7ffb1ad@c-s.fr>
+References: <cover.1539092111.git.christophe.leroy@c-s.fr>
+ <343c844bbc5081d13ee4c9aa27ff3118f607e1cc.1539092112.git.christophe.leroy@c-s.fr>
+ <87va61jsma.fsf@concordia.ellerman.id.au>
+ <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
+ <87efcoeudx.fsf@concordia.ellerman.id.au>
+ <6ec9cf4b-abd2-8244-4780-4564a7ffb1ad@c-s.fr>
+Message-ID: <e3b03750-f76a-0a70-69ff-3767382859c6@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 10/17/18 4:42 PM, Christophe Leroy wrote:
+> 
+> 
+> On 10/17/2018 10:32 AM, Michael Ellerman wrote:
+>> Christophe Leroy <christophe.leroy@c-s.fr> writes:
+>>> On 10/17/2018 12:59 AM, Michael Ellerman wrote:
+>> ...
+>>>> The question is what's the right way to fix it? Should pte_pgprot() not
+>>>> be filtering those bits out on book3e?
+>>>
+>>> I think we should not use pte_pggrot() for that then. What about the
+>>> below fix ?
+>>
+>> Thanks, that almost works.
+>>
+>> pte_mkprivileged() also needs to not strip _PAGE_BAP_SR.
+> 
+> Oops, I missed it allthough I knew it. Patch below.
+> 
+> From: Christophe Leroy <christophe.leroy@c-s.fr>
+> Date: Wed, 17 Oct 2018 10:46:24 +0000
+> Subject: [PATCH] powerpc/book3e: redefine pte_mkprivileged() and 
+> pte_mkuser()
+> To: Benjamin Herrenschmidt <benh@kernel.crashing.org>, Paul Mackerras 
+> <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>
+> Cc: linux-kernel at vger.kernel.org, linuxppc-dev at lists.ozlabs.org
+> 
+> Book3e defines both _PAGE_USER and _PAGE_PRIVILEGED, so the nohash
+> default pte_mkprivileged() and pte_mkuser() are not usable.
+> 
+> This patch redefines them for book3e.
+> 
+> Fixes: a0da4bc166f2 ("powerpc/mm: Allow platforms to redefine some 
+> helpers")
+> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+> ---
+>  ?arch/powerpc/include/asm/nohash/pte-book3e.h | 14 ++++++++++++++
+>  ?1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/powerpc/include/asm/nohash/pte-book3e.h 
+> b/arch/powerpc/include/asm/nohash/pte-book3e.h
+> index 58eef8cb569d..fb4297dff3e2 100644
+> --- a/arch/powerpc/include/asm/nohash/pte-book3e.h
+> +++ b/arch/powerpc/include/asm/nohash/pte-book3e.h
+> @@ -109,5 +109,19 @@
+>  ?#define PAGE_READONLY??? __pgprot(_PAGE_BASE | _PAGE_USER)
+>  ?#define PAGE_READONLY_X??? __pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_EXEC)
+> 
+> +static inline pte_t pte_mkprivileged(pte_t pte)
+> +{
+> +??? return __pte((pte_val(pte) & ~_PAGE_USER) | _PAGE_PRIVILEGED);
+> +}
+> +
+> +#define pte_mkprivileged pte_mkprivileged
+> +
+> +static inline pte_t pte_mkuser(pte_t pte)
+> +{
+> +??? return __pte((pte_val(pte) & ~_PAGE_PRIVILEGED) | _PAGE_USER);
+> +}
+> +
+> +#define pte_mkuser pte_mkuser
+> +
 
-   ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
+I was build testing a similar patch. We would need to put #ifndef 
+__ASSEMBLY__ around it.
 
-has been applied to the asoc tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 13c3bf174becfb8b55adcfeb6f01724dc99347f0 Mon Sep 17 00:00:00 2001
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Wed, 17 Oct 2018 00:38:06 -0700
-Subject: [PATCH] ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
-
-BCLK / LRCK ratio should be sample size * channels, but it was
-hardcoded to 32 (0x1 is 32 as per A33 and A64 datasheets).
-
-Calculate it basing on sample size and number of channels.
-
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sunxi/sun8i-codec.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index fb37dd927e33..522a72fde78d 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -24,6 +24,7 @@
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
-+#include <linux/log2.h>
- 
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
-@@ -52,7 +53,6 @@
- #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV		13
- #define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV		9
- #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV		6
--#define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16		(1 << 6)
- #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ		4
- #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16		(1 << 4)
- #define SUN8I_AIF1CLK_CTRL_AIF1_DATA_FMT		2
-@@ -300,12 +300,23 @@ static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
- 	return best_val;
- }
- 
-+static int sun8i_codec_get_lrck_div(unsigned int channels,
-+				    unsigned int word_size)
-+{
-+	unsigned int div = word_size * channels;
-+
-+	if (div < 16 || div > 256)
-+		return -EINVAL;
-+
-+	return ilog2(div) - 4;
-+}
-+
- static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
- 				 struct snd_pcm_hw_params *params,
- 				 struct snd_soc_dai *dai)
- {
- 	struct sun8i_codec *scodec = snd_soc_component_get_drvdata(dai->component);
--	int sample_rate;
-+	int sample_rate, lrck_div;
- 	u8 bclk_div;
- 
- 	/*
-@@ -321,9 +332,14 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
- 			   bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
- 
-+	lrck_div = sun8i_codec_get_lrck_div(params_channels(params),
-+					    params_physical_width(params));
-+	if (lrck_div < 0)
-+		return lrck_div;
-+
- 	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
--			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
-+			   lrck_div << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV);
- 
- 	sample_rate = sun8i_codec_get_hw_rate(params);
- 	if (sample_rate < 0)
--- 
-2.19.0.rc2
+-aneesh
