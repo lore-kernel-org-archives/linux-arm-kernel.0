@@ -1,169 +1,38 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 17 Oct 2018 17:17:39 +0300
-Subject: [PATCH v3 2/4] driver core: add deferring probe reason to
- devices_deferred property
-In-Reply-To: <20181017132400.5300-1-a.hajda@samsung.com>
-References: <CGME20181017132404eucas1p2a413f6853af8f11a874650b6289d56cf@eucas1p2.samsung.com>
- <CAHp75Vd2c3sHz=ZObsNAyEmOK-=__2=y-soDM5DqNUyLLK8jdA@mail.gmail.com>
- <20181017132400.5300-1-a.hajda@samsung.com>
-Message-ID: <CAHp75VdwnHLuXazD926CU+HWWv+sgp8BFCdW=vHqzMqsE87Ekg@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 17 Oct 2018 16:20:41 +0200
+Subject: [PATCH v7 0/8] arm64: untag user pointers passed to the kernel
+In-Reply-To: <be684ce5-92fd-e970-b002-83452cf50abd@arm.com>
+References: <cover.1538485901.git.andreyknvl@google.com>
+ <be684ce5-92fd-e970-b002-83452cf50abd@arm.com>
+Message-ID: <CAAeHK+yEZTLjgSj8YUzeJec9Pp2TwuLT5nCa1OpfBLXJkx_hhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 4:24 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
+On Wed, Oct 17, 2018 at 4:06 PM, Vincenzo Frascino
+<vincenzo.frascino@arm.com> wrote:
+> Hi Andrey,
+> I have been thinking a bit lately on how to address the problem of user tagged pointers passed to the kernel through syscalls, and IMHO probably the best way we have to catch them all and make sure that the approach is maintainable in the long term is to introduce shims that tag/untag the pointers passed to the kernel.
 >
-> /sys/kernel/debug/devices_deferred property contains list of deferred devices.
-> This list does not contain reason why the driver deferred probe, the patch
-> improves it.
-> The natural place to set the reason is probe_err function introduced recently,
-> ie. if probe_err will be called with -EPROBE_DEFER instead of printk the message
-> will be attached to deferred device and printed when user read devices_deferred
-> property.
+> In details, what I am proposing can live either in userspace (preferred solution so that we do not have to relax the ABI) or in kernel space and can be summarized as follows:
+>  - A shim is specific to a syscall and is called by the libc when it needs to invoke the respective syscall.
+>  - It is required only if the syscall accepts pointers.
+>  - It saves the tags of a pointers passed to the syscall in memory (same approach if the we are passing a struct that contains pointers to the kernel, with the difference that all the tags of the pointers in the struct need to be saved singularly)
+>  - Untags the pointers
+>  - Invokes the syscall
+>  - Retags the pointers with the tags stored in memory
+>  - Returns
 >
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Reviewed-by: Mark Brown <broonie@kernel.org>
-> Reviewed-by: Javier Martinez Canillas <javierm@redhat.com>
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> ---
-> v3:
->   - adjusted deferred_devs_show, to accept newline ended messages,
->   - changed conditonal check to positive,
->   - added R-b by Andy.
-> v2:
->   - changed __deferred_probe_set_msg args - like in __dev_printk, fits better,
->   - use kasprintf instead of bunch of code,
->   - keep consistent format of devices_deferred lines,
->   - added R-Bs (again I hope changes above are not against it).
-> ---
->  drivers/base/base.h |  3 +++
->  drivers/base/core.c |  9 +++++----
->  drivers/base/dd.c   | 21 ++++++++++++++++++++-
->  3 files changed, 28 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/base/base.h b/drivers/base/base.h
-> index 7a419a7a6235..effbd5e7f9f1 100644
-> --- a/drivers/base/base.h
-> +++ b/drivers/base/base.h
-> @@ -75,6 +75,7 @@ struct device_private {
->         struct klist_node knode_driver;
->         struct klist_node knode_bus;
->         struct list_head deferred_probe;
-> +       char *deferred_probe_msg;
->         struct device *device;
->  };
->  #define to_device_private_parent(obj)  \
-> @@ -113,6 +114,8 @@ extern void device_release_driver_internal(struct device *dev,
->  extern void driver_detach(struct device_driver *drv);
->  extern int driver_probe_device(struct device_driver *drv, struct device *dev);
->  extern void driver_deferred_probe_del(struct device *dev);
-> +extern void __deferred_probe_set_msg(const struct device *dev,
-> +                                    struct va_format *vaf);
->  static inline int driver_match_device(struct device_driver *drv,
->                                       struct device *dev)
->  {
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index 1f3e99c2ef03..27990110fb24 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -3076,6 +3076,7 @@ define_dev_printk_level(_dev_info, KERN_INFO);
->   *
->   * This helper implements common pattern present in probe functions for error
->   * checking: print message if the error is not -EPROBE_DEFER and propagate it.
-> + * In case of -EPROBE_DEFER it sets defer probe reason.
->   * It replaces code sequence:
->   *     if (err != -EPROBE_DEFER)
->   *             dev_err(dev, ...);
-> @@ -3091,14 +3092,14 @@ int probe_err(const struct device *dev, int err, const char *fmt, ...)
->         struct va_format vaf;
->         va_list args;
->
-> -       if (err == -EPROBE_DEFER)
-> -               return err;
-> -
->         va_start(args, fmt);
->         vaf.fmt = fmt;
->         vaf.va = &args;
->
-> -       dev_err(dev, "error %d: %pV", err, &vaf);
-> +       if (err == -EPROBE_DEFER)
-> +               __deferred_probe_set_msg(dev, &vaf);
-> +       else
-> +               dev_err(dev, "error %d: %pV", err, &vaf);
->
->         va_end(args);
->
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 169412ee4ae8..6e488146b328 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -27,6 +27,7 @@
->  #include <linux/async.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pinctrl/devinfo.h>
-> +#include <linux/slab.h>
->
->  #include "base.h"
->  #include "power/power.h"
-> @@ -132,6 +133,8 @@ void driver_deferred_probe_del(struct device *dev)
->         if (!list_empty(&dev->p->deferred_probe)) {
->                 dev_dbg(dev, "Removed from deferred list\n");
->                 list_del_init(&dev->p->deferred_probe);
-> +               kfree(dev->p->deferred_probe_msg);
-> +               dev->p->deferred_probe_msg = NULL;
->         }
->         mutex_unlock(&deferred_probe_mutex);
->  }
-> @@ -202,6 +205,21 @@ void device_unblock_probing(void)
->         driver_deferred_probe_trigger();
->  }
->
-> +/*
-> + * __deferred_probe_set_msg() - Set defer probe reason message for device
-> + */
-> +void __deferred_probe_set_msg(const struct device *dev, struct va_format *vaf)
-> +{
-> +       mutex_lock(&deferred_probe_mutex);
-> +
+> What do you think?
 
-> +       if (dev->p->deferred_probe_msg)
+Hi Vincenzo,
 
-Sorry, I have noticed this a bit late, this check is not needed, since
-kfree() is NULL-aware.
+If I correctly understand what you are proposing, I'm not sure if that
+would work with the countless number of different ioctl calls. For
+example when an ioctl accepts a struct with a bunch of pointer fields.
+In this case a shim like the one you propose can't live in userspace,
+since libc doesn't know about the interface of all ioctls, so it can't
+know which fields to untag. The kernel knows about those interfaces
+(since the kernel implements them), but then we would need a custom
+shim for each ioctl variation, which doesn't seem practical.
 
-> +               kfree(dev->p->deferred_probe_msg);
-> +       dev->p->deferred_probe_msg = kasprintf(GFP_KERNEL, "%s: %pV",
-> +                                              dev_driver_string(dev), vaf);
-
-...and perhaps slightly better looking (up to you):
-
-const char *drv = dev_driver_string(dev);
-
-...
-
-... = kasprintf(..., drv, ...); // it would be exactly oneline
-
-> +
-> +       mutex_unlock(&deferred_probe_mutex);
-> +}
-> +
->  /*
->   * deferred_devs_show() - Show the devices in the deferred probe pending list.
->   */
-> @@ -212,7 +230,8 @@ static int deferred_devs_show(struct seq_file *s, void *data)
->         mutex_lock(&deferred_probe_mutex);
->
->         list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
-> -               seq_printf(s, "%s\n", dev_name(curr->device));
-> +               seq_printf(s, "%s\t%s", dev_name(curr->device),
-> +                          curr->device->p->deferred_probe_msg ?: "\n");
->
->         mutex_unlock(&deferred_probe_mutex);
->
-> --
-> 2.18.0
->
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+Thanks!
