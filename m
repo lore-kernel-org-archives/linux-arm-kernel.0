@@ -1,45 +1,37 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 17 Oct 2018 12:37:54 +0000
-Subject: [PATCH v4 3/4] ARM: dts: imx6ull: Add dcp node
+Date: Wed, 17 Oct 2018 12:37:51 +0000
+Subject: [PATCH v4 1/4] dt-bindings: crypto: Mention clocks for mxs-dcp
 In-Reply-To: <cover.1539779579.git.leonard.crestez@nxp.com>
 References: <cover.1539779579.git.leonard.crestez@nxp.com>
-Message-ID: <f503eea6c702aeff091f4c03d4059b67ec17b2b4.1539779579.git.leonard.crestez@nxp.com>
+Message-ID: <4536b5b5b101ab6a4197fb4891f775ddeb519847.1539779579.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCP block on 6ull has no major differences other than requiring
-explicit clock enabling.
+Explicit clock enabling is required on 6sll and 6ull so mention that
+standard clock bindings are used.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 Reviewed-by: Fabio Estevam <festevam@gmail.com>
 ---
- arch/arm/boot/dts/imx6ull.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/devicetree/bindings/crypto/fsl-dcp.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index 796ed35d4ac9..f3668fe69eac 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -37,10 +37,20 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0x02200000 0x100000>;
- 			ranges;
+diff --git a/Documentation/devicetree/bindings/crypto/fsl-dcp.txt b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
+index 76a0b4e80e83..4e4d387e38a5 100644
+--- a/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
++++ b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
+@@ -4,10 +4,12 @@ Required properties:
+ - compatible : Should be "fsl,<soc>-dcp"
+ - reg : Should contain MXS DCP registers location and length
+ - interrupts : Should contain MXS DCP interrupt numbers, VMI IRQ and DCP IRQ
+                must be supplied, optionally Secure IRQ can be present, but
+ 	       is currently not implemented and not used.
++- clocks : Clock reference (only required on some SOCs: 6ull and 6sll).
++- clock-names : Must be "dcp".
  
-+			dcp: crypto at 2280000 {
-+				compatible = "fsl,imx6ull-dcp", "fsl,imx28-dcp";
-+				reg = <0x02280000 0x4000>;
-+				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6ULL_CLK_DCP_CLK>;
-+				clock-names = "dcp";
-+			};
-+
- 			iomuxc_snvs: iomuxc-snvs at 2290000 {
- 				compatible = "fsl,imx6ull-iomuxc-snvs";
- 				reg = <0x02290000 0x4000>;
- 			};
+ Example:
  
+ dcp at 80028000 {
+ 	compatible = "fsl,imx28-dcp", "fsl,imx23-dcp";
 -- 
 2.17.1
