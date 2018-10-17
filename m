@@ -1,18 +1,39 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 08:26:29 -0700
-Subject: [PATCH 1/2] clk: imx: cpu clock should be always critical
-In-Reply-To: <1539756441-18776-1-git-send-email-Anson.Huang@nxp.com>
-References: <1539756441-18776-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <153978998995.5275.238389804579286767@swboyd.mtv.corp.google.com>
+Date: Wed, 17 Oct 2018 08:32:05 -0700
+Subject: [PATCH v13 6/8] clk: qcom: cpu-8996: Add support to switch to
+ alternate PLL
+In-Reply-To: <20180614215358.11264-7-ilia.lin@gmail.com>
+References: <20180614215358.11264-1-ilia.lin@gmail.com>
+ <20180614215358.11264-7-ilia.lin@gmail.com>
+Message-ID: <153979032539.5275.12064078400966025600@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Anson Huang (2018-10-16 23:11:59)
-> Add CLK_IS_CRITICAL flag for cpu clock type to
-> make cpu clock use count correct, as cpu clock
-> should be always critical.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
+Quoting ilia.lin at gmail.com (2018-06-14 14:53:53)
+> @@ -227,6 +232,26 @@ clk_cpu_8996_mux_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
+>         return 0;
+>  }
+>  
+> +int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
 
-Applied to clk-next
+static? And name it something like clk_cpu_8996_notifier?
+
+> +                       void *data)
+> +{
+> +       int ret;
+> +       struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_nb(nb);
+> +
+> +       switch (event) {
+> +       case PRE_RATE_CHANGE:
+> +               ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
+> +               break;
+> +       case POST_RATE_CHANGE:
+> +               ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, PLL_INDEX);
+> +               break;
+> +       default:
+> +               ret = 0;
+> +               break;
+> +       }
+> +
+> +       return notifier_from_errno(ret);
+> +};
