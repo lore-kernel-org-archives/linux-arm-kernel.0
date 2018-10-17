@@ -1,104 +1,115 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Oct 2018 15:41:56 +0200
-Subject: [PATCH v3 3/6] clocksource: exynos_mct: Refactor resources allocation
-In-Reply-To: <20181017134159.9656-1-m.szyprowski@samsung.com>
-References: <20181017134159.9656-1-m.szyprowski@samsung.com>
- <CGME20181017134206eucas1p1ebc76569f706675d41f2d2183349f1f3@eucas1p1.samsung.com>
-Message-ID: <20181017134159.9656-4-m.szyprowski@samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 17 Oct 2018 08:49:25 -0500
+Subject: [PATCH 1/2] dt-bindings: irqchip: Introduce TISCI Interrupt
+ router bindings
+In-Reply-To: <20181006162929.u6uh4ffn6gm3incf@akan>
+References: <20181006072812.15814-1-lokeshvutla@ti.com>
+ <20181006072812.15814-2-lokeshvutla@ti.com>
+ <20181006162929.u6uh4ffn6gm3incf@akan>
+Message-ID: <20181017134925.GA7084@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move interrupts allocation from exynos4_timer_resources() into separate
-function together with the interrupt number parsing code from
-mct_init_dt(), so the code for managing interrupts is kept together.
-While touching exynos4_timer_resources() function, move of_iomap() to it.
-No functional changes.
+On Sat, Oct 06, 2018 at 11:29:29AM -0500, Nishanth Menon wrote:
+> On 12:58-20181006, Lokesh Vutla wrote:
+> > Add the DT binding documentation for Interrupt router driver.
+> > 
+> > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> > ---
+> >  .../interrupt-controller/ti,sci-intr.txt      | 83 +++++++++++++++++++
+> >  MAINTAINERS                                   |  1 +
+> >  2 files changed, 84 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> > new file mode 100644
+> > index 000000000000..681ca53cc5fb
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> > @@ -0,0 +1,83 @@
+> > +Texas Instruments K3 Interrupt Router
+> > +=====================================
+> > +
+> > +The Interrupt Router (INTR) module provides a mechanism to mux M
+> > +interrupt inputs to N interrupt outputs, where all M inputs are selectable
+> > +to be driven per N output. There is one register per output (MUXCNTL_N) that
+> > +controls the selection.
+> > +
+> > +
+> > +                                 Interrupt Router
+> > +                             +----------------------+
+> > +                             |  Inputs     Outputs  |
+> > +        +-------+            | +------+             |
+> > +        | GPIO  |----------->| | irq0 |             |       Host IRQ
+> > +        +-------+            | +------+             |      controller
+> > +                             |    .        +-----+  |      +-------+
+> > +        +-------+            |    .        |  0  |  |----->|  GIC  |
+> > +        | INTA  |----------->|    .        +-----+  |      +-------+
+> > +        +-------+            |    .          .      |
+> > +                             | +------+      .      |
+> > +                             | | irqM |    +-----+  |
+> > +                             | +------+    |  N  |  |
+> > +                             |             +-----+  |
+> > +                             +----------------------+
+> > +
+> > +Configuration of these MUXCNTL_N registers is done by a system controller
+> > +(like the Device Memory and Security Controller on K3 AM654 SoC). System
+> > +controller will keep track of the used and unused registers within the Router.
+> > +Driver should request the system controller to get the range of GIC IRQs
+> > +assigned to the requesting hosts. It is the drivers responsibility to keep
+> > +track of GIC IRQs.
+> > +
+> > +Communication between the host processor running an OS and the system
+> > +controller happens through a protocol called TI System Control Interface
+> > +(TISCI protocol). For more details refer:
+> > +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> > +
+> > +TISCI Interrupt Router Node:
+> > +----------------------------
+> > +- compatible:		Must be "ti,sci-intr".
+> > +- interrupt-controller:	Identifies the node as an interrupt controller
+> > +- #interrupt-cells:	Specifies the number of cells needed to encode an
+> > +			interrupt source. The value should be 3.
+> > +			First cell should contain the TISCI device ID of source
+> > +			Second cell should contain the interrupt source offset
+> > +			within the device
+> > +			Third cell specifies the trigger type as defined
+> > +			in interrupts.txt in this directory.
+> > +- interrupt-parent:	phandle of irq parent for TISCI intr. The parent must
+> > +			use the same interrupt-cells format as GIC.
+> > +- ti,sci:		Phandle to TI-SCI compatible System controller node.
+> > +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
+> > +- ti,sci-rm-range-girq:	Tuple corresponding to unique TISCI resource type that
+> > +			defines the dst host irq ranges assigned to this
+> > +			interrupt router from this host context.
+> > +			Tuple should be of format <type subtype>.
+> > +
+> 
+> Rob, DT maintainers,
+> 
+> I'd like a feedback from DT maintainers on this 'range' topic.
+> 
+> TISCI Firmware [1] currently seems to define a type corresponding to a
+> device ID[2]. in AM6 device, for example, this is different, however
+> have a 1 to 1 correspondence. However, there is expectation that type will
+> end up as device ID in a future SoC.
+> 
+> While this is subject to much debate internally, I'd like some feedback if this
+> is OK from Device tree representation - it is true that Firmware does
+> look at it as type, however in some future SoC, it could be that the
+> values themselves may correspond one to one with a device id -> The
+> original wish was that types might be something reusable across SoCs,
+> but that is turning out to be more of a theoretical wish than any thing
+> practical.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/clocksource/exynos_mct.c | 49 +++++++++++++++++++-------------
- 1 file changed, 30 insertions(+), 19 deletions(-)
+I'm not sure I follow all the terminology here of type, subtype, "dst 
+host irq", etc. It looks to me like you should be using interrupt-map property.
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 49413900b24c..02ad55db390b 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -502,11 +502,14 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
- 	return 0;
- }
- 
--static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
-+static int __init exynos4_timer_resources(struct device_node *np)
- {
--	int err, cpu;
- 	struct clk *mct_clk, *tick_clk;
- 
-+	reg_base = of_iomap(np, 0);
-+	if (!reg_base)
-+		panic("%s: unable to ioremap mct address space\n", __func__);
-+
- 	tick_clk = of_clk_get_by_name(np, "fin_pll");
- 	if (IS_ERR(tick_clk))
- 		panic("%s: unable to determine tick clock rate\n", __func__);
-@@ -517,9 +520,27 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
- 		panic("%s: unable to retrieve mct clock instance\n", __func__);
- 	clk_prepare_enable(mct_clk);
- 
--	reg_base = base;
--	if (!reg_base)
--		panic("%s: unable to ioremap mct address space\n", __func__);
-+	return 0;
-+}
-+
-+static int __init exynos4_timer_interrupts(struct device_node *np,
-+					   unsigned int int_type)
-+{
-+	int i, err, cpu;
-+
-+	mct_int_type = int_type;
-+
-+	/* This driver uses only one global timer interrupt */
-+	mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
-+
-+	/*
-+	 * Find out the number of local irqs specified. The local
-+	 * timer irqs are specified after the four global timer
-+	 * irqs are specified.
-+	 */
-+	nr_irqs = of_irq_count(np);
-+	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
-+		mct_irqs[i] = irq_of_parse_and_map(np, i);
- 
- 	if (mct_int_type == MCT_INT_PPI) {
- 
-@@ -579,24 +600,14 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
- 
- static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
- {
--	u32 nr_irqs, i;
- 	int ret;
- 
--	mct_int_type = int_type;
--
--	/* This driver uses only one global timer interrupt */
--	mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
-+	ret = exynos4_timer_resources(np);
-+	if (ret)
-+		return ret;
- 
--	/*
--	 * Find out the number of local irqs specified. The local
--	 * timer irqs are specified after the four global timer
--	 * irqs are specified.
--	 */
--	nr_irqs = of_irq_count(np);
--	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
--		mct_irqs[i] = irq_of_parse_and_map(np, i);
- 
--	ret = exynos4_timer_resources(np, of_iomap(np, 0));
-+	ret = exynos4_timer_interrupts(np, int_type);
- 	if (ret)
- 		return ret;
- 
--- 
-2.17.1
+Rob
+
+> 
+> [1]http://software-dl.ti.com/tisci/esd/latest/5_soc_doc/am6x/resasg_types.html
+> [2]http://software-dl.ti.com/tisci/esd/latest/5_soc_doc/am6x/devices.html
+> -- 
+> Regards,
+> Nishanth Menon
