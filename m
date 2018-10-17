@@ -1,59 +1,62 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 17 Oct 2018 09:24:05 +0000
-Subject: [PATCH V4 10/11] clk: imx: add imx_check_clk_hws helper function
-In-Reply-To: <153972567736.5275.15651461252543929480@swboyd.mtv.corp.google.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-11-git-send-email-aisheng.dong@nxp.com>
- <153972567736.5275.15651461252543929480@swboyd.mtv.corp.google.com>
-Message-ID: <AM0PR04MB4211A0E210D834DD76DE655980FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: shun-chih.yu@mediatek.com (shun-chih.yu at mediatek.com)
+Date: Wed, 17 Oct 2018 17:36:58 +0800
+Subject: [PATCH 1/2] dt-bindings: dmaengine: Add MediaTek Command-Queue DMA
+ controller bindings
+In-Reply-To: <1539769019-32107-1-git-send-email-shun-chih.yu@mediatek.com>
+References: <1539769019-32107-1-git-send-email-shun-chih.yu@mediatek.com>
+Message-ID: <1539769019-32107-2-git-send-email-shun-chih.yu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Wednesday, October 17, 2018 5:35 AM
-> Quoting A.s. Dong (2018-10-14 01:08:13)
-> > Add imx_check_clk_hws helper function
-> >
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Stephen Boyd <sboyd@kernel.org>
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/clk/imx/clk-common.h | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> >
-> > diff --git a/drivers/clk/imx/clk-common.h
-> > b/drivers/clk/imx/clk-common.h index e3634a5..01550fd 100644
-> > --- a/drivers/clk/imx/clk-common.h
-> > +++ b/drivers/clk/imx/clk-common.h
-> > @@ -13,4 +13,15 @@ static inline struct clk_hw *imx_clk_hw_fixed(const
-> char *name, int rate)
-> >         return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
-> > }
-> >
-> > +static inline void imx_check_clk_hws(struct clk_hw *clks[], unsigned
-> > +int count) {
-> > +       unsigned int i;
-> > +
-> > +       for (i = 0; i < count; i++) {
-> > +               if (IS_ERR(clks[i]))
-> > +                       pr_err("i.MX clk %u: register failed with %ld\n",
-> > +                               i, PTR_ERR(clks[i]));
-> > +       }
-> > +}
-> 
-> And get rid of this too? I don't see the need for layers on top of code snippets.
-> Just write them many times in the same driver, and then decide to consolidate
-> that logic behind something larger than a few helper functions.
+From: Shun-Chih Yu <shun-chih.yu@mediatek.com>
 
-Okay, just see this, then forget my former question in another email talking about
-this function. Will remove them all.
-Thanks for the suggestion.
+Document the devicetree bindings for MediaTek Command-Queue DMA controller
+which could be found on MT6765 SoC or other similar Mediatek SoCs.
 
-Regards
-Dong Aisheng
+Signed-off-by: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-> 
-> > +
+---
+ .../devicetree/bindings/dma/mtk-cqdma.txt          |   31 ++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/mtk-cqdma.txt b/Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+new file mode 100644
+index 0000000..fb12927
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+@@ -0,0 +1,31 @@
++MediaTek Command-Queue DMA Controller
++==================================
++
++Required properties:
++
++- compatible:	Must be "mediatek,mt6765-cqdma" for MT6765.
++- reg:		Should contain the base address and length for each channel.
++- interrupts:	Should contain references to the interrupts for each channel.
++- clocks:	Should be the clock specifiers corresponding to the entry in
++		clock-names property.
++- clock-names:	Should contain "cqdma" entries.
++- dma-channels: The number of DMA channels supported by the controller.
++- dma-requests: The number of DMA request supported by the controller.
++- #dma-cells: 	The length of the DMA specifier, must be <1>. This one cell
++		in dmas property of a client device represents the channel
++		number.
++Example:
++
++        cqdma: dma-controller at 10212000 {
++		compatible = "mediatek,mt6765-cqdma";
++		reg = <0 0x10212000 0 0x1000>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>,
++			<GIC_SPI 114 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&infracfg CLK_IFR_CQ_DMA>;
++		clock-names = "cqdma";
++		dma-channels = <2>;
++		dma-requests = <32>;
++		#dma-cells = <1>;
++	};
++
++DMA clients must use the format described in dma/dma.txt file.
+-- 
+1.7.9.5
