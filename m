@@ -1,47 +1,59 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 17 Oct 2018 11:10:57 +0200
-Subject: [PATCH 3/3] drivers: use probe_err function in obvious cases
-In-Reply-To: <CAHp75VeZEtG7f3WmgvLrirReSwgbOQDp1qiBZ47652poMw8BUQ@mail.gmail.com>
-References: <CGME20181016072250eucas1p1a763670c8509d20a6e6847eadb246817@eucas1p1.samsung.com>
- <20181016072244.1216-1-a.hajda@samsung.com>
- <20181016072244.1216-4-a.hajda@samsung.com>
- <CAHp75VeZEtG7f3WmgvLrirReSwgbOQDp1qiBZ47652poMw8BUQ@mail.gmail.com>
-Message-ID: <20181017091059eucas1p2919e8b5984d4b8998438251a26987068~eWli2LsTV3025130251eucas1p2r@eucas1p2.samsung.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 17 Oct 2018 09:11:03 +0000
+Subject: [PATCH V4 02/11] clk: imx: scu: add scu clock common part
+In-Reply-To: <153972550584.5275.12112973418888551824@swboyd.mtv.corp.google.com>
+References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
+ <1539504194-28289-3-git-send-email-aisheng.dong@nxp.com>
+ <153972550584.5275.12112973418888551824@swboyd.mtv.corp.google.com>
+Message-ID: <AM0PR04MB42110A50FDC33E66A9DDF63D80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2018 15:51, Andy Shevchenko wrote:
-> On Tue, Oct 16, 2018 at 10:22 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
->> The patch replaces obviously matching code with probe_err function.
->> There are many more places where probe_err could be used.
->> The patch shows how the new function should be used, and how it
->> improves the code.
->> --- a/drivers/gpio/gpio-pca953x.c
->> +++ b/drivers/gpio/gpio-pca953x.c
->> @@ -824,9 +824,7 @@ static int pca953x_probe(struct i2c_client *client,
->>         reg = devm_regulator_get(&client->dev, "vcc");
->>         if (IS_ERR(reg)) {
->>                 ret = PTR_ERR(reg);
->> -               if (ret != -EPROBE_DEFER)
->> -                       dev_err(&client->dev, "reg get err: %d\n", ret);
->> -               return ret;
->> +               return probe_err(&client->dev, ret, "reg get err: %d\n", ret);
-> No need to assign ret above.
-> As I mentioned, better to print a value for everyone.
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at kernel.org]
+> Sent: Wednesday, October 17, 2018 5:32 AM
+> Quoting A.s. Dong (2018-10-14 01:07:45)
+> > Add scu clock common part which will be used by client clock drivers.
+> >
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Cc: Stephen Boyd <sboyd@kernel.org>
+> > Cc: Michael Turquette <mturquette@baylibre.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> > ChangeLog:
+> > v3->v4:
+> >  * scu headfile path change
+> > v2->v3:
+> >  * no changes
+> > v1->v2:
+> >  * update function call name
+> > ---
+> >  drivers/clk/imx/Kconfig       |  2 ++
+> >  drivers/clk/imx/Makefile      |  2 ++
+> >  drivers/clk/imx/scu/Kconfig   |  5 +++++
+> >  drivers/clk/imx/scu/Makefile  |  4 ++++
+> > drivers/clk/imx/scu/clk-scu.c | 17 +++++++++++++++++
+> > drivers/clk/imx/scu/clk-scu.h | 18 ++++++++++++++++++
+> 
+> Why is scu nested one level deeper in the imx directory? Can't we just keep
+> them all within imx toplevel directory?
+> 
 
-OK.
+Mostly because SCU clocks are totally different from the legacy clocks.
+(No much legacy things can be reused) So organized them together in a deeper folder
+for clear separation and better maintenance
 
-Thanks for all reviews. I have posted v2 of patches 1 and 2 as replies
-in this thread.
-As patch 3 requires splitting, adjusting arguments of probe_err (remove
-err and newline), and depends on patch 1 I will prepare it and post
-later, probably next cycle as suggested Javier.
+Do you think we still should put them within imx toplevel directory and mix them with
+Legacy clocks?
 
 Regards
-Andrzej
+Dong Aisheng
 
-
->
->>         }
-> Please, split it at least one patch per subsystem.
->
+> >  6 files changed, 48 insertions(+)
+> >  create mode 100644 drivers/clk/imx/scu/Kconfig  create mode 100644
+> > drivers/clk/imx/scu/Makefile  create mode 100644
+> > drivers/clk/imx/scu/clk-scu.c  create mode 100644
+> > drivers/clk/imx/scu/clk-scu.h
+> >
