@@ -1,57 +1,104 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Oct 2018 15:41:54 +0200
-Subject: [PATCH v3 1/6] clocksource: exynos_mct: Remove dead code
+Date: Wed, 17 Oct 2018 15:41:56 +0200
+Subject: [PATCH v3 3/6] clocksource: exynos_mct: Refactor resources allocation
 In-Reply-To: <20181017134159.9656-1-m.szyprowski@samsung.com>
 References: <20181017134159.9656-1-m.szyprowski@samsung.com>
- <CGME20181017134205eucas1p148faab76ac153e9afbb8a519e6d8d1e2@eucas1p1.samsung.com>
-Message-ID: <20181017134159.9656-2-m.szyprowski@samsung.com>
+ <CGME20181017134206eucas1p1ebc76569f706675d41f2d2183349f1f3@eucas1p1.samsung.com>
+Message-ID: <20181017134159.9656-4-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos Multi-Core Timer driver is used only on device-tree based
-systems, so remove non-dt related code. In case of !CONFIG_OF
-the code is anyway equal because of_irq_count() has a stub
-returning 0. Device node pointer is always provided when driver
-has been probed from device tree.
+Move interrupts allocation from exynos4_timer_resources() into separate
+function together with the interrupt number parsing code from
+mct_init_dt(), so the code for managing interrupts is kept together.
+While touching exynos4_timer_resources() function, move of_iomap() to it.
+No functional changes.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/clocksource/exynos_mct.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/clocksource/exynos_mct.c | 49 +++++++++++++++++++-------------
+ 1 file changed, 30 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 7a244b681876..ef18bbf8d20c 100644
+index 49413900b24c..02ad55db390b 100644
 --- a/drivers/clocksource/exynos_mct.c
 +++ b/drivers/clocksource/exynos_mct.c
-@@ -507,13 +507,12 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
- 	int err, cpu;
+@@ -502,11 +502,14 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
+ 	return 0;
+ }
+ 
+-static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
++static int __init exynos4_timer_resources(struct device_node *np)
+ {
+-	int err, cpu;
  	struct clk *mct_clk, *tick_clk;
  
--	tick_clk = np ? of_clk_get_by_name(np, "fin_pll") :
--				clk_get(NULL, "fin_pll");
-+	tick_clk = of_clk_get_by_name(np, "fin_pll");
++	reg_base = of_iomap(np, 0);
++	if (!reg_base)
++		panic("%s: unable to ioremap mct address space\n", __func__);
++
+ 	tick_clk = of_clk_get_by_name(np, "fin_pll");
  	if (IS_ERR(tick_clk))
  		panic("%s: unable to determine tick clock rate\n", __func__);
- 	clk_rate = clk_get_rate(tick_clk);
- 
--	mct_clk = np ? of_clk_get_by_name(np, "mct") : clk_get(NULL, "mct");
-+	mct_clk = of_clk_get_by_name(np, "mct");
- 	if (IS_ERR(mct_clk))
+@@ -517,9 +520,27 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
  		panic("%s: unable to retrieve mct clock instance\n", __func__);
  	clk_prepare_enable(mct_clk);
-@@ -581,11 +580,7 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
- 	 * timer irqs are specified after the four global timer
- 	 * irqs are specified.
- 	 */
--#ifdef CONFIG_OF
- 	nr_irqs = of_irq_count(np);
--#else
--	nr_irqs = 0;
--#endif
- 	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
- 		mct_irqs[i] = irq_of_parse_and_map(np, i);
+ 
+-	reg_base = base;
+-	if (!reg_base)
+-		panic("%s: unable to ioremap mct address space\n", __func__);
++	return 0;
++}
++
++static int __init exynos4_timer_interrupts(struct device_node *np,
++					   unsigned int int_type)
++{
++	int i, err, cpu;
++
++	mct_int_type = int_type;
++
++	/* This driver uses only one global timer interrupt */
++	mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
++
++	/*
++	 * Find out the number of local irqs specified. The local
++	 * timer irqs are specified after the four global timer
++	 * irqs are specified.
++	 */
++	nr_irqs = of_irq_count(np);
++	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
++		mct_irqs[i] = irq_of_parse_and_map(np, i);
+ 
+ 	if (mct_int_type == MCT_INT_PPI) {
+ 
+@@ -579,24 +600,14 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+ 
+ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
+ {
+-	u32 nr_irqs, i;
+ 	int ret;
+ 
+-	mct_int_type = int_type;
+-
+-	/* This driver uses only one global timer interrupt */
+-	mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
++	ret = exynos4_timer_resources(np);
++	if (ret)
++		return ret;
+ 
+-	/*
+-	 * Find out the number of local irqs specified. The local
+-	 * timer irqs are specified after the four global timer
+-	 * irqs are specified.
+-	 */
+-	nr_irqs = of_irq_count(np);
+-	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
+-		mct_irqs[i] = irq_of_parse_and_map(np, i);
+ 
+-	ret = exynos4_timer_resources(np, of_iomap(np, 0));
++	ret = exynos4_timer_interrupts(np, int_type);
+ 	if (ret)
+ 		return ret;
  
 -- 
 2.17.1
