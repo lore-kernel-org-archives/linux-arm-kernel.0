@@ -1,69 +1,85 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 17 Oct 2018 00:38:04 -0700
-Subject: [PATCH v5 0/9] Add support for audiocodec in Allwinner A64
-Message-ID: <20181017073813.14127-1-anarsoul@gmail.com>
+Date: Wed, 17 Oct 2018 00:38:05 -0700
+Subject: [PATCH v5 1/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+In-Reply-To: <20181017073813.14127-1-anarsoul@gmail.com>
+References: <20181017073813.14127-1-anarsoul@gmail.com>
+Message-ID: <20181017073813.14127-2-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds Allwinner A64 audiocodec support into sun4i-i2s,
-sun8i-codec drivers, introduces new sun50i-codec-analog driver and enables
-sound on Pine64, SoPine boards and Pinebook.
+From: Marcus Cooper <codekipper@gmail.com>
 
-I2S for audiocodec in A64 is different from other 3 I2S modules but
-similar to one in A10, digital part of codec is compatible with A33 and
-analog controls part is completely different from other SoCs - it shares
-only few bits in few registers, so adding support for it into existing
-sun8i-codec-analog would mean duplicating all the widgets, controls and
-some routes and making it hard to read. Therefore it makes sense to
-introduce new driver.
+The I2S block used for the audio codec in the A64 differs from other 3
+I2S modules in A64 and isn't compatible with H3. But it is very similar
+to what is found in A10(sun4i). However, its TX FIFO is
+located at a different address.
 
-v2: - Use simple-amplifier for speaker amp on Pinebook
-    - Rename sun50i-a64-i2s to sun50i-a64-codec-i2s to preserve compatible
-      string for other 3 I2S modules in A64 in case if there's any
-      incompatibility with H3
-v3: - renamed sunxi-adda-pr-regmap to sun8i-adda-pr-regmap
-    - use ilog2() to calculate reg value for LRCK div instead of using a
-      table
-v4: - dts: don't use 'Mic' and 'Headset Mic' widgets from sun8i-codec,
-      define our board-level widgets instead.
-v5: - collect all the tags
-    - drop the change to sun8i_codec_clk_div
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ .../devicetree/bindings/sound/sun4i-i2s.txt   |  2 ++
+ sound/soc/sunxi/sun4i-i2s.c                   | 21 +++++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-Marcus Cooper (1):
-  ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
-
-Vasily Khoruzhick (8):
-  ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
-  ASoC: sun8i-codec-analog: split regmap code into separate driver
-  ASoC: dt-binding: Add bindings for Allwinner A64 codec's analog path
-    controls
-  ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path
-    controls
-  ASoC: sunxi: allow the sun8i-codec driver to be built on ARM64
-  arm64: dts: allwinner: a64: add nodes necessary for analog sound
-    support
-  arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
-  arm64: dts: allwinner: a64: enable sound on Pinebook
-
- .../devicetree/bindings/sound/sun4i-i2s.txt   |   2 +
- .../bindings/sound/sun50i-codec-analog.txt    |  12 +
- .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  29 ++
- .../dts/allwinner/sun50i-a64-pinebook.dts     |  42 ++
- .../allwinner/sun50i-a64-sopine-baseboard.dts |  29 ++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  58 +++
- sound/soc/sunxi/Kconfig                       |  17 +-
- sound/soc/sunxi/Makefile                      |   2 +
- sound/soc/sunxi/sun4i-i2s.c                   |  21 +
- sound/soc/sunxi/sun50i-codec-analog.c         | 444 ++++++++++++++++++
- sound/soc/sunxi/sun8i-adda-pr-regmap.c        | 102 ++++
- sound/soc/sunxi/sun8i-adda-pr-regmap.h        |   7 +
- sound/soc/sunxi/sun8i-codec-analog.c          |  79 +---
- sound/soc/sunxi/sun8i-codec.c                 |  22 +-
- 14 files changed, 785 insertions(+), 81 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
- create mode 100644 sound/soc/sunxi/sun50i-codec-analog.c
- create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.c
- create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.h
-
+diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+index b9d50d6cdef3..61e71c1729e0 100644
+--- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+@@ -10,6 +10,7 @@ Required properties:
+    - "allwinner,sun6i-a31-i2s"
+    - "allwinner,sun8i-a83t-i2s"
+    - "allwinner,sun8i-h3-i2s"
++   - "allwinner,sun50i-a64-codec-i2s"
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - interrupts: should contain the I2S interrupt.
+@@ -26,6 +27,7 @@ Required properties for the following compatibles:
+ 	- "allwinner,sun6i-a31-i2s"
+ 	- "allwinner,sun8i-a83t-i2s"
+ 	- "allwinner,sun8i-h3-i2s"
++	- "allwinner,sun50i-a64-codec-i2s"
+ - resets: phandle to the reset line for this codec
+ 
+ Example:
+diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+index daa6c08cffbc..d5ec1a20499d 100644
+--- a/sound/soc/sunxi/sun4i-i2s.c
++++ b/sound/soc/sunxi/sun4i-i2s.c
+@@ -950,6 +950,23 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
+ 	.field_rxchansel	= REG_FIELD(SUN8I_I2S_RX_CHAN_SEL_REG, 0, 2),
+ };
+ 
++static const struct sun4i_i2s_quirks sun50i_a64_codec_i2s_quirks = {
++	.has_reset		= true,
++	.reg_offset_txdata	= SUN8I_I2S_FIFO_TX_REG,
++	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
++	.has_slave_select_bit	= true,
++	.field_clkdiv_mclk_en	= REG_FIELD(SUN4I_I2S_CLK_DIV_REG, 7, 7),
++	.field_fmt_wss		= REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
++	.field_fmt_sr		= REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
++	.field_fmt_bclk		= REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
++	.field_fmt_lrclk	= REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
++	.field_fmt_mode		= REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
++	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
++	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
++	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
++	.field_rxchansel	= REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
++};
++
+ static int sun4i_i2s_init_regmap_fields(struct device *dev,
+ 					struct sun4i_i2s *i2s)
+ {
+@@ -1158,6 +1175,10 @@ static const struct of_device_id sun4i_i2s_match[] = {
+ 		.compatible = "allwinner,sun8i-h3-i2s",
+ 		.data = &sun8i_h3_i2s_quirks,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-a64-codec-i2s",
++		.data = &sun50i_a64_codec_i2s_quirks,
++	},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_i2s_match);
 -- 
 2.19.0
