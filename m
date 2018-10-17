@@ -1,65 +1,62 @@
-From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Wed, 17 Oct 2018 15:06:53 +0100
-Subject: [PATCH v7 0/8] arm64: untag user pointers passed to the kernel
-In-Reply-To: <cover.1538485901.git.andreyknvl@google.com>
-References: <cover.1538485901.git.andreyknvl@google.com>
-Message-ID: <be684ce5-92fd-e970-b002-83452cf50abd@arm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 17 Oct 2018 07:15:28 -0700
+Subject: [SPAM]Re: [PATCH v1 3/3] clk: mediatek: mt2712: add pll reference
+ support
+In-Reply-To: <1539784392.16401.28.camel@mtksdaap41>
+References: <20180920095727.11868-1-weiyi.lu@mediatek.com>
+ <20180920095727.11868-5-weiyi.lu@mediatek.com>
+ <153936680359.5275.14901579706860255114@swboyd.mtv.corp.google.com>
+ <1539784392.16401.28.camel@mtksdaap41>
+Message-ID: <153978572885.5275.2199850145066961212@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+Quoting Weiyi Lu (2018-10-17 06:53:12)
+> On Fri, 2018-10-12 at 10:53 -0700, Stephen Boyd wrote:
+> > Quoting Weiyi Lu (2018-09-20 02:57:27)
+> > > +
+> > > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk",
+> > > +                       "#clock-cells", 0, &refclk);
+> > > +       if (!rc) {
+> > > +               of_property_read_string(refclk.np, "clock-output-names",
+> > > +                               &refclk_name);
+> > > +               for (i = 0; i < num_plls; i++)
+> > > +                       plls[i].parent_name = refclk_name;
+> > 
+> > Use of_clk_parent_fill()?
+> > 
+> Thanks for the hint, i might use of_clk_get_parent_name() instead like
+> below to get each parent clock name.
+> refclk_name = of_clk_get_parent_name(node, 0);
+> refclk_aud_name = of_clk_get_parent_name(node, 1);
 
-On 02/10/2018 14:12, Andrey Konovalov wrote:
-> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
-> tags into the top byte of each pointer. Userspace programs (such as
-> HWASan, a memory debugging tool [1]) might use this feature and pass
-> tagged user pointers to the kernel through syscalls or other interfaces.
-> 
-> Right now the kernel is already able to handle user faults with tagged
-> pointers, due to these patches:
-> 
-> 1. 81cddd65 ("arm64: traps: fix userspace cache maintenance emulation on a
->              tagged pointer")
-> 2. 7dcd9dd8 ("arm64: hw_breakpoint: fix watchpoint matching for tagged
-> 	      pointers")
-> 3. 276e9327 ("arm64: entry: improve data abort handling of tagged
-> 	      pointers")
-> 
-> When passing tagged pointers to syscalls, there's a special case of such a
-> pointer being passed to one of the memory syscalls (mmap, mprotect, etc.).
-> These syscalls don't do memory accesses but rather deal with memory
-> ranges, hence an untagged pointer is better suited.
-> 
-> This patchset extends tagged pointer support to non-memory syscalls. This
-> is done by reusing the untagged_addr macro to untag user pointers when the
-> kernel performs pointer checking to find out whether the pointer comes
-> from userspace (most notably in access_ok).
-> 
-> The following testing approaches has been taken to find potential issues
-> with user pointer untagging:
-> 
-> 1. Static testing (with sparse [2] and separately with a custom static
->    analyzer based on Clang) to track casts of __user pointers to integer
->    types to find places where untagging needs to be done.
-> 
-> 2. Dynamic testing: adding BUG_ON(has_tag(addr)) to find_vma() and running
->    a modified syzkaller version that passes tagged pointers to the kernel.
-> 
-...
+Alright.
 
-I have been thinking a bit lately on how to address the problem of user tagged pointers passed to the kernel through syscalls, and IMHO probably the best way we have to catch them all and make sure that the approach is maintainable in the long term is to introduce shims that tag/untag the pointers passed to the kernel.
+> 
+> > > +       }
+> > > +
+> > > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk-aud",
+> > > +                       "#clock-cells", 0, &refclk_aud);
+> > 
+> > This is odd. Is this a custom 'clocks' property? What's going on here?
+> > Why can't we use assigned clock parents for this?
+> Yes. both the reference clock of all PLL and the reference clock of
+> audio PLL could be customized.These two reference clocks shall be
+> provided by some component like crystal oscillators on the board. So we
+> might unable to switch the PLL reference source at runtime, in other
+> words, it should be set statically. That's why we didn't provide the
+> set_parent ops for pll clock type. It's also the main reason we choose
+> not to use assigned-clock-parents for this requirement.
+> 
 
-In details, what I am proposing can live either in userspace (preferred solution so that we do not have to relax the ABI) or in kernel space and can be summarized as follows:
- - A shim is specific to a syscall and is called by the libc when it needs to invoke the respective syscall.
- - It is required only if the syscall accepts pointers.
- - It saves the tags of a pointers passed to the syscall in memory (same approach if the we are passing a struct that contains pointers to the kernel, with the difference that all the tags of the pointers in the struct need to be saved singularly)
- - Untags the pointers
- - Invokes the syscall
- - Retags the pointers with the tags stored in memory
- - Returns
+Ok. Do you need some new software clk flag that indicates we should
+"lock" the parent or rate configured at boot time? I would like to see
+this driver implement the clk_ops for the hardware and have the
+framework be the one that configures the tree, instead of doing it some
+custom way for this single driver.
 
-What do you think?
-
--- 
-Regards,
-Vincenzo
+> > > +       if (!rc) {
+> > > +               of_property_read_string(refclk_aud.np, "clock-output-names",
+> > > +                               &refclk_aud_name);
+> > > +               if (strcmp(refclk_name, refclk_aud_name)) {
+> > > +                       plls[CLK_APMIXED_APLL1].parent_name = refclk_aud_name;
