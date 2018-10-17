@@ -1,34 +1,85 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2018 12:07:22 +0200
-Subject: [PATCH] arm64: renesas_defconfig: Enable R-Car thermal driver
-Message-ID: <20181017100722.29481-1-horms+renesas@verge.net.au>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Wed, 17 Oct 2018 21:32:10 +1100
+Subject: Crash on FSL Book3E due to pte_pgprot()? (was Re: [PATCH v3
+ 12/24] powerpc/mm: use pte helpers in generic code)
+In-Reply-To: <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
+References: <cover.1539092111.git.christophe.leroy@c-s.fr>
+ <343c844bbc5081d13ee4c9aa27ff3118f607e1cc.1539092112.git.christophe.leroy@c-s.fr>
+ <87va61jsma.fsf@concordia.ellerman.id.au>
+ <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
+Message-ID: <87efcoeudx.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the R-Car thermal driver.
+Christophe Leroy <christophe.leroy@c-s.fr> writes:
+> On 10/17/2018 12:59 AM, Michael Ellerman wrote:
+...
+>> The question is what's the right way to fix it? Should pte_pgprot() not
+>> be filtering those bits out on book3e?
+>
+> I think we should not use pte_pggrot() for that then. What about the 
+> below fix ?
 
-This driver is used in conjunction with the R-Car V3M (r8a77970),
-E3 (r8a77990) and D3 (r8a77995) SoCs.
+Thanks, that almost works.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-N.B: This is targeted at the devel branch of the renesas tree
-but not upstream where renesas_defconfig does not currently exist
----
- arch/arm64/configs/renesas_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+pte_mkprivileged() also needs to not strip _PAGE_BAP_SR.
 
-diff --git a/arch/arm64/configs/renesas_defconfig b/arch/arm64/configs/renesas_defconfig
-index f8fca4a777da..b7298a389568 100644
---- a/arch/arm64/configs/renesas_defconfig
-+++ b/arch/arm64/configs/renesas_defconfig
-@@ -154,6 +154,7 @@ CONFIG_THERMAL=y
- CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
- CONFIG_CPU_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
-+CONFIG_RCAR_THERMAL=y
- CONFIG_RCAR_GEN3_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_RENESAS_WDT=y
--- 
-2.11.0
+
+But there's also a use of pte_pgprot() in mm/memory.c, and I think that
+is also broken now that we don't add PAGE_KERNEL back in.
+
+Aneesh is going to do a patch to make pte_pgprot() only mask the PFN
+which is what other arches do.
+
+cheers
+
+> From: Christophe Leroy <christophe.leroy@c-s.fr>
+> Date: Wed, 17 Oct 2018 05:56:25 +0000
+> Subject: [PATCH] powerpc/mm: don't use pte_pgprot() in ioremap_prot()
+>
+> pte_pgprot() filters out some required flags like _PAGE_PRESENT.
+>
+> This patch replaces pte_pgprot() by __pgprot(pte_val())
+> in ioremap_prot()
+>
+> Fixes: 26973fa5ac0e ("powerpc/mm: use pte helpers in generic code")
+> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+> ---
+>   arch/powerpc/mm/pgtable_32.c | 3 ++-
+>   arch/powerpc/mm/pgtable_64.c | 4 ++--
+>   2 files changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
+> index 5877f5aa8f5d..a606e2f4937b 100644
+> --- a/arch/powerpc/mm/pgtable_32.c
+> +++ b/arch/powerpc/mm/pgtable_32.c
+> @@ -122,7 +122,8 @@ ioremap_prot(phys_addr_t addr, unsigned long size, 
+> unsigned long flags)
+>   	pte = pte_exprotect(pte);
+>   	pte = pte_mkprivileged(pte);
+>
+> -	return __ioremap_caller(addr, size, pte_pgprot(pte), 
+> __builtin_return_address(0));
+> +	return __ioremap_caller(addr, size, __pgprot(pte_val(pte)),
+> +				__builtin_return_address(0));
+>   }
+>   EXPORT_SYMBOL(ioremap_prot);
+>
+> diff --git a/arch/powerpc/mm/pgtable_64.c b/arch/powerpc/mm/pgtable_64.c
+> index fb1375c07e8c..836bf436cabb 100644
+> --- a/arch/powerpc/mm/pgtable_64.c
+> +++ b/arch/powerpc/mm/pgtable_64.c
+> @@ -245,8 +245,8 @@ void __iomem * ioremap_prot(phys_addr_t addr, 
+> unsigned long size,
+>   	pte = pte_mkprivileged(pte);
+>
+>   	if (ppc_md.ioremap)
+> -		return ppc_md.ioremap(addr, size, pte_pgprot(pte), caller);
+> -	return __ioremap_caller(addr, size, pte_pgprot(pte), caller);
+> +		return ppc_md.ioremap(addr, size, __pgprot(pte_val(pte)), caller);
+> +	return __ioremap_caller(addr, size, __pgprot(pte_val(pte)), caller);
+>   }
+>
+>
+> -- 
+> 2.13.3
