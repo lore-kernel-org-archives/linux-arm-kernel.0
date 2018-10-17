@@ -1,49 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Oct 2018 18:10:28 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Fix big-endian CMD_SYNC writes
-In-Reply-To: <20181017170712.GA4570@arm.com>
-References: <e14feb6f7dedc90d181e20fbeaaba49156b03b09.1539689371.git.robin.murphy@arm.com>
- <20181017170712.GA4570@arm.com>
-Message-ID: <439dcb28-5f18-29b4-d655-2b1ed790337d@arm.com>
+From: natechancellor@gmail.com (Nathan Chancellor)
+Date: Wed, 17 Oct 2018 10:09:02 -0700
+Subject: [PATCH] misc: atmel-ssc: Fix section annotation on
+ atmel_ssc_get_driver_data
+Message-ID: <20181017170901.13119-1-natechancellor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/18 18:07, Will Deacon wrote:
-> On Tue, Oct 16, 2018 at 12:31:07PM +0100, Robin Murphy wrote:
->> When we insert the sync sequence number into the CMD_SYNC.MSIData field,
->> we do so in CPU-native byte order, before writing out the whole command
->> as explicitly little-endian dwords. Thus on big-endian systems, the SMMU
->> will receive and write back a byteswapped version of sync_nr, which would
->> be perfect if it were targeting a similarly-little-endian ITS, but since
->> it's actually writing back to memory being polled by the CPUs, they're
->> going to end up seeing the wrong thing.
->>
->> Since the SMMU doesn't care what the MSIData actually contains, the
->> minimal-overhead solution is to simply add an extra byteswap initially,
->> such that it then writes back the big-endian format directly.
->>
->> Fixes: 37de98f8f1cf ("iommu/arm-smmu-v3: Use CMD_SYNC completion MSI")
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   drivers/iommu/arm-smmu-v3.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index db402e8b068b..867ba548c2cc 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -952,7 +952,7 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->>   	struct arm_smmu_cmdq_ent ent = {
->>   		.opcode = CMDQ_OP_CMD_SYNC,
->>   		.sync	= {
->> -			.msiaddr = virt_to_phys(&smmu->sync_count),
->> +			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
-> 
-> Hmm, aren't you swabbing the address here? Don't we want to swab the data?
-> We also need a comment to explain this!
+After building the kernel with Clang, the following section mismatch
+warning appears:
 
-It's entirely possible that I'm a spectacular idiot. <sigh>
+WARNING: vmlinux.o(.text+0x3bf19a6): Section mismatch in reference from
+the function ssc_probe() to the function
+.init.text:atmel_ssc_get_driver_data()
+The function ssc_probe() references
+the function __init atmel_ssc_get_driver_data().
+This is often because ssc_probe lacks a __init
+annotation or the annotation of atmel_ssc_get_driver_data is wrong.
 
-Let me try again...
+Remove __init from atmel_ssc_get_driver_data to get rid of the mismatch.
 
-Robin.
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+---
+
+Alternatively, ssc_probe could be marked as __init, I don't think there
+is any way for the probe to defer. I decided to go with the more
+conservative option first but I'm happy to respin if necessary.
+
+Thanks!
+
+ drivers/misc/atmel-ssc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+index b2a0340f277e..d8e3cc2dc747 100644
+--- a/drivers/misc/atmel-ssc.c
++++ b/drivers/misc/atmel-ssc.c
+@@ -132,7 +132,7 @@ static const struct of_device_id atmel_ssc_dt_ids[] = {
+ MODULE_DEVICE_TABLE(of, atmel_ssc_dt_ids);
+ #endif
+ 
+-static inline const struct atmel_ssc_platform_data * __init
++static inline const struct atmel_ssc_platform_data *
+ 	atmel_ssc_get_driver_data(struct platform_device *pdev)
+ {
+ 	if (pdev->dev.of_node) {
+-- 
+2.19.1
