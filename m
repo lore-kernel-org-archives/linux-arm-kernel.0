@@ -1,45 +1,57 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 17 Oct 2018 07:24:34 +0000
-Subject: [PATCH V6 0/3] soc: imx: add scu power domain driver
-Message-ID: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
+Date: Wed, 17 Oct 2018 07:24:40 +0000
+Subject: [PATCH V6 1/3] dt-bindings: fsl: scu: make power domain compatible
+ string SoC specific
+In-Reply-To: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
+References: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds the scu based power domain driver.
-It depends on SCU driver.
+As the power domain API might change in the future for new SoCs, although
+in a very low possibility, it's still better to make the compatible string
+more SoC specific to avoid the possible version change for new SoCs.
 
-Change Log:
+Due to there're still no users in kernel, it's safe to update it without
+breaking anything.
+
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
+Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ChangeLog:
 v5->v6:
- * only compatible string name updated from fsl,scu-pd to fsl,imx8qxp-scu-pd
-   accordingly
-v4->v5:
- * some minor improvements according to Sascha's suggestion
-   Note: did not use dev_* print functions due to we already have proper
-         prefix by redefining pr_fmt. So it seems not quite neccesary
-	 to pass in a struct device * pointer for debug purpose only in
-	 each functions.
-v3->v4:
- * only scu headfile path update
+ * new patch
+---
+ Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-v2->v3:
- * structure and enums name update
- * api usage update
-
-Dong Aisheng (3):
-  dt-bindings: fsl: scu: make power domain compatible string SoC
-    specific
-  firmware: imx: add pm svc headfile
-  firmware: imx: add SCU power domain driver
-
- .../devicetree/bindings/arm/freescale/fsl,scu.txt  |   4 +-
- drivers/firmware/imx/Kconfig                       |   6 +
- drivers/firmware/imx/Makefile                      |   3 +-
- drivers/firmware/imx/scu-pd.c                      | 164 +++++++++++++++++++++
- include/linux/firmware/imx/sci.h                   |   1 +
- include/linux/firmware/imx/svc/pm.h                |  85 +++++++++++
- 6 files changed, 260 insertions(+), 3 deletions(-)
- create mode 100644 drivers/firmware/imx/scu-pd.c
- create mode 100644 include/linux/firmware/imx/svc/pm.h
-
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+index 46d0af1..87fc4b4 100644
+--- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+@@ -58,7 +58,7 @@ This binding for the SCU power domain providers uses the generic power
+ domain binding[2].
+ 
+ Required properties:
+-- compatible:		Should be "fsl,scu-pd".
++- compatible:		Should be "fsl,imx8qxp-scu-pd".
+ - #address-cells:	Should be 1.
+ - #size-cells:		Should be 0.
+ 
+@@ -153,7 +153,7 @@ firmware {
+ 		};
+ 
+ 		imx8qx-pm {
+-			compatible = "fsl,scu-pd";
++			compatible = "fsl,imx8qxp-scu-pd";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
 -- 
 2.7.4
