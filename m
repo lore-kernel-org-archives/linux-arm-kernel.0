@@ -1,143 +1,200 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 17 Oct 2018 09:03:28 +0000
-Subject: [PATCH V4 04/11] clk: imx: scu: add scu clock gpr divider
-In-Reply-To: <153972527843.5275.15123840961402192766@swboyd.mtv.corp.google.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-5-git-send-email-aisheng.dong@nxp.com>
- <153972527843.5275.15123840961402192766@swboyd.mtv.corp.google.com>
-Message-ID: <AM0PR04MB42119987039050D9488EB30F80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Oct 2018 11:04:17 +0200
+Subject: [PATCH] [ALTERNATIVE] ARM: fix copypage functions for clang
+In-Reply-To: <CAK8P3a3XUdkBmrnMUn2TePEBAh49=QvvxRiOk_+JnSp1fSwXJg@mail.gmail.com>
+References: <CAK8P3a3XUdkBmrnMUn2TePEBAh49=QvvxRiOk_+JnSp1fSwXJg@mail.gmail.com>
+Message-ID: <20181017090417.833924-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Wednesday, October 17, 2018 5:28 AM
-[...]
-> Quoting A.s. Dong (2018-10-14 01:07:52)
-> > +/*
-> > + * clk_divider_scu_recalc_rate - Get clock rate for a SCU clock
-> > + * @hw: clock to get rate for
-> > + * @parent_rate: parent rate provided by common clock framework
-> > + *
-> > + * Gets the current clock rate of a SCU clock. Returns the current
-> > + * clock rate, or zero in failure.
-> > + */
-> > +static unsigned long clk_divider_gpr_scu_recalc_rate(struct clk_hw *hw,
-> > +                                                    unsigned long
-> > +parent_rate) {
-> > +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-> > +       u32 val;
-> > +       int ret;
-> > +
-> > +       ret = imx_sc_misc_get_control(ccm_ipc_handle, clk->rsrc_id,
-> > +                                     clk->gpr_id, &val);
-> > +       if (ret) {
-> > +               pr_err("%s: failed to get clock rate %d\n",
-> > +                       clk_hw_get_name(hw), ret);
-> > +               return 0;
-> > +       }
-> > +
-> > +       return val ? parent_rate / 2 : parent_rate;
-> 
-> I hope parent_rate can't be zero here.
-> 
+clang points out that a naked function should not pass
+the function arguments into the inline assembly:
 
-It can be zero, I guess.
-But zero seems safe to me, am I wrong?
+arch/arm/mm/copypage-feroceon.c:67:9: error: parameter references not allowed in naked functions
+arch/arm/mm/copypage-v4mc.c:64:9: error: parameter references not allowed in naked functions
+arch/arm/mm/copypage-v4wb.c:47:9: error: parameter references not allowed in naked functions
+arch/arm/mm/copypage-v4wt.c:43:9: error: parameter references not allowed in naked functions
+arch/arm/mm/copypage-xsc3.c:70:9: error: parameter references not allowed in naked functions
+arch/arm/mm/copypage-xscale.c:84:9: error: parameter references not allowed in naked functions
 
-> > +}
-> > +
-> > +/*
-> > + * clk_divider_scu_round_rate - Round clock rate for a SCU clock
-> > + * @hw: clock to round rate for
-> > + * @rate: rate to round
-> > + * @parent_rate: parent rate provided by common clock framework
-> > + *
-> > + * Round clock rate for a SCU clock according to parent rate  */
-> > +static long clk_divider_gpr_scu_round_rate(struct clk_hw *hw, unsigned
-> long rate,
-> > +                                          unsigned long *prate) {
-> > +       if (rate < *prate)
-> > +               rate = *prate / 2;
-> > +       else
-> > +               rate = *prate;
-> > +
-> > +       return rate;
-> > +}
-> > +
-> > +/*
-> > + * clk_divider_scu_set_rate - Set rate for a SCU clock
-> > + * @hw: clock to change rate for
-> > + * @rate: target rate for the clock
-> > + * @parent_rate: rate of the clock parent
-> > + *
-> > + * Sets a clock frequency for a SCU clock. Returns the SCU
-> > + * protocol status.
-> > + */
-> > +static int clk_divider_gpr_scu_set_rate(struct clk_hw *hw, unsigned long
-> rate,
-> > +                                       unsigned long parent_rate) {
-> > +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-> > +       uint32_t val;
-> > +
-> > +       val = (rate < parent_rate) ? 1 : 0;
-> 
-> Nitpick: Write it out as
-> 
-> 	val = 0;
-> 	if (rate < parent_rate)
-> 		val = 1;
-> 
+The constraints were originally added in commit 9a40ac86152c ("ARM:
+6164/1: Add kto and kfrom to input operands list.") as a gcc-4.5
+workaround. Another workaround for the same problem was added in commit
+9c695203a7dd ("compiler-gcc.h: gcc-4.5 needs noclone and noinline
+on __naked functions") and should have obsoleted the first one. That
+workaroud was subsequently reverted in commit d124b44f09ca ("Compiler
+Attributes: naked was fixed in gcc 4.6") as we raised the minimum compiler
+level to gcc-4.6.
 
-Good suggestion
+Remove the extraneous references and use the register numbers
+consistently as required by clang.
 
-> > +
-> > +       return imx_sc_misc_set_control(ccm_ipc_handle, clk->rsrc_id,
-> > +                                      clk->gpr_id, val); }
-> > +
-> > +static const struct clk_ops clk_divider_gpr_scu_ops = {
-> > +       .recalc_rate = clk_divider_gpr_scu_recalc_rate,
-> > +       .round_rate = clk_divider_gpr_scu_round_rate,
-> > +       .set_rate = clk_divider_gpr_scu_set_rate, };
-> > +
-> > +struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char
-> *parent_name,
-> > +                                      u32 rsrc_id, u8 gpr_id) {
-> > +       struct clk_divider_gpr_scu *div;
-> > +       struct clk_init_data init;
-> > +       struct clk_hw *hw;
-> > +       int ret;
-> > +
-> > +       div = kzalloc(sizeof(*div), GFP_KERNEL);
-> > +       if (!div)
-> > +               return ERR_PTR(-ENOMEM);
-> > +
-> > +       div->rsrc_id = rsrc_id;
-> > +       div->gpr_id = gpr_id;
-> > +
-> > +       init.name = name;
-> > +       init.ops = &clk_divider_gpr_scu_ops;
-> > +       init.flags = CLK_GET_RATE_NOCACHE;
-> 
-> Same NOCACHE comment.
-> 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I've used this on my randconfig build setup, and it makes all
+configurations build without warnings, but I have not done
+any runtime testing on it.
+---
+ arch/arm/mm/copypage-feroceon.c |  4 ++--
+ arch/arm/mm/copypage-v4mc.c     | 26 +++++++++++++-------------
+ arch/arm/mm/copypage-v4wb.c     |  4 ++--
+ arch/arm/mm/copypage-v4wt.c     |  4 ++--
+ arch/arm/mm/copypage-xsc3.c     |  6 +++---
+ arch/arm/mm/copypage-xscale.c   |  4 ++--
+ 6 files changed, 24 insertions(+), 24 deletions(-)
 
-Replied in another mail.
-
-Regards
-Dong Aisheng
-
-> > +       init.parent_names = parent_name ? &parent_name : NULL;
-> > +       init.num_parents = parent_name ? 1 : 0;
-> > +
-> > +       div->hw.init = &init;
-> > +
-> > +       hw = &div->hw;
-> > +       ret = clk_hw_register(NULL, hw);
-> > +       if (ret) {
-> > +               kfree(div);
-> > +               hw = ERR_PTR(ret);
-> > +       }
-> > +
-> > +       return hw;
-> > +}
+diff --git a/arch/arm/mm/copypage-feroceon.c b/arch/arm/mm/copypage-feroceon.c
+index 49ee0c1a7209..e69bf2f15f32 100644
+--- a/arch/arm/mm/copypage-feroceon.c
++++ b/arch/arm/mm/copypage-feroceon.c
+@@ -18,7 +18,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4-r9, lr}		\n\
+-	mov	ip, %2				\n\
++	mov	ip, %0				\n\
+ 1:	mov	lr, r1				\n\
+ 	ldmia	r1!, {r2 - r9}			\n\
+ 	pld	[lr, #32]			\n\
+@@ -64,7 +64,7 @@ feroceon_copy_user_page(void *kto, const void *kfrom)
+ 	mcr	p15, 0, ip, c7, c10, 4		@ drain WB\n\
+ 	ldmfd	sp!, {r4-r9, pc}"
+ 	:
+-	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE));
++	: "I" (PAGE_SIZE));
+ }
+ 
+ void feroceon_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-v4mc.c b/arch/arm/mm/copypage-v4mc.c
+index 0224416cba3c..5c70e48ad833 100644
+--- a/arch/arm/mm/copypage-v4mc.c
++++ b/arch/arm/mm/copypage-v4mc.c
+@@ -45,23 +45,23 @@ mc_copy_user_page(void *from, void *to)
+ {
+ 	asm volatile(
+ 	"stmfd	sp!, {r4, lr}			@ 2\n\
+-	mov	r4, %2				@ 1\n\
+-	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
+-1:	mcr	p15, 0, %1, c7, c6, 1		@ 1   invalidate D line\n\
+-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+-	ldmia	%0!, {r2, r3, ip, lr}		@ 4+1\n\
+-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+-	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
+-	mcr	p15, 0, %1, c7, c6, 1		@ 1   invalidate D line\n\
+-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+-	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
++	mov	r4, %0				@ 1\n\
++	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
++1:	mcr	p15, 0, r1, c7, c6, 1		@ 1   invalidate D line\n\
++	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
++	ldmia	r0!, {r2, r3, ip, lr}		@ 4+1\n\
++	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
++	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
++	mcr	p15, 0, r1, c7, c6, 1		@ 1   invalidate D line\n\
++	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
++	ldmia	r0!, {r2, r3, ip, lr}		@ 4\n\
+ 	subs	r4, r4, #1			@ 1\n\
+-	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
+-	ldmneia	%0!, {r2, r3, ip, lr}		@ 4\n\
++	stmia	r1!, {r2, r3, ip, lr}		@ 4\n\
++	ldmneia	r0!, {r2, r3, ip, lr}		@ 4\n\
+ 	bne	1b				@ 1\n\
+ 	ldmfd	sp!, {r4, pc}			@ 3"
+ 	:
+-	: "r" (from), "r" (to), "I" (PAGE_SIZE / 64));
++	: "I" (PAGE_SIZE / 64));
+ }
+ 
+ void v4_mc_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-v4wb.c b/arch/arm/mm/copypage-v4wb.c
+index 067d0fdd630c..7ea9cf07bd5c 100644
+--- a/arch/arm/mm/copypage-v4wb.c
++++ b/arch/arm/mm/copypage-v4wb.c
+@@ -27,7 +27,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4, lr}			@ 2\n\
+-	mov	r2, %2				@ 1\n\
++	mov	r2, %0				@ 1\n\
+ 	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
+ 1:	mcr	p15, 0, r0, c7, c6, 1		@ 1   invalidate D line\n\
+ 	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
+@@ -44,7 +44,7 @@ v4wb_copy_user_page(void *kto, const void *kfrom)
+ 	mcr	p15, 0, r1, c7, c10, 4		@ 1   drain WB\n\
+ 	ldmfd	 sp!, {r4, pc}			@ 3"
+ 	:
+-	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
++	: "I" (PAGE_SIZE / 64));
+ }
+ 
+ void v4wb_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-v4wt.c b/arch/arm/mm/copypage-v4wt.c
+index b85c5da2e510..c742ab24efd6 100644
+--- a/arch/arm/mm/copypage-v4wt.c
++++ b/arch/arm/mm/copypage-v4wt.c
+@@ -25,7 +25,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4, lr}			@ 2\n\
+-	mov	r2, %2				@ 1\n\
++	mov	r2, %0				@ 1\n\
+ 	ldmia	r1!, {r3, r4, ip, lr}		@ 4\n\
+ 1:	stmia	r0!, {r3, r4, ip, lr}		@ 4\n\
+ 	ldmia	r1!, {r3, r4, ip, lr}		@ 4+1\n\
+@@ -40,7 +40,7 @@ v4wt_copy_user_page(void *kto, const void *kfrom)
+ 	mcr	p15, 0, r2, c7, c7, 0		@ flush ID cache\n\
+ 	ldmfd	sp!, {r4, pc}			@ 3"
+ 	:
+-	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64));
++	: "I" (PAGE_SIZE / 64));
+ }
+ 
+ void v4wt_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-xsc3.c b/arch/arm/mm/copypage-xsc3.c
+index 03a2042aced5..9944bdb4721d 100644
+--- a/arch/arm/mm/copypage-xsc3.c
++++ b/arch/arm/mm/copypage-xsc3.c
+@@ -34,8 +34,8 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
+ {
+ 	asm("\
+ 	stmfd	sp!, {r4, r5, lr}		\n\
+-	mov	lr, %2				\n\
+-						\n\
++	mov	lr, %0				\n\
++					\n\
+ 	pld	[r1, #0]			\n\
+ 	pld	[r1, #32]			\n\
+ 1:	pld	[r1, #64]			\n\
+@@ -67,7 +67,7 @@ xsc3_mc_copy_user_page(void *kto, const void *kfrom)
+ 						\n\
+ 	ldmfd	sp!, {r4, r5, pc}"
+ 	:
+-	: "r" (kto), "r" (kfrom), "I" (PAGE_SIZE / 64 - 1));
++	: "I" (PAGE_SIZE / 64 - 1));
+ }
+ 
+ void xsc3_mc_copy_user_highpage(struct page *to, struct page *from,
+diff --git a/arch/arm/mm/copypage-xscale.c b/arch/arm/mm/copypage-xscale.c
+index 97972379f4d6..ef52a052d9bb 100644
+--- a/arch/arm/mm/copypage-xscale.c
++++ b/arch/arm/mm/copypage-xscale.c
+@@ -45,7 +45,7 @@ mc_copy_user_page(void *from, void *to)
+ 	 */
+ 	asm volatile(
+ 	"stmfd	sp!, {r4, r5, lr}		\n\
+-	mov	lr, %2				\n\
++	mov	lr, %0				\n\
+ 	pld	[r0, #0]			\n\
+ 	pld	[r0, #32]			\n\
+ 	pld	[r1, #0]			\n\
+@@ -81,7 +81,7 @@ mc_copy_user_page(void *from, void *to)
+ 	beq	2b				\n\
+ 	ldmfd	sp!, {r4, r5, pc}		"
+ 	:
+-	: "r" (from), "r" (to), "I" (PAGE_SIZE / 64 - 1));
++	: "I" (PAGE_SIZE / 64 - 1));
+ }
+ 
+ void xscale_mc_copy_user_highpage(struct page *to, struct page *from,
+-- 
+2.18.0
