@@ -1,132 +1,117 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 09:05:51 -0700
-Subject: [PATCH V4 03/11] clk: imx: scu: add scu clock divider
-In-Reply-To: <AM0PR04MB42114436952826801D15BA3E80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-4-git-send-email-aisheng.dong@nxp.com>
- <153972518358.5275.8551722631185725008@swboyd.mtv.corp.google.com>
- <AM0PR04MB42111D180BE6D7557F71D15380FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <153978942538.5275.15892434593141965554@swboyd.mtv.corp.google.com>
- <AM0PR04MB42114436952826801D15BA3E80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <153979235107.5275.17099119584473464472@swboyd.mtv.corp.google.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Oct 2018 17:30:18 +0100
+Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
+ SPIs
+In-Reply-To: <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
+References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
+ <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
+Message-ID: <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-10-17 08:45:05)
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd at kernel.org]
-> > Sent: Wednesday, October 17, 2018 11:17 PM
-> > Quoting A.s. Dong (2018-10-17 01:56:35)
-> > > > From: Stephen Boyd [mailto:sboyd at kernel.org]
-> > > > Sent: Wednesday, October 17, 2018 5:26 AM Quoting A.s. Dong
-> > > > (2018-10-14 01:07:49)
-> > >
-> > > How about do something like below?
-> > > struct req_get_clock_rate {
-> > >         u16 resource;
-> > >         u8 clk;
-> > > } __packed;
-> > >
-> > > struct resp_get_clock_rate {
-> > >         u32 rate;
-> > > } __packed;
-> > 
-> > This doesn't need __packed because it's a single u32.
-> > 
+On 16/10/18 10:15, Yang Yingliang wrote:
+> Now with
+> 5052875 ("irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller"),
+> we can support MBIGEN to generate message based SPIs by writing GICD_SETSPIR.
 > 
-> It's a safe writing, but yes, can be removed.
+> The first 64-pins of each MBIGEN chip is used to generate SPIs, and each
+> MBIGEN chip has several MBIGEN nodes, every node has 128 pins for generating
+> LPIs. The total pins are: 64(SPIs) + 128 * node_nr(LPIs). So we can translate
+> the pin index in a unified way in mbigen_domain_translate().
 > 
-> > >
-> > > struct imx_sc_msg_get_clock_rate {
-> > >         struct imx_sc_rpc_msg hdr;
-> > >         union {
-> > >                 struct req_get_clock_rate req;
-> > >                 struct resp_get_clock_rate resp;
-> > >         } data;
-> > > } __packed;
-> > >
-> > 
-> > Yes something like this would be best. And now I wonder if
-> > imx_scu_call_rpc() is doing endianness swapping? Or does it copy data into
-> > these response structures? I'm saying that the u32/16/8 may need to be
-> > __le32/16/8 and then have the proper accessors.
-> > 
+> Also Add TYPE and VEC registers that used by generating SPIs, the driver can
+> access them when MBIGEN is used to generate SPIs.
 > 
-> No endianness swapping. It's fixed little endian.
-> SCU protocol isn't aware of these structures. The structures are defined
-> according to SCU protocol definition to make sure each field position and size
-> are correct. Then SCU IPC driver just send and receive them sequentially.
-> Client driver uses the structures to retrieve the responding filed values.
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> ---
+>  drivers/irqchip/irq-mbigen.c | 21 +++++++++++++++++++--
+>  1 file changed, 19 insertions(+), 2 deletions(-)
 > 
-> We do this like drivers/firmware/ti_sci.h
-> Do you think we still need specify __le32/16/8 for this case?
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index f05998f..37c1932 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -48,6 +48,7 @@
+>  #define MBIGEN_NODE_OFFSET		0x1000
+>  
+>  /* offset of vector register in mbigen node */
+> +#define REG_MBIGEN_SPI_VEC_OFFSET	0x500
+>  #define REG_MBIGEN_LPI_VEC_OFFSET	0x200
+>  
+>  /**
+> @@ -62,6 +63,7 @@
+>   * This register is used to configure interrupt
+>   * trigger type
+>   */
+> +#define REG_MBIGEN_SPI_TYPE_OFFSET	0x400
+>  #define REG_MBIGEN_LPI_TYPE_OFFSET	0x0
+>  
+>  /**
+> @@ -79,6 +81,9 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
+>  {
+>  	unsigned int nid, pin;
+>  
+> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP)
+> +		return (hwirq * 4 + REG_MBIGEN_SPI_VEC_OFFSET);
+> +
+>  	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
+>  	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
+>  	pin = hwirq % IRQS_PER_MBIGEN_NODE;
+> @@ -92,6 +97,13 @@ static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
+>  {
+>  	unsigned int nid, irq_ofst, ofst;
+>  
+> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
+> +		*mask = 1 << (hwirq % 32);
+> +		ofst = hwirq / 32 * 4;
+> +		*addr = ofst + REG_MBIGEN_SPI_TYPE_OFFSET;
+> +		return;
+> +	}
+> +
+>  	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
+>  	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
+>  	irq_ofst = hwirq % IRQS_PER_MBIGEN_NODE;
+> @@ -162,6 +174,12 @@ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+>  	u32 val;
+>  
+>  	base += get_mbigen_vec_reg(d->hwirq);
+> +
+> +	if (d->hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
+> +		writel_relaxed(msg->data, base);
+> +		return;
+> +	}
 
-Probably, because the CPU in linux could be big endian or little endian.
-It doesn't hurt to do it right to begin with and then you get the
-support for free if it's ever used later on.
+How is the GICD_SETSPI_NSR base address programmed if you're ignoring
+the address stored in the message?
 
-> 
-> > >
-> > > > > +       hdr->size = 3;
-> > > > > +
-> > > > > +       msg.rate = rate;
-> > > > > +       msg.resource = div->rsrc_id;
-> > > > > +       msg.clk = div->clk_type;
-> > > > > +
-> > > > > +       ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
-> > > > > +       if (ret)
-> > > > > +               pr_err("%s: failed to set clock rate %ld : ret %d\n",
-> > > > > +                       clk_hw_get_name(hw), rate, ret);
-> > > > > +
-> > > > > +       return 0;
-> > > > > +}
-> > > > > +
-> > > > > +static const struct clk_ops clk_divider_scu_ops = {
-> > > > > +       .recalc_rate = clk_divider_scu_recalc_rate,
-> > > > > +       .round_rate = clk_divider_scu_round_rate,
-> > > > > +       .set_rate = clk_divider_scu_set_rate, };
-> > > > > +
-> > > > > +struct clk_hw *imx_clk_register_divider_scu(const char *name,
-> > > > > +                                           const char
-> > > > *parent_name,
-> > > > > +                                           u32 rsrc_id,
-> > > > > +                                           u8 clk_type) {
-> > > > > +       struct clk_divider_scu *div;
-> > > > > +       struct clk_init_data init;
-> > > > > +       struct clk_hw *hw;
-> > > > > +       int ret;
-> > > > > +
-> > > > > +       div = kzalloc(sizeof(*div), GFP_KERNEL);
-> > > > > +       if (!div)
-> > > > > +               return ERR_PTR(-ENOMEM);
-> > > > > +
-> > > > > +       div->rsrc_id = rsrc_id;
-> > > > > +       div->clk_type = clk_type;
-> > > > > +
-> > > > > +       init.name = name;
-> > > > > +       init.ops = &clk_divider_scu_ops;
-> > > > > +       init.flags = CLK_GET_RATE_NOCACHE;
-> > > >
-> > > > Why nocache? Please have a good reason and add a comment indicating
-> > why.
-> > > >
-> > >
-> > > Because on MX8, the clocks are tightly couple with power domain that
-> > > once the power domain is off, the clock status will be lost.
-> > > Making it NOCACHE helps user to retrieve the real clock status from HW
-> > > Instead of using the possible invalid cached rate.
-> > >
-> > > Is that reasonable enough to specify it?
-> > 
-> > Yes, you can add a comment like that. Or the clk rate can be restored when the
-> > power domain is enabled again?
-> 
-> No restore when power domain is enabled again. That needs driver to do special
-> handling. 
-> 
-> Can we add the comment in commit message as there're still many other places
-> using this?
+How do you deal with level interrupts, as you don't seem to use the
+level MSI framework either?
+
+> +
+>  	val = readl_relaxed(base);
+>  
+>  	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
+> @@ -182,8 +200,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+>  		if (fwspec->param_count != 2)
+>  			return -EINVAL;
+>  
+> -		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
+> -			(fwspec->param[0] < SPI_NUM_PER_MBIGEN_CHIP))
+> +		if (fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM)
+>  			return -EINVAL;
+>  		else
+>  			*hwirq = fwspec->param[0];
 > 
 
-Sure. Please also add the comment into the code so we don't have to dig
-it out of commit text.
+Now, the biggest question of them all: how does it work with ACPI? Last
+time I checked, there was no DT support for platforms using the MBIGEN.
+
+My gut feeling is that it would be so much better if the SPIs generated
+by the MBIGEN were configured in firmware, and the devices behind it
+would just describe the corresponding SPI...
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
