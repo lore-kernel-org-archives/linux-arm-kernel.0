@@ -1,107 +1,154 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 17 Oct 2018 15:22:05 +0200
-Subject: [PATCH v3 1/4] driver core: add probe_err log helper
-In-Reply-To: <CAHp75Vd1JQVx96FLEtTO7a7-OBaC1nUKcoSk4S6wvO6BtjJ-3w@mail.gmail.com>
-References: <CAHp75Vd1JQVx96FLEtTO7a7-OBaC1nUKcoSk4S6wvO6BtjJ-3w@mail.gmail.com>
- <CGME20181017132209eucas1p1d23615adc15663caaffb3c117dc61151@eucas1p1.samsung.com>
-Message-ID: <20181017132205.5204-1-a.hajda@samsung.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 17 Oct 2018 08:22:51 -0500
+Subject: [PATCH v9 2/9] PCI: Using PCI configuration space header type
+ instead of class type to assign resource
+In-Reply-To: <20181016145355.GB16390@e107981-ln.cambridge.arm.com>
+References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
+ <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
+ <20181016145355.GB16390@e107981-ln.cambridge.arm.com>
+Message-ID: <20181017132251.GG5906@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During probe every time driver gets resource it should usually check for error
-printk some message if it is not -EPROBE_DEFER and return the error. This
-pattern is simple but requires adding few lines after any resource acquisition
-code, as a result it is often omited or implemented only partially.
-probe_err helps to replace such code sequences with simple call, so code:
-	if (err != -EPROBE_DEFER)
-		dev_err(dev, ...);
-	return err;
-becomes:
-	return probe_err(dev, err, ...);
+On Tue, Oct 16, 2018 at 03:53:55PM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Oct 16, 2018 at 06:44:43PM +0800, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > 
+> > The PCI configuration space header type defines the layout of the rest
+> > of the header (PCI r3.0 sec 6.1, PCIe r4.0 sec 7.5.1.1.9) while the
+> > resource assignment is based on the configuration space layout instead
+> > of its class type. Using configuration space header type instead of
+> > class type for the resource assignment.
+> > 
+> > Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > ---
+> >  drivers/pci/pci.c       |  3 +--
+> >  drivers/pci/probe.c     |  3 ---
+> >  drivers/pci/setup-bus.c | 20 ++++++++++----------
+> >  3 files changed, 11 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > index 29ff961..7d379ca 100644
+> > --- a/drivers/pci/pci.c
+> > +++ b/drivers/pci/pci.c
+> > @@ -5908,8 +5908,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
+> >  	 * to enable the kernel to reassign new resource
+> >  	 * window later on.
+> >  	 */
+> > -	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
+> > -	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
+> > +	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
+> >  		for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
+> >  			r = &dev->resource[i];
+> >  			if (!(r->flags & IORESOURCE_MEM))
+> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > index ec78400..29a35c1 100644
+> > --- a/drivers/pci/probe.c
+> > +++ b/drivers/pci/probe.c
+> > @@ -1695,9 +1695,6 @@ int pci_setup_device(struct pci_dev *dev)
+> >  		break;
+> >  
+> >  	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
+> > -		if (class != PCI_CLASS_BRIDGE_PCI)
+> > -			goto bad;
+> > -
+> >  		/*
+> >  		 * The PCI-to-PCI bridge spec requires that subtractive
+> >  		 * decoding (i.e. transparent) bridge must have programming
+> > diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+> > index 79b1824..69f90f4 100644
+> > --- a/drivers/pci/setup-bus.c
+> > +++ b/drivers/pci/setup-bus.c
+> > @@ -182,7 +182,7 @@ static void __dev_sort_resources(struct pci_dev *dev,
+> >  	u16 class = dev->class >> 8;
+> >  
+> >  	/* Don't touch classless devices or host bridges or ioapics.  */
+> > -	if (class == PCI_CLASS_NOT_DEFINED || class == PCI_CLASS_BRIDGE_HOST)
+> > +	if (class == PCI_CLASS_NOT_DEFINED)
+> 
+> I think this check has been there since the first initial git commit,
+> whether that's _really_ needed or not in the current kernel it is very
+> hard to say.
+> 
+> I am not that sure it is safe to remove it, especially given that we are at
+> -rc8 and close to a release, it would be good if this patch could sit in
+> next to give it some exposure to testing before merging it upstream.
 
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javierm@redhat.com>
-Reviewed-by: Mark Brown <broonie@kernel.org>
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
----
-v3:
-  - added 'extern __printf(3, 4)' decorators to probe_err,
-  - changed error logging format - newline at the end,
-  - added empty lines in probe_err around dev_err,
-  - added R-b by Mark and Andy.
-v2:
-  - added error value to log message,
-  - fixed code style,
-  - added EXPORT_SYMBOL_GPL,
-  - Added R-B by Javier (I hope the changes did not invalidate it).
----
- drivers/base/core.c    | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/device.h |  3 +++
- 2 files changed, 42 insertions(+)
+Yes, you're right; I think I think this is a little too risky at this
+point.  I'll pull this patch out and queue it up for the next cycle
+(v4.21).
 
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index 04bbcd779e11..1f3e99c2ef03 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -3067,6 +3067,45 @@ define_dev_printk_level(_dev_info, KERN_INFO);
- 
- #endif
- 
-+/**
-+ * probe_err - probe error check and log helper
-+ * @dev: the pointer to the struct device
-+ * @err: error value to test
-+ * @fmt: printf-style format string
-+ * @...: arguments as specified in the format string
-+ *
-+ * This helper implements common pattern present in probe functions for error
-+ * checking: print message if the error is not -EPROBE_DEFER and propagate it.
-+ * It replaces code sequence:
-+ * 	if (err != -EPROBE_DEFER)
-+ * 		dev_err(dev, ...);
-+ * 	return err;
-+ * with
-+ * 	return probe_err(dev, err, ...);
-+ *
-+ * Returns @err.
-+ *
-+ */
-+int probe_err(const struct device *dev, int err, const char *fmt, ...)
-+{
-+	struct va_format vaf;
-+	va_list args;
-+
-+	if (err == -EPROBE_DEFER)
-+		return err;
-+
-+	va_start(args, fmt);
-+	vaf.fmt = fmt;
-+	vaf.va = &args;
-+
-+	dev_err(dev, "error %d: %pV", err, &vaf);
-+
-+	va_end(args);
-+
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(probe_err);
-+
- static inline bool fwnode_is_primary(struct fwnode_handle *fwnode)
- {
- 	return fwnode && !IS_ERR(fwnode->secondary);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 90224e75ade4..6831677d5278 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -1577,6 +1577,9 @@ do {									\
- 	WARN_ONCE(condition, "%s %s: " format, \
- 			dev_driver_string(dev), dev_name(dev), ## arg)
- 
-+extern __printf(3, 4)
-+int probe_err(const struct device *dev, int err, const char *fmt, ...);
-+
- /* Create alias, so I can be autoloaded. */
- #define MODULE_ALIAS_CHARDEV(major,minor) \
- 	MODULE_ALIAS("char-major-" __stringify(major) "-" __stringify(minor))
--- 
-2.18.0
+For v4.20, I think you should resurrect the class code patch [1].  That
+should be enough to make things work in v4.20, even without this hdr_type
+patch.  It will also improve the lspci output, because I think it uses the
+class code to look up the generic description, e.g., in this output:
+
+  00:1c.0 PCI bridge: Intel Corporation Sunrise Point-LP PCI Express Root Port (rev f1)
+
+I think the "PCI bridge" part is based on the class code.
+
+Bjorn
+
+[1] https://lore.kernel.org/linux-pci/1539590940-13355-3-git-send-email-honghui.zhang at mediatek.com
+
+> >  		return;
+> >  
+> >  	/* Don't touch ioapic devices already enabled by firmware */
+> > @@ -1221,12 +1221,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
+> >  		if (!b)
+> >  			continue;
+> >  
+> > -		switch (dev->class >> 8) {
+> > -		case PCI_CLASS_BRIDGE_CARDBUS:
+> > +		switch (dev->hdr_type) {
+> > +		case PCI_HEADER_TYPE_CARDBUS:
+> >  			pci_bus_size_cardbus(b, realloc_head);
+> >  			break;
+> >  
+> > -		case PCI_CLASS_BRIDGE_PCI:
+> > +		case PCI_HEADER_TYPE_BRIDGE:
+> >  		default:
+> >  			__pci_bus_size_bridges(b, realloc_head);
+> >  			break;
+> > @@ -1237,12 +1237,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
+> >  	if (pci_is_root_bus(bus))
+> >  		return;
+> >  
+> > -	switch (bus->self->class >> 8) {
+> > -	case PCI_CLASS_BRIDGE_CARDBUS:
+> > +	switch (bus->self->hdr_type) {
+> > +	case PCI_HEADER_TYPE_CARDBUS:
+> >  		/* don't size cardbuses yet. */
+> >  		break;
+> >  
+> > -	case PCI_CLASS_BRIDGE_PCI:
+> > +	case PCI_HEADER_TYPE_BRIDGE:
+> >  		pci_bridge_check_ranges(bus);
+> >  		if (bus->self->is_hotplug_bridge) {
+> >  			additional_io_size  = pci_hotplug_io_size;
+> > @@ -1391,13 +1391,13 @@ void __pci_bus_assign_resources(const struct pci_bus *bus,
+> >  
+> >  		__pci_bus_assign_resources(b, realloc_head, fail_head);
+> >  
+> > -		switch (dev->class >> 8) {
+> > -		case PCI_CLASS_BRIDGE_PCI:
+> > +		switch (dev->hdr_type) {
+> > +		case PCI_HEADER_TYPE_BRIDGE:
+> >  			if (!pci_is_enabled(dev))
+> >  				pci_setup_bridge(b);
+> >  			break;
+> >  
+> > -		case PCI_CLASS_BRIDGE_CARDBUS:
+> > +		case PCI_HEADER_TYPE_CARDBUS:
+> >  			pci_setup_cardbus(b);
+> >  			break;
+> >  
+> > -- 
+> > 2.6.4
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
