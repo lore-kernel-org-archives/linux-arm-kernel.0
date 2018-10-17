@@ -1,56 +1,46 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Oct 2018 15:41:53 +0200
-Subject: [PATCH v3 0/6] Proper arch timer support for Exynos5433-based
- TM2(e) boards
-References: <CGME20181017134204eucas1p10d92a91f2b945afdc7b39ce6e7813a8e@eucas1p1.samsung.com>
-Message-ID: <20181017134159.9656-1-m.szyprowski@samsung.com>
+Date: Wed, 17 Oct 2018 15:41:57 +0200
+Subject: [PATCH v3 4/6] clocksource: exynos_mct: Add arch_timer cooperation
+ mode for ARM64
+In-Reply-To: <20181017134159.9656-1-m.szyprowski@samsung.com>
+References: <20181017134159.9656-1-m.szyprowski@samsung.com>
+ <CGME20181017134207eucas1p1b938eefe31fc47baaf538c9ebafc1a7e@eucas1p1.samsung.com>
+Message-ID: <20181017134159.9656-5-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+To get ARM Architected Timers working on Samsung Exynos SoCs, one has to
+first configure and enable Exynos Multi-Core Timer, because they both
+share some common hardware blocks (global system counter). This patch
+adds a mode of cooperation with arch_timer driver, so kernel can use
+CP15 based timer interface via arch_timer driver, which is mandatory
+on ARM64. In such mode MCT driver only enables its clocks and starts
+global timer. Everything else will be handled by arch_timer driver.
 
-This patchset is an attempt to submit the last piece of missing code
-to have proper support for Exynos5433 SoCs based TM2(e) boards. It
-performs a cleanup of timer configuration, which so far needed various
-out-of-tree workarounds. The fixes provided by this patchset are also
-needed for add proper support for system suspend/resume.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/clocksource/exynos_mct.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-
-Changelog:
-
-v3:
-- added patch, which splits resources and interrupts allocation
-- simplified arch timer cooperation mode
-- dropped CPU hotplug priority change patch, it is not really needed
-- removed more non-dt dead code
-
-v2:
-- dropped arch timer patch, it will be discussed separately
-- fixed issues pointed by Krzysztof Kozlowski
-
-v1: https://patchwork.kernel.org/project/linux-samsung-soc/list/?series=27965&state=*&archive=both
-- initial version
-
-
-Patch summary:
-
-Marek Szyprowski (6):
-  clocksource: exynos_mct: Remove dead code
-  clocksource: exynos_mct: Fix error path in timer resources
-    initialization
-  clocksource: exynos_mct: Refactor resources allocation
-  clocksource: exynos_mct: Add arch_timer cooperation mode for ARM64
-  arm64: dts: exynos: Move arch-timer node to right place
-  arm64: platform: Add enable Exynos Multi-Core Timer driver
-
- arch/arm64/Kconfig.platforms               |  1 +
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 23 +++---
- drivers/clocksource/exynos_mct.c           | 81 ++++++++++++++--------
- 3 files changed, 67 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 02ad55db390b..1b19a4f03929 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -606,6 +606,15 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
+ 	if (ret)
+ 		return ret;
+ 
++	if (IS_ENABLED(CONFIG_ARM64) && IS_ENABLED(CONFIG_ARM_ARCH_TIMER)) {
++		struct device_node *np = of_find_compatible_node(NULL, NULL,
++							     "arm,armv8-timer");
++		if (np) {
++			of_node_put(np);
++			exynos4_mct_frc_start();
++			return 0;
++		}
++	}
+ 
+ 	ret = exynos4_timer_interrupts(np, int_type);
+ 	if (ret)
 -- 
 2.17.1
