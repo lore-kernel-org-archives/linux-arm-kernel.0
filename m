@@ -1,28 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 17 Oct 2018 10:02:41 -0300
-Subject: [PATCH v4 2/4] crypto: mxs-dcp - Add support for dcp clk
-In-Reply-To: <a97517bf72f649915bccf555ab7d3c8c4551298d.camel@nxp.com>
-References: <cover.1539779579.git.leonard.crestez@nxp.com>
- <95dce7010676581691b1ac9906e9298470e0aa1a.1539779579.git.leonard.crestez@nxp.com>
- <CAOMZO5BMeHjsyZWhUb5RmEBRCYViUN-Vx8KyLBWtDJGKBHHpCg@mail.gmail.com>
- <a97517bf72f649915bccf555ab7d3c8c4551298d.camel@nxp.com>
-Message-ID: <CAOMZO5DCzM_NnqD4tHTAn4pAaUdQGo38Ami1h3pu9SzgyQ7GnQ@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 17 Oct 2018 15:03:44 +0200
+Subject: Clock configuration for the SAMA5D2 NAND controller
+In-Reply-To: <CAGkQfmOOv41vwYtt3rjgC6SmXOkAdASvjWt+YWAksGo-4HqvpQ@mail.gmail.com>
+References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+ <20181017143849.1240d9bb@bbrezillon>
+ <CAGkQfmOOv41vwYtt3rjgC6SmXOkAdASvjWt+YWAksGo-4HqvpQ@mail.gmail.com>
+Message-ID: <20181017150344.40d687d1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 9:59 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+On Wed, 17 Oct 2018 14:49:27 +0200
+Romain Izard <romain.izard.pro@gmail.com> wrote:
 
-> There is a changelog in the cover letter.
+> Le mer. 17 oct. 2018 ? 14:38, Boris Brezillon
+> <boris.brezillon@bootlin.com> a ?crit :
+> >
+> > Hi Romain,
+> >
+> > On Wed, 10 Oct 2018 19:05:06 +0200
+> > Romain Izard <romain.izard.pro@gmail.com> wrote:
+> >  
+> > > Hello,
+> > >
+> > > While evaluating a new flash memory chip for my product based on a SAMA5D2
+> > > chip, I tried to update my software to use the latest device tree bindings.
+> > >
+> > > Until now, I was using the legacy bindings for the NAND controller, that
+> > > preserved the timings configured by the bootloader in the EBI registers. The
+> > > bindings introduced in Linux 4.13 are used together with the NAND driver to
+> > > reconfigure the timings of the memory interface to match the speed profile
+> > > declared by some NAND components.
+> > >
+> > > However, when comparing the timings in the registers, there was a large
+> > > difference between what I calculated by hand in the past and the values
+> > > configured by the drivers. The difference was in fact a 2 factor.  
+> >
+> > Is it 2 times slower or 2 times faster with the new approach? Is the
+> > new calculation providing a working solution, or do you have data
+> > corruption because of that? Is your NAND ONFI compliant?
+> >  
+> - The number of clock cycles for each configured timing is larger, so the
+> access times are slower.
 
-It did not show up:
-https://lkml.org/lkml/2018/10/17/673
+Okay. When calculating the timings by hand, what was reference freq you
+used? Did you compare it to the clk freq we have when the NAND
+controller driver tweaks the timings?
 
-> This only looks slightly odd in git diff but it's not unrelated.
->
-> I placed clk get/prepare/enable just before stmp_reset_block and made
-> stmp_reset_block print a message and goto err_disable_unprepare_clk on
-> failure instead of just "if (ret) return ret;"
+> - No obvious problem has been observed during my limited testing. It
+> is possible to read and write on the Flash.
 
-Got it! Then it looks fine, thanks:
+That's not surprising if it's running slower than what can actually be
+achieved.
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+> - This is with an ONFI compilant flash, that claims to support timing
+> modes from 0 to 4.
+
+Okay. We don't support EDO modes [1], so mode 4 should be rejected. Did
+you base your hand-made calculation on mode 3 or 4?
+
+[1]https://elixir.bootlin.com/linux/v4.19-rc8/source/drivers/mtd/nand/raw/atmel/nand-controller.c#L1205
