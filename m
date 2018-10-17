@@ -1,63 +1,77 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 17 Oct 2018 13:10:58 +0530
-Subject: [PATCH v2 05/21] PCI: keystone: Remove unused argument from
- ks_dw_pcie_host_init()
+Date: Wed, 17 Oct 2018 13:11:12 +0530
+Subject: [PATCH v2 19/21] PCI: keystone: Add debug error message for all errors
 In-Reply-To: <20181017074114.28239-1-kishon@ti.com>
 References: <20181017074114.28239-1-kishon@ti.com>
-Message-ID: <20181017074114.28239-6-kishon@ti.com>
+Message-ID: <20181017074114.28239-20-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Remove unused "msi_intc_np" argument from
-ks_dw_pcie_host_init().
+commit 025dd3daeda77f61a280da87ae701 ("PCI: keystone: Add error IRQ
+handler") added dev_err() message only for ERR_AXI and ERR_FATAL. Add
+debug error message for ERR_SYS, ERR_NONFATAL, ERR_CORR and ERR_AER here.
+
+While at that avoid using ERR_IRQ_STATUS_RAW and use ERR_IRQ_STATUS
+instead.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone-dw.c | 3 +--
- drivers/pci/controller/dwc/pci-keystone.c    | 2 +-
- drivers/pci/controller/dwc/pci-keystone.h    | 3 +--
- 3 files changed, 3 insertions(+), 5 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 32 ++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/pci/controller/dwc/pci-keystone-dw.c b/drivers/pci/controller/dwc/pci-keystone-dw.c
-index 0682213328e9..4bd6c6e2b177 100644
---- a/drivers/pci/controller/dwc/pci-keystone-dw.c
-+++ b/drivers/pci/controller/dwc/pci-keystone-dw.c
-@@ -439,8 +439,7 @@ void ks_dw_pcie_initiate_link_train(struct keystone_pcie *ks_pcie)
-  * and call dw_pcie_v3_65_host_init() API to initialize the Keystone
-  * PCI host controller.
-  */
--int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
--				struct device_node *msi_intc_np)
-+int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie)
- {
- 	struct dw_pcie *pci = ks_pcie->pci;
- 	struct pcie_port *pp = &pci->pp;
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index aa7e706fc37d..f87ade2de711 100644
+index c0bba7b604fa..e9e646acc2d5 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -341,7 +341,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
- 	}
+@@ -79,7 +79,6 @@
+ #define ERR_SYS		BIT(0)	/* System (fatal, non-fatal, or correctable) */
+ #define ERR_IRQ_ALL	(ERR_AER | ERR_AXI | ERR_CORR | \
+ 			 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
+-#define ERR_FATAL_IRQ	(ERR_FATAL | ERR_AXI)
+ #define ERR_IRQ_STATUS			0x1c4
+ #define ERR_IRQ_ENABLE_SET		0x1c8
+ #define ERR_IRQ_ENABLE_CLR		0x1cc
+@@ -246,18 +245,33 @@ static void ks_pcie_enable_error_irq(struct keystone_pcie *ks_pcie)
  
- 	pp->ops = &keystone_pcie_host_ops;
--	ret = ks_dw_pcie_host_init(ks_pcie, ks_pcie->msi_intc_np);
-+	ret = ks_dw_pcie_host_init(ks_pcie);
- 	if (ret) {
- 		dev_err(dev, "failed to initialize host\n");
- 		return ret;
-diff --git a/drivers/pci/controller/dwc/pci-keystone.h b/drivers/pci/controller/dwc/pci-keystone.h
-index 8a13da391543..4eacc263f157 100644
---- a/drivers/pci/controller/dwc/pci-keystone.h
-+++ b/drivers/pci/controller/dwc/pci-keystone.h
-@@ -41,8 +41,7 @@ void ks_dw_pcie_enable_legacy_irqs(struct keystone_pcie *ks_pcie);
- void ks_dw_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie, int offset);
- void ks_dw_pcie_enable_error_irq(struct keystone_pcie *ks_pcie);
- irqreturn_t ks_dw_pcie_handle_error_irq(struct keystone_pcie *ks_pcie);
--int  ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
--			struct device_node *msi_intc_np);
-+int  ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie);
- int ks_dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 		unsigned int devfn, int where, int size, u32 val);
- int ks_dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ static irqreturn_t ks_pcie_handle_error_irq(struct keystone_pcie *ks_pcie)
+ {
+-	u32 status;
++	u32 reg;
++	struct device *dev = ks_pcie->pci->dev;
+ 
+-	status = ks_pcie_app_readl(ks_pcie, ERR_IRQ_STATUS);
+-	if (!status)
++	reg = ks_pcie_app_readl(ks_pcie, ERR_IRQ_STATUS);
++	if (!reg)
+ 		return IRQ_NONE;
+ 
+-	if (status & ERR_FATAL_IRQ)
+-		dev_err(ks_pcie->pci->dev, "fatal error (status %#010x)\n",
+-			status);
++	if (reg & ERR_SYS)
++		dev_err(dev, "System Error\n");
++
++	if (reg & ERR_FATAL)
++		dev_err(dev, "Fatal Error\n");
++
++	if (reg & ERR_NONFATAL)
++		dev_dbg(dev, "Non Fatal Error\n");
++
++	if (reg & ERR_CORR)
++		dev_dbg(dev, "Correctable Error\n");
++
++	if (reg & ERR_AXI)
++		dev_err(dev, "AXI tag lookup fatal Error\n");
++
++	if (reg & ERR_AER)
++		dev_err(dev, "ECRC Error\n");
++
++	ks_pcie_app_writel(ks_pcie, ERR_IRQ_STATUS, reg);
+ 
+-	/* Ack the IRQ; status bits are RW1C */
+-	ks_pcie_app_writel(ks_pcie, ERR_IRQ_STATUS, status);
+ 	return IRQ_HANDLED;
+ }
+ 
 -- 
 2.17.1
