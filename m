@@ -1,61 +1,80 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 17 Oct 2018 15:03:44 +0200
-Subject: Clock configuration for the SAMA5D2 NAND controller
-In-Reply-To: <CAGkQfmOOv41vwYtt3rjgC6SmXOkAdASvjWt+YWAksGo-4HqvpQ@mail.gmail.com>
-References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
- <20181017143849.1240d9bb@bbrezillon>
- <CAGkQfmOOv41vwYtt3rjgC6SmXOkAdASvjWt+YWAksGo-4HqvpQ@mail.gmail.com>
-Message-ID: <20181017150344.40d687d1@bbrezillon>
+From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
+Date: Wed, 17 Oct 2018 13:10:46 +0000
+Subject: [PATCH] power: reset: at91-reset: enable I-cache for
+ at91sam9260_reset
+In-Reply-To: <CALDOjzhZg3X1y22KE1yw_0ZFjuvaa=3GhEF2iU=KUk6-eRZN2g@mail.gmail.com>
+References: <20181007125815.8392-1-jonas@threetimestwo.org>
+ <80993f04-c8ce-5a71-4f04-7edab5e1857b@microchip.com>
+ <2351196.3BzoFE0xYq@ws-140106>
+ <CALDOjzhZg3X1y22KE1yw_0ZFjuvaa=3GhEF2iU=KUk6-eRZN2g@mail.gmail.com>
+Message-ID: <11b4bcb4-8882-bdd2-c7f7-6a74d0758cbc@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018 14:49:27 +0200
-Romain Izard <romain.izard.pro@gmail.com> wrote:
 
-> Le mer. 17 oct. 2018 ? 14:38, Boris Brezillon
-> <boris.brezillon@bootlin.com> a ?crit :
-> >
-> > Hi Romain,
-> >
-> > On Wed, 10 Oct 2018 19:05:06 +0200
-> > Romain Izard <romain.izard.pro@gmail.com> wrote:
-> >  
-> > > Hello,
-> > >
-> > > While evaluating a new flash memory chip for my product based on a SAMA5D2
-> > > chip, I tried to update my software to use the latest device tree bindings.
-> > >
-> > > Until now, I was using the legacy bindings for the NAND controller, that
-> > > preserved the timings configured by the bootloader in the EBI registers. The
-> > > bindings introduced in Linux 4.13 are used together with the NAND driver to
-> > > reconfigure the timings of the memory interface to match the speed profile
-> > > declared by some NAND components.
-> > >
-> > > However, when comparing the timings in the registers, there was a large
-> > > difference between what I calculated by hand in the past and the values
-> > > configured by the drivers. The difference was in fact a 2 factor.  
-> >
-> > Is it 2 times slower or 2 times faster with the new approach? Is the
-> > new calculation providing a working solution, or do you have data
-> > corruption because of that? Is your NAND ONFI compliant?
-> >  
-> - The number of clock cycles for each configured timing is larger, so the
-> access times are slower.
 
-Okay. When calculating the timings by hand, what was reference freq you
-used? Did you compare it to the clk freq we have when the NAND
-controller driver tweaks the timings?
+On 17.10.2018 15:17, Jonas Danielsson wrote:
+> On Tue, Oct 16, 2018 at 4:52 PM Alexander Stein
+> <alexander.stein@systec-electronic.com> wrote:
+>>
+>> On Tuesday, October 16, 2018, 3:30:24 PM CEST Claudiu.Beznea at microchip.com wrote:
+>>> Hi Jonas,
+>>>
+>>> On 07.10.2018 15:57, Jonas Danielsson wrote:
+>>>> From: Jonas Danielsson <jonas@orbital-systems.com>
+>>>>
+>>>> This fixes a bug where our embedded system (AT91SAM9260 based) would
+>>>> hang at reboot. At the most we managed 16 boot loops without a hang.
+>>>>
+>>>> With this patch applied the problem has not been observed and the board
+>>>> has managed above 250 boot loops.
+>>>>
+>>>> The AT91SAM9260 datasheet tells us that with the instruction cache
+>>>> disabled all instructions are fetched from SDRAM. And we have an errata
+>>>> telling us we must power down the SDRAM before issuing cpu reset.
+>>>>
+>>>> This means we need the instruction cache enabled in at91sam9260_reset()
+>>>> At the moment it is being disabled in cpu_proc_fin() which is called from
+>>>> arch/arm/kernel/reboot.c.
+>>>
+>>> Are you using kexec reboot or implemented hibernate mode on this machine?
+>>> I'm seeing cpu_proc_fin() is called only in case of kexec reboot or
+>>> switching to hibernate mode.
+>>>
+>>> In case of normal reboot (e.g. reboot command) machine_restart() from
+>>> arch/arm/kernel/reboot.c is called. Please correct me if I'm wrong.
+>>
+>> Another location is cpu_reset() aka cpu_arm926_reset() in proc-arm926.S
+>> which also disables I-cache. But I can't track down a callstack
+>> ending there.
+>>
+> 
+> We take the normal path of sys_reboot => kernel_restart => machine_restart ...
+> 
+> I added code to print the c1 register in different paths. And I-cache
+> is enabled.
+> So now I am really confused about why the patch worked.
 
-> - No obvious problem has been observed during my limited testing. It
-> is possible to read and write on the Flash.
+Just saying... maybe your instructions add some delay on the execution path
+and this is why it helps... try to access cp15 co-processor for read and
+write back the value you read without actually to modify it, to see if this
+could be the reason: e.g.:
 
-That's not surprising if it's running slower than what can actually be
-achieved.
+mrc	p15, 0, r0, c1, c0, 0
+orr	r1, r1, #4096		// whatever is in r1, doesn't matter
+mcr	p15, 0, r0, c1, c0, 0
 
-> - This is with an ONFI compilant flash, that claims to support timing
-> modes from 0 to 4.
+Thank you,
+Claudiu Beznea
 
-Okay. We don't support EDO modes [1], so mode 4 should be rejected. Did
-you base your hand-made calculation on mode 3 or 4?
-
-[1]https://elixir.bootlin.com/linux/v4.19-rc8/source/drivers/mtd/nand/raw/atmel/nand-controller.c#L1205
+> 
+>> Best regards,
+>> Alexander
+> 
+> Jonas
+> 
+>>
+>>
+>>
+> 
+> 
