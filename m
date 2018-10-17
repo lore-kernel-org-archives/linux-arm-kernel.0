@@ -1,95 +1,166 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 08:18:47 -0700
-Subject: [PATCH V4 09/11] clk: imx: add common imx_clk_hw_fixed functions
-In-Reply-To: <AM0PR04MB4211AC4095A29F4C49FF7E0180FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-10-git-send-email-aisheng.dong@nxp.com>
- <153972556312.5275.17225594568267875356@swboyd.mtv.corp.google.com>
- <AM0PR04MB4211AC4095A29F4C49FF7E0180FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <153978952755.5275.12107400457792189263@swboyd.mtv.corp.google.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 17 Oct 2018 08:36:26 -0700
+Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown hooks
+ into pm_runtime hooks
+In-Reply-To: <20181017152523.p34t3xani5cnfk3w@flea>
+References: <20181016031141.16259-1-anarsoul@gmail.com>
+ <CA+E=qVci2FVMH7O83Xv9ic_WFvFYyxmPDjp309dFi23XiHYzzQ@mail.gmail.com>
+ <20181017152523.p34t3xani5cnfk3w@flea>
+Message-ID: <6365837.9zzJEACKLf@anarsoul-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-10-17 02:21:57)
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd at kernel.org]
-> > Sent: Wednesday, October 17, 2018 5:33 AM
-> > Quoting A.s. Dong (2018-10-14 01:08:09)
-> > > This may be used by both mmio and scu clks. So let's put it into a
-> > > common file.
-> > >
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > Cc: Stephen Boyd <sboyd@kernel.org>
-> > > Cc: Michael Turquette <mturquette@baylibre.com>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > ---
-> > >  drivers/clk/imx/clk-common.h  | 16 ++++++++++++++++
-> > > drivers/clk/imx/scu/clk-scu.h |  2 ++
-> > >  2 files changed, 18 insertions(+)
-> > >  create mode 100644 drivers/clk/imx/clk-common.h
-> > >
-> > > diff --git a/drivers/clk/imx/clk-common.h
-> > > b/drivers/clk/imx/clk-common.h new file mode 100644 index
-> > > 0000000..e3634a5
-> > > --- /dev/null
-> > > +++ b/drivers/clk/imx/clk-common.h
-> > > @@ -0,0 +1,16 @@
-> > > +/* SPDX-License-Identifier: GPL-2.0+ */
-> > > +/*
-> > > + * Copyright 2018 NXP
-> > > + */
-> > > +
-> > > +#ifndef __IMX_CLK_COMMON_H
-> > > +#define __IMX_CLK_COMMON_H
-> > > +
-> > > +#include <linux/clk-provider.h>
-> > > +
-> > > +static inline struct clk_hw *imx_clk_hw_fixed(const char *name, int
-> > > +rate) {
-> > > +       return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
-> > > +}
+On Wednesday, October 17, 2018 8:25:23 AM PDT Maxime Ripard wrote:
+> On Wed, Oct 17, 2018 at 07:41:55AM -0700, Vasily Khoruzhick wrote:
+> > On Wed, Oct 17, 2018 at 12:45 AM Maxime Ripard
 > > 
-> > Why do we need this wrapper file? 
+> > <maxime.ripard@bootlin.com> wrote:
+> > > On Tue, Oct 16, 2018 at 08:08:41PM -0700, Vasily Khoruzhick wrote:
+> > > > On Tue, Oct 16, 2018 at 12:16 AM Maxime Ripard
+> > > > 
+> > > > <maxime.ripard@bootlin.com> wrote:
+> > > > > On Mon, Oct 15, 2018 at 08:11:41PM -0700, Vasily Khoruzhick wrote:
+> > > > > > startup() and shutdown() hooks are called for both substreams,
+> > > > > > so stopping either substream when another is running breaks the
+> > > > > > latter.
+> > > > > > 
+> > > > > > E.g. playback breaks if capture is stopped when playback is
+> > > > > > running.
+> > > > > > 
+> > > > > > Move code from startup() and shutdown() to resume() and suspend()
+> > > > > > hooks respectively to fix this issue
+> > > > > > 
+> > > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > > > ---
+> > > > > > v2: - rename from "ASoC: sun4i-i2s: don't try to start up
+> > > > > > 
+> > > > > >                  or shut down DAI if it's active"
+> > > > > >     
+> > > > > >     - move code from startup/shutdown hooks into pm_runtime
+> > > > > >  
+> > > > > >  sound/soc/sunxi/sun4i-i2s.c | 61
+> > > > > >  +++++++++++++++----------------------
+> > > > > >  1 file changed, 25 insertions(+), 36 deletions(-)
+> > > > > > 
+> > > > > > diff --git a/sound/soc/sunxi/sun4i-i2s.c
+> > > > > > b/sound/soc/sunxi/sun4i-i2s.c
+> > > > > > index a4aa931ebfae..daa6c08cffbc 100644
+> > > > > > --- a/sound/soc/sunxi/sun4i-i2s.c
+> > > > > > +++ b/sound/soc/sunxi/sun4i-i2s.c
+> > > > > > @@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct
+> > > > > > snd_pcm_substream *substream, int cmd,> > > > > 
+> > > > > >       return 0;
+> > > > > >  
+> > > > > >  }
+> > > > > > 
+> > > > > > -static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+> > > > > > -                          struct snd_soc_dai *dai)
+> > > > > > -{
+> > > > > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > > > > > -
+> > > > > > -     /* Enable the whole hardware block */
+> > > > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > > > -                        SUN4I_I2S_CTRL_GL_EN,
+> > > > > > SUN4I_I2S_CTRL_GL_EN);
+> > > > > > -
+> > > > > > -     /* Enable the first output line */
+> > > > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK,
+> > > > > > -                        SUN4I_I2S_CTRL_SDO_EN(0));
+> > > > > > -
+> > > > > > -
+> > > > > > -     return clk_prepare_enable(i2s->mod_clk);
+> > > > > > -}
+> > > > > > -
+> > > > > > -static void sun4i_i2s_shutdown(struct snd_pcm_substream
+> > > > > > *substream,
+> > > > > > -                            struct snd_soc_dai *dai)
+> > > > > > -{
+> > > > > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > > > > > -
+> > > > > > -     clk_disable_unprepare(i2s->mod_clk);
+> > > > > > -
+> > > > > > -     /* Disable our output lines */
+> > > > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
+> > > > > > -
+> > > > > > -     /* Disable the whole hardware block */
+> > > > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > > > -                        SUN4I_I2S_CTRL_GL_EN, 0);
+> > > > > > -}
+> > > > > > -
+> > > > > > 
+> > > > > >  static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int
+> > > > > >  clk_id,
+> > > > > >  
+> > > > > >                               unsigned int freq, int dir)
+> > > > > >  
+> > > > > >  {
+> > > > > > 
+> > > > > > @@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops
+> > > > > > sun4i_i2s_dai_ops = {> > > > > 
+> > > > > >       .hw_params      = sun4i_i2s_hw_params,
+> > > > > >       .set_fmt        = sun4i_i2s_set_fmt,
+> > > > > >       .set_sysclk     = sun4i_i2s_set_sysclk,
+> > > > > > 
+> > > > > > -     .shutdown       = sun4i_i2s_shutdown,
+> > > > > > -     .startup        = sun4i_i2s_startup,
+> > > > > > 
+> > > > > >       .trigger        = sun4i_i2s_trigger,
+> > > > > >  
+> > > > > >  };
+> > > > > > 
+> > > > > > @@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct
+> > > > > > device *dev)> > > > > 
+> > > > > >               goto err_disable_clk;
+> > > > > >       
+> > > > > >       }
+> > > > > > 
+> > > > > > +     /* Enable the whole hardware block */
+> > > > > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > > > +                        SUN4I_I2S_CTRL_GL_EN,
+> > > > > > SUN4I_I2S_CTRL_GL_EN);
+> > > > > > +
+> > > > > 
+> > > > > So this is definitely needed
+> > > > > 
+> > > > > > +     /* Enable the first output line */
+> > > > > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > > > +                        SUN4I_I2S_CTRL_SDO_EN_MASK,
+> > > > > > +                        SUN4I_I2S_CTRL_SDO_EN(0));
+> > > > > > +
+> > > > > > +     ret = clk_prepare_enable(i2s->mod_clk);
+> > > > > > +     if (ret) {
+> > > > > > +             dev_err(dev, "Failed to enable module clock\n");
+> > > > > > +             goto err_disable_clk;
+> > > > > > +     }
+> > > > > 
+> > > > > But we really don't want to enable the module clock before the
+> > > > > playback / capture actually starts. And I'm guessing it would make
+> > > > > more sense to keep the output enable configuration there as well,
+> > > > > since it's likely that we will have support for it in the future,
+> > > > > and
+> > > > > we'll need additional information from ASoC when we'll do.
+> > > > 
+> > > > Should we go with v1 version of my patch then? I see no reason to
+> > > > shuffle code around if we keep startup() and shutdown() hooks.
+> > > 
+> > > I'd go for something in between. runtime_pm already provides whether
+> > > the device is active or not, so you can just move the
+> > > SUN4I_I2S_CTRL_GL_EN write to the runtime_resume and runtime_suspend
+> > > functions, and that should fix your issue.
+> > 
+> > I still need to guard enabling output line with "if (dai->active)
+> > return", so it doesn't fix the issue unfortunately.
 > 
-> This file clk-common.h is used to put the common bits between legacy clocks and scu clocks.
-> Only imx_clk_hw_fixed() is added in this patch.
-> 
-> > Just call the registration function directly
-> > with the right arguments instead of wrapping them in another function please.
-> 
-> That's legacy way and widely used before in order to save unnecessary parameters
-> for imx clocks.
-> e.g.
-> drivers/clk/imx/clk.h
-> static inline struct clk *imx_clk_fixed(const char *name, int rate)
-> {
->         return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
-> }
-> 
-> static inline struct clk *imx_clk_divider(const char *name, const char *parent,
->                 void __iomem *reg, u8 shift, u8 width)
-> {
->         return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
->                         reg, shift, width, 0, &imx_ccm_lock);
-> }
-> 
-> I can remove it if you dislike it.
-> 
-> Just one question, in later patch, another common function will also be added here:
-> static inline void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count)
-> {
->         unsigned int i;
-> 
->         for (i = 0; i < count; i++) {
->                 if (IS_ERR(clks[i]))
->                         pr_err("i.MX clk %u: register failed with %ld\n",
->                                 i, PTR_ERR(clks[i])); 
->         }
-> }
-> 
-> Should we remove it as well?
-> 
+> Why? The configuration is static, so it probably doesn't change much?
 
-Yes please remove this whole file.
+startup() and shutdown() are called once for each substream, i.e. for capture 
+and playback.
+
+If we start playback and capture and the stop either we end up with calling 
+startup() twice and then shutdown() once. Since it disables I2S output it 
+breaks substream that is still working.
+
+> 
+> Maxime
