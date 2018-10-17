@@ -1,64 +1,30 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 17 Oct 2018 15:27:57 +0000
-Subject: [PATCH V4 02/11] clk: imx: scu: add scu clock common part
-In-Reply-To: <153978883132.5275.17975663103503100871@swboyd.mtv.corp.google.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-3-git-send-email-aisheng.dong@nxp.com>
- <153972550584.5275.12112973418888551824@swboyd.mtv.corp.google.com>
- <AM0PR04MB42110A50FDC33E66A9DDF63D80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <153978883132.5275.17975663103503100871@swboyd.mtv.corp.google.com>
-Message-ID: <AM0PR04MB4211F83EBE8EA339185C75BC80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 17 Oct 2018 08:26:32 -0700
+Subject: [PATCH 2/2] clk: imx7d: remove CLK_IS_CRITICAL flag for
+ arm_a7_root_clk
+In-Reply-To: <1539756441-18776-2-git-send-email-Anson.Huang@nxp.com>
+References: <1539756441-18776-1-git-send-email-Anson.Huang@nxp.com>
+ <1539756441-18776-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <153978999232.5275.9499110259610344794@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Wednesday, October 17, 2018 11:07 PM
-> Quoting A.s. Dong (2018-10-17 02:11:03)
-> > > -----Original Message-----
-> > > From: Stephen Boyd [mailto:sboyd at kernel.org]
-> > > Sent: Wednesday, October 17, 2018 5:32 AM Quoting A.s. Dong
-> > > (2018-10-14 01:07:45)
-> > > > Add scu clock common part which will be used by client clock drivers.
-> > > >
-> > > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > > Cc: Stephen Boyd <sboyd@kernel.org>
-> > > > Cc: Michael Turquette <mturquette@baylibre.com>
-> > > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > > ---
-> > > > ChangeLog:
-> > > > v3->v4:
-> > > >  * scu headfile path change
-> > > > v2->v3:
-> > > >  * no changes
-> > > > v1->v2:
-> > > >  * update function call name
-> > > > ---
-> > > >  drivers/clk/imx/Kconfig       |  2 ++
-> > > >  drivers/clk/imx/Makefile      |  2 ++
-> > > >  drivers/clk/imx/scu/Kconfig   |  5 +++++
-> > > >  drivers/clk/imx/scu/Makefile  |  4 ++++
-> > > > drivers/clk/imx/scu/clk-scu.c | 17 +++++++++++++++++
-> > > > drivers/clk/imx/scu/clk-scu.h | 18 ++++++++++++++++++
-> > >
-> > > Why is scu nested one level deeper in the imx directory? Can't we
-> > > just keep them all within imx toplevel directory?
-> > >
-> >
-> > Mostly because SCU clocks are totally different from the legacy clocks.
-> > (No much legacy things can be reused) So organized them together in a
-> > deeper folder for clear separation and better maintenance
-> >
-> > Do you think we still should put them within imx toplevel directory
-> > and mix them with Legacy clocks?
-> >
+Quoting Anson Huang (2018-10-16 23:12:04)
+> i.MX7D uses virtual cpu clock of "arm" clock to be child clock
+> of "arm_a7_root_clk" and it is with CLK_IS_CRITICAL flag set, so
+> no need to add CLK_IS_CRITICAL flag for keeping "arm_a7_root_clk"
+> use count correct, latest clock tree is as below in clk_summary:
 > 
-> Yes. Or make a new imx-foo directory for your new fangled SoC clk driver code
-> in drivers/clk/.
+> pll_arm_main                         1        1        0   792000000          0
+>       pll_arm_main_bypass            1        1        0   792000000          0
+>          pll_arm_main_clk            1        1        0   792000000          0
+>             arm_a7_src               1        1        0   792000000          0
+>                arm_a7_cg             1        1        0   792000000          0
+>                   arm_a7_div         1        1        0   792000000          0
+>                      arm_a7_root_clk       1        1        0   792000000    0
+>                         arm          1        1        0   792000000
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
 
-Okay, then let's still put them in the same imx directory.
-
-Regards
-Dong Aisheng
+Applied to clk-next
