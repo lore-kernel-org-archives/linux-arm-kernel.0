@@ -1,45 +1,73 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 17 Oct 2018 07:28:44 +0000
-Subject: [PATCH V4 05/11] clk: imx: scu: add scu clock gate
-In-Reply-To: <153972471150.5275.14761857440358508106@swboyd.mtv.corp.google.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-6-git-send-email-aisheng.dong@nxp.com>
- <20181015073207.66npcgegibl2rybb@pengutronix.de>
- <AM0PR04MB4211129386C9088C6AFEDAF580FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20181015095342.kjokajxyugugbtcw@pengutronix.de>
- <AM0PR04MB42111FD6D3542E12250E556880FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <153972471150.5275.14761857440358508106@swboyd.mtv.corp.google.com>
-Message-ID: <AM0PR04MB4211CA6F8AF1A312A516DB0180FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 17 Oct 2018 09:29:41 +0200
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
+ SPI NOR flash memories
+In-Reply-To: <20181017091045.124e0266@bbrezillon>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+ <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
+ <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
+ <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181017090724.12f2cd79@bbrezillon>
+ <20181017091045.124e0266@bbrezillon>
+Message-ID: <20181017092941.3658bd9a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 17 Oct 2018 09:10:45 +0200
+Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Wednesday, October 17, 2018 5:19 AM
-
-[...]
-
-> > " Drivers don't need to manually protect resources shared between the
-> > operations of one group, regardless of whether those resources are
-> > shared by multiple clocks or not. However, access to resources that
-> > are shared between operations of the two groups needs to be protected by
-> the drivers."
-> >
-> > Do you think it's okay to drop it?
-> >
+> On Wed, 17 Oct 2018 09:07:24 +0200
+> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 > 
-> No it's not OK. We prefer that clk drivers don't assume the global locks in the
-> clk framework are going to protect them from concurrent access to the same
-> resource between different clks. Drivers can assume that a clk op won't be
-> called in parallel for the same clk, but they shouldn't assume that everything is
-> protected otherwise. If they did, we would have to go find all the drivers that
-> make this assumption and then fix them when we eventually split the lock into
-> smaller pieces.
+> > On Wed, 17 Oct 2018 02:07:43 +0000
+> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> >   
+> > > >       
+> > > Actually there is no entry of s25fs512s in current spi-nor.c file.
+> > > For my connected flash part, jedec ID read points to s25fl512s. I
+> > > have asked my board team to confirm the name of exact connected flash
+> > > part. When I check the data sheet of s25fs512s, it also points to the
+> > > same Jedec ID information. { "s25fl512s",  INFO(0x010220, 0x4d00, 256
+> > > * 1024, 256, ....}
+> > > 
+> > > But as stated earlier, if I skip reading SFDP or read using 1-1-1
+> > > protocol then read are always correct. For 1-4-4 protocol read are
+> > > wrong and on further debugging found that Read code of 0x6C is being
+> > > send as opcode instead of 0xEC.
+> > > 
+> > > If I revert this patch, reads are working fine.    
+> > 
+> > Can you try with the following patch?
+> >   
 > 
-> Long story short, if you have something shared (i.e. a register) and you plan to
-> write to it and read from it for multiple clks, add a lock around it.
+> Hm, nevermind. The problem is actually not related to 4B vs non-4B mode
+> but 1-1-4 vs 1-4-4 modes.
+> 
 
-Okay, got it. Appreciated for the detailed explanation.
+Can you try with this patch applied?
 
-Regards
-Dong Aisheng
+--->8---
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 9407ca5f9443..cf33d834698c 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -3132,6 +3132,17 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
+                switch (SFDP_PARAM_HEADER_ID(param_header)) {
+                case SFDP_SECTOR_MAP_ID:
+                        err = spi_nor_parse_smpt(nor, param_header);
++                       if (err) {
++                               dev_warn(dev,
++                                        "failed to parse SMPT (err = %d)\n",
++                                        err);
++                               /*
++                                * SMPT parsing is optional, let's not drop
++                                * all information we extracted so far just
++                                * because it failed.
++                                */
++                               err = 0;
++                       }
+                        break;
+ 
+                default:
