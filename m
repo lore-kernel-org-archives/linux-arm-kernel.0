@@ -1,69 +1,106 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 08:18:16 -0700
-Subject: [PATCH V4 08/11] clk: imx: scu: add scu clock gpr mux
-In-Reply-To: <AM0PR04MB42111EE950D372B8D330164780FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-9-git-send-email-aisheng.dong@nxp.com>
- <153972544065.5275.2030080128764662219@swboyd.mtv.corp.google.com>
- <AM0PR04MB42111EE950D372B8D330164780FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <153978949677.5275.18324073004650149491@swboyd.mtv.corp.google.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 17 Oct 2018 16:19:54 +0100
+Subject: [PATCH v8 0/9] PCI: mediatek: fixup find_port, enable_msi and
+ add PM, module support
+In-Reply-To: <1539590940-13355-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1539590940-13355-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20181017151954.GA9374@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-10-17 02:07:00)
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd at kernel.org]
-> > Sent: Wednesday, October 17, 2018 5:31 AM
-> > Quoting A.s. Dong (2018-10-14 01:08:06)
-> > > diff --git a/drivers/clk/imx/scu/clk-mux-gpr-scu.c
-> > > b/drivers/clk/imx/scu/clk-mux-gpr-scu.c
-> > > new file mode 100644
-> > > index 0000000..2ad7a80
-> > > --- /dev/null
-> > > +++ b/drivers/clk/imx/scu/clk-mux-gpr-scu.c
-> > > @@ -0,0 +1,90 @@
-> > > +// SPDX-License-Identifier: GPL-2.0+
-> > > +/*
-> > > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > > + * Copyright 2017~2018 NXP
-> > > + *     Dong Aisheng <aisheng.dong@nxp.com>
-> > > + */
-> > > +
-> > > +#include <linux/clk-provider.h>
-> > > +#include <linux/err.h>
-> > > +#include <linux/io.h>
-> > > +#include <linux/slab.h>
-> > > +
-> > > +#include "clk-scu.h"
-> > > +
-> > > +struct clk_mux_gpr_scu {
-> > > +       struct clk_hw hw;
-> > > +       u32     rsrc_id;
-> > > +       u8      gpr_id;
-> > > +};
-> > > +
-> > > +#define to_clk_mux_gpr_scu(_hw) container_of(_hw, struct
-> > > +clk_mux_gpr_scu, hw)
-> > > +
-> > > +static u8 clk_mux_gpr_scu_get_parent(struct clk_hw *hw) {
-> > > +       struct clk_mux_gpr_scu *gpr_mux = to_clk_mux_gpr_scu(hw);
-> > > +       u32 val = 0;
-> > > +       int ret;
-> > > +
-> > > +       ret = imx_sc_misc_get_control(ccm_ipc_handle, gpr_mux->rsrc_id,
-> > > +                                     gpr_mux->gpr_id, &val);
-> > > +       if (ret) {
-> > > +               pr_err("%s: failed to get clock parent %d\n",
-> > > +                       clk_hw_get_name(hw), ret);
-> > > +               return 0;
-> > > +       }
-> > > +
-> > > +       return (u8)val;
-> > 
-> > Nitpick: Please drop explicit casts.
-> > 
+On Mon, Oct 15, 2018 at 04:08:51PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> Compiler does it for us already, right?
-> Will drop it.
+> This patchset includes misc patchs:
+> 
+> The patch 1 fixup the mtk_pcie_find_port logic which will cause system
+> could not touch the EP's configuration space that connected to PCIe slot 1.
+> 
+> The patch 2 fixup the class type for MT7622.
+> The patch 6 fixup the enable msi logic, the operation to enable MSI
+> should be after system clock is enabled. Call mtk_pcie_enable_msi in
+> mtk_pcie_startup_port_v2 since the clock was all enabled at that time.
+> 
+> The patch 7 was rebased and refactor of the v4 patch[1], changes are:
+>  -Add PM support for MT7622.
+>  -Using mtk_pcie_enable_port to re-establish the link when resumed.
+>  -Rebased on this patchset.
+> 
+> The patch 9 add loadable kernel module support.
+> 
+> [1] https://patchwork.kernel.org/patch/10479079
 
-Yes and my brain is a tired compiler :)
+I have pushed out (after basically rewriting all commit logs and
+squashing two patches) this version of the patchset to my pci/mediatek
+branch for v4.20, keeping in mind that you must follow-up with Bjorn on
+this patch:
+
+https://patchwork.ozlabs.org/patch/984668/
+
+that we shall still consider for v4.21.
+
+Lorenzo
+
+> Change since v7:
+>  - Add Acked-by tags from Ryder Lee.
+>  - Add Fix tags for patch 2(Fix calss type for MT7622 as PCI_CLASS_BRIDGE_PCI)
+>    and patch 6(Fixup enable MSI logic by enable MSI after clock enabled)
+> 
+> Change since v6:
+>  - Remove the pci_unmap_iospace when remove the device since the
+>    devm_pci_remap_iospace is an devm_ version.
+>  - Commit message changed for patch 2(Fix class type for MT7622 as PCI_CLASS_BRIDGE_PCI).
+>  - Capitilizing "MSI" and "PM" in the patch title.
+> 
+> Change since v5:
+>  - A bit improvement of mtk_pcie_find_port suggest by Lorenzo.
+>    MSI after clock enabled).
+>  - Add Acked-by tags from Ryder.
+> 
+> Change since v4:
+>  - Add patch 2 to fixup class type for MT7622.
+>  - Add patch 3 to remove the redundant dev->pm_domain check
+>  - Add patch 4 to covert to use pci_host_probe
+>  - Add patch 5 to re-arrange the function define, this is a prepare patch for
+>    fixup the enable_msi logic, no functional changed have been made by this one.
+>  - Add patch 8 to save the GIC IRQ in mtk_pcie_port as a prepare patch for tear
+>    down the irq when remove the kernel module.
+>  - Re-arrange the find_port flow suggest by Lorenzo to make the code parse easier
+>    for the patch 1.
+>  - Remove the .pm_support in mtk_pcie_soc in patch 7 since if system pm was not
+>    supported, then those pm callbacks will never be executed for MT7622. So the
+>    .pm_support is not needed.
+> 
+> Change since v3:
+>  - Remove pm_runtime_XXX ops in suspend and resume callbacks in the third patch.
+>  - Rebase to 4.19-rc1.
+> 
+> Change since v2:
+>  - Fix the list_for_each_entry_safe parameter error.
+>  - Add Ryder's Acked-by flag.
+> 
+> Change since v1:
+>  - A bit of code refact of the first patch suggested by Andy Shevchenko, and
+>    commit message updated.
+> 
+> Honghui Zhang (9):
+>   PCI: mediatek: Using slot's devfn for compare to fix
+>     mtk_pcie_find_port logic
+>   PCI: mediatek: Fix class type for MT7622 as PCI_CLASS_BRIDGE_PCI
+>   PCI: mediatek: Remove the redundant dev->pm_domain check
+>   PCI: mediatek: Convert to use pci_host_probe()
+>   PCI: mediatek: Move the mtk_pcie_startup_port_v2 function's define
+>     after mtk_pcie_setup_irq
+>   PCI: mediatek: Fixup enable MSI logic by enable MSI after clock
+>     enabled
+>   PCI: mediatek: Add system PM support for MT2712 and MT7622
+>   PCI: mediatek: Save the GIC IRQ in mtk_pcie_port
+>   PCI: mediatek: Add loadable kernel module support
+> 
+>  drivers/pci/controller/Kconfig         |   2 +-
+>  drivers/pci/controller/pcie-mediatek.c | 319 +++++++++++++++++++++------------
+>  2 files changed, 204 insertions(+), 117 deletions(-)
+> 
+> -- 
+> 2.6.4
+> 
