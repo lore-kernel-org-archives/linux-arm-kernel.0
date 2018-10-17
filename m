@@ -1,196 +1,336 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 17 Oct 2018 11:52:37 +0200
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
- SPI NOR flash memories
-In-Reply-To: <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
- <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
- <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
- <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017090724.12f2cd79@bbrezillon>
- <20181017091045.124e0266@bbrezillon>
- <20181017092941.3658bd9a@bbrezillon>
- <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <20181017115237.07310b74@bbrezillon>
+From: aneesh.kumar@linux.ibm.com (Aneesh Kumar K.V)
+Date: Wed, 17 Oct 2018 15:09:21 +0530
+Subject: Crash on FSL Book3E due to pte_pgprot()? (was Re: [PATCH v3
+ 12/24] powerpc/mm: use pte helpers in generic code)
+In-Reply-To: <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
+References: <cover.1539092111.git.christophe.leroy@c-s.fr>
+ <343c844bbc5081d13ee4c9aa27ff3118f607e1cc.1539092112.git.christophe.leroy@c-s.fr>
+ <87va61jsma.fsf@concordia.ellerman.id.au>
+ <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
+Message-ID: <87ftx4x67q.fsf@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018 07:46:30 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+Christophe Leroy <christophe.leroy@c-s.fr> writes:
 
-> Hi Boris,
-> 
-> > -----Original Message-----
-> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > Sent: Wednesday, October 17, 2018 1:00 PM
-> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > Cc: Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>; Tudor Ambarus
-> > <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
-> > dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
-> > linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
-> > cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; linux-arm-
-> > kernel at lists.infradead.org; Cristian.Birsan at microchip.com
-> > Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
-> > NOR flash memories
-> > 
-> > On Wed, 17 Oct 2018 09:10:45 +0200
-> > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> >   
-> > > On Wed, 17 Oct 2018 09:07:24 +0200
-> > > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> > >  
-> > > > On Wed, 17 Oct 2018 02:07:43 +0000
-> > > > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> > > >  
-> > > > > >  
-> > > > > Actually there is no entry of s25fs512s in current spi-nor.c file.
-> > > > > For my connected flash part, jedec ID read points to s25fl512s. I
-> > > > > have asked my board team to confirm the name of exact connected
-> > > > > flash part. When I check the data sheet of s25fs512s, it also
-> > > > > points to the same Jedec ID information. { "s25fl512s",
-> > > > > INFO(0x010220, 0x4d00, 256
-> > > > > * 1024, 256, ....}
-> > > > >
-> > > > > But as stated earlier, if I skip reading SFDP or read using 1-1-1
-> > > > > protocol then read are always correct. For 1-4-4 protocol read are
-> > > > > wrong and on further debugging found that Read code of 0x6C is
-> > > > > being send as opcode instead of 0xEC.
-> > > > >
-> > > > > If I revert this patch, reads are working fine.  
-> > > >
-> > > > Can you try with the following patch?
-> > > >  
-> > >
-> > > Hm, nevermind. The problem is actually not related to 4B vs non-4B
-> > > mode but 1-1-4 vs 1-4-4 modes.  
-> Yes, that's only I have stated in my first mail that instead of 1-4-4 mode read opcode is being sent for 1-1-4 mode.
-> > >  
-> > 
-> > Can you try with this patch applied?
-> >   
-> With suggested patch, read for protocol 1-4-4 working correctly.
-> 
-> 	[    1.625360] m25p80 spi0.0: found s25fl512s, expected m25p80                                                                   
-> 	[    1.631094] m25p80 spi0.0: failed to parse SMPT (err = -22)                                                                   
-> 	[    1.636661] 261 8c4c780 opcode(read:eb, pp:2, erase:d8)                                                                       
-> 	[    1.641878] 266 8c4c780 opcode(read:ec, pp:12, erase:dc)                                                                      
-> 	[    1.647200] m25p80 spi0.0: s25fl512s (65536 Kbytes)         
-> 
+> On 10/17/2018 12:59 AM, Michael Ellerman wrote:
+>> Christophe Leroy <christophe.leroy@c-s.fr> writes:
+>> 
+>>> Get rid of platform specific _PAGE_XXXX in powerpc common code and
+>>> use helpers instead.
+>>>
+>>> mm/dump_linuxpagetables.c will be handled separately
+>>>
+>>> Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
+>>> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+>>> ---
+>>>   arch/powerpc/include/asm/book3s/32/pgtable.h |  9 +++------
+>>>   arch/powerpc/include/asm/nohash/32/pgtable.h | 12 ++++++++----
+>>>   arch/powerpc/include/asm/nohash/pgtable.h    |  3 +--
+>>>   arch/powerpc/mm/pgtable.c                    | 21 +++++++--------------
+>>>   arch/powerpc/mm/pgtable_32.c                 | 15 ++++++++-------
+>>>   arch/powerpc/mm/pgtable_64.c                 | 14 +++++++-------
+>>>   arch/powerpc/xmon/xmon.c                     | 12 +++++++-----
+>>>   7 files changed, 41 insertions(+), 45 deletions(-)
+>> 
+>> So turns out this patch *also* breaks my p5020ds :)
+>> 
+>> Even with patch 4 merged, see next.
+>> 
+>> It's the same crash:
+>> 
+>>    pcieport 2000:00:00.0: AER enabled with IRQ 480
+>>    Unable to handle kernel paging request for data at address 0x8000080080080000
+>>    Faulting instruction address: 0xc0000000000192cc
+>>    Oops: Kernel access of bad area, sig: 11 [#1]
+>>    BE SMP NR_CPUS=24 CoreNet Generic
+>>    Modules linked in:
+>>    CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc3-gcc7x-g98c847323b3a #1
+>>    NIP:  c0000000000192cc LR: c0000000005d0f9c CTR: 0000000000100000
+>>    REGS: c0000000f31bb400 TRAP: 0300   Not tainted  (4.19.0-rc3-gcc7x-g98c847323b3a)
+>>    MSR:  0000000080029000 <CE,EE,ME>  CR: 24000224  XER: 00000000
+>>    DEAR: 8000080080080000 ESR: 0000000000800000 IRQMASK: 0
+>>    GPR00: c0000000005d0f84 c0000000f31bb688 c00000000117dc00 8000080080080000
+>>    GPR04: 0000000000000000 0000000000400000 00000ffbff241010 c0000000f31b8000
+>>    GPR08: 0000000000000000 0000000000100000 0000000000000000 c0000000012d4710
+>>    GPR12: 0000000084000422 c0000000012ff000 c000000000002774 0000000000000000
+>>    GPR16: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+>>    GPR20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+>>    GPR24: 0000000000000000 0000000000000000 8000080080080000 c0000000ffff89a8
+>>    GPR28: c0000000f3576400 c0000000f3576410 0000000000400000 c0000000012ecc98
+>>    NIP [c0000000000192cc] ._memset_io+0x6c/0x9c
+>>    LR [c0000000005d0f9c] .fsl_qman_probe+0x198/0x928
+>>    Call Trace:
+>>    [c0000000f31bb688] [c0000000005d0f84] .fsl_qman_probe+0x180/0x928 (unreliable)
+>>    [c0000000f31bb728] [c0000000006432ec] .platform_drv_probe+0x60/0xb4
+>>    [c0000000f31bb7a8] [c00000000064083c] .really_probe+0x294/0x35c
+>>    [c0000000f31bb848] [c000000000640d2c] .__driver_attach+0x148/0x14c
+>>    [c0000000f31bb8d8] [c00000000063d7dc] .bus_for_each_dev+0xb0/0x118
+>>    [c0000000f31bb988] [c00000000063ff28] .driver_attach+0x34/0x4c
+>>    [c0000000f31bba08] [c00000000063f648] .bus_add_driver+0x174/0x2bc
+>>    [c0000000f31bbaa8] [c0000000006418bc] .driver_register+0x90/0x180
+>>    [c0000000f31bbb28] [c000000000643270] .__platform_driver_register+0x60/0x7c
+>>    [c0000000f31bbba8] [c000000000ee2a70] .fsl_qman_driver_init+0x24/0x38
+>>    [c0000000f31bbc18] [c0000000000023fc] .do_one_initcall+0x64/0x2b8
+>>    [c0000000f31bbcf8] [c000000000e9f480] .kernel_init_freeable+0x3a8/0x494
+>>    [c0000000f31bbda8] [c000000000002798] .kernel_init+0x24/0x148
+>>    [c0000000f31bbe28] [c0000000000009e8] .ret_from_kernel_thread+0x58/0x70
+>>    Instruction dump:
+>>    4e800020 2ba50003 40dd003c 3925fffc 5488402e 7929f082 7d082378 39290001
+>>    550a801e 7d2903a6 7d4a4378 794a0020 <91430000> 38630004 4200fff8 70a50003
+>> 
+>> 
+>> Comparing a working vs broken kernel, it seems to boil down to the fact
+>> that we're filtering out more PTE bits now that we use pte_pgprot() in
+>> ioremap_prot().
+>> 
+>> With the old code we get:
+>>    ioremap_prot: addr 0xff800000 flags 0x241215
+>>    ioremap_prot: addr 0xff800000 flags 0x241215
+>>    map_kernel_page: ea 0x8000080080080000 pa 0xff800000 pte 0xff800241215
+>> 
+>> 
+>> And now we get:
+>>    ioremap_prot: addr 0xff800000 flags 0x241215 pte 0x241215
+>>    ioremap_prot: addr 0xff800000 pte 0x241215
+>>    ioremap_prot: addr 0xff800000 prot 0x241014
+>>    map_kernel_page: ea 0x8000080080080000 pa 0xff800000 pte 0xff800241014
+>> 
+>> So we're losing 0x201, which for nohash book3e is:
+>> 
+>>    #define _PAGE_PRESENT	0x000001 /* software: pte contains a translation */
+>>    #define _PAGE_PSIZE_4K	0x000200
+>> 
+>> 
+>> I haven't worked out if it's one or both of those that matter.
+>
+> At least missing _PAGE_PRESENT is an issue I believe.
+>> 
+>> The question is what's the right way to fix it? Should pte_pgprot() not
+>> be filtering those bits out on book3e?
+>
+> I think we should not use pte_pggrot() for that then. What about the 
+> below fix ?
+>
+> Christophe
+>
+> From: Christophe Leroy <christophe.leroy@c-s.fr>
+> Date: Wed, 17 Oct 2018 05:56:25 +0000
+> Subject: [PATCH] powerpc/mm: don't use pte_pgprot() in ioremap_prot()
+>
+> pte_pgprot() filters out some required flags like _PAGE_PRESENT.
+>
+> This patch replaces pte_pgprot() by __pgprot(pte_val())
+> in ioremap_prot()
+>
+> Fixes: 26973fa5ac0e ("powerpc/mm: use pte helpers in generic code")
+> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+> ---
+>   arch/powerpc/mm/pgtable_32.c | 3 ++-
+>   arch/powerpc/mm/pgtable_64.c | 4 ++--
+>   2 files changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
+> index 5877f5aa8f5d..a606e2f4937b 100644
+> --- a/arch/powerpc/mm/pgtable_32.c
+> +++ b/arch/powerpc/mm/pgtable_32.c
+> @@ -122,7 +122,8 @@ ioremap_prot(phys_addr_t addr, unsigned long size, 
+> unsigned long flags)
+>   	pte = pte_exprotect(pte);
+>   	pte = pte_mkprivileged(pte);
+>
+> -	return __ioremap_caller(addr, size, pte_pgprot(pte), 
+> __builtin_return_address(0));
+> +	return __ioremap_caller(addr, size, __pgprot(pte_val(pte)),
+> +				__builtin_return_address(0));
 
-Okay, let's try this one to see why the SMPT parsing fails.
 
---->8---
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 9407ca5f9443..564882c87641 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -2855,23 +2855,31 @@ static u8 spi_nor_smpt_read_dummy(const struct spi_nor *nor, const u32 settings)
-  * spi_nor_get_map_in_use() - get the configuration map in use
-  * @nor:       pointer to a 'struct spi_nor'
-  * @smpt:      pointer to the sector map parameter table
-+ * @smpt_len:  number of entries in the smpt array
-  */
--static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
-+static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt,
-+                                        u32 smpt_len)
+That means we pass the pfn bits also to __ioremap_caller right? How about
+
+>From b4d5e0f24f8482375b2dd86afaced26ebf716600 Mon Sep 17 00:00:00 2001
+From: "Aneesh Kumar K.V" <aneesh.kumar@linux.ibm.com>
+Date: Wed, 17 Oct 2018 14:07:50 +0530
+Subject: [PATCH] powerpc/mm: Make pte_pgprot return all pte bits
+
+Other archs do the same and instead of adding required pte bits (which got
+masked out) in __ioremap_at, make sure we filter only pfn bits out.
+
+Fixes: 26973fa5ac0e ("powerpc/mm: use pte helpers in generic code")
+Signed-off-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
+---
+ arch/powerpc/include/asm/book3s/32/pgtable.h       |  6 ------
+ arch/powerpc/include/asm/book3s/64/pgtable.h       |  8 --------
+ arch/powerpc/include/asm/nohash/32/pte-40x.h       |  5 -----
+ arch/powerpc/include/asm/nohash/32/pte-44x.h       |  5 -----
+ arch/powerpc/include/asm/nohash/32/pte-8xx.h       |  5 -----
+ arch/powerpc/include/asm/nohash/32/pte-fsl-booke.h |  5 -----
+ arch/powerpc/include/asm/nohash/pgtable.h          |  1 -
+ arch/powerpc/include/asm/nohash/pte-book3e.h       |  5 -----
+ arch/powerpc/include/asm/pgtable.h                 | 10 ++++++++++
+ 9 files changed, 10 insertions(+), 40 deletions(-)
+
+diff --git a/arch/powerpc/include/asm/book3s/32/pgtable.h b/arch/powerpc/include/asm/book3s/32/pgtable.h
+index 0fbd4c642b51..e61dd3ae5bc0 100644
+--- a/arch/powerpc/include/asm/book3s/32/pgtable.h
++++ b/arch/powerpc/include/asm/book3s/32/pgtable.h
+@@ -48,11 +48,6 @@ static inline bool pte_user(pte_t pte)
+ #define _PAGE_CHG_MASK	(PTE_RPN_MASK | _PAGE_HASHPTE | _PAGE_DIRTY | \
+ 			 _PAGE_ACCESSED | _PAGE_SPECIAL)
+ 
+-/* Mask of bits returned by pte_pgprot() */
+-#define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_COHERENT | _PAGE_NO_CACHE | \
+-			 _PAGE_WRITETHRU | _PAGE_USER | _PAGE_ACCESSED | \
+-			 _PAGE_RW | _PAGE_DIRTY)
+-
+ /*
+  * We define 2 sets of base prot bits, one for basic pages (ie,
+  * cacheable kernel and user pages) and one for non cacheable
+@@ -396,7 +391,6 @@ static inline int pte_young(pte_t pte)		{ return !!(pte_val(pte) & _PAGE_ACCESSE
+ static inline int pte_special(pte_t pte)	{ return !!(pte_val(pte) & _PAGE_SPECIAL); }
+ static inline int pte_none(pte_t pte)		{ return (pte_val(pte) & ~_PTE_NONE_MASK) == 0; }
+ static inline bool pte_exec(pte_t pte)		{ return true; }
+-static inline pgprot_t pte_pgprot(pte_t pte)	{ return __pgprot(pte_val(pte) & PAGE_PROT_BITS); }
+ 
+ static inline int pte_present(pte_t pte)
  {
-        const u32 *ret = NULL;
--       u32 i, addr;
-+       u32 i, addr, nmaps;
-        int err;
-        u8 addr_width, read_opcode, read_dummy;
-        u8 read_data_mask, data_byte, map_id;
-+       bool map_id_is_valid = false;
+diff --git a/arch/powerpc/include/asm/book3s/64/pgtable.h b/arch/powerpc/include/asm/book3s/64/pgtable.h
+index c34a161dc651..cb5dd4078d42 100644
+--- a/arch/powerpc/include/asm/book3s/64/pgtable.h
++++ b/arch/powerpc/include/asm/book3s/64/pgtable.h
+@@ -128,13 +128,6 @@
  
-        addr_width = nor->addr_width;
-        read_dummy = nor->read_dummy;
-        read_opcode = nor->read_opcode;
+ #define H_PTE_PKEY  (H_PTE_PKEY_BIT0 | H_PTE_PKEY_BIT1 | H_PTE_PKEY_BIT2 | \
+ 		     H_PTE_PKEY_BIT3 | H_PTE_PKEY_BIT4)
+-/*
+- * Mask of bits returned by pte_pgprot()
+- */
+-#define PAGE_PROT_BITS  (_PAGE_SAO | _PAGE_NON_IDEMPOTENT | _PAGE_TOLERANT | \
+-			 H_PAGE_4K_PFN | _PAGE_PRIVILEGED | _PAGE_ACCESSED | \
+-			 _PAGE_READ | _PAGE_WRITE |  _PAGE_DIRTY | _PAGE_EXEC | \
+-			 _PAGE_SOFT_DIRTY | H_PTE_PKEY)
+ /*
+  * We define 2 sets of base prot bits, one for basic pages (ie,
+  * cacheable kernel and user pages) and one for non cacheable
+@@ -496,7 +489,6 @@ static inline bool pte_exec(pte_t pte)
+ 	return !!(pte_raw(pte) & cpu_to_be64(_PAGE_EXEC));
+ }
  
-+       for (i = 0; i < smpt_len; i++)
-+               pr_info("%s:%i smpt[%d] = %08x\n", __func__, __LINE__, i, smpt[i]);
-+
-        map_id = 0;
--       i = 0;
-        /* Determine if there are any optional Detection Command Descriptors */
--       while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
-+       for (i = 0; i < smpt_len; i++) {
-+               if (!(smpt[i] & SMPT_DESC_TYPE_MAP))
-+                       break;
-+
-                read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
-                nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
-                nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
-@@ -2887,18 +2895,40 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
-                 * Configuration that is currently in use.
-                 */
-                map_id = map_id << 1 | !!(data_byte & read_data_mask);
-+               map_id_is_valid = true;
-                i = i + 2;
-        }
+-static inline pgprot_t pte_pgprot(pte_t pte)	{ return __pgprot(pte_val(pte) & PAGE_PROT_BITS); }
  
-+       if (map_id_is_valid)
-+               pr_info("%s:%i map_id = %d\n", __func__, __LINE__, map_id);
-+       else
-+               pr_info("%s:%i no map_id\n", __func__, __LINE__);
-+
-        /* Find the matching configuration map */
--       while (SMPT_MAP_ID(smpt[i]) != map_id) {
--               if (smpt[i] & SMPT_DESC_END)
--                       goto out;
-+       for (nmaps = 0; i < smpt_len; nmaps++) {
-+               if (!(smpt[i] & SMPT_DESC_TYPE_MAP))
-+                       continue;
-+
-+               if (!map_id_is_valid) {
-+                       /*
-+                        * Command descriptors are optional but if we didn't
-+                        * find any, we should ensure we have only one map.
-+                        */
-+                       if (nmaps) {
-+                               ret = NULL;
-+                               break;
-+                       }
-+
-+                       ret = smpt + i;
-+               } else if (map_id == SMPT_MAP_ID(smpt[i])) {
-+                       ret = smpt + i;
-+                       break;
-+               }
-+
-                /* increment the table index to the next map */
-                i += SMPT_MAP_REGION_COUNT(smpt[i]) + 1;
-        }
+ #ifdef CONFIG_HAVE_ARCH_SOFT_DIRTY
+ static inline bool pte_soft_dirty(pte_t pte)
+diff --git a/arch/powerpc/include/asm/nohash/32/pte-40x.h b/arch/powerpc/include/asm/nohash/32/pte-40x.h
+index 7a8b3c94592f..661f4599f2fc 100644
+--- a/arch/powerpc/include/asm/nohash/32/pte-40x.h
++++ b/arch/powerpc/include/asm/nohash/32/pte-40x.h
+@@ -73,11 +73,6 @@
+ /* Until my rework is finished, 40x still needs atomic PTE updates */
+ #define PTE_ATOMIC_UPDATES	1
  
--       ret = smpt + i;
-        /* fall through */
- out:
-        nor->addr_width = addr_width;
-@@ -3020,7 +3050,7 @@ static int spi_nor_parse_smpt(struct spi_nor *nor,
-        for (i = 0; i < smpt_header->length; i++)
-                smpt[i] = le32_to_cpu(smpt[i]);
+-/* Mask of bits returned by pte_pgprot() */
+-#define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_NO_CACHE | \
+-			 _PAGE_WRITETHRU | _PAGE_USER | _PAGE_ACCESSED | \
+-			 _PAGE_RW | _PAGE_HWWRITE | _PAGE_DIRTY | _PAGE_EXEC)
+-
+ #define _PAGE_BASE_NC	(_PAGE_PRESENT | _PAGE_ACCESSED)
+ #define _PAGE_BASE	(_PAGE_BASE_NC)
  
--       sector_map = spi_nor_get_map_in_use(nor, smpt);
-+       sector_map = spi_nor_get_map_in_use(nor, smpt, smpt_header->length);
-        if (!sector_map) {
-                ret = -EINVAL;
-                goto out;
-@@ -3132,6 +3162,17 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
-                switch (SFDP_PARAM_HEADER_ID(param_header)) {
-                case SFDP_SECTOR_MAP_ID:
-                        err = spi_nor_parse_smpt(nor, param_header);
-+                       if (err) {
-+                               dev_warn(dev,
-+                                        "failed to parse SMPT (err = %d)\n",
-+                                        err);
-+                               /*
-+                                * SMPT parsing is optional, let's not drop
-+                                * all information we extracted so far just
-+                                * because it failed.
-+                                */
-+                               err = 0;
-+                       }
-                        break;
+diff --git a/arch/powerpc/include/asm/nohash/32/pte-44x.h b/arch/powerpc/include/asm/nohash/32/pte-44x.h
+index 8d6b268a986f..78bc304f750e 100644
+--- a/arch/powerpc/include/asm/nohash/32/pte-44x.h
++++ b/arch/powerpc/include/asm/nohash/32/pte-44x.h
+@@ -93,11 +93,6 @@
+ #define _PAGE_KERNEL_RW		(_PAGE_DIRTY | _PAGE_RW)
+ #define _PAGE_KERNEL_RWX	(_PAGE_DIRTY | _PAGE_RW | _PAGE_EXEC)
  
-                default:
+-/* Mask of bits returned by pte_pgprot() */
+-#define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_COHERENT | _PAGE_NO_CACHE | \
+-			 _PAGE_WRITETHRU | _PAGE_USER | _PAGE_ACCESSED | \
+-			 _PAGE_RW | _PAGE_DIRTY | _PAGE_EXEC)
+-
+ /* TODO: Add large page lowmem mapping support */
+ #define _PMD_PRESENT	0
+ #define _PMD_PRESENT_MASK (PAGE_MASK)
+diff --git a/arch/powerpc/include/asm/nohash/32/pte-8xx.h b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
+index 1c57efac089d..6bfe041ef59d 100644
+--- a/arch/powerpc/include/asm/nohash/32/pte-8xx.h
++++ b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
+@@ -55,11 +55,6 @@
+ #define _PAGE_KERNEL_RW		(_PAGE_SH | _PAGE_DIRTY)
+ #define _PAGE_KERNEL_RWX	(_PAGE_SH | _PAGE_DIRTY | _PAGE_EXEC)
+ 
+-/* Mask of bits returned by pte_pgprot() */
+-#define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_NO_CACHE | \
+-			 _PAGE_ACCESSED | _PAGE_RO | _PAGE_NA | \
+-			 _PAGE_SH | _PAGE_DIRTY | _PAGE_EXEC)
+-
+ #define _PMD_PRESENT	0x0001
+ #define _PMD_PRESENT_MASK	_PMD_PRESENT
+ #define _PMD_BAD	0x0fd0
+diff --git a/arch/powerpc/include/asm/nohash/32/pte-fsl-booke.h b/arch/powerpc/include/asm/nohash/32/pte-fsl-booke.h
+index 1ecf60fe0909..0fc1bd42bb3e 100644
+--- a/arch/powerpc/include/asm/nohash/32/pte-fsl-booke.h
++++ b/arch/powerpc/include/asm/nohash/32/pte-fsl-booke.h
+@@ -39,11 +39,6 @@
+ /* No page size encoding in the linux PTE */
+ #define _PAGE_PSIZE		0
+ 
+-/* Mask of bits returned by pte_pgprot() */
+-#define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_COHERENT | _PAGE_NO_CACHE | \
+-			 _PAGE_WRITETHRU | _PAGE_USER | _PAGE_ACCESSED | \
+-			 _PAGE_RW | _PAGE_DIRTY | _PAGE_EXEC)
+-
+ #define _PMD_PRESENT	0
+ #define _PMD_PRESENT_MASK (PAGE_MASK)
+ #define _PMD_BAD	(~PAGE_MASK)
+diff --git a/arch/powerpc/include/asm/nohash/pgtable.h b/arch/powerpc/include/asm/nohash/pgtable.h
+index 04e9f0922ad4..70ff23974b59 100644
+--- a/arch/powerpc/include/asm/nohash/pgtable.h
++++ b/arch/powerpc/include/asm/nohash/pgtable.h
+@@ -52,7 +52,6 @@ static inline int pte_none(pte_t pte)		{ return (pte_val(pte) & ~_PTE_NONE_MASK)
+ static inline bool pte_hashpte(pte_t pte)	{ return false; }
+ static inline bool pte_ci(pte_t pte)		{ return pte_val(pte) & _PAGE_NO_CACHE; }
+ static inline bool pte_exec(pte_t pte)		{ return pte_val(pte) & _PAGE_EXEC; }
+-static inline pgprot_t pte_pgprot(pte_t pte)	{ return __pgprot(pte_val(pte) & PAGE_PROT_BITS); }
+ 
+ #ifdef CONFIG_NUMA_BALANCING
+ /*
+diff --git a/arch/powerpc/include/asm/nohash/pte-book3e.h b/arch/powerpc/include/asm/nohash/pte-book3e.h
+index 58eef8cb569d..f95ab6eaf441 100644
+--- a/arch/powerpc/include/asm/nohash/pte-book3e.h
++++ b/arch/powerpc/include/asm/nohash/pte-book3e.h
+@@ -82,11 +82,6 @@
+ #define _PTE_NONE_MASK	0
+ #endif
+ 
+-/* Mask of bits returned by pte_pgprot() */
+-#define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_COHERENT | _PAGE_NO_CACHE | \
+-			 _PAGE_WRITETHRU | _PAGE_USER | _PAGE_ACCESSED | \
+-			 _PAGE_PRIVILEGED | _PAGE_RW | _PAGE_DIRTY | _PAGE_EXEC)
+-
+ /*
+  * We define 2 sets of base prot bits, one for basic pages (ie,
+  * cacheable kernel and user pages) and one for non cacheable
+diff --git a/arch/powerpc/include/asm/pgtable.h b/arch/powerpc/include/asm/pgtable.h
+index fb4b85bba110..9679b7519a35 100644
+--- a/arch/powerpc/include/asm/pgtable.h
++++ b/arch/powerpc/include/asm/pgtable.h
+@@ -46,6 +46,16 @@ struct mm_struct;
+ /* Keep these as a macros to avoid include dependency mess */
+ #define pte_page(x)		pfn_to_page(pte_pfn(x))
+ #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
++/*
++ * Select all bits except the pfn
++ */
++static inline pgprot_t pte_pgprot(pte_t pte)
++{
++	unsigned long pte_flags;
++
++	pte_flags = pte_val(pte) & ~PTE_RPN_MASK;
++	return __pgprot(pte_flags);
++}
+ 
+ /*
+  * ZERO_PAGE is a global shared page that is always zero: used
+-- 
+2.17.2
