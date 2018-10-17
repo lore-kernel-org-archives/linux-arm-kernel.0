@@ -1,33 +1,45 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 13:16:53 -0700
-Subject: [PATCH V12 00/14] Krait clocks + Krait CPUfreq
-In-Reply-To: <153979105280.5275.841088095583550635@swboyd.mtv.corp.google.com>
-References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
- <2ae96741-94c0-ba4c-fc19-05d33179683c@codeaurora.org>
- <d682580d-5070-0271-197f-29d988172937@codeaurora.org>
- <D8FC68C0-2572-4A86-81D9-D0099D314A45@gmail.com>
- <F5A89365-C613-4FE2-AD32-DC0AC6DF380B@gmail.com>
- <fb81b8d5-3d24-b413-8d59-33cb70e46f8b@codeaurora.org>
- <153979105280.5275.841088095583550635@swboyd.mtv.corp.google.com>
-Message-ID: <153980741313.5275.10376918222904341760@swboyd.mtv.corp.google.com>
+From: eugenis@google.com (Evgenii Stepanov)
+Date: Wed, 17 Oct 2018 13:25:42 -0700
+Subject: [PATCH v7 0/8] arm64: untag user pointers passed to the kernel
+In-Reply-To: <CAAeHK+yEZTLjgSj8YUzeJec9Pp2TwuLT5nCa1OpfBLXJkx_hhg@mail.gmail.com>
+References: <cover.1538485901.git.andreyknvl@google.com>
+ <be684ce5-92fd-e970-b002-83452cf50abd@arm.com>
+ <CAAeHK+yEZTLjgSj8YUzeJec9Pp2TwuLT5nCa1OpfBLXJkx_hhg@mail.gmail.com>
+Message-ID: <CAFKCwrh4-BvFB_R1J0LWcbfeR=d02OazowFuMU+hmq8Y=Dx+4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2018-10-17 08:44:12)
-> Quoting Sricharan R (2018-09-20 06:03:31)
-> > 
-> > 
-> > On 9/20/2018 1:54 AM, Craig wrote:
-> > > Yup, this patch seems to have fixed the higher frequencies from the quick test I did.
-> > >
-> >       Thanks !!. Can i take that as 
-> >           Tested-by: Craig Tatlor <ctatlor97@gmail.com>  ?
-> > 
-> 
-> Is this patch series going to be resent?
-> 
+On Wed, Oct 17, 2018 at 7:20 AM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> On Wed, Oct 17, 2018 at 4:06 PM, Vincenzo Frascino
+> <vincenzo.frascino@arm.com> wrote:
+>> Hi Andrey,
+>> I have been thinking a bit lately on how to address the problem of user tagged pointers passed to the kernel through syscalls, and IMHO probably the best way we have to catch them all and make sure that the approach is maintainable in the long term is to introduce shims that tag/untag the pointers passed to the kernel.
+>>
+>> In details, what I am proposing can live either in userspace (preferred solution so that we do not have to relax the ABI) or in kernel space and can be summarized as follows:
+>>  - A shim is specific to a syscall and is called by the libc when it needs to invoke the respective syscall.
+>>  - It is required only if the syscall accepts pointers.
+>>  - It saves the tags of a pointers passed to the syscall in memory (same approach if the we are passing a struct that contains pointers to the kernel, with the difference that all the tags of the pointers in the struct need to be saved singularly)
+>>  - Untags the pointers
+>>  - Invokes the syscall
+>>  - Retags the pointers with the tags stored in memory
+>>  - Returns
+>>
+>> What do you think?
+>
+> Hi Vincenzo,
+>
+> If I correctly understand what you are proposing, I'm not sure if that
+> would work with the countless number of different ioctl calls. For
+> example when an ioctl accepts a struct with a bunch of pointer fields.
+> In this case a shim like the one you propose can't live in userspace,
+> since libc doesn't know about the interface of all ioctls, so it can't
+> know which fields to untag. The kernel knows about those interfaces
+> (since the kernel implements them), but then we would need a custom
+> shim for each ioctl variation, which doesn't seem practical.
 
-Nevermind. Looking at it I think I can apply all the clk ones and we're
-good to go. If you can send a followup patch series to change the
-registration and provider APIs to be clk_hw instead of clk based I would
-appreciate it.
+The current patchset handles majority of pointers in a just a few
+common places, like copy_from_user. Userspace shims will need to untag
+& retag all pointer arguments - we are looking at hundreds if not
+thousands of shims. They will also be located in a different code base
+from the syscall / ioctl implementations, which would make them
+impossible to keep up to date.
