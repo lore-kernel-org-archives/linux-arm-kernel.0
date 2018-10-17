@@ -1,105 +1,100 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 17 Oct 2018 11:59:09 +1100
-Subject: Crash on FSL Book3E due to pte_pgprot()? (was Re: [PATCH v3 12/24]
- powerpc/mm: use pte helpers in generic code)
-In-Reply-To: <343c844bbc5081d13ee4c9aa27ff3118f607e1cc.1539092112.git.christophe.leroy@c-s.fr>
-References: <cover.1539092111.git.christophe.leroy@c-s.fr>
- <343c844bbc5081d13ee4c9aa27ff3118f607e1cc.1539092112.git.christophe.leroy@c-s.fr>
-Message-ID: <87va61jsma.fsf@concordia.ellerman.id.au>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Wed, 17 Oct 2018 01:54:01 +0000
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
+ NOR flash memories
+In-Reply-To: <20181016141754.38dfcf90@bbrezillon>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+ <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181016140411.3f06e449@bbrezillon> <20181016141754.38dfcf90@bbrezillon>
+Message-ID: <VI1PR04MB1038B7650F887549CA5EE22B99FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christophe Leroy <christophe.leroy@c-s.fr> writes:
+Hi Boris,
 
-> Get rid of platform specific _PAGE_XXXX in powerpc common code and
-> use helpers instead.
->
-> mm/dump_linuxpagetables.c will be handled separately
->
-> Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
-> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
-> ---
->  arch/powerpc/include/asm/book3s/32/pgtable.h |  9 +++------
->  arch/powerpc/include/asm/nohash/32/pgtable.h | 12 ++++++++----
->  arch/powerpc/include/asm/nohash/pgtable.h    |  3 +--
->  arch/powerpc/mm/pgtable.c                    | 21 +++++++--------------
->  arch/powerpc/mm/pgtable_32.c                 | 15 ++++++++-------
->  arch/powerpc/mm/pgtable_64.c                 | 14 +++++++-------
->  arch/powerpc/xmon/xmon.c                     | 12 +++++++-----
->  7 files changed, 41 insertions(+), 45 deletions(-)
+> -----Original Message-----
+> From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> Sent: Tuesday, October 16, 2018 5:48 PM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Cc: Tudor Ambarus <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
+> dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
+> linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
+> cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org; Cristian.Birsan at microchip.com
+> Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
+> NOR flash memories
+> 
+> On Tue, 16 Oct 2018 14:04:11 +0200
+> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> 
+> > On Tue, 16 Oct 2018 09:51:47 +0000
+> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> >
+> > > Hi Tudor,
+> > >
+> > > This patch is breaking the 1-4-4 Read protocol for the spansion flash
+> "s25fl512s".
+> > >
+> > > Without this patch read request command for Quad mode, 4-byte enable, is
+> coming as 0xEC i.e. SPINOR_OP_READ_1_4_4_4B.
+> > > But after applying this patch, read request command for Quad mode is
+> coming as 0x6C i.e. SPINOR_OP_READ_1_1_4_4B.
+> > >
+> > > This flash also supports non-uniform erase.
+> > > Can you please check and provide some suggestion?
+> >
+> > Are you sure the regression comes from this patch? I suspect your bug
+> > comes from 41fe242979e4 ("mtd: spi-nor: fsl-quadspi: fix read error
+> > for flash size larger than 16MB").
+> 
+> I guess you're testing with an fsl-qspi controller, right? Can you try with this
+> patch?
 
-So turns out this patch *also* breaks my p5020ds :)
+I am testing nxp-flexspi controller and doing just read of small size 0x200.
+Also 1-1-1 protocol i.e. spi-rx/tx-bus-width as 1 is working fine for this flash.
 
-Even with patch 4 merged, see next.
+Without this patch read from 1-4-4 protocol is working correctly.
 
-It's the same crash:
+--
+Regards
+Yogesh Gaur
 
-  pcieport 2000:00:00.0: AER enabled with IRQ 480
-  Unable to handle kernel paging request for data at address 0x8000080080080000
-  Faulting instruction address: 0xc0000000000192cc
-  Oops: Kernel access of bad area, sig: 11 [#1]
-  BE SMP NR_CPUS=24 CoreNet Generic
-  Modules linked in:
-  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc3-gcc7x-g98c847323b3a #1
-  NIP:  c0000000000192cc LR: c0000000005d0f9c CTR: 0000000000100000
-  REGS: c0000000f31bb400 TRAP: 0300   Not tainted  (4.19.0-rc3-gcc7x-g98c847323b3a)
-  MSR:  0000000080029000 <CE,EE,ME>  CR: 24000224  XER: 00000000
-  DEAR: 8000080080080000 ESR: 0000000000800000 IRQMASK: 0 
-  GPR00: c0000000005d0f84 c0000000f31bb688 c00000000117dc00 8000080080080000 
-  GPR04: 0000000000000000 0000000000400000 00000ffbff241010 c0000000f31b8000 
-  GPR08: 0000000000000000 0000000000100000 0000000000000000 c0000000012d4710 
-  GPR12: 0000000084000422 c0000000012ff000 c000000000002774 0000000000000000 
-  GPR16: 0000000000000000 0000000000000000 0000000000000000 0000000000000000 
-  GPR20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000 
-  GPR24: 0000000000000000 0000000000000000 8000080080080000 c0000000ffff89a8 
-  GPR28: c0000000f3576400 c0000000f3576410 0000000000400000 c0000000012ecc98 
-  NIP [c0000000000192cc] ._memset_io+0x6c/0x9c
-  LR [c0000000005d0f9c] .fsl_qman_probe+0x198/0x928
-  Call Trace:
-  [c0000000f31bb688] [c0000000005d0f84] .fsl_qman_probe+0x180/0x928 (unreliable)
-  [c0000000f31bb728] [c0000000006432ec] .platform_drv_probe+0x60/0xb4
-  [c0000000f31bb7a8] [c00000000064083c] .really_probe+0x294/0x35c
-  [c0000000f31bb848] [c000000000640d2c] .__driver_attach+0x148/0x14c
-  [c0000000f31bb8d8] [c00000000063d7dc] .bus_for_each_dev+0xb0/0x118
-  [c0000000f31bb988] [c00000000063ff28] .driver_attach+0x34/0x4c
-  [c0000000f31bba08] [c00000000063f648] .bus_add_driver+0x174/0x2bc
-  [c0000000f31bbaa8] [c0000000006418bc] .driver_register+0x90/0x180
-  [c0000000f31bbb28] [c000000000643270] .__platform_driver_register+0x60/0x7c
-  [c0000000f31bbba8] [c000000000ee2a70] .fsl_qman_driver_init+0x24/0x38
-  [c0000000f31bbc18] [c0000000000023fc] .do_one_initcall+0x64/0x2b8
-  [c0000000f31bbcf8] [c000000000e9f480] .kernel_init_freeable+0x3a8/0x494
-  [c0000000f31bbda8] [c000000000002798] .kernel_init+0x24/0x148
-  [c0000000f31bbe28] [c0000000000009e8] .ret_from_kernel_thread+0x58/0x70
-  Instruction dump:
-  4e800020 2ba50003 40dd003c 3925fffc 5488402e 7929f082 7d082378 39290001 
-  550a801e 7d2903a6 7d4a4378 794a0020 <91430000> 38630004 4200fff8 70a50003 
-
-
-Comparing a working vs broken kernel, it seems to boil down to the fact
-that we're filtering out more PTE bits now that we use pte_pgprot() in
-ioremap_prot().
-
-With the old code we get:
-  ioremap_prot: addr 0xff800000 flags 0x241215
-  ioremap_prot: addr 0xff800000 flags 0x241215
-  map_kernel_page: ea 0x8000080080080000 pa 0xff800000 pte 0xff800241215
-
-
-And now we get:
-  ioremap_prot: addr 0xff800000 flags 0x241215 pte 0x241215
-  ioremap_prot: addr 0xff800000 pte 0x241215
-  ioremap_prot: addr 0xff800000 prot 0x241014
-  map_kernel_page: ea 0x8000080080080000 pa 0xff800000 pte 0xff800241014
-
-So we're losing 0x201, which for nohash book3e is:
-
-  #define _PAGE_PRESENT	0x000001 /* software: pte contains a translation */
-  #define _PAGE_PSIZE_4K	0x000200
-
-
-I haven't worked out if it's one or both of those that matter.
-
-The question is what's the right way to fix it? Should pte_pgprot() not
-be filtering those bits out on book3e?
-
-cheers
+> 
+> --->8---
+> 
+> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+> index 1ff3430f82c8..c47fe70c9f98 100644
+> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> @@ -477,9 +477,6 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)  static int
+> fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)  {
+>         switch (cmd) {
+> -       case SPINOR_OP_READ_1_1_4:
+> -       case SPINOR_OP_READ_1_1_4_4B:
+> -               return SEQID_READ;
+>         case SPINOR_OP_WREN:
+>                 return SEQID_WREN;
+>         case SPINOR_OP_WRDI:
+> @@ -490,8 +487,6 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+>                 return SEQID_SE;
+>         case SPINOR_OP_CHIP_ERASE:
+>                 return SEQID_CHIP_ERASE;
+> -       case SPINOR_OP_PP:
+> -               return SEQID_PP;
+>         case SPINOR_OP_RDID:
+>                 return SEQID_RDID;
+>         case SPINOR_OP_WRSR:
+> @@ -503,7 +498,11 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+>         case SPINOR_OP_BRWR:
+>                 return SEQID_BRWR;
+>         default:
+> -               if (cmd == q->nor[0].erase_opcode)
+> +               if (cmd == q->nor[0].read_opcode)
+> +                       return SEQID_READ;
+> +               else if (cmd == q->nor[0].program_opcode)
+> +                       return SEQID_PP;
+> +               else if (cmd == q->nor[0].erase_opcode)
+>                         return SEQID_SE;
+>                 dev_err(q->dev, "Unsupported cmd 0x%.2x\n", cmd);
+>                 break;
