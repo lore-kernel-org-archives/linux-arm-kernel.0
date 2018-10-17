@@ -1,29 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 17 Oct 2018 15:00:22 -0500
-Subject: [PATCH v2 2/2] dt-bindings: uniphier: move cache-uniphier.txt to
- vendor directory
-In-Reply-To: <1539318324-4938-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1539318324-4938-1-git-send-email-yamada.masahiro@socionext.com>
- <1539318324-4938-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20181017200022.GA14782@bogus>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 17 Oct 2018 13:16:53 -0700
+Subject: [PATCH V12 00/14] Krait clocks + Krait CPUfreq
+In-Reply-To: <153979105280.5275.841088095583550635@swboyd.mtv.corp.google.com>
+References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
+ <2ae96741-94c0-ba4c-fc19-05d33179683c@codeaurora.org>
+ <d682580d-5070-0271-197f-29d988172937@codeaurora.org>
+ <D8FC68C0-2572-4A86-81D9-D0099D314A45@gmail.com>
+ <F5A89365-C613-4FE2-AD32-DC0AC6DF380B@gmail.com>
+ <fb81b8d5-3d24-b413-8d59-33cb70e46f8b@codeaurora.org>
+ <153979105280.5275.841088095583550635@swboyd.mtv.corp.google.com>
+Message-ID: <153980741313.5275.10376918222904341760@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Oct 2018 13:25:24 +0900, Masahiro Yamada wrote:
-> Now, the Socionext vendor directory is available at
-> Documentation/devicetree/bindings/arm/socionext/
+Quoting Stephen Boyd (2018-10-17 08:44:12)
+> Quoting Sricharan R (2018-09-20 06:03:31)
+> > 
+> > 
+> > On 9/20/2018 1:54 AM, Craig wrote:
+> > > Yup, this patch seems to have fixed the higher frequencies from the quick test I did.
+> > >
+> >       Thanks !!. Can i take that as 
+> >           Tested-by: Craig Tatlor <ctatlor97@gmail.com>  ?
+> > 
 > 
-> Move cache-uniphier.txt over to it.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> Changes in v2:
->   - New patch
-> 
->  .../devicetree/bindings/arm/{uniphier => socionext}/cache-uniphier.txt    | 0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/arm/{uniphier => socionext}/cache-uniphier.txt (100%)
+> Is this patch series going to be resent?
 > 
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Nevermind. Looking at it I think I can apply all the clk ones and we're
+good to go. If you can send a followup patch series to change the
+registration and provider APIs to be clk_hw instead of clk based I would
+appreciate it.
