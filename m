@@ -1,100 +1,104 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Wed, 17 Oct 2018 01:54:01 +0000
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
- NOR flash memories
-In-Reply-To: <20181016141754.38dfcf90@bbrezillon>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
- <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181016140411.3f06e449@bbrezillon> <20181016141754.38dfcf90@bbrezillon>
-Message-ID: <VI1PR04MB1038B7650F887549CA5EE22B99FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Wed, 17 Oct 2018 11:01:17 +0900
+Subject: [PATCH v9 00/11] Introduce the Counter subsystem
+In-Reply-To: <cover.1532298882.git.vilhelm.gray@gmail.com>
+References: <cover.1532298882.git.vilhelm.gray@gmail.com>
+Message-ID: <20181017020117.GB3307@icarus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-> -----Original Message-----
-> From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> Sent: Tuesday, October 16, 2018 5:48 PM
-> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> Cc: Tudor Ambarus <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
-> dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
-> linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
-> cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org; Cristian.Birsan at microchip.com
-> Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
-> NOR flash memories
+On Sun, Jul 22, 2018 at 06:49:49PM -0400, William Breathitt Gray wrote:
+> Changes in v9:
+>  - Prefix exported symbols with "counter_" to make counter namespace
+>    explicit and clear
+>  - Replace scnprintf and snprintf lines with sprintf in 104-quad-8.c
+>    since we're dealing with sysfs files
 > 
-> On Tue, 16 Oct 2018 14:04:11 +0200
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> This revision is functionally identical to the last; changes in this
+> version were made to improve code clarity. Andrew Morton suggested
+> improving the names of the exported symbols to clean up the Counter
+> subsytem namespace. This revision adds a "counter_" prefix to the
+> exported symbols to keep the namespace tidy and these symbols as
+> clearly part of the Counter subsystem.
 > 
-> > On Tue, 16 Oct 2018 09:51:47 +0000
-> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> >
-> > > Hi Tudor,
-> > >
-> > > This patch is breaking the 1-4-4 Read protocol for the spansion flash
-> "s25fl512s".
-> > >
-> > > Without this patch read request command for Quad mode, 4-byte enable, is
-> coming as 0xEC i.e. SPINOR_OP_READ_1_4_4_4B.
-> > > But after applying this patch, read request command for Quad mode is
-> coming as 0x6C i.e. SPINOR_OP_READ_1_1_4_4B.
-> > >
-> > > This flash also supports non-uniform erase.
-> > > Can you please check and provide some suggestion?
-> >
-> > Are you sure the regression comes from this patch? I suspect your bug
-> > comes from 41fe242979e4 ("mtd: spi-nor: fsl-quadspi: fix read error
-> > for flash size larger than 16MB").
+> Andrew Morton also brought up a good point that the Generic Counter
+> "signal" terminology could conflict with the existing established use of
+> the term in other areas of the Linux kernel. I've changed the major
+> exported symbols in counter.h that used the "signal_" naming covention
+> to now use a "counter_signal_" naming convention in order to help
+> prevent this confusion; I've made similar changes to symbols in
+> counter.c as well. If this naming still causes trouble, we can consider
+> alternative names for this component.
 > 
-> I guess you're testing with an fsl-qspi controller, right? Can you try with this
-> patch?
-
-I am testing nxp-flexspi controller and doing just read of small size 0x200.
-Also 1-1-1 protocol i.e. spi-rx/tx-bus-width as 1 is working fine for this flash.
-
-Without this patch read from 1-4-4 protocol is working correctly.
-
---
-Regards
-Yogesh Gaur
-
+> William Breathitt Gray
 > 
-> --->8---
+> Benjamin Gaignard (2):
+>   counter: Add STM32 Timer quadrature encoder
+>   dt-bindings: counter: Document stm32 quadrature encoder
 > 
-> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-> index 1ff3430f82c8..c47fe70c9f98 100644
-> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> @@ -477,9 +477,6 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)  static int
-> fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)  {
->         switch (cmd) {
-> -       case SPINOR_OP_READ_1_1_4:
-> -       case SPINOR_OP_READ_1_1_4_4B:
-> -               return SEQID_READ;
->         case SPINOR_OP_WREN:
->                 return SEQID_WREN;
->         case SPINOR_OP_WRDI:
-> @@ -490,8 +487,6 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
->                 return SEQID_SE;
->         case SPINOR_OP_CHIP_ERASE:
->                 return SEQID_CHIP_ERASE;
-> -       case SPINOR_OP_PP:
-> -               return SEQID_PP;
->         case SPINOR_OP_RDID:
->                 return SEQID_RDID;
->         case SPINOR_OP_WRSR:
-> @@ -503,7 +498,11 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
->         case SPINOR_OP_BRWR:
->                 return SEQID_BRWR;
->         default:
-> -               if (cmd == q->nor[0].erase_opcode)
-> +               if (cmd == q->nor[0].read_opcode)
-> +                       return SEQID_READ;
-> +               else if (cmd == q->nor[0].program_opcode)
-> +                       return SEQID_PP;
-> +               else if (cmd == q->nor[0].erase_opcode)
->                         return SEQID_SE;
->                 dev_err(q->dev, "Unsupported cmd 0x%.2x\n", cmd);
->                 break;
+> Fabrice Gasnier (2):
+>   counter: stm32-lptimer: add counter device
+>   dt-bindings: counter: Adjust dt-bindings for STM32 lptimer move
+> 
+> William Breathitt Gray (7):
+>   counter: Introduce the Generic Counter interface
+>   counter: Documentation: Add Generic Counter sysfs documentation
+>   docs: Add Generic Counter interface documentation
+>   iio: 104-quad-8: Update license boilerplate
+>   counter: 104-quad-8: Add Generic Counter interface support
+>   counter: 104-quad-8: Documentation: Add Generic Counter sysfs
+>     documentation
+>   iio: counter: Add deprecation markings for IIO Counter attributes
+> 
+>  Documentation/ABI/testing/sysfs-bus-counter   |  230 +++
+>  .../ABI/testing/sysfs-bus-counter-104-quad-8  |   36 +
+>  Documentation/ABI/testing/sysfs-bus-iio       |    8 +
+>  .../testing/sysfs-bus-iio-counter-104-quad-8  |   16 +
+>  .../{iio => }/counter/stm32-lptimer-cnt.txt   |    0
+>  .../bindings/counter/stm32-timer-cnt.txt      |   31 +
+>  .../devicetree/bindings/mfd/stm32-lptimer.txt |    2 +-
+>  .../devicetree/bindings/mfd/stm32-timers.txt  |    7 +
+>  Documentation/driver-api/generic-counter.rst  |  342 ++++
+>  Documentation/driver-api/index.rst            |    1 +
+>  MAINTAINERS                                   |   15 +-
+>  drivers/Kconfig                               |    2 +
+>  drivers/Makefile                              |    1 +
+>  drivers/{iio => }/counter/104-quad-8.c        |  782 +++++++-
+>  drivers/counter/Kconfig                       |   51 +
+>  drivers/{iio => }/counter/Makefile            |    5 +-
+>  drivers/counter/counter.c                     | 1567 +++++++++++++++++
+>  drivers/{iio => }/counter/stm32-lptimer-cnt.c |  361 +++-
+>  drivers/counter/stm32-timer-cnt.c             |  390 ++++
+>  drivers/iio/Kconfig                           |    1 -
+>  drivers/iio/Makefile                          |    1 -
+>  drivers/iio/counter/Kconfig                   |   34 -
+>  include/linux/counter.h                       |  510 ++++++
+>  include/linux/counter_enum.h                  |   45 +
+>  24 files changed, 4352 insertions(+), 86 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+>  rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
+>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>  create mode 100644 Documentation/driver-api/generic-counter.rst
+>  rename drivers/{iio => }/counter/104-quad-8.c (44%)
+>  create mode 100644 drivers/counter/Kconfig
+>  rename drivers/{iio => }/counter/Makefile (46%)
+>  create mode 100644 drivers/counter/counter.c
+>  rename drivers/{iio => }/counter/stm32-lptimer-cnt.c (48%)
+>  create mode 100644 drivers/counter/stm32-timer-cnt.c
+>  delete mode 100644 drivers/iio/counter/Kconfig
+>  create mode 100644 include/linux/counter.h
+>  create mode 100644 include/linux/counter_enum.h
+> 
+> -- 
+> 2.18.0
+
+Hi Greg,
+
+It's been some time now since this patchset was submitted so I want to
+check up and see if I should try to merge it in through IIO or some
+other subsystem, or wait for now for additional reviews.
+
+Sincerely,
+
+William Breathitt Gray
