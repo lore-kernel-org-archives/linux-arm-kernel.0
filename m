@@ -1,29 +1,45 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 17 Oct 2018 12:37:50 +0000
-Subject: [PATCH v4 0/4] Port mxs-dcp to imx6ull and imx6sll
-Message-ID: <cover.1539779579.git.leonard.crestez@nxp.com>
+Date: Wed, 17 Oct 2018 12:37:54 +0000
+Subject: [PATCH v4 3/4] ARM: dts: imx6ull: Add dcp node
+In-Reply-To: <cover.1539779579.git.leonard.crestez@nxp.com>
+References: <cover.1539779579.git.leonard.crestez@nxp.com>
+Message-ID: <f503eea6c702aeff091f4c03d4059b67ec17b2b4.1539779579.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCP block is present on 6sll and 6ull but not enabled. The hardware is
-mostly compatible with 6sl, the only important difference is that explicit
-clock enabling is required.
+The DCP block on 6ull has no major differences other than requiring
+explicit clock enabling.
 
-There were several issues with the functionality of this driver (it didn't
-even probe properly) but they are fixed in cryptodev/master by this series:
-    https://lore.kernel.org/patchwork/cover/994874/
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
+---
+ arch/arm/boot/dts/imx6ull.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Leonard Crestez (4):
-  dt-bindings: crypto: Mention clocks for mxs-dcp
-  crypto: mxs-dcp - Add support for dcp clk
-  ARM: dts: imx6ull: Add dcp node
-  ARM: imx_v6_v7_defconfig: Enable CRYPTO_DEV_MXS_DCP
-
- .../devicetree/bindings/crypto/fsl-dcp.txt    |  2 ++
- arch/arm/boot/dts/imx6ull.dtsi                | 10 +++++++
- arch/arm/configs/imx_v6_v7_defconfig          |  1 +
- drivers/crypto/mxs-dcp.c                      | 28 +++++++++++++++++--
- 4 files changed, 38 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
+index 796ed35d4ac9..f3668fe69eac 100644
+--- a/arch/arm/boot/dts/imx6ull.dtsi
++++ b/arch/arm/boot/dts/imx6ull.dtsi
+@@ -37,10 +37,20 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			reg = <0x02200000 0x100000>;
+ 			ranges;
+ 
++			dcp: crypto at 2280000 {
++				compatible = "fsl,imx6ull-dcp", "fsl,imx28-dcp";
++				reg = <0x02280000 0x4000>;
++				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6ULL_CLK_DCP_CLK>;
++				clock-names = "dcp";
++			};
++
+ 			iomuxc_snvs: iomuxc-snvs at 2290000 {
+ 				compatible = "fsl,imx6ull-iomuxc-snvs";
+ 				reg = <0x02290000 0x4000>;
+ 			};
+ 
 -- 
 2.17.1
