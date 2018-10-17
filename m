@@ -1,122 +1,127 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 17 Oct 2018 13:11:03 +0530
-Subject: [PATCH v2 10/21] PCI: keystone: Use SYSCON APIs to get device ID from
- control module
+Date: Wed, 17 Oct 2018 13:11:06 +0530
+Subject: [PATCH v2 13/21] PCI: keystone: Cleanup configuration space access
 In-Reply-To: <20181017074114.28239-1-kishon@ti.com>
 References: <20181017074114.28239-1-kishon@ti.com>
-Message-ID: <20181017074114.28239-11-kishon@ti.com>
+Message-ID: <20181017074114.28239-14-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control module registers should be read using syscon APIs.
-pci-keystone.c uses platform_get_resource to get control module registers.
-Fix it here by using syscon APIs to get device id from control module.
+Cleanup configuration space access by removing ks_pcie_cfg_setup
+which has an unncessary check of "if (bus == 0)" which will never be the
+case of *_other_conf() and adding macros for configuring the CFG_SETUP
+register required for accessing the configuration space of the device.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 45 ++++++++++++++++-------
- 1 file changed, 32 insertions(+), 13 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 70 +++++++----------------
+ 1 file changed, 20 insertions(+), 50 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index e2045b5d2af2..e22328f89c84 100644
+index 4f764ec49a4c..1f14de0ef27f 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -15,12 +15,14 @@
- #include <linux/interrupt.h>
- #include <linux/irqdomain.h>
- #include <linux/init.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/msi.h>
- #include <linux/of_irq.h>
- #include <linux/of.h>
- #include <linux/of_pci.h>
- #include <linux/platform_device.h>
- #include <linux/phy/phy.h>
-+#include <linux/regmap.h>
- #include <linux/resource.h>
- #include <linux/signal.h>
+@@ -45,7 +45,13 @@
  
-@@ -28,6 +30,9 @@
- 
- #define DRIVER_NAME	"keystone-pcie"
- 
-+#define PCIE_VENDORID_MASK	0xffff
-+#define PCIE_DEVICEID_SHIFT	16
+ /* Application registers */
+ #define CMD_STATUS			0x004
 +
- /* DEV_STAT_CTRL */
- #define PCIE_CAP_BASE		0x70
- 
-@@ -744,10 +749,34 @@ static int ks_pcie_fault(unsigned long addr, unsigned int fsr,
- 	return 0;
+ #define CFG_SETUP			0x008
++#define CFG_BUS(x)			(((x) & 0xff) << 16)
++#define CFG_DEVICE(x)			(((x) & 0x1f) << 8)
++#define CFG_FUNC(x)			((x) & 0x7)
++#define CFG_TYPE1			BIT(24)
++
+ #define OB_SIZE				0x030
+ #define CFG_PCIM_WIN_SZ_IDX		3
+ #define CFG_PCIM_WIN_CNT		32
+@@ -364,60 +370,21 @@ static void ks_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
+ 	ks_pcie_app_writel(ks_pcie, CMD_STATUS, OB_XLAT_EN_VAL | val);
  }
  
-+static int __init ks_pcie_init_id(struct keystone_pcie *ks_pcie)
-+{
-+	int ret;
-+	unsigned int id;
-+	struct regmap *devctrl_regs;
-+	struct dw_pcie *pci = ks_pcie->pci;
-+	struct device *dev = pci->dev;
-+	struct device_node *np = dev->of_node;
-+
-+	devctrl_regs = syscon_regmap_lookup_by_phandle(np, "ti,syscon-pcie-id");
-+	if (IS_ERR(devctrl_regs))
-+		return PTR_ERR(devctrl_regs);
-+
-+	ret = regmap_read(devctrl_regs, 0, &id);
-+	if (ret)
-+		return ret;
-+
-+	dw_pcie_writew_dbi(pci, PCI_VENDOR_ID, id & PCIE_VENDORID_MASK);
-+	dw_pcie_writew_dbi(pci, PCI_DEVICE_ID, id >> PCIE_DEVICEID_SHIFT);
-+
-+	return 0;
-+}
-+
- static int __init ks_pcie_host_init(struct pcie_port *pp)
+-/**
+- * ks_pcie_cfg_setup() - Set up configuration space address for a device
+- *
+- * @ks_pcie: ptr to keystone_pcie structure
+- * @bus: Bus number the device is residing on
+- * @devfn: device, function number info
+- *
+- * Forms and returns the address of configuration space mapped in PCIESS
+- * address space 0.  Also configures CFG_SETUP for remote configuration space
+- * access.
+- *
+- * The address space has two regions to access configuration - local and remote.
+- * We access local region for bus 0 (as RC is attached on bus 0) and remote
+- * region for others with TYPE 1 access when bus > 1.  As for device on bus = 1,
+- * we will do TYPE 0 access as it will be on our secondary bus (logical).
+- * CFG_SETUP is needed only for remote configuration access.
+- */
+-static void __iomem *ks_pcie_cfg_setup(struct keystone_pcie *ks_pcie, u8 bus,
+-				       unsigned int devfn)
+-{
+-	u8 device = PCI_SLOT(devfn), function = PCI_FUNC(devfn);
+-	struct dw_pcie *pci = ks_pcie->pci;
+-	struct pcie_port *pp = &pci->pp;
+-	u32 regval;
+-
+-	if (bus == 0)
+-		return pci->dbi_base;
+-
+-	regval = (bus << 16) | (device << 8) | function;
+-
+-	/*
+-	 * Since Bus#1 will be a virtual bus, we need to have TYPE0
+-	 * access only.
+-	 * TYPE 1
+-	 */
+-	if (bus != 1)
+-		regval |= BIT(24);
+-
+-	ks_pcie_app_writel(ks_pcie, CFG_SETUP, regval);
+-	return pp->va_cfg0_base;
+-}
+-
+ static int ks_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ 				 unsigned int devfn, int where, int size,
+ 				 u32 *val)
  {
  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
  	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
-+	int ret;
+-	u8 bus_num = bus->number;
+-	void __iomem *addr;
++	u32 reg;
  
- 	dw_pcie_setup_rc(pp);
+-	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
++	reg = CFG_BUS(bus->number) | CFG_DEVICE(PCI_SLOT(devfn)) |
++		CFG_FUNC(PCI_FUNC(devfn));
++	if (bus->parent->number != pp->root_bus_nr)
++		reg |= CFG_TYPE1;
++	ks_pcie_app_writel(ks_pcie, CFG_SETUP, reg);
  
-@@ -757,8 +786,9 @@ static int __init ks_pcie_host_init(struct pcie_port *pp)
- 	writew(PCI_IO_RANGE_TYPE_32 | (PCI_IO_RANGE_TYPE_32 << 8),
- 			pci->dbi_base + PCI_IO_BASE);
+-	return dw_pcie_read(addr + where, size, val);
++	return dw_pcie_read(pp->va_cfg0_base + where, size, val);
+ }
  
--	/* update the Vendor ID */
--	writew(ks_pcie->device_id, pci->dbi_base + PCI_DEVICE_ID);
-+	ret = ks_pcie_init_id(ks_pcie);
-+	if (ret < 0)
-+		return ret;
+ static int ks_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+@@ -426,12 +393,15 @@ static int ks_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ {
+ 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+ 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
+-	u8 bus_num = bus->number;
+-	void __iomem *addr;
++	u32 reg;
  
- 	/*
- 	 * PCIe access errors that result into OCP errors are caught by ARM as
-@@ -864,8 +894,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct dw_pcie *pci;
- 	struct keystone_pcie *ks_pcie;
--	struct resource *res;
--	void __iomem *reg_p;
- 	struct phy *phy;
- 	int ret;
+-	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
++	reg = CFG_BUS(bus->number) | CFG_DEVICE(PCI_SLOT(devfn)) |
++		CFG_FUNC(PCI_FUNC(devfn));
++	if (bus->parent->number != pp->root_bus_nr)
++		reg |= CFG_TYPE1;
++	ks_pcie_app_writel(ks_pcie, CFG_SETUP, reg);
  
-@@ -893,15 +921,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
- 			return ret;
- 	}
+-	return dw_pcie_write(addr + where, size, val);
++	return dw_pcie_write(pp->va_cfg0_base + where, size, val);
+ }
  
--	/* index 2 is to read PCI DEVICE_ID */
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
--	reg_p = devm_ioremap_resource(dev, res);
--	if (IS_ERR(reg_p))
--		return PTR_ERR(reg_p);
--	ks_pcie->device_id = readl(reg_p) >> 16;
--	devm_iounmap(dev, reg_p);
--	devm_release_mem_region(dev, res->start, resource_size(res));
--
- 	ks_pcie->np = dev->of_node;
- 	platform_set_drvdata(pdev, ks_pcie);
- 	ks_pcie->clk = devm_clk_get(dev, "pcie");
+ /**
 -- 
 2.17.1
