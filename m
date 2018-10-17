@@ -1,47 +1,43 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 17 Oct 2018 18:52:52 +0200
-Subject: [PATCH v9 5/6] arm64: zynqmp: Add DDRC node
-In-Reply-To: <1539581388-23963-6-git-send-email-manish.narani@xilinx.com>
-References: <1539581388-23963-1-git-send-email-manish.narani@xilinx.com>
- <1539581388-23963-6-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20181017165252.GG22535@zn.tnic>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Oct 2018 18:07:12 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Fix big-endian CMD_SYNC writes
+In-Reply-To: <e14feb6f7dedc90d181e20fbeaaba49156b03b09.1539689371.git.robin.murphy@arm.com>
+References: <e14feb6f7dedc90d181e20fbeaaba49156b03b09.1539689371.git.robin.murphy@arm.com>
+Message-ID: <20181017170712.GA4570@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 10:59:47AM +0530, Manish Narani wrote:
-> Add ddrc memory controller node in dts. The size mentioned in dts is
-> 0x30000, because we need to access DDR_QOS INTR registers located at
-> 0xFD090208 from this driver.
+On Tue, Oct 16, 2018 at 12:31:07PM +0100, Robin Murphy wrote:
+> When we insert the sync sequence number into the CMD_SYNC.MSIData field,
+> we do so in CPU-native byte order, before writing out the whole command
+> as explicitly little-endian dwords. Thus on big-endian systems, the SMMU
+> will receive and write back a byteswapped version of sync_nr, which would
+> be perfect if it were targeting a similarly-little-endian ITS, but since
+> it's actually writing back to memory being polled by the CPUs, they're
+> going to end up seeing the wrong thing.
 > 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> Since the SMMU doesn't care what the MSIData actually contains, the
+> minimal-overhead solution is to simply add an extra byteswap initially,
+> such that it then writes back the big-endian format directly.
+> 
+> Fixes: 37de98f8f1cf ("iommu/arm-smmu-v3: Use CMD_SYNC completion MSI")
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > ---
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  drivers/iommu/arm-smmu-v3.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> index 29ce234..a81d3b16 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> @@ -355,6 +355,13 @@
->  			xlnx,bus-width = <64>;
->  		};
->  
-> +		mc: memory-controller at fd070000 {
-> +			compatible = "xlnx,zynqmp-ddrc-2.40a";
-> +			reg = <0x0 0xfd070000 0x0 0x30000>;
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0 112 4>;
-> +		};
-> +
->  		gem0: ethernet at ff0b0000 {
->  			compatible = "cdns,zynqmp-gem", "cdns,gem";
->  			status = "disabled";
-> -- 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index db402e8b068b..867ba548c2cc 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -952,7 +952,7 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+>  	struct arm_smmu_cmdq_ent ent = {
+>  		.opcode = CMDQ_OP_CMD_SYNC,
+>  		.sync	= {
+> -			.msiaddr = virt_to_phys(&smmu->sync_count),
+> +			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
 
-Still needs DT folks ACK.
+Hmm, aren't you swabbing the address here? Don't we want to swab the data?
+We also need a comment to explain this!
 
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Will
