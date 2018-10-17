@@ -1,71 +1,172 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 08:41:18 -0700
-Subject: [PATCH v13 3/8] clk: Use devm_ in the register fixed factor clock
-In-Reply-To: <20181014202122.GA13473@centauri.lan>
-References: <20180614215358.11264-1-ilia.lin@gmail.com>
- <20180614215358.11264-4-ilia.lin@gmail.com>
- <CAHYQr0rR=mcV-SxZFW+5M4CTUaTv_f_bruyq91HiGP6sqUZ3Yw@mail.gmail.com>
- <153938209728.5275.8811599608746761178@swboyd.mtv.corp.google.com>
- <20181014202122.GA13473@centauri.lan>
-Message-ID: <153979087829.5275.6249138489771592939@swboyd.mtv.corp.google.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 17 Oct 2018 23:42:47 +0800
+Subject: [PATCH v4 3/4] perf/smmuv3: Add MSI irq support
+In-Reply-To: <20181016124920.24708-4-shameerali.kolothum.thodi@huawei.com>
+References: <20181016124920.24708-4-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <201810172330.GRaDCqBM%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Niklas Cassel (2018-10-14 13:21:22)
-> On Fri, Oct 12, 2018 at 03:08:17PM -0700, Stephen Boyd wrote:
-> > Quoting Ricardo Salveti (2018-09-14 11:53:02)
-> > > On Thu, Jun 14, 2018 at 6:55 PM <ilia.lin@gmail.com> wrote:
-> > > >
-> > > > From: Ilia Lin <ilialin@codeaurora.org>
-> > > >
-> > > > Use devm_clk_hw_register instead of clk_hw_register
-> > > > to simplify the usage of this API. This way drivers that call
-> > > > the clk_hw_register_fixed_factor won't need to maintain
-> > > > a data structure for further cleanup.
-> > > >
-> > > > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> > > > Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
-> > > > ---
-> > > >  drivers/clk/clk-fixed-factor.c | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > >
-> > > > diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> > > > index a5d402de5584..8e39bda8e596 100644
-> > > > --- a/drivers/clk/clk-fixed-factor.c
-> > > > +++ b/drivers/clk/clk-fixed-factor.c
-> > > > @@ -94,7 +94,7 @@ struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
-> > > >         init.num_parents = 1;
-> > > >
-> > > >         hw = &fix->hw;
-> > > > -       ret = clk_hw_register(dev, hw);
-> > > > +       ret = devm_clk_hw_register(dev, hw);
-> > > 
-> > > Not sure what is the current state of this patch-set, but this change
-> > > breaks drivers calling clk_hw_register_fixed_factor with a NULL dev
-> > > (e.g. imx_clk_fixed_factor), as devm_clk_hw_register needs a valid dev
-> > > for devres_add to work.
-> > > 
-> > 
-> > Yep. Probably better to just have a driver register the clk_hw structure
-> > itself with the clk framework vs. trying to get it right here in the
-> > generic type registration function.
-> > 
-> 
-> Hello Ilia, Stephen,
-> 
-> As you know this patch series is needed to get DVFS working on msm8996.
-> 
-> Ilia, are you planning on submitting a new patch set for this, or would
-> you prefer if we submitted a new patch version for you?
-> 
-> Looking at this patch series, this appears to be the only outstanding
-> review comment.
+Hi Shameer,
 
-Sorry, you were too hopeful :/
+Thank you for the patch! Yet something to improve:
 
-> Stephen, do you have any review comments on this series?
-> 
+[auto build test ERROR on linux-sof-driver/master]
+[also build test ERROR on v4.19-rc8 next-20181017]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Yes, my nitpick should be easy to resolve and then it's just a few open
-questions after that. Otherwise things seem fine and the CPU can run
-really fast without bumping up the voltages?
+url:    https://github.com/0day-ci/linux/commits/Shameer-Kolothum/arm64-SMMUv3-PMU-driver-with-IORT-support/20181017-063949
+base:   https://github.com/thesofproject/linux master
+config: sh-allyesconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sh 
+
+All errors (new ones prefixed by >>):
+
+   In file included from include/linux/kernel.h:11:0,
+                    from include/linux/list.h:9,
+                    from include/linux/resource_ext.h:17,
+                    from include/linux/acpi.h:26,
+                    from drivers/perf/arm_smmuv3_pmu.c:37:
+   drivers/perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_counter_set_value':
+   include/linux/bitops.h:7:24: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define BIT(nr)   (1UL << (nr))
+                           ^
+   drivers/perf/arm_smmuv3_pmu.c:152:31: note: in expansion of macro 'BIT'
+     if (smmu_pmu->counter_mask & BIT(32))
+                                  ^~~
+   drivers/perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_counter_get_value':
+   include/linux/bitops.h:7:24: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define BIT(nr)   (1UL << (nr))
+                           ^
+   drivers/perf/arm_smmuv3_pmu.c:162:31: note: in expansion of macro 'BIT'
+     if (smmu_pmu->counter_mask & BIT(32))
+                                  ^~~
+   drivers/perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_free_msis':
+>> drivers/perf/arm_smmuv3_pmu.c:601:2: error: implicit declaration of function 'platform_msi_domain_free_irqs'; did you mean 'platform_pm_freeze'? [-Werror=implicit-function-declaration]
+     platform_msi_domain_free_irqs(dev);
+     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     platform_pm_freeze
+   drivers/perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_setup_msi':
+   drivers/perf/arm_smmuv3_pmu.c:632:8: error: implicit declaration of function 'platform_msi_domain_alloc_irqs'; did you mean 'platform_device_alloc'? [-Werror=implicit-function-declaration]
+     ret = platform_msi_domain_alloc_irqs(dev, 1, smmu_pmu_write_msi_msg);
+           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+           platform_device_alloc
+   In file included from include/linux/list.h:9:0,
+                    from include/linux/resource_ext.h:17,
+                    from include/linux/acpi.h:26,
+                    from drivers/perf/arm_smmuv3_pmu.c:37:
+   include/linux/msi.h:114:38: error: 'struct device' has no member named 'msi_list'
+    #define dev_to_msi_list(dev)  (&(dev)->msi_list)
+                                         ^
+   include/linux/kernel.h:961:26: note: in definition of macro 'container_of'
+     void *__mptr = (void *)(ptr);     \
+                             ^~~
+   include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
+     list_entry((ptr)->next, type, member)
+     ^~~~~~~~~~
+   include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
+     list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
+     list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+                      ^~~~~~~~~~~~~~~
+   drivers/perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro 'first_msi_entry'
+     desc = first_msi_entry(dev);
+            ^~~~~~~~~~~~~~~
+   In file included from include/linux/ioport.h:13:0,
+                    from include/linux/acpi.h:25,
+                    from drivers/perf/arm_smmuv3_pmu.c:37:
+   include/linux/msi.h:114:38: error: 'struct device' has no member named 'msi_list'
+    #define dev_to_msi_list(dev)  (&(dev)->msi_list)
+                                         ^
+   include/linux/compiler.h:316:19: note: in definition of macro '__compiletime_assert'
+      bool __cond = !(condition);    \
+                      ^~~~~~~~~
+   include/linux/compiler.h:339:2: note: in expansion of macro '_compiletime_assert'
+     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+     ^~~~~~~~~~~~~~~~~~~
+   include/linux/build_bug.h:45:37: note: in expansion of macro 'compiletime_assert'
+    #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+                                        ^~~~~~~~~~~~~~~~~~
+   include/linux/kernel.h:962:2: note: in expansion of macro 'BUILD_BUG_ON_MSG'
+     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
+     ^~~~~~~~~~~~~~~~
+   include/linux/kernel.h:962:20: note: in expansion of macro '__same_type'
+     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
+                       ^~~~~~~~~~~
+   include/linux/list.h:366:2: note: in expansion of macro 'container_of'
+     container_of(ptr, type, member)
+     ^~~~~~~~~~~~
+   include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
+     list_entry((ptr)->next, type, member)
+     ^~~~~~~~~~
+   include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
+     list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
+     list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+                      ^~~~~~~~~~~~~~~
+   drivers/perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro 'first_msi_entry'
+     desc = first_msi_entry(dev);
+            ^~~~~~~~~~~~~~~
+   include/linux/msi.h:114:38: error: 'struct device' has no member named 'msi_list'
+    #define dev_to_msi_list(dev)  (&(dev)->msi_list)
+                                         ^
+   include/linux/compiler.h:316:19: note: in definition of macro '__compiletime_assert'
+      bool __cond = !(condition);    \
+                      ^~~~~~~~~
+   include/linux/compiler.h:339:2: note: in expansion of macro '_compiletime_assert'
+     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+     ^~~~~~~~~~~~~~~~~~~
+   include/linux/build_bug.h:45:37: note: in expansion of macro 'compiletime_assert'
+    #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+                                        ^~~~~~~~~~~~~~~~~~
+   include/linux/kernel.h:962:2: note: in expansion of macro 'BUILD_BUG_ON_MSG'
+     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
+     ^~~~~~~~~~~~~~~~
+   include/linux/kernel.h:963:6: note: in expansion of macro '__same_type'
+        !__same_type(*(ptr), void),   \
+         ^~~~~~~~~~~
+   include/linux/list.h:366:2: note: in expansion of macro 'container_of'
+     container_of(ptr, type, member)
+     ^~~~~~~~~~~~
+   include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
+     list_entry((ptr)->next, type, member)
+     ^~~~~~~~~~
+   include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
+     list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+     ^~~~~~~~~~~~~~~~
+   include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
+     list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+                      ^~~~~~~~~~~~~~~
+   drivers/perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro 'first_msi_entry'
+     desc = first_msi_entry(dev);
+            ^~~~~~~~~~~~~~~
+   drivers/perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_probe':
+
+vim +601 drivers/perf/arm_smmuv3_pmu.c
+
+   596	
+   597	static void smmu_pmu_free_msis(void *data)
+   598	{
+   599		struct device *dev = data;
+   600	
+ > 601		platform_msi_domain_free_irqs(dev);
+   602	}
+   603	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 47775 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181017/6a955108/attachment-0001.gz>
