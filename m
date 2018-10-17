@@ -1,124 +1,233 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 16 Oct 2018 20:08:41 -0700
-Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown hooks
- into pm_runtime hooks
-In-Reply-To: <20181016071626.m6jkoiixkvxks5ob@flea>
-References: <20181016031141.16259-1-anarsoul@gmail.com>
- <20181016071626.m6jkoiixkvxks5ob@flea>
-Message-ID: <CA+E=qVcK7mBbZ-C8FyAxUty_wQ_aOjo1b0+iU4E5CgG=yBCj=g@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 17 Oct 2018 08:51:39 +0530
+Subject: [PATCH 11/19] PCI: keystone: Cleanup PHY handling
+In-Reply-To: <20181016170656.GD16390@e107981-ln.cambridge.arm.com>
+References: <20181015130721.5535-1-kishon@ti.com>
+ <20181015130721.5535-12-kishon@ti.com>
+ <20181016170656.GD16390@e107981-ln.cambridge.arm.com>
+Message-ID: <647103e4-1a38-d3f8-9779-3429530e2f31@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 12:16 AM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
->
-> On Mon, Oct 15, 2018 at 08:11:41PM -0700, Vasily Khoruzhick wrote:
-> > startup() and shutdown() hooks are called for both substreams,
-> > so stopping either substream when another is running breaks the
-> > latter.
-> >
-> > E.g. playback breaks if capture is stopped when playback is running.
-> >
-> > Move code from startup() and shutdown() to resume() and suspend()
-> > hooks respectively to fix this issue
-> >
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > ---
-> > v2: - rename from "ASoC: sun4i-i2s: don't try to start up
-> >                  or shut down DAI if it's active"
-> >     - move code from startup/shutdown hooks into pm_runtime
-> >
-> >  sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
-> >  1 file changed, 25 insertions(+), 36 deletions(-)
-> >
-> > diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-> > index a4aa931ebfae..daa6c08cffbc 100644
-> > --- a/sound/soc/sunxi/sun4i-i2s.c
-> > +++ b/sound/soc/sunxi/sun4i-i2s.c
-> > @@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
-> >       return 0;
-> >  }
-> >
-> > -static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
-> > -                          struct snd_soc_dai *dai)
-> > -{
-> > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> > -
-> > -     /* Enable the whole hardware block */
-> > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > -                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> > -
-> > -     /* Enable the first output line */
-> > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > -                        SUN4I_I2S_CTRL_SDO_EN_MASK,
-> > -                        SUN4I_I2S_CTRL_SDO_EN(0));
-> > -
-> > -
-> > -     return clk_prepare_enable(i2s->mod_clk);
-> > -}
-> > -
-> > -static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
-> > -                            struct snd_soc_dai *dai)
-> > -{
-> > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> > -
-> > -     clk_disable_unprepare(i2s->mod_clk);
-> > -
-> > -     /* Disable our output lines */
-> > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > -                        SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
-> > -
-> > -     /* Disable the whole hardware block */
-> > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > -                        SUN4I_I2S_CTRL_GL_EN, 0);
-> > -}
-> > -
-> >  static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
-> >                               unsigned int freq, int dir)
-> >  {
-> > @@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
-> >       .hw_params      = sun4i_i2s_hw_params,
-> >       .set_fmt        = sun4i_i2s_set_fmt,
-> >       .set_sysclk     = sun4i_i2s_set_sysclk,
-> > -     .shutdown       = sun4i_i2s_shutdown,
-> > -     .startup        = sun4i_i2s_startup,
-> >       .trigger        = sun4i_i2s_trigger,
-> >  };
-> >
-> > @@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
-> >               goto err_disable_clk;
-> >       }
-> >
-> > +     /* Enable the whole hardware block */
-> > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > +                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> > +
->
-> So this is definitely needed
->
-> > +     /* Enable the first output line */
-> > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > +                        SUN4I_I2S_CTRL_SDO_EN_MASK,
-> > +                        SUN4I_I2S_CTRL_SDO_EN(0));
-> > +
-> > +     ret = clk_prepare_enable(i2s->mod_clk);
-> > +     if (ret) {
-> > +             dev_err(dev, "Failed to enable module clock\n");
-> > +             goto err_disable_clk;
-> > +     }
->
-> But we really don't want to enable the module clock before the
-> playback / capture actually starts. And I'm guessing it would make
-> more sense to keep the output enable configuration there as well,
-> since it's likely that we will have support for it in the future, and
-> we'll need additional information from ASoC when we'll do.
+Lorenzo,
 
-Should we go with v1 version of my patch then? I see no reason to
-shuffle code around if we keep startup() and shutdown() hooks.
+On Tuesday 16 October 2018 10:36 PM, Lorenzo Pieralisi wrote:
+> On Mon, Oct 15, 2018 at 06:37:13PM +0530, Kishon Vijay Abraham I wrote:
+>> Cleanup PHY handling by using devm_phy_optional_get to get PHYs if
+>> the PHYs are optional, creating a device link between the PHY device
+>> and the controller device and disable PHY on error cases here.
+>> Also invoke phy_reset() as part of initializing PHY.
+> 
+> Hi Kishon,
+> 
+> it is a bit of nitpicking, I know it is annoying but when I read "Also"
+> in commit logs there is almost certainly a reason to split the patch
+> into logical standalone entities, this one looks like one.
+> 
+> Every patch must be a self-contained change that, in case we have to
+> revert it, must not affect other patches.
+> 
+> There are some more patches in the series that would benefit from
+> splitting so I kindly ask you to go through them and repost, we
+> should still be able to hit v4.20.
 
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+Sure, I'll repost them.
+
+Thanks
+Kishon
+> 
+> Thanks,
+> Lorenzo
+> 
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/pci/controller/dwc/pci-keystone.c | 126 +++++++++++++++++++---
+>>  1 file changed, 110 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+>> index e22328f89c84..bf37609ad75b 100644
+>> --- a/drivers/pci/controller/dwc/pci-keystone.c
+>> +++ b/drivers/pci/controller/dwc/pci-keystone.c
+>> @@ -105,6 +105,9 @@ struct keystone_pcie {
+>>  
+>>  	int			num_msi_host_irqs;
+>>  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
+>> +	int			num_lanes;
+>> +	struct phy		**phy;
+>> +	struct device_link	**link;
+>>  	struct			device_node *msi_intc_np;
+>>  	struct irq_domain	*legacy_irq_domain;
+>>  	struct device_node	*np;
+>> @@ -880,22 +883,61 @@ static const struct dw_pcie_ops ks_pcie_dw_pcie_ops = {
+>>  	.link_up = ks_pcie_link_up,
+>>  };
+>>  
+>> -static int __exit ks_pcie_remove(struct platform_device *pdev)
+>> +static void ks_pcie_disable_phy(struct keystone_pcie *ks_pcie)
+>>  {
+>> -	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+>> +	int num_lanes = ks_pcie->num_lanes;
+>>  
+>> -	clk_disable_unprepare(ks_pcie->clk);
+>> +	while (num_lanes--) {
+>> +		phy_power_off(ks_pcie->phy[num_lanes]);
+>> +		phy_exit(ks_pcie->phy[num_lanes]);
+>> +	}
+>> +}
+>> +
+>> +static int ks_pcie_enable_phy(struct keystone_pcie *ks_pcie)
+>> +{
+>> +	int i;
+>> +	int ret;
+>> +	int num_lanes = ks_pcie->num_lanes;
+>> +
+>> +	for (i = 0; i < num_lanes; i++) {
+>> +		ret = phy_reset(ks_pcie->phy[i]);
+>> +		if (ret < 0)
+>> +			goto err_phy;
+>> +
+>> +		ret = phy_init(ks_pcie->phy[i]);
+>> +		if (ret < 0)
+>> +			goto err_phy;
+>> +
+>> +		ret = phy_power_on(ks_pcie->phy[i]);
+>> +		if (ret < 0) {
+>> +			phy_exit(ks_pcie->phy[i]);
+>> +			goto err_phy;
+>> +		}
+>> +	}
+>>  
+>>  	return 0;
+>> +
+>> +err_phy:
+>> +	while (--i >= 0) {
+>> +		phy_power_off(ks_pcie->phy[i]);
+>> +		phy_exit(ks_pcie->phy[i]);
+>> +	}
+>> +
+>> +	return ret;
+>>  }
+>>  
+>>  static int __init ks_pcie_probe(struct platform_device *pdev)
+>>  {
+>>  	struct device *dev = &pdev->dev;
+>> +	struct device_node *np = dev->of_node;
+>>  	struct dw_pcie *pci;
+>>  	struct keystone_pcie *ks_pcie;
+>> -	struct phy *phy;
+>> +	struct device_link **link;
+>> +	struct phy **phy;
+>> +	u32 num_lanes;
+>> +	char name[10];
+>>  	int ret;
+>> +	int i;
+>>  
+>>  	ks_pcie = devm_kzalloc(dev, sizeof(*ks_pcie), GFP_KERNEL);
+>>  	if (!ks_pcie)
+>> @@ -908,29 +950,59 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>>  	pci->dev = dev;
+>>  	pci->ops = &ks_pcie_dw_pcie_ops;
+>>  
+>> -	ks_pcie->pci = pci;
+>> +	ret = of_property_read_u32(np, "num-lanes", &num_lanes);
+>> +	if (ret)
+>> +		num_lanes = 1;
+>>  
+>> -	/* initialize SerDes Phy if present */
+>> -	phy = devm_phy_get(dev, "pcie-phy");
+>> -	if (PTR_ERR_OR_ZERO(phy) == -EPROBE_DEFER)
+>> -		return PTR_ERR(phy);
+>> +	phy = devm_kzalloc(dev, sizeof(*phy) * num_lanes, GFP_KERNEL);
+>> +	if (!phy)
+>> +		return -ENOMEM;
+>>  
+>> -	if (!IS_ERR_OR_NULL(phy)) {
+>> -		ret = phy_init(phy);
+>> -		if (ret < 0)
+>> -			return ret;
+>> +	link = devm_kzalloc(dev, sizeof(*link) * num_lanes, GFP_KERNEL);
+>> +	if (!link)
+>> +		return -ENOMEM;
+>> +
+>> +	for (i = 0; i < num_lanes; i++) {
+>> +		snprintf(name, sizeof(name), "pcie-phy%d", i);
+>> +		phy[i] = devm_phy_optional_get(dev, name);
+>> +		if (IS_ERR(phy[i])) {
+>> +			ret = PTR_ERR(phy[i]);
+>> +			goto err_link;
+>> +		}
+>> +
+>> +		if (!phy[i])
+>> +			continue;
+>> +
+>> +		link[i] = device_link_add(dev, &phy[i]->dev, DL_FLAG_STATELESS);
+>> +		if (!link[i]) {
+>> +			ret = -EINVAL;
+>> +			goto err_link;
+>> +		}
+>> +	}
+>> +
+>> +	ks_pcie->np = np;
+>> +	ks_pcie->pci = pci;
+>> +	ks_pcie->link = link;
+>> +	ks_pcie->num_lanes = num_lanes;
+>> +	ks_pcie->phy = phy;
+>> +
+>> +	ret = ks_pcie_enable_phy(ks_pcie);
+>> +	if (ret) {
+>> +		dev_err(dev, "failed to enable phy\n");
+>> +		goto err_link;
+>>  	}
+>>  
+>> -	ks_pcie->np = dev->of_node;
+>>  	platform_set_drvdata(pdev, ks_pcie);
+>>  	ks_pcie->clk = devm_clk_get(dev, "pcie");
+>>  	if (IS_ERR(ks_pcie->clk)) {
+>>  		dev_err(dev, "Failed to get pcie rc clock\n");
+>> -		return PTR_ERR(ks_pcie->clk);
+>> +		ret = PTR_ERR(ks_pcie->clk);
+>> +		goto err_phy;
+>>  	}
+>> +
+>>  	ret = clk_prepare_enable(ks_pcie->clk);
+>>  	if (ret)
+>> -		return ret;
+>> +		goto err_phy;
+>>  
+>>  	ret = ks_pcie_add_pcie_port(ks_pcie, pdev);
+>>  	if (ret < 0)
+>> @@ -940,9 +1012,31 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>>  fail_clk:
+>>  	clk_disable_unprepare(ks_pcie->clk);
+>>  
+>> +err_phy:
+>> +	ks_pcie_disable_phy(ks_pcie);
+>> +
+>> +err_link:
+>> +	while (--i >= 0 && link[i])
+>> +		device_link_del(link[i]);
+>> +
+>>  	return ret;
+>>  }
+>>  
+>> +static int __exit ks_pcie_remove(struct platform_device *pdev)
+>> +{
+>> +	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
+>> +	struct device_link **link = ks_pcie->link;
+>> +	int num_lanes = ks_pcie->num_lanes;
+>> +
+>> +	clk_disable_unprepare(ks_pcie->clk);
+>> +	ks_pcie_disable_phy(ks_pcie);
+>> +
+>> +	while (num_lanes--)
+>> +		device_link_del(link[num_lanes]);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static struct platform_driver ks_pcie_driver __refdata = {
+>>  	.probe  = ks_pcie_probe,
+>>  	.remove = __exit_p(ks_pcie_remove),
+>> -- 
+>> 2.17.1
+>>
