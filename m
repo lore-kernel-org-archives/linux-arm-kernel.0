@@ -1,79 +1,107 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed, 17 Oct 2018 19:54:55 -0300
-Subject: [PATCH 05/11] perf evsel: Store ids for events with their own cpus
- perf_event__synthesize_event_update_cpus
-In-Reply-To: <20181017225501.32150-1-acme@kernel.org>
-References: <20181017225501.32150-1-acme@kernel.org>
-Message-ID: <20181017225501.32150-6-acme@kernel.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 18 Oct 2018 07:48:43 +0800
+Subject: [xlnx:master 2059/2087] drivers/tty//serial/uartlite.c:774:33:
+ error: 'ulite_of_match' undeclared
+Message-ID: <201810180727.l4Gqf9fJ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiri Olsa <jolsa@redhat.com>
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   4d97746570a6e51f834bbf2758a4b4c33308428d
+commit: 967c635b02189fe38adbc264793129c87be15ddf [2059/2087] serial-uartlite: Remove ULITE_NR_PORTS macro
+config: i386-randconfig-s3-201841 (attached as .config)
+compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
+reproduce:
+        git checkout 967c635b02189fe38adbc264793129c87be15ddf
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-John reported crash when recording on an event under PMU with cpumask defined:
+All errors (new ones prefixed by >>):
 
-  root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-  perf: Segmentation fault
-  Obtained 9 stack frames.
-  ./perf_debug_() [0x4c5ef8]
-  [0xffff82ba267c]
-  ./perf_debug_() [0x4bc5a8]
-  ./perf_debug_() [0x419550]
-  ./perf_debug_() [0x41a928]
-  ./perf_debug_() [0x472f58]
-  ./perf_debug_() [0x473210]
-  ./perf_debug_() [0x4070f4]
-  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe0) [0xffff8294c8a0]
-  Segmentation fault (core dumped)
+   drivers/tty//serial/uartlite.c: In function 'ulite_get_id':
+>> drivers/tty//serial/uartlite.c:774:33: error: 'ulite_of_match' undeclared (first use in this function)
+      ret = of_alias_get_alias_list(ulite_of_match, "serial",
+                                    ^~~~~~~~~~~~~~
+   drivers/tty//serial/uartlite.c:774:33: note: each undeclared identifier is reported only once for each function it appears in
 
-We synthesize an update event that needs to touch the evsel id array, which is
-not defined at that time. Fixing this by forcing the id allocation for events
-with their own cpus.
+vim +/ulite_of_match +774 drivers/tty//serial/uartlite.c
 
-Reported-by: John Garry <john.garry@huawei.com>
-Signed-off-by: Jiri Olsa <jolsa@kernel.org>
-Tested-by: John Garry <john.garry@huawei.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Andi Kleen <ak@linux.intel.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxarm at huawei.com
-Fixes: bfd8f72c2778 ("perf record: Synthesize unit/scale/... in event update")
-Link: http://lkml.kernel.org/r/20181003212052.GA32371 at krava
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+   769	
+   770		mutex_lock(&bitmap_lock);
+   771	
+   772		/* Alias list is stable that's why get alias bitmap only once */
+   773		if (!alias_bitmap_initialized) {
+ > 774			ret = of_alias_get_alias_list(ulite_of_match, "serial",
+   775						      alias_bitmap, MAX_UART_INSTANCES);
+   776			if (ret) {
+   777				mutex_unlock(&bitmap_lock);
+   778				return ret;
+   779			}
+   780	
+   781			alias_bitmap_initialized++;
+   782		}
+   783	
+   784		/* Make sure that alias ID is not taken by instance without alias */
+   785		bitmap_or(bitmap, bitmap, alias_bitmap, MAX_UART_INSTANCES);
+   786	
+   787		dev_dbg(&pdev->dev, "Alias bitmap: %*pb\n",
+   788			MAX_UART_INSTANCES, bitmap);
+   789	
+   790		/* Look for a serialN alias */
+   791		if (id < 0)
+   792			id = of_alias_get_id(pdev->dev.of_node, "serial");
+   793	
+   794		if (id < 0) {
+   795			dev_warn(&pdev->dev,
+   796				 "No serial alias passed. Using the first free id\n");
+   797	
+   798			/*
+   799			 * Start with id 0 and check if there is no serial0 alias
+   800			 * which points to device which is compatible with this driver.
+   801			 * If alias exists then try next free position.
+   802			 */
+   803			id = 0;
+   804	
+   805			for (;;) {
+   806				dev_info(&pdev->dev, "Checking id %d\n", id);
+   807				id = find_next_zero_bit(bitmap, MAX_UART_INSTANCES, id);
+   808	
+   809				/* No free empty instance */
+   810				if (id == MAX_UART_INSTANCES) {
+   811					dev_err(&pdev->dev, "No free ID\n");
+   812					mutex_unlock(&bitmap_lock);
+   813					return -EINVAL;
+   814				}
+   815	
+   816				dev_dbg(&pdev->dev, "The empty id is %d\n", id);
+   817				/* Check if ID is empty */
+   818				if (!test_and_set_bit(id, bitmap)) {
+   819					/* Break the loop if bit is taken */
+   820					dev_dbg(&pdev->dev,
+   821						"Selected ID %d allocation passed\n",
+   822						id);
+   823					break;
+   824				}
+   825				dev_dbg(&pdev->dev,
+   826					"Selected ID %d allocation failed\n", id);
+   827				/* if taking bit fails then try next one */
+   828				id++;
+   829			}
+   830		}
+   831	
+   832		mutex_unlock(&bitmap_lock);
+   833	
+   834		return id;
+   835	}
+   836	
+
 ---
- tools/perf/builtin-report.c | 1 +
- tools/perf/util/evsel.c     | 3 +++
- 2 files changed, 4 insertions(+)
-
-diff --git a/tools/perf/builtin-report.c b/tools/perf/builtin-report.c
-index 76e12bcd1765..b2188e623e22 100644
---- a/tools/perf/builtin-report.c
-+++ b/tools/perf/builtin-report.c
-@@ -981,6 +981,7 @@ int cmd_report(int argc, const char **argv)
- 			.id_index	 = perf_event__process_id_index,
- 			.auxtrace_info	 = perf_event__process_auxtrace_info,
- 			.auxtrace	 = perf_event__process_auxtrace,
-+			.event_update	 = perf_event__process_event_update,
- 			.feature	 = process_feature_event,
- 			.ordered_events	 = true,
- 			.ordering_requires_timestamps = true,
-diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-index 1a61628a1c12..e596ae358c4d 100644
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -1089,6 +1089,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
- 		attr->exclude_user   = 1;
- 	}
- 
-+	if (evsel->own_cpus)
-+		evsel->attr.read_format |= PERF_FORMAT_ID;
-+
- 	/*
- 	 * Apply event specific term settings,
- 	 * it overloads any global configuration.
--- 
-2.14.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 26978 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/011325e5/attachment-0001.gz>
