@@ -1,107 +1,51 @@
-From: peng.ma@nxp.com (Peng Ma)
-Date: Wed, 17 Oct 2018 13:59:52 +0800
-Subject: [v9 2/7] dmaengine: fsldma: Adding macro FSL_DMA_IN/OUT implement for
- ARM platform
-In-Reply-To: <20181017055957.542-1-peng.ma@nxp.com>
-References: <20181017055957.542-1-peng.ma@nxp.com>
-Message-ID: <20181017055957.542-2-peng.ma@nxp.com>
+From: vkoul@kernel.org (Vinod)
+Date: Wed, 17 Oct 2018 11:35:31 +0530
+Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
+In-Reply-To: <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
+References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
+ <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
+Message-ID: <20181017060531.GU2400@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the macro FSL_DMA_IN/OUT implement for ARM platform.
+On 17-10-18, 09:41, sudheer.v wrote:
 
-Signed-off-by: Wen He <wen.he_1@nxp.com>
-Signed-off-by: Peng Ma <peng.ma@nxp.com>
----
-change in v9:
-	- rewrite function fsl_ioread64 and fsl_ioread64be to make a better read
+Please add the change log describing the driver and its features
 
- drivers/dma/fsldma.h |   59 +++++++++++++++++++++++++++++++++----------------
- 1 files changed, 40 insertions(+), 19 deletions(-)
+> Signed-off-by: sudheer.v <open.sudheer@gmail.com>
 
-diff --git a/drivers/dma/fsldma.h b/drivers/dma/fsldma.h
-index 982845b..f635bc1 100644
---- a/drivers/dma/fsldma.h
-+++ b/drivers/dma/fsldma.h
-@@ -196,39 +196,60 @@ struct fsldma_chan {
- #define to_fsl_desc(lh) container_of(lh, struct fsl_desc_sw, node)
- #define tx_to_fsl_desc(tx) container_of(tx, struct fsl_desc_sw, async_tx)
- 
-+#ifdef	CONFIG_PPC
-+#define fsl_ioread32(p)		in_le32(p)
-+#define fsl_ioread32be(p)	in_be32(p)
-+#define fsl_iowrite32(v, p)	out_le32(p, v)
-+#define fsl_iowrite32be(v, p)	out_be32(p, v)
-+
- #ifndef __powerpc64__
--static u64 in_be64(const u64 __iomem *addr)
-+static u64 fsl_ioread64(const u64 __iomem *addr)
- {
--	return ((u64)in_be32((u32 __iomem *)addr) << 32) |
--		(in_be32((u32 __iomem *)addr + 1));
-+	u32 fsl_addr = lower_32_bits(addr);
-+
-+	return in_le32(fsl_addr) | in_le32(fsl_addr + 1) << 32;
- }
- 
--static void out_be64(u64 __iomem *addr, u64 val)
-+static void fsl_iowrite64(u64 val, u64 __iomem *addr)
- {
--	out_be32((u32 __iomem *)addr, val >> 32);
--	out_be32((u32 __iomem *)addr + 1, (u32)val);
-+	out_le32((u32 __iomem *)addr + 1, val >> 32);
-+	out_le32((u32 __iomem *)addr, (u32)val);
- }
- 
--/* There is no asm instructions for 64 bits reverse loads and stores */
--static u64 in_le64(const u64 __iomem *addr)
-+static u64 fsl_ioread64be(const u64 __iomem *addr)
- {
--	return ((u64)in_le32((u32 __iomem *)addr + 1) << 32) |
--		(in_le32((u32 __iomem *)addr));
-+	u32 fsl_addr = lower_32_bits(addr);
-+
-+	return in_be32(fsl_addr + 1) | in_be32(fsl_addr) << 32;
- }
- 
--static void out_le64(u64 __iomem *addr, u64 val)
-+static void fsl_iowrite64be(u64 val, u64 __iomem *addr)
- {
--	out_le32((u32 __iomem *)addr + 1, val >> 32);
--	out_le32((u32 __iomem *)addr, (u32)val);
-+	out_be32((u32 __iomem *)addr, val >> 32);
-+	out_be32((u32 __iomem *)addr + 1, (u32)val);
- }
- #endif
-+#endif
- 
--#define FSL_DMA_IN(fsl_chan, addr, width)				\
--		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
--			in_be##width(addr) : in_le##width(addr))
--#define FSL_DMA_OUT(fsl_chan, addr, val, width)			\
--		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
--			out_be##width(addr, val) : out_le##width(addr, val))
-+#if defined(CONFIG_ARM64) || defined(CONFIG_ARM)
-+#define fsl_ioread32(p)		ioread32(p)
-+#define fsl_ioread32be(p)	ioread32be(p)
-+#define fsl_iowrite32(v, p)	iowrite32(v, p)
-+#define fsl_iowrite32be(v, p)	iowrite32be(v, p)
-+#define fsl_ioread64(p)		ioread64(p)
-+#define fsl_ioread64be(p)	ioread64be(p)
-+#define fsl_iowrite64(v, p)	iowrite64(v, p)
-+#define fsl_iowrite64be(v, p)	iowrite64be(v, p)
-+#endif
-+
-+#define FSL_DMA_IN(fsl_dma, addr, width)			\
-+		(((fsl_dma)->feature & FSL_DMA_BIG_ENDIAN) ?	\
-+			fsl_ioread##width##be(addr) : fsl_ioread##width(addr))
-+
-+#define FSL_DMA_OUT(fsl_dma, addr, val, width)			\
-+		(((fsl_dma)->feature & FSL_DMA_BIG_ENDIAN) ?	\
-+			fsl_iowrite##width##be(val, addr) : fsl_iowrite	\
-+		##width(val, addr))
- 
- #define DMA_TO_CPU(fsl_chan, d, width)					\
- 		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
+
+> ---
+>  drivers/tty/serial/8250/8250_aspeed_uart_dma.c | 1594 ++++++++++++++++++++++++
+>  1 file changed, 1594 insertions(+)
+>  create mode 100644 drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+> 
+> diff --git a/drivers/tty/serial/8250/8250_aspeed_uart_dma.c b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+> new file mode 100644
+> index 0000000..e1019a8
+> --- /dev/null
+> +++ b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+
+why is this in serial. It is dmaengine driver so belongs to drivers/dma/
+like other controllers. Please move it out and resubmit.
+
+While doing resubmission please take some time to understand subsystem
+tags to use. (hint git log <subsystem> will tell you)
+
+Also series has [[PATCH] 8/9] whereas it should be [PATCH 8/9] please
+let git generate that for you (hint git format-patch start..end does a
+good job)
+
+> @@ -0,0 +1,1594 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + *   drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+> + *    1. 2018/07/01 Shivah Shankar created
+> + *    2. 2018/08/25 sudheer.veliseti<open.sudheer@gmail.com> modified
+
+we dont use this log in kernel. I do not see s-o-b by Shivah, that
+should be added. I think he should be author and you need to list
+changes you did..
+
 -- 
-1.7.1
+~Vinod
