@@ -1,138 +1,104 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 17 Oct 2018 09:45:39 +0200
-Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown
- hooks into pm_runtime hooks
-In-Reply-To: <CA+E=qVcK7mBbZ-C8FyAxUty_wQ_aOjo1b0+iU4E5CgG=yBCj=g@mail.gmail.com>
-References: <20181016031141.16259-1-anarsoul@gmail.com>
- <20181016071626.m6jkoiixkvxks5ob@flea>
- <CA+E=qVcK7mBbZ-C8FyAxUty_wQ_aOjo1b0+iU4E5CgG=yBCj=g@mail.gmail.com>
-Message-ID: <20181017074539.b6qeft5oba45dv5r@flea>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Wed, 17 Oct 2018 07:46:30 +0000
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
+ NOR flash memories
+In-Reply-To: <20181017092941.3658bd9a@bbrezillon>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+ <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
+ <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
+ <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181017090724.12f2cd79@bbrezillon>	<20181017091045.124e0266@bbrezillon>
+ <20181017092941.3658bd9a@bbrezillon>
+Message-ID: <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 08:08:41PM -0700, Vasily Khoruzhick wrote:
-> On Tue, Oct 16, 2018 at 12:16 AM Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Mon, Oct 15, 2018 at 08:11:41PM -0700, Vasily Khoruzhick wrote:
-> > > startup() and shutdown() hooks are called for both substreams,
-> > > so stopping either substream when another is running breaks the
-> > > latter.
-> > >
-> > > E.g. playback breaks if capture is stopped when playback is running.
-> > >
-> > > Move code from startup() and shutdown() to resume() and suspend()
-> > > hooks respectively to fix this issue
-> > >
-> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > ---
-> > > v2: - rename from "ASoC: sun4i-i2s: don't try to start up
-> > >                  or shut down DAI if it's active"
-> > >     - move code from startup/shutdown hooks into pm_runtime
-> > >
-> > >  sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
-> > >  1 file changed, 25 insertions(+), 36 deletions(-)
-> > >
-> > > diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-> > > index a4aa931ebfae..daa6c08cffbc 100644
-> > > --- a/sound/soc/sunxi/sun4i-i2s.c
-> > > +++ b/sound/soc/sunxi/sun4i-i2s.c
-> > > @@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
-> > >       return 0;
-> > >  }
-> > >
-> > > -static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
-> > > -                          struct snd_soc_dai *dai)
-> > > -{
-> > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> > > -
-> > > -     /* Enable the whole hardware block */
-> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > -                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> > > -
-> > > -     /* Enable the first output line */
-> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK,
-> > > -                        SUN4I_I2S_CTRL_SDO_EN(0));
-> > > -
-> > > -
-> > > -     return clk_prepare_enable(i2s->mod_clk);
-> > > -}
-> > > -
-> > > -static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
-> > > -                            struct snd_soc_dai *dai)
-> > > -{
-> > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> > > -
-> > > -     clk_disable_unprepare(i2s->mod_clk);
-> > > -
-> > > -     /* Disable our output lines */
-> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
-> > > -
-> > > -     /* Disable the whole hardware block */
-> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > -                        SUN4I_I2S_CTRL_GL_EN, 0);
-> > > -}
-> > > -
-> > >  static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
-> > >                               unsigned int freq, int dir)
-> > >  {
-> > > @@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
-> > >       .hw_params      = sun4i_i2s_hw_params,
-> > >       .set_fmt        = sun4i_i2s_set_fmt,
-> > >       .set_sysclk     = sun4i_i2s_set_sysclk,
-> > > -     .shutdown       = sun4i_i2s_shutdown,
-> > > -     .startup        = sun4i_i2s_startup,
-> > >       .trigger        = sun4i_i2s_trigger,
-> > >  };
-> > >
-> > > @@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
-> > >               goto err_disable_clk;
-> > >       }
-> > >
-> > > +     /* Enable the whole hardware block */
-> > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > +                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> > > +
-> >
-> > So this is definitely needed
-> >
-> > > +     /* Enable the first output line */
-> > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > +                        SUN4I_I2S_CTRL_SDO_EN_MASK,
-> > > +                        SUN4I_I2S_CTRL_SDO_EN(0));
-> > > +
-> > > +     ret = clk_prepare_enable(i2s->mod_clk);
-> > > +     if (ret) {
-> > > +             dev_err(dev, "Failed to enable module clock\n");
-> > > +             goto err_disable_clk;
-> > > +     }
-> >
-> > But we really don't want to enable the module clock before the
-> > playback / capture actually starts. And I'm guessing it would make
-> > more sense to keep the output enable configuration there as well,
-> > since it's likely that we will have support for it in the future, and
-> > we'll need additional information from ASoC when we'll do.
+Hi Boris,
+
+> -----Original Message-----
+> From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> Sent: Wednesday, October 17, 2018 1:00 PM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Cc: Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>; Tudor Ambarus
+> <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
+> dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
+> linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
+> cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org; Cristian.Birsan at microchip.com
+> Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
+> NOR flash memories
 > 
-> Should we go with v1 version of my patch then? I see no reason to
-> shuffle code around if we keep startup() and shutdown() hooks.
+> On Wed, 17 Oct 2018 09:10:45 +0200
+> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> 
+> > On Wed, 17 Oct 2018 09:07:24 +0200
+> > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> >
+> > > On Wed, 17 Oct 2018 02:07:43 +0000
+> > > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> > >
+> > > > >
+> > > > Actually there is no entry of s25fs512s in current spi-nor.c file.
+> > > > For my connected flash part, jedec ID read points to s25fl512s. I
+> > > > have asked my board team to confirm the name of exact connected
+> > > > flash part. When I check the data sheet of s25fs512s, it also
+> > > > points to the same Jedec ID information. { "s25fl512s",
+> > > > INFO(0x010220, 0x4d00, 256
+> > > > * 1024, 256, ....}
+> > > >
+> > > > But as stated earlier, if I skip reading SFDP or read using 1-1-1
+> > > > protocol then read are always correct. For 1-4-4 protocol read are
+> > > > wrong and on further debugging found that Read code of 0x6C is
+> > > > being send as opcode instead of 0xEC.
+> > > >
+> > > > If I revert this patch, reads are working fine.
+> > >
+> > > Can you try with the following patch?
+> > >
+> >
+> > Hm, nevermind. The problem is actually not related to 4B vs non-4B
+> > mode but 1-1-4 vs 1-4-4 modes.
+Yes, that's only I have stated in my first mail that instead of 1-4-4 mode read opcode is being sent for 1-1-4 mode.
+> >
+> 
+> Can you try with this patch applied?
+> 
+With suggested patch, read for protocol 1-4-4 working correctly.
 
-I'd go for something in between. runtime_pm already provides whether
-the device is active or not, so you can just move the
-SUN4I_I2S_CTRL_GL_EN write to the runtime_resume and runtime_suspend
-functions, and that should fix your issue.
+	[    1.625360] m25p80 spi0.0: found s25fl512s, expected m25p80                                                                   
+	[    1.631094] m25p80 spi0.0: failed to parse SMPT (err = -22)                                                                   
+	[    1.636661] 261 8c4c780 opcode(read:eb, pp:2, erase:d8)                                                                       
+	[    1.641878] 266 8c4c780 opcode(read:ec, pp:12, erase:dc)                                                                      
+	[    1.647200] m25p80 spi0.0: s25fl512s (65536 Kbytes)         
 
-Maxime
+Without this patch, param_headers are getting freed and restoring previous erase map i.e. opcode related to 1-1-4 protocol.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181017/65c9e55c/attachment.sig>
+--
+Regards
+Yogesh Gaur
+
+> --->8---
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c index
+> 9407ca5f9443..cf33d834698c 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -3132,6 +3132,17 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
+>                 switch (SFDP_PARAM_HEADER_ID(param_header)) {
+>                 case SFDP_SECTOR_MAP_ID:
+>                         err = spi_nor_parse_smpt(nor, param_header);
+> +                       if (err) {
+> +                               dev_warn(dev,
+> +                                        "failed to parse SMPT (err = %d)\n",
+> +                                        err);
+> +                               /*
+> +                                * SMPT parsing is optional, let's not drop
+> +                                * all information we extracted so far just
+> +                                * because it failed.
+> +                                */
+> +                               err = 0;
+> +                       }
+>                         break;
+> 
+>                 default:
