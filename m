@@ -1,301 +1,270 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 17 Oct 2018 09:43:05 +0000
-Subject: [PATCH V4 11/11] clk: imx: add imx8qxp clk driver
-In-Reply-To: <153972593926.5275.4006811101853084389@swboyd.mtv.corp.google.com>
-References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
- <1539504194-28289-12-git-send-email-aisheng.dong@nxp.com>
- <153972593926.5275.4006811101853084389@swboyd.mtv.corp.google.com>
-Message-ID: <AM0PR04MB4211CA96D332FCC1ED3D547380FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Wed, 17 Oct 2018 09:48:53 +0000
+Subject: [PATCH v4 3/4] perf/smmuv3: Add MSI irq support
+In-Reply-To: <201810171145.mGVw4SgU%fengguang.wu@intel.com>
+References: <20181016124920.24708-4-shameerali.kolothum.thodi@huawei.com>
+ <201810171145.mGVw4SgU%fengguang.wu@intel.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA83879F3FB@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+
 > -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Wednesday, October 17, 2018 5:39 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> shawnguo at kernel.org; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx
-> <linux-imx@nxp.com>; kernel at pengutronix.de; A.s. Dong
-> <aisheng.dong@nxp.com>
-> Subject: Re: [PATCH V4 11/11] clk: imx: add imx8qxp clk driver
+> From: kbuild test robot [mailto:lkp at intel.com]
+> Sent: 17 October 2018 04:36
+> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+> Cc: kbuild-all at 01.org; lorenzo.pieralisi at arm.com; robin.murphy at arm.com;
+> jean-philippe.brucker at arm.com; will.deacon at arm.com;
+> mark.rutland at arm.com; Guohanjun (Hanjun Guo) <guohanjun@huawei.com>;
+> John Garry <john.garry@huawei.com>; pabba at codeaurora.org;
+> vkilari at codeaurora.org; rruigrok at codeaurora.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Linuxarm <linuxarm@huawei.com>;
+> neil.m.leeder at gmail.com
+> Subject: Re: [PATCH v4 3/4] perf/smmuv3: Add MSI irq support
 > 
-> Quoting A.s. Dong (2018-10-14 01:08:16)
-> > diff --git a/drivers/clk/imx/scu/clk-imx8qxp.c
-> > b/drivers/clk/imx/scu/clk-imx8qxp.c
-> > new file mode 100644
-> > index 0000000..958c26d
-> > --- /dev/null
-> > +++ b/drivers/clk/imx/scu/clk-imx8qxp.c
-> > @@ -0,0 +1,425 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > + * Copyright 2017~2018 NXP
-> > + *     Dong Aisheng <aisheng.dong@nxp.com>
-> > + */
-> > +
-> > +#include <dt-bindings/clock/imx8qxp-clock.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/err.h>
-> > +#include <linux/io.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/slab.h>
-> > +
-> > +#include <soc/imx/imx8qxp/lpcg.h>
-> > +
-> > +#include "clk-scu.h"
-> > +
-> > +static struct clk_hw_onecell_data *clk_data;
+> Hi Shameer,
 > 
-> Please give this static global variable a more unique name as opposed to
-> 'clk_data'.
+> Thank you for the patch! Yet something to improve:
 > 
+> [auto build test ERROR on linux-sof-driver/master]
+> [also build test ERROR on v4.19-rc8 next-20181016]
+> [if your patch is applied to the wrong git tree, please drop us a note to help
+> improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Shameer-Kolothum/arm64-
+> SMMUv3-PMU-driver-with-IORT-support/20181017-063949
+> base:   https://github.com/thesofproject/linux master
+> config: sh-allmodconfig (attached as .config)
+> compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-
+> tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         GCC_VERSION=7.2.0 make.cross ARCH=sh
+> 
+> All error/warnings (new ones prefixed by >>):
+> 
+>    In file included from include/linux/kernel.h:11:0,
+>                     from include/linux/list.h:9,
+>                     from include/linux/resource_ext.h:17,
+>                     from include/linux/acpi.h:26,
+>                     from drivers//perf/arm_smmuv3_pmu.c:37:
+>    drivers//perf/arm_smmuv3_pmu.c: In function
+> 'smmu_pmu_counter_set_value':
+>    include/linux/bitops.h:7:24: warning: left shift count >= width of type [-Wshift-
+> count-overflow]
+>     #define BIT(nr)   (1UL << (nr))
+>                            ^
+>    drivers//perf/arm_smmuv3_pmu.c:152:31: note: in expansion of macro 'BIT'
+>      if (smmu_pmu->counter_mask & BIT(32))
+>                                   ^~~
+>    drivers//perf/arm_smmuv3_pmu.c: In function
+> 'smmu_pmu_counter_get_value':
+>    include/linux/bitops.h:7:24: warning: left shift count >= width of type [-Wshift-
+> count-overflow]
+>     #define BIT(nr)   (1UL << (nr))
+>                            ^
+>    drivers//perf/arm_smmuv3_pmu.c:162:31: note: in expansion of macro 'BIT'
+>      if (smmu_pmu->counter_mask & BIT(32))
+>                                   ^~~
+>    drivers//perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_free_msis':
+> >> drivers//perf/arm_smmuv3_pmu.c:601:2: error: implicit declaration of
+> function 'platform_msi_domain_free_irqs'; did you mean
+> 'platform_get_device_id'? [-Werror=implicit-function-declaration]
+>      platform_msi_domain_free_irqs(dev);
+>      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Got it.
+Ok. This is probably because of the COMPILE_TEST added to patch #2 and
+this one will have dependency on PCI/PCI_MSI. I will remove that in next
+revision.
 
+Thanks,
+Shameer
+
+>      platform_get_device_id
+>    drivers//perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_setup_msi':
+> >> drivers//perf/arm_smmuv3_pmu.c:632:8: error: implicit declaration of
+> function 'platform_msi_domain_alloc_irqs'; did you mean
+> 'platform_device_alloc'? [-Werror=implicit-function-declaration]
+>      ret = platform_msi_domain_alloc_irqs(dev, 1, smmu_pmu_write_msi_msg);
+>            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>            platform_device_alloc
+>    In file included from include/linux/list.h:9:0,
+>                     from include/linux/resource_ext.h:17,
+>                     from include/linux/acpi.h:26,
+>                     from drivers//perf/arm_smmuv3_pmu.c:37:
+>    include/linux/msi.h:114:38: error: 'struct device' has no member named
+> 'msi_list'
+>     #define dev_to_msi_list(dev)  (&(dev)->msi_list)
+>                                          ^
+>    include/linux/kernel.h:961:26: note: in definition of macro 'container_of'
+>      void *__mptr = (void *)(ptr);     \
+>                              ^~~
+>    include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
+>      list_entry((ptr)->next, type, member)
+>      ^~~~~~~~~~
+>    include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
+>      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+>      ^~~~~~~~~~~~~~~~
+>    include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
+>      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+>                       ^~~~~~~~~~~~~~~
+> >> drivers//perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro
+> 'first_msi_entry'
+>      desc = first_msi_entry(dev);
+>             ^~~~~~~~~~~~~~~
+>    In file included from include/linux/ioport.h:13:0,
+>                     from include/linux/acpi.h:25,
+>                     from drivers//perf/arm_smmuv3_pmu.c:37:
+>    include/linux/msi.h:114:38: error: 'struct device' has no member named
+> 'msi_list'
+>     #define dev_to_msi_list(dev)  (&(dev)->msi_list)
+>                                          ^
+>    include/linux/compiler.h:316:19: note: in definition of macro
+> '__compiletime_assert'
+>       bool __cond = !(condition);    \
+>                       ^~~~~~~~~
+>    include/linux/compiler.h:339:2: note: in expansion of macro
+> '_compiletime_assert'
+>      _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+>      ^~~~~~~~~~~~~~~~~~~
+>    include/linux/build_bug.h:45:37: note: in expansion of macro
+> 'compiletime_assert'
+>     #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+>                                         ^~~~~~~~~~~~~~~~~~
+>    include/linux/kernel.h:962:2: note: in expansion of macro
+> 'BUILD_BUG_ON_MSG'
+>      BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
+>      ^~~~~~~~~~~~~~~~
+>    include/linux/kernel.h:962:20: note: in expansion of macro '__same_type'
+>      BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
+>                        ^~~~~~~~~~~
+>    include/linux/list.h:366:2: note: in expansion of macro 'container_of'
+>      container_of(ptr, type, member)
+>      ^~~~~~~~~~~~
+>    include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
+>      list_entry((ptr)->next, type, member)
+>      ^~~~~~~~~~
+>    include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
+>      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+>      ^~~~~~~~~~~~~~~~
+>    include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
+>      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+>                       ^~~~~~~~~~~~~~~
+> >> drivers//perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro
+> 'first_msi_entry'
+>      desc = first_msi_entry(dev);
+>             ^~~~~~~~~~~~~~~
+>    include/linux/msi.h:114:38: error: 'struct device' has no member named
+> 'msi_list'
+>     #define dev_to_msi_list(dev)  (&(dev)->msi_list)
+>                                          ^
+>    include/linux/compiler.h:316:19: note: in definition of macro
+> '__compiletime_assert'
+>       bool __cond = !(condition);    \
+>                       ^~~~~~~~~
+>    include/linux/compiler.h:339:2: note: in expansion of macro
+> '_compiletime_assert'
+>      _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+>      ^~~~~~~~~~~~~~~~~~~
+>    include/linux/build_bug.h:45:37: note: in expansion of macro
+> 'compiletime_assert'
+>     #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+>                                         ^~~~~~~~~~~~~~~~~~
+>    include/linux/kernel.h:962:2: note: in expansion of macro
+> 'BUILD_BUG_ON_MSG'
+>      BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
+>      ^~~~~~~~~~~~~~~~
+>    include/linux/kernel.h:963:6: note: in expansion of macro '__same_type'
+>         !__same_type(*(ptr), void),   \
+>          ^~~~~~~~~~~
+>    include/linux/list.h:366:2: note: in expansion of macro 'container_of'
+>      container_of(ptr, type, member)
+>      ^~~~~~~~~~~~
+>    include/linux/list.h:377:2: note: in expansion of macro 'list_entry'
+>      list_entry((ptr)->next, type, member)
+>      ^~~~~~~~~~
+>    include/linux/msi.h:116:2: note: in expansion of macro 'list_first_entry'
+>      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+>      ^~~~~~~~~~~~~~~~
+>    include/linux/msi.h:116:19: note: in expansion of macro 'dev_to_msi_list'
+>      list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+>                       ^~~~~~~~~~~~~~~
+> >> drivers//perf/arm_smmuv3_pmu.c:638:9: note: in expansion of macro
+> 'first_msi_entry'
+>      desc = first_msi_entry(dev);
+>             ^~~~~~~~~~~~~~~
+>    drivers//perf/arm_smmuv3_pmu.c: In function 'smmu_pmu_probe':
+>    drivers//perf/arm_smmuv3_pmu.c:745:64: warning: format '%llx' expects
+> argument of type 'long long unsigned int', but argument 4 has type
+> 'resource_size_t {aka unsigned int}' [-Wformat=]
+>      name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "smmuv3_pmcg_%llx",
+>                                                                 ~~~^
+>                                                                 %x
+>    cc1: some warnings being treated as errors
 > 
-> > +
-> > +static const char * const enet_sels[] = { "enet_25MHz",
-> > +"enet_125MHz", }; static const char * const enet0_rmii_tx_sels[] = {
-> > +"enet0_ref_div", "dummy", }; static const char * const
-> > +enet1_rmii_tx_sels[] = { "enet1_ref_div", "dummy", };
-> > +
-> > +static int imx8qxp_clk_probe(struct platform_device *pdev) {
-> > +       struct device_node *ccm_node = pdev->dev.of_node;
-> > +       struct clk_hw **clks;
-> > +       int ret;
-> > +
-> > +       ret = imx_clk_scu_init();
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       clk_data = devm_kzalloc(&pdev->dev, sizeof(*clk_data) +
-> > +                               sizeof(*clk_data->hws) *
-> IMX8QXP_CLK_END,
-> > +                               GFP_KERNEL);
-> > +       if (!clk_data)
-> > +               return -ENOMEM;
-> > +
-> > +       clk_data->num = IMX8QXP_CLK_END;
-> > +       clks = clk_data->hws;
-> > +
-> > +       /* Fixed clocks */
-> > +       clks[IMX8QXP_CLK_DUMMY]         =
-> imx_clk_hw_fixed("dummy", 0);
-> > +       clks[IMX8QXP_24MHZ]             =
-> imx_clk_hw_fixed("xtal_24MHz", 24000000);
-> > +       clks[IMX8QXP_GPT_3M]            =
-> imx_clk_hw_fixed("gpt_3m", 3000000);
-> > +       clks[IMX8QXP_32KHZ]             =
-> imx_clk_hw_fixed("xtal_32KHz", 32768);
-> > +
-
-These are external clocks and should be put in Devicetree.
-
-> > +       /* ARM core */
-> > +       clks[IMX8QXP_A35_DIV]           =
-> imx_clk_divider_scu("a35_div", IMX_SC_R_A35, IMX_SC_PM_CLK_CPU);
-> > +
-> > +       clks[IMX8QXP_IPG_DMA_CLK_ROOT]  =
-> imx_clk_hw_fixed("ipg_dma_clk_root", 120000000);
-> > +       clks[IMX8QXP_AXI_CONN_CLK_ROOT] =
-> imx_clk_hw_fixed("axi_conn_clk_root", 333333333);
-> > +       clks[IMX8QXP_AHB_CONN_CLK_ROOT] =
-> imx_clk_hw_fixed("ahb_conn_clk_root", 166666666);
-> > +       clks[IMX8QXP_IPG_CONN_CLK_ROOT] =
-> imx_clk_hw_fixed("ipg_conn_clk_root", 83333333);
-> > +       clks[IMX8QXP_DC_AXI_EXT_CLK]    =
-> imx_clk_hw_fixed("axi_ext_dc_clk_root", 800000000);
-> > +       clks[IMX8QXP_DC_AXI_INT_CLK]    =
-> imx_clk_hw_fixed("axi_int_dc_clk_root", 400000000);
-> > +       clks[IMX8QXP_DC_CFG_CLK]        =
-> imx_clk_hw_fixed("cfg_dc_clk_root", 100000000);
-> > +       clks[IMX8QXP_MIPI_IPG_CLK]      =
-> imx_clk_hw_fixed("ipg_mipi_clk_root", 120000000);
-> > +       clks[IMX8QXP_IMG_AXI_CLK]       =
-> imx_clk_hw_fixed("axi_img_clk_root", 400000000);
-> > +       clks[IMX8QXP_IMG_IPG_CLK]       =
-> imx_clk_hw_fixed("ipg_img_clk_root", 200000000);
-> > +       clks[IMX8QXP_IMG_PXL_CLK]       =
-> imx_clk_hw_fixed("pxl_img_clk_root", 600000000);
-> > +       clks[IMX8QXP_HSIO_AXI_CLK]      =
-> imx_clk_hw_fixed("axi_hsio_clk_root", 400000000);
-> > +       clks[IMX8QXP_HSIO_PER_CLK]      =
-> imx_clk_hw_fixed("per_hsio_clk_root", 133333333);
+> vim +601 drivers//perf/arm_smmuv3_pmu.c
 > 
-> Can these fixed rate clks come from DT? Or what's going on here?
+>    596
+>    597	static void smmu_pmu_free_msis(void *data)
+>    598	{
+>    599		struct device *dev = data;
+>    600
+>  > 601		platform_msi_domain_free_irqs(dev);
+>    602	}
+>    603
+>    604	static void smmu_pmu_write_msi_msg(struct msi_desc *desc, struct
+> msi_msg *msg)
+>    605	{
+>    606		phys_addr_t doorbell;
+>    607		struct device *dev = msi_desc_to_dev(desc);
+>    608		struct smmu_pmu *pmu = dev_get_drvdata(dev);
+>    609
+>    610		doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
+>    611		doorbell &= MSI_CFG0_ADDR_MASK;
+>    612
+>    613		writeq_relaxed(doorbell, pmu->reg_base +
+> SMMU_PMCG_IRQ_CFG0);
+>    614		writel_relaxed(msg->data, pmu->reg_base +
+> SMMU_PMCG_IRQ_CFG1);
+>    615		writel_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE,
+>    616			       pmu->reg_base + SMMU_PMCG_IRQ_CFG2);
+>    617	}
+>    618
+>    619	static void smmu_pmu_setup_msi(struct smmu_pmu *pmu)
+>    620	{
+>    621		struct msi_desc *desc;
+>    622		struct device *dev = pmu->dev;
+>    623		int ret;
+>    624
+>    625		/* Clear MSI address reg */
+>    626		writeq_relaxed(0, pmu->reg_base +
+> SMMU_PMCG_IRQ_CFG0);
+>    627
+>    628		/* MSI supported or not */
+>    629		if (!(readl(pmu->reg_base + SMMU_PMCG_CFGR) &
+> SMMU_PMCG_CFGR_MSI))
+>    630			return;
+>    631
+>  > 632		ret = platform_msi_domain_alloc_irqs(dev, 1,
+> smmu_pmu_write_msi_msg);
+>    633		if (ret) {
+>    634			dev_warn(dev, "failed to allocate MSIs\n");
+>    635			return;
+>    636		}
+>    637
+>  > 638		desc = first_msi_entry(dev);
+>    639		if (desc)
+>    640			pmu->irq = desc->irq;
+>    641
+>    642		/* Add callback to free MSIs on teardown */
+>    643		devm_add_action(dev, smmu_pmu_free_msis, dev);
+>    644	}
+>    645
 > 
-
-Those are not external clocks.
-Do we have to put them in device tree as well?
-
-> > +
-> > +       clks[IMX8QXP_UART0_DIV]         =
-> imx_clk_divider_scu("uart0_div", IMX_SC_R_UART_0, IMX_SC_PM_CLK_PER);
-> > +       clks[IMX8QXP_UART0_IPG_CLK]     =
-> imx_clk_gate2_scu("uart0_ipg_clk", "ipg_dma_clk_root", (void __iomem
-> *)(LPUART_0_LPCG), 16, 0);
-> > +       clks[IMX8QXP_UART0_CLK]         =
-> imx_clk_gate_scu("uart0_clk", "uart0_div", IMX_SC_R_UART_0,
-> IMX_SC_PM_CLK_PER, (void __iomem *)(LPUART_0_LPCG), 0, 0);
-> > +
-> [...]
-> > +       clks[IMX8QXP_IMG_PDMA_2_CLK]            =
-> imx_clk_gate2_scu("img_pdma2_clk", "pxl_img_clk_root", (void __iomem
-> *)(IMG_PDMA_2_LPCG), 0, 0);
-> > +       clks[IMX8QXP_IMG_PDMA_3_CLK]            =
-> imx_clk_gate2_scu("img_pdma3_clk", "pxl_img_clk_root", (void __iomem
-> *)(IMG_PDMA_3_LPCG), 0, 0);
-> > +       clks[IMX8QXP_IMG_PDMA_4_CLK]            =
-> imx_clk_gate2_scu("img_pdma4_clk", "pxl_img_clk_root", (void __iomem
-> *)(IMG_PDMA_4_LPCG), 0, 0);
-> > +       clks[IMX8QXP_IMG_PDMA_5_CLK]            =
-> imx_clk_gate2_scu("img_pdma5_clk", "pxl_img_clk_root", (void __iomem
-> *)(IMG_PDMA_5_LPCG), 0, 0);
-> > +       clks[IMX8QXP_IMG_PDMA_6_CLK]            =
-> imx_clk_gate2_scu("img_pdma6_clk", "pxl_img_clk_root", (void __iomem
-> *)(IMG_PDMA_6_LPCG), 0, 0);
-> > +       clks[IMX8QXP_IMG_PDMA_7_CLK]            =
-> imx_clk_gate2_scu("img_pdma7_clk", "pxl_img_clk_root", (void __iomem
-> *)(IMG_PDMA_7_LPCG), 0, 0);
-> 
-> All the casts in here shouldn't be necessary, see below.
-> 
-> > +
-> > +       /* MIPI CSI SS */
-> > +       clks[IMX8QXP_CSI0_I2C0_DIV]     =
-> imx_clk_divider_scu("mipi_csi0_i2c0_div", IMX_SC_R_CSI_0_I2C_0,
-> IMX_SC_PM_CLK_PER);
-> > +       clks[IMX8QXP_CSI0_PWM0_DIV]     =
-> imx_clk_divider_scu("mipi_csi0_pwm0_div", IMX_SC_R_CSI_0_PWM_0,
-> IMX_SC_PM_CLK_PER);
-> > +       clks[IMX8QXP_CSI0_CORE_DIV]     =
-> imx_clk_divider_scu("mipi_csi0_core_div", IMX_SC_R_CSI_0,
-> IMX_SC_PM_CLK_PER);
-> > +       clks[IMX8QXP_CSI0_ESC_DIV]      =
-> imx_clk_divider_scu("mipi_csi0_esc_div", IMX_SC_R_CSI_0,
-> IMX_SC_PM_CLK_MISC);
-> > +       clks[IMX8QXP_CSI0_IPG_CLK_S]    =
-> imx_clk_gate2_scu("mipi_csi0_ipg_s", "ipg_mipi_csi_clk_root", (void __iomem
-> *)(MIPI_CSI_0_LPCG + 0x8), 16, 0);
-> > +       clks[IMX8QXP_CSI0_IPG_CLK]      =
-> imx_clk_gate2_scu("mipi_csi0_ipg", "mipi_csi0_ipg_s", (void __iomem
-> *)(MIPI_CSI_0_LPCG), 16, 0);
-> > +       clks[IMX8QXP_CSI0_APB_CLK]      =
-> imx_clk_gate2_scu("mipi_csi0_apb_clk", "ipg_mipi_csi_clk_root", (void
-> __iomem *)(MIPI_CSI_0_LPCG + 0x4), 16,  0);
-> > +       clks[IMX8QXP_CSI0_I2C0_IPG_CLK] =
-> imx_clk_gate2_scu("mipi_csi0_i2c0_ipg_s", "ipg_mipi_csi_clk_root", (void
-> __iomem *)(MIPI_CSI_0_LPCG + 0x14), 16, 0);
-> > +       clks[IMX8QXP_CSI0_I2C0_CLK]     =
-> imx_clk_gate_scu("mipi_csi0_i2c0_clk", "mipi_csi0_i2c0_div",
-> IMX_SC_R_CSI_0_I2C_0, IMX_SC_PM_CLK_PER, (void __iomem
-> *)(MIPI_CSI_0_LPCG + 0x14), 0, 0);
-> > +       clks[IMX8QXP_CSI0_PWM0_IPG_CLK] =
-> imx_clk_gate2_scu("mipi_csi0_pwm0_ipg_s", "ipg_mipi_csi_clk_root", (void
-> __iomem *)(MIPI_CSI_0_LPCG + 0x10), 16, 0);
-> > +       clks[IMX8QXP_CSI0_PWM0_CLK]     =
-> imx_clk_gate_scu("mipi_csi0_pwm0_clk", "mipi_csi0_pwm0_div",
-> IMX_SC_R_CSI_0_PWM_0, IMX_SC_PM_CLK_PER, (void __iomem
-> *)(MIPI_CSI_0_LPCG + 0x10), 0, 0);
-> > +       clks[IMX8QXP_CSI0_CORE_CLK]     =
-> imx_clk_gate_scu("mipi_csi0_core_clk", "mipi_csi0_core_div",
-> IMX_SC_R_CSI_0, IMX_SC_PM_CLK_PER, (void __iomem *)(MIPI_CSI_0_LPCG +
-> 0x18), 16, 0);
-> > +       clks[IMX8QXP_CSI0_ESC_CLK]      =
-> imx_clk_gate_scu("mipi_csi0_esc_clk", "mipi_csi0_esc_div", IMX_SC_R_CSI_0,
-> IMX_SC_PM_CLK_MISC, (void __iomem *)(MIPI_CSI_0_LPCG + 0x1C), 16, 0);
-> > +
-> > +       /* HSIO SS */
-> > +       clks[IMX8QXP_HSIO_PCIE_MSTR_AXI_CLK]    =
-> imx_clk_gate2_scu("hsio_pcie_mstr_axi_clk", "axi_hsio_clk_root", (void
-> __iomem *)(HSIO_PCIE_X1_LPCG), 16, 0);
-> > +       clks[IMX8QXP_HSIO_PCIE_SLV_AXI_CLK]     =
-> imx_clk_gate2_scu("hsio_pcie_slv_axi_clk", "axi_hsio_clk_root", (void
-> __iomem *)(HSIO_PCIE_X1_LPCG), 20, 0);
-> > +       clks[IMX8QXP_HSIO_PCIE_DBI_AXI_CLK]     =
-> imx_clk_gate2_scu("hsio_pcie_dbi_axi_clk", "axi_hsio_clk_root", (void
-> __iomem *)(HSIO_PCIE_X1_LPCG), 24, 0);
-> > +       clks[IMX8QXP_HSIO_PCIE_X1_PER_CLK]      =
-> imx_clk_gate2_scu("hsio_pcie_x1_per_clk", "per_hsio_clk_root", (void
-> __iomem *)(HSIO_PCIE_X1_CRR3_LPCG), 16, 0);
-> > +       clks[IMX8QXP_HSIO_PHY_X1_PER_CLK]       =
-> imx_clk_gate2_scu("hsio_phy_x1_per_clk", "per_hsio_clk_root", (void
-> __iomem *)(HSIO_PHY_X1_CRR1_LPCG), 16, 0);
-> > +       clks[IMX8QXP_HSIO_MISC_PER_CLK]         =
-> imx_clk_gate2_scu("hsio_misc_per_clk", "per_hsio_clk_root", (void __iomem
-> *)(HSIO_MISC_LPCG), 16, 0);
-> > +       clks[IMX8QXP_HSIO_PHY_X1_APB_CLK]       =
-> imx_clk_gate2_scu("hsio_phy_x1_apb_clk", "per_hsio_clk_root", (void
-> __iomem *)(HSIO_PHY_X1_LPCG), 16, 0);
-> > +       clks[IMX8QXP_HSIO_GPIO_CLK]             =
-> imx_clk_gate2_scu("hsio_gpio_clk", "per_hsio_clk_root", (void __iomem
-> *)(HSIO_GPIO_LPCG), 16, 0);
-> > +       clks[IMX8QXP_HSIO_PHY_X1_PCLK]          =
-> imx_clk_gate2_scu("hsio_phy_x1_pclk", "dummy", (void __iomem
-> *)(HSIO_PHY_X1_LPCG), 0, 0);
-> > +
-> > +       imx_check_clk_hws(clks, clk_data->num);
-> > +
-> > +       of_clk_add_hw_provider(ccm_node, of_clk_hw_onecell_get,
-> > + clk_data);
-> > +
-> > +       pr_info("i.MX8QXP clock tree init done.\n");
-> 
-> Please no "I'm alive!" messages.
-> 
-
-Got it
-
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct of_device_id imx8qxp_match[] = {
-> > +       { .compatible = "fsl,imx8qxp-clk", },
-> > +       { /* sentinel */ }
-> > +};
-> > +
-> > +static struct platform_driver imx8qxp_clk_driver = {
-> > +       .driver = {
-> > +               .name = "imx8qxp-clk",
-> > +               .of_match_table = imx8qxp_match,
-> > +       },
-> > +       .probe = imx8qxp_clk_probe,
-> > +};
-> > +
-> > +static int __init imx8qxp_clk_init(void) {
-> > +       return platform_driver_register(&imx8qxp_clk_driver);
-> > +}
-> > +core_initcall(imx8qxp_clk_init);
-> > diff --git a/include/soc/imx/imx8qxp/lpcg.h
-> > b/include/soc/imx/imx8qxp/lpcg.h new file mode 100644 index
-> > 0000000..afbb5da
-> > --- /dev/null
-> > +++ b/include/soc/imx/imx8qxp/lpcg.h
-> > @@ -0,0 +1,186 @@
-> > +/* SPDX-License-Identifier: GPL-2.0+ */
-> > +/*
-> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > + * Copyright 2017~2018 NXP
-> > + *
-> > + */
-> > +
-> > +#ifndef _SC_LPCG_H
-> > +#define _SC_LPCG_H
-> > +
-> > +/*LSIO SS */
-> > +#define                PWM_0_LPCG              0x5D400000
-> 
-> Are these virtual or physical addresses? Because up above they're casted right
-> into void __iomem pointers, which makes me thing they're virtual addresses,
-> but then that would mean there's some sort of static iomap being used, but
-> I'm not aware of anything like that.
-
-Yes, you're right. Those should be physical address and iomem cast is not necessary.
-Sorry about missing that.
-
-Regards
-Dong Aisheng
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
