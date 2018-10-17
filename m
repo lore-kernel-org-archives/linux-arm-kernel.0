@@ -1,43 +1,102 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 17 Oct 2018 00:38:08 -0700
-Subject: [PATCH v5 4/9] ASoC: dt-binding: Add bindings for Allwinner A64
- codec's analog path controls
+Date: Wed, 17 Oct 2018 00:38:11 -0700
+Subject: [PATCH v5 7/9] arm64: dts: allwinner: a64: add nodes necessary for
+ analog sound support
 In-Reply-To: <20181017073813.14127-1-anarsoul@gmail.com>
 References: <20181017073813.14127-1-anarsoul@gmail.com>
-Message-ID: <20181017073813.14127-5-anarsoul@gmail.com>
+Message-ID: <20181017073813.14127-8-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The internal codec on Allwinner A64 is split into 2 parts. The
-analog path controls are routed through an embedded custom register
-bus accessed through the PRCM block just as on A23/A33/H3.
-
-Add a binding for this hardware.
+Add nodes for i2s, digital and analog parts of audiocodec on A64
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- .../bindings/sound/sun50i-codec-analog.txt           | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 58 +++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
-new file mode 100644
-index 000000000000..4f8ad0e04d20
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
-@@ -0,0 +1,12 @@
-+* Allwinner A64 Codec Analog Controls
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index d3daf90a8715..d066ed59f27a 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -157,6 +157,34 @@
+ 		compatible = "linux,spdif-dit";
+ 	};
+ 
++	sound: sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "sun50i-a64-audio";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,frame-master = <&cpudai>;
++		simple-audio-card,bitclock-master = <&cpudai>;
++		simple-audio-card,mclk-fs = <512>;
++		simple-audio-card,aux-devs = <&codec_analog>;
++		simple-audio-card,routing =
++				"Left DAC", "AIF1 Slot 0 Left",
++				"Right DAC", "AIF1 Slot 0 Right",
++				"AIF1 Slot 0 Left ADC", "Left ADC",
++				"AIF1 Slot 0 Right ADC", "Right ADC",
++				"Left ADC", "ADC",
++				"Right ADC", "ADC",
++				"MIC1", "Mic",
++				"MIC2", "Headset Mic";
++		status = "disabled";
 +
-+Required properties:
-+- compatible: must be one of the following compatibles:
-+		- "allwinner,sun50i-a64-codec-analog"
-+- reg: must contain the registers location and length
++		cpudai: simple-audio-card,cpu {
++			sound-dai = <&dai>;
++		};
 +
-+Example:
-+	codec_analog: codec-analog at 1f015c0 {
-+		compatible = "allwinner,sun50i-a64-codec-analog";
-+		reg = <0x01f015c0 0x4>;
++		link_codec: simple-audio-card,codec {
++			sound-dai = <&codec>;
++		};
 +	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+@@ -522,6 +550,30 @@
+ 			status = "disabled";
+ 		};
+ 
++		dai: dai@1c22c00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun50i-a64-codec-i2s";
++			reg = <0x01c22c00 0x200>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "apb", "mod";
++			resets = <&ccu RST_BUS_CODEC>;
++			reset-names = "rst";
++			dmas = <&dma 15>, <&dma 15>;
++			dma-names = "rx", "tx";
++			status = "disabled";
++		};
++
++		codec: codec at 1c22e00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-a33-codec";
++			reg = <0x01c22e00 0x600>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "bus", "mod";
++			status = "disabled";
++		};
++
+ 		uart0: serial at 1c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+@@ -715,6 +767,12 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		codec_analog: codec-analog at 1f015c0 {
++			compatible = "allwinner,sun50i-a64-codec-analog";
++			reg = <0x01f015c0 0x4>;
++			status = "disabled";
++		};
++
+ 		r_i2c: i2c at 1f02400 {
+ 			compatible = "allwinner,sun50i-a64-i2c",
+ 				     "allwinner,sun6i-a31-i2c";
 -- 
 2.19.0
