@@ -1,81 +1,138 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 17 Oct 2018 13:11:05 +0530
-Subject: [PATCH v2 12/21] PCI: keystone: Invoke pm_runtime APIs to enable clock
-In-Reply-To: <20181017074114.28239-1-kishon@ti.com>
-References: <20181017074114.28239-1-kishon@ti.com>
-Message-ID: <20181017074114.28239-13-kishon@ti.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 17 Oct 2018 09:45:39 +0200
+Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown
+ hooks into pm_runtime hooks
+In-Reply-To: <CA+E=qVcK7mBbZ-C8FyAxUty_wQ_aOjo1b0+iU4E5CgG=yBCj=g@mail.gmail.com>
+References: <20181016031141.16259-1-anarsoul@gmail.com>
+ <20181016071626.m6jkoiixkvxks5ob@flea>
+ <CA+E=qVcK7mBbZ-C8FyAxUty_wQ_aOjo1b0+iU4E5CgG=yBCj=g@mail.gmail.com>
+Message-ID: <20181017074539.b6qeft5oba45dv5r@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invoke pm_runtime APIs to enable clocks and remove explicit
-clock enabling using clk_prepare_enable().
+On Tue, Oct 16, 2018 at 08:08:41PM -0700, Vasily Khoruzhick wrote:
+> On Tue, Oct 16, 2018 at 12:16 AM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Mon, Oct 15, 2018 at 08:11:41PM -0700, Vasily Khoruzhick wrote:
+> > > startup() and shutdown() hooks are called for both substreams,
+> > > so stopping either substream when another is running breaks the
+> > > latter.
+> > >
+> > > E.g. playback breaks if capture is stopped when playback is running.
+> > >
+> > > Move code from startup() and shutdown() to resume() and suspend()
+> > > hooks respectively to fix this issue
+> > >
+> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > ---
+> > > v2: - rename from "ASoC: sun4i-i2s: don't try to start up
+> > >                  or shut down DAI if it's active"
+> > >     - move code from startup/shutdown hooks into pm_runtime
+> > >
+> > >  sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
+> > >  1 file changed, 25 insertions(+), 36 deletions(-)
+> > >
+> > > diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+> > > index a4aa931ebfae..daa6c08cffbc 100644
+> > > --- a/sound/soc/sunxi/sun4i-i2s.c
+> > > +++ b/sound/soc/sunxi/sun4i-i2s.c
+> > > @@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
+> > >       return 0;
+> > >  }
+> > >
+> > > -static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+> > > -                          struct snd_soc_dai *dai)
+> > > -{
+> > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > > -
+> > > -     /* Enable the whole hardware block */
+> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > -                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
+> > > -
+> > > -     /* Enable the first output line */
+> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK,
+> > > -                        SUN4I_I2S_CTRL_SDO_EN(0));
+> > > -
+> > > -
+> > > -     return clk_prepare_enable(i2s->mod_clk);
+> > > -}
+> > > -
+> > > -static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
+> > > -                            struct snd_soc_dai *dai)
+> > > -{
+> > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > > -
+> > > -     clk_disable_unprepare(i2s->mod_clk);
+> > > -
+> > > -     /* Disable our output lines */
+> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
+> > > -
+> > > -     /* Disable the whole hardware block */
+> > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > -                        SUN4I_I2S_CTRL_GL_EN, 0);
+> > > -}
+> > > -
+> > >  static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+> > >                               unsigned int freq, int dir)
+> > >  {
+> > > @@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
+> > >       .hw_params      = sun4i_i2s_hw_params,
+> > >       .set_fmt        = sun4i_i2s_set_fmt,
+> > >       .set_sysclk     = sun4i_i2s_set_sysclk,
+> > > -     .shutdown       = sun4i_i2s_shutdown,
+> > > -     .startup        = sun4i_i2s_startup,
+> > >       .trigger        = sun4i_i2s_trigger,
+> > >  };
+> > >
+> > > @@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
+> > >               goto err_disable_clk;
+> > >       }
+> > >
+> > > +     /* Enable the whole hardware block */
+> > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > +                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
+> > > +
+> >
+> > So this is definitely needed
+> >
+> > > +     /* Enable the first output line */
+> > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > +                        SUN4I_I2S_CTRL_SDO_EN_MASK,
+> > > +                        SUN4I_I2S_CTRL_SDO_EN(0));
+> > > +
+> > > +     ret = clk_prepare_enable(i2s->mod_clk);
+> > > +     if (ret) {
+> > > +             dev_err(dev, "Failed to enable module clock\n");
+> > > +             goto err_disable_clk;
+> > > +     }
+> >
+> > But we really don't want to enable the module clock before the
+> > playback / capture actually starts. And I'm guessing it would make
+> > more sense to keep the output enable configuration there as well,
+> > since it's likely that we will have support for it in the future, and
+> > we'll need additional information from ASoC when we'll do.
+> 
+> Should we go with v1 version of my patch then? I see no reason to
+> shuffle code around if we keep startup() and shutdown() hooks.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/pci/controller/dwc/pci-keystone.c | 28 ++++++++++-------------
- 1 file changed, 12 insertions(+), 16 deletions(-)
+I'd go for something in between. runtime_pm already provides whether
+the device is active or not, so you can just move the
+SUN4I_I2S_CTRL_GL_EN write to the runtime_resume and runtime_suspend
+functions, and that should fix your issue.
 
-diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index 5ae73c185c99..4f764ec49a4c 100644
---- a/drivers/pci/controller/dwc/pci-keystone.c
-+++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -96,7 +96,6 @@
- 
- struct keystone_pcie {
- 	struct dw_pcie		*pci;
--	struct	clk		*clk;
- 	/* PCI Device ID */
- 	u32			device_id;
- 	int			num_legacy_host_irqs;
-@@ -989,26 +988,22 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, ks_pcie);
--	ks_pcie->clk = devm_clk_get(dev, "pcie");
--	if (IS_ERR(ks_pcie->clk)) {
--		dev_err(dev, "Failed to get pcie rc clock\n");
--		ret = PTR_ERR(ks_pcie->clk);
--		goto err_phy;
-+	pm_runtime_enable(dev);
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0) {
-+		dev_err(dev, "pm_runtime_get_sync failed\n");
-+		goto err_get_sync;
- 	}
- 
--	ret = clk_prepare_enable(ks_pcie->clk);
--	if (ret)
--		goto err_phy;
--
- 	ret = ks_pcie_add_pcie_port(ks_pcie, pdev);
- 	if (ret < 0)
--		goto fail_clk;
-+		goto err_get_sync;
- 
- 	return 0;
--fail_clk:
--	clk_disable_unprepare(ks_pcie->clk);
- 
--err_phy:
-+err_get_sync:
-+	pm_runtime_put(dev);
-+	pm_runtime_disable(dev);
- 	ks_pcie_disable_phy(ks_pcie);
- 
- err_link:
-@@ -1023,10 +1018,11 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
- 	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
- 	struct device_link **link = ks_pcie->link;
- 	int num_lanes = ks_pcie->num_lanes;
-+	struct device *dev = &pdev->dev;
- 
--	clk_disable_unprepare(ks_pcie->clk);
-+	pm_runtime_put(dev);
-+	pm_runtime_disable(dev);
- 	ks_pcie_disable_phy(ks_pcie);
--
- 	while (num_lanes--)
- 		device_link_del(link[num_lanes]);
- 
+Maxime
+
 -- 
-2.17.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181017/65c9e55c/attachment.sig>
