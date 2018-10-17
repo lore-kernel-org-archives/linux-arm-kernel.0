@@ -1,57 +1,74 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 17 Oct 2018 20:31:14 +0200
-Subject: [PATCH] misc: atmel-ssc: Fix section annotation on
- atmel_ssc_get_driver_data
-In-Reply-To: <20181017182031.GA9678@flashbox>
-References: <20181017170901.13119-1-natechancellor@gmail.com>
- <20181017181625.GW17341@piout.net> <20181017182031.GA9678@flashbox>
-Message-ID: <20181017183114.GZ17341@piout.net>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 17 Oct 2018 11:32:13 -0700
+Subject: [PATCH 2/6] clk: mvebu: add helper file for Armada AP and CP
+ clocks
+In-Reply-To: <20180922181709.13007-3-gregory.clement@bootlin.com>
+References: <20180922181709.13007-1-gregory.clement@bootlin.com>
+ <20180922181709.13007-3-gregory.clement@bootlin.com>
+Message-ID: <153980113358.5275.6784587664499905114@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/2018 11:20:31-0700, Nathan Chancellor wrote:
-> On Wed, Oct 17, 2018 at 08:16:25PM +0200, Alexandre Belloni wrote:
-> > On 17/10/2018 10:09:02-0700, Nathan Chancellor wrote:
-> > > After building the kernel with Clang, the following section mismatch
-> > > warning appears:
-> > > 
-> > > WARNING: vmlinux.o(.text+0x3bf19a6): Section mismatch in reference from
-> > > the function ssc_probe() to the function
-> > > .init.text:atmel_ssc_get_driver_data()
-> > > The function ssc_probe() references
-> > > the function __init atmel_ssc_get_driver_data().
-> > > This is often because ssc_probe lacks a __init
-> > > annotation or the annotation of atmel_ssc_get_driver_data is wrong.
-> > > 
-> > > Remove __init from atmel_ssc_get_driver_data to get rid of the mismatch.
-> > > 
-> > 
-> > Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > 
-> > I would add:
-> > 
-> > Fixes: 5c86ac695c7e ("ASoC: atmel-ssc: use module_platform_driver macro")
-> > 
-> > > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
-> > > ---
-> > > 
-> > > Alternatively, ssc_probe could be marked as __init, I don't think there
-> > > is any way for the probe to defer. I decided to go with the more
-> > > conservative option first but I'm happy to respin if necessary.
-> > > 
-> > 
-> > A probe function should never be marked __init, unless you ensure there
-> > is no way to bind/unbind the driver at runtime.
-> > 
-> 
-> Thank you for the review and that clarification, wasn't able to find
-> much regarding __init on probe functions in my research.
-> 
+Quoting Gregory CLEMENT (2018-09-22 11:17:05)
+> diff --git a/drivers/clk/mvebu/armada_ap_cp_helper.c b/drivers/clk/mvebu/armada_ap_cp_helper.c
+> new file mode 100644
+> index 000000000000..5f2457719b10
+> --- /dev/null
+> +++ b/drivers/clk/mvebu/armada_ap_cp_helper.c
+> @@ -0,0 +1,28 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Marvell Armada AP and CP110 helper
+> + *
+> + * Copyright (C) 2018 Marvell
+> + *
+> + * Gregory Clement <gregory.clement@bootlin.com>
+> + *
+> + */
+> +
+> +#include "armada_ap_cp_helper.h"
+> +#include <linux/device.h>
+> +
+> +char *ap_cp_unique_name(struct device *dev, struct device_node *np,
+> +                       const char *name)
+> +{
+> +       const __be32 *reg;
+> +       u64 addr;
+> +
+> +       /* Do not create a name if there is no clock */
+> +       if (!name)
+> +               return NULL;
+> +
+> +       reg = of_get_property(np, "reg", NULL);
+> +       addr = of_translate_address(np, reg);
+> +       return devm_kasprintf(dev, GFP_KERNEL, "%llx-%s",
+> +                             (unsigned long long)addr, name);
 
-You can look for suppress_bind_attrs for more info.
+We probably don't want to leak physical addresses into debugfs, but I
+guess this is how it's already been, so maybe something in the future
+should change this for security purposes.
 
+> +}
+> diff --git a/drivers/clk/mvebu/armada_ap_cp_helper.h b/drivers/clk/mvebu/armada_ap_cp_helper.h
+> new file mode 100644
+> index 000000000000..23aa29f3fcf7
+> --- /dev/null
+> +++ b/drivers/clk/mvebu/armada_ap_cp_helper.h
+> @@ -0,0 +1,11 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +
+> +#ifndef __ARMADA_AP_CP_HELPER_H
+> +#define __ARMADA_AP_CP_HELPER_H
+> +
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Drop these includes? And forward declare 
+
+struct device;
+struct device_node;
+
+> +
+> +char *ap_cp_unique_name(struct device *dev, struct device_node *np,
+> +                       const char *name);
+> +#endif
