@@ -1,68 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Oct 2018 17:51:21 +0100
-Subject: [PATCH] kvm: arm64: fix caching of host MDCR_EL2 value
-In-Reply-To: <20181017164210.16094-1-mark.rutland@arm.com>
-References: <20181017164210.16094-1-mark.rutland@arm.com>
-Message-ID: <adf13571-9e07-bf97-2794-7a21a8c2fb2c@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 17 Oct 2018 18:52:52 +0200
+Subject: [PATCH v9 5/6] arm64: zynqmp: Add DDRC node
+In-Reply-To: <1539581388-23963-6-git-send-email-manish.narani@xilinx.com>
+References: <1539581388-23963-1-git-send-email-manish.narani@xilinx.com>
+ <1539581388-23963-6-git-send-email-manish.narani@xilinx.com>
+Message-ID: <20181017165252.GG22535@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/18 17:42, Mark Rutland wrote:
-> At boot time, KVM stashes the host MDCR_EL2 value, but only does this
-> when the kernel is not running in hyp mode (i.e. is non-VHE). In these
-> cases, the stashed value of MDCR_EL2.HPMN happens to be zero, which can
-> lead to CONSTRAINED UNPREDICTABLE behaviour.
+On Mon, Oct 15, 2018 at 10:59:47AM +0530, Manish Narani wrote:
+> Add ddrc memory controller node in dts. The size mentioned in dts is
+> 0x30000, because we need to access DDR_QOS INTR registers located at
+> 0xFD090208 from this driver.
 > 
-> Since we use this value to derive the MDCR_EL2 value when switching
-> to/from a guest, after a guest have been run, the performance counters
-> do not behave as expected. This has been observed to result in accesses
-> via PMXEVTYPER_EL0 and PMXEVCNTR_EL0 not affecting the relevant
-> counters, resulting in events not being counted. In these cases, only
-> the fixed-purpose cycle counter appears to work as expected.
-> 
-> Fix this by always stashing the host MDCR_EL2 value, regardless of VHE.
-> 
-> Fixes: 1e947bad0b63b351 ("arm64: KVM: Skip HYP setup when already running in HYP")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Christopher Dall <christoffer.dall@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
+> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
 > ---
->  virt/kvm/arm/arm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index c92053bc3f96..8fb31a7cc22c 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1295,8 +1295,6 @@ static void cpu_init_hyp_mode(void *dummy)
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> index 29ce234..a81d3b16 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> @@ -355,6 +355,13 @@
+>  			xlnx,bus-width = <64>;
+>  		};
 >  
->  	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
->  	__cpu_init_stage2();
-> -
-> -	kvm_arm_init_debug();
->  }
->  
->  static void cpu_hyp_reset(void)
-> @@ -1320,6 +1318,8 @@ static void cpu_hyp_reinit(void)
->  		cpu_init_hyp_mode(NULL);
->  	}
->  
-> +	kvm_arm_init_debug();
+> +		mc: memory-controller at fd070000 {
+> +			compatible = "xlnx,zynqmp-ddrc-2.40a";
+> +			reg = <0x0 0xfd070000 0x0 0x30000>;
+> +			interrupt-parent = <&gic>;
+> +			interrupts = <0 112 4>;
+> +		};
 > +
->  	if (vgic_present)
->  		kvm_vgic_init_cpu_hardware();
->  }
-> 
+>  		gem0: ethernet at ff0b0000 {
+>  			compatible = "cdns,zynqmp-gem", "cdns,gem";
+>  			status = "disabled";
+> -- 
 
-Urghh. Lovely. Thanks for tracking that one down. I'll queue it
-immediately, with a Cc to stable.
+Still needs DT folks ACK.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
