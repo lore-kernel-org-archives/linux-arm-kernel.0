@@ -1,61 +1,69 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 17 Oct 2018 13:03:03 +0530
-Subject: [linux-sunxi] [PATCH v11 1/2] dt-bindings: media: Add Allwinner
- V3s Camera Sensor Interface (CSI)
-In-Reply-To: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
-References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <CAMty3ZD3TDOC_PSvbEtopT12pCmXCDqZQdPVB9GNC7wOrj_LYQ@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 17 Oct 2018 00:38:04 -0700
+Subject: [PATCH v5 0/9] Add support for audiocodec in Allwinner A64
+Message-ID: <20181017073813.14127-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 2:11 PM Yong Deng <yong.deng@magewell.com> wrote:
->
-> Add binding documentation for Allwinner V3s CSI.
->
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> ---
->  .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
->
-> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> new file mode 100644
-> index 000000000000..2ff47a9507a6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> @@ -0,0 +1,59 @@
-> +Allwinner V3s Camera Sensor Interface
-> +-------------------------------------
-> +
-> +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> +interface and CSI1 is used for parallel interface.
-> +
-> +Required properties:
-> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> +  - reg: base address and size of the memory-mapped region.
-> +  - interrupts: interrupt associated to this IP
-> +  - clocks: phandles to the clocks feeding the CSI
-> +    * bus: the CSI interface clock
-> +    * mod: the CSI module clock
-> +    * ram: the CSI DRAM clock
-> +  - clock-names: the clock names mentioned above
-> +  - resets: phandles to the reset line driving the CSI
-> +
-> +Each CSI node should contain one 'port' child node with one child 'endpoint'
-> +node, according to the bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
-> +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
-> +Bt656 for CSI1.
+This series adds Allwinner A64 audiocodec support into sun4i-i2s,
+sun8i-codec drivers, introduces new sun50i-codec-analog driver and enables
+sound on Pine64, SoPine boards and Pinebook.
 
-But A64 manual claimed that CSI0 is parallel (ofcourse it has only one
-controller). On the other-side the register space seems similar. and
-also is Bt656 and CCIR656 are same types?
+I2S for audiocodec in A64 is different from other 3 I2S modules but
+similar to one in A10, digital part of codec is compatible with A33 and
+analog controls part is completely different from other SoCs - it shares
+only few bits in few registers, so adding support for it into existing
+sun8i-codec-analog would mean duplicating all the widgets, controls and
+some routes and making it hard to read. Therefore it makes sense to
+introduce new driver.
+
+v2: - Use simple-amplifier for speaker amp on Pinebook
+    - Rename sun50i-a64-i2s to sun50i-a64-codec-i2s to preserve compatible
+      string for other 3 I2S modules in A64 in case if there's any
+      incompatibility with H3
+v3: - renamed sunxi-adda-pr-regmap to sun8i-adda-pr-regmap
+    - use ilog2() to calculate reg value for LRCK div instead of using a
+      table
+v4: - dts: don't use 'Mic' and 'Headset Mic' widgets from sun8i-codec,
+      define our board-level widgets instead.
+v5: - collect all the tags
+    - drop the change to sun8i_codec_clk_div
+
+Marcus Cooper (1):
+  ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+
+Vasily Khoruzhick (8):
+  ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
+  ASoC: sun8i-codec-analog: split regmap code into separate driver
+  ASoC: dt-binding: Add bindings for Allwinner A64 codec's analog path
+    controls
+  ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path
+    controls
+  ASoC: sunxi: allow the sun8i-codec driver to be built on ARM64
+  arm64: dts: allwinner: a64: add nodes necessary for analog sound
+    support
+  arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
+  arm64: dts: allwinner: a64: enable sound on Pinebook
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt   |   2 +
+ .../bindings/sound/sun50i-codec-analog.txt    |  12 +
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  29 ++
+ .../dts/allwinner/sun50i-a64-pinebook.dts     |  42 ++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  29 ++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  58 +++
+ sound/soc/sunxi/Kconfig                       |  17 +-
+ sound/soc/sunxi/Makefile                      |   2 +
+ sound/soc/sunxi/sun4i-i2s.c                   |  21 +
+ sound/soc/sunxi/sun50i-codec-analog.c         | 444 ++++++++++++++++++
+ sound/soc/sunxi/sun8i-adda-pr-regmap.c        | 102 ++++
+ sound/soc/sunxi/sun8i-adda-pr-regmap.h        |   7 +
+ sound/soc/sunxi/sun8i-codec-analog.c          |  79 +---
+ sound/soc/sunxi/sun8i-codec.c                 |  22 +-
+ 14 files changed, 785 insertions(+), 81 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+ create mode 100644 sound/soc/sunxi/sun50i-codec-analog.c
+ create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.c
+ create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.h
 
 -- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+2.19.0
