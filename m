@@ -1,154 +1,146 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 17 Oct 2018 08:22:51 -0500
-Subject: [PATCH v9 2/9] PCI: Using PCI configuration space header type
- instead of class type to assign resource
-In-Reply-To: <20181016145355.GB16390@e107981-ln.cambridge.arm.com>
-References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
- <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
- <20181016145355.GB16390@e107981-ln.cambridge.arm.com>
-Message-ID: <20181017132251.GG5906@bhelgaas-glaptop.roam.corp.google.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 17 Oct 2018 15:24:00 +0200
+Subject: [PATCH v3 2/4] driver core: add deferring probe reason to
+ devices_deferred property
+In-Reply-To: <CAHp75Vd2c3sHz=ZObsNAyEmOK-=__2=y-soDM5DqNUyLLK8jdA@mail.gmail.com>
+References: <CAHp75Vd2c3sHz=ZObsNAyEmOK-=__2=y-soDM5DqNUyLLK8jdA@mail.gmail.com>
+ <CGME20181017132404eucas1p2a413f6853af8f11a874650b6289d56cf@eucas1p2.samsung.com>
+Message-ID: <20181017132400.5300-1-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 03:53:55PM +0100, Lorenzo Pieralisi wrote:
-> On Tue, Oct 16, 2018 at 06:44:43PM +0800, honghui.zhang at mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > The PCI configuration space header type defines the layout of the rest
-> > of the header (PCI r3.0 sec 6.1, PCIe r4.0 sec 7.5.1.1.9) while the
-> > resource assignment is based on the configuration space layout instead
-> > of its class type. Using configuration space header type instead of
-> > class type for the resource assignment.
-> > 
-> > Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > ---
-> >  drivers/pci/pci.c       |  3 +--
-> >  drivers/pci/probe.c     |  3 ---
-> >  drivers/pci/setup-bus.c | 20 ++++++++++----------
-> >  3 files changed, 11 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > index 29ff961..7d379ca 100644
-> > --- a/drivers/pci/pci.c
-> > +++ b/drivers/pci/pci.c
-> > @@ -5908,8 +5908,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
-> >  	 * to enable the kernel to reassign new resource
-> >  	 * window later on.
-> >  	 */
-> > -	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
-> > -	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
-> > +	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
-> >  		for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
-> >  			r = &dev->resource[i];
-> >  			if (!(r->flags & IORESOURCE_MEM))
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index ec78400..29a35c1 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -1695,9 +1695,6 @@ int pci_setup_device(struct pci_dev *dev)
-> >  		break;
-> >  
-> >  	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
-> > -		if (class != PCI_CLASS_BRIDGE_PCI)
-> > -			goto bad;
-> > -
-> >  		/*
-> >  		 * The PCI-to-PCI bridge spec requires that subtractive
-> >  		 * decoding (i.e. transparent) bridge must have programming
-> > diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-> > index 79b1824..69f90f4 100644
-> > --- a/drivers/pci/setup-bus.c
-> > +++ b/drivers/pci/setup-bus.c
-> > @@ -182,7 +182,7 @@ static void __dev_sort_resources(struct pci_dev *dev,
-> >  	u16 class = dev->class >> 8;
-> >  
-> >  	/* Don't touch classless devices or host bridges or ioapics.  */
-> > -	if (class == PCI_CLASS_NOT_DEFINED || class == PCI_CLASS_BRIDGE_HOST)
-> > +	if (class == PCI_CLASS_NOT_DEFINED)
-> 
-> I think this check has been there since the first initial git commit,
-> whether that's _really_ needed or not in the current kernel it is very
-> hard to say.
-> 
-> I am not that sure it is safe to remove it, especially given that we are at
-> -rc8 and close to a release, it would be good if this patch could sit in
-> next to give it some exposure to testing before merging it upstream.
+/sys/kernel/debug/devices_deferred property contains list of deferred devices.
+This list does not contain reason why the driver deferred probe, the patch
+improves it.
+The natural place to set the reason is probe_err function introduced recently,
+ie. if probe_err will be called with -EPROBE_DEFER instead of printk the message
+will be attached to deferred device and printed when user read devices_deferred
+property.
 
-Yes, you're right; I think I think this is a little too risky at this
-point.  I'll pull this patch out and queue it up for the next cycle
-(v4.21).
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+Reviewed-by: Mark Brown <broonie@kernel.org>
+Reviewed-by: Javier Martinez Canillas <javierm@redhat.com>
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+---
+v3:
+  - adjusted deferred_devs_show, to accept newline ended messages,
+  - changed conditonal check to positive,
+  - added R-b by Andy.
+v2:
+  - changed __deferred_probe_set_msg args - like in __dev_printk, fits better,
+  - use kasprintf instead of bunch of code,
+  - keep consistent format of devices_deferred lines,
+  - added R-Bs (again I hope changes above are not against it).
+---
+ drivers/base/base.h |  3 +++
+ drivers/base/core.c |  9 +++++----
+ drivers/base/dd.c   | 21 ++++++++++++++++++++-
+ 3 files changed, 28 insertions(+), 5 deletions(-)
 
-For v4.20, I think you should resurrect the class code patch [1].  That
-should be enough to make things work in v4.20, even without this hdr_type
-patch.  It will also improve the lspci output, because I think it uses the
-class code to look up the generic description, e.g., in this output:
-
-  00:1c.0 PCI bridge: Intel Corporation Sunrise Point-LP PCI Express Root Port (rev f1)
-
-I think the "PCI bridge" part is based on the class code.
-
-Bjorn
-
-[1] https://lore.kernel.org/linux-pci/1539590940-13355-3-git-send-email-honghui.zhang at mediatek.com
-
-> >  		return;
-> >  
-> >  	/* Don't touch ioapic devices already enabled by firmware */
-> > @@ -1221,12 +1221,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
-> >  		if (!b)
-> >  			continue;
-> >  
-> > -		switch (dev->class >> 8) {
-> > -		case PCI_CLASS_BRIDGE_CARDBUS:
-> > +		switch (dev->hdr_type) {
-> > +		case PCI_HEADER_TYPE_CARDBUS:
-> >  			pci_bus_size_cardbus(b, realloc_head);
-> >  			break;
-> >  
-> > -		case PCI_CLASS_BRIDGE_PCI:
-> > +		case PCI_HEADER_TYPE_BRIDGE:
-> >  		default:
-> >  			__pci_bus_size_bridges(b, realloc_head);
-> >  			break;
-> > @@ -1237,12 +1237,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
-> >  	if (pci_is_root_bus(bus))
-> >  		return;
-> >  
-> > -	switch (bus->self->class >> 8) {
-> > -	case PCI_CLASS_BRIDGE_CARDBUS:
-> > +	switch (bus->self->hdr_type) {
-> > +	case PCI_HEADER_TYPE_CARDBUS:
-> >  		/* don't size cardbuses yet. */
-> >  		break;
-> >  
-> > -	case PCI_CLASS_BRIDGE_PCI:
-> > +	case PCI_HEADER_TYPE_BRIDGE:
-> >  		pci_bridge_check_ranges(bus);
-> >  		if (bus->self->is_hotplug_bridge) {
-> >  			additional_io_size  = pci_hotplug_io_size;
-> > @@ -1391,13 +1391,13 @@ void __pci_bus_assign_resources(const struct pci_bus *bus,
-> >  
-> >  		__pci_bus_assign_resources(b, realloc_head, fail_head);
-> >  
-> > -		switch (dev->class >> 8) {
-> > -		case PCI_CLASS_BRIDGE_PCI:
-> > +		switch (dev->hdr_type) {
-> > +		case PCI_HEADER_TYPE_BRIDGE:
-> >  			if (!pci_is_enabled(dev))
-> >  				pci_setup_bridge(b);
-> >  			break;
-> >  
-> > -		case PCI_CLASS_BRIDGE_CARDBUS:
-> > +		case PCI_HEADER_TYPE_CARDBUS:
-> >  			pci_setup_cardbus(b);
-> >  			break;
-> >  
-> > -- 
-> > 2.6.4
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/base/base.h b/drivers/base/base.h
+index 7a419a7a6235..effbd5e7f9f1 100644
+--- a/drivers/base/base.h
++++ b/drivers/base/base.h
+@@ -75,6 +75,7 @@ struct device_private {
+ 	struct klist_node knode_driver;
+ 	struct klist_node knode_bus;
+ 	struct list_head deferred_probe;
++	char *deferred_probe_msg;
+ 	struct device *device;
+ };
+ #define to_device_private_parent(obj)	\
+@@ -113,6 +114,8 @@ extern void device_release_driver_internal(struct device *dev,
+ extern void driver_detach(struct device_driver *drv);
+ extern int driver_probe_device(struct device_driver *drv, struct device *dev);
+ extern void driver_deferred_probe_del(struct device *dev);
++extern void __deferred_probe_set_msg(const struct device *dev,
++				     struct va_format *vaf);
+ static inline int driver_match_device(struct device_driver *drv,
+ 				      struct device *dev)
+ {
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index 1f3e99c2ef03..27990110fb24 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -3076,6 +3076,7 @@ define_dev_printk_level(_dev_info, KERN_INFO);
+  *
+  * This helper implements common pattern present in probe functions for error
+  * checking: print message if the error is not -EPROBE_DEFER and propagate it.
++ * In case of -EPROBE_DEFER it sets defer probe reason.
+  * It replaces code sequence:
+  * 	if (err != -EPROBE_DEFER)
+  * 		dev_err(dev, ...);
+@@ -3091,14 +3092,14 @@ int probe_err(const struct device *dev, int err, const char *fmt, ...)
+ 	struct va_format vaf;
+ 	va_list args;
+ 
+-	if (err == -EPROBE_DEFER)
+-		return err;
+-
+ 	va_start(args, fmt);
+ 	vaf.fmt = fmt;
+ 	vaf.va = &args;
+ 
+-	dev_err(dev, "error %d: %pV", err, &vaf);
++	if (err == -EPROBE_DEFER)
++		__deferred_probe_set_msg(dev, &vaf);
++	else
++		dev_err(dev, "error %d: %pV", err, &vaf);
+ 
+ 	va_end(args);
+ 
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 169412ee4ae8..6e488146b328 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -27,6 +27,7 @@
+ #include <linux/async.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/pinctrl/devinfo.h>
++#include <linux/slab.h>
+ 
+ #include "base.h"
+ #include "power/power.h"
+@@ -132,6 +133,8 @@ void driver_deferred_probe_del(struct device *dev)
+ 	if (!list_empty(&dev->p->deferred_probe)) {
+ 		dev_dbg(dev, "Removed from deferred list\n");
+ 		list_del_init(&dev->p->deferred_probe);
++		kfree(dev->p->deferred_probe_msg);
++		dev->p->deferred_probe_msg = NULL;
+ 	}
+ 	mutex_unlock(&deferred_probe_mutex);
+ }
+@@ -202,6 +205,21 @@ void device_unblock_probing(void)
+ 	driver_deferred_probe_trigger();
+ }
+ 
++/*
++ * __deferred_probe_set_msg() - Set defer probe reason message for device
++ */
++void __deferred_probe_set_msg(const struct device *dev, struct va_format *vaf)
++{
++	mutex_lock(&deferred_probe_mutex);
++
++	if (dev->p->deferred_probe_msg)
++		kfree(dev->p->deferred_probe_msg);
++	dev->p->deferred_probe_msg = kasprintf(GFP_KERNEL, "%s: %pV",
++					       dev_driver_string(dev), vaf);
++
++	mutex_unlock(&deferred_probe_mutex);
++}
++
+ /*
+  * deferred_devs_show() - Show the devices in the deferred probe pending list.
+  */
+@@ -212,7 +230,8 @@ static int deferred_devs_show(struct seq_file *s, void *data)
+ 	mutex_lock(&deferred_probe_mutex);
+ 
+ 	list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
+-		seq_printf(s, "%s\n", dev_name(curr->device));
++		seq_printf(s, "%s\t%s", dev_name(curr->device),
++			   curr->device->p->deferred_probe_msg ?: "\n");
+ 
+ 	mutex_unlock(&deferred_probe_mutex);
+ 
+-- 
+2.18.0
