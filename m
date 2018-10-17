@@ -1,73 +1,61 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 17 Oct 2018 09:29:41 +0200
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
- SPI NOR flash memories
-In-Reply-To: <20181017091045.124e0266@bbrezillon>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
- <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
- <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
- <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017090724.12f2cd79@bbrezillon>
- <20181017091045.124e0266@bbrezillon>
-Message-ID: <20181017092941.3658bd9a@bbrezillon>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 17 Oct 2018 13:03:03 +0530
+Subject: [linux-sunxi] [PATCH v11 1/2] dt-bindings: media: Add Allwinner
+ V3s Camera Sensor Interface (CSI)
+In-Reply-To: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <CAMty3ZD3TDOC_PSvbEtopT12pCmXCDqZQdPVB9GNC7wOrj_LYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018 09:10:45 +0200
-Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+On Wed, Sep 26, 2018 at 2:11 PM Yong Deng <yong.deng@magewell.com> wrote:
+>
+> Add binding documentation for Allwinner V3s CSI.
+>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
+>  .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+>
+> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> new file mode 100644
+> index 000000000000..2ff47a9507a6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> @@ -0,0 +1,59 @@
+> +Allwinner V3s Camera Sensor Interface
+> +-------------------------------------
+> +
+> +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> +interface and CSI1 is used for parallel interface.
+> +
+> +Required properties:
+> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> +  - reg: base address and size of the memory-mapped region.
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the CSI
+> +    * bus: the CSI interface clock
+> +    * mod: the CSI module clock
+> +    * ram: the CSI DRAM clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandles to the reset line driving the CSI
+> +
+> +Each CSI node should contain one 'port' child node with one child 'endpoint'
+> +node, according to the bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
+> +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
+> +Bt656 for CSI1.
 
-> On Wed, 17 Oct 2018 09:07:24 +0200
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> 
-> > On Wed, 17 Oct 2018 02:07:43 +0000
-> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> >   
-> > > >       
-> > > Actually there is no entry of s25fs512s in current spi-nor.c file.
-> > > For my connected flash part, jedec ID read points to s25fl512s. I
-> > > have asked my board team to confirm the name of exact connected flash
-> > > part. When I check the data sheet of s25fs512s, it also points to the
-> > > same Jedec ID information. { "s25fl512s",  INFO(0x010220, 0x4d00, 256
-> > > * 1024, 256, ....}
-> > > 
-> > > But as stated earlier, if I skip reading SFDP or read using 1-1-1
-> > > protocol then read are always correct. For 1-4-4 protocol read are
-> > > wrong and on further debugging found that Read code of 0x6C is being
-> > > send as opcode instead of 0xEC.
-> > > 
-> > > If I revert this patch, reads are working fine.    
-> > 
-> > Can you try with the following patch?
-> >   
-> 
-> Hm, nevermind. The problem is actually not related to 4B vs non-4B mode
-> but 1-1-4 vs 1-4-4 modes.
-> 
+But A64 manual claimed that CSI0 is parallel (ofcourse it has only one
+controller). On the other-side the register space seems similar. and
+also is Bt656 and CCIR656 are same types?
 
-Can you try with this patch applied?
-
---->8---
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 9407ca5f9443..cf33d834698c 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -3132,6 +3132,17 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
-                switch (SFDP_PARAM_HEADER_ID(param_header)) {
-                case SFDP_SECTOR_MAP_ID:
-                        err = spi_nor_parse_smpt(nor, param_header);
-+                       if (err) {
-+                               dev_warn(dev,
-+                                        "failed to parse SMPT (err = %d)\n",
-+                                        err);
-+                               /*
-+                                * SMPT parsing is optional, let's not drop
-+                                * all information we extracted so far just
-+                                * because it failed.
-+                                */
-+                               err = 0;
-+                       }
-                        break;
- 
-                default:
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
