@@ -1,61 +1,55 @@
-From: Steve.Capper@arm.com (Steve Capper)
-Date: Wed, 17 Oct 2018 14:52:45 +0000
-Subject: [PATCH 3/5] arm64: mm: Copy over arch_get_unmapped_area
-In-Reply-To: <20180907140439.5ji2c2fdxhvzzv32@capper-debian.cambridge.arm.com>
-References: <20180829124543.25314-1-steve.capper@arm.com>
- <20180829124543.25314-4-steve.capper@arm.com>
- <0b6b0dba-b8ae-3e8d-68d1-6b93dfb777c0@redhat.com>
- <20180907140439.5ji2c2fdxhvzzv32@capper-debian.cambridge.arm.com>
-Message-ID: <20181017145235.raigvrlxwherivzp@capper-debian.cambridge.arm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 17 Oct 2018 08:07:11 -0700
+Subject: [PATCH V4 02/11] clk: imx: scu: add scu clock common part
+In-Reply-To: <AM0PR04MB42110A50FDC33E66A9DDF63D80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
+ <1539504194-28289-3-git-send-email-aisheng.dong@nxp.com>
+ <153972550584.5275.12112973418888551824@swboyd.mtv.corp.google.com>
+ <AM0PR04MB42110A50FDC33E66A9DDF63D80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <153978883132.5275.17975663103503100871@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 03:04:39PM +0100, Steve Capper wrote:
-> On Fri, Sep 07, 2018 at 02:15:32AM -0400, Jon Masters wrote:
-> > On 08/29/2018 08:45 AM, Steve Capper wrote:
+Quoting A.s. Dong (2018-10-17 02:11:03)
+> > -----Original Message-----
+> > From: Stephen Boyd [mailto:sboyd at kernel.org]
+> > Sent: Wednesday, October 17, 2018 5:32 AM
+> > Quoting A.s. Dong (2018-10-14 01:07:45)
+> > > Add scu clock common part which will be used by client clock drivers.
+> > >
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Cc: Stephen Boyd <sboyd@kernel.org>
+> > > Cc: Michael Turquette <mturquette@baylibre.com>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > ---
+> > > ChangeLog:
+> > > v3->v4:
+> > >  * scu headfile path change
+> > > v2->v3:
+> > >  * no changes
+> > > v1->v2:
+> > >  * update function call name
+> > > ---
+> > >  drivers/clk/imx/Kconfig       |  2 ++
+> > >  drivers/clk/imx/Makefile      |  2 ++
+> > >  drivers/clk/imx/scu/Kconfig   |  5 +++++
+> > >  drivers/clk/imx/scu/Makefile  |  4 ++++
+> > > drivers/clk/imx/scu/clk-scu.c | 17 +++++++++++++++++
+> > > drivers/clk/imx/scu/clk-scu.h | 18 ++++++++++++++++++
 > > 
-> > > In order to support 52-bit VAs for userspace we need to alter the mmap
-> > > area choosing logic to give 52-bit VAs where "high" addresses are
-> > > requested.
+> > Why is scu nested one level deeper in the imx directory? Can't we just keep
+> > them all within imx toplevel directory?
 > > 
-> > <snip>
-> > 
-> > > +unsigned long
-> > > +arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
-> > > +			  const unsigned long len, const unsigned long pgoff,
-> > > +			  const unsigned long flags)
-> > 
-> > <snip>
-> > 
-> > > +	/* requested length too big for entire address space */
-> > > +	if (len > TASK_SIZE - mmap_min_addr)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	if (flags & MAP_FIXED)
-> > > +		return addr;
-> > 
-> > arch/x86/mm/mmap.c:
-> > 
-> >  *  With 5-level paging this request would be granted and result in a
-> >  *  mapping which crosses the border of the 47-bit virtual address
-> >  *  space. If the application cannot handle addresses above 47-bit this
-> >  *  will lead to misbehaviour and hard to diagnose failures.
-> >  *
-> >  * Therefore ignore address hints which would result in a mapping
-> >  * crossing the 47-bit virtual address boundary.
-> > 
-> > You'll probably want something similar above.
-> >
 > 
-> Thanks Jon, I'll roll this into a future patch.
->
+> Mostly because SCU clocks are totally different from the legacy clocks.
+> (No much legacy things can be reused) So organized them together in a deeper folder
+> for clear separation and better maintenance
+> 
+> Do you think we still should put them within imx toplevel directory and mix them with
+> Legacy clocks?
+> 
 
-Hi Jon,
-Going through this again, I believe the logic in the core code
-arch_get_unmapped_area_topdown and arch_get_unmapped_area has equivalent
-checks to mmap_address_hint_valid (if we substitute TASK_SIZE for a
-limit depending on hint address).
-
-Cheers,
--- 
-Steve
+Yes. Or make a new imx-foo directory for your new fangled SoC clk driver
+code in drivers/clk/.
