@@ -1,37 +1,36 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 17 Oct 2018 12:37:51 +0000
-Subject: [PATCH v4 1/4] dt-bindings: crypto: Mention clocks for mxs-dcp
+Date: Wed, 17 Oct 2018 12:37:55 +0000
+Subject: [PATCH v4 4/4] ARM: imx_v6_v7_defconfig: Enable CRYPTO_DEV_MXS_DCP
 In-Reply-To: <cover.1539779579.git.leonard.crestez@nxp.com>
 References: <cover.1539779579.git.leonard.crestez@nxp.com>
-Message-ID: <4536b5b5b101ab6a4197fb4891f775ddeb519847.1539779579.git.leonard.crestez@nxp.com>
+Message-ID: <5ba9a89b881f6ce816262ce52f431e32e7fb85a7.1539779579.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Explicit clock enabling is required on 6sll and 6ull so mention that
-standard clock bindings are used.
+This block is present in 6sl, 6sll and 6ull so it should be enabled in
+the default imx kernel config.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 Reviewed-by: Fabio Estevam <festevam@gmail.com>
 ---
- Documentation/devicetree/bindings/crypto/fsl-dcp.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/fsl-dcp.txt b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
-index 76a0b4e80e83..4e4d387e38a5 100644
---- a/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
-+++ b/Documentation/devicetree/bindings/crypto/fsl-dcp.txt
-@@ -4,10 +4,12 @@ Required properties:
- - compatible : Should be "fsl,<soc>-dcp"
- - reg : Should contain MXS DCP registers location and length
- - interrupts : Should contain MXS DCP interrupt numbers, VMI IRQ and DCP IRQ
-                must be supplied, optionally Secure IRQ can be present, but
- 	       is currently not implemented and not used.
-+- clocks : Clock reference (only required on some SOCs: 6ull and 6sll).
-+- clock-names : Must be "dcp".
- 
- Example:
- 
- dcp at 80028000 {
- 	compatible = "fsl,imx28-dcp", "fsl,imx23-dcp";
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 1ad5736c8fa6..57928dff9bce 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -428,10 +428,11 @@ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=m
+ CONFIG_NLS_UTF8=y
+ CONFIG_SECURITYFS=y
+ CONFIG_CRYPTO_DEV_FSL_CAAM=y
+ CONFIG_CRYPTO_DEV_SAHARA=y
++CONFIG_CRYPTO_DEV_MXS_DCP=y
+ CONFIG_CRC_CCITT=m
+ CONFIG_CRC_T10DIF=y
+ CONFIG_CRC7=m
+ CONFIG_LIBCRC32C=m
+ CONFIG_FONTS=y
 -- 
 2.17.1
