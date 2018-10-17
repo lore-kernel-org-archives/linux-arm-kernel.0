@@ -1,118 +1,152 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 17 Oct 2018 16:29:15 +0200
-Subject: [PATCH v3 3/6] clocksource: exynos_mct: Refactor resources
- allocation
-In-Reply-To: <20181017134159.9656-4-m.szyprowski@samsung.com>
-References: <CGME20181017134206eucas1p1ebc76569f706675d41f2d2183349f1f3@eucas1p1.samsung.com>
- <20181017134159.9656-1-m.szyprowski@samsung.com>
- <20181017134159.9656-4-m.szyprowski@samsung.com>
-Message-ID: <CAJKOXPcMPz0wsEU9Lt1e0dp7tEk9+t8kteW=hih7sNsp99Dkkw@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 17 Oct 2018 15:38:57 +0100
+Subject: [PATCH v5 2/2] iommu/arm-smmu-v3: Reunify
+ arm_smmu_cmdq_issue_sync()
+In-Reply-To: <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
+References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+ <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
+Message-ID: <b35bb171-013b-3cb7-9a99-78505b9fdd18@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018 at 15:42, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On 17/10/2018 14:56, Robin Murphy wrote:
+> Now that both sync methods are more or less the same shape, we can save
+> some code and levels of indirection by rolling them up together again,
+> with just a couple of simple conditionals to discriminate the MSI and
+> queue-polling specifics.
+
+Hi Robin, Will,
+
+I had been thinking of this other patch previously:
+
+iommu/arm-smmu-v3: Stop rebuilding non-MSI CMD_SYNC commands
+
+The contents of the non-MSI CMD_SYNC command are fixed. This patch 
+offers a small optimisation by keeping a sample of this command on the 
+heap for re-use, thereby avoiding unnecessary re-building.
+
+Signed-off-by: John Garry <john.garry@huawei.com>
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 6947ccf..9d86c29 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -963,14 +963,16 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct 
+arm_smmu_device *smmu)
+
+  static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+  {
+-       u64 cmd[CMDQ_ENT_DWORDS];
++       static u64 cmd[CMDQ_ENT_DWORDS] = {
++              FIELD_PREP(CMDQ_0_OP, CMDQ_OP_CMD_SYNC) |
++              FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV) |
++              FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH) |
++              FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB),
++           0};
+         unsigned long flags;
+         bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+-       struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+         int ret;
+
+-       arm_smmu_cmdq_build_cmd(cmd, &ent);
+-
+         spin_lock_irqsave(&smmu->cmdq.lock, flags);
+         arm_smmu_cmdq_insert_cmd(smmu, cmd);
+         ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+
+But it seems that combining the the MSI and non-MSI methods would block 
+this.
+
+How do you feel about this?
+
+Thanks,
+John
+
 >
-> Move interrupts allocation from exynos4_timer_resources() into separate
-> function together with the interrupt number parsing code from
-> mct_init_dt(), so the code for managing interrupts is kept together.
-> While touching exynos4_timer_resources() function, move of_iomap() to it.
-> No functional changes.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > ---
->  drivers/clocksource/exynos_mct.c | 49 +++++++++++++++++++-------------
->  1 file changed, 30 insertions(+), 19 deletions(-)
+>  drivers/iommu/arm-smmu-v3.c | 49 +++++++++----------------------------
+>  1 file changed, 12 insertions(+), 37 deletions(-)
 >
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 49413900b24c..02ad55db390b 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -502,11 +502,14 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
->         return 0;
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index da8a91d116bf..36db63e3afcf 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -933,7 +933,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>   * The difference between val and sync_idx is bounded by the maximum size of
+>   * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe arithmetic.
+>   */
+> -static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+>  {
+>  	ktime_t timeout;
+>  	u32 val;
+> @@ -988,16 +988,17 @@ static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
+>  	return -ETIMEDOUT;
 >  }
 >
-> -static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
-> +static int __init exynos4_timer_resources(struct device_node *np)
+> -static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+> +static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
 >  {
-> -       int err, cpu;
->         struct clk *mct_clk, *tick_clk;
->
-> +       reg_base = of_iomap(np, 0);
-> +       if (!reg_base)
-> +               panic("%s: unable to ioremap mct address space\n", __func__);
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+>  	unsigned long flags;
+> -	struct arm_smmu_cmdq_ent ent = {
+> -		.opcode = CMDQ_OP_CMD_SYNC,
+> -		.sync	= {
+> -			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
+> -		},
+> -	};
+> +	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+> +		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+> +	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+> +	int ret, sync_idx, sync_gen;
 > +
->         tick_clk = of_clk_get_by_name(np, "fin_pll");
->         if (IS_ERR(tick_clk))
->                 panic("%s: unable to determine tick clock rate\n", __func__);
-> @@ -517,9 +520,27 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
->                 panic("%s: unable to retrieve mct clock instance\n", __func__);
->         clk_prepare_enable(mct_clk);
+> +	if (msi)
+> +		ent.sync.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count));
 >
-> -       reg_base = base;
-> -       if (!reg_base)
-> -               panic("%s: unable to ioremap mct address space\n", __func__);
-> +       return 0;
-> +}
-> +
-> +static int __init exynos4_timer_interrupts(struct device_node *np,
-> +                                          unsigned int int_type)
-> +{
-> +       int i, err, cpu;
-> +
-> +       mct_int_type = int_type;
-
-This does not look good. Before, assignment was done before call to
-exynos4_timer_resources(). Now, if I follow the path correctly, it
-will be after. Therefore the exynos4_timer_resources() will use wrong
-value. This should pop up during tests.
-
-Best regards,
-Krzysztof
-
-> +
-> +       /* This driver uses only one global timer interrupt */
-> +       mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
-> +
-> +       /*
-> +        * Find out the number of local irqs specified. The local
-> +        * timer irqs are specified after the four global timer
-> +        * irqs are specified.
-> +        */
-> +       nr_irqs = of_irq_count(np);
-> +       for (i = MCT_L0_IRQ; i < nr_irqs; i++)
-> +               mct_irqs[i] = irq_of_parse_and_map(np, i);
+>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
 >
->         if (mct_int_type == MCT_INT_PPI) {
->
-> @@ -579,24 +600,14 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
->
->  static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
->  {
-> -       u32 nr_irqs, i;
->         int ret;
->
-> -       mct_int_type = int_type;
+> @@ -1009,39 +1010,13 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+>  		arm_smmu_cmdq_build_cmd(cmd, &ent);
+>  		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+>  	}
 > -
-> -       /* This driver uses only one global timer interrupt */
-> -       mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
-> +       ret = exynos4_timer_resources(np);
-> +       if (ret)
-> +               return ret;
+> -	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+> -
+> -	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+> -}
+> -
+> -static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+> -{
+> -	u64 cmd[CMDQ_ENT_DWORDS];
+> -	unsigned long flags;
+> -	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+> -	int sync_idx, sync_gen;
+> -
+> -	arm_smmu_cmdq_build_cmd(cmd, &ent);
+> -
+> -	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+> -	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
+> -		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+>  	sync_idx = smmu->cmdq.q.prod;
+>  	sync_gen = READ_ONCE(smmu->cmdq_generation);
+> +
+>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
 >
-> -       /*
-> -        * Find out the number of local irqs specified. The local
-> -        * timer irqs are specified after the four global timer
-> -        * irqs are specified.
-> -        */
-> -       nr_irqs = of_irq_count(np);
-> -       for (i = MCT_L0_IRQ; i < nr_irqs; i++)
-> -               mct_irqs[i] = irq_of_parse_and_map(np, i);
->
-> -       ret = exynos4_timer_resources(np, of_iomap(np, 0));
-> +       ret = exynos4_timer_interrupts(np, int_type);
->         if (ret)
->                 return ret;
->
-> --
-> 2.17.1
+> -	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+> -}
+> -
+> -static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+> -{
+> -	int ret;
+> -	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+> -		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+> -
+> -	ret = msi ? __arm_smmu_cmdq_issue_sync_msi(smmu)
+> -		  : __arm_smmu_cmdq_issue_sync(smmu);
+> +	ret = msi ? arm_smmu_sync_poll_msi(smmu, ent.sync.msidata)
+> +		  : arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+>  	if (ret)
+>  		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
+>  }
 >
