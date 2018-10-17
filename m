@@ -1,150 +1,71 @@
-From: amit.kachhap@arm.com (Amit Daniel Kachhap)
-Date: Wed, 17 Oct 2018 16:18:00 +0530
-Subject: [PATCH v3 7/7] arm/kvm: arm64: Add a vcpu feature for pointer
- authentication
-In-Reply-To: <1539773280-4159-1-git-send-email-amit.kachhap@arm.com>
-References: <1539773280-4159-1-git-send-email-amit.kachhap@arm.com>
-Message-ID: <1539773280-4159-8-git-send-email-amit.kachhap@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 17 Oct 2018 12:12:58 +0100
+Subject: [PATCH v2 00/21] PCI: Cleanup pci-keystone driver
+In-Reply-To: <20181017074114.28239-1-kishon@ti.com>
+References: <20181017074114.28239-1-kishon@ti.com>
+Message-ID: <20181017111258.GA5692@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a runtime feature and can be enabled by --ptrauth option.
+On Wed, Oct 17, 2018 at 01:10:53PM +0530, Kishon Vijay Abraham I wrote:
+> The PCIe controller in AM654 uses Synopsys core revision 4.90a and uses
+> the same TI wrapper as used in keystone2 with certain modification.
+> Hence AM654 will use the same pci wrapper driver pci-keystone.c
+> 
+> In preparation for adding AM654 support, cleanup pci-keystone driver
+> here.
+> 
+> Most of the cleanups here are trivial with major modification being
+> merging pci-keystone-dw.c and pci-keystone.c
+> 
+> Cleaning-up irq handling in the RFC series is dropped here as it has
+> few comments to be addressed.
+> 
+> Changes from v1:
+> *) remove phy_reset in the cleanup PHY handling patch. It will be sent
+>    while adding AM654 support
+> *) Add a separate patch for using ERR_IRQ_STATUS instead of
+>    ERR_IRQ_STATUS_RAW
+> *) Split outbound window configuration into two patches. One which
+>    gets the number of outbound windows from DT and the other cleansup
+>    outbound window configuration.
+> 
+> Kishon Vijay Abraham I (21):
+>   PCI: keystone: Use quirk to limit MRRS for K2G
+>   PCI: keystone: Use quirk to set MRRS for PCI host bridge
+>   PCI: keystone: Move dw_pcie_setup_rc out of ks_pcie_establish_link()
+>   PCI: keystone: Do not initiate link training multiple times
+>   PCI: keystone: Remove unused argument from ks_dw_pcie_host_init()
+>   PCI: keystone: Merge pci-keystone-dw.c and pci-keystone.c
+>   PCI: keystone: Remove redundant platform_set_drvdata
+>   PCI: keystone: Use uniform function naming convention
+>   dt-bindings: PCI: keystone: Add bindings to get device control module
+>   PCI: keystone: Use syscon APIs to get device id from control module
+>   PCI: keystone: Cleanup PHY handling
+>   PCI: keystone: Invoke pm_runtime APIs to enable clock
+>   PCI: keystone: Cleanup configuration space access
+>   PCI: keystone: Get number of outbound windows from DT
+>   PCI: keystone: Cleanup outbound window configuration
+>   PCI: keystone: Cleanup set_dbi_mode and get_dbi_mode
+>   PCI: keystone: Cleanup ks_pcie_link_up()
+>   PCI: keystone: Use ERR_IRQ_STATUS instead of ERR_IRQ_STATUS_RAW to get
+>     interrupt status
+>   PCI: keystone: Add debug error message for all errors
+>   PCI: keystone: Reorder header file in alphabetical order
+>   PCI: keystone: Cleanup macros defined in pci-keystone.c
+> 
+>  .../devicetree/bindings/pci/pci-keystone.txt  |   3 +
+>  MAINTAINERS                                   |   2 +-
+>  drivers/pci/controller/dwc/Makefile           |   2 +-
+>  drivers/pci/controller/dwc/pci-keystone-dw.c  | 484 -----------
+>  drivers/pci/controller/dwc/pci-keystone.c     | 788 +++++++++++++++---
+>  drivers/pci/controller/dwc/pci-keystone.h     |  57 --
+>  drivers/pci/controller/dwc/pcie-designware.h  |   4 +
+>  7 files changed, 686 insertions(+), 654 deletions(-)
+>  delete mode 100644 drivers/pci/controller/dwc/pci-keystone-dw.c
+>  delete mode 100644 drivers/pci/controller/dwc/pci-keystone.h
 
-Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
----
- arm/aarch32/include/kvm/kvm-cpu-arch.h    | 2 ++
- arm/aarch64/include/asm/kvm.h             | 3 +++
- arm/aarch64/include/kvm/kvm-arch.h        | 1 +
- arm/aarch64/include/kvm/kvm-config-arch.h | 4 +++-
- arm/aarch64/include/kvm/kvm-cpu-arch.h    | 2 ++
- arm/aarch64/kvm-cpu.c                     | 5 +++++
- arm/include/arm-common/kvm-config-arch.h  | 1 +
- arm/kvm-cpu.c                             | 7 +++++++
- include/linux/kvm.h                       | 1 +
- 9 files changed, 25 insertions(+), 1 deletion(-)
+I have applied the series to pci/keystone, tentatively for v4.20.
 
-diff --git a/arm/aarch32/include/kvm/kvm-cpu-arch.h b/arm/aarch32/include/kvm/kvm-cpu-arch.h
-index d28ea67..5779767 100644
---- a/arm/aarch32/include/kvm/kvm-cpu-arch.h
-+++ b/arm/aarch32/include/kvm/kvm-cpu-arch.h
-@@ -13,4 +13,6 @@
- #define ARM_CPU_ID		0, 0, 0
- #define ARM_CPU_ID_MPIDR	5
- 
-+unsigned int kvm__cpu_ptrauth_get_feature(void) {}
-+
- #endif /* KVM__KVM_CPU_ARCH_H */
-diff --git a/arm/aarch64/include/asm/kvm.h b/arm/aarch64/include/asm/kvm.h
-index c286035..0fd183d 100644
---- a/arm/aarch64/include/asm/kvm.h
-+++ b/arm/aarch64/include/asm/kvm.h
-@@ -98,6 +98,9 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
- #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
- 
-+/* CPU uses address authentication and A key */
-+#define KVM_ARM_VCPU_PTRAUTH		4
-+
- struct kvm_vcpu_init {
- 	__u32 target;
- 	__u32 features[7];
-diff --git a/arm/aarch64/include/kvm/kvm-arch.h b/arm/aarch64/include/kvm/kvm-arch.h
-index 9de623a..bd566cb 100644
---- a/arm/aarch64/include/kvm/kvm-arch.h
-+++ b/arm/aarch64/include/kvm/kvm-arch.h
-@@ -11,4 +11,5 @@
- 
- #include "arm-common/kvm-arch.h"
- 
-+
- #endif /* KVM__KVM_ARCH_H */
-diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
-index 04be43d..2074684 100644
---- a/arm/aarch64/include/kvm/kvm-config-arch.h
-+++ b/arm/aarch64/include/kvm/kvm-config-arch.h
-@@ -8,7 +8,9 @@
- 			"Create PMUv3 device"),				\
- 	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
- 			"Specify random seed for Kernel Address Space "	\
--			"Layout Randomization (KASLR)"),
-+			"Layout Randomization (KASLR)"),		\
-+	OPT_BOOLEAN('\0', "ptrauth", &(cfg)->has_ptrauth,		\
-+			"Enable address authentication"),
- 
- #include "arm-common/kvm-config-arch.h"
- 
-diff --git a/arm/aarch64/include/kvm/kvm-cpu-arch.h b/arm/aarch64/include/kvm/kvm-cpu-arch.h
-index a9d8563..f7b64b7 100644
---- a/arm/aarch64/include/kvm/kvm-cpu-arch.h
-+++ b/arm/aarch64/include/kvm/kvm-cpu-arch.h
-@@ -17,4 +17,6 @@
- #define ARM_CPU_CTRL		3, 0, 1, 0
- #define ARM_CPU_CTRL_SCTLR_EL1	0
- 
-+unsigned int kvm__cpu_ptrauth_get_feature(void);
-+
- #endif /* KVM__KVM_CPU_ARCH_H */
-diff --git a/arm/aarch64/kvm-cpu.c b/arm/aarch64/kvm-cpu.c
-index 1b29374..10da2cb 100644
---- a/arm/aarch64/kvm-cpu.c
-+++ b/arm/aarch64/kvm-cpu.c
-@@ -123,6 +123,11 @@ void kvm_cpu__reset_vcpu(struct kvm_cpu *vcpu)
- 		return reset_vcpu_aarch64(vcpu);
- }
- 
-+unsigned int kvm__cpu_ptrauth_get_feature(void)
-+{
-+	return (1UL << KVM_ARM_VCPU_PTRAUTH);
-+}
-+
- int kvm_cpu__get_endianness(struct kvm_cpu *vcpu)
- {
- 	struct kvm_one_reg reg;
-diff --git a/arm/include/arm-common/kvm-config-arch.h b/arm/include/arm-common/kvm-config-arch.h
-index 6a196f1..eb872db 100644
---- a/arm/include/arm-common/kvm-config-arch.h
-+++ b/arm/include/arm-common/kvm-config-arch.h
-@@ -10,6 +10,7 @@ struct kvm_config_arch {
- 	bool		aarch32_guest;
- 	bool		has_pmuv3;
- 	u64		kaslr_seed;
-+	bool		has_ptrauth;
- 	enum irqchip_type irqchip;
- };
- 
-diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
-index 7780251..5afd727 100644
---- a/arm/kvm-cpu.c
-+++ b/arm/kvm-cpu.c
-@@ -68,6 +68,13 @@ struct kvm_cpu *kvm_cpu__arch_init(struct kvm *kvm, unsigned long cpu_id)
- 		vcpu_init.features[0] |= (1UL << KVM_ARM_VCPU_PSCI_0_2);
- 	}
- 
-+	/* Set KVM_ARM_VCPU_PTRAUTH_I_A if available */
-+	if (kvm__supports_extension(kvm, KVM_CAP_ARM_PTRAUTH)) {
-+		if (kvm->cfg.arch.has_ptrauth)
-+			vcpu_init.features[0] |=
-+					kvm__cpu_ptrauth_get_feature();
-+	}
-+
- 	/*
- 	 * If the preferred target ioctl is successful then
- 	 * use preferred target else try each and every target type
-diff --git a/include/linux/kvm.h b/include/linux/kvm.h
-index f51d508..ffd8f5c 100644
---- a/include/linux/kvm.h
-+++ b/include/linux/kvm.h
-@@ -883,6 +883,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_PPC_MMU_RADIX 134
- #define KVM_CAP_PPC_MMU_HASH_V3 135
- #define KVM_CAP_IMMEDIATE_EXIT 136
-+#define KVM_CAP_ARM_PTRAUTH 160
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
--- 
-2.7.4
+Thanks,
+Lorenzo
