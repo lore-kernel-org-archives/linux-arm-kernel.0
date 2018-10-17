@@ -1,95 +1,58 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Wed, 17 Oct 2018 21:53:12 +0800
-Subject: [SPAM]Re: [PATCH v1 3/3] clk: mediatek: mt2712: add pll
- reference support
-In-Reply-To: <153936680359.5275.14901579706860255114@swboyd.mtv.corp.google.com>
-References: <20180920095727.11868-1-weiyi.lu@mediatek.com>
- <20180920095727.11868-5-weiyi.lu@mediatek.com>
- <153936680359.5275.14901579706860255114@swboyd.mtv.corp.google.com>
-Message-ID: <1539784392.16401.28.camel@mtksdaap41>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 17 Oct 2018 08:53:23 -0500
+Subject: [PATCH 2/4] doc/layerscape-pci: removed unsuitable compatible
+ string
+In-Reply-To: <20181008031428.25293-3-Zhiqiang.Hou@nxp.com>
+References: <20181008031428.25293-1-Zhiqiang.Hou@nxp.com>
+ <20181008031428.25293-3-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181017135323.GA31980@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-10-12 at 10:53 -0700, Stephen Boyd wrote:
-> Quoting Weiyi Lu (2018-09-20 02:57:27)
-> > For some MT2712 projects, audpll could select another reference
-> > clock source if there exists an extra Crystal Oscillators than
-> > the default clk26m XTAL.
-> > Declare with the property "mediatek,refclk-aud" to switch
-> > the audpll reference clock.
-> > And also support to modify the reference clock of all PLL with
-> > property "mediatek,refclk" instead of the default source "clk26m".
-> > 
-> > Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
-> > ---
-> > diff --git a/drivers/clk/mediatek/clk-mt2712.c b/drivers/clk/mediatek/clk-mt2712.c
-> > index e36f4aab634d..2a4db1718089 100644
-> > --- a/drivers/clk/mediatek/clk-mt2712.c
-> > +++ b/drivers/clk/mediatek/clk-mt2712.c
-> [...]
-> > +       size_t i;
-> > +       u32 r;
-> > +
-> > +       base = of_iomap(node, 0);
-> > +       if (base) {
-> > +               sel_addr = base + 0x40;
-> > +       } else {
-> > +               pr_err("%s(): ioremap failed\n", __func__);
-> > +               return;
-> > +       }
-> 
-> Nitpick: Write this as
-> 
-> 	base = of_iomap();
-> 	if (!base)
-> 		return;
-> 	sel_addr = base + 0x40;
-> 
-Got it, I'll fix it.
+On Mon, Oct 08, 2018 at 11:14:26AM +0800, Zhiqiang Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-> > +
-> > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk",
-> > +                       "#clock-cells", 0, &refclk);
-> > +       if (!rc) {
-> > +               of_property_read_string(refclk.np, "clock-output-names",
-> > +                               &refclk_name);
-> > +               for (i = 0; i < num_plls; i++)
-> > +                       plls[i].parent_name = refclk_name;
-> 
-> Use of_clk_parent_fill()?
-> 
-Thanks for the hint, i might use of_clk_get_parent_name() instead like
-below to get each parent clock name.
-refclk_name = of_clk_get_parent_name(node, 0);
-refclk_aud_name = of_clk_get_parent_name(node, 1);
+Similar comments on this one too.
 
-> > +       }
-> > +
-> > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk-aud",
-> > +                       "#clock-cells", 0, &refclk_aud);
 > 
-> This is odd. Is this a custom 'clocks' property? What's going on here?
-> Why can't we use assigned clock parents for this?
-Yes. both the reference clock of all PLL and the reference clock of
-audio PLL could be customized.These two reference clocks shall be
-provided by some component like crystal oscillators on the board. So we
-might unable to switch the PLL reference source at runtime, in other
-words, it should be set statically. That's why we didn't provide the
-set_parent ops for pll clock type. It's also the main reason we choose
-not to use assigned-clock-parents for this requirement.
-
-> > +       if (!rc) {
-> > +               of_property_read_string(refclk_aud.np, "clock-output-names",
-> > +                               &refclk_aud_name);
-> > +               if (strcmp(refclk_name, refclk_aud_name)) {
-> > +                       plls[CLK_APMIXED_APLL1].parent_name = refclk_aud_name;
-> > +                       plls[CLK_APMIXED_APLL2].parent_name = refclk_aud_name;
-> > +                       r = readl(sel_addr) | 0x60000;
-> > +               } else {
-> > +                       r = readl(sel_addr) & ~0x60000;
-> > +               }
-> > +
-> > +               writel(r, sel_addr);
-> > +       }
-> > +}
-> > +
+> Removed the compatible string "snps,dw-pcie", it is for the reference
+> platform driver for PCI RC IP Protoyping Kits based on the ARC SDP,
+> so it is not suitable for all platform with designware PCIe controller,
+> and platform vendors have themselves' drivers.
+> 
+> The compatible string "snsp,dw-pcie" was added by mistake and it's not
+> matched that time, but it is matched because pcie drivers has been
+> collected recently.
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index 5eb1c202932f..9b2b8d66d1f4 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -13,8 +13,8 @@ information.
+>  
+>  Required properties:
+>  - compatible: should contain the platform identifier such as:
+> -        "fsl,ls1021a-pcie", "snps,dw-pcie"
+> -        "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
+> +        "fsl,ls1021a-pcie"
+> +        "fsl,ls2080a-pcie", "fsl,ls2085a-pcie"
+>          "fsl,ls2088a-pcie"
+>          "fsl,ls1088a-pcie"
+>          "fsl,ls1046a-pcie"
+> @@ -36,7 +36,7 @@ Required properties:
+>  Example:
+>  
+>  	pcie at 3400000 {
+> -		compatible = "fsl,ls1021a-pcie", "snps,dw-pcie";
+> +		compatible = "fsl,ls1021a-pcie";
+>  		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
+>  		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+>  		reg-names = "regs", "config";
+> -- 
+> 2.17.1
+> 
