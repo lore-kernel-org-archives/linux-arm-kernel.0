@@ -1,152 +1,139 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 17 Oct 2018 15:38:57 +0100
-Subject: [PATCH v5 2/2] iommu/arm-smmu-v3: Reunify
- arm_smmu_cmdq_issue_sync()
-In-Reply-To: <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
-References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
- <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
-Message-ID: <b35bb171-013b-3cb7-9a99-78505b9fdd18@huawei.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 17 Oct 2018 07:41:55 -0700
+Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown hooks
+ into pm_runtime hooks
+In-Reply-To: <20181017074539.b6qeft5oba45dv5r@flea>
+References: <20181016031141.16259-1-anarsoul@gmail.com>
+ <20181016071626.m6jkoiixkvxks5ob@flea>
+ <CA+E=qVcK7mBbZ-C8FyAxUty_wQ_aOjo1b0+iU4E5CgG=yBCj=g@mail.gmail.com>
+ <20181017074539.b6qeft5oba45dv5r@flea>
+Message-ID: <CA+E=qVci2FVMH7O83Xv9ic_WFvFYyxmPDjp309dFi23XiHYzzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/2018 14:56, Robin Murphy wrote:
-> Now that both sync methods are more or less the same shape, we can save
-> some code and levels of indirection by rolling them up together again,
-> with just a couple of simple conditionals to discriminate the MSI and
-> queue-polling specifics.
+On Wed, Oct 17, 2018 at 12:45 AM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> On Tue, Oct 16, 2018 at 08:08:41PM -0700, Vasily Khoruzhick wrote:
+> > On Tue, Oct 16, 2018 at 12:16 AM Maxime Ripard
+> > <maxime.ripard@bootlin.com> wrote:
+> > >
+> > > On Mon, Oct 15, 2018 at 08:11:41PM -0700, Vasily Khoruzhick wrote:
+> > > > startup() and shutdown() hooks are called for both substreams,
+> > > > so stopping either substream when another is running breaks the
+> > > > latter.
+> > > >
+> > > > E.g. playback breaks if capture is stopped when playback is running.
+> > > >
+> > > > Move code from startup() and shutdown() to resume() and suspend()
+> > > > hooks respectively to fix this issue
+> > > >
+> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > ---
+> > > > v2: - rename from "ASoC: sun4i-i2s: don't try to start up
+> > > >                  or shut down DAI if it's active"
+> > > >     - move code from startup/shutdown hooks into pm_runtime
+> > > >
+> > > >  sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
+> > > >  1 file changed, 25 insertions(+), 36 deletions(-)
+> > > >
+> > > > diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+> > > > index a4aa931ebfae..daa6c08cffbc 100644
+> > > > --- a/sound/soc/sunxi/sun4i-i2s.c
+> > > > +++ b/sound/soc/sunxi/sun4i-i2s.c
+> > > > @@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
+> > > >       return 0;
+> > > >  }
+> > > >
+> > > > -static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+> > > > -                          struct snd_soc_dai *dai)
+> > > > -{
+> > > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > > > -
+> > > > -     /* Enable the whole hardware block */
+> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > -                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
+> > > > -
+> > > > -     /* Enable the first output line */
+> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK,
+> > > > -                        SUN4I_I2S_CTRL_SDO_EN(0));
+> > > > -
+> > > > -
+> > > > -     return clk_prepare_enable(i2s->mod_clk);
+> > > > -}
+> > > > -
+> > > > -static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
+> > > > -                            struct snd_soc_dai *dai)
+> > > > -{
+> > > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > > > -
+> > > > -     clk_disable_unprepare(i2s->mod_clk);
+> > > > -
+> > > > -     /* Disable our output lines */
+> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
+> > > > -
+> > > > -     /* Disable the whole hardware block */
+> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > -                        SUN4I_I2S_CTRL_GL_EN, 0);
+> > > > -}
+> > > > -
+> > > >  static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+> > > >                               unsigned int freq, int dir)
+> > > >  {
+> > > > @@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
+> > > >       .hw_params      = sun4i_i2s_hw_params,
+> > > >       .set_fmt        = sun4i_i2s_set_fmt,
+> > > >       .set_sysclk     = sun4i_i2s_set_sysclk,
+> > > > -     .shutdown       = sun4i_i2s_shutdown,
+> > > > -     .startup        = sun4i_i2s_startup,
+> > > >       .trigger        = sun4i_i2s_trigger,
+> > > >  };
+> > > >
+> > > > @@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
+> > > >               goto err_disable_clk;
+> > > >       }
+> > > >
+> > > > +     /* Enable the whole hardware block */
+> > > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > +                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
+> > > > +
+> > >
+> > > So this is definitely needed
+> > >
+> > > > +     /* Enable the first output line */
+> > > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > > > +                        SUN4I_I2S_CTRL_SDO_EN_MASK,
+> > > > +                        SUN4I_I2S_CTRL_SDO_EN(0));
+> > > > +
+> > > > +     ret = clk_prepare_enable(i2s->mod_clk);
+> > > > +     if (ret) {
+> > > > +             dev_err(dev, "Failed to enable module clock\n");
+> > > > +             goto err_disable_clk;
+> > > > +     }
+> > >
+> > > But we really don't want to enable the module clock before the
+> > > playback / capture actually starts. And I'm guessing it would make
+> > > more sense to keep the output enable configuration there as well,
+> > > since it's likely that we will have support for it in the future, and
+> > > we'll need additional information from ASoC when we'll do.
+> >
+> > Should we go with v1 version of my patch then? I see no reason to
+> > shuffle code around if we keep startup() and shutdown() hooks.
+>
+> I'd go for something in between. runtime_pm already provides whether
+> the device is active or not, so you can just move the
+> SUN4I_I2S_CTRL_GL_EN write to the runtime_resume and runtime_suspend
+> functions, and that should fix your issue.
 
-Hi Robin, Will,
-
-I had been thinking of this other patch previously:
-
-iommu/arm-smmu-v3: Stop rebuilding non-MSI CMD_SYNC commands
-
-The contents of the non-MSI CMD_SYNC command are fixed. This patch 
-offers a small optimisation by keeping a sample of this command on the 
-heap for re-use, thereby avoiding unnecessary re-building.
-
-Signed-off-by: John Garry <john.garry@huawei.com>
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 6947ccf..9d86c29 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -963,14 +963,16 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct 
-arm_smmu_device *smmu)
-
-  static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
-  {
--       u64 cmd[CMDQ_ENT_DWORDS];
-+       static u64 cmd[CMDQ_ENT_DWORDS] = {
-+              FIELD_PREP(CMDQ_0_OP, CMDQ_OP_CMD_SYNC) |
-+              FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV) |
-+              FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH) |
-+              FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB),
-+           0};
-         unsigned long flags;
-         bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
--       struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-         int ret;
-
--       arm_smmu_cmdq_build_cmd(cmd, &ent);
--
-         spin_lock_irqsave(&smmu->cmdq.lock, flags);
-         arm_smmu_cmdq_insert_cmd(smmu, cmd);
-         ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
-
-But it seems that combining the the MSI and non-MSI methods would block 
-this.
-
-How do you feel about this?
-
-Thanks,
-John
+I still need to guard enabling output line with "if (dai->active)
+return", so it doesn't fix the issue unfortunately.
 
 >
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 49 +++++++++----------------------------
->  1 file changed, 12 insertions(+), 37 deletions(-)
+> Maxime
 >
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index da8a91d116bf..36db63e3afcf 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -933,7 +933,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->   * The difference between val and sync_idx is bounded by the maximum size of
->   * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe arithmetic.
->   */
-> -static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
-> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
->  {
->  	ktime_t timeout;
->  	u32 val;
-> @@ -988,16 +988,17 @@ static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
->  	return -ETIMEDOUT;
->  }
->
-> -static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
-> +static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->  {
->  	u64 cmd[CMDQ_ENT_DWORDS];
->  	unsigned long flags;
-> -	struct arm_smmu_cmdq_ent ent = {
-> -		.opcode = CMDQ_OP_CMD_SYNC,
-> -		.sync	= {
-> -			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
-> -		},
-> -	};
-> +	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
-> +		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
-> +	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-> +	int ret, sync_idx, sync_gen;
-> +
-> +	if (msi)
-> +		ent.sync.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count));
->
->  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
->
-> @@ -1009,39 +1010,13 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->  		arm_smmu_cmdq_build_cmd(cmd, &ent);
->  		arm_smmu_cmdq_insert_cmd(smmu, cmd);
->  	}
-> -
-> -	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-> -
-> -	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
-> -}
-> -
-> -static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
-> -{
-> -	u64 cmd[CMDQ_ENT_DWORDS];
-> -	unsigned long flags;
-> -	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-> -	int sync_idx, sync_gen;
-> -
-> -	arm_smmu_cmdq_build_cmd(cmd, &ent);
-> -
-> -	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> -	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
-> -		arm_smmu_cmdq_insert_cmd(smmu, cmd);
->  	sync_idx = smmu->cmdq.q.prod;
->  	sync_gen = READ_ONCE(smmu->cmdq_generation);
-> +
->  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->
-> -	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
-> -}
-> -
-> -static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
-> -{
-> -	int ret;
-> -	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
-> -		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
-> -
-> -	ret = msi ? __arm_smmu_cmdq_issue_sync_msi(smmu)
-> -		  : __arm_smmu_cmdq_issue_sync(smmu);
-> +	ret = msi ? arm_smmu_sync_poll_msi(smmu, ent.sync.msidata)
-> +		  : arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
->  	if (ret)
->  		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
->  }
->
+> --
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
