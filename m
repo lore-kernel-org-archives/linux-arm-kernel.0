@@ -1,64 +1,118 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Oct 2018 10:23:17 -0400 (EDT)
-Subject: [PATCH 1/2] ARM: copypage-fa: add kto and kfrom to input operands
- list
-In-Reply-To: <CAK8P3a3XUdkBmrnMUn2TePEBAh49=QvvxRiOk_+JnSp1fSwXJg@mail.gmail.com>
-References: <20181015221629.13924-1-stefan@agner.ch>
- <CACRpkdaVGKLtE-whhK3oFgY+4xoy1JqWkcBW4UO0-hJs2B-QGg@mail.gmail.com>
- <20181016084416.GF30658@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1810161357580.1498@knanqh.ubzr>
- <CAK8P3a3XUdkBmrnMUn2TePEBAh49=QvvxRiOk_+JnSp1fSwXJg@mail.gmail.com>
-Message-ID: <nycvar.YSQ.7.76.1810171009560.1498@knanqh.ubzr>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 17 Oct 2018 16:29:15 +0200
+Subject: [PATCH v3 3/6] clocksource: exynos_mct: Refactor resources
+ allocation
+In-Reply-To: <20181017134159.9656-4-m.szyprowski@samsung.com>
+References: <CGME20181017134206eucas1p1ebc76569f706675d41f2d2183349f1f3@eucas1p1.samsung.com>
+ <20181017134159.9656-1-m.szyprowski@samsung.com>
+ <20181017134159.9656-4-m.szyprowski@samsung.com>
+Message-ID: <CAJKOXPcMPz0wsEU9Lt1e0dp7tEk9+t8kteW=hih7sNsp99Dkkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018, Arnd Bergmann wrote:
+On Wed, 17 Oct 2018 at 15:42, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+> Move interrupts allocation from exynos4_timer_resources() into separate
+> function together with the interrupt number parsing code from
+> mct_init_dt(), so the code for managing interrupts is kept together.
+> While touching exynos4_timer_resources() function, move of_iomap() to it.
+> No functional changes.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/clocksource/exynos_mct.c | 49 +++++++++++++++++++-------------
+>  1 file changed, 30 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 49413900b24c..02ad55db390b 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -502,11 +502,14 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
+>         return 0;
+>  }
+>
+> -static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+> +static int __init exynos4_timer_resources(struct device_node *np)
+>  {
+> -       int err, cpu;
+>         struct clk *mct_clk, *tick_clk;
+>
+> +       reg_base = of_iomap(np, 0);
+> +       if (!reg_base)
+> +               panic("%s: unable to ioremap mct address space\n", __func__);
+> +
+>         tick_clk = of_clk_get_by_name(np, "fin_pll");
+>         if (IS_ERR(tick_clk))
+>                 panic("%s: unable to determine tick clock rate\n", __func__);
+> @@ -517,9 +520,27 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+>                 panic("%s: unable to retrieve mct clock instance\n", __func__);
+>         clk_prepare_enable(mct_clk);
+>
+> -       reg_base = base;
+> -       if (!reg_base)
+> -               panic("%s: unable to ioremap mct address space\n", __func__);
+> +       return 0;
+> +}
+> +
+> +static int __init exynos4_timer_interrupts(struct device_node *np,
+> +                                          unsigned int int_type)
+> +{
+> +       int i, err, cpu;
+> +
+> +       mct_int_type = int_type;
 
-> On Tue, Oct 16, 2018 at 10:43 PM Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 16 Oct 2018, Russell King - ARM Linux wrote:
-> > > On Tue, Oct 16, 2018 at 10:00:19AM +0200, Linus Walleij wrote:
-> > > > On Tue, Oct 16, 2018 at 12:16 AM Stefan Agner <stefan@agner.ch> wrote:
-> > > It's not obvious yet whether this is right - it contradicts the GCC
-> > > manual, but then we have evidence that it's required for some GCC
-> > > versions where GCC may clone the function, or if the function is
-> > > used within the same file.
-> >
-> > Why not getting rid of __naked altogether? Here's what I suggest:
-> >
-> > ----- >8
-> > Subject: [PATCH] ARM: remove naked function usage
-> >
-> > Convert page copy functions not to rely on the naked function attribute.
-> >
-> > This attribute is known to confuse some gcc versions when function
-> > arguments aren't explicitly listed as inline assembly operands despite
-> > the gcc documentation. That resulted in commit 9a40ac86152c ("ARM:
-> > 6164/1: Add kto and kfrom to input operands list.").
-> 
-> It's probably worth noting that the minimum gcc version for compiling
-> the kernel is now gcc-4.6, which I think does not suffer from the gcc-4.5
-> bug that triggered the change. See in particular commits 9c695203a7dd
-> ("compiler-gcc.h: gcc-4.5 needs noclone and noinline on __naked functions")
-> and d124b44f09ca ("Compiler Attributes: naked was fixed in gcc 4.6").
-> 
-> The first one made sure we don't inline these functions, so gcc-4.5
-> no longer runs into the problem even in the absence of the workaround,
-> and the second patch reverts that again, noting that gcc-4.6 is fixed.
-> 
-> I don't see anything wrong with converting the functions to not
-> use __naked at all, but I think we can also just revert the original
-> commit 9a40ac86152c to get it to build with clang. When I last
-> played with clang on arm32, that's what I did. I'll reply with the
-> patch I have in my randconfig tree.
+This does not look good. Before, assignment was done before call to
+exynos4_timer_resources(). Now, if I follow the path correctly, it
+will be after. Therefore the exynos4_timer_resources() will use wrong
+value. This should pop up during tests.
 
-The __naked attribute has idiosyncrasies of its own, regardless of any 
-potential bugs, that sometimes makes it harder to maintain and prevent 
-extra optimizations that the compiler could otherwise take care of. So I 
-think that this is a good thing to get rid of __naked when its usage 
-isn't necessary, like the instances in this patch.
+Best regards,
+Krzysztof
 
-The remaining instances are cases where there is simply no stack 
-available making __naked necessary in those cases.
-
-
-Nicolas
+> +
+> +       /* This driver uses only one global timer interrupt */
+> +       mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
+> +
+> +       /*
+> +        * Find out the number of local irqs specified. The local
+> +        * timer irqs are specified after the four global timer
+> +        * irqs are specified.
+> +        */
+> +       nr_irqs = of_irq_count(np);
+> +       for (i = MCT_L0_IRQ; i < nr_irqs; i++)
+> +               mct_irqs[i] = irq_of_parse_and_map(np, i);
+>
+>         if (mct_int_type == MCT_INT_PPI) {
+>
+> @@ -579,24 +600,14 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+>
+>  static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
+>  {
+> -       u32 nr_irqs, i;
+>         int ret;
+>
+> -       mct_int_type = int_type;
+> -
+> -       /* This driver uses only one global timer interrupt */
+> -       mct_irqs[MCT_G0_IRQ] = irq_of_parse_and_map(np, MCT_G0_IRQ);
+> +       ret = exynos4_timer_resources(np);
+> +       if (ret)
+> +               return ret;
+>
+> -       /*
+> -        * Find out the number of local irqs specified. The local
+> -        * timer irqs are specified after the four global timer
+> -        * irqs are specified.
+> -        */
+> -       nr_irqs = of_irq_count(np);
+> -       for (i = MCT_L0_IRQ; i < nr_irqs; i++)
+> -               mct_irqs[i] = irq_of_parse_and_map(np, i);
+>
+> -       ret = exynos4_timer_resources(np, of_iomap(np, 0));
+> +       ret = exynos4_timer_interrupts(np, int_type);
+>         if (ret)
+>                 return ret;
+>
+> --
+> 2.17.1
+>
