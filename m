@@ -1,30 +1,68 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 08:26:32 -0700
-Subject: [PATCH 2/2] clk: imx7d: remove CLK_IS_CRITICAL flag for
- arm_a7_root_clk
-In-Reply-To: <1539756441-18776-2-git-send-email-Anson.Huang@nxp.com>
-References: <1539756441-18776-1-git-send-email-Anson.Huang@nxp.com>
- <1539756441-18776-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <153978999232.5275.9499110259610344794@swboyd.mtv.corp.google.com>
+From: anders.roxell@linaro.org (Anders Roxell)
+Date: Wed, 17 Oct 2018 17:26:22 +0200
+Subject: [PATCH] arm64: perf: set suppress_bind_attrs flag to true
+Message-ID: <20181017152622.15717-1-anders.roxell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Anson Huang (2018-10-16 23:12:04)
-> i.MX7D uses virtual cpu clock of "arm" clock to be child clock
-> of "arm_a7_root_clk" and it is with CLK_IS_CRITICAL flag set, so
-> no need to add CLK_IS_CRITICAL flag for keeping "arm_a7_root_clk"
-> use count correct, latest clock tree is as below in clk_summary:
-> 
-> pll_arm_main                         1        1        0   792000000          0
->       pll_arm_main_bypass            1        1        0   792000000          0
->          pll_arm_main_clk            1        1        0   792000000          0
->             arm_a7_src               1        1        0   792000000          0
->                arm_a7_cg             1        1        0   792000000          0
->                   arm_a7_div         1        1        0   792000000          0
->                      arm_a7_root_clk       1        1        0   792000000    0
->                         arm          1        1        0   792000000
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
+The armv8_pmuv3 driver doesn't have a remove function, and when the test
+'CONFIG_DEBUG_TEST_DRIVER_REMOVE=y' is enabled, the following Call trace
+can be seen.
 
-Applied to clk-next
+[    1.424287] Failed to register pmu: armv8_pmuv3, reason -17
+[    1.424870] WARNING: CPU: 0 PID: 1 at ../kernel/events/core.c:11771 perf_event_sysfs_init+0x98/0xdc
+[    1.425220] Modules linked in:
+[    1.425531] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W         4.19.0-rc7-next-20181012-00003-ge7a97b1ad77b-dirty #35
+[    1.425951] Hardware name: linux,dummy-virt (DT)
+[    1.426212] pstate: 80000005 (Nzcv daif -PAN -UAO)
+[    1.426458] pc : perf_event_sysfs_init+0x98/0xdc
+[    1.426720] lr : perf_event_sysfs_init+0x98/0xdc
+[    1.426908] sp : ffff00000804bd50
+[    1.427077] x29: ffff00000804bd50 x28: ffff00000934e078
+[    1.427429] x27: ffff000009546000 x26: 0000000000000007
+[    1.427757] x25: ffff000009280710 x24: 00000000ffffffef
+[    1.428086] x23: ffff000009408000 x22: 0000000000000000
+[    1.428415] x21: ffff000009136008 x20: ffff000009408730
+[    1.428744] x19: ffff80007b20b400 x18: 000000000000000a
+[    1.429075] x17: 0000000000000000 x16: 0000000000000000
+[    1.429418] x15: 0000000000000400 x14: 2e79726f74636572
+[    1.429748] x13: 696420656d617320 x12: 656874206e692065
+[    1.430060] x11: 6d616e20656d6173 x10: 2065687420687469
+[    1.430335] x9 : ffff00000804bd50 x8 : 206e6f7361657220
+[    1.430610] x7 : 2c3376756d705f38 x6 : ffff00000954d7ce
+[    1.430880] x5 : 0000000000000000 x4 : 0000000000000000
+[    1.431226] x3 : 0000000000000000 x2 : ffffffffffffffff
+[    1.431554] x1 : 4d151327adc50b00 x0 : 0000000000000000
+[    1.431868] Call trace:
+[    1.432102]  perf_event_sysfs_init+0x98/0xdc
+[    1.432382]  do_one_initcall+0x6c/0x1a8
+[    1.432637]  kernel_init_freeable+0x1bc/0x280
+[    1.432905]  kernel_init+0x18/0x160
+[    1.433115]  ret_from_fork+0x10/0x18
+[    1.433297] ---[ end trace 27fd415390eb9883 ]---
+
+Rework to set suppress_bind_attrs flag to avoid removing the device when
+CONFIG_DEBUG_TEST_DRIVER_REMOVE=y, since there's no real reason to
+remove the armv8_pmuv3 driver.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Co-developed-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+---
+ arch/arm64/kernel/perf_event.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 8e38d5267f22..5ffcb54fde3f 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1267,6 +1267,7 @@ static struct platform_driver armv8_pmu_driver = {
+ 	.driver		= {
+ 		.name	= ARMV8_PMU_PDEV_NAME,
+ 		.of_match_table = armv8_pmu_of_device_ids,
++		.suppress_bind_attrs = true,
+ 	},
+ 	.probe		= armv8_pmu_device_probe,
+ };
+-- 
+2.19.1
