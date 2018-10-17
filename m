@@ -1,48 +1,57 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 17 Oct 2018 11:28:38 -0700
-Subject: [PATCH 5/9] arm64: dts: sdm845: Add gpu and gmu device nodes
-In-Reply-To: <20180827151112.25211-6-jcrouse@codeaurora.org>
-References: <20180827151112.25211-1-jcrouse@codeaurora.org>
- <20180827151112.25211-6-jcrouse@codeaurora.org>
-Message-ID: <CAD=FV=WzkRtcdy_=eatp=AEkJ54d=qvNGzNYCMCMnVAWtrXAQg@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 17 Oct 2018 20:31:14 +0200
+Subject: [PATCH] misc: atmel-ssc: Fix section annotation on
+ atmel_ssc_get_driver_data
+In-Reply-To: <20181017182031.GA9678@flashbox>
+References: <20181017170901.13119-1-natechancellor@gmail.com>
+ <20181017181625.GW17341@piout.net> <20181017182031.GA9678@flashbox>
+Message-ID: <20181017183114.GZ17341@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17/10/2018 11:20:31-0700, Nathan Chancellor wrote:
+> On Wed, Oct 17, 2018 at 08:16:25PM +0200, Alexandre Belloni wrote:
+> > On 17/10/2018 10:09:02-0700, Nathan Chancellor wrote:
+> > > After building the kernel with Clang, the following section mismatch
+> > > warning appears:
+> > > 
+> > > WARNING: vmlinux.o(.text+0x3bf19a6): Section mismatch in reference from
+> > > the function ssc_probe() to the function
+> > > .init.text:atmel_ssc_get_driver_data()
+> > > The function ssc_probe() references
+> > > the function __init atmel_ssc_get_driver_data().
+> > > This is often because ssc_probe lacks a __init
+> > > annotation or the annotation of atmel_ssc_get_driver_data is wrong.
+> > > 
+> > > Remove __init from atmel_ssc_get_driver_data to get rid of the mismatch.
+> > > 
+> > 
+> > Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > 
+> > I would add:
+> > 
+> > Fixes: 5c86ac695c7e ("ASoC: atmel-ssc: use module_platform_driver macro")
+> > 
+> > > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> > > ---
+> > > 
+> > > Alternatively, ssc_probe could be marked as __init, I don't think there
+> > > is any way for the probe to defer. I decided to go with the more
+> > > conservative option first but I'm happy to respin if necessary.
+> > > 
+> > 
+> > A probe function should never be marked __init, unless you ensure there
+> > is no way to bind/unbind the driver at runtime.
+> > 
+> 
+> Thank you for the review and that clarification, wasn't able to find
+> much regarding __init on probe functions in my research.
+> 
 
-On Mon, Aug 27, 2018 at 8:11 AM Jordan Crouse <jcrouse@codeaurora.org> wrote:
-> +               gpu at 5000000 {
-> +                       compatible = "qcom,adreno-630.2", "qcom,adreno";
-> +                       #stream-id-cells = <16>;
-> +
-> +                       reg = <0x5000000 0x40000>;
-> +                       reg-names = "kgsl_3d0_reg_memory";
-> +
-> +                       /*
-> +                        * Look ma, no clocks! The GPU clocks and power are
-> +                        * controlled entirely by the GMU
-> +                        */
-> +
-> +                       interrupts = <0 300 0>;
-> +                       interrupt-names = "kgsl_3d0_irq";
-
-Drive-by feedback here.  The "interrupts" above should be:
-
-interrupts = <GIC_SPI 300 IRQ_TYPE_LEVEL_HIGH>;
-
-* GIC_SPI is 0, but GIC_SPI is more documenting.
-
-* having 0 for the final element means 'IRQ_TYPE_NONE'.  On newer
-kernels commit 6ef6386ef7c1 ("irqchip/gic-v3: Loudly complain about
-the use of IRQ_TYPE_NONE") will cause loud yells if you do this.  This
-turns out to be a bit silly because (IIUC) the flags in the device
-tree are totally ignored if the driver passes in flags itself [1].
-...but I guess we should do it right.  I believe the code requesting
-this irq is a6xx_gmu_get_irq() which requests a level high interrupt,
-so we should list level high here.
+You can look for suppress_bind_attrs for more info.
 
 
-[1] https://lore.kernel.org/lkml/CAD=FV=XmiOh0Mg0f4a=W0NCH8eb--OQhP2jNAv2ZMpUBOn9n6Q at mail.gmail.com/T/#u
-
-
--Doug
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
