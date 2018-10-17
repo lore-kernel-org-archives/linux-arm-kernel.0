@@ -1,53 +1,41 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 17 Oct 2018 13:10:57 +0530
-Subject: [PATCH v2 04/21] PCI: keystone: Do not initiate link training
- multiple times
+Date: Wed, 17 Oct 2018 13:10:54 +0530
+Subject: [PATCH v2 01/21] PCI: keystone: Use quirk to limit MRRS for K2G
 In-Reply-To: <20181017074114.28239-1-kishon@ti.com>
 References: <20181017074114.28239-1-kishon@ti.com>
-Message-ID: <20181017074114.28239-5-kishon@ti.com>
+Message-ID: <20181017074114.28239-2-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 886bc5ceb5cc3ad4b219502d72 ("PCI: designware: Add generic
-dw_pcie_wait_for_link()") while adding a generic dw_pcie_wait_for_link()
-performed a special handling (initiate link training multiple times) for
-keystone which is not required. This also resulted in unncessarily waiting
-for more time to establish the link even when no PCI device is connected.
-
-Remove it and make it look similar to other dwc based PCIe drivers.
+PCI controller in K2G also has a limitation that memory read request
+size (MRRS) must not exceed 256 bytes. Use the quirk to limit MRRS
+(added for K2HK, K2L and K2E) for K2G as well.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index afb948372077..aa7e706fc37d 100644
+index e88bd221fffe..7d43e10a03b0 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -87,19 +87,17 @@ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
- {
- 	struct dw_pcie *pci = ks_pcie->pci;
- 	struct device *dev = pci->dev;
--	unsigned int retries;
+@@ -36,6 +36,7 @@
+ #define PCIE_RC_K2HK		0xb008
+ #define PCIE_RC_K2E		0xb009
+ #define PCIE_RC_K2L		0xb00a
++#define PCIE_RC_K2G		0xb00b
  
- 	if (dw_pcie_link_up(pci)) {
- 		dev_info(dev, "Link already up\n");
- 		return 0;
- 	}
+ #define to_keystone_pcie(x)	dev_get_drvdata((x)->dev)
  
-+	ks_dw_pcie_initiate_link_train(ks_pcie);
-+
- 	/* check if the link is up or not */
--	for (retries = 0; retries < 5; retries++) {
--		ks_dw_pcie_initiate_link_train(ks_pcie);
--		if (!dw_pcie_wait_for_link(pci))
--			return 0;
--	}
-+	if (!dw_pcie_wait_for_link(pci))
-+		return 0;
+@@ -50,6 +51,8 @@ static void quirk_limit_mrrs(struct pci_dev *dev)
+ 		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+ 		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2L),
+ 		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
++		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2G),
++		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+ 		{ 0, },
+ 	};
  
- 	dev_err(dev, "phy link never came up\n");
- 	return -ETIMEDOUT;
 -- 
 2.17.1
