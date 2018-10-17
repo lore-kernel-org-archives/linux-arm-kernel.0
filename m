@@ -1,58 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 17 Oct 2018 08:53:23 -0500
-Subject: [PATCH 2/4] doc/layerscape-pci: removed unsuitable compatible
- string
-In-Reply-To: <20181008031428.25293-3-Zhiqiang.Hou@nxp.com>
-References: <20181008031428.25293-1-Zhiqiang.Hou@nxp.com>
- <20181008031428.25293-3-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181017135323.GA31980@bogus>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 17 Oct 2018 15:54:40 +0200
+Subject: Clock configuration for the SAMA5D2 NAND controller
+In-Reply-To: <CAGkQfmNdp+Si9FseRjjRG4r272kRtu=7MqwHD6OUoRKCinXO-g@mail.gmail.com>
+References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+ <20181017143849.1240d9bb@bbrezillon>
+ <CAGkQfmOOv41vwYtt3rjgC6SmXOkAdASvjWt+YWAksGo-4HqvpQ@mail.gmail.com>
+ <20181017150344.40d687d1@bbrezillon>
+ <CAGkQfmNdp+Si9FseRjjRG4r272kRtu=7MqwHD6OUoRKCinXO-g@mail.gmail.com>
+Message-ID: <20181017155440.10d34743@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2018 at 11:14:26AM +0800, Zhiqiang Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Wed, 17 Oct 2018 15:36:17 +0200
+Romain Izard <romain.izard.pro@gmail.com> wrote:
 
-Similar comments on this one too.
+> Le mer. 17 oct. 2018 ? 15:03, Boris Brezillon <boris.brezillon@bootlin.com>
+> a ?crit :
+> >
+> > On Wed, 17 Oct 2018 14:49:27 +0200 Romain Izard
+> > <romain.izard.pro@gmail.com> wrote:
+> >  
+> > > Le mer. 17 oct. 2018 ? 14:38, Boris Brezillon
+> > > <boris.brezillon@bootlin.com> a ?crit :  
+> > > >  
+> [...]
+> > > >
+> > > > Is it 2 times slower or 2 times faster with the new approach? Is the
+> > > > new calculation providing a working solution, or do you have data
+> > > > corruption because of that? Is your NAND ONFI compliant?
+> > > >  
+> > > - The number of clock cycles for each configured timing is larger, so
+> > > the access times are slower.  
+> >
+> > Okay. When calculating the timings by hand, what was reference freq you
+> > used? Did you compare it to the clk freq we have when the NAND controller
+> > driver tweaks the timings?
+> >  
+> I know that I did the calculations with a 83 MHz clock, but that the kernel
+> code used a 166 MHz clock instead. The only question is to know whether it
+> is me or the existing code that is right.
 
-> 
-> Removed the compatible string "snps,dw-pcie", it is for the reference
-> platform driver for PCI RC IP Protoyping Kits based on the ARC SDP,
-> so it is not suitable for all platform with designware PCIe controller,
-> and platform vendors have themselves' drivers.
-> 
-> The compatible string "snsp,dw-pcie" was added by mistake and it's not
-> matched that time, but it is matched because pcie drivers has been
-> collected recently.
-> 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> ---
->  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 5eb1c202932f..9b2b8d66d1f4 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -13,8 +13,8 @@ information.
->  
->  Required properties:
->  - compatible: should contain the platform identifier such as:
-> -        "fsl,ls1021a-pcie", "snps,dw-pcie"
-> -        "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
-> +        "fsl,ls1021a-pcie"
-> +        "fsl,ls2080a-pcie", "fsl,ls2085a-pcie"
->          "fsl,ls2088a-pcie"
->          "fsl,ls1088a-pcie"
->          "fsl,ls1046a-pcie"
-> @@ -36,7 +36,7 @@ Required properties:
->  Example:
->  
->  	pcie at 3400000 {
-> -		compatible = "fsl,ls1021a-pcie", "snps,dw-pcie";
-> +		compatible = "fsl,ls1021a-pcie";
->  		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
->  		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
->  		reg-names = "regs", "config";
-> -- 
-> 2.17.1
-> 
+Actually, if you have a test point on the RE pin, there's an easy way
+to know who's right: check the freq on RE and compare it to what you
+expect it to be.
