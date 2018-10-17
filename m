@@ -1,79 +1,283 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 17 Oct 2018 00:38:13 -0700
-Subject: [PATCH v5 9/9] arm64: dts: allwinner: a64: enable sound on Pinebook
+Date: Wed, 17 Oct 2018 00:38:07 -0700
+Subject: [PATCH v5 3/9] ASoC: sun8i-codec-analog: split regmap code into
+ separate driver
 In-Reply-To: <20181017073813.14127-1-anarsoul@gmail.com>
 References: <20181017073813.14127-1-anarsoul@gmail.com>
-Message-ID: <20181017073813.14127-10-anarsoul@gmail.com>
+Message-ID: <20181017073813.14127-4-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables I2S, digital and analog parts of audiocodec on
-Pinebook
+It will be reused by sun50i-codec-analog later.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- .../dts/allwinner/sun50i-a64-pinebook.dts     | 42 +++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ sound/soc/sunxi/Kconfig                |   7 +-
+ sound/soc/sunxi/Makefile               |   1 +
+ sound/soc/sunxi/sun8i-adda-pr-regmap.c | 102 +++++++++++++++++++++++++
+ sound/soc/sunxi/sun8i-adda-pr-regmap.h |   7 ++
+ sound/soc/sunxi/sun8i-codec-analog.c   |  79 +------------------
+ 5 files changed, 119 insertions(+), 77 deletions(-)
+ create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.c
+ create mode 100644 sound/soc/sunxi/sun8i-adda-pr-regmap.h
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-index e2e426334cfe..b426a6e2b485 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-@@ -74,6 +74,23 @@
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
- 	};
+diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+index 22408bc2d6ec..83b770cdfdaa 100644
+--- a/sound/soc/sunxi/Kconfig
++++ b/sound/soc/sunxi/Kconfig
+@@ -23,7 +23,7 @@ config SND_SUN8I_CODEC
+ config SND_SUN8I_CODEC_ANALOG
+ 	tristate "Allwinner sun8i Codec Analog Controls Support"
+ 	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+-	select REGMAP
++	select SND_SUN8I_ADDA_PR_REGMAP
+ 	help
+ 	  Say Y or M if you want to add support for the analog controls for
+ 	  the codec embedded in newer Allwinner SoCs.
+@@ -45,4 +45,9 @@ config SND_SUN4I_SPDIF
+ 	help
+ 	  Say Y or M to add support for the S/PDIF audio block in the Allwinner
+ 	  A10 and affiliated SoCs.
 +
-+	speaker_amp: speaker_amp {
-+		compatible = "simple-audio-amplifier";
-+		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>;
-+	};
++config SND_SUN8I_ADDA_PR_REGMAP
++	tristate
++	select REGMAP
++
+ endmenu
+diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
+index 4a9ef67386ca..74b99d55cfca 100644
+--- a/sound/soc/sunxi/Makefile
++++ b/sound/soc/sunxi/Makefile
+@@ -4,3 +4,4 @@ obj-$(CONFIG_SND_SUN4I_I2S) += sun4i-i2s.o
+ obj-$(CONFIG_SND_SUN4I_SPDIF) += sun4i-spdif.o
+ obj-$(CONFIG_SND_SUN8I_CODEC_ANALOG) += sun8i-codec-analog.o
+ obj-$(CONFIG_SND_SUN8I_CODEC) += sun8i-codec.o
++obj-$(CONFIG_SND_SUN8I_ADDA_PR_REGMAP) += sun8i-adda-pr-regmap.o
+diff --git a/sound/soc/sunxi/sun8i-adda-pr-regmap.c b/sound/soc/sunxi/sun8i-adda-pr-regmap.c
+new file mode 100644
+index 000000000000..e68ce9d2884d
+--- /dev/null
++++ b/sound/soc/sunxi/sun8i-adda-pr-regmap.c
+@@ -0,0 +1,102 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * This driver provides regmap to access to analog part of audio codec
++ * found on Allwinner A23, A31s, A33, H3 and A64 Socs
++ *
++ * Copyright 2016 Chen-Yu Tsai <wens@csie.org>
++ * Copyright (C) 2018 Vasily Khoruzhick <anarsoul@gmail.com>
++ */
++
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/regmap.h>
++
++#include "sun8i-adda-pr-regmap.h"
++
++/* Analog control register access bits */
++#define ADDA_PR			0x0		/* PRCM base + 0x1c0 */
++#define ADDA_PR_RESET			BIT(28)
++#define ADDA_PR_WRITE			BIT(24)
++#define ADDA_PR_ADDR_SHIFT		16
++#define ADDA_PR_ADDR_MASK		GENMASK(4, 0)
++#define ADDA_PR_DATA_IN_SHIFT		8
++#define ADDA_PR_DATA_IN_MASK		GENMASK(7, 0)
++#define ADDA_PR_DATA_OUT_SHIFT		0
++#define ADDA_PR_DATA_OUT_MASK		GENMASK(7, 0)
++
++/* regmap access bits */
++static int adda_reg_read(void *context, unsigned int reg, unsigned int *val)
++{
++	void __iomem *base = (void __iomem *)context;
++	u32 tmp;
++
++	/* De-assert reset */
++	writel(readl(base) | ADDA_PR_RESET, base);
++
++	/* Clear write bit */
++	writel(readl(base) & ~ADDA_PR_WRITE, base);
++
++	/* Set register address */
++	tmp = readl(base);
++	tmp &= ~(ADDA_PR_ADDR_MASK << ADDA_PR_ADDR_SHIFT);
++	tmp |= (reg & ADDA_PR_ADDR_MASK) << ADDA_PR_ADDR_SHIFT;
++	writel(tmp, base);
++
++	/* Read back value */
++	*val = readl(base) & ADDA_PR_DATA_OUT_MASK;
++
++	return 0;
++}
++
++static int adda_reg_write(void *context, unsigned int reg, unsigned int val)
++{
++	void __iomem *base = (void __iomem *)context;
++	u32 tmp;
++
++	/* De-assert reset */
++	writel(readl(base) | ADDA_PR_RESET, base);
++
++	/* Set register address */
++	tmp = readl(base);
++	tmp &= ~(ADDA_PR_ADDR_MASK << ADDA_PR_ADDR_SHIFT);
++	tmp |= (reg & ADDA_PR_ADDR_MASK) << ADDA_PR_ADDR_SHIFT;
++	writel(tmp, base);
++
++	/* Set data to write */
++	tmp = readl(base);
++	tmp &= ~(ADDA_PR_DATA_IN_MASK << ADDA_PR_DATA_IN_SHIFT);
++	tmp |= (val & ADDA_PR_DATA_IN_MASK) << ADDA_PR_DATA_IN_SHIFT;
++	writel(tmp, base);
++
++	/* Set write bit to signal a write */
++	writel(readl(base) | ADDA_PR_WRITE, base);
++
++	/* Clear write bit */
++	writel(readl(base) & ~ADDA_PR_WRITE, base);
++
++	return 0;
++}
++
++static const struct regmap_config adda_pr_regmap_cfg = {
++	.name		= "adda-pr",
++	.reg_bits	= 5,
++	.reg_stride	= 1,
++	.val_bits	= 8,
++	.reg_read	= adda_reg_read,
++	.reg_write	= adda_reg_write,
++	.fast_io	= true,
++	.max_register	= 31,
 +};
 +
-+&codec {
-+	status = "okay";
-+};
++struct regmap *sun8i_adda_pr_regmap_init(struct device *dev,
++					 void __iomem *base)
++{
++	return devm_regmap_init(dev, NULL, base, &adda_pr_regmap_cfg);
++}
++EXPORT_SYMBOL_GPL(sun8i_adda_pr_regmap_init);
 +
-+&codec_analog {
-+	status = "okay";
-+};
++MODULE_DESCRIPTION("Allwinner analog audio codec regmap driver");
++MODULE_AUTHOR("Vasily Khoruzhick <anarsoul@gmail.com>");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:sunxi-adda-pr");
+diff --git a/sound/soc/sunxi/sun8i-adda-pr-regmap.h b/sound/soc/sunxi/sun8i-adda-pr-regmap.h
+new file mode 100644
+index 000000000000..a5ae95dfebc1
+--- /dev/null
++++ b/sound/soc/sunxi/sun8i-adda-pr-regmap.h
+@@ -0,0 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Copyright (C) 2018 Vasily Khoruzhick <anarsoul@gmail.com>
++ */
 +
-+&dai {
-+	status = "okay";
- };
++struct regmap *sun8i_adda_pr_regmap_init(struct device *dev,
++					 void __iomem *base);
+diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+index 485e79f292c4..916a46bbc1c8 100644
+--- a/sound/soc/sunxi/sun8i-codec-analog.c
++++ b/sound/soc/sunxi/sun8i-codec-analog.c
+@@ -27,6 +27,8 @@
+ #include <sound/soc-dapm.h>
+ #include <sound/tlv.h>
  
- &ehci0 {
-@@ -278,6 +295,31 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
- };
- 
-+&sound {
-+	status = "okay";
-+	simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
-+				    "Microphone", "Internal Microphone Right",
-+				    "Headphone", "Headphone Jack",
-+				    "Speaker", "Internal Speaker";
-+	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
-+	simple-audio-card,routing =
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right",
-+			"INL", "LINEOUT",
-+			"INR", "LINEOUT",
-+			"Internal Speaker", "OUTL",
-+			"Internal Speaker", "OUTR",
-+			"Headphone Jack", "HP",
-+			"AIF1 Slot 0 Left ADC", "Left ADC",
-+			"AIF1 Slot 0 Right ADC", "Right ADC",
-+			"Left ADC", "ADC",
-+			"Right ADC", "ADC",
-+			"Internal Microphone Left", "MBIAS",
-+			"MIC1", "Internal Microphone Left",
-+			"Internal Microphone Right", "HBIAS",
-+			"MIC2", "Internal Microphone Right";
-+};
++#include "sun8i-adda-pr-regmap.h"
 +
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+ /* Codec analog control register offsets and bit fields */
+ #define SUN8I_ADDA_HP_VOLC		0x00
+ #define SUN8I_ADDA_HP_VOLC_PA_CLK_GATE		7
+@@ -120,81 +122,6 @@
+ #define SUN8I_ADDA_ADC_AP_EN_ADCLEN		6
+ #define SUN8I_ADDA_ADC_AP_EN_ADCG		0
+ 
+-/* Analog control register access bits */
+-#define ADDA_PR			0x0		/* PRCM base + 0x1c0 */
+-#define ADDA_PR_RESET			BIT(28)
+-#define ADDA_PR_WRITE			BIT(24)
+-#define ADDA_PR_ADDR_SHIFT		16
+-#define ADDA_PR_ADDR_MASK		GENMASK(4, 0)
+-#define ADDA_PR_DATA_IN_SHIFT		8
+-#define ADDA_PR_DATA_IN_MASK		GENMASK(7, 0)
+-#define ADDA_PR_DATA_OUT_SHIFT		0
+-#define ADDA_PR_DATA_OUT_MASK		GENMASK(7, 0)
+-
+-/* regmap access bits */
+-static int adda_reg_read(void *context, unsigned int reg, unsigned int *val)
+-{
+-	void __iomem *base = (void __iomem *)context;
+-	u32 tmp;
+-
+-	/* De-assert reset */
+-	writel(readl(base) | ADDA_PR_RESET, base);
+-
+-	/* Clear write bit */
+-	writel(readl(base) & ~ADDA_PR_WRITE, base);
+-
+-	/* Set register address */
+-	tmp = readl(base);
+-	tmp &= ~(ADDA_PR_ADDR_MASK << ADDA_PR_ADDR_SHIFT);
+-	tmp |= (reg & ADDA_PR_ADDR_MASK) << ADDA_PR_ADDR_SHIFT;
+-	writel(tmp, base);
+-
+-	/* Read back value */
+-	*val = readl(base) & ADDA_PR_DATA_OUT_MASK;
+-
+-	return 0;
+-}
+-
+-static int adda_reg_write(void *context, unsigned int reg, unsigned int val)
+-{
+-	void __iomem *base = (void __iomem *)context;
+-	u32 tmp;
+-
+-	/* De-assert reset */
+-	writel(readl(base) | ADDA_PR_RESET, base);
+-
+-	/* Set register address */
+-	tmp = readl(base);
+-	tmp &= ~(ADDA_PR_ADDR_MASK << ADDA_PR_ADDR_SHIFT);
+-	tmp |= (reg & ADDA_PR_ADDR_MASK) << ADDA_PR_ADDR_SHIFT;
+-	writel(tmp, base);
+-
+-	/* Set data to write */
+-	tmp = readl(base);
+-	tmp &= ~(ADDA_PR_DATA_IN_MASK << ADDA_PR_DATA_IN_SHIFT);
+-	tmp |= (val & ADDA_PR_DATA_IN_MASK) << ADDA_PR_DATA_IN_SHIFT;
+-	writel(tmp, base);
+-
+-	/* Set write bit to signal a write */
+-	writel(readl(base) | ADDA_PR_WRITE, base);
+-
+-	/* Clear write bit */
+-	writel(readl(base) & ~ADDA_PR_WRITE, base);
+-
+-	return 0;
+-}
+-
+-static const struct regmap_config adda_pr_regmap_cfg = {
+-	.name		= "adda-pr",
+-	.reg_bits	= 5,
+-	.reg_stride	= 1,
+-	.val_bits	= 8,
+-	.reg_read	= adda_reg_read,
+-	.reg_write	= adda_reg_write,
+-	.fast_io	= true,
+-	.max_register	= 24,
+-};
+-
+ /* mixer controls */
+ static const struct snd_kcontrol_new sun8i_codec_mixer_controls[] = {
+ 	SOC_DAPM_DOUBLE_R("DAC Playback Switch",
+@@ -912,7 +839,7 @@ static int sun8i_codec_analog_probe(struct platform_device *pdev)
+ 		return PTR_ERR(base);
+ 	}
+ 
+-	regmap = devm_regmap_init(&pdev->dev, NULL, base, &adda_pr_regmap_cfg);
++	regmap = sun8i_adda_pr_regmap_init(&pdev->dev, base);
+ 	if (IS_ERR(regmap)) {
+ 		dev_err(&pdev->dev, "Failed to create regmap\n");
+ 		return PTR_ERR(regmap);
 -- 
 2.19.0
