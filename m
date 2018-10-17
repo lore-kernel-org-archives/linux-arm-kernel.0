@@ -1,74 +1,134 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 11:32:13 -0700
-Subject: [PATCH 2/6] clk: mvebu: add helper file for Armada AP and CP
- clocks
-In-Reply-To: <20180922181709.13007-3-gregory.clement@bootlin.com>
-References: <20180922181709.13007-1-gregory.clement@bootlin.com>
- <20180922181709.13007-3-gregory.clement@bootlin.com>
-Message-ID: <153980113358.5275.6784587664499905114@swboyd.mtv.corp.google.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Wed, 17 Oct 2018 20:21:16 +0200
+Subject: [PATCH] KVM: arm64: Safety check PSTATE when entering guest and
+ handle IL
+Message-ID: <20181017182116.22603-1-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2018-09-22 11:17:05)
-> diff --git a/drivers/clk/mvebu/armada_ap_cp_helper.c b/drivers/clk/mvebu/armada_ap_cp_helper.c
-> new file mode 100644
-> index 000000000000..5f2457719b10
-> --- /dev/null
-> +++ b/drivers/clk/mvebu/armada_ap_cp_helper.c
-> @@ -0,0 +1,28 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Marvell Armada AP and CP110 helper
-> + *
-> + * Copyright (C) 2018 Marvell
-> + *
-> + * Gregory Clement <gregory.clement@bootlin.com>
-> + *
-> + */
-> +
-> +#include "armada_ap_cp_helper.h"
-> +#include <linux/device.h>
-> +
-> +char *ap_cp_unique_name(struct device *dev, struct device_node *np,
-> +                       const char *name)
-> +{
-> +       const __be32 *reg;
-> +       u64 addr;
-> +
-> +       /* Do not create a name if there is no clock */
-> +       if (!name)
-> +               return NULL;
-> +
-> +       reg = of_get_property(np, "reg", NULL);
-> +       addr = of_translate_address(np, reg);
-> +       return devm_kasprintf(dev, GFP_KERNEL, "%llx-%s",
-> +                             (unsigned long long)addr, name);
+This commit adds a paranoid check when entering the guest to make sure
+we don't attempt running guest code in an equally or more privilged mode
+than the hypervisor.  We also catch other accidental programming of the
+SPSR_EL2 which results in an illegal exception return and report this
+safely back to the user.
 
-We probably don't want to leak physical addresses into debugfs, but I
-guess this is how it's already been, so maybe something in the future
-should change this for security purposes.
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ arch/arm64/include/asm/kvm_asm.h |  1 +
+ arch/arm64/include/asm/ptrace.h  |  3 +++
+ arch/arm64/kvm/handle_exit.c     |  7 +++++++
+ arch/arm64/kvm/hyp/hyp-entry.S   | 16 +++++++++++++++-
+ arch/arm64/kvm/hyp/sysreg-sr.c   | 19 ++++++++++++++++++-
+ 5 files changed, 44 insertions(+), 2 deletions(-)
 
-> +}
-> diff --git a/drivers/clk/mvebu/armada_ap_cp_helper.h b/drivers/clk/mvebu/armada_ap_cp_helper.h
-> new file mode 100644
-> index 000000000000..23aa29f3fcf7
-> --- /dev/null
-> +++ b/drivers/clk/mvebu/armada_ap_cp_helper.h
-> @@ -0,0 +1,11 @@
-> +/* SPDX-License-Identifier: GPL-2.0+ */
-> +
-> +#ifndef __ARMADA_AP_CP_HELPER_H
-> +#define __ARMADA_AP_CP_HELPER_H
-> +
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-
-Drop these includes? And forward declare 
-
-struct device;
-struct device_node;
-
-> +
-> +char *ap_cp_unique_name(struct device *dev, struct device_node *np,
-> +                       const char *name);
-> +#endif
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 102b5a5c47b6..7738b4882d18 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -30,6 +30,7 @@
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_EL1_SERROR  1
+ #define ARM_EXCEPTION_TRAP	  2
++#define ARM_EXCEPTION_IL	  3
+ /* The hyp-stub will return this for any kvm_call_hyp() call */
+ #define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
+ 
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 177b851ca6d9..ff35ac1258eb 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -25,6 +25,9 @@
+ #define CurrentEL_EL1		(1 << 2)
+ #define CurrentEL_EL2		(2 << 2)
+ 
++/* Additional SPSR bits not exposed in the UABI */
++#define PSR_IL_BIT		(1 << 20)
++
+ /* AArch32-specific ptrace requests */
+ #define COMPAT_PTRACE_GETREGS		12
+ #define COMPAT_PTRACE_SETREGS		13
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index e5e741bfffe1..35a81bebd02b 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -284,6 +284,13 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 */
+ 		run->exit_reason = KVM_EXIT_FAIL_ENTRY;
+ 		return 0;
++	case ARM_EXCEPTION_IL:
++		/*
++		 * We attempted an illegal exception return.  Guest state must
++		 * have been corrupted somehow.  Give up.
++		 */
++		run->exit_reason = KVM_EXIT_FAIL_ENTRY;
++		return -EINVAL;
+ 	default:
+ 		kvm_pr_unimpl("Unsupported exception type: %d",
+ 			      exception_index);
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 24b4fbafe3e4..b1f14f736962 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -162,6 +162,20 @@ el1_error:
+ 	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+ 	b	__guest_exit
+ 
++el2_sync:
++	/* Check for illegal exception return, otherwise panic */
++	mrs	x0, spsr_el2
++
++	/* if this was something else, then panic! */
++	tst	x0, #PSR_IL_BIT
++	b.eq	__hyp_panic
++
++	/* Let's attempt a recovery from the illegal exception return */
++	get_vcpu_ptr	x1, x0
++	mov	x0, #ARM_EXCEPTION_IL
++	b	__guest_exit
++
++
+ el2_error:
+ 	ldp	x0, x1, [sp], #16
+ 
+@@ -240,7 +254,7 @@ ENTRY(__kvm_hyp_vector)
+ 	invalid_vect	el2t_fiq_invalid	// FIQ EL2t
+ 	invalid_vect	el2t_error_invalid	// Error EL2t
+ 
+-	invalid_vect	el2h_sync_invalid	// Synchronous EL2h
++	valid_vect	el2_sync		// Synchronous EL2h
+ 	invalid_vect	el2h_irq_invalid	// IRQ EL2h
+ 	invalid_vect	el2h_fiq_invalid	// FIQ EL2h
+ 	valid_vect	el2_error		// Error EL2h
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 9ce223944983..d7ac15412c97 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -152,8 +152,25 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+ static void __hyp_text
+ __sysreg_restore_el2_return_state(struct kvm_cpu_context *ctxt)
+ {
++	u64 pstate = ctxt->gp_regs.regs.pstate;
++	u64 mode = pstate & PSR_AA32_MODE_MASK;
++
++	/*
++	 * Safety check to ensure we're setting the CPU up to enter the guest
++	 * in a less privileged mode.
++	 *
++	 * If we are attempting a return to EL2 or higher in AArch64 state,
++	 * program SPSR_EL2 with M=EL2h and the IL bit set which ensures that
++	 * we'll take an illegal exception return exception immediately after
++	 * the ERET to the guest.  Attempts to return to AArch32 Hyp will
++	 * result in an illegal exception return because EL2's execution state
++	 * is determined by SCR_EL3.RW.
++	 */
++	if (!(mode & PSR_MODE32_BIT) && mode >= PSR_MODE_EL2t)
++		pstate = PSR_MODE_EL2h | PSR_IL_BIT;
++
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
+-	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
++	write_sysreg_el2(pstate,			spsr);
+ 
+ 	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
+ 		write_sysreg_s(ctxt->sys_regs[DISR_EL1], SYS_VDISR_EL2);
+-- 
+2.18.0
