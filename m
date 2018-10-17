@@ -1,57 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 17 Oct 2018 11:56:43 +0200
-Subject: [PATCH 1/2] [RFC] arm64: renesas: Move SoC Kconfig symbols to
- drivers/soc/renesas/
-In-Reply-To: <20181015154048.hkmht7cml272xbcg@verge.net.au>
-References: <20181011085508.5234-1-geert+renesas@glider.be>
- <20181011085508.5234-2-geert+renesas@glider.be>
- <20181011135448.sah5unjhclllvqty@verge.net.au>
- <20181015154048.hkmht7cml272xbcg@verge.net.au>
-Message-ID: <CAMuHMdWaXCu9KukLioxkcNoDQt4wKs2C9vrRbQRVJ+8+ux4PAQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 17 Oct 2018 11:58:29 +0200
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: add thermal device
+ support
+In-Reply-To: <1539612746-9711-1-git-send-email-ykaneko0929@gmail.com>
+References: <1539612746-9711-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <20181017095828.lgp6e7q4ag4meybs@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Mon, Oct 15, 2018 at 11:12:26PM +0900, Yoshihiro Kaneko wrote:
+> This patch adds the thermal device node and the thermal-zone for
+> the R8A77990 SoC.
+> 
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Thanks,
 
-On Mon, Oct 15, 2018 at 5:40 PM Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Oct 11, 2018 at 03:54:55PM +0200, Simon Horman wrote:
-> > On Thu, Oct 11, 2018 at 10:55:07AM +0200, Geert Uytterhoeven wrote:
-> > > For consistency with other vendors, which have a single Kconfig symbol
-> > > in arch/arm64/Kconfig.platforms.
-> > >
-> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > ---
-> > > Note that drivers/clk/ is included before drivers/soc/.  Hence when
-> > > COMPILE_TEST=y, questions will be asked about clock drivers before they
-> > > can be auto-selected by SoC support.
-> > >
-> > > Question: Should we introduce a family-specific Kconfig symbol for R-Car
-> > >       Gen3 (ARCH_RCAR_GEN1), which could be used for enabling
-> >
-> > s/1/3/?
+This looks fine to me but I will wait to see if there are other reviews
+before applying.
 
-Sure.
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-> > >
-> > >       RST_RCAR?
-> >
-> > Given that it would be consistent with R-Car Gen 1 and 2,
-> > that seems like a good idea to me.
->
-> there has been no other feedback on this series.
-> How would you like to proceed?
+Also tested on Ebisu/E3 in conjunction with "[PATCH/RFT 0/2] thermal: add
+suport for R8A77990"
 
-I will add a new symbol ARCH_RCAR_GEN3 for v2?
+# X=1000000; while [ "$X" -gt 0 ]; do X=$(($X -1 )); done; cat
+# /sys/devices/virtual/thermal/thermal_zone0/temp; sleep 1; cat
+# /sys/devices/virtual/thermal/thermal_zone0/temp
+30000
+25000
 
-Any comments about PATCH 2/2?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
