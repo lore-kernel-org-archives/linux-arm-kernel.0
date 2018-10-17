@@ -1,37 +1,51 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Oct 2018 15:41:59 +0200
-Subject: [PATCH v3 6/6] arm64: platform: Add enable Exynos Multi-Core Timer
- driver
+Date: Wed, 17 Oct 2018 15:41:55 +0200
+Subject: [PATCH v3 2/6] clocksource: exynos_mct: Fix error path in timer
+ resources initialization
 In-Reply-To: <20181017134159.9656-1-m.szyprowski@samsung.com>
 References: <20181017134159.9656-1-m.szyprowski@samsung.com>
- <CGME20181017134208eucas1p19c81d1ce9050be1b78e386d8a349f441@eucas1p1.samsung.com>
-Message-ID: <20181017134159.9656-7-m.szyprowski@samsung.com>
+ <CGME20181017134206eucas1p1caf7cdec20ec620a5bf52fb9e060a7de@eucas1p1.samsung.com>
+Message-ID: <20181017134159.9656-3-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos SoCs enabling MCT driver is required even if ARM Architected
-Timer driver is used to for managing timer hardware and clock source
-events.
+While freeing interrupt handlers in error path, don't assume that all
+requested interrupts are per-processor interrupts and properly release
+standard interrupts too.
 
+Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/exynos_mct.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 51bc479334a4..7cc687580fad 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -62,6 +62,7 @@ config ARCH_BRCMSTB
- config ARCH_EXYNOS
- 	bool "ARMv8 based Samsung Exynos SoC family"
- 	select COMMON_CLK_SAMSUNG
-+	select CLKSRC_EXYNOS_MCT
- 	select EXYNOS_PM_DOMAINS if PM_GENERIC_DOMAINS
- 	select EXYNOS_PMU
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index ef18bbf8d20c..49413900b24c 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -561,7 +561,19 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+ 	return 0;
+ 
+ out_irq:
+-	free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
++	if (mct_int_type == MCT_INT_PPI) {
++		free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
++	} else {
++		for_each_possible_cpu(cpu) {
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			if (pcpu_mevt->evt.irq != -1) {
++				free_irq(pcpu_mevt->evt.irq, pcpu_mevt);
++				pcpu_mevt->evt.irq = -1;
++			}
++		}
++	}
+ 	return err;
+ }
+ 
 -- 
 2.17.1
