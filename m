@@ -1,57 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Oct 2018 17:42:10 +0100
-Subject: [PATCH] kvm: arm64: fix caching of host MDCR_EL2 value
-Message-ID: <20181017164210.16094-1-mark.rutland@arm.com>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Wed, 17 Oct 2018 09:48:15 -0700
+Subject: [PATCH V2 1/4] mm: mmap: Allow for "high" userspace addresses
+In-Reply-To: <20181017163459.20175-2-steve.capper@arm.com>
+References: <20181017163459.20175-1-steve.capper@arm.com>
+ <20181017163459.20175-2-steve.capper@arm.com>
+Message-ID: <20181017164815.GA7966@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At boot time, KVM stashes the host MDCR_EL2 value, but only does this
-when the kernel is not running in hyp mode (i.e. is non-VHE). In these
-cases, the stashed value of MDCR_EL2.HPMN happens to be zero, which can
-lead to CONSTRAINED UNPREDICTABLE behaviour.
+On Wed, Oct 17, 2018 at 05:34:56PM +0100, Steve Capper wrote:
+> This patch adds support for "high" userspace addresses that are
+> optionally supported on the system and have to be requested via a hint
+> mechanism ("high" addr parameter to mmap).
+> 
+> Rather than duplicate the arch_get_unmapped_* stock implementations,
+> this patch instead introduces two architectural helper macros and
+> applies them to arch_get_unmapped_*:
+>  arch_get_mmap_end(addr) - get mmap upper limit depending on addr hint
+>  arch_get_mmap_base(addr, base) - get mmap_base depending on addr hint
+> 
+> If these macros are not defined in architectural code then they default
+> to (TASK_SIZE) and (base) so should not introduce any behavioural
+> changes to architectures that do not define them.
 
-Since we use this value to derive the MDCR_EL2 value when switching
-to/from a guest, after a guest have been run, the performance counters
-do not behave as expected. This has been observed to result in accesses
-via PMXEVTYPER_EL0 and PMXEVCNTR_EL0 not affecting the relevant
-counters, resulting in events not being counted. In these cases, only
-the fixed-purpose cycle counter appears to work as expected.
-
-Fix this by always stashing the host MDCR_EL2 value, regardless of VHE.
-
-Fixes: 1e947bad0b63b351 ("arm64: KVM: Skip HYP setup when already running in HYP")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Christopher Dall <christoffer.dall@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
----
- virt/kvm/arm/arm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index c92053bc3f96..8fb31a7cc22c 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1295,8 +1295,6 @@ static void cpu_init_hyp_mode(void *dummy)
- 
- 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
- 	__cpu_init_stage2();
--
--	kvm_arm_init_debug();
- }
- 
- static void cpu_hyp_reset(void)
-@@ -1320,6 +1318,8 @@ static void cpu_hyp_reinit(void)
- 		cpu_init_hyp_mode(NULL);
- 	}
- 
-+	kvm_arm_init_debug();
-+
- 	if (vgic_present)
- 		kvm_vgic_init_cpu_hardware();
- }
--- 
-2.11.0
+Can you explain (in the changelog) why we need to do this for arm64
+when it wasn't needed for the equivalent feature on x86-64?  I think the
+answer is that x86-64 already has its own arch_get_unmapped* functions and
+rather than duplicating arch_get_unmapped* for arm64, you want to continue
+using the generic ones with just this minor hooking.  But I'd like that
+spelled out explicitly for the next person who comes along and wonders.
