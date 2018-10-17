@@ -1,48 +1,63 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Wed, 17 Oct 2018 10:09:02 -0700
-Subject: [PATCH] misc: atmel-ssc: Fix section annotation on
- atmel_ssc_get_driver_data
-Message-ID: <20181017170901.13119-1-natechancellor@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 17 Oct 2018 18:13:26 +0100
+Subject: [PATCH] kvm: arm64: fix caching of host MDCR_EL2 value
+In-Reply-To: <20181017164210.16094-1-mark.rutland@arm.com>
+References: <20181017164210.16094-1-mark.rutland@arm.com>
+Message-ID: <a9599220-4351-181a-1150-facead06996d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After building the kernel with Clang, the following section mismatch
-warning appears:
+On 17/10/18 17:42, Mark Rutland wrote:
+> At boot time, KVM stashes the host MDCR_EL2 value, but only does this
+> when the kernel is not running in hyp mode (i.e. is non-VHE). In these
+> cases, the stashed value of MDCR_EL2.HPMN happens to be zero, which can
+> lead to CONSTRAINED UNPREDICTABLE behaviour.
+> 
+> Since we use this value to derive the MDCR_EL2 value when switching
+> to/from a guest, after a guest have been run, the performance counters
+> do not behave as expected. This has been observed to result in accesses
+> via PMXEVTYPER_EL0 and PMXEVCNTR_EL0 not affecting the relevant
+> counters, resulting in events not being counted. In these cases, only
+> the fixed-purpose cycle counter appears to work as expected.
+> 
+> Fix this by always stashing the host MDCR_EL2 value, regardless of VHE.
 
-WARNING: vmlinux.o(.text+0x3bf19a6): Section mismatch in reference from
-the function ssc_probe() to the function
-.init.text:atmel_ssc_get_driver_data()
-The function ssc_probe() references
-the function __init atmel_ssc_get_driver_data().
-This is often because ssc_probe lacks a __init
-annotation or the annotation of atmel_ssc_get_driver_data is wrong.
+FWIW,
 
-Remove __init from atmel_ssc_get_driver_data to get rid of the mismatch.
+Tested-by: Robin Murphy <robin.murphy@arm.com>
 
-Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
----
-
-Alternatively, ssc_probe could be marked as __init, I don't think there
-is any way for the probe to defer. I decided to go with the more
-conservative option first but I'm happy to respin if necessary.
-
-Thanks!
-
- drivers/misc/atmel-ssc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index b2a0340f277e..d8e3cc2dc747 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -132,7 +132,7 @@ static const struct of_device_id atmel_ssc_dt_ids[] = {
- MODULE_DEVICE_TABLE(of, atmel_ssc_dt_ids);
- #endif
- 
--static inline const struct atmel_ssc_platform_data * __init
-+static inline const struct atmel_ssc_platform_data *
- 	atmel_ssc_get_driver_data(struct platform_device *pdev)
- {
- 	if (pdev->dev.of_node) {
--- 
-2.19.1
+> Fixes: 1e947bad0b63b351 ("arm64: KVM: Skip HYP setup when already running in HYP")
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christopher Dall <christoffer.dall@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> ---
+>   virt/kvm/arm/arm.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index c92053bc3f96..8fb31a7cc22c 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1295,8 +1295,6 @@ static void cpu_init_hyp_mode(void *dummy)
+>   
+>   	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+>   	__cpu_init_stage2();
+> -
+> -	kvm_arm_init_debug();
+>   }
+>   
+>   static void cpu_hyp_reset(void)
+> @@ -1320,6 +1318,8 @@ static void cpu_hyp_reinit(void)
+>   		cpu_init_hyp_mode(NULL);
+>   	}
+>   
+> +	kvm_arm_init_debug();
+> +
+>   	if (vgic_present)
+>   		kvm_vgic_init_cpu_hardware();
+>   }
+> 
