@@ -1,21 +1,17 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 11:02:42 -0700
-Subject: [PATCH v11 1/5] dt-bindings: add binding for i.MX8MQ CCM
-In-Reply-To: <1539157520-25081-2-git-send-email-abel.vesa@nxp.com>
-References: <1539157520-25081-1-git-send-email-abel.vesa@nxp.com>
- <1539157520-25081-2-git-send-email-abel.vesa@nxp.com>
-Message-ID: <153979936233.5275.16984530832638476058@swboyd.mtv.corp.google.com>
+Date: Wed, 17 Oct 2018 10:50:03 -0700
+Subject: [PATCH v2 10/22] clk: at91: add sama5d4 pmc driver
+In-Reply-To: <20181016142200.19741-11-alexandre.belloni@bootlin.com>
+References: <20181016142200.19741-1-alexandre.belloni@bootlin.com>
+ <20181016142200.19741-11-alexandre.belloni@bootlin.com>
+Message-ID: <153979860360.5275.5029628133199951213@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Abel Vesa (2018-10-10 00:45:16)
-> From: Lucas Stach <l.stach@pengutronix.de>
+Quoting Alexandre Belloni (2018-10-16 07:21:48)
+> Add a driver for the PMC clocks of the sama5d4
 > 
-> This adds the binding for the i.MX8MQ Clock Controller Module.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 > ---
 
-Looks ok, but I'll wait for the resend.
+Applied to clk-next
