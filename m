@@ -1,78 +1,111 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Oct 2018 12:29:14 +0100
-Subject: [PATCH 1/3] driver core: add probe_err log helper
-In-Reply-To: <CAHp75VecquoNrzOuRvWcZ-Qa1b-5P0V0MWq=sNj-SnVcd2EhRw@mail.gmail.com>
-References: <CGME20181016072249eucas1p2303b8c06a9f7c839a971fe065b0c752e@eucas1p2.samsung.com>
- <20181016072244.1216-1-a.hajda@samsung.com>
- <20181016072244.1216-2-a.hajda@samsung.com>
- <CAHp75VfVxEkTzc=1hBrvc4K7r=L28vXipb=j9jSRJbTJE4GtLQ@mail.gmail.com>
- <605bd00e-ed0d-4259-bdc3-1784b2b3b16a@samsung.com>
- <20181016125543eucas1p1f23b3482179a9cd465f509e0abf782c1~eGAecmAv93038330383eucas1p1j@eucas1p1.samsung.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 17 Oct 2018 14:30:15 +0300
+Subject: [PATCH v2 1/3] driver core: add probe_err log helper
+In-Reply-To: <20181017085824.30806-1-a.hajda@samsung.com>
+References: <CGME20181017085832eucas1p23dbb86230149a13634b8a091c3b1301f@eucas1p2.samsung.com>
  <CAHp75VecquoNrzOuRvWcZ-Qa1b-5P0V0MWq=sNj-SnVcd2EhRw@mail.gmail.com>
-Message-ID: <20181017112914.GH30658@n2100.armlinux.org.uk>
+ <20181017085824.30806-1-a.hajda@samsung.com>
+Message-ID: <CAHp75VeV-fFZpPLJ26br-JL5WeAAKRJmAcWya-EgHQ6S3BRg+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 04:55:00PM +0300, Andy Shevchenko wrote:
-> On Tue, Oct 16, 2018 at 3:55 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
-> > On 16.10.2018 13:29, Andrzej Hajda wrote:
-> > > On 16.10.2018 13:01, Andy Shevchenko wrote:
-> > >> On Tue, Oct 16, 2018 at 10:22 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
-> > >>> During probe every time driver gets resource it should usually check for error
-> > >>> printk some message if it is not -EPROBE_DEFER and return the error. This
-> > >>> pattern is simple but requires adding few lines after any resource acquisition
-> > >>> code, as a result it is often omited or implemented only partially.
-> > >>> probe_err helps to replace such code seqences with simple call, so code:
-> > >>>         if (err != -EPROBE_DEFER)
-> > >>>                 dev_err(dev, ...);
-> > >>>         return err;
-> > >>> becomes:
-> > >>>         return probe_err(dev, err, ...);
-> 
-> > >>> +               va_start(args, fmt);
-> > >>> +
-> > >>> +               vaf.fmt = fmt;
-> > >>> +               vaf.va = &args;
-> > >>> +
-> > >>> +               __dev_printk(KERN_ERR, dev, &vaf);
-> 
-> > >> It would be nice to print an error code as well, wouldn't it?
-> > > Hmm, on probe fail error is printed anyway (with exception of
-> > > EPROBE_DEFER, ENODEV and ENXIO):
-> > >     "probe of %s failed with error %d\n"
-> > > On the other side currently some drivers prints the error code anyway
-> > > via dev_err or similar, so I guess during conversion to probe_err it
-> > > should be removed then.
-> > >
-> > > If we add error code to probe_err is it OK to report it this way?
-> > >     dev_err(dev, "%V, %d\n", &vaf, err);
-> >
-> > Ups, I forgot that message passed to probe_err will contain already
-> > newline character.
-> 
-> You may consider not to pass it.
+On Wed, Oct 17, 2018 at 11:58 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
+>
+> During probe every time driver gets resource it should usually check for error
+> printk some message if it is not -EPROBE_DEFER and return the error. This
+> pattern is simple but requires adding few lines after any resource acquisition
+> code, as a result it is often omited or implemented only partially.
+> probe_err helps to replace such code sequences with simple call, so code:
+>         if (err != -EPROBE_DEFER)
+>                 dev_err(dev, ...);
+>         return err;
+> becomes:
+>         return probe_err(dev, err, ...);
+>
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javierm@redhat.com>
+>
 
-It's normal to pass the '\n', so by doing this, we create the situation
-where this function becomes the exception to the norm.  That's not a
-good idea - we will see people forget that appending '\n' should not
-be done for this particular function.
+Looks good to me,
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-While we could add a checkpatch rule, that's hassle (extra rework).  In
-any case, I think the message would be much better formatted if we did:
+> ---
+> v2:
+>   - added error value to log message,
+>   - fixed code style,
+>   - added EXPORT_SYMBOL_GPL,
+>   - Added R-B by Javier (I hope the changes did not invalidate it).
+> ---
+>  drivers/base/core.c    | 37 +++++++++++++++++++++++++++++++++++++
+>  include/linux/device.h |  2 ++
+>  2 files changed, 39 insertions(+)
+>
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 04bbcd779e11..aa6f3229d066 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -3067,6 +3067,43 @@ define_dev_printk_level(_dev_info, KERN_INFO);
+>
+>  #endif
+>
+> +/**
+> + * probe_err - probe error check and log helper
+> + * @dev: the pointer to the struct device
+> + * @err: error value to test
+> + * @fmt: printf-style format string, not ended with newline
+> + * @...: arguments as specified in the format string
+> + *
+> + * This helper implements common pattern present in probe functions for error
+> + * checking: print message if the error is not -EPROBE_DEFER and propagate it.
+> + * It replaces code sequence:
+> + *     if (err != -EPROBE_DEFER)
+> + *             dev_err(dev, ...);
+> + *     return err;
+> + * with
+> + *     return probe_err(dev, err, ...);
+> + *
+> + * Returns @err.
+> + *
+> + */
+> +int probe_err(const struct device *dev, int err, const char *fmt, ...)
+> +{
+> +       struct va_format vaf;
+> +       va_list args;
+> +
+> +       if (err == -EPROBE_DEFER)
+> +               return err;
+> +
+> +       va_start(args, fmt);
+> +       vaf.fmt = fmt;
+> +       vaf.va = &args;
+> +       dev_err(dev, "%pV, %d\n", &vaf, err);
+> +       va_end(args);
+> +
+> +       return err;
+> +}
+> +EXPORT_SYMBOL_GPL(probe_err);
+> +
+>  static inline bool fwnode_is_primary(struct fwnode_handle *fwnode)
+>  {
+>         return fwnode && !IS_ERR(fwnode->secondary);
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 90224e75ade4..06c2c797d132 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -1577,6 +1577,8 @@ do {                                                                      \
+>         WARN_ONCE(condition, "%s %s: " format, \
+>                         dev_driver_string(dev), dev_name(dev), ## arg)
+>
+> +int probe_err(const struct device *dev, int err, const char *fmt, ...);
+> +
+>  /* Create alias, so I can be autoloaded. */
+>  #define MODULE_ALIAS_CHARDEV(major,minor) \
+>         MODULE_ALIAS("char-major-" __stringify(major) "-" __stringify(minor))
+> --
+> 2.18.0
+>
 
-	dev_err(dev, "error %d: %V", err, &vaf);
-
-which means we end up with (eg):
-
-	error -5: request_irq failed for irq 9
-
-rather than:
-
-	request_irq failed for irq 9, -5
-
-which is more confusing.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+With Best Regards,
+Andy Shevchenko
