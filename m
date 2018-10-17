@@ -1,71 +1,34 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Wed, 17 Oct 2018 10:24:00 +0200
-Subject: [PATCH 00/11] thermal: add new flag irq-mode for trip point
-In-Reply-To: <CAJKOXPd4=hvowfkEJbfX_BXf_PEjxuKxn7dxy7cb=G59a8+GOw@mail.gmail.com>
-References: <CGME20181016145637eucas1p2dfa78042b9fd4fd27af7cc8537b7f485@eucas1p2.samsung.com>
- <20181016145637eucas1p2dfa78042b9fd4fd27af7cc8537b7f485~eHqCoEO-42133821338eucas1p2F@eucas1p2.samsung.com>
- <CAJKOXPei6b7TnOnG7DUMNm+xEUsMxqcMOfbG10cJbrNROXLN2w@mail.gmail.com>
- <20181017074244eucas1p2487ff3bccf50d6f4fd7a99cd7d8d2bb4~eVYe84jXW0904509045eucas1p2q@eucas1p2.samsung.com>
- <CAJKOXPd4=hvowfkEJbfX_BXf_PEjxuKxn7dxy7cb=G59a8+GOw@mail.gmail.com>
-Message-ID: <20181017082402eucas1p1088cde8bb32592e96decd0075ecc055a~eV8jZImjv1752717527eucas1p1K@eucas1p1.samsung.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 17 Oct 2018 10:38:20 +0200
+Subject: [PATCH v5 2/9] ASoC: sun8i-codec: Don't hardcode BCLK / LRCK ratio
+In-Reply-To: <20181017073813.14127-3-anarsoul@gmail.com>
+References: <20181017073813.14127-1-anarsoul@gmail.com>
+ <20181017073813.14127-3-anarsoul@gmail.com>
+Message-ID: <20181017083820.bmxu7j3ctbcmzh36@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/17/2018 09:52 AM, Krzysztof Kozlowski wrote:
-> On Wed, 17 Oct 2018 at 09:42, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->>
->> Hi Krzysztof,
->>
->> On 10/17/2018 09:03 AM, Krzysztof Koz?owski wrote:
->>> On Tue, 16 Oct 2018 at 16:56, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->>>>
->>>> Hi all,
->>>>
->>>> This patch set adds new flag and mechanism in thermal trip point in DT.
->>>> The current situation with 'passive' (passive cooling - DVFS)
->>>> trip point is that it enables polling mode in thermal framework.
->>>
->>> For DT platform, I checked it some months ago... and that time I was
->>> pretty sure - passive mode does not enable polling (unless you tell it
->>> explicitly with "polling-delay-passive"). Maybe something changed...
->>> but quick look at the code tell me that not. Passive does not indicate
->>> polling mode.
->>>
->>> Why do you think that passive enables polling?
->> Please check dt file which implements 2 more trip points that HW
->> supports:
->> arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->>
->> In that file we have this trick with 'active' present.
->> Yes, you are right, 'polling-delay-passive' enables it in
->> the thermal code (for whole thermal zone).
->> Unfortunately, if you change the bellow 'active' to 'passive'
->> in that file, they will start polling, which is not what we want.
+On Wed, Oct 17, 2018 at 12:38:06AM -0700, Vasily Khoruzhick wrote:
+> BCLK / LRCK ratio should be sample size * channels, but it was
+> hardcoded to 32 (0x1 is 32 as per A33 and A64 datasheets).
 > 
-> Yes but this looks different than what you explained at the beginning.
-> You said that passive enables polling mode... which is not true. You
-> can have active with or without polling. You can have passive with or
-> without polling. But the real problem you described now is that given
-> polling/IRQ mode applies to entire thermal zone, not to a specific
-> trip point.
+> Calculate it basing on sample size and number of channels.
 > 
-> I agree with this problem but you need to clearly mark it in cover
-> letter and description of other commits because really from existing
-> explanation I understood something completely different. You simply
-> want to configure IRQ or polling per trip-point, not per thermal zone.
-Thank you for your feedback, I will rewrite the cover letter and
-descriptions.
-I will add that the thermal zone polling settings are for all it's trip
-points, which has some implications. Therefore, trying to work around,
-might cause confusion due to misalignment with trip point documentation
-and old assumptions.
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-Regards,
-Lukasz
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-> 
-> Best regards,
-> Krzysztof
-> 
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181017/17a48cd0/attachment.sig>
