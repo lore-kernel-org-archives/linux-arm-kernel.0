@@ -1,77 +1,62 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 17 Oct 2018 13:11:12 +0530
-Subject: [PATCH v2 19/21] PCI: keystone: Add debug error message for all errors
+Date: Wed, 17 Oct 2018 13:11:09 +0530
+Subject: [PATCH v2 16/21] PCI: keystone: Cleanup set_dbi_mode and get_dbi_mode
 In-Reply-To: <20181017074114.28239-1-kishon@ti.com>
 References: <20181017074114.28239-1-kishon@ti.com>
-Message-ID: <20181017074114.28239-20-kishon@ti.com>
+Message-ID: <20181017074114.28239-17-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 025dd3daeda77f61a280da87ae701 ("PCI: keystone: Add error IRQ
-handler") added dev_err() message only for ERR_AXI and ERR_FATAL. Add
-debug error message for ERR_SYS, ERR_NONFATAL, ERR_CORR and ERR_AER here.
-
-While at that avoid using ERR_IRQ_STATUS_RAW and use ERR_IRQ_STATUS
-instead.
+No functional change. Use BIT() macro for DBI_CS2 and cleanup
+set_dbimode and get_dbi_mode
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 32 ++++++++++++++++-------
- 1 file changed, 23 insertions(+), 9 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index c0bba7b604fa..e9e646acc2d5 100644
+index 3576a184b9eb..2decbaec81a3 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -79,7 +79,6 @@
- #define ERR_SYS		BIT(0)	/* System (fatal, non-fatal, or correctable) */
- #define ERR_IRQ_ALL	(ERR_AER | ERR_AXI | ERR_CORR | \
- 			 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
--#define ERR_FATAL_IRQ	(ERR_FATAL | ERR_AXI)
- #define ERR_IRQ_STATUS			0x1c4
- #define ERR_IRQ_ENABLE_SET		0x1c8
- #define ERR_IRQ_ENABLE_CLR		0x1cc
-@@ -246,18 +245,33 @@ static void ks_pcie_enable_error_irq(struct keystone_pcie *ks_pcie)
+@@ -40,7 +40,7 @@
+ #define LTSSM_EN_VAL		        BIT(0)
+ #define LTSSM_STATE_MASK		0x1f
+ #define LTSSM_STATE_L0			0x11
+-#define DBI_CS2_EN_VAL			0x20
++#define DBI_CS2				BIT(5)
+ #define OB_XLAT_EN_VAL		        BIT(1)
  
- static irqreturn_t ks_pcie_handle_error_irq(struct keystone_pcie *ks_pcie)
- {
--	u32 status;
-+	u32 reg;
-+	struct device *dev = ks_pcie->pci->dev;
+ /* Application registers */
+@@ -315,11 +315,12 @@ static void ks_pcie_set_dbi_mode(struct keystone_pcie *ks_pcie)
+ 	u32 val;
  
--	status = ks_pcie_app_readl(ks_pcie, ERR_IRQ_STATUS);
--	if (!status)
-+	reg = ks_pcie_app_readl(ks_pcie, ERR_IRQ_STATUS);
-+	if (!reg)
- 		return IRQ_NONE;
+ 	val = ks_pcie_app_readl(ks_pcie, CMD_STATUS);
+-	ks_pcie_app_writel(ks_pcie, CMD_STATUS, DBI_CS2_EN_VAL | val);
++	val |= DBI_CS2;
++	ks_pcie_app_writel(ks_pcie, CMD_STATUS, val);
  
--	if (status & ERR_FATAL_IRQ)
--		dev_err(ks_pcie->pci->dev, "fatal error (status %#010x)\n",
--			status);
-+	if (reg & ERR_SYS)
-+		dev_err(dev, "System Error\n");
-+
-+	if (reg & ERR_FATAL)
-+		dev_err(dev, "Fatal Error\n");
-+
-+	if (reg & ERR_NONFATAL)
-+		dev_dbg(dev, "Non Fatal Error\n");
-+
-+	if (reg & ERR_CORR)
-+		dev_dbg(dev, "Correctable Error\n");
-+
-+	if (reg & ERR_AXI)
-+		dev_err(dev, "AXI tag lookup fatal Error\n");
-+
-+	if (reg & ERR_AER)
-+		dev_err(dev, "ECRC Error\n");
-+
-+	ks_pcie_app_writel(ks_pcie, ERR_IRQ_STATUS, reg);
- 
--	/* Ack the IRQ; status bits are RW1C */
--	ks_pcie_app_writel(ks_pcie, ERR_IRQ_STATUS, status);
- 	return IRQ_HANDLED;
+ 	do {
+ 		val = ks_pcie_app_readl(ks_pcie, CMD_STATUS);
+-	} while (!(val & DBI_CS2_EN_VAL));
++	} while (!(val & DBI_CS2));
  }
  
+ /**
+@@ -333,11 +334,12 @@ static void ks_pcie_clear_dbi_mode(struct keystone_pcie *ks_pcie)
+ 	u32 val;
+ 
+ 	val = ks_pcie_app_readl(ks_pcie, CMD_STATUS);
+-	ks_pcie_app_writel(ks_pcie, CMD_STATUS, ~DBI_CS2_EN_VAL & val);
++	val &= ~DBI_CS2;
++	ks_pcie_app_writel(ks_pcie, CMD_STATUS, val);
+ 
+ 	do {
+ 		val = ks_pcie_app_readl(ks_pcie, CMD_STATUS);
+-	} while (val & DBI_CS2_EN_VAL);
++	} while (val & DBI_CS2);
+ }
+ 
+ static void ks_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
 -- 
 2.17.1
