@@ -1,84 +1,98 @@
-From: aneesh.kumar@linux.ibm.com (Aneesh Kumar K.V)
-Date: Wed, 17 Oct 2018 17:23:38 +0530
-Subject: Crash on FSL Book3E due to pte_pgprot()? (was Re: [PATCH v3
- 12/24] powerpc/mm: use pte helpers in generic code)
-In-Reply-To: <6ec9cf4b-abd2-8244-4780-4564a7ffb1ad@c-s.fr>
-References: <cover.1539092111.git.christophe.leroy@c-s.fr>
- <343c844bbc5081d13ee4c9aa27ff3118f607e1cc.1539092112.git.christophe.leroy@c-s.fr>
- <87va61jsma.fsf@concordia.ellerman.id.au>
- <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
- <87efcoeudx.fsf@concordia.ellerman.id.au>
- <6ec9cf4b-abd2-8244-4780-4564a7ffb1ad@c-s.fr>
-Message-ID: <e3b03750-f76a-0a70-69ff-3767382859c6@linux.ibm.com>
+From: jonas@orbital-systems.com (Jonas Danielsson)
+Date: Wed, 17 Oct 2018 14:17:14 +0200
+Subject: [PATCH] power: reset: at91-reset: enable I-cache for
+ at91sam9260_reset
+In-Reply-To: <2351196.3BzoFE0xYq@ws-140106>
+References: <20181007125815.8392-1-jonas@threetimestwo.org>
+ <80993f04-c8ce-5a71-4f04-7edab5e1857b@microchip.com>
+ <2351196.3BzoFE0xYq@ws-140106>
+Message-ID: <CALDOjzhZg3X1y22KE1yw_0ZFjuvaa=3GhEF2iU=KUk6-eRZN2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/18 4:42 PM, Christophe Leroy wrote:
-> 
-> 
-> On 10/17/2018 10:32 AM, Michael Ellerman wrote:
->> Christophe Leroy <christophe.leroy@c-s.fr> writes:
->>> On 10/17/2018 12:59 AM, Michael Ellerman wrote:
->> ...
->>>> The question is what's the right way to fix it? Should pte_pgprot() not
->>>> be filtering those bits out on book3e?
->>>
->>> I think we should not use pte_pggrot() for that then. What about the
->>> below fix ?
->>
->> Thanks, that almost works.
->>
->> pte_mkprivileged() also needs to not strip _PAGE_BAP_SR.
-> 
-> Oops, I missed it allthough I knew it. Patch below.
-> 
-> From: Christophe Leroy <christophe.leroy@c-s.fr>
-> Date: Wed, 17 Oct 2018 10:46:24 +0000
-> Subject: [PATCH] powerpc/book3e: redefine pte_mkprivileged() and 
-> pte_mkuser()
-> To: Benjamin Herrenschmidt <benh@kernel.crashing.org>, Paul Mackerras 
-> <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>
-> Cc: linux-kernel at vger.kernel.org, linuxppc-dev at lists.ozlabs.org
-> 
-> Book3e defines both _PAGE_USER and _PAGE_PRIVILEGED, so the nohash
-> default pte_mkprivileged() and pte_mkuser() are not usable.
-> 
-> This patch redefines them for book3e.
-> 
-> Fixes: a0da4bc166f2 ("powerpc/mm: Allow platforms to redefine some 
-> helpers")
-> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
-> ---
->  ?arch/powerpc/include/asm/nohash/pte-book3e.h | 14 ++++++++++++++
->  ?1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/powerpc/include/asm/nohash/pte-book3e.h 
-> b/arch/powerpc/include/asm/nohash/pte-book3e.h
-> index 58eef8cb569d..fb4297dff3e2 100644
-> --- a/arch/powerpc/include/asm/nohash/pte-book3e.h
-> +++ b/arch/powerpc/include/asm/nohash/pte-book3e.h
-> @@ -109,5 +109,19 @@
->  ?#define PAGE_READONLY??? __pgprot(_PAGE_BASE | _PAGE_USER)
->  ?#define PAGE_READONLY_X??? __pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_EXEC)
-> 
-> +static inline pte_t pte_mkprivileged(pte_t pte)
-> +{
-> +??? return __pte((pte_val(pte) & ~_PAGE_USER) | _PAGE_PRIVILEGED);
-> +}
-> +
-> +#define pte_mkprivileged pte_mkprivileged
-> +
-> +static inline pte_t pte_mkuser(pte_t pte)
-> +{
-> +??? return __pte((pte_val(pte) & ~_PAGE_PRIVILEGED) | _PAGE_USER);
-> +}
-> +
-> +#define pte_mkuser pte_mkuser
-> +
+On Tue, Oct 16, 2018 at 4:52 PM Alexander Stein
+<alexander.stein@systec-electronic.com> wrote:
+>
+> On Tuesday, October 16, 2018, 3:30:24 PM CEST Claudiu.Beznea at microchip.com wrote:
+> > Hi Jonas,
+> >
+> > On 07.10.2018 15:57, Jonas Danielsson wrote:
+> > > From: Jonas Danielsson <jonas@orbital-systems.com>
+> > >
+> > > This fixes a bug where our embedded system (AT91SAM9260 based) would
+> > > hang at reboot. At the most we managed 16 boot loops without a hang.
+> > >
+> > > With this patch applied the problem has not been observed and the board
+> > > has managed above 250 boot loops.
+> > >
+> > > The AT91SAM9260 datasheet tells us that with the instruction cache
+> > > disabled all instructions are fetched from SDRAM. And we have an errata
+> > > telling us we must power down the SDRAM before issuing cpu reset.
+> > >
+> > > This means we need the instruction cache enabled in at91sam9260_reset()
+> > > At the moment it is being disabled in cpu_proc_fin() which is called from
+> > > arch/arm/kernel/reboot.c.
+> >
+> > Are you using kexec reboot or implemented hibernate mode on this machine?
+> > I'm seeing cpu_proc_fin() is called only in case of kexec reboot or
+> > switching to hibernate mode.
+> >
+> > In case of normal reboot (e.g. reboot command) machine_restart() from
+> > arch/arm/kernel/reboot.c is called. Please correct me if I'm wrong.
+>
+> Another location is cpu_reset() aka cpu_arm926_reset() in proc-arm926.S
+> which also disables I-cache. But I can't track down a callstack
+> ending there.
+>
 
-I was build testing a similar patch. We would need to put #ifndef 
-__ASSEMBLY__ around it.
+We take the normal path of sys_reboot => kernel_restart => machine_restart ...
+
+I added code to print the c1 register in different paths. And I-cache
+is enabled.
+So now I am really confused about why the patch worked.
+
+> Best regards,
+> Alexander
+
+Jonas
+
+>
+>
+>
+
+
+-- 
 
 
 
--aneesh
+
+
+
+JONAS DANIELSSON
+Software Developer
+
++46 72 361 5022
+Malm? - Sweden
+
+ORBITAL SYSTEMS
+orbital-systems.com
+
+
+
+
+The information contained in this message is intended for the personal
+and confidential use of the designated recipients named above and may
+contain confidential and/or privileged material. If the reader of this
+message is not the intended recipient or an agent responsible for
+delivering it to the intended recipient, you are hereby notified that
+you have received this document in error, and that any review,
+dissemination, distribution, or copying of this message is strictly
+prohibited. If you have received this communication in error, please
+notify the sender immediately and delete this e-mail from your system.
+
+Although this transmission and any attachments are believed to be free
+of any virus or other defect that might affect any computer system
+into which it is received and opened, it is the responsibility of the
+recipient to ensure that it is virus free and no responsibility is
+accepted by ORBITAL SYSTEMS AB, its subsidiaries and affiliates, as
+applicable, for any loss or damage arising in any way.
