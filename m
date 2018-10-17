@@ -1,18 +1,18 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 10:49:46 -0700
-Subject: [PATCH v2 04/22] clk: at91: audio-pll: separate registration from
- DT parsing
-In-Reply-To: <20181016142200.19741-5-alexandre.belloni@bootlin.com>
+Date: Wed, 17 Oct 2018 10:49:57 -0700
+Subject: [PATCH v2 08/22] dt-bindings: clk: at91: Document new PMC binding
+In-Reply-To: <20181016142200.19741-9-alexandre.belloni@bootlin.com>
 References: <20181016142200.19741-1-alexandre.belloni@bootlin.com>
- <20181016142200.19741-5-alexandre.belloni@bootlin.com>
-Message-ID: <153979858672.5275.14300177764052679778@swboyd.mtv.corp.google.com>
+ <20181016142200.19741-9-alexandre.belloni@bootlin.com>
+Message-ID: <153979859749.5275.16249727048370446424@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandre Belloni (2018-10-16 07:21:42)
-> Separate registration out of of_sama5d2_clk_audio_pll*_setup to allow other
-> code to use it.
+Quoting Alexandre Belloni (2018-10-16 07:21:46)
+> Document the new PMC binding with only one PMC node for all the PMC clocks
+> instead of one node per clock as this proved to be problematic.
 > 
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 > ---
 
