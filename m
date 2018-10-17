@@ -1,40 +1,66 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2018 11:16:04 +0200
-Subject: [PATCH RESEND] ARM: dma-mapping: update comment about handling
- dma_ops when detaching from IOMMU
-In-Reply-To: <20181015105517.28032-1-wsa+renesas@sang-engineering.com>
-References: <20181015105517.28032-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20181017091604.63mfy5ztgpbijycm@verge.net.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 17 Oct 2018 11:18:30 +0200
+Subject: [PATCH V2] DT: rockchip: Fix stability issues with the 'performance'
+ governor on rock960
+Message-ID: <1539767918-26587-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 12:55:17PM +0200, Wolfram Sang wrote:
-> Update the comment because we don't set the pointer to NULL anymore.
-> Also use the correct pointer name 'dma_ops' instead of 'dma_map_ops'.
-> 
-> Fixes: 1874619a7df4 ("ARM: dma-mapping: Set proper DMA ops in arm_iommu_detach_device()")
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+When the performance governor is set as default, the rock960 hangs
+around one minute after booting, whatever the activity is (idle, key
+pressed, loaded, ...).
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Based on the commit log found at https://patchwork.kernel.org/patch/10092377/
 
-> ---
->  arch/arm/mm/dma-mapping.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 66566472c153..e3b04786838f 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -2287,7 +2287,7 @@ EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
->   * @dev: valid struct device pointer
->   *
->   * Detaches the provided device from a previously attached map.
-> - * This voids the dma operations (dma_map_ops pointer)
-> + * This overwrites the dma_ops pointer with appropriate non-IOMMU ops.
->   */
->  void arm_iommu_detach_device(struct device *dev)
->  {
-> -- 
-> 2.11.0
-> 
+"vdd_log has no consumer and therefore will not be set to a specific
+voltage. Still the PWM output pin gets configured and thence the vdd_log
+output voltage will changed from it's default. Depending on the idle
+state of the PWM this will slightly over or undervoltage the logic supply
+of the RK3399 and cause instability with GbE (undervoltage) and PCIe
+(overvoltage). Since the default value set by a voltage divider is the
+correct supply voltage and we don't need to change it during runtime we
+remove the rail from the devicetree completely so the PWM pin will not
+be configured."
+
+After removing the vdd-log from the rock960's specific DT, the board
+does no longer hang and shows a stable behavior.
+
+Apply the same change for the rock960 by removing the vdd-log from the
+DT.
+
+Fixes: 874846f1fccd ("arm64: dts: rockchip: add 96boards RK3399 Ficus board")
+Tested-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+Changelog
+  - V2
+     * Added Tested and Fixes tags
+---
+ arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi | 12 ------------
+ 1 file changed, 12 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+index 6c8c4ab..56abbb0 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+@@ -57,18 +57,6 @@
+ 		regulator-always-on;
+ 		vin-supply = <&vcc_sys>;
+ 	};
+-
+-	vdd_log: vdd-log {
+-		compatible = "pwm-regulator";
+-		pwms = <&pwm2 0 25000 0>;
+-		regulator-name = "vdd_log";
+-		regulator-min-microvolt = <800000>;
+-		regulator-max-microvolt = <1400000>;
+-		regulator-always-on;
+-		regulator-boot-on;
+-		vin-supply = <&vcc_sys>;
+-	};
+-
+ };
+ 
+ &cpu_l0 {
+-- 
+2.7.4
