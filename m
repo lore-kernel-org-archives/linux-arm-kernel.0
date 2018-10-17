@@ -1,62 +1,143 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 17 Oct 2018 19:56:25 +1100
-Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
-In-Reply-To: <20181017060531.GU2400@vkoul-mobl>
-References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
- <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
- <20181017060531.GU2400@vkoul-mobl>
-Message-ID: <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 17 Oct 2018 09:03:28 +0000
+Subject: [PATCH V4 04/11] clk: imx: scu: add scu clock gpr divider
+In-Reply-To: <153972527843.5275.15123840961402192766@swboyd.mtv.corp.google.com>
+References: <1539504194-28289-1-git-send-email-aisheng.dong@nxp.com>
+ <1539504194-28289-5-git-send-email-aisheng.dong@nxp.com>
+ <153972527843.5275.15123840961402192766@swboyd.mtv.corp.google.com>
+Message-ID: <AM0PR04MB42119987039050D9488EB30F80FF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-10-17 at 11:35 +0530, Vinod wrote:
-> On 17-10-18, 09:41, sudheer.v wrote:
-> 
-> Please add the change log describing the driver and its features
-> 
-> > Signed-off-by: sudheer.v <open.sudheer@gmail.com>
-> 
-> 
-> > ---
-> >  drivers/tty/serial/8250/8250_aspeed_uart_dma.c | 1594 ++++++++++++++++++++++++
-> >  1 file changed, 1594 insertions(+)
-> >  create mode 100644 drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > 
-> > diff --git a/drivers/tty/serial/8250/8250_aspeed_uart_dma.c b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > new file mode 100644
-> > index 0000000..e1019a8
-> > --- /dev/null
-> > +++ b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> 
-> why is this in serial. It is dmaengine driver so belongs to drivers/dma/
-> like other controllers. Please move it out and resubmit.
- 
-It's not a dmaengine driver. It's a serial UART driver that happens to
-use a dedicated DMA engine.
-
-It's unclear whether it should be split into two drivers, or just have
-the serial driver directly use the dma engine since that engine is
-dedicated in HW to only work on those UARTs and nothing else...
-
-Cheers,
-Ben.
-
-
-> While doing resubmission please take some time to understand subsystem
-> tags to use. (hint git log <subsystem> will tell you)
-> 
-> Also series has [[PATCH] 8/9] whereas it should be [PATCH 8/9] please
-> let git generate that for you (hint git format-patch start..end does a
-> good job)
-> 
-> > @@ -0,0 +1,1594 @@
-> > +// SPDX-License-Identifier: GPL-2.0
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at kernel.org]
+> Sent: Wednesday, October 17, 2018 5:28 AM
+[...]
+> Quoting A.s. Dong (2018-10-14 01:07:52)
 > > +/*
-> > + *   drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > + *    1. 2018/07/01 Shivah Shankar created
-> > + *    2. 2018/08/25 sudheer.veliseti<open.sudheer@gmail.com> modified
+> > + * clk_divider_scu_recalc_rate - Get clock rate for a SCU clock
+> > + * @hw: clock to get rate for
+> > + * @parent_rate: parent rate provided by common clock framework
+> > + *
+> > + * Gets the current clock rate of a SCU clock. Returns the current
+> > + * clock rate, or zero in failure.
+> > + */
+> > +static unsigned long clk_divider_gpr_scu_recalc_rate(struct clk_hw *hw,
+> > +                                                    unsigned long
+> > +parent_rate) {
+> > +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
+> > +       u32 val;
+> > +       int ret;
+> > +
+> > +       ret = imx_sc_misc_get_control(ccm_ipc_handle, clk->rsrc_id,
+> > +                                     clk->gpr_id, &val);
+> > +       if (ret) {
+> > +               pr_err("%s: failed to get clock rate %d\n",
+> > +                       clk_hw_get_name(hw), ret);
+> > +               return 0;
+> > +       }
+> > +
+> > +       return val ? parent_rate / 2 : parent_rate;
 > 
-> we dont use this log in kernel. I do not see s-o-b by Shivah, that
-> should be added. I think he should be author and you need to list
-> changes you did..
+> I hope parent_rate can't be zero here.
 > 
+
+It can be zero, I guess.
+But zero seems safe to me, am I wrong?
+
+> > +}
+> > +
+> > +/*
+> > + * clk_divider_scu_round_rate - Round clock rate for a SCU clock
+> > + * @hw: clock to round rate for
+> > + * @rate: rate to round
+> > + * @parent_rate: parent rate provided by common clock framework
+> > + *
+> > + * Round clock rate for a SCU clock according to parent rate  */
+> > +static long clk_divider_gpr_scu_round_rate(struct clk_hw *hw, unsigned
+> long rate,
+> > +                                          unsigned long *prate) {
+> > +       if (rate < *prate)
+> > +               rate = *prate / 2;
+> > +       else
+> > +               rate = *prate;
+> > +
+> > +       return rate;
+> > +}
+> > +
+> > +/*
+> > + * clk_divider_scu_set_rate - Set rate for a SCU clock
+> > + * @hw: clock to change rate for
+> > + * @rate: target rate for the clock
+> > + * @parent_rate: rate of the clock parent
+> > + *
+> > + * Sets a clock frequency for a SCU clock. Returns the SCU
+> > + * protocol status.
+> > + */
+> > +static int clk_divider_gpr_scu_set_rate(struct clk_hw *hw, unsigned long
+> rate,
+> > +                                       unsigned long parent_rate) {
+> > +       struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
+> > +       uint32_t val;
+> > +
+> > +       val = (rate < parent_rate) ? 1 : 0;
+> 
+> Nitpick: Write it out as
+> 
+> 	val = 0;
+> 	if (rate < parent_rate)
+> 		val = 1;
+> 
+
+Good suggestion
+
+> > +
+> > +       return imx_sc_misc_set_control(ccm_ipc_handle, clk->rsrc_id,
+> > +                                      clk->gpr_id, val); }
+> > +
+> > +static const struct clk_ops clk_divider_gpr_scu_ops = {
+> > +       .recalc_rate = clk_divider_gpr_scu_recalc_rate,
+> > +       .round_rate = clk_divider_gpr_scu_round_rate,
+> > +       .set_rate = clk_divider_gpr_scu_set_rate, };
+> > +
+> > +struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char
+> *parent_name,
+> > +                                      u32 rsrc_id, u8 gpr_id) {
+> > +       struct clk_divider_gpr_scu *div;
+> > +       struct clk_init_data init;
+> > +       struct clk_hw *hw;
+> > +       int ret;
+> > +
+> > +       div = kzalloc(sizeof(*div), GFP_KERNEL);
+> > +       if (!div)
+> > +               return ERR_PTR(-ENOMEM);
+> > +
+> > +       div->rsrc_id = rsrc_id;
+> > +       div->gpr_id = gpr_id;
+> > +
+> > +       init.name = name;
+> > +       init.ops = &clk_divider_gpr_scu_ops;
+> > +       init.flags = CLK_GET_RATE_NOCACHE;
+> 
+> Same NOCACHE comment.
+> 
+
+Replied in another mail.
+
+Regards
+Dong Aisheng
+
+> > +       init.parent_names = parent_name ? &parent_name : NULL;
+> > +       init.num_parents = parent_name ? 1 : 0;
+> > +
+> > +       div->hw.init = &init;
+> > +
+> > +       hw = &div->hw;
+> > +       ret = clk_hw_register(NULL, hw);
+> > +       if (ret) {
+> > +               kfree(div);
+> > +               hw = ERR_PTR(ret);
+> > +       }
+> > +
+> > +       return hw;
+> > +}
