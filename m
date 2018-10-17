@@ -1,85 +1,164 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 17 Oct 2018 21:32:10 +1100
-Subject: Crash on FSL Book3E due to pte_pgprot()? (was Re: [PATCH v3
- 12/24] powerpc/mm: use pte helpers in generic code)
-In-Reply-To: <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
-References: <cover.1539092111.git.christophe.leroy@c-s.fr>
- <343c844bbc5081d13ee4c9aa27ff3118f607e1cc.1539092112.git.christophe.leroy@c-s.fr>
- <87va61jsma.fsf@concordia.ellerman.id.au>
- <236d72cd-e6d7-61e5-2c80-e4311e41b4f6@c-s.fr>
-Message-ID: <87efcoeudx.fsf@concordia.ellerman.id.au>
+From: pankaj.bansal@nxp.com (Pankaj Bansal)
+Date: Wed, 17 Oct 2018 10:32:45 +0000
+Subject: [PATCH v3] arm64: dts: add LX2160AQDS board support
+In-Reply-To: <20181005081053.27105-1-pankaj.bansal@nxp.com>
+References: <20181005081053.27105-1-pankaj.bansal@nxp.com>
+Message-ID: <20181017160430.22381-1-pankaj.bansal@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christophe Leroy <christophe.leroy@c-s.fr> writes:
-> On 10/17/2018 12:59 AM, Michael Ellerman wrote:
-...
->> The question is what's the right way to fix it? Should pte_pgprot() not
->> be filtering those bits out on book3e?
->
-> I think we should not use pte_pggrot() for that then. What about the 
-> below fix ?
+The LX2160A QorIQ Development System (QDS) is a test, evaluation, and
+development platform, supporting QorIQ LX2160A processor.
 
-Thanks, that almost works.
+Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+---
 
-pte_mkprivileged() also needs to not strip _PAGE_BAP_SR.
+Notes:
+    V3:
+     - Updated temperature sensor regulator name in board device tree
+     - Added esdhc controller nodes in board device tree
+     - Added aliases for uart/crypto nodes
+    V2:
+     - Sorted the nodes alphabetically
+     - Sorted the files' in Makefile alphabetically
+     - Added newline between property list and sub nodes
+     - Added and defined vcc-supply property to temperature sensor node in  device tree
+    
+    This patch is dependent on below patches
+     [1] https://lore.kernel.org/patchwork/project/lkml/list/?series=369563
 
+ arch/arm64/boot/dts/freescale/Makefile       |   1 +
+ .../boot/dts/freescale/fsl-lx2160a-qds.dts   | 112 +++++++++++++++++
+ 2 files changed, 113 insertions(+)
 
-But there's also a use of pte_pgprot() in mm/memory.c, and I think that
-is also broken now that we don't add PAGE_KERNEL back in.
-
-Aneesh is going to do a patch to make pte_pgprot() only mask the PFN
-which is what other arches do.
-
-cheers
-
-> From: Christophe Leroy <christophe.leroy@c-s.fr>
-> Date: Wed, 17 Oct 2018 05:56:25 +0000
-> Subject: [PATCH] powerpc/mm: don't use pte_pgprot() in ioremap_prot()
->
-> pte_pgprot() filters out some required flags like _PAGE_PRESENT.
->
-> This patch replaces pte_pgprot() by __pgprot(pte_val())
-> in ioremap_prot()
->
-> Fixes: 26973fa5ac0e ("powerpc/mm: use pte helpers in generic code")
-> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
-> ---
->   arch/powerpc/mm/pgtable_32.c | 3 ++-
->   arch/powerpc/mm/pgtable_64.c | 4 ++--
->   2 files changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
-> index 5877f5aa8f5d..a606e2f4937b 100644
-> --- a/arch/powerpc/mm/pgtable_32.c
-> +++ b/arch/powerpc/mm/pgtable_32.c
-> @@ -122,7 +122,8 @@ ioremap_prot(phys_addr_t addr, unsigned long size, 
-> unsigned long flags)
->   	pte = pte_exprotect(pte);
->   	pte = pte_mkprivileged(pte);
->
-> -	return __ioremap_caller(addr, size, pte_pgprot(pte), 
-> __builtin_return_address(0));
-> +	return __ioremap_caller(addr, size, __pgprot(pte_val(pte)),
-> +				__builtin_return_address(0));
->   }
->   EXPORT_SYMBOL(ioremap_prot);
->
-> diff --git a/arch/powerpc/mm/pgtable_64.c b/arch/powerpc/mm/pgtable_64.c
-> index fb1375c07e8c..836bf436cabb 100644
-> --- a/arch/powerpc/mm/pgtable_64.c
-> +++ b/arch/powerpc/mm/pgtable_64.c
-> @@ -245,8 +245,8 @@ void __iomem * ioremap_prot(phys_addr_t addr, 
-> unsigned long size,
->   	pte = pte_mkprivileged(pte);
->
->   	if (ppc_md.ioremap)
-> -		return ppc_md.ioremap(addr, size, pte_pgprot(pte), caller);
-> -	return __ioremap_caller(addr, size, pte_pgprot(pte), caller);
-> +		return ppc_md.ioremap(addr, size, __pgprot(pte_val(pte)), caller);
-> +	return __ioremap_caller(addr, size, __pgprot(pte_val(pte)), caller);
->   }
->
->
-> -- 
-> 2.13.3
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 445b72bd5a36..46b1479b7a6b 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -13,4 +13,5 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+new file mode 100644
+index 000000000000..99a22abbe725
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+@@ -0,0 +1,112 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++//
++// Device Tree file for LX2160AQDS
++//
++// Copyright 2018 NXP
++
++/dts-v1/;
++
++#include "fsl-lx2160a.dtsi"
++
++/ {
++	model = "NXP Layerscape LX2160AQDS";
++	compatible = "fsl,lx2160a-qds", "fsl,lx2160a";
++
++	aliases {
++		crypto = &crypto;
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	sb_3v3: regulator-sb3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "MC34717-3.3VSB";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
++&crypto {
++	status = "okay";
++};
++
++&esdhc0 {
++	status = "okay";
++};
++
++&esdhc1 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	i2c-mux at 77 {
++		compatible = "nxp,pca9547";
++		reg = <0x77>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x2>;
++
++			power-monitor at 40 {
++				compatible = "ti,ina220";
++				reg = <0x40>;
++				shunt-resistor = <500>;
++			};
++
++			power-monitor at 41 {
++				compatible = "ti,ina220";
++				reg = <0x41>;
++				shunt-resistor = <1000>;
++			};
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x3>;
++
++			temperature-sensor at 4c {
++				compatible = "nxp,sa56004";
++				reg = <0x4c>;
++				vcc-supply = <&sb_3v3>;
++			};
++
++			temperature-sensor at 4d {
++				compatible = "nxp,sa56004";
++				reg = <0x4d>;
++				vcc-supply = <&sb_3v3>;
++			};
++
++			rtc at 51 {
++				compatible = "nxp,pcf2129";
++				reg = <0x51>;
++			};
++		};
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
+-- 
+2.17.1
