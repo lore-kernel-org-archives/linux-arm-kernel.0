@@ -1,45 +1,102 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 17 Oct 2018 15:54:40 +0200
-Subject: Clock configuration for the SAMA5D2 NAND controller
-In-Reply-To: <CAGkQfmNdp+Si9FseRjjRG4r272kRtu=7MqwHD6OUoRKCinXO-g@mail.gmail.com>
-References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
- <20181017143849.1240d9bb@bbrezillon>
- <CAGkQfmOOv41vwYtt3rjgC6SmXOkAdASvjWt+YWAksGo-4HqvpQ@mail.gmail.com>
- <20181017150344.40d687d1@bbrezillon>
- <CAGkQfmNdp+Si9FseRjjRG4r272kRtu=7MqwHD6OUoRKCinXO-g@mail.gmail.com>
-Message-ID: <20181017155440.10d34743@bbrezillon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 17 Oct 2018 14:56:07 +0100
+Subject: [PATCH v5 2/2] iommu/arm-smmu-v3: Reunify arm_smmu_cmdq_issue_sync()
+In-Reply-To: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+Message-ID: <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018 15:36:17 +0200
-Romain Izard <romain.izard.pro@gmail.com> wrote:
+Now that both sync methods are more or less the same shape, we can save
+some code and levels of indirection by rolling them up together again,
+with just a couple of simple conditionals to discriminate the MSI and
+queue-polling specifics.
 
-> Le mer. 17 oct. 2018 ? 15:03, Boris Brezillon <boris.brezillon@bootlin.com>
-> a ?crit :
-> >
-> > On Wed, 17 Oct 2018 14:49:27 +0200 Romain Izard
-> > <romain.izard.pro@gmail.com> wrote:
-> >  
-> > > Le mer. 17 oct. 2018 ? 14:38, Boris Brezillon
-> > > <boris.brezillon@bootlin.com> a ?crit :  
-> > > >  
-> [...]
-> > > >
-> > > > Is it 2 times slower or 2 times faster with the new approach? Is the
-> > > > new calculation providing a working solution, or do you have data
-> > > > corruption because of that? Is your NAND ONFI compliant?
-> > > >  
-> > > - The number of clock cycles for each configured timing is larger, so
-> > > the access times are slower.  
-> >
-> > Okay. When calculating the timings by hand, what was reference freq you
-> > used? Did you compare it to the clk freq we have when the NAND controller
-> > driver tweaks the timings?
-> >  
-> I know that I did the calculations with a 83 MHz clock, but that the kernel
-> code used a 166 MHz clock instead. The only question is to know whether it
-> is me or the existing code that is right.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 49 +++++++++----------------------------
+ 1 file changed, 12 insertions(+), 37 deletions(-)
 
-Actually, if you have a test point on the RE pin, there's an easy way
-to know who's right: check the freq on RE and compare it to what you
-expect it to be.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index da8a91d116bf..36db63e3afcf 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -933,7 +933,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+  * The difference between val and sync_idx is bounded by the maximum size of
+  * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe arithmetic.
+  */
+-static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
++static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+ {
+ 	ktime_t timeout;
+ 	u32 val;
+@@ -988,16 +988,17 @@ static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
+ 	return -ETIMEDOUT;
+ }
+ 
+-static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
++static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+ {
+ 	u64 cmd[CMDQ_ENT_DWORDS];
+ 	unsigned long flags;
+-	struct arm_smmu_cmdq_ent ent = {
+-		.opcode = CMDQ_OP_CMD_SYNC,
+-		.sync	= {
+-			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
+-		},
+-	};
++	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
++		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
++	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
++	int ret, sync_idx, sync_gen;
++
++	if (msi)
++		ent.sync.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count));
+ 
+ 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+ 
+@@ -1009,39 +1010,13 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+ 		arm_smmu_cmdq_build_cmd(cmd, &ent);
+ 		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+ 	}
+-
+-	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+-
+-	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+-}
+-
+-static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+-{
+-	u64 cmd[CMDQ_ENT_DWORDS];
+-	unsigned long flags;
+-	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+-	int sync_idx, sync_gen;
+-
+-	arm_smmu_cmdq_build_cmd(cmd, &ent);
+-
+-	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+-	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
+-		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+ 	sync_idx = smmu->cmdq.q.prod;
+ 	sync_gen = READ_ONCE(smmu->cmdq_generation);
++
+ 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+ 
+-	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+-}
+-
+-static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+-{
+-	int ret;
+-	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+-		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+-
+-	ret = msi ? __arm_smmu_cmdq_issue_sync_msi(smmu)
+-		  : __arm_smmu_cmdq_issue_sync(smmu);
++	ret = msi ? arm_smmu_sync_poll_msi(smmu, ent.sync.msidata)
++		  : arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+ 	if (ret)
+ 		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
+ }
+-- 
+2.19.1.dirty
