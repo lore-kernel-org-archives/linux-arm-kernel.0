@@ -1,22 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 17 Oct 2018 14:33:46 -0500
-Subject: [PATCH 06/11] dt-bindings: spi/spi-pxa2xx: Add spi-slave property
-In-Reply-To: <20181010170936.316862-7-lkundrak@v3.sk>
-References: <20181010170936.316862-1-lkundrak@v3.sk>
- <20181010170936.316862-7-lkundrak@v3.sk>
-Message-ID: <20181017193346.GB8853@bogus>
+Date: Wed, 17 Oct 2018 14:38:12 -0500
+Subject: [PATCH 03/15] dt-bindings: olpc,xo1.75-ec: Add OLPC XO-1.75 EC
+ bindings
+In-Reply-To: <20181010172300.317643-4-lkundrak@v3.sk>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-4-lkundrak@v3.sk>
+Message-ID: <20181017193812.GA11939@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 07:09:31PM +0200, Lubomir Rintel wrote:
-> This is used to indicate that the chip attached to this controller is a SPI
-> master.
+On Wed, Oct 10, 2018 at 07:22:48PM +0200, Lubomir Rintel wrote:
+> The OLPC XO-1.75 Embedded Controller is a SPI master that uses extra
+> signals for handshaking. It needs to know when is the slave (Linux)
+> side's TX FIFO ready for transfer (the ready-gpio signal on the SPI
+> controller node) and when does it wish to respond with a command (the
+> cmd-gpio property).
 > 
 > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 > ---
->  Documentation/devicetree/bindings/spi/spi-pxa2xx.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  .../bindings/misc/olpc,xo1.75-ec.txt          | 24 +++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt b/Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt
+> new file mode 100644
+> index 000000000000..14385fee65d2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt
+> @@ -0,0 +1,24 @@
+> +OLPC XO-1.75 Embedded Controller
+> +
+> +Required properties:
+> +- compatible: Should be "olpc,xo1.75-ec".
+> +- cmd-gpio: gpio specifier of the CMD pin
 
-This could be rolled into patch 1. Either way,
+cmd-gpios
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+> +
+> +The embedded controller requires the SPI controller driver to signal readiness
+> +to receive a transfer (that is, when TX FIFO contains the response data) by
+> +strobing the ACK pin with the ready signal. See the "ready-gpio" property of the
+
+This will need updating based on the SPI binding.
+
+> +SSP binding as documented in:
+> +<Documentation/devicetree/bindings/spi/spi-pxa2xx.txt>.
+> +
+> +Example:
+> +	&ssp3 {
+> +		spi-slave;
+> +		status = "okay";
+
+Don't show status in examples.
+
+> +		ready-gpio = <&gpio 125 GPIO_ACTIVE_HIGH>;
+> +
+> +		slave {
+> +			compatible = "olpc,xo1.75-ec";
+> +			spi-cpha;
+> +			cmd-gpio = <&gpio 155 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> -- 
+> 2.19.0
+> 
