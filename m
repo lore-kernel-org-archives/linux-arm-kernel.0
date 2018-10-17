@@ -1,48 +1,71 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 08:39:26 -0700
-Subject: [PATCH v13 2/8] clk: qcom: Make clk_alpha_pll_configure available
- to modules
-In-Reply-To: <20180614215358.11264-3-ilia.lin@gmail.com>
+Date: Wed, 17 Oct 2018 08:41:18 -0700
+Subject: [PATCH v13 3/8] clk: Use devm_ in the register fixed factor clock
+In-Reply-To: <20181014202122.GA13473@centauri.lan>
 References: <20180614215358.11264-1-ilia.lin@gmail.com>
- <20180614215358.11264-3-ilia.lin@gmail.com>
-Message-ID: <153979076609.5275.11289929616133786271@swboyd.mtv.corp.google.com>
+ <20180614215358.11264-4-ilia.lin@gmail.com>
+ <CAHYQr0rR=mcV-SxZFW+5M4CTUaTv_f_bruyq91HiGP6sqUZ3Yw@mail.gmail.com>
+ <153938209728.5275.8811599608746761178@swboyd.mtv.corp.google.com>
+ <20181014202122.GA13473@centauri.lan>
+Message-ID: <153979087829.5275.6249138489771592939@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting ilia.lin at gmail.com (2018-06-14 14:53:49)
-> From: Rajendra Nayak <rnayak@codeaurora.org>
+Quoting Niklas Cassel (2018-10-14 13:21:22)
+> On Fri, Oct 12, 2018 at 03:08:17PM -0700, Stephen Boyd wrote:
+> > Quoting Ricardo Salveti (2018-09-14 11:53:02)
+> > > On Thu, Jun 14, 2018 at 6:55 PM <ilia.lin@gmail.com> wrote:
+> > > >
+> > > > From: Ilia Lin <ilialin@codeaurora.org>
+> > > >
+> > > > Use devm_clk_hw_register instead of clk_hw_register
+> > > > to simplify the usage of this API. This way drivers that call
+> > > > the clk_hw_register_fixed_factor won't need to maintain
+> > > > a data structure for further cleanup.
+> > > >
+> > > > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> > > > Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
+> > > > ---
+> > > >  drivers/clk/clk-fixed-factor.c | 2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > >
+> > > > diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> > > > index a5d402de5584..8e39bda8e596 100644
+> > > > --- a/drivers/clk/clk-fixed-factor.c
+> > > > +++ b/drivers/clk/clk-fixed-factor.c
+> > > > @@ -94,7 +94,7 @@ struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
+> > > >         init.num_parents = 1;
+> > > >
+> > > >         hw = &fix->hw;
+> > > > -       ret = clk_hw_register(dev, hw);
+> > > > +       ret = devm_clk_hw_register(dev, hw);
+> > > 
+> > > Not sure what is the current state of this patch-set, but this change
+> > > breaks drivers calling clk_hw_register_fixed_factor with a NULL dev
+> > > (e.g. imx_clk_fixed_factor), as devm_clk_hw_register needs a valid dev
+> > > for devres_add to work.
+> > > 
+> > 
+> > Yep. Probably better to just have a driver register the clk_hw structure
+> > itself with the clk framework vs. trying to get it right here in the
+> > generic type registration function.
+> > 
 > 
-> Allow clk_alpha_pll_configure to be called from loadable
-> kernel modules.
+> Hello Ilia, Stephen,
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
+> As you know this patch series is needed to get DVFS working on msm8996.
+> 
+> Ilia, are you planning on submitting a new patch set for this, or would
+> you prefer if we submitted a new patch version for you?
+> 
+> Looking at this patch series, this appears to be the only outstanding
+> review comment.
 
-Oh I think this one came via another patch series. Either way, keep
-resending this along with everything else to make kbuild happy.
+Sorry, you were too hopeful :/
 
->  drivers/clk/qcom/clk-alpha-pll.c | 1 +
->  1 file changed, 1 insertion(+)
+> Stephen, do you have any review comments on this series?
 > 
-> diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
-> index 3c49a60072f1..a43f80ac94a4 100644
-> --- a/drivers/clk/qcom/clk-alpha-pll.c
-> +++ b/drivers/clk/qcom/clk-alpha-pll.c
-> @@ -228,6 +228,7 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
->         if (pll->flags & SUPPORTS_FSM_MODE)
->                 qcom_pll_set_fsm_mode(regmap, PLL_MODE(pll), 6, 0);
->  }
-> +EXPORT_SYMBOL_GPL(clk_alpha_pll_configure);
->  
->  static int clk_alpha_pll_hwfsm_enable(struct clk_hw *hw)
->  {
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Yes, my nitpick should be easy to resolve and then it's just a few open
+questions after that. Otherwise things seem fine and the CPU can run
+really fast without bumping up the voltages?
