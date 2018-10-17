@@ -1,17 +1,221 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 10:50:12 -0700
-Subject: [PATCH v2 13/22] clk: at91: add at91sam9x5 PMCs driver
-In-Reply-To: <20181016142200.19741-14-alexandre.belloni@bootlin.com>
-References: <20181016142200.19741-1-alexandre.belloni@bootlin.com>
- <20181016142200.19741-14-alexandre.belloni@bootlin.com>
-Message-ID: <153979861221.5275.17316275955366531183@swboyd.mtv.corp.google.com>
+Date: Wed, 17 Oct 2018 11:02:15 -0700
+Subject: [PATCH v11 4/5] clk: imx: add imx composite clock
+In-Reply-To: <1539157520-25081-5-git-send-email-abel.vesa@nxp.com>
+References: <1539157520-25081-1-git-send-email-abel.vesa@nxp.com>
+ <1539157520-25081-5-git-send-email-abel.vesa@nxp.com>
+Message-ID: <153979933548.5275.10155260505209370069@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandre Belloni (2018-10-16 07:21:51)
-> Add a driver for the PMC clocks of the at91sam9x5 SoCs
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> ---
+Quoting Abel Vesa (2018-10-10 00:45:19)
+> diff --git a/drivers/clk/imx/clk-composite-8m.c b/drivers/clk/imx/clk-composite-8m.c
+> new file mode 100644
+> index 0000000..e214812
+> --- /dev/null
+> +++ b/drivers/clk/imx/clk-composite-8m.c
+> @@ -0,0 +1,181 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright 2018 NXP
+> + */
+> +
+> +#include <linux/errno.h>
+> +#include <linux/slab.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk.h>
 
-Applied to clk-next
+Is this include used? Same comment applies to all the building block
+patches in this series.
+
+> +
+> +#include "clk.h"
+> +
+> +#define PCG_PREDIV_SHIFT       16
+> +#define PCG_PREDIV_WIDTH       3
+> +#define PCG_PREDIV_MAX         8
+> +
+> +#define PCG_DIV_SHIFT          0
+> +#define PCG_DIV_WIDTH          6
+> +#define PCG_DIV_MAX            64
+> +
+> +#define PCG_PCS_SHIFT          24
+> +#define PCG_PCS_MASK           0x7
+> +
+> +#define PCG_CGC_SHIFT          28
+> +
+> +static unsigned long imx8m_clk_composite_divider_recalc_rate(struct clk_hw *hw,
+> +                                               unsigned long parent_rate)
+> +{
+> +       struct clk_divider *divider = to_clk_divider(hw);
+> +       unsigned long prediv_rate;
+> +       unsigned int prediv_value;
+> +       unsigned int div_value;
+> +
+> +       prediv_value = clk_readl(divider->reg) >> divider->shift;
+> +       prediv_value &= clk_div_mask(divider->width);
+> +
+> +       prediv_rate = divider_recalc_rate(hw, parent_rate, prediv_value,
+> +                                               NULL, divider->flags,
+> +                                               divider->width);
+> +
+> +       div_value = clk_readl(divider->reg) >> PCG_DIV_SHIFT;
+> +       div_value &= clk_div_mask(PCG_DIV_WIDTH);
+> +
+> +       return divider_recalc_rate(hw, prediv_rate, div_value, NULL,
+> +                                  divider->flags, PCG_DIV_WIDTH);
+> +}
+> +
+> +static int imx8m_clk_composite_compute_dividers(unsigned long rate,
+> +                                               unsigned long parent_rate,
+> +                                               int *prediv, int *postdiv)
+> +{
+> +       int div1, div2;
+> +       int error = INT_MAX;
+> +       int ret = -EINVAL;
+> +
+> +       /* default values */
+
+Nitpick alert: Useless comment?
+
+> +       *prediv = 1;
+> +       *postdiv = 1;
+> +
+> +       for (div1 = 1; div1 <= PCG_PREDIV_MAX; div1++) {
+> +               for (div2 = 1; div2 <= PCG_DIV_MAX; div2++) {
+> +                       int new_error = ((parent_rate / div1) / div2) - rate;
+> +
+> +                       if (abs(new_error) < abs(error)) {
+> +                               *prediv = div1;
+> +                               *postdiv = div2;
+> +                               error = new_error;
+> +                               ret = 0;
+> +                       }
+> +               }
+> +       }
+> +       return ret;
+> +}
+> +
+> +static long imx8m_clk_composite_divider_round_rate(struct clk_hw *hw,
+> +                                               unsigned long rate,
+> +                                               unsigned long *prate)
+> +{
+> +       int prediv_value;
+> +       int div_value;
+> +
+> +       imx8m_clk_composite_compute_dividers(rate, *prate,
+> +                                               &prediv_value, &div_value);
+> +
+> +       rate = DIV_ROUND_UP(*prate, prediv_value);
+> +       rate = DIV_ROUND_UP(rate, div_value);
+> +
+> +       return rate;
+
+So just 
+
+	return DIV_ROUND_UP(rate, div_value);
+
+> +}
+> +
+> +static int imx8m_clk_composite_divider_set_rate(struct clk_hw *hw,
+> +                                       unsigned long rate,
+> +                                       unsigned long parent_rate)
+> +{
+> +       struct clk_divider *divider = to_clk_divider(hw);
+> +       unsigned long flags = 0;
+> +       int prediv_value;
+> +       int div_value;
+> +       int ret = 0;
+> +       u32 val;
+> +
+> +       ret = imx8m_clk_composite_compute_dividers(rate, parent_rate,
+> +                                               &prediv_value, &div_value);
+> +       if (ret)
+> +               return -EINVAL;
+> +
+> +       spin_lock_irqsave(divider->lock, flags);
+> +
+> +       val = clk_readl(divider->reg);
+> +       val &= ~((clk_div_mask(divider->width) << divider->shift) |
+> +                       (clk_div_mask(PCG_DIV_WIDTH) << PCG_DIV_SHIFT));
+> +
+> +       val |= (u32)(prediv_value  - 1) << divider->shift;
+> +       val |= (u32)(div_value - 1) << PCG_DIV_SHIFT;
+> +       clk_writel(val, divider->reg);
+
+Please don't use clk_readl and clk_writel() unless you absolutely must
+do so.
+
+> +
+> +       spin_unlock_irqrestore(divider->lock, flags);
+> +
+> +       return ret;
+> +}
+> +
+> +static const struct clk_ops imx8m_clk_composite_divider_ops = {
+> +       .recalc_rate = imx8m_clk_composite_divider_recalc_rate,
+> +       .round_rate = imx8m_clk_composite_divider_round_rate,
+> +       .set_rate = imx8m_clk_composite_divider_set_rate,
+> +};
+> +
+> +struct clk *imx8m_clk_composite_flags(const char *name,
+> +                                       const char **parent_names,
+> +                                       int num_parents, void __iomem *reg,
+> +                                       unsigned long flags)
+> +{
+> +       struct clk_hw *mux_hw = NULL, *div_hw = NULL, *gate_hw = NULL;
+> +       struct clk_divider *div = NULL;
+> +       struct clk_gate *gate = NULL;
+> +       struct clk_mux *mux = NULL;
+> +       struct clk *clk = ERR_PTR(-ENOMEM);
+> +
+> +       mux = kzalloc(sizeof(*mux), GFP_KERNEL);
+> +       if (!mux)
+> +               goto fail;
+> +
+> +       mux_hw = &mux->hw;
+> +       mux->reg = reg;
+> +       mux->shift = PCG_PCS_SHIFT;
+> +       mux->mask = PCG_PCS_MASK;
+> +
+> +       div = kzalloc(sizeof(*div), GFP_KERNEL);
+> +       if (!div)
+> +               goto fail;
+> +
+> +       div_hw = &div->hw;
+> +       div->reg = reg;
+> +       div->shift = PCG_PREDIV_SHIFT;
+> +       div->width = PCG_PREDIV_WIDTH;
+> +       div->lock = &imx_ccm_lock;
+> +       div->flags = CLK_DIVIDER_ROUND_CLOSEST;
+> +
+> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> +       if (!gate)
+> +               goto fail;
+> +
+> +       gate_hw = &gate->hw;
+> +       gate->reg = reg;
+> +       gate->bit_idx = PCG_CGC_SHIFT;
+> +
+> +       clk = clk_register_composite(NULL, name, parent_names, num_parents,
+> +                                       mux_hw, &clk_mux_ops, div_hw,
+> +                                       &imx8m_clk_composite_divider_ops,
+> +                                       gate_hw, &clk_gate_ops, flags);
+
+Can new imx driver code start using the clk_hw based registration
+functions? If it's too hard to fix all call-sites, it's fine to pull the
+struct clk pointer out of the hw structure and return that for now, but
+eventually I'd like to get rid of clk based registration APIs. It's an
+ongoing saga.
+
+> +       if (IS_ERR(clk))
+> +               goto fail;
+> +
+> +       return clk;
+> +
+> +fail:
+> +       kfree(gate);
+> +       kfree(div);
+> +       kfree(mux);
+> +       return clk;
+> +}
