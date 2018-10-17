@@ -1,97 +1,200 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 17 Oct 2018 13:11:08 +0530
-Subject: [PATCH v2 15/21] PCI: keystone: Cleanup outbound window configuration
+Date: Wed, 17 Oct 2018 13:11:04 +0530
+Subject: [PATCH v2 11/21] PCI: keystone: Cleanup PHY handling
 In-Reply-To: <20181017074114.28239-1-kishon@ti.com>
 References: <20181017074114.28239-1-kishon@ti.com>
-Message-ID: <20181017074114.28239-16-kishon@ti.com>
+Message-ID: <20181017074114.28239-12-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Outbound translation window is configured in order to access the
-PCIe card's MEM space. Cleanup outbound translation configuration
-here by using BIT() macros, adding a macro for window size and
-using lower_32_bits/upper_32_bits macros for configuring the 64 bit
-offset in the outbound translation region.
+Cleanup PHY handling by using devm_phy_optional_get to get PHYs if
+the PHYs are optional, creating a device link between the PHY device
+and the controller device and disable PHY on error cases here.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 32 ++++++++++++-----------
- 1 file changed, 17 insertions(+), 15 deletions(-)
+ drivers/pci/controller/dwc/pci-keystone.c | 122 +++++++++++++++++++---
+ 1 file changed, 106 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index 608e40c4b991..3576a184b9eb 100644
+index e22328f89c84..5ae73c185c99 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -41,7 +41,7 @@
- #define LTSSM_STATE_MASK		0x1f
- #define LTSSM_STATE_L0			0x11
- #define DBI_CS2_EN_VAL			0x20
--#define OB_XLAT_EN_VAL		        2
-+#define OB_XLAT_EN_VAL		        BIT(1)
+@@ -105,6 +105,9 @@ struct keystone_pcie {
  
- /* Application registers */
- #define CMD_STATUS			0x004
-@@ -53,10 +53,11 @@
- #define CFG_TYPE1			BIT(24)
+ 	int			num_msi_host_irqs;
+ 	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
++	int			num_lanes;
++	struct phy		**phy;
++	struct device_link	**link;
+ 	struct			device_node *msi_intc_np;
+ 	struct irq_domain	*legacy_irq_domain;
+ 	struct device_node	*np;
+@@ -880,22 +883,57 @@ static const struct dw_pcie_ops ks_pcie_dw_pcie_ops = {
+ 	.link_up = ks_pcie_link_up,
+ };
  
- #define OB_SIZE				0x030
--#define CFG_PCIM_WIN_SZ_IDX		3
- #define SPACE0_REMOTE_CFG_OFFSET	0x1000
- #define OB_OFFSET_INDEX(n)		(0x200 + (8 * (n)))
- #define OB_OFFSET_HI(n)			(0x204 + (8 * (n)))
-+#define OB_ENABLEN			BIT(0)
-+#define OB_WIN_SIZE			8	/* 8MB */
- 
- /* IRQ register defines */
- #define IRQ_EOI				0x050
-@@ -341,12 +342,13 @@ static void ks_pcie_clear_dbi_mode(struct keystone_pcie *ks_pcie)
- 
- static void ks_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
+-static int __exit ks_pcie_remove(struct platform_device *pdev)
++static void ks_pcie_disable_phy(struct keystone_pcie *ks_pcie)
  {
-+	u32 val;
- 	u32 num_viewport = ks_pcie->num_viewport;
- 	struct dw_pcie *pci = ks_pcie->pci;
- 	struct pcie_port *pp = &pci->pp;
--	u32 start = pp->mem->start, end = pp->mem->end;
--	int i, tr_size;
--	u32 val;
-+	u64 start = pp->mem->start;
-+	u64 end = pp->mem->end;
+-	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
++	int num_lanes = ks_pcie->num_lanes;
+ 
+-	clk_disable_unprepare(ks_pcie->clk);
++	while (num_lanes--) {
++		phy_power_off(ks_pcie->phy[num_lanes]);
++		phy_exit(ks_pcie->phy[num_lanes]);
++	}
++}
++
++static int ks_pcie_enable_phy(struct keystone_pcie *ks_pcie)
++{
 +	int i;
++	int ret;
++	int num_lanes = ks_pcie->num_lanes;
++
++	for (i = 0; i < num_lanes; i++) {
++		ret = phy_init(ks_pcie->phy[i]);
++		if (ret < 0)
++			goto err_phy;
++
++		ret = phy_power_on(ks_pcie->phy[i]);
++		if (ret < 0) {
++			phy_exit(ks_pcie->phy[i]);
++			goto err_phy;
++		}
++	}
  
- 	/* Disable BARs for inbound access */
- 	ks_pcie_set_dbi_mode(ks_pcie);
-@@ -354,21 +356,21 @@ static void ks_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
- 	dw_pcie_writel_dbi(pci, PCI_BASE_ADDRESS_1, 0);
- 	ks_pcie_clear_dbi_mode(ks_pcie);
- 
--	/* Set outbound translation size per window division */
--	ks_pcie_app_writel(ks_pcie, OB_SIZE, CFG_PCIM_WIN_SZ_IDX & 0x7);
--
--	tr_size = (1 << (CFG_PCIM_WIN_SZ_IDX & 0x7)) * SZ_1M;
-+	val = ilog2(OB_WIN_SIZE);
-+	ks_pcie_app_writel(ks_pcie, OB_SIZE, val);
- 
- 	/* Using Direct 1:1 mapping of RC <-> PCI memory space */
--	for (i = 0; (i < num_viewport) && (start < end); i++) {
--		ks_pcie_app_writel(ks_pcie, OB_OFFSET_INDEX(i), start | 1);
--		ks_pcie_app_writel(ks_pcie, OB_OFFSET_HI(i), 0);
--		start += tr_size;
-+	for (i = 0; i < num_viewport && (start < end); i++) {
-+		ks_pcie_app_writel(ks_pcie, OB_OFFSET_INDEX(i),
-+				   lower_32_bits(start) | OB_ENABLEN);
-+		ks_pcie_app_writel(ks_pcie, OB_OFFSET_HI(i),
-+				   upper_32_bits(start));
-+		start += OB_WIN_SIZE;
- 	}
- 
--	/* Enable OB translation */
- 	val = ks_pcie_app_readl(ks_pcie, CMD_STATUS);
--	ks_pcie_app_writel(ks_pcie, CMD_STATUS, OB_XLAT_EN_VAL | val);
-+	val |= OB_XLAT_EN_VAL;
-+	ks_pcie_app_writel(ks_pcie, CMD_STATUS, val);
+ 	return 0;
++
++err_phy:
++	while (--i >= 0) {
++		phy_power_off(ks_pcie->phy[i]);
++		phy_exit(ks_pcie->phy[i]);
++	}
++
++	return ret;
  }
  
- static int ks_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ static int __init ks_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
+ 	struct dw_pcie *pci;
+ 	struct keystone_pcie *ks_pcie;
+-	struct phy *phy;
++	struct device_link **link;
++	struct phy **phy;
++	u32 num_lanes;
++	char name[10];
+ 	int ret;
++	int i;
+ 
+ 	ks_pcie = devm_kzalloc(dev, sizeof(*ks_pcie), GFP_KERNEL);
+ 	if (!ks_pcie)
+@@ -908,29 +946,59 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	pci->dev = dev;
+ 	pci->ops = &ks_pcie_dw_pcie_ops;
+ 
+-	ks_pcie->pci = pci;
++	ret = of_property_read_u32(np, "num-lanes", &num_lanes);
++	if (ret)
++		num_lanes = 1;
+ 
+-	/* initialize SerDes Phy if present */
+-	phy = devm_phy_get(dev, "pcie-phy");
+-	if (PTR_ERR_OR_ZERO(phy) == -EPROBE_DEFER)
+-		return PTR_ERR(phy);
++	phy = devm_kzalloc(dev, sizeof(*phy) * num_lanes, GFP_KERNEL);
++	if (!phy)
++		return -ENOMEM;
+ 
+-	if (!IS_ERR_OR_NULL(phy)) {
+-		ret = phy_init(phy);
+-		if (ret < 0)
+-			return ret;
++	link = devm_kzalloc(dev, sizeof(*link) * num_lanes, GFP_KERNEL);
++	if (!link)
++		return -ENOMEM;
++
++	for (i = 0; i < num_lanes; i++) {
++		snprintf(name, sizeof(name), "pcie-phy%d", i);
++		phy[i] = devm_phy_optional_get(dev, name);
++		if (IS_ERR(phy[i])) {
++			ret = PTR_ERR(phy[i]);
++			goto err_link;
++		}
++
++		if (!phy[i])
++			continue;
++
++		link[i] = device_link_add(dev, &phy[i]->dev, DL_FLAG_STATELESS);
++		if (!link[i]) {
++			ret = -EINVAL;
++			goto err_link;
++		}
++	}
++
++	ks_pcie->np = np;
++	ks_pcie->pci = pci;
++	ks_pcie->link = link;
++	ks_pcie->num_lanes = num_lanes;
++	ks_pcie->phy = phy;
++
++	ret = ks_pcie_enable_phy(ks_pcie);
++	if (ret) {
++		dev_err(dev, "failed to enable phy\n");
++		goto err_link;
+ 	}
+ 
+-	ks_pcie->np = dev->of_node;
+ 	platform_set_drvdata(pdev, ks_pcie);
+ 	ks_pcie->clk = devm_clk_get(dev, "pcie");
+ 	if (IS_ERR(ks_pcie->clk)) {
+ 		dev_err(dev, "Failed to get pcie rc clock\n");
+-		return PTR_ERR(ks_pcie->clk);
++		ret = PTR_ERR(ks_pcie->clk);
++		goto err_phy;
+ 	}
++
+ 	ret = clk_prepare_enable(ks_pcie->clk);
+ 	if (ret)
+-		return ret;
++		goto err_phy;
+ 
+ 	ret = ks_pcie_add_pcie_port(ks_pcie, pdev);
+ 	if (ret < 0)
+@@ -940,9 +1008,31 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ fail_clk:
+ 	clk_disable_unprepare(ks_pcie->clk);
+ 
++err_phy:
++	ks_pcie_disable_phy(ks_pcie);
++
++err_link:
++	while (--i >= 0 && link[i])
++		device_link_del(link[i]);
++
+ 	return ret;
+ }
+ 
++static int __exit ks_pcie_remove(struct platform_device *pdev)
++{
++	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
++	struct device_link **link = ks_pcie->link;
++	int num_lanes = ks_pcie->num_lanes;
++
++	clk_disable_unprepare(ks_pcie->clk);
++	ks_pcie_disable_phy(ks_pcie);
++
++	while (num_lanes--)
++		device_link_del(link[num_lanes]);
++
++	return 0;
++}
++
+ static struct platform_driver ks_pcie_driver __refdata = {
+ 	.probe  = ks_pcie_probe,
+ 	.remove = __exit_p(ks_pcie_remove),
 -- 
 2.17.1
