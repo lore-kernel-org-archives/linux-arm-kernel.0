@@ -1,139 +1,61 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 17 Oct 2018 07:41:55 -0700
-Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown hooks
- into pm_runtime hooks
-In-Reply-To: <20181017074539.b6qeft5oba45dv5r@flea>
-References: <20181016031141.16259-1-anarsoul@gmail.com>
- <20181016071626.m6jkoiixkvxks5ob@flea>
- <CA+E=qVcK7mBbZ-C8FyAxUty_wQ_aOjo1b0+iU4E5CgG=yBCj=g@mail.gmail.com>
- <20181017074539.b6qeft5oba45dv5r@flea>
-Message-ID: <CA+E=qVci2FVMH7O83Xv9ic_WFvFYyxmPDjp309dFi23XiHYzzQ@mail.gmail.com>
+From: Steve.Capper@arm.com (Steve Capper)
+Date: Wed, 17 Oct 2018 14:52:45 +0000
+Subject: [PATCH 3/5] arm64: mm: Copy over arch_get_unmapped_area
+In-Reply-To: <20180907140439.5ji2c2fdxhvzzv32@capper-debian.cambridge.arm.com>
+References: <20180829124543.25314-1-steve.capper@arm.com>
+ <20180829124543.25314-4-steve.capper@arm.com>
+ <0b6b0dba-b8ae-3e8d-68d1-6b93dfb777c0@redhat.com>
+ <20180907140439.5ji2c2fdxhvzzv32@capper-debian.cambridge.arm.com>
+Message-ID: <20181017145235.raigvrlxwherivzp@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 12:45 AM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
->
-> On Tue, Oct 16, 2018 at 08:08:41PM -0700, Vasily Khoruzhick wrote:
-> > On Tue, Oct 16, 2018 at 12:16 AM Maxime Ripard
-> > <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > On Mon, Oct 15, 2018 at 08:11:41PM -0700, Vasily Khoruzhick wrote:
-> > > > startup() and shutdown() hooks are called for both substreams,
-> > > > so stopping either substream when another is running breaks the
-> > > > latter.
-> > > >
-> > > > E.g. playback breaks if capture is stopped when playback is running.
-> > > >
-> > > > Move code from startup() and shutdown() to resume() and suspend()
-> > > > hooks respectively to fix this issue
-> > > >
-> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > ---
-> > > > v2: - rename from "ASoC: sun4i-i2s: don't try to start up
-> > > >                  or shut down DAI if it's active"
-> > > >     - move code from startup/shutdown hooks into pm_runtime
-> > > >
-> > > >  sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
-> > > >  1 file changed, 25 insertions(+), 36 deletions(-)
-> > > >
-> > > > diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-> > > > index a4aa931ebfae..daa6c08cffbc 100644
-> > > > --- a/sound/soc/sunxi/sun4i-i2s.c
-> > > > +++ b/sound/soc/sunxi/sun4i-i2s.c
-> > > > @@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
-> > > >       return 0;
-> > > >  }
-> > > >
-> > > > -static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
-> > > > -                          struct snd_soc_dai *dai)
-> > > > -{
-> > > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> > > > -
-> > > > -     /* Enable the whole hardware block */
-> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > > -                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> > > > -
-> > > > -     /* Enable the first output line */
-> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK,
-> > > > -                        SUN4I_I2S_CTRL_SDO_EN(0));
-> > > > -
-> > > > -
-> > > > -     return clk_prepare_enable(i2s->mod_clk);
-> > > > -}
-> > > > -
-> > > > -static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
-> > > > -                            struct snd_soc_dai *dai)
-> > > > -{
-> > > > -     struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> > > > -
-> > > > -     clk_disable_unprepare(i2s->mod_clk);
-> > > > -
-> > > > -     /* Disable our output lines */
-> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > > -                        SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
-> > > > -
-> > > > -     /* Disable the whole hardware block */
-> > > > -     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > > -                        SUN4I_I2S_CTRL_GL_EN, 0);
-> > > > -}
-> > > > -
-> > > >  static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
-> > > >                               unsigned int freq, int dir)
-> > > >  {
-> > > > @@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
-> > > >       .hw_params      = sun4i_i2s_hw_params,
-> > > >       .set_fmt        = sun4i_i2s_set_fmt,
-> > > >       .set_sysclk     = sun4i_i2s_set_sysclk,
-> > > > -     .shutdown       = sun4i_i2s_shutdown,
-> > > > -     .startup        = sun4i_i2s_startup,
-> > > >       .trigger        = sun4i_i2s_trigger,
-> > > >  };
-> > > >
-> > > > @@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
-> > > >               goto err_disable_clk;
-> > > >       }
-> > > >
-> > > > +     /* Enable the whole hardware block */
-> > > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > > +                        SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
-> > > > +
-> > >
-> > > So this is definitely needed
-> > >
-> > > > +     /* Enable the first output line */
-> > > > +     regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > > +                        SUN4I_I2S_CTRL_SDO_EN_MASK,
-> > > > +                        SUN4I_I2S_CTRL_SDO_EN(0));
-> > > > +
-> > > > +     ret = clk_prepare_enable(i2s->mod_clk);
-> > > > +     if (ret) {
-> > > > +             dev_err(dev, "Failed to enable module clock\n");
-> > > > +             goto err_disable_clk;
-> > > > +     }
-> > >
-> > > But we really don't want to enable the module clock before the
-> > > playback / capture actually starts. And I'm guessing it would make
-> > > more sense to keep the output enable configuration there as well,
-> > > since it's likely that we will have support for it in the future, and
-> > > we'll need additional information from ASoC when we'll do.
+On Fri, Sep 07, 2018 at 03:04:39PM +0100, Steve Capper wrote:
+> On Fri, Sep 07, 2018 at 02:15:32AM -0400, Jon Masters wrote:
+> > On 08/29/2018 08:45 AM, Steve Capper wrote:
+> > 
+> > > In order to support 52-bit VAs for userspace we need to alter the mmap
+> > > area choosing logic to give 52-bit VAs where "high" addresses are
+> > > requested.
+> > 
+> > <snip>
+> > 
+> > > +unsigned long
+> > > +arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+> > > +			  const unsigned long len, const unsigned long pgoff,
+> > > +			  const unsigned long flags)
+> > 
+> > <snip>
+> > 
+> > > +	/* requested length too big for entire address space */
+> > > +	if (len > TASK_SIZE - mmap_min_addr)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	if (flags & MAP_FIXED)
+> > > +		return addr;
+> > 
+> > arch/x86/mm/mmap.c:
+> > 
+> >  *  With 5-level paging this request would be granted and result in a
+> >  *  mapping which crosses the border of the 47-bit virtual address
+> >  *  space. If the application cannot handle addresses above 47-bit this
+> >  *  will lead to misbehaviour and hard to diagnose failures.
+> >  *
+> >  * Therefore ignore address hints which would result in a mapping
+> >  * crossing the 47-bit virtual address boundary.
+> > 
+> > You'll probably want something similar above.
 > >
-> > Should we go with v1 version of my patch then? I see no reason to
-> > shuffle code around if we keep startup() and shutdown() hooks.
+> 
+> Thanks Jon, I'll roll this into a future patch.
 >
-> I'd go for something in between. runtime_pm already provides whether
-> the device is active or not, so you can just move the
-> SUN4I_I2S_CTRL_GL_EN write to the runtime_resume and runtime_suspend
-> functions, and that should fix your issue.
 
-I still need to guard enabling output line with "if (dai->active)
-return", so it doesn't fix the issue unfortunately.
+Hi Jon,
+Going through this again, I believe the logic in the core code
+arch_get_unmapped_area_topdown and arch_get_unmapped_area has equivalent
+checks to mmap_address_hint_valid (if we substitute TASK_SIZE for a
+limit depending on hint address).
 
->
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+Cheers,
+-- 
+Steve
