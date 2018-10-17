@@ -1,213 +1,281 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 12:51:35 -0700
-Subject: [PATCH v9 4/5] clk: imx: add imx composite clock
-In-Reply-To: <1537785597-26499-5-git-send-email-abel.vesa@nxp.com>
+Date: Wed, 17 Oct 2018 12:55:52 -0700
+Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
+In-Reply-To: <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
 References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
- <1537785597-26499-5-git-send-email-abel.vesa@nxp.com>
-Message-ID: <153980589525.5275.9065338436630625817@swboyd.mtv.corp.google.com>
+ <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
+Message-ID: <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Abel Vesa (2018-09-24 03:39:56)
-> diff --git a/drivers/clk/imx/clk-composite.c b/drivers/clk/imx/clk-composite.c
+Quoting Abel Vesa (2018-09-24 03:39:55)
+> diff --git a/drivers/clk/imx/clk-sccg-pll.c b/drivers/clk/imx/clk-sccg-pll.c
 > new file mode 100644
-> index 0000000..4b03107
+> index 0000000..a9837fa
 > --- /dev/null
-> +++ b/drivers/clk/imx/clk-composite.c
-> @@ -0,0 +1,181 @@
-> +// SPDX-License-Identifier: GPL-2.0
+> +++ b/drivers/clk/imx/clk-sccg-pll.c
+> @@ -0,0 +1,237 @@
+> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
 > +/*
-> + * Copyright 2018 NXP
+> + * Copyright 2018 NXP.
 > + */
 > +
-> +#include <linux/errno.h>
-> +#include <linux/slab.h>
-> +#include <linux/clk-provider.h>
 > +#include <linux/clk.h>
 
-Is this include used?
+Is this include used? Otherwise should see clk-provider.h included here.
 
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/slab.h>
+> +#include <linux/delay.h>
+> +#include <linux/bitfield.h>
 > +
 > +#include "clk.h"
 > +
-> +#define PCG_PREDIV_SHIFT       16
-> +#define PCG_PREDIV_WIDTH       3
-> +#define PCG_PREDIV_MAX         8
+> +/* PLL CFGs */
+> +#define PLL_CFG0               0x0
+> +#define PLL_CFG1               0x4
+> +#define PLL_CFG2               0x8
 > +
-> +#define PCG_DIV_SHIFT          0
-> +#define PCG_DIV_WIDTH          6
-> +#define PCG_DIV_MAX            64
+> +#define PLL_DIVF1_MASK         GENMASK(18, 13)
+> +#define PLL_DIVF2_MASK         GENMASK(12, 7)
+> +#define PLL_DIVR1_MASK         GENMASK(27, 25)
+> +#define PLL_DIVR2_MASK         GENMASK(24, 19)
+> +#define PLL_REF_MASK           GENMASK(2, 0)
 > +
-> +#define PCG_PCS_SHIFT          24
-> +#define PCG_PCS_MASK           0x7
+> +#define PLL_LOCK_MASK          BIT(31)
+> +#define PLL_PD_MASK            BIT(7)
 > +
-> +#define PCG_CGC_SHIFT          28
+> +#define OSC_25M                        25000000
+> +#define OSC_27M                        27000000
 > +
-> +static unsigned long imx_clk_composite_divider_recalc_rate(struct clk_hw *hw,
-> +                                               unsigned long parent_rate)
-> +{
-> +       struct clk_divider *divider = to_clk_divider(hw);
-> +       unsigned long prediv_rate;
-> +       unsigned int prediv_value;
-> +       unsigned int div_value;
+> +#define PLL_SCCG_LOCK_TIMEOUT  70
 > +
-> +       prediv_value = clk_readl(divider->reg) >> divider->shift;
-> +       prediv_value &= clk_div_mask(divider->width);
-> +
-> +       prediv_rate = divider_recalc_rate(hw, parent_rate, prediv_value,
-> +                                               NULL, divider->flags,
-> +                                               divider->width);
-> +
-> +       div_value = clk_readl(divider->reg) >> PCG_DIV_SHIFT;
-> +       div_value &= clk_div_mask(PCG_DIV_WIDTH);
-> +
-> +       return divider_recalc_rate(hw, prediv_rate, div_value, NULL,
-> +                                  divider->flags, PCG_DIV_WIDTH);
-> +}
-> +
-> +static int imx_clk_composite_compute_dividers(unsigned long rate,
-> +                                               unsigned long parent_rate,
-> +                                               int *prediv, int *postdiv)
-> +{
-> +       int div1, div2;
-> +       int error = INT_MAX;
-> +       int ret = -EINVAL;
-> +
-> +       /* default values */
-> +       *prediv = 1;
-> +       *postdiv = 1;
-> +
-> +       for (div1 = 1; div1 <= PCG_PREDIV_MAX; div1++) {
-> +               for (div2 = 1; div2 <= PCG_DIV_MAX; div2++) {
-> +                       int new_error = ((parent_rate / div1) / div2) - rate;
-> +
-> +                       if (abs(new_error) < abs(error)) {
-> +                               *prediv = div1;
-> +                               *postdiv = div2;
-> +                               error = new_error;
-> +                               ret = 0;
-> +                       }
-> +               }
-> +       }
-> +       return ret;
-> +}
-> +
-> +static long imx_clk_composite_divider_round_rate(struct clk_hw *hw,
-> +                                               unsigned long rate,
-> +                                               unsigned long *prate)
-> +{
-> +       int prediv_value;
-> +       int div_value;
-> +
-> +       imx_clk_composite_compute_dividers(rate, *prate,
-> +                                               &prediv_value, &div_value);
-> +
-> +       rate = DIV_ROUND_UP_ULL((u64)*prate, prediv_value);
-> +       rate = DIV_ROUND_UP_ULL((u64)rate, div_value);
-> +
-> +       return rate;
-
-Looks the same as another patch, maybe it is?
-
-Anyway, same nitpick about returning the DIV_ROUND_UP_ULL() result.
-
-> +}
-> +
-> +static int imx_clk_composite_divider_set_rate(struct clk_hw *hw,
-> +                                       unsigned long rate,
-> +                                       unsigned long parent_rate)
-> +{
-> +       struct clk_divider *divider = to_clk_divider(hw);
-> +       unsigned long flags = 0;
-> +       int prediv_value;
-> +       int div_value;
-> +       int ret = 0;
-> +       u32 val;
-> +
-> +       ret = imx_clk_composite_compute_dividers(rate, parent_rate,
-> +                                               &prediv_value, &div_value);
-> +       if (ret)
-> +               return -EINVAL;
-> +
-> +       spin_lock_irqsave(divider->lock, flags);
-> +
-> +       val = clk_readl(divider->reg);
-> +       val &= ~((clk_div_mask(divider->width) << divider->shift) |
-> +                       (clk_div_mask(PCG_DIV_WIDTH) << PCG_DIV_SHIFT));
-> +
-> +       val |= (u32)(prediv_value  - 1) << divider->shift;
-> +       val |= (u32)(div_value - 1) << PCG_DIV_SHIFT;
-> +       clk_writel(val, divider->reg);
-
-Please don't use clk_writel().
-
-> +
-> +       spin_unlock_irqrestore(divider->lock, flags);
-> +
-> +       return ret;
-> +}
-> +
-> +static const struct clk_ops imx_clk_composite_divider_ops = {
-> +       .recalc_rate = imx_clk_composite_divider_recalc_rate,
-> +       .round_rate = imx_clk_composite_divider_round_rate,
-> +       .set_rate = imx_clk_composite_divider_set_rate,
+> +struct clk_sccg_pll {
+> +       struct clk_hw   hw;
+> +       void __iomem    *base;
 > +};
 > +
-> +struct clk *imx_clk_composite_flags(const char *name,
-> +                                       const char **parent_names,
-> +                                       int num_parents, void __iomem *reg,
-> +                                       unsigned long flags)
+> +#define to_clk_sccg_pll(_hw) container_of(_hw, struct clk_sccg_pll, hw)
+> +
+> +static int clk_pll_wait_lock(struct clk_sccg_pll *pll)
 > +{
-> +       struct clk_hw *mux_hw = NULL, *div_hw = NULL, *gate_hw = NULL;
-> +       struct clk_divider *div = NULL;
-> +       struct clk_gate *gate = NULL;
-> +       struct clk_mux *mux = NULL;
-> +       struct clk *clk = ERR_PTR(-ENOMEM);
+> +       u32 val;
 > +
-> +       mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> +       if (!mux)
-> +               goto fail;
+> +       return readl_poll_timeout(pll->base, val, val & PLL_LOCK_MASK, 0,
+> +                                       PLL_SCCG_LOCK_TIMEOUT);
+> +}
 > +
-> +       mux_hw = &mux->hw;
-> +       mux->reg = reg;
-> +       mux->shift = PCG_PCS_SHIFT;
-> +       mux->mask = PCG_PCS_MASK;
+> +static int clk_pll1_is_prepared(struct clk_hw *hw)
+> +{
+> +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
+> +       u32 val;
 > +
-> +       div = kzalloc(sizeof(*div), GFP_KERNEL);
-> +       if (!div)
-> +               goto fail;
+> +       val = readl_relaxed(pll->base + PLL_CFG0);
+> +       return (val & PLL_PD_MASK) ? 0 : 1;
+> +}
 > +
-> +       div_hw = &div->hw;
-> +       div->reg = reg;
-> +       div->shift = PCG_PREDIV_SHIFT;
-> +       div->width = PCG_PREDIV_WIDTH;
-> +       div->lock = &imx_ccm_lock;
-> +       div->flags = CLK_DIVIDER_ROUND_CLOSEST;
+> +static unsigned long clk_pll1_recalc_rate(struct clk_hw *hw,
+> +                                        unsigned long parent_rate)
+> +{
+> +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
+> +       u32 val, divf;
 > +
-> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +       if (!gate)
-> +               goto fail;
+> +       val = readl_relaxed(pll->base + PLL_CFG2);
+> +       divf = FIELD_GET(PLL_DIVF1_MASK, val);
 > +
-> +       gate_hw = &gate->hw;
-> +       gate->reg = reg;
-> +       gate->bit_idx = PCG_CGC_SHIFT;
+> +       return parent_rate * 2 * (divf + 1);
+> +}
 > +
-> +       clk = clk_register_composite(NULL, name, parent_names, num_parents,
-> +                                       mux_hw, &clk_mux_ops, div_hw,
-> +                                       &imx_clk_composite_divider_ops, gate_hw,
-> +                                       &clk_gate_ops, flags);
+> +static long clk_pll1_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                              unsigned long *prate)
+> +{
+> +       unsigned long parent_rate = *prate;
+> +       u32 div;
+> +
+> +       div = rate / (parent_rate * 2);
 
-Didn't I already review this? I'd prefer we move this to using clk_hw
-based APIs and then return the clk pointer if needed.
+Can parent_rate be 0?
+
+> +
+> +       return parent_rate * div * 2;
+> +}
+> +
+> +static int clk_pll1_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                           unsigned long parent_rate)
+> +{
+> +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
+> +       u32 val;
+> +       u32 divf;
+> +
+> +       divf = rate / (parent_rate * 2);
+
+Can parent_rate be 0?
+
+> +
+> +       val = readl_relaxed(pll->base + PLL_CFG2);
+> +       val &= ~PLL_DIVF1_MASK;
+> +       val |= FIELD_PREP(PLL_DIVF1_MASK, divf - 1);
+> +       writel_relaxed(val, pll->base + PLL_CFG2);
+> +
+> +       return clk_pll_wait_lock(pll);
+> +}
+> +
+> +static int clk_pll1_prepare(struct clk_hw *hw)
+> +{
+> +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
+> +       u32 val;
+> +
+> +       val = readl_relaxed(pll->base + PLL_CFG0);
+> +       val &= ~PLL_PD_MASK;
+> +       writel_relaxed(val, pll->base + PLL_CFG0);
+> +
+> +       return clk_pll_wait_lock(pll);
+> +}
+> +
+> +static void clk_pll1_unprepare(struct clk_hw *hw)
+> +{
+> +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
+> +       u32 val;
+> +
+> +       val = readl_relaxed(pll->base + PLL_CFG0);
+> +       val |= PLL_PD_MASK;
+> +       writel_relaxed(val, pll->base + PLL_CFG0);
+> +
+> +}
+> +
+> +static unsigned long clk_pll2_recalc_rate(struct clk_hw *hw,
+> +                                        unsigned long parent_rate)
+> +{
+> +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
+> +       u32 val, ref, divr1, divf1, divr2, divf2;
+> +       u64 temp64;
+> +
+> +       val = readl_relaxed(pll->base + PLL_CFG0);
+> +       switch (FIELD_GET(PLL_REF_MASK, val)) {
+> +       case 0:
+> +               ref = OSC_25M;
+> +               break;
+> +       case 1:
+> +               ref = OSC_27M;
+> +               break;
+> +       default:
+> +               ref = OSC_25M;
+
+Does this information not come through 'parent_rate'?
+
+> +               break;
+> +       }
+> +
+> +       val = readl_relaxed(pll->base + PLL_CFG2);
+> +       divr1 = FIELD_GET(PLL_DIVR1_MASK, val);
+> +       divr2 = FIELD_GET(PLL_DIVR2_MASK, val);
+> +       divf1 = FIELD_GET(PLL_DIVF1_MASK, val);
+> +       divf2 = FIELD_GET(PLL_DIVF2_MASK, val);
+> +
+> +       temp64 = ref * 2;
+> +       temp64 *= (divf1 + 1) * (divf2 + 1);
+> +
+> +       do_div(temp64, (divr1 + 1) * (divr2 + 1));
+
+Nitpicks: A comment with the equation may be helpful to newcomers.
+
+> +
+> +       return (unsigned long)temp64;
+
+Drop useless cast please.
+
+> +}
+> +
+> +static long clk_pll2_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                              unsigned long *prate)
+> +{
+> +       u32 div;
+> +       unsigned long parent_rate = *prate;
+> +
+> +       div = rate / (parent_rate);
+> +
+> +       return parent_rate * div;
+> +}
+> +
+> +static int clk_pll2_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                           unsigned long parent_rate)
+> +{
+> +       u32 val;
+> +       u32 divf;
+> +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
+> +
+> +       divf = rate / (parent_rate);
+
+Drop useless parenthesis please.
+
+> +
+> +       val = readl_relaxed(pll->base + PLL_CFG2);
+> +       val &= ~PLL_DIVF2_MASK;
+> +       val |= FIELD_PREP(PLL_DIVF2_MASK, divf - 1);
+> +       writel_relaxed(val, pll->base + PLL_CFG2);
+> +
+> +       return clk_pll_wait_lock(pll);
+> +}
+> +
+> +static const struct clk_ops clk_sccg_pll1_ops = {
+> +       .is_prepared    = clk_pll1_is_prepared,
+> +       .recalc_rate    = clk_pll1_recalc_rate,
+> +       .round_rate     = clk_pll1_round_rate,
+> +       .set_rate       = clk_pll1_set_rate,
+> +};
+> +
+> +static const struct clk_ops clk_sccg_pll2_ops = {
+> +       .prepare        = clk_pll1_prepare,
+> +       .unprepare      = clk_pll1_unprepare,
+> +       .recalc_rate    = clk_pll2_recalc_rate,
+> +       .round_rate     = clk_pll2_round_rate,
+> +       .set_rate       = clk_pll2_set_rate,
+> +};
+> +
+> +struct clk *imx_clk_sccg_pll(const char *name,
+> +                               const char *parent_name,
+> +                               void __iomem *base,
+> +                               enum imx_sccg_pll_type pll_type)
+> +{
+> +       struct clk_sccg_pll *pll;
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> +       if (!pll)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       pll->base = base;
+> +       init.name = name;
+> +       switch (pll_type) {
+> +       case SCCG_PLL1:
+> +               init.ops = &clk_sccg_pll1_ops;
+> +               break;
+> +       case SCCG_PLL2:
+> +               init.ops = &clk_sccg_pll2_ops;
+> +               break;
+> +       default:
+> +               kfree(pll);
+> +               return ERR_PTR(-EINVAL);
+
+Do this case statement before allocating? So that kfree() isn't required
+here?
+
+> +       }
+> +
+> +       init.flags = 0;
+> +       init.parent_names = &parent_name;
+> +       init.num_parents = 1;
+> +
+> +       pll->hw.init = &init;
+> +
+> +       clk = clk_register(NULL, &pll->hw);
+
+Any chance to use clk_hw based registration APIs?
 
 > +       if (IS_ERR(clk))
-> +               goto fail;
+> +               kfree(pll);
 > +
 > +       return clk;
-> +
-> +fail:
-> +       kfree(gate);
-> +       kfree(div);
-> +       kfree(mux);
-> +       return clk;
-> +}
