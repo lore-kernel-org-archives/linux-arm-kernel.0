@@ -1,120 +1,71 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Wed, 17 Oct 2018 08:20:19 +0000
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
- NOR flash memories
-In-Reply-To: <47586729-d711-cd38-a4b2-bef09f64cba3@microchip.com>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
- <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
- <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
- <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017090724.12f2cd79@bbrezillon> <20181017091045.124e0266@bbrezillon>
- <20181017092941.3658bd9a@bbrezillon>
- <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <47586729-d711-cd38-a4b2-bef09f64cba3@microchip.com>
-Message-ID: <VI1PR04MB1038987B053C31099A76344699FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+From: l.luba@partner.samsung.com (Lukasz Luba)
+Date: Wed, 17 Oct 2018 10:24:00 +0200
+Subject: [PATCH 00/11] thermal: add new flag irq-mode for trip point
+In-Reply-To: <CAJKOXPd4=hvowfkEJbfX_BXf_PEjxuKxn7dxy7cb=G59a8+GOw@mail.gmail.com>
+References: <CGME20181016145637eucas1p2dfa78042b9fd4fd27af7cc8537b7f485@eucas1p2.samsung.com>
+ <20181016145637eucas1p2dfa78042b9fd4fd27af7cc8537b7f485~eHqCoEO-42133821338eucas1p2F@eucas1p2.samsung.com>
+ <CAJKOXPei6b7TnOnG7DUMNm+xEUsMxqcMOfbG10cJbrNROXLN2w@mail.gmail.com>
+ <20181017074244eucas1p2487ff3bccf50d6f4fd7a99cd7d8d2bb4~eVYe84jXW0904509045eucas1p2q@eucas1p2.samsung.com>
+ <CAJKOXPd4=hvowfkEJbfX_BXf_PEjxuKxn7dxy7cb=G59a8+GOw@mail.gmail.com>
+Message-ID: <20181017082402eucas1p1088cde8bb32592e96decd0075ecc055a~eV8jZImjv1752717527eucas1p1K@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tudor,
 
-> -----Original Message-----
-> From: Tudor Ambarus [mailto:tudor.ambarus at microchip.com]
-> Sent: Wednesday, October 17, 2018 1:31 PM
-> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; Boris Brezillon
-> <boris.brezillon@bootlin.com>
-> Cc: Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>; marek.vasut at gmail.com;
-> dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
-> linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
-> cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org; Cristian.Birsan at microchip.com
-> Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
-> NOR flash memories
-> 
-> Hi, Yogesh,
-> 
-> On 10/17/2018 10:46 AM, Yogesh Narayan Gaur wrote:
-> > Hi Boris,
-> >
-> >> -----Original Message-----
-> >> From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> >> Sent: Wednesday, October 17, 2018 1:00 PM
-> >> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> >> Cc: Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>; Tudor Ambarus
-> >> <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
-> >> dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
-> >> linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
-> >> cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org;
-> >> linux-arm- kernel at lists.infradead.org; Cristian.Birsan at microchip.com
-> >> Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform
-> >> SFDP SPI NOR flash memories
-> >>
-> >> On Wed, 17 Oct 2018 09:10:45 +0200
-> >> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> >>
-> >>> On Wed, 17 Oct 2018 09:07:24 +0200
-> >>> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> >>>
-> >>>> On Wed, 17 Oct 2018 02:07:43 +0000
-> >>>> Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> >>>>
-> >>>>>>
-> >>>>> Actually there is no entry of s25fs512s in current spi-nor.c file.
-> >>>>> For my connected flash part, jedec ID read points to s25fl512s. I
-> >>>>> have asked my board team to confirm the name of exact connected
-> >>>>> flash part. When I check the data sheet of s25fs512s, it also
-> >>>>> points to the same Jedec ID information. { "s25fl512s",
-> >>>>> INFO(0x010220, 0x4d00, 256
-> >>>>> * 1024, 256, ....}
-> >>>>>
-> >>>>> But as stated earlier, if I skip reading SFDP or read using 1-1-1
-> >>>>> protocol then read are always correct. For 1-4-4 protocol read are
-> >>>>> wrong and on further debugging found that Read code of 0x6C is
-> >>>>> being send as opcode instead of 0xEC.
-> >>>>>
-> >>>>> If I revert this patch, reads are working fine.
-> >>>>
-> >>>> Can you try with the following patch?
-> >>>>
-> >>>
-> >>> Hm, nevermind. The problem is actually not related to 4B vs non-4B
-> >>> mode but 1-1-4 vs 1-4-4 modes.
-> > Yes, that's only I have stated in my first mail that instead of 1-4-4 mode read
-> opcode is being sent for 1-1-4 mode.
-> >>>
-> >>
-> >> Can you try with this patch applied?
-> >>
-> > With suggested patch, read for protocol 1-4-4 working correctly.
-> >
-> > 	[    1.625360] m25p80 spi0.0: found s25fl512s, expected m25p80
-> > 	[    1.631094] m25p80 spi0.0: failed to parse SMPT (err = -22)
-> > 	[    1.636661] 261 8c4c780 opcode(read:eb, pp:2, erase:d8)
-> > 	[    1.641878] 266 8c4c780 opcode(read:ec, pp:12, erase:dc)
-> > 	[    1.647200] m25p80 spi0.0: s25fl512s (65536 Kbytes)
-> >
-> > Without this patch, param_headers are getting freed and restoring previous
-> erase map i.e. opcode related to 1-1-4 protocol.
-> >
-> 
-> Can you add some prints in spi_nor_parse_smpt() to isolate what's failing? We
-> should understand whether it's something wrong in spi_nor_parse_smpt() or the
-> s25fs512s smpt table does not respect the standard.
-> 
 
-It's returning failure from below point in func spi_nor_get_map_in_use()
+On 10/17/2018 09:52 AM, Krzysztof Kozlowski wrote:
+> On Wed, 17 Oct 2018 at 09:42, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+>>
+>> Hi Krzysztof,
+>>
+>> On 10/17/2018 09:03 AM, Krzysztof Koz?owski wrote:
+>>> On Tue, 16 Oct 2018 at 16:56, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+>>>>
+>>>> Hi all,
+>>>>
+>>>> This patch set adds new flag and mechanism in thermal trip point in DT.
+>>>> The current situation with 'passive' (passive cooling - DVFS)
+>>>> trip point is that it enables polling mode in thermal framework.
+>>>
+>>> For DT platform, I checked it some months ago... and that time I was
+>>> pretty sure - passive mode does not enable polling (unless you tell it
+>>> explicitly with "polling-delay-passive"). Maybe something changed...
+>>> but quick look at the code tell me that not. Passive does not indicate
+>>> polling mode.
+>>>
+>>> Why do you think that passive enables polling?
+>> Please check dt file which implements 2 more trip points that HW
+>> supports:
+>> arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>
+>> In that file we have this trick with 'active' present.
+>> Yes, you are right, 'polling-delay-passive' enables it in
+>> the thermal code (for whole thermal zone).
+>> Unfortunately, if you change the bellow 'active' to 'passive'
+>> in that file, they will start polling, which is not what we want.
+> 
+> Yes but this looks different than what you explained at the beginning.
+> You said that passive enables polling mode... which is not true. You
+> can have active with or without polling. You can have passive with or
+> without polling. But the real problem you described now is that given
+> polling/IRQ mode applies to entire thermal zone, not to a specific
+> trip point.
+> 
+> I agree with this problem but you need to clearly mark it in cover
+> letter and description of other commits because really from existing
+> explanation I understood something completely different. You simply
+> want to configure IRQ or polling per trip-point, not per thermal zone.
+Thank you for your feedback, I will rewrite the cover letter and
+descriptions.
+I will add that the thermal zone polling settings are for all it's trip
+points, which has some implications. Therefore, trying to work around,
+might cause confusion due to misalignment with trip point documentation
+and old assumptions.
 
-        /* Find the matching configuration map */
-        while (SMPT_MAP_ID(smpt[i]) != map_id) {
-                if (smpt[i] & SMPT_DESC_END) {
-                        printk("%d %s \n", __LINE__, __func__);
-                        goto out;
-                }
---
-Regards
-Yogesh Gaur.
+Regards,
+Lukasz
 
-> Thanks,
-> ta
+> 
+> Best regards,
+> Krzysztof
 > 
