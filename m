@@ -1,45 +1,26 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Wed, 17 Oct 2018 12:42:28 +0200
-Subject: Clock configuration for the SAMA5D2 NAND controller
-In-Reply-To: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
-References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
-Message-ID: <CAGkQfmMphvck9rraYq+o8zA254q7ETYyniiUV-QBsUR9X+OFKQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 17 Oct 2018 10:56:56 +0100
+Subject: [PATCH v2 1/3] driver core: add probe_err log helper
+In-Reply-To: <20181017085824.30806-1-a.hajda@samsung.com>
+References: <CAHp75VecquoNrzOuRvWcZ-Qa1b-5P0V0MWq=sNj-SnVcd2EhRw@mail.gmail.com>
+ <CGME20181017085832eucas1p23dbb86230149a13634b8a091c3b1301f@eucas1p2.samsung.com>
+ <20181017085824.30806-1-a.hajda@samsung.com>
+Message-ID: <20181017095656.GC24097@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+linux-mtd, linux-clk
+On Wed, Oct 17, 2018 at 10:58:24AM +0200, Andrzej Hajda wrote:
+> During probe every time driver gets resource it should usually check for error
+> printk some message if it is not -EPROBE_DEFER and return the error. This
+> pattern is simple but requires adding few lines after any resource acquisition
+> code, as a result it is often omited or implemented only partially.
+> probe_err helps to replace such code sequences with simple call, so code:
 
-Le mer. 10 oct. 2018 ? 19:05, Romain Izard
-<romain.izard.pro@gmail.com> a ?crit :
->
-> Hello,
->
-> While evaluating a new flash memory chip for my product based on a SAMA5D2
-> chip, I tried to update my software to use the latest device tree bindings.
->
-> Until now, I was using the legacy bindings for the NAND controller, that
-> preserved the timings configured by the bootloader in the EBI registers. The
-> bindings introduced in Linux 4.13 are used together with the NAND driver to
-> reconfigure the timings of the memory interface to match the speed profile
-> declared by some NAND components.
->
-> However, when comparing the timings in the registers, there was a large
-> difference between what I calculated by hand in the past and the values
-> configured by the drivers. The difference was in fact a 2 factor.
->
-> For me, the issue is due to the clock configuration declared in the SAMA5D2
-> device tree: The reference clock used by the nand-controller driver is the
-> clock for its parent node, which is directly the Master Clock. And on my
-> end, what I understood when writing the clock settings for my bootloader was
-> that the reference clock was the HSMC clock, which derives from the H32MX
-> clock, which runs at half the rate of the Master Clock.
->
-> The documentation for the SAMA5D2 is not very precise on this topic, so I
-> would like to have some feedback. Is the clock used as a reference for the
-> chip select configuration registers the Master Clock itself, or is it the
-> peripheral clock for the HSMC module ?
->
->
-> Best regards,
-> --
-> Romain Izard
+Reviwed-by: Mark Brown <broonie@kernel.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181017/c8603fbe/attachment.sig>
