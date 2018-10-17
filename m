@@ -1,62 +1,169 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 17 Oct 2018 07:15:28 -0700
-Subject: [SPAM]Re: [PATCH v1 3/3] clk: mediatek: mt2712: add pll reference
- support
-In-Reply-To: <1539784392.16401.28.camel@mtksdaap41>
-References: <20180920095727.11868-1-weiyi.lu@mediatek.com>
- <20180920095727.11868-5-weiyi.lu@mediatek.com>
- <153936680359.5275.14901579706860255114@swboyd.mtv.corp.google.com>
- <1539784392.16401.28.camel@mtksdaap41>
-Message-ID: <153978572885.5275.2199850145066961212@swboyd.mtv.corp.google.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 17 Oct 2018 17:17:39 +0300
+Subject: [PATCH v3 2/4] driver core: add deferring probe reason to
+ devices_deferred property
+In-Reply-To: <20181017132400.5300-1-a.hajda@samsung.com>
+References: <CGME20181017132404eucas1p2a413f6853af8f11a874650b6289d56cf@eucas1p2.samsung.com>
+ <CAHp75Vd2c3sHz=ZObsNAyEmOK-=__2=y-soDM5DqNUyLLK8jdA@mail.gmail.com>
+ <20181017132400.5300-1-a.hajda@samsung.com>
+Message-ID: <CAHp75VdwnHLuXazD926CU+HWWv+sgp8BFCdW=vHqzMqsE87Ekg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Weiyi Lu (2018-10-17 06:53:12)
-> On Fri, 2018-10-12 at 10:53 -0700, Stephen Boyd wrote:
-> > Quoting Weiyi Lu (2018-09-20 02:57:27)
-> > > +
-> > > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk",
-> > > +                       "#clock-cells", 0, &refclk);
-> > > +       if (!rc) {
-> > > +               of_property_read_string(refclk.np, "clock-output-names",
-> > > +                               &refclk_name);
-> > > +               for (i = 0; i < num_plls; i++)
-> > > +                       plls[i].parent_name = refclk_name;
-> > 
-> > Use of_clk_parent_fill()?
-> > 
-> Thanks for the hint, i might use of_clk_get_parent_name() instead like
-> below to get each parent clock name.
-> refclk_name = of_clk_get_parent_name(node, 0);
-> refclk_aud_name = of_clk_get_parent_name(node, 1);
+On Wed, Oct 17, 2018 at 4:24 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
+>
+> /sys/kernel/debug/devices_deferred property contains list of deferred devices.
+> This list does not contain reason why the driver deferred probe, the patch
+> improves it.
+> The natural place to set the reason is probe_err function introduced recently,
+> ie. if probe_err will be called with -EPROBE_DEFER instead of printk the message
+> will be attached to deferred device and printed when user read devices_deferred
+> property.
+>
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> Reviewed-by: Mark Brown <broonie@kernel.org>
+> Reviewed-by: Javier Martinez Canillas <javierm@redhat.com>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> ---
+> v3:
+>   - adjusted deferred_devs_show, to accept newline ended messages,
+>   - changed conditonal check to positive,
+>   - added R-b by Andy.
+> v2:
+>   - changed __deferred_probe_set_msg args - like in __dev_printk, fits better,
+>   - use kasprintf instead of bunch of code,
+>   - keep consistent format of devices_deferred lines,
+>   - added R-Bs (again I hope changes above are not against it).
+> ---
+>  drivers/base/base.h |  3 +++
+>  drivers/base/core.c |  9 +++++----
+>  drivers/base/dd.c   | 21 ++++++++++++++++++++-
+>  3 files changed, 28 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/base/base.h b/drivers/base/base.h
+> index 7a419a7a6235..effbd5e7f9f1 100644
+> --- a/drivers/base/base.h
+> +++ b/drivers/base/base.h
+> @@ -75,6 +75,7 @@ struct device_private {
+>         struct klist_node knode_driver;
+>         struct klist_node knode_bus;
+>         struct list_head deferred_probe;
+> +       char *deferred_probe_msg;
+>         struct device *device;
+>  };
+>  #define to_device_private_parent(obj)  \
+> @@ -113,6 +114,8 @@ extern void device_release_driver_internal(struct device *dev,
+>  extern void driver_detach(struct device_driver *drv);
+>  extern int driver_probe_device(struct device_driver *drv, struct device *dev);
+>  extern void driver_deferred_probe_del(struct device *dev);
+> +extern void __deferred_probe_set_msg(const struct device *dev,
+> +                                    struct va_format *vaf);
+>  static inline int driver_match_device(struct device_driver *drv,
+>                                       struct device *dev)
+>  {
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 1f3e99c2ef03..27990110fb24 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -3076,6 +3076,7 @@ define_dev_printk_level(_dev_info, KERN_INFO);
+>   *
+>   * This helper implements common pattern present in probe functions for error
+>   * checking: print message if the error is not -EPROBE_DEFER and propagate it.
+> + * In case of -EPROBE_DEFER it sets defer probe reason.
+>   * It replaces code sequence:
+>   *     if (err != -EPROBE_DEFER)
+>   *             dev_err(dev, ...);
+> @@ -3091,14 +3092,14 @@ int probe_err(const struct device *dev, int err, const char *fmt, ...)
+>         struct va_format vaf;
+>         va_list args;
+>
+> -       if (err == -EPROBE_DEFER)
+> -               return err;
+> -
+>         va_start(args, fmt);
+>         vaf.fmt = fmt;
+>         vaf.va = &args;
+>
+> -       dev_err(dev, "error %d: %pV", err, &vaf);
+> +       if (err == -EPROBE_DEFER)
+> +               __deferred_probe_set_msg(dev, &vaf);
+> +       else
+> +               dev_err(dev, "error %d: %pV", err, &vaf);
+>
+>         va_end(args);
+>
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 169412ee4ae8..6e488146b328 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/async.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pinctrl/devinfo.h>
+> +#include <linux/slab.h>
+>
+>  #include "base.h"
+>  #include "power/power.h"
+> @@ -132,6 +133,8 @@ void driver_deferred_probe_del(struct device *dev)
+>         if (!list_empty(&dev->p->deferred_probe)) {
+>                 dev_dbg(dev, "Removed from deferred list\n");
+>                 list_del_init(&dev->p->deferred_probe);
+> +               kfree(dev->p->deferred_probe_msg);
+> +               dev->p->deferred_probe_msg = NULL;
+>         }
+>         mutex_unlock(&deferred_probe_mutex);
+>  }
+> @@ -202,6 +205,21 @@ void device_unblock_probing(void)
+>         driver_deferred_probe_trigger();
+>  }
+>
+> +/*
+> + * __deferred_probe_set_msg() - Set defer probe reason message for device
+> + */
+> +void __deferred_probe_set_msg(const struct device *dev, struct va_format *vaf)
+> +{
+> +       mutex_lock(&deferred_probe_mutex);
+> +
 
-Alright.
+> +       if (dev->p->deferred_probe_msg)
 
-> 
-> > > +       }
-> > > +
-> > > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk-aud",
-> > > +                       "#clock-cells", 0, &refclk_aud);
-> > 
-> > This is odd. Is this a custom 'clocks' property? What's going on here?
-> > Why can't we use assigned clock parents for this?
-> Yes. both the reference clock of all PLL and the reference clock of
-> audio PLL could be customized.These two reference clocks shall be
-> provided by some component like crystal oscillators on the board. So we
-> might unable to switch the PLL reference source at runtime, in other
-> words, it should be set statically. That's why we didn't provide the
-> set_parent ops for pll clock type. It's also the main reason we choose
-> not to use assigned-clock-parents for this requirement.
-> 
+Sorry, I have noticed this a bit late, this check is not needed, since
+kfree() is NULL-aware.
 
-Ok. Do you need some new software clk flag that indicates we should
-"lock" the parent or rate configured at boot time? I would like to see
-this driver implement the clk_ops for the hardware and have the
-framework be the one that configures the tree, instead of doing it some
-custom way for this single driver.
+> +               kfree(dev->p->deferred_probe_msg);
+> +       dev->p->deferred_probe_msg = kasprintf(GFP_KERNEL, "%s: %pV",
+> +                                              dev_driver_string(dev), vaf);
 
-> > > +       if (!rc) {
-> > > +               of_property_read_string(refclk_aud.np, "clock-output-names",
-> > > +                               &refclk_aud_name);
-> > > +               if (strcmp(refclk_name, refclk_aud_name)) {
-> > > +                       plls[CLK_APMIXED_APLL1].parent_name = refclk_aud_name;
+...and perhaps slightly better looking (up to you):
+
+const char *drv = dev_driver_string(dev);
+
+...
+
+... = kasprintf(..., drv, ...); // it would be exactly oneline
+
+> +
+> +       mutex_unlock(&deferred_probe_mutex);
+> +}
+> +
+>  /*
+>   * deferred_devs_show() - Show the devices in the deferred probe pending list.
+>   */
+> @@ -212,7 +230,8 @@ static int deferred_devs_show(struct seq_file *s, void *data)
+>         mutex_lock(&deferred_probe_mutex);
+>
+>         list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
+> -               seq_printf(s, "%s\n", dev_name(curr->device));
+> +               seq_printf(s, "%s\t%s", dev_name(curr->device),
+> +                          curr->device->p->deferred_probe_msg ?: "\n");
+>
+>         mutex_unlock(&deferred_probe_mutex);
+>
+> --
+> 2.18.0
+>
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
