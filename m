@@ -1,44 +1,195 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 17 Oct 2018 06:12:04 +0000
-Subject: [PATCH 2/2] clk: imx7d: remove CLK_IS_CRITICAL flag for
- arm_a7_root_clk
-In-Reply-To: <1539756441-18776-1-git-send-email-Anson.Huang@nxp.com>
-References: <1539756441-18776-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1539756441-18776-2-git-send-email-Anson.Huang@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 Oct 2018 14:12:57 +0800
+Subject: [PATCH v4 5/7] power: supply: add AC power supply driver for
+ AXP813
+In-Reply-To: <20181013080848.29894-6-oskari@lemmela.net>
+References: <20181013080848.29894-1-oskari@lemmela.net>
+ <20181013080848.29894-6-oskari@lemmela.net>
+Message-ID: <CAGb2v646PM4s+MvFt3MRS7g6O7_DBw8Jha24dd=a0DmMsvcAoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX7D uses virtual cpu clock of "arm" clock to be child clock
-of "arm_a7_root_clk" and it is with CLK_IS_CRITICAL flag set, so
-no need to add CLK_IS_CRITICAL flag for keeping "arm_a7_root_clk"
-use count correct, latest clock tree is as below in clk_summary:
+On Sat, Oct 13, 2018 at 4:09 PM Oskari Lemmela <oskari@lemmela.net> wrote:
+>
+> AXP813 and AXP803 PMICs can control input current and
+> minimum voltage.
+>
+> Both of these values are configurable.
+>
+> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+> ---
+>  drivers/power/supply/axp20x_ac_power.c | 92 ++++++++++++++++++++++++++
+>  include/linux/mfd/axp20x.h             |  1 +
+>  2 files changed, 93 insertions(+)
+>
+> diff --git a/drivers/power/supply/axp20x_ac_power.c b/drivers/power/supply/axp20x_ac_power.c
+> index 0771f951b11f..059a97d6e14c 100644
+> --- a/drivers/power/supply/axp20x_ac_power.c
+> +++ b/drivers/power/supply/axp20x_ac_power.c
+> @@ -27,6 +27,16 @@
+>  #define AXP20X_PWR_STATUS_ACIN_PRESENT BIT(7)
+>  #define AXP20X_PWR_STATUS_ACIN_AVAIL   BIT(6)
+>
+> +#define AXP813_VHOLD_MASK              GENMASK(5, 3)
+> +#define AXP813_VHOLD_UV_TO_BIT(x)      ((((x) / 100000) - 40) << 3)
+> +#define AXP813_VHOLD_REG_TO_UV(x)      \
+> +       (((((x) & AXP813_VHOLD_MASK) >> 3) + 40) * 100000)
+> +
+> +#define AXP813_CURR_LIMIT_MASK         GENMASK(2, 0)
+> +#define AXP813_CURR_LIMIT_UA_TO_BIT(x) (((x) / 500000) - 3)
+> +#define AXP813_CURR_LIMIT_REG_TO_UA(x) \
+> +       ((((x) & AXP813_CURR_LIMIT_MASK) + 3) * 500000)
+> +
+>  #define DRVNAME "axp20x-ac-power-supply"
+>
+>  struct axp20x_ac_power {
+> @@ -102,6 +112,55 @@ static int axp20x_ac_power_get_property(struct power_supply *psy,
+>
+>                 return 0;
+>
+> +       case POWER_SUPPLY_PROP_VOLTAGE_MIN:
+> +               ret = regmap_read(power->regmap, AXP813_ACIN_PATH_CTRL, &reg);
+> +               if (ret)
+> +                       return ret;
+> +
+> +               val->intval = AXP813_VHOLD_REG_TO_UV(reg);
+> +
+> +               return 0;
+> +
+> +       case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+> +               ret = regmap_read(power->regmap, AXP813_ACIN_PATH_CTRL, &reg);
+> +               if (ret)
+> +                       return ret;
+> +
+> +               val->intval = AXP813_CURR_LIMIT_REG_TO_UA(reg);
 
-pll_arm_main                         1        1        0   792000000          0
-      pll_arm_main_bypass            1        1        0   792000000          0
-         pll_arm_main_clk            1        1        0   792000000          0
-            arm_a7_src               1        1        0   792000000          0
-               arm_a7_cg             1        1        0   792000000          0
-                  arm_a7_div         1        1        0   792000000          0
-                     arm_a7_root_clk       1        1        0   792000000    0
-                        arm          1        1        0   792000000
+This doesn't handle the case where the register value is set to 0x6 or 0x7,
+which should still mean 4000 mA.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> +
+> +               return 0;
+> +
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +
+> +       return -EINVAL;
+> +}
+> +
+> +static int axp813_ac_power_set_property(struct power_supply *psy,
+> +                                       enum power_supply_property psp,
+> +                                       const union power_supply_propval *val)
+> +{
+> +       struct axp20x_ac_power *power = power_supply_get_drvdata(psy);
+> +
+> +       switch (psp) {
+> +       case POWER_SUPPLY_PROP_VOLTAGE_MIN:
+> +               if (val->intval < 4000000 || val->intval > 4700000)
+> +                       return -EINVAL;
+> +
+> +               return regmap_update_bits(power->regmap, AXP813_ACIN_PATH_CTRL,
+> +                                         AXP813_VHOLD_MASK,
+> +                                         AXP813_VHOLD_UV_TO_BIT(val->intval));
+> +
+> +       case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+> +               if (val->intval < 1500000 || val->intval > 4000000)
+> +                       return -EINVAL;
+> +
+> +               return regmap_update_bits(power->regmap, AXP813_ACIN_PATH_CTRL,
+> +                                         AXP813_CURR_LIMIT_MASK,
+> +                                         AXP813_CURR_LIMIT_UA_TO_BIT
+> +                                         (val->intval));
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 076460b..adb08f6 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -775,7 +775,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_CLKO1_ROOT_DIV] = imx_clk_divider2("clko1_post_div", "clko1_pre_div", base + 0xbd80, 0, 6);
- 	clks[IMX7D_CLKO2_ROOT_DIV] = imx_clk_divider2("clko2_post_div", "clko2_pre_div", base + 0xbe00, 0, 6);
- 
--	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate2_flags("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
-+	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate2_flags("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0, CLK_OPS_PARENT_ENABLE);
- 	clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
- 	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate2_flags("main_axi_root_clk", "axi_post_div", base + 0x4040, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
- 	clks[IMX7D_DISP_AXI_ROOT_CLK] = imx_clk_gate4("disp_axi_root_clk", "disp_axi_post_div", base + 0x4050, 0);
--- 
-2.7.4
+Nit, don't wrap this part. Even if it exceeds the 80 character limit, it's
+still easier to read that way.
+
+ChenYu
+
+> +
+>         default:
+>                 return -EINVAL;
+>         }
+> @@ -109,6 +168,13 @@ static int axp20x_ac_power_get_property(struct power_supply *psy,
+>         return -EINVAL;
+>  }
+>
+> +static int axp813_ac_power_prop_writeable(struct power_supply *psy,
+> +                                         enum power_supply_property psp)
+> +{
+> +       return psp == POWER_SUPPLY_PROP_VOLTAGE_MIN ||
+> +              psp == POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT;
+> +}
+> +
+>  static enum power_supply_property axp20x_ac_power_properties[] = {
+>         POWER_SUPPLY_PROP_HEALTH,
+>         POWER_SUPPLY_PROP_PRESENT,
+> @@ -123,6 +189,14 @@ static enum power_supply_property axp22x_ac_power_properties[] = {
+>         POWER_SUPPLY_PROP_ONLINE,
+>  };
+>
+> +static enum power_supply_property axp813_ac_power_properties[] = {
+> +       POWER_SUPPLY_PROP_HEALTH,
+> +       POWER_SUPPLY_PROP_PRESENT,
+> +       POWER_SUPPLY_PROP_ONLINE,
+> +       POWER_SUPPLY_PROP_VOLTAGE_MIN,
+> +       POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
+> +};
+> +
+>  static const struct power_supply_desc axp20x_ac_power_desc = {
+>         .name = "axp20x-ac",
+>         .type = POWER_SUPPLY_TYPE_MAINS,
+> @@ -139,6 +213,16 @@ static const struct power_supply_desc axp22x_ac_power_desc = {
+>         .get_property = axp20x_ac_power_get_property,
+>  };
+>
+> +static const struct power_supply_desc axp813_ac_power_desc = {
+> +       .name = "axp813-ac",
+> +       .type = POWER_SUPPLY_TYPE_MAINS,
+> +       .properties = axp813_ac_power_properties,
+> +       .num_properties = ARRAY_SIZE(axp813_ac_power_properties),
+> +       .property_is_writeable = axp813_ac_power_prop_writeable,
+> +       .get_property = axp20x_ac_power_get_property,
+> +       .set_property = axp813_ac_power_set_property,
+> +};
+> +
+>  struct axp_data {
+>         const struct power_supply_desc  *power_desc;
+>         bool                            acin_adc;
+> @@ -154,6 +238,11 @@ static const struct axp_data axp22x_data = {
+>         .acin_adc = false,
+>  };
+>
+> +static const struct axp_data axp813_data = {
+> +       .power_desc = &axp813_ac_power_desc,
+> +       .acin_adc = false,
+> +};
+> +
+>  static int axp20x_ac_power_probe(struct platform_device *pdev)
+>  {
+>         struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+> @@ -234,6 +323,9 @@ static const struct of_device_id axp20x_ac_power_match[] = {
+>         }, {
+>                 .compatible = "x-powers,axp221-ac-power-supply",
+>                 .data = &axp22x_data,
+> +       }, {
+> +               .compatible = "x-powers,axp813-ac-power-supply",
+> +               .data = &axp813_data,
+>         }, { /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, axp20x_ac_power_match);
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 517e60eecbcb..2302b620d238 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -266,6 +266,7 @@ enum axp20x_variants {
+>  #define AXP288_RT_BATT_V_H             0xa0
+>  #define AXP288_RT_BATT_V_L             0xa1
+>
+> +#define AXP813_ACIN_PATH_CTRL          0x3a
+>  #define AXP813_ADC_RATE                        0x85
+>
+>  /* Fuel Gauge */
+> --
+> 2.17.1
+>
