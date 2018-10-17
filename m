@@ -1,49 +1,35 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Oct 2018 21:32:58 +0100
-Subject: [PATCH v2] iommu/arm-smmu-v3: Fix big-endian CMD_SYNC writes
-Message-ID: <b8d7b19b5cdf1abb28a00c04d2b778f25e168dd6.1539807887.git.robin.murphy@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 17 Oct 2018 22:53:48 +0200
+Subject: [PATCH] spi: pxa2xx: fix PCI dependency
+In-Reply-To: <20181017185128.2634666-1-arnd@arndb.de>
+References: <20181017185128.2634666-1-arnd@arndb.de>
+Message-ID: <CAMuHMdUHV_eeA7Va+MdkhnercM+1yop56wL8uyMhNSz8sh6dWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we insert the sync sequence number into the CMD_SYNC.MSIData field,
-we do so in CPU-native byte order, before writing out the whole command
-as explicitly little-endian dwords. Thus on big-endian systems, the SMMU
-will receive and write back a byteswapped version of sync_nr, which would
-be perfect if it were targeting a similarly-little-endian ITS, but since
-it's actually writing back to memory being polled by the CPUs, they're
-going to end up seeing the wrong thing.
+Hi Arnd,
 
-Since the SMMU doesn't care what the MSIData actually contains, the
-minimal-overhead solution is to simply add an extra byteswap initially,
-such that it then writes back the big-endian format directly.
+On Wed, Oct 17, 2018 at 8:52 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> The code reorganization broke building without CONFIG_PCI:
+>
+> drivers/spi/spi-pxa2xx.c: In function 'pxa2xx_spi_init_pdata':
+> drivers/spi/spi-pxa2xx.c:1457:15: error: implicit declaration of function 'pci_match_id'; did you mean 'pci_map_sg'? [-Werror=implicit-function-declaration]
+>
+> Add back an #ifdef around the code block that requires it.
+>
+> Fixes: 87ae1d2d7077 ("spi: pxa2xx: Add devicetree support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Fixes: 37de98f8f1cf ("iommu/arm-smmu-v3: Use CMD_SYNC completion MSI")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Already fixed in spi-next by commit 9c2120090586d7e5 ("PCI: Provide
+pci_match_id() with CONFIG_PCI=n").
 
-v2: Actually fix the right thing, and comment it.
+Gr{oetje,eeting}s,
 
- drivers/iommu/arm-smmu-v3.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+                        Geert
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index db402e8b068b..bff47594856b 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -839,7 +839,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 			cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV);
- 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
- 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
--		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
-+		/*
-+		 * Commands are written little-endian, but we want the SMMU to
-+		 * receive MSIData, and thus write it back to memory, in CPU
-+		 * byte order, so big-endian needs an extra byteswap here.
-+		 */
-+		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA,
-+				     cpu_to_le32(ent->sync.msidata));
- 		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
- 		break;
- 	default:
 -- 
-2.19.1.dirty
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
