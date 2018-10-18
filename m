@@ -1,42 +1,58 @@
 From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Wed, 17 Oct 2018 17:54:00 -0700
-Subject: [PATCH] ARM: OMAP2+: prm44xx: Fix section annotation on
- omap44xx_prm_enable_io_wakeup
-Message-ID: <20181018005400.7521-1-natechancellor@gmail.com>
+Date: Wed, 17 Oct 2018 17:56:28 -0700
+Subject: [PATCH] mfd: db8500-prcmu: Fix some section annotations
+Message-ID: <20181018005628.8295-1-natechancellor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 When building the kernel with Clang, the following section mismatch
-warning appears:
+warnings appear:
 
-WARNING: vmlinux.o(.text+0x38b3c): Section mismatch in reference from
-the function omap44xx_prm_late_init() to the function
-.init.text:omap44xx_prm_enable_io_wakeup()
-The function omap44xx_prm_late_init() references
-the function __init omap44xx_prm_enable_io_wakeup().
-This is often because omap44xx_prm_late_init lacks a __init
-annotation or the annotation of omap44xx_prm_enable_io_wakeup is wrong.
+WARNING: vmlinux.o(.text+0x7239cc): Section mismatch in reference from
+the function db8500_prcmu_probe() to the function
+.init.text:init_prcm_registers()
+The function db8500_prcmu_probe() references
+the function __init init_prcm_registers().
+This is often because db8500_prcmu_probe lacks a __init
+annotation or the annotation of init_prcm_registers is wrong.
 
-Remove the __init annotation from omap44xx_prm_enable_io_wakeup so there
-is no more mismatch.
+WARNING: vmlinux.o(.text+0x723e28): Section mismatch in reference from
+the function db8500_prcmu_probe() to the function
+.init.text:fw_project_name()
+The function db8500_prcmu_probe() references
+the function __init fw_project_name().
+This is often because db8500_prcmu_probe lacks a __init
+annotation or the annotation of fw_project_name is wrong.
+
+db8500_prcmu_probe should not be marked as __init so remove the __init
+annotation from fw_project_name and init_prcm_registers.
 
 Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
 ---
- arch/arm/mach-omap2/prm44xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mfd/db8500-prcmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 7b95729e8359..38a1be6c3694 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -351,7 +351,7 @@ static void omap44xx_prm_reconfigure_io_chain(void)
-  * to occur, WAKEUPENABLE bits must be set in the pad mux registers, and
-  * omap44xx_prm_reconfigure_io_chain() must be called.  No return value.
-  */
--static void __init omap44xx_prm_enable_io_wakeup(void)
-+static void omap44xx_prm_enable_io_wakeup(void)
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 5970b8def548..aec20e1c7d3d 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2584,7 +2584,7 @@ static struct irq_chip prcmu_irq_chip = {
+ 	.irq_unmask	= prcmu_irq_unmask,
+ };
+ 
+-static __init char *fw_project_name(u32 project)
++static char *fw_project_name(u32 project)
  {
- 	s32 inst = omap4_prmst_get_prm_dev_inst();
+ 	switch (project) {
+ 	case PRCMU_FW_PROJECT_U8500:
+@@ -2732,7 +2732,7 @@ void __init db8500_prcmu_early_init(u32 phy_base, u32 size)
+ 	INIT_WORK(&mb0_transfer.mask_work, prcmu_mask_work);
+ }
+ 
+-static void __init init_prcm_registers(void)
++static void init_prcm_registers(void)
+ {
+ 	u32 val;
  
 -- 
 2.19.1
