@@ -1,58 +1,57 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 18 Oct 2018 22:50:09 +0200
-Subject: [PATCH v5 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
-References: <1539839345-14021-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <20181018225009.59d94aee@bbrezillon>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 19 Oct 2018 00:15:49 +0200
+Subject: omap4: support for manually updated display
+In-Reply-To: <20180910174453.GV5662@atomide.com>
+References: <20180830090456.GA17277@amd>
+ <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
+ <3205865.8O8aibZXye@avalon> <20180910174453.GV5662@atomide.com>
+Message-ID: <20181018221549.GB6364@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Oct 2018 13:09:05 +0800
-Jianxin Pan <jianxin.pan@amlogic.com> wrote:
+Hi!
 
-> +static int meson_nfc_buffer_init(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *nand = mtd_to_nand(mtd);
-> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
-> +	static int max_page_bytes, max_info_bytes;
-> +	int page_bytes, info_bytes;
-> +	int nsectors;
-> +
-> +	nsectors = mtd->writesize / nand->ecc.size;
-> +	page_bytes =  mtd->writesize + mtd->oobsize;
-> +	info_bytes = nsectors * PER_INFO_BYTE;
-> +
-> +	if (nfc->data_buf && nfc->info_buf) {
-> +		if (max_page_bytes < page_bytes)
-> +			meson_nfc_free_buffer(nfc);
-> +		else
-> +			return 0;
-> +	}
-> +
-> +	max_page_bytes = max_t(int, max_page_bytes, page_bytes);
-> +	max_info_bytes = max_t(int, max_info_bytes, info_bytes);
-> +
-> +	nfc->data_buf = kmalloc(max_page_bytes, GFP_KERNEL);
+> > I want to make it clear that I don't want to claim any privilege in getting 
+> > patches merged first. I am however worried that, without an easy way to test 
+> > DSI support, and without enough time to focus on it, I would break whatever 
+> > would be merged now in future reworks. I would thus like to find out how to 
+> > collaborate on this task, hopefully to move towards usage of drm_bridge and 
+> > drm_panel for DSI-based pipelines.
+> 
+> Real users with mainline kernel with a real product should
+> always have priority over any ongoing clean-up.
+> 
+> And for testing, a bunch of real users is something you can't
+> beat for proper testing of code on ongoing basis!
+> 
+> Naturally the burden of getting the patches ready is on the people
+> using them for rebase and fixing comments. And Sebastian has
+> already agreed help with maintaining it.
+> 
+> I've been actually using DSI command mode support and testing
+> Linux next several times a week to prevent regressions from
+> sneaking into -rc1 in general. So now I can't test omapdrm with
+> next until Sebastian is done with rebasing.. Back to headless
+> testing then.
+> 
+> Anyways, I'd say let's add the DSI command mode support ASAP after
+> rebasing, there are at least Sebastian, Pavel and I then testing
+> and helping with further ongoing panel conversion work.
 
-Is there a good reason for not using chip->data_buf and allocating a
-new buffer here?
+Are there any news here? Does someone have a patch set that actually
+works?
 
-> +	if (!nfc->data_buf)
-> +		return -ENOMEM;
-> +
-> +	nfc->info_buf = kmalloc(max_info_bytes, GFP_KERNEL);
-> +	if (!nfc->info_buf) {
-> +		kfree(nfc->data_buf);
-> +		return -ENOMEM;
-> +	}
+Are there any in-progress patches I could help with?
 
-I'd recommend moving this info_buf in the priv chip struct, otherwise
-you'll have to protect nfc->info_buf with a lock to prevent an already
-register chip from using this pointer while you're reallocating the
-buffer. Also, I think you have a memleak here.
-
-> +
-> +	return 0;
-> +}
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181019/e7b5e3f2/attachment.sig>
