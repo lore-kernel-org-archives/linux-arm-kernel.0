@@ -1,80 +1,108 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 18 Oct 2018 21:10:11 +0530
-Subject: [PATCH v2 04/10] firmware: ti_sci: Add RM mapping table for am654
-In-Reply-To: <20181018154017.7112-1-lokeshvutla@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
-Message-ID: <20181018154017.7112-5-lokeshvutla@ti.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 18 Oct 2018 08:17:35 -0700
+Subject: [PATCH 7/9] arm64: allwinner: a64: enable ANX6345 bridge on
+ Pinebook
+In-Reply-To: <20181018073327.64942-8-icenowy@aosc.io>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <20181018073327.64942-8-icenowy@aosc.io>
+Message-ID: <10486569.ZhsSaQbvn5@anarsoul-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Hi Icenowy,
 
-Add the resource mapping table for AM654 SoC as defined
-in http://downloads.ti.com/tisci/esd/latest/5_soc_doc/am6x/resasg_types.html
-Introduce a new compatible for AM654 "ti,am654-sci" for using
-this resource map table.
+On Thursday, October 18, 2018 12:33:25 AM PDT Icenowy Zheng wrote:
+> Pinebook has an ANX6345 bridge connected to the RGB666 LCD output, and
+> the I2C controlling signals are connected to R_I2C bus.
+> 
+> Enable it in the device tree, and add a usable EDID from the panel's
+> datasheet (at least 14" Pinebook used a panel without EDID).
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Changes since v1:
-- new patch added.
+There's no EDID in dts and 14" Pinebook uses a panel with EDID. Is it leftover 
+of old comment?
 
- .../bindings/arm/keystone/ti,sci.txt          |  3 ++-
- drivers/firmware/ti_sci.c                     | 23 +++++++++++++++++++
- 2 files changed, 25 insertions(+), 1 deletion(-)
+Regards,
+Vasily
 
-diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-index b56a02c10ae6..6f0cd31c1520 100644
---- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-@@ -24,7 +24,8 @@ relationship between the TI-SCI parent node to the child node.
- 
- Required properties:
- -------------------
--- compatible: should be "ti,k2g-sci"
-+- compatible:	should be "ti,k2g-sci" for TI 66AK2G SoC
-+		should be "ti,am654-sci" for for TI AM654 SoC
- - mbox-names:
- 	"rx" - Mailbox corresponding to receive path
- 	"tx" - Mailbox corresponding to transmit path
-diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
-index 987bfb29475c..c2f0815edab6 100644
---- a/drivers/firmware/ti_sci.c
-+++ b/drivers/firmware/ti_sci.c
-@@ -2500,10 +2500,33 @@ static const struct ti_sci_desc ti_sci_pmmc_k2g_desc = {
- 	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
- 	.max_msgs = 20,
- 	.max_msg_size = 64,
-+	.rm_type_map = NULL,
-+};
-+
-+static struct ti_sci_rm_type_map ti_sci_am654_rm_type_map[] = {
-+	{.dev_id = 56, .type = 0x00b}, /* GIC_IRQ */
-+	{.dev_id = 179, .type = 0x000}, /* MAIN_NAV_UDMASS_IA0 */
-+	{.dev_id = 187, .type = 0x009}, /* MAIN_NAV_RA */
-+	{.dev_id = 188, .type = 0x006}, /* MAIN_NAV_UDMAP */
-+	{.dev_id = 194, .type = 0x007}, /* MCU_NAV_UDMAP */
-+	{.dev_id = 195, .type = 0x00a}, /* MCU_NAV_RA */
-+	{.dev_id = 0, .type = 0x000}, /* end of table */
-+};
-+
-+/* Description for AM654 */
-+static const struct ti_sci_desc ti_sci_pmmc_am654_desc = {
-+	.default_host_id = 12,
-+	/* Conservative duration */
-+	.max_rx_timeout_ms = 10000,
-+	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
-+	.max_msgs = 20,
-+	.max_msg_size = 60,
-+	.rm_type_map = ti_sci_am654_rm_type_map,
- };
- 
- static const struct of_device_id ti_sci_of_match[] = {
- 	{.compatible = "ti,k2g-sci", .data = &ti_sci_pmmc_k2g_desc},
-+	{.compatible = "ti,am654-sci", .data = &ti_sci_pmmc_am654_desc},
- 	{ /* Sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, ti_sci_of_match);
--- 
-2.19.1
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../dts/allwinner/sun50i-a64-pinebook.dts     | 43 +++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts index
+> 77fac84797e9..d7c14d0d61f9 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> @@ -66,6 +66,10 @@
+>  	};
+>  };
+> 
+> +&de {
+> +	status = "okay";
+> +};
+> +
+>  &ehci0 {
+>  	phys = <&usbphy 0>;
+>  	phy-names = "usb";
+> @@ -76,6 +80,10 @@
+>  	status = "okay";
+>  };
+> 
+> +&mixer0 {
+> +	status = "okay";
+> +};
+> +
+>  &mmc0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc0_pins>;
+> @@ -127,6 +135,27 @@
+>  	status = "okay";
+>  };
+> 
+> +&r_i2c {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&r_i2c_pins_a>;
+> +	status = "okay";
+> +
+> +	anx6345: anx6345 at 38 {
+> +		compatible = "analogix,anx6345";
+> +		reg = <0x38>;
+> +		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
+> +		panel-supply = <&reg_dc1sw>;
+> +		dvdd25-supply = <&reg_dldo2>;
+> +		dvdd12-supply = <&reg_fldo1>;
+> +
+> +		port {
+> +			anx6345_in: endpoint {
+> +				remote-endpoint = <&tcon0_out_anx6345>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+>  &r_rsb {
+>  	status = "okay";
+> 
+> @@ -267,6 +296,20 @@
+>  	vcc-hdmi-supply = <&reg_dldo1>;
+>  };
+> 
+> +&tcon0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&lcd_rgb666_pins>;
+> +
+> +	status = "okay";
+> +};
+> +
+> +&tcon0_out {
+> +	tcon0_out_anx6345: endpoint at 0 {
+> +		reg = <0>;
+> +		remote-endpoint = <&anx6345_in>;
+> +	};
+> +};
+> +
+>  &uart0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart0_pb_pins>;
