@@ -1,39 +1,111 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 18 Oct 2018 19:20:56 +0800
-Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
- SPIs
-In-Reply-To: <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
-References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
- <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
- <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com> <5BC800EB.5070201@huawei.com>
- <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
-Message-ID: <df892248-4f9c-c095-df9b-885f1e650ba0@huawei.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Oct 2018 14:23:50 +0300
+Subject: [PATCH 4/9] dt-bindings: Add ANX6345 DP/eDP transmitter binding
+In-Reply-To: <c68f0da9607805e1f6673a9a16a7dcfff4d8fe91.camel@aosc.io>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <1886367.eljNk7jKYl@avalon>
+ <c68f0da9607805e1f6673a9a16a7dcfff4d8fe91.camel@aosc.io>
+Message-ID: <2778638.na8ndVNUfi@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Icenowy,
 
->>>>
->>> Now, the biggest question of them all: how does it work with ACPI? Last
->>> time I checked, there was no DT support for platforms using the MBIGEN.
->> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hip07.dtsi
->> This DT describes how platform devices using the MBIGEN.
+On Thursday, 18 October 2018 13:00:05 EEST Icenowy Zheng wrote:
+> ? 2018-10-18?? 11:53 +0300?Laurent Pinchart???
+> > On Thursday, 18 October 2018 10:33:22 EEST Icenowy Zheng wrote:
+> >> The ANX6345 is an ultra-low power DisplayPort/eDP transmitter
+> >> designed
+> >> for portable devices.
+> >> 
+> >> Add a binding document for it.
+> >> 
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> ---
+> >> 
+> >>  .../bindings/display/bridge/anx6345.txt       | 39 +++++++++++++++++++
+> >> 
+> >>  1 file changed, 39 insertions(+)
+> >>  create mode 100644
+> >> 
+> >> Documentation/devicetree/bindings/display/bridge/anx6345.txt
+> >> 
+> >> diff --git
+> >> a/Documentation/devicetree/bindings/display/bridge/anx6345.txt
+> >> b/Documentation/devicetree/bindings/display/bridge/anx6345.txt new
+> >> file
+> >> mode 100644
+> >> index 000000000000..0689d4eb5f65
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/display/bridge/anx6345.txt
+> >> @@ -0,0 +1,39 @@
+> >> +Analogix ANX6345 eDP Transmitter
+> >> +--------------------------------
+> >> +
+> >> +The ANX6345 is an ultra-low power Full-HD eDP transmitter designed
+> >> for
+> >> +portable devices.
+> >> +
+> >> +Required properties:
+> >> +
+> >> + - compatible		: "analogix,anx6345"
+> >> + - reg			: I2C address of the device
+> >> + - reset-gpios		: Which GPIO to use for reset
+> >> +
+> >> +Optional properties:
+> >> +
+> >> + - dvdd12-supply	: Regulator for 1.2V digital core power.
+> >> + - dvdd25-supply	: Regulator for 2.5V digital core power.
+> > 
+> > Shouldn't these to supplies be mandatory ?
 > 
-> That's not how my own D05 boots. It is ACPI only. How is that going to
-> work on this platform?
+> Yes they should.
+> 
+> >> + - panel-supply		: Regulator for the power of the panel.
+> > 
+> > Shouldn't the panel supply for specified in the DT node of the panel
+> > ?
+> 
+> However, eDP panel can be probed, may vary on the same device, and we
+> don't have a generic binding for it...
 
-D05 is ACPI only so it has no dtb in the firmware, that's why we can
-boot D05 without acpi=on in the boot cmdline, but if you want to
-boot D05 with dtb, you could try to specify the dtb in the grub
-(seems centos based):
+Shouldn't we fix that ? :-)
 
-menuentry "example" --id example{
-        linux /Image-kernel root=... rdinit=...
-        initrd /example.img
-        devicetree /d05.dtb
-}
+> >> + - edid			: verbatim EDID data block describing
+> >> attached
+> >> +			  panel, only used when the panel has no EDID
+> >> info.
+> > 
+> > This should also be specified in the panel DT node.
+> > 
+> > > + - Video port for RGB input, using the DT bindings defined in [1].
+> > 
+> > I think you should also add a port for the output.
+> 
+> What will it point to?
 
-Hope it helps.
+The panel DT node ?
 
-Thanks
-Hanjun
+> >> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+> >> +
+> >> +Example:
+> >> +
+> >> +anx6345: anx6345 at 38 {
+> >> +	compatible = "analogix,anx6345";
+> >> +	reg = <0x38>;
+> >> +	reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
+> >> +	panel-supply = <&reg_dc1sw>;
+> >> +	dvdd25-supply = <&reg_dldo2>;
+> >> +	dvdd12-supply = <&reg_fldo1>;
+> >> +
+> >> +	port {
+> >> +		anx6345_in: endpoint {
+> >> +			remote-endpoint = <&tcon0_out_anx6345>;
+> >> +		};
+> >> +	};
+> >> +};
+
+-- 
+Regards,
+
+Laurent Pinchart
