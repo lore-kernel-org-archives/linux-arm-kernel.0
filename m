@@ -1,58 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Oct 2018 12:19:51 +0100
-Subject: [PATCH v5 1/2] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
- lock
-In-Reply-To: <2c4e00a2-cd53-a6f5-8561-97379dcf9c02@huawei.com>
-References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
- <2c4e00a2-cd53-a6f5-8561-97379dcf9c02@huawei.com>
-Message-ID: <535fd13d-4cc5-e551-01d9-f7eb05c3ddb0@arm.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 18 Oct 2018 19:20:56 +0800
+Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
+ SPIs
+In-Reply-To: <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
+References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
+ <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
+ <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com> <5BC800EB.5070201@huawei.com>
+ <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
+Message-ID: <df892248-4f9c-c095-df9b-885f1e650ba0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/18 11:55, John Garry wrote:
-[...]
->> @@ -976,18 +1019,19 @@ static int __arm_smmu_cmdq_issue_sync(struct 
->> arm_smmu_device *smmu)
->> ?{
->> ???? u64 cmd[CMDQ_ENT_DWORDS];
->> ???? unsigned long flags;
->> -??? bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->> ???? struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
->> -??? int ret;
->> +??? int sync_idx, sync_gen;
->>
->> ???? arm_smmu_cmdq_build_cmd(cmd, &ent);
->>
->> ???? spin_lock_irqsave(&smmu->cmdq.lock, flags);
->> -??? arm_smmu_cmdq_insert_cmd(smmu, cmd);
->> -??? ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
->> +??? if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
->> +??????? arm_smmu_cmdq_insert_cmd(smmu, cmd);
-> 
-> Hi Robin,
-> 
-> If we did stop rebuilding the non-MSI command as I suggested, then we 
-> would not have the case of building the command and then discarding it, 
-> right?
+Hi Marc,
 
-I suppose so. But that build/discard case can also be avoided by 
-applying patch 2/2 of this series ;)
+>>>>
+>>> Now, the biggest question of them all: how does it work with ACPI? Last
+>>> time I checked, there was no DT support for platforms using the MBIGEN.
+>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+>> This DT describes how platform devices using the MBIGEN.
+> 
+> That's not how my own D05 boots. It is ACPI only. How is that going to
+> work on this platform?
 
-Robin.
+D05 is ACPI only so it has no dtb in the firmware, that's why we can
+boot D05 without acpi=on in the boot cmdline, but if you want to
+boot D05 with dtb, you could try to specify the dtb in the grub
+(seems centos based):
 
-> 
-> Thanks,
-> John
-> 
->> +??? sync_idx = smmu->cmdq.q.prod;
->> +??? sync_gen = READ_ONCE(smmu->cmdq_generation);
->> ???? spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->>
->> -??? return ret;
->> +??? return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
->> ?}
->>
->> ?static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->>
-> 
-> 
+menuentry "example" --id example{
+        linux /Image-kernel root=... rdinit=...
+        initrd /example.img
+        devicetree /d05.dtb
+}
+
+Hope it helps.
+
+Thanks
+Hanjun
