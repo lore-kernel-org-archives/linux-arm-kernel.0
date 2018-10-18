@@ -1,104 +1,214 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Oct 2018 11:44:46 +0100
-Subject: [RFC PATCH 4/4] i2c: core: introduce master_xfer_irqless callback
-In-Reply-To: <20180920161423.13990-5-wsa+renesas@sang-engineering.com>
-References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
- <20180920161423.13990-5-wsa+renesas@sang-engineering.com>
-Message-ID: <20181018104446.GM6920@n2100.armlinux.org.uk>
+From: john.garry@huawei.com (John Garry)
+Date: Thu, 18 Oct 2018 11:55:47 +0100
+Subject: [PATCH v5 1/2] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
+ lock
+In-Reply-To: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+Message-ID: <2c4e00a2-cd53-a6f5-8561-97379dcf9c02@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 06:14:23PM +0200, Wolfram Sang wrote:
-> We had the request to access devices very late when interrupts are not
-> available anymore multiple times now. Mostly to prepare shutdown or
-> reboot. Allow adapters to specify a specific callback for this case.
-> Note that we fall back to the generic master_xfer callback if this new
-> irqless one is not present. This is intentional to preserve the previous
-> behaviour and avoid regressions. Because there are drivers not using
-> interrupts or because it might have worked "accidently" before.
-
-It's not really about "irqless", it's about being in atomic context.
-irqless makes it sound like you may sleep, but the reality is sleeping
-is also out (the scheduler needs IRQs to do it's job.)
-
-So, it may be tempting to use things like msleep() in "irqless" but
-that's not permissable.  So surely "atomic" would be a better name for
-this?
-
-Also, how does this get around the issue which I pointed out with (eg)
-an oops occuring, which leads to a panic followed by an attempt to
-reboot if the I2C bus in question is already mid-transaction?  Won't
-we deadlock?
-
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On 17/10/2018 14:56, Robin Murphy wrote:
+> Even without the MSI trick, we can still do a lot better than hogging
+> the entire queue while it drains. All we actually need to do for the
+> necessary guarantee of completion is wait for our particular command to
+> have been consumed - as long as we keep track of where we inserted it,
+> there is no need to block other CPUs from adding further commands in the
+> meantime. There is one theoretical (but incredibly unlikely) edge case
+> to avoid, where cons has wrapped twice to still appear 'behind' the sync
+> position - this is easily disambiguated by adding a generation count to
+> the queue to indicate when prod wraps, since cons cannot wrap twice
+> without prod having wrapped at least once.
+>
+> This also makes it reasonable to separate the two conceptually different
+> modes of polling such that command insertion - which really wants to be
+> fair and have minimal latency - is not subject to exponential backoff,
+> and returns to its original implementation.
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > ---
->  drivers/i2c/i2c-core-base.c |  6 +++++-
->  include/linux/i2c.h         | 10 +++++++---
->  2 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-> index 904b4d2ebefa..f827446c3089 100644
-> --- a/drivers/i2c/i2c-core-base.c
-> +++ b/drivers/i2c/i2c-core-base.c
-> @@ -1887,7 +1887,11 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
->  	/* Retry automatically on arbitration loss */
->  	orig_jiffies = jiffies;
->  	for (ret = 0, try = 0; try <= adap->retries; try++) {
-> -		ret = adap->algo->master_xfer(adap, msgs, num);
-> +		if ((in_atomic() || irqs_disabled()) && adap->algo->master_xfer_irqless)
-> +			ret = adap->algo->master_xfer_irqless(adap, msgs, num);
-> +		else
-> +			ret = adap->algo->master_xfer(adap, msgs, num);
+>
+> v5:
+>  - Rework to incorporate the back-to-back sync elision.
+>  - Refactor the generation count slightly to preemptively help with
+>    the HiSilicon MSI workaround.
+>  - Split the cleanup into a separate patch for ease of review (it could
+>    happily be squashed when applied).
+>
+> The fundamental logic is copied directly from v4, but I've dropped the
+> previous tested-by since there are a fair few subtle changes in how it's
+> integrated. Patches are based on Will's iommu/devel branch plus my "Fix
+> big-endian CMD_SYNC writes" patch.
+>
+> Robin.
+>
+>  drivers/iommu/arm-smmu-v3.c | 94 +++++++++++++++++++++++++++----------
+>  1 file changed, 69 insertions(+), 25 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 867ba548c2cc..da8a91d116bf 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -588,6 +588,7 @@ struct arm_smmu_device {
+>  	struct arm_smmu_strtab_cfg	strtab_cfg;
+>
+>  	u32				sync_count;
+> +	int				cmdq_generation;
+>
+>  	/* IOMMU core code handle */
+>  	struct iommu_device		iommu;
+> @@ -676,6 +677,17 @@ static bool queue_empty(struct arm_smmu_queue *q)
+>  	       Q_WRP(q, q->prod) == Q_WRP(q, q->cons);
+>  }
+>
+> +static bool queue_behind(struct arm_smmu_queue *q, u32 idx)
+> +{
+> +	return Q_IDX(q, q->cons) < Q_IDX(q, idx);
+> +}
 > +
->  		if (ret != -EAGAIN)
->  			break;
->  		if (time_after(jiffies, orig_jiffies + adap->timeout))
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index 65b4eaed1d96..11e615123bd0 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -498,6 +498,8 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
->   * @master_xfer: Issue a set of i2c transactions to the given I2C adapter
->   *   defined by the msgs array, with num messages available to transfer via
->   *   the adapter specified by adap.
-> + * @master_xfer_irqless: same as master_xfer. Yet, not using any interrupts
-> + *   so e.g. PMICs can be accessed very late before shutdown
->   * @smbus_xfer: Issue smbus transactions to the given I2C adapter. If this
->   *   is not present, then the bus layer will try and convert the SMBus calls
->   *   into I2C transfers instead.
-> @@ -511,9 +513,9 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
->   * be addressed using the same bus algorithms - i.e. bit-banging or the PCF8584
->   * to name two of the most common.
->   *
-> - * The return codes from the @master_xfer field should indicate the type of
-> - * error code that occurred during the transfer, as documented in the kernel
-> - * Documentation file Documentation/i2c/fault-codes.
-> + * The return codes from the @master_xfer{_irqless} field should indicate the
-> + * type of error code that occurred during the transfer, as documented in the
-> + * Kernel Documentation file Documentation/i2c/fault-codes.
->   */
->  struct i2c_algorithm {
->  	/* If an adapter algorithm can't do I2C-level access, set master_xfer
-> @@ -524,6 +526,8 @@ struct i2c_algorithm {
->  	   processed, or a negative value on error */
->  	int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs,
->  			   int num);
-> +	int (*master_xfer_irqless)(struct i2c_adapter *adap,
-> +				   struct i2c_msg *msgs, int num);
->  	int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr,
->  			   unsigned short flags, char read_write,
->  			   u8 command, int size, union i2c_smbus_data *data);
-> -- 
-> 2.18.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +static bool queue_ahead_not_wrapped(struct arm_smmu_queue *q, u32 idx)
+> +{
+> +	return Q_IDX(q, q->cons) >= Q_IDX(q, idx) &&
+> +	       Q_WRP(q, q->cons) == Q_WRP(q, idx);
+> +}
+> +
+>  static void queue_sync_cons(struct arm_smmu_queue *q)
+>  {
+>  	q->cons = readl_relaxed(q->cons_reg);
+> @@ -709,33 +721,19 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>  	writel(q->prod, q->prod_reg);
+>  }
+>
+> -/*
+> - * Wait for the SMMU to consume items. If sync is true, wait until the queue
+> - * is empty. Otherwise, wait until there is at least one free slot.
+> - */
+> -static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
+> +static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
+>  {
+> -	ktime_t timeout;
+> -	unsigned int delay = 1, spin_cnt = 0;
+> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+>
+> -	/* Wait longer if it's a CMD_SYNC */
+> -	timeout = ktime_add_us(ktime_get(), sync ?
+> -					    ARM_SMMU_CMDQ_SYNC_TIMEOUT_US :
+> -					    ARM_SMMU_POLL_TIMEOUT_US);
+> -
+> -	while (queue_sync_cons(q), (sync ? !queue_empty(q) : queue_full(q))) {
+> +	while (queue_sync_cons(q), queue_full(q)) {
+>  		if (ktime_compare(ktime_get(), timeout) > 0)
+>  			return -ETIMEDOUT;
+>
+>  		if (wfe) {
+>  			wfe();
+> -		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
+> -			cpu_relax();
+> -			continue;
+>  		} else {
+> -			udelay(delay);
+> -			delay *= 2;
+> -			spin_cnt = 0;
+> +			cpu_relax();
+> +			udelay(1);
+>  		}
+>  	}
+>
+> @@ -905,8 +903,11 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+>
+>  	smmu->prev_cmd_opcode = FIELD_GET(CMDQ_0_OP, cmd[0]);
+>
+> +	if (Q_IDX(q, q->prod + 1) == 0)
+> +		WRITE_ONCE(smmu->cmdq_generation, smmu->cmdq_generation + 1);
+> +
+>  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+> -		if (queue_poll_cons(q, false, wfe))
+> +		if (queue_poll_cons(q, wfe))
+>  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+>  	}
+>  }
+> @@ -945,6 +946,48 @@ static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+>  	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
+>  }
+>
+> +static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
+> +				   int sync_gen)
+> +{
+> +	struct arm_smmu_queue *q = &smmu->cmdq.q;
+> +	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+> +	unsigned int delay = 1, spin_cnt = 0;
+> +	ktime_t timeout;
+> +
+> +	timeout = ktime_add_us(ktime_get(), ARM_SMMU_CMDQ_SYNC_TIMEOUT_US);
+> +	do {
+> +		queue_sync_cons(q);
+> +		/*
+> +		 * If we see updates quickly enough, cons has passed sync_idx,
+> +		 * but not yet wrapped. At worst, cons might have actually
+> +		 * wrapped an even number of times, but that still guarantees
+> +		 * the original sync must have been consumed.
+> +		 */
+> +		if (queue_ahead_not_wrapped(q, sync_idx))
+> +			return 0;
+> +		/*
+> +		 * Otherwise, cons may have passed sync_idx and wrapped one or
+> +		 * more times to appear behind it again, but in that case prod
+> +		 * must also be one or more generations ahead.
+> +		 */
+> +		if (queue_behind(q, sync_idx) &&
+> +		    READ_ONCE(smmu->cmdq_generation) != sync_gen)
+> +			return 0;
+> +
+> +		if (wfe) {
+> +			wfe();
+> +		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
+> +			cpu_relax();
+> +		} else {
+> +			udelay(delay);
+> +			delay *= 2;
+> +			spin_cnt = 0;
+> +		}
+> +	} while (ktime_before(ktime_get(), timeout));
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+>  static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+>  {
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+> @@ -976,18 +1019,19 @@ static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+>  {
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+>  	unsigned long flags;
+> -	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>  	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+> -	int ret;
+> +	int sync_idx, sync_gen;
+>
+>  	arm_smmu_cmdq_build_cmd(cmd, &ent);
+>
+>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+> -	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+> -	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+> +	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
+> +		arm_smmu_cmdq_insert_cmd(smmu, cmd);
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Hi Robin,
+
+If we did stop rebuilding the non-MSI command as I suggested, then we 
+would not have the case of building the command and then discarding it, 
+right?
+
+Thanks,
+John
+
+> +	sync_idx = smmu->cmdq.q.prod;
+> +	sync_gen = READ_ONCE(smmu->cmdq_generation);
+>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>
+> -	return ret;
+> +	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+>  }
+>
+>  static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+>
