@@ -1,89 +1,63 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 Oct 2018 15:33:26 +0800
-Subject: [PATCH 8/9] arm64: allwinner: a64: enable ANX6345 bridge on TERES-I
+Date: Thu, 18 Oct 2018 15:33:27 +0800
+Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to dot
+ clock frequency check
 In-Reply-To: <20181018073327.64942-1-icenowy@aosc.io>
 References: <20181018073327.64942-1-icenowy@aosc.io>
-Message-ID: <20181018073327.64942-9-icenowy@aosc.io>
+Message-ID: <20181018073327.64942-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TERES-I has an ANX6345 bridge connected to the RGB666 LCD output, and
-the I2C controlling signals are connected to I2C0 bus.
+From: Chen-Yu Tsai <wens@csie.org>
 
-Enable it in the device tree.
+The panels shipped with Allwinner devices are very "generic", i.e.
+they do not have model numbers or reliable sources of information
+for the timings (that we know of) other than the fex files shipped
+on them. The dot clock frequency provided in the fex files have all
+been rounded to the nearest MHz, as that is the unit used in them.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+We were using the simple panel "urt,umsh-8596md-t" as a substitute
+for the A13 Q8 tablets in the absence of a specific model for what
+may be many different but otherwise timing compatible panels. This
+was usable without any visual artifacts or side effects, until the
+dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+rgb: Validate the clock rate").
+
+The reason this check fails is because the dotclock frequency for
+this model is 33.26 MHz, which is not achievable with our dot clock
+hardware, and the rate returned by clk_round_rate deviates slightly,
+causing the driver to reject the display mode.
+
+The LCD panels have some tolerance on the dot clock frequency, even
+if it's not specified in their datasheets.
+
+This patch adds a 5% tolerence to the dot clock check.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../boot/dts/allwinner/sun50i-a64-teres-i.dts | 40 +++++++++++++++++--
- 1 file changed, 36 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-index c455b24dd079..bc1d0d6c0672 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-@@ -72,20 +72,38 @@
- 	};
- };
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index bf068da6b12e..23bdc449eacc 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -92,13 +92,14 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
+ 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
  
++	/* Check against a 5% tolerance for the dot clock */
+ 	tcon->dclk_min_div = 6;
+ 	tcon->dclk_max_div = 127;
+ 	rounded_rate = clk_round_rate(tcon->dclk, rate);
+-	if (rounded_rate < rate)
++	if (rounded_rate < rate * 19 / 20 )
+ 		return MODE_CLOCK_LOW;
  
--/* The ANX6345 eDP-bridge is on i2c0. There is no linux (mainline)
-- * driver for this chip at the moment, the bootloader initializes it.
-- * However it can be accessed with the i2c-dev driver from user space.
-- */
- &i2c0 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins>;
- 	status = "okay";
-+
-+	anx6345: anx6345 at 38 {
-+		compatible = "analogix,anx6345";
-+		reg = <0x38>;
-+		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
-+		dvdd25-supply = <&reg_dldo2>;
-+		dvdd12-supply = <&reg_dldo3>;
-+
-+		port {
-+			anx6345_in: endpoint {
-+				remote-endpoint = <&tcon0_out_anx6345>;
-+			};
-+		};
-+	};
-+};
-+
-+&mixer0 {
-+	status = "okay";
- };
+-	if (rounded_rate > rate)
++	if (rounded_rate > rate * 21 / 20)
+ 		return MODE_CLOCK_HIGH;
  
- &mmc0 {
-@@ -258,6 +276,20 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_anx6345: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&anx6345_in>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+ 	DRM_DEBUG_DRIVER("Clock rate OK\n");
 -- 
 2.18.1
