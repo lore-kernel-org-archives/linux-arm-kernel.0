@@ -1,245 +1,56 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 18 Oct 2018 17:26:06 +0000
-Subject: [PATCH V7 3/3] firmware: imx: add SCU power domain driver
-In-Reply-To: <1539883285-7990-1-git-send-email-aisheng.dong@nxp.com>
-References: <1539883285-7990-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1539883285-7990-4-git-send-email-aisheng.dong@nxp.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Oct 2018 18:31:36 +0100
+Subject: [PATCH v7 7/8] arm64: update
+ Documentation/arm64/tagged-pointers.txt
+In-Reply-To: <CAAeHK+yPCRNAOSi6OpYC_Tdbo9SoXRVRbx8pjXNq96v8csO-Wg@mail.gmail.com>
+References: <cover.1538485901.git.andreyknvl@google.com>
+ <47a464307d4df3c0cb65f88d1fe83f9a741dd74b.1538485901.git.andreyknvl@google.com>
+ <20181003173256.GG12998@arrakis.emea.arm.com>
+ <CAAeHK+yPCRNAOSi6OpYC_Tdbo9SoXRVRbx8pjXNq96v8csO-Wg@mail.gmail.com>
+Message-ID: <20181018173135.GF237391@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some i.MX SoCs contain a system controller that is responsible for
-controlling the state of the IPs that are present. Communication
-between the host processor running an OS and the system controller
-happens through a SCU protocol. This patch adds SCU protocol based
-power domains drivers.
+On Wed, Oct 10, 2018 at 04:09:25PM +0200, Andrey Konovalov wrote:
+> On Wed, Oct 3, 2018 at 7:32 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Oct 02, 2018 at 03:12:42PM +0200, Andrey Konovalov wrote:
+[...]
+> > Also, how is user space supposed to know that it can now pass tagged
+> > pointers into the kernel? An ABI change (or relaxation), needs to be
+> > advertised by the kernel, usually via a new HWCAP bit (e.g. HWCAP_TBI).
+> > Once we have a HWCAP bit in place, we need to be pretty clear about
+> > which syscalls can and cannot cope with tagged pointers. The "as of now"
+> > implies potential further relaxation which, again, would need to be
+> > advertised to user in some (additional) way.
+> 
+> How exactly should I do that? Something like this [1]? Or is it only
+> for hardware specific things and for this patchset I need to do
+> something else?
+> 
+> [1] https://github.com/torvalds/linux/commit/7206dc93a58fb76421c4411eefa3c003337bcb2d
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: linux-pm at vger.kernel.org
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-ChangeLog:
-v6->v7:
- * still using generic "fsl,scu-pd" to driver binding incase the future
-   SoC is compatible
- * remove unnecessary cast
-v5->v6:
- * only compatible string name updated from fsl,scu-pd to fsl,imx8qxp-scu-pd
-   accordingly
-v4->v5:
- * minor improvements according to Sascha's suggestions
-v3->v4:
- * update firmware headfile patch from include/soc/imx to
-   include/linux/firmware/imx
-v2->v3:
- * name of structures/enums updated with imx_sc prefix
-v1->v2:
- * move into drivers/firmware/imx
- * Implement sc_pm_set_resource_power_mode() API in the driver instead
-   of call it via SCU API according to Sascha's suggestion
----
- drivers/firmware/imx/Kconfig  |   6 ++
- drivers/firmware/imx/Makefile |   3 +-
- drivers/firmware/imx/scu-pd.c | 164 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 172 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/imx/scu-pd.c
+Thinking some more on this, we should probably keep the HWCAP_* bits for
+actual hardware features. Maybe someone else has a better idea (the
+linux-abi list?). An option would be to make use of AT_FLAGS auxv
+(currently 0) in Linux. I've seen some MIPS patches in the past but
+nothing upstream.
 
-diff --git a/drivers/firmware/imx/Kconfig b/drivers/firmware/imx/Kconfig
-index b170c28..6a7a7c2 100644
---- a/drivers/firmware/imx/Kconfig
-+++ b/drivers/firmware/imx/Kconfig
-@@ -9,3 +9,9 @@ config IMX_SCU
- 
- 	  This driver manages the IPC interface between host CPU and the
- 	  SCU firmware running on M4.
-+
-+config IMX_SCU_PD
-+	bool "IMX SCU Power Domain driver"
-+	depends on IMX_SCU
-+	help
-+	  The System Controller Firmware (SCFW) based power domain driver.
-diff --git a/drivers/firmware/imx/Makefile b/drivers/firmware/imx/Makefile
-index 0ac04df..1b2e15b 100644
---- a/drivers/firmware/imx/Makefile
-+++ b/drivers/firmware/imx/Makefile
-@@ -1,2 +1,3 @@
- # SPDX-License-Identifier: GPL-2.0
--obj-$(CONFIG_IMX_SCU)	+= imx-scu.o misc.o
-+obj-$(CONFIG_IMX_SCU)		+= imx-scu.o misc.o
-+obj-$(CONFIG_IMX_SCU_PD)	+= scu-pd.o
-diff --git a/drivers/firmware/imx/scu-pd.c b/drivers/firmware/imx/scu-pd.c
-new file mode 100644
-index 0000000..13478cd
---- /dev/null
-+++ b/drivers/firmware/imx/scu-pd.c
-@@ -0,0 +1,164 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
-+ *	Dong Aisheng <aisheng.dong@nxp.com>
-+ *
-+ * Implementation of the SCU based Power Domains
-+ */
-+
-+#define pr_fmt(fmt) "scu_pd: " fmt
-+
-+#include <linux/firmware/imx/sci.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm.h>
-+#include <linux/pm_domain.h>
-+#include <linux/slab.h>
-+
-+struct imx_sc_pm_domain {
-+	struct generic_pm_domain pd;
-+	u32 rsrc_id;
-+};
-+
-+static struct imx_sc_ipc *pm_ipc_handle;
-+
-+/* SCU Power Mode Protocol definition */
-+struct imx_sc_msg_req_set_resource_power_mode {
-+	struct imx_sc_rpc_msg hdr;
-+	u16 resource;
-+	u8 mode;
-+} __packed;
-+
-+static int imx_sc_pd_power(struct generic_pm_domain *domain, bool power_on)
-+{
-+	struct imx_sc_msg_req_set_resource_power_mode msg;
-+	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-+	struct imx_sc_pm_domain *pd;
-+	int ret;
-+
-+	pd = container_of(domain, struct imx_sc_pm_domain, pd);
-+
-+	hdr->ver = IMX_SC_RPC_VERSION;
-+	hdr->svc = IMX_SC_RPC_SVC_PM;
-+	hdr->func = IMX_SC_PM_FUNC_SET_RESOURCE_POWER_MODE;
-+	hdr->size = 2;
-+
-+	msg.resource = pd->rsrc_id;
-+	msg.mode = power_on ? IMX_SC_PM_PW_MODE_ON : IMX_SC_PM_PW_MODE_LP;
-+
-+	ret = imx_scu_call_rpc(pm_ipc_handle, &msg, true);
-+	if (ret)
-+		pr_err("failed to power %s resource %d ret %d\n",
-+			power_on ? "up" : "off", pd->rsrc_id, ret);
-+
-+	return ret;
-+}
-+
-+static int imx_sc_pd_power_on(struct generic_pm_domain *domain)
-+{
-+	return imx_sc_pd_power(domain, true);
-+}
-+
-+static int imx_sc_pd_power_off(struct generic_pm_domain *domain)
-+{
-+	return imx_sc_pd_power(domain, false);
-+}
-+
-+static struct generic_pm_domain *imx_sc_pm_add_one_domain(
-+					struct device_node *np,
-+					struct generic_pm_domain *genpd_parent)
-+{
-+	struct imx_sc_pm_domain *imx_sc_pd;
-+	u32 rsrc_id;
-+	int ret;
-+
-+	imx_sc_pd = kzalloc(sizeof(*imx_sc_pd), GFP_KERNEL);
-+	if (!imx_sc_pd)
-+		return ERR_PTR(-ENOMEM);
-+
-+	if (!of_property_read_u32(np, "reg", &rsrc_id)) {
-+		if (rsrc_id >= IMX_SC_R_LAST) {
-+			pr_warn("%pOF: invalid rsrc id %d found", np, rsrc_id);
-+			ret = -EINVAL;
-+			goto err;
-+		}
-+		imx_sc_pd->rsrc_id = rsrc_id;
-+		imx_sc_pd->pd.power_off = imx_sc_pd_power_off;
-+		imx_sc_pd->pd.power_on = imx_sc_pd_power_on;
-+	} else {
-+		imx_sc_pd->rsrc_id = IMX_SC_R_LAST;
-+	}
-+
-+	imx_sc_pd->pd.name = np->name;
-+
-+	ret = pm_genpd_init(&imx_sc_pd->pd, NULL, true);
-+	if (ret < 0)
-+		goto err;
-+
-+	if (genpd_parent) {
-+		ret = pm_genpd_add_subdomain(genpd_parent, &imx_sc_pd->pd);
-+		if (ret)
-+			goto err;
-+	}
-+
-+	ret = of_genpd_add_provider_simple(np, &imx_sc_pd->pd);
-+	if (!ret)
-+		return &imx_sc_pd->pd;
-+
-+	pm_genpd_remove_subdomain(genpd_parent, &imx_sc_pd->pd);
-+
-+err:
-+	pr_warn("failed to add PM domain %pOF: %d\n", np, ret);
-+	kfree(imx_sc_pd);
-+	return ERR_PTR(ret);
-+}
-+
-+static void imx_sc_pm_add_pm_domains(struct device_node *parent,
-+				     struct generic_pm_domain *genpd_parent)
-+{
-+	struct generic_pm_domain *pd;
-+	struct device_node *np;
-+
-+	for_each_child_of_node(parent, np) {
-+		pd = imx_sc_pm_add_one_domain(np, genpd_parent);
-+		if (!IS_ERR(pd))
-+			imx_sc_pm_add_pm_domains(np, pd);
-+	}
-+}
-+
-+static int imx_sc_pd_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret;
-+
-+	ret = imx_scu_get_handle(&pm_ipc_handle);
-+	if (ret)
-+		return ret;
-+
-+	imx_sc_pm_add_pm_domains(np, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id imx_sc_pd_match[] = {
-+	{ .compatible = "fsl,scu-pd", },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver imx_sc_pd_driver = {
-+	.driver = {
-+		.name = "imx-scu-pd",
-+		.of_match_table = imx_sc_pd_match,
-+	},
-+	.probe = imx_sc_pd_probe,
-+};
-+builtin_platform_driver(imx_sc_pd_driver);
-+
-+MODULE_AUTHOR("Dong Aisheng <aisheng.dong@nxp.com>");
-+MODULE_DESCRIPTION("IMX SCU Power Domain driver");
-+MODULE_LICENSE("GPL v2");
+Yet another option would be for the user to probe on some innocuous
+syscall currently returning -EFAULT on tagged pointer arguments but I
+don't particularly like this.
+
+> >> - - pointer arguments to system calls, including pointers in structures
+> >> -   passed to system calls,
+> >> +  - pointer arguments (including pointers in structures), which don't
+> >> +    describe virtual memory ranges, passed to system calls
+> >
+> > I think we need to be more precise here...
+> 
+> In what way?
+
+In the way of being explicit about which syscalls support tagged
+pointers, unless we find a good reason to support tagged pointers on all
+syscalls and avoid any lists.
+
 -- 
-2.7.4
+Catalin
