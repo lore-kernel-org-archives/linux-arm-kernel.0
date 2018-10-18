@@ -1,117 +1,41 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Thu, 18 Oct 2018 09:58:52 +0100
-Subject: [PATCH v5 2/2] iommu/arm-smmu-v3: Reunify
- arm_smmu_cmdq_issue_sync()
-In-Reply-To: <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
-References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
- <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
-Message-ID: <20181018085852.GJ12972@e119886-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Oct 2018 10:14:54 +0100
+Subject: [PATCH v4 0/2] rename function name and enable 32bit vcpu events
+In-Reply-To: <20181012161249.9236-1-gengdongjiu@huawei.com>
+References: <20181012161249.9236-1-gengdongjiu@huawei.com>
+Message-ID: <c1cc827c-c1b7-1fa5-85be-54fc400febb1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 02:56:07PM +0100, Robin Murphy wrote:
-> Now that both sync methods are more or less the same shape, we can save
-> some code and levels of indirection by rolling them up together again,
-> with just a couple of simple conditionals to discriminate the MSI and
-> queue-polling specifics.
+On 12/10/18 17:12, Dongjiu Geng wrote:
+> Rename the kvm_arch_dev_ioctl_check_extension() to 
+> kvm_arch_vm_ioctl_check_extension, because the name
+> is not readable;
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 49 +++++++++----------------------------
->  1 file changed, 12 insertions(+), 37 deletions(-)
+> Enable the 32 bit vcpu events support.
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index da8a91d116bf..36db63e3afcf 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -933,7 +933,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->   * The difference between val and sync_idx is bounded by the maximum size of
->   * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe arithmetic.
->   */
-> -static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
-> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
->  {
->  	ktime_t timeout;
->  	u32 val;
-> @@ -988,16 +988,17 @@ static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
->  	return -ETIMEDOUT;
->  }
->  
-> -static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
-> +static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->  {
->  	u64 cmd[CMDQ_ENT_DWORDS];
->  	unsigned long flags;
-> -	struct arm_smmu_cmdq_ent ent = {
-> -		.opcode = CMDQ_OP_CMD_SYNC,
-> -		.sync	= {
-> -			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
-> -		},
-
-You indicated that "Patches are based on Will's iommu/devel branch plus my
-"Fix big-endian CMD_SYNC writes" patch." - However your v2 of that patch didn't
-include this cpu_to_le32 hunk. 
-
-Reviewed-by: Andrew Murray <andrew.murray@arm.com>
-
-Thanks,
-
-Andrew Murray
-
-> -	};
-> +	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
-> +		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
-> +	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-> +	int ret, sync_idx, sync_gen;
-> +
-> +	if (msi)
-> +		ent.sync.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count));
->  
->  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
->  
-> @@ -1009,39 +1010,13 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->  		arm_smmu_cmdq_build_cmd(cmd, &ent);
->  		arm_smmu_cmdq_insert_cmd(smmu, cmd);
->  	}
-> -
-> -	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-> -
-> -	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
-> -}
-> -
-> -static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
-> -{
-> -	u64 cmd[CMDQ_ENT_DWORDS];
-> -	unsigned long flags;
-> -	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-> -	int sync_idx, sync_gen;
-> -
-> -	arm_smmu_cmdq_build_cmd(cmd, &ent);
-> -
-> -	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> -	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
-> -		arm_smmu_cmdq_insert_cmd(smmu, cmd);
->  	sync_idx = smmu->cmdq.q.prod;
->  	sync_gen = READ_ONCE(smmu->cmdq_generation);
-> +
->  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->  
-> -	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
-> -}
-> -
-> -static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
-> -{
-> -	int ret;
-> -	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
-> -		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
-> -
-> -	ret = msi ? __arm_smmu_cmdq_issue_sync_msi(smmu)
-> -		  : __arm_smmu_cmdq_issue_sync(smmu);
-> +	ret = msi ? arm_smmu_sync_poll_msi(smmu, ent.sync.msidata)
-> +		  : arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
->  	if (ret)
->  		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
->  }
-> -- 
-> 2.19.1.dirty
+> Change since v3:
+> 1. Address James's comments to update the patch commit messages
 > 
+> Change since v2:
+> 1. Address Suzuki's comments to update the patch commit messages
+> 
+> change since v1:
+> 1. Update patch commit messages.
+> 
+> Dongjiu Geng (2):
+>   arm/arm64: KVM: rename function kvm_arch_dev_ioctl_check_extension()
+>   arm/arm64: KVM: enable 32 bits kvm vcpu events support
+> 
+>  arch/arm/include/asm/kvm_host.h   | 2 +-
+>  arch/arm64/include/asm/kvm_host.h | 2 +-
+>  arch/arm64/kvm/reset.c            | 5 ++---
+>  virt/kvm/arm/arm.c                | 3 ++-
+>  4 files changed, 6 insertions(+), 6 deletions(-)
+> 
+
+Applied, thanks.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
