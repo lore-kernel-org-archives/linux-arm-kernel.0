@@ -1,93 +1,99 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 18 Oct 2018 21:10:16 +0530
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
+Date: Thu, 18 Oct 2018 21:10:14 +0530
+Subject: [PATCH v2 07/10] irqchip: ti-sci-intr: Add support for Interrupt
+ Router driver
 In-Reply-To: <20181018154017.7112-1-lokeshvutla@ti.com>
 References: <20181018154017.7112-1-lokeshvutla@ti.com>
-Message-ID: <20181018154017.7112-10-lokeshvutla@ti.com>
+Message-ID: <20181018154017.7112-8-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Texas Instruments' K3 generation SoCs has an IP Interrupt Aggregator
-which is an interrupt controller that does the following:
-- Converts events to interrupts that can be understood by
-  an interrupt router.
-- Allows for multiplexing of events to interrupts.
-- Allows for grouping of multiple events to a single interrupt.
+Texas Instruments' K3 generation SoCs has an IP Interrupt Router
+that does allows for multiplexing of input interrupts to host
+interrupt controller. Interrupt Router inputs are either from a
+peripheral or from an Interrupt Aggregator which is another
+interrupt controller.
 
-Configuration of the interrupt aggregator registers can only be done by
+Configuration of the interrupt router registers can only be done by
 a system co-processor and the driver needs to send a message to this
 co processor over TISCI protocol.
 
-Add support for Interrupt Aggregator driver over TISCI protocol.
+Add support for Interrupt Router driver over TISCI protocol.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
 Changes since v1:
-- New patch
+- made Kconfig symbol as non selectable by user.
+- Dropped using ti_sci_intr_irq_desc structure.
+- Fixup error path in allocate_gic_irq.
+- Updated handling of Interrupt Aggregator as child controller.
 
- MAINTAINERS                             |   1 +
- drivers/irqchip/Kconfig                 |  11 +
- drivers/irqchip/Makefile                |   1 +
- drivers/irqchip/irq-ti-sci-inta.c       | 613 ++++++++++++++++++++++++
- include/linux/irqchip/irq-ti-sci-inta.h |  35 ++
- 5 files changed, 661 insertions(+)
- create mode 100644 drivers/irqchip/irq-ti-sci-inta.c
- create mode 100644 include/linux/irqchip/irq-ti-sci-inta.h
+Note: Did not add system firmware helper apis as I did not get a response from
+	firmware maintainers. Also I see other firmware drivers(like
+	arm scmi[1]) using the same approach. Will wait for some more time
+	to get feedback from tisci maintainers.
+
+[1] include/linux/scmi_protocol.h
+
+ MAINTAINERS                       |   1 +
+ drivers/irqchip/Kconfig           |  11 ++
+ drivers/irqchip/Makefile          |   1 +
+ drivers/irqchip/irq-ti-sci-intr.c | 302 ++++++++++++++++++++++++++++++
+ 4 files changed, 315 insertions(+)
+ create mode 100644 drivers/irqchip/irq-ti-sci-intr.c
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 8cf1a6b73e6c..35c790ab0ae7 100644
+index 710cf728b9d0..4f1bb64a15a1 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -14689,6 +14689,7 @@ F:	drivers/reset/reset-ti-sci.c
+@@ -14687,6 +14687,7 @@ F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+ F:	drivers/clk/keystone/sci-clk.c
+ F:	drivers/reset/reset-ti-sci.c
  F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
- F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
- F:	drivers/irqchip/irq-ti-sci-intr.c
-+F:	drivers/irqchip/irq-ti-sci-inta.c
++F:	drivers/irqchip/irq-ti-sci-intr.c
  
  THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
  M:	Hans Verkuil <hverkuil@xs4all.nl>
 diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index f6620a6bb872..895f6b47dc5b 100644
+index 96451b581452..f6620a6bb872 100644
 --- a/drivers/irqchip/Kconfig
 +++ b/drivers/irqchip/Kconfig
-@@ -385,6 +385,17 @@ config TI_SCI_INTR_IRQCHIP
- 	  If you wish to use interrupt router irq resources managed by the
- 	  TI System Controller, say Y here. Otherwise, say N.
+@@ -374,6 +374,17 @@ config QCOM_PDC
+ 	  Power Domain Controller driver to manage and configure wakeup
+ 	  IRQs for Qualcomm Technologies Inc (QTI) mobile chips.
  
-+config TI_SCI_INTA_IRQCHIP
++config TI_SCI_INTR_IRQCHIP
 +	bool
 +	depends on TI_SCI_PROTOCOL && ARCH_K3
 +	select IRQ_DOMAIN
 +	select IRQ_DOMAIN_HIERARCHY
 +	help
-+	  This enables the irqchip driver support for K3 Interrupt aggregator
++	  This enables the irqchip driver support for K3 Interrupt router
 +	  over TI System Control Interface available on some new TI's SoCs.
-+	  If you wish to use interrupt aggregator irq resources managed by the
++	  If you wish to use interrupt router irq resources managed by the
 +	  TI System Controller, say Y here. Otherwise, say N.
 +
  endmenu
  
  config SIFIVE_PLIC
 diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 44bf65606d60..aede4c1cc4a6 100644
+index b822199445ff..44bf65606d60 100644
 --- a/drivers/irqchip/Makefile
 +++ b/drivers/irqchip/Makefile
-@@ -90,3 +90,4 @@ obj-$(CONFIG_NDS32)			+= irq-ativic32.o
+@@ -89,3 +89,4 @@ obj-$(CONFIG_GOLDFISH_PIC) 		+= irq-goldfish-pic.o
+ obj-$(CONFIG_NDS32)			+= irq-ativic32.o
  obj-$(CONFIG_QCOM_PDC)			+= qcom-pdc.o
  obj-$(CONFIG_SIFIVE_PLIC)		+= irq-sifive-plic.o
- obj-$(CONFIG_TI_SCI_INTR_IRQCHIP)	+= irq-ti-sci-intr.o
-+obj-$(CONFIG_TI_SCI_INTA_IRQCHIP)	+= irq-ti-sci-inta.o
-diff --git a/drivers/irqchip/irq-ti-sci-inta.c b/drivers/irqchip/irq-ti-sci-inta.c
++obj-$(CONFIG_TI_SCI_INTR_IRQCHIP)	+= irq-ti-sci-intr.o
+diff --git a/drivers/irqchip/irq-ti-sci-intr.c b/drivers/irqchip/irq-ti-sci-intr.c
 new file mode 100644
-index 000000000000..ef0a2e8b782c
+index 000000000000..a8e141839a42
 --- /dev/null
-+++ b/drivers/irqchip/irq-ti-sci-inta.c
-@@ -0,0 +1,613 @@
++++ b/drivers/irqchip/irq-ti-sci-intr.c
+@@ -0,0 +1,302 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Texas Instruments' K3 Interrupt Aggregator irqchip driver
++ * Texas Instruments' K3 Interrupt Router irqchip driver
 + *
 + * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
 + *	Lokesh Vutla <lokeshvutla@ti.com>
@@ -104,86 +110,32 @@ index 000000000000..ef0a2e8b782c
 +#include <linux/irqdomain.h>
 +#include <linux/soc/ti/ti_sci_protocol.h>
 +
-+#define MAX_EVENTS_PER_VINT	64
-+#define TI_SCI_EVENT_IRQ	BIT(31)
++#define TI_SCI_DEV_ID_MASK	0xffff
++#define TI_SCI_DEV_ID_SHIFT	16
++#define TI_SCI_IRQ_ID_MASK	0xffff
++#define TI_SCI_IRQ_ID_SHIFT	0
++#define TI_SCI_IS_EVENT_IRQ	BIT(31)
 +
-+#define VINT_ENABLE_CLR_OFFSET	0x18
++#define HWIRQ_TO_DEVID(hwirq)	(((hwirq) >> (TI_SCI_DEV_ID_SHIFT)) & \
++				 (TI_SCI_DEV_ID_MASK))
++#define HWIRQ_TO_IRQID(hwirq)	((hwirq) & (TI_SCI_IRQ_ID_MASK))
 +
 +/**
-+ * struct ti_sci_inta_irq_domain - Structure representing a TISCI based
-+ *				   Interrupt Aggregator IRQ domain.
++ * struct ti_sci_intr_irq_domain - Structure representing a TISCI based
++ *				   Interrupt Router IRQ domain.
 + * @sci:	Pointer to TISCI handle
-+ * @vint:	TISCI resource pointer representing IA inerrupts.
-+ * @global_event:TISCI resource pointer representing global events.
-+ * @base:	Base address of the memory mapped IO registers
-+ * @ia_id:	TISCI device ID of this Interrupt Aggregator.
++ * @dst_irq:	TISCI resource pointer representing destination irq controller.
 + * @dst_id:	TISCI device ID of the destination irq controller.
 + */
-+struct ti_sci_inta_irq_domain {
++struct ti_sci_intr_irq_domain {
 +	const struct ti_sci_handle *sci;
-+	struct ti_sci_resource *vint;
-+	struct ti_sci_resource *global_event;
-+	void __iomem *base;
-+	u16 ia_id;
++	struct ti_sci_resource *dst_irq;
 +	u16 dst_id;
 +};
 +
-+/**
-+ * struct ti_sci_inta_event_desc - Description of an event coming to
-+ *				   Interrupt Aggregator.
-+ * @global_event:	Global event number corresponding to this event
-+ * @src_id:		TISCI device ID of the event source
-+ * @src_index:		Event source index within the device.
-+ */
-+struct ti_sci_inta_event_desc {
-+	u16 global_event;
-+	u16 src_id;
-+	u16 src_index;
-+};
-+
-+/**
-+ * struct ti_sci_inta_vint_desc - Description of a virtual interrupt coming out
-+ *				  of Interrupt Aggregator.
-+ * @lock:		lock to guard the event map
-+ * @event_map:		Bitmap to manage the allocation of events to vint.
-+ * @events:		Array of event descriptors assigned to this vint.
-+ * @ack_needed:		Event needs to be acked via INTA. This is used when
-+ *			HW generating events cannot clear the events by itself.
-+ *			Assuming that only events from the same hw block are
-+ *			grouped. So all the events attached to vint needs
-+ *			an ack or none needs an ack.
-+ */
-+struct ti_sci_inta_vint_desc {
-+	raw_spinlock_t lock;
-+	unsigned long *event_map;
-+	struct ti_sci_inta_event_desc events[MAX_EVENTS_PER_VINT];
-+	bool ack_needed;
-+};
-+
-+static void ti_sci_inta_irq_eoi(struct irq_data *data)
-+{
-+	struct ti_sci_inta_irq_domain *inta = data->domain->host_data;
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	u64 val;
-+	int bit;
-+
-+	vint_desc = irq_data_get_irq_chip_data(data);
-+	if (!vint_desc->ack_needed)
-+		goto out;
-+
-+	for_each_set_bit(bit, vint_desc->event_map, MAX_EVENTS_PER_VINT) {
-+		val = 1 << bit;
-+		__raw_writeq(val, inta->base + data->hwirq * 0x1000 +
-+			     VINT_ENABLE_CLR_OFFSET);
-+	}
-+
-+out:
-+	irq_chip_eoi_parent(data);
-+}
-+
-+static struct irq_chip ti_sci_inta_irq_chip = {
-+	.name			= "INTA",
-+	.irq_eoi		= ti_sci_inta_irq_eoi,
++static struct irq_chip ti_sci_intr_irq_chip = {
++	.name			= "INTR",
++	.irq_eoi		= irq_chip_eoi_parent,
 +	.irq_mask		= irq_chip_mask_parent,
 +	.irq_unmask		= irq_chip_unmask_parent,
 +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
@@ -192,7 +144,7 @@ index 000000000000..ef0a2e8b782c
 +};
 +
 +/**
-+ * ti_sci_inta_irq_domain_translate() - Retrieve hwirq and type from
++ * ti_sci_intr_irq_domain_translate() - Retrieve hwirq and type from
 + *					IRQ firmware specific handler.
 + * @domain:	Pointer to IRQ domain
 + * @fwspec:	Pointer to IRQ specific firmware structure
@@ -201,17 +153,19 @@ index 000000000000..ef0a2e8b782c
 + *
 + * Return 0 if all went ok else appropriate error.
 + */
-+static int ti_sci_inta_irq_domain_translate(struct irq_domain *domain,
++static int ti_sci_intr_irq_domain_translate(struct irq_domain *domain,
 +					    struct irq_fwspec *fwspec,
 +					    unsigned long *hwirq,
 +					    unsigned int *type)
 +{
 +	if (is_of_node(fwspec->fwnode)) {
-+		if (fwspec->param_count != 4)
++		if (fwspec->param_count != 3)
 +			return -EINVAL;
 +
-+		*hwirq = fwspec->param[2];
-+		*type = fwspec->param[3] & IRQ_TYPE_SENSE_MASK;
++		*hwirq = ((fwspec->param[0] & TI_SCI_DEV_ID_MASK) <<
++			  TI_SCI_DEV_ID_SHIFT) |
++			 (fwspec->param[1] & TI_SCI_IRQ_ID_MASK);
++		*type = fwspec->param[2];
 +
 +		return 0;
 +	}
@@ -219,236 +173,156 @@ index 000000000000..ef0a2e8b782c
 +	return -EINVAL;
 +}
 +
-+/**
-+ * ti_sci_free_event_irq() - Free an event from vint
-+ * @inta:	Pointer to Interrupt Aggregator IRQ domain
-+ * @vint_desc:	Virtual interrupt descriptor containing the event.
-+ * @event_index:Event Index within the vint.
-+ * @dst_irq:	Destination host irq
-+ * @vint:	Interrupt number within interrupt aggregator.
-+ */
-+static void ti_sci_free_event_irq(struct ti_sci_inta_irq_domain *inta,
-+				  struct ti_sci_inta_vint_desc *vint_desc,
-+				  u32 event_index, u16 dst_irq, u16 vint)
++static inline void ti_sci_intr_delete_desc(struct ti_sci_intr_irq_domain *intr,
++					   u16 src_id, u16 src_index,
++					   u16 dst_irq)
 +{
-+	struct ti_sci_inta_event_desc *event;
-+	unsigned long flags;
-+
-+	if (event_index >= MAX_EVENTS_PER_VINT)
-+		return;
-+
-+	event = &vint_desc->events[event_index];
-+	inta->sci->ops.rm_irq_ops.free_event_irq(inta->sci,
-+						 event->src_id,
-+						 event->src_index,
-+						 inta->dst_id,
-+						 dst_irq,
-+						 inta->ia_id, vint,
-+						 event->global_event,
-+						 event_index);
-+
-+	raw_spin_lock_irqsave(&vint_desc->lock, flags);
-+	clear_bit(event_index, vint_desc->event_map);
-+	raw_spin_unlock_irqrestore(&vint_desc->lock, flags);
-+
-+	ti_sci_release_resource(inta->global_event, event->global_event);
++	intr->sci->ops.rm_irq_ops.free_direct_irq(intr->sci, src_id, src_index,
++						  intr->dst_id, dst_irq);
 +}
 +
 +/**
-+ * ti_sci_inta_irq_domain_free() - Free an IRQ from the IRQ domain
++ * ti_sci_intr_irq_domain_free() - Free the specified IRQs from the domain.
 + * @domain:	Domain to which the irqs belong
-+ * @virq:	base linux virtual IRQ to be freed.
++ * @virq:	Linux virtual IRQ to be freed.
 + * @nr_irqs:	Number of continuous irqs to be freed
 + */
-+static void ti_sci_inta_irq_domain_free(struct irq_domain *domain,
++static void ti_sci_intr_irq_domain_free(struct irq_domain *domain,
 +					unsigned int virq, unsigned int nr_irqs)
 +{
-+	struct ti_sci_inta_irq_domain *inta = domain->host_data;
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct irq_data *data, *gic_data;
-+	int event_index;
++	struct ti_sci_intr_irq_domain *intr = domain->host_data;
++	struct irq_data *data, *parent_data;
++	u32 flags;
++	int i;
 +
-+	data = irq_domain_get_irq_data(domain, virq);
-+	gic_data = irq_domain_get_irq_data(domain->parent->parent, virq);
++	intr = domain->host_data;
 +
-+	vint_desc = irq_data_get_irq_chip_data(data);
++	for (i = 0; i < nr_irqs; i++) {
++		data = irq_domain_get_irq_data(domain, virq + i);
++		flags = (u32)(u64)irq_data_get_irq_chip_data(data);
++		parent_data = irq_domain_get_irq_data(domain->parent, virq + i);
 +
-+	/* This is the last event in the vint */
-+	event_index = find_first_bit(vint_desc->event_map, MAX_EVENTS_PER_VINT);
-+	ti_sci_free_event_irq(inta, vint_desc, event_index,
-+			      gic_data->hwirq, data->hwirq);
-+	irq_domain_free_irqs_parent(domain, virq, 1);
-+	irq_domain_reset_irq_data(data);
-+	ti_sci_release_resource(inta->vint, data->hwirq);
-+	kfree(vint_desc->event_map);
-+	kfree(vint_desc);
-+}
-+
-+/**
-+ * ti_sci_allocate_event_irq() - Allocate an event to a IA vint.
-+ * @inta:	Pointer to Interrupt Aggregator IRQ domain
-+ * @vint_desc:	Virtual interrupt descriptor to which the event gets attached.
-+ * @src_id:	TISCI device id of the event source
-+ * @src_index:	Event index with in the device.
-+ * @dst_irq:	Destination host irq
-+ * @vint:	Interrupt number within interrupt aggregator.
-+ *
-+ * Return 0 if all went ok else appropriate error value.
-+ */
-+static int ti_sci_allocate_event_irq(struct ti_sci_inta_irq_domain *inta,
-+				     struct ti_sci_inta_vint_desc *vint_desc,
-+				     u16 src_id, u16 src_index, u16 dst_irq,
-+				     u16 vint)
-+{
-+	struct ti_sci_inta_event_desc *event;
-+	unsigned long flags;
-+	u32 free_bit;
-+	int err;
-+
-+	raw_spin_lock_irqsave(&vint_desc->lock, flags);
-+	free_bit = find_first_zero_bit(vint_desc->event_map,
-+				       MAX_EVENTS_PER_VINT);
-+	if (free_bit != MAX_EVENTS_PER_VINT)
-+		set_bit(free_bit, vint_desc->event_map);
-+	raw_spin_unlock_irqrestore(&vint_desc->lock, flags);
-+
-+	if (free_bit >= MAX_EVENTS_PER_VINT)
-+		return -ENODEV;
-+
-+	event = &vint_desc->events[free_bit];
-+
-+	event->src_id = src_id;
-+	event->src_index = src_index;
-+	event->global_event = ti_sci_get_free_resource(inta->global_event);
-+
-+	err = inta->sci->ops.rm_irq_ops.set_event_irq(inta->sci,
-+						      src_id, src_index,
-+						      inta->dst_id,
-+						      dst_irq,
-+						      inta->ia_id,
-+						      vint,
-+						      event->global_event,
-+						      free_bit);
-+	if (err) {
-+		pr_err("%s: Event allocation failed from src = %d, index = %d, to dst = %d,irq = %d,via ia_id = %d, vint = %d,global event = %d, status_bit = %d\n",
-+		       __func__, src_id, src_index, inta->dst_id, dst_irq,
-+		       inta->ia_id, vint, event->global_event, free_bit);
-+		return err;
++		if (!(flags & TI_SCI_IS_EVENT_IRQ))
++			ti_sci_intr_delete_desc(intr,
++						HWIRQ_TO_DEVID(data->hwirq),
++						HWIRQ_TO_IRQID(data->hwirq),
++						parent_data->hwirq);
++		ti_sci_release_resource(intr->dst_irq, parent_data->hwirq);
++		irq_domain_free_irqs_parent(domain, virq + i, 1);
++		irq_domain_reset_irq_data(data);
 +	}
-+
-+	return 0;
 +}
 +
 +/**
-+ * alloc_parent_irq() - Allocate parent irq to Interrupt aggregator
-+ * @domain:	IRQ domain corresponding to Interrupt Aggregator
-+ * @virq:	Linux virtual IRQ number
-+ * @src_id:	TISCI device id of the event source
-+ * @src_index:	Event index with in the device.
-+ * @vint:	Virtual interrupt number within IA
-+ * @flags:	Corresponding IRQ flags
++ * allocate_gic_irq() - Allocate GIC specific IRQ
++ * @domain:	Point to the interrupt router IRQ domain
++ * @dev:	TISCI device IRQ generating the IRQ
++ * @irq:	IRQ offset within the device
++ * @flags:	Corresponding flags to the IRQ
 + *
-+ * Return pointer to vint descriptor if all went well else corresponding
-+ * error pointer.
++ * Returns 0 if all went well else appropriate error pointer.
 + */
-+static struct ti_sci_inta_vint_desc *alloc_parent_irq(struct irq_domain *domain,
-+						      unsigned int virq,
-+						      u32 src_id, u32 src_index,
-+						      u32 vint, u32 flags)
++static int allocate_gic_irq(struct irq_domain *domain, unsigned int virq,
++			    u16 dev, u16 irq, u32 flags)
 +{
-+	struct ti_sci_inta_irq_domain *inta = domain->host_data;
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct irq_data *gic_data;
++	struct ti_sci_intr_irq_domain *intr = domain->host_data;
 +	struct irq_fwspec fwspec;
++	u16 dst_irq;
 +	int err;
 +
 +	if (!irq_domain_get_of_node(domain->parent))
-+		return ERR_PTR(-EINVAL);
++		return -EINVAL;
 +
-+	vint_desc = kzalloc(sizeof(*vint_desc), GFP_KERNEL);
-+	if (!vint_desc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	vint_desc->event_map = kcalloc(BITS_TO_LONGS(MAX_EVENTS_PER_VINT),
-+				       sizeof(*vint_desc->event_map),
-+				       GFP_KERNEL);
-+	if (!vint_desc->event_map) {
-+		kfree(vint_desc);
-+		return ERR_PTR(-ENOMEM);
-+	}
++	dst_irq = ti_sci_get_free_resource(intr->dst_irq);
 +
 +	fwspec.fwnode = domain->parent->fwnode;
 +	fwspec.param_count = 3;
-+	/* Interrupt parent is Interrupt Router */
-+	fwspec.param[0] = inta->ia_id;
-+	fwspec.param[1] = vint;
-+	fwspec.param[2] = flags | TI_SCI_EVENT_IRQ;
++	fwspec.param[0] = 0;	/* SPI */
++	fwspec.param[1] = dst_irq - 32; /* SPI offset */
++	fwspec.param[2] = flags & IRQ_TYPE_SENSE_MASK;
 +
 +	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
 +	if (err)
 +		goto err_irqs;
 +
-+	gic_data = irq_domain_get_irq_data(domain->parent->parent, virq);
++	/* If event is requested then return */
++	if (flags & TI_SCI_IS_EVENT_IRQ)
++		return 0;
 +
-+	raw_spin_lock_init(&vint_desc->lock);
++	err = intr->sci->ops.rm_irq_ops.set_direct_irq(intr->sci, dev, irq,
++						       intr->dst_id, dst_irq);
++	if (err) {
++		pr_err("%s: IRQ allocation failed from src = %d, src_index = %d to dst_id = %d, dst_irq = %d",
++		       __func__, dev, irq, intr->dst_id, dst_irq);
++		goto err_msg;
++	}
 +
-+	err = ti_sci_allocate_event_irq(inta, vint_desc, src_id, src_index,
-+					gic_data->hwirq, vint);
-+	if (err)
-+		goto err_events;
++	return 0;
 +
-+	return vint_desc;
-+
-+err_events:
++err_msg:
 +	irq_domain_free_irqs_parent(domain, virq, 1);
 +err_irqs:
-+	ti_sci_release_resource(inta->vint, vint);
-+	kfree(vint_desc);
-+	return ERR_PTR(err);
++	ti_sci_release_resource(intr->dst_irq, dst_irq);
++	return err;
 +}
 +
 +/**
-+ * ti_sci_inta_irq_domain_alloc() - Allocate Interrupt aggregator IRQs
-+ * @domain:	Point to the interrupt aggregator IRQ domain
++ * ti_sci_intr_irq_domain_alloc() - Allocate Interrupt router IRQs
++ * @domain:	Point to the interrupt router IRQ domain
 + * @virq:	Corresponding Linux virtual IRQ number
 + * @nr_irqs:	Continuous irqs to be allocated
 + * @data:	Pointer to firmware specifier
 + *
 + * Return 0 if all went well else appropriate error value.
 + */
-+static int ti_sci_inta_irq_domain_alloc(struct irq_domain *domain,
++static int ti_sci_intr_irq_domain_alloc(struct irq_domain *domain,
 +					unsigned int virq, unsigned int nr_irqs,
 +					void *data)
 +{
-+	struct ti_sci_inta_vint_desc *vint_desc;
 +	struct irq_fwspec *fwspec = data;
-+	int err;
++	u16 src_id, src_index;
++	unsigned long hwirq;
++	int i, err;
++	u32 type;
 +
-+	vint_desc = alloc_parent_irq(domain, virq, fwspec->param[0],
-+				     fwspec->param[1], fwspec->param[2],
-+				     fwspec->param[3]);
-+	if (IS_ERR(vint_desc))
-+		return PTR_ERR(vint_desc);
++	err = ti_sci_intr_irq_domain_translate(domain, fwspec, &hwirq, &type);
++	if (err)
++		return err;
 +
-+	err = irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[2],
-+					    &ti_sci_inta_irq_chip, vint_desc);
++	src_id = HWIRQ_TO_DEVID(hwirq);
++	src_index = HWIRQ_TO_IRQID(hwirq);
 +
++	for (i = 0; i < nr_irqs; i++) {
++		err = allocate_gic_irq(domain, virq + i, src_id, src_index + i,
++				       type);
++		if (err)
++			goto err_irq;
++
++		err = irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
++						    &ti_sci_intr_irq_chip,
++						    (void *)(u64)type);
++		if (err)
++			goto err_irq;
++	}
++
++	return 0;
++err_irq:
++	ti_sci_intr_irq_domain_free(domain, virq, i);
 +	return err;
 +}
 +
-+static const struct irq_domain_ops ti_sci_inta_irq_domain_ops = {
-+	.alloc		= ti_sci_inta_irq_domain_alloc,
-+	.free		= ti_sci_inta_irq_domain_free,
-+	.translate	= ti_sci_inta_irq_domain_translate,
++static const struct irq_domain_ops ti_sci_intr_irq_domain_ops = {
++	.alloc		= ti_sci_intr_irq_domain_alloc,
++	.free		= ti_sci_intr_irq_domain_free,
++	.translate	= ti_sci_intr_irq_domain_translate,
 +};
 +
-+static int ti_sci_inta_irq_domain_probe(struct platform_device *pdev)
++static int ti_sci_intr_irq_domain_probe(struct platform_device *pdev)
 +{
 +	struct irq_domain *parent_domain, *domain;
-+	struct ti_sci_inta_irq_domain *inta;
++	struct ti_sci_intr_irq_domain *intr;
 +	struct device_node *parent_node;
 +	struct device *dev = &pdev->dev;
-+	struct resource *res;
 +	int ret;
 +
 +	parent_node = of_irq_find_parent(dev_of_node(dev));
@@ -458,56 +332,41 @@ index 000000000000..ef0a2e8b782c
 +	}
 +
 +	parent_domain = irq_find_host(parent_node);
-+	if (!parent_domain)
-+		return -EPROBE_DEFER;
++	if (!parent_domain) {
++		dev_err(dev, "Failed to find IRQ parent domain\n");
++		return -ENODEV;
++	}
 +
-+	inta = devm_kzalloc(dev, sizeof(*inta), GFP_KERNEL);
-+	if (!inta)
++	intr = devm_kzalloc(dev, sizeof(*intr), GFP_KERNEL);
++	if (!intr)
 +		return -ENOMEM;
 +
-+	inta->sci = devm_ti_sci_get_by_phandle(dev, "ti,sci");
-+	if (IS_ERR(inta->sci)) {
-+		ret = PTR_ERR(inta->sci);
++	intr->sci = devm_ti_sci_get_by_phandle(dev, "ti,sci");
++	if (IS_ERR(intr->sci)) {
++		ret = PTR_ERR(intr->sci);
 +		if (ret != -EPROBE_DEFER)
 +			dev_err(dev, "ti,sci read fail %d\n", ret);
-+		inta->sci = NULL;
++		intr->sci = NULL;
 +		return ret;
 +	}
 +
-+	ret = of_property_read_u32(dev->of_node, "ti,sci-dev-id",
-+				   (u32 *)&inta->ia_id);
++	ret = of_property_read_u32(dev_of_node(dev), "ti,sci-dst-id",
++				   (u32 *)&intr->dst_id);
 +	if (ret) {
-+		dev_err(dev, "missing 'ti,sci-dev-id' property\n");
++		dev_err(dev, "missing 'ti,sci-dst-id' property\n");
 +		return -EINVAL;
 +	}
 +
-+	inta->vint = devm_ti_sci_get_of_resource(inta->sci, dev,
-+						 inta->ia_id,
-+						 "ti,sci-rm-range-vint");
-+	if (IS_ERR(inta->vint)) {
-+		dev_err(dev, "VINT resource allocation failed\n");
-+		return PTR_ERR(inta->vint);
++	intr->dst_irq = devm_ti_sci_get_of_resource(intr->sci, dev,
++						    intr->dst_id,
++						    "ti,sci-rm-range-girq");
++	if (IS_ERR(intr->dst_irq)) {
++		dev_err(dev, "Destination irq resource allocation failed\n");
++		return PTR_ERR(intr->dst_irq);
 +	}
-+
-+	inta->global_event =
-+		devm_ti_sci_get_of_resource(inta->sci, dev,
-+					    inta->ia_id,
-+					    "ti,sci-rm-range-global-event");
-+	if (IS_ERR(inta->global_event)) {
-+		dev_err(dev, "Global event resource allocation failed\n");
-+		return PTR_ERR(inta->global_event);
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	inta->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(inta->base))
-+		return -ENODEV;
-+
-+	ret = of_property_read_u32(parent_node, "ti,sci-dst-id",
-+				   (u32 *)&inta->dst_id);
 +
 +	domain = irq_domain_add_hierarchy(parent_domain, 0, 0, dev_of_node(dev),
-+					  &ti_sci_inta_irq_domain_ops, inta);
++					  &ti_sci_intr_irq_domain_ops, intr);
 +	if (!domain) {
 +		dev_err(dev, "Failed to allocate IRQ domain\n");
 +		return -ENOMEM;
@@ -516,228 +375,23 @@ index 000000000000..ef0a2e8b782c
 +	return 0;
 +}
 +
-+/**
-+ * ti_sci_inta_register_event() - Register a event to an interrupt aggregator
-+ * @dev:	Device pointer to source generating the event
-+ * @src_id:	TISCI device ID of the event source
-+ * @src_index:	Event source index within the device.
-+ * @virq:	Linux Virtual IRQ number
-+ * @flags:	Corresponding IRQ flags
-+ * @ack_needed:	If explicit clearing of event is required.
-+ *
-+ * Creates a new irq and attaches to IA domain if virq is not specified
-+ * else attaches the event to vint corresponding to virq.
-+ * When using TISCI within the client drivers, source indexes are always
-+ * generated dynamically and cannot be represented in DT. So client
-+ * drivers should call this API instead of platform_get_irq().
-+ *
-+ * Return virq if all went well else appropriate error value.
-+ */
-+int ti_sci_inta_register_event(struct device *dev, u16 src_id, u16 src_index,
-+			       unsigned int virq, u32 flags, bool ack_needed)
-+{
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct ti_sci_inta_irq_domain *inta;
-+	struct irq_data *data, *gic_data;
-+	struct device_node *parent_node;
-+	struct irq_domain *domain;
-+	struct irq_fwspec fwspec;
-+	int err;
-+
-+	parent_node = of_irq_find_parent(dev->of_node);
-+	if (!parent_node)
-+		return -ENODEV;
-+
-+	domain = irq_find_host(parent_node);
-+	if (!domain)
-+		return -EPROBE_DEFER;
-+
-+	inta = domain->host_data;
-+
-+	if (virq > 0) {
-+		/* If Group already available */
-+		data = irq_domain_get_irq_data(domain, virq);
-+		gic_data = irq_domain_get_irq_data(domain->parent->parent,
-+						   virq);
-+
-+		vint_desc = irq_data_get_irq_chip_data(data);
-+
-+		err = ti_sci_allocate_event_irq(inta, vint_desc, src_id,
-+						src_index, gic_data->hwirq,
-+						data->hwirq);
-+		if (err)
-+			return err;
-+	} else {
-+		fwspec.param_count = 4;
-+		fwspec.fwnode = domain->fwnode;
-+		fwspec.param[0] = src_id;
-+		fwspec.param[1] = src_index;
-+		fwspec.param[2] = ti_sci_get_free_resource(inta->vint);
-+		fwspec.param[3] = flags;
-+
-+		virq = irq_create_fwspec_mapping(&fwspec);
-+		if (virq <= 0)
-+			ti_sci_release_resource(inta->vint, fwspec.param[2]);
-+
-+		data = irq_domain_get_irq_data(domain, virq);
-+		vint_desc = irq_data_get_irq_chip_data(data);
-+		vint_desc->ack_needed = ack_needed;
-+	}
-+
-+	return virq;
-+}
-+EXPORT_SYMBOL_GPL(ti_sci_inta_register_event);
-+
-+/**
-+ * get_event_index() - Helper api to get the event index with the vint.
-+ * @vint_desc:	Pointer to the IA irq descriptor
-+ * @src_id:	TISCI device ID of the event source
-+ * @src_index:	Event source index within the device.
-+ *
-+ * Return the index if all went well else MAX_EVENTS_PER_VINT.
-+ */
-+static u8 get_event_index(struct ti_sci_inta_vint_desc *vint_desc, u16 src_id,
-+			  u16 src_index)
-+{
-+	int i;
-+
-+	for (i = 0; i < MAX_EVENTS_PER_VINT; i++) {
-+		if (vint_desc->events[i].src_id == src_id &&
-+		    vint_desc->events[i].src_index == src_index)
-+			return i;
-+	}
-+
-+	return MAX_EVENTS_PER_VINT;
-+}
-+
-+/**
-+ * is_event_last() -  Helper api to determine if the event is the last
-+ *		      event within the vint
-+ * @vint_desc:	Pointer to the IA irq descriptor
-+ * @event_index:	Event index within the vint of IA.
-+ *
-+ * Return true if specified index is the last event else false.
-+ */
-+static bool is_event_last(struct ti_sci_inta_vint_desc *vint_desc,
-+			  u8 event_index)
-+{
-+	unsigned long flags;
-+	int next_event;
-+	bool status;
-+
-+	raw_spin_lock_irqsave(&vint_desc->lock, flags);
-+	next_event = find_next_bit(vint_desc->event_map, MAX_EVENTS_PER_VINT,
-+				   event_index + 1);
-+	status = (next_event != MAX_EVENTS_PER_VINT) ? false : true;
-+	if (event_index !=
-+		find_first_bit(vint_desc->event_map, MAX_EVENTS_PER_VINT))
-+		status = false;
-+	raw_spin_unlock_irqrestore(&vint_desc->lock, flags);
-+
-+	return status;
-+}
-+
-+/**
-+ * ti_sci_inta_unregister_event() - Unregister a event from an IA.
-+ * @dev:	Device pointer to source generating the event
-+ * @src_id:	TISCI device ID of the event source
-+ * @src_index:	Event source index within the device.
-+ * @virq:	Linux Virtual IRQ number
-+ *
-+ * Deletes the event from IA interrupt descriptor. If this event is the
-+ * last event then delete the vint as well.
-+ */
-+void ti_sci_inta_unregister_event(struct device *dev, u16 src_id,
-+				  u16 src_index, unsigned int virq)
-+{
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct irq_data *data, *gic_data;
-+	struct device_node *parent_node;
-+	struct irq_domain *domain;
-+	u8 event_index;
-+
-+	parent_node = of_irq_find_parent(dev->of_node);
-+	if (!parent_node)
-+		return;
-+
-+	domain = irq_find_host(parent_node);
-+
-+	data = irq_domain_get_irq_data(domain, virq);
-+	gic_data = irq_domain_get_irq_data(domain->parent->parent, virq);
-+
-+	vint_desc = irq_data_get_irq_chip_data(data);
-+
-+	event_index = get_event_index(vint_desc, src_id, src_index);
-+	if (event_index == MAX_EVENTS_PER_VINT)
-+		return;
-+
-+	if (is_event_last(vint_desc, event_index))
-+		irq_dispose_mapping(virq);
-+	else
-+		ti_sci_free_event_irq(domain->host_data, vint_desc,
-+				      event_index, gic_data->hwirq,
-+				      data->hwirq);
-+}
-+EXPORT_SYMBOL_GPL(ti_sci_inta_unregister_event);
-+
-+static const struct of_device_id ti_sci_inta_irq_domain_of_match[] = {
-+	{ .compatible = "ti,sci-inta", },
++static const struct of_device_id ti_sci_intr_irq_domain_of_match[] = {
++	{ .compatible = "ti,sci-intr", },
 +	{ /* sentinel */ },
 +};
-+MODULE_DEVICE_TABLE(of, ti_sci_inta_irq_domain_of_match);
++MODULE_DEVICE_TABLE(of, ti_sci_intr_irq_domain_of_match);
 +
-+static struct platform_driver ti_sci_inta_irq_domain_driver = {
-+	.probe = ti_sci_inta_irq_domain_probe,
++static struct platform_driver ti_sci_intr_irq_domain_driver = {
++	.probe = ti_sci_intr_irq_domain_probe,
 +	.driver = {
-+		.name = "ti-sci-inta",
-+		.of_match_table = ti_sci_inta_irq_domain_of_match,
++		.name = "ti-sci-intr",
++		.of_match_table = ti_sci_intr_irq_domain_of_match,
 +	},
 +};
-+module_platform_driver(ti_sci_inta_irq_domain_driver);
++module_platform_driver(ti_sci_intr_irq_domain_driver);
 +
 +MODULE_AUTHOR("Lokesh Vutla <lokeshvutla@ticom>");
-+MODULE_DESCRIPTION("K3 Interrupt Aggregator driver over TI SCI protocol");
++MODULE_DESCRIPTION("K3 Interrupt Router driver over TI SCI protocol");
 +MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/irqchip/irq-ti-sci-inta.h b/include/linux/irqchip/irq-ti-sci-inta.h
-new file mode 100644
-index 000000000000..c078234fda3f
---- /dev/null
-+++ b/include/linux/irqchip/irq-ti-sci-inta.h
-@@ -0,0 +1,35 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Texas Instruments' System Control Interface (TI-SCI) irqchip
-+ *
-+ * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
-+ *	Lokesh Vutla <lokeshvutla@ti.com>
-+ */
-+
-+#ifndef __INCLUDE_LINUX_IRQCHIP_TI_SCI_INTA_H
-+#define __INCLUDE_LINUX_IRQCHIP_TI_SCI_INTA_H
-+
-+#if IS_ENABLED(CONFIG_TI_SCI_INTA_IRQCHIP)
-+int ti_sci_inta_register_event(struct device *dev, u16 src_id, u16 src_index,
-+			       unsigned int virq, u32 flags);
-+int ti_sci_inta_unregister_event(struct device *dev, u16 src_id, u16 src_index,
-+				 unsigned int virq);
-+
-+#else /* CONFIG_TI_SCI_INTA_IRQCHIP */
-+
-+static inline int ti_sci_inta_register_event(struct device *dev, u16 src_id,
-+					     u16 src_index, unsigned int virq,
-+					     u32 flags)
-+{
-+	return -EINVAL;
-+}
-+
-+static inline int ti_sci_inta_unregister_event(struct device *dev, u16 src_id,
-+					       u16 src_index, unsigned int virq)
-+{
-+	return -EINVAL;
-+}
-+
-+#endif /* CONFIG_TI_SCI_INTA_IRQCHIP */
-+
-+#endif /* __INCLUDE_LINUX_IRQCHIP_TI_SCI_INTA_H */
 -- 
 2.19.1
