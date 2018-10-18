@@ -1,27 +1,27 @@
-From: zhlcindy@gmail.com (Li Zhang)
-Date: Thu, 18 Oct 2018 17:17:57 +0800
-Subject: kvm-unit-tests gicv2 cases fail
-Message-ID: <CAD8of+q29DrQa4Ay6karXC19vXzX++2T8FR-V1SAjGuO0ejYhQ@mail.gmail.com>
+From: chunyan.zhang@unisoc.com (Chunyan Zhang)
+Date: Thu, 18 Oct 2018 17:17:33 +0800
+Subject: [GIT PULL] sprd dts for kernel v4.20-rc1
+Message-ID: <1539854253-4784-1-git-send-email-chunyan.zhang@unisoc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-I run kvm-units-test on ARM server(QDF2400), but gicv2-ipi,
-gicv2-active cases fail.
-By debuging kvm-unit-tests source code, I found that interrupt is not
-handled. do_handle_exception is not called.
+For 4.20-rc1 there's one patch only for sprd devicetree, please pull from my git tree:
 
-By looking into KVM source code, it has GICv2 emulation on GICv3 support.
-I've tried a lot of kernel versions, from v4.12~v4.19 in mainline,
-these cases always fail.
-Is it possible that hardware/software disables this?
+https://github.com/lyrazhang/linux.git m-v4.19-rc1
 
-It seems that GICv2 is a little old for ARM server, I am confused when
-we can use it.
-Do we need to care about these cases?
+Please let me know if there's some problem.
 
---
+Thanks,
+Chunyan
 
-Best Regards
--Li
+----------------------------------------------------------------
+
+Suzuki K Poulose (1):
+  arm64: dts: sc9836/sc9860: Update coresight bindings for hardware
+    ports
+
+ arch/arm64/boot/dts/sprd/sc9836.dtsi |  78 +++++++------
+ arch/arm64/boot/dts/sprd/sc9860.dtsi | 215 ++++++++++++++++++-----------------
+ 2 files changed, 151 insertions(+), 142 deletions(-)
