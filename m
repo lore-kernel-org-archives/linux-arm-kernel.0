@@ -1,75 +1,150 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Oct 2018 11:55:28 +0300
-Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to
- dot clock frequency check
-In-Reply-To: <20181018073327.64942-10-icenowy@aosc.io>
-References: <20181018073327.64942-1-icenowy@aosc.io>
- <20181018073327.64942-10-icenowy@aosc.io>
-Message-ID: <4168274.Gmp9JTCfJR@avalon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Oct 2018 09:55:36 +0100
+Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
+ SPIs
+In-Reply-To: <5BC800EB.5070201@huawei.com>
+References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
+ <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
+ <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com> <5BC800EB.5070201@huawei.com>
+Message-ID: <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+Hi Yang,
 
-Thank you for the patch.
+On 18/10/18 04:41, Yang Yingliang wrote:
+> Hi, Marc
+> 
+> On 2018/10/18 0:30, Marc Zyngier wrote:
+>> On 16/10/18 10:15, Yang Yingliang wrote:
+>>> Now with
+>>> 5052875 ("irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller"),
+>>> we can support MBIGEN to generate message based SPIs by writing GICD_SETSPIR.
+>>>
+>>> The first 64-pins of each MBIGEN chip is used to generate SPIs, and each
+>>> MBIGEN chip has several MBIGEN nodes, every node has 128 pins for generating
+>>> LPIs. The total pins are: 64(SPIs) + 128 * node_nr(LPIs). So we can translate
+>>> the pin index in a unified way in mbigen_domain_translate().
+>>>
+>>> Also Add TYPE and VEC registers that used by generating SPIs, the driver can
+>>> access them when MBIGEN is used to generate SPIs.
+>>>
+>>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+>>> ---
+>>>   drivers/irqchip/irq-mbigen.c | 21 +++++++++++++++++++--
+>>>   1 file changed, 19 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>>> index f05998f..37c1932 100644
+>>> --- a/drivers/irqchip/irq-mbigen.c
+>>> +++ b/drivers/irqchip/irq-mbigen.c
+>>> @@ -48,6 +48,7 @@
+>>>   #define MBIGEN_NODE_OFFSET		0x1000
+>>>   
+>>>   /* offset of vector register in mbigen node */
+>>> +#define REG_MBIGEN_SPI_VEC_OFFSET	0x500
+>>>   #define REG_MBIGEN_LPI_VEC_OFFSET	0x200
+>>>   
+>>>   /**
+>>> @@ -62,6 +63,7 @@
+>>>    * This register is used to configure interrupt
+>>>    * trigger type
+>>>    */
+>>> +#define REG_MBIGEN_SPI_TYPE_OFFSET	0x400
+>>>   #define REG_MBIGEN_LPI_TYPE_OFFSET	0x0
+>>>   
+>>>   /**
+>>> @@ -79,6 +81,9 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
+>>>   {
+>>>   	unsigned int nid, pin;
+>>>   
+>>> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP)
+>>> +		return (hwirq * 4 + REG_MBIGEN_SPI_VEC_OFFSET);
+>>> +
+>>>   	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
+>>>   	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
+>>>   	pin = hwirq % IRQS_PER_MBIGEN_NODE;
+>>> @@ -92,6 +97,13 @@ static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
+>>>   {
+>>>   	unsigned int nid, irq_ofst, ofst;
+>>>   
+>>> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
+>>> +		*mask = 1 << (hwirq % 32);
+>>> +		ofst = hwirq / 32 * 4;
+>>> +		*addr = ofst + REG_MBIGEN_SPI_TYPE_OFFSET;
+>>> +		return;
+>>> +	}
+>>> +
+>>>   	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
+>>>   	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
+>>>   	irq_ofst = hwirq % IRQS_PER_MBIGEN_NODE;
+>>> @@ -162,6 +174,12 @@ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+>>>   	u32 val;
+>>>   
+>>>   	base += get_mbigen_vec_reg(d->hwirq);
+>>> +
+>>> +	if (d->hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
+>>> +		writel_relaxed(msg->data, base);
+>>> +		return;
+>>> +	}
+>> How is the GICD_SETSPI_NSR base address programmed if you're ignoring
+>> the address stored in the message?
+> Now, this base address is encoded in MBIGEN register by default.
 
-On Thursday, 18 October 2018 10:33:27 EEST Icenowy Zheng wrote:
-> From: Chen-Yu Tsai <wens@csie.org>
-> 
-> The panels shipped with Allwinner devices are very "generic", i.e.
-> they do not have model numbers or reliable sources of information
-> for the timings (that we know of) other than the fex files shipped
-> on them. The dot clock frequency provided in the fex files have all
-> been rounded to the nearest MHz, as that is the unit used in them.
-> 
-> We were using the simple panel "urt,umsh-8596md-t" as a substitute
-> for the A13 Q8 tablets in the absence of a specific model for what
-> may be many different but otherwise timing compatible panels. This
-> was usable without any visual artifacts or side effects, until the
-> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
-> rgb: Validate the clock rate").
-> 
-> The reason this check fails is because the dotclock frequency for
-> this model is 33.26 MHz, which is not achievable with our dot clock
-> hardware, and the rate returned by clk_round_rate deviates slightly,
-> causing the driver to reject the display mode.
-> 
-> The LCD panels have some tolerance on the dot clock frequency, even
-> if it's not specified in their datasheets.
-> 
-> This patch adds a 5% tolerence to the dot clock check.
+OK. So let's move the comment in that function to the top, and indicate
+that this also applies to the GICD_SETSPI_NSR register.
 
-Why do you think this shouldn't be merged ?
+> In case this address isn't set to register in later SoCs, I think the
+> MBIGEN driver set this base address would be better. I will add
+> relative codes to handle both GICD_SETSPI_NSR and ITS Translate
+> address.
+> 
+>>
+>> How do you deal with level interrupts, as you don't seem to use the
+>> level MSI framework either?
+> The MBIGEN driver need to clear active state in irq_eoi hook, when it
+> dealing with level SPIs.
 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_rgb.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> b/drivers/gpu/drm/sun4i/sun4i_rgb.c index bf068da6b12e..23bdc449eacc 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> @@ -92,13 +92,14 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct
-> drm_encoder *crtc,
-> 
->  	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
-> 
-> +	/* Check against a 5% tolerance for the dot clock */
->  	tcon->dclk_min_div = 6;
->  	tcon->dclk_max_div = 127;
->  	rounded_rate = clk_round_rate(tcon->dclk, rate);
-> -	if (rounded_rate < rate)
-> +	if (rounded_rate < rate * 19 / 20 )
->  		return MODE_CLOCK_LOW;
-> 
-> -	if (rounded_rate > rate)
-> +	if (rounded_rate > rate * 21 / 20)
->  		return MODE_CLOCK_HIGH;
-> 
->  	DRM_DEBUG_DRIVER("Clock rate OK\n");
+OK, so you're not taking advantage of the the CLEAR register here? Sad.
 
+> 
+>>
+>>> +
+>>>   	val = readl_relaxed(base);
+>>>   
+>>>   	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
+>>> @@ -182,8 +200,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+>>>   		if (fwspec->param_count != 2)
+>>>   			return -EINVAL;
+>>>   
+>>> -		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
+>>> -			(fwspec->param[0] < SPI_NUM_PER_MBIGEN_CHIP))
+>>> +		if (fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM)
+>>>   			return -EINVAL;
+>>>   		else
+>>>   			*hwirq = fwspec->param[0];
+>>>
+>> Now, the biggest question of them all: how does it work with ACPI? Last
+>> time I checked, there was no DT support for platforms using the MBIGEN.
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+> This DT describes how platform devices using the MBIGEN.
+
+That's not how my own D05 boots. It is ACPI only. How is that going to
+work on this platform?
+
+> 
+>>
+>> My gut feeling is that it would be so much better if the SPIs generated
+>> by the MBIGEN were configured in firmware, and the devices behind it
+>> would just describe the corresponding SPI...
+> We need use this framework to clear active state in MBIGEN register, so 
+> configuring
+> in firmware is not enough...
+
+Fair enough.
+
+Thanks,
+
+	M.
 -- 
-Regards,
-
-Laurent Pinchart
+Jazz is not dead. It just smells funny...
