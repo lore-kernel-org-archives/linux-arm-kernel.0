@@ -1,68 +1,68 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 18 Oct 2018 16:24:49 +0200
-Subject: [PATCH v5 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
-References: <1539839345-14021-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <20181018162449.3fe433e7@bbrezillon>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 Oct 2018 09:33:42 -0500
+Subject: [PATCH V6 1/3] dt-bindings: fsl: scu: make power domain
+ compatible string SoC specific
+In-Reply-To: <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
+References: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
+ <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181018143342.GA22874@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Oct 2018 13:09:05 +0800
-Jianxin Pan <jianxin.pan@amlogic.com> wrote:
+On Wed, Oct 17, 2018 at 07:24:40AM +0000, A.s. Dong wrote:
+> As the power domain API might change in the future for new SoCs, although
+> in a very low possibility, it's still better to make the compatible string
+> more SoC specific to avoid the possible version change for new SoCs.
+> 
+> Due to there're still no users in kernel, it's safe to update it without
+> breaking anything.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-> +static int meson_nfc_exec_op(struct nand_chip *chip,
-> +			     const struct nand_operation *op, bool check_only)
-> +{
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
-> +	struct meson_nfc *nfc = nand_get_controller_data(chip);
-> +	const struct nand_op_instr *instr = NULL;
-> +	int ret = 0, cmd;
-> +	unsigned int op_id;
-> +	int i;
-> +
-> +	for (op_id = 0; op_id < op->ninstrs; op_id++) {
-> +		instr = &op->instrs[op_id];
-> +		switch (instr->type) {
-> +		case NAND_OP_CMD_INSTR:
-> +			if (instr->ctx.cmd.opcode == NAND_CMD_STATUS)
-> +				meson_nfc_cmd_idle(nfc, nfc->timing.twb);
+checkpatch says:
 
-Hm, I don't want drivers to base their decisions on the opcode value.
-There's a ->delay_ns field in the instruction object, can't you use
-that one instead? Also, I don't understand why this is only needed for
-the STATUS command. It should normally be applied to all instructions.
+WARNING: Missing Signed-off-by: line by nominal patch author 'A.s. Dong <aisheng.dong@nxp.com>'
 
-> +			cmd = nfc->param.chip_select | NFC_CMD_CLE;
-> +			cmd |= instr->ctx.cmd.opcode & 0xff;
-> +			writel(cmd, nfc->reg_base + NFC_REG_CMD);
-> +			if (instr->ctx.cmd.opcode == NAND_CMD_STATUS)
-> +				meson_nfc_cmd_idle(nfc, nfc->timing.twhr);
-> +			break;
-> +
-> +		case NAND_OP_ADDR_INSTR:
-> +			for (i = 0; i < instr->ctx.addr.naddrs; i++) {
-> +				cmd = nfc->param.chip_select | NFC_CMD_ALE;
-> +				cmd |= instr->ctx.addr.addrs[i] & 0xff;
-> +				writel(cmd, nfc->reg_base + NFC_REG_CMD);
-> +			}
-> +			break;
-> +
-> +		case NAND_OP_DATA_IN_INSTR:
-> +			meson_nfc_read_buf(mtd, instr->ctx.data.buf.in,
-> +					   instr->ctx.data.len);
-> +			break;
-> +
-> +		case NAND_OP_DATA_OUT_INSTR:
-> +			meson_nfc_write_buf(mtd, instr->ctx.data.buf.out,
-> +					    instr->ctx.data.len);
-> +			break;
-> +
-> +		case NAND_OP_WAITRDY_INSTR:
-> +			meson_nfc_queue_rb(nfc, instr->ctx.waitrdy.timeout_ms);
-> +			break;
-> +		}
-> +	}
-> +	return ret;
-> +}
+> ---
+> ChangeLog:
+> v5->v6:
+>  * new patch
+> ---
+>  Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> index 46d0af1..87fc4b4 100644
+> --- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> @@ -58,7 +58,7 @@ This binding for the SCU power domain providers uses the generic power
+>  domain binding[2].
+>  
+>  Required properties:
+> -- compatible:		Should be "fsl,scu-pd".
+> +- compatible:		Should be "fsl,imx8qxp-scu-pd".
+
+You can keep both if you think future SoCs will be compatible.
+
+>  - #address-cells:	Should be 1.
+>  - #size-cells:		Should be 0.
+>  
+> @@ -153,7 +153,7 @@ firmware {
+>  		};
+>  
+>  		imx8qx-pm {
+> -			compatible = "fsl,scu-pd";
+> +			compatible = "fsl,imx8qxp-scu-pd";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  
+> -- 
+> 2.7.4
+> 
