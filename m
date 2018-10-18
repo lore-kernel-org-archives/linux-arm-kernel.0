@@ -1,13 +1,15 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 18 Oct 2018 16:54:07 +0000
-Subject: [PATCH V5 7/9] clk: imx: scu: add scu clock mux
+Date: Thu, 18 Oct 2018 16:54:11 +0000
+Subject: [PATCH V5 8/9] clk: imx: scu: add scu clock gpr mux
 In-Reply-To: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
 References: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1539881347-20871-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1539881347-20871-9-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add scu based clock mux.
+Add scu based clock gpr mux. Unlike the normal scu mux, such
+muxes are controlled by GPR bits through SCU sc_misc_set_control
+API.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -17,43 +19,43 @@ Cc: Michael Turquette <mturquette@baylibre.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 ChangeLog:
-v4->v5:
- * use union to avoid struct cast for IPC read msg
- * remove unnecessary debug messages
+v4-v5:
+ * remove one unnecessary debug message
+ * drop explict casts
  * move scu clk files into imx top directory
 v3->v4:
  * scu headfile path update
 v2->v3:
  * structure name and api usage update
 v1->v2:
- * move SCU clock API implementation into driver
+ * no changes except headfile name updated
 ---
- drivers/clk/imx/Makefile      |   3 +-
- drivers/clk/imx/clk-mux-scu.c | 123 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk-scu.h     |  13 +++++
- 3 files changed, 138 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/clk-mux-scu.c
+ drivers/clk/imx/Makefile          |  3 +-
+ drivers/clk/imx/clk-mux-gpr-scu.c | 84 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk-scu.h         | 11 +++++
+ 3 files changed, 97 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/clk-mux-gpr-scu.c
 
 diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index 4564175..5f1cece 100644
+index 5f1cece..e0d327e 100644
 --- a/drivers/clk/imx/Makefile
 +++ b/drivers/clk/imx/Makefile
-@@ -18,7 +18,8 @@ obj-$(CONFIG_MXC_CLK_SCU) += \
- 	clk-divider-scu.o \
+@@ -19,7 +19,8 @@ obj-$(CONFIG_MXC_CLK_SCU) += \
  	clk-divider-gpr-scu.o \
  	clk-gate-scu.o \
--	clk-gate-gpr-scu.o
-+	clk-gate-gpr-scu.o \
-+	clk-mux-scu.o
+ 	clk-gate-gpr-scu.o \
+-	clk-mux-scu.o
++	clk-mux-scu.o \
++	clk-mux-gpr-scu.o
  
  obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
  obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
-diff --git a/drivers/clk/imx/clk-mux-scu.c b/drivers/clk/imx/clk-mux-scu.c
+diff --git a/drivers/clk/imx/clk-mux-gpr-scu.c b/drivers/clk/imx/clk-mux-gpr-scu.c
 new file mode 100644
-index 0000000..8addff1
+index 0000000..441c53b
 --- /dev/null
-+++ b/drivers/clk/imx/clk-mux-scu.c
-@@ -0,0 +1,123 @@
++++ b/drivers/clk/imx/clk-mux-gpr-scu.c
+@@ -0,0 +1,84 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
@@ -68,90 +70,50 @@ index 0000000..8addff1
 +
 +#include "clk-scu.h"
 +
-+struct clk_mux_scu {
++struct clk_mux_gpr_scu {
 +	struct clk_hw hw;
-+	u32 rsrc_id;
-+	u8 clk_type;
++	u32	rsrc_id;
++	u8	gpr_id;
 +};
 +
-+#define to_clk_mux_scu(_hw) container_of(_hw, struct clk_mux_scu, hw)
++#define to_clk_mux_gpr_scu(_hw) container_of(_hw, struct clk_mux_gpr_scu, hw)
 +
-+/* SCU Clock Protocol definitions */
-+struct imx_sc_msg_req_set_clock_parent {
-+	struct imx_sc_rpc_msg hdr;
-+	u16 resource;
-+	u8 clk;
-+	u8 parent;
-+} __packed;
-+
-+struct req_get_clock_parent {
-+	u16 resource;
-+	u8 clk;
-+} __packed;
-+
-+struct resp_get_clock_parent {
-+	u8 parent;
-+};
-+
-+struct imx_sc_msg_get_clock_parent {
-+	struct imx_sc_rpc_msg hdr;
-+	union {
-+		struct req_get_clock_parent req;
-+		struct resp_get_clock_parent resp;
-+	} data;
-+} __packed;
-+
-+static u8 clk_mux_scu_get_parent(struct clk_hw *hw)
++static u8 clk_mux_gpr_scu_get_parent(struct clk_hw *hw)
 +{
-+	struct clk_mux_scu *mux = to_clk_mux_scu(hw);
-+	struct imx_sc_msg_get_clock_parent msg;
-+	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++	struct clk_mux_gpr_scu *gpr_mux = to_clk_mux_gpr_scu(hw);
++	u32 val = 0;
 +	int ret;
 +
-+	hdr->ver = IMX_SC_RPC_VERSION;
-+	hdr->svc = IMX_SC_RPC_SVC_PM;
-+	hdr->func = IMX_SC_PM_FUNC_GET_CLOCK_PARENT;
-+	hdr->size = 2;
++	ret = imx_sc_misc_get_control(ccm_ipc_handle, gpr_mux->rsrc_id,
++				      gpr_mux->gpr_id, &val);
++	if (ret) {
++		pr_err("%s: failed to get clock parent %d\n",
++			clk_hw_get_name(hw), ret);
++		return 0;
++	}
 +
-+	msg.data.req.resource = mux->rsrc_id;
-+	msg.data.req.clk = mux->clk_type;
-+
-+	ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
-+	if (ret)
-+		return ret;
-+
-+	return msg.data.resp.parent;
++	return val;
 +}
 +
-+static int clk_mux_scu_set_parent(struct clk_hw *hw, u8 index)
++static int clk_mux_gpr_scu_set_parent(struct clk_hw *hw, u8 index)
 +{
-+	struct clk_mux_scu *mux = to_clk_mux_scu(hw);
-+	struct imx_sc_msg_req_set_clock_parent msg;
-+	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++	struct clk_mux_gpr_scu *gpr_mux = to_clk_mux_gpr_scu(hw);
 +
-+	hdr->ver = IMX_SC_RPC_VERSION;
-+	hdr->svc = IMX_SC_RPC_SVC_PM;
-+	hdr->func = IMX_SC_PM_FUNC_SET_CLOCK_PARENT;
-+	hdr->size = 2;
-+
-+	msg.resource = mux->rsrc_id;
-+	msg.clk = mux->clk_type;
-+	msg.parent = index;
-+
-+	return imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
++	return imx_sc_misc_set_control(ccm_ipc_handle, gpr_mux->rsrc_id,
++				       gpr_mux->gpr_id, index);
 +}
 +
-+static const struct clk_ops clk_mux_scu_ops = {
-+	.get_parent = clk_mux_scu_get_parent,
-+	.set_parent = clk_mux_scu_set_parent,
++static const struct clk_ops clk_mux_gpr_scu_ops = {
++	.get_parent = clk_mux_gpr_scu_get_parent,
++	.set_parent = clk_mux_gpr_scu_set_parent,
 +};
 +
-+struct clk_hw *clk_register_mux_scu(const char *name, const char * const *parents,
-+				    int num_parents, unsigned long flags,
-+				    u32 rsrc_id, u8 clk_type)
++struct clk_hw *clk_register_mux_gpr_scu(const char *name, const char * const *parents,
++					int num_parents, unsigned long flags,
++					u32 rsrc_id, u8 gpr_id)
 +{
++	struct clk_mux_gpr_scu *mux;
 +	struct clk_init_data init;
-+	struct clk_mux_scu *mux;
 +	struct clk_hw *hw;
 +	int ret;
 +
@@ -160,13 +122,14 @@ index 0000000..8addff1
 +		return ERR_PTR(-ENOMEM);
 +
 +	init.name = name;
-+	init.ops = &clk_mux_scu_ops;
++	init.ops = &clk_mux_gpr_scu_ops;
 +	init.parent_names = parents;
 +	init.num_parents = num_parents;
++	init.flags = flags;
 +
 +	mux->hw.init = &init;
 +	mux->rsrc_id = rsrc_id;
-+	mux->clk_type = clk_type;
++	mux->gpr_id = gpr_id;
 +
 +	hw = &mux->hw;
 +	ret = clk_hw_register(NULL, hw);
@@ -178,24 +141,22 @@ index 0000000..8addff1
 +	return hw;
 +}
 diff --git a/drivers/clk/imx/clk-scu.h b/drivers/clk/imx/clk-scu.h
-index 673b280..2a5a45e 100644
+index 2a5a45e..bab6a7f 100644
 --- a/drivers/clk/imx/clk-scu.h
 +++ b/drivers/clk/imx/clk-scu.h
-@@ -68,4 +68,17 @@ static inline struct clk_hw *imx_clk_gate_gpr_scu(const char *name, const char *
- 	return clk_register_gate_gpr_scu(name, parent, rsrc_id, gpr_id, invert_flag);
+@@ -81,4 +81,15 @@ static inline struct clk_hw *imx_clk_mux_scu(const char *name,
+ 			clk_type);
  }
  
-+struct clk_hw *clk_register_mux_scu(const char *name, const char * const *parents,
++struct clk_hw *clk_register_mux_gpr_scu(const char *name, const char * const *parents,
 +			int num_parents, unsigned long flags,
-+			u32 rsrc_id, u8 clk_type);
++			u32 rsrc_id, u8 gpr_id);
 +
-+static inline struct clk_hw *imx_clk_mux_scu(const char *name,
-+			const char * const *parents, int num_parents,
-+			u32 rsrc_id, u8 clk_type)
++static inline struct clk_hw *imx_clk_mux_gpr_scu(const char *name, const char * const *parents,
++			int num_parents, u32 rsrc_id, u8 gpr_id)
 +{
-+	return clk_register_mux_scu(name, parents, num_parents,
-+			CLK_SET_RATE_NO_REPARENT, rsrc_id,
-+			clk_type);
++	return clk_register_mux_gpr_scu(name, parents, num_parents,
++			CLK_SET_RATE_NO_REPARENT, rsrc_id, gpr_id);
 +}
 +
  #endif
