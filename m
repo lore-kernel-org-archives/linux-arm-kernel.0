@@ -1,97 +1,121 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 Oct 2018 15:33:25 +0800
-Subject: [PATCH 7/9] arm64: allwinner: a64: enable ANX6345 bridge on Pinebook
-In-Reply-To: <20181018073327.64942-1-icenowy@aosc.io>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Oct 2018 11:47:20 +0300
+Subject: [PATCH 1/9] drm/bridge: move ANA78xx driver to analogix
+ subdirectory
+In-Reply-To: <20181018073327.64942-2-icenowy@aosc.io>
 References: <20181018073327.64942-1-icenowy@aosc.io>
-Message-ID: <20181018073327.64942-8-icenowy@aosc.io>
+ <20181018073327.64942-2-icenowy@aosc.io>
+Message-ID: <1600163.alMOuyZOxo@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pinebook has an ANX6345 bridge connected to the RGB666 LCD output, and
-the I2C controlling signals are connected to R_I2C bus.
+Hi Icenowy,
 
-Enable it in the device tree, and add a usable EDID from the panel's
-datasheet (at least 14" Pinebook used a panel without EDID).
+Thank you for the patch.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- .../dts/allwinner/sun50i-a64-pinebook.dts     | 43 +++++++++++++++++++
- 1 file changed, 43 insertions(+)
+On Thursday, 18 October 2018 10:33:19 EEST Icenowy Zheng wrote:
+> As ANA78xx chips are designed and produced by Analogix Semiconductor,
+> Inc, move their driver codes into analogix subdirectory.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/gpu/drm/bridge/Kconfig                         | 10 ----------
+>  drivers/gpu/drm/bridge/Makefile                        |  4 ++--
+>  drivers/gpu/drm/bridge/analogix/Kconfig                | 10 ++++++++++
+>  drivers/gpu/drm/bridge/analogix/Makefile               |  1 +
+>  .../gpu/drm/bridge/{ => analogix}/analogix-anx78xx.c   |  0
+>  .../gpu/drm/bridge/{ => analogix}/analogix-anx78xx.h   |  0
+>  6 files changed, 13 insertions(+), 12 deletions(-)
+>  rename drivers/gpu/drm/bridge/{ => analogix}/analogix-anx78xx.c (100%)
+>  rename drivers/gpu/drm/bridge/{ => analogix}/analogix-anx78xx.h (100%)
+> 
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index 9eeb8ef0b174..8a7ffb3256d8 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -15,16 +15,6 @@ config DRM_PANEL_BRIDGE
+>  menu "Display Interface Bridges"
+>  	depends on DRM && DRM_BRIDGE
+> 
+> -config DRM_ANALOGIX_ANX78XX
+> -	tristate "Analogix ANX78XX bridge"
+> -	select DRM_KMS_HELPER
+> -	select REGMAP_I2C
+> -	---help---
+> -	  ANX78XX is an ultra-low Full-HD SlimPort transmitter
+> -	  designed for portable devices. The ANX78XX transforms
+> -	  the HDMI output of an application processor to MyDP
+> -	  or DisplayPort.
+> -
+>  config DRM_CDNS_DSI
+>  	tristate "Cadence DPI/DSI bridge"
+>  	select DRM_KMS_HELPER
+> diff --git a/drivers/gpu/drm/bridge/Makefile
+> b/drivers/gpu/drm/bridge/Makefile index 4934fcf5a6f8..a6c7dd7727ea 100644
+> --- a/drivers/gpu/drm/bridge/Makefile
+> +++ b/drivers/gpu/drm/bridge/Makefile
+> @@ -1,5 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+>  obj-$(CONFIG_DRM_CDNS_DSI) += cdns-dsi.o
+>  obj-$(CONFIG_DRM_DUMB_VGA_DAC) += dumb-vga-dac.o
+>  obj-$(CONFIG_DRM_LVDS_ENCODER) += lvds-encoder.o
+> @@ -12,8 +11,9 @@ obj-$(CONFIG_DRM_SII9234) += sii9234.o
+>  obj-$(CONFIG_DRM_THINE_THC63LVD1024) += thc63lvd1024.o
+>  obj-$(CONFIG_DRM_TOSHIBA_TC358764) += tc358764.o
+>  obj-$(CONFIG_DRM_TOSHIBA_TC358767) += tc358767.o
+> -obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix/
+>  obj-$(CONFIG_DRM_I2C_ADV7511) += adv7511/
+>  obj-$(CONFIG_DRM_TI_SN65DSI86) += ti-sn65dsi86.o
+>  obj-$(CONFIG_DRM_TI_TFP410) += ti-tfp410.o
+> +
+> +obj-y += analogix/
+>  obj-y += synopsys/
+> diff --git a/drivers/gpu/drm/bridge/analogix/Kconfig
+> b/drivers/gpu/drm/bridge/analogix/Kconfig index 80f286fa3a69..27b37aa2ea77
+> 100644
+> --- a/drivers/gpu/drm/bridge/analogix/Kconfig
+> +++ b/drivers/gpu/drm/bridge/analogix/Kconfig
+> @@ -1,3 +1,13 @@
+>  config DRM_ANALOGIX_DP
+>  	tristate
+>  	depends on DRM
+> +
+> +config DRM_ANALOGIX_ANX78XX
+> +	tristate "Analogix ANX78XX bridge"
+> +	select DRM_KMS_HELPER
+> +	select REGMAP_I2C
+> +	---help---
+> +	  ANX78XX is an ultra-low Full-HD SlimPort transmitter
+> +	  designed for portable devices. The ANX78XX transforms
+> +	  the HDMI output of an application processor to MyDP
+> +	  or DisplayPort.
+> diff --git a/drivers/gpu/drm/bridge/analogix/Makefile
+> b/drivers/gpu/drm/bridge/analogix/Makefile index cd4010ba6890..eb41be845055
+> 100644
+> --- a/drivers/gpu/drm/bridge/analogix/Makefile
+> +++ b/drivers/gpu/drm/bridge/analogix/Makefile
+> @@ -1,2 +1,3 @@
+>  analogix_dp-objs := analogix_dp_core.o analogix_dp_reg.o
+>  obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp.o
+> +obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-index 77fac84797e9..d7c14d0d61f9 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-@@ -66,6 +66,10 @@
- 	};
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	phys = <&usbphy 0>;
- 	phy-names = "usb";
-@@ -76,6 +80,10 @@
- 	status = "okay";
- };
- 
-+&mixer0 {
-+	status = "okay";
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -127,6 +135,27 @@
- 	status = "okay";
- };
- 
-+&r_i2c {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&r_i2c_pins_a>;
-+	status = "okay";
-+
-+	anx6345: anx6345 at 38 {
-+		compatible = "analogix,anx6345";
-+		reg = <0x38>;
-+		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
-+		panel-supply = <&reg_dc1sw>;
-+		dvdd25-supply = <&reg_dldo2>;
-+		dvdd12-supply = <&reg_fldo1>;
-+
-+		port {
-+			anx6345_in: endpoint {
-+				remote-endpoint = <&tcon0_out_anx6345>;
-+			};
-+		};
-+	};
-+};
-+
- &r_rsb {
- 	status = "okay";
- 
-@@ -267,6 +296,20 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_anx6345: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&anx6345_in>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+This makes sense to me. I would have tried to keep the Kconfig and Makefile 
+entries alphabetically sorted, but that's not a big deal. With or without the 
+sorting,
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> diff --git a/drivers/gpu/drm/bridge/analogix-anx78xx.c
+> b/drivers/gpu/drm/bridge/analogix/analogix-anx78xx.c similarity index 100%
+> rename from drivers/gpu/drm/bridge/analogix-anx78xx.c
+> rename to drivers/gpu/drm/bridge/analogix/analogix-anx78xx.c
+> diff --git a/drivers/gpu/drm/bridge/analogix-anx78xx.h
+> b/drivers/gpu/drm/bridge/analogix/analogix-anx78xx.h similarity index 100%
+> rename from drivers/gpu/drm/bridge/analogix-anx78xx.h
+> rename to drivers/gpu/drm/bridge/analogix/analogix-anx78xx.h
+
 -- 
-2.18.1
+Regards,
+
+Laurent Pinchart
