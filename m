@@ -1,41 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Oct 2018 10:14:54 +0100
-Subject: [PATCH v4 0/2] rename function name and enable 32bit vcpu events
-In-Reply-To: <20181012161249.9236-1-gengdongjiu@huawei.com>
-References: <20181012161249.9236-1-gengdongjiu@huawei.com>
-Message-ID: <c1cc827c-c1b7-1fa5-85be-54fc400febb1@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 18 Oct 2018 11:18:06 +0200
+Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to
+ dot clock frequency check
+In-Reply-To: <4168274.Gmp9JTCfJR@avalon>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <20181018073327.64942-10-icenowy@aosc.io>
+ <4168274.Gmp9JTCfJR@avalon>
+Message-ID: <CAKMK7uFp2c=wqzPi096MTRB6Cdfacerkp6dM=fEqCAr99PQG9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/18 17:12, Dongjiu Geng wrote:
-> Rename the kvm_arch_dev_ioctl_check_extension() to 
-> kvm_arch_vm_ioctl_check_extension, because the name
-> is not readable;
-> 
-> Enable the 32 bit vcpu events support.
-> 
-> Change since v3:
-> 1. Address James's comments to update the patch commit messages
-> 
-> Change since v2:
-> 1. Address Suzuki's comments to update the patch commit messages
-> 
-> change since v1:
-> 1. Update patch commit messages.
-> 
-> Dongjiu Geng (2):
->   arm/arm64: KVM: rename function kvm_arch_dev_ioctl_check_extension()
->   arm/arm64: KVM: enable 32 bits kvm vcpu events support
-> 
->  arch/arm/include/asm/kvm_host.h   | 2 +-
->  arch/arm64/include/asm/kvm_host.h | 2 +-
->  arch/arm64/kvm/reset.c            | 5 ++---
->  virt/kvm/arm/arm.c                | 3 ++-
->  4 files changed, 6 insertions(+), 6 deletions(-)
-> 
+On Thu, Oct 18, 2018 at 10:55 AM Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>
+> Hi Icenowy,
+>
+> Thank you for the patch.
+>
+> On Thursday, 18 October 2018 10:33:27 EEST Icenowy Zheng wrote:
+> > From: Chen-Yu Tsai <wens@csie.org>
+> >
+> > The panels shipped with Allwinner devices are very "generic", i.e.
+> > they do not have model numbers or reliable sources of information
+> > for the timings (that we know of) other than the fex files shipped
+> > on them. The dot clock frequency provided in the fex files have all
+> > been rounded to the nearest MHz, as that is the unit used in them.
+> >
+> > We were using the simple panel "urt,umsh-8596md-t" as a substitute
+> > for the A13 Q8 tablets in the absence of a specific model for what
+> > may be many different but otherwise timing compatible panels. This
+> > was usable without any visual artifacts or side effects, until the
+> > dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+> > rgb: Validate the clock rate").
+> >
+> > The reason this check fails is because the dotclock frequency for
+> > this model is 33.26 MHz, which is not achievable with our dot clock
+> > hardware, and the rate returned by clk_round_rate deviates slightly,
+> > causing the driver to reject the display mode.
+> >
+> > The LCD panels have some tolerance on the dot clock frequency, even
+> > if it's not specified in their datasheets.
+> >
+> > This patch adds a 5% tolerence to the dot clock check.
+>
+> Why do you think this shouldn't be merged ?
 
-Applied, thanks.
+It pisses of a lot of people who really insist upon accurate timing. I
+think a better fix would be to have a dotclock range in drm_panel, and
+some magic to figure out which one of these we can actually do. Then
+tell userspace that this is the mode is should request. That way
+userspace knows what the actual dotclock/refresh rate is, and the
+panel still works.
+-Daniel
 
-	M.
+>
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_rgb.c | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> > b/drivers/gpu/drm/sun4i/sun4i_rgb.c index bf068da6b12e..23bdc449eacc 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> > @@ -92,13 +92,14 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct
+> > drm_encoder *crtc,
+> >
+> >       DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+> >
+> > +     /* Check against a 5% tolerance for the dot clock */
+> >       tcon->dclk_min_div = 6;
+> >       tcon->dclk_max_div = 127;
+> >       rounded_rate = clk_round_rate(tcon->dclk, rate);
+> > -     if (rounded_rate < rate)
+> > +     if (rounded_rate < rate * 19 / 20 )
+> >               return MODE_CLOCK_LOW;
+> >
+> > -     if (rounded_rate > rate)
+> > +     if (rounded_rate > rate * 21 / 20)
+> >               return MODE_CLOCK_HIGH;
+> >
+> >       DRM_DEBUG_DRIVER("Clock rate OK\n");
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
