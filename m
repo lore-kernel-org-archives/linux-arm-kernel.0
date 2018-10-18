@@ -1,9 +1,10 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Thu, 18 Oct 2018 10:09:59 +0800
-Subject: [PATCH V2 2/4] arm64: mm: Introduce DEFAULT_MAP_WINDOW
-In-Reply-To: <20181017163459.20175-3-steve.capper@arm.com>
-References: <20181017163459.20175-3-steve.capper@arm.com>
-Message-ID: <201810181056.kv4MsksX%fengguang.wu@intel.com>
+Date: Thu, 18 Oct 2018 10:28:07 +0800
+Subject: [PATCH V2 3/4] arm64: mm: Define arch_get_mmap_end,
+ arch_get_mmap_base
+In-Reply-To: <20181017163459.20175-4-steve.capper@arm.com>
+References: <20181017163459.20175-4-steve.capper@arm.com>
+Message-ID: <201810181001.S8feTq0v%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,93 +29,98 @@ reproduce:
 
 All warnings (new ones prefixed by >>):
 
-   In file included from include/linux/cache.h:5:0,
-                    from include/linux/printk.h:9,
-                    from include/linux/kernel.h:14,
-                    from include/asm-generic/bug.h:18,
-                    from arch/arm64/include/asm/bug.h:37,
-                    from include/linux/bug.h:5,
-                    from arch/arm64/include/asm/ptrace.h:90,
-                    from arch/arm64/include/asm/elf.h:24,
-                    from include/linux/elf.h:5,
-                    from arch/arm64/mm/mmap.c:19:
-   arch/arm64/mm/mmap.c: In function 'arch_pick_mmap_layout':
+   In file included from include/asm-generic/qrwlock.h:23:0,
+                    from ./arch/arm64/include/generated/asm/qrwlock.h:1,
+                    from arch/arm64/include/asm/spinlock.h:19,
+                    from include/linux/spinlock.h:88,
+                    from include/linux/mmzone.h:8,
+                    from include/linux/gfp.h:6,
+                    from include/linux/slab.h:15,
+                    from mm/mmap.c:12:
+   mm/mmap.c: In function 'arch_get_unmapped_area':
    arch/arm64/include/asm/processor.h:63:50: error: 'tsk' undeclared (first use in this function)
     #define DEFAULT_MAP_WINDOW (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
                                                      ^
-   include/uapi/linux/kernel.h:11:41: note: in definition of macro '__ALIGN_KERNEL_MASK'
-    #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
-                                            ^
-   include/linux/kernel.h:58:22: note: in expansion of macro '__ALIGN_KERNEL'
-    #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
-                         ^~~~~~~~~~~~~~
-   include/linux/mm.h:144:26: note: in expansion of macro 'ALIGN'
-    #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
-                             ^~~~~
-   arch/arm64/include/asm/processor.h:70:29: note: in expansion of macro 'PAGE_ALIGN'
-    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-                                ^~~~~~~~~~
-   arch/arm64/include/asm/processor.h:70:40: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
-    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-                                           ^~~~~~~~~~~~~~~~~~
->> arch/arm64/mm/mmap.c:98:19: note: in expansion of macro 'TASK_UNMAPPED_BASE'
-      mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
-                      ^~~~~~~~~~~~~~~~~~
+   arch/arm64/include/asm/processor.h:81:42: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
+    #define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
+                                             ^~~~~~~~~~~~~~~~~~
+>> mm/mmap.c:2073:33: note: in expansion of macro 'arch_get_mmap_end'
+     const unsigned long mmap_end = arch_get_mmap_end(addr);
+                                    ^~~~~~~~~~~~~~~~~
    arch/arm64/include/asm/processor.h:63:50: note: each undeclared identifier is reported only once for each function it appears in
     #define DEFAULT_MAP_WINDOW (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
                                                      ^
-   include/uapi/linux/kernel.h:11:41: note: in definition of macro '__ALIGN_KERNEL_MASK'
-    #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
-                                            ^
-   include/linux/kernel.h:58:22: note: in expansion of macro '__ALIGN_KERNEL'
-    #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
-                         ^~~~~~~~~~~~~~
-   include/linux/mm.h:144:26: note: in expansion of macro 'ALIGN'
-    #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
-                             ^~~~~
-   arch/arm64/include/asm/processor.h:70:29: note: in expansion of macro 'PAGE_ALIGN'
-    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-                                ^~~~~~~~~~
-   arch/arm64/include/asm/processor.h:70:40: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
-    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-                                           ^~~~~~~~~~~~~~~~~~
->> arch/arm64/mm/mmap.c:98:19: note: in expansion of macro 'TASK_UNMAPPED_BASE'
-      mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
-                      ^~~~~~~~~~~~~~~~~~
+   arch/arm64/include/asm/processor.h:81:42: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
+    #define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
+                                             ^~~~~~~~~~~~~~~~~~
+>> mm/mmap.c:2073:33: note: in expansion of macro 'arch_get_mmap_end'
+     const unsigned long mmap_end = arch_get_mmap_end(addr);
+                                    ^~~~~~~~~~~~~~~~~
+   mm/mmap.c: In function 'arch_get_unmapped_area_topdown':
+   arch/arm64/include/asm/processor.h:63:50: error: 'tsk' undeclared (first use in this function)
+    #define DEFAULT_MAP_WINDOW (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+                                                     ^
+   arch/arm64/include/asm/processor.h:81:42: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
+    #define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
+                                             ^~~~~~~~~~~~~~~~~~
+   mm/mmap.c:2113:33: note: in expansion of macro 'arch_get_mmap_end'
+     const unsigned long mmap_end = arch_get_mmap_end(addr);
+                                    ^~~~~~~~~~~~~~~~~
 
-vim +/TASK_UNMAPPED_BASE +98 arch/arm64/mm/mmap.c
+vim +/arch_get_mmap_end +2073 mm/mmap.c
 
-1d18c47c Catalin Marinas 2012-03-05   81  
-1d18c47c Catalin Marinas 2012-03-05   82  /*
-1d18c47c Catalin Marinas 2012-03-05   83   * This function, called very early during the creation of a new process VM
-1d18c47c Catalin Marinas 2012-03-05   84   * image, sets up which VM layout function to use:
-1d18c47c Catalin Marinas 2012-03-05   85   */
-8f2af155 Kees Cook       2018-04-10   86  void arch_pick_mmap_layout(struct mm_struct *mm, struct rlimit *rlim_stack)
-1d18c47c Catalin Marinas 2012-03-05   87  {
-dd04cff1 Kees Cook       2015-04-14   88  	unsigned long random_factor = 0UL;
-dd04cff1 Kees Cook       2015-04-14   89  
-dd04cff1 Kees Cook       2015-04-14   90  	if (current->flags & PF_RANDOMIZE)
-2b68f6ca Kees Cook       2015-04-14   91  		random_factor = arch_mmap_rnd();
-dd04cff1 Kees Cook       2015-04-14   92  
-1d18c47c Catalin Marinas 2012-03-05   93  	/*
-1d18c47c Catalin Marinas 2012-03-05   94  	 * Fall back to the standard layout if the personality bit is set, or
-1d18c47c Catalin Marinas 2012-03-05   95  	 * if the expected stack growth is unlimited:
-1d18c47c Catalin Marinas 2012-03-05   96  	 */
-8f2af155 Kees Cook       2018-04-10   97  	if (mmap_is_legacy(rlim_stack)) {
-dd04cff1 Kees Cook       2015-04-14  @98  		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
-1d18c47c Catalin Marinas 2012-03-05   99  		mm->get_unmapped_area = arch_get_unmapped_area;
-1d18c47c Catalin Marinas 2012-03-05  100  	} else {
-8f2af155 Kees Cook       2018-04-10  101  		mm->mmap_base = mmap_base(random_factor, rlim_stack);
-1d18c47c Catalin Marinas 2012-03-05  102  		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
-1d18c47c Catalin Marinas 2012-03-05  103  	}
-1d18c47c Catalin Marinas 2012-03-05  104  }
-1d18c47c Catalin Marinas 2012-03-05  105  
+d5d60952 Steve Capper           2018-10-17  2053  
+^1da177e Linus Torvalds         2005-04-16  2054  /* Get an address range which is currently unmapped.
+^1da177e Linus Torvalds         2005-04-16  2055   * For shmat() with addr=0.
+^1da177e Linus Torvalds         2005-04-16  2056   *
+^1da177e Linus Torvalds         2005-04-16  2057   * Ugly calling convention alert:
+^1da177e Linus Torvalds         2005-04-16  2058   * Return value with the low bits set means error value,
+^1da177e Linus Torvalds         2005-04-16  2059   * ie
+^1da177e Linus Torvalds         2005-04-16  2060   *	if (ret & ~PAGE_MASK)
+^1da177e Linus Torvalds         2005-04-16  2061   *		error = ret;
+^1da177e Linus Torvalds         2005-04-16  2062   *
+^1da177e Linus Torvalds         2005-04-16  2063   * This function "knows" that -ENOMEM has the bits set.
+^1da177e Linus Torvalds         2005-04-16  2064   */
+^1da177e Linus Torvalds         2005-04-16  2065  #ifndef HAVE_ARCH_UNMAPPED_AREA
+^1da177e Linus Torvalds         2005-04-16  2066  unsigned long
+^1da177e Linus Torvalds         2005-04-16  2067  arch_get_unmapped_area(struct file *filp, unsigned long addr,
+^1da177e Linus Torvalds         2005-04-16  2068  		unsigned long len, unsigned long pgoff, unsigned long flags)
+^1da177e Linus Torvalds         2005-04-16  2069  {
+^1da177e Linus Torvalds         2005-04-16  2070  	struct mm_struct *mm = current->mm;
+1be7107f Hugh Dickins           2017-06-19  2071  	struct vm_area_struct *vma, *prev;
+db4fbfb9 Michel Lespinasse      2012-12-11  2072  	struct vm_unmapped_area_info info;
+d5d60952 Steve Capper           2018-10-17 @2073  	const unsigned long mmap_end = arch_get_mmap_end(addr);
+^1da177e Linus Torvalds         2005-04-16  2074  
+d5d60952 Steve Capper           2018-10-17  2075  	if (len > mmap_end - mmap_min_addr)
+^1da177e Linus Torvalds         2005-04-16  2076  		return -ENOMEM;
+^1da177e Linus Torvalds         2005-04-16  2077  
+06abdfb4 Benjamin Herrenschmidt 2007-05-06  2078  	if (flags & MAP_FIXED)
+06abdfb4 Benjamin Herrenschmidt 2007-05-06  2079  		return addr;
+06abdfb4 Benjamin Herrenschmidt 2007-05-06  2080  
+^1da177e Linus Torvalds         2005-04-16  2081  	if (addr) {
+^1da177e Linus Torvalds         2005-04-16  2082  		addr = PAGE_ALIGN(addr);
+1be7107f Hugh Dickins           2017-06-19  2083  		vma = find_vma_prev(mm, addr, &prev);
+d5d60952 Steve Capper           2018-10-17  2084  		if (mmap_end - len >= addr && addr >= mmap_min_addr &&
+1be7107f Hugh Dickins           2017-06-19  2085  		    (!vma || addr + len <= vm_start_gap(vma)) &&
+1be7107f Hugh Dickins           2017-06-19  2086  		    (!prev || addr >= vm_end_gap(prev)))
+^1da177e Linus Torvalds         2005-04-16  2087  			return addr;
+^1da177e Linus Torvalds         2005-04-16  2088  	}
+^1da177e Linus Torvalds         2005-04-16  2089  
+db4fbfb9 Michel Lespinasse      2012-12-11  2090  	info.flags = 0;
+db4fbfb9 Michel Lespinasse      2012-12-11  2091  	info.length = len;
+4e99b021 Heiko Carstens         2013-11-12  2092  	info.low_limit = mm->mmap_base;
+d5d60952 Steve Capper           2018-10-17  2093  	info.high_limit = mmap_end;
+db4fbfb9 Michel Lespinasse      2012-12-11  2094  	info.align_mask = 0;
+db4fbfb9 Michel Lespinasse      2012-12-11  2095  	return vm_unmapped_area(&info);
+^1da177e Linus Torvalds         2005-04-16  2096  }
+^1da177e Linus Torvalds         2005-04-16  2097  #endif
+^1da177e Linus Torvalds         2005-04-16  2098  
 
-:::::: The code at line 98 was first introduced by commit
-:::::: dd04cff1dceab18226853b555cf07914648a235f arm64: standardize mmap_rnd() usage
+:::::: The code at line 2073 was first introduced by commit
+:::::: d5d60952691e93644f4e7692baffbef33c93f91a mm: mmap: Allow for "high" userspace addresses
 
-:::::: TO: Kees Cook <keescook@chromium.org>
-:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
+:::::: TO: Steve Capper <steve.capper@arm.com>
+:::::: CC: 0day robot <lkp@intel.com>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -125,4 +131,4 @@ Name: .config.gz
 Type: application/gzip
 Size: 40225 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/3046b2d8/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/3b851d8b/attachment-0001.gz>
