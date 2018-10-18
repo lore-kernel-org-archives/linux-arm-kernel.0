@@ -1,110 +1,56 @@
-From: frieder.schrempf@kontron.de (Frieder Schrempf)
-Date: Thu, 18 Oct 2018 09:45:04 +0200
-Subject: [PATCH] ARM: dts: imx: Add dummy PHYs for HSIC-only USB controllers
-Message-ID: <1539848729-27646-1-git-send-email-frieder.schrempf@kontron.de>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 18 Oct 2018 11:05:34 +0300
+Subject: [PATCH 2/2] mfd: ab8500-core: Return zero in
+ get_register_interruptible()
+Message-ID: <20181018080534.yw2crvhguen5vajg@kili.mountain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SOCs in the i.MX6 family have a USB host controller that is
-only capable of the HSIC interface and has no on-board PHY.
+I just noticed this in review.  The get_register_interruptible() should
+return zero on success but it instead returns the value that it read.
 
-To be able to use these controllers, we need to add "usb-nop-xceiv"
-dummy PHYs.
+I looked at all the places that called this directly and they check for
+negatives and treat greater than or equal to zero as success.  This
+function is also called as the ->get_register() function pointer.  Some
+of the callers of that treat all non-zero returns as errors, so it's
+possible that this bug causes some problems in real life.
 
-Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
+I could not find any callers that rely on the current behavior, and this
+makes the function align with the get_register_interruptible() in
+ab3100-core.c.
+
+Fixes: 47c1697508f2 ("mfd: Align ab8500 with the abx500 interface")
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 14 ++++++++++++++
- arch/arm/boot/dts/imx6sl.dtsi  |  7 +++++++
- arch/arm/boot/dts/imx6sx.dtsi  |  6 ++++++
- 3 files changed, 27 insertions(+)
+ drivers/mfd/ab8500-core.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 61d2d26..d3404d1 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -139,6 +139,16 @@
- 		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
- 	};
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 30d09d177171..66458a329127 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -252,16 +252,18 @@ static int get_register_interruptible(struct ab8500 *ab8500, u8 bank,
+ 	mutex_lock(&ab8500->lock);
  
-+	usbphynop1: usbphynop1 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
+ 	ret = ab8500->read(ab8500, addr);
+-	if (ret < 0)
++	if (ret < 0) {
+ 		dev_err(ab8500->dev, "failed to read reg %#x: %d\n",
+ 			addr, ret);
+-	else
+-		*value = ret;
++		return ret;
++	}
 +
-+	usbphynop2: usbphynop2 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -981,6 +991,8 @@
- 				reg = <0x02184400 0x200>;
- 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-+				fsl,usbphy = <&usbphynop1>;
-+				phy_type = "hsic";
- 				fsl,usbmisc = <&usbmisc 2>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-@@ -994,6 +1006,8 @@
- 				reg = <0x02184600 0x200>;
- 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-+				fsl,usbphy = <&usbphynop2>;
-+				phy_type = "hsic";
- 				fsl,usbmisc = <&usbmisc 3>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 7a4f5da..81edcdc 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -110,6 +110,11 @@
- 		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
- 	};
++	*value = ret;
  
-+	usbphynop1: usbphynop1 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -815,6 +820,8 @@
- 				reg = <0x02184400 0x200>;
- 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SL_CLK_USBOH3>;
-+				fsl,usbphy = <&usbphynop1>;
-+				phy_type = "hsic";
- 				fsl,usbmisc = <&usbmisc 2>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 844caa3..07ed417 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -159,6 +159,11 @@
- 		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
- 	};
+ 	mutex_unlock(&ab8500->lock);
+ 	dev_vdbg(ab8500->dev, "rd: addr %#x => data %#x\n", addr, ret);
  
-+	usbphynop1: usbphynop1 {
-+		compatible = "usb-nop-xceiv";
-+		#phy-cells = <0>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -877,6 +882,7 @@
- 				reg = <0x02184400 0x200>;
- 				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_USBOH3>;
-+				fsl,usbphy = <&usbphynop1>;
- 				fsl,usbmisc = <&usbmisc 2>;
- 				phy_type = "hsic";
- 				fsl,anatop = <&anatop>;
+-	return ret;
++	return 0;
+ }
+ 
+ static int ab8500_get_register(struct device *dev, u8 bank,
 -- 
-2.7.4
+2.11.0
