@@ -1,107 +1,100 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 18 Oct 2018 07:48:43 +0800
-Subject: [xlnx:master 2059/2087] drivers/tty//serial/uartlite.c:774:33:
- error: 'ulite_of_match' undeclared
-Message-ID: <201810180727.l4Gqf9fJ%fengguang.wu@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 17 Oct 2018 19:51:30 -0500
+Subject: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+In-Reply-To: <AM0PR04MB4211ECC04FD48918E9DFBAB880FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1539527419-23613-1-git-send-email-aisheng.dong@nxp.com>
+ <1539527419-23613-3-git-send-email-aisheng.dong@nxp.com>
+ <CAOMZO5BEwNQy0HA80qOzm_w-c63tFK1eL+cOHNCxKYq9PHGsqw@mail.gmail.com>
+ <AM0PR04MB4211ECC04FD48918E9DFBAB880FD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20181018005130.GA8173@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   4d97746570a6e51f834bbf2758a4b4c33308428d
-commit: 967c635b02189fe38adbc264793129c87be15ddf [2059/2087] serial-uartlite: Remove ULITE_NR_PORTS macro
-config: i386-randconfig-s3-201841 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        git checkout 967c635b02189fe38adbc264793129c87be15ddf
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On Mon, Oct 15, 2018 at 07:57:07AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Fabio Estevam [mailto:festevam at gmail.com]
+> > Sent: Monday, October 15, 2018 7:14 AM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> > <linux-arm-kernel@lists.infradead.org>; Dong Aisheng <dongas86@gmail.com>;
+> > Sascha Hauer <kernel@pengutronix.de>; Shawn Guo <shawnguo@kernel.org>;
+> > Fabio Estevam <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>;
+> > Catalin Marinas <catalin.marinas@arm.com>; Will Deacon
+> > <will.deacon@arm.com>; dl-linux-imx <linux-imx@nxp.com>; Mark Rutland
+> > <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND FLATTENED
+> > DEVICE TREE BINDINGS <devicetree@vger.kernel.org>
+> > Subject: Re: [PATCH V2 2/4] arm64: dts: imx: add imx8qxp support
+> > 
+> > Hi Dong,
+> > 
+> > On Sun, Oct 14, 2018 at 11:35 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+> > >
+> > > Add imx8qxp support
+> > 
+> > You could probably expand the commit log by explaining a bit of what im8qxp
+> > means.
+> > 
+> 
+> Got it, thanks for the suggestion.
+> 
+> > > diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> > > b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> > > new file mode 100644
+> > > index 0000000..e1d2578
+> > > --- /dev/null
+> > > +++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> > > @@ -0,0 +1,861 @@
+> > > +// SPDX-License-Identifier: GPL-2.0+
+> > > +/*
+> > > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > > + * Copyright 2017~2018 NXP
+> > 
+> > I guess you meant "-" instead of "~".
+> > 
+> > > +       memory at 80000000 {
+> > > +               device_type = "memory";
+> > > +               reg = <0x00000000 0x80000000 0 0x40000000>;
+> > > +       };
+> > 
+> > This should go to the board dts file instead as the memory size may vary from
+> > board to board.
+> > 
+> 
+> That's right. Will change it.
+> 
+> > > +               imx8qx-pm {
+> > > +                       compatible = "fsl,scu-pd";
+> > > +                       #address-cells = <1>;
+> > > +                       #size-cells = <0>;
+> > > +
+> > > +                       pd_lsio: lsio-power-domain {
+> > > +                               #power-domain-cells = <0>;
+> > > +                               #address-cells = <1>;
+> > > +                               #size-cells = <0>;
+> > > +
+> > > +                               pd_lsio_pwm0: lsio-pwm0 at 191 {
+> > > +                                       reg = <191>;
+> > 
+> > The number after @ is in hex, so the reg property should be 0x191.
+> 
+> Thanks for the reminder.
+> The PD ID is defined in DEC. So I will change them all into HEX later manually.
+> 
+> BTW, this seems like error prone and checkpatch can't report it.
 
-All errors (new ones prefixed by >>):
+checkpatch doesn't really check dts files.
 
-   drivers/tty//serial/uartlite.c: In function 'ulite_get_id':
->> drivers/tty//serial/uartlite.c:774:33: error: 'ulite_of_match' undeclared (first use in this function)
-      ret = of_alias_get_alias_list(ulite_of_match, "serial",
-                                    ^~~~~~~~~~~~~~
-   drivers/tty//serial/uartlite.c:774:33: note: each undeclared identifier is reported only once for each function it appears in
+But if it did would you have noticed? Because there is at least one 
+checkpatch issue with your author name and S-o-b name not matching.
 
-vim +/ulite_of_match +774 drivers/tty//serial/uartlite.c
+> And I notice many similar users in kernel with the same issue:
+> arch/arm/boot/dts/tps65910.dtsi
+> arch/arm/boot/dts/tegra124-nyan.dtsi
+> arch/arm/boot/dts/rk3288.dtsi
 
-   769	
-   770		mutex_lock(&bitmap_lock);
-   771	
-   772		/* Alias list is stable that's why get alias bitmap only once */
-   773		if (!alias_bitmap_initialized) {
- > 774			ret = of_alias_get_alias_list(ulite_of_match, "serial",
-   775						      alias_bitmap, MAX_UART_INSTANCES);
-   776			if (ret) {
-   777				mutex_unlock(&bitmap_lock);
-   778				return ret;
-   779			}
-   780	
-   781			alias_bitmap_initialized++;
-   782		}
-   783	
-   784		/* Make sure that alias ID is not taken by instance without alias */
-   785		bitmap_or(bitmap, bitmap, alias_bitmap, MAX_UART_INSTANCES);
-   786	
-   787		dev_dbg(&pdev->dev, "Alias bitmap: %*pb\n",
-   788			MAX_UART_INSTANCES, bitmap);
-   789	
-   790		/* Look for a serialN alias */
-   791		if (id < 0)
-   792			id = of_alias_get_id(pdev->dev.of_node, "serial");
-   793	
-   794		if (id < 0) {
-   795			dev_warn(&pdev->dev,
-   796				 "No serial alias passed. Using the first free id\n");
-   797	
-   798			/*
-   799			 * Start with id 0 and check if there is no serial0 alias
-   800			 * which points to device which is compatible with this driver.
-   801			 * If alias exists then try next free position.
-   802			 */
-   803			id = 0;
-   804	
-   805			for (;;) {
-   806				dev_info(&pdev->dev, "Checking id %d\n", id);
-   807				id = find_next_zero_bit(bitmap, MAX_UART_INSTANCES, id);
-   808	
-   809				/* No free empty instance */
-   810				if (id == MAX_UART_INSTANCES) {
-   811					dev_err(&pdev->dev, "No free ID\n");
-   812					mutex_unlock(&bitmap_lock);
-   813					return -EINVAL;
-   814				}
-   815	
-   816				dev_dbg(&pdev->dev, "The empty id is %d\n", id);
-   817				/* Check if ID is empty */
-   818				if (!test_and_set_bit(id, bitmap)) {
-   819					/* Break the loop if bit is taken */
-   820					dev_dbg(&pdev->dev,
-   821						"Selected ID %d allocation passed\n",
-   822						id);
-   823					break;
-   824				}
-   825				dev_dbg(&pdev->dev,
-   826					"Selected ID %d allocation failed\n", id);
-   827				/* if taking bit fails then try next one */
-   828				id++;
-   829			}
-   830		}
-   831	
-   832		mutex_unlock(&bitmap_lock);
-   833	
-   834		return id;
-   835	}
-   836	
+At least I2C and SPI are now checked by dtc. 'simple-bus' children were 
+too, but silently broke and only recently got fixed in upstream dtc. 
+I've not pulled that into the kernel yet, but you can build dtbs using 
+an external copy of dtc. And guess what, there are *lots* of warnings.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 26978 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/011325e5/attachment-0001.gz>
+Rob
