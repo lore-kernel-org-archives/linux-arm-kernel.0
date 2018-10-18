@@ -1,40 +1,29 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 Oct 2018 15:33:24 +0800
-Subject: [PATCH 6/9] arm64: allwinner: a64: add pinmux for RGB666 LCD
-In-Reply-To: <20181018073327.64942-1-icenowy@aosc.io>
-References: <20181018073327.64942-1-icenowy@aosc.io>
-Message-ID: <20181018073327.64942-7-icenowy@aosc.io>
+From: shun-chih.yu@mediatek.com (shun-chih.yu at mediatek.com)
+Date: Thu, 18 Oct 2018 15:49:09 +0800
+Subject: [PATCH v3] add support for Mediatek Command-Queue DMA controller on
+ MT6765 SoC
+Message-ID: <1539848951-14798-1-git-send-email-shun-chih.yu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64's TCON0 can output RGB666 LCD signal.
 
-Add its pinmux.
+Changes since v2:
+- fix build warning for kernel with DMA address in 32-bit
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Changes since v1:
+- remove unused macros, typos
+- leverage ASYNC_TX_ENABLE_CHANNEL_SWITCH to maintain DMA descriptor list
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index f3a66f888205..9806cbf6cc64 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -518,6 +518,15 @@
- 				function = "i2c1";
- 			};
- 
-+			lcd_rgb666_pins: lcd-rgb666 {
-+				pins = "PD0", "PD1", "PD2", "PD3", "PD4",
-+				       "PD5", "PD6", "PD7", "PD8", "PD9",
-+				       "PD10", "PD11", "PD12", "PD13",
-+				       "PD14", "PD15", "PD16", "PD17",
-+				       "PD18", "PD19", "PD20", "PD21";
-+				function = "lcd0";
-+			};
-+
- 			mmc0_pins: mmc0-pins {
- 				pins = "PF0", "PF1", "PF2", "PF3",
- 				       "PF4", "PF5";
--- 
-2.18.1
+Shun-Chih Yu (2):
+  dt-bindings: dmaengine: Add MediaTek Command-Queue DMA controller
+    bindings
+  dmaengine: mediatek: Add MediaTek Command-Queue DMA controller for
+    MT6765 SoC
+
+ .../devicetree/bindings/dma/mtk-cqdma.txt          |   31 +
+ drivers/dma/mediatek/Kconfig                       |   13 +
+ drivers/dma/mediatek/Makefile                      |    1 +
+ drivers/dma/mediatek/mtk-cqdma.c                   |  951 ++++++++++++++++++++
+ 4 files changed, 996 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+ create mode 100644 drivers/dma/mediatek/mtk-cqdma.c
