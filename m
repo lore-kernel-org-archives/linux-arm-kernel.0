@@ -1,58 +1,169 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Wed, 17 Oct 2018 17:56:28 -0700
-Subject: [PATCH] mfd: db8500-prcmu: Fix some section annotations
-Message-ID: <20181018005628.8295-1-natechancellor@gmail.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Thu, 18 Oct 2018 09:25:12 +0800
+Subject: [PATCH v9 2/9] PCI: Using PCI configuration space header type
+ instead of class type to assign resource
+In-Reply-To: <20181017132251.GG5906@bhelgaas-glaptop.roam.corp.google.com>
+References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
+ <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
+ <20181016145355.GB16390@e107981-ln.cambridge.arm.com>
+ <20181017132251.GG5906@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1539825912.11281.8.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building the kernel with Clang, the following section mismatch
-warnings appear:
+On Wed, 2018-10-17 at 08:22 -0500, Bjorn Helgaas wrote:
+> On Tue, Oct 16, 2018 at 03:53:55PM +0100, Lorenzo Pieralisi wrote:
+> > On Tue, Oct 16, 2018 at 06:44:43PM +0800, honghui.zhang at mediatek.com wrote:
+> > > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > > 
+> > > The PCI configuration space header type defines the layout of the rest
+> > > of the header (PCI r3.0 sec 6.1, PCIe r4.0 sec 7.5.1.1.9) while the
+> > > resource assignment is based on the configuration space layout instead
+> > > of its class type. Using configuration space header type instead of
+> > > class type for the resource assignment.
+> > > 
+> > > Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+> > > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > > ---
+> > >  drivers/pci/pci.c       |  3 +--
+> > >  drivers/pci/probe.c     |  3 ---
+> > >  drivers/pci/setup-bus.c | 20 ++++++++++----------
+> > >  3 files changed, 11 insertions(+), 15 deletions(-)
+> > > 
+> > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > > index 29ff961..7d379ca 100644
+> > > --- a/drivers/pci/pci.c
+> > > +++ b/drivers/pci/pci.c
+> > > @@ -5908,8 +5908,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
+> > >  	 * to enable the kernel to reassign new resource
+> > >  	 * window later on.
+> > >  	 */
+> > > -	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
+> > > -	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
+> > > +	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
+> > >  		for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
+> > >  			r = &dev->resource[i];
+> > >  			if (!(r->flags & IORESOURCE_MEM))
+> > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > > index ec78400..29a35c1 100644
+> > > --- a/drivers/pci/probe.c
+> > > +++ b/drivers/pci/probe.c
+> > > @@ -1695,9 +1695,6 @@ int pci_setup_device(struct pci_dev *dev)
+> > >  		break;
+> > >  
+> > >  	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
+> > > -		if (class != PCI_CLASS_BRIDGE_PCI)
+> > > -			goto bad;
+> > > -
+> > >  		/*
+> > >  		 * The PCI-to-PCI bridge spec requires that subtractive
+> > >  		 * decoding (i.e. transparent) bridge must have programming
+> > > diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+> > > index 79b1824..69f90f4 100644
+> > > --- a/drivers/pci/setup-bus.c
+> > > +++ b/drivers/pci/setup-bus.c
+> > > @@ -182,7 +182,7 @@ static void __dev_sort_resources(struct pci_dev *dev,
+> > >  	u16 class = dev->class >> 8;
+> > >  
+> > >  	/* Don't touch classless devices or host bridges or ioapics.  */
+> > > -	if (class == PCI_CLASS_NOT_DEFINED || class == PCI_CLASS_BRIDGE_HOST)
+> > > +	if (class == PCI_CLASS_NOT_DEFINED)
+> > 
+> > I think this check has been there since the first initial git commit,
+> > whether that's _really_ needed or not in the current kernel it is very
+> > hard to say.
+> > 
+> > I am not that sure it is safe to remove it, especially given that we are at
+> > -rc8 and close to a release, it would be good if this patch could sit in
+> > next to give it some exposure to testing before merging it upstream.
+> 
 
-WARNING: vmlinux.o(.text+0x7239cc): Section mismatch in reference from
-the function db8500_prcmu_probe() to the function
-.init.text:init_prcm_registers()
-The function db8500_prcmu_probe() references
-the function __init init_prcm_registers().
-This is often because db8500_prcmu_probe lacks a __init
-annotation or the annotation of init_prcm_registers is wrong.
+I'm not sure why the first version has take care of
+PCI_CLASS_BRIDGE_HOST separately, I have no idea whether there's some
+host bridge device that has their resource fixed.
 
-WARNING: vmlinux.o(.text+0x723e28): Section mismatch in reference from
-the function db8500_prcmu_probe() to the function
-.init.text:fw_project_name()
-The function db8500_prcmu_probe() references
-the function __init fw_project_name().
-This is often because db8500_prcmu_probe lacks a __init
-annotation or the annotation of fw_project_name is wrong.
+I agree that this patch should be hold for the moment since I have it
+tested only in Mediatek's platform.
 
-db8500_prcmu_probe should not be marked as __init so remove the __init
-annotation from fw_project_name and init_prcm_registers.
+Thanks
 
-Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
----
- drivers/mfd/db8500-prcmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> Yes, you're right; I think I think this is a little too risky at this
+> point.  I'll pull this patch out and queue it up for the next cycle
+> (v4.21).
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 5970b8def548..aec20e1c7d3d 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2584,7 +2584,7 @@ static struct irq_chip prcmu_irq_chip = {
- 	.irq_unmask	= prcmu_irq_unmask,
- };
- 
--static __init char *fw_project_name(u32 project)
-+static char *fw_project_name(u32 project)
- {
- 	switch (project) {
- 	case PRCMU_FW_PROJECT_U8500:
-@@ -2732,7 +2732,7 @@ void __init db8500_prcmu_early_init(u32 phy_base, u32 size)
- 	INIT_WORK(&mb0_transfer.mask_work, prcmu_mask_work);
- }
- 
--static void __init init_prcm_registers(void)
-+static void init_prcm_registers(void)
- {
- 	u32 val;
- 
--- 
-2.19.1
+Thanks, I will follow up this patch.
+
+> 
+> For v4.20, I think you should resurrect the class code patch [1].  That
+> should be enough to make things work in v4.20, even without this hdr_type
+> patch.  It will also improve the lspci output, because I think it uses the
+> class code to look up the generic description, e.g., in this output:
+> 
+>   00:1c.0 PCI bridge: Intel Corporation Sunrise Point-LP PCI Express Root Port (rev f1)
+> 
+> I think the "PCI bridge" part is based on the class code.
+> 
+> Bjorn
+> 
+> [1] https://lore.kernel.org/linux-pci/1539590940-13355-3-git-send-email-honghui.zhang at mediatek.com
+> 
+> > >  		return;
+> > >  
+> > >  	/* Don't touch ioapic devices already enabled by firmware */
+> > > @@ -1221,12 +1221,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
+> > >  		if (!b)
+> > >  			continue;
+> > >  
+> > > -		switch (dev->class >> 8) {
+> > > -		case PCI_CLASS_BRIDGE_CARDBUS:
+> > > +		switch (dev->hdr_type) {
+> > > +		case PCI_HEADER_TYPE_CARDBUS:
+> > >  			pci_bus_size_cardbus(b, realloc_head);
+> > >  			break;
+> > >  
+> > > -		case PCI_CLASS_BRIDGE_PCI:
+> > > +		case PCI_HEADER_TYPE_BRIDGE:
+> > >  		default:
+> > >  			__pci_bus_size_bridges(b, realloc_head);
+> > >  			break;
+> > > @@ -1237,12 +1237,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
+> > >  	if (pci_is_root_bus(bus))
+> > >  		return;
+> > >  
+> > > -	switch (bus->self->class >> 8) {
+> > > -	case PCI_CLASS_BRIDGE_CARDBUS:
+> > > +	switch (bus->self->hdr_type) {
+> > > +	case PCI_HEADER_TYPE_CARDBUS:
+> > >  		/* don't size cardbuses yet. */
+> > >  		break;
+> > >  
+> > > -	case PCI_CLASS_BRIDGE_PCI:
+> > > +	case PCI_HEADER_TYPE_BRIDGE:
+> > >  		pci_bridge_check_ranges(bus);
+> > >  		if (bus->self->is_hotplug_bridge) {
+> > >  			additional_io_size  = pci_hotplug_io_size;
+> > > @@ -1391,13 +1391,13 @@ void __pci_bus_assign_resources(const struct pci_bus *bus,
+> > >  
+> > >  		__pci_bus_assign_resources(b, realloc_head, fail_head);
+> > >  
+> > > -		switch (dev->class >> 8) {
+> > > -		case PCI_CLASS_BRIDGE_PCI:
+> > > +		switch (dev->hdr_type) {
+> > > +		case PCI_HEADER_TYPE_BRIDGE:
+> > >  			if (!pci_is_enabled(dev))
+> > >  				pci_setup_bridge(b);
+> > >  			break;
+> > >  
+> > > -		case PCI_CLASS_BRIDGE_CARDBUS:
+> > > +		case PCI_HEADER_TYPE_CARDBUS:
+> > >  			pci_setup_cardbus(b);
+> > >  			break;
+> > >  
+> > > -- 
+> > > 2.6.4
+> > > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
