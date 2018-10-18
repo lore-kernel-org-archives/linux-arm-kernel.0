@@ -1,50 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Oct 2018 12:56:35 +0100
-Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
- SPIs
-In-Reply-To: <df892248-4f9c-c095-df9b-885f1e650ba0@huawei.com>
-References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
- <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
- <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com> <5BC800EB.5070201@huawei.com>
- <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
- <df892248-4f9c-c095-df9b-885f1e650ba0@huawei.com>
-Message-ID: <223d7d7f-54b4-fd7f-1f83-95c9476136b7@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 18 Oct 2018 14:18:19 +0200
+Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to
+ dot clock frequency check
+In-Reply-To: <1585874.9P5eR8PMbl@avalon>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <CAKMK7uFp2c=wqzPi096MTRB6Cdfacerkp6dM=fEqCAr99PQG9w@mail.gmail.com>
+ <20181018094258.oahlopafvm2udvoe@flea> <1585874.9P5eR8PMbl@avalon>
+Message-ID: <20181018121819.gmup3jd7ukj52rvx@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
-
-On 18/10/18 12:20, Hanjun Guo wrote:
-> Hi Marc,
+On Thu, Oct 18, 2018 at 02:31:01PM +0300, Laurent Pinchart wrote:
+> Hello,
 > 
->>>>>
->>>> Now, the biggest question of them all: how does it work with ACPI? Last
->>>> time I checked, there was no DT support for platforms using the MBIGEN.
->>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hip07.dtsi
->>> This DT describes how platform devices using the MBIGEN.
->>
->> That's not how my own D05 boots. It is ACPI only. How is that going to
->> work on this platform?
+> On Thursday, 18 October 2018 12:42:58 EEST Maxime Ripard wrote:
+> > On Thu, Oct 18, 2018 at 11:18:06AM +0200, Daniel Vetter wrote:
+> > > On Thu, Oct 18, 2018 at 10:55 AM Laurent Pinchart wrote:
+> > >> On Thursday, 18 October 2018 10:33:27 EEST Icenowy Zheng wrote:
+> > >>> From: Chen-Yu Tsai <wens@csie.org>
+> > >>> 
+> > >>> The panels shipped with Allwinner devices are very "generic", i.e.
+> > >>> they do not have model numbers or reliable sources of information
+> > >>> for the timings (that we know of) other than the fex files shipped
+> > >>> on them. The dot clock frequency provided in the fex files have all
+> > >>> been rounded to the nearest MHz, as that is the unit used in them.
+> > >>> 
+> > >>> We were using the simple panel "urt,umsh-8596md-t" as a substitute
+> > >>> for the A13 Q8 tablets in the absence of a specific model for what
+> > >>> may be many different but otherwise timing compatible panels. This
+> > >>> was usable without any visual artifacts or side effects, until the
+> > >>> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+> > >>> rgb: Validate the clock rate").
+> > >>> 
+> > >>> The reason this check fails is because the dotclock frequency for
+> > >>> this model is 33.26 MHz, which is not achievable with our dot clock
+> > >>> hardware, and the rate returned by clk_round_rate deviates slightly,
+> > >>> causing the driver to reject the display mode.
+> > >>> 
+> > >>> The LCD panels have some tolerance on the dot clock frequency, even
+> > >>> if it's not specified in their datasheets.
+> > >>> 
+> > >>> This patch adds a 5% tolerence to the dot clock check.
+> > >> 
+> > >> Why do you think this shouldn't be merged ?
+> > > 
+> > > It pisses of a lot of people who really insist upon accurate timing.
+> > 
+> > It's not just about accurate timings. That 5% is a made-up limit, that
+> > never have really been confirmed by looking at the typical tolerancies
+> > of panels.
+> > 
+> > And while being to relaxed might make some panels work that are not
+> > working currently, it might also break some panels that currently work
+> > and won't now, and ideally, we should really be able to let those
+> > panels work if they can, and filter out resolutions if they can't.
+> > 
+> > > I think a better fix would be to have a dotclock range in drm_panel,
+> > > and some magic to figure out which one of these we can actually
+> > > do. Then tell userspace that this is the mode is should
+> > > request. That way userspace knows what the actual dotclock/refresh
+> > > rate is, and the panel still works.
+> > 
+> > It's not just about panels, but also bridges with EDID where the
+> > tolerancy is not exposed.
 > 
-> D05 is ACPI only so it has no dtb in the firmware, that's why we can
-> boot D05 without acpi=on in the boot cmdline, but if you want to
-> boot D05 with dtb, you could try to specify the dtb in the grub
-> (seems centos based):
-> 
-> menuentry "example" --id example{
->         linux /Image-kernel root=... rdinit=...
->         initrd /example.img
->         devicetree /d05.dtb
-> }
+> Given that the tolerance is a property of the panel or bridge, I agree with 
+> Daniel that it should be implemented there, or at least in cooperation with 
+> drm_panel and drm_bridge.
 
-Sure. But what I'm asking here is how this change in the MBIGEN driver
-can be beneficial to people who need ACPI, for better or worse? For
-example, you cannot get the PCIe SMMU without ACPI. Good-bye VFIO.
+How are we supposed to deal with panels without any documentation then?
 
-If it is DT only, I seriously doubt anyone will be able to use it.
+> Semi-related information, I think the CEA and VESA standards allow a 0.5% 
+> clock tolerance. What is the maximum clock frequency deviation required for 
+> this platform ?
 
-Thanks,
+Looks like it does indeed. That's definetely good to know.
 
-	M.
+Thanks!
+Maxime
+
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
