@@ -1,96 +1,136 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Thu, 18 Oct 2018 11:32:07 +0800
-Subject: [RESEND PATCH] ARM: prevent tracing IPI_CPU_BACKTRACE
-In-Reply-To: <1538019697-14673-1-git-send-email-chunyan.zhang@unisoc.com>
-References: <1538019697-14673-1-git-send-email-chunyan.zhang@unisoc.com>
-Message-ID: <CAAfSe-sd9Zzh3Oz-fUSz-ssEpSYPYE7mbhFUuyim3V-62=sPXQ@mail.gmail.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Thu, 18 Oct 2018 11:41:31 +0800
+Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
+ SPIs
+In-Reply-To: <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com>
+References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
+ <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
+ <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com>
+Message-ID: <5BC800EB.5070201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Sep 2018 at 11:42, Chunyan Zhang <chunyan.zhang@unisoc.com> wrote:
->
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> When function tracing for IPIs is enabled, we get a warning for an
-> overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
-> as triggered by raise_nmi():
->
-> arch/arm/kernel/smp.c: In function 'raise_nmi':
-> arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
->         trace_ipi_raise(target, ipi_types[ipinr]);
->
-> This is a correct warning as we actually overflow the array here.
->
-> This patch raise_nmi() to call __smp_cross_call() instead of
-> smp_cross_call(), to avoid calling into ftrace. For clarification,
-> I'm also adding a two new code comments describing how this one
-> is special.
->
-> The warning appears to have shown up after patch e7273ff49acf
-> ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI"), which
-> changed the number assignment from '15' to '8', but as far as I can
-> tell has existed since the IPI tracepoints were first introduced.
-> If we decide to backport this patch to stable kernels, we probably
-> need to backport e7273ff49acf as well.
->
-> Resubmiting this patch is because that I found coverity is complaining
-> the issue this patch fixed, and also I got the traces like below:
-> "ipi_raise: target_mask=00000001 (machine_suspend)" which actually was
-> the TPS of suspend_resume[1] rather than ipi_raise.
->
-> [1]
-> https://elixir.bootlin.com/linux/latest/source/kernel/power/suspend.c#L80
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: e7273ff49acf ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI")
-> Fixes: 365ec7b17327 ("ARM: add IPI tracepoints") # v3.17
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@unisoc.com>
-> ---
->  arch/arm/include/asm/hardirq.h | 1 +
->  arch/arm/kernel/smp.c          | 6 +++++-
->  2 files changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-> index cba23ea..7a88f16 100644
-> --- a/arch/arm/include/asm/hardirq.h
-> +++ b/arch/arm/include/asm/hardirq.h
-> @@ -6,6 +6,7 @@
->  #include <linux/threads.h>
->  #include <asm/irq.h>
->
-> +/* number of IPIS _not_ including IPI_CPU_BACKTRACE */
->  #define NR_IPI 7
->
->  typedef struct {
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 0978282..123be77 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -75,6 +75,10 @@ enum ipi_msg_type {
->         IPI_CPU_STOP,
->         IPI_IRQ_WORK,
->         IPI_COMPLETION,
-> +       /*
-> +        * CPU_BACKTRACE is special and not included in NR_IPI
-> +        * or tracable with trace_ipi_*
-> +        */
->         IPI_CPU_BACKTRACE,
->         /*
->          * SGI8-15 can be reserved by secure firmware, and thus may
-> @@ -755,7 +759,7 @@ core_initcall(register_cpufreq_notifier);
->
->  static void raise_nmi(cpumask_t *mask)
->  {
-> -       smp_cross_call(mask, IPI_CPU_BACKTRACE);
-> +       _smp_cross_call(mask, IPI_CPU_BACKTRACE);
+Hi, Marc
 
-Here should be double underline, i.e.
+On 2018/10/18 0:30, Marc Zyngier wrote:
+> On 16/10/18 10:15, Yang Yingliang wrote:
+>> Now with
+>> 5052875 ("irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller"),
+>> we can support MBIGEN to generate message based SPIs by writing GICD_SETSPIR.
+>>
+>> The first 64-pins of each MBIGEN chip is used to generate SPIs, and each
+>> MBIGEN chip has several MBIGEN nodes, every node has 128 pins for generating
+>> LPIs. The total pins are: 64(SPIs) + 128 * node_nr(LPIs). So we can translate
+>> the pin index in a unified way in mbigen_domain_translate().
+>>
+>> Also Add TYPE and VEC registers that used by generating SPIs, the driver can
+>> access them when MBIGEN is used to generate SPIs.
+>>
+>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+>> ---
+>>   drivers/irqchip/irq-mbigen.c | 21 +++++++++++++++++++--
+>>   1 file changed, 19 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>> index f05998f..37c1932 100644
+>> --- a/drivers/irqchip/irq-mbigen.c
+>> +++ b/drivers/irqchip/irq-mbigen.c
+>> @@ -48,6 +48,7 @@
+>>   #define MBIGEN_NODE_OFFSET		0x1000
+>>   
+>>   /* offset of vector register in mbigen node */
+>> +#define REG_MBIGEN_SPI_VEC_OFFSET	0x500
+>>   #define REG_MBIGEN_LPI_VEC_OFFSET	0x200
+>>   
+>>   /**
+>> @@ -62,6 +63,7 @@
+>>    * This register is used to configure interrupt
+>>    * trigger type
+>>    */
+>> +#define REG_MBIGEN_SPI_TYPE_OFFSET	0x400
+>>   #define REG_MBIGEN_LPI_TYPE_OFFSET	0x0
+>>   
+>>   /**
+>> @@ -79,6 +81,9 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
+>>   {
+>>   	unsigned int nid, pin;
+>>   
+>> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP)
+>> +		return (hwirq * 4 + REG_MBIGEN_SPI_VEC_OFFSET);
+>> +
+>>   	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
+>>   	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
+>>   	pin = hwirq % IRQS_PER_MBIGEN_NODE;
+>> @@ -92,6 +97,13 @@ static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
+>>   {
+>>   	unsigned int nid, irq_ofst, ofst;
+>>   
+>> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
+>> +		*mask = 1 << (hwirq % 32);
+>> +		ofst = hwirq / 32 * 4;
+>> +		*addr = ofst + REG_MBIGEN_SPI_TYPE_OFFSET;
+>> +		return;
+>> +	}
+>> +
+>>   	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
+>>   	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
+>>   	irq_ofst = hwirq % IRQS_PER_MBIGEN_NODE;
+>> @@ -162,6 +174,12 @@ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+>>   	u32 val;
+>>   
+>>   	base += get_mbigen_vec_reg(d->hwirq);
+>> +
+>> +	if (d->hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
+>> +		writel_relaxed(msg->data, base);
+>> +		return;
+>> +	}
+> How is the GICD_SETSPI_NSR base address programmed if you're ignoring
+> the address stored in the message?
+Now, this base address is encoded in MBIGEN register by default.
 
-> +       __smp_cross_call(mask, IPI_CPU_BACKTRACE);
+In case this address isn't set to register in later SoCs, I think the
+MBIGEN driver set this base address would be better. I will add
+relative codes to handle both GICD_SETSPI_NSR and ITS Translate
+address.
 
->  }
 >
->  void arch_trigger_cpumask_backtrace(const cpumask_t *mask, bool exclude_self)
-> --
-> 2.7.4
+> How do you deal with level interrupts, as you don't seem to use the
+> level MSI framework either?
+The MBIGEN driver need to clear active state in irq_eoi hook, when it
+dealing with level SPIs.
+
 >
+>> +
+>>   	val = readl_relaxed(base);
+>>   
+>>   	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
+>> @@ -182,8 +200,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+>>   		if (fwspec->param_count != 2)
+>>   			return -EINVAL;
+>>   
+>> -		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
+>> -			(fwspec->param[0] < SPI_NUM_PER_MBIGEN_CHIP))
+>> +		if (fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM)
+>>   			return -EINVAL;
+>>   		else
+>>   			*hwirq = fwspec->param[0];
+>>
+> Now, the biggest question of them all: how does it work with ACPI? Last
+> time I checked, there was no DT support for platforms using the MBIGEN.
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+This DT describes how platform devices using the MBIGEN.
+
+>
+> My gut feeling is that it would be so much better if the SPIs generated
+> by the MBIGEN were configured in firmware, and the devices behind it
+> would just describe the corresponding SPI...
+We need use this framework to clear active state in MBIGEN register, so 
+configuring
+in firmware is not enough...
+
+Regards,
+Yang
+>
+> Thanks,
+>
+> 	M.
