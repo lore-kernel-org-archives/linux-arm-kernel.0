@@ -1,32 +1,138 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 18 Oct 2018 20:04:26 +0200 (CEST)
-Subject: DMA configuration in non-DT probed driver
-In-Reply-To: <839aa8cf-aabe-c087-4d35-c1a96bbf3f13@arm.com>
-References: <18dfef35-54f6-0e45-ff8e-f0c3e70b8580@i2se.com>
- <839aa8cf-aabe-c087-4d35-c1a96bbf3f13@arm.com>
-Message-ID: <469006239.132128.1539885866203@email.1und1.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Oct 2018 19:09:53 +0100
+Subject: [PATCH 07/10] swiotlb: refactor swiotlb_map_page
+In-Reply-To: <20181008080246.20543-8-hch@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-8-hch@lst.de>
+Message-ID: <35016142-f06d-e424-5afe-6026b6d57eda@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Robin Murphy <robin.murphy@arm.com> hat am 18. Oktober 2018 um 15:35 geschrieben:
+On 08/10/18 09:02, Christoph Hellwig wrote:
+> Remove the somewhat useless map_single function, and replace it with a
+> swiotlb_bounce_page handler that handles everything related to actually
+> bouncing a page.
 > 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>   kernel/dma/swiotlb.c | 77 +++++++++++++++++++++-----------------------
+>   1 file changed, 36 insertions(+), 41 deletions(-)
 > 
-> If you consider the VCHIQ node to represent "stuff the VC4 does" and 
-> don't want to go to a full-blown "devices owned by VC4" bus_type 
-> implementation similar to Host1x, then given that in practice you've got 
-> a pretty simple interconnect topology I reckon it's fair and 
-> sufficiently accurate for the VCHIQ driver to configure 
-> dynamically-created devices based on its own node, i.e. something like:
-> 
-> 	child_dev = platform_device_alloc(...)
-> 	of_dma_configure(&child_dev->dev, vchiq_dev->of_node, ...);
-> 	platform_device_add(child_dev);
-> 
-> (the configuration wants to be done before anything which could trigger 
-> driver probing to avoid any possibility of awkward races)
-> 
-> You could *almost* just set child_dev's of_node and let 
-> platform_dma_configure() take care of the rest, but unfortunately I 
-> think that probably breaks driver matching.
+> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+> index 15755d7a5242..4d7a4d85d71e 100644
+> --- a/kernel/dma/swiotlb.c
+> +++ b/kernel/dma/swiotlb.c
+> @@ -543,26 +543,6 @@ phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
+>   	return tlb_addr;
+>   }
+>   
+> -/*
+> - * Allocates bounce buffer and returns its physical address.
+> - */
+> -static phys_addr_t
+> -map_single(struct device *hwdev, phys_addr_t phys, size_t size,
+> -	   enum dma_data_direction dir, unsigned long attrs)
+> -{
+> -	dma_addr_t start_dma_addr;
+> -
+> -	if (swiotlb_force == SWIOTLB_NO_FORCE) {
+> -		dev_warn_ratelimited(hwdev, "Cannot do DMA to address %pa\n",
+> -				     &phys);
+> -		return SWIOTLB_MAP_ERROR;
+> -	}
+> -
+> -	start_dma_addr = __phys_to_dma(hwdev, io_tlb_start);
+> -	return swiotlb_tbl_map_single(hwdev, start_dma_addr, phys, size,
+> -				      dir, attrs);
+> -}
+> -
+>   /*
+>    * tlb_addr is the physical address of the bounce buffer to unmap.
+>    */
+> @@ -714,6 +694,34 @@ static bool swiotlb_free_buffer(struct device *dev, size_t size,
+>   	return true;
+>   }
+>   
+> +static dma_addr_t swiotlb_bounce_page(struct device *dev, phys_addr_t *phys,
+> +		size_t size, enum dma_data_direction dir, unsigned long attrs)
+> +{
+> +	dma_addr_t dma_addr;
+> +
+> +	if (unlikely(swiotlb_force == SWIOTLB_NO_FORCE)) {
+> +		dev_warn_ratelimited(dev,
+> +			"Cannot do DMA to address %pa\n", phys);
+> +		return DIRECT_MAPPING_ERROR;
+> +	}
+> +
+> +	/* Oh well, have to allocate and map a bounce buffer. */
+> +	*phys = swiotlb_tbl_map_single(dev, __phys_to_dma(dev, io_tlb_start),
+> +			*phys, size, dir, attrs);
+> +	if (*phys == SWIOTLB_MAP_ERROR)
+> +		return DIRECT_MAPPING_ERROR;
+> +
+> +	/* Ensure that the address returned is DMA'ble */
+> +	dma_addr = __phys_to_dma(dev, *phys);
+> +	if (unlikely(!dma_capable(dev, dma_addr, size))) {
+> +		swiotlb_tbl_unmap_single(dev, *phys, size, dir,
+> +			attrs | DMA_ATTR_SKIP_CPU_SYNC);
+> +		return DIRECT_MAPPING_ERROR;
+> +	}
+> +
+> +	return dma_addr;
+> +}
+> +
+>   /*
+>    * Map a single buffer of the indicated size for DMA in streaming mode.  The
+>    * physical address to use is returned.
+> @@ -726,8 +734,8 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
+>   			    enum dma_data_direction dir,
+>   			    unsigned long attrs)
+>   {
+> -	phys_addr_t map, phys = page_to_phys(page) + offset;
+> -	dma_addr_t dev_addr = phys_to_dma(dev, phys);
+> +	phys_addr_t phys = page_to_phys(page) + offset;
+> +	dma_addr_t dma_addr = phys_to_dma(dev, phys);
+>   
+>   	BUG_ON(dir == DMA_NONE);
+>   	/*
+> @@ -735,26 +743,13 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
+>   	 * we can safely return the device addr and not worry about bounce
+>   	 * buffering it.
+>   	 */
+> -	if (dma_capable(dev, dev_addr, size) && swiotlb_force != SWIOTLB_FORCE)
+> -		return dev_addr;
+> -
+> -	trace_swiotlb_bounced(dev, dev_addr, size, swiotlb_force);
+> -
+> -	/* Oh well, have to allocate and map a bounce buffer. */
+> -	map = map_single(dev, phys, size, dir, attrs);
+> -	if (map == SWIOTLB_MAP_ERROR)
+> -		return DIRECT_MAPPING_ERROR;
+> -
+> -	dev_addr = __phys_to_dma(dev, map);
+> -
+> -	/* Ensure that the address returned is DMA'ble */
+> -	if (dma_capable(dev, dev_addr, size))
+> -		return dev_addr;
+> -
+> -	attrs |= DMA_ATTR_SKIP_CPU_SYNC;
+> -	swiotlb_tbl_unmap_single(dev, map, size, dir, attrs);
+> +	if (!dma_capable(dev, dma_addr, size) ||
+> +	    swiotlb_force == SWIOTLB_FORCE) {
+> +		trace_swiotlb_bounced(dev, dma_addr, size, swiotlb_force);
+> +		dma_addr = swiotlb_bounce_page(dev, &phys, size, dir, attrs);
+> +	}
 
-Thank you very much
+FWIW I prefer the inverse condition and early return of the original 
+code here, which also then allows a tail-call to swiotlb_bounce_page() 
+(and saves a couple of lines), but it's no biggie.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+>   
+> -	return DIRECT_MAPPING_ERROR;
+> +	return dma_addr;
+>   }
+>   
+>   /*
+> 
