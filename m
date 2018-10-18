@@ -1,33 +1,31 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 19 Oct 2018 19:30:18 +0900
-Subject: [PATCH v3 2/2] dt-bindings: uniphier: move cache-uniphier.txt to
- vendor directory
-In-Reply-To: <1539945019-24950-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1539945019-24950-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1539945019-24950-3-git-send-email-yamada.masahiro@socionext.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 18 Oct 2018 18:58:08 +0200
+Subject: [PATCH v2] clk: sunxi-ng: enable so-said LDOs for A64 SoC's
+ pll-mipi clock
+In-Reply-To: <20181018070729.52943-1-icenowy@aosc.io>
+References: <20181018070729.52943-1-icenowy@aosc.io>
+Message-ID: <20181018165808.f23gfkwlgskzdbfy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, the Socionext vendor directory is available at
-Documentation/devicetree/bindings/arm/socionext/
+On Thu, Oct 18, 2018 at 03:07:29PM +0800, Icenowy Zheng wrote:
+> In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
+> register is called "LDO{1,2}_EN", and according to the BSP source code
+> from Allwinner , the LDOs are enabled during the clock's enabling
+> process.
+> 
+> The clock failed to generate output if the two LDOs are not enabled.
+> 
+> Add the two bits to the clock's gate bits, so that the LDOs are enabled
+> when the PLL is enabled.
+> 
+> Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Move cache-uniphier.txt over to it.
+Queued for 4.21, thanks!
+Maxime
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
-
-Changes in v3: None
-Changes in v2:
-  - New patch
-
- .../devicetree/bindings/arm/{uniphier => socionext}/cache-uniphier.txt    | 0
- 1 file changed, 0 insertions(+), 0 deletions(-)
- rename Documentation/devicetree/bindings/arm/{uniphier => socionext}/cache-uniphier.txt (100%)
-
-diff --git a/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt b/Documentation/devicetree/bindings/arm/socionext/cache-uniphier.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
-rename to Documentation/devicetree/bindings/arm/socionext/cache-uniphier.txt
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
