@@ -1,190 +1,77 @@
-From: john.garry@huawei.com (John Garry)
-Date: Thu, 18 Oct 2018 12:29:42 +0100
-Subject: [PATCH v5 2/2] iommu/arm-smmu-v3: Reunify
- arm_smmu_cmdq_issue_sync()
-In-Reply-To: <06a949af-2660-3efa-a315-5f45620c139b@arm.com>
-References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
- <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
- <b35bb171-013b-3cb7-9a99-78505b9fdd18@huawei.com>
- <06a949af-2660-3efa-a315-5f45620c139b@arm.com>
-Message-ID: <8fae7967-7c98-3c47-3f5e-33a59f9fa67f@huawei.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Oct 2018 14:31:01 +0300
+Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to
+ dot clock frequency check
+In-Reply-To: <20181018094258.oahlopafvm2udvoe@flea>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <CAKMK7uFp2c=wqzPi096MTRB6Cdfacerkp6dM=fEqCAr99PQG9w@mail.gmail.com>
+ <20181018094258.oahlopafvm2udvoe@flea>
+Message-ID: <1585874.9P5eR8PMbl@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/2018 12:18, Robin Murphy wrote:
-> Hi John,
->
-> On 17/10/18 15:38, John Garry wrote:
->> On 17/10/2018 14:56, Robin Murphy wrote:
->>> Now that both sync methods are more or less the same shape, we can save
->>> some code and levels of indirection by rolling them up together again,
->>> with just a couple of simple conditionals to discriminate the MSI and
->>> queue-polling specifics.
->>
->> Hi Robin, Will,
->>
->> I had been thinking of this other patch previously:
->>
->> iommu/arm-smmu-v3: Stop rebuilding non-MSI CMD_SYNC commands
->>
->> The contents of the non-MSI CMD_SYNC command are fixed. This patch
->> offers a small optimisation by keeping a sample of this command on the
->> heap for re-use, thereby avoiding unnecessary re-building.
->
+Hello,
 
-Hi Robin,
+On Thursday, 18 October 2018 12:42:58 EEST Maxime Ripard wrote:
+> On Thu, Oct 18, 2018 at 11:18:06AM +0200, Daniel Vetter wrote:
+> > On Thu, Oct 18, 2018 at 10:55 AM Laurent Pinchart wrote:
+> >> On Thursday, 18 October 2018 10:33:27 EEST Icenowy Zheng wrote:
+> >>> From: Chen-Yu Tsai <wens@csie.org>
+> >>> 
+> >>> The panels shipped with Allwinner devices are very "generic", i.e.
+> >>> they do not have model numbers or reliable sources of information
+> >>> for the timings (that we know of) other than the fex files shipped
+> >>> on them. The dot clock frequency provided in the fex files have all
+> >>> been rounded to the nearest MHz, as that is the unit used in them.
+> >>> 
+> >>> We were using the simple panel "urt,umsh-8596md-t" as a substitute
+> >>> for the A13 Q8 tablets in the absence of a specific model for what
+> >>> may be many different but otherwise timing compatible panels. This
+> >>> was usable without any visual artifacts or side effects, until the
+> >>> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+> >>> rgb: Validate the clock rate").
+> >>> 
+> >>> The reason this check fails is because the dotclock frequency for
+> >>> this model is 33.26 MHz, which is not achievable with our dot clock
+> >>> hardware, and the rate returned by clk_round_rate deviates slightly,
+> >>> causing the driver to reject the display mode.
+> >>> 
+> >>> The LCD panels have some tolerance on the dot clock frequency, even
+> >>> if it's not specified in their datasheets.
+> >>> 
+> >>> This patch adds a 5% tolerence to the dot clock check.
+> >> 
+> >> Why do you think this shouldn't be merged ?
+> > 
+> > It pisses of a lot of people who really insist upon accurate timing.
+> 
+> It's not just about accurate timings. That 5% is a made-up limit, that
+> never have really been confirmed by looking at the typical tolerancies
+> of panels.
+> 
+> And while being to relaxed might make some panels work that are not
+> working currently, it might also break some panels that currently work
+> and won't now, and ideally, we should really be able to let those
+> panels work if they can, and filter out resolutions if they can't.
+> 
+> > I think a better fix would be to have a dotclock range in drm_panel,
+> > and some magic to figure out which one of these we can actually
+> > do. Then tell userspace that this is the mode is should
+> > request. That way userspace knows what the actual dotclock/refresh
+> > rate is, and the panel still works.
+> 
+> It's not just about panels, but also bridges with EDID where the
+> tolerancy is not exposed.
 
-> As far as I can tell, not counting the general call overhead which can
-> be solved in less-specific ways, this essentially saves two MOVs, a
-> MOVK, and an STP which in practice might not even reach L1 before it
-> gets forwarded back out of the store buffer. Do you have any numbers for
-> what difference this makes in terms of I/O performance or cache traffic?
+Given that the tolerance is a property of the panel or bridge, I agree with 
+Daniel that it should be implemented there, or at least in cooperation with 
+drm_panel and drm_bridge.
 
-I'll try to get some numbers. I'm not expected anything big, but this 
-just seemed like a cheap optimisation, maybe at the expense of slightly 
-inconsistent code.
+Semi-related information, I think the CEA and VESA standards allow a 0.5% 
+clock tolerance. What is the maximum clock frequency deviation required for 
+this platform ?
 
-Thanks,
-John
+-- 
+Regards,
 
->
-> Robin.
->
->> Signed-off-by: John Garry <john.garry@huawei.com>
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 6947ccf..9d86c29 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -963,14 +963,16 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct
->> arm_smmu_device *smmu)
->>
->>   static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->>   {
->> -       u64 cmd[CMDQ_ENT_DWORDS];
->> +       static u64 cmd[CMDQ_ENT_DWORDS] = {
->> +              FIELD_PREP(CMDQ_0_OP, CMDQ_OP_CMD_SYNC) |
->> +              FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV) |
->> +              FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH) |
->> +              FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB),
->> +           0};
->>          unsigned long flags;
->>          bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->> -       struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
->>          int ret;
->>
->> -       arm_smmu_cmdq_build_cmd(cmd, &ent);
->> -
->>          spin_lock_irqsave(&smmu->cmdq.lock, flags);
->>          arm_smmu_cmdq_insert_cmd(smmu, cmd);
->>          ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
->>
->> But it seems that combining the the MSI and non-MSI methods would
->> block this.
->>
->> How do you feel about this?
->>
->> Thanks,
->> John
->>
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>  drivers/iommu/arm-smmu-v3.c | 49 +++++++++----------------------------
->>>  1 file changed, 12 insertions(+), 37 deletions(-)
->>>
->>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>> index da8a91d116bf..36db63e3afcf 100644
->>> --- a/drivers/iommu/arm-smmu-v3.c
->>> +++ b/drivers/iommu/arm-smmu-v3.c
->>> @@ -933,7 +933,7 @@ static void arm_smmu_cmdq_issue_cmd(struct
->>> arm_smmu_device *smmu,
->>>   * The difference between val and sync_idx is bounded by the maximum
->>> size of
->>>   * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe
->>> arithmetic.
->>>   */
->>> -static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu,
->>> u32 sync_idx)
->>> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32
->>> sync_idx)
->>>  {
->>>      ktime_t timeout;
->>>      u32 val;
->>> @@ -988,16 +988,17 @@ static int arm_smmu_sync_poll_cons(struct
->>> arm_smmu_device *smmu, u32 sync_idx,
->>>      return -ETIMEDOUT;
->>>  }
->>>
->>> -static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->>> +static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->>>  {
->>>      u64 cmd[CMDQ_ENT_DWORDS];
->>>      unsigned long flags;
->>> -    struct arm_smmu_cmdq_ent ent = {
->>> -        .opcode = CMDQ_OP_CMD_SYNC,
->>> -        .sync    = {
->>> -            .msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
->>> -        },
->>> -    };
->>> +    bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
->>> +           (smmu->features & ARM_SMMU_FEAT_COHERENCY);
->>> +    struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
->>> +    int ret, sync_idx, sync_gen;
->>> +
->>> +    if (msi)
->>> +        ent.sync.msiaddr =
->>> cpu_to_le32(virt_to_phys(&smmu->sync_count));
->>>
->>>      spin_lock_irqsave(&smmu->cmdq.lock, flags);
->>>
->>> @@ -1009,39 +1010,13 @@ static int
->>> __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->>>          arm_smmu_cmdq_build_cmd(cmd, &ent);
->>>          arm_smmu_cmdq_insert_cmd(smmu, cmd);
->>>      }
->>> -
->>> -    spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->>> -
->>> -    return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
->>> -}
->>> -
->>> -static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->>> -{
->>> -    u64 cmd[CMDQ_ENT_DWORDS];
->>> -    unsigned long flags;
->>> -    struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
->>> -    int sync_idx, sync_gen;
->>> -
->>> -    arm_smmu_cmdq_build_cmd(cmd, &ent);
->>> -
->>> -    spin_lock_irqsave(&smmu->cmdq.lock, flags);
->>> -    if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
->>> -        arm_smmu_cmdq_insert_cmd(smmu, cmd);
->>>      sync_idx = smmu->cmdq.q.prod;
->>>      sync_gen = READ_ONCE(smmu->cmdq_generation);
->>> +
->>>      spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->>>
->>> -    return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
->>> -}
->>> -
->>> -static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->>> -{
->>> -    int ret;
->>> -    bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
->>> -           (smmu->features & ARM_SMMU_FEAT_COHERENCY);
->>> -
->>> -    ret = msi ? __arm_smmu_cmdq_issue_sync_msi(smmu)
->>> -          : __arm_smmu_cmdq_issue_sync(smmu);
->>> +    ret = msi ? arm_smmu_sync_poll_msi(smmu, ent.sync.msidata)
->>> +          : arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
->>>      if (ret)
->>>          dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
->>>  }
->>>
->>
->>
->
-> .
->
+Laurent Pinchart
