@@ -1,68 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Oct 2018 09:33:42 -0500
-Subject: [PATCH V6 1/3] dt-bindings: fsl: scu: make power domain
- compatible string SoC specific
-In-Reply-To: <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
-References: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
- <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20181018143342.GA22874@bogus>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 18 Oct 2018 11:55:22 -0300
+Subject: [PATCH] ARM: dts: imx: Add missing stdout-path property
+In-Reply-To: <20181018145128.21117-1-shyam.saini@amarulasolutions.com>
+References: <20181018145128.21117-1-shyam.saini@amarulasolutions.com>
+Message-ID: <CAOMZO5Di60q+ma2ASe-PbSitAPMEBvWN1Sa2uQY6CKN6rEkSgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 07:24:40AM +0000, A.s. Dong wrote:
-> As the power domain API might change in the future for new SoCs, although
-> in a very low possibility, it's still better to make the compatible string
-> more SoC specific to avoid the possible version change for new SoCs.
-> 
-> Due to there're still no users in kernel, it's safe to update it without
-> breaking anything.
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+On Thu, Oct 18, 2018 at 11:52 AM Shyam Saini
+<shyam.saini@amarulasolutions.com> wrote:
+>
+> This would help us to get early boot logs by passing "earlycon" to
+> kernel bootargs.
+>
+> Further, by adding this we don't have to depend on complex earlyprintk
+> configs for early boot logs.
+>
+> Signed-off-by: Shyam Saini <shyam.saini@amarulasolutions.com>
 
-checkpatch says:
+In the Subject please mention the board name:
 
-WARNING: Missing Signed-off-by: line by nominal patch author 'A.s. Dong <aisheng.dong@nxp.com>'
+ARM: dts: imx6qdl-icore: Add missing stdout-path property
 
-> ---
-> ChangeLog:
-> v5->v6:
->  * new patch
-> ---
->  Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> index 46d0af1..87fc4b4 100644
-> --- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> @@ -58,7 +58,7 @@ This binding for the SCU power domain providers uses the generic power
->  domain binding[2].
->  
->  Required properties:
-> -- compatible:		Should be "fsl,scu-pd".
-> +- compatible:		Should be "fsl,imx8qxp-scu-pd".
+With this change in place then you can add:
 
-You can keep both if you think future SoCs will be compatible.
-
->  - #address-cells:	Should be 1.
->  - #size-cells:		Should be 0.
->  
-> @@ -153,7 +153,7 @@ firmware {
->  		};
->  
->  		imx8qx-pm {
-> -			compatible = "fsl,scu-pd";
-> +			compatible = "fsl,imx8qxp-scu-pd";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  
-> -- 
-> 2.7.4
-> 
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
