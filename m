@@ -1,150 +1,213 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Oct 2018 09:55:36 +0100
-Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
- SPIs
-In-Reply-To: <5BC800EB.5070201@huawei.com>
-References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
- <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
- <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com> <5BC800EB.5070201@huawei.com>
-Message-ID: <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 18 Oct 2018 09:56:21 +0100
+Subject: [PATCH v5 1/2] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
+ lock
+In-Reply-To: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+Message-ID: <20181018085620.GI12972@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yang,
-
-On 18/10/18 04:41, Yang Yingliang wrote:
-> Hi, Marc
+On Wed, Oct 17, 2018 at 02:56:06PM +0100, Robin Murphy wrote:
+> Even without the MSI trick, we can still do a lot better than hogging
+> the entire queue while it drains. All we actually need to do for the
+> necessary guarantee of completion is wait for our particular command to
+> have been consumed - as long as we keep track of where we inserted it,
+> there is no need to block other CPUs from adding further commands in the
+> meantime. There is one theoretical (but incredibly unlikely) edge case
+> to avoid, where cons has wrapped twice to still appear 'behind' the sync
+> position - this is easily disambiguated by adding a generation count to
+> the queue to indicate when prod wraps, since cons cannot wrap twice
+> without prod having wrapped at least once.
 > 
-> On 2018/10/18 0:30, Marc Zyngier wrote:
->> On 16/10/18 10:15, Yang Yingliang wrote:
->>> Now with
->>> 5052875 ("irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller"),
->>> we can support MBIGEN to generate message based SPIs by writing GICD_SETSPIR.
->>>
->>> The first 64-pins of each MBIGEN chip is used to generate SPIs, and each
->>> MBIGEN chip has several MBIGEN nodes, every node has 128 pins for generating
->>> LPIs. The total pins are: 64(SPIs) + 128 * node_nr(LPIs). So we can translate
->>> the pin index in a unified way in mbigen_domain_translate().
->>>
->>> Also Add TYPE and VEC registers that used by generating SPIs, the driver can
->>> access them when MBIGEN is used to generate SPIs.
->>>
->>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
->>> ---
->>>   drivers/irqchip/irq-mbigen.c | 21 +++++++++++++++++++--
->>>   1 file changed, 19 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
->>> index f05998f..37c1932 100644
->>> --- a/drivers/irqchip/irq-mbigen.c
->>> +++ b/drivers/irqchip/irq-mbigen.c
->>> @@ -48,6 +48,7 @@
->>>   #define MBIGEN_NODE_OFFSET		0x1000
->>>   
->>>   /* offset of vector register in mbigen node */
->>> +#define REG_MBIGEN_SPI_VEC_OFFSET	0x500
->>>   #define REG_MBIGEN_LPI_VEC_OFFSET	0x200
->>>   
->>>   /**
->>> @@ -62,6 +63,7 @@
->>>    * This register is used to configure interrupt
->>>    * trigger type
->>>    */
->>> +#define REG_MBIGEN_SPI_TYPE_OFFSET	0x400
->>>   #define REG_MBIGEN_LPI_TYPE_OFFSET	0x0
->>>   
->>>   /**
->>> @@ -79,6 +81,9 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
->>>   {
->>>   	unsigned int nid, pin;
->>>   
->>> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP)
->>> +		return (hwirq * 4 + REG_MBIGEN_SPI_VEC_OFFSET);
->>> +
->>>   	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
->>>   	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
->>>   	pin = hwirq % IRQS_PER_MBIGEN_NODE;
->>> @@ -92,6 +97,13 @@ static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
->>>   {
->>>   	unsigned int nid, irq_ofst, ofst;
->>>   
->>> +	if (hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
->>> +		*mask = 1 << (hwirq % 32);
->>> +		ofst = hwirq / 32 * 4;
->>> +		*addr = ofst + REG_MBIGEN_SPI_TYPE_OFFSET;
->>> +		return;
->>> +	}
->>> +
->>>   	hwirq -= SPI_NUM_PER_MBIGEN_CHIP;
->>>   	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
->>>   	irq_ofst = hwirq % IRQS_PER_MBIGEN_NODE;
->>> @@ -162,6 +174,12 @@ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
->>>   	u32 val;
->>>   
->>>   	base += get_mbigen_vec_reg(d->hwirq);
->>> +
->>> +	if (d->hwirq < SPI_NUM_PER_MBIGEN_CHIP) {
->>> +		writel_relaxed(msg->data, base);
->>> +		return;
->>> +	}
->> How is the GICD_SETSPI_NSR base address programmed if you're ignoring
->> the address stored in the message?
-> Now, this base address is encoded in MBIGEN register by default.
-
-OK. So let's move the comment in that function to the top, and indicate
-that this also applies to the GICD_SETSPI_NSR register.
-
-> In case this address isn't set to register in later SoCs, I think the
-> MBIGEN driver set this base address would be better. I will add
-> relative codes to handle both GICD_SETSPI_NSR and ITS Translate
-> address.
+> This also makes it reasonable to separate the two conceptually different
+> modes of polling such that command insertion - which really wants to be
+> fair and have minimal latency - is not subject to exponential backoff,
+> and returns to its original implementation.
 > 
->>
->> How do you deal with level interrupts, as you don't seem to use the
->> level MSI framework either?
-> The MBIGEN driver need to clear active state in irq_eoi hook, when it
-> dealing with level SPIs.
-
-OK, so you're not taking advantage of the the CLEAR register here? Sad.
-
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 > 
->>
->>> +
->>>   	val = readl_relaxed(base);
->>>   
->>>   	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
->>> @@ -182,8 +200,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
->>>   		if (fwspec->param_count != 2)
->>>   			return -EINVAL;
->>>   
->>> -		if ((fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM) ||
->>> -			(fwspec->param[0] < SPI_NUM_PER_MBIGEN_CHIP))
->>> +		if (fwspec->param[0] > MAXIMUM_IRQ_PIN_NUM)
->>>   			return -EINVAL;
->>>   		else
->>>   			*hwirq = fwspec->param[0];
->>>
->> Now, the biggest question of them all: how does it work with ACPI? Last
->> time I checked, there was no DT support for platforms using the MBIGEN.
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hip07.dtsi
-> This DT describes how platform devices using the MBIGEN.
-
-That's not how my own D05 boots. It is ACPI only. How is that going to
-work on this platform?
-
+> v5:
+>  - Rework to incorporate the back-to-back sync elision.
+>  - Refactor the generation count slightly to preemptively help with
+>    the HiSilicon MSI workaround.
+>  - Split the cleanup into a separate patch for ease of review (it could
+>    happily be squashed when applied).
 > 
->>
->> My gut feeling is that it would be so much better if the SPIs generated
->> by the MBIGEN were configured in firmware, and the devices behind it
->> would just describe the corresponding SPI...
-> We need use this framework to clear active state in MBIGEN register, so 
-> configuring
-> in firmware is not enough...
+> The fundamental logic is copied directly from v4, but I've dropped the
+> previous tested-by since there are a fair few subtle changes in how it's
+> integrated. Patches are based on Will's iommu/devel branch plus my "Fix
+> big-endian CMD_SYNC writes" patch.
 
-Fair enough.
+Reviewed-by: Andrew Murray <andrew.murray@arm.com>
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Andrew Murray
+
+> 
+> Robin.
+> 
+>  drivers/iommu/arm-smmu-v3.c | 94 +++++++++++++++++++++++++++----------
+>  1 file changed, 69 insertions(+), 25 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 867ba548c2cc..da8a91d116bf 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -588,6 +588,7 @@ struct arm_smmu_device {
+>  	struct arm_smmu_strtab_cfg	strtab_cfg;
+>  
+>  	u32				sync_count;
+> +	int				cmdq_generation;
+>  
+>  	/* IOMMU core code handle */
+>  	struct iommu_device		iommu;
+> @@ -676,6 +677,17 @@ static bool queue_empty(struct arm_smmu_queue *q)
+>  	       Q_WRP(q, q->prod) == Q_WRP(q, q->cons);
+>  }
+>  
+> +static bool queue_behind(struct arm_smmu_queue *q, u32 idx)
+> +{
+> +	return Q_IDX(q, q->cons) < Q_IDX(q, idx);
+> +}
+> +
+> +static bool queue_ahead_not_wrapped(struct arm_smmu_queue *q, u32 idx)
+> +{
+> +	return Q_IDX(q, q->cons) >= Q_IDX(q, idx) &&
+> +	       Q_WRP(q, q->cons) == Q_WRP(q, idx);
+> +}
+> +
+>  static void queue_sync_cons(struct arm_smmu_queue *q)
+>  {
+>  	q->cons = readl_relaxed(q->cons_reg);
+> @@ -709,33 +721,19 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+>  	writel(q->prod, q->prod_reg);
+>  }
+>  
+> -/*
+> - * Wait for the SMMU to consume items. If sync is true, wait until the queue
+> - * is empty. Otherwise, wait until there is at least one free slot.
+> - */
+> -static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
+> +static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
+>  {
+> -	ktime_t timeout;
+> -	unsigned int delay = 1, spin_cnt = 0;
+> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+>  
+> -	/* Wait longer if it's a CMD_SYNC */
+> -	timeout = ktime_add_us(ktime_get(), sync ?
+> -					    ARM_SMMU_CMDQ_SYNC_TIMEOUT_US :
+> -					    ARM_SMMU_POLL_TIMEOUT_US);
+> -
+> -	while (queue_sync_cons(q), (sync ? !queue_empty(q) : queue_full(q))) {
+> +	while (queue_sync_cons(q), queue_full(q)) {
+>  		if (ktime_compare(ktime_get(), timeout) > 0)
+>  			return -ETIMEDOUT;
+>  
+>  		if (wfe) {
+>  			wfe();
+> -		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
+> -			cpu_relax();
+> -			continue;
+>  		} else {
+> -			udelay(delay);
+> -			delay *= 2;
+> -			spin_cnt = 0;
+> +			cpu_relax();
+> +			udelay(1);
+>  		}
+>  	}
+>  
+> @@ -905,8 +903,11 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+>  
+>  	smmu->prev_cmd_opcode = FIELD_GET(CMDQ_0_OP, cmd[0]);
+>  
+> +	if (Q_IDX(q, q->prod + 1) == 0)
+> +		WRITE_ONCE(smmu->cmdq_generation, smmu->cmdq_generation + 1);
+> +
+>  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+> -		if (queue_poll_cons(q, false, wfe))
+> +		if (queue_poll_cons(q, wfe))
+>  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+>  	}
+>  }
+> @@ -945,6 +946,48 @@ static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+>  	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
+>  }
+>  
+> +static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
+> +				   int sync_gen)
+> +{
+> +	struct arm_smmu_queue *q = &smmu->cmdq.q;
+> +	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+> +	unsigned int delay = 1, spin_cnt = 0;
+> +	ktime_t timeout;
+> +
+> +	timeout = ktime_add_us(ktime_get(), ARM_SMMU_CMDQ_SYNC_TIMEOUT_US);
+> +	do {
+> +		queue_sync_cons(q);
+> +		/*
+> +		 * If we see updates quickly enough, cons has passed sync_idx,
+> +		 * but not yet wrapped. At worst, cons might have actually
+> +		 * wrapped an even number of times, but that still guarantees
+> +		 * the original sync must have been consumed.
+> +		 */
+> +		if (queue_ahead_not_wrapped(q, sync_idx))
+> +			return 0;
+> +		/*
+> +		 * Otherwise, cons may have passed sync_idx and wrapped one or
+> +		 * more times to appear behind it again, but in that case prod
+> +		 * must also be one or more generations ahead.
+> +		 */
+> +		if (queue_behind(q, sync_idx) &&
+> +		    READ_ONCE(smmu->cmdq_generation) != sync_gen)
+> +			return 0;
+> +
+> +		if (wfe) {
+> +			wfe();
+> +		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
+> +			cpu_relax();
+> +		} else {
+> +			udelay(delay);
+> +			delay *= 2;
+> +			spin_cnt = 0;
+> +		}
+> +	} while (ktime_before(ktime_get(), timeout));
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+>  static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+>  {
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+> @@ -976,18 +1019,19 @@ static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+>  {
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+>  	unsigned long flags;
+> -	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>  	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+> -	int ret;
+> +	int sync_idx, sync_gen;
+>  
+>  	arm_smmu_cmdq_build_cmd(cmd, &ent);
+>  
+>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+> -	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+> -	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+> +	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
+> +		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+> +	sync_idx = smmu->cmdq.q.prod;
+> +	sync_gen = READ_ONCE(smmu->cmdq_generation);
+>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>  
+> -	return ret;
+> +	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+>  }
+>  
+>  static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+> -- 
+> 2.19.1.dirty
+> 
