@@ -1,176 +1,116 @@
-From: changbin.du@gmail.com (Du Changbin)
-Date: Thu, 18 Oct 2018 16:25:48 +0000
-Subject: [PATCH 4/4] kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to
- apply GCC -Og optimization
-In-Reply-To: <20181018162548.6399-1-changbin.du@gmail.com>
-References: <20181018162548.6399-1-changbin.du@gmail.com>
-Message-ID: <20181018162548.6399-5-changbin.du@gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 18 Oct 2018 21:10:15 +0530
+Subject: [PATCH v2 08/10] dt-bindings: irqchip: Introduce TISCI Interrupt
+ Aggregator bindings
+In-Reply-To: <20181018154017.7112-1-lokeshvutla@ti.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+Message-ID: <20181018154017.7112-9-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changbin Du <changbin.du@intel.com>
+Add the DT binding documentation for Interrupt Aggregator driver.
 
-This will apply GCC '-Og' optimization level which is supported
-since GCC 4.8. This optimization level offers a reasonable level
-of optimization while maintaining fast compilation and a good
-debugging experience. It is similar to '-O1' while perferring
-to keep debug ability over runtime speed.
-
-If enabling this option breaks your kernel, you should either
-disable this or find a fix (mostly in the arch code). Currently
-this option has only been tested on x86_64 and arm platform.
-
-This option can satisfy people who was searching for a method
-to disable compiler optimizations so to achieve better kernel
-debugging experience with kgdb or qemu.
-
-The main problem of '-Og' is we must not use __attribute__((error(msg))).
-The compiler will report error though the call to error function
-still can be optimize out. So we must fallback to array tricky.
-
-Comparison of vmlinux size: a bit smaller.
-
-    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ size vmlinux
-       text    data     bss     dec     hex filename
-    22665554   9709674  2920908 35296136        21a9388 vmlinux
-
-    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ size vmlinux
-       text    data     bss     dec     hex filename
-    21499032   10102758 2920908 34522698        20ec64a vmlinux
-
-Comparison of system performance: a bit drop (~6%).
-    This benchmark of kernel compilation is suggested by Ingo Molnar.
-    https://lkml.org/lkml/2018/5/2/74
-
-    Preparation: Set cpufreq to 'performance'.
-    for ((cpu=0; cpu<120; cpu++)); do
-      G=/sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_governor
-      [ -f $G ] && echo performance > $G
-    done
-
-    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ perf stat --repeat 5 --null --pre                 '\
-        cp -a kernel ../kernel.copy.$(date +%s);         \
-        rm -rf *;                                        \
-        git checkout .;                                  \
-        echo 1 > /proc/sys/vm/drop_caches;               \
-        find ../kernel* -type f | xargs cat >/dev/null;  \
-        make -j kernel >/dev/null;                       \
-        make clean >/dev/null 2>&1;                      \
-        sync                                            '\
-                                                         \
-        make -j8 >/dev/null
-
-    Performance counter stats for 'make -j8' (5 runs):
-
-        219.764246652 seconds time elapsed                   ( +-  0.78% )
-
-    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ perf stat --repeat 5 --null --pre                 '\
-        cp -a kernel ../kernel.copy.$(date +%s);         \
-        rm -rf *;                                        \
-        git checkout .;                                  \
-        echo 1 > /proc/sys/vm/drop_caches;               \
-        find ../kernel* -type f | xargs cat >/dev/null;  \
-        make -j kernel >/dev/null;                       \
-        make clean >/dev/null 2>&1;                      \
-        sync                                            '\
-                                                         \
-        make -j8 >/dev/null
-
-    Performance counter stats for 'make -j8' (5 runs):
-
-         233.574187771 seconds time elapsed                  ( +-  0.19% )
-
-Signed-off-by: Changbin Du <changbin.du@intel.com>
-Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- Makefile                     |  5 +++++
- include/linux/compiler-gcc.h |  2 +-
- include/linux/compiler.h     |  2 +-
- init/Kconfig                 | 19 +++++++++++++++++++
- 4 files changed, 26 insertions(+), 2 deletions(-)
+Changes since v1:
+- New patch
 
-diff --git a/Makefile b/Makefile
-index 757d6507cb5c..0e747fafb53b 100644
---- a/Makefile
-+++ b/Makefile
-@@ -657,6 +657,10 @@ KBUILD_CFLAGS	+= $(call cc-disable-warning, format-truncation)
- KBUILD_CFLAGS	+= $(call cc-disable-warning, format-overflow)
- KBUILD_CFLAGS	+= $(call cc-disable-warning, int-in-bool-context)
- 
-+ifdef CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-+KBUILD_CFLAGS	+= $(call cc-option, -Og)
-+KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized,)
-+else
- ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
- KBUILD_CFLAGS	+= $(call cc-option,-Oz,-Os)
- KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized,)
-@@ -667,6 +671,7 @@ else
- KBUILD_CFLAGS   += -O2
- endif
- endif
-+endif
- 
- KBUILD_CFLAGS += $(call cc-ifversion, -lt, 0409, \
- 			$(call cc-disable-warning,maybe-uninitialized,))
-diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
-index 4d36b27214fd..2a76f7c64b54 100644
---- a/include/linux/compiler-gcc.h
-+++ b/include/linux/compiler-gcc.h
-@@ -85,7 +85,7 @@
- 
- #define __compiletime_object_size(obj) __builtin_object_size(obj, 0)
- 
--#ifndef __CHECKER__
-+#if !defined(__CHECKER__) && !defined(CONFIG_CC_OPTIMIZE_FOR_DEBUGGING)
- #define __compiletime_warning(message) __attribute__((warning(message)))
- #define __compiletime_error(message) __attribute__((error(message)))
- 
-diff --git a/include/linux/compiler.h b/include/linux/compiler.h
-index 681d866efb1e..9385c62e9f00 100644
---- a/include/linux/compiler.h
-+++ b/include/linux/compiler.h
-@@ -320,7 +320,7 @@ static inline void *offset_to_ptr(const int *off)
-  * sparse see a constant array size without breaking compiletime_assert on old
-  * versions of GCC (e.g. 4.2.4), so hide the array from sparse altogether.
-  */
--# ifndef __CHECKER__
-+# if !defined(__CHECKER__) && !defined(CONFIG_CC_OPTIMIZE_FOR_DEBUGGING)
- #  define __compiletime_error_fallback(condition) \
- 	do { ((void)sizeof(char[1 - 2 * condition])); } while (0)
- # endif
-diff --git a/init/Kconfig b/init/Kconfig
-index 1e234e2f1cba..b01c7c654570 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1081,6 +1081,25 @@ config CC_OPTIMIZE_FOR_SIZE
- 
- 	  If unsure, say N.
- 
-+config CC_OPTIMIZE_FOR_DEBUGGING
-+	bool "Optimize for better debugging experience (-Og)"
-+	select NO_AUTO_INLINE
-+	help
-+	  This will apply GCC '-Og' optimization level which is supported
-+	  since GCC 4.8. This optimization level offers a reasonable level
-+	  of optimization while maintaining fast compilation and a good
-+	  debugging experience. It is similar to '-O1' while preferring to
-+	  keep debug ability over runtime speed. The overall performance
-+	  will drop a bit (~6%).
+ .../interrupt-controller/ti,sci-inta.txt      | 74 +++++++++++++++++++
+ MAINTAINERS                                   |  1 +
+ 2 files changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+new file mode 100644
+index 000000000000..17b1fbd90312
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+@@ -0,0 +1,74 @@
++Texas Instruments K3 Interrupt Aggregator
++=========================================
 +
-+	  Use only if you want to debug the kernel, especially if you want
-+	  to have better kernel debugging experience with gdb facilities
-+	  like kgdb or qemu. If enabling this option breaks your kernel,
-+	  you should either disable this or find a fix (mostly in the arch
-+	  code).
++The Interrupt Aggregator (INTA) provides a centralized machine
++which handles the termination of system events to that they can
++be coherently processed by the host(s) in the system. A maximum
++of 64 events can be mapped to a single interrupt.
 +
-+	  If unsure, select N.
 +
- endchoice
++                              Interrupt Aggregator
++                     +-----------------------------------------+
++                     |      Intmap            VINT             |
++                     | +--------------+  +------------+        |
++            m ------>| | vint  | bit  |  | 0 |.....|63| vint0  |
++               .     | +--------------+  +------------+        |       +------+
++               .     |         .               .               |       | HOST |
++Globalevents  ------>|         .               .               |------>| IRQ  |
++               .     |         .               .               |       | CTRL |
++               .     |         .               .               |       +------+
++            n ------>| +--------------+  +------------+        |
++                     | | vint  | bit  |  | 0 |.....|63| vintx  |
++                     | +--------------+  +------------+        |
++                     |                                         |
++                     +-----------------------------------------+
++
++Configuration of these Intmap registers that maps global events to vint is done
++by a system controller (like the Device Memory and Security Controller on K3
++AM654 SoC). Driver should request the system controller to get the range
++of global events and vints assigned to the requesting host. Management
++of these requested resources should be handled by driver and requests
++system controller to map specific global event to vint, bit pair.
++
++Communication between the host processor running an OS and the system
++controller happens through a protocol called TI System Control Interface
++(TISCI protocol). For more details refer:
++Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
++
++TISCI Interrupt Aggregator Node:
++-------------------------------
++- compatible:		Must be "ti,sci-inta".
++- reg:			Should contain registers location and length.
++- interrupt-controller:	Identifies the node as an interrupt controller
++- #interrupt-cells:	Specifies the number of cells needed to encode an
++			interrupt source. The value should be 4.
++			First cell should contain the TISCI device ID of source
++			Second cell should contain the event source offset
++			within the device
++			Third cell specified the interrupt number(vint)
++			reaching Interrupt aggregator.
++			Fourth cell specifies the trigger type as defined
++			in interrupts.txt in this directory.
++- interrupt-parent:	phandle of irq parent for TISCI intr.
++- ti,sci:		Phandle to TI-SCI compatible System controller node.
++- ti,sci-dev-id:	TISCI device ID of the Interrupt Aggregator.
++- ti,sci-rm-range-vint:	TISCI subtype id representing the virtual interrupts
++			(vints) range within this IA, assigned to the
++			requesting host context.
++- ti,sci-rm-range-global-event:	TISCI subtype id representing the global
++			events range reaching this IA and are assigned
++			to the requesting host context.
++
++Example:
++--------
++main_udmass_inta: interrupt-controller at 33d00000 {
++	compatible = "ti,sci-inta";
++	reg = <0x0 0x33d00000 0x0 0x100000>;
++	interrupt-controller;
++	interrupt-parent = <&main_navss_intr>;
++	#interrupt-cells = <4>;
++	ti,sci = <&dmsc>;
++	ti,sci-dev-id = <179>;
++	ti,sci-rm-range-vint = <0x0>;
++	ti,sci-rm-range-global-event = <0x1>;
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4f1bb64a15a1..8cf1a6b73e6c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -14687,6 +14687,7 @@ F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+ F:	drivers/clk/keystone/sci-clk.c
+ F:	drivers/reset/reset-ti-sci.c
+ F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
++F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+ F:	drivers/irqchip/irq-ti-sci-intr.c
  
- config HAVE_LD_DEAD_CODE_DATA_ELIMINATION
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
 -- 
-2.17.1
+2.19.1
