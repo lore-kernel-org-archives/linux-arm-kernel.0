@@ -1,136 +1,60 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 18 Oct 2018 14:37:41 +0100
-Subject: [KVMTOOL][PATCH v2 2/9] kvm__arch_init: Don't pass hugetlbfs_path and
- ram_size in parameter
-In-Reply-To: <20181018133748.32577-1-julien.grall@arm.com>
-References: <20181018133748.32577-1-julien.grall@arm.com>
-Message-ID: <20181018133748.32577-3-julien.grall@arm.com>
+Date: Thu, 18 Oct 2018 14:37:39 +0100
+Subject: [KVMTOOL][PATCH v2 0/9] arm: Allow the user specifying where the RAM
+ is place in the memory
+Message-ID: <20181018133748.32577-1-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The structure KVM already contains a pointer to the configuration. Both
-hugetlbfs_path and ram_size are part of the configuration, so is it not
-necessary to path them again in parameter.
+Hi all,
 
-Signed-off-by: Julien Grall <julien.grall@arm.com>
----
- arm/kvm.c         | 7 +++++--
- include/kvm/kvm.h | 2 +-
- kvm.c             | 2 +-
- mips/kvm.c        | 5 ++++-
- powerpc/kvm.c     | 5 ++++-
- x86/kvm.c         | 5 ++++-
- 6 files changed, 19 insertions(+), 7 deletions(-)
+At the moment, a user is only able to specify the amount of RAM used by the
+guest. Where the RAM will live is left to the software and hardcoded.
 
-diff --git a/arm/kvm.c b/arm/kvm.c
-index 5b1f73c..5a68c9a 100644
---- a/arm/kvm.c
-+++ b/arm/kvm.c
-@@ -57,10 +57,13 @@ void kvm__arch_set_cmdline(char *cmdline, bool video)
- {
- }
- 
--void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
-+void kvm__arch_init(struct kvm *kvm)
- {
- 	unsigned long alignment;
- 
-+	/* Convenience aliases */
-+	const char *hugetlbfs_path = kvm->cfg.hugetlbfs_path;
-+
- 	/*
- 	 * Allocate guest memory. We must align our buffer to 64K to
- 	 * correlate with the maximum guest page size for virtio-mmio.
-@@ -73,7 +76,7 @@ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
- 		alignment = SZ_32M;
- 	else
- 		alignment = SZ_2M;
--	kvm->ram_size = min(ram_size, (u64)ARM_MAX_MEMORY(kvm));
-+	kvm->ram_size = min(kvm->cfg.ram_size, (u64)ARM_MAX_MEMORY(kvm));
- 	kvm->arch.ram_alloc_size = kvm->ram_size + alignment;
- 	kvm->arch.ram_alloc_start = mmap_anon_or_hugetlbfs(kvm, hugetlbfs_path,
- 						kvm->arch.ram_alloc_size);
-diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
-index 1edacfd..2d58ff4 100644
---- a/include/kvm/kvm.h
-+++ b/include/kvm/kvm.h
-@@ -136,7 +136,7 @@ int kvm__enumerate_instances(int (*callback)(const char *name, int pid));
- void kvm__remove_socket(const char *name);
- 
- void kvm__arch_set_cmdline(char *cmdline, bool video);
--void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size);
-+void kvm__arch_init(struct kvm *kvm);
- void kvm__arch_delete_ram(struct kvm *kvm);
- int kvm__arch_setup_firmware(struct kvm *kvm);
- int kvm__arch_free_firmware(struct kvm *kvm);
-diff --git a/kvm.c b/kvm.c
-index 7de825a..9769e85 100644
---- a/kvm.c
-+++ b/kvm.c
-@@ -386,7 +386,7 @@ int kvm__init(struct kvm *kvm)
- 		goto err_vm_fd;
- 	}
- 
--	kvm__arch_init(kvm, kvm->cfg.hugetlbfs_path, kvm->cfg.ram_size);
-+	kvm__arch_init(kvm);
- 
- 	INIT_LIST_HEAD(&kvm->mem_banks);
- 	kvm__init_ram(kvm);
-diff --git a/mips/kvm.c b/mips/kvm.c
-index 211770d..e2a0c63 100644
---- a/mips/kvm.c
-+++ b/mips/kvm.c
-@@ -57,9 +57,12 @@ void kvm__arch_set_cmdline(char *cmdline, bool video)
- }
- 
- /* Architecture-specific KVM init */
--void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
-+void kvm__arch_init(struct kvm *kvm)
- {
- 	int ret;
-+	/* Convenience aliases */
-+	u64 ram_size = kvm->cfg.ram_size;
-+	const char *hugetlbfs_path = kvm->cfg.hugetlbfs_path;
- 
- 	kvm->ram_start = mmap_anon_or_hugetlbfs(kvm, hugetlbfs_path, ram_size);
- 	kvm->ram_size = ram_size;
-diff --git a/powerpc/kvm.c b/powerpc/kvm.c
-index 702d67d..034bc46 100644
---- a/powerpc/kvm.c
-+++ b/powerpc/kvm.c
-@@ -88,10 +88,13 @@ void kvm__arch_set_cmdline(char *cmdline, bool video)
- }
- 
- /* Architecture-specific KVM init */
--void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
-+void kvm__arch_init(struct kvm *kvm)
- {
- 	int cap_ppc_rma;
- 	unsigned long hpt;
-+	/* Convenience aliases */
-+	u64 ram_size = kvm->cfg.ram_size;
-+	const char *hugetlbfs_path = kvm->cfg.hugetlbfs_path;
- 
- 	kvm->ram_size		= ram_size;
- 
-diff --git a/x86/kvm.c b/x86/kvm.c
-index 3e0f0b7..5abb41e 100644
---- a/x86/kvm.c
-+++ b/x86/kvm.c
-@@ -130,10 +130,13 @@ void kvm__arch_set_cmdline(char *cmdline, bool video)
- }
- 
- /* Architecture-specific KVM init */
--void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
-+void kvm__arch_init(struct kvm *kvm)
- {
- 	struct kvm_pit_config pit_config = { .flags = 0, };
- 	int ret;
-+	/* Convenience aliases */
-+	u64 ram_size = kvm->cfg.ram_size;
-+	const char *hugetlbfs_path = kvm->cfg.hugetlbfs_path;
- 
- 	ret = ioctl(kvm->vm_fd, KVM_SET_TSS_ADDR, 0xfffbd000);
- 	if (ret < 0)
+It could be useful for testing purpose to move the RAM in different place.
+This series adds the possibility for the user to specify multiple RAM region.
+
+The option -m/--mem is extended to specify the address using the following
+format: <size>@<addr>. The option needs to be repeated as many times as the
+number of RAM region in the guest layout.
+
+For instance, if you want 512MB at 3GB and 512MB 4GB it would look like:
+    -m 512 at 0xc0000000 -m 512 at 0x100000000
+
+Note that the memory layout is not yet fully configurable by the user, so the
+MMIO region is still living below 2GB. This means RAM cannot live in the
+region 0-2GB. This could be changed in the future.
+
+Cheers,
+
+Julien Grall (7):
+  kvm__arch_init: Don't pass hugetlbfs_path and ram_size in parameter
+  virtio/scsi: Allow to use multiple banks
+  Fold kvm__init_ram call in kvm__arch_init
+  arm: Add an helper to sanitize KVM configuration
+  arm: Move anything related to RAM initialization in kvm__init_ram
+  Allow the user to specify where the RAM is placed in the memory
+  arm: Add support for multi memory regions
+
+Suzuki K Poulose (2):
+  arm: Allow use of hugepage with 16K pagesize host
+  kvmtool: Allow standard size specifiers for memory bank
+
+ arm/aarch32/include/kvm/kvm-arch.h |   2 +-
+ arm/aarch64/include/kvm/kvm-arch.h |   4 +-
+ arm/fdt.c                          |  19 +++--
+ arm/include/arm-common/kvm-arch.h  |  24 ++++--
+ arm/kvm.c                          | 160 ++++++++++++++++++++++++++++++-------
+ builtin-run.c                      | 129 +++++++++++++++++++++++++++---
+ include/kvm/kvm-config.h           |  16 +++-
+ include/kvm/kvm.h                  |  24 ++++--
+ kvm.c                              |   8 +-
+ mips/kvm.c                         |  47 ++++++-----
+ powerpc/kvm.c                      |  33 +++++---
+ virtio/scsi.c                      |  21 +++--
+ x86/bios.c                         |   8 +-
+ x86/kvm.c                          |  54 ++++++++-----
+ 14 files changed, 417 insertions(+), 132 deletions(-)
+
 -- 
 2.11.0
