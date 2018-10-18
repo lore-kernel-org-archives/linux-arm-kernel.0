@@ -1,57 +1,253 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 18 Oct 2018 20:54:40 +0800
-Subject: [PATCH 3/4] irqchip/mbigen: add support for a MBIGEN generating
- SPIs
-In-Reply-To: <223d7d7f-54b4-fd7f-1f83-95c9476136b7@arm.com>
-References: <1539681316-19300-1-git-send-email-yangyingliang@huawei.com>
- <1539681316-19300-4-git-send-email-yangyingliang@huawei.com>
- <a8ea3f08-8d60-13bf-edcc-03298a9cfb0d@arm.com> <5BC800EB.5070201@huawei.com>
- <15c4ab00-3bfa-0eb8-a341-fc7a2be857f7@arm.com>
- <df892248-4f9c-c095-df9b-885f1e650ba0@huawei.com>
- <223d7d7f-54b4-fd7f-1f83-95c9476136b7@arm.com>
-Message-ID: <fde290c2-01e3-d5a8-eaa9-e7faaabf84ec@huawei.com>
+From: jeyu@kernel.org (Jessica Yu)
+Date: Thu, 18 Oct 2018 14:58:20 +0200
+Subject: [PATCH v3 3/4] arm64: implement live patching
+In-Reply-To: <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141652.5478C68BE1@newverein.lst.de>
+ <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
+Message-ID: <20181018125820.iw54zbirq74ulknj@linux-8ccs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/10/18 19:56, Marc Zyngier wrote:
-> Hi Hanjun,
-> 
-> On 18/10/18 12:20, Hanjun Guo wrote:
->> Hi Marc,
++++ Miroslav Benes [17/10/18 15:39 +0200]:
+>On Mon, 1 Oct 2018, Torsten Duwe wrote:
+>
+>> Based on ftrace with regs, do the usual thing. Also allocate a
+>> task flag for whatever consistency handling will be used.
+>> Watch out for interactions with the graph tracer.
+>
+>Similar to what Mark wrote about 2/4, I'd appreciate a better commit log.
+>Could you explain traditional "what/why/how", please?
+>
+>> Signed-off-by: Torsten Duwe <duwe@suse.de>
 >>
->>>>>>
->>>>> Now, the biggest question of them all: how does it work with ACPI? Last
->>>>> time I checked, there was no DT support for platforms using the MBIGEN.
->>>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hip07.dtsi
->>>> This DT describes how platform devices using the MBIGEN.
->>>
->>> That's not how my own D05 boots. It is ACPI only. How is that going to
->>> work on this platform?
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -119,6 +119,7 @@ config ARM64
+>>  	select HAVE_GENERIC_DMA_COHERENT
+>>  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+>>  	select HAVE_IRQ_TIME_ACCOUNTING
+>> +	select HAVE_LIVEPATCH
+>>  	select HAVE_MEMBLOCK
+>>  	select HAVE_MEMBLOCK_NODE_MAP if NUMA
+>>  	select HAVE_NMI
+>> @@ -1349,4 +1350,6 @@ if CRYPTO
+>>  source "arch/arm64/crypto/Kconfig"
+>>  endif
 >>
->> D05 is ACPI only so it has no dtb in the firmware, that's why we can
->> boot D05 without acpi=on in the boot cmdline, but if you want to
->> boot D05 with dtb, you could try to specify the dtb in the grub
->> (seems centos based):
+>> +source "kernel/livepatch/Kconfig"
+>> +
+>>  source "lib/Kconfig"
+>> --- a/arch/arm64/include/asm/thread_info.h
+>> +++ b/arch/arm64/include/asm/thread_info.h
+>> @@ -76,6 +76,7 @@ void arch_release_task_struct(struct tas
+>>  #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
+>>  #define TIF_UPROBE		4	/* uprobe breakpoint or singlestep */
+>>  #define TIF_FSCHECK		5	/* Check FS is USER_DS on return */
+>> +#define TIF_PATCH_PENDING	6
+>>  #define TIF_NOHZ		7
+>>  #define TIF_SYSCALL_TRACE	8
+>>  #define TIF_SYSCALL_AUDIT	9
+>> @@ -94,6 +95,7 @@ void arch_release_task_struct(struct tas
+>>  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+>>  #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
+>>  #define _TIF_FOREIGN_FPSTATE	(1 << TIF_FOREIGN_FPSTATE)
+>> +#define _TIF_PATCH_PENDING	(1 << TIF_PATCH_PENDING)
+>>  #define _TIF_NOHZ		(1 << TIF_NOHZ)
+>>  #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
+>>  #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+>> @@ -106,7 +108,8 @@ void arch_release_task_struct(struct tas
 >>
->> menuentry "example" --id example{
->>         linux /Image-kernel root=... rdinit=...
->>         initrd /example.img
->>         devicetree /d05.dtb
->> }
-> 
-> Sure. But what I'm asking here is how this change in the MBIGEN driver
-> can be beneficial to people who need ACPI, for better or worse? For
-> example, you cannot get the PCIe SMMU without ACPI. Good-bye VFIO.
-> 
-> If it is DT only, I seriously doubt anyone will be able to use it.
+>>  #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+>>  				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
+>> -				 _TIF_UPROBE | _TIF_FSCHECK)
+>> +				 _TIF_UPROBE | _TIF_FSCHECK | \
+>> +				 _TIF_PATCH_PENDING)
+>
+>Could you add a note to the changelog what this means? My ability to read
+>arm64 entry.S is very limited, but I can see that _TIF_WORK_MASK is
+>process in a syscall exit and irq return paths. That's good. It is also
+>called (via "b ret_to_user") in a couple of different places (el0_*
+>labels). I guess those are returns from exception handling. A comment
+>about it in the changelog would be appreciated.
+>
+>>  #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+>>  				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/livepatch.h
+>> @@ -0,0 +1,36 @@
+>> +/* SPDX-License-Identifier: GPL-2.0
+>> + *
+>> + * livepatch.h - arm64-specific Kernel Live Patching Core
+>> + *
+>> + * Copyright (C) 2016,2018 SUSE
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * as published by the Free Software Foundation; either version 2
+>> + * of the License, or (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#ifndef _ASM_ARM64_LIVEPATCH_H
+>> +#define _ASM_ARM64_LIVEPATCH_H
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/ftrace.h>
+>
+>I think that only
+>
+>#include <asm/ptrace.h>
+>
+>is in fact needed, because of "struct pt_regs".
+>
+>
+>Ad relocations. I checked that everything in struct mod_arch_specific
+>stays after the module is load. Both core and init get SHF_ALLOC set
+>(mod->arch.core.plt->sh_flags in module_frob_arch_sections(). It is
+>important because apply_relocate_add() may use those sections
+>through module_emit_plt_entry() call.
 
-We have another ARM64 SoC for wireless base station which with the
-same CPU DIE but different IO DIE, they share the same mbigen controller.
+Yes, it looks like the needed .plt sections will remain in module
+memory. However, I think I found a slight issue... :/
 
-Since we use big-endian on wireless base station so only DT is available
-(EFI stub is little-endian), we need to reuse this mbigen driver
-on this SoC (not the one for D05) as well, not sure if this makes sense
-to you, please let us know.
+In module_frob_arch_sections(), mod->arch.core.plt is set to an offset
+within info->sechdrs:
 
-Thanks
-Hanjun
+             if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
+                     mod->arch.core.plt = sechdrs + i;
+
+sechdrs is from info->sechdrs, which is freed at the end of
+load_module() via free_copy(). So although the relevant plt section(s)
+are in module memory, mod->arch.core.plt will point to invalid memory
+after info is freed. In other words, the section (.plt) *is* in memory
+but the section header (struct elf64_shdr) containing section metadata
+like sh_addr, sh_size etc., is not.
+
+But we have mod->klp_info->sechdrs (which is a copy of the section
+headers) for this very reason. It is initialized only at the very end
+of load_module(). I don't think copy_module_elf() is dependent on
+anything, so it can just be moved earlier.
+
+Note that we cannot set mod->arch.core.plt to mod->klp_info->sechdrs + i
+during module_frob_arch_sections() because it is still too early, none
+of the module sections have been copied and none of their sh_addr's
+have been set to their final locations as this is all happening before
+move_module() is called. So we can use a module_finalize() function
+for arm64 to switch the mod->arch.core.plt to use the klp_info section
+headers.
+
+Maybe this will be more clear in the example fix below (completely
+untested and unreviewed!):
+
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index 97d0ef12e2ff..150afc29171b 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -25,6 +25,7 @@ struct mod_plt_sec {
+ 	struct elf64_shdr	*plt;
+ 	int			plt_num_entries;
+ 	int			plt_max_entries;
++	int			plt_shndx;
+ };
+ 
+ struct mod_arch_specific {
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+index f0690c2ca3e0..c23cef8f0165 100644
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -196,6 +196,21 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+ 	return ret;
+ }
+ 
++int module_finalize(const Elf_Ehdr *hdr, const Elf_Shdr *sechdrs,
++		    struct module *mod)
++{
++	/*
++	 * Livepatch modules need to keep access to section headers to apply
++	 * relocations. Note mod->klp_info should have already been initialized
++	 * and all section sh_addr's should have their final addresses by the
++	 * time module_finalize() is called.
++	 */
++	if (is_livepatch_module(mod))
++		mod->arch.core.plt = mod->klp_info->sechdrs + mod->arch.core.plt_shndx;
++
++	return 0;
++}
++
+ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 			      char *secstrings, struct module *mod)
+ {
+@@ -210,11 +225,13 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	 * entries. Record the symtab address as well.
+ 	 */
+ 	for (i = 0; i < ehdr->e_shnum; i++) {
+-		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
++		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt")) {
+ 			mod->arch.core.plt = sechdrs + i;
+-		else if (!strcmp(secstrings + sechdrs[i].sh_name, ".init.plt"))
++			mod->arch.core.plt_shndx = i;
++		} else if (!strcmp(secstrings + sechdrs[i].sh_name, ".init.plt")) {
+ 			mod->arch.init.plt = sechdrs + i;
+-		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
++			mod->arch.init.plt_shndx = i;
++		} else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
+ 			 !strcmp(secstrings + sechdrs[i].sh_name,
+ 				 ".text.ftrace_trampoline"))
+ 			tramp = sechdrs + i;
+diff --git a/kernel/module.c b/kernel/module.c
+index 6746c85511fe..2fc4d74288dd 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -3363,6 +3363,12 @@ static int post_relocation(struct module *mod, const struct load_info *info)
+ 	/* Setup kallsyms-specific fields. */
+ 	add_kallsyms(mod, info);
+ 
++	if (is_livepatch_module(mod)) {
++		err = copy_module_elf(mod, info);
++		if (err < 0)
++			return err;
++	}
++
+ 	/* Arch-specific module finalizing. */
+ 	return module_finalize(info->hdr, info->sechdrs, mod);
+ }
+@@ -3775,12 +3781,6 @@ static int load_module(struct load_info *info, const char __user *uargs,
+ 	if (err < 0)
+ 		goto coming_cleanup;
+ 
+-	if (is_livepatch_module(mod)) {
+-		err = copy_module_elf(mod, info);
+-		if (err < 0)
+-			goto sysfs_cleanup;
+-	}
+-
+ 	/* Get rid of temporary copy. */
+ 	free_copy(info);
+
+Thoughts? Does the fix make sense?
+
+>The last thing is count_plts() function called from
+>module_frob_arch_sections(). It needed to be changed in 2016 as well. See
+>Jessica's patch
+>(20160713001113.GA30925 at packer-debian-8-amd64.digitalocean.com). The logic
+>in the function has changed since then. If I am not mistaken,
+>count_plts() is fine as it is right now. It does not consider SHN_UNDEF
+>anymore, it looks at the destination section (where a symbol should
+>resolved to) only.
+>
+>Jessica, could you doublecheck, please?
+
+Yes, I think count_plts() is fine now in this case (because it is
+always true that sym->st_shndx != dstidx for SHN_LIVEPATCH symbols)
+and my old patch from 2016 is no longer needed.
+
+Thanks,
+
+Jessica
