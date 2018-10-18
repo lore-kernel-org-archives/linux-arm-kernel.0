@@ -1,45 +1,88 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 18 Oct 2018 22:34:26 +0200
+Date: Thu, 18 Oct 2018 22:39:43 +0200
 Subject: [PATCH v5 2/2] mtd: rawnand: meson: add support for Amlogic
  NAND flash controller
 In-Reply-To: <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
 References: <1539839345-14021-1-git-send-email-jianxin.pan@amlogic.com>
  <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <20181018223426.5bfa23a1@bbrezillon>
+Message-ID: <20181018223943.145e5497@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 18 Oct 2018 13:09:05 +0800
 Jianxin Pan <jianxin.pan@amlogic.com> wrote:
 
-> +static int meson_nand_bch_mode(struct nand_chip *nand)
+> +static int meson_nfc_calc_set_timing(struct meson_nfc *nfc,
+> +				     const struct nand_sdr_timings *timings)
 > +{
-> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
-> +	struct meson_nand_ecc meson_ecc[] = {
-> +		MESON_ECC_DATA(NFC_ECC_BCH8_1K, 8),
-> +		MESON_ECC_DATA(NFC_ECC_BCH24_1K, 24),
-> +		MESON_ECC_DATA(NFC_ECC_BCH30_1K, 30),
-> +		MESON_ECC_DATA(NFC_ECC_BCH40_1K, 40),
-> +		MESON_ECC_DATA(NFC_ECC_BCH50_1K, 50),
-> +		MESON_ECC_DATA(NFC_ECC_BCH60_1K, 60),
-> +	};
-> +	int i, ret = 0;
+> +	struct nand_timing *timing = &nfc->timing;
+> +	int div, bt_min, bt_max, bus_timing;
+> +	int ret;
 > +
-> +	if (nand->ecc.strength > 60 || nand->ecc.strength < 8)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; i < sizeof(meson_ecc); i++) {
-> +		if (meson_ecc[i].strength == nand->ecc.strength) {
-> +			meson_chip->bch_mode = meson_ecc[i].bch;
-> +			break;
-
-			return 0;
-
-> +		}
+> +	div = DIV_ROUND_UP((timings->tRC_min / 1000), NFC_CLK_CYCLE);
+> +	ret = clk_set_rate(nfc->device_clk, 1000000000 / div);
+> +	if (ret) {
+> +		dev_err(nfc->dev, "failed to set nand clock rate\n");
+> +		return ret;
 > +	}
 > +
-> +	return ret;
+> +	timing->twb = DIV_ROUND_UP(PSEC_TO_NSEC(timings->tWB_max),
+> +				   div * NFC_CLK_CYCLE);
+> +	timing->tadl = DIV_ROUND_UP(PSEC_TO_NSEC(timings->tADL_min),
+> +				    div * NFC_CLK_CYCLE);
+> +	timing->twhr = DIV_ROUND_UP(PSEC_TO_NSEC(timings->tWHR_min),
+> +				    div * NFC_CLK_CYCLE);
+> +
+> +	bt_min = (timings->tREA_max + NFC_DEFAULT_DELAY) / div;
+> +	bt_max = (NFC_DEFAULT_DELAY + timings->tRHOH_min
+> +			+ timings->tRC_min / 2) / div;
+> +
+> +	bt_min = DIV_ROUND_UP(bt_min, 1000);
+> +	bt_max = DIV_ROUND_UP(bt_max, 1000);
+> +
+> +	if (bt_max < bt_min)
+> +		return -EINVAL;
+> +
+> +	bus_timing = (bt_min + bt_max) / 2 + 1;
+> +
+> +	writel((1 << 21), nfc->reg_base + NFC_REG_CFG);
+> +	writel((NFC_CLK_CYCLE - 1) | (bus_timing << 5),
+> +	       nfc->reg_base + NFC_REG_CFG);
+> +
+> +	writel((1 << 31), nfc->reg_base + NFC_REG_CMD);
+> +
+> +	return 0;
+> +}
+> +
+> +static int
+> +meson_nfc_setup_data_interface(struct nand_chip *nand, int csline,
+> +			       const struct nand_data_interface *conf)
+> +{
+> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> +	const struct nand_sdr_timings *timings;
+> +
+> +	timings = nand_get_sdr_timings(conf);
+> +	if (IS_ERR(timings))
+> +		return -ENOTSUPP;
+> +
+> +	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
+> +		return 0;
 
-	return -EINVAL;
+Hm, before saying you supporting the requested timing, you should make
+sure they are actually supported. I'd recommend splitting this in 2
+steps:
 
+1/ calc timings
+2/ store the timings in the chip priv struct so that they can be
+applied next time ->select_chip() is called.
+
+> +
+> +	meson_nfc_calc_set_timing(nfc, timings);
+
+You should not set the timing from ->setup_data_interface(), just
+calculate them, make sure they are supported and store the state in the
+private chip struct. Applying those timings should be done in
+->select_chip(), so that you can support 2 chips with different timings.
+
+> +	return 0;
 > +}
