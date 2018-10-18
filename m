@@ -1,41 +1,66 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 18 Oct 2018 10:38:19 -0700
-Subject: [PATCH V5 9/9] clk: imx: add imx8qxp clk driver
-In-Reply-To: <1539881347-20871-10-git-send-email-aisheng.dong@nxp.com>
-References: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
- <1539881347-20871-10-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <153988429912.5275.13469659599335212731@swboyd.mtv.corp.google.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Oct 2018 18:44:32 +0100
+Subject: [PATCH 05/10] swiotlb: merge swiotlb_unmap_page and unmap_single
+In-Reply-To: <20181008080246.20543-6-hch@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-6-hch@lst.de>
+Message-ID: <04683c71-b1a2-4a61-f46c-cd450ac80627@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-10-18 09:54:15)
-> +
-> +#include <dt-bindings/clock/imx8qxp-clock.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +#include <soc/imx/imx8qxp/lpcg.h>
-> +
-> +#include "clk-scu.h"
-> +
-> +static struct clk_hw_onecell_data *imx8qxp_clk_data;
-> +
-> +static const char * const enet_sels[] = { "enet_25MHz", "enet_125MHz", };
-> +static const char * const enet0_rmii_tx_sels[] = { "enet0_ref_div", "dummy", };
-> +static const char * const enet1_rmii_tx_sels[] = { "enet1_ref_div", "dummy", };
-> +
-> +static int imx8qxp_clk_probe(struct platform_device *pdev)
-> +{
-> +       struct device_node *ccm_node = pdev->dev.of_node;
+On 08/10/18 09:02, Christoph Hellwig wrote:
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>   kernel/dma/swiotlb.c | 15 ++++-----------
+>   1 file changed, 4 insertions(+), 11 deletions(-)
+> 
+> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+> index 11dbcd80b4a6..15335f3a1bf3 100644
+> --- a/kernel/dma/swiotlb.c
+> +++ b/kernel/dma/swiotlb.c
+> @@ -765,9 +765,9 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
+>    * After this call, reads by the cpu to the buffer are guaranteed to see
+>    * whatever the device wrote there.
+>    */
+> -static void unmap_single(struct device *hwdev, dma_addr_t dev_addr,
+> -			 size_t size, enum dma_data_direction dir,
+> -			 unsigned long attrs)
+> +void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
+> +			size_t size, enum dma_data_direction dir,
+> +			unsigned long attrs)
+>   {
+>   	phys_addr_t paddr = dma_to_phys(hwdev, dev_addr);
+>   
+> @@ -790,13 +790,6 @@ static void unmap_single(struct device *hwdev, dma_addr_t dev_addr,
+>   	dma_mark_clean(phys_to_virt(paddr), size);
+>   }
+>   
+> -void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
+> -			size_t size, enum dma_data_direction dir,
+> -			unsigned long attrs)
+> -{
+> -	unmap_single(hwdev, dev_addr, size, dir, attrs);
+> -}
+> -
+>   /*
+>    * Make physical memory consistent for a single streaming mode DMA translation
+>    * after a transfer.
+> @@ -900,7 +893,7 @@ swiotlb_unmap_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+>   	BUG_ON(dir == DMA_NONE);
 
-Where's the DT binding for this device?
+In passing, I notice that this BUG_ON(), and its friends elsewhere in 
+the file, appear entirely pointless, since the wrappers in dma-mapping.h 
+have already made the equivalent check.
 
-> +       struct clk_hw **clks;
-> +       int ret, i;
-> +
-> +       ret = imx_clk_scu_init();
+For this patch, though,
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+>   
+>   	for_each_sg(sgl, sg, nelems, i)
+> -		unmap_single(hwdev, sg->dma_address, sg_dma_len(sg), dir,
+> +		swiotlb_unmap_page(hwdev, sg->dma_address, sg_dma_len(sg), dir,
+>   			     attrs);
+>   }
+>   
+> 
