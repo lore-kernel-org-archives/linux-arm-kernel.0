@@ -1,69 +1,168 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 17 Oct 2018 18:45:36 -0700
-Subject: [PATCH 1/3] driver core: add probe_err log helper
-In-Reply-To: <20181017112914.GH30658@n2100.armlinux.org.uk>
-References: <CGME20181016072249eucas1p2303b8c06a9f7c839a971fe065b0c752e@eucas1p2.samsung.com>
- <20181016072244.1216-1-a.hajda@samsung.com>
- <20181016072244.1216-2-a.hajda@samsung.com>
- <CAHp75VfVxEkTzc=1hBrvc4K7r=L28vXipb=j9jSRJbTJE4GtLQ@mail.gmail.com>
- <605bd00e-ed0d-4259-bdc3-1784b2b3b16a@samsung.com>
- <20181016125543eucas1p1f23b3482179a9cd465f509e0abf782c1~eGAecmAv93038330383eucas1p1j@eucas1p1.samsung.com>
- <CAHp75VecquoNrzOuRvWcZ-Qa1b-5P0V0MWq=sNj-SnVcd2EhRw@mail.gmail.com>
- <20181017112914.GH30658@n2100.armlinux.org.uk>
-Message-ID: <c2c8f5186beff6bdc04cfe79292cedad20f36475.camel@perches.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 18 Oct 2018 09:50:07 +0800
+Subject: [PATCH V2 2/4] arm64: mm: Introduce DEFAULT_MAP_WINDOW
+In-Reply-To: <20181017163459.20175-3-steve.capper@arm.com>
+References: <20181017163459.20175-3-steve.capper@arm.com>
+Message-ID: <201810180952.4NR6F0Y7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-10-17 at 12:29 +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 16, 2018 at 04:55:00PM +0300, Andy Shevchenko wrote:
-> > On Tue, Oct 16, 2018 at 3:55 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
-> > > On 16.10.2018 13:29, Andrzej Hajda wrote:
-> > > > On 16.10.2018 13:01, Andy Shevchenko wrote:
-> > > > > On Tue, Oct 16, 2018 at 10:22 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
-> > > > > > During probe every time driver gets resource it should usually check for error
-> > > > > > printk some message if it is not -EPROBE_DEFER and return the error. This
-> > > > > > pattern is simple but requires adding few lines after any resource acquisition
-> > > > > > code, as a result it is often omited or implemented only partially.
-> > > > > > probe_err helps to replace such code seqences with simple call, so code:
-> > > > > >         if (err != -EPROBE_DEFER)
-> > > > > >                 dev_err(dev, ...);
-> > > > > >         return err;
-> > > > > > becomes:
-> > > > > >         return probe_err(dev, err, ...);
-> > > > > > +               va_start(args, fmt);
-> > > > > > +
-> > > > > > +               vaf.fmt = fmt;
-> > > > > > +               vaf.va = &args;
-> > > > > > +
-> > > > > > +               __dev_printk(KERN_ERR, dev, &vaf);
-> > > > > It would be nice to print an error code as well, wouldn't it?
-> > > > Hmm, on probe fail error is printed anyway (with exception of
-> > > > EPROBE_DEFER, ENODEV and ENXIO):
-> > > >     "probe of %s failed with error %d\n"
-> > > > On the other side currently some drivers prints the error code anyway
-> > > > via dev_err or similar, so I guess during conversion to probe_err it
-> > > > should be removed then.
-> > > > 
-> > > > If we add error code to probe_err is it OK to report it this way?
-> > > >     dev_err(dev, "%V, %d\n", &vaf, err);
-> > > 
-> > > Ups, I forgot that message passed to probe_err will contain already
-> > > newline character.
-> > 
-> > You may consider not to pass it.
-> 
-> It's normal to pass the '\n', so by doing this, we create the situation
-> where this function becomes the exception to the norm.  That's not a
-> good idea - we will see people forget that appending '\n' should not
-> be done for this particular function.
-> 
-> While we could add a checkpatch rule, that's hassle (extra rework).
+Hi Steve,
 
-It would not be a simple checkpatch rule with high confidence
-because of pr_cont uses that may not be in the patch context.
+Thank you for the patch! Yet something to improve:
 
-> In I think the message would be much better formatted if we did:
-> 
-> 	dev_err(dev, "error %d: %V", err, &vaf);
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.19-rc8]
+[cannot apply to next-20181017]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-s/%V/%pV/
+url:    https://github.com/0day-ci/linux/commits/Steve-Capper/52-bit-userspace-VAs/20181018-061652
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+
+All error/warnings (new ones prefixed by >>):
+
+   In file included from include/linux/cache.h:5:0,
+                    from include/linux/printk.h:9,
+                    from include/linux/kernel.h:14,
+                    from include/asm-generic/bug.h:18,
+                    from arch/arm64/include/asm/bug.h:37,
+                    from include/linux/bug.h:5,
+                    from include/linux/thread_info.h:12,
+                    from fs//hugetlbfs/inode.c:12:
+   fs//hugetlbfs/inode.c: In function 'hugetlb_get_unmapped_area':
+>> arch/arm64/include/asm/processor.h:63:50: error: 'tsk' undeclared (first use in this function)
+    #define DEFAULT_MAP_WINDOW (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+                                                     ^
+   include/uapi/linux/kernel.h:11:41: note: in definition of macro '__ALIGN_KERNEL_MASK'
+    #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
+                                            ^
+>> include/linux/kernel.h:58:22: note: in expansion of macro '__ALIGN_KERNEL'
+    #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
+                         ^~~~~~~~~~~~~~
+>> include/linux/mm.h:144:26: note: in expansion of macro 'ALIGN'
+    #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+                             ^~~~~
+>> arch/arm64/include/asm/processor.h:70:29: note: in expansion of macro 'PAGE_ALIGN'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                ^~~~~~~~~~
+>> arch/arm64/include/asm/processor.h:70:40: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                           ^~~~~~~~~~~~~~~~~~
+>> fs//hugetlbfs/inode.c:214:19: note: in expansion of macro 'TASK_UNMAPPED_BASE'
+     info.low_limit = TASK_UNMAPPED_BASE;
+                      ^~~~~~~~~~~~~~~~~~
+   arch/arm64/include/asm/processor.h:63:50: note: each undeclared identifier is reported only once for each function it appears in
+    #define DEFAULT_MAP_WINDOW (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+                                                     ^
+   include/uapi/linux/kernel.h:11:41: note: in definition of macro '__ALIGN_KERNEL_MASK'
+    #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
+                                            ^
+>> include/linux/kernel.h:58:22: note: in expansion of macro '__ALIGN_KERNEL'
+    #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
+                         ^~~~~~~~~~~~~~
+>> include/linux/mm.h:144:26: note: in expansion of macro 'ALIGN'
+    #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+                             ^~~~~
+>> arch/arm64/include/asm/processor.h:70:29: note: in expansion of macro 'PAGE_ALIGN'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                ^~~~~~~~~~
+>> arch/arm64/include/asm/processor.h:70:40: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                           ^~~~~~~~~~~~~~~~~~
+>> fs//hugetlbfs/inode.c:214:19: note: in expansion of macro 'TASK_UNMAPPED_BASE'
+     info.low_limit = TASK_UNMAPPED_BASE;
+                      ^~~~~~~~~~~~~~~~~~
+--
+   In file included from include/linux/cache.h:5:0,
+                    from include/linux/printk.h:9,
+                    from include/linux/kernel.h:14,
+                    from include/asm-generic/bug.h:18,
+                    from arch/arm64/include/asm/bug.h:37,
+                    from include/linux/bug.h:5,
+                    from include/linux/thread_info.h:12,
+                    from fs/hugetlbfs/inode.c:12:
+   fs/hugetlbfs/inode.c: In function 'hugetlb_get_unmapped_area':
+>> arch/arm64/include/asm/processor.h:63:50: error: 'tsk' undeclared (first use in this function)
+    #define DEFAULT_MAP_WINDOW (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+                                                     ^
+   include/uapi/linux/kernel.h:11:41: note: in definition of macro '__ALIGN_KERNEL_MASK'
+    #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
+                                            ^
+>> include/linux/kernel.h:58:22: note: in expansion of macro '__ALIGN_KERNEL'
+    #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
+                         ^~~~~~~~~~~~~~
+>> include/linux/mm.h:144:26: note: in expansion of macro 'ALIGN'
+    #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+                             ^~~~~
+>> arch/arm64/include/asm/processor.h:70:29: note: in expansion of macro 'PAGE_ALIGN'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                ^~~~~~~~~~
+>> arch/arm64/include/asm/processor.h:70:40: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                           ^~~~~~~~~~~~~~~~~~
+   fs/hugetlbfs/inode.c:214:19: note: in expansion of macro 'TASK_UNMAPPED_BASE'
+     info.low_limit = TASK_UNMAPPED_BASE;
+                      ^~~~~~~~~~~~~~~~~~
+   arch/arm64/include/asm/processor.h:63:50: note: each undeclared identifier is reported only once for each function it appears in
+    #define DEFAULT_MAP_WINDOW (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+                                                     ^
+   include/uapi/linux/kernel.h:11:41: note: in definition of macro '__ALIGN_KERNEL_MASK'
+    #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
+                                            ^
+>> include/linux/kernel.h:58:22: note: in expansion of macro '__ALIGN_KERNEL'
+    #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
+                         ^~~~~~~~~~~~~~
+>> include/linux/mm.h:144:26: note: in expansion of macro 'ALIGN'
+    #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+                             ^~~~~
+>> arch/arm64/include/asm/processor.h:70:29: note: in expansion of macro 'PAGE_ALIGN'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                ^~~~~~~~~~
+>> arch/arm64/include/asm/processor.h:70:40: note: in expansion of macro 'DEFAULT_MAP_WINDOW'
+    #define TASK_UNMAPPED_BASE (PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+                                           ^~~~~~~~~~~~~~~~~~
+   fs/hugetlbfs/inode.c:214:19: note: in expansion of macro 'TASK_UNMAPPED_BASE'
+     info.low_limit = TASK_UNMAPPED_BASE;
+                      ^~~~~~~~~~~~~~~~~~
+
+vim +/tsk +63 arch/arm64/include/asm/processor.h
+
+    52	
+    53	/*
+    54	 * TASK_SIZE - the maximum size of a user space task.
+    55	 * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
+    56	 */
+    57	#ifdef CONFIG_COMPAT
+    58	#define TASK_SIZE_32		UL(0x100000000)
+    59	#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
+    60					TASK_SIZE_32 : TASK_SIZE_64)
+    61	#define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+    62					TASK_SIZE_32 : TASK_SIZE_64)
+  > 63	#define DEFAULT_MAP_WINDOW	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+    64					TASK_SIZE_32 : DEFAULT_MAP_WINDOW_64)
+    65	#else
+    66	#define TASK_SIZE		TASK_SIZE_64
+    67	#define DEFAULT_MAP_WINDOW	DEFAULT_MAP_WINDOW_64
+    68	#endif /* CONFIG_COMPAT */
+    69	
+  > 70	#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+    71	#define STACK_TOP_MAX		DEFAULT_MAP_WINDOW_64
+    72	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 40225 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/fe5209b1/attachment-0001.gz>
