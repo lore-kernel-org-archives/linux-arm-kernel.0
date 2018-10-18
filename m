@@ -1,11 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Oct 2018 11:47:20 +0300
-Subject: [PATCH 1/9] drm/bridge: move ANA78xx driver to analogix
- subdirectory
-In-Reply-To: <20181018073327.64942-2-icenowy@aosc.io>
+Date: Thu, 18 Oct 2018 11:53:16 +0300
+Subject: [PATCH 4/9] dt-bindings: Add ANX6345 DP/eDP transmitter binding
+In-Reply-To: <20181018073327.64942-5-icenowy@aosc.io>
 References: <20181018073327.64942-1-icenowy@aosc.io>
- <20181018073327.64942-2-icenowy@aosc.io>
-Message-ID: <1600163.alMOuyZOxo@avalon>
+ <20181018073327.64942-5-icenowy@aosc.io>
+Message-ID: <1886367.eljNk7jKYl@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,107 +12,76 @@ Hi Icenowy,
 
 Thank you for the patch.
 
-On Thursday, 18 October 2018 10:33:19 EEST Icenowy Zheng wrote:
-> As ANA78xx chips are designed and produced by Analogix Semiconductor,
-> Inc, move their driver codes into analogix subdirectory.
+On Thursday, 18 October 2018 10:33:22 EEST Icenowy Zheng wrote:
+> The ANX6345 is an ultra-low power DisplayPort/eDP transmitter designed
+> for portable devices.
+> 
+> Add a binding document for it.
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  drivers/gpu/drm/bridge/Kconfig                         | 10 ----------
->  drivers/gpu/drm/bridge/Makefile                        |  4 ++--
->  drivers/gpu/drm/bridge/analogix/Kconfig                | 10 ++++++++++
->  drivers/gpu/drm/bridge/analogix/Makefile               |  1 +
->  .../gpu/drm/bridge/{ => analogix}/analogix-anx78xx.c   |  0
->  .../gpu/drm/bridge/{ => analogix}/analogix-anx78xx.h   |  0
->  6 files changed, 13 insertions(+), 12 deletions(-)
->  rename drivers/gpu/drm/bridge/{ => analogix}/analogix-anx78xx.c (100%)
->  rename drivers/gpu/drm/bridge/{ => analogix}/analogix-anx78xx.h (100%)
+>  .../bindings/display/bridge/anx6345.txt       | 39 +++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/display/bridge/anx6345.txt
 > 
-> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-> index 9eeb8ef0b174..8a7ffb3256d8 100644
-> --- a/drivers/gpu/drm/bridge/Kconfig
-> +++ b/drivers/gpu/drm/bridge/Kconfig
-> @@ -15,16 +15,6 @@ config DRM_PANEL_BRIDGE
->  menu "Display Interface Bridges"
->  	depends on DRM && DRM_BRIDGE
-> 
-> -config DRM_ANALOGIX_ANX78XX
-> -	tristate "Analogix ANX78XX bridge"
-> -	select DRM_KMS_HELPER
-> -	select REGMAP_I2C
-> -	---help---
-> -	  ANX78XX is an ultra-low Full-HD SlimPort transmitter
-> -	  designed for portable devices. The ANX78XX transforms
-> -	  the HDMI output of an application processor to MyDP
-> -	  or DisplayPort.
-> -
->  config DRM_CDNS_DSI
->  	tristate "Cadence DPI/DSI bridge"
->  	select DRM_KMS_HELPER
-> diff --git a/drivers/gpu/drm/bridge/Makefile
-> b/drivers/gpu/drm/bridge/Makefile index 4934fcf5a6f8..a6c7dd7727ea 100644
-> --- a/drivers/gpu/drm/bridge/Makefile
-> +++ b/drivers/gpu/drm/bridge/Makefile
-> @@ -1,5 +1,4 @@
->  # SPDX-License-Identifier: GPL-2.0
-> -obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
->  obj-$(CONFIG_DRM_CDNS_DSI) += cdns-dsi.o
->  obj-$(CONFIG_DRM_DUMB_VGA_DAC) += dumb-vga-dac.o
->  obj-$(CONFIG_DRM_LVDS_ENCODER) += lvds-encoder.o
-> @@ -12,8 +11,9 @@ obj-$(CONFIG_DRM_SII9234) += sii9234.o
->  obj-$(CONFIG_DRM_THINE_THC63LVD1024) += thc63lvd1024.o
->  obj-$(CONFIG_DRM_TOSHIBA_TC358764) += tc358764.o
->  obj-$(CONFIG_DRM_TOSHIBA_TC358767) += tc358767.o
-> -obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix/
->  obj-$(CONFIG_DRM_I2C_ADV7511) += adv7511/
->  obj-$(CONFIG_DRM_TI_SN65DSI86) += ti-sn65dsi86.o
->  obj-$(CONFIG_DRM_TI_TFP410) += ti-tfp410.o
+> diff --git a/Documentation/devicetree/bindings/display/bridge/anx6345.txt
+> b/Documentation/devicetree/bindings/display/bridge/anx6345.txt new file
+> mode 100644
+> index 000000000000..0689d4eb5f65
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/anx6345.txt
+> @@ -0,0 +1,39 @@
+> +Analogix ANX6345 eDP Transmitter
+> +--------------------------------
 > +
-> +obj-y += analogix/
->  obj-y += synopsys/
-> diff --git a/drivers/gpu/drm/bridge/analogix/Kconfig
-> b/drivers/gpu/drm/bridge/analogix/Kconfig index 80f286fa3a69..27b37aa2ea77
-> 100644
-> --- a/drivers/gpu/drm/bridge/analogix/Kconfig
-> +++ b/drivers/gpu/drm/bridge/analogix/Kconfig
-> @@ -1,3 +1,13 @@
->  config DRM_ANALOGIX_DP
->  	tristate
->  	depends on DRM
+> +The ANX6345 is an ultra-low power Full-HD eDP transmitter designed for
+> +portable devices.
 > +
-> +config DRM_ANALOGIX_ANX78XX
-> +	tristate "Analogix ANX78XX bridge"
-> +	select DRM_KMS_HELPER
-> +	select REGMAP_I2C
-> +	---help---
-> +	  ANX78XX is an ultra-low Full-HD SlimPort transmitter
-> +	  designed for portable devices. The ANX78XX transforms
-> +	  the HDMI output of an application processor to MyDP
-> +	  or DisplayPort.
-> diff --git a/drivers/gpu/drm/bridge/analogix/Makefile
-> b/drivers/gpu/drm/bridge/analogix/Makefile index cd4010ba6890..eb41be845055
-> 100644
-> --- a/drivers/gpu/drm/bridge/analogix/Makefile
-> +++ b/drivers/gpu/drm/bridge/analogix/Makefile
-> @@ -1,2 +1,3 @@
->  analogix_dp-objs := analogix_dp_core.o analogix_dp_reg.o
->  obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp.o
-> +obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+> +Required properties:
+> +
+> + - compatible		: "analogix,anx6345"
+> + - reg			: I2C address of the device
+> + - reset-gpios		: Which GPIO to use for reset
+> +
+> +Optional properties:
+> +
+> + - dvdd12-supply	: Regulator for 1.2V digital core power.
+> + - dvdd25-supply	: Regulator for 2.5V digital core power.
 
-This makes sense to me. I would have tried to keep the Kconfig and Makefile 
-entries alphabetically sorted, but that's not a big deal. With or without the 
-sorting,
+Shouldn't these to supplies be mandatory ?
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> + - panel-supply		: Regulator for the power of the panel.
 
-> diff --git a/drivers/gpu/drm/bridge/analogix-anx78xx.c
-> b/drivers/gpu/drm/bridge/analogix/analogix-anx78xx.c similarity index 100%
-> rename from drivers/gpu/drm/bridge/analogix-anx78xx.c
-> rename to drivers/gpu/drm/bridge/analogix/analogix-anx78xx.c
-> diff --git a/drivers/gpu/drm/bridge/analogix-anx78xx.h
-> b/drivers/gpu/drm/bridge/analogix/analogix-anx78xx.h similarity index 100%
-> rename from drivers/gpu/drm/bridge/analogix-anx78xx.h
-> rename to drivers/gpu/drm/bridge/analogix/analogix-anx78xx.h
+Shouldn't the panel supply for specified in the DT node of the panel ?
+
+> + - edid			: verbatim EDID data block describing attached
+> +			  panel, only used when the panel has no EDID info.
+
+This should also be specified in the panel DT node.
+
+> + - Video port for RGB input, using the DT bindings defined in [1].
+
+I think you should also add a port for the output.
+
+> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+> +
+> +Example:
+> +
+> +anx6345: anx6345 at 38 {
+> +	compatible = "analogix,anx6345";
+> +	reg = <0x38>;
+> +	reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
+> +	panel-supply = <&reg_dc1sw>;
+> +	dvdd25-supply = <&reg_dldo2>;
+> +	dvdd12-supply = <&reg_fldo1>;
+> +
+> +	port {
+> +		anx6345_in: endpoint {
+> +			remote-endpoint = <&tcon0_out_anx6345>;
+> +		};
+> +	};
+> +};
 
 -- 
 Regards,
