@@ -1,82 +1,69 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 18 Oct 2018 11:42:58 +0200
-Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to
- dot clock frequency check
-In-Reply-To: <CAKMK7uFp2c=wqzPi096MTRB6Cdfacerkp6dM=fEqCAr99PQG9w@mail.gmail.com>
-References: <20181018073327.64942-1-icenowy@aosc.io>
- <20181018073327.64942-10-icenowy@aosc.io>
- <4168274.Gmp9JTCfJR@avalon>
- <CAKMK7uFp2c=wqzPi096MTRB6Cdfacerkp6dM=fEqCAr99PQG9w@mail.gmail.com>
-Message-ID: <20181018094258.oahlopafvm2udvoe@flea>
+From: vkoul@kernel.org (Vinod)
+Date: Thu, 18 Oct 2018 15:25:07 +0530
+Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
+In-Reply-To: <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
+References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
+ <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
+ <20181017060531.GU2400@vkoul-mobl>
+ <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
+Message-ID: <20181018095507.GC2400@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2018 at 11:18:06AM +0200, Daniel Vetter wrote:
-> On Thu, Oct 18, 2018 at 10:55 AM Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> >
-> > Hi Icenowy,
-> >
-> > Thank you for the patch.
-> >
-> > On Thursday, 18 October 2018 10:33:27 EEST Icenowy Zheng wrote:
-> > > From: Chen-Yu Tsai <wens@csie.org>
-> > >
-> > > The panels shipped with Allwinner devices are very "generic", i.e.
-> > > they do not have model numbers or reliable sources of information
-> > > for the timings (that we know of) other than the fex files shipped
-> > > on them. The dot clock frequency provided in the fex files have all
-> > > been rounded to the nearest MHz, as that is the unit used in them.
-> > >
-> > > We were using the simple panel "urt,umsh-8596md-t" as a substitute
-> > > for the A13 Q8 tablets in the absence of a specific model for what
-> > > may be many different but otherwise timing compatible panels. This
-> > > was usable without any visual artifacts or side effects, until the
-> > > dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
-> > > rgb: Validate the clock rate").
-> > >
-> > > The reason this check fails is because the dotclock frequency for
-> > > this model is 33.26 MHz, which is not achievable with our dot clock
-> > > hardware, and the rate returned by clk_round_rate deviates slightly,
-> > > causing the driver to reject the display mode.
-> > >
-> > > The LCD panels have some tolerance on the dot clock frequency, even
-> > > if it's not specified in their datasheets.
-> > >
-> > > This patch adds a 5% tolerence to the dot clock check.
-> >
-> > Why do you think this shouldn't be merged ?
+On 17-10-18, 19:56, Benjamin Herrenschmidt wrote:
+> On Wed, 2018-10-17 at 11:35 +0530, Vinod wrote:
+> > On 17-10-18, 09:41, sudheer.v wrote:
+> > 
+> > Please add the change log describing the driver and its features
+> > 
+> > > Signed-off-by: sudheer.v <open.sudheer@gmail.com>
+> > > ---
+> > >  drivers/tty/serial/8250/8250_aspeed_uart_dma.c | 1594 ++++++++++++++++++++++++
+> > >  1 file changed, 1594 insertions(+)
+> > >  create mode 100644 drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+> > > 
+> > > diff --git a/drivers/tty/serial/8250/8250_aspeed_uart_dma.c b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+> > > new file mode 100644
+> > > index 0000000..e1019a8
+> > > --- /dev/null
+> > > +++ b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+> > 
+> > why is this in serial. It is dmaengine driver so belongs to drivers/dma/
+> > like other controllers. Please move it out and resubmit.
+>  
+> It's not a dmaengine driver. It's a serial UART driver that happens to
+> use a dedicated DMA engine.
+
+Then I see no reason for it to use dmaengine APIs. The framework allows
+people to share a controller for many clients, but if you have dedicated
+one then you may use it directly
+
+> It's unclear whether it should be split into two drivers, or just have
+> the serial driver directly use the dma engine since that engine is
+> dedicated in HW to only work on those UARTs and nothing else...
 > 
-> It pisses of a lot of people who really insist upon accurate timing.
-
-It's not just about accurate timings. That 5% is a made-up limit, that
-never have really been confirmed by looking at the typical tolerancies
-of panels.
-
-And while being to relaxed might make some panels work that are not
-working currently, it might also break some panels that currently work
-and won't now, and ideally, we should really be able to let those
-panels work if they can, and filter out resolutions if they can't.
-
-> I think a better fix would be to have a dotclock range in drm_panel,
-> and some magic to figure out which one of these we can actually
-> do. Then tell userspace that this is the mode is should
-> request. That way userspace knows what the actual dotclock/refresh
-> rate is, and the panel still works.
-
-It's not just about panels, but also bridges with EDID where the
-tolerancy is not exposed.
-
-Maxime
+> Cheers,
+> Ben.
+> 
+> 
+> > While doing resubmission please take some time to understand subsystem
+> > tags to use. (hint git log <subsystem> will tell you)
+> > 
+> > Also series has [[PATCH] 8/9] whereas it should be [PATCH 8/9] please
+> > let git generate that for you (hint git format-patch start..end does a
+> > good job)
+> > 
+> > > @@ -0,0 +1,1594 @@
+> > > +// SPDX-License-Identifier: GPL-2.0
+> > > +/*
+> > > + *   drivers/tty/serial/8250/8250_aspeed_uart_dma.c
+> > > + *    1. 2018/07/01 Shivah Shankar created
+> > > + *    2. 2018/08/25 sudheer.veliseti<open.sudheer@gmail.com> modified
+> > 
+> > we dont use this log in kernel. I do not see s-o-b by Shivah, that
+> > should be added. I think he should be author and you need to list
+> > changes you did..
+> > 
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/1f417078/attachment.sig>
+~Vinod
