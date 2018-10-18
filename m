@@ -1,35 +1,44 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 18 Oct 2018 13:14:05 +0200
-Subject: DMA configuration in non-DT probed driver
-Message-ID: <18dfef35-54f6-0e45-ff8e-f0c3e70b8580@i2se.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Oct 2018 12:14:36 +0100
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <CAK8P3a1Yhhv1TcQTcF0MinicGovgp_0g_sXqADe3fjVTtOK_aw@mail.gmail.com>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <CALCETrVuabkb5ZQOSgQQTEq8CrS602NBpAkE2=4n982r1f5reQ@mail.gmail.com>
+ <CAK8P3a1Yhhv1TcQTcF0MinicGovgp_0g_sXqADe3fjVTtOK_aw@mail.gmail.com>
+Message-ID: <20181018111435.GA237391@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Oct 14, 2018 at 09:49:01PM +0200, Arnd Bergmann wrote:
+> On Sat, Oct 13, 2018 at 9:36 PM Andy Lutomirski <luto@amacapital.net> wrote:
+> >
+> > On Wed, May 16, 2018 at 1:19 AM Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > >
+> > > This series enables AARCH64 with ILP32 mode.
+> > >
+> > > As supporting work, it introduces ARCH_32BIT_OFF_T configuration
+> > > option that is enabled for existing 32-bit architectures but disabled
+> > > for new arches (so 64-bit off_t userspace type is used by new userspace).
+> > > Also it deprecates getrlimit and setrlimit syscalls prior to prlimit64.
+> >
+> > Second, ILP32 user code is highly unlikely
+> > to end up with the same struct layout as ILP64 code.  The latter seems
+> > like it should be solved entirely in userspace by adding a way to
+> > annotate a structure as being a kernel ABI structure and getting the
+> > toolchain to lay it out as if it were ILP64 even though the target is
+> > ILP32.
+> 
+> The syscall ABI could be almost completely abstracted in glibc, the
+> main issue is ioctl and a couple of related interfaces that pass data
+> structures (read() on /dev/input/*, mmap on /dev/snd/*
+> or raw sockets, fcntl).
 
-i'm currently working on the VCHIQ driver ( drivers
-<https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers?h=next-20181018>/staging
-<https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/staging?h=next-20181018>/vc04_services
-<https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/staging/vc04_services?h=next-20181018>/interface
-<https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/staging/vc04_services/interface?h=next-20181018>/vchiq_arm
-<https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/staging/vc04_services/interface/vchiq_arm?h=next-20181018>
-) in staging which is only used by the Raspberry Pi. The driver should
-register at least 2 child devices (bcm2835-audio and bcm2835-camera)
-instead of model these via DT binding. The reason is the VCHIQ driver is
-a communication interface to the Video Core 4 GPU firmware, so a DT
-binding wont be appropriate.
+There is another case on struct siginfo which has some pointers and it
+wouldn't look like an LP64 structure at all (and glibc doesn't normally
+intercept the sighandler call to rewrite the structure). We could add
+padding around void * members as the kernel zeros them, I don't recall
+the kernel reading these pointers from user. Anyway, using something
+that resembles compat_siginfo looked the simplest for ILP32.
 
-Since the DT probing usually handle the DMA configuration, i need some
-kind of equivalent for non-DT probing. Looking at the kernel, i found in
-drivers/gpu/drm/xen/xen_drm_front.c in combination of
-of_dma_configure(dev, NULL, true) and manual setting of the coherent dma
-mask.
-
-So here are my questions:
-Is this an acceptable way to setup dma ops and masks or is there a
-better solution?
-Which driver should do the dma configuration the parent (VCHIQ) or the
-child device (bcm2835-audio, ...)?
-
-Thanks
-Stefan
+-- 
+Catalin
