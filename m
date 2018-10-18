@@ -1,69 +1,59 @@
-From: vkoul@kernel.org (Vinod)
-Date: Thu, 18 Oct 2018 15:25:07 +0530
-Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
-In-Reply-To: <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
-References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
- <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
- <20181017060531.GU2400@vkoul-mobl>
- <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
-Message-ID: <20181018095507.GC2400@vkoul-mobl>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 18 Oct 2018 11:57:02 +0200
+Subject: [PATCH v4 0/6] Proper arch timer support for Exynos5433-based
+ TM2(e) boards
+References: <CGME20181018095714eucas1p2019a898487b589ff402b70fae42cabaa@eucas1p2.samsung.com>
+Message-ID: <20181018095708.1527-1-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-10-18, 19:56, Benjamin Herrenschmidt wrote:
-> On Wed, 2018-10-17 at 11:35 +0530, Vinod wrote:
-> > On 17-10-18, 09:41, sudheer.v wrote:
-> > 
-> > Please add the change log describing the driver and its features
-> > 
-> > > Signed-off-by: sudheer.v <open.sudheer@gmail.com>
-> > > ---
-> > >  drivers/tty/serial/8250/8250_aspeed_uart_dma.c | 1594 ++++++++++++++++++++++++
-> > >  1 file changed, 1594 insertions(+)
-> > >  create mode 100644 drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > > 
-> > > diff --git a/drivers/tty/serial/8250/8250_aspeed_uart_dma.c b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > > new file mode 100644
-> > > index 0000000..e1019a8
-> > > --- /dev/null
-> > > +++ b/drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > 
-> > why is this in serial. It is dmaengine driver so belongs to drivers/dma/
-> > like other controllers. Please move it out and resubmit.
->  
-> It's not a dmaengine driver. It's a serial UART driver that happens to
-> use a dedicated DMA engine.
+Dear All,
 
-Then I see no reason for it to use dmaengine APIs. The framework allows
-people to share a controller for many clients, but if you have dedicated
-one then you may use it directly
+This patchset is an attempt to submit the last piece of missing code
+to have proper support for Exynos5433 SoCs based TM2(e) boards. It
+performs a cleanup of timer configuration, which so far needed various
+out-of-tree workarounds. The fixes provided by this patchset are also
+needed for add proper support for system suspend/resume.
 
-> It's unclear whether it should be split into two drivers, or just have
-> the serial driver directly use the dma engine since that engine is
-> dedicated in HW to only work on those UARTs and nothing else...
-> 
-> Cheers,
-> Ben.
-> 
-> 
-> > While doing resubmission please take some time to understand subsystem
-> > tags to use. (hint git log <subsystem> will tell you)
-> > 
-> > Also series has [[PATCH] 8/9] whereas it should be [PATCH 8/9] please
-> > let git generate that for you (hint git format-patch start..end does a
-> > good job)
-> > 
-> > > @@ -0,0 +1,1594 @@
-> > > +// SPDX-License-Identifier: GPL-2.0
-> > > +/*
-> > > + *   drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > > + *    1. 2018/07/01 Shivah Shankar created
-> > > + *    2. 2018/08/25 sudheer.veliseti<open.sudheer@gmail.com> modified
-> > 
-> > we dont use this log in kernel. I do not see s-o-b by Shivah, that
-> > should be added. I think he should be author and you need to list
-> > changes you did..
-> > 
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+
+Changelog:
+
+v4:
+- fixes lack of fixup in patch #3, pointed by Krzysztof Kozlowski
+
+v3:
+- added patch, which splits resources and interrupts allocation
+- simplified arch timer cooperation mode
+- dropped CPU hotplug priority change patch, it is not really needed
+- removed more non-dt dead code
+
+v2:
+- dropped arch timer patch, it will be discussed separately
+- fixed issues pointed by Krzysztof Kozlowski
+
+v1: https://patchwork.kernel.org/project/linux-samsung-soc/list/?series=27965&state=*&archive=both
+- initial version
+
+
+Patch summary:
+
+Marek Szyprowski (6):
+  clocksource: exynos_mct: Remove dead code
+  clocksource: exynos_mct: Fix error path in timer resources
+    initialization
+  clocksource: exynos_mct: Refactor resources allocation
+  clocksource: exynos_mct: Add arch_timer cooperation mode for ARM64
+  arm64: dts: exynos: Move arch-timer node to right place
+  arm64: platform: Add enable Exynos Multi-Core Timer driver
+
+ arch/arm64/Kconfig.platforms               |  1 +
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 23 +++---
+ drivers/clocksource/exynos_mct.c           | 81 ++++++++++++++--------
+ 3 files changed, 67 insertions(+), 38 deletions(-)
 
 -- 
-~Vinod
+2.17.1
