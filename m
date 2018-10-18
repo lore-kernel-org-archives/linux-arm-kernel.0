@@ -1,65 +1,130 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 18 Oct 2018 21:10:07 +0530
-Subject: [PATCH v2 00/10] Add support for TISCI irqchip drivers
-Message-ID: <20181018154017.7112-1-lokeshvutla@ti.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 18 Oct 2018 15:47:09 +0000
+Subject: [PATCH V6 1/3] dt-bindings: fsl: scu: make power domain
+ compatible string SoC specific
+In-Reply-To: <CAL_JsqKNvohQs16B0xGNJ9gbDDR7SU+mF6VUwf2V8CyP0jwE3w@mail.gmail.com>
+References: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
+ <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
+ <20181018143342.GA22874@bogus>
+ <AM0PR04MB42110D63D97B31830B5EC93580F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CAL_JsqKNvohQs16B0xGNJ9gbDDR7SU+mF6VUwf2V8CyP0jwE3w@mail.gmail.com>
+Message-ID: <AM0PR04MB421173A3DD4B77F21353FFC280F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TISCI abstracts the handling of IRQ routes where interrupt sources
-are not directly connected to host interrupt controller. This series
-adds support for:
-- TISCI commands needed for IRQ configuration
-- Interrupt Router(INTR) and Interrupt Aggregator(INTA) drivers
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Thursday, October 18, 2018 11:39 PM
+[...]
+> On Thu, Oct 18, 2018 at 10:08 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+> >
+> > > -----Original Message-----
+> > > From: Rob Herring [mailto:robh at kernel.org]
+> > > Sent: Thursday, October 18, 2018 10:34 PM
+> > > To: A.s. Dong <aisheng.dong@nxp.com>
+> > [...]
+> > > On Wed, Oct 17, 2018 at 07:24:40AM +0000, A.s. Dong wrote:
+> > > > As the power domain API might change in the future for new SoCs,
+> > > > although in a very low possibility, it's still better to make the
+> > > > compatible string more SoC specific to avoid the possible version
+> > > > change for
+> > > new SoCs.
+> > > >
+> > > > Due to there're still no users in kernel, it's safe to update it
+> > > > without breaking anything.
+> > > >
+> > > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > Cc: devicetree at vger.kernel.org
+> > > > Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > >
+> > > checkpatch says:
+> > >
+> > > WARNING: Missing Signed-off-by: line by nominal patch author 'A.s.
+> > > Dong <aisheng.dong@nxp.com>'
+> > >
+> >
+> > Do you think if we can ignore this warning?
+> 
+> Probably, but better if you can fix it.
+> 
+> > It seems checkpatch checks the email sender name as nominal patch
+> > author which is abbreviated as 'A.S. Dong'. But I always use the full
+> > name in upstreaming patches.
+> 
+> The patch contents should start with a 'From:' line if your sending email
+> doesn't match the patch author (such as when you sent another author's
+> patch). Maybe it did match and your email server is overwriting it. I would
+> imagine that can be fixed.
+> 
 
-More information on TISCI IRQ management can be found here[1].
-Complete TISCI resource management information can be found here[2].
-AM65x SoC related TISCI information can be found here[3].
-INTR and INTA related information can be found in TRM[4].
+Yes, I will try to fix it. Thanks for the suggestion.
+As this may be related to our email server, probably may not be able to fixe so quick
+for this patch resend. Please let me know if you mind it.
 
-[1] http://downloads.ti.com/tisci/esd/latest/2_tisci_msgs/rm/rm_irq.html
-[2] http://downloads.ti.com/tisci/esd/latest/2_tisci_msgs/index.html#resource-management-rm
-[3] http://downloads.ti.com/tisci/esd/latest/5_soc_doc/index.html#am6-soc-family
-[4] http://www.ti.com/lit/pdf/spruid7
+> > > > ---
+> > > > ChangeLog:
+> > > > v5->v6:
+> > > >  * new patch
+> > > > ---
+> > > >  Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 4
+> > > > ++--
+> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > >
+> > > > diff --git
+> > > > a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > > b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > > index 46d0af1..87fc4b4 100644
+> > > > --- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > > @@ -58,7 +58,7 @@ This binding for the SCU power domain providers
+> > > > uses the generic power  domain binding[2].
+> > > >
+> > > >  Required properties:
+> > > > -- compatible:              Should be "fsl,scu-pd".
+> > > > +- compatible:              Should be "fsl,imx8qxp-scu-pd".
+> > >
+> > > You can keep both if you think future SoCs will be compatible.
+> > >
+> >
+> > They're likely to be compatible AFAIK.
+> >
+> > Just to be clear, you mean keep both of them?
+> 
+> Yes, but...
+> > e.g.
+> > compatible: Should be "fsl,imx8qxp-scu-pd" or "fsl,scu-pd"
+> 
+> Not exactly, "fsl,scu-pd" should be a fallback and the driver can match on that
+> (until you need to distinguish). So like this:
+> 
+> Should be one of:
+>   "fsl,imx8qxp-scu-pd"
+> followed by "fsl,scu-pd"
+> 
+> > Can you please help clarify a bit more on why it's better to do that
+> > as I'm not quite Understand?
+> >
+> > And for later when mx8qm is supported, should we add it again as follows?
+> > compatible: Should be "fsl,imx8qm-scu-pd", "fsl,imx8qxp-scu-pd" or
+> "fsl,scu-pd"
+> 
+> If formatted as above, then it is a one line change to add:
+> 
+> Should be one of:
+>   "fsl,imx8qm-scu-pd"
+>   "fsl,imx8qxp-scu-pd"
+> followed by "fsl,scu-pd"
+> 
 
-Changes since v1:
-- Consolidated both TISCI and irqchip drivers as suggested by Marc.
-- Each patch contains respective changes.
+Much clear now.
+Thanks for the clarification.
 
-Grygorii Strashko (1):
-  firmware: ti_sci: Add support to get TISCI handle using of_phandle
+Regards
+Dong Aisheng
 
-Lokesh Vutla (8):
-  firmware: ti_sci: Add support for RM core ops
-  firmware: ti_sci: Add support for IRQ management
-  firmware: ti_sci: Add helper apis to manage resources
-  dt-bindings: irqchip: Introduce TISCI Interrupt router bindings
-  irqchip: ti-sci-intr: Add support for Interrupt Router driver
-  dt-bindings: irqchip: Introduce TISCI Interrupt Aggregator bindings
-  irqchip: ti-sci-inta: Add support for Interrupt Aggregator driver
-  soc: ti: am6: Enable interrupt controller drivers
-
-Peter Ujfalusi (1):
-  firmware: ti_sci: Add RM mapping table for am654
-
- .../bindings/arm/keystone/ti,sci.txt          |   3 +-
- .../interrupt-controller/ti,sci-inta.txt      |  74 ++
- .../interrupt-controller/ti,sci-intr.txt      |  81 ++
- MAINTAINERS                                   |   4 +
- drivers/firmware/ti_sci.c                     | 850 ++++++++++++++++++
- drivers/firmware/ti_sci.h                     | 102 +++
- drivers/irqchip/Kconfig                       |  22 +
- drivers/irqchip/Makefile                      |   2 +
- drivers/irqchip/irq-ti-sci-inta.c             | 613 +++++++++++++
- drivers/irqchip/irq-ti-sci-intr.c             | 302 +++++++
- drivers/soc/ti/Kconfig                        |   3 +
- include/linux/irqchip/irq-ti-sci-inta.h       |  35 +
- include/linux/soc/ti/ti_sci_protocol.h        | 169 ++++
- 13 files changed, 2259 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
- create mode 100644 drivers/irqchip/irq-ti-sci-inta.c
- create mode 100644 drivers/irqchip/irq-ti-sci-intr.c
- create mode 100644 include/linux/irqchip/irq-ti-sci-inta.h
-
--- 
-2.19.1
+> Rob
