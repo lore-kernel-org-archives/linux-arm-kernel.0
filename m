@@ -1,35 +1,59 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 18 Oct 2018 18:19:34 +0000
-Subject: [PATCH V3 5/8] dt-bindings: spi: lpspi: add imx8qxp compatible string
+Date: Thu, 18 Oct 2018 18:19:47 +0000
+Subject: [PATCH V3 8/8] defconfig: arm64: add imx8qxp support
 In-Reply-To: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
 References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1539886483-15775-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1539886483-15775-9-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx8qxp compatible string
-
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-spi at vger.kernel.org
-Cc: devicetree at vger.kernel.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/configs/defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt b/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt
-index 4af1326..8d178a4 100644
---- a/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt
-@@ -3,6 +3,7 @@
- Required properties:
- - compatible :
-   - "fsl,imx7ulp-spi" for LPSPI compatible with the one integrated on i.MX7ULP soc
-+  - "fsl,imx8qxp-spi" for LPSPI compatible with the one integrated on i.MX8QXP soc
- - reg : address and length of the lpspi master registers
- - interrupts : lpspi interrupt
- - clocks : lpspi clock specifier
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index db8d364..7e07505 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -45,6 +45,8 @@ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_MESON=y
+ CONFIG_ARCH_MVEBU=y
++CONFIG_ARCH_MXC=y
++CONFIG_SOC_IMX8QXP=y
+ CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SEATTLE=y
+@@ -219,6 +221,7 @@ CONFIG_NET_XGENE=y
+ CONFIG_ATL1C=m
+ CONFIG_MACB=y
+ CONFIG_THUNDER_NIC_PF=y
++CONFIG_FEC=y
+ CONFIG_HIX5HD2_GMAC=y
+ CONFIG_HNS_DSAF=y
+ CONFIG_HNS_ENET=y
+@@ -294,6 +297,8 @@ CONFIG_SERIAL_MSM=y
+ CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_SERIAL_XILINX_PS_UART=y
+ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+ CONFIG_SERIAL_MVEBU_UART=y
+ CONFIG_SERIAL_DEV_BUS=y
+ CONFIG_VIRTIO_CONSOLE=y
+@@ -514,6 +519,7 @@ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_OF_ARASAN=y
+ CONFIG_MMC_SDHCI_OF_ESDHC=y
+ CONFIG_MMC_SDHCI_CADENCE=y
++CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_F_SDH30=y
+ CONFIG_MMC_MESON_GX=y
 -- 
 2.7.4
