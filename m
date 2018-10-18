@@ -1,84 +1,85 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 18 Oct 2018 14:52:07 +0100
-Subject: [KVMTOOL][PATCH v2 3/9] virtio/scsi: Allow to use multiple banks
-In-Reply-To: <86093494-1ba0-6f72-06d2-a69a9636d59c@arm.com>
-References: <20181018133748.32577-1-julien.grall@arm.com>
- <20181018133748.32577-4-julien.grall@arm.com>
- <86093494-1ba0-6f72-06d2-a69a9636d59c@arm.com>
-Message-ID: <8f15095f-4305-61cc-1524-ff18b00b4522@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Oct 2018 16:57:03 +0300
+Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to
+ dot clock frequency check
+In-Reply-To: <20181018121819.gmup3jd7ukj52rvx@flea>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <1585874.9P5eR8PMbl@avalon> <20181018121819.gmup3jd7ukj52rvx@flea>
+Message-ID: <18807799.FbuUgLpiEM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
 
-
-On 18/10/2018 14:47, Suzuki K Poulose wrote:
+On Thursday, 18 October 2018 15:18:19 EEST Maxime Ripard wrote:
+> On Thu, Oct 18, 2018 at 02:31:01PM +0300, Laurent Pinchart wrote:
+> > On Thursday, 18 October 2018 12:42:58 EEST Maxime Ripard wrote:
+> >> On Thu, Oct 18, 2018 at 11:18:06AM +0200, Daniel Vetter wrote:
+> >>> On Thu, Oct 18, 2018 at 10:55 AM Laurent Pinchart wrote:
+> >>>> On Thursday, 18 October 2018 10:33:27 EEST Icenowy Zheng wrote:
+> >>>>> From: Chen-Yu Tsai <wens@csie.org>
+> >>>>> 
+> >>>>> The panels shipped with Allwinner devices are very "generic", i.e.
+> >>>>> they do not have model numbers or reliable sources of information
+> >>>>> for the timings (that we know of) other than the fex files shipped
+> >>>>> on them. The dot clock frequency provided in the fex files have all
+> >>>>> been rounded to the nearest MHz, as that is the unit used in them.
+> >>>>> 
+> >>>>> We were using the simple panel "urt,umsh-8596md-t" as a substitute
+> >>>>> for the A13 Q8 tablets in the absence of a specific model for what
+> >>>>> may be many different but otherwise timing compatible panels. This
+> >>>>> was usable without any visual artifacts or side effects, until the
+> >>>>> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+> >>>>> rgb: Validate the clock rate").
+> >>>>> 
+> >>>>> The reason this check fails is because the dotclock frequency for
+> >>>>> this model is 33.26 MHz, which is not achievable with our dot clock
+> >>>>> hardware, and the rate returned by clk_round_rate deviates slightly,
+> >>>>> causing the driver to reject the display mode.
+> >>>>> 
+> >>>>> The LCD panels have some tolerance on the dot clock frequency, even
+> >>>>> if it's not specified in their datasheets.
+> >>>>> 
+> >>>>> This patch adds a 5% tolerence to the dot clock check.
+> >>>> 
+> >>>> Why do you think this shouldn't be merged ?
+> >>> 
+> >>> It pisses of a lot of people who really insist upon accurate timing.
+> >> 
+> >> It's not just about accurate timings. That 5% is a made-up limit, that
+> >> never have really been confirmed by looking at the typical tolerancies
+> >> of panels.
+> >> 
+> >> And while being to relaxed might make some panels work that are not
+> >> working currently, it might also break some panels that currently work
+> >> and won't now, and ideally, we should really be able to let those
+> >> panels work if they can, and filter out resolutions if they can't.
+> >> 
+> >>> I think a better fix would be to have a dotclock range in drm_panel,
+> >>> and some magic to figure out which one of these we can actually
+> >>> do. Then tell userspace that this is the mode is should
+> >>> request. That way userspace knows what the actual dotclock/refresh
+> >>> rate is, and the panel still works.
+> >> 
+> >> It's not just about panels, but also bridges with EDID where the
+> >> tolerancy is not exposed.
+> > 
+> > Given that the tolerance is a property of the panel or bridge, I agree
+> > with Daniel that it should be implemented there, or at least in
+> > cooperation with drm_panel and drm_bridge.
 > 
-> Hi Julien,
+> How are we supposed to deal with panels without any documentation then?
 
-Hi Suzuki,
+We can only guess, but if the guess comes from the panel driver, it will at 
+least not affect all panels and bridges, like this patch does.
 
-> On 10/18/2018 02:37 PM, Julien Grall wrote:
->> At the moment, virtio scsi only register a bank starting at 0. On some
->> architectures this may not be true and the guest may have multiple
->> memory region.
->>
->> Register all the memory regions to vhost by browsing kvm->mem_banks. The
->> code is based on the virtio_net__vhost_init implementation.
->>
->> Signed-off-by: Julien Grall <julien.grall@arm.com>
->>
->> ---
->>
->> This code was not tested as I don't have any setup with scsi.
->> ---
->> ? virtio/scsi.c | 21 +++++++++++++--------
->> ? 1 file changed, 13 insertions(+), 8 deletions(-)
->>
->> diff --git a/virtio/scsi.c b/virtio/scsi.c
->> index a429ac8..0361285 100644
->> --- a/virtio/scsi.c
->> +++ b/virtio/scsi.c
->> @@ -178,24 +178,29 @@ static struct virtio_ops scsi_dev_virtio_ops = {
->> ? static void virtio_scsi_vhost_init(struct kvm *kvm, struct scsi_dev 
->> *sdev)
->> ? {
->> +??? struct kvm_mem_bank *bank;
->> ????? struct vhost_memory *mem;
->> ????? u64 features;
->> -??? int r;
->> +??? int r, i;
->> ????? sdev->vhost_fd = open("/dev/vhost-scsi", O_RDWR);
->> ????? if (sdev->vhost_fd < 0)
->> ????????? die_perror("Failed openning vhost-scsi device");
->> -??? mem = calloc(1, sizeof(*mem) + sizeof(struct vhost_memory_region));
->> +??? mem = calloc(1, sizeof(*mem) + kvm->mem_slots * sizeof(struct 
->> vhost_memory_region));
->> ????? if (mem == NULL)
->> ????????? die("Failed allocating memory for vhost memory map");
->> -??? mem->nregions = 1;
->> -??? mem->regions[0] = (struct vhost_memory_region) {
->> -??????? .guest_phys_addr??? = 0,
->> -??????? .memory_size??????? = kvm->ram_size,
->> -??????? .userspace_addr??????? = (unsigned long)kvm->ram_start,
->> -??? };
->> +??? i = 0;
->> +??? list_for_each_entry(bank, &kvm->mem_banks, list) {
->> +??????? mem->regions[0] = (struct vhost_memory_region) {
->> +??????????? .guest_phys_addr??? = bank->guest_phys_addr,
->> +??????????? .memory_size??????? = bank->size,
->> +??????????? .userspace_addr??????? = (unsigned long)bank->host_addr,
->> +??????? };
->> +
->> +??? }
->> +??? mem->nregions = i;
+> > Semi-related information, I think the CEA and VESA standards allow a 0.5%
+> > clock tolerance. What is the maximum clock frequency deviation required
+> > for this platform ?
 > 
-> That looks wrong. We set mem->nregions to 0 ?
-> Or did you miss an "i++" inside the loop ?
-
-I missed the "i++" inside the loop. Good catch!
-I will fix it in the next version.
-
-Cheers,
+> Looks like it does indeed. That's definetely good to know.
 
 -- 
-Julien Grall
+Regards,
+
+Laurent Pinchart
