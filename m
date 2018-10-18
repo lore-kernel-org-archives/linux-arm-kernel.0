@@ -1,22 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Oct 2018 13:25:32 -0500
-Subject: [PATCH v4 1/4] dt-bindings: crypto: Mention clocks for mxs-dcp
-In-Reply-To: <4536b5b5b101ab6a4197fb4891f775ddeb519847.1539779579.git.leonard.crestez@nxp.com>
-References: <cover.1539779579.git.leonard.crestez@nxp.com>
- <4536b5b5b101ab6a4197fb4891f775ddeb519847.1539779579.git.leonard.crestez@nxp.com>
-Message-ID: <20181018182532.GA28722@bogus>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 18 Oct 2018 20:43:04 +0200
+Subject: [PATCH v1 1/3] ARM: dts: imx6sll: fix typo for fsl,imx6sll-i2c
+ node
+In-Reply-To: <20181018112615.29362-2-o.rempel@pengutronix.de>
+References: <20181018112615.29362-1-o.rempel@pengutronix.de>
+ <20181018112615.29362-2-o.rempel@pengutronix.de>
+Message-ID: <20181018184304.ln6xd3iev64vkv7e@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018 12:37:51 +0000, Leonard Crestez wrote:
-> Explicit clock enabling is required on 6sll and 6ull so mention that
-> standard clock bindings are used.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Reviewed-by: Fabio Estevam <festevam@gmail.com>
+On Thu, Oct 18, 2018 at 01:26:13PM +0200, Oleksij Rempel wrote:
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 > ---
->  Documentation/devicetree/bindings/crypto/fsl-dcp.txt | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/boot/dts/imx6sll.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
+> diff --git a/arch/arm/boot/dts/imx6sll.dtsi b/arch/arm/boot/dts/imx6sll.dtsi
+> index 000e6136a9d6..3e6ffaf5f104 100644
+> --- a/arch/arm/boot/dts/imx6sll.dtsi
+> +++ b/arch/arm/boot/dts/imx6sll.dtsi
+> @@ -709,7 +709,7 @@
+>  			i2c1: i2c at 21a0000 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> -				compatible = "fs,imx6sll-i2c", "fsl,imx21-i2c";
+> +				compatible = "fsl,imx6sll-i2c", "fsl,imx21-i2c";
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
