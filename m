@@ -1,45 +1,31 @@
-From: Steve.Capper@arm.com (Steve Capper)
-Date: Thu, 18 Oct 2018 10:35:38 +0000
-Subject: [PATCH V2 1/4] mm: mmap: Allow for "high" userspace addresses
-In-Reply-To: <20181017164815.GA7966@bombadil.infradead.org>
-References: <20181017163459.20175-1-steve.capper@arm.com>
- <20181017163459.20175-2-steve.capper@arm.com>
- <20181017164815.GA7966@bombadil.infradead.org>
-Message-ID: <20181018103528.us35ibcpbcducuyr@capper-debian.cambridge.arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 18 Oct 2018 16:05:36 +0530
+Subject: [RFC PATCH 0/4] i2c: core: introduce master_xfer_irqless
+In-Reply-To: <20180920225608.GD988@kunai>
+References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
+ <20180920220203.GA5662@atomide.com> <20180920225608.GD988@kunai>
+Message-ID: <80230455-e0c6-be60-4d91-367c86387d6a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 09:48:15AM -0700, Matthew Wilcox wrote:
-> On Wed, Oct 17, 2018 at 05:34:56PM +0100, Steve Capper wrote:
-> > This patch adds support for "high" userspace addresses that are
-> > optionally supported on the system and have to be requested via a hint
-> > mechanism ("high" addr parameter to mmap).
-> > 
-> > Rather than duplicate the arch_get_unmapped_* stock implementations,
-> > this patch instead introduces two architectural helper macros and
-> > applies them to arch_get_unmapped_*:
-> >  arch_get_mmap_end(addr) - get mmap upper limit depending on addr hint
-> >  arch_get_mmap_base(addr, base) - get mmap_base depending on addr hint
-> > 
-> > If these macros are not defined in architectural code then they default
-> > to (TASK_SIZE) and (base) so should not introduce any behavioural
-> > changes to architectures that do not define them.
+
+
+On Friday 21 September 2018 04:26 AM, Wolfram Sang wrote:
 > 
-> Can you explain (in the changelog) why we need to do this for arm64
-> when it wasn't needed for the equivalent feature on x86-64?  I think the
-> answer is that x86-64 already has its own arch_get_unmapped* functions and
-> rather than duplicating arch_get_unmapped* for arm64, you want to continue
-> using the generic ones with just this minor hooking.  But I'd like that
-> spelled out explicitly for the next person who comes along and wonders.
->
+>> Thanks looks nice to me:
+>>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> Thanks, Tony!
 
-Thanks Matthew,
-Yes we thought it better to make an unobtrusive change to the generic
-code rather than copy it over to arm64 (whilst x86 already had an
-architecture specific version that was patched).
+Hi Wolfram Sang,
 
-I will make the commit log a lot clearer.
+Posted: https://lore.kernel.org/patchwork/patch/1001457/
 
-Cheers,
--- 
-Steve
+Thanks for the series! I tested for poweroff on am572x-idk.
+
+Tested-by: Keerthy <j-keerthy@ti.com>
+
+Regards,
+Keerthy
+> 
