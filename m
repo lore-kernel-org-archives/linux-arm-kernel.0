@@ -1,10 +1,10 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 18 Oct 2018 18:19:24 +0000
-Subject: [PATCH V3 3/8] dt-bindings: mmc: fsl-imx-esdhc: add imx8qxp
+Date: Thu, 18 Oct 2018 18:19:29 +0000
+Subject: [PATCH V3 4/8] dt-bindings: i2c: i2c-imx-lpi2c: add imx8qxp
  compatible string
 In-Reply-To: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
 References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1539886483-15775-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1539886483-15775-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,27 +12,25 @@ Add imx8qxp compatible string
 
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: linux-serial at vger.kernel.org
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-i2c at vger.kernel.org
 Cc: devicetree at vger.kernel.org
-Cc: linux-mmc at vger.kernel.org
-Cc: Haibo Chen <haibo.chen@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt | 1 +
+ Documentation/devicetree/bindings/i2c/i2c-imx-lpi2c.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-index 3e29050..9201a7d 100644
---- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -16,6 +16,7 @@ Required properties:
- 	       "fsl,imx6sl-usdhc"
- 	       "fsl,imx6sx-usdhc"
- 	       "fsl,imx7d-usdhc"
-+	       "fsl,imx8qxp-usdhc"
- 
- Optional properties:
- - fsl,wp-controller : Indicate to use controller internal write protection
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx-lpi2c.txt b/Documentation/devicetree/bindings/i2c/i2c-imx-lpi2c.txt
+index 00e4365..abbc905 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-imx-lpi2c.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-imx-lpi2c.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible :
+   - "fsl,imx7ulp-lpi2c" for LPI2C compatible with the one integrated on i.MX7ULP soc
+   - "fsl,imx8dv-lpi2c" for LPI2C compatible with the one integrated on i.MX8DV soc
++  - "fsl,imx8qxp-lpi2c" for LPI2C compatible with the one integrated on i.MX8QXP soc
+ - reg : address and length of the lpi2c master registers
+ - interrupts : lpi2c interrupt
+ - clocks : lpi2c clock specifier
 -- 
 2.7.4
