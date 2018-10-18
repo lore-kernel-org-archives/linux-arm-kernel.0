@@ -1,65 +1,96 @@
-From: rafael.tinoco@linaro.org (Rafael David Tinoco)
-Date: Thu, 18 Oct 2018 00:30:34 -0300
-Subject: ARM32: It appears that vector_swi does not update
- (thread_info)->syscall variable
-Message-ID: <CABdQkv_wT4waAOZ+chxhgWgjBDFHvp0w6PKP2gMSMfGS_ug0HA@mail.gmail.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Thu, 18 Oct 2018 11:32:07 +0800
+Subject: [RESEND PATCH] ARM: prevent tracing IPI_CPU_BACKTRACE
+In-Reply-To: <1538019697-14673-1-git-send-email-chunyan.zhang@unisoc.com>
+References: <1538019697-14673-1-git-send-email-chunyan.zhang@unisoc.com>
+Message-ID: <CAAfSe-sd9Zzh3Oz-fUSz-ssEpSYPYE7mbhFUuyim3V-62=sPXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During LKFT functional tests, we have realized that /proc/*/syscall
-first field (current syscall number) is not correct for arm32. It
-appears that some syscalls have their syscall numbers correctly
-displayed and others show only 0 (even if showing argument pointers),
-while in arm64 all of them are correctly displayed.
+On Thu, 27 Sep 2018 at 11:42, Chunyan Zhang <chunyan.zhang@unisoc.com> wrote:
+>
+> From: Arnd Bergmann <arnd@arndb.de>
+>
+> When function tracing for IPIs is enabled, we get a warning for an
+> overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
+> as triggered by raise_nmi():
+>
+> arch/arm/kernel/smp.c: In function 'raise_nmi':
+> arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
+>         trace_ipi_raise(target, ipi_types[ipinr]);
+>
+> This is a correct warning as we actually overflow the array here.
+>
+> This patch raise_nmi() to call __smp_cross_call() instead of
+> smp_cross_call(), to avoid calling into ftrace. For clarification,
+> I'm also adding a two new code comments describing how this one
+> is special.
+>
+> The warning appears to have shown up after patch e7273ff49acf
+> ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI"), which
+> changed the number assignment from '15' to '8', but as far as I can
+> tell has existed since the IPI tracepoints were first introduced.
+> If we decide to backport this patch to stable kernels, we probably
+> need to backport e7273ff49acf as well.
+>
+> Resubmiting this patch is because that I found coverity is complaining
+> the issue this patch fixed, and also I got the traces like below:
+> "ipi_raise: target_mask=00000001 (machine_suspend)" which actually was
+> the TPS of suspend_resume[1] rather than ipi_raise.
+>
+> [1]
+> https://elixir.bootlin.com/linux/latest/source/kernel/power/suspend.c#L80
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: e7273ff49acf ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI")
+> Fixes: 365ec7b17327 ("ARM: add IPI tracepoints") # v3.17
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@unisoc.com>
+> ---
+>  arch/arm/include/asm/hardirq.h | 1 +
+>  arch/arm/kernel/smp.c          | 6 +++++-
+>  2 files changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+> index cba23ea..7a88f16 100644
+> --- a/arch/arm/include/asm/hardirq.h
+> +++ b/arch/arm/include/asm/hardirq.h
+> @@ -6,6 +6,7 @@
+>  #include <linux/threads.h>
+>  #include <asm/irq.h>
+>
+> +/* number of IPIS _not_ including IPI_CPU_BACKTRACE */
+>  #define NR_IPI 7
+>
+>  typedef struct {
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 0978282..123be77 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -75,6 +75,10 @@ enum ipi_msg_type {
+>         IPI_CPU_STOP,
+>         IPI_IRQ_WORK,
+>         IPI_COMPLETION,
+> +       /*
+> +        * CPU_BACKTRACE is special and not included in NR_IPI
+> +        * or tracable with trace_ipi_*
+> +        */
+>         IPI_CPU_BACKTRACE,
+>         /*
+>          * SGI8-15 can be reserved by secure firmware, and thus may
+> @@ -755,7 +759,7 @@ core_initcall(register_cpufreq_notifier);
+>
+>  static void raise_nmi(cpumask_t *mask)
+>  {
+> -       smp_cross_call(mask, IPI_CPU_BACKTRACE);
+> +       _smp_cross_call(mask, IPI_CPU_BACKTRACE);
 
-/proc/*/syscall:
+Here should be double underline, i.e.
 
-# good
+> +       __smp_cross_call(mask, IPI_CPU_BACKTRACE);
 
-252 0xa 0xbef3d930 0x9 0xffffffff 0x0 0x6c 0xbef3d908 0xb6e6f286
-142 0x4 0x0 0xbea3eb2c 0x0 0x0 0x6c 0xbea3ea88 0xb6e40286
-252 0x4 0xbe8d59e8 0x9 0xffffffff 0xbe8d59e8 0x4 0xbe8d59c0 0xb6e11286
-
-# bad
-
-0 0xbed0a544 0xbed0a29c 0x0 0x8 0xbed0a544 0xbed0a29c 0xbed0a1e8 0xb6e47286
-0 0x4 0xbed0a528 0x3f 0xffffffff 0x0 0x6c 0xbed0a500 0xb6e47286
-0 0x400 0xbec61920 0x0 0x0 0x0 0x400 0xbec61860 0xb6dfe286
-
-It appears that:
-
-ARM64: syscall_get_nr() gets syscall number from (struct pt_regs)->syscallno
-
-=> syscallno is updated in el0_svc_common(), right in the beginning,
-independently of "has_syscall_work()" result. with that,
-proc_pid_syscall()->collect_syscall()->syscall_get_nr() is able to
-read syscallno from task's pt_regs whenever procfs needs.
-
-ARM32: syscall_get_nr() gets syscall no from task_thread_info(task)->syscall
-
-=> From vector_swi:
-
-thread_info->syscall variable seems to be updated ONLY when
-_TIF_SYSCALL_WORK flag is set into TI_FLAGS (similar to
-has_syscall_work() function used in el0_svc_common() for arm64): it
-makes a branch to __sys_trace, which calls syscall_trace_enter()
-function, which will update thread_info->syscall correctly (and this
-seems to be the only place where it is updated).
-
-=> If there is NO branch to __sys_trace (likely), it seems that
-(thread_info)->syscall is never updated, making the procfs logic, for
-getting the task current syscall number, to display 0 only (like in
-#bad).
-
-If this analysis is right, solution could be to set
-(thread_info)->syscall variable directly in vector_swi entry, before
-calling the invoke_syscall macro (similar to what el0_svc_common() ?).
-I did not send a patch because that area is sensitive in amount of
-registers being used.
-
-If analysis is wrong, sorry for the burden.
-
-Link: https://bugs.linaro.org/show_bug.cgi?id=3783
-
-Thank you
-Rafael
+>  }
+>
+>  void arch_trigger_cpumask_backtrace(const cpumask_t *mask, bool exclude_self)
+> --
+> 2.7.4
+>
