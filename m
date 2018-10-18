@@ -1,88 +1,89 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Thu, 18 Oct 2018 16:23:59 +0800
-Subject: [PATCH] ARM: prevent tracing IPI_CPU_BACKTRACE
-In-Reply-To: <1538019697-14673-1-git-send-email-chunyan.zhang@unisoc.com>
-References: <1538019697-14673-1-git-send-email-chunyan.zhang@unisoc.com>
-Message-ID: <1539851039-15778-1-git-send-email-zhang.chunyan@linaro.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 18 Oct 2018 15:33:26 +0800
+Subject: [PATCH 8/9] arm64: allwinner: a64: enable ANX6345 bridge on TERES-I
+In-Reply-To: <20181018073327.64942-1-icenowy@aosc.io>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+Message-ID: <20181018073327.64942-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+TERES-I has an ANX6345 bridge connected to the RGB666 LCD output, and
+the I2C controlling signals are connected to I2C0 bus.
 
-When function tracing for IPIs is enabled, we get a warning for an
-overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
-as triggered by raise_nmi():
+Enable it in the device tree.
 
-arch/arm/kernel/smp.c: In function 'raise_nmi':
-arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
-	trace_ipi_raise(target, ipi_types[ipinr]);
-
-This is a correct warning as we actually overflow the array here.
-
-This patch raise_nmi() to call __smp_cross_call() instead of
-smp_cross_call(), to avoid calling into ftrace. For clarification,
-I'm also adding a two new code comments describing how this one
-is special.
-
-The warning appears to have shown up after patch e7273ff49acf
-("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI"), which
-changed the number assignment from '15' to '8', but as far as I can
-tell has existed since the IPI tracepoints were first introduced.
-If we decide to backport this patch to stable kernels, we probably
-need to backport e7273ff49acf as well.
-
-Resubmitting this patch is because that I found coverity is complaining
-the issue this patch fixed, and also I got the traces like below:
-"ipi_raise: target_mask=00000001 (machine_suspend)" which actually was
-the TPS of suspend_resume[1] rather that ipi_raise.
-
-[1]
-https://elixir.bootlin.com/linux/latest/source/kernel/power/suspend.c#L80
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e7273ff49acf ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI")
-Fixes: 365ec7b17327 ("ARM: add IPI tracepoints") # v3.17
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/include/asm/hardirq.h | 1 +
- arch/arm/kernel/smp.c          | 6 +++++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ .../boot/dts/allwinner/sun50i-a64-teres-i.dts | 40 +++++++++++++++++--
+ 1 file changed, 36 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index cba23ea..7a88f16 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -6,6 +6,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+index c455b24dd079..bc1d0d6c0672 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+@@ -72,20 +72,38 @@
+ 	};
+ };
  
-+/* number of IPIS _not_ including IPI_CPU_BACKTRACE */
- #define NR_IPI	7
++&de {
++	status = "okay";
++};
++
+ &ehci1 {
+ 	status = "okay";
+ };
  
- typedef struct {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 0978282..ddd48e2 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -75,6 +75,10 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
-+	/*
-+	 * CPU_BACKTRACE is special and not included in NR_IPI
-+	 * or tracable with trace_ipi_*
-+	 */
- 	IPI_CPU_BACKTRACE,
- 	/*
- 	 * SGI8-15 can be reserved by secure firmware, and thus may
-@@ -755,7 +759,7 @@ core_initcall(register_cpufreq_notifier);
  
- static void raise_nmi(cpumask_t *mask)
- {
--	smp_cross_call(mask, IPI_CPU_BACKTRACE);
-+	__smp_cross_call(mask, IPI_CPU_BACKTRACE);
- }
+-/* The ANX6345 eDP-bridge is on i2c0. There is no linux (mainline)
+- * driver for this chip at the moment, the bootloader initializes it.
+- * However it can be accessed with the i2c-dev driver from user space.
+- */
+ &i2c0 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins>;
+ 	status = "okay";
++
++	anx6345: anx6345 at 38 {
++		compatible = "analogix,anx6345";
++		reg = <0x38>;
++		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
++		dvdd25-supply = <&reg_dldo2>;
++		dvdd12-supply = <&reg_dldo3>;
++
++		port {
++			anx6345_in: endpoint {
++				remote-endpoint = <&tcon0_out_anx6345>;
++			};
++		};
++	};
++};
++
++&mixer0 {
++	status = "okay";
+ };
  
- void arch_trigger_cpumask_backtrace(const cpumask_t *mask, bool exclude_self)
+ &mmc0 {
+@@ -258,6 +276,20 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_rgb666_pins>;
++
++	status = "okay";
++};
++
++&tcon0_out {
++	tcon0_out_anx6345: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&anx6345_in>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
-2.7.4
+2.18.1
