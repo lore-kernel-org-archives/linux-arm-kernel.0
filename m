@@ -1,69 +1,136 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 18 Oct 2018 14:37:42 +0100
-Subject: [KVMTOOL][PATCH v2 3/9] virtio/scsi: Allow to use multiple banks
+Date: Thu, 18 Oct 2018 14:37:48 +0100
+Subject: [KVMTOOL][PATCH v2 9/9] kvmtool: Allow standard size specifiers for
+ memory bank
 In-Reply-To: <20181018133748.32577-1-julien.grall@arm.com>
 References: <20181018133748.32577-1-julien.grall@arm.com>
-Message-ID: <20181018133748.32577-4-julien.grall@arm.com>
+Message-ID: <20181018133748.32577-10-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, virtio scsi only register a bank starting at 0. On some
-architectures this may not be true and the guest may have multiple
-memory region.
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Register all the memory regions to vhost by browsing kvm->mem_banks. The
-code is based on the virtio_net__vhost_init implementation.
+Allow standard suffixes, K, M, G, T & P suffixes for sizes and addresses for
+memory bank parameters. By default, the size is specified in MB.
 
-Signed-off-by: Julien Grall <julien.grall@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
 ---
 
-This code was not tested as I don't have any setup with scsi.
+    Changes in v2:
+        - Patch added
 ---
- virtio/scsi.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ builtin-run.c | 50 ++++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 42 insertions(+), 8 deletions(-)
 
-diff --git a/virtio/scsi.c b/virtio/scsi.c
-index a429ac8..0361285 100644
---- a/virtio/scsi.c
-+++ b/virtio/scsi.c
-@@ -178,24 +178,29 @@ static struct virtio_ops scsi_dev_virtio_ops = {
+diff --git a/builtin-run.c b/builtin-run.c
+index 568af5c..c907295 100644
+--- a/builtin-run.c
++++ b/builtin-run.c
+@@ -49,9 +49,11 @@
+ #include <ctype.h>
+ #include <stdio.h>
  
- static void virtio_scsi_vhost_init(struct kvm *kvm, struct scsi_dev *sdev)
- {
-+	struct kvm_mem_bank *bank;
- 	struct vhost_memory *mem;
- 	u64 features;
--	int r;
-+	int r, i;
+-#define MB_SHIFT		(20)
+ #define KB_SHIFT		(10)
++#define MB_SHIFT		(20)
+ #define GB_SHIFT		(30)
++#define TB_SHIFT		(40)
++#define PB_SHIFT		(50)
  
- 	sdev->vhost_fd = open("/dev/vhost-scsi", O_RDWR);
- 	if (sdev->vhost_fd < 0)
- 		die_perror("Failed openning vhost-scsi device");
+ __thread struct kvm_cpu *current_kvm_cpu;
  
--	mem = calloc(1, sizeof(*mem) + sizeof(struct vhost_memory_region));
-+	mem = calloc(1, sizeof(*mem) + kvm->mem_slots * sizeof(struct vhost_memory_region));
- 	if (mem == NULL)
- 		die("Failed allocating memory for vhost memory map");
+@@ -87,6 +89,37 @@ void kvm_run_set_wrapper_sandbox(void)
+ 	kvm_run_wrapper = KVM_RUN_SANDBOX;
+ }
  
--	mem->nregions = 1;
--	mem->regions[0] = (struct vhost_memory_region) {
--		.guest_phys_addr	= 0,
--		.memory_size		= kvm->ram_size,
--		.userspace_addr		= (unsigned long)kvm->ram_start,
--	};
-+	i = 0;
-+	list_for_each_entry(bank, &kvm->mem_banks, list) {
-+		mem->regions[0] = (struct vhost_memory_region) {
-+			.guest_phys_addr	= bank->guest_phys_addr,
-+			.memory_size		= bank->size,
-+			.userspace_addr		= (unsigned long)bank->host_addr,
-+		};
++static int __parse_size_spec(char **next)
++{
++	int shift = 0;
 +
++	switch(**next) {
++	case 'K': shift = KB_SHIFT; break;
++	case 'M': shift = MB_SHIFT; break;
++	case 'G': shift = GB_SHIFT; break;
++	case 'T': shift = TB_SHIFT; break;
++	case 'P': shift = PB_SHIFT; break;
 +	}
-+	mem->nregions = i;
++	if (shift)
++		(*next)++;
++	return shift;
++}
++
++static u64 parse_mem_size_spec(char **next)
++{
++	int shift = __parse_size_spec(next);
++
++	/* By default the size is in MB, if none is specified */
++	if (!shift)
++		shift = 20;
++	return ((u64)1) << shift;
++}
++
++static u64 parse_addr_spec(char **next)
++{
++	return ((u64)1) << __parse_size_spec(next);
++}
++
+ static int mem_parser(const struct option *opt, const char *arg, int unset)
+ {
+ 	struct kvm_config *cfg = opt->value;
+@@ -101,6 +134,8 @@ static int mem_parser(const struct option *opt, const char *arg, int unset)
+ 	if (next == p)
+ 		die("mem: no size specified.\n");
  
- 	r = ioctl(sdev->vhost_fd, VHOST_SET_OWNER);
- 	if (r != 0)
++	size *= parse_mem_size_spec(&next);
++
+ 	if (*next != '@' && *next != '\0')
+ 		die("mem: unexpected chars after size.\n");
+ 
+@@ -122,6 +157,8 @@ static int mem_parser(const struct option *opt, const char *arg, int unset)
+ 		if (cfg->nr_ram > 0)
+ 			die("mem: <addr> must be specified\n");
+ 		addr = INVALID_RAM_ADDR;
++	} else {
++		addr *= parse_addr_spec(&next);
+ 	}
+ 
+ 	if ( cfg->nr_ram == MAX_RAM_BANKS )
+@@ -322,7 +359,7 @@ static u64 host_ram_size(void)
+ 		return 0;
+ 	}
+ 
+-	return (nr_pages * page_size) >> MB_SHIFT;
++	return (nr_pages * page_size);
+ }
+ 
+ /*
+@@ -336,11 +373,11 @@ static u64 get_ram_size(int nr_cpus)
+ 	u64 available;
+ 	u64 ram_size;
+ 
+-	ram_size	= 64 * (nr_cpus + 3);
++	ram_size	= (64 * (nr_cpus + 3)) << MB_SHIFT;
+ 
+ 	available	= host_ram_size() * RAM_SIZE_RATIO;
+ 	if (!available)
+-		available = MIN_RAM_SIZE_MB;
++		available = MIN_RAM_SIZE_MB << MB_SHIFT;
+ 
+ 	if (ram_size > available)
+ 		ram_size	= available;
+@@ -594,11 +631,8 @@ static struct kvm *kvm_cmd_run_init(int argc, const char **argv)
+ 		kvm->cfg.nr_ram = 1;
+ 	}
+ 
+-	for (i = 0; i < kvm->cfg.nr_ram; i++) {
++	for (i = 0; i < kvm->cfg.nr_ram; i++)
+ 		total_ram += kvm->cfg.ram[i].size;
+-		/* The user input is in MB, but the internal deals with bytes */
+-		kvm->cfg.ram[i].size <<= MB_SHIFT;
+-	}
+ 
+ 	if (total_ram > host_ram_size())
+ 		pr_warning("Guest memory size %lluMB exceeds host physical RAM size %lluMB",
 -- 
 2.11.0
