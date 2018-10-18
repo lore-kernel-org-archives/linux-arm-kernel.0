@@ -1,76 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 18 Oct 2018 08:58:25 -0500
-Subject: [PATCH v4 07/10] dt-bindings: phy: add binding for Allwinner USB3
- PHY
-In-Reply-To: <92e92f817d4df753d654124514e89c62f40d52eb.camel@aosc.io>
-References: <20181004122855.22981-1-icenowy@aosc.io>
- <20181004122855.22981-8-icenowy@aosc.io>
- <20181005205855.GA2458@bogus>
- <92e92f817d4df753d654124514e89c62f40d52eb.camel@aosc.io>
-Message-ID: <CAL_JsqL=YY2K0KPK-fN1O-a3R4o5GwYUZr9wyA2DOaXc29Hh3g@mail.gmail.com>
+From: sean.wang@kernel.org (Sean Wang)
+Date: Thu, 18 Oct 2018 22:24:25 +0800
+Subject: [PATCH 2/5] arm64: dts: mediatek: mt6797: Add pinctrl support
+In-Reply-To: <20181008191411.32555-3-manivannan.sadhasivam@linaro.org>
+References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
+ <20181008191411.32555-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <CAGp9LzqKEpmJMZhU0KW2GWXT4mxEiMqA0xhGxeX2kv+7_ADtKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2018 at 9:42 PM Icenowy Zheng <icenowy@aosc.io> wrote:
+On Tue, Oct 9, 2018 at 3:16 AM Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
 >
-> ? 2018-10-05?? 15:58 -0500?Rob Herring???
-> > On Thu, Oct 04, 2018 at 08:28:52PM +0800, Icenowy Zheng wrote:
-> > > The new Allwinner H6 SoC contains a USB3 PHY that is wired to the
-> > > external USB3 pins of the SoC.
-> > >
-> > > Add a device tree binding for the PHY.
-> > >
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > > Changes in v4:
-> > > - Changed Vbus regulator property to vbus-supply.
-> > >
-> > > Changes in v3:
-> > > - Added Chen-Yu's Review tag.
-> > >
-> > > No changes in v2, v1.
-> > >
-> > >  .../bindings/phy/sun50i-usb3-phy.txt          | 23
-> > > +++++++++++++++++++
-> > >  1 file changed, 23 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/phy/sun50i-
-> > > usb3-phy.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/phy/sun50i-usb3-
-> > > phy.txt b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-> > > new file mode 100644
-> > > index 000000000000..9f49c6b8c7e7
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-> > > @@ -0,0 +1,23 @@
-> > > +Allwinner sun50i USB3 PHY
-> > > +-----------------------
-> > > +
-> > > +Required properties:
-> > > +- compatible : should be one of
-> > > +  * allwinner,sun60i-h6-usb3-phy
-> > > +- reg : a list of offset + length pairs
-> > > +- #phy-cells : from the generic phy bindings, must be 0
-> > > +- clocks : phandle + clock specifier for the phy clock
-> > > +- resets : phandle + reset specifier for the phy reset
-> > > +
-> > > +Optional Properties:
-> > > +- vbus-supply : a phandle to a regulator that provides power to
-> > > VBUS.
-> >
-> > This belongs in a connector node as it is part of the connector
-> > unless
-> > the phy physically needs Vbus for power.
-> >
-> > But others have done this, so all the phys can just be wrong...
+> Add pinctrl support for Mediatek MT6797 SoC.
 >
-> How should we reference the connector?
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt6797.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 >
-> Via OF graph or simply a property in PHY node?
+> diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+> index 4beaa71107d7..231230d32d09 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+> @@ -14,6 +14,7 @@
+>  #include <dt-bindings/clock/mt6797-clk.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/pinctrl/mt6797-pinfunc.h>
+>
+>  / {
+>         compatible = "mediatek,mt6797";
+> @@ -129,6 +130,19 @@
+>                 #clock-cells = <1>;
+>         };
+>
+> +       pio: pinctrl at 10005000 {
+> +               compatible = "mediatek,mt6797-pinctrl";
+> +               reg = <0 0x10005000 0 0x1000>,
+> +                     <0 0x10002000 0 0x400>,
+> +                     <0 0x10002400 0 0x400>,
+> +                     <0 0x10002800 0 0x400>,
+> +                     <0 0x10002C00 0 0x400>;
+> +               reg-names = "gpio", "iocfgl", "iocfgb",
+> +                           "iocfgr", "iocfgt";
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
+> +       };
+> +
 
-The connector is either a child of the controller or an OF graph from
-the controller to the connector. The phy driver needs the controller
-node and then it can walk the tree or graph to get the connector node.
+The content looks good to me, but the dt-binding document is required
+to be added for MT6797 SoC before the DTS instance is being added.
 
-Rob
+>         scpsys: scpsys at 10006000 {
+>                 compatible = "mediatek,mt6797-scpsys";
+>                 #power-domain-cells = <1>;
+> --
+> 2.17.1
+>
+>
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
