@@ -1,165 +1,110 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 18 Oct 2018 21:10:08 +0530
-Subject: [PATCH v2 01/10] firmware: ti_sci: Add support to get TISCI handle
- using of_phandle
-In-Reply-To: <20181018154017.7112-1-lokeshvutla@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
-Message-ID: <20181018154017.7112-2-lokeshvutla@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 18 Oct 2018 10:38:54 -0500
+Subject: [PATCH V6 1/3] dt-bindings: fsl: scu: make power domain
+ compatible string SoC specific
+In-Reply-To: <AM0PR04MB42110D63D97B31830B5EC93580F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
+ <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
+ <20181018143342.GA22874@bogus>
+ <AM0PR04MB42110D63D97B31830B5EC93580F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <CAL_JsqKNvohQs16B0xGNJ9gbDDR7SU+mF6VUwf2V8CyP0jwE3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+On Thu, Oct 18, 2018 at 10:08 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+>
+> > -----Original Message-----
+> > From: Rob Herring [mailto:robh at kernel.org]
+> > Sent: Thursday, October 18, 2018 10:34 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> [...]
+> > On Wed, Oct 17, 2018 at 07:24:40AM +0000, A.s. Dong wrote:
+> > > As the power domain API might change in the future for new SoCs,
+> > > although in a very low possibility, it's still better to make the
+> > > compatible string more SoC specific to avoid the possible version change for
+> > new SoCs.
+> > >
+> > > Due to there're still no users in kernel, it's safe to update it
+> > > without breaking anything.
+> > >
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: devicetree at vger.kernel.org
+> > > Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >
+> > checkpatch says:
+> >
+> > WARNING: Missing Signed-off-by: line by nominal patch author 'A.s. Dong
+> > <aisheng.dong@nxp.com>'
+> >
+>
+> Do you think if we can ignore this warning?
 
-TISCI has been updated to have support for Resource management(likes
-interrupts etc..). And there can be multiple device instances of a
-resource type in a SoC. So every driver corresponding to a resource type
-should get a TISCI handle so that it can make TISCI calls. And each
-DT node corresponding to a device should exist under its corresponding
-bus node as per the SoC architecture.
+Probably, but better if you can fix it.
 
-But existing apis in TISCI library assumes that all TISCI users are
-child nodes of TISCI. Which is not true in the above case. So introduce
-(devm_)ti_sci_get_by_phandle() apis that can be used by TISCI users
-to get TISCI handle using of phandle property.
+> It seems checkpatch checks the email sender name as nominal patch author
+> which is abbreviated as 'A.S. Dong'. But I always use the full name in
+> upstreaming patches.
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Changes since v1:
-- None.
+The patch contents should start with a 'From:' line if your sending
+email doesn't match the patch author (such as when you sent another
+author's patch). Maybe it did match and your email server is
+overwriting it. I would imagine that can be fixed.
 
- drivers/firmware/ti_sci.c              | 83 ++++++++++++++++++++++++++
- include/linux/soc/ti/ti_sci_protocol.h | 17 ++++++
- 2 files changed, 100 insertions(+)
+> > > ---
+> > > ChangeLog:
+> > > v5->v6:
+> > >  * new patch
+> > > ---
+> > >  Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git
+> > > a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > index 46d0af1..87fc4b4 100644
+> > > --- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > > @@ -58,7 +58,7 @@ This binding for the SCU power domain providers uses
+> > > the generic power  domain binding[2].
+> > >
+> > >  Required properties:
+> > > -- compatible:              Should be "fsl,scu-pd".
+> > > +- compatible:              Should be "fsl,imx8qxp-scu-pd".
+> >
+> > You can keep both if you think future SoCs will be compatible.
+> >
+>
+> They're likely to be compatible AFAIK.
+>
+> Just to be clear, you mean keep both of them?
 
-diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
-index 69ed1464175c..f0cafa8a2ee9 100644
---- a/drivers/firmware/ti_sci.c
-+++ b/drivers/firmware/ti_sci.c
-@@ -1781,6 +1781,89 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(devm_ti_sci_get_handle);
- 
-+/**
-+ * ti_sci_get_by_phandle() - Get the TI SCI handle using DT phandle
-+ * @np:		device node
-+ * @propname:	property name containing phandle on TISCI node
-+ *
-+ * NOTE: The function does not track individual clients of the framework
-+ * and is expected to be maintained by caller of TI SCI protocol library.
-+ * ti_sci_put_handle must be balanced with successful ti_sci_get_by_phandle
-+ * Return: pointer to handle if successful, else:
-+ * -EPROBE_DEFER if the instance is not ready
-+ * -ENODEV if the required node handler is missing
-+ * -EINVAL if invalid conditions are encountered.
-+ */
-+const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
-+						  const char *property)
-+{
-+	struct ti_sci_handle *handle = NULL;
-+	struct device_node *ti_sci_np;
-+	struct ti_sci_info *info;
-+	struct list_head *p;
-+
-+	if (!np) {
-+		pr_err("I need a device pointer\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	ti_sci_np = of_parse_phandle(np, property, 0);
-+	if (!ti_sci_np)
-+		return ERR_PTR(-ENODEV);
-+
-+	mutex_lock(&ti_sci_list_mutex);
-+	list_for_each(p, &ti_sci_list) {
-+		info = list_entry(p, struct ti_sci_info, node);
-+		if (ti_sci_np == info->dev->of_node) {
-+			handle = &info->handle;
-+			info->users++;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&ti_sci_list_mutex);
-+	of_node_put(ti_sci_np);
-+
-+	if (!handle)
-+		return ERR_PTR(-EPROBE_DEFER);
-+
-+	return handle;
-+}
-+EXPORT_SYMBOL_GPL(ti_sci_get_by_phandle);
-+
-+/**
-+ * devm_ti_sci_get_by_phandle() - Managed get handle using phandle
-+ * @dev:	Device pointer requesting TISCI handle
-+ * @propname:	property name containing phandle on TISCI node
-+ *
-+ * NOTE: This releases the handle once the device resources are
-+ * no longer needed. MUST NOT BE released with ti_sci_put_handle.
-+ * The function does not track individual clients of the framework
-+ * and is expected to be maintained by caller of TI SCI protocol library.
-+ *
-+ * Return: 0 if all went fine, else corresponding error.
-+ */
-+const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
-+						       const char *property)
-+{
-+	const struct ti_sci_handle *handle;
-+	const struct ti_sci_handle **ptr;
-+
-+	ptr = devres_alloc(devm_ti_sci_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+	handle = ti_sci_get_by_phandle(dev_of_node(dev), property);
-+
-+	if (!IS_ERR(handle)) {
-+		*ptr = handle;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return handle;
-+}
-+EXPORT_SYMBOL_GPL(devm_ti_sci_get_by_phandle);
-+
- static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
- 				void *cmd)
- {
-diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
-index 18435e5c6364..515587e9d373 100644
---- a/include/linux/soc/ti/ti_sci_protocol.h
-+++ b/include/linux/soc/ti/ti_sci_protocol.h
-@@ -217,6 +217,10 @@ struct ti_sci_handle {
- const struct ti_sci_handle *ti_sci_get_handle(struct device *dev);
- int ti_sci_put_handle(const struct ti_sci_handle *handle);
- const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev);
-+const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
-+						  const char *property);
-+const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
-+						       const char *property);
- 
- #else	/* CONFIG_TI_SCI_PROTOCOL */
- 
-@@ -236,6 +240,19 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
- 	return ERR_PTR(-EINVAL);
- }
- 
-+static inline
-+const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
-+						  const char *property)
-+{
-+	return ERR_PTR(-EINVAL);
-+}
-+
-+static inline
-+const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
-+						       const char *property)
-+{
-+	return ERR_PTR(-EINVAL);
-+}
- #endif	/* CONFIG_TI_SCI_PROTOCOL */
- 
- #endif	/* __TISCI_PROTOCOL_H */
--- 
-2.19.1
+Yes, but...
+> e.g.
+> compatible: Should be "fsl,imx8qxp-scu-pd" or "fsl,scu-pd"
+
+Not exactly, "fsl,scu-pd" should be a fallback and the driver can
+match on that (until you need to distinguish). So like this:
+
+Should be one of:
+  "fsl,imx8qxp-scu-pd"
+followed by "fsl,scu-pd"
+
+> Can you please help clarify a bit more on why it's better to do that as I'm not quite
+> Understand?
+>
+> And for later when mx8qm is supported, should we add it again as follows?
+> compatible: Should be "fsl,imx8qm-scu-pd", "fsl,imx8qxp-scu-pd" or "fsl,scu-pd"
+
+If formatted as above, then it is a one line change to add:
+
+Should be one of:
+  "fsl,imx8qm-scu-pd"
+  "fsl,imx8qxp-scu-pd"
+followed by "fsl,scu-pd"
+
+Rob
