@@ -1,119 +1,100 @@
-From: sean.wang@kernel.org (Sean Wang)
-Date: Thu, 18 Oct 2018 23:06:08 +0800
-Subject: [PATCH 5/5] pinctrl: mediatek: Add initial pinctrl driver for
- MT6797 SoC
-In-Reply-To: <e7abee72-23a3-4716-baf0-484514bbb019@gmail.com>
-References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
- <20181008191411.32555-6-manivannan.sadhasivam@linaro.org>
- <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
- <20181011164429.GA18174@Mani-XPS-13-9360>
- <e7abee72-23a3-4716-baf0-484514bbb019@gmail.com>
-Message-ID: <CAGp9LzoP2zkryhJCQNGpe9X0+7yUd31ffV7vM4j6KvTdfPpCrA@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 18 Oct 2018 15:08:46 +0000
+Subject: [PATCH V6 1/3] dt-bindings: fsl: scu: make power domain
+ compatible string SoC specific
+In-Reply-To: <20181018143342.GA22874@bogus>
+References: <1539760797-12991-1-git-send-email-aisheng.dong@nxp.com>
+ <1539760797-12991-2-git-send-email-aisheng.dong@nxp.com>
+ <20181018143342.GA22874@bogus>
+Message-ID: <AM0PR04MB42110D63D97B31830B5EC93580F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 10:01 PM Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
->
->
->
-> On 11/10/2018 18:44, Manivannan Sadhasivam wrote:
-> > On Thu, Oct 11, 2018 at 05:50:19PM +0200, Matthias Brugger wrote:
-> >>
-> >>
-> >> On 08/10/2018 21:14, Manivannan Sadhasivam wrote:
-> >>> Add initial pinctrl driver for Mediatek MT6797 SoC supporting only
-> >>> GPIO and pinmux configurations.
-> >>>
-> >>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> >>> ---
-> >>>  drivers/pinctrl/mediatek/Kconfig              |    7 +
-> >>>  drivers/pinctrl/mediatek/Makefile             |    1 +
-> >>>  drivers/pinctrl/mediatek/pinctrl-mt6797.c     |   82 +
-> >>>  drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h | 2430 +++++++++++++++++
-> >>>  4 files changed, 2520 insertions(+)
-> >>>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt6797.c
-> >>>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
-> >>>
-> >> [...]
-> >>> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
-> >>> new file mode 100644
-> >>> index 000000000000..8949d2a15c39
-> >>> --- /dev/null
-> >>> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
-> >>> @@ -0,0 +1,2430 @@
-> >>> +/* SPDX-License-Identifier: GPL-2.0 */
-> >>> +/*
-> >>> + * Based on pinctrl-mtk-mt6765.h
-> >>> + *
-> >>> + * Copyright (C) 2018 MediaTek Inc.
-> >>> + *
-> >>> + * Author: ZH Chen <zh.chen@mediatek.com>
-> >>> + *
-> >>> + * Copyright (c) 2018 Manivannan Sadhasivam
-> >>> + */
-> >>> +
-> >>> +#ifndef __PINCTRL_MTK_MT6797_H
-> >>> +#define __PINCTRL_MTK_MT6797_H
-> >>> +
-> >>> +#include "pinctrl-paris.h"
-> >>> +
-> >>> +static const struct mtk_pin_desc mtk_pins_mt6797[] = {
-> >>> +   MTK_PIN(
-> >>> +           0, "GPIO0",
-> >>> +           MTK_EINT_FUNCTION(NO_EINT_SUPPORT, NO_EINT_SUPPORT),
-> >>> +           DRV_GRP3,
-> >>
-> >> As far as I have seen, you put all pins in driving group 3, but from the public
-> >> available "Functional Specification" (page 51-81) I can see that there exist
-> >> several driving groups:
-> >> 2/4/6/8 mA (DRV_GRP3)
-> >> 4/8/12/16 mA (not sure which group this is)
-> >> 2/4/6/8/10/12/14/16 mA (DRV_GRP4).
-> >>
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Thursday, October 18, 2018 10:34 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+[...]
+> On Wed, Oct 17, 2018 at 07:24:40AM +0000, A.s. Dong wrote:
+> > As the power domain API might change in the future for new SoCs,
+> > although in a very low possibility, it's still better to make the
+> > compatible string more SoC specific to avoid the possible version change for
+> new SoCs.
 > >
-> > Not sure about that. But I derived the configuration from DRV_CFGx
-> > registers available in "Application Software Register Table - Part 1"
-> > from page no: 906.
+> > Due to there're still no users in kernel, it's safe to update it
+> > without breaking anything.
 > >
-> > This register supports 2/4/6/8mA and this belongs to DRV_GRP2/DRV_GRP3
-> > [1].
->
-> I can see other driving groups as defined in the "Functional Specification" [1]
-> which gets also reflected in the "Application Software Register Table - Part 1"
-> [2], see for example page 852.
->
-> CCing Mars, maybe he can help to clarify.
->
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: devicetree at vger.kernel.org
+> > Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> checkpatch says:
+> 
+> WARNING: Missing Signed-off-by: line by nominal patch author 'A.s. Dong
+> <aisheng.dong@nxp.com>'
+> 
 
-the driver currently only supports the basic operation, not including
-driving operation, so
-what value for the driving mode for a certain pin seems not really
-matter in the early patch. I think these advanced operations can be
-added with another patch.
+Do you think if we can ignore this warning?
 
-> Regards,
-> Matthias
->
-> [1]
-> https://www.96boards.org/documentation/consumer/mediatekx20/additional-docs/docs/MT6797_Functional_Specification_V1_0.pdf
-> [2]
-> https://www.96boards.org/documentation/consumer/mediatekx20/additional-docs/docs/MT6797_Register_Table_Part_1.pdf
->
+It seems checkpatch checks the email sender name as nominal patch author
+which is abbreviated as 'A.S. Dong'. But I always use the full name in
+upstreaming patches.
+
+> > ---
+> > ChangeLog:
+> > v5->v6:
+> >  * new patch
+> > ---
+> >  Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
 > >
-> > Still I'm not fully confident of my choice here. Maybe Sean can throw
-> > some inputs!
+> > diff --git
+> > a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > index 46d0af1..87fc4b4 100644
+> > --- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > @@ -58,7 +58,7 @@ This binding for the SCU power domain providers uses
+> > the generic power  domain binding[2].
 > >
-> > Thanks,
-> > Mani
+> >  Required properties:
+> > -- compatible:		Should be "fsl,scu-pd".
+> > +- compatible:		Should be "fsl,imx8qxp-scu-pd".
+> 
+> You can keep both if you think future SoCs will be compatible.
+> 
+
+They're likely to be compatible AFAIK.
+
+Just to be clear, you mean keep both of them?
+e.g.
+compatible: Should be "fsl,imx8qxp-scu-pd" or "fsl,scu-pd"
+Can you please help clarify a bit more on why it's better to do that as I'm not quite
+Understand?
+
+And for later when mx8qm is supported, should we add it again as follows?
+compatible: Should be "fsl,imx8qm-scu-pd", "fsl,imx8qxp-scu-pd" or "fsl,scu-pd"
+
+Regards
+Dong Aisheng
+
+> >  - #address-cells:	Should be 1.
+> >  - #size-cells:		Should be 0.
 > >
-> > [1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c#n40
+> > @@ -153,7 +153,7 @@ firmware {
+> >  		};
 > >
-> >> Regards,
-> >> Matthias
-> >>
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> >  		imx8qx-pm {
+> > -			compatible = "fsl,scu-pd";
+> > +			compatible = "fsl,imx8qxp-scu-pd";
+> >  			#address-cells = <1>;
+> >  			#size-cells = <0>;
+> >
+> > --
+> > 2.7.4
+> >
