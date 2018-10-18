@@ -1,81 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 18 Oct 2018 11:40:09 +0200
-Subject: [PATCH v3 3/6] clocksource: exynos_mct: Refactor resources
- allocation
-In-Reply-To: <CAJKOXPcMPz0wsEU9Lt1e0dp7tEk9+t8kteW=hih7sNsp99Dkkw@mail.gmail.com>
-References: <CGME20181017134206eucas1p1ebc76569f706675d41f2d2183349f1f3@eucas1p1.samsung.com>
- <20181017134159.9656-1-m.szyprowski@samsung.com>
- <20181017134159.9656-4-m.szyprowski@samsung.com>
- <CAJKOXPcMPz0wsEU9Lt1e0dp7tEk9+t8kteW=hih7sNsp99Dkkw@mail.gmail.com>
-Message-ID: <20181018094011eucas1p11831fa3b26007be54af17d57852e120b~eqoUWGdbK0807208072eucas1p1I@eucas1p1.samsung.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 18 Oct 2018 11:42:58 +0200
+Subject: [PATCH 9/9] [DO NOT MERGE] drm/sun4i: rgb: Add 5% tolerance to
+ dot clock frequency check
+In-Reply-To: <CAKMK7uFp2c=wqzPi096MTRB6Cdfacerkp6dM=fEqCAr99PQG9w@mail.gmail.com>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <20181018073327.64942-10-icenowy@aosc.io>
+ <4168274.Gmp9JTCfJR@avalon>
+ <CAKMK7uFp2c=wqzPi096MTRB6Cdfacerkp6dM=fEqCAr99PQG9w@mail.gmail.com>
+Message-ID: <20181018094258.oahlopafvm2udvoe@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Thu, Oct 18, 2018 at 11:18:06AM +0200, Daniel Vetter wrote:
+> On Thu, Oct 18, 2018 at 10:55 AM Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+> >
+> > Hi Icenowy,
+> >
+> > Thank you for the patch.
+> >
+> > On Thursday, 18 October 2018 10:33:27 EEST Icenowy Zheng wrote:
+> > > From: Chen-Yu Tsai <wens@csie.org>
+> > >
+> > > The panels shipped with Allwinner devices are very "generic", i.e.
+> > > they do not have model numbers or reliable sources of information
+> > > for the timings (that we know of) other than the fex files shipped
+> > > on them. The dot clock frequency provided in the fex files have all
+> > > been rounded to the nearest MHz, as that is the unit used in them.
+> > >
+> > > We were using the simple panel "urt,umsh-8596md-t" as a substitute
+> > > for the A13 Q8 tablets in the absence of a specific model for what
+> > > may be many different but otherwise timing compatible panels. This
+> > > was usable without any visual artifacts or side effects, until the
+> > > dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+> > > rgb: Validate the clock rate").
+> > >
+> > > The reason this check fails is because the dotclock frequency for
+> > > this model is 33.26 MHz, which is not achievable with our dot clock
+> > > hardware, and the rate returned by clk_round_rate deviates slightly,
+> > > causing the driver to reject the display mode.
+> > >
+> > > The LCD panels have some tolerance on the dot clock frequency, even
+> > > if it's not specified in their datasheets.
+> > >
+> > > This patch adds a 5% tolerence to the dot clock check.
+> >
+> > Why do you think this shouldn't be merged ?
+> 
+> It pisses of a lot of people who really insist upon accurate timing.
 
-On 2018-10-17 16:29, Krzysztof Kozlowski wrote:
-> On Wed, 17 Oct 2018 at 15:42, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->> Move interrupts allocation from exynos4_timer_resources() into separate
->> function together with the interrupt number parsing code from
->> mct_init_dt(), so the code for managing interrupts is kept together.
->> While touching exynos4_timer_resources() function, move of_iomap() to it.
->> No functional changes.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  drivers/clocksource/exynos_mct.c | 49 +++++++++++++++++++-------------
->>  1 file changed, 30 insertions(+), 19 deletions(-)
->>
->> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->> index 49413900b24c..02ad55db390b 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -502,11 +502,14 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
->>         return 0;
->>  }
->>
->> -static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
->> +static int __init exynos4_timer_resources(struct device_node *np)
->>  {
->> -       int err, cpu;
->>         struct clk *mct_clk, *tick_clk;
->>
->> +       reg_base = of_iomap(np, 0);
->> +       if (!reg_base)
->> +               panic("%s: unable to ioremap mct address space\n", __func__);
->> +
->>         tick_clk = of_clk_get_by_name(np, "fin_pll");
->>         if (IS_ERR(tick_clk))
->>                 panic("%s: unable to determine tick clock rate\n", __func__);
->> @@ -517,9 +520,27 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
->>                 panic("%s: unable to retrieve mct clock instance\n", __func__);
->>         clk_prepare_enable(mct_clk);
->>
->> -       reg_base = base;
->> -       if (!reg_base)
->> -               panic("%s: unable to ioremap mct address space\n", __func__);
->> +       return 0;
->> +}
->> +
->> +static int __init exynos4_timer_interrupts(struct device_node *np,
->> +                                          unsigned int int_type)
->> +{
->> +       int i, err, cpu;
->> +
->> +       mct_int_type = int_type;
-> This does not look good. Before, assignment was done before call to
-> exynos4_timer_resources(). Now, if I follow the path correctly, it
-> will be after. Therefore the exynos4_timer_resources() will use wrong
-> value. This should pop up during tests.
+It's not just about accurate timings. That 5% is a made-up limit, that
+never have really been confirmed by looking at the typical tolerancies
+of panels.
 
-After refactoring exynos4_timer_resource() doesn't use int_type, but you
-are right, there is one item missing: nr_irqs as local variable, what
-causes the driver to mess with the global one, what is fatal to the
-system. I will send a fixed version in a few minutes.
+And while being to relaxed might make some panels work that are not
+working currently, it might also break some panels that currently work
+and won't now, and ideally, we should really be able to let those
+panels work if they can, and filter out resolutions if they can't.
 
-> ...
+> I think a better fix would be to have a dotclock range in drm_panel,
+> and some magic to figure out which one of these we can actually
+> do. Then tell userspace that this is the mode is should
+> request. That way userspace knows what the actual dotclock/refresh
+> rate is, and the panel still works.
 
-Best regards
+It's not just about panels, but also bridges with EDID where the
+tolerancy is not exposed.
+
+Maxime
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/1f417078/attachment.sig>
