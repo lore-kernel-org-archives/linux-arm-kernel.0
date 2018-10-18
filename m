@@ -1,176 +1,81 @@
-From: c.manszewski@samsung.com (Christoph Manszewski)
-Date: Thu, 18 Oct 2018 11:36:10 +0200
-Subject: [PATCH v2 2/2] drm/exynos: decon: Make pixel blend mode configurable
-In-Reply-To: <1539855370-15194-1-git-send-email-c.manszewski@samsung.com>
-References: <1539855370-15194-1-git-send-email-c.manszewski@samsung.com>
- <CGME20181018093637eucas1p20c846b3959514f8c14a167342d53eba4@eucas1p2.samsung.com>
-Message-ID: <20181018093637eucas1p20c846b3959514f8c14a167342d53eba4~eqlNE4PfC1414614146eucas1p2R@eucas1p2.samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 18 Oct 2018 11:40:09 +0200
+Subject: [PATCH v3 3/6] clocksource: exynos_mct: Refactor resources
+ allocation
+In-Reply-To: <CAJKOXPcMPz0wsEU9Lt1e0dp7tEk9+t8kteW=hih7sNsp99Dkkw@mail.gmail.com>
+References: <CGME20181017134206eucas1p1ebc76569f706675d41f2d2183349f1f3@eucas1p1.samsung.com>
+ <20181017134159.9656-1-m.szyprowski@samsung.com>
+ <20181017134159.9656-4-m.szyprowski@samsung.com>
+ <CAJKOXPcMPz0wsEU9Lt1e0dp7tEk9+t8kteW=hih7sNsp99Dkkw@mail.gmail.com>
+Message-ID: <20181018094011eucas1p11831fa3b26007be54af17d57852e120b~eqoUWGdbK0807208072eucas1p1I@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently blend mode is set accordingly to pixel format.
-Add pixel blend mode property and make it configurable,
-by modifying the blend equation.
+Hi Krzysztof,
 
-Tested on TM2 with Exynos 5433 CPU, on top of exynos-drm-next,
-commit: c530174b90fa
+On 2018-10-17 16:29, Krzysztof Kozlowski wrote:
+> On Wed, 17 Oct 2018 at 15:42, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> Move interrupts allocation from exynos4_timer_resources() into separate
+>> function together with the interrupt number parsing code from
+>> mct_init_dt(), so the code for managing interrupts is kept together.
+>> While touching exynos4_timer_resources() function, move of_iomap() to it.
+>> No functional changes.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>  drivers/clocksource/exynos_mct.c | 49 +++++++++++++++++++-------------
+>>  1 file changed, 30 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+>> index 49413900b24c..02ad55db390b 100644
+>> --- a/drivers/clocksource/exynos_mct.c
+>> +++ b/drivers/clocksource/exynos_mct.c
+>> @@ -502,11 +502,14 @@ static int exynos4_mct_dying_cpu(unsigned int cpu)
+>>         return 0;
+>>  }
+>>
+>> -static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+>> +static int __init exynos4_timer_resources(struct device_node *np)
+>>  {
+>> -       int err, cpu;
+>>         struct clk *mct_clk, *tick_clk;
+>>
+>> +       reg_base = of_iomap(np, 0);
+>> +       if (!reg_base)
+>> +               panic("%s: unable to ioremap mct address space\n", __func__);
+>> +
+>>         tick_clk = of_clk_get_by_name(np, "fin_pll");
+>>         if (IS_ERR(tick_clk))
+>>                 panic("%s: unable to determine tick clock rate\n", __func__);
+>> @@ -517,9 +520,27 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+>>                 panic("%s: unable to retrieve mct clock instance\n", __func__);
+>>         clk_prepare_enable(mct_clk);
+>>
+>> -       reg_base = base;
+>> -       if (!reg_base)
+>> -               panic("%s: unable to ioremap mct address space\n", __func__);
+>> +       return 0;
+>> +}
+>> +
+>> +static int __init exynos4_timer_interrupts(struct device_node *np,
+>> +                                          unsigned int int_type)
+>> +{
+>> +       int i, err, cpu;
+>> +
+>> +       mct_int_type = int_type;
+> This does not look good. Before, assignment was done before call to
+> exynos4_timer_resources(). Now, if I follow the path correctly, it
+> will be after. Therefore the exynos4_timer_resources() will use wrong
+> value. This should pop up during tests.
 
-Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
----
-After further studying the documentation, it turned out that decon
-supports premultiplied pixel blend mode by using blend equation,
-make use of this.
+After refactoring exynos4_timer_resource() doesn't use int_type, but you
+are right, there is one item missing: nr_irqs as local variable, what
+causes the driver to mess with the global one, what is fatal to the
+system. I will send a fixed version in a few minutes.
 
-v2 changes:
- - add premultiplied mode by setting blending equation accordingly,
- - remove no longer used blend mode settings from decon_win_set_pixfmt,
+> ...
 
- drivers/gpu/drm/exynos/exynos5433_drm_decon.c | 64 +++++++++++++++++++++++----
- drivers/gpu/drm/exynos/regs-decon5433.h       | 15 +++++++
- 2 files changed, 70 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-index 2578db16750d..bc1339d63aed 100644
---- a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-@@ -86,10 +86,10 @@ static const enum drm_plane_type decon_win_types[WINDOWS_NR] = {
- 
- static const unsigned int capabilities[WINDOWS_NR] = {
- 	0,
--	EXYNOS_DRM_PLANE_CAP_WIN_BLEND,
--	EXYNOS_DRM_PLANE_CAP_WIN_BLEND,
--	EXYNOS_DRM_PLANE_CAP_WIN_BLEND,
--	EXYNOS_DRM_PLANE_CAP_WIN_BLEND,
-+	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
-+	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
-+	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
-+	EXYNOS_DRM_PLANE_CAP_WIN_BLEND | EXYNOS_DRM_PLANE_CAP_PIX_BLEND,
- };
- 
- static inline void decon_set_bits(struct decon_context *ctx, u32 reg, u32 mask,
-@@ -267,13 +267,53 @@ static void decon_commit(struct exynos_drm_crtc *crtc)
- 	decon_set_bits(ctx, DECON_UPDATE, STANDALONE_UPDATE_F, ~0);
- }
- 
-+static void decon_win_set_bldeq(struct decon_context *ctx, unsigned int win,
-+				unsigned int alpha, unsigned int pixel_alpha)
-+{
-+	u32 mask = BLENDERQ_A_FUNC_F(0xf) | BLENDERQ_B_FUNC_F(0xf);
-+	u32 val = 0;
-+
-+	switch (pixel_alpha) {
-+	case DRM_MODE_BLEND_PIXEL_NONE:
-+		break;
-+	case DRM_MODE_BLEND_COVERAGE:
-+		val |= BLENDERQ_A_FUNC_F(BLENDERQ_ALPHA_A);
-+		val |= BLENDERQ_B_FUNC_F(BLENDERQ_ONE_MINUS_ALPHA_A);
-+		decon_set_bits(ctx, DECON_BLENDERQx(win), mask, val);
-+		break;
-+	case DRM_MODE_BLEND_PREMULTI:
-+	default:
-+		if (alpha != DRM_BLEND_ALPHA_OPAQUE) {
-+			val |= BLENDERQ_A_FUNC_F(BLENDERQ_ALPHA0);
-+			val |= BLENDERQ_B_FUNC_F(BLENDERQ_ONE_MINUS_ALPHA_A);
-+		} else {
-+			val |= BLENDERQ_A_FUNC_F(BLENDERQ_ONE);
-+			val |= BLENDERQ_B_FUNC_F(BLENDERQ_ONE_MINUS_ALPHA_A);
-+		}
-+		decon_set_bits(ctx, DECON_BLENDERQx(win), mask, val);
-+		break;
-+	}
-+}
- 
- static void decon_win_set_bldmod(struct decon_context *ctx, unsigned int win,
--				 unsigned int alpha)
-+				 unsigned int alpha, unsigned int pixel_alpha)
- {
- 	u32 win_alpha = alpha >> 8;
- 	u32 val = 0;
- 
-+	switch (pixel_alpha) {
-+	case DRM_MODE_BLEND_PIXEL_NONE:
-+		break;
-+	case DRM_MODE_BLEND_COVERAGE:
-+	case DRM_MODE_BLEND_PREMULTI:
-+	default:
-+		val |= WINCONx_ALPHA_SEL_F;
-+		val |= WINCONx_BLD_PIX_F;
-+		val |= WINCONx_ALPHA_MUL_F;
-+		break;
-+	}
-+	decon_set_bits(ctx, DECON_WINCONx(win), WINCONx_BLEND_MODE_MASK, val);
-+
- 	if (alpha != DRM_BLEND_ALPHA_OPAQUE) {
- 		val = VIDOSD_Wx_ALPHA_R_F(win_alpha) |
- 		      VIDOSD_Wx_ALPHA_G_F(win_alpha) |
-@@ -293,6 +333,11 @@ static void decon_win_set_pixfmt(struct decon_context *ctx, unsigned int win,
- 	unsigned int alpha = state->base.alpha;
- 	unsigned long val;
- 
-+	if (fb->format->has_alpha)
-+		pixel_alpha = state->base.pixel_blend_mode;
-+	else
-+		pixel_alpha = DRM_MODE_BLEND_PIXEL_NONE;
-+
- 	val = readl(ctx->addr + DECON_WINCONx(win));
- 	val &= WINCONx_ENWIN_F;
- 
-@@ -315,9 +360,8 @@ static void decon_win_set_pixfmt(struct decon_context *ctx, unsigned int win,
- 	case DRM_FORMAT_ARGB8888:
- 	default:
- 		val |= WINCONx_BPPMODE_32BPP_A8888;
--		val |= WINCONx_WSWP_F | WINCONx_BLD_PIX_F | WINCONx_ALPHA_SEL_F;
-+		val |= WINCONx_WSWP_F;
- 		val |= WINCONx_BURSTLEN_16WORD;
--		val |= WINCONx_ALPHA_MUL_F;
- 		break;
- 	}
- 
-@@ -335,10 +379,12 @@ static void decon_win_set_pixfmt(struct decon_context *ctx, unsigned int win,
- 		val &= ~WINCONx_BURSTLEN_MASK;
- 		val |= WINCONx_BURSTLEN_8WORD;
- 	}
-+	decon_set_bits(ctx, DECON_WINCONx(win), ~WINCONx_BLEND_MODE_MASK, val);
- 
--	writel(val, ctx->addr + DECON_WINCONx(win));
--	if (win > 0)
-+	if (win > 0) {
- 		decon_win_set_bldmod(ctx, win, alpha);
-+		decon_win_set_bldeq(ctx, win, alpha, pixel_alpha);
-+	}
- }
- 
- static void decon_shadow_protect(struct decon_context *ctx, bool protect)
-diff --git a/drivers/gpu/drm/exynos/regs-decon5433.h b/drivers/gpu/drm/exynos/regs-decon5433.h
-index 72648bda3142..63db6974bf14 100644
---- a/drivers/gpu/drm/exynos/regs-decon5433.h
-+++ b/drivers/gpu/drm/exynos/regs-decon5433.h
-@@ -117,6 +117,7 @@
- #define WINCONx_BPPMODE_16BPP_A4444	(0xe << 2)
- #define WINCONx_ALPHA_SEL_F		(1 << 1)
- #define WINCONx_ENWIN_F			(1 << 0)
-+#define WINCONx_BLEND_MODE_MASK		(0xc2)
- 
- /* SHADOWCON */
- #define SHADOWCON_PROTECT_MASK		GENMASK(14, 10)
-@@ -213,4 +214,18 @@
- /* BLENDCON */
- #define BLEND_NEW			(1 << 0)
- 
-+/* BLENDERQx */
-+#define BLENDERQ_ZERO			0x0
-+#define BLENDERQ_ONE			0x1
-+#define BLENDERQ_ALPHA_A		0x2
-+#define BLENDERQ_ONE_MINUS_ALPHA_A	0x3
-+#define BLENDERQ_ALPHA0			0x6
-+#define BLENDERQ_Q_FUNC_F(n)		(n << 18)
-+#define BLENDERQ_P_FUNC_F(n)		(n << 12)
-+#define BLENDERQ_B_FUNC_F(n)		(n << 6)
-+#define BLENDERQ_A_FUNC_F(n)		(n << 0)
-+
-+/* BLENDCON */
-+#define BLEND_NEW			(1 << 0)
-+
- #endif /* EXYNOS_REGS_DECON5433_H */
+Best regards
 -- 
-2.7.4
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
