@@ -1,397 +1,240 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 18 Oct 2018 21:10:14 +0530
-Subject: [PATCH v2 07/10] irqchip: ti-sci-intr: Add support for Interrupt
- Router driver
+Date: Thu, 18 Oct 2018 21:10:12 +0530
+Subject: [PATCH v2 05/10] firmware: ti_sci: Add helper apis to manage resources
 In-Reply-To: <20181018154017.7112-1-lokeshvutla@ti.com>
 References: <20181018154017.7112-1-lokeshvutla@ti.com>
-Message-ID: <20181018154017.7112-8-lokeshvutla@ti.com>
+Message-ID: <20181018154017.7112-6-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Texas Instruments' K3 generation SoCs has an IP Interrupt Router
-that does allows for multiplexing of input interrupts to host
-interrupt controller. Interrupt Router inputs are either from a
-peripheral or from an Interrupt Aggregator which is another
-interrupt controller.
-
-Configuration of the interrupt router registers can only be done by
-a system co-processor and the driver needs to send a message to this
-co processor over TISCI protocol.
-
-Add support for Interrupt Router driver over TISCI protocol.
+Each resource with in the device can be uniquely identified
+by a type and subtype as defined by TISCI. Since this is generic
+across the devices, resource allocation also can be made generic
+instead of each client driver handling the resource. So add helper
+apis to manage the resource.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
 Changes since v1:
-- made Kconfig symbol as non selectable by user.
-- Dropped using ti_sci_intr_irq_desc structure.
-- Fixup error path in allocate_gic_irq.
-- Updated handling of Interrupt Aggregator as child controller.
+- Updated to use RM mapping table
+- AM6 SoC information is derived from here[1]
+[1] http://downloads.ti.com/tisci/esd/latest/5_soc_doc/am6x/resasg_types.html
 
-Note: Did not add system firmware helper apis as I did not get a response from
-	firmware maintainers. Also I see other firmware drivers(like
-	arm scmi[1]) using the same approach. Will wait for some more time
-	to get feedback from tisci maintainers.
+ drivers/firmware/ti_sci.c              | 128 +++++++++++++++++++++++++
+ include/linux/soc/ti/ti_sci_protocol.h |  48 ++++++++++
+ 2 files changed, 176 insertions(+)
 
-[1] include/linux/scmi_protocol.h
-
- MAINTAINERS                       |   1 +
- drivers/irqchip/Kconfig           |  11 ++
- drivers/irqchip/Makefile          |   1 +
- drivers/irqchip/irq-ti-sci-intr.c | 302 ++++++++++++++++++++++++++++++
- 4 files changed, 315 insertions(+)
- create mode 100644 drivers/irqchip/irq-ti-sci-intr.c
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 710cf728b9d0..4f1bb64a15a1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -14687,6 +14687,7 @@ F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
- F:	drivers/clk/keystone/sci-clk.c
- F:	drivers/reset/reset-ti-sci.c
- F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
-+F:	drivers/irqchip/irq-ti-sci-intr.c
+diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+index c2f0815edab6..581d7a151533 100644
+--- a/drivers/firmware/ti_sci.c
++++ b/drivers/firmware/ti_sci.c
+@@ -2480,6 +2480,134 @@ const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(devm_ti_sci_get_by_phandle);
  
- THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
- M:	Hans Verkuil <hverkuil@xs4all.nl>
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 96451b581452..f6620a6bb872 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -374,6 +374,17 @@ config QCOM_PDC
- 	  Power Domain Controller driver to manage and configure wakeup
- 	  IRQs for Qualcomm Technologies Inc (QTI) mobile chips.
- 
-+config TI_SCI_INTR_IRQCHIP
-+	bool
-+	depends on TI_SCI_PROTOCOL && ARCH_K3
-+	select IRQ_DOMAIN
-+	select IRQ_DOMAIN_HIERARCHY
-+	help
-+	  This enables the irqchip driver support for K3 Interrupt router
-+	  over TI System Control Interface available on some new TI's SoCs.
-+	  If you wish to use interrupt router irq resources managed by the
-+	  TI System Controller, say Y here. Otherwise, say N.
-+
- endmenu
- 
- config SIFIVE_PLIC
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index b822199445ff..44bf65606d60 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -89,3 +89,4 @@ obj-$(CONFIG_GOLDFISH_PIC) 		+= irq-goldfish-pic.o
- obj-$(CONFIG_NDS32)			+= irq-ativic32.o
- obj-$(CONFIG_QCOM_PDC)			+= qcom-pdc.o
- obj-$(CONFIG_SIFIVE_PLIC)		+= irq-sifive-plic.o
-+obj-$(CONFIG_TI_SCI_INTR_IRQCHIP)	+= irq-ti-sci-intr.o
-diff --git a/drivers/irqchip/irq-ti-sci-intr.c b/drivers/irqchip/irq-ti-sci-intr.c
-new file mode 100644
-index 000000000000..a8e141839a42
---- /dev/null
-+++ b/drivers/irqchip/irq-ti-sci-intr.c
-@@ -0,0 +1,302 @@
-+// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Texas Instruments' K3 Interrupt Router irqchip driver
++ * ti_sci_get_free_resource() - Get a free resource from TISCI resource.
++ * @res:	Pointer to the TISCI resource
 + *
-+ * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
-+ *	Lokesh Vutla <lokeshvutla@ti.com>
++ * Return: resource num if all went ok else TI_SCI_RESOURCE_NULL.
 + */
++u16 ti_sci_get_free_resource(struct ti_sci_resource *res)
++{
++	unsigned long flags;
++	u16 set, free_bit;
 +
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/irqchip.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/irqdomain.h>
-+#include <linux/soc/ti/ti_sci_protocol.h>
++	raw_spin_lock_irqsave(&res->lock, flags);
++	for (set = 0; set < res->sets; set++) {
++		free_bit = find_first_zero_bit(res->desc[set].res_map,
++					       res->desc[set].num);
++		if (free_bit != res->desc[set].num) {
++			set_bit(free_bit, res->desc[set].res_map);
++			raw_spin_unlock_irqrestore(&res->lock, flags);
++			return res->desc[set].start + free_bit;
++		}
++	}
++	raw_spin_unlock_irqrestore(&res->lock, flags);
 +
-+#define TI_SCI_DEV_ID_MASK	0xffff
-+#define TI_SCI_DEV_ID_SHIFT	16
-+#define TI_SCI_IRQ_ID_MASK	0xffff
-+#define TI_SCI_IRQ_ID_SHIFT	0
-+#define TI_SCI_IS_EVENT_IRQ	BIT(31)
-+
-+#define HWIRQ_TO_DEVID(hwirq)	(((hwirq) >> (TI_SCI_DEV_ID_SHIFT)) & \
-+				 (TI_SCI_DEV_ID_MASK))
-+#define HWIRQ_TO_IRQID(hwirq)	((hwirq) & (TI_SCI_IRQ_ID_MASK))
++	return TI_SCI_RESOURCE_NULL;
++}
++EXPORT_SYMBOL_GPL(ti_sci_get_free_resource);
 +
 +/**
-+ * struct ti_sci_intr_irq_domain - Structure representing a TISCI based
-+ *				   Interrupt Router IRQ domain.
-+ * @sci:	Pointer to TISCI handle
-+ * @dst_irq:	TISCI resource pointer representing destination irq controller.
-+ * @dst_id:	TISCI device ID of the destination irq controller.
++ * ti_sci_release_resource() - Release a resource from TISCI resource.
++ * @res:	Pointer to the TISCI resource
 + */
-+struct ti_sci_intr_irq_domain {
-+	const struct ti_sci_handle *sci;
-+	struct ti_sci_resource *dst_irq;
-+	u16 dst_id;
-+};
++void ti_sci_release_resource(struct ti_sci_resource *res, u16 id)
++{
++	unsigned long flags;
++	u16 set;
 +
-+static struct irq_chip ti_sci_intr_irq_chip = {
-+	.name			= "INTR",
-+	.irq_eoi		= irq_chip_eoi_parent,
-+	.irq_mask		= irq_chip_mask_parent,
-+	.irq_unmask		= irq_chip_unmask_parent,
-+	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-+	.irq_set_type		= irq_chip_set_type_parent,
-+	.irq_set_affinity	= irq_chip_set_affinity_parent,
-+};
++	raw_spin_lock_irqsave(&res->lock, flags);
++	for (set = 0; set < res->sets; set++) {
++		if (res->desc[set].start <= id &&
++		    (res->desc[set].num + res->desc[set].start) > id)
++			clear_bit(id - res->desc[set].start,
++				  res->desc[set].res_map);
++	}
++	raw_spin_unlock_irqrestore(&res->lock, flags);
++}
++EXPORT_SYMBOL_GPL(ti_sci_release_resource);
 +
 +/**
-+ * ti_sci_intr_irq_domain_translate() - Retrieve hwirq and type from
-+ *					IRQ firmware specific handler.
-+ * @domain:	Pointer to IRQ domain
-+ * @fwspec:	Pointer to IRQ specific firmware structure
-+ * @hwirq:	IRQ number identified by hardware
-+ * @type:	IRQ type
++ * devm_ti_sci_get_of_resource() - Get a TISCI resource assigned to a device
++ * @handle:	TISCI handle
++ * @dev:	Device pointer to which the resource is assigned
++ * @of_prop:	property name by which the resource are represented
 + *
-+ * Return 0 if all went ok else appropriate error.
-+ */
-+static int ti_sci_intr_irq_domain_translate(struct irq_domain *domain,
-+					    struct irq_fwspec *fwspec,
-+					    unsigned long *hwirq,
-+					    unsigned int *type)
-+{
-+	if (is_of_node(fwspec->fwnode)) {
-+		if (fwspec->param_count != 3)
-+			return -EINVAL;
-+
-+		*hwirq = ((fwspec->param[0] & TI_SCI_DEV_ID_MASK) <<
-+			  TI_SCI_DEV_ID_SHIFT) |
-+			 (fwspec->param[1] & TI_SCI_IRQ_ID_MASK);
-+		*type = fwspec->param[2];
-+
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+static inline void ti_sci_intr_delete_desc(struct ti_sci_intr_irq_domain *intr,
-+					   u16 src_id, u16 src_index,
-+					   u16 dst_irq)
-+{
-+	intr->sci->ops.rm_irq_ops.free_direct_irq(intr->sci, src_id, src_index,
-+						  intr->dst_id, dst_irq);
-+}
-+
-+/**
-+ * ti_sci_intr_irq_domain_free() - Free the specified IRQs from the domain.
-+ * @domain:	Domain to which the irqs belong
-+ * @virq:	Linux virtual IRQ to be freed.
-+ * @nr_irqs:	Number of continuous irqs to be freed
-+ */
-+static void ti_sci_intr_irq_domain_free(struct irq_domain *domain,
-+					unsigned int virq, unsigned int nr_irqs)
-+{
-+	struct ti_sci_intr_irq_domain *intr = domain->host_data;
-+	struct irq_data *data, *parent_data;
-+	u32 flags;
-+	int i;
-+
-+	intr = domain->host_data;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		data = irq_domain_get_irq_data(domain, virq + i);
-+		flags = (u32)(u64)irq_data_get_irq_chip_data(data);
-+		parent_data = irq_domain_get_irq_data(domain->parent, virq + i);
-+
-+		if (!(flags & TI_SCI_IS_EVENT_IRQ))
-+			ti_sci_intr_delete_desc(intr,
-+						HWIRQ_TO_DEVID(data->hwirq),
-+						HWIRQ_TO_IRQID(data->hwirq),
-+						parent_data->hwirq);
-+		ti_sci_release_resource(intr->dst_irq, parent_data->hwirq);
-+		irq_domain_free_irqs_parent(domain, virq + i, 1);
-+		irq_domain_reset_irq_data(data);
-+	}
-+}
-+
-+/**
-+ * allocate_gic_irq() - Allocate GIC specific IRQ
-+ * @domain:	Point to the interrupt router IRQ domain
-+ * @dev:	TISCI device IRQ generating the IRQ
-+ * @irq:	IRQ offset within the device
-+ * @flags:	Corresponding flags to the IRQ
++ * Note: This function expects of_prop to be in the form of tuples
++ *	<type, subtype>. Allocates and initializes ti_sci_resource structure
++ *	for each of_prop. Client driver can directly call
++ *	ti_sci_(get_free, release)_resource apis for handling the resource.
 + *
-+ * Returns 0 if all went well else appropriate error pointer.
++ * Return: Pointer to ti_sci_resource if all went well else appropriate
++ *	   error pointer.
 + */
-+static int allocate_gic_irq(struct irq_domain *domain, unsigned int virq,
-+			    u16 dev, u16 irq, u32 flags)
++struct ti_sci_resource *
++devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
++			    struct device *dev, u32 dev_id, char *of_prop)
 +{
-+	struct ti_sci_intr_irq_domain *intr = domain->host_data;
-+	struct irq_fwspec fwspec;
-+	u16 dst_irq;
-+	int err;
++	u32 resource_subtype;
++	u16 resource_type;
++	struct ti_sci_resource *res;
++	int sets, i, ret;
 +
-+	if (!irq_domain_get_of_node(domain->parent))
-+		return -EINVAL;
++	res = devm_kzalloc(dev, sizeof(*res), GFP_KERNEL);
++	if (!res)
++		return ERR_PTR(-ENOMEM);
 +
-+	dst_irq = ti_sci_get_free_resource(intr->dst_irq);
-+
-+	fwspec.fwnode = domain->parent->fwnode;
-+	fwspec.param_count = 3;
-+	fwspec.param[0] = 0;	/* SPI */
-+	fwspec.param[1] = dst_irq - 32; /* SPI offset */
-+	fwspec.param[2] = flags & IRQ_TYPE_SENSE_MASK;
-+
-+	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
-+	if (err)
-+		goto err_irqs;
-+
-+	/* If event is requested then return */
-+	if (flags & TI_SCI_IS_EVENT_IRQ)
-+		return 0;
-+
-+	err = intr->sci->ops.rm_irq_ops.set_direct_irq(intr->sci, dev, irq,
-+						       intr->dst_id, dst_irq);
-+	if (err) {
-+		pr_err("%s: IRQ allocation failed from src = %d, src_index = %d to dst_id = %d, dst_irq = %d",
-+		       __func__, dev, irq, intr->dst_id, dst_irq);
-+		goto err_msg;
++	sets = of_property_count_elems_of_size(dev_of_node(dev), of_prop,
++					       sizeof(u32));
++	if (sets < 0) {
++		dev_err(dev, "%s resource type ids not available\n", of_prop);
++		return ERR_PTR(sets);
 +	}
 +
-+	return 0;
++	res->sets = sets;
 +
-+err_msg:
-+	irq_domain_free_irqs_parent(domain, virq, 1);
-+err_irqs:
-+	ti_sci_release_resource(intr->dst_irq, dst_irq);
-+	return err;
-+}
++	res->desc = devm_kcalloc(dev, res->sets, sizeof(*res->desc),
++				 GFP_KERNEL);
++	if (!res->desc)
++		return ERR_PTR(-ENOMEM);
 +
-+/**
-+ * ti_sci_intr_irq_domain_alloc() - Allocate Interrupt router IRQs
-+ * @domain:	Point to the interrupt router IRQ domain
-+ * @virq:	Corresponding Linux virtual IRQ number
-+ * @nr_irqs:	Continuous irqs to be allocated
-+ * @data:	Pointer to firmware specifier
-+ *
-+ * Return 0 if all went well else appropriate error value.
-+ */
-+static int ti_sci_intr_irq_domain_alloc(struct irq_domain *domain,
-+					unsigned int virq, unsigned int nr_irqs,
-+					void *data)
-+{
-+	struct irq_fwspec *fwspec = data;
-+	u16 src_id, src_index;
-+	unsigned long hwirq;
-+	int i, err;
-+	u32 type;
-+
-+	err = ti_sci_intr_irq_domain_translate(domain, fwspec, &hwirq, &type);
-+	if (err)
-+		return err;
-+
-+	src_id = HWIRQ_TO_DEVID(hwirq);
-+	src_index = HWIRQ_TO_IRQID(hwirq);
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		err = allocate_gic_irq(domain, virq + i, src_id, src_index + i,
-+				       type);
-+		if (err)
-+			goto err_irq;
-+
-+		err = irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-+						    &ti_sci_intr_irq_chip,
-+						    (void *)(u64)type);
-+		if (err)
-+			goto err_irq;
-+	}
-+
-+	return 0;
-+err_irq:
-+	ti_sci_intr_irq_domain_free(domain, virq, i);
-+	return err;
-+}
-+
-+static const struct irq_domain_ops ti_sci_intr_irq_domain_ops = {
-+	.alloc		= ti_sci_intr_irq_domain_alloc,
-+	.free		= ti_sci_intr_irq_domain_free,
-+	.translate	= ti_sci_intr_irq_domain_translate,
-+};
-+
-+static int ti_sci_intr_irq_domain_probe(struct platform_device *pdev)
-+{
-+	struct irq_domain *parent_domain, *domain;
-+	struct ti_sci_intr_irq_domain *intr;
-+	struct device_node *parent_node;
-+	struct device *dev = &pdev->dev;
-+	int ret;
-+
-+	parent_node = of_irq_find_parent(dev_of_node(dev));
-+	if (!parent_node) {
-+		dev_err(dev, "Failed to get IRQ parent node\n");
-+		return -ENODEV;
-+	}
-+
-+	parent_domain = irq_find_host(parent_node);
-+	if (!parent_domain) {
-+		dev_err(dev, "Failed to find IRQ parent domain\n");
-+		return -ENODEV;
-+	}
-+
-+	intr = devm_kzalloc(dev, sizeof(*intr), GFP_KERNEL);
-+	if (!intr)
-+		return -ENOMEM;
-+
-+	intr->sci = devm_ti_sci_get_by_phandle(dev, "ti,sci");
-+	if (IS_ERR(intr->sci)) {
-+		ret = PTR_ERR(intr->sci);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(dev, "ti,sci read fail %d\n", ret);
-+		intr->sci = NULL;
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(dev_of_node(dev), "ti,sci-dst-id",
-+				   (u32 *)&intr->dst_id);
++	ret = ti_sci_get_resource_type(handle_to_ti_sci_info(handle), dev_id,
++				       &resource_type);
 +	if (ret) {
-+		dev_err(dev, "missing 'ti,sci-dst-id' property\n");
-+		return -EINVAL;
++		dev_err(dev, "No valid resource type for %u\n", dev_id);
++		return ERR_PTR(-EINVAL);
 +	}
 +
-+	intr->dst_irq = devm_ti_sci_get_of_resource(intr->sci, dev,
-+						    intr->dst_id,
-+						    "ti,sci-rm-range-girq");
-+	if (IS_ERR(intr->dst_irq)) {
-+		dev_err(dev, "Destination irq resource allocation failed\n");
-+		return PTR_ERR(intr->dst_irq);
-+	}
++	for (i = 0; i < res->sets; i++) {
++		ret = of_property_read_u32_index(dev_of_node(dev), of_prop, i,
++						 &resource_subtype);
++		if (ret)
++			return ERR_PTR(-EINVAL);
 +
-+	domain = irq_domain_add_hierarchy(parent_domain, 0, 0, dev_of_node(dev),
-+					  &ti_sci_intr_irq_domain_ops, intr);
-+	if (!domain) {
-+		dev_err(dev, "Failed to allocate IRQ domain\n");
-+		return -ENOMEM;
-+	}
++		ret = handle->ops.rm_core_ops.get_range(handle, dev_id,
++							resource_subtype,
++							&res->desc[i].start,
++							&res->desc[i].num);
++		if (ret) {
++			dev_err(dev, "type %d subtype %d not allocated for host %d\n",
++				resource_type, resource_subtype,
++				handle_to_ti_sci_info(handle)->host_id);
++			return ERR_PTR(ret);
++		}
 +
-+	return 0;
++		dev_dbg(dev, "res type = %d, subtype = %d, start = %d, num = %d\n",
++			resource_type, resource_subtype, res->desc[i].start,
++			res->desc[i].num);
++
++		res->desc[i].res_map =
++			devm_kzalloc(dev, BITS_TO_LONGS(res->desc[i].num) *
++				     sizeof(*res->desc[i].res_map), GFP_KERNEL);
++		if (!res->desc[i].res_map)
++			return ERR_PTR(-ENOMEM);
++	}
++	raw_spin_lock_init(&res->lock);
++
++	return res;
++}
++EXPORT_SYMBOL_GPL(devm_ti_sci_get_of_resource);
++
+ static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
+ 				void *cmd)
+ {
+diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
+index 6d17580839dc..2a1a41a17295 100644
+--- a/include/linux/soc/ti/ti_sci_protocol.h
++++ b/include/linux/soc/ti/ti_sci_protocol.h
+@@ -317,6 +317,33 @@ struct ti_sci_handle {
+ 	struct ti_sci_ops ops;
+ };
+ 
++#define TI_SCI_RESOURCE_NULL	0xffff
++
++/**
++ * struct ti_sci_resource_desc - Description of TI SCI resource instance range.
++ * @start:	Start index of the resource.
++ * @num:	Number of resources.
++ * @res_map:	Bitmap to manage the allocation of these resources.
++ */
++struct ti_sci_resource_desc {
++	u16 start;
++	u16 num;
++	unsigned long *res_map;
++};
++
++/**
++ * struct ti_sci_resource - Structure representing a resource assigned
++ *			    to a device.
++ * @sets:	Number of sets available from this resource type
++ * @lock:	Lock to guard the res map in each set.
++ * @desc:	Array of resource descriptors.
++ */
++struct ti_sci_resource {
++	u16 sets;
++	raw_spinlock_t lock;
++	struct ti_sci_resource_desc *desc;
++};
++
+ #if IS_ENABLED(CONFIG_TI_SCI_PROTOCOL)
+ const struct ti_sci_handle *ti_sci_get_handle(struct device *dev);
+ int ti_sci_put_handle(const struct ti_sci_handle *handle);
+@@ -325,6 +352,11 @@ const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
+ 						  const char *property);
+ const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
+ 						       const char *property);
++u16 ti_sci_get_free_resource(struct ti_sci_resource *res);
++void ti_sci_release_resource(struct ti_sci_resource *res, u16 id);
++struct ti_sci_resource *
++devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
++			    struct device *dev, u32 dev_id, char *of_prop);
+ 
+ #else	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+@@ -357,6 +389,22 @@ const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
+ {
+ 	return ERR_PTR(-EINVAL);
+ }
++
++static inline u16 ti_sci_get_free_resource(struct ti_sci_resource *res)
++{
++	return TI_SCI_RESOURCE_NULL;
 +}
 +
-+static const struct of_device_id ti_sci_intr_irq_domain_of_match[] = {
-+	{ .compatible = "ti,sci-intr", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, ti_sci_intr_irq_domain_of_match);
++static inline void ti_sci_release_resource(struct ti_sci_resource *res, u16 id)
++{
++}
 +
-+static struct platform_driver ti_sci_intr_irq_domain_driver = {
-+	.probe = ti_sci_intr_irq_domain_probe,
-+	.driver = {
-+		.name = "ti-sci-intr",
-+		.of_match_table = ti_sci_intr_irq_domain_of_match,
-+	},
-+};
-+module_platform_driver(ti_sci_intr_irq_domain_driver);
-+
-+MODULE_AUTHOR("Lokesh Vutla <lokeshvutla@ticom>");
-+MODULE_DESCRIPTION("K3 Interrupt Router driver over TI SCI protocol");
-+MODULE_LICENSE("GPL v2");
++static inline struct ti_sci_resource *
++devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
++			    struct device *dev, u32 dev_id, char *of_prop)
++{
++	return ERR_PTR(-EINVAL);
++}
+ #endif	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+ #endif	/* __TISCI_PROTOCOL_H */
 -- 
 2.19.1
