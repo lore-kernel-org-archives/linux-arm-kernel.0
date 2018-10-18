@@ -1,111 +1,77 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 18 Oct 2018 09:26:24 +0800
-Subject: [PATCH v8 0/9] PCI: mediatek: fixup find_port, enable_msi and
- add PM, module support
-In-Reply-To: <20181017151954.GA9374@e107981-ln.cambridge.arm.com>
-References: <1539590940-13355-1-git-send-email-honghui.zhang@mediatek.com>
- <20181017151954.GA9374@e107981-ln.cambridge.arm.com>
-Message-ID: <1539825984.11281.9.camel@mhfsdcap03>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 18 Oct 2018 09:31:33 +0800
+Subject: [PATCH 2/2] dmaengine: mediatek: Add MediaTek Command-Queue DMA
+ controller for MT6765 SoC
+In-Reply-To: <1539769019-32107-3-git-send-email-shun-chih.yu@mediatek.com>
+References: <1539769019-32107-3-git-send-email-shun-chih.yu@mediatek.com>
+Message-ID: <201810180946.E3RuWb5X%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-10-17 at 16:19 +0100, Lorenzo Pieralisi wrote:
-> On Mon, Oct 15, 2018 at 04:08:51PM +0800, honghui.zhang at mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > This patchset includes misc patchs:
-> > 
-> > The patch 1 fixup the mtk_pcie_find_port logic which will cause system
-> > could not touch the EP's configuration space that connected to PCIe slot 1.
-> > 
-> > The patch 2 fixup the class type for MT7622.
-> > The patch 6 fixup the enable msi logic, the operation to enable MSI
-> > should be after system clock is enabled. Call mtk_pcie_enable_msi in
-> > mtk_pcie_startup_port_v2 since the clock was all enabled at that time.
-> > 
-> > The patch 7 was rebased and refactor of the v4 patch[1], changes are:
-> >  -Add PM support for MT7622.
-> >  -Using mtk_pcie_enable_port to re-establish the link when resumed.
-> >  -Rebased on this patchset.
-> > 
-> > The patch 9 add loadable kernel module support.
-> > 
-> > [1] https://patchwork.kernel.org/patch/10479079
-> 
-> I have pushed out (after basically rewriting all commit logs and
-> squashing two patches) this version of the patchset to my pci/mediatek
-> branch for v4.20, keeping in mind that you must follow-up with Bjorn on
-> this patch:
+Hi Shun-Chih,
 
-Thanks for your great help with this serial.
+Thank you for the patch! Perhaps something to improve:
 
-> 
-> https://patchwork.ozlabs.org/patch/984668/
-> 
-> that we shall still consider for v4.21.
-> 
-> Lorenzo
-> 
-> > Change since v7:
-> >  - Add Acked-by tags from Ryder Lee.
-> >  - Add Fix tags for patch 2(Fix calss type for MT7622 as PCI_CLASS_BRIDGE_PCI)
-> >    and patch 6(Fixup enable MSI logic by enable MSI after clock enabled)
-> > 
-> > Change since v6:
-> >  - Remove the pci_unmap_iospace when remove the device since the
-> >    devm_pci_remap_iospace is an devm_ version.
-> >  - Commit message changed for patch 2(Fix class type for MT7622 as PCI_CLASS_BRIDGE_PCI).
-> >  - Capitilizing "MSI" and "PM" in the patch title.
-> > 
-> > Change since v5:
-> >  - A bit improvement of mtk_pcie_find_port suggest by Lorenzo.
-> >    MSI after clock enabled).
-> >  - Add Acked-by tags from Ryder.
-> > 
-> > Change since v4:
-> >  - Add patch 2 to fixup class type for MT7622.
-> >  - Add patch 3 to remove the redundant dev->pm_domain check
-> >  - Add patch 4 to covert to use pci_host_probe
-> >  - Add patch 5 to re-arrange the function define, this is a prepare patch for
-> >    fixup the enable_msi logic, no functional changed have been made by this one.
-> >  - Add patch 8 to save the GIC IRQ in mtk_pcie_port as a prepare patch for tear
-> >    down the irq when remove the kernel module.
-> >  - Re-arrange the find_port flow suggest by Lorenzo to make the code parse easier
-> >    for the patch 1.
-> >  - Remove the .pm_support in mtk_pcie_soc in patch 7 since if system pm was not
-> >    supported, then those pm callbacks will never be executed for MT7622. So the
-> >    .pm_support is not needed.
-> > 
-> > Change since v3:
-> >  - Remove pm_runtime_XXX ops in suspend and resume callbacks in the third patch.
-> >  - Rebase to 4.19-rc1.
-> > 
-> > Change since v2:
-> >  - Fix the list_for_each_entry_safe parameter error.
-> >  - Add Ryder's Acked-by flag.
-> > 
-> > Change since v1:
-> >  - A bit of code refact of the first patch suggested by Andy Shevchenko, and
-> >    commit message updated.
-> > 
-> > Honghui Zhang (9):
-> >   PCI: mediatek: Using slot's devfn for compare to fix
-> >     mtk_pcie_find_port logic
-> >   PCI: mediatek: Fix class type for MT7622 as PCI_CLASS_BRIDGE_PCI
-> >   PCI: mediatek: Remove the redundant dev->pm_domain check
-> >   PCI: mediatek: Convert to use pci_host_probe()
-> >   PCI: mediatek: Move the mtk_pcie_startup_port_v2 function's define
-> >     after mtk_pcie_setup_irq
-> >   PCI: mediatek: Fixup enable MSI logic by enable MSI after clock
-> >     enabled
-> >   PCI: mediatek: Add system PM support for MT2712 and MT7622
-> >   PCI: mediatek: Save the GIC IRQ in mtk_pcie_port
-> >   PCI: mediatek: Add loadable kernel module support
-> > 
-> >  drivers/pci/controller/Kconfig         |   2 +-
-> >  drivers/pci/controller/pcie-mediatek.c | 319 +++++++++++++++++++++------------
-> >  2 files changed, 204 insertions(+), 117 deletions(-)
-> > 
-> > -- 
-> > 2.6.4
-> > 
+[auto build test WARNING on linux-sof-driver/master]
+[also build test WARNING on v4.19-rc8 next-20181017]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/shun-chih-yu-mediatek-com/dt-bindings-dmaengine-Add-MediaTek-Command-Queue-DMA-controller-bindings/20181018-071645
+base:   https://github.com/thesofproject/linux master
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All warnings (new ones prefixed by >>):
+
+   drivers/dma/mediatek/mtk-cqdma.c: In function 'mtk_cqdma_start':
+>> drivers/dma/mediatek/mtk-cqdma.c:245:43: warning: right shift count >= width of type [-Wshift-count-overflow]
+     mtk_dma_set(pc, MTK_CQDMA_SRC2, cvd->src >> MTK_CQDMA_ADDR2_SHFIT);
+                                              ^~
+   drivers/dma/mediatek/mtk-cqdma.c:249:44: warning: right shift count >= width of type [-Wshift-count-overflow]
+     mtk_dma_set(pc, MTK_CQDMA_DST2, cvd->dest >> MTK_CQDMA_ADDR2_SHFIT);
+                                               ^~
+
+vim +245 drivers/dma/mediatek/mtk-cqdma.c
+
+   230	
+   231	static void mtk_cqdma_start(struct mtk_cqdma_pchan *pc,
+   232				    struct mtk_cqdma_vdesc *cvd)
+   233	{
+   234		/* wait for the previous transaction done */
+   235		if (mtk_cqdma_poll_engine_done(pc, true) < 0)
+   236			dev_err(cqdma2dev(to_cqdma_dev(cvd->ch)), "cqdma wait transaction timeout\n");
+   237	
+   238		/* warm reset the dma engine for the new transaction */
+   239		mtk_dma_set(pc, MTK_CQDMA_RESET, MTK_CQDMA_WARM_RST_BIT);
+   240		if (mtk_cqdma_poll_engine_done(pc, true) < 0)
+   241			dev_err(cqdma2dev(to_cqdma_dev(cvd->ch)), "cqdma warm reset timeout\n");
+   242	
+   243		/* setup the source */
+   244		mtk_dma_set(pc, MTK_CQDMA_SRC, cvd->src & MTK_CQDMA_ADDR_LIMIT);
+ > 245		mtk_dma_set(pc, MTK_CQDMA_SRC2, cvd->src >> MTK_CQDMA_ADDR2_SHFIT);
+   246	
+   247		/* setup the destination */
+   248		mtk_dma_set(pc, MTK_CQDMA_DST, cvd->dest & MTK_CQDMA_ADDR_LIMIT);
+   249		mtk_dma_set(pc, MTK_CQDMA_DST2, cvd->dest >> MTK_CQDMA_ADDR2_SHFIT);
+   250	
+   251		/* setup the length */
+   252		mtk_dma_set(pc, MTK_CQDMA_LEN1, cvd->len);
+   253	
+   254		/* start dma engine */
+   255		mtk_dma_set(pc, MTK_CQDMA_EN, MTK_CQDMA_EN_BIT);
+   256	}
+   257	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62847 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/018f63cc/attachment-0001.gz>
