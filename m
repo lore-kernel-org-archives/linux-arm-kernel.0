@@ -1,15 +1,16 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 18 Oct 2018 16:53:56 +0000
-Subject: [PATCH V5 4/9] clk: imx: scu: add scu clock gpr divider
+Date: Thu, 18 Oct 2018 16:53:52 +0000
+Subject: [PATCH V5 3/9] clk: imx: scu: add scu clock divider
 In-Reply-To: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
 References: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1539881347-20871-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1539881347-20871-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add scu based clock gpr divider. Unlike the normal scu divider, such
-dividers are controlled by GPR bits through SCU sc_misc_set_control
-API.
+Add scu based clock divider. Note on MX8, the clocks are tightly
+coupled with power domain that once the power domain is off, the clock
+status will be lost. SO we make it NOCACHE to help user to retrieve the real
+clock status from HW instead of using the possible invalid cached rate.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -20,48 +21,52 @@ Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 ChangeLog:
 v4->v5:
- * a few minor improvements suggested by Stephen
+ * remove unneeded jiffies.h headfile
+ * use union for scu protocol structure to avoid cast
+ * remove unnecessary cast
+ * add more explanation about the NOCACHE flag in commit message
  * move scu clk files into imx top directory
 v3->v4:
  * scu headfile path update
 v2->v3:
- * structures name and api use update
+ * structures/enums name update with imx_sc prefix
 v1->v2:
- * no changes except update headfile name
+ * move SCU clock API implementation into driver
 ---
- drivers/clk/imx/Makefile              |   3 +-
- drivers/clk/imx/clk-divider-gpr-scu.c | 130 ++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk-scu.h             |   3 +
- 3 files changed, 135 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/clk-divider-gpr-scu.c
+ drivers/clk/imx/Makefile          |   3 +-
+ drivers/clk/imx/clk-divider-scu.c | 171 ++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk-scu.h         |  18 ++++
+ 3 files changed, 191 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/clk-divider-scu.c
 
 diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index b01f433..5ffcb71 100644
+index eec6d72..b01f433 100644
 --- a/drivers/clk/imx/Makefile
 +++ b/drivers/clk/imx/Makefile
-@@ -15,7 +15,8 @@ obj-$(CONFIG_MXC_CLK) += \
+@@ -14,7 +14,8 @@ obj-$(CONFIG_MXC_CLK) += \
+ 	clk-pfd.o
  
  obj-$(CONFIG_MXC_CLK_SCU) += \
- 	clk-scu.o \
--	clk-divider-scu.o
-+	clk-divider-scu.o \
-+	clk-divider-gpr-scu.o
+-	clk-scu.o
++	clk-scu.o \
++	clk-divider-scu.o
  
  obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
  obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
-diff --git a/drivers/clk/imx/clk-divider-gpr-scu.c b/drivers/clk/imx/clk-divider-gpr-scu.c
+diff --git a/drivers/clk/imx/clk-divider-scu.c b/drivers/clk/imx/clk-divider-scu.c
 new file mode 100644
-index 0000000..2fc5c25
+index 0000000..95d5bd6
 --- /dev/null
-+++ b/drivers/clk/imx/clk-divider-gpr-scu.c
-@@ -0,0 +1,130 @@
++++ b/drivers/clk/imx/clk-divider-scu.c
+@@ -0,0 +1,171 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017~2018 NXP
 + *	Dong Aisheng <aisheng.dong@nxp.com>
++ *
 + */
-+
++#include <linux/clk.h>
 +#include <linux/clk-provider.h>
 +#include <linux/err.h>
 +#include <linux/io.h>
@@ -69,59 +74,92 @@ index 0000000..2fc5c25
 +
 +#include "clk-scu.h"
 +
-+struct clk_divider_gpr_scu {
++struct clk_divider_scu {
 +	struct clk_hw hw;
 +	u32 rsrc_id;
-+	u8 gpr_id;
++	u8 clk_type;
 +};
 +
-+static inline struct clk_divider_gpr_scu *to_clk_divider_gpr_scu(struct clk_hw *hw)
++/* SCU Clock Protocol definitions */
++struct imx_sc_msg_req_set_clock_rate {
++	struct imx_sc_rpc_msg hdr;
++	u32 rate;
++	u16 resource;
++	u8 clk;
++} __packed;
++
++struct req_get_clock_rate {
++	u16 resource;
++	u8 clk;
++} __packed;
++
++struct resp_get_clock_rate {
++	u32 rate;
++} __packed;
++
++struct imx_sc_msg_get_clock_rate {
++	struct imx_sc_rpc_msg hdr;
++	union {
++		struct req_get_clock_rate req;
++		struct resp_get_clock_rate resp;
++	} data;
++} __packed;
++
++static inline struct clk_divider_scu *to_clk_divider_scu(struct clk_hw *hw)
 +{
-+	return container_of(hw, struct clk_divider_gpr_scu, hw);
++	return container_of(hw, struct clk_divider_scu, hw);
 +}
 +
 +/*
 + * clk_divider_scu_recalc_rate - Get clock rate for a SCU clock
 + * @hw: clock to get rate for
-+ * @parent_rate: parent rate provided by common clock framework
++ * @parent_rate: parent rate provided by common clock framework, not used
 + *
 + * Gets the current clock rate of a SCU clock. Returns the current
 + * clock rate, or zero in failure.
 + */
-+static unsigned long clk_divider_gpr_scu_recalc_rate(struct clk_hw *hw,
-+						     unsigned long parent_rate)
++static unsigned long clk_divider_scu_recalc_rate(struct clk_hw *hw,
++						 unsigned long parent_rate)
 +{
-+	struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-+	u32 val;
++	struct clk_divider_scu *div = to_clk_divider_scu(hw);
++	struct imx_sc_msg_get_clock_rate msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
 +	int ret;
 +
-+	ret = imx_sc_misc_get_control(ccm_ipc_handle, clk->rsrc_id,
-+				      clk->gpr_id, &val);
++	hdr->ver = IMX_SC_RPC_VERSION;
++	hdr->svc = IMX_SC_RPC_SVC_PM;
++	hdr->func = IMX_SC_PM_FUNC_GET_CLOCK_RATE;
++	hdr->size = 2;
++
++	msg.data.req.resource = div->rsrc_id;
++	msg.data.req.clk = div->clk_type;
++
++	ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
 +	if (ret) {
 +		pr_err("%s: failed to get clock rate %d\n",
 +			clk_hw_get_name(hw), ret);
 +		return 0;
 +	}
 +
-+	return val ? parent_rate / 2 : parent_rate;
++	return msg.data.resp.rate;
 +}
 +
 +/*
 + * clk_divider_scu_round_rate - Round clock rate for a SCU clock
 + * @hw: clock to round rate for
 + * @rate: rate to round
-+ * @parent_rate: parent rate provided by common clock framework
++ * @parent_rate: parent rate provided by common clock framework, not used
 + *
-+ * Round clock rate for a SCU clock according to parent rate
++ * Gets the current clock rate of a SCU clock. Returns the current
++ * clock rate, or zero in failure.
 + */
-+static long clk_divider_gpr_scu_round_rate(struct clk_hw *hw, unsigned long rate,
-+					   unsigned long *prate)
++static long clk_divider_scu_round_rate(struct clk_hw *hw, unsigned long rate,
++				       unsigned long *parent_rate)
 +{
-+	if (rate < *prate)
-+		rate = *prate / 2;
-+	else
-+		rate = *prate;
-+
++	/*
++	 * Assume we support all the requested rate and let the SCU firmware
++	 * to handle the left work
++	 */
 +	return rate;
 +}
 +
@@ -129,34 +167,42 @@ index 0000000..2fc5c25
 + * clk_divider_scu_set_rate - Set rate for a SCU clock
 + * @hw: clock to change rate for
 + * @rate: target rate for the clock
-+ * @parent_rate: rate of the clock parent
++ * @parent_rate: rate of the clock parent, not used for SCU clocks
 + *
 + * Sets a clock frequency for a SCU clock. Returns the SCU
 + * protocol status.
 + */
-+static int clk_divider_gpr_scu_set_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long parent_rate)
++static int clk_divider_scu_set_rate(struct clk_hw *hw, unsigned long rate,
++				    unsigned long parent_rate)
 +{
-+	struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-+	u32 val = 0;
++	struct clk_divider_scu *div = to_clk_divider_scu(hw);
++	struct imx_sc_msg_req_set_clock_rate msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
 +
-+	if (rate < parent_rate)
-+		val = 1;
++	hdr->ver = IMX_SC_RPC_VERSION;
++	hdr->svc = IMX_SC_RPC_SVC_PM;
++	hdr->func = IMX_SC_PM_FUNC_SET_CLOCK_RATE;
++	hdr->size = 3;
 +
-+	return imx_sc_misc_set_control(ccm_ipc_handle, clk->rsrc_id,
-+				       clk->gpr_id, val);
++	msg.rate = rate;
++	msg.resource = div->rsrc_id;
++	msg.clk = div->clk_type;
++
++	return imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
 +}
 +
-+static const struct clk_ops clk_divider_gpr_scu_ops = {
-+	.recalc_rate = clk_divider_gpr_scu_recalc_rate,
-+	.round_rate = clk_divider_gpr_scu_round_rate,
-+	.set_rate = clk_divider_gpr_scu_set_rate,
++static const struct clk_ops clk_divider_scu_ops = {
++	.recalc_rate = clk_divider_scu_recalc_rate,
++	.round_rate = clk_divider_scu_round_rate,
++	.set_rate = clk_divider_scu_set_rate,
 +};
 +
-+struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char *parent_name,
-+				       u32 rsrc_id, u8 gpr_id)
++struct clk_hw *imx_clk_register_divider_scu(const char *name,
++					    const char *parent_name,
++					    u32 rsrc_id,
++					    u8 clk_type)
 +{
-+	struct clk_divider_gpr_scu *div;
++	struct clk_divider_scu *div;
 +	struct clk_init_data init;
 +	struct clk_hw *hw;
 +	int ret;
@@ -166,14 +212,13 @@ index 0000000..2fc5c25
 +		return ERR_PTR(-ENOMEM);
 +
 +	div->rsrc_id = rsrc_id;
-+	div->gpr_id = gpr_id;
++	div->clk_type = clk_type;
 +
 +	init.name = name;
-+	init.ops = &clk_divider_gpr_scu_ops;
++	init.ops = &clk_divider_scu_ops;
 +	init.flags = CLK_GET_RATE_NOCACHE;
 +	init.parent_names = parent_name ? &parent_name : NULL;
 +	init.num_parents = parent_name ? 1 : 0;
-+
 +	div->hw.init = &init;
 +
 +	hw = &div->hw;
@@ -186,15 +231,37 @@ index 0000000..2fc5c25
 +	return hw;
 +}
 diff --git a/drivers/clk/imx/clk-scu.h b/drivers/clk/imx/clk-scu.h
-index e99af63..f0796f3 100644
+index b964f35..e99af63 100644
 --- a/drivers/clk/imx/clk-scu.h
 +++ b/drivers/clk/imx/clk-scu.h
-@@ -33,4 +33,7 @@ static inline struct clk_hw *imx_clk_divider2_scu(const char *name,
- 	return imx_clk_register_divider_scu(name, parent_name, rsrc_id, clk_type);
- }
+@@ -7,6 +7,7 @@
+ #ifndef __IMX_CLK_SCU_H
+ #define __IMX_CLK_SCU_H
  
-+struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char *parent_name,
-+				u32 rsrc_id, u8 gpr_id);
++#include <linux/clk-provider.h>
+ #include <linux/firmware/imx/sci.h>
+ #include <linux/spinlock.h>
+ 
+@@ -15,4 +16,21 @@ extern struct imx_sc_ipc *ccm_ipc_handle;
+ 
+ int imx_clk_scu_init(void);
+ 
++struct clk_hw *imx_clk_register_divider_scu(const char *name,
++				const char *parent_name, u32 rsrc_id,
++				u8 clk_type);
++
++static inline struct clk_hw *imx_clk_divider_scu(const char *name,
++				u32 rsrc_id, u8 clk_type)
++{
++	return imx_clk_register_divider_scu(name, NULL, rsrc_id, clk_type);
++}
++
++static inline struct clk_hw *imx_clk_divider2_scu(const char *name,
++				const char *parent_name,
++				u32 rsrc_id, u8 clk_type)
++{
++	return imx_clk_register_divider_scu(name, parent_name, rsrc_id, clk_type);
++}
 +
  #endif
 -- 
