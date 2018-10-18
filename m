@@ -1,77 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 18 Oct 2018 09:31:33 +0800
-Subject: [PATCH 2/2] dmaengine: mediatek: Add MediaTek Command-Queue DMA
- controller for MT6765 SoC
-In-Reply-To: <1539769019-32107-3-git-send-email-shun-chih.yu@mediatek.com>
-References: <1539769019-32107-3-git-send-email-shun-chih.yu@mediatek.com>
-Message-ID: <201810180946.E3RuWb5X%fengguang.wu@intel.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 17 Oct 2018 18:45:36 -0700
+Subject: [PATCH 1/3] driver core: add probe_err log helper
+In-Reply-To: <20181017112914.GH30658@n2100.armlinux.org.uk>
+References: <CGME20181016072249eucas1p2303b8c06a9f7c839a971fe065b0c752e@eucas1p2.samsung.com>
+ <20181016072244.1216-1-a.hajda@samsung.com>
+ <20181016072244.1216-2-a.hajda@samsung.com>
+ <CAHp75VfVxEkTzc=1hBrvc4K7r=L28vXipb=j9jSRJbTJE4GtLQ@mail.gmail.com>
+ <605bd00e-ed0d-4259-bdc3-1784b2b3b16a@samsung.com>
+ <20181016125543eucas1p1f23b3482179a9cd465f509e0abf782c1~eGAecmAv93038330383eucas1p1j@eucas1p1.samsung.com>
+ <CAHp75VecquoNrzOuRvWcZ-Qa1b-5P0V0MWq=sNj-SnVcd2EhRw@mail.gmail.com>
+ <20181017112914.GH30658@n2100.armlinux.org.uk>
+Message-ID: <c2c8f5186beff6bdc04cfe79292cedad20f36475.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shun-Chih,
+On Wed, 2018-10-17 at 12:29 +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 16, 2018 at 04:55:00PM +0300, Andy Shevchenko wrote:
+> > On Tue, Oct 16, 2018 at 3:55 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
+> > > On 16.10.2018 13:29, Andrzej Hajda wrote:
+> > > > On 16.10.2018 13:01, Andy Shevchenko wrote:
+> > > > > On Tue, Oct 16, 2018 at 10:22 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
+> > > > > > During probe every time driver gets resource it should usually check for error
+> > > > > > printk some message if it is not -EPROBE_DEFER and return the error. This
+> > > > > > pattern is simple but requires adding few lines after any resource acquisition
+> > > > > > code, as a result it is often omited or implemented only partially.
+> > > > > > probe_err helps to replace such code seqences with simple call, so code:
+> > > > > >         if (err != -EPROBE_DEFER)
+> > > > > >                 dev_err(dev, ...);
+> > > > > >         return err;
+> > > > > > becomes:
+> > > > > >         return probe_err(dev, err, ...);
+> > > > > > +               va_start(args, fmt);
+> > > > > > +
+> > > > > > +               vaf.fmt = fmt;
+> > > > > > +               vaf.va = &args;
+> > > > > > +
+> > > > > > +               __dev_printk(KERN_ERR, dev, &vaf);
+> > > > > It would be nice to print an error code as well, wouldn't it?
+> > > > Hmm, on probe fail error is printed anyway (with exception of
+> > > > EPROBE_DEFER, ENODEV and ENXIO):
+> > > >     "probe of %s failed with error %d\n"
+> > > > On the other side currently some drivers prints the error code anyway
+> > > > via dev_err or similar, so I guess during conversion to probe_err it
+> > > > should be removed then.
+> > > > 
+> > > > If we add error code to probe_err is it OK to report it this way?
+> > > >     dev_err(dev, "%V, %d\n", &vaf, err);
+> > > 
+> > > Ups, I forgot that message passed to probe_err will contain already
+> > > newline character.
+> > 
+> > You may consider not to pass it.
+> 
+> It's normal to pass the '\n', so by doing this, we create the situation
+> where this function becomes the exception to the norm.  That's not a
+> good idea - we will see people forget that appending '\n' should not
+> be done for this particular function.
+> 
+> While we could add a checkpatch rule, that's hassle (extra rework).
 
-Thank you for the patch! Perhaps something to improve:
+It would not be a simple checkpatch rule with high confidence
+because of pr_cont uses that may not be in the patch context.
 
-[auto build test WARNING on linux-sof-driver/master]
-[also build test WARNING on v4.19-rc8 next-20181017]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> In I think the message would be much better formatted if we did:
+> 
+> 	dev_err(dev, "error %d: %V", err, &vaf);
 
-url:    https://github.com/0day-ci/linux/commits/shun-chih-yu-mediatek-com/dt-bindings-dmaengine-Add-MediaTek-Command-Queue-DMA-controller-bindings/20181018-071645
-base:   https://github.com/thesofproject/linux master
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All warnings (new ones prefixed by >>):
-
-   drivers/dma/mediatek/mtk-cqdma.c: In function 'mtk_cqdma_start':
->> drivers/dma/mediatek/mtk-cqdma.c:245:43: warning: right shift count >= width of type [-Wshift-count-overflow]
-     mtk_dma_set(pc, MTK_CQDMA_SRC2, cvd->src >> MTK_CQDMA_ADDR2_SHFIT);
-                                              ^~
-   drivers/dma/mediatek/mtk-cqdma.c:249:44: warning: right shift count >= width of type [-Wshift-count-overflow]
-     mtk_dma_set(pc, MTK_CQDMA_DST2, cvd->dest >> MTK_CQDMA_ADDR2_SHFIT);
-                                               ^~
-
-vim +245 drivers/dma/mediatek/mtk-cqdma.c
-
-   230	
-   231	static void mtk_cqdma_start(struct mtk_cqdma_pchan *pc,
-   232				    struct mtk_cqdma_vdesc *cvd)
-   233	{
-   234		/* wait for the previous transaction done */
-   235		if (mtk_cqdma_poll_engine_done(pc, true) < 0)
-   236			dev_err(cqdma2dev(to_cqdma_dev(cvd->ch)), "cqdma wait transaction timeout\n");
-   237	
-   238		/* warm reset the dma engine for the new transaction */
-   239		mtk_dma_set(pc, MTK_CQDMA_RESET, MTK_CQDMA_WARM_RST_BIT);
-   240		if (mtk_cqdma_poll_engine_done(pc, true) < 0)
-   241			dev_err(cqdma2dev(to_cqdma_dev(cvd->ch)), "cqdma warm reset timeout\n");
-   242	
-   243		/* setup the source */
-   244		mtk_dma_set(pc, MTK_CQDMA_SRC, cvd->src & MTK_CQDMA_ADDR_LIMIT);
- > 245		mtk_dma_set(pc, MTK_CQDMA_SRC2, cvd->src >> MTK_CQDMA_ADDR2_SHFIT);
-   246	
-   247		/* setup the destination */
-   248		mtk_dma_set(pc, MTK_CQDMA_DST, cvd->dest & MTK_CQDMA_ADDR_LIMIT);
-   249		mtk_dma_set(pc, MTK_CQDMA_DST2, cvd->dest >> MTK_CQDMA_ADDR2_SHFIT);
-   250	
-   251		/* setup the length */
-   252		mtk_dma_set(pc, MTK_CQDMA_LEN1, cvd->len);
-   253	
-   254		/* start dma engine */
-   255		mtk_dma_set(pc, MTK_CQDMA_EN, MTK_CQDMA_EN_BIT);
-   256	}
-   257	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62847 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181018/018f63cc/attachment-0001.gz>
+s/%V/%pV/
