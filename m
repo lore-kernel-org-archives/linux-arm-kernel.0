@@ -1,214 +1,97 @@
-From: john.garry@huawei.com (John Garry)
-Date: Thu, 18 Oct 2018 11:55:47 +0100
-Subject: [PATCH v5 1/2] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
- lock
-In-Reply-To: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
-References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
-Message-ID: <2c4e00a2-cd53-a6f5-8561-97379dcf9c02@huawei.com>
+From: mikebrady@eircom.net (Mike Brady)
+Date: Thu, 18 Oct 2018 11:57:15 +0100
+Subject: [PATCH] staging: bcm2835-audio: interpolate audio delay
+Message-ID: <20181018105715.GA6660@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/2018 14:56, Robin Murphy wrote:
-> Even without the MSI trick, we can still do a lot better than hogging
-> the entire queue while it drains. All we actually need to do for the
-> necessary guarantee of completion is wait for our particular command to
-> have been consumed - as long as we keep track of where we inserted it,
-> there is no need to block other CPUs from adding further commands in the
-> meantime. There is one theoretical (but incredibly unlikely) edge case
-> to avoid, where cons has wrapped twice to still appear 'behind' the sync
-> position - this is easily disambiguated by adding a generation count to
-> the queue to indicate when prod wraps, since cons cannot wrap twice
-> without prod having wrapped at least once.
->
-> This also makes it reasonable to separate the two conceptually different
-> modes of polling such that command insertion - which really wants to be
-> fair and have minimal latency - is not subject to exponential backoff,
-> and returns to its original implementation.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->
-> v5:
->  - Rework to incorporate the back-to-back sync elision.
->  - Refactor the generation count slightly to preemptively help with
->    the HiSilicon MSI workaround.
->  - Split the cleanup into a separate patch for ease of review (it could
->    happily be squashed when applied).
->
-> The fundamental logic is copied directly from v4, but I've dropped the
-> previous tested-by since there are a fair few subtle changes in how it's
-> integrated. Patches are based on Will's iommu/devel branch plus my "Fix
-> big-endian CMD_SYNC writes" patch.
->
-> Robin.
->
->  drivers/iommu/arm-smmu-v3.c | 94 +++++++++++++++++++++++++++----------
->  1 file changed, 69 insertions(+), 25 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 867ba548c2cc..da8a91d116bf 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -588,6 +588,7 @@ struct arm_smmu_device {
->  	struct arm_smmu_strtab_cfg	strtab_cfg;
->
->  	u32				sync_count;
-> +	int				cmdq_generation;
->
->  	/* IOMMU core code handle */
->  	struct iommu_device		iommu;
-> @@ -676,6 +677,17 @@ static bool queue_empty(struct arm_smmu_queue *q)
->  	       Q_WRP(q, q->prod) == Q_WRP(q, q->cons);
->  }
->
-> +static bool queue_behind(struct arm_smmu_queue *q, u32 idx)
-> +{
-> +	return Q_IDX(q, q->cons) < Q_IDX(q, idx);
-> +}
-> +
-> +static bool queue_ahead_not_wrapped(struct arm_smmu_queue *q, u32 idx)
-> +{
-> +	return Q_IDX(q, q->cons) >= Q_IDX(q, idx) &&
-> +	       Q_WRP(q, q->cons) == Q_WRP(q, idx);
-> +}
-> +
->  static void queue_sync_cons(struct arm_smmu_queue *q)
->  {
->  	q->cons = readl_relaxed(q->cons_reg);
-> @@ -709,33 +721,19 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->  	writel(q->prod, q->prod_reg);
->  }
->
-> -/*
-> - * Wait for the SMMU to consume items. If sync is true, wait until the queue
-> - * is empty. Otherwise, wait until there is at least one free slot.
-> - */
-> -static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
-> +static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
->  {
-> -	ktime_t timeout;
-> -	unsigned int delay = 1, spin_cnt = 0;
-> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
->
-> -	/* Wait longer if it's a CMD_SYNC */
-> -	timeout = ktime_add_us(ktime_get(), sync ?
-> -					    ARM_SMMU_CMDQ_SYNC_TIMEOUT_US :
-> -					    ARM_SMMU_POLL_TIMEOUT_US);
-> -
-> -	while (queue_sync_cons(q), (sync ? !queue_empty(q) : queue_full(q))) {
-> +	while (queue_sync_cons(q), queue_full(q)) {
->  		if (ktime_compare(ktime_get(), timeout) > 0)
->  			return -ETIMEDOUT;
->
->  		if (wfe) {
->  			wfe();
-> -		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
-> -			cpu_relax();
-> -			continue;
->  		} else {
-> -			udelay(delay);
-> -			delay *= 2;
-> -			spin_cnt = 0;
-> +			cpu_relax();
-> +			udelay(1);
->  		}
->  	}
->
-> @@ -905,8 +903,11 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
->
->  	smmu->prev_cmd_opcode = FIELD_GET(CMDQ_0_OP, cmd[0]);
->
-> +	if (Q_IDX(q, q->prod + 1) == 0)
-> +		WRITE_ONCE(smmu->cmdq_generation, smmu->cmdq_generation + 1);
-> +
->  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
-> -		if (queue_poll_cons(q, false, wfe))
-> +		if (queue_poll_cons(q, wfe))
->  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
->  	}
->  }
-> @@ -945,6 +946,48 @@ static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
->  	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
->  }
->
-> +static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
-> +				   int sync_gen)
-> +{
-> +	struct arm_smmu_queue *q = &smmu->cmdq.q;
-> +	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-> +	unsigned int delay = 1, spin_cnt = 0;
-> +	ktime_t timeout;
-> +
-> +	timeout = ktime_add_us(ktime_get(), ARM_SMMU_CMDQ_SYNC_TIMEOUT_US);
-> +	do {
-> +		queue_sync_cons(q);
-> +		/*
-> +		 * If we see updates quickly enough, cons has passed sync_idx,
-> +		 * but not yet wrapped. At worst, cons might have actually
-> +		 * wrapped an even number of times, but that still guarantees
-> +		 * the original sync must have been consumed.
-> +		 */
-> +		if (queue_ahead_not_wrapped(q, sync_idx))
-> +			return 0;
-> +		/*
-> +		 * Otherwise, cons may have passed sync_idx and wrapped one or
-> +		 * more times to appear behind it again, but in that case prod
-> +		 * must also be one or more generations ahead.
-> +		 */
-> +		if (queue_behind(q, sync_idx) &&
-> +		    READ_ONCE(smmu->cmdq_generation) != sync_gen)
-> +			return 0;
-> +
-> +		if (wfe) {
-> +			wfe();
-> +		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
-> +			cpu_relax();
-> +		} else {
-> +			udelay(delay);
-> +			delay *= 2;
-> +			spin_cnt = 0;
-> +		}
-> +	} while (ktime_before(ktime_get(), timeout));
-> +
-> +	return -ETIMEDOUT;
-> +}
-> +
->  static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->  {
->  	u64 cmd[CMDQ_ENT_DWORDS];
-> @@ -976,18 +1019,19 @@ static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->  {
->  	u64 cmd[CMDQ_ENT_DWORDS];
->  	unsigned long flags;
-> -	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->  	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-> -	int ret;
-> +	int sync_idx, sync_gen;
->
->  	arm_smmu_cmdq_build_cmd(cmd, &ent);
->
->  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> -	arm_smmu_cmdq_insert_cmd(smmu, cmd);
-> -	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
-> +	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
-> +		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+When the BCM2835 audio output is used, userspace sees a jitter up to 10ms
+in the audio position, aka "delay" -- the number of frames that must
+be output before a new frame would be played.
+Make this a bit nicer for userspace by interpolating the position
+using the CPU clock.
+The overhead is small -- an extra ktime_get() every time a GPU message
+is sent -- and another call and a few calculations whenever the delay
+is sought from userland.
+At 48,000 frames per second, i.e. approximately 20 microseconds per
+frame, it would take a clock inaccuracy of
+20 microseconds in 10 milliseconds -- 2,000 parts per million --
+to result in an inaccurate estimate, whereas
+crystal- or resonator-based clocks typically have an
+inaccuracy of 10s to 100s of parts per million.
 
-Hi Robin,
+Signed-off-by: Mike Brady <mikebrady@eircom.net>
+---
+ .../vc04_services/bcm2835-audio/bcm2835-pcm.c | 23 ++++++++++++++++++-
+ .../vc04_services/bcm2835-audio/bcm2835.h     |  1 +
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-If we did stop rebuilding the non-MSI command as I suggested, then we 
-would not have the case of building the command and then discarding it, 
-right?
-
-Thanks,
-John
-
-> +	sync_idx = smmu->cmdq.q.prod;
-> +	sync_gen = READ_ONCE(smmu->cmdq_generation);
->  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->
-> -	return ret;
-> +	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
->  }
->
->  static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+index e66da11af5cf..250adf82385a 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+@@ -12,7 +12,8 @@
+ static const struct snd_pcm_hardware snd_bcm2835_playback_hw = {
+ 	.info = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER |
+ 		 SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID |
+-		 SNDRV_PCM_INFO_DRAIN_TRIGGER | SNDRV_PCM_INFO_SYNC_APPLPTR),
++		 SNDRV_PCM_INFO_BATCH | SNDRV_PCM_INFO_DRAIN_TRIGGER |
++		 SNDRV_PCM_INFO_SYNC_APPLPTR),
+ 	.formats = SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+ 	.rates = SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+ 	.rate_min = 8000,
+@@ -74,6 +75,7 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream,
+ 	atomic_set(&alsa_stream->pos, pos);
+ 
+ 	alsa_stream->period_offset += bytes;
++	alsa_stream->interpolate_start = ktime_get();
+ 	if (alsa_stream->period_offset >= alsa_stream->period_size) {
+ 		alsa_stream->period_offset %= alsa_stream->period_size;
+ 		snd_pcm_period_elapsed(substream);
+@@ -243,6 +245,7 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
+ 	atomic_set(&alsa_stream->pos, 0);
+ 	alsa_stream->period_offset = 0;
+ 	alsa_stream->draining = false;
++	alsa_stream->interpolate_start = ktime_get();
+ 
+ 	return 0;
+ }
+@@ -292,6 +295,24 @@ snd_bcm2835_pcm_pointer(struct snd_pcm_substream *substream)
+ {
+ 	struct snd_pcm_runtime *runtime = substream->runtime;
+ 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
++	ktime_t now = ktime_get();
++
++	/* Give userspace better delay reporting by interpolating between GPU
++	 * notifications, assuming audio speed is close enough to the clock
++	 * used for ktime
++	 */
++
++	if ((ktime_to_ns(alsa_stream->interpolate_start)) &&
++	    (ktime_compare(alsa_stream->interpolate_start, now) < 0)) {
++		u64 interval =
++			(ktime_to_ns(ktime_sub(now,
++				alsa_stream->interpolate_start)));
++		u64 frames_output_in_interval =
++			div_u64((interval * runtime->rate), 1000000000);
++		snd_pcm_sframes_t frames_output_in_interval_sized =
++			-frames_output_in_interval;
++		runtime->delay = frames_output_in_interval_sized;
++	}
+ 
+ 	return snd_pcm_indirect_playback_pointer(substream,
+ 		&alsa_stream->pcm_indirect,
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
+index e13435d1c205..595ad584243f 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
+@@ -78,6 +78,7 @@ struct bcm2835_alsa_stream {
+ 	unsigned int period_offset;
+ 	unsigned int buffer_size;
+ 	unsigned int period_size;
++	ktime_t interpolate_start;
+ 
+ 	struct bcm2835_audio_instance *instance;
+ 	int idx;
+-- 
+2.17.1
