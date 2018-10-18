@@ -1,47 +1,102 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 18 Oct 2018 15:07:29 +0800
-Subject: [PATCH v2] clk: sunxi-ng: enable so-said LDOs for A64 SoC's pll-mipi
- clock
-Message-ID: <20181018070729.52943-1-icenowy@aosc.io>
+Date: Thu, 18 Oct 2018 15:33:19 +0800
+Subject: [PATCH 1/9] drm/bridge: move ANA78xx driver to analogix subdirectory
+In-Reply-To: <20181018073327.64942-1-icenowy@aosc.io>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+Message-ID: <20181018073327.64942-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
-register is called "LDO{1,2}_EN", and according to the BSP source code
-from Allwinner , the LDOs are enabled during the clock's enabling
-process.
+As ANA78xx chips are designed and produced by Analogix Semiconductor,
+Inc, move their driver codes into analogix subdirectory.
 
-The clock failed to generate output if the two LDOs are not enabled.
-
-Add the two bits to the clock's gate bits, so that the LDOs are enabled
-when the PLL is enabled.
-
-Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-Changes in v2:
-- Add a section of comments before the addition.
+ drivers/gpu/drm/bridge/Kconfig                         | 10 ----------
+ drivers/gpu/drm/bridge/Makefile                        |  4 ++--
+ drivers/gpu/drm/bridge/analogix/Kconfig                | 10 ++++++++++
+ drivers/gpu/drm/bridge/analogix/Makefile               |  1 +
+ .../gpu/drm/bridge/{ => analogix}/analogix-anx78xx.c   |  0
+ .../gpu/drm/bridge/{ => analogix}/analogix-anx78xx.h   |  0
+ 6 files changed, 13 insertions(+), 12 deletions(-)
+ rename drivers/gpu/drm/bridge/{ => analogix}/analogix-anx78xx.c (100%)
+ rename drivers/gpu/drm/bridge/{ => analogix}/analogix-anx78xx.h (100%)
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-index 5f80eb018014..884d8f7863c4 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-@@ -162,7 +162,12 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
- #define SUN50I_A64_PLL_MIPI_REG		0x040
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 9eeb8ef0b174..8a7ffb3256d8 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -15,16 +15,6 @@ config DRM_PANEL_BRIDGE
+ menu "Display Interface Bridges"
+ 	depends on DRM && DRM_BRIDGE
  
- static struct ccu_nkm pll_mipi_clk = {
--	.enable		= BIT(31),
-+	/*
-+	 * The bit 23 and 22 are called "LDO{1,2}_EN" on the SoC's
-+	 * user manual, and by experiments the PLL doesn't work without
-+	 * these bits toggled.
-+	 */
-+	.enable		= BIT(31) | BIT(23) | BIT(22),
- 	.lock		= BIT(28),
- 	.n		= _SUNXI_CCU_MULT(8, 4),
- 	.k		= _SUNXI_CCU_MULT_MIN(4, 2, 2),
+-config DRM_ANALOGIX_ANX78XX
+-	tristate "Analogix ANX78XX bridge"
+-	select DRM_KMS_HELPER
+-	select REGMAP_I2C
+-	---help---
+-	  ANX78XX is an ultra-low Full-HD SlimPort transmitter
+-	  designed for portable devices. The ANX78XX transforms
+-	  the HDMI output of an application processor to MyDP
+-	  or DisplayPort.
+-
+ config DRM_CDNS_DSI
+ 	tristate "Cadence DPI/DSI bridge"
+ 	select DRM_KMS_HELPER
+diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+index 4934fcf5a6f8..a6c7dd7727ea 100644
+--- a/drivers/gpu/drm/bridge/Makefile
++++ b/drivers/gpu/drm/bridge/Makefile
+@@ -1,5 +1,4 @@
+ # SPDX-License-Identifier: GPL-2.0
+-obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+ obj-$(CONFIG_DRM_CDNS_DSI) += cdns-dsi.o
+ obj-$(CONFIG_DRM_DUMB_VGA_DAC) += dumb-vga-dac.o
+ obj-$(CONFIG_DRM_LVDS_ENCODER) += lvds-encoder.o
+@@ -12,8 +11,9 @@ obj-$(CONFIG_DRM_SII9234) += sii9234.o
+ obj-$(CONFIG_DRM_THINE_THC63LVD1024) += thc63lvd1024.o
+ obj-$(CONFIG_DRM_TOSHIBA_TC358764) += tc358764.o
+ obj-$(CONFIG_DRM_TOSHIBA_TC358767) += tc358767.o
+-obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix/
+ obj-$(CONFIG_DRM_I2C_ADV7511) += adv7511/
+ obj-$(CONFIG_DRM_TI_SN65DSI86) += ti-sn65dsi86.o
+ obj-$(CONFIG_DRM_TI_TFP410) += ti-tfp410.o
++
++obj-y += analogix/
+ obj-y += synopsys/
+diff --git a/drivers/gpu/drm/bridge/analogix/Kconfig b/drivers/gpu/drm/bridge/analogix/Kconfig
+index 80f286fa3a69..27b37aa2ea77 100644
+--- a/drivers/gpu/drm/bridge/analogix/Kconfig
++++ b/drivers/gpu/drm/bridge/analogix/Kconfig
+@@ -1,3 +1,13 @@
+ config DRM_ANALOGIX_DP
+ 	tristate
+ 	depends on DRM
++
++config DRM_ANALOGIX_ANX78XX
++	tristate "Analogix ANX78XX bridge"
++	select DRM_KMS_HELPER
++	select REGMAP_I2C
++	---help---
++	  ANX78XX is an ultra-low Full-HD SlimPort transmitter
++	  designed for portable devices. The ANX78XX transforms
++	  the HDMI output of an application processor to MyDP
++	  or DisplayPort.
+diff --git a/drivers/gpu/drm/bridge/analogix/Makefile b/drivers/gpu/drm/bridge/analogix/Makefile
+index cd4010ba6890..eb41be845055 100644
+--- a/drivers/gpu/drm/bridge/analogix/Makefile
++++ b/drivers/gpu/drm/bridge/analogix/Makefile
+@@ -1,2 +1,3 @@
+ analogix_dp-objs := analogix_dp_core.o analogix_dp_reg.o
+ obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp.o
++obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+diff --git a/drivers/gpu/drm/bridge/analogix-anx78xx.c b/drivers/gpu/drm/bridge/analogix/analogix-anx78xx.c
+similarity index 100%
+rename from drivers/gpu/drm/bridge/analogix-anx78xx.c
+rename to drivers/gpu/drm/bridge/analogix/analogix-anx78xx.c
+diff --git a/drivers/gpu/drm/bridge/analogix-anx78xx.h b/drivers/gpu/drm/bridge/analogix/analogix-anx78xx.h
+similarity index 100%
+rename from drivers/gpu/drm/bridge/analogix-anx78xx.h
+rename to drivers/gpu/drm/bridge/analogix/analogix-anx78xx.h
 -- 
 2.18.1
