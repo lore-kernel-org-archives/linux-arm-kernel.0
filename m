@@ -1,104 +1,72 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 18 Oct 2018 07:44:15 +0200
-Subject: [GIT PULL 00/11] perf/urgent fixes
-In-Reply-To: <20181017225501.32150-1-acme@kernel.org>
-References: <20181017225501.32150-1-acme@kernel.org>
-Message-ID: <20181018054415.GA62071@gmail.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Thu, 18 Oct 2018 14:00:17 +0800
+Subject: [SPAM]Re: [PATCH v1 3/3] clk: mediatek: mt2712: add pll
+ reference support
+In-Reply-To: <153978572885.5275.2199850145066961212@swboyd.mtv.corp.google.com>
+References: <20180920095727.11868-1-weiyi.lu@mediatek.com>
+ <20180920095727.11868-5-weiyi.lu@mediatek.com>
+ <153936680359.5275.14901579706860255114@swboyd.mtv.corp.google.com>
+ <1539784392.16401.28.camel@mtksdaap41>
+ <153978572885.5275.2199850145066961212@swboyd.mtv.corp.google.com>
+Message-ID: <1539842417.22495.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2018-10-17 at 07:15 -0700, Stephen Boyd wrote:
+> Quoting Weiyi Lu (2018-10-17 06:53:12)
+> > On Fri, 2018-10-12 at 10:53 -0700, Stephen Boyd wrote:
+> > > Quoting Weiyi Lu (2018-09-20 02:57:27)
+> > > > +
+> > > > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk",
+> > > > +                       "#clock-cells", 0, &refclk);
+> > > > +       if (!rc) {
+> > > > +               of_property_read_string(refclk.np, "clock-output-names",
+> > > > +                               &refclk_name);
+> > > > +               for (i = 0; i < num_plls; i++)
+> > > > +                       plls[i].parent_name = refclk_name;
+> > > 
+> > > Use of_clk_parent_fill()?
+> > > 
+> > Thanks for the hint, i might use of_clk_get_parent_name() instead like
+> > below to get each parent clock name.
+> > refclk_name = of_clk_get_parent_name(node, 0);
+> > refclk_aud_name = of_clk_get_parent_name(node, 1);
+> 
+> Alright.
+> 
+> > 
+> > > > +       }
+> > > > +
+> > > > +       rc = of_parse_phandle_with_args(node, "mediatek,refclk-aud",
+> > > > +                       "#clock-cells", 0, &refclk_aud);
+> > > 
+> > > This is odd. Is this a custom 'clocks' property? What's going on here?
+> > > Why can't we use assigned clock parents for this?
+> > Yes. both the reference clock of all PLL and the reference clock of
+> > audio PLL could be customized.These two reference clocks shall be
+> > provided by some component like crystal oscillators on the board. So we
+> > might unable to switch the PLL reference source at runtime, in other
+> > words, it should be set statically. That's why we didn't provide the
+> > set_parent ops for pll clock type. It's also the main reason we choose
+> > not to use assigned-clock-parents for this requirement.
+> > 
+> 
+> Ok. Do you need some new software clk flag that indicates we should
+> "lock" the parent or rate configured at boot time? I would like to see
+> this driver implement the clk_ops for the hardware and have the
+> framework be the one that configures the tree, instead of doing it some
+> custom way for this single driver.
+> 
+Hi Stephen, do you mean we might be able to add a flag just like
+CLK_IS_CRITICAL and how it works on clk_enable & clk_disable ops?
+And should we make this new flag to allow to set parent before clock is
+registered and prohibit from changing the rate and parent after clock
+registration. If my understanding is correct, I'll give a try.
+BTW, how about the two patch for the ECO change before this patch. Is
+there any problem on those two patches?
 
-* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
-
-> Hi Ingo,
-> 
-> 	Please consider pulling,
-> 
-> Best Regards,
-> 
-> - Arnaldo
-> 
-> Test results at the end of this message, as usual.
-> 
-> The following changes since commit c1883f10cfe05c707cce46d6999411c50a2413ca:
-> 
->   Merge tag 'perf-urgent-for-mingo-4.19-20181005' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/urgent (2018-10-05 18:14:00 +0200)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.19-20181017
-> 
-> for you to fetch changes up to edeb0c90df3581b821a764052d185df985f8b8dc:
-> 
->   perf tools: Stop fallbacking to kallsyms for vdso symbols lookup (2018-10-17 15:56:15 -0300)
-> 
-> ----------------------------------------------------------------
-> perf/urgent fixes:
-> 
-> - Stop fallbacking to kallsyms for vDSO symbols lookup, this wasn't
->   being really used and is not valid in arches such as Sparc, where
->   user and kernel space don't share the address space, relying only on
->   cpumode to figure out what DSOs to lookup (Arnaldo Carvalho de Melo)
-> 
-> - Align cpu map synthesized events properly, fixing SIGBUS in
->   CPUs like Sparc (David Miller)
-> 
-> - Fix use of alternatives to find JDIR (Jarod Wilson)
-> 
-> - Store ids for events with their own cpus when synthesizing user
->   level event details (scale, unit, etc) events, fixing a crash
->   when recording a PMU event with a cpumask defined (Jiri Olsa)
-> 
-> - Fix wrong filter_band* values for uncore Intel vendor events (Jiri Olsa)
-> 
-> - Fix detection of tracefs path in systems without tracefs, where
->   that path should be the debugfs mountpoint plus "/tracing/" (Jiri Olsa)
-> 
-> - Pass build flags to traceevent build, allowing using alternative
->   flags in distro packages, RPM, for instance (Jiri Olsa)
-> 
-> - Fix 'perf report' crash on invalid inline debug information (Milian Wolff)
-> 
-> - Synch kvm uapi copies (Arnaldo Carvalho de Melo)
-> 
-> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-> 
-> ----------------------------------------------------------------
-> Arnaldo Carvalho de Melo (3):
->       tools arch uapi: Sync the x86 kvm.h copy
->       tools headers uapi: Sync kvm.h copy
->       perf tools: Stop fallbacking to kallsyms for vdso symbols lookup
-> 
-> David Miller (1):
->       perf cpu_map: Align cpu map synthesized events properly.
-> 
-> Jarod Wilson (1):
->       perf tools: Fix use of alternatives to find JDIR
-> 
-> Jiri Olsa (5):
->       Revert "perf tools: Fix PMU term format max value calculation"
->       perf vendor events intel: Fix wrong filter_band* values for uncore events
->       perf evsel: Store ids for events with their own cpus perf_event__synthesize_event_update_cpus
->       perf tools: Fix tracing_path_mount proper path
->       perf tools: Pass build flags to traceevent build
-> 
-> Milian Wolff (1):
->       perf report: Don't crash on invalid inline debug information
-> 
->  tools/arch/x86/include/uapi/asm/kvm.h              |  1 +
->  tools/include/uapi/linux/kvm.h                     |  1 +
->  tools/lib/api/fs/tracing_path.c                    |  4 ++--
->  tools/perf/Makefile.config                         |  2 +-
->  tools/perf/Makefile.perf                           |  2 +-
->  tools/perf/builtin-report.c                        |  1 +
->  .../pmu-events/arch/x86/ivytown/uncore-power.json  | 16 ++++++++--------
->  .../pmu-events/arch/x86/jaketown/uncore-power.json | 16 ++++++++--------
->  tools/perf/util/event.c                            | 22 +++-------------------
->  tools/perf/util/evsel.c                            |  3 +++
->  tools/perf/util/pmu.c                              | 13 +++++++------
->  tools/perf/util/srcline.c                          |  3 +++
->  12 files changed, 39 insertions(+), 45 deletions(-)
-
-Pulled, thanks a lot Arnaldo!
-
-	Ingo
+> > > > +       if (!rc) {
+> > > > +               of_property_read_string(refclk_aud.np, "clock-output-names",
+> > > > +                               &refclk_aud_name);
+> > > > +               if (strcmp(refclk_name, refclk_aud_name)) {
+> > > > +                       plls[CLK_APMIXED_APLL1].parent_name = refclk_aud_name;
