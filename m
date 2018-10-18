@@ -1,31 +1,47 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 18 Oct 2018 06:51:55 +0000
-Subject: [PATCH] clk: imx7d: remove UART1 clock setting
-Message-ID: <1539845238-24114-1-git-send-email-Anson.Huang@nxp.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 18 Oct 2018 15:07:29 +0800
+Subject: [PATCH v2] clk: sunxi-ng: enable so-said LDOs for A64 SoC's pll-mipi
+ clock
+Message-ID: <20181018070729.52943-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is clock assignment in dtb for UART1, so setting
-UART1 clock in clock driver is NOT necessary.
+In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
+register is called "LDO{1,2}_EN", and according to the BSP source code
+from Allwinner , the LDOs are enabled during the clock's enabling
+process.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+The clock failed to generate output if the two LDOs are not enabled.
+
+Add the two bits to the clock's gate bits, so that the LDOs are enabled
+when the PLL is enabled.
+
+Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/clk/imx/clk-imx7d.c | 3 ---
- 1 file changed, 3 deletions(-)
+Changes in v2:
+- Add a section of comments before the addition.
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index adb08f6..06c105d 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -886,9 +886,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
- 	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+index 5f80eb018014..884d8f7863c4 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+@@ -162,7 +162,12 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
+ #define SUN50I_A64_PLL_MIPI_REG		0x040
  
--	/* set uart module clock's parent clock source that must be great then 80MHz */
--	clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
--
- 	/* Set clock rate for USBPHY, the USB_PLL at CCM is from USBOTG2 */
- 	clks[IMX7D_USB1_MAIN_480M_CLK] = imx_clk_fixed_factor("pll_usb1_main_clk", "osc", 20, 1);
- 	clks[IMX7D_USB_MAIN_480M_CLK] = imx_clk_fixed_factor("pll_usb_main_clk", "osc", 20, 1);
+ static struct ccu_nkm pll_mipi_clk = {
+-	.enable		= BIT(31),
++	/*
++	 * The bit 23 and 22 are called "LDO{1,2}_EN" on the SoC's
++	 * user manual, and by experiments the PLL doesn't work without
++	 * these bits toggled.
++	 */
++	.enable		= BIT(31) | BIT(23) | BIT(22),
+ 	.lock		= BIT(28),
+ 	.n		= _SUNXI_CCU_MULT(8, 4),
+ 	.k		= _SUNXI_CCU_MULT_MIN(4, 2, 2),
 -- 
-2.7.4
+2.18.1
