@@ -1,137 +1,285 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:47 +0100
-Subject: [PATCH 12/26] kvm: arm64: Configure VTCR_EL2.SL0 per VM
+Date: Fri, 19 Oct 2018 13:58:45 +0100
+Subject: [PATCH 10/26] kvm: arm64: Make stage2 page table layout dynamic
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-13-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-VTCR_EL2 holds the following key stage2 translation table
-parameters:
-  SL0  - Entry level in the page table lookup.
-  T0SZ - Denotes the size of the memory addressed by the table.
+Switch to dynamic stage2 page table layout based on the given
+VM. So far we had a common stage2 table layout determined at
+compile time. Make decision based on the VM instance depending
+on the IPA limit for the VM. Adds helpers to compute the stage2
+parameters based on the guest's IPA and uses them to make the decisions.
 
-We have been using fixed values for the SL0 depending on the
-page size as we have a fixed IPA size. But since we are about
-to make it dynamic, we need to calculate the SL0 at runtime
-per VM. This patch adds a helper to compute the value of SL0
-for a VM based on the IPA size.
+The IPA limit is still fixed to 40bits and the build time check
+to ensure the stage2 doesn't exceed the host kernels page table
+levels is retained. Also make sure that we use the pud/pmd level
+helpers from the host only when they are not folded.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h | 67 +++++++++++++++++++++++---------
- arch/arm64/kvm/reset.c           |  1 +
- 2 files changed, 49 insertions(+), 19 deletions(-)
+ arch/arm64/include/asm/stage2_pgtable.h | 84 +++++++++++++++----------
+ 1 file changed, 52 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index b236d90ca056..f913adb44f93 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -121,7 +121,6 @@
- #define VTCR_EL2_IRGN0_WBWA	TCR_IRGN0_WBWA
- #define VTCR_EL2_SL0_SHIFT	6
- #define VTCR_EL2_SL0_MASK	(3 << VTCR_EL2_SL0_SHIFT)
--#define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
- #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_VS_SHIFT	19
- #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
-@@ -144,30 +143,60 @@
- #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
- 				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+index 384f9e982cba..36a0a1165003 100644
+--- a/arch/arm64/include/asm/stage2_pgtable.h
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -22,6 +22,13 @@
+ #include <linux/hugetlb.h>
+ #include <asm/pgtable.h>
  
--#ifdef CONFIG_ARM64_64K_PAGES
++/*
++ * PGDIR_SHIFT determines the size a top-level page table entry can map
++ * and depends on the number of levels in the page table. Compute the
++ * PGDIR_SHIFT for a given number of levels.
++ */
++#define pt_levels_pgdir_shift(lvls)	ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - (lvls))
++
  /*
-- * Stage2 translation configuration:
-- * 64kB pages (TG0 = 1)
-- * 2 level page tables (SL = 1)
-+ * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
-+ * Interestingly, it depends on the page size.
-+ * See D.10.2.121, VTCR_EL2, in ARM DDI 0487C.a
-+ *
-+ *	-----------------------------------------
-+ *	| Entry level		|  4K  | 16K/64K |
-+ *	------------------------------------------
-+ *	| Level: 0		|  2   |   -     |
-+ *	------------------------------------------
-+ *	| Level: 1		|  1   |   2     |
-+ *	------------------------------------------
-+ *	| Level: 2		|  0   |   1     |
-+ *	------------------------------------------
-+ *	| Level: 3		|  -   |   0     |
-+ *	------------------------------------------
-+ *
-+ * The table roughly translates to :
-+ *
-+ *	SL0(PAGE_SIZE, Entry_level) = TGRAN_SL0_BASE - Entry_Level
-+ *
-+ * Where TGRAN_SL0_BASE is a magic number depending on the page size:
-+ * 	TGRAN_SL0_BASE(4K) = 2
-+ *	TGRAN_SL0_BASE(16K) = 3
-+ *	TGRAN_SL0_BASE(64K) = 3
-+ * provided we take care of ruling out the unsupported cases and
-+ * Entry_Level = 4 - Number_of_levels.
-+ *
+  * The hardware supports concatenation of up to 16 tables at stage2 entry level
+  * and we use the feature whenever possible.
+@@ -30,11 +37,13 @@
+  * On arm64, the smallest PAGE_SIZE supported is 4k, which means
+  *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
+  * This implies, the total number of page table levels at stage2 expected
+- * by the hardware is actually the number of levels required for (KVM_PHYS_SHIFT - 4)
++ * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
+  * in normal translations(e.g, stage1), since we cannot have another level in
+- * the range (KVM_PHYS_SHIFT, KVM_PHYS_SHIFT - 4).
++ * the range (IPA_SHIFT, IPA_SHIFT - 4).
   */
--#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
-+#ifdef CONFIG_ARM64_64K_PAGES
-+
-+#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_64K
-+#define VTCR_EL2_TGRAN_SL0_BASE		3UL
-+
- #elif defined(CONFIG_ARM64_16K_PAGES)
--/*
-- * Stage2 translation configuration:
-- * 16kB pages (TG0 = 2)
-- * 2 level page tables (SL = 1)
-- */
--#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
-+
-+#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_16K
-+#define VTCR_EL2_TGRAN_SL0_BASE		3UL
-+
- #else	/* 4K */
--/*
-- * Stage2 translation configuration:
-- * 4kB pages (TG0 = 0)
-- * 3 level page tables (SL = 1)
-- */
--#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
-+
-+#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_4K
-+#define VTCR_EL2_TGRAN_SL0_BASE		2UL
-+
+-#define STAGE2_PGTABLE_LEVELS		ARM64_HW_PGTABLE_LEVELS(KVM_PHYS_SHIFT - 4)
++#define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
++#define STAGE2_PGTABLE_LEVELS		stage2_pgtable_levels(KVM_PHYS_SHIFT)
++#define kvm_stage2_levels(kvm)		stage2_pgtable_levels(kvm_phys_shift(kvm))
+ 
+ /*
+  * With all the supported VA_BITs and 40bit guest IPA, the following condition
+@@ -54,33 +63,42 @@
+ #error "Unsupported combination of guest IPA and host VA_BITS."
  #endif
  
--#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
-+#define VTCR_EL2_LVLS_TO_SL0(levels)	\
-+	((VTCR_EL2_TGRAN_SL0_BASE - (4 - (levels))) << VTCR_EL2_SL0_SHIFT)
-+#define VTCR_EL2_SL0_TO_LVLS(sl0)	\
-+	((sl0) + 4 - VTCR_EL2_TGRAN_SL0_BASE)
-+#define VTCR_EL2_LVLS(vtcr)		\
-+	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
+-/* S2_PGDIR_SHIFT is the size mapped by top-level stage2 entry */
+-#define S2_PGDIR_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - STAGE2_PGTABLE_LEVELS)
+-#define S2_PGDIR_SIZE			(1UL << S2_PGDIR_SHIFT)
+-#define S2_PGDIR_MASK			(~(S2_PGDIR_SIZE - 1))
 +
-+#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
- /*
-  * ARM VMSAv8-64 defines an algorithm for finding the translation table
-  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 616120c4176b..1ced1e37374e 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -160,6 +160,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
- 	if (phys_shift > KVM_PHYS_SHIFT)
- 		phys_shift = KVM_PHYS_SHIFT;
- 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
-+	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
++/* stage2_pgdir_shift() is the size mapped by top-level stage2 entry for the VM */
++#define stage2_pgdir_shift(kvm)		pt_levels_pgdir_shift(kvm_stage2_levels(kvm))
++#define stage2_pgdir_size(kvm)		(1ULL << stage2_pgdir_shift(kvm))
++#define stage2_pgdir_mask(kvm)		~(stage2_pgdir_size(kvm) - 1)
  
- 	/*
- 	 * Enable the Hardware Access Flag management, unconditionally
+ /*
+  * The number of PTRS across all concatenated stage2 tables given by the
+  * number of bits resolved@the initial level.
+  */
+-#define PTRS_PER_S2_PGD			(1 << (KVM_PHYS_SHIFT - S2_PGDIR_SHIFT))
++#define __s2_pgd_ptrs(ipa, lvls)	(1 << ((ipa) - pt_levels_pgdir_shift((lvls))))
++#define __s2_pgd_size(ipa, lvls)	(__s2_pgd_ptrs((ipa), (lvls)) * sizeof(pgd_t))
++
++#define stage2_pgd_ptrs(kvm)		__s2_pgd_ptrs(kvm_phys_shift(kvm), kvm_stage2_levels(kvm))
++#define stage2_pgd_size(kvm)		__s2_pgd_size(kvm_phys_shift(kvm), kvm_stage2_levels(kvm))
+ 
+ /*
+  * kvm_mmmu_cache_min_pages() is the number of pages required to install
+  * a stage-2 translation. We pre-allocate the entry level page table at
+  * the VM creation.
+  */
+-#define kvm_mmu_cache_min_pages(kvm)	(STAGE2_PGTABLE_LEVELS - 1)
++#define kvm_mmu_cache_min_pages(kvm)	(kvm_stage2_levels(kvm) - 1)
+ 
+ /* Stage2 PUD definitions when the level is present */
+-#define STAGE2_PGTABLE_HAS_PUD		(STAGE2_PGTABLE_LEVELS > 3)
++static inline bool kvm_stage2_has_pud(struct kvm *kvm)
++{
++	return (CONFIG_PGTABLE_LEVELS > 3) && (kvm_stage2_levels(kvm) > 3);
++}
++
+ #define S2_PUD_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(1)
+ #define S2_PUD_SIZE			(1UL << S2_PUD_SHIFT)
+ #define S2_PUD_MASK			(~(S2_PUD_SIZE - 1))
+ 
+ static inline bool stage2_pgd_none(struct kvm *kvm, pgd_t pgd)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD)
++	if (kvm_stage2_has_pud(kvm))
+ 		return pgd_none(pgd);
+ 	else
+ 		return 0;
+@@ -88,13 +106,13 @@ static inline bool stage2_pgd_none(struct kvm *kvm, pgd_t pgd)
+ 
+ static inline void stage2_pgd_clear(struct kvm *kvm, pgd_t *pgdp)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD)
++	if (kvm_stage2_has_pud(kvm))
+ 		pgd_clear(pgdp);
+ }
+ 
+ static inline bool stage2_pgd_present(struct kvm *kvm, pgd_t pgd)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD)
++	if (kvm_stage2_has_pud(kvm))
+ 		return pgd_present(pgd);
+ 	else
+ 		return 1;
+@@ -102,14 +120,14 @@ static inline bool stage2_pgd_present(struct kvm *kvm, pgd_t pgd)
+ 
+ static inline void stage2_pgd_populate(struct kvm *kvm, pgd_t *pgd, pud_t *pud)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD)
++	if (kvm_stage2_has_pud(kvm))
+ 		pgd_populate(NULL, pgd, pud);
+ }
+ 
+ static inline pud_t *stage2_pud_offset(struct kvm *kvm,
+ 				       pgd_t *pgd, unsigned long address)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD)
++	if (kvm_stage2_has_pud(kvm))
+ 		return pud_offset(pgd, address);
+ 	else
+ 		return (pud_t *)pgd;
+@@ -117,13 +135,13 @@ static inline pud_t *stage2_pud_offset(struct kvm *kvm,
+ 
+ static inline void stage2_pud_free(struct kvm *kvm, pud_t *pud)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD)
++	if (kvm_stage2_has_pud(kvm))
+ 		pud_free(NULL, pud);
+ }
+ 
+ static inline bool stage2_pud_table_empty(struct kvm *kvm, pud_t *pudp)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD)
++	if (kvm_stage2_has_pud(kvm))
+ 		return kvm_page_empty(pudp);
+ 	else
+ 		return false;
+@@ -132,7 +150,7 @@ static inline bool stage2_pud_table_empty(struct kvm *kvm, pud_t *pudp)
+ static inline phys_addr_t
+ stage2_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+ {
+-	if (STAGE2_PGTABLE_HAS_PUD) {
++	if (kvm_stage2_has_pud(kvm)) {
+ 		phys_addr_t boundary = (addr + S2_PUD_SIZE) & S2_PUD_MASK;
+ 
+ 		return (boundary - 1 < end - 1) ? boundary : end;
+@@ -142,14 +160,18 @@ stage2_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+ }
+ 
+ /* Stage2 PMD definitions when the level is present */
+-#define STAGE2_PGTABLE_HAS_PMD		(STAGE2_PGTABLE_LEVELS > 2)
++static inline bool kvm_stage2_has_pmd(struct kvm *kvm)
++{
++	return (CONFIG_PGTABLE_LEVELS > 2) && (kvm_stage2_levels(kvm) > 2);
++}
++
+ #define S2_PMD_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(2)
+ #define S2_PMD_SIZE			(1UL << S2_PMD_SHIFT)
+ #define S2_PMD_MASK			(~(S2_PMD_SIZE - 1))
+ 
+ static inline bool stage2_pud_none(struct kvm *kvm, pud_t pud)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		return pud_none(pud);
+ 	else
+ 		return 0;
+@@ -157,13 +179,13 @@ static inline bool stage2_pud_none(struct kvm *kvm, pud_t pud)
+ 
+ static inline void stage2_pud_clear(struct kvm *kvm, pud_t *pud)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		pud_clear(pud);
+ }
+ 
+ static inline bool stage2_pud_present(struct kvm *kvm, pud_t pud)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		return pud_present(pud);
+ 	else
+ 		return 1;
+@@ -171,14 +193,14 @@ static inline bool stage2_pud_present(struct kvm *kvm, pud_t pud)
+ 
+ static inline void stage2_pud_populate(struct kvm *kvm, pud_t *pud, pmd_t *pmd)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		pud_populate(NULL, pud, pmd);
+ }
+ 
+ static inline pmd_t *stage2_pmd_offset(struct kvm *kvm,
+ 				       pud_t *pud, unsigned long address)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		return pmd_offset(pud, address);
+ 	else
+ 		return (pmd_t *)pud;
+@@ -186,13 +208,13 @@ static inline pmd_t *stage2_pmd_offset(struct kvm *kvm,
+ 
+ static inline void stage2_pmd_free(struct kvm *kvm, pmd_t *pmd)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		pmd_free(NULL, pmd);
+ }
+ 
+ static inline bool stage2_pud_huge(struct kvm *kvm, pud_t pud)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		return pud_huge(pud);
+ 	else
+ 		return 0;
+@@ -200,7 +222,7 @@ static inline bool stage2_pud_huge(struct kvm *kvm, pud_t pud)
+ 
+ static inline bool stage2_pmd_table_empty(struct kvm *kvm, pmd_t *pmdp)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD)
++	if (kvm_stage2_has_pmd(kvm))
+ 		return kvm_page_empty(pmdp);
+ 	else
+ 		return 0;
+@@ -209,7 +231,7 @@ static inline bool stage2_pmd_table_empty(struct kvm *kvm, pmd_t *pmdp)
+ static inline phys_addr_t
+ stage2_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+ {
+-	if (STAGE2_PGTABLE_HAS_PMD) {
++	if (kvm_stage2_has_pmd(kvm)) {
+ 		phys_addr_t boundary = (addr + S2_PMD_SIZE) & S2_PMD_MASK;
+ 
+ 		return (boundary - 1 < end - 1) ? boundary : end;
+@@ -223,17 +245,15 @@ static inline bool stage2_pte_table_empty(struct kvm *kvm, pte_t *ptep)
+ 	return kvm_page_empty(ptep);
+ }
+ 
+-#define stage2_pgd_size(kvm)	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+-
+ static inline unsigned long stage2_pgd_index(struct kvm *kvm, phys_addr_t addr)
+ {
+-	return (((addr) >> S2_PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1));
++	return (((addr) >> stage2_pgdir_shift(kvm)) & (stage2_pgd_ptrs(kvm) - 1));
+ }
+ 
+ static inline phys_addr_t
+ stage2_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+ {
+-	phys_addr_t boundary = (addr + S2_PGDIR_SIZE) & S2_PGDIR_MASK;
++	phys_addr_t boundary = (addr + stage2_pgdir_size(kvm)) & stage2_pgdir_mask(kvm);
+ 
+ 	return (boundary - 1 < end - 1) ? boundary : end;
+ }
 -- 
 2.19.1
