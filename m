@@ -1,53 +1,76 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:57 +0100
-Subject: [PATCH 22/26] KVM: arm/arm64: Ensure only THP is candidate for
- adjustment
+Date: Fri, 19 Oct 2018 13:58:52 +0100
+Subject: [PATCH 17/26] kvm: arm64: Limit the minimum number of page table
+ levels
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-23-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Punit Agrawal <punit.agrawal@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-PageTransCompoundMap() returns true for hugetlbfs and THP
-hugepages. This behaviour incorrectly leads to stage 2 faults for
-unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
-treated as THP faults.
+Since we are about to remove the lower limit on the IPA size,
+make sure that we do not go to 1 level page table (e.g, with
+32bit IPA on 64K host with concatenation) to avoid splitting
+the host PMD huge pages at stage2.
 
-Tighten the check to filter out hugetlbfs pages. This also leads to
-consistently mapping all unsupported hugepage sizes as PTE level
-entries at stage 2.
-
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: stable at vger.kernel.org # v4.13+
+Cc: Christoffer Dall <cdall@kernel.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/mmu.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/stage2_pgtable.h |  7 ++++++-
+ arch/arm64/kvm/reset.c                  | 10 +++++++++-
+ 2 files changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 7e477b3cae5b..c23a1b323aad 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1231,8 +1231,14 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
- {
- 	kvm_pfn_t pfn = *pfnp;
- 	gfn_t gfn = *ipap >> PAGE_SHIFT;
-+	struct page *page = pfn_to_page(pfn);
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+index c62fe118a898..2cce769ba4c6 100644
+--- a/arch/arm64/include/asm/stage2_pgtable.h
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -72,8 +72,13 @@
+ /*
+  * The number of PTRS across all concatenated stage2 tables given by the
+  * number of bits resolved at the initial level.
++ * If we force more levels than necessary, we may have (stage2_pgdir_shift > IPA),
++ * in which case, stage2_pgd_ptrs will have one entry.
+  */
+-#define __s2_pgd_ptrs(ipa, lvls)	(1 << ((ipa) - pt_levels_pgdir_shift((lvls))))
++#define pgd_ptrs_shift(ipa, pgdir_shift)	\
++	((ipa) > (pgdir_shift) ? ((ipa) - (pgdir_shift)) : 0)
++#define __s2_pgd_ptrs(ipa, lvls)		\
++	(1 << (pgd_ptrs_shift((ipa), pt_levels_pgdir_shift(lvls))))
+ #define __s2_pgd_size(ipa, lvls)	(__s2_pgd_ptrs((ipa), (lvls)) * sizeof(pgd_t))
  
--	if (PageTransCompoundMap(pfn_to_page(pfn))) {
+ #define stage2_pgd_ptrs(kvm)		__s2_pgd_ptrs(kvm_phys_shift(kvm), kvm_stage2_levels(kvm))
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 96b3f50101bc..f156e45760bc 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -190,6 +190,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+ {
+ 	u64 vtcr = VTCR_EL2_FLAGS;
+ 	u32 parange, phys_shift;
++	u8 lvls;
+ 
+ 	if (type)
+ 		return -EINVAL;
+@@ -203,7 +204,14 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+ 	if (phys_shift > KVM_PHYS_SHIFT)
+ 		phys_shift = KVM_PHYS_SHIFT;
+ 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
+-	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(phys_shift));
 +	/*
-+	 * PageTransCompoungMap() returns true for THP and
-+	 * hugetlbfs. Make sure the adjustment is done only for THP
-+	 * pages.
++	 * Use a minimum 2 level page table to prevent splitting
++	 * host PMD huge pages at stage2.
 +	 */
-+	if (!PageHuge(page) && PageTransCompoundMap(page)) {
- 		unsigned long mask;
- 		/*
- 		 * The address we faulted on is backed by a transparent huge
++	lvls = stage2_pgtable_levels(phys_shift);
++	if (lvls < 2)
++		lvls = 2;
++	vtcr |= VTCR_EL2_LVLS_TO_SL0(lvls);
+ 
+ 	/*
+ 	 * Enable the Hardware Access Flag management, unconditionally
 -- 
 2.19.1
