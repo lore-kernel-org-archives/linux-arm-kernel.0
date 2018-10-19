@@ -1,150 +1,196 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Oct 2018 13:22:28 +0100
-Subject: [PATCH 6/9] PCI: consolidate PCI config entry in drivers/pci
-In-Reply-To: <20181019120952.32763-7-hch@lst.de>
-References: <20181019120952.32763-1-hch@lst.de>
- <20181019120952.32763-7-hch@lst.de>
-Message-ID: <20181019122228.GJ30658@n2100.armlinux.org.uk>
+From: jeyu@kernel.org (Jessica Yu)
+Date: Fri, 19 Oct 2018 14:18:48 +0200
+Subject: [PATCH v3 3/4] arm64: implement live patching
+In-Reply-To: <alpine.LSU.2.21.1810191338020.4692@pobox.suse.cz>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141652.5478C68BE1@newverein.lst.de>
+ <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
+ <20181018125820.iw54zbirq74ulknj@linux-8ccs>
+ <alpine.LSU.2.21.1810191338020.4692@pobox.suse.cz>
+Message-ID: <20181019121847.eug4p2mxr32cebk2@linux-8ccs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 02:09:49PM +0200, Christoph Hellwig wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e33735ce1c14..7495d0a0aa31 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -149,9 +149,6 @@ config ARM_DMA_IOMMU_ALIGNMENT
->  
->  endif
->  
-> -config MIGHT_HAVE_PCI
-> -	bool
-> -
->  config SYS_SUPPORTS_APM_EMULATION
->  	bool
->  
-> @@ -320,7 +317,7 @@ config ARCH_MULTIPLATFORM
->  	select COMMON_CLK
->  	select GENERIC_CLOCKEVENTS
->  	select GENERIC_IRQ_MULTI_HANDLER
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	select PCI_DOMAINS if PCI
->  	select SPARSE_IRQ
->  	select USE_OF
-> @@ -436,7 +433,7 @@ config ARCH_IXP4XX
->  	select DMABOUNCE if PCI
->  	select GENERIC_CLOCKEVENTS
->  	select GPIOLIB
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	select NEED_MACH_IO_H
->  	select USB_EHCI_BIG_ENDIAN_DESC
->  	select USB_EHCI_BIG_ENDIAN_MMIO
-> @@ -449,7 +446,7 @@ config ARCH_DOVE
->  	select GENERIC_CLOCKEVENTS
->  	select GENERIC_IRQ_MULTI_HANDLER
->  	select GPIOLIB
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	select MVEBU_MBUS
->  	select PINCTRL
->  	select PINCTRL_DOVE
-> @@ -1216,14 +1213,6 @@ config ISA_DMA
->  config ISA_DMA_API
->  	bool
->  
-> -config PCI
-> -	bool "PCI support" if MIGHT_HAVE_PCI
-> -	help
-> -	  Find out whether you have a PCI motherboard. PCI is the name of a
-> -	  bus system, i.e. the way the CPU talks to the other stuff inside
-> -	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-> -	  VESA. If you have PCI, say Y, otherwise N.
-> -
->  config PCI_DOMAINS
->  	bool "Support for multiple PCI domains"
->  	depends on PCI
-> @@ -1252,8 +1241,6 @@ config PCI_HOST_ITE8152
->  	default y
->  	select DMABOUNCE
->  
-> -source "drivers/pci/Kconfig"
-> -
->  source "drivers/pcmcia/Kconfig"
->  
->  endmenu
-> diff --git a/arch/arm/mach-ks8695/Kconfig b/arch/arm/mach-ks8695/Kconfig
-> index a545976bdbd6..b3185c05fffa 100644
-> --- a/arch/arm/mach-ks8695/Kconfig
-> +++ b/arch/arm/mach-ks8695/Kconfig
-> @@ -4,7 +4,7 @@ menu "Kendin/Micrel KS8695 Implementations"
->  
->  config MACH_KS8695
->  	bool "KS8695 development board"
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	help
->  	  Say 'Y' here if you want your kernel to run on the original
->  	  Kendin-Micrel KS8695 development board.
-> @@ -52,7 +52,7 @@ config MACH_CM4002
->  
->  config MACH_CM4008
->  	bool "OpenGear CM4008"
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	help
->  	  Say 'Y' here if you want your kernel to support the OpenGear
->  	  CM4008 Console Server. See http://www.opengear.com for more
-> @@ -60,7 +60,7 @@ config MACH_CM4008
->  
->  config MACH_CM41xx
->  	bool "OpenGear CM41xx"
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	help
->  	  Say 'Y' here if you want your kernel to support the OpenGear
->  	  CM4016 or CM4048 Console Servers. See http://www.opengear.com for
-> @@ -68,7 +68,7 @@ config MACH_CM41xx
->  
->  config MACH_IM4004
->  	bool "OpenGear IM4004"
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	help
->  	  Say 'Y' here if you want your kernel to support the OpenGear
->  	  IM4004 Secure Access Server. See http://www.opengear.com for
-> @@ -76,7 +76,7 @@ config MACH_IM4004
->  
->  config MACH_IM42xx
->  	bool "OpenGear IM42xx"
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	help
->  	  Say 'Y' here if you want your kernel to support the OpenGear
->  	  IM4216 or IM4248 Console Servers. See http://www.opengear.com for
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index a68b34183107..b185794549be 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -125,7 +125,7 @@ config MACH_ARMCORE
->  	bool "CompuLab CM-X255/CM-X270 modules"
->  	select ARCH_HAS_DMA_SET_COHERENT_MASK if PCI
->  	select IWMMXT
-> -	select MIGHT_HAVE_PCI
-> +	select HAVE_PCI
->  	select NEED_MACH_IO_H if PCI
->  	select PXA25x
->  	select PXA27x
++++ Miroslav Benes [19/10/18 13:59 +0200]:
+>On Thu, 18 Oct 2018, Jessica Yu wrote:
+>
+>> +++ Miroslav Benes [17/10/18 15:39 +0200]:
+>> >On Mon, 1 Oct 2018, Torsten Duwe wrote:
+>> >
+>> >Ad relocations. I checked that everything in struct mod_arch_specific
+>> >stays after the module is load. Both core and init get SHF_ALLOC set
+>> >(mod->arch.core.plt->sh_flags in module_frob_arch_sections(). It is
+>> >important because apply_relocate_add() may use those sections
+>> >through module_emit_plt_entry() call.
+>>
+>> Yes, it looks like the needed .plt sections will remain in module
+>> memory. However, I think I found a slight issue... :/
+>>
+>> In module_frob_arch_sections(), mod->arch.core.plt is set to an offset
+>> within info->sechdrs:
+>>
+>>             if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
+>>                     mod->arch.core.plt = sechdrs + i;
+>>
+>> sechdrs is from info->sechdrs, which is freed at the end of
+>> load_module() via free_copy(). So although the relevant plt section(s)
+>> are in module memory, mod->arch.core.plt will point to invalid memory
+>> after info is freed. In other words, the section (.plt) *is* in memory
+>> but the section header (struct elf64_shdr) containing section metadata
+>> like sh_addr, sh_size etc., is not.
+>>
+>> But we have mod->klp_info->sechdrs (which is a copy of the section
+>> headers) for this very reason. It is initialized only at the very end
+>> of load_module(). I don't think copy_module_elf() is dependent on
+>> anything, so it can just be moved earlier.
+>>
+>> Note that we cannot set mod->arch.core.plt to mod->klp_info->sechdrs + i
+>> during module_frob_arch_sections() because it is still too early, none
+>> of the module sections have been copied and none of their sh_addr's
+>> have been set to their final locations as this is all happening before
+>> move_module() is called. So we can use a module_finalize() function
+>> for arm64 to switch the mod->arch.core.plt to use the klp_info section
+>> headers.
+>
+>Thanks for the analysis. You seem to be right.
+>
+>> Maybe this will be more clear in the example fix below (completely
+>> untested and unreviewed!):
+>>
+>> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+>> index 97d0ef12e2ff..150afc29171b 100644
+>> --- a/arch/arm64/include/asm/module.h
+>> +++ b/arch/arm64/include/asm/module.h
+>> @@ -25,6 +25,7 @@ struct mod_plt_sec {
+>> 	struct elf64_shdr	*plt;
+>> 	int			plt_num_entries;
+>> 	int			plt_max_entries;
+>> +	int			plt_shndx;
+>> };
+>>
+>> struct mod_arch_specific {
+>> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+>> index f0690c2ca3e0..c23cef8f0165 100644
+>> --- a/arch/arm64/kernel/module-plts.c
+>> +++ b/arch/arm64/kernel/module-plts.c
+>> @@ -196,6 +196,21 @@ static unsigned int count_plts(Elf64_Sym *syms,
+>> Elf64_Rela *rela, int num,
+>> 	return ret;
+>> }
+>>
+>> +int module_finalize(const Elf_Ehdr *hdr, const Elf_Shdr *sechdrs,
+>> +		    struct module *mod)
+>> +{
+>> +	/*
+>> +	 * Livepatch modules need to keep access to section headers to apply
+>> +	 * relocations. Note mod->klp_info should have already been
+>> initialized
+>> +	 * and all section sh_addr's should have their final addresses by the
+>> +	 * time module_finalize() is called.
+>> +	 */
+>> +	if (is_livepatch_module(mod))
+>> +		mod->arch.core.plt = mod->klp_info->sechdrs +
+>> mod->arch.core.plt_shndx;
+>> +
+>> +	return 0;
+>> +}
+>
+>There is already module_finalize() in arch/arm64/kernel/module.c, so this
+>should probably go there.
 
-This is wrong.  "MIGHT_HAVE_PCI" is _not_ the same as "HAVE_PCI" - we
-have a bunch of platforms that mandatorily have PCI and these select
-PCI directly.  "MIGHT_HAVE_PCI" controls the _visibility_ of the PCI
-menu option, but does not prevent it being selected.  Your patch will
-cause Kconfig to complain for those which mandatorily have PCI but
-do not set HAVE_PCI.
+Ah yeah, I missed that :) Yep, that would be where it'd go.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+>If I am not mistaken, we do not care for arch.init.plt in livepatch. Is
+>that correct?
+
+I do not believe patching of __init functions is supported (right?) So
+we do not need to keep arch.init.plt alive post-module-load.
+
+>> int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>> 			      char *secstrings, struct module *mod)
+>> {
+>> @@ -210,11 +225,13 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
+>> *sechdrs,
+>> 	 * entries. Record the symtab address as well.
+>> 	 */
+>> 	for (i = 0; i < ehdr->e_shnum; i++) {
+>> -		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
+>> +		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt")) {
+>> 			mod->arch.core.plt = sechdrs + i;
+>> -		else if (!strcmp(secstrings + sechdrs[i].sh_name,
+>> ".init.plt"))
+>> +			mod->arch.core.plt_shndx = i;
+>> +		} else if (!strcmp(secstrings + sechdrs[i].sh_name,
+>> ".init.plt")) {
+>> 			mod->arch.init.plt = sechdrs + i;
+>> -		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
+>> +			mod->arch.init.plt_shndx = i;
+>
+>It is initialized here, but that's not necessarily a bad thing.
+
+I think I added this line for consistency, but I actually don't think
+it is needed. We only would need to keep the section index for
+arch.core.plt then.
+
+>> +		} else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
+>> 			 !strcmp(secstrings + sechdrs[i].sh_name,
+>> 				 ".text.ftrace_trampoline"))
+>> 			tramp = sechdrs + i;
+>> diff --git a/kernel/module.c b/kernel/module.c
+>> index 6746c85511fe..2fc4d74288dd 100644
+>> --- a/kernel/module.c
+>> +++ b/kernel/module.c
+>> @@ -3363,6 +3363,12 @@ static int post_relocation(struct module *mod, const
+>> struct load_info *info)
+>> 	/* Setup kallsyms-specific fields. */
+>> 	add_kallsyms(mod, info);
+>>
+>> +	if (is_livepatch_module(mod)) {
+>> +		err = copy_module_elf(mod, info);
+>> +		if (err < 0)
+>> +			return err;
+>> +	}
+>> +
+>> 	/* Arch-specific module finalizing. */
+>> 	return module_finalize(info->hdr, info->sechdrs, mod);
+>> }
+>> @@ -3775,12 +3781,6 @@ static int load_module(struct load_info *info, const
+>> char __user *uargs,
+>> 	if (err < 0)
+>> 		goto coming_cleanup;
+>>
+>> -	if (is_livepatch_module(mod)) {
+>> -		err = copy_module_elf(mod, info);
+>> -		if (err < 0)
+>> -			goto sysfs_cleanup;
+>> -	}
+>> -
+>> 	/* Get rid of temporary copy. */
+>> 	free_copy(info);
+>
+>Hm, this is hopefully all right. We'd need to change the error handling a
+>bit. free_module_elf() is now called in free_module() and it should be
+>moved somewhere to load_module(). Probably under free_arch_cleanup label.
+>Although it would be much better to rework post_relocation() and handle it
+>right there.
+>
+>Something like
+>
+>-	return module_finalize(info->hdr, info->sechdrs, mod);
+>+	err = module_finalize(info->hdr, info->sechdrs, mod);
+>+	if (err < 0)
+>+		free_module_elf();
+>+
+>+	return err;
+
+Ah yeah, I'll clean up the error handling. I'll re-submit this as a
+real patch after cleaning it up a bit and it could be added to this
+series after review.
+
+>> Thoughts? Does the fix make sense?
+>
+>I think so.
+
+Thanks Miroslav for the impromptu review :-)
+
+Jessica
