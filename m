@@ -1,196 +1,137 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:49 +0100
-Subject: [PATCH 14/26] vgic: Add support for 52bit guest physical address
+Date: Fri, 19 Oct 2018 13:58:47 +0100
+Subject: [PATCH 12/26] kvm: arm64: Configure VTCR_EL2.SL0 per VM
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-15-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kristina Martsenko <kristina.martsenko@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Add support for handling 52bit guest physical address to the
-VGIC layer. So far we have limited the guest physical address
-to 48bits, by explicitly masking the upper bits. This patch
-removes the restriction. We do not have to check if the host
-supports 52bit as the gpa is always validated during an access.
-(e.g, kvm_{read/write}_guest, kvm_is_visible_gfn()).
-Also, the ITS table save-restore is also not affected with
-the enhancement. The DTE entries already store the bits[51:8]
-of the ITT_addr (with a 256byte alignment).
+VTCR_EL2 holds the following key stage2 translation table
+parameters:
+  SL0  - Entry level in the page table lookup.
+  T0SZ - Denotes the size of the memory addressed by the table.
+
+We have been using fixed values for the SL0 depending on the
+page size as we have a fixed IPA size. But since we are about
+to make it dynamic, we need to calculate the SL0 at runtime
+per VM. This patch adds a helper to compute the value of SL0
+for a VM based on the IPA size.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-[ Macro clean ups, fix PROPBASER and PENDBASER accesses ]
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h |  5 +++++
- virt/kvm/arm/vgic/vgic-its.c       | 36 +++++++++---------------------
- virt/kvm/arm/vgic/vgic-mmio-v3.c   |  2 --
- 3 files changed, 15 insertions(+), 28 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h | 67 +++++++++++++++++++++++---------
+ arch/arm64/kvm/reset.c           |  1 +
+ 2 files changed, 49 insertions(+), 19 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 8bdbb5f29494..74b0aa9c7499 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -357,6 +357,8 @@
- #define GITS_CBASER_RaWaWt	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWt)
- #define GITS_CBASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWb)
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index b236d90ca056..f913adb44f93 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -121,7 +121,6 @@
+ #define VTCR_EL2_IRGN0_WBWA	TCR_IRGN0_WBWA
+ #define VTCR_EL2_SL0_SHIFT	6
+ #define VTCR_EL2_SL0_MASK	(3 << VTCR_EL2_SL0_SHIFT)
+-#define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
+ #define VTCR_EL2_T0SZ_MASK	0x3f
+ #define VTCR_EL2_VS_SHIFT	19
+ #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
+@@ -144,30 +143,60 @@
+ #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+ 				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
  
-+#define GITS_CBASER_ADDRESS(cbaser)	((cbaser) & GENMASK_ULL(51, 12))
+-#ifdef CONFIG_ARM64_64K_PAGES
+ /*
+- * Stage2 translation configuration:
+- * 64kB pages (TG0 = 1)
+- * 2 level page tables (SL = 1)
++ * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
++ * Interestingly, it depends on the page size.
++ * See D.10.2.121, VTCR_EL2, in ARM DDI 0487C.a
++ *
++ *	-----------------------------------------
++ *	| Entry level		|  4K  | 16K/64K |
++ *	------------------------------------------
++ *	| Level: 0		|  2   |   -     |
++ *	------------------------------------------
++ *	| Level: 1		|  1   |   2     |
++ *	------------------------------------------
++ *	| Level: 2		|  0   |   1     |
++ *	------------------------------------------
++ *	| Level: 3		|  -   |   0     |
++ *	------------------------------------------
++ *
++ * The table roughly translates to :
++ *
++ *	SL0(PAGE_SIZE, Entry_level) = TGRAN_SL0_BASE - Entry_Level
++ *
++ * Where TGRAN_SL0_BASE is a magic number depending on the page size:
++ * 	TGRAN_SL0_BASE(4K) = 2
++ *	TGRAN_SL0_BASE(16K) = 3
++ *	TGRAN_SL0_BASE(64K) = 3
++ * provided we take care of ruling out the unsupported cases and
++ * Entry_Level = 4 - Number_of_levels.
++ *
+  */
+-#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
++#ifdef CONFIG_ARM64_64K_PAGES
 +
- #define GITS_BASER_NR_REGS		8
- 
- #define GITS_BASER_VALID			(1ULL << 63)
-@@ -388,6 +390,9 @@
- #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
- #define GITS_BASER_PHYS_52_to_48(phys)					\
- 	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
-+#define GITS_BASER_ADDR_48_to_52(baser)					\
-+	(((baser) & GENMASK_ULL(47, 16)) | (((baser) >> 12) & 0xf) << 48)
++#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_64K
++#define VTCR_EL2_TGRAN_SL0_BASE		3UL
 +
- #define GITS_BASER_SHAREABILITY_SHIFT	(10)
- #define GITS_BASER_InnerShareable					\
- 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 12502251727e..eb2a390a6c86 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -241,13 +241,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
- 	list_for_each_entry(dev, &(its)->device_list, dev_list) \
- 		list_for_each_entry(ite, &(dev)->itt_head, ite_list)
- 
+ #elif defined(CONFIG_ARM64_16K_PAGES)
 -/*
-- * We only implement 48 bits of PA at the moment, although the ITS
-- * supports more. Let's be restrictive here.
+- * Stage2 translation configuration:
+- * 16kB pages (TG0 = 2)
+- * 2 level page tables (SL = 1)
 - */
--#define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
--#define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
--
- #define GIC_LPI_OFFSET 8192
+-#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
++
++#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_16K
++#define VTCR_EL2_TGRAN_SL0_BASE		3UL
++
+ #else	/* 4K */
+-/*
+- * Stage2 translation configuration:
+- * 4kB pages (TG0 = 0)
+- * 3 level page tables (SL = 1)
+- */
+-#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
++
++#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_4K
++#define VTCR_EL2_TGRAN_SL0_BASE		2UL
++
+ #endif
  
- #define VITS_TYPER_IDBITS 16
-@@ -759,6 +752,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- {
- 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
- 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
-+	phys_addr_t base = GITS_BASER_ADDR_48_to_52(baser);
- 	int esz = GITS_BASER_ENTRY_SIZE(baser);
- 	int index;
- 	gfn_t gfn;
-@@ -783,7 +777,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- 		if (id >= (l1_tbl_size / esz))
- 			return false;
+-#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
++#define VTCR_EL2_LVLS_TO_SL0(levels)	\
++	((VTCR_EL2_TGRAN_SL0_BASE - (4 - (levels))) << VTCR_EL2_SL0_SHIFT)
++#define VTCR_EL2_SL0_TO_LVLS(sl0)	\
++	((sl0) + 4 - VTCR_EL2_TGRAN_SL0_BASE)
++#define VTCR_EL2_LVLS(vtcr)		\
++	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
++
++#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
+ /*
+  * ARM VMSAv8-64 defines an algorithm for finding the translation table
+  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 616120c4176b..1ced1e37374e 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -160,6 +160,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+ 	if (phys_shift > KVM_PHYS_SHIFT)
+ 		phys_shift = KVM_PHYS_SHIFT;
+ 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
++	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
  
--		addr = BASER_ADDRESS(baser) + id * esz;
-+		addr = base + id * esz;
- 		gfn = addr >> PAGE_SHIFT;
- 
- 		if (eaddr)
-@@ -798,7 +792,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- 
- 	/* Each 1st level entry is represented by a 64-bit value. */
- 	if (kvm_read_guest_lock(its->dev->kvm,
--			   BASER_ADDRESS(baser) + index * sizeof(indirect_ptr),
-+			   base + index * sizeof(indirect_ptr),
- 			   &indirect_ptr, sizeof(indirect_ptr)))
- 		return false;
- 
-@@ -808,11 +802,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- 	if (!(indirect_ptr & BIT_ULL(63)))
- 		return false;
- 
--	/*
--	 * Mask the guest physical address and calculate the frame number.
--	 * Any address beyond our supported 48 bits of PA will be caught
--	 * by the actual check in the final step.
--	 */
-+	/* Mask the guest physical address and calculate the frame number. */
- 	indirect_ptr &= GENMASK_ULL(51, 16);
- 
- 	/* Find the address of the actual entry */
-@@ -1304,9 +1294,6 @@ static u64 vgic_sanitise_its_baser(u64 reg)
- 				  GITS_BASER_OUTER_CACHEABILITY_SHIFT,
- 				  vgic_sanitise_outer_cacheability);
- 
--	/* Bits 15:12 contain bits 51:48 of the PA, which we don't support. */
--	reg &= ~GENMASK_ULL(15, 12);
--
- 	/* We support only one (ITS) page size: 64K */
- 	reg = (reg & ~GITS_BASER_PAGE_SIZE_MASK) | GITS_BASER_PAGE_SIZE_64K;
- 
-@@ -1325,11 +1312,8 @@ static u64 vgic_sanitise_its_cbaser(u64 reg)
- 				  GITS_CBASER_OUTER_CACHEABILITY_SHIFT,
- 				  vgic_sanitise_outer_cacheability);
- 
--	/*
--	 * Sanitise the physical address to be 64k aligned.
--	 * Also limit the physical addresses to 48 bits.
--	 */
--	reg &= ~(GENMASK_ULL(51, 48) | GENMASK_ULL(15, 12));
-+	/* Sanitise the physical address to be 64k aligned. */
-+	reg &= ~GENMASK_ULL(15, 12);
- 
- 	return reg;
- }
-@@ -1375,7 +1359,7 @@ static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
- 	if (!its->enabled)
- 		return;
- 
--	cbaser = CBASER_ADDRESS(its->cbaser);
-+	cbaser = GITS_CBASER_ADDRESS(its->cbaser);
- 
- 	while (its->cwriter != its->creadr) {
- 		int ret = kvm_read_guest_lock(kvm, cbaser + its->creadr,
-@@ -2233,7 +2217,7 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
- 	if (!(baser & GITS_BASER_VALID))
- 		return 0;
- 
--	l1_gpa = BASER_ADDRESS(baser);
-+	l1_gpa = GITS_BASER_ADDR_48_to_52(baser);
- 
- 	if (baser & GITS_BASER_INDIRECT) {
- 		l1_esz = GITS_LVL1_ENTRY_SIZE;
-@@ -2305,7 +2289,7 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
- {
- 	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
- 	u64 baser = its->baser_coll_table;
--	gpa_t gpa = BASER_ADDRESS(baser);
-+	gpa_t gpa = GITS_BASER_ADDR_48_to_52(baser);
- 	struct its_collection *collection;
- 	u64 val;
- 	size_t max_size, filled = 0;
-@@ -2354,7 +2338,7 @@ static int vgic_its_restore_collection_table(struct vgic_its *its)
- 	if (!(baser & GITS_BASER_VALID))
- 		return 0;
- 
--	gpa = BASER_ADDRESS(baser);
-+	gpa = GITS_BASER_ADDR_48_to_52(baser);
- 
- 	max_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
- 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index a2a175b08b17..b3d1f0985117 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -364,7 +364,6 @@ static u64 vgic_sanitise_pendbaser(u64 reg)
- 				  vgic_sanitise_outer_cacheability);
- 
- 	reg &= ~PENDBASER_RES0_MASK;
--	reg &= ~GENMASK_ULL(51, 48);
- 
- 	return reg;
- }
-@@ -382,7 +381,6 @@ static u64 vgic_sanitise_propbaser(u64 reg)
- 				  vgic_sanitise_outer_cacheability);
- 
- 	reg &= ~PROPBASER_RES0_MASK;
--	reg &= ~GENMASK_ULL(51, 48);
- 	return reg;
- }
- 
+ 	/*
+ 	 * Enable the Hardware Access Flag management, unconditionally
 -- 
 2.19.1
