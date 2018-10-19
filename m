@@ -1,363 +1,137 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 19 Oct 2018 19:06:56 +0300
-Subject: [PATCH 06/15] Platform: OLPC: Add XO-1.75 EC driver
-In-Reply-To: <20181010172300.317643-7-lkundrak@v3.sk>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-7-lkundrak@v3.sk>
-Message-ID: <CAHp75VcefOJHZ3WdZYrGEJFjqg2s1oJ75Jg9gKmQFre_ScAPZg@mail.gmail.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Sat, 20 Oct 2018 00:12:53 +0800
+Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
+ <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
+Message-ID: <01d07c83-b17e-70b5-6e9b-8150ee3aedf2@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 8:24 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
->
-> It's based off the driver from the OLPC kernel sources. Somewhat
-> modernized and cleaned up, for better or worse.
->
-> Modified to plug into the olpc-ec driver infrastructure (so that battery
-> interface and debugfs could be reused) and the SPI slave framework.
-
-
-> +#include <asm/system_misc.h>
-
-asm/* goes after linux/*
-
-> +#include <linux/delay.h>
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/completion.h>
-> +#include <linux/slab.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/ctype.h>
-> +#include <linux/olpc-ec.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/reboot.h>
-> +#include <linux/input.h>
-> +#include <linux/kfifo.h>
-> +#include <linux/module.h>
-> +#include <linux/power_supply.h>
-
-Easy to maintain when it's sorted.
-
-> +       { 0 },
-
-Terminators are better without trailing comma.
-
-> +#define EC_CMD_LEN             8
-> +#define EC_MAX_RESP_LEN                16
-
-> +#define LOG_BUF_SIZE           127
-
-127 sounds slightly strange. Is it by specification of protocol? Would
-it be better to define it 128 bytes / items?
-
-> +static int olpc_xo175_ec_is_valid_cmd(u8 cmd)
-> +{
-> +       const struct ec_cmd_t *p;
-> +
-> +       for (p = olpc_xo175_ec_cmds; p->cmd; p++) {
-> +               if (p->cmd == cmd)
-> +                       return p->bytes_returned;
-> +       }
-> +
-> +       return -1;
-
--EINVAL ?
-
-> +}
-
-> +static void olpc_xo175_ec_complete(void *arg);
-
-Hmm... Can we avoid forward declaration?
-
-> +       channel = priv->rx_buf[0];
-> +       byte = priv->rx_buf[1];
-
-Maybe specific structures would fit better?
-
-Like
-
-struct olpc_ec_resp_hdr {
- u8 channel;
- u8 byte;
-...
-}
-
-> +               dev_warn(dev, "kbd/tpad not supported\n");
-
-Please, spell it fully as touchpad and keyboard.
-
-> +                       pm_wakeup_event(priv->pwrbtn->dev.parent, 1000);
-
-Magic number.
-
-> +                       /* For now, we just ignore the unknown events. */
-
-dev_dbg(dev, "Ignored unknown event %.2x\n", byte);
-
-?
-
-> if (isprint(byte)) {
-> +                       priv->logbuf[priv->logbuf_len++] = byte;
-> +                       if (priv->logbuf_len == LOG_BUF_SIZE)
-> +                               olpc_xo175_ec_flush_logbuf(priv);
-> +               }
-
-You may consider to take everything and run %pE when printing instead of %s.
-
-> +static int olpc_xo175_ec_cmd(u8 cmd, u8 *inbuf, size_t inlen, u8 *resp,
-> +                                       size_t resp_len, void *ec_cb_arg)
-> +{
-> +       struct olpc_xo175_ec *priv = ec_cb_arg;
-> +       struct device *dev = &priv->spi->dev;
-> +       unsigned long flags;
-> +       int nr_bytes;
-> +       int ret = 0;
-> +
-> +       dev_dbg(dev, "CMD %x, %d bytes expected\n", cmd, resp_len);
-> +
-> +       if (inlen > 5) {
-
-Magic number.
-
-> +               dev_err(dev, "command len %d too big!\n", resp_len);
-> +               return -EOVERFLOW;
-> +       }
-
-> +       WARN_ON(priv->suspended);
-> +       if (priv->suspended)
-
-if (WARN_ON(...)) ?
-
-> +               return -EBUSY;
-
-> +       if (resp_len > nr_bytes)
-> +               resp_len = nr_bytes;
-
-resp_len = min(resp_len, nr_bytes);
-
-> +       priv->cmd[0] = cmd;
-> +       priv->cmd[1] = inlen;
-> +       priv->cmd[2] = 0;
-
-Perhaps specific struct header for this?
-
-> +       memset(resp, 0, resp_len);
-
-Wouldn't be better to do this in where actual response has been filled?
-
-> +       if (!wait_for_completion_timeout(&priv->cmd_done,
-> +                       msecs_to_jiffies(4000))) {
-
-Magic number.
-
-> +       }
-
-> +       /* Deal with the results. */
-
-Somehow feels noisy / unneeded comment.
-
-> +       if (priv->cmd_state == CMD_STATE_ERROR_RECEIVED) {
-> +               /* EC-provided error is in the single response byte */
-> +               dev_err(dev, "command 0x%x returned error 0x%x\n",
-> +                                                       cmd, priv->resp[0]);
-
-Indentation.
-
-> +               ret = -EREMOTEIO;
-> +       } else if (priv->resp_len != nr_bytes) {
-
-> +               dev_err(dev, "command 0x%x returned %d bytes, expected %d bytes\n",
-> +                                               cmd, priv->resp_len, nr_bytes);
-> +               ret = -ETIMEDOUT;
-
-In the message I see nothing about timeout.
-
-> +       } else {
-
-> +       }
-
-> +}
-
-
-> +static int olpc_xo175_ec_set_event_mask(unsigned int mask)
-> +{
-> +       unsigned char args[2];
-
-u8
-
-> +
-> +       args[0] = mask & 0xff;
-> +       args[1] = (mask >> 8) & 0xff;
-
-...mask >> 0;
-...mask >> 8;
-
-> +       return olpc_ec_cmd(CMD_WRITE_EXT_SCI_MASK, args, 2, NULL, 0);
-> +}
-
-> +
-> +static void olpc_xo175_ec_restart(enum reboot_mode mode, const char *cmd)
-> +{
-> +       while (1) {
-> +               olpc_ec_cmd(CMD_POWER_CYCLE, NULL, 0, NULL, 0);
-> +               mdelay(1000);
-> +       }
-> +}
-> +
-
-> +static void olpc_xo175_ec_power_off(void)
-> +{
-> +       while (1) {
-> +               olpc_ec_cmd(CMD_POWER_OFF, NULL, 0, NULL, 0);
-> +               mdelay(1000);
-> +       }
-> +}
-> +
-
-> +#ifdef CONFIG_PM
-> +static int olpc_xo175_ec_suspend(struct device *dev)
-
-__maybe_unused  instead of ugly #ifdef?
-
-> +{
-
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct olpc_xo175_ec *priv = platform_get_drvdata(pdev);
-
-dev_get_drvdata() or how is it called?
-
-> +       unsigned char hintargs[5];
-
-struct olpc_ec_hint_cmd {
-u8 ...
-u32 ...
-};
-
-?
-
-> +       static unsigned int suspend_count;
-
-u32 I suppose.
-
-> +
-> +       suspend_count++;
-> +       dev_dbg(dev, "%s: suspend sync %08x\n", __func__, suspend_count);
-
-__func__ can be issued if user asked for via Dynamic Debug interface.
-
-> +       /*
-> +        * First byte is 1 to indicate suspend, the rest is an integer
-> +        * counter.
-> +        */
-> +       hintargs[0] = 1;
-> +       memcpy(&hintargs[1], &suspend_count, 4);
-> +       olpc_ec_cmd(CMD_SUSPEND_HINT, hintargs, 5, NULL, 0);
-
-What do you need this counter for?
-
-> +       priv->suspended = true;
-
-Hmm... Who is the user of it?
-
-> +       return 0;
-> +}
-> +
-> +static int olpc_xo175_ec_resume_noirq(struct device *dev)
-> +{
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct olpc_xo175_ec *priv = platform_get_drvdata(pdev);
-> +
-> +       priv->suspended = false;
-> +
-> +       return 0;
-> +}
-> +
-> +static int olpc_xo175_ec_resume(struct device *dev)
-> +{
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct olpc_xo175_ec *priv = platform_get_drvdata(pdev);
-
-> +       unsigned char x = 0;
-
-u8
-
-> +       priv->suspended = false;
-
-Isn't it redundant since noirq callback above?
-
-> +       /*
-> +        * The resume hint is only needed if no other commands are
-> +        * being sent during resume. all it does is tell the EC
-> +        * the SoC is definitely awake.
-> +        */
-> +       olpc_ec_cmd(CMD_SUSPEND_HINT, &x, 1, NULL, 0);
-> +
-
-> +       /* Enable all EC events while we're awake */
-> +       olpc_xo175_ec_set_event_mask(0xffff);
-
-#define EC_ALL_EVENTS GENMASK(15, 0)
-
-> +}
-> +#endif
-
-> +static struct platform_device *olpc_ec;
-
-I would rather see this at the top of file.
-
-> +static int olpc_xo175_ec_probe(struct spi_device *spi)
-> +{
-
-> +       if (olpc_ec) {
-> +               dev_err(&spi->dev, "OLPC EC already registered.\n");
-> +               return -EBUSY;
-> +       }
-
-It's racy against parallel probe called. I don't think it would be a
-real issue, just let you know.
-
-
-> +       /* Set up power button input device */
-> +       priv->pwrbtn = devm_input_allocate_device(&spi->dev);
-> +       if (!priv->pwrbtn)
-> +               return -ENOMEM;
-> +       priv->pwrbtn->name = "Power Button";
-> +       priv->pwrbtn->dev.parent = &spi->dev;
-> +       input_set_capability(priv->pwrbtn, EV_KEY, KEY_POWER);
-> +       ret = input_register_device(priv->pwrbtn);
-> +       if (ret) {
-> +               dev_err(&spi->dev, "error registering input device: %d\n", ret);
-> +               return ret;
-> +       }
-
-I would split out power button driver, but it's up to you.
-
-
-> +       /* Enable all EC events while we're awake */
-> +       olpc_xo175_ec_set_event_mask(0xffff);
-
-See above about this magic.
-
-> +}
-
-> +#ifdef CONFIG_PM
-> +       .suspend        = olpc_xo175_ec_suspend,
-> +       .resume_noirq   = olpc_xo175_ec_resume_noirq,
-> +       .resume         = olpc_xo175_ec_resume,
-> +#endif
-
-SET_SYSTEM_SLEEP_PM_OPS() ?
-SET_NOIRQ_SYSTEM_SLEEP_PM_OPS() ?
-
-> +static const struct of_device_id olpc_xo175_ec_of_match[] = {
-> +       { .compatible = "olpc,xo1.75-ec" },
-
-> +       { },
-
-No comma for terminators.
-
-> +};
-
--- 
-With Best Regards,
-Andy Shevchenko
+On 2018/10/19 1:13, Stephen Boyd wrote:
+> Quoting Jianxin Pan (2018-10-17 22:07:25)
+>> diff --git a/drivers/clk/meson/clk-regmap.c b/drivers/clk/meson/clk-regmap.c
+>> index 305ee30..f96314d 100644
+>> --- a/drivers/clk/meson/clk-regmap.c
+>> +++ b/drivers/clk/meson/clk-regmap.c
+>> @@ -113,8 +113,25 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, unsigned long rate,
+>>                                   clk_div_mask(div->width) << div->shift, val);
+>>  };
+>>  
+>> -/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
+>> +static void clk_regmap_div_init(struct clk_hw *hw)
+>> +{
+>> +       struct clk_regmap *clk = to_clk_regmap(hw);
+>> +       struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk);
+>> +       unsigned int val;
+>> +       int ret;
+>> +
+>> +       ret = regmap_read(clk->map, div->offset, &val);
+>> +       if (ret)
+>> +               return;
+>>  
+>> +       val &= (clk_div_mask(div->width) << div->shift);
+>> +       if (!val)
+>> +               regmap_update_bits(clk->map, div->offset,
+>> +                                  clk_div_mask(div->width) << div->shift,
+>> +                                  clk_div_mask(div->width));
+>> +}
+>> +
+>> +/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
+> 
+> We should add a patch to rename the symbol for qcom, i.e.
+> qcom_clk_regmap_div_ro_ops, and then any symbols in this directory
+> should be meson_clk_regmap_div_ro_ops.
+"/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */"
+This comment is not introduced in this patch.
+I followed the naming style in this file and add clk_regmap_divider_with_init_ops.
+
+@Jerome? What's your suggestion about this?
+> 
+> Or we should just give up and squash the regmap implementations together
+> into a new clk_regmap set of ops.
+> 
+>>  const struct clk_ops clk_regmap_divider_ops = {
+>>         .recalc_rate = clk_regmap_div_recalc_rate,
+>>         .round_rate = clk_regmap_div_round_rate,
+>> diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
+>> new file mode 100644
+>> index 0000000..5555e3f
+>> --- /dev/null
+>> +++ b/drivers/clk/meson/mmc-clkc.c
+>> @@ -0,0 +1,296 @@
+>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>> +/*
+>> + * Amlogic Meson MMC Sub Clock Controller Driver
+>> + *
+>> + * Copyright (c) 2017 Baylibre SAS.
+>> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+>> + *
+>> + * Copyright (c) 2018 Amlogic, inc.
+>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
+>> + */
+>> +
+>> +#include <linux/clk.h>
+> 
+> clk-provider.h instead of clk.h?
+OK.
+> 
+>> +#include <linux/module.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/platform_device.h>
+>> +#include <dt-bindings/clock/amlogic,mmc-clkc.h>
+>> +
+>> +
+> [...]
+>> +
+>> +static struct clk_regmap *
+>> +mmc_clkc_register_clk_with_parent(struct device *dev, struct regmap *map,
+>> +                                 char *suffix, const char *parent,
+>> +                                 unsigned long flags,
+>> +                                 const struct clk_ops *ops, void *data)
+>> +{
+>> +       struct clk_init_data init;
+>> +       struct clk_regmap *clk;
+>> +
+>> +       init.ops = ops;
+>> +       init.flags = flags;
+>> +       init.parent_names = (const char* const []){ parent, };
+> 
+> Can't we just assign &parent here?
+OK. I will fix it in the next version.
+> 
+>> +       init.num_parents = 1;
+>> +
+>> +       clk = mmc_clkc_register_clk(dev, map, &init, suffix, data);
+>> +       if (IS_ERR(clk))
+>> +               dev_err(dev, "Core %s clock registration failed\n", suffix);
+>> +
+>> +       return clk;
+>> +}
+>> +
+>> +static int mmc_clkc_probe(struct platform_device *pdev)
+>> +{
+>> +       struct clk_hw_onecell_data *onecell_data;
+>> +       struct device *dev = &pdev->dev;
+>> +       struct mmc_clkc_data *data;
+>> +       struct regmap *map;
+>> +       struct clk_regmap *mux, *div, *core, *rx, *tx;
+>> +
+>> +       data = (struct mmc_clkc_data *)of_device_get_match_data(dev);
+> 
+> Nitpick: Drop the cast.
+OK. I will drop it.
+Thanks for the review.
+
+> 
+>> +       if (!data)
+>> +               return -ENODEV;
+>> +
+>> +       map = syscon_node_to_regmap(dev->of_node);
+> 
+> .
+> 
