@@ -1,199 +1,130 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Fri, 19 Oct 2018 13:59:01 +0200 (CEST)
-Subject: [PATCH v3 3/4] arm64: implement live patching
-In-Reply-To: <20181018125820.iw54zbirq74ulknj@linux-8ccs>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
- <20181018125820.iw54zbirq74ulknj@linux-8ccs>
-Message-ID: <alpine.LSU.2.21.1810191338020.4692@pobox.suse.cz>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 19 Oct 2018 14:08:46 +0200
+Subject: [PATCH 00/12] introduce support for early platform drivers
+In-Reply-To: <20180511162028.20616-1-brgl@bgdev.pl>
+References: <20180511162028.20616-1-brgl@bgdev.pl>
+Message-ID: <CAMRc=MdShqv00spBgOu1=YfG9enZ6umPss7kfi=XRV=J6S3qGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Oct 2018, Jessica Yu wrote:
+pt., 11 maj 2018 o 18:21 Bartosz Golaszewski <brgl@bgdev.pl> napisa?(a):
+>
+> This series is a follow-up to the RFC[1] posted a couple days ago.
+>
+> NOTE: this series applies on top of my recent patches[2] that move the previous
+> implementation of early platform devices to arch/sh.
+>
+> Problem:
+>
+> Certain class of devices, such as timers, certain clock drivers and irq chip
+> drivers need to be probed early in the boot sequence. The currently preferred
+> approach is using one of the OF_DECLARE() macros. This however does not create
+> a platform device which has many drawbacks - such as not being able to use
+> devres routines, dev_ log functions or no way of deferring the init OF function
+> if some other resources are missing.
+>
+> For drivers that use both platform drivers and OF_DECLARE the situation is even
+> more complicated as the code needs to take into account that there can possibly
+> be no struct device present. For a specific use case that we're having problems
+> with, please refer to the recent DaVinci common-clock conversion patches and
+> the nasty workaround that this problem implies[3].
+>
+> We also used to have an early platform drivers implementation but they were not
+> integrated with the linux device model at all - they merely used the same data
+> structures. The users could not use devres, defer probe and the early devices
+> never became actual platform devices later on.
+>
+> Proposed solution:
+>
+> This series aims at solving this problem by (re-)introducing the concept of
+> early platform drivers and devices - this time however in a way that seamlessly
+> integrates with the existing platform drivers and also offers device-tree
+> support.
+>
+> The idea is to provide a way for users to probe devices early, while already
+> being able to use devres, devices resources and properties and also deferred
+> probing.
+>
+> New structures are introduced: the early platform driver contains the
+> early_probe callback which has the same signature as regular platform_device
+> probe. This callback is called early on. The user can have both the early and
+> regular probe speficied or only one of them and they both receive the same
+> platform device object as argument. Any device data allocated early will be
+> carried over to the normal probe.
+>
+> The architecture code is responsible for calling early_platform_start() in
+> which the early drivers will be registered and devices populated from DT.
+>
+> Once the device and kobject mechanisms are ready, all early drivers and devices
+> will be converted into real platform drivers and devices. Also: if any of the
+> early platform registration functions will be called once early initialization
+> is done, these functions will work like regular platform_device/driver ones.
+>
+> Patches 1-9/12 introduce changes to existing code that are necessary before
+> adding support for early drivers. Patch 10/12 contains the new framwork in an
+> isolated file which can be compiled only if needed by the architecture.
+>
+> Patch 11/12 contains a dummy early platform driver that serves as a code
+> example and can be used for simple testing.
+>
+> The last patch finally makes the of/platform code aware of early platform
+> drivers.
+>
+> If accepted, this new mechanism could potentially lead to consolidation of the
+> code currently used by users of OF_DECLARE, since they could be converted to
+> actual platform drivers.
+>
+> [1] https://lkml.org/lkml/2018/4/26/657
+> [2] https://lkml.org/lkml/2018/4/30/547
+> [3] https://lkml.org/lkml/2018/4/26/1094
+>
+> Bartosz Golaszewski (12):
+>   platform/early: add a new field to struct device
+>   platform/early: don't WARN() on non-empty devres list for early
+>     devices
+>   platform/early: export platform_match() locally
+>   platform: provide a separate function for initializing platform
+>     devices
+>   platform: export platform_device_release() locally
+>   of: add a new flag for OF device nodes
+>   of/platform: provide a separate routine for setting up device
+>     resources
+>   of/platform: provide a separate routine for device initialization
+>   platform/early: add an init section for early driver data
+>   platform/early: implement support for early platform drivers
+>   misc: implement a dummy early platform driver
+>   of/platform: make the OF code aware of early platform drivers
+>
+>  drivers/base/Kconfig              |   3 +
+>  drivers/base/Makefile             |   1 +
+>  drivers/base/base.h               |   4 +
+>  drivers/base/dd.c                 |   2 +-
+>  drivers/base/early.c              | 332 ++++++++++++++++++++++++++++++
+>  drivers/base/platform.c           |  28 ++-
+>  drivers/misc/Kconfig              |   8 +
+>  drivers/misc/Makefile             |   2 +
+>  drivers/misc/dummy-early.c        |  82 ++++++++
+>  drivers/of/platform.c             |  85 +++++---
+>  include/asm-generic/vmlinux.lds.h |  11 +
+>  include/linux/device.h            |   1 +
+>  include/linux/early_platform.h    |  75 +++++++
+>  include/linux/of.h                |   1 +
+>  include/linux/of_platform.h       |   2 +
+>  include/linux/platform_device.h   |   2 +
+>  16 files changed, 604 insertions(+), 35 deletions(-)
+>  create mode 100644 drivers/base/early.c
+>  create mode 100644 drivers/misc/dummy-early.c
+>  create mode 100644 include/linux/early_platform.h
+>
+> --
+> 2.17.0
+>
 
-> +++ Miroslav Benes [17/10/18 15:39 +0200]:
-> >On Mon, 1 Oct 2018, Torsten Duwe wrote:
-> >
-> >Ad relocations. I checked that everything in struct mod_arch_specific
-> >stays after the module is load. Both core and init get SHF_ALLOC set
-> >(mod->arch.core.plt->sh_flags in module_frob_arch_sections(). It is
-> >important because apply_relocate_add() may use those sections
-> >through module_emit_plt_entry() call.
-> 
-> Yes, it looks like the needed .plt sections will remain in module
-> memory. However, I think I found a slight issue... :/
-> 
-> In module_frob_arch_sections(), mod->arch.core.plt is set to an offset
-> within info->sechdrs:
-> 
->             if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
->                     mod->arch.core.plt = sechdrs + i;
-> 
-> sechdrs is from info->sechdrs, which is freed at the end of
-> load_module() via free_copy(). So although the relevant plt section(s)
-> are in module memory, mod->arch.core.plt will point to invalid memory
-> after info is freed. In other words, the section (.plt) *is* in memory
-> but the section header (struct elf64_shdr) containing section metadata
-> like sh_addr, sh_size etc., is not.
-> 
-> But we have mod->klp_info->sechdrs (which is a copy of the section
-> headers) for this very reason. It is initialized only at the very end
-> of load_module(). I don't think copy_module_elf() is dependent on
-> anything, so it can just be moved earlier.
-> 
-> Note that we cannot set mod->arch.core.plt to mod->klp_info->sechdrs + i
-> during module_frob_arch_sections() because it is still too early, none
-> of the module sections have been copied and none of their sh_addr's
-> have been set to their final locations as this is all happening before
-> move_module() is called. So we can use a module_finalize() function
-> for arm64 to switch the mod->arch.core.plt to use the klp_info section
-> headers.
+Hi
 
-Thanks for the analysis. You seem to be right.
- 
-> Maybe this will be more clear in the example fix below (completely
-> untested and unreviewed!):
-> 
-> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-> index 97d0ef12e2ff..150afc29171b 100644
-> --- a/arch/arm64/include/asm/module.h
-> +++ b/arch/arm64/include/asm/module.h
-> @@ -25,6 +25,7 @@ struct mod_plt_sec {
-> 	struct elf64_shdr	*plt;
-> 	int			plt_num_entries;
-> 	int			plt_max_entries;
-> +	int			plt_shndx;
-> };
-> 
-> struct mod_arch_specific {
-> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-> index f0690c2ca3e0..c23cef8f0165 100644
-> --- a/arch/arm64/kernel/module-plts.c
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -196,6 +196,21 @@ static unsigned int count_plts(Elf64_Sym *syms,
-> Elf64_Rela *rela, int num,
-> 	return ret;
-> }
-> 
-> +int module_finalize(const Elf_Ehdr *hdr, const Elf_Shdr *sechdrs,
-> +		    struct module *mod)
-> +{
-> +	/*
-> +	 * Livepatch modules need to keep access to section headers to apply
-> +	 * relocations. Note mod->klp_info should have already been
-> initialized
-> +	 * and all section sh_addr's should have their final addresses by the
-> +	 * time module_finalize() is called.
-> +	 */
-> +	if (is_livepatch_module(mod))
-> +		mod->arch.core.plt = mod->klp_info->sechdrs +
-> mod->arch.core.plt_shndx;
-> +
-> +	return 0;
-> +}
+For anyone interested: I'll be doing a BoF about early platform
+drivers next week on Monday at 6:00pm during the ELCE 2018 in
+Edinburgh. It would be great to discuss this topic personally.
 
-There is already module_finalize() in arch/arm64/kernel/module.c, so this 
-should probably go there.
-
-If I am not mistaken, we do not care for arch.init.plt in livepatch. Is 
-that correct?
-
-> int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
-> 			      char *secstrings, struct module *mod)
-> {
-> @@ -210,11 +225,13 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
-> 	 * entries. Record the symtab address as well.
-> 	 */
-> 	for (i = 0; i < ehdr->e_shnum; i++) {
-> -		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
-> +		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt")) {
-> 			mod->arch.core.plt = sechdrs + i;
-> -		else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> ".init.plt"))
-> +			mod->arch.core.plt_shndx = i;
-> +		} else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> ".init.plt")) {
-> 			mod->arch.init.plt = sechdrs + i;
-> -		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
-> +			mod->arch.init.plt_shndx = i;
-
-It is initialized here, but that's not necessarily a bad thing.
-
-> +		} else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
-> 			 !strcmp(secstrings + sechdrs[i].sh_name,
-> 				 ".text.ftrace_trampoline"))
-> 			tramp = sechdrs + i;
-> diff --git a/kernel/module.c b/kernel/module.c
-> index 6746c85511fe..2fc4d74288dd 100644
-> --- a/kernel/module.c
-> +++ b/kernel/module.c
-> @@ -3363,6 +3363,12 @@ static int post_relocation(struct module *mod, const
-> struct load_info *info)
-> 	/* Setup kallsyms-specific fields. */
-> 	add_kallsyms(mod, info);
-> 
-> +	if (is_livepatch_module(mod)) {
-> +		err = copy_module_elf(mod, info);
-> +		if (err < 0)
-> +			return err;
-> +	}
-> +
-> 	/* Arch-specific module finalizing. */
-> 	return module_finalize(info->hdr, info->sechdrs, mod);
-> }
-> @@ -3775,12 +3781,6 @@ static int load_module(struct load_info *info, const
-> char __user *uargs,
-> 	if (err < 0)
-> 		goto coming_cleanup;
-> 
-> -	if (is_livepatch_module(mod)) {
-> -		err = copy_module_elf(mod, info);
-> -		if (err < 0)
-> -			goto sysfs_cleanup;
-> -	}
-> -
-> 	/* Get rid of temporary copy. */
-> 	free_copy(info);
-
-Hm, this is hopefully all right. We'd need to change the error handling a 
-bit. free_module_elf() is now called in free_module() and it should be 
-moved somewhere to load_module(). Probably under free_arch_cleanup label. 
-Although it would be much better to rework post_relocation() and handle it 
-right there.
-
-Something like
-
--	return module_finalize(info->hdr, info->sechdrs, mod);
-+	err = module_finalize(info->hdr, info->sechdrs, mod);
-+	if (err < 0)
-+		free_module_elf();
-+
-+	return err;
-
-> Thoughts? Does the fix make sense?
-
-I think so.
-
-> >The last thing is count_plts() function called from
-> >module_frob_arch_sections(). It needed to be changed in 2016 as well. See
-> >Jessica's patch
-> >(20160713001113.GA30925 at packer-debian-8-amd64.digitalocean.com). The logic
-> >in the function has changed since then. If I am not mistaken,
-> >count_plts() is fine as it is right now. It does not consider SHN_UNDEF
-> >anymore, it looks at the destination section (where a symbol should
-> >resolved to) only.
-> >
-> >Jessica, could you doublecheck, please?
-> 
-> Yes, I think count_plts() is fine now in this case (because it is
-> always true that sym->st_shndx != dstidx for SHN_LIVEPATCH symbols)
-> and my old patch from 2016 is no longer needed.
-
-Thanks a lot, Jessica.
-
-Torsten, could you include the outcome to your patch set once we settle on 
-it? Thanks.
-
-Miroslav
+Best regards and hope to see you there
+Bartosz Golaszewski
