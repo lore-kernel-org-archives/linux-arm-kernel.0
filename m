@@ -1,104 +1,54 @@
-From: qiangqing.zhang@nxp.com (Joakim Zhang)
-Date: Fri, 19 Oct 2018 09:42:47 +0000
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Add flexcan support
-Message-ID: <20181019094031.22492-1-qiangqing.zhang@nxp.com>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino)
+Date: Fri, 19 Oct 2018 10:04:42 +0100
+Subject: [PATCH v7 0/8] arm64: untag user pointers passed to the kernel
+In-Reply-To: <CAFKCwrh4-BvFB_R1J0LWcbfeR=d02OazowFuMU+hmq8Y=Dx+4w@mail.gmail.com>
+References: <cover.1538485901.git.andreyknvl@google.com>
+ <be684ce5-92fd-e970-b002-83452cf50abd@arm.com>
+ <CAAeHK+yEZTLjgSj8YUzeJec9Pp2TwuLT5nCa1OpfBLXJkx_hhg@mail.gmail.com>
+ <CAFKCwrh4-BvFB_R1J0LWcbfeR=d02OazowFuMU+hmq8Y=Dx+4w@mail.gmail.com>
+Message-ID: <9bb7fefd-3f8f-266a-3cc9-cc64f8927206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <aisheng.dong@nxp.com>
+On 10/17/18 9:25 PM, Evgenii Stepanov wrote:
+> On Wed, Oct 17, 2018 at 7:20 AM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>> On Wed, Oct 17, 2018 at 4:06 PM, Vincenzo Frascino
+>> <vincenzo.frascino@arm.com> wrote:
+>>> Hi Andrey,
+>>> I have been thinking a bit lately on how to address the problem of user tagged pointers passed to the kernel through syscalls, and IMHO probably the best way we have to catch them all and make sure that the approach is maintainable in the long term is to introduce shims that tag/untag the pointers passed to the kernel.
+>>>
+>>> In details, what I am proposing can live either in userspace (preferred solution so that we do not have to relax the ABI) or in kernel space and can be summarized as follows:
+>>>  - A shim is specific to a syscall and is called by the libc when it needs to invoke the respective syscall.
+>>>  - It is required only if the syscall accepts pointers.
+>>>  - It saves the tags of a pointers passed to the syscall in memory (same approach if the we are passing a struct that contains pointers to the kernel, with the difference that all the tags of the pointers in the struct need to be saved singularly)
+>>>  - Untags the pointers
+>>>  - Invokes the syscall
+>>>  - Retags the pointers with the tags stored in memory
+>>>  - Returns
+>>>
+>>> What do you think?
+>>
+>> Hi Vincenzo,
+>>
+>> If I correctly understand what you are proposing, I'm not sure if that
+>> would work with the countless number of different ioctl calls. For
+>> example when an ioctl accepts a struct with a bunch of pointer fields.
+>> In this case a shim like the one you propose can't live in userspace,
+>> since libc doesn't know about the interface of all ioctls, so it can't
+>> know which fields to untag. The kernel knows about those interfaces
+>> (since the kernel implements them), but then we would need a custom
+>> shim for each ioctl variation, which doesn't seem practical.
+> 
+> The current patchset handles majority of pointers in a just a few
+> common places, like copy_from_user. Userspace shims will need to untag
+> & retag all pointer arguments - we are looking at hundreds if not
+> thousands of shims. They will also be located in a different code base
+> from the syscall / ioctl implementations, which would make them
+> impossible to keep up to date.
+> 
 
-CAN transceiver is different on RevA and RevB board.
-It's active high on RevA while active low on Rev B.
+I agree with both of you, ioctl is the real show stopper for this approach. Thanks for pointing this out.
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
----
- arch/arm/boot/dts/imx6sx-sdb.dts  |  5 ++++
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 42 +++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 6dd9bebfe027..092b8de142a8 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -10,6 +10,11 @@
- 
- / {
- 	model = "Freescale i.MX6 SoloX SDB RevB Board";
-+
-+	/* Transceiver EN/STBY is active low on RevB board */
-+	reg_can_stby: regulator-can-stby {
-+		gpio = <&gpio4 27 GPIO_ACTIVE_LOW>;
-+	};
- };
- 
- &i2c1 {
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index f8f31872fa14..e37ec4b396a2 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -136,6 +136,20 @@
- 		regulator-max-microvolt = <5000000>;
- 	};
- 
-+	reg_can_en: regulator-can-en {
-+		compatible = "regulator-fixed";
-+		regulator-name = "can-en";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_can_stby: regulator-can-stby {
-+		compatible = "regulator-fixed";
-+		regulator-name = "can-stby";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
- 	sound {
- 		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
- 		model = "wm8962-audio";
-@@ -202,6 +216,20 @@
- 	status = "okay";
- };
- 
-+&flexcan1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	xceiver-supply = <&reg_can_stby>;
-+	status = "okay";
-+};
-+
-+&flexcan2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	xceiver-supply = <&reg_can_stby>;
-+	status = "okay";
-+};
-+
- &i2c3 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
-@@ -397,6 +425,20 @@
- 			>;
- 		};
- 
-+		pinctrl_flexcan1: flexcan1grp {
-+			fsl,pins = <
-+				MX6SX_PAD_QSPI1B_DQS__CAN1_TX		0x1b020
-+				MX6SX_PAD_QSPI1A_SS1_B__CAN1_RX		0x1b020
-+			>;
-+		};
-+
-+		pinctrl_flexcan2: flexcan2grp {
-+			fsl,pins = <
-+				MX6SX_PAD_QSPI1B_SS1_B__CAN2_RX		0x1b020
-+				MX6SX_PAD_QSPI1A_DQS__CAN2_TX		0x1b020
-+			>;
-+		};
-+
- 		pinctrl_gpio_keys: gpio_keysgrp {
- 			fsl,pins = <
- 				MX6SX_PAD_CSI_DATA04__GPIO1_IO_18 0x17059
 -- 
-2.17.1
+Regards,
+Vincenzo
