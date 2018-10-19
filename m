@@ -1,61 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:58 +0100
-Subject: [PATCH 23/26] KVM: arm64: Fix caching of host MDCR_EL2 value
+Date: Fri, 19 Oct 2018 13:58:56 +0100
+Subject: [PATCH 21/26] arm64: KVM: Remove some extra semicolon in
+ kvm_target_cpu
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-24-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-22-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: zhong jiang <zhongjiang@huawei.com>
 
-At boot time, KVM stashes the host MDCR_EL2 value, but only does this
-when the kernel is not running in hyp mode (i.e. is non-VHE). In these
-cases, the stashed value of MDCR_EL2.HPMN happens to be zero, which can
-lead to CONSTRAINED UNPREDICTABLE behaviour.
+There are some extra semicolon in kvm_target_cpu, remove it.
 
-Since we use this value to derive the MDCR_EL2 value when switching
-to/from a guest, after a guest have been run, the performance counters
-do not behave as expected. This has been observed to result in accesses
-via PMXEVTYPER_EL0 and PMXEVCNTR_EL0 not affecting the relevant
-counters, resulting in events not being counted. In these cases, only
-the fixed-purpose cycle counter appears to work as expected.
-
-Fix this by always stashing the host MDCR_EL2 value, regardless of VHE.
-
-Cc: Christopher Dall <christoffer.dall@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: stable at vger.kernel.org
-Fixes: 1e947bad0b63b351 ("arm64: KVM: Skip HYP setup when already running in HYP")
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/guest.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 4ce99bb223bc..4c5ff06b18f9 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1296,8 +1296,6 @@ static void cpu_init_hyp_mode(void *dummy)
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 07256b08226c..a74f84d09412 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -338,15 +338,15 @@ int __attribute_const__ kvm_target_cpu(void)
+ 			return KVM_ARM_TARGET_CORTEX_A53;
+ 		case ARM_CPU_PART_CORTEX_A57:
+ 			return KVM_ARM_TARGET_CORTEX_A57;
+-		};
++		}
+ 		break;
+ 	case ARM_CPU_IMP_APM:
+ 		switch (part_number) {
+ 		case APM_CPU_PART_POTENZA:
+ 			return KVM_ARM_TARGET_XGENE_POTENZA;
+-		};
++		}
+ 		break;
+-	};
++	}
  
- 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
- 	__cpu_init_stage2();
--
--	kvm_arm_init_debug();
- }
- 
- static void cpu_hyp_reset(void)
-@@ -1315,6 +1313,8 @@ static void cpu_hyp_reinit(void)
- 	else
- 		cpu_init_hyp_mode(NULL);
- 
-+	kvm_arm_init_debug();
-+
- 	if (vgic_present)
- 		kvm_vgic_init_cpu_hardware();
- }
+ 	/* Return a default generic target */
+ 	return KVM_ARM_TARGET_GENERIC_V8;
 -- 
 2.19.1
