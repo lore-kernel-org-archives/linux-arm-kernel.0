@@ -1,61 +1,38 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri, 19 Oct 2018 12:17:03 +0200
-Subject: [PATCH v1 2/3] i2c: imx: probe dma only only on i.MX50 and later.
-In-Reply-To: <20181019092145.6zihrnduyypzo5x2@pengutronix.de>
-References: <20181018112615.29362-1-o.rempel@pengutronix.de>
- <20181018112615.29362-3-o.rempel@pengutronix.de>
- <20181019071243.t5bwcmnnlqrgtajj@pengutronix.de>
- <20181019090100.6vcergf6txgxt7fo@pengutronix.de>
- <20181019092145.6zihrnduyypzo5x2@pengutronix.de>
-Message-ID: <20181019101703.qmgljhldymq3xtj3@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Oct 2018 11:17:32 +0100
+Subject: [PATCH] arm64: KVM: Guests can skip __install_bp_hardening_cb()s
+ HYP work
+In-Reply-To: <20180921204919.5790-1-james.morse@arm.com>
+References: <20180921204919.5790-1-james.morse@arm.com>
+Message-ID: <de8be744-525a-2b75-ef77-e66d7fbabc40@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 11:21:45AM +0200, Uwe Kleine-K?nig wrote:
-> On Fri, Oct 19, 2018 at 11:01:00AM +0200, Oleksij Rempel wrote:
-> > On Fri, Oct 19, 2018 at 09:12:43AM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello Oleksij,
-> > > 
-> > > On Thu, Oct 18, 2018 at 01:26:14PM +0200, Oleksij Rempel wrote:
-> > > > The DMA support for I2C was introduced on i.MX50. So,
-> > > > avoid of DMA probing on not supported versions.
-> > > 
-> > > What is the obvious downside of trying to use DMA on i.MX21? If the
-> > > purpose is just to suppress the message
-> > > 
-> > > 	can't request DMA tx channel
-> > > 
-> > > , that goes away with patch 3, too.
-> > > 
-> > > Note that if we agree that i.MX50 (and later) isn't compatible to
-> > > i.MX21, all device trees should be fixed accordingly. IMHO the
-> > > difference "There is a DMA engine connected only on some
-> > > implementations" doesn't give enough incentive to claim that i.MX21 and
-> > > i.MX50 must not share the compatible.
-> > 
-> > I don't see any sense to do allocation and add extra probes just to find
-> > what we already know from compatible.
+On 21/09/18 21:49, James Morse wrote:
+> enable_smccc_arch_workaround_1() passes NULL as the hyp_vecs start and
+> end if the HVC conduit is in use, and ARM_SMCCC_ARCH_WORKAROUND_1 is
+> detected.
 > 
-> I think it's perfectly fine to only notice that there is no DMA support
-> when trying to set it up. It has slight runtime overhead, yes, but being
-> able to handle imx21 and imx50 in the same way is a nice advantage that
-> I don't want to throw away easily.
+> If the guest kernel happened to be built with KVM_INDIRECT_VECTORS,
+> we go on to allocate a slot, memcpy() the empty workaround in and
+> do the appropriate cache maintenance.
 > 
-> If you care about the allocation, you can do do the calls to
-> dma_request_chan first and assign to local variables before the
-> allocation of *dma.
+> This works as we always tell memcpy() the range is 0, so it never
+> accesses the NULL src pointer, but we still do the cache maintenance.
+> 
+> If hyp_vecs_start is NULL we know we're a guest, just update the fn
+> like the !KVM_INDIRECT_VECTORS version.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
-Ok, then we can drop this patch.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
+Catalin: could you sneak this one in for 4.20? It is strictly a KVM
+patch, but its location makes it more suitable for the arm64 tree...
+
+Thanks,
+
+	M.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181019/37dc7490/attachment.sig>
+Jazz is not dead. It just smells funny...
