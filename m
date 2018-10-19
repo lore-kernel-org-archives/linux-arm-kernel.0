@@ -1,190 +1,86 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:46 +0100
-Subject: [PATCH 11/26] kvm: arm64: Dynamic configuration of VTTBR mask
+Date: Fri, 19 Oct 2018 13:58:38 +0100
+Subject: [PATCH 03/26] kvm: arm64: Add helper for loading the stage2 setting
+ for a VM
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-12-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-On arm64 VTTBR_EL2:BADDR holds the base address for the stage2
-translation table. The Arm ARM mandates that the bits BADDR[x-1:0]
-should be 0, where 'x' is defined for a given IPA Size and the
-number of levels for a translation granule size. It is defined
-using some magical constants. This patch is a reverse engineered
-implementation to calculate the 'x' at runtime for a given ipa and
-number of page table levels. See patch for more details.
+We load the stage2 context of a guest for different operations,
+including running the guest and tlb maintenance on behalf of the
+guest. As of now only the vttbr is private to the guest, but this
+is about to change with IPA per VM. Add a helper to load the stage2
+configuration for a VM, which could do the right thing with the
+future changes.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h | 73 ++++++++++++++++++++++++++++----
- arch/arm64/include/asm/kvm_mmu.h | 25 ++++++++++-
- 2 files changed, 88 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/kvm_hyp.h | 9 +++++++++
+ arch/arm64/kvm/hyp/switch.c      | 2 +-
+ arch/arm64/kvm/hyp/tlb.c         | 4 ++--
+ 3 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 14317b3a1820..b236d90ca056 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -123,7 +123,6 @@
- #define VTCR_EL2_SL0_MASK	(3 << VTCR_EL2_SL0_SHIFT)
- #define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
- #define VTCR_EL2_T0SZ_MASK	0x3f
--#define VTCR_EL2_T0SZ_40B	24
- #define VTCR_EL2_VS_SHIFT	19
- #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
- #define VTCR_EL2_VS_16BIT	(1 << VTCR_EL2_VS_SHIFT)
-@@ -140,11 +139,8 @@
-  * Note that when using 4K pages, we concatenate two first level page tables
-  * together. With 16K pages, we concatenate 16 first level page tables.
-  *
-- * The magic numbers used for VTTBR_X in this patch can be found in Tables
-- * D4-23 and D4-25 in ARM DDI 0487A.b.
-  */
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 384c34397619..d1bd1e0f14d7 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -155,5 +155,14 @@ void deactivate_traps_vhe_put(void);
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+ void __noreturn __hyp_do_panic(unsigned long, ...);
  
--#define VTCR_EL2_T0SZ_IPA	VTCR_EL2_T0SZ_40B
- #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
- 				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
- 
-@@ -155,7 +151,6 @@
-  * 2 level page tables (SL = 1)
-  */
- #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
--#define VTTBR_X_TGRAN_MAGIC		38
- #elif defined(CONFIG_ARM64_16K_PAGES)
- /*
-  * Stage2 translation configuration:
-@@ -163,7 +158,6 @@
-  * 2 level page tables (SL = 1)
-  */
- #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
--#define VTTBR_X_TGRAN_MAGIC		42
- #else	/* 4K */
- /*
-  * Stage2 translation configuration:
-@@ -171,13 +165,74 @@
-  * 3 level page tables (SL = 1)
-  */
- #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
--#define VTTBR_X_TGRAN_MAGIC		37
- #endif
- 
- #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
--#define VTTBR_X				(VTTBR_X_TGRAN_MAGIC - VTCR_EL2_T0SZ_IPA)
 +/*
-+ * ARM VMSAv8-64 defines an algorithm for finding the translation table
-+ * descriptors in section D4.2.8 in ARM DDI 0487C.a.
-+ *
-+ * The algorithm defines the expectations on the translation table
-+ * addresses for each level, based on PAGE_SIZE, entry level
-+ * and the translation table size (T0SZ). The variable "x" in the
-+ * algorithm determines the alignment of a table base address at a given
-+ * level and thus determines the alignment of VTTBR:BADDR for stage2
-+ * page table entry level.
-+ * Since the number of bits resolved at the entry level could vary
-+ * depending on the T0SZ, the value of "x" is defined based on a
-+ * Magic constant for a given PAGE_SIZE and Entry Level. The
-+ * intermediate levels must be always aligned to the PAGE_SIZE (i.e,
-+ * x = PAGE_SHIFT).
-+ *
-+ * The value of "x" for entry level is calculated as :
-+ *    x = Magic_N - T0SZ
-+ *
-+ * where Magic_N is an integer depending on the page size and the entry
-+ * level of the page table as below:
-+ *
-+ *	--------------------------------------------
-+ *	| Entry level		|  4K    16K   64K |
-+ *	--------------------------------------------
-+ *	| Level: 0 (4 levels)	| 28   |  -  |  -  |
-+ *	--------------------------------------------
-+ *	| Level: 1 (3 levels)	| 37   | 31  | 25  |
-+ *	--------------------------------------------
-+ *	| Level: 2 (2 levels)	| 46   | 42  | 38  |
-+ *	--------------------------------------------
-+ *	| Level: 3 (1 level)	| -    | 53  | 51  |
-+ *	--------------------------------------------
-+ *
-+ * We have a magic formula for the Magic_N below:
-+ *
-+ *  Magic_N(PAGE_SIZE, Level) = 64 - ((PAGE_SHIFT - 3) * Number_of_levels)
-+ *
-+ * where Number_of_levels = (4 - Level). We are only interested in the
-+ * value for Entry_Level for the stage2 page table.
-+ *
-+ * So, given that T0SZ = (64 - IPA_SHIFT), we can compute 'x' as follows:
-+ *
-+ *	x = (64 - ((PAGE_SHIFT - 3) * Number_of_levels)) - (64 - IPA_SHIFT)
-+ *	  = IPA_SHIFT - ((PAGE_SHIFT - 3) * Number of levels)
-+ *
-+ * Here is one way to explain the Magic Formula:
-+ *
-+ *  x = log2(Size_of_Entry_Level_Table)
-+ *
-+ * Since, we can resolve (PAGE_SHIFT - 3) bits@each level, and another
-+ * PAGE_SHIFT bits in the PTE, we have :
-+ *
-+ *  Bits_Entry_level = IPA_SHIFT - ((PAGE_SHIFT - 3) * (n - 1) + PAGE_SHIFT)
-+ *		     = IPA_SHIFT - (PAGE_SHIFT - 3) * n - 3
-+ *  where n = number of levels, and since each pointer is 8bytes, we have:
-+ *
-+ *  x = Bits_Entry_Level + 3
-+ *    = IPA_SHIFT - (PAGE_SHIFT - 3) * n
-+ *
-+ * The only constraint here is that, we have to find the number of page table
-+ * levels for a given IPA size (which we do, see stage2_pt_levels())
++ * Must be called from hyp code running at EL2 with an updated VTTBR
++ * and interrupts disabled.
 + */
-+#define ARM64_VTTBR_X(ipa, levels)	((ipa) - ((levels) * (PAGE_SHIFT - 3)))
++static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
++{
++	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++}
++
+ #endif /* __ARM64_KVM_HYP_H__ */
  
--#define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_X)
- #define VTTBR_VMID_SHIFT  (UL(48))
- #define VTTBR_VMID_MASK(size) (_AT(u64, (1 << size) - 1) << VTTBR_VMID_SHIFT)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index ca46153d7915..9d5ce1a3039a 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -198,7 +198,7 @@ void deactivate_traps_vhe_put(void)
  
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7342d2c51773..ac3ca9690bad 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -145,7 +145,6 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- #define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
- #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
- #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
--#define kvm_vttbr_baddr_mask(kvm)	VTTBR_BADDR_MASK
- 
- static inline bool kvm_page_empty(void *ptr)
+ static void __hyp_text __activate_vm(struct kvm *kvm)
  {
-@@ -520,5 +519,29 @@ static inline int hyp_map_aux_data(void)
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	__load_guest_stage2(kvm);
+ }
  
- #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
+ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 131c7772703c..4dbd9c69a96d 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -30,7 +30,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+ 	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
+ 	 * let's flip TGE before executing the TLB operation.
+ 	 */
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	__load_guest_stage2(kvm);
+ 	val = read_sysreg(hcr_el2);
+ 	val &= ~HCR_TGE;
+ 	write_sysreg(val, hcr_el2);
+@@ -39,7 +39,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
  
-+/*
-+ * Get the magic number 'x' for VTTBR:BADDR of this KVM instance.
-+ * With v8.2 LVA extensions, 'x' should be a minimum of 6 with
-+ * 52bit IPS.
-+ */
-+static inline int arm64_vttbr_x(u32 ipa_shift, u32 levels)
-+{
-+	int x = ARM64_VTTBR_X(ipa_shift, levels);
-+
-+	return (IS_ENABLED(CONFIG_ARM64_PA_BITS_52) && x < 6) ? 6 : x;
-+}
-+
-+static inline u64 vttbr_baddr_mask(u32 ipa_shift, u32 levels)
-+{
-+	unsigned int x = arm64_vttbr_x(ipa_shift, levels);
-+
-+	return GENMASK_ULL(PHYS_MASK_SHIFT - 1, x);
-+}
-+
-+static inline u64 kvm_vttbr_baddr_mask(struct kvm *kvm)
-+{
-+	return vttbr_baddr_mask(kvm_phys_shift(kvm), kvm_stage2_levels(kvm));
-+}
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
+ static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
+ {
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	__load_guest_stage2(kvm);
+ 	isb();
+ }
+ 
 -- 
 2.19.1
