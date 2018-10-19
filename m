@@ -1,40 +1,53 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 19 Oct 2018 09:45:12 -0400
-Subject: [PATCH 03/10] swiotlb: do not panic on mapping failures
-In-Reply-To: <20181019060425.GA28108@lst.de>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-4-hch@lst.de>
- <20181019001714.GD1251@char.us.oracle.com>
- <20181019060425.GA28108@lst.de>
-Message-ID: <20181019134512.GD54336@Konrads-MacBook-Pro.local>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Oct 2018 13:58:57 +0100
+Subject: [PATCH 22/26] KVM: arm/arm64: Ensure only THP is candidate for
+ adjustment
+In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
+References: <20181019125901.185478-1-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-23-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 08:04:25AM +0200, Christoph Hellwig wrote:
-> On Thu, Oct 18, 2018 at 08:17:14PM -0400, Konrad Rzeszutek Wilk wrote:
-> > On Mon, Oct 08, 2018 at 10:02:39AM +0200, Christoph Hellwig wrote:
-> > > All properly written drivers now have error handling in the
-> > > dma_map_single / dma_map_page callers.  As swiotlb_tbl_map_single already
-> > > prints a useful warning when running out of swiotlb pool swace we can
-> > 
-> > s/swace/space/
-> > 
-> > > also remove swiotlb_full entirely as it serves no purpose now.
-> > 
-> > The panic albeit was useful for those drivers that didn't handle it.
-> > 
-> > Thoughts? I am kind of thinking screw them but then I am not too thrilled
-> > about silent data corruption errors.
-> 
-> I can add an (optional) panic back in common code so that the different
-> mapping types are covered.
+From: Punit Agrawal <punit.agrawal@arm.com>
 
-Thank you.
-> 
-> Btw, are you fine with taking this through the dma mapping tree for
-> this merge window?  I'd probably leave it in linux-next for another
+PageTransCompoundMap() returns true for hugetlbfs and THP
+hugepages. This behaviour incorrectly leads to stage 2 faults for
+unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
+treated as THP faults.
 
-Yes, please.
-> week or so and don't send it with the first pull request on Monday.
+Tighten the check to filter out hugetlbfs pages. This also leads to
+consistently mapping all unsupported hugepage sizes as PTE level
+entries at stage 2.
 
-<nods>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: stable at vger.kernel.org # v4.13+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/mmu.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 7e477b3cae5b..c23a1b323aad 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1231,8 +1231,14 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
+ {
+ 	kvm_pfn_t pfn = *pfnp;
+ 	gfn_t gfn = *ipap >> PAGE_SHIFT;
++	struct page *page = pfn_to_page(pfn);
+ 
+-	if (PageTransCompoundMap(pfn_to_page(pfn))) {
++	/*
++	 * PageTransCompoungMap() returns true for THP and
++	 * hugetlbfs. Make sure the adjustment is done only for THP
++	 * pages.
++	 */
++	if (!PageHuge(page) && PageTransCompoundMap(page)) {
+ 		unsigned long mask;
+ 		/*
+ 		 * The address we faulted on is backed by a transparent huge
+-- 
+2.19.1
