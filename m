@@ -1,51 +1,46 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Sat, 20 Oct 2018 14:18:04 +0530
-Subject: [PATCH 2/3] dt-bindings: fpga: Add bindings for ZynqMP fpga driver
-In-Reply-To: <20181020084805.29103-1-nava.manne@xilinx.com>
-References: <20181020084805.29103-1-nava.manne@xilinx.com>
-Message-ID: <20181020084805.29103-3-nava.manne@xilinx.com>
+From: navam@xilinx.com (Nava kishore Manne)
+Date: Fri, 19 Oct 2018 09:20:58 +0000
+Subject: [PATCH 3/3] reset: reset-zynqmp: Adding support for Xilinx zynqmp
+ reset controller.
+In-Reply-To: <1539939793.3395.2.camel@pengutronix.de>
+References: <20181020084107.28251-1-nava.manne@xilinx.com>
+ <20181020084107.28251-4-nava.manne@xilinx.com>
+ <1539939793.3395.2.camel@pengutronix.de>
+Message-ID: <BYAPR02MB47108BCDC1AF5454F2DDF328C2F90@BYAPR02MB4710.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation to describe Xilinx ZynqMP fpga driver
-bindings.
+Hi Philipp
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v1:
-                Created a Seperate(New) DT binding file as
-                suggested by Rob.
+Thanks for the quicks response....
 
-Changes for RFC-V2:
-                -Moved pcap node as a child to firwmare
-                 node as suggested by Rob.
+> -----Original Message-----
+> From: Philipp Zabel [mailto:p.zabel at pengutronix.de]
+> Sent: Friday, October 19, 2018 2:33 PM
+> To: Nava kishore Manne <navam@xilinx.com>; robh+dt at kernel.org;
+> mark.rutland at arm.com; Michal Simek <michals@xilinx.com>; Rajan Vaja
+> <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; chinnikishore369 at gmail.com
+> Subject: Re: [PATCH 3/3] reset: reset-zynqmp: Adding support for Xilinx
+> zynqmp reset controller.
+> 
+> Hi Nava,
+> 
+> On Sat, 2018-10-20 at 14:11 +0530, Nava kishore Manne wrote:
+> > Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
+> > The zynqmp reset-controller has the ability to reset lines connected
+> > to different blocks and peripheral in the Soc.
+> >
+> > Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> > ---
+> > Changes for v1:
+> > 		-None.
+> 
+> I had comments on RFC v3 that are not addressed yet, see below.
+> 
 
- .../bindings/fpga/xlnx,zynqmp-pcap-fpga.txt     | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+Sorry, I have missed your comments . Will fix in the next version.
 
-diff --git a/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-new file mode 100644
-index 000000000000..248ff0ee60a8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-@@ -0,0 +1,17 @@
-+--------------------------------------------------------------------------
-+Device Tree zynqmp-fpga bindings for the Zynq Ultrascale+ MPSoC controlled
-+using ZynqMP SoC firmware interface
-+--------------------------------------------------------------------------
-+For Bitstream configuration on ZynqMp Soc uses processor configuration
-+port(PCAP) to configure the programmable logic(PL) through PS by using
-+FW interface.
-+
-+Required properties:
-+- compatible: should contain "xlnx,zynqmp-pcap-fpga"
-+
-+-------
-+Example
-+-------
-+	zynqmp_pcap: pcap {
-+		compatible = "xlnx,zynqmp-pcap-fpga";
-+	};
--- 
-2.18.0
+Regards,
+Navakishore.
