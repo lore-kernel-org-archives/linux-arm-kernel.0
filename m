@@ -1,47 +1,78 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 19 Oct 2018 11:04:07 -0700
-Subject: [PATCH v5 2/3] clk: meson: add DT documentation for emmc clock
- controller
-In-Reply-To: <efc5b030-f344-80ce-f57e-582207f436fe@amlogic.com>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-3-git-send-email-jianxin.pan@amlogic.com>
- <153988248599.5275.8444799485095155762@swboyd.mtv.corp.google.com>
- <efc5b030-f344-80ce-f57e-582207f436fe@amlogic.com>
-Message-ID: <153997224756.53599.3138050846693192599@swboyd.mtv.corp.google.com>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Fri, 19 Oct 2018 11:18:22 -0700 (PDT)
+Subject: [PATCH 6/9] PCI: consolidate PCI config entry in drivers/pci
+In-Reply-To: <20181019120952.32763-7-hch@lst.de>
+Message-ID: <mhng-153e4e0b-8fe9-4712-849f-f01455ef56f4@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jianxin Pan (2018-10-19 08:50:08)
-> On 2018/10/19 1:08, Stephen Boyd wrote:
-> > Quoting Jianxin Pan (2018-10-17 22:07:24)
-> >> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> >> new file mode 100644
-> >> index 0000000..9e6d343
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> >> @@ -0,0 +1,31 @@
-> >> +* Amlogic MMC Sub Clock Controller Driver
-> >> +
-> >> +The Amlogic MMC clock controller generates and supplies clock to support
-> >> +MMC and NAND controller
-> >> +
-> >> +Required Properties:
-> >> +
-> >> +- compatible: should be:
-> >> +               "amlogic,gx-mmc-clkc"
-> >> +               "amlogic,axg-mmc-clkc"
-> >> +
-> >> +- #clock-cells: should be 1.
-> >> +- clocks: phandles to clocks corresponding to the clock-names property
-> >> +- clock-names: list of parent clock names
-> >> +       - "clkin0", "clkin1"
-> >> +
-> >> +Parent node should have the following properties :
-> > 
-> > The example only has one node. Can you add two nodes?
-> OK. This clock is used by nand and emmc. I will add a new example for emmc too.
-> Thank you for your review.
+On Fri, 19 Oct 2018 05:09:49 PDT (-0700), Christoph Hellwig wrote:
+> There is no good reason to duplicate the PCI menu in every architecture.
+> Instead provide a selectable HAVE_PCI symbol that indicates availability
+> of PCI support and the handle the rest in drivers/pci.
+>
+> Note that for powerpc we now select HAVE_PCI globally instead of the
+> convoluted mess of conditional or or non-conditional support per board,
+> similar to what we do e.g. on x86.  For alpha PCI is selected for the
+> non-jensen configs as it was the default before, and a lot of code does
+> not compile without PCI enabled.  On other architectures with limited
+> PCI support that wasn't as complicated I've left the selection as-is.
+>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
+> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Maybe I misunderstand. I thought the clk controller was two nodes, but
-it isn't? This wording is trying to explain what a consumer should look
-like?
+...
+
+> diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
+> index a344980287a5..071952cd4cae 100644
+> --- a/arch/riscv/Kconfig
+> +++ b/arch/riscv/Kconfig
+> @@ -39,8 +39,10 @@ config RISCV
+>  	select SPARSE_IRQ
+>  	select SYSCTL_EXCEPTION_TRACE
+>  	select HAVE_ARCH_TRACEHOOK
+> +	select HAVE_PCI
+>  	select MODULES_USE_ELF_RELA if MODULES
+>  	select THREAD_INFO_IN_TASK
+> +	select PCI_MSI if PCI
+>  	select RISCV_TIMER
+>  	select GENERIC_IRQ_MULTI_HANDLER
+>  	select ARCH_HAS_PTE_SPECIAL
+> @@ -216,28 +218,12 @@ source "kernel/Kconfig.hz"
+>
+>  endmenu
+>
+> -menu "Bus support"
+> -
+> -config PCI
+> -	bool "PCI support"
+> -	select PCI_MSI
+> -	help
+> -	  This feature enables support for PCI bus system. If you say Y
+> -	  here, the kernel will include drivers and infrastructure code
+> -	  to support PCI bus devices.
+> -
+> -	  If you don't know what to do here, say Y.
+> -
+>  config PCI_DOMAINS
+>  	def_bool PCI
+>
+>  config PCI_DOMAINS_GENERIC
+>  	def_bool PCI
+>
+> -source "drivers/pci/Kconfig"
+> -
+> -endmenu
+> -
+>  menu "Power management options"
+>
+>  source kernel/power/Kconfig
+
+Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
+
+I'm assuming this will go in via PCI tree of some sort, so I'm not going to 
+touch it any further.
+
+Thanks for cleaning this up!
