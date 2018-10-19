@@ -1,19 +1,18 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 19 Oct 2018 13:26:25 +0100 (BST)
-Subject: Applied "ASoC: dt-bindings: add mclk provider support to stm32 sai"
- to the asoc tree
-In-Reply-To: <1539612216-12602-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <20181019122625.DD8F91122548@debutante.sirena.org.uk>
+Date: Fri, 19 Oct 2018 13:30:02 +0100 (BST)
+Subject: Applied "spi: pxa2xx: fix PCI dependency" to the spi tree
+In-Reply-To: <20181017185128.2634666-1-arnd@arndb.de>
+Message-ID: <20181019123002.196D21122548@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: dt-bindings: add mclk provider support to stm32 sai
+   spi: pxa2xx: fix PCI dependency
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,44 +33,40 @@ to this mail.
 Thanks,
 Mark
 
->From af16112457d8175b444baa9aac02558a1e1154b5 Mon Sep 17 00:00:00 2001
-From: Olivier Moysan <olivier.moysan@st.com>
-Date: Mon, 15 Oct 2018 16:03:33 +0200
-Subject: [PATCH] ASoC: dt-bindings: add mclk provider support to stm32 sai
+>From 23aa9fdea2d364924fadf3dcc1509bd578ac1f00 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 17 Oct 2018 20:50:52 +0200
+Subject: [PATCH] spi: pxa2xx: fix PCI dependency
 
-add mclk provider support to stm32 sai
+The code reorganization broke building without CONFIG_PCI:
 
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+drivers/spi/spi-pxa2xx.c: In function 'pxa2xx_spi_init_pdata':
+drivers/spi/spi-pxa2xx.c:1457:15: error: implicit declaration of function 'pci_match_id'; did you mean 'pci_map_sg'? [-Werror=implicit-function-declaration]
+
+Add back an #ifdef around the code block that requires it.
+
+Fixes: 87ae1d2d7077 ("spi: pxa2xx: Add devicetree support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/sound/st,stm32-sai.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/spi/spi-pxa2xx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-index 3a3fc506e43a..3f4467ff0aa2 100644
---- a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-+++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-@@ -31,7 +31,11 @@ SAI subnodes required properties:
-   - reg: Base address and size of SAI sub-block register set.
-   - clocks: Must contain one phandle and clock specifier pair
- 	for sai_ck which feeds the internal clock generator.
-+	If the SAI shares a master clock, with another SAI set as MCLK
-+	clock provider, SAI provider phandle must be specified here.
-   - clock-names: Must contain "sai_ck".
-+	Must also contain "MCLK", if SAI shares a master clock,
-+	with a SAI set as MCLK clock provider.
-   - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
-   - dma-names: identifier string for each DMA request line
- 	"tx": if sai sub-block is configured as playback DAI
-@@ -51,6 +55,9 @@ SAI subnodes Optional properties:
- 	configured according to protocol defined in related DAI link node,
- 	such as i2s, left justified, right justified, dsp and pdm protocols.
- 	Note: ac97 protocol is not supported by SAI driver
-+   - #clock-cells: should be 0. This property must be present if the SAI device
-+	is a master clock provider, according to clocks bindings, described in
-+	Documentation/devicetree/bindings/clock/clock-bindings.txt.
- 
- The device node should contain one 'port' child node with one child 'endpoint'
- node, according to the bindings defined in Documentation/devicetree/bindings/
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 612cc49db28f..c1c30109dd1f 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -1453,9 +1453,11 @@ pxa2xx_spi_init_pdata(struct platform_device *pdev)
+ 	if (pdev->dev.of_node)
+ 		of_id = of_match_device(pdev->dev.driver->of_match_table,
+ 					&pdev->dev);
++#ifdef CONFIG_PCI
+ 	else if (dev_is_pci(pdev->dev.parent))
+ 		pcidev_id = pci_match_id(pxa2xx_spi_pci_compound_match,
+ 					 to_pci_dev(pdev->dev.parent));
++#endif
+ 	else if (adev)
+ 		adev_id = acpi_match_device(pdev->dev.driver->acpi_match_table,
+ 					    &pdev->dev);
 -- 
 2.19.0.rc2
