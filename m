@@ -1,32 +1,104 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Oct 2018 11:24:26 +0200
-Subject: [PATCH] ARM: defconfig: Update multi_v7 to use PREEMPT
-Message-ID: <20181019092426.12052-1-linus.walleij@linaro.org>
+From: qiangqing.zhang@nxp.com (Joakim Zhang)
+Date: Fri, 19 Oct 2018 09:42:47 +0000
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Add flexcan support
+Message-ID: <20181019094031.22492-1-qiangqing.zhang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using CONFIG_PREEMPT as preemption model for ARMv7 systems
-appear to be the most reasonable default.
+From: Dong Aisheng <aisheng.dong@nxp.com>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC folks, if you agree with this patch, please
-just apply it where and when appropriate.
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+CAN transceiver is different on RevA and RevB board.
+It's active high on RevA while active low on Rev B.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index fc33444e94f0..a5d184779709 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -1,6 +1,7 @@
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
- CONFIG_CGROUPS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_EMBEDDED=y
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
+---
+ arch/arm/boot/dts/imx6sx-sdb.dts  |  5 ++++
+ arch/arm/boot/dts/imx6sx-sdb.dtsi | 42 +++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 6dd9bebfe027..092b8de142a8 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -10,6 +10,11 @@
+ 
+ / {
+ 	model = "Freescale i.MX6 SoloX SDB RevB Board";
++
++	/* Transceiver EN/STBY is active low on RevB board */
++	reg_can_stby: regulator-can-stby {
++		gpio = <&gpio4 27 GPIO_ACTIVE_LOW>;
++	};
+ };
+ 
+ &i2c1 {
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index f8f31872fa14..e37ec4b396a2 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -136,6 +136,20 @@
+ 		regulator-max-microvolt = <5000000>;
+ 	};
+ 
++	reg_can_en: regulator-can-en {
++		compatible = "regulator-fixed";
++		regulator-name = "can-en";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	reg_can_stby: regulator-can-stby {
++		compatible = "regulator-fixed";
++		regulator-name = "can-stby";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
+ 	sound {
+ 		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
+ 		model = "wm8962-audio";
+@@ -202,6 +216,20 @@
+ 	status = "okay";
+ };
+ 
++&flexcan1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	xceiver-supply = <&reg_can_stby>;
++	status = "okay";
++};
++
++&flexcan2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	xceiver-supply = <&reg_can_stby>;
++	status = "okay";
++};
++
+ &i2c3 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -397,6 +425,20 @@
+ 			>;
+ 		};
+ 
++		pinctrl_flexcan1: flexcan1grp {
++			fsl,pins = <
++				MX6SX_PAD_QSPI1B_DQS__CAN1_TX		0x1b020
++				MX6SX_PAD_QSPI1A_SS1_B__CAN1_RX		0x1b020
++			>;
++		};
++
++		pinctrl_flexcan2: flexcan2grp {
++			fsl,pins = <
++				MX6SX_PAD_QSPI1B_SS1_B__CAN2_RX		0x1b020
++				MX6SX_PAD_QSPI1A_DQS__CAN2_TX		0x1b020
++			>;
++		};
++
+ 		pinctrl_gpio_keys: gpio_keysgrp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_CSI_DATA04__GPIO1_IO_18 0x17059
 -- 
-2.17.2
+2.17.1
