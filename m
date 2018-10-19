@@ -1,91 +1,93 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 19 Oct 2018 11:03:13 +0200
-Subject: [PATCH 3/3] reset: reset-zynqmp: Adding support for Xilinx
- zynqmp reset controller.
-In-Reply-To: <20181020084107.28251-4-nava.manne@xilinx.com>
-References: <20181020084107.28251-1-nava.manne@xilinx.com>
- <20181020084107.28251-4-nava.manne@xilinx.com>
-Message-ID: <1539939793.3395.2.camel@pengutronix.de>
+From: liang.yang@amlogic.com (Liang Yang)
+Date: Fri, 19 Oct 2018 17:01:51 +0800
+Subject: [PATCH v5 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <20181019104248.528a3409@bbrezillon>
+References: <1539839345-14021-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
+ <20181018225009.59d94aee@bbrezillon>
+ <695f6a8b-d37b-bc57-215b-eb6c36252a80@amlogic.com>
+ <20181019104248.528a3409@bbrezillon>
+Message-ID: <0b07e022-60f5-6263-bfa7-779e7aa3cbe1@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nava,
 
-On Sat, 2018-10-20 at 14:11 +0530, Nava kishore Manne wrote:
-> Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-> The zynqmp reset-controller has the ability to reset lines
-> connected to different blocks and peripheral in the Soc.
+
+On 2018/10/19 16:42, Boris Brezillon wrote:
+> On Fri, 19 Oct 2018 16:29:40 +0800
+> Liang Yang <liang.yang@amlogic.com> wrote:
 > 
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> ---
-> Changes for v1:
-> 		-None.
+>> On 2018/10/19 4:50, Boris Brezillon wrote:
+>>> On Thu, 18 Oct 2018 13:09:05 +0800
+>>> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
+>>>    
+>>>> +static int meson_nfc_buffer_init(struct mtd_info *mtd)
+>>>> +{
+>>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
+>>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+>>>> +	static int max_page_bytes, max_info_bytes;
+>>>> +	int page_bytes, info_bytes;
+>>>> +	int nsectors;
+>>>> +
+>>>> +	nsectors = mtd->writesize / nand->ecc.size;
+>>>> +	page_bytes =  mtd->writesize + mtd->oobsize;
+>>>> +	info_bytes = nsectors * PER_INFO_BYTE;
+>>>> +
+>>>> +	if (nfc->data_buf && nfc->info_buf) {
+>>>> +		if (max_page_bytes < page_bytes)
+>>>> +			meson_nfc_free_buffer(nfc);
+>>>> +		else
+>>>> +			return 0;
+>>>> +	}
+>>>> +
+>>>> +	max_page_bytes = max_t(int, max_page_bytes, page_bytes);
+>>>> +	max_info_bytes = max_t(int, max_info_bytes, info_bytes);
+>>>> +
+>>>> +	nfc->data_buf = kmalloc(max_page_bytes, GFP_KERNEL);
+>>>
+>>> Is there a good reason for not using chip->data_buf and allocating a
+>>> new buffer here?
+>>>    
+>> when calling read_oob or write_oob, i need a mid-buffer which is used in
+>> meson_nfc_prase_data_oob(). i.e. after reading a page data into
+>> nfc->data_buf, I will format it and transfer to chip->data_buf.
+>>
+>>
+>>>> +	if (!nfc->data_buf)
+>>>> +		return -ENOMEM;
+>>>> +
+>>>> +	nfc->info_buf = kmalloc(max_info_bytes, GFP_KERNEL);
+>>>> +	if (!nfc->info_buf) {
+>>>> +		kfree(nfc->data_buf);
+>>>> +		return -ENOMEM;
+>>>> +	}
+>>>
+>>> I'd recommend moving this info_buf in the priv chip struct, otherwise
+>>> you'll have to protect nfc->info_buf with a lock to prevent an already
+>>> register chip from using this pointer while you're reallocating the
+>>> buffer. Also, I think you have a memleak here.
+>>>    
+>> ok, i will move it in the chip struct .
+>>
+>> but how memleak happens even i have called meson_nfc_free_buffer before
+>> and free data_buf if info_buf alloc faied.
+> 
+> You're right, I missed the call to meson_nfc_free_buffer() when
+> max_page_bytes < page_bytes. Still, this part is racy, just like the
+> nfc->data_buf replacement is if you have several NAND chips. I'd
+> recommend moving those bufs to the priv chip struct.
+> 
 
-I had comments on RFC v3 that are not addressed yet, see below.
+ok. i will move data_duf and info_buf to priv chip struct.
 
-> --- /dev/null
-> +++ b/drivers/reset/reset-zynqmp.c
-> @@ -0,0 +1,117 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2018 Xilinx, Inc.
-> + *
-> + */
-> +
-> +#include <linux/io.h>
-
-Unnecessary.
-
-[...]
-> +static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
-> +			       unsigned long id)
-> +{
-> +	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-> +	int val, err;
-> +
-> +	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
-> +	if (!err)
-> +		return -EINVAL;
-
-Should return error code, and only if there is an error:
-
-	if (err)
-		return err;
-
-> +	return val;
-> +}
-> +
-> +static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
-> +			      unsigned long id)
-> +{
-> +	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-> +
-> +	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-> +					    PM_RESET_ACTION_PULSE);
-> +}
-> +
-> +static struct reset_control_ops zynqmp_reset_ops = {
-
-Should be const:
-
-	static const struct reset_control_ops zynqmp_reset_ops = {
-
-> +	.reset = zynqmp_reset_reset,
-> +	.assert = zynqmp_reset_assert,
-> +	.deassert = zynqmp_reset_deassert,
-> +	.status = zynqmp_reset_status,
-> +};
-> +
-> +static int zynqmp_reset_probe(struct platform_device *pdev)
-> +{
-> +	struct zynqmp_reset_data *priv;
-> +
-> +	priv = devm_kzalloc(&pdev->dev,
-> +			    sizeof(*priv), GFP_KERNEL);
-
-Fits on one line:
-
-	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-
-regards
-Philipp
+>>
+>>>> +
+>>>> +	return 0;
+>>>> +}
+>>>
+>>> .
+>>>    
+> 
+> .
+> 
