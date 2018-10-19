@@ -1,28 +1,66 @@
-From: paulcrowley@google.com (Paul Crowley)
-Date: Fri, 19 Oct 2018 11:19:24 -0700
-Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
-In-Reply-To: <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Fri, 19 Oct 2018 11:28:05 -0700
+Subject: [RFC PATCH v2 04/12] crypto: chacha - add XChaCha12 support
+In-Reply-To: <CAKv+Gu_wVmnEND3MGTG7bqqynbBqyzmE_gTmqZfrT551_n9Hmw@mail.gmail.com>
 References: <20181015175424.97147-1-ebiggers@kernel.org>
- <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
-Message-ID: <CA+_SqcDszvqfH7qvEyi8QW2RqkA1kpV6L7VWxhtw5Ogzeovhbg@mail.gmail.com>
+ <20181015175424.97147-5-ebiggers@kernel.org>
+ <CAKv+Gu_wVmnEND3MGTG7bqqynbBqyzmE_gTmqZfrT551_n9Hmw@mail.gmail.com>
+Message-ID: <20181019182804.GA246441@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Oct 2018 at 08:58, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> Before merging this into the kernel, do you want to wait until you've
-> received some public review from academia?
+Hi Ard,
 
-I would prefer not to wait. Unlike a new primitive whose strength can
-only be known through attempts at cryptanalysis, Adiantum is a
-construction based on
-well-understood and trusted primitives; it is secure if the proof
-accompanying it is correct. Given that (outside competitions or
-standardization efforts) no-one ever issues public statements that
-they think algorithms or proofs are good, what I'm expecting from
-academia is silence :) The most we could hope for would be getting the
-paper accepted at a conference, and we're pursuing that but there's a
-good chance that won't happen simply because it's not very novel. It
-basically takes existing ideas and applies them using a stream cipher
-instead of a block cipher, and a faster hashing mode; it's also a
-small update from HPolyC. I've had some private feedback that the
-proof seems correct, and that's all I'm expecting to get.
+On Fri, Oct 19, 2018 at 10:34:41PM +0800, Ard Biesheuvel wrote:
+> > diff --git a/include/crypto/chacha.h b/include/crypto/chacha.h
+> > index ae79e9983c72f..3d261f5cd156d 100644
+> > --- a/include/crypto/chacha.h
+> > +++ b/include/crypto/chacha.h
+> > @@ -5,6 +5,11 @@
+> >   * XChaCha extends ChaCha's nonce to 192 bits, while provably retaining ChaCha's
+> >   * security.  Here they share the same key size, tfm context, and setkey
+> >   * function; only their IV size and encrypt/decrypt function differ.
+> > + *
+> > + * The ChaCha paper specifies 20, 12, and 8-round variants.  In general, it is
+> > + * recommended to use the 20-round variant ChaCha20.  However, the other
+> > + * variants can be needed in some performance-sensitive scenarios.  The generic
+> > + * ChaCha code currently allows only the 20 and 12-round variants.
+> >   */
+> >
+> >  #ifndef _CRYPTO_CHACHA_H
+> > @@ -39,6 +44,8 @@ void crypto_chacha_init(u32 *state, struct chacha_ctx *ctx, u8 *iv);
+> >
+> >  int crypto_chacha20_setkey(struct crypto_skcipher *tfm, const u8 *key,
+> >                            unsigned int keysize);
+> > +int crypto_chacha12_setkey(struct crypto_skcipher *tfm, const u8 *key,
+> > +                          unsigned int keysize);
+> >
+> >  int crypto_chacha_crypt(struct skcipher_request *req);
+> >  int crypto_xchacha_crypt(struct skcipher_request *req);
+> > diff --git a/lib/chacha.c b/lib/chacha.c
+> > index 0a2c2e5b7b84d..c4d69a83fcd2d 100644
+> > --- a/lib/chacha.c
+> > +++ b/lib/chacha.c
+> > @@ -21,7 +21,7 @@ static void chacha_permute(u32 *x, int nrounds)
+> >         int i;
+> >
+> >         /* whitelist the allowed round counts */
+> > -       BUG_ON(nrounds != 20);
+> > +       BUG_ON(nrounds != 20 && nrounds != 12);
+> >
+> 
+> I didn't spot this until this patch, but BUG_ON() may bring down the
+> kernel, and so it should really only be used as a last resort. (i.e.,
+> if this is called from non-process context things may explode rather
+> painfully)
+> 
+> I didn't look at the entire file [which is a bit cumbersome while
+> reviewing incremental changes like this] and so I don't really have
+> another suggestion right now, but please try to come up with something
+> better if you can.
+> 
+
+I'll change it to WARN_ON_ONCE(), I guess.  I do still want it to be very noisy
+if something fishy is going on with the round count.
+
+- Eric
