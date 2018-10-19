@@ -1,30 +1,40 @@
 From: changbin.du@gmail.com (Du Changbin)
-Date: Fri, 19 Oct 2018 12:49:21 +0000
-Subject: [PATCH v2 4/4] kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING
- to apply GCC -Og optimization
-In-Reply-To: <20181019124921.13780-1-changbin.du@gmail.com>
-References: <20181019124921.13780-1-changbin.du@gmail.com>
-Message-ID: <20181019124921.13780-5-changbin.du@gmail.com>
+Date: Fri, 19 Oct 2018 12:49:17 +0000
+Subject: [PATCH v2 0/4] kernel hacking: GCC optimization for better debug
+ experience (-Og)
+Message-ID: <20181019124921.13780-1-changbin.du@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will apply GCC '-Og' optimization level which is supported
-since GCC 4.8. This optimization level offers a reasonable level
-of optimization while maintaining fast compilation and a good
-debugging experience. It is similar to '-O1' while perferring
-to keep debug ability over runtime speed.
+Hi all,
+I have posted this series several months ago but interrupted by personal
+affairs. Now I get time to complete this task. Thanks for all of the
+reviewers.
 
-If enabling this option breaks your kernel, you should either
-disable this or find a fix (mostly in the arch code). Currently
-this option has only been tested on x86_64 and arm platform.
+I know some kernel developers was searching for a method to dissable GCC
+optimizations, probably they want to apply GCC '-O0' option. But since Linux
+kernel relies on GCC optimization to remove some dead code, so '-O0' just
+breaks the build. They do need this because they want to debug kernel with
+qemu, simics, kgtp or kgdb.
 
-This option can satisfy people who was searching for a method
-to disable compiler optimizations so to achieve better kernel
-debugging experience with kgdb or qemu.
+Thanks for the GCC '-Og' optimization level introduced in GCC 4.8, which
+offers a reasonable level of optimization while maintaining fast compilation
+and a good debugging experience. It is similar to '-O1' while perferring to
+keep debug ability over runtime speed. With '-Og', we can build a kernel with
+better debug ability and little performance drop after some simple change.
 
-The main problem of '-Og' is we must not use __attribute__((error(msg))).
-The compiler will report error though the call to error function
-still can be optimize out. So we must fallback to array tricky.
+In this series, firstly introduce a new config CONFIG_NO_AUTO_INLINE after two
+fixes for this new option. With this option, only functions explicitly marked
+with "inline" will  be inlined. This will allow the function tracer to trace
+more functions because it only traces functions that the compiler has not
+inlined.
+
+Then introduce new config CC_OPTIMIZE_FOR_DEBUGGING which apply '-Og'
+optimization level for whole kernel, with a simple fix in fix_to_virt().
+Currently I have only tested this option on x86 and ARM platform. Other
+platforms should also work but probably need some compiling fixes as what
+having done in this series. I leave that to who want to try this debug
+option.
 
 Comparison of vmlinux size: a bit smaller.
 
@@ -37,6 +47,7 @@ Comparison of vmlinux size: a bit smaller.
     $ size vmlinux
        text    data     bss     dec     hex filename
     21499032   10102758 2920908 34522698        20ec64a vmlinux
+
 
 Comparison of system performance: a bit drop (~6%).
     This benchmark of kernel compilation is suggested by Ingo Molnar.
@@ -61,7 +72,7 @@ Comparison of system performance: a bit drop (~6%).
                                                          \
         make -j8 >/dev/null
 
-    Performance counter stats for 'make -j8' (5 runs):
+     Performance counter stats for 'make -j8' (5 runs):
 
         219.764246652 seconds time elapsed                   ( +-  0.78% )
 
@@ -82,93 +93,26 @@ Comparison of system performance: a bit drop (~6%).
 
          233.574187771 seconds time elapsed                  ( +-  0.19% )
 
-Signed-off-by: Du Changbin <changbin.du@gmail.com>
-Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
----
- Makefile                     |  5 +++++
- include/linux/compiler-gcc.h |  2 +-
- include/linux/compiler.h     |  2 +-
- init/Kconfig                 | 19 +++++++++++++++++++
- 4 files changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/Makefile b/Makefile
-index 757d6507cb5c..ea908cfe8594 100644
---- a/Makefile
-+++ b/Makefile
-@@ -657,6 +657,10 @@ KBUILD_CFLAGS	+= $(call cc-disable-warning, format-truncation)
- KBUILD_CFLAGS	+= $(call cc-disable-warning, format-overflow)
- KBUILD_CFLAGS	+= $(call cc-disable-warning, int-in-bool-context)
- 
-+ifdef CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-+KBUILD_CFLAGS	+= $(call cc-option, -Og)
-+KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized,)
-+else
- ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
- KBUILD_CFLAGS	+= $(call cc-option,-Oz,-Os)
- KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized,)
-@@ -667,6 +671,7 @@ else
- KBUILD_CFLAGS   += -O2
- endif
- endif
-+endif
- 
- KBUILD_CFLAGS += $(call cc-ifversion, -lt, 0409, \
- 			$(call cc-disable-warning,maybe-uninitialized,))
-diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
-index 4d36b27214fd..2a76f7c64b54 100644
---- a/include/linux/compiler-gcc.h
-+++ b/include/linux/compiler-gcc.h
-@@ -85,7 +85,7 @@
- 
- #define __compiletime_object_size(obj) __builtin_object_size(obj, 0)
- 
--#ifndef __CHECKER__
-+#if !defined(__CHECKER__) && !defined(CONFIG_CC_OPTIMIZE_FOR_DEBUGGING)
- #define __compiletime_warning(message) __attribute__((warning(message)))
- #define __compiletime_error(message) __attribute__((error(message)))
- 
-diff --git a/include/linux/compiler.h b/include/linux/compiler.h
-index 681d866efb1e..9385c62e9f00 100644
---- a/include/linux/compiler.h
-+++ b/include/linux/compiler.h
-@@ -320,7 +320,7 @@ static inline void *offset_to_ptr(const int *off)
-  * sparse see a constant array size without breaking compiletime_assert on old
-  * versions of GCC (e.g. 4.2.4), so hide the array from sparse altogether.
-  */
--# ifndef __CHECKER__
-+# if !defined(__CHECKER__) && !defined(CONFIG_CC_OPTIMIZE_FOR_DEBUGGING)
- #  define __compiletime_error_fallback(condition) \
- 	do { ((void)sizeof(char[1 - 2 * condition])); } while (0)
- # endif
-diff --git a/init/Kconfig b/init/Kconfig
-index 1e234e2f1cba..b01c7c654570 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1081,6 +1081,25 @@ config CC_OPTIMIZE_FOR_SIZE
- 
- 	  If unsure, say N.
- 
-+config CC_OPTIMIZE_FOR_DEBUGGING
-+	bool "Optimize for better debugging experience (-Og)"
-+	select NO_AUTO_INLINE
-+	help
-+	  This will apply GCC '-Og' optimization level which is supported
-+	  since GCC 4.8. This optimization level offers a reasonable level
-+	  of optimization while maintaining fast compilation and a good
-+	  debugging experience. It is similar to '-O1' while preferring to
-+	  keep debug ability over runtime speed. The overall performance
-+	  will drop a bit (~6%).
-+
-+	  Use only if you want to debug the kernel, especially if you want
-+	  to have better kernel debugging experience with gdb facilities
-+	  like kgdb or qemu. If enabling this option breaks your kernel,
-+	  you should either disable this or find a fix (mostly in the arch
-+	  code).
-+
-+	  If unsure, select N.
-+
- endchoice
- 
- config HAVE_LD_DEAD_CODE_DATA_ELIMINATION
+Du Changbin (4):
+  x86/mm: surround level4_kernel_pgt with #ifdef
+    CONFIG_X86_5LEVEL...#endif
+  kernel hacking: new config NO_AUTO_INLINE to disable compiler
+    auto-inline optimizations
+  ARM: mm: fix build error in fix_to_virt with
+    CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+  kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og
+    optimization
+
+ Makefile                          | 11 +++++++++++
+ arch/arm/mm/mmu.c                 |  2 +-
+ arch/x86/include/asm/pgtable_64.h |  2 ++
+ arch/x86/kernel/head64.c          | 13 ++++++-------
+ include/linux/compiler-gcc.h      |  2 +-
+ include/linux/compiler.h          |  2 +-
+ init/Kconfig                      | 19 +++++++++++++++++++
+ lib/Kconfig.debug                 | 17 +++++++++++++++++
+ 8 files changed, 58 insertions(+), 10 deletions(-)
+
 -- 
 2.17.1
