@@ -1,197 +1,40 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 19 Oct 2018 16:48:06 +0300
-Subject: [PATCH 13/15] power: supply: olpc_battery: Move priv data to a
- struct
-In-Reply-To: <20181010172300.317643-14-lkundrak@v3.sk>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-14-lkundrak@v3.sk>
-Message-ID: <CAHp75VfDHFVHbxfdQp_Ug9SCx9d0=Rd9vBQYK0kYnok9B_kqrg@mail.gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 19 Oct 2018 09:45:12 -0400
+Subject: [PATCH 03/10] swiotlb: do not panic on mapping failures
+In-Reply-To: <20181019060425.GA28108@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-4-hch@lst.de>
+ <20181019001714.GD1251@char.us.oracle.com>
+ <20181019060425.GA28108@lst.de>
+Message-ID: <20181019134512.GD54336@Konrads-MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 8:24 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
->
-> The global variables for private data are not too nice. I'd like some
-> more, and that would clutter the global name space even further.
->
+On Fri, Oct 19, 2018 at 08:04:25AM +0200, Christoph Hellwig wrote:
+> On Thu, Oct 18, 2018 at 08:17:14PM -0400, Konrad Rzeszutek Wilk wrote:
+> > On Mon, Oct 08, 2018 at 10:02:39AM +0200, Christoph Hellwig wrote:
+> > > All properly written drivers now have error handling in the
+> > > dma_map_single / dma_map_page callers.  As swiotlb_tbl_map_single already
+> > > prints a useful warning when running out of swiotlb pool swace we can
+> > 
+> > s/swace/space/
+> > 
+> > > also remove swiotlb_full entirely as it serves no purpose now.
+> > 
+> > The panic albeit was useful for those drivers that didn't handle it.
+> > 
+> > Thoughts? I am kind of thinking screw them but then I am not too thrilled
+> > about silent data corruption errors.
+> 
+> I can add an (optional) panic back in common code so that the different
+> mapping types are covered.
 
-Good change!
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Thank you.
+> 
+> Btw, are you fine with taking this through the dma mapping tree for
+> this merge window?  I'd probably leave it in linux-next for another
 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> ---
->  drivers/power/supply/olpc_battery.c | 73 +++++++++++++++--------------
->  1 file changed, 38 insertions(+), 35 deletions(-)
->
-> diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
-> index 540d44bf536f..2a2d7cc995f0 100644
-> --- a/drivers/power/supply/olpc_battery.c
-> +++ b/drivers/power/supply/olpc_battery.c
-> @@ -53,6 +53,12 @@
->
->  #define BAT_ADDR_MFR_TYPE      0x5F
->
-> +struct olpc_battery_data {
-> +       struct power_supply *olpc_ac;
-> +       struct power_supply *olpc_bat;
-> +       char bat_serial[17];
-> +};
-> +
->  /*********************************************************************
->   *             Power
->   *********************************************************************/
-> @@ -91,11 +97,8 @@ static const struct power_supply_desc olpc_ac_desc = {
->         .get_property = olpc_ac_get_prop,
->  };
->
-> -static struct power_supply *olpc_ac;
-> -
-> -static char bat_serial[17]; /* Ick */
-> -
-> -static int olpc_bat_get_status(union power_supply_propval *val, uint8_t ec_byte)
-> +static int olpc_bat_get_status(struct olpc_battery_data *data,
-> +               union power_supply_propval *val, uint8_t ec_byte)
->  {
->         if (olpc_platform_info.ecver > 0x44) {
->                 if (ec_byte & (BAT_STAT_CHARGING | BAT_STAT_TRICKLE))
-> @@ -326,6 +329,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
->                                  enum power_supply_property psp,
->                                  union power_supply_propval *val)
->  {
-> +       struct olpc_battery_data *data = power_supply_get_drvdata(psy);
->         int ret = 0;
->         __be16 ec_word;
->         uint8_t ec_byte;
-> @@ -347,7 +351,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
->
->         switch (psp) {
->         case POWER_SUPPLY_PROP_STATUS:
-> -               ret = olpc_bat_get_status(val, ec_byte);
-> +               ret = olpc_bat_get_status(data, val, ec_byte);
->                 if (ret)
->                         return ret;
->                 break;
-> @@ -450,8 +454,8 @@ static int olpc_bat_get_property(struct power_supply *psy,
->                 if (ret)
->                         return ret;
->
-> -               sprintf(bat_serial, "%016llx", (long long)be64_to_cpu(ser_buf));
-> -               val->strval = bat_serial;
-> +               sprintf(data->bat_serial, "%016llx", (long long)be64_to_cpu(ser_buf));
-> +               val->strval = data->bat_serial;
->                 break;
->         case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
->                 ret = olpc_bat_get_voltage_max_design(val);
-> @@ -579,17 +583,17 @@ static struct power_supply_desc olpc_bat_desc = {
->         .use_for_apm = 1,
->  };
->
-> -static struct power_supply *olpc_bat;
-> -
->  static int olpc_battery_suspend(struct platform_device *pdev,
->                                 pm_message_t state)
->  {
-> -       if (device_may_wakeup(&olpc_ac->dev))
-> +       struct olpc_battery_data *data = platform_get_drvdata(pdev);
-> +
-> +       if (device_may_wakeup(&data->olpc_ac->dev))
->                 olpc_ec_wakeup_set(EC_SCI_SRC_ACPWR);
->         else
->                 olpc_ec_wakeup_clear(EC_SCI_SRC_ACPWR);
->
-> -       if (device_may_wakeup(&olpc_bat->dev))
-> +       if (device_may_wakeup(&data->olpc_bat->dev))
->                 olpc_ec_wakeup_set(EC_SCI_SRC_BATTERY | EC_SCI_SRC_BATSOC
->                                    | EC_SCI_SRC_BATERR);
->         else
-> @@ -601,7 +605,8 @@ static int olpc_battery_suspend(struct platform_device *pdev,
->
->  static int olpc_battery_probe(struct platform_device *pdev)
->  {
-> -       int ret;
-> +       struct power_supply_config psy_cfg = {};
-> +       struct olpc_battery_data *data;
->         uint8_t status;
->
->         /*
-> @@ -620,9 +625,13 @@ static int olpc_battery_probe(struct platform_device *pdev)
->
->         /* Ignore the status. It doesn't actually matter */
->
-> -       olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc, NULL);
-> -       if (IS_ERR(olpc_ac))
-> -               return PTR_ERR(olpc_ac);
-> +       psy_cfg.of_node = pdev->dev.of_node;
-> +       psy_cfg.drv_data = data;
-> +
-> +       data->olpc_ac = devm_power_supply_register(&pdev->dev, &olpc_ac_desc, &psy_cfg);
-> +       if (IS_ERR(data->olpc_ac))
-> +               return PTR_ERR(data->olpc_ac);
-> +
->         if (of_property_match_string(pdev->dev.of_node, "compatible",
->                                         "olpc,xo1.5-battery") >= 0) {
->                 /* XO-1.5 */
-> @@ -634,42 +643,36 @@ static int olpc_battery_probe(struct platform_device *pdev)
->                 olpc_bat_desc.num_properties = ARRAY_SIZE(olpc_xo1_bat_props);
->         }
->
-> -       olpc_bat = power_supply_register(&pdev->dev, &olpc_bat_desc, NULL);
-> -       if (IS_ERR(olpc_bat)) {
-> -               ret = PTR_ERR(olpc_bat);
-> -               goto battery_failed;
-> -       }
-> +       data->olpc_bat = devm_power_supply_register(&pdev->dev, &olpc_bat_desc, &psy_cfg);
-> +       if (IS_ERR(data->olpc_bat))
-> +               return PTR_ERR(data->olpc_bat);
->
-> -       ret = device_create_bin_file(&olpc_bat->dev, &olpc_bat_eeprom);
-> +       ret = device_create_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
->         if (ret)
-> -               goto eeprom_failed;
-> +               return ret;
->
-> -       ret = device_create_file(&olpc_bat->dev, &olpc_bat_error);
-> +       ret = device_create_file(&data->olpc_bat->dev, &olpc_bat_error);
->         if (ret)
->                 goto error_failed;
->
->         if (olpc_ec_wakeup_available()) {
-> -               device_set_wakeup_capable(&olpc_ac->dev, true);
-> -               device_set_wakeup_capable(&olpc_bat->dev, true);
-> +               device_set_wakeup_capable(&data->olpc_ac->dev, true);
-> +               device_set_wakeup_capable(&data->olpc_bat->dev, true);
->         }
->
->         return 0;
->
->  error_failed:
-> -       device_remove_bin_file(&olpc_bat->dev, &olpc_bat_eeprom);
-> -eeprom_failed:
-> -       power_supply_unregister(olpc_bat);
-> -battery_failed:
-> -       power_supply_unregister(olpc_ac);
-> +       device_remove_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
->         return ret;
->  }
->
->  static int olpc_battery_remove(struct platform_device *pdev)
->  {
-> -       device_remove_file(&olpc_bat->dev, &olpc_bat_error);
-> -       device_remove_bin_file(&olpc_bat->dev, &olpc_bat_eeprom);
-> -       power_supply_unregister(olpc_bat);
-> -       power_supply_unregister(olpc_ac);
-> +       struct olpc_battery_data *data = platform_get_drvdata(pdev);
-> +
-> +       device_remove_file(&data->olpc_bat->dev, &olpc_bat_error);
-> +       device_remove_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
->         return 0;
->  }
->
-> --
-> 2.19.0
->
+Yes, please.
+> week or so and don't send it with the first pull request on Monday.
 
-
--- 
-With Best Regards,
-Andy Shevchenko
+<nods>
