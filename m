@@ -1,35 +1,63 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 19 Oct 2018 09:14:03 -0700
-Subject: [PATCH v2 1/9] ASoC: sun4i-i2s: Add compatibility with A64 codec
- I2S
-In-Reply-To: <20181015081836.onjczcsg5qwp6rbt@flea>
-References: <20181013165329.13363-1-anarsoul@gmail.com>
- <20181013165329.13363-2-anarsoul@gmail.com>
- <20181015081836.onjczcsg5qwp6rbt@flea>
-Message-ID: <2698773.RERkv2aHyz@anarsoul-thinkpad>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Oct 2018 17:16:51 +0100
+Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
+In-Reply-To: <CAGXu5jK8OK+430FQtztwVD8B95_SCjTWoysZXBdkZaDeSiV+ow@mail.gmail.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-8-kristina.martsenko@arm.com>
+ <20181019111542.6wrvjguirglzg7vg@mbp>
+ <20181019112404.GD14246@arm.com>
+ <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
+ <20181019154948.GD16771@arm.com>
+ <CAGXu5jK8OK+430FQtztwVD8B95_SCjTWoysZXBdkZaDeSiV+ow@mail.gmail.com>
+Message-ID: <20181019161651.GE16771@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 15, 2018 1:18:36 AM PDT Maxime Ripard wrote:
-> On Sat, Oct 13, 2018 at 09:53:21AM -0700, Vasily Khoruzhick wrote:
-> > From: Marcus Cooper <codekipper@gmail.com>
-> > 
-> > The I2S block used for the audio codec in the A64 differs from other 3
-> > I2S modules in A64 and isn't compatible with H3. But it is very similar
-> > to what is found in A10(sun4i). However, its TX FIFO is
-> > located at a different address.
-> > 
-> > Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+On Fri, Oct 19, 2018 at 09:05:57AM -0700, Kees Cook wrote:
+> On Fri, Oct 19, 2018 at 8:49 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Oct 19, 2018 at 08:36:45AM -0700, Kees Cook wrote:
+> >> On Fri, Oct 19, 2018 at 4:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > FWIW: I think we should be entertaining a prctl() interface to use a new
+> >> > key on a per-thread basis. Obviously, this would need to be used with care
+> >> > (e.g. you'd fork(); use the prctl() and then you'd better not return from
+> >> > the calling function!).
+> >> >
+> >> > Assuming we want this (Kees -- I was under the impression that everything in
+> >> > Android would end up with the same key otherwise?), then the question is
+> >> > do we want:
+> >> >
+> >> >   - prctl() get/set operations for the key, or
+> >> >   - prctl() set_random_key operation, or
+> >> >   - both of the above?
+> >> >
+> >> > Part of the answer to that may lie in the requirements of CRIU, where I
+> >> > strongly suspect they need explicit get/set operations, although these
+> >> > could be gated on CONFIG_CHECKPOINT_RESTORE=y.
+> >>
+> >> Oh CRIU. Yikes. I'd like the get/set to be gated by the CONFIG, yes.
+> >> No reason to allow explicit access to the key (and selected algo) if
+> >> we don't have to.
+> >
+> > Makes sense.
+> >
+> >> As for per-thread or not, having a "pick a new key now" prctl() sounds
+> >> good, but I'd like to have an eye toward having it just be "automatic"
+> >> on clone().
+> >
+> > I thought about that too, but we're out of clone() flags afaict and there's
+> > no arch hook in there. We could add yet another clone syscall, but yuck (and
+> > I reckon viro would kill us).
+> >
+> > Or are you saying that we could infer the behaviour from the existing set
+> > of flags?
 > 
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-Mark, can you pick this patch up please?
-
-Thanks!
-
-Regards,
-Vasily
-
+> I mean if it's starting a new thread, it should get a new key
+> automatically, just like the ssp canary happens in dup_task_struct().
 > 
-> Maxime
+> (Or did I miss some context for why that's not possible?)
+
+The problem with that is if the child thread (in userspace) returns from
+the function that called fork(), then it will explode because the link
+register will have been signed with the parent key.
+
+Will
