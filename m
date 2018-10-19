@@ -1,251 +1,83 @@
-From: moritz.fischer.private@gmail.com (Moritz Fischer)
-Date: Fri, 19 Oct 2018 14:23:44 -0700
-Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
- zynqmp
-In-Reply-To: <20181020084805.29103-4-nava.manne@xilinx.com>
-References: <20181020084805.29103-1-nava.manne@xilinx.com>
- <20181020084805.29103-4-nava.manne@xilinx.com>
-Message-ID: <CAJYdmePxnkG=3iJC5Lewq3n3zFGTKASJX7ceUEufBvOJogCfdA@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sat, 20 Oct 2018 00:58:27 +0200
+Subject: omap4: support for manually updated display
+In-Reply-To: <20181019164450.GD43338@atomide.com>
+References: <20180830090456.GA17277@amd>
+ <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
+ <3205865.8O8aibZXye@avalon> <20180910174453.GV5662@atomide.com>
+ <20181018221549.GB6364@amd> <20181019164450.GD43338@atomide.com>
+Message-ID: <20181019225827.s76wapp3cxrmp5af@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nava,
+Hi,
 
-Looks good to me, a couple of nits inline below.
+On Fri, Oct 19, 2018 at 09:44:50AM -0700, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [181018 22:15]:
+> > Hi!
+> > 
+> > > > I want to make it clear that I don't want to claim any privilege in getting 
+> > > > patches merged first. I am however worried that, without an easy way to test 
+> > > > DSI support, and without enough time to focus on it, I would break whatever 
+> > > > would be merged now in future reworks. I would thus like to find out how to 
+> > > > collaborate on this task, hopefully to move towards usage of drm_bridge and 
+> > > > drm_panel for DSI-based pipelines.
+> > > 
+> > > Real users with mainline kernel with a real product should
+> > > always have priority over any ongoing clean-up.
+> > > 
+> > > And for testing, a bunch of real users is something you can't
+> > > beat for proper testing of code on ongoing basis!
+> > > 
+> > > Naturally the burden of getting the patches ready is on the people
+> > > using them for rebase and fixing comments. And Sebastian has
+> > > already agreed help with maintaining it.
+> > > 
+> > > I've been actually using DSI command mode support and testing
+> > > Linux next several times a week to prevent regressions from
+> > > sneaking into -rc1 in general. So now I can't test omapdrm with
+> > > next until Sebastian is done with rebasing.. Back to headless
+> > > testing then.
+> > > 
+> > > Anyways, I'd say let's add the DSI command mode support ASAP after
+> > > rebasing, there are at least Sebastian, Pavel and I then testing
+> > > and helping with further ongoing panel conversion work.
+> > 
+> > Are there any news here? Does someone have a patch set that actually
+> > works?
+> 
+> I was wondering about that too.. I only have the v4.19-rc1 based
+> patches and can no longer test with Linux next. Sebastian, any
+> update?
+> 
+> > Are there any in-progress patches I could help with?
+> 
+> I can put in some effort too if needed.
 
-On Fri, Oct 19, 2018 at 1:50 AM Nava kishore Manne
-<nava.manne@xilinx.com> wrote:
->
-> This patch adds FPGA Manager support for the Xilinx
-> ZynqMp chip.
+I have some in-progress patches, that are not yet working. The
+reversal of display pipeline initialization introduced some
+issues with DSI (since the panel cannot be fully initialized
+without DSI controller). I got this resolved by registering
+the DSI display before the DSI controller is fully intialized.
+This is obviously racy and breaks for device with DSI backlight
+(since display probe function tries to do DSI queries). I think
+properly solving this mess requires full migration to
+the common mipi_dsi_host/mipi_dsi_device infrastructure. This
+should obviously be done anyways, but for now the hack should
+be good enough. There is still some other issue, though. I do
+not yet understand the origin of that one.
 
-Isn't it ZynqMP ?
->
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> ---
-> Changes for v1:
->                 -None.
->
-> Changes for RFC-V2:
->                 -Updated the Fpga Mgr registrations call's
->                  to 4.18
->
->  drivers/fpga/Kconfig       |   9 +++
->  drivers/fpga/Makefile      |   1 +
->  drivers/fpga/zynqmp-fpga.c | 159 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 169 insertions(+)
->  create mode 100644 drivers/fpga/zynqmp-fpga.c
->
-> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-> index 1ebcef4bab5b..26ebbcf3d3a3 100644
-> --- a/drivers/fpga/Kconfig
-> +++ b/drivers/fpga/Kconfig
-> @@ -56,6 +56,15 @@ config FPGA_MGR_ZYNQ_FPGA
->         help
->           FPGA manager driver support for Xilinx Zynq FPGAs.
->
-> +config FPGA_MGR_ZYNQMP_FPGA
-> +       tristate "Xilinx Zynqmp FPGA"
-> +       depends on ARCH_ZYNQMP || COMPILE_TEST
-> +       help
-> +         FPGA manager driver support for Xilinx ZynqMP FPGAs.
-> +         This driver uses processor configuration port(PCAP)
-This driver uses *the* processor configuration port.
+I uploaded my current status here. It's not based on the newest
+-next, but contains the interesting patches from Laurent. Also
+the last few patches are not yet cleaned up, sorry for the mess.
 
-> +         to configure the programmable logic(PL) through PS
-> +         on ZynqMP SoC.
-> +
->  config FPGA_MGR_XILINX_SPI
->         tristate "Xilinx Configuration over Slave Serial (SPI)"
->         depends on SPI
-> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-> index 7a2d73ba7122..3488ebbaee46 100644
-> --- a/drivers/fpga/Makefile
-> +++ b/drivers/fpga/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)    += socfpga-a10.o
->  obj-$(CONFIG_FPGA_MGR_TS73XX)          += ts73xx-fpga.o
->  obj-$(CONFIG_FPGA_MGR_XILINX_SPI)      += xilinx-spi.o
->  obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)       += zynq-fpga.o
-> +obj-$(CONFIG_FPGA_MGR_ZYNQMP_FPGA)     += zynqmp-fpga.o
->  obj-$(CONFIG_ALTERA_PR_IP_CORE)         += altera-pr-ip-core.o
->  obj-$(CONFIG_ALTERA_PR_IP_CORE_PLAT)    += altera-pr-ip-core-plat.o
->
-> diff --git a/drivers/fpga/zynqmp-fpga.c b/drivers/fpga/zynqmp-fpga.c
-> new file mode 100644
-> index 000000000000..2760d7e3872a
-> --- /dev/null
-> +++ b/drivers/fpga/zynqmp-fpga.c
-> @@ -0,0 +1,159 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2018 Xilinx, Inc.
-> + */
-> +
-> +#include <linux/dma-mapping.h>
-> +#include <linux/fpga/fpga-mgr.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/string.h>
-> +#include <linux/firmware/xlnx-zynqmp.h>
-> +
-> +/* Constant Definitions */
-> +#define IXR_FPGA_DONE_MASK     0X00000008U
-> +
-> +/**
-> + * struct zynqmp_fpga_priv - Private data structure
-> + * @dev:       Device data structure
-> + * @flags:     flags which is used to identify the bitfile type
-> + */
-> +struct zynqmp_fpga_priv {
-> +       struct device *dev;
-> +       u32 flags;
-> +};
-> +
-> +static int zynqmp_fpga_ops_write_init(struct fpga_manager *mgr,
-> +                                     struct fpga_image_info *info,
-> +                                     const char *buf, size_t size)
-> +{
-> +       struct zynqmp_fpga_priv *priv;
-> +
-> +       priv = mgr->priv;
-> +       priv->flags = info->flags;
-> +
-> +       return 0;
-> +}
-> +
-> +static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
-> +                                const char *buf, size_t size)
-> +{
-> +       struct zynqmp_fpga_priv *priv;
-> +       char *kbuf;
-> +       dma_addr_t dma_addr;
-> +       int ret;
-> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+https://git.kernel.org/pub/scm/linux/kernel/git/sre/linux-n900.git/log/?h=droid4-display-omapdrm-4.20-next
 
-Reverse xmas-tree please, i.e. long lines first.
-
-> +
-> +       if (!eemi_ops || !eemi_ops->fpga_load)
-> +               return -ENXIO;
-> +
-> +       priv = mgr->priv;
-> +
-> +       kbuf = dma_alloc_coherent(priv->dev, size, &dma_addr, GFP_KERNEL);
-> +       if (!kbuf)
-> +               return -ENOMEM;
-> +
-> +       memcpy(kbuf, buf, size);
-> +
-> +       wmb(); /* ensure all writes are done before initiate FW call */
-> +
-> +       ret = eemi_ops->fpga_load(dma_addr, size, priv->flags);
-> +
-> +       dma_free_coherent(priv->dev, size, kbuf, dma_addr);
-> +
-> +       return ret;
-> +}
-> +
-> +static int zynqmp_fpga_ops_write_complete(struct fpga_manager *mgr,
-> +                                         struct fpga_image_info *info)
-> +{
-> +       return 0;
-> +}
-> +
-> +static enum fpga_mgr_states zynqmp_fpga_ops_state(struct fpga_manager *mgr)
-> +{
-> +       u32 status;
-> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-
-Same here, split it up if necessary.
-> +
-> +       if (!eemi_ops || !eemi_ops->fpga_get_status)
-> +               return FPGA_MGR_STATE_UNKNOWN;
-> +
-> +       eemi_ops->fpga_get_status(&status);
-> +       if (status & IXR_FPGA_DONE_MASK)
-> +               return FPGA_MGR_STATE_OPERATING;
-> +
-> +       return FPGA_MGR_STATE_UNKNOWN;
-> +}
-> +
-> +static const struct fpga_manager_ops zynqmp_fpga_ops = {
-> +       .state = zynqmp_fpga_ops_state,
-> +       .write_init = zynqmp_fpga_ops_write_init,
-> +       .write = zynqmp_fpga_ops_write,
-> +       .write_complete = zynqmp_fpga_ops_write_complete,
-> +};
-> +
-> +static int zynqmp_fpga_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct zynqmp_fpga_priv *priv;
-> +       struct fpga_manager *mgr;
-> +       int err, ret;
-> +
-> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +
-> +       priv->dev = dev;
-> +       ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(44));
-> +       if (ret < 0)
-> +               dev_err(dev, "no usable DMA configuration");
-
-Do you wanna do something about this error if it happens? Return 'ret' maybe?
-> +
-> +       mgr = fpga_mgr_create(dev, "Xilinx ZynqMP FPGA Manager",
-> +                             &zynqmp_fpga_ops, priv);
-> +       if (!mgr)
-> +               return -ENOMEM;
-> +
-> +       platform_set_drvdata(pdev, mgr);
-> +
-> +       err = fpga_mgr_register(mgr);
-> +       if (err) {
-> +               dev_err(dev, "unable to register FPGA manager");
-> +               fpga_mgr_free(mgr);
-> +               return err;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int zynqmp_fpga_remove(struct platform_device *pdev)
-> +{
-> +       struct fpga_manager *mgr = platform_get_drvdata(pdev);
-> +
-> +       fpga_mgr_unregister(mgr);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id zynqmp_fpga_of_match[] = {
-> +       { .compatible = "xlnx,zynqmp-pcap-fpga", },
-> +       {},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, zynqmp_fpga_of_match);
-> +
-> +static struct platform_driver zynqmp_fpga_driver = {
-> +       .probe = zynqmp_fpga_probe,
-> +       .remove = zynqmp_fpga_remove,
-> +       .driver = {
-> +               .name = "zynqmp_fpga_manager",
-> +               .of_match_table = of_match_ptr(zynqmp_fpga_of_match),
-> +       },
-> +};
-> +
-> +module_platform_driver(zynqmp_fpga_driver);
-> +
-> +MODULE_AUTHOR("Nava kishore Manne <navam@xilinx.com>");
-> +MODULE_DESCRIPTION("Xilinx ZynqMp FPGA Manager");
-> +MODULE_LICENSE("GPL");
-> --
-> 2.18.0
->
-
-Thanks,
-
-Moritz
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181020/68068820/attachment.sig>
