@@ -1,35 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 19 Oct 2018 09:12:43 +0200
-Subject: [PATCH v1 2/3] i2c: imx: probe dma only only on i.MX50 and later.
-In-Reply-To: <20181018112615.29362-3-o.rempel@pengutronix.de>
-References: <20181018112615.29362-1-o.rempel@pengutronix.de>
- <20181018112615.29362-3-o.rempel@pengutronix.de>
-Message-ID: <20181019071243.t5bwcmnnlqrgtajj@pengutronix.de>
+From: open.sudheer@gmail.com (sudheer.v)
+Date: Fri, 19 Oct 2018 12:41:56 +0530
+Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
+In-Reply-To: <a3fecf7913d6a85a6294afbc5a1a18b7714d6756.camel@kernel.crashing.org>
+References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
+ <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
+ <20181017060531.GU2400@vkoul-mobl>
+ <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
+ <20181018095507.GC2400@vkoul-mobl>
+ <a3fecf7913d6a85a6294afbc5a1a18b7714d6756.camel@kernel.crashing.org>
+Message-ID: <20181019071154.GE13642@Pilot130>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Oleksij,
+On Fri, Oct 19, 2018 at 10:32:24AM +1100, Benjamin Herrenschmidt wrote:
+> On Thu, 2018-10-18 at 15:25 +0530, Vinod wrote:
+> > 
+> > > It's not a dmaengine driver. It's a serial UART driver that happens to
+> > > use a dedicated DMA engine.
+> > 
+> > Then I see no reason for it to use dmaengine APIs. The framework allows
+> > people to share a controller for many clients, but if you have dedicated
+> > one then you may use it directly
+> 
+> Well... the engine is shared by a few UARTs, they have dedicated rings
+> but there's a common set of regs for interrupt handling etc.
+> 
+> That said, I still think it could be contained within a UART driver,
+> there's little benefit in adding the framework overhead, esp since
+> these are really weak cores, any overhead will be felt.
+> 
+> Ben.
+> 
+> > > It's unclear whether it should be split into two drivers, or just have
+> > > the serial driver directly use the dma engine since that engine is
+> > > dedicated in HW to only work on those UARTs and nothing else...
+> > > 
+> > > Cheers,
+> > > Ben.
 
-On Thu, Oct 18, 2018 at 01:26:14PM +0200, Oleksij Rempel wrote:
-> The DMA support for I2C was introduced on i.MX50. So,
-> avoid of DMA probing on not supported versions.
+Initially we wanted to have  a single driver,
+however we had an informal discussion with one of the maintainer 
+and based on the feedback, followed the Linux DMA and UART architecture.
 
-What is the obvious downside of trying to use DMA on i.MX21? If the
-purpose is just to suppress the message
+If this seperate DMA-engine driver adds more overhead than benifit,
+we will merge them into a single UART driver and resubmitt the patches.
+Vinod,
+      can this dma-controller driver sit under dma subsystem?.
+      or better to move it under UART framework.
 
-	can't request DMA tx channel
-
-, that goes away with patch 3, too.
-
-Note that if we agree that i.MX50 (and later) isn't compatible to
-i.MX21, all device trees should be fixed accordingly. IMHO the
-difference "There is a DMA engine connected only on some
-implementations" doesn't give enough incentive to claim that i.MX21 and
-i.MX50 must not share the compatible.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thank you.
+-- Sudheer
