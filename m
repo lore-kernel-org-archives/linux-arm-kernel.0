@@ -1,52 +1,87 @@
-From: zhlcindy@gmail.com (Li Zhang)
-Date: Fri, 19 Oct 2018 12:53:17 +0800
-Subject: kvm-unit-tests gicv2 cases fail
-In-Reply-To: <CAKv+Gu96fULFjVNyxpy_N3CVZaE2aL19HXFaov4u4eC+rFj8Pg@mail.gmail.com>
-References: <CAD8of+q29DrQa4Ay6karXC19vXzX++2T8FR-V1SAjGuO0ejYhQ@mail.gmail.com>
- <20181019032557.h2je3v7frp7nnnj4@kamzik.brq.redhat.com>
- <CAKv+Gu96fULFjVNyxpy_N3CVZaE2aL19HXFaov4u4eC+rFj8Pg@mail.gmail.com>
-Message-ID: <CAD8of+qVj7=0POGXTg_5K3cHkEQ_XyxdmjS0nUXa=mGJ8fbfXw@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 19 Oct 2018 12:56:23 +0800
+Subject: [PATCH] coresight: tmc: Fix bad register address for CLAIM
+Message-ID: <1539924983-18503-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 11:59 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> On 19 October 2018 at 11:25, Andrew Jones <drjones@redhat.com> wrote:
-> > On Thu, Oct 18, 2018 at 05:17:57PM +0800, Li Zhang wrote:
-> >> Hi,
-> >>
-> >> I run kvm-units-test on ARM server(QDF2400), but gicv2-ipi,
-> >> gicv2-active cases fail.
-> >> By debuging kvm-unit-tests source code, I found that interrupt is not
-> >> handled. do_handle_exception is not called.
-> >>
-> >> By looking into KVM source code, it has GICv2 emulation on GICv3 support.
-> >> I've tried a lot of kernel versions, from v4.12~v4.19 in mainline,
-> >> these cases always fail.
-> >> Is it possible that hardware/software disables this?
-> >>
-> >> It seems that GICv2 is a little old for ARM server, I am confused when
-> >> we can use it.
-> >> Do we need to care about these cases?
-> >
-> > We care, but I haven't seen these issues, and, if this only reproduces on
-> > a gicv2 emulation on gicv3 configuration, then I don't have any hardware
-> > where I can reproduce/debug it.
-> >
->
-> Do you have access to a Socionext SynQuacer board? I use it regularly
-> with QEMU/KVM running both in GICv2 and GICv3 modes, and I haven't
-> noticed any issues.
+Commit 4d3ebd3658d8 ("coreisght: tmc: Claim device before use") uses
+CLAIM tag to validate if the device is available, it needs to pass
+the device base address to access related registers.
 
-I only have QDF2400 boards on my hand.
+In the function tmc_etb_disable_hw() it wrongly passes the driver data
+pointer as register base address, thus it's easily to produce the kernel
+warning info like below:
 
-Do you mean by starting a guest with QEMU/KVM with GICv2?
-I tried that once, guest hang. Guest kernel has some message with call trace.
-So I checked kvm-unit-tests, GICv2 always failed.
+[   83.579898] WARNING: CPU: 4 PID: 2970 at drivers/hwtracing/coresight/coresight.c:207 coresight_disclaim_device_unlocked+0x44/0x80
+[   83.591448] Modules linked in:
+[   83.594485] CPU: 4 PID: 2970 Comm: uname Not tainted 4.19.0-rc6-00417-g721b509 #110
+[   83.602067] Hardware name: ARM Juno development board (r2) (DT)
+[   83.607932] pstate: 80000085 (Nzcv daIf -PAN -UAO)
+[   83.612681] pc : coresight_disclaim_device_unlocked+0x44/0x80
+[   83.618375] lr : coresight_disclaim_device_unlocked+0x44/0x80
+[   83.624064] sp : ffff00000fe3ba20
+[   83.627347] x29: ffff00000fe3ba20 x28: ffff80002d430dc0
+[   83.632618] x27: ffff800033177c00 x26: ffff80002eb44480
+[   83.637889] x25: 0000000000000001 x24: ffff800033c72600
+[   83.643160] x23: ffff0000099b11f8 x22: ffff0000099b11c8
+[   83.648430] x21: 0000000000000002 x20: ffff800033a90418
+[   83.653701] x19: ffff0000099b11c8 x18: 0000000000000000
+[   83.658971] x17: 0000000000000000 x16: 0000000000000000
+[   83.664241] x15: 0000000000000000 x14: 0000000000000000
+[   83.669511] x13: 0000000000000000 x12: 0000000000000000
+[   83.674782] x11: 0000000000000000 x10: 0000000000000000
+[   83.680052] x9 : 0000000000000000 x8 : 0000000000000001
+[   83.685322] x7 : 0000000000010000 x6 : ffff800033ebab18
+[   83.690593] x5 : ffff800033ebab18 x4 : ffff800033e6c698
+[   83.695862] x3 : 0000000000000001 x2 : 0000000000000000
+[   83.701133] x1 : 0000000000000000 x0 : 0000000000000001
+[   83.706404] Call trace:
+[   83.708830]  coresight_disclaim_device_unlocked+0x44/0x80
+[   83.714180]  coresight_disclaim_device+0x34/0x48
+[   83.718756]  tmc_disable_etf_sink+0xc4/0xf0
+[   83.722902]  coresight_disable_path_from+0xc8/0x240
+[   83.727735]  coresight_disable_path+0x24/0x30
+[   83.732053]  etm_event_stop+0x130/0x170
+[   83.735854]  etm_event_del+0x24/0x30
+[   83.739399]  event_sched_out.isra.51+0xcc/0x1e8
+[   83.743887]  group_sched_out.part.53+0x44/0xb0
+[   83.748291]  ctx_sched_out+0x298/0x2b8
+[   83.752005]  task_ctx_sched_out+0x74/0xa8
+[   83.755980]  perf_event_exit_task+0x140/0x418
+[   83.760298]  do_exit+0x3f4/0xcf0
+[   83.763497]  do_group_exit+0x5c/0xc0
+[   83.767041]  __arm64_sys_exit_group+0x24/0x28
+[   83.771359]  el0_svc_common+0x110/0x178
+[   83.775160]  el0_svc_handler+0x94/0xe8
+[   83.778875]  el0_svc+0x8/0xc
+[   83.781728] ---[ end trace 02d8d8eac46db9e5 ]---
 
+This patch is to fix this bug by using 'drvdata->base' as the
+register base address for CLAIM related operation.
 
+Fixes: 4d3ebd3658d8 ("coreisght: tmc: Claim device before use")
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Mike Leach <mike.leach@linaro.org>
+Cc: Robert Walker <robert.walker@arm.com>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index 53fc83b..5864ac5 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -86,7 +86,7 @@ static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ 
+ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ {
+-	coresight_disclaim_device(drvdata);
++	coresight_disclaim_device(drvdata->base);
+ 	__tmc_etb_disable_hw(drvdata);
+ }
+ 
 -- 
-
-Best Regards
--Li
+2.7.4
