@@ -1,40 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 19 Oct 2018 16:54:10 +0100
-Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
-In-Reply-To: <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <20181005084754.20950-8-kristina.martsenko@arm.com>
- <20181019111542.6wrvjguirglzg7vg@mbp>
- <20181019112404.GD14246@arm.com>
- <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
-Message-ID: <20181019155410.wsbmhluq4xqcyty2@lakrids.cambridge.arm.com>
+From: olivier.moysan@st.com (Olivier Moysan)
+Date: Fri, 19 Oct 2018 17:56:35 +0200
+Subject: [PATCH 1/1] ASoC: cs42l51: fix mclk support
+Message-ID: <1539964595-23758-1-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 08:36:45AM -0700, Kees Cook wrote:
-> On Fri, Oct 19, 2018 at 4:24 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Assuming we want this (Kees -- I was under the impression that everything in
-> > Android would end up with the same key otherwise?), then the question is
-> > do we want:
-> >
-> >   - prctl() get/set operations for the key, or
-> >   - prctl() set_random_key operation, or
-> >   - both of the above?
-> >
-> > Part of the answer to that may lie in the requirements of CRIU, where I
-> > strongly suspect they need explicit get/set operations, although these
-> > could be gated on CONFIG_CHECKPOINT_RESTORE=y.
-> 
-> Oh CRIU. Yikes. I'd like the get/set to be gated by the CONFIG, yes.
-> No reason to allow explicit access to the key (and selected algo) if
-> we don't have to.
+Fixes: 5e8d63a726f8 ("ASoC: cs42l51: add mclk support")
 
-As a minor aside, the PAC algorithm (which can be IMPLEMENTATION
-DEFINED) is fixed in HW, and cannot be selected dynamically.
+The MCLK clock is made optional for cs42l51 codec.
+However, ASoC DAPM clock supply widget, expects the clock to be defined
+unconditionally.
+Register MCLK DAPM conditionally in codec driver,
+depending on clock presence in DT.
 
-Thus if a process is using pointer authentication, it would not be
-possible for CRIU to migrate that process to a CPU with a different PAC
-algorithm.
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+---
+ sound/soc/codecs/cs42l51.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Thanks,
-Mark.
+diff --git a/sound/soc/codecs/cs42l51.c b/sound/soc/codecs/cs42l51.c
+index eb40bff54cec..fd2bd74024c1 100644
+--- a/sound/soc/codecs/cs42l51.c
++++ b/sound/soc/codecs/cs42l51.c
+@@ -21,6 +21,7 @@
+  *  - master mode *NOT* supported
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <sound/core.h>
+@@ -41,6 +42,7 @@ enum master_slave_mode {
+ 
+ struct cs42l51_private {
+ 	unsigned int mclk;
++	struct clk *mclk_handle;
+ 	unsigned int audio_mode;	/* The mode (I2S or left-justified) */
+ 	enum master_slave_mode func;
+ };
+@@ -492,9 +494,13 @@ static int cs42l51_component_probe(struct snd_soc_component *component)
+ {
+ 	int ret, reg;
+ 	struct snd_soc_dapm_context *dapm;
++	struct cs42l51_private *cs42l51;
+ 
++	cs42l51 = snd_soc_component_get_drvdata(component);
+ 	dapm = snd_soc_component_get_dapm(component);
+-	snd_soc_dapm_new_controls(dapm, cs42l51_dapm_mclk_widgets, 1);
++
++	if (cs42l51->mclk_handle)
++		snd_soc_dapm_new_controls(dapm, cs42l51_dapm_mclk_widgets, 1);
+ 
+ 	/*
+ 	 * DAC configuration
+@@ -548,6 +554,13 @@ int cs42l51_probe(struct device *dev, struct regmap *regmap)
+ 
+ 	dev_set_drvdata(dev, cs42l51);
+ 
++	cs42l51->mclk_handle = devm_clk_get(dev, "MCLK");
++	if (IS_ERR(cs42l51->mclk_handle)) {
++		if (PTR_ERR(cs42l51->mclk_handle) != -ENOENT)
++			return PTR_ERR(cs42l51->mclk_handle);
++		cs42l51->mclk_handle = NULL;
++	}
++
+ 	/* Verify that we have a CS42L51 */
+ 	ret = regmap_read(regmap, CS42L51_CHIP_REV_ID, &val);
+ 	if (ret < 0) {
+-- 
+2.7.4
