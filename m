@@ -1,97 +1,141 @@
-From: liang.yang@amlogic.com (Liang Yang)
-Date: Fri, 19 Oct 2018 16:04:09 +0800
-Subject: [PATCH v5 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-In-Reply-To: <20181018223943.145e5497@bbrezillon>
-References: <1539839345-14021-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
- <20181018223943.145e5497@bbrezillon>
-Message-ID: <b80f2e72-7ad5-9f37-a059-87b1d8344e7b@amlogic.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 19 Oct 2018 08:05:51 +0000
+Subject: [PATCH V3 7/8] arm64: dts: imx: add imx8qxp mek support
+In-Reply-To: <20181018202740.GA7262@bogus>
+References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
+ <1539886483-15775-8-git-send-email-aisheng.dong@nxp.com>
+ <20181018202740.GA7262@bogus>
+Message-ID: <DB7PR04MB4218778D66FBD51554D64D6980F90@DB7PR04MB4218.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Friday, October 19, 2018 4:28 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+[...]
+> On Thu, Oct 18, 2018 at 06:19:43PM +0000, A.s. Dong wrote:
+> > i.MX 8QuadXPlus is a quad (4x) Cortex-A35 proccessor with powerful
+> > graphic and multimedia features. This patch adds imx8qxp mek board
+> > support.
+> >
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> > v2->v3:
+> >  * Pad names update
+> >  * move memory node to here
+> >  * add no-sd and no-sdio under emmc node
+> > ---
+> >  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
+> >  arch/arm64/boot/dts/freescale/Makefile        |   1 +
+> >  arch/arm64/boot/dts/freescale/imx8qxp-mek.dts | 141
+> > ++++++++++++++++++++++++++
+> >  3 files changed, 146 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+> > b/Documentation/devicetree/bindings/arm/fsl.txt
+> > index baeb1fc..704472b 100644
+> > --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> > @@ -97,6 +97,10 @@ i.MX7 SabreSD Board  Required root node
+> properties:
+> >      - compatible = "fsl,imx7d-sdb", "fsl,imx7d";
+> >
+> > +i.MX8QXP MEK Board
+> > +Required root node properties:
+> > +    - compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
+> > +
+> >  Generic i.MX boards
+> >  -------------------
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
+> > b/arch/arm64/boot/dts/freescale/Makefile
+> > index 86e18ad..cff87f3 100644
+> > --- a/arch/arm64/boot/dts/freescale/Makefile
+> > +++ b/arch/arm64/boot/dts/freescale/Makefile
+> > @@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) +=
+> fsl-ls2080a-rdb.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+> > +dtb-$(CONFIG_SOC_IMX8QXP) += imx8qxp-mek.dtb
+> > diff --git a/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
+> > b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
+> > new file mode 100644
+> > index 0000000..6087ead
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
+> > @@ -0,0 +1,141 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright 2017~2018 NXP
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "imx8qxp.dtsi"
+> > +
+> > +/ {
+> > +	model = "Freescale i.MX8QXP MEK";
+> > +	compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
+> > +
+> > +	chosen {
+> > +		stdout-path = &dma_lpuart0;
+> > +	};
+> > +
+> > +	memory at 80000000 {
+> > +		device_type = "memory";
+> > +		reg = <0x00000000 0x80000000 0 0x40000000>;
+> > +	};
+> > +
+> > +	reg_usdhc2_vmmc: usdhc2-vmmc {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "SD1_SPWR";
+> > +		regulator-min-microvolt = <3000000>;
+> > +		regulator-max-microvolt = <3000000>;
+> > +		gpio = <&lsio_gpio4 19 GPIO_ACTIVE_HIGH>;
+> > +		enable-active-high;
+> > +	};
+> > +};
+> > +
+> > +&dma_lpuart0 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_lpuart0>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&fec1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_fec1>;
+> > +	phy-mode = "rgmii-id";
+> > +	phy-handle = <&ethphy0>;
+> > +	fsl,magic-packet;
+> > +	status = "okay";
+> > +
+> > +	mdio {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		ethphy0: ethernet-phy at 0 {
+> > +			compatible = "ethernet-phy-ieee802.3-c22";
+> 
+> > +			at803x,eee-disabled;
+> > +			at803x,vddio-1p8v;
+> 
+> These 2 are Not documented.
 
+Sorry for missing these.
+They're seemed to be introduce with original local code, as it does not
+Affect the normal function, I will remove them in next patch set.
 
-On 2018/10/19 4:39, Boris Brezillon wrote:
-> On Thu, 18 Oct 2018 13:09:05 +0800
-> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
-> 
->> +static int meson_nfc_calc_set_timing(struct meson_nfc *nfc,
->> +				     const struct nand_sdr_timings *timings)
->> +{
->> +	struct nand_timing *timing = &nfc->timing;
->> +	int div, bt_min, bt_max, bus_timing;
->> +	int ret;
->> +
->> +	div = DIV_ROUND_UP((timings->tRC_min / 1000), NFC_CLK_CYCLE);
->> +	ret = clk_set_rate(nfc->device_clk, 1000000000 / div);
->> +	if (ret) {
->> +		dev_err(nfc->dev, "failed to set nand clock rate\n");
->> +		return ret;
->> +	}
->> +
->> +	timing->twb = DIV_ROUND_UP(PSEC_TO_NSEC(timings->tWB_max),
->> +				   div * NFC_CLK_CYCLE);
->> +	timing->tadl = DIV_ROUND_UP(PSEC_TO_NSEC(timings->tADL_min),
->> +				    div * NFC_CLK_CYCLE);
->> +	timing->twhr = DIV_ROUND_UP(PSEC_TO_NSEC(timings->tWHR_min),
->> +				    div * NFC_CLK_CYCLE);
->> +
->> +	bt_min = (timings->tREA_max + NFC_DEFAULT_DELAY) / div;
->> +	bt_max = (NFC_DEFAULT_DELAY + timings->tRHOH_min
->> +			+ timings->tRC_min / 2) / div;
->> +
->> +	bt_min = DIV_ROUND_UP(bt_min, 1000);
->> +	bt_max = DIV_ROUND_UP(bt_max, 1000);
->> +
->> +	if (bt_max < bt_min)
->> +		return -EINVAL;
->> +
->> +	bus_timing = (bt_min + bt_max) / 2 + 1;
->> +
->> +	writel((1 << 21), nfc->reg_base + NFC_REG_CFG);
->> +	writel((NFC_CLK_CYCLE - 1) | (bus_timing << 5),
->> +	       nfc->reg_base + NFC_REG_CFG);
->> +
->> +	writel((1 << 31), nfc->reg_base + NFC_REG_CMD);
->> +
->> +	return 0;
->> +}
->> +
->> +static int
->> +meson_nfc_setup_data_interface(struct nand_chip *nand, int csline,
->> +			       const struct nand_data_interface *conf)
->> +{
->> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
->> +	const struct nand_sdr_timings *timings;
->> +
->> +	timings = nand_get_sdr_timings(conf);
->> +	if (IS_ERR(timings))
->> +		return -ENOTSUPP;
->> +
->> +	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
->> +		return 0;
-> 
-> Hm, before saying you supporting the requested timing, you should make
-> sure they are actually supported. I'd recommend splitting this in 2
-> steps:
-> 
-> 1/ calc timings
-> 2/ store the timings in the chip priv struct so that they can be
-> applied next time ->select_chip() is called.
-> 
-ok, i will try to split.
+Thanks for the carefully review.
 
->> +
->> +	meson_nfc_calc_set_timing(nfc, timings);
-> > You should not set the timing from ->setup_data_interface(), just
-> calculate them, make sure they are supported and store the state in the
-> private chip struct. Applying those timings should be done in
-> ->select_chip(), so that you can support 2 chips with different timings.
-> 
-em, i will fix it.
->> +	return 0;
->> +}
-> 
-> .
-> 
+Regards
+Dong Aisheng
