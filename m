@@ -1,38 +1,22 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 19 Oct 2018 09:46:30 -0400
-Subject: [PATCH 07/10] swiotlb: refactor swiotlb_map_page
-In-Reply-To: <20181019065258.GA29249@lst.de>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-8-hch@lst.de>
- <35016142-f06d-e424-5afe-6026b6d57eda@arm.com>
- <20181019003715.GI1251@char.us.oracle.com>
- <20181019065258.GA29249@lst.de>
-Message-ID: <20181019134629.GE54336@Konrads-MacBook-Pro.local>
+From: duwe@lst.de (Torsten Duwe)
+Date: Fri, 19 Oct 2018 15:46:24 +0200
+Subject: [PATCH v3 3/4] arm64: implement live patching
+In-Reply-To: <alpine.LSU.2.21.1810191338020.4692@pobox.suse.cz>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141652.5478C68BE1@newverein.lst.de>
+ <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
+ <20181018125820.iw54zbirq74ulknj@linux-8ccs>
+ <alpine.LSU.2.21.1810191338020.4692@pobox.suse.cz>
+Message-ID: <20181019134624.GA17302@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 08:52:58AM +0200, Christoph Hellwig wrote:
-> On Thu, Oct 18, 2018 at 08:37:15PM -0400, Konrad Rzeszutek Wilk wrote:
-> > > > +	if (!dma_capable(dev, dma_addr, size) ||
-> > > > +	    swiotlb_force == SWIOTLB_FORCE) {
-> > > > +		trace_swiotlb_bounced(dev, dma_addr, size, swiotlb_force);
-> > > > +		dma_addr = swiotlb_bounce_page(dev, &phys, size, dir, attrs);
-> > > > +	}
-> > > 
-> > > FWIW I prefer the inverse condition and early return of the original code
-> > > here, which also then allows a tail-call to swiotlb_bounce_page() (and saves
-> > > a couple of lines), but it's no biggie.
-> > > 
-> > > Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> > 
-> > I agree with Robin - it certainly makes it easier to read.
-> > 
-> > With that small change:
-> > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+On Fri, Oct 19, 2018 at 01:59:01PM +0200, Miroslav Benes wrote:
 > 
-> So I did this edit, and in this patch it does indeed look much cleaner.
-> But in patch 9 we introduce the cache maintainance, and have to invert
-> the condition again if we don't want a goto mess:
+> Torsten, could you include the outcome to your patch set once we settle on 
+> it? Thanks.
 
-Right. In which case please leave this patch as it is. And please
-plaster the Reviewed-by on the patch. Thank you!
+Absolutely! Whether as patch 4/4 or on its own and I refer to it -- we'll
+figure it out.
+
+	Torsten
