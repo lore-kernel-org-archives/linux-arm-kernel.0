@@ -1,24 +1,33 @@
 From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 19 Oct 2018 10:37:11 +0000
-Subject: [PATCH v2 3/4] dmaengine: xilinx_dma: Introduce helper macro for
- preparing dma address
-In-Reply-To: <1538241480-13844-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+Date: Fri, 19 Oct 2018 10:38:54 +0000
+Subject: [PATCH v2 4/4] dmaengine: xilinx_dma: Fix 64-bit simple CDMA
+ transfer
+In-Reply-To: <1538241480-13844-5-git-send-email-radhey.shyam.pandey@xilinx.com>
 References: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1538241480-13844-4-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <DM5PR02MB21878ECD3C2B2E4535F2244FDCF90@DM5PR02MB2187.namprd02.prod.outlook.com>
+ <1538241480-13844-5-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <DM5PR02MB218754E3827458E08060DDF2DCF90@DM5PR02MB2187.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-	Thanks for the patch...
 
+> -----Original Message-----
+> From: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Sent: Saturday, September 29, 2018 10:48 PM
+> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
+> <michals@xilinx.com>; Appana Durga Kedareswara Rao
+> <appanad@xilinx.com>; Radhey Shyam Pandey <radheys@xilinx.com>
+> Cc: dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: [PATCH v2 4/4] dmaengine: xilinx_dma: Fix 64-bit simple CDMA
+> transfer
 > 
-> This patch introduces the xilinx_prep_dma_addr_t macro which prepares
-> dma_addr_t from hardware buffer descriptor LSB and MSB fields. It will be
-> used in simple dma 64-bit programming sequence.
+> In AXI CDMA simple mode also pass MSB bits of source and destination
+> address to xilinx_write function. This fixes simple CDMA operation mode using
+> 64-bit addressing.
 > 
 > Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
 Reviewed-by: Appana Durga Kedareswara Rao <appana.durga.rao@xilinx.com>
 
@@ -27,23 +36,30 @@ Kedar.
 
 > ---
 > Changes for v2:
-> New patch- Preparatory change for 4/4 fix.
+> Use helper macro for preparing dma_addr_t.
 > ---
->  drivers/dma/xilinx/xilinx_dma.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+>  drivers/dma/xilinx/xilinx_dma.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
 > 
 > diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index a37871e..c27ab64 100644
+> index c27ab64..d04ef85 100644
 > --- a/drivers/dma/xilinx/xilinx_dma.c
 > +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -190,6 +190,8 @@
->  /* AXI CDMA Specific Masks */
->  #define XILINX_CDMA_CR_SGMODE          BIT(3)
+> @@ -1247,8 +1247,10 @@ static void xilinx_cdma_start_transfer(struct
+> xilinx_dma_chan *chan)
 > 
-> +#define xilinx_prep_dma_addr_t(addr)	\
-> +	((dma_addr_t)((u64)addr##_##msb << 32 | (addr)))
->  /**
->   * struct xilinx_vdma_desc_hw - Hardware Descriptor
->   * @next_desc: Next Descriptor Pointer @0x00
+>  		hw = &segment->hw;
+> 
+> -		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw-
+> >src_addr);
+> -		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw-
+> >dest_addr);
+> +		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR,
+> +			     xilinx_prep_dma_addr_t(hw->src_addr));
+> +		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR,
+> +			     xilinx_prep_dma_addr_t(hw->dest_addr));
+> 
+>  		/* Start the transfer */
+>  		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
 > --
 > 1.7.1
