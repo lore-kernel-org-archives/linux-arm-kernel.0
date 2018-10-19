@@ -1,57 +1,42 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 19 Oct 2018 00:15:49 +0200
-Subject: omap4: support for manually updated display
-In-Reply-To: <20180910174453.GV5662@atomide.com>
-References: <20180830090456.GA17277@amd>
- <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
- <3205865.8O8aibZXye@avalon> <20180910174453.GV5662@atomide.com>
-Message-ID: <20181018221549.GB6364@amd>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 18 Oct 2018 20:09:34 -0400
+Subject: [PATCH 01/10] swiotlb: remove a pointless comment
+In-Reply-To: <20181008080246.20543-2-hch@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-2-hch@lst.de>
+Message-ID: <20181019000934.GB1251@char.us.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Oct 08, 2018 at 10:02:37AM +0200, Christoph Hellwig wrote:
+> This comments describes an aspect of the map_sg interface that isn't
+> even exploited by swiotlb.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
-> > I want to make it clear that I don't want to claim any privilege in getting 
-> > patches merged first. I am however worried that, without an easy way to test 
-> > DSI support, and without enough time to focus on it, I would break whatever 
-> > would be merged now in future reworks. I would thus like to find out how to 
-> > collaborate on this task, hopefully to move towards usage of drm_bridge and 
-> > drm_panel for DSI-based pipelines.
+Thank you!
+> ---
+>  kernel/dma/swiotlb.c | 6 ------
+>  1 file changed, 6 deletions(-)
 > 
-> Real users with mainline kernel with a real product should
-> always have priority over any ongoing clean-up.
+> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+> index 4f8a6dbf0b60..9062b14bc7f4 100644
+> --- a/kernel/dma/swiotlb.c
+> +++ b/kernel/dma/swiotlb.c
+> @@ -925,12 +925,6 @@ swiotlb_sync_single_for_device(struct device *hwdev, dma_addr_t dev_addr,
+>   * appropriate dma address and length.  They are obtained via
+>   * sg_dma_{address,length}(SG).
+>   *
+> - * NOTE: An implementation may be able to use a smaller number of
+> - *       DMA address/length pairs than there are SG table elements.
+> - *       (for example via virtual mapping capabilities)
+> - *       The routine returns the number of addr/length pairs actually
+> - *       used, at most nents.
+> - *
+>   * Device ownership issues as mentioned above for swiotlb_map_page are the
+>   * same here.
+>   */
+> -- 
+> 2.19.0
 > 
-> And for testing, a bunch of real users is something you can't
-> beat for proper testing of code on ongoing basis!
-> 
-> Naturally the burden of getting the patches ready is on the people
-> using them for rebase and fixing comments. And Sebastian has
-> already agreed help with maintaining it.
-> 
-> I've been actually using DSI command mode support and testing
-> Linux next several times a week to prevent regressions from
-> sneaking into -rc1 in general. So now I can't test omapdrm with
-> next until Sebastian is done with rebasing.. Back to headless
-> testing then.
-> 
-> Anyways, I'd say let's add the DSI command mode support ASAP after
-> rebasing, there are at least Sebastian, Pavel and I then testing
-> and helping with further ongoing panel conversion work.
-
-Are there any news here? Does someone have a patch set that actually
-works?
-
-Are there any in-progress patches I could help with?
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181019/e7b5e3f2/attachment.sig>
