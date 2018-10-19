@@ -1,59 +1,91 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 19 Oct 2018 10:32:24 +1100
-Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
-In-Reply-To: <20181018095507.GC2400@vkoul-mobl>
-References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
- <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
- <20181017060531.GU2400@vkoul-mobl>
- <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
- <20181018095507.GC2400@vkoul-mobl>
-Message-ID: <a3fecf7913d6a85a6294afbc5a1a18b7714d6756.camel@kernel.crashing.org>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 18 Oct 2018 20:17:14 -0400
+Subject: [PATCH 03/10] swiotlb: do not panic on mapping failures
+In-Reply-To: <20181008080246.20543-4-hch@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-4-hch@lst.de>
+Message-ID: <20181019001714.GD1251@char.us.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-10-18 at 15:25 +0530, Vinod wrote:
+On Mon, Oct 08, 2018 at 10:02:39AM +0200, Christoph Hellwig wrote:
+> All properly written drivers now have error handling in the
+> dma_map_single / dma_map_page callers.  As swiotlb_tbl_map_single already
+> prints a useful warning when running out of swiotlb pool swace we can
+
+s/swace/space/
+
+> also remove swiotlb_full entirely as it serves no purpose now.
+
+The panic albeit was useful for those drivers that didn't handle it.
+
+Thoughts? I am kind of thinking screw them but then I am not too thrilled
+about silent data corruption errors.
 > 
-> > It's not a dmaengine driver. It's a serial UART driver that happens to
-> > use a dedicated DMA engine.
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  kernel/dma/swiotlb.c | 33 +--------------------------------
+>  1 file changed, 1 insertion(+), 32 deletions(-)
 > 
-> Then I see no reason for it to use dmaengine APIs. The framework allows
-> people to share a controller for many clients, but if you have dedicated
-> one then you may use it directly
-
-Well... the engine is shared by a few UARTs, they have dedicated rings
-but there's a common set of regs for interrupt handling etc.
-
-That said, I still think it could be contained within a UART driver,
-there's little benefit in adding the framework overhead, esp since
-these are really weak cores, any overhead will be felt.
-
-Ben.
-
-> > It's unclear whether it should be split into two drivers, or just have
-> > the serial driver directly use the dma engine since that engine is
-> > dedicated in HW to only work on those UARTs and nothing else...
-> > 
-> > Cheers,
-> > Ben.
-> > 
-> > 
-> > > While doing resubmission please take some time to understand subsystem
-> > > tags to use. (hint git log <subsystem> will tell you)
-> > > 
-> > > Also series has [[PATCH] 8/9] whereas it should be [PATCH 8/9] please
-> > > let git generate that for you (hint git format-patch start..end does a
-> > > good job)
-> > > 
-> > > > @@ -0,0 +1,1594 @@
-> > > > +// SPDX-License-Identifier: GPL-2.0
-> > > > +/*
-> > > > + *   drivers/tty/serial/8250/8250_aspeed_uart_dma.c
-> > > > + *    1. 2018/07/01 Shivah Shankar created
-> > > > + *    2. 2018/08/25 sudheer.veliseti<open.sudheer@gmail.com> modified
-> > > 
-> > > we dont use this log in kernel. I do not see s-o-b by Shivah, that
-> > > should be added. I think he should be author and you need to list
-> > > changes you did..
-> > > 
-> 
+> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+> index 26d3af52956f..69bf305ee5f8 100644
+> --- a/kernel/dma/swiotlb.c
+> +++ b/kernel/dma/swiotlb.c
+> @@ -761,34 +761,6 @@ static bool swiotlb_free_buffer(struct device *dev, size_t size,
+>  	return true;
+>  }
+>  
+> -static void
+> -swiotlb_full(struct device *dev, size_t size, enum dma_data_direction dir,
+> -	     int do_panic)
+> -{
+> -	if (swiotlb_force == SWIOTLB_NO_FORCE)
+> -		return;
+> -
+> -	/*
+> -	 * Ran out of IOMMU space for this operation. This is very bad.
+> -	 * Unfortunately the drivers cannot handle this operation properly.
+> -	 * unless they check for dma_mapping_error (most don't)
+> -	 * When the mapping is small enough return a static buffer to limit
+> -	 * the damage, or panic when the transfer is too big.
+> -	 */
+> -	dev_err_ratelimited(dev, "DMA: Out of SW-IOMMU space for %zu bytes\n",
+> -			    size);
+> -
+> -	if (size <= io_tlb_overflow || !do_panic)
+> -		return;
+> -
+> -	if (dir == DMA_BIDIRECTIONAL)
+> -		panic("DMA: Random memory could be DMA accessed\n");
+> -	if (dir == DMA_FROM_DEVICE)
+> -		panic("DMA: Random memory could be DMA written\n");
+> -	if (dir == DMA_TO_DEVICE)
+> -		panic("DMA: Random memory could be DMA read\n");
+> -}
+> -
+>  /*
+>   * Map a single buffer of the indicated size for DMA in streaming mode.  The
+>   * physical address to use is returned.
+> @@ -817,10 +789,8 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
+>  
+>  	/* Oh well, have to allocate and map a bounce buffer. */
+>  	map = map_single(dev, phys, size, dir, attrs);
+> -	if (map == SWIOTLB_MAP_ERROR) {
+> -		swiotlb_full(dev, size, dir, 1);
+> +	if (map == SWIOTLB_MAP_ERROR)
+>  		return __phys_to_dma(dev, io_tlb_overflow_buffer);
+> -	}
+>  
+>  	dev_addr = __phys_to_dma(dev, map);
+>  
+> @@ -948,7 +918,6 @@ swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl, int nelems,
+>  			if (map == SWIOTLB_MAP_ERROR) {
+>  				/* Don't panic here, we expect map_sg users
+>  				   to do proper error handling. */
+> -				swiotlb_full(hwdev, sg->length, dir, 0);
+>  				attrs |= DMA_ATTR_SKIP_CPU_SYNC;
+>  				swiotlb_unmap_sg_attrs(hwdev, sgl, i, dir,
+>  						       attrs);
+> -- 
+> 2.19.0
 > 
