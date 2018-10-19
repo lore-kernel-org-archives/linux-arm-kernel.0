@@ -1,76 +1,96 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:52 +0100
-Subject: [PATCH 17/26] kvm: arm64: Limit the minimum number of page table
- levels
+Date: Fri, 19 Oct 2018 13:58:54 +0100
+Subject: [PATCH 19/26] KVM: arm/arm64: Rename kvm_arm_config_vm to
+ kvm_arm_setup_stage2
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-18-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+VM tends to be a very overloaded term in KVM, so let's keep it
+to describe the virtual machine. For the virtual memory setup,
+let's use the "stage2" suffix.
 
-Since we are about to remove the lower limit on the IPA size,
-make sure that we do not go to 1 level page table (e.g, with
-32bit IPA on 64K host with concatenation) to avoid splitting
-the host PMD huge pages at stage2.
-
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/stage2_pgtable.h |  7 ++++++-
- arch/arm64/kvm/reset.c                  | 10 +++++++++-
- 2 files changed, 15 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 6 +++++-
+ arch/arm64/include/asm/kvm_arm.h  | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 2 +-
+ arch/arm64/kvm/reset.c            | 2 +-
+ virt/kvm/arm/arm.c                | 2 +-
+ 5 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-index c62fe118a898..2cce769ba4c6 100644
---- a/arch/arm64/include/asm/stage2_pgtable.h
-+++ b/arch/arm64/include/asm/stage2_pgtable.h
-@@ -72,8 +72,13 @@
- /*
-  * The number of PTRS across all concatenated stage2 tables given by the
-  * number of bits resolved at the initial level.
-+ * If we force more levels than necessary, we may have (stage2_pgdir_shift > IPA),
-+ * in which case, stage2_pgd_ptrs will have one entry.
-  */
--#define __s2_pgd_ptrs(ipa, lvls)	(1 << ((ipa) - pt_levels_pgdir_shift((lvls))))
-+#define pgd_ptrs_shift(ipa, pgdir_shift)	\
-+	((ipa) > (pgdir_shift) ? ((ipa) - (pgdir_shift)) : 0)
-+#define __s2_pgd_ptrs(ipa, lvls)		\
-+	(1 << (pgd_ptrs_shift((ipa), pt_levels_pgdir_shift(lvls))))
- #define __s2_pgd_size(ipa, lvls)	(__s2_pgd_ptrs((ipa), (lvls)) * sizeof(pgd_t))
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 72d46418e1ef..b45af481ccf7 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -354,8 +354,12 @@ static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
+ struct kvm *kvm_arch_alloc_vm(void);
+ void kvm_arch_free_vm(struct kvm *kvm);
  
- #define stage2_pgd_ptrs(kvm)		__s2_pgd_ptrs(kvm_phys_shift(kvm), kvm_stage2_levels(kvm))
+-static inline int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
++static inline int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type)
+ {
++	/*
++	 * On 32bit ARM, VMs get a static 40bit IPA stage2 setup,
++	 * so any non-zero value used as type is illegal.
++	 */
+ 	if (type)
+ 		return -EINVAL;
+ 	return 0;
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index f1330284720d..6e324d1f1231 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -133,7 +133,7 @@
+  * 40 bits wide (T0SZ = 24).  Systems with a PARange smaller than 40 bits are
+  * not known to exist and will break with this configuration.
+  *
+- * The VTCR_EL2 is configured per VM and is initialised in kvm_arm_config_vm().
++ * The VTCR_EL2 is configured per VM and is initialised in kvm_arm_setup_stage2().
+  *
+  * Note that when using 4K pages, we concatenate two first level page tables
+  * together. With 16K pages, we concatenate 16 first level page tables.
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index f008f8866b2a..376a5b695467 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -511,6 +511,6 @@ void kvm_set_ipa_limit(void);
+ struct kvm *kvm_arch_alloc_vm(void);
+ void kvm_arch_free_vm(struct kvm *kvm);
+ 
+-int kvm_arm_config_vm(struct kvm *kvm, unsigned long type);
++int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type);
+ 
+ #endif /* __ARM64_KVM_HOST_H__ */
 diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 96b3f50101bc..f156e45760bc 100644
+index 95f28d5950e0..aa806d582552 100644
 --- a/arch/arm64/kvm/reset.c
 +++ b/arch/arm64/kvm/reset.c
-@@ -190,6 +190,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+@@ -189,7 +189,7 @@ void kvm_set_ipa_limit(void)
+  * all CPUs, as it is safe to run with or without the feature and
+  * the bit is RES0 on CPUs that don't support it.
+  */
+-int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
++int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type)
  {
  	u64 vtcr = VTCR_EL2_FLAGS;
  	u32 parange, phys_shift;
-+	u8 lvls;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 631f9a3ad99a..91c464c9cd21 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -120,7 +120,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ {
+ 	int ret, cpu;
  
- 	if (type)
- 		return -EINVAL;
-@@ -203,7 +204,14 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
- 	if (phys_shift > KVM_PHYS_SHIFT)
- 		phys_shift = KVM_PHYS_SHIFT;
- 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
--	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(phys_shift));
-+	/*
-+	 * Use a minimum 2 level page table to prevent splitting
-+	 * host PMD huge pages at stage2.
-+	 */
-+	lvls = stage2_pgtable_levels(phys_shift);
-+	if (lvls < 2)
-+		lvls = 2;
-+	vtcr |= VTCR_EL2_LVLS_TO_SL0(lvls);
+-	ret = kvm_arm_config_vm(kvm, type);
++	ret = kvm_arm_setup_stage2(kvm, type);
+ 	if (ret)
+ 		return ret;
  
- 	/*
- 	 * Enable the Hardware Access Flag management, unconditionally
 -- 
 2.19.1
