@@ -1,52 +1,91 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Oct 2018 18:44:48 +0100
-Subject: [PATCH] iommu: arm-smmu: handle client iommu translation fault
- handlers
-In-Reply-To: <6edd8f71-4363-01b6-6b45-aebc92604559@linaro.org>
-References: <20181010144407.23336-1-stanimir.varbanov@linaro.org>
- <20181010170837.GC16512@arm.com>
- <6edd8f71-4363-01b6-6b45-aebc92604559@linaro.org>
-Message-ID: <20181019174447.GB4429@brain-police>
+Date: Fri, 19 Oct 2018 18:45:24 +0100
+Subject: [PATCH v5 11/17] arm64: docs: document pointer authentication
+In-Reply-To: <20181019151029.GD3985@arrakis.emea.arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-12-kristina.martsenko@arm.com>
+ <9acb0cd2-66b0-1c41-b1a8-7c70608e9a9b@foss.arm.com>
+ <7b0de19b-45b9-f4df-25d1-c7e80fab49dc@arm.com>
+ <20181019113556.ljbdmjo5pdw7muvz@mbp>
+ <e73035eb-2157-7a9c-3631-d4d2ad0b7d38@arm.com>
+ <20181019151029.GD3985@arrakis.emea.arm.com>
+Message-ID: <20181019174524.GC4429@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2018 at 03:26:57PM +0300, Stanimir Varbanov wrote:
-> On 10/10/2018 08:08 PM, Will Deacon wrote:
-> > On Wed, Oct 10, 2018 at 05:44:07PM +0300, Stanimir Varbanov wrote:
-> >> Call iommu client translation fault handler(s).
-> >>
-> >> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> >> ---
-> >>  drivers/iommu/arm-smmu.c | 3 +++
-> >>  1 file changed, 3 insertions(+)
-> >>
-> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> >> index 066f4c8daf4e..02a8aab0cc59 100644
-> >> --- a/drivers/iommu/arm-smmu.c
-> >> +++ b/drivers/iommu/arm-smmu.c
-> >> @@ -568,6 +568,9 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
-> >>  			    fsr, iova, fsynr, cfg->cbndx);
-> >>  
-> >>  	writel(fsr, cb_base + ARM_SMMU_CB_FSR);
-> >> +
-> >> +	report_iommu_fault(domain, smmu->dev, iova, 0);
+On Fri, Oct 19, 2018 at 04:10:29PM +0100, Catalin Marinas wrote:
+> On Fri, Oct 19, 2018 at 03:42:23PM +0100, Kristina Martsenko wrote:
+> > On 19/10/2018 12:35, Catalin Marinas wrote:
+> > > On Tue, Oct 16, 2018 at 05:14:39PM +0100, Kristina Martsenko wrote:
+> > >> On 05/10/2018 10:04, Ramana Radhakrishnan wrote:
+> > >>> On 05/10/2018 09:47, Kristina Martsenko wrote:
+> > >>>> +Virtualization
+> > >>>> +--------------
+> > >>>> +
+> > >>>> +Pointer authentication is not currently supported in KVM guests. KVM
+> > >>>> +will mask the feature bits from ID_AA64ISAR1_EL1, and attempted use of
+> > >>>> +the feature will result in an UNDEFINED exception being injected into
+> > >>>> +the guest.
+> > >>>
+> > >>> However applications using instructions from the hint space will
+> > >>> continue to work albeit without any protection (as they would just be
+> > >>> nops) ?
+> > >>
+> > >> Mostly, yes. If the guest leaves SCTLR_EL1.EnIA unset (and
+> > >> EnIB/EnDA/EnDB), then PAC* and AUT* instructions in the HINT space will
+> > >> execute as NOPs. If the guest sets EnIA, then PAC*/AUT* instructions
+> > >> will trap and KVM will inject an "Unknown reason" exception into the
+> > >> guest (which will cause a Linux guest to send a SIGILL to the application).
+> > > 
+> > > I think that part is fine. If KVM (a fairly recent version with CPUID
+> > > sanitisation) does not enable ptr auth, the CPUID should not advertise
+> > > this feature either so the guest kernel should not enable it. For the
+> > > above instructions in the HINT space, they will just be NOPs. If the
+> > > guest kernel enables the feature regardless of the CPUID information, it
+> > > deserves to get an "Unknown reason" exception.
+> > > 
+> > >> In the latter case we could instead pretend the instruction was a NOP
+> > >> and not inject an exception, but trapping twice per every function would
+> > >> probably be terrible for performance. The guest shouldn't be setting
+> > >> EnIA anyway if ID_AA64ISAR1_EL1 reports that pointer authentication is
+> > >> not present (because KVM has hidden it).
+> > > 
+> > > I don't think we should. The SCTLR_EL1 bits are RES0 unless you know
+> > > that the feature is present via CPUID.
+> > > 
+> > >> The other special case is the XPACLRI instruction, which is also in the
+> > >> HINT space. Currently it will trap and KVM will inject an exception into
+> > >> the guest. We should probably change this to NOP instead, as that's what
+> > >> applications will expect. Unfortunately there is no EnIA-like control to
+> > >> make it NOP.
+> > > 
+> > > Very good catch. Basically if EL2 doesn't know about ptr auth (older
+> > > distro), EL1 may or may not know but leaves SCTLR_EL1 disabled (based on
+> > > CPUID), the default HCR_EL2 is to trap (I'm ignoring EL3 as that's like
+> > > to have ptr auth enabled, being built for the specific HW). So a user
+> > > app considering XPACLRI a NOP (or inoffensive) will get a SIGILL
+> > > (injected by the guest kernel following the injection of "Unknown
+> > > reason" exception by KVM).
+> > > 
+> > > Ramana, is XPACLRI commonly generated by gcc and expects it to be a NOP?
+> > > Could we restrict it to only being used at run-time if the corresponding
+> > > HWCAP is set? This means redefining this instruction as no longer in the
+> > > NOP space.
 > > 
-> > Who's using this? Generally, the callback here isn't so useful because it's
+> > I think an alternative solution is to just disable trapping of pointer
+> > auth instructions in KVM. This will mean that the instructions will
+> > behave the same in the guest as they do in the host. HINT-space
+> > instructions (including XPACLRI) will behave as NOPs (or perform their
+> > function, if enabled by the guest), and will not trap.
 > 
-> The idea was to use it from video driver to dump few multimedia
-> interconnect registers which will give us some more info about the fault.
-> 
-> > called in irq context. We also don't enable stalling since 3714ce1d6655.
-> > 
-> > We previously had fairly detailed discussions on the list with Rob Clark
-> > about alternative ways to design this, but I don't remember where it ended
-> > up.
-> 
-> It will be useful if you point me to the discussion. Thanks!
+> OK, so this means disabling the trap (during early EL2 setup) but still
+> sanitizing the CPUID not to report the feature to EL1 unless fully
+> supported on all CPUs.
 
-There's more, but some stuff I managed to dig up is here:
-
-https://lists.linuxfoundation.org/pipermail/iommu/2017-January/019931.html
-https://lists.linuxfoundation.org/pipermail/iommu/2017-September/024143.html
+... which is perfectly sensible, but not actually my main concern here.
+I'm worried about the possibility of distributions shipping *now* with
+userspace that's built with these instructions. That stuff is going to
+break if/when it encounters v8.3 hardware, and I don't think we can do
+much about it other than alert them to the potential issue.
 
 Will
