@@ -1,45 +1,43 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 19 Oct 2018 07:57:54 +0300
-Subject: [PATCH RESEND] arm64: dts: clearfog-gt-8k: enable mini-PCIe CON2 USB
-Message-ID: <0336903e29be69d70a4dfc3b243d7134fba67ade.1539925074.git.baruch@tkos.co.il>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 19 Oct 2018 13:50:07 +0800
+Subject: [PATCH v2] clk: sunxi-ng: enable so-said LDOs for A64 SoC's
+ pll-mipi clock
+In-Reply-To: <153988319489.5275.13596491306786109572@swboyd.mtv.corp.google.com>
+References: <20181018070729.52943-1-icenowy@aosc.io>
+ <153988319489.5275.13596491306786109572@swboyd.mtv.corp.google.com>
+Message-ID: <AF7A4F82-D6B1-4F86-ACF1-2786E990C0B6@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deassert the reset and wireless disable signals on the CON2 mini-PCIe
-socket. That allows the host to detect USB devices on the mini-PCIe
-socket.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
 
-Resend: forgot to Cc the ARM kernel list on previous submission. Sorry
-for the duplicate.
----
- .../boot/dts/marvell/armada-8040-clearfog-gt-8k.dts  | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+? 2018?10?19? GMT+08:00 ??1:19:54, Stephen Boyd <sboyd@kernel.org> ??:
+>Quoting Icenowy Zheng (2018-10-18 00:07:29)
+>> In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
+>> register is called "LDO{1,2}_EN", and according to the BSP source
+>code
+>> from Allwinner , the LDOs are enabled during the clock's enabling
+>> process.
+>> 
+>> The clock failed to generate output if the two LDOs are not enabled.
+>> 
+>> Add the two bits to the clock's gate bits, so that the LDOs are
+>enabled
+>> when the PLL is enabled.
+>> 
+>> Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>
+>Looks OK to me from not knowing anything about this driver. Shall I
+>pick
+>directly into clk-next for next release?
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-index 73df0ef5e0c4..c2e53b4edb0c 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-@@ -246,6 +246,18 @@
- 		gpios = <1 GPIO_ACTIVE_HIGH>;
- 		output-high;
- 	};
-+
-+	lte_reset {
-+		gpio-hog;
-+		gpios = <2 GPIO_ACTIVE_LOW>;
-+		output-low;
-+	};
-+
-+	lte_disable {
-+		gpio-hog;
-+		gpios = <21 GPIO_ACTIVE_LOW>;
-+		output-low;
-+	};
- };
- 
- &cp0_ethernet {
--- 
-2.19.1
+I prefer to wait for an ACK from Maxime.
+
+>
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
