@@ -1,96 +1,50 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 19 Oct 2018 09:47:29 -0600
-Subject: [PATCH] coresight: tmc: Fix bad register address for CLAIM
-In-Reply-To: <1539924983-18503-1-git-send-email-leo.yan@linaro.org>
-References: <1539924983-18503-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CANLsYkzb_40ODVF5Mh7i3urEaq769drifjC+KWH+cgKR9L9a5g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Oct 2018 16:49:48 +0100
+Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
+In-Reply-To: <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-8-kristina.martsenko@arm.com>
+ <20181019111542.6wrvjguirglzg7vg@mbp>
+ <20181019112404.GD14246@arm.com>
+ <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
+Message-ID: <20181019154948.GD16771@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Oct 2018 at 22:56, Leo Yan <leo.yan@linaro.org> wrote:
->
-> Commit 4d3ebd3658d8 ("coreisght: tmc: Claim device before use") uses
-> CLAIM tag to validate if the device is available, it needs to pass
-> the device base address to access related registers.
->
-> In the function tmc_etb_disable_hw() it wrongly passes the driver data
-> pointer as register base address, thus it's easily to produce the kernel
-> warning info like below:
->
-> [   83.579898] WARNING: CPU: 4 PID: 2970 at drivers/hwtracing/coresight/coresight.c:207 coresight_disclaim_device_unlocked+0x44/0x80
-> [   83.591448] Modules linked in:
-> [   83.594485] CPU: 4 PID: 2970 Comm: uname Not tainted 4.19.0-rc6-00417-g721b509 #110
-> [   83.602067] Hardware name: ARM Juno development board (r2) (DT)
-> [   83.607932] pstate: 80000085 (Nzcv daIf -PAN -UAO)
-> [   83.612681] pc : coresight_disclaim_device_unlocked+0x44/0x80
-> [   83.618375] lr : coresight_disclaim_device_unlocked+0x44/0x80
-> [   83.624064] sp : ffff00000fe3ba20
-> [   83.627347] x29: ffff00000fe3ba20 x28: ffff80002d430dc0
-> [   83.632618] x27: ffff800033177c00 x26: ffff80002eb44480
-> [   83.637889] x25: 0000000000000001 x24: ffff800033c72600
-> [   83.643160] x23: ffff0000099b11f8 x22: ffff0000099b11c8
-> [   83.648430] x21: 0000000000000002 x20: ffff800033a90418
-> [   83.653701] x19: ffff0000099b11c8 x18: 0000000000000000
-> [   83.658971] x17: 0000000000000000 x16: 0000000000000000
-> [   83.664241] x15: 0000000000000000 x14: 0000000000000000
-> [   83.669511] x13: 0000000000000000 x12: 0000000000000000
-> [   83.674782] x11: 0000000000000000 x10: 0000000000000000
-> [   83.680052] x9 : 0000000000000000 x8 : 0000000000000001
-> [   83.685322] x7 : 0000000000010000 x6 : ffff800033ebab18
-> [   83.690593] x5 : ffff800033ebab18 x4 : ffff800033e6c698
-> [   83.695862] x3 : 0000000000000001 x2 : 0000000000000000
-> [   83.701133] x1 : 0000000000000000 x0 : 0000000000000001
-> [   83.706404] Call trace:
-> [   83.708830]  coresight_disclaim_device_unlocked+0x44/0x80
-> [   83.714180]  coresight_disclaim_device+0x34/0x48
-> [   83.718756]  tmc_disable_etf_sink+0xc4/0xf0
-> [   83.722902]  coresight_disable_path_from+0xc8/0x240
-> [   83.727735]  coresight_disable_path+0x24/0x30
-> [   83.732053]  etm_event_stop+0x130/0x170
-> [   83.735854]  etm_event_del+0x24/0x30
-> [   83.739399]  event_sched_out.isra.51+0xcc/0x1e8
-> [   83.743887]  group_sched_out.part.53+0x44/0xb0
-> [   83.748291]  ctx_sched_out+0x298/0x2b8
-> [   83.752005]  task_ctx_sched_out+0x74/0xa8
-> [   83.755980]  perf_event_exit_task+0x140/0x418
-> [   83.760298]  do_exit+0x3f4/0xcf0
-> [   83.763497]  do_group_exit+0x5c/0xc0
-> [   83.767041]  __arm64_sys_exit_group+0x24/0x28
-> [   83.771359]  el0_svc_common+0x110/0x178
-> [   83.775160]  el0_svc_handler+0x94/0xe8
-> [   83.778875]  el0_svc+0x8/0xc
-> [   83.781728] ---[ end trace 02d8d8eac46db9e5 ]---
->
-> This patch is to fix this bug by using 'drvdata->base' as the
-> register base address for CLAIM related operation.
->
-> Fixes: 4d3ebd3658d8 ("coreisght: tmc: Claim device before use")
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Mike Leach <mike.leach@linaro.org>
-> Cc: Robert Walker <robert.walker@arm.com>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index 53fc83b..5864ac5 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -86,7 +86,7 @@ static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
->
->  static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
->  {
-> -       coresight_disclaim_device(drvdata);
-> +       coresight_disclaim_device(drvdata->base);
->         __tmc_etb_disable_hw(drvdata);
->  }
->
+On Fri, Oct 19, 2018 at 08:36:45AM -0700, Kees Cook wrote:
+> On Fri, Oct 19, 2018 at 4:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > FWIW: I think we should be entertaining a prctl() interface to use a new
+> > key on a per-thread basis. Obviously, this would need to be used with care
+> > (e.g. you'd fork(); use the prctl() and then you'd better not return from
+> > the calling function!).
+> >
+> > Assuming we want this (Kees -- I was under the impression that everything in
+> > Android would end up with the same key otherwise?), then the question is
+> > do we want:
+> >
+> >   - prctl() get/set operations for the key, or
+> >   - prctl() set_random_key operation, or
+> >   - both of the above?
+> >
+> > Part of the answer to that may lie in the requirements of CRIU, where I
+> > strongly suspect they need explicit get/set operations, although these
+> > could be gated on CONFIG_CHECKPOINT_RESTORE=y.
+> 
+> Oh CRIU. Yikes. I'd like the get/set to be gated by the CONFIG, yes.
+> No reason to allow explicit access to the key (and selected algo) if
+> we don't have to.
 
-Applied - thanks.
-Mathieu
+Makes sense.
 
-> --
-> 2.7.4
->
+> As for per-thread or not, having a "pick a new key now" prctl() sounds
+> good, but I'd like to have an eye toward having it just be "automatic"
+> on clone().
+
+I thought about that too, but we're out of clone() flags afaict and there's
+no arch hook in there. We could add yet another clone syscall, but yuck (and
+I reckon viro would kill us).
+
+Or are you saying that we could infer the behaviour from the existing set
+of flags?
+
+Will
