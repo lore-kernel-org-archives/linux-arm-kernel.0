@@ -1,118 +1,83 @@
-From: changbin.du@gmail.com (Du Changbin)
-Date: Fri, 19 Oct 2018 12:49:17 +0000
-Subject: [PATCH v2 0/4] kernel hacking: GCC optimization for better debug
- experience (-Og)
-Message-ID: <20181019124921.13780-1-changbin.du@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 19 Oct 2018 21:56:34 +0900
+Subject: [PATCH 2/9] arm: remove EISA kconfig option
+In-Reply-To: <20181019120952.32763-3-hch@lst.de>
+References: <20181019120952.32763-1-hch@lst.de>
+ <20181019120952.32763-3-hch@lst.de>
+Message-ID: <CAK7LNATc54ZMaKLzabW=NqCQ+WSr-3C7PNAGL6OmOnQf_kgOyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-I have posted this series several months ago but interrupted by personal
-affairs. Now I get time to complete this task. Thanks for all of the
-reviewers.
+On Fri, Oct 19, 2018 at 9:10 PM Christoph Hellwig <hch@lst.de> wrote:
+>
+> No arm config enables EISA, and arm does not include drivers/eisa/Kconfig
+> which provides support for things like PCI to EISA bridges, so it is most
+> likely dead.
+>
+> If this is wrong we will be able to resurrect it easily by selecting
+> HAVE_EISA for the right arm configs after this series.
 
-I know some kernel developers was searching for a method to dissable GCC
-optimizations, probably they want to apply GCC '-O0' option. But since Linux
-kernel relies on GCC optimization to remove some dead code, so '-O0' just
-breaks the build. They do need this because they want to debug kernel with
-qemu, simics, kgtp or kgdb.
+What is your concern?
 
-Thanks for the GCC '-Og' optimization level introduced in GCC 4.8, which
-offers a reasonable level of optimization while maintaining fast compilation
-and a good debugging experience. It is similar to '-O1' while perferring to
-keep debug ability over runtime speed. With '-Og', we can build a kernel with
-better debug ability and little performance drop after some simple change.
-
-In this series, firstly introduce a new config CONFIG_NO_AUTO_INLINE after two
-fixes for this new option. With this option, only functions explicitly marked
-with "inline" will  be inlined. This will allow the function tracer to trace
-more functions because it only traces functions that the compiler has not
-inlined.
-
-Then introduce new config CC_OPTIMIZE_FOR_DEBUGGING which apply '-Og'
-optimization level for whole kernel, with a simple fix in fix_to_virt().
-Currently I have only tested this option on x86 and ARM platform. Other
-platforms should also work but probably need some compiling fixes as what
-having done in this series. I leave that to who want to try this debug
-option.
-
-Comparison of vmlinux size: a bit smaller.
-
-    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ size vmlinux
-       text    data     bss     dec     hex filename
-    22665554   9709674  2920908 35296136        21a9388 vmlinux
-
-    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ size vmlinux
-       text    data     bss     dec     hex filename
-    21499032   10102758 2920908 34522698        20ec64a vmlinux
+This absolutely looks dead to me.
 
 
-Comparison of system performance: a bit drop (~6%).
-    This benchmark of kernel compilation is suggested by Ingo Molnar.
-    https://lkml.org/lkml/2018/5/2/74
+> Suggested-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arm/Kconfig | 15 ---------------
+>  1 file changed, 15 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index e8cd55a5b04c..e33735ce1c14 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -165,21 +165,6 @@ config HAVE_PROC_CPU
+>  config NO_IOPORT_MAP
+>         bool
+>
+> -config EISA
+> -       bool
 
-    Preparation: Set cpufreq to 'performance'.
-    for ((cpu=0; cpu<120; cpu++)); do
-      G=/sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_governor
-      [ -f $G ] && echo performance > $G
-    done
+There is no prompt for this symbol.
+Hence, there is no way for a user to enable this directly.
 
-    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ perf stat --repeat 5 --null --pre                 '\
-        cp -a kernel ../kernel.copy.$(date +%s);         \
-        rm -rf *;                                        \
-        git checkout .;                                  \
-        echo 1 > /proc/sys/vm/drop_caches;               \
-        find ../kernel* -type f | xargs cat >/dev/null;  \
-        make -j kernel >/dev/null;                       \
-        make clean >/dev/null 2>&1;                      \
-        sync                                            '\
-                                                         \
-        make -j8 >/dev/null
+'select EISA' is the only way to enable it.
 
-     Performance counter stats for 'make -j8' (5 runs):
+git grep 'select EISA'
+gave no hit.
 
-        219.764246652 seconds time elapsed                   ( +-  0.78% )
-
-    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-    $ perf stat --repeat 5 --null --pre                 '\
-        cp -a kernel ../kernel.copy.$(date +%s);         \
-        rm -rf *;                                        \
-        git checkout .;                                  \
-        echo 1 > /proc/sys/vm/drop_caches;               \
-        find ../kernel* -type f | xargs cat >/dev/null;  \
-        make -j kernel >/dev/null;                       \
-        make clean >/dev/null 2>&1;                      \
-        sync                                            '\
-                                                         \
-        make -j8 >/dev/null
-
-    Performance counter stats for 'make -j8' (5 runs):
-
-         233.574187771 seconds time elapsed                  ( +-  0.19% )
+So, we can say it is dead.
 
 
-Du Changbin (4):
-  x86/mm: surround level4_kernel_pgt with #ifdef
-    CONFIG_X86_5LEVEL...#endif
-  kernel hacking: new config NO_AUTO_INLINE to disable compiler
-    auto-inline optimizations
-  ARM: mm: fix build error in fix_to_virt with
-    CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
-  kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og
-    optimization
 
- Makefile                          | 11 +++++++++++
- arch/arm/mm/mmu.c                 |  2 +-
- arch/x86/include/asm/pgtable_64.h |  2 ++
- arch/x86/kernel/head64.c          | 13 ++++++-------
- include/linux/compiler-gcc.h      |  2 +-
- include/linux/compiler.h          |  2 +-
- init/Kconfig                      | 19 +++++++++++++++++++
- lib/Kconfig.debug                 | 17 +++++++++++++++++
- 8 files changed, 58 insertions(+), 10 deletions(-)
+
+
+> -       ---help---
+> -         The Extended Industry Standard Architecture (EISA) bus was
+> -         developed as an open alternative to the IBM MicroChannel bus.
+> -
+> -         The EISA bus provided some of the features of the IBM MicroChannel
+> -         bus while maintaining backward compatibility with cards made for
+> -         the older ISA bus.  The EISA bus saw limited use between 1988 and
+> -         1995 when it was made obsolete by the PCI bus.
+> -
+> -         Say Y here if you are building a kernel for an EISA-based machine.
+> -
+> -         Otherwise, say N.
+> -
+>  config SBUS
+>         bool
+
+
+
+I guess the situation is the same as powerpc.
+
+The difference between arm and powerpc is the presence of help.
+
+You fold the powerpc change in 9/9.
+
 
 -- 
-2.17.1
+Best Regards
+Masahiro Yamada
