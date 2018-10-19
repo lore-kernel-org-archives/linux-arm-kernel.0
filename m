@@ -1,89 +1,61 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:59 +0100
-Subject: [PATCH 24/26] arm/arm64: KVM: Rename function
- kvm_arch_dev_ioctl_check_extension()
+Date: Fri, 19 Oct 2018 13:58:58 +0100
+Subject: [PATCH 23/26] KVM: arm64: Fix caching of host MDCR_EL2 value
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-25-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongjiu Geng <gengdongjiu@huawei.com>
+From: Mark Rutland <mark.rutland@arm.com>
 
-Rename kvm_arch_dev_ioctl_check_extension() to
-kvm_arch_vm_ioctl_check_extension(), because it does
-not have any relationship with device.
+At boot time, KVM stashes the host MDCR_EL2 value, but only does this
+when the kernel is not running in hyp mode (i.e. is non-VHE). In these
+cases, the stashed value of MDCR_EL2.HPMN happens to be zero, which can
+lead to CONSTRAINED UNPREDICTABLE behaviour.
 
-Renaming this function can make code readable.
+Since we use this value to derive the MDCR_EL2 value when switching
+to/from a guest, after a guest have been run, the performance counters
+do not behave as expected. This has been observed to result in accesses
+via PMXEVTYPER_EL0 and PMXEVCNTR_EL0 not affecting the relevant
+counters, resulting in events not being counted. In these cases, only
+the fixed-purpose cycle counter appears to work as expected.
 
+Fix this by always stashing the host MDCR_EL2 value, regardless of VHE.
+
+Cc: Christopher Dall <christoffer.dall@arm.com>
 Cc: James Morse <james.morse@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: stable at vger.kernel.org
+Fixes: 1e947bad0b63b351 ("arm64: KVM: Skip HYP setup when already running in HYP")
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   | 2 +-
- arch/arm64/include/asm/kvm_host.h | 2 +-
- arch/arm64/kvm/reset.c            | 4 ++--
- virt/kvm/arm/arm.c                | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ virt/kvm/arm/arm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index b45af481ccf7..5ca5d9af0c26 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -273,7 +273,7 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
- 
--static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-+static inline int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	return 0;
- }
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 376a5b695467..f84052f306af 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -53,7 +53,7 @@ DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
- 
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
--int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
-+int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext);
- void __extended_idmap_trampoline(phys_addr_t boot_pgd, phys_addr_t idmap_start);
- 
- struct kvm_arch {
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index aa806d582552..337d2fbc2f06 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -59,12 +59,12 @@ static bool cpu_has_32bit_el1(void)
- }
- 
- /**
-- * kvm_arch_dev_ioctl_check_extension
-+ * kvm_arch_vm_ioctl_check_extension
-  *
-  * We currently assume that the number of HW registers is uniform
-  * across all CPUs (see cpuinfo_sanity_check).
-  */
--int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-+int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	int r;
- 
 diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 4c5ff06b18f9..7c9d7b51ce89 100644
+index 4ce99bb223bc..4c5ff06b18f9 100644
 --- a/virt/kvm/arm/arm.c
 +++ b/virt/kvm/arm/arm.c
-@@ -241,7 +241,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 		r = 1;
- 		break;
- 	default:
--		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
-+		r = kvm_arch_vm_ioctl_check_extension(kvm, ext);
- 		break;
- 	}
- 	return r;
+@@ -1296,8 +1296,6 @@ static void cpu_init_hyp_mode(void *dummy)
+ 
+ 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 	__cpu_init_stage2();
+-
+-	kvm_arm_init_debug();
+ }
+ 
+ static void cpu_hyp_reset(void)
+@@ -1315,6 +1313,8 @@ static void cpu_hyp_reinit(void)
+ 	else
+ 		cpu_init_hyp_mode(NULL);
+ 
++	kvm_arm_init_debug();
++
+ 	if (vgic_present)
+ 		kvm_vgic_init_cpu_hardware();
+ }
 -- 
 2.19.1
