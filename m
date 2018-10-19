@@ -1,64 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:39 +0100
-Subject: [PATCH 04/26] arm64: Add a helper for PARange to physical shift
- conversion
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 19 Oct 2018 15:23:31 +0200
+Subject: [GIT PULL 00/26] KVM/arm updates for 4.20
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-5-marc.zyngier@arm.com>
+Message-ID: <9af51d24-fe4a-32d9-3637-004ce9ed0e7d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+On 19/10/2018 14:58, Marc Zyngier wrote:
+> Paolo, Radim,
+> 
+> This is the bulk of the KVM/arm changes for 4.20. This time, the
+> biggest change by far is the support for variable addressing range in
+> guests, allowing userspace to size arm64 VMs from 32 to 52bits instead
+> of the hard-coded 40bits we've enjoyed so far. Other than that, we
+> have a random selection of small fixes and cleanups.
+> 
+> Note that this will generate a few minor conflicts with the arm64 tree,
+> which should be resolved as per this branch[1].
 
-On arm64, ID_AA64MMFR0_EL1.PARange encodes the maximum Physical
-Address range supported by the CPU. Add a helper to decode this
-to actual physical shift. If we hit an unallocated value, return
-the maximum range supported by the kernel.
-This will be used by KVM to set the VTCR_EL2.T0SZ, as it
-is about to move its place. Having this helper keeps the code
-movement cleaner.
+That's a bit annoying.  KVM parts of "Support Common Not Private
+translations" should not have gone through the arm64 tree.  Instead,
+Catalin should have placed the first patches in a topic branch for you
+to pull.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/cpufeature.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+This minimizes the effort for everyone else, basically.  Conflicts need
+to be sorted out by Stephen Rothwell, myself and Linus/Greg, while topic
+branches just work.
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1717ba1db35d..072cc1c970c2 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -530,6 +530,26 @@ void arm64_set_ssbd_mitigation(bool state);
- static inline void arm64_set_ssbd_mitigation(bool state) {}
- #endif
- 
-+static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
-+{
-+	switch (parange) {
-+	case 0: return 32;
-+	case 1: return 36;
-+	case 2: return 40;
-+	case 3: return 42;
-+	case 4: return 44;
-+	case 5: return 48;
-+	case 6: return 52;
-+	/*
-+	 * A future PE could use a value unknown to the kernel.
-+	 * However, by the "D10.1.4 Principles of the ID scheme
-+	 * for fields in ID registers", ARM DDI 0487C.a, any new
-+	 * value is guaranteed to be higher than what we know already.
-+	 * As a safe limit, we return the limit supported by the kernel.
-+	 */
-+	default: return CONFIG_ARM64_PA_BITS;
-+	}
-+}
- #endif /* __ASSEMBLY__ */
- 
- #endif
--- 
-2.19.1
+If it weren't for the include/uapi/linux/kvm.h change, where I have to
+sort the capability numbers as they are assigned by the various
+architecture maintainers(*), I would have told you to just send the pull
+request to Catalin this time through (but that would just be a band-aid,
+it should not be the norm).  Anyway, just remember this next time.
+
+Thanks,
+
+Paolo
+
+	(*) That's also a bit suboptimal, because it complicates
+	    debugging of new features after they're merged, but I have
+	    no better idea.
