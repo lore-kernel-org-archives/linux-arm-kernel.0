@@ -1,51 +1,38 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 19 Oct 2018 16:57:04 +0300
-Subject: [PATCH 0/15] Add support for OLPC XO 1.75 Embedded Controller
-In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
-Message-ID: <CAHp75Vd_9RmfDFnSzkNOQyfKVOR1tfzbMPy0_J7_DfZ2e4A16g@mail.gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 19 Oct 2018 09:46:30 -0400
+Subject: [PATCH 07/10] swiotlb: refactor swiotlb_map_page
+In-Reply-To: <20181019065258.GA29249@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-8-hch@lst.de>
+ <35016142-f06d-e424-5afe-6026b6d57eda@arm.com>
+ <20181019003715.GI1251@char.us.oracle.com>
+ <20181019065258.GA29249@lst.de>
+Message-ID: <20181019134629.GE54336@Konrads-MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2018 at 8:23 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
->
-> Hi.
->
-> This patchset adds support for the Embedded Controller on an OLPC XO
-> 1.75 machine. OLPC XO 1.75 is a MMP2 based ARM laptop. It plugs into
-> the existing OLPC platform infrastructure, currently used by the x86
-> based models.
->
-> The EC operates in SPI master mode, meaning the SOC is the SPI slave. It
-> uses extra handshake signal to signal readiness of SOC to accept data
-> from EC and to initiate a transaction if SOC wishes to submit data.
->
-> The SPI slave support for MMP2 was submitted separately:
-> https://lore.kernel.org/lkml/20181010170936.316862-1-lkundrak at v3.sk/T/#t
->
+On Fri, Oct 19, 2018 at 08:52:58AM +0200, Christoph Hellwig wrote:
+> On Thu, Oct 18, 2018 at 08:37:15PM -0400, Konrad Rzeszutek Wilk wrote:
+> > > > +	if (!dma_capable(dev, dma_addr, size) ||
+> > > > +	    swiotlb_force == SWIOTLB_FORCE) {
+> > > > +		trace_swiotlb_bounced(dev, dma_addr, size, swiotlb_force);
+> > > > +		dma_addr = swiotlb_bounce_page(dev, &phys, size, dir, attrs);
+> > > > +	}
+> > > 
+> > > FWIW I prefer the inverse condition and early return of the original code
+> > > here, which also then allows a tail-call to swiotlb_bounce_page() (and saves
+> > > a couple of lines), but it's no biggie.
+> > > 
+> > > Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> > 
+> > I agree with Robin - it certainly makes it easier to read.
+> > 
+> > With that small change:
+> > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> 
+> So I did this edit, and in this patch it does indeed look much cleaner.
+> But in patch 9 we introduce the cache maintainance, and have to invert
+> the condition again if we don't want a goto mess:
 
-> THe "power: supply: olpc_battery: correct the temperature" patch was
-
-The
-
-> already sent out separately, but I'm including it because the last
-> commit of the set depends on it.
->
-> Tested to work on an OLPC XO 1.75 and also tested not to break x86
-> support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
-> unlikely this breaks it when XO 1 works.
->
-> Thanks in advance for reviews and feedback of any kind.
-
-Thanks for the series.
-I'm about to review the patch 6, otherwise read my comments for the
-rest and consider addressing them.
-
->
-> Lubo
->
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+Right. In which case please leave this patch as it is. And please
+plaster the Reviewed-by on the patch. Thank you!
