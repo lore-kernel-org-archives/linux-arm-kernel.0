@@ -1,31 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 19 Oct 2018 13:26:20 -0300
-Subject: [PATCH] ARM: dts: imx6ul: ccimx6ulsom: Add support for wireless
- SOM variant
-In-Reply-To: <1539962141-32418-2-git-send-email-alex.gonzalez@digi.com>
-References: <1539962141-32418-1-git-send-email-alex.gonzalez@digi.com>
- <1539962141-32418-2-git-send-email-alex.gonzalez@digi.com>
-Message-ID: <CAOMZO5BwqT5Y5xECqnLx6K6Vv2gur4HV2g6zJDJyDot5FdX+KQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Oct 2018 09:44:50 -0700
+Subject: omap4: support for manually updated display
+In-Reply-To: <20181018221549.GB6364@amd>
+References: <20180830090456.GA17277@amd>
+ <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
+ <3205865.8O8aibZXye@avalon> <20180910174453.GV5662@atomide.com>
+ <20181018221549.GB6364@amd>
+Message-ID: <20181019164450.GD43338@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+* Pavel Machek <pavel@ucw.cz> [181018 22:15]:
+> Hi!
+> 
+> > > I want to make it clear that I don't want to claim any privilege in getting 
+> > > patches merged first. I am however worried that, without an easy way to test 
+> > > DSI support, and without enough time to focus on it, I would break whatever 
+> > > would be merged now in future reworks. I would thus like to find out how to 
+> > > collaborate on this task, hopefully to move towards usage of drm_bridge and 
+> > > drm_panel for DSI-based pipelines.
+> > 
+> > Real users with mainline kernel with a real product should
+> > always have priority over any ongoing clean-up.
+> > 
+> > And for testing, a bunch of real users is something you can't
+> > beat for proper testing of code on ongoing basis!
+> > 
+> > Naturally the burden of getting the patches ready is on the people
+> > using them for rebase and fixing comments. And Sebastian has
+> > already agreed help with maintaining it.
+> > 
+> > I've been actually using DSI command mode support and testing
+> > Linux next several times a week to prevent regressions from
+> > sneaking into -rc1 in general. So now I can't test omapdrm with
+> > next until Sebastian is done with rebasing.. Back to headless
+> > testing then.
+> > 
+> > Anyways, I'd say let's add the DSI command mode support ASAP after
+> > rebasing, there are at least Sebastian, Pavel and I then testing
+> > and helping with further ongoing panel conversion work.
+> 
+> Are there any news here? Does someone have a patch set that actually
+> works?
 
-On Fri, Oct 19, 2018 at 12:17 PM Alex Gonzalez <alex.gonzalez@digi.com> wrote:
+I was wondering about that too.. I only have the v4.19-rc1 based
+patches and can no longer test with Linux next. Sebastian, any
+update?
 
-> +/* USDHC1 (Wireless) */
-> +&usdhc1 {
-> +       pinctrl-names = "default", "sleep";
-> +       pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_wifibt_ctrl>;
-> +       pinctrl-1 = <&pinctrl_usdhc1_sleep &pinctrl_wifibt_ctrl_sleep>;
-> +       non-removable;
-> +       no-1-8-v;
-> +       bus-width = <4>;
-> +       status = "okay";
-> +};
-> +
-> +
+> Are there any in-progress patches I could help with?
 
-Just a minor not: only one blank line is enough.
+I can put in some effort too if needed.
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Regards,
+
+Tony
