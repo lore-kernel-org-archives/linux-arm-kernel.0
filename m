@@ -1,61 +1,21 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Fri, 19 Oct 2018 17:14:38 +0200 (CEST)
-Subject: [PATCH v3 3/4] arm64: implement live patching
-In-Reply-To: <20181019121847.eug4p2mxr32cebk2@linux-8ccs>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
- <20181018125820.iw54zbirq74ulknj@linux-8ccs>
- <alpine.LSU.2.21.1810191338020.4692@pobox.suse.cz>
- <20181019121847.eug4p2mxr32cebk2@linux-8ccs>
-Message-ID: <alpine.LSU.2.21.1810191709050.4692@pobox.suse.cz>
+From: alex.gonzalez@digi.com (Alex Gonzalez)
+Date: Fri, 19 Oct 2018 17:15:40 +0200
+Subject: [PATCH] ARM: dts: imx6ul: ccimx6ulsom: Add support for wireless SOM
+ variant
+Message-ID: <1539962141-32418-1-git-send-email-alex.gonzalez@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The wireless variants of the ConnecCore 6UL SOM include a Qualcomm
+QCA6564 wireless chip with dual WiFi and Bluetooth.
 
-> >If I am not mistaken, we do not care for arch.init.plt in livepatch. Is
-> >that correct?
-> 
-> I do not believe patching of __init functions is supported (right?) So
-> we do not need to keep arch.init.plt alive post-module-load.
+The QCA6564 uses the out-of-tree driver at:
+https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-2.0/
 
-I think we can do that. Theoretically. I'm not sure if it is actually 
-useful. Module's init functions are called after the modules is patched, 
-so there is no obstacle.
+Blueooth uses the HCI H4 UART driver.
 
-But arch.init.plt would be useful only for the relocations of the patching 
-module, right? Patching functions would not part of init section anyway, I 
-think, so arch.init.plt is useless post-module-load.
- 
-> >> int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
-> >> 			      char *secstrings, struct module *mod)
-> >> {
-> >> @@ -210,11 +225,13 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr,
-> >> Elf_Shdr
-> >> *sechdrs,
-> >>   * entries. Record the symtab address as well.
-> >>   */
-> >> 	for (i = 0; i < ehdr->e_shnum; i++) {
-> >> -		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
-> >> +		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt")) {
-> >> 			mod->arch.core.plt = sechdrs + i;
-> >> -		else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> >> ".init.plt"))
-> >> +			mod->arch.core.plt_shndx = i;
-> >> +		} else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> >> ".init.plt")) {
-> >> 			mod->arch.init.plt = sechdrs + i;
-> >> -		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
-> >> +			mod->arch.init.plt_shndx = i;
-> >
-> >It is initialized here, but that's not necessarily a bad thing.
-> 
-> I think I added this line for consistency, but I actually don't think
-> it is needed. We only would need to keep the section index for
-> arch.core.plt then.
+Alex Gonzalez (1):
+  ARM: dts: imx6ul: ccimx6ulsom: Add support for wireless SOM variant
 
-Yes. I'd welcome a comment somewhere in both cases. Either that we 
-initialize it just for consistency, or that we don't, because it's not 
-needed.
-
-Miroslav
+ arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi | 65 +++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
