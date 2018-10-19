@@ -1,46 +1,51 @@
-From: navam@xilinx.com (Nava kishore Manne)
-Date: Fri, 19 Oct 2018 09:20:58 +0000
-Subject: [PATCH 3/3] reset: reset-zynqmp: Adding support for Xilinx zynqmp
- reset controller.
-In-Reply-To: <1539939793.3395.2.camel@pengutronix.de>
-References: <20181020084107.28251-1-nava.manne@xilinx.com>
- <20181020084107.28251-4-nava.manne@xilinx.com>
- <1539939793.3395.2.camel@pengutronix.de>
-Message-ID: <BYAPR02MB47108BCDC1AF5454F2DDF328C2F90@BYAPR02MB4710.namprd02.prod.outlook.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 19 Oct 2018 11:21:45 +0200
+Subject: [PATCH v1 2/3] i2c: imx: probe dma only only on i.MX50 and later.
+In-Reply-To: <20181019090100.6vcergf6txgxt7fo@pengutronix.de>
+References: <20181018112615.29362-1-o.rempel@pengutronix.de>
+ <20181018112615.29362-3-o.rempel@pengutronix.de>
+ <20181019071243.t5bwcmnnlqrgtajj@pengutronix.de>
+ <20181019090100.6vcergf6txgxt7fo@pengutronix.de>
+Message-ID: <20181019092145.6zihrnduyypzo5x2@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp
-
-Thanks for the quicks response....
-
-> -----Original Message-----
-> From: Philipp Zabel [mailto:p.zabel at pengutronix.de]
-> Sent: Friday, October 19, 2018 2:33 PM
-> To: Nava kishore Manne <navam@xilinx.com>; robh+dt at kernel.org;
-> mark.rutland at arm.com; Michal Simek <michals@xilinx.com>; Rajan Vaja
-> <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; chinnikishore369 at gmail.com
-> Subject: Re: [PATCH 3/3] reset: reset-zynqmp: Adding support for Xilinx
-> zynqmp reset controller.
+On Fri, Oct 19, 2018 at 11:01:00AM +0200, Oleksij Rempel wrote:
+> On Fri, Oct 19, 2018 at 09:12:43AM +0200, Uwe Kleine-K?nig wrote:
+> > Hello Oleksij,
+> > 
+> > On Thu, Oct 18, 2018 at 01:26:14PM +0200, Oleksij Rempel wrote:
+> > > The DMA support for I2C was introduced on i.MX50. So,
+> > > avoid of DMA probing on not supported versions.
+> > 
+> > What is the obvious downside of trying to use DMA on i.MX21? If the
+> > purpose is just to suppress the message
+> > 
+> > 	can't request DMA tx channel
+> > 
+> > , that goes away with patch 3, too.
+> > 
+> > Note that if we agree that i.MX50 (and later) isn't compatible to
+> > i.MX21, all device trees should be fixed accordingly. IMHO the
+> > difference "There is a DMA engine connected only on some
+> > implementations" doesn't give enough incentive to claim that i.MX21 and
+> > i.MX50 must not share the compatible.
 > 
-> Hi Nava,
-> 
-> On Sat, 2018-10-20 at 14:11 +0530, Nava kishore Manne wrote:
-> > Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-> > The zynqmp reset-controller has the ability to reset lines connected
-> > to different blocks and peripheral in the Soc.
-> >
-> > Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> > ---
-> > Changes for v1:
-> > 		-None.
-> 
-> I had comments on RFC v3 that are not addressed yet, see below.
-> 
+> I don't see any sense to do allocation and add extra probes just to find
+> what we already know from compatible.
 
-Sorry, I have missed your comments . Will fix in the next version.
+I think it's perfectly fine to only notice that there is no DMA support
+when trying to set it up. It has slight runtime overhead, yes, but being
+able to handle imx21 and imx50 in the same way is a nice advantage that
+I don't want to throw away easily.
 
-Regards,
-Navakishore.
+If you care about the allocation, you can do do the calls to
+dma_request_chan first and assign to local variables before the
+allocation of *dma.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
