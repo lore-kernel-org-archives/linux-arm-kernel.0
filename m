@@ -1,39 +1,61 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Fri, 19 Oct 2018 17:58:35 +0200
-Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
-In-Reply-To: <20181015175424.97147-1-ebiggers@kernel.org>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
-Message-ID: <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 19 Oct 2018 09:05:57 -0700
+Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
+In-Reply-To: <20181019154948.GD16771@arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-8-kristina.martsenko@arm.com>
+ <20181019111542.6wrvjguirglzg7vg@mbp>
+ <20181019112404.GD14246@arm.com>
+ <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
+ <20181019154948.GD16771@arm.com>
+Message-ID: <CAGXu5jK8OK+430FQtztwVD8B95_SCjTWoysZXBdkZaDeSiV+ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eric,
+On Fri, Oct 19, 2018 at 8:49 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Oct 19, 2018 at 08:36:45AM -0700, Kees Cook wrote:
+>> On Fri, Oct 19, 2018 at 4:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > FWIW: I think we should be entertaining a prctl() interface to use a new
+>> > key on a per-thread basis. Obviously, this would need to be used with care
+>> > (e.g. you'd fork(); use the prctl() and then you'd better not return from
+>> > the calling function!).
+>> >
+>> > Assuming we want this (Kees -- I was under the impression that everything in
+>> > Android would end up with the same key otherwise?), then the question is
+>> > do we want:
+>> >
+>> >   - prctl() get/set operations for the key, or
+>> >   - prctl() set_random_key operation, or
+>> >   - both of the above?
+>> >
+>> > Part of the answer to that may lie in the requirements of CRIU, where I
+>> > strongly suspect they need explicit get/set operations, although these
+>> > could be gated on CONFIG_CHECKPOINT_RESTORE=y.
+>>
+>> Oh CRIU. Yikes. I'd like the get/set to be gated by the CONFIG, yes.
+>> No reason to allow explicit access to the key (and selected algo) if
+>> we don't have to.
+>
+> Makes sense.
+>
+>> As for per-thread or not, having a "pick a new key now" prctl() sounds
+>> good, but I'd like to have an eye toward having it just be "automatic"
+>> on clone().
+>
+> I thought about that too, but we're out of clone() flags afaict and there's
+> no arch hook in there. We could add yet another clone syscall, but yuck (and
+> I reckon viro would kill us).
+>
+> Or are you saying that we could infer the behaviour from the existing set
+> of flags?
 
-> As before, some of these patches conflict with the new "Zinc" crypto
-> library.  But I don't know when Zinc will be merged, so for now I've
-> continued to base this patchset on the current 'cryptodev'.
+I mean if it's starting a new thread, it should get a new key
+automatically, just like the ssp canary happens in dup_task_struct().
 
-I'd appreciate it if you waited to merge this until you can rebase it
-on top of Zinc. In fact, if you already want to build it on top of
-Zinc, I'm happy to work with you on that in a shared repo or similar.
-We can also hash out the details of that in person in Vancouver in a
-few weeks. I think pushing this in before will create undesirable
-churn for both of us.
+(Or did I miss some context for why that's not possible?)
 
-> Therefore, we (well, Paul Crowley did the real work) designed a new
-> encryption mode, Adiantum.  In essence, Adiantum makes it secure to use
-> the ChaCha stream cipher for disk encryption.  Adiantum is specified by
-> our paper here: https://eprint.iacr.org/2018/720.pdf ("Adiantum:
-> length-preserving encryption for entry-level processors").  Reference
-> code and test vectors are here: https://github.com/google/adiantum.
-> Most of the high-level concepts of Adiantum are not new; similar
-> existing modes include XCB, HCTR, and HCH.  Adiantum and these modes are
-> true wide-block modes (tweakable super-pseudorandom permutations), so
-> they actually provide a stronger notion of security than XTS.
+-Kees
 
-Great, I'm very happy to see you've created such a high performance alternative.
-
-Before merging this into the kernel, do you want to wait until you've
-received some public review from academia?
-
-Jason
+-- 
+Kees Cook
+Pixel Security
