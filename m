@@ -1,62 +1,62 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 19 Oct 2018 09:07:36 +0100
-Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
-In-Reply-To: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
-References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <e01f2e58-3e78-9f6c-16b4-0b8d92a64a09@arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 19 Oct 2018 10:10:33 +0200
+Subject: [PATCH v5 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <09f76f17-05c4-d9e0-0167-f68e224f00c4@amlogic.com>
+References: <1539839345-14021-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839345-14021-3-git-send-email-jianxin.pan@amlogic.com>
+ <20181018213308.3f8a5279@bbrezillon>
+ <09f76f17-05c4-d9e0-0167-f68e224f00c4@amlogic.com>
+Message-ID: <20181019101033.0a160506@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle ping on this series.
+On Fri, 19 Oct 2018 15:29:05 +0800
+Liang Yang <liang.yang@amlogic.com> wrote:
 
-On 26/09/18 14:56, Julien Thierry wrote:
-> Hi,
+> > How about defining that the HW returns an array of __le64 instead and then
+> > define the following macros which you can use after converting in the
+> > CPU endianness
+> > 
+> > #define ECC_GET_PROTECTED_OOB_BYTE(x, y)	(((x) >> (8 * (1 + y)) & GENMASK(7, 0))
+> > #define ECC_COMPLETE			BIT(31)
+> > #define ECC_ERR_CNT(x)			(((x) >> 24) & GENMASK(5, 0))
+> > 
+> > (I'm not entirely sure the field positions are correct, but I'll let you
+> > check that).
+> >   
+> ok. i think it should be:
 > 
-> Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
-> using it to access memory. When taking an exception, it is possible that
-> the context during which the exception occured had SP mis-aligned. The
-> entry code needs to make sure that the stack is aligned before using it to
-> save the context.
+> #define ECC_GET_PROTECTED_OOB_BYTE(x, y)	(((x) >> (8 * y) &
+> GENMASK(7, 0))
 > 
-> This is only a concern when taking exception from an EL using the same
-> SP_ELx as the handler. In other cases it can be assumed that the SP being
-> picked up on exception entry is aligned under the condition that SP is
-> always aligned when doing eret to an EL using a different SP.
-> 
-> On Juno I see a runtime difference <1% for hackbench. If I do not include
-> the fast path at EL1 (patch 4) I see a diff of 1-2%.
-> 
-> For EL2 entries, a bit of clean up of stuff getting patched in the vector
-> has been needed.
-> 
-> Cheers,
-> 
-> Julien
-> 
-> -->
-> 
-> Julien Thierry (7):
->    arm64: Add static check for pt_regs alignment
->    arm64: sdei: Always use sdei stack for sdei events
->    arm64: Align stack when taking exception from EL1
->    arm64: Add fast-path for stack alignment
->    arm64: Do not apply BP hardening for hyp entries from EL2
->    arm64: Do not apply vector harderning for hyp entries from EL2
->    arm64: kvm: Align stack for exception coming from EL2
-> 
->   arch/arm64/include/asm/assembler.h |  9 +++++
->   arch/arm64/include/asm/ptrace.h    |  2 +
->   arch/arm64/include/asm/sdei.h      |  2 -
->   arch/arm64/kernel/cpu_errata.c     | 10 ++++-
->   arch/arm64/kernel/entry.S          | 43 +++++++++++++++++++--
->   arch/arm64/kernel/sdei.c           | 23 ++++-------
->   arch/arm64/kvm/hyp/hyp-entry.S     | 78 +++++++++++++++++++++++++++++++-------
->   drivers/firmware/Kconfig           |  1 +
->   8 files changed, 132 insertions(+), 36 deletions(-)
-> 
-> --
-> 1.9.1
-> 
+> if x represents the u64 and y represents the index of the u64.
 
--- 
-Julien Thierry
+Absolutely.
+
+> 
+> 
+> 
+> >> +
+> >> +#define PER_INFO_BYTE	(sizeof(struct meson_nfc_info_format))
+> >> +
+> >> +struct meson_nfc_nand_chip {
+> >> +	struct list_head node;
+> >> +	struct nand_chip nand;
+> >> +	bool is_scramble;  
+> > 
+> > I think I already mentioned the NAND_NEED_SCRAMBLING flag []. Please
+> > drop this field and test (chip->flags & NAND_NEED_SCRAMBLING) instead.
+> >   
+> em, i use NAND_NEED_SCRAMBLING and is_scramble is set:
+> static int meson_nand_attach_chip(struct nand_chip *nand)
+> {
+> 	......
+> 	meson_chip->is_scramble =
+> 		(nand->options & NAND_NEED_SCRAMBLING) ? 1 : 0;
+> 	......
+> }
+
+Why do you need to add a new field then? Just test
+nand->options & NAND_NEED_SCRAMBLING directly or provide a helper
+function that does that.
