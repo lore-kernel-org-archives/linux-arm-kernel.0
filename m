@@ -1,46 +1,16 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 19 Oct 2018 10:54:21 +0200
-Subject: [PATCH 6/6] mmc: mediatek: drop too much code of tuning method
-In-Reply-To: <1539415250-32337-7-git-send-email-chaotian.jing@mediatek.com>
-References: <1539415250-32337-1-git-send-email-chaotian.jing@mediatek.com>
- <1539415250-32337-7-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <513726cb-79e8-ca4d-e887-bf63c833260b@gmail.com>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Fri, 19 Oct 2018 11:00:29 +0200
+Subject: [PATCH v2] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
+In-Reply-To: <20181012131406.18601-1-vincent.whitchurch@axis.com>
+References: <20181012131406.18601-1-vincent.whitchurch@axis.com>
+Message-ID: <20181019090029.x4s7xn7u7ygs7dgx@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 12, 2018 at 03:14:06PM +0200, Vincent Whitchurch wrote:
+> +	.macro ldr1b ptr reg cond=al abort
+> +	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
+> +	.endm
 
-
-On 13/10/2018 09:20, Chaotian Jing wrote:
-> the tuning code is becoming more and more bloated, let's make the
-> set cmd/data delay to inline function to avoid too much redundant code.
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/host/mtk-sd.c | 133 +++++++++++++---------------------------------
->  1 file changed, 38 insertions(+), 95 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-[...]> @@ -1923,17 +1898,8 @@ static int msdc_tune_together(struct mmc_host
-*mmc, u32 opcode)
->  	sdr_clr_bits(host->base + MSDC_IOCON,
->  		     MSDC_IOCON_DSPL | MSDC_IOCON_W_DSPL);
->  	for (i = 0 ; i < PAD_DELAY_MAX; i++) {
-> -		if (host->top_base) {
-> -			sdr_set_field(host->top_base + EMMC_TOP_CMD,
-> -				      PAD_CMD_RXDLY, i);
-> -			sdr_set_field(host->top_base + EMMC_TOP_CONTROL,
-> -				      PAD_DAT_RD_RXDLY, i);
-> -		} else {
-> -			sdr_set_field(host->base + tune_reg,
-> -				      MSDC_PAD_TUNE_CMDRDLY, i);
-> -			sdr_set_field(host->base + tune_reg,
-> -				      MSDC_PAD_TUNE_DATRRDLY, i);
-> -		}
-> +		msdc_set_cmd_delay(host, i);
-> +		msdc_set_data_delay(host, i);
-
-Put the clean-up before introducing msdc_tune_together, that makes the series
-much easier to read.
-
-Thanks,
-Matthias
+This is broken on Thumb-2 since the fault handler is installed on the
+implicitly-inserted IT instead of the LDR.  I will send a v3.
