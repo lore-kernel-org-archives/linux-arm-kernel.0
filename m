@@ -1,59 +1,83 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:50 +0100
-Subject: [PATCH 15/26] kvm: arm64: Add 52bit support for PAR to HPFAR
- conversoin
+Date: Fri, 19 Oct 2018 13:58:48 +0100
+Subject: [PATCH 13/26] kvm: arm64: Switch to per VM IPA limit
 In-Reply-To: <20181019125901.185478-1-marc.zyngier@arm.com>
 References: <20181019125901.185478-1-marc.zyngier@arm.com>
-Message-ID: <20181019125901.185478-16-marc.zyngier@arm.com>
+Message-ID: <20181019125901.185478-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Add support for handling 52bit addresses in PAR to HPFAR
-conversion. Instead of hardcoding the address limits, we
-now use PHYS_MASK_SHIFT.
+Now that we can manage the stage2 page table per VM, switch the
+configuration details to per VM instance. The VTCR is updated
+with the values specific to the VM based on the configuration.
+We store the IPA size and the number of stage2 page table levels
+for the guest already in VTCR. Decode it back from the vtcr
+field wherever we need it.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h | 7 +++++++
- arch/arm64/kvm/hyp/switch.c      | 2 +-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_arm.h        | 2 ++
+ arch/arm64/include/asm/kvm_mmu.h        | 2 +-
+ arch/arm64/include/asm/stage2_pgtable.h | 2 +-
+ arch/arm64/kvm/reset.c                  | 2 +-
+ 4 files changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index e4240568cc18..f1330284720d 100644
+index f913adb44f93..e4240568cc18 100644
 --- a/arch/arm64/include/asm/kvm_arm.h
 +++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -311,6 +311,13 @@
+@@ -197,6 +197,8 @@
+ 	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
  
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~UL(0xf))
-+/*
-+ * We have
-+ *	PAR	[PA_Shift - 1	: 12] = PA	[PA_Shift - 1 : 12]
-+ *	HPFAR	[PA_Shift - 9	: 4]  = FIPA	[PA_Shift - 1 : 12]
-+ */
-+#define PAR_TO_HPFAR(par)		\
-+	(((par) & GENMASK_ULL(PHYS_MASK_SHIFT - 1, 12)) >> 8)
+ #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
++#define VTCR_EL2_IPA(vtcr)		(64 - ((vtcr) & VTCR_EL2_T0SZ_MASK))
++
+ /*
+  * ARM VMSAv8-64 defines an algorithm for finding the translation table
+  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index ac3ca9690bad..77b1af9e64db 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -142,7 +142,7 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+  */
+ #define KVM_PHYS_SHIFT	(40)
  
- #define kvm_arm_exception_type	\
- 	{0, "IRQ" }, 		\
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 9d5ce1a3039a..7cc175c88a37 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -263,7 +263,7 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
- 		return false; /* Translation failed, back to guest */
+-#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
++#define kvm_phys_shift(kvm)		VTCR_EL2_IPA(kvm->arch.vtcr)
+ #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
+ #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
  
- 	/* Convert PAR to HPFAR format */
--	*hpfar = ((tmp >> 12) & ((1UL << 36) - 1)) << 4;
-+	*hpfar = PAR_TO_HPFAR(tmp);
- 	return true;
- }
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+index 36a0a1165003..c62fe118a898 100644
+--- a/arch/arm64/include/asm/stage2_pgtable.h
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -43,7 +43,7 @@
+  */
+ #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
+ #define STAGE2_PGTABLE_LEVELS		stage2_pgtable_levels(KVM_PHYS_SHIFT)
+-#define kvm_stage2_levels(kvm)		stage2_pgtable_levels(kvm_phys_shift(kvm))
++#define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
  
+ /*
+  * With all the supported VA_BITs and 40bit guest IPA, the following condition
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 1ced1e37374e..2bf41e007390 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -160,7 +160,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+ 	if (phys_shift > KVM_PHYS_SHIFT)
+ 		phys_shift = KVM_PHYS_SHIFT;
+ 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
+-	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
++	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(phys_shift));
+ 
+ 	/*
+ 	 * Enable the Hardware Access Flag management, unconditionally
 -- 
 2.19.1
