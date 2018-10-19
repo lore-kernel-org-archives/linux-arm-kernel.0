@@ -1,50 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Oct 2018 16:49:48 +0100
-Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
-In-Reply-To: <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <20181005084754.20950-8-kristina.martsenko@arm.com>
- <20181019111542.6wrvjguirglzg7vg@mbp>
- <20181019112404.GD14246@arm.com>
- <CAGXu5j+2axuzPJji_eCvMZDiPvrPsP3kAnG0CY_rsL5c=uFQFA@mail.gmail.com>
-Message-ID: <20181019154948.GD16771@arm.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Fri, 19 Oct 2018 23:50:08 +0800
+Subject: [PATCH v5 2/3] clk: meson: add DT documentation for emmc clock
+ controller
+In-Reply-To: <153988248599.5275.8444799485095155762@swboyd.mtv.corp.google.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-3-git-send-email-jianxin.pan@amlogic.com>
+ <153988248599.5275.8444799485095155762@swboyd.mtv.corp.google.com>
+Message-ID: <efc5b030-f344-80ce-f57e-582207f436fe@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 08:36:45AM -0700, Kees Cook wrote:
-> On Fri, Oct 19, 2018 at 4:24 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > FWIW: I think we should be entertaining a prctl() interface to use a new
-> > key on a per-thread basis. Obviously, this would need to be used with care
-> > (e.g. you'd fork(); use the prctl() and then you'd better not return from
-> > the calling function!).
-> >
-> > Assuming we want this (Kees -- I was under the impression that everything in
-> > Android would end up with the same key otherwise?), then the question is
-> > do we want:
-> >
-> >   - prctl() get/set operations for the key, or
-> >   - prctl() set_random_key operation, or
-> >   - both of the above?
-> >
-> > Part of the answer to that may lie in the requirements of CRIU, where I
-> > strongly suspect they need explicit get/set operations, although these
-> > could be gated on CONFIG_CHECKPOINT_RESTORE=y.
+On 2018/10/19 1:08, Stephen Boyd wrote:
+> Quoting Jianxin Pan (2018-10-17 22:07:24)
+>> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+>> new file mode 100644
+>> index 0000000..9e6d343
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+>> @@ -0,0 +1,31 @@
+>> +* Amlogic MMC Sub Clock Controller Driver
+>> +
+>> +The Amlogic MMC clock controller generates and supplies clock to support
+>> +MMC and NAND controller
+>> +
+>> +Required Properties:
+>> +
+>> +- compatible: should be:
+>> +               "amlogic,gx-mmc-clkc"
+>> +               "amlogic,axg-mmc-clkc"
+>> +
+>> +- #clock-cells: should be 1.
+>> +- clocks: phandles to clocks corresponding to the clock-names property
+>> +- clock-names: list of parent clock names
+>> +       - "clkin0", "clkin1"
+>> +
+>> +Parent node should have the following properties :
 > 
-> Oh CRIU. Yikes. I'd like the get/set to be gated by the CONFIG, yes.
-> No reason to allow explicit access to the key (and selected algo) if
-> we don't have to.
-
-Makes sense.
-
-> As for per-thread or not, having a "pick a new key now" prctl() sounds
-> good, but I'd like to have an eye toward having it just be "automatic"
-> on clone().
-
-I thought about that too, but we're out of clone() flags afaict and there's
-no arch hook in there. We could add yet another clone syscall, but yuck (and
-I reckon viro would kill us).
-
-Or are you saying that we could infer the behaviour from the existing set
-of flags?
-
-Will
+> The example only has one node. Can you add two nodes?
+OK. This clock is used by nand and emmc. I will add a new example for emmc too.
+Thank you for your review.
+> 
+>> +- compatible: "amlogic,axg-mmc-clkc", "syscon".
+>> +- reg: base address and size of the MMC control register space.
+>> +
+>> +Example: Clock controller node:
+>> +
+>> +sd_mmc_c_clkc: clock-controller at 7000 {
+>> +       compatible = "amlogic,axg-mmc-clkc", "syscon";
+>> +       reg = <0x0 0x7000 0x0 0x4>;
+>> +       #clock-cells = <1>;
+>> +
+>> +       clock-names = "clkin0", "clkin1";
+>> +       clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
+>> +                <&clkc CLKID_FCLK_DIV2>;
+>> +};
+> 
+> .
+> 
