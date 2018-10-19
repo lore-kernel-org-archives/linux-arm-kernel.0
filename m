@@ -1,288 +1,116 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 19 Oct 2018 21:52:05 +0800
-Subject: [PATCH v3 3/4] arm64: implement live patching
-In-Reply-To: <20181018125820.iw54zbirq74ulknj@linux-8ccs>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
- <20181018125820.iw54zbirq74ulknj@linux-8ccs>
-Message-ID: <CAKv+Gu_yNBN+Rpw98MAZaxzSjm20qMYD7+fiJ1fBHoUeDr9fBA@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 19 Oct 2018 16:55:25 +0300
+Subject: [PATCH 15/15] power: supply: olpc_battery: Add OLPC XO 1.75
+ support
+In-Reply-To: <20181010172300.317643-16-lkundrak@v3.sk>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-16-lkundrak@v3.sk>
+Message-ID: <CAHp75VepkJ2yy==rDO+WCrmj28_GDvin_3+MEnL7k0n4ZVP8QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 October 2018 at 20:58, Jessica Yu <jeyu@kernel.org> wrote:
-> +++ Miroslav Benes [17/10/18 15:39 +0200]:
+On Wed, Oct 10, 2018 at 8:24 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
 >
->> On Mon, 1 Oct 2018, Torsten Duwe wrote:
->>
->>> Based on ftrace with regs, do the usual thing. Also allocate a
->>> task flag for whatever consistency handling will be used.
->>> Watch out for interactions with the graph tracer.
->>
->>
->> Similar to what Mark wrote about 2/4, I'd appreciate a better commit log.
->> Could you explain traditional "what/why/how", please?
->>
->>> Signed-off-by: Torsten Duwe <duwe@suse.de>
->>>
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -119,6 +119,7 @@ config ARM64
->>>         select HAVE_GENERIC_DMA_COHERENT
->>>         select HAVE_HW_BREAKPOINT if PERF_EVENTS
->>>         select HAVE_IRQ_TIME_ACCOUNTING
->>> +       select HAVE_LIVEPATCH
->>>         select HAVE_MEMBLOCK
->>>         select HAVE_MEMBLOCK_NODE_MAP if NUMA
->>>         select HAVE_NMI
->>> @@ -1349,4 +1350,6 @@ if CRYPTO
->>>  source "arch/arm64/crypto/Kconfig"
->>>  endif
->>>
->>> +source "kernel/livepatch/Kconfig"
->>> +
->>>  source "lib/Kconfig"
->>> --- a/arch/arm64/include/asm/thread_info.h
->>> +++ b/arch/arm64/include/asm/thread_info.h
->>> @@ -76,6 +76,7 @@ void arch_release_task_struct(struct tas
->>>  #define TIF_FOREIGN_FPSTATE    3       /* CPU's FP state is not
->>> current's */
->>>  #define TIF_UPROBE             4       /* uprobe breakpoint or
->>> singlestep */
->>>  #define TIF_FSCHECK            5       /* Check FS is USER_DS on return
->>> */
->>> +#define TIF_PATCH_PENDING      6
->>>  #define TIF_NOHZ               7
->>>  #define TIF_SYSCALL_TRACE      8
->>>  #define TIF_SYSCALL_AUDIT      9
->>> @@ -94,6 +95,7 @@ void arch_release_task_struct(struct tas
->>>  #define _TIF_NEED_RESCHED      (1 << TIF_NEED_RESCHED)
->>>  #define _TIF_NOTIFY_RESUME     (1 << TIF_NOTIFY_RESUME)
->>>  #define _TIF_FOREIGN_FPSTATE   (1 << TIF_FOREIGN_FPSTATE)
->>> +#define _TIF_PATCH_PENDING     (1 << TIF_PATCH_PENDING)
->>>  #define _TIF_NOHZ              (1 << TIF_NOHZ)
->>>  #define _TIF_SYSCALL_TRACE     (1 << TIF_SYSCALL_TRACE)
->>>  #define _TIF_SYSCALL_AUDIT     (1 << TIF_SYSCALL_AUDIT)
->>> @@ -106,7 +108,8 @@ void arch_release_task_struct(struct tas
->>>
->>>  #define _TIF_WORK_MASK         (_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
->>>                                  _TIF_NOTIFY_RESUME |
->>> _TIF_FOREIGN_FPSTATE | \
->>> -                                _TIF_UPROBE | _TIF_FSCHECK)
->>> +                                _TIF_UPROBE | _TIF_FSCHECK | \
->>> +                                _TIF_PATCH_PENDING)
->>
->>
->> Could you add a note to the changelog what this means? My ability to read
->> arm64 entry.S is very limited, but I can see that _TIF_WORK_MASK is
->> process in a syscall exit and irq return paths. That's good. It is also
->> called (via "b ret_to_user") in a couple of different places (el0_*
->> labels). I guess those are returns from exception handling. A comment
->> about it in the changelog would be appreciated.
->>
->>>  #define _TIF_SYSCALL_WORK      (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
->>> | \
->>>                                  _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP |
->>> \
->>> --- /dev/null
->>> +++ b/arch/arm64/include/asm/livepatch.h
->>> @@ -0,0 +1,36 @@
->>> +/* SPDX-License-Identifier: GPL-2.0
->>> + *
->>> + * livepatch.h - arm64-specific Kernel Live Patching Core
->>> + *
->>> + * Copyright (C) 2016,2018 SUSE
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> + * modify it under the terms of the GNU General Public License
->>> + * as published by the Free Software Foundation; either version 2
->>> + * of the License, or (at your option) any later version.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +#ifndef _ASM_ARM64_LIVEPATCH_H
->>> +#define _ASM_ARM64_LIVEPATCH_H
->>> +
->>> +#include <linux/module.h>
->>> +#include <linux/ftrace.h>
->>
->>
->> I think that only
->>
->> #include <asm/ptrace.h>
->>
->> is in fact needed, because of "struct pt_regs".
->>
->>
->> Ad relocations. I checked that everything in struct mod_arch_specific
->> stays after the module is load. Both core and init get SHF_ALLOC set
->> (mod->arch.core.plt->sh_flags in module_frob_arch_sections(). It is
->> important because apply_relocate_add() may use those sections
->> through module_emit_plt_entry() call.
+> The battery and the protocol are essentially the same as OLPC XO 1.5,
+> but the responses from the EC are LSB first.
 >
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> ---
+>  drivers/power/supply/olpc_battery.c | 23 ++++++++++++++++++-----
+>  1 file changed, 18 insertions(+), 5 deletions(-)
 >
-> Yes, it looks like the needed .plt sections will remain in module
-> memory. However, I think I found a slight issue... :/
+> diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
+> index dde9863e5c4a..2adf33b9f641 100644
+> --- a/drivers/power/supply/olpc_battery.c
+> +++ b/drivers/power/supply/olpc_battery.c
+> @@ -56,6 +56,7 @@ struct olpc_battery_data {
+>         struct power_supply *olpc_bat;
+>         char bat_serial[17];
+>         int new_proto;
+> +       int little_endian;
+>  };
 >
-> In module_frob_arch_sections(), mod->arch.core.plt is set to an offset
-> within info->sechdrs:
->
->             if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
->                     mod->arch.core.plt = sechdrs + i;
->
-> sechdrs is from info->sechdrs, which is freed at the end of
-> load_module() via free_copy(). So although the relevant plt section(s)
-> are in module memory, mod->arch.core.plt will point to invalid memory
-> after info is freed. In other words, the section (.plt) *is* in memory
-> but the section header (struct elf64_shdr) containing section metadata
-> like sh_addr, sh_size etc., is not.
->
-
-Just for my understanding: this only matters for live patching, right?
-
-The original PLT support was implemented to support loading modules
-outside of the -/+ 128 MB range of an arm64 relative branch/jump
-instruction, and was later enhanced [for the same reason] to support
-emitting a trampoline for the ftrace entrypoint.
-
-
-
-> But we have mod->klp_info->sechdrs (which is a copy of the section
-> headers) for this very reason. It is initialized only at the very end
-> of load_module(). I don't think copy_module_elf() is dependent on
-> anything, so it can just be moved earlier.
->
-> Note that we cannot set mod->arch.core.plt to mod->klp_info->sechdrs + i
-> during module_frob_arch_sections() because it is still too early, none
-> of the module sections have been copied and none of their sh_addr's
-> have been set to their final locations as this is all happening before
-> move_module() is called. So we can use a module_finalize() function
-> for arm64 to switch the mod->arch.core.plt to use the klp_info section
-> headers.
->
-> Maybe this will be more clear in the example fix below (completely
-> untested and unreviewed!):
->
-> diff --git a/arch/arm64/include/asm/module.h
-> b/arch/arm64/include/asm/module.h
-> index 97d0ef12e2ff..150afc29171b 100644
-> --- a/arch/arm64/include/asm/module.h
-> +++ b/arch/arm64/include/asm/module.h
-> @@ -25,6 +25,7 @@ struct mod_plt_sec {
->         struct elf64_shdr       *plt;
->         int                     plt_num_entries;
->         int                     plt_max_entries;
-> +       int                     plt_shndx;
-> };
->
-> struct mod_arch_specific {
-> diff --git a/arch/arm64/kernel/module-plts.c
-> b/arch/arm64/kernel/module-plts.c
-> index f0690c2ca3e0..c23cef8f0165 100644
-> --- a/arch/arm64/kernel/module-plts.c
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -196,6 +196,21 @@ static unsigned int count_plts(Elf64_Sym *syms,
-> Elf64_Rela *rela, int num,
+>  /*********************************************************************
+> @@ -321,6 +322,14 @@ static int olpc_bat_get_voltage_max_design(union power_supply_propval *val)
 >         return ret;
-> }
+>  }
 >
-> +int module_finalize(const Elf_Ehdr *hdr, const Elf_Shdr *sechdrs,
-> +                   struct module *mod)
+> +static s16 ecword_to_cpu(struct olpc_battery_data *data, u16 ec_byte)
+
+ec_byte is misleading name. It's a 16-bit word. and since we called in
+I/O accessor it as word, you may do the similar here.
+
+And why result is s16 and not u16?
+
 > +{
-> +       /*
-> +        * Livepatch modules need to keep access to section headers to apply
-> +        * relocations. Note mod->klp_info should have already been
-> initialized
-> +        * and all section sh_addr's should have their final addresses by
-> the
-> +        * time module_finalize() is called.
-> +        */
-> +       if (is_livepatch_module(mod))
-> +               mod->arch.core.plt = mod->klp_info->sechdrs +
-> mod->arch.core.plt_shndx;
+> +       if (data->little_endian)
+> +               return le16_to_cpu(ec_byte);
+> +       else
+> +               return be16_to_cpu(ec_byte);
+
 > +
-> +       return 0;
-> +}
-> +
-> int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                               char *secstrings, struct module *mod)
-> {
-> @@ -210,11 +225,13 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->          * entries. Record the symtab address as well.
->          */
->         for (i = 0; i < ehdr->e_shnum; i++) {
-> -               if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
-> +               if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt")) {
->                         mod->arch.core.plt = sechdrs + i;
-> -               else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> ".init.plt"))
-> +                       mod->arch.core.plt_shndx = i;
-> +               } else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> ".init.plt")) {
->                         mod->arch.init.plt = sechdrs + i;
-> -               else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
-> +                       mod->arch.init.plt_shndx = i;
-> +               } else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
->                          !strcmp(secstrings + sechdrs[i].sh_name,
->                                  ".text.ftrace_trampoline"))
->                         tramp = sechdrs + i;
-> diff --git a/kernel/module.c b/kernel/module.c
-> index 6746c85511fe..2fc4d74288dd 100644
-> --- a/kernel/module.c
-> +++ b/kernel/module.c
-> @@ -3363,6 +3363,12 @@ static int post_relocation(struct module *mod, const
-> struct load_info *info)
->         /* Setup kallsyms-specific fields. */
->         add_kallsyms(mod, info);
+>  /*********************************************************************
+>   *             Battery properties
+>   *********************************************************************/
+> @@ -393,7 +402,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
+>                 if (ret)
+>                         return ret;
 >
-> +       if (is_livepatch_module(mod)) {
-> +               err = copy_module_elf(mod, info);
-> +               if (err < 0)
-> +                       return err;
-> +       }
-> +
->         /* Arch-specific module finalizing. */
->         return module_finalize(info->hdr, info->sechdrs, mod);
-> }
-> @@ -3775,12 +3781,6 @@ static int load_module(struct load_info *info, const
-> char __user *uargs,
->         if (err < 0)
->                 goto coming_cleanup;
+> -               val->intval = (s16)be16_to_cpu(ec_word) * 9760L / 32;
+> +               val->intval = ecword_to_cpu(data, ec_word) * 9760L / 32;
+>                 break;
+>         case POWER_SUPPLY_PROP_CURRENT_AVG:
+>         case POWER_SUPPLY_PROP_CURRENT_NOW:
+> @@ -401,7 +410,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
+>                 if (ret)
+>                         return ret;
 >
-> -       if (is_livepatch_module(mod)) {
-> -               err = copy_module_elf(mod, info);
-> -               if (err < 0)
-> -                       goto sysfs_cleanup;
-> -       }
-> -
->         /* Get rid of temporary copy. */
->         free_copy(info);
+> -               val->intval = (s16)be16_to_cpu(ec_word) * 15625L / 120;
+> +               val->intval = ecword_to_cpu(data, ec_word) * 15625L / 120;
+>                 break;
+>         case POWER_SUPPLY_PROP_CAPACITY:
+>                 ret = olpc_ec_cmd(EC_BAT_SOC, NULL, 0, &ec_byte, 1);
+> @@ -432,21 +441,21 @@ static int olpc_bat_get_property(struct power_supply *psy,
+>                 if (ret)
+>                         return ret;
 >
-> Thoughts? Does the fix make sense?
+> -               val->intval = (s16)be16_to_cpu(ec_word) * 10 / 256;
+> +               val->intval = ecword_to_cpu(data, ec_word) * 10 / 256;
+>                 break;
+>         case POWER_SUPPLY_PROP_TEMP_AMBIENT:
+>                 ret = olpc_ec_cmd(EC_AMB_TEMP, NULL, 0, (void *)&ec_word, 2);
+>                 if (ret)
+>                         return ret;
 >
->> The last thing is count_plts() function called from
->> module_frob_arch_sections(). It needed to be changed in 2016 as well. See
->> Jessica's patch
->> (20160713001113.GA30925 at packer-debian-8-amd64.digitalocean.com). The logic
->> in the function has changed since then. If I am not mistaken,
->> count_plts() is fine as it is right now. It does not consider SHN_UNDEF
->> anymore, it looks at the destination section (where a symbol should
->> resolved to) only.
->>
->> Jessica, could you doublecheck, please?
+> -               val->intval = (int)be16_to_cpu(ec_word) * 10 / 256;
+> +               val->intval = (int)ecword_to_cpu(data, ec_word) * 10 / 256;
+>                 break;
+>         case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+>                 ret = olpc_ec_cmd(EC_BAT_ACR, NULL, 0, (void *)&ec_word, 2);
+>                 if (ret)
+>                         return ret;
 >
+> -               val->intval = (s16)be16_to_cpu(ec_word) * 6250 / 15;
+> +               val->intval = ecword_to_cpu(data, ec_word) * 6250 / 15;
+>                 break;
+>         case POWER_SUPPLY_PROP_SERIAL_NUMBER:
+>                 ret = olpc_ec_cmd(EC_BAT_SERIAL, NULL, 0, (void *)&ser_buf, 8);
+> @@ -626,6 +635,10 @@ static int olpc_battery_probe(struct platform_device *pdev)
+>         if (ecver[0] > 0x44) {
+>                 /* XO 1 or 1.5 with a new EC firmware. */
+>                 data->new_proto = 1;
+> +       } else if (of_find_compatible_node(NULL, NULL, "olpc,xo1.75-ec")) {
+> +               /* XO 1.75 */
+> +               data->new_proto = 1;
+> +               data->little_endian = 1;
+>         } else if (ecver[0] < 0x44) {
+>                 /*
+>                  * We've seen a number of EC protocol changes; this driver
+> --
+> 2.19.0
 >
-> Yes, I think count_plts() is fine now in this case (because it is
-> always true that sym->st_shndx != dstidx for SHN_LIVEPATCH symbols)
-> and my old patch from 2016 is no longer needed.
->
-> Thanks,
->
-> Jessica
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
