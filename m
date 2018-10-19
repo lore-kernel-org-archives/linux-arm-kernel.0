@@ -1,123 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Oct 2018 13:58:35 +0100
-Subject: [GIT PULL 00/26] KVM/arm updates for 4.20
-Message-ID: <20181019125901.185478-1-marc.zyngier@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 19 Oct 2018 16:00:32 +0300
+Subject: [PATCH 01/15] power: supply: olpc_battery: correct the
+ temperature units
+In-Reply-To: <20181010172300.317643-2-lkundrak@v3.sk>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-2-lkundrak@v3.sk>
+Message-ID: <CAHp75VenECSZWR3RVh=t35Os93t-MzEH_YzPgT=qQWL-SwjgFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paolo, Radim,
+On Wed, Oct 10, 2018 at 8:23 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
+>
+> According to [1] and [2], the temperature values are in tenths of degree
+> Celsius. Exposing the Celsius value makes the battery appear on fire:
+>
+>   $ upower -i /org/freedesktop/UPower/devices/battery_olpc_battery
+>   ...
+>       temperature:         236.9 degrees C
+>
+> Tested on OLPC XO-1 and OLPC XO-1.75 laptops.
 
-This is the bulk of the KVM/arm changes for 4.20. This time, the
-biggest change by far is the support for variable addressing range in
-guests, allowing userspace to size arm64 VMs from 32 to 52bits instead
-of the hard-coded 40bits we've enjoyed so far. Other than that, we
-have a random selection of small fixes and cleanups.
+It's interesting that the very author of that code is not included in
+so-o long Cc list :)
+Cc: David.
 
-Note that this will generate a few minor conflicts with the arm64 tree,
-which should be resolved as per this branch[1].
+David, do you remember if and how you had tested temperature report of
+the battery on OLPC?
+I guess this kind of error would be appear immediately.
 
-Please pull,
+OTOH it might be that power framework had changed requirements (which
+would be noticeable change).
+If the latter is true, this patch misses Fixes tag. Actually in any
+case it misses it.
 
-	M.
+>
+> [1] include/linux/power_supply.h
+> [2] Documentation/power/power_supply_class.txt
+>
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> ---
+>  drivers/power/supply/olpc_battery.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
+> index 6da79ae14860..5a97e42a3547 100644
+> --- a/drivers/power/supply/olpc_battery.c
+> +++ b/drivers/power/supply/olpc_battery.c
+> @@ -428,14 +428,14 @@ static int olpc_bat_get_property(struct power_supply *psy,
+>                 if (ret)
+>                         return ret;
+>
+> -               val->intval = (s16)be16_to_cpu(ec_word) * 100 / 256;
+> +               val->intval = (s16)be16_to_cpu(ec_word) * 10 / 256;
+>                 break;
+>         case POWER_SUPPLY_PROP_TEMP_AMBIENT:
+>                 ret = olpc_ec_cmd(EC_AMB_TEMP, NULL, 0, (void *)&ec_word, 2);
+>                 if (ret)
+>                         return ret;
+>
+> -               val->intval = (int)be16_to_cpu(ec_word) * 100 / 256;
+> +               val->intval = (int)be16_to_cpu(ec_word) * 10 / 256;
+>                 break;
+>         case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+>                 ret = olpc_ec_cmd(EC_BAT_ACR, NULL, 0, (void *)&ec_word, 2);
+> --
+> 2.19.0
+>
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git merge-resolution-4.20
 
-The following changes since commit 6bf4ca7fbc85d80446ac01c0d1d77db4d91a6d84:
-
-  Linux 4.19-rc5 (2018-09-23 19:15:18 +0200)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-for-v4.20
-
-for you to fetch changes up to e4e11cc0f81ee7be17d6f6fb96128a6d51c0e838:
-
-  KVM: arm64: Safety check PSTATE when entering guest and handle IL (2018-10-19 11:13:03 +0100)
-
-----------------------------------------------------------------
-KVM/arm updates for 4.20
-
-- Improved guest IPA space support (32 to 52 bits)
-- RAS event delivery for 32bit
-- PMU fixes
-- Guest entry hardening
-- Various cleanups
-
-----------------------------------------------------------------
-Christoffer Dall (1):
-      KVM: arm64: Safety check PSTATE when entering guest and handle IL
-
-Dongjiu Geng (2):
-      arm/arm64: KVM: Rename function kvm_arch_dev_ioctl_check_extension()
-      arm/arm64: KVM: Enable 32 bits kvm vcpu events support
-
-Kristina Martsenko (1):
-      vgic: Add support for 52bit guest physical address
-
-Marc Zyngier (2):
-      KVM: arm/arm64: Rename kvm_arm_config_vm to kvm_arm_setup_stage2
-      KVM: arm64: Drop __cpu_init_stage2 on the VHE path
-
-Mark Rutland (1):
-      KVM: arm64: Fix caching of host MDCR_EL2 value
-
-Punit Agrawal (1):
-      KVM: arm/arm64: Ensure only THP is candidate for adjustment
-
-Suzuki K Poulose (17):
-      kvm: arm/arm64: Fix stage2_flush_memslot for 4 level page table
-      kvm: arm/arm64: Remove spurious WARN_ON
-      kvm: arm64: Add helper for loading the stage2 setting for a VM
-      arm64: Add a helper for PARange to physical shift conversion
-      kvm: arm64: Clean up VTCR_EL2 initialisation
-      kvm: arm/arm64: Allow arch specific configurations for VM
-      kvm: arm64: Configure VTCR_EL2 per VM
-      kvm: arm/arm64: Prepare for VM specific stage2 translations
-      kvm: arm64: Prepare for dynamic stage2 page table layout
-      kvm: arm64: Make stage2 page table layout dynamic
-      kvm: arm64: Dynamic configuration of VTTBR mask
-      kvm: arm64: Configure VTCR_EL2.SL0 per VM
-      kvm: arm64: Switch to per VM IPA limit
-      kvm: arm64: Add 52bit support for PAR to HPFAR conversoin
-      kvm: arm64: Set a limit on the IPA size
-      kvm: arm64: Limit the minimum number of page table levels
-      kvm: arm64: Allow tuning the physical address size for VM
-
-zhong jiang (1):
-      arm64: KVM: Remove some extra semicolon in kvm_target_cpu
-
- Documentation/virtual/kvm/api.txt             |  31 ++++
- arch/arm/include/asm/kvm_arm.h                |   3 +-
- arch/arm/include/asm/kvm_host.h               |  13 +-
- arch/arm/include/asm/kvm_mmu.h                |  15 +-
- arch/arm/include/asm/stage2_pgtable.h         |  54 +++---
- arch/arm64/include/asm/cpufeature.h           |  20 +++
- arch/arm64/include/asm/kvm_arm.h              | 155 +++++++++++++----
- arch/arm64/include/asm/kvm_asm.h              |   3 +-
- arch/arm64/include/asm/kvm_host.h             |  18 +-
- arch/arm64/include/asm/kvm_hyp.h              |  10 ++
- arch/arm64/include/asm/kvm_mmu.h              |  42 ++++-
- arch/arm64/include/asm/ptrace.h               |   3 +
- arch/arm64/include/asm/stage2_pgtable-nopmd.h |  42 -----
- arch/arm64/include/asm/stage2_pgtable-nopud.h |  39 -----
- arch/arm64/include/asm/stage2_pgtable.h       | 236 +++++++++++++++++++-------
- arch/arm64/kvm/guest.c                        |   6 +-
- arch/arm64/kvm/handle_exit.c                  |   7 +
- arch/arm64/kvm/hyp/Makefile                   |   1 -
- arch/arm64/kvm/hyp/hyp-entry.S                |  16 +-
- arch/arm64/kvm/hyp/s2-setup.c                 |  90 ----------
- arch/arm64/kvm/hyp/switch.c                   |   4 +-
- arch/arm64/kvm/hyp/sysreg-sr.c                |  19 ++-
- arch/arm64/kvm/hyp/tlb.c                      |   4 +-
- arch/arm64/kvm/reset.c                        | 108 +++++++++++-
- include/linux/irqchip/arm-gic-v3.h            |   5 +
- include/uapi/linux/kvm.h                      |  10 ++
- virt/kvm/arm/arm.c                            |  26 ++-
- virt/kvm/arm/mmu.c                            | 128 +++++++-------
- virt/kvm/arm/vgic/vgic-its.c                  |  36 ++--
- virt/kvm/arm/vgic/vgic-kvm-device.c           |   2 +-
- virt/kvm/arm/vgic/vgic-mmio-v3.c              |   2 -
- 31 files changed, 717 insertions(+), 431 deletions(-)
- delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopmd.h
- delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopud.h
- delete mode 100644 arch/arm64/kvm/hyp/s2-setup.c
+-- 
+With Best Regards,
+Andy Shevchenko
