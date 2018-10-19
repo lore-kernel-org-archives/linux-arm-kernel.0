@@ -1,211 +1,164 @@
 From: rick.p.edgecombe@intel.com (Rick Edgecombe)
-Date: Fri, 19 Oct 2018 13:47:21 -0700
-Subject: [PATCH v3 1/3] modules: Create arch versions of module alloc/free
+Date: Fri, 19 Oct 2018 13:47:23 -0700
+Subject: [PATCH v3 3/3] bpf: Add system wide BPF JIT limit
 In-Reply-To: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
 References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
-Message-ID: <20181019204723.3903-2-rick.p.edgecombe@intel.com>
+Message-ID: <20181019204723.3903-4-rick.p.edgecombe@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In prep for module space rlimit, create a singular cross platform
-module_alloc and module_memfree that call into arch specific
-implementations.
+In case of games played with multiple users, also add a system wide limit
+(in bytes) for BPF JIT. The default intends to be big enough for 10000 BPF JIT
+filters. This cannot help with the DOS in the case of
+CONFIG_BPF_JIT_ALWAYS_ON, but it can help with DOS for module space and
+with forcing a module to be loaded at a paticular address.
 
-This has only been tested on x86.
+The limit can be set like this:
+echo 5000000 > /proc/sys/net/core/bpf_jit_limit
 
 Signed-off-by: Rick Edgecombe <rick.p.edgecombe@intel.com>
 ---
- arch/arm/kernel/module.c       |  2 +-
- arch/arm64/kernel/module.c     |  2 +-
- arch/mips/kernel/module.c      |  2 +-
- arch/nds32/kernel/module.c     |  2 +-
- arch/nios2/kernel/module.c     |  4 ++--
- arch/parisc/kernel/module.c    |  2 +-
- arch/s390/kernel/module.c      |  2 +-
- arch/sparc/kernel/module.c     |  2 +-
- arch/unicore32/kernel/module.c |  2 +-
- arch/x86/kernel/module.c       |  2 +-
- kernel/module.c                | 14 ++++++++++++--
- 11 files changed, 23 insertions(+), 13 deletions(-)
+ include/linux/bpf.h        |  7 +++++++
+ include/linux/filter.h     |  1 +
+ kernel/bpf/core.c          | 22 +++++++++++++++++++++-
+ kernel/bpf/inode.c         | 16 ++++++++++++++++
+ net/core/sysctl_net_core.c |  7 +++++++
+ 5 files changed, 52 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 3ff571c2c71c..359838a4bb06 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -38,7 +38,7 @@
- #endif
+diff --git a/include/linux/bpf.h b/include/linux/bpf.h
+index 523481a3471b..4d7b729a1fe7 100644
+--- a/include/linux/bpf.h
++++ b/include/linux/bpf.h
+@@ -827,4 +827,11 @@ extern const struct bpf_func_proto bpf_get_local_storage_proto;
+ void bpf_user_rnd_init_once(void);
+ u64 bpf_user_rnd_u32(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
  
- #ifdef CONFIG_MMU
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	gfp_t gfp_mask = GFP_KERNEL;
- 	void *p;
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index f0f27aeefb73..a6891eb2fc16 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -30,7 +30,7 @@
- #include <asm/insn.h>
- #include <asm/sections.h>
- 
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	gfp_t gfp_mask = GFP_KERNEL;
- 	void *p;
-diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
-index 491605137b03..e9ee8e7544f9 100644
---- a/arch/mips/kernel/module.c
-+++ b/arch/mips/kernel/module.c
-@@ -45,7 +45,7 @@ static LIST_HEAD(dbe_list);
- static DEFINE_SPINLOCK(dbe_lock);
- 
- #ifdef MODULE_START
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
- 				GFP_KERNEL, PAGE_KERNEL, 0, NUMA_NO_NODE,
-diff --git a/arch/nds32/kernel/module.c b/arch/nds32/kernel/module.c
-index 1e31829cbc2a..75535daa22a5 100644
---- a/arch/nds32/kernel/module.c
-+++ b/arch/nds32/kernel/module.c
-@@ -7,7 +7,7 @@
- #include <linux/moduleloader.h>
- #include <asm/pgtable.h>
- 
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
- 				    GFP_KERNEL, PAGE_KERNEL, 0, NUMA_NO_NODE,
-diff --git a/arch/nios2/kernel/module.c b/arch/nios2/kernel/module.c
-index e2e3f13f98d5..cd059a8e9a7b 100644
---- a/arch/nios2/kernel/module.c
-+++ b/arch/nios2/kernel/module.c
-@@ -28,7 +28,7 @@
-  * from 0x80000000 (vmalloc area) to 0xc00000000 (kernel) (kmalloc returns
-  * addresses in 0xc0000000)
-  */
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	if (size == 0)
- 		return NULL;
-@@ -36,7 +36,7 @@ void *module_alloc(unsigned long size)
- }
- 
- /* Free memory returned from module_alloc */
--void module_memfree(void *module_region)
-+void arch_module_memfree(void *module_region)
- {
- 	kfree(module_region);
- }
-diff --git a/arch/parisc/kernel/module.c b/arch/parisc/kernel/module.c
-index b5b3cb00f1fb..72ab3c8b103b 100644
---- a/arch/parisc/kernel/module.c
-+++ b/arch/parisc/kernel/module.c
-@@ -213,7 +213,7 @@ static inline int reassemble_22(int as22)
- 		((as22 & 0x0003ff) << 3));
- }
- 
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	/* using RWX means less protection for modules, but it's
- 	 * easier than trying to map the text, data, init_text and
-diff --git a/arch/s390/kernel/module.c b/arch/s390/kernel/module.c
-index d298d3cb46d0..e07c4a9384c0 100644
---- a/arch/s390/kernel/module.c
-+++ b/arch/s390/kernel/module.c
-@@ -30,7 +30,7 @@
- 
- #define PLT_ENTRY_SIZE 20
- 
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	if (PAGE_ALIGN(size) > MODULES_LEN)
- 		return NULL;
-diff --git a/arch/sparc/kernel/module.c b/arch/sparc/kernel/module.c
-index df39580f398d..870581ba9205 100644
---- a/arch/sparc/kernel/module.c
-+++ b/arch/sparc/kernel/module.c
-@@ -40,7 +40,7 @@ static void *module_map(unsigned long size)
- }
- #endif /* CONFIG_SPARC64 */
- 
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	void *ret;
- 
-diff --git a/arch/unicore32/kernel/module.c b/arch/unicore32/kernel/module.c
-index e191b3448bd3..53ea96459d8c 100644
---- a/arch/unicore32/kernel/module.c
-+++ b/arch/unicore32/kernel/module.c
-@@ -22,7 +22,7 @@
- #include <asm/pgtable.h>
- #include <asm/sections.h>
- 
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
- 				GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
-diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
-index f58336af095c..032e49180577 100644
---- a/arch/x86/kernel/module.c
-+++ b/arch/x86/kernel/module.c
-@@ -77,7 +77,7 @@ static unsigned long int get_module_load_offset(void)
- }
- #endif
- 
--void *module_alloc(unsigned long size)
-+void *arch_module_alloc(unsigned long size)
- {
- 	void *p;
- 
-diff --git a/kernel/module.c b/kernel/module.c
-index 6746c85511fe..41c22aba8209 100644
---- a/kernel/module.c
-+++ b/kernel/module.c
-@@ -2110,11 +2110,16 @@ static void free_module_elf(struct module *mod)
- }
- #endif /* CONFIG_LIVEPATCH */
- 
--void __weak module_memfree(void *module_region)
-+void __weak arch_module_memfree(void *module_region)
- {
- 	vfree(module_region);
- }
- 
-+void module_memfree(void *module_region)
-+{
-+	arch_module_memfree(module_region);
-+}
++#ifndef MOD_BPF_LIMIT_DEFAULT
++/*
++ * Leave room for 10000 large eBPF filters as default.
++ */
++#define MOD_BPF_LIMIT_DEFAULT (5 * PAGE_SIZE * 10000)
++#endif
 +
- void __weak module_arch_cleanup(struct module *mod)
- {
- }
-@@ -2728,11 +2733,16 @@ static void dynamic_debug_remove(struct module *mod, struct _ddebug *debug)
- 		ddebug_remove_module(mod->name);
- }
+ #endif /* _LINUX_BPF_H */
+diff --git a/include/linux/filter.h b/include/linux/filter.h
+index 6791a0ac0139..3e91ffc7962b 100644
+--- a/include/linux/filter.h
++++ b/include/linux/filter.h
+@@ -854,6 +854,7 @@ bpf_run_sk_reuseport(struct sock_reuseport *reuse, struct sock *sk,
+ extern int bpf_jit_enable;
+ extern int bpf_jit_harden;
+ extern int bpf_jit_kallsyms;
++extern int bpf_jit_limit;
  
--void * __weak module_alloc(unsigned long size)
-+void * __weak arch_module_alloc(unsigned long size)
- {
- 	return vmalloc_exec(size);
- }
+ typedef void (*bpf_jit_fill_hole_t)(void *area, unsigned int size);
  
-+void *module_alloc(unsigned long size)
-+{
-+	return arch_module_alloc(size);
-+}
+diff --git a/kernel/bpf/core.c b/kernel/bpf/core.c
+index 3f5bf1af0826..12c20fa6f04b 100644
+--- a/kernel/bpf/core.c
++++ b/kernel/bpf/core.c
+@@ -369,6 +369,9 @@ void bpf_prog_kallsyms_del_all(struct bpf_prog *fp)
+ int bpf_jit_enable   __read_mostly = IS_BUILTIN(CONFIG_BPF_JIT_ALWAYS_ON);
+ int bpf_jit_harden   __read_mostly;
+ int bpf_jit_kallsyms __read_mostly;
++int bpf_jit_limit __read_mostly;
 +
- #ifdef CONFIG_DEBUG_KMEMLEAK
- static void kmemleak_load_module(const struct module *mod,
- 				 const struct load_info *info)
++static atomic_long_t module_vm;
+ 
+ static __always_inline void
+ bpf_get_prog_addr_region(const struct bpf_prog *prog,
+@@ -583,17 +586,31 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+ 		     bpf_jit_fill_hole_t bpf_fill_ill_insns)
+ {
+ 	struct bpf_binary_header *hdr;
+-	unsigned int size, hole, start;
++	unsigned int size, hole, start, vpages;
+ 
+ 	/* Most of BPF filters are really small, but if some of them
+ 	 * fill a page, allow at least 128 extra bytes to insert a
+ 	 * random section of illegal instructions.
+ 	 */
+ 	size = round_up(proglen + sizeof(*hdr) + 128, PAGE_SIZE);
++
++	/* Size plus a guard page */
++	vpages = (PAGE_ALIGN(size) >> PAGE_SHIFT) + 1;
++
++	if (atomic_long_read(&module_vm) + vpages > bpf_jit_limit >> PAGE_SHIFT)
++		return NULL;
++
+ 	hdr = module_alloc(size);
+ 	if (hdr == NULL)
+ 		return NULL;
+ 
++	atomic_long_add(vpages, &module_vm);
++
++	if (atomic_long_read(&module_vm) > bpf_jit_limit >> PAGE_SHIFT) {
++		bpf_jit_binary_free(hdr);
++		return NULL;
++	}
++
+ 	/* Fill space with illegal/arch-dep instructions. */
+ 	bpf_fill_ill_insns(hdr, size);
+ 
+@@ -610,7 +627,10 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+ 
+ void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+ {
++	/* Size plus the guard page */
++	unsigned int vpages = hdr->pages + 1;
+ 	module_memfree(hdr);
++	atomic_long_sub(vpages, &module_vm);
+ }
+ 
+ /* This symbol is only overridden by archs that have different
+diff --git a/kernel/bpf/inode.c b/kernel/bpf/inode.c
+index 2ada5e21dfa6..d0a109733294 100644
+--- a/kernel/bpf/inode.c
++++ b/kernel/bpf/inode.c
+@@ -667,10 +667,26 @@ static struct file_system_type bpf_fs_type = {
+ 	.kill_sb	= kill_litter_super,
+ };
+ 
++#ifdef CONFIG_BPF_JIT
++void set_bpf_jit_limit(void)
++{
++	bpf_jit_limit = MOD_BPF_LIMIT_DEFAULT;
++}
++#else
++void set_bpf_jit_limit(void)
++{
++}
++#endif
++
+ static int __init bpf_init(void)
+ {
+ 	int ret;
+ 
++	/*
++	 * Module space size can be non-compile time constant so set it here.
++	 */
++	set_bpf_jit_limit();
++
+ 	ret = sysfs_create_mount_point(fs_kobj, "bpf");
+ 	if (ret)
+ 		return ret;
+diff --git a/net/core/sysctl_net_core.c b/net/core/sysctl_net_core.c
+index b1a2c5e38530..6bdf4a3da2b2 100644
+--- a/net/core/sysctl_net_core.c
++++ b/net/core/sysctl_net_core.c
+@@ -396,6 +396,13 @@ static struct ctl_table net_core_table[] = {
+ 		.extra1		= &zero,
+ 		.extra2		= &one,
+ 	},
++	{
++		.procname	= "bpf_jit_limit",
++		.data		= &bpf_jit_limit,
++		.maxlen		= sizeof(int),
++		.mode		= 0600,
++		.proc_handler	= proc_dointvec,
++	},
+ # endif
+ #endif
+ 	{
 -- 
 2.17.1
