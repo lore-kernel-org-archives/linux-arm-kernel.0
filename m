@@ -1,40 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 19 Oct 2018 09:51:55 -0300
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Add flexcan support
-In-Reply-To: <20181019094031.22492-1-qiangqing.zhang@nxp.com>
-References: <20181019094031.22492-1-qiangqing.zhang@nxp.com>
-Message-ID: <CAOMZO5AqZrYmc474NjvG1nF94ZNvgHyv7Q3R+QxrLmSN6EhYDw@mail.gmail.com>
+From: changbin.du@gmail.com (Du Changbin)
+Date: Fri, 19 Oct 2018 12:49:20 +0000
+Subject: [PATCH v2 3/4] ARM: mm: fix build error in fix_to_virt with
+ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+In-Reply-To: <20181019124921.13780-1-changbin.du@gmail.com>
+References: <20181019124921.13780-1-changbin.du@gmail.com>
+Message-ID: <20181019124921.13780-4-changbin.du@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joakim,
+With '-Og' optimization level, GCC would not optimize a count for a loop
+as a constant value. But BUILD_BUG_ON() only accept compile-time constant
+values. Let's use __fix_to_virt() to avoid the error.
 
-On Fri, Oct 19, 2018 at 6:43 AM Joakim Zhang <qiangqing.zhang@nxp.com> wrote:
->
-> From: Dong Aisheng <aisheng.dong@nxp.com>
->
-> CAN transceiver is different on RevA and RevB board.
-> It's active high on RevA while active low on Rev B.
->
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
-> ---
->  arch/arm/boot/dts/imx6sx-sdb.dts  |  5 ++++
->  arch/arm/boot/dts/imx6sx-sdb.dtsi | 42 +++++++++++++++++++++++++++++++
->  2 files changed, 47 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-> index 6dd9bebfe027..092b8de142a8 100644
-> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-> @@ -10,6 +10,11 @@
->
->  / {
->         model = "Freescale i.MX6 SoloX SDB RevB Board";
-> +
-> +       /* Transceiver EN/STBY is active low on RevB board */
-> +       reg_can_stby: regulator-can-stby {
-> +               gpio = <&gpio4 27 GPIO_ACTIVE_LOW>;
+arch/arm/mm/mmu.o: In function `fix_to_virt':
+/home/changbin/work/linux/./include/asm-generic/fixmap.h:31: undefined reference to `__compiletime_assert_31'
+Makefile:1051: recipe for target 'vmlinux' failed
+make: *** [vmlinux] Error 1
 
-Don't we need a  gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>; and also a
-"enable-active-high" entries in the imx6sx-sdb-reva.dts?
+Signed-off-by: Du Changbin <changbin.du@gmail.com>
+Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+---
+ arch/arm/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e46a6a446cdd..c08d74e76714 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1599,7 +1599,7 @@ static void __init early_fixmap_shutdown(void)
+ 		pte_t *pte;
+ 		struct map_desc map;
+ 
+-		map.virtual = fix_to_virt(i);
++		map.virtual = __fix_to_virt(i);
+ 		pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
+ 
+ 		/* Only i/o device mappings are supported ATM */
+-- 
+2.17.1
