@@ -1,141 +1,62 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 19 Oct 2018 08:05:51 +0000
-Subject: [PATCH V3 7/8] arm64: dts: imx: add imx8qxp mek support
-In-Reply-To: <20181018202740.GA7262@bogus>
-References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
- <1539886483-15775-8-git-send-email-aisheng.dong@nxp.com>
- <20181018202740.GA7262@bogus>
-Message-ID: <DB7PR04MB4218778D66FBD51554D64D6980F90@DB7PR04MB4218.eurprd04.prod.outlook.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 19 Oct 2018 09:07:36 +0100
+Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
+In-Reply-To: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <e01f2e58-3e78-9f6c-16b4-0b8d92a64a09@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Friday, October 19, 2018 4:28 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-[...]
-> On Thu, Oct 18, 2018 at 06:19:43PM +0000, A.s. Dong wrote:
-> > i.MX 8QuadXPlus is a quad (4x) Cortex-A35 proccessor with powerful
-> > graphic and multimedia features. This patch adds imx8qxp mek board
-> > support.
-> >
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> > v2->v3:
-> >  * Pad names update
-> >  * move memory node to here
-> >  * add no-sd and no-sdio under emmc node
-> > ---
-> >  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
-> >  arch/arm64/boot/dts/freescale/Makefile        |   1 +
-> >  arch/arm64/boot/dts/freescale/imx8qxp-mek.dts | 141
-> > ++++++++++++++++++++++++++
-> >  3 files changed, 146 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
-> > b/Documentation/devicetree/bindings/arm/fsl.txt
-> > index baeb1fc..704472b 100644
-> > --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> > @@ -97,6 +97,10 @@ i.MX7 SabreSD Board  Required root node
-> properties:
-> >      - compatible = "fsl,imx7d-sdb", "fsl,imx7d";
-> >
-> > +i.MX8QXP MEK Board
-> > +Required root node properties:
-> > +    - compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
-> > +
-> >  Generic i.MX boards
-> >  -------------------
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
-> > b/arch/arm64/boot/dts/freescale/Makefile
-> > index 86e18ad..cff87f3 100644
-> > --- a/arch/arm64/boot/dts/freescale/Makefile
-> > +++ b/arch/arm64/boot/dts/freescale/Makefile
-> > @@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) +=
-> fsl-ls2080a-rdb.dtb
-> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
-> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
-> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
-> > +dtb-$(CONFIG_SOC_IMX8QXP) += imx8qxp-mek.dtb
-> > diff --git a/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-> > b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-> > new file mode 100644
-> > index 0000000..6087ead
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-> > @@ -0,0 +1,141 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * Copyright 2017~2018 NXP
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "imx8qxp.dtsi"
-> > +
-> > +/ {
-> > +	model = "Freescale i.MX8QXP MEK";
-> > +	compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
-> > +
-> > +	chosen {
-> > +		stdout-path = &dma_lpuart0;
-> > +	};
-> > +
-> > +	memory at 80000000 {
-> > +		device_type = "memory";
-> > +		reg = <0x00000000 0x80000000 0 0x40000000>;
-> > +	};
-> > +
-> > +	reg_usdhc2_vmmc: usdhc2-vmmc {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "SD1_SPWR";
-> > +		regulator-min-microvolt = <3000000>;
-> > +		regulator-max-microvolt = <3000000>;
-> > +		gpio = <&lsio_gpio4 19 GPIO_ACTIVE_HIGH>;
-> > +		enable-active-high;
-> > +	};
-> > +};
-> > +
-> > +&dma_lpuart0 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_lpuart0>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&fec1 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_fec1>;
-> > +	phy-mode = "rgmii-id";
-> > +	phy-handle = <&ethphy0>;
-> > +	fsl,magic-packet;
-> > +	status = "okay";
-> > +
-> > +	mdio {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		ethphy0: ethernet-phy at 0 {
-> > +			compatible = "ethernet-phy-ieee802.3-c22";
+Gentle ping on this series.
+
+On 26/09/18 14:56, Julien Thierry wrote:
+> Hi,
 > 
-> > +			at803x,eee-disabled;
-> > +			at803x,vddio-1p8v;
+> Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
+> using it to access memory. When taking an exception, it is possible that
+> the context during which the exception occured had SP mis-aligned. The
+> entry code needs to make sure that the stack is aligned before using it to
+> save the context.
 > 
-> These 2 are Not documented.
+> This is only a concern when taking exception from an EL using the same
+> SP_ELx as the handler. In other cases it can be assumed that the SP being
+> picked up on exception entry is aligned under the condition that SP is
+> always aligned when doing eret to an EL using a different SP.
+> 
+> On Juno I see a runtime difference <1% for hackbench. If I do not include
+> the fast path at EL1 (patch 4) I see a diff of 1-2%.
+> 
+> For EL2 entries, a bit of clean up of stuff getting patched in the vector
+> has been needed.
+> 
+> Cheers,
+> 
+> Julien
+> 
+> -->
+> 
+> Julien Thierry (7):
+>    arm64: Add static check for pt_regs alignment
+>    arm64: sdei: Always use sdei stack for sdei events
+>    arm64: Align stack when taking exception from EL1
+>    arm64: Add fast-path for stack alignment
+>    arm64: Do not apply BP hardening for hyp entries from EL2
+>    arm64: Do not apply vector harderning for hyp entries from EL2
+>    arm64: kvm: Align stack for exception coming from EL2
+> 
+>   arch/arm64/include/asm/assembler.h |  9 +++++
+>   arch/arm64/include/asm/ptrace.h    |  2 +
+>   arch/arm64/include/asm/sdei.h      |  2 -
+>   arch/arm64/kernel/cpu_errata.c     | 10 ++++-
+>   arch/arm64/kernel/entry.S          | 43 +++++++++++++++++++--
+>   arch/arm64/kernel/sdei.c           | 23 ++++-------
+>   arch/arm64/kvm/hyp/hyp-entry.S     | 78 +++++++++++++++++++++++++++++++-------
+>   drivers/firmware/Kconfig           |  1 +
+>   8 files changed, 132 insertions(+), 36 deletions(-)
+> 
+> --
+> 1.9.1
+> 
 
-Sorry for missing these.
-They're seemed to be introduce with original local code, as it does not
-Affect the normal function, I will remove them in next patch set.
-
-Thanks for the carefully review.
-
-Regards
-Dong Aisheng
+-- 
+Julien Thierry
