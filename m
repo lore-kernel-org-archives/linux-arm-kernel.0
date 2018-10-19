@@ -1,164 +1,58 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Sat, 20 Oct 2018 14:06:03 +0530
-Subject: [PATCH 3/3] nvmem: zynqmp: Added zynqmp nvmem firmware driver
-In-Reply-To: <20181020083603.27602-1-nava.manne@xilinx.com>
-References: <20181020083603.27602-1-nava.manne@xilinx.com>
-Message-ID: <20181020083603.27602-4-nava.manne@xilinx.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 19 Oct 2018 09:39:15 +0100
+Subject: [PATCH] coresight: tmc: Fix bad register address for CLAIM
+In-Reply-To: <1539924983-18503-1-git-send-email-leo.yan@linaro.org>
+References: <1539924983-18503-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <9b6a508d-5c4b-ffd8-7f6b-3f4e6db26571@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds zynqmp nvmem firmware driver to access the
-SoC revision information from the hardware register.
+Hi Leo,
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v1:
-		-None
+On 10/19/2018 05:56 AM, Leo Yan wrote:
+> Commit 4d3ebd3658d8 ("coreisght: tmc: Claim device before use") uses
+> CLAIM tag to validate if the device is available, it needs to pass
+> the device base address to access related registers.
+> 
+> In the function tmc_etb_disable_hw() it wrongly passes the driver data
+> pointer as register base address, thus it's easily to produce the kernel
+> warning info like below:
+> 
+> [   83.579898] WARNING: CPU: 4 PID: 2970 at drivers/hwtracing/coresight/coresight.c:207 coresight_disclaim_device_unlocked+0x44/0x80
+> [   83.591448] Modules linked in:
+> [   83.594485] CPU: 4 PID: 2970 Comm: uname Not tainted 4.19.0-rc6-00417-g721b509 #110
 
-Changes for RFC-V3:
-                -Changed nvmem_register() to devm_nvmem_register()
-                 and pr_debug() to dev_dbg() as suggested by srinivas.
+Oops! Thanks for fixing !
 
-Changes for RFC-V2:
-                -None.
 
- drivers/nvmem/Kconfig        | 15 ++++----
- drivers/nvmem/Makefile       |  5 +--
- drivers/nvmem/zynqmp_nvmem.c | 86 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+), 10 deletions(-)
- create mode 100644 drivers/nvmem/zynqmp_nvmem.c
+> 
+> This patch is to fix this bug by using 'drvdata->base' as the
+> register base address for CLAIM related operation.
+> 
+> Fixes: 4d3ebd3658d8 ("coreisght: tmc: Claim device before use")
+> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Mike Leach <mike.leach@linaro.org>
+> Cc: Robert Walker <robert.walker@arm.com>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 0a7a470e..2edb142 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -181,15 +181,14 @@ config RAVE_SP_EEPROM
- 	help
- 	  Say y here to enable Rave SP EEPROM support.
- 
--config SC27XX_EFUSE
--	tristate "Spreadtrum SC27XX eFuse Support"
--	depends on MFD_SC27XX_PMIC || COMPILE_TEST
--	depends on HAS_IOMEM
-+config NVMEM_ZYNQMP
-+	bool "Xilinx ZYNQMP SoC nvmem firmware support"
-+	depends on ARCH_ZYNQMP
- 	help
--	  This is a simple driver to dump specified values of Spreadtrum
--	  SC27XX PMICs from eFuse.
-+	  This is a driver to access hardware related data like
-+	  soc revision, IDCODE... etc by using the firmware
-+	  interface.
- 
--	  This driver can also be built as a module. If so, the module
--	  will be called nvmem-sc27xx-efuse.
-+	  If sure, say yes. If unsure, say no.
- 
- endif
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 4e8c616..0b3abd7 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -39,5 +39,6 @@ obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
- nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
- obj-$(CONFIG_RAVE_SP_EEPROM)	+= nvmem-rave-sp-eeprom.o
- nvmem-rave-sp-eeprom-y		:= rave-sp-eeprom.o
--obj-$(CONFIG_SC27XX_EFUSE)	+= nvmem-sc27xx-efuse.o
--nvmem-sc27xx-efuse-y		:= sc27xx-efuse.o
-+obj-$(CONFIG_NVMEM_ZYNQMP)     += nvmem_zynqmp_nvmem.o
-+nvmem_zynqmp_nvmem-y           := zynqmp_nvmem.o
-+
-diff --git a/drivers/nvmem/zynqmp_nvmem.c b/drivers/nvmem/zynqmp_nvmem.c
-new file mode 100644
-index 0000000..b910864
---- /dev/null
-+++ b/drivers/nvmem/zynqmp_nvmem.c
-@@ -0,0 +1,86 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018 Xilinx, Inc.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/firmware/xlnx-zynqmp.h>
-+
-+#define SILICON_REVISION_MASK 0xF
-+
-+struct zynqmp_nvmem_data {
-+	struct device *dev;
-+	struct nvmem_device *nvmem;
-+};
-+
-+static int zynqmp_nvmem_read(void *context, unsigned int offset,
-+			     void *val, size_t bytes)
-+{
-+	int ret;
-+	int idcode, version;
-+	struct zynqmp_nvmem_data *priv = context;
-+
-+	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-+
-+	if (!eemi_ops || !eemi_ops->get_chipid)
-+		return -ENXIO;
-+
-+	ret = eemi_ops->get_chipid(&idcode, &version);
-+	if (ret < 0)
-+		return ret;
-+
-+	dev_dbg(priv->dev, "Read chipid val %x %x\n", idcode, version);
-+	*(int *)val = version & SILICON_REVISION_MASK;
-+
-+	return 0;
-+}
-+
-+static struct nvmem_config econfig = {
-+	.name = "zynqmp-nvmem",
-+	.owner = THIS_MODULE,
-+	.word_size = 1,
-+	.size = 1,
-+	.read_only = true,
-+};
-+
-+static const struct of_device_id zynqmp_nvmem_match[] = {
-+	{ .compatible = "xlnx,zynqmp-nvmem-fw", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, zynqmp_nvmem_match);
-+
-+static int zynqmp_nvmem_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct zynqmp_nvmem_data *priv;
-+
-+	priv = devm_kzalloc(dev, sizeof(struct zynqmp_nvmem_data), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->dev = dev;
-+	econfig.dev = dev;
-+	econfig.reg_read = zynqmp_nvmem_read;
-+	econfig.priv = priv;
-+
-+	priv->nvmem = devm_nvmem_register(dev, &econfig);
-+
-+	return PTR_ERR_OR_ZERO(priv->nvmem);
-+}
-+
-+static struct platform_driver zynqmp_nvmem_driver = {
-+	.probe = zynqmp_nvmem_probe,
-+	.driver = {
-+		.name = "zynqmp-nvmem",
-+		.of_match_table = zynqmp_nvmem_match,
-+	},
-+};
-+
-+module_platform_driver(zynqmp_nvmem_driver);
-+
-+MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>, Nava kishore Manne <navam@xilinx.com>");
-+MODULE_DESCRIPTION("ZynqMP NVMEM driver");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+> ---
+>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 53fc83b..5864ac5 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -86,7 +86,7 @@ static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+>   
+>   static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+>   {
+> -	coresight_disclaim_device(drvdata);
+> +	coresight_disclaim_device(drvdata->base);
+>   	__tmc_etb_disable_hw(drvdata);
+>   }
+>   
+> 
