@@ -1,46 +1,91 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Fri, 19 Oct 2018 11:01:00 +0200
-Subject: [PATCH v1 2/3] i2c: imx: probe dma only only on i.MX50 and later.
-In-Reply-To: <20181019071243.t5bwcmnnlqrgtajj@pengutronix.de>
-References: <20181018112615.29362-1-o.rempel@pengutronix.de>
- <20181018112615.29362-3-o.rempel@pengutronix.de>
- <20181019071243.t5bwcmnnlqrgtajj@pengutronix.de>
-Message-ID: <20181019090100.6vcergf6txgxt7fo@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 19 Oct 2018 11:03:13 +0200
+Subject: [PATCH 3/3] reset: reset-zynqmp: Adding support for Xilinx
+ zynqmp reset controller.
+In-Reply-To: <20181020084107.28251-4-nava.manne@xilinx.com>
+References: <20181020084107.28251-1-nava.manne@xilinx.com>
+ <20181020084107.28251-4-nava.manne@xilinx.com>
+Message-ID: <1539939793.3395.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 09:12:43AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Oleksij,
-> 
-> On Thu, Oct 18, 2018 at 01:26:14PM +0200, Oleksij Rempel wrote:
-> > The DMA support for I2C was introduced on i.MX50. So,
-> > avoid of DMA probing on not supported versions.
-> 
-> What is the obvious downside of trying to use DMA on i.MX21? If the
-> purpose is just to suppress the message
-> 
-> 	can't request DMA tx channel
-> 
-> , that goes away with patch 3, too.
-> 
-> Note that if we agree that i.MX50 (and later) isn't compatible to
-> i.MX21, all device trees should be fixed accordingly. IMHO the
-> difference "There is a DMA engine connected only on some
-> implementations" doesn't give enough incentive to claim that i.MX21 and
-> i.MX50 must not share the compatible.
+Hi Nava,
 
-I don't see any sense to do allocation and add extra probes just to find
-what we already know from compatible.
+On Sat, 2018-10-20 at 14:11 +0530, Nava kishore Manne wrote:
+> Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
+> The zynqmp reset-controller has the ability to reset lines
+> connected to different blocks and peripheral in the Soc.
+> 
+> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> ---
+> Changes for v1:
+> 		-None.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181019/0d0f381a/attachment.sig>
+I had comments on RFC v3 that are not addressed yet, see below.
+
+> --- /dev/null
+> +++ b/drivers/reset/reset-zynqmp.c
+> @@ -0,0 +1,117 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2018 Xilinx, Inc.
+> + *
+> + */
+> +
+> +#include <linux/io.h>
+
+Unnecessary.
+
+[...]
+> +static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
+> +			       unsigned long id)
+> +{
+> +	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
+> +	int val, err;
+> +
+> +	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
+> +	if (!err)
+> +		return -EINVAL;
+
+Should return error code, and only if there is an error:
+
+	if (err)
+		return err;
+
+> +	return val;
+> +}
+> +
+> +static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
+> +
+> +	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
+> +					    PM_RESET_ACTION_PULSE);
+> +}
+> +
+> +static struct reset_control_ops zynqmp_reset_ops = {
+
+Should be const:
+
+	static const struct reset_control_ops zynqmp_reset_ops = {
+
+> +	.reset = zynqmp_reset_reset,
+> +	.assert = zynqmp_reset_assert,
+> +	.deassert = zynqmp_reset_deassert,
+> +	.status = zynqmp_reset_status,
+> +};
+> +
+> +static int zynqmp_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct zynqmp_reset_data *priv;
+> +
+> +	priv = devm_kzalloc(&pdev->dev,
+> +			    sizeof(*priv), GFP_KERNEL);
+
+Fits on one line:
+
+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+
+regards
+Philipp
