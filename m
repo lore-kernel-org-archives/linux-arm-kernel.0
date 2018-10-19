@@ -1,71 +1,39 @@
-From: olivier.moysan@st.com (Olivier Moysan)
-Date: Fri, 19 Oct 2018 17:56:35 +0200
-Subject: [PATCH 1/1] ASoC: cs42l51: fix mclk support
-Message-ID: <1539964595-23758-1-git-send-email-olivier.moysan@st.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Fri, 19 Oct 2018 17:58:35 +0200
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <20181015175424.97147-1-ebiggers@kernel.org>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+Message-ID: <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes: 5e8d63a726f8 ("ASoC: cs42l51: add mclk support")
+Hello Eric,
 
-The MCLK clock is made optional for cs42l51 codec.
-However, ASoC DAPM clock supply widget, expects the clock to be defined
-unconditionally.
-Register MCLK DAPM conditionally in codec driver,
-depending on clock presence in DT.
+> As before, some of these patches conflict with the new "Zinc" crypto
+> library.  But I don't know when Zinc will be merged, so for now I've
+> continued to base this patchset on the current 'cryptodev'.
 
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
----
- sound/soc/codecs/cs42l51.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+I'd appreciate it if you waited to merge this until you can rebase it
+on top of Zinc. In fact, if you already want to build it on top of
+Zinc, I'm happy to work with you on that in a shared repo or similar.
+We can also hash out the details of that in person in Vancouver in a
+few weeks. I think pushing this in before will create undesirable
+churn for both of us.
 
-diff --git a/sound/soc/codecs/cs42l51.c b/sound/soc/codecs/cs42l51.c
-index eb40bff54cec..fd2bd74024c1 100644
---- a/sound/soc/codecs/cs42l51.c
-+++ b/sound/soc/codecs/cs42l51.c
-@@ -21,6 +21,7 @@
-  *  - master mode *NOT* supported
-  */
- 
-+#include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <sound/core.h>
-@@ -41,6 +42,7 @@ enum master_slave_mode {
- 
- struct cs42l51_private {
- 	unsigned int mclk;
-+	struct clk *mclk_handle;
- 	unsigned int audio_mode;	/* The mode (I2S or left-justified) */
- 	enum master_slave_mode func;
- };
-@@ -492,9 +494,13 @@ static int cs42l51_component_probe(struct snd_soc_component *component)
- {
- 	int ret, reg;
- 	struct snd_soc_dapm_context *dapm;
-+	struct cs42l51_private *cs42l51;
- 
-+	cs42l51 = snd_soc_component_get_drvdata(component);
- 	dapm = snd_soc_component_get_dapm(component);
--	snd_soc_dapm_new_controls(dapm, cs42l51_dapm_mclk_widgets, 1);
-+
-+	if (cs42l51->mclk_handle)
-+		snd_soc_dapm_new_controls(dapm, cs42l51_dapm_mclk_widgets, 1);
- 
- 	/*
- 	 * DAC configuration
-@@ -548,6 +554,13 @@ int cs42l51_probe(struct device *dev, struct regmap *regmap)
- 
- 	dev_set_drvdata(dev, cs42l51);
- 
-+	cs42l51->mclk_handle = devm_clk_get(dev, "MCLK");
-+	if (IS_ERR(cs42l51->mclk_handle)) {
-+		if (PTR_ERR(cs42l51->mclk_handle) != -ENOENT)
-+			return PTR_ERR(cs42l51->mclk_handle);
-+		cs42l51->mclk_handle = NULL;
-+	}
-+
- 	/* Verify that we have a CS42L51 */
- 	ret = regmap_read(regmap, CS42L51_CHIP_REV_ID, &val);
- 	if (ret < 0) {
--- 
-2.7.4
+> Therefore, we (well, Paul Crowley did the real work) designed a new
+> encryption mode, Adiantum.  In essence, Adiantum makes it secure to use
+> the ChaCha stream cipher for disk encryption.  Adiantum is specified by
+> our paper here: https://eprint.iacr.org/2018/720.pdf ("Adiantum:
+> length-preserving encryption for entry-level processors").  Reference
+> code and test vectors are here: https://github.com/google/adiantum.
+> Most of the high-level concepts of Adiantum are not new; similar
+> existing modes include XCB, HCTR, and HCH.  Adiantum and these modes are
+> true wide-block modes (tweakable super-pseudorandom permutations), so
+> they actually provide a stronger notion of security than XTS.
+
+Great, I'm very happy to see you've created such a high performance alternative.
+
+Before merging this into the kernel, do you want to wait until you've
+received some public review from academia?
+
+Jason
