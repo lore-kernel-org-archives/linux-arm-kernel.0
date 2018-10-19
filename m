@@ -1,78 +1,28 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Fri, 19 Oct 2018 11:18:22 -0700 (PDT)
-Subject: [PATCH 6/9] PCI: consolidate PCI config entry in drivers/pci
-In-Reply-To: <20181019120952.32763-7-hch@lst.de>
-Message-ID: <mhng-153e4e0b-8fe9-4712-849f-f01455ef56f4@palmer-si-x1c4>
+From: paulcrowley@google.com (Paul Crowley)
+Date: Fri, 19 Oct 2018 11:19:24 -0700
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+Message-ID: <CA+_SqcDszvqfH7qvEyi8QW2RqkA1kpV6L7VWxhtw5Ogzeovhbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Oct 2018 05:09:49 PDT (-0700), Christoph Hellwig wrote:
-> There is no good reason to duplicate the PCI menu in every architecture.
-> Instead provide a selectable HAVE_PCI symbol that indicates availability
-> of PCI support and the handle the rest in drivers/pci.
->
-> Note that for powerpc we now select HAVE_PCI globally instead of the
-> convoluted mess of conditional or or non-conditional support per board,
-> similar to what we do e.g. on x86.  For alpha PCI is selected for the
-> non-jensen configs as it was the default before, and a lot of code does
-> not compile without PCI enabled.  On other architectures with limited
-> PCI support that wasn't as complicated I've left the selection as-is.
->
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+On Fri, 19 Oct 2018 at 08:58, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+> Before merging this into the kernel, do you want to wait until you've
+> received some public review from academia?
 
-...
-
-> diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
-> index a344980287a5..071952cd4cae 100644
-> --- a/arch/riscv/Kconfig
-> +++ b/arch/riscv/Kconfig
-> @@ -39,8 +39,10 @@ config RISCV
->  	select SPARSE_IRQ
->  	select SYSCTL_EXCEPTION_TRACE
->  	select HAVE_ARCH_TRACEHOOK
-> +	select HAVE_PCI
->  	select MODULES_USE_ELF_RELA if MODULES
->  	select THREAD_INFO_IN_TASK
-> +	select PCI_MSI if PCI
->  	select RISCV_TIMER
->  	select GENERIC_IRQ_MULTI_HANDLER
->  	select ARCH_HAS_PTE_SPECIAL
-> @@ -216,28 +218,12 @@ source "kernel/Kconfig.hz"
->
->  endmenu
->
-> -menu "Bus support"
-> -
-> -config PCI
-> -	bool "PCI support"
-> -	select PCI_MSI
-> -	help
-> -	  This feature enables support for PCI bus system. If you say Y
-> -	  here, the kernel will include drivers and infrastructure code
-> -	  to support PCI bus devices.
-> -
-> -	  If you don't know what to do here, say Y.
-> -
->  config PCI_DOMAINS
->  	def_bool PCI
->
->  config PCI_DOMAINS_GENERIC
->  	def_bool PCI
->
-> -source "drivers/pci/Kconfig"
-> -
-> -endmenu
-> -
->  menu "Power management options"
->
->  source kernel/power/Kconfig
-
-Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
-
-I'm assuming this will go in via PCI tree of some sort, so I'm not going to 
-touch it any further.
-
-Thanks for cleaning this up!
+I would prefer not to wait. Unlike a new primitive whose strength can
+only be known through attempts at cryptanalysis, Adiantum is a
+construction based on
+well-understood and trusted primitives; it is secure if the proof
+accompanying it is correct. Given that (outside competitions or
+standardization efforts) no-one ever issues public statements that
+they think algorithms or proofs are good, what I'm expecting from
+academia is silence :) The most we could hope for would be getting the
+paper accepted at a conference, and we're pursuing that but there's a
+good chance that won't happen simply because it's not very novel. It
+basically takes existing ideas and applies them using a stream cipher
+instead of a block cipher, and a faster hashing mode; it's also a
+small update from HPolyC. I've had some private feedback that the
+proof seems correct, and that's all I'm expecting to get.
