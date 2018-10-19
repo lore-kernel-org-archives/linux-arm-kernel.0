@@ -1,50 +1,46 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 19 Oct 2018 14:09:45 +0200
-Subject: [PATCH 2/9] arm: remove EISA kconfig option
+Date: Fri, 19 Oct 2018 14:09:46 +0200
+Subject: [PATCH 3/9] powerpc: remove CONFIG_PCI_QSPAN
 In-Reply-To: <20181019120952.32763-1-hch@lst.de>
 References: <20181019120952.32763-1-hch@lst.de>
-Message-ID: <20181019120952.32763-3-hch@lst.de>
+Message-ID: <20181019120952.32763-4-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No arm config enables EISA, and arm does not include drivers/eisa/Kconfig
-which provides support for things like PCI to EISA bridges, so it is most
-likely dead.
+This option isn't actually used anywhere.
 
-If this is wrong we will be able to resurrect it easily by selecting
-HAVE_EISA for the right arm configs after this series.
-
-Suggested-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 Signed-off-by: Christoph Hellwig <hch@lst.de>
+Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 ---
- arch/arm/Kconfig | 15 ---------------
- 1 file changed, 15 deletions(-)
+ arch/powerpc/Kconfig | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e8cd55a5b04c..e33735ce1c14 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -165,21 +165,6 @@ config HAVE_PROC_CPU
- config NO_IOPORT_MAP
- 	bool
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index a80669209155..e8c8970248bc 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -955,7 +955,6 @@ config PCI
+ 	bool "PCI support" if PPC_PCI_CHOICE
+ 	default y if !40x && !CPM2 && !PPC_8xx && !PPC_83xx \
+ 		&& !PPC_85xx && !PPC_86xx && !GAMECUBE_COMMON
+-	default PCI_QSPAN if PPC_8xx
+ 	select GENERIC_PCI_IOMAP
+ 	help
+ 	  Find out whether your system includes a PCI bus. PCI is the name of
+@@ -969,14 +968,6 @@ config PCI_DOMAINS
+ config PCI_SYSCALL
+ 	def_bool PCI
  
--config EISA
--	bool
--	---help---
--	  The Extended Industry Standard Architecture (EISA) bus was
--	  developed as an open alternative to the IBM MicroChannel bus.
+-config PCI_QSPAN
+-	bool "QSpan PCI"
+-	depends on PPC_8xx
+-	select PPC_I8259
+-	help
+-	  Say Y here if you have a system based on a Motorola 8xx-series
+-	  embedded processor with a QSPAN PCI interface, otherwise say N.
 -
--	  The EISA bus provided some of the features of the IBM MicroChannel
--	  bus while maintaining backward compatibility with cards made for
--	  the older ISA bus.  The EISA bus saw limited use between 1988 and
--	  1995 when it was made obsolete by the PCI bus.
--
--	  Say Y here if you are building a kernel for an EISA-based machine.
--
--	  Otherwise, say N.
--
- config SBUS
+ config PCI_8260
  	bool
- 
+ 	depends on PCI && 8260
 -- 
 2.19.1
