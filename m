@@ -1,51 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Oct 2018 11:34:51 +0100
-Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
-In-Reply-To: <CAL_Jsq+NExxsksmhA6z5_eTutVkm_NFthayvHz-vvq1gkSeXNA@mail.gmail.com>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-14-robh@kernel.org>
- <20181009115713.GE6248@arm.com>
- <CAL_JsqLeG3WUa2peOWFGUoMuonWaWJoU-7A6d8cqXp-_e3B3XA@mail.gmail.com>
- <20181010165048.GB16512@arm.com>
- <CAL_Jsq+NExxsksmhA6z5_eTutVkm_NFthayvHz-vvq1gkSeXNA@mail.gmail.com>
-Message-ID: <20181019103451.GB14246@arm.com>
+From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Fri, 19 Oct 2018 10:37:11 +0000
+Subject: [PATCH v2 3/4] dmaengine: xilinx_dma: Introduce helper macro for
+ preparing dma address
+In-Reply-To: <1538241480-13844-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1538241480-13844-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <DM5PR02MB21878ECD3C2B2E4535F2244FDCF90@DM5PR02MB2187.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-On Wed, Oct 10, 2018 at 01:51:24PM -0500, Rob Herring wrote:
-> On Wed, Oct 10, 2018 at 11:50 AM Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Oct 09, 2018 at 01:14:02PM -0500, Rob Herring wrote:
-> > > I guess the single interrupt case is less obvious now with no
-> > > description (it's the first list item of 'oneOf'). The schema If the
-> > > single interrupt is not supported, then we can drop it here.
-> >
-> > Well the description says "1 interrupt per core" which is incorrect.
+	Thanks for the patch...
+
 > 
-> You are reading the schema wrong. There are 2 cases supported as
-> defined by each '-'. The 2nd case is all the keywords until the
-> indentation decreases. So 'description' is just description of the 2nd
-> case. The first case is just "maxItems: 1". I probably didn't put a
-> description because why write in free form text what the schema says
-> (other than of course no one knows json-schema...).
-
-Apologies, I've not read one of these things before and looks like I
-completely misread it.
-
-> YAML combines the best of Makefiles and python. You can't have tabs
-> and Indentation is significant. :)
-
-Oh wow, I'm in way over my head here!
-
-> > I also
-> > don't understand why maxItems is 8.
+> This patch introduces the xilinx_prep_dma_addr_t macro which prepares
+> dma_addr_t from hardware buffer descriptor LSB and MSB fields. It will be
+> used in simple dma 64-bit programming sequence.
 > 
-> Humm, I probably just made that up based on GICv2 limitations. What
-> should it be? If there's not any inherit maximum, can we put something
-> reasonable? There's not really any way to express that it should match
-> the number of cores in the system.
+> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
 
-What's the largest number you can think of?
+Reviewed-by: Appana Durga Kedareswara Rao <appana.durga.rao@xilinx.com>
 
-Will
+Regards,
+Kedar.
+
+> ---
+> Changes for v2:
+> New patch- Preparatory change for 4/4 fix.
+> ---
+>  drivers/dma/xilinx/xilinx_dma.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index a37871e..c27ab64 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -190,6 +190,8 @@
+>  /* AXI CDMA Specific Masks */
+>  #define XILINX_CDMA_CR_SGMODE          BIT(3)
+> 
+> +#define xilinx_prep_dma_addr_t(addr)	\
+> +	((dma_addr_t)((u64)addr##_##msb << 32 | (addr)))
+>  /**
+>   * struct xilinx_vdma_desc_hw - Hardware Descriptor
+>   * @next_desc: Next Descriptor Pointer @0x00
+> --
+> 1.7.1
