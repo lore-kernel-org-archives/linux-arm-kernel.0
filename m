@@ -1,29 +1,46 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Sat, 20 Oct 2018 14:18:02 +0530
-Subject: [PATCH 0/3] Add Bitstream configuration support for ZynqMP
-Message-ID: <20181020084805.29103-1-nava.manne@xilinx.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 19 Oct 2018 10:54:21 +0200
+Subject: [PATCH 6/6] mmc: mediatek: drop too much code of tuning method
+In-Reply-To: <1539415250-32337-7-git-send-email-chaotian.jing@mediatek.com>
+References: <1539415250-32337-1-git-send-email-chaotian.jing@mediatek.com>
+ <1539415250-32337-7-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <513726cb-79e8-ca4d-e887-bf63c833260b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches are created On top of the
-below repo.
-//git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-BRANCH: next/drivers.  
 
-Nava kishore Manne (3):
-  firmware: xilinx: Add fpga API's
-  dt-bindings: fpga: Add bindings for ZynqMP fpga driver
-  fpga manager: Adding FPGA Manager support for Xilinx zynqmp
 
- .../bindings/fpga/xlnx,zynqmp-pcap-fpga.txt   |  17 ++
- drivers/firmware/xilinx/zynqmp.c              |  46 +++++
- drivers/fpga/Kconfig                          |   9 +
- drivers/fpga/Makefile                         |   1 +
- drivers/fpga/zynqmp-fpga.c                    | 159 ++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h          |   4 +
- 6 files changed, 236 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
- create mode 100644 drivers/fpga/zynqmp-fpga.c
+On 13/10/2018 09:20, Chaotian Jing wrote:
+> the tuning code is becoming more and more bloated, let's make the
+> set cmd/data delay to inline function to avoid too much redundant code.
+> 
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/mtk-sd.c | 133 +++++++++++++---------------------------------
+>  1 file changed, 38 insertions(+), 95 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+[...]> @@ -1923,17 +1898,8 @@ static int msdc_tune_together(struct mmc_host
+*mmc, u32 opcode)
+>  	sdr_clr_bits(host->base + MSDC_IOCON,
+>  		     MSDC_IOCON_DSPL | MSDC_IOCON_W_DSPL);
+>  	for (i = 0 ; i < PAD_DELAY_MAX; i++) {
+> -		if (host->top_base) {
+> -			sdr_set_field(host->top_base + EMMC_TOP_CMD,
+> -				      PAD_CMD_RXDLY, i);
+> -			sdr_set_field(host->top_base + EMMC_TOP_CONTROL,
+> -				      PAD_DAT_RD_RXDLY, i);
+> -		} else {
+> -			sdr_set_field(host->base + tune_reg,
+> -				      MSDC_PAD_TUNE_CMDRDLY, i);
+> -			sdr_set_field(host->base + tune_reg,
+> -				      MSDC_PAD_TUNE_DATRRDLY, i);
+> -		}
+> +		msdc_set_cmd_delay(host, i);
+> +		msdc_set_data_delay(host, i);
 
--- 
-2.18.0
+Put the clean-up before introducing msdc_tune_together, that makes the series
+much easier to read.
+
+Thanks,
+Matthias
