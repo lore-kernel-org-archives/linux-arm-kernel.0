@@ -1,65 +1,53 @@
-From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 19 Oct 2018 10:38:54 +0000
-Subject: [PATCH v2 4/4] dmaengine: xilinx_dma: Fix 64-bit simple CDMA
- transfer
-In-Reply-To: <1538241480-13844-5-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1538241480-13844-5-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <DM5PR02MB218754E3827458E08060DDF2DCF90@DM5PR02MB2187.namprd02.prod.outlook.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Oct 2018 12:15:43 +0100
+Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
+In-Reply-To: <20181005084754.20950-8-kristina.martsenko@arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-8-kristina.martsenko@arm.com>
+Message-ID: <20181019111542.6wrvjguirglzg7vg@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 05, 2018 at 09:47:44AM +0100, Kristina Martsenko wrote:
+> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+> new file mode 100644
+> index 000000000000..2aefedc31d9e
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/pointer_auth.h
+> @@ -0,0 +1,63 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +#ifndef __ASM_POINTER_AUTH_H
+> +#define __ASM_POINTER_AUTH_H
+> +
+> +#include <linux/random.h>
+> +
+> +#include <asm/cpufeature.h>
+> +#include <asm/sysreg.h>
+> +
+> +#ifdef CONFIG_ARM64_PTR_AUTH
+> +/*
+> + * Each key is a 128-bit quantity which is split across a pair of 64-bit
+> + * registers (Lo and Hi).
+> + */
+> +struct ptrauth_key {
+> +	unsigned long lo, hi;
+> +};
+> +
+> +/*
+> + * We give each process its own instruction A key (APIAKey), which is shared by
+> + * all threads. This is inherited upon fork(), and reinitialised upon exec*().
+> + * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
+> + * instructions behaving as NOPs.
+> + */
 
+I don't remember the past discussions but I assume the tools guys are ok
+with a single key shared by multiple threads. Ramana, could you ack this
+part, FTR?
 
-> -----Original Message-----
-> From: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Sent: Saturday, September 29, 2018 10:48 PM
-> To: vkoul at kernel.org; dan.j.williams at intel.com; Michal Simek
-> <michals@xilinx.com>; Appana Durga Kedareswara Rao
-> <appanad@xilinx.com>; Radhey Shyam Pandey <radheys@xilinx.com>
-> Cc: dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: [PATCH v2 4/4] dmaengine: xilinx_dma: Fix 64-bit simple CDMA
-> transfer
-> 
-> In AXI CDMA simple mode also pass MSB bits of source and destination
-> address to xilinx_write function. This fixes simple CDMA operation mode using
-> 64-bit addressing.
-> 
-> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+(and it would help if someone from the Android and Chrome camps can
+confirm)
 
-Reviewed-by: Appana Durga Kedareswara Rao <appana.durga.rao@xilinx.com>
+Thanks.
 
-Regards,
-Kedar.
-
-> ---
-> Changes for v2:
-> Use helper macro for preparing dma_addr_t.
-> ---
->  drivers/dma/xilinx/xilinx_dma.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index c27ab64..d04ef85 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -1247,8 +1247,10 @@ static void xilinx_cdma_start_transfer(struct
-> xilinx_dma_chan *chan)
-> 
->  		hw = &segment->hw;
-> 
-> -		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw-
-> >src_addr);
-> -		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw-
-> >dest_addr);
-> +		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR,
-> +			     xilinx_prep_dma_addr_t(hw->src_addr));
-> +		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR,
-> +			     xilinx_prep_dma_addr_t(hw->dest_addr));
-> 
->  		/* Start the transfer */
->  		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
-> --
-> 1.7.1
+-- 
+Catalin
