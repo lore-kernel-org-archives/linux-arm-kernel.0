@@ -1,66 +1,48 @@
 From: ebiggers@kernel.org (Eric Biggers)
-Date: Fri, 19 Oct 2018 11:28:05 -0700
-Subject: [RFC PATCH v2 04/12] crypto: chacha - add XChaCha12 support
-In-Reply-To: <CAKv+Gu_wVmnEND3MGTG7bqqynbBqyzmE_gTmqZfrT551_n9Hmw@mail.gmail.com>
+Date: Fri, 19 Oct 2018 12:04:11 -0700
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
 References: <20181015175424.97147-1-ebiggers@kernel.org>
- <20181015175424.97147-5-ebiggers@kernel.org>
- <CAKv+Gu_wVmnEND3MGTG7bqqynbBqyzmE_gTmqZfrT551_n9Hmw@mail.gmail.com>
-Message-ID: <20181019182804.GA246441@gmail.com>
+ <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+Message-ID: <20181019190411.GB246441@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi Jason,
 
-On Fri, Oct 19, 2018 at 10:34:41PM +0800, Ard Biesheuvel wrote:
-> > diff --git a/include/crypto/chacha.h b/include/crypto/chacha.h
-> > index ae79e9983c72f..3d261f5cd156d 100644
-> > --- a/include/crypto/chacha.h
-> > +++ b/include/crypto/chacha.h
-> > @@ -5,6 +5,11 @@
-> >   * XChaCha extends ChaCha's nonce to 192 bits, while provably retaining ChaCha's
-> >   * security.  Here they share the same key size, tfm context, and setkey
-> >   * function; only their IV size and encrypt/decrypt function differ.
-> > + *
-> > + * The ChaCha paper specifies 20, 12, and 8-round variants.  In general, it is
-> > + * recommended to use the 20-round variant ChaCha20.  However, the other
-> > + * variants can be needed in some performance-sensitive scenarios.  The generic
-> > + * ChaCha code currently allows only the 20 and 12-round variants.
-> >   */
-> >
-> >  #ifndef _CRYPTO_CHACHA_H
-> > @@ -39,6 +44,8 @@ void crypto_chacha_init(u32 *state, struct chacha_ctx *ctx, u8 *iv);
-> >
-> >  int crypto_chacha20_setkey(struct crypto_skcipher *tfm, const u8 *key,
-> >                            unsigned int keysize);
-> > +int crypto_chacha12_setkey(struct crypto_skcipher *tfm, const u8 *key,
-> > +                          unsigned int keysize);
-> >
-> >  int crypto_chacha_crypt(struct skcipher_request *req);
-> >  int crypto_xchacha_crypt(struct skcipher_request *req);
-> > diff --git a/lib/chacha.c b/lib/chacha.c
-> > index 0a2c2e5b7b84d..c4d69a83fcd2d 100644
-> > --- a/lib/chacha.c
-> > +++ b/lib/chacha.c
-> > @@ -21,7 +21,7 @@ static void chacha_permute(u32 *x, int nrounds)
-> >         int i;
-> >
-> >         /* whitelist the allowed round counts */
-> > -       BUG_ON(nrounds != 20);
-> > +       BUG_ON(nrounds != 20 && nrounds != 12);
-> >
+On Fri, Oct 19, 2018 at 05:58:35PM +0200, Jason A. Donenfeld wrote:
+> Hello Eric,
 > 
-> I didn't spot this until this patch, but BUG_ON() may bring down the
-> kernel, and so it should really only be used as a last resort. (i.e.,
-> if this is called from non-process context things may explode rather
-> painfully)
+> > As before, some of these patches conflict with the new "Zinc" crypto
+> > library.  But I don't know when Zinc will be merged, so for now I've
+> > continued to base this patchset on the current 'cryptodev'.
 > 
-> I didn't look at the entire file [which is a bit cumbersome while
-> reviewing incremental changes like this] and so I don't really have
-> another suggestion right now, but please try to come up with something
-> better if you can.
+> I'd appreciate it if you waited to merge this until you can rebase it
+> on top of Zinc. In fact, if you already want to build it on top of
+> Zinc, I'm happy to work with you on that in a shared repo or similar.
+> We can also hash out the details of that in person in Vancouver in a
+> few weeks. I think pushing this in before will create undesirable
+> churn for both of us.
 > 
 
-I'll change it to WARN_ON_ONCE(), I guess.  I do still want it to be very noisy
-if something fishy is going on with the round count.
+I won't be at Plumbers, sorry!  For if/when it's needed, I'll start a version of
+this based on Zinc.  The basic requirements are that we need (1) xchacha12 and
+xchacha20 available as 'skciphers' in the crypto API, and (2) the poly1305_core
+functions (see patch 08/12).  In principle, these can be implemented in Zinc.
+The Adiantum template and all the NHPoly1305 stuff will be the same either way.
+(Unless you'll want one or both of those moved to Zinc too.  To be honest, even
+after your explanations I still don't have a clear idea of what is supposed to
+go in Zinc and what isn't...)
+
+However, for now I'm hesitant to completely abandon the current approach and bet
+the farm on Zinc.  Zinc has a large scope and various controversies that haven't
+yet been fully resolved to everyone's satisfaction, including unclear licenses
+on some of the essential assembly files.  It's not appropriate to grind kernel
+crypto development to grind a halt while everyone waits for Zinc.
+
+So if Zinc is ready, then it makes sense for it to go first;
+otherwise, it doesn't.  It's not yet clear which is the case.
+
+Thanks,
 
 - Eric
