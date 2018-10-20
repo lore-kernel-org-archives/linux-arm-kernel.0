@@ -1,82 +1,61 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Sat, 20 Oct 2018 00:12:07 -0700
-Subject: [RFC PATCH v2 11/12] crypto: adiantum - add Adiantum support
-In-Reply-To: <CAKv+Gu9wrOOk-LGPYmxgLbv86uXzMeHN6th3mMEDT3Vg893HWw@mail.gmail.com>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <20181015175424.97147-12-ebiggers@kernel.org>
- <CAKv+Gu9wrOOk-LGPYmxgLbv86uXzMeHN6th3mMEDT3Vg893HWw@mail.gmail.com>
-Message-ID: <20181020071206.GE876@sol.localdomain>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Sat, 20 Oct 2018 15:36:54 +0800
+Subject: [PATCH v2 1/1] iommu/arm-smmu-v3: eliminate a potential memory
+ corruption on Hi16xx soc
+Message-ID: <1540021014-8176-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+The standard GITS_TRANSLATER register in ITS is only 4 bytes, but
+Hisilicon expands the next 4 bytes to carry some IMPDEF information. That
+means, total 8 bytes data will be written to MSIAddress each time.
 
-On Sat, Oct 20, 2018 at 12:17:58PM +0800, Ard Biesheuvel wrote:
-> On 16 October 2018 at 01:54, Eric Biggers <ebiggers@kernel.org> wrote:
-> > From: Eric Biggers <ebiggers@google.com>
-> >
-> > Add support for the Adiantum encryption mode.  Adiantum was designed by
-> > Paul Crowley and is specified by our paper:
-> >
-> >     Adiantum: length-preserving encryption for entry-level processors
-> >     (https://eprint.iacr.org/2018/720.pdf)
-> >
-> > See our paper for full details; this patch only provides an overview.
-> >
-> > Adiantum is a tweakable, length-preserving encryption mode designed for
-> > fast and secure disk encryption, especially on CPUs without dedicated
-> > crypto instructions.  Adiantum encrypts each sector using the XChaCha12
-> > stream cipher, two passes of an ?-almost-?-universal (?A?U) hash
-> > function, and an invocation of the AES-256 block cipher on a single
-> > 16-byte block.  On CPUs without AES instructions, Adiantum is much
-> > faster than AES-XTS; for example, on ARM Cortex-A7, on 4096-byte sectors
-> > Adiantum encryption is about 4 times faster than AES-256-XTS encryption,
-> > and decryption about 5 times faster.
-> >
-> > Adiantum is a specialization of the more general HBSH construction.  Our
-> > earlier proposal, HPolyC, was also a HBSH specialization, but it used a
-> > different ?A?U hash function, one based on Poly1305 only.  Adiantum's
-> > ?A?U hash function, which is based primarily on the "NH" hash function
-> > like that used in UMAC (RFC4418), is about twice as fast as HPolyC's;
-> > consequently, Adiantum is about 20% faster than HPolyC.
-> >
-> > This speed comes with no loss of security: Adiantum is provably just as
-> > secure as HPolyC, in fact slightly *more* secure.  Like HPolyC,
-> > Adiantum's security is reducible to that of XChaCha12 and AES-256,
-> > subject to a security bound.  XChaCha12 itself has a security reduction
-> > to ChaCha12.  Therefore, one need not "trust" Adiantum; one need only
-> > trust ChaCha12 and AES-256.  Note that the ?A?U hash function is only
-> > used for its proven combinatorical properties so cannot be "broken".
-> >
-> 
-> So what happens if the part of the input covered by the block cipher
-> is identical between different generations of the same disk block
-> (whose sector count is used as the 'outer' IV). How are we not in the
-> same boat as before when using stream ciphers for disk encryption?
-> 
+MSIAddr: |----4bytes----|----4bytes----|
+	 |    MSIData   |    IMPDEF    |
 
-This is the point of the hash step.  The value encrypted with the block cipher
-to produce the intermediate value C_M (used as the stream cipher nonce) is
-H(T, P_L) + P_R.  (T is the tweak a.k.a the IV, P_L is the plaintext except the
-last 16 bytes, P_R is the last 16 bytes.)  A collision in this value occurs iff:
+There is no problem for ITS, because the next 4 bytes space is reserved
+in ITS. But it will overwrite the 4 bytes memory following "sync_count".
+It's very fortunately that the previous and the next neighbour of the
+"sync_count" are both aligned by 8 bytes, so no problem is met now.
 
-	H(T1, P1_L) + P1_R = H(T2, P2_L) + P2_R
-i.e.
-	H(T1, P1_L) - H(T2, P2_L) = P2_R - P1_R
-	
-If (T1, P1_L) = (T2, P2_L) then P1_R != P2_R so the equation has no solutions
-(since we don't consider queries where the whole input is the same; those
-unavoidably produce the same ciphertext).  Otherwise (T1, P1_L) != (T2, P2_L),
-and since the hash function H is ?-almost-?-universal over integers mod 2^128,
-the equation is true for at most a very small proportion '?' of hash keys.
-But, the hash key is chosen at random and is unknown to the attacker.
+It's good to explicitly add a workaround:
+1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is
+   always aligned by 8 bytes.
+2. Add a "int" struct member to make sure the 4 bytes padding is always
+   exist.
 
-The same applies in the other direction, for chosen ciphertext attacks.
+There is no functional change.
 
-Basically, it's very difficult for an attacker to cause the intermediate value
-C_M to be reused, and the outputs will appear random until they do.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Of course, all this is explained much more precisely and comprehensively in our
-paper.  See section 5, "Security reduction".
-
-- Eric
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 5059d09..624fdd0 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -586,7 +586,20 @@ struct arm_smmu_device {
+ 
+ 	struct arm_smmu_strtab_cfg	strtab_cfg;
+ 
+-	u32				sync_count;
++	/*
++	 * The alignment and padding is required by Hi16xx of Hisilicon.
++	 * Because the ITS hardware on Hi16xx will truncate the MSIAddress(Here
++	 * it's the address of "sync_count") to 8 bytes boundary first, then
++	 * write 32 bits MSIdata at offset 0, and 32 bits IMPDEF data at offset
++	 * 4. Without this workaround, the adjacent member maybe overwritten.
++	 *
++	 *                    |---4bytes---|---4bytes---|
++	 * MSIAddress & (~0x7):   MSIdata  | IMPDEF data|
++	 */
++	struct {
++		u32			sync_count;
++		int			padding;
++	} __attribute__((aligned(8)));
+ 
+ 	/* IOMMU core code handle */
+ 	struct iommu_device		iommu;
+-- 
+1.8.3
