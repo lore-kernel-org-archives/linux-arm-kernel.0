@@ -1,112 +1,166 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Sat, 20 Oct 2018 14:18:03 +0530
-Subject: [PATCH 1/3] firmware: xilinx: Add fpga API's
-In-Reply-To: <20181020084805.29103-1-nava.manne@xilinx.com>
-References: <20181020084805.29103-1-nava.manne@xilinx.com>
-Message-ID: <20181020084805.29103-2-nava.manne@xilinx.com>
+Date: Sat, 20 Oct 2018 14:11:07 +0530
+Subject: [PATCH 3/3] reset: reset-zynqmp: Adding support for Xilinx zynqmp
+ reset controller.
+In-Reply-To: <20181020084107.28251-1-nava.manne@xilinx.com>
+References: <20181020084107.28251-1-nava.manne@xilinx.com>
+Message-ID: <20181020084107.28251-4-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This Patch Adds fpga API's to support the Bitstream loading
-by using firmware interface.
+Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
+The zynqmp reset-controller has the ability to reset lines
+connected to different blocks and peripheral in the Soc.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
 Changes for v1:
 		-None.
 
+Changes for RFC-V3:
+                -None.
+
 Changes for RFC-V2:
-                -New Patch.
+                -Moved eemi_ops into a priv struct as suggested
+                 by philipp.
 
- drivers/firmware/xilinx/zynqmp.c     | 46 ++++++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h |  4 +++
- 2 files changed, 50 insertions(+)
+ drivers/reset/Makefile       |   1 +
+ drivers/reset/reset-zynqmp.c | 117 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 118 insertions(+)
+ create mode 100644 drivers/reset/reset-zynqmp.c
 
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 84b3fd2eca8b..38a1ab1be03b 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -428,6 +428,50 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 4243c38228e2..eb315d14a520 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -24,4 +24,5 @@ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+ obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+ obj-$(CONFIG_RESET_UNIPHIER_USB3) += reset-uniphier-usb3.o
+ obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
++obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
  
-+/**
-+ * zynqmp_pm_fpga_load - Perform the fpga load
-+ * @address:	Address to write to
-+ * @size:	pl bitstream size
-+ * @flags:
-+ *	BIT(0) - Bit-stream type.
-+ *		 0 - Full Bit-stream.
-+ *		 1 - Partial Bit-stream.
+diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
+new file mode 100644
+index 000000000000..9528fa3894fc
+--- /dev/null
++++ b/drivers/reset/reset-zynqmp.c
+@@ -0,0 +1,117 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2018 Xilinx, Inc.
 + *
-+ * This function provides access to pmufw. To transfer
-+ * the required bitstream into PL.
-+ *
-+ * Return: Returns status, either success or error+reason
 + */
-+static int zynqmp_pm_fpga_load(const u64 address, const u32 size,
-+			       const u32 flags)
++
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/firmware/xlnx-zynqmp.h>
++
++#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
++#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
++
++struct zynqmp_reset_data {
++	struct reset_controller_dev rcdev;
++	const struct zynqmp_eemi_ops *eemi_ops;
++};
++
++static inline struct zynqmp_reset_data *
++to_zynqmp_reset_data(struct reset_controller_dev *rcdev)
 +{
-+	return zynqmp_pm_invoke_fn(PM_FPGA_LOAD, lower_32_bits(address),
-+				   upper_32_bits(address), size, flags, NULL);
++	return container_of(rcdev, struct zynqmp_reset_data, rcdev);
 +}
 +
-+/**
-+ * zynqmp_pm_fpga_get_status - Read value from PCAP status register
-+ * @value: Value to read
-+ *
-+ * This function provides access to the xilfpga library to get
-+ * the PCAP status
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_fpga_get_status(u32 *value)
++static int zynqmp_reset_assert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
 +{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
-+	int ret;
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
 +
-+	if (!value)
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_ASSERT);
++}
++
++static int zynqmp_reset_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_RELEASE);
++}
++
++static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++	int val, err;
++
++	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
++	if (!err)
 +		return -EINVAL;
 +
-+	ret = zynqmp_pm_invoke_fn(PM_FPGA_GET_STATUS, 0, 0, 0, 0, ret_payload);
-+	*value = ret_payload[1];
-+
-+	return ret;
++	return val;
 +}
 +
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
- 	.query_data = zynqmp_pm_query_data,
-@@ -440,6 +484,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
- 	.clock_getrate = zynqmp_pm_clock_getrate,
- 	.clock_setparent = zynqmp_pm_clock_setparent,
- 	.clock_getparent = zynqmp_pm_clock_getparent,
-+	.fpga_load = zynqmp_pm_fpga_load,
-+	.fpga_get_status = zynqmp_pm_fpga_get_status,
- };
- 
- /**
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 015e130431e6..b24400ee630a 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -34,6 +34,8 @@
- 
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
-+	PM_FPGA_LOAD = 22,
-+	PM_FPGA_GET_STATUS,
- 	PM_QUERY_DATA = 35,
- 	PM_CLOCK_ENABLE,
- 	PM_CLOCK_DISABLE,
-@@ -89,6 +91,8 @@ struct zynqmp_pm_query_data {
- 
- struct zynqmp_eemi_ops {
- 	int (*get_api_version)(u32 *version);
-+	int (*fpga_load)(const u64 address, const u32 size, const u32 flags);
-+	int (*fpga_get_status)(u32 *value);
- 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
- 	int (*clock_enable)(u32 clock_id);
- 	int (*clock_disable)(u32 clock_id);
++static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_PULSE);
++}
++
++static struct reset_control_ops zynqmp_reset_ops = {
++	.reset = zynqmp_reset_reset,
++	.assert = zynqmp_reset_assert,
++	.deassert = zynqmp_reset_deassert,
++	.status = zynqmp_reset_status,
++};
++
++static int zynqmp_reset_probe(struct platform_device *pdev)
++{
++	struct zynqmp_reset_data *priv;
++
++	priv = devm_kzalloc(&pdev->dev,
++			    sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, priv);
++
++	priv->eemi_ops = zynqmp_pm_get_eemi_ops();
++	if (!priv->eemi_ops)
++		return -ENXIO;
++
++	priv->rcdev.ops = &zynqmp_reset_ops;
++	priv->rcdev.owner = THIS_MODULE;
++	priv->rcdev.of_node = pdev->dev.of_node;
++	priv->rcdev.nr_resets = ZYNQMP_NR_RESETS;
++
++	return devm_reset_controller_register(&pdev->dev, &priv->rcdev);
++}
++
++static const struct of_device_id zynqmp_reset_dt_ids[] = {
++	{ .compatible = "xlnx,zynqmp-reset", },
++	{ /* sentinel */ },
++};
++
++static struct platform_driver zynqmp_reset_driver = {
++	.probe	= zynqmp_reset_probe,
++	.driver = {
++		.name		= KBUILD_MODNAME,
++		.of_match_table	= zynqmp_reset_dt_ids,
++	},
++};
++
++static int __init zynqmp_reset_init(void)
++{
++	return platform_driver_register(&zynqmp_reset_driver);
++}
++
++arch_initcall(zynqmp_reset_init);
 -- 
 2.18.0
