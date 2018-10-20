@@ -1,62 +1,82 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Sat, 20 Oct 2018 12:02:37 +0530
-Subject: [PATCH 0/6] Tracing register accesses with pstore and dynamic
- debug
-In-Reply-To: <20181020052535.GA155509@joelaf.mtv.corp.google.com>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <20181020052535.GA155509@joelaf.mtv.corp.google.com>
-Message-ID: <1d3ddbe3-d3ac-aa3e-fc9e-36739ddd0c91@codeaurora.org>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Sat, 20 Oct 2018 00:12:07 -0700
+Subject: [RFC PATCH v2 11/12] crypto: adiantum - add Adiantum support
+In-Reply-To: <CAKv+Gu9wrOOk-LGPYmxgLbv86uXzMeHN6th3mMEDT3Vg893HWw@mail.gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <20181015175424.97147-12-ebiggers@kernel.org>
+ <CAKv+Gu9wrOOk-LGPYmxgLbv86uXzMeHN6th3mMEDT3Vg893HWw@mail.gmail.com>
+Message-ID: <20181020071206.GE876@sol.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2018 10:55 AM, Joel Fernandes wrote:
-> On Sun, Sep 09, 2018 at 01:57:01AM +0530, Sai Prakash Ranjan wrote:
->> Hi,
->>
->> This patch series adds Event tracing support to pstore and is continuation
->> to the RFC patch introduced to add a new tracing facility for register
->> accesses called Register Trace Buffer(RTB). Since we decided to not introduce
->> a separate framework to trace register accesses and use existing framework
->> like tracepoints, I have moved from RFC. Details of the RFC in link below:
->>
->> Link: https://lore.kernel.org/lkml/cover.1535119710.git.saiprakash.ranjan at codeaurora.org/
->>
->> MSR tracing example given by Steven was helpful in using tracepoints for
->> register accesses instead of using separate trace. But just having these
->> IO traces would not help much unless we could have them in some persistent
->> ram buffer for debugging unclocked access or some kind of bus hang or an
->> unexpected reset caused by some buggy driver which happens a lot during
->> initial development stages. By analyzing the last few entries of this buffer,
->> we could identify the register access which is causing the issue.
+Hi Ard,
+
+On Sat, Oct 20, 2018 at 12:17:58PM +0800, Ard Biesheuvel wrote:
+> On 16 October 2018 at 01:54, Eric Biggers <ebiggers@kernel.org> wrote:
+> > From: Eric Biggers <ebiggers@google.com>
+> >
+> > Add support for the Adiantum encryption mode.  Adiantum was designed by
+> > Paul Crowley and is specified by our paper:
+> >
+> >     Adiantum: length-preserving encryption for entry-level processors
+> >     (https://eprint.iacr.org/2018/720.pdf)
+> >
+> > See our paper for full details; this patch only provides an overview.
+> >
+> > Adiantum is a tweakable, length-preserving encryption mode designed for
+> > fast and secure disk encryption, especially on CPUs without dedicated
+> > crypto instructions.  Adiantum encrypts each sector using the XChaCha12
+> > stream cipher, two passes of an ?-almost-?-universal (?A?U) hash
+> > function, and an invocation of the AES-256 block cipher on a single
+> > 16-byte block.  On CPUs without AES instructions, Adiantum is much
+> > faster than AES-XTS; for example, on ARM Cortex-A7, on 4096-byte sectors
+> > Adiantum encryption is about 4 times faster than AES-256-XTS encryption,
+> > and decryption about 5 times faster.
+> >
+> > Adiantum is a specialization of the more general HBSH construction.  Our
+> > earlier proposal, HPolyC, was also a HBSH specialization, but it used a
+> > different ?A?U hash function, one based on Poly1305 only.  Adiantum's
+> > ?A?U hash function, which is based primarily on the "NH" hash function
+> > like that used in UMAC (RFC4418), is about twice as fast as HPolyC's;
+> > consequently, Adiantum is about 20% faster than HPolyC.
+> >
+> > This speed comes with no loss of security: Adiantum is provably just as
+> > secure as HPolyC, in fact slightly *more* secure.  Like HPolyC,
+> > Adiantum's security is reducible to that of XChaCha12 and AES-256,
+> > subject to a security bound.  XChaCha12 itself has a security reduction
+> > to ChaCha12.  Therefore, one need not "trust" Adiantum; one need only
+> > trust ChaCha12 and AES-256.  Note that the ?A?U hash function is only
+> > used for its proven combinatorical properties so cannot be "broken".
+> >
 > 
-> Hi Sai,
-> 
-> I wanted to see if I could make some time to get your patches working. We are
-> hitting usecases that need something like this as well. Basically devices
-> hanging and then the ramdump does not tell us much, so in this case pstore
-> events can be really helpful. This usecase came up last year as well.
-> 
-> Anyway while I was going through your patches, I cleaned up some pstore code
-> as well and I have 3 more patches on top of yours for this clean up. I prefer
-> we submit the patches together and sync our work together so that there is
-> least conflict.
-> 
-> Here's my latest tree:
-> https://github.com/joelagnel/linux-kernel/commits/pstore-events
-> (note that I have only build tested the patches since I just wrote them and
-> its quite late in the night here ;-))
+> So what happens if the part of the input covered by the block cipher
+> is identical between different generations of the same disk block
+> (whose sector count is used as the 'outer' IV). How are we not in the
+> same boat as before when using stream ciphers for disk encryption?
 > 
 
-Hi Joel,
+This is the point of the hash step.  The value encrypted with the block cipher
+to produce the intermediate value C_M (used as the stream cipher nonce) is
+H(T, P_L) + P_R.  (T is the tweak a.k.a the IV, P_L is the plaintext except the
+last 16 bytes, P_R is the last 16 bytes.)  A collision in this value occurs iff:
 
-Thanks for looking into this. Sure, I will be happy to sync up with you 
-on this. I can test your additional patches on top of my pstore patches. 
-BTW, I'm still stuck at copying binary record into pstore and then 
-extract it during read time. Seems like I'm missing something.
+	H(T1, P1_L) + P1_R = H(T2, P2_L) + P2_R
+i.e.
+	H(T1, P1_L) - H(T2, P2_L) = P2_R - P1_R
+	
+If (T1, P1_L) = (T2, P2_L) then P1_R != P2_R so the equation has no solutions
+(since we don't consider queries where the whole input is the same; those
+unavoidably produce the same ciphertext).  Otherwise (T1, P1_L) != (T2, P2_L),
+and since the hash function H is ?-almost-?-universal over integers mod 2^128,
+the equation is true for at most a very small proportion '?' of hash keys.
+But, the hash key is chosen at random and is unknown to the attacker.
 
-Thanks,
-Sai
+The same applies in the other direction, for chosen ciphertext attacks.
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Basically, it's very difficult for an attacker to cause the intermediate value
+C_M to be reused, and the outputs will appear random until they do.
+
+Of course, all this is explained much more precisely and comprehensively in our
+paper.  See section 5, "Security reduction".
+
+- Eric
