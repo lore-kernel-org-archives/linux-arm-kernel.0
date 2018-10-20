@@ -1,67 +1,247 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 20 Oct 2018 22:10:45 +0800
-Subject: [PATCH v3 3/4] arm64: implement live patching
-In-Reply-To: <alpine.LSU.2.21.1810191714540.4692@pobox.suse.cz>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
- <20181018125820.iw54zbirq74ulknj@linux-8ccs>
- <CAKv+Gu_yNBN+Rpw98MAZaxzSjm20qMYD7+fiJ1fBHoUeDr9fBA@mail.gmail.com>
- <alpine.LSU.2.21.1810191714540.4692@pobox.suse.cz>
-Message-ID: <CAKv+Gu8Vg9-CwvU-u9gNGmtB7gTapuCPHjU5v7FWnPsVy6vptA@mail.gmail.com>
+Date: Sat, 20 Oct 2018 23:00:04 +0800
+Subject: [RFC PATCH v2 10/12] crypto: arm/nhpoly1305 - add
+ NEON-accelerated NHPoly1305
+In-Reply-To: <20181020055136.GD876@sol.localdomain>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <20181015175424.97147-11-ebiggers@kernel.org>
+ <CAKv+Gu_HCecGeqFTf-Ys+GiWr98JO_ydZ1cAsMbKM88ZKG=Sog@mail.gmail.com>
+ <20181020055136.GD876@sol.localdomain>
+Message-ID: <CAKv+Gu8rrdEDSpRMTXk7vAwO23z7Z_ZR1vhxL-gCejUbc_+hKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2018 at 23:21, Miroslav Benes <mbenes@suse.cz> wrote:
->
->> >> Ad relocations. I checked that everything in struct mod_arch_specific
->> >> stays after the module is load. Both core and init get SHF_ALLOC set
->> >> (mod->arch.core.plt->sh_flags in module_frob_arch_sections(). It is
->> >> important because apply_relocate_add() may use those sections
->> >> through module_emit_plt_entry() call.
+On 20 October 2018 at 13:51, Eric Biggers <ebiggers@kernel.org> wrote:
+> On Sat, Oct 20, 2018 at 12:12:56PM +0800, Ard Biesheuvel wrote:
+>> On 16 October 2018 at 01:54, Eric Biggers <ebiggers@kernel.org> wrote:
+>> > From: Eric Biggers <ebiggers@google.com>
 >> >
+>> > Add an ARM NEON implementation of NHPoly1305, an ?-almost-?-universal
+>> > hash function used in the Adiantum encryption mode.  For now, only the
+>> > NH portion is actually NEON-accelerated; the Poly1305 part is less
+>> > performance-critical so is just implemented in C.
 >> >
->> > Yes, it looks like the needed .plt sections will remain in module
->> > memory. However, I think I found a slight issue... :/
+>> > Signed-off-by: Eric Biggers <ebiggers@google.com>
+>> > ---
+>> >  arch/arm/crypto/Kconfig                |   5 ++
+>> >  arch/arm/crypto/Makefile               |   2 +
+>> >  arch/arm/crypto/nh-neon-core.S         | 116 +++++++++++++++++++++++++
+>> >  arch/arm/crypto/nhpoly1305-neon-glue.c |  78 +++++++++++++++++
+>> >  4 files changed, 201 insertions(+)
+>> >  create mode 100644 arch/arm/crypto/nh-neon-core.S
+>> >  create mode 100644 arch/arm/crypto/nhpoly1305-neon-glue.c
 >> >
->> > In module_frob_arch_sections(), mod->arch.core.plt is set to an offset
->> > within info->sechdrs:
+>> > diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+>> > index cc932d9bba561..458562a34aabe 100644
+>> > --- a/arch/arm/crypto/Kconfig
+>> > +++ b/arch/arm/crypto/Kconfig
+>> > @@ -122,4 +122,9 @@ config CRYPTO_CHACHA20_NEON
+>> >         select CRYPTO_BLKCIPHER
+>> >         select CRYPTO_CHACHA20
 >> >
->> >             if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
->> >                     mod->arch.core.plt = sechdrs + i;
+>> > +config CRYPTO_NHPOLY1305_NEON
+>> > +       tristate "NEON accelerated NHPoly1305 hash function (for Adiantum)"
+>> > +       depends on KERNEL_MODE_NEON
+>> > +       select CRYPTO_NHPOLY1305
+>> > +
+>> >  endif
+>> > diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+>> > index 005482ff95047..b65d6bfab8e6b 100644
+>> > --- a/arch/arm/crypto/Makefile
+>> > +++ b/arch/arm/crypto/Makefile
+>> > @@ -10,6 +10,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
+>> >  obj-$(CONFIG_CRYPTO_SHA256_ARM) += sha256-arm.o
+>> >  obj-$(CONFIG_CRYPTO_SHA512_ARM) += sha512-arm.o
+>> >  obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha-neon.o
+>> > +obj-$(CONFIG_CRYPTO_NHPOLY1305_NEON) += nhpoly1305-neon.o
 >> >
->> > sechdrs is from info->sechdrs, which is freed at the end of
->> > load_module() via free_copy(). So although the relevant plt section(s)
->> > are in module memory, mod->arch.core.plt will point to invalid memory
->> > after info is freed. In other words, the section (.plt) *is* in memory
->> > but the section header (struct elf64_shdr) containing section metadata
->> > like sh_addr, sh_size etc., is not.
+>> >  ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
+>> >  ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
+>> > @@ -53,6 +54,7 @@ ghash-arm-ce-y        := ghash-ce-core.o ghash-ce-glue.o
+>> >  crct10dif-arm-ce-y     := crct10dif-ce-core.o crct10dif-ce-glue.o
+>> >  crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+>> >  chacha-neon-y := chacha-neon-core.o chacha-neon-glue.o
+>> > +nhpoly1305-neon-y := nh-neon-core.o nhpoly1305-neon-glue.o
 >> >
+>> >  ifdef REGENERATE_ARM_CRYPTO
+>> >  quiet_cmd_perl = PERL    $@
+>> > diff --git a/arch/arm/crypto/nh-neon-core.S b/arch/arm/crypto/nh-neon-core.S
+>> > new file mode 100644
+>> > index 0000000000000..434d80ab531c2
+>> > --- /dev/null
+>> > +++ b/arch/arm/crypto/nh-neon-core.S
+>> > @@ -0,0 +1,116 @@
+>> > +/* SPDX-License-Identifier: GPL-2.0 */
+>> > +/*
+>> > + * NH - ?-almost-universal hash function, NEON accelerated version
+>> > + *
+>> > + * Copyright 2018 Google LLC
+>> > + *
+>> > + * Author: Eric Biggers <ebiggers@google.com>
+>> > + */
+>> > +
+>> > +#include <linux/linkage.h>
+>> > +
+>> > +       .text
+>> > +       .fpu            neon
+>> > +
+>> > +       KEY             .req    r0
+>> > +       MESSAGE         .req    r1
+>> > +       MESSAGE_LEN     .req    r2
+>> > +       HASH            .req    r3
+>> > +
+>> > +       PASS0_SUMS      .req    q0
+>> > +       PASS0_SUM_A     .req    d0
+>> > +       PASS0_SUM_B     .req    d1
+>> > +       PASS1_SUMS      .req    q1
+>> > +       PASS1_SUM_A     .req    d2
+>> > +       PASS1_SUM_B     .req    d3
+>> > +       PASS2_SUMS      .req    q2
+>> > +       PASS2_SUM_A     .req    d4
+>> > +       PASS2_SUM_B     .req    d5
+>> > +       PASS3_SUMS      .req    q3
+>> > +       PASS3_SUM_A     .req    d6
+>> > +       PASS3_SUM_B     .req    d7
+>> > +       K0              .req    q4
+>> > +       K1              .req    q5
+>> > +       K2              .req    q6
+>> > +       K3              .req    q7
+>> > +       T0              .req    q8
+>> > +       T0_L            .req    d16
+>> > +       T0_H            .req    d17
+>> > +       T1              .req    q9
+>> > +       T1_L            .req    d18
+>> > +       T1_H            .req    d19
+>> > +       T2              .req    q10
+>> > +       T2_L            .req    d20
+>> > +       T2_H            .req    d21
+>> > +       T3              .req    q11
+>> > +       T3_L            .req    d22
+>> > +       T3_H            .req    d23
+>> > +
+>> > +.macro _nh_stride      k0, k1, k2, k3
+>> > +
+>> > +       // Load next message stride
+>> > +       vld1.8          {T3}, [MESSAGE]!
+>> > +
+>> > +       // Load next key stride
+>> > +       vld1.32         {\k3}, [KEY]!
+>> > +
+>> > +       // Add message words to key words
+>> > +       vadd.u32        T0, T3, \k0
+>> > +       vadd.u32        T1, T3, \k1
+>> > +       vadd.u32        T2, T3, \k2
+>> > +       vadd.u32        T3, T3, \k3
+>> > +
+>> > +       // Multiply 32x32 => 64 and accumulate
+>> > +       vmlal.u32       PASS0_SUMS, T0_L, T0_H
+>> > +       vmlal.u32       PASS1_SUMS, T1_L, T1_H
+>> > +       vmlal.u32       PASS2_SUMS, T2_L, T2_H
+>> > +       vmlal.u32       PASS3_SUMS, T3_L, T3_H
+>> > +.endm
+>> > +
 >>
->> Just for my understanding: this only matters for live patching, right?
+>> Since we seem to have some spare NEON registers: would it help to have
+>> a double round version of this macro?
+>>
 >
-> Yes. Live patching can do deferred relocations. When a module is loaded
-> and livepatched, the relevant symbols in the patching module are resolved.
-> We call apply_relocate_add(), which is arch-specific, and we must be sure
-> that everything used by apply_relocate_add() is preserved in the patching
-> module after it is loaded.
+> It helps a little bit, but not much.  The loads are the only part that can be
+> optimized further.  I think I'd rather have the shorter + simpler version,
+> unless the loads can be optimized significantly more on other processors.
+>
+> Also, originally I had it loading the key and message for the next stride while
+> doing the current one, but that didn't seem worthwhile either.
 >
 
-So I suppose this could get interesting in cases where modules are far
-away from the kernel (i.e., more than -/+ 128 MB). Fortunately, the
-modules themselves are always placed in a 128 MB window, but this
-window could be out of reach for branches into the kernel proper. If
-we find ourselves in the situation where we need to patch calls into
-the kernel proper to point into this module, this may get interesting,
-since the PLT entries *must* be allocated along with the module that
-contains the branch instruction, or the PLT entry itself may be out of
-range, defeating the purpose.
+Fair enough.
 
-
->> The original PLT support was implemented to support loading modules
->> outside of the -/+ 128 MB range of an arm64 relative branch/jump
->> instruction, and was later enhanced [for the same reason] to support
->> emitting a trampoline for the ftrace entrypoint.
+>> > +/*
+>> > + * void nh_neon(const u32 *key, const u8 *message, size_t message_len,
+>> > + *             u8 hash[NH_HASH_BYTES])
+>> > + *
+>> > + * It's guaranteed that message_len % 16 == 0.
+>> > + */
+>> > +ENTRY(nh_neon)
+>> > +
+>> > +       vld1.32         {K0,K1}, [KEY]!
+>> > +         vmov.u64      PASS0_SUMS, #0
+>> > +         vmov.u64      PASS1_SUMS, #0
+>> > +       vld1.32         {K2}, [KEY]!
+>> > +         vmov.u64      PASS2_SUMS, #0
+>> > +         vmov.u64      PASS3_SUMS, #0
+>> > +
+>> > +       subs            MESSAGE_LEN, MESSAGE_LEN, #64
+>> > +       blt             .Lloop4_done
+>> > +.Lloop4:
+>> > +       _nh_stride      K0, K1, K2, K3
+>> > +       _nh_stride      K1, K2, K3, K0
+>> > +       _nh_stride      K2, K3, K0, K1
+>> > +       _nh_stride      K3, K0, K1, K2
+>> > +       subs            MESSAGE_LEN, MESSAGE_LEN, #64
+>> > +       bge             .Lloop4
+>> > +
+>> > +.Lloop4_done:
+>> > +       ands            MESSAGE_LEN, MESSAGE_LEN, #63
+>> > +       beq             .Ldone
+>> > +       _nh_stride      K0, K1, K2, K3
+>> > +
+>> > +       subs            MESSAGE_LEN, MESSAGE_LEN, #16
+>> > +       beq             .Ldone
+>> > +       _nh_stride      K1, K2, K3, K0
+>> > +
+>> > +       subs            MESSAGE_LEN, MESSAGE_LEN, #16
+>> > +       beq             .Ldone
+>> > +       _nh_stride      K2, K3, K0, K1
+>> > +
+>> > +.Ldone:
+>> > +       // Sum the accumulators for each pass, then store the sums to 'hash'
+>> > +       vadd.u64        T0_L, PASS0_SUM_A, PASS0_SUM_B
+>> > +       vadd.u64        T0_H, PASS1_SUM_A, PASS1_SUM_B
+>> > +       vadd.u64        T1_L, PASS2_SUM_A, PASS2_SUM_B
+>> > +       vadd.u64        T1_H, PASS3_SUM_A, PASS3_SUM_B
+>> > +       vst1.8          {T0-T1}, [HASH]
+>> > +       bx              lr
+>> > +ENDPROC(nh_neon)
+>> > diff --git a/arch/arm/crypto/nhpoly1305-neon-glue.c b/arch/arm/crypto/nhpoly1305-neon-glue.c
+>> > new file mode 100644
+>> > index 0000000000000..df48a00f4c50f
+>> > --- /dev/null
+>> > +++ b/arch/arm/crypto/nhpoly1305-neon-glue.c
+>> > @@ -0,0 +1,78 @@
+>> > +// SPDX-License-Identifier: GPL-2.0
+>> > +/*
+>> > + * NHPoly1305 - ?-almost-?-universal hash function for Adiantum
+>> > + * (NEON accelerated version)
+>> > + *
+>> > + * Copyright 2018 Google LLC
+>> > + */
+>> > +
+>> > +#include <asm/neon.h>
+>> > +#include <asm/simd.h>
+>> > +#include <crypto/internal/hash.h>
+>> > +#include <crypto/nhpoly1305.h>
+>> > +#include <linux/module.h>
+>> > +
+>> > +asmlinkage void nh_neon(const u32 *key, const u8 *message, size_t message_len,
+>> > +                       u8 hash[NH_HASH_BYTES]);
+>> > +
+>> > +static void _nh_neon(const u32 *key, const u8 *message, size_t message_len,
+>> > +                    __le64 hash[NH_NUM_PASSES])
+>> > +{
+>> > +       nh_neon(key, message, message_len, (u8 *)hash);
+>> > +}
+>> > +
+>>
+>> Why do we need this function?
+>>
 >
-> Regards,
-> Miroslav
+> For now it's not needed so I should probably just remove it, but it seems likely
+> that indirect calls to assembly functions in the kernel will be going away in
+> order to add support for CFI (control flow integrity).  The android-4.9 and
+> android-4.14 kernels support CFI on arm64, so you might notice that some of the
+> arm64 crypto code had to be patched for this reason.
+>
+
+I didn't actually look at those kernel trees so I hadn't noticed yet.
+In any case, I'd suggest that we just keep this wrapper then, but
+please add a comment describing why it's there.
