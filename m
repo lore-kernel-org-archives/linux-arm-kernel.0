@@ -1,54 +1,227 @@
-From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Fri, 19 Oct 2018 10:04:42 +0100
-Subject: [PATCH v7 0/8] arm64: untag user pointers passed to the kernel
-In-Reply-To: <CAFKCwrh4-BvFB_R1J0LWcbfeR=d02OazowFuMU+hmq8Y=Dx+4w@mail.gmail.com>
-References: <cover.1538485901.git.andreyknvl@google.com>
- <be684ce5-92fd-e970-b002-83452cf50abd@arm.com>
- <CAAeHK+yEZTLjgSj8YUzeJec9Pp2TwuLT5nCa1OpfBLXJkx_hhg@mail.gmail.com>
- <CAFKCwrh4-BvFB_R1J0LWcbfeR=d02OazowFuMU+hmq8Y=Dx+4w@mail.gmail.com>
-Message-ID: <9bb7fefd-3f8f-266a-3cc9-cc64f8927206@arm.com>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Sat, 20 Oct 2018 14:18:05 +0530
+Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
+ zynqmp
+In-Reply-To: <20181020084805.29103-1-nava.manne@xilinx.com>
+References: <20181020084805.29103-1-nava.manne@xilinx.com>
+Message-ID: <20181020084805.29103-4-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/18 9:25 PM, Evgenii Stepanov wrote:
-> On Wed, Oct 17, 2018 at 7:20 AM, Andrey Konovalov <andreyknvl@google.com> wrote:
->> On Wed, Oct 17, 2018 at 4:06 PM, Vincenzo Frascino
->> <vincenzo.frascino@arm.com> wrote:
->>> Hi Andrey,
->>> I have been thinking a bit lately on how to address the problem of user tagged pointers passed to the kernel through syscalls, and IMHO probably the best way we have to catch them all and make sure that the approach is maintainable in the long term is to introduce shims that tag/untag the pointers passed to the kernel.
->>>
->>> In details, what I am proposing can live either in userspace (preferred solution so that we do not have to relax the ABI) or in kernel space and can be summarized as follows:
->>>  - A shim is specific to a syscall and is called by the libc when it needs to invoke the respective syscall.
->>>  - It is required only if the syscall accepts pointers.
->>>  - It saves the tags of a pointers passed to the syscall in memory (same approach if the we are passing a struct that contains pointers to the kernel, with the difference that all the tags of the pointers in the struct need to be saved singularly)
->>>  - Untags the pointers
->>>  - Invokes the syscall
->>>  - Retags the pointers with the tags stored in memory
->>>  - Returns
->>>
->>> What do you think?
->>
->> Hi Vincenzo,
->>
->> If I correctly understand what you are proposing, I'm not sure if that
->> would work with the countless number of different ioctl calls. For
->> example when an ioctl accepts a struct with a bunch of pointer fields.
->> In this case a shim like the one you propose can't live in userspace,
->> since libc doesn't know about the interface of all ioctls, so it can't
->> know which fields to untag. The kernel knows about those interfaces
->> (since the kernel implements them), but then we would need a custom
->> shim for each ioctl variation, which doesn't seem practical.
-> 
-> The current patchset handles majority of pointers in a just a few
-> common places, like copy_from_user. Userspace shims will need to untag
-> & retag all pointer arguments - we are looking at hundreds if not
-> thousands of shims. They will also be located in a different code base
-> from the syscall / ioctl implementations, which would make them
-> impossible to keep up to date.
-> 
+This patch adds FPGA Manager support for the Xilinx
+ZynqMp chip.
 
-I agree with both of you, ioctl is the real show stopper for this approach. Thanks for pointing this out.
+Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+---
+Changes for v1:
+		-None.
 
+Changes for RFC-V2:
+                -Updated the Fpga Mgr registrations call's
+                 to 4.18
+
+ drivers/fpga/Kconfig       |   9 +++
+ drivers/fpga/Makefile      |   1 +
+ drivers/fpga/zynqmp-fpga.c | 159 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 169 insertions(+)
+ create mode 100644 drivers/fpga/zynqmp-fpga.c
+
+diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+index 1ebcef4bab5b..26ebbcf3d3a3 100644
+--- a/drivers/fpga/Kconfig
++++ b/drivers/fpga/Kconfig
+@@ -56,6 +56,15 @@ config FPGA_MGR_ZYNQ_FPGA
+ 	help
+ 	  FPGA manager driver support for Xilinx Zynq FPGAs.
+ 
++config FPGA_MGR_ZYNQMP_FPGA
++	tristate "Xilinx Zynqmp FPGA"
++	depends on ARCH_ZYNQMP || COMPILE_TEST
++	help
++	  FPGA manager driver support for Xilinx ZynqMP FPGAs.
++	  This driver uses processor configuration port(PCAP)
++	  to configure the programmable logic(PL) through PS
++	  on ZynqMP SoC.
++
+ config FPGA_MGR_XILINX_SPI
+ 	tristate "Xilinx Configuration over Slave Serial (SPI)"
+ 	depends on SPI
+diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
+index 7a2d73ba7122..3488ebbaee46 100644
+--- a/drivers/fpga/Makefile
++++ b/drivers/fpga/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)	+= socfpga-a10.o
+ obj-$(CONFIG_FPGA_MGR_TS73XX)		+= ts73xx-fpga.o
+ obj-$(CONFIG_FPGA_MGR_XILINX_SPI)	+= xilinx-spi.o
+ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
++obj-$(CONFIG_FPGA_MGR_ZYNQMP_FPGA)	+= zynqmp-fpga.o
+ obj-$(CONFIG_ALTERA_PR_IP_CORE)         += altera-pr-ip-core.o
+ obj-$(CONFIG_ALTERA_PR_IP_CORE_PLAT)    += altera-pr-ip-core-plat.o
+ 
+diff --git a/drivers/fpga/zynqmp-fpga.c b/drivers/fpga/zynqmp-fpga.c
+new file mode 100644
+index 000000000000..2760d7e3872a
+--- /dev/null
++++ b/drivers/fpga/zynqmp-fpga.c
+@@ -0,0 +1,159 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2018 Xilinx, Inc.
++ */
++
++#include <linux/dma-mapping.h>
++#include <linux/fpga/fpga-mgr.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/string.h>
++#include <linux/firmware/xlnx-zynqmp.h>
++
++/* Constant Definitions */
++#define IXR_FPGA_DONE_MASK	0X00000008U
++
++/**
++ * struct zynqmp_fpga_priv - Private data structure
++ * @dev:	Device data structure
++ * @flags:	flags which is used to identify the bitfile type
++ */
++struct zynqmp_fpga_priv {
++	struct device *dev;
++	u32 flags;
++};
++
++static int zynqmp_fpga_ops_write_init(struct fpga_manager *mgr,
++				      struct fpga_image_info *info,
++				      const char *buf, size_t size)
++{
++	struct zynqmp_fpga_priv *priv;
++
++	priv = mgr->priv;
++	priv->flags = info->flags;
++
++	return 0;
++}
++
++static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
++				 const char *buf, size_t size)
++{
++	struct zynqmp_fpga_priv *priv;
++	char *kbuf;
++	dma_addr_t dma_addr;
++	int ret;
++	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
++
++	if (!eemi_ops || !eemi_ops->fpga_load)
++		return -ENXIO;
++
++	priv = mgr->priv;
++
++	kbuf = dma_alloc_coherent(priv->dev, size, &dma_addr, GFP_KERNEL);
++	if (!kbuf)
++		return -ENOMEM;
++
++	memcpy(kbuf, buf, size);
++
++	wmb(); /* ensure all writes are done before initiate FW call */
++
++	ret = eemi_ops->fpga_load(dma_addr, size, priv->flags);
++
++	dma_free_coherent(priv->dev, size, kbuf, dma_addr);
++
++	return ret;
++}
++
++static int zynqmp_fpga_ops_write_complete(struct fpga_manager *mgr,
++					  struct fpga_image_info *info)
++{
++	return 0;
++}
++
++static enum fpga_mgr_states zynqmp_fpga_ops_state(struct fpga_manager *mgr)
++{
++	u32 status;
++	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
++
++	if (!eemi_ops || !eemi_ops->fpga_get_status)
++		return FPGA_MGR_STATE_UNKNOWN;
++
++	eemi_ops->fpga_get_status(&status);
++	if (status & IXR_FPGA_DONE_MASK)
++		return FPGA_MGR_STATE_OPERATING;
++
++	return FPGA_MGR_STATE_UNKNOWN;
++}
++
++static const struct fpga_manager_ops zynqmp_fpga_ops = {
++	.state = zynqmp_fpga_ops_state,
++	.write_init = zynqmp_fpga_ops_write_init,
++	.write = zynqmp_fpga_ops_write,
++	.write_complete = zynqmp_fpga_ops_write_complete,
++};
++
++static int zynqmp_fpga_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct zynqmp_fpga_priv *priv;
++	struct fpga_manager *mgr;
++	int err, ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->dev = dev;
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(44));
++	if (ret < 0)
++		dev_err(dev, "no usable DMA configuration");
++
++	mgr = fpga_mgr_create(dev, "Xilinx ZynqMP FPGA Manager",
++			      &zynqmp_fpga_ops, priv);
++	if (!mgr)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, mgr);
++
++	err = fpga_mgr_register(mgr);
++	if (err) {
++		dev_err(dev, "unable to register FPGA manager");
++		fpga_mgr_free(mgr);
++		return err;
++	}
++
++	return 0;
++}
++
++static int zynqmp_fpga_remove(struct platform_device *pdev)
++{
++	struct fpga_manager *mgr = platform_get_drvdata(pdev);
++
++	fpga_mgr_unregister(mgr);
++
++	return 0;
++}
++
++static const struct of_device_id zynqmp_fpga_of_match[] = {
++	{ .compatible = "xlnx,zynqmp-pcap-fpga", },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, zynqmp_fpga_of_match);
++
++static struct platform_driver zynqmp_fpga_driver = {
++	.probe = zynqmp_fpga_probe,
++	.remove = zynqmp_fpga_remove,
++	.driver = {
++		.name = "zynqmp_fpga_manager",
++		.of_match_table = of_match_ptr(zynqmp_fpga_of_match),
++	},
++};
++
++module_platform_driver(zynqmp_fpga_driver);
++
++MODULE_AUTHOR("Nava kishore Manne <navam@xilinx.com>");
++MODULE_DESCRIPTION("Xilinx ZynqMp FPGA Manager");
++MODULE_LICENSE("GPL");
 -- 
-Regards,
-Vincenzo
+2.18.0
