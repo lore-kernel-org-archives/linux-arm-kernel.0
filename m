@@ -1,66 +1,66 @@
-From: vkoul@kernel.org (Vinod)
-Date: Sat, 20 Oct 2018 21:56:24 +0530
-Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
-In-Reply-To: <20181019071154.GE13642@Pilot130>
-References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
- <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
- <20181017060531.GU2400@vkoul-mobl>
- <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
- <20181018095507.GC2400@vkoul-mobl>
- <a3fecf7913d6a85a6294afbc5a1a18b7714d6756.camel@kernel.crashing.org>
- <20181019071154.GE13642@Pilot130>
-Message-ID: <20181020162624.GC2894@vkoul-mobl>
+From: joel@joelfernandes.org (Joel Fernandes)
+Date: Sat, 20 Oct 2018 09:27:19 -0700
+Subject: [PATCH 0/6] Tracing register accesses with pstore and dynamic
+ debug
+In-Reply-To: <1d3ddbe3-d3ac-aa3e-fc9e-36739ddd0c91@codeaurora.org>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <20181020052535.GA155509@joelaf.mtv.corp.google.com>
+ <1d3ddbe3-d3ac-aa3e-fc9e-36739ddd0c91@codeaurora.org>
+Message-ID: <20181020162719.GA49955@joelaf.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-10-18, 12:41, sudheer.v wrote:
-> On Fri, Oct 19, 2018 at 10:32:24AM +1100, Benjamin Herrenschmidt wrote:
-> > On Thu, 2018-10-18 at 15:25 +0530, Vinod wrote:
+On Sat, Oct 20, 2018 at 12:02:37PM +0530, Sai Prakash Ranjan wrote:
+> On 10/20/2018 10:55 AM, Joel Fernandes wrote:
+> > On Sun, Sep 09, 2018 at 01:57:01AM +0530, Sai Prakash Ranjan wrote:
+> > > Hi,
 > > > 
-> > > > It's not a dmaengine driver. It's a serial UART driver that happens to
-> > > > use a dedicated DMA engine.
+> > > This patch series adds Event tracing support to pstore and is continuation
+> > > to the RFC patch introduced to add a new tracing facility for register
+> > > accesses called Register Trace Buffer(RTB). Since we decided to not introduce
+> > > a separate framework to trace register accesses and use existing framework
+> > > like tracepoints, I have moved from RFC. Details of the RFC in link below:
 > > > 
-> > > Then I see no reason for it to use dmaengine APIs. The framework allows
-> > > people to share a controller for many clients, but if you have dedicated
-> > > one then you may use it directly
+> > > Link: https://lore.kernel.org/lkml/cover.1535119710.git.saiprakash.ranjan at codeaurora.org/
+> > > 
+> > > MSR tracing example given by Steven was helpful in using tracepoints for
+> > > register accesses instead of using separate trace. But just having these
+> > > IO traces would not help much unless we could have them in some persistent
+> > > ram buffer for debugging unclocked access or some kind of bus hang or an
+> > > unexpected reset caused by some buggy driver which happens a lot during
+> > > initial development stages. By analyzing the last few entries of this buffer,
+> > > we could identify the register access which is causing the issue.
 > > 
-> > Well... the engine is shared by a few UARTs, they have dedicated rings
-> > but there's a common set of regs for interrupt handling etc.
+> > Hi Sai,
 > > 
-> > That said, I still think it could be contained within a UART driver,
-> > there's little benefit in adding the framework overhead, esp since
-> > these are really weak cores, any overhead will be felt.
+> > I wanted to see if I could make some time to get your patches working. We are
+> > hitting usecases that need something like this as well. Basically devices
+> > hanging and then the ramdump does not tell us much, so in this case pstore
+> > events can be really helpful. This usecase came up last year as well.
 > > 
-> > Ben.
+> > Anyway while I was going through your patches, I cleaned up some pstore code
+> > as well and I have 3 more patches on top of yours for this clean up. I prefer
+> > we submit the patches together and sync our work together so that there is
+> > least conflict.
 > > 
-> > > > It's unclear whether it should be split into two drivers, or just have
-> > > > the serial driver directly use the dma engine since that engine is
-> > > > dedicated in HW to only work on those UARTs and nothing else...
-> > > > 
-> > > > Cheers,
-> > > > Ben.
+> > Here's my latest tree:
+> > https://github.com/joelagnel/linux-kernel/commits/pstore-events
+> > (note that I have only build tested the patches since I just wrote them and
+> > its quite late in the night here ;-))
+> > 
 > 
-> Initially we wanted to have  a single driver,
-> however we had an informal discussion with one of the maintainer 
-> and based on the feedback, followed the Linux DMA and UART architecture.
+> Hi Joel,
 > 
-> If this seperate DMA-engine driver adds more overhead than benifit,
-> we will merge them into a single UART driver and resubmitt the patches.
-> Vinod,
->       can this dma-controller driver sit under dma subsystem?.
->       or better to move it under UART framework.
+> Thanks for looking into this. Sure, I will be happy to sync up with you on
 
+Thanks. And added a fourth patch in the tree too.
 
-My advise would be to see what you can do with the DMA IP block. If this
-can/would be used in different places then it would make sense to do a
-dmaengine driver and solve the problem for everyone.
+> this. I can test your additional patches on top of my pstore patches. BTW,
+> I'm still stuck at copying binary record into pstore and then extract it
+> during read time. Seems like I'm missing something.
 
-If this is always going to be hidden behind serial then maybe it makes
-sense to be inside serial driver and not use dmaengine APIs
+Sure, push your latest somewhere and let me know. I'll try to get you unstuck.
 
-If you decide to prefer the former case, please move it to dmaengine and
-resubmit :)
+thanks,
 
-HTH
--- 
-~Vinod
+ - Joel
