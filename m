@@ -1,128 +1,50 @@
-From: qiangqing.zhang@nxp.com (Joakim Zhang)
-Date: Sat, 20 Oct 2018 02:35:36 +0000
-Subject: [PATCH v2 1/1] ARM: dts: imx6sx-sdb: Add flexcan support
-Message-ID: <20181020023318.21663-1-qiangqing.zhang@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 20 Oct 2018 11:24:05 +0800
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <CA+_SqcDszvqfH7qvEyi8QW2RqkA1kpV6L7VWxhtw5Ogzeovhbg@mail.gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+ <CA+_SqcDszvqfH7qvEyi8QW2RqkA1kpV6L7VWxhtw5Ogzeovhbg@mail.gmail.com>
+Message-ID: <CAKv+Gu9be0LDSzkinzwJ50LN+g7Omdjh5Z7xUmpoQc+oCzxZ_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <aisheng.dong@nxp.com>
+On 20 October 2018 at 02:19, Paul Crowley <paulcrowley@google.com> wrote:
+> On Fri, 19 Oct 2018 at 08:58, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+>> Before merging this into the kernel, do you want to wait until you've
+>> received some public review from academia?
+>
+> I would prefer not to wait. Unlike a new primitive whose strength can
+> only be known through attempts at cryptanalysis, Adiantum is a
+> construction based on
+> well-understood and trusted primitives; it is secure if the proof
+> accompanying it is correct. Given that (outside competitions or
+> standardization efforts) no-one ever issues public statements that
+> they think algorithms or proofs are good, what I'm expecting from
+> academia is silence :) The most we could hope for would be getting the
+> paper accepted at a conference, and we're pursuing that but there's a
+> good chance that won't happen simply because it's not very novel. It
+> basically takes existing ideas and applies them using a stream cipher
+> instead of a block cipher, and a faster hashing mode; it's also a
+> small update from HPolyC. I've had some private feedback that the
+> proof seems correct, and that's all I'm expecting to get.
 
-CAN transceiver is different on RevA and RevB board.
-It's active high on RevA while active low on Rev B.
+Hi Paul, Eric,
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
----
- arch/arm/boot/dts/imx6sx-sdb-reva.dts | 12 ++++++++
- arch/arm/boot/dts/imx6sx-sdb.dts      |  5 ++++
- arch/arm/boot/dts/imx6sx-sdb.dtsi     | 42 +++++++++++++++++++++++++++
- 3 files changed, 59 insertions(+)
+The Adiantum paper claims
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-index 9cc6ff206aea..d98dcf00b9c4 100644
---- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-@@ -10,6 +10,18 @@
- 
- / {
- 	model = "Freescale i.MX6 SoloX SDB RevA Board";
-+
-+	/* Transceiver EN/STBY is active high on RevA board */
-+	reg_can_en: regulator-can-en {
-+		gpio = <&gpio4 25 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_can_stby: regulator-can-stby {
-+		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		vin-supply = <&reg_can_en>;
-+	};
- };
- 
- &i2c1 {
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 6dd9bebfe027..092b8de142a8 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -10,6 +10,11 @@
- 
- / {
- 	model = "Freescale i.MX6 SoloX SDB RevB Board";
-+
-+	/* Transceiver EN/STBY is active low on RevB board */
-+	reg_can_stby: regulator-can-stby {
-+		gpio = <&gpio4 27 GPIO_ACTIVE_LOW>;
-+	};
- };
- 
- &i2c1 {
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index f8f31872fa14..e37ec4b396a2 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -136,6 +136,20 @@
- 		regulator-max-microvolt = <5000000>;
- 	};
- 
-+	reg_can_en: regulator-can-en {
-+		compatible = "regulator-fixed";
-+		regulator-name = "can-en";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_can_stby: regulator-can-stby {
-+		compatible = "regulator-fixed";
-+		regulator-name = "can-stby";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
- 	sound {
- 		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
- 		model = "wm8962-audio";
-@@ -202,6 +216,20 @@
- 	status = "okay";
- };
- 
-+&flexcan1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	xceiver-supply = <&reg_can_stby>;
-+	status = "okay";
-+};
-+
-+&flexcan2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	xceiver-supply = <&reg_can_stby>;
-+	status = "okay";
-+};
-+
- &i2c3 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
-@@ -397,6 +425,20 @@
- 			>;
- 		};
- 
-+		pinctrl_flexcan1: flexcan1grp {
-+			fsl,pins = <
-+				MX6SX_PAD_QSPI1B_DQS__CAN1_TX		0x1b020
-+				MX6SX_PAD_QSPI1A_SS1_B__CAN1_RX		0x1b020
-+			>;
-+		};
-+
-+		pinctrl_flexcan2: flexcan2grp {
-+			fsl,pins = <
-+				MX6SX_PAD_QSPI1B_SS1_B__CAN2_RX		0x1b020
-+				MX6SX_PAD_QSPI1A_DQS__CAN2_TX		0x1b020
-+			>;
-+		};
-+
- 		pinctrl_gpio_keys: gpio_keysgrp {
- 			fsl,pins = <
- 				MX6SX_PAD_CSI_DATA04__GPIO1_IO_18 0x17059
--- 
-2.17.1
+"On an ARM Cortex-A7 processor, Adiantum decrypts 4096-byte messages
+at 11 cycles per byte, five times faster than AES-256-XTS, with a
+constant-time implementation."
+
+which is surprising to me. The bit slicing NEON AES core runs at ~14
+cycle per byte on a Cortex-A15 (when encrypting), so 55 cycles per
+byte on A7 sounds rather high. Is it really that bad?
+
+Also, the paper mentions that the second hash pass and the stream
+cipher en/decryption pass could be executed in parallel, while your
+implementation performs three distinct passes. Do you have any
+estimates on the potential performance gain of implementing that? In
+my experience (which is mostly A53 rather than A7 based, mind you),
+removing memory accesses can help tremendously to speed up the
+execution on low end cores.
