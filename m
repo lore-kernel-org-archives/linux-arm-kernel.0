@@ -1,230 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 20 Oct 2018 23:06:00 +0800
-Subject: [RFC PATCH v2 09/12] crypto: nhpoly1305 - add NHPoly1305 support
-In-Reply-To: <20181020053834.GC876@sol.localdomain>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <20181015175424.97147-10-ebiggers@kernel.org>
- <CAKv+Gu-5WM19g5HguDheAADbigKNxokDCFMekkt4OYdEEa8Avw@mail.gmail.com>
- <20181020053834.GC876@sol.localdomain>
-Message-ID: <CAKv+Gu-A_EhMBXq_nqzBzpgN36foo6hA3Ba3=j+WVM-jph=mrw@mail.gmail.com>
+From: vkoul@kernel.org (Vinod)
+Date: Sat, 20 Oct 2018 21:56:24 +0530
+Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
+In-Reply-To: <20181019071154.GE13642@Pilot130>
+References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
+ <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
+ <20181017060531.GU2400@vkoul-mobl>
+ <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
+ <20181018095507.GC2400@vkoul-mobl>
+ <a3fecf7913d6a85a6294afbc5a1a18b7714d6756.camel@kernel.crashing.org>
+ <20181019071154.GE13642@Pilot130>
+Message-ID: <20181020162624.GC2894@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2018 at 13:38, Eric Biggers <ebiggers@kernel.org> wrote:
-> Hi Ard,
->
-> On Sat, Oct 20, 2018 at 12:00:31PM +0800, Ard Biesheuvel wrote:
->> On 16 October 2018 at 01:54, Eric Biggers <ebiggers@kernel.org> wrote:
->> > From: Eric Biggers <ebiggers@google.com>
->> >
->> > Add a generic implementation of NHPoly1305, an ?-almost-?-universal hash
->> > function used in the Adiantum encryption mode.
->> >
->> > CONFIG_NHPOLY1305 is not selectable by itself since there won't be any
->> > real reason to enable it without also enabling Adiantum support.
->> >
->> > Signed-off-by: Eric Biggers <ebiggers@google.com>
->> > ---
->> >  crypto/Kconfig              |    5 +
->> >  crypto/Makefile             |    1 +
->> >  crypto/nhpoly1305.c         |  288 ++++++++
->> >  crypto/testmgr.c            |    6 +
->> >  crypto/testmgr.h            | 1240 ++++++++++++++++++++++++++++++++++-
->> >  include/crypto/nhpoly1305.h |   74 +++
->> >  6 files changed, 1610 insertions(+), 4 deletions(-)
->> >  create mode 100644 crypto/nhpoly1305.c
->> >  create mode 100644 include/crypto/nhpoly1305.h
->> >
->> > diff --git a/crypto/Kconfig b/crypto/Kconfig
->> > index 4fa0a4a0e8615..431beca903623 100644
->> > --- a/crypto/Kconfig
->> > +++ b/crypto/Kconfig
->> > @@ -493,6 +493,11 @@ config CRYPTO_KEYWRAP
->> >           Support for key wrapping (NIST SP800-38F / RFC3394) without
->> >           padding.
->> >
->> > +config CRYPTO_NHPOLY1305
->> > +       tristate
->> > +       select CRYPTO_HASH
->> > +       select CRYPTO_POLY1305
->> > +
->> >  comment "Hash modes"
->> >
->> >  config CRYPTO_CMAC
->> > diff --git a/crypto/Makefile b/crypto/Makefile
->> > index 7e673f7c71107..87b86f221a2a2 100644
->> > --- a/crypto/Makefile
->> > +++ b/crypto/Makefile
->> > @@ -84,6 +84,7 @@ obj-$(CONFIG_CRYPTO_LRW) += lrw.o
->> >  obj-$(CONFIG_CRYPTO_XTS) += xts.o
->> >  obj-$(CONFIG_CRYPTO_CTR) += ctr.o
->> >  obj-$(CONFIG_CRYPTO_KEYWRAP) += keywrap.o
->> > +obj-$(CONFIG_CRYPTO_NHPOLY1305) += nhpoly1305.o
->> >  obj-$(CONFIG_CRYPTO_GCM) += gcm.o
->> >  obj-$(CONFIG_CRYPTO_CCM) += ccm.o
->> >  obj-$(CONFIG_CRYPTO_CHACHA20POLY1305) += chacha20poly1305.o
->> > diff --git a/crypto/nhpoly1305.c b/crypto/nhpoly1305.c
->> > new file mode 100644
->> > index 0000000000000..087ad7680dd62
->> > --- /dev/null
->> > +++ b/crypto/nhpoly1305.c
->> > @@ -0,0 +1,288 @@
->> > +// SPDX-License-Identifier: GPL-2.0
->> > +/*
->> > + * NHPoly1305 - ?-almost-?-universal hash function for Adiantum
->> > + *
->> > + * Copyright 2018 Google LLC
->> > + */
->> > +
->> > +/*
->> > + * "NHPoly1305" is the main component of Adiantum hashing.
->> > + * Specifically, it is the calculation
->> > + *
->> > + *     H_M ? Poly1305_{K_M}(NH_{K_N}(pad_{128}(M)))
->> > + *
->> > + * from the procedure in section A.5 of the Adiantum paper [1].  It is an
->> > + * ?-almost-?-universal (?A?U) hash function for equal-length inputs over
->> > + * Z/(2^{128}Z), where the "?" operation is addition.  It hashes 1024-byte
->> > + * chunks of the input with the NH hash function [2], reducing the input length
->> > + * by 32x.  The resulting NH digests are evaluated as a polynomial in
->> > + * GF(2^{130}-5), like in the Poly1305 MAC [3].  Note that the polynomial
->> > + * evaluation by itself would suffice to achieve the ?A?U property; NH is used
->> > + * for performance since it's over twice as fast as Poly1305.
->> > + *
->> > + * This is *not* a cryptographic hash function; do not use it as such!
->> > + *
->> > + * [1] Adiantum: length-preserving encryption for entry-level processors
->> > + *     (https://eprint.iacr.org/2018/720.pdf)
->> > + * [2] UMAC: Fast and Secure Message Authentication
->> > + *     (https://fastcrypto.org/umac/umac_proc.pdf)
->> > + * [3] The Poly1305-AES message-authentication code
->> > + *     (https://cr.yp.to/mac/poly1305-20050329.pdf)
->> > + */
->> > +
->> > +#include <asm/unaligned.h>
->> > +#include <crypto/algapi.h>
->> > +#include <crypto/internal/hash.h>
->> > +#include <crypto/nhpoly1305.h>
->> > +#include <linux/crypto.h>
->> > +#include <linux/kernel.h>
->> > +#include <linux/module.h>
->> > +
->> > +#define NH_STRIDE(K0, K1, K2, K3)                              \
->> > +({                                                             \
->> > +       m_A = get_unaligned_le32(src); src += 4;                \
->> > +       m_B = get_unaligned_le32(src); src += 4;                \
->> > +       m_C = get_unaligned_le32(src); src += 4;                \
->> > +       m_D = get_unaligned_le32(src); src += 4;                \
->> > +       K3##_A = *key++;                                        \
->> > +       K3##_B = *key++;                                        \
->> > +       K3##_C = *key++;                                        \
->> > +       K3##_D = *key++;                                        \
->> > +       sum0 += (u64)(u32)(m_A + K0##_A) * (u32)(m_C + K0##_C); \
->> > +       sum1 += (u64)(u32)(m_A + K1##_A) * (u32)(m_C + K1##_C); \
->> > +       sum2 += (u64)(u32)(m_A + K2##_A) * (u32)(m_C + K2##_C); \
->> > +       sum3 += (u64)(u32)(m_A + K3##_A) * (u32)(m_C + K3##_C); \
->> > +       sum0 += (u64)(u32)(m_B + K0##_B) * (u32)(m_D + K0##_D); \
->> > +       sum1 += (u64)(u32)(m_B + K1##_B) * (u32)(m_D + K1##_D); \
->> > +       sum2 += (u64)(u32)(m_B + K2##_B) * (u32)(m_D + K2##_D); \
->> > +       sum3 += (u64)(u32)(m_B + K3##_B) * (u32)(m_D + K3##_D); \
->> > +})
->> > +
->> > +static void nh_generic(const u32 *key, const u8 *src, size_t srclen,
->> > +                      __le64 hash[NH_NUM_PASSES])
->> > +{
->> > +       u64 sum0 = 0, sum1 = 0, sum2 = 0, sum3 = 0;
->> > +       u32 k0_A = *key++;
->> > +       u32 k0_B = *key++;
->> > +       u32 k0_C = *key++;
->> > +       u32 k0_D = *key++;
->> > +       u32 k1_A = *key++;
->> > +       u32 k1_B = *key++;
->> > +       u32 k1_C = *key++;
->> > +       u32 k1_D = *key++;
->> > +       u32 k2_A = *key++;
->> > +       u32 k2_B = *key++;
->> > +       u32 k2_C = *key++;
->> > +       u32 k2_D = *key++;
->> > +       u32 k3_A, k3_B, k3_C, k3_D;
->> > +       u32 m_A, m_B, m_C, m_D;
->> > +       size_t n = srclen / NH_MESSAGE_UNIT;
->> > +
->> > +       BUILD_BUG_ON(NH_PAIR_STRIDE != 2);
->> > +       BUILD_BUG_ON(NH_NUM_PASSES != 4);
->> > +
->> > +       while (n >= 4) {
->> > +               NH_STRIDE(k0, k1, k2, k3);
->> > +               NH_STRIDE(k1, k2, k3, k0);
->> > +               NH_STRIDE(k2, k3, k0, k1);
->> > +               NH_STRIDE(k3, k0, k1, k2);
->> > +               n -= 4;
->> > +       }
->> > +       if (n) {
->> > +               NH_STRIDE(k0, k1, k2, k3);
->> > +               if (--n) {
->> > +                       NH_STRIDE(k1, k2, k3, k0);
->> > +                       if (--n)
->> > +                               NH_STRIDE(k2, k3, k0, k1);
->> > +               }
->> > +       }
->> > +
->>
->> This all looks a bit clunky to me, with the macro, the *key++s in the
->> initializers and these conditionals.
->>
->> Was it written in this particular way to get GCC to optimize it in the
->> right way?
->
-> This does get compiled into something much faster than a naive version, which
-> you can find commented out at
-> https://github.com/google/adiantum/blob/master/benchmark/src/nh.c#L14.
->
-> Though, I admit that I haven't put a ton of effort into this C implementation of
-> NH yet.  Right now it's actually somewhat of a translation of the NEON version.
-> I'll do some experiments and see if it can be made into something less ugly
-> without losing performance.
->
+On 19-10-18, 12:41, sudheer.v wrote:
+> On Fri, Oct 19, 2018 at 10:32:24AM +1100, Benjamin Herrenschmidt wrote:
+> > On Thu, 2018-10-18 at 15:25 +0530, Vinod wrote:
+> > > 
+> > > > It's not a dmaengine driver. It's a serial UART driver that happens to
+> > > > use a dedicated DMA engine.
+> > > 
+> > > Then I see no reason for it to use dmaengine APIs. The framework allows
+> > > people to share a controller for many clients, but if you have dedicated
+> > > one then you may use it directly
+> > 
+> > Well... the engine is shared by a few UARTs, they have dedicated rings
+> > but there's a common set of regs for interrupt handling etc.
+> > 
+> > That said, I still think it could be contained within a UART driver,
+> > there's little benefit in adding the framework overhead, esp since
+> > these are really weak cores, any overhead will be felt.
+> > 
+> > Ben.
+> > 
+> > > > It's unclear whether it should be split into two drivers, or just have
+> > > > the serial driver directly use the dma engine since that engine is
+> > > > dedicated in HW to only work on those UARTs and nothing else...
+> > > > 
+> > > > Cheers,
+> > > > Ben.
+> 
+> Initially we wanted to have  a single driver,
+> however we had an informal discussion with one of the maintainer 
+> and based on the feedback, followed the Linux DMA and UART architecture.
+> 
+> If this seperate DMA-engine driver adds more overhead than benifit,
+> we will merge them into a single UART driver and resubmitt the patches.
+> Vinod,
+>       can this dma-controller driver sit under dma subsystem?.
+>       or better to move it under UART framework.
 
-No that's fine but please document it.
 
->>
->> > +       hash[0] = cpu_to_le64(sum0);
->> > +       hash[1] = cpu_to_le64(sum1);
->> > +       hash[2] = cpu_to_le64(sum2);
->> > +       hash[3] = cpu_to_le64(sum3);
->> > +}
->> > +
->> > +/* Pass the next NH hash value through Poly1305 */
->> > +static void process_nh_hash_value(struct nhpoly1305_state *state,
->> > +                                 const struct nhpoly1305_key *key)
->> > +{
->> > +       BUILD_BUG_ON(NH_HASH_BYTES % POLY1305_BLOCK_SIZE != 0);
->> > +
->> > +       poly1305_core_blocks(&state->poly_state, &key->poly_key, state->nh_hash,
->> > +                            NH_HASH_BYTES / POLY1305_BLOCK_SIZE);
->> > +}
->> > +
->> > +/*
->> > + * Feed the next portion of the source data, as a whole number of 16-byte
->> > + * "NH message units", through NH and Poly1305.  Each NH hash is taken over
->> > + * 1024 bytes, except possibly the final one which is taken over a multiple of
->> > + * 16 bytes up to 1024.  Also, in the case where data is passed in misaligned
->> > + * chunks, we combine partial hashes; the end result is the same either way.
->> > + */
->> > +static void nhpoly1305_units(struct nhpoly1305_state *state,
->> > +                            const struct nhpoly1305_key *key,
->> > +                            const u8 *src, unsigned int srclen, nh_t nh_fn)
->>
->> Since indirect calls are going out of style: can we get rid of the
->> function pointer? Or is the compiler already inferring that it always
->> refers to nh_generic()?
->>
->
-> At least for now I want to use the same crypto_nhpoly1305_*_helper() functions
-> for all nhpoly1305 implementations, and that requires that 'nh' be a function
-> pointer.  The helpers could be placed in a header and inlined which would turn
-> 'nh' into a direct call, but it seemed to be too much code to inline, and
-> normally 'nh' is only invoked once per 1024 bytes anyway.
->
+My advise would be to see what you can do with the DMA IP block. If this
+can/would be used in different places then it would make sense to do a
+dmaengine driver and solve the problem for everyone.
 
-OK.
+If this is always going to be hidden behind serial then maybe it makes
+sense to be inside serial driver and not use dmaengine APIs
+
+If you decide to prefer the former case, please move it to dmaengine and
+resubmit :)
+
+HTH
+-- 
+~Vinod
