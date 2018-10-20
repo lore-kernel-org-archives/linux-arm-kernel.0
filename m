@@ -1,14 +1,13 @@
 From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Sun, 21 Oct 2018 06:30:00 +0900
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add SCIF-{0, 1, 3, 4,
- 5} device nodes
-Message-ID: <1540071000-27091-1-git-send-email-ykaneko0929@gmail.com>
+Date: Sun, 21 Oct 2018 06:30:27 +0900
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add all HSCIF nodes
+Message-ID: <1540071027-27130-1-git-send-email-ykaneko0929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This patch adds the device nodes for SCIF-{0,1,3,4,5} serial ports to
+This patch adds the device nodes for all HSCIF serial ports to
 the R8A77990 SoC.
 
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
@@ -17,109 +16,107 @@ Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
 This patch is based on the devel branch of Simon Horman's renesas tree.
 
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 83 +++++++++++++++++++++++++++++++
- 1 file changed, 83 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 88 +++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index 6d5efeb..f969e68 100644
+index f969e68..a437862 100644
 --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -679,6 +679,40 @@
- 			status = "disabled";
+@@ -357,6 +357,94 @@
+ 			resets = <&cpg 407>;
  		};
  
-+		scif0: serial at e6e60000 {
-+			compatible = "renesas,scif-r8a77990",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e60000 0 64>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 207>,
++		hscif0: serial at e6540000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6540000 0 0x60>;
++			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 520>,
 +				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
 +				 <&scif_clk>;
 +			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
-+			       <&dmac2 0x51>, <&dmac2 0x50>;
++			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
++			       <&dmac2 0x31>, <&dmac2 0x30>;
 +			dma-names = "tx", "rx", "tx", "rx";
 +			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 207>;
++			resets = <&cpg 520>;
 +			status = "disabled";
 +		};
 +
-+		scif1: serial at e6e68000 {
-+			compatible = "renesas,scif-r8a77990",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e68000 0 64>;
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 206>,
++		hscif1: serial at e6550000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6550000 0 0x60>;
++			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 519>,
 +				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
 +				 <&scif_clk>;
 +			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
-+			       <&dmac2 0x53>, <&dmac2 0x52>;
++			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
++			       <&dmac2 0x33>, <&dmac2 0x32>;
 +			dma-names = "tx", "rx", "tx", "rx";
 +			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 206>;
++			resets = <&cpg 519>;
 +			status = "disabled";
 +		};
 +
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a77990",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
-@@ -694,6 +728,55 @@
- 			status = "disabled";
- 		};
- 
-+		scif3: serial at e6c50000 {
-+			compatible = "renesas,scif-r8a77990",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6c50000 0 64>;
-+			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 204>,
++		hscif2: serial at e6560000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6560000 0 0x60>;
++			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 518>,
 +				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
 +				 <&scif_clk>;
 +			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x57>, <&dmac0 0x56>;
++			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
++			       <&dmac2 0x35>, <&dmac2 0x34>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 518>;
++			status = "disabled";
++		};
++
++		hscif3: serial at e66a0000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe66a0000 0 0x60>;
++			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 517>,
++				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x37>, <&dmac0 0x36>;
 +			dma-names = "tx", "rx";
 +			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 204>;
++			resets = <&cpg 517>;
 +			status = "disabled";
 +		};
 +
-+		scif4: serial at e6c40000 {
-+			compatible = "renesas,scif-r8a77990",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6c40000 0 64>;
-+			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 203>,
++		hscif4: serial at e66b0000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe66b0000 0 0x60>;
++			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 516>,
 +				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
 +				 <&scif_clk>;
 +			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x59>, <&dmac0 0x58>;
++			dmas = <&dmac0 0x39>, <&dmac0 0x38>;
 +			dma-names = "tx", "rx";
 +			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 203>;
++			resets = <&cpg 516>;
 +			status = "disabled";
 +		};
 +
-+		scif5: serial at e6f30000 {
-+			compatible = "renesas,scif-r8a77990",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6f30000 0 64>;
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 202>,
-+				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>,
-+			       <&dmac2 0x5b>, <&dmac2 0x5a>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 202>;
-+			status = "disabled";
-+		};
-+
- 		msiof0: spi at e6e90000 {
- 			compatible = "renesas,msiof-r8a77990",
- 				     "renesas,rcar-gen3-msiof";
+ 		dmac0: dma-controller at e6700000 {
+ 			compatible = "renesas,dmac-r8a77990",
+ 				     "renesas,rcar-dmac";
 -- 
 1.9.1
