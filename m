@@ -1,49 +1,90 @@
-From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Sun, 21 Oct 2018 23:58:48 +0200
-Subject: [PATCH] thermal: bcm2835: enable hwmon explicitly
-Message-ID: <20181021215848.5827-1-matthias.bgg@kernel.org>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Sun, 21 Oct 2018 15:23:42 -0700
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <20181019190411.GB246441@gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+ <20181019190411.GB246441@gmail.com>
+Message-ID: <20181021222341.GA742@sol.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <mbrugger@suse.com>
+On Fri, Oct 19, 2018 at 12:04:11PM -0700, Eric Biggers wrote:
+> Hi Jason,
+> 
+> On Fri, Oct 19, 2018 at 05:58:35PM +0200, Jason A. Donenfeld wrote:
+> > Hello Eric,
+> > 
+> > > As before, some of these patches conflict with the new "Zinc" crypto
+> > > library.  But I don't know when Zinc will be merged, so for now I've
+> > > continued to base this patchset on the current 'cryptodev'.
+> > 
+> > I'd appreciate it if you waited to merge this until you can rebase it
+> > on top of Zinc. In fact, if you already want to build it on top of
+> > Zinc, I'm happy to work with you on that in a shared repo or similar.
+> > We can also hash out the details of that in person in Vancouver in a
+> > few weeks. I think pushing this in before will create undesirable
+> > churn for both of us.
+> > 
+> 
+> I won't be at Plumbers, sorry!  For if/when it's needed, I'll start a version of
+> this based on Zinc.  The basic requirements are that we need (1) xchacha12 and
+> xchacha20 available as 'skciphers' in the crypto API, and (2) the poly1305_core
+> functions (see patch 08/12).  In principle, these can be implemented in Zinc.
+> The Adiantum template and all the NHPoly1305 stuff will be the same either way.
+> (Unless you'll want one or both of those moved to Zinc too.  To be honest, even
+> after your explanations I still don't have a clear idea of what is supposed to
+> go in Zinc and what isn't...)
+> 
+> However, for now I'm hesitant to completely abandon the current approach and bet
+> the farm on Zinc.  Zinc has a large scope and various controversies that haven't
+> yet been fully resolved to everyone's satisfaction, including unclear licenses
+> on some of the essential assembly files.  It's not appropriate to grind kernel
+> crypto development to grind a halt while everyone waits for Zinc.
+> 
+> So if Zinc is ready, then it makes sense for it to go first;
+> otherwise, it doesn't.  It's not yet clear which is the case.
+> 
 
-By defaul of-based thermal driver do not enable hwmon.
-This patch does this explicitly, so that the temperature can be read
-through the common hwmon sysfs.
+I started a branch based on Zinc:
+https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/linux.git,
+branch "adiantum-zinc".
 
-Signed-off-by: Matthias Brugger <mbrugger@suse.com>
----
- drivers/thermal/broadcom/bcm2835_thermal.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+For Poly1305, for now I decided to just use the existing functions, passing 0
+for the 16-byte element is added at the end.  This causes some unnecessary
+overhead, but it's not very much.  It also results in a much larger size of
+'struct nhpoly1305_state', but that doesn't matter too much anymore either [1].
 
-diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
-index 23ad4f9f2143..24b006a95142 100644
---- a/drivers/thermal/broadcom/bcm2835_thermal.c
-+++ b/drivers/thermal/broadcom/bcm2835_thermal.c
-@@ -27,6 +27,8 @@
- #include <linux/platform_device.h>
- #include <linux/thermal.h>
- 
-+#include "../thermal_hwmon.h"
-+
- #define BCM2835_TS_TSENSCTL			0x00
- #define BCM2835_TS_TSENSSTAT			0x04
- 
-@@ -275,6 +277,15 @@ static int bcm2835_thermal_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, tz);
- 
-+	/*
-+	 * Thermal_zone doesn't enable hwmon as default,
-+	 * enable it here
-+	 */
-+	tz->tzp->no_hwmon = false;
-+	err = thermal_add_hwmon_sysfs(tz);
-+	if (err)
-+		goto err_tz;
-+
- 	bcm2835_thermal_debugfs(pdev);
- 
- 	return 0;
--- 
-2.19.1
+For ChaCha, I haven't yet updated all the "Zinc" assembly to support 12 rounds.
+So far I've updated my ARM scalar implementation.  I still don't see how you
+expect people to maintain the files like chacha20-x86_64.S from which all
+comments, register aliases, etc. were removed in comparison to the original
+OpenSSL code.  I find it hard to very understand what's going on from what is
+nearly an 'objdump' output.  (I'll figure it out eventually, but it will take
+some time.)  I don't see how dumping thousands of lines of undocumented,
+generated assembly code into the kernel fits with your goals of "Zinc's focus is
+on simplicity and clarity" and "inviting collaboration".  Note that the
+OpenSSL-derived assembly files still have an unclear license as well.
+
+I'm also still not a fan of the remaining duplication between "zinc" and
+"crypto", e.g. we still have both crypto/chacha.h and zinc/chacha.h, and
+separate tests for "zinc" and "crypto".  (I haven't yet gotten around to adding
+"zinc tests" for XChaCha12, though I did add "crypto tests".  Note that "crypto
+tests" are much easier to add, since all algorithms of the same type share a
+common test framework -- not the case for Zinc.)
+
+Of course, both myself and others have expressed concerns about these issues
+previously too, yet they remain unaddressed nor is there a documentation file
+explaining things.  So please understand that until it's clear that Zinc is
+ready, I still have to have Adiantum ready to go without Zinc, just in case.
+
+Thanks,
+
+- Eric
+
+[1] Originally we were going to define Adiantum's hash function to be
+    Poly1305(message_length || tweak_length || tweak || NH(message)), which
+    would have made it desirable to export the Poly1305 state before NH, so that
+    it could be imported for the second hash step to avoid redundantly hashing
+    the message length and tweak.  But later we changed it to
+    Poly1305(message_length || tweak) + Poly1305(NH(message)).
