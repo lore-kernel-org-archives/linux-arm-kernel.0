@@ -1,75 +1,35 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 24 Oct 2018 15:19:24 +0800
-Subject: [PATCH] mmc: sdhci: Conver sdhci_allocate_bounce_buffer() to return
- void
-Message-ID: <1540365564-30645-1-git-send-email-zhang.chunyan@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Sun, 21 Oct 2018 18:34:45 +0200
+Subject: [PATCH 1/2] drm/sun4i: hdmi: Fix unitialized variable
+Message-ID: <20181021163446.29135-1-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function sdhci_allocate_bounce_buffer() always return zero at
-present, so there's no need to have a return value, that will also make
-error path easier.
+The is_double variable is used to store, and possibly returning to the
+calling function, whether it needs to double the rate of the parent clock
+or not.
 
-CC: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+In the case where it does, the variable is affected, but in the case where
+it doesn't we return some uninitialized value. Fix this.
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/mmc/host/sdhci.c | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 1b3fbd9..e94f4aa 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -3408,7 +3408,7 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
- }
- EXPORT_SYMBOL_GPL(__sdhci_read_caps);
- 
--static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
-+static void sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+index 3ecffa52c814..cd2348554bac 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+@@ -35,7 +35,7 @@ static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
  {
- 	struct mmc_host *mmc = host->mmc;
- 	unsigned int max_blocks;
-@@ -3446,7 +3446,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
- 		 * Exiting with zero here makes sure we proceed with
- 		 * mmc->max_segs == 1.
- 		 */
--		return 0;
-+		return;
- 	}
+ 	unsigned long best_rate = 0;
+ 	u8 best_m = 0, m;
+-	bool is_double;
++	bool is_double = false;
  
- 	host->bounce_addr = dma_map_single(mmc->parent,
-@@ -3456,7 +3456,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
- 	ret = dma_mapping_error(mmc->parent, host->bounce_addr);
- 	if (ret)
- 		/* Again fall back to max_segs == 1 */
--		return 0;
-+		return;
- 	host->bounce_buffer_size = bounce_size;
- 
- 	/* Lie about this since we're bouncing */
-@@ -3466,8 +3466,6 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
- 
- 	pr_info("%s bounce up to %u segments into one, max segment size %u bytes\n",
- 		mmc_hostname(mmc), max_blocks, bounce_size);
--
--	return 0;
- }
- 
- int sdhci_setup_host(struct sdhci_host *host)
-@@ -3987,12 +3985,9 @@ int sdhci_setup_host(struct sdhci_host *host)
- 	 */
- 	mmc->max_blk_count = (host->quirks & SDHCI_QUIRK_NO_MULTIBLOCK) ? 1 : 65535;
- 
--	if (mmc->max_segs == 1) {
-+	if (mmc->max_segs == 1)
- 		/* This may alter mmc->*_blk_* parameters */
--		ret = sdhci_allocate_bounce_buffer(host);
--		if (ret)
--			return ret;
--	}
-+		sdhci_allocate_bounce_buffer(host);
- 
- 	return 0;
- 
+ 	for (m = div_offset ?: 1; m < (16 + div_offset); m++) {
+ 		u8 d;
 -- 
-2.7.4
+2.19.1
