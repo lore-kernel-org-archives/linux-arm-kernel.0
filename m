@@ -1,77 +1,46 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 21 Oct 2018 21:59:55 +0200
-Subject: [PATCH 0/6] gpio: simplify getting .driver_data
-Message-ID: <20181021200002.1472-1-wsa+renesas@sang-engineering.com>
+Date: Sun, 21 Oct 2018 22:00:01 +0200
+Subject: [PATCH 6/6] gpio: gpio-zynq: simplify getting .driver_data
+In-Reply-To: <20181021200002.1472-1-wsa+renesas@sang-engineering.com>
+References: <20181021200002.1472-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20181021200002.1472-7-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I got tired of fixing this in Renesas drivers manually, so I took the big
-hammer. Remove this cumbersome code pattern which got copy-pasted too much
-already:
+We should get 'driver_data' from 'struct device' directly. Going via
+platform_device is an unneeded step back and forth.
 
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
+
+Build tested only. buildbot is happy.
+
+ drivers/gpio/gpio-zynq.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index 3f5fcdd5a429..ac9b02c9598f 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -693,8 +693,7 @@ static int __maybe_unused zynq_gpio_resume(struct device *dev)
+ 
+ static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
+ {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
-+	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
-
-A branch, tested by buildbot, can be found here:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git coccinelle/get_drvdata
-
-I have been asked if it couldn't be done for dev_set_drvdata as well. I checked
-it and did not find one occasion where it could be simplified like this. Not
-much of a surprise because driver_data is usually set in probe() functions
-which access struct platform_device in many other ways.
-
-I am open for other comments, suggestions, too, of course.
-
-Here is the cocci-script I created:
-
-@@
-struct device* d;
-identifier pdev;
-expression *ptr;
-@@
-(
--	struct platform_device *pdev = to_platform_device(d);
-|
--	struct platform_device *pdev;
-	...
--	pdev = to_platform_device(d);
-)
-	<... when != pdev
--	&pdev->dev
-+	d
-	...>
-
-	ptr =
--	platform_get_drvdata(pdev)
-+	dev_get_drvdata(d)
-
-	<... when != pdev
--	&pdev->dev
-+	d
-	...>
-
-Kind regards,
-
-   Wolfram
-
-
-Wolfram Sang (6):
-  gpio: gpio-dwapb: simplify getting .driver_data
-  gpio: gpio-lynxpoint: simplify getting .driver_data
-  gpio: gpio-mxc: simplify getting .driver_data
-  gpio: gpio-omap: simplify getting .driver_data
-  gpio: gpio-tegra: simplify getting .driver_data
-  gpio: gpio-zynq: simplify getting .driver_data
-
- drivers/gpio/gpio-dwapb.c     |  6 ++----
- drivers/gpio/gpio-lynxpoint.c |  3 +--
- drivers/gpio/gpio-mxc.c       |  6 ++----
- drivers/gpio/gpio-omap.c      | 12 ++++--------
- drivers/gpio/gpio-tegra.c     |  6 ++----
- drivers/gpio/gpio-zynq.c      |  6 ++----
- 6 files changed, 13 insertions(+), 26 deletions(-)
-
+-	struct zynq_gpio *gpio = platform_get_drvdata(pdev);
++	struct zynq_gpio *gpio = dev_get_drvdata(dev);
+ 
+ 	clk_disable_unprepare(gpio->clk);
+ 
+@@ -703,8 +702,7 @@ static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
+ 
+ static int __maybe_unused zynq_gpio_runtime_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct zynq_gpio *gpio = platform_get_drvdata(pdev);
++	struct zynq_gpio *gpio = dev_get_drvdata(dev);
+ 
+ 	return clk_prepare_enable(gpio->clk);
+ }
 -- 
 2.19.0
