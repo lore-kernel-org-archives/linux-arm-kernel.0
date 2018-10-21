@@ -1,7 +1,7 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 21 Oct 2018 22:00:47 +0200
-Subject: [PATCH 0/5] thermal: simplify getting .driver_data
-Message-ID: <20181021200053.2194-1-wsa+renesas@sang-engineering.com>
+Date: Sun, 21 Oct 2018 22:00:44 +0200
+Subject: [PATCH 0/3] spi: simplify getting .driver_data
+Message-ID: <20181021200048.2114-1-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -57,20 +57,15 @@ Kind regards,
    Wolfram
 
 
-Wolfram Sang (5):
-  thermal: int340x_thermal: int3400_thermal: simplify getting
-    .driver_data
-  thermal: rockchip_thermal: simplify getting .driver_data
-  thermal: spear_thermal: simplify getting .driver_data
-  thermal: st: st_thermal: simplify getting .driver_data
-  thermal: zx2967_thermal: simplify getting .driver_data
+Wolfram Sang (3):
+  spi: spi-rspi: simplify getting .driver_data
+  spi: spi-sh-msiof: simplify getting .driver_data
+  spi: spi-zynqmp-gqspi: simplify getting .driver_data
 
- drivers/thermal/int340x_thermal/int3400_thermal.c | 9 +++------
- drivers/thermal/rockchip_thermal.c                | 8 +++-----
- drivers/thermal/spear_thermal.c                   | 8 +++-----
- drivers/thermal/st/st_thermal.c                   | 6 ++----
- drivers/thermal/zx2967_thermal.c                  | 6 ++----
- 5 files changed, 13 insertions(+), 24 deletions(-)
+ drivers/spi/spi-rspi.c         | 6 ++----
+ drivers/spi/spi-sh-msiof.c     | 6 ++----
+ drivers/spi/spi-zynqmp-gqspi.c | 6 ++----
+ 3 files changed, 6 insertions(+), 12 deletions(-)
 
 -- 
 2.19.0
