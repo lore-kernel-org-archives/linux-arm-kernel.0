@@ -1,36 +1,122 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 21 Oct 2018 15:02:26 +0100
-Subject: [PATCH v2] ASoC: sun4i-i2s: move code from startup/shutdown
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 21 Oct 2018 08:39:11 -0700
+Subject: [PATCH RESEND v2] ASoC: sun4i-i2s: move code from startup/shutdown
  hooks into pm_runtime hooks
-In-Reply-To: <1716612.tSkIyEiKY2@anarsoul-thinkpad>
-References: <20181016031141.16259-1-anarsoul@gmail.com>
- <6365837.9zzJEACKLf@anarsoul-thinkpad>
- <20181017210159.hni6ozm755orvzzg@flea>
- <1716612.tSkIyEiKY2@anarsoul-thinkpad>
-Message-ID: <20181021140226.GF8554@sirena.org.uk>
+Message-ID: <20181021153912.29185-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 09:18:18AM -0700, Vasily Khoruzhick wrote:
-> On Wednesday, October 17, 2018 2:01:59 PM PDT Maxime Ripard wrote:
-> > On Wed, Oct 17, 2018 at 08:36:26AM -0700, Vasily Khoruzhick wrote:
-> > > On Wednesday, October 17, 2018 8:25:23 AM PDT Maxime Ripard wrote:
-> > > > On Wed, Oct 17, 2018 at 07:41:55AM -0700, Vasily Khoruzhick wrote:
-> > > > > On Wed, Oct 17, 2018 at 12:45 AM Maxime Ripard
+startup() and shutdown() hooks are called for both substreams,
+so stopping either substream when another is running breaks the
+latter.
 
-Please delete unneeded context from mails when replying.  Doing this
-makes it much easier to find your reply in the message, helping ensure
-it won't be missed by people scrolling through the irrelevant quoted
-material.
+E.g. playback breaks if capture is stopped when playback is running.
 
-> Mark, can you pick up this one please? Thanks!
+Move code from startup() and shutdown() to resume() and suspend()
+hooks respectively to fix this issue
 
-Please resend, I dropped it due to the (initial) negative review
-comments.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181021/b7ba89f4/attachment-0001.sig>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+v2: - rename from "ASoC: sun4i-i2s: don't try to start up
+                 or shut down DAI if it's active"
+    - move code from startup/shutdown hooks into pm_runtime
+
+ sound/soc/sunxi/sun4i-i2s.c | 61 +++++++++++++++----------------------
+ 1 file changed, 25 insertions(+), 36 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+index a4aa931ebfae..daa6c08cffbc 100644
+--- a/sound/soc/sunxi/sun4i-i2s.c
++++ b/sound/soc/sunxi/sun4i-i2s.c
+@@ -644,40 +644,6 @@ static int sun4i_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	return 0;
+ }
+ 
+-static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+-			     struct snd_soc_dai *dai)
+-{
+-	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+-
+-	/* Enable the whole hardware block */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
+-
+-	/* Enable the first output line */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_SDO_EN_MASK,
+-			   SUN4I_I2S_CTRL_SDO_EN(0));
+-
+-
+-	return clk_prepare_enable(i2s->mod_clk);
+-}
+-
+-static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
+-			       struct snd_soc_dai *dai)
+-{
+-	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+-
+-	clk_disable_unprepare(i2s->mod_clk);
+-
+-	/* Disable our output lines */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
+-
+-	/* Disable the whole hardware block */
+-	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+-			   SUN4I_I2S_CTRL_GL_EN, 0);
+-}
+-
+ static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+ 				unsigned int freq, int dir)
+ {
+@@ -695,8 +661,6 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
+ 	.hw_params	= sun4i_i2s_hw_params,
+ 	.set_fmt	= sun4i_i2s_set_fmt,
+ 	.set_sysclk	= sun4i_i2s_set_sysclk,
+-	.shutdown	= sun4i_i2s_shutdown,
+-	.startup	= sun4i_i2s_startup,
+ 	.trigger	= sun4i_i2s_trigger,
+ };
+ 
+@@ -869,6 +833,21 @@ static int sun4i_i2s_runtime_resume(struct device *dev)
+ 		goto err_disable_clk;
+ 	}
+ 
++	/* Enable the whole hardware block */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_GL_EN, SUN4I_I2S_CTRL_GL_EN);
++
++	/* Enable the first output line */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_SDO_EN_MASK,
++			   SUN4I_I2S_CTRL_SDO_EN(0));
++
++	ret = clk_prepare_enable(i2s->mod_clk);
++	if (ret) {
++		dev_err(dev, "Failed to enable module clock\n");
++		goto err_disable_clk;
++	}
++
+ 	return 0;
+ 
+ err_disable_clk:
+@@ -880,6 +859,16 @@ static int sun4i_i2s_runtime_suspend(struct device *dev)
+ {
+ 	struct sun4i_i2s *i2s = dev_get_drvdata(dev);
+ 
++	clk_disable_unprepare(i2s->mod_clk);
++
++	/* Disable our output lines */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_SDO_EN_MASK, 0);
++
++	/* Disable the whole hardware block */
++	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
++			   SUN4I_I2S_CTRL_GL_EN, 0);
++
+ 	regcache_cache_only(i2s->regmap, true);
+ 
+ 	clk_disable_unprepare(i2s->bus_clk);
+-- 
+2.19.0
