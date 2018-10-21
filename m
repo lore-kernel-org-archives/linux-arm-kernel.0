@@ -1,48 +1,47 @@
-From: tomer.ashur@esat.kuleuven.be (Tomer Ashur)
-Date: Mon, 22 Oct 2018 13:20:51 +0200
-Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
-In-Reply-To: <2395454e-a0dc-408f-4138-9d15ab5f20b8@esat.kuleuven.be>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
- <CA+_SqcDszvqfH7qvEyi8QW2RqkA1kpV6L7VWxhtw5Ogzeovhbg@mail.gmail.com>
- <2395454e-a0dc-408f-4138-9d15ab5f20b8@esat.kuleuven.be>
-Message-ID: <ebd9d96e-4a2c-528d-b8e8-67907f2a8be0@esat.kuleuven.be>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 21 Oct 2018 23:45:54 +0200
+Subject: [PATCH 0/15] Add support for OLPC XO 1.75 Embedded Controller
+In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+Message-ID: <20181021214554.i2mb5yn2doabyt5a@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 19-Oct-18 8:19 PM, Paul Crowley wrote:
->> I would prefer not to wait. Unlike a new primitive whose strength can
->> only be known through attempts at cryptanalysis, Adiantum is a
->> construction based on
->> well-understood and trusted primitives; it is secure if the proof
->> accompanying it is correct. Given that (outside competitions or
->> standardization efforts) no-one ever issues public statements that
->> they think algorithms or proofs are good, what I'm expecting from
->> academia is silence :) The most we could hope for would be getting the
->> paper accepted at a conference, and we're pursuing that but there's a
->> good chance that won't happen simply because it's not very novel. It
->> basically takes existing ideas and applies them using a stream cipher
->> instead of a block cipher, and a faster hashing mode; it's also a
->> small update from HPolyC. I've had some private feedback that the
->> proof seems correct, and that's all I'm expecting to get.
->
-I tend to agree with Paul on this point. This is a place where academia
-needs to improve. An attempt to do so is the Real World Crypto
-conference (RWC; https://rwc.iacr.org/2019/), but the deadline for
-submissions was October 1st. For HpolyC I asked a few people to take a
-look at the construction and the consensus was that it seems secure but
-that the proof style makes it hard to verify. I haven't had the time yet
-to read the Adiantum paper (and I'm not a provable security person
-anyway) but I suppose Paul took the comments he received on this into
-account and that's the best we can hope for. Academia simply moves in a
-different pace and has different incentives.
+Hi,
 
-?Tomer
+On Wed, Oct 10, 2018 at 07:22:45PM +0200, Lubomir Rintel wrote:
+> Hi.
+> 
+> This patchset adds support for the Embedded Controller on an OLPC XO
+> 1.75 machine. OLPC XO 1.75 is a MMP2 based ARM laptop. It plugs into
+> the existing OLPC platform infrastructure, currently used by the x86
+> based models.
+> 
+> The EC operates in SPI master mode, meaning the SOC is the SPI slave. It
+> uses extra handshake signal to signal readiness of SOC to accept data
+> from EC and to initiate a transaction if SOC wishes to submit data.
+> 
+> The SPI slave support for MMP2 was submitted separately:
+> https://lore.kernel.org/lkml/20181010170936.316862-1-lkundrak at v3.sk/T/#t
+> 
+> THe "power: supply: olpc_battery: correct the temperature" patch was
+> already sent out separately, but I'm including it because the last
+> commit of the set depends on it.
+> 
+> Tested to work on an OLPC XO 1.75 and also tested not to break x86
+> support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
+> unlikely this breaks it when XO 1 works.
+> 
+> Thanks in advance for reviews and feedback of any kind.
 
+I reviewed the power-supply related patches (1, 10, 12-15) and think
+they are fine apart from the things found by Andy Shevchenko.
+
+-- Sebastian
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181022/152c9cb5/attachment-0001.sig>
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181021/13fd8e3c/attachment.sig>
