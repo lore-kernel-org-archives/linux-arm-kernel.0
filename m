@@ -1,71 +1,107 @@
 From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Sun, 21 Oct 2018 09:16:59 +0530
+Date: Sun, 21 Oct 2018 10:29:17 +0530
 Subject: [PATCH 0/6] Tracing register accesses with pstore and dynamic
  debug
-In-Reply-To: <20181020162719.GA49955@joelaf.mtv.corp.google.com>
+In-Reply-To: <15ec736d-bd54-5519-4b99-47dd161bc556@codeaurora.org>
 References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
  <20181020052535.GA155509@joelaf.mtv.corp.google.com>
  <1d3ddbe3-d3ac-aa3e-fc9e-36739ddd0c91@codeaurora.org>
  <20181020162719.GA49955@joelaf.mtv.corp.google.com>
-Message-ID: <15ec736d-bd54-5519-4b99-47dd161bc556@codeaurora.org>
+ <15ec736d-bd54-5519-4b99-47dd161bc556@codeaurora.org>
+Message-ID: <92075d3d-1ea9-d746-384a-1b61ceefcb70@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2018 9:57 PM, Joel Fernandes wrote:
-> On Sat, Oct 20, 2018 at 12:02:37PM +0530, Sai Prakash Ranjan wrote:
->> On 10/20/2018 10:55 AM, Joel Fernandes wrote:
->>> On Sun, Sep 09, 2018 at 01:57:01AM +0530, Sai Prakash Ranjan wrote:
->>>> Hi,
+On 10/21/2018 9:16 AM, Sai Prakash Ranjan wrote:
+> On 10/20/2018 9:57 PM, Joel Fernandes wrote:
+>> On Sat, Oct 20, 2018 at 12:02:37PM +0530, Sai Prakash Ranjan wrote:
+>>> On 10/20/2018 10:55 AM, Joel Fernandes wrote:
+>>>> On Sun, Sep 09, 2018 at 01:57:01AM +0530, Sai Prakash Ranjan wrote:
+>>>>> Hi,
+>>>>>
+>>>>> This patch series adds Event tracing support to pstore and is 
+>>>>> continuation
+>>>>> to the RFC patch introduced to add a new tracing facility for register
+>>>>> accesses called Register Trace Buffer(RTB). Since we decided to not 
+>>>>> introduce
+>>>>> a separate framework to trace register accesses and use existing 
+>>>>> framework
+>>>>> like tracepoints, I have moved from RFC. Details of the RFC in link 
+>>>>> below:
+>>>>>
+>>>>> Link: 
+>>>>> https://lore.kernel.org/lkml/cover.1535119710.git.saiprakash.ranjan at codeaurora.org/ 
+>>>>>
+>>>>>
+>>>>> MSR tracing example given by Steven was helpful in using 
+>>>>> tracepoints for
+>>>>> register accesses instead of using separate trace. But just having 
+>>>>> these
+>>>>> IO traces would not help much unless we could have them in some 
+>>>>> persistent
+>>>>> ram buffer for debugging unclocked access or some kind of bus hang 
+>>>>> or an
+>>>>> unexpected reset caused by some buggy driver which happens a lot 
+>>>>> during
+>>>>> initial development stages. By analyzing the last few entries of 
+>>>>> this buffer,
+>>>>> we could identify the register access which is causing the issue.
 >>>>
->>>> This patch series adds Event tracing support to pstore and is continuation
->>>> to the RFC patch introduced to add a new tracing facility for register
->>>> accesses called Register Trace Buffer(RTB). Since we decided to not introduce
->>>> a separate framework to trace register accesses and use existing framework
->>>> like tracepoints, I have moved from RFC. Details of the RFC in link below:
+>>>> Hi Sai,
 >>>>
->>>> Link: https://lore.kernel.org/lkml/cover.1535119710.git.saiprakash.ranjan at codeaurora.org/
+>>>> I wanted to see if I could make some time to get your patches 
+>>>> working. We are
+>>>> hitting usecases that need something like this as well. Basically 
+>>>> devices
+>>>> hanging and then the ramdump does not tell us much, so in this case 
+>>>> pstore
+>>>> events can be really helpful. This usecase came up last year as well.
 >>>>
->>>> MSR tracing example given by Steven was helpful in using tracepoints for
->>>> register accesses instead of using separate trace. But just having these
->>>> IO traces would not help much unless we could have them in some persistent
->>>> ram buffer for debugging unclocked access or some kind of bus hang or an
->>>> unexpected reset caused by some buggy driver which happens a lot during
->>>> initial development stages. By analyzing the last few entries of this buffer,
->>>> we could identify the register access which is causing the issue.
+>>>> Anyway while I was going through your patches, I cleaned up some 
+>>>> pstore code
+>>>> as well and I have 3 more patches on top of yours for this clean up. 
+>>>> I prefer
+>>>> we submit the patches together and sync our work together so that 
+>>>> there is
+>>>> least conflict.
+>>>>
+>>>> Here's my latest tree:
+>>>> https://github.com/joelagnel/linux-kernel/commits/pstore-events
+>>>> (note that I have only build tested the patches since I just wrote 
+>>>> them and
+>>>> its quite late in the night here ;-))
+>>>>
 >>>
->>> Hi Sai,
+>>> Hi Joel,
 >>>
->>> I wanted to see if I could make some time to get your patches working. We are
->>> hitting usecases that need something like this as well. Basically devices
->>> hanging and then the ramdump does not tell us much, so in this case pstore
->>> events can be really helpful. This usecase came up last year as well.
->>>
->>> Anyway while I was going through your patches, I cleaned up some pstore code
->>> as well and I have 3 more patches on top of yours for this clean up. I prefer
->>> we submit the patches together and sync our work together so that there is
->>> least conflict.
->>>
->>> Here's my latest tree:
->>> https://github.com/joelagnel/linux-kernel/commits/pstore-events
->>> (note that I have only build tested the patches since I just wrote them and
->>> its quite late in the night here ;-))
->>>
+>>> Thanks for looking into this. Sure, I will be happy to sync up with 
+>>> you on
 >>
->> Hi Joel,
+>> Thanks. And added a fourth patch in the tree too.
 >>
->> Thanks for looking into this. Sure, I will be happy to sync up with you on
+>>> this. I can test your additional patches on top of my pstore patches. 
+>>> BTW,
+>>> I'm still stuck at copying binary record into pstore and then extract it
+>>> during read time. Seems like I'm missing something.
+>>
+>> Sure, push your latest somewhere and let me know. I'll try to get you 
+>> unstuck.
+>>
 > 
-> Thanks. And added a fourth patch in the tree too.
-> 
->> this. I can test your additional patches on top of my pstore patches. BTW,
->> I'm still stuck at copying binary record into pstore and then extract it
->> during read time. Seems like I'm missing something.
-> 
-> Sure, push your latest somewhere and let me know. I'll try to get you unstuck.
+> Thanks Joel, I will push my changes and let you know in some time.
 > 
 
-Thanks Joel, I will push my changes and let you know in some time.
+Hi Joel,
 
+Here's my tree:
+https://github.com/saiprakash-ranjan/linux/commits/pstore-events
+
+I have one patch extra on top of your patches. Nothing much on binary 
+record storage in this patch, only removed kmalloc in pstore event call 
+to avoid loop.
+
+Thanks,
+Sai
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
