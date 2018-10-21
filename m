@@ -1,47 +1,59 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 21 Oct 2018 23:45:54 +0200
-Subject: [PATCH 0/15] Add support for OLPC XO 1.75 Embedded Controller
-In-Reply-To: <20181010172300.317643-1-lkundrak@v3.sk>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
-Message-ID: <20181021214554.i2mb5yn2doabyt5a@earth.universe>
+Date: Sun, 21 Oct 2018 23:15:26 +0200
+Subject: [PATCH v4 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
+ power DT binding
+In-Reply-To: <20181013080848.29894-2-oskari@lemmela.net>
+References: <20181013080848.29894-1-oskari@lemmela.net>
+ <20181013080848.29894-2-oskari@lemmela.net>
+Message-ID: <20181021211526.gnynhk3ibte3o2kf@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Oct 10, 2018 at 07:22:45PM +0200, Lubomir Rintel wrote:
-> Hi.
+On Sat, Oct 13, 2018 at 11:08:42AM +0300, Oskari Lemmela wrote:
+> The AXP803/AXP813 AC power supply can limit input current and voltage.
 > 
-> This patchset adds support for the Embedded Controller on an OLPC XO
-> 1.75 machine. OLPC XO 1.75 is a MMP2 based ARM laptop. It plugs into
-> the existing OLPC platform infrastructure, currently used by the x86
-> based models.
-> 
-> The EC operates in SPI master mode, meaning the SOC is the SPI slave. It
-> uses extra handshake signal to signal readiness of SOC to accept data
-> from EC and to initiate a transaction if SOC wishes to submit data.
-> 
-> The SPI slave support for MMP2 was submitted separately:
-> https://lore.kernel.org/lkml/20181010170936.316862-1-lkundrak at v3.sk/T/#t
-> 
-> THe "power: supply: olpc_battery: correct the temperature" patch was
-> already sent out separately, but I'm including it because the last
-> commit of the set depends on it.
-> 
-> Tested to work on an OLPC XO 1.75 and also tested not to break x86
-> support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
-> unlikely this breaks it when XO 1 works.
-> 
-> Thanks in advance for reviews and feedback of any kind.
+> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
+> ---
 
-I reviewed the power-supply related patches (1, 10, 12-15) and think
-they are fine apart from the things found by Andy Shevchenko.
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
 
 -- Sebastian
+
+>  .../devicetree/bindings/power/supply/axp20x_ac_power.txt       | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> index 826e8a879121..7a1fb532abe5 100644
+> --- a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
+> @@ -4,6 +4,7 @@ Required Properties:
+>   - compatible: One of:
+>  			"x-powers,axp202-ac-power-supply"
+>  			"x-powers,axp221-ac-power-supply"
+> +			"x-powers,axp813-ac-power-supply"
+>  
+>  This node is a subnode of the axp20x PMIC.
+>  
+> @@ -13,6 +14,8 @@ reading ADC channels from the AXP20X ADC.
+>  The AXP22X is only able to tell if an AC power supply is present and
+>  usable.
+>  
+> +AXP813/AXP803 are able to limit current and supply voltage
+> +
+>  Example:
+>  
+>  &axp209 {
+> -- 
+> 2.17.1
+> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181021/13fd8e3c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181021/8640a93c/attachment.sig>
