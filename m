@@ -1,59 +1,97 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 21 Oct 2018 23:15:26 +0200
-Subject: [PATCH v4 1/7] dt-bindings: power: supply: axp20x: add AXP813 AC
- power DT binding
-In-Reply-To: <20181013080848.29894-2-oskari@lemmela.net>
-References: <20181013080848.29894-1-oskari@lemmela.net>
- <20181013080848.29894-2-oskari@lemmela.net>
-Message-ID: <20181021211526.gnynhk3ibte3o2kf@earth.universe>
+Date: Sun, 21 Oct 2018 23:27:37 +0200
+Subject: [PATCH 01/15] power: supply: olpc_battery: correct the
+ temperature units
+In-Reply-To: <CAHp75VenECSZWR3RVh=t35Os93t-MzEH_YzPgT=qQWL-SwjgFQ@mail.gmail.com>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-2-lkundrak@v3.sk>
+ <CAHp75VenECSZWR3RVh=t35Os93t-MzEH_YzPgT=qQWL-SwjgFQ@mail.gmail.com>
+Message-ID: <20181021212737.v546ychvlnkxxvrp@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sat, Oct 13, 2018 at 11:08:42AM +0300, Oskari Lemmela wrote:
-> The AXP803/AXP813 AC power supply can limit input current and voltage.
+On Fri, Oct 19, 2018 at 04:00:32PM +0300, Andy Shevchenko wrote:
+> On Wed, Oct 10, 2018 at 8:23 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
+> >
+> > According to [1] and [2], the temperature values are in tenths of degree
+> > Celsius. Exposing the Celsius value makes the battery appear on fire:
+> >
+> >   $ upower -i /org/freedesktop/UPower/devices/battery_olpc_battery
+> >   ...
+> >       temperature:         236.9 degrees C
+> >
+> > Tested on OLPC XO-1 and OLPC XO-1.75 laptops.
 > 
-> Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
-> ---
+> It's interesting that the very author of that code is not included in
+> so-o long Cc list :)
+> Cc: David.
+> 
+> David, do you remember if and how you had tested temperature report of
+> the battery on OLPC? I guess this kind of error would be appear immediately.
 
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.com>
+It depends on the way of testing. It's not so obvious when you just
+do a `cat /sys/class/power_supply/.../temperature`, since you just
+get the raw integer.
+
+> OTOH it might be that power framework had changed requirements (which
+> would be noticeable change).
+
+As far as I know, power-supply has always used 1/10 ?C. People tend
+to get units wrong all the time though (i.e. mV instead of uV). I'm
+not surprised, that this sneaked into the kernel.
+
+> If the latter is true, this patch misses Fixes tag. Actually in any
+> case it misses it.
+
+Yes, this should probably have Fixes: fb972873a767 ("[BATTERY] One Laptop
+Per Child power/battery driver").
 
 -- Sebastian
 
->  .../devicetree/bindings/power/supply/axp20x_ac_power.txt       | 3 +++
->  1 file changed, 3 insertions(+)
+> > [1] include/linux/power_supply.h
+> > [2] Documentation/power/power_supply_class.txt
+> >
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> > ---
+> >  drivers/power/supply/olpc_battery.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
+> > index 6da79ae14860..5a97e42a3547 100644
+> > --- a/drivers/power/supply/olpc_battery.c
+> > +++ b/drivers/power/supply/olpc_battery.c
+> > @@ -428,14 +428,14 @@ static int olpc_bat_get_property(struct power_supply *psy,
+> >                 if (ret)
+> >                         return ret;
+> >
+> > -               val->intval = (s16)be16_to_cpu(ec_word) * 100 / 256;
+> > +               val->intval = (s16)be16_to_cpu(ec_word) * 10 / 256;
+> >                 break;
+> >         case POWER_SUPPLY_PROP_TEMP_AMBIENT:
+> >                 ret = olpc_ec_cmd(EC_AMB_TEMP, NULL, 0, (void *)&ec_word, 2);
+> >                 if (ret)
+> >                         return ret;
+> >
+> > -               val->intval = (int)be16_to_cpu(ec_word) * 100 / 256;
+> > +               val->intval = (int)be16_to_cpu(ec_word) * 10 / 256;
+> >                 break;
+> >         case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+> >                 ret = olpc_ec_cmd(EC_BAT_ACR, NULL, 0, (void *)&ec_word, 2);
+> > --
+> > 2.19.0
+> >
 > 
-> diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-> index 826e8a879121..7a1fb532abe5 100644
-> --- a/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-> +++ b/Documentation/devicetree/bindings/power/supply/axp20x_ac_power.txt
-> @@ -4,6 +4,7 @@ Required Properties:
->   - compatible: One of:
->  			"x-powers,axp202-ac-power-supply"
->  			"x-powers,axp221-ac-power-supply"
-> +			"x-powers,axp813-ac-power-supply"
->  
->  This node is a subnode of the axp20x PMIC.
->  
-> @@ -13,6 +14,8 @@ reading ADC channels from the AXP20X ADC.
->  The AXP22X is only able to tell if an AC power supply is present and
->  usable.
->  
-> +AXP813/AXP803 are able to limit current and supply voltage
-> +
->  Example:
->  
->  &axp209 {
+> 
 > -- 
-> 2.17.1
-> 
+> With Best Regards,
+> Andy Shevchenko
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181021/8640a93c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181021/a9461f46/attachment-0001.sig>
