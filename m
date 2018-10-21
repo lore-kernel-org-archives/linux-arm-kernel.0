@@ -1,55 +1,49 @@
-From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 21 Oct 2018 22:00:49 +0200
-Subject: [PATCH 2/5] thermal: rockchip_thermal: simplify getting .driver_data
-In-Reply-To: <20181021200053.2194-1-wsa+renesas@sang-engineering.com>
-References: <20181021200053.2194-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20181021200053.2194-3-wsa+renesas@sang-engineering.com>
+From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
+Date: Sun, 21 Oct 2018 23:58:48 +0200
+Subject: [PATCH] thermal: bcm2835: enable hwmon explicitly
+Message-ID: <20181021215848.5827-1-matthias.bgg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should get 'driver_data' from 'struct device' directly. Going via
-platform_device is an unneeded step back and forth.
+From: Matthias Brugger <mbrugger@suse.com>
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+By defaul of-based thermal driver do not enable hwmon.
+This patch does this explicitly, so that the temperature can be read
+through the common hwmon sysfs.
+
+Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
+ drivers/thermal/broadcom/bcm2835_thermal.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Build tested only. buildbot is happy.
-
- drivers/thermal/rockchip_thermal.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index f36375d5a16c..9c7643d62ed7 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -1327,8 +1327,7 @@ static int rockchip_thermal_remove(struct platform_device *pdev)
+diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+index 23ad4f9f2143..24b006a95142 100644
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -27,6 +27,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/thermal.h>
  
- static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
-+	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
- 	int i;
++#include "../thermal_hwmon.h"
++
+ #define BCM2835_TS_TSENSCTL			0x00
+ #define BCM2835_TS_TSENSSTAT			0x04
  
- 	for (i = 0; i < thermal->chip->chn_num; i++)
-@@ -1346,8 +1345,7 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+@@ -275,6 +277,15 @@ static int bcm2835_thermal_probe(struct platform_device *pdev)
  
- static int __maybe_unused rockchip_thermal_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
-+	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
- 	int i;
- 	int error;
+ 	platform_set_drvdata(pdev, tz);
  
-@@ -1376,7 +1374,7 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
- 					      id, thermal->regs,
- 					      thermal->tshut_temp);
- 		if (error)
--			dev_err(&pdev->dev, "%s: invalid tshut=%d, error=%d\n",
-+			dev_err(dev, "%s: invalid tshut=%d, error=%d\n",
- 				__func__, thermal->tshut_temp, error);
- 	}
++	/*
++	 * Thermal_zone doesn't enable hwmon as default,
++	 * enable it here
++	 */
++	tz->tzp->no_hwmon = false;
++	err = thermal_add_hwmon_sysfs(tz);
++	if (err)
++		goto err_tz;
++
+ 	bcm2835_thermal_debugfs(pdev);
  
+ 	return 0;
 -- 
-2.19.0
+2.19.1
