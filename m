@@ -1,82 +1,83 @@
-From: joel@joelfernandes.org (Joel Fernandes)
-Date: Sat, 20 Oct 2018 22:09:06 -0700
-Subject: [PATCH 0/6] Tracing register accesses with pstore and dynamic
- debug
-In-Reply-To: <15ec736d-bd54-5519-4b99-47dd161bc556@codeaurora.org>
-Message-ID: <20181021050906.GA238354@joelaf.mtv.corp.google.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Sun, 21 Oct 2018 13:10:44 +0000
+Subject: [PATCH RESEND V4 0/9] clk: add imx7ulp clk support
+Message-ID: <1540127173-21346-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 21, 2018 at 09:16:59AM +0530, Sai Prakash Ranjan wrote:
-> On 10/20/2018 9:57 PM, Joel Fernandes wrote:
-> > On Sat, Oct 20, 2018 at 12:02:37PM +0530, Sai Prakash Ranjan wrote:
-> > > On 10/20/2018 10:55 AM, Joel Fernandes wrote:
-> > > > On Sun, Sep 09, 2018 at 01:57:01AM +0530, Sai Prakash Ranjan wrote:
-> > > > > Hi,
-> > > > > 
-> > > > > This patch series adds Event tracing support to pstore and is continuation
-> > > > > to the RFC patch introduced to add a new tracing facility for register
-> > > > > accesses called Register Trace Buffer(RTB). Since we decided to not introduce
-> > > > > a separate framework to trace register accesses and use existing framework
-> > > > > like tracepoints, I have moved from RFC. Details of the RFC in link below:
-> > > > > 
-> > > > > Link: https://lore.kernel.org/lkml/cover.1535119710.git.saiprakash.ranjan at codeaurora.org/
-> > > > > 
-> > > > > MSR tracing example given by Steven was helpful in using tracepoints for
-> > > > > register accesses instead of using separate trace. But just having these
-> > > > > IO traces would not help much unless we could have them in some persistent
-> > > > > ram buffer for debugging unclocked access or some kind of bus hang or an
-> > > > > unexpected reset caused by some buggy driver which happens a lot during
-> > > > > initial development stages. By analyzing the last few entries of this buffer,
-> > > > > we could identify the register access which is causing the issue.
-> > > > 
-> > > > Hi Sai,
-> > > > 
-> > > > I wanted to see if I could make some time to get your patches working. We are
-> > > > hitting usecases that need something like this as well. Basically devices
-> > > > hanging and then the ramdump does not tell us much, so in this case pstore
-> > > > events can be really helpful. This usecase came up last year as well.
-> > > > 
-> > > > Anyway while I was going through your patches, I cleaned up some pstore code
-> > > > as well and I have 3 more patches on top of yours for this clean up. I prefer
-> > > > we submit the patches together and sync our work together so that there is
-> > > > least conflict.
-> > > > 
-> > > > Here's my latest tree:
-> > > > https://github.com/joelagnel/linux-kernel/commits/pstore-events
-> > > > (note that I have only build tested the patches since I just wrote them and
-> > > > its quite late in the night here ;-))
-> > > > 
-> > > 
-> > > Hi Joel,
-> > > 
-> > > Thanks for looking into this. Sure, I will be happy to sync up with you on
-> > 
-> > Thanks. And added a fourth patch in the tree too.
+This is a rebased version of below patch series against latest clk tree.
+[PATCH RESEND V3 0/9] clk: add imx7ulp clk support
+https://lkml.org/lkml/2018/3/16/310
 
+It only updates the license to SPDX format as well as a minor fix of
+pllv4.
 
-While at it, I was thinking about the problem we are trying to solve in
-another way. If ftrace itself can use pages from the persistent ram store,
-instead of the kernel's buddy allocator, then the ftrace ring buffer itself
-could persist across a system reboot.
+This patch series intends to add imx7ulp clk support.
 
-The clear advantage of that for Sai's pstore events work is, not having to
-duplicate a lot of the ring buffer code and stuff into pstore (for the pstore
-events for example, I wanted time stamps as well and ftrace's ring buffer has
-some nice time management code to deal with time deltas). We already have
-other ring buffers maintained in other parts of the kernel for tracing right?
-So I'm a bit averse to duplicating that into pstore as well for tracing. The
-other advantage of persisting the ftrace ring buffer would also mean data
-from other tracers such as function-graph tracer and irqsoff tracers would
-also persist and then we can also probably get rid of ftrace-in-pstore stuff
-which is kind of incomplete anyway since it does not have time stamps for
-recorded functions.
+i.MX7ULP Clock functions are under joint control of the System
+Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+modules, and Core Mode Controller (CMC)1 blocks
 
-Steven and Kees: what do you think, is persisting ftrace ring buffer across
-reboots a worthwhile idea? Any thoughts on how feasible something like that
-could be, code wise? Off the top, I think the ring buffer state that ftrace
-needs other than the trace data itself will also have to be persisted.
+The clocking scheme provides clear separation between M4 domain
+and A7 domain. Except for a few clock sources shared between two
+domains, such as the System Oscillator clock, the Slow IRC (SIRC),
+and and the Fast IRC clock (FIRCLK), clock sources and clock
+management are separated and contained within each domain.
 
-thanks,
+M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
 
- - Joel
+Note: this series only adds A7 clock domain support as M4 clock
+domain will be handled by M4 seperately.
+
+Change Log:
+v3->v4:
+ * update after changing scg and pcc into separete nodes according to
+   Rob's suggestion
+v2->v3:
+ * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible racy
+   Others no changes.
+
+v1->v2:
+ * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+ * use clk_hw apis to register clocks
+ * use of_clk_add_hw_provider
+ * split the clocks register process into two parts: early part for possible
+   timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
+   the left normal peripheral clocks registered by a platform driver.
+
+Dong Aisheng (9):
+  clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+  clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
+  clk: imx: add pllv4 support
+  clk: imx: add pfdv2 support
+  clk: imx: add composite clk support
+  dt-bindings: clock: add imx7ulp clock binding doc
+  clk: imx: make mux parent strings const
+  clk: imx: implement new clk_hw based APIs
+  clk: imx: add imx7ulp clk driver
+
+ .../devicetree/bindings/clock/imx7ulp-clock.txt    |  87 +++++++++
+ drivers/clk/clk-divider.c                          | 152 +++++++++++++++
+ drivers/clk/clk-fractional-divider.c               |  10 +
+ drivers/clk/imx/Makefile                           |   6 +-
+ drivers/clk/imx/clk-busy.c                         |   2 +-
+ drivers/clk/imx/clk-composite.c                    |  85 +++++++++
+ drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+ drivers/clk/imx/clk-imx7ulp.c                      | 209 +++++++++++++++++++++
+ drivers/clk/imx/clk-pfdv2.c                        | 201 ++++++++++++++++++++
+ drivers/clk/imx/clk-pllv4.c                        | 182 ++++++++++++++++++
+ drivers/clk/imx/clk.c                              |  22 +++
+ drivers/clk/imx/clk.h                              |  92 ++++++++-
+ include/dt-bindings/clock/imx7ulp-clock.h          | 109 +++++++++++
+ include/linux/clk-provider.h                       |  17 ++
+ 14 files changed, 1166 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+ create mode 100644 drivers/clk/imx/clk-composite.c
+ create mode 100644 drivers/clk/imx/clk-imx7ulp.c
+ create mode 100644 drivers/clk/imx/clk-pfdv2.c
+ create mode 100644 drivers/clk/imx/clk-pllv4.c
+ create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
+
+-- 
+2.7.4
