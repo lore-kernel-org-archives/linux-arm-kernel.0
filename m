@@ -1,63 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 21 Oct 2018 17:59:08 +0200 (CEST)
-Subject: Applied "spi: lpspi: add imx8qxp compatible string" to the spi tree
-In-Reply-To: <1539886483-15775-6-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20181021155908.81C2F440078@finisterre.ee.mobilebroadband>
+From: wsa+renesas@sang-engineering.com (Wolfram Sang)
+Date: Sun, 21 Oct 2018 21:59:58 +0200
+Subject: [PATCH 1/1] bus: brcmstb_gisb: simplify getting .driver_data
+In-Reply-To: <20181021195958.1412-1-wsa+renesas@sang-engineering.com>
+References: <20181021195958.1412-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20181021195958.1412-2-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+We should get 'driver_data' from 'struct device' directly. Going via
+platform_device is an unneeded step back and forth.
 
-   spi: lpspi: add imx8qxp compatible string
-
-has been applied to the spi tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 0c903aafc8529f64d24d2cd6df32f2bf16aad20b Mon Sep 17 00:00:00 2001
-From: "A.s. Dong" <aisheng.dong@nxp.com>
-Date: Thu, 18 Oct 2018 18:19:34 +0000
-Subject: [PATCH] spi: lpspi: add imx8qxp compatible string
-
-Add imx8qxp compatible string
-
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt b/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt
-index 4af132606b37..8d178a4503cf 100644
---- a/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-fsl-lpspi.txt
-@@ -3,6 +3,7 @@
- Required properties:
- - compatible :
-   - "fsl,imx7ulp-spi" for LPSPI compatible with the one integrated on i.MX7ULP soc
-+  - "fsl,imx8qxp-spi" for LPSPI compatible with the one integrated on i.MX8QXP soc
- - reg : address and length of the lpspi master registers
- - interrupts : lpspi interrupt
- - clocks : lpspi clock specifier
+Build tested only. buildbot is happy.
+
+ drivers/bus/brcmstb_gisb.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index 68ac3e93b600..f58ff67e97ac 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -150,8 +150,7 @@ static ssize_t gisb_arb_get_timeout(struct device *dev,
+ 				    struct device_attribute *attr,
+ 				    char *buf)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
++	struct brcmstb_gisb_arb_device *gdev = dev_get_drvdata(dev);
+ 	u32 timeout;
+ 
+ 	mutex_lock(&gdev->lock);
+@@ -165,8 +164,7 @@ static ssize_t gisb_arb_set_timeout(struct device *dev,
+ 				    struct device_attribute *attr,
+ 				    const char *buf, size_t count)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
++	struct brcmstb_gisb_arb_device *gdev = dev_get_drvdata(dev);
+ 	int val, ret;
+ 
+ 	ret = kstrtoint(buf, 10, &val);
+@@ -418,8 +416,7 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+ #ifdef CONFIG_PM_SLEEP
+ static int brcmstb_gisb_arb_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
++	struct brcmstb_gisb_arb_device *gdev = dev_get_drvdata(dev);
+ 
+ 	gdev->saved_timeout = gisb_read(gdev, ARB_TIMER);
+ 
+@@ -431,8 +428,7 @@ static int brcmstb_gisb_arb_suspend(struct device *dev)
+  */
+ static int brcmstb_gisb_arb_resume_noirq(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
++	struct brcmstb_gisb_arb_device *gdev = dev_get_drvdata(dev);
+ 
+ 	gisb_write(gdev, gdev->saved_timeout, ARB_TIMER);
+ 
 -- 
 2.19.0
