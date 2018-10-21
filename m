@@ -1,47 +1,75 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 21 Oct 2018 22:00:20 +0200
-Subject: [PATCH 9/9] net: phy: mdio-mux-bcm-iproc: simplify getting
- .driver_data
-In-Reply-To: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
-References: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20181021200021.1693-10-wsa+renesas@sang-engineering.com>
+Date: Sun, 21 Oct 2018 22:00:26 +0200
+Subject: [PATCH 0/5] pinctrl: simplify getting .driver_data
+Message-ID: <20181021200032.1833-1-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should get 'driver_data' from 'struct device' directly. Going via
-platform_device is an unneeded step back and forth.
+I got tired of fixing this in Renesas drivers manually, so I took the big
+hammer. Remove this cumbersome code pattern which got copy-pasted too much
+already:
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
-
-Build tested only. buildbot is happy.
-
- drivers/net/phy/mdio-mux-bcm-iproc.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-index c017486e9b86..696bdf1e4576 100644
---- a/drivers/net/phy/mdio-mux-bcm-iproc.c
-+++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-@@ -289,8 +289,7 @@ static int mdio_mux_iproc_remove(struct platform_device *pdev)
- #ifdef CONFIG_PM_SLEEP
- static int mdio_mux_iproc_suspend(struct device *dev)
- {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct iproc_mdiomux_desc *md = platform_get_drvdata(pdev);
-+	struct iproc_mdiomux_desc *md = dev_get_drvdata(dev);
- 
- 	clk_disable_unprepare(md->core_clk);
- 
-@@ -299,8 +298,7 @@ static int mdio_mux_iproc_suspend(struct device *dev)
- 
- static int mdio_mux_iproc_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct iproc_mdiomux_desc *md = platform_get_drvdata(pdev);
-+	struct iproc_mdiomux_desc *md = dev_get_drvdata(dev);
- 
- 	clk_prepare_enable(md->core_clk);
- 	mdio_mux_iproc_config(md);
+-	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
++	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
+
+A branch, tested by buildbot, can be found here:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git coccinelle/get_drvdata
+
+I have been asked if it couldn't be done for dev_set_drvdata as well. I checked
+it and did not find one occasion where it could be simplified like this. Not
+much of a surprise because driver_data is usually set in probe() functions
+which access struct platform_device in many other ways.
+
+I am open for other comments, suggestions, too, of course.
+
+Here is the cocci-script I created:
+
+@@
+struct device* d;
+identifier pdev;
+expression *ptr;
+@@
+(
+-	struct platform_device *pdev = to_platform_device(d);
+|
+-	struct platform_device *pdev;
+	...
+-	pdev = to_platform_device(d);
+)
+	<... when != pdev
+-	&pdev->dev
++	d
+	...>
+
+	ptr =
+-	platform_get_drvdata(pdev)
++	dev_get_drvdata(d)
+
+	<... when != pdev
+-	&pdev->dev
++	d
+	...>
+
+Kind regards,
+
+   Wolfram
+
+
+Wolfram Sang (5):
+  pinctrl: intel: pinctrl-baytrail: simplify getting .driver_data
+  pinctrl: intel: pinctrl-cherryview: simplify getting .driver_data
+  pinctrl: intel: pinctrl-intel: simplify getting .driver_data
+  pinctrl: pinctrl-amd: simplify getting .driver_data
+  pinctrl: pinctrl-at91-pio4: simplify getting .driver_data
+
+ drivers/pinctrl/intel/pinctrl-baytrail.c   | 6 ++----
+ drivers/pinctrl/intel/pinctrl-cherryview.c | 6 ++----
+ drivers/pinctrl/intel/pinctrl-intel.c      | 6 ++----
+ drivers/pinctrl/pinctrl-amd.c              | 6 ++----
+ drivers/pinctrl/pinctrl-at91-pio4.c        | 6 ++----
+ 5 files changed, 10 insertions(+), 20 deletions(-)
+
 -- 
 2.19.0
