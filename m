@@ -1,249 +1,184 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 22 Oct 2018 09:34:15 +0200
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
- SPI NOR flash memories
-In-Reply-To: <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
- <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
- <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
- <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017090724.12f2cd79@bbrezillon>
- <20181017091045.124e0266@bbrezillon>
- <20181017092941.3658bd9a@bbrezillon>
- <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017115237.07310b74@bbrezillon>
- <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <20181022093415.131b75bc@bbrezillon>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Mon, 22 Oct 2018 09:34:26 +0200
+Subject: [PATCH v3] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
+Message-ID: <20181022073426.24856-1-vincent.whitchurch@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2018 06:04:13 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
+ldr/str instructions in copy_{from/to}_user.  They are currently
+unnecessarily using single ldr/str instructions and can use ldm/stm
+instructions instead like memcpy does (but with appropriate fixup
+tables).
 
-> Hi Boris, Tudor,
-> 
-> > -----Original Message-----
-> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > Sent: Wednesday, October 17, 2018 3:23 PM
-> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > Cc: Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>; Tudor Ambarus
-> > <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
-> > dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
-> > linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
-> > cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; linux-arm-
-> > kernel at lists.infradead.org; Cristian.Birsan at microchip.com
-> > Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
-> > NOR flash memories
-> > 
-> > On Wed, 17 Oct 2018 07:46:30 +0000
-> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> >   
-> > > Hi Boris,
-> > >  
-> > > > -----Original Message-----
-> > > > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > > > Sent: Wednesday, October 17, 2018 1:00 PM
-> > > > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > > > Cc: Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>; Tudor Ambarus
-> > > > <tudor.ambarus@microchip.com>; marek.vasut at gmail.com;
-> > > > dwmw2 at infradead.org; computersforpeace at gmail.com; richard at nod.at;
-> > > > linux-kernel at vger.kernel.org; nicolas.ferre at microchip.com;
-> > > > cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org;
-> > > > linux-arm- kernel at lists.infradead.org; Cristian.Birsan at microchip.com
-> > > > Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform
-> > > > SFDP SPI NOR flash memories
-> > > >
-> > > > On Wed, 17 Oct 2018 09:10:45 +0200
-> > > > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> > > >  
-> > > > > On Wed, 17 Oct 2018 09:07:24 +0200 Boris Brezillon
-> > > > > <boris.brezillon@bootlin.com> wrote:
-> > > > >  
-> > > > > > On Wed, 17 Oct 2018 02:07:43 +0000 Yogesh Narayan Gaur
-> > > > > > <yogeshnarayan.gaur@nxp.com> wrote:
-> > > > > >  
-> > > > > > > >  
-> > > > > > > Actually there is no entry of s25fs512s in current spi-nor.c file.
-> > > > > > > For my connected flash part, jedec ID read points to
-> > > > > > > s25fl512s. I have asked my board team to confirm the name of
-> > > > > > > exact connected flash part. When I check the data sheet of
-> > > > > > > s25fs512s, it also points to the same Jedec ID information. {
-> > > > > > > "s25fl512s", INFO(0x010220, 0x4d00, 256
-> > > > > > > * 1024, 256, ....}
-> > > > > > >
-> > > > > > > But as stated earlier, if I skip reading SFDP or read using
-> > > > > > > 1-1-1 protocol then read are always correct. For 1-4-4
-> > > > > > > protocol read are wrong and on further debugging found that
-> > > > > > > Read code of 0x6C is being send as opcode instead of 0xEC.
-> > > > > > >
-> > > > > > > If I revert this patch, reads are working fine.  
-> > > > > >
-> > > > > > Can you try with the following patch?
-> > > > > >  
-> > > > >
-> > > > > Hm, nevermind. The problem is actually not related to 4B vs non-4B
-> > > > > mode but 1-1-4 vs 1-4-4 modes.  
-> > > Yes, that's only I have stated in my first mail that instead of 1-4-4 mode read  
-> > opcode is being sent for 1-1-4 mode.  
-> > > > >  
-> > > >
-> > > > Can you try with this patch applied?
-> > > >  
-> > > With suggested patch, read for protocol 1-4-4 working correctly.
-> > >
-> > > 	[    1.625360] m25p80 spi0.0: found s25fl512s, expected m25p80
-> > > 	[    1.631094] m25p80 spi0.0: failed to parse SMPT (err = -22)
-> > > 	[    1.636661] 261 8c4c780 opcode(read:eb, pp:2, erase:d8)
-> > > 	[    1.641878] 266 8c4c780 opcode(read:ec, pp:12, erase:dc)
-> > > 	[    1.647200] m25p80 spi0.0: s25fl512s (65536 Kbytes)
-> > >  
-> > 
-> > Okay, let's try this one to see why the SMPT parsing fails.
-> >   
-> 
-> Please find the below info for the SMPT table read from the flash
-> [    1.631085] spi_nor_get_map_in_use:2880 smpt[0]=08ff65fc   
-> [    1.636393] spi_nor_get_map_in_use:2880 smpt[1]=00000004   
-> [    1.641696] spi_nor_get_map_in_use:2880 smpt[2]=04ff65fc   
-> [    1.646998] spi_nor_get_map_in_use:2880 smpt[3]=00000002   
-> [    1.652302] spi_nor_get_map_in_use:2880 smpt[4]=02ff65fd   
-> [    1.657606] spi_nor_get_map_in_use:2880 smpt[5]=00000004   
-> [    1.662911] spi_nor_get_map_in_use:2880 smpt[6]=ff0201fe   
-> [    1.668215] spi_nor_get_map_in_use:2880 smpt[7]=00007ff1   
-> [    1.673520] spi_nor_get_map_in_use:2880 smpt[8]=00037ff4   
-> [    1.678825] spi_nor_get_map_in_use:2880 smpt[9]=03fbfff4   
-> [    1.684128] spi_nor_get_map_in_use:2880 smpt[10]=ff0203fe   
-> [    1.689519] spi_nor_get_map_in_use:2880 smpt[11]=03fbfff4   
-> [    1.694911] spi_nor_get_map_in_use:2880 smpt[12]=00037ff4   
-> [    1.700303] spi_nor_get_map_in_use:2880 smpt[13]=00007ff1   
-> [    1.705693] spi_nor_get_map_in_use:2880 smpt[14]=ff0005ff   
-> [    1.711081] spi_nor_get_map_in_use:2880 smpt[15]=03fffff4   
-> [    1.716470] spi_nor_get_map_in_use:2910 NO map_id           
-> [    1.721165] spi_nor_parse_smpt:3055                         
-> [    1.724645] m25p80 spi0.0: failed to parse SMPT (err = -22)
-> 
-> I have checked that all these information are matching with the fields specified in this flash data sheet [1], page 131-133.
-> 
-> Below is the full debug patch.
-> 
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -2863,22 +2863,28 @@ static u8 spi_nor_smpt_read_dummy(const struct spi_nor *nor, const u32 settings)
->   * @nor:       pointer to a 'struct spi_nor'
->   * @smpt:      pointer to the sector map parameter table
->   */
-> -static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
-> +static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt, u32 smpt_len)
->  {
->         const u32 *ret = NULL;
-> -       u32 i, addr;
-> +       u32 i, addr, nmaps;
->         int err;
->         u8 addr_width, read_opcode, read_dummy;
->         u8 read_data_mask, data_byte, map_id;
-> +       bool map_id_is_valid = false;
-> 
->         addr_width = nor->addr_width;
->         read_dummy = nor->read_dummy;
->         read_opcode = nor->read_opcode;
-> 
-> +       for (i = 0; i<smpt_len; i++)
-> +               pr_info("%s:%i smpt[%d]=%08x\n", __func__, __LINE__, i, smpt[i]);
-> +
->         map_id = 0;
-> -       i = 0;
->         /* Determine if there are any optional Detection Command Descriptors */
-> -       while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
-> +       for (i = 0; i< smpt_len; i++) {
-> +               if (!(smpt[i] & SMPT_DESC_TYPE_MAP))
-> +                       break;
-> +
->                 read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
->                 nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
->                 nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
-> @@ -2894,18 +2900,35 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
->                  * Configuration that is currently in use.
->                  */
->                 map_id = map_id << 1 | !!(data_byte & read_data_mask);
-> +               map_id_is_valid = true;
->                 i = i + 2;
->         }
-> 
-> -       /* Find the matching configuration map */
-> -       while (SMPT_MAP_ID(smpt[i]) != map_id) {
-> -               if (smpt[i] & SMPT_DESC_END)
-> -                       goto out;
-> +       if (map_id_is_valid)
-> +               pr_info("%s:%i map_id=%d\n", __func__, __LINE__, map_id);
-> +       else
-> +               pr_info("%s:%i NO map_id\n", __func__, __LINE__);
-> +
-> +       for (nmaps = 0; nmaps< smpt_len; nmaps++) {
-> +               if(!(smpt[nmaps] & SMPT_DESC_TYPE_MAP))
+This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
+about 4% on my Cortex-A9.
 
-My bad, this should be
+before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
+before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
+before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
+before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
 
-		if(smpt[nmaps] & SMPT_DESC_TYPE_MAP)
+ after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
+ after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
 
-Can you try again with this change?
+Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+---
+v3: Explicitly add IT instructions to fix fault handling on Thumb-2
+v2: Group *_SHIFT #defines with respective .macro implementations
 
-> +                       continue;
-> +
-> +               if(!map_id_is_valid) {
-> +                       if (nmaps) {
-> +                               ret = NULL;
-> +                               break;
-> +                       }
-> +
-> +                       ret = smpt+nmaps;
-> +               } else if (map_id == SMPT_MAP_ID(smpt[nmaps])) {
-> +                       ret = smpt+nmaps;
-> +                       break;
-> +               }
-> +
->                 /* increment the table index to the next map */
-> -               i += SMPT_MAP_REGION_COUNT(smpt[i]) + 1;
-> +               nmaps += SMPT_MAP_REGION_COUNT(smpt[nmaps]) + 1;
->         }
-> 
-> -       ret = smpt + i;
->         /* fall through */
->  out:
->         nor->addr_width = addr_width;
-> @@ -3027,8 +3050,9 @@ static int spi_nor_parse_smpt(struct spi_nor *nor,
->         for (i = 0; i < smpt_header->length; i++)
->                 smpt[i] = le32_to_cpu(smpt[i]);
-> 
-> -       sector_map = spi_nor_get_map_in_use(nor, smpt);
-> +       sector_map = spi_nor_get_map_in_use(nor, smpt, smpt_header->length);
->         if (!sector_map) {
-> +               pr_info("%s:%i\n", __func__, __LINE__);
->                 ret = -EINVAL;
->                 goto out;
->         }
-> @@ -3139,6 +3167,17 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
->                 switch (SFDP_PARAM_HEADER_ID(param_header)) {
->                 case SFDP_SECTOR_MAP_ID:
->                         err = spi_nor_parse_smpt(nor, param_header);
-> +                       if (err) {
-> +                               dev_warn(dev,
-> +                               "failed to parse SMPT (err = %d)\n",
-> +                               err);
-> +                               /*
-> +                                * SMPT parsing is optional, let's not drop
-> +                                * all information we extracted so far just
-> +                                * because it failed.
-> +                                */
-> +                               err = 0;
-> +                       }
->                         break;
-> 
->                 default:
-> [1] http://www.cypress.com/documentation/datasheets/s25fs512s-512-mbit-18-v-serial-peripheral-interface-multi-io-non-volatile
-> 
-> --
-> Regards
-> Yogesh Gaur
-> [...]
+ arch/arm/include/asm/assembler.h |  6 ++++--
+ arch/arm/lib/copy_from_user.S    | 30 +++++++++++++++++++++++++++++-
+ arch/arm/lib/copy_to_user.S      | 34 +++++++++++++++++++++++++++++-----
+ 3 files changed, 62 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index b17ee03d280b..da16d31c7ef9 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -243,13 +243,15 @@
+ 	.endm
+ #endif
+ 
+-#define USER(x...)				\
++#define USERL(l, x...)				\
+ 9999:	x;					\
+ 	.pushsection __ex_table,"a";		\
+ 	.align	3;				\
+-	.long	9999b,9001f;			\
++	.long	9999b,l;			\
+ 	.popsection
+ 
++#define USER(x...)	USERL(9001f, x)
++
+ #ifdef CONFIG_SMP
+ #define ALT_SMP(instr...)					\
+ 9998:	instr
+diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
+index a826df3d3814..216f5c5956a1 100644
+--- a/arch/arm/lib/copy_from_user.S
++++ b/arch/arm/lib/copy_from_user.S
+@@ -34,12 +34,13 @@
+  *	Number of bytes NOT copied.
+  */
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
++
+ #ifndef CONFIG_THUMB2_KERNEL
+ #define LDR1W_SHIFT	0
+ #else
+ #define LDR1W_SHIFT	1
+ #endif
+-#define STR1W_SHIFT	0
+ 
+ 	.macro ldr1w ptr reg abort
+ 	ldrusr	\reg, \ptr, 4, abort=\abort
+@@ -61,6 +62,33 @@
+ 	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
+ 
++#else
++
++#define LDR1W_SHIFT	0
++
++	.macro ldr1w ptr reg abort
++	USERL(\abort, W(ldr) \reg, [\ptr], #4)
++	.endm
++
++	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
++	.endm
++
++	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
++
++	.macro ldr1b ptr reg cond=al abort
++	.ifnc	\cond, al
++	it	\cond
++	.endif
++	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
++	.endm
++
++#endif /* CONFIG_CPU_USE_DOMAINS */
++
++#define STR1W_SHIFT	0
++
+ 	.macro str1w ptr reg abort
+ 	W(str) \reg, [\ptr], #4
+ 	.endm
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index caf5019d8161..ce92f282feb4 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -35,11 +35,6 @@
+  */
+ 
+ #define LDR1W_SHIFT	0
+-#ifndef CONFIG_THUMB2_KERNEL
+-#define STR1W_SHIFT	0
+-#else
+-#define STR1W_SHIFT	1
+-#endif
+ 
+ 	.macro ldr1w ptr reg abort
+ 	W(ldr) \reg, [\ptr], #4
+@@ -57,6 +52,14 @@
+ 	ldr\cond\()b \reg, [\ptr], #1
+ 	.endm
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
++
++#ifndef CONFIG_THUMB2_KERNEL
++#define STR1W_SHIFT	0
++#else
++#define STR1W_SHIFT	1
++#endif
++
+ 	.macro str1w ptr reg abort
+ 	strusr	\reg, \ptr, 4, abort=\abort
+ 	.endm
+@@ -76,6 +79,27 @@
+ 	strusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
+ 
++#else
++
++#define STR1W_SHIFT	0
++
++	.macro str1w ptr reg abort
++	USERL(\abort, W(str) \reg, [\ptr], #4)
++	.endm
++
++	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
++
++	.macro str1b ptr reg cond=al abort
++	.ifnc	\cond, al
++	it	\cond
++	.endif
++	USERL(\abort, str\cond\()b \reg, [\ptr], #1)
++	.endm
++
++#endif /* CONFIG_CPU_USE_DOMAINS */
++
+ 	.macro enter reg1 reg2
+ 	mov	r3, #0
+ 	stmdb	sp!, {r0, r2, r3, \reg1, \reg2}
+-- 
+2.11.0
