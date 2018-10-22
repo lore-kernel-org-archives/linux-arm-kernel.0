@@ -1,68 +1,105 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 22 Oct 2018 11:15:43 +0200
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
- SPI NOR flash memories
-In-Reply-To: <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
- <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
- <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
- <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017090724.12f2cd79@bbrezillon>
- <20181017091045.124e0266@bbrezillon>
- <20181017092941.3658bd9a@bbrezillon>
- <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017115237.07310b74@bbrezillon>
- <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <20181022111543.2a607efc@bbrezillon>
+From: alex.gonzalez@digi.com (Alex Gonzalez)
+Date: Mon, 22 Oct 2018 11:27:23 +0200
+Subject: [PATCH v1] ARM: dts: imx6ul: ccimx6ulsom: Add support for wireless
+ SOM variant
+In-Reply-To: <1540200443-24773-1-git-send-email-alex.gonzalez@digi.com>
+References: <1540200443-24773-1-git-send-email-alex.gonzalez@digi.com>
+Message-ID: <1540200443-24773-2-git-send-email-alex.gonzalez@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2018 06:04:13 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+The wireless variants of the ConnecCore 6UL SOM include a Qualcomm
+QCA6564 wireless chip with dual WiFi and Bluetooth.
 
+Both the ConnectCore 6UL SBC Express and Pro boards fit a wireless SOM.
 
-> -       /* Find the matching configuration map */
-> -       while (SMPT_MAP_ID(smpt[i]) != map_id) {
-> -               if (smpt[i] & SMPT_DESC_END)
-> -                       goto out;
-> +       if (map_id_is_valid)
-> +               pr_info("%s:%i map_id=%d\n", __func__, __LINE__, map_id);
-> +       else
-> +               pr_info("%s:%i NO map_id\n", __func__, __LINE__);
-> +
-> +       for (nmaps = 0; nmaps< smpt_len; nmaps++) {
+The Wifi is connected through the SDIO interface on usdhc1 and the
+Bluetooth is connected via uart1.
 
-Why did you change this for loop?
+Signed-off-by: Alex Gonzalez <alex.gonzalez@digi.com>
+---
+ arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi | 64 +++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-> +               if(!(smpt[nmaps] & SMPT_DESC_TYPE_MAP))
-> +                       continue;
-> +
-> +               if(!map_id_is_valid) {
-> +                       if (nmaps) {
-
-With your change in the for () block, this test is no longer valid...
-
-Please keep the original patch and patch the if () condition as
-suggested.
-
-> +                               ret = NULL;
-> +                               break;
-> +                       }
-> +
-> +                       ret = smpt+nmaps;
-> +               } else if (map_id == SMPT_MAP_ID(smpt[nmaps])) {
-> +                       ret = smpt+nmaps;
-> +                       break;
-> +               }
-> +
->                 /* increment the table index to the next map */
-> -               i += SMPT_MAP_REGION_COUNT(smpt[i]) + 1;
-> +               nmaps += SMPT_MAP_REGION_COUNT(smpt[nmaps]) + 1;
->         }
-> 
-> -       ret = smpt + i;
->         /* fall through */
->  out:
->         nor->addr_width = addr_width;
+diff --git a/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi b/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
+index c71a84da1af0..23bbcd4c71d1 100644
+--- a/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
++++ b/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
+@@ -161,6 +161,25 @@
+ 	};
+ };
+ 
++/* UART1 (Bluetooth) */
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	uart-has-rtscts;
++	status = "okay";
++};
++
++/* USDHC1 (Wireless) */
++&usdhc1 {
++	pinctrl-names = "default", "sleep";
++	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_wifibt_ctrl>;
++	pinctrl-1 = <&pinctrl_usdhc1_sleep &pinctrl_wifibt_ctrl_sleep>;
++	non-removable;
++	no-1-8-v;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl_gpmi_nand: gpmigrp {
+ 		fsl,pins = <
+@@ -188,6 +207,51 @@
+ 			MX6UL_PAD_UART4_RX_DATA__I2C1_SDA 0x4001b8b0
+ 			>;
+ 		};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX   0x1b0b1
++			MX6UL_PAD_UART1_RX_DATA__UART1_DCE_RX   0x1b0b1
++			MX6UL_PAD_UART1_RTS_B__UART1_DCE_RTS    0x1b0b1
++			MX6UL_PAD_UART1_CTS_B__UART1_DCE_CTS    0x1b0b1
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6UL_PAD_SD1_CMD__USDHC1_CMD           0x17059
++			MX6UL_PAD_SD1_CLK__USDHC1_CLK           0x17051
++			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0       0x17059
++			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1       0x17059
++			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2       0x17059
++			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3       0x17059
++			 >;
++		};
++
++	pinctrl_usdhc1_sleep: usdhc1grp-sleep {
++		fsl,pins = <
++			MX6UL_PAD_SD1_CMD__GPIO2_IO16           0x3000
++			MX6UL_PAD_SD1_CLK__GPIO2_IO17           0x3000
++			MX6UL_PAD_SD1_DATA0__GPIO2_IO18         0x3000
++			MX6UL_PAD_SD1_DATA1__GPIO2_IO19         0x3000
++			MX6UL_PAD_SD1_DATA2__GPIO2_IO20         0x3000
++			MX6UL_PAD_SD1_DATA3__GPIO2_IO21         0x3000
++			 >;
++	};
++
++	pinctrl_wifibt_ctrl: wifibt-ctrl-grp {
++		fsl,pins = <
++			MX6UL_PAD_SNVS_TAMPER0__GPIO5_IO00      0x08a0
++			MX6UL_PAD_SNVS_TAMPER9__GPIO5_IO09      0x08a0
++			  >;
++	};
++
++	pinctrl_wifibt_ctrl_sleep: wifibt-ctrl-grp-sleep {
++		fsl,pins = <
++			MX6UL_PAD_SNVS_TAMPER0__GPIO5_IO00      0x3000
++			MX6UL_PAD_SNVS_TAMPER9__GPIO5_IO09      0x3000
++			 >;
++	};
+ };
+ 
+ &reg_arm {
