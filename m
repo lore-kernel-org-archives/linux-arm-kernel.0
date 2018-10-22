@@ -1,35 +1,61 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 21 Oct 2018 21:11:08 -0700 (PDT)
-Subject: [PATCH 0/9] net: simplify getting .driver_data
-In-Reply-To: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
-References: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20181021.211108.848222946495599164.davem@davemloft.net>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Mon, 22 Oct 2018 13:59:18 +0800
+Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <153997220960.53599.2059896905852359614@swboyd.mtv.corp.google.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
+ <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
+ <01d07c83-b17e-70b5-6e9b-8150ee3aedf2@amlogic.com>
+ <153997220960.53599.2059896905852359614@swboyd.mtv.corp.google.com>
+Message-ID: <9ddb0f0f-994c-b743-99cd-05ec094a6afc@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Date: Sun, 21 Oct 2018 22:00:11 +0200
-
-> I got tired of fixing this in Renesas drivers manually, so I took the big
-> hammer. Remove this cumbersome code pattern which got copy-pasted too much
-> already:
+On 2018/10/20 2:03, Stephen Boyd wrote:
+> Quoting Jianxin Pan (2018-10-19 09:12:53)
+>> On 2018/10/19 1:13, Stephen Boyd wrote:
+>>> Quoting Jianxin Pan (2018-10-17 22:07:25)
+>>>> diff --git a/drivers/clk/meson/clk-regmap.c b/drivers/clk/meson/clk-regmap.c
+>>>> index 305ee30..f96314d 100644
+>>>> --- a/drivers/clk/meson/clk-regmap.c
+>>>> +++ b/drivers/clk/meson/clk-regmap.c
+>>>> @@ -113,8 +113,25 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, unsigned long rate,
+>>>>                                   clk_div_mask(div->width) << div->shift, val);
+>>>>  };
+>>>>  
+>>>> -/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
+>>>> +static void clk_regmap_div_init(struct clk_hw *hw)
+>>>> +{
+>>>> +       struct clk_regmap *clk = to_clk_regmap(hw);
+>>>> +       struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk);
+>>>> +       unsigned int val;
+>>>> +       int ret;
+>>>> +
+>>>> +       ret = regmap_read(clk->map, div->offset, &val);
+>>>> +       if (ret)
+>>>> +               return;
+>>>>  
+>>>> +       val &= (clk_div_mask(div->width) << div->shift);
+>>>> +       if (!val)
+>>>> +               regmap_update_bits(clk->map, div->offset,
+>>>> +                                  clk_div_mask(div->width) << div->shift,
+>>>> +                                  clk_div_mask(div->width));
+>>>> +}
+>>>> +
+>>>> +/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
+>>>
+>>> We should add a patch to rename the symbol for qcom, i.e.
+>>> qcom_clk_regmap_div_ro_ops, and then any symbols in this directory
+>>> should be meson_clk_regmap_div_ro_ops.
+>> "/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */"
+>> This comment is not introduced in this patch.
+>> I followed the naming style in this file and add clk_regmap_divider_with_init_ops.
+>>
+>> @Jerome? What's your suggestion about this?
 > 
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
-> +	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
+> Yes you don't need to fix anything in this series. Just saying that in
+> the future we should work on cleaning this up.
 > 
-> A branch, tested by buildbot, can be found here:
+OK. Thank you!
+> .
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git coccinelle/get_drvdata
-> 
-> I have been asked if it couldn't be done for dev_set_drvdata as well. I checked
-> it and did not find one occasion where it could be simplified like this. Not
-> much of a surprise because driver_data is usually set in probe() functions
-> which access struct platform_device in many other ways.
-> 
-> I am open for other comments, suggestions, too, of course.
-> 
-> Here is the cocci-script I created:
- ...
-
-Series applied to net-next, thanks.
