@@ -1,34 +1,29 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 22 Oct 2018 13:39:02 -0700
-Subject: [PATCH v2 00/10] Add support for TISCI irqchip drivers
-In-Reply-To: <20181018154017.7112-1-lokeshvutla@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
-Message-ID: <942981b8-7536-2b6b-ad49-dc59671cbda6@oracle.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Mon, 22 Oct 2018 15:58:15 -0500
+Subject: [PATCH v3] arm64: dts: add LX2160AQDS board support
+In-Reply-To: <20181019041648.GA6716@X250>
+References: <20181005081053.27105-1-pankaj.bansal@nxp.com>
+ <20181017160430.22381-1-pankaj.bansal@nxp.com>
+ <20181019041648.GA6716@X250>
+Message-ID: <CADRPPNQ3FoEiYC6SoLtD+=uyL_zFS+rQ+79-g=NLiAE3HckFtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2018 8:40 AM, Lokesh Vutla wrote:
-> TISCI abstracts the handling of IRQ routes where interrupt sources
-> are not directly connected to host interrupt controller. This series
-> adds support for:
-> - TISCI commands needed for IRQ configuration
-> - Interrupt Router(INTR) and Interrupt Aggregator(INTA) drivers
-> 
-> More information on TISCI IRQ management can be found here[1].
-> Complete TISCI resource management information can be found here[2].
-> AM65x SoC related TISCI information can be found here[3].
-> INTR and INTA related information can be found in TRM[4].
-> 
-I didn't read the specs but from what you described in
-INTA and INTR bindings, does the flow of IRQs like below ?
+On Thu, Oct 18, 2018 at 11:17 PM Shawn Guo <shawnguo@kernel.org> wrote:
+>
+> On Wed, Oct 17, 2018 at 10:32:45AM +0000, Pankaj Bansal wrote:
+> > The LX2160A QorIQ Development System (QDS) is a test, evaluation, and
+> > development platform, supporting QorIQ LX2160A processor.
+> >
+> > Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+> > Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+>
+> Looks good to me.  @Leo, are you okay with it?
 
-Device IRQ(e.g USB) -->INTR-->INTA--->HOST IRQ controller(GIC)
+Yes.  But be aware that the dependency patches of this patch are not
+applied yet.
 
-The confusing part is aggregator and can multiplex as well
-as grouping but seems like its event grouping or multiplexing
-than actual device IRQ grouping or multi-plexsing.
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-What am I missing ?
-
-Regards,S
-antosh
+>
+> Shawn
