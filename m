@@ -1,62 +1,152 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Oct 2018 19:43:01 -0300
-Subject: [RFC PATCH v2 09/12] crypto: nhpoly1305 - add NHPoly1305 support
-In-Reply-To: <20181022224008.GB59695@gmail.com>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <20181015175424.97147-10-ebiggers@kernel.org>
- <CAKv+Gu-5WM19g5HguDheAADbigKNxokDCFMekkt4OYdEEa8Avw@mail.gmail.com>
- <20181020053834.GC876@sol.localdomain>
- <CAKv+Gu-A_EhMBXq_nqzBzpgN36foo6hA3Ba3=j+WVM-jph=mrw@mail.gmail.com>
- <20181022184236.GA59695@gmail.com>
- <CAKv+Gu_vXmfNQT8j=G_Zz5C3-zDPPEQ2ne6ZZQw8mD0rifO8qA@mail.gmail.com>
- <20181022224008.GB59695@gmail.com>
-Message-ID: <CAKv+Gu-6JCQ=f=Qy8DCLAN4V56HbXAG9Wr2Tb7Zm25HLKuG4Lg@mail.gmail.com>
+From: rick.p.edgecombe@intel.com (Edgecombe, Rick P)
+Date: Mon, 22 Oct 2018 23:06:00 +0000
+Subject: [PATCH RFC v3 0/3] Rlimit for module space
+In-Reply-To: <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
+References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
+ <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
+Message-ID: <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2018 at 19:40, Eric Biggers <ebiggers@kernel.org> wrote:
-> Hi Ard,
->
-> On Mon, Oct 22, 2018 at 07:25:27PM -0300, Ard Biesheuvel wrote:
->> >
->> > Hmm, I'm actually leaning towards the following instead.  Unrolling multiple
->> > strides to try to reduce loads of the keys doesn't seem worthwhile in the C
->> > implementation; for one, it bloats the code size a lot
->> > (412 => 2332 bytes on arm32).
->> >
->> > static void nh_generic(const u32 *key, const u8 *message, size_t message_len,
->> >                        __le64 hash[NH_NUM_PASSES])
->> > {
->> >         u64 sums[4] = { 0, 0, 0, 0 };
->> >
->> >         BUILD_BUG_ON(NH_PAIR_STRIDE != 2);
->> >         BUILD_BUG_ON(NH_NUM_PASSES != 4);
->> >
->> >         while (message_len) {
->> >                 u32 m0 = get_unaligned_le32(message + 0);
->> >                 u32 m1 = get_unaligned_le32(message + 4);
->> >                 u32 m2 = get_unaligned_le32(message + 8);
->> >                 u32 m3 = get_unaligned_le32(message + 12);
->> >
->> >                 sums[0] += (u64)(u32)(m0 + key[ 0]) * (u32)(m2 + key[ 2]);
->> >                 sums[1] += (u64)(u32)(m0 + key[ 4]) * (u32)(m2 + key[ 6]);
->> >                 sums[2] += (u64)(u32)(m0 + key[ 8]) * (u32)(m2 + key[10]);
->> >                 sums[3] += (u64)(u32)(m0 + key[12]) * (u32)(m2 + key[14]);
->> >                 sums[0] += (u64)(u32)(m1 + key[ 1]) * (u32)(m3 + key[ 3]);
->> >                 sums[1] += (u64)(u32)(m1 + key[ 5]) * (u32)(m3 + key[ 7]);
->> >                 sums[2] += (u64)(u32)(m1 + key[ 9]) * (u32)(m3 + key[11]);
->> >                 sums[3] += (u64)(u32)(m1 + key[13]) * (u32)(m3 + key[15]);
->>
->> Are these (u32) casts really necessary? All the addends are u32 types,
->> so I'd expect each (x + y) subexpression to have a u32 type already as
->> well. Or am I missing something?
->>
->
-> The (u32) casts are only necessary when sizeof(int) > sizeof(u32), as then the
-> addends will be promoted to 'int'.  Of course, that's never the case for the
-> Linux kernel.  But I prefer it to be as robust and well-defined as possible,
-> since people might use this as a reference when coding other implementations,
-> which could end up finding their way into unusual and/or future platforms.
->
+On Sat, 2018-10-20 at 19:20 +0200, Ard Biesheuvel wrote:
+> Hi Rick,
+> 
+> On 19 October 2018 at 22:47, Rick Edgecombe <rick.p.edgecombe@intel.com>
+> wrote:
+> > If BPF JIT is on, there is no effective limit to prevent filling the entire
+> > module space with JITed e/BPF filters.
+> 
+> Why do BPF filters use the module space, and does this reason apply to
+> all architectures?
+> 
+> On arm64, we already support loading plain modules far away from the
+> core kernel (i.e. out of range for ordinary relative jump/calll
+> instructions), and so I'd expect BPF to be able to deal with this
+> already as well. So for arm64, I wonder why an ordinary vmalloc_exec()
+> wouldn't be more appropriate.
+AFAIK, it's like you said about relative instruction limits, but also because
+some predictors don't predict past a certain distance. So performance as well.
+Not sure the reasons for each arch, or if they all apply for BPF JIT. There seem
+to be 8 by my count, that have a dedicated module space for some reason.
 
-Fair enough.
+> So before refactoring the module alloc/free routines to accommodate
+> BPF, I'd like to take one step back and assess whether it wouldn't be
+> more appropriate to have a separate bpf_alloc/free API, which could be
+> totally separate from module alloc/free if the arch permits it.
+> 
+I am not a BPF JIT expert unfortunately, hopefully someone more authoritative
+will chime in. I only ran into this because I was trying to increase
+randomization for the module space and wanted to find out how many allocations
+needed to be supported.
+
+I'd guess though, that BPF JIT is just assuming that there will be some arch
+specific constraints about where text can be placed optimally and they would
+already be taken into account in the module space allocator.
+
+If there are no constraints for some arch, I'd wonder why not just update its
+module_alloc to use the whole space available. What exactly are the constraints
+for arm64 for normal modules?
+
+It seems fine to me for architectures to have the option of solving this a
+different way. If potentially the rlimit ends up being the best solution for
+some architectures though, do you think this refactor (pretty close to just a
+name change) is that intrusive?
+
+I guess it could be just a BPF JIT per user limit and not touch module space,
+but I thought the module space limit was a more general solution as that is the
+actual limited resource.
+
+> > For classic BPF filters attached with
+> > setsockopt SO_ATTACH_FILTER, there is no memlock rlimit check to limit the
+> > number of insertions like there is for the bpf syscall.
+> > 
+> > This patch adds a per user rlimit for module space, as well as a system wide
+> > limit for BPF JIT. In a previously reviewed patchset, Jann Horn pointed out
+> > the
+> > problem that in some cases a user can get access to 65536 UIDs, so the
+> > effective
+> > limit cannot be set low enough to stop an attacker and be useful for the
+> > general
+> > case. A discussed alternative solution was a system wide limit for BPF JIT
+> > filters. This much more simply resolves the problem of exhaustion and
+> > de-randomizing in the case of non-CONFIG_BPF_JIT_ALWAYS_ON. If
+> > CONFIG_BPF_JIT_ALWAYS_ON is on however, BPF insertions will fail if another
+> > user
+> > exhausts the BPF JIT limit. In this case a per user limit is still needed.
+> > If
+> > the subuid facility is disabled for normal users, this should still be ok
+> > because the higher limit will not be able to be worked aroThey might und
+> > that way.
+> > 
+> > The new BPF JIT limit can be set like this:
+> > echo 5000000 > /proc/sys/net/core/bpf_jit_limit
+> > 
+> > So I *think* this patchset should resolve that issue except for the
+> > configuration of CONFIG_BPF_JIT_ALWAYS_ON and subuid allowed for normal
+> > users.
+> > Better module space KASLR is another way to resolve the de-randomizing
+> > issue,
+> > and so then you would just be left with the BPF DOS in that configuration.
+> > 
+> > Jann also pointed out how, with purposely fragmenting the module space, you
+> > could make the effective module space blockage area much larger. This is
+> > also
+> > somewhat un-resolved. The impact would depend on how big of a space you are
+> > trying to allocate. The limit has been lowered on x86_64 so that at least
+> > typical sized BPF filters cannot be blocked.
+> > 
+> > If anyone with more experience with subuid/user namespaces has any
+> > suggestions
+> > I'd be glad to hear. On an Ubuntu machine it didn't seem like a un-
+> > privileged
+> > user could do this. I am going to keep working on this and see if I can find
+> > a
+> > better solution.
+> > 
+> > Changes since v2:
+> >  - System wide BPF JIT limit (discussion with Jann Horn)
+> >  - Holding reference to user correctly (Jann)
+> >  - Having arch versions of modulde_alloc (Dave Hansen, Jessica Yu)
+> >  - Shrinking of default limits, to help prevent the limit being worked
+> > around
+> >    with fragmentation (Jann)
+> > 
+> > Changes since v1:
+> >  - Plug in for non-x86
+> >  - Arch specific default values
+> > 
+> > 
+> > Rick Edgecombe (3):
+> >   modules: Create arch versions of module alloc/free
+> >   modules: Create rlimit for module space
+> >   bpf: Add system wide BPF JIT limit
+> > 
+> >  arch/arm/kernel/module.c                |   2 +-
+> >  arch/arm64/kernel/module.c              |   2 +-
+> >  arch/mips/kernel/module.c               |   2 +-
+> >  arch/nds32/kernel/module.c              |   2 +-
+> >  arch/nios2/kernel/module.c              |   4 +-
+> >  arch/parisc/kernel/module.c             |   2 +-
+> >  arch/s390/kernel/module.c               |   2 +-
+> >  arch/sparc/kernel/module.c              |   2 +-
+> >  arch/unicore32/kernel/module.c          |   2 +-
+> >  arch/x86/include/asm/pgtable_32_types.h |   3 +
+> >  arch/x86/include/asm/pgtable_64_types.h |   2 +
+> >  arch/x86/kernel/module.c                |   2 +-
+> >  fs/proc/base.c                          |   1 +
+> >  include/asm-generic/resource.h          |   8 ++
+> >  include/linux/bpf.h                     |   7 ++
+> >  include/linux/filter.h                  |   1 +
+> >  include/linux/sched/user.h              |   4 +
+> >  include/uapi/asm-generic/resource.h     |   3 +-
+> >  kernel/bpf/core.c                       |  22 +++-
+> >  kernel/bpf/inode.c                      |  16 +++
+> >  kernel/module.c                         | 152 +++++++++++++++++++++++-
+> >  net/core/sysctl_net_core.c              |   7 ++
+> >  22 files changed, 233 insertions(+), 15 deletions(-)
+> > 
+> > --
+> > 2.17.1
+> > 
+branching predictors may not be able to predict past a certain distance. So
+performance as well.
