@@ -1,33 +1,44 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 22 Oct 2018 16:08:11 +0530
-Subject: [Freedreno] [PATCH 5/9] arm64: dts: sdm845: Add gpu and gmu
- device nodes
-In-Reply-To: <20181015143444.GA4751@jcrouse-lnx.qualcomm.com>
-References: <20181010094628.wejfgmvcv6stzoco@vireshk-i7>
- <20181010142905.GB9977@jcrouse-lnx.qualcomm.com>
- <20181010143149.4e3ct3efkuwxa2hw@vireshk-i7>
- <20181010144856.GC9977@jcrouse-lnx.qualcomm.com>
- <20181010145139.nvalsr2ij2lj53dh@vireshk-i7>
- <20181010151006.GD9977@jcrouse-lnx.qualcomm.com>
- <20181011050216.4ba5i3ghh5rbvjbl@vireshk-i7>
- <20181011145456.GG9977@jcrouse-lnx.qualcomm.com>
- <20181015100327.qoojonf46lh6g3sh@vireshk-i7>
- <20181015143444.GA4751@jcrouse-lnx.qualcomm.com>
-Message-ID: <20181022103811.ywvyasnshjtdzjki@vireshk-i7>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 22 Oct 2018 11:22:26 +0100
+Subject: [PATCH 09/12] dt-bindings: panel: Add Bananapi S070WV20-CT16
+ MIPI-DSI panel bindings
+In-Reply-To: <20181015182448.GA7134@bogus>
+References: <20180927114850.24565-1-jagan@amarulasolutions.com>
+ <20180927114850.24565-10-jagan@amarulasolutions.com>
+ <20181015182448.GA7134@bogus>
+Message-ID: <CAGb2v64QEhy1J05L9W0_uWhmrky8wD+vg3v5wA7Yd3_U-DdpKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-10-18, 08:34, Jordan Crouse wrote:
-> I agree that consistency is good. But the GPU is by design outside of the
-> control of the genpd universe so it is by design not using the same features.
-> It unfortunately does happen to use a similar number in an OPP binding to
-> construct the level mapping but since we can't read the cmd-db from the GMU
-> space this is a necessary evil.
+Hi Rob,
 
-Where do you define how to use this binding in case of GPU? I mean
-some DT binding doc must have some information to avoid confusion as
-all other users will have the qcom,level thing in the genpd's OPP
-table which GPU will have it directly within its OPP table.
+On Mon, Oct 15, 2018 at 7:24 PM Rob Herring <robh@kernel.org> wrote:
+>
+> On Thu, 27 Sep 2018 17:18:47 +0530, Jagan Teki wrote:
+> > Bananapi S070WV20-CT16 is 800x480, 4-lane MIPI-DSI panel, the
+> > same panel PCB comes with parallel RBG which is supported via
+> > panel-simple with "bananapi,s070wv20-ct16" compatible.
+> >
+> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > ---
+> >  .../panel/bananapi,s070wv20-ct16-dsi.txt      | 21 +++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt
+> >
+>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
--- 
-viresh
+This "panel" is actually an RGB panel with a MIPI-DSI-to-RGB bridge
+tacked on. On one particular revision of this module, one can also
+directly use the RGB interface.
+
+Would it be better to model this as bridge+panel? We already have
+a binding for the RGB version [1]. This would make it harder to
+make a driver though, as there is no publicly available datasheet
+for the bridge chip, so it's likely that part of the init sequence
+would have to be hard-coded.
+
+Thanks
+ChenYu
+
+[1] Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
