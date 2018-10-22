@@ -1,62 +1,63 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Oct 2018 11:19:51 -0400 (EDT)
-Subject: [PATCH v3] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
-In-Reply-To: <20181022073426.24856-1-vincent.whitchurch@axis.com>
-References: <20181022073426.24856-1-vincent.whitchurch@axis.com>
-Message-ID: <nycvar.YSQ.7.76.1810221111220.1498@knanqh.ubzr>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Mon, 22 Oct 2018 17:30:05 +0200
+Subject: [PATCH V12 00/14] Krait clocks + Krait CPUfreq
+In-Reply-To: <c5f492c0-19a2-db8f-a114-d3cfe17ae6c6@codeaurora.org>
+References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
+ <2ae96741-94c0-ba4c-fc19-05d33179683c@codeaurora.org>
+ <d682580d-5070-0271-197f-29d988172937@codeaurora.org>
+ <D8FC68C0-2572-4A86-81D9-D0099D314A45@gmail.com>
+ <F5A89365-C613-4FE2-AD32-DC0AC6DF380B@gmail.com>
+ <fb81b8d5-3d24-b413-8d59-33cb70e46f8b@codeaurora.org>
+ <153979105280.5275.841088095583550635@swboyd.mtv.corp.google.com>
+ <153980741313.5275.10376918222904341760@swboyd.mtv.corp.google.com>
+ <c5f492c0-19a2-db8f-a114-d3cfe17ae6c6@codeaurora.org>
+Message-ID: <20181022153005.GA23950@centauri.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2018, Vincent Whitchurch wrote:
-
-> ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
-> ldr/str instructions in copy_{from/to}_user.  They are currently
-> unnecessarily using single ldr/str instructions and can use ldm/stm
-> instructions instead like memcpy does (but with appropriate fixup
-> tables).
+On Mon, Oct 22, 2018 at 09:39:03AM +0530, Sricharan R wrote:
+> Hi Stephen,
 > 
-> This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
-> about 4% on my Cortex-A9.
+> On 10/18/2018 1:46 AM, Stephen Boyd wrote:
+> > Quoting Stephen Boyd (2018-10-17 08:44:12)
+> >> Quoting Sricharan R (2018-09-20 06:03:31)
+> >>>
+> >>>
+> >>> On 9/20/2018 1:54 AM, Craig wrote:
+> >>>> Yup, this patch seems to have fixed the higher frequencies from the quick test I did.
+> >>>>
+> >>>       Thanks !!. Can i take that as 
+> >>>           Tested-by: Craig Tatlor <ctatlor97@gmail.com>  ?
+> >>>
+> >>
+> >> Is this patch series going to be resent?
+> >>
+> > 
+> > Nevermind. Looking at it I think I can apply all the clk ones and we're
+> > good to go. If you can send a followup patch series to change the
+> > registration and provider APIs to be clk_hw instead of clk based I would
+> > appreciate it.
+> > 
 > 
-> before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
-> before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
-> before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
-> before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
-> before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
-> before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
-> before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
-> before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
-> before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
-> before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
-> 
->  after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
->  after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
->  after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
->  after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
->  after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
->  after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
->  after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
->  after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
->  after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
->  after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
-> 
-> Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
-> ---
-> v3: Explicitly add IT instructions to fix fault handling on Thumb-2
+> Sorry for the late response. Was away.
+> Only pending thing was separating out the binding documentation for the cpu-freq
+> driver and fixing the text in documentation.  That means, yes its fine to merge
+> the clk ones as you said. I will resend that. Also, will send a follow up series for clk_hw to
+> clk change as you mentioned separately.
 
-Sorry if this is starting to look like bikeshedding, but...
+Hello Sricharan,
 
-> +	.macro ldr1b ptr reg cond=al abort
-> +	.ifnc	\cond, al
-> +	it	\cond
-> +	.endif
-> +	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
-> +	.endm
+Great to see that the clk parts has been marged to clk-next!
 
-You could simply factor out the ldr1b macro definition out of the 
-CONFIG_CPU_USE_DOMAINS conditional to reuse the existing one which makes 
-use of ldrusr where this it issue is already covered for you. The ldr1b 
-and str1b don't actually need to be different.
+Are you also planning on sending out a new version of the cpufreq driver
+consolidation parts?
+
+I'm planning on extending your consilidated cpufreq driver with support
+for msm8916 (Cortex-A53), where I plan to read PVS/speedbin, in order to
+set opp_supported_hw(), and also register with cpufreq (since Viresh/Ulf
+suggested that we shouldn't register with cpufreq in the CPR power-domain
+driver).
 
 
-Nicolas
+Kind regards,
+Niklas
