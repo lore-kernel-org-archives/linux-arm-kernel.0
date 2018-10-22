@@ -1,52 +1,33 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Mon, 22 Oct 2018 16:54:48 +0200
-Subject: [PATCH v3 3/4] arm64: implement live patching
-In-Reply-To: <alpine.LSU.2.21.1810221452070.13146@pobox.suse.cz>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
- <20181018125820.iw54zbirq74ulknj@linux-8ccs>
- <CAKv+Gu_yNBN+Rpw98MAZaxzSjm20qMYD7+fiJ1fBHoUeDr9fBA@mail.gmail.com>
- <alpine.LSU.2.21.1810191714540.4692@pobox.suse.cz>
- <CAKv+Gu8Vg9-CwvU-u9gNGmtB7gTapuCPHjU5v7FWnPsVy6vptA@mail.gmail.com>
- <alpine.LSU.2.21.1810221452070.13146@pobox.suse.cz>
-Message-ID: <20181022145448.GA22918@lst.de>
+From: olivier.moysan@st.com (Olivier Moysan)
+Date: Mon, 22 Oct 2018 17:10:45 +0200
+Subject: [PATCH 1/2] ASoC: stm32: add clock dependency for sai
+In-Reply-To: <1540221046-11812-1-git-send-email-olivier.moysan@st.com>
+References: <1540221046-11812-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <1540221046-11812-2-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2018 at 02:53:10PM +0200, Miroslav Benes wrote:
-> On Sat, 20 Oct 2018, Ard Biesheuvel wrote:
-> > So I suppose this could get interesting in cases where modules are far
-> > away from the kernel (i.e., more than -/+ 128 MB). Fortunately, the
-> > modules themselves are always placed in a 128 MB window, but this
-> > window could be out of reach for branches into the kernel proper. If
-> > we find ourselves in the situation where we need to patch calls into
-> > the kernel proper to point into this module, this may get interesting,
-> > since the PLT entries *must* be allocated along with the module that
-> > contains the branch instruction, or the PLT entry itself may be out of
-> > range, defeating the purpose.
-> 
-> Hm... Torsten, didn't you have to solve something similar in powerpc case? 
+Fixes: 8307b2afd386 ("ASoC: stm32: sai: set sai as mclk clock provider")
 
-At address ranges: that was the TOC pointer issue, that is an array of
-addresses and other 64-bit constants with a reference to it kept in a register,
-whose value is local to any module. PPC64 needs 5 instructions to load a 64-bit
-value immediate, arm has the ldr_l macro. So in short: no. We were discussing a
-few nasty tricks to reconstruct the TOC value from the code addresses, but
-ended up with a solution that is clean in that respect.
+Add COMMON_CLK dependency for STM32 SAI,
+as it is required by clock provider.
 
-At PLTs: ppc64 uses, IIRC, a regular trampoline slot to get to all called
-functions, including ftrace and friends. So for e.g. live patch kernels
-the total number, as predetermined, is only incremented by 2. Only the
-trampoline _code_ for ftrace was modified.
-I assume with "branches" you mean "branch with link" a.k.a a subroutine call?
-All references to external symbols are allocated a PLT entry, right?
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+---
+ sound/soc/stm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-ftrace / live patching calls are alway intercepted at the called function.
-                                       ===========--------======---------
-The interceptor then uses a special trampoline to go to ftrace_caller, which
-does the rest.
-
-Am I missing something?
-
-	Torsten
+diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
+index 9b2681397dba..c66ffa72057e 100644
+--- a/sound/soc/stm/Kconfig
++++ b/sound/soc/stm/Kconfig
+@@ -3,6 +3,7 @@ menu "STMicroelectronics STM32 SOC audio support"
+ config SND_SOC_STM32_SAI
+ 	tristate "STM32 SAI interface (Serial Audio Interface) support"
+ 	depends on (ARCH_STM32 && OF) || COMPILE_TEST
++	depends on COMMON_CLK
+ 	depends on SND_SOC
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+-- 
+2.7.4
