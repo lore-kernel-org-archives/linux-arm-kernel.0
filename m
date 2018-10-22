@@ -1,70 +1,84 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 22 Oct 2018 14:40:07 +0200
-Subject: [PATCH v2 0/7] spi: add support for octal mode
-In-Reply-To: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1539605534-22302-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <20181022144007.367830c6@bbrezillon>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 22 Oct 2018 14:52:21 +0200 (CEST)
+Subject: DMA configuration in non-DT probed driver
+In-Reply-To: <839aa8cf-aabe-c087-4d35-c1a96bbf3f13@arm.com>
+References: <18dfef35-54f6-0e45-ff8e-f0c3e70b8580@i2se.com>
+ <839aa8cf-aabe-c087-4d35-c1a96bbf3f13@arm.com>
+Message-ID: <1629892246.163919.1540212741937@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Mark
+Hi Robin,
 
-Hi Yogesh,
+> Robin Murphy <robin.murphy@arm.com> hat am 18. Oktober 2018 um 15:35 geschrieben:
+> 
+> 
+> More generally, though, I maintain that DMA configuration is logically 
+> the responsibility of whoever creates the struct device, i.e. usually 
+> the parent/bus driver. Whether DMA master devices are discrete 
+> peripheral blocks or just firmware functions running on some DSP (or 
+> indeed GPU), *somewhere* in the silicon there is a DMA master interface 
+> emitting transactions, and that interface (or at least one which is 
+> indistinguishable from it) should always be described by some DT node 
+> (e.g. for dynamically-discovered PCI devices it's the 'platform' side of 
+> the host bridge).
+> 
+> If you consider the VCHIQ node to represent "stuff the VC4 does" and 
+> don't want to go to a full-blown "devices owned by VC4" bus_type 
+> implementation similar to Host1x, then given that in practice you've got 
+> a pretty simple interconnect topology I reckon it's fair and 
+> sufficiently accurate for the VCHIQ driver to configure 
+> dynamically-created devices based on its own node, i.e. something like:
+> 
+> 	child_dev = platform_device_alloc(...)
+> 	of_dma_configure(&child_dev->dev, vchiq_dev->of_node, ...);
+> 	platform_device_add(child_dev);
+> 
 
-On Mon, 15 Oct 2018 12:13:57 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+i tried this but i'm getting "DMA mask not set" from of_dma_configure.
 
-> Add support for octal mode IO data transfer.
-> Micron flash, mt35xu512aba, supports octal mode data transfer and
-> NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
-> 
-> Patch series
-> * Add support for octal mode flags and parsing of same in spi driver.
-> * Add parsing logic for spi-mem framework and m25p80.c device file.
-> * Add opcodes for octal I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
->   Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
-> * Add mode bit required for octal mode in nxp-fspi driver [2].
-> * Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
-> 
-> Cherry pick below 2 patches (from: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git):
->     c639f871febe6667d9afce28108c634e5636c735 spi: spi-mem: Fix inverted logic in op sanity check
->     db122eb8a749a1eff038f9a282c620ab16c4be1d spi: spi-mem: Add extra sanity checks on the op param
-> 
-> Tested on LX2160ARDB target with nxp-fspi driver, below are
-> Read performance number of 1-1-1 and 1-1-8 read protocol.
-> 
->  root at lxxx:~# cat /proc/mtd
->  dev:    size   erasesize  name
->  mtd0: 04000000 00001000 "spi0.0"
->  mtd1: 04000000 00001000 "spi0.1"
->  root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
->  Copied 16777216 bytes from address 0x00000000 in flash to 0read
-> 
->  real    0m2.792s
->  user    0m0.000s
->  sys     0m2.790s
->  root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
->  Copied 16777216 bytes from address 0x00000000 in flash to 0read
-> 
->  real    0m0.441s
->  user    0m0.000s
->  sys     0m0.440s
->  root at ls1012ardb:~#
-> 
->  Flash device MTD0 configured in 1-1-1 protocol.
->  Flash device MTD1 configured in 1-1-8 protocol.
-> 
-> [1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384
-> [2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70210
-> 
-> Yogesh Gaur (7):
->   spi: add support for octal I/O data transfer
+So i tried the following to register the camera and audio:
 
-I guess you've followed the discussion with Mark on the "mtd: spi-nor:
-Proposal for 8-8-8 mode support" series. Can you please send a new
-version of this patchset after adding patching spi_setup() to support
-octal mode?
+static struct platform_device *
+vchiq_register_child(struct platform_device *pdev, const char *name)
+{
+	struct platform_device_info pdevinfo;
 
-Thanks,
+	memset(&pdevinfo, 0, sizeof(pdevinfo));
 
-Boris
+	pdevinfo.parent = &pdev->dev;
+	pdevinfo.name = name;
+	pdevinfo.id = PLATFORM_DEVID_NONE;
+	pdevinfo.dma_mask = DMA_BIT_MASK(32);
+
+	return platform_device_register_full(&pdevinfo);
+}
+
+This works except of the following memleak:
+
+unreferenced object 0xec9c9300 (size 64):
+  comm "systemd-udevd", pid 182, jiffies 4294937996 (age 1376.140s)
+  hex dump (first 32 bytes):
+    ff ff ff ff 00 00 00 00 2f 70 6c 61 74 66 6f 72  ......../platfor
+    6d 2f 73 6f 63 2f 33 66 30 30 62 38 34 30 2e 6d  m/soc/3f00b840.m
+  backtrace:
+    [<9d7676d1>] vchiq_register_child+0x58/0x74 [vchiq]
+    [<6a2780cc>] vchiq_probe+0x1c0/0x264 [vchiq]
+    [<278d830e>] platform_drv_probe+0x48/0x98
+    [<c9846b79>] really_probe+0x228/0x2d0
+    [<489d6b89>] driver_probe_device+0x60/0x164
+    [<ccf84a43>] __driver_attach+0xd0/0xd4
+    [<042acada>] bus_for_each_dev+0x74/0xb4
+    [<b04ae13a>] bus_add_driver+0x18c/0x210
+    [<a66d3fa5>] driver_register+0x7c/0x114
+    [<a7353eeb>] do_one_initcall+0x54/0x1fc
+    [<9420261f>] do_init_module+0x64/0x1f4
+    [<571c859a>] load_module+0x1dfc/0x24bc
+    [<06885682>] sys_finit_module+0xac/0xd8
+    [<85e18c3d>] __sys_trace_return+0x0/0x20
+    [<0051c54d>] 0xbecb0898
+    [<0a0ced8e>] 0xffffffff
+
+Any idea what i've missed?
+
+Stefan
