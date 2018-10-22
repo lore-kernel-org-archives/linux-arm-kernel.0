@@ -1,35 +1,222 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 22 Oct 2018 11:14:07 +0300
-Subject: omap4: support for manually updated display
-In-Reply-To: <20181020003812.GE43338@atomide.com>
-References: <20180830090456.GA17277@amd>
- <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com> <3205865.8O8aibZXye@avalon>
- <20180910174453.GV5662@atomide.com> <20181018221549.GB6364@amd>
- <20181019164450.GD43338@atomide.com>
- <20181019225827.s76wapp3cxrmp5af@earth.universe>
- <20181020003812.GE43338@atomide.com>
-Message-ID: <6ebd84ad-3428-c2f5-da8b-e5b1c54ea5e2@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 22 Oct 2018 10:29:10 +0200
+Subject: [RESEND PATCH v5 0/9] extend PWM framework to support PWM modes
+In-Reply-To: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20181022082910.uw6i64h3w7jwxyx5@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/18 03:38, Tony Lindgren wrote:
-> * Sebastian Reichel <sre@kernel.org> [181019 15:58]:
->> I uploaded my current status here. It's not based on the newest
->> -next, but contains the interesting patches from Laurent. Also
->> the last few patches are not yet cleaned up, sorry for the mess.
+Hello Claudiu,
+
+On Tue, Aug 28, 2018 at 04:01:17PM +0300, Claudiu Beznea wrote:
+> Please give feedback on these patches which extends the PWM framework in
+> order to support multiple PWM modes of operations. This series is a rework
+> of [1] and [2].
 > 
-> Way to go, thanks :) Here's a quick fix for issues with loading
-> and unloading modules, seems like this should be fixed somewhere
-> else though?
+> The current patch series add the following PWM modes:
+> - PWM mode normal
+> - PWM mode complementary
+> - PWM mode push-pull
+> 
+> Normal mode - for PWM channels with one output; output waveforms looks like
+> this:
+>              __    __    __    __
+>     PWM   __|  |__|  |__|  |__|  |__
+>             <--T-->
+> 
+>     Where T is the signal period
 
-I didn't get that far on drm-next with pandaboard. When loading modules, dsi_probe crashes. It is missing runtime_get(). But after adding runtime_get call, it fails and I see:
+In my discussion about some suggested changes to the PWM framework I
+used slightly different way to show the wave-forms in ASCII which are
+IMHO slightly better. Also I think it is valuable to not use a 50% duty
+cycle in the examples to remove some ambiguity.
 
-[   44.671081] omap_hwmod: dss_dsi2: _wait_target_ready failed: -16
-[   44.677459] omapdss_dsi 58005000.encoder: use pm_runtime_put_sync_suspend() in driver?
+With a duty cycle of 1/3 the normal mode looks as follows in "my" way:
 
-Why is dsi2 busy (and what does it even mean)...
+          __       __       __
+ PWM   __/  \_____/  \_____/  \_____/
+         ^        ^        ^        ^
 
- Tomi
+The carets mark always the start of a period. And note the rising and
+falling edges are already part of the active and inactive phases
+respectively which matches reality.
+ 
+> Since PWMs with more than one output per channel could be used as one
+> output PWM the normal mode is the default mode for all PWMs (if not
+> specified otherwise).
+> 
+> Complementary mode - for PWM channels with two outputs; output waveforms
+> for a PWM channel in complementary mode looks line this:
+>              __    __    __    __
+>     PWMH1 __|  |__|  |__|  |__|  |__
+>           __    __    __    __    __
+>     PWML1   |__|  |__|  |__|  |__|
+>             <--T-->
+> 
+>     Where T is the signal period.
+
+So this translates to (I think):
+
+           __       __       __       __       __
+ PWMH   __/  \_____/  \_____/  \_____/  \_____/  \_____/
+        __    _____    _____    _____    _____    _____
+ PWML     \__/     \__/     \__/     \__/     \__/     \
+          ^        ^        ^        ^        ^        ^
+
+That is PWML always pulls in the opposite direction of PWMH. Maybe we
+could come up with better terms than PWMH and PWML (which might be
+specific for the Atmel implementation?). Maybe "normal" and
+"complement"?
+
+> Push-pull mode - for PWM channels with two outputs; output waveforms for a
+> PWM channel in push-pull mode with normal polarity looks like this:
+>             __          __
+>     PWMH __|  |________|  |________
+>                   __          __
+>     PWML ________|  |________|  |__
+>            <--T-->
+
+That again with the alternative display method and duty cycle 1/3:
+
+           __                __                __
+ PWMA   __/  \______________/  \______________/  \______
+                    __                __
+ PWMB   ___________/  \______________/  \______________/
+          ^        ^        ^        ^        ^        ^
+
+That is PWMA and PWMB are active only every 2nd period taking alternate
+turns, right?
+
+
+>     If polarity is inversed:
+>          __    ________    ________
+>     PWMH   |__|        |__|
+>          ________    ________    __
+>     PWML         |__|        |__|
+>            <--T-->
+
+That's again with duty cycle 1/3:
+
+        __    ______________    ______________    ______
+ PWMA     \__/              \__/              \__/
+        ___________    ______________    ______________
+ PWMB              \__/              \__/              \
+          ^        ^        ^        ^        ^        ^
+
+Given that the start of period isn't externally visible this is
+equivalent to using a duty cycle 2/3 and not inverting which results in:
+
+        __    ______________    ______________    ______
+ PWMA     \__/              \__/              \__/
+        ___________    ______________    ______________
+ PWMB              \__/              \__/              \
+             ^        ^        ^        ^        ^
+
+I would really like if a more detailed description of the modes would be
+created as part of this series. Currently there are a few implied
+properties hidden in the PWM API (unrelated to this series) which I try
+to resolve together with Thierry. Getting this documented right from the
+start would be great here.
+
+I didn't look in detail into the driver implementation, but from the
+PWMs implemented in the STM32F4 family I would have chosen a different
+model which makes me wonder if we should stick to a more general way to
+describe two outputs from a single PWM channel.
+
+I would use four values with nanosecond resolution to describe these:
+
+  .period
+  .duty_cycle
+  .alt_duty_cycle
+  .alt_offset
+
+period and duty_cycle is as before for the primary output and then the
+alt_* values describe offset and duty cycle of the secondary output.
+
+What you called "normal mode" would then be specified using
+
+  .period = $period
+  .duty_cycle = $duty_cycle
+  .alt_duty_cycle = 0
+  .alt_offset = dontcare
+
+Your "push pull mode" would be:
+
+  .period = 2 * $period
+  .duty_cycle = $duty_cycle
+  .alt_duty_cycle = $duty_cycle
+  .alt_offset = $period
+
+and complementary mode would be specified using:
+
+  .period = $period
+  .duty_cycle = $duty_cycle
+  .alt_duty_cycle = $period - $duty_cycle
+  .alt_offset = $duty_cycle
+
+With this abstraction stuff like "complementary output with dead-time
+insertion" (something like:
+
+           __                __                __
+ PWMA   __/  \______________/  \______________/  \______
+                __________        __________          __
+ PWMB   _______/          \______/          \______/
+          ^                 ^                 ^
+
+) could be modelled.
+
+> The PWM working modes are per PWM channel registered as PWM's capabilities.
+> The driver registers itself to PWM core a get_caps() function, in
+> struct pwm_ops, that will be used by PWM core to retrieve PWM capabilities.
+> If this function is not registered in driver's probe, a default function
+> will be used to retrieve PWM capabilities. Currently, the default
+> capabilities includes only PWM normal mode.
+
+In the i2c framework this is a function, too, and I wonder if simplicity
+is better served when this is just a flags member in the pwm_ops
+structure.
+
+> PWM state has been updated to keep PWM mode. PWM mode could be configured
+> via sysfs or via DT. pwm_apply_state() will do the preliminary validation
+> for PWM mode to be applied.
+> 
+> In sysfs, user could get PWM modes by reading mode file of PWM device:
+> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# ls -l
+> total 0
+> -r--r--r-- 1 root root 4096 Oct  9 09:07 capture
+> lrwxrwxrwx 1 root root    0 Oct  9 09:07 device -> ../../pwmchip0
+> -rw-r--r-- 1 root root 4096 Oct  9 08:42 duty_cycle
+> -rw-r--r-- 1 root root 4096 Oct  9 08:44 enable
+> --w------- 1 root root 4096 Oct  9 09:07 export
+> -rw-r--r-- 1 root root 4096 Oct  9 08:43 mode
+> -r--r--r-- 1 root root 4096 Oct  9 09:07 npwm
+> -rw-r--r-- 1 root root 4096 Oct  9 08:42 period
+> -rw-r--r-- 1 root root 4096 Oct  9 08:44 polarity
+> drwxr-xr-x 2 root root    0 Oct  9 09:07 power
+> lrwxrwxrwx 1 root root    0 Oct  9 09:07 subsystem -> ../../../../../../../../class/pwm
+> -rw-r--r-- 1 root root 4096 Oct  9 08:42 uevent
+> --w------- 1 root root 4096 Oct  9 09:07 unexport
+> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# cat mode
+> normal complementary [push-pull]
+> 
+> The mode enclosed in bracket is the currently active mode.
+> 
+> The mode could be set, via sysfs, by writing to mode file one of the modes
+> displayed at read:
+> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# echo normal > mode
+> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# cat mode
+> [normal] complementary push-pull 
+
+Getting a simple user of this into the kernel would be beneficial, too.
+In my discussion with Thierry I'm faced with arguments like: You're
+simplifying stuff which might destroy a use-case for sysfs users. This
+is hard to argue against because it involves some guesswork to
+reconstruct or contradict such arguments.
+
+Best regards
+Uwe
 
 -- 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
