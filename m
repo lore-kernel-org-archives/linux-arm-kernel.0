@@ -1,105 +1,120 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 22 Oct 2018 13:52:11 +0200
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
- SPI NOR flash memories
-In-Reply-To: <VI1PR04MB1038E072BFFD09C7C19AD2F899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017090724.12f2cd79@bbrezillon>
- <20181017091045.124e0266@bbrezillon>
- <20181017092941.3658bd9a@bbrezillon>
- <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017115237.07310b74@bbrezillon>
- <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181022111543.2a607efc@bbrezillon>
- <VI1PR04MB1038EF892921194D1BFDE6FC99F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181022122659.0675942e@bbrezillon>
- <VI1PR04MB1038E92FFAB03E07048FD8B499F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181022124627.2c6c3b93@bbrezillon>
- <20181022125259.42df83ea@bbrezillon>
- <VI1PR04MB1038C9C889185F2A700220F299F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181022134324.2c1bd248@bbrezillon>
- <VI1PR04MB1038E072BFFD09C7C19AD2F899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <20181022135211.1978c25d@bbrezillon>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 22 Oct 2018 13:29:15 +0100
+Subject: [PATCH v5 2/2] iommu/arm-smmu-v3: Reunify
+ arm_smmu_cmdq_issue_sync()
+In-Reply-To: <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
+References: <61b4c3e5f1322dfe96ca2062a7fe058298340996.1539782799.git.robin.murphy@arm.com>
+ <fe1b23d1980dd110eb2e8ffc01c2dd68632566d1.1539782799.git.robin.murphy@arm.com>
+Message-ID: <dbe0e7bc-a5f4-1fb7-3c46-feb535f4222d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2018 11:46:55 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+On 17/10/2018 14:56, Robin Murphy wrote:
+> Now that both sync methods are more or less the same shape, we can save
+> some code and levels of indirection by rolling them up together again,
+> with just a couple of simple conditionals to discriminate the MSI and
+> queue-polling specifics.
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-> Hi,
-> 
-> > -----Original Message-----
-> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > Sent: Monday, October 22, 2018 5:13 PM
-> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > Cc: Cristian.Birsan at microchip.com; Tudor Ambarus
-> > <tudor.ambarus@microchip.com>; richard at nod.at; Mark Brown
-> > <broonie@kernel.org>; linux-kernel at vger.kernel.org;
-> > nicolas.ferre at microchip.com; marek.vasut at gmail.com;
-> > cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org; Cyrille Pitchen
-> > <cyrille.pitchen@wedev4u.fr>; computersforpeace at gmail.com;
-> > dwmw2 at infradead.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
-> > NOR flash memories
-> > 
-> > On Mon, 22 Oct 2018 11:03:09 +0000
-> > Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-> >   
-> > > Hi,
-> > >  
-> > > > -----Original Message-----
-> > > > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > > > Sent: Monday, October 22, 2018 4:23 PM
-> > > > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>;
-> > > > Cristian.Birsan at microchip.com
-> > > > Cc: Tudor Ambarus <tudor.ambarus@microchip.com>; richard at nod.at;
-> > > > Mark Brown <broonie@kernel.org>; linux-kernel at vger.kernel.org;
-> > > > nicolas.ferre at microchip.com; marek.vasut at gmail.com;
-> > > > cyrille.pitchen at microchip.com; linux-mtd at lists.infradead.org;
-> > > > Cyrille Pitchen <cyrille.pitchen@wedev4u.fr>;
-> > > > computersforpeace at gmail.com; dwmw2 at infradead.org;
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > Subject: Re: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform
-> > > > SFDP SPI NOR flash memories
-> > > >
-> > > > On Mon, 22 Oct 2018 12:46:27 +0200
-> > > > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> > > >  
-> > > > > On Mon, 22 Oct 2018 10:39:48 +0000 Yogesh Narayan Gaur
-> > > > > <yogeshnarayan.gaur@nxp.com> wrote:
-> > > > >  
-> Patch used
-> 
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -2863,26 +2863,39 @@ static u8 spi_nor_smpt_read_dummy(const struct spi_nor *nor, const u32 settings)
+Tested-by: John Garry <john.garry@huawei.com>
 
->         /* Determine if there are any optional Detection Command Descriptors */
-> -       while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
-> +       for (i = 0; i< smpt_len; i++) {
+I seem to be getting some boost in the scenarios I tested:
+Storage controller: 746K IOPS (with) vs 730K (without)
+NVMe disk:  471K IOPS (with) vs 420K IOPS (without)
 
-See, you should have i += 2 here, not i++.
-
-> +               if ((smpt[i] & SMPT_DESC_TYPE_MAP))
-> +                       break;
-> +
->                 read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
->                 nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
-> -               nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
-> +               if (!nor->addr_width)
-> +                       nor->addr_width = 3;
-> +
-> +               nor->read_dummy = 8; //spi_nor_smpt_read_dummy(nor, smpt[i]);
->                 nor->read_opcode = SMPT_CMD_OPCODE(smpt[i]);
-> +               pr_info("smpt[%d]=[addr_width:%08x, read_dumy:%08x, read_opcode:%08x]\n", i, nor->addr_width, nor->read_dummy, nor->read_opcode);
-> +
->                 addr = smpt[i + 1];
-> 
->                 err = spi_nor_read_raw(nor, addr, 1, &data_byte);
-
-And add a trace here to print data_byte and addr.
+Note that this is with strict mode set and without the CMD_SYNC 
+optimisation I punted. And this is on D05, so no MSI-based CMD_SYNC support.
 
 Thanks,
+John
 
-Boris
+Ps. for anyone testing, use the v1 smmu "Fix Endian" patch to get this 
+series to apply.
+
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 49 +++++++++----------------------------
+>  1 file changed, 12 insertions(+), 37 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index da8a91d116bf..36db63e3afcf 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -933,7 +933,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>   * The difference between val and sync_idx is bounded by the maximum size of
+>   * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe arithmetic.
+>   */
+> -static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+> +static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+>  {
+>  	ktime_t timeout;
+>  	u32 val;
+> @@ -988,16 +988,17 @@ static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
+>  	return -ETIMEDOUT;
+>  }
+>
+> -static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+> +static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+>  {
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+>  	unsigned long flags;
+> -	struct arm_smmu_cmdq_ent ent = {
+> -		.opcode = CMDQ_OP_CMD_SYNC,
+> -		.sync	= {
+> -			.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count)),
+> -		},
+> -	};
+> +	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+> +		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+> +	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+> +	int ret, sync_idx, sync_gen;
+> +
+> +	if (msi)
+> +		ent.sync.msiaddr = cpu_to_le32(virt_to_phys(&smmu->sync_count));
+>
+>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+>
+> @@ -1009,39 +1010,13 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+>  		arm_smmu_cmdq_build_cmd(cmd, &ent);
+>  		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+>  	}
+> -
+> -	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+> -
+> -	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+> -}
+> -
+> -static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+> -{
+> -	u64 cmd[CMDQ_ENT_DWORDS];
+> -	unsigned long flags;
+> -	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+> -	int sync_idx, sync_gen;
+> -
+> -	arm_smmu_cmdq_build_cmd(cmd, &ent);
+> -
+> -	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+> -	if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC)
+> -		arm_smmu_cmdq_insert_cmd(smmu, cmd);
+>  	sync_idx = smmu->cmdq.q.prod;
+>  	sync_gen = READ_ONCE(smmu->cmdq_generation);
+> +
+>  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>
+> -	return arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+> -}
+> -
+> -static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+> -{
+> -	int ret;
+> -	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+> -		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
+> -
+> -	ret = msi ? __arm_smmu_cmdq_issue_sync_msi(smmu)
+> -		  : __arm_smmu_cmdq_issue_sync(smmu);
+> +	ret = msi ? arm_smmu_sync_poll_msi(smmu, ent.sync.msidata)
+> +		  : arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+>  	if (ret)
+>  		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
+>  }
+>
