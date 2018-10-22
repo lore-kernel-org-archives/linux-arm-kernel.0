@@ -1,135 +1,48 @@
-From: Jan.Glauber@cavium.com (Jan Glauber)
-Date: Mon, 22 Oct 2018 15:33:08 +0000
-Subject: DMA remote memcpy requests
-In-Reply-To: <DM6PR04MB40594025419A9A12707C7BB6F2F40@DM6PR04MB4059.namprd04.prod.outlook.com>
-References: <DM6PR04MB4059742D494D96FC11674A50F2E20@DM6PR04MB4059.namprd04.prod.outlook.com>
- <b56bf98f-5055-fb85-7807-e45d495369f3@arm.com>
- <DM6PR04MB405918E803AF4FCC34B12083F2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181015150912.GA8789@hc>
- <DM6PR04MB4059991247828ADBD6133D2FF2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181015153926.GC8789@hc>
- <DM6PR04MB405906FA74124FFEBCA9188AF2FD0@DM6PR04MB4059.namprd04.prod.outlook.com>
- <DM6PR04MB40597DF28818CD395136EC17F2F80@DM6PR04MB4059.namprd04.prod.outlook.com>
- <20181022142843.GA10359@hc>
- <DM6PR04MB40594025419A9A12707C7BB6F2F40@DM6PR04MB4059.namprd04.prod.outlook.com>
-Message-ID: <20181022153300.GB10359@hc>
+From: atull@kernel.org (Alan Tull)
+Date: Mon, 22 Oct 2018 10:58:42 -0500
+Subject: [PATCH 0/3] Add Bitstream configuration support for ZynqMP
+In-Reply-To: <20181020084805.29103-1-nava.manne@xilinx.com>
+References: <20181020084805.29103-1-nava.manne@xilinx.com>
+Message-ID: <CANk1AXTUu=qiko9_sLrxrNxBmX7p0OXVxNN13p1uBirNh+Ymtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2018 at 02:39:00PM +0000, Adam Cottrel wrote:
-> Dear Jan,
-> 
-> As I understand this, to turn off I need to re-compile without SMMU driver support via the kernel config flags.
-> 
-> However, if I turn the SMU off, how will the system cope?
+On Fri, Oct 19, 2018 at 3:49 AM Nava kishore Manne
+<nava.manne@xilinx.com> wrote:
 
-The SMMU should be optional, but I didn't try it myselfs so bad things
-might happen...
+Hi Nava,
 
-Regards,
-Jan
+>
+> This series of patches are created On top of the
+> below repo.
+> //git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+> BRANCH: next/drivers.
 
-> Best,
-> Adam
-> 
-> > -----Original Message-----
-> > From: Jan Glauber <Jan.Glauber@cavium.com>
-> > Sent: 22 October 2018 15:29
-> > To: Adam Cottrel <adam.cottrel@veea.com>
-> > Cc: Nair, Jayachandran <Jayachandran.Nair@cavium.com>; rric at kernel.org;
-> > Goutham, Sunil <Sunil.Goutham@cavium.com>; Will Deacon
-> > <will.deacon@arm.com>; Robin Murphy <robin.murphy@arm.com>; linux-
-> > arm-kernel at lists.infradead.org
-> > Subject: Re: DMA remote memcpy requests
-> >
-> > On Thu, Oct 18, 2018 at 03:36:25PM +0000, Adam Cottrel wrote:
-> > > Dear Jan,
-> > >
-> > > Sorry for the delay in getting back to you - the patch took longer than
-> > expected to finish.
-> > >
-> > >  $ cat /proc/config.gz | gunzip | grep ERRATUM
-> > > CONFIG_ARM64_ERRATUM_826319=y
-> > CONFIG_ARM64_ERRATUM_827319=y
-> > > CONFIG_ARM64_ERRATUM_824069=y
-> > CONFIG_ARM64_ERRATUM_819472=y
-> > > CONFIG_ARM64_ERRATUM_832075=y
-> > CONFIG_ARM64_ERRATUM_834220=y
-> > > CONFIG_ARM64_ERRATUM_845719=y
-> > CONFIG_ARM64_ERRATUM_843419=y
-> > > CONFIG_CAVIUM_ERRATUM_22375=y
-> > CONFIG_CAVIUM_ERRATUM_23144=y
-> > > CONFIG_CAVIUM_ERRATUM_23154=y
-> > CONFIG_CAVIUM_ERRATUM_27456=y
-> > > CONFIG_CAVIUM_ERRATUM_28168=y                               <---------------------
-> > HERE!!
-> > > CONFIG_CAVIUM_ERRATUM_30115=y
-> > > CONFIG_QCOM_FALKOR_ERRATUM_1003=y
-> > > CONFIG_QCOM_FALKOR_ERRATUM_1009=y
-> > > CONFIG_QCOM_QDF2400_ERRATUM_0065=y
-> > > CONFIG_FSL_ERRATUM_A008585=y
-> > > CONFIG_HISILICON_ERRATUM_161010101=y
-> > > CONFIG_ARM64_ERRATUM_858921=y
-> > >
-> > > As you can see, the fix is enabled, but when I test, it is not making any
-> > difference to the original issue. The ath10k driver is still dropping inward DMA
-> > under memory pressure.
-> >
-> > OK, it was just a guess from my side.
-> >
-> > > As an aside, I had to make one small change to the patch due to differences
-> > between earlier kernel versions. Please see cavium.diff attached. Is this an
-> > acceptable change?
-> >
-> > Your resolution looks fine.
-> >
-> > > Before we discount this as being a fix, please can you tell me how I can
-> > prove that the patch is actually working on my platform?
-> >
-> > It looks like it doesn't solve your issue. I just wanted to rule this one out.
-> >
-> > Have you tried the other suggestion of completely turning of the SMMU?
-> >
-> > Regards,
-> > Jan
-> >
-> >
-> > > Best,
-> > > Adam
-> > >
-> > > > -----Original Message-----
-> > > > From: linux-arm-kernel
-> > > > <linux-arm-kernel-bounces@lists.infradead.org> On Behalf Of Adam
-> > > > Cottrel
-> > > > Sent: 15 October 2018 16:51
-> > > > To: Jan Glauber <Jan.Glauber@cavium.com>
-> > > > Cc: Nair, Jayachandran <Jayachandran.Nair@cavium.com>;
-> > > > rric at kernel.org; Goutham, Sunil <Sunil.Goutham@cavium.com>; Will
-> > > > Deacon <will.deacon@arm.com>; Robin Murphy
-> > <robin.murphy@arm.com>;
-> > > > linux- arm-kernel at lists.infradead.org
-> > > > Subject: RE: DMA remote memcpy requests
-> > > >
-> > > > Dear Jan,
-> > > >
-> > > > > I'm not sure where that point would be where DMA request could be
-> > > > > lost here.
-> > > > > The MMC and PCIe only meet in the NCB (near coprocessor bus) which
-> > > > > goes to the Coherent memory interconnect and L2 cache.
-> > > > >
-> > > > > I've looked for any known errata but didn't find anything that
-> > > > > would match your problem.
-> > > >
-> > > > For the purposes of debug, is it possible for me to turn off the
-> > > > MMC? Or the
-> > > > L2 cache? Or put it into pass through mode? Or get any kind of stack
-> > > > trace on its operation?
-> > > >
-> > > > Best,
-> > > > Adam
-> > > >
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
+IIUC this is dependent on some patches that aren't released yet.
+Please make this explicit by specifying which patches this is
+dependent on in each future submission of new versions.  It will help
+so that I don't send these upstream prematurely and introduce build
+breaks.  Of course, we can keep reviewing!
+
+Thanks for submitting!
+Alan
+
+>
+> Nava kishore Manne (3):
+>   firmware: xilinx: Add fpga API's
+>   dt-bindings: fpga: Add bindings for ZynqMP fpga driver
+>   fpga manager: Adding FPGA Manager support for Xilinx zynqmp
+>
+>  .../bindings/fpga/xlnx,zynqmp-pcap-fpga.txt   |  17 ++
+>  drivers/firmware/xilinx/zynqmp.c              |  46 +++++
+>  drivers/fpga/Kconfig                          |   9 +
+>  drivers/fpga/Makefile                         |   1 +
+>  drivers/fpga/zynqmp-fpga.c                    | 159 ++++++++++++++++++
+>  include/linux/firmware/xlnx-zynqmp.h          |   4 +
+>  6 files changed, 236 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+>  create mode 100644 drivers/fpga/zynqmp-fpga.c
+>
+> --
+> 2.18.0
+>
