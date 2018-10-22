@@ -1,75 +1,204 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 22 Oct 2018 12:20:48 +0200
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
- SPI NOR flash memories
-In-Reply-To: <VI1PR04MB1038EF892921194D1BFDE6FC99F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
- <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
- <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
- <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017090724.12f2cd79@bbrezillon>
- <20181017091045.124e0266@bbrezillon>
- <20181017092941.3658bd9a@bbrezillon>
- <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181017115237.07310b74@bbrezillon>
- <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20181022111543.2a607efc@bbrezillon>
- <VI1PR04MB1038EF892921194D1BFDE6FC99F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
-Message-ID: <20181022122048.2b3633e0@bbrezillon>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Mon, 22 Oct 2018 03:22:55 -0700
+Subject: [PATCH 3/3] fpga manager: Adding FPGA Manager support for Xilinx
+ zynqmp
+In-Reply-To: <BYAPR02MB47106D61C0CDB8268BAF4E44C2F40@BYAPR02MB4710.namprd02.prod.outlook.com>
+References: <20181020084805.29103-1-nava.manne@xilinx.com>
+ <20181020084805.29103-4-nava.manne@xilinx.com>
+ <CAJYdmePxnkG=3iJC5Lewq3n3zFGTKASJX7ceUEufBvOJogCfdA@mail.gmail.com>
+ <CAAtXAHdP6z5NG+EAvW_N_RfcPv59e15hkd83AR-L3RDBrLMvcQ@mail.gmail.com>
+ <BYAPR02MB47106D61C0CDB8268BAF4E44C2F40@BYAPR02MB4710.namprd02.prod.outlook.com>
+Message-ID: <20181022102255.GA1428@archbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2018 10:03:55 +0000
-Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
-
-> [    1.624684] m25p80 spi0.0: found s25fl512s, expected m25p80
-> [    1.630377] Start [addr_width:00000000, read_dumy:08, read_opcode:00000000]
-> [    1.637335] spi_nor_get_map_in_use:2882 smpt[0]=08ff65fc
-> [    1.642641] spi_nor_get_map_in_use:2882 smpt[1]=00000004
-> [    1.647945] spi_nor_get_map_in_use:2882 smpt[2]=04ff65fc
-> [    1.653248] spi_nor_get_map_in_use:2882 smpt[3]=00000002
-> [    1.658551] spi_nor_get_map_in_use:2882 smpt[4]=02ff65fd
-> [    1.663855] spi_nor_get_map_in_use:2882 smpt[5]=00000004
-> [    1.669158] spi_nor_get_map_in_use:2882 smpt[6]=ff0201fe
-> [    1.674461] spi_nor_get_map_in_use:2882 smpt[7]=00007ff1
-> [    1.679766] spi_nor_get_map_in_use:2882 smpt[8]=00037ff4
-> [    1.685070] spi_nor_get_map_in_use:2882 smpt[9]=03fbfff4
-> [    1.690375] spi_nor_get_map_in_use:2882 smpt[10]=ff0203fe
-> [    1.695768] spi_nor_get_map_in_use:2882 smpt[11]=03fbfff4
-> [    1.701158] spi_nor_get_map_in_use:2882 smpt[12]=00037ff4
-> [    1.706550] spi_nor_get_map_in_use:2882 smpt[13]=00007ff1
-> [    1.711940] spi_nor_get_map_in_use:2882 smpt[14]=ff0005ff
-> [    1.717330] spi_nor_get_map_in_use:2882 smpt[15]=03fffff4
-> [    1.722720] smpt[0]=[addr_width:00000000, read_dumy:08, read_opcode:00000065]
-
-Okay, so addr_width is wrong here (I guess read_dummy is wrong too).
-That's probably because we fall in the SMPT_CMD_ADDRESS_LEN_USE_CURRENT
-case and nor->addr_width has not yet been initialize when we reach this
-function.
-
-> [    1.729861] spi_nor_get_map_in_use:2912 map_id=1
+On Mon, Oct 22, 2018 at 10:03:55AM +0000, Nava kishore Manne wrote:
+> Hi Mortiz,
 > 
+> Thanks for the quick response....
+> Please find my response inline.
 > 
+> > -----Original Message-----
+> > From: Moritz Fischer [mailto:moritz.fischer at ettus.com]
+> > Sent: Saturday, October 20, 2018 7:02 AM
+> > To: Moritz Fischer <moritz.fischer.private@gmail.com>
+> > Cc: Nava kishore Manne <navam@xilinx.com>; Alan Tull <atull@kernel.org>;
+> > Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> > Michal Simek <michals@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>; Jolly
+> > Shah <JOLLYS@xilinx.com>; linux-fpga at vger.kernel.org; Devicetree List
+> > <devicetree@vger.kernel.org>; linux-arm-kernel <linux-arm-
+> > kernel at lists.infradead.org>; Linux Kernel Mailing List <linux-
+> > kernel at vger.kernel.org>; chinnikishore369 at gmail.com
+> > Subject: Re: [PATCH 3/3] fpga manager: Adding FPGA Manager support for
+> > Xilinx zynqmp
+> > 
+> > On Fri, Oct 19, 2018 at 2:33 PM Moritz Fischer
+> > <moritz.fischer.private@gmail.com> wrote:
+> > >
+> > > Hi Nava,
+> > >
+> > > Looks good to me, a couple of nits inline below.
+> > >
+> > > On Fri, Oct 19, 2018 at 1:50 AM Nava kishore Manne
+> > > <nava.manne@xilinx.com> wrote:
+> > > >
+> > > > This patch adds FPGA Manager support for the Xilinx ZynqMp chip.
+> > >
+> > > Isn't it ZynqMP ?
+> > > >
+> > > > Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> > > > ---
+> > > > Changes for v1:
+> > > >                 -None.
+> > > >
+> > > > Changes for RFC-V2:
+> > > >                 -Updated the Fpga Mgr registrations call's
+> > > >                  to 4.18
+> > > >
+> > > >  drivers/fpga/Kconfig       |   9 +++
+> > > >  drivers/fpga/Makefile      |   1 +
+> > > >  drivers/fpga/zynqmp-fpga.c | 159
+> > > > +++++++++++++++++++++++++++++++++++++
+> > > >  3 files changed, 169 insertions(+)
+> > > >  create mode 100644 drivers/fpga/zynqmp-fpga.c
+> > > >
+> > > > diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig index
+> > > > 1ebcef4bab5b..26ebbcf3d3a3 100644
+> > > > --- a/drivers/fpga/Kconfig
+> > > > +++ b/drivers/fpga/Kconfig
+> > > > @@ -56,6 +56,15 @@ config FPGA_MGR_ZYNQ_FPGA
+> > > >         help
+> > > >           FPGA manager driver support for Xilinx Zynq FPGAs.
+> > > >
+> > > > +config FPGA_MGR_ZYNQMP_FPGA
+> > > > +       tristate "Xilinx Zynqmp FPGA"
+> > > > +       depends on ARCH_ZYNQMP || COMPILE_TEST
+> > > > +       help
+> > > > +         FPGA manager driver support for Xilinx ZynqMP FPGAs.
+> > > > +         This driver uses processor configuration port(PCAP)
+> > > This driver uses *the* processor configuration port.
+> > >
+> > > > +         to configure the programmable logic(PL) through PS
+> > > > +         on ZynqMP SoC.
+> > > > +
+> > > >  config FPGA_MGR_XILINX_SPI
+> > > >         tristate "Xilinx Configuration over Slave Serial (SPI)"
+> > > >         depends on SPI
+> > > > diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile index
+> > > > 7a2d73ba7122..3488ebbaee46 100644
+> > > > --- a/drivers/fpga/Makefile
+> > > > +++ b/drivers/fpga/Makefile
+> > > > @@ -16,6 +16,7 @@ obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)    +=
+> > socfpga-a10.o
+> > > >  obj-$(CONFIG_FPGA_MGR_TS73XX)          += ts73xx-fpga.o
+> > > >  obj-$(CONFIG_FPGA_MGR_XILINX_SPI)      += xilinx-spi.o
+> > > >  obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)       += zynq-fpga.o
+> > > > +obj-$(CONFIG_FPGA_MGR_ZYNQMP_FPGA)     += zynqmp-fpga.o
+> > > >  obj-$(CONFIG_ALTERA_PR_IP_CORE)         += altera-pr-ip-core.o
+> > > >  obj-$(CONFIG_ALTERA_PR_IP_CORE_PLAT)    += altera-pr-ip-core-plat.o
+> > > >
+> > > > diff --git a/drivers/fpga/zynqmp-fpga.c b/drivers/fpga/zynqmp-fpga.c
+> > > > new file mode 100644 index 000000000000..2760d7e3872a
+> > > > --- /dev/null
+> > > > +++ b/drivers/fpga/zynqmp-fpga.c
+> > > > @@ -0,0 +1,159 @@
+> > > > +// SPDX-License-Identifier: GPL-2.0+
+> > > > +/*
+> > > > + * Copyright (C) 2018 Xilinx, Inc.
+> > > > + */
+> > > > +
+> > > > +#include <linux/dma-mapping.h>
+> > > > +#include <linux/fpga/fpga-mgr.h>
+> > > > +#include <linux/io.h>
+> > > > +#include <linux/kernel.h>
+> > > > +#include <linux/module.h>
+> > > > +#include <linux/of_address.h>
+> > > > +#include <linux/string.h>
+> > > > +#include <linux/firmware/xlnx-zynqmp.h>
+> > > > +
+> > > > +/* Constant Definitions */
+> > > > +#define IXR_FPGA_DONE_MASK     0X00000008U
+> > > > +
+> > > > +/**
+> > > > + * struct zynqmp_fpga_priv - Private data structure
+> > > > + * @dev:       Device data structure
+> > > > + * @flags:     flags which is used to identify the bitfile type
+> > > > + */
+> > > > +struct zynqmp_fpga_priv {
+> > > > +       struct device *dev;
+> > > > +       u32 flags;
+> > > > +};
+> > > > +
+> > > > +static int zynqmp_fpga_ops_write_init(struct fpga_manager *mgr,
+> > > > +                                     struct fpga_image_info *info,
+> > > > +                                     const char *buf, size_t size)
+> > > > +{
+> > > > +       struct zynqmp_fpga_priv *priv;
+> > > > +
+> > > > +       priv = mgr->priv;
+> > > > +       priv->flags = info->flags;
+> > > > +
+> > > > +       return 0;
+> > > > +}
+> > > > +
+> > > > +static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
+> > > > +                                const char *buf, size_t size) {
+> > > > +       struct zynqmp_fpga_priv *priv;
+> > > > +       char *kbuf;
+> > > > +       dma_addr_t dma_addr;
+> > > > +       int ret;
+> > > > +       const struct zynqmp_eemi_ops *eemi_ops =
+> > > > +zynqmp_pm_get_eemi_ops();
+> > >
+> > > Reverse xmas-tree please, i.e. long lines first.
+> > >
+> > > > +
+> > > > +       if (!eemi_ops || !eemi_ops->fpga_load)
+> > > > +               return -ENXIO;
+> > > > +
+> > > > +       priv = mgr->priv;
+> > > > +
+> > > > +       kbuf = dma_alloc_coherent(priv->dev, size, &dma_addr,
+> > GFP_KERNEL);
+> > > > +       if (!kbuf)
+> > > > +               return -ENOMEM;
+> > > > +
+> > > > +       memcpy(kbuf, buf, size);
+> > > > +
+> > > > +       wmb(); /* ensure all writes are done before initiate FW call
+> > > > + */
+> > > > +
+> > > > +       ret = eemi_ops->fpga_load(dma_addr, size, priv->flags);
+> > 
+> > Don't you have to do anything with the flags? Is it really just a pass-through of
+> > FPGA manager flags to eemi calls?
+> > 
+> > Don't you want to make partial bitstreams e.g. use a flags value that you export
+> > in your firmware header (xlnx-zynqmp.h) and set those based on what flags get
+> > passed in, i.e. explicitely translate FPGA Manager flags to your firmware flags?
+> 
+> At this point of time the firmware use Flag 0 for full Bitstream and 1 for partial bitstream loading.
+> So I have not doing any explicit translate FPGA Manager flags inside the driver.
+> Will document the flags info in xlnx-zynqmp.h
+
+I think you should explicitely translate them, the fact that they happen
+to line up in the current implementation is somewhat of coincidence, and
+in future might break (since it's not really easy to to spot the
+dependency when refactoring).
+
+Why don't you do something like:
+
+#include <linux/firmware/xilinx-zynqmp.h>
 
 [...]
 
-> +       for (i = 0; i<smpt_len; i++)
-> +               pr_info("%s:%i smpt[%d]=%08x\n", __func__, __LINE__, i, smpt[i]);
-> +
->         map_id = 0;
-> -       i = 0;
->         /* Determine if there are any optional Detection Command Descriptors */
-> -       while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
-> +       for (i = 0; i< smpt_len; i++) {
-> +               if ((smpt[i] & SMPT_DESC_TYPE_MAP))
-> +                       break;
-> +
->                 read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
->                 nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
->                 nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
->                 nor->read_opcode = SMPT_CMD_OPCODE(smpt[i]);
-> +               pr_info("smpt[%d]=[addr_width:%08x, read_dumy:%0x8, read_opcode:%08x]\n", i, nor->addr_width, nor->read_dummy, nor->read_opcode);
+eemi_flags = 0;
 
-								^ %08x
+if (flags & FPGA_MGR_PARTIAL_RECONFIG)
+	eemi_flags |= XILINX_ZYNQMP_PM_FPGA_PARTIAL;
+
+eemi_ops->fpga_load(...., eemi_flags);
+
+Thanks,
+
+Moritz
