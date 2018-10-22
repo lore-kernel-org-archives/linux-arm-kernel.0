@@ -1,68 +1,49 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Mon, 22 Oct 2018 14:53:10 +0200 (CEST)
-Subject: [PATCH v3 3/4] arm64: implement live patching
-In-Reply-To: <CAKv+Gu8Vg9-CwvU-u9gNGmtB7gTapuCPHjU5v7FWnPsVy6vptA@mail.gmail.com>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <alpine.LSU.2.21.1810171051560.21847@pobox.suse.cz>
- <20181018125820.iw54zbirq74ulknj@linux-8ccs>
- <CAKv+Gu_yNBN+Rpw98MAZaxzSjm20qMYD7+fiJ1fBHoUeDr9fBA@mail.gmail.com>
- <alpine.LSU.2.21.1810191714540.4692@pobox.suse.cz>
- <CAKv+Gu8Vg9-CwvU-u9gNGmtB7gTapuCPHjU5v7FWnPsVy6vptA@mail.gmail.com>
-Message-ID: <alpine.LSU.2.21.1810221452070.13146@pobox.suse.cz>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Mon, 22 Oct 2018 15:20:27 +0200
+Subject: [Freedreno] [PATCH 5/9] arm64: dts: sdm845: Add gpu and gmu
+ device nodes
+In-Reply-To: <20181022103811.ywvyasnshjtdzjki@vireshk-i7>
+References: <20181010142905.GB9977@jcrouse-lnx.qualcomm.com>
+ <20181010143149.4e3ct3efkuwxa2hw@vireshk-i7>
+ <20181010144856.GC9977@jcrouse-lnx.qualcomm.com>
+ <20181010145139.nvalsr2ij2lj53dh@vireshk-i7>
+ <20181010151006.GD9977@jcrouse-lnx.qualcomm.com>
+ <20181011050216.4ba5i3ghh5rbvjbl@vireshk-i7>
+ <20181011145456.GG9977@jcrouse-lnx.qualcomm.com>
+ <20181015100327.qoojonf46lh6g3sh@vireshk-i7>
+ <20181015143444.GA4751@jcrouse-lnx.qualcomm.com>
+ <20181022103811.ywvyasnshjtdzjki@vireshk-i7>
+Message-ID: <20181022132027.GA15708@centauri.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Oct 2018, Ard Biesheuvel wrote:
-
-> On 19 October 2018 at 23:21, Miroslav Benes <mbenes@suse.cz> wrote:
-> >
-> >> >> Ad relocations. I checked that everything in struct mod_arch_specific
-> >> >> stays after the module is load. Both core and init get SHF_ALLOC set
-> >> >> (mod->arch.core.plt->sh_flags in module_frob_arch_sections(). It is
-> >> >> important because apply_relocate_add() may use those sections
-> >> >> through module_emit_plt_entry() call.
-> >> >
-> >> >
-> >> > Yes, it looks like the needed .plt sections will remain in module
-> >> > memory. However, I think I found a slight issue... :/
-> >> >
-> >> > In module_frob_arch_sections(), mod->arch.core.plt is set to an offset
-> >> > within info->sechdrs:
-> >> >
-> >> >             if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
-> >> >                     mod->arch.core.plt = sechdrs + i;
-> >> >
-> >> > sechdrs is from info->sechdrs, which is freed at the end of
-> >> > load_module() via free_copy(). So although the relevant plt section(s)
-> >> > are in module memory, mod->arch.core.plt will point to invalid memory
-> >> > after info is freed. In other words, the section (.plt) *is* in memory
-> >> > but the section header (struct elf64_shdr) containing section metadata
-> >> > like sh_addr, sh_size etc., is not.
-> >> >
-> >>
-> >> Just for my understanding: this only matters for live patching, right?
-> >
-> > Yes. Live patching can do deferred relocations. When a module is loaded
-> > and livepatched, the relevant symbols in the patching module are resolved.
-> > We call apply_relocate_add(), which is arch-specific, and we must be sure
-> > that everything used by apply_relocate_add() is preserved in the patching
-> > module after it is loaded.
-> >
+On Mon, Oct 22, 2018 at 04:08:11PM +0530, Viresh Kumar wrote:
+> On 15-10-18, 08:34, Jordan Crouse wrote:
+> > I agree that consistency is good. But the GPU is by design outside of the
+> > control of the genpd universe so it is by design not using the same features.
+> > It unfortunately does happen to use a similar number in an OPP binding to
+> > construct the level mapping but since we can't read the cmd-db from the GMU
+> > space this is a necessary evil.
 > 
-> So I suppose this could get interesting in cases where modules are far
-> away from the kernel (i.e., more than -/+ 128 MB). Fortunately, the
-> modules themselves are always placed in a 128 MB window, but this
-> window could be out of reach for branches into the kernel proper. If
-> we find ourselves in the situation where we need to patch calls into
-> the kernel proper to point into this module, this may get interesting,
-> since the PLT entries *must* be allocated along with the module that
-> contains the branch instruction, or the PLT entry itself may be out of
-> range, defeating the purpose.
+> Where do you define how to use this binding in case of GPU? I mean
+> some DT binding doc must have some information to avoid confusion as
+> all other users will have the qcom,level thing in the genpd's OPP
+> table which GPU will have it directly within its OPP table.
 
-Hm... Torsten, didn't you have to solve something similar in powerpc case? 
+Jordan suggested to use the RPMH_REGULATOR_LEVEL_* defines.
+These are defined in include/dt-bindings/power/qcom-rpmpd.h.
 
-> >> The original PLT support was implemented to support loading modules
-> >> outside of the -/+ 128 MB range of an arm64 relative branch/jump
-> >> instruction, and was later enhanced [for the same reason] to support
-> >> emitting a trampoline for the ftrace entrypoint.
+This header is only referenced in
+Documentation/devicetree/bindings/power/qcom,rpmpd.txt
+(Which this patch series does not seem to use.)
+
+This patch series does use
+Documentation/devicetree/bindings/opp/qcom-opp.txt
+but it does not reference include/dt-bindings/power/qcom-rpmpd.h.
+
+So to further avoid confusion, perhaps it is better to create new
+defines, instead of reusing the RPMH_REGULATOR_LEVEL_* defines?
+
+
+Kind regards,
+Niklas
