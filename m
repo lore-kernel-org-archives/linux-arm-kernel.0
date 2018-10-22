@@ -1,70 +1,73 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Mon, 22 Oct 2018 14:05:48 +0800
-Subject: [PATCH v5 2/3] clk: meson: add DT documentation for emmc clock
- controller
-In-Reply-To: <153997224756.53599.3138050846693192599@swboyd.mtv.corp.google.com>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-3-git-send-email-jianxin.pan@amlogic.com>
- <153988248599.5275.8444799485095155762@swboyd.mtv.corp.google.com>
- <efc5b030-f344-80ce-f57e-582207f436fe@amlogic.com>
- <153997224756.53599.3138050846693192599@swboyd.mtv.corp.google.com>
-Message-ID: <2a3890e2-10a7-ef0a-637d-af980d495606@amlogic.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 22 Oct 2018 12:20:08 +0530
+Subject: [PATCH 6/6] arm64: dts: xilinx: ultra96: Standardize LED labels
+ and triggers
+In-Reply-To: <20181015185147.GA29649@amd>
+References: <20181009140522.6492-1-manivannan.sadhasivam@linaro.org>
+ <20181009140522.6492-7-manivannan.sadhasivam@linaro.org>
+ <7b94c09d-ecbd-e48e-6583-127566715a76@xilinx.com>
+ <20181015185147.GA29649@amd>
+Message-ID: <20181022065008.GA10999@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Pavel,
 
-Thanks for the fully review, we really appreciate your time.
+Sorry for the late reply! Not sure why your resonse was filtered by the
+Spam filter :\
 
-Please see my comments below. 
+On Mon, Oct 15, 2018 at 09:56:01PM +0200, Pavel Machek wrote:
+> On Wed 2018-10-10 09:25:24, Michal Simek wrote:
+> > On 9.10.2018 16:05, Manivannan Sadhasivam wrote:
+> > > For all 96Boards, the following standard is used for onboard LEDs.
+> > > 
+> > > device-name:green:user1  default-trigger: heartbeat
+> > > device-name:green:user2  default-trigger: mmc0/disk-activity
+> > >                                           (onboard-storage)
+> > > device-name:green:user3  default-trigger: mmc1 (SD-card)
+> > > device-name:green:user4  default-trigger: none, panic-indicator
+> 
+> Actually, having one LED as heartbeat and second as panic indicator
+> only... Could those be merged and remaining LED used to something
+> useful?
+>
 
-On 2018/10/20 2:04, Stephen Boyd wrote:
-> Quoting Jianxin Pan (2018-10-19 08:50:08)
->> On 2018/10/19 1:08, Stephen Boyd wrote:
->>> Quoting Jianxin Pan (2018-10-17 22:07:24)
->>>> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
->>>> new file mode 100644
->>>> index 0000000..9e6d343
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
->>>> @@ -0,0 +1,31 @@
->>>> +* Amlogic MMC Sub Clock Controller Driver
->>>> +
->>>> +The Amlogic MMC clock controller generates and supplies clock to support
->>>> +MMC and NAND controller
->>>> +
->>>> +Required Properties:
->>>> +
->>>> +- compatible: should be:
->>>> +               "amlogic,gx-mmc-clkc"
->>>> +               "amlogic,axg-mmc-clkc"
->>>> +
->>>> +- #clock-cells: should be 1.
->>>> +- clocks: phandles to clocks corresponding to the clock-names property
->>>> +- clock-names: list of parent clock names
->>>> +       - "clkin0", "clkin1"
->>>> +
->>>> +Parent node should have the following properties :
->>>
->>> The example only has one node. Can you add two nodes?
->> OK. This clock is used by nand and emmc. I will add a new example for emmc too.
->> Thank you for your review.
+No. Our intention is to leave one LED as a panic indicator and a dedicated
+LED for heartbeat. If user wants to override the defaults, he can always do
+with any LEDs.
+ 
+> > > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > > ---
 > 
-> Maybe I misunderstand. I thought the clk controller was two nodes, but
-> it isn't? This wording is trying to explain what a consumer should look
-> like?
+> > > index eb5e8bddb610..565ceb390f99 100644
+> > > --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> > > +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> > > @@ -57,29 +57,30 @@
+> > >  	leds {
+> > >  		compatible = "gpio-leds";
+> > >  		ds2 {
+> > > -			label = "ds2";
+> > > +			label = "zynqmp-zcu100-revC:green:user1";
+> > 
+> > The purpose of this series should be standardize Led labels that's why I
+> > would expect that leds will be called in the same way on all these
+> > boards that's why I am not getting why there is board name.
+> > 
+> > green:user1 or just user1 should be enough.
 > 
-Yes.There is another clk controller.  I will add it in the next version.
-sd_emmc_b_clkc: clock-controller at 5000 {                  
-         compatible = "amlogic,axg-mmc-clkc", "syscon";   
-         reg = <0x0 0x5000 0x0 0x4>;                      
-         #clock-cells = <1>;                              
-                                                          
-         clock-names = "clkin0", "clkin1";                
-         clocks = <&clkc CLKID_SD_EMMC_B_CLK0>,           
-                 <&clkc CLKID_FCLK_DIV2>;                 
-};
-sd_emmc_c_clkc is for nadn and mmc portC.
-sd_emmc_b_clkc is for mmc portB.
-> .
+> green:user1 is better. Also... I guess this should go to the LEDs
+> list... and if you want to make names standard, maybe there's better
+> naming than user1..user4?
 > 
+
+These are user LEDs and that's why the `userN` naming convention comes into
+place. Here I agree to move with "green:user1" format and sending it to the
+LEDs list.
+
+Thanks,
+Mani
+
+> 									Pavel
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
