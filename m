@@ -1,133 +1,79 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 22 Oct 2018 13:43:56 +0300
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <6b112f34-cae3-fcd4-0d36-80b39c575fe4@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <6b112f34-cae3-fcd4-0d36-80b39c575fe4@ti.com>
-Message-ID: <85ec72c9-1b5b-6621-a704-c12efe6d72a7@ti.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 22 Oct 2018 12:46:27 +0200
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
+ SPI NOR flash memories
+In-Reply-To: <VI1PR04MB1038E92FFAB03E07048FD8B499F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+ <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
+ <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
+ <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181017090724.12f2cd79@bbrezillon>
+ <20181017091045.124e0266@bbrezillon>
+ <20181017092941.3658bd9a@bbrezillon>
+ <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181017115237.07310b74@bbrezillon>
+ <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181022111543.2a607efc@bbrezillon>
+ <VI1PR04MB1038EF892921194D1BFDE6FC99F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181022122659.0675942e@bbrezillon>
+ <VI1PR04MB1038E92FFAB03E07048FD8B499F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
+Message-ID: <20181022124627.2c6c3b93@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 22 Oct 2018 10:39:48 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
+> 
+> [    1.632190] Start [addr_width:00000000, read_dumy:08, read_opcode:00000000]                                                   
+> [    1.639148] spi_nor_get_map_in_use:2882 smpt[0]=08ff65fc                                                                      
+> [    1.644451] spi_nor_get_map_in_use:2882 smpt[1]=00000004                                                                      
+> [    1.649755] spi_nor_get_map_in_use:2882 smpt[2]=04ff65fc                                                                      
+> [    1.655057] spi_nor_get_map_in_use:2882 smpt[3]=00000002                                                                      
+> [    1.660360] spi_nor_get_map_in_use:2882 smpt[4]=02ff65fd                                                                      
+> [    1.665662] spi_nor_get_map_in_use:2882 smpt[5]=00000004                                                                      
+> [    1.670965] spi_nor_get_map_in_use:2882 smpt[6]=ff0201fe                                                                      
+> [    1.676267] spi_nor_get_map_in_use:2882 smpt[7]=00007ff1                                                                      
+> [    1.681571] spi_nor_get_map_in_use:2882 smpt[8]=00037ff4                                                                      
+> [    1.686874] spi_nor_get_map_in_use:2882 smpt[9]=03fbfff4                                                                      
+> [    1.692176] spi_nor_get_map_in_use:2882 smpt[10]=ff0203fe                                                                     
+> [    1.697566] spi_nor_get_map_in_use:2882 smpt[11]=03fbfff4                                                                     
+> [    1.702954] spi_nor_get_map_in_use:2882 smpt[12]=00037ff4                                                                     
+> [    1.708343] spi_nor_get_map_in_use:2882 smpt[13]=00007ff1                                                                     
+> [    1.713732] spi_nor_get_map_in_use:2882 smpt[14]=ff0005ff                                                                     
+> [    1.719120] spi_nor_get_map_in_use:2882 smpt[15]=03fffff4                                                                     
+> [    1.724509] smpt[0]=[addr_width:00000000, read_dumy:08, read_opcode:00000065]                                                 
+> [    1.731650] smpt[1]=[addr_width:00000000, read_dumy:08, read_opcode:00000000]                                                 
+> [    1.738791] smpt[2]=[addr_width:00000000, read_dumy:08, read_opcode:00000065]   
 
-On 2018-10-22 13:42, Peter Ujfalusi wrote:
-> Lokesh,
-> 
-> On 2018-10-18 18:40, Lokesh Vutla wrote:
->> Texas Instruments' K3 generation SoCs has an IP Interrupt Aggregator
->> which is an interrupt controller that does the following:
->> - Converts events to interrupts that can be understood by
->>   an interrupt router.
->> - Allows for multiplexing of events to interrupts.
->> - Allows for grouping of multiple events to a single interrupt.
->>
->> Configuration of the interrupt aggregator registers can only be done by
->> a system co-processor and the driver needs to send a message to this
->> co processor over TISCI protocol.
->>
->> Add support for Interrupt Aggregator driver over TISCI protocol.
-> 
-> Have you compiled this?
-> 
-> ...
-> 
->> diff --git a/drivers/irqchip/irq-ti-sci-inta.c b/drivers/irqchip/irq-ti-sci-inta.c
->> new file mode 100644
->> index 000000000000..ef0a2e8b782c
->> --- /dev/null
->> +++ b/drivers/irqchip/irq-ti-sci-inta.c
-> 
-> ...
-> 
->> +/**
->> + * ti_sci_inta_register_event() - Register a event to an interrupt aggregator
->> + * @dev:	Device pointer to source generating the event
->> + * @src_id:	TISCI device ID of the event source
->> + * @src_index:	Event source index within the device.
->> + * @virq:	Linux Virtual IRQ number
->> + * @flags:	Corresponding IRQ flags
->> + * @ack_needed:	If explicit clearing of event is required.
->> + *
->> + * Creates a new irq and attaches to IA domain if virq is not specified
->> + * else attaches the event to vint corresponding to virq.
->> + * When using TISCI within the client drivers, source indexes are always
->> + * generated dynamically and cannot be represented in DT. So client
->> + * drivers should call this API instead of platform_get_irq().
->> + *
->> + * Return virq if all went well else appropriate error value.
->> + */
->> +int ti_sci_inta_register_event(struct device *dev, u16 src_id, u16 src_index,
->> +			       unsigned int virq, u32 flags, bool ack_needed)
+You still don't print read_dummy correctly: %0x8 -> %08x.
 
-And can you swap the flags and ack_needed?
+Can you add
 
->> +{
-> 
-> ...
-> 
->> diff --git a/include/linux/irqchip/irq-ti-sci-inta.h b/include/linux/irqchip/irq-ti-sci-inta.h
->> new file mode 100644
->> index 000000000000..c078234fda3f
->> --- /dev/null
->> +++ b/include/linux/irqchip/irq-ti-sci-inta.h
->> @@ -0,0 +1,35 @@
->> +/* SPDX-License-Identifier: GPL-2.0 */
->> +/*
->> + * Texas Instruments' System Control Interface (TI-SCI) irqchip
->> + *
->> + * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
->> + *	Lokesh Vutla <lokeshvutla@ti.com>
->> + */
->> +
->> +#ifndef __INCLUDE_LINUX_IRQCHIP_TI_SCI_INTA_H
->> +#define __INCLUDE_LINUX_IRQCHIP_TI_SCI_INTA_H
->> +
->> +#if IS_ENABLED(CONFIG_TI_SCI_INTA_IRQCHIP)
->> +int ti_sci_inta_register_event(struct device *dev, u16 src_id, u16 src_index,
->> +			       unsigned int virq, u32 flags);
-> 
-> You are missing the ack_needed
-> 
->> +int ti_sci_inta_unregister_event(struct device *dev, u16 src_id, u16 src_index,
->> +				 unsigned int virq);
->> +
->> +#else /* CONFIG_TI_SCI_INTA_IRQCHIP */
->> +
->> +static inline int ti_sci_inta_register_event(struct device *dev, u16 src_id,
->> +					     u16 src_index, unsigned int virq,
->> +					     u32 flags)
-> 
-> Here as well.
-> 
->> +{
->> +	return -EINVAL;
->> +}
->> +
->> +static inline int ti_sci_inta_unregister_event(struct device *dev, u16 src_id,
->> +					       u16 src_index, unsigned int virq)
->> +{
->> +	return -EINVAL;
->> +}
->> +
->> +#endif /* CONFIG_TI_SCI_INTA_IRQCHIP */
->> +
->> +#endif /* __INCLUDE_LINUX_IRQCHIP_TI_SCI_INTA_H */
->>
-> 
-> - P?ter
-> 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+	if (!nor->addr_width)
+		nor->addr_width = 3;
 
-- P?ter
+After the
 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+	nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
+
+line.
+                                              
+> [    1.745932] spi_nor_get_map_in_use:2911 map_id=0 smpt_len:16 i=:3                                                             
+> [    1.752018] End [addr_width:00000000, read_dumy:08, read_opcode:00000065]         
+> 
+> Also, one more thing when we are returning from the function, we are over-writing the values of addr_widthm read_dummy and read_opcode.
+> Is this correct?
+
+Yes, that's correct.
+
+> 
+> out:
+>         nor->addr_width = addr_width;
+>         nor->read_dummy = read_dummy;
+>         nor->read_opcode = read_opcode;
+>         return ret;
+> }
+> 
