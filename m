@@ -1,113 +1,141 @@
-From: k.marinushkin@gmail.com (Kirill Marinushkin)
-Date: Tue, 23 Oct 2018 00:25:14 +0200
-Subject: [PATCH v2] staging: bcm2835-audio: interpolate audio delay
-In-Reply-To: <20181022191708.GA4659@ubuntu>
-References: <20181022191708.GA4659@ubuntu>
-Message-ID: <a703f8a2-e85a-bc5b-750a-cc43ef252ba5@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Oct 2018 19:25:27 -0300
+Subject: [RFC PATCH v2 09/12] crypto: nhpoly1305 - add NHPoly1305 support
+In-Reply-To: <20181022184236.GA59695@gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <20181015175424.97147-10-ebiggers@kernel.org>
+ <CAKv+Gu-5WM19g5HguDheAADbigKNxokDCFMekkt4OYdEEa8Avw@mail.gmail.com>
+ <20181020053834.GC876@sol.localdomain>
+ <CAKv+Gu-A_EhMBXq_nqzBzpgN36foo6hA3Ba3=j+WVM-jph=mrw@mail.gmail.com>
+ <20181022184236.GA59695@gmail.com>
+Message-ID: <CAKv+Gu_vXmfNQT8j=G_Zz5C3-zDPPEQ2ne6ZZQw8mD0rifO8qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mike,
+On 22 October 2018 at 15:42, Eric Biggers <ebiggers@kernel.org> wrote:
+> On Sat, Oct 20, 2018 at 11:06:00PM +0800, Ard Biesheuvel wrote:
+>> >> > +
+>> >> > +#define NH_STRIDE(K0, K1, K2, K3)                              \
+>> >> > +({                                                             \
+>> >> > +       m_A = get_unaligned_le32(src); src += 4;                \
+>> >> > +       m_B = get_unaligned_le32(src); src += 4;                \
+>> >> > +       m_C = get_unaligned_le32(src); src += 4;                \
+>> >> > +       m_D = get_unaligned_le32(src); src += 4;                \
+>> >> > +       K3##_A = *key++;                                        \
+>> >> > +       K3##_B = *key++;                                        \
+>> >> > +       K3##_C = *key++;                                        \
+>> >> > +       K3##_D = *key++;                                        \
+>> >> > +       sum0 += (u64)(u32)(m_A + K0##_A) * (u32)(m_C + K0##_C); \
+>> >> > +       sum1 += (u64)(u32)(m_A + K1##_A) * (u32)(m_C + K1##_C); \
+>> >> > +       sum2 += (u64)(u32)(m_A + K2##_A) * (u32)(m_C + K2##_C); \
+>> >> > +       sum3 += (u64)(u32)(m_A + K3##_A) * (u32)(m_C + K3##_C); \
+>> >> > +       sum0 += (u64)(u32)(m_B + K0##_B) * (u32)(m_D + K0##_D); \
+>> >> > +       sum1 += (u64)(u32)(m_B + K1##_B) * (u32)(m_D + K1##_D); \
+>> >> > +       sum2 += (u64)(u32)(m_B + K2##_B) * (u32)(m_D + K2##_D); \
+>> >> > +       sum3 += (u64)(u32)(m_B + K3##_B) * (u32)(m_D + K3##_D); \
+>> >> > +})
+>> >> > +
+>> >> > +static void nh_generic(const u32 *key, const u8 *src, size_t srclen,
+>> >> > +                      __le64 hash[NH_NUM_PASSES])
+>> >> > +{
+>> >> > +       u64 sum0 = 0, sum1 = 0, sum2 = 0, sum3 = 0;
+>> >> > +       u32 k0_A = *key++;
+>> >> > +       u32 k0_B = *key++;
+>> >> > +       u32 k0_C = *key++;
+>> >> > +       u32 k0_D = *key++;
+>> >> > +       u32 k1_A = *key++;
+>> >> > +       u32 k1_B = *key++;
+>> >> > +       u32 k1_C = *key++;
+>> >> > +       u32 k1_D = *key++;
+>> >> > +       u32 k2_A = *key++;
+>> >> > +       u32 k2_B = *key++;
+>> >> > +       u32 k2_C = *key++;
+>> >> > +       u32 k2_D = *key++;
+>> >> > +       u32 k3_A, k3_B, k3_C, k3_D;
+>> >> > +       u32 m_A, m_B, m_C, m_D;
+>> >> > +       size_t n = srclen / NH_MESSAGE_UNIT;
+>> >> > +
+>> >> > +       BUILD_BUG_ON(NH_PAIR_STRIDE != 2);
+>> >> > +       BUILD_BUG_ON(NH_NUM_PASSES != 4);
+>> >> > +
+>> >> > +       while (n >= 4) {
+>> >> > +               NH_STRIDE(k0, k1, k2, k3);
+>> >> > +               NH_STRIDE(k1, k2, k3, k0);
+>> >> > +               NH_STRIDE(k2, k3, k0, k1);
+>> >> > +               NH_STRIDE(k3, k0, k1, k2);
+>> >> > +               n -= 4;
+>> >> > +       }
+>> >> > +       if (n) {
+>> >> > +               NH_STRIDE(k0, k1, k2, k3);
+>> >> > +               if (--n) {
+>> >> > +                       NH_STRIDE(k1, k2, k3, k0);
+>> >> > +                       if (--n)
+>> >> > +                               NH_STRIDE(k2, k3, k0, k1);
+>> >> > +               }
+>> >> > +       }
+>> >> > +
+>> >>
+>> >> This all looks a bit clunky to me, with the macro, the *key++s in the
+>> >> initializers and these conditionals.
+>> >>
+>> >> Was it written in this particular way to get GCC to optimize it in the
+>> >> right way?
+>> >
+>> > This does get compiled into something much faster than a naive version, which
+>> > you can find commented out at
+>> > https://github.com/google/adiantum/blob/master/benchmark/src/nh.c#L14.
+>> >
+>> > Though, I admit that I haven't put a ton of effort into this C implementation of
+>> > NH yet.  Right now it's actually somewhat of a translation of the NEON version.
+>> > I'll do some experiments and see if it can be made into something less ugly
+>> > without losing performance.
+>> >
+>>
+>> No that's fine but please document it.
+>>
+>
+> Hmm, I'm actually leaning towards the following instead.  Unrolling multiple
+> strides to try to reduce loads of the keys doesn't seem worthwhile in the C
+> implementation; for one, it bloats the code size a lot
+> (412 => 2332 bytes on arm32).
+>
+> static void nh_generic(const u32 *key, const u8 *message, size_t message_len,
+>                        __le64 hash[NH_NUM_PASSES])
+> {
+>         u64 sums[4] = { 0, 0, 0, 0 };
+>
+>         BUILD_BUG_ON(NH_PAIR_STRIDE != 2);
+>         BUILD_BUG_ON(NH_NUM_PASSES != 4);
+>
+>         while (message_len) {
+>                 u32 m0 = get_unaligned_le32(message + 0);
+>                 u32 m1 = get_unaligned_le32(message + 4);
+>                 u32 m2 = get_unaligned_le32(message + 8);
+>                 u32 m3 = get_unaligned_le32(message + 12);
+>
+>                 sums[0] += (u64)(u32)(m0 + key[ 0]) * (u32)(m2 + key[ 2]);
+>                 sums[1] += (u64)(u32)(m0 + key[ 4]) * (u32)(m2 + key[ 6]);
+>                 sums[2] += (u64)(u32)(m0 + key[ 8]) * (u32)(m2 + key[10]);
+>                 sums[3] += (u64)(u32)(m0 + key[12]) * (u32)(m2 + key[14]);
+>                 sums[0] += (u64)(u32)(m1 + key[ 1]) * (u32)(m3 + key[ 3]);
+>                 sums[1] += (u64)(u32)(m1 + key[ 5]) * (u32)(m3 + key[ 7]);
+>                 sums[2] += (u64)(u32)(m1 + key[ 9]) * (u32)(m3 + key[11]);
+>                 sums[3] += (u64)(u32)(m1 + key[13]) * (u32)(m3 + key[15]);
 
-AFAIU, this patch is wrong. Please correct me, maybe I misunderstand something.
+Are these (u32) casts really necessary? All the addends are u32 types,
+so I'd expect each (x + y) subexpression to have a u32 type already as
+well. Or am I missing something?
 
-> The problem that this patch seeks to resolve is that when userland asks for
-> the delay
+>                 key += NH_MESSAGE_UNIT / sizeof(key[0]);
+>                 message += NH_MESSAGE_UNIT;
+>                 message_len -= NH_MESSAGE_UNIT;
+>         }
+>
+>         hash[0] = cpu_to_le64(sums[0]);
+>         hash[1] = cpu_to_le64(sums[1]);
+>         hash[2] = cpu_to_le64(sums[2]);
+>         hash[3] = cpu_to_le64(sums[3]);
+> }
 
-The userspace asks not for delay, but for the pointer.
-You modify the function, which is called `snd_bcm2835_pcm_pointer`. Here you are
-supposed to increase `alsa_stream->pos` with the proper offset. Instead, you
-imitate a delay, but in fact the delay is not increased.
-
-So, the proper solution should be to fix the reported pointer. As a result,
-userspace will recieve the correct delay, instead of these crazy 10 ms.
-
-> FYI, there is
-> a discussion of the effects of a downstream equivalent of this suggested patch
-> at:
-> https://github.com/raspberrypi/firmware/issues/1026#issuecomment-415746016.
-
-Thank you for the link, it clarified for me what you try to achieve.
-
-On 10/22/18 21:17, Mike Brady wrote:
-> When the BCM2835 audio output is used, userspace sees a jitter up to 10ms
-> in the audio position, aka "delay" -- the number of frames that must
-> be output before a new frame would be played.
-> Make this a bit nicer for userspace by interpolating the position
-> using the CPU clock.
-> The overhead is small -- an extra ktime_get() every time a GPU message
-> is sent -- and another call and a few calculations whenever the delay
-> is sought from userland.
-> At 48,000 frames per second, i.e. approximately 20 microseconds per
-> frame, it would take a clock inaccuracy of
-> 20 microseconds in 10 milliseconds -- 2,000 parts per million --
-> to result in an inaccurate estimate, whereas
-> crystal- or resonator-based clocks typically have an
-> inaccuracy of 10s to 100s of parts per million.
-> 
-> Signed-off-by: Mike Brady <mikebrady@eircom.net>
-> ---
-> Changes in v2 -- remove inappropriate addition of SNDRV_PCM_INFO_BATCH flag
-> 
->  .../vc04_services/bcm2835-audio/bcm2835-pcm.c | 20 +++++++++++++++++++
->  .../vc04_services/bcm2835-audio/bcm2835.h     |  1 +
->  2 files changed, 21 insertions(+)
-> 
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-> index e66da11af5cf..9053b996cada 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-> @@ -74,6 +74,7 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream,
->  	atomic_set(&alsa_stream->pos, pos);
->  
->  	alsa_stream->period_offset += bytes;
-> +	alsa_stream->interpolate_start = ktime_get();
->  	if (alsa_stream->period_offset >= alsa_stream->period_size) {
->  		alsa_stream->period_offset %= alsa_stream->period_size;
->  		snd_pcm_period_elapsed(substream);
-> @@ -243,6 +244,7 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
->  	atomic_set(&alsa_stream->pos, 0);
->  	alsa_stream->period_offset = 0;
->  	alsa_stream->draining = false;
-> +	alsa_stream->interpolate_start = ktime_get();
->  
->  	return 0;
->  }
-> @@ -292,6 +294,24 @@ snd_bcm2835_pcm_pointer(struct snd_pcm_substream *substream)
->  {
->  	struct snd_pcm_runtime *runtime = substream->runtime;
->  	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
-> +	ktime_t now = ktime_get();
-> +
-> +	/* Give userspace better delay reporting by interpolating between GPU
-> +	 * notifications, assuming audio speed is close enough to the clock
-> +	 * used for ktime
-> +	 */
-> +
-> +	if ((ktime_to_ns(alsa_stream->interpolate_start)) &&
-> +	    (ktime_compare(alsa_stream->interpolate_start, now) < 0)) {
-> +		u64 interval =
-> +			(ktime_to_ns(ktime_sub(now,
-> +				alsa_stream->interpolate_start)));
-> +		u64 frames_output_in_interval =
-> +			div_u64((interval * runtime->rate), 1000000000);
-> +		snd_pcm_sframes_t frames_output_in_interval_sized =
-> +			-frames_output_in_interval;
-> +		runtime->delay = frames_output_in_interval_sized;
-> +	}
->  
->  	return snd_pcm_indirect_playback_pointer(substream,
->  		&alsa_stream->pcm_indirect,
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-> index e13435d1c205..595ad584243f 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-> @@ -78,6 +78,7 @@ struct bcm2835_alsa_stream {
->  	unsigned int period_offset;
->  	unsigned int buffer_size;
->  	unsigned int period_size;
-> +	ktime_t interpolate_start;
->  
->  	struct bcm2835_audio_instance *instance;
->  	int idx;
-> 
+In any case, this looks much better to me, so if the performance is
+satisfactory, let's use this version.
