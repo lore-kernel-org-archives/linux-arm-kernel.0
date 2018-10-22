@@ -1,50 +1,35 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 22 Oct 2018 09:39:03 +0530
-Subject: [PATCH V12 00/14] Krait clocks + Krait CPUfreq
-In-Reply-To: <153980741313.5275.10376918222904341760@swboyd.mtv.corp.google.com>
-References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
- <2ae96741-94c0-ba4c-fc19-05d33179683c@codeaurora.org>
- <d682580d-5070-0271-197f-29d988172937@codeaurora.org>
- <D8FC68C0-2572-4A86-81D9-D0099D314A45@gmail.com>
- <F5A89365-C613-4FE2-AD32-DC0AC6DF380B@gmail.com>
- <fb81b8d5-3d24-b413-8d59-33cb70e46f8b@codeaurora.org>
- <153979105280.5275.841088095583550635@swboyd.mtv.corp.google.com>
- <153980741313.5275.10376918222904341760@swboyd.mtv.corp.google.com>
-Message-ID: <c5f492c0-19a2-db8f-a114-d3cfe17ae6c6@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 21 Oct 2018 21:11:08 -0700 (PDT)
+Subject: [PATCH 0/9] net: simplify getting .driver_data
+In-Reply-To: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
+References: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20181021.211108.848222946495599164.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Date: Sun, 21 Oct 2018 22:00:11 +0200
 
-On 10/18/2018 1:46 AM, Stephen Boyd wrote:
-> Quoting Stephen Boyd (2018-10-17 08:44:12)
->> Quoting Sricharan R (2018-09-20 06:03:31)
->>>
->>>
->>> On 9/20/2018 1:54 AM, Craig wrote:
->>>> Yup, this patch seems to have fixed the higher frequencies from the quick test I did.
->>>>
->>>       Thanks !!. Can i take that as 
->>>           Tested-by: Craig Tatlor <ctatlor97@gmail.com>  ?
->>>
->>
->> Is this patch series going to be resent?
->>
+> I got tired of fixing this in Renesas drivers manually, so I took the big
+> hammer. Remove this cumbersome code pattern which got copy-pasted too much
+> already:
 > 
-> Nevermind. Looking at it I think I can apply all the clk ones and we're
-> good to go. If you can send a followup patch series to change the
-> registration and provider APIs to be clk_hw instead of clk based I would
-> appreciate it.
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
 > 
+> A branch, tested by buildbot, can be found here:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git coccinelle/get_drvdata
+> 
+> I have been asked if it couldn't be done for dev_set_drvdata as well. I checked
+> it and did not find one occasion where it could be simplified like this. Not
+> much of a surprise because driver_data is usually set in probe() functions
+> which access struct platform_device in many other ways.
+> 
+> I am open for other comments, suggestions, too, of course.
+> 
+> Here is the cocci-script I created:
+ ...
 
-Sorry for the late response. Was away.
-Only pending thing was separating out the binding documentation for the cpu-freq
-driver and fixing the text in documentation.  That means, yes its fine to merge
-the clk ones as you said. I will resend that. Also, will send a follow up series for clk_hw to
-clk change as you mentioned separately.
-
-Regards,
- Sricharan
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Series applied to net-next, thanks.
