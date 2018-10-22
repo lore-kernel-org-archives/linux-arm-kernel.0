@@ -1,96 +1,200 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 22 Oct 2018 10:05:45 -0700
-Subject: [PATCH 0/9] net: simplify getting .driver_data
-In-Reply-To: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
-References: <20181021200021.1693-1-wsa+renesas@sang-engineering.com>
-Message-ID: <7a2fdd94-a883-da02-845e-f6dd8dcfb969@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 22 Oct 2018 18:11:04 +0100
+Subject: [PATCH 09/10] swiotlb: add support for non-coherent DMA
+In-Reply-To: <20181008080246.20543-10-hch@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-10-hch@lst.de>
+Message-ID: <9ea28547-dd1a-b4bd-2e91-f71e70417e7d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/18 1:00 PM, Wolfram Sang wrote:
-> I got tired of fixing this in Renesas drivers manually, so I took the big
-> hammer. Remove this cumbersome code pattern which got copy-pasted too much
-> already:
+On 08/10/2018 09:02, Christoph Hellwig wrote:
+> Handle architectures that are not cache coherent directly in the main
+> swiotlb code by calling arch_sync_dma_for_{device,cpu} in all the right
+> places from the various dma_map/unmap/sync methods when the device is
+> non-coherent.
 > 
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
-> +	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
+> Because swiotlb now uses dma_direct_alloc for the coherent allocation
+> that side is already taken care of by the dma-direct code calling into
+> arch_dma_{alloc,free} for devices that are non-coherent.
 > 
-> A branch, tested by buildbot, can be found here:
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>   kernel/dma/swiotlb.c | 23 +++++++++++++++++------
+>   1 file changed, 17 insertions(+), 6 deletions(-)
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git coccinelle/get_drvdata
-> 
-> I have been asked if it couldn't be done for dev_set_drvdata as well. I checked
-> it and did not find one occasion where it could be simplified like this. Not
-> much of a surprise because driver_data is usually set in probe() functions
-> which access struct platform_device in many other ways.
-> 
-> I am open for other comments, suggestions, too, of course.
+> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+> index 475a41eff3dc..52885b274368 100644
+> --- a/kernel/dma/swiotlb.c
+> +++ b/kernel/dma/swiotlb.c
+> @@ -21,6 +21,7 @@
+>   
+>   #include <linux/cache.h>
+>   #include <linux/dma-direct.h>
+> +#include <linux/dma-noncoherent.h>
+>   #include <linux/mm.h>
+>   #include <linux/export.h>
+>   #include <linux/spinlock.h>
+> @@ -677,6 +678,10 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
+>   		dma_addr = swiotlb_bounce_page(dev, &phys, size, dir, attrs);
+>   	}
+>   
+> +	if (!dev_is_dma_coherent(dev) &&
+> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
 
-Would it make sense to annotate platform_get_drvdata() with __deprecated
-or something like that to prevent further uses by driver authors?
+Nit: other parts of the file are already using the "!(...)" style rather 
+than "(...) == 0".
 
-Do you mind submitting the cocci-script to the maintainers of the
-coccinelle scripts that way it can be included and run by automated
-tools? Thanks!
+> +		arch_sync_dma_for_device(dev, phys, size, dir);
+> +
+>   	return dma_addr;
+>   }
+>   
+> @@ -696,6 +701,10 @@ void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
+>   
+>   	BUG_ON(dir == DMA_NONE);
+>   
+> +	if (!dev_is_dma_coherent(hwdev) &&
+> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+> +		arch_sync_dma_for_cpu(hwdev, paddr, size, dir);
+> +
+>   	if (is_swiotlb_buffer(paddr)) {
+>   		swiotlb_tbl_unmap_single(hwdev, paddr, size, dir, attrs);
+>   		return;
+> @@ -732,15 +741,17 @@ swiotlb_sync_single(struct device *hwdev, dma_addr_t dev_addr,
+>   
+>   	BUG_ON(dir == DMA_NONE);
+>   
+> -	if (is_swiotlb_buffer(paddr)) {
+> +	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_CPU)
+> +		arch_sync_dma_for_cpu(hwdev, paddr, size, dir);
+> +
+> +	if (is_swiotlb_buffer(paddr))
+>   		swiotlb_tbl_sync_single(hwdev, paddr, size, dir, target);
+> -		return;
+> -	}
+>   
+> -	if (dir != DMA_FROM_DEVICE)
+> -		return;
+> +	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_DEVICE)
+> +		arch_sync_dma_for_device(hwdev, paddr, size, dir);
+>   
+> -	dma_mark_clean(phys_to_virt(paddr), size);
+> +	if (!is_swiotlb_buffer(paddr) && dir == DMA_FROM_DEVICE)
+> +		dma_mark_clean(phys_to_virt(paddr), size);
+>   }
 
-> 
-> Here is the cocci-script I created:
-> 
-> @@
-> struct device* d;
-> identifier pdev;
-> expression *ptr;
-> @@
-> (
-> -	struct platform_device *pdev = to_platform_device(d);
-> |
-> -	struct platform_device *pdev;
-> 	...
-> -	pdev = to_platform_device(d);
-> )
-> 	<... when != pdev
-> -	&pdev->dev
-> +	d
-> 	...>
-> 
-> 	ptr =
-> -	platform_get_drvdata(pdev)
-> +	dev_get_drvdata(d)
-> 
-> 	<... when != pdev
-> -	&pdev->dev
-> +	d
-> 	...>
-> 
-> Kind regards,
-> 
->    Wolfram
-> 
-> 
-> Wolfram Sang (9):
->   net: dsa: bcm_sf2: simplify getting .driver_data
->   net: dsa: qca8k: simplify getting .driver_data
->   net: ethernet: cadence: macb_main: simplify getting .driver_data
->   net: ethernet: davicom: dm9000: simplify getting .driver_data
->   net: ethernet: smsc: smc91x: simplify getting .driver_data
->   net: ethernet: ti: cpsw: simplify getting .driver_data
->   net: ethernet: ti: davinci_emac: simplify getting .driver_data
->   net: ethernet: wiznet: w5300: simplify getting .driver_data
->   net: phy: mdio-mux-bcm-iproc: simplify getting .driver_data
-> 
->  drivers/net/dsa/bcm_sf2.c                | 6 ++----
->  drivers/net/dsa/qca8k.c                  | 6 ++----
->  drivers/net/ethernet/cadence/macb_main.c | 6 ++----
->  drivers/net/ethernet/davicom/dm9000.c    | 6 ++----
->  drivers/net/ethernet/smsc/smc91x.c       | 3 +--
->  drivers/net/ethernet/ti/cpsw.c           | 6 ++----
->  drivers/net/ethernet/ti/davinci_emac.c   | 6 ++----
->  drivers/net/ethernet/wiznet/w5300.c      | 6 ++----
->  drivers/net/phy/mdio-mux-bcm-iproc.c     | 6 ++----
->  9 files changed, 17 insertions(+), 34 deletions(-)
-> 
+All these "if"s end up pretty hard to follow at first glance :(
 
+I had a quick play at moving the cache maintenance here out into the 
+callers, which comes out arguably looking perhaps a little cleaner (only 
++1 source line overall, and actually reduces text size by 32 bytes for 
+my build), but sadly I can't really see any way of doing the equivalent 
+for map/unmap short of duplicating the whole 3-line arch_sync_*() block, 
+which just makes for a different readability problem. As you mentioned 
+on patch #7, I guess this really is just one of those things which has 
+no nice solution, so cosmetics aside,
 
--- 
-Florian
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+FWIW, below is my "cleanup" attempt (diff on top of the 
+swiotlb-noncoherent.3 branch).
+
+Robin.
+
+----->8-----
+diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+index 52885b274368..43ee29969fdd 100644
+--- a/kernel/dma/swiotlb.c
++++ b/kernel/dma/swiotlb.c
+@@ -741,23 +741,24 @@ swiotlb_sync_single(struct device *hwdev, 
+dma_addr_t dev_addr,
+
+  	BUG_ON(dir == DMA_NONE);
+
+-	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_CPU)
+-		arch_sync_dma_for_cpu(hwdev, paddr, size, dir);
+-
+-	if (is_swiotlb_buffer(paddr))
++	if (is_swiotlb_buffer(paddr)) {
+  		swiotlb_tbl_sync_single(hwdev, paddr, size, dir, target);
++		return;
++	}
+
+-	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_DEVICE)
+-		arch_sync_dma_for_device(hwdev, paddr, size, dir);
++	if (dir != DMA_FROM_DEVICE)
++		return;
+
+-	if (!is_swiotlb_buffer(paddr) && dir == DMA_FROM_DEVICE)
+-		dma_mark_clean(phys_to_virt(paddr), size);
++	dma_mark_clean(phys_to_virt(paddr), size);
+  }
+
+  void
+  swiotlb_sync_single_for_cpu(struct device *hwdev, dma_addr_t dev_addr,
+  			    size_t size, enum dma_data_direction dir)
+  {
++	if (!dev_is_dma_coherent(hwdev))
++		arch_sync_dma_for_cpu(hwdev, dma_to_phys(hwdev, dev_addr),
++				      size, dir);
+  	swiotlb_sync_single(hwdev, dev_addr, size, dir, SYNC_FOR_CPU);
+  }
+
+@@ -766,6 +767,9 @@ swiotlb_sync_single_for_device(struct device *hwdev, 
+dma_addr_t dev_addr,
+  			       size_t size, enum dma_data_direction dir)
+  {
+  	swiotlb_sync_single(hwdev, dev_addr, size, dir, SYNC_FOR_DEVICE);
++	if (!dev_is_dma_coherent(hwdev))
++		arch_sync_dma_for_device(hwdev, dma_to_phys(hwdev, dev_addr),
++					 size, dir);
+  }
+
+  /*
+@@ -828,31 +832,28 @@ swiotlb_unmap_sg_attrs(struct device *hwdev, 
+struct scatterlist *sgl,
+   * The same as swiotlb_sync_single_* but for a scatter-gather list, 
+same rules
+   * and usage.
+   */
+-static void
+-swiotlb_sync_sg(struct device *hwdev, struct scatterlist *sgl,
+-		int nelems, enum dma_data_direction dir,
+-		enum dma_sync_target target)
++void
++swiotlb_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sgl,
++			int nelems, enum dma_data_direction dir)
+  {
+  	struct scatterlist *sg;
+  	int i;
+
+  	for_each_sg(sgl, sg, nelems, i)
+-		swiotlb_sync_single(hwdev, sg->dma_address,
+-				    sg_dma_len(sg), dir, target);
++		swiotlb_sync_single_for_cpu(hwdev, sg->dma_address,
++					    sg_dma_len(sg), dir);
+  }
+
+  void
+-swiotlb_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sg,
+-			int nelems, enum dma_data_direction dir)
+-{
+-	swiotlb_sync_sg(hwdev, sg, nelems, dir, SYNC_FOR_CPU);
+-}
+-
+-void
+-swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
++swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sgl,
+  			   int nelems, enum dma_data_direction dir)
+  {
+-	swiotlb_sync_sg(hwdev, sg, nelems, dir, SYNC_FOR_DEVICE);
++	struct scatterlist *sg;
++	int i;
++
++	for_each_sg(sgl, sg, nelems, i)
++		swiotlb_sync_single_for_device(hwdev, sg->dma_address,
++					       sg_dma_len(sg), dir);
+  }
+
+  /*
