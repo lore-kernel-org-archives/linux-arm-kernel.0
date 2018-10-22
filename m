@@ -1,200 +1,143 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 22 Oct 2018 18:11:04 +0100
-Subject: [PATCH 09/10] swiotlb: add support for non-coherent DMA
-In-Reply-To: <20181008080246.20543-10-hch@lst.de>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-10-hch@lst.de>
-Message-ID: <9ea28547-dd1a-b4bd-2e91-f71e70417e7d@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 23 Oct 2018 01:14:23 +0800
+Subject: [v9 2/7] dmaengine: fsldma: Adding macro FSL_DMA_IN/OUT
+ implement for ARM platform
+In-Reply-To: <20181017055957.542-2-peng.ma@nxp.com>
+References: <20181017055957.542-2-peng.ma@nxp.com>
+Message-ID: <201810230103.1SquAJF2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2018 09:02, Christoph Hellwig wrote:
-> Handle architectures that are not cache coherent directly in the main
-> swiotlb code by calling arch_sync_dma_for_{device,cpu} in all the right
-> places from the various dma_map/unmap/sync methods when the device is
-> non-coherent.
-> 
-> Because swiotlb now uses dma_direct_alloc for the coherent allocation
-> that side is already taken care of by the dma-direct code calling into
-> arch_dma_{alloc,free} for devices that are non-coherent.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->   kernel/dma/swiotlb.c | 23 +++++++++++++++++------
->   1 file changed, 17 insertions(+), 6 deletions(-)
-> 
-> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
-> index 475a41eff3dc..52885b274368 100644
-> --- a/kernel/dma/swiotlb.c
-> +++ b/kernel/dma/swiotlb.c
-> @@ -21,6 +21,7 @@
->   
->   #include <linux/cache.h>
->   #include <linux/dma-direct.h>
-> +#include <linux/dma-noncoherent.h>
->   #include <linux/mm.h>
->   #include <linux/export.h>
->   #include <linux/spinlock.h>
-> @@ -677,6 +678,10 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
->   		dma_addr = swiotlb_bounce_page(dev, &phys, size, dir, attrs);
->   	}
->   
-> +	if (!dev_is_dma_coherent(dev) &&
-> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+Hi Peng,
 
-Nit: other parts of the file are already using the "!(...)" style rather 
-than "(...) == 0".
+Thank you for the patch! Perhaps something to improve:
 
-> +		arch_sync_dma_for_device(dev, phys, size, dir);
-> +
->   	return dma_addr;
->   }
->   
-> @@ -696,6 +701,10 @@ void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
->   
->   	BUG_ON(dir == DMA_NONE);
->   
-> +	if (!dev_is_dma_coherent(hwdev) &&
-> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
-> +		arch_sync_dma_for_cpu(hwdev, paddr, size, dir);
-> +
->   	if (is_swiotlb_buffer(paddr)) {
->   		swiotlb_tbl_unmap_single(hwdev, paddr, size, dir, attrs);
->   		return;
-> @@ -732,15 +741,17 @@ swiotlb_sync_single(struct device *hwdev, dma_addr_t dev_addr,
->   
->   	BUG_ON(dir == DMA_NONE);
->   
-> -	if (is_swiotlb_buffer(paddr)) {
-> +	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_CPU)
-> +		arch_sync_dma_for_cpu(hwdev, paddr, size, dir);
-> +
-> +	if (is_swiotlb_buffer(paddr))
->   		swiotlb_tbl_sync_single(hwdev, paddr, size, dir, target);
-> -		return;
-> -	}
->   
-> -	if (dir != DMA_FROM_DEVICE)
-> -		return;
-> +	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_DEVICE)
-> +		arch_sync_dma_for_device(hwdev, paddr, size, dir);
->   
-> -	dma_mark_clean(phys_to_virt(paddr), size);
-> +	if (!is_swiotlb_buffer(paddr) && dir == DMA_FROM_DEVICE)
-> +		dma_mark_clean(phys_to_virt(paddr), size);
->   }
+[auto build test WARNING on linux-sof-driver/master]
+[also build test WARNING on v4.19 next-20181019]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-All these "if"s end up pretty hard to follow at first glance :(
+url:    https://github.com/0day-ci/linux/commits/Peng-Ma/dmaengine-fsldma-Replace-DMA_IN-OUT-by-FSL_DMA_IN-OUT/20181017-232444
+base:   https://github.com/thesofproject/linux master
+config: powerpc-xes_mpc85xx_defconfig (attached as .config)
+compiler: powerpc-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=powerpc 
 
-I had a quick play at moving the cache maintenance here out into the 
-callers, which comes out arguably looking perhaps a little cleaner (only 
-+1 source line overall, and actually reduces text size by 32 bytes for 
-my build), but sadly I can't really see any way of doing the equivalent 
-for map/unmap short of duplicating the whole 3-line arch_sync_*() block, 
-which just makes for a different readability problem. As you mentioned 
-on patch #7, I guess this really is just one of those things which has 
-no nice solution, so cosmetics aside,
+All warnings (new ones prefixed by >>):
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+   In file included from drivers/dma/fsldma.c:41:0:
+   drivers/dma/fsldma.h: In function 'fsl_ioread64':
+>> drivers/dma/fsldma.h:210:17: warning: passing argument 1 of 'in_le32' makes pointer from integer without a cast [-Wint-conversion]
+     return in_le32(fsl_addr) | in_le32(fsl_addr + 1) << 32;
+                    ^~~~~~~~
+   In file included from include/linux/io.h:25:0,
+                    from include/linux/irq.h:20,
+                    from arch/powerpc/include/asm/hardirq.h:6,
+                    from include/linux/hardirq.h:9,
+                    from include/linux/interrupt.h:11,
+                    from include/linux/pci.h:32,
+                    from drivers/dma/fsldma.c:29:
+   arch/powerpc/include/asm/io.h:172:15: note: expected 'const volatile u32 * {aka const volatile unsigned int *}' but argument is of type 'u32 {aka unsigned int}'
+    DEF_MMIO_IN_X(in_le32, 32, lwbrx);
+                  ^
+   arch/powerpc/include/asm/io.h:131:23: note: in definition of macro 'DEF_MMIO_IN_X'
+    static inline u##size name(const volatile u##size __iomem *addr) \
+                          ^~~~
+   In file included from drivers/dma/fsldma.c:41:0:
+   drivers/dma/fsldma.h:210:37: warning: passing argument 1 of 'in_le32' makes pointer from integer without a cast [-Wint-conversion]
+     return in_le32(fsl_addr) | in_le32(fsl_addr + 1) << 32;
+                                        ^~~~~~~~
+   In file included from include/linux/io.h:25:0,
+                    from include/linux/irq.h:20,
+                    from arch/powerpc/include/asm/hardirq.h:6,
+                    from include/linux/hardirq.h:9,
+                    from include/linux/interrupt.h:11,
+                    from include/linux/pci.h:32,
+                    from drivers/dma/fsldma.c:29:
+   arch/powerpc/include/asm/io.h:172:15: note: expected 'const volatile u32 * {aka const volatile unsigned int *}' but argument is of type 'u32 {aka unsigned int}'
+    DEF_MMIO_IN_X(in_le32, 32, lwbrx);
+                  ^
+   arch/powerpc/include/asm/io.h:131:23: note: in definition of macro 'DEF_MMIO_IN_X'
+    static inline u##size name(const volatile u##size __iomem *addr) \
+                          ^~~~
+   In file included from drivers/dma/fsldma.c:41:0:
+>> drivers/dma/fsldma.h:210:51: warning: left shift count >= width of type [-Wshift-count-overflow]
+     return in_le32(fsl_addr) | in_le32(fsl_addr + 1) << 32;
+                                                      ^~
+   drivers/dma/fsldma.h: In function 'fsl_ioread64be':
+>> drivers/dma/fsldma.h:223:17: warning: passing argument 1 of 'in_be32' makes pointer from integer without a cast [-Wint-conversion]
+     return in_be32(fsl_addr + 1) | in_be32(fsl_addr) << 32;
+                    ^~~~~~~~
+   In file included from include/linux/io.h:25:0,
+                    from include/linux/irq.h:20,
+                    from arch/powerpc/include/asm/hardirq.h:6,
+                    from include/linux/hardirq.h:9,
+                    from include/linux/interrupt.h:11,
+                    from include/linux/pci.h:32,
+                    from drivers/dma/fsldma.c:29:
+   arch/powerpc/include/asm/io.h:170:15: note: expected 'const volatile u32 * {aka const volatile unsigned int *}' but argument is of type 'u32 {aka unsigned int}'
+    DEF_MMIO_IN_D(in_be32, 32, lwz);
+                  ^
+   arch/powerpc/include/asm/io.h:149:23: note: in definition of macro 'DEF_MMIO_IN_D'
+    static inline u##size name(const volatile u##size __iomem *addr) \
+                          ^~~~
+   In file included from drivers/dma/fsldma.c:41:0:
+   drivers/dma/fsldma.h:223:41: warning: passing argument 1 of 'in_be32' makes pointer from integer without a cast [-Wint-conversion]
+     return in_be32(fsl_addr + 1) | in_be32(fsl_addr) << 32;
+                                            ^~~~~~~~
+   In file included from include/linux/io.h:25:0,
+                    from include/linux/irq.h:20,
+                    from arch/powerpc/include/asm/hardirq.h:6,
+                    from include/linux/hardirq.h:9,
+                    from include/linux/interrupt.h:11,
+                    from include/linux/pci.h:32,
+                    from drivers/dma/fsldma.c:29:
+   arch/powerpc/include/asm/io.h:170:15: note: expected 'const volatile u32 * {aka const volatile unsigned int *}' but argument is of type 'u32 {aka unsigned int}'
+    DEF_MMIO_IN_D(in_be32, 32, lwz);
+                  ^
+   arch/powerpc/include/asm/io.h:149:23: note: in definition of macro 'DEF_MMIO_IN_D'
+    static inline u##size name(const volatile u##size __iomem *addr) \
+                          ^~~~
+   In file included from drivers/dma/fsldma.c:41:0:
+   drivers/dma/fsldma.h:223:51: warning: left shift count >= width of type [-Wshift-count-overflow]
+     return in_be32(fsl_addr + 1) | in_be32(fsl_addr) << 32;
+                                                      ^~
 
-FWIW, below is my "cleanup" attempt (diff on top of the 
-swiotlb-noncoherent.3 branch).
+vim +/in_le32 +210 drivers/dma/fsldma.h
 
-Robin.
+   204	
+   205	#ifndef __powerpc64__
+   206	static u64 fsl_ioread64(const u64 __iomem *addr)
+   207	{
+   208		u32 fsl_addr = lower_32_bits(addr);
+   209	
+ > 210		return in_le32(fsl_addr) | in_le32(fsl_addr + 1) << 32;
+   211	}
+   212	
+   213	static void fsl_iowrite64(u64 val, u64 __iomem *addr)
+   214	{
+   215		out_le32((u32 __iomem *)addr + 1, val >> 32);
+   216		out_le32((u32 __iomem *)addr, (u32)val);
+   217	}
+   218	
+   219	static u64 fsl_ioread64be(const u64 __iomem *addr)
+   220	{
+   221		u32 fsl_addr = lower_32_bits(addr);
+   222	
+ > 223		return in_be32(fsl_addr + 1) | in_be32(fsl_addr) << 32;
+   224	}
+   225	
 
------>8-----
-diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
-index 52885b274368..43ee29969fdd 100644
---- a/kernel/dma/swiotlb.c
-+++ b/kernel/dma/swiotlb.c
-@@ -741,23 +741,24 @@ swiotlb_sync_single(struct device *hwdev, 
-dma_addr_t dev_addr,
-
-  	BUG_ON(dir == DMA_NONE);
-
--	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_CPU)
--		arch_sync_dma_for_cpu(hwdev, paddr, size, dir);
--
--	if (is_swiotlb_buffer(paddr))
-+	if (is_swiotlb_buffer(paddr)) {
-  		swiotlb_tbl_sync_single(hwdev, paddr, size, dir, target);
-+		return;
-+	}
-
--	if (!dev_is_dma_coherent(hwdev) && target == SYNC_FOR_DEVICE)
--		arch_sync_dma_for_device(hwdev, paddr, size, dir);
-+	if (dir != DMA_FROM_DEVICE)
-+		return;
-
--	if (!is_swiotlb_buffer(paddr) && dir == DMA_FROM_DEVICE)
--		dma_mark_clean(phys_to_virt(paddr), size);
-+	dma_mark_clean(phys_to_virt(paddr), size);
-  }
-
-  void
-  swiotlb_sync_single_for_cpu(struct device *hwdev, dma_addr_t dev_addr,
-  			    size_t size, enum dma_data_direction dir)
-  {
-+	if (!dev_is_dma_coherent(hwdev))
-+		arch_sync_dma_for_cpu(hwdev, dma_to_phys(hwdev, dev_addr),
-+				      size, dir);
-  	swiotlb_sync_single(hwdev, dev_addr, size, dir, SYNC_FOR_CPU);
-  }
-
-@@ -766,6 +767,9 @@ swiotlb_sync_single_for_device(struct device *hwdev, 
-dma_addr_t dev_addr,
-  			       size_t size, enum dma_data_direction dir)
-  {
-  	swiotlb_sync_single(hwdev, dev_addr, size, dir, SYNC_FOR_DEVICE);
-+	if (!dev_is_dma_coherent(hwdev))
-+		arch_sync_dma_for_device(hwdev, dma_to_phys(hwdev, dev_addr),
-+					 size, dir);
-  }
-
-  /*
-@@ -828,31 +832,28 @@ swiotlb_unmap_sg_attrs(struct device *hwdev, 
-struct scatterlist *sgl,
-   * The same as swiotlb_sync_single_* but for a scatter-gather list, 
-same rules
-   * and usage.
-   */
--static void
--swiotlb_sync_sg(struct device *hwdev, struct scatterlist *sgl,
--		int nelems, enum dma_data_direction dir,
--		enum dma_sync_target target)
-+void
-+swiotlb_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sgl,
-+			int nelems, enum dma_data_direction dir)
-  {
-  	struct scatterlist *sg;
-  	int i;
-
-  	for_each_sg(sgl, sg, nelems, i)
--		swiotlb_sync_single(hwdev, sg->dma_address,
--				    sg_dma_len(sg), dir, target);
-+		swiotlb_sync_single_for_cpu(hwdev, sg->dma_address,
-+					    sg_dma_len(sg), dir);
-  }
-
-  void
--swiotlb_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sg,
--			int nelems, enum dma_data_direction dir)
--{
--	swiotlb_sync_sg(hwdev, sg, nelems, dir, SYNC_FOR_CPU);
--}
--
--void
--swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
-+swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sgl,
-  			   int nelems, enum dma_data_direction dir)
-  {
--	swiotlb_sync_sg(hwdev, sg, nelems, dir, SYNC_FOR_DEVICE);
-+	struct scatterlist *sg;
-+	int i;
-+
-+	for_each_sg(sgl, sg, nelems, i)
-+		swiotlb_sync_single_for_device(hwdev, sg->dma_address,
-+					       sg_dma_len(sg), dir);
-  }
-
-  /*
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 17785 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181023/e67f88ef/attachment-0001.gz>
