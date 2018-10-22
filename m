@@ -1,47 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2018 11:43:14 -0700
-Subject: omap4: support for manually updated display
-In-Reply-To: <20181022163134.GF43338@atomide.com>
-References: <20180830090456.GA17277@amd>
- <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
- <3205865.8O8aibZXye@avalon> <20180910174453.GV5662@atomide.com>
- <20181018221549.GB6364@amd> <20181019164450.GD43338@atomide.com>
- <20181019225827.s76wapp3cxrmp5af@earth.universe>
- <20181020003812.GE43338@atomide.com>
- <6ebd84ad-3428-c2f5-da8b-e5b1c54ea5e2@ti.com>
- <20181022163134.GF43338@atomide.com>
-Message-ID: <20181022184314.GG43338@atomide.com>
+From: mikebrady@eircom.net (Mike Brady)
+Date: Mon, 22 Oct 2018 20:08:05 +0100
+Subject: [PATCH] staging: bcm2835-audio: interpolate audio delay
+In-Reply-To: <22867d63-12f1-31f7-acb6-ce9a58fcbe71@gmail.com>
+References: <20181018105715.GA6660@ubuntu>
+ <22867d63-12f1-31f7-acb6-ce9a58fcbe71@gmail.com>
+Message-ID: <20181022190805.GA4551@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [181022 16:31]:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [181022 08:14]:
-> > On 20/10/18 03:38, Tony Lindgren wrote:
-> > > * Sebastian Reichel <sre@kernel.org> [181019 15:58]:
-> > >> I uploaded my current status here. It's not based on the newest
-> > >> -next, but contains the interesting patches from Laurent. Also
-> > >> the last few patches are not yet cleaned up, sorry for the mess.
-> > > 
-> > > Way to go, thanks :) Here's a quick fix for issues with loading
-> > > and unloading modules, seems like this should be fixed somewhere
-> > > else though?
-> 
-> Sorry one oops was for rmmod, the other one was for modprobe.
-> 
-> > I didn't get that far on drm-next with pandaboard. When loading modules, dsi_probe crashes. It is missing runtime_get(). But after adding runtime_get call, it fails and I see:
-> > 
-> > [   44.671081] omap_hwmod: dss_dsi2: _wait_target_ready failed: -16
-> > [   44.677459] omapdss_dsi 58005000.encoder: use pm_runtime_put_sync_suspend() in driver?
-> > 
-> > Why is dsi2 busy (and what does it even mean)...
-> 
-> Hmm below segfault is what I see on pandaboard-es with
-> next-20181019 with no extra patches.
+Hi Kirill.
 
-And git bisect points to these issues starting with commit
-27d624527d99 ("drm/omap: dss: Acquire next dssdev at probe time")
-if that might help.
+The problem that this patch seeks to resolve is that when userland asks for the
+delay -- the time to hear -- the driver responds with a figure that is only updated
+when a GPU interrupt occurs, now approximately every 10 milliseconds.
 
-Regards,
+As far as I am aware, there is no way to get a more up-to-date delay number on request,
+hence the present patch to interpolate based on the time of the last update, the time of
+the request and the nominal frame rate.
 
-Tony
+It does have the drawback of relying on the accuracy of the CPU clock and on the
+nominal rate but on reasonable assumptions, it will not be in error over
+the approximately 10 ms interval.
+
+As you'll probably know, this is the built-in DAC in the full-sized Raspberry Pi devices and
+is widely used. As a developer of Shairport Sync, I have noticed that the "slop" in
+delay on the Pi's built-in DAC is very large by comparison with other DACs. FYI, there is
+a discussion of the effects of a downstream equivalent of this suggested patch at:
+https://github.com/raspberrypi/firmware/issues/1026#issuecomment-415746016.
+
+Best wishes
+Mike
+
+On Thu, Oct 18, 2018 at 09:48:36PM +0200, Kirill Marinushkin wrote:
+> Hello Mike,
+> 
+> On 10/18/18 12:57, Mike Brady wrote:
+> > +	ktime_t now = ktime_get();
+> > +
+> > +	/* Give userspace better delay reporting by interpolating between GPU
+> > +	 * notifications, assuming audio speed is close enough to the clock
+> > +	 * used for ktime
+> > +	 */
+> > +
+> > +	if ((ktime_to_ns(alsa_stream->interpolate_start)) &&
+> > +	    (ktime_compare(alsa_stream->interpolate_start, now) < 0)) {
+> > +		u64 interval =
+> > +			(ktime_to_ns(ktime_sub(now,
+> > +				alsa_stream->interpolate_start)));
+> > +		u64 frames_output_in_interval =
+> > +			div_u64((interval * runtime->rate), 1000000000);
+> > +		snd_pcm_sframes_t frames_output_in_interval_sized =
+> > +			-frames_output_in_interval;
+> > +		runtime->delay = frames_output_in_interval_sized;
+> > +	}
+> 
+> This doesn't look like a good solution for me. More like a workaround. What is
+> the root cause of the delay?
+> 
+> Best Regards,
+> Kirill
