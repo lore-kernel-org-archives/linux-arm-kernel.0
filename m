@@ -1,26 +1,42 @@
-From: alex.gonzalez@digi.com (Alex Gonzalez)
-Date: Mon, 22 Oct 2018 11:27:22 +0200
-Subject: [PATCH v1] ARM: dts: imx6ul: ccimx6ulsom: Add support for wireless
- SOM variant
-Message-ID: <1540200443-24773-1-git-send-email-alex.gonzalez@digi.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 22 Oct 2018 02:30:23 -0700
+Subject: [PATCH] ARM: kprobes: Fix false positive with FORTIFY_SOURCE
+Message-ID: <20181022093023.GA8920@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wireless variants of the ConnecCore 6UL SOM include a Qualcomm
-QCA6564 wireless chip with dual WiFi and Bluetooth.
+The arm compiler internally interprets an inline assembly label
+as an unsigned long value, not a pointer. As a result, under
+CONFIG_FORTIFY_SOURCE, the size of the array pointed to by an address
+of a label is 4 bytes, which was tripping the runtime checks. Instead,
+we can just cast the label (as done with the size calculations earlier)
+to avoid the problem.
 
-The QCA6564 uses the out-of-tree driver at:
-https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-2.0/
+Reported-by: William Cohen <wcohen@redhat.com>
+Fixes: 6974f0c4555e ("include/linux/string.h: add the option of fortified string.h functions")
+Cc: stable at vger.kernel.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/probes/kprobes/opt-arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Blueooth uses the HCI H4 UART driver.
+diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+index b2aa9b32bff2..2c118a6ab358 100644
+--- a/arch/arm/probes/kprobes/opt-arm.c
++++ b/arch/arm/probes/kprobes/opt-arm.c
+@@ -247,7 +247,7 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
+ 	}
+ 
+ 	/* Copy arch-dep-instance from template. */
+-	memcpy(code, &optprobe_template_entry,
++	memcpy(code, (unsigned char *)optprobe_template_entry,
+ 			TMPL_END_IDX * sizeof(kprobe_opcode_t));
+ 
+ 	/* Adjust buffer according to instruction. */
+-- 
+2.17.1
 
-Changes since [1]:
-* Removed extra new line
 
-[1] https://lore.kernel.org/lkml/1539962141-32418-2-git-send-email-alex.gonzalez at digi.com/
-
-Alex Gonzalez (1):
-  ARM: dts: imx6ul: ccimx6ulsom: Add support for wireless SOM variant
-
- arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+-- 
+Kees Cook
+Pixel Security
