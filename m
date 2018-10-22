@@ -1,184 +1,64 @@
-From: vincent.whitchurch@axis.com (Vincent Whitchurch)
-Date: Mon, 22 Oct 2018 09:34:26 +0200
-Subject: [PATCH v3] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
-Message-ID: <20181022073426.24856-1-vincent.whitchurch@axis.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 22 Oct 2018 10:01:52 +0200
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP
+ SPI NOR flash memories
+In-Reply-To: <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+ <VI1PR04MB103888BC18F3C5AD0C02DEF699FE0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <31a8f6a9-1459-443a-6ef8-2b2c17769ae4@microchip.com>
+ <de0f7245-2557-12be-a306-67b08e55ae7b@wedev4u.fr>
+ <VI1PR04MB1038AB25EABDC8507984ADC799FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181017090724.12f2cd79@bbrezillon>
+ <20181017091045.124e0266@bbrezillon>
+ <20181017092941.3658bd9a@bbrezillon>
+ <VI1PR04MB1038EFA1E83AD78EBE84ECC499FF0@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <20181017115237.07310b74@bbrezillon>
+ <VI1PR04MB1038BD6103DD8BD6B6DEC2B899F40@VI1PR04MB1038.eurprd04.prod.outlook.com>
+Message-ID: <20181022100152.05da1b6c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
-ldr/str instructions in copy_{from/to}_user.  They are currently
-unnecessarily using single ldr/str instructions and can use ldm/stm
-instructions instead like memcpy does (but with appropriate fixup
-tables).
+On Mon, 22 Oct 2018 06:04:13 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
-about 4% on my Cortex-A9.
+> -static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
+> +static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt, u32 smpt_len)
+>  {
+>         const u32 *ret = NULL;
+> -       u32 i, addr;
+> +       u32 i, addr, nmaps;
+>         int err;
+>         u8 addr_width, read_opcode, read_dummy;
+>         u8 read_data_mask, data_byte, map_id;
+> +       bool map_id_is_valid = false;
+> 
+>         addr_width = nor->addr_width;
+>         read_dummy = nor->read_dummy;
+>         read_opcode = nor->read_opcode;
+> 
+> +       for (i = 0; i<smpt_len; i++)
+> +               pr_info("%s:%i smpt[%d]=%08x\n", __func__, __LINE__, i, smpt[i]);
+> +
+>         map_id = 0;
+> -       i = 0;
+>         /* Determine if there are any optional Detection Command Descriptors */
+> -       while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
+> +       for (i = 0; i< smpt_len; i++) {
+> +               if (!(smpt[i] & SMPT_DESC_TYPE_MAP))
+> +                       break;
+> +
+>                 read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
+>                 nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
+>                 nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
 
-before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
-before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
-before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
-before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
-before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
-before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
-before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
-before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
-before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
-before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
+Could you also print the ->addr_width, ->read_dummy and ->read_opcode
+here?
 
- after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
- after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
- after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
- after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
- after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
- after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
- after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
- after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
- after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
- after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
-
-Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
----
-v3: Explicitly add IT instructions to fix fault handling on Thumb-2
-v2: Group *_SHIFT #defines with respective .macro implementations
-
- arch/arm/include/asm/assembler.h |  6 ++++--
- arch/arm/lib/copy_from_user.S    | 30 +++++++++++++++++++++++++++++-
- arch/arm/lib/copy_to_user.S      | 34 +++++++++++++++++++++++++++++-----
- 3 files changed, 62 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index b17ee03d280b..da16d31c7ef9 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -243,13 +243,15 @@
- 	.endm
- #endif
- 
--#define USER(x...)				\
-+#define USERL(l, x...)				\
- 9999:	x;					\
- 	.pushsection __ex_table,"a";		\
- 	.align	3;				\
--	.long	9999b,9001f;			\
-+	.long	9999b,l;			\
- 	.popsection
- 
-+#define USER(x...)	USERL(9001f, x)
-+
- #ifdef CONFIG_SMP
- #define ALT_SMP(instr...)					\
- 9998:	instr
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index a826df3d3814..216f5c5956a1 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -34,12 +34,13 @@
-  *	Number of bytes NOT copied.
-  */
- 
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+
- #ifndef CONFIG_THUMB2_KERNEL
- #define LDR1W_SHIFT	0
- #else
- #define LDR1W_SHIFT	1
- #endif
--#define STR1W_SHIFT	0
- 
- 	.macro ldr1w ptr reg abort
- 	ldrusr	\reg, \ptr, 4, abort=\abort
-@@ -61,6 +62,33 @@
- 	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
- 	.endm
- 
-+#else
-+
-+#define LDR1W_SHIFT	0
-+
-+	.macro ldr1w ptr reg abort
-+	USERL(\abort, W(ldr) \reg, [\ptr], #4)
-+	.endm
-+
-+	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
-+	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
-+	.endm
-+
-+	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-+	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
-+	.endm
-+
-+	.macro ldr1b ptr reg cond=al abort
-+	.ifnc	\cond, al
-+	it	\cond
-+	.endif
-+	USERL(\abort, ldr\cond\()b \reg, [\ptr], #1)
-+	.endm
-+
-+#endif /* CONFIG_CPU_USE_DOMAINS */
-+
-+#define STR1W_SHIFT	0
-+
- 	.macro str1w ptr reg abort
- 	W(str) \reg, [\ptr], #4
- 	.endm
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index caf5019d8161..ce92f282feb4 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -35,11 +35,6 @@
-  */
- 
- #define LDR1W_SHIFT	0
--#ifndef CONFIG_THUMB2_KERNEL
--#define STR1W_SHIFT	0
--#else
--#define STR1W_SHIFT	1
--#endif
- 
- 	.macro ldr1w ptr reg abort
- 	W(ldr) \reg, [\ptr], #4
-@@ -57,6 +52,14 @@
- 	ldr\cond\()b \reg, [\ptr], #1
- 	.endm
- 
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+
-+#ifndef CONFIG_THUMB2_KERNEL
-+#define STR1W_SHIFT	0
-+#else
-+#define STR1W_SHIFT	1
-+#endif
-+
- 	.macro str1w ptr reg abort
- 	strusr	\reg, \ptr, 4, abort=\abort
- 	.endm
-@@ -76,6 +79,27 @@
- 	strusr	\reg, \ptr, 1, \cond, abort=\abort
- 	.endm
- 
-+#else
-+
-+#define STR1W_SHIFT	0
-+
-+	.macro str1w ptr reg abort
-+	USERL(\abort, W(str) \reg, [\ptr], #4)
-+	.endm
-+
-+	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-+	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
-+	.endm
-+
-+	.macro str1b ptr reg cond=al abort
-+	.ifnc	\cond, al
-+	it	\cond
-+	.endif
-+	USERL(\abort, str\cond\()b \reg, [\ptr], #1)
-+	.endm
-+
-+#endif /* CONFIG_CPU_USE_DOMAINS */
-+
- 	.macro enter reg1 reg2
- 	mov	r3, #0
- 	stmdb	sp!, {r0, r2, r3, \reg1, \reg2}
--- 
-2.11.0
+> @@ -2894,18 +2900,35 @@ static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
+>                  * Configuration that is currently in use.
+>                  */
+>                 map_id = map_id << 1 | !!(data_byte & read_data_mask);
+> +               map_id_is_valid = true;
+>                 i = i + 2;
+>         }
