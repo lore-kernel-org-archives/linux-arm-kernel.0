@@ -1,39 +1,40 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Tue, 23 Oct 2018 21:53:23 +0300
-Subject: [PATCH v5 04/11] dt-bindings: iio: adc: add AXP803 ADC bindings
+Date: Tue, 23 Oct 2018 21:53:22 +0300
+Subject: [PATCH v5 03/11] dt-bindings: gpio: gpio-axp209: add AXP803 GPIO
+ bindings
 In-Reply-To: <20181023185330.10472-1-oskari@lemmela.net>
 References: <20181023185330.10472-1-oskari@lemmela.net>
-Message-ID: <20181023185330.10472-5-oskari@lemmela.net>
+Message-ID: <20181023185330.10472-4-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP803 ADC is compatible with AXP813 ADC, but add
+The AXP803 GPIO is compatible with AXP813 GPIO, but add
 specific compatible for it.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 ---
- Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt | 2 ++
+ Documentation/devicetree/bindings/gpio/gpio-axp209.txt | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
-index 7a6313913923..1dbd5e480acd 100644
---- a/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
-@@ -4,6 +4,7 @@ Required properties:
-   - compatible: should be one of:
-     - "x-powers,axp209-adc",
-     - "x-powers,axp221-adc",
-+    - "x-powers,axp803-adc",
-     - "x-powers,axp813-adc",
-   - #io-channel-cells: should be 1,
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+index fc42b2caa06d..5337a21d7bcf 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+@@ -11,6 +11,7 @@ This driver employs the per-pin muxing pattern.
+ Required properties:
+ - compatible: Should be one of:
+ 	- "x-powers,axp209-gpio"
++	- "x-powers,axp803-gpio"
+ 	- "x-powers,axp813-gpio"
+ - #gpio-cells: Should be two. The first cell is the pin number and the
+   second is the GPIO flags.
+@@ -67,6 +68,7 @@ GPIO0	|	gpio_in, gpio_out, ldo, adc
+ GPIO1	|	gpio_in, gpio_out, ldo, adc
+ GPIO2	|	gpio_in, gpio_out
  
-@@ -39,6 +40,7 @@ AXP22x
-  2 | batt_chrg_i
-  3 | batt_dischrg_i
- 
-+AXP803
- AXP813
++axp803
+ axp813
  ------
-  0 | pmic_temp
+ GPIO	|	Functions
 -- 
 2.17.1
