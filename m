@@ -1,40 +1,170 @@
-From: tony.xie@rock-chips.com (tony)
-Date: Tue, 23 Oct 2018 11:33:10 +0800
-Subject: [PATCH v4 1/5] mfd: rk808: Add RK817 and RK809 support
-In-Reply-To: <20180911123907.GN4185@dell>
-References: <1535968829-19418-1-git-send-email-tony.xie@rock-chips.com>
- <1535968829-19418-2-git-send-email-tony.xie@rock-chips.com>
- <20180911123907.GN4185@dell>
-Message-ID: <219a9cdd-00d7-2920-4986-dcc1c8a27f6c@rock-chips.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Tue, 23 Oct 2018 13:15:06 +0900
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+In-Reply-To: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+Message-ID: <CAAFQd5AMirap5vjVC+73cv_KzE=-+EUD6TWd_NHRDw_m-sXDrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vivek,
 
-> On Mon, 03 Sep 2018, Tony Xie wrote:
+On Fri, Jun 15, 2018 at 7:53 PM Vivek Gautam
+<vivek.gautam@codeaurora.org> wrote:
 >
->>      The rk809 and rk817 are a Power Management IC (PMIC) for multimedia
->>      and handheld devices. It contains the following components:
->>
->>          - Regulators
->>          - RTC
->>          - Clocking
->>
->>      Both RK809 and RK817 chips are using a similar register map,
->>      so we can reuse the RTC and Clocking and regulators functionality.
->>
->> Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
->> ---
-> It's often helpful to place a Changelog in this space.
- ??? I will output the changelog in the first mail when send-mail.
+> Qualcomm SoCs have an additional level of cache called as
+> System cache or Last level cache[1]. This cache sits right
+> before the DDR, and is tightly coupled with the memory
+> controller.
+> The cache is available to all the clients present in the
+> SoC system. The clients request their slices from this system
+> cache, make it active, and can then start using it. For these
+> clients with smmu, to start using the system cache for
+> dma buffers and related page tables [2], few of the memory
+> attributes need to be set accordingly.
+> This change makes the related memory Outer-Shareable, and
+> updates the MAIR with necessary protection.
 >
->>   drivers/mfd/Kconfig       |   6 +-
->>   drivers/mfd/rk808.c       | 218 +++++++++++++++++++++++++++++++++++++++++++++-
->>   include/linux/mfd/rk808.h | 172 ++++++++++++++++++++++++++++++++++++
->>   kernel/reboot.c           |   1 +
->>   4 files changed, 391 insertions(+), 6 deletions(-)
-> I just reviewed v4.
+> The MAIR attribute requirements are:
+>     Inner Cacheablity = 0
+>     Outer Cacheablity = 1, Write-Back Write Allocate
+>     Outer Shareablity = 1
 >
-> It looks like the review comments are still relevant.
- ??? I will commit the v5 today which includes some modification base on 
-your comments base in the v3.
+> This change is a realisation of following changes
+> from downstream msm-4.9:
+> iommu: io-pgtable-arm: Support DOMAIN_ATTRIBUTE_USE_UPSTREAM_HINT
+> iommu: io-pgtable-arm: Implement IOMMU_USE_UPSTREAM_HINT
+
+Would you be able to provide links to those 2 downstream changes?
+
 >
+> [1] https://patchwork.kernel.org/patch/10422531/
+> [2] https://patchwork.kernel.org/patch/10302791/
+>
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu.c       | 14 ++++++++++++++
+>  drivers/iommu/io-pgtable-arm.c | 24 +++++++++++++++++++-----
+>  drivers/iommu/io-pgtable.h     |  4 ++++
+>  include/linux/iommu.h          |  4 ++++
+>  4 files changed, 41 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index f7a96bcf94a6..8058e7205034 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -249,6 +249,7 @@ struct arm_smmu_domain {
+>         struct mutex                    init_mutex; /* Protects smmu pointer */
+>         spinlock_t                      cb_lock; /* Serialises ATS1* ops and TLB syncs */
+>         struct iommu_domain             domain;
+> +       bool                            has_sys_cache;
+>  };
+>
+>  struct arm_smmu_option_prop {
+> @@ -862,6 +863,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>
+>         if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+>                 pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+> +       if (smmu_domain->has_sys_cache)
+> +               pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_SYS_CACHE;
+>
+>         smmu_domain->smmu = smmu;
+>         pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+> @@ -1477,6 +1480,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+>         case DOMAIN_ATTR_NESTING:
+>                 *(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+>                 return 0;
+> +       case DOMAIN_ATTR_USE_SYS_CACHE:
+> +               *((int *)data) = smmu_domain->has_sys_cache;
+> +               return 0;
+>         default:
+>                 return -ENODEV;
+>         }
+> @@ -1506,6 +1512,14 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+>                         smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
+>
+>                 break;
+> +       case DOMAIN_ATTR_USE_SYS_CACHE:
+> +               if (smmu_domain->smmu) {
+> +                       ret = -EPERM;
+> +                       goto out_unlock;
+> +               }
+> +               if (*((int *)data))
+> +                       smmu_domain->has_sys_cache = true;
+> +               break;
+>         default:
+>                 ret = -ENODEV;
+>         }
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 010a254305dd..b2aee1828524 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -169,9 +169,11 @@
+>  #define ARM_LPAE_MAIR_ATTR_DEVICE      0x04
+>  #define ARM_LPAE_MAIR_ATTR_NC          0x44
+>  #define ARM_LPAE_MAIR_ATTR_WBRWA       0xff
+> +#define ARM_LPAE_MAIR_ATTR_SYS_CACHE   0xf4
+>  #define ARM_LPAE_MAIR_ATTR_IDX_NC      0
+>  #define ARM_LPAE_MAIR_ATTR_IDX_CACHE   1
+>  #define ARM_LPAE_MAIR_ATTR_IDX_DEV     2
+> +#define ARM_LPAE_MAIR_ATTR_IDX_SYS_CACHE       3
+>
+>  /* IOPTE accessors */
+>  #define iopte_deref(pte,d) __va(iopte_to_paddr(pte, d))
+> @@ -442,6 +444,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+>                 else if (prot & IOMMU_CACHE)
+>                         pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
+>                                 << ARM_LPAE_PTE_ATTRINDX_SHIFT);
+> +               else if (prot & IOMMU_SYS_CACHE)
+> +                       pte |= (ARM_LPAE_MAIR_ATTR_IDX_SYS_CACHE
+> +                               << ARM_LPAE_PTE_ATTRINDX_SHIFT);
+> +
+
+Okay, so we favor the full caching (IC WBRWA, OC WBRWA, OS) first if
+requested or otherwise try to use system cache (IC NC, OC WBWA?, OS)?
+Sounds fine.
+
+nit: Unnecessary blank line.
+
+>         } else {
+>                 pte = ARM_LPAE_PTE_HAP_FAULT;
+>                 if (prot & IOMMU_READ)
+> @@ -771,7 +777,8 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+>         u64 reg;
+>         struct arm_lpae_io_pgtable *data;
+>
+> -       if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
+> +       if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
+> +                           IO_PGTABLE_QUIRK_SYS_CACHE))
+>                 return NULL;
+>
+>         data = arm_lpae_alloc_pgtable(cfg);
+> @@ -779,9 +786,14 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+>                 return NULL;
+>
+>         /* TCR */
+> -       reg = (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
+> -             (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT) |
+> -             (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
+> +       if (cfg->quirks & IO_PGTABLE_QUIRK_SYS_CACHE) {
+> +               reg = (ARM_LPAE_TCR_SH_OS << ARM_LPAE_TCR_SH0_SHIFT) |
+> +                     (ARM_LPAE_TCR_RGN_NC << ARM_LPAE_TCR_IRGN0_SHIFT);
+
+Contrary to the earlier code which favored IC/IS if possible, here we
+seem to disable IC/IS if the SYS_CACHE quirk is requested, regardless
+of whether it could still be desirable to use IC/IS. Perhaps rather
+than
+IO_PGTABLE_QUIRK_SYS_CACHE, we need something like
+IO_PGTABLE_QUIRK_NO_INNER_CACHE?
+
+> +       } else {
+> +               reg = (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
+> +                     (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT);
+> +       }
+> +       reg |= (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
+>
+
+[keeping the context]
+
+Best regards,
+Tomasz
