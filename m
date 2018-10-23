@@ -1,27 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 23 Oct 2018 12:13:03 +0200
-Subject: [PATCH] ARM: dts: fix imx7d boot spi dma setup error
-In-Reply-To: <20181023083356.17579-1-xiaoning.wang@nxp.com>
-References: <20181023083356.17579-1-xiaoning.wang@nxp.com>
-Message-ID: <20181023101302.ttniiewnouyrufdg@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Oct 2018 11:20:09 +0100
+Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
+In-Reply-To: <5ca5bf92-f2b7-48c9-ea41-5efeff09a799@arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-8-kristina.martsenko@arm.com>
+ <20181019111542.6wrvjguirglzg7vg@mbp>
+ <5ca5bf92-f2b7-48c9-ea41-5efeff09a799@arm.com>
+Message-ID: <20181023102008.GA8989@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 08:36:17AM +0000, Clark Wang wrote:
-> Add dmas and dma-names for ecspi1~4 to fix kernel boot error:
-> "spi_imx 30840000.ecspi: dma setup error -19, use pio".
+On Tue, Oct 23, 2018 at 09:36:16AM +0100, Ramana Radhakrishnan wrote:
+> On 19/10/2018 12:15, Catalin Marinas wrote:
+> > On Fri, Oct 05, 2018 at 09:47:44AM +0100, Kristina Martsenko wrote:
+> >> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+> >> new file mode 100644
+> >> index 000000000000..2aefedc31d9e
+> >> --- /dev/null
+> >> +++ b/arch/arm64/include/asm/pointer_auth.h
+> >> @@ -0,0 +1,63 @@
+> >> +// SPDX-License-Identifier: GPL-2.0
+> >> +#ifndef __ASM_POINTER_AUTH_H
+> >> +#define __ASM_POINTER_AUTH_H
+> >> +
+> >> +#include <linux/random.h>
+> >> +
+> >> +#include <asm/cpufeature.h>
+> >> +#include <asm/sysreg.h>
+> >> +
+> >> +#ifdef CONFIG_ARM64_PTR_AUTH
+> >> +/*
+> >> + * Each key is a 128-bit quantity which is split across a pair of 64-bit
+> >> + * registers (Lo and Hi).
+> >> + */
+> >> +struct ptrauth_key {
+> >> +	unsigned long lo, hi;
+> >> +};
+> >> +
+> >> +/*
+> >> + * We give each process its own instruction A key (APIAKey), which is shared by
+> >> + * all threads. This is inherited upon fork(), and reinitialised upon exec*().
+> >> + * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
+> >> + * instructions behaving as NOPs.
+> >> + */
+> > 
+> > I don't remember the past discussions but I assume the tools guys are ok
+> > with a single key shared by multiple threads. Ramana, could you ack this
+> > part, FTR?
+> 
+> Sorry about the slow response, I've been traveling.
+> 
+> Ack and Will's response covers the reasons why pretty well. A prctl call 
+> would be a good enhancement.
 
-Actually this should not be an error and the message is supposed to say:
+One minor "gotcha" with that is that the glibc prctl() wrapper would need to
+be annotated not to use pointer auth, or we'd have to issue the syscall
+in-line.
 
-	Unable to setup DMA, falling back to PIO
-
-So IMHO this should be downgraded from dev_err to dev_info and reworded.
-Maybe even try DMA-setup on devices where it is known to fail and don't
-emit a message on -ENODEV at all.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Will
