@@ -1,59 +1,86 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 23 Oct 2018 10:06:04 +0900
-Subject: [PATCH] ARM: kprobes: Fix false positive with FORTIFY_SOURCE
-In-Reply-To: <20181022093023.GA8920@beast>
-References: <20181022093023.GA8920@beast>
-Message-ID: <20181023100604.ea7a1a9b5c1c8904aab1b36b@kernel.org>
+From: allen.pais@oracle.com (Allen Pais)
+Date: Tue, 23 Oct 2018 06:36:57 +0530
+Subject: [PATCH] arm64: hugetlb: Register hugepages during arch init
+Message-ID: <1540256817-3327-1-git-send-email-allen.pais@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2018 02:30:23 -0700
-Kees Cook <keescook@chromium.org> wrote:
+Add hstate for each supported hugepage size using arch initcall.
 
-> The arm compiler internally interprets an inline assembly label
-> as an unsigned long value, not a pointer. As a result, under
-> CONFIG_FORTIFY_SOURCE, the size of the array pointed to by an address
-> of a label is 4 bytes, which was tripping the runtime checks. Instead,
-> we can just cast the label (as done with the size calculations earlier)
-> to avoid the problem.
-> 
-> Reported-by: William Cohen <wcohen@redhat.com>
-> Fixes: 6974f0c4555e ("include/linux/string.h: add the option of fortified string.h functions")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+* no hugepage parameters
 
-Good catch! This looks good to me.
+  Without hugepage parameters, only a default hugepage size is
+  available for dynamic allocation.  It's different, for example, from
+  x86_64 and sparc64 where all supported hugepage sizes are available.
 
-Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+* only default_hugepagesz= is specified and set not to HPAGE_SIZE
 
-Thank you,
+  In spite of the fact that default_hugepagesz= is set to a valid
+  hugepage size, it's treated as unsupported and reverted to
+  HPAGE_SIZE.  Such behaviour is also different from x86_64 and
+  sparc64.
 
+Reviewed-by: Tom Saeger <tom.saeger@oracle.com>
+Signed-off-by: Dmitry Klochkov <dmitry.klochkov@oracle.com>
+Signed-off-by: Allen Pais <allen.pais@oracle.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 33 ++++++++++++++++++++++-----------
+ 1 file changed, 22 insertions(+), 11 deletions(-)
 
-> ---
->  arch/arm/probes/kprobes/opt-arm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
-> index b2aa9b32bff2..2c118a6ab358 100644
-> --- a/arch/arm/probes/kprobes/opt-arm.c
-> +++ b/arch/arm/probes/kprobes/opt-arm.c
-> @@ -247,7 +247,7 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
->  	}
->  
->  	/* Copy arch-dep-instance from template. */
-> -	memcpy(code, &optprobe_template_entry,
-> +	memcpy(code, (unsigned char *)optprobe_template_entry,
->  			TMPL_END_IDX * sizeof(kprobe_opcode_t));
->  
->  	/* Adjust buffer according to instruction. */
-> -- 
-> 2.17.1
-> 
-> 
-> -- 
-> Kees Cook
-> Pixel Security
-
-
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index f58ea50..28cbc22 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -429,6 +429,27 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 	clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
+ }
+ 
++static void __init add_huge_page_size(unsigned long size)
++{
++	if (size_to_hstate(size))
++		return;
++
++	hugetlb_add_hstate(ilog2(size) - PAGE_SHIFT);
++}
++
++static int __init hugetlbpage_init(void)
++{
++#ifdef CONFIG_ARM64_4K_PAGES
++	add_huge_page_size(PUD_SIZE);
++#endif
++	add_huge_page_size(PMD_SIZE * CONT_PMDS);
++	add_huge_page_size(PMD_SIZE);
++	add_huge_page_size(PAGE_SIZE * CONT_PTES);
++
++	return 0;
++}
++arch_initcall(hugetlbpage_init);
++
+ static __init int setup_hugepagesz(char *opt)
+ {
+ 	unsigned long ps = memparse(opt, &opt);
+@@ -440,7 +461,7 @@ static __init int setup_hugepagesz(char *opt)
+ 	case PMD_SIZE * CONT_PMDS:
+ 	case PMD_SIZE:
+ 	case PAGE_SIZE * CONT_PTES:
+-		hugetlb_add_hstate(ilog2(ps) - PAGE_SHIFT);
++		add_huge_page_size(ps);
+ 		return 1;
+ 	}
+ 
+@@ -449,13 +470,3 @@ static __init int setup_hugepagesz(char *opt)
+ 	return 0;
+ }
+ __setup("hugepagesz=", setup_hugepagesz);
+-
+-#ifdef CONFIG_ARM64_64K_PAGES
+-static __init int add_default_hugepagesz(void)
+-{
+-	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
+-		hugetlb_add_hstate(CONT_PTE_SHIFT);
+-	return 0;
+-}
+-arch_initcall(add_default_hugepagesz);
+-#endif
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+1.8.3.1
