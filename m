@@ -1,65 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 23 Oct 2018 11:54:04 +0200 (CEST)
-Subject: Applied "ASoC: stm32: add clock dependency for sai" to the asoc tree
-In-Reply-To: <1540221046-11812-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <20181023095404.C9F7F440078@finisterre.ee.mobilebroadband>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Tue, 23 Oct 2018 09:37:45 +0000
+Subject: [PATCH v3 7/7] arm64: dts: lx2160a: update fspi node
+In-Reply-To: <1540287311-1572-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1540287311-1572-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1540287311-1572-8-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Flash mt35xu512aba connected to FlexSPI controller supports
+1-1-8/1-8-8 protocol.
+Added flag spi-rx-bus-width and spi-tx-bus-width with values as
+8 and 8 respectively for both flashes connected at CS0 and CS1.
 
-   ASoC: stm32: add clock dependency for sai
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From e6d7942ce602e99d506a7c08f1935a274645dfda Mon Sep 17 00:00:00 2001
-From: Olivier Moysan <olivier.moysan@st.com>
-Date: Mon, 22 Oct 2018 17:10:45 +0200
-Subject: [PATCH] ASoC: stm32: add clock dependency for sai
-
-Fixes: 8307b2afd386 ("ASoC: stm32: sai: set sai as mclk clock provider")
-
-Add COMMON_CLK dependency for STM32 SAI,
-as it is required by clock provider.
-
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
- sound/soc/stm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changes for v3:
+- None
+Changes for v2:
+- None
 
-diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
-index 9b2681397dba..c66ffa72057e 100644
---- a/sound/soc/stm/Kconfig
-+++ b/sound/soc/stm/Kconfig
-@@ -3,6 +3,7 @@ menu "STMicroelectronics STM32 SOC audio support"
- config SND_SOC_STM32_SAI
- 	tristate "STM32 SAI interface (Serial Audio Interface) support"
- 	depends on (ARCH_STM32 && OF) || COMPILE_TEST
-+	depends on COMMON_CLK
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+index 3b20c97..24cc41c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+@@ -45,6 +45,8 @@
+ 		m25p,fast-read;
+ 		spi-max-frequency = <20000000>;
+ 		reg = <0>;
++		spi-rx-bus-width = <8>;
++		spi-tx-bus-width = <8>;
+ 	};
+ 
+ 	mt35xu512aba1: flash at 1 {
+@@ -54,6 +56,8 @@
+ 		m25p,fast-read;
+ 		spi-max-frequency = <20000000>;
+ 		reg = <1>;
++		spi-rx-bus-width = <8>;
++		spi-tx-bus-width = <8>;
+ 	};
+ };
+ 
 -- 
-2.19.0
+2.7.4
