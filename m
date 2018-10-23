@@ -1,41 +1,92 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 23 Oct 2018 13:06:08 +0200
-Subject: [PATCH 3/3] spi: bcm2835: make license text and module license match
-In-Reply-To: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
-References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1540292769-5905-4-git-send-email-stefan.wahren@i2se.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 Oct 2018 12:10:46 +0100
+Subject: [RESEND PATCH v3 3/3] sh: add the sh_ prefix to early platform
+ symbols
+In-Reply-To: <20180827090651.25062-4-brgl@bgdev.pl>
+References: <20180827090651.25062-1-brgl@bgdev.pl>
+ <20180827090651.25062-4-brgl@bgdev.pl>
+Message-ID: <8636swude1.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The license text is specifying GPL v2 or later but the MODULE_LICENSE
-is set to GPL v2 which means GNU Public License v2 only. So choose the
-license text as the correct one.
+Hi Bartosz,
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/spi/spi-bcm2835.c    | 2 +-
- drivers/spi/spi-bcm2835aux.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On Mon, 27 Aug 2018 10:06:51 +0100,
+Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> 
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Old early platform device support is now sh-specific. Before moving on
+> to implementing new early platform framework based on real platform
+> devices, prefix all early platform symbols with 'sh_'.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/sh/drivers/platform_early.c       | 66 +++++++++++++-------------
+>  arch/sh/include/asm/platform_early.h   | 30 ++++++------
+>  arch/sh/kernel/cpu/sh2/setup-sh7619.c  |  2 +-
+>  arch/sh/kernel/cpu/sh2a/setup-mxg.c    |  2 +-
+>  arch/sh/kernel/cpu/sh2a/setup-sh7201.c |  2 +-
+>  arch/sh/kernel/cpu/sh2a/setup-sh7203.c |  2 +-
+>  arch/sh/kernel/cpu/sh2a/setup-sh7206.c |  2 +-
+>  arch/sh/kernel/cpu/sh2a/setup-sh7264.c |  2 +-
+>  arch/sh/kernel/cpu/sh2a/setup-sh7269.c |  2 +-
+>  arch/sh/kernel/cpu/sh3/setup-sh7705.c  |  2 +-
+>  arch/sh/kernel/cpu/sh3/setup-sh770x.c  |  2 +-
+>  arch/sh/kernel/cpu/sh3/setup-sh7710.c  |  2 +-
+>  arch/sh/kernel/cpu/sh3/setup-sh7720.c  |  2 +-
+>  arch/sh/kernel/cpu/sh4/setup-sh4-202.c |  2 +-
+>  arch/sh/kernel/cpu/sh4/setup-sh7750.c  |  8 ++--
+>  arch/sh/kernel/cpu/sh4/setup-sh7760.c  |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7343.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7366.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7722.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7723.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7724.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7734.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7757.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7763.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7770.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7780.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7785.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-sh7786.c |  2 +-
+>  arch/sh/kernel/cpu/sh4a/setup-shx3.c   |  2 +-
+>  arch/sh/kernel/cpu/sh5/setup-sh5.c     |  2 +-
+>  arch/sh/kernel/setup.c                 |  2 +-
+>  arch/sh/kernel/time.c                  |  4 +-
+>  drivers/clocksource/sh_cmt.c           |  6 +--
+>  drivers/clocksource/sh_mtu2.c          |  6 +--
+>  drivers/clocksource/sh_tmu.c           |  6 +--
+>  drivers/tty/serial/sh-sci.c            |  4 +-
+>  include/linux/platform_device.h        |  2 +-
+>  37 files changed, 94 insertions(+), 94 deletions(-)
+> 
+> diff --git a/arch/sh/drivers/platform_early.c b/arch/sh/drivers/platform_early.c
+> index 3dfe9f3541bb..f6d148451dfc 100644
+> --- a/arch/sh/drivers/platform_early.c
+> +++ b/arch/sh/drivers/platform_early.c
+> @@ -4,8 +4,8 @@
+>  #include <linux/mod_devicetable.h>
+>  #include <linux/pm.h>
+>  
+> -static __initdata LIST_HEAD(early_platform_driver_list);
+> -static __initdata LIST_HEAD(early_platform_device_list);
+> +static __initdata LIST_HEAD(sh_early_platform_driver_list);
+> +static __initdata LIST_HEAD(sh_early_platform_device_list);
 
-diff --git a/drivers/spi/spi-bcm2835.c b/drivers/spi/spi-bcm2835.c
-index f35cc10..b0b87ff 100644
---- a/drivers/spi/spi-bcm2835.c
-+++ b/drivers/spi/spi-bcm2835.c
-@@ -843,4 +843,4 @@ module_platform_driver(bcm2835_spi_driver);
- 
- MODULE_DESCRIPTION("SPI controller driver for Broadcom BCM2835");
- MODULE_AUTHOR("Chris Boot <bootc@bootc.net>");
--MODULE_LICENSE("GPL v2");
-+MODULE_LICENSE("GPL");
-diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
-index 3094d81..671e374 100644
---- a/drivers/spi/spi-bcm2835aux.c
-+++ b/drivers/spi/spi-bcm2835aux.c
-@@ -542,4 +542,4 @@ module_platform_driver(bcm2835aux_spi_driver);
- 
- MODULE_DESCRIPTION("SPI controller driver for Broadcom BCM2835 aux");
- MODULE_AUTHOR("Martin Sperl <kernel@martin.sperl.org>");
--MODULE_LICENSE("GPL v2");
-+MODULE_LICENSE("GPL");
+As discussed offline at ELC, I don't think this patch is useful at
+this stage, and in the context of this particular series. I believe it
+should be dropped and only the first two patches should be merged. If
+the SH maintainer is not responsive, then maybe Greg could take them
+as they remove cruft from core code.
+
+As for the whole "early device" debate, my take is that we'd be much
+better off making the device model available early, rather than trying
+to architect something that is simply papering over the issue.
+
+Thanks,
+
+	M.
+
 -- 
-2.7.4
+Jazz is not dead, it just smell funny.
