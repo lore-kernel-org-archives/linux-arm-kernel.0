@@ -1,61 +1,39 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 23 Oct 2018 21:20:30 +0530
-Subject: [PATCH v2 10/15] dt-bindings: panel: Add Bananapi S070WV20-CT16
- ICN6211 MIPI-DSI to RGB bridge
+Date: Tue, 23 Oct 2018 21:20:32 +0530
+Subject: [PATCH v2 12/15] clk: sunxi-ng: a64: Add min and max rate for PLL_MIPI
 In-Reply-To: <20181023155035.9101-1-jagan@amarulasolutions.com>
 References: <20181023155035.9101-1-jagan@amarulasolutions.com>
-Message-ID: <20181023155035.9101-11-jagan@amarulasolutions.com>
+Message-ID: <20181023155035.9101-13-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB bridge panel,
-the same panel PCB comes with parallel RBG which is supported via
-panel-simple driver with "bananapi,s070wv20-ct16" compatible.
+A64 manual say PLL_MIPI rates are 500MHz to 1.4GHz, but
+using minimum 500MHz can't release the clock and which
+is not working.
 
-But this binding is specific for MIPI DSI to RGB bridge panels,
-which usually accessed using MIPI DSI controller driver.
-
-for information:
-- "bananapi,s070wv20-ct16" compatible for parallel RGB panels
-- "bananapi,s070wv20-ct16-icn6211" compatible for MIPI-DSI to RGB
-bridge panels
+So use working minimum rate as 300MHz which is tested on
+Bananapi DSI panel.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- Add detailed commit message
-- Update the bindings as MIPI-DSI to RGB bridge
+- new patch
 
- .../panel/bananapi,s070wv20-ct16-icn6211.txt  | 21 +++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt
-new file mode 100644
-index 000000000000..68a89b6feaee
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt
-@@ -0,0 +1,21 @@
-+Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB bridge
-+
-+Required properties:
-+- compatible: must be "bananapi,s070wv20-ct16-icn6211"
-+- reg: DSI virtual channel used by that screen
-+- avdd-supply: analog regulator dc1 switch
-+- dvdd-supply: 3v3 digital regulator
-+- reset-gpios: a GPIO phandle for the reset pin
-+
-+Optional properties:
-+- backlight: phandle for the backlight control.
-+
-+Example:
-+panel at 0 {
-+	compatible = "bananapi,s070wv20-ct16-icn6211";
-+	reg = <0>;
-+	avdd-supply = <&reg_dc1sw>;
-+	dvdd-supply = <&reg_dldo1>;
-+	reset-gpios = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+	backlight = <&backlight_dsi>;
-+};
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+index 019d67bf97c4..5a3a5b821f8b 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+@@ -167,6 +167,8 @@ static struct ccu_nkm pll_mipi_clk = {
+ 	.n		= _SUNXI_CCU_MULT(8, 4),
+ 	.k		= _SUNXI_CCU_MULT_MIN(4, 2, 2),
+ 	.m		= _SUNXI_CCU_DIV(0, 4),
++	.min_rate	= 300000000,		/* Actual rate is 500MHz */
++	.max_rate	= 1400000000UL,
+ 	.common		= {
+ 		.reg		= 0x040,
+ 		.hw.init	= CLK_HW_INIT("pll-mipi", "pll-video0",
 -- 
 2.18.0.321.gffc6fa0e3
