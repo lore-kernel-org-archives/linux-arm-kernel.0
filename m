@@ -1,114 +1,285 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 24 Oct 2018 00:36:51 +0530
-Subject: [PATCH 1/5] arm64: dts: hisilicon: Add Pinctrl support for HiKey970
- board
+Date: Wed, 24 Oct 2018 00:36:53 +0530
+Subject: [PATCH 3/5] arm64: dts: hisilicon: hi3670: Add UART nodes
 In-Reply-To: <20181023190655.12004-1-manivannan.sadhasivam@linaro.org>
 References: <20181023190655.12004-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181023190655.12004-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181023190655.12004-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl support based on "pinctrl-single" driver for HiKey970
-development board from HiSilicon.
+Add UART nodes for HiSilicon HI3670 SoC and also relevant pinmux/pinconf
+entries.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- .../boot/dts/hisilicon/hikey970-pinctrl.dtsi  | 87 +++++++++++++++++++
- 1 file changed, 87 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey970-pinctrl.dtsi
+ arch/arm64/boot/dts/hisilicon/hi3670.dtsi     |  72 ++++++++
+ .../boot/dts/hisilicon/hikey970-pinctrl.dtsi  | 157 ++++++++++++++++++
+ 2 files changed, 229 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3670.dtsi b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+index b99f5e0fe577..a5bd6d80b226 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+@@ -187,6 +187,76 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		uart0: serial at fdf02000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xfdf02000 0x0 0x1000>;
++			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3670_CLK_GATE_UART0>,
++				 <&crg_ctrl HI3670_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pmx_func &uart0_cfg_func>;
++			status = "disabled";
++		};
++
++		uart1: serial at fdf00000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xfdf00000 0x0 0x1000>;
++			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3670_CLK_GATE_UART1>,
++				 <&crg_ctrl HI3670_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			status = "disabled";
++		};
++
++		uart2: serial at fdf03000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xfdf03000 0x0 0x1000>;
++			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3670_CLK_GATE_UART2>,
++				 <&crg_ctrl HI3670_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart2_pmx_func &uart2_cfg_func>;
++			status = "disabled";
++		};
++
++		uart3: serial at ffd74000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xffd74000 0x0 0x1000>;
++			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3670_CLK_GATE_UART3>,
++				 <&crg_ctrl HI3670_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart3_pmx_func &uart3_cfg_func>;
++			status = "disabled";
++		};
++
++		uart4: serial at fdf01000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xfdf01000 0x0 0x1000>;
++			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3670_CLK_GATE_UART4>,
++				 <&crg_ctrl HI3670_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart4_pmx_func &uart4_cfg_func>;
++			status = "disabled";
++		};
++
++		uart5: serial at fdf05000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xfdf05000 0x0 0x1000>;
++			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3670_CLK_GATE_UART5>,
++				 <&crg_ctrl HI3670_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			status = "disabled";
++		};
++
+ 		uart6: serial at fff32000 {
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0x0 0xfff32000 0x0 0x1000>;
+@@ -194,6 +264,8 @@
+ 			clocks = <&crg_ctrl HI3670_CLK_UART6>,
+ 				 <&crg_ctrl HI3670_PCLK>;
+ 			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart6_pmx_func &uart6_cfg_func>;
+ 			status = "disabled";
+ 		};
+ 
 diff --git a/arch/arm64/boot/dts/hisilicon/hikey970-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey970-pinctrl.dtsi
-new file mode 100644
-index 000000000000..64fb9a3bd707
---- /dev/null
+index 64fb9a3bd707..67bb52d43619 100644
+--- a/arch/arm64/boot/dts/hisilicon/hikey970-pinctrl.dtsi
 +++ b/arch/arm64/boot/dts/hisilicon/hikey970-pinctrl.dtsi
-@@ -0,0 +1,87 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Pinctrl dts file for HiSilicon HiKey970 development board
-+ */
+@@ -20,6 +20,47 @@
+ 			pinctrl-single,function-mask = <0x7>;
+ 			/* pin base, nr pins & gpio function */
+ 			pinctrl-single,gpio-range = <&range 0 82 0>;
 +
-+#include <dt-bindings/pinctrl/hisi.h>
++			uart0_pmx_func: uart0_pmx_func {
++				pinctrl-single,pins = <
++					0x054 MUX_M2 /* UART0_RXD */
++					0x058 MUX_M2 /* UART0_TXD */
++				>;
++			};
 +
-+/ {
-+	soc {
-+		range: gpio-range {
-+			#pinctrl-single,gpio-range-cells = <3>;
-+		};
++			uart2_pmx_func: uart2_pmx_func {
++				pinctrl-single,pins = <
++					0x700 MUX_M2 /* UART2_CTS_N */
++					0x704 MUX_M2 /* UART2_RTS_N */
++					0x708 MUX_M2 /* UART2_RXD */
++					0x70c MUX_M2 /* UART2_TXD */
++				>;
++			};
 +
-+		pmx0: pinmux at e896c000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xe896c000 0x0 0x72c>;
-+			#pinctrl-cells = <1>;
-+			#gpio-range-cells = <0x3>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 82 0>;
-+		};
++			uart3_pmx_func: uart3_pmx_func {
++				pinctrl-single,pins = <
++					0x064 MUX_M1 /* UART3_CTS_N */
++					0x068 MUX_M1 /* UART3_RTS_N */
++					0x06c MUX_M1 /* UART3_RXD */
++					0x070 MUX_M1 /* UART3_TXD */
++				>;
++			};
 +
-+		pmx2: pinmux at e896c800 {
-+			compatible = "pinconf-single";
-+			reg = <0x0 0xe896c800 0x0 0x72c>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+		};
++			uart4_pmx_func: uart4_pmx_func {
++				pinctrl-single,pins = <
++					0x074 MUX_M1 /* UART4_CTS_N */
++					0x078 MUX_M1 /* UART4_RTS_N */
++					0x07c MUX_M1 /* UART4_RXD */
++					0x080 MUX_M1 /* UART4_TXD */
++				>;
++			};
 +
-+		pmx5: pinmux at fc182000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xfc182000 0x0 0x028>;
-+			#gpio-range-cells = <3>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 10 0>;
++			uart6_pmx_func: uart6_pmx_func {
++				pinctrl-single,pins = <
++					0x05c MUX_M1 /* UART6_RXD */
++					0x060 MUX_M1 /* UART6_TXD */
++				>;
++			};
+ 		};
+ 
+ 		pmx2: pinmux at e896c800 {
+@@ -27,6 +68,122 @@
+ 			reg = <0x0 0xe896c800 0x0 0x72c>;
+ 			#pinctrl-cells = <1>;
+ 			pinctrl-single,register-width = <0x20>;
 +
-+		};
++			uart0_cfg_func: uart0_cfg_func {
++				pinctrl-single,pins = <
++					0x058 0x0 /* UART0_RXD */
++					0x05c 0x0 /* UART0_TXD */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_DIS
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE7_04MA DRIVE6_MASK
++				>;
++			};
 +
-+		pmx6: pinmux at fc182800 {
-+			compatible = "pinconf-single";
-+			reg = <0x0 0xfc182800 0x0 0x028>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+		};
++			uart2_cfg_func: uart2_cfg_func {
++				pinctrl-single,pins = <
++					0x700 0x0 /* UART2_CTS_N */
++					0x704 0x0 /* UART2_RTS_N */
++					0x708 0x0 /* UART2_RXD */
++					0x70c 0x0 /* UART2_TXD */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_DIS
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE7_04MA DRIVE6_MASK
++				>;
++			};
 +
-+		pmx7: pinmux at ff37e000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xff37e000 0x0 0x030>;
-+			#gpio-range-cells = <3>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 12 0>;
-+		};
++			uart3_cfg_func: uart3_cfg_func {
++				pinctrl-single,pins = <
++					0x068 0x0 /* UART3_CTS_N */
++					0x06c 0x0 /* UART3_RTS_N */
++					0x070 0x0 /* UART3_RXD */
++					0x074 0x0 /* UART3_TXD */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_DIS
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE7_04MA DRIVE6_MASK
++				>;
++			};
 +
-+		pmx8: pinmux at ff37e800 {
-+			compatible = "pinconf-single";
-+			reg = <0x0 0xff37e800 0x0 0x030>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+		};
++			uart4_cfg_func: uart4_cfg_func {
++				pinctrl-single,pins = <
++					0x078 0x0 /* UART4_CTS_N */
++					0x07c 0x0 /* UART4_RTS_N */
++					0x080 0x0 /* UART4_RXD */
++					0x084 0x0 /* UART4_TXD */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_DIS
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE7_04MA DRIVE6_MASK
++				>;
++			};
 +
-+		pmx1: pinmux at fff11000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xfff11000 0x0 0x73c>;
-+			#gpio-range-cells = <0x3>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 46 0>;
-+		};
-+
-+		pmx16: pinmux at fff11800 {
-+			compatible = "pinconf-single";
-+			reg = <0x0 0xfff11800 0x0 0x73c>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+		};
-+	};
-+};
++			uart6_cfg_func: uart6_cfg_func {
++				pinctrl-single,pins = <
++					0x060 0x0 /* UART6_RXD */
++					0x064 0x0 /* UART6_TXD */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_DIS
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE7_02MA DRIVE6_MASK
++				>;
++			};
+ 		};
+ 
+ 		pmx5: pinmux at fc182000 {
 -- 
 2.17.1
