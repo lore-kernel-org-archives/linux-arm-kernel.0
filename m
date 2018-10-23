@@ -1,45 +1,108 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Tue, 23 Oct 2018 09:37:32 +0000
-Subject: [PATCH v3 5/7] mtd: m25p80: add support of octo mode I/O transfer
-In-Reply-To: <1540287311-1572-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1540287311-1572-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1540287311-1572-6-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 23 Oct 2018 12:08:17 +0200
+Subject: [PATCH 2/4] drm/panel: simple: Add support for the Lemaker
+ BL035 3.5" LCD
+In-Reply-To: <20181010145850.krwe7wlqkbcpja33@flea>
+References: <20181010114134.8211-1-contact@paulk.fr>
+ <20181010114134.8211-2-contact@paulk.fr>
+ <20181010145850.krwe7wlqkbcpja33@flea>
+Message-ID: <30178c8b263656a9c285e45c78e1908927c99c48.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for octo mode I/O data transfer based on the controller (spi)
-mode.
-Assign hw-capability mask bits for octo transfer.
+Hi,
 
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
-Changes for v3:
-- Modified string 'octal' with 'octo'.
-Changes for v2:
-- Incorporated review comments of Boris.
+Le mercredi 10 octobre 2018 ? 16:58 +0200, Maxime Ripard a ?crit :
+> On Wed, Oct 10, 2018 at 01:41:32PM +0200, Paul Kocialkowski wrote:
+> > This adds support for the 3.5" LCD panel from Lemaker, sold for use with
+> > BananaPi boards. It comes with a 24-bit RGB888 parallel interface and
+> > requires an active-low DE signal
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  drivers/gpu/drm/panel/panel-simple.c | 27 +++++++++++++++++++++++++++
+> >  1 file changed, 27 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> > index 97964f7f2ace..229080fcf65e 100644
+> > --- a/drivers/gpu/drm/panel/panel-simple.c
+> > +++ b/drivers/gpu/drm/panel/panel-simple.c
+> > @@ -1461,6 +1461,30 @@ static const struct panel_desc kyo_tcg121xglp = {
+> >  	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+> >  };
+> >  
+> > +static const struct drm_display_mode lemaker_bl035_mode = {
+> > +	.clock = 7000,
+> > +	.hdisplay = 320,
+> > +	.hsync_start = 320 + 20,
+> > +	.hsync_end = 320 + 20 + 30,
+> > +	.htotal = 320 + 20 + 30 + 38,
+> > +	.vdisplay = 240,
+> > +	.vsync_start = 240 + 4,
+> > +	.vsync_end = 240 + 4 + 3,
+> > +	.vtotal = 240 + 4 + 3 + 15,
+> > +	.vrefresh = 60,
+> > +};
+> > +
+> > +static const struct panel_desc lemaker_bl035 = {
+> > +	.modes = &lemaker_bl035_mode,
+> > +	.num_modes = 1,
+> > +	.size = {
+> > +		.width = 70,
+> > +		.height = 52,
+> > +	},
+> > +	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+> > +	.bus_flags = DRM_BUS_FLAG_DE_LOW,
+> > +};
+> > +
+> >  static const struct drm_display_mode lg_lb070wv8_mode = {
+> >  	.clock = 33246,
+> >  	.hdisplay = 800,
+> > @@ -2456,6 +2480,9 @@ static const struct of_device_id platform_of_match[] = {
+> >  	}, {
+> >  		.compatible = "kyo,tcg121xglp",
+> >  		.data = &kyo_tcg121xglp,
+> > +	}, {
+> > +		.compatible = "lemaker,bl035",
+> > +		.data = &lemaker_bl035,
+> 
+> You should document that new compatible. Also, where is this name
+> coming from? Is it the name it's sold under? something you came up
+> with?
 
- drivers/mtd/devices/m25p80.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Oh right, I forgot to document the compatible (and add the new vendor).
 
-diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index cb14cf9..7d5c3a1 100644
---- a/drivers/mtd/devices/m25p80.c
-+++ b/drivers/mtd/devices/m25p80.c
-@@ -175,7 +175,14 @@ static int m25p_probe(struct spi_mem *spimem)
- 	spi_mem_set_drvdata(spimem, flash);
- 	flash->spimem = spimem;
- 
--	if (spi->mode & SPI_RX_QUAD) {
-+	if (spi->mode & SPI_RX_OCTO) {
-+		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
-+
-+		if (spi->mode & SPI_TX_OCTO)
-+			hwcaps.mask |= (SNOR_HWCAPS_READ_1_8_8 |
-+					SNOR_HWCAPS_PP_1_1_8 |
-+					SNOR_HWCAPS_PP_1_8_8);
-+	} else if (spi->mode & SPI_RX_QUAD) {
- 		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
- 
- 		if (spi->mode & SPI_TX_QUAD)
+The name "BL035" comes from the PCB itself, where it reads "BL035-RGB-
+002" under the Lemaker logo. I went for "BL035" to keep it short.
+
+The latter part seems to be the PCB revision. According to the fex
+files[0], the timings are the same for all the screens of the same size
+(regardless of revision), so that revision probably shouldn't be in the
+panel name.
+
+As for the "RGB" part, Lemaker only makes 3.5 and 5 inch LCDs with a
+parallel RGB interface and 7 and 10.1 inch LCDs with LVDS, so there is
+no ambiguity for now.
+
+Do you think it makes sense to keep that part in the panel name
+nevertheless?
+
+[0]: https://github.com/LeMaker/fex_configuration
+
+Cheers,
+
+Paul
+
 -- 
-2.7.4
+Developer of free digital technology and hardware support.
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181023/835abcc7/attachment.sig>
