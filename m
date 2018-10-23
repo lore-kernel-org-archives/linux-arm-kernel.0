@@ -1,48 +1,45 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Tue, 23 Oct 2018 09:37:45 +0000
-Subject: [PATCH v3 7/7] arm64: dts: lx2160a: update fspi node
+Date: Tue, 23 Oct 2018 09:37:32 +0000
+Subject: [PATCH v3 5/7] mtd: m25p80: add support of octo mode I/O transfer
 In-Reply-To: <1540287311-1572-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 References: <1540287311-1572-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1540287311-1572-8-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1540287311-1572-6-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flash mt35xu512aba connected to FlexSPI controller supports
-1-1-8/1-8-8 protocol.
-Added flag spi-rx-bus-width and spi-tx-bus-width with values as
-8 and 8 respectively for both flashes connected at CS0 and CS1.
+Add support for octo mode I/O data transfer based on the controller (spi)
+mode.
+Assign hw-capability mask bits for octo transfer.
 
 Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
 Changes for v3:
-- None
+- Modified string 'octal' with 'octo'.
 Changes for v2:
-- None
+- Incorporated review comments of Boris.
 
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/mtd/devices/m25p80.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-index 3b20c97..24cc41c 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-@@ -45,6 +45,8 @@
- 		m25p,fast-read;
- 		spi-max-frequency = <20000000>;
- 		reg = <0>;
-+		spi-rx-bus-width = <8>;
-+		spi-tx-bus-width = <8>;
- 	};
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index cb14cf9..7d5c3a1 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -175,7 +175,14 @@ static int m25p_probe(struct spi_mem *spimem)
+ 	spi_mem_set_drvdata(spimem, flash);
+ 	flash->spimem = spimem;
  
- 	mt35xu512aba1: flash at 1 {
-@@ -54,6 +56,8 @@
- 		m25p,fast-read;
- 		spi-max-frequency = <20000000>;
- 		reg = <1>;
-+		spi-rx-bus-width = <8>;
-+		spi-tx-bus-width = <8>;
- 	};
- };
+-	if (spi->mode & SPI_RX_QUAD) {
++	if (spi->mode & SPI_RX_OCTO) {
++		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_8;
++
++		if (spi->mode & SPI_TX_OCTO)
++			hwcaps.mask |= (SNOR_HWCAPS_READ_1_8_8 |
++					SNOR_HWCAPS_PP_1_1_8 |
++					SNOR_HWCAPS_PP_1_8_8);
++	} else if (spi->mode & SPI_RX_QUAD) {
+ 		hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
  
+ 		if (spi->mode & SPI_TX_QUAD)
 -- 
 2.7.4
