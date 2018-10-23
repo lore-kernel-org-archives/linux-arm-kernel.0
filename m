@@ -1,66 +1,66 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2018 09:52:09 +0100
-Subject: [PATCH v2 1/3] ARM: socfpga: Clean unused functions
-In-Reply-To: <CAJiuCceqyPY+dYr+1xdSyUh5x1Fr=M_p1nsMF9h52v5CXt1uYw@mail.gmail.com>
-References: <20181009112021.756-1-peron.clem@gmail.com>
- <CAJiuCceqyPY+dYr+1xdSyUh5x1Fr=M_p1nsMF9h52v5CXt1uYw@mail.gmail.com>
-Message-ID: <20181023085208.GL30658@n2100.armlinux.org.uk>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Tue, 23 Oct 2018 08:56:38 +0000
+Subject: [PATCH RESEND v4 0/5] spi: spi-mem: Add driver for NXP FlexSPI
+ controller
+Message-ID: <1540284888-32307-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 10:47:05AM +0200, Cl?ment P?ron wrote:
-> Hi Dinh / Russell,
-> 
-> Could you have a look at these patchs please ?
+- Add driver for NXP FlexSPI host controller
 
-Nothing to do with me - it's up to the socfpga maintainer and arm-soc
-maintainers.
+ FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
+ which supports two SPI channels and up to 4 external devices.
+ Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
+ i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
+ bidirectional data lines.
 
-> Thanks,
-> Clement
-> 
-> On Tue, 9 Oct 2018 at 13:20, Cl?ment P?ron <peron.clem@gmail.com> wrote:
-> >
-> > These functions are unused externally, removed them and declare
-> > the one used locally as static.
-> >
-> > Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
-> > ---
-> >  arch/arm/mach-socfpga/core.h    | 2 --
-> >  arch/arm/mach-socfpga/socfpga.c | 2 +-
-> >  2 files changed, 1 insertion(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-> > index 65e1817d8afe..92cae0a9213f 100644
-> > --- a/arch/arm/mach-socfpga/core.h
-> > +++ b/arch/arm/mach-socfpga/core.h
-> > @@ -34,8 +34,6 @@
-> >
-> >  #define RSTMGR_MPUMODRST_CPU1          0x2     /* CPU1 Reset */
-> >
-> > -extern void socfpga_init_clocks(void);
-> > -extern void socfpga_sysmgr_init(void);
-> >  void socfpga_init_l2_ecc(void);
-> >  void socfpga_init_ocram_ecc(void);
-> >  void socfpga_init_arria10_l2_ecc(void);
-> > diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> > index dde14f7bf2c3..5fb6f79059a8 100644
-> > --- a/arch/arm/mach-socfpga/socfpga.c
-> > +++ b/arch/arm/mach-socfpga/socfpga.c
-> > @@ -32,7 +32,7 @@ void __iomem *rst_manager_base_addr;
-> >  void __iomem *sdr_ctl_base_addr;
-> >  unsigned long socfpga_cpu1start_addr;
-> >
-> > -void __init socfpga_sysmgr_init(void)
-> > +static void __init socfpga_sysmgr_init(void)
-> >  {
-> >         struct device_node *np;
-> >
-> > --
-> > 2.17.1
-> >
+- Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
+ filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
+ LX2160ARDB is having two NOR slave device connected on single bus A
+ i.e. A0 and A1 (CS0 and CS1).
+ LX2160AQDS is having two NOR slave device connected on separate buses
+ one flash on A0 and second on B1 i.e. (CS0 and CS3).
+ Verified this driver on following SPI NOR flashes:
+   Micron, mt35xu512aba[3], [Read - 1 bit mode]
+   Cypress, s25fl512s, [Read - 1/2/4 bit mode]
+
+[1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
+[2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?series=26689
+[3] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70179
+
+Yogesh Gaur (5):
+  spi: spi-mem: Add driver for NXP FlexSPI controller
+  dt-bindings: spi: add binding file for NXP FlexSPI controller
+  arm64: dts: lx2160a: add FlexSPI node property
+  arm64: defconfig: enable NXP FlexSPI driver
+  MAINTAINERS: add maintainers for the NXP FlexSPI driver
+
+Added Mark Brown as reviewer in to list, thus sending patches again.
+
+Changes for v4:
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+- Incorporated binding file review comments.
+Changes for v3:
+- Incorporated review comments for
+  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
+Changes for v2:
+- Incorporated Boris review comments and drop below patches as per the comments.
+ - Patch 'spi: add slave device size in spi_device struct'
+ - Patch 'spi: add flags for octal I/O data transfer'
+- Incorporated DTS and Binding file review comments of Shawn Guo and Rob Herring.
+
+ .../devicetree/bindings/spi/spi-nxp-fspi.txt       |   39 +
+ MAINTAINERS                                        |    6 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  |   22 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     |   12 +
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/spi/Kconfig                                |   10 +
+ drivers/spi/Makefile                               |    1 +
+ drivers/spi/spi-nxp-fspi.c                         | 1158 ++++++++++++++++++++
+ 8 files changed, 1249 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+ create mode 100644 drivers/spi/spi-nxp-fspi.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.7.4
