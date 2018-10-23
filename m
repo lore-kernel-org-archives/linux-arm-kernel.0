@@ -1,39 +1,41 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 23 Oct 2018 23:20:18 +0200
-Subject: [PATCH] thermal: bcm2835: enable hwmon explicitly
-In-Reply-To: <459136891.184150.1540296101955@email.1und1.de>
-References: <20181021215848.5827-1-matthias.bgg@kernel.org>
- <459136891.184150.1540296101955@email.1und1.de>
-Message-ID: <12ca4f71-8ba9-91dd-f5a0-0c72c91401ef@gmail.com>
+From: vdumpa@nvidia.com (Krishna Reddy)
+Date: Tue, 23 Oct 2018 15:39:04 -0700
+Subject: [PATCH 0/3] Add Tegra194 Dual ARM SMMU driver
+Message-ID: <1540334347-7178-1-git-send-email-vdumpa@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+NVIDIA's Xavier (Tegra194) SOC has three ARM SMMU(MMU-500) instances.
+Two of the SMMU instances are used to interleave IOVA accesses across them.
+The IOVA accesses from HW devices are interleaved across these two SMMU instances
+and they need to be programmed identical.
 
-On 23/10/2018 14:01, Stefan Wahren wrote:
-> Hi Matthias,
-> 
->> matthias.bgg at kernel.org hat am 21. Oktober 2018 um 23:58 geschrieben:
->>
->>
->> From: Matthias Brugger <mbrugger@suse.com>
->>
->> By defaul of-based thermal driver do not enable hwmon.
->> This patch does this explicitly, so that the temperature can be read
->> through the common hwmon sysfs.
->>
->> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> 
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> I'm just curious which board and config did you use for your tests?
-> 
+The existing ARM SMMU driver can't be used in its current form for programming the
+two SMMU instances identically. But, most of the code can be shared between ARM SMMU
+driver and Tegra194 SMMU driver.
+Page fault handling and TLB sync operations need to know about specific instance
+of SMMU for correct fault handling and optimal TLB sync wait. Rest of the code doesn't
+need to know about number of SMMU instances. Based on this fact, The patch series here
+rearranges the arm-smmu.c code to allow sharing most of the ARM SMMU programming/iommu_ops
+code between ARM SMMU driver and Tegra194 SMMU driver and transparently
+handles programming of two SMMU instances.
 
-I use the RPi3 B+. I suppose when asking about the config, you want to know if I
-also enable the RASPBERRYPI_HWMON, yes I enable that as well. Actually this
-patch is for openSUSE Leap. You can find the whole config (if you are
-interested) here:
-https://kernel.suse.com/cgit/kernel-source/tree/config/arm64/default?h=SLE15
+The third SMMU instance would use the existing ARM SMMU driver.
 
-Regards,
-Matthias
+Krishna Reddy (3):
+  iommu/arm-smmu: rearrange arm-smmu.c code
+  iommu/arm-smmu: Prepare fault, probe, sync functions for sharing code
+  iommu/tegra194_smmu: Add Tegra194 SMMU driver
+
+ drivers/iommu/Makefile          |    1 +
+ drivers/iommu/arm-smmu-common.c | 1971 +++++++++++++++++++++++++++++++++++
+ drivers/iommu/arm-smmu-common.h |  256 +++++
+ drivers/iommu/arm-smmu.c        | 2167 +--------------------------------------
+ drivers/iommu/tegra194-smmu.c   |  201 ++++
+ 5 files changed, 2436 insertions(+), 2160 deletions(-)
+ create mode 100644 drivers/iommu/arm-smmu-common.c
+ create mode 100644 drivers/iommu/arm-smmu-common.h
+ create mode 100644 drivers/iommu/tegra194-smmu.c
+
+-- 
+2.1.4
