@@ -1,61 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 Oct 2018 13:18:23 +0100
-Subject: [RESEND PATCH v3 3/3] sh: add the sh_ prefix to early platform
- symbols
-In-Reply-To: <CAMuHMdWPPr56j3z4-eamtavt7cZ2jkKyE3W5_XiK1HNim8qXBg@mail.gmail.com>
-References: <20180827090651.25062-1-brgl@bgdev.pl>
- <20180827090651.25062-4-brgl@bgdev.pl>
- <8636swude1.wl-marc.zyngier@arm.com>
- <CAMuHMdWPPr56j3z4-eamtavt7cZ2jkKyE3W5_XiK1HNim8qXBg@mail.gmail.com>
-Message-ID: <861s8gua9c.wl-marc.zyngier@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 23 Oct 2018 12:23:12 +0000
+Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
+In-Reply-To: <20181023120401.GO30658@n2100.armlinux.org.uk>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
+ <20181023120401.GO30658@n2100.armlinux.org.uk>
+Message-ID: <AM0PR04MB42119A454DD2F53590BCE7FF80F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Russell,
 
-On Tue, 23 Oct 2018 12:32:16 +0100,
-Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
+> Sent: Tuesday, October 23, 2018 8:04 PM
+[...]
+> On Tue, Oct 23, 2018 at 11:49:17AM +0000, A.s. Dong wrote:
+> > +	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
+> > +	clk_port = devm_clk_get(&pdev->dev, "port");
+> > +	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
+> > +	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
 > 
-> Hi Marc,
+> 	if (clk_gpio == ERR_PTR(-EPROBE_DEFER) ||
+> 	    clk_port == ERR_PTR(-EPROBE_DEFER)) {
 > 
-> On Tue, Oct 23, 2018 at 1:11 PM Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On Mon, 27 Aug 2018 10:06:51 +0100,
-> > Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> > As for the whole "early device" debate, my take is that we'd be much
-> > better off making the device model available early, rather than trying
-> > to architect something that is simply papering over the issue.
-> 
-> The device model itself can be made available earlier, but the big
-> blocker is mainly the use of everything related to the scheduler
-> (threads, msleep()), which depends on the "early" timer.
 
-I agree this is an annoying dependency, as I've myself been down that
-particular rabbit hole... ;-)
+Thanks for the suggestion. I will update it in next series.
+Before that, let's wait a moment to see if any more review comments.
 
-> I think it can be made to work if msleep() and all thread-related
-> functions would return -EPROBE_DEFER, but that should be handled in
-> every single driver, which may be already the case for
-> thread-related functions, but not for e.g. msleep(), which currently
-> returns void.
+BTW, as I see kernel currently is widely using PTR_ERR(ptr) to compare
+-EPROBE_DEFER, I'm not quite get the point why the new approach
+you suggested is better, is it less error-prone? Or something else?
+would you please help clarify a bit more?
 
-That would be massively invasive...
+Regards
+Dong Aisheng
 
-One way of solving this would be to make the device model available
-early, but then preserve the ordering required by other subsystems
-such as the scheduler: interrupts, timers and clocks have to be
-available first, as they are basically at the root of all
-dependencies.
-
-This is a different kind of "early" though, as having the device model
-early means all its functionalities are available early, and that
-includes being able to allocate DMA buffers, which some interrupt
-controllers require. The current proposal doesn't help with DMA, and
-still leaves these devices in a state where drivers have to reinvent
-their own square wheel.
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+> --
+> RMK's Patch system:
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
+> armlinux.org.uk%2Fdeveloper%2Fpatches%2F&amp;data=02%7C01%7Caishen
+> g.dong%40nxp.com%7C34fcfce2f5d042efd0b808d638dfaaed%7C686ea1d3bc
+> 2b4c6fa92cd99c5c301635%7C0%7C0%7C636758930627945785&amp;sdata=
+> PME05RkmX0mxRmhO%2Bj%2FofV3VN2VMx3FWU9bbqFr3XAg%3D&amp;res
+> erved=0
+> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps
+> up According to speedtest.net: 11.9Mbps down 500kbps up
