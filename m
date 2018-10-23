@@ -1,104 +1,50 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 23 Oct 2018 21:20:35 +0530
-Subject: [PATCH v2 15/15] arm64: dts: allwinner: bananapi-m64: Bananapi
- S070WV20-CT16 DSI panel
+Date: Tue, 23 Oct 2018 21:20:28 +0530
+Subject: [PATCH v2 08/15] drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
 In-Reply-To: <20181023155035.9101-1-jagan@amarulasolutions.com>
 References: <20181023155035.9101-1-jagan@amarulasolutions.com>
-Message-ID: <20181023155035.9101-16-jagan@amarulasolutions.com>
+Message-ID: <20181023155035.9101-9-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for Bananapi S070WV20-CT16 DSI panel to
-BPI-M64 board.
+TCON DRQ set bits for non-burst DSI mode can computed via
+horizontal front porch instead of front porch + sync timings.
 
-DSI panel connected via board DSI port with,
-- DC1SW as AVDD supply
-- DCDC1 as DVDD supply
-- PD6 gpio for reset pin
-- PD5 gpio for backlight enable pin
-- PD7 gpio for backlight vdd supply
+According to BSP code form BPI-M64-bsp in
+linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c
+TCON DRQ set bits are computed for non-burst mode as
+
+=> panel->lcd_ht -    panel->lcd_x - panel->lcd_hbp
+=> (timmings->hor_front_porch + panel->lcd_hbp + panel->lcd_x)
+   - panel->lcd_x - panel->hbp
+=> timmings->hor_front_porch
+=> mode->hsync_start - mode->hdisplay
+
+So, update the DRQ set bits accordingly.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- Use quadratic rule on pwm brightness
+- Add detailed commit message
 
- .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 42 +++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index ef1c90401bb2..e0c6d1870a94 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -45,6 +45,7 @@
- #include "sun50i-a64.dtsi"
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index 3a1d48bc1996..8d154cf2e6d6 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -367,9 +367,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+ 	struct mipi_dsi_device *device = dsi->device;
+ 	u32 val = 0;
  
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pwm/pwm.h>
+-	if ((mode->hsync_end - mode->hdisplay) > 20) {
++	if ((mode->hsync_start - mode->hdisplay) > 20) {
+ 		/* Maaaaaagic */
+-		u16 drq = (mode->hsync_end - mode->hdisplay) - 20;
++		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
  
- / {
- 	model = "BananaPi-M64";
-@@ -56,6 +57,24 @@
- 		serial1 = &uart1;
- 	};
- 
-+	vdd_bl: regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "bl-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&pio 3 7 GPIO_ACTIVE_HIGH>; /* PD7 */
-+		enable-active-high;
-+	};
-+
-+	backlight_dsi: backlight-dsi {
-+		compatible = "pwm-backlight";
-+		pwms = <&r_pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <1 2 4 8 16 32 64 128 512>;
-+		default-brightness-level = <2>;
-+		enable-gpios = <&pio 3 5 GPIO_ACTIVE_HIGH>; /* PD5 */
-+		power-supply = <&vdd_bl>;
-+	};
-+
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-@@ -101,6 +120,23 @@
- 	status = "okay";
- };
- 
-+&dphy {
-+	status = "okay";
-+};
-+
-+&dsi {
-+	status = "okay";
-+
-+	panel at 0 {
-+		compatible = "bananapi,s070wv20-ct16-icn6211";
-+		reg = <0>;
-+		avdd-supply = <&reg_dc1sw>;
-+		dvdd-supply = <&reg_dldo1>;
-+		reset-gpios = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+		backlight = <&backlight_dsi>;
-+	};
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -193,6 +229,12 @@
- 	status = "okay";
- };
- 
-+&r_pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&r_pwm_pin>;
-+	status = "okay";
-+};
-+
- &r_rsb {
- 	status = "okay";
- 
+ 		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+ 		drq /= 32;
 -- 
 2.18.0.321.gffc6fa0e3
