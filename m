@@ -1,57 +1,49 @@
-From: xiaoning.wang@nxp.com (Clark Wang)
-Date: Tue, 23 Oct 2018 08:36:17 +0000
-Subject: [PATCH] ARM: dts: fix imx7d boot spi dma setup error
-Message-ID: <20181023083356.17579-1-xiaoning.wang@nxp.com>
+From: Ramana.Radhakrishnan@arm.com (Ramana Radhakrishnan)
+Date: Tue, 23 Oct 2018 08:39:19 +0000
+Subject: [PATCH 00/17] ARMv8.3 pointer authentication support
+In-Reply-To: <20181019123646.GG14246@arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181019123646.GG14246@arm.com>
+Message-ID: <8478fc27-6e74-4fa6-7956-ffc1cca6c063@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dmas and dma-names for ecspi1~4 to fix kernel boot error:
-"spi_imx 30840000.ecspi: dma setup error -19, use pio".
+On 19/10/2018 13:36, Will Deacon wrote:
+> On Fri, Oct 05, 2018 at 09:47:37AM +0100, Kristina Martsenko wrote:
+>> 1) Key support
+>>
+>> This series enables the use of instructions using APIAKey, which is
+>> initialised and maintained per-process (shared by all threads). GCC
+>> currently only makes use of APIAKey.
+>>
+>> This series does not add support for APIBKey, APDAKey, APDBKey, nor
+>> APGAKey. HINT-space instructions using these keys will currently execute
+>> as NOPs. Support for these keys can be added as users appear.
+>>
+>> Note that while we expose the cpuid register (ID_AA64ISAR1_EL1) to
+>> userspace, it only contains one feature for address authentication
+>> (API/APA), so it cannot be used by userspace to tell which keys the
+>> kernel supports. For this the kernel exposes HWCAP bits, one per key
+>> (currently only APIAKey), which must be checked instead.
+> 
+> Given that the architecture doesn't provide an identification mechanism
+> for the case where only one of the keys is available, I would much prefer
+> that we expose both of the keys to userspace. Is the only downside of
+> that a possible exception entry overhead if the kernel wants to use pointer
+> authentication as well?
+> 
+> Having an initial implementation where the B key operations act as NOPs
+> isn't ideal if we want to support future users -- chances are they'll
+> be put off because deployed kernels don't give them whatever security
+> guarantees they require. It's a bit of a chicken-and-egg problem, so
+> unless we have good reasons to keep the B key hidden, I think we should
+> be exposing it from the start.
 
-Signed-off-by: Xiaoning Wang <xiaoning.wang@nxp.com>
----
- arch/arm/boot/dts/imx7s.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+There are patches in flight to get B key signing support in for GCC 9  - 
+so exposing this to user space will be good.
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index aa8df7d93b2e..043e39124c43 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -651,6 +651,8 @@
- 				clocks = <&clks IMX7D_ECSPI4_ROOT_CLK>,
- 					<&clks IMX7D_ECSPI4_ROOT_CLK>;
- 				clock-names = "ipg", "per";
-+				dmas = <&sdma 6 7 1>, <&sdma 7 7 2>;
-+				dma-names = "rx", "tx";
- 				status = "disabled";
- 			};
- 
-@@ -732,6 +734,8 @@
- 					clocks = <&clks IMX7D_ECSPI1_ROOT_CLK>,
- 						<&clks IMX7D_ECSPI1_ROOT_CLK>;
- 					clock-names = "ipg", "per";
-+					dmas = <&sdma 0 7 1>, <&sdma 1 7 2>;
-+					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
- 
-@@ -744,6 +748,8 @@
- 					clocks = <&clks IMX7D_ECSPI2_ROOT_CLK>,
- 						<&clks IMX7D_ECSPI2_ROOT_CLK>;
- 					clock-names = "ipg", "per";
-+					dmas = <&sdma 2 7 1>, <&sdma 3 7 2>;
-+					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
- 
-@@ -756,6 +762,8 @@
- 					clocks = <&clks IMX7D_ECSPI3_ROOT_CLK>,
- 						<&clks IMX7D_ECSPI3_ROOT_CLK>;
- 					clock-names = "ipg", "per";
-+					dmas = <&sdma 4 7 1>, <&sdma 5 7 2>;
-+					dma-names = "rx", "tx";
- 					status = "disabled";
- 				};
- 
--- 
-2.17.1
+Ramana
+
+> 
+> Will
+> 
