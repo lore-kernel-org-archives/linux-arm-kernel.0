@@ -1,175 +1,173 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Oct 2018 08:54:56 -0300
-Subject: [PATCH RFC v3 0/3] Rlimit for module space
-In-Reply-To: <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
-References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
- <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
- <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
-Message-ID: <CAKv+Gu-Rk-SQVOQ63L3DkF3=EVik3pHXzpNp5r5TrgDajTM_iQ@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 23 Oct 2018 11:49:29 +0000
+Subject: [PATCH V2 7/8] dts: fsl: add imx7ulp evk support
+In-Reply-To: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1540295058-26090-8-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2018 at 20:06, Edgecombe, Rick P
-<rick.p.edgecombe@intel.com> wrote:
-> On Sat, 2018-10-20 at 19:20 +0200, Ard Biesheuvel wrote:
->> Hi Rick,
->>
->> On 19 October 2018 at 22:47, Rick Edgecombe <rick.p.edgecombe@intel.com>
->> wrote:
->> > If BPF JIT is on, there is no effective limit to prevent filling the entire
->> > module space with JITed e/BPF filters.
->>
->> Why do BPF filters use the module space, and does this reason apply to
->> all architectures?
->>
->> On arm64, we already support loading plain modules far away from the
->> core kernel (i.e. out of range for ordinary relative jump/calll
->> instructions), and so I'd expect BPF to be able to deal with this
->> already as well. So for arm64, I wonder why an ordinary vmalloc_exec()
->> wouldn't be more appropriate.
-> AFAIK, it's like you said about relative instruction limits, but also because
-> some predictors don't predict past a certain distance. So performance as well.
-> Not sure the reasons for each arch, or if they all apply for BPF JIT. There seem
-> to be 8 by my count, that have a dedicated module space for some reason.
->
->> So before refactoring the module alloc/free routines to accommodate
->> BPF, I'd like to take one step back and assess whether it wouldn't be
->> more appropriate to have a separate bpf_alloc/free API, which could be
->> totally separate from module alloc/free if the arch permits it.
->>
-> I am not a BPF JIT expert unfortunately, hopefully someone more authoritative
-> will chime in. I only ran into this because I was trying to increase
-> randomization for the module space and wanted to find out how many allocations
-> needed to be supported.
->
-> I'd guess though, that BPF JIT is just assuming that there will be some arch
-> specific constraints about where text can be placed optimally and they would
-> already be taken into account in the module space allocator.
->
-> If there are no constraints for some arch, I'd wonder why not just update its
-> module_alloc to use the whole space available. What exactly are the constraints
-> for arm64 for normal modules?
->
+The NXP i.MX 7ULP Evaluation Kit (EVK) provides a platform for rapid
+evaluation of the i.MX 7ULP, which features NXP's advanced implementation
+of the Arm? Cortex?-A7 core, the Arm Cortex-M4 core, as well as a 3D and
+2D Graphics Processing Units (GPUs).
 
-Relative branches and the interactions with KAsan.
+The EVK enables HDMI output for simple out-of-the-box to bring up but
+allows reconfiguration for MIPI displays. The EVK is designed as a
+System-On-Module(SOM) board that connects to an associated baseboard.
+The SOM provides 1 GB LPDDR3, 8 MB Quad SPI flash, Micro SD 3.0 card
+socket, WiFi/ Bluetooth capability, USB 2.0 OTG with Type C connector
+and an NXP PF1550 power management IC (PMIC). The baseboard provides
+additional capabilities including a full SD/MMC 3.0 card socket, audio
+codec, multiple sensors, an HDMI connector, and an alternate MIPI display
+connector. Additionally, the EVK facilitates software development with the
+ultimate goal of faster time to market through the support of both
+Linux? OS and AndroidTM rich operating systems, as well as FreeRTOS.
 
-We just fixed something similar in the kprobes code: it was using
-RWX-mapped module memory to store kprobed instructions, and we
-replaced that with a simple vmalloc_exec() [and code to remap it
-read-only], which was possible given that relative branches are always
-emulated by arm64 kprobes.
+This patch aims to support the preliminary booting up features
+as follows:
+GPIO
+LPUART
+FEC
+SD/MMC
 
-So it depends on whether BPF code needs to be in relative branching
-range from the calling code, and whether the BPF code itself is
-emitted using relative branches into other parts of the code.
+See more board details:
+https://www.nxp.com/products/processors-and-microcontrollers/
+arm-based-processors-and-mcus/i.mx-applications-processors/
+i.mx-7-processors/evaluation-kit-for-the-i.mx-7ulp-applications
+-processor:MCIMX7ULP-EVK
 
-> It seems fine to me for architectures to have the option of solving this a
-> different way. If potentially the rlimit ends up being the best solution for
-> some architectures though, do you think this refactor (pretty close to just a
-> name change) is that intrusive?
->
-> I guess it could be just a BPF JIT per user limit and not touch module space,
-> but I thought the module space limit was a more general solution as that is the
-> actual limited resource.
->
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ChangeLog:
+v1->v2:
+ * switch to SPDX license
+ * pad name update
+ * fix Character '_' not recommended in node name
+ * separate from soc.dtsi file
+---
+ arch/arm/boot/dts/Makefile        |  2 +
+ arch/arm/boot/dts/imx7ulp-evk.dts | 94 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 96 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
 
-I think it is wrong to conflate the two things. Limiting the number of
-BPF allocations and the limiting number of module allocations are two
-separate things, and the fact that BPF reuses module_alloc() out of
-convenience does not mean a single rlimit for both is appropriate.
-
-
->> > For classic BPF filters attached with
->> > setsockopt SO_ATTACH_FILTER, there is no memlock rlimit check to limit the
->> > number of insertions like there is for the bpf syscall.
->> >
->> > This patch adds a per user rlimit for module space, as well as a system wide
->> > limit for BPF JIT. In a previously reviewed patchset, Jann Horn pointed out
->> > the
->> > problem that in some cases a user can get access to 65536 UIDs, so the
->> > effective
->> > limit cannot be set low enough to stop an attacker and be useful for the
->> > general
->> > case. A discussed alternative solution was a system wide limit for BPF JIT
->> > filters. This much more simply resolves the problem of exhaustion and
->> > de-randomizing in the case of non-CONFIG_BPF_JIT_ALWAYS_ON. If
->> > CONFIG_BPF_JIT_ALWAYS_ON is on however, BPF insertions will fail if another
->> > user
->> > exhausts the BPF JIT limit. In this case a per user limit is still needed.
->> > If
->> > the subuid facility is disabled for normal users, this should still be ok
->> > because the higher limit will not be able to be worked aroThey might und
->> > that way.
->> >
->> > The new BPF JIT limit can be set like this:
->> > echo 5000000 > /proc/sys/net/core/bpf_jit_limit
->> >
->> > So I *think* this patchset should resolve that issue except for the
->> > configuration of CONFIG_BPF_JIT_ALWAYS_ON and subuid allowed for normal
->> > users.
->> > Better module space KASLR is another way to resolve the de-randomizing
->> > issue,
->> > and so then you would just be left with the BPF DOS in that configuration.
->> >
->> > Jann also pointed out how, with purposely fragmenting the module space, you
->> > could make the effective module space blockage area much larger. This is
->> > also
->> > somewhat un-resolved. The impact would depend on how big of a space you are
->> > trying to allocate. The limit has been lowered on x86_64 so that at least
->> > typical sized BPF filters cannot be blocked.
->> >
->> > If anyone with more experience with subuid/user namespaces has any
->> > suggestions
->> > I'd be glad to hear. On an Ubuntu machine it didn't seem like a un-
->> > privileged
->> > user could do this. I am going to keep working on this and see if I can find
->> > a
->> > better solution.
->> >
->> > Changes since v2:
->> >  - System wide BPF JIT limit (discussion with Jann Horn)
->> >  - Holding reference to user correctly (Jann)
->> >  - Having arch versions of modulde_alloc (Dave Hansen, Jessica Yu)
->> >  - Shrinking of default limits, to help prevent the limit being worked
->> > around
->> >    with fragmentation (Jann)
->> >
->> > Changes since v1:
->> >  - Plug in for non-x86
->> >  - Arch specific default values
->> >
->> >
->> > Rick Edgecombe (3):
->> >   modules: Create arch versions of module alloc/free
->> >   modules: Create rlimit for module space
->> >   bpf: Add system wide BPF JIT limit
->> >
->> >  arch/arm/kernel/module.c                |   2 +-
->> >  arch/arm64/kernel/module.c              |   2 +-
->> >  arch/mips/kernel/module.c               |   2 +-
->> >  arch/nds32/kernel/module.c              |   2 +-
->> >  arch/nios2/kernel/module.c              |   4 +-
->> >  arch/parisc/kernel/module.c             |   2 +-
->> >  arch/s390/kernel/module.c               |   2 +-
->> >  arch/sparc/kernel/module.c              |   2 +-
->> >  arch/unicore32/kernel/module.c          |   2 +-
->> >  arch/x86/include/asm/pgtable_32_types.h |   3 +
->> >  arch/x86/include/asm/pgtable_64_types.h |   2 +
->> >  arch/x86/kernel/module.c                |   2 +-
->> >  fs/proc/base.c                          |   1 +
->> >  include/asm-generic/resource.h          |   8 ++
->> >  include/linux/bpf.h                     |   7 ++
->> >  include/linux/filter.h                  |   1 +
->> >  include/linux/sched/user.h              |   4 +
->> >  include/uapi/asm-generic/resource.h     |   3 +-
->> >  kernel/bpf/core.c                       |  22 +++-
->> >  kernel/bpf/inode.c                      |  16 +++
->> >  kernel/module.c                         | 152 +++++++++++++++++++++++-
->> >  net/core/sysctl_net_core.c              |   7 ++
->> >  22 files changed, 233 insertions(+), 15 deletions(-)
->> >
->> > --
->> > 2.17.1
->> >
-> branching predictors may not be able to predict past a certain distance. So
-> performance as well.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d7268ae..39eac9c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -573,6 +573,8 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7d-sdb-sht11.dtb \
+ 	imx7s-colibri-eval-v3.dtb \
+ 	imx7s-warp.dtb
++dtb-$(CONFIG_SOC_IMX7ULP) += \
++	imx7ulp-evk.dtb
+ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-moxa-uc-8410a.dtb \
+ 	ls1021a-qds.dtb \
+diff --git a/arch/arm/boot/dts/imx7ulp-evk.dts b/arch/arm/boot/dts/imx7ulp-evk.dts
+new file mode 100644
+index 0000000..d876cb3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx7ulp-evk.dts
+@@ -0,0 +1,94 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP
++ *   Dong Aisheng <aisheng.dong@nxp.com>
++ */
++
++/dts-v1/;
++
++#include "imx7ulp.dtsi"
++
++/ {
++	model = "NXP i.MX7ULP EVK";
++	compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp", "Generic DT based system";
++
++	chosen {
++		stdout-path = &lpuart4;
++	};
++
++	memory at 60000000 {
++		reg = <0x60000000 0x40000000>;
++	};
++
++	reg_vsd_3v3: regulator-vsd-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "VSD_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usdhc0_rst>;
++		gpio = <&gpio_ptd 0 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&lpuart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_lpuart4>;
++	status = "okay";
++};
++
++&usdhc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc0_cmd_data>, <&pinctrl_usdhc0_clk>,
++		    <&pinctrl_usdhc0_cd>;
++	cd-gpios = <&gpio_ptc 10 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&reg_vsd_3v3>;
++	status = "okay";
++};
++
++&iomuxc1 {
++	pinctrl_lpuart4: lpuart4grp {
++		pinmux = <
++			IMX7ULP_PAD_PTC3__LPUART4_RX
++			IMX7ULP_PAD_PTC2__LPUART4_TX
++		>;
++		bias-pull-up;
++	};
++
++	pinctrl_usdhc0_cmd_data: usdhc0-cmd-data-grp {
++		pinmux = <
++			IMX7ULP_PAD_PTD1__SDHC0_CMD
++			IMX7ULP_PAD_PTD2__SDHC0_CLK
++			IMX7ULP_PAD_PTD7__SDHC0_D3
++			IMX7ULP_PAD_PTD8__SDHC0_D2
++			IMX7ULP_PAD_PTD9__SDHC0_D1
++			IMX7ULP_PAD_PTD10__SDHC0_D0
++		>;
++		drive-strength = <1>;
++		bias-pull-up;
++	};
++
++	pinctrl_usdhc0_clk: usdhc0-clk-grp {
++		pinmux = <
++			IMX7ULP_PAD_PTD2__SDHC0_CLK
++		>;
++		drive-strength = <1>;
++		bias-pull-down;
++	};
++
++	pinctrl_usdhc0_cd: usdhc0-gpio-cd-grp {
++		pinmux = <
++			IMX7ULP_PAD_PTC10__PTC10	/* USDHC0 CD */
++		>;
++		bias-pull-up;
++	};
++
++	pinctrl_usdhc0_rst: usdhc0-gpio-rst-grp {
++		pinmux = <
++			IMX7ULP_PAD_PTD0__PTD0		/* USDHC0 RST */
++		>;
++		bias-pull-up;
++	};
++};
+-- 
+2.7.4
