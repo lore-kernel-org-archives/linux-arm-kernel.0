@@ -1,37 +1,37 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 23 Oct 2018 21:20:33 +0530
-Subject: [PATCH v2 13/15] dt-bindings: sun6i-dsi: Add compatible for A64 DPHY
-In-Reply-To: <20181023155035.9101-1-jagan@amarulasolutions.com>
-References: <20181023155035.9101-1-jagan@amarulasolutions.com>
-Message-ID: <20181023155035.9101-14-jagan@amarulasolutions.com>
+Date: Tue, 23 Oct 2018 21:27:24 +0530
+Subject: [PATCH v5 1/4] clk: sunxi-ng: Enable DE2_CCU for SUN8I and SUN50I
+Message-ID: <20181023155727.9383-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIPI DSI PHY HDMI controller on Allwinner A64 is similar
-on the one on A31.
-
-Add A64 compatible and append A31 compatible as fallback.
+Allwinner SoC like SUN8I and SUN50I has DE2 CCU so enable them
+as default.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
+Changes for v5:
+- remove DRM dependency 
+Changes for v4, v3:
+- none
 Changes for v2:
-- new patch
+- Enable for MACH_SUN8I
 
- Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/sunxi-ng/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-index 9fa6e7a758ad..704fb31962f2 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-@@ -36,7 +36,7 @@ D-PHY
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 826674d090fd..99cf8103474c 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -63,6 +63,8 @@ config SUN8I_V3S_CCU
  
- Required properties:
-   - compatible: value must be one of:
--    * allwinner,sun6i-a31-mipi-dphy
-+    * "allwinner,sun50i-a64-mipi-dphy", "allwinner,sun6i-a31-mipi-dphy"
-   - reg: base address and size of memory-mapped region
-   - clocks: phandles to the clocks feeding the DSI encoder
-     * bus: the DSI interface clock
+ config SUN8I_DE2_CCU
+ 	bool "Support for the Allwinner SoCs DE2 CCU"
++	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
++	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI)
+ 
+ config SUN8I_R40_CCU
+ 	bool "Support for the Allwinner R40 CCU"
 -- 
 2.18.0.321.gffc6fa0e3
