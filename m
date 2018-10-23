@@ -1,55 +1,57 @@
-From: Ramana.Radhakrishnan@arm.com (Ramana Radhakrishnan)
-Date: Tue, 23 Oct 2018 08:36:16 +0000
-Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
-In-Reply-To: <20181019111542.6wrvjguirglzg7vg@mbp>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <20181005084754.20950-8-kristina.martsenko@arm.com>
- <20181019111542.6wrvjguirglzg7vg@mbp>
-Message-ID: <5ca5bf92-f2b7-48c9-ea41-5efeff09a799@arm.com>
+From: xiaoning.wang@nxp.com (Clark Wang)
+Date: Tue, 23 Oct 2018 08:36:17 +0000
+Subject: [PATCH] ARM: dts: fix imx7d boot spi dma setup error
+Message-ID: <20181023083356.17579-1-xiaoning.wang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/2018 12:15, Catalin Marinas wrote:
-> On Fri, Oct 05, 2018 at 09:47:44AM +0100, Kristina Martsenko wrote:
->> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
->> new file mode 100644
->> index 000000000000..2aefedc31d9e
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/pointer_auth.h
->> @@ -0,0 +1,63 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +#ifndef __ASM_POINTER_AUTH_H
->> +#define __ASM_POINTER_AUTH_H
->> +
->> +#include <linux/random.h>
->> +
->> +#include <asm/cpufeature.h>
->> +#include <asm/sysreg.h>
->> +
->> +#ifdef CONFIG_ARM64_PTR_AUTH
->> +/*
->> + * Each key is a 128-bit quantity which is split across a pair of 64-bit
->> + * registers (Lo and Hi).
->> + */
->> +struct ptrauth_key {
->> +	unsigned long lo, hi;
->> +};
->> +
->> +/*
->> + * We give each process its own instruction A key (APIAKey), which is shared by
->> + * all threads. This is inherited upon fork(), and reinitialised upon exec*().
->> + * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
->> + * instructions behaving as NOPs.
->> + */
-> 
-> I don't remember the past discussions but I assume the tools guys are ok
-> with a single key shared by multiple threads. Ramana, could you ack this
-> part, FTR?
+Add dmas and dma-names for ecspi1~4 to fix kernel boot error:
+"spi_imx 30840000.ecspi: dma setup error -19, use pio".
 
-Sorry about the slow response, I've been traveling.
+Signed-off-by: Xiaoning Wang <xiaoning.wang@nxp.com>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Ack and Will's response covers the reasons why pretty well. A prctl call 
-would be a good enhancement.
-
-regards
-Ramana
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index aa8df7d93b2e..043e39124c43 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -651,6 +651,8 @@
+ 				clocks = <&clks IMX7D_ECSPI4_ROOT_CLK>,
+ 					<&clks IMX7D_ECSPI4_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 6 7 1>, <&sdma 7 7 2>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -732,6 +734,8 @@
+ 					clocks = <&clks IMX7D_ECSPI1_ROOT_CLK>,
+ 						<&clks IMX7D_ECSPI1_ROOT_CLK>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 0 7 1>, <&sdma 1 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -744,6 +748,8 @@
+ 					clocks = <&clks IMX7D_ECSPI2_ROOT_CLK>,
+ 						<&clks IMX7D_ECSPI2_ROOT_CLK>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 2 7 1>, <&sdma 3 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -756,6 +762,8 @@
+ 					clocks = <&clks IMX7D_ECSPI3_ROOT_CLK>,
+ 						<&clks IMX7D_ECSPI3_ROOT_CLK>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 4 7 1>, <&sdma 5 7 2>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+-- 
+2.17.1
