@@ -1,39 +1,37 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 23 Oct 2018 21:20:32 +0530
-Subject: [PATCH v2 12/15] clk: sunxi-ng: a64: Add min and max rate for PLL_MIPI
+Date: Tue, 23 Oct 2018 21:20:33 +0530
+Subject: [PATCH v2 13/15] dt-bindings: sun6i-dsi: Add compatible for A64 DPHY
 In-Reply-To: <20181023155035.9101-1-jagan@amarulasolutions.com>
 References: <20181023155035.9101-1-jagan@amarulasolutions.com>
-Message-ID: <20181023155035.9101-13-jagan@amarulasolutions.com>
+Message-ID: <20181023155035.9101-14-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A64 manual say PLL_MIPI rates are 500MHz to 1.4GHz, but
-using minimum 500MHz can't release the clock and which
-is not working.
+The MIPI DSI PHY HDMI controller on Allwinner A64 is similar
+on the one on A31.
 
-So use working minimum rate as 300MHz which is tested on
-Bananapi DSI panel.
+Add A64 compatible and append A31 compatible as fallback.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
 - new patch
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-index 019d67bf97c4..5a3a5b821f8b 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-@@ -167,6 +167,8 @@ static struct ccu_nkm pll_mipi_clk = {
- 	.n		= _SUNXI_CCU_MULT(8, 4),
- 	.k		= _SUNXI_CCU_MULT_MIN(4, 2, 2),
- 	.m		= _SUNXI_CCU_DIV(0, 4),
-+	.min_rate	= 300000000,		/* Actual rate is 500MHz */
-+	.max_rate	= 1400000000UL,
- 	.common		= {
- 		.reg		= 0x040,
- 		.hw.init	= CLK_HW_INIT("pll-mipi", "pll-video0",
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+index 9fa6e7a758ad..704fb31962f2 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+@@ -36,7 +36,7 @@ D-PHY
+ 
+ Required properties:
+   - compatible: value must be one of:
+-    * allwinner,sun6i-a31-mipi-dphy
++    * "allwinner,sun50i-a64-mipi-dphy", "allwinner,sun6i-a31-mipi-dphy"
+   - reg: base address and size of memory-mapped region
+   - clocks: phandles to the clocks feeding the DSI encoder
+     * bus: the DSI interface clock
 -- 
 2.18.0.321.gffc6fa0e3
