@@ -1,49 +1,45 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Tue, 23 Oct 2018 18:03:42 +0530
-Subject: [PATCH v2] mm: Introduce new function vm_insert_kmem_page
-In-Reply-To: <20181023122435.GB20085@bombadil.infradead.org>
-References: <CANiq72mkTP_m20vqei-cpN+ypQ_gU472qn5m68vb_4Nqj5afMQ@mail.gmail.com>
- <CAFqt6zaFc_GenhfvsD0VPfepR-jjXypj+4CgNEuHMVq1WXV+8w@mail.gmail.com>
- <CANiq72kVJn7985EET067Dgj+z0dwb0x2MTUnREMWKCVU6=WnJA@mail.gmail.com>
- <CAFqt6zZ4sPjtb5BaDfwc5tZv+vMj6ao3NJZ_3quX9AH5pCMwJg@mail.gmail.com>
- <CANiq72m9u1PL9X+dPNLxgkhvttj=4ijLyM2sFex=Kws7wswKzw@mail.gmail.com>
- <CAFqt6zYH4Aczu8AYke8AfGuMS70SJXCMn-n8X8C_Tz03gTjn8g@mail.gmail.com>
- <CANiq72kRAZE9SyM4EkpaBZH03Ex0Z=4Pk2iOuc2jBDKTfKjHQg@mail.gmail.com>
- <CAFqt6zZCCPFE3sQ3u_gjiN8wwd99nwWatk9JRsiGxbCwhi91mg@mail.gmail.com>
- <CANiq72k-e_j67==VdrayqggjAd7MAfpaJS-_0=jkmh4OWynukQ@mail.gmail.com>
- <CAFqt6zZ2yHkVcbYtK1dxr9B3K5WVYGboavjP1ibmYei0u4zFbQ@mail.gmail.com>
- <20181023122435.GB20085@bombadil.infradead.org>
-Message-ID: <CAFqt6zZp=UsSGH148=tPWLnSxC51EGdR0Vv4f5tP58MO-6OS_w@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 23 Oct 2018 14:41:37 +0200
+Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
+In-Reply-To: <AM0PR04MB42119A454DD2F53590BCE7FF80F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
+ <20181023120401.GO30658@n2100.armlinux.org.uk>
+ <AM0PR04MB42119A454DD2F53590BCE7FF80F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20181023124137.wivishetiasdytfr@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 5:54 PM Matthew Wilcox <willy@infradead.org> wrote:
->
-> On Tue, Oct 23, 2018 at 05:44:32PM +0530, Souptick Joarder wrote:
-> > On Sat, Oct 6, 2018 at 4:19 PM Miguel Ojeda
-> > <miguel.ojeda.sandonis@gmail.com> wrote:
-> > >
-> > > On Sat, Oct 6, 2018 at 7:11 AM Souptick Joarder <jrdr.linux@gmail.com> wrote:
-> > > >
-> > > > On Fri, Oct 5, 2018 at 11:39 PM Miguel Ojeda
-> > > > <miguel.ojeda.sandonis@gmail.com> wrote:
-> > > > > They are not supposed to be "steps". You did it with 70+ commits (!!)
-> > > > > over the course of several months. Why a tree wasn't created, stuff
-> > > > > developed there, and when done, submitted it for review?
-> > > >
-> > > > Because we already have a plan for entire vm_fault_t migration and
-> > > > the * instruction * was to send one patch per driver.
-> > >
-> > > The instruction?
-> >
-> > Sorry for the delayed response.
-> > Instruction from Matthew  Wilcox who is supervising the entire vm_fault_t
-> > migration work :-)
->
-> Hang on.  That was for the initial vm_fault_t conversion in which each
-> step was clearly an improvement.  What you're looking at now is far
-> from that.
+On Tue, Oct 23, 2018 at 12:23:12PM +0000, A.s. Dong wrote:
+> Hi Russell,
+> 
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
+> > Sent: Tuesday, October 23, 2018 8:04 PM
+> [...]
+> > On Tue, Oct 23, 2018 at 11:49:17AM +0000, A.s. Dong wrote:
+> > > +	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
+> > > +	clk_port = devm_clk_get(&pdev->dev, "port");
+> > > +	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
+> > > +	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
+> > 
+> > 	if (clk_gpio == ERR_PTR(-EPROBE_DEFER) ||
+> > 	    clk_port == ERR_PTR(-EPROBE_DEFER)) {
+> > 
+> 
+> Thanks for the suggestion. I will update it in next series.
+> Before that, let's wait a moment to see if any more review comments.
+> 
+> BTW, as I see kernel currently is widely using PTR_ERR(ptr) to compare
+> -EPROBE_DEFER, I'm not quite get the point why the new approach
+> you suggested is better, is it less error-prone? Or something else?
+> would you please help clarify a bit more?
 
-Ok. But my understanding was, the approach of vm_insert_range comes
-into discussion as part of converting vm_insert_page into vmf_insert_page
-which is still part of original vm_fault_t conversion discussion.  No ?
+See the discussion in https://lore.kernel.org/patchwork/patch/999602/.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
