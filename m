@@ -1,100 +1,126 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Oct 2018 07:40:34 -0300
-Subject: [RFC PATCH v2 11/12] crypto: adiantum - add Adiantum support
-In-Reply-To: <20181020071206.GE876@sol.localdomain>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <20181015175424.97147-12-ebiggers@kernel.org>
- <CAKv+Gu9wrOOk-LGPYmxgLbv86uXzMeHN6th3mMEDT3Vg893HWw@mail.gmail.com>
- <20181020071206.GE876@sol.localdomain>
-Message-ID: <CAKv+Gu9zBKK7ughbBAKkHdfgX2KrBXkF6MhH3xrSdLegrjjYJQ@mail.gmail.com>
+From: tony.xie@rock-chips.com (Tony Xie)
+Date: Tue, 23 Oct 2018 19:36:52 +0800
+Subject: [PATCH v5 5/5] clk: RK808: add RK809 and RK817 support.
+In-Reply-To: <1540294467-25813-1-git-send-email-tony.xie@rock-chips.com>
+References: <1540294467-25813-1-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <1540294612-25991-1-git-send-email-tony.xie@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2018 at 15:12, Eric Biggers <ebiggers@kernel.org> wrote:
-> Hi Ard,
->
-> On Sat, Oct 20, 2018 at 12:17:58PM +0800, Ard Biesheuvel wrote:
->> On 16 October 2018 at 01:54, Eric Biggers <ebiggers@kernel.org> wrote:
->> > From: Eric Biggers <ebiggers@google.com>
->> >
->> > Add support for the Adiantum encryption mode.  Adiantum was designed by
->> > Paul Crowley and is specified by our paper:
->> >
->> >     Adiantum: length-preserving encryption for entry-level processors
->> >     (https://eprint.iacr.org/2018/720.pdf)
->> >
->> > See our paper for full details; this patch only provides an overview.
->> >
->> > Adiantum is a tweakable, length-preserving encryption mode designed for
->> > fast and secure disk encryption, especially on CPUs without dedicated
->> > crypto instructions.  Adiantum encrypts each sector using the XChaCha12
->> > stream cipher, two passes of an ?-almost-?-universal (?A?U) hash
->> > function, and an invocation of the AES-256 block cipher on a single
->> > 16-byte block.  On CPUs without AES instructions, Adiantum is much
->> > faster than AES-XTS; for example, on ARM Cortex-A7, on 4096-byte sectors
->> > Adiantum encryption is about 4 times faster than AES-256-XTS encryption,
->> > and decryption about 5 times faster.
->> >
->> > Adiantum is a specialization of the more general HBSH construction.  Our
->> > earlier proposal, HPolyC, was also a HBSH specialization, but it used a
->> > different ?A?U hash function, one based on Poly1305 only.  Adiantum's
->> > ?A?U hash function, which is based primarily on the "NH" hash function
->> > like that used in UMAC (RFC4418), is about twice as fast as HPolyC's;
->> > consequently, Adiantum is about 20% faster than HPolyC.
->> >
->> > This speed comes with no loss of security: Adiantum is provably just as
->> > secure as HPolyC, in fact slightly *more* secure.  Like HPolyC,
->> > Adiantum's security is reducible to that of XChaCha12 and AES-256,
->> > subject to a security bound.  XChaCha12 itself has a security reduction
->> > to ChaCha12.  Therefore, one need not "trust" Adiantum; one need only
->> > trust ChaCha12 and AES-256.  Note that the ?A?U hash function is only
->> > used for its proven combinatorical properties so cannot be "broken".
->> >
->>
->> So what happens if the part of the input covered by the block cipher
->> is identical between different generations of the same disk block
->> (whose sector count is used as the 'outer' IV). How are we not in the
->> same boat as before when using stream ciphers for disk encryption?
->>
->
-> This is the point of the hash step.  The value encrypted with the block cipher
-> to produce the intermediate value C_M (used as the stream cipher nonce) is
-> H(T, P_L) + P_R.  (T is the tweak a.k.a the IV, P_L is the plaintext except the
-> last 16 bytes, P_R is the last 16 bytes.)  A collision in this value occurs iff:
->
->         H(T1, P1_L) + P1_R = H(T2, P2_L) + P2_R
-> i.e.
->         H(T1, P1_L) - H(T2, P2_L) = P2_R - P1_R
->
-> If (T1, P1_L) = (T2, P2_L) then P1_R != P2_R so the equation has no solutions
-> (since we don't consider queries where the whole input is the same; those
-> unavoidably produce the same ciphertext).  Otherwise (T1, P1_L) != (T2, P2_L),
-> and since the hash function H is ?-almost-?-universal over integers mod 2^128,
-> the equation is true for at most a very small proportion '?' of hash keys.
-> But, the hash key is chosen at random and is unknown to the attacker.
->
-> The same applies in the other direction, for chosen ciphertext attacks.
->
-> Basically, it's very difficult for an attacker to cause the intermediate value
-> C_M to be reused, and the outputs will appear random until they do.
->
-> Of course, all this is explained much more precisely and comprehensively in our
-> paper.  See section 5, "Security reduction".
->
+RK809 and RK817 are power management IC chips for multimedia products.
+most of their functions and registers are same, including the clkout
+funciton.
 
-Thanks for the explanation. I saw that the result of the AES
-encryption was used as the XChaCha nonce, but I failed to spot that
-the result of the nhpoly1305 pass is added/subtracted to/from that
-particular block first.
+Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
+---
+ drivers/clk/Kconfig     |  9 ++++---
+ drivers/clk/clk-rk808.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 67 insertions(+), 6 deletions(-)
 
-In any case, this looks good to me: as far as I can tell, the code
-implements the algorithm as described in the paper, and the plumbing
-into the crypto API looks correct to me as well.
-
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Whether the paper is correct is a different matter: it looks
-convincing to me but IANAC.
-
-The only request I have is to add a speed test to tcrypt as well so we
-can easily benchmark it.
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 721572a..92cf5ad 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -46,13 +46,12 @@ config COMMON_CLK_MAX77686
+ 	  clock.
+ 
+ config COMMON_CLK_RK808
+-	tristate "Clock driver for RK805/RK808/RK818"
++	tristate "Clock driver for RK805/RK808/RK809/RK817/RK818"
+ 	depends on MFD_RK808
+ 	---help---
+-	  This driver supports RK805, RK808 and RK818 crystal oscillator clock. These
+-	  multi-function devices have two fixed-rate oscillators,
+-	  clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
+-	  by control register.
++	  This driver supports RK805, RK809 and RK817, RK808 and RK818 crystal oscillator clock.
++	  These multi-function devices have two fixed-rate oscillators, clocked at 32KHz each.
++	  Clkout1 is always on, Clkout2 can off by control register.
+ 
+ config COMMON_CLK_HI655X
+ 	tristate "Clock driver for Hi655x" if EXPERT
+diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
+index 6461f28..7f9a56b 100644
+--- a/drivers/clk/clk-rk808.c
++++ b/drivers/clk/clk-rk808.c
+@@ -96,6 +96,68 @@ static int rk808_clkout2_is_prepared(struct clk_hw *hw)
+ 	return idx ? &rk808_clkout->clkout2_hw : &rk808_clkout->clkout1_hw;
+ }
+ 
++static int rk817_clkout2_enable(struct clk_hw *hw, bool enable)
++{
++	struct rk808_clkout *rk808_clkout = container_of(hw,
++							 struct rk808_clkout,
++							 clkout2_hw);
++	struct rk808 *rk808 = rk808_clkout->rk808;
++
++	return regmap_update_bits(rk808->regmap, RK817_SYS_CFG(1),
++				  RK817_CLK32KOUT2_EN,
++				  enable ? RK817_CLK32KOUT2_EN : 0);
++}
++
++static int rk817_clkout2_prepare(struct clk_hw *hw)
++{
++	return rk817_clkout2_enable(hw, true);
++}
++
++static void rk817_clkout2_unprepare(struct clk_hw *hw)
++{
++	rk817_clkout2_enable(hw, false);
++}
++
++static int rk817_clkout2_is_prepared(struct clk_hw *hw)
++{
++	struct rk808_clkout *rk808_clkout = container_of(hw,
++							 struct rk808_clkout,
++							 clkout2_hw);
++	struct rk808 *rk808 = rk808_clkout->rk808;
++	unsigned int val;
++
++	int ret = regmap_read(rk808->regmap, RK817_SYS_CFG(1), &val);
++
++	if (ret < 0)
++		return 0;
++
++	return (val & RK817_CLK32KOUT2_EN) ? 1 : 0;
++}
++
++static const struct clk_ops rk817_clkout2_ops = {
++	.prepare = rk817_clkout2_prepare,
++	.unprepare = rk817_clkout2_unprepare,
++	.is_prepared = rk817_clkout2_is_prepared,
++	.recalc_rate = rk808_clkout_recalc_rate,
++};
++
++static const struct clk_ops *rkpmic_get_ops(long variant)
++{
++	switch (variant) {
++	case RK809_ID:
++	case RK817_ID:
++		return &rk817_clkout2_ops;
++	/*
++	 * For the default case, it match the following PMIC type.
++	 * RK805_ID
++	 * RK808_ID
++	 * RK818_ID
++	 */
++	default:
++		return &rk808_clkout2_ops;
++	}
++}
++
+ static int rk808_clkout_probe(struct platform_device *pdev)
+ {
+ 	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
+@@ -127,7 +189,7 @@ static int rk808_clkout_probe(struct platform_device *pdev)
+ 		return ret;
+ 
+ 	init.name = "rk808-clkout2";
+-	init.ops = &rk808_clkout2_ops;
++	init.ops = rkpmic_get_ops(rk808->variant);
+ 	rk808_clkout->clkout2_hw.init = &init;
+ 
+ 	/* optional override of the clockname */
+-- 
+1.9.1
