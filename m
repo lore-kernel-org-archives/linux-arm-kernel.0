@@ -1,40 +1,40 @@
-From: oskari@lemmela.net (Oskari Lemmela)
-Date: Tue, 23 Oct 2018 21:53:22 +0300
-Subject: [PATCH v5 03/11] dt-bindings: gpio: gpio-axp209: add AXP803 GPIO
- bindings
-In-Reply-To: <20181023185330.10472-1-oskari@lemmela.net>
-References: <20181023185330.10472-1-oskari@lemmela.net>
-Message-ID: <20181023185330.10472-4-oskari@lemmela.net>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 23 Oct 2018 15:35:31 -0500
+Subject: [PATCH] ARM: debug: enable UART1 for socfpga Cyclone5
+In-Reply-To: <CAJiuCceZr8NsDgBJgA2y61VHdQ3JYQ6_3r4jKooKLbVfRD8eJQ@mail.gmail.com>
+References: <20181009112837.2517-1-peron.clem@gmail.com>
+ <e761c76d-a806-402a-b25b-04aee9329dbc@kernel.org>
+ <CAJiuCceZr8NsDgBJgA2y61VHdQ3JYQ6_3r4jKooKLbVfRD8eJQ@mail.gmail.com>
+Message-ID: <74512aef-d551-30af-b4cf-25f48047a4ac@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP803 GPIO is compatible with AXP813 GPIO, but add
-specific compatible for it.
 
-Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
----
- Documentation/devicetree/bindings/gpio/gpio-axp209.txt | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-index fc42b2caa06d..5337a21d7bcf 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-@@ -11,6 +11,7 @@ This driver employs the per-pin muxing pattern.
- Required properties:
- - compatible: Should be one of:
- 	- "x-powers,axp209-gpio"
-+	- "x-powers,axp803-gpio"
- 	- "x-powers,axp813-gpio"
- - #gpio-cells: Should be two. The first cell is the pin number and the
-   second is the GPIO flags.
-@@ -67,6 +68,7 @@ GPIO0	|	gpio_in, gpio_out, ldo, adc
- GPIO1	|	gpio_in, gpio_out, ldo, adc
- GPIO2	|	gpio_in, gpio_out
- 
-+axp803
- axp813
- ------
- GPIO	|	Functions
--- 
-2.17.1
+On 10/23/2018 09:44 AM, Cl?ment P?ron wrote:
+> HI Dinh,
+> 
+> On Tue, 23 Oct 2018 at 16:04, Dinh Nguyen <dinguyen@kernel.org> wrote:
+>>
+>> Hi Cl?ment,
+>>
+>> On 10/09/2018 06:28 AM, Cl?ment P?ron wrote:
+>>> Cyclone5 and Arria10 doesn't have the same memory map for UART1.
+>>>
+>>> Split the SOCFPGA_UART1 into 2 options to allow debugging on UART1 for Cylone5.
+>>>
+>>
+>> I'm not sure the need for this patch. Are there any cyclone5 based
+>> boards that has UART1 as the debug uart? I see that all of them are
+>> using UART0.
+> 
+> There is no upstream device with this UART used. But the board I have
+> use it, and there is no limitation to not have it available upstream
+> no ?
+> 
+
+I see. Then I don't think the patch is applicable because none of the
+upstream devices need it. Now, if you were to upstream your board that
+uses UART1, then there will be a case for this patch. Do you agree?
+
+Dinh
