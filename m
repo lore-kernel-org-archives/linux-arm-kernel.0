@@ -1,45 +1,52 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 23 Oct 2018 11:49:03 +0000
-Subject: [PATCH V2 1/8] dt-bindings: fsl: add compatible for imx7ulp evk
+Date: Tue, 23 Oct 2018 11:49:13 +0000
+Subject: [PATCH V2 3/8] dt-bindings: gpio: vf610: add optional clocks property
 In-Reply-To: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
 References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1540295058-26090-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1540295058-26090-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On some SoCs(e.g. MX7ULP), GPIO clock is gatable and maybe
+disabled by default. Users have to make sure it's enabled before
+being able to access controller registers, otherwise an external
+abort error may occur. Let's add the optional clocks property to
+handle this case.
+
+For ULP GPIO clock, it includes two separate clocks: one is for
+GPIO controller Input/Output function clock while another is
+GPIO port control clock for interrupt function.
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: linux-gpio at vger.kernel.org
 Cc: devicetree at vger.kernel.org
-Cc: Shawn Guo <shawnguo@kernel.org>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+v1->v2:
+ * new patch
+---
+ Documentation/devicetree/bindings/gpio/gpio-vf610.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 7b964d8..9c7c788 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -101,6 +101,10 @@ i.MX7 SabreSD Board
- Required root node properties:
-     - compatible = "fsl,imx7d-sdb", "fsl,imx7d";
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+index 0ccbae4..ae254aa 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+@@ -24,6 +24,12 @@ Required properties for GPIO node:
+       4 = active high level-sensitive.
+       8 = active low level-sensitive.
  
-+i.MX7ULP Evaluation Kit
-+Required root node properties:
-+    - compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp";
++Optional properties:
++-clocks:	Must contain an entry for each entry in clock-names.
++		See common clock-bindings.txt for details.
++-clock-names:	A list of clock names. For imx7ulp, it must contain
++		"gpio", "port".
 +
- Generic i.MX boards
- -------------------
- 
-@@ -123,6 +127,10 @@ i.MX6q generic board
- Required root node properties:
-     - compatible = "fsl,imx6q";
- 
-+i.MX7ULP generic board
-+Required root node properties:
-+    - compatible = "fsl,imx7ulp";
-+
- Freescale Vybrid Platform Device Tree Bindings
- ----------------------------------------------
+ Note: Each GPIO port should have an alias correctly numbered in "aliases"
+ node.
  
 -- 
 2.7.4
