@@ -1,60 +1,61 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 23 Oct 2018 21:20:29 +0530
-Subject: [PATCH v2 09/15] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
- start delay
+Date: Tue, 23 Oct 2018 21:20:30 +0530
+Subject: [PATCH v2 10/15] dt-bindings: panel: Add Bananapi S070WV20-CT16
+ ICN6211 MIPI-DSI to RGB bridge
 In-Reply-To: <20181023155035.9101-1-jagan@amarulasolutions.com>
 References: <20181023155035.9101-1-jagan@amarulasolutions.com>
-Message-ID: <20181023155035.9101-10-jagan@amarulasolutions.com>
+Message-ID: <20181023155035.9101-11-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Accordingly to BPI-M64-bsp DE DSI code Video start delay
-can be computed by subtracting total vertical timing with
-front porch timing and with adding 1 delay line for TCON.
+Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB bridge panel,
+the same panel PCB comes with parallel RBG which is supported via
+panel-simple driver with "bananapi,s070wv20-ct16" compatible.
 
-Video start delay is computed in BPI-M64-bsp code as
-linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c
+But this binding is specific for MIPI DSI to RGB bridge panels,
+which usually accessed using MIPI DSI controller driver.
 
-u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
-=> (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
-=> (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
-   - panel->lcd_y - (panel->lcd_vbp)
-=> timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
-  			     - panel->lcd_y - panel->lcd_vbp
-=> timmings->ver_front_porch
-
-So, update the start delay computation accordingly.
+for information:
+- "bananapi,s070wv20-ct16" compatible for parallel RGB panels
+- "bananapi,s070wv20-ct16-icn6211" compatible for MIPI-DSI to RGB
+bridge panels
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
 - Add detailed commit message
+- Update the bindings as MIPI-DSI to RGB bridge
 
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ .../panel/bananapi,s070wv20-ct16-icn6211.txt  | 21 +++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 8d154cf2e6d6..6bece492b1f7 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
- static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
- 					   struct drm_display_mode *mode)
- {
--	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-+	u32 vfp = mode->vsync_start - mode->vdisplay;
-+	u32 start_delay;
+diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt
+new file mode 100644
+index 000000000000..68a89b6feaee
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-icn6211.txt
+@@ -0,0 +1,21 @@
++Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB bridge
 +
-+	start_delay = mode->vtotal - vfp + 1;
-+	if (start_delay > mode->vtotal)
-+		start_delay -= mode->vtotal;
++Required properties:
++- compatible: must be "bananapi,s070wv20-ct16-icn6211"
++- reg: DSI virtual channel used by that screen
++- avdd-supply: analog regulator dc1 switch
++- dvdd-supply: 3v3 digital regulator
++- reset-gpios: a GPIO phandle for the reset pin
 +
-+	if (!start_delay)
-+		start_delay = 1;
++Optional properties:
++- backlight: phandle for the backlight control.
 +
-+	return start_delay;
- }
- 
- static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
++Example:
++panel at 0 {
++	compatible = "bananapi,s070wv20-ct16-icn6211";
++	reg = <0>;
++	avdd-supply = <&reg_dc1sw>;
++	dvdd-supply = <&reg_dldo1>;
++	reset-gpios = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
++	backlight = <&backlight_dsi>;
++};
 -- 
 2.18.0.321.gffc6fa0e3
