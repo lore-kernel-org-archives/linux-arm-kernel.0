@@ -1,92 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 Oct 2018 12:10:46 +0100
-Subject: [RESEND PATCH v3 3/3] sh: add the sh_ prefix to early platform
- symbols
-In-Reply-To: <20180827090651.25062-4-brgl@bgdev.pl>
-References: <20180827090651.25062-1-brgl@bgdev.pl>
- <20180827090651.25062-4-brgl@bgdev.pl>
-Message-ID: <8636swude1.wl-marc.zyngier@arm.com>
+From: tony.xie@rock-chips.com (Tony Xie)
+Date: Tue, 23 Oct 2018 19:34:22 +0800
+Subject: [PATCH v5 0/5] support a new type of PMIC,
+ including two chips(rk817 and rk809)
+Message-ID: <1540294467-25813-1-git-send-email-tony.xie@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+Most of functions and registers of the rk817 and rk808 are the same,
+so they can share allmost all codes.
 
-On Mon, 27 Aug 2018 10:06:51 +0100,
-Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> 
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> Old early platform device support is now sh-specific. Before moving on
-> to implementing new early platform framework based on real platform
-> devices, prefix all early platform symbols with 'sh_'.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/sh/drivers/platform_early.c       | 66 +++++++++++++-------------
->  arch/sh/include/asm/platform_early.h   | 30 ++++++------
->  arch/sh/kernel/cpu/sh2/setup-sh7619.c  |  2 +-
->  arch/sh/kernel/cpu/sh2a/setup-mxg.c    |  2 +-
->  arch/sh/kernel/cpu/sh2a/setup-sh7201.c |  2 +-
->  arch/sh/kernel/cpu/sh2a/setup-sh7203.c |  2 +-
->  arch/sh/kernel/cpu/sh2a/setup-sh7206.c |  2 +-
->  arch/sh/kernel/cpu/sh2a/setup-sh7264.c |  2 +-
->  arch/sh/kernel/cpu/sh2a/setup-sh7269.c |  2 +-
->  arch/sh/kernel/cpu/sh3/setup-sh7705.c  |  2 +-
->  arch/sh/kernel/cpu/sh3/setup-sh770x.c  |  2 +-
->  arch/sh/kernel/cpu/sh3/setup-sh7710.c  |  2 +-
->  arch/sh/kernel/cpu/sh3/setup-sh7720.c  |  2 +-
->  arch/sh/kernel/cpu/sh4/setup-sh4-202.c |  2 +-
->  arch/sh/kernel/cpu/sh4/setup-sh7750.c  |  8 ++--
->  arch/sh/kernel/cpu/sh4/setup-sh7760.c  |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7343.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7366.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7722.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7723.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7724.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7734.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7757.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7763.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7770.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7780.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7785.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-sh7786.c |  2 +-
->  arch/sh/kernel/cpu/sh4a/setup-shx3.c   |  2 +-
->  arch/sh/kernel/cpu/sh5/setup-sh5.c     |  2 +-
->  arch/sh/kernel/setup.c                 |  2 +-
->  arch/sh/kernel/time.c                  |  4 +-
->  drivers/clocksource/sh_cmt.c           |  6 +--
->  drivers/clocksource/sh_mtu2.c          |  6 +--
->  drivers/clocksource/sh_tmu.c           |  6 +--
->  drivers/tty/serial/sh-sci.c            |  4 +-
->  include/linux/platform_device.h        |  2 +-
->  37 files changed, 94 insertions(+), 94 deletions(-)
-> 
-> diff --git a/arch/sh/drivers/platform_early.c b/arch/sh/drivers/platform_early.c
-> index 3dfe9f3541bb..f6d148451dfc 100644
-> --- a/arch/sh/drivers/platform_early.c
-> +++ b/arch/sh/drivers/platform_early.c
-> @@ -4,8 +4,8 @@
->  #include <linux/mod_devicetable.h>
->  #include <linux/pm.h>
->  
-> -static __initdata LIST_HEAD(early_platform_driver_list);
-> -static __initdata LIST_HEAD(early_platform_device_list);
-> +static __initdata LIST_HEAD(sh_early_platform_driver_list);
-> +static __initdata LIST_HEAD(sh_early_platform_device_list);
+Their specifications are as follows??
+  1) The RK809 and RK809 consist of 5 DCDCs, 9 LDOs and have the same registers
+     for these components except dcdc5.
+  2) The dcdc5 is a boost dcdc for RK817 and is a buck for RK809.
+  3) The RK817 has one switch but The Rk809 has two.
 
-As discussed offline at ELC, I don't think this patch is useful at
-this stage, and in the context of this particular series. I believe it
-should be dropped and only the first two patches should be merged. If
-the SH maintainer is not responsive, then maybe Greg could take them
-as they remove cruft from core code.
+Changes in V2:
+1. initialize the pm_pwroff_fn to NULL. 
+2. use EXPORT_SYMBOL_GPL to export pm_power_off_prepare.
+3. change patch 2/3/4/5 subjects. 
 
-As for the whole "early device" debate, my take is that we'd be much
-better off making the device model available early, rather than trying
-to architect something that is simply papering over the issue.
+Changes in V3??
+1. change patch 4 subjects
+2. replace pr_ with dev_ for printing in patch 2
+3. modify switch1 and switch2 configs in patch 2
+4. explain gpio information for rk809 and rk817 in patch 4
 
-Thanks,
+Changes in V4:
+1. modify some codes for patch 2 and patch 5 according to comments 
+2. add reviewer mail lists for patch 3 and 4
 
-	M.
+Changes in V5:
+modify some codes for patch 1 according to reveiw comments for v3.
+ 1) remove the pm_power_off_prepare() and replace with shutdown call-back from syscore
+ 2) move the macro REGMAP_IRQ_M into the regmap.h and rename it REGMAP_IRQ_LINE
+ 3) make some dev_warn() log clear
+
+Tony Xie (5):
+  mfd: rk808: Add RK817 and RK809 support
+  regulator: rk808: add RK809 and RK817 support.
+  dt-bindings: mfd: rk808: Add binding information for RK809 and RK817.
+  rtc: rk808: add RK809 and RK817 support.
+  clk: RK808: add RK809 and RK817 support.
+
+ Documentation/devicetree/bindings/mfd/rk808.txt |  44 ++
+ drivers/clk/Kconfig                             |   9 +-
+ drivers/clk/clk-rk808.c                         |  64 ++-
+ drivers/mfd/Kconfig                             |   6 +-
+ drivers/mfd/rk808.c                             | 225 +++++++-
+ drivers/regulator/Kconfig                       |   4 +-
+ drivers/regulator/rk808-regulator.c             | 657 +++++++++++++++++++++++-
+ drivers/rtc/Kconfig                             |   4 +-
+ drivers/rtc/rtc-rk808.c                         |  68 ++-
+ include/linux/mfd/rk808.h                       | 175 +++++++
+ include/linux/regmap.h                          |   6 +
+ 11 files changed, 1193 insertions(+), 69 deletions(-)
 
 -- 
-Jazz is not dead, it just smell funny.
+1.9.1
