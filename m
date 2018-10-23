@@ -1,62 +1,68 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 23 Oct 2018 10:10:22 -0700
-Subject: [PATCH v2 03/15] clk: sunxi-ng: Add check for maximum rate to NKM
- PLLs
-In-Reply-To: <20181023155035.9101-4-jagan@amarulasolutions.com>
-References: <20181023155035.9101-1-jagan@amarulasolutions.com>
- <20181023155035.9101-4-jagan@amarulasolutions.com>
-Message-ID: <CA+E=qVcs0xT2Vqksjs4tz5eBtp_RZ_dqX0AEPfjSaJqA5YBt-g@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue, 23 Oct 2018 10:34:14 -0700
+Subject: [PATCH v2 00/10] Add support for TISCI irqchip drivers
+In-Reply-To: <050161aa-a257-9bf8-b3c9-35b13925b556@ti.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <942981b8-7536-2b6b-ad49-dc59671cbda6@oracle.com>
+ <050161aa-a257-9bf8-b3c9-35b13925b556@ti.com>
+Message-ID: <38811dd7-0645-0439-092d-6759ab52cb0a@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 8:51 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
->
-> Some NKM PLLs, frequency can be set above PLL working range.
->
-> Add a constraint for maximum supported rate. This way, drivers can
-> specify which is maximum allowed rate for PLL.
+On 10/23/2018 1:17 AM, Lokesh Vutla wrote:
+> Hi Santosh,
+> 
+> On Tuesday 23 October 2018 02:09 AM, Santosh Shilimkar wrote:
+>> On 10/18/2018 8:40 AM, Lokesh Vutla wrote:
+>>> TISCI abstracts the handling of IRQ routes where interrupt sources
+>>> are not directly connected to host interrupt controller. This series
+>>> adds support for:
+>>> - TISCI commands needed for IRQ configuration
+>>> - Interrupt Router(INTR) and Interrupt Aggregator(INTA) drivers
+>>>
+>>> More information on TISCI IRQ management can be found here[1].
+>>> Complete TISCI resource management information can be found here[2].
+>>> AM65x SoC related TISCI information can be found here[3].
+>>> INTR and INTA related information can be found in TRM[4].
+>>>
+>> I didn't read the specs but from what you described in
+>> INTA and INTR bindings, does the flow of IRQs like below ?
+>>
+>> Device IRQ(e.g USB) -->INTR-->INTA--->HOST IRQ controller(GIC)
+> 
+> Not all devices in SoC are connected to INTA. Only the devices that are 
+> capable of generating events are connected to INTA. And INTA is 
+> connected to INTR.
+> 
+> So there are three ways in which IRQ can flow in AM65x SoC:
+> 1) Device directly connected to GIC
+>  ????- Device IRQ --> GIC
+>  ????- (Most legacy peripherals like MMC, UART falls in this case)
+> 2) Device connected to INTR.
+>  ????- Device IRQ --> INTR --> GIC
+>  ????- This is cases where you want to mux IRQs. Used for GPIOs and 
+> Mailboxes
+>  ????- (This is somewhat similar to crossbar on DRA7 devices)
+> 3) Devices connected to INTA.
+>  ????- Device Event --> INTA --> INTR --> GIC
+>  ????- Used for DMA and networking devices.
+> 
+> Events are messages based on a hw protocol, sent by a master over a 
+> dedicated Event transport lane. Events are highly precise that no 
+> under/over flow of data transfer occurs at source/destination regardless 
+> of distance and latency. So this is mostly preferred in DMA and 
+> networking usecases. Now Interrupt Aggregator(IA) has the logic to 
+> converts these events to Interrupts.
+> 
+This helps but none of the kernel doc you added, makes this clear so
+perhaps you want to add this info to make that clear for reviewers
+as well as for future reference.
 
-I'd squash patches 2 and 3 into a single patch.
+Now regarding the events, no matter how they are routed/processed
+within SOC, they are essentially interrupts so I do agree with
+Marc's other comment.
 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - new patch
->
->  drivers/clk/sunxi-ng/ccu_nkm.c | 7 +++++++
->  drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
->  2 files changed, 8 insertions(+)
->
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> index d17539dc88dd..574fd2cd2a79 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> @@ -132,6 +132,13 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
->                 return rate;
->         }
->
-> +       if (nkm->max_rate && rate > nkm->max_rate) {
-> +               rate = nkm->max_rate;
-> +               if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +                       rate /= nkm->fixed_post_div;
-> +               return rate;
-> +       }
-> +
->         ccu_nkm_find_best(*parent_rate, rate, &_nkm);
->
->         rate = *parent_rate * _nkm.n * _nkm.k / _nkm.m;
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
-> index ff5bd00f429f..c82590481188 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nkm.h
-> +++ b/drivers/clk/sunxi-ng/ccu_nkm.h
-> @@ -36,6 +36,7 @@ struct ccu_nkm {
->
->         unsigned int            fixed_post_div;
->         unsigned int            min_rate;
-> +       unsigned int            max_rate;
->
->         struct ccu_common       common;
->  };
-> --
-> 2.18.0.321.gffc6fa0e3
->
+Thanks for explanation again !!
+
+regards,
+Santosh
