@@ -1,152 +1,59 @@
-From: rick.p.edgecombe@intel.com (Edgecombe, Rick P)
-Date: Mon, 22 Oct 2018 23:06:00 +0000
-Subject: [PATCH RFC v3 0/3] Rlimit for module space
-In-Reply-To: <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
-References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
- <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
-Message-ID: <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Tue, 23 Oct 2018 10:06:04 +0900
+Subject: [PATCH] ARM: kprobes: Fix false positive with FORTIFY_SOURCE
+In-Reply-To: <20181022093023.GA8920@beast>
+References: <20181022093023.GA8920@beast>
+Message-ID: <20181023100604.ea7a1a9b5c1c8904aab1b36b@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-10-20 at 19:20 +0200, Ard Biesheuvel wrote:
-> Hi Rick,
+On Mon, 22 Oct 2018 02:30:23 -0700
+Kees Cook <keescook@chromium.org> wrote:
+
+> The arm compiler internally interprets an inline assembly label
+> as an unsigned long value, not a pointer. As a result, under
+> CONFIG_FORTIFY_SOURCE, the size of the array pointed to by an address
+> of a label is 4 bytes, which was tripping the runtime checks. Instead,
+> we can just cast the label (as done with the size calculations earlier)
+> to avoid the problem.
 > 
-> On 19 October 2018 at 22:47, Rick Edgecombe <rick.p.edgecombe@intel.com>
-> wrote:
-> > If BPF JIT is on, there is no effective limit to prevent filling the entire
-> > module space with JITed e/BPF filters.
+> Reported-by: William Cohen <wcohen@redhat.com>
+> Fixes: 6974f0c4555e ("include/linux/string.h: add the option of fortified string.h functions")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+
+Good catch! This looks good to me.
+
+Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+
+Thank you,
+
+
+> ---
+>  arch/arm/probes/kprobes/opt-arm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Why do BPF filters use the module space, and does this reason apply to
-> all architectures?
+> diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+> index b2aa9b32bff2..2c118a6ab358 100644
+> --- a/arch/arm/probes/kprobes/opt-arm.c
+> +++ b/arch/arm/probes/kprobes/opt-arm.c
+> @@ -247,7 +247,7 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
+>  	}
+>  
+>  	/* Copy arch-dep-instance from template. */
+> -	memcpy(code, &optprobe_template_entry,
+> +	memcpy(code, (unsigned char *)optprobe_template_entry,
+>  			TMPL_END_IDX * sizeof(kprobe_opcode_t));
+>  
+>  	/* Adjust buffer according to instruction. */
+> -- 
+> 2.17.1
 > 
-> On arm64, we already support loading plain modules far away from the
-> core kernel (i.e. out of range for ordinary relative jump/calll
-> instructions), and so I'd expect BPF to be able to deal with this
-> already as well. So for arm64, I wonder why an ordinary vmalloc_exec()
-> wouldn't be more appropriate.
-AFAIK, it's like you said about relative instruction limits, but also because
-some predictors don't predict past a certain distance. So performance as well.
-Not sure the reasons for each arch, or if they all apply for BPF JIT. There seem
-to be 8 by my count, that have a dedicated module space for some reason.
-
-> So before refactoring the module alloc/free routines to accommodate
-> BPF, I'd like to take one step back and assess whether it wouldn't be
-> more appropriate to have a separate bpf_alloc/free API, which could be
-> totally separate from module alloc/free if the arch permits it.
 > 
-I am not a BPF JIT expert unfortunately, hopefully someone more authoritative
-will chime in. I only ran into this because I was trying to increase
-randomization for the module space and wanted to find out how many allocations
-needed to be supported.
+> -- 
+> Kees Cook
+> Pixel Security
 
-I'd guess though, that BPF JIT is just assuming that there will be some arch
-specific constraints about where text can be placed optimally and they would
-already be taken into account in the module space allocator.
 
-If there are no constraints for some arch, I'd wonder why not just update its
-module_alloc to use the whole space available. What exactly are the constraints
-for arm64 for normal modules?
-
-It seems fine to me for architectures to have the option of solving this a
-different way. If potentially the rlimit ends up being the best solution for
-some architectures though, do you think this refactor (pretty close to just a
-name change) is that intrusive?
-
-I guess it could be just a BPF JIT per user limit and not touch module space,
-but I thought the module space limit was a more general solution as that is the
-actual limited resource.
-
-> > For classic BPF filters attached with
-> > setsockopt SO_ATTACH_FILTER, there is no memlock rlimit check to limit the
-> > number of insertions like there is for the bpf syscall.
-> > 
-> > This patch adds a per user rlimit for module space, as well as a system wide
-> > limit for BPF JIT. In a previously reviewed patchset, Jann Horn pointed out
-> > the
-> > problem that in some cases a user can get access to 65536 UIDs, so the
-> > effective
-> > limit cannot be set low enough to stop an attacker and be useful for the
-> > general
-> > case. A discussed alternative solution was a system wide limit for BPF JIT
-> > filters. This much more simply resolves the problem of exhaustion and
-> > de-randomizing in the case of non-CONFIG_BPF_JIT_ALWAYS_ON. If
-> > CONFIG_BPF_JIT_ALWAYS_ON is on however, BPF insertions will fail if another
-> > user
-> > exhausts the BPF JIT limit. In this case a per user limit is still needed.
-> > If
-> > the subuid facility is disabled for normal users, this should still be ok
-> > because the higher limit will not be able to be worked aroThey might und
-> > that way.
-> > 
-> > The new BPF JIT limit can be set like this:
-> > echo 5000000 > /proc/sys/net/core/bpf_jit_limit
-> > 
-> > So I *think* this patchset should resolve that issue except for the
-> > configuration of CONFIG_BPF_JIT_ALWAYS_ON and subuid allowed for normal
-> > users.
-> > Better module space KASLR is another way to resolve the de-randomizing
-> > issue,
-> > and so then you would just be left with the BPF DOS in that configuration.
-> > 
-> > Jann also pointed out how, with purposely fragmenting the module space, you
-> > could make the effective module space blockage area much larger. This is
-> > also
-> > somewhat un-resolved. The impact would depend on how big of a space you are
-> > trying to allocate. The limit has been lowered on x86_64 so that at least
-> > typical sized BPF filters cannot be blocked.
-> > 
-> > If anyone with more experience with subuid/user namespaces has any
-> > suggestions
-> > I'd be glad to hear. On an Ubuntu machine it didn't seem like a un-
-> > privileged
-> > user could do this. I am going to keep working on this and see if I can find
-> > a
-> > better solution.
-> > 
-> > Changes since v2:
-> >  - System wide BPF JIT limit (discussion with Jann Horn)
-> >  - Holding reference to user correctly (Jann)
-> >  - Having arch versions of modulde_alloc (Dave Hansen, Jessica Yu)
-> >  - Shrinking of default limits, to help prevent the limit being worked
-> > around
-> >    with fragmentation (Jann)
-> > 
-> > Changes since v1:
-> >  - Plug in for non-x86
-> >  - Arch specific default values
-> > 
-> > 
-> > Rick Edgecombe (3):
-> >   modules: Create arch versions of module alloc/free
-> >   modules: Create rlimit for module space
-> >   bpf: Add system wide BPF JIT limit
-> > 
-> >  arch/arm/kernel/module.c                |   2 +-
-> >  arch/arm64/kernel/module.c              |   2 +-
-> >  arch/mips/kernel/module.c               |   2 +-
-> >  arch/nds32/kernel/module.c              |   2 +-
-> >  arch/nios2/kernel/module.c              |   4 +-
-> >  arch/parisc/kernel/module.c             |   2 +-
-> >  arch/s390/kernel/module.c               |   2 +-
-> >  arch/sparc/kernel/module.c              |   2 +-
-> >  arch/unicore32/kernel/module.c          |   2 +-
-> >  arch/x86/include/asm/pgtable_32_types.h |   3 +
-> >  arch/x86/include/asm/pgtable_64_types.h |   2 +
-> >  arch/x86/kernel/module.c                |   2 +-
-> >  fs/proc/base.c                          |   1 +
-> >  include/asm-generic/resource.h          |   8 ++
-> >  include/linux/bpf.h                     |   7 ++
-> >  include/linux/filter.h                  |   1 +
-> >  include/linux/sched/user.h              |   4 +
-> >  include/uapi/asm-generic/resource.h     |   3 +-
-> >  kernel/bpf/core.c                       |  22 +++-
-> >  kernel/bpf/inode.c                      |  16 +++
-> >  kernel/module.c                         | 152 +++++++++++++++++++++++-
-> >  net/core/sysctl_net_core.c              |   7 ++
-> >  22 files changed, 233 insertions(+), 15 deletions(-)
-> > 
-> > --
-> > 2.17.1
-> > 
-branching predictors may not be able to predict past a certain distance. So
-performance as well.
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
