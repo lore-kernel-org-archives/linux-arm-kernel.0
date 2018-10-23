@@ -1,71 +1,191 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 23 Oct 2018 11:49:17 +0000
-Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
+Date: Tue, 23 Oct 2018 11:49:21 +0000
+Subject: [PATCH V2 5/8] ARM: imx: add initial support for imx7ulp
 In-Reply-To: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
 References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1540295058-26090-6-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs need the gpio clock to be enabled before accessing
-HW registers. This patch add the optional clock handling.
+The i.MX 7ULP family of processors represents NXP?s latest achievement
+in ultra-low-power processing for use cases demanding long battery life.
+Targeted towards the growing market of portable devices, the i.MX 7ULP
+family of processors features NXP's advanced implementation of the Arm?
+Cortex?-A7 core, the Arm Cortex-M4 core, as well as a 3D and 2D Graphics
+Processing Units (GPUs). The i.MX 7ULP family provides up to 32-bit
+LPDDR2/LPDDR3 memory interface and a number of other interfaces for
+connecting peripherals, such as WLAN, Bluetooth, GPS, displays, and
+camera sensors.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Stefan Agner <stefan@agner.ch>
+This patch aims to add an initial support for imx7ulp. Note that we need
+configure power mode to Partial Stop mode 3 with system/bus clock enabled
+first as the default enabled STOP mode will gate off system/bus clock when
+execute WFI in MX7ULP SoC.
+
+And there's still no MXC_CPU_IMX7ULP IDs read from register as ULP has no
+anatop as before. So we encode one with 0xff in reverse order in case new
+ones will be in the future.
+
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: linux-gpio at vger.kernel.org
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
+ChangeLog:
 v1->v2:
- * new patch
+ * switch to SPDX license
+ * more description of new SOC in commit message
 ---
- drivers/gpio/gpio-vf610.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/mach-imx/Kconfig        |  9 +++++++++
+ arch/arm/mach-imx/Makefile       |  1 +
+ arch/arm/mach-imx/common.h       |  1 +
+ arch/arm/mach-imx/cpu.c          |  3 +++
+ arch/arm/mach-imx/mach-imx7ulp.c | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mxc.h          |  1 +
+ arch/arm/mach-imx/pm-imx7ulp.c   | 28 ++++++++++++++++++++++++++++
+ 7 files changed, 75 insertions(+)
+ create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+ create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
 
-diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-index d4ad6d0..cbc4f44 100644
---- a/drivers/gpio/gpio-vf610.c
-+++ b/drivers/gpio/gpio-vf610.c
-@@ -16,6 +16,7 @@
-  */
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index abc3371..c12a05c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -558,6 +558,15 @@ config SOC_IMX7D
+ 	help
+ 		This enables support for Freescale i.MX7 Dual processor.
  
- #include <linux/bitops.h>
-+#include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/init.h>
-@@ -256,6 +257,7 @@ static int vf610_gpio_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
-+	struct clk *clk_gpio, *clk_port;
- 	struct vf610_gpio_port *port;
- 	struct resource *iores;
- 	struct gpio_chip *gc;
-@@ -280,6 +282,24 @@ static int vf610_gpio_probe(struct platform_device *pdev)
- 	if (port->irq < 0)
- 		return port->irq;
++config SOC_IMX7ULP
++	bool "i.MX7ULP support"
++	select ARM_GIC
++	select CLKSRC_IMX_TPM
++	select HAVE_ARM_ARCH_TIMER
++	select PINCTRL_IMX7ULP
++	help
++	  This enables support for Freescale i.MX7 Ultra Low Power processor.
++
+ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+ 	select ARM_GIC if ARCH_MULTI_V7
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index bae179a..8af2f7e 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -83,6 +83,7 @@ obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+ obj-$(CONFIG_SOC_IMX7D_CA7) += mach-imx7d.o
+ obj-$(CONFIG_SOC_IMX7D_CM4) += mach-imx7d-cm4.o
++obj-$(CONFIG_SOC_IMX7ULP) += mach-imx7ulp.o pm-imx7ulp.o
  
-+	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
-+	clk_port = devm_clk_get(&pdev->dev, "port");
-+	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
-+	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
-+		return -EPROBE_DEFER;
-+	} else if (!IS_ERR_OR_NULL(clk_gpio) &&
-+		   !IS_ERR_OR_NULL(clk_port)) {
-+		ret = clk_prepare_enable(clk_gpio);
-+		if (ret)
-+			return ret;
+ ifeq ($(CONFIG_SUSPEND),y)
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 423dd76..bc915e5 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -120,6 +120,7 @@ void imx6dl_pm_init(void);
+ void imx6sl_pm_init(void);
+ void imx6sx_pm_init(void);
+ void imx6ul_pm_init(void);
++void imx7ulp_pm_init(void);
+ 
+ #ifdef CONFIG_PM
+ void imx51_pm_init(void);
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index c73593e..0b137ee 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -145,6 +145,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX7D:
+ 		soc_id = "i.MX7D";
+ 		break;
++	case MXC_CPU_IMX7ULP:
++		soc_id = "i.MX7ULP";
++		break;
+ 	default:
+ 		soc_id = "Unknown";
+ 	}
+diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
+new file mode 100644
+index 0000000..ad8be07
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-imx7ulp.c
+@@ -0,0 +1,32 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP
++ *   Author: Dong Aisheng <aisheng.dong@nxp.com>
++ */
 +
-+		ret = clk_prepare_enable(clk_port);
-+		if (ret) {
-+			clk_disable_unprepare(clk_gpio);
-+			return ret;
-+		}
-+	}
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
 +
- 	gc = &port->gc;
- 	gc->of_node = np;
- 	gc->parent = dev;
++#include "common.h"
++#include "hardware.h"
++
++static void __init imx7ulp_init_machine(void)
++{
++	imx7ulp_pm_init();
++
++	mxc_set_cpu_type(MXC_CPU_IMX7ULP);
++	imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_1_0);
++	of_platform_default_populate(NULL, NULL, imx_soc_device_init());
++}
++
++static const char *const imx7ulp_dt_compat[] __initconst = {
++	"fsl,imx7ulp",
++	NULL,
++};
++
++DT_MACHINE_START(IMX7ulp, "Freescale i.MX7ULP (Device Tree)")
++	.init_machine	= imx7ulp_init_machine,
++	.dt_compat	= imx7ulp_dt_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index b130a53..8e72d4e 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -44,6 +44,7 @@
+ #define MXC_CPU_IMX6ULZ		0x6b
+ #define MXC_CPU_IMX6SLL		0x67
+ #define MXC_CPU_IMX7D		0x72
++#define MXC_CPU_IMX7ULP		0xff
+ 
+ #define IMX_DDR_TYPE_LPDDR2		1
+ 
+diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
+new file mode 100644
+index 0000000..9fb7da0
+--- /dev/null
++++ b/arch/arm/mach-imx/pm-imx7ulp.c
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP
++ *   Author: Dong Aisheng <aisheng.dong@nxp.com>
++ */
++
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#define SMC_PMCTRL		0x10
++#define BP_PMCTRL_PSTOPO        16
++#define PSTOPO_PSTOP3		0x3
++
++void __init imx7ulp_pm_init(void)
++{
++	struct device_node *np;
++	void __iomem *smc1_base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
++	smc1_base = of_iomap(np, 0);
++	WARN_ON(!smc1_base);
++
++	/* Partial Stop mode 3 with system/bus clock enabled */
++	writel_relaxed(PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO,
++		       smc1_base + SMC_PMCTRL);
++}
 -- 
 2.7.4
