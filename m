@@ -1,29 +1,52 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 23 Oct 2018 11:31:50 -0700
-Subject: [PATCH 1/3] clk: bcm2835: make license text and module license
- match
-In-Reply-To: <1540292769-5905-2-git-send-email-stefan.wahren@i2se.com>
-References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
- <1540292769-5905-2-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <877ei81pm1.fsf@anholt.net>
+From: oskari@lemmela.net (Oskari Lemmela)
+Date: Tue, 23 Oct 2018 21:53:30 +0300
+Subject: [PATCH v5 11/11] mfd: axp20x: Add supported cells for AXP803
+In-Reply-To: <20181023185330.10472-1-oskari@lemmela.net>
+References: <20181023185330.10472-1-oskari@lemmela.net>
+Message-ID: <20181023185330.10472-12-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Parts of the AXP803 are compatible with their counterparts on the AXP813.
+These include the GPIO, ADC, AC and battery power supplies.
 
-> The license text is specifying GPL v2 or later but the MODULE_LICENSE
-> is set to GPL v2 which means GNU Public License v2 only. So choose the
-> license text as the correct one.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ drivers/mfd/axp20x.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-For the series:
-
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181023/6d2d8dc0/attachment.sig>
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index dfc3cff1d08b..e415b967d38c 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -728,11 +728,26 @@ static const struct mfd_cell axp288_cells[] = {
+ 
+ static const struct mfd_cell axp803_cells[] = {
+ 	{
++		.name		= "axp20x-gpio",
++		.of_compatible	= "x-powers,axp813-gpio",
++	}, {
+ 		.name			= "axp221-pek",
+ 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+ 		.resources		= axp803_pek_resources,
+ 	},
+ 	{	.name			= "axp20x-regulator" },
++	{
++		.name		= "axp813-adc",
++		.of_compatible	= "x-powers,axp813-adc",
++	}, {
++		.name		= "axp20x-battery-power-supply",
++		.of_compatible	= "x-powers,axp813-battery-power-supply",
++	}, {
++		.name		= "axp20x-ac-power-supply",
++		.of_compatible	= "x-powers,axp813-ac-power-supply",
++		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
++		.resources	= axp20x_ac_power_supply_resources,
++	},
+ };
+ 
+ static const struct mfd_cell axp806_self_working_cells[] = {
+-- 
+2.17.1
