@@ -1,52 +1,37 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Tue, 23 Oct 2018 21:53:30 +0300
-Subject: [PATCH v5 11/11] mfd: axp20x: Add supported cells for AXP803
+Date: Tue, 23 Oct 2018 21:53:24 +0300
+Subject: [PATCH v5 05/11] ARM: dts: axp81x: add AC power supply subnode
 In-Reply-To: <20181023185330.10472-1-oskari@lemmela.net>
 References: <20181023185330.10472-1-oskari@lemmela.net>
-Message-ID: <20181023185330.10472-12-oskari@lemmela.net>
+Message-ID: <20181023185330.10472-6-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parts of the AXP803 are compatible with their counterparts on the AXP813.
-These include the GPIO, ADC, AC and battery power supplies.
+Add AC power supply subnode for AXP81X PMIC.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- drivers/mfd/axp20x.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/axp81x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index dfc3cff1d08b..e415b967d38c 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -728,11 +728,26 @@ static const struct mfd_cell axp288_cells[] = {
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index 043c717dcef1..bd83962d3627 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -48,6 +48,11 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
  
- static const struct mfd_cell axp803_cells[] = {
- 	{
-+		.name		= "axp20x-gpio",
-+		.of_compatible	= "x-powers,axp813-gpio",
-+	}, {
- 		.name			= "axp221-pek",
- 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
- 		.resources		= axp803_pek_resources,
- 	},
- 	{	.name			= "axp20x-regulator" },
-+	{
-+		.name		= "axp813-adc",
-+		.of_compatible	= "x-powers,axp813-adc",
-+	}, {
-+		.name		= "axp20x-battery-power-supply",
-+		.of_compatible	= "x-powers,axp813-battery-power-supply",
-+	}, {
-+		.name		= "axp20x-ac-power-supply",
-+		.of_compatible	= "x-powers,axp813-ac-power-supply",
-+		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-+		.resources	= axp20x_ac_power_supply_resources,
-+	},
- };
- 
- static const struct mfd_cell axp806_self_working_cells[] = {
++	ac_power_supply: ac-power-supply {
++		compatible = "x-powers,axp813-ac-power-supply";
++		status = "disabled";
++	};
++
+ 	axp_adc: adc {
+ 		compatible = "x-powers,axp813-adc";
+ 		#io-channel-cells = <1>;
 -- 
 2.17.1
