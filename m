@@ -1,9 +1,9 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 23 Oct 2018 13:06:06 +0200
-Subject: [PATCH 1/3] clk: bcm2835: make license text and module license match
+Date: Tue, 23 Oct 2018 13:06:08 +0200
+Subject: [PATCH 3/3] spi: bcm2835: make license text and module license match
 In-Reply-To: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
 References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1540292769-5905-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1540292769-5905-4-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,28 +13,28 @@ license text as the correct one.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- drivers/clk/bcm/clk-bcm2835-aux.c | 2 +-
- drivers/clk/bcm/clk-bcm2835.c     | 2 +-
+ drivers/spi/spi-bcm2835.c    | 2 +-
+ drivers/spi/spi-bcm2835aux.c | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/bcm/clk-bcm2835-aux.c b/drivers/clk/bcm/clk-bcm2835-aux.c
-index f225ad2..e01d557 100644
---- a/drivers/clk/bcm/clk-bcm2835-aux.c
-+++ b/drivers/clk/bcm/clk-bcm2835-aux.c
-@@ -79,4 +79,4 @@ builtin_platform_driver(bcm2835_aux_clk_driver);
+diff --git a/drivers/spi/spi-bcm2835.c b/drivers/spi/spi-bcm2835.c
+index f35cc10..b0b87ff 100644
+--- a/drivers/spi/spi-bcm2835.c
++++ b/drivers/spi/spi-bcm2835.c
+@@ -843,4 +843,4 @@ module_platform_driver(bcm2835_spi_driver);
  
- MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
- MODULE_DESCRIPTION("BCM2835 auxiliary peripheral clock driver");
+ MODULE_DESCRIPTION("SPI controller driver for Broadcom BCM2835");
+ MODULE_AUTHOR("Chris Boot <bootc@bootc.net>");
 -MODULE_LICENSE("GPL v2");
 +MODULE_LICENSE("GPL");
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 7bef066..6b6d836 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -2206,4 +2206,4 @@ builtin_platform_driver(bcm2835_clk_driver);
+diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+index 3094d81..671e374 100644
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -542,4 +542,4 @@ module_platform_driver(bcm2835aux_spi_driver);
  
- MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
- MODULE_DESCRIPTION("BCM2835 clock driver");
+ MODULE_DESCRIPTION("SPI controller driver for Broadcom BCM2835 aux");
+ MODULE_AUTHOR("Martin Sperl <kernel@martin.sperl.org>");
 -MODULE_LICENSE("GPL v2");
 +MODULE_LICENSE("GPL");
 -- 
