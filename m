@@ -1,56 +1,71 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 23 Oct 2018 11:49:08 +0000
-Subject: [PATCH V2 2/8] dt-bindings: fsl: add imx7ulp pm related components
- bindings
+Date: Tue, 23 Oct 2018 11:49:17 +0000
+Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
 In-Reply-To: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
 References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1540295058-26090-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx7ulp pm related components bindings
+Some SoCs need the gpio clock to be enabled before accessing
+HW registers. This patch add the optional clock handling.
 
-Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stefan Agner <stefan@agner.ch>
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: devicetree at vger.kernel.org
+Cc: linux-gpio at vger.kernel.org
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-ChangeLog:
 v1->v2:
  * new patch
 ---
- .../bindings/arm/freescale/fsl,imx7ulp-pm.txt      | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
+ drivers/gpio/gpio-vf610.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
-new file mode 100644
-index 0000000..75195be
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
-@@ -0,0 +1,23 @@
-+Freescale i.MX7ULP Power Management Components
-+----------------------------------------------
+diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+index d4ad6d0..cbc4f44 100644
+--- a/drivers/gpio/gpio-vf610.c
++++ b/drivers/gpio/gpio-vf610.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <linux/bitops.h>
++#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+@@ -256,6 +257,7 @@ static int vf610_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
++	struct clk *clk_gpio, *clk_port;
+ 	struct vf610_gpio_port *port;
+ 	struct resource *iores;
+ 	struct gpio_chip *gc;
+@@ -280,6 +282,24 @@ static int vf610_gpio_probe(struct platform_device *pdev)
+ 	if (port->irq < 0)
+ 		return port->irq;
+ 
++	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
++	clk_port = devm_clk_get(&pdev->dev, "port");
++	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
++	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
++		return -EPROBE_DEFER;
++	} else if (!IS_ERR_OR_NULL(clk_gpio) &&
++		   !IS_ERR_OR_NULL(clk_port)) {
++		ret = clk_prepare_enable(clk_gpio);
++		if (ret)
++			return ret;
 +
-+The Multi-System Mode Controller (MSMC) is responsible for sequencing
-+the MCU into and out of all stop and run power modes. Specifically, it
-+monitors events to trigger transitions between power modes while
-+controlling the power, clocks, and memories of the MCU to achieve the
-+power consumption and functionality of that mode.
++		ret = clk_prepare_enable(clk_port);
++		if (ret) {
++			clk_disable_unprepare(clk_gpio);
++			return ret;
++		}
++	}
 +
-+The WFI or WFE instruction is used to invoke a Sleep, Deep Sleep or
-+Standby modes for either Cortex family. Run, Wait, and Stop are the
-+common terms used for the primary operating modes of Kinetis
-+microcontrollers.
-+
-+Required properties:
-+- compatible:	Should be "fsl,imx7ulp-smc1".
-+- reg:		Specifies base physical address and size of the register sets.
-+
-+Example:
-+smc1: smc1 at 40410000 {
-+	compatible = "fsl,imx7ulp-smc1";
-+	reg = <0x40410000 0x1000>;
-+};
+ 	gc = &port->gc;
+ 	gc->of_node = np;
+ 	gc->parent = dev;
 -- 
 2.7.4
