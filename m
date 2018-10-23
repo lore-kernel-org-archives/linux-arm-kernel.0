@@ -1,102 +1,77 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 23 Oct 2018 11:33:10 +0200
-Subject: [PATCH 1/4] drm/sun4i: tcon: Support an active-low DE signal
- with RGB interface
-In-Reply-To: <20181010145736.l6zpohvvd4b5qngr@flea>
-References: <20181010114134.8211-1-contact@paulk.fr>
- <20181010145736.l6zpohvvd4b5qngr@flea>
-Message-ID: <224ec158bf627b4d2f577b1dadf10bd87891e2a7.camel@paulk.fr>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Tue, 23 Oct 2018 09:37:00 +0000
+Subject: [PATCH v3 0/7] spi: add support for octo mode
+Message-ID: <1540287311-1572-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add support for octo mode IO data transfer.
+Micron flash, mt35xu512aba, supports octal mode data transfer and
+NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
 
-Le mercredi 10 octobre 2018 ? 16:57 +0200, Maxime Ripard a ?crit :
-> On Wed, Oct 10, 2018 at 01:41:31PM +0200, Paul Kocialkowski wrote:
-> > Some panels need an active-low data enable (DE) signal for the RGB
-> > interface. This requires flipping a bit in the TCON0 polarity register
-> > when setting up the mode for the RGB interface.
-> > 
-> > Add a new helper function to match specific bus flags and use it to set
-> > the polarity inversion bit for the DE signal when required.
-> > 
-> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++--
-> >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
-> >  2 files changed, 27 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > index 3fb084f802e2..d249a462ec09 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > @@ -78,6 +78,24 @@ static int sun4i_tcon_get_pixel_depth(const struct drm_encoder *encoder)
-> >  	return -EINVAL;
-> >  }
-> >  
-> > +static bool sun4i_tcon_match_bus_flags(const struct drm_encoder *encoder,
-> > +				       u32 bus_flags)
-> > +{
-> > +	struct drm_connector *connector;
-> > +	struct drm_display_info *info;
-> > +
-> > +	connector = sun4i_tcon_get_connector(encoder);
-> > +	if (!connector)
-> > +		return false;
-> > +
-> > +	info = &connector->display_info;
-> > +
-> > +	if ((info->bus_flags & bus_flags) == bus_flags)
-> > +		return true;
-> > +
-> > +	return false;
-> > +}
-> > +
-> >  static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
-> >  					  bool enabled)
-> >  {
-> > @@ -415,6 +433,7 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
-> >  }
-> >  
-> >  static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
-> > +				     const struct drm_encoder *encoder,
-> >  				     const struct drm_display_mode *mode)
-> >  {
-> >  	unsigned int bp, hsync, vsync;
-> > @@ -474,8 +493,13 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
-> >  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
-> >  		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
-> >  
-> > +	if (sun4i_tcon_match_bus_flags(encoder, DRM_BUS_FLAG_DE_LOW))
-> > +		val |= SUN4I_TCON0_IO_POL_DE_NEGATIVE;
-> > +
-> 
-> There's other flags in use in that function, you should also migrate
-> them (ideally by splitting that new function into a separate patch).
+Patch series
+* Add support for octo mode flags and parsing of same in spi driver.
+* Add parsing logic for spi-mem framework and m25p80.c device file.
+* Add opcodes for octo I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
+  Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
+* Add mode bit required for octo mode in nxp-fspi driver [2].
+* Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
 
-Actually, these other flags are not DRM bus flags but DRM mode flags,
-which can be accessed directly from the mode pointer passed as
-argument. Thus, they don't require a helper.
+Cherry pick below 2 patches (from: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git):
+    c639f871febe6667d9afce28108c634e5636c735 spi: spi-mem: Fix inverted logic in op sanity check
+    db122eb8a749a1eff038f9a282c620ab16c4be1d spi: spi-mem: Add extra sanity checks on the op param
 
-If you'd like, I could still split this patch into one introducing the
-helper and one using it for checking the DE_LOW flag.
+Tested on LX2160ARDB target with nxp-fspi driver, below are
+Read performance number of 1-1-1 and 1-1-8 read protocol.
 
-What do you think?
+ root at lxxx:~# cat /proc/mtd
+ dev:    size   erasesize  name
+ mtd0: 04000000 00001000 "spi0.0"
+ mtd1: 04000000 00001000 "spi0.1"
+ root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
+ Copied 16777216 bytes from address 0x00000000 in flash to 0read
 
-Cheers,
+ real    0m2.792s
+ user    0m0.000s
+ sys     0m2.790s
+ root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
+ Copied 16777216 bytes from address 0x00000000 in flash to 0read
 
-Paul
+ real    0m0.441s
+ user    0m0.000s
+ sys     0m0.440s
+ root at ls1012ardb:~#
+
+ Flash device MTD0 configured in 1-1-1 protocol.
+ Flash device MTD1 configured in 1-1-8 protocol.
+
+[1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384
+[2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=72181
+
+Yogesh Gaur (7):
+  spi: add support for octo mode I/O data transfer
+  spi: spi-mem: add support for octo mode I/O data transfer
+  mtd: spi-nor: add opcodes for octo Read/Write commands
+  mtd: spi-nor: add octo read flag for flash mt35xu512aba
+  mtd: m25p80: add support of octo mode I/O transfer
+  spi: nxp-fspi: add octo mode flag bit for octal support
+  arm64: dts: lx2160a: update fspi node
+
+Changes for v3:
+- Add octo mode support in spi_setup().
+- Rename all patches with 'octal' string modified as 'octo'.
+Changes for v2:
+- Incorporated review comments of Boris and Vignesh.
+
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  4 ++++
+ drivers/mtd/devices/m25p80.c                      |  9 ++++++++-
+ drivers/mtd/spi-nor/spi-nor.c                     | 15 ++++++++++++++-
+ drivers/spi/spi-mem.c                             |  9 ++++++++-
+ drivers/spi/spi-nxp-fspi.c                        |  4 ++--
+ drivers/spi/spi.c                                 | 12 ++++++++++--
+ include/linux/mtd/spi-nor.h                       |  8 ++++++++
+ include/linux/spi/spi.h                           |  2 ++
+ 8 files changed, 56 insertions(+), 7 deletions(-)
 
 -- 
-Developer of free digital technology and hardware support.
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181023/3761bac8/attachment-0001.sig>
+2.7.4
