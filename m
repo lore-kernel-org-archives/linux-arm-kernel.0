@@ -1,421 +1,348 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 24 Oct 2018 00:36:52 +0530
-Subject: [PATCH 2/5] arm64: dts: hisilicon: hi3760: Add GPIO controller support
+Date: Wed, 24 Oct 2018 00:36:55 +0530
+Subject: [PATCH 5/5] arm64: dts: hisilicon: hikey970: Add GPIO line names
 In-Reply-To: <20181023190655.12004-1-manivannan.sadhasivam@linaro.org>
 References: <20181023190655.12004-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181023190655.12004-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181023190655.12004-6-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO controller support for HiSilicon HI3670 SoC based on ARM
-Primecell PL061 GPIO controller.
+Add GPIO line names for HiSilicon HiKey970 board based on HI3670 SoC.
+The Line names are derived from "hikey970-schematics.pdf" document and
+named in conjunction with 96Boards CE Specification v1.0.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- .../boot/dts/hisilicon/hi3670-hikey970.dts    |   1 +
- arch/arm64/boot/dts/hisilicon/hi3670.dtsi     | 379 ++++++++++++++++++
- 2 files changed, 380 insertions(+)
+ .../boot/dts/hisilicon/hi3670-hikey970.dts    | 317 ++++++++++++++++++
+ 1 file changed, 317 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts b/arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
-index 4f5118642024..8fdc1dfcb06c 100644
+index fc851a3177e7..c9775b66629f 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
 +++ b/arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
-@@ -10,6 +10,7 @@
- /dts-v1/;
- 
- #include "hi3670.dtsi"
-+#include "hikey970-pinctrl.dtsi"
- 
- / {
- 	model = "HiKey970";
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3670.dtsi b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
-index 34a2f0dbc6f7..b99f5e0fe577 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
-@@ -196,5 +196,384 @@
- 			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
-+
-+		gpio0: gpio at e8a0b000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a0b000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 1 0 1 &pmx0 3 1 5>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO0>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio1: gpio at e8a0c000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a0c000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO1>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio2: gpio at e8a0d000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a0d000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 1 6 7>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO2>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio3: gpio at e8a0e000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a0e000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges =  <&pmx0 0 13 4 &pmx0 7 17 1>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio4: gpio at e8a0f000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a0f000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 18 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO4>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio5: gpio at e8a10000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a10000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 26 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO5>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio6: gpio at e8a11000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a11000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 1 34 7>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO6>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio7: gpio at e8a12000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a12000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 41 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO7>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio8: gpio at e8a13000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a13000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 49 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO8>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio9: gpio at e8a14000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a14000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 57 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO9>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio10: gpio at e8a15000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a15000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 65 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO10>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio11: gpio at e8a16000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a16000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 73 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO11>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio12: gpio at e8a17000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a17000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx0 0 81 1>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO12>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio13: gpio at e8a18000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a18000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO13>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio14: gpio at e8a19000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a19000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO14>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio15: gpio at e8a1a000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a1a000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO15>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio16: gpio at e8a1b000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a1b000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx5 0 0 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO16>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio17: gpio at e8a1c000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a1c000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx5 0 8 2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO17>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio18: gpio at fff28000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff28000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx1 4 42 4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_GPIO18>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio19: gpio at fff29000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff29000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx1 0 61 2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_GPIO19>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio20: gpio at e8a1f000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a1f000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx7 0 0 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO20>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio21: gpio at e8a20000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xe8a20000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx7 0 8 4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg_ctrl HI3670_PCLK_GPIO21>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio22: gpio at fff0b000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff0b000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* GPIO176 */
-+			gpio-ranges = <&pmx1 2 0 6>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_AO_GPIO0>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio23: gpio at fff0c000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff0c000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* GPIO184 */
-+			gpio-ranges = <&pmx1 0 6 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_AO_GPIO1>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio24: gpio at fff0d000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff0d000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* GPIO192 */
-+			gpio-ranges = <&pmx1 0 14 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_AO_GPIO2>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio25: gpio at fff0e000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff0e000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* GPIO200 */
-+			gpio-ranges = <&pmx1 0 22 8>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_AO_GPIO3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio26: gpio at fff0f000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff0f000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* GPIO208 */
-+			gpio-ranges = <&pmx1 0 30 1>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_AO_GPIO4>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio27: gpio at fff10000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff10000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* GPIO216 */
-+			gpio-ranges = <&pmx1 4 31 4>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_AO_GPIO5>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpio28: gpio at fff1d000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x0 0xfff1d000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio-ranges = <&pmx1 1 35 7>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&sctrl HI3670_PCLK_AO_GPIO6>;
-+			clock-names = "apb_pclk";
-+		};
+@@ -37,6 +37,323 @@
  	};
  };
+ 
++/*
++ * Legend: proper name = the GPIO line is used as GPIO
++ *         NC = not connected (pin out but not routed from the chip to
++ *              anything the board)
++ *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
++ *         "" = no idea, schematic doesn't say, could be
++ *              unrouted (not connected to any external pin)
++ *         LSEC = Low Speed External Connector
++ *         HSEC = High Speed External Connector
++ *
++ * Line names are taken from "hikey970-schematics.pdf" from HiSilicon.
++ *
++ * For the lines routed to the external connectors the
++ * lines are named after the 96Boards CE Specification 1.0,
++ * Appendix "Expansion Connector Signal Description".
++ *
++ * When the 96Board naming of a line and the schematic name of
++ * the same line are in conflict, the 96Board specification
++ * takes precedence, which means that the external UART on the
++ * LSEC is named UART0 while the schematic and SoC names this
++ * UART2. This is only for the informational lines i.e. "[FOO]",
++ * the GPIO named lines "GPIO-A" thru "GPIO-L" are the only
++ * ones actually used for GPIO.
++ */
++&gpio0 {
++	/* GPIO_000-GPIO_007 */
++	gpio-line-names =
++		"",
++		"TP901", /* TEST_MODE connected to TP901 */
++		"",
++		"GPIO_003_USB_HUB_RESET_N",
++		"NC",
++		"[AP_GPS_REF_CLK]",
++		"[I2C3_SCL]",
++		"[I2C3_SDA]";
++};
++
++&gpio1 {
++	/* GPIO_008-GPIO_015 */
++	gpio-line-names =
++		"[UART0_CTS]", /* LSEC pin 3: GPIO_008_UART2_CTS_N */
++		"[UART0_RTS]", /* LSEC pin 9: GPIO_009_UART2_RTS_N */
++		"[UART0_TXD]", /* LSEC pin 5: GPIO_010_UART2_TXD */
++		"[UART0_RXD]", /* LSEC pin 7: GPIO_011_UART2_RXD */
++		"[USER_LED5]",
++		"GPIO-I", /* LSEC pin 31: GPIO_013_CAM0_RST_N */
++		"[USER_LED3]",
++		"[USER_LED4]";
++};
++
++&gpio2 {
++	/* GPIO_016-GPIO_023 */
++	gpio-line-names =
++		"GPIO-G", /* LSEC pin 29: GPIO_016_LCD_TE0 */
++		"[CSI0_MCLK]", /* HSEC pin 15: ISP_CCLK0_MCAM */
++		"[CSI1_MCLK]", /* HSEC pin 17: ISP_CCLK1_SCAM */
++		"GPIO_019_BT_ACTIVE",
++		"[I2C2_SCL]", /* HSEC pin 32: ISP_SCL0 */
++		"[I2C2_SDA]", /* HSEC pin 34: ISP_SDA0 */
++		"[I2C3_SCL]", /* HSEC pin 36: ISP_SCL1 */
++		"[I2C3_SDA]"; /* HSEC pin 38: ISP_SDA1 */
++};
++
++&gpio3 {
++	/* GPIO_024-GPIO_031 */
++	gpio-line-names =
++		"GPIO_024_WIFI_ACTIVE",
++		"GPIO_025_PERST_M.2",
++		"[I2C4_SCL]",
++		"[I2C4_SDA]",
++		"NC",
++		"GPIO-H", /* LSEC pin 30: GPIO_029_LCD_RST_N */
++		"[USER_LED1]",
++		"GPIO-L"; /* LSEC pin 34: GPIO_031 */
++};
++
++&gpio4 {
++	/* GPIO_032-GPIO_039 */
++	gpio-line-names =
++		"GPIO-K", /* LSEC pin 33: GPIO_032_CAM1_RST_N */
++		"GPIO_033_PMU1_EN",
++		"GPIO_034_USBSW_SEL",
++		/*
++		 * These two pins should be used for SD(IO) data according
++		 * to the 96boards specification but seems to be repurposed
++		 * for UART 0. They are however named according to the spec.
++		 */
++		"[SD_DAT1]", /* HSEC pin 3: GPIO_035_UART0_RXD */
++		"[SD_DAT2]", /* HSEC pin 5: GPIO_036_UART0_TXD */
++		"[UART1_RXD]", /* LSEC pin 13: DEBUG_UART6_RXD */
++		"[UART1_TXD]", /* LSEC pin 11: DEBUG_UART6_TXD */
++		"[SOC_GPS_UART3_CTS_N]"; /* TP2304 */
++};
++
++&gpio5 {
++	/* GPIO_040-GPIO_047 */
++	gpio-line-names =
++		"[SOC_GPS_UART3_RTS_N]", /* TP2302 */
++		"[SOC_GPS_UART3_RXD]", /* TP2303 */
++		"[SOC_GPS_UART3_TXD]", /* TP2305 */
++		"[SOC_BT_UART4_CTS_N]",
++		"[SOC_BT_UART4_RTS_N]",
++		"[SOC_BT_UART4_RXD]",
++		"[SOC_BT_UART4_TXD]",
++		"NC";
++};
++
++&gpio6 {
++	/* GPIO_048-GPIO_055 */
++	gpio-line-names =
++		"NC",
++		"GPIO_049_USER_LED6",
++		"GPIO_050_CAN_RST",
++		"GPIO_051_WIFI_EN",
++		"GPIO-D", /* LSEC pin 26 */
++		"GPIO-J", /* LSEC pin 32 */
++		"GPIO_054_BT_EN",
++		"[GPIO_055_SEL]";
++};
++
++&gpio7 {
++	/* GPIO_056-GPIO_063 */
++	gpio-line-names =
++		"[PCIE_PERST_L]", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio8 {
++	/* GPIO_064-GPIO_071 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio9 {
++	/* GPIO_072-GPIO_079 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio10 {
++	/* GPIO_080-GPIO_087 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio11 {
++	/* GPIO_088-GPIO_095 */
++	gpio-line-names = "NC", "NC", "NC", "NC", "NC", "NC", "NC", "NC";
++};
++
++&gpio12 {
++	/* GPIO_096-GPIO_103 */
++	gpio-line-names = "NC", "", "", "", "", "", "", "";
++};
++
++&gpio13 {
++	/* GPIO_104-GPIO_111 */
++	gpio-line-names = "", "", "", "", "", "", "", "";
++};
++
++&gpio14 {
++	/* GPIO_112-GPIO_119 */
++	gpio-line-names = "", "", "", "", "", "", "", "";
++};
++
++&gpio15 {
++	/* GPIO_120-GPIO_127 */
++	gpio-line-names = "", "", "", "", "", "", "", "";
++};
++
++&gpio16 {
++	/* GPIO_128-GPIO_135 */
++	gpio-line-names =
++		"[WL_SDIO_CLK]",
++		"[WL_SDIO_CMD]",
++		"[WL_SDIO_DATA0]",
++		"[WL_SDIO_DATA1]",
++		"[WL_SDIO_DATA2]",
++		"[WL_SDIO_DATA3]",
++		"[ETH_ISOLATE]",
++		"NC";
++};
++
++&gpio17 {
++	/* GPIO_136-GPIO_143 */
++	gpio-line-names =
++		"[MINI1CLK_EN]", "NC", "", "", "", "", "", "";
++};
++
++&gpio18 {
++	/* GPIO_144-GPIO_151 */
++	gpio-line-names =
++		"[SPI1_SCLK]", /* HSEC pin 9: GPIO_144_SPI3_CLK */
++		"[SPI1_DIN]", /* HSEC pin 11: GPIO_145_SPI3_DI */
++		"[SPI1_DOUT]", /* HSEC pin 1: GPIO_146_SPI3_DO */
++		"[SPI1_CS]", /* HSEC pin 7: GPIO_147_SPI3_CS0_N */
++		"[POWER_INT_N]",
++		"[CDMA_GPS_SYNC]",
++		"GPIO_150_PEX_INTA",
++		"GPIO_151_CAN_INT";
++};
++
++&gpio19 {
++	/* GPIO_152-GPIO_159 */
++	gpio-line-names = "", "", "", "", "", "", "", "";
++};
++
++&gpio20 {
++	/* GPIO_160-GPIO_167 */
++	gpio-line-names =
++		"[SD_CLK]",
++		"[SD_CMD]",
++		"[SD_DATA0]",
++		"[SD_DATA1]",
++		"[SD_DATA2]",
++		"[SD_DATA3]",
++		"GPIO_166_ETHCLK_EN",
++		"GPIO_167_USER_LED2";
++};
++
++&gpio21 {
++	/* GPIO_168-GPIO_175 */
++	gpio-line-names =
++		"GPIO_168_GPS_EN",
++		"GPIO-C", /* LSEC pin 25: GPIO_169_USIM1_CLK */
++		"GPIO-E", /* LSEC pin 27: GPIO_170_USIM1_RST */
++		"GPIO-B", /* LSEC pin 24: GPIO_171_USIM1_DATA */
++		"", "", "", "", "";
++};
++
++&gpio22 {
++	/* GPIO_176-GPIO_183 */
++	gpio-line-names =
++		"[PMU_PWR_HOLD]",
++		"GPIO_177_WL_WAKEUP_AP",
++		"[JTAG_TCK]",
++		"[JTAG_TMS]",
++		"[JTAG_TDI]",
++		"[JTAG_TMS]",
++		"GPIO_182_FATAL_ERR",
++		"NC";
++};
++
++&gpio23 {
++	/* GPIO_184-GPIO_191 */
++	gpio-line-names =
++		"GPIO_184_JTAG_SEL",
++		"GPIO-F", /* LSEC pin 28: GPIO_185_LCD_BL_PWM */
++		"[I2C0_SCL]", /* LSEC pin 15: GPIO_186_I2C0_SCL */
++		"[I2C0_SDA]", /* LSEC pin 17: GPIO_187_I2C0_SDA */
++		"[GPIO_188_I2C1_SCL]", /* Actual SoC I2C1_SCL */
++		"[GPIO_189_I2C1_SDA]", /* Actual SoC I2C1_SDA */
++		"[I2C1_SCL]", /* LSEC pin 19: GPIO_190_I2C2_SCL */
++		"[I2C2_SDA]"; /* LSEC pin 21: GPIO_191_I2C2_SDA */
++};
++
++&gpio24 {
++	/* GPIO_192-GPIO_199 */
++	gpio-line-names =
++		"[SD_LED]",
++		"NC",
++		"[PCM_DI]", /* LSEC pin 22: GPIO_194_I2S0_DI */
++		"[PCM_DO]", /* LSEC pin 20: GPIO_195_I2S0_DO */
++		"[PCM_CLK]", /* LSEC pin 18: GPIO_196_I2S0_XCLK */
++		"[PCM_FS]", /* LSEC pin 16: GPIO_197_I2S0_XFS */
++		"",
++		"[I2S2_DO]";
++};
++
++&gpio25 {
++	/* GPIO_200-GPIO_207 */
++	gpio-line-names =
++		"[I2S2_XCLK]",
++		"[I2S2_XFS]",
++		"GPIO_202_PERST_ETH",
++		"GPIO_203_PWRON_DET",
++		"GPIO_204_PMU1_IRQ_N",
++		"GPIO_205_SD_DET",
++		"GPIO_206_GPS_MOTION_INT",
++		"GPIO_207_HDMI_SEL";
++};
++
++&gpio26 {
++	/* GPIO_208-GPIO_215 */
++	gpio-line-names =
++		"GPIO-A", /* LSEC pin 23: GPIO_208_WAKEUP_SOC */
++		"GPIO_209_VBUS_TYPEC",
++		"NC",
++		"NC",
++		"NC",
++		"[SPI0_SCLK]", /* LSEC pin 8: GPIO_213_SPI2_CLK */
++		"[SPI0_DIN]", /* LSEC pin 10: GPIO_214_SPI2_DI */
++		"[SPI0_DOUT]"; /* LSEC pin 14: GPIO_215_SPI2_DO */
++};
++
++&gpio27 {
++	/* GPIO_216-GPIO_223 */
++	gpio-line-names =
++		"[SPI0_CS]", /* LSEC pin 12: GPIO_216_SPI2_CS0_N */
++		"GPIO_217_HDMI_PD",
++		"GPIO_218_GPS_WAKEUP_AP",
++		"GPIO_219_M.2CLK_EN",
++		"GPIO_220_PERST_MINI",
++		"GPIO_221_CC_INT",
++		"[PCIE_CLKREQ_L]",
++		"NC";
++};
++
++&gpio28 {
++	/* GPIO_224-GPIO_231 */
++	gpio-line-names =
++		"[PMU0_INT]",
++		"[SPMI_DATA]",
++		"[SPMI_CLK]",
++		"[CAN_SPI_CLK]",
++		"[CAN_SPI_DI]",
++		"[CAN_SPI_DO]",
++		"[CAN_SPI_CS]",
++		"GPIO_231_HDMI_INT";
++};
++
+ &uart0 {
+ 	/* On High speed expansion header */
+ 	label = "HS-UART0";
 -- 
 2.17.1
