@@ -1,66 +1,40 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Tue, 23 Oct 2018 21:53:25 +0300
-Subject: [PATCH v5 06/11] arm64: dts: allwinner: axp803: add AC and battery
- power supplies
+Date: Tue, 23 Oct 2018 21:53:27 +0300
+Subject: [PATCH v5 08/11] arm64: dts: allwinner: a64: pinebook: enable power
+ supplies
 In-Reply-To: <20181023185330.10472-1-oskari@lemmela.net>
 References: <20181023185330.10472-1-oskari@lemmela.net>
-Message-ID: <20181023185330.10472-7-oskari@lemmela.net>
+Message-ID: <20181023185330.10472-9-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parts of the AXP803 are compatible with their counterparts on the AXP813.
-Add DT nodes ADC, GPIO, AC and battery power supplies.
+From: Vasily Khoruzhick <anarsoul@gmail.com>
 
-Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
-Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Pinebook has ACIN connector and 10000 mAh battery.
+
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/axp803.dtsi | 33 +++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-index e5eae8bafc42..c3a618e1279a 100644
---- a/arch/arm64/boot/dts/allwinner/axp803.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-@@ -49,6 +49,39 @@
- 	interrupt-controller;
- 	#interrupt-cells = <1>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index 897e60cbe38d..4fabe22ece47 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -149,6 +149,14 @@
  
-+	ac_power_supply: ac-power-supply {
-+		compatible = "x-powers,axp803-ac-power-supply",
-+			     "x-powers,axp813-ac-power-supply";
-+		status = "disabled";
-+	};
+ #include "axp803.dtsi"
+ 
++&ac_power_supply {
++	status = "okay";
++};
 +
-+	axp_adc: adc {
-+		compatible = "x-powers,axp803-adc", "x-powers,axp813-adc";
-+		#io-channel-cells = <1>;
-+	};
++&battery_power_supply {
++	status = "okay";
++};
 +
-+	axp_gpio: gpio {
-+		compatible = "x-powers,axp803-gpio", "x-powers,axp813-gpio";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		gpio0_ldo: gpio0-ldo {
-+			pins = "GPIO0";
-+			function = "ldo";
-+		};
-+
-+		gpio1_ldo: gpio1-ldo {
-+			pins = "GPIO1";
-+			function = "ldo";
-+		};
-+	};
-+
-+	battery_power_supply: battery-power-supply {
-+		compatible = "x-powers,axp803-battery-power-supply",
-+			     "x-powers,axp813-battery-power-supply";
-+		status = "disabled";
-+	};
-+
- 	regulators {
- 		/* Default work frequency for buck regulators */
- 		x-powers,dcdc-freq = <3000>;
+ &reg_aldo1 {
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <2800000>;
 -- 
 2.17.1
