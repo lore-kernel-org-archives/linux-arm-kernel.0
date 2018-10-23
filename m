@@ -1,71 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 Oct 2018 09:27:07 +0100
-Subject: [PATCH v2 00/10] Add support for TISCI irqchip drivers
-In-Reply-To: <050161aa-a257-9bf8-b3c9-35b13925b556@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <942981b8-7536-2b6b-ad49-dc59671cbda6@oracle.com>
- <050161aa-a257-9bf8-b3c9-35b13925b556@ti.com>
-Message-ID: <864lddt6ec.wl-marc.zyngier@arm.com>
+From: Ramana.Radhakrishnan@arm.com (Ramana Radhakrishnan)
+Date: Tue, 23 Oct 2018 08:36:16 +0000
+Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
+In-Reply-To: <20181019111542.6wrvjguirglzg7vg@mbp>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <20181005084754.20950-8-kristina.martsenko@arm.com>
+ <20181019111542.6wrvjguirglzg7vg@mbp>
+Message-ID: <5ca5bf92-f2b7-48c9-ea41-5efeff09a799@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Oct 2018 09:17:56 +0100,
-Lokesh Vutla <lokeshvutla@ti.com> wrote:
+On 19/10/2018 12:15, Catalin Marinas wrote:
+> On Fri, Oct 05, 2018 at 09:47:44AM +0100, Kristina Martsenko wrote:
+>> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+>> new file mode 100644
+>> index 000000000000..2aefedc31d9e
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/pointer_auth.h
+>> @@ -0,0 +1,63 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +#ifndef __ASM_POINTER_AUTH_H
+>> +#define __ASM_POINTER_AUTH_H
+>> +
+>> +#include <linux/random.h>
+>> +
+>> +#include <asm/cpufeature.h>
+>> +#include <asm/sysreg.h>
+>> +
+>> +#ifdef CONFIG_ARM64_PTR_AUTH
+>> +/*
+>> + * Each key is a 128-bit quantity which is split across a pair of 64-bit
+>> + * registers (Lo and Hi).
+>> + */
+>> +struct ptrauth_key {
+>> +	unsigned long lo, hi;
+>> +};
+>> +
+>> +/*
+>> + * We give each process its own instruction A key (APIAKey), which is shared by
+>> + * all threads. This is inherited upon fork(), and reinitialised upon exec*().
+>> + * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
+>> + * instructions behaving as NOPs.
+>> + */
 > 
-> Hi Santosh,
-> 
-> On Tuesday 23 October 2018 02:09 AM, Santosh Shilimkar wrote:
-> > On 10/18/2018 8:40 AM, Lokesh Vutla wrote:
-> >> TISCI abstracts the handling of IRQ routes where interrupt sources
-> >> are not directly connected to host interrupt controller. This series
-> >> adds support for:
-> >> - TISCI commands needed for IRQ configuration
-> >> - Interrupt Router(INTR) and Interrupt Aggregator(INTA) drivers
-> >> 
-> >> More information on TISCI IRQ management can be found here[1].
-> >> Complete TISCI resource management information can be found here[2].
-> >> AM65x SoC related TISCI information can be found here[3].
-> >> INTR and INTA related information can be found in TRM[4].
-> >> 
-> > I didn't read the specs but from what you described in
-> > INTA and INTR bindings, does the flow of IRQs like below ?
-> > 
-> > Device IRQ(e.g USB) -->INTR-->INTA--->HOST IRQ controller(GIC)
-> 
-> Not all devices in SoC are connected to INTA. Only the devices that
-> are capable of generating events are connected to INTA. And INTA is
-> connected to INTR.
-> 
-> So there are three ways in which IRQ can flow in AM65x SoC:
-> 1) Device directly connected to GIC
-> 	- Device IRQ --> GIC
-> 	- (Most legacy peripherals like MMC, UART falls in this case)
-> 2) Device connected to INTR.
-> 	- Device IRQ --> INTR --> GIC
-> 	- This is cases where you want to mux IRQs. Used for GPIOs and Mailboxes
-> 	- (This is somewhat similar to crossbar on DRA7 devices)
-> 3) Devices connected to INTA.
-> 	- Device Event --> INTA --> INTR --> GIC
-> 	- Used for DMA and networking devices.
-> 
-> Events are messages based on a hw protocol, sent by a master over a
-> dedicated Event transport lane. Events are highly precise that no
-> under/over flow of data transfer occurs at source/destination
-> regardless of distance and latency. So this is mostly preferred in DMA
-> and networking usecases. Now Interrupt Aggregator(IA) has the logic to
-> converts these events to Interrupts.
+> I don't remember the past discussions but I assume the tools guys are ok
+> with a single key shared by multiple threads. Ramana, could you ack this
+> part, FTR?
 
-Can we stop with these events already? What you describe here *is* an
-interrupt. The fact that you have some other dedicated infrastructure
-in your SoC is an implementation detail that doesn't concern the
-kernel at all.
+Sorry about the slow response, I've been traveling.
 
-So this should be modelled as an interrupt, and not have its own
-special interface at all.
+Ack and Will's response covers the reasons why pretty well. A prctl call 
+would be a good enhancement.
 
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+regards
+Ramana
