@@ -1,36 +1,78 @@
 From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Tue, 23 Oct 2018 18:31:58 +0530
-Subject: [PATCH V3 2/5] mm/hugetlb: Enable PUD level huge page migration
+Date: Tue, 23 Oct 2018 18:32:01 +0530
+Subject: [PATCH V3 5/5] arm64/mm: Enable HugeTLB migration for contiguous bit
+ HugeTLB pages
 In-Reply-To: <1540299721-26484-1-git-send-email-anshuman.khandual@arm.com>
 References: <1540299721-26484-1-git-send-email-anshuman.khandual@arm.com>
-Message-ID: <1540299721-26484-3-git-send-email-anshuman.khandual@arm.com>
+Message-ID: <1540299721-26484-6-git-send-email-anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architectures like arm64 have PUD level HugeTLB pages for certain configs
-(1GB huge page is PUD based on ARM64_4K_PAGES base page size) that can be
-enabled for migration. It can be achieved through checking for PUD_SHIFT
-order based HugeTLB pages during migration.
+Let arm64 subscribe to the previously added framework in which architecture
+can inform whether a given huge page size is supported for migration. This
+just overrides the default function arch_hugetlb_migration_supported() and
+enables migration for all possible HugeTLB page sizes on arm64. With this,
+HugeTLB migration support on arm64 now covers all possible HugeTLB options.
+
+        CONT PTE    PMD    CONT PMD    PUD
+        --------    ---    --------    ---
+4K:        64K      2M        32M      1G
+16K:        2M     32M         1G
+64K:        2M    512M        16G
 
 Reviewed-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
 Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 ---
- include/linux/hugetlb.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/hugetlb.h |  5 +++++
+ arch/arm64/mm/hugetlbpage.c      | 20 ++++++++++++++++++++
+ 2 files changed, 25 insertions(+)
 
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 1b858d7..70bcd89 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -497,7 +497,8 @@ static inline bool hugepage_migration_supported(struct hstate *h)
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index e73f685..656f70e 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -20,6 +20,11 @@
+ 
+ #include <asm/page.h>
+ 
++#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
++#define arch_hugetlb_migration_supported arch_hugetlb_migration_supported
++extern bool arch_hugetlb_migration_supported(struct hstate *h);
++#endif
++
+ static inline pte_t huge_ptep_get(pte_t *ptep)
  {
- #ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
- 	if ((huge_page_shift(h) == PMD_SHIFT) ||
--		(huge_page_shift(h) == PGDIR_SHIFT))
-+		(huge_page_shift(h) == PUD_SHIFT) ||
-+			(huge_page_shift(h) == PGDIR_SHIFT))
- 		return true;
- 	else
- 		return false;
+ 	return READ_ONCE(*ptep);
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 21512ca..f3afdcf 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -27,6 +27,26 @@
+ #include <asm/tlbflush.h>
+ #include <asm/pgalloc.h>
+ 
++#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
++bool arch_hugetlb_migration_supported(struct hstate *h)
++{
++	size_t pagesize = huge_page_size(h);
++
++	switch (pagesize) {
++#ifdef CONFIG_ARM64_4K_PAGES
++	case PUD_SIZE:
++#endif
++	case PMD_SIZE:
++	case CONT_PMD_SIZE:
++	case CONT_PTE_SIZE:
++		return true;
++	}
++	pr_warn("%s: unrecognized huge page size 0x%lx\n",
++			__func__, pagesize);
++	return false;
++}
++#endif
++
+ int pmd_huge(pmd_t pmd)
+ {
+ 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
 -- 
 2.7.4
