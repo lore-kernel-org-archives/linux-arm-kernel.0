@@ -1,68 +1,112 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Wed, 24 Oct 2018 16:11:59 +0200
-Subject: [PATCH] ARM: debug: enable UART1 for socfpga Cyclone5
-In-Reply-To: <20181024065152.yinlj4axprtwdzku@pengutronix.de>
-References: <20181009112837.2517-1-peron.clem@gmail.com>
- <e761c76d-a806-402a-b25b-04aee9329dbc@kernel.org>
- <CAJiuCceZr8NsDgBJgA2y61VHdQ3JYQ6_3r4jKooKLbVfRD8eJQ@mail.gmail.com>
- <74512aef-d551-30af-b4cf-25f48047a4ac@kernel.org>
- <20181024065152.yinlj4axprtwdzku@pengutronix.de>
-Message-ID: <CAJiuCcfZ7+gaxA5iGhS48eODPsTaZc5-Bd2zXqaAgtNd0fwSKg@mail.gmail.com>
+From: jeyu@kernel.org (Jessica Yu)
+Date: Wed, 24 Oct 2018 17:07:06 +0200
+Subject: [PATCH RFC v3 0/3] Rlimit for module space
+In-Reply-To: <CAKv+Gu-Rk-SQVOQ63L3DkF3=EVik3pHXzpNp5r5TrgDajTM_iQ@mail.gmail.com>
+References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
+ <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
+ <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
+ <CAKv+Gu-Rk-SQVOQ63L3DkF3=EVik3pHXzpNp5r5TrgDajTM_iQ@mail.gmail.com>
+Message-ID: <20181024150706.jewcclhhh756tupn@linux-8ccs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 24 Oct 2018 at 08:51, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
++++ Ard Biesheuvel [23/10/18 08:54 -0300]:
+>On 22 October 2018 at 20:06, Edgecombe, Rick P
+><rick.p.edgecombe@intel.com> wrote:
+>> On Sat, 2018-10-20 at 19:20 +0200, Ard Biesheuvel wrote:
+>>> Hi Rick,
+>>>
+>>> On 19 October 2018 at 22:47, Rick Edgecombe <rick.p.edgecombe@intel.com>
+>>> wrote:
+>>> > If BPF JIT is on, there is no effective limit to prevent filling the entire
+>>> > module space with JITed e/BPF filters.
+>>>
+>>> Why do BPF filters use the module space, and does this reason apply to
+>>> all architectures?
+>>>
+>>> On arm64, we already support loading plain modules far away from the
+>>> core kernel (i.e. out of range for ordinary relative jump/calll
+>>> instructions), and so I'd expect BPF to be able to deal with this
+>>> already as well. So for arm64, I wonder why an ordinary vmalloc_exec()
+>>> wouldn't be more appropriate.
+>> AFAIK, it's like you said about relative instruction limits, but also because
+>> some predictors don't predict past a certain distance. So performance as well.
+>> Not sure the reasons for each arch, or if they all apply for BPF JIT. There seem
+>> to be 8 by my count, that have a dedicated module space for some reason.
+>>
+>>> So before refactoring the module alloc/free routines to accommodate
+>>> BPF, I'd like to take one step back and assess whether it wouldn't be
+>>> more appropriate to have a separate bpf_alloc/free API, which could be
+>>> totally separate from module alloc/free if the arch permits it.
+>>>
+>> I am not a BPF JIT expert unfortunately, hopefully someone more authoritative
+>> will chime in. I only ran into this because I was trying to increase
+>> randomization for the module space and wanted to find out how many allocations
+>> needed to be supported.
+>>
+>> I'd guess though, that BPF JIT is just assuming that there will be some arch
+>> specific constraints about where text can be placed optimally and they would
+>> already be taken into account in the module space allocator.
+>>
+>> If there are no constraints for some arch, I'd wonder why not just update its
+>> module_alloc to use the whole space available. What exactly are the constraints
+>> for arm64 for normal modules?
+>>
 >
-> On Tue, Oct 23, 2018 at 03:35:31PM -0500, Dinh Nguyen wrote:
-> >
-> >
-> > On 10/23/2018 09:44 AM, Cl?ment P?ron wrote:
-> > > HI Dinh,
-> > >
-> > > On Tue, 23 Oct 2018 at 16:04, Dinh Nguyen <dinguyen@kernel.org> wrote:
-> > >>
-> > >> Hi Cl?ment,
-> > >>
-> > >> On 10/09/2018 06:28 AM, Cl?ment P?ron wrote:
-> > >>> Cyclone5 and Arria10 doesn't have the same memory map for UART1.
-> > >>>
-> > >>> Split the SOCFPGA_UART1 into 2 options to allow debugging on UART1 for Cylone5.
-> > >>>
-> > >>
-> > >> I'm not sure the need for this patch. Are there any cyclone5 based
-> > >> boards that has UART1 as the debug uart? I see that all of them are
-> > >> using UART0.
-> > >
-> > > There is no upstream device with this UART used. But the board I have
-> > > use it, and there is no limitation to not have it available upstream
-> > > no ?
-> > >
-> >
-> > I see. Then I don't think the patch is applicable because none of the
-> > upstream devices need it. Now, if you were to upstream your board that
-> > uses UART1, then there will be a case for this patch. Do you agree?
-
-I don't think my board is upstreamable it's not a devkit and not
-really interesting for the community.
-
-It's really a trivial patch and it will avoid wasting time  to another
-owner of CycloneV board who would like to have debug on UART1
-
-Thanks
-Clement
-
+>Relative branches and the interactions with KAsan.
 >
-> I'd not say having to upstream the board is a sensible precondition for
-> such a patch. One of the arguments for moving ARM to dt was that this
-> allows to separate the machine specifics from the code. So I'd say if
-> Cl?ment has a need, this is a good enough reason to take this patch.
+>We just fixed something similar in the kprobes code: it was using
+>RWX-mapped module memory to store kprobed instructions, and we
+>replaced that with a simple vmalloc_exec() [and code to remap it
+>read-only], which was possible given that relative branches are always
+>emulated by arm64 kprobes.
 >
-> Just my 0.02 ?,
-> Uwe
+>So it depends on whether BPF code needs to be in relative branching
+>range from the calling code, and whether the BPF code itself is
+>emitted using relative branches into other parts of the code.
 >
-> --
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> It seems fine to me for architectures to have the option of solving this a
+>> different way. If potentially the rlimit ends up being the best solution for
+>> some architectures though, do you think this refactor (pretty close to just a
+>> name change) is that intrusive?
+>>
+>> I guess it could be just a BPF JIT per user limit and not touch module space,
+>> but I thought the module space limit was a more general solution as that is the
+>> actual limited resource.
+>>
+>
+>I think it is wrong to conflate the two things. Limiting the number of
+>BPF allocations and the limiting number of module allocations are two
+>separate things, and the fact that BPF reuses module_alloc() out of
+>convenience does not mean a single rlimit for both is appropriate.
+
+Hm, I think Ard has a good point. AFAIK, and correct me if I'm wrong,
+users of module_alloc() i.e. kprobes, ftrace, bpf, seem to use it
+because it is an easy way to obtain executable kernel memory (and
+depending on the needs of the architecture, being additionally
+reachable via relative branches) during runtime. The side effect is
+that all these users share the "module" memory space, even though this
+memory region is not exclusively used by modules (well, personally I
+think it technically should be, because seeing module_alloc() usage
+outside of the module loader is kind of a misuse of the module API and
+it's confusing for people who don't know the reason behind its usage
+outside of the module loader).
+
+Right now I'm not sure if it makes sense to impose a blanket limit on
+all module_alloc() allocations when the real motivation behind the
+rlimit is related to BPF, i.e., to stop unprivileged users from
+hogging up all the vmalloc space for modules with JITed BPF filters.
+So the rlimit has more to do with limiting the memory usage of BPF
+filters than it has to do with modules themselves.
+
+I think Ard's suggestion of having a separate bpf_alloc/free API makes
+a lot of sense if we want to keep track of bpf-related allocations
+(and then the rlimit would be enforced for those). Maybe part of the
+module mapping space could be carved out for bpf filters (e.g. have
+BPF_VADDR, BPF_VSIZE, etc like how we have it for modules), or
+continue sharing the region but explicitly define a separate bpf_alloc
+API, depending on an architecture's needs. What do people think?
+
+Thanks,
+
+Jessica
