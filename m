@@ -1,52 +1,46 @@
-From: kimbrownkd@gmail.com (Kimberly Brown)
-Date: Wed, 24 Oct 2018 00:56:53 -0400
-Subject: [PATCH v2] staging: mt7621-dma: Add braces around else branches
-In-Reply-To: <20181023211142.GA2661@v>
-References: <20181023211142.GA2661@v>
-Message-ID: <20181024045653.GA2864@v>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Wed, 24 Oct 2018 14:29:24 +0800
+Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
+ <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
+Message-ID: <ffb2e431-95a2-b5fc-34ee-432e101379a4@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add braces around else branches in conditional statements that include
-branches with multiple statements. This style complies with the Linux
-kernel coding style and improves consistency and readability. Issues found by
-checkpatch.
-
-Signed-off-by: Kimberly Brown <kimbrownkd@gmail.com>
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
----
-Changes in v2:
-- Added people and mailing lists from get_maintainer.pl to the CC list
-- Added Reviewed-by line
-
- drivers/staging/mt7621-dma/mtk-hsdma.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/mt7621-dma/mtk-hsdma.c b/drivers/staging/mt7621-dma/mtk-hsdma.c
-index df6ebf41bdea..35556f024aa1 100644
---- a/drivers/staging/mt7621-dma/mtk-hsdma.c
-+++ b/drivers/staging/mt7621-dma/mtk-hsdma.c
-@@ -418,8 +418,9 @@ static void mtk_hsdma_chan_done(struct mtk_hsdam_engine *hsdma,
- 			vchan_cookie_complete(&desc->vdesc);
- 			chan_issued = gdma_next_desc(chan);
- 		}
--	} else
-+	} else {
- 		dev_dbg(hsdma->ddev.dev, "no desc to complete\n");
-+	}
- 
- 	if (chan_issued)
- 		set_bit(chan->id, &hsdma->chan_issued);
-@@ -456,8 +457,9 @@ static void mtk_hsdma_issue_pending(struct dma_chan *c)
- 		if (gdma_next_desc(chan)) {
- 			set_bit(chan->id, &hsdma->chan_issued);
- 			tasklet_schedule(&hsdma->task);
--		} else
-+		} else {
- 			dev_dbg(hsdma->ddev.dev, "no desc to issue\n");
-+		}
- 	}
- 	spin_unlock_bh(&chan->vchan.lock);
- }
--- 
-2.17.1
+On 2018/10/19 1:13, Stephen Boyd wrote:
+> Quoting Jianxin Pan (2018-10-17 22:07:25)
+[...]
+>> diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
+>> new file mode 100644
+>> index 0000000..5555e3f
+>> --- /dev/null
+>> +++ b/drivers/clk/meson/mmc-clkc.c
+>> @@ -0,0 +1,296 @@
+>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>> +/*
+>> + * Amlogic Meson MMC Sub Clock Controller Driver
+>> + *
+>> + * Copyright (c) 2017 Baylibre SAS.
+>> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+>> + *
+>> + * Copyright (c) 2018 Amlogic, inc.
+>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
+>> + */
+>> +
+>> +#include <linux/clk.h>
+> 
+> clk-provider.h instead of clk.h?>
+Maybe we need to keep clk.h
+devm_clk_get() is called in mmc_clkc_register_mux() to get parent in from DTS.
+I'm sorry to miss this in previous reply.
+>> +#include <linux/module.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/platform_device.h>
+[...]> 
+> .
+> 
