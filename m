@@ -1,90 +1,52 @@
-From: navam@xilinx.com (Nava kishore Manne)
-Date: Wed, 24 Oct 2018 06:45:11 +0000
-Subject: [PATCH 2/3] dt-bindings: fpga: Add bindings for ZynqMP fpga driver
-In-Reply-To: <CANk1AXQ_AFGX9_80YM7-GYncfZ8pOhaYdSb=O-ZpYCWuHx71vA@mail.gmail.com>
-References: <20181020084805.29103-1-nava.manne@xilinx.com>
- <20181020084805.29103-3-nava.manne@xilinx.com>
- <CANk1AXQ_AFGX9_80YM7-GYncfZ8pOhaYdSb=O-ZpYCWuHx71vA@mail.gmail.com>
-Message-ID: <BYAPR02MB47101F176968C213EA05B5D5C2F60@BYAPR02MB4710.namprd02.prod.outlook.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 24 Oct 2018 08:51:52 +0200
+Subject: [PATCH] ARM: debug: enable UART1 for socfpga Cyclone5
+In-Reply-To: <74512aef-d551-30af-b4cf-25f48047a4ac@kernel.org>
+References: <20181009112837.2517-1-peron.clem@gmail.com>
+ <e761c76d-a806-402a-b25b-04aee9329dbc@kernel.org>
+ <CAJiuCceZr8NsDgBJgA2y61VHdQ3JYQ6_3r4jKooKLbVfRD8eJQ@mail.gmail.com>
+ <74512aef-d551-30af-b4cf-25f48047a4ac@kernel.org>
+Message-ID: <20181024065152.yinlj4axprtwdzku@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Tue, Oct 23, 2018 at 03:35:31PM -0500, Dinh Nguyen wrote:
+> 
+> 
+> On 10/23/2018 09:44 AM, Cl?ment P?ron wrote:
+> > HI Dinh,
+> > 
+> > On Tue, 23 Oct 2018 at 16:04, Dinh Nguyen <dinguyen@kernel.org> wrote:
+> >>
+> >> Hi Cl?ment,
+> >>
+> >> On 10/09/2018 06:28 AM, Cl?ment P?ron wrote:
+> >>> Cyclone5 and Arria10 doesn't have the same memory map for UART1.
+> >>>
+> >>> Split the SOCFPGA_UART1 into 2 options to allow debugging on UART1 for Cylone5.
+> >>>
+> >>
+> >> I'm not sure the need for this patch. Are there any cyclone5 based
+> >> boards that has UART1 as the debug uart? I see that all of them are
+> >> using UART0.
+> > 
+> > There is no upstream device with this UART used. But the board I have
+> > use it, and there is no limitation to not have it available upstream
+> > no ?
+> > 
+> 
+> I see. Then I don't think the patch is applicable because none of the
+> upstream devices need it. Now, if you were to upstream your board that
+> uses UART1, then there will be a case for this patch. Do you agree?
 
-Thanks for the quick response..
-Please find my response inline.
+I'd not say having to upstream the board is a sensible precondition for
+such a patch. One of the arguments for moving ARM to dt was that this
+allows to separate the machine specifics from the code. So I'd say if
+Cl?ment has a need, this is a good enough reason to take this patch.
 
-> -----Original Message-----
-> From: Alan Tull [mailto:atull at kernel.org]
-> Sent: Monday, October 22, 2018 11:12 PM
-> To: Nava kishore Manne <navam@xilinx.com>
-> Cc: Moritz Fischer <mdf@kernel.org>; Rob Herring <robh+dt@kernel.org>;
-> Mark Rutland <mark.rutland@arm.com>; Michal Simek <michals@xilinx.com>;
-> Rajan Vaja <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>; linux-
-> fpga at vger.kernel.org; open list:OPEN FIRMWARE AND FLATTENED DEVICE
-> TREE BINDINGS <devicetree@vger.kernel.org>; moderated
-> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
-> kernel at lists.infradead.org>; linux-kernel <linux-kernel@vger.kernel.org>;
-> kishore m <chinnikishore369@gmail.com>
-> Subject: Re: [PATCH 2/3] dt-bindings: fpga: Add bindings for ZynqMP fpga
-> driver
-> 
-> On Fri, Oct 19, 2018 at 3:49 AM Nava kishore Manne
-> <nava.manne@xilinx.com> wrote:
-> 
-> Hi Nava,
-> 
-> Just some nits, below.
-> 
-> >
-> > Add documentation to describe Xilinx ZynqMP fpga driver bindings.
-> >
-> > Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> > ---
-> > Changes for v1:
-> >                 Created a Seperate(New) DT binding file as
-> >                 suggested by Rob.
-> >
-> > Changes for RFC-V2:
-> >                 -Moved pcap node as a child to firwmare
-> >                  node as suggested by Rob.
-> >
-> >  .../bindings/fpga/xlnx,zynqmp-pcap-fpga.txt     | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-> > b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-> > new file mode 100644
-> > index 000000000000..248ff0ee60a8
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-> > @@ -0,0 +1,17 @@
-> > +---------------------------------------------------------------------
-> > +-----
-> 
-> Please get rid of all these '----' separators (in 4 places).
-> 
-Will fix in the next version.
+Just my 0.02 ?,
+Uwe
 
-> > +Device Tree zynqmp-fpga bindings for the Zynq Ultrascale+ MPSoC
-> > +controlled using ZynqMP SoC firmware interface
-> > +---------------------------------------------------------------------
-> > +----- For Bitstream configuration on ZynqMp Soc uses processor
-> > +configuration
-> > +port(PCAP) to configure the programmable logic(PL) through PS by
-> > +using FW interface.
-> > +
-> > +Required properties:
-> > +- compatible: should contain "xlnx,zynqmp-pcap-fpga"
-> > +
-> > +-------
-> > +Example
-> 
-> Nit: please add a colon so 'Example:'
-Will fix in the next version
-
-Regards,
-Navakishore.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
