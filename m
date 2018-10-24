@@ -1,119 +1,209 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed, 24 Oct 2018 19:24:32 +0200
-Subject: [PATCH 1/4] drm/sun4i: tcon: Support an active-low DE signal
- with RGB interface
-In-Reply-To: <20181024164758.iqnlie4witckzauy@flea>
-References: <20181010114134.8211-1-contact@paulk.fr>
- <20181010145736.l6zpohvvd4b5qngr@flea>
- <224ec158bf627b4d2f577b1dadf10bd87891e2a7.camel@paulk.fr>
- <20181024164758.iqnlie4witckzauy@flea>
-Message-ID: <265be8b3daab5b9fedcf7646c68c4319a2564b3c.camel@paulk.fr>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed, 24 Oct 2018 23:18:27 +0530
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+In-Reply-To: <CAAFQd5AMirap5vjVC+73cv_KzE=-+EUD6TWd_NHRDw_m-sXDrw@mail.gmail.com>
+References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+ <CAAFQd5AMirap5vjVC+73cv_KzE=-+EUD6TWd_NHRDw_m-sXDrw@mail.gmail.com>
+Message-ID: <CAFp+6iFWZ9DGGHedqVLrGZqXPsS9RMbe4QgpJr5skJdd4m+RSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tomasz,
 
-Le mercredi 24 octobre 2018 ? 17:47 +0100, Maxime Ripard a ?crit :
-> On Tue, Oct 23, 2018 at 11:33:10AM +0200, Paul Kocialkowski wrote:
-> > Hi,
-> > 
-> > Le mercredi 10 octobre 2018 ? 16:57 +0200, Maxime Ripard a ?crit :
-> > > On Wed, Oct 10, 2018 at 01:41:31PM +0200, Paul Kocialkowski wrote:
-> > > > Some panels need an active-low data enable (DE) signal for the RGB
-> > > > interface. This requires flipping a bit in the TCON0 polarity register
-> > > > when setting up the mode for the RGB interface.
-> > > > 
-> > > > Add a new helper function to match specific bus flags and use it to set
-> > > > the polarity inversion bit for the DE signal when required.
-> > > > 
-> > > > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > > > ---
-> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++--
-> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
-> > > >  2 files changed, 27 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > > index 3fb084f802e2..d249a462ec09 100644
-> > > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > > @@ -78,6 +78,24 @@ static int sun4i_tcon_get_pixel_depth(const struct drm_encoder *encoder)
-> > > >  	return -EINVAL;
-> > > >  }
-> > > >  
-> > > > +static bool sun4i_tcon_match_bus_flags(const struct drm_encoder *encoder,
-> > > > +				       u32 bus_flags)
-> > > > +{
-> > > > +	struct drm_connector *connector;
-> > > > +	struct drm_display_info *info;
-> > > > +
-> > > > +	connector = sun4i_tcon_get_connector(encoder);
-> > > > +	if (!connector)
-> > > > +		return false;
-> > > > +
-> > > > +	info = &connector->display_info;
-> > > > +
-> > > > +	if ((info->bus_flags & bus_flags) == bus_flags)
-> > > > +		return true;
-> > > > +
-> > > > +	return false;
-> > > > +}
-> > > > +
-> > > >  static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
-> > > >  					  bool enabled)
-> > > >  {
-> > > > @@ -415,6 +433,7 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
-> > > >  }
-> > > >  
-> > > >  static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
-> > > > +				     const struct drm_encoder *encoder,
-> > > >  				     const struct drm_display_mode *mode)
-> > > >  {
-> > > >  	unsigned int bp, hsync, vsync;
-> > > > @@ -474,8 +493,13 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
-> > > >  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
-> > > >  		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
-> > > >  
-> > > > +	if (sun4i_tcon_match_bus_flags(encoder, DRM_BUS_FLAG_DE_LOW))
-> > > > +		val |= SUN4I_TCON0_IO_POL_DE_NEGATIVE;
-> > > > +
-> > > 
-> > > There's other flags in use in that function, you should also migrate
-> > > them (ideally by splitting that new function into a separate patch).
-> > 
-> > Actually, these other flags are not DRM bus flags but DRM mode flags,
-> > which can be accessed directly from the mode pointer passed as
-> > argument. Thus, they don't require a helper.
-> 
-> I was talking about DRM_BUS_FLAG_PIXDATA_POSEDGE and
-> DRM_BUS_FLAG_PIXDATA_NEGEDGE, which are in the current tree.
+On Tue, Oct 23, 2018 at 9:45 AM Tomasz Figa <tfiga@chromium.org> wrote:
+>
+> Hi Vivek,
+>
+> On Fri, Jun 15, 2018 at 7:53 PM Vivek Gautam
+> <vivek.gautam@codeaurora.org> wrote:
+> >
+> > Qualcomm SoCs have an additional level of cache called as
+> > System cache or Last level cache[1]. This cache sits right
+> > before the DDR, and is tightly coupled with the memory
+> > controller.
+> > The cache is available to all the clients present in the
+> > SoC system. The clients request their slices from this system
+> > cache, make it active, and can then start using it. For these
+> > clients with smmu, to start using the system cache for
+> > dma buffers and related page tables [2], few of the memory
+> > attributes need to be set accordingly.
+> > This change makes the related memory Outer-Shareable, and
+> > updates the MAIR with necessary protection.
+> >
+> > The MAIR attribute requirements are:
+> >     Inner Cacheablity = 0
+> >     Outer Cacheablity = 1, Write-Back Write Allocate
+> >     Outer Shareablity = 1
+> >
+> > This change is a realisation of following changes
+> > from downstream msm-4.9:
+> > iommu: io-pgtable-arm: Support DOMAIN_ATTRIBUTE_USE_UPSTREAM_HINT
+> > iommu: io-pgtable-arm: Implement IOMMU_USE_UPSTREAM_HINT
+>
+> Would you be able to provide links to those 2 downstream changes?
 
-Thanks, I guess I need to rebase these patches atop the current tree!
+Thanks for the review.
+Here are the links for the changes:
+[1] -- iommu: io-pgtable-arm: Support DOMAIN_ATTRIBUTE_USE_UPSTREAM_HINT
+[2] -- iommu: io-pgtable-arm: Implement IOMMU_USE_UPSTREAM_HINT
 
-Looking at how these flags are used in the current tree, I see that the
-connector's display_info structure (that contains the bus flags) is
-retreived from tcon->panel.
+[1] https://source.codeaurora.org/quic/la/kernel/msm-4.9/commit/?h=msm-4.9&id=bf762276796e79ca90014992f4d9da5593fa7d51
+[2] https://source.codeaurora.org/quic/la/kernel/msm-4.9/commit/?h=msm-4.9&id=d4c72c413ea27c43f60825193d4de9cb8ffd9602
 
-Would it make sense to change this and retreive it from the encoder,
-passed as argument to that function (as I've done in this patch)
-instead? This way, this wouldn't only apply to panels, but also to
-external bridges. It would also somewhat streamline the logic.
+>
+> >
+> > [1] https://patchwork.kernel.org/patch/10422531/
+> > [2] https://patchwork.kernel.org/patch/10302791/
+> >
+> > Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> > ---
+> >  drivers/iommu/arm-smmu.c       | 14 ++++++++++++++
+> >  drivers/iommu/io-pgtable-arm.c | 24 +++++++++++++++++++-----
+> >  drivers/iommu/io-pgtable.h     |  4 ++++
+> >  include/linux/iommu.h          |  4 ++++
+> >  4 files changed, 41 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index f7a96bcf94a6..8058e7205034 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -249,6 +249,7 @@ struct arm_smmu_domain {
+> >         struct mutex                    init_mutex; /* Protects smmu pointer */
+> >         spinlock_t                      cb_lock; /* Serialises ATS1* ops and TLB syncs */
+> >         struct iommu_domain             domain;
+> > +       bool                            has_sys_cache;
+> >  };
+> >
+> >  struct arm_smmu_option_prop {
+> > @@ -862,6 +863,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+> >
+> >         if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+> >                 pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+> > +       if (smmu_domain->has_sys_cache)
+> > +               pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_SYS_CACHE;
+> >
+> >         smmu_domain->smmu = smmu;
+> >         pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+> > @@ -1477,6 +1480,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+> >         case DOMAIN_ATTR_NESTING:
+> >                 *(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+> >                 return 0;
+> > +       case DOMAIN_ATTR_USE_SYS_CACHE:
+> > +               *((int *)data) = smmu_domain->has_sys_cache;
+> > +               return 0;
+> >         default:
+> >                 return -ENODEV;
+> >         }
+> > @@ -1506,6 +1512,14 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+> >                         smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
+> >
+> >                 break;
+> > +       case DOMAIN_ATTR_USE_SYS_CACHE:
+> > +               if (smmu_domain->smmu) {
+> > +                       ret = -EPERM;
+> > +                       goto out_unlock;
+> > +               }
+> > +               if (*((int *)data))
+> > +                       smmu_domain->has_sys_cache = true;
+> > +               break;
+> >         default:
+> >                 ret = -ENODEV;
+> >         }
+> > diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> > index 010a254305dd..b2aee1828524 100644
+> > --- a/drivers/iommu/io-pgtable-arm.c
+> > +++ b/drivers/iommu/io-pgtable-arm.c
+> > @@ -169,9 +169,11 @@
+> >  #define ARM_LPAE_MAIR_ATTR_DEVICE      0x04
+> >  #define ARM_LPAE_MAIR_ATTR_NC          0x44
+> >  #define ARM_LPAE_MAIR_ATTR_WBRWA       0xff
+> > +#define ARM_LPAE_MAIR_ATTR_SYS_CACHE   0xf4
+> >  #define ARM_LPAE_MAIR_ATTR_IDX_NC      0
+> >  #define ARM_LPAE_MAIR_ATTR_IDX_CACHE   1
+> >  #define ARM_LPAE_MAIR_ATTR_IDX_DEV     2
+> > +#define ARM_LPAE_MAIR_ATTR_IDX_SYS_CACHE       3
+> >
+> >  /* IOPTE accessors */
+> >  #define iopte_deref(pte,d) __va(iopte_to_paddr(pte, d))
+> > @@ -442,6 +444,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+> >                 else if (prot & IOMMU_CACHE)
+> >                         pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
+> >                                 << ARM_LPAE_PTE_ATTRINDX_SHIFT);
+> > +               else if (prot & IOMMU_SYS_CACHE)
+> > +                       pte |= (ARM_LPAE_MAIR_ATTR_IDX_SYS_CACHE
+> > +                               << ARM_LPAE_PTE_ATTRINDX_SHIFT);
+> > +
+>
+> Okay, so we favor the full caching (IC WBRWA, OC WBRWA, OS) first if
+> requested or otherwise try to use system cache (IC NC, OC WBWA?, OS)?
+> Sounds fine.
 
-What do you think?
+That's right. When devices can use full caching, the system cache will
+also be used. Otherwise when devices can't allocate/use inner caches,
+system cache (Outer WBRWA, and IC NC) is the option.
 
-Cheers,
+>
+> nit: Unnecessary blank line.
 
-Paul
+will remove it.
 
--- 
-Developer of free digital technology and hardware support.
+>
+> >         } else {
+> >                 pte = ARM_LPAE_PTE_HAP_FAULT;
+> >                 if (prot & IOMMU_READ)
+> > @@ -771,7 +777,8 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+> >         u64 reg;
+> >         struct arm_lpae_io_pgtable *data;
+> >
+> > -       if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
+> > +       if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
+> > +                           IO_PGTABLE_QUIRK_SYS_CACHE))
+> >                 return NULL;
+> >
+> >         data = arm_lpae_alloc_pgtable(cfg);
+> > @@ -779,9 +786,14 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
+> >                 return NULL;
+> >
+> >         /* TCR */
+> > -       reg = (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
+> > -             (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT) |
+> > -             (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
+> > +       if (cfg->quirks & IO_PGTABLE_QUIRK_SYS_CACHE) {
+> > +               reg = (ARM_LPAE_TCR_SH_OS << ARM_LPAE_TCR_SH0_SHIFT) |
+> > +                     (ARM_LPAE_TCR_RGN_NC << ARM_LPAE_TCR_IRGN0_SHIFT);
+>
+> Contrary to the earlier code which favored IC/IS if possible, here we
+> seem to disable IC/IS if the SYS_CACHE quirk is requested, regardless
+> of whether it could still be desirable to use IC/IS. Perhaps rather
+> than
+> IO_PGTABLE_QUIRK_SYS_CACHE, we need something like
+> IO_PGTABLE_QUIRK_NO_INNER_CACHE?
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181024/95b20608/attachment.sig>
+IIUC, with QUIRK_NO_INNER_CACHE, we would explicitly handle the case
+of non I/O-coherent devices that can't use inner caches.
+Other devices will have coherent view of inner as well as outer caches
+(including system cache).
+Do I understand you correctly?
+
+Best regards
+Vivek
+>
+> > +       } else {
+> > +               reg = (ARM_LPAE_TCR_SH_IS << ARM_LPAE_TCR_SH0_SHIFT) |
+> > +                     (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT);
+> > +       }
+> > +       reg |= (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
+> >
+>
+> [keeping the context]
+>
+> Best regards,
+> Tomasz
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+
+--
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
