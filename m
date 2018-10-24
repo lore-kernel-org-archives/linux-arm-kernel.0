@@ -1,97 +1,160 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 24 Oct 2018 10:58:42 +0200
-Subject: [PATCH v5 2/3] clk: meson: add DT documentation for emmc clock
- controller
-In-Reply-To: <1539839245-13793-3-git-send-email-jianxin.pan@amlogic.com>
+Date: Wed, 24 Oct 2018 10:58:56 +0200
+Subject: [PATCH v5 1/3] clk: meson: add emmc sub clock phase delay driver
+In-Reply-To: <1539839245-13793-2-git-send-email-jianxin.pan@amlogic.com>
 References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-3-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <ca95948abd58876a23b2eb3e52b96124e9eed793.camel@baylibre.com>
+ <1539839245-13793-2-git-send-email-jianxin.pan@amlogic.com>
+Message-ID: <10a0572db79ef0cb4f345c8ba2685bea5670b1a5.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 2018-10-18 at 13:07 +0800, Jianxin Pan wrote:
 > From: Yixun Lan <yixun.lan@amlogic.com>
 > 
-> Document the MMC sub clock controller driver, the potential consumer
-> of this driver is MMC or NAND. Also add four clock bindings IDs which
-> provided by this driver.
+> Export the emmc sub clock phase delay ops which will be used
+> by the emmc sub clock driver itself.
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
 > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
 > ---
->  .../devicetree/bindings/clock/amlogic,mmc-clkc.txt | 31 ++++++++++++++++++++++
->  include/dt-bindings/clock/amlogic,mmc-clkc.h       | 17 ++++++++++++
->  2 files changed, 48 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
->  create mode 100644 include/dt-bindings/clock/amlogic,mmc-clkc.h
+>  drivers/clk/meson/Makefile          |  2 +-
+>  drivers/clk/meson/clk-phase-delay.c | 79 +++++++++++++++++++++++++++++++++++++
+>  drivers/clk/meson/clkc.h            | 13 ++++++
+>  3 files changed, 93 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/meson/clk-phase-delay.c
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
+> index 72ec8c4..39ce566 100644
+> --- a/drivers/clk/meson/Makefile
+> +++ b/drivers/clk/meson/Makefile
+> @@ -2,7 +2,7 @@
+>  # Makefile for Meson specific clk
+>  #
+>  
+> -obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o
+> +obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o clk-phase-delay.o
+>  obj-$(CONFIG_COMMON_CLK_AMLOGIC_AUDIO)	+= clk-triphase.o sclk-div.o
+>  obj-$(CONFIG_COMMON_CLK_MESON_AO) += meson-aoclk.o
+>  obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
+> diff --git a/drivers/clk/meson/clk-phase-delay.c b/drivers/clk/meson/clk-phase-delay.c
 > new file mode 100644
-> index 0000000..9e6d343
+> index 0000000..b9573a7
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> @@ -0,0 +1,31 @@
-> +* Amlogic MMC Sub Clock Controller Driver
-> +
-> +The Amlogic MMC clock controller generates and supplies clock to support
-> +MMC and NAND controller
-> +
-> +Required Properties:
-> +
-> +- compatible: should be:
-> +		"amlogic,gx-mmc-clkc"
-> +		"amlogic,axg-mmc-clkc"
-> +
-> +- #clock-cells: should be 1.
-> +- clocks: phandles to clocks corresponding to the clock-names property
-> +- clock-names: list of parent clock names
-> +	- "clkin0", "clkin1"
-> +
-> +Parent node should have the following properties :
-> +- compatible: "amlogic,axg-mmc-clkc", "syscon".
-> +- reg: base address and size of the MMC control register space.
-
-I get why Stephen is confused by your description, I am too. The example
-contradict the documentation.
-
-The  documentation above says that the parent node should be a syscon with the
-mmc register space.
-
-But your example shows this in the node itself.
-
-> +
-> +Example: Clock controller node:
-> +
-> +sd_mmc_c_clkc: clock-controller at 7000 {
-> +	compatible = "amlogic,axg-mmc-clkc", "syscon";
-> +	reg = <0x0 0x7000 0x0 0x4>;
-> +	#clock-cells = <1>;
-> +
-> +	clock-names = "clkin0", "clkin1";
-> +	clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
-> +		 <&clkc CLKID_FCLK_DIV2>;
-> +};
-> diff --git a/include/dt-bindings/clock/amlogic,mmc-clkc.h b/include/dt-bindings/clock/amlogic,mmc-clkc.h
-> new file mode 100644
-> index 0000000..162b949
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/amlogic,mmc-clkc.h
-> @@ -0,0 +1,17 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+> +++ b/drivers/clk/meson/clk-phase-delay.c
+> @@ -0,0 +1,79 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 > +/*
-> + * Meson MMC sub clock tree IDs
+> + * Amlogic Meson MMC Sub Clock Controller Driver
 > + *
-> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+> + * Copyright (c) 2017 Baylibre SAS.
+> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
 > + * Author: Yixun Lan <yixun.lan@amlogic.com>
 > + */
 > +
-> +#ifndef __MMC_CLKC_H
-> +#define __MMC_CLKC_H
+> +#include <linux/clk-provider.h>
+> +#include "clkc.h"
 > +
-> +#define CLKID_MMC_DIV				1
-> +#define CLKID_MMC_PHASE_CORE			2
-> +#define CLKID_MMC_PHASE_TX			3
-> +#define CLKID_MMC_PHASE_RX			4
+> +static int meson_clk_phase_delay_get_phase(struct clk_hw *hw)
+> +{
+> +	struct clk_regmap *clk = to_clk_regmap(hw);
+> +	struct meson_clk_phase_delay_data *ph =
+> +		meson_clk_get_phase_delay_data(clk);
+> +	unsigned long period_ps, p, d;
+> +	int degrees;
+> +	u32 val;
 > +
-> +#endif
+> +	regmap_read(clk->map, ph->phase.reg_off, &val);
+> +	p = PARM_GET(ph->phase.width, ph->phase.shift, val);
+
+there is an helper for this: meson_parm_read()
+
+> +	degrees = p * 360 / (1 << (ph->phase.width));
+> +
+> +	period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
+> +				 clk_hw_get_rate(hw));
+> +
+> +	d = PARM_GET(ph->delay.width, ph->delay.shift, val);
+> +	degrees += d * ph->delay_step_ps * 360 / period_ps;
+> +	degrees %= 360;
+> +
+> +	return degrees;
+> +}
+> +
+> +static void meson_clk_apply_phase_delay(struct clk_regmap *clk,
+> +					unsigned int phase,
+> +					unsigned int delay)
+
+This helper function is a bit overkill.
+simply call meson_parm_write() twice in meson_clk_phase_delay_set_phase().
+
+> +{
+> +	struct meson_clk_phase_delay_data *ph = clk->data;
+> +	u32 val;
+> +
+> +	regmap_read(clk->map, ph->delay.reg_off, &val);
+> +	val = PARM_SET(ph->phase.width, ph->phase.shift, val, phase);
+> +	val = PARM_SET(ph->delay.width, ph->delay.shift, val, delay);
+> +	regmap_write(clk->map, ph->delay.reg_off, val);
+> +}
+> +
+> +static int meson_clk_phase_delay_set_phase(struct clk_hw *hw, int degrees)
+> +{
+> +	struct clk_regmap *clk = to_clk_regmap(hw);
+> +	struct meson_clk_phase_delay_data *ph =
+> +		meson_clk_get_phase_delay_data(clk);
+> +	unsigned long period_ps, d = 0, r;
+> +	u64 p;
+> +
+> +	p = degrees % 360;
+> +	period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
+> +				 clk_hw_get_rate(hw));
+> +
+> +	/* First compute the phase index (p), the remainder (r) is the
+> +	 * part we'll try to acheive using the delays (d).
+> +	 */
+> +	r = do_div(p, 360 / (1 << (ph->phase.width)));
+> +	d = DIV_ROUND_CLOSEST(r * period_ps,
+> +			      360 * ph->delay_step_ps);
+> +	d = min(d, PMASK(ph->delay.width));
+> +
+> +	meson_clk_apply_phase_delay(clk, p, d);
+> +	return 0;
+> +}
+> +
+> +const struct clk_ops meson_clk_phase_delay_ops = {
+> +	.get_phase = meson_clk_phase_delay_get_phase,
+> +	.set_phase = meson_clk_phase_delay_set_phase,
+> +};
+> +EXPORT_SYMBOL_GPL(meson_clk_phase_delay_ops);
+> diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
+> index 6b96d55..3309d78 100644
+> --- a/drivers/clk/meson/clkc.h
+> +++ b/drivers/clk/meson/clkc.h
+> @@ -105,6 +105,18 @@ struct clk_regmap _name = {						\
+>  	},								\
+>  };
+>  
+> +struct meson_clk_phase_delay_data {
+> +	struct parm			phase;
+> +	struct parm			delay;
+> +	unsigned int			delay_step_ps;
+> +};
+> +
+> +static inline struct meson_clk_phase_delay_data *
+> +meson_clk_get_phase_delay_data(struct clk_regmap *clk)
+> +{
+> +	return (struct meson_clk_phase_delay_data *)clk->data;
+> +}
+> +
+>  /* clk_ops */
+>  extern const struct clk_ops meson_clk_pll_ro_ops;
+>  extern const struct clk_ops meson_clk_pll_ops;
+> @@ -112,5 +124,6 @@ struct clk_regmap _name = {						\
+>  extern const struct clk_ops meson_clk_mpll_ro_ops;
+>  extern const struct clk_ops meson_clk_mpll_ops;
+>  extern const struct clk_ops meson_clk_phase_ops;
+> +extern const struct clk_ops meson_clk_phase_delay_ops;
+>  
+>  #endif /* __CLKC_H */
