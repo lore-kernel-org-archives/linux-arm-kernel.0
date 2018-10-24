@@ -1,68 +1,101 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 24 Oct 2018 12:45:44 +0200
-Subject: [PATCH v2] staging: mt7621-dma: Add braces around else branches
-In-Reply-To: <20181024045653.GA2864@v>
-References: <20181023211142.GA2661@v> <20181024045653.GA2864@v>
-Message-ID: <af4594cc-05c0-672c-d560-b50705ceaab3@gmail.com>
+From: pankaj.bansal@nxp.com (Pankaj Bansal)
+Date: Wed, 24 Oct 2018 10:49:20 +0000
+Subject: [PATCH] arm64: dts: Add flexcan nodes in LX2160A
+Message-ID: <20181024161509.14200-1-pankaj.bansal@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kiberly,
+The FlexCAN module in LX2160A is a communication controller implementing
+the CAN protocol according to the ISO 11898-1 standard and CAN 2.0 B
+protocol specifications.
 
-Thanks for adding all the emails in CC.
-I would encourage you for your next patch to distinguish between CC and TO.
-You should send your patch TO important maintainers in the get_maintainers.pl
-list (as default, to all of them). If there is someone you really want to look
-into the patch, then add him/her in TO as well.
+-Flexible mailboxes configurable to store 0 to 8, 16, 32 or 64 bytes
+data length
+-Each mailbox configurable as receive or transmit, all supporting
+standard and extended messages
 
-Put the rest (people and mailing lists) in CC. Why? Some people filter their
-mails so that they can concentrate on the mails they got send directly and look
-on mails they are in CC with lower priority (maybe not at all, because there are
-too much?). So it is important to have the maintainers in the TO list and not in CC.
+Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+---
 
-Keep up the good work :)
-Matthias
+Notes:
+    This patch depends on below patches:
+    [1] https://lore.kernel.org/patchwork/project/lkml/list/?series=369563
+    [2] https://patchwork.kernel.org/patch/10645287/
+    
+    This patch is used by below patches:
+    [1] https://www.spinics.net/lists/linux-can/msg00348.html
 
-On 24/10/2018 06:56, Kimberly Brown wrote:
-> Add braces around else branches in conditional statements that include
-> branches with multiple statements. This style complies with the Linux
-> kernel coding style and improves consistency and readability. Issues found by
-> checkpatch.
-> 
-> Signed-off-by: Kimberly Brown <kimbrownkd@gmail.com>
-> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
-> Changes in v2:
-> - Added people and mailing lists from get_maintainer.pl to the CC list
-> - Added Reviewed-by line
-> 
->  drivers/staging/mt7621-dma/mtk-hsdma.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/staging/mt7621-dma/mtk-hsdma.c b/drivers/staging/mt7621-dma/mtk-hsdma.c
-> index df6ebf41bdea..35556f024aa1 100644
-> --- a/drivers/staging/mt7621-dma/mtk-hsdma.c
-> +++ b/drivers/staging/mt7621-dma/mtk-hsdma.c
-> @@ -418,8 +418,9 @@ static void mtk_hsdma_chan_done(struct mtk_hsdam_engine *hsdma,
->  			vchan_cookie_complete(&desc->vdesc);
->  			chan_issued = gdma_next_desc(chan);
->  		}
-> -	} else
-> +	} else {
->  		dev_dbg(hsdma->ddev.dev, "no desc to complete\n");
-> +	}
->  
->  	if (chan_issued)
->  		set_bit(chan->id, &hsdma->chan_issued);
-> @@ -456,8 +457,9 @@ static void mtk_hsdma_issue_pending(struct dma_chan *c)
->  		if (gdma_next_desc(chan)) {
->  			set_bit(chan->id, &hsdma->chan_issued);
->  			tasklet_schedule(&hsdma->task);
-> -		} else
-> +		} else {
->  			dev_dbg(hsdma->ddev.dev, "no desc to issue\n");
-> +		}
->  	}
->  	spin_unlock_bh(&chan->vchan.lock);
->  }
-> 
+ .../boot/dts/freescale/fsl-lx2160a-qds.dts   |  8 ++++++++
+ .../boot/dts/freescale/fsl-lx2160a-rdb.dts   |  8 ++++++++
+ .../boot/dts/freescale/fsl-lx2160a.dtsi      | 18 ++++++++++++++++++
+ 3 files changed, 34 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+index 99a22abbe725..8a0305a2b778 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+@@ -31,6 +31,14 @@
+ 	};
+ };
+ 
++&can0 {
++	status = "okay";
++};
++
++&can1 {
++	status = "okay";
++};
++
+ &crypto {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+index 6481e5f20e69..f8c95fc6de27 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+@@ -31,6 +31,14 @@
+ 	};
+ };
+ 
++&can0 {
++	status = "okay";
++};
++
++&can1 {
++	status = "okay";
++};
++
+ &crypto {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+index 56f846c55812..23ea8776b55a 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+@@ -566,6 +566,24 @@
+ 			status = "disabled";
+ 		};
+ 
++		can0: can at 2180000 {
++			compatible = "fsl,lx2160ar1-flexcan";
++			reg = <0x0 0x2180000 0x0 0x10000>;
++			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 7>, <&clockgen 4 7>;
++			clock-names = "ipg", "per";
++			status = "disabled";
++		};
++
++		can1: can at 2190000 {
++			compatible = "fsl,lx2160ar1-flexcan";
++			reg = <0x0 0x2190000 0x0 0x10000>;
++			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 7>, <&clockgen 4 7>;
++			clock-names = "ipg", "per";
++			status = "disabled";
++		};
++
+ 		uart0: serial at 21c0000 {
+ 			compatible = "arm,sbsa-uart","arm,pl011";
+ 			reg = <0x0 0x21c0000 0x0 0x1000>;
+-- 
+2.17.1
