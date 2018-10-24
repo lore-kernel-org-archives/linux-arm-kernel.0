@@ -1,264 +1,415 @@
 From: dbasehore@chromium.org (Derek Basehore)
-Date: Tue, 23 Oct 2018 18:31:30 -0700
-Subject: [PATCH 4/6] clk: add pre clk changes support
+Date: Tue, 23 Oct 2018 18:31:29 -0700
+Subject: [PATCH 3/6] clk: change rates via list iteration
 In-Reply-To: <20181024013132.115907-1-dbasehore@chromium.org>
 References: <20181024013132.115907-1-dbasehore@chromium.org>
-Message-ID: <20181024013132.115907-5-dbasehore@chromium.org>
+Message-ID: <20181024013132.115907-4-dbasehore@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new clk_op, pre_rate_req. It allows clks to setup an
-intermediate state when clk rates are changed. One use case for this
-is when a clk needs to switch to a safe parent when its PLL ancestor
-changes rates. This is needed when a PLL cannot guarantee that it will
-not exceed the new rate before it locks. The set_rate, set_parent, and
-set_rate_and_parent callbacks are used with the pre_rate_req callback.
+This changes the clk_set_rate code to use lists instead of recursion.
+While making this change, also add error handling for clk_set_rate.
+This means that errors in the set_rate/set_parent/set_rate_and_parent
+functions will not longer be ignored. When an error occurs, the clk
+rates and parents are reset, unless an error occurs here, in which we
+bail and cross our fingers.
 
 Signed-off-by: Derek Basehore <dbasehore@chromium.org>
 ---
- drivers/clk/clk.c            | 136 +++++++++++++++++++++++++++++++++--
- include/linux/clk-provider.h |  10 +++
- 2 files changed, 139 insertions(+), 7 deletions(-)
+ drivers/clk/clk.c | 225 +++++++++++++++++++++++++++++++---------------
+ 1 file changed, 153 insertions(+), 72 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 1db44b4e46b0..36a2f929ab8d 100644
+index 61de8ad3e4cf..1db44b4e46b0 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -39,6 +39,7 @@ static int enable_refcnt;
- static HLIST_HEAD(clk_root_list);
- static HLIST_HEAD(clk_orphan_list);
- static LIST_HEAD(clk_notifier_list);
-+static LIST_HEAD(pre_change_free_list);
+@@ -42,6 +42,13 @@ static LIST_HEAD(clk_notifier_list);
  
  /***    private data structures    ***/
  
-@@ -1896,6 +1897,74 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *core,
- 	return fail_clk;
- }
++struct clk_change {
++	struct list_head	change_list;
++	unsigned long		rate;
++	struct clk_core		*core;
++	struct clk_core		*parent;
++};
++
+ struct clk_core {
+ 	const char		*name;
+ 	const struct clk_ops	*ops;
+@@ -52,11 +59,9 @@ struct clk_core {
+ 	const char		**parent_names;
+ 	struct clk_core		**parents;
+ 	u8			num_parents;
+-	u8			new_parent_index;
+ 	unsigned long		rate;
+ 	unsigned long		req_rate;
+-	unsigned long		new_rate;
+-	struct clk_core		*new_parent;
++	struct clk_change	change;
+ 	struct clk_core		*new_child;
+ 	unsigned long		flags;
+ 	bool			orphan;
+@@ -1719,20 +1724,53 @@ static int __clk_speculate_rates(struct clk_core *core,
  
-+static int clk_pre_rate_req(struct list_head *pre_list, struct clk_core *core)
-+{
-+	struct clk_core *child, *parent = core->parent;
-+	struct clk_rate_request next, pre;
-+	struct clk_change *change;
-+	int ret;
+ static void clk_calc_subtree(struct clk_core *core)
+ {
+-	struct clk_core *child;
++	LIST_HEAD(tmp_list);
+ 
+-	hlist_for_each_entry(child, &core->children, child_node) {
+-		child->new_rate = clk_recalc(child, core->new_rate);
+-		clk_calc_subtree(child);
++	list_add(&core->change.change_list, &tmp_list);
++	while (!list_empty(&tmp_list)) {
++		struct clk_change *change = list_first_entry(&tmp_list,
++				struct clk_change, change_list);
++		struct clk_core *tmp = change->core;
++		struct clk_core *child;
 +
-+	hlist_for_each_entry(child, &core->children, child_node) {
-+		ret = clk_pre_rate_req(pre_list, child);
-+		if (ret)
-+			return ret;
++		hlist_for_each_entry(child, &tmp->children, child_node) {
++			child->change.rate = clk_recalc(child,
++					tmp->change.rate);
++			list_add_tail(&child->change.change_list, &tmp_list);
++		}
++
++		list_del_init(&change->change_list);
 +	}
-+
-+	if (core->new_child) {
-+		ret = clk_pre_rate_req(pre_list, child);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	if (!core->ops->pre_rate_req)
-+		return 0;
-+
-+	if (core->change.parent)
-+		parent = core->change.parent;
-+
-+	if (parent) {
-+		next.best_parent_hw = parent->hw;
-+		next.best_parent_rate = parent->change.rate;
-+	}
-+
-+	next.rate = core->change.rate;
-+	clk_core_get_boundaries(core, &next.min_rate, &next.max_rate);
-+
-+	ret = core->ops->pre_rate_req(core->hw, &next, &pre);
-+	if (ret < 0)
-+		return ret;
-+	else if (!ret)
-+		goto out;
-+
-+	/*
-+	 * We allocate a change for each clk with the pre_rate_req op. If we run
-+	 * out, that's because we wrapped around to a clk again in the
-+	 * pre_rate_req step which is not allowed.
-+	 */
-+	change = list_first_entry(&pre_change_free_list, struct clk_change,
-+				  change_list);
-+	if (IS_ERR_OR_NULL(change)) {
-+		pr_err("%s: pre_rate_req loop detected on clk %s. All pre_rate_req clk_change structs are used\n",
-+				__func__, core->name);
-+		return -EDEADLK;
-+	}
-+
-+	change->core = core;
-+	change->rate = pre.rate;
-+	change->parent = pre.best_parent_hw ? pre.best_parent_hw->core : NULL;
-+	list_move(&change->change_list, pre_list);
-+
-+out:
-+	/* If the pre req req pulls in a new parent, add it to the call chain */
-+	if (parent != change->parent) {
-+		ret = clk_pre_rate_req(pre_list, change->parent);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
 +}
 +
- /*
++static void clk_prepare_changes(struct list_head *change_list,
++				struct clk_core *core)
++{
++	LIST_HEAD(tmp_list);
++
++	list_add(&core->change.change_list, &tmp_list);
++	while (!list_empty(&tmp_list)) {
++		struct clk_change *change = list_first_entry(&tmp_list,
++				struct clk_change, change_list);
++		struct clk_core *tmp = change->core;
++		struct clk_core *child;
++
++		hlist_for_each_entry(child, &tmp->children, child_node)
++			list_add_tail(&child->change.change_list, &tmp_list);
++
++		child = tmp->new_child;
++		if (child)
++			list_add_tail(&child->change.change_list, &tmp_list);
++
++		list_move_tail(&tmp->change.change_list, change_list);
+ 	}
+ }
+ 
+ static void clk_set_change(struct clk_core *core, unsigned long new_rate,
+-			   struct clk_core *new_parent, u8 p_index)
++			   struct clk_core *new_parent)
+ {
+-	core->new_rate = new_rate;
+-	core->new_parent = new_parent;
+-	core->new_parent_index = p_index;
++	core->change.rate = new_rate;
++	core->change.parent = new_parent;
+ 	/* include clk in new parent's PRE_RATE_CHANGE notifications */
+ 	core->new_child = NULL;
+ 	if (new_parent && new_parent != core->parent)
+@@ -1752,7 +1790,6 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
+ 	unsigned long new_rate;
+ 	unsigned long min_rate;
+ 	unsigned long max_rate;
+-	int p_index = 0;
+ 	long ret;
+ 
+ 	/* sanity */
+@@ -1788,14 +1825,13 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
+ 			return NULL;
+ 	} else if (!parent || !(core->flags & CLK_SET_RATE_PARENT)) {
+ 		/* pass-through clock without adjustable parent */
+-		core->new_rate = core->rate;
+ 		return NULL;
+ 	} else {
+ 		/* pass-through clock with adjustable parent */
+ 		top = clk_calc_new_rates(parent, rate);
+-		new_rate = parent->new_rate;
++		new_rate = parent->change.rate;
+ 		hlist_for_each_entry(child, &parent->children, child_node)
+-			child->new_rate = clk_recalc(child, new_rate);
++			child->change.rate = clk_recalc(child, new_rate);
+ 		goto out;
+ 	}
+ 
+@@ -1807,25 +1843,16 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
+ 		return NULL;
+ 	}
+ 
+-	/* try finding the new parent index */
+-	if (parent && core->num_parents > 1) {
+-		p_index = clk_fetch_parent_index(core, parent);
+-		if (p_index < 0) {
+-			pr_debug("%s: clk %s can not be parent of clk %s\n",
+-				 __func__, parent->name, core->name);
+-			return NULL;
+-		}
+-	}
+-
+ 	if ((core->flags & CLK_SET_RATE_PARENT) && parent &&
+ 	    best_parent_rate != parent->rate) {
+ 		top = clk_calc_new_rates(parent, best_parent_rate);
+ 		hlist_for_each_entry(child, &parent->children, child_node)
+-			child->new_rate = clk_recalc(child, parent->new_rate);
++			child->change.rate = clk_recalc(child,
++					parent->change.rate);
+ 	}
+ 
+ out:
+-	clk_set_change(core, new_rate, parent, p_index);
++	clk_set_change(core, new_rate, parent);
+ 
+ 	return top;
+ }
+@@ -1841,18 +1868,18 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *core,
+ 	struct clk_core *child, *tmp_clk, *fail_clk = NULL;
+ 	int ret = NOTIFY_DONE;
+ 
+-	if (core->rate == core->new_rate)
++	if (core->rate == core->change.rate)
+ 		return NULL;
+ 
+ 	if (core->notifier_count) {
+-		ret = __clk_notify(core, event, core->rate, core->new_rate);
++		ret = __clk_notify(core, event, core->rate, core->change.rate);
+ 		if (ret & NOTIFY_STOP_MASK)
+ 			fail_clk = core;
+ 	}
+ 
+ 	hlist_for_each_entry(child, &core->children, child_node) {
+ 		/* Skip children who will be reparented to another clock */
+-		if (child->new_parent && child->new_parent != core)
++		if (child->change.parent && child->change.parent != core)
+ 			continue;
+ 		tmp_clk = clk_propagate_rate_change(child, event);
+ 		if (tmp_clk)
+@@ -1873,28 +1900,30 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *core,
   * walk down a subtree and set the new rates notifying the rate
   * change on the way
-@@ -2065,6 +2134,8 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
+  */
+-static void clk_change_rate(struct clk_core *core)
++static int clk_change_rate(struct clk_change *change)
+ {
+-	struct clk_core *child;
+-	struct hlist_node *tmp;
++	struct clk_core *core = change->core;
+ 	unsigned long old_rate;
+ 	unsigned long best_parent_rate = 0;
+ 	bool skip_set_rate = false;
+-	struct clk_core *old_parent;
++	struct clk_core *old_parent = NULL;
+ 	struct clk_core *parent = NULL;
++	int p_index;
++	int ret = 0;
+ 
+ 	old_rate = core->rate;
+ 
+-	if (core->new_parent) {
+-		parent = core->new_parent;
+-		best_parent_rate = core->new_parent->rate;
++	if (change->parent) {
++		parent = change->parent;
++		best_parent_rate = parent->rate;
+ 	} else if (core->parent) {
+ 		parent = core->parent;
+-		best_parent_rate = core->parent->rate;
++		best_parent_rate = parent->rate;
+ 	}
+ 
+-	if (clk_pm_runtime_get(core))
+-		return;
++	ret = clk_pm_runtime_get(core);
++	if (ret)
++		return ret;
+ 
+ 	if (core->flags & CLK_SET_RATE_UNGATE) {
+ 		unsigned long flags;
+@@ -1905,35 +1934,55 @@ static void clk_change_rate(struct clk_core *core)
+ 		clk_enable_unlock(flags);
+ 	}
+ 
+-	if (core->new_parent && core->new_parent != core->parent) {
+-		old_parent = __clk_set_parent_before(core, core->new_parent);
+-		trace_clk_set_parent(core, core->new_parent);
++	if (core->flags & CLK_OPS_PARENT_ENABLE)
++		clk_core_prepare_enable(parent);
++
++	if (parent != core->parent) {
++		p_index = clk_fetch_parent_index(core, parent);
++		if (p_index < 0) {
++			pr_debug("%s: clk %s can not be parent of clk %s\n",
++				 __func__, parent->name, core->name);
++			ret = p_index;
++			goto out;
++		}
++		old_parent = __clk_set_parent_before(core, parent);
++
++		trace_clk_set_parent(core, change->parent);
+ 
+ 		if (core->ops->set_rate_and_parent) {
+ 			skip_set_rate = true;
+-			core->ops->set_rate_and_parent(core->hw, core->new_rate,
++			ret = core->ops->set_rate_and_parent(core->hw,
++					change->rate,
+ 					best_parent_rate,
+-					core->new_parent_index);
++					p_index);
+ 		} else if (core->ops->set_parent) {
+-			core->ops->set_parent(core->hw, core->new_parent_index);
++			ret = core->ops->set_parent(core->hw, p_index);
+ 		}
+ 
+-		trace_clk_set_parent_complete(core, core->new_parent);
+-		__clk_set_parent_after(core, core->new_parent, old_parent);
+-	}
++		trace_clk_set_parent_complete(core, change->parent);
++		__clk_set_parent_after(core, change->parent, old_parent);
++		if (ret)
++			goto out;
+ 
+-	if (core->flags & CLK_OPS_PARENT_ENABLE)
+-		clk_core_prepare_enable(parent);
++	}
+ 
+-	trace_clk_set_rate(core, core->new_rate);
++	trace_clk_set_rate(core, change->rate);
+ 
+ 	if (!skip_set_rate && core->ops->set_rate)
+-		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
++		ret = core->ops->set_rate(core->hw, change->rate,
++				best_parent_rate);
+ 
+-	trace_clk_set_rate_complete(core, core->new_rate);
++	trace_clk_set_rate_complete(core, change->rate);
+ 
+ 	core->rate = clk_recalc(core, best_parent_rate);
+ 
++out:
++	if (core->flags & CLK_OPS_PARENT_ENABLE)
++		clk_core_disable_unprepare(parent);
++
++	if (core->notifier_count && old_rate != core->rate)
++		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
++
+ 	if (core->flags & CLK_SET_RATE_UNGATE) {
+ 		unsigned long flags;
+ 
+@@ -1943,31 +1992,44 @@ static void clk_change_rate(struct clk_core *core)
+ 		clk_core_unprepare(core);
+ 	}
+ 
+-	if (core->flags & CLK_OPS_PARENT_ENABLE)
+-		clk_core_disable_unprepare(parent);
+-
+-	if (core->notifier_count && old_rate != core->rate)
+-		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
++	clk_pm_runtime_put(core);
+ 
+ 	if (core->flags & CLK_RECALC_NEW_RATES)
+-		(void)clk_calc_new_rates(core, core->new_rate);
++		(void)clk_calc_new_rates(core, change->rate);
+ 
+ 	/*
+-	 * Use safe iteration, as change_rate can actually swap parents
+-	 * for certain clock types.
++	 * Keep track of old parent and requested rate in case we have
++	 * to undo the change due to an error.
+ 	 */
+-	hlist_for_each_entry_safe(child, tmp, &core->children, child_node) {
+-		/* Skip children who will be reparented to another clock */
+-		if (child->new_parent && child->new_parent != core)
+-			continue;
+-		clk_change_rate(child);
++	change->parent = old_parent;
++	change->rate = old_rate;
++	return ret;
++}
++
++static int clk_change_rates(struct list_head *list)
++{
++	struct clk_change *change, *tmp;
++	int ret = 0;
++
++	list_for_each_entry(change, list, change_list) {
++		ret = clk_change_rate(change);
++		if (ret)
++			goto err;
+ 	}
+ 
+-	/* handle the new child who might not be in core->children yet */
+-	if (core->new_child)
+-		clk_change_rate(core->new_child);
++	return 0;
++err:
++	list_for_each_entry_safe_continue(change, tmp, list, change_list)
++		list_del_init(&change->change_list);
+ 
+-	clk_pm_runtime_put(core);
++	list_for_each_entry(change, list, change_list) {
++		/* Give up. Driver might want to shutdown/reboot. */
++		ret = clk_change_rate(change);
++		if (WARN_ON(ret))
++			return ret;
++	}
++
++	return ret;
+ }
+ 
+ static unsigned long clk_core_req_round_rate_nolock(struct clk_core *core,
+@@ -2001,7 +2063,9 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
+ 				    unsigned long req_rate)
+ {
  	struct clk_core *top, *fail_clk;
- 	struct clk_change *change, *tmp;
++	struct clk_change *change, *tmp;
  	unsigned long rate;
-+	LIST_HEAD(pre_changes);
-+	LIST_HEAD(post_changes);
- 	LIST_HEAD(changes);
++	LIST_HEAD(changes);
  	int ret = 0;
  
-@@ -2092,6 +2163,14 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
+ 	if (!core)
+@@ -2028,6 +2092,9 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
  
  	clk_calc_subtree(core);
  
-+	/* We need a separate list for these changes due to error handling. */
-+	ret = clk_pre_rate_req(&pre_changes, top);
-+	if (ret) {
-+		pr_debug("%s: failed pre_rate_req via top clk %s: %d\n",
-+				__func__, top->name, ret);
-+		goto pre_rate_req;
-+	}
++	/* Construct the list of changes */
++	clk_prepare_changes(&changes, top);
 +
- 	/* Construct the list of changes */
- 	clk_prepare_changes(&changes, top);
- 
-@@ -2100,11 +2179,19 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
+ 	/* notify that we are about to change rates */
+ 	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
  	if (fail_clk) {
- 		pr_debug("%s: failed to set %s rate\n", __func__,
- 				fail_clk->name);
--		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
- 		ret = -EBUSY;
--		goto err;
-+		goto prop_rate;
-+	}
-+
-+	ret = clk_change_rates(&pre_changes);
-+	if (ret) {
-+		pr_debug("%s: rate rate changes failed via top clk %s: %d\n",
-+				__func__, top->name, ret);
-+		goto pre_rate_req;
+@@ -2039,7 +2106,19 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
  	}
  
-+	list_splice_tail(&post_changes, &changes);
-+
  	/* change the rates */
- 	ret = clk_change_rates(&changes);
- 	list_for_each_entry_safe(change, tmp, &changes, change_list) {
-@@ -2112,16 +2199,28 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
- 		change->parent = NULL;
- 		list_del_init(&change->change_list);
- 	}
--
- 	if (ret) {
- 		pr_debug("%s: failed to set %s rate via top clk %s\n", __func__,
- 				core->name, top->name);
--		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
--		goto err;
-+		goto change_rates;
- 	}
- 
-+	list_splice(&pre_changes, &pre_change_free_list);
- 	core->req_rate = req_rate;
--err:
-+
-+	return 0;
-+
-+change_rates:
-+	WARN_ON(clk_change_rates(&pre_changes));
-+pre_rate_req:
-+	list_splice(&pre_changes, &pre_change_free_list);
-+prop_rate:
-+	clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
+-	clk_change_rate(top);
++	ret = clk_change_rates(&changes);
 +	list_for_each_entry_safe(change, tmp, &changes, change_list) {
 +		change->rate = 0;
 +		change->parent = NULL;
 +		list_del_init(&change->change_list);
 +	}
- 	clk_pm_runtime_put(core);
- 
- 	return ret;
-@@ -3139,7 +3238,9 @@ static int __clk_core_init(struct clk_core *core)
- 
- 	/* check that clk_ops are sane.  See Documentation/driver-api/clk.rst */
- 	if (core->ops->set_rate &&
--	    !((core->ops->round_rate || core->ops->determine_rate) &&
-+	    !((core->ops->round_rate ||
-+	       core->ops->determine_rate ||
-+	       core->ops->pre_rate_req) &&
- 	      core->ops->recalc_rate)) {
- 		pr_err("%s: %s must implement .round_rate or .determine_rate in addition to .recalc_rate\n",
- 		       __func__, core->name);
-@@ -3175,6 +3276,20 @@ static int __clk_core_init(struct clk_core *core)
- 				"%s: invalid NULL in %s's .parent_names\n",
- 				__func__, core->name);
- 
-+	/* Allocate a clk_change struct for pre_rate_reqs */
-+	if (core->ops->pre_rate_req) {
-+		struct clk_change *change = kzalloc(sizeof(*change),
-+				GFP_KERNEL);
-+		if (!change) {
-+			ret = -ENOMEM;
-+			kfree(core->parents);
-+			goto out;
-+		}
 +
-+		INIT_LIST_HEAD(&change->change_list);
-+		list_add(&pre_change_free_list, &change->change_list);
++	if (ret) {
++		pr_debug("%s: failed to set %s rate via top clk %s\n", __func__,
++				core->name, top->name);
++		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
++		goto err;
 +	}
-+
- 	core->parent = __clk_init_parent(core);
  
- 	/*
-@@ -3476,6 +3591,13 @@ static void __clk_release(struct kref *ref)
- 	while (--i >= 0)
- 		kfree_const(core->parent_names[i]);
+ 	core->req_rate = req_rate;
+ err:
+@@ -3306,6 +3385,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+ 	core->max_rate = ULONG_MAX;
+ 	INIT_LIST_HEAD(&core->prepare_list);
+ 	INIT_LIST_HEAD(&core->enable_list);
++	INIT_LIST_HEAD(&core->change.change_list);
++	core->change.core = core;
+ 	hw->core = core;
  
-+	if (core->ops->pre_rate_req) {
-+		struct clk_change *change =
-+			list_first_entry(&pre_change_free_list,
-+					struct clk_change, change_list);
-+		list_del(&change->change_list);
-+		kfree(change);
-+	}
- 	kfree(core->parent_names);
- 	kfree_const(core->name);
- 	kfree(core);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 60c51871b04b..98a65c6c326d 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -138,6 +138,13 @@ struct clk_duty {
-  *		actually supported by the clock, and optionally the parent clock
-  *		that should be used to provide the clock rate.
-  *
-+ * @pre_rate_req: Given the next state that the clk will enter via a
-+ *		clk_rate_request struct, next, fill in another clk_rate_request
-+ *		struct, pre, with any desired intermediate state to change to
-+ *		before the state in next is applied. Returns positive to request
-+ *		an intermediate state transition, 0 for no transition, and
-+ *		-EERROR otherwise.
-+ *
-  * @set_parent:	Change the input source of this clock; for clocks with multiple
-  *		possible parents specify a new parent by passing in the index
-  *		as a u8 corresponding to the parent in either the .parent_names
-@@ -236,6 +243,9 @@ struct clk_ops {
- 					unsigned long *parent_rate);
- 	int		(*determine_rate)(struct clk_hw *hw,
- 					  struct clk_rate_request *req);
-+	int		(*pre_rate_req)(struct clk_hw *hw,
-+					const struct clk_rate_request *next,
-+					struct clk_rate_request *pre);
- 	int		(*set_parent)(struct clk_hw *hw, u8 index);
- 	u8		(*get_parent)(struct clk_hw *hw);
- 	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
+ 	/* allocate local copy in case parent_names is __initdata */
 -- 
 2.19.1.568.g152ad8e336-goog
