@@ -1,112 +1,40 @@
-From: jeyu@kernel.org (Jessica Yu)
-Date: Wed, 24 Oct 2018 17:07:06 +0200
-Subject: [PATCH RFC v3 0/3] Rlimit for module space
-In-Reply-To: <CAKv+Gu-Rk-SQVOQ63L3DkF3=EVik3pHXzpNp5r5TrgDajTM_iQ@mail.gmail.com>
-References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
- <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
- <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
- <CAKv+Gu-Rk-SQVOQ63L3DkF3=EVik3pHXzpNp5r5TrgDajTM_iQ@mail.gmail.com>
-Message-ID: <20181024150706.jewcclhhh756tupn@linux-8ccs>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 24 Oct 2018 17:33:53 +0200
+Subject: [PATCH 2/2] arm64: tegra: Add PWM fan support on Jetson Xavier
+In-Reply-To: <20181024153353.15745-1-thierry.reding@gmail.com>
+References: <20181024153353.15745-1-thierry.reding@gmail.com>
+Message-ID: <20181024153353.15745-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Ard Biesheuvel [23/10/18 08:54 -0300]:
->On 22 October 2018 at 20:06, Edgecombe, Rick P
-><rick.p.edgecombe@intel.com> wrote:
->> On Sat, 2018-10-20 at 19:20 +0200, Ard Biesheuvel wrote:
->>> Hi Rick,
->>>
->>> On 19 October 2018 at 22:47, Rick Edgecombe <rick.p.edgecombe@intel.com>
->>> wrote:
->>> > If BPF JIT is on, there is no effective limit to prevent filling the entire
->>> > module space with JITed e/BPF filters.
->>>
->>> Why do BPF filters use the module space, and does this reason apply to
->>> all architectures?
->>>
->>> On arm64, we already support loading plain modules far away from the
->>> core kernel (i.e. out of range for ordinary relative jump/calll
->>> instructions), and so I'd expect BPF to be able to deal with this
->>> already as well. So for arm64, I wonder why an ordinary vmalloc_exec()
->>> wouldn't be more appropriate.
->> AFAIK, it's like you said about relative instruction limits, but also because
->> some predictors don't predict past a certain distance. So performance as well.
->> Not sure the reasons for each arch, or if they all apply for BPF JIT. There seem
->> to be 8 by my count, that have a dedicated module space for some reason.
->>
->>> So before refactoring the module alloc/free routines to accommodate
->>> BPF, I'd like to take one step back and assess whether it wouldn't be
->>> more appropriate to have a separate bpf_alloc/free API, which could be
->>> totally separate from module alloc/free if the arch permits it.
->>>
->> I am not a BPF JIT expert unfortunately, hopefully someone more authoritative
->> will chime in. I only ran into this because I was trying to increase
->> randomization for the module space and wanted to find out how many allocations
->> needed to be supported.
->>
->> I'd guess though, that BPF JIT is just assuming that there will be some arch
->> specific constraints about where text can be placed optimally and they would
->> already be taken into account in the module space allocator.
->>
->> If there are no constraints for some arch, I'd wonder why not just update its
->> module_alloc to use the whole space available. What exactly are the constraints
->> for arm64 for normal modules?
->>
->
->Relative branches and the interactions with KAsan.
->
->We just fixed something similar in the kprobes code: it was using
->RWX-mapped module memory to store kprobed instructions, and we
->replaced that with a simple vmalloc_exec() [and code to remap it
->read-only], which was possible given that relative branches are always
->emulated by arm64 kprobes.
->
->So it depends on whether BPF code needs to be in relative branching
->range from the calling code, and whether the BPF code itself is
->emitted using relative branches into other parts of the code.
->
->> It seems fine to me for architectures to have the option of solving this a
->> different way. If potentially the rlimit ends up being the best solution for
->> some architectures though, do you think this refactor (pretty close to just a
->> name change) is that intrusive?
->>
->> I guess it could be just a BPF JIT per user limit and not touch module space,
->> but I thought the module space limit was a more general solution as that is the
->> actual limited resource.
->>
->
->I think it is wrong to conflate the two things. Limiting the number of
->BPF allocations and the limiting number of module allocations are two
->separate things, and the fact that BPF reuses module_alloc() out of
->convenience does not mean a single rlimit for both is appropriate.
+From: Thierry Reding <treding@nvidia.com>
 
-Hm, I think Ard has a good point. AFAIK, and correct me if I'm wrong,
-users of module_alloc() i.e. kprobes, ftrace, bpf, seem to use it
-because it is an easy way to obtain executable kernel memory (and
-depending on the needs of the architecture, being additionally
-reachable via relative branches) during runtime. The side effect is
-that all these users share the "module" memory space, even though this
-memory region is not exclusively used by modules (well, personally I
-think it technically should be, because seeing module_alloc() usage
-outside of the module loader is kind of a misuse of the module API and
-it's confusing for people who don't know the reason behind its usage
-outside of the module loader).
+Enable PWM4 in device tree and use it to drive the PWM fan on the Jetson
+Xavier.
 
-Right now I'm not sure if it makes sense to impose a blanket limit on
-all module_alloc() allocations when the real motivation behind the
-rlimit is related to BPF, i.e., to stop unprivileged users from
-hogging up all the vmalloc space for modules with JITed BPF filters.
-So the rlimit has more to do with limiting the memory usage of BPF
-filters than it has to do with modules themselves.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-I think Ard's suggestion of having a separate bpf_alloc/free API makes
-a lot of sense if we want to keep track of bpf-related allocations
-(and then the rlimit would be enforced for those). Maybe part of the
-module mapping space could be carved out for bpf filters (e.g. have
-BPF_VADDR, BPF_VSIZE, etc like how we have it for modules), or
-continue sharing the region but explicitly define a separate bpf_alloc
-API, depending on an architecture's needs. What do people think?
-
-Thanks,
-
-Jessica
+diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts b/arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
+index 9ff3c18280c4..86f05504ca38 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
+@@ -12,5 +12,14 @@
+ 		sdhci at 3400000 {
+ 			status = "okay";
+ 		};
++
++		pwm at c340000 {
++			status = "okay";
++		};
++	};
++
++	fan {
++		compatible = "pwm-fan";
++		pwms = <&pwm4 0 45334>;
+ 	};
+ };
+-- 
+2.19.1
