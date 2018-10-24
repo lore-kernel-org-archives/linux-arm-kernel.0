@@ -1,85 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Oct 2018 12:32:27 +0200 (CEST)
-Subject: Applied "spi: uniphier: fix incorrect property items" to the spi tree
-In-Reply-To: <1540373669-18969-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <20181024103227.AA308440078@finisterre.ee.mobilebroadband>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 24 Oct 2018 12:45:44 +0200
+Subject: [PATCH v2] staging: mt7621-dma: Add braces around else branches
+In-Reply-To: <20181024045653.GA2864@v>
+References: <20181023211142.GA2661@v> <20181024045653.GA2864@v>
+Message-ID: <af4594cc-05c0-672c-d560-b50705ceaab3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Kiberly,
 
-   spi: uniphier: fix incorrect property items
+Thanks for adding all the emails in CC.
+I would encourage you for your next patch to distinguish between CC and TO.
+You should send your patch TO important maintainers in the get_maintainers.pl
+list (as default, to all of them). If there is someone you really want to look
+into the patch, then add him/her in TO as well.
 
-has been applied to the spi tree at
+Put the rest (people and mailing lists) in CC. Why? Some people filter their
+mails so that they can concentrate on the mails they got send directly and look
+on mails they are in CC with lower priority (maybe not at all, because there are
+too much?). So it is important to have the maintainers in the TO list and not in CC.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+Keep up the good work :)
+Matthias
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 3511ba7d4ca6f39e2d060bb94e42a41ad1fee7bf Mon Sep 17 00:00:00 2001
-From: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-Date: Wed, 24 Oct 2018 18:34:29 +0900
-Subject: [PATCH] spi: uniphier: fix incorrect property items
-
-This commit fixes incorrect property because it was different
-from the actual.
-The parameters of '#address-cells' and '#size-cells' were removed,
-and 'interrupts', 'pinctrl-names' and 'pinctrl-0' were added.
-
-Fixes: 4dcd5c2781f3 ("spi: add DT bindings for UniPhier SPI controller")
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- .../devicetree/bindings/spi/spi-uniphier.txt       | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-uniphier.txt b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-index 504a4ecfc7b1..b04e66a52de5 100644
---- a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-@@ -5,18 +5,20 @@ UniPhier SoCs have SCSSI which supports SPI single channel.
- Required properties:
-  - compatible: should be "socionext,uniphier-scssi"
-  - reg: address and length of the spi master registers
-- - #address-cells: must be <1>, see spi-bus.txt
-- - #size-cells: must be <0>, see spi-bus.txt
-- - clocks: A phandle to the clock for the device.
-- - resets: A phandle to the reset control for the device.
-+ - interrupts: a single interrupt specifier
-+ - pinctrl-names: should be "default"
-+ - pinctrl-0: pin control state for the default mode
-+ - clocks: a phandle to the clock for the device
-+ - resets: a phandle to the reset control for the device
- 
- Example:
- 
- spi0: spi at 54006000 {
- 	compatible = "socionext,uniphier-scssi";
- 	reg = <0x54006000 0x100>;
--	#address-cells = <1>;
--	#size-cells = <0>;
-+	interrupts = <0 39 4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_spi0>;
- 	clocks = <&peri_clk 11>;
- 	resets = <&peri_rst 11>;
- };
--- 
-2.19.0
+On 24/10/2018 06:56, Kimberly Brown wrote:
+> Add braces around else branches in conditional statements that include
+> branches with multiple statements. This style complies with the Linux
+> kernel coding style and improves consistency and readability. Issues found by
+> checkpatch.
+> 
+> Signed-off-by: Kimberly Brown <kimbrownkd@gmail.com>
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+> Changes in v2:
+> - Added people and mailing lists from get_maintainer.pl to the CC list
+> - Added Reviewed-by line
+> 
+>  drivers/staging/mt7621-dma/mtk-hsdma.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/mt7621-dma/mtk-hsdma.c b/drivers/staging/mt7621-dma/mtk-hsdma.c
+> index df6ebf41bdea..35556f024aa1 100644
+> --- a/drivers/staging/mt7621-dma/mtk-hsdma.c
+> +++ b/drivers/staging/mt7621-dma/mtk-hsdma.c
+> @@ -418,8 +418,9 @@ static void mtk_hsdma_chan_done(struct mtk_hsdam_engine *hsdma,
+>  			vchan_cookie_complete(&desc->vdesc);
+>  			chan_issued = gdma_next_desc(chan);
+>  		}
+> -	} else
+> +	} else {
+>  		dev_dbg(hsdma->ddev.dev, "no desc to complete\n");
+> +	}
+>  
+>  	if (chan_issued)
+>  		set_bit(chan->id, &hsdma->chan_issued);
+> @@ -456,8 +457,9 @@ static void mtk_hsdma_issue_pending(struct dma_chan *c)
+>  		if (gdma_next_desc(chan)) {
+>  			set_bit(chan->id, &hsdma->chan_issued);
+>  			tasklet_schedule(&hsdma->task);
+> -		} else
+> +		} else {
+>  			dev_dbg(hsdma->ddev.dev, "no desc to issue\n");
+> +		}
+>  	}
+>  	spin_unlock_bh(&chan->vchan.lock);
+>  }
+> 
