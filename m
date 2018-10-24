@@ -1,38 +1,45 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Sun, 21 Oct 2018 18:34:46 +0200
-Subject: [PATCH 2/2] drm/sun4i: hdmi: Fix double flag assignation
-In-Reply-To: <20181021163446.29135-1-maxime.ripard@bootlin.com>
-References: <20181021163446.29135-1-maxime.ripard@bootlin.com>
-Message-ID: <20181021163446.29135-2-maxime.ripard@bootlin.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 24 Oct 2018 15:22:27 +0800
+Subject: [PATCH 3/3] iommu/tegra194_smmu: Add Tegra194 SMMU driver
+In-Reply-To: <1540334347-7178-4-git-send-email-vdumpa@nvidia.com>
+References: <1540334347-7178-4-git-send-email-vdumpa@nvidia.com>
+Message-ID: <201810241524.jCAbYVLi%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The is_double flag is a boolean currently assigned to the value of the d
-variable, that is either 1 or 2. It means that this is_double variable is
-always set to true, even though the initial intent was to have it set to
-true when d is 2.
+Hi Krishna,
 
-Fix this.
+Thank you for the patch! Yet something to improve:
 
-Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+[auto build test ERROR on iommu/next]
+[also build test ERROR on next-20181019]
+[cannot apply to v4.19]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Krishna-Reddy/Add-Tegra194-Dual-ARM-SMMU-driver/20181024-123501
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+   drivers/iommu/tegra194-smmu.o: In function `arm_smmu_attach_dev':
+>> tegra194-smmu.c:(.text+0x1800): undefined reference to `alloc_io_pgtable_ops'
+   drivers/iommu/tegra194-smmu.o: In function `arm_smmu_domain_free':
+>> tegra194-smmu.c:(.text+0x1af8): undefined reference to `free_io_pgtable_ops'
+
 ---
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-index cd2348554bac..fb985ba1a176 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-@@ -52,7 +52,7 @@ static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
- 			    (rate - tmp_rate) < (rate - best_rate)) {
- 				best_rate = tmp_rate;
- 				best_m = m;
--				is_double = d;
-+				is_double = (d == 2) ? true : false;
- 			}
- 		}
- 	}
--- 
-2.19.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 44388 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181024/bbe4332a/attachment-0001.gz>
