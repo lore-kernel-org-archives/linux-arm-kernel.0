@@ -1,48 +1,21 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Wed, 24 Oct 2018 16:51:27 +0800
-Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <154037087711.53599.12246779227164118041@swboyd.mtv.corp.google.com>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
- <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
- <ffb2e431-95a2-b5fc-34ee-432e101379a4@amlogic.com>
- <154037087711.53599.12246779227164118041@swboyd.mtv.corp.google.com>
-Message-ID: <40509901-a793-971d-eb2e-40230b67f490@amlogic.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 24 Oct 2018 01:48:30 -0700
+Subject: [PATCH v2 02/15] clk: sunxi-ng: Add check for minimal rate to NKM
+ PLLs
+In-Reply-To: <20181023155035.9101-3-jagan@amarulasolutions.com>
+References: <20181023155035.9101-1-jagan@amarulasolutions.com>
+ <20181023155035.9101-3-jagan@amarulasolutions.com>
+Message-ID: <154037091085.53599.3262228306180990630@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/10/24 16:47, Stephen Boyd wrote:
-> Quoting Jianxin Pan (2018-10-23 23:29:24)
->> On 2018/10/19 1:13, Stephen Boyd wrote:
->>> Quoting Jianxin Pan (2018-10-17 22:07:25)
->> [...]
->>>> diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
->>>> new file mode 100644
->>>> index 0000000..5555e3f
->>>> --- /dev/null
->>>> +++ b/drivers/clk/meson/mmc-clkc.c
->>>> @@ -0,0 +1,296 @@
->>>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->>>> +/*
->>>> + * Amlogic Meson MMC Sub Clock Controller Driver
->>>> + *
->>>> + * Copyright (c) 2017 Baylibre SAS.
->>>> + * Author: Jerome Brunet <jbrunet@baylibre.com>
->>>> + *
->>>> + * Copyright (c) 2018 Amlogic, inc.
->>>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
->>>> + */
->>>> +
->>>> +#include <linux/clk.h>
->>>
->>> clk-provider.h instead of clk.h?>
->> Maybe we need to keep clk.h
->> devm_clk_get() is called in mmc_clkc_register_mux() to get parent in from DTS.
->> I'm sorry to miss this in previous reply.
+Quoting Jagan Teki (2018-10-23 08:50:22)
+> Some NKM PLLs doesn't work well when their output clock rate is set below
+> certain rate.
 > 
-> OK. But also include clk-provider.h if provider APIs are being used
-> here.
-OK. I will add it. Thank you.
+> So, add support for minimal rate for relevant PLLs.
 > 
-> .
-> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+
+Acked-by: Stephen Boyd <sboyd@kernel.org>
