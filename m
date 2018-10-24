@@ -1,46 +1,55 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Wed, 24 Oct 2018 14:29:24 +0800
-Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
- <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
-Message-ID: <ffb2e431-95a2-b5fc-34ee-432e101379a4@amlogic.com>
+From: navam@xilinx.com (Nava kishore Manne)
+Date: Wed, 24 Oct 2018 06:32:21 +0000
+Subject: [PATCH 0/3] Add Bitstream configuration support for ZynqMP
+In-Reply-To: <CANk1AXTUu=qiko9_sLrxrNxBmX7p0OXVxNN13p1uBirNh+Ymtw@mail.gmail.com>
+References: <20181020084805.29103-1-nava.manne@xilinx.com>
+ <CANk1AXTUu=qiko9_sLrxrNxBmX7p0OXVxNN13p1uBirNh+Ymtw@mail.gmail.com>
+Message-ID: <BYAPR02MB4710AD8C0FD51D14A7A40395C2F60@BYAPR02MB4710.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/10/19 1:13, Stephen Boyd wrote:
-> Quoting Jianxin Pan (2018-10-17 22:07:25)
-[...]
->> diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
->> new file mode 100644
->> index 0000000..5555e3f
->> --- /dev/null
->> +++ b/drivers/clk/meson/mmc-clkc.c
->> @@ -0,0 +1,296 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * Amlogic Meson MMC Sub Clock Controller Driver
->> + *
->> + * Copyright (c) 2017 Baylibre SAS.
->> + * Author: Jerome Brunet <jbrunet@baylibre.com>
->> + *
->> + * Copyright (c) 2018 Amlogic, inc.
->> + * Author: Yixun Lan <yixun.lan@amlogic.com>
->> + */
->> +
->> +#include <linux/clk.h>
+Hi Alan,
+
+Thanks for the reply...
+Please find my response inline.
+
+> -----Original Message-----
+> From: Alan Tull [mailto:atull at kernel.org]
+> Sent: Monday, October 22, 2018 9:29 PM
+> To: Nava kishore Manne <navam@xilinx.com>
+> Cc: Moritz Fischer <mdf@kernel.org>; Rob Herring <robh+dt@kernel.org>;
+> Mark Rutland <mark.rutland@arm.com>; Michal Simek <michals@xilinx.com>;
+> Rajan Vaja <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>; linux-
+> fpga at vger.kernel.org; open list:OPEN FIRMWARE AND FLATTENED DEVICE
+> TREE BINDINGS <devicetree@vger.kernel.org>; moderated
+> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
+> kernel at lists.infradead.org>; linux-kernel <linux-kernel@vger.kernel.org>;
+> kishore m <chinnikishore369@gmail.com>
+> Subject: Re: [PATCH 0/3] Add Bitstream configuration support for ZynqMP
 > 
-> clk-provider.h instead of clk.h?>
-Maybe we need to keep clk.h
-devm_clk_get() is called in mmc_clkc_register_mux() to get parent in from DTS.
-I'm sorry to miss this in previous reply.
->> +#include <linux/module.h>
->> +#include <linux/regmap.h>
->> +#include <linux/slab.h>
->> +#include <linux/of_device.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/platform_device.h>
-[...]> 
-> .
+> On Fri, Oct 19, 2018 at 3:49 AM Nava kishore Manne
+> <nava.manne@xilinx.com> wrote:
 > 
+> Hi Nava,
+> 
+> >
+> > This series of patches are created On top of the below repo.
+> > //git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+> > BRANCH: next/drivers.
+> 
+> IIUC this is dependent on some patches that aren't released yet.
+> Please make this explicit by specifying which patches this is dependent on in
+> each future submission of new versions.  It will help so that I don't send these
+> upstream prematurely and introduce build breaks.  Of course, we can keep
+> reviewing!
+> 
+
+This driver depends on the below series of patches
+https://lkml.org/lkml/2018/9/12/983 
+Which is got integrated into the below upstream repo.
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/tree/drivers/firmware/xilinx?h=for-next 
+I hope arm maintainers will send the pull-request in soon to integrate these patches with main repo.
+Will add the required info for the dependent patches in s-o-b section 
+
+Regards,
+Navakishore.
