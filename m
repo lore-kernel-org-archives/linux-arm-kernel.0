@@ -1,73 +1,52 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 24 Oct 2018 09:41:26 +0530
-Subject: [PATCH V12 00/14] Krait clocks + Krait CPUfreq
-In-Reply-To: <20181022153005.GA23950@centauri.lan>
-References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
- <2ae96741-94c0-ba4c-fc19-05d33179683c@codeaurora.org>
- <d682580d-5070-0271-197f-29d988172937@codeaurora.org>
- <D8FC68C0-2572-4A86-81D9-D0099D314A45@gmail.com>
- <F5A89365-C613-4FE2-AD32-DC0AC6DF380B@gmail.com>
- <fb81b8d5-3d24-b413-8d59-33cb70e46f8b@codeaurora.org>
- <153979105280.5275.841088095583550635@swboyd.mtv.corp.google.com>
- <153980741313.5275.10376918222904341760@swboyd.mtv.corp.google.com>
- <c5f492c0-19a2-db8f-a114-d3cfe17ae6c6@codeaurora.org>
- <20181022153005.GA23950@centauri.lan>
-Message-ID: <a9fed22d-89c2-9d3d-f6bb-594dac0e3ec5@codeaurora.org>
+From: kimbrownkd@gmail.com (Kimberly Brown)
+Date: Wed, 24 Oct 2018 00:56:53 -0400
+Subject: [PATCH v2] staging: mt7621-dma: Add braces around else branches
+In-Reply-To: <20181023211142.GA2661@v>
+References: <20181023211142.GA2661@v>
+Message-ID: <20181024045653.GA2864@v>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+Add braces around else branches in conditional statements that include
+branches with multiple statements. This style complies with the Linux
+kernel coding style and improves consistency and readability. Issues found by
+checkpatch.
 
-On 10/22/2018 9:00 PM, Niklas Cassel wrote:
-> On Mon, Oct 22, 2018 at 09:39:03AM +0530, Sricharan R wrote:
->> Hi Stephen,
->>
->> On 10/18/2018 1:46 AM, Stephen Boyd wrote:
->>> Quoting Stephen Boyd (2018-10-17 08:44:12)
->>>> Quoting Sricharan R (2018-09-20 06:03:31)
->>>>>
->>>>>
->>>>> On 9/20/2018 1:54 AM, Craig wrote:
->>>>>> Yup, this patch seems to have fixed the higher frequencies from the quick test I did.
->>>>>>
->>>>>       Thanks !!. Can i take that as 
->>>>>           Tested-by: Craig Tatlor <ctatlor97@gmail.com>  ?
->>>>>
->>>>
->>>> Is this patch series going to be resent?
->>>>
->>>
->>> Nevermind. Looking at it I think I can apply all the clk ones and we're
->>> good to go. If you can send a followup patch series to change the
->>> registration and provider APIs to be clk_hw instead of clk based I would
->>> appreciate it.
->>>
->>
->> Sorry for the late response. Was away.
->> Only pending thing was separating out the binding documentation for the cpu-freq
->> driver and fixing the text in documentation.  That means, yes its fine to merge
->> the clk ones as you said. I will resend that. Also, will send a follow up series for clk_hw to
->> clk change as you mentioned separately.
-> 
-> Hello Sricharan,
-> 
-> Great to see that the clk parts has been marged to clk-next!
-> 
-> Are you also planning on sending out a new version of the cpufreq driver
-> consolidation parts?
-> 
-   yeah right, will send a new version, sometime next week.
+Signed-off-by: Kimberly Brown <kimbrownkd@gmail.com>
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+Changes in v2:
+- Added people and mailing lists from get_maintainer.pl to the CC list
+- Added Reviewed-by line
 
-> I'm planning on extending your consilidated cpufreq driver with support
-> for msm8916 (Cortex-A53), where I plan to read PVS/speedbin, in order to
-> set opp_supported_hw(), and also register with cpufreq (since Viresh/Ulf
-> suggested that we shouldn't register with cpufreq in the CPR power-domain
-> driver).
+ drivers/staging/mt7621-dma/mtk-hsdma.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-   ok sure.
-
-Regards,
- Sricharan
-
+diff --git a/drivers/staging/mt7621-dma/mtk-hsdma.c b/drivers/staging/mt7621-dma/mtk-hsdma.c
+index df6ebf41bdea..35556f024aa1 100644
+--- a/drivers/staging/mt7621-dma/mtk-hsdma.c
++++ b/drivers/staging/mt7621-dma/mtk-hsdma.c
+@@ -418,8 +418,9 @@ static void mtk_hsdma_chan_done(struct mtk_hsdam_engine *hsdma,
+ 			vchan_cookie_complete(&desc->vdesc);
+ 			chan_issued = gdma_next_desc(chan);
+ 		}
+-	} else
++	} else {
+ 		dev_dbg(hsdma->ddev.dev, "no desc to complete\n");
++	}
+ 
+ 	if (chan_issued)
+ 		set_bit(chan->id, &hsdma->chan_issued);
+@@ -456,8 +457,9 @@ static void mtk_hsdma_issue_pending(struct dma_chan *c)
+ 		if (gdma_next_desc(chan)) {
+ 			set_bit(chan->id, &hsdma->chan_issued);
+ 			tasklet_schedule(&hsdma->task);
+-		} else
++		} else {
+ 			dev_dbg(hsdma->ddev.dev, "no desc to issue\n");
++		}
+ 	}
+ 	spin_unlock_bh(&chan->vchan.lock);
+ }
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.17.1
