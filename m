@@ -1,109 +1,206 @@
 From: dbasehore@chromium.org (Derek Basehore)
-Date: Tue, 23 Oct 2018 18:31:28 -0700
-Subject: [PATCH 2/6] clk: fix clk_calc_subtree compute duplications
+Date: Tue, 23 Oct 2018 18:31:27 -0700
+Subject: [PATCH 1/6] clk: Remove recursion in clk_core_{prepare,enable}()
 In-Reply-To: <20181024013132.115907-1-dbasehore@chromium.org>
 References: <20181024013132.115907-1-dbasehore@chromium.org>
-Message-ID: <20181024013132.115907-3-dbasehore@chromium.org>
+Message-ID: <20181024013132.115907-2-dbasehore@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_calc_subtree was called at every step up the clk tree in
-clk_calc_new_rates. Since it recursively calls itself for its
-children, this means it would be called once on each clk for each
-step above the top clk is.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-This fixes this by breaking the subtree calculation into two parts.
-The first part recalcs the rate for each child of the parent clk in
-clk_calc_new_rates. This part is not recursive itself. The second part
-recursively calls a new clk_calc_subtree on the clk_core that was
-passed into clk_set_rate.
+Enabling and preparing clocks can be written quite naturally with
+recursion. We start at some point in the tree and recurse up the
+tree to find the oldest parent clk that needs to be enabled or
+prepared. Then we enable/prepare and return to the caller, going
+back to the clk we started at and enabling/preparing along the
+way.
 
+The problem is recursion isn't great for kernel code where we
+have a limited stack size. Furthermore, we may be calling this
+code inside clk_set_rate() which also has recursion in it, so
+we're really not looking good if we encounter a tall clk tree.
+
+Let's create a stack instead by looping over the parent chain and
+collecting clks of interest. Then the enable/prepare becomes as
+simple as iterating over that list and calling enable.
+
+Cc: Jerome Brunet <jbrunet@baylibre.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Derek Basehore <dbasehore@chromium.org>
 ---
- drivers/clk/clk.c | 30 ++++++++++++++++++++----------
- 1 file changed, 20 insertions(+), 10 deletions(-)
+ drivers/clk/clk.c | 113 ++++++++++++++++++++++++++--------------------
+ 1 file changed, 64 insertions(+), 49 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 95d818f5edb2..61de8ad3e4cf 100644
+index af011974d4ec..95d818f5edb2 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -1717,11 +1717,19 @@ static int __clk_speculate_rates(struct clk_core *core,
+@@ -71,6 +71,8 @@ struct clk_core {
+ 	struct hlist_head	children;
+ 	struct hlist_node	child_node;
+ 	struct hlist_head	clks;
++	struct list_head	prepare_list;
++	struct list_head	enable_list;
+ 	unsigned int		notifier_count;
+ #ifdef CONFIG_DEBUG_FS
+ 	struct dentry		*dentry;
+@@ -740,49 +742,48 @@ EXPORT_SYMBOL_GPL(clk_unprepare);
+ static int clk_core_prepare(struct clk_core *core)
+ {
+ 	int ret = 0;
++	struct clk_core *tmp, *parent;
++	LIST_HEAD(head);
+ 
+ 	lockdep_assert_held(&prepare_lock);
+ 
+-	if (!core)
+-		return 0;
++	while (core) {
++		list_add(&core->prepare_list, &head);
++		/* Stop once we see a clk that is already prepared */
++		if (core->prepare_count)
++			break;
++		core = core->parent;
++	}
+ 
+-	if (core->prepare_count == 0) {
+-		ret = clk_pm_runtime_get(core);
+-		if (ret)
+-			return ret;
++	list_for_each_entry_safe(core, tmp, &head, prepare_list) {
++		list_del_init(&core->prepare_list);
+ 
+-		ret = clk_core_prepare(core->parent);
+-		if (ret)
+-			goto runtime_put;
++		if (core->prepare_count == 0) {
++			ret = clk_pm_runtime_get(core);
++			if (ret)
++				goto err;
+ 
+-		trace_clk_prepare(core);
++			trace_clk_prepare(core);
+ 
+-		if (core->ops->prepare)
+-			ret = core->ops->prepare(core->hw);
++			if (core->ops->prepare)
++				ret = core->ops->prepare(core->hw);
+ 
+-		trace_clk_prepare_complete(core);
++			trace_clk_prepare_complete(core);
+ 
+-		if (ret)
+-			goto unprepare;
++			if (ret) {
++				clk_pm_runtime_put(core);
++				goto err;
++			}
++		}
++		core->prepare_count++;
+ 	}
+ 
+-	core->prepare_count++;
+-
+-	/*
+-	 * CLK_SET_RATE_GATE is a special case of clock protection
+-	 * Instead of a consumer claiming exclusive rate control, it is
+-	 * actually the provider which prevents any consumer from making any
+-	 * operation which could result in a rate change or rate glitch while
+-	 * the clock is prepared.
+-	 */
+-	if (core->flags & CLK_SET_RATE_GATE)
+-		clk_core_rate_protect(core);
+-
+ 	return 0;
+-unprepare:
+-	clk_core_unprepare(core->parent);
+-runtime_put:
+-	clk_pm_runtime_put(core);
++err:
++	parent = core->parent;
++	list_for_each_entry_safe_continue(core, tmp, &head, prepare_list)
++		list_del_init(&core->prepare_list);
++	clk_core_unprepare(parent);
  	return ret;
  }
  
--static void clk_calc_subtree(struct clk_core *core, unsigned long new_rate,
--			     struct clk_core *new_parent, u8 p_index)
-+static void clk_calc_subtree(struct clk_core *core)
+@@ -878,37 +879,49 @@ EXPORT_SYMBOL_GPL(clk_disable);
+ static int clk_core_enable(struct clk_core *core)
  {
- 	struct clk_core *child;
+ 	int ret = 0;
++	struct clk_core *tmp, *parent;
++	LIST_HEAD(head);
  
-+	hlist_for_each_entry(child, &core->children, child_node) {
-+		child->new_rate = clk_recalc(child, core->new_rate);
-+		clk_calc_subtree(child);
-+	}
-+}
-+
-+static void clk_set_change(struct clk_core *core, unsigned long new_rate,
-+			   struct clk_core *new_parent, u8 p_index)
-+{
- 	core->new_rate = new_rate;
- 	core->new_parent = new_parent;
- 	core->new_parent_index = p_index;
-@@ -1729,11 +1737,6 @@ static void clk_calc_subtree(struct clk_core *core, unsigned long new_rate,
- 	core->new_child = NULL;
- 	if (new_parent && new_parent != core->parent)
- 		new_parent->new_child = core;
+ 	lockdep_assert_held(&enable_lock);
+ 
+-	if (!core)
+-		return 0;
 -
--	hlist_for_each_entry(child, &core->children, child_node) {
--		child->new_rate = clk_recalc(child, new_rate);
--		clk_calc_subtree(child, child->new_rate, NULL, 0);
--	}
- }
- 
- /*
-@@ -1744,7 +1747,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
- 					   unsigned long rate)
- {
- 	struct clk_core *top = core;
--	struct clk_core *old_parent, *parent;
-+	struct clk_core *old_parent, *parent, *child;
- 	unsigned long best_parent_rate = 0;
- 	unsigned long new_rate;
- 	unsigned long min_rate;
-@@ -1791,6 +1794,8 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
- 		/* pass-through clock with adjustable parent */
- 		top = clk_calc_new_rates(parent, rate);
- 		new_rate = parent->new_rate;
-+		hlist_for_each_entry(child, &parent->children, child_node)
-+			child->new_rate = clk_recalc(child, new_rate);
- 		goto out;
- 	}
- 
-@@ -1813,11 +1818,14 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
- 	}
- 
- 	if ((core->flags & CLK_SET_RATE_PARENT) && parent &&
--	    best_parent_rate != parent->rate)
-+	    best_parent_rate != parent->rate) {
- 		top = clk_calc_new_rates(parent, best_parent_rate);
-+		hlist_for_each_entry(child, &parent->children, child_node)
-+			child->new_rate = clk_recalc(child, parent->new_rate);
+-	if (WARN(core->prepare_count == 0,
+-	    "Enabling unprepared %s\n", core->name))
+-		return -ESHUTDOWN;
++	while (core) {
++		list_add(&core->enable_list, &head);
++		/* Stop once we see a clk that is already enabled */
++		if (core->enable_count)
++			break;
++		core = core->parent;
 +	}
  
- out:
--	clk_calc_subtree(core, new_rate, parent, p_index);
-+	clk_set_change(core, new_rate, parent, p_index);
+-	if (core->enable_count == 0) {
+-		ret = clk_core_enable(core->parent);
++	list_for_each_entry_safe(core, tmp, &head, enable_list) {
++		list_del_init(&core->enable_list);
  
- 	return top;
- }
-@@ -2018,6 +2026,8 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
- 	if (ret)
- 		return ret;
+-		if (ret)
+-			return ret;
++		if (WARN_ON(core->prepare_count == 0)) {
++			ret = -ESHUTDOWN;
++			goto err;
++		}
  
-+	clk_calc_subtree(core);
+-		trace_clk_enable_rcuidle(core);
++		if (core->enable_count == 0) {
++			trace_clk_enable_rcuidle(core);
+ 
+-		if (core->ops->enable)
+-			ret = core->ops->enable(core->hw);
++			if (core->ops->enable)
++				ret = core->ops->enable(core->hw);
+ 
+-		trace_clk_enable_complete_rcuidle(core);
++			trace_clk_enable_complete_rcuidle(core);
+ 
+-		if (ret) {
+-			clk_core_disable(core->parent);
+-			return ret;
++			if (ret)
++				goto err;
+ 		}
 +
- 	/* notify that we are about to change rates */
- 	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
- 	if (fail_clk) {
++		core->enable_count++;
+ 	}
+ 
+-	core->enable_count++;
+ 	return 0;
++err:
++	parent = core->parent;
++	list_for_each_entry_safe_continue(core, tmp, &head, enable_list)
++		list_del_init(&core->enable_list);
++	clk_core_disable(parent);
++	return ret;
+ }
+ 
+ static int clk_core_enable_lock(struct clk_core *core)
+@@ -3281,6 +3294,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+ 	core->num_parents = hw->init->num_parents;
+ 	core->min_rate = 0;
+ 	core->max_rate = ULONG_MAX;
++	INIT_LIST_HEAD(&core->prepare_list);
++	INIT_LIST_HEAD(&core->enable_list);
+ 	hw->core = core;
+ 
+ 	/* allocate local copy in case parent_names is __initdata */
 -- 
 2.19.1.568.g152ad8e336-goog
