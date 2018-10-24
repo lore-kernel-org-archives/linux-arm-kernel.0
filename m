@@ -1,49 +1,123 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Thu, 25 Oct 2018 13:02:05 +0530
-Subject: [PATCH v2 2/3] dt-bindings: fpga: Add bindings for ZynqMP fpga driver
-In-Reply-To: <20181025073206.9264-1-nava.manne@xilinx.com>
-References: <20181025073206.9264-1-nava.manne@xilinx.com>
-Message-ID: <20181025073206.9264-3-nava.manne@xilinx.com>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Wed, 24 Oct 2018 07:35:46 +0000
+Subject: [PATCH v3 0/7] include: add
+ setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64
+Message-ID: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation to describe Xilinx ZynqMP fpga driver
-bindings.
+Hello
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v2:
-		-Removed "----" separators.
-Changes for v1:
-                -Created a Seperate(New) DT binding file as
-                 suggested by Rob.
+This patchset adds a new set of functions which are open-coded in lot of
+place.
+Basicly the pattern is always the same, "read, modify a bit, write"
+some driver and the powerpc arch already have thoses pattern them as functions. (like ahci_sunxi.c or dwmac-meson8b)
 
-Changes for RFC-V2:
-                -Moved pcap node as a child to firwmare
-                 node as suggested by Rob.
+The first patch rename some powerpc functions for being consistent with
+the new name convention.
 
- .../bindings/fpga/xlnx,zynqmp-pcap-fpga.txt         | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+The second patch adds the header with all setbits functions.
 
-diff --git a/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-new file mode 100644
-index 000000000000..1f6f58872311
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
-@@ -0,0 +1,13 @@
-+Device Tree zynqmp-fpga bindings for the Zynq Ultrascale+ MPSoC controlled
-+using ZynqMP SoC firmware interface
-+For Bitstream configuration on ZynqMp Soc uses processor configuration
-+port(PCAP) to configure the programmable logic(PL) through PS by using
-+FW interface.
-+
-+Required properties:
-+- compatible: should contain "xlnx,zynqmp-pcap-fpga"
-+
-+Example:
-+	zynqmp_pcap: pcap {
-+		compatible = "xlnx,zynqmp-pcap-fpga";
-+	};
+The third patch is a try to implement a coccinelle semantic patch to
+find all place where xxxbits function could be used.
+It should not be merged since it is un-finalized.
+For the moment, the "add setbits.h header" is not working and need a future
+coccinelle version.
+
+The four last patch are example of some drivers conversion.
+Thoses patchs give an example of the reduction of code won by using xxxbits32.
+
+I would like to thanks Julia Lawall for her help on the coccinelle
+patch.
+
+Note that I dont know which maintainer will take the linux/setbits.h include patch.
+
+Regards
+
+Changes since v2:
+- Fixed patch title
+- Fixed style problems
+- shorted macro arguments name
+
+Changes since v1:
+- renamed LE functions to _leXX
+- updated coccinnelle patch with JLawall's comments
+
+Corentin Labbe (7):
+  powerpc: rename setbits32/clrbits32 to setbits_be32/clrbits_be32
+  include: add setbits_leXX/clrbits_leXX/clrsetbits_leXX in
+    linux/setbits.h
+  coccinelle: add xxxsetbits_leXX converting spatch
+  ata: ahci_sunxi: use xxxsetbitsi_le32 functions
+  net: ethernet: stmmac: dwmac-sun8i: use xxxsetbits_le32
+  drm: meson: use xxxsetbits_le32
+  net: stmmac: dwmac-meson8b: use xxxsetbits_le32
+
+ arch/powerpc/include/asm/fsl_lbc.h            |   2 +-
+ arch/powerpc/include/asm/io.h                 |   4 +-
+ arch/powerpc/platforms/44x/canyonlands.c      |   4 +-
+ arch/powerpc/platforms/4xx/gpio.c             |  28 +-
+ arch/powerpc/platforms/512x/pdm360ng.c        |   6 +-
+ arch/powerpc/platforms/52xx/mpc52xx_common.c  |   6 +-
+ arch/powerpc/platforms/52xx/mpc52xx_gpt.c     |  12 +-
+ arch/powerpc/platforms/82xx/ep8248e.c         |   2 +-
+ arch/powerpc/platforms/82xx/km82xx.c          |   6 +-
+ arch/powerpc/platforms/82xx/mpc8272_ads.c     |  10 +-
+ arch/powerpc/platforms/82xx/pq2.c             |   2 +-
+ arch/powerpc/platforms/82xx/pq2ads-pci-pic.c  |   4 +-
+ arch/powerpc/platforms/82xx/pq2fads.c         |  10 +-
+ arch/powerpc/platforms/83xx/km83xx.c          |   6 +-
+ arch/powerpc/platforms/83xx/mpc836x_mds.c     |   2 +-
+ arch/powerpc/platforms/85xx/mpc85xx_mds.c     |   2 +-
+ arch/powerpc/platforms/85xx/mpc85xx_pm_ops.c  |   4 +-
+ arch/powerpc/platforms/85xx/mpc85xx_rdb.c     |   2 +-
+ arch/powerpc/platforms/85xx/p1022_ds.c        |   6 +-
+ arch/powerpc/platforms/85xx/p1022_rdk.c       |   6 +-
+ arch/powerpc/platforms/85xx/t1042rdb_diu.c    |   6 +-
+ arch/powerpc/platforms/85xx/twr_p102x.c       |   2 +-
+ arch/powerpc/platforms/86xx/mpc8610_hpcd.c    |   6 +-
+ arch/powerpc/platforms/8xx/adder875.c         |   2 +-
+ arch/powerpc/platforms/8xx/m8xx_setup.c       |   4 +-
+ arch/powerpc/platforms/8xx/mpc86xads_setup.c  |   4 +-
+ arch/powerpc/platforms/8xx/mpc885ads_setup.c  |  28 +-
+ .../platforms/embedded6xx/flipper-pic.c       |   6 +-
+ arch/powerpc/platforms/embedded6xx/hlwd-pic.c |   8 +-
+ arch/powerpc/platforms/embedded6xx/wii.c      |  12 +-
+ arch/powerpc/sysdev/cpm1.c                    |  26 +-
+ arch/powerpc/sysdev/cpm2.c                    |  16 +-
+ arch/powerpc/sysdev/cpm_common.c              |   4 +-
+ arch/powerpc/sysdev/fsl_85xx_l2ctlr.c         |  16 +-
+ arch/powerpc/sysdev/fsl_lbc.c                 |   2 +-
+ arch/powerpc/sysdev/fsl_pci.c                 |  12 +-
+ arch/powerpc/sysdev/fsl_pmc.c                 |   2 +-
+ arch/powerpc/sysdev/fsl_rcpm.c                |  74 +--
+ arch/powerpc/sysdev/fsl_rio.c                 |   4 +-
+ arch/powerpc/sysdev/fsl_rmu.c                 |   9 +-
+ arch/powerpc/sysdev/mpic_timer.c              |  12 +-
+ drivers/ata/ahci_sunxi.c                      |  62 +--
+ drivers/gpu/drm/meson/meson_crtc.c            |  14 +-
+ drivers/gpu/drm/meson/meson_dw_hdmi.c         |  33 +-
+ drivers/gpu/drm/meson/meson_plane.c           |  13 +-
+ drivers/gpu/drm/meson/meson_registers.h       |   3 -
+ drivers/gpu/drm/meson/meson_venc.c            |  13 +-
+ drivers/gpu/drm/meson/meson_venc_cvbs.c       |   4 +-
+ drivers/gpu/drm/meson/meson_viu.c             |  65 +--
+ drivers/gpu/drm/meson/meson_vpp.c             |  22 +-
+ .../ethernet/stmicro/stmmac/dwmac-meson8b.c   |  56 +-
+ .../net/ethernet/stmicro/stmmac/dwmac-sun8i.c |  62 +--
+ include/linux/setbits.h                       |  84 +++
+ scripts/add_new_include_in_source.py          |  61 +++
+ scripts/coccinelle/misc/setbits32.cocci       | 487 ++++++++++++++++++
+ .../coccinelle/misc/setbits32_relaxed.cocci   | 487 ++++++++++++++++++
+ scripts/coccinelle/misc/setbits64.cocci       | 487 ++++++++++++++++++
+ scripts/coccinelle/misc/setbits_dev.cocci     | 235 +++++++++
+ 58 files changed, 2172 insertions(+), 395 deletions(-)
+ create mode 100644 include/linux/setbits.h
+ create mode 100755 scripts/add_new_include_in_source.py
+ create mode 100644 scripts/coccinelle/misc/setbits32.cocci
+ create mode 100644 scripts/coccinelle/misc/setbits32_relaxed.cocci
+ create mode 100644 scripts/coccinelle/misc/setbits64.cocci
+ create mode 100644 scripts/coccinelle/misc/setbits_dev.cocci
+
 -- 
-2.18.0
+2.18.1
