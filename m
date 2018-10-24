@@ -1,51 +1,71 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Wed, 24 Oct 2018 18:34:29 +0900
-Subject: [PATCH] spi: uniphier: fix incorrect property items
-Message-ID: <1540373669-18969-1-git-send-email-hayashibara.keiji@socionext.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 24 Oct 2018 11:00:50 +0200
+Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <153997220960.53599.2059896905852359614@swboyd.mtv.corp.google.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
+ <153988282130.5275.17528969137837015544@swboyd.mtv.corp.google.com>
+ <01d07c83-b17e-70b5-6e9b-8150ee3aedf2@amlogic.com>
+ <153997220960.53599.2059896905852359614@swboyd.mtv.corp.google.com>
+Message-ID: <9db735d01a0f9fc3f82be6d45c88c4b98362d062.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes incorrect property because it was different
-from the actual.
-The parameters of '#address-cells' and '#size-cells' were removed,
-and 'interrupts', 'pinctrl-names' and 'pinctrl-0' were added.
+On Fri, 2018-10-19 at 11:03 -0700, Stephen Boyd wrote:
+> Quoting Jianxin Pan (2018-10-19 09:12:53)
+> > On 2018/10/19 1:13, Stephen Boyd wrote:
+> > > Quoting Jianxin Pan (2018-10-17 22:07:25)
+> > > > diff --git a/drivers/clk/meson/clk-regmap.c b/drivers/clk/meson/clk-regmap.c
+> > > > index 305ee30..f96314d 100644
+> > > > --- a/drivers/clk/meson/clk-regmap.c
+> > > > +++ b/drivers/clk/meson/clk-regmap.c
+> > > > @@ -113,8 +113,25 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, unsigned long rate,
+> > > >                                   clk_div_mask(div->width) << div->shift, val);
+> > > >  };
+> > > >  
+> > > > -/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
+> > > > +static void clk_regmap_div_init(struct clk_hw *hw)
+> > > > +{
+> > > > +       struct clk_regmap *clk = to_clk_regmap(hw);
+> > > > +       struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk);
+> > > > +       unsigned int val;
+> > > > +       int ret;
+> > > > +
+> > > > +       ret = regmap_read(clk->map, div->offset, &val);
+> > > > +       if (ret)
+> > > > +               return;
+> > > >  
+> > > > +       val &= (clk_div_mask(div->width) << div->shift);
+> > > > +       if (!val)
+> > > > +               regmap_update_bits(clk->map, div->offset,
+> > > > +                                  clk_div_mask(div->width) << div->shift,
+> > > > +                                  clk_div_mask(div->width));
+> > > > +}
+> > > > +
+> > > > +/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
+> > > 
+> > > We should add a patch to rename the symbol for qcom, i.e.
+> > > qcom_clk_regmap_div_ro_ops, and then any symbols in this directory
+> > > should be meson_clk_regmap_div_ro_ops.
+> > 
+> > "/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */"
+> > This comment is not introduced in this patch.
+> > I followed the naming style in this file and add clk_regmap_divider_with_init_ops.
+> > 
+> > @Jerome? What's your suggestion about this?
+> 
+> Yes you don't need to fix anything in this series. Just saying that in
+> the future we should work on cleaning this up.
 
-Fixes: 4dcd5c2781f3 ("spi: add DT bindings for UniPhier SPI controller")
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
----
- Documentation/devicetree/bindings/spi/spi-uniphier.txt | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-uniphier.txt b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-index 504a4ec..b04e66a 100644
---- a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-@@ -5,18 +5,20 @@ UniPhier SoCs have SCSSI which supports SPI single channel.
- Required properties:
-  - compatible: should be "socionext,uniphier-scssi"
-  - reg: address and length of the spi master registers
-- - #address-cells: must be <1>, see spi-bus.txt
-- - #size-cells: must be <0>, see spi-bus.txt
-- - clocks: A phandle to the clock for the device.
-- - resets: A phandle to the reset control for the device.
-+ - interrupts: a single interrupt specifier
-+ - pinctrl-names: should be "default"
-+ - pinctrl-0: pin control state for the default mode
-+ - clocks: a phandle to the clock for the device
-+ - resets: a phandle to the reset control for the device
- 
- Example:
- 
- spi0: spi at 54006000 {
- 	compatible = "socionext,uniphier-scssi";
- 	reg = <0x54006000 0x100>;
--	#address-cells = <1>;
--	#size-cells = <0>;
-+	interrupts = <0 39 4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_spi0>;
- 	clocks = <&peri_clk 11>;
- 	resets = <&peri_rst 11>;
- };
--- 
-2.7.4
+Well, first, I wonder why such a change ends up in a patch that is supposed to
+add a controller.
+
+If such a change was really required to implement a generic div (which I doubt)
+it would need to be in separate with clear explanation.
+
+Stephen,
+I agree at some point we should squash the different regmap implementations and
+provide generic (enough) implementation. There is not only qcom and meson, some
+other controllers are redefining regmap ops and I bet driver outside of
+drivers/clk/* could use a generic implementation as well.
