@@ -1,283 +1,466 @@
-From: dbasehore@chromium.org (dbasehore .)
-Date: Wed, 24 Oct 2018 13:50:28 -0700
-Subject: [PATCH 1/6] clk: Remove recursion in clk_core_{prepare,enable}()
-In-Reply-To: <CAGAzgspHFiuUpfTjD5v9-U=yAxwkBnZh3Mwtaom4wsiO-Bcfgw@mail.gmail.com>
-References: <20181024013132.115907-1-dbasehore@chromium.org>
- <20181024013132.115907-2-dbasehore@chromium.org>
- <264adf2a81bcd602f2a58e4a46c3273cd7c77ca2.camel@baylibre.com>
- <CAGAzgspHFiuUpfTjD5v9-U=yAxwkBnZh3Mwtaom4wsiO-Bcfgw@mail.gmail.com>
-Message-ID: <CAGAzgsrTPoBaP_wZ1fUryTgbu6RhwOtGPDV_njamOoiiH9Or9g@mail.gmail.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Wed, 24 Oct 2018 14:10:44 -0700
+Subject: [PATCH v8 08/12] mfd: intel-peci-client: Add PECI client MFD
+ driver
+In-Reply-To: <20181024105903.GB4939@dell>
+References: <20180918215124.14003-1-jae.hyun.yoo@linux.intel.com>
+ <20180918215124.14003-9-jae.hyun.yoo@linux.intel.com>
+ <20181024105903.GB4939@dell>
+Message-ID: <db7570cb-8f63-b551-d119-c54270ce6139@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 1:15 PM dbasehore . <dbasehore@chromium.org> wrote:
->
-> On Wed, Oct 24, 2018 at 2:51 AM Jerome Brunet <jbrunet@baylibre.com> wrote:
-> >
-> > On Tue, 2018-10-23 at 18:31 -0700, Derek Basehore wrote:
-> > > From: Stephen Boyd <sboyd@codeaurora.org>
-> > >
-> > > Enabling and preparing clocks can be written quite naturally with
-> > > recursion. We start at some point in the tree and recurse up the
-> > > tree to find the oldest parent clk that needs to be enabled or
-> > > prepared. Then we enable/prepare and return to the caller, going
-> > > back to the clk we started at and enabling/preparing along the
-> > > way.
-> > >
-> > > The problem is recursion isn't great for kernel code where we
-> > > have a limited stack size. Furthermore, we may be calling this
-> > > code inside clk_set_rate() which also has recursion in it, so
-> > > we're really not looking good if we encounter a tall clk tree.
-> > >
-> > > Let's create a stack instead by looping over the parent chain and
-> > > collecting clks of interest. Then the enable/prepare becomes as
-> > > simple as iterating over that list and calling enable.
-> >
-> > Hi Derek,
-> >
-> > What about unprepare() and disable() ?
-> >
-> > This patch removes the recursion from the enable path but keeps it for the
-> > disable path ... this is very odd. Assuming doing so works, It certainly makes
-> > CCF a lot harder to understand.
-> >
-> > What about clock protection which essentially works on the same model as prepare
-> > and enable ?
-> >
-> > Overall, this change does not look like something that should be merged as it
-> > is. If you were just seeking comments, you should add the "RFC" tag to your
-> > series.
-> >
-> > Jerome.
-> >
-> > >
-> > > Cc: Jerome Brunet <jbrunet@baylibre.com>
-> >
-> > If you don't mind, I would prefer to get the whole series next time. It helps to
-> > get the context.
-> >
-> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
-> > > ---
-> > >  drivers/clk/clk.c | 113 ++++++++++++++++++++++++++--------------------
-> > >  1 file changed, 64 insertions(+), 49 deletions(-)
-> > >
-> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > index af011974d4ec..95d818f5edb2 100644
-> > > --- a/drivers/clk/clk.c
-> > > +++ b/drivers/clk/clk.c
-> > > @@ -71,6 +71,8 @@ struct clk_core {
-> > >       struct hlist_head       children;
-> > >       struct hlist_node       child_node;
-> > >       struct hlist_head       clks;
-> > > +     struct list_head        prepare_list;
-> > > +     struct list_head        enable_list;
-> > >       unsigned int            notifier_count;
-> > >  #ifdef CONFIG_DEBUG_FS
-> > >       struct dentry           *dentry;
-> > > @@ -740,49 +742,48 @@ EXPORT_SYMBOL_GPL(clk_unprepare);
-> > >  static int clk_core_prepare(struct clk_core *core)
-> > >  {
-> > >       int ret = 0;
-> > > +     struct clk_core *tmp, *parent;
-> > > +     LIST_HEAD(head);
-> > >
-> > >       lockdep_assert_held(&prepare_lock);
-> > >
-> > > -     if (!core)
-> > > -             return 0;
-> > > +     while (core) {
-> > > +             list_add(&core->prepare_list, &head);
-> > > +             /* Stop once we see a clk that is already prepared */
-> > > +             if (core->prepare_count)
-> > > +                     break;
-> > > +             core = core->parent;
-> > > +     }
-> > >
-> > > -     if (core->prepare_count == 0) {
-> > > -             ret = clk_pm_runtime_get(core);
-> > > -             if (ret)
-> > > -                     return ret;
-> > > +     list_for_each_entry_safe(core, tmp, &head, prepare_list) {
-> > > +             list_del_init(&core->prepare_list);
-> >
-> > Is there any point in removing it from the list ?
-> > Maybe I missed it but it does not seems useful.
-> >
-> > Without this, we could use list_for_each_entry()
-> >
-> > >
-> > > -             ret = clk_core_prepare(core->parent);
-> > > -             if (ret)
-> > > -                     goto runtime_put;
-> > > +             if (core->prepare_count == 0) {
-> >
-> > Should we really check the count here ? You are not checking the count when the
-> > put() counterpart is called below.
->
-> I think I accidentally messed that up when I picked up the patch.
-> There were some merge conflicts with the addition of the
-> clk_pm_runtime code.
+Hi Lee,
 
-Nevermind, this is incorrect. The clk_pm_runtime_put is within this if
-statement too, so there isn't an issue here.
+On 10/24/2018 3:59 AM, Lee Jones wrote:
+> On Tue, 18 Sep 2018, Jae Hyun Yoo wrote:
+> 
+>> This commit adds PECI client MFD driver.
+>>
 
->
-> >
-> > Since PM runtime has ref counting as well, either way would work I guess ... but
-> > we shall be consistent
-> >
-> > > +                     ret = clk_pm_runtime_get(core);
-> > > +                     if (ret)
-> > > +                             goto err;
-> > >
-> > > -             trace_clk_prepare(core);
-> > > +                     trace_clk_prepare(core);
-> > >
-> > > -             if (core->ops->prepare)
-> > > -                     ret = core->ops->prepare(core->hw);
-> > > +                     if (core->ops->prepare)
-> > > +                             ret = core->ops->prepare(core->hw);
-> > >
-> > > -             trace_clk_prepare_complete(core);
-> > > +                     trace_clk_prepare_complete(core);
-> > >
-> > > -             if (ret)
-> > > -                     goto unprepare;
-> > > +                     if (ret) {
-> > > +                             clk_pm_runtime_put(core);
-> > > +                             goto err;
-> > > +                     }
-> > > +             }
-> > > +             core->prepare_count++;
-> > >       }
-> > >
-> > > -     core->prepare_count++;
-> > > -
-> > > -     /*
-> > > -      * CLK_SET_RATE_GATE is a special case of clock protection
-> > > -      * Instead of a consumer claiming exclusive rate control, it is
-> > > -      * actually the provider which prevents any consumer from making any
-> > > -      * operation which could result in a rate change or rate glitch while
-> > > -      * the clock is prepared.
-> > > -      */
-> > > -     if (core->flags & CLK_SET_RATE_GATE)
-> > > -             clk_core_rate_protect(core);
-> >
-> > This gets removed without anything replacing it.
-> >
-> > is CLK_SET_RATE_GATE and clock protection support dropped after this change ?
->
-> No, I think I just accidentally removed this when resolving conflicts.
->
-> >
-> > > -
-> > >       return 0;
-> > > -unprepare:
-> > > -     clk_core_unprepare(core->parent);
-> > > -runtime_put:
-> > > -     clk_pm_runtime_put(core);
-> > > +err:
-> > > +     parent = core->parent;
-> > > +     list_for_each_entry_safe_continue(core, tmp, &head, prepare_list)
-> > > +             list_del_init(&core->prepare_list);
-> > > +     clk_core_unprepare(parent);
-> >
-> > If you get here because of failure clk_pm_runtime_get(), you will unprepare a
-> > clock which may have not been prepared first
-> >
-> > Overall the rework of error exit path does not seem right (or necessary)
-> >
->
-> Yeah, all of this seems to just be a poor resolution of patch
-> conflicts on my part. Will fix.
+<snip>
 
-Nevermind, that's not the case. We add the first core that has a
-non-zero prepare_count to the first (or we go all the way to root).
-That core can't encounter an error since those only happen in the
-prepare_count == 0 case. If it's NULL, clk_core_unprepare just
-returns.
+>> +config MFD_INTEL_PECI_CLIENT
+>> +	bool "Intel PECI client"
+>> +	depends on (PECI || COMPILE_TEST)
+>> +	select MFD_CORE
+>> +	help
+>> +	  If you say yes to this option, support will be included for the
+>> +	  multi-functional Intel PECI (Platform Environment Control Interface)
+> 
+> Remove 'multi-functional' from this sentence.
+> 
 
->
-> > >       return ret;
-> > >  }
-> > >
-> > > @@ -878,37 +879,49 @@ EXPORT_SYMBOL_GPL(clk_disable);
-> > >  static int clk_core_enable(struct clk_core *core)
-> > >  {
-> > >       int ret = 0;
-> > > +     struct clk_core *tmp, *parent;
-> > > +     LIST_HEAD(head);
-> > >
-> > >       lockdep_assert_held(&enable_lock);
-> > >
-> > > -     if (!core)
-> > > -             return 0;
-> > > -
-> > > -     if (WARN(core->prepare_count == 0,
-> > > -         "Enabling unprepared %s\n", core->name))
-> > > -             return -ESHUTDOWN;
-> > > +     while (core) {
-> > > +             list_add(&core->enable_list, &head);
-> > > +             /* Stop once we see a clk that is already enabled */
-> > > +             if (core->enable_count)
-> > > +                     break;
-> > > +             core = core->parent;
-> > > +     }
-> > >
-> > > -     if (core->enable_count == 0) {
-> > > -             ret = clk_core_enable(core->parent);
-> > > +     list_for_each_entry_safe(core, tmp, &head, enable_list) {
-> > > +             list_del_init(&core->enable_list);
-> > >
-> > > -             if (ret)
-> > > -                     return ret;
-> > > +             if (WARN_ON(core->prepare_count == 0)) {
-> > > +                     ret = -ESHUTDOWN;
-> > > +                     goto err;
-> > > +             }
-> > >
-> > > -             trace_clk_enable_rcuidle(core);
-> > > +             if (core->enable_count == 0) {
-> > > +                     trace_clk_enable_rcuidle(core);
-> > >
-> > > -             if (core->ops->enable)
-> > > -                     ret = core->ops->enable(core->hw);
-> > > +                     if (core->ops->enable)
-> > > +                             ret = core->ops->enable(core->hw);
-> > >
-> > > -             trace_clk_enable_complete_rcuidle(core);
-> > > +                     trace_clk_enable_complete_rcuidle(core);
-> > >
-> > > -             if (ret) {
-> > > -                     clk_core_disable(core->parent);
-> > > -                     return ret;
-> > > +                     if (ret)
-> > > +                             goto err;
-> > >               }
-> > > +
-> > > +             core->enable_count++;
-> > >       }
-> > >
-> > > -     core->enable_count++;
-> > >       return 0;
-> > > +err:
-> > > +     parent = core->parent;
-> > > +     list_for_each_entry_safe_continue(core, tmp, &head, enable_list)
-> > > +             list_del_init(&core->enable_list);
-> > > +     clk_core_disable(parent);
-> > > +     return ret;
-> > >  }
-> > >
-> > >  static int clk_core_enable_lock(struct clk_core *core)
-> > > @@ -3281,6 +3294,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
-> > >       core->num_parents = hw->init->num_parents;
-> > >       core->min_rate = 0;
-> > >       core->max_rate = ULONG_MAX;
-> > > +     INIT_LIST_HEAD(&core->prepare_list);
-> > > +     INIT_LIST_HEAD(&core->enable_list);
-> > >       hw->core = core;
-> > >
-> > >       /* allocate local copy in case parent_names is __initdata */
-> >
-> >
+Will remove the word.
+
+<snip>
+
+>> +static struct mfd_cell peci_functions[] = {
+>> +	{
+>> +		.name = "peci-cputemp",
+>> +	},
+>> +	{
+>> +		.name = "peci-dimmtemp",
+>> +	},
+> 
+> 	{ .name = "peci-cputemp", },
+> 	{ .name = "peci-dimmtemp", },
+> 
+
+Will change it like you suggested.
+
+> Do these have 2 different drivers?  Where are you putting them?
+> 
+
+Yes, these have 2 different drivers as hwmon subsystem drivers.
+I submitted them into this patch series.
+Patch 10/12: https://lkml.org/lkml/2018/9/18/1524
+Patch 11/12: https://lkml.org/lkml/2018/9/18/1523
+
+>> +	/* TODO: Add additional PECI sideband functions into here */
+> 
+> When will this be done?
+> 
+
+I'm hoping it will be done by the end of this year.
+
+>> +};
+>> +
+>> +static const struct cpu_gen_info cpu_gen_info_table[] = {
+>> +	[CPU_GEN_HSX] = {
+>> +		.family        = 6, /* Family code */
+>> +		.model         = INTEL_FAM6_HASWELL_X,
+>> +		.core_max      = CORE_MAX_ON_HSX,
+>> +		.chan_rank_max = CHAN_RANK_MAX_ON_HSX,
+>> +		.dimm_idx_max  = DIMM_IDX_MAX_ON_HSX },
+>> +	[CPU_GEN_BRX] = {
+>> +		.family        = 6, /* Family code */
+>> +		.model         = INTEL_FAM6_BROADWELL_X,
+>> +		.core_max      = CORE_MAX_ON_BDX,
+>> +		.chan_rank_max = CHAN_RANK_MAX_ON_BDX,
+>> +		.dimm_idx_max  = DIMM_IDX_MAX_ON_BDX },
+>> +	[CPU_GEN_SKX] = {
+>> +		.family        = 6, /* Family code */
+>> +		.model         = INTEL_FAM6_SKYLAKE_X,
+>> +		.core_max      = CORE_MAX_ON_SKX,
+>> +		.chan_rank_max = CHAN_RANK_MAX_ON_SKX,
+>> +		.dimm_idx_max  = DIMM_IDX_MAX_ON_SKX },
+> 
+> The '},'s should go on the line below.
+> 
+
+Okay. Will fix it.
+
+>> +};
+>> +
+>> +static int peci_client_get_cpu_gen_info(struct peci_mfd *priv)
+> 
+> Remove all mention of 'mfd'.  It's not a thing.
+> 
+
+Will remove 'mfd'.
+
+>> +{
+>> +	u32 cpu_id;
+>> +	int i, rc;
+>> +
+>> +	rc = peci_get_cpu_id(priv->adapter, priv->addr, &cpu_id);
+>> +	if (rc)
+>> +		return rc;
+>> +
+>> +	for (i = 0; i < ARRAY_SIZE(cpu_gen_info_table); i++) {
+>> +		if (FIELD_GET(CPU_ID_FAMILY_MASK, cpu_id) +
+>> +			FIELD_GET(CPU_ID_EXT_FAMILY_MASK, cpu_id) ==
+>> +				cpu_gen_info_table[i].family &&
+>> +		    FIELD_GET(CPU_ID_MODEL_MASK, cpu_id) ==
+>> +			FIELD_GET(LOWER_NIBBLE_MASK,
+>> +				  cpu_gen_info_table[i].model) &&
+>> +		    FIELD_GET(CPU_ID_EXT_MODEL_MASK, cpu_id) ==
+>> +			FIELD_GET(UPPER_NIBBLE_MASK,
+>> +				  cpu_gen_info_table[i].model)) {
+>> +			break;
+>> +		}
+>> +	}
+> 
+> This is really read.  Please reformat it, even if you have to use
+> local variables to make it more legible.
+> 
+
+Will reformat it using local variables for better readability as you
+suggest.
+
+>> +	if (i >= ARRAY_SIZE(cpu_gen_info_table))
+>> +		return -ENODEV;
+> 
+> Do you really want to fail silently?
+> 
+
+No. I'll add a dev_err printing.
+
+>> +	priv->gen_info = &cpu_gen_info_table[i];
+> 
+> If you do this in the for(), you can then test priv->gen_info instead
+> of seeing if the iterator maxed out.  Much nicer I think.
+> 
+
+Yes, that would be much nicer. Will fix it.
+
+>> +	return 0;
+>> +}
+>> +
+>> +bool peci_temp_need_update(struct temp_data *temp)
+>> +{
+>> +	if (temp->valid &&
+>> +	    time_before(jiffies, temp->last_updated + UPDATE_INTERVAL))
+>> +		return false;
+>> +
+>> +	return true;
+>> +}
+>> +EXPORT_SYMBOL_GPL(peci_temp_need_update);
+>> +
+>> +void peci_temp_mark_updated(struct temp_data *temp)
+>> +{
+>> +	temp->valid = 1;
+>> +	temp->last_updated = jiffies;
+>> +}
+>> +EXPORT_SYMBOL_GPL(peci_temp_mark_updated);
+> 
+> These are probably better suited as inline functions to be placed in
+> a header file.  No need to export them, since they only use their own
+> data.
+> 
+
+Yes, that makes sense. I'll change these to inline functions.
+
+>> +int peci_client_command(struct peci_mfd *priv, enum peci_cmd cmd, void *vmsg)
+>> +{
+>> +	return peci_command(priv->adapter, cmd, vmsg);
+>> +}
+>> +EXPORT_SYMBOL_GPL(peci_client_command);
+> 
+> If you share the adaptor with the client, you can call peci_command()
+> directly.  There should also be some locking in here somewhere too.
+> 
+
+Yes, the client->adapter can be referenced from child drivers. Will make
+them call peci_command() directly.
+
+>> +int peci_client_rd_pkg_cfg_cmd(struct peci_mfd *priv, u8 mbx_idx,
+> 
+> This is gobbledegook.  What's rd?  Read?
+> 
+
+Yes, the 'rd' means 'read'. I intended to keep command names as listed
+in the PECI specification such as RdPkgConfig, WrPkgConfig and so on.
+Should I change it to 'peci_client_read_package_config_command' ?
+
+>> +			       u16 param, u8 *data)
+>> +{
+>> +	struct peci_rd_pkg_cfg_msg msg;
+>> +	int rc;
+>> +
+>> +	msg.addr = priv->addr;
+>> +	msg.index = mbx_idx;
+>> +	msg.param = param;
+>> +	msg.rx_len = 4;
+>> +
+>> +	rc = peci_command(priv->adapter, PECI_CMD_RD_PKG_CFG, &msg);
+>> +	if (!rc)
+>> +		memcpy(data, msg.pkg_config, 4);
+>> +
+>> +	return rc;
+>> +}
+>> +EXPORT_SYMBOL_GPL(peci_client_rd_pkg_cfg_cmd);
+> 
+> This too should be set-up as an inline function, not an exported one.
+> 
+
+Will change it to inline function.
+
+>> +static int peci_client_probe(struct peci_client *client)
+>> +{
+>> +	struct device *dev = &client->dev;
+>> +	struct peci_mfd *priv;
+>> +	int rc;
+> 
+> 'ret' is more common.
+> 
+
+Will fix it.
+
+>> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>> +	if (!priv)
+>> +		return -ENOMEM;
+>> +
+>> +	dev_set_drvdata(dev, priv);
+>> +	priv->client = client;
+>> +	priv->dev = dev;
+> 
+>> +	priv->adapter = client->adapter;
+>> +	priv->addr = client->addr;
+> 
+> You're already saving client.  No need to save its individual
+> attributes as well.
+> 
+
+I intended to reduce pointer referencing depth because adapter and addr 
+are frequently used, but you are right. I'll remove adapter and addr 
+from the struct.
+
+>> +	priv->cpu_no = client->addr - PECI_BASE_ADDR;
+> 
+> This seems clunky.  Does the spec say that the addresses have to be in
+> numerical order with no gaps?  What if someone chooses to implement 4
+> CPUs at 0x30, 0x35, 0x45 and 0x60?
+> 
+
+The CPU address will be assigned by H/W strap settings in order. Also,
+there would be a case of using some CPU slots left empty, so gaps could
+be happen on the addresses but it's still acceptable.
+
+> What do you then do with cpu_no?
+> 
+
+It is being used for child device id parameter when this code calls
+devm_mfd_add_devices() below. Also, it is referenced from cputemp and
+dimmtemp hwmon drivers but it isn't needed because the hwmon drivers
+already know client->addr. I'll change cpu_no as a local variable in 
+here for child device id and will change the hwmon drivers.
+
+>> +	snprintf(priv->name, PECI_NAME_SIZE, "peci_client.cpu%d", priv->cpu_no);
+>> +
+>> +	rc = peci_client_get_cpu_gen_info(priv);
+>> +	if (rc)
+>> +		return rc;
+>> +
+>> +	rc = devm_mfd_add_devices(priv->dev, priv->cpu_no, peci_functions,
+>> +				  ARRAY_SIZE(peci_functions), NULL, 0, NULL);
+>> +	if (rc < 0) {
+>> +		dev_err(priv->dev, "devm_mfd_add_devices failed: %d\n", rc);
+> 
+> This to too specific.
+> 
+>    "Failed to register child devices"
+> 
+
+Will fix it like you suggested.
+
+>> +		return rc;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +#ifdef CONFIG_OF
+>> +static const struct of_device_id peci_client_of_table[] = {
+>> +	{ .compatible = "intel,peci-client" },
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, peci_client_of_table);
+>> +#endif
+>> +
+>> +static const struct peci_device_id peci_client_ids[] = {
+>> +	{ .name = "peci-client", .driver_data = 0 },
+> 
+> Remove .driver_data if you're not going to use it.
+> 
+
+Okay. I'll remove .driver_data.
+
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(peci, peci_client_ids);
+>> +
+>> +static struct peci_driver peci_client_driver = {
+>> +	.probe    = peci_client_probe,
+>> +	.id_table = peci_client_ids,
+>> +	.driver   = {
+>> +			.name           = "peci-client",
+>> +			.of_match_table =
+>> +				of_match_ptr(peci_client_of_table),
+>> +	},
+>> +};
+> 
+> Odd tabbing.
+> 
+
+Will fix the indentation.
+
+>> +module_peci_driver(peci_client_driver);
+>> +
+>> +MODULE_AUTHOR("Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>");
+>> +MODULE_DESCRIPTION("PECI client MFD driver");
+> 
+> Remove "MFD".
+> 
+
+Will remove it.
+
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/include/linux/mfd/intel-peci-client.h b/include/linux/mfd/intel-peci-client.h
+>> new file mode 100644
+>> index 000000000000..7ec272cddceb
+>> --- /dev/null
+>> +++ b/include/linux/mfd/intel-peci-client.h
+>> @@ -0,0 +1,81 @@
+>> +/* SPDX-License-Identifier: GPL-2.0 */
+>> +/* Copyright (c) 2018 Intel Corporation */
+>> +
+>> +#ifndef __LINUX_MFD_PECI_CLIENT_H
+>> +#define __LINUX_MFD_PECI_CLIENT_H
+>> +
+>> +#include <linux/peci.h>
+>> +
+>> +#if IS_ENABLED(CONFIG_X86)
+>> +#include <asm/intel-family.h>
+>> +#else
+>> +/**
+>> + * Architectures other than x86 cannot include the header file so define these
+>> + * at here. These are needed for detecting type of client x86 CPUs behind a PECI
+>> + * connection.
+>> + */
+>> +#define INTEL_FAM6_HASWELL_X   0x3F
+>> +#define INTEL_FAM6_BROADWELL_X 0x4F
+>> +#define INTEL_FAM6_SKYLAKE_X   0x55
+>> +#endif
+>> +
+>> +#define LOWER_NIBBLE_MASK      GENMASK(3, 0)
+>> +#define UPPER_NIBBLE_MASK      GENMASK(7, 4)
+>> +
+>> +#define CPU_ID_MODEL_MASK      GENMASK(7, 4)
+>> +#define CPU_ID_FAMILY_MASK     GENMASK(11, 8)
+>> +#define CPU_ID_EXT_MODEL_MASK  GENMASK(19, 16)
+>> +#define CPU_ID_EXT_FAMILY_MASK GENMASK(27, 20)
+>> +
+>> +#define CORE_MAX_ON_HSX        18 /* Max number of cores on Haswell */
+>> +#define CHAN_RANK_MAX_ON_HSX   8  /* Max number of channel ranks on Haswell */
+>> +#define DIMM_IDX_MAX_ON_HSX    3  /* Max DIMM index per channel on Haswell */
+>> +
+>> +#define CORE_MAX_ON_BDX        24 /* Max number of cores on Broadwell */
+>> +#define CHAN_RANK_MAX_ON_BDX   4  /* Max number of channel ranks on Broadwell */
+>> +#define DIMM_IDX_MAX_ON_BDX    3  /* Max DIMM index per channel on Broadwell */
+>> +
+>> +#define CORE_MAX_ON_SKX        28 /* Max number of cores on Skylake */
+>> +#define CHAN_RANK_MAX_ON_SKX   6  /* Max number of channel ranks on Skylake */
+>> +#define DIMM_IDX_MAX_ON_SKX    2  /* Max DIMM index per channel on Skylake */
+>> +
+>> +#define CORE_NUMS_MAX          CORE_MAX_ON_SKX
+>> +#define CHAN_RANK_MAX          CHAN_RANK_MAX_ON_HSX
+>> +#define DIMM_IDX_MAX           DIMM_IDX_MAX_ON_HSX
+>> +#define DIMM_NUMS_MAX          (CHAN_RANK_MAX * DIMM_IDX_MAX)
+>> +
+>> +#define TEMP_TYPE_PECI         6 /* Sensor type 6: Intel PECI */
+>> +
+>> +#define UPDATE_INTERVAL        HZ
+>> +
+>> +struct temp_data {
+>> +	uint  valid;
+>> +	s32   value;
+>> +	ulong last_updated;
+>> +};
+> 
+> This should not live in here.
+> 
+
+Will move it.
+
+>> +struct cpu_gen_info {
+>> +	u16  family;
+>> +	u8   model;
+>> +	uint core_max;
+>> +	uint chan_rank_max;
+>> +	uint dimm_idx_max;
+>> +};
+>> +
+>> +struct peci_mfd {
+> 
+> Remove "_mfd".
+> 
+
+Will remove 'mfd'.
+
+>> +	struct peci_client *client;
+>> +	struct device *dev;
+>> +	struct peci_adapter *adapter;
+>> +	char name[PECI_NAME_SIZE];
+> 
+> What is this used for?
+> 
+
+This isn't needed. Thanks for your pointing out. I'll remove it.
+
+>> +	u8 addr;
+>> +	uint cpu_no;
+>> +	const struct cpu_gen_info *gen_info;
+> 
+> Where is this used?
+> 
+
+It is referenced from cputemp and dimmtemp hwmon drivers to specify CPU
+generation.
+
+>> +};
+> 
+> Both of these structs need kerneldoc headers.
+> 
+
+Will add kerneldoc headers.
+
+>> +bool peci_temp_need_update(struct temp_data *temp);
+>> +void peci_temp_mark_updated(struct temp_data *temp);
+> 
+> These should live in a temperature driver.
+> 
+
+Agreed. I'll move it to temperature driver.
+
+Thanks a lot for your careful review. I'll submit a new patch set soon.
+
+Jae
+
+>> +int  peci_client_command(struct peci_mfd *mfd, enum peci_cmd cmd, void *vmsg);
+>> +int  peci_client_rd_pkg_cfg_cmd(struct peci_mfd *mfd, u8 mbx_idx,
+>> +				u16 param, u8 *data);
+>> +
+>> +#endif /* __LINUX_MFD_PECI_CLIENT_H */
+> 
