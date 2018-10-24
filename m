@@ -1,57 +1,49 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 24 Oct 2018 13:15:18 +0200
-Subject: [PATCH 5/5] pinctrl: pinctrl-at91-pio4: simplify getting
- .driver_data
-In-Reply-To: <20181021200032.1833-6-wsa+renesas@sang-engineering.com>
-References: <20181021200032.1833-1-wsa+renesas@sang-engineering.com>
- <20181021200032.1833-6-wsa+renesas@sang-engineering.com>
-Message-ID: <20181024111518.GA15587@piout.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 24 Oct 2018 08:19:53 -0300
+Subject: [PATCH V1 3/3] ARM: dts: sabreauto: Add flexcan support
+In-Reply-To: <20181024111213.2724-4-qiangqing.zhang@nxp.com>
+References: <20181024111213.2724-1-qiangqing.zhang@nxp.com>
+ <20181024111213.2724-4-qiangqing.zhang@nxp.com>
+Message-ID: <CAOMZO5Cm2U4dR982vYTmb5zfdjfXbQ95B+mDt2Fp8D-QtvT6FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/2018 22:00:31+0200, Wolfram Sang wrote:
-> We should get 'driver_data' from 'struct device' directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Hi Joakim,
 
-> ---
-> 
-> Build tested only. buildbot is happy.
-> 
->  drivers/pinctrl/pinctrl-at91-pio4.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-> index 5a850491a5cb..4ee135d7b883 100644
-> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
-> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-> @@ -868,8 +868,7 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
->  
->  static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-> +	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
->  	int i, j;
->  
->  	/*
-> @@ -897,8 +896,7 @@ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
->  
->  static int __maybe_unused atmel_pctrl_resume(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-> +	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
->  	int i, j;
->  
->  	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
-> -- 
-> 2.19.0
-> 
+On Wed, Oct 24, 2018 at 8:15 AM Joakim Zhang <qiangqing.zhang@nxp.com> wrote:
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> diff --git a/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+> new file mode 100644
+> index 000000000000..963e0b559d60
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+> @@ -0,0 +1,19 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+
+You can remove this paragraph as you are using SPDX tag.
+
+> +++ b/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
+> @@ -0,0 +1,19 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+
+Ditto.
+
+> +&can1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_flexcan1>;
+> +       pinctrl-assert-gpios = <&max7310_b 3 GPIO_ACTIVE_HIGH>; /* TX */
+
+This property does not exist in upstream.
