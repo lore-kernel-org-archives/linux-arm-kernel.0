@@ -1,407 +1,133 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 24 Oct 2018 17:02:13 -0500
-Subject: [PATCH V2 6/8] dts: imx: add common imx7ulp dtsi support
-In-Reply-To: <1540295058-26090-7-git-send-email-aisheng.dong@nxp.com>
-References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
- <1540295058-26090-7-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20181024220213.GA26789@bogus>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Wed, 24 Oct 2018 15:06:17 -0700
+Subject: [RFC PATCH v2 11/12] crypto: adiantum - add Adiantum support
+In-Reply-To: <CAKv+Gu9zBKK7ughbBAKkHdfgX2KrBXkF6MhH3xrSdLegrjjYJQ@mail.gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <20181015175424.97147-12-ebiggers@kernel.org>
+ <CAKv+Gu9wrOOk-LGPYmxgLbv86uXzMeHN6th3mMEDT3Vg893HWw@mail.gmail.com>
+ <20181020071206.GE876@sol.localdomain>
+ <CAKv+Gu9zBKK7ughbBAKkHdfgX2KrBXkF6MhH3xrSdLegrjjYJQ@mail.gmail.com>
+Message-ID: <20181024220614.GA13497@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 11:49:25AM +0000, A.s. Dong wrote:
-> The i.MX 7ULP family of processors represents NXP?s latest achievement
-> in ultra-low-power processing for use cases demanding long battery life.
-> Targeted towards the growing market of portable devices, the i.MX 7ULP
-> family of processors features NXP's advanced implementation of the Arm?
-> Cortex?-A7 core, the Arm Cortex-M4 core, as well as a 3D and 2D Graphics
-> Processing Units (GPUs).
+On Tue, Oct 23, 2018 at 07:40:34AM -0300, Ard Biesheuvel wrote:
+> On 20 October 2018 at 15:12, Eric Biggers <ebiggers@kernel.org> wrote:
+> > Hi Ard,
+> >
+> > On Sat, Oct 20, 2018 at 12:17:58PM +0800, Ard Biesheuvel wrote:
+> >> On 16 October 2018 at 01:54, Eric Biggers <ebiggers@kernel.org> wrote:
+> >> > From: Eric Biggers <ebiggers@google.com>
+> >> >
+> >> > Add support for the Adiantum encryption mode.  Adiantum was designed by
+> >> > Paul Crowley and is specified by our paper:
+> >> >
+> >> >     Adiantum: length-preserving encryption for entry-level processors
+> >> >     (https://eprint.iacr.org/2018/720.pdf)
+> >> >
+> >> > See our paper for full details; this patch only provides an overview.
+> >> >
+> >> > Adiantum is a tweakable, length-preserving encryption mode designed for
+> >> > fast and secure disk encryption, especially on CPUs without dedicated
+> >> > crypto instructions.  Adiantum encrypts each sector using the XChaCha12
+> >> > stream cipher, two passes of an ?-almost-?-universal (?A?U) hash
+> >> > function, and an invocation of the AES-256 block cipher on a single
+> >> > 16-byte block.  On CPUs without AES instructions, Adiantum is much
+> >> > faster than AES-XTS; for example, on ARM Cortex-A7, on 4096-byte sectors
+> >> > Adiantum encryption is about 4 times faster than AES-256-XTS encryption,
+> >> > and decryption about 5 times faster.
+> >> >
+> >> > Adiantum is a specialization of the more general HBSH construction.  Our
+> >> > earlier proposal, HPolyC, was also a HBSH specialization, but it used a
+> >> > different ?A?U hash function, one based on Poly1305 only.  Adiantum's
+> >> > ?A?U hash function, which is based primarily on the "NH" hash function
+> >> > like that used in UMAC (RFC4418), is about twice as fast as HPolyC's;
+> >> > consequently, Adiantum is about 20% faster than HPolyC.
+> >> >
+> >> > This speed comes with no loss of security: Adiantum is provably just as
+> >> > secure as HPolyC, in fact slightly *more* secure.  Like HPolyC,
+> >> > Adiantum's security is reducible to that of XChaCha12 and AES-256,
+> >> > subject to a security bound.  XChaCha12 itself has a security reduction
+> >> > to ChaCha12.  Therefore, one need not "trust" Adiantum; one need only
+> >> > trust ChaCha12 and AES-256.  Note that the ?A?U hash function is only
+> >> > used for its proven combinatorical properties so cannot be "broken".
+> >> >
+> >>
+> >> So what happens if the part of the input covered by the block cipher
+> >> is identical between different generations of the same disk block
+> >> (whose sector count is used as the 'outer' IV). How are we not in the
+> >> same boat as before when using stream ciphers for disk encryption?
+> >>
+> >
+> > This is the point of the hash step.  The value encrypted with the block cipher
+> > to produce the intermediate value C_M (used as the stream cipher nonce) is
+> > H(T, P_L) + P_R.  (T is the tweak a.k.a the IV, P_L is the plaintext except the
+> > last 16 bytes, P_R is the last 16 bytes.)  A collision in this value occurs iff:
+> >
+> >         H(T1, P1_L) + P1_R = H(T2, P2_L) + P2_R
+> > i.e.
+> >         H(T1, P1_L) - H(T2, P2_L) = P2_R - P1_R
+> >
+> > If (T1, P1_L) = (T2, P2_L) then P1_R != P2_R so the equation has no solutions
+> > (since we don't consider queries where the whole input is the same; those
+> > unavoidably produce the same ciphertext).  Otherwise (T1, P1_L) != (T2, P2_L),
+> > and since the hash function H is ?-almost-?-universal over integers mod 2^128,
+> > the equation is true for at most a very small proportion '?' of hash keys.
+> > But, the hash key is chosen at random and is unknown to the attacker.
+> >
+> > The same applies in the other direction, for chosen ciphertext attacks.
+> >
+> > Basically, it's very difficult for an attacker to cause the intermediate value
+> > C_M to be reused, and the outputs will appear random until they do.
+> >
+> > Of course, all this is explained much more precisely and comprehensively in our
+> > paper.  See section 5, "Security reduction".
+> >
 > 
-> This patch aims to add the initial support including:
-> 1) CLK
-> 2) GPIO PTC, PTD, PTE, PTF
-> 3) uSDHC 1/2
-> 4) LPUART 4/5/6/7
-> 5) LPI2C 6/7
+> Thanks for the explanation. I saw that the result of the AES
+> encryption was used as the XChaCha nonce, but I failed to spot that
+> the result of the nhpoly1305 pass is added/subtracted to/from that
+> particular block first.
 > 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> ChangeLog:
-> v1->v2:
->  * update clk part due to binding change
->  * separate soc.dtsi from board.dts
-> ---
->  arch/arm/boot/dts/imx7ulp.dtsi | 323 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 323 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+> In any case, this looks good to me: as far as I can tell, the code
+> implements the algorithm as described in the paper, and the plumbing
+> into the crypto API looks correct to me as well.
 > 
-> diff --git a/arch/arm/boot/dts/imx7ulp.dtsi b/arch/arm/boot/dts/imx7ulp.dtsi
-> new file mode 100644
-> index 0000000..795edc2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx7ulp.dtsi
-> @@ -0,0 +1,323 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + * Copyright 2017-2018 NXP
-> + *   Dong Aisheng <aisheng.dong@nxp.com>
-> + */
-> +
-> +#include <dt-bindings/clock/imx7ulp-clock.h>
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +#include "imx7ulp-pinfunc.h"
-> +
-> +/ {
-> +	interrupt-parent = <&intc>;
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	aliases {
-> +		gpio0 = &gpio_ptc;
-> +		gpio1 = &gpio_ptd;
-> +		gpio2 = &gpio_pte;
-> +		gpio3 = &gpio_ptf;
-> +		i2c0 = &lpi2c6;
-> +		i2c1 = &lpi2c7;
-> +		mmc0 = &usdhc0;
-> +		mmc1 = &usdhc1;
-> +		serial0 = &lpuart4;
-> +		serial1 = &lpuart5;
-> +		serial2 = &lpuart6;
-> +		serial3 = &lpuart7;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +		};
-> +	};
-> +
-> +	intc: interrupt-controller at 40021000 {
-> +		compatible = "arm,cortex-a7-gic";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		reg = <0x40021000 0x1000>,
-> +		      <0x40022000 0x1000>;
-> +	};
-> +
-> +	rosc: clock-rosc {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <32768>;
-> +		clock-output-names = "rosc";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	sosc: clock-sosc {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <24000000>;
-> +		clock-output-names = "sosc";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	sirc: clock-sirc {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <16000000>;
-> +		clock-output-names = "sirc";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	firc: clock-firc {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <48000000>;
-> +		clock-output-names = "firc";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	upll: clock-upll {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <480000000>;
-> +		clock-output-names = "upll";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	mpll: clock-mpll {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <480000000>;
-> +		clock-output-names = "mpll";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		arm,cpu-registers-not-fw-configured;
-
-AIUI, this was a work-around for some existing platform. New platforms 
-should not have this property.
-
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +		clock-frequency = <1000000>;
-
-This too should be initialized by firmware and not in DT IIRC.
-
-> +		status = "disabled";
-
-I think enabled should be the norm.
-
-> +	};
-> +
-> +	ahbbridge0: bus at 40000000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x40000000 0x800000>;
-> +		ranges;
-> +
-> +		lpuart4: serial at 402d0000 {
-> +			compatible = "fsl,imx7ulp-lpuart";
-> +			reg = <0x402d0000 0x1000>;
-> +			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&pcc2 IMX7ULP_CLK_LPUART4>;
-> +			clock-names = "ipg";
-> +			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPUART4>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_SOSC_BUS_CLK>;
-> +			assigned-clock-rates = <24000000>;
-> +			status = "disabled";
-> +		};
-> +
-> +		lpuart5: serial at 402e0000 {
-> +			compatible = "fsl,imx7ulp-lpuart";
-> +			reg = <0x402e0000 0x1000>;
-> +			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&pcc2 IMX7ULP_CLK_LPUART5>;
-> +			clock-names = "ipg";
-> +			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPUART5>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-> +			assigned-clock-rates = <48000000>;
-> +			status = "disabled";
-> +		};
-> +
-> +		tpm5: tpm at 40260000 {
-> +			compatible = "fsl,imx7ulp-tpm";
-> +			reg = <0x40260000 0x1000>;
-> +			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>,
-> +				 <&pcc2 IMX7ULP_CLK_LPTPM5>;
-> +			clock-names = "ipg", "per";
-> +		};
-> +
-> +		usdhc0: usdhc at 40370000 {
-
-mmc at ... is the standard name.
-
-> +			compatible = "fsl,imx7ulp-usdhc", "fsl,imx6sx-usdhc";
-> +			reg = <0x40370000 0x10000>;
-> +			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>,
-> +				 <&scg1 IMX7ULP_CLK_NIC1_DIV>,
-> +				 <&pcc2 IMX7ULP_CLK_USDHC0>;
-> +			clock-names ="ipg", "ahb", "per";
-> +			assigned-clocks = <&pcc2 IMX7ULP_CLK_USDHC0>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_NIC1_DIV>;
-> +			bus-width = <4>;
-> +			fsl,tuning-start-tap = <20>;
-> +			fsl,tuning-step= <2>;
-> +			status = "disabled";
-> +		};
-> +
-> +		usdhc1: usdhc at 40380000 {
-
-ditto.
-
-> +			compatible = "fsl,imx7ulp-usdhc", "fsl,imx6sx-usdhc";
-> +			reg = <0x40380000 0x10000>;
-> +			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>,
-> +				 <&scg1 IMX7ULP_CLK_NIC1_DIV>,
-> +				 <&pcc2 IMX7ULP_CLK_USDHC1>;
-> +			clock-names ="ipg", "ahb", "per";
-> +			assigned-clocks = <&pcc2 IMX7ULP_CLK_USDHC1>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_NIC1_DIV>;
-> +			bus-width = <4>;
-> +			fsl,tuning-start-tap = <20>;
-> +			fsl,tuning-step= <2>;
-> +			status = "disabled";
-> +		};
-> +
-> +		scg1: scg1 at 403e0000 {
-
-clock-controller at ...
-
-> +			compatible = "fsl,imx7ulp-scg1";
-> +			reg = <0x403e0000 0x10000>;
-> +			clocks = <&rosc>, <&sosc>, <&sirc>,
-> +				 <&firc>, <&upll>, <&mpll>;
-> +			clock-names = "rosc", "sosc", "sirc",
-> +				      "firc", "upll", "mpll";
-> +			#clock-cells = <1>;
-> +		};
-> +
-> +		pcc2: pcc2 at 403f0000 {
-
-clock-controller at ...
-
-> +			compatible = "fsl,imx7ulp-pcc2";
-> +			reg = <0x403f0000 0x10000>;
-> +			#clock-cells = <1>;
-> +			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPTPM5>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_SOSC_BUS_CLK>;
-> +		};
-> +
-> +		smc1: smc1 at 40410000 {
-> +			compatible = "fsl,imx7ulp-smc1";
-> +			reg = <0x40410000 0x1000>;
-> +		};
-> +
-> +		pcc3: pcc3 at 40b30000 {
-
-clock-controller at ...
-
-> +			compatible = "fsl,imx7ulp-pcc3";
-> +			reg = <0x40b30000 0x10000>;
-> +			#clock-cells = <1>;
-> +		};
-> +	};
-> +
-> +	ahbbridge1: bus at 40800000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x40800000 0x800000>;
-> +		ranges;
-> +
-> +		lpi2c6: lpi2c at 40a40000 {
-
-i2c at ...
-
-> +			compatible = "fsl,imx7ulp-lpi2c";
-> +			reg = <0x40a40000 0x10000>;
-> +			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&pcc3 IMX7ULP_CLK_LPI2C6>;
-> +			clock-names = "ipg";
-> +			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPI2C6>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-> +			assigned-clock-rates = <48000000>;
-> +			status = "disabled";
-> +		};
-> +
-> +		lpi2c7: lpi2c at 40a50000 {
-
-i2c at ...
-
-> +			compatible = "fsl,imx7ulp-lpi2c";
-> +			reg = <0x40a50000 0x10000>;
-> +			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&pcc3 IMX7ULP_CLK_LPI2C7>;
-> +			clock-names = "ipg";
-> +			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPI2C7>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-> +			assigned-clock-rates = <48000000>;
-> +			status = "disabled";
-> +		};
-> +
-> +		lpuart6: serial at 40a60000 {
-> +			compatible = "fsl,imx7ulp-lpuart";
-> +			reg = <0x40a60000 0x1000>;
-> +			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&pcc3 IMX7ULP_CLK_LPUART6>;
-> +			clock-names = "ipg";
-> +			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPUART6>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-> +			assigned-clock-rates = <48000000>;
-> +			status = "disabled";
-> +		};
-> +
-> +		lpuart7: serial at 40a70000 {
-> +			compatible = "fsl,imx7ulp-lpuart";
-> +			reg = <0x40a70000 0x1000>;
-> +			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&pcc3  IMX7ULP_CLK_LPUART7>;
-> +			clock-names = "ipg";
-> +			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPUART7>;
-> +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-> +			assigned-clock-rates = <48000000>;
-> +			status = "disabled";
-> +		};
-> +
-> +		iomuxc1: iomuxc at 40ac0000 {
-
-pinctrl at ...
-
-> +			compatible = "fsl,imx7ulp-iomuxc1";
-> +			reg = <0x40ac0000 0x1000>;
-> +		};
-> +
-> +		gpio_ptc: gpio at 40ae0000 {
-> +			compatible = "fsl,vf610-gpio";
-> +			reg = <0x40ae0000 0x1000 0x400f0000 0x40>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-> +				 <&pcc3 IMX7ULP_CLK_PCTLC>;
-> +			clock-names = "gpio", "port";
-> +			gpio-ranges = <&iomuxc1 0 0 32>;
-> +		};
-> +
-> +		gpio_ptd: gpio at 40af0000 {
-> +			compatible = "fsl,vf610-gpio";
-> +			reg = <0x40af0000 0x1000 0x400f0040 0x40>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-> +				 <&pcc3 IMX7ULP_CLK_PCTLD>;
-> +			clock-names = "gpio", "port";
-> +			gpio-ranges = <&iomuxc1 0 32 32>;
-> +		};
-> +
-> +		gpio_pte: gpio at 40b00000 {
-> +			compatible = "fsl,vf610-gpio";
-> +			reg = <0x40b00000 0x1000 0x400f0080 0x40>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-> +				 <&pcc3 IMX7ULP_CLK_PCTLE>;
-> +			clock-names = "gpio", "port";
-> +			gpio-ranges = <&iomuxc1 0 64 32>;
-> +		};
-> +
-> +		gpio_ptf: gpio at 40b10000 {
-> +			compatible = "fsl,vf610-gpio";
-> +			reg = <0x40b10000 0x1000 0x400f00c0 0x40>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-> +				 <&pcc3 IMX7ULP_CLK_PCTLF>;
-> +			clock-names = "gpio", "port";
-> +			gpio-ranges = <&iomuxc1 0 96 32>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.7.4
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
+> Whether the paper is correct is a different matter: it looks
+> convincing to me but IANAC.
+> 
+> The only request I have is to add a speed test to tcrypt as well so we
+> can easily benchmark it.
+
+I'll add an Adiantum testing mode to tcrypt, though I have to admit that I
+really dislike tcrypt, so I've actually been using a custom patch instead
+(https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/linux.git/commit/?h=cryptobench).
+
+FWIW, I mostly dislike tcrypt's lack of flexibility.  Every benchmark setting
+has to be coded explicitly in tcrypt, with a mode number to select it.  It's
+often missing what I want, or what I want is included but comes with a bunch of
+unwanted tests too.  Also tcrypt has to be built as a loadable module, so it
+can't be used with CONFIG_MODULES=n.  And the benchmark results only go directly
+to the kernel log, where they aren't easily retrievable from a script.
+
+The patch I've been using just exposes a file /proc/cryptobench (note: it maybe
+should be made into a char device instead) to which you can write commands like:
+
+	algtype=skcipher algname=adiantum(xchacha12,aes) keysize=32 bufsize=4096 niter=1000
+
+Then userspace reads back the result:
+
+	SUCCESS algname=adiantum(xchacha12,aes) driver_name=adiantum(xchacha12-software,aes-aesni,nhpoly1305-generic) measurement=0x30a5abd5776e0af enc_time=44831104 dec_time=38303077
+
+It's then pretty straightforward to wrap this API in a userspace script that
+does all the benchmarks you need, and formats the results nicely.
+
+For correctness testing there's also an option 'sgl_fuzz' that randomizes the
+scatterlist division.
+
+Currently the patch is missing some features such as AEAD support, but at some
+point I'd like to get it into a state where it can be included upstream.
+
+- Eric
