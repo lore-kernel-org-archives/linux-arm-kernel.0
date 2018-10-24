@@ -1,37 +1,53 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 24 Oct 2018 06:07:53 -0700
-Subject: [PATCH 1/6] clk: Remove recursion in clk_core_{prepare,enable}()
-In-Reply-To: <20181024013132.115907-2-dbasehore@chromium.org>
-References: <20181024013132.115907-1-dbasehore@chromium.org>
- <20181024013132.115907-2-dbasehore@chromium.org>
-Message-ID: <154038647375.53599.631725372765617195@swboyd.mtv.corp.google.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Oct 2018 14:14:54 +0100
+Subject: [Outreachy kernel] Re: [PATCH v2] staging: mt7621-dma: Add
+ braces around else branches
+In-Reply-To: <alpine.DEB.2.21.1810241404050.2371@hadrien>
+References: <20181023211142.GA2661@v> <20181024045653.GA2864@v>
+ <af4594cc-05c0-672c-d560-b50705ceaab3@gmail.com>
+ <20181024110745.GV30658@n2100.armlinux.org.uk>
+ <alpine.DEB.2.21.1810241404050.2371@hadrien>
+Message-ID: <20181024131454.GW30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Derek Basehore (2018-10-23 18:31:27)
-> From: Stephen Boyd <sboyd@codeaurora.org>
+On Wed, Oct 24, 2018 at 02:06:18PM +0100, Julia Lawall wrote:
 > 
-> Enabling and preparing clocks can be written quite naturally with
-> recursion. We start at some point in the tree and recurse up the
-> tree to find the oldest parent clk that needs to be enabled or
-> prepared. Then we enable/prepare and return to the caller, going
-> back to the clk we started at and enabling/preparing along the
-> way.
 > 
-> The problem is recursion isn't great for kernel code where we
-> have a limited stack size. Furthermore, we may be calling this
-> code inside clk_set_rate() which also has recursion in it, so
-> we're really not looking good if we encounter a tall clk tree.
+> On Wed, 24 Oct 2018, Russell King - ARM Linux wrote:
 > 
-> Let's create a stack instead by looping over the parent chain and
-> collecting clks of interest. Then the enable/prepare becomes as
-> simple as iterating over that list and calling enable.
+> > On Wed, Oct 24, 2018 at 12:45:44PM +0200, Matthias Brugger wrote:
+> > > Hi Kiberly,
+> > >
+> > > Thanks for adding all the emails in CC.
+> > > I would encourage you for your next patch to distinguish between CC and TO.
+> > > You should send your patch TO important maintainers in the get_maintainers.pl
+> > > list (as default, to all of them). If there is someone you really want to look
+> > > into the patch, then add him/her in TO as well.
+> > >
+> > > Put the rest (people and mailing lists) in CC. Why? Some people filter their
+> > > mails so that they can concentrate on the mails they got send directly and look
+> > > on mails they are in CC with lower priority (maybe not at all, because there are
+> > > too much?). So it is important to have the maintainers in the TO list and not in CC.
+> >
+> > +1
+> >
+> > I'm glad that there's someone else in the Linux community that agrees
+> > with me on this point, and is willing to speak out about it.
 > 
-> Cc: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+> If it's an important point, perhaps it should be mentioned in
+> submitting-patches.rst?  There is a mention of the Cc tag, but no
+> indication of who to put in CC.
 
-Did you change anything substantially? Or is it just a resend of my
-patch from a while ago? If you can add a link to the original and also
-describe what changed in a maintainer tag it would be much easier for me
-to compare.
+submitting-patches.rst talks about the Cc tag in the commit, not the To
+or Cc in the email client.
+
+In any case, there's a lot of personal issues here: most kernel
+developers don't care whether they're in the To or Cc header of an
+email, but there are some who do use it as Matthias says - which is
+actually the long-standing definition of these headers.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
