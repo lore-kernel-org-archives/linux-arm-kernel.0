@@ -1,137 +1,42 @@
-From: clabbe@baylibre.com (Corentin Labbe)
-Date: Wed, 24 Oct 2018 07:35:53 +0000
-Subject: [PATCH v3 7/7] net: stmmac: dwmac-meson8b: use xxxsetbits_le32
-In-Reply-To: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
-References: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <1540366553-18541-8-git-send-email-clabbe@baylibre.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Wed, 24 Oct 2018 09:53:03 +0200
+Subject: [PATCH v2] zynq-fpga: Only route PR via PCAP when required
+In-Reply-To: <1540276279-2903-1-git-send-email-mike.looijmans@topic.nl>
+References: <1540276279-2903-1-git-send-email-mike.looijmans@topic.nl>
+Message-ID: <1540367583-5413-1-git-send-email-mike.looijmans@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch convert meson stmmac glue driver to use all xxxsetbits_le32 functions.
+The Xilinx Zynq FPGA driver takes ownership of the PR interface, making
+it impossible to use the ICAP interface for partial reconfiguration.
 
-Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+This patch changes the driver to only activate PR over PCAP while the
+device is actively being accessed by the driver for programming.
+
+This allows both PCAP and ICAP interfaces to be used for PR.
+
+Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
+Reviewed-by: Moritz Fischer <mdf@kernel.org>
 ---
- .../ethernet/stmicro/stmmac/dwmac-meson8b.c   | 56 ++++++++-----------
- 1 file changed, 22 insertions(+), 34 deletions(-)
+v2: Move the register setting in between the clock enable/disable
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-index c5979569fd60..abcf65588576 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-@@ -23,6 +23,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/platform_device.h>
- #include <linux/stmmac.h>
-+#include <linux/setbits.h>
+ drivers/fpga/zynq-fpga.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+index 3110e00..ff3a427 100644
+--- a/drivers/fpga/zynq-fpga.c
++++ b/drivers/fpga/zynq-fpga.c
+@@ -501,6 +501,10 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr,
+ 	if (err)
+ 		return err;
  
- #include "stmmac_platform.h"
- 
-@@ -75,18 +76,6 @@ struct meson8b_dwmac_clk_configs {
- 	struct clk_gate		rgmii_tx_en;
- };
- 
--static void meson8b_dwmac_mask_bits(struct meson8b_dwmac *dwmac, u32 reg,
--				    u32 mask, u32 value)
--{
--	u32 data;
--
--	data = readl(dwmac->regs + reg);
--	data &= ~mask;
--	data |= (value & mask);
--
--	writel(data, dwmac->regs + reg);
--}
--
- static struct clk *meson8b_dwmac_register_clk(struct meson8b_dwmac *dwmac,
- 					      const char *name_suffix,
- 					      const char **parent_names,
-@@ -192,14 +181,13 @@ static int meson8b_set_phy_mode(struct meson8b_dwmac *dwmac)
- 	case PHY_INTERFACE_MODE_RGMII_ID:
- 	case PHY_INTERFACE_MODE_RGMII_TXID:
- 		/* enable RGMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
--					PRG_ETH0_RGMII_MODE,
--					PRG_ETH0_RGMII_MODE);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0, PRG_ETH0_RGMII_MODE,
-+				PRG_ETH0_RGMII_MODE);
- 		break;
- 	case PHY_INTERFACE_MODE_RMII:
- 		/* disable RGMII mode -> enables RMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
--					PRG_ETH0_RGMII_MODE, 0);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0, PRG_ETH0_RGMII_MODE,
-+				0);
- 		break;
- 	default:
- 		dev_err(dwmac->dev, "fail to set phy-mode %s\n",
-@@ -218,15 +206,15 @@ static int meson_axg_set_phy_mode(struct meson8b_dwmac *dwmac)
- 	case PHY_INTERFACE_MODE_RGMII_ID:
- 	case PHY_INTERFACE_MODE_RGMII_TXID:
- 		/* enable RGMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
--					PRG_ETH0_EXT_PHY_MODE_MASK,
--					PRG_ETH0_EXT_RGMII_MODE);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0,
-+				PRG_ETH0_EXT_PHY_MODE_MASK,
-+				PRG_ETH0_EXT_RGMII_MODE);
- 		break;
- 	case PHY_INTERFACE_MODE_RMII:
- 		/* disable RGMII mode -> enables RMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
--					PRG_ETH0_EXT_PHY_MODE_MASK,
--					PRG_ETH0_EXT_RMII_MODE);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0,
-+				PRG_ETH0_EXT_PHY_MODE_MASK,
-+				PRG_ETH0_EXT_RMII_MODE);
- 		break;
- 	default:
- 		dev_err(dwmac->dev, "fail to set phy-mode %s\n",
-@@ -255,11 +243,11 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- 	case PHY_INTERFACE_MODE_RGMII_ID:
- 	case PHY_INTERFACE_MODE_RGMII_TXID:
- 		/* only relevant for RMII mode -> disable in RGMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
--					PRG_ETH0_INVERTED_RMII_CLK, 0);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0,
-+				PRG_ETH0_INVERTED_RMII_CLK, 0);
- 
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_TXDLY_MASK,
--					tx_dly_val << PRG_ETH0_TXDLY_SHIFT);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0, PRG_ETH0_TXDLY_MASK,
-+				tx_dly_val << PRG_ETH0_TXDLY_SHIFT);
- 
- 		/* Configure the 125MHz RGMII TX clock, the IP block changes
- 		 * the output automatically (= without us having to configure
-@@ -287,13 +275,13 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- 
- 	case PHY_INTERFACE_MODE_RMII:
- 		/* invert internal clk_rmii_i to generate 25/2.5 tx_rx_clk */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
--					PRG_ETH0_INVERTED_RMII_CLK,
--					PRG_ETH0_INVERTED_RMII_CLK);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0,
-+				PRG_ETH0_INVERTED_RMII_CLK,
-+				PRG_ETH0_INVERTED_RMII_CLK);
- 
- 		/* TX clock delay cannot be configured in RMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_TXDLY_MASK,
--					0);
-+		clrsetbits_le32(dwmac->regs + PRG_ETH0, PRG_ETH0_TXDLY_MASK,
-+				0);
- 
- 		break;
- 
-@@ -304,8 +292,8 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- 	}
- 
- 	/* enable TX_CLK and PHY_REF_CLK generator */
--	meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_TX_AND_PHY_REF_CLK,
--				PRG_ETH0_TX_AND_PHY_REF_CLK);
-+	clrsetbits_le32(dwmac->regs + PRG_ETH0, PRG_ETH0_TX_AND_PHY_REF_CLK,
-+			PRG_ETH0_TX_AND_PHY_REF_CLK);
- 
- 	return 0;
- }
++	/* Release 'PR' control back to the ICAP */
++	zynq_fpga_write(priv, CTRL_OFFSET,
++		zynq_fpga_read(priv, CTRL_OFFSET) & ~CTRL_PCAP_PR_MASK);
++
+ 	err = zynq_fpga_poll_timeout(priv, INT_STS_OFFSET, intr_status,
+ 				     intr_status & IXR_PCFG_DONE_MASK,
+ 				     INIT_POLL_DELAY,
 -- 
-2.18.1
+1.9.1
