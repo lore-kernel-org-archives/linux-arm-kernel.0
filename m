@@ -1,52 +1,29 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Wed, 24 Oct 2018 16:39:35 -0500
-Subject: [PATCH v5 2/6] soc/fsl/guts: Add definition for LX2160A
-In-Reply-To: <1539536883-1928-3-git-send-email-vabhav.sharma@nxp.com>
-References: <1539536883-1928-1-git-send-email-vabhav.sharma@nxp.com>
- <1539536883-1928-3-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <CADRPPNTwpQRu9fxt8PTVb6VoNJEFFrMHpCrRa5T7YEddSVnq-w@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 24 Oct 2018 16:54:52 -0500
+Subject: [PATCH V2 2/8] dt-bindings: fsl: add imx7ulp pm related
+ components  bindings
+In-Reply-To: <1540295058-26090-3-git-send-email-aisheng.dong@nxp.com>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181024215452.GA25080@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2018 at 12:14 AM Vabhav Sharma <vabhav.sharma@nxp.com> wrote:
->
-> Adding compatible string "lx2160a-dcfg" to
-> initialize guts driver for lx2160 and SoC die
-> attribute definition for LX2160A
->
-> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
-
-Acked-by: Li Yang <leoyang.li@nxp.com>
-
+On Tue, 23 Oct 2018 11:49:08 +0000, "A.s. Dong" wrote:
+> Add imx7ulp pm related components bindings
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
->  drivers/soc/fsl/guts.c | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
-> index 302e0c8..bcab1ee 100644
-> --- a/drivers/soc/fsl/guts.c
-> +++ b/drivers/soc/fsl/guts.c
-> @@ -100,6 +100,11 @@ static const struct fsl_soc_die_attr fsl_soc_die[] = {
->           .svr          = 0x87000000,
->           .mask         = 0xfff70000,
->         },
-> +       /* Die: LX2160A, SoC: LX2160A/LX2120A/LX2080A */
-> +       { .die          = "LX2160A",
-> +         .svr          = 0x87360000,
-> +         .mask         = 0xff3f0000,
-> +       },
->         { },
->  };
->
-> @@ -222,6 +227,7 @@ static const struct of_device_id fsl_guts_of_match[] = {
->         { .compatible = "fsl,ls1088a-dcfg", },
->         { .compatible = "fsl,ls1012a-dcfg", },
->         { .compatible = "fsl,ls1046a-dcfg", },
-> +       { .compatible = "fsl,lx2160a-dcfg", },
->         {}
->  };
->  MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
-> --
-> 2.7.4
->
+> ChangeLog:
+> v1->v2:
+>  * new patch
+> ---
+>  .../bindings/arm/freescale/fsl,imx7ulp-pm.txt      | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
+> 
+
+Reviewed-by: Rob Herring <robh@kernel.org>
