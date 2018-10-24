@@ -1,52 +1,75 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 24 Oct 2018 08:51:52 +0200
-Subject: [PATCH] ARM: debug: enable UART1 for socfpga Cyclone5
-In-Reply-To: <74512aef-d551-30af-b4cf-25f48047a4ac@kernel.org>
-References: <20181009112837.2517-1-peron.clem@gmail.com>
- <e761c76d-a806-402a-b25b-04aee9329dbc@kernel.org>
- <CAJiuCceZr8NsDgBJgA2y61VHdQ3JYQ6_3r4jKooKLbVfRD8eJQ@mail.gmail.com>
- <74512aef-d551-30af-b4cf-25f48047a4ac@kernel.org>
-Message-ID: <20181024065152.yinlj4axprtwdzku@pengutronix.de>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Wed, 24 Oct 2018 15:19:24 +0800
+Subject: [PATCH] mmc: sdhci: Conver sdhci_allocate_bounce_buffer() to return
+ void
+Message-ID: <1540365564-30645-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 03:35:31PM -0500, Dinh Nguyen wrote:
-> 
-> 
-> On 10/23/2018 09:44 AM, Cl?ment P?ron wrote:
-> > HI Dinh,
-> > 
-> > On Tue, 23 Oct 2018 at 16:04, Dinh Nguyen <dinguyen@kernel.org> wrote:
-> >>
-> >> Hi Cl?ment,
-> >>
-> >> On 10/09/2018 06:28 AM, Cl?ment P?ron wrote:
-> >>> Cyclone5 and Arria10 doesn't have the same memory map for UART1.
-> >>>
-> >>> Split the SOCFPGA_UART1 into 2 options to allow debugging on UART1 for Cylone5.
-> >>>
-> >>
-> >> I'm not sure the need for this patch. Are there any cyclone5 based
-> >> boards that has UART1 as the debug uart? I see that all of them are
-> >> using UART0.
-> > 
-> > There is no upstream device with this UART used. But the board I have
-> > use it, and there is no limitation to not have it available upstream
-> > no ?
-> > 
-> 
-> I see. Then I don't think the patch is applicable because none of the
-> upstream devices need it. Now, if you were to upstream your board that
-> uses UART1, then there will be a case for this patch. Do you agree?
+The function sdhci_allocate_bounce_buffer() always return zero at
+present, so there's no need to have a return value, that will also make
+error path easier.
 
-I'd not say having to upstream the board is a sensible precondition for
-such a patch. One of the arguments for moving ARM to dt was that this
-allows to separate the machine specifics from the code. So I'd say if
-Cl?ment has a need, this is a good enough reason to take this patch.
+CC: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+---
+ drivers/mmc/host/sdhci.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-Just my 0.02 ?,
-Uwe
-
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 1b3fbd9..e94f4aa 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -3408,7 +3408,7 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
+ }
+ EXPORT_SYMBOL_GPL(__sdhci_read_caps);
+ 
+-static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
++static void sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ {
+ 	struct mmc_host *mmc = host->mmc;
+ 	unsigned int max_blocks;
+@@ -3446,7 +3446,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ 		 * Exiting with zero here makes sure we proceed with
+ 		 * mmc->max_segs == 1.
+ 		 */
+-		return 0;
++		return;
+ 	}
+ 
+ 	host->bounce_addr = dma_map_single(mmc->parent,
+@@ -3456,7 +3456,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ 	ret = dma_mapping_error(mmc->parent, host->bounce_addr);
+ 	if (ret)
+ 		/* Again fall back to max_segs == 1 */
+-		return 0;
++		return;
+ 	host->bounce_buffer_size = bounce_size;
+ 
+ 	/* Lie about this since we're bouncing */
+@@ -3466,8 +3466,6 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ 
+ 	pr_info("%s bounce up to %u segments into one, max segment size %u bytes\n",
+ 		mmc_hostname(mmc), max_blocks, bounce_size);
+-
+-	return 0;
+ }
+ 
+ int sdhci_setup_host(struct sdhci_host *host)
+@@ -3987,12 +3985,9 @@ int sdhci_setup_host(struct sdhci_host *host)
+ 	 */
+ 	mmc->max_blk_count = (host->quirks & SDHCI_QUIRK_NO_MULTIBLOCK) ? 1 : 65535;
+ 
+-	if (mmc->max_segs == 1) {
++	if (mmc->max_segs == 1)
+ 		/* This may alter mmc->*_blk_* parameters */
+-		ret = sdhci_allocate_bounce_buffer(host);
+-		if (ret)
+-			return ret;
+-	}
++		sdhci_allocate_bounce_buffer(host);
+ 
+ 	return 0;
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
