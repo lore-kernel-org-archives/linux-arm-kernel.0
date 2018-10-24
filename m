@@ -1,22 +1,75 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 24 Oct 2018 10:57:49 +0300
-Subject: [PATCH v3 4/7] ata: ahci_sunxi: use xxxsetbitsi_le32 functions
-In-Reply-To: <1540366553-18541-5-git-send-email-clabbe@baylibre.com>
-References: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
- <1540366553-18541-5-git-send-email-clabbe@baylibre.com>
-Message-ID: <83472722-c7e7-820f-b97f-37016ff32893@cogentembedded.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Wed, 24 Oct 2018 16:01:24 +0800
+Subject: [PATCH] mmc: sdhci: Convert sdhci_allocate_bounce_buffer() to return
+ void
+Message-ID: <1540368084-32202-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+The function sdhci_allocate_bounce_buffer() always return zero at
+present, so there's no need to have a return value, that will also make
+error path easier.
 
-    Typo in the subject: s/xxxsetbitsi/xxxsetbits/.
+CC: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+---
+ drivers/mmc/host/sdhci.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-On 24.10.2018 10:35, Corentin Labbe wrote:
-
-> This patch converts ahci_sunxi to use xxxsetbits_le32 functions
->
-> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
-[...]
-
-MBR, Sergei
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 1b3fbd9..e94f4aa 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -3408,7 +3408,7 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
+ }
+ EXPORT_SYMBOL_GPL(__sdhci_read_caps);
+ 
+-static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
++static void sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ {
+ 	struct mmc_host *mmc = host->mmc;
+ 	unsigned int max_blocks;
+@@ -3446,7 +3446,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ 		 * Exiting with zero here makes sure we proceed with
+ 		 * mmc->max_segs == 1.
+ 		 */
+-		return 0;
++		return;
+ 	}
+ 
+ 	host->bounce_addr = dma_map_single(mmc->parent,
+@@ -3456,7 +3456,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ 	ret = dma_mapping_error(mmc->parent, host->bounce_addr);
+ 	if (ret)
+ 		/* Again fall back to max_segs == 1 */
+-		return 0;
++		return;
+ 	host->bounce_buffer_size = bounce_size;
+ 
+ 	/* Lie about this since we're bouncing */
+@@ -3466,8 +3466,6 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+ 
+ 	pr_info("%s bounce up to %u segments into one, max segment size %u bytes\n",
+ 		mmc_hostname(mmc), max_blocks, bounce_size);
+-
+-	return 0;
+ }
+ 
+ int sdhci_setup_host(struct sdhci_host *host)
+@@ -3987,12 +3985,9 @@ int sdhci_setup_host(struct sdhci_host *host)
+ 	 */
+ 	mmc->max_blk_count = (host->quirks & SDHCI_QUIRK_NO_MULTIBLOCK) ? 1 : 65535;
+ 
+-	if (mmc->max_segs == 1) {
++	if (mmc->max_segs == 1)
+ 		/* This may alter mmc->*_blk_* parameters */
+-		ret = sdhci_allocate_bounce_buffer(host);
+-		if (ret)
+-			return ret;
+-	}
++		sdhci_allocate_bounce_buffer(host);
+ 
+ 	return 0;
+ 
+-- 
+2.7.4
