@@ -1,123 +1,123 @@
 From: clabbe@baylibre.com (Corentin Labbe)
-Date: Wed, 24 Oct 2018 07:35:46 +0000
-Subject: [PATCH v3 0/7] include: add
- setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64
-Message-ID: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
+Date: Wed, 24 Oct 2018 07:35:50 +0000
+Subject: [PATCH v3 4/7] ata: ahci_sunxi: use xxxsetbitsi_le32 functions
+In-Reply-To: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
+References: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
+Message-ID: <1540366553-18541-5-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+This patch converts ahci_sunxi to use xxxsetbits_le32 functions
 
-This patchset adds a new set of functions which are open-coded in lot of
-place.
-Basicly the pattern is always the same, "read, modify a bit, write"
-some driver and the powerpc arch already have thoses pattern them as functions. (like ahci_sunxi.c or dwmac-meson8b)
+Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+---
+ drivers/ata/ahci_sunxi.c | 62 +++++++++++-----------------------------
+ 1 file changed, 17 insertions(+), 45 deletions(-)
 
-The first patch rename some powerpc functions for being consistent with
-the new name convention.
-
-The second patch adds the header with all setbits functions.
-
-The third patch is a try to implement a coccinelle semantic patch to
-find all place where xxxbits function could be used.
-It should not be merged since it is un-finalized.
-For the moment, the "add setbits.h header" is not working and need a future
-coccinelle version.
-
-The four last patch are example of some drivers conversion.
-Thoses patchs give an example of the reduction of code won by using xxxbits32.
-
-I would like to thanks Julia Lawall for her help on the coccinelle
-patch.
-
-Note that I dont know which maintainer will take the linux/setbits.h include patch.
-
-Regards
-
-Changes since v2:
-- Fixed patch title
-- Fixed style problems
-- shorted macro arguments name
-
-Changes since v1:
-- renamed LE functions to _leXX
-- updated coccinnelle patch with JLawall's comments
-
-Corentin Labbe (7):
-  powerpc: rename setbits32/clrbits32 to setbits_be32/clrbits_be32
-  include: add setbits_leXX/clrbits_leXX/clrsetbits_leXX in
-    linux/setbits.h
-  coccinelle: add xxxsetbits_leXX converting spatch
-  ata: ahci_sunxi: use xxxsetbitsi_le32 functions
-  net: ethernet: stmmac: dwmac-sun8i: use xxxsetbits_le32
-  drm: meson: use xxxsetbits_le32
-  net: stmmac: dwmac-meson8b: use xxxsetbits_le32
-
- arch/powerpc/include/asm/fsl_lbc.h            |   2 +-
- arch/powerpc/include/asm/io.h                 |   4 +-
- arch/powerpc/platforms/44x/canyonlands.c      |   4 +-
- arch/powerpc/platforms/4xx/gpio.c             |  28 +-
- arch/powerpc/platforms/512x/pdm360ng.c        |   6 +-
- arch/powerpc/platforms/52xx/mpc52xx_common.c  |   6 +-
- arch/powerpc/platforms/52xx/mpc52xx_gpt.c     |  12 +-
- arch/powerpc/platforms/82xx/ep8248e.c         |   2 +-
- arch/powerpc/platforms/82xx/km82xx.c          |   6 +-
- arch/powerpc/platforms/82xx/mpc8272_ads.c     |  10 +-
- arch/powerpc/platforms/82xx/pq2.c             |   2 +-
- arch/powerpc/platforms/82xx/pq2ads-pci-pic.c  |   4 +-
- arch/powerpc/platforms/82xx/pq2fads.c         |  10 +-
- arch/powerpc/platforms/83xx/km83xx.c          |   6 +-
- arch/powerpc/platforms/83xx/mpc836x_mds.c     |   2 +-
- arch/powerpc/platforms/85xx/mpc85xx_mds.c     |   2 +-
- arch/powerpc/platforms/85xx/mpc85xx_pm_ops.c  |   4 +-
- arch/powerpc/platforms/85xx/mpc85xx_rdb.c     |   2 +-
- arch/powerpc/platforms/85xx/p1022_ds.c        |   6 +-
- arch/powerpc/platforms/85xx/p1022_rdk.c       |   6 +-
- arch/powerpc/platforms/85xx/t1042rdb_diu.c    |   6 +-
- arch/powerpc/platforms/85xx/twr_p102x.c       |   2 +-
- arch/powerpc/platforms/86xx/mpc8610_hpcd.c    |   6 +-
- arch/powerpc/platforms/8xx/adder875.c         |   2 +-
- arch/powerpc/platforms/8xx/m8xx_setup.c       |   4 +-
- arch/powerpc/platforms/8xx/mpc86xads_setup.c  |   4 +-
- arch/powerpc/platforms/8xx/mpc885ads_setup.c  |  28 +-
- .../platforms/embedded6xx/flipper-pic.c       |   6 +-
- arch/powerpc/platforms/embedded6xx/hlwd-pic.c |   8 +-
- arch/powerpc/platforms/embedded6xx/wii.c      |  12 +-
- arch/powerpc/sysdev/cpm1.c                    |  26 +-
- arch/powerpc/sysdev/cpm2.c                    |  16 +-
- arch/powerpc/sysdev/cpm_common.c              |   4 +-
- arch/powerpc/sysdev/fsl_85xx_l2ctlr.c         |  16 +-
- arch/powerpc/sysdev/fsl_lbc.c                 |   2 +-
- arch/powerpc/sysdev/fsl_pci.c                 |  12 +-
- arch/powerpc/sysdev/fsl_pmc.c                 |   2 +-
- arch/powerpc/sysdev/fsl_rcpm.c                |  74 +--
- arch/powerpc/sysdev/fsl_rio.c                 |   4 +-
- arch/powerpc/sysdev/fsl_rmu.c                 |   9 +-
- arch/powerpc/sysdev/mpic_timer.c              |  12 +-
- drivers/ata/ahci_sunxi.c                      |  62 +--
- drivers/gpu/drm/meson/meson_crtc.c            |  14 +-
- drivers/gpu/drm/meson/meson_dw_hdmi.c         |  33 +-
- drivers/gpu/drm/meson/meson_plane.c           |  13 +-
- drivers/gpu/drm/meson/meson_registers.h       |   3 -
- drivers/gpu/drm/meson/meson_venc.c            |  13 +-
- drivers/gpu/drm/meson/meson_venc_cvbs.c       |   4 +-
- drivers/gpu/drm/meson/meson_viu.c             |  65 +--
- drivers/gpu/drm/meson/meson_vpp.c             |  22 +-
- .../ethernet/stmicro/stmmac/dwmac-meson8b.c   |  56 +-
- .../net/ethernet/stmicro/stmmac/dwmac-sun8i.c |  62 +--
- include/linux/setbits.h                       |  84 +++
- scripts/add_new_include_in_source.py          |  61 +++
- scripts/coccinelle/misc/setbits32.cocci       | 487 ++++++++++++++++++
- .../coccinelle/misc/setbits32_relaxed.cocci   | 487 ++++++++++++++++++
- scripts/coccinelle/misc/setbits64.cocci       | 487 ++++++++++++++++++
- scripts/coccinelle/misc/setbits_dev.cocci     | 235 +++++++++
- 58 files changed, 2172 insertions(+), 395 deletions(-)
- create mode 100644 include/linux/setbits.h
- create mode 100755 scripts/add_new_include_in_source.py
- create mode 100644 scripts/coccinelle/misc/setbits32.cocci
- create mode 100644 scripts/coccinelle/misc/setbits32_relaxed.cocci
- create mode 100644 scripts/coccinelle/misc/setbits64.cocci
- create mode 100644 scripts/coccinelle/misc/setbits_dev.cocci
-
+diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
+index 911710643305..69c2e01c3d52 100644
+--- a/drivers/ata/ahci_sunxi.c
++++ b/drivers/ata/ahci_sunxi.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/setbits.h>
+ #include "ahci.h"
+ 
+ #define DRV_NAME "ahci-sunxi"
+@@ -58,34 +59,6 @@ MODULE_PARM_DESC(enable_pmp,
+ #define AHCI_P0PHYCR	0x0178
+ #define AHCI_P0PHYSR	0x017c
+ 
+-static void sunxi_clrbits(void __iomem *reg, u32 clr_val)
+-{
+-	u32 reg_val;
+-
+-	reg_val = readl(reg);
+-	reg_val &= ~(clr_val);
+-	writel(reg_val, reg);
+-}
+-
+-static void sunxi_setbits(void __iomem *reg, u32 set_val)
+-{
+-	u32 reg_val;
+-
+-	reg_val = readl(reg);
+-	reg_val |= set_val;
+-	writel(reg_val, reg);
+-}
+-
+-static void sunxi_clrsetbits(void __iomem *reg, u32 clr_val, u32 set_val)
+-{
+-	u32 reg_val;
+-
+-	reg_val = readl(reg);
+-	reg_val &= ~(clr_val);
+-	reg_val |= set_val;
+-	writel(reg_val, reg);
+-}
+-
+ static u32 sunxi_getbits(void __iomem *reg, u8 mask, u8 shift)
+ {
+ 	return (readl(reg) >> shift) & mask;
+@@ -100,22 +73,21 @@ static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
+ 	writel(0, reg_base + AHCI_RWCR);
+ 	msleep(5);
+ 
+-	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(19));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
+-			 (0x7 << 24),
+-			 (0x5 << 24) | BIT(23) | BIT(18));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS1R,
+-			 (0x3 << 16) | (0x1f << 8) | (0x3 << 6),
+-			 (0x2 << 16) | (0x6 << 8) | (0x2 << 6));
+-	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(28) | BIT(15));
+-	sunxi_clrbits(reg_base + AHCI_PHYCS1R, BIT(19));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
+-			 (0x7 << 20), (0x3 << 20));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS2R,
+-			 (0x1f << 5), (0x19 << 5));
++	setbits_le32(reg_base + AHCI_PHYCS1R, BIT(19));
++	clrsetbits_le32(reg_base + AHCI_PHYCS0R, (0x7 << 24),
++			(0x5 << 24) | BIT(23) | BIT(18));
++	clrsetbits_le32(reg_base + AHCI_PHYCS1R,
++			(0x3 << 16) | (0x1f << 8) | (0x3 << 6),
++			(0x2 << 16) | (0x6 << 8) | (0x2 << 6));
++	setbits_le32(reg_base + AHCI_PHYCS1R, BIT(28) | BIT(15));
++	clrbits_le32(reg_base + AHCI_PHYCS1R, BIT(19));
++	clrsetbits_le32(reg_base + AHCI_PHYCS0R,
++			(0x7 << 20), (0x3 << 20));
++	clrsetbits_le32(reg_base + AHCI_PHYCS2R,
++			(0x1f << 5), (0x19 << 5));
+ 	msleep(5);
+ 
+-	sunxi_setbits(reg_base + AHCI_PHYCS0R, (0x1 << 19));
++	setbits_le32(reg_base + AHCI_PHYCS0R, (0x1 << 19));
+ 
+ 	timeout = 250; /* Power up takes aprox 50 us */
+ 	do {
+@@ -130,7 +102,7 @@ static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
+ 		udelay(1);
+ 	} while (1);
+ 
+-	sunxi_setbits(reg_base + AHCI_PHYCS2R, (0x1 << 24));
++	setbits_le32(reg_base + AHCI_PHYCS2R, (0x1 << 24));
+ 
+ 	timeout = 100; /* Calibration takes aprox 10 us */
+ 	do {
+@@ -158,10 +130,10 @@ static void ahci_sunxi_start_engine(struct ata_port *ap)
+ 	struct ahci_host_priv *hpriv = ap->host->private_data;
+ 
+ 	/* Setup DMA before DMA start */
+-	sunxi_clrsetbits(hpriv->mmio + AHCI_P0DMACR, 0x0000ff00, 0x00004400);
++	clrsetbits_le32(hpriv->mmio + AHCI_P0DMACR, 0x0000ff00, 0x00004400);
+ 
+ 	/* Start DMA */
+-	sunxi_setbits(port_mmio + PORT_CMD, PORT_CMD_START);
++	setbits_le32(port_mmio + PORT_CMD, PORT_CMD_START);
+ }
+ 
+ static const struct ata_port_info ahci_sunxi_port_info = {
 -- 
 2.18.1
