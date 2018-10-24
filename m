@@ -1,148 +1,111 @@
 From: clabbe@baylibre.com (Corentin Labbe)
-Date: Wed, 24 Oct 2018 07:35:51 +0000
-Subject: [PATCH v3 5/7] net: ethernet: stmmac: dwmac-sun8i: use xxxsetbits_le32
+Date: Wed, 24 Oct 2018 07:35:48 +0000
+Subject: [PATCH v3 2/7] include: add setbits_leXX/clrbits_leXX/clrsetbits_leXX
+ in linux/setbits.h
 In-Reply-To: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
 References: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <1540366553-18541-6-git-send-email-clabbe@baylibre.com>
+Message-ID: <1540366553-18541-3-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch convert dwmac-sun8i driver to use all xxxsetbits_le32 functions.
+This patch adds setbits_le32/clrbits_le32/clrsetbits_le32 and
+setbits_le64/clrbits_le64/clrsetbits_le64 in linux/setbits.h header.
 
 Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
 ---
- .../net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 62 +++++--------------
- 1 file changed, 16 insertions(+), 46 deletions(-)
+ include/linux/setbits.h | 84 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
+ create mode 100644 include/linux/setbits.h
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index f9a61f90cfbc..74067a59af50 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -28,6 +28,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/regmap.h>
- #include <linux/stmmac.h>
-+#include <linux/setbits.h>
- 
- #include "stmmac.h"
- #include "stmmac_platform.h"
-@@ -342,50 +343,30 @@ static void sun8i_dwmac_disable_dma_irq(void __iomem *ioaddr, u32 chan)
- 
- static void sun8i_dwmac_dma_start_tx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
--
--	v = readl(ioaddr + EMAC_TX_CTL1);
--	v |= EMAC_TX_DMA_START;
--	v |= EMAC_TX_DMA_EN;
--	writel(v, ioaddr + EMAC_TX_CTL1);
-+	setbits_le32(ioaddr + EMAC_TX_CTL1,
-+		     EMAC_TX_DMA_START | EMAC_TX_DMA_EN);
- }
- 
- static void sun8i_dwmac_enable_dma_transmission(void __iomem *ioaddr)
- {
--	u32 v;
--
--	v = readl(ioaddr + EMAC_TX_CTL1);
--	v |= EMAC_TX_DMA_START;
--	v |= EMAC_TX_DMA_EN;
--	writel(v, ioaddr + EMAC_TX_CTL1);
-+	setbits_le32(ioaddr + EMAC_TX_CTL1,
-+		     EMAC_TX_DMA_START | EMAC_TX_DMA_EN);
- }
- 
- static void sun8i_dwmac_dma_stop_tx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
--
--	v = readl(ioaddr + EMAC_TX_CTL1);
--	v &= ~EMAC_TX_DMA_EN;
--	writel(v, ioaddr + EMAC_TX_CTL1);
-+	clrbits_le32(ioaddr + EMAC_TX_CTL1, EMAC_TX_DMA_EN);
- }
- 
- static void sun8i_dwmac_dma_start_rx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
--
--	v = readl(ioaddr + EMAC_RX_CTL1);
--	v |= EMAC_RX_DMA_START;
--	v |= EMAC_RX_DMA_EN;
--	writel(v, ioaddr + EMAC_RX_CTL1);
-+	setbits_le32(ioaddr + EMAC_RX_CTL1,
-+		     EMAC_RX_DMA_START | EMAC_RX_DMA_EN);
- }
- 
- static void sun8i_dwmac_dma_stop_rx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
--
--	v = readl(ioaddr + EMAC_RX_CTL1);
--	v &= ~EMAC_RX_DMA_EN;
--	writel(v, ioaddr + EMAC_RX_CTL1);
-+	clrbits_le32(ioaddr + EMAC_RX_CTL1, EMAC_RX_DMA_EN);
- }
- 
- static int sun8i_dwmac_dma_interrupt(void __iomem *ioaddr,
-@@ -578,7 +559,6 @@ static void sun8i_dwmac_set_umac_addr(struct mac_device_info *hw,
- 				      unsigned int reg_n)
- {
- 	void __iomem *ioaddr = hw->pcsr;
--	u32 v;
- 
- 	if (!addr) {
- 		writel(0, ioaddr + EMAC_MACADDR_HI(reg_n));
-@@ -588,9 +568,8 @@ static void sun8i_dwmac_set_umac_addr(struct mac_device_info *hw,
- 	stmmac_set_mac_addr(ioaddr, addr, EMAC_MACADDR_HI(reg_n),
- 			    EMAC_MACADDR_LO(reg_n));
- 	if (reg_n > 0) {
--		v = readl(ioaddr + EMAC_MACADDR_HI(reg_n));
--		v |= MAC_ADDR_TYPE_DST;
--		writel(v, ioaddr + EMAC_MACADDR_HI(reg_n));
-+		setbits_le32(ioaddr + EMAC_MACADDR_HI(reg_n),
-+			     MAC_ADDR_TYPE_DST);
- 	}
- }
- 
-@@ -608,11 +587,8 @@ static void sun8i_dwmac_get_umac_addr(struct mac_device_info *hw,
- static int sun8i_dwmac_rx_ipc_enable(struct mac_device_info *hw)
- {
- 	void __iomem *ioaddr = hw->pcsr;
--	u32 v;
- 
--	v = readl(ioaddr + EMAC_RX_CTL0);
--	v |= EMAC_RX_DO_CRC;
--	writel(v, ioaddr + EMAC_RX_CTL0);
-+	setbits_le32(ioaddr + EMAC_RX_CTL0, EMAC_RX_DO_CRC);
- 
- 	return 1;
- }
-@@ -662,21 +638,15 @@ static void sun8i_dwmac_flow_ctrl(struct mac_device_info *hw,
- 				  unsigned int pause_time, u32 tx_cnt)
- {
- 	void __iomem *ioaddr = hw->pcsr;
--	u32 v;
- 
--	v = readl(ioaddr + EMAC_RX_CTL0);
- 	if (fc == FLOW_AUTO)
--		v |= EMAC_RX_FLOW_CTL_EN;
-+		setbits_le32(ioaddr + EMAC_RX_CTL0, EMAC_RX_FLOW_CTL_EN);
- 	else
--		v &= ~EMAC_RX_FLOW_CTL_EN;
--	writel(v, ioaddr + EMAC_RX_CTL0);
--
--	v = readl(ioaddr + EMAC_TX_FLOW_CTL);
-+		clrbits_le32(ioaddr + EMAC_RX_CTL0, EMAC_RX_FLOW_CTL_EN);
- 	if (fc == FLOW_AUTO)
--		v |= EMAC_TX_FLOW_CTL_EN;
-+		setbits_le32(ioaddr + EMAC_TX_FLOW_CTL, EMAC_TX_FLOW_CTL_EN);
- 	else
--		v &= ~EMAC_TX_FLOW_CTL_EN;
--	writel(v, ioaddr + EMAC_TX_FLOW_CTL);
-+		clrbits_le32(ioaddr + EMAC_TX_FLOW_CTL, EMAC_TX_FLOW_CTL_EN);
- }
- 
- static int sun8i_dwmac_reset(struct stmmac_priv *priv)
+diff --git a/include/linux/setbits.h b/include/linux/setbits.h
+new file mode 100644
+index 000000000000..c82faf8d7fe4
+--- /dev/null
++++ b/include/linux/setbits.h
+@@ -0,0 +1,84 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __LINUX_SETBITS_H
++#define __LINUX_SETBITS_H
++
++#include <linux/io.h>
++
++#define __setbits(rfn, wfn, addr, set) wfn((rfn(addr) | (set)), addr)
++#define __clrbits(rfn, wfn, addr, mask) wfn((rfn(addr) & ~(mask)), addr)
++#define __clrsetbits(rfn, wfn, addr, mask, set) wfn(((rfn(addr) & ~(mask)) | (set)), addr)
++#define __setclrbits(rfn, wfn, addr, mask, set) wfn(((rfn(addr) | (set)) & ~(mask)), addr)
++
++#ifndef setbits_le32
++#define setbits_le32(addr, set) __setbits(readl, writel, addr, set)
++#endif
++#ifndef setbits_le32_relaxed
++#define setbits_le32_relaxed(addr, set) __setbits(readl_relaxed, writel_relaxed, \
++					       addr, set)
++#endif
++
++#ifndef clrbits_le32
++#define clrbits_le32(addr, mask) __clrbits(readl, writel, addr, mask)
++#endif
++#ifndef clrbits_le32_relaxed
++#define clrbits_le32_relaxed(addr, mask) __clrbits(readl_relaxed, writel_relaxed, \
++						addr, mask)
++#endif
++
++#ifndef clrsetbits_le32
++#define clrsetbits_le32(addr, mask, set) __clrsetbits(readl, writel, addr, mask, set)
++#endif
++#ifndef clrsetbits_le32_relaxed
++#define clrsetbits_le32_relaxed(addr, mask, set) __clrsetbits(readl_relaxed, \
++							   writel_relaxed, \
++							   addr, mask, set)
++#endif
++
++#ifndef setclrbits_le32
++#define setclrbits_le32(addr, mask, set) __setclrbits(readl, writel, addr, mask, set)
++#endif
++#ifndef setclrbits_le32_relaxed
++#define setclrbits_le32_relaxed(addr, mask, set) __setclrbits(readl_relaxed, \
++							   writel_relaxed, \
++							   addr, mask, set)
++#endif
++
++/* We cannot use CONFIG_64BIT as some x86 drivers use non-atomicwriteq() */
++#if defined(writeq) && defined(readq)
++#ifndef setbits_le64
++#define setbits_le64(addr, set) __setbits(readq, writeq, addr, set)
++#endif
++#ifndef setbits_le64_relaxed
++#define setbits_le64_relaxed(addr, set) __setbits(readq_relaxed, writeq_relaxed, \
++					       addr, set)
++#endif
++
++#ifndef clrbits_le64
++#define clrbits_le64(addr, mask) __clrbits(readq, writeq, addr, mask)
++#endif
++#ifndef clrbits_le64_relaxed
++#define clrbits_le64_relaxed(addr, mask) __clrbits(readq_relaxed, writeq_relaxed, \
++						addr, mask)
++#endif
++
++#ifndef clrsetbits_le64
++#define clrsetbits_le64(addr, mask, set) __clrsetbits(readq, writeq, addr, mask, set)
++#endif
++#ifndef clrsetbits_le64_relaxed
++#define clrsetbits_le64_relaxed(addr, mask, set) __clrsetbits(readq_relaxed, \
++							   writeq_relaxed, \
++							   addr, mask, set)
++#endif
++
++#ifndef setclrbits_le64
++#define setclrbits_le64(addr, mask, set) __setclrbits(readq, writeq, addr, mask, set)
++#endif
++#ifndef setclrbits_le64_relaxed
++#define setclrbits_le64_relaxed(addr, mask, set) __setclrbits(readq_relaxed, \
++							   writeq_relaxed, \
++							   addr, mask, set)
++#endif
++
++#endif /* writeq/readq */
++
++#endif /* __LINUX_SETBITS_H */
 -- 
 2.18.1
