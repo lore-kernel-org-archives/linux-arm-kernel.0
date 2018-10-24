@@ -1,75 +1,53 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 24 Oct 2018 16:01:24 +0800
-Subject: [PATCH] mmc: sdhci: Convert sdhci_allocate_bounce_buffer() to return
- void
-Message-ID: <1540368084-32202-1-git-send-email-zhang.chunyan@linaro.org>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 24 Oct 2018 08:14:01 +0000
+Subject: [PATCH V2 7/8] dts: fsl: add imx7ulp evk support
+In-Reply-To: <CAOMZO5BLXGYfvq6GqK66Qe1aTNHmYJOBhKTPKTwNx=tDROKw6Q@mail.gmail.com>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-8-git-send-email-aisheng.dong@nxp.com>
+ <CAOMZO5C3Fv+s-bLeHGZ6LEB=ZqRxf=gXuzbtwfNS=PvQeVJ1Ag@mail.gmail.com>
+ <AM0PR04MB42110E5309341D1626EB6EF980F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CAOMZO5BLXGYfvq6GqK66Qe1aTNHmYJOBhKTPKTwNx=tDROKw6Q@mail.gmail.com>
+Message-ID: <AM0PR04MB421195B48BA336AD7078110D80F60@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function sdhci_allocate_bounce_buffer() always return zero at
-present, so there's no need to have a return value, that will also make
-error path easier.
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Wednesday, October 24, 2018 12:26 AM
+[...]
+> On Tue, Oct 23, 2018 at 11:42 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+> 
+> > I'm a bit hesitate to do that as the driver already supports it.
+> > There's no extra effort to use it. And we probably could take ULP as a
+> > special case to test generic binding rather then simply drop it and
+> > drop driver features. Once we get objection from users later, we still can
+> simply fallback as there's still only official boards using it.
+> 
+> We had this same discussion some months ago when we were reviewing
+> i.MX8 support.
+>
+> I don't see the value in doing pinctrl differently on i.MX7ULP.
+>
 
-CC: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
----
- drivers/mmc/host/sdhci.c | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+I thought the situation is different as ULP actually already supports generic binding
+before that discussion.
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 1b3fbd9..e94f4aa 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -3408,7 +3408,7 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
- }
- EXPORT_SYMBOL_GPL(__sdhci_read_caps);
- 
--static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
-+static void sdhci_allocate_bounce_buffer(struct sdhci_host *host)
- {
- 	struct mmc_host *mmc = host->mmc;
- 	unsigned int max_blocks;
-@@ -3446,7 +3446,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
- 		 * Exiting with zero here makes sure we proceed with
- 		 * mmc->max_segs == 1.
- 		 */
--		return 0;
-+		return;
- 	}
- 
- 	host->bounce_addr = dma_map_single(mmc->parent,
-@@ -3456,7 +3456,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
- 	ret = dma_mapping_error(mmc->parent, host->bounce_addr);
- 	if (ret)
- 		/* Again fall back to max_segs == 1 */
--		return 0;
-+		return;
- 	host->bounce_buffer_size = bounce_size;
- 
- 	/* Lie about this since we're bouncing */
-@@ -3466,8 +3466,6 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
- 
- 	pr_info("%s bounce up to %u segments into one, max segment size %u bytes\n",
- 		mmc_hostname(mmc), max_blocks, bounce_size);
--
--	return 0;
- }
- 
- int sdhci_setup_host(struct sdhci_host *host)
-@@ -3987,12 +3985,9 @@ int sdhci_setup_host(struct sdhci_host *host)
- 	 */
- 	mmc->max_blk_count = (host->quirks & SDHCI_QUIRK_NO_MULTIBLOCK) ? 1 : 65535;
- 
--	if (mmc->max_segs == 1) {
-+	if (mmc->max_segs == 1)
- 		/* This may alter mmc->*_blk_* parameters */
--		ret = sdhci_allocate_bounce_buffer(host);
--		if (ret)
--			return ret;
--	}
-+		sdhci_allocate_bounce_buffer(host);
- 
- 	return 0;
- 
--- 
-2.7.4
+> > Last, it's not correct that there's not only one method for all i.MX devices.
+> > MX23/28 are different ones and ULP is more like MX23/28.
+> > And I saw no objections from users for MX23/28.
+> 
+> Yes, but these are legacy platforms.
+> 
+> For new ones, we should try to keep consistency, just like we discussed during
+> i.MX8 review.
+
+So the question is whether it's necessary to switch generic binding back to the
+legacy one for ULP. Personally I'm not strongly against this, but I need some
+confirmation from Shawn and Sascha.
+
+Shawn & Sascha, would you make a judgement call?
+If you also strongly request that, I will try to make it patch to test Linus W.
+Hopefully our agreement could satisfy Linus W.
+
+Regards
+Dong Aisheng
