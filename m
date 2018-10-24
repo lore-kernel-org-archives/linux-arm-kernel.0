@@ -1,76 +1,80 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 24 Oct 2018 16:25:47 -0500
-Subject: [PATCH v2 0/2] arm64: Cut rebuild time when changing
- CONFIG_BLK_DEV_INITRD
-In-Reply-To: <6e647f76-8523-09d3-9b72-d8d8abd213a4@gmail.com>
-References: <20181024193256.23734-1-f.fainelli@gmail.com>
- <CAL_Jsq+KCOv6pXXHhHDZ+7-QUrmtMDvSjEVhK15yZ3qbnn61Ag@mail.gmail.com>
- <6e647f76-8523-09d3-9b72-d8d8abd213a4@gmail.com>
-Message-ID: <CAL_JsqKC6+8gobdk1uhMLLdMUHEO8D0c3m6+F_3y3NTU_KidOw@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Wed, 24 Oct 2018 17:40:42 -0400 (EDT)
+Subject: ARM64 KVM crash
+In-Reply-To: <86h8hqtd4m.wl-marc.zyngier@arm.com>
+References: <alpine.LRH.2.02.1810121204120.16008@file01.intranet.prod.int.rdu2.redhat.com>
+ <b3355304-5144-b17a-c39c-866e197e3cc6@arm.com>
+ <alpine.LRH.2.02.1810121453380.14664@file01.intranet.prod.int.rdu2.redhat.com>
+ <86h8hqtd4m.wl-marc.zyngier@arm.com>
+Message-ID: <alpine.LRH.2.02.1810241738390.871@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 3:01 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
->
-> On 10/24/18 12:55 PM, Rob Herring wrote:
-> > On Wed, Oct 24, 2018 at 2:33 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >>
-> >> Hi all,
-> >>
-> >> While investigating why ARM64 required a ton of objects to be rebuilt
-> >> when toggling CONFIG_DEV_BLK_INITRD, it became clear that this was
-> >> because we define __early_init_dt_declare_initrd() differently and we do
-> >> that in arch/arm64/include/asm/memory.h which gets included by a fair
-> >> amount of other header files, and translation units as well.
-> >
-> > I scratch my head sometimes as to why some config options rebuild so
-> > much stuff. One down, ? to go. :)
-> >
->
-> This one was by far the most invasive one due to its include chain, but
-> yes, there would be many more that could be optimized.
->
-> >> Changing the value of CONFIG_DEV_BLK_INITRD is a common thing with build
-> >> systems that generate two kernels: one with the initramfs and one
-> >> without. buildroot is one of these build systems, OpenWrt is also
-> >> another one that does this.
-> >>
-> >> This patch series proposes adding an empty initrd.h to satisfy the need
-> >> for drivers/of/fdt.c to unconditionally include that file, and moves the
-> >> custom __early_init_dt_declare_initrd() definition away from
-> >> asm/memory.h
-> >>
-> >> This cuts the number of objects rebuilds from 1920 down to 26, so a
-> >> factor 73 approximately.
-> >>
-> >> Apologies for the long CC list, please let me know how you would go
-> >> about merging that and if another approach would be preferable, e.g:
-> >> introducing a CONFIG_ARCH_INITRD_BELOW_START_OK Kconfig option or
-> >> something like that.
-> >
-> > There may be a better way as of 4.20 because bootmem is now gone and
-> > only memblock is used. This should unify what each arch needs to do
-> > with initrd early. We need the physical address early for memblock
-> > reserving. Then later on we need the virtual address to access the
-> > initrd. Perhaps we should just change initrd_start and initrd_end to
-> > physical addresses (or add 2 new variables would be less invasive and
-> > allow for different translation than __va()). The sanity checks and
-> > memblock reserve could also perhaps be moved to a common location.
-> >
-> > Alternatively, given arm64 is the only oddball, I'd be fine with an
-> > "if (IS_ENABLED(CONFIG_ARM64))" condition in the default
-> > __early_init_dt_declare_initrd as long as we have a path to removing
-> > it like the above option.
->
-> OK, let me cook a patch doing that and meanwhile I will look at how much
-> work is involved to implement the above option you outlined, which also
-> sounds entirely reasonable.
 
-BTW, I would suspect that initrd_below_start_ok being 1 is not okay
-for most arches. I'm not sure how that would work. min_low_pfn is
-typically based on the start of memory. arm64 is not even setting it.
 
-Rob
+On Sat, 13 Oct 2018, Marc Zyngier wrote:
 
-> --
-> Florian
+> On Fri, 12 Oct 2018 19:59:16 +0100,
+> Mikulas Patocka <mpatocka@redhat.com> wrote:
+> > 
+> > 
+> > 
+> > On Fri, 12 Oct 2018, Marc Zyngier wrote:
+> > 
+> > > Right. But how is that related to KVM? See below:
+> > > 
+> > > > [75476.680725]  find_next_and_bit+0xc/0x70
+> > > > [75476.680728]  find_busiest_group+0x128/0x938
+> > > > [75476.680730]  load_balance+0x148/0x848
+> > > > [75476.680732]  pick_next_task_fair+0x1d4/0x568
+> > > > [75476.680734]  __schedule+0xe8/0x4b0
+> > > > [75476.680736]  schedule+0x38/0xa0
+> > > > [75476.680739]  kvm_vcpu_block+0x88/0x180
+> > > > [75476.680742]  kvm_handle_wfx+0x80/0xb8
+> > > > [75476.680744]  handle_exit+0x138/0x1b8
+> > > 
+> > > The guest is exiting because it has executed a blocking WFI, so KVM's
+> > > job is done and we're calling schedule(). The scheduler then starts
+> > > doing its job of picking the next victim.
+> > > 
+> > > At this stage, the kernel indeed blows up. But this doesn't immediately
+> > > seem to be KVM's fault. It is far more likely that the scheduler has
+> > > messed something up in its own data structure, which is even worse :-(.
+> > > 
+> > > I'd suggest you get in touch with the scheduler guys to see if they have
+> > > any insight. Also, trying to come up with a reproducer would be
+> > > extremely useful.
+> > > 
+> > > Thanks,
+> > > 
+> > > 	M.
+> > 
+> > I use this machine most of the time without KVM - and it crashed when I 
+> > started KVM - so I assume that KVM had something to do with it. Perhaps it 
+> > corrupts random memory? I may try to run some KVM stress for many days to 
+> > test if I reproduce it.
+> 
+> One thing I know for sure is that if you use a tap (such as macvtap)
+
+I don't have macvtap compiled. The board is also used as a router and the 
+virtual machine bridge uses the same routing tables and iptables rules as 
+anything else.
+
+> to give networking to your VMs, the Ethernet driver on the 8040 (such
+> as on your MacchiatoBin) will happily corrupt memory (you can witness
+> that without running KVM at all). Something to do with the sbk being
+> freed early.
+> 
+> I've reported this issue several times, only to hear the wind
+> blowing. At this stage, I've shelved it. There is enough decent and
+> maintained platforms around not to worry about the unmaintained stuff.
+> 
+> Now, if you can give me a reproducer, I'll happily investigate.
+
+I haven't reproduced it so far :-(
+
+> Thanks,
+> 
+> 	M.
+
+Mikulas
