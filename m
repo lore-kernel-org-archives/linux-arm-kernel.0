@@ -1,32 +1,85 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 24 Oct 2018 13:43:59 +0000
-Subject: [PATCH] ARM: dts: replace gpio-key,wakeup with wakeup-source
- property
-In-Reply-To: <20181024114540.5196-1-sudeep.holla@arm.com>
-References: <20181024114540.5196-1-sudeep.holla@arm.com>
-Message-ID: <b81ade0b-2ec7-16a9-fb43-909008d96635@axentia.se>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 24 Oct 2018 15:50:02 +0200
+Subject: [PATCH] mmc: sdhci: Convert sdhci_allocate_bounce_buffer() to
+ return void
+In-Reply-To: <1540368084-32202-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1540368084-32202-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <CAPDyKFp8vo11pb-5qVdhkxTgMnL-R0FvYKuh_dkLDNbF6_4=XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-10-24 13:45, Sudeep Holla wrote:
-> Most of the legacy "gpio-key,wakeup" and "enable-sdio-wakeup" boolean
-> properties are already replaced with "wakeup-source". However few
-> occurrences of old property has popped up again, probably from the
-> remnants in downstream trees.
-> 
-> This patch replaces the legacy properties with the unified
-> "wakeup-source" property.
-> 
-> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> Cc: Peter Rosin <peda@axentia.se>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+On 24 October 2018 at 10:01, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> The function sdhci_allocate_bounce_buffer() always return zero at
+> present, so there's no need to have a return value, that will also make
+> error path easier.
+>
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 
-Acked-by: Peter Rosin <peda@axentia.se>
+This looks good to me, however please re-post to linux-mmc.
 
-Cheers,
-Peter
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/sdhci.c | 15 +++++----------
+>  1 file changed, 5 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 1b3fbd9..e94f4aa 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -3408,7 +3408,7 @@ void __sdhci_read_caps(struct sdhci_host *host, u16 *ver, u32 *caps, u32 *caps1)
+>  }
+>  EXPORT_SYMBOL_GPL(__sdhci_read_caps);
+>
+> -static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+> +static void sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+>  {
+>         struct mmc_host *mmc = host->mmc;
+>         unsigned int max_blocks;
+> @@ -3446,7 +3446,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+>                  * Exiting with zero here makes sure we proceed with
+>                  * mmc->max_segs == 1.
+>                  */
+> -               return 0;
+> +               return;
+>         }
+>
+>         host->bounce_addr = dma_map_single(mmc->parent,
+> @@ -3456,7 +3456,7 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+>         ret = dma_mapping_error(mmc->parent, host->bounce_addr);
+>         if (ret)
+>                 /* Again fall back to max_segs == 1 */
+> -               return 0;
+> +               return;
+>         host->bounce_buffer_size = bounce_size;
+>
+>         /* Lie about this since we're bouncing */
+> @@ -3466,8 +3466,6 @@ static int sdhci_allocate_bounce_buffer(struct sdhci_host *host)
+>
+>         pr_info("%s bounce up to %u segments into one, max segment size %u bytes\n",
+>                 mmc_hostname(mmc), max_blocks, bounce_size);
+> -
+> -       return 0;
+>  }
+>
+>  int sdhci_setup_host(struct sdhci_host *host)
+> @@ -3987,12 +3985,9 @@ int sdhci_setup_host(struct sdhci_host *host)
+>          */
+>         mmc->max_blk_count = (host->quirks & SDHCI_QUIRK_NO_MULTIBLOCK) ? 1 : 65535;
+>
+> -       if (mmc->max_segs == 1) {
+> +       if (mmc->max_segs == 1)
+>                 /* This may alter mmc->*_blk_* parameters */
+> -               ret = sdhci_allocate_bounce_buffer(host);
+> -               if (ret)
+> -                       return ret;
+> -       }
+> +               sdhci_allocate_bounce_buffer(host);
+>
+>         return 0;
+>
+> --
+> 2.7.4
+>
