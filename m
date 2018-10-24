@@ -1,278 +1,84 @@
-From: dbasehore@chromium.org (dbasehore .)
-Date: Wed, 24 Oct 2018 13:23:42 -0700
-Subject: [PATCH 1/6] clk: Remove recursion in clk_core_{prepare,enable}()
-In-Reply-To: <CAGAzgspHFiuUpfTjD5v9-U=yAxwkBnZh3Mwtaom4wsiO-Bcfgw@mail.gmail.com>
-References: <20181024013132.115907-1-dbasehore@chromium.org>
- <20181024013132.115907-2-dbasehore@chromium.org>
- <264adf2a81bcd602f2a58e4a46c3273cd7c77ca2.camel@baylibre.com>
- <CAGAzgspHFiuUpfTjD5v9-U=yAxwkBnZh3Mwtaom4wsiO-Bcfgw@mail.gmail.com>
-Message-ID: <CAGAzgspQg4_TVLi9XLGFaFHbOo2fuduihajud4GtA5cDu1v+5w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 24 Oct 2018 21:36:20 +0100
+Subject: [PATCH v2 15/15] arm64: dts: allwinner: bananapi-m64: Bananapi
+ S070WV20-CT16 DSI panel
+In-Reply-To: <20181024181159.35lm7ihqestbetvb@flea>
+References: <20181023155035.9101-1-jagan@amarulasolutions.com>
+ <20181023155035.9101-16-jagan@amarulasolutions.com>
+ <20181024181159.35lm7ihqestbetvb@flea>
+Message-ID: <CAGb2v66MwbY1yHN8TLpChRfJPCd7-3qmH3O1R2Ku4wRzJfOu=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 1:15 PM dbasehore . <dbasehore@chromium.org> wrote:
->
-> On Wed, Oct 24, 2018 at 2:51 AM Jerome Brunet <jbrunet@baylibre.com> wrote:
+On Wed, Oct 24, 2018 at 7:12 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Tue, Oct 23, 2018 at 09:20:35PM +0530, Jagan Teki wrote:
+> > This patch add support for Bananapi S070WV20-CT16 DSI panel to
+> > BPI-M64 board.
 > >
-> > On Tue, 2018-10-23 at 18:31 -0700, Derek Basehore wrote:
-> > > From: Stephen Boyd <sboyd@codeaurora.org>
-> > >
-> > > Enabling and preparing clocks can be written quite naturally with
-> > > recursion. We start at some point in the tree and recurse up the
-> > > tree to find the oldest parent clk that needs to be enabled or
-> > > prepared. Then we enable/prepare and return to the caller, going
-> > > back to the clk we started at and enabling/preparing along the
-> > > way.
-> > >
-> > > The problem is recursion isn't great for kernel code where we
-> > > have a limited stack size. Furthermore, we may be calling this
-> > > code inside clk_set_rate() which also has recursion in it, so
-> > > we're really not looking good if we encounter a tall clk tree.
-> > >
-> > > Let's create a stack instead by looping over the parent chain and
-> > > collecting clks of interest. Then the enable/prepare becomes as
-> > > simple as iterating over that list and calling enable.
-> >
-> > Hi Derek,
-> >
-> > What about unprepare() and disable() ?
-> >
-> > This patch removes the recursion from the enable path but keeps it for the
-> > disable path ... this is very odd. Assuming doing so works, It certainly makes
-> > CCF a lot harder to understand.
-> >
-> > What about clock protection which essentially works on the same model as prepare
-> > and enable ?
-> >
-> > Overall, this change does not look like something that should be merged as it
-> > is. If you were just seeking comments, you should add the "RFC" tag to your
-> > series.
-> >
-> > Jerome.
-> >
-> > >
-> > > Cc: Jerome Brunet <jbrunet@baylibre.com>
-> >
-> > If you don't mind, I would prefer to get the whole series next time. It helps to
-> > get the context.
-> >
-> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
-> > > ---
-> > >  drivers/clk/clk.c | 113 ++++++++++++++++++++++++++--------------------
-> > >  1 file changed, 64 insertions(+), 49 deletions(-)
-> > >
-> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > index af011974d4ec..95d818f5edb2 100644
-> > > --- a/drivers/clk/clk.c
-> > > +++ b/drivers/clk/clk.c
-> > > @@ -71,6 +71,8 @@ struct clk_core {
-> > >       struct hlist_head       children;
-> > >       struct hlist_node       child_node;
-> > >       struct hlist_head       clks;
-> > > +     struct list_head        prepare_list;
-> > > +     struct list_head        enable_list;
-> > >       unsigned int            notifier_count;
-> > >  #ifdef CONFIG_DEBUG_FS
-> > >       struct dentry           *dentry;
-> > > @@ -740,49 +742,48 @@ EXPORT_SYMBOL_GPL(clk_unprepare);
-> > >  static int clk_core_prepare(struct clk_core *core)
-> > >  {
-> > >       int ret = 0;
-> > > +     struct clk_core *tmp, *parent;
-> > > +     LIST_HEAD(head);
-> > >
-> > >       lockdep_assert_held(&prepare_lock);
-> > >
-> > > -     if (!core)
-> > > -             return 0;
-> > > +     while (core) {
-> > > +             list_add(&core->prepare_list, &head);
-> > > +             /* Stop once we see a clk that is already prepared */
-> > > +             if (core->prepare_count)
-> > > +                     break;
-> > > +             core = core->parent;
-> > > +     }
-> > >
-> > > -     if (core->prepare_count == 0) {
-> > > -             ret = clk_pm_runtime_get(core);
-> > > -             if (ret)
-> > > -                     return ret;
-> > > +     list_for_each_entry_safe(core, tmp, &head, prepare_list) {
-> > > +             list_del_init(&core->prepare_list);
-> >
-> > Is there any point in removing it from the list ?
-> > Maybe I missed it but it does not seems useful.
-> >
-> > Without this, we could use list_for_each_entry()
-> >
-> > >
-> > > -             ret = clk_core_prepare(core->parent);
-> > > -             if (ret)
-> > > -                     goto runtime_put;
-> > > +             if (core->prepare_count == 0) {
-> >
-> > Should we really check the count here ? You are not checking the count when the
-> > put() counterpart is called below.
->
-> I think I accidentally messed that up when I picked up the patch.
-> There were some merge conflicts with the addition of the
-> clk_pm_runtime code.
->
-> >
-> > Since PM runtime has ref counting as well, either way would work I guess ... but
-> > we shall be consistent
-> >
-> > > +                     ret = clk_pm_runtime_get(core);
-> > > +                     if (ret)
-> > > +                             goto err;
-> > >
-> > > -             trace_clk_prepare(core);
-> > > +                     trace_clk_prepare(core);
-> > >
-> > > -             if (core->ops->prepare)
-> > > -                     ret = core->ops->prepare(core->hw);
-> > > +                     if (core->ops->prepare)
-> > > +                             ret = core->ops->prepare(core->hw);
-> > >
-> > > -             trace_clk_prepare_complete(core);
-> > > +                     trace_clk_prepare_complete(core);
-> > >
-> > > -             if (ret)
-> > > -                     goto unprepare;
-> > > +                     if (ret) {
-> > > +                             clk_pm_runtime_put(core);
-> > > +                             goto err;
-> > > +                     }
-> > > +             }
-> > > +             core->prepare_count++;
-> > >       }
-> > >
-> > > -     core->prepare_count++;
-> > > -
-> > > -     /*
-> > > -      * CLK_SET_RATE_GATE is a special case of clock protection
-> > > -      * Instead of a consumer claiming exclusive rate control, it is
-> > > -      * actually the provider which prevents any consumer from making any
-> > > -      * operation which could result in a rate change or rate glitch while
-> > > -      * the clock is prepared.
-> > > -      */
-> > > -     if (core->flags & CLK_SET_RATE_GATE)
-> > > -             clk_core_rate_protect(core);
-> >
-> > This gets removed without anything replacing it.
-> >
-> > is CLK_SET_RATE_GATE and clock protection support dropped after this change ?
->
-> No, I think I just accidentally removed this when resolving conflicts.
->
-> >
-> > > -
-> > >       return 0;
-> > > -unprepare:
-> > > -     clk_core_unprepare(core->parent);
-> > > -runtime_put:
-> > > -     clk_pm_runtime_put(core);
-> > > +err:
-> > > +     parent = core->parent;
-> > > +     list_for_each_entry_safe_continue(core, tmp, &head, prepare_list)
-> > > +             list_del_init(&core->prepare_list);
-> > > +     clk_core_unprepare(parent);
-> >
-> > If you get here because of failure clk_pm_runtime_get(), you will unprepare a
-> > clock which may have not been prepared first
-> >
-> > Overall the rework of error exit path does not seem right (or necessary)
-> >
->
-> Yeah, all of this seems to just be a poor resolution of patch
-> conflicts on my part. Will fix.
->
+> > DSI panel connected via board DSI port with,
+> > - DC1SW as AVDD supply
+> > - DCDC1 as DVDD supply
+> > - PD6 gpio for reset pin
+> > - PD5 gpio for backlight enable pin
+> > - PD7 gpio for backlight vdd supply
 
-Actually, I think that the rework of the error exit path makes sense
-since the prior exit path was for the recursive case, not the list
-iteration case. I will fix the issue where we call clk_core_unprepare
-when it shouldn't, though.
+This is for a removable module, which is best handled using an overlay.
+This patch should be marked [DO NOT MERGE].
 
-> > >       return ret;
-> > >  }
-> > >
-> > > @@ -878,37 +879,49 @@ EXPORT_SYMBOL_GPL(clk_disable);
-> > >  static int clk_core_enable(struct clk_core *core)
-> > >  {
-> > >       int ret = 0;
-> > > +     struct clk_core *tmp, *parent;
-> > > +     LIST_HEAD(head);
-> > >
-> > >       lockdep_assert_held(&enable_lock);
-> > >
-> > > -     if (!core)
-> > > -             return 0;
-> > > -
-> > > -     if (WARN(core->prepare_count == 0,
-> > > -         "Enabling unprepared %s\n", core->name))
-> > > -             return -ESHUTDOWN;
-> > > +     while (core) {
-> > > +             list_add(&core->enable_list, &head);
-> > > +             /* Stop once we see a clk that is already enabled */
-> > > +             if (core->enable_count)
-> > > +                     break;
-> > > +             core = core->parent;
-> > > +     }
-> > >
-> > > -     if (core->enable_count == 0) {
-> > > -             ret = clk_core_enable(core->parent);
-> > > +     list_for_each_entry_safe(core, tmp, &head, enable_list) {
-> > > +             list_del_init(&core->enable_list);
-> > >
-> > > -             if (ret)
-> > > -                     return ret;
-> > > +             if (WARN_ON(core->prepare_count == 0)) {
-> > > +                     ret = -ESHUTDOWN;
-> > > +                     goto err;
-> > > +             }
-> > >
-> > > -             trace_clk_enable_rcuidle(core);
-> > > +             if (core->enable_count == 0) {
-> > > +                     trace_clk_enable_rcuidle(core);
-> > >
-> > > -             if (core->ops->enable)
-> > > -                     ret = core->ops->enable(core->hw);
-> > > +                     if (core->ops->enable)
-> > > +                             ret = core->ops->enable(core->hw);
-> > >
-> > > -             trace_clk_enable_complete_rcuidle(core);
-> > > +                     trace_clk_enable_complete_rcuidle(core);
-> > >
-> > > -             if (ret) {
-> > > -                     clk_core_disable(core->parent);
-> > > -                     return ret;
-> > > +                     if (ret)
-> > > +                             goto err;
-> > >               }
-> > > +
-> > > +             core->enable_count++;
-> > >       }
-> > >
-> > > -     core->enable_count++;
-> > >       return 0;
-> > > +err:
-> > > +     parent = core->parent;
-> > > +     list_for_each_entry_safe_continue(core, tmp, &head, enable_list)
-> > > +             list_del_init(&core->enable_list);
-> > > +     clk_core_disable(parent);
-> > > +     return ret;
-> > >  }
-> > >
-> > >  static int clk_core_enable_lock(struct clk_core *core)
-> > > @@ -3281,6 +3294,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
-> > >       core->num_parents = hw->init->num_parents;
-> > >       core->min_rate = 0;
-> > >       core->max_rate = ULONG_MAX;
-> > > +     INIT_LIST_HEAD(&core->prepare_list);
-> > > +     INIT_LIST_HEAD(&core->enable_list);
-> > >       hw->core = core;
-> > >
-> > >       /* allocate local copy in case parent_names is __initdata */
+> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > ---
+> > Changes for v2:
+> > - Use quadratic rule on pwm brightness
 > >
+> >  .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 42 +++++++++++++++++++
+> >  1 file changed, 42 insertions(+)
 > >
+> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> > index ef1c90401bb2..e0c6d1870a94 100644
+> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+> > @@ -45,6 +45,7 @@
+> >  #include "sun50i-a64.dtsi"
+> >
+> >  #include <dt-bindings/gpio/gpio.h>
+> > +#include <dt-bindings/pwm/pwm.h>
+> >
+> >  / {
+> >       model = "BananaPi-M64";
+> > @@ -56,6 +57,24 @@
+> >               serial1 = &uart1;
+> >       };
+> >
+> > +     vdd_bl: regulator at 0 {
+>
+> You shouldn't have a unit address if you don't have a reg
+> property. This will trigger a DTC warning.
+> > +             compatible = "regulator-fixed";
+> > +             regulator-name = "bl-3v3";
+> > +             regulator-min-microvolt = <3300000>;
+> > +             regulator-max-microvolt = <3300000>;
+> > +             gpio = <&pio 3 7 GPIO_ACTIVE_HIGH>; /* PD7 */
+> > +             enable-active-high;
+> > +     };
+> > +
+> > +     backlight_dsi: backlight-dsi {
+
+This should be just "backlight". There's nothing DSI specific
+about a backlight.
+
+> > +             compatible = "pwm-backlight";
+> > +             pwms = <&r_pwm 0 50000 PWM_POLARITY_INVERTED>;
+> > +             brightness-levels = <1 2 4 8 16 32 64 128 512>;
+> > +             default-brightness-level = <2>;
+> > +             enable-gpios = <&pio 3 5 GPIO_ACTIVE_HIGH>; /* PD5 */
+> > +             power-supply = <&vdd_bl>;
+> > +     };
+>
+> These nodes should be ordered by alphabetical order.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
