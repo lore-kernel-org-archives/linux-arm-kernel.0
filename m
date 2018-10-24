@@ -1,88 +1,97 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 24 Oct 2018 17:47:58 +0100
-Subject: [PATCH 1/4] drm/sun4i: tcon: Support an active-low DE signal
- with RGB interface
-In-Reply-To: <224ec158bf627b4d2f577b1dadf10bd87891e2a7.camel@paulk.fr>
+Date: Wed, 24 Oct 2018 17:57:59 +0100
+Subject: [PATCH 2/4] drm/panel: simple: Add support for the Lemaker BL035
+ 3.5" LCD
+In-Reply-To: <30178c8b263656a9c285e45c78e1908927c99c48.camel@paulk.fr>
 References: <20181010114134.8211-1-contact@paulk.fr>
- <20181010145736.l6zpohvvd4b5qngr@flea>
- <224ec158bf627b4d2f577b1dadf10bd87891e2a7.camel@paulk.fr>
-Message-ID: <20181024164758.iqnlie4witckzauy@flea>
+ <20181010114134.8211-2-contact@paulk.fr>
+ <20181010145850.krwe7wlqkbcpja33@flea>
+ <30178c8b263656a9c285e45c78e1908927c99c48.camel@paulk.fr>
+Message-ID: <20181024165759.k6cnxyzgpiiuaigs@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 11:33:10AM +0200, Paul Kocialkowski wrote:
+On Tue, Oct 23, 2018 at 12:08:17PM +0200, Paul Kocialkowski wrote:
 > Hi,
 > 
-> Le mercredi 10 octobre 2018 ? 16:57 +0200, Maxime Ripard a ?crit :
-> > On Wed, Oct 10, 2018 at 01:41:31PM +0200, Paul Kocialkowski wrote:
-> > > Some panels need an active-low data enable (DE) signal for the RGB
-> > > interface. This requires flipping a bit in the TCON0 polarity register
-> > > when setting up the mode for the RGB interface.
-> > > 
-> > > Add a new helper function to match specific bus flags and use it to set
-> > > the polarity inversion bit for the DE signal when required.
+> Le mercredi 10 octobre 2018 ? 16:58 +0200, Maxime Ripard a ?crit :
+> > On Wed, Oct 10, 2018 at 01:41:32PM +0200, Paul Kocialkowski wrote:
+> > > This adds support for the 3.5" LCD panel from Lemaker, sold for use with
+> > > BananaPi boards. It comes with a 24-bit RGB888 parallel interface and
+> > > requires an active-low DE signal
 > > > 
 > > > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > > > ---
-> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++--
-> > >  drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
-> > >  2 files changed, 27 insertions(+), 2 deletions(-)
+> > >  drivers/gpu/drm/panel/panel-simple.c | 27 +++++++++++++++++++++++++++
+> > >  1 file changed, 27 insertions(+)
 > > > 
-> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > index 3fb084f802e2..d249a462ec09 100644
-> > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > @@ -78,6 +78,24 @@ static int sun4i_tcon_get_pixel_depth(const struct drm_encoder *encoder)
-> > >  	return -EINVAL;
-> > >  }
+> > > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> > > index 97964f7f2ace..229080fcf65e 100644
+> > > --- a/drivers/gpu/drm/panel/panel-simple.c
+> > > +++ b/drivers/gpu/drm/panel/panel-simple.c
+> > > @@ -1461,6 +1461,30 @@ static const struct panel_desc kyo_tcg121xglp = {
+> > >  	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+> > >  };
 > > >  
-> > > +static bool sun4i_tcon_match_bus_flags(const struct drm_encoder *encoder,
-> > > +				       u32 bus_flags)
-> > > +{
-> > > +	struct drm_connector *connector;
-> > > +	struct drm_display_info *info;
+> > > +static const struct drm_display_mode lemaker_bl035_mode = {
+> > > +	.clock = 7000,
+> > > +	.hdisplay = 320,
+> > > +	.hsync_start = 320 + 20,
+> > > +	.hsync_end = 320 + 20 + 30,
+> > > +	.htotal = 320 + 20 + 30 + 38,
+> > > +	.vdisplay = 240,
+> > > +	.vsync_start = 240 + 4,
+> > > +	.vsync_end = 240 + 4 + 3,
+> > > +	.vtotal = 240 + 4 + 3 + 15,
+> > > +	.vrefresh = 60,
+> > > +};
 > > > +
-> > > +	connector = sun4i_tcon_get_connector(encoder);
-> > > +	if (!connector)
-> > > +		return false;
+> > > +static const struct panel_desc lemaker_bl035 = {
+> > > +	.modes = &lemaker_bl035_mode,
+> > > +	.num_modes = 1,
+> > > +	.size = {
+> > > +		.width = 70,
+> > > +		.height = 52,
+> > > +	},
+> > > +	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+> > > +	.bus_flags = DRM_BUS_FLAG_DE_LOW,
+> > > +};
 > > > +
-> > > +	info = &connector->display_info;
-> > > +
-> > > +	if ((info->bus_flags & bus_flags) == bus_flags)
-> > > +		return true;
-> > > +
-> > > +	return false;
-> > > +}
-> > > +
-> > >  static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
-> > >  					  bool enabled)
-> > >  {
-> > > @@ -415,6 +433,7 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
-> > >  }
-> > >  
-> > >  static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
-> > > +				     const struct drm_encoder *encoder,
-> > >  				     const struct drm_display_mode *mode)
-> > >  {
-> > >  	unsigned int bp, hsync, vsync;
-> > > @@ -474,8 +493,13 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
-> > >  	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
-> > >  		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
-> > >  
-> > > +	if (sun4i_tcon_match_bus_flags(encoder, DRM_BUS_FLAG_DE_LOW))
-> > > +		val |= SUN4I_TCON0_IO_POL_DE_NEGATIVE;
-> > > +
+> > >  static const struct drm_display_mode lg_lb070wv8_mode = {
+> > >  	.clock = 33246,
+> > >  	.hdisplay = 800,
+> > > @@ -2456,6 +2480,9 @@ static const struct of_device_id platform_of_match[] = {
+> > >  	}, {
+> > >  		.compatible = "kyo,tcg121xglp",
+> > >  		.data = &kyo_tcg121xglp,
+> > > +	}, {
+> > > +		.compatible = "lemaker,bl035",
+> > > +		.data = &lemaker_bl035,
 > > 
-> > There's other flags in use in that function, you should also migrate
-> > them (ideally by splitting that new function into a separate patch).
+> > You should document that new compatible. Also, where is this name
+> > coming from? Is it the name it's sold under? something you came up
+> > with?
 > 
-> Actually, these other flags are not DRM bus flags but DRM mode flags,
-> which can be accessed directly from the mode pointer passed as
-> argument. Thus, they don't require a helper.
+> Oh right, I forgot to document the compatible (and add the new vendor).
+> 
+> The name "BL035" comes from the PCB itself, where it reads "BL035-RGB-
+> 002" under the Lemaker logo. I went for "BL035" to keep it short.
+> 
+> The latter part seems to be the PCB revision. According to the fex
+> files[0], the timings are the same for all the screens of the same size
+> (regardless of revision), so that revision probably shouldn't be in the
+> panel name.
+> 
+> As for the "RGB" part, Lemaker only makes 3.5 and 5 inch LCDs with a
+> parallel RGB interface and 7 and 10.1 inch LCDs with LVDS, so there is
+> no ambiguity for now.
+> 
+> Do you think it makes sense to keep that part in the panel name
+> nevertheless?
 
-I was talking about DRM_BUS_FLAG_PIXDATA_POSEDGE and
-DRM_BUS_FLAG_PIXDATA_NEGEDGE, which are in the current tree.
+I'd just put the full reference, to be on the safe side.
 
+Thanks!
 Maxime
 
 -- 
