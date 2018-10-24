@@ -1,45 +1,81 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 24 Oct 2018 15:22:27 +0800
-Subject: [PATCH 3/3] iommu/tegra194_smmu: Add Tegra194 SMMU driver
-In-Reply-To: <1540334347-7178-4-git-send-email-vdumpa@nvidia.com>
-References: <1540334347-7178-4-git-send-email-vdumpa@nvidia.com>
-Message-ID: <201810241524.jCAbYVLi%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Oct 2018 08:25:40 +0100
+Subject: [PATCH v8 07/12] dt-bindings: mfd: Add a document for PECI
+ client MFD
+In-Reply-To: <20180918215124.14003-8-jae.hyun.yoo@linux.intel.com>
+References: <20180918215124.14003-1-jae.hyun.yoo@linux.intel.com>
+ <20180918215124.14003-8-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20181024072540.GA4939@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krishna,
+On Tue, 18 Sep 2018, Jae Hyun Yoo wrote:
 
-Thank you for the patch! Yet something to improve:
+> This commit adds a dt-bindings document for PECI client MFD.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Andrew Jeffery <andrew@aj.id.au>
+> Cc: James Feist <james.feist@linux.intel.com>
+> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
+> Cc: Joel Stanley <joel@jms.id.au>
+> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> ---
+>  .../bindings/mfd/intel-peci-client.txt        | 34 +++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/intel-peci-client.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/intel-peci-client.txt b/Documentation/devicetree/bindings/mfd/intel-peci-client.txt
+> new file mode 100644
+> index 000000000000..cb341e363add
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/intel-peci-client.txt
+> @@ -0,0 +1,34 @@
+> +* Intel PECI client bindings
+> +
+> +PECI (Platform Environment Control Interface) is a one-wire bus interface that
+> +provides a communication channel from PECI clients in Intel processors and
+> +chipset components to external monitoring or control devices. PECI is designed
+> +to support the following sideband functions:
+> +
+> +- Processor and DRAM thermal management
+> +- Platform Manageability
+> +- Processor Interface Tuning and Diagnostics
+> +- Failure Analysis
+> +
+> +Required properties:
+> +- compatible : Should be "intel,peci-client".
+> +- reg        : Should contain address of a client CPU. Address range of CPU
+> +	       clients starts from 0x30 based on PECI specification.
 
-[auto build test ERROR on iommu/next]
-[also build test ERROR on next-20181019]
-[cannot apply to v4.19]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Nit: "start"
 
-url:    https://github.com/0day-ci/linux/commits/Krishna-Reddy/Add-Tegra194-Dual-ARM-SMMU-driver/20181024-123501
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+Would be better worded:
 
-All errors (new ones prefixed by >>):
+"According to the PECI specification client addresses start from 0x30."
 
-   drivers/iommu/tegra194-smmu.o: In function `arm_smmu_attach_dev':
->> tegra194-smmu.c:(.text+0x1800): undefined reference to `alloc_io_pgtable_ops'
-   drivers/iommu/tegra194-smmu.o: In function `arm_smmu_domain_free':
->> tegra194-smmu.c:(.text+0x1af8): undefined reference to `free_io_pgtable_ops'
+> +Example:
+> +	peci-bus at 0 {
+> +		compatible = "vendor,soc-peci";
+> +		reg = <0x0 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		peci-client at 30 {
+> +			compatible = "intel,peci-client";
+> +			reg = <0x30>;
+> +		};
+> +
+> +		peci-client at 31 {
+> +			compatible = "intel,peci-client";
+> +			reg = <0x31>;
+> +		};
+> +	};
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 44388 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181024/bbe4332a/attachment-0001.gz>
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
