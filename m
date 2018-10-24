@@ -1,101 +1,83 @@
-From: pankaj.bansal@nxp.com (Pankaj Bansal)
-Date: Wed, 24 Oct 2018 10:49:20 +0000
-Subject: [PATCH] arm64: dts: Add flexcan nodes in LX2160A
-Message-ID: <20181024161509.14200-1-pankaj.bansal@nxp.com>
+From: shubhrajyoti.datta@gmail.com (shubhrajyoti.datta at gmail.com)
+Date: Wed, 24 Oct 2018 16:20:03 +0530
+Subject: [PATCH] i2c: cadence: Implement timeout
+Message-ID: <1540378203-1655-1-git-send-email-shubhrajyoti.datta@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FlexCAN module in LX2160A is a communication controller implementing
-the CAN protocol according to the ISO 11898-1 standard and CAN 2.0 B
-protocol specifications.
+From: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
 
--Flexible mailboxes configurable to store 0 to 8, 16, 32 or 64 bytes
-data length
--Each mailbox configurable as receive or transmit, all supporting
-standard and extended messages
+In some cases we are waiting in a loop. Replace the infinite wait with
+the  timeout.
 
-Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
 ---
+ drivers/i2c/busses/i2c-cadence.c | 30 ++++++++++++++++++++++++++----
+ 1 file changed, 26 insertions(+), 4 deletions(-)
 
-Notes:
-    This patch depends on below patches:
-    [1] https://lore.kernel.org/patchwork/project/lkml/list/?series=369563
-    [2] https://patchwork.kernel.org/patch/10645287/
-    
-    This patch is used by below patches:
-    [1] https://www.spinics.net/lists/linux-can/msg00348.html
-
- .../boot/dts/freescale/fsl-lx2160a-qds.dts   |  8 ++++++++
- .../boot/dts/freescale/fsl-lx2160a-rdb.dts   |  8 ++++++++
- .../boot/dts/freescale/fsl-lx2160a.dtsi      | 18 ++++++++++++++++++
- 3 files changed, 34 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-index 99a22abbe725..8a0305a2b778 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-@@ -31,6 +31,14 @@
- 	};
- };
+diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+index b136057..9c38278 100644
+--- a/drivers/i2c/busses/i2c-cadence.c
++++ b/drivers/i2c/busses/i2c-cadence.c
+@@ -209,6 +209,7 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
+ 	struct cdns_i2c *id = ptr;
+ 	/* Signal completion only after everything is updated */
+ 	int done_flag = 0;
++	unsigned int timeout;
+ 	irqreturn_t status = IRQ_NONE;
  
-+&can0 {
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
- &crypto {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-index 6481e5f20e69..f8c95fc6de27 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-@@ -31,6 +31,14 @@
- 	};
- };
+ 	isr_status = cdns_i2c_readreg(CDNS_I2C_ISR_OFFSET);
+@@ -235,6 +236,7 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
+ 	    ((isr_status & CDNS_I2C_IXR_COMP) ||
+ 	     (isr_status & CDNS_I2C_IXR_DATA))) {
+ 		/* Read data if receive data valid is set */
++		timeout = 1000;
+ 		while (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) &
+ 		       CDNS_I2C_SR_RXDV) {
+ 			/*
+@@ -253,6 +255,16 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
  
-+&can0 {
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
- &crypto {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-index 56f846c55812..23ea8776b55a 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-@@ -566,6 +566,24 @@
- 			status = "disabled";
- 		};
+ 			if (cdns_is_holdquirk(id, hold_quirk))
+ 				break;
++			timeout--;
++			if (timeout)
++				mdelay(1);
++			else
++				break;
++		}
++		if (!timeout) {
++			id->err_status = -ETIMEDOUT;
++			complete(&id->xfer_done);
++			return IRQ_HANDLED;
+ 		}
  
-+		can0: can at 2180000 {
-+			compatible = "fsl,lx2160ar1-flexcan";
-+			reg = <0x0 0x2180000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 7>, <&clockgen 4 7>;
-+			clock-names = "ipg", "per";
-+			status = "disabled";
-+		};
-+
-+		can1: can at 2190000 {
-+			compatible = "fsl,lx2160ar1-flexcan";
-+			reg = <0x0 0x2190000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 7>, <&clockgen 4 7>;
-+			clock-names = "ipg", "per";
-+			status = "disabled";
-+		};
-+
- 		uart0: serial at 21c0000 {
- 			compatible = "arm,sbsa-uart","arm,pl011";
- 			reg = <0x0 0x21c0000 0x0 0x1000>;
+ 		/*
+@@ -262,12 +274,22 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
+ 		 * maintain transfer size non-zero while performing a large
+ 		 * receive operation.
+ 		 */
++		timeout = 1000;
+ 		if (cdns_is_holdquirk(id, hold_quirk)) {
+ 			/* wait while fifo is full */
+-			while (cdns_i2c_readreg(CDNS_I2C_XFER_SIZE_OFFSET) !=
+-			       (id->curr_recv_count - CDNS_I2C_FIFO_DEPTH))
+-				;
+-
++			while ((cdns_i2c_readreg(CDNS_I2C_XFER_SIZE_OFFSET) !=
++			       (id->curr_recv_count - CDNS_I2C_FIFO_DEPTH))) {
++				timeout--;
++				if (timeout)
++					mdelay(1);
++				else
++					break;
++			}
++			if (!timeout) {
++				id->err_status = -ETIMEDOUT;
++				complete(&id->xfer_done);
++				return IRQ_HANDLED;
++			}
+ 			/*
+ 			 * Check number of bytes to be received against maximum
+ 			 * transfer size and update register accordingly.
 -- 
-2.17.1
+2.1.1
