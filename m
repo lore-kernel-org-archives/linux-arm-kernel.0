@@ -1,63 +1,137 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 25 Oct 2018 11:44:38 -0700
-Subject: [PATCH] mm/page_owner: use vmalloc instead of kmalloc
-In-Reply-To: <1540492481-4144-1-git-send-email-miles.chen@mediatek.com>
-References: <1540492481-4144-1-git-send-email-miles.chen@mediatek.com>
-Message-ID: <e0cd65fdd6afc17b2be9b3ac64d50b95b2c2f32e.camel@perches.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 25 Oct 2018 13:45:56 -0500
+Subject: [PATCH v2 06/10] dt-bindings: irqchip: Introduce TISCI Interrupt
+ router bindings
+In-Reply-To: <20181018154017.7112-7-lokeshvutla@ti.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <20181018154017.7112-7-lokeshvutla@ti.com>
+Message-ID: <20181025184556.GA19597@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-10-26 at 02:34 +0800, miles.chen at mediatek.com wrote:
-> From: Miles Chen <miles.chen@mediatek.com>
+On Thu, Oct 18, 2018 at 09:10:13PM +0530, Lokesh Vutla wrote:
+> Add the DT binding documentation for Interrupt router driver.
 > 
-> The kbuf used by page owner is allocated by kmalloc(),
-> which means it can use only normal memory and there might
-> be a "out of memory" issue when we're out of normal memory.
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+> Changes since v1:
+> - Drop dependency on GIC
+> - Updated supported interrupt types.
 > 
-> Use vmalloc() so we can also allocate kbuf from highmem
-> on 32bit kernel.
+>  .../interrupt-controller/ti,sci-intr.txt      | 81 +++++++++++++++++++
+>  MAINTAINERS                                   |  1 +
+>  2 files changed, 82 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> new file mode 100644
+> index 000000000000..276bb4f0ad12
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> @@ -0,0 +1,81 @@
+> +Texas Instruments K3 Interrupt Router
+> +=====================================
+> +
+> +The Interrupt Router (INTR) module provides a mechanism to mux M
+> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
+> +to be driven per N output. There is one register per output (MUXCNTL_N) that
+> +controls the selection.
+> +
+> +
+> +                                 Interrupt Router
+> +                             +----------------------+
+> +                             |  Inputs     Outputs  |
+> +        +-------+            | +------+             |
+> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
+> +        +-------+            | +------+             |      controller
+> +                             |    .        +-----+  |      +-------+
+> +        +-------+            |    .        |  0  |  |----->|  IRQ  |
+> +        | INTA  |----------->|    .        +-----+  |      +-------+
+> +        +-------+            |    .          .      |
+> +                             | +------+      .      |
+> +                             | | irqM |    +-----+  |
+> +                             | +------+    |  N  |  |
+> +                             |             +-----+  |
+> +                             +----------------------+
+> +
+> +Configuration of these MUXCNTL_N registers is done by a system controller
+> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
+> +controller will keep track of the used and unused registers within the Router.
+> +Driver should request the system controller to get the range of GIC IRQs
+> +assigned to the requesting hosts. It is the drivers responsibility to keep
+> +track of Host IRQs.
+> +
+> +Communication between the host processor running an OS and the system
+> +controller happens through a protocol called TI System Control Interface
+> +(TISCI protocol). For more details refer:
+> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> +
+> +TISCI Interrupt Router Node:
+> +----------------------------
+> +- compatible:		Must be "ti,sci-intr".
+> +- interrupt-controller:	Identifies the node as an interrupt controller
+> +- #interrupt-cells:	Specifies the number of cells needed to encode an
+> +			interrupt source. The value should be 3.
+> +			First cell should contain the TISCI device ID of source
+> +			Second cell should contain the interrupt source offset
+> +			within the device
+> +			Third cell specifies the trigger type as defined
+> +			in interrupts.txt in this directory. Only level
+> +			sensitive trigger types are supported.
+> +- interrupt-parent:	phandle of irq parent for TISCI intr.
 
-If this is really necessary, using kvmalloc/kvfree would
-be better as the vmalloc space is also limited.
+This is implied and could be in a parent node.
 
-> diff --git a/mm/page_owner.c b/mm/page_owner.c
-[]
-> @@ -1,7 +1,6 @@
->  // SPDX-License-Identifier: GPL-2.0
->  #include <linux/debugfs.h>
->  #include <linux/mm.h>
-> -#include <linux/slab.h>
->  #include <linux/uaccess.h>
->  #include <linux/bootmem.h>
->  #include <linux/stacktrace.h>
-> @@ -10,6 +9,7 @@
->  #include <linux/migrate.h>
->  #include <linux/stackdepot.h>
->  #include <linux/seq_file.h>
-> +#include <linux/vmalloc.h>
+> +- ti,sci:		Phandle to TI-SCI compatible System controller node.
+> +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
+> +- ti,sci-rm-range-girq:	TISCI subtype id representing the host irqs assigned
+> +			to this interrupt router.
+
+These need a better explanation and there's still some questions on v1 
+asked of me that I tried to answer.
+
+> +
+> +Example:
+> +--------
+> +The following example demonstrates both interrupt router node and the consumer
+> +node(main gpio) on the AM654 SoC:
+> +
+> +main_intr: interrupt-controller at 1 {
+> +	compatible = "ti,sci-intr";
+> +	interrupt-controller;
+> +	interrupt-parent = <&gic>;
+> +	#interrupt-cells = <3>;
+> +	ti,sci = <&dmsc>;
+> +	ti,sci-dst-id = <56>;
+> +	ti,sci-rm-range-girq = <0x1>;
+> +};
+> +
+> +main_gpio0:  main_gpio0 at 600000 {
+
+gpio at ...
+
+> +	...
+> +	interrupt-parent = <&main_intr>;
+> +	interrupts = <57 256 IRQ_TYPE_EDGE_RISING>,
+> +			<57 257 IRQ_TYPE_EDGE_RISING>,
+> +			<57 258 IRQ_TYPE_EDGE_RISING>,
+> +			<57 259 IRQ_TYPE_EDGE_RISING>,
+> +			<57 260 IRQ_TYPE_EDGE_RISING>,
+> +			<57 261 IRQ_TYPE_EDGE_RISING>;
+> +	...
+> +};
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 06966772cad4..710cf728b9d0 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -14686,6 +14686,7 @@ F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
+>  F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>  F:	drivers/clk/keystone/sci-clk.c
+>  F:	drivers/reset/reset-ti-sci.c
+> +F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
 >  
->  #include "internal.h"
->  
-> @@ -351,7 +351,7 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
->  		.skip = 0
->  	};
->  
-> -	kbuf = kmalloc(count, GFP_KERNEL);
-> +	kbuf = vmalloc(count);
->  	if (!kbuf)
->  		return -ENOMEM;
->  
-> @@ -397,11 +397,11 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
->  	if (copy_to_user(buf, kbuf, ret))
->  		ret = -EFAULT;
->  
-> -	kfree(kbuf);
-> +	vfree(kbuf);
->  	return ret;
->  
->  err:
-> -	kfree(kbuf);
-> +	vfree(kbuf);
->  	return -ENOMEM;
->  }
->  
+>  THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+>  M:	Hans Verkuil <hverkuil@xs4all.nl>
+> -- 
+> 2.19.1
+> 
