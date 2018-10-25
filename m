@@ -1,40 +1,48 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 25 Oct 2018 09:12:28 -0700
-Subject: [PATCH v7 2/2] ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE
- PMU driver
-In-Reply-To: <20181025055833.28471-3-ganapatrao.kulkarni@cavium.com>
-References: <20181025055833.28471-1-ganapatrao.kulkarni@cavium.com>
- <20181025055833.28471-3-ganapatrao.kulkarni@cavium.com>
-Message-ID: <84978a48-bd25-eede-519a-a4e9991c5c3d@infradead.org>
+From: amhetre@nvidia.com (Ashish Mhetre)
+Date: Thu, 25 Oct 2018 21:42:24 +0530
+Subject: [PATCH] arm64: Don't flush tlb while clearing the accessed bit
+Message-ID: <1540483944-22718-1-git-send-email-amhetre@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/18 10:59 PM, Kulkarni, Ganapatrao wrote:
-> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> index 08ebaf7cca8b..c1956b1af2bb 100644
-> --- a/drivers/perf/Kconfig
-> +++ b/drivers/perf/Kconfig
-> @@ -87,6 +87,15 @@ config QCOM_L3_PMU
->  	   Adds the L3 cache PMU into the perf events subsystem for
->  	   monitoring L3 cache events.
->  
-> +config THUNDERX2_PMU
-> +        tristate "Cavium ThunderX2 SoC PMU UNCORE"
-> +	depends on ARCH_THUNDER2 && ARM64 && ACPI && NUMA
-> +        default m
-> +	help
-> +	  Provides support for ThunderX2 UNCORE events.
-> +	  The SoC has PMU support in its L3 cache controller (L3C) and
-> +	  in the DDR4 Memory Controller (DMC).
-> +
->  config XGENE_PMU
->          depends on ARCH_XGENE
->          bool "APM X-Gene SoC PMU"
+From: Alex Van Brunt <avanbrunt@nvidia.com>
 
-Please fix the Kconfig indentation.  Use one tab (not spaces) for each of
-tristate, depends, default, and help.  (yes, some of them are tabs and some
-are spaces.)
+Accessed bit is used to age a page and in generic implementation there is
+flush_tlb while clearing the accessed bit.
+Flushing a TLB is overhead on ARM64 as access flag faults don't get
+translation table entries cached into TLB's. Flushing TLB is not necessary
+for this. Clearing the accessed bit without flushing TLB doesn't cause data
+corruption on ARM64.
+In our case with this patch, speed of reading from fast NVMe/SSD through
+PCIe got improved by 10% ~ 15% and writing got improved by 20% ~ 40%.
+So for performance optimisation don't flush TLB when clearing the accessed
+bit on ARM64.
+x86 made the same optimization even though their TLB invalidate is much
+faster as it doesn't broadcast to other CPUs.
 
+Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
+Signed-off-by: Ashish Mhetre <amhetre@nvidia.com>
+---
+ arch/arm64/include/asm/pgtable.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 2ab2031..42931f6 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -652,6 +652,13 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
+ 	return __ptep_test_and_clear_young(ptep);
+ }
+ 
++#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
++static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
++					 unsigned long address, pte_t *ptep)
++{
++	return ptep_test_and_clear_young(vma, address, ptep);
++}
++
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define __HAVE_ARCH_PMDP_TEST_AND_CLEAR_YOUNG
+ static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 -- 
-~Randy
+2.7.4
