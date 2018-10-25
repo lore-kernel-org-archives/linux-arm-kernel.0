@@ -1,124 +1,174 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 25 Oct 2018 17:29:33 +0200
-Subject: [PATCH RFX 09/11] staging: bcm2835-audio: Drop DT dependency
+Date: Thu, 25 Oct 2018 17:29:34 +0200
+Subject: [PATCH RFC 10/11] staging: bcm2835-camera: Provide more specific
+ probe error messages
 In-Reply-To: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
 References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1540481375-15952-10-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1540481375-15952-11-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like the bcm2835-video make this a platform driver which is probed
-by vchiq. In order to change the number of channels use a module
-parameter instead, but use the maximum as default.
+Currently there is only a catch-all info message which print the
+relevant error code without any context. So add more specific error
+messages in order to narrow down possible issues.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 41 ++++++++++------------
- 1 file changed, 19 insertions(+), 22 deletions(-)
+ .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 58 +++++++++++++++-------
+ 1 file changed, 39 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-index 87a27fd..5c5b600 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-@@ -4,15 +4,17 @@
- #include <linux/platform_device.h>
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+index cd773eb..84ca22d 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+@@ -1539,8 +1539,11 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
+ 	struct vchiq_mmal_component  *camera;
  
- #include <linux/init.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/module.h>
--#include <linux/of.h>
+ 	ret = vchiq_mmal_init(&dev->instance);
+-	if (ret < 0)
++	if (ret < 0) {
++		v4l2_err(&dev->v4l2_dev, "%s: vchiq mmal init failed %d\n",
++			 __func__, ret);
+ 		return ret;
++	}
  
- #include "bcm2835.h"
+ 	/* get the camera component ready */
+ 	ret = vchiq_mmal_component_init(dev->instance, "ril.camera",
+@@ -1549,7 +1552,9 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
+ 		goto unreg_mmal;
  
- static bool enable_hdmi;
- static bool enable_headphones;
- static bool enable_compat_alsa = true;
-+static int num_channels = MAX_SUBSTREAMS;
+ 	camera = dev->component[MMAL_COMPONENT_CAMERA];
+-	if (camera->outputs <  MMAL_CAMERA_PORT_COUNT) {
++	if (camera->outputs < MMAL_CAMERA_PORT_COUNT) {
++		v4l2_err(&dev->v4l2_dev, "%s: too few camera outputs %d needed %d\n",
++			 __func__, camera->outputs, MMAL_CAMERA_PORT_COUNT);
+ 		ret = -EINVAL;
+ 		goto unreg_camera;
+ 	}
+@@ -1557,8 +1562,11 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
+ 	ret = set_camera_parameters(dev->instance,
+ 				    camera,
+ 				    dev);
+-	if (ret < 0)
++	if (ret < 0) {
++		v4l2_err(&dev->v4l2_dev, "%s: unable to set camera parameters: %d\n",
++			 __func__, ret);
+ 		goto unreg_camera;
++	}
  
- module_param(enable_hdmi, bool, 0444);
- MODULE_PARM_DESC(enable_hdmi, "Enables HDMI virtual audio device");
-@@ -21,6 +23,8 @@ MODULE_PARM_DESC(enable_headphones, "Enables Headphones virtual audio device");
- module_param(enable_compat_alsa, bool, 0444);
- MODULE_PARM_DESC(enable_compat_alsa,
- 		 "Enables ALSA compatibility virtual audio device");
-+module_param(num_channels, int, 0644);
-+MODULE_PARM_DESC(num_channels, "Number of audio channels (default: 8)");
+ 	/* There was an error in the firmware that meant the camera component
+ 	 * produced BGR instead of RGB.
+@@ -1647,8 +1655,8 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
  
- static void bcm2835_devm_free_vchi_ctx(struct device *dev, void *res)
- {
-@@ -293,31 +297,30 @@ static int snd_add_child_devices(struct device *device, u32 numchans)
+ 	if (dev->component[MMAL_COMPONENT_PREVIEW]->inputs < 1) {
+ 		ret = -EINVAL;
+-		pr_debug("too few input ports %d needed %d\n",
+-			 dev->component[MMAL_COMPONENT_PREVIEW]->inputs, 1);
++		v4l2_err(&dev->v4l2_dev, "%s: too few input ports %d needed %d\n",
++			 __func__, dev->component[MMAL_COMPONENT_PREVIEW]->inputs, 1);
+ 		goto unreg_preview;
+ 	}
+ 
+@@ -1661,8 +1669,8 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
+ 
+ 	if (dev->component[MMAL_COMPONENT_IMAGE_ENCODE]->inputs < 1) {
+ 		ret = -EINVAL;
+-		v4l2_err(&dev->v4l2_dev, "too few input ports %d needed %d\n",
+-			 dev->component[MMAL_COMPONENT_IMAGE_ENCODE]->inputs,
++		v4l2_err(&dev->v4l2_dev, "%s: too few input ports %d needed %d\n",
++			 __func__, dev->component[MMAL_COMPONENT_IMAGE_ENCODE]->inputs,
+ 			 1);
+ 		goto unreg_image_encoder;
+ 	}
+@@ -1676,8 +1684,8 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
+ 
+ 	if (dev->component[MMAL_COMPONENT_VIDEO_ENCODE]->inputs < 1) {
+ 		ret = -EINVAL;
+-		v4l2_err(&dev->v4l2_dev, "too few input ports %d needed %d\n",
+-			 dev->component[MMAL_COMPONENT_VIDEO_ENCODE]->inputs,
++		v4l2_err(&dev->v4l2_dev, "%s: too few input ports %d needed %d\n",
++			 __func__, dev->component[MMAL_COMPONENT_VIDEO_ENCODE]->inputs,
+ 			 1);
+ 		goto unreg_vid_encoder;
+ 	}
+@@ -1706,8 +1714,11 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
+ 					      sizeof(enable));
+ 	}
+ 	ret = bm2835_mmal_set_all_camera_controls(dev);
+-	if (ret < 0)
++	if (ret < 0) {
++		v4l2_err(&dev->v4l2_dev, "%s: failed to set all camera controls: %d\n",
++			 __func__, ret);
+ 		goto unreg_vid_encoder;
++	}
+ 
  	return 0;
- }
  
--static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
-+static int snd_bcm2835_alsa_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
--	u32 numchans;
- 	int err;
+@@ -1873,21 +1884,29 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
+ 		snprintf(dev->v4l2_dev.name, sizeof(dev->v4l2_dev.name),
+ 			 "%s", BM2835_MMAL_MODULE_NAME);
+ 		ret = v4l2_device_register(NULL, &dev->v4l2_dev);
+-		if (ret)
++		if (ret) {
++			dev_err(&pdev->dev, "%s: could not register V4L2 device: %d\n",
++				__func__, ret);
+ 			goto free_dev;
++		}
  
--	err = of_property_read_u32(dev->of_node, "brcm,pwm-channels",
--				   &numchans);
--	if (err) {
--		dev_err(dev, "Failed to get DT property 'brcm,pwm-channels'");
--		return err;
-+	if (num_channels <= 0 || num_channels > MAX_SUBSTREAMS) {
-+		num_channels = MAX_SUBSTREAMS;
-+		dev_warn(dev, "Illegal num_channels value, will use %u\n",
-+			 num_channels);
- 	}
+ 		/* setup v4l controls */
+ 		ret = bm2835_mmal_init_controls(dev, &dev->ctrl_handler);
+-		if (ret < 0)
++		if (ret < 0) {
++			v4l2_err(&dev->v4l2_dev, "%s: could not init controls: %d\n",
++				__func__, ret);
+ 			goto unreg_dev;
++		}
+ 		dev->v4l2_dev.ctrl_handler = &dev->ctrl_handler;
  
--	if (numchans == 0 || numchans > MAX_SUBSTREAMS) {
--		numchans = MAX_SUBSTREAMS;
--		dev_warn(dev,
--			 "Illegal 'brcm,pwm-channels' value, will use %u\n",
--			 numchans);
-+	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+	dev->dma_mask = &dev->coherent_dma_mask;
-+	err = of_dma_configure(dev, NULL, true);
-+	if (err) {
-+		dev_err(dev, "Unable to setup DMA: %d\n", err);
-+		return err;
- 	}
- 
- 	err = bcm2835_devm_add_vchi_ctx(dev);
- 	if (err)
- 		return err;
- 
--	err = snd_add_child_devices(dev, numchans);
-+	err = snd_add_child_devices(dev, num_channels);
- 	if (err)
- 		return err;
- 
-@@ -339,21 +342,14 @@ static int snd_bcm2835_alsa_resume(struct platform_device *pdev)
- 
- #endif
- 
--static const struct of_device_id snd_bcm2835_of_match_table[] = {
--	{ .compatible = "brcm,bcm2835-audio",},
--	{},
--};
--MODULE_DEVICE_TABLE(of, snd_bcm2835_of_match_table);
+ 		/* mmal init */
+ 		dev->instance = instance;
+ 		ret = mmal_init(dev);
+-		if (ret < 0)
++		if (ret < 0) {
++			v4l2_err(&dev->v4l2_dev, "%s: mmal init failed: %d\n",
++				 __func__, ret);
+ 			goto unreg_dev;
 -
- static struct platform_driver bcm2835_alsa0_driver = {
--	.probe = snd_bcm2835_alsa_probe_dt,
-+	.probe = snd_bcm2835_alsa_probe,
- #ifdef CONFIG_PM
- 	.suspend = snd_bcm2835_alsa_suspend,
- 	.resume = snd_bcm2835_alsa_resume,
- #endif
- 	.driver = {
- 		.name = "bcm2835_audio",
--		.of_match_table = snd_bcm2835_of_match_table,
- 	},
- };
- module_platform_driver(bcm2835_alsa0_driver);
-@@ -361,3 +357,4 @@ module_platform_driver(bcm2835_alsa0_driver);
- MODULE_AUTHOR("Dom Cobley");
- MODULE_DESCRIPTION("Alsa driver for BCM2835 chip");
- MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:bcm2835_audio");
++		}
+ 		/* initialize queue */
+ 		q = &dev->capture.vb_vidq;
+ 		memset(q, 0, sizeof(*q));
+@@ -1905,16 +1924,19 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
+ 
+ 		/* initialise video devices */
+ 		ret = bm2835_mmal_init_device(dev, &dev->vdev);
+-		if (ret < 0)
++		if (ret < 0) {
++			v4l2_err(&dev->v4l2_dev, "%s: could not init device: %d\n",
++				 __func__, ret);
+ 			goto unreg_dev;
++		}
+ 
+ 		/* Really want to call vidioc_s_fmt_vid_cap with the default
+ 		 * format, but currently the APIs don't join up.
+ 		 */
+ 		ret = mmal_setup_components(dev, &default_v4l2_format);
+ 		if (ret < 0) {
+-			v4l2_err(&dev->v4l2_dev,
+-				 "%s: could not setup components\n", __func__);
++			v4l2_err(&dev->v4l2_dev, "%s: could not setup components: %d\n",
++				 __func__, ret);
+ 			goto unreg_dev;
+ 		}
+ 
+@@ -1938,8 +1960,6 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
+ 		bcm2835_cleanup_instance(gdev[i]);
+ 		gdev[i] = NULL;
+ 	}
+-	pr_info("%s: error %d while loading driver\n",
+-		BM2835_MMAL_MODULE_NAME, ret);
+ 
+ cleanup_mmal:
+ 	vchiq_mmal_finalise(instance);
 -- 
 2.7.4
