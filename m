@@ -1,51 +1,124 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 25 Oct 2018 17:29:32 +0200
-Subject: [PATCH RFC 08/11] staging: bcm2835-audio: use
- module_platform_driver() macro
+Date: Thu, 25 Oct 2018 17:29:33 +0200
+Subject: [PATCH RFX 09/11] staging: bcm2835-audio: Drop DT dependency
 In-Reply-To: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
 References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1540481375-15952-9-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1540481375-15952-10-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is not much value behind this boilerplate, so use
-module_platform_driver() instead.
+Just like the bcm2835-video make this a platform driver which is probed
+by vchiq. In order to change the number of channels use a module
+parameter instead, but use the maximum as default.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- .../staging/vc04_services/bcm2835-audio/bcm2835.c    | 20 +-------------------
- 1 file changed, 1 insertion(+), 19 deletions(-)
+ .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 41 ++++++++++------------
+ 1 file changed, 19 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-index 87d56ab..87a27fd 100644
+index 87a27fd..5c5b600 100644
 --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
 +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-@@ -356,25 +356,7 @@ static struct platform_driver bcm2835_alsa0_driver = {
- 		.of_match_table = snd_bcm2835_of_match_table,
+@@ -4,15 +4,17 @@
+ #include <linux/platform_device.h>
+ 
+ #include <linux/init.h>
++#include <linux/dma-mapping.h>
++#include <linux/of_device.h>
+ #include <linux/slab.h>
+ #include <linux/module.h>
+-#include <linux/of.h>
+ 
+ #include "bcm2835.h"
+ 
+ static bool enable_hdmi;
+ static bool enable_headphones;
+ static bool enable_compat_alsa = true;
++static int num_channels = MAX_SUBSTREAMS;
+ 
+ module_param(enable_hdmi, bool, 0444);
+ MODULE_PARM_DESC(enable_hdmi, "Enables HDMI virtual audio device");
+@@ -21,6 +23,8 @@ MODULE_PARM_DESC(enable_headphones, "Enables Headphones virtual audio device");
+ module_param(enable_compat_alsa, bool, 0444);
+ MODULE_PARM_DESC(enable_compat_alsa,
+ 		 "Enables ALSA compatibility virtual audio device");
++module_param(num_channels, int, 0644);
++MODULE_PARM_DESC(num_channels, "Number of audio channels (default: 8)");
+ 
+ static void bcm2835_devm_free_vchi_ctx(struct device *dev, void *res)
+ {
+@@ -293,31 +297,30 @@ static int snd_add_child_devices(struct device *device, u32 numchans)
+ 	return 0;
+ }
+ 
+-static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
++static int snd_bcm2835_alsa_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+-	u32 numchans;
+ 	int err;
+ 
+-	err = of_property_read_u32(dev->of_node, "brcm,pwm-channels",
+-				   &numchans);
+-	if (err) {
+-		dev_err(dev, "Failed to get DT property 'brcm,pwm-channels'");
+-		return err;
++	if (num_channels <= 0 || num_channels > MAX_SUBSTREAMS) {
++		num_channels = MAX_SUBSTREAMS;
++		dev_warn(dev, "Illegal num_channels value, will use %u\n",
++			 num_channels);
+ 	}
+ 
+-	if (numchans == 0 || numchans > MAX_SUBSTREAMS) {
+-		numchans = MAX_SUBSTREAMS;
+-		dev_warn(dev,
+-			 "Illegal 'brcm,pwm-channels' value, will use %u\n",
+-			 numchans);
++	dev->coherent_dma_mask = DMA_BIT_MASK(32);
++	dev->dma_mask = &dev->coherent_dma_mask;
++	err = of_dma_configure(dev, NULL, true);
++	if (err) {
++		dev_err(dev, "Unable to setup DMA: %d\n", err);
++		return err;
+ 	}
+ 
+ 	err = bcm2835_devm_add_vchi_ctx(dev);
+ 	if (err)
+ 		return err;
+ 
+-	err = snd_add_child_devices(dev, numchans);
++	err = snd_add_child_devices(dev, num_channels);
+ 	if (err)
+ 		return err;
+ 
+@@ -339,21 +342,14 @@ static int snd_bcm2835_alsa_resume(struct platform_device *pdev)
+ 
+ #endif
+ 
+-static const struct of_device_id snd_bcm2835_of_match_table[] = {
+-	{ .compatible = "brcm,bcm2835-audio",},
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, snd_bcm2835_of_match_table);
+-
+ static struct platform_driver bcm2835_alsa0_driver = {
+-	.probe = snd_bcm2835_alsa_probe_dt,
++	.probe = snd_bcm2835_alsa_probe,
+ #ifdef CONFIG_PM
+ 	.suspend = snd_bcm2835_alsa_suspend,
+ 	.resume = snd_bcm2835_alsa_resume,
+ #endif
+ 	.driver = {
+ 		.name = "bcm2835_audio",
+-		.of_match_table = snd_bcm2835_of_match_table,
  	},
  };
--
--static int bcm2835_alsa_device_init(void)
--{
--	int retval;
--
--	retval = platform_driver_register(&bcm2835_alsa0_driver);
--	if (retval)
--		pr_err("Error registering bcm2835_audio driver %d .\n", retval);
--
--	return retval;
--}
--
--static void bcm2835_alsa_device_exit(void)
--{
--	platform_driver_unregister(&bcm2835_alsa0_driver);
--}
--
--late_initcall(bcm2835_alsa_device_init);
--module_exit(bcm2835_alsa_device_exit);
-+module_platform_driver(bcm2835_alsa0_driver);
- 
+ module_platform_driver(bcm2835_alsa0_driver);
+@@ -361,3 +357,4 @@ module_platform_driver(bcm2835_alsa0_driver);
  MODULE_AUTHOR("Dom Cobley");
  MODULE_DESCRIPTION("Alsa driver for BCM2835 chip");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:bcm2835_audio");
 -- 
 2.7.4
