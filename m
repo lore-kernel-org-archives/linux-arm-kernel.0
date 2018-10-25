@@ -1,55 +1,24 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Oct 2018 22:20:06 +0100
-Subject: [PATCH] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
- disabled
-In-Reply-To: <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
-References: <20181025180957.7900-1-f.fainelli@gmail.com>
- <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
-Message-ID: <20181025212006.GE30658@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 25 Oct 2018 16:18:20 -0500
+Subject: [RESEND PATCH 1/2] drm/panel: Add support for Armadeus ST0700
+ Adapt
+In-Reply-To: <20181024125457.25204-1-sebastien.szymanski@armadeus.com>
+References: <20181024125457.25204-1-sebastien.szymanski@armadeus.com>
+Message-ID: <20181025211820.GA1173@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 12:00:09AM +0530, Souptick Joarder wrote:
-> On Thu, Oct 25, 2018 at 11:40 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >
-> > Some software such as perf makes unconditional use of the special
-> > [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
-> > enabled in the kernel.
-> >
-> > Facilitate the debugging of such situations by printing a debug message
-> > to the kernel log showing the task name and the faulting address.
-> >
-> > Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> > ---
-> >  arch/arm/mm/fault.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> >
-> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> > index f4ea4c62c613..f17471fbc1c4 100644
-> > --- a/arch/arm/mm/fault.c
-> > +++ b/arch/arm/mm/fault.c
-> > @@ -173,6 +173,11 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
-> >                 show_regs(regs);
-> >         }
-> >  #endif
-> > +#ifndef CONFIG_KUSER_HELPERS
+On Wed, 24 Oct 2018 14:54:56 +0200, =?UTF-8?q?S=C3=A9bastien=20Szymanski?= wrote:
+> This patch adds support for the Armadeus ST0700 Adapt. It comes with a
+> Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT and an adapter board so
+> that it can be connected on the TFT header of Armadeus Dev boards.
 > 
-> Just have one doubt, if the condition is "#ifdef CONFIG_KUSER_HELPER"
-> as commit message suggests the scenario is valid when CONFIG_KUSER_HELPER
-> is enabled ? No ?
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> ---
+>  .../display/panel/armadeus,st0700-adapt.txt        |  9 +++++++
+>  drivers/gpu/drm/panel/panel-simple.c               | 29 ++++++++++++++++++++++
+>  2 files changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
 > 
-> > +       if ((sig == SIGSEGV) && ((addr & PAGE_MASK) == 0xffff0000))
-> > +               printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at 0x%08lx\n",
-> > +                      tsk->comm, addr);
-> > +#endif
 
-The idea is to print a message when we get a SEGV _and_ the faulting
-address is in the vectors page _and_ CONFIG_KUSER_HELPERS is _not_ set
-(which makes the page inaccessible.)  The message points users to
-enable it and/or why the application has failed.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Reviewed-by: Rob Herring <robh@kernel.org>
