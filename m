@@ -1,93 +1,32 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 25 Oct 2018 14:43:06 +0000
-Subject: [PATCH V5 9/9] clk: imx: add imx8qxp clk driver
-In-Reply-To: <AM0PR04MB42112BEEF4DB939F13D6AF1680F90@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
- <1539881347-20871-10-git-send-email-aisheng.dong@nxp.com>
- <153988429912.5275.13469659599335212731@swboyd.mtv.corp.google.com>
- <AM0PR04MB42112CB1324B0994A26AB15D80F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <153989556955.53599.9032716427049619310@swboyd.mtv.corp.google.com>
- <AM0PR04MB42112BEEF4DB939F13D6AF1680F90@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211CE37D05973D6CE521D7080F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 25 Oct 2018 09:48:41 -0500
+Subject: [[PATCH] 0/9] *** DMA support for UART in ASPEED's AST2500  ***
+In-Reply-To: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
+References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
+Message-ID: <20181025144841.GA21004@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Friday, October 19, 2018 5:05 PM
-[...]
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd at kernel.org]
-> > Sent: Friday, October 19, 2018 4:46 AM
-> > To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> > shawnguo at kernel.org; Fabio Estevam <fabio.estevam@nxp.com>;
-> > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de
-> > Subject: RE: [PATCH V5 9/9] clk: imx: add imx8qxp clk driver
-> >
-> > Quoting A.s. Dong (2018-10-18 11:13:39)
-> > > > -----Original Message-----
-> > > > From: Stephen Boyd [mailto:sboyd at kernel.org]
-> > > > Sent: Friday, October 19, 2018 1:38 AM
-> > > > To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org
-> > > > Cc: linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> > > > shawnguo at kernel.org; Fabio Estevam <fabio.estevam@nxp.com>;
-> > > > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; A.s. Dong
-> > > > <aisheng.dong@nxp.com>
-> > > > Subject: Re: [PATCH V5 9/9] clk: imx: add imx8qxp clk driver
-> > > >
-> > > > Quoting A.s. Dong (2018-10-18 09:54:15)
-> > > > > +
-> > > > > +#include <dt-bindings/clock/imx8qxp-clock.h>
-> > > > > +#include <linux/clk.h>
-> > > > > +#include <linux/err.h>
-> > > > > +#include <linux/io.h>
-> > > > > +#include <linux/of.h>
-> > > > > +#include <linux/of_address.h>
-> > > > > +#include <linux/platform_device.h> #include <linux/slab.h>
-> > > > > +
-> > > > > +#include <soc/imx/imx8qxp/lpcg.h>
-> > > > > +
-> > > > > +#include "clk-scu.h"
-> > > > > +
-> > > > > +static struct clk_hw_onecell_data *imx8qxp_clk_data;
-> > > > > +
-> > > > > +static const char * const enet_sels[] = { "enet_25MHz",
-> > > > > +"enet_125MHz", }; static const char * const
-> > > > > +enet0_rmii_tx_sels[] = { "enet0_ref_div", "dummy", }; static
-> > > > > +const char * const enet1_rmii_tx_sels[] = { "enet1_ref_div",
-> > > > > +"dummy", };
-> > > > > +
-> > > > > +static int imx8qxp_clk_probe(struct platform_device *pdev) {
-> > > > > +       struct device_node *ccm_node = pdev->dev.of_node;
-> > > >
-> > > > Where's the DT binding for this device?
-> > >
-> > > Sorry for missed to mention this.
-> > > It's been merged into scu binding doc per Rob's request which has
-> > > already been in Shawn's tree.
-> > >
-> > > Please take a look at here:
-> [...]
-> >
-> > Ok I ask because it's odd to hardcode physical addresses in a clk
-> > driver when those should come from DT in reg properties. Was Rob aware
-> > that this clk node was combining I/O memory and message passing?
+On Wed, Oct 17, 2018 at 09:40:57AM +0530, sudheer.v wrote:
+> DMA controller driver  and UART dma client driver for aspeed's AST2500
 > 
-> Yes, I agree with you. That seems like a special to i.MX case.
-> The problem is not all clocks having a LPCG gate. And those LPCGs are also not
-> continuous and may be shared by many clocks which make things more
-> complicated.
-> I'm not sure parsing from device tree could be better way to do it.
-> Probably need huge changes.
-> 
-> How would you suggest?
-> Do you think we can workaround this due to the special iMX?
-> 
+> sudheer.v (9):
 
-Do you have any suggestion about this?
+We need a full name for author and Signed-off-by.
 
-Regards
-Dong Aisheng
+>   DT-changes-for-DMA-UART-of-AST2500
+>   Defconfig-changes-for-DMA-UART-of-AST2500
+>   configuration-for-DMA-of-AST2500
+>   Documentation-DTbindings-DMA-controller-of-AST2500
+>   DMA-driver-for-AST2500
+>   configuration-for-DMA-UART-of-AST2500
+>   Documentation-DTbindings-DMA-UART-of-AST2500
+>   DMA-UART-Driver-for-AST2500
+>   updating MAINTAINERS for DMA and DMA-UART drivers of AST2500
+
+Your commit messages need some work. Use 'git log --oneline <dir>' on 
+each directory for inspiration as to what the subject should be.
+
+DT bindings specifically are "dt-bindings: <binding dir>: ..."
+
+Rob
