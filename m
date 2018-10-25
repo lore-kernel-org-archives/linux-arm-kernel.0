@@ -1,67 +1,85 @@
-From: hal@halemmerich.com (Hal Emmerich)
-Date: Thu, 25 Oct 2018 15:43:26 -0500
-Subject: [BUG] clk: rockchip: rk3288: rockchip_mmc_get_phase: invalid clk rate
-Message-ID: <c8030f3d-c579-650c-89d5-6227aacea346@halemmerich.com>
+From: dachaac@gmail.com (=?UTF-8?B?VmVzYSBKw6TDpHNrZWzDpGluZW4=?=)
+Date: Thu, 25 Oct 2018 23:53:56 +0300
+Subject: [PATCH v2 3/3] reset: reset-zynqmp: Adding support for Xilinx
+ zynqmp reset controller.
+In-Reply-To: <20181026122424.30831-4-nava.manne@xilinx.com>
+References: <20181026122424.30831-1-nava.manne@xilinx.com>
+ <20181026122424.30831-4-nava.manne@xilinx.com>
+Message-ID: <437c1bc9-8d5b-7b2a-f612-993151c23f7c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+Hi,
 
-When booting a veyron-speedy device with the rk3288 and kernel 4.19 I get the following errors regarding the mmc and invalid clk rates:
+Some comments below.
 
+On 26/10/2018 15.24, Nava kishore Manne wrote:
+> Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
+> The zynqmp reset-controller has the ability to reset lines
+> connected to different blocks and peripheral in the Soc.
+>
+> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> ---
+> Changes for v2:
+> 		-Fixed some minor coding issues as suggested
+> 		 by philipp.
+>
+> Changes for v1:
+> 		-None.
+>
+> Changes for RFC-V3:
+> 		-None.
+>
+> Changes for RFC-V2:
+> 		-Moved eemi_ops into a priv struct as suggested
+> 		 by philipp.
+>
+>   drivers/reset/Makefile       |   1 +
+>   drivers/reset/reset-zynqmp.c | 114 +++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 115 insertions(+)
+>   create mode 100644 drivers/reset/reset-zynqmp.c
+>
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 4243c38..eb315d1 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -24,4 +24,5 @@ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+>   obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+>   obj-$(CONFIG_RESET_UNIPHIER_USB3) += reset-uniphier-usb3.o
+>   obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
+> +obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
+>   
+> diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
+> new file mode 100644
+> index 0000000..cff63d9
+> --- /dev/null
+> +++ b/drivers/reset/reset-zynqmp.c
+> @@ -0,0 +1,114 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2018 Xilinx, Inc.
+> + *
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/firmware/xlnx-zynqmp.h>
+> +
+> +#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
+Probably should be:
 
-[??? 0.000000] NR_IRQS: 16, nr_irqs: 16, preallocated irqs: 16
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] rockchip_mmc_get_phase: invalid clk rate
-[??? 0.000000] arch_timer: cp15 timer(s) running at 24.00MHz (phys).
++#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 1)
 
-commit c420c1e4db229a5d18faed4b58c01ef89027d5b7 added these error messages.
+or if START is moved one forward:
 
-Adding a call to clk_hw_get_name reveals the clocks throwing these errors are:
-sdmmc_drv
-sdmmv_sample
-sdio0_drv
-sdio0_sample
-sdio1_drv
-sdio1_sample
-emmc_drv
-emmc_sample
++#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START)
 
+> +#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
+If you move start forward then you don't need +1 here. Or you can get 
+rid of the define altogether and just use ZYNQMP_PM_RESET_START in it's 
+place..
 
-Looking at the git logs, other platforms just need to change what closks the sdio and emmc used
-in the respective clk-rk3XXX.c so I'm assuming something in this section of clk-rk3288.c is wrong:
-
-??? COMPOSITE(SCLK_SDMMC, "sclk_sdmmc", mux_mmc_src_p, 0,
-??? ??? ??? RK3288_CLKSEL_CON(11), 6, 2, MFLAGS, 0, 6, DFLAGS,
-??? ??? ??? RK3288_CLKGATE_CON(13), 0, GFLAGS),
-??? COMPOSITE(SCLK_SDIO0, "sclk_sdio0", mux_mmc_src_p, 0,
-??? ??? ??? RK3288_CLKSEL_CON(12), 6, 2, MFLAGS, 0, 6, DFLAGS,
-??? ??? ??? RK3288_CLKGATE_CON(13), 1, GFLAGS),
-??? COMPOSITE(SCLK_SDIO1, "sclk_sdio1", mux_mmc_src_p, 0,
-??? ??? ??? RK3288_CLKSEL_CON(34), 14, 2, MFLAGS, 8, 6, DFLAGS,
-??? ??? ??? RK3288_CLKGATE_CON(13), 2, GFLAGS),
-??? COMPOSITE(SCLK_EMMC, "sclk_emmc", mux_mmc_src_p, 0,
-??? ??? ??? RK3288_CLKSEL_CON(12), 14, 2, MFLAGS, 8, 6, DFLAGS,
-??? ??? ??? RK3288_CLKGATE_CON(13), 3, GFLAGS),
-
-??? MMC(SCLK_SDMMC_DRV,??? "sdmmc_drv",??? "sclk_sdmmc", RK3288_SDMMC_CON0, 1),
-??? MMC(SCLK_SDMMC_SAMPLE, "sdmmc_sample", "sclk_sdmmc", RK3288_SDMMC_CON1, 0),
-
-??? MMC(SCLK_SDIO0_DRV,??? "sdio0_drv",??? "sclk_sdio0", RK3288_SDIO0_CON0, 1),
-??? MMC(SCLK_SDIO0_SAMPLE, "sdio0_sample", "sclk_sdio0", RK3288_SDIO0_CON1, 0),
-
-??? MMC(SCLK_SDIO1_DRV,??? "sdio1_drv",??? "sclk_sdio1", RK3288_SDIO1_CON0, 1),
-??? MMC(SCLK_SDIO1_SAMPLE, "sdio1_sample", "sclk_sdio1", RK3288_SDIO1_CON1, 0),
-
-??? MMC(SCLK_EMMC_DRV,???? "emmc_drv",???? "sclk_emmc",? RK3288_EMMC_CON0,? 1),
-??? MMC(SCLK_EMMC_SAMPLE,? "emmc_sample",? "sclk_emmc",? RK3288_EMMC_CON1,? 0),
-
-Should sclk_* be clk_*?
-
-Thanks all.
+Thanks,
+Vesa J??skel?inen
