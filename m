@@ -1,76 +1,40 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 25 Oct 2018 09:16:01 -0700
-Subject: [PATCH v8 08/12] mfd: intel-peci-client: Add PECI client MFD
- driver
-In-Reply-To: <20181025053030.GD4939@dell>
-References: <20180918215124.14003-1-jae.hyun.yoo@linux.intel.com>
- <20180918215124.14003-9-jae.hyun.yoo@linux.intel.com>
- <20181024105903.GB4939@dell>
- <db7570cb-8f63-b551-d119-c54270ce6139@linux.intel.com>
- <20181025053030.GD4939@dell>
-Message-ID: <509c4c0e-eabb-2276-3ffd-3fc675801142@linux.intel.com>
+From: c.manszewski@samsung.com (Christoph Manszewski)
+Date: Thu, 25 Oct 2018 18:21:51 +0200
+Subject: [PATCH v4 0/2] drm/exynos: decon: Add properties
+References: <CGME20181025162201eucas1p1033325147e317799e7c174345c9ab333@eucas1p1.samsung.com>
+Message-ID: <20181025162201eucas1p1033325147e317799e7c174345c9ab333~g5oKoWGPR1757217572eucas1p1Y@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2018 10:30 PM, Lee Jones wrote:
-> On Wed, 24 Oct 2018, Jae Hyun Yoo wrote:
->> On 10/24/2018 3:59 AM, Lee Jones wrote:
->>> On Tue, 18 Sep 2018, Jae Hyun Yoo wrote:
->>>
->>>> This commit adds PECI client MFD driver.
->>>>
->>
->> <snip>
-> 
-> [...]
-> 
->>>> +bool peci_temp_need_update(struct temp_data *temp)
->>>> +{
->>>> +	if (temp->valid &&
->>>> +	    time_before(jiffies, temp->last_updated + UPDATE_INTERVAL))
->>>> +		return false;
->>>> +
->>>> +	return true;
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(peci_temp_need_update);
->>>> +
->>>> +void peci_temp_mark_updated(struct temp_data *temp)
->>>> +{
->>>> +	temp->valid = 1;
->>>> +	temp->last_updated = jiffies;
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(peci_temp_mark_updated);
->>>
->>> These are probably better suited as inline functions to be placed in
->>> a header file.  No need to export them, since they only use their own
->>> data.
-> 
-> Also move them into the HWMON header file.
-> 
-> They have no business in MFD.
-> 
+Hello,
 
-Agreed. I'll move them into the HWMON header.
+This patch series adds two new configurable properties
+to exynos5433_drm_decon.
 
-> [...]
-> 
->>>> +int peci_client_rd_pkg_cfg_cmd(struct peci_mfd *priv, u8 mbx_idx,
->>>
->>> This is gobbledegook.  What's rd?  Read?
->>>
->>
->> Yes, the 'rd' means 'read'. I intended to keep command names as listed
->> in the PECI specification such as RdPkgConfig, WrPkgConfig and so on.
->> Should I change it to 'peci_client_read_package_config_command' ?
-> 
-> I looks/reads a lot nicer, don't you think?
-> 
+Patch 1 add window alpha property.
+Patch 2 add pixel blend mode property.
 
-Okay. I'll change it too.
+Regards,
+Chris
 
-Thanks again for your review, Lee!
+Changes in v4:
+- set blend equation for DRM_MODE_BLEND_PIXEL_NONE explicitly,
 
-Jae
+Changes in v3: 
+- fix compilation error,
 
-> [...]
-> 
+Changes in v2: 
+- add premultiplied pixel blend mode (i.e. make it functional),
+- correct minor issues from v1, 
+- refactor code in order to adapt to above changes.
+
+Christoph Manszewski (2):
+  drm/exynos: decon: Make plane alpha configurable
+  drm/exynos: decon: Make pixel blend mode configurable
+
+ drivers/gpu/drm/exynos/exynos5433_drm_decon.c | 82 ++++++++++++++++++++++++++-
+ drivers/gpu/drm/exynos/regs-decon5433.h       | 22 +++++++
+ 2 files changed, 102 insertions(+), 2 deletions(-)
+
+-- 
+2.7.4
