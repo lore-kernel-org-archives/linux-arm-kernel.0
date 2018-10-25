@@ -1,39 +1,58 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 24 Oct 2018 19:10:25 -0500
-Subject: [PATCH] arm64: dts: ls1012a: Add FRWY-LS1012A device tree binding
-In-Reply-To: <20181016074006.10079-1-pramod.kumar_1@nxp.com>
-References: <20181016074006.10079-1-pramod.kumar_1@nxp.com>
-Message-ID: <20181025001025.GA11498@bogus>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 24 Oct 2018 17:14:16 -0700
+Subject: [PATCH 1/2] perf tools: Make find_vdso_map() more modular
+In-Reply-To: <20181025000905.6095-2-f.fainelli@gmail.com>
+References: <20181025000905.6095-1-f.fainelli@gmail.com>
+ <20181025000905.6095-2-f.fainelli@gmail.com>
+Message-ID: <86f8ae1e-b50b-559c-11a4-e0c5f311f92a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 07:39:35AM +0000, Pramod Kumar wrote:
-> LS1012A-FRWY is an ls1012a based SoC board
-> Add device tree binding for LS1012A-FRWY board
-
-Subject for bindings should be 'dt-bindings: ...'
-
+On 10/24/18 5:09 PM, Florian Fainelli wrote:
+> In preparation for checking that the vectors page on the ARM
+> architecture, refactor the find_vdso_map() function to accept finding an
+> arbitrary string and create a dedicated helper function for that under
+> util/find-map.c and update find_vdso_map() to use it.
 > 
-> Signed-off-by: Pramod Kumar <pramod.kumar_1@nxp.com>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+>  tools/perf/util/find-map.c      | 31 +++++++++++++++++++++++++++++++
+>  tools/perf/util/find-vdso-map.c | 30 +++---------------------------
+>  2 files changed, 34 insertions(+), 27 deletions(-)
+>  create mode 100644 tools/perf/util/find-map.c
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index 8a1baa2b9723..1eda1f79eb43 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -155,6 +155,10 @@ LS1012A ARMv8 based FRDM Board
->  Required root node properties:
->      - compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
->  
-> +LS1012A ARMv8 based FRWY Board
-> +Required root node properties:
-> +    - compatible = "fsl,ls1012a-frwy", "fsl,ls1012a";
+> diff --git a/tools/perf/util/find-map.c b/tools/perf/util/find-map.c
+> new file mode 100644
+> index 000000000000..42533fc21108
+> --- /dev/null
+> +++ b/tools/perf/util/find-map.c
+> @@ -0,0 +1,31 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +static int find_map(void **start, void **end, const char *name)
+> +{
+> +	FILE *maps;
+> +	char line[128];
+> +	int found = 0;
 > +
->  LS1012A ARMv8 based QDS Board
->  Required root node properties:
->      - compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
-> -- 
-> 2.17.1
-> 
+> +	maps = fopen("/proc/self/maps", "r");
+> +	if (!maps) {
+> +		fprintf(stderr, "vdso: cannot open maps\n");
+> +		return -1;
+> +	}
+> +
+> +	while (!found && fgets(line, sizeof(line), maps)) {
+> +		int m = -1;
+> +
+> +		/* We care only about private r-x mappings. */
+> +		if (2 != sscanf(line, "%p-%p r-xp %*x %*x:%*x %*u %n",
+> +				start, end, &m))
+> +			continue;
+> +		if (m < 0)
+> +			continue;
+> +
+> +		if (!strncmp(&line[m], name, sizeof(name) - 1))
+
+Meh, this should be strlen() now, but I would like to hear comments
+before submitting a v2 of this anyway. Thanks!
+-- 
+Florian
