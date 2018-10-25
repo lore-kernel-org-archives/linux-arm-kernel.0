@@ -1,174 +1,37 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 25 Oct 2018 17:29:34 +0200
-Subject: [PATCH RFC 10/11] staging: bcm2835-camera: Provide more specific
- probe error messages
-In-Reply-To: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1540481375-15952-11-git-send-email-stefan.wahren@i2se.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Oct 2018 17:38:08 +0200
+Subject: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
+In-Reply-To: <1540403734-137721-2-git-send-email-lsun@mellanox.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1540403734-137721-1-git-send-email-lsun@mellanox.com>
+ <1540403734-137721-2-git-send-email-lsun@mellanox.com>
+Message-ID: <CAK8P3a1jTsvzYhS4CxvmK6tOgPn_g7=1S4xAcca2K4v70vhyEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there is only a catch-all info message which print the
-relevant error code without any context. So add more specific error
-messages in order to narrow down possible issues.
+On 10/24/18, Liming Sun <lsun@mellanox.com> wrote:
+> This commit introduces config option for Mellanox BlueField SoC,
+> which can be used to build the SoC specific drivers, and enables
+> it by default in configs/defconfig.
+>
+> Reviewed-by: David Woods <dwoods@mellanox.com>
+> Signed-off-by: Liming Sun <lsun@mellanox.com>
+> ---
+>  arch/arm64/Kconfig.platforms | 6 ++++++
+>  arch/arm64/configs/defconfig | 1 +
+>  2 files changed, 7 insertions(+)
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 58 +++++++++++++++-------
- 1 file changed, 39 insertions(+), 19 deletions(-)
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-index cd773eb..84ca22d 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-@@ -1539,8 +1539,11 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
- 	struct vchiq_mmal_component  *camera;
- 
- 	ret = vchiq_mmal_init(&dev->instance);
--	if (ret < 0)
-+	if (ret < 0) {
-+		v4l2_err(&dev->v4l2_dev, "%s: vchiq mmal init failed %d\n",
-+			 __func__, ret);
- 		return ret;
-+	}
- 
- 	/* get the camera component ready */
- 	ret = vchiq_mmal_component_init(dev->instance, "ril.camera",
-@@ -1549,7 +1552,9 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
- 		goto unreg_mmal;
- 
- 	camera = dev->component[MMAL_COMPONENT_CAMERA];
--	if (camera->outputs <  MMAL_CAMERA_PORT_COUNT) {
-+	if (camera->outputs < MMAL_CAMERA_PORT_COUNT) {
-+		v4l2_err(&dev->v4l2_dev, "%s: too few camera outputs %d needed %d\n",
-+			 __func__, camera->outputs, MMAL_CAMERA_PORT_COUNT);
- 		ret = -EINVAL;
- 		goto unreg_camera;
- 	}
-@@ -1557,8 +1562,11 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
- 	ret = set_camera_parameters(dev->instance,
- 				    camera,
- 				    dev);
--	if (ret < 0)
-+	if (ret < 0) {
-+		v4l2_err(&dev->v4l2_dev, "%s: unable to set camera parameters: %d\n",
-+			 __func__, ret);
- 		goto unreg_camera;
-+	}
- 
- 	/* There was an error in the firmware that meant the camera component
- 	 * produced BGR instead of RGB.
-@@ -1647,8 +1655,8 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
- 
- 	if (dev->component[MMAL_COMPONENT_PREVIEW]->inputs < 1) {
- 		ret = -EINVAL;
--		pr_debug("too few input ports %d needed %d\n",
--			 dev->component[MMAL_COMPONENT_PREVIEW]->inputs, 1);
-+		v4l2_err(&dev->v4l2_dev, "%s: too few input ports %d needed %d\n",
-+			 __func__, dev->component[MMAL_COMPONENT_PREVIEW]->inputs, 1);
- 		goto unreg_preview;
- 	}
- 
-@@ -1661,8 +1669,8 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
- 
- 	if (dev->component[MMAL_COMPONENT_IMAGE_ENCODE]->inputs < 1) {
- 		ret = -EINVAL;
--		v4l2_err(&dev->v4l2_dev, "too few input ports %d needed %d\n",
--			 dev->component[MMAL_COMPONENT_IMAGE_ENCODE]->inputs,
-+		v4l2_err(&dev->v4l2_dev, "%s: too few input ports %d needed %d\n",
-+			 __func__, dev->component[MMAL_COMPONENT_IMAGE_ENCODE]->inputs,
- 			 1);
- 		goto unreg_image_encoder;
- 	}
-@@ -1676,8 +1684,8 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
- 
- 	if (dev->component[MMAL_COMPONENT_VIDEO_ENCODE]->inputs < 1) {
- 		ret = -EINVAL;
--		v4l2_err(&dev->v4l2_dev, "too few input ports %d needed %d\n",
--			 dev->component[MMAL_COMPONENT_VIDEO_ENCODE]->inputs,
-+		v4l2_err(&dev->v4l2_dev, "%s: too few input ports %d needed %d\n",
-+			 __func__, dev->component[MMAL_COMPONENT_VIDEO_ENCODE]->inputs,
- 			 1);
- 		goto unreg_vid_encoder;
- 	}
-@@ -1706,8 +1714,11 @@ static int mmal_init(struct bm2835_mmal_dev *dev)
- 					      sizeof(enable));
- 	}
- 	ret = bm2835_mmal_set_all_camera_controls(dev);
--	if (ret < 0)
-+	if (ret < 0) {
-+		v4l2_err(&dev->v4l2_dev, "%s: failed to set all camera controls: %d\n",
-+			 __func__, ret);
- 		goto unreg_vid_encoder;
-+	}
- 
- 	return 0;
- 
-@@ -1873,21 +1884,29 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
- 		snprintf(dev->v4l2_dev.name, sizeof(dev->v4l2_dev.name),
- 			 "%s", BM2835_MMAL_MODULE_NAME);
- 		ret = v4l2_device_register(NULL, &dev->v4l2_dev);
--		if (ret)
-+		if (ret) {
-+			dev_err(&pdev->dev, "%s: could not register V4L2 device: %d\n",
-+				__func__, ret);
- 			goto free_dev;
-+		}
- 
- 		/* setup v4l controls */
- 		ret = bm2835_mmal_init_controls(dev, &dev->ctrl_handler);
--		if (ret < 0)
-+		if (ret < 0) {
-+			v4l2_err(&dev->v4l2_dev, "%s: could not init controls: %d\n",
-+				__func__, ret);
- 			goto unreg_dev;
-+		}
- 		dev->v4l2_dev.ctrl_handler = &dev->ctrl_handler;
- 
- 		/* mmal init */
- 		dev->instance = instance;
- 		ret = mmal_init(dev);
--		if (ret < 0)
-+		if (ret < 0) {
-+			v4l2_err(&dev->v4l2_dev, "%s: mmal init failed: %d\n",
-+				 __func__, ret);
- 			goto unreg_dev;
--
-+		}
- 		/* initialize queue */
- 		q = &dev->capture.vb_vidq;
- 		memset(q, 0, sizeof(*q));
-@@ -1905,16 +1924,19 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
- 
- 		/* initialise video devices */
- 		ret = bm2835_mmal_init_device(dev, &dev->vdev);
--		if (ret < 0)
-+		if (ret < 0) {
-+			v4l2_err(&dev->v4l2_dev, "%s: could not init device: %d\n",
-+				 __func__, ret);
- 			goto unreg_dev;
-+		}
- 
- 		/* Really want to call vidioc_s_fmt_vid_cap with the default
- 		 * format, but currently the APIs don't join up.
- 		 */
- 		ret = mmal_setup_components(dev, &default_v4l2_format);
- 		if (ret < 0) {
--			v4l2_err(&dev->v4l2_dev,
--				 "%s: could not setup components\n", __func__);
-+			v4l2_err(&dev->v4l2_dev, "%s: could not setup components: %d\n",
-+				 __func__, ret);
- 			goto unreg_dev;
- 		}
- 
-@@ -1938,8 +1960,6 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
- 		bcm2835_cleanup_instance(gdev[i]);
- 		gdev[i] = NULL;
- 	}
--	pr_info("%s: error %d while loading driver\n",
--		BM2835_MMAL_MODULE_NAME, ret);
- 
- cleanup_mmal:
- 	vchiq_mmal_finalise(instance);
--- 
-2.7.4
+I'm sorry for missing your series in the past. We should definitely merge
+the platform support soon. Do you also have device tree files for reference
+systems or even production hardware?
+
+I need to have a separate look at the fifo driver.
+
+Unfortunately, you have sent these patches during the merge window,
+which is the time during which we don't pick up new work. Let's plan
+to pick these up after 4.20-rc1, and please resend to arm at kernel.org
+if we manage to forget about it again.
+
+      Arnd
