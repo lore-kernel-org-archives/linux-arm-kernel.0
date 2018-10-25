@@ -1,36 +1,36 @@
-From: k.marinushkin@gmail.com (Kirill Marinushkin)
-Date: Thu, 25 Oct 2018 19:20:40 +0200
-Subject: [alsa-devel] [PATCH v2] staging: bcm2835-audio: interpolate audio
- delay
-In-Reply-To: <s5hftwuo4t0.wl-tiwai@suse.de>
-References: <20181022191708.GA4659@ubuntu>
- <a703f8a2-e85a-bc5b-750a-cc43ef252ba5@gmail.com>
- <EA85FEC9-B1C7-4548-88F5-F0E7BC12158E@eircom.net>
- <046aea96-e0d3-60f4-c61a-c26bb1b5c193@gmail.com>
- <B9A84822-3780-4E01-96AD-FD3B42C44B45@eircom.net>
- <9884c4f5-2343-e3a4-8d8b-dd2db404ef27@gmail.com>
- <s5hftwuo4t0.wl-tiwai@suse.de>
-Message-ID: <5bc8295a-1e38-99b5-d54c-72e920600f83@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 25 Oct 2018 10:19:54 -0700
+Subject: [PATCH 2/2] perf tests: Add a test for the ARM 32-bit [vectors]
+ page
+In-Reply-To: <20181025021013.GA30116@lunn.ch>
+References: <20181025000905.6095-1-f.fainelli@gmail.com>
+ <20181025000905.6095-3-f.fainelli@gmail.com> <20181025021013.GA30116@lunn.ch>
+Message-ID: <175fd725-a97a-c282-5aa1-952014ff9023@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Takashi, Mike,
+On 10/24/18 7:10 PM, Andrew Lunn wrote:
+> On Wed, Oct 24, 2018 at 05:09:05PM -0700, Florian Fainelli wrote:
+>> perf on ARM requires CONFIG_KUSER_HELPERS to be turned on to allow some
+>> independance with respect to the ARM CPU being used. Add a test which
+>> tries to locate the [vectors] page, created when CONFIG_KUSER_HELPERS is
+>> turned on to help asses the system's health.
+> 
+> Hi Florian
+> 
+> I've suffered the pain from missing CONFIG_KUSER_HELPERS. The
+> segfaults give little clue as to what is going wrong,and gdb is not
+> much use either.
 
-@Takashi
+If you have a working backtrace, you can typically see the virtual
+address being in 0xffff_xxxx which gives a bit of a clue, but yes, this
+is not particularly helpful.
 
-On 10/25/18 09:37, Takashi Iwai wrote:
-> Well, in the API POV, it's nothing wrong to keep hwptr sticking while
-> updating only delay value.  It implies that the hardware chip doesn't
-> provide the hwptr update.
+> 
+> What i don't see here is any clue to CONFIG_KUSER_HELPERS. If the test
+> fails, could you print a message suggesting CONFIG_KUSER_HELPERS on
+> ARM?
 
-Thank you for the clarification. Modifying `runtime->delay` from the `pointer`
-function looked wrong for me. Now I understand the motivation and the use-case.
-I will be more careful when analyzing the code which doesn't fit my expectations.
-
-@Mike
-
-I was wrong. You can ignore my comments. Please don't take them personal: it's
-all about having high-quality code in kernel.
-
-Best Regards,
-Kirill
+Sure, sounds reasonable, thanks for taking a look.
+-- 
+Florian
