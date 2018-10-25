@@ -1,59 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Oct 2018 19:03:32 +0100
-Subject: [PATCH 2/2] perf tests: Add a test for the ARM 32-bit [vectors]
- page
-In-Reply-To: <a6f5b6e7-4d3e-dd8f-4028-0ee370b11722@gmail.com>
-References: <20181025000905.6095-1-f.fainelli@gmail.com>
- <20181025000905.6095-3-f.fainelli@gmail.com>
- <20181025021013.GA30116@lunn.ch>
- <175fd725-a97a-c282-5aa1-952014ff9023@gmail.com>
- <20181025173242.GC30658@n2100.armlinux.org.uk>
- <a6f5b6e7-4d3e-dd8f-4028-0ee370b11722@gmail.com>
-Message-ID: <20181025180332.GD30658@n2100.armlinux.org.uk>
+From: natechancellor@gmail.com (Nathan Chancellor)
+Date: Thu, 25 Oct 2018 11:05:25 -0700
+Subject: [PATCH] dmaengine: xilinx_dma: Remove __aligned attribute on
+ zynqmp_dma_desc_ll
+Message-ID: <20181025180525.28378-1-natechancellor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 10:53:12AM -0700, Florian Fainelli wrote:
-> Something like this below? It does not have to be an alternative
-> solution, I would find it useful for perf to make sure the vectors page
-> is present in the virtual address space by having an explicit test. perf
-> maintains, what do you think?
+Clang warns:
 
-Yep, I'd swap the two tests merely because the check for 'sig' will be
-slightly cheaper than the mask-and-test of addr, but it probably doesn't
-make that much difference.
+drivers/dma/xilinx/zynqmp_dma.c:166:4: warning: attribute 'aligned' is
+ignored, place it after "struct" to apply attribute to type declaration
+[-Wignored-attributes]
+}; __aligned(64)
+   ^
+./include/linux/compiler_types.h:200:38: note: expanded from macro
+'__aligned'
+#define __aligned(x)            __attribute__((aligned(x)))
+                                               ^
+1 warning generated.
 
-> 
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index f4ea4c62c613..b045b48d368d 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -173,6 +173,11 @@ __do_user_fault(struct task_struct *tsk, unsigned
-> long addr,
->                 show_regs(regs);
->         }
->  #endif
-> +#ifndef CONFIG_KUSER_HELPERS
-> +       if (((addr & PAGE_MASK) == 0xffff0000) && (sig == SIGSEGV))
-> +               printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at
-> 0x%08lx\n",
-> +                      tsk->comm, addr);
-> +#endif
-> 
->         tsk->thread.address = addr;
->         tsk->thread.error_code = fsr;
-> 
-> 
-> > 
-> > BTW, I note that the help text for CONFIG_KUSER_HELPERS needs to be
-> > updated.
-> > 
-> 
-> 
-> -- 
-> Florian
+As Nick pointed out in the previous version of this patch, the author
+likely intended for this struct to be 8-byte (64-bit) aligned, not
+64-byte, which is the default. Remove the hanging __aligned attribute.
 
+Fixes: b0cc417c1637 ("dmaengine: Add Xilinx zynqmp dma engine driver support")
+Reported-by: Nick Desaulniers <ndesaulniers@google.com>
+Suggested-by: Nick Desaulniers <ndesaulniers@google.com>
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+---
+ drivers/dma/xilinx/zynqmp_dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/dma/xilinx/zynqmp_dma.c b/drivers/dma/xilinx/zynqmp_dma.c
+index c74a88b65039..73de6a6179fc 100644
+--- a/drivers/dma/xilinx/zynqmp_dma.c
++++ b/drivers/dma/xilinx/zynqmp_dma.c
+@@ -163,7 +163,7 @@ struct zynqmp_dma_desc_ll {
+ 	u32 ctrl;
+ 	u64 nxtdscraddr;
+ 	u64 rsvd;
+-}; __aligned(64)
++};
+ 
+ /**
+  * struct zynqmp_dma_desc_sw - Per Transaction structure
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.19.1
