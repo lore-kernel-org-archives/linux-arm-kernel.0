@@ -1,118 +1,133 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2018 10:38:27 +0100
-Subject: [PATCH v5 3/5] dt-bindings: mfd: rk808: Add binding information
- for RK809 and RK817.
-In-Reply-To: <1540294467-25813-4-git-send-email-tony.xie@rock-chips.com>
-References: <1540294467-25813-1-git-send-email-tony.xie@rock-chips.com>
- <1540294467-25813-4-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <20181025093827.GP4939@dell>
+From: rppt@linux.ibm.com (Mike Rapoport)
+Date: Thu, 25 Oct 2018 10:38:34 +0100
+Subject: [PATCH v2 0/2] arm64: Cut rebuild time when changing
+ CONFIG_BLK_DEV_INITRD
+In-Reply-To: <CAL_Jsq+KCOv6pXXHhHDZ+7-QUrmtMDvSjEVhK15yZ3qbnn61Ag@mail.gmail.com>
+References: <20181024193256.23734-1-f.fainelli@gmail.com>
+ <CAL_Jsq+KCOv6pXXHhHDZ+7-QUrmtMDvSjEVhK15yZ3qbnn61Ag@mail.gmail.com>
+Message-ID: <20181025093833.GA23607@rapoport-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Oct 2018, Tony Xie wrote:
-
-> Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
+On Wed, Oct 24, 2018 at 02:55:17PM -0500, Rob Herring wrote:
+> On Wed, Oct 24, 2018 at 2:33 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+> >
+> > Hi all,
+> >
+> > While investigating why ARM64 required a ton of objects to be rebuilt
+> > when toggling CONFIG_DEV_BLK_INITRD, it became clear that this was
+> > because we define __early_init_dt_declare_initrd() differently and we do
+> > that in arch/arm64/include/asm/memory.h which gets included by a fair
+> > amount of other header files, and translation units as well.
 > 
-> Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/mfd/rk808.txt | 44 +++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+> I scratch my head sometimes as to why some config options rebuild so
+> much stuff. One down, ? to go. :)
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
-> index 91b6522..d575780 100644
-> --- a/Documentation/devicetree/bindings/mfd/rk808.txt
-> +++ b/Documentation/devicetree/bindings/mfd/rk808.txt
-> @@ -3,11 +3,15 @@ RK8XX Power Management Integrated Circuit
->  The rk8xx family current members:
->  rk805
->  rk808
-> +rk809
-> +rk817
->  rk818
->  
->  Required properties:
->  - compatible: "rockchip,rk805"
->  - compatible: "rockchip,rk808"
-> +- compatible: "rockchip,rk809"
-> +- compatible: "rockchip,rk817"
->  - compatible: "rockchip,rk818"
->  - reg: I2C slave address
->  - interrupt-parent: The parent interrupt controller.
-> @@ -46,6 +50,23 @@ Optional RK808 properties:
->    the gpio controller. If DVS GPIOs aren't present, voltage changes will happen
->    very quickly with no slow ramp time.
->  
-> +Optional shared RK809 and RK817 properties:
-> +- vcc1-supply:  The input supply for DCDC_REG1
-> +- vcc2-supply:  The input supply for DCDC_REG2
-> +- vcc3-supply:  The input supply for DCDC_REG3
-> +- vcc4-supply:  The input supply for DCDC_REG4
-> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
-> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
-> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
-> +
-> +Optional RK809 properties:
-> +- vcc8-supply:  The input supply for SWITCH_REG1
-> +- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
-> +
-> +Optional RK817 properties:
-> +- vcc8-supply:  The input supply for BOOST
-> +- vcc9-supply:  The input supply for OTG_SWITCH
-> +
->  Optional RK818 properties:
->  - vcc1-supply:  The input supply for DCDC_REG1
->  - vcc2-supply:  The input supply for DCDC_REG2
-> @@ -87,6 +108,21 @@ number as described in RK808 datasheet.
->  	- SWITCH_REGn
->  		- valid values for n are 1 to 2
->  
-> +Following regulators of the RK809 and RK817 PMIC blocks are supported. Note that
-> +the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
-> +number as described in RK809 and RK817 datasheets.
-> +
-> +	- DCDC_REGn
-> +		- valid values for n are 1 to 5 for RK809.
-> +		- valid values for n are 1 to 4 for RK817.
-> +	- LDO_REGn
-> +		- valid values for n are 1 to 9 for RK809.
-> +		- valid values for n are 1 to 9 for RK817.
-> +	- SWITCH_REGn
-> +		- valid values for n are 1 to 2 for RK809.
-> +	- BOOST for RK817
-> +	- OTG_SWITCH for RK817
-> +
->  Following regulators of the RK818 PMIC block are supported. Note that
->  the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
->  number as described in RK818 datasheet.
-> @@ -99,6 +135,14 @@ number as described in RK818 datasheet.
->  	- HDMI_SWITCH
->  	- OTG_SWITCH
->  
-> +There are three pins needed to config for each of RK809 and RK817,
+> > Changing the value of CONFIG_DEV_BLK_INITRD is a common thing with build
+> > systems that generate two kernels: one with the initramfs and one
+> > without. buildroot is one of these build systems, OpenWrt is also
+> > another one that does this.
+> >
+> > This patch series proposes adding an empty initrd.h to satisfy the need
+> > for drivers/of/fdt.c to unconditionally include that file, and moves the
+> > custom __early_init_dt_declare_initrd() definition away from
+> > asm/memory.h
+> >
+> > This cuts the number of objects rebuilds from 1920 down to 26, so a
+> > factor 73 approximately.
+> >
+> > Apologies for the long CC list, please let me know how you would go
+> > about merging that and if another approach would be preferable, e.g:
+> > introducing a CONFIG_ARCH_INITRD_BELOW_START_OK Kconfig option or
+> > something like that.
+> 
+> There may be a better way as of 4.20 because bootmem is now gone and
+> only memblock is used. This should unify what each arch needs to do
+> with initrd early. We need the physical address early for memblock
+> reserving. Then later on we need the virtual address to access the
+> initrd. Perhaps we should just change initrd_start and initrd_end to
+> physical addresses (or add 2 new variables would be less invasive and
+> allow for different translation than __va()). The sanity checks and
+> memblock reserve could also perhaps be moved to a common location.
+>
+> Alternatively, given arm64 is the only oddball, I'd be fine with an
+> "if (IS_ENABLED(CONFIG_ARM64))" condition in the default
+> __early_init_dt_declare_initrd as long as we have a path to removing
+> it like the above option.
 
-Nit: "configure" in full please.
+I think arm64 does not have to redefine __early_init_dt_declare_initrd().
+Something like this might be just all we need (completely untested,
+probably it won't even compile):
 
-Actually: "It is necessary to configure three pins for both the RK809 and RK817"
-
-> +named "gpio_ts" "gpio_gt" "gpio_slp".
-> +	The gpio_gt and gpio_ts pins support the gpio function.
-> +	The gpio_slp pin is for controlling the pmic states, as below:
-> +		- reset
-> +		- power down
-> +		- sleep
-> +
->  Standard regulator bindings are used inside regulator subnodes. Check
->    Documentation/devicetree/bindings/regulator/regulator.txt
->  for more details
-
-Once that's fixed, please apply my:
-
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 9d9582c..e9ca238 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -62,6 +62,9 @@ s64 memstart_addr __ro_after_init = -1;
+ phys_addr_t arm64_dma_phys_limit __ro_after_init;
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
++
++static phys_addr_t initrd_start_phys, initrd_end_phys;
++
+ static int __init early_initrd(char *p)
+ {
+ 	unsigned long start, size;
+@@ -71,8 +74,8 @@ static int __init early_initrd(char *p)
+ 	if (*endp == ',') {
+ 		size = memparse(endp + 1, NULL);
+ 
+-		initrd_start = start;
+-		initrd_end = start + size;
++		initrd_start_phys = start;
++		initrd_end_phys = end;
+ 	}
+ 	return 0;
+ }
+@@ -407,14 +410,27 @@ void __init arm64_memblock_init(void)
+ 		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
+ 	}
+ 
+-	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
++	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) &&
++	    (initrd_start || initrd_start_phys)) {
++		/*
++		 * FIXME: ensure proper precendence between
++		 * early_initrd and DT when both are present
++		 */
++		if (initrd_start) {
++			initrd_start_phys = __phys_to_virt(initrd_start);
++			initrd_end_phys = __phys_to_virt(initrd_end);
++		} else if (initrd_start_phys) {
++			initrd_start = __va(initrd_start_phys);
++			initrd_end = __va(initrd_start_phys);
++		}
++
+ 		/*
+ 		 * Add back the memory we just removed if it results in the
+ 		 * initrd to become inaccessible via the linear mapping.
+ 		 * Otherwise, this is a no-op
+ 		 */
+-		u64 base = initrd_start & PAGE_MASK;
+-		u64 size = PAGE_ALIGN(initrd_end) - base;
++		u64 base = initrd_start_phys & PAGE_MASK;
++		u64 size = PAGE_ALIGN(initrd_end_phys) - base;
+ 
+ 		/*
+ 		 * We can only add back the initrd memory if we don't end up
+@@ -458,7 +474,7 @@ void __init arm64_memblock_init(void)
+ 	 * pagetables with memblock.
+ 	 */
+ 	memblock_reserve(__pa_symbol(_text), _end - _text);
+-#ifdef CONFIG_BLK_DEV_INITRD
++#if 0
+ 	if (initrd_start) {
+ 		memblock_reserve(initrd_start, initrd_end - initrd_start);
+ 
+ 
+> Rob
+> 
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sincerely yours,
+Mike.
