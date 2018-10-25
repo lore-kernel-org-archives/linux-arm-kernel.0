@@ -1,114 +1,31 @@
-From: jakub.kicinski@netronome.com (Jakub Kicinski)
-Date: Wed, 24 Oct 2018 15:46:13 -0700
-Subject: [PATCH v3 2/7] include: add
- setbits_leXX/clrbits_leXX/clrsetbits_leXX in linux/setbits.h
-In-Reply-To: <1540366553-18541-3-git-send-email-clabbe@baylibre.com>
-References: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
- <1540366553-18541-3-git-send-email-clabbe@baylibre.com>
-Message-ID: <20181024154613.3ecc96dc@cakuba.netronome.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 24 Oct 2018 17:09:03 -0700
+Subject: [PATCH 0/2] perf tests: Check for ARM [vectors] page
+Message-ID: <20181025000905.6095-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Oct 2018 07:35:48 +0000, Corentin Labbe wrote:
-> This patch adds setbits_le32/clrbits_le32/clrsetbits_le32 and
-> setbits_le64/clrbits_le64/clrsetbits_le64 in linux/setbits.h header.
-> 
-> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+Hi all,
 
-Did you have a look at all the functions defined in bitfield.h?
-(including the magic macro-generated ones?)  Perhaps those could be
-used here?
+I just painfully learned that perf would segfault when
+CONFIG_KUSER_HELPERS is disabled because it unconditionally makes use of
+it. This patch series adds an ARM test for that by leveraging the
+existing find_vdso_map() function and making it more generic and capable
+of location any map within /proc/self/maps.
 
-I also share the concerns about the non-atomic RMW.  Obviously correct
-beats short IMHO.
+Florian Fainelli (2):
+  perf tools: Make find_vdso_map() more modular
+  perf tests: Add a test for the ARM 32-bit [vectors] page
 
-> diff --git a/include/linux/setbits.h b/include/linux/setbits.h
-> new file mode 100644
-> index 000000000000..c82faf8d7fe4
-> --- /dev/null
-> +++ b/include/linux/setbits.h
-> @@ -0,0 +1,84 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +#ifndef __LINUX_SETBITS_H
-> +#define __LINUX_SETBITS_H
-> +
-> +#include <linux/io.h>
-> +
-> +#define __setbits(rfn, wfn, addr, set) wfn((rfn(addr) | (set)), addr)
-> +#define __clrbits(rfn, wfn, addr, mask) wfn((rfn(addr) & ~(mask)), addr)
-> +#define __clrsetbits(rfn, wfn, addr, mask, set) wfn(((rfn(addr) & ~(mask)) | (set)), addr)
-> +#define __setclrbits(rfn, wfn, addr, mask, set) wfn(((rfn(addr) | (set)) & ~(mask)), addr)
-> +
-> +#ifndef setbits_le32
-> +#define setbits_le32(addr, set) __setbits(readl, writel, addr, set)
-> +#endif
-> +#ifndef setbits_le32_relaxed
-> +#define setbits_le32_relaxed(addr, set) __setbits(readl_relaxed, writel_relaxed, \
-> +					       addr, set)
-> +#endif
-> +
-> +#ifndef clrbits_le32
-> +#define clrbits_le32(addr, mask) __clrbits(readl, writel, addr, mask)
-> +#endif
-> +#ifndef clrbits_le32_relaxed
-> +#define clrbits_le32_relaxed(addr, mask) __clrbits(readl_relaxed, writel_relaxed, \
-> +						addr, mask)
-> +#endif
-> +
-> +#ifndef clrsetbits_le32
-> +#define clrsetbits_le32(addr, mask, set) __clrsetbits(readl, writel, addr, mask, set)
-> +#endif
-> +#ifndef clrsetbits_le32_relaxed
-> +#define clrsetbits_le32_relaxed(addr, mask, set) __clrsetbits(readl_relaxed, \
-> +							   writel_relaxed, \
-> +							   addr, mask, set)
-> +#endif
-> +
-> +#ifndef setclrbits_le32
-> +#define setclrbits_le32(addr, mask, set) __setclrbits(readl, writel, addr, mask, set)
-> +#endif
-> +#ifndef setclrbits_le32_relaxed
-> +#define setclrbits_le32_relaxed(addr, mask, set) __setclrbits(readl_relaxed, \
-> +							   writel_relaxed, \
-> +							   addr, mask, set)
-> +#endif
-> +
-> +/* We cannot use CONFIG_64BIT as some x86 drivers use non-atomicwriteq() */
-> +#if defined(writeq) && defined(readq)
-> +#ifndef setbits_le64
-> +#define setbits_le64(addr, set) __setbits(readq, writeq, addr, set)
-> +#endif
-> +#ifndef setbits_le64_relaxed
-> +#define setbits_le64_relaxed(addr, set) __setbits(readq_relaxed, writeq_relaxed, \
-> +					       addr, set)
-> +#endif
-> +
-> +#ifndef clrbits_le64
-> +#define clrbits_le64(addr, mask) __clrbits(readq, writeq, addr, mask)
-> +#endif
-> +#ifndef clrbits_le64_relaxed
-> +#define clrbits_le64_relaxed(addr, mask) __clrbits(readq_relaxed, writeq_relaxed, \
-> +						addr, mask)
-> +#endif
-> +
-> +#ifndef clrsetbits_le64
-> +#define clrsetbits_le64(addr, mask, set) __clrsetbits(readq, writeq, addr, mask, set)
-> +#endif
-> +#ifndef clrsetbits_le64_relaxed
-> +#define clrsetbits_le64_relaxed(addr, mask, set) __clrsetbits(readq_relaxed, \
-> +							   writeq_relaxed, \
-> +							   addr, mask, set)
-> +#endif
-> +
-> +#ifndef setclrbits_le64
-> +#define setclrbits_le64(addr, mask, set) __setclrbits(readq, writeq, addr, mask, set)
-> +#endif
-> +#ifndef setclrbits_le64_relaxed
-> +#define setclrbits_le64_relaxed(addr, mask, set) __setclrbits(readq_relaxed, \
-> +							   writeq_relaxed, \
-> +							   addr, mask, set)
-> +#endif
-> +
-> +#endif /* writeq/readq */
-> +
-> +#endif /* __LINUX_SETBITS_H */
+ tools/perf/arch/arm/tests/Build          |  1 +
+ tools/perf/arch/arm/tests/arch-tests.c   |  4 +++
+ tools/perf/arch/arm/tests/vectors-page.c | 20 +++++++++++++++
+ tools/perf/tests/tests.h                 |  5 ++++
+ tools/perf/util/find-map.c               | 31 ++++++++++++++++++++++++
+ tools/perf/util/find-vdso-map.c          | 30 +++--------------------
+ 6 files changed, 64 insertions(+), 27 deletions(-)
+ create mode 100644 tools/perf/arch/arm/tests/vectors-page.c
+ create mode 100644 tools/perf/util/find-map.c
+
+-- 
+2.17.1
