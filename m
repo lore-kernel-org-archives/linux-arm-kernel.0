@@ -1,85 +1,65 @@
-From: dachaac@gmail.com (=?UTF-8?B?VmVzYSBKw6TDpHNrZWzDpGluZW4=?=)
-Date: Thu, 25 Oct 2018 23:53:56 +0300
-Subject: [PATCH v2 3/3] reset: reset-zynqmp: Adding support for Xilinx
- zynqmp reset controller.
-In-Reply-To: <20181026122424.30831-4-nava.manne@xilinx.com>
-References: <20181026122424.30831-1-nava.manne@xilinx.com>
- <20181026122424.30831-4-nava.manne@xilinx.com>
-Message-ID: <437c1bc9-8d5b-7b2a-f612-993151c23f7c@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 25 Oct 2018 22:58:30 +0200
+Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <f4d239df2f1333b005680f9bfdd2eba93e7f86e5.camel@baylibre.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
+ <a8d359208edfdc75cb5c6de378796f76e0572a0f.camel@baylibre.com>
+ <eda2faf2-cf06-902d-36ff-48ceafcb4a4b@amlogic.com>
+ <f4d239df2f1333b005680f9bfdd2eba93e7f86e5.camel@baylibre.com>
+Message-ID: <CAFBinCCuqUmVNdwUm7WbkHy1eWvOA5oQ5FcOuytbYNbgGcXnRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jerome,
 
-Some comments below.
-
-On 26/10/2018 15.24, Nava kishore Manne wrote:
-> Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-> The zynqmp reset-controller has the ability to reset lines
-> connected to different blocks and peripheral in the Soc.
+On Thu, Oct 25, 2018 at 2:54 PM Jerome Brunet <jbrunet@baylibre.com> wrote:
+[snip]
+> > > > +static void clk_regmap_div_init(struct clk_hw *hw)
+> > > > +{
+> > > > + struct clk_regmap *clk = to_clk_regmap(hw);
+> > > > + struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk);
+> > > > + unsigned int val;
+> > > > + int ret;
+> > > > +
+> > > > + ret = regmap_read(clk->map, div->offset, &val);
+> > > > + if (ret)
+> > > > +         return;
+> > > >
+> > > > + val &= (clk_div_mask(div->width) << div->shift);
+> > > > + if (!val)
+> > > > +         regmap_update_bits(clk->map, div->offset,
+> > > > +                            clk_div_mask(div->width) << div->shift,
+> > > > +                            clk_div_mask(div->width));
+> > >
+> > > This is wrong for several reasons:
+> > > * You should hard code the initial value in the driver.
+> > > * If shift is not 0, I doubt this will give the expected result.
+> >
+> > The value 0x00 of divider means nand clock off then read/write nand register is forbidden.
 >
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> ---
-> Changes for v2:
-> 		-Fixed some minor coding issues as suggested
-> 		 by philipp.
+> That is not entirely true, you can access the clock register or you'd be in a
+> chicken and egg situation.
 >
-> Changes for v1:
-> 		-None.
+> > Should we set the initial value in nand driver, or in sub emmc clk driver?
 >
-> Changes for RFC-V3:
-> 		-None.
->
-> Changes for RFC-V2:
-> 		-Moved eemi_ops into a priv struct as suggested
-> 		 by philipp.
->
->   drivers/reset/Makefile       |   1 +
->   drivers/reset/reset-zynqmp.c | 114 +++++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 115 insertions(+)
->   create mode 100644 drivers/reset/reset-zynqmp.c
->
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 4243c38..eb315d1 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -24,4 +24,5 @@ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
->   obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
->   obj-$(CONFIG_RESET_UNIPHIER_USB3) += reset-uniphier-usb3.o
->   obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-> +obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
->   
-> diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
-> new file mode 100644
-> index 0000000..cff63d9
-> --- /dev/null
-> +++ b/drivers/reset/reset-zynqmp.c
-> @@ -0,0 +1,114 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2018 Xilinx, Inc.
-> + *
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/firmware/xlnx-zynqmp.h>
-> +
-> +#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
-Probably should be:
+> In the nand driver, which is the consumer of the clock. see my previous comments
+> about it.
+an old version of this series had the code still in the NAND driver
+(by writing to the registers directly instead of using the clk API).
+this looks pretty much like a "sclk-div" to me (as I commented in v3
+of this series: [0]):
+- value 0 means disabled
+- positive divider values
+- (probably no duty control, but that's optional as far as I
+understand sclk-div)
+- uses max divider value when enabling the clock
 
-+#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 1)
+if switching to sclk-div works then we can get rid of some duplicate code
 
-or if START is moved one forward:
 
-+#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START)
+Regards
+Martin
 
-> +#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
-If you move start forward then you don't need +1 here. Or you can get 
-rid of the define altogether and just use ZYNQMP_PM_RESET_START in it's 
-place..
 
-Thanks,
-Vesa J??skel?inen
+[0] https://patchwork.kernel.org/patch/10607157/#22238243
