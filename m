@@ -1,40 +1,40 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 24 Oct 2018 17:17:40 -0700
-Subject: [PATCH v3 1/3] of/fdt: Absorb ARM64's __early_init_dt_declare_initrd()
+Date: Wed, 24 Oct 2018 17:17:41 -0700
+Subject: [PATCH v3 2/3] arm64: Remove custom __early_init_dt_declare_initrd
+ implenentation
 In-Reply-To: <20181025001742.6510-1-f.fainelli@gmail.com>
 References: <20181025001742.6510-1-f.fainelli@gmail.com>
-Message-ID: <20181025001742.6510-2-f.fainelli@gmail.com>
+Message-ID: <20181025001742.6510-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 is the only architecture that requires a re-definition of
-__early_init_dt_declare_initrd(), absorb its custom implemention in
-drivers/of/fdt.c.
+Now that drivers/of/fdt.c includes the proper implementation for ARM64,
+we can get rid of our custom __early_init_dt_declare_initrd()
+implementation.
 
-Suggested-by: Rob Herring <robh at kernel.org.
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/of/fdt.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/include/asm/memory.h | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 800ad252cf9c..7d316f008f22 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -896,9 +896,14 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
- static void __early_init_dt_declare_initrd(unsigned long start,
- 					   unsigned long end)
- {
-+#if IS_ENABLED(CONFIG_ARM64)
-+	initrd_start = start;
-+	initrd_end = end;
-+#else
- 	initrd_start = (unsigned long)__va(start);
- 	initrd_end = (unsigned long)__va(end);
- 	initrd_below_start_ok = 1;
-+#endif
- }
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index b96442960aea..dc3ca21ba240 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -168,14 +168,6 @@
+ #define IOREMAP_MAX_ORDER	(PMD_SHIFT)
  #endif
  
+-#ifdef CONFIG_BLK_DEV_INITRD
+-#define __early_init_dt_declare_initrd(__start, __end)			\
+-	do {								\
+-		initrd_start = (__start);				\
+-		initrd_end = (__end);					\
+-	} while (0)
+-#endif
+-
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/bitops.h>
 -- 
 2.17.1
