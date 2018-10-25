@@ -1,137 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 25 Oct 2018 13:45:56 -0500
-Subject: [PATCH v2 06/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-In-Reply-To: <20181018154017.7112-7-lokeshvutla@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-7-lokeshvutla@ti.com>
-Message-ID: <20181025184556.GA19597@bogus>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 25 Oct 2018 11:48:24 -0700
+Subject: [PATCH] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
+ disabled
+In-Reply-To: <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
+References: <20181025180957.7900-1-f.fainelli@gmail.com>
+ <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
+Message-ID: <9090f6e8-c9c7-800e-707e-07b0033ce166@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2018 at 09:10:13PM +0530, Lokesh Vutla wrote:
-> Add the DT binding documentation for Interrupt router driver.
+On 10/25/18 11:30 AM, Souptick Joarder wrote:
+> On Thu, Oct 25, 2018 at 11:40 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>
+>> Some software such as perf makes unconditional use of the special
+>> [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
+>> enabled in the kernel.
+>>
+>> Facilitate the debugging of such situations by printing a debug message
+>> to the kernel log showing the task name and the faulting address.
+>>
+>> Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  arch/arm/mm/fault.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+>> index f4ea4c62c613..f17471fbc1c4 100644
+>> --- a/arch/arm/mm/fault.c
+>> +++ b/arch/arm/mm/fault.c
+>> @@ -173,6 +173,11 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>>                 show_regs(regs);
+>>         }
+>>  #endif
+>> +#ifndef CONFIG_KUSER_HELPERS
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-> Changes since v1:
-> - Drop dependency on GIC
-> - Updated supported interrupt types.
+> Just have one doubt, if the condition is "#ifdef CONFIG_KUSER_HELPER"
+> as commit message suggests the scenario is valid when CONFIG_KUSER_HELPER
+> is enabled ? No ?
+
+#ifndef CONFIG_KUSER_HELPERS is what is intended here, when that option
+is not enabled, there is no [vectors] page provided in a program's
+virtual address space, so accesses to that virtual address will cause a
+fault which we are catching here.
+
+When CONFIG_KUSER_HELPERS is enabled, every program gets a valid vectors
+page in its virtual address space, and accessing that address would not
+cause a fault, since the page is there.
+
+Does this clarify the intent of this commit?
+
 > 
->  .../interrupt-controller/ti,sci-intr.txt      | 81 +++++++++++++++++++
->  MAINTAINERS                                   |  1 +
->  2 files changed, 82 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
-> new file mode 100644
-> index 000000000000..276bb4f0ad12
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
-> @@ -0,0 +1,81 @@
-> +Texas Instruments K3 Interrupt Router
-> +=====================================
-> +
-> +The Interrupt Router (INTR) module provides a mechanism to mux M
-> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
-> +to be driven per N output. There is one register per output (MUXCNTL_N) that
-> +controls the selection.
-> +
-> +
-> +                                 Interrupt Router
-> +                             +----------------------+
-> +                             |  Inputs     Outputs  |
-> +        +-------+            | +------+             |
-> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
-> +        +-------+            | +------+             |      controller
-> +                             |    .        +-----+  |      +-------+
-> +        +-------+            |    .        |  0  |  |----->|  IRQ  |
-> +        | INTA  |----------->|    .        +-----+  |      +-------+
-> +        +-------+            |    .          .      |
-> +                             | +------+      .      |
-> +                             | | irqM |    +-----+  |
-> +                             | +------+    |  N  |  |
-> +                             |             +-----+  |
-> +                             +----------------------+
-> +
-> +Configuration of these MUXCNTL_N registers is done by a system controller
-> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
-> +controller will keep track of the used and unused registers within the Router.
-> +Driver should request the system controller to get the range of GIC IRQs
-> +assigned to the requesting hosts. It is the drivers responsibility to keep
-> +track of Host IRQs.
-> +
-> +Communication between the host processor running an OS and the system
-> +controller happens through a protocol called TI System Control Interface
-> +(TISCI protocol). For more details refer:
-> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> +
-> +TISCI Interrupt Router Node:
-> +----------------------------
-> +- compatible:		Must be "ti,sci-intr".
-> +- interrupt-controller:	Identifies the node as an interrupt controller
-> +- #interrupt-cells:	Specifies the number of cells needed to encode an
-> +			interrupt source. The value should be 3.
-> +			First cell should contain the TISCI device ID of source
-> +			Second cell should contain the interrupt source offset
-> +			within the device
-> +			Third cell specifies the trigger type as defined
-> +			in interrupts.txt in this directory. Only level
-> +			sensitive trigger types are supported.
-> +- interrupt-parent:	phandle of irq parent for TISCI intr.
+>> +       if ((sig == SIGSEGV) && ((addr & PAGE_MASK) == 0xffff0000))
+>> +               printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at 0x%08lx\n",
+>> +                      tsk->comm, addr);
+>> +#endif
+>>
+>>         tsk->thread.address = addr;
+>>         tsk->thread.error_code = fsr;
+>> --
+>> 2.17.1
+>>
 
-This is implied and could be in a parent node.
 
-> +- ti,sci:		Phandle to TI-SCI compatible System controller node.
-> +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
-> +- ti,sci-rm-range-girq:	TISCI subtype id representing the host irqs assigned
-> +			to this interrupt router.
-
-These need a better explanation and there's still some questions on v1 
-asked of me that I tried to answer.
-
-> +
-> +Example:
-> +--------
-> +The following example demonstrates both interrupt router node and the consumer
-> +node(main gpio) on the AM654 SoC:
-> +
-> +main_intr: interrupt-controller at 1 {
-> +	compatible = "ti,sci-intr";
-> +	interrupt-controller;
-> +	interrupt-parent = <&gic>;
-> +	#interrupt-cells = <3>;
-> +	ti,sci = <&dmsc>;
-> +	ti,sci-dst-id = <56>;
-> +	ti,sci-rm-range-girq = <0x1>;
-> +};
-> +
-> +main_gpio0:  main_gpio0 at 600000 {
-
-gpio at ...
-
-> +	...
-> +	interrupt-parent = <&main_intr>;
-> +	interrupts = <57 256 IRQ_TYPE_EDGE_RISING>,
-> +			<57 257 IRQ_TYPE_EDGE_RISING>,
-> +			<57 258 IRQ_TYPE_EDGE_RISING>,
-> +			<57 259 IRQ_TYPE_EDGE_RISING>,
-> +			<57 260 IRQ_TYPE_EDGE_RISING>,
-> +			<57 261 IRQ_TYPE_EDGE_RISING>;
-> +	...
-> +};
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 06966772cad4..710cf728b9d0 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -14686,6 +14686,7 @@ F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
->  F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->  F:	drivers/clk/keystone/sci-clk.c
->  F:	drivers/reset/reset-ti-sci.c
-> +F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
->  
->  THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
->  M:	Hans Verkuil <hverkuil@xs4all.nl>
-> -- 
-> 2.19.1
-> 
+-- 
+Florian
