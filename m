@@ -1,76 +1,85 @@
-From: green.hu@gmail.com (Greentime Hu)
-Date: Thu, 25 Oct 2018 17:59:59 +0800
-Subject: [PATCH v4 0/4] nds32: Perf support
-In-Reply-To: <cover.1540430861.git.nickhu@andestech.com>
-References: <cover.1540430861.git.nickhu@andestech.com>
-Message-ID: <CAEbi=3epEazp30TE=dgVtAU8kye49a3z7uZig88q0zngxAmitg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2018 11:10:37 +0100
+Subject: [PATCH 2/2] mfd: ab8500-core: Return zero in
+ get_register_interruptible()
+In-Reply-To: <20181025084643.tz72tsh7fulsnnzq@mwanda>
+References: <20181018080534.yw2crvhguen5vajg@kili.mountain>
+ <20181025082508.GJ4939@dell>
+ <20181025084643.tz72tsh7fulsnnzq@mwanda>
+Message-ID: <20181025101037.GR4939@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nick Hu <nickhu@andestech.com> ? 2018?10?25? ?? ??10:25???
->
-> These four commits are perf supporting for nds32.
-> There are three perfomance counters in nds32, and
-> each of them can counts different events. You can
-> use 'perf list' to show the available events that
-> can be used.
->
-> Changes in V2:
->         1. Change the definition 'PFM_CTL_xxx' to
-> array form.
->
->         2. Simplify the PMU driver.
->
->         3. Stop all counters when handling irq
-> caused by performance counters overflow.
->
->         4. Rename the compatible string in
-> devicetree.
->
-> Changes in V3:
->         Fix the typo in Documentation/devicetree/
-> bindings/nds32/pmu.txt.
->
-> Changes in V4:
->         Move 'Documentation/devicetree/bindings/nds32/pmu.txt'
-> to 'Documentation/devicetree/bindings/perf/nds32v3-pmu.txt'.
->
-> Nickhu (4):
->   nds32: Fix bug in bitfield.h
->   nds32: Perf porting
->   nds32: Add perf call-graph support.
->   nds32: Add document for NDS32 PMU.
->
->  .../devicetree/bindings/perf/nds32v3-pmu.txt  |   17 +
->  arch/nds32/Kconfig                            |    1 +
->  arch/nds32/boot/dts/ae3xx.dts                 |    5 +
->  arch/nds32/include/asm/Kbuild                 |    1 +
->  arch/nds32/include/asm/bitfield.h             |    4 +-
->  arch/nds32/include/asm/perf_event.h           |   16 +
->  arch/nds32/include/asm/pmu.h                  |  386 +++++
->  arch/nds32/include/asm/stacktrace.h           |   39 +
->  arch/nds32/kernel/Makefile                    |    3 +-
->  arch/nds32/kernel/perf_event_cpu.c            | 1522 +++++++++++++++++
->  arch/nds32/mm/fault.c                         |   13 +-
->  tools/include/asm/barrier.h                   |    2 +
->  tools/perf/arch/nds32/Build                   |    1 +
->  tools/perf/arch/nds32/util/Build              |    1 +
->  tools/perf/arch/nds32/util/header.c           |   29 +
->  tools/perf/pmu-events/arch/nds32/mapfile.csv  |   15 +
->  .../pmu-events/arch/nds32/n13/atcpmu.json     |  290 ++++
->  17 files changed, 2337 insertions(+), 8 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/perf/nds32v3-pmu.txt
->  create mode 100644 arch/nds32/include/asm/perf_event.h
->  create mode 100644 arch/nds32/include/asm/pmu.h
->  create mode 100644 arch/nds32/include/asm/stacktrace.h
->  create mode 100644 arch/nds32/kernel/perf_event_cpu.c
->  create mode 100644 tools/perf/arch/nds32/Build
->  create mode 100644 tools/perf/arch/nds32/util/Build
->  create mode 100644 tools/perf/arch/nds32/util/header.c
->  create mode 100644 tools/perf/pmu-events/arch/nds32/mapfile.csv
->  create mode 100644 tools/perf/pmu-events/arch/nds32/n13/atcpmu.json
->
-Hi Nick,
+On Thu, 25 Oct 2018, Dan Carpenter wrote:
 
-Thank you.
-Acked-by: Greentime Hu <greentime@andestech.com>
+> On Thu, Oct 25, 2018 at 09:25:08AM +0100, Lee Jones wrote:
+> > On Thu, 18 Oct 2018, Dan Carpenter wrote:
+> > 
+> > > I just noticed this in review.  The get_register_interruptible() should
+> > > return zero on success but it instead returns the value that it read.
+> > > 
+> > > I looked at all the places that called this directly and they check for
+> > > negatives and treat greater than or equal to zero as success.  This
+> > > function is also called as the ->get_register() function pointer.  Some
+> > > of the callers of that treat all non-zero returns as errors, so it's
+> > > possible that this bug causes some problems in real life.
+> > > 
+> > > I could not find any callers that rely on the current behavior, and this
+> > > makes the function align with the get_register_interruptible() in
+> > > ab3100-core.c.
+> > > 
+> > > Fixes: 47c1697508f2 ("mfd: Align ab8500 with the abx500 interface")
+> > > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> > > ---
+> > >  drivers/mfd/ab8500-core.c | 10 ++++++----
+> > >  1 file changed, 6 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+> > > index 30d09d177171..66458a329127 100644
+> > > --- a/drivers/mfd/ab8500-core.c
+> > > +++ b/drivers/mfd/ab8500-core.c
+> > > @@ -252,16 +252,18 @@ static int get_register_interruptible(struct ab8500 *ab8500, u8 bank,
+> > >  	mutex_lock(&ab8500->lock);
+> > >  
+> > >  	ret = ab8500->read(ab8500, addr);
+> > > -	if (ret < 0)
+> > > +	if (ret < 0) {
+> > >  		dev_err(ab8500->dev, "failed to read reg %#x: %d\n",
+> > >  			addr, ret);
+> > > -	else
+> > > -		*value = ret;
+> > > +		return ret;
+> > 
+> > Looks like you just broke the AB8500.
+> > 
+> 
+> 
+> Oh wow.  I screwed up the locking.
+> 
+> 
+> > What is it you're trying to achieve here?  Apart from attempting to
+> > return with the mutex still held, what semantics have you changed?
+> > 
+> 
+> Sorry that wasn't clear.  Here is the relevant bits from the commit
+> message.
+> 
+> > > function is also called as the ->get_register() function pointer.  Some
+> > > of the callers of that treat all non-zero returns as errors, so it's
+> > > possible that this bug causes some problems in real life.
+> 
+> We're returning positive non-zero values on success instead of zero.
+> It's definitely a bug, but I'm not sure if it has an impact in real
+> life.
+
+Oh, I see.
+
+Maybe:
+
+	return (ret > 0) ? 0 : ret;
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
