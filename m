@@ -1,36 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 25 Oct 2018 14:15:08 -0500
-Subject: [PATCH 2/3] dt-bindings: nvmem: Add bindings for ZynqMP nvmem
- driver
-In-Reply-To: <20181020083603.27602-3-nava.manne@xilinx.com>
-References: <20181020083603.27602-1-nava.manne@xilinx.com>
- <20181020083603.27602-3-nava.manne@xilinx.com>
-Message-ID: <20181025191508.GA26613@bogus>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 25 Oct 2018 21:26:21 +0200
+Subject: [PATCH v2] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
+ disabled
+In-Reply-To: <20181025190110.7564-1-f.fainelli@gmail.com>
+References: <20181025190110.7564-1-f.fainelli@gmail.com>
+Message-ID: <20181025192621.GB16785@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2018 at 02:06:02PM +0530, Nava kishore Manne wrote:
-> Add documentation to describe Xilinx ZynqMP nvmem driver
-> bindings.
+On Thu, Oct 25, 2018 at 12:01:08PM -0700, Florian Fainelli wrote:
+> Some software such as perf makes unconditional use of the special
+> [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
+> enabled in the kernel.
 > 
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> ---
-> Changes for v1:
-> 		Created a Seperate(New) DT binding file as
-> 		suggested by Rob.
-> 
-> Changes for RFC-V3:
->                 -None.
-> 
-> Changes for RFC-V2:
->                 -Moved nvmem_firmware node as a child to
->                  firwmare node.
-> 
->  .../bindings/nvmem/xlnx,zynqmp-nvmem.txt           | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
+> Facilitate the debugging of such situations by printing a debug message
+> to the kernel log showing the task name and the faulting address.
 
-Before I okay any ZynqMP firmware related bindings, I want to see a 
-complete binding, not things added one by one.
+Hi Florian
 
-Rob
+Nice. I wish we had this a couple of months ago.
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+Thanks
+    Andrew
