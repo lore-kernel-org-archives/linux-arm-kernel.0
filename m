@@ -1,59 +1,232 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 25 Oct 2018 14:59:07 -0500
-Subject: [PATCH] spi: uniphier: fix incorrect property items
-In-Reply-To: <1540373669-18969-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1540373669-18969-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <20181025195906.GA22391@bogus>
+From: dachaac@gmail.com (=?UTF-8?B?VmVzYSBKw6TDpHNrZWzDpGluZW4=?=)
+Date: Thu, 25 Oct 2018 23:43:24 +0300
+Subject: [PATCH v2 1/3] firmware: xilinx: Add reset API's
+In-Reply-To: <20181026122424.30831-2-nava.manne@xilinx.com>
+References: <20181026122424.30831-1-nava.manne@xilinx.com>
+ <20181026122424.30831-2-nava.manne@xilinx.com>
+Message-ID: <e5e8a803-0563-b52b-668e-010256705e2e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 06:34:29PM +0900, Keiji Hayashibara wrote:
-> This commit fixes incorrect property because it was different
-> from the actual.
-> The parameters of '#address-cells' and '#size-cells' were removed,
-> and 'interrupts', 'pinctrl-names' and 'pinctrl-0' were added.
-> 
-> Fixes: 4dcd5c2781f3 ("spi: add DT bindings for UniPhier SPI controller")
-> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+Hi,
+
+Some comments below.
+
+On 26/10/2018 15.24, Nava kishore Manne wrote:
+> This Patch Adds reset API's to support release, assert
+> and status functionalities by using firmware interface.
+>
+> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 > ---
->  Documentation/devicetree/bindings/spi/spi-uniphier.txt | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-uniphier.txt b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-> index 504a4ec..b04e66a 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-> @@ -5,18 +5,20 @@ UniPhier SoCs have SCSSI which supports SPI single channel.
->  Required properties:
->   - compatible: should be "socionext,uniphier-scssi"
->   - reg: address and length of the spi master registers
-> - - #address-cells: must be <1>, see spi-bus.txt
-> - - #size-cells: must be <0>, see spi-bus.txt
+> Changes for v2:
+> 		-None.
+>
+> Changes for v1:
+> 		-None.
+>
+> Changes for RFC-V3:
+> 		-None.
+>
+> Changes for RFC-V2:
+> 		-New patch.
+>
+>   drivers/firmware/xilinx/zynqmp.c     |  40 +++++++++++
+>   include/linux/firmware/xlnx-zynqmp.h | 136 +++++++++++++++++++++++++++++++++++
+>   2 files changed, 176 insertions(+)
+>
+> diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+> index 84b3fd2..cd13b06 100644
+> --- a/drivers/firmware/xilinx/zynqmp.c
+> +++ b/drivers/firmware/xilinx/zynqmp.c
+> @@ -428,6 +428,44 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
+>   	return ret;
+>   }
+>   
+> +/**
+> + * zynqmp_pm_reset_assert - Request setting of reset (1 - assert, 0 - release)
+> + * @reset:		Reset to be configured
+> + * @assert_flag:	Flag stating should reset be asserted (1) or
+> + *			released (0)
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_reset_assert(const enum zynqmp_pm_reset reset,
+> +				  const enum zynqmp_pm_reset_action assert_flag)
+> +{
+> +	return zynqmp_pm_invoke_fn(PM_RESET_ASSERT, reset, assert_flag,
+> +				   0, 0, NULL);
+> +}
+> +
+> +/**
+> + * zynqmp_pm_reset_get_status - Get status of the reset
+> + * @reset:      Reset whose status should be returned
+> + * @status:     Returned status
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_reset_get_status(const enum zynqmp_pm_reset reset,
+> +				      u32 *status)
+> +{
+> +	u32 ret_payload[PAYLOAD_ARG_CNT];
+> +	int ret;
+> +
+> +	if (!status)
+> +		return -EINVAL;
+> +
+> +	ret = zynqmp_pm_invoke_fn(PM_RESET_GET_STATUS, reset, 0,
+> +				  0, 0, ret_payload);
+> +	*status = ret_payload[1];
+> +
+> +	return ret;
+> +}
+> +
+>   static const struct zynqmp_eemi_ops eemi_ops = {
+>   	.get_api_version = zynqmp_pm_get_api_version,
+>   	.query_data = zynqmp_pm_query_data,
+> @@ -440,6 +478,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
+>   	.clock_getrate = zynqmp_pm_clock_getrate,
+>   	.clock_setparent = zynqmp_pm_clock_setparent,
+>   	.clock_getparent = zynqmp_pm_clock_getparent,
+> +	.reset_assert = zynqmp_pm_reset_assert,
+> +	.reset_get_status = zynqmp_pm_reset_get_status,
+>   };
+>   
+>   /**
+> diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+> index 015e130..29d83ca 100644
+> --- a/include/linux/firmware/xlnx-zynqmp.h
+> +++ b/include/linux/firmware/xlnx-zynqmp.h
+> @@ -34,6 +34,8 @@
+>   
+>   enum pm_api_id {
+>   	PM_GET_API_VERSION = 1,
+> +	PM_RESET_ASSERT = 17,
+> +	PM_RESET_GET_STATUS,
+>   	PM_QUERY_DATA = 35,
+>   	PM_CLOCK_ENABLE,
+>   	PM_CLOCK_DISABLE,
+> @@ -73,6 +75,137 @@ enum pm_query_id {
+>   	PM_QID_CLOCK_GET_ATTRIBUTES,
+>   };
+>   
+> +enum zynqmp_pm_reset_action {
+> +	PM_RESET_ACTION_RELEASE,
+> +	PM_RESET_ACTION_ASSERT,
+> +	PM_RESET_ACTION_PULSE,
+> +};
+> +
+> +enum zynqmp_pm_reset {
+> +	ZYNQMP_PM_RESET_START = 999,
+> +	ZYNQMP_PM_RESET_PCIE_CFG,
+Why not just do:
 
-How is removing these correct? They are needed if you have any child 
-devices.
++	ZYNQMP_PM_RESET_START = 1000,
++	ZYNQMP_PM_RESET_PCIE_CFG = 1000,
 
-> - - clocks: A phandle to the clock for the device.
-> - - resets: A phandle to the reset control for the device.
-> + - interrupts: a single interrupt specifier
-> + - pinctrl-names: should be "default"
-> + - pinctrl-0: pin control state for the default mode
-> + - clocks: a phandle to the clock for the device
-> + - resets: a phandle to the reset control for the device
->  
->  Example:
->  
->  spi0: spi at 54006000 {
->  	compatible = "socionext,uniphier-scssi";
->  	reg = <0x54006000 0x100>;
-> -	#address-cells = <1>;
-> -	#size-cells = <0>;
-> +	interrupts = <0 39 4>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_spi0>;
->  	clocks = <&peri_clk 11>;
->  	resets = <&peri_rst 11>;
->  };
-> -- 
-> 2.7.4
-> 
+This way it would not then indicate that START is actual reset line.
+
+> +	ZYNQMP_PM_RESET_PCIE_BRIDGE,
+> +	ZYNQMP_PM_RESET_PCIE_CTRL,
+> +	ZYNQMP_PM_RESET_DP,
+> +	ZYNQMP_PM_RESET_SWDT_CRF,
+> +	ZYNQMP_PM_RESET_AFI_FM5,
+> +	ZYNQMP_PM_RESET_AFI_FM4,
+> +	ZYNQMP_PM_RESET_AFI_FM3,
+> +	ZYNQMP_PM_RESET_AFI_FM2,
+> +	ZYNQMP_PM_RESET_AFI_FM1,
+> +	ZYNQMP_PM_RESET_AFI_FM0,
+> +	ZYNQMP_PM_RESET_GDMA,
+> +	ZYNQMP_PM_RESET_GPU_PP1,
+> +	ZYNQMP_PM_RESET_GPU_PP0,
+> +	ZYNQMP_PM_RESET_GPU,
+> +	ZYNQMP_PM_RESET_GT,
+> +	ZYNQMP_PM_RESET_SATA,
+> +	ZYNQMP_PM_RESET_ACPU3_PWRON,
+> +	ZYNQMP_PM_RESET_ACPU2_PWRON,
+> +	ZYNQMP_PM_RESET_ACPU1_PWRON,
+> +	ZYNQMP_PM_RESET_ACPU0_PWRON,
+> +	ZYNQMP_PM_RESET_APU_L2,
+> +	ZYNQMP_PM_RESET_ACPU3,
+> +	ZYNQMP_PM_RESET_ACPU2,
+> +	ZYNQMP_PM_RESET_ACPU1,
+> +	ZYNQMP_PM_RESET_ACPU0,
+> +	ZYNQMP_PM_RESET_DDR,
+> +	ZYNQMP_PM_RESET_APM_FPD,
+> +	ZYNQMP_PM_RESET_SOFT,
+> +	ZYNQMP_PM_RESET_GEM0,
+> +	ZYNQMP_PM_RESET_GEM1,
+> +	ZYNQMP_PM_RESET_GEM2,
+> +	ZYNQMP_PM_RESET_GEM3,
+> +	ZYNQMP_PM_RESET_QSPI,
+> +	ZYNQMP_PM_RESET_UART0,
+> +	ZYNQMP_PM_RESET_UART1,
+> +	ZYNQMP_PM_RESET_SPI0,
+> +	ZYNQMP_PM_RESET_SPI1,
+> +	ZYNQMP_PM_RESET_SDIO0,
+> +	ZYNQMP_PM_RESET_SDIO1,
+> +	ZYNQMP_PM_RESET_CAN0,
+> +	ZYNQMP_PM_RESET_CAN1,
+> +	ZYNQMP_PM_RESET_I2C0,
+> +	ZYNQMP_PM_RESET_I2C1,
+> +	ZYNQMP_PM_RESET_TTC0,
+> +	ZYNQMP_PM_RESET_TTC1,
+> +	ZYNQMP_PM_RESET_TTC2,
+> +	ZYNQMP_PM_RESET_TTC3,
+> +	ZYNQMP_PM_RESET_SWDT_CRL,
+> +	ZYNQMP_PM_RESET_NAND,
+> +	ZYNQMP_PM_RESET_ADMA,
+> +	ZYNQMP_PM_RESET_GPIO,
+> +	ZYNQMP_PM_RESET_IOU_CC,
+> +	ZYNQMP_PM_RESET_TIMESTAMP,
+> +	ZYNQMP_PM_RESET_RPU_R50,
+> +	ZYNQMP_PM_RESET_RPU_R51,
+> +	ZYNQMP_PM_RESET_RPU_AMBA,
+> +	ZYNQMP_PM_RESET_OCM,
+> +	ZYNQMP_PM_RESET_RPU_PGE,
+> +	ZYNQMP_PM_RESET_USB0_CORERESET,
+> +	ZYNQMP_PM_RESET_USB1_CORERESET,
+> +	ZYNQMP_PM_RESET_USB0_HIBERRESET,
+> +	ZYNQMP_PM_RESET_USB1_HIBERRESET,
+> +	ZYNQMP_PM_RESET_USB0_APB,
+> +	ZYNQMP_PM_RESET_USB1_APB,
+> +	ZYNQMP_PM_RESET_IPI,
+> +	ZYNQMP_PM_RESET_APM_LPD,
+> +	ZYNQMP_PM_RESET_RTC,
+> +	ZYNQMP_PM_RESET_SYSMON,
+> +	ZYNQMP_PM_RESET_AFI_FM6,
+> +	ZYNQMP_PM_RESET_LPD_SWDT,
+> +	ZYNQMP_PM_RESET_FPD,
+> +	ZYNQMP_PM_RESET_RPU_DBG1,
+> +	ZYNQMP_PM_RESET_RPU_DBG0,
+> +	ZYNQMP_PM_RESET_DBG_LPD,
+> +	ZYNQMP_PM_RESET_DBG_FPD,
+> +	ZYNQMP_PM_RESET_APLL,
+> +	ZYNQMP_PM_RESET_DPLL,
+> +	ZYNQMP_PM_RESET_VPLL,
+> +	ZYNQMP_PM_RESET_IOPLL,
+> +	ZYNQMP_PM_RESET_RPLL,
+> +	ZYNQMP_PM_RESET_GPO3_PL_0,
+> +	ZYNQMP_PM_RESET_GPO3_PL_1,
+> +	ZYNQMP_PM_RESET_GPO3_PL_2,
+> +	ZYNQMP_PM_RESET_GPO3_PL_3,
+> +	ZYNQMP_PM_RESET_GPO3_PL_4,
+> +	ZYNQMP_PM_RESET_GPO3_PL_5,
+> +	ZYNQMP_PM_RESET_GPO3_PL_6,
+> +	ZYNQMP_PM_RESET_GPO3_PL_7,
+> +	ZYNQMP_PM_RESET_GPO3_PL_8,
+> +	ZYNQMP_PM_RESET_GPO3_PL_9,
+> +	ZYNQMP_PM_RESET_GPO3_PL_10,
+> +	ZYNQMP_PM_RESET_GPO3_PL_11,
+> +	ZYNQMP_PM_RESET_GPO3_PL_12,
+> +	ZYNQMP_PM_RESET_GPO3_PL_13,
+> +	ZYNQMP_PM_RESET_GPO3_PL_14,
+> +	ZYNQMP_PM_RESET_GPO3_PL_15,
+> +	ZYNQMP_PM_RESET_GPO3_PL_16,
+> +	ZYNQMP_PM_RESET_GPO3_PL_17,
+> +	ZYNQMP_PM_RESET_GPO3_PL_18,
+> +	ZYNQMP_PM_RESET_GPO3_PL_19,
+> +	ZNQMP_PM_RESET_GPO3_PL_20,
+Typo here. Missing Y.
+
+Thanks,
+Vesa J??skel?inen
