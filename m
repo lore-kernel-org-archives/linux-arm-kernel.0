@@ -1,90 +1,108 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 25 Oct 2018 11:40:12 +0000
-Subject: [PATCH V3 6/8] arm64: dts: imx: add imx8qxp support
-In-Reply-To: <CAPDyKFoxuRaYyYHqA=hWKQpQAbQ3HCDx+dtzSaePm0T7_j6p1g@mail.gmail.com>
-References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
- <1539886483-15775-7-git-send-email-aisheng.dong@nxp.com>
- <20181018202457.GA25174@bogus>
- <DB7PR04MB42188ABE426A055E6097C03080F90@DB7PR04MB4218.eurprd04.prod.outlook.com>
- <CAPDyKFpYXo21fsHynZWTV9OOoCWGUJe2SZBR-A-dc8T8g3cLrg@mail.gmail.com>
- <AM0PR04MB4211E163C5AF713142C56A5A80F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFo=gt5eB2B8muA1iVJSin2CJsQ19zeL9pm==Ln73pFSfQ@mail.gmail.com>
- <AM0PR04MB421187B2BA549B04B67553E780F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFoxuRaYyYHqA=hWKQpQAbQ3HCDx+dtzSaePm0T7_j6p1g@mail.gmail.com>
-Message-ID: <AM0PR04MB421126852CF634123B17589180F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: jeyu@kernel.org (Jessica Yu)
+Date: Thu, 25 Oct 2018 13:42:28 +0200
+Subject: [PATCH] arm64/module: use mod->klp_info section header information
+In-Reply-To: <alpine.LSU.2.21.1810251051330.9841@pobox.suse.cz>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141652.5478C68BE1@newverein.lst.de>
+ <20181023175553.gaobskk26koft6s2@linux-8ccs>
+ <20181025080816.525dppcfrrevf6jc@pathway.suse.cz>
+ <alpine.LSU.2.21.1810251051330.9841@pobox.suse.cz>
+Message-ID: <20181025114228.4zkwvdfwrwhngwod@linux-8ccs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
-> Sent: Thursday, October 25, 2018 7:31 PM
-[...]
-> + Jon
-> 
-> [...]
-> 
-> >>
-> >> In regards to model the HW correctly. I don't believe your HW
-> >> topology have each PWM block, GPIO block, etc, in their own gate-able
-> power domain, right?
-> >> Or is it so?
-> >>
-> >
-> > First of all, thanks for your and Rob's good suggestions.
-> > I spent a lot more time to do research to try to make it better
-> > according to your suggestions. Some of your ideas absolutely helped me
-> > a lot and gave me some inspirations.
-> >
-> > Some new findings are that some of our power domains are organized in
-> > a tree was because the kernel does not support multi-power domains for one
-> device.
-> > but from HW point of view, they're identical.
-> > You can more serious situation from local tree at here:
++++ Miroslav Benes [25/10/18 11:00 +0200]:
+>On Thu, 25 Oct 2018, Petr Mladek wrote:
+>
+>> On Tue 2018-10-23 19:55:54, Jessica Yu wrote:
+>> > The arm64 module loader keeps a pointer into info->sechdrs to keep track
+>> > of section header information for .plt section(s). A pointer to the
+>> > relevent section header (struct elf64_shdr) in info->sechdrs is stored
+>> > in mod->arch.{init,core}.plt. This pointer may be accessed while
+>> > applying relocations in apply_relocate_add() for example. And unlike
+>> > normal modules, livepatch modules can call apply_relocate_add() after
+>> > module load. But the info struct (and therefore info->sechdrs) gets
+>> > freed at the end of load_module() and so mod->arch.{init,core}.plt
+>> > becomes an invalid pointer after the module is done loading.
+>> >
+>> > Luckily, livepatch modules already keep a copy of Elf section header
+>> > information in mod->klp_info. So make sure livepatch modules on arm64
+>> > have access to the section headers in klp_info and set
+>> > mod->arch.{init,core}.plt to the appropriate section header in
+>> > mod->klp_info so that they can call apply_relocate_add() even after
+>> > module load.
+>> >
+>> > diff --git a/kernel/module.c b/kernel/module.c
+>> > index f475f30eed8c..f3ac04cc9fc3 100644
+>> > --- a/kernel/module.c
+>> > +++ b/kernel/module.c
+>> > @@ -3367,6 +3367,8 @@ int __weak module_finalize(const Elf_Ehdr *hdr,
+>> >
+>> > static int post_relocation(struct module *mod, const struct load_info *info)
+>> > {
+>> > +	int err;
+>> > +
+>> > 	/* Sort exception table now relocations are done. */
+>> > 	sort_extable(mod->extable, mod->extable + mod->num_exentries);
+>> >
+>> > @@ -3377,8 +3379,18 @@ static int post_relocation(struct module *mod, const struct load_info *info)
+>> > 	/* Setup kallsyms-specific fields. */
+>> > 	add_kallsyms(mod, info);
+>> >
+>> > +	if (is_livepatch_module(mod)) {
+>> > +		err = copy_module_elf(mod, info);
+>> > +		if (err < 0)
+>> > +			return err;
+>> > +	}
+>> > +
+>> > 	/* Arch-specific module finalizing. */
+>> > -	return module_finalize(info->hdr, info->sechdrs, mod);
+>> > +	err = module_finalize(info->hdr, info->sechdrs, mod);
+>> > +	if (err < 0)
+>>
+>> 	if (err < 0 && is_livepatch_module(mod))
+>
+>Ah, right.
+>
+>> > +		free_module_elf(mod);
+>> > +
+>> > +	return err;
+>> > }
+>>
+>> Also we need to free the copied stuff in load_module() when
+>> anything called after post_relocation() fails. I think
+>> that the following would work:
+>>
+>> --- a/kernel/module.c
+>> +++ b/kernel/module.c
+>> @@ -3823,6 +3823,8 @@ static int load_module(struct load_info *info, const char __user *uargs,
+>>  	kfree(mod->args);
+>>   free_arch_cleanup:
+>>  	module_arch_cleanup(mod);
+>> +	if (is_livepatch_module(mod))
+>> +		free_module_elf(mod);
+>>   free_modinfo:
+>>  	free_modinfo(mod);
+>>   free_unload:
+>
+>Yes, we need to free it somewhere and I missed it. free_arch_cleanup seems
+>to be the correct place.
 
-[...]
+Good catches, thank you both!
 
-> >
-> > I just found your following patch perfectly addressed our issue as we
-> > do have many Devices requires to handle multi power domains.
-> > 3c095f32a92b PM / Domains: Add support for multi PM domains per device
-> > to genpd e.g. For LVDS devices, it need both LVDS and DC(Display controller)
-> PD to work.
-> 
-> Thanks for letting me know about further use cases about multiple PM domain
-> per device. Very interesting.
-> 
-> >
-> > Now i was trying to understand all of our current user case with the
-> > team, If all of them do not need a tree to address dependency issue, I may
-> remove them all from device tree.
-> > Then it would be much more clearer than before and be something like what
-> Tegra does.
-> > include/dt-bindings/power/tegra186-powergate.h
-> > drivers/soc/tegra/powergate-bpmp.c
-> 
-> Yes!
-> 
-> >
-> > For example, 1 #power-domain-cells will be enough. The first cell can
-> > be a global SCU power domain and the 2nd cell the device ID.
-> > Hopefully this can be what you and Rob want.
-> >
-> > If any good suggestions please let me know.
-> 
-> It makes perfect sense!
-> 
-> In regards to deploy support for multiple PM domains per device, you may
-> have a look at the recent work done Jon Hunter for the Tegra xHCI genpd
-> support [1].
-> 
+>> But I suggest to just move copy_module_elf() up and keep
+>> calling it from load_module() directly. It would make
+>> the error handling more clear.
+>
+>Unfortunately it is not that simple. arm64's module_finalize() uses
+>mod->klp_info with the patch, so copy_module_elf() must be called before.
+>We could move module_finalize() from post_relocation() to load_module()
+>and place copy_module_elf() between those two, but I don't know. That's up
+>to Jessica.
 
-Thanks for sharing this info.
-Will investigate it.
+Yeah, it's a stylistic preference - will shuffle those calls around
+and see what looks best. v2 to come shortly.
 
-Regards
-Dong Aisheng
+Thanks!
 
-> [...]
-> 
-> Kind regards
-> Uffe
+Jessica
