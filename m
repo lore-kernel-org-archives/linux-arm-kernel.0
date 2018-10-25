@@ -1,29 +1,22 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Thu, 25 Oct 2018 13:25:45 -0500
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Fri, 26 Oct 2018 00:00:09 +0530
 Subject: [PATCH] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
  disabled
-In-Reply-To: <20181025180957.7900-1-f.fainelli@gmail.com> (Florian Fainelli's
- message of "Thu, 25 Oct 2018 11:09:55 -0700")
+In-Reply-To: <20181025180957.7900-1-f.fainelli@gmail.com>
 References: <20181025180957.7900-1-f.fainelli@gmail.com>
-Message-ID: <87tvl9nas6.fsf@xmission.com>
+Message-ID: <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
-
+On Thu, Oct 25, 2018 at 11:40 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+>
 > Some software such as perf makes unconditional use of the special
 > [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
 > enabled in the kernel.
 >
 > Facilitate the debugging of such situations by printing a debug message
 > to the kernel log showing the task name and the faulting address.
-
-Can't someone trigger this segv deliberately and spam the kerne log?
-Doesn't this need something like printk_ratelimit or something to ensure
-this message only gets printed once?
-
-Eric
-
+>
 > Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
 > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
@@ -35,14 +28,22 @@ Eric
 > --- a/arch/arm/mm/fault.c
 > +++ b/arch/arm/mm/fault.c
 > @@ -173,6 +173,11 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
->  		show_regs(regs);
->  	}
+>                 show_regs(regs);
+>         }
 >  #endif
 > +#ifndef CONFIG_KUSER_HELPERS
-> +	if ((sig == SIGSEGV) && ((addr & PAGE_MASK) == 0xffff0000))
-> +		printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at 0x%08lx\n",
-> +		       tsk->comm, addr);
+
+Just have one doubt, if the condition is "#ifdef CONFIG_KUSER_HELPER"
+as commit message suggests the scenario is valid when CONFIG_KUSER_HELPER
+is enabled ? No ?
+
+> +       if ((sig == SIGSEGV) && ((addr & PAGE_MASK) == 0xffff0000))
+> +               printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at 0x%08lx\n",
+> +                      tsk->comm, addr);
 > +#endif
->  
->  	tsk->thread.address = addr;
->  	tsk->thread.error_code = fsr;
+>
+>         tsk->thread.address = addr;
+>         tsk->thread.error_code = fsr;
+> --
+> 2.17.1
+>
