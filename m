@@ -1,77 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Oct 2018 15:06:36 +0100
-Subject: [PATCH v3 1/3] of/fdt: Absorb ARM64's
- __early_init_dt_declare_initrd()
-In-Reply-To: <CAL_JsqK-bSu520fx-dWMyHsooOU9=24DEf6fZSudQ-QKDkXbGA@mail.gmail.com>
-References: <20181025001742.6510-1-f.fainelli@gmail.com>
- <20181025001742.6510-2-f.fainelli@gmail.com>
- <CAL_JsqK-bSu520fx-dWMyHsooOU9=24DEf6fZSudQ-QKDkXbGA@mail.gmail.com>
-Message-ID: <20181025140636.GA30658@n2100.armlinux.org.uk>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 25 Oct 2018 16:18:35 +0200
+Subject: [PATCH RFC v3 0/3] Rlimit for module space
+In-Reply-To: <d1fec827d028168047eafbac56e8e47d37cf7fb5.camel@intel.com>
+References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
+ <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
+ <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
+ <CAKv+Gu-Rk-SQVOQ63L3DkF3=EVik3pHXzpNp5r5TrgDajTM_iQ@mail.gmail.com>
+ <20181024150706.jewcclhhh756tupn@linux-8ccs>
+ <d7cb6a8c-b7d6-5c82-6721-2b5387da673f@iogearbox.net>
+ <d1fec827d028168047eafbac56e8e47d37cf7fb5.camel@intel.com>
+Message-ID: <20181025141835.GS18839@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 08:25:04AM -0500, Rob Herring wrote:
-> On Wed, Oct 24, 2018 at 7:17 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >
-> > ARM64 is the only architecture that requires a re-definition of
-> > __early_init_dt_declare_initrd(), absorb its custom implemention in
-> > drivers/of/fdt.c.
-> >
-> > Suggested-by: Rob Herring <robh@kernel.org.
-> 
-> You forgot a shift key. :)
-> 
-> > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> > ---
-> >  drivers/of/fdt.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> >
-> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> > index 800ad252cf9c..7d316f008f22 100644
-> > --- a/drivers/of/fdt.c
-> > +++ b/drivers/of/fdt.c
-> > @@ -896,9 +896,14 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
-> >  static void __early_init_dt_declare_initrd(unsigned long start,
-> >                                            unsigned long end)
-> >  {
-> > +#if IS_ENABLED(CONFIG_ARM64)
-> 
-> C code, not preprocessor please.
-> 
-> > +       initrd_start = start;
-> > +       initrd_end = end;
-> 
-> Thinking some more about this, perhaps it is better to just add the
-> *_phys variants now along side the VA variants and set them here. Then
-> the arm64 code can override the initrd_start, initrd_end, and
-> initrd_below_start_ok values.
+On Thu 25-10-18 01:01:44, Edgecombe, Rick P wrote:
+[...]
+> FWIW, cgroups seems like a better solution than rlimit to me too. Maybe you all
+> already know, but it looks like the cgroups vmalloc charge is done in the main
+> page allocator and counts against the whole kernel memory limit.
 
-Please, let's not make the age old mistake of inventing new symbols
-for stuff that already exists:
+I am not sure I understand what you are saying but let me clarify that
+vmalloc memory is accounted against memory cgroup associated with the
+user context calling vmalloc. All you need to do is to add __GFP_ACCOUNT
+to the gfp mask. The only challenge here is the charged memory life
+cycle. When does it get deallocated? In the worst case the memory is not
+tight to any user context and as such it doesn't get deallocated by
+killing all processes which could lead to memcg limit exhaustion.
 
-$ grep phys_initrd_start arch/ -rl
-arch/arm/mm/init.c
-arch/nds32/mm/init.c
-arch/unicore32/mm/init.c
-$ grep initrd_start_phys arch/ -rl
-$
+> A user may want
+> to have a higher kernel limit than the module space size, so it seems it isn't
+> enough by itself and some new limit would need to be added.
 
-Please use the "phys_initrd_start" and "phys_initrd_end" naming,
-which already exist on some architectures rather than inventing a new
-set of symbols for the same thing and then forcing arches to change.
-We could then get rid of:
-
-        /* FDT scan will populate initrd_start */
-        if (initrd_start && !phys_initrd_size) {
-                phys_initrd_start = __virt_to_phys(initrd_start);
-                phys_initrd_size = initrd_end - initrd_start;
-        }
-
-        initrd_start = initrd_end = 0;
-
-in ARM, which exists purely to cope with DT.
-
+If there is another restriction on this memory then you are right.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Michal Hocko
+SUSE Labs
