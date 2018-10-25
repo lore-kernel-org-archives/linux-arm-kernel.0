@@ -1,220 +1,76 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Thu, 25 Oct 2018 09:49:49 +0000
-Subject: [PATCH v2 4/4] dts/arm64/layerscape: Clean PCIe controller compatible
- strings
-In-Reply-To: <20181025094929.29481-1-Zhiqiang.Hou@nxp.com>
-References: <20181025094929.29481-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181025094929.29481-5-Zhiqiang.Hou@nxp.com>
+From: green.hu@gmail.com (Greentime Hu)
+Date: Thu, 25 Oct 2018 17:59:59 +0800
+Subject: [PATCH v4 0/4] nds32: Perf support
+In-Reply-To: <cover.1540430861.git.nickhu@andestech.com>
+References: <cover.1540430861.git.nickhu@andestech.com>
+Message-ID: <CAEbi=3epEazp30TE=dgVtAU8kye49a3z7uZig88q0zngxAmitg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Nick Hu <nickhu@andestech.com> ? 2018?10?25? ?? ??10:25???
+>
+> These four commits are perf supporting for nds32.
+> There are three perfomance counters in nds32, and
+> each of them can counts different events. You can
+> use 'perf list' to show the available events that
+> can be used.
+>
+> Changes in V2:
+>         1. Change the definition 'PFM_CTL_xxx' to
+> array form.
+>
+>         2. Simplify the PMU driver.
+>
+>         3. Stop all counters when handling irq
+> caused by performance counters overflow.
+>
+>         4. Rename the compatible string in
+> devicetree.
+>
+> Changes in V3:
+>         Fix the typo in Documentation/devicetree/
+> bindings/nds32/pmu.txt.
+>
+> Changes in V4:
+>         Move 'Documentation/devicetree/bindings/nds32/pmu.txt'
+> to 'Documentation/devicetree/bindings/perf/nds32v3-pmu.txt'.
+>
+> Nickhu (4):
+>   nds32: Fix bug in bitfield.h
+>   nds32: Perf porting
+>   nds32: Add perf call-graph support.
+>   nds32: Add document for NDS32 PMU.
+>
+>  .../devicetree/bindings/perf/nds32v3-pmu.txt  |   17 +
+>  arch/nds32/Kconfig                            |    1 +
+>  arch/nds32/boot/dts/ae3xx.dts                 |    5 +
+>  arch/nds32/include/asm/Kbuild                 |    1 +
+>  arch/nds32/include/asm/bitfield.h             |    4 +-
+>  arch/nds32/include/asm/perf_event.h           |   16 +
+>  arch/nds32/include/asm/pmu.h                  |  386 +++++
+>  arch/nds32/include/asm/stacktrace.h           |   39 +
+>  arch/nds32/kernel/Makefile                    |    3 +-
+>  arch/nds32/kernel/perf_event_cpu.c            | 1522 +++++++++++++++++
+>  arch/nds32/mm/fault.c                         |   13 +-
+>  tools/include/asm/barrier.h                   |    2 +
+>  tools/perf/arch/nds32/Build                   |    1 +
+>  tools/perf/arch/nds32/util/Build              |    1 +
+>  tools/perf/arch/nds32/util/header.c           |   29 +
+>  tools/perf/pmu-events/arch/nds32/mapfile.csv  |   15 +
+>  .../pmu-events/arch/nds32/n13/atcpmu.json     |  290 ++++
+>  17 files changed, 2337 insertions(+), 8 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/perf/nds32v3-pmu.txt
+>  create mode 100644 arch/nds32/include/asm/perf_event.h
+>  create mode 100644 arch/nds32/include/asm/pmu.h
+>  create mode 100644 arch/nds32/include/asm/stacktrace.h
+>  create mode 100644 arch/nds32/kernel/perf_event_cpu.c
+>  create mode 100644 tools/perf/arch/nds32/Build
+>  create mode 100644 tools/perf/arch/nds32/util/Build
+>  create mode 100644 tools/perf/arch/nds32/util/header.c
+>  create mode 100644 tools/perf/pmu-events/arch/nds32/mapfile.csv
+>  create mode 100644 tools/perf/pmu-events/arch/nds32/n13/atcpmu.json
+>
+Hi Nick,
 
-Removed the wrong compatible string "snps,dw-pcie", in case
-match incorrect driver.
-
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
-V2:
- - no change
-
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi |  2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |  6 +++---
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi |  6 +++---
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi |  6 +++---
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi |  8 ++++----
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 12 ++++--------
- 6 files changed, 18 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index 5da732f82fa0..028a6daa5597 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -475,7 +475,7 @@
- 		};
- 
- 		pcie at 3400000 {
--			compatible = "fsl,ls1012a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1012a-pcie";
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 3fed504b5381..5480d6c4c548 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -661,7 +661,7 @@
- 		};
- 
- 		pcie at 3400000 {
--			compatible = "fsl,ls1043a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1043a-pcie";
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-@@ -686,7 +686,7 @@
- 		};
- 
- 		pcie at 3500000 {
--			compatible = "fsl,ls1043a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1043a-pcie";
- 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-@@ -711,7 +711,7 @@
- 		};
- 
- 		pcie at 3600000 {
--			compatible = "fsl,ls1043a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1043a-pcie";
- 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 51cbd50012d6..519315c5d507 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -630,7 +630,7 @@
- 		};
- 
- 		pcie at 3400000 {
--			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1046a-pcie";
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-@@ -655,7 +655,7 @@
- 		};
- 
- 		pcie at 3500000 {
--			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1046a-pcie";
- 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-@@ -680,7 +680,7 @@
- 		};
- 
- 		pcie at 3600000 {
--			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1046a-pcie";
- 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index a07f612ab56b..10b253c88a16 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -512,7 +512,7 @@
- 		};
- 
- 		pcie at 3400000 {
--			compatible = "fsl,ls1088a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1088a-pcie";
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x20 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-@@ -536,7 +536,7 @@
- 		};
- 
- 		pcie at 3500000 {
--			compatible = "fsl,ls1088a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1088a-pcie";
- 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 			       0x28 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-@@ -560,7 +560,7 @@
- 		};
- 
- 		pcie at 3600000 {
--			compatible = "fsl,ls1088a-pcie", "snps,dw-pcie";
-+			compatible = "fsl,ls1088a-pcie";
- 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 			       0x30 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-index 7c882da3f6b0..a5f668d786b8 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-@@ -119,7 +119,7 @@
- };
- 
- &pcie1 {
--	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-+	compatible = "fsl,ls2088a-pcie";
- 	reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 	       0x20 0x00000000 0x0 0x00002000>; /* configuration space */
- 
-@@ -128,7 +128,7 @@
- };
- 
- &pcie2 {
--	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-+	compatible = "fsl,ls2088a-pcie";
- 	reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 	       0x28 0x00000000 0x0 0x00002000>; /* configuration space */
- 
-@@ -137,7 +137,7 @@
- };
- 
- &pcie3 {
--	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-+	compatible = "fsl,ls2088a-pcie";
- 	reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 	       0x30 0x00000000 0x0 0x00002000>; /* configuration space */
- 
-@@ -146,7 +146,7 @@
- };
- 
- &pcie4 {
--	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-+	compatible = "fsl,ls2088a-pcie";
- 	reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
- 	       0x38 0x00000000 0x0 0x00002000>; /* configuration space */
- 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index d188774a36e8..80cc40f76a4a 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -630,8 +630,7 @@
- 		};
- 
- 		pcie1: pcie at 3400000 {
--			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
--				     "snps,dw-pcie";
-+			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie";
- 			reg-names = "regs", "config";
- 			interrupts = <0 108 0x4>; /* Level high type */
- 			interrupt-names = "intr";
-@@ -651,8 +650,7 @@
- 		};
- 
- 		pcie2: pcie at 3500000 {
--			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
--				     "snps,dw-pcie";
-+			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie";
- 			reg-names = "regs", "config";
- 			interrupts = <0 113 0x4>; /* Level high type */
- 			interrupt-names = "intr";
-@@ -672,8 +670,7 @@
- 		};
- 
- 		pcie3: pcie at 3600000 {
--			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
--				     "snps,dw-pcie";
-+			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie";
- 			reg-names = "regs", "config";
- 			interrupts = <0 118 0x4>; /* Level high type */
- 			interrupt-names = "intr";
-@@ -693,8 +690,7 @@
- 		};
- 
- 		pcie4: pcie at 3700000 {
--			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
--				     "snps,dw-pcie";
-+			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie";
- 			reg-names = "regs", "config";
- 			interrupts = <0 123 0x4>; /* Level high type */
- 			interrupt-names = "intr";
--- 
-2.17.1
+Thank you.
+Acked-by: Greentime Hu <greentime@andestech.com>
