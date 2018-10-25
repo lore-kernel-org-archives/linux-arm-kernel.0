@@ -1,39 +1,74 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 25 Oct 2018 12:01:08 -0700
-Subject: [PATCH v2] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS disabled
-Message-ID: <20181025190110.7564-1-f.fainelli@gmail.com>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Fri, 26 Oct 2018 00:36:27 +0530
+Subject: [PATCH] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
+ disabled
+In-Reply-To: <9090f6e8-c9c7-800e-707e-07b0033ce166@gmail.com>
+References: <20181025180957.7900-1-f.fainelli@gmail.com>
+ <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
+ <9090f6e8-c9c7-800e-707e-07b0033ce166@gmail.com>
+Message-ID: <CAFqt6zbFPgiDBV8CEk7sOyb3j_wYYGHZOUYwfK59LHskNa7VjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some software such as perf makes unconditional use of the special
-[vectors] page which is only provided when CONFIG_KUSER_HELPERS is
-enabled in the kernel.
+On Fri, Oct 26, 2018 at 12:18 AM Florian Fainelli <f.fainelli@gmail.com> wrote:
+>
+> On 10/25/18 11:30 AM, Souptick Joarder wrote:
+> > On Thu, Oct 25, 2018 at 11:40 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+> >>
+> >> Some software such as perf makes unconditional use of the special
+> >> [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
+> >> enabled in the kernel.
+> >>
+> >> Facilitate the debugging of such situations by printing a debug message
+> >> to the kernel log showing the task name and the faulting address.
+> >>
+> >> Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
+> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> >> ---
+> >>  arch/arm/mm/fault.c | 5 +++++
+> >>  1 file changed, 5 insertions(+)
+> >>
+> >> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> >> index f4ea4c62c613..f17471fbc1c4 100644
+> >> --- a/arch/arm/mm/fault.c
+> >> +++ b/arch/arm/mm/fault.c
+> >> @@ -173,6 +173,11 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+> >>                 show_regs(regs);
+> >>         }
+> >>  #endif
+> >> +#ifndef CONFIG_KUSER_HELPERS
+> >
+> > Just have one doubt, if the condition is "#ifdef CONFIG_KUSER_HELPER"
+> > as commit message suggests the scenario is valid when CONFIG_KUSER_HELPER
+> > is enabled ? No ?
+>
+> #ifndef CONFIG_KUSER_HELPERS is what is intended here, when that option
+> is not enabled, there is no [vectors] page provided in a program's
+> virtual address space, so accesses to that virtual address will cause a
+> fault which we are catching here.
+>
+> When CONFIG_KUSER_HELPERS is enabled, every program gets a valid vectors
+> page in its virtual address space, and accessing that address would not
+> cause a fault, since the page is there.
+>
+> Does this clarify the intent of this commit?
 
-Facilitate the debugging of such situations by printing a debug message
-to the kernel log showing the task name and the faulting address.
-
-Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mm/fault.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index f4ea4c62c613..58f69fa07df9 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -173,6 +173,12 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 		show_regs(regs);
- 	}
- #endif
-+#ifndef CONFIG_KUSER_HELPERS
-+	if ((sig == SIGSEGV) && ((addr & PAGE_MASK) == 0xffff0000))
-+		printk_ratelimited(KERN_DEBUG
-+				   "%s: CONFIG_KUSER_HELPERS disabled at 0x%08lx\n",
-+				   tsk->comm, addr);
-+#endif
- 
- 	tsk->thread.address = addr;
- 	tsk->thread.error_code = fsr;
--- 
-2.17.1
+Yes, It's clear. It might be good to add little more description on
+commit message here.
+But it's your choice on taking this input :-)
+>
+> >
+> >> +       if ((sig == SIGSEGV) && ((addr & PAGE_MASK) == 0xffff0000))
+> >> +               printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at 0x%08lx\n",
+> >> +                      tsk->comm, addr);
+> >> +#endif
+> >>
+> >>         tsk->thread.address = addr;
+> >>         tsk->thread.error_code = fsr;
+> >> --
+> >> 2.17.1
+> >>
+>
+>
+> --
+> Florian
