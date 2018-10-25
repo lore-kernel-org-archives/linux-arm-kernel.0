@@ -1,37 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Oct 2018 17:38:08 +0200
-Subject: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
-In-Reply-To: <1540403734-137721-2-git-send-email-lsun@mellanox.com>
+Date: Thu, 25 Oct 2018 17:32:35 +0200
+Subject: [PATCH v4 3/4] dt-bindings: soc: Add TmFifo binding for Mellanox
+ BlueField SoC
+In-Reply-To: <1540403734-137721-3-git-send-email-lsun@mellanox.com>
 References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
  <1540403734-137721-1-git-send-email-lsun@mellanox.com>
- <1540403734-137721-2-git-send-email-lsun@mellanox.com>
-Message-ID: <CAK8P3a1jTsvzYhS4CxvmK6tOgPn_g7=1S4xAcca2K4v70vhyEA@mail.gmail.com>
+ <1540403734-137721-3-git-send-email-lsun@mellanox.com>
+Message-ID: <CAK8P3a1K7BjgZRyBMKFrqWfcr-Bb3HQus+QE7qTpd27voE9e0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/24/18, Liming Sun <lsun@mellanox.com> wrote:
-> This commit introduces config option for Mellanox BlueField SoC,
-> which can be used to build the SoC specific drivers, and enables
-> it by default in configs/defconfig.
+> Add devicetree bindings for the TmFifo which is found on Mellanox
+> BlueField SoCs.
 >
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > Reviewed-by: David Woods <dwoods@mellanox.com>
 > Signed-off-by: Liming Sun <lsun@mellanox.com>
 > ---
->  arch/arm64/Kconfig.platforms | 6 ++++++
->  arch/arm64/configs/defconfig | 1 +
->  2 files changed, 7 insertions(+)
+>  .../devicetree/bindings/soc/mellanox/tmfifo.txt    | 23
+> ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+>
+> diff --git a/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> new file mode 100644
+> index 0000000..8a13fa6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> @@ -0,0 +1,23 @@
+> +* Mellanox BlueField SoC TmFifo
+> +
+> +BlueField TmFifo provides a shared FIFO between the target and the
+> +external host machine, which can be accessed by external host via
+> +USB or PCIe. In the current tmfifo driver, this FIFO has been demuxed
+> +to implement virtual console and network interface based on the virtio
+> +framework.
+> +
+> +Required properties:
+> +
+> +- compatible:	Should be "mellanox,bf-tmfifo"
+> +- reg:		Physical base address and length of Rx/Tx block
+> +- interrupts:	The interrupt number of Rx low water mark, Rx high water
+> mark
+> +		Tx low water mark, Tx high water mark respectively.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-I'm sorry for missing your series in the past. We should definitely merge
-the platform support soon. Do you also have device tree files for reference
-systems or even production hardware?
+This sounds like it might fit into the mailbox subsystem, and perhaps
+it should use the mailbox DT bindings. Have you had a look at that?
 
-I need to have a separate look at the fifo driver.
-
-Unfortunately, you have sent these patches during the merge window,
-which is the time during which we don't pick up new work. Let's plan
-to pick these up after 4.20-rc1, and please resend to arm at kernel.org
-if we manage to forget about it again.
-
-      Arnd
+       Arnd
