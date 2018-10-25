@@ -1,64 +1,36 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 25 Oct 2018 17:29:29 +0200
-Subject: [PATCH RFC 05/11] staging: vchiq_arm: Fix camera device registration
-In-Reply-To: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1540481375-15952-6-git-send-email-stefan.wahren@i2se.com>
+Date: Thu, 25 Oct 2018 17:29:24 +0200
+Subject: [PATCH RFC 00/11] staging: vc04_services: Improve driver load/unload
+Message-ID: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the camera driver isn't probed via DT, we need to properly setup DMA.
+This patch series improves the load/unload of bcm2835 camera and audio
+drivers. It has been tested with Raspberry Pi 3 B and a camera module V1.
 
-Fixes: 37b7b3087a2f ("staging/vc04_services: Register a platform device for the camera driver.")
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- .../vc04_services/interface/vchiq_arm/vchiq_arm.c    | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
+This series based on current linux-next and Phil Elwell's series ("Improve VCHIQ
+cache line size handling"). After Nicolas' series ("staging: vc04_services:
+Some dead code removal") has been applied, i will rebase my series.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index d7d7c2f0..778a252 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -49,6 +49,7 @@
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/compat.h>
-+#include <linux/dma-mapping.h>
- #include <soc/bcm2835/raspberrypi-firmware.h>
- 
- #include "vchiq_core.h"
-@@ -3588,6 +3589,21 @@ static const struct of_device_id vchiq_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, vchiq_of_match);
- 
-+static struct platform_device *
-+vchiq_register_child(struct platform_device *pdev, const char *name)
-+{
-+	struct platform_device_info pdevinfo;
-+
-+	memset(&pdevinfo, 0, sizeof(pdevinfo));
-+
-+	pdevinfo.parent = &pdev->dev;
-+	pdevinfo.name = name;
-+	pdevinfo.id = PLATFORM_DEVID_NONE;
-+	pdevinfo.dma_mask = DMA_BIT_MASK(32);
-+
-+	return platform_device_register_full(&pdevinfo);
-+}
-+
- static int vchiq_probe(struct platform_device *pdev)
- {
- 	struct device_node *fw_node;
-@@ -3653,9 +3669,7 @@ static int vchiq_probe(struct platform_device *pdev)
- 		VCHIQ_VERSION, VCHIQ_VERSION_MIN,
- 		MAJOR(vchiq_devid), MINOR(vchiq_devid));
- 
--	bcm2835_camera = platform_device_register_data(&pdev->dev,
--						       "bcm2835-camera", -1,
--						       NULL, 0);
-+	bcm2835_camera = vchiq_register_child(pdev, "bcm2835-camera");
- 
- 	return 0;
- 
+Stefan Wahren (11):
+  staging: bcm2835-camera: Abort probe if there is no camera
+  staging: bcm2835-camera: fix module autoloading
+  staging: bcm2835-camera: Move module info to the end
+  staging: vchiq_arm: Fix platform device unregistration
+  staging: vchiq_arm: Fix camera device registration
+  staging: vchiq_arm: Register a platform device for audio
+  staging: bcm2835-audio: Enable compile test
+  staging: bcm2835-audio: use module_platform_driver() macro
+  staging: bcm2835-audio: Drop DT dependency
+  staging: bcm2835-camera: Provide more specific probe error messages
+  staging: bcm2835-camera: Add hint about possible faulty config
+
+ .../staging/vc04_services/bcm2835-audio/Kconfig    |  2 +-
+ .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 61 ++++++-----------
+ .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 78 +++++++++++++++-------
+ .../vc04_services/bcm2835-camera/mmal-vchiq.c      |  5 +-
+ .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 27 ++++++--
+ 5 files changed, 102 insertions(+), 71 deletions(-)
+
 -- 
 2.7.4
