@@ -1,130 +1,237 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Thu, 25 Oct 2018 13:02:04 +0530
-Subject: [PATCH v2 1/3] firmware: xilinx: Add fpga API's
+Date: Thu, 25 Oct 2018 13:02:06 +0530
+Subject: [PATCH v2 3/3] fpga manager: Adding FPGA Manager support for Xilinx
+ zynqmp
 In-Reply-To: <20181025073206.9264-1-nava.manne@xilinx.com>
 References: <20181025073206.9264-1-nava.manne@xilinx.com>
-Message-ID: <20181025073206.9264-2-nava.manne@xilinx.com>
+Message-ID: <20181025073206.9264-4-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This Patch Adds fpga API's to support the Bitstream loading
-by using firmware interface.
+This patch adds FPGA Manager support for the Xilinx
+ZynqMP chip.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
-This patch depends on the below series of patches
-https://lkml.org/lkml/2018/9/12/983
-Which is got integrated into the below upstream repo.
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/tree/drivers/firmware/xilinx?h=for-next
-
 Changes for v2:
-		-Added Firmware FPGA Manager flags As suggested by
-		 Moritz.
+		-Fixed some minor coding issues as suggested by
+		 Moritz
+
 Changes for v1:
                 -None.
 
 Changes for RFC-V2:
-                -New Patch.
+                -Updated the Fpga Mgr registrations call's
+                 to 4.18
 
- drivers/firmware/xilinx/zynqmp.c     | 46 ++++++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h | 12 ++++++++
- 2 files changed, 58 insertions(+)
+ drivers/fpga/Kconfig       |   9 ++
+ drivers/fpga/Makefile      |   1 +
+ drivers/fpga/zynqmp-fpga.c | 165 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 175 insertions(+)
+ create mode 100644 drivers/fpga/zynqmp-fpga.c
 
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 84b3fd2eca8b..4a5919448198 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -428,6 +428,50 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
+diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+index 1ebcef4bab5b..38eed4f9d6e9 100644
+--- a/drivers/fpga/Kconfig
++++ b/drivers/fpga/Kconfig
+@@ -56,6 +56,15 @@ config FPGA_MGR_ZYNQ_FPGA
+ 	help
+ 	  FPGA manager driver support for Xilinx Zynq FPGAs.
  
-+/**
-+ * zynqmp_pm_fpga_load - Perform the fpga load
-+ * @address:	Address to write to
-+ * @size:	pl bitstream size
-+ * @flags:
-+ *	BIT(0) - Bit-stream type.
-+ *		 0 - Full Bitstream.
-+ *		 1 - Partial Bitstream.
-+ *
-+ * This function provides access to pmufw. To transfer
-+ * the required bitstream into PL.
-+ *
-+ * Return: Returns status, either success or error+reason
++config FPGA_MGR_ZYNQMP_FPGA
++	tristate "Xilinx Zynqmp FPGA"
++	depends on ARCH_ZYNQMP || COMPILE_TEST
++	help
++	  FPGA manager driver support for Xilinx ZynqMP FPGAs.
++	  This driver uses the processor configuration port(PCAP)
++	  to configure the programmable logic(PL) through PS
++	  on ZynqMP SoC.
++
+ config FPGA_MGR_XILINX_SPI
+ 	tristate "Xilinx Configuration over Slave Serial (SPI)"
+ 	depends on SPI
+diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
+index 7a2d73ba7122..3488ebbaee46 100644
+--- a/drivers/fpga/Makefile
++++ b/drivers/fpga/Makefile
+@@ -16,6 +16,7 @@ obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)	+= socfpga-a10.o
+ obj-$(CONFIG_FPGA_MGR_TS73XX)		+= ts73xx-fpga.o
+ obj-$(CONFIG_FPGA_MGR_XILINX_SPI)	+= xilinx-spi.o
+ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
++obj-$(CONFIG_FPGA_MGR_ZYNQMP_FPGA)	+= zynqmp-fpga.o
+ obj-$(CONFIG_ALTERA_PR_IP_CORE)         += altera-pr-ip-core.o
+ obj-$(CONFIG_ALTERA_PR_IP_CORE_PLAT)    += altera-pr-ip-core-plat.o
+ 
+diff --git a/drivers/fpga/zynqmp-fpga.c b/drivers/fpga/zynqmp-fpga.c
+new file mode 100644
+index 000000000000..3c8fb28ef4ce
+--- /dev/null
++++ b/drivers/fpga/zynqmp-fpga.c
+@@ -0,0 +1,165 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2018 Xilinx, Inc.
 + */
-+static int zynqmp_pm_fpga_load(const u64 address, const u32 size,
-+			       const u32 flags)
++
++#include <linux/dma-mapping.h>
++#include <linux/fpga/fpga-mgr.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/string.h>
++#include <linux/firmware/xlnx-zynqmp.h>
++
++/* Constant Definitions */
++#define IXR_FPGA_DONE_MASK	0X00000008U
++
++/**
++ * struct zynqmp_fpga_priv - Private data structure
++ * @dev:	Device data structure
++ * @flags:	flags which is used to identify the bitfile type
++ */
++struct zynqmp_fpga_priv {
++	struct device *dev;
++	u32 flags;
++};
++
++static int zynqmp_fpga_ops_write_init(struct fpga_manager *mgr,
++				      struct fpga_image_info *info,
++				      const char *buf, size_t size)
 +{
-+	return zynqmp_pm_invoke_fn(PM_FPGA_LOAD, lower_32_bits(address),
-+				   upper_32_bits(address), size, flags, NULL);
++	struct zynqmp_fpga_priv *priv;
++
++	priv = mgr->priv;
++	priv->flags = info->flags;
++
++	return 0;
 +}
 +
-+/**
-+ * zynqmp_pm_fpga_get_status - Read value from PCAP status register
-+ * @value: Value to read
-+ *
-+ * This function provides access to the xilfpga library to get
-+ * the PCAP status
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_fpga_get_status(u32 *value)
++static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
++				 const char *buf, size_t size)
 +{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
++	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
++	struct zynqmp_fpga_priv *priv;
++	dma_addr_t dma_addr;
++	u32 eemi_flags = 0;
++	char *kbuf;
 +	int ret;
 +
-+	if (!value)
-+		return -EINVAL;
++	if (!eemi_ops || !eemi_ops->fpga_load)
++		return -ENXIO;
 +
-+	ret = zynqmp_pm_invoke_fn(PM_FPGA_GET_STATUS, 0, 0, 0, 0, ret_payload);
-+	*value = ret_payload[1];
++	priv = mgr->priv;
++
++	kbuf = dma_alloc_coherent(priv->dev, size, &dma_addr, GFP_KERNEL);
++	if (!kbuf)
++		return -ENOMEM;
++
++	memcpy(kbuf, buf, size);
++
++	wmb(); /* ensure all writes are done before initiate FW call */
++
++	if (priv->flags & FPGA_MGR_PARTIAL_RECONFIG)
++		eemi_flags |= XILINX_ZYNQMP_PM_FPGA_PARTIAL;
++
++	ret = eemi_ops->fpga_load(dma_addr, size, eemi_flags);
++
++	dma_free_coherent(priv->dev, size, kbuf, dma_addr);
 +
 +	return ret;
 +}
 +
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
- 	.query_data = zynqmp_pm_query_data,
-@@ -440,6 +484,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
- 	.clock_getrate = zynqmp_pm_clock_getrate,
- 	.clock_setparent = zynqmp_pm_clock_setparent,
- 	.clock_getparent = zynqmp_pm_clock_getparent,
-+	.fpga_load = zynqmp_pm_fpga_load,
-+	.fpga_get_status = zynqmp_pm_fpga_get_status,
- };
- 
- /**
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 015e130431e6..0f900b48e1be 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -32,8 +32,18 @@
- /* Number of 32bits values in payload */
- #define PAYLOAD_ARG_CNT	4U
- 
-+/*
-+ * Firmware FPGA Manager flags
-+ * XILINX_ZYNQMP_PM_FPGA_PARTIAL: FPGA partial reconfiguration
-+ */
-+#define XILINX_ZYNQMP_PM_FPGA_PARTIAL	BIT(0)
++static int zynqmp_fpga_ops_write_complete(struct fpga_manager *mgr,
++					  struct fpga_image_info *info)
++{
++	return 0;
++}
 +
++static enum fpga_mgr_states zynqmp_fpga_ops_state(struct fpga_manager *mgr)
++{
++	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
++	u32 status;
 +
++	if (!eemi_ops || !eemi_ops->fpga_get_status)
++		return FPGA_MGR_STATE_UNKNOWN;
 +
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
-+	PM_FPGA_LOAD = 22,
-+	PM_FPGA_GET_STATUS,
- 	PM_QUERY_DATA = 35,
- 	PM_CLOCK_ENABLE,
- 	PM_CLOCK_DISABLE,
-@@ -89,6 +99,8 @@ struct zynqmp_pm_query_data {
- 
- struct zynqmp_eemi_ops {
- 	int (*get_api_version)(u32 *version);
-+	int (*fpga_load)(const u64 address, const u32 size, const u32 flags);
-+	int (*fpga_get_status)(u32 *value);
- 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
- 	int (*clock_enable)(u32 clock_id);
- 	int (*clock_disable)(u32 clock_id);
++	eemi_ops->fpga_get_status(&status);
++	if (status & IXR_FPGA_DONE_MASK)
++		return FPGA_MGR_STATE_OPERATING;
++
++	return FPGA_MGR_STATE_UNKNOWN;
++}
++
++static const struct fpga_manager_ops zynqmp_fpga_ops = {
++	.state = zynqmp_fpga_ops_state,
++	.write_init = zynqmp_fpga_ops_write_init,
++	.write = zynqmp_fpga_ops_write,
++	.write_complete = zynqmp_fpga_ops_write_complete,
++};
++
++static int zynqmp_fpga_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct zynqmp_fpga_priv *priv;
++	struct fpga_manager *mgr;
++	int err, ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->dev = dev;
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(44));
++	if (ret < 0) {
++		dev_err(dev, "no usable DMA configuration");
++		return ret;
++	}
++
++	mgr = fpga_mgr_create(dev, "Xilinx ZynqMP FPGA Manager",
++			      &zynqmp_fpga_ops, priv);
++	if (!mgr)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, mgr);
++
++	err = fpga_mgr_register(mgr);
++	if (err) {
++		dev_err(dev, "unable to register FPGA manager");
++		fpga_mgr_free(mgr);
++		return err;
++	}
++
++	return 0;
++}
++
++static int zynqmp_fpga_remove(struct platform_device *pdev)
++{
++	struct fpga_manager *mgr = platform_get_drvdata(pdev);
++
++	fpga_mgr_unregister(mgr);
++
++	return 0;
++}
++
++static const struct of_device_id zynqmp_fpga_of_match[] = {
++	{ .compatible = "xlnx,zynqmp-pcap-fpga", },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, zynqmp_fpga_of_match);
++
++static struct platform_driver zynqmp_fpga_driver = {
++	.probe = zynqmp_fpga_probe,
++	.remove = zynqmp_fpga_remove,
++	.driver = {
++		.name = "zynqmp_fpga_manager",
++		.of_match_table = of_match_ptr(zynqmp_fpga_of_match),
++	},
++};
++
++module_platform_driver(zynqmp_fpga_driver);
++
++MODULE_AUTHOR("Nava kishore Manne <navam@xilinx.com>");
++MODULE_DESCRIPTION("Xilinx ZynqMp FPGA Manager");
++MODULE_LICENSE("GPL");
 -- 
 2.18.0
