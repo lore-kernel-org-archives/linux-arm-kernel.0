@@ -1,268 +1,70 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 25 Oct 2018 10:12:45 +0200
-Subject: [PATCH 1/6] clk: Remove recursion in clk_core_{prepare,enable}()
-In-Reply-To: <CAGAzgsox7bfh4fLBCjJvFeXAJRWx9imsrFVgQYa=q1ooX2Mi1w@mail.gmail.com>
-References: <20181024013132.115907-1-dbasehore@chromium.org>
- <20181024013132.115907-2-dbasehore@chromium.org>
- <264adf2a81bcd602f2a58e4a46c3273cd7c77ca2.camel@baylibre.com>
- <CAGAzgsox7bfh4fLBCjJvFeXAJRWx9imsrFVgQYa=q1ooX2Mi1w@mail.gmail.com>
-Message-ID: <639e0498b81edf5f39b1e73efa8a3db8188d6930.camel@baylibre.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2018 09:25:08 +0100
+Subject: [PATCH 2/2] mfd: ab8500-core: Return zero in
+ get_register_interruptible()
+In-Reply-To: <20181018080534.yw2crvhguen5vajg@kili.mountain>
+References: <20181018080534.yw2crvhguen5vajg@kili.mountain>
+Message-ID: <20181025082508.GJ4939@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-10-24 at 13:36 -0700, dbasehore . wrote:
-> On Wed, Oct 24, 2018 at 2:51 AM Jerome Brunet <jbrunet@baylibre.com> wrote:
-> > 
-> > On Tue, 2018-10-23 at 18:31 -0700, Derek Basehore wrote:
-> > > From: Stephen Boyd <sboyd@codeaurora.org>
-> > > 
-> > > Enabling and preparing clocks can be written quite naturally with
-> > > recursion. We start at some point in the tree and recurse up the
-> > > tree to find the oldest parent clk that needs to be enabled or
-> > > prepared. Then we enable/prepare and return to the caller, going
-> > > back to the clk we started at and enabling/preparing along the
-> > > way.
-> > > 
-> > > The problem is recursion isn't great for kernel code where we
-> > > have a limited stack size. Furthermore, we may be calling this
-> > > code inside clk_set_rate() which also has recursion in it, so
-> > > we're really not looking good if we encounter a tall clk tree.
-> > > 
-> > > Let's create a stack instead by looping over the parent chain and
-> > > collecting clks of interest. Then the enable/prepare becomes as
-> > > simple as iterating over that list and calling enable.
-> > 
-> > Hi Derek,
-> > 
-> > What about unprepare() and disable() ?
-> > 
-> > This patch removes the recursion from the enable path but keeps it for the
-> > disable path ... this is very odd. Assuming doing so works, It certainly makes
-> > CCF a lot harder to understand.
-> 
-> It wasn't there in the original patch. I asked Stephen, and he thinks
-> it may have been left that way because unprepare/disable are tail
-> recursion cases, which the compiler can optimize away.
+On Thu, 18 Oct 2018, Dan Carpenter wrote:
 
-I'm sure the compiler is very clever ;) My point is more about maintainability
-and how easy it is to understand for human beings.
-
+> I just noticed this in review.  The get_register_interruptible() should
+> return zero on success but it instead returns the value that it read.
 > 
-> > 
-> > What about clock protection which essentially works on the same model as prepare
-> > and enable ?
-> > 
-> > Overall, this change does not look like something that should be merged as it
-> > is. If you were just seeking comments, you should add the "RFC" tag to your
-> > series.
-> > 
-> > Jerome.
-> > 
-> > > 
-> > > Cc: Jerome Brunet <jbrunet@baylibre.com>
-> > 
-> > If you don't mind, I would prefer to get the whole series next time. It helps to
-> > get the context.
-> > 
-> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
-> > > ---
-> > >  drivers/clk/clk.c | 113 ++++++++++++++++++++++++++--------------------
-> > >  1 file changed, 64 insertions(+), 49 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > index af011974d4ec..95d818f5edb2 100644
-> > > --- a/drivers/clk/clk.c
-> > > +++ b/drivers/clk/clk.c
-> > > @@ -71,6 +71,8 @@ struct clk_core {
-> > >       struct hlist_head       children;
-> > >       struct hlist_node       child_node;
-> > >       struct hlist_head       clks;
-> > > +     struct list_head        prepare_list;
-> > > +     struct list_head        enable_list;
-> > >       unsigned int            notifier_count;
-> > >  #ifdef CONFIG_DEBUG_FS
-> > >       struct dentry           *dentry;
-> > > @@ -740,49 +742,48 @@ EXPORT_SYMBOL_GPL(clk_unprepare);
-> > >  static int clk_core_prepare(struct clk_core *core)
-> > >  {
-> > >       int ret = 0;
-> > > +     struct clk_core *tmp, *parent;
-> > > +     LIST_HEAD(head);
-> > > 
-> > >       lockdep_assert_held(&prepare_lock);
-> > > 
-> > > -     if (!core)
-> > > -             return 0;
-> > > +     while (core) {
-> > > +             list_add(&core->prepare_list, &head);
-> > > +             /* Stop once we see a clk that is already prepared */
-> > > +             if (core->prepare_count)
-> > > +                     break;
-> > > +             core = core->parent;
-> > > +     }
-> > > 
-> > > -     if (core->prepare_count == 0) {
-> > > -             ret = clk_pm_runtime_get(core);
-> > > -             if (ret)
-> > > -                     return ret;
-> > > +     list_for_each_entry_safe(core, tmp, &head, prepare_list) {
-> > > +             list_del_init(&core->prepare_list);
-> > 
-> > Is there any point in removing it from the list ?
-> > Maybe I missed it but it does not seems useful.
-> > 
-> > Without this, we could use list_for_each_entry()
-> > 
-> > > 
-> > > -             ret = clk_core_prepare(core->parent);
-> > > -             if (ret)
-> > > -                     goto runtime_put;
-> > > +             if (core->prepare_count == 0) {
-> > 
-> > Should we really check the count here ? You are not checking the count when the
-> > put() counterpart is called below.
-> > 
-> > Since PM runtime has ref counting as well, either way would work I guess ... but
-> > we shall be consistent
-> > 
-> > > +                     ret = clk_pm_runtime_get(core);
-> > > +                     if (ret)
-> > > +                             goto err;
-> > > 
-> > > -             trace_clk_prepare(core);
-> > > +                     trace_clk_prepare(core);
-> > > 
-> > > -             if (core->ops->prepare)
-> > > -                     ret = core->ops->prepare(core->hw);
-> > > +                     if (core->ops->prepare)
-> > > +                             ret = core->ops->prepare(core->hw);
-> > > 
-> > > -             trace_clk_prepare_complete(core);
-> > > +                     trace_clk_prepare_complete(core);
-> > > 
-> > > -             if (ret)
-> > > -                     goto unprepare;
-> > > +                     if (ret) {
-> > > +                             clk_pm_runtime_put(core);
-> > > +                             goto err;
-> > > +                     }
-> > > +             }
-> > > +             core->prepare_count++;
-> > >       }
-> > > 
-> > > -     core->prepare_count++;
-> > > -
-> > > -     /*
-> > > -      * CLK_SET_RATE_GATE is a special case of clock protection
-> > > -      * Instead of a consumer claiming exclusive rate control, it is
-> > > -      * actually the provider which prevents any consumer from making any
-> > > -      * operation which could result in a rate change or rate glitch while
-> > > -      * the clock is prepared.
-> > > -      */
-> > > -     if (core->flags & CLK_SET_RATE_GATE)
-> > > -             clk_core_rate_protect(core);
-> > 
-> > This gets removed without anything replacing it.
-> > 
-> > is CLK_SET_RATE_GATE and clock protection support dropped after this change ?
-> > 
-> > > -
-> > >       return 0;
-> > > -unprepare:
-> > > -     clk_core_unprepare(core->parent);
-> > > -runtime_put:
-> > > -     clk_pm_runtime_put(core);
-> > > +err:
-> > > +     parent = core->parent;
-> > > +     list_for_each_entry_safe_continue(core, tmp, &head, prepare_list)
-> > > +             list_del_init(&core->prepare_list);
-> > > +     clk_core_unprepare(parent);
-> > 
-> > If you get here because of failure clk_pm_runtime_get(), you will unprepare a
-> > clock which may have not been prepared first
-> > 
-> > Overall the rework of error exit path does not seem right (or necessary)
-> > 
-> > >       return ret;
-> > >  }
-> > > 
-> > > @@ -878,37 +879,49 @@ EXPORT_SYMBOL_GPL(clk_disable);
-> > >  static int clk_core_enable(struct clk_core *core)
-> > >  {
-> > >       int ret = 0;
-> > > +     struct clk_core *tmp, *parent;
-> > > +     LIST_HEAD(head);
-> > > 
-> > >       lockdep_assert_held(&enable_lock);
-> > > 
-> > > -     if (!core)
-> > > -             return 0;
-> > > -
-> > > -     if (WARN(core->prepare_count == 0,
-> > > -         "Enabling unprepared %s\n", core->name))
-> > > -             return -ESHUTDOWN;
-> > > +     while (core) {
-> > > +             list_add(&core->enable_list, &head);
-> > > +             /* Stop once we see a clk that is already enabled */
-> > > +             if (core->enable_count)
-> > > +                     break;
-> > > +             core = core->parent;
-> > > +     }
-> > > 
-> > > -     if (core->enable_count == 0) {
-> > > -             ret = clk_core_enable(core->parent);
-> > > +     list_for_each_entry_safe(core, tmp, &head, enable_list) {
-> > > +             list_del_init(&core->enable_list);
-> > > 
-> > > -             if (ret)
-> > > -                     return ret;
-> > > +             if (WARN_ON(core->prepare_count == 0)) {
-> > > +                     ret = -ESHUTDOWN;
-> > > +                     goto err;
-> > > +             }
-> > > 
-> > > -             trace_clk_enable_rcuidle(core);
-> > > +             if (core->enable_count == 0) {
-> > > +                     trace_clk_enable_rcuidle(core);
-> > > 
-> > > -             if (core->ops->enable)
-> > > -                     ret = core->ops->enable(core->hw);
-> > > +                     if (core->ops->enable)
-> > > +                             ret = core->ops->enable(core->hw);
-> > > 
-> > > -             trace_clk_enable_complete_rcuidle(core);
-> > > +                     trace_clk_enable_complete_rcuidle(core);
-> > > 
-> > > -             if (ret) {
-> > > -                     clk_core_disable(core->parent);
-> > > -                     return ret;
-> > > +                     if (ret)
-> > > +                             goto err;
-> > >               }
-> > > +
-> > > +             core->enable_count++;
-> > >       }
-> > > 
-> > > -     core->enable_count++;
-> > >       return 0;
-> > > +err:
-> > > +     parent = core->parent;
-> > > +     list_for_each_entry_safe_continue(core, tmp, &head, enable_list)
-> > > +             list_del_init(&core->enable_list);
-> > > +     clk_core_disable(parent);
-> > > +     return ret;
-> > >  }
-> > > 
-> > >  static int clk_core_enable_lock(struct clk_core *core)
-> > > @@ -3281,6 +3294,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
-> > >       core->num_parents = hw->init->num_parents;
-> > >       core->min_rate = 0;
-> > >       core->max_rate = ULONG_MAX;
-> > > +     INIT_LIST_HEAD(&core->prepare_list);
-> > > +     INIT_LIST_HEAD(&core->enable_list);
-> > >       hw->core = core;
-> > > 
-> > >       /* allocate local copy in case parent_names is __initdata */
-> > 
-> > 
+> I looked at all the places that called this directly and they check for
+> negatives and treat greater than or equal to zero as success.  This
+> function is also called as the ->get_register() function pointer.  Some
+> of the callers of that treat all non-zero returns as errors, so it's
+> possible that this bug causes some problems in real life.
+> 
+> I could not find any callers that rely on the current behavior, and this
+> makes the function align with the get_register_interruptible() in
+> ab3100-core.c.
+> 
+> Fixes: 47c1697508f2 ("mfd: Align ab8500 with the abx500 interface")
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> ---
+>  drivers/mfd/ab8500-core.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+> index 30d09d177171..66458a329127 100644
+> --- a/drivers/mfd/ab8500-core.c
+> +++ b/drivers/mfd/ab8500-core.c
+> @@ -252,16 +252,18 @@ static int get_register_interruptible(struct ab8500 *ab8500, u8 bank,
+>  	mutex_lock(&ab8500->lock);
+>  
+>  	ret = ab8500->read(ab8500, addr);
+> -	if (ret < 0)
+> +	if (ret < 0) {
+>  		dev_err(ab8500->dev, "failed to read reg %#x: %d\n",
+>  			addr, ret);
+> -	else
+> -		*value = ret;
+> +		return ret;
+
+Looks like you just broke the AB8500.
+
+What is it you're trying to achieve here?  Apart from attempting to
+return with the mutex still held, what semantics have you changed?
+
+> +	}
+> +
+> +	*value = ret;
+>  
+>  	mutex_unlock(&ab8500->lock);
+>  	dev_vdbg(ab8500->dev, "rd: addr %#x => data %#x\n", addr, ret);
+>  
+> -	return ret;
+> +	return 0;
+>  }
+>  
+>  static int ab8500_get_register(struct device *dev, u8 bank,
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
