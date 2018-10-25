@@ -1,42 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 24 Oct 2018 17:17:42 -0700
-Subject: [PATCH v3 3/3] of/fdt: Remove definition check for
- __early_init_dt_declare_initrd
-In-Reply-To: <20181025001742.6510-1-f.fainelli@gmail.com>
-References: <20181025001742.6510-1-f.fainelli@gmail.com>
-Message-ID: <20181025001742.6510-4-f.fainelli@gmail.com>
+From: qiangqing.zhang@nxp.com (Joakim Zhang)
+Date: Thu, 25 Oct 2018 00:44:24 +0000
+Subject: [PATCH V1 3/3] ARM: dts: sabreauto: Add flexcan support
+In-Reply-To: <CAOMZO5Cm2U4dR982vYTmb5zfdjfXbQ95B+mDt2Fp8D-QtvT6FA@mail.gmail.com>
+References: <20181024111213.2724-1-qiangqing.zhang@nxp.com>
+ <20181024111213.2724-4-qiangqing.zhang@nxp.com>
+ <CAOMZO5Cm2U4dR982vYTmb5zfdjfXbQ95B+mDt2Fp8D-QtvT6FA@mail.gmail.com>
+Message-ID: <DB7PR04MB4618CEA5069E3A276E92D22AE6F70@DB7PR04MB4618.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARM64 no longer providing a custom __early_init_dt_declare_initrd()
-in its headers, and no other architecture doing something similar,
-remove the check for __early_init_dt_declare_initrd being already
-defined since we now have the one and only definition for it.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/of/fdt.c | 2 --
- 1 file changed, 2 deletions(-)
+-----Original Message-----
+From: Fabio Estevam [mailto:festevam at gmail.com] 
+Sent: 2018?10?24? 19:20
+To: Joakim Zhang <qiangqing.zhang@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; Rob Herring <robh+dt@kernel.org>; moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>; A.s. Dong <aisheng.dong@nxp.com>
+Subject: Re: [PATCH V1 3/3] ARM: dts: sabreauto: Add flexcan support
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 7d316f008f22..2e962d75dbce 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -892,7 +892,6 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
--#ifndef __early_init_dt_declare_initrd
- static void __early_init_dt_declare_initrd(unsigned long start,
- 					   unsigned long end)
- {
-@@ -905,7 +904,6 @@ static void __early_init_dt_declare_initrd(unsigned long start,
- 	initrd_below_start_ok = 1;
- #endif
- }
--#endif
- 
- /**
-  * early_init_dt_check_for_initrd - Decode initrd location from flat tree
--- 
-2.17.1
+Hi Joakim,
+
+On Wed, Oct 24, 2018 at 8:15 AM Joakim Zhang <qiangqing.zhang@nxp.com> wrote:
+
+> diff --git a/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+> new file mode 100644
+> index 000000000000..963e0b559d60
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+> @@ -0,0 +1,19 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+
+You can remove this paragraph as you are using SPDX tag.
+
+> +++ b/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
+> @@ -0,0 +1,19 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+
+Ditto.
+
+> +&can1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_flexcan1>;
+> +       pinctrl-assert-gpios = <&max7310_b 3 GPIO_ACTIVE_HIGH>; /* TX */
+
+This property does not exist in upstream.
+
+
+Hi Fabio,
+
+I will modify what you have commented. Thanks a lot.
+
+Best Regards,
+Joakim Zhang
