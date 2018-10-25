@@ -1,61 +1,133 @@
 From: Ganapatrao.Kulkarni@cavium.com (Kulkarni, Ganapatrao)
-Date: Thu, 25 Oct 2018 05:59:15 +0000
-Subject: [PATCH v7 0/2] Add ThunderX2 SoC Performance Monitoring Unit driver
-Message-ID: <20181025055833.28471-1-ganapatrao.kulkarni@cavium.com>
+Date: Thu, 25 Oct 2018 05:59:20 +0000
+Subject: [PATCH v7 1/2] perf, uncore: Adding documentation for ThunderX2 pmu
+ uncore driver
+In-Reply-To: <20181025055833.28471-1-ganapatrao.kulkarni@cavium.com>
+References: <20181025055833.28471-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20181025055833.28471-2-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds PMU driver for Cavium's ThunderX2 SoC UNCORE devices.
-The SoC has PMU support in L3 cache controller (L3C) and in the
+The SoC has PMU support in its L3 cache controller (L3C) and in the
 DDR4 Memory Controller (DMC).
 
-v7:
-	Incorporated review comments [3].
-	Modified driver as loadable module.
-	Updated Documentation with Event description.
-	Removed per-channel(no SMC calls) sampling implementation(
-	Since DMC and L3C channels are interleave, we have decided to
-	sample channel zero and prorate it to account for a Device).
-
-[3] https://patchwork.kernel.org/patch/10479203/
-
-v6:
-	Rebased to 4.18-rc1
-	Updated with comments from John Garry[3]
-
-[3] https://lkml.org/lkml/2018/5/17/408
-
-v5:
-	Incorporated review comments from Mark Rutland[2]
-v4:
-	Incorporated review comments from Mark Rutland[1]
-
-[1] https://www.spinics.net/lists/arm-kernel/msg588563.html
-[2] https://lkml.org/lkml/2018/4/26/376
-
-v3:
-	Fixed warning reported by kbuild robot
-
-v2:
-	Rebased to 4.12-rc1
-	Removed Arch VULCAN dependency.
-	Update SMC call parameters as per latest firmware.
-
-v1:
-	Initial patch
-
-Ganapatrao Kulkarni (2):
-  perf, uncore: Adding documentation for ThunderX2 pmu uncore driver
-  ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE PMU driver
-
- Documentation/perf/thunderx2-pmu.txt | 106 ++++
- drivers/perf/Kconfig                 |   9 +
- drivers/perf/Makefile                |   1 +
- drivers/perf/thunderx2_pmu.c         | 867 +++++++++++++++++++++++++++
- include/linux/cpuhotplug.h           |   1 +
- 5 files changed, 984 insertions(+)
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+---
+ Documentation/perf/thunderx2-pmu.txt | 106 +++++++++++++++++++++++++++
+ 1 file changed, 106 insertions(+)
  create mode 100644 Documentation/perf/thunderx2-pmu.txt
- create mode 100644 drivers/perf/thunderx2_pmu.c
 
+diff --git a/Documentation/perf/thunderx2-pmu.txt b/Documentation/perf/thunderx2-pmu.txt
+new file mode 100644
+index 000000000000..9f5dd7459e68
+--- /dev/null
++++ b/Documentation/perf/thunderx2-pmu.txt
+@@ -0,0 +1,106 @@
++
++Cavium ThunderX2 SoC Performance Monitoring Unit (PMU UNCORE)
++==========================================================================
++
++ThunderX2 SoC PMU consists of independent system wide per Socket PMUs such
++as Level 3 Cache(L3C) and DDR4 Memory Controller(DMC).
++
++DMC has 8 interleave channels and L3C has 16 interleave tiles. Events are
++sampled for default channel(i.e channel 0) and prorated to total number of
++channels/tiles.
++
++DMC and L3C, Each PMU supports up to 4 counters. Counters are independently
++programmable and can be started and stopped individually. Each counter can
++be set to sample specific perf events. Counters are 32 bit and do not support
++overflow interrupt; they are sampled at every 2 seconds.
++
++PMU UNCORE (perf) driver:
++
++The thunderx2-pmu driver registers several perf PMUs for DMC and L3C devices.
++Each of the PMUs provides description of its available events
++and configuration options in sysfs.
++	see /sys/devices/uncore_<l3c_S/dmc_S/>
++
++S is socket id.
++Each PMU can be used to sample up to 4 events simultaneously.
++
++The "format" directory describes format of the config (event ID).
++The "events" directory provides configuration templates for all
++supported event types that can be used with perf tool.
++
++For example, "uncore_dmc_0/cnt_cycles/" is an
++equivalent of "uncore_dmc_0/config=0x1/".
++
++Each perf driver also provides a "cpumask" sysfs attribute, which contains a
++single CPU ID of the processor which is likely to be used to handle all the
++PMU events. It will be the first online CPU from the NUMA node of the PMU device.
++
++Example for perf tool use:
++
++perf stat -a -e uncore_dmc_0/cnt_cycles/ sleep 1
++
++perf stat -a -e \
++uncore_dmc_0/cnt_cycles/,\
++uncore_dmc_0/data_transfers/,\
++uncore_dmc_0/read_txns/,\
++uncore_dmc_0/write_txns/ sleep 1
++
++perf stat -a -e \
++uncore_l3c_0/read_request/,\
++uncore_l3c_0/read_hit/,\
++uncore_l3c_0/inv_request/,\
++uncore_l3c_0/inv_hit/ sleep 1
++
++The driver does not support sampling, therefore "perf record" will
++not work. Per-task (without "-a") perf sessions are not supported.
++
++L3C events:
++============
++
++read_request:
++	Number of Read requests received by the L3 Cache.
++	This include Read as well as Read Exclusives.
++
++read_hit:
++	Number of Read requests received by the L3 cache that were hit
++	in the L3 (Data provided form the L3)
++
++writeback_request:
++	Number of Write Backs received by the L3 Cache. These are basically
++	the L2 Evicts and writes from the PCIe Write Cache.
++
++inv_nwrite_request:
++	This is the Number of Invalidate and Write received by the L3 Cache.
++	Also Writes from IO that did not go through the PCIe Write Cache.
++
++inv_nwrite_hit
++	This is the Number of Invalidate and Write received by the L3 Cache
++	That were a hit in the L3 Cache.
++
++inv_request:
++	Number of Invalidate request received by the L3 Cache.
++
++inv_hit:
++	Number of Invalidate request received by the L3 Cache that were a
++	hit in L3.
++
++evict_request:
++	Number of Evicts that the L3 generated.
++
++NOTE:
++1. Granularity of all these events counter value is cache line length(64 Bytes).
++2. L3C cache Hit Ratio = (read_hit + inv_nwrite_hit + inv_hit) / (read_request + inv_nwrite_request + inv_request)
++
++DMC events:
++============
++cnt_cycles:
++	Count cycles (Clocks at the DMC clock rate)
++
++write_txns:
++	Number of 64 Bytes write transactions received by the DMC(s)
++
++read_txns:
++	Number of 64 Bytes Read transactions received by the DMC(s)
++
++data_transfers:
++	Number of 64 Bytes data transferred to or from DRAM.
 -- 
 2.18.0
