@@ -1,67 +1,28 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 25 Oct 2018 11:48:24 -0700
+Date: Thu, 25 Oct 2018 11:50:43 -0700
 Subject: [PATCH] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
  disabled
-In-Reply-To: <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
+In-Reply-To: <87tvl9nas6.fsf@xmission.com>
 References: <20181025180957.7900-1-f.fainelli@gmail.com>
- <CAFqt6zYxY+ocQPwNnV3CE7pTrUFniQETcxsq4Dsof41E91L6BQ@mail.gmail.com>
-Message-ID: <9090f6e8-c9c7-800e-707e-07b0033ce166@gmail.com>
+ <87tvl9nas6.fsf@xmission.com>
+Message-ID: <a48601e2-dde2-47b8-b591-ffccdc9f1bf8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/18 11:30 AM, Souptick Joarder wrote:
-> On Thu, Oct 25, 2018 at 11:40 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
->>
+On 10/25/18 11:25 AM, Eric W. Biederman wrote:
+> Florian Fainelli <f.fainelli@gmail.com> writes:
+> 
 >> Some software such as perf makes unconditional use of the special
 >> [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
 >> enabled in the kernel.
 >>
 >> Facilitate the debugging of such situations by printing a debug message
 >> to the kernel log showing the task name and the faulting address.
->>
->> Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  arch/arm/mm/fault.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
->> index f4ea4c62c613..f17471fbc1c4 100644
->> --- a/arch/arm/mm/fault.c
->> +++ b/arch/arm/mm/fault.c
->> @@ -173,6 +173,11 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
->>                 show_regs(regs);
->>         }
->>  #endif
->> +#ifndef CONFIG_KUSER_HELPERS
 > 
-> Just have one doubt, if the condition is "#ifdef CONFIG_KUSER_HELPER"
-> as commit message suggests the scenario is valid when CONFIG_KUSER_HELPER
-> is enabled ? No ?
+> Can't someone trigger this segv deliberately and spam the kerne log?
+> Doesn't this need something like printk_ratelimit or something to ensure
+> this message only gets printed once?
 
-#ifndef CONFIG_KUSER_HELPERS is what is intended here, when that option
-is not enabled, there is no [vectors] page provided in a program's
-virtual address space, so accesses to that virtual address will cause a
-fault which we are catching here.
-
-When CONFIG_KUSER_HELPERS is enabled, every program gets a valid vectors
-page in its virtual address space, and accessing that address would not
-cause a fault, since the page is there.
-
-Does this clarify the intent of this commit?
-
-> 
->> +       if ((sig == SIGSEGV) && ((addr & PAGE_MASK) == 0xffff0000))
->> +               printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at 0x%08lx\n",
->> +                      tsk->comm, addr);
->> +#endif
->>
->>         tsk->thread.address = addr;
->>         tsk->thread.error_code = fsr;
->> --
->> 2.17.1
->>
-
-
+Yes, good point, thanks.
 -- 
 Florian
