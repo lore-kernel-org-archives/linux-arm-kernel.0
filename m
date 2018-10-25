@@ -1,74 +1,69 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 25 Oct 2018 13:31:10 +0200
-Subject: [PATCH V3 6/8] arm64: dts: imx: add imx8qxp support
-In-Reply-To: <AM0PR04MB421187B2BA549B04B67553E780F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
- <1539886483-15775-7-git-send-email-aisheng.dong@nxp.com>
- <20181018202457.GA25174@bogus>
- <DB7PR04MB42188ABE426A055E6097C03080F90@DB7PR04MB4218.eurprd04.prod.outlook.com>
- <CAPDyKFpYXo21fsHynZWTV9OOoCWGUJe2SZBR-A-dc8T8g3cLrg@mail.gmail.com>
- <AM0PR04MB4211E163C5AF713142C56A5A80F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFo=gt5eB2B8muA1iVJSin2CJsQ19zeL9pm==Ln73pFSfQ@mail.gmail.com>
- <AM0PR04MB421187B2BA549B04B67553E780F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <CAPDyKFoxuRaYyYHqA=hWKQpQAbQ3HCDx+dtzSaePm0T7_j6p1g@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 25 Oct 2018 11:36:48 +0000
+Subject: [PATCH V2 7/8] dts: fsl: add imx7ulp evk support
+In-Reply-To: <AM0PR04MB421195B48BA336AD7078110D80F60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-8-git-send-email-aisheng.dong@nxp.com>
+ <CAOMZO5C3Fv+s-bLeHGZ6LEB=ZqRxf=gXuzbtwfNS=PvQeVJ1Ag@mail.gmail.com>
+ <AM0PR04MB42110E5309341D1626EB6EF980F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CAOMZO5BLXGYfvq6GqK66Qe1aTNHmYJOBhKTPKTwNx=tDROKw6Q@mail.gmail.com>
+ <AM0PR04MB421195B48BA336AD7078110D80F60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB42112F8F7E40BA1B248E5E3180F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Jon
+Hi Shawn & Sascha,
 
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Wednesday, October 24, 2018 4:14 PM
 [...]
+> > -----Original Message-----
+> > From: Fabio Estevam [mailto:festevam at gmail.com]
+> > Sent: Wednesday, October 24, 2018 12:26 AM
+> [...]
+> > On Tue, Oct 23, 2018 at 11:42 AM A.s. Dong <aisheng.dong@nxp.com>
+> wrote:
+> >
+> > > I'm a bit hesitate to do that as the driver already supports it.
+> > > There's no extra effort to use it. And we probably could take ULP as
+> > > a special case to test generic binding rather then simply drop it
+> > > and drop driver features. Once we get objection from users later, we
+> > > still can
+> > simply fallback as there's still only official boards using it.
+> >
+> > We had this same discussion some months ago when we were reviewing
+> > i.MX8 support.
+> >
+> > I don't see the value in doing pinctrl differently on i.MX7ULP.
+> >
+> 
+> I thought the situation is different as ULP actually already supports generic
+> binding before that discussion.
+> 
+> > > Last, it's not correct that there's not only one method for all i.MX devices.
+> > > MX23/28 are different ones and ULP is more like MX23/28.
+> > > And I saw no objections from users for MX23/28.
+> >
+> > Yes, but these are legacy platforms.
+> >
+> > For new ones, we should try to keep consistency, just like we
+> > discussed during
+> > i.MX8 review.
+> 
+> So the question is whether it's necessary to switch generic binding back to the
+> legacy one for ULP. Personally I'm not strongly against this, but I need some
+> confirmation from Shawn and Sascha.
+> 
+> Shawn & Sascha, would you make a judgement call?
+> If you also strongly request that, I will try to make it patch to test Linus W.
+> Hopefully our agreement could satisfy Linus W.
+> 
 
->>
->> In regards to model the HW correctly. I don't believe your HW topology have
->> each PWM block, GPIO block, etc, in their own gate-able power domain, right?
->> Or is it so?
->>
->
-> First of all, thanks for your and Rob's good suggestions.
-> I spent a lot more time to do research to try to make it better according to your
-> suggestions. Some of your ideas absolutely helped me a lot and gave me some
-> inspirations.
->
-> Some new findings are that some of our power domains are organized in a tree
-> was because the kernel does not support multi-power domains for one device.
-> but from HW point of view, they're identical.
-> You can more serious situation from local tree at here:
-> https://source.codeaurora.org/external/imx/linux-imx/tree/arch/arm64/boot/dts/freescale/fsl-imx8dx.dtsi?h=imx_4.9.88_imx8qxp_beta2#n195
->
-> I just found your following patch perfectly addressed our issue as we do have many
-> Devices requires to handle multi power domains.
-> 3c095f32a92b PM / Domains: Add support for multi PM domains per device to genpd
-> e.g. For LVDS devices, it need both LVDS and DC(Display controller) PD to work.
+Would you please let me know if you're all okay with this?
 
-Thanks for letting me know about further use cases about multiple PM
-domain per device. Very interesting.
+Regards
+Dong Aisheng
 
->
-> Now i was trying to understand all of our current user case with the team, If all of them
-> do not need a tree to address dependency issue, I may remove them all from device tree.
-> Then it would be much more clearer than before and be something like what Tegra does.
-> include/dt-bindings/power/tegra186-powergate.h
-> drivers/soc/tegra/powergate-bpmp.c
-
-Yes!
-
->
-> For example, 1 #power-domain-cells will be enough. The first cell can be a global SCU
-> power domain and the 2nd cell the device ID.
-> Hopefully this can be what you and Rob want.
->
-> If any good suggestions please let me know.
-
-It makes perfect sense!
-
-In regards to deploy support for multiple PM domains per device, you
-may have a look at the recent work done Jon Hunter for the Tegra xHCI
-genpd support [1].
-
-[...]
-
-Kind regards
-Uffe
-
-[1]
-https://patchwork.ozlabs.org/cover/976328/
+> Regards
+> Dong Aisheng
