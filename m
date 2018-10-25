@@ -1,29 +1,36 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 25 Oct 2018 16:54:57 +0000
-Subject: [PATCH V2 6/8] dts: imx: add common imx7ulp dtsi support
-In-Reply-To: <CAOMZO5ArziSkimJvKMFPR-RZwWywLmzjpmvAFT9fB0fp_J_YZw@mail.gmail.com>
-References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
- <1540295058-26090-7-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5ArziSkimJvKMFPR-RZwWywLmzjpmvAFT9fB0fp_J_YZw@mail.gmail.com>
-Message-ID: <AM0PR04MB42113E80FC62AE9B1D72ADA580F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Thu, 25 Oct 2018 19:20:40 +0200
+Subject: [alsa-devel] [PATCH v2] staging: bcm2835-audio: interpolate audio
+ delay
+In-Reply-To: <s5hftwuo4t0.wl-tiwai@suse.de>
+References: <20181022191708.GA4659@ubuntu>
+ <a703f8a2-e85a-bc5b-750a-cc43ef252ba5@gmail.com>
+ <EA85FEC9-B1C7-4548-88F5-F0E7BC12158E@eircom.net>
+ <046aea96-e0d3-60f4-c61a-c26bb1b5c193@gmail.com>
+ <B9A84822-3780-4E01-96AD-FD3B42C44B45@eircom.net>
+ <9884c4f5-2343-e3a4-8d8b-dd2db404ef27@gmail.com>
+ <s5hftwuo4t0.wl-tiwai@suse.de>
+Message-ID: <5bc8295a-1e38-99b5-d54c-72e920600f83@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Friday, October 26, 2018 12:44 AM
-[...]
-> On Tue, Oct 23, 2018 at 8:55 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
-> 
-> > +               gpio_ptc: gpio at 40ae0000 {
-> > +                       compatible = "fsl,vf610-gpio";
-> 
-> This should be:
-> 
-> compatible = "fsl,imx7ulp-gpio", "fsl,vf610-gpio";
+Hello Takashi, Mike,
 
-That's true.
-Thanks for reminder.
+@Takashi
 
-Regards
-Dong Aisheng
+On 10/25/18 09:37, Takashi Iwai wrote:
+> Well, in the API POV, it's nothing wrong to keep hwptr sticking while
+> updating only delay value.  It implies that the hardware chip doesn't
+> provide the hwptr update.
+
+Thank you for the clarification. Modifying `runtime->delay` from the `pointer`
+function looked wrong for me. Now I understand the motivation and the use-case.
+I will be more careful when analyzing the code which doesn't fit my expectations.
+
+@Mike
+
+I was wrong. You can ignore my comments. Please don't take them personal: it's
+all about having high-quality code in kernel.
+
+Best Regards,
+Kirill
