@@ -1,167 +1,46 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Fri, 26 Oct 2018 17:54:24 +0530
-Subject: [PATCH v2 3/3] reset: reset-zynqmp: Adding support for Xilinx zynqmp
- reset controller.
-In-Reply-To: <20181026122424.30831-1-nava.manne@xilinx.com>
-References: <20181026122424.30831-1-nava.manne@xilinx.com>
-Message-ID: <20181026122424.30831-4-nava.manne@xilinx.com>
+From: rafael.tinoco@linaro.org (Rafael David Tinoco)
+Date: Thu, 25 Oct 2018 09:37:59 -0300
+Subject: [PATCH 1/2] mm/zsmalloc.c: check encoded object value overflow
+ for PAE
+In-Reply-To: <20181025120006.GY30658@n2100.armlinux.org.uk>
+References: <20181025012745.20884-1-rafael.tinoco@linaro.org>
+ <20181025120006.GY30658@n2100.armlinux.org.uk>
+Message-ID: <CABdQkv_cC4ixEFr91zyg-S21O5_7U8FV7=g7ZMRqGcQyhrwzaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-The zynqmp reset-controller has the ability to reset lines
-connected to different blocks and peripheral in the Soc.
+> MAX_PHYSMEM_BITS is a definition for sparsemem, and is only visible
+> when sparsemem is enabled.  When sparsemem is disabled, asm/sparsemem.h
+> is not included (and should not be included) which means there is no
+> MAX_PHYSMEM_BITS definition.
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v2:
-		-Fixed some minor coding issues as suggested
-		 by philipp.
+Missed that part :\, tks.
 
-Changes for v1:
-		-None.
+> I don't think zsmalloc.c should be (ab)using MAX_PHYSMEM_BITS, and
+> your description above makes it sound like you expect it to always be
+> defined.
+>
+> If we want to have a definition for this, we shouldn't be playing
+> fragile games like:
+>
+> #ifndef MAX_POSSIBLE_PHYSMEM_BITS
+> #ifdef MAX_PHYSMEM_BITS
+> #define MAX_POSSIBLE_PHYSMEM_BITS MAX_PHYSMEM_BITS
+> #else
+> /*
+>  * If this definition of MAX_PHYSMEM_BITS is used, OBJ_INDEX_BITS will just
+>  * be PAGE_SHIFT
+>  */
+> #define MAX_POSSIBLE_PHYSMEM_BITS BITS_PER_LONG
+> #endif
+> #endif
+>
+> but instead insist that MAX_PHYSMEM_BITS is defined _everywhere_.
 
-Changes for RFC-V3:
-		-None.
-
-Changes for RFC-V2:
-		-Moved eemi_ops into a priv struct as suggested
-		 by philipp.
-
- drivers/reset/Makefile       |   1 +
- drivers/reset/reset-zynqmp.c | 114 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 115 insertions(+)
- create mode 100644 drivers/reset/reset-zynqmp.c
-
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 4243c38..eb315d1 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -24,4 +24,5 @@ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
- obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
- obj-$(CONFIG_RESET_UNIPHIER_USB3) += reset-uniphier-usb3.o
- obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-+obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
- 
-diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
-new file mode 100644
-index 0000000..cff63d9
---- /dev/null
-+++ b/drivers/reset/reset-zynqmp.c
-@@ -0,0 +1,114 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018 Xilinx, Inc.
-+ *
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/firmware/xlnx-zynqmp.h>
-+
-+#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
-+#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
-+
-+struct zynqmp_reset_data {
-+	struct reset_controller_dev rcdev;
-+	const struct zynqmp_eemi_ops *eemi_ops;
-+};
-+
-+static inline struct zynqmp_reset_data *
-+to_zynqmp_reset_data(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct zynqmp_reset_data, rcdev);
-+}
-+
-+static int zynqmp_reset_assert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_ASSERT);
-+}
-+
-+static int zynqmp_reset_deassert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_RELEASE);
-+}
-+
-+static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+	int val, err;
-+
-+	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
-+	if (!err)
-+		return err;
-+
-+	return val;
-+}
-+
-+static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_PULSE);
-+}
-+
-+static struct reset_control_ops zynqmp_reset_ops = {
-+	.reset = zynqmp_reset_reset,
-+	.assert = zynqmp_reset_assert,
-+	.deassert = zynqmp_reset_deassert,
-+	.status = zynqmp_reset_status,
-+};
-+
-+static int zynqmp_reset_probe(struct platform_device *pdev)
-+{
-+	struct zynqmp_reset_data *priv;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	priv->eemi_ops = zynqmp_pm_get_eemi_ops();
-+	if (!priv->eemi_ops)
-+		return -ENXIO;
-+
-+	priv->rcdev.ops = &zynqmp_reset_ops;
-+	priv->rcdev.owner = THIS_MODULE;
-+	priv->rcdev.of_node = pdev->dev.of_node;
-+	priv->rcdev.nr_resets = ZYNQMP_NR_RESETS;
-+
-+	return devm_reset_controller_register(&pdev->dev, &priv->rcdev);
-+}
-+
-+static const struct of_device_id zynqmp_reset_dt_ids[] = {
-+	{ .compatible = "xlnx,zynqmp-reset", },
-+	{ /* sentinel */ },
-+};
-+
-+static struct platform_driver zynqmp_reset_driver = {
-+	.probe	= zynqmp_reset_probe,
-+	.driver = {
-+		.name		= KBUILD_MODNAME,
-+		.of_match_table	= zynqmp_reset_dt_ids,
-+	},
-+};
-+
-+static int __init zynqmp_reset_init(void)
-+{
-+	return platform_driver_register(&zynqmp_reset_driver);
-+}
-+
-+arch_initcall(zynqmp_reset_init);
--- 
-2.7.4
+Is it okay to propose using only MAX_PHYSMEM_BITS for zsmalloc (like
+it was before commit 02390b87) instead, and make sure *at least* ARM
+32/64 and x86/x64, for now, have it defined outside sparsemem headers
+as well ? This way I can WARN_ONCE(), instead of BUG(), when specific
+arch does not define it - enforcing behavior - showing BITS_PER_LONG
+is being used instead of MAX_PHYSMEM_BITS (warning, at least once, for
+the possibility of an overflow, like the issue showed in here).
