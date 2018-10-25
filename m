@@ -1,135 +1,231 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Thu, 25 Oct 2018 19:50:11 +0800
-Subject: [PATCH v5 2/3] clk: meson: add DT documentation for emmc clock
- controller
-In-Reply-To: <20181024145513.GA6647@ofant>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-3-git-send-email-jianxin.pan@amlogic.com>
- <ca95948abd58876a23b2eb3e52b96124e9eed793.camel@baylibre.com>
- <20181024145513.GA6647@ofant>
-Message-ID: <146f13c1-f309-d619-602b-b14535ab5f79@amlogic.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 25 Oct 2018 11:53:01 +0000
+Subject: [PATCH V2 6/8] dts: imx: add common imx7ulp dtsi support
+In-Reply-To: <20181024220213.GA26789@bogus>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-7-git-send-email-aisheng.dong@nxp.com>
+ <20181024220213.GA26789@bogus>
+Message-ID: <AM0PR04MB4211A07053E99036B51ACB5880F70@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/10/25 15:29, Yixun Lan wrote:
-> Hi Jerome, Jianxin:
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Thursday, October 25, 2018 6:02 AM
+[...]
+> On Tue, Oct 23, 2018 at 11:49:25AM +0000, A.s. Dong wrote:
+> > The i.MX 7ULP family of processors represents NXP?s latest achievement
+> > in ultra-low-power processing for use cases demanding long battery life.
+> > Targeted towards the growing market of portable devices, the i.MX 7ULP
+> > family of processors features NXP's advanced implementation of the
+> > Arm?
+> > Cortex?-A7 core, the Arm Cortex-M4 core, as well as a 3D and 2D
+> > Graphics Processing Units (GPUs).
+> >
+> > This patch aims to add the initial support including:
+> > 1) CLK
+> > 2) GPIO PTC, PTD, PTE, PTF
+> > 3) uSDHC 1/2
+> > 4) LPUART 4/5/6/7
+> > 5) LPI2C 6/7
+> >
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> > ChangeLog:
+> > v1->v2:
+> >  * update clk part due to binding change
+> >  * separate soc.dtsi from board.dts
+> > ---
+> >  arch/arm/boot/dts/imx7ulp.dtsi | 323
+> > +++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 323 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+> >
+> > diff --git a/arch/arm/boot/dts/imx7ulp.dtsi
+> > b/arch/arm/boot/dts/imx7ulp.dtsi new file mode 100644 index
+> > 0000000..795edc2
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx7ulp.dtsi
+> > @@ -0,0 +1,323 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017-2018 NXP
+> > + *   Dong Aisheng <aisheng.dong@nxp.com>
+> > + */
+> > +
+> > +#include <dt-bindings/clock/imx7ulp-clock.h>
+> > +#include <dt-bindings/gpio/gpio.h>
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +
+> > +#include "imx7ulp-pinfunc.h"
+> > +
+> > +/ {
+> > +	interrupt-parent = <&intc>;
+> > +
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	aliases {
+> > +		gpio0 = &gpio_ptc;
+> > +		gpio1 = &gpio_ptd;
+> > +		gpio2 = &gpio_pte;
+> > +		gpio3 = &gpio_ptf;
+> > +		i2c0 = &lpi2c6;
+> > +		i2c1 = &lpi2c7;
+> > +		mmc0 = &usdhc0;
+> > +		mmc1 = &usdhc1;
+> > +		serial0 = &lpuart4;
+> > +		serial1 = &lpuart5;
+> > +		serial2 = &lpuart6;
+> > +		serial3 = &lpuart7;
+> > +	};
+> > +
+> > +	cpus {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu0: cpu at 0 {
+> > +			compatible = "arm,cortex-a7";
+> > +			device_type = "cpu";
+> > +			reg = <0>;
+> > +		};
+> > +	};
+> > +
+> > +	intc: interrupt-controller at 40021000 {
+> > +		compatible = "arm,cortex-a7-gic";
+> > +		#interrupt-cells = <3>;
+> > +		interrupt-controller;
+> > +		reg = <0x40021000 0x1000>,
+> > +		      <0x40022000 0x1000>;
+> > +	};
+> > +
+> > +	rosc: clock-rosc {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <32768>;
+> > +		clock-output-names = "rosc";
+> > +		#clock-cells = <0>;
+> > +	};
+> > +
+> > +	sosc: clock-sosc {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <24000000>;
+> > +		clock-output-names = "sosc";
+> > +		#clock-cells = <0>;
+> > +	};
+> > +
+> > +	sirc: clock-sirc {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <16000000>;
+> > +		clock-output-names = "sirc";
+> > +		#clock-cells = <0>;
+> > +	};
+> > +
+> > +	firc: clock-firc {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <48000000>;
+> > +		clock-output-names = "firc";
+> > +		#clock-cells = <0>;
+> > +	};
+> > +
+> > +	upll: clock-upll {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <480000000>;
+> > +		clock-output-names = "upll";
+> > +		#clock-cells = <0>;
+> > +	};
+> > +
+> > +	mpll: clock-mpll {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <480000000>;
+> > +		clock-output-names = "mpll";
+> > +		#clock-cells = <0>;
+> > +	};
+> > +
+> > +	timer {
+> > +		compatible = "arm,armv7-timer";
+> > +		arm,cpu-registers-not-fw-configured;
 > 
-> see my comments
+> AIUI, this was a work-around for some existing platform. New platforms should
+> not have this property.
 > 
-> On 10:58 Wed 24 Oct     , Jerome Brunet wrote:
->> On Thu, 2018-10-18 at 13:07 +0800, Jianxin Pan wrote:
->>> From: Yixun Lan <yixun.lan@amlogic.com>
->>>
->>> Document the MMC sub clock controller driver, the potential consumer
->>> of this driver is MMC or NAND. Also add four clock bindings IDs which
->>> provided by this driver.
->>>
->>> Reviewed-by: Rob Herring <robh@kernel.org>
->>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->>> Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
->>> ---
->>>  .../devicetree/bindings/clock/amlogic,mmc-clkc.txt | 31 ++++++++++++++++++++++
->>>  include/dt-bindings/clock/amlogic,mmc-clkc.h       | 17 ++++++++++++
->>>  2 files changed, 48 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
->>>  create mode 100644 include/dt-bindings/clock/amlogic,mmc-clkc.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
->>> new file mode 100644
->>> index 0000000..9e6d343
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
->>> @@ -0,0 +1,31 @@
->>> +* Amlogic MMC Sub Clock Controller Driver
->>> +
->>> +The Amlogic MMC clock controller generates and supplies clock to support
->>> +MMC and NAND controller
->>> +
->>> +Required Properties:
->>> +
->>> +- compatible: should be:
->>> +		"amlogic,gx-mmc-clkc"
->>> +		"amlogic,axg-mmc-clkc"
->>> +
->>> +- #clock-cells: should be 1.
->>> +- clocks: phandles to clocks corresponding to the clock-names property
->>> +- clock-names: list of parent clock names
->>> +	- "clkin0", "clkin1"
->>> +
->>> +Parent node should have the following properties :
->>> +- compatible: "amlogic,axg-mmc-clkc", "syscon".
->>> +- reg: base address and size of the MMC control register space.
->>
->> I get why Stephen is confused by your description, I am too. The example
->> contradict the documentation.
->>
->> The  documentation above says that the parent node should be a syscon with the
->> mmc register space.
->>
->> But your example shows this in the node itself.
->>
+> > +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
+> IRQ_TYPE_LEVEL_LOW)>,
+> > +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
+> IRQ_TYPE_LEVEL_LOW)>;
+> > +		clock-frequency = <1000000>;
 > 
-> yes, I think the documentation need to be fixed
-ok, Thankyou. I will fix it in the next version.
+> This too should be initialized by firmware and not in DT IIRC.
 > 
-> for the final solution, we decide to make 'mmc-clkc' an independent node
-> instead of being a sub-node of 'mmc', so both of them may exist in parallel..
+
+Sorry for the careless. I should double checking these codes before sending
+as the origin code base is quite old since first version.
+
+
+> > +		status = "disabled";
 > 
-> the DT part may like this:
+> I think enabled should be the norm.
 > 
-> 			sd_emmc_c_clkc: clock-controller at 7000 {
-> 				compatible = "amlogic,axg-mmc-clkc", "syscon";
-> 				reg = <0x0 0x7000 0x0 0x4>;
-> 				...
-> 			};
+
+This is mostly because the arm timer may stop during low power idle
+and we already have a TPM timer function the same in SoC.
+Do you think we should still enable it?
+
+> > +	};
+> > +
+> > +	ahbbridge0: bus at 40000000 {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		reg = <0x40000000 0x800000>;
+> > +		ranges;
+> > +
+> > +		lpuart4: serial at 402d0000 {
+> > +			compatible = "fsl,imx7ulp-lpuart";
+> > +			reg = <0x402d0000 0x1000>;
+> > +			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clocks = <&pcc2 IMX7ULP_CLK_LPUART4>;
+> > +			clock-names = "ipg";
+> > +			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPUART4>;
+> > +			assigned-clock-parents = <&scg1
+> IMX7ULP_CLK_SOSC_BUS_CLK>;
+> > +			assigned-clock-rates = <24000000>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		lpuart5: serial at 402e0000 {
+> > +			compatible = "fsl,imx7ulp-lpuart";
+> > +			reg = <0x402e0000 0x1000>;
+> > +			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clocks = <&pcc2 IMX7ULP_CLK_LPUART5>;
+> > +			clock-names = "ipg";
+> > +			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPUART5>;
+> > +			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
+> > +			assigned-clock-rates = <48000000>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		tpm5: tpm at 40260000 {
+> > +			compatible = "fsl,imx7ulp-tpm";
+> > +			reg = <0x40260000 0x1000>;
+> > +			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clocks = <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>,
+> > +				 <&pcc2 IMX7ULP_CLK_LPTPM5>;
+> > +			clock-names = "ipg", "per";
+> > +		};
+> > +
+> > +		usdhc0: usdhc at 40370000 {
 > 
-> 			sd_emmc_c: mmc at 7000 {
-> 				compatible = "amlogic,axg-mmc";
-> 				reg = <0x0 0x7000 0x0 0x800>;
-> 				...
-> 			};
+> mmc at ... is the standard name.
 > 
-> 
->>> +
->>> +Example: Clock controller node:
->>> +
->>> +sd_mmc_c_clkc: clock-controller at 7000 {
->>> +	compatible = "amlogic,axg-mmc-clkc", "syscon";
->>> +	reg = <0x0 0x7000 0x0 0x4>;
->>> +	#clock-cells = <1>;
->>> +
->>> +	clock-names = "clkin0", "clkin1";
->>> +	clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
->>> +		 <&clkc CLKID_FCLK_DIV2>;
->>> +};
->>> diff --git a/include/dt-bindings/clock/amlogic,mmc-clkc.h b/include/dt-bindings/clock/amlogic,mmc-clkc.h
->>> new file mode 100644
->>> index 0000000..162b949
->>> --- /dev/null
->>> +++ b/include/dt-bindings/clock/amlogic,mmc-clkc.h
->>> @@ -0,0 +1,17 @@
->>> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
->>> +/*
->>> + * Meson MMC sub clock tree IDs
->>> + *
->>> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
->>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
->>> + */
->>> +
->>> +#ifndef __MMC_CLKC_H
->>> +#define __MMC_CLKC_H
->>> +
->>> +#define CLKID_MMC_DIV				1
->>> +#define CLKID_MMC_PHASE_CORE			2
->>> +#define CLKID_MMC_PHASE_TX			3
->>> +#define CLKID_MMC_PHASE_RX			4
->>> +
->>> +#endif
->>
->>
->>
->> _______________________________________________
->> linux-amlogic mailing list
->> linux-amlogic at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-amlogic
-> 
+
+I should be more careful about these. Other places are the same.
+Thanks for the reminder.
+
+Regards
+Dong Aisheng
