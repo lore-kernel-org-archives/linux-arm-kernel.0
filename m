@@ -1,45 +1,87 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2018 09:03:30 +0100
-Subject: [PATCH] mfd: db8500-prcmu: Fix some section annotations
-In-Reply-To: <20181018005628.8295-1-natechancellor@gmail.com>
-References: <20181018005628.8295-1-natechancellor@gmail.com>
-Message-ID: <20181025080330.GI4939@dell>
+From: pmladek@suse.com (Petr Mladek)
+Date: Thu, 25 Oct 2018 10:08:16 +0200
+Subject: [PATCH] arm64/module: use mod->klp_info section header information
+In-Reply-To: <20181023175553.gaobskk26koft6s2@linux-8ccs>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141652.5478C68BE1@newverein.lst.de>
+ <20181023175553.gaobskk26koft6s2@linux-8ccs>
+Message-ID: <20181025080816.525dppcfrrevf6jc@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Oct 2018, Nathan Chancellor wrote:
+On Tue 2018-10-23 19:55:54, Jessica Yu wrote:
+> The arm64 module loader keeps a pointer into info->sechdrs to keep track
+> of section header information for .plt section(s). A pointer to the
+> relevent section header (struct elf64_shdr) in info->sechdrs is stored
+> in mod->arch.{init,core}.plt. This pointer may be accessed while
+> applying relocations in apply_relocate_add() for example. And unlike
+> normal modules, livepatch modules can call apply_relocate_add() after
+> module load. But the info struct (and therefore info->sechdrs) gets
+> freed at the end of load_module() and so mod->arch.{init,core}.plt
+> becomes an invalid pointer after the module is done loading.
+> 
+> Luckily, livepatch modules already keep a copy of Elf section header
+> information in mod->klp_info. So make sure livepatch modules on arm64
+> have access to the section headers in klp_info and set
+> mod->arch.{init,core}.plt to the appropriate section header in
+> mod->klp_info so that they can call apply_relocate_add() even after
+> module load.
+> 
+> diff --git a/kernel/module.c b/kernel/module.c
+> index f475f30eed8c..f3ac04cc9fc3 100644
+> --- a/kernel/module.c
+> +++ b/kernel/module.c
+> @@ -3367,6 +3367,8 @@ int __weak module_finalize(const Elf_Ehdr *hdr,
+> 
+> static int post_relocation(struct module *mod, const struct load_info *info)
+> {
+> +	int err;
+> +
+> 	/* Sort exception table now relocations are done. */
+> 	sort_extable(mod->extable, mod->extable + mod->num_exentries);
+> 
+> @@ -3377,8 +3379,18 @@ static int post_relocation(struct module *mod, const struct load_info *info)
+> 	/* Setup kallsyms-specific fields. */
+> 	add_kallsyms(mod, info);
+> 
+> +	if (is_livepatch_module(mod)) {
+> +		err = copy_module_elf(mod, info);
+> +		if (err < 0)
+> +			return err;
+> +	}
+> +
+> 	/* Arch-specific module finalizing. */
+> -	return module_finalize(info->hdr, info->sechdrs, mod);
+> +	err = module_finalize(info->hdr, info->sechdrs, mod);
+> +	if (err < 0)
 
-> When building the kernel with Clang, the following section mismatch
-> warnings appear:
-> 
-> WARNING: vmlinux.o(.text+0x7239cc): Section mismatch in reference from
-> the function db8500_prcmu_probe() to the function
-> .init.text:init_prcm_registers()
-> The function db8500_prcmu_probe() references
-> the function __init init_prcm_registers().
-> This is often because db8500_prcmu_probe lacks a __init
-> annotation or the annotation of init_prcm_registers is wrong.
-> 
-> WARNING: vmlinux.o(.text+0x723e28): Section mismatch in reference from
-> the function db8500_prcmu_probe() to the function
-> .init.text:fw_project_name()
-> The function db8500_prcmu_probe() references
-> the function __init fw_project_name().
-> This is often because db8500_prcmu_probe lacks a __init
-> annotation or the annotation of fw_project_name is wrong.
-> 
-> db8500_prcmu_probe should not be marked as __init so remove the __init
-> annotation from fw_project_name and init_prcm_registers.
-> 
-> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
-> ---
->  drivers/mfd/db8500-prcmu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+	if (err < 0 && is_livepatch_module(mod))
 
-Applied for v4.21, thanks.
+> +		free_module_elf(mod);
+> +
+> +	return err;
+> }
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Also we need to free the copied stuff in load_module() when
+anything called after post_relocation() fails. I think
+that the following would work:
+
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -3823,6 +3823,8 @@ static int load_module(struct load_info *info, const char __user *uargs,
+ 	kfree(mod->args);
+  free_arch_cleanup:
+ 	module_arch_cleanup(mod);
++	if (is_livepatch_module(mod))
++		free_module_elf(mod);
+  free_modinfo:
+ 	free_modinfo(mod);
+  free_unload:
+
+
+But I suggest to just move copy_module_elf() up and keep
+calling it from load_module() directly. It would make
+the error handling more clear.
+
+Best Regards,
+Petr
