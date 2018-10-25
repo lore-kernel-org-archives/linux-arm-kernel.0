@@ -1,79 +1,59 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 25 Oct 2018 19:58:47 +0200
-Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
-In-Reply-To: <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
-References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
- <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <c023948f3baee96cb186f970fdb71ebd@agner.ch>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Oct 2018 19:03:32 +0100
+Subject: [PATCH 2/2] perf tests: Add a test for the ARM 32-bit [vectors]
+ page
+In-Reply-To: <a6f5b6e7-4d3e-dd8f-4028-0ee370b11722@gmail.com>
+References: <20181025000905.6095-1-f.fainelli@gmail.com>
+ <20181025000905.6095-3-f.fainelli@gmail.com>
+ <20181025021013.GA30116@lunn.ch>
+ <175fd725-a97a-c282-5aa1-952014ff9023@gmail.com>
+ <20181025173242.GC30658@n2100.armlinux.org.uk>
+ <a6f5b6e7-4d3e-dd8f-4028-0ee370b11722@gmail.com>
+Message-ID: <20181025180332.GD30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.10.2018 13:49, A.s. Dong wrote:
-> Some SoCs need the gpio clock to be enabled before accessing
-> HW registers. This patch add the optional clock handling.
+On Thu, Oct 25, 2018 at 10:53:12AM -0700, Florian Fainelli wrote:
+> Something like this below? It does not have to be an alternative
+> solution, I would find it useful for perf to make sure the vectors page
+> is present in the virtual address space by having an explicit test. perf
+> maintains, what do you think?
+
+Yep, I'd swap the two tests merely because the check for 'sig' will be
+slightly cheaper than the mask-and-test of addr, but it probably doesn't
+make that much difference.
+
 > 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: linux-gpio at vger.kernel.org
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> v1->v2:
->  * new patch
-> ---
->  drivers/gpio/gpio-vf610.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index f4ea4c62c613..b045b48d368d 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -173,6 +173,11 @@ __do_user_fault(struct task_struct *tsk, unsigned
+> long addr,
+>                 show_regs(regs);
+>         }
+>  #endif
+> +#ifndef CONFIG_KUSER_HELPERS
+> +       if (((addr & PAGE_MASK) == 0xffff0000) && (sig == SIGSEGV))
+> +               printk(KERN_DEBUG "%s: CONFIG_KUSER_HELPERS disabled at
+> 0x%08lx\n",
+> +                      tsk->comm, addr);
+> +#endif
 > 
-> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-> index d4ad6d0..cbc4f44 100644
-> --- a/drivers/gpio/gpio-vf610.c
-> +++ b/drivers/gpio/gpio-vf610.c
-> @@ -16,6 +16,7 @@
->   */
->  
->  #include <linux/bitops.h>
-> +#include <linux/clk.h>
->  #include <linux/err.h>
->  #include <linux/gpio.h>
->  #include <linux/init.h>
-> @@ -256,6 +257,7 @@ static int vf610_gpio_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
-> +	struct clk *clk_gpio, *clk_port;
->  	struct vf610_gpio_port *port;
->  	struct resource *iores;
->  	struct gpio_chip *gc;
-> @@ -280,6 +282,24 @@ static int vf610_gpio_probe(struct platform_device *pdev)
->  	if (port->irq < 0)
->  		return port->irq;
->  
-> +	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
-> +	clk_port = devm_clk_get(&pdev->dev, "port");
+>         tsk->thread.address = addr;
+>         tsk->thread.error_code = fsr;
+> 
+> 
+> > 
+> > BTW, I note that the help text for CONFIG_KUSER_HELPERS needs to be
+> > updated.
+> > 
+> 
+> 
+> -- 
+> Florian
 
-Are you sure that those are two independent clocks? On i.MX 7 usually
-there was a single clock gate controlling multiple clocks at once (which
-should be modeled as a single clock gate in the clock tree).
-
---
-Stefan 
-
-> +	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
-> +	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
-> +		return -EPROBE_DEFER;
-> +	} else if (!IS_ERR_OR_NULL(clk_gpio) &&
-> +		   !IS_ERR_OR_NULL(clk_port)) {
-> +		ret = clk_prepare_enable(clk_gpio);
-> +		if (ret)
-> +			return ret;
-> +
-> +		ret = clk_prepare_enable(clk_port);
-> +		if (ret) {
-> +			clk_disable_unprepare(clk_gpio);
-> +			return ret;
-> +		}
-> +	}
-> +
->  	gc = &port->gc;
->  	gc->of_node = np;
->  	gc->parent = dev;
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
