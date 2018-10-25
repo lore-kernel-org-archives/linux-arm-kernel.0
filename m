@@ -1,66 +1,122 @@
-From: qiangqing.zhang@nxp.com (Joakim Zhang)
-Date: Thu, 25 Oct 2018 00:44:24 +0000
-Subject: [PATCH V1 3/3] ARM: dts: sabreauto: Add flexcan support
-In-Reply-To: <CAOMZO5Cm2U4dR982vYTmb5zfdjfXbQ95B+mDt2Fp8D-QtvT6FA@mail.gmail.com>
-References: <20181024111213.2724-1-qiangqing.zhang@nxp.com>
- <20181024111213.2724-4-qiangqing.zhang@nxp.com>
- <CAOMZO5Cm2U4dR982vYTmb5zfdjfXbQ95B+mDt2Fp8D-QtvT6FA@mail.gmail.com>
-Message-ID: <DB7PR04MB4618CEA5069E3A276E92D22AE6F70@DB7PR04MB4618.eurprd04.prod.outlook.com>
+From: rick.p.edgecombe@intel.com (Edgecombe, Rick P)
+Date: Thu, 25 Oct 2018 01:01:44 +0000
+Subject: [PATCH RFC v3 0/3] Rlimit for module space
+In-Reply-To: <d7cb6a8c-b7d6-5c82-6721-2b5387da673f@iogearbox.net>
+References: <20181019204723.3903-1-rick.p.edgecombe@intel.com>
+ <CAKv+Gu_AgPv2o4=U0-7pnpgtSufEobnta8oKhhGfCdCxM82B5Q@mail.gmail.com>
+ <6b1017c450d163539d2b974657baaaf697f0a138.camel@intel.com>
+ <CAKv+Gu-Rk-SQVOQ63L3DkF3=EVik3pHXzpNp5r5TrgDajTM_iQ@mail.gmail.com>
+ <20181024150706.jewcclhhh756tupn@linux-8ccs>
+ <d7cb6a8c-b7d6-5c82-6721-2b5387da673f@iogearbox.net>
+Message-ID: <d1fec827d028168047eafbac56e8e47d37cf7fb5.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2018-10-24 at 18:04 +0200, Daniel Borkmann wrote:
+> [ +Alexei, netdev ]
+> 
+> On 10/24/2018 05:07 PM, Jessica Yu wrote:
+> > +++ Ard Biesheuvel [23/10/18 08:54 -0300]:
+> > > On 22 October 2018 at 20:06, Edgecombe, Rick P
+> > > <rick.p.edgecombe@intel.com> wrote:
+> 
+> [...]
+> > > I think it is wrong to conflate the two things. Limiting the number of
+> > > BPF allocations and the limiting number of module allocations are two
+> > > separate things, and the fact that BPF reuses module_alloc() out of
+> > > convenience does not mean a single rlimit for both is appropriate.
+> > 
+> > Hm, I think Ard has a good point. AFAIK, and correct me if I'm wrong,
+> > users of module_alloc() i.e. kprobes, ftrace, bpf, seem to use it
+> > because it is an easy way to obtain executable kernel memory (and
+> > depending on the needs of the architecture, being additionally
+> > reachable via relative branches) during runtime. The side effect is
+> > that all these users share the "module" memory space, even though this
+> > memory region is not exclusively used by modules (well, personally I
+> > think it technically should be, because seeing module_alloc() usage
+> > outside of the module loader is kind of a misuse of the module API and
+> > it's confusing for people who don't know the reason behind its usage
+> > outside of the module loader).
+> > 
+> > Right now I'm not sure if it makes sense to impose a blanket limit on
+> > all module_alloc() allocations when the real motivation behind the
+> > rlimit is related to BPF, i.e., to stop unprivileged users from
+> > hogging up all the vmalloc space for modules with JITed BPF filters.
+> > So the rlimit has more to do with limiting the memory usage of BPF
+> > filters than it has to do with modules themselves.
+> > 
+> > I think Ard's suggestion of having a separate bpf_alloc/free API makes
+> > a lot of sense if we want to keep track of bpf-related allocations
+> > (and then the rlimit would be enforced for those). Maybe part of the
+> > module mapping space could be carved out for bpf filters (e.g. have
+> > BPF_VADDR, BPF_VSIZE, etc like how we have it for modules), or
+> > continue sharing the region but explicitly define a separate bpf_alloc
+> > API, depending on an architecture's needs. What do people think?
+> 
+> Hmm, I think here are several issues mixed up at the same time which is just
+> very confusing, imho:
+> 
+> 1) The fact that there are several non-module users of module_alloc()
+> as Jessica notes such as kprobes, ftrace, bpf, for example. While all of
+> them are not being modules, they all need to alloc some piece of executable
+> memory. It's nothing new, this exists for 7 years now since 0a14842f5a3c
+> ("net: filter: Just In Time compiler for x86-64") from BPF side; effectively
+> that is even /before/ eBPF existed. Having some different API perhaps for all
+> these users seems to make sense if the goal is not to interfere with modules
+> themselves. It might also help as a benefit to potentially increase that
+> memory pool if we're hitting limits at scale which would not be a concern
+> for normal kernel modules since there's usually just a very few of them
+> needed (unlike dynamically tracing various kernel parts 24/7 w/ or w/o BPF,
+> running BPF-seccomp policies, networking BPF policies, etc which need to
+> scale w/ application or container deployment; so this is of much more
+> dynamic and unpredictable nature).
+> 
+> 2) Then there is rlimit which is proposing to have a "fairer" share among
+> unprivileged users. I'm not fully sure yet whether rlimit is actually a
+> nice usable interface for all this. I'd agree that something is needed
+> on that regard, but I also tend to like Michal Hocko's cgroup proposal,
+> iow, to have such resource control as part of memory cgroup could be
+> something to consider _especially_ since it already _exists_ for vmalloc()
+> backed memory so this should be not much different than that. It sounds
+> like 2) comes on top of 1).
+FWIW, cgroups seems like a better solution than rlimit to me too. Maybe you all
+already know, but it looks like the cgroups vmalloc charge is done in the main
+page allocator and counts against the whole kernel memory limit. A user may want
+to have a higher kernel limit than the module space size, so it seems it isn't
+enough by itself and some new limit would need to be added.
 
------Original Message-----
-From: Fabio Estevam [mailto:festevam at gmail.com] 
-Sent: 2018?10?24? 19:20
-To: Joakim Zhang <qiangqing.zhang@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; Rob Herring <robh+dt@kernel.org>; moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>; A.s. Dong <aisheng.dong@nxp.com>
-Subject: Re: [PATCH V1 3/3] ARM: dts: sabreauto: Add flexcan support
+As for what the limit should be, I wonder if some of the disagreement is just
+from the name "module space".
 
-Hi Joakim,
+There is a limited resource of physical memory, so we have limits for it. There
+is a limited resource of CPU time, so we have limits for it. If there is a
+limited resource for preferred address space for executable code, why not just
+continue that trend? If other forms of unprivileged JIT come along, would it be
+better to have N limits for each type? Request_module probably can't fill the
+space, but technically there are already 2 unprivileged users. So IMHO, its a
+more forward looking solution.
 
-On Wed, Oct 24, 2018 at 8:15 AM Joakim Zhang <qiangqing.zhang@nxp.com> wrote:
+If there are some usage/architecture combos that don't need the preferred space
+they can allocate in vmalloc and have it not count against the preferred space
+limit but still count against the cgroups kernel memory limit.
 
-> diff --git a/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
-> new file mode 100644
-> index 000000000000..963e0b559d60
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
-> @@ -0,0 +1,19 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+Another benefit of centralizing the allocation of the "executable memory
+preferred space" is KASLR. Right now that is only done in module_alloc and so
+all users of it get randomized. If they all call vmalloc by themselves they will
+just use the normal allocator.
 
-You can remove this paragraph as you are using SPDX tag.
+Anyway, it seems like either type of limit (BPF JIT or all module space) will
+solve the problem equally well today.
 
-> +++ b/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
-> @@ -0,0 +1,19 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-
-Ditto.
-
-> +&can1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_flexcan1>;
-> +       pinctrl-assert-gpios = <&max7310_b 3 GPIO_ACTIVE_HIGH>; /* TX */
-
-This property does not exist in upstream.
-
-
-Hi Fabio,
-
-I will modify what you have commented. Thanks a lot.
-
-Best Regards,
-Joakim Zhang
+> 3) Last but not least, there's a short term fix which is needed independently
+> of 1) and 2) and should be done immediately which is to account for
+> unprivileged users and restrict them based on a global configurable
+> limit such that privileged use keeps functioning, and 2) could enforce
+> based on the global upper limit, for example. Pending fix is under
+> https://patchwork.ozlabs.org/patch/987971/ which we intend to ship to
+> Linus as soon as possible as short term fix. Then something like memcg
+> can be considered on top since it seems this makes most sense from a
+> usability point.
+> 
+> Thanks a lot,
+> Daniel
