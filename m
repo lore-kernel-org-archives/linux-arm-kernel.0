@@ -1,57 +1,102 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 25 Oct 2018 08:25:04 -0500
-Subject: [PATCH v3 1/3] of/fdt: Absorb ARM64's
- __early_init_dt_declare_initrd()
-In-Reply-To: <20181025001742.6510-2-f.fainelli@gmail.com>
-References: <20181025001742.6510-1-f.fainelli@gmail.com>
- <20181025001742.6510-2-f.fainelli@gmail.com>
-Message-ID: <CAL_JsqK-bSu520fx-dWMyHsooOU9=24DEf6fZSudQ-QKDkXbGA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Oct 2018 14:43:44 +0100
+Subject: [PATCH 1/2] mm/zsmalloc.c: check encoded object value overflow
+ for PAE
+In-Reply-To: <CABdQkv_cC4ixEFr91zyg-S21O5_7U8FV7=g7ZMRqGcQyhrwzaQ@mail.gmail.com>
+References: <20181025012745.20884-1-rafael.tinoco@linaro.org>
+ <20181025120006.GY30658@n2100.armlinux.org.uk>
+ <CABdQkv_cC4ixEFr91zyg-S21O5_7U8FV7=g7ZMRqGcQyhrwzaQ@mail.gmail.com>
+Message-ID: <20181025134344.GZ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 7:17 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
->
-> ARM64 is the only architecture that requires a re-definition of
-> __early_init_dt_declare_initrd(), absorb its custom implemention in
-> drivers/of/fdt.c.
->
-> Suggested-by: Rob Herring <robh@kernel.org.
+On Thu, Oct 25, 2018 at 09:37:59AM -0300, Rafael David Tinoco wrote:
+> Is it okay to propose using only MAX_PHYSMEM_BITS for zsmalloc (like
+> it was before commit 02390b87) instead, and make sure *at least* ARM
+> 32/64 and x86/x64, for now, have it defined outside sparsemem headers
+> as well ?
 
-You forgot a shift key. :)
+It looks to me like this has been broken on ARM for quite some time,
+predating that commit.  The original was:
 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  drivers/of/fdt.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 800ad252cf9c..7d316f008f22 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -896,9 +896,14 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
->  static void __early_init_dt_declare_initrd(unsigned long start,
->                                            unsigned long end)
->  {
-> +#if IS_ENABLED(CONFIG_ARM64)
+#ifndef MAX_PHYSMEM_BITS
+#ifdef CONFIG_HIGHMEM64G
+#define MAX_PHYSMEM_BITS 36
+#else /* !CONFIG_HIGHMEM64G */
+#define MAX_PHYSMEM_BITS BITS_PER_LONG
+#endif
+#endif
+#define _PFN_BITS              (MAX_PHYSMEM_BITS - PAGE_SHIFT)
 
-C code, not preprocessor please.
+On ARM, CONFIG_HIGHMEM64G is never defined (it's an x86 private symbol)
+which means that the above sets MAX_PHYSMEM_BITS to 32 on non-sparsemem
+ARM LPAE platforms.  So commit 02390b87 hasn't really changed anything
+as far as ARM LPAE is concerned - and this looks to be a bug that goes
+all the way back to when zsmalloc.c was moved out of staging in 2014.
 
-> +       initrd_start = start;
-> +       initrd_end = end;
+Digging further back, it seems this brokenness was introduced with:
 
-Thinking some more about this, perhaps it is better to just add the
-*_phys variants now along side the VA variants and set them here. Then
-the arm64 code can override the initrd_start, initrd_end, and
-initrd_below_start_ok values.
+commit 6e00ec00b1a76a199b8c0acae401757b795daf57
+Author: Seth Jennings <sjenning@linux.vnet.ibm.com>
+Date:   Mon Mar 5 11:33:22 2012 -0600
 
-> +#else
->         initrd_start = (unsigned long)__va(start);
->         initrd_end = (unsigned long)__va(end);
->         initrd_below_start_ok = 1;
-> +#endif
->  }
->  #endif
->
-> --
-> 2.17.1
->
+    staging: zsmalloc: calculate MAX_PHYSMEM_BITS if not defined
+
+    This patch provides a way to determine or "set a
+    reasonable value for" MAX_PHYSMEM_BITS in the case that
+    it is not defined (i.e. !SPARSEMEM)
+
+    Signed-off-by: Seth Jennings <sjenning@linux.vnet.ibm.com>
+    Acked-by: Nitin Gupta <ngupta@vflare.org>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+which, at the time, realised the problem with SPARSEMEM, but decided
+that in the absense of SPARSEMEM, that MAX_PHYSMEM_BITS shall be
+BITS_PER_LONG which seems absurd (see below.)
+
+> This way I can WARN_ONCE(), instead of BUG(), when specific
+> arch does not define it - enforcing behavior - showing BITS_PER_LONG
+> is being used instead of MAX_PHYSMEM_BITS (warning, at least once, for
+> the possibility of an overflow, like the issue showed in here).
+
+Assuming that the maximum number of physical memory bits are
+BITS_PER_LONG in the absense of MAX_POSSIBLE_PHYSMEM_BITS is a nonsense
+- we have had the potential for PAE systems for a long time, and to
+introduce new code that makes this assumption was plainly wrong.
+
+We know when there's the potential for PAE, and thus more than
+BITS_PER_LONG bits of physical memory address, through
+CONFIG_PHYS_ADDR_T_64BIT.  So if we have the situation where
+MAX_POSSIBLE_PHYSMEM_BITS (or the older case of MAX_PHYSMEM_BITS) not
+being defined, but CONFIG_PHYS_ADDR_T_64BIT set, we should've been
+erroring or something based on not knowing how many physical memory
+bits are possible - it would be more than BITS_PER_LONG but less
+than some unknown number of bits.
+
+This is why I think any fallback here to BITS_PER_LONG is wrong.
+
+What I suggested is to not fall back to BITS_PER_LONG in any case, but
+always define MAX_PHYSMEM_BITS.  However, I now see that won't work for
+x86 because MAX_PHYSMEM_BITS is not a constant anymore.
+
+So I suggest everything that uses zsmalloc.c should instead define
+MAX_POSSIBLE_PHYSMEM_BITS.
+
+Note that there should _also_ be some protection in zsmalloc.c against
+MAX_POSSIBLE_PHYSMEM_BITS being too large:
+
+#define OBJ_INDEX_BITS  (BITS_PER_LONG - _PFN_BITS - OBJ_TAG_BITS)
+#define OBJ_TAG_BITS 1
+#define _PFN_BITS               (MAX_POSSIBLE_PHYSMEM_BITS - PAGE_SHIFT)
+
+which means there's an implicit limitation on _PFN_BITS being less than
+BITS_PER_LONG - OBJ_TAG_BITS (where, if it's equal to this, and hence
+OBJ_INDEX_BITS will be zero.)  This imples that MAX_POSSIBLE_PHYSMEM_BITS
+must be smaller than BITS_PER_LONG + PAGE_SHIFT - OBJ_TAG_BITS, or
+43 bits on a 32 bit system.  If you want to guarantee a minimum number
+of objects, then that limitation needs to be reduced further.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
