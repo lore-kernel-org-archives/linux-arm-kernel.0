@@ -1,58 +1,85 @@
-From: sashal@kernel.org (Sasha Levin)
-Date: Thu, 25 Oct 2018 10:18:32 -0400
-Subject: [PATCH AUTOSEL 3.18 77/98] clocksource/exynos_mct: Clear interrupt
- when cpu is shut down
-In-Reply-To: <20181025141853.214051-1-sashal@kernel.org>
-References: <20181025141853.214051-1-sashal@kernel.org>
-Message-ID: <20181025141853.214051-77-sashal@kernel.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 25 Oct 2018 09:31:32 -0500
+Subject: [PATCH v3 1/3] of/fdt: Absorb ARM64's
+ __early_init_dt_declare_initrd()
+In-Reply-To: <20181025140636.GA30658@n2100.armlinux.org.uk>
+References: <20181025001742.6510-1-f.fainelli@gmail.com>
+ <20181025001742.6510-2-f.fainelli@gmail.com>
+ <CAL_JsqK-bSu520fx-dWMyHsooOU9=24DEf6fZSudQ-QKDkXbGA@mail.gmail.com>
+ <20181025140636.GA30658@n2100.armlinux.org.uk>
+Message-ID: <CAL_JsqJU67p+Qck-38uaV81MWfGshPem96cAKcz3W7--dzyzoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joonyoung Shim <jy0922.shim@samsung.com>
+On Thu, Oct 25, 2018 at 9:06 AM Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+>
+> On Thu, Oct 25, 2018 at 08:25:04AM -0500, Rob Herring wrote:
+> > On Wed, Oct 24, 2018 at 7:17 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > >
+> > > ARM64 is the only architecture that requires a re-definition of
+> > > __early_init_dt_declare_initrd(), absorb its custom implemention in
+> > > drivers/of/fdt.c.
+> > >
+> > > Suggested-by: Rob Herring <robh@kernel.org.
+> >
+> > You forgot a shift key. :)
+> >
+> > > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> > > ---
+> > >  drivers/of/fdt.c | 5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > >
+> > > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> > > index 800ad252cf9c..7d316f008f22 100644
+> > > --- a/drivers/of/fdt.c
+> > > +++ b/drivers/of/fdt.c
+> > > @@ -896,9 +896,14 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
+> > >  static void __early_init_dt_declare_initrd(unsigned long start,
+> > >                                            unsigned long end)
+> > >  {
+> > > +#if IS_ENABLED(CONFIG_ARM64)
+> >
+> > C code, not preprocessor please.
+> >
+> > > +       initrd_start = start;
+> > > +       initrd_end = end;
+> >
+> > Thinking some more about this, perhaps it is better to just add the
+> > *_phys variants now along side the VA variants and set them here. Then
+> > the arm64 code can override the initrd_start, initrd_end, and
+> > initrd_below_start_ok values.
+>
+> Please, let's not make the age old mistake of inventing new symbols
+> for stuff that already exists:
+>
+> $ grep phys_initrd_start arch/ -rl
+> arch/arm/mm/init.c
+> arch/nds32/mm/init.c
+> arch/unicore32/mm/init.c
+> $ grep initrd_start_phys arch/ -rl
+> $
+>
+> Please use the "phys_initrd_start" and "phys_initrd_end" naming,
 
-[ Upstream commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 ]
+Yes, of course. That is what I intended. I assumed Florian would be
+aware of it from your other email.
 
-When a CPU goes offline a potentially pending timer interrupt is not
-cleared. When the CPU comes online again then the pending interrupt is
-delivered before the per cpu clockevent device is initialized. As a
-consequence the tick interrupt handler dereferences a NULL pointer.
-
-[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
-[   51.289348] task: ee942d00 task.stack: ee960000
-[   51.293861] PC is at tick_periodic+0x38/0xb0
-[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
-
-Clear the pending interrupt in the cpu dying path.
-
-Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
-Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: cw00.choi at samsung.com
-Cc: daniel.lezcano at linaro.org
-Cc: stable at vger.kernel.org
-Cc: javier at osg.samsung.com
-Cc: kgene at kernel.org
-Cc: krzk at kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Sasha Levin <sashal@kernel.org>
----
- drivers/clocksource/exynos_mct.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index c844616028d2..714f9a767b17 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -487,6 +487,7 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
- 	if (mct_int_type == MCT_INT_SPI) {
- 		if (evt->irq != -1)
- 			disable_irq_nosync(evt->irq);
-+		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
- 	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
- 	}
--- 
-2.17.1
+> which already exist on some architectures rather than inventing a new
+> set of symbols for the same thing and then forcing arches to change.
+> We could then get rid of:
+>
+>         /* FDT scan will populate initrd_start */
+>         if (initrd_start && !phys_initrd_size) {
+>                 phys_initrd_start = __virt_to_phys(initrd_start);
+>                 phys_initrd_size = initrd_end - initrd_start;
+>         }
+>
+>         initrd_start = initrd_end = 0;
+>
+> in ARM, which exists purely to cope with DT.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+> According to speedtest.net: 11.9Mbps down 500kbps up
