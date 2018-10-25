@@ -1,69 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2018 06:30:30 +0100
-Subject: [PATCH v8 08/12] mfd: intel-peci-client: Add PECI client MFD
- driver
-In-Reply-To: <db7570cb-8f63-b551-d119-c54270ce6139@linux.intel.com>
-References: <20180918215124.14003-1-jae.hyun.yoo@linux.intel.com>
- <20180918215124.14003-9-jae.hyun.yoo@linux.intel.com>
- <20181024105903.GB4939@dell>
- <db7570cb-8f63-b551-d119-c54270ce6139@linux.intel.com>
-Message-ID: <20181025053030.GD4939@dell>
+From: Ganapatrao.Kulkarni@cavium.com (Kulkarni, Ganapatrao)
+Date: Thu, 25 Oct 2018 05:59:15 +0000
+Subject: [PATCH v7 0/2] Add ThunderX2 SoC Performance Monitoring Unit driver
+Message-ID: <20181025055833.28471-1-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Oct 2018, Jae Hyun Yoo wrote:
-> On 10/24/2018 3:59 AM, Lee Jones wrote:
-> > On Tue, 18 Sep 2018, Jae Hyun Yoo wrote:
-> > 
-> > > This commit adds PECI client MFD driver.
-> > > 
-> 
-> <snip>
+This patchset adds PMU driver for Cavium's ThunderX2 SoC UNCORE devices.
+The SoC has PMU support in L3 cache controller (L3C) and in the
+DDR4 Memory Controller (DMC).
 
-[...]
+v7:
+	Incorporated review comments [3].
+	Modified driver as loadable module.
+	Updated Documentation with Event description.
+	Removed per-channel(no SMC calls) sampling implementation(
+	Since DMC and L3C channels are interleave, we have decided to
+	sample channel zero and prorate it to account for a Device).
 
-> > > +bool peci_temp_need_update(struct temp_data *temp)
-> > > +{
-> > > +	if (temp->valid &&
-> > > +	    time_before(jiffies, temp->last_updated + UPDATE_INTERVAL))
-> > > +		return false;
-> > > +
-> > > +	return true;
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(peci_temp_need_update);
-> > > +
-> > > +void peci_temp_mark_updated(struct temp_data *temp)
-> > > +{
-> > > +	temp->valid = 1;
-> > > +	temp->last_updated = jiffies;
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(peci_temp_mark_updated);
-> > 
-> > These are probably better suited as inline functions to be placed in
-> > a header file.  No need to export them, since they only use their own
-> > data.
+[3] https://patchwork.kernel.org/patch/10479203/
 
-Also move them into the HWMON header file.
+v6:
+	Rebased to 4.18-rc1
+	Updated with comments from John Garry[3]
 
-They have no business in MFD.
+[3] https://lkml.org/lkml/2018/5/17/408
 
-[...]
+v5:
+	Incorporated review comments from Mark Rutland[2]
+v4:
+	Incorporated review comments from Mark Rutland[1]
 
-> > > +int peci_client_rd_pkg_cfg_cmd(struct peci_mfd *priv, u8 mbx_idx,
-> > 
-> > This is gobbledegook.  What's rd?  Read?
-> > 
-> 
-> Yes, the 'rd' means 'read'. I intended to keep command names as listed
-> in the PECI specification such as RdPkgConfig, WrPkgConfig and so on.
-> Should I change it to 'peci_client_read_package_config_command' ?
+[1] https://www.spinics.net/lists/arm-kernel/msg588563.html
+[2] https://lkml.org/lkml/2018/4/26/376
 
-I looks/reads a lot nicer, don't you think?
+v3:
+	Fixed warning reported by kbuild robot
 
-[...]
+v2:
+	Rebased to 4.12-rc1
+	Removed Arch VULCAN dependency.
+	Update SMC call parameters as per latest firmware.
+
+v1:
+	Initial patch
+
+Ganapatrao Kulkarni (2):
+  perf, uncore: Adding documentation for ThunderX2 pmu uncore driver
+  ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE PMU driver
+
+ Documentation/perf/thunderx2-pmu.txt | 106 ++++
+ drivers/perf/Kconfig                 |   9 +
+ drivers/perf/Makefile                |   1 +
+ drivers/perf/thunderx2_pmu.c         | 867 +++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h           |   1 +
+ 5 files changed, 984 insertions(+)
+ create mode 100644 Documentation/perf/thunderx2-pmu.txt
+ create mode 100644 drivers/perf/thunderx2_pmu.c
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.18.0
