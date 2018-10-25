@@ -1,66 +1,51 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 25 Oct 2018 09:37:15 +0200
-Subject: [alsa-devel] [PATCH v2] staging: bcm2835-audio: interpolate audio
- delay
-In-Reply-To: <9884c4f5-2343-e3a4-8d8b-dd2db404ef27@gmail.com>
-References: <20181022191708.GA4659@ubuntu>
- <a703f8a2-e85a-bc5b-750a-cc43ef252ba5@gmail.com>
- <EA85FEC9-B1C7-4548-88F5-F0E7BC12158E@eircom.net>
- <046aea96-e0d3-60f4-c61a-c26bb1b5c193@gmail.com>
- <B9A84822-3780-4E01-96AD-FD3B42C44B45@eircom.net>
- <9884c4f5-2343-e3a4-8d8b-dd2db404ef27@gmail.com>
-Message-ID: <s5hftwuo4t0.wl-tiwai@suse.de>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 25 Oct 2018 09:45:32 +0200
+Subject: [PATCH V3 3/5] mm/hugetlb: Enable arch specific huge page size
+ support for migration
+In-Reply-To: <bf5e636c-9cc4-50d6-4160-78a1a7703860@arm.com>
+References: <1540299721-26484-1-git-send-email-anshuman.khandual@arm.com>
+ <1540299721-26484-4-git-send-email-anshuman.khandual@arm.com>
+ <20181024135639.GH18839@dhcp22.suse.cz>
+ <20181024135859.GI18839@dhcp22.suse.cz>
+ <bf5e636c-9cc4-50d6-4160-78a1a7703860@arm.com>
+Message-ID: <20181025074532.GM18839@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2018 00:02:34 +0200,
-Kirill Marinushkin wrote:
+On Thu 25-10-18 11:53:34, Anshuman Khandual wrote:
 > 
-> >> When you play sound - the pointer increments.
-> > 
-> > Unfortunately, when you play sound, the pointer does not actually increment, for up to about 10 milliseconds. I know of no way to actually access the true ?live? position of the frame that is being played at any instant; hence the desire to estimate it.
-> > 
 > 
-> Your vision of situation in the opposite from my vision. What you see as a
-> symptom - I see as a root cause. As I see, you should fix the
-> pointer-not-incrementing. Why do you think that it's okay that the pointer is
-> not updating during sound play? Why do you insist that there is a delay? I don't
-> understand why we are so stuck here.
+> On 10/24/2018 07:28 PM, Michal Hocko wrote:
+> > On Wed 24-10-18 15:56:39, Michal Hocko wrote:
+> >> On Tue 23-10-18 18:31:59, Anshuman Khandual wrote:
+> >>> Architectures like arm64 have HugeTLB page sizes which are different than
+> >>> generic sizes at PMD, PUD, PGD level and implemented via contiguous bits.
+> >>> At present these special size HugeTLB pages cannot be identified through
+> >>> macros like (PMD|PUD|PGDIR)_SHIFT and hence chosen not be migrated.
+> >>>
+> >>> Enabling migration support for these special HugeTLB page sizes along with
+> >>> the generic ones (PMD|PUD|PGD) would require identifying all of them on a
+> >>> given platform. A platform specific hook can precisely enumerate all huge
+> >>> page sizes supported for migration. Instead of comparing against standard
+> >>> huge page orders let hugetlb_migration_support() function call a platform
+> >>> hook arch_hugetlb_migration_support(). Default definition for the platform
+> >>> hook maintains existing semantics which checks standard huge page order.
+> >>> But an architecture can choose to override the default and provide support
+> >>> for a comprehensive set of huge page sizes.
+> >>>
+> >>> Reviewed-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+> >>> Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+> >>
+> >> Acked-by: Michal Hocko <mhocko@use.com>
+> > 
+> > fat fingers here, should be mhocko at suse.com of course.
+> 
+> Sure no problems. As we had discussed earlier and agreed to keep the previous
+> patch "mm/hugetlb: Enable PUD level huge page migration" separate and not fold
+> into this one, I will assume your ACK on it as well unless your disagree.
 
-Well, in the API POV, it's nothing wrong to keep hwptr sticking while
-updating only delay value.  It implies that the hardware chip doesn't
-provide the hwptr update.
+OK with me.
 
-Though, usually the delay value is provided also from the hardware,
-e.g. reading the link position or such.  It's a typical case like
-USB-audio, where the hwptr gets updated and the delay indicates the
-actual position *behind* hwptr.  That works because hwptr shows the
-position in the ring buffer at which you can access the data.  And it
-doesn't mean that hwptr is the actually playing position, but it can
-be ahead of the current position, when many samples are queued on
-FIFO.  The delay is provided to correct the position back to the
-actual point.
-
-But, this also doesn't mean that the delay shouldn't be used for the
-purpose like this patchset, either.  OTOH, providing a finer hwptr
-value would be likely more apps-friendly; there must be many programs
-that don't evaluate the delay value properly.
-
-So, I suppose that hwptr update might be a better option if the code
-won't become too complex.  Let's see.
-
-
-One another thing I'd like to point out is that the value given in the
-patch is nothing but an estimated position, optimistically calculated
-via the system timer.  Mike and I had already discussion in another
-thread, and another possible option would be to provide the proper
-timestamp-vs-hwptr pair, instead of updating the timestamp always at
-the status read.
-
-Maybe it's worth to have a module option to suppress this optimistic
-hwptr update behavior, in case something went wrong with clocks?
-
-
-thanks,
-
-Takashi
+-- 
+Michal Hocko
+SUSE Labs
