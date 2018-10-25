@@ -1,24 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 25 Oct 2018 16:18:20 -0500
-Subject: [RESEND PATCH 1/2] drm/panel: Add support for Armadeus ST0700
- Adapt
-In-Reply-To: <20181024125457.25204-1-sebastien.szymanski@armadeus.com>
-References: <20181024125457.25204-1-sebastien.szymanski@armadeus.com>
-Message-ID: <20181025211820.GA1173@bogus>
+Date: Thu, 25 Oct 2018 16:50:56 -0500
+Subject: [PATCH v2 1/4] dt-bindings: pci: layerscape-pci: add compatible
+ strings "fsl,ls1043a-pcie"
+In-Reply-To: <20181025094929.29481-2-Zhiqiang.Hou@nxp.com>
+References: <20181025094929.29481-1-Zhiqiang.Hou@nxp.com>
+ <20181025094929.29481-2-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181025215056.GA13567@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Oct 2018 14:54:56 +0200, =?UTF-8?q?S=C3=A9bastien=20Szymanski?= wrote:
-> This patch adds support for the Armadeus ST0700 Adapt. It comes with a
-> Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT and an adapter board so
-> that it can be connected on the TFT header of Armadeus Dev boards.
+On Thu, 25 Oct 2018 09:49:34 +0000, "Z.q. Hou" wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> The PCIe compatible string for LS1043A was lost, so add it.
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > ---
->  .../display/panel/armadeus,st0700-adapt.txt        |  9 +++++++
->  drivers/gpu/drm/panel/panel-simple.c               | 29 ++++++++++++++++++++++
->  2 files changed, 38 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
+> V2:
+>  - Improved the subject and corrected 'PCIe' casing.
+> 
+>  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
