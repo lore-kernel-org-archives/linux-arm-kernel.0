@@ -1,49 +1,35 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 25 Oct 2018 17:29:25 +0200
-Subject: [PATCH RFC 01/11] staging: bcm2835-camera: Abort probe if there is no
- camera
+Date: Thu, 25 Oct 2018 17:29:28 +0200
+Subject: [PATCH RFC 04/11] staging: vchiq_arm: Fix platform device
+ unregistration
 In-Reply-To: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
 References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1540481375-15952-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1540481375-15952-5-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abort the probing of the camera driver in case there isn't a camera
-actually connected to the Raspberry Pi. This solution also avoids a
-NULL ptr dereference of mmal instance on driver unload.
+In error case platform_device_register_data would return an ERR_PTR
+instead of NULL. So we better check this before unregistration.
 
-Fixes: 7b3ad5abf027 ("staging: Import the BCM2835 MMAL-based V4L2 camera driver.")
+Fixes: 37b7b3087a2f ("staging/vc04_services: Register a platform device for the camera driver.")
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-index c04bdf0..d6fbef7 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-@@ -1841,6 +1841,12 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
- 	num_cameras = get_num_cameras(instance,
- 				      resolutions,
- 				      MAX_BCM2835_CAMERAS);
-+
-+	if (num_cameras < 1) {
-+		ret = -ENODEV;
-+		goto cleanup_mmal;
-+	}
-+
- 	if (num_cameras > MAX_BCM2835_CAMERAS)
- 		num_cameras = MAX_BCM2835_CAMERAS;
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index ea78937..d7d7c2f0 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -3672,7 +3672,8 @@ static int vchiq_probe(struct platform_device *pdev)
  
-@@ -1940,6 +1946,9 @@ static int bcm2835_mmal_probe(struct platform_device *pdev)
- 	pr_info("%s: error %d while loading driver\n",
- 		BM2835_MMAL_MODULE_NAME, ret);
- 
-+cleanup_mmal:
-+	vchiq_mmal_finalise(instance);
-+
- 	return ret;
- }
- 
+ static int vchiq_remove(struct platform_device *pdev)
+ {
+-	platform_device_unregister(bcm2835_camera);
++	if (!IS_ERR(bcm2835_camera))
++		platform_device_unregister(bcm2835_camera);
+ 	vchiq_debugfs_deinit();
+ 	device_destroy(vchiq_class, vchiq_devid);
+ 	class_destroy(vchiq_class);
 -- 
 2.7.4
