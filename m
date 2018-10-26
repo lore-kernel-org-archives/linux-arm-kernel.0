@@ -1,49 +1,94 @@
-From: xiaowei.bao@nxp.com (Xiaowei Bao)
-Date: Fri, 26 Oct 2018 03:45:43 +0000
-Subject: [PATCH 3/6] PCI: layerscape: Add the EP mode support
-In-Reply-To: <20181025215246.GA14861@bogus>
-References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
- <20181025110901.5680-3-xiaowei.bao@nxp.com> <20181025215246.GA14861@bogus>
-Message-ID: <HE1PR04MB149735C7EF2A23AEE982BB9FF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 26 Oct 2018 03:49:32 +0000
+Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
+In-Reply-To: <c023948f3baee96cb186f970fdb71ebd@agner.ch>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
+ <c023948f3baee96cb186f970fdb71ebd@agner.ch>
+Message-ID: <AM0PR04MB42115EAC49CC0F67BE45CCB380F00@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
------Original Message-----
-From: Rob Herring <robh@kernel.org> 
-Sent: 2018?10?26? 5:53
-To: Xiaowei Bao <xiaowei.bao@nxp.com>
-Cc: bhelgaas at google.com; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; kishon at ti.com; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-Subject: Re: [PATCH 3/6] PCI: layerscape: Add the EP mode support
-
-On Thu, Oct 25, 2018 at 07:08:58PM +0800, Xiaowei Bao wrote:
-> Add the EP mode support.
+> -----Original Message-----
+> From: Stefan Agner [mailto:stefan at agner.ch]
+> Sent: Friday, October 26, 2018 1:59 AM
+[...]
 > 
-> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
-> ---
->  .../devicetree/bindings/pci/layerscape-pci.txt     |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+> On 23.10.2018 13:49, A.s. Dong wrote:
+> > Some SoCs need the gpio clock to be enabled before accessing HW
+> > registers. This patch add the optional clock handling.
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Stefan Agner <stefan@agner.ch>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: linux-gpio at vger.kernel.org
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> > v1->v2:
+> >  * new patch
+> > ---
+> >  drivers/gpio/gpio-vf610.c | 20 ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> >
+> > diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+> > index d4ad6d0..cbc4f44 100644
+> > --- a/drivers/gpio/gpio-vf610.c
+> > +++ b/drivers/gpio/gpio-vf610.c
+> > @@ -16,6 +16,7 @@
+> >   */
+> >
+> >  #include <linux/bitops.h>
+> > +#include <linux/clk.h>
+> >  #include <linux/err.h>
+> >  #include <linux/gpio.h>
+> >  #include <linux/init.h>
+> > @@ -256,6 +257,7 @@ static int vf610_gpio_probe(struct platform_device
+> > *pdev)  {
+> >  	struct device *dev = &pdev->dev;
+> >  	struct device_node *np = dev->of_node;
+> > +	struct clk *clk_gpio, *clk_port;
+> >  	struct vf610_gpio_port *port;
+> >  	struct resource *iores;
+> >  	struct gpio_chip *gc;
+> > @@ -280,6 +282,24 @@ static int vf610_gpio_probe(struct platform_device
+> *pdev)
+> >  	if (port->irq < 0)
+> >  		return port->irq;
+> >
+> > +	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
+> > +	clk_port = devm_clk_get(&pdev->dev, "port");
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 66df1e8..d3d7be1 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -13,12 +13,15 @@ information.
->  
->  Required properties:
->  - compatible: should contain the platform identifier such as:
-> +  RC mode:
->          "fsl,ls1021a-pcie", "snps,dw-pcie"
->          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
->          "fsl,ls2088a-pcie"
->          "fsl,ls1088a-pcie"
->          "fsl,ls1046a-pcie"
->          "fsl,ls1012a-pcie"
-> +  EP mode:
-> +        "fsl,ls-pcie-ep"
+> Are you sure that those are two independent clocks? On i.MX 7 usually there
+> was a single clock gate controlling multiple clocks at once (which should be
+> modeled as a single clock gate in the clock tree).
+> 
 
-You need SoC specific compatibles for the same reasons as the RC.
-[Xiaowei Bao] I want to contains all layerscape platform use one compatible if the PCIe controller work in EP mode.
+Yes, they're two separate clocks in HW for gpio and port controller respectively.
+One is for GPIO general purpose input/output function which another for port Interrupt.
+Just like we have separate register ranges for gpio and port.
 
-Rob
+Regards
+Dong Aisheng
+
+> --
+> Stefan
+> 
+> > +	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
+> > +	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
+> > +		return -EPROBE_DEFER;
+> > +	} else if (!IS_ERR_OR_NULL(clk_gpio) &&
+> > +		   !IS_ERR_OR_NULL(clk_port)) {
+> > +		ret = clk_prepare_enable(clk_gpio);
+> > +		if (ret)
+> > +			return ret;
+> > +
+> > +		ret = clk_prepare_enable(clk_port);
+> > +		if (ret) {
+> > +			clk_disable_unprepare(clk_gpio);
+> > +			return ret;
+> > +		}
+> > +	}
+> > +
+> >  	gc = &port->gc;
+> >  	gc->of_node = np;
+> >  	gc->parent = dev;
