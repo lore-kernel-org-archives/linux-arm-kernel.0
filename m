@@ -1,117 +1,84 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 26 Oct 2018 08:08:43 +0800
-Subject: [PATCH 4/9] dt-bindings: Add ANX6345 DP/eDP transmitter binding
-In-Reply-To: <20181025183003.GA12672@bogus>
-References: <20181018073327.64942-1-icenowy@aosc.io>
- <1886367.eljNk7jKYl@avalon>
- <c68f0da9607805e1f6673a9a16a7dcfff4d8fe91.camel@aosc.io>
- <2778638.na8ndVNUfi@avalon>
- <f71d442412f31828c466e3483e9d42f5e96ddc1d.camel@aosc.io>
- <20181025183003.GA12672@bogus>
-Message-ID: <3E73AB92-AFD7-4DA6-AF42-725B894DE114@aosc.io>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Fri, 26 Oct 2018 09:12:09 +0900
+Subject: [PATCH] spi: uniphier: fix incorrect property items
+In-Reply-To: <20181025195906.GA22391@bogus>
+References: <1540373669-18969-1-git-send-email-hayashibara.keiji@socionext.com>
+ <20181025195906.GA22391@bogus>
+Message-ID: <000c01d46cc0$89d0a520$9d71ef60$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Rob,
 
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Friday, October 26, 2018 4:59 AM
+> To: Hayashibara, Keiji/?? ?? <hayashibara.keiji@socionext.com>
+> Cc: broonie at kernel.org; mark.rutland at arm.com; Yamada, Masahiro/?? ?? <yamada.masahiro@socionext.com>;
+> linux-spi at vger.kernel.org; linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> stable at vger.kernel.org; masami.hiramatsu at linaro.org; jaswinder.singh at linaro.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH] spi: uniphier: fix incorrect property items
+> 
+> On Wed, Oct 24, 2018 at 06:34:29PM +0900, Keiji Hayashibara wrote:
+> > This commit fixes incorrect property because it was different from the
+> > actual.
+> > The parameters of '#address-cells' and '#size-cells' were removed, and
+> > 'interrupts', 'pinctrl-names' and 'pinctrl-0' were added.
+> >
+> > Fixes: 4dcd5c2781f3 ("spi: add DT bindings for UniPhier SPI
+> > controller")
+> > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+> > ---
+> >  Documentation/devicetree/bindings/spi/spi-uniphier.txt | 14
+> > ++++++++------
+> >  1 file changed, 8 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
+> > b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
+> > index 504a4ec..b04e66a 100644
+> > --- a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
+> > +++ b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
+> > @@ -5,18 +5,20 @@ UniPhier SoCs have SCSSI which supports SPI single channel.
+> >  Required properties:
+> >   - compatible: should be "socionext,uniphier-scssi"
+> >   - reg: address and length of the spi master registers
+> > - - #address-cells: must be <1>, see spi-bus.txt
+> > - - #size-cells: must be <0>, see spi-bus.txt
+> 
+> How is removing these correct? They are needed if you have any child devices.
 
-? 2018?10?26? GMT+08:00 ??2:30:03, Rob Herring <robh@kernel.org> ??:
->On Thu, Oct 18, 2018 at 08:40:11PM +0800, Icenowy Zheng wrote:
->> ? 2018-10-18?? 14:23 +0300?Laurent Pinchart???
->> > Hi Icenowy,
->> > 
->> > On Thursday, 18 October 2018 13:00:05 EEST Icenowy Zheng wrote:
->> > > ? 2018-10-18?? 11:53 +0300?Laurent Pinchart???
->> > > > On Thursday, 18 October 2018 10:33:22 EEST Icenowy Zheng wrote:
->> > > > > The ANX6345 is an ultra-low power DisplayPort/eDP transmitter
->> > > > > designed
->> > > > > for portable devices.
->> > > > > 
->> > > > > Add a binding document for it.
->> > > > > 
->> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> > > > > ---
->> > > > > 
->> > > > >  .../bindings/display/bridge/anx6345.txt       | 39
->> > > > > +++++++++++++++++++
->> > > > > 
->> > > > >  1 file changed, 39 insertions(+)
->> > > > >  create mode 100644
->> > > > > 
->> > > > > Documentation/devicetree/bindings/display/bridge/anx6345.txt
->> > > > > 
->> > > > > diff --git
->> > > > >
->a/Documentation/devicetree/bindings/display/bridge/anx6345.txt
->> > > > >
->b/Documentation/devicetree/bindings/display/bridge/anx6345.txt
->> > > > > new
->> > > > > file
->> > > > > mode 100644
->> > > > > index 000000000000..0689d4eb5f65
->> > > > > --- /dev/null
->> > > > > +++
->> > > > >
->b/Documentation/devicetree/bindings/display/bridge/anx6345.txt
->> > > > > @@ -0,0 +1,39 @@
->> > > > > +Analogix ANX6345 eDP Transmitter
->> > > > > +--------------------------------
->> > > > > +
->> > > > > +The ANX6345 is an ultra-low power Full-HD eDP transmitter
->> > > > > designed
->> > > > > for
->> > > > > +portable devices.
->> > > > > +
->> > > > > +Required properties:
->> > > > > +
->> > > > > + - compatible		: "analogix,anx6345"
->> > > > > + - reg			: I2C address of the device
->> > > > > + - reset-gpios		: Which GPIO to use for reset
->> > > > > +
->> > > > > +Optional properties:
->> > > > > +
->> > > > > + - dvdd12-supply	: Regulator for 1.2V digital core
->> > > > > power.
->> > > > > + - dvdd25-supply	: Regulator for 2.5V digital core
->> > > > > power.
->> > > > 
->> > > > Shouldn't these to supplies be mandatory ?
->> > > 
->> > > Yes they should.
->> > > 
->> > > > > + - panel-supply		: Regulator for the power of
->> > > > > the panel.
->> > > > 
->> > > > Shouldn't the panel supply for specified in the DT node of the
->> > > > panel
->> > > > ?
->> > > 
->> > > However, eDP panel can be probed, may vary on the same device,
->and
->> > > we
->> > > don't have a generic binding for it...
->> > 
->> > Shouldn't we fix that ? :-)
->> 
->> Maybe we should create a connector binding instead of a panel
->binding?
->
->There's not any such thing as a standard eDP connector, is there? 
->Otherwise, that's just creating a generic panel binding in disguise. 
->Maybe if eDP interface is standardized enough in terms of power
->control, 
->control lines, EDID at least sometimes present, etc., then we could
+They are necessary when the child device is connected.
+I removed it because it was specified in spi-bus.txt,
+but I will leave them in next patch.
 
-eDP has the same display signal set with DP, including AUX which
-carries DPCD and EDID (if present).
+> 
+> > - - clocks: A phandle to the clock for the device.
+> > - - resets: A phandle to the reset control for the device.
+> > + - interrupts: a single interrupt specifier
+> > + - pinctrl-names: should be "default"
+> > + - pinctrl-0: pin control state for the default mode
+> > + - clocks: a phandle to the clock for the device
+> > + - resets: a phandle to the reset control for the device
+> >
+> >  Example:
+> >
+> >  spi0: spi at 54006000 {
+> >  	compatible = "socionext,uniphier-scssi";
+> >  	reg = <0x54006000 0x100>;
+> > -	#address-cells = <1>;
+> > -	#size-cells = <0>;
+> > +	interrupts = <0 39 4>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_spi0>;
+> >  	clocks = <&peri_clk 11>;
+> >  	resets = <&peri_rst 11>;
+> >  };
+> > --
+> > 2.7.4
+> >
 
-But I don't know whether other lines are standardized, including power, backlight, etc.
+Thank you.
 
->have 
->some sort of generic eDP panel/connector binding.
->
->Rob
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+---
+Best Regards,
+Keiji Hayashibara
