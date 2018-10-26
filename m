@@ -1,187 +1,490 @@
 From: duwe@lst.de (Torsten Duwe)
-Date: Fri, 26 Oct 2018 16:21:57 +0200 (CEST)
-Subject: [PATCH v4 3/3] arm64: reliable stacktraces
+Date: Fri, 26 Oct 2018 16:21:48 +0200 (CEST)
+Subject: [PATCH v4 1/3] arm64: implement ftrace with regs
 In-Reply-To: <20181026142008.D922868C94@newverein.lst.de>
 References: <20181026142008.D922868C94@newverein.lst.de>
-Message-ID: <20181026142157.B8FAA68C97@newverein.lst.de>
+Message-ID: <20181026142148.6353A68C94@newverein.lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enhance the stack unwinder so that it reports whether it had to stop
-normally or due to an error condition; unwind_frame() will report
-continue/error/normal ending and walk_stackframe() will pass that
-info. __save_stack_trace() is used to check the validity of a stack;
-save_stack_trace_tsk_reliable() can now trivially be implemented.
-Modify arch/arm64/kernel/time.c as the only external caller so far
-to recognise the new semantics.
+Use -fpatchable-function-entry (gcc8) to add 2 NOPs at the beginning
+of each function. Replace the first NOP thus generated with a quick LR
+saver (move it to scratch reg x9), so the 2nd replacement insn, the call
+to ftrace, does not clobber the value. Ftrace will then generate the
+standard stack frames.
 
-I had to introduce a marker symbol kthread_return_to_user to tell
-the normal origin of a kernel thread.
+Note that patchable-function-entry in GCC disables IPA-RA, which means
+ABI register calling conventions are obeyed *and* scratch registers
+such as x9 are available.
+
+Introduce and handle an ftrace_regs_trampoline for module PLTs, right
+after ftrace_trampoline, and double the size of this special section
+if .text.ftrace_trampoline is present in the module.
 
 Signed-off-by: Torsten Duwe <duwe@suse.de>
 
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -128,8 +128,9 @@ config ARM64
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
- 	select HAVE_PERF_USER_STACK_DUMP
--	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_RCU_TABLE_FREE
-+	select HAVE_REGS_AND_STACK_ACCESS_API
-+	select HAVE_RELIABLE_STACKTRACE
- 	select HAVE_STACKPROTECTOR
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_KPROBES
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -33,7 +33,7 @@ struct stackframe {
- };
+@@ -110,6 +110,8 @@ config ARM64
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select HAVE_DMA_CONTIGUOUS
+ 	select HAVE_DYNAMIC_FTRACE
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS \
++		if $(cc-option,-fpatchable-function-entry=2)
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 	select HAVE_FTRACE_MCOUNT_RECORD
+ 	select HAVE_FUNCTION_TRACER
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -78,6 +78,10 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
+ KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
+ endif
  
- extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
--extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
-+extern int walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
- 			    int (*fn)(struct stackframe *, void *), void *data);
- extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
- 
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -40,6 +40,16 @@
-  *	ldp	x29, x30, [sp]
-  *	add	sp, sp, #0x10
-  */
++ifeq ($(CONFIG_DYNAMIC_FTRACE_WITH_REGS),y)
++  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
++endif
 +
-+/* The bottom of kernel thread stacks points there */
-+extern void *kthread_return_to_user;
+ # Default value
+ head-y		:= arch/arm64/kernel/head.o
+ 
+--- a/arch/arm64/include/asm/ftrace.h
++++ b/arch/arm64/include/asm/ftrace.h
+@@ -16,6 +16,19 @@
+ #define MCOUNT_ADDR		((unsigned long)_mcount)
+ #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+ 
++/*
++ * DYNAMIC_FTRACE_WITH_REGS is implemented by adding 2 NOPs at the beginning
++ * of each function, with the second NOP actually calling ftrace. In contrary
++ * to a classic _mcount call, the call instruction to be modified is thus
++ * the second one, and not the only one.
++ */
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++#define ARCH_SUPPORTS_FTRACE_OPS 1
++#define REC_IP_BRANCH_OFFSET AARCH64_INSN_SIZE
++#else
++#define REC_IP_BRANCH_OFFSET 0
++#endif
++
+ #ifndef __ASSEMBLY__
+ #include <linux/compat.h>
+ 
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -7,9 +7,9 @@ CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(
+ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ CFLAGS_armv8_deprecated.o := -I$(src)
+ 
+-CFLAGS_REMOVE_ftrace.o = -pg
+-CFLAGS_REMOVE_insn.o = -pg
+-CFLAGS_REMOVE_return_address.o = -pg
++CFLAGS_REMOVE_ftrace.o = -pg $(CC_FLAGS_FTRACE)
++CFLAGS_REMOVE_insn.o = -pg $(CC_FLAGS_FTRACE)
++CFLAGS_REMOVE_return_address.o = -pg $(CC_FLAGS_FTRACE)
+ 
+ # Object file lists.
+ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -11,7 +11,8 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__K
+ 				   -fPIC -fno-strict-aliasing -mno-red-zone \
+ 				   -mno-mmx -mno-sse -fshort-wchar
+ 
+-cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie
++cflags-$(CONFIG_ARM64)		:= $(filter-out -pg $(CC_FLAGS_FTRACE)\
++				  ,$(KBUILD_CFLAGS)) -fpie
+ cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
+ 				   -fno-builtin -fpic -mno-single-pic-base
+ 
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -13,6 +13,8 @@
+ #include <asm/assembler.h>
+ #include <asm/ftrace.h>
+ #include <asm/insn.h>
++#include <asm/asm-offsets.h>
++#include <asm/assembler.h>
+ 
+ /*
+  * Gcc with -pg will put the following code in the beginning of each function:
+@@ -123,6 +125,7 @@ skip_ftrace_call:			// }
+ ENDPROC(_mcount)
+ 
+ #else /* CONFIG_DYNAMIC_FTRACE */
++#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+ /*
+  * _mcount() is used to build the kernel with -pg option, but all the branch
+  * instructions to _mcount() are replaced to NOP initially at kernel start up,
+@@ -162,6 +165,114 @@ ftrace_graph_call:			// ftrace_graph_cal
+ 
+ 	mcount_exit
+ ENDPROC(ftrace_caller)
++#else /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
 +
 +/*
-+ * unwind_frame -- unwind a single stack frame.
-+ * Returns 0 when there are more frames to go.
-+ * 1 means reached end of stack; negative (error)
-+ * means stopped because information is not reliable.
++ * Since no -pg or similar compiler flag is used, there should really be
++ * no reference to _mcount; so do not define one. Only some value for
++ * MCOUNT_ADDR is needed for comparison. Let it point here to have some
++ * sort of magic value that can be recognised when debugging.
 + */
- int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- {
- 	unsigned long fp = frame->fp;
-@@ -75,29 +85,39 @@ int notrace unwind_frame(struct task_str
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
- 
- 	/*
-+	 * kthreads created via copy_thread() (called from kthread_create())
-+	 * will have a zero BP and a return value into ret_from_fork.
-+	 */
-+	if (!frame->fp && frame->pc == (unsigned long)&kthread_return_to_user)
-+		return 1;
++	.global _mcount
++_mcount:
++	ret	/* make it differ from regs caller */
++
++ENTRY(ftrace_regs_caller)
++	/* callee's preliminary stack frame: */
++	stp	fp, x9, [sp, #-16]!
++	mov	fp, sp
++
++	/* our stack frame: */
++	stp	fp, lr, [sp, #-S_FRAME_SIZE]!
++	add	x9, sp, #16	/* offset to pt_regs */
++
++	stp	x10, x11, [x9, #S_X10]
++	stp	x12, x13, [x9, #S_X12]
++	stp	x14, x15, [x9, #S_X14]
++	stp	x16, x17, [x9, #S_X16]
++	stp	x18, x19, [x9, #S_X18]
++	stp	x20, x21, [x9, #S_X20]
++	stp	x22, x23, [x9, #S_X22]
++	stp	x24, x25, [x9, #S_X24]
++	stp	x26, x27, [x9, #S_X26]
++
++	b	ftrace_common
++ENDPROC(ftrace_regs_caller)
++
++ENTRY(ftrace_caller)
++	/* callee's preliminary stack frame: */
++	stp	fp, x9, [sp, #-16]!
++	mov	fp, sp
++
++	/* our stack frame: */
++	stp	fp, lr, [sp, #-S_FRAME_SIZE]!
++	add	x9, sp, #16	/* offset to pt_regs */
++
++ftrace_common:
 +	/*
- 	 * Frames created upon entry from EL0 have NULL FP and PC values, so
- 	 * don't bother reporting these. Frames created by __noreturn functions
- 	 * might have a valid FP even if PC is bogus, so only terminate where
- 	 * both are NULL.
- 	 */
- 	if (!frame->fp && !frame->pc)
--		return -EINVAL;
-+		return 1;
++	 * At this point we have 2 new stack frames, and x9 pointing
++	 * at a pt_regs which we can populate as needed.
++	 */
++
++	/* save function arguments */
++	stp	x0, x1, [x9]
++	stp	x2, x3, [x9, #S_X2]
++	stp	x4, x5, [x9, #S_X4]
++	stp	x6, x7, [x9, #S_X6]
++	stp	x8, x9, [x9, #S_X8]
++
++	ldr	x0, [fp]
++	stp	x28, x0, [x9, #S_X28]	/* FP in pt_regs + "our" x28 */
++
++	/* The program counter just after the ftrace call site */
++	str	lr, [x9, #S_PC]
++	/* The stack pointer as it was on ftrace_caller entry... */
++	add	x28, fp, #16
++	str	x28, [x9, #S_SP]
++	/* The link Register at callee entry */
++	ldr	x28, [fp, 8]
++	str	x28, [x9, #S_LR]	/* to pt_regs.r[30] */
++
++	ldr_l	x2, function_trace_op, x0
++	ldr	x1, [fp, #8]
++	sub	x0, lr, #8	/* function entry == IP */
++	mov	x3, x9		/* pt_regs are @x9 */
++
++	mov	fp, sp
++
++	.global ftrace_call
++ftrace_call:
++
++	bl	ftrace_stub
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.global ftrace_graph_call
++ftrace_graph_call:			// ftrace_graph_caller();
++	nop				// If enabled, this will be replaced
++					// "b ftrace_graph_caller"
++#endif
++
++ftrace_common_return:
++	add	x9, sp, #16	/* advance to pt_regs for restore */
++
++	ldp	x0, x1, [x9]
++	ldp	x2, x3, [x9, #S_X2]
++	ldp	x4, x5, [x9, #S_X4]
++	ldp	x6, x7, [x9, #S_X6]
++	ldp	x8, x9, [x9, #S_X8]
++
++	ldp	x28, fp, [x9, #S_X28]
++
++	ldr	lr, [x9, #S_LR]
++	ldr	x9, [x9, #S_PC]
++	/* clean up both frames, ours and callee preliminary */
++	add	sp, sp, #S_FRAME_SIZE + 16
++
++	ret	x9
++
++ENDPROC(ftrace_caller)
++
++#endif /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
+ #endif /* CONFIG_DYNAMIC_FTRACE */
  
- 	return 0;
+ ENTRY(ftrace_stub)
+@@ -197,12 +308,21 @@ ENDPROC(ftrace_stub)
+  * and run return_to_handler() later on its exit.
+  */
+ ENTRY(ftrace_graph_caller)
++#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+ 	mcount_get_lr_addr	  x0	//     pointer to function's saved lr
+ 	mcount_get_pc		  x1	//     function's pc
+ 	mcount_get_parent_fp	  x2	//     parent's fp
+ 	bl	prepare_ftrace_return	// prepare_ftrace_return(&lr, pc, fp)
+ 
+ 	mcount_exit
++#else
++	add	x9, sp, #16	/* advance to pt_regs to gather args */
++	add	x0, x9, #S_LR		   /* &lr */
++	ldr	x1, [x9, #S_PC]		   /* pc */
++	ldr	x2, [x9, #S_STACKFRAME]	   /* fp */
++	bl	prepare_ftrace_return
++	b	ftrace_common_return
++#endif
+ ENDPROC(ftrace_graph_caller)
+ 
+ /*
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -65,18 +65,61 @@ int ftrace_update_ftrace_func(ftrace_fun
+ 	return ftrace_modify_code(pc, 0, new, false);
  }
  
--void notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
-+int notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
- 		     int (*fn)(struct stackframe *, void *), void *data)
++#ifdef CONFIG_ARM64_MODULE_PLTS
++static int install_ftrace_trampoline(struct module *mod, unsigned long *addr)
++{
++	struct plt_entry trampoline, *mod_trampoline;
++	trampoline = get_plt_entry(*addr);
++
++	if (*addr == FTRACE_ADDR)
++		mod_trampoline = mod->arch.ftrace_trampoline;
++	else if (*addr == FTRACE_REGS_ADDR)
++		mod_trampoline = mod->arch.ftrace_regs_trampoline;
++	else
++		return -EINVAL;
++
++	if (!plt_entries_equal(mod_trampoline, &trampoline)) {
++
++			/* point the trampoline to our ftrace entry point */
++			module_disable_ro(mod);
++			*mod_trampoline = trampoline;
++			module_enable_ro(mod, true);
++
++			/* update trampoline before patching in the branch */
++			smp_wmb();
++		}
++	*addr = (unsigned long)(void *)mod_trampoline;
++
++	return 0;
++}
++#endif
++
++/*
++ * Ftrace with regs generates the tracer calls as close as possible to
++ * the function entry; no stack frame has been set up at that point.
++ * In order to make another call e.g to ftrace_caller, the LR must be
++ * saved from being overwritten.
++ * Between two functions, and with IPA-RA turned off, the scratch registers
++ * are available, so move the LR to x9 before calling into ftrace.
++ * "mov x9, lr" is officially aliased from "orr x9, xzr, lr".
++ */
++#define QUICK_LR_SAVE aarch64_insn_gen_logical_shifted_reg( \
++			AARCH64_INSN_REG_9, AARCH64_INSN_REG_ZR, \
++			AARCH64_INSN_REG_LR, 0, AARCH64_INSN_VARIANT_64BIT, \
++			AARCH64_INSN_LOGIC_ORR)
++
+ /*
+  * Turn on the call to ftrace_caller() in instrumented function
+  */
+ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
  {
- 	while (1) {
- 		int ret;
+-	unsigned long pc = rec->ip;
++	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
++	int ret;
+ 	u32 old, new;
+ 	long offset = (long)pc - (long)addr;
  
--		if (fn(frame, data))
--			break;
-+		ret = fn(frame, data);
+ 	if (offset < -SZ_128M || offset >= SZ_128M) {
+ #ifdef CONFIG_ARM64_MODULE_PLTS
+-		struct plt_entry trampoline;
+ 		struct module *mod;
+ 
+ 		/*
+@@ -96,54 +139,65 @@ int ftrace_make_call(struct dyn_ftrace *
+ 		if (WARN_ON(!mod))
+ 			return -EINVAL;
+ 
+-		/*
+-		 * There is only one ftrace trampoline per module. For now,
+-		 * this is not a problem since on arm64, all dynamic ftrace
+-		 * invocations are routed via ftrace_caller(). This will need
+-		 * to be revisited if support for multiple ftrace entry points
+-		 * is added in the future, but for now, the pr_err() below
+-		 * deals with a theoretical issue only.
+-		 */
+-		trampoline = get_plt_entry(addr);
+-		if (!plt_entries_equal(mod->arch.ftrace_trampoline,
+-				       &trampoline)) {
+-			if (!plt_entries_equal(mod->arch.ftrace_trampoline,
+-					       &(struct plt_entry){})) {
+-				pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
+-				return -EINVAL;
+-			}
+-
+-			/* point the trampoline to our ftrace entry point */
+-			module_disable_ro(mod);
+-			*mod->arch.ftrace_trampoline = trampoline;
+-			module_enable_ro(mod, true);
+-
+-			/* update trampoline before patching in the branch */
+-			smp_wmb();
++		/* Check against our well-known list of ftrace entry points */
++		if (addr == FTRACE_ADDR || addr == FTRACE_REGS_ADDR) {
++			ret = install_ftrace_trampoline(mod, &addr);
++			if (ret < 0)
++				return ret;
+ 		}
+-		addr = (unsigned long)(void *)mod->arch.ftrace_trampoline;
++		else
++			return -EINVAL;
++
+ #else /* CONFIG_ARM64_MODULE_PLTS */
+ 		return -EINVAL;
+ #endif /* CONFIG_ARM64_MODULE_PLTS */
+ 	}
+ 
+ 	old = aarch64_insn_gen_nop();
++	if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS)) {
++		new = QUICK_LR_SAVE;
++		ret = ftrace_modify_code(pc - AARCH64_INSN_SIZE,
++					 old, new, true);
 +		if (ret)
 +			return ret;
- 		ret = unwind_frame(tsk, frame);
- 		if (ret < 0)
-+			return ret;
-+		if (ret > 0)
- 			break;
- 	}
-+	return 0;
++	}
+ 	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
+ 
+ 	return ftrace_modify_code(pc, old, new, true);
  }
  
- #ifdef CONFIG_STACKTRACE
-@@ -145,14 +165,15 @@ void save_stack_trace_regs(struct pt_reg
- 		trace->entries[trace->nr_entries++] = ULONG_MAX;
- }
- 
--static noinline void __save_stack_trace(struct task_struct *tsk,
-+static noinline int __save_stack_trace(struct task_struct *tsk,
- 	struct stack_trace *trace, unsigned int nosched)
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
++			unsigned long addr)
++{
++	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
++	u32 old, new;
++
++	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
++	new = aarch64_insn_gen_branch_imm(pc, addr, true);
++
++	return ftrace_modify_code(pc, old, new, true);
++}
++#endif
++
+ /*
+  * Turn off the call to ftrace_caller() in instrumented function
+  */
+ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+ 		    unsigned long addr)
  {
- 	struct stack_trace_data data;
- 	struct stackframe frame;
+-	unsigned long pc = rec->ip;
++	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
+ 	bool validate = true;
 +	int ret;
+ 	u32 old = 0, new;
+ 	long offset = (long)pc - (long)addr;
  
- 	if (!try_get_task_stack(tsk))
--		return;
-+		return -EBUSY;
++	/* -fpatchable-function-entry= does not generate a profiling call
++	 *  initially; the NOPs are already there.
++	 */
++	if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS) && addr == MCOUNT_ADDR)
++		return 0;
++
+ 	if (offset < -SZ_128M || offset >= SZ_128M) {
+ #ifdef CONFIG_ARM64_MODULE_PLTS
+ 		u32 replaced;
+@@ -188,7 +242,15 @@ int ftrace_make_nop(struct module *mod,
  
- 	data.trace = trace;
- 	data.skip = trace->skip;
-@@ -171,11 +192,12 @@ static noinline void __save_stack_trace(
- 	frame.graph = tsk->curr_ret_stack;
- #endif
+ 	new = aarch64_insn_gen_nop();
  
--	walk_stackframe(tsk, &frame, save_trace, &data);
-+	ret = walk_stackframe(tsk, &frame, save_trace, &data);
- 	if (trace->nr_entries < trace->max_entries)
- 		trace->entries[trace->nr_entries++] = ULONG_MAX;
- 
- 	put_task_stack(tsk);
+-	return ftrace_modify_code(pc, old, new, validate);
++	ret = ftrace_modify_code(pc, old, new, validate);
++	if (ret)
++		return ret;
++	if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS)) {
++		old = QUICK_LR_SAVE;
++		ret = ftrace_modify_code(pc - AARCH64_INSN_SIZE,
++					 old, new, true);
++	}
 +	return ret;
  }
- EXPORT_SYMBOL_GPL(save_stack_trace_tsk);
  
-@@ -190,4 +212,12 @@ void save_stack_trace(struct stack_trace
- }
- 
- EXPORT_SYMBOL_GPL(save_stack_trace);
-+
-+int save_stack_trace_tsk_reliable(struct task_struct *tsk,
-+				  struct stack_trace *trace)
-+{
-+	return __save_stack_trace(tsk, trace, 1);
-+}
-+EXPORT_SYMBOL_GPL(save_stack_trace_tsk_reliable);
-+
+ void arch_ftrace_update_code(int command)
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -115,6 +115,7 @@
+ #define MCOUNT_REC()	. = ALIGN(8);				\
+ 			__start_mcount_loc = .;			\
+ 			KEEP(*(__mcount_loc))			\
++			KEEP(*(__patchable_function_entries))	\
+ 			__stop_mcount_loc = .;
+ #else
+ #define MCOUNT_REC()
+--- a/include/linux/compiler_types.h
++++ b/include/linux/compiler_types.h
+@@ -61,8 +61,12 @@ extern void __chk_io_ptr(const volatile
+ #if defined(CC_USING_HOTPATCH) && !defined(__CHECKER__)
+ #define notrace __attribute__((hotpatch(0,0)))
+ #else
++#if defined(CONFIG_ARM64) && defined(CONFIG_DYNAMIC_FTRACE_WITH_REGS)
++#define notrace __attribute__((patchable_function_entry(0)))
++#else
+ #define notrace __attribute__((no_instrument_function))
  #endif
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -56,7 +56,7 @@ unsigned long profile_pc(struct pt_regs
++#endif
+ 
+ /* Intel compiler defines __GNUC__. So we will overwrite implementations
+  * coming from above header files here
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -33,6 +33,7 @@ struct mod_arch_specific {
+ 
+ 	/* for CONFIG_DYNAMIC_FTRACE */
+ 	struct plt_entry 	*ftrace_trampoline;
++	struct plt_entry 	*ftrace_regs_trampoline;
+ };
  #endif
- 	do {
- 		int ret = unwind_frame(NULL, &frame);
--		if (ret < 0)
-+		if (ret)
- 			return 0;
- 	} while (in_lock_functions(frame.pc));
  
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1178,15 +1178,17 @@ ENTRY(cpu_switch_to)
- ENDPROC(cpu_switch_to)
- NOKPROBE(cpu_switch_to)
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -452,8 +452,11 @@ int module_finalize(const Elf_Ehdr *hdr,
+ 			apply_alternatives_module((void *)s->sh_addr, s->sh_size);
+ #ifdef CONFIG_ARM64_MODULE_PLTS
+ 		if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
+-		    !strcmp(".text.ftrace_trampoline", secstrs + s->sh_name))
++		    !strcmp(".text.ftrace_trampoline", secstrs + s->sh_name)) {
+ 			me->arch.ftrace_trampoline = (void *)s->sh_addr;
++			me->arch.ftrace_regs_trampoline =
++				(void *)(s->sh_addr + sizeof(struct plt_entry));
++		}
+ #endif
+ 	}
  
-+	.global	kthread_return_to_user
- /*
-  * This is how we return from a fork.
-  */
- ENTRY(ret_from_fork)
- 	bl	schedule_tail
--	cbz	x19, 1f				// not a kernel thread
-+	cbz	x19, kthread_return_to_user	// not a kernel thread
- 	mov	x0, x20
- 	blr	x19
--1:	get_thread_info tsk
-+kthread_return_to_user:
-+	get_thread_info tsk
- 	b	ret_to_user
- ENDPROC(ret_from_fork)
- NOKPROBE(ret_from_fork)
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -272,7 +272,7 @@ int module_frob_arch_sections(Elf_Ehdr *
+ 		tramp->sh_type = SHT_NOBITS;
+ 		tramp->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+ 		tramp->sh_addralign = __alignof__(struct plt_entry);
+-		tramp->sh_size = sizeof(struct plt_entry);
++		tramp->sh_size = 2 * sizeof(struct plt_entry);
+ 	}
+ 
+ 	return 0;
