@@ -1,113 +1,37 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 26 Oct 2018 14:43:25 +0200
-Subject: [PATCH v2 1/2] ARM: dts: socfpga: Add fpga2hps and fpga2sdram
- bridges
-In-Reply-To: <73ftyceiny.fsf@pengutronix.de>
-References: <20180822084110.14969-1-s.trumtrar@pengutronix.de>
- <73lg85luwn.fsf@pengutronix.de>
- <CANk1AXRicxbojUmtp8e7wzDcMNOX-Z4-P=oWw4dzfcR69rP+rw@mail.gmail.com>
- <73ftyceiny.fsf@pengutronix.de>
-Message-ID: <73r2gcnaj6.fsf@pengutronix.de>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 26 Oct 2018 14:44:55 +0200
+Subject: [PATCH 10/10] arm64: use the generic swiotlb_dma_ops
+In-Reply-To: <738dfd71-f78b-1d73-712c-73a4b6d4141c@arm.com>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-11-hch@lst.de>
+ <738dfd71-f78b-1d73-712c-73a4b6d4141c@arm.com>
+Message-ID: <20181026124455.GA28571@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi!
-
-Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
-
-> Hi!
+On Mon, Oct 22, 2018 at 06:52:51PM +0100, Robin Murphy wrote:
+>> scatterlist *sgl,
+>> -				  int nelems, enum dma_data_direction dir,
+>> -				  unsigned long attrs)
+>> +long arch_dma_coherent_to_pfn(struct device *dev, void *cpu_addr,
 >
-> Alan Tull <atull@kernel.org> writes:
->
->> On Thu, Sep 13, 2018 at 2:27 AM Steffen Trumtrar
->> <s.trumtrar@pengutronix.de> wrote:
->>>
->>>
->>> Hi!
->>>
->>> Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
->>>
->>> > Add the remaining two bridges on the Cyclone-V SoCFPGA SoCs.
->>> >
->>> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>> > ---
->>> > Changes in v2:
->>> >   - set status to disabled, so there are no accidental users 
->>> >   >   of
->>> >   the bridges
->>> >
->>> >  arch/arm/boot/dts/socfpga.dtsi | 14 ++++++++++++++
->>> >  1 file changed, 14 insertions(+)
->>> >
->>> > diff --git a/arch/arm/boot/dts/socfpga.dtsi
->>> > b/arch/arm/boot/dts/socfpga.dtsi
->>> > index b38f8c240558..11781f795de2 100644
->>> > --- a/arch/arm/boot/dts/socfpga.dtsi
->>> > +++ b/arch/arm/boot/dts/socfpga.dtsi
->>> > @@ -543,6 +543,20 @@
->>> >                       clocks = <&l4_main_clk>;
->>> >               };
->>> >
->>> > +             fpga_bridge2: fpga-bridge at ff600000 {
->>> > +                     compatible =
->>> > "altr,socfpga-fpga2hps-bridge";
->>> > +                     reg = <0xff600000 0x100000>;
->>> > +                     resets = <&rst FPGA2HPS_RESET>;
->>> > +                     clocks = <&l4_main_clk>;
->>> > +                     status = "disabled";
->>> > +             };
->>> > +
->>> > +             fpga_bridge3: fpga-bridge at ffc25080 {
->>> > +                     compatible =
->>> > "altr,socfpga-fpga2sdram-bridge";
->>> > +                     reg = <0xffc25080 0x4>;
->>> > +                     status = "disabled";
->>> > +             };
->>> > +
->>> >               fpgamgr0: fpgamgr at ff706000 {
->>> >                       compatible = "altr,socfpga-fpga-mgr";
->>> >                       reg = <0xff706000 0x1000
->>>
->>> Any opinion on this? There shouldn't be any accidental use of 
->>> the
->>> bridges now with status=disabled.
->>
->> Hi Steffen,
->>
->> Do you have a use case you need this for?
->>
->
-> Yes, of course. I think all our SoCFPGA customers use these 
-> bridges.
->
->> I don't mind leaving it that way it is and letting people who 
->> are
->> actually enabling the bridges in their designs add the whole 
->> node.
->>
->
-> Why do you think, that these bridges are different from the 
-> other ones?
-> Or other IP blocks on the SoCFPGA even?
-> This is the socfpga.dtsi file, it describes the hardware common 
-> to all
-> Cyclone5 SoCs. All SoCs have these bridges, so why not add it?
->
+> I realise I'm spotting this a bit late, but does this interface really need 
+> somewhat-atypical signed PFNs?
 
-Any opinion on this? I still don't see why these bridges are 
-different from the other IP cores.
+It has been a while since I wrote this code, and I can't remember the
+reason for it except that I'm pretty sure I copy and pasted it from
+existing code somewhere.
 
+Switching it to unsigned long should be fine, and patches are welcome.
 
-Best regards,
-Steffen
+>> +static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
+>> +				      struct page *page, size_t size)
+>
+> If __iommu_get_sgtable() is now the only user, I'd say just inline these 
+> remnants there (or let that case call dma_common_sgtable() if that's what 
+> swiotlb_dma_ops are now relying on). Either way the "__swiotlb" is now a 
+> complete misnomer.
 
--- 
-Pengutronix e.K.                          | Steffen Trumtrar 
-|
-Industrial Linux Solutions                | 
-http://www.pengutronix.de/ |
-Peiner Str. 6-8, 31137 Hildesheim, Germany| Phone: 
-+49-5121-206917-0   |
-Amtsgericht Hildesheim, HRA 2686          | Fax: 
-+49-5121-206917-5555|
+It is.  But we hopefully kill both the only user and this helper in
+the 4.21 merge window when moving the iommu dma api wrappers to common
+code.
