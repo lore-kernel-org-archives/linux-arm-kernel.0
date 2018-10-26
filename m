@@ -1,69 +1,81 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 26 Oct 2018 12:05:25 -0700
-Subject: [PATCH v2 0/2] arm64: Cut rebuild time when changing
- CONFIG_BLK_DEV_INITRD
-In-Reply-To: <20181026110708.GA3814@rapoport-lnx>
-References: <20181024193256.23734-1-f.fainelli@gmail.com>
- <CAL_Jsq+KCOv6pXXHhHDZ+7-QUrmtMDvSjEVhK15yZ3qbnn61Ag@mail.gmail.com>
- <20181025093833.GA23607@rapoport-lnx>
- <CAL_JsqL62ttsGSbE1BS5v-mX3pKE-p_HyvuZD6nB+GUbQyetzg@mail.gmail.com>
- <20181025172935.GA27364@rapoport-lnx>
- <CAL_JsqJrMq+QHvuOsqEdCFchmXsd4s2XKUD_TboKzeEQprJvjg@mail.gmail.com>
- <1bb3bd63-a88e-b668-ea36-f0f985c0e2b1@gmail.com>
- <20181026110708.GA3814@rapoport-lnx>
-Message-ID: <53ec9df5-ef2a-edc5-be1c-bca32959c0bc@gmail.com>
+From: lsun@mellanox.com (Liming Sun)
+Date: Fri, 26 Oct 2018 19:18:30 +0000
+Subject: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
+In-Reply-To: <CAK8P3a1jTsvzYhS4CxvmK6tOgPn_g7=1S4xAcca2K4v70vhyEA@mail.gmail.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1540403734-137721-1-git-send-email-lsun@mellanox.com>
+ <1540403734-137721-2-git-send-email-lsun@mellanox.com>
+ <CAK8P3a1jTsvzYhS4CxvmK6tOgPn_g7=1S4xAcca2K4v70vhyEA@mail.gmail.com>
+Message-ID: <AM4PR05MB32204021433BBB853C50FF30A1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/18 4:07 AM, Mike Rapoport wrote:
-> On Thu, Oct 25, 2018 at 04:07:13PM -0700, Florian Fainelli wrote:
->> On 10/25/18 2:13 PM, Rob Herring wrote:
->>> On Thu, Oct 25, 2018 at 12:30 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
->>>>
->>>> On Thu, Oct 25, 2018 at 08:15:15AM -0500, Rob Herring wrote:
->>>>> +Ard
->>>>>
->>>>> On Thu, Oct 25, 2018 at 4:38 AM Mike Rapoport <rppt@linux.ibm.com> wrote:
->>>>>>
->>>>>> On Wed, Oct 24, 2018 at 02:55:17PM -0500, Rob Herring wrote:
->>>>>>> On Wed, Oct 24, 2018 at 2:33 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>>>>>>
->>>>>>>> Hi all,
->>>>>>>>
->>>>>>>> While investigating why ARM64 required a ton of objects to be rebuilt
->>>>>>>> when toggling CONFIG_DEV_BLK_INITRD, it became clear that this was
->>>>>>>> because we define __early_init_dt_declare_initrd() differently and we do
->>>>>>>> that in arch/arm64/include/asm/memory.h which gets included by a fair
->>>>>>>> amount of other header files, and translation units as well.
->>>>>>>
->>>>>> I think arm64 does not have to redefine __early_init_dt_declare_initrd().
->>>>>> Something like this might be just all we need (completely untested,
->>>>>> probably it won't even compile):
-> 
-> [ ... ]
->  
->> FWIW, I am extracting the ARM implementation that parses the initrd
->> early command line parameter and the "setup" code doing the page
->> boundary alignment and memblock checking into a helper into lib/ that
->> other architectures can re-use. So far, this removes the need for
->> unicore32, arc and arm to duplicate essentially the same logic.
-> 
-> Presuming you are going to need asm-generic/initrd.h for that as well,
-> using override for __early_init_dt_declare_initrd in arm64 version of
-> initrd.h might be the simplest option.
+Thanks Arnd for the comments!  Please see my response inline.
 
-What I am contemplating doing is promote
-phys_initrd_start/phys_initrd_size to be global variables (similar to
-initrd_start, initrd_end) and have a generic helper function for parsing
-the initrd= command line parameter and finally removing
-__early_init_dt_declare_initrd() because we could have
-early_init_dt_check_for_initrd() just populate
-phys_initrd_start/phys_initrd_size directly as well as
-initrd_start/initrd_end using __va() to preserve compatibility with
-architectures that rely on this. Then I would convert ARM64 to check for
-phys_initrd_start which is really what it is is trying to do in
-arch/arm64/mm/init.c::arm64_memblock_init().
+- Liming
 
-Does that sound like a reasonable approach?
--- 
-Florian
+> -----Original Message-----
+> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> Behalf Of Arnd Bergmann
+> Sent: Thursday, October 25, 2018 11:38 AM
+> To: Liming Sun <lsun@mellanox.com>
+> Cc: Olof Johansson <olof@lixom.net>; David Woods
+> <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-
+> soc <arm@kernel.org>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
+> 
+> On 10/24/18, Liming Sun <lsun@mellanox.com> wrote:
+> > This commit introduces config option for Mellanox BlueField SoC,
+> > which can be used to build the SoC specific drivers, and enables
+> > it by default in configs/defconfig.
+> >
+> > Reviewed-by: David Woods <dwoods@mellanox.com>
+> > Signed-off-by: Liming Sun <lsun@mellanox.com>
+> > ---
+> >  arch/arm64/Kconfig.platforms | 6 ++++++
+> >  arch/arm64/configs/defconfig | 1 +
+> >  2 files changed, 7 insertions(+)
+> 
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> I'm sorry for missing your series in the past. We should definitely merge
+> the platform support soon. Do you also have device tree files for reference
+> systems or even production hardware?
+
+We have obsoleted the device tree, and mainly support ACPI now
+on Reference/Production HW. Below is the TMFIFO definition in the ACPI
+DSDT table.
+
+    // RShim TMFIFO
+    Device(RSH0) {
+      Name(_HID, "MLNXBF01")
+      Name(_UID, Zero)
+      Name(_CCA, 1)
+      Name(_CRS, ResourceTemplate() {
+        Memory32Fixed(ReadWrite, 0x00800a20, 0x00000018)
+        Memory32Fixed(ReadWrite, 0x00800a40, 0x00000018)
+        Interrupt(ResourceConsumer, Edge, ActiveHigh, Exclusive)
+          { BF1_RSH0_TM_HTT_LWM_INT,
+            BF1_RSH0_TM_HTT_HWM_INT,
+            BF1_RSH0_TM_TTH_LWM_INT,
+            BF1_RSH0_TM_TTH_HWM_INT
+          }
+      })
+    }
+
+The full ACPI implementation can be found in the 1.0 release:
+http://www.mellanox.com/downloads/BlueField/BlueField-1.0.0.10521/BlueField-1.0.0.10521.tar.xz
+Inside this tarball, we can see the "src/edk2/" directory which has the edk2 patch file including all the ACPI implementation.
+
+> 
+> I need to have a separate look at the fifo driver.
+> 
+> Unfortunately, you have sent these patches during the merge window,
+> which is the time during which we don't pick up new work. Let's plan
+> to pick these up after 4.20-rc1, and please resend to arm at kernel.org
+> if we manage to forget about it again.
+> 
+>       Arnd
+
+Thanks for the information. I'll resend it to make sure not to miss the date.
