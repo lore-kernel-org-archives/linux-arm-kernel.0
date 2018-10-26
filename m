@@ -1,93 +1,81 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 26 Oct 2018 22:21:22 +0800
-Subject: [xlnx:master 2116/2130]
- drivers/media/platform/xilinx/xilinx-multi-scaler.c:361:18: warning: passing
- argument 1 of 'ioread32' discards 'const' qualifier from pointer target type
-Message-ID: <201810262220.ORU20qSM%fengguang.wu@intel.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Fri, 26 Oct 2018 20:13:19 +0530
+Subject: [PATCH v3 00/25] drm/sun4i: Allwinner A64 MIPI-DSI support 
+Message-ID: <20181026144344.27778-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   e0652408f6a3e2464aed159fa83dc3b2a2aadefd
-commit: 194a9a06e8d3bac2dc43ff54d5cece3ba6a2e15f [2116/2130] v4l: xilinx-multi-scaler: Remove volatile
-config: sh-allyesconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 194a9a06e8d3bac2dc43ff54d5cece3ba6a2e15f
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=sh 
+This series fixed the issues related to work DSI on 2-lane panel
+which is reported on previous version[1].
 
-All warnings (new ones prefixed by >>):
+Few comments from previous version still in discussion, but I just
+send this version just to group all working changes together.
+anyway I will fix in this in next version if any.
 
-   drivers/media/platform/xilinx/xilinx-multi-scaler.c: In function 'xm2msc_readreg':
->> drivers/media/platform/xilinx/xilinx-multi-scaler.c:361:18: warning: passing argument 1 of 'ioread32' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-     return ioread32(addr);
-                     ^~~~
-   In file included from arch/sh/include/asm/io.h:21:0,
-                    from include/linux/io.h:25,
-                    from include/linux/irq.h:25,
-                    from arch/sh/include/asm/hardirq.h:6,
-                    from include/linux/hardirq.h:9,
-                    from include/linux/interrupt.h:13,
-                    from drivers/media/platform/xilinx/xilinx-multi-scaler.c:18:
-   include/asm-generic/iomap.h:32:21: note: expected 'void *' but argument is of type 'const void *'
-    extern unsigned int ioread32(void __iomem *);
-                        ^~~~~~~~
-   In file included from include/linux/printk.h:330:0,
-                    from include/linux/kernel.h:14,
-                    from include/linux/delay.h:22,
-                    from drivers/media/platform/xilinx/xilinx-multi-scaler.c:15:
-   drivers/media/platform/xilinx/xilinx-multi-scaler.c: In function 'xm2msc_parse_of':
-   drivers/media/platform/xilinx/xilinx-multi-scaler.c:1782:15: warning: format '%llx' expects argument of type 'long long unsigned int', but argument 4 has type 'resource_size_t {aka unsigned int}' [-Wformat=]
-     dev_dbg(dev, "IO Mem 0x%llx mapped at %p\n", res->start, xm2msc->regs);
-                  ^                               ~~~~~~
-   include/linux/dynamic_debug.h:135:39: note: in definition of macro 'dynamic_dev_dbg'
-      __dynamic_dev_dbg(&descriptor, dev, fmt, \
-                                          ^~~
-   drivers/media/platform/xilinx/xilinx-multi-scaler.c:1782:2: note: in expansion of macro 'dev_dbg'
-     dev_dbg(dev, "IO Mem 0x%llx mapped at %p\n", res->start, xm2msc->regs);
-     ^~~~~~~
-   In file included from arch/sh/include/asm/string.h:3:0,
-                    from include/linux/string.h:19,
-                    from include/linux/bitmap.h:9,
-                    from include/linux/cpumask.h:12,
-                    from include/linux/rcupdate.h:44,
-                    from include/linux/rculist.h:11,
-                    from include/linux/dcache.h:7,
-                    from include/linux/fs.h:8,
-                    from drivers/media/platform/xilinx/xilinx-multi-scaler.c:16:
-   drivers/media/platform/xilinx/xilinx-multi-scaler.c: In function 'xm2msc_querycap':
-   arch/sh/include/asm/string_32.h:50:42: warning: array subscript is above array bounds [-Warray-bounds]
-      : "0" (__dest), "1" (__src), "r" (__src+__n)
-                                        ~~~~~^~~~
-   arch/sh/include/asm/string_32.h:50:42: warning: array subscript is above array bounds [-Warray-bounds]
-      : "0" (__dest), "1" (__src), "r" (__src+__n)
-                                        ~~~~~^~~~
+PLL_MIPI min rate is still weird, I tried many possible dclock rate
+from panel driver to satisfy manual suggested min rate 500MHz but
+none working so eventually moved 300MHz. any inputs on this area
+are welcome.
 
-vim +361 drivers/media/platform/xilinx/xilinx-multi-scaler.c
+All these changes are tested in 2-lane, 4-lane MIPI-DSI panels.
 
-484cdb2d Suresh Gupta 2018-09-17  358  
-194a9a06 Suresh Gupta 2018-10-12  359  static inline u32 xm2msc_readreg(const void __iomem *addr)
-484cdb2d Suresh Gupta 2018-09-17  360  {
-484cdb2d Suresh Gupta 2018-09-17 @361  	return ioread32(addr);
-484cdb2d Suresh Gupta 2018-09-17  362  }
-484cdb2d Suresh Gupta 2018-09-17  363  
+If anyone wants to test, use this repo [2] with WIP-A64-DSI branch.
 
-:::::: The code at line 361 was first introduced by commit
-:::::: 484cdb2d9f7105aebcd6667344220598ba3e4b93 platform: xilinx: Add mem to mem Multi-Scaler driver (XM2MSC)
+Any inputs,
+Jagan.
 
-:::::: TO: Suresh Gupta <suresh.gupta@xilinx.com>
-:::::: CC: Michal Simek <michal.simek@xilinx.com>
+[2] https://github.com/amarula/linux-amarula
+[1] https://patchwork.kernel.org/cover/10653275/
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 47078 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181026/40c545d0/attachment-0001.gz>
+Jagan Teki (25):
+  clk: sunxi-ng: a64: Fix gate bit of DSI DPHY
+  clk: sunxi-ng: Add check for minimal rate to NKM PLLs
+  clk: sunxi-ng: Add check for maximum rate to NKM PLLs
+  drm/sun4i: sun6i_mipi_dsi: Add Allwinner A64 MIPI DSI support
+  dt-bindings: sun6i-dsi: Add compatible for A64 MIPI DSI
+  drm/sun4i: sun6i_mipi_dsi: Add DSI Generic short write 2 param
+    transfer
+  drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
+  drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
+  drm/sun4i: sun6i_mipi_dsi: Refactor vertical video start delay
+  drm/sun4i: sun6i_mipi_dsi: Fix DSI hbp timing value
+  drm/sun4i: sun6i_mipi_dsi: Fix DSI hblk timing calculation
+  drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet overhead
+  drm/sun4i: sun6i_mipi_dsi: Fix DSI hfp timing value
+  drm/sun4i: sun6i_mipi_dsi: Increase hfp packet overhead
+  drm/sun4i: sun6i_mipi_dsi: Set proper vblk timing calculation
+  drm/sun4i: sun6i_mipi_dsi: Add support for VCC-DSI voltage regulator
+  dt-bindings: panel: Add Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB
+    bridge
+  drm/panel: Add Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB bridge
+  dt-bindings: panel: Add Techstar TS8550B MIPI DSI panel
+  drm/panel: Add Techstar TS8550B MIPI-DSI LCD panel
+  clk: sunxi-ng: a64: Add min and max rate for PLL_MIPI
+  dt-bindings: sun6i-dsi: Add compatible for A64 DPHY
+  arm64: dts: allwinner: a64: Add DSI pipeline
+  [DO NOT MERGE] arm64: dts: allwinner: bananapi-m64: Bananapi S070WV20-CT16 DSI panel
+  arm64: dts: allwinner: a64-amarula-relic: Enable Techstar TS8550B
+    MIPI-DSI panel
+
+ .../display/panel/bananapi,s070wv20-ct16.txt  |  31 +-
+ .../display/panel/techstar,ts8550b.txt        |  20 +
+ .../bindings/display/sunxi/sun6i-dsi.txt      |   3 +-
+ .../allwinner/sun50i-a64-amarula-relic.dts    |  46 +++
+ .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  42 +++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  45 +++
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c         |   4 +-
+ drivers/clk/sunxi-ng/ccu_nkm.c                |  14 +
+ drivers/clk/sunxi-ng/ccu_nkm.h                |   2 +
+ drivers/gpu/drm/panel/Kconfig                 |  18 +
+ drivers/gpu/drm/panel/Makefile                |   2 +
+ .../panel/panel-bananapi-s070wv20-icn6211.c   | 336 +++++++++++++++++
+ .../gpu/drm/panel/panel-techstar-ts8550b.c    | 346 ++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c        | 122 ++++--
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h        |   8 +
+ 15 files changed, 1009 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/techstar,ts8550b.txt
+ create mode 100644 drivers/gpu/drm/panel/panel-bananapi-s070wv20-icn6211.c
+ create mode 100644 drivers/gpu/drm/panel/panel-techstar-ts8550b.c
+
+-- 
+2.18.0.321.gffc6fa0e3
