@@ -1,52 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 26 Oct 2018 09:30:50 +0100
-Subject: [PATCH 2/2 v2] mfd: ab8500-core: Return zero in
- get_register_interruptible()
-In-Reply-To: <20181025124344.xw3phqnvrwq2nj7g@kili.mountain>
-References: <20181025101037.GR4939@dell>
- <20181025124344.xw3phqnvrwq2nj7g@kili.mountain>
-Message-ID: <20181026083050.GN4870@dell>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Oct 2018 09:33:18 +0100
+Subject: [PATCH] arm64: Log the Fault Status Code (FSC) upon memory aborts
+In-Reply-To: <1540512876-12011-1-git-send-email-sudaraja@codeaurora.org>
+References: <1540512876-12011-1-git-send-email-sudaraja@codeaurora.org>
+Message-ID: <20181026083318.xbeo3drinb5ptiba@blommer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2018, Dan Carpenter wrote:
+On Thu, Oct 25, 2018 at 05:14:36PM -0700, Sudarshan Rajagopalan wrote:
+> When decoding the information from ESR on mem faults, log the
+> FSC value, which is commonly shared for Data and Instruction aborts.
 
-> This function is supposed to return zero on success or negative error
-> codes on error.  Unfortunately, there is a bug so it sometimes returns
-> non-zero, positive numbers on success.
+Given we extract the other fields, extracting the FSC makes sense to me.
+
 > 
-> I noticed this bug during review and I can't test it.  It does appear
-> that the return is sometimes propogated back to _regmap_read() where all
-> non-zero returns are treated as failure so this may affect run time.
-> 
-> Fixes: 47c1697508f2 ("mfd: Align ab8500 with the abx500 interface")
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Change-Id: If7d7f6027958864d99dfb7e79d368e82415dce97
+
+Please drop any Change-Id tag when sending patches upstream.
+
+> Signed-off-by: Sudarshan Rajagopalan <sudaraja@codeaurora.org>
 > ---
-> v2: In v1, I introduced an new error path and forgot to drop the lock.
+>  arch/arm64/mm/fault.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
->  drivers/mfd/ab8500-core.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index b8eecc7..e9d07ab 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -120,6 +120,7 @@ static void mem_abort_decode(unsigned int esr)
+>  	pr_alert("  EA = %lu, S1PTW = %lu\n",
+>  		 (esr & ESR_ELx_EA) >> ESR_ELx_EA_SHIFT,
+>  		 (esr & ESR_ELx_S1PTW) >> ESR_ELx_S1PTW_SHIFT);
+> +	pr_alert("  FSC = %lu\n", (esr & ESR_ELx_FSC));
 
-Looks okay at first blush.
+I think it would make sense to log this immediately after the ESR and decoded
+exception class, before the other fault fields.
 
-I'd really like Linus to review/test though.
+It would be nice if we could factor out the strings from the fault_info table,
+so that we can print a human-readable string as we do for the ESR, but I think
+that can be a future addition.
 
-> diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-> index 30d09d177171..11ab17f64c64 100644
-> --- a/drivers/mfd/ab8500-core.c
-> +++ b/drivers/mfd/ab8500-core.c
-> @@ -261,7 +261,7 @@ static int get_register_interruptible(struct ab8500 *ab8500, u8 bank,
->  	mutex_unlock(&ab8500->lock);
->  	dev_vdbg(ab8500->dev, "rd: addr %#x => data %#x\n", addr, ret);
+FWIW, with this moved immediately after the dump of the ESR (and decoded ESR
+string):
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 >  
-> -	return ret;
-> +	return (ret < 0) ? ret : 0;
->  }
->  
->  static int ab8500_get_register(struct device *dev, u8 bank,
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>  	if (esr_is_data_abort(esr))
+>  		data_abort_decode(esr);
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
