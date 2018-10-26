@@ -1,38 +1,38 @@
 From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Fri, 26 Oct 2018 15:14:35 -0500
-Subject: [PATCH] ARM: dts: socfpga: Fix SDRAM node address for Arria10
-In-Reply-To: <1537888870-357-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1537888870-357-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <0e965db7-78e7-afba-2b6e-0ccd1b73ae36@linux.intel.com>
+Date: Fri, 26 Oct 2018 15:15:32 -0500
+Subject: [PATCH] arm64: dts: stratix10: Correct System Manager register
+ size
+In-Reply-To: <1537889512-586-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1537889512-586-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <ecd3e018-758a-3fd6-3524-379f84b67030@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle ping.
+Gentle ping...
 
-On 9/25/18 10:21 AM, thor.thayer at linux.intel.com wrote:
+On 9/25/18 10:31 AM, thor.thayer at linux.intel.com wrote:
 > From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> The address in the SDRAM node was incorrect. Fix this to agree with the
-> correct address and to match the reg definition block.
+> Correct the register size of the System Manager node.
 > 
 > Cc: stable at vger.kernel.org
-> Fixes: 54b4a8f57848b("arm: socfpga: dts: Add Arria10 SDRAM EDAC DTS support")
+> Fixes: 78cd6a9d8e154 ("arm64: dts: Add base stratix 10 dtsi")
 > Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
 > ---
->   arch/arm/boot/dts/socfpga_arria10.dtsi | 2 +-
+>   arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 2 +-
 >   1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-> index 791ca15c799e..bd1985694bca 100644
-> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-> @@ -601,7 +601,7 @@
->   			status = "disabled";
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index 67dac595dc72..3989876ab699 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -327,7 +327,7 @@
+>   
+>   		sysmgr: sysmgr at ffd12000 {
+>   			compatible = "altr,sys-mgr", "syscon";
+> -			reg = <0xffd12000 0x1000>;
+> +			reg = <0xffd12000 0x228>;
 >   		};
 >   
-> -		sdr: sdr at ffc25000 {
-> +		sdr: sdr at ffcfb100 {
->   			compatible = "altr,sdr-ctl", "syscon";
->   			reg = <0xffcfb100 0x80>;
->   		};
+>   		/* Local timer */
 > 
