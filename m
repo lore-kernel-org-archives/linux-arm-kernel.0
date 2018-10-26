@@ -1,81 +1,40 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 26 Oct 2018 20:13:19 +0530
-Subject: [PATCH v3 00/25] drm/sun4i: Allwinner A64 MIPI-DSI support 
-Message-ID: <20181026144344.27778-1-jagan@amarulasolutions.com>
+Date: Fri, 26 Oct 2018 20:13:20 +0530
+Subject: [PATCH v3 01/25] clk: sunxi-ng: a64: Fix gate bit of DSI DPHY
+In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+Message-ID: <20181026144344.27778-2-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixed the issues related to work DSI on 2-lane panel
-which is reported on previous version[1].
+DSI DPHY gate bit on MIPI DSI clock register is bit 15
+not bit 30.
 
-Few comments from previous version still in discussion, but I just
-send this version just to group all working changes together.
-anyway I will fix in this in next version if any.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
+Tested-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v3:
+- collect Stephen Ack
+- add tested credit
+Changes for v2:
+- none
 
-PLL_MIPI min rate is still weird, I tried many possible dclock rate
-from panel driver to satisfy manual suggested min rate 500MHz but
-none working so eventually moved 300MHz. any inputs on this area
-are welcome.
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-All these changes are tested in 2-lane, 4-lane MIPI-DSI panels.
-
-If anyone wants to test, use this repo [2] with WIP-A64-DSI branch.
-
-Any inputs,
-Jagan.
-
-[2] https://github.com/amarula/linux-amarula
-[1] https://patchwork.kernel.org/cover/10653275/
-
-Jagan Teki (25):
-  clk: sunxi-ng: a64: Fix gate bit of DSI DPHY
-  clk: sunxi-ng: Add check for minimal rate to NKM PLLs
-  clk: sunxi-ng: Add check for maximum rate to NKM PLLs
-  drm/sun4i: sun6i_mipi_dsi: Add Allwinner A64 MIPI DSI support
-  dt-bindings: sun6i-dsi: Add compatible for A64 MIPI DSI
-  drm/sun4i: sun6i_mipi_dsi: Add DSI Generic short write 2 param
-    transfer
-  drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
-  drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
-  drm/sun4i: sun6i_mipi_dsi: Refactor vertical video start delay
-  drm/sun4i: sun6i_mipi_dsi: Fix DSI hbp timing value
-  drm/sun4i: sun6i_mipi_dsi: Fix DSI hblk timing calculation
-  drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet overhead
-  drm/sun4i: sun6i_mipi_dsi: Fix DSI hfp timing value
-  drm/sun4i: sun6i_mipi_dsi: Increase hfp packet overhead
-  drm/sun4i: sun6i_mipi_dsi: Set proper vblk timing calculation
-  drm/sun4i: sun6i_mipi_dsi: Add support for VCC-DSI voltage regulator
-  dt-bindings: panel: Add Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB
-    bridge
-  drm/panel: Add Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB bridge
-  dt-bindings: panel: Add Techstar TS8550B MIPI DSI panel
-  drm/panel: Add Techstar TS8550B MIPI-DSI LCD panel
-  clk: sunxi-ng: a64: Add min and max rate for PLL_MIPI
-  dt-bindings: sun6i-dsi: Add compatible for A64 DPHY
-  arm64: dts: allwinner: a64: Add DSI pipeline
-  [DO NOT MERGE] arm64: dts: allwinner: bananapi-m64: Bananapi S070WV20-CT16 DSI panel
-  arm64: dts: allwinner: a64-amarula-relic: Enable Techstar TS8550B
-    MIPI-DSI panel
-
- .../display/panel/bananapi,s070wv20-ct16.txt  |  31 +-
- .../display/panel/techstar,ts8550b.txt        |  20 +
- .../bindings/display/sunxi/sun6i-dsi.txt      |   3 +-
- .../allwinner/sun50i-a64-amarula-relic.dts    |  46 +++
- .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  42 +++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  45 +++
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c         |   4 +-
- drivers/clk/sunxi-ng/ccu_nkm.c                |  14 +
- drivers/clk/sunxi-ng/ccu_nkm.h                |   2 +
- drivers/gpu/drm/panel/Kconfig                 |  18 +
- drivers/gpu/drm/panel/Makefile                |   2 +
- .../panel/panel-bananapi-s070wv20-icn6211.c   | 336 +++++++++++++++++
- .../gpu/drm/panel/panel-techstar-ts8550b.c    | 346 ++++++++++++++++++
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c        | 122 ++++--
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h        |   8 +
- 15 files changed, 1009 insertions(+), 30 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/panel/techstar,ts8550b.txt
- create mode 100644 drivers/gpu/drm/panel/panel-bananapi-s070wv20-icn6211.c
- create mode 100644 drivers/gpu/drm/panel/panel-techstar-ts8550b.c
-
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+index f7d297368eb2..019d67bf97c4 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+@@ -581,7 +581,7 @@ static const char * const dsi_dphy_parents[] = { "pll-video0", "pll-periph0" };
+ static const u8 dsi_dphy_table[] = { 0, 2, };
+ static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(dsi_dphy_clk, "dsi-dphy",
+ 				       dsi_dphy_parents, dsi_dphy_table,
+-				       0x168, 0, 4, 8, 2, BIT(31), CLK_SET_RATE_PARENT);
++				       0x168, 0, 4, 8, 2, BIT(15), CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
+ 			     0x1a0, 0, 3, BIT(31), CLK_SET_RATE_PARENT);
 -- 
 2.18.0.321.gffc6fa0e3
