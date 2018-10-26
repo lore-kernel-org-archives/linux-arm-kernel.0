@@ -1,118 +1,223 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Fri, 26 Oct 2018 15:47:59 +0200
-Subject: [PATCH RFC 04/18] stagning: vchiq_arm: use list_for_each_entry when
- accessing bulk_waiter_list
+Date: Fri, 26 Oct 2018 15:48:06 +0200
+Subject: [PATCH RFC 11/18] staging: vchiq_arm: use completions instead of
+ semaphores
 In-Reply-To: <20181026134813.7775-1-nsaenzjulienne@suse.de>
 References: <20181026134813.7775-1-nsaenzjulienne@suse.de>
-Message-ID: <20181026134813.7775-5-nsaenzjulienne@suse.de>
+Message-ID: <20181026134813.7775-12-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The resulting code is way more readeable and intuitive compared to plain
-list_for_each.
+It is preferred in the kernel to avoid using semaphores to wait for
+events, as they are optimised for the opposite situation; where the
+common case is that they are available and may block only occasionally.
+FYI see this thread: https://lkml.org/lkml/2008/4/11/323.
+
+Also completions are semantically more explicit in this case.
 
 Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
 ---
- .../interface/vchiq_arm/vchiq_arm.c           | 52 ++++++-------------
- 1 file changed, 16 insertions(+), 36 deletions(-)
+ .../interface/vchiq_arm/vchiq_arm.c           | 58 ++++++++++---------
+ 1 file changed, 31 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index d88dd7415e1e..5f55c708ade8 100644
+index 1cdfdb714abc..463d0eec2e96 100644
 --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
 +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -280,16 +280,11 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
- 		"%s(%p): returning %d", __func__, instance, status);
+@@ -44,7 +44,7 @@
+ #include <linux/highmem.h>
+ #include <linux/pagemap.h>
+ #include <linux/bug.h>
+-#include <linux/semaphore.h>
++#include <linux/completion.h>
+ #include <linux/list.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+@@ -121,9 +121,9 @@ typedef struct user_service_struct {
+ 	int message_available_pos;
+ 	int msg_insert;
+ 	int msg_remove;
+-	struct semaphore insert_event;
+-	struct semaphore remove_event;
+-	struct semaphore close_event;
++	struct completion insert_event;
++	struct completion remove_event;
++	struct completion close_event;
+ 	VCHIQ_HEADER_T * msg_queue[MSG_QUEUE_SIZE];
+ } USER_SERVICE_T;
  
- 	if (status == VCHIQ_SUCCESS) {
--		struct list_head *pos, *next;
-+		struct bulk_waiter_node *waiter, *next;
+@@ -138,8 +138,8 @@ struct vchiq_instance_struct {
+ 	VCHIQ_COMPLETION_DATA_T completions[MAX_COMPLETIONS];
+ 	int completion_insert;
+ 	int completion_remove;
+-	struct semaphore insert_event;
+-	struct semaphore remove_event;
++	struct completion insert_event;
++	struct completion remove_event;
+ 	struct mutex completion_mutex;
  
--		list_for_each_safe(pos, next,
--				&instance->bulk_waiter_list) {
--			struct bulk_waiter_node *waiter;
--
--			waiter = list_entry(pos,
--					struct bulk_waiter_node,
--					list);
--			list_del(pos);
-+		list_for_each_entry_safe(waiter, next,
-+					 &instance->bulk_waiter_list, list) {
-+			list_del(&waiter->list);
+ 	int connected;
+@@ -562,7 +562,8 @@ add_completion(VCHIQ_INSTANCE_T instance, VCHIQ_REASON_T reason,
+ 		vchiq_log_trace(vchiq_arm_log_level,
+ 			"%s - completion queue full", __func__);
+ 		DEBUG_COUNT(COMPLETION_QUEUE_FULL_COUNT);
+-		if (down_interruptible(&instance->remove_event) != 0) {
++		if (wait_for_completion_interruptible(
++					&instance->remove_event)) {
  			vchiq_log_info(vchiq_arm_log_level,
- 					"bulk_waiter - cleaned up %pK for pid %d",
- 					waiter, waiter->pid);
-@@ -473,7 +468,6 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
- 	VCHIQ_SERVICE_T *service;
- 	VCHIQ_STATUS_T status;
- 	struct bulk_waiter_node *waiter = NULL;
--	struct list_head *pos;
+ 				"service_callback interrupted");
+ 			return VCHIQ_RETRY;
+@@ -600,7 +601,7 @@ add_completion(VCHIQ_INSTANCE_T instance, VCHIQ_REASON_T reason,
+ 	insert++;
+ 	instance->completion_insert = insert;
  
- 	service = find_service_by_handle(handle);
- 	if (!service)
-@@ -484,13 +478,9 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
- 	unlock_service(service);
+-	up(&instance->insert_event);
++	complete(&instance->insert_event);
  
- 	mutex_lock(&instance->bulk_waiter_list_mutex);
--	list_for_each(pos, &instance->bulk_waiter_list) {
--		if (list_entry(pos, struct bulk_waiter_node,
--				list)->pid == current->pid) {
--			waiter = list_entry(pos,
--				struct bulk_waiter_node,
--				list);
--			list_del(pos);
-+	list_for_each_entry(waiter, &instance->bulk_waiter_list, list) {
-+		if (waiter->pid == current->pid) {
-+			list_del(&waiter->list);
- 			break;
- 		}
- 	}
-@@ -1135,21 +1125,16 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 				ret = -ENOMEM;
- 				break;
+ 	return VCHIQ_SUCCESS;
+ }
+@@ -673,7 +674,8 @@ service_callback(VCHIQ_REASON_T reason, VCHIQ_HEADER_T *header,
  			}
-+
- 			args.userdata = &waiter->bulk_waiter;
- 		} else if (args.mode == VCHIQ_BULK_MODE_WAITING) {
--			struct list_head *pos;
--
- 			mutex_lock(&instance->bulk_waiter_list_mutex);
--			list_for_each(pos, &instance->bulk_waiter_list) {
--				if (list_entry(pos, struct bulk_waiter_node,
--					list)->pid == current->pid) {
--					waiter = list_entry(pos,
--						struct bulk_waiter_node,
--						list);
--					list_del(pos);
-+			list_for_each_entry(waiter, &instance->bulk_waiter_list,
-+					    list) {
-+				if (waiter->pid == current->pid) {
-+					list_del(&waiter->list);
- 					break;
- 				}
--
- 			}
- 			mutex_unlock(&instance->bulk_waiter_list_mutex);
- 			if (!waiter) {
-@@ -2158,16 +2143,11 @@ vchiq_release(struct inode *inode, struct file *file)
- 		vchiq_release_internal(instance->state, NULL);
  
- 		{
--			struct list_head *pos, *next;
--
--			list_for_each_safe(pos, next,
--				&instance->bulk_waiter_list) {
--				struct bulk_waiter_node *waiter;
-+			struct bulk_waiter_node *waiter, *next;
- 
--				waiter = list_entry(pos,
--					struct bulk_waiter_node,
--					list);
--				list_del(pos);
-+			list_for_each_entry_safe(waiter, next,
-+					&instance->bulk_waiter_list, list) {
-+				list_del(&waiter->list);
+ 			DEBUG_TRACE(SERVICE_CALLBACK_LINE);
+-			if (down_interruptible(&user_service->remove_event)
++			if (wait_for_completion_interruptible(
++						&user_service->remove_event)
+ 				!= 0) {
  				vchiq_log_info(vchiq_arm_log_level,
- 					"bulk_waiter - cleaned up %pK for pid %d",
- 					waiter, waiter->pid);
+ 					"%s interrupted", __func__);
+@@ -705,7 +707,7 @@ service_callback(VCHIQ_REASON_T reason, VCHIQ_HEADER_T *header,
+ 		}
+ 
+ 		spin_unlock(&msg_queue_spinlock);
+-		up(&user_service->insert_event);
++		complete(&user_service->insert_event);
+ 
+ 		header = NULL;
+ 	}
+@@ -745,7 +747,7 @@ static void close_delivered(USER_SERVICE_T *user_service)
+ 		unlock_service(user_service->service);
+ 
+ 		/* Wake the user-thread blocked in close_ or remove_service */
+-		up(&user_service->close_event);
++		complete(&user_service->close_event);
+ 
+ 		user_service->close_pending = 0;
+ 	}
+@@ -867,7 +869,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		if (status == VCHIQ_SUCCESS) {
+ 			/* Wake the completion thread and ask it to exit */
+ 			instance->closing = 1;
+-			up(&instance->insert_event);
++			complete(&instance->insert_event);
+ 		}
+ 
+ 		break;
+@@ -948,9 +950,9 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 				instance->completion_remove - 1;
+ 			user_service->msg_insert = 0;
+ 			user_service->msg_remove = 0;
+-			sema_init(&user_service->insert_event, 0);
+-			sema_init(&user_service->remove_event, 0);
+-			sema_init(&user_service->close_event, 0);
++			init_completion(&user_service->insert_event);
++			init_completion(&user_service->remove_event);
++			init_completion(&user_service->close_event);
+ 
+ 			if (args.is_open) {
+ 				status = vchiq_open_service_internal
+@@ -1007,7 +1009,8 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		   has been closed until the client library calls the
+ 		   CLOSE_DELIVERED ioctl, signalling close_event. */
+ 		if (user_service->close_pending &&
+-			down_interruptible(&user_service->close_event))
++			wait_for_completion_interruptible(
++				&user_service->close_event))
+ 			status = VCHIQ_RETRY;
+ 		break;
+ 	}
+@@ -1182,7 +1185,8 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ 			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+ 			mutex_unlock(&instance->completion_mutex);
+-			rc = down_interruptible(&instance->insert_event);
++			rc = wait_for_completion_interruptible(
++						&instance->insert_event);
+ 			mutex_lock(&instance->completion_mutex);
+ 			if (rc != 0) {
+ 				DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+@@ -1310,7 +1314,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		}
+ 
+ 		if (ret != 0)
+-			up(&instance->remove_event);
++			complete(&instance->remove_event);
+ 		mutex_unlock(&instance->completion_mutex);
+ 		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+ 	} break;
+@@ -1350,8 +1354,8 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			do {
+ 				spin_unlock(&msg_queue_spinlock);
+ 				DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+-				if (down_interruptible(
+-					&user_service->insert_event) != 0) {
++				if (wait_for_completion_interruptible(
++					&user_service->insert_event)) {
+ 					vchiq_log_info(vchiq_arm_log_level,
+ 						"DEQUEUE_MESSAGE interrupted");
+ 					ret = -EINTR;
+@@ -1373,7 +1377,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		user_service->msg_remove++;
+ 		spin_unlock(&msg_queue_spinlock);
+ 
+-		up(&user_service->remove_event);
++		complete(&user_service->remove_event);
+ 		if (header == NULL)
+ 			ret = -ENOTCONN;
+ 		else if (header->size <= args.bufsize) {
+@@ -1979,8 +1983,8 @@ vchiq_open(struct inode *inode, struct file *file)
+ 
+ 		vchiq_debugfs_add_instance(instance);
+ 
+-		sema_init(&instance->insert_event, 0);
+-		sema_init(&instance->remove_event, 0);
++		init_completion(&instance->insert_event);
++		init_completion(&instance->remove_event);
+ 		mutex_init(&instance->completion_mutex);
+ 		mutex_init(&instance->bulk_waiter_list_mutex);
+ 		INIT_LIST_HEAD(&instance->bulk_waiter_list);
+@@ -2033,12 +2037,12 @@ vchiq_release(struct inode *inode, struct file *file)
+ 
+ 		/* Wake the completion thread and ask it to exit */
+ 		instance->closing = 1;
+-		up(&instance->insert_event);
++		complete(&instance->insert_event);
+ 
+ 		mutex_unlock(&instance->completion_mutex);
+ 
+ 		/* Wake the slot handler if the completion queue is full. */
+-		up(&instance->remove_event);
++		complete(&instance->remove_event);
+ 
+ 		/* Mark all services for termination... */
+ 		i = 0;
+@@ -2047,7 +2051,7 @@ vchiq_release(struct inode *inode, struct file *file)
+ 			USER_SERVICE_T *user_service = service->base.userdata;
+ 
+ 			/* Wake the slot handler if the msg queue is full. */
+-			up(&user_service->remove_event);
++			complete(&user_service->remove_event);
+ 
+ 			vchiq_terminate_service_internal(service);
+ 			unlock_service(service);
+@@ -2103,7 +2107,7 @@ vchiq_release(struct inode *inode, struct file *file)
+ 
+ 				/* Wake any blocked user-thread */
+ 				if (instance->use_close_delivered)
+-					up(&user_service->close_event);
++					complete(&user_service->close_event);
+ 				unlock_service(service);
+ 			}
+ 			instance->completion_remove++;
 -- 
 2.19.1
