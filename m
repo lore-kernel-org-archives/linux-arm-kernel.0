@@ -1,136 +1,66 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 26 Oct 2018 10:15:30 +0200
-Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
-In-Reply-To: <AM0PR04MB42115EAC49CC0F67BE45CCB380F00@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
- <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
- <c023948f3baee96cb186f970fdb71ebd@agner.ch>
- <AM0PR04MB42115EAC49CC0F67BE45CCB380F00@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <24253e7336192f7afeefe385953d04b3@agner.ch>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 26 Oct 2018 11:18:52 +0300
+Subject: [PATCH RFC 06/11] staging: vchiq_arm: Register a platform device
+ for audio
+In-Reply-To: <20181026080931.akdnmd3zok3aagjw@mwanda>
+References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
+ <1540481375-15952-7-git-send-email-stefan.wahren@i2se.com>
+ <20181026080931.akdnmd3zok3aagjw@mwanda>
+Message-ID: <20181026081852.g5dc7qq7slruhg5n@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.10.2018 05:49, A.s. Dong wrote:
->> -----Original Message-----
->> From: Stefan Agner [mailto:stefan at agner.ch]
->> Sent: Friday, October 26, 2018 1:59 AM
-> [...]
->>
->> On 23.10.2018 13:49, A.s. Dong wrote:
->> > Some SoCs need the gpio clock to be enabled before accessing HW
->> > registers. This patch add the optional clock handling.
->> >
->> > Cc: Linus Walleij <linus.walleij@linaro.org>
->> > Cc: Stefan Agner <stefan@agner.ch>
->> > Cc: Shawn Guo <shawnguo@kernel.org>
->> > Cc: linux-gpio at vger.kernel.org
->> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> > ---
->> > v1->v2:
->> >  * new patch
->> > ---
->> >  drivers/gpio/gpio-vf610.c | 20 ++++++++++++++++++++
->> >  1 file changed, 20 insertions(+)
->> >
->> > diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
->> > index d4ad6d0..cbc4f44 100644
->> > --- a/drivers/gpio/gpio-vf610.c
->> > +++ b/drivers/gpio/gpio-vf610.c
->> > @@ -16,6 +16,7 @@
->> >   */
->> >
->> >  #include <linux/bitops.h>
->> > +#include <linux/clk.h>
->> >  #include <linux/err.h>
->> >  #include <linux/gpio.h>
->> >  #include <linux/init.h>
->> > @@ -256,6 +257,7 @@ static int vf610_gpio_probe(struct platform_device
->> > *pdev)  {
->> >  	struct device *dev = &pdev->dev;
->> >  	struct device_node *np = dev->of_node;
->> > +	struct clk *clk_gpio, *clk_port;
->> >  	struct vf610_gpio_port *port;
->> >  	struct resource *iores;
->> >  	struct gpio_chip *gc;
->> > @@ -280,6 +282,24 @@ static int vf610_gpio_probe(struct platform_device
->> *pdev)
->> >  	if (port->irq < 0)
->> >  		return port->irq;
->> >
->> > +	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
->> > +	clk_port = devm_clk_get(&pdev->dev, "port");
->>
->> Are you sure that those are two independent clocks? On i.MX 7 usually there
->> was a single clock gate controlling multiple clocks at once (which should be
->> modeled as a single clock gate in the clock tree).
->>
+On Fri, Oct 26, 2018 at 11:09:31AM +0300, Dan Carpenter wrote:
+> On Thu, Oct 25, 2018 at 05:29:30PM +0200, Stefan Wahren wrote:
+> > Following Eric's commit 37b7b3087a2f ("staging/vc04_services: Register a
+> > platform device for the camera driver.") this register the audio driver as
+> > a platform device, too.
+> > 
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > ---
+> >  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> > index 778a252..fc6388b 100644
+> > --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> > +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> > @@ -170,6 +170,7 @@ static struct class  *vchiq_class;
+> >  static struct device *vchiq_dev;
+> >  static DEFINE_SPINLOCK(msg_queue_spinlock);
+> >  static struct platform_device *bcm2835_camera;
+> > +static struct platform_device *bcm2835_audio;
+> >  
+> >  static struct vchiq_drvdata bcm2835_drvdata = {
+> >  	.cache_line_size = 32,
+> > @@ -3670,6 +3671,7 @@ static int vchiq_probe(struct platform_device *pdev)
+> >  		MAJOR(vchiq_devid), MINOR(vchiq_devid));
+> >  
+> >  	bcm2835_camera = vchiq_register_child(pdev, "bcm2835-camera");
+> > +	bcm2835_audio = vchiq_register_child(pdev, "bcm2835_audio");
 > 
-> Yes, they're two separate clocks in HW for gpio and port controller
-> respectively.
-> One is for GPIO general purpose input/output function which another
-> for port Interrupt.
-> Just like we have separate register ranges for gpio and port.
+> Same thing.  Check here and not in the remove function.
+> 
 
-Oh I see, that is the same with Vybrid actually. However, in Vybrid, for
-some reason, there is only a clock for port (Port X multiplexing
-control).
+Never mind.  I see what you're doing now that you have both camera and
+audio.  You want it to still load even if one is not present.  That's
+fine.
 
-Can we make port clock independently optional?
+I am slightly uncomfortable just leaving error pointers lying around.
+It might be nicer to just do:
 
-E.g.
-
-	clk_port = devm_clk_get(&pdev->dev, "port");
-	if (clk_gpio == ERR_PTR(-EPROBE_DEFER))
-		return -EPROBE_DEFER;
-
-	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
-	if (clk_gpio == ERR_PTR(-EPROBE_DEFER))
-		return -EPROBE_DEFER;
-
-	if (!IS_ERR_OR_NULL(clk_port)) {
-		ret = clk_prepare_enable(clk_port);
-		if (ret)
-			return ret;
+	bcm2835_camera = vchiq_register_child(pdev, "bcm2835-camera");
+	if (IS_ERR(bcm2835_camera)) {
+		dev_err(pdev, "bcm2835-camera not registered.\n");
+		bcm2835_camera = NULL;
 	}
 
-	if (!IS_ERR_OR_NULL(clk_gpio))
-		ret = clk_prepare_enable(clk_gpio);
-		if (ret) {
-			clk_disable_unprepare(clk_port);
-			return ret;
-		}
-	}
+In that case NULL becomes a special case of success.  The unregister
+functions accept NULL pointers so they wouldn't need to be changed.
 
-Also there is some error handling a bit further down which needs proper
-disabling the clocks.
+Btw, if these had been normal patch instead of RFC we would have just
+applied them and I wouldn't have complained.  But since you're
+deliberately requesting comments anyway, then ...
 
---
-Stefan
-
-
-> 
-> Regards
-> Dong Aisheng
-> 
->> --
->> Stefan
->>
->> > +	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
->> > +	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
->> > +		return -EPROBE_DEFER;
->> > +	} else if (!IS_ERR_OR_NULL(clk_gpio) &&
->> > +		   !IS_ERR_OR_NULL(clk_port)) {
->> > +		ret = clk_prepare_enable(clk_gpio);
->> > +		if (ret)
->> > +			return ret;
->> > +
->> > +		ret = clk_prepare_enable(clk_port);
->> > +		if (ret) {
->> > +			clk_disable_unprepare(clk_gpio);
->> > +			return ret;
->> > +		}
->> > +	}
->> > +
->> >  	gc = &port->gc;
->> >  	gc->of_node = np;
->> >  	gc->parent = dev;
+regards,
+dan carpenter
