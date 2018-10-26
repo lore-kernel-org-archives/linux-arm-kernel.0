@@ -1,94 +1,56 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 26 Oct 2018 03:49:32 +0000
-Subject: [PATCH V2 4/8] gpio: vf610: add optional clock support
-In-Reply-To: <c023948f3baee96cb186f970fdb71ebd@agner.ch>
-References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
- <1540295058-26090-5-git-send-email-aisheng.dong@nxp.com>
- <c023948f3baee96cb186f970fdb71ebd@agner.ch>
-Message-ID: <AM0PR04MB42115EAC49CC0F67BE45CCB380F00@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 26 Oct 2018 09:41:07 +0530
+Subject: [PATCH] dt-bindings: arm: Fix cpu capacity mismatch in example
+In-Reply-To: <80206cb7-b550-1cf6-abf4-e4b17de4cdb5@linaro.org>
+References: <138600f5d504b41202a29a1e130a7aa4e51f1925.1540451976.git.viresh.kumar@linaro.org>
+ <80206cb7-b550-1cf6-abf4-e4b17de4cdb5@linaro.org>
+Message-ID: <20181026041107.4hofhlcubbo5claq@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stefan Agner [mailto:stefan at agner.ch]
-> Sent: Friday, October 26, 2018 1:59 AM
-[...]
+On 25-10-18, 14:04, Daniel Lezcano wrote:
+> I think it is actually correct. The example is confusing on what the
+> numbers are. IIUC, it is:
 > 
-> On 23.10.2018 13:49, A.s. Dong wrote:
-> > Some SoCs need the gpio clock to be enabled before accessing HW
-> > registers. This patch add the optional clock handling.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Stefan Agner <stefan@agner.ch>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: linux-gpio at vger.kernel.org
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> > v1->v2:
-> >  * new patch
-> > ---
-> >  drivers/gpio/gpio-vf610.c | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >
-> > diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-> > index d4ad6d0..cbc4f44 100644
-> > --- a/drivers/gpio/gpio-vf610.c
-> > +++ b/drivers/gpio/gpio-vf610.c
-> > @@ -16,6 +16,7 @@
-> >   */
-> >
-> >  #include <linux/bitops.h>
-> > +#include <linux/clk.h>
-> >  #include <linux/err.h>
-> >  #include <linux/gpio.h>
-> >  #include <linux/init.h>
-> > @@ -256,6 +257,7 @@ static int vf610_gpio_probe(struct platform_device
-> > *pdev)  {
-> >  	struct device *dev = &pdev->dev;
-> >  	struct device_node *np = dev->of_node;
-> > +	struct clk *clk_gpio, *clk_port;
-> >  	struct vf610_gpio_port *port;
-> >  	struct resource *iores;
-> >  	struct gpio_chip *gc;
-> > @@ -280,6 +282,24 @@ static int vf610_gpio_probe(struct platform_device
-> *pdev)
-> >  	if (port->irq < 0)
-> >  		return port->irq;
-> >
-> > +	clk_gpio = devm_clk_get(&pdev->dev, "gpio");
-> > +	clk_port = devm_clk_get(&pdev->dev, "port");
+> (after normalizing)
 > 
-> Are you sure that those are two independent clocks? On i.MX 7 usually there
-> was a single clock gate controlling multiple clocks at once (which should be
-> modeled as a single clock gate in the clock tree).
+> dhrystone result on big CPU is 1024 at 1100MHz
+> dhrystone result on little CPU is 446 at 850MHz
 > 
+> We have to scale the result of the little for 1100MHz in order to compare.
+> 
+> 1100/850 = 1.294
+> 
+> dhrystone result on little CPU is 446 * 1.294 = 577 at 1100MHz
+> 
+> So we put the normalized values 1024 and 577. The arch_topology will
+> scale 577 back to 446 as it will compute the max capacity based on the
+> max freq which is 850MHz.
+> 
+> The *final* capacities are 1024 for cluster0 and 446 for cluster1 (read
+> the cpu max capacity, the ones showed in the sysfs).
+> 
+> Did I miss something ?
 
-Yes, they're two separate clocks in HW for gpio and port controller respectively.
-One is for GPIO general purpose input/output function which another for port Interrupt.
-Just like we have separate register ranges for gpio and port.
+No. What about making it more clear in the example to save the next idiot (like
+me) from wasting time :)
 
-Regards
-Dong Aisheng
+diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+index 9b5685a1d15d..d061e6575bde 100644
+--- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
++++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+@@ -61,7 +61,10 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
+ Example 1 (ARM 64-bit, 6-cpu system, two clusters):
+ capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
+ supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
+-final capacities are 1024 for cluster0 and 446 for cluster1
++final capacities are 1024 for cluster0 and 446 for cluster1.
++Note that the values mentioned below in the example (1024 and 578)
++aren't normalized based on max frequency of each cluster and that is
++left for the operating system to do.
+ 
+ cpus {
+        #address-cells = <2>;
 
-> --
-> Stefan
-> 
-> > +	if ((PTR_ERR(clk_gpio) == -EPROBE_DEFER) ||
-> > +	    (PTR_ERR(clk_port) == -EPROBE_DEFER)) {
-> > +		return -EPROBE_DEFER;
-> > +	} else if (!IS_ERR_OR_NULL(clk_gpio) &&
-> > +		   !IS_ERR_OR_NULL(clk_port)) {
-> > +		ret = clk_prepare_enable(clk_gpio);
-> > +		if (ret)
-> > +			return ret;
-> > +
-> > +		ret = clk_prepare_enable(clk_port);
-> > +		if (ret) {
-> > +			clk_disable_unprepare(clk_gpio);
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> >  	gc = &port->gc;
-> >  	gc->of_node = np;
-> >  	gc->parent = dev;
+-- 
+viresh
