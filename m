@@ -1,79 +1,74 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Fri, 26 Oct 2018 15:47:58 +0200
-Subject: [PATCH RFC 03/18] staging: vchiq_shim: delete vchi_service_create
-In-Reply-To: <20181026134813.7775-1-nsaenzjulienne@suse.de>
-References: <20181026134813.7775-1-nsaenzjulienne@suse.de>
-Message-ID: <20181026134813.7775-4-nsaenzjulienne@suse.de>
+Date: Fri, 26 Oct 2018 15:47:55 +0200
+Subject: [PATCH RFC 00/18] staging: vchiq: remove dead code & misc fixes
+Message-ID: <20181026134813.7775-1-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No one is using the API neither in the actual staging tree nor in the
-downstream tree (https://github.com/raspberrypi/linux).
+Hi All,
 
-Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
----
- .../vc04_services/interface/vchi/vchi.h       |  5 ---
- .../interface/vchiq_arm/vchiq_shim.c          | 32 -------------------
- 2 files changed, 37 deletions(-)
+This series was written in parallel with reading and understanding the
+vchiq code. So excuse me for the lack of logic in the sequence of
+patches.
 
-diff --git a/drivers/staging/vc04_services/interface/vchi/vchi.h b/drivers/staging/vc04_services/interface/vchi/vchi.h
-index 01381904775d..379a16ebfd5b 100644
---- a/drivers/staging/vc04_services/interface/vchi/vchi.h
-+++ b/drivers/staging/vc04_services/interface/vchi/vchi.h
-@@ -113,11 +113,6 @@ extern uint32_t vchi_current_time(VCHI_INSTANCE_T instance_handle);
- /******************************************************************************
-  Global service API
-  *****************************************************************************/
--// Routine to create a named service
--extern int32_t vchi_service_create(VCHI_INSTANCE_T instance_handle,
--				   SERVICE_CREATION_T *setup,
--				   VCHI_SERVICE_HANDLE_T *handle);
--
- // Routine to destroy a service
- extern int32_t vchi_service_destroy(const VCHI_SERVICE_HANDLE_T handle);
- 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-index c3223fcdaf87..81cac68f4b78 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-@@ -660,38 +660,6 @@ int32_t vchi_service_open(VCHI_INSTANCE_T instance_handle,
- }
- EXPORT_SYMBOL(vchi_service_open);
- 
--int32_t vchi_service_create(VCHI_INSTANCE_T instance_handle,
--	SERVICE_CREATION_T *setup,
--	VCHI_SERVICE_HANDLE_T *handle)
--{
--	VCHIQ_INSTANCE_T instance = (VCHIQ_INSTANCE_T)instance_handle;
--	struct shim_service *service = service_alloc(instance, setup);
--
--	*handle = (VCHI_SERVICE_HANDLE_T)service;
--
--	if (service) {
--		VCHIQ_SERVICE_PARAMS_T params;
--		VCHIQ_STATUS_T status;
--
--		memset(&params, 0, sizeof(params));
--		params.fourcc = setup->service_id;
--		params.callback = shim_callback;
--		params.userdata = service;
--		params.version = setup->version.version;
--		params.version_min = setup->version.version_min;
--		status = vchiq_add_service(instance, &params, &service->handle);
--
--		if (status != VCHIQ_SUCCESS) {
--			service_free(service);
--			service = NULL;
--			*handle = NULL;
--		}
--	}
--
--	return (service != NULL) ? 0 : -1;
--}
--EXPORT_SYMBOL(vchi_service_create);
--
- int32_t vchi_service_close(const VCHI_SERVICE_HANDLE_T handle)
- {
- 	int32_t ret = -1;
+It's an RFC for various reasons, first I think it's going to clash with
+the last Stefan's series. Also I'm not used to doing big series.
+
+The main focus was to delete as much code as possible, I've counted
+around 550 lines, which is not bad. Apart from that there are some
+patches enforcing proper kernel APIs usage.
+
+The only patch that really changes code is the
+vchiq_ioc_copy_element_data() rewrite, I was having doubts whether to
+add it into the series, but since it's a RFC, I don't think it hurts.
+
+The last commit updates the TODO list with some of my observations, I
+realise some of the might be a little opinionated. If anything it's
+going to force a discussion on the topic, which is nice.
+
+The series was developed on top of linux-next, and was tested on a
+RPIv3B+ with audio, video and running vchiq_test.
+
+Regards,
+Nicolas
+
+===
+
+Nicolas Saenz Julienne (18):
+  staging: vchiq_core: rework vchiq_get_config
+  staging: vchiq_arm: rework close/remove_service IOCTLS
+  staging: vchiq_shim: delete vchi_service_create
+  stagning: vchiq_arm: use list_for_each_entry when accessing
+    bulk_waiter_list
+  staging: vchiq_arm: get rid of vchi_mh.h
+  staging: vchiq_arm: rework vchiq_ioc_copy_element_data
+  staging: vchiq-core: get rid of is_master distinction
+  staging: vchiq_core: remove unnecessary safety checks in
+    vchiq_init_state
+  staging: vchiq_core: do not initialize semaphores twice
+  staging: vchiq_core: don't add a wmb() before remote_event_signal()
+  staging: vchiq_arm: use completions instead of semaphores
+  staging: vchiq_util: use completions instead of semaphores
+  staging: vchiq_core: use completions instead of semaphores
+  staging: vchiq_util: get rid of unneeded memory barriers
+  stagning: vchiq_core: fix logic redundancy in parse_open
+  staging: vchiq_arm: rework probe and init functions
+  staging: vchiq_arm: fix open/release cdev functions
+  staging: vchiq: add more tasks to the TODO list
+
+ .../staging/vc04_services/interface/vchi/TODO |  46 +-
+ .../vc04_services/interface/vchi/vchi.h       |   8 -
+ .../vc04_services/interface/vchi/vchi_mh.h    |  42 --
+ .../interface/vchiq_arm/vchiq_2835_arm.c      |  18 +-
+ .../interface/vchiq_arm/vchiq_arm.c           | 598 ++++++++----------
+ .../interface/vchiq_arm/vchiq_core.c          | 511 +++------------
+ .../interface/vchiq_arm/vchiq_core.h          |  47 +-
+ .../interface/vchiq_arm/vchiq_if.h            |  11 +-
+ .../interface/vchiq_arm/vchiq_shim.c          |  32 -
+ .../interface/vchiq_arm/vchiq_util.c          |  48 +-
+ .../interface/vchiq_arm/vchiq_util.h          |   6 +-
+ 11 files changed, 429 insertions(+), 938 deletions(-)
+ delete mode 100644 drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+
 -- 
 2.19.1
