@@ -1,67 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 26 Oct 2018 20:41:56 +0200
-Subject: [PATCH 2/4] ARM: S3C24XX: rx1950: make use of atomic PWM API
-In-Reply-To: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
-References: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20181026184157.16371-2-u.kleine-koenig@pengutronix.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 26 Oct 2018 12:05:25 -0700
+Subject: [PATCH v2 0/2] arm64: Cut rebuild time when changing
+ CONFIG_BLK_DEV_INITRD
+In-Reply-To: <20181026110708.GA3814@rapoport-lnx>
+References: <20181024193256.23734-1-f.fainelli@gmail.com>
+ <CAL_Jsq+KCOv6pXXHhHDZ+7-QUrmtMDvSjEVhK15yZ3qbnn61Ag@mail.gmail.com>
+ <20181025093833.GA23607@rapoport-lnx>
+ <CAL_JsqL62ttsGSbE1BS5v-mX3pKE-p_HyvuZD6nB+GUbQyetzg@mail.gmail.com>
+ <20181025172935.GA27364@rapoport-lnx>
+ <CAL_JsqJrMq+QHvuOsqEdCFchmXsd4s2XKUD_TboKzeEQprJvjg@mail.gmail.com>
+ <1bb3bd63-a88e-b668-ea36-f0f985c0e2b1@gmail.com>
+ <20181026110708.GA3814@rapoport-lnx>
+Message-ID: <53ec9df5-ef2a-edc5-be1c-bca32959c0bc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy PWM API should be removed in the long run, so convert a user
-to the atomic PWM API.
+On 10/26/18 4:07 AM, Mike Rapoport wrote:
+> On Thu, Oct 25, 2018 at 04:07:13PM -0700, Florian Fainelli wrote:
+>> On 10/25/18 2:13 PM, Rob Herring wrote:
+>>> On Thu, Oct 25, 2018 at 12:30 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
+>>>>
+>>>> On Thu, Oct 25, 2018 at 08:15:15AM -0500, Rob Herring wrote:
+>>>>> +Ard
+>>>>>
+>>>>> On Thu, Oct 25, 2018 at 4:38 AM Mike Rapoport <rppt@linux.ibm.com> wrote:
+>>>>>>
+>>>>>> On Wed, Oct 24, 2018 at 02:55:17PM -0500, Rob Herring wrote:
+>>>>>>> On Wed, Oct 24, 2018 at 2:33 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>>>>>>
+>>>>>>>> Hi all,
+>>>>>>>>
+>>>>>>>> While investigating why ARM64 required a ton of objects to be rebuilt
+>>>>>>>> when toggling CONFIG_DEV_BLK_INITRD, it became clear that this was
+>>>>>>>> because we define __early_init_dt_declare_initrd() differently and we do
+>>>>>>>> that in arch/arm64/include/asm/memory.h which gets included by a fair
+>>>>>>>> amount of other header files, and translation units as well.
+>>>>>>>
+>>>>>> I think arm64 does not have to redefine __early_init_dt_declare_initrd().
+>>>>>> Something like this might be just all we need (completely untested,
+>>>>>> probably it won't even compile):
+> 
+> [ ... ]
+>  
+>> FWIW, I am extracting the ARM implementation that parses the initrd
+>> early command line parameter and the "setup" code doing the page
+>> boundary alignment and memblock checking into a helper into lib/ that
+>> other architectures can re-use. So far, this removes the need for
+>> unicore32, arc and arm to duplicate essentially the same logic.
+> 
+> Presuming you are going to need asm-generic/initrd.h for that as well,
+> using override for __early_init_dt_declare_initrd in arm64 version of
+> initrd.h might be the simplest option.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-s3c24xx/mach-rx1950.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+What I am contemplating doing is promote
+phys_initrd_start/phys_initrd_size to be global variables (similar to
+initrd_start, initrd_end) and have a generic helper function for parsing
+the initrd= command line parameter and finally removing
+__early_init_dt_declare_initrd() because we could have
+early_init_dt_check_for_initrd() just populate
+phys_initrd_start/phys_initrd_size directly as well as
+initrd_start/initrd_end using __va() to preserve compatibility with
+architectures that rely on this. Then I would convert ARM64 to check for
+phys_initrd_start which is really what it is is trying to do in
+arch/arm64/mm/init.c::arm64_memblock_init().
 
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 7f5a18fa305b..5c4459f9a5f7 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -375,6 +375,7 @@ static struct pwm_lookup rx1950_pwm_lookup[] = {
- 		   PWM_POLARITY_NORMAL),
- };
- 
-+static struct pwm_state lcd_pwm_state;
- static struct pwm_device *lcd_pwm;
- 
- static void rx1950_lcd_power(int enable)
-@@ -428,15 +429,17 @@ static void rx1950_lcd_power(int enable)
- 
- 		/* GPB1->OUTPUT, GPB1->0 */
- 		gpio_direction_output(S3C2410_GPB(1), 0);
--		pwm_config(lcd_pwm, 0, LCD_PWM_PERIOD);
--		pwm_disable(lcd_pwm);
-+		lcd_pwm_state.duty_cycle = 0;
-+		lcd_pwm_state.enabled = false;
-+		pwm_apply_state(lcd_pwm, &lcd_pwm_state);
- 
- 		/* GPC0->0, GPC10->0 */
- 		gpio_direction_output(S3C2410_GPC(0), 0);
- 		gpio_direction_output(S3C2410_GPC(10), 0);
- 	} else {
--		pwm_config(lcd_pwm, LCD_PWM_DUTY, LCD_PWM_PERIOD);
--		pwm_enable(lcd_pwm);
-+		lcd_pwm_state.duty_cycle = LCD_PWM_DUTY;
-+		lcd_pwm_state.enabled = true;
-+		pwm_apply_state(lcd_pwm, &lcd_pwm_state);
- 
- 		gpio_direction_output(S3C2410_GPC(0), 1);
- 		gpio_direction_output(S3C2410_GPC(5), 1);
-@@ -491,11 +494,8 @@ static int rx1950_backlight_init(struct device *dev)
- 		return PTR_ERR(lcd_pwm);
- 	}
- 
--	/*
--	 * FIXME: pwm_apply_args() should be removed when switching to
--	 * the atomic PWM API.
--	 */
--	pwm_apply_args(lcd_pwm);
-+	pwm_get_state_default(lcd_pwm, &lcd_pwm_state);
-+	lcd_pwm_state.period = LCD_PWM_PERIOD;
- 
- 	rx1950_lcd_power(1);
- 	rx1950_bl_power(1);
+Does that sound like a reasonable approach?
 -- 
-2.19.1
+Florian
