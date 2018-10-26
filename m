@@ -1,319 +1,431 @@
-From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
-Date: Fri, 26 Oct 2018 16:19:48 +0000
-Subject: [PATCH 1/2] regulator: act8945: Implement PM functionalities
-In-Reply-To: <1540570753-16370-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1540570753-16370-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1540570753-16370-2-git-send-email-claudiu.beznea@microchip.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Fri, 26 Oct 2018 16:13:24 +0000
+Subject: [linux-sunxi] [PATCH v3 20/25] drm/panel: Add Techstar TS8550B
+ MIPI-DSI LCD panel
+In-Reply-To: <20181026144344.27778-21-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-21-jagan@amarulasolutions.com>
+Message-ID: <20181026161324.qbpcpkpwyixi7juk@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@bootlin.com>
+On Fri, Oct 26, 2018 at 08:13:39PM +0530, Jagan Teki wrote:
+> Techstar TS8550B MIPI DSI panel is 480x854, 2-lane MIPI DSI
+> LCD panel. Add panel driver for it.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Tested-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v3:
+> - new patch
+> Changes for v2:
+> - none
+> 
+>  drivers/gpu/drm/panel/Kconfig                 |   9 +
+>  drivers/gpu/drm/panel/Makefile                |   1 +
+>  .../gpu/drm/panel/panel-techstar-ts8550b.c    | 346 ++++++++++++++++++
+>  3 files changed, 356 insertions(+)
+>  create mode 100644 drivers/gpu/drm/panel/panel-techstar-ts8550b.c
+> 
+> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+> index 20b88c275421..d0d4e60f5153 100644
+> --- a/drivers/gpu/drm/panel/Kconfig
+> +++ b/drivers/gpu/drm/panel/Kconfig
+> @@ -195,4 +195,13 @@ config DRM_PANEL_SITRONIX_ST7789V
+>  	  Say Y here if you want to enable support for the Sitronix
+>  	  ST7789V controller for 240x320 LCD panels
+>  
+> +config DRM_PANEL_TECHSTAR_TS8550B
+> +	tristate "Techstar TS8550B MIPI-DSI panel driver"
+> +	depends on OF
+> +	depends on DRM_MIPI_DSI
+> +	depends on BACKLIGHT_CLASS_DEVICE
+> +	help
+> +	  Say Y if you want to enable support for panels based on the
+> +	  Techstar TS8550B MIPI-DSI interface.
+> +
+>  endmenu
+> diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+> index 04696bb85218..88011f06edb8 100644
+> --- a/drivers/gpu/drm/panel/Makefile
+> +++ b/drivers/gpu/drm/panel/Makefile
+> @@ -20,3 +20,4 @@ obj-$(CONFIG_DRM_PANEL_SEIKO_43WVF1G) += panel-seiko-43wvf1g.o
+>  obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
+>  obj-$(CONFIG_DRM_PANEL_SHARP_LS043T1LE01) += panel-sharp-ls043t1le01.o
+>  obj-$(CONFIG_DRM_PANEL_SITRONIX_ST7789V) += panel-sitronix-st7789v.o
+> +obj-$(CONFIG_DRM_PANEL_TECHSTAR_TS8550B) += panel-techstar-ts8550b.o
+> diff --git a/drivers/gpu/drm/panel/panel-techstar-ts8550b.c b/drivers/gpu/drm/panel/panel-techstar-ts8550b.c
+> new file mode 100644
+> index 000000000000..8baca71595a7
+> --- /dev/null
+> +++ b/drivers/gpu/drm/panel/panel-techstar-ts8550b.c
+> @@ -0,0 +1,346 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2019, Amarula Solutions.
+> + * Author: Jagan Teki <jagan@amarulasolutions.com>
+> + */
+> +
+> +#include <linux/backlight.h>
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/errno.h>
+> +#include <linux/fb.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/regulator/consumer.h>
+> +
+> +#include <drm/drm_mipi_dsi.h>
+> +#include <drm/drm_modes.h>
+> +#include <drm/drm_panel.h>
+> +
+> +#include <video/mipi_display.h>
+> +
+> +struct ts8550b {
+> +	struct drm_panel	panel;
+> +	struct mipi_dsi_device	*dsi;
+> +
+> +	struct backlight_device *backlight;
+> +	struct regulator	*dvdd;
+> +	struct regulator	*avdd;
+> +	struct gpio_desc	*reset;
+> +
+> +	bool			is_enabled;
+> +	bool			is_prepared;
+> +};
+> +
+> +static inline struct ts8550b *panel_to_ts8550b(struct drm_panel *panel)
+> +{
+> +	return container_of(panel, struct ts8550b, panel);
+> +}
+> +
+> +static inline int ts8550b_dcs_write_seq(struct ts8550b *ctx, const void *seq,
+> +					size_t len)
+> +{
+> +	return mipi_dsi_dcs_write_buffer(ctx->dsi, seq, len);
+> +};
+> +
+> +#define ts8550b_dcs_write_seq_static(ctx, seq...)		\
+> +	({							\
+> +		static const u8 d[] = { seq };			\
+> +		ts8550b_dcs_write_seq(ctx, d, ARRAY_SIZE(d));	\
+> +	})
+> +
+> +static void ts8550b_init_sequence(struct ts8550b *ctx)
 
-The regulator supports a dedicated suspend mode.
-Implement the appropriate ->set_suspend_xx() hooks, add support for
-->set_mode(), and provide basic PM ops functionalities to setup the
-regulator in a suspend state when the system is entering suspend.
+This seems to be pretty "standard" MIPI-based display, utilizing
+bunch of manufacturer-specific commands during init sequence.
 
-We also implement the ->shutdown() method to make sure the PMIC will
-not enter the suspend state when the system is shutdown.
+Standard MIPI commands fall between 0x00..0xAF and are defined in <video/mipi.h>
 
-Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
-[claudiu.beznea at microchip.com: remove dev_pm_ops, fix checkpatch warking, adapt commit message]
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- drivers/regulator/act8945a-regulator.c | 195 ++++++++++++++++++++++++++++++++-
- 1 file changed, 193 insertions(+), 2 deletions(-)
+> +{
+> +	ts8550b_dcs_write_seq_static(ctx, 0x01, 0x00);
 
-diff --git a/drivers/regulator/act8945a-regulator.c b/drivers/regulator/act8945a-regulator.c
-index 43fda8b4455a..41bf7d224abb 100644
---- a/drivers/regulator/act8945a-regulator.c
-+++ b/drivers/regulator/act8945a-regulator.c
-@@ -15,6 +15,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
- 
-@@ -23,23 +24,36 @@
-  */
- #define ACT8945A_SYS_MODE	0x00
- #define ACT8945A_SYS_CTRL	0x01
-+#define ACT8945A_SYS_UNLK_REGS	0x0b
- #define ACT8945A_DCDC1_VSET1	0x20
- #define ACT8945A_DCDC1_VSET2	0x21
- #define ACT8945A_DCDC1_CTRL	0x22
-+#define ACT8945A_DCDC1_SUS	0x24
- #define ACT8945A_DCDC2_VSET1	0x30
- #define ACT8945A_DCDC2_VSET2	0x31
- #define ACT8945A_DCDC2_CTRL	0x32
-+#define ACT8945A_DCDC2_SUS	0x34
- #define ACT8945A_DCDC3_VSET1	0x40
- #define ACT8945A_DCDC3_VSET2	0x41
- #define ACT8945A_DCDC3_CTRL	0x42
-+#define ACT8945A_DCDC3_SUS	0x44
-+
-+#define ACT8945A_DCDC_MODE_MSK		BIT(5)
-+#define ACT8945A_DCDC_MODE_FIXED	BIT(5)
-+#define ACT8945A_DCDC_MODE_POWER_SAVING	(0)
-+
- #define ACT8945A_LDO1_VSET	0x50
- #define ACT8945A_LDO1_CTRL	0x51
-+#define ACT8945A_LDO1_SUS	0x52
- #define ACT8945A_LDO2_VSET	0x54
- #define ACT8945A_LDO2_CTRL	0x55
-+#define ACT8945A_LDO2_SUS	0x56
- #define ACT8945A_LDO3_VSET	0x60
- #define ACT8945A_LDO3_CTRL	0x61
-+#define ACT8945A_LDO3_SUS	0x62
- #define ACT8945A_LDO4_VSET	0x64
- #define ACT8945A_LDO4_CTRL	0x65
-+#define ACT8945A_LDO4_SUS	0x66
- 
- /**
-  * Field Definitions.
-@@ -63,12 +77,154 @@ enum {
- 	ACT8945A_REG_NUM,
- };
- 
-+struct act8945a_pmic {
-+	struct regulator_dev *rdevs[ACT8945A_REG_NUM];
-+	struct regmap *regmap;
-+};
-+
- static const struct regulator_linear_range act8945a_voltage_ranges[] = {
- 	REGULATOR_LINEAR_RANGE(600000, 0, 23, 25000),
- 	REGULATOR_LINEAR_RANGE(1200000, 24, 47, 50000),
- 	REGULATOR_LINEAR_RANGE(2400000, 48, 63, 100000),
- };
- 
-+static int act8945a_set_suspend_state(struct regulator_dev *rdev, bool enable)
-+{
-+	struct regmap *regmap = rdev->regmap;
-+	int id = rdev->desc->id, ret, reg, val;
-+
-+	switch (id) {
-+	case ACT8945A_ID_DCDC1:
-+		reg = ACT8945A_DCDC1_SUS;
-+		val = 0xa8;
-+		break;
-+	case ACT8945A_ID_DCDC2:
-+		reg = ACT8945A_DCDC2_SUS;
-+		val = 0xa8;
-+		break;
-+	case ACT8945A_ID_DCDC3:
-+		reg = ACT8945A_DCDC3_SUS;
-+		val = 0xa8;
-+		break;
-+	case ACT8945A_ID_LDO1:
-+		reg = ACT8945A_LDO1_SUS;
-+		val = 0xe8;
-+		break;
-+	case ACT8945A_ID_LDO2:
-+		reg = ACT8945A_LDO2_SUS;
-+		val = 0xe8;
-+		break;
-+	case ACT8945A_ID_LDO3:
-+		reg = ACT8945A_LDO3_SUS;
-+		val = 0xe8;
-+		break;
-+	case ACT8945A_ID_LDO4:
-+		reg = ACT8945A_LDO4_SUS;
-+		val = 0xe8;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	if (enable)
-+		val |= BIT(4);
-+
-+	/*
-+	 * Ask the PMIC to enable/disable this output when entering hibernate
-+	 * mode.
-+	 */
-+	ret = regmap_write(regmap, reg, val);
-+	if (ret < 0)
-+		return ret;
-+
-+	/*
-+	 * Ask the PMIC to enter the suspend mode on the next PWRHLD
-+	 * transition.
-+	 */
-+	return regmap_write(regmap, ACT8945A_SYS_CTRL, 0x42);
-+}
-+
-+static int act8945a_set_suspend_enable(struct regulator_dev *rdev)
-+{
-+	return act8945a_set_suspend_state(rdev, true);
-+}
-+
-+static int act8945a_set_suspend_disable(struct regulator_dev *rdev)
-+{
-+	return act8945a_set_suspend_state(rdev, false);
-+}
-+
-+static unsigned int act8945a_of_map_mode(unsigned int mode)
-+{
-+	if (mode == ACT8945A_DCDC_MODE_POWER_SAVING)
-+		return REGULATOR_MODE_STANDBY;
-+
-+	return REGULATOR_MODE_NORMAL;
-+}
-+
-+static int act8945a_set_mode(struct regulator_dev *rdev, unsigned int mode)
-+{
-+	struct regmap *regmap = rdev->regmap;
-+	int id = rdev->desc->id;
-+	int reg, val;
-+
-+	switch (mode) {
-+	case REGULATOR_MODE_STANDBY:
-+		val = ACT8945A_DCDC_MODE_POWER_SAVING;
-+		break;
-+	case REGULATOR_MODE_NORMAL:
-+		val = ACT8945A_DCDC_MODE_FIXED;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	switch (id) {
-+	case ACT8945A_ID_DCDC1:
-+		reg = ACT8945A_DCDC1_CTRL;
-+		break;
-+	case ACT8945A_ID_DCDC2:
-+		reg = ACT8945A_DCDC2_CTRL;
-+		break;
-+	case ACT8945A_ID_DCDC3:
-+		reg = ACT8945A_DCDC3_CTRL;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return regmap_update_bits(regmap, reg, ACT8945A_DCDC_MODE_MSK, val);
-+}
-+
-+static unsigned int act8945a_get_mode(struct regulator_dev *rdev)
-+{
-+	struct regmap *regmap = rdev->regmap;
-+	int id = rdev->desc->id;
-+	unsigned int val;
-+	int reg;
-+
-+	switch (id) {
-+	case ACT8945A_ID_DCDC1:
-+		reg = ACT8945A_DCDC1_CTRL;
-+		break;
-+	case ACT8945A_ID_DCDC2:
-+		reg = ACT8945A_DCDC2_CTRL;
-+		break;
-+	case ACT8945A_ID_DCDC3:
-+		reg = ACT8945A_DCDC3_CTRL;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	regmap_read(regmap, reg, &val);
-+
-+	if ((val & ACT8945A_DCDC_MODE_MSK) == ACT8945A_DCDC_MODE_POWER_SAVING)
-+		return REGULATOR_MODE_STANDBY;
-+
-+	return REGULATOR_MODE_NORMAL;
-+}
-+
- static const struct regulator_ops act8945a_ops = {
- 	.list_voltage		= regulator_list_voltage_linear_range,
- 	.map_voltage		= regulator_map_voltage_linear_range,
-@@ -76,7 +232,11 @@ static const struct regulator_ops act8945a_ops = {
- 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
- 	.enable			= regulator_enable_regmap,
- 	.disable		= regulator_disable_regmap,
-+	.set_mode		= act8945a_set_mode,
-+	.get_mode		= act8945a_get_mode,
- 	.is_enabled		= regulator_is_enabled_regmap,
-+	.set_suspend_enable	= act8945a_set_suspend_enable,
-+	.set_suspend_disable	= act8945a_set_suspend_disable,
- };
- 
- #define ACT89xx_REG(_name, _family, _id, _vsel_reg, _supply)		\
-@@ -84,6 +244,7 @@ static const struct regulator_ops act8945a_ops = {
- 		.name			= _name,			\
- 		.supply_name		= _supply,			\
- 		.of_match		= of_match_ptr("REG_"#_id),	\
-+		.of_map_mode		= act8945a_of_map_mode,		\
- 		.regulators_node	= of_match_ptr("regulators"),	\
- 		.id			= _family##_ID_##_id,		\
- 		.type			= REGULATOR_VOLTAGE,		\
-@@ -122,10 +283,22 @@ static int act8945a_pmic_probe(struct platform_device *pdev)
- {
- 	struct regulator_config config = { };
- 	const struct regulator_desc *regulators;
-+	struct act8945a_pmic *act8945a;
- 	struct regulator_dev *rdev;
- 	int i, num_regulators;
- 	bool voltage_select;
- 
-+	act8945a = devm_kzalloc(&pdev->dev, sizeof(*act8945a), GFP_KERNEL);
-+	if (!act8945a)
-+		return -ENOMEM;
-+
-+	act8945a->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-+	if (!act8945a->regmap) {
-+		dev_err(&pdev->dev,
-+			"could not retrieve regmap from parent device\n");
-+		return -EINVAL;
-+	}
-+
- 	voltage_select = of_property_read_bool(pdev->dev.parent->of_node,
- 					       "active-semi,vsel-high");
- 
-@@ -140,16 +313,33 @@ static int act8945a_pmic_probe(struct platform_device *pdev)
- 	config.dev = &pdev->dev;
- 	config.dev->of_node = pdev->dev.parent->of_node;
- 	for (i = 0; i < num_regulators; i++) {
--		rdev = devm_regulator_register(&pdev->dev, &regulators[i], &config);
-+		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
-+					       &config);
- 		if (IS_ERR(rdev)) {
- 			dev_err(&pdev->dev,
- 				"failed to register %s regulator\n",
- 				regulators[i].name);
- 			return PTR_ERR(rdev);
- 		}
-+
-+		act8945a->rdevs[i] = rdev;
- 	}
- 
--	return 0;
-+	platform_set_drvdata(pdev, act8945a);
-+
-+	/* Unlock expert registers. */
-+	return regmap_write(act8945a->regmap, ACT8945A_SYS_UNLK_REGS, 0xef);
-+}
-+
-+static void act8945a_pmic_shutdown(struct platform_device *pdev)
-+{
-+	struct act8945a_pmic *act8945a = platform_get_drvdata(pdev);
-+	struct regmap *regmap = act8945a->regmap;
-+
-+	/*
-+	 * Ask the PMIC to shutdown everything on the next PWRHLD transition.
-+	 */
-+	regmap_write(regmap, ACT8945A_SYS_CTRL, 0x0);
- }
- 
- static struct platform_driver act8945a_pmic_driver = {
-@@ -157,6 +347,7 @@ static struct platform_driver act8945a_pmic_driver = {
- 		.name = "act8945a-regulator",
- 	},
- 	.probe = act8945a_pmic_probe,
-+	.shutdown = act8945a_pmic_shutdown,
- };
- module_platform_driver(act8945a_pmic_driver);
- 
--- 
-2.7.4
+
+MIPI_DCS_SOFT_RESET
+
+> +	msleep(200);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xFF, 0x77, 0x01, 0x00, 0x00, 0x11);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xD1, 0x11);
+> +	ts8550b_dcs_write_seq_static(ctx, 0x11, 0x00);
+
+MIPI_DCS_EXIT_SLEEP_MODE
+
+> +	msleep(200);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xFF, 0x77, 0x01, 0x00, 0x00, 0x10);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xC0, 0xE9, 0x03);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xC1, 0x12, 0x02);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xC2, 0x07, 0x06);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB0, 0x00, 0x0E, 0x15, 0x0F, 0x11,
+> +				     0x08, 0x08, 0x08, 0x08, 0x23, 0x04, 0x13,
+> +				     0x12, 0x2B, 0x34, 0x1F);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB1, 0x00, 0x0E, 0x95, 0x0F, 0x13,
+> +				     0x07, 0x09, 0x08, 0x08, 0x22, 0x04, 0x10,
+> +				     0x0E, 0x2C, 0x34, 0x1F);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xFF, 0x77, 0x01, 0x00, 0x00, 0x11);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB0, 0x45);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB1, 0x13);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB2, 0x07);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB3, 0x80);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB5, 0x47);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB7, 0x85);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB8, 0x20);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xB9, 0x11);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xC1, 0x78);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xC2, 0x78);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xD0, 0x88);
+> +	msleep(100);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE0, 0x00, 0x00, 0x02);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE1, 0x0B, 0x00, 0x0D, 0x00, 0x0C,
+> +				     0x00, 0x0E, 0x00, 0x00, 0x44, 0x44);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE2, 0x33, 0x33, 0x44, 0x44, 0x64,
+> +				     0x00, 0x66, 0x00, 0x65, 0x00, 0x67, 0x00,
+> +				     0x00);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE3, 0x00, 0x00, 0x33, 0x33);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE4, 0x44, 0x44);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE5, 0x0C, 0x78, 0x3C, 0xA0, 0x0E,
+> +				     0x78, 0x3C, 0xA0, 0x10, 0x78, 0x3C, 0xA0,
+> +				     0x12, 0x78, 0x3C, 0xA0);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE6, 0x00, 0x00, 0x33, 0x33);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE7, 0x44, 0x44);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xE8, 0x0D, 0x78, 0x3C, 0xA0, 0x0F,
+> +				     0x78, 0x3C, 0xA0, 0x11, 0x78, 0x3C, 0xA0,
+> +				     0x13, 0x78, 0x3C, 0xA0);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xEB, 0x02, 0x02, 0x39, 0x39, 0xEE,
+> +				     0x44, 0x00);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xEC, 0x00, 0x00);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xED, 0xFF, 0xF1, 0x04, 0x56, 0x72,
+> +				     0x3F, 0xFF, 0xFF, 0xFF, 0xFF, 0xF3, 0x27,
+> +				     0x65, 0x40, 0x1F, 0xFF);
+> +	ts8550b_dcs_write_seq_static(ctx, 0xFF, 0x77, 0x01, 0x00, 0x00, 0x00);
+> +	msleep(10);
+> +	ts8550b_dcs_write_seq_static(ctx, 0x29, 0x00);
+
+MIPI_DCS_SET_DISPLAY_ON
+
+> +	msleep(200);
+> +}
+> +
+> +static int ts8550b_prepare(struct drm_panel *panel)
+> +{
+> +	struct ts8550b *ctx = panel_to_ts8550b(panel);
+> +	int ret;
+> +
+> +	if (ctx->is_prepared)
+> +		return 0;
+> +
+> +	gpiod_set_value(ctx->reset, 0);
+> +	msleep(20);
+> +
+> +	ret = regulator_enable(ctx->dvdd);
+> +	if (ret)
+> +		return ret;
+> +	msleep(20);
+> +
+> +	ret = regulator_enable(ctx->avdd);
+> +	if (ret)
+> +		return ret;
+> +	msleep(20);
+> +
+> +	gpiod_set_value(ctx->reset, 1);
+> +	msleep(20);
+> +
+> +	gpiod_set_value(ctx->reset, 0);
+> +	msleep(30);
+> +
+> +	gpiod_set_value(ctx->reset, 1);
+> +	msleep(150);
+> +
+> +	ts8550b_init_sequence(ctx);
+> +
+> +	ctx->is_prepared = true;
+> +
+> +	return 0;
+> +}
+> +
+> +static int ts8550b_enable(struct drm_panel *panel)
+> +{
+> +	struct ts8550b *ctx = panel_to_ts8550b(panel);
+> +
+> +	if (ctx->is_enabled)
+> +		return 0;
+> +
+> +	msleep(120);
+> +
+> +	backlight_enable(ctx->backlight);
+> +	ctx->is_enabled = true;
+> +
+> +	return 0;
+> +}
+> +
+> +static int ts8550b_disable(struct drm_panel *panel)
+> +{
+> +	struct ts8550b *ctx = panel_to_ts8550b(panel);
+> +
+> +	if (!ctx->is_enabled)
+> +		return 0;
+> +
+> +	backlight_disable(ctx->backlight);
+> +	ctx->is_enabled = false;
+> +
+> +	return 0;
+> +}
+> +
+> +static int ts8550b_unprepare(struct drm_panel *panel)
+> +{
+> +	struct ts8550b *ctx = panel_to_ts8550b(panel);
+> +	int ret;
+> +
+> +	if (!ctx->is_prepared)
+> +		return 0;
+> +
+> +	ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
+> +	if (ret < 0)
+> +		dev_err(panel->dev, "failed to set display off: %d\n", ret);
+> +
+> +	ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
+> +	if (ret < 0)
+> +		dev_err(panel->dev, "failed to enter sleep mode: %d\n", ret);
+> +
+> +	msleep(120);
+> +
+> +	regulator_disable(ctx->dvdd);
+> +
+> +	regulator_disable(ctx->avdd);
+> +
+> +	gpiod_set_value(ctx->reset, 0);
+> +
+> +	gpiod_set_value(ctx->reset, 1);
+> +
+> +	gpiod_set_value(ctx->reset, 0);
+> +
+> +	ctx->is_prepared = false;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct drm_display_mode default_mode = {
+> +	.clock		= 27500,
+> +	.vrefresh	= 60,
+> +
+> +	.hdisplay	= 480,
+> +	.hsync_start	= 480 + 38,
+> +	.hsync_end	= 480 + 38 + 12,
+> +	.htotal		= 480 + 38 + 12 + 12,
+> +
+> +	.vdisplay	= 854,
+> +	.vsync_start	= 854 + 18,
+> +	.vsync_end	= 854 + 18 + 8,
+> +	.vtotal		= 854 + 18 + 8 + 4,
+> +};
+> +
+> +static int ts8550b_get_modes(struct drm_panel *panel)
+> +{
+> +	struct drm_connector *connector = panel->connector;
+> +	struct ts8550b *ctx = panel_to_ts8550b(panel);
+> +	struct drm_display_mode *mode;
+> +
+> +	mode = drm_mode_duplicate(panel->drm, &default_mode);
+> +	if (!mode) {
+> +		dev_err(&ctx->dsi->dev, "failed to add mode %ux%ux@%u\n",
+> +			default_mode.hdisplay, default_mode.vdisplay,
+> +			default_mode.vrefresh);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	drm_mode_set_name(mode);
+> +
+> +	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
+> +	drm_mode_probed_add(connector, mode);
+> +
+> +	panel->connector->display_info.width_mm = 69;
+> +	panel->connector->display_info.height_mm = 139;
+> +
+> +	return 1;
+> +}
+> +
+> +static const struct drm_panel_funcs ts8550b_funcs = {
+> +	.disable	= ts8550b_disable,
+> +	.unprepare	= ts8550b_unprepare,
+> +	.prepare	= ts8550b_prepare,
+> +	.enable		= ts8550b_enable,
+> +	.get_modes	= ts8550b_get_modes,
+> +};
+> +
+> +static int ts8550b_dsi_probe(struct mipi_dsi_device *dsi)
+> +{
+> +	struct device_node *np;
+> +	struct ts8550b *ctx;
+> +	int ret;
+> +
+> +	ctx = devm_kzalloc(&dsi->dev, sizeof(*ctx), GFP_KERNEL);
+> +	if (!ctx)
+> +		return -ENOMEM;
+> +
+> +	mipi_dsi_set_drvdata(dsi, ctx);
+> +	ctx->dsi = dsi;
+> +
+> +	drm_panel_init(&ctx->panel);
+> +	ctx->panel.dev = &dsi->dev;
+> +	ctx->panel.funcs = &ts8550b_funcs;
+> +
+> +	ctx->dvdd = devm_regulator_get(&dsi->dev, "dvdd");
+> +	if (IS_ERR(ctx->dvdd)) {
+> +		dev_err(&dsi->dev, "Couldn't get dvdd regulator\n");
+> +		return PTR_ERR(ctx->dvdd);
+> +	}
+> +
+> +	ctx->avdd = devm_regulator_get(&dsi->dev, "avdd");
+> +	if (IS_ERR(ctx->avdd)) {
+> +		dev_err(&dsi->dev, "Couldn't get avdd regulator\n");
+> +		return PTR_ERR(ctx->avdd);
+> +	}
+> +
+> +	ctx->reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
+> +	if (IS_ERR(ctx->reset)) {
+> +		dev_err(&dsi->dev, "Couldn't get our reset GPIO\n");
+> +		return PTR_ERR(ctx->reset);
+> +	}
+> +
+> +	np = of_parse_phandle(dsi->dev.of_node, "backlight", 0);
+> +	if (np) {
+> +		ctx->backlight = of_find_backlight_by_node(np);
+> +		of_node_put(np);
+> +
+> +		if (!ctx->backlight)
+> +			return -EPROBE_DEFER;
+> +	}
+> +
+> +	ret = drm_panel_add(&ctx->panel);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO;
+> +	dsi->format = MIPI_DSI_FMT_RGB888;
+> +	dsi->lanes = 2;
+> +
+> +	return mipi_dsi_attach(dsi);
+> +}
+> +
+> +static int ts8550b_dsi_remove(struct mipi_dsi_device *dsi)
+> +{
+> +	struct ts8550b *ctx = mipi_dsi_get_drvdata(dsi);
+> +
+> +	mipi_dsi_detach(dsi);
+> +	drm_panel_remove(&ctx->panel);
+> +
+> +	if (ctx->backlight)
+> +		put_device(&ctx->backlight->dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ts8550b_of_match[] = {
+> +	{ .compatible = "techstar,ts8550b" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, ts8550b_of_match);
+> +
+> +static struct mipi_dsi_driver ts8550b_dsi_driver = {
+> +	.probe		= ts8550b_dsi_probe,
+> +	.remove		= ts8550b_dsi_remove,
+> +	.driver = {
+> +		.name		= "techstar-ts8550b",
+> +		.of_match_table	= ts8550b_of_match,
+> +	},
+> +};
+> +module_mipi_dsi_driver(ts8550b_dsi_driver);
+> +
+> +MODULE_AUTHOR("Jagan Teki <jagan@amarulasolutions.com>");
+> +MODULE_DESCRIPTION("Techstar TS8550B MIPI-DSI LCD Panel Driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.18.0.321.gffc6fa0e3
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
