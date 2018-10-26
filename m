@@ -1,42 +1,52 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 26 Oct 2018 20:13:40 +0530
-Subject: [PATCH v3 21/25] clk: sunxi-ng: a64: Add min and max rate for PLL_MIPI
+Date: Fri, 26 Oct 2018 20:13:38 +0530
+Subject: [PATCH v3 19/25] dt-bindings: panel: Add Techstar TS8550B MIPI DSI
+ panel
 In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
 References: <20181026144344.27778-1-jagan@amarulasolutions.com>
-Message-ID: <20181026144344.27778-22-jagan@amarulasolutions.com>
+Message-ID: <20181026144344.27778-20-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Manual noted to use PLL_MIPI rate 500MHz to 1.4GHz,
-but lowering the min rate by 300MHz can result proper
-working nkms divider with the help of desired dclock
-rate from panel driver.
+Techstar TS8550B MIPI DSI panel is 480x854, 2-lane MIPI DSI
+LCD panel. Add dt-bingings for it.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
-Tested-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v3:
-- collect Stephen Ack
-- add tested credit
+- new patch
 Changes for v2:
 - none
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 ++
- 1 file changed, 2 insertions(+)
+ .../display/panel/techstar,ts8550b.txt        | 20 +++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/techstar,ts8550b.txt
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-index 019d67bf97c4..5a3a5b821f8b 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-@@ -167,6 +167,8 @@ static struct ccu_nkm pll_mipi_clk = {
- 	.n		= _SUNXI_CCU_MULT(8, 4),
- 	.k		= _SUNXI_CCU_MULT_MIN(4, 2, 2),
- 	.m		= _SUNXI_CCU_DIV(0, 4),
-+	.min_rate	= 300000000,		/* Actual rate is 500MHz */
-+	.max_rate	= 1400000000UL,
- 	.common		= {
- 		.reg		= 0x040,
- 		.hw.init	= CLK_HW_INIT("pll-mipi", "pll-video0",
+diff --git a/Documentation/devicetree/bindings/display/panel/techstar,ts8550b.txt b/Documentation/devicetree/bindings/display/panel/techstar,ts8550b.txt
+new file mode 100644
+index 000000000000..6da050621d07
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/techstar,ts8550b.txt
+@@ -0,0 +1,20 @@
++Techstar TS8550B MIPI DSI LCD Panel
++
++Required properties:
++- compatible: must be "techstar,ts8550b"
++- reg: DSI virtual channel used by that screen
++- avdd-supply: analog regulator dc1 switch
++- dvdd-supply: 3v3 digital regulator
++- reset-gpios: a GPIO phandle for the reset pin
++
++Optional properties:
++- backlight: phandle for the backlight control.
++
++panel at 0 {
++	compatible = "techstar,ts8550b";
++	reg = <0>;
++	avdd-supply = <&reg_dc1sw>;
++	dvdd-supply = <&reg_dldo2>;
++	reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
++	backlight = <&backlight>;
++};
 -- 
 2.18.0.321.gffc6fa0e3
