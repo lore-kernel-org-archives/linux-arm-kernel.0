@@ -1,74 +1,63 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 26 Oct 2018 20:13:36 +0530
-Subject: [PATCH v3 17/25] dt-bindings: panel: Add Bananapi S070WV20-CT16
- ICN6211 MIPI-DSI to RGB bridge
+Date: Fri, 26 Oct 2018 20:13:28 +0530
+Subject: [PATCH v3 09/25] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
+ start delay
 In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
 References: <20181026144344.27778-1-jagan@amarulasolutions.com>
-Message-ID: <20181026144344.27778-18-jagan@amarulasolutions.com>
+Message-ID: <20181026144344.27778-10-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB
-bridge panel, which is available on same PCB with 24-bit RGB interface.
+Video start delay can be computed by subtracting total vertical
+timing with front porch timing and with adding 1 delay line for TCON.
 
-So, this patch adds DSI specific binding details on existing
-dt-bindings file.
+BSP code form BPI-M64-bsp is computing video start delay as
+(in linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+
+u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
+=> (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
+=> (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
+   - panel->lcd_y - (panel->lcd_vbp)
+=> timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
+  			     - panel->lcd_y - panel->lcd_vbp
+=> timmings->ver_front_porch
+
+So, update the start delay computation accordingly.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Tested-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v3:
-- Use existing binding doc and update dsi details
+- Fixed proper commit message
+- add tested credit
 Changes for v2:
 - none
 
- .../display/panel/bananapi,s070wv20-ct16.txt  | 31 +++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-index 35bc0c839f49..b7855dc7c66f 100644
---- a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-+++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-@@ -1,12 +1,39 @@
- Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index 8d154cf2e6d6..6bece492b1f7 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ 					   struct drm_display_mode *mode)
+ {
+-	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
++	u32 vfp = mode->vsync_start - mode->vdisplay;
++	u32 start_delay;
++
++	start_delay = mode->vtotal - vfp + 1;
++	if (start_delay > mode->vtotal)
++		start_delay -= mode->vtotal;
++
++	if (!start_delay)
++		start_delay = 1;
++
++	return start_delay;
+ }
  
-+S070WV20-CT16 is 7" 800x480 panel connected through a 24-bit RGB interface.
-+
-+Depending on the variant, the PCB attached to the panel module either
-+supports DSI, or DSI + 24-bit RGB. DSI is converted to 24-bit RGB via
-+an onboard ICN6211 MIPI DSI - RGB bridge chip, then fed to the panel
-+itself
-+
- Required properties:
--- compatible: should be "bananapi,s070wv20-ct16"
-+- compatible:
-+  for 24-bit RGB interface, use "bananapi,s070wv20-ct16"
-+  for ICN6211 MIPI-DSI to RGB bridge, use "bananapi,s070wv20-ct16-icn6211"
-+
-+Required properties for RGB:
- - power-supply: see ./panel-common.txt
- 
-+Required properties for MIPI-DSI to RGB:
-+- reg: for DSI virtual channel used by that screen
-+- avdd-supply: analog regulator dc1 switch
-+- dvdd-supply: 3v3 digital regulator
-+- reset-gpios: a GPIO phandle for the reset pin
-+
- Optional properties:
--- enable-gpios: see ./simple-panel.txt
-+- enable-gpios: see ./simple-panel.txt(not available in MIPI-DSI to RGB bridge)
- - backlight: see ./simple-panel.txt
- 
- This binding is compatible with the simple-panel binding, which is specified
- in ./simple-panel.txt.
-+
-+Example:
-+panel at 0 {
-+	compatible = "bananapi,s070wv20-ct16-icn6211";
-+	reg = <0>;
-+	avdd-supply = <&reg_dc1sw>;
-+	dvdd-supply = <&reg_dldo1>;
-+	reset-gpios = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+	backlight = <&backlight_dsi>;
-+};
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
 -- 
 2.18.0.321.gffc6fa0e3
