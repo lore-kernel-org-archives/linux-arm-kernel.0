@@ -1,60 +1,94 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Fri, 26 Oct 2018 15:28:33 -0500
-Subject: [PATCH 3/6] PCI: layerscape: Add the EP mode support
-In-Reply-To: <HE1PR04MB14972C9176E68EEDBD3AD64BF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
-References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
- <20181025110901.5680-3-xiaowei.bao@nxp.com>
- <20181025215246.GA14861@bogus>
- <HE1PR04MB149735C7EF2A23AEE982BB9FF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <CAK8P3a3Ty4bRuHiVHY6dh55b1ms8z7RpG2sALM0Dn_8Yd39-xQ@mail.gmail.com>
- <HE1PR04MB14972C9176E68EEDBD3AD64BF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
-Message-ID: <CADRPPNRP5RORVr0O59=O-PhRRerirFkPeOmAcKq3pNumf4Mriw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2018 22:33:38 +0200
+Subject: [PATCH v4 3/4] dt-bindings: soc: Add TmFifo binding for Mellanox
+ BlueField SoC
+In-Reply-To: <AM4PR05MB3220F4E5EEB673F0CC97C11DA1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1540403734-137721-1-git-send-email-lsun@mellanox.com>
+ <1540403734-137721-3-git-send-email-lsun@mellanox.com>
+ <CAK8P3a1K7BjgZRyBMKFrqWfcr-Bb3HQus+QE7qTpd27voE9e0A@mail.gmail.com>
+ <AM4PR05MB3220F4E5EEB673F0CC97C11DA1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
+Message-ID: <CAK8P3a21y1jm+1aZ8is7Rp=Re++BxL3mJM-Zj=_3c-Lq4y_Few@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 2:43 AM Xiaowei Bao <xiaowei.bao@nxp.com> wrote:
->
->
->
-> -----Original Message-----
-> From: arndbergmann at gmail.com <arndbergmann@gmail.com> On Behalf Of Arnd Bergmann
-> Sent: 2018?10?26? 15:01
-> To: Xiaowei Bao <xiaowei.bao@nxp.com>
-> Cc: Rob Herring <robh@kernel.org>; bhelgaas at google.com; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; kishon at ti.com; lorenzo.pieralisi at arm.com; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-> Subject: Re: [PATCH 3/6] PCI: layerscape: Add the EP mode support
->
-> On 10/26/18, Xiaowei Bao <xiaowei.bao@nxp.com> wrote:
-> > From: Rob Herring <robh@kernel.org>
-> >> On Thu, Oct 25, 2018 at 07:08:58PM +0800, Xiaowei Bao wrote:
-> >>>          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
-> >>>          "fsl,ls2088a-pcie"
-> >>>          "fsl,ls1088a-pcie"
-> >>>          "fsl,ls1046a-pcie"
-> >>>          "fsl,ls1012a-pcie
-> >>> +  EP mode:
-> >>> +        "fsl,ls-pcie-ep"
-> >>
-> > > You need SoC specific compatibles for the same reasons as the RC.
+On Fri, Oct 26, 2018 at 9:36 PM Liming Sun <lsun@mellanox.com> wrote:
+> > -----Original Message-----
+> > From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> > > @@ -0,0 +1,23 @@
+> > > +* Mellanox BlueField SoC TmFifo
+> > > +
+> > > +BlueField TmFifo provides a shared FIFO between the target and the
+> > > +external host machine, which can be accessed by external host via
+> > > +USB or PCIe. In the current tmfifo driver, this FIFO has been demuxed
+> > > +to implement virtual console and network interface based on the virtio
+> > > +framework.
+> > > +
+> > > +Required properties:
+> > > +
+> > > +- compatible:      Should be "mellanox,bf-tmfifo"
+> > > +- reg:             Physical base address and length of Rx/Tx block
+> > > +- interrupts:      The interrupt number of Rx low water mark, Rx high water
+> > > mark
+> > > +           Tx low water mark, Tx high water mark respectively.
 > >
-> > [Xiaowei Bao] I want to contains all layerscape platform use one
-> > compatible if the PCIe controller work in EP mode.
+> >
+> > This sounds like it might fit into the mailbox subsystem, and perhaps
+> > it should use the mailbox DT bindings. Have you had a look at that?
 >
-> Do you mean only one of the SoCs that support RC mode has EP mode?
-> I think you still need a SoC specific compatible as Rob explained, in case there will be a second one in the future.
+> This commit of dt-bindings is mainly to solve the warning of checkpatch.pl.
+> Like the response to patch 2/4, ACPI is actually used now instead of device tree.
+> The TMFIFO definition in the ACPI DSDT table would be something like below.
 >
-> If you want to ensure that you don't have to update the device driver for each new chip that comes in when the EP mode is compatible, the way this is handled is to list multiple values in the compatible property, listing the first SoC that introduced the specific version of that IP block as the most generic type, e.g.
+>     // RShim TMFIFO
+>     Device(RSH0) {
+>       Name(_HID, "MLNXBF01")
+>       Name(_UID, Zero)
+>       Name(_CCA, 1)
+>       Name(_CRS, ResourceTemplate() {
+>         Memory32Fixed(ReadWrite, 0x00800a20, 0x00000018)
+>         Memory32Fixed(ReadWrite, 0x00800a40, 0x00000018)
+>         Interrupt(ResourceConsumer, Edge, ActiveHigh, Exclusive)
+>           { BF1_RSH0_TM_HTT_LWM_INT,
+>             BF1_RSH0_TM_HTT_HWM_INT,
+>             BF1_RSH0_TM_TTH_LWM_INT,
+>             BF1_RSH0_TM_TTH_HWM_INT
+>           }
+>       })
+>     }
 >
->   copatible = "fsl,ls2088a-pcie-ep", "fsl,ls1012a-pcie-ep", "snps,dw-pcie-ep";
->
-> For consistency, it probably is best to match each RC mode value with the corresponding EP mode string for each device that can support both (if there is more than one).
->
->       Arnd
-> [Xiaowei Bao] My mean is that the ls-pcie-ep compatibles will contain all layerscape SOCs of NXP, e.g: ls1046a-pcie-ep, fsl,ls2088a-pcie-ep, ls2088a-pcie-ep and so on, other layerscape SOCs have not test except the ls1046a, I think it is compatible if the new chip or other SOCs use the DW core, OK, I will discuss this issue internally, and reply to you later.
+> Any suggestion how it should be added into Linux Documentation, or maybe I
+> should just remove this commit from this patch series?
 
-You can define a generic compatible string for the EP mode of all
-these platforms.  But like Rob and Arnd mentioned, it is good to also
-define the SoC specific compatible strings just in case that we need
-special treatment for certain SoCs in the future.
+Maybe the best way here would be to not use ACPI for the case
+where bluefin is integrated into a PCIe endpoint, since ACPI is
+not as flexible here and generally relies on having an SBSA
+compliant hardware that you no longer have if you require
+random platform devices for booting from and for your console.
 
-Regards,
-Leo
+For the case where a bluefin SoC is used in a standalone system,
+having ACPI makes more sense, as that lets you install Red Hat
+Linux or other operating systems that rely on SBBR and SBSA.
+
+> As for the sub-component of this driver, the "soc" might be better fit than the mailbox
+> for some reasons. It's a communication between extern machines and the SoC via
+> USB / PCIe,  like pushing boot stream, console and network mgmt. Some of the features,
+> like pushing boot stream, doesn't communicate with the ARM core. The boot stream
+> is pushed to the SoC HW logic directly. I'll add the host-side virtio-based driver in patch v5.
+
+Right, the drivers/mailbox subsystem was not the right idea here,
+I noticed that myself after actually reading the driver. Drivers/soc
+may also not be the best fit, since this is not really about it being
+a SoC, but rather a way to encapsulate virtual devices. The
+mic driver I mentioned is in drivers/misc, but I don't like to add stuff
+there if we can avoid it.
+
+drivers/virtio, drivers/bus or drivers/mfd might also be an option that
+could fit better than drivers/soc, or you could have your own subdir
+below drivers/ as some others do. Finally, drivers/platform/mellanox
+might be a reasonable choice, and it would let you keep both sides
+of the driver in one place.
+
+       Arnd
