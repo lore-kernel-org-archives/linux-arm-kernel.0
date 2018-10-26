@@ -1,37 +1,41 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 26 Oct 2018 10:04:21 +0200
-Subject: [PATCH 09/10] swiotlb: add support for non-coherent DMA
-In-Reply-To: <9ea28547-dd1a-b4bd-2e91-f71e70417e7d@arm.com>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-10-hch@lst.de>
- <9ea28547-dd1a-b4bd-2e91-f71e70417e7d@arm.com>
-Message-ID: <20181026080421.GA6100@lst.de>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 26 Oct 2018 11:07:25 +0300
+Subject: [PATCH RFC 04/11] staging: vchiq_arm: Fix platform device
+ unregistration
+In-Reply-To: <1540481375-15952-5-git-send-email-stefan.wahren@i2se.com>
+References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
+ <1540481375-15952-5-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20181026080725.vzm7cxj6bcpdisym@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2018 at 06:11:04PM +0100, Robin Murphy wrote:
->>   +	if (!dev_is_dma_coherent(dev) &&
->> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
->
-> Nit: other parts of the file are already using the "!(...)" style rather 
-> than "(...) == 0".
+On Thu, Oct 25, 2018 at 05:29:28PM +0200, Stefan Wahren wrote:
+> In error case platform_device_register_data would return an ERR_PTR
+> instead of NULL. So we better check this before unregistration.
+> 
+> Fixes: 37b7b3087a2f ("staging/vc04_services: Register a platform device for the camera driver.")
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> index ea78937..d7d7c2f0 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> @@ -3672,7 +3672,8 @@ static int vchiq_probe(struct platform_device *pdev)
+>  
+>  static int vchiq_remove(struct platform_device *pdev)
+>  {
+> -	platform_device_unregister(bcm2835_camera);
+> +	if (!IS_ERR(bcm2835_camera))
+> +		platform_device_unregister(bcm2835_camera);
 
-Indeed.  Probably some kind of copy and past error..
+This wouldn't be needed if we checked for platform_device_register_data()
+errors in probe.  That would be a better fix.
 
-> I had a quick play at moving the cache maintenance here out into the 
-> callers, which comes out arguably looking perhaps a little cleaner (only +1 
-> source line overall, and actually reduces text size by 32 bytes for my 
-> build), but sadly I can't really see any way of doing the equivalent for 
-> map/unmap short of duplicating the whole 3-line arch_sync_*() block, which 
-> just makes for a different readability problem. As you mentioned on patch 
-> #7, I guess this really is just one of those things which has no nice 
-> solution, so cosmetics aside,
+This is obviously a bug, but is it a real life bug, btw?  I would be
+surprised if platform_device_register_data() actually failed.
 
-It looks pretty ok, but given that I want to send this version to
-Linus for the merge window I don't really dare to touch it.
-
-The master plan for 4.21 is to actually merge swiotlb into dma-direct
-and to allow direct calls to dma-direct given how expensive indirect
-calls are with spectre, and dma mappings show up badly in various
-benchmarks.  I'll see if I can do that in a way following what you've
-done.
+regards,
+dan carpenter
