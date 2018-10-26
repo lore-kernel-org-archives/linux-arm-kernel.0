@@ -1,239 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 26 Oct 2018 14:56:45 +0200
-Subject: [RESEND PATCH v5 0/9] extend PWM framework to support PWM modes
-In-Reply-To: <f19251eb-80e1-aea1-2d8a-971fe53242d0@microchip.com>
-References: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
- <20181022082910.uw6i64h3w7jwxyx5@pengutronix.de>
- <f19251eb-80e1-aea1-2d8a-971fe53242d0@microchip.com>
-Message-ID: <20181026125644.ivfw6xefc7wqt2vw@pengutronix.de>
+From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
+Date: Fri, 26 Oct 2018 15:47:58 +0200
+Subject: [PATCH RFC 03/18] staging: vchiq_shim: delete vchi_service_create
+In-Reply-To: <20181026134813.7775-1-nsaenzjulienne@suse.de>
+References: <20181026134813.7775-1-nsaenzjulienne@suse.de>
+Message-ID: <20181026134813.7775-4-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Claudiu,
+No one is using the API neither in the actual staging tree nor in the
+downstream tree (https://github.com/raspberrypi/linux).
 
-On Fri, Oct 26, 2018 at 10:44:43AM +0000, Claudiu.Beznea at microchip.com wrote:
-> Thank you for your inputs and sorry for the late response. Please see my
-> answers inline.
+Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+---
+ .../vc04_services/interface/vchi/vchi.h       |  5 ---
+ .../interface/vchiq_arm/vchiq_shim.c          | 32 -------------------
+ 2 files changed, 37 deletions(-)
 
-No problems, I didn't held my breath :-)
-
-> On 22.10.2018 11:29, Uwe Kleine-K?nig wrote:
-> > On Tue, Aug 28, 2018 at 04:01:17PM +0300, Claudiu Beznea wrote:
-> >> Since PWMs with more than one output per channel could be used as one
-> >> output PWM the normal mode is the default mode for all PWMs (if not
-> >> specified otherwise).
-> >>
-> >> Complementary mode - for PWM channels with two outputs; output waveforms
-> >> for a PWM channel in complementary mode looks line this:
-> >>              __    __    __    __
-> >>     PWMH1 __|  |__|  |__|  |__|  |__
-> >>           __    __    __    __    __
-> >>     PWML1   |__|  |__|  |__|  |__|
-> >>             <--T-->
-> >>
-> >>     Where T is the signal period.
-> > 
-> > So this translates to (I think):
-> > 
-> >            __       __       __       __       __
-> >  PWMH   __/  \_____/  \_____/  \_____/  \_____/  \_____/
-> >         __    _____    _____    _____    _____    _____
-> >  PWML     \__/     \__/     \__/     \__/     \__/     \
-> >           ^        ^        ^        ^        ^        ^
-> > 
-> > That is PWML always pulls in the opposite direction of PWMH. Maybe we
-> > could come up with better terms than PWMH and PWML (which might be
-> > specific for the Atmel implementation?).
-> 
-> Yes, this is Atmel implementation naming.
-> 
-> > Maybe "normal" and
-> > "complement"?
-> 
-> I will think about it try to come with new naming. Normal and Complement
-> may be confusing for users with regards to PWM modes.
-> 
-> > 
-> >> Push-pull mode - for PWM channels with two outputs; output waveforms for a
-> >> PWM channel in push-pull mode with normal polarity looks like this:
-> >>             __          __
-> >>     PWMH __|  |________|  |________
-> >>                   __          __
-> >>     PWML ________|  |________|  |__
-> >>            <--T-->
-> > 
-> > That again with the alternative display method and duty cycle 1/3:
-> > 
-> >            __                __                __
-> >  PWMA   __/  \______________/  \______________/  \______
-> >                     __                __
-> >  PWMB   ___________/  \______________/  \______________/
-> >           ^        ^        ^        ^        ^        ^
-> Ok.
-> 
-> > That is PWMA and PWMB are active only every 2nd period taking alternate
-> > turns, right?
-> 
-> Yes.
-> 
-> > 
-> > 
-> >>     If polarity is inversed:
-> >>          __    ________    ________
-> >>     PWMH   |__|        |__|
-> >>          ________    ________    __
-> >>     PWML         |__|        |__|
-> >>            <--T-->
-> > 
-> > That's again with duty cycle 1/3:
-> > 
-> >         __    ______________    ______________    ______
-> >  PWMA     \__/              \__/              \__/
-> >         ___________    ______________    ______________
-> >  PWMB              \__/              \__/              \
-> >           ^        ^        ^        ^        ^        ^
-> > 
-> 
-> Ok.
-> 
-> > Given that the start of period isn't externally visible this is
-> > equivalent to using a duty cycle 2/3 and not inverting which results in:
-> > 
-> >         __    ______________    ______________    ______
-> >  PWMA     \__/              \__/              \__/
-> >         ___________    ______________    ______________
-> >  PWMB              \__/              \__/              \
-> >              ^        ^        ^        ^        ^
-> > 
-> > I would really like if a more detailed description of the modes would be
-> > created as part of this series.
-> 
-> Sure, I will try to document it better.
-
-Note here I just leaked my belief that the PWM framework shouldn't
-necessarily expose inversion to users which is part of my discussion
-with Thierry. I think it would be sensible to drop it here.
-
-> > Currently there are a few implied
-> > properties hidden in the PWM API (unrelated to this series) which I try
-> > to resolve together with Thierry. Getting this documented right from the
-> > start would be great here.
-> 
-> Could you tell me if you want something specific to be touch as part of
-> documentation process for these PWM modes?
-
-At least having something about the expectations in Documenation/ would
-be great.
-
-> > I didn't look in detail into the driver implementation, but from the
-> > PWMs implemented in the STM32F4 family I would have chosen a different
-> > model which makes me wonder if we should stick to a more general way to
-> > describe two outputs from a single PWM channel.
-> > 
-> > I would use four values with nanosecond resolution to describe these:
-> > 
-> >   .period
-> >   .duty_cycle
-> >   .alt_duty_cycle
-> >   .alt_offset
-> > 
-> > period and duty_cycle is as before for the primary output and then the
-> > alt_* values describe offset and duty cycle of the secondary output.
-> > 
-> > What you called "normal mode" would then be specified using
-> > 
-> >   .period = $period
-> >   .duty_cycle = $duty_cycle
-> >   .alt_duty_cycle = 0
-> >   .alt_offset = dontcare
-> > 
-> > Your "push pull mode" would be:
-> > 
-> >   .period = 2 * $period
-> >   .duty_cycle = $duty_cycle
-> >   .alt_duty_cycle = $duty_cycle
-> >   .alt_offset = $period
-> > 
-> > and complementary mode would be specified using:
-> > 
-> >   .period = $period
-> >   .duty_cycle = $duty_cycle
-> >   .alt_duty_cycle = $period - $duty_cycle
-> >   .alt_offset = $duty_cycle
-> > 
-> 
-> On Atmel PWM controller the push-pull mode is hardware generated based on
-> period and duty cycles that are setup for only one channel. The hardware
-> will take care of the synchronization b/w the outputs so that the push-pull
-> characteristic to be generated.
-> 
-> Having different configuration for every output part of the push-pull
-> waveform will allow users to generate every kind of outputs. But for IPs
-> that are capable of push-pull or complementary modes the generation of the
-> 2 outputs are done in hardware (true in case of Atmel PWM controller). In
-> case of STM32F4 as far as I can see from [1] "The advanced-control timers
-> (TIM1 and TIM8 ) can output two complementary signals and
-> manage the switching-off and the switching-on instants of the outputs."
-> Maybe, in this case, if there are 2 hardware blocks that could be synced to
-> work together, e.g. in complementary mode, the setting of these two timers
-> should be done in driver so that the hardware blocks to be configured
-> together, atomically, so that the complementary characteristics to be obtained.
-
-The upside I see in my approach with .alt_duty_cycle and .alt_offset
-over your .mode is that it allows to describe more use-cases. If I
-wanted to support complementary with dead-time I'd need another member
-in pwm_state to specify the dead time. Then the next controller can only
-add dead time on one end of secondary output needing yet another mode
-enum. With my approach I think you can specify all sensible(TM)
-waveforms already now. Then a driver must not be adapted again when
-someone adds support for another mode.
-
-The downside is that if your PWM only supports complementary mode with
-no dead-time you have to find out from .alt_duty_cycle and .alt_offset
-that the specified wave form is indeed matching complementary mode. From
-from the framework's POV this is more elegant though (but YMMV).
-
-> > With this abstraction stuff like "complementary output with dead-time
-> > insertion" (something like:
-> > 
-> >            __                __                __
-> >  PWMA   __/  \______________/  \______________/  \______
-> >                 __________        __________          __
-> >  PWMB   _______/          \______/          \______/
-> >           ^                 ^                 ^
-> > 
-> > ) could be modelled.
-> 
-> Same for this, my opinion is that we should implement generic things in
-> core and drivers should configure properly the IP so that it generates the
-> proper signals.
-
-This is common to both our approaches. Just the way the PWM user
-specifies his/her wishes (and so the input for hw drivers) is different.
+diff --git a/drivers/staging/vc04_services/interface/vchi/vchi.h b/drivers/staging/vc04_services/interface/vchi/vchi.h
+index 01381904775d..379a16ebfd5b 100644
+--- a/drivers/staging/vc04_services/interface/vchi/vchi.h
++++ b/drivers/staging/vc04_services/interface/vchi/vchi.h
+@@ -113,11 +113,6 @@ extern uint32_t vchi_current_time(VCHI_INSTANCE_T instance_handle);
+ /******************************************************************************
+  Global service API
+  *****************************************************************************/
+-// Routine to create a named service
+-extern int32_t vchi_service_create(VCHI_INSTANCE_T instance_handle,
+-				   SERVICE_CREATION_T *setup,
+-				   VCHI_SERVICE_HANDLE_T *handle);
+-
+ // Routine to destroy a service
+ extern int32_t vchi_service_destroy(const VCHI_SERVICE_HANDLE_T handle);
  
-> >> The PWM working modes are per PWM channel registered as PWM's capabilities.
-> >> The driver registers itself to PWM core a get_caps() function, in
-> >> struct pwm_ops, that will be used by PWM core to retrieve PWM capabilities.
-> >> If this function is not registered in driver's probe, a default function
-> >> will be used to retrieve PWM capabilities. Currently, the default
-> >> capabilities includes only PWM normal mode.
-> > 
-> > In the i2c framework this is a function, too, and I wonder if simplicity
-> > is better served when this is just a flags member in the pwm_ops
-> > structure.
-> 
-> Thierry proposed this so that we could retrieve capabilities per PWM channel.
-
-I don't have a complete overview over the different hardware
-implementations, but I'd expect that if two different implementations
-share the operations then the return value of .get_caps is shared by
-both. As long this is the case not introducing a callback for that is
-the easier path. Adding a callback later when (and if) this is required
-is trivial then.
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
+index c3223fcdaf87..81cac68f4b78 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
+@@ -660,38 +660,6 @@ int32_t vchi_service_open(VCHI_INSTANCE_T instance_handle,
+ }
+ EXPORT_SYMBOL(vchi_service_open);
  
-Best regards
-Uwe
-
+-int32_t vchi_service_create(VCHI_INSTANCE_T instance_handle,
+-	SERVICE_CREATION_T *setup,
+-	VCHI_SERVICE_HANDLE_T *handle)
+-{
+-	VCHIQ_INSTANCE_T instance = (VCHIQ_INSTANCE_T)instance_handle;
+-	struct shim_service *service = service_alloc(instance, setup);
+-
+-	*handle = (VCHI_SERVICE_HANDLE_T)service;
+-
+-	if (service) {
+-		VCHIQ_SERVICE_PARAMS_T params;
+-		VCHIQ_STATUS_T status;
+-
+-		memset(&params, 0, sizeof(params));
+-		params.fourcc = setup->service_id;
+-		params.callback = shim_callback;
+-		params.userdata = service;
+-		params.version = setup->version.version;
+-		params.version_min = setup->version.version_min;
+-		status = vchiq_add_service(instance, &params, &service->handle);
+-
+-		if (status != VCHIQ_SUCCESS) {
+-			service_free(service);
+-			service = NULL;
+-			*handle = NULL;
+-		}
+-	}
+-
+-	return (service != NULL) ? 0 : -1;
+-}
+-EXPORT_SYMBOL(vchi_service_create);
+-
+ int32_t vchi_service_close(const VCHI_SERVICE_HANDLE_T handle)
+ {
+ 	int32_t ret = -1;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.19.1
