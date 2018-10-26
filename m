@@ -1,509 +1,307 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 26 Oct 2018 12:21:56 +0200
-Subject: [PATCH 3/3] drm/mediatek: Use drm_gem_cma_object instead of
- mtk_drm_gem_obj
-In-Reply-To: <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
-References: <1540538523-1973-1-git-send-email-ck.hu@mediatek.com>
- <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
-Message-ID: <20181026102156.GH21967@phenom.ffwll.local>
+From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
+Date: Fri, 26 Oct 2018 10:44:43 +0000
+Subject: [RESEND PATCH v5 0/9] extend PWM framework to support PWM modes
+In-Reply-To: <20181022082910.uw6i64h3w7jwxyx5@pengutronix.de>
+References: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
+ <20181022082910.uw6i64h3w7jwxyx5@pengutronix.de>
+Message-ID: <f19251eb-80e1-aea1-2d8a-971fe53242d0@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 03:22:03PM +0800, CK Hu wrote:
-> After adding dma_dev in struct drm_device and
-> drm_gem_cma_dumb_create_no_kmap(), drm_gem_cma_object could replace
-> mtk_drm_gem_obj, so use drm_gem_cma_object instead of mtk_drm_gem_obj to
-> reduce redundant code.
+Hi Uwe,
+
+Thank you for your inputs and sorry for the late response. Please see my
+answers inline.
+
+On 22.10.2018 11:29, Uwe Kleine-K?nig wrote:
+> Hello Claudiu,
 > 
-> Signed-off-by: CK Hu <ck.hu@mediatek.com>
-
-A few questions/thoughts:
-
-- Why do you need both drm_device->dev and drm_device->dma_dev? Can't you
-  just register the drm_device with the right struct device?
-
-- You don't use drm_gem_prime_import_dev, so prime import isn't using the
-  right device either.
-
-- exynos seems to have the same or at least similar issue, stronger case
-  for your patches if you can solve both.
-
-- I'd start out with using struct drm_gem_cma_object in mtk (similar to
-  what vc4 does), and then reusing as much as possible of the existing
-  helpers. And then looking later on what's still left (like the support
-  for leaving out the virtual mapping).
-
--Daniel
-
-> ---
->  drivers/gpu/drm/mediatek/Makefile        |   1 -
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |   1 -
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c   |  15 +-
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h   |   1 -
->  drivers/gpu/drm/mediatek/mtk_drm_fb.c    |   1 -
->  drivers/gpu/drm/mediatek/mtk_drm_gem.c   | 243 -------------------------------
->  drivers/gpu/drm/mediatek/mtk_drm_gem.h   |  56 -------
->  drivers/gpu/drm/mediatek/mtk_drm_plane.c |   8 +-
->  8 files changed, 11 insertions(+), 315 deletions(-)
->  delete mode 100644 drivers/gpu/drm/mediatek/mtk_drm_gem.c
->  delete mode 100644 drivers/gpu/drm/mediatek/mtk_drm_gem.h
+> On Tue, Aug 28, 2018 at 04:01:17PM +0300, Claudiu Beznea wrote:
+>> Please give feedback on these patches which extends the PWM framework in
+>> order to support multiple PWM modes of operations. This series is a rework
+>> of [1] and [2].
+>>
+>> The current patch series add the following PWM modes:
+>> - PWM mode normal
+>> - PWM mode complementary
+>> - PWM mode push-pull
+>>
+>> Normal mode - for PWM channels with one output; output waveforms looks like
+>> this:
+>>              __    __    __    __
+>>     PWM   __|  |__|  |__|  |__|  |__
+>>             <--T-->
+>>
+>>     Where T is the signal period
 > 
-> diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-> index ce83c39..c4fa126 100644
-> --- a/drivers/gpu/drm/mediatek/Makefile
-> +++ b/drivers/gpu/drm/mediatek/Makefile
-> @@ -7,7 +7,6 @@ mediatek-drm-y := mtk_disp_color.o \
->  		  mtk_drm_ddp_comp.o \
->  		  mtk_drm_drv.o \
->  		  mtk_drm_fb.o \
-> -		  mtk_drm_gem.o \
->  		  mtk_drm_plane.o \
->  		  mtk_dsi.o \
->  		  mtk_mipi_tx.o \
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> index 92ecb9b..534c22a 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> @@ -24,7 +24,6 @@
->  #include "mtk_drm_crtc.h"
->  #include "mtk_drm_ddp.h"
->  #include "mtk_drm_ddp_comp.h"
-> -#include "mtk_drm_gem.h"
->  #include "mtk_drm_plane.h"
+> In my discussion about some suggested changes to the PWM framework I
+> used slightly different way to show the wave-forms in ASCII which are
+> IMHO slightly better. 
+
+It is true that the slope version is more like in real world but, on the
+other hand, the datasheets and documentations mostly uses the digital
+waveform formats (with no slopes) with regards to, at least PWM.
+
+> Also I think it is valuable to not use a 50% duty
+> cycle in the examples to remove some ambiguity.
+
+Ok, sure, I will use a 1/3 duty cycle on next version.
+
+> 
+> With a duty cycle of 1/3 the normal mode looks as follows in "my" way:
+> 
+>           __       __       __
+>  PWM   __/  \_____/  \_____/  \_____/
+>          ^        ^        ^        ^
+> 
+> The carets mark always the start of a period. And note the rising and
+> falling edges are already part of the active and inactive phases
+> respectively which matches reality.
+
+Ok, I'll use the carets on next version.
+
 >  
->  /**
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index 47ec604..306ba29 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -30,7 +30,6 @@
->  #include "mtk_drm_ddp_comp.h"
->  #include "mtk_drm_drv.h"
->  #include "mtk_drm_fb.h"
-> -#include "mtk_drm_gem.h"
->  
->  #define DRIVER_NAME "mediatek"
->  #define DRIVER_DESC "Mediatek SoC DRM"
-> @@ -282,7 +281,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
->  		goto err_component_unbind;
->  	}
->  
-> -	private->dma_dev = &pdev->dev;
-> +	drm->dma_dev = &pdev->dev;
->  
->  	/*
->  	 * We don't use the drm_irq_install() helpers provided by the DRM
-> @@ -320,7 +319,7 @@ static void mtk_drm_kms_deinit(struct drm_device *drm)
->  	.open = drm_open,
->  	.release = drm_release,
->  	.unlocked_ioctl = drm_ioctl,
-> -	.mmap = mtk_drm_gem_mmap,
-> +	.mmap = drm_gem_cma_mmap,
->  	.poll = drm_poll,
->  	.read = drm_read,
->  	.compat_ioctl = drm_compat_ioctl,
-> @@ -330,17 +329,17 @@ static void mtk_drm_kms_deinit(struct drm_device *drm)
->  	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME |
->  			   DRIVER_ATOMIC,
->  
-> -	.gem_free_object_unlocked = mtk_drm_gem_free_object,
-> +	.gem_free_object_unlocked = drm_gem_cma_free_object,
->  	.gem_vm_ops = &drm_gem_cma_vm_ops,
-> -	.dumb_create = mtk_drm_gem_dumb_create,
-> +	.dumb_create = drm_gem_cma_dumb_create_no_kmap,
->  
->  	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
->  	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
->  	.gem_prime_export = drm_gem_prime_export,
->  	.gem_prime_import = drm_gem_prime_import,
-> -	.gem_prime_get_sg_table = mtk_gem_prime_get_sg_table,
-> -	.gem_prime_import_sg_table = mtk_gem_prime_import_sg_table,
-> -	.gem_prime_mmap = mtk_drm_gem_mmap_buf,
-> +	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
-> +	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
-> +	.gem_prime_mmap = drm_gem_cma_prime_mmap,
->  	.fops = &mtk_drm_fops,
->  
->  	.name = DRIVER_NAME,
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> index ecc00ca..cbbe63b 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> @@ -41,7 +41,6 @@ struct mtk_mmsys_driver_data {
->  
->  struct mtk_drm_private {
->  	struct drm_device *drm;
-> -	struct device *dma_dev;
->  
->  	unsigned int num_pipes;
->  
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> index be5f6f1..45c22aa 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> @@ -21,7 +21,6 @@
->  
->  #include "mtk_drm_drv.h"
->  #include "mtk_drm_fb.h"
-> -#include "mtk_drm_gem.h"
->  
->  static const struct drm_framebuffer_funcs mtk_drm_fb_funcs = {
->  	.create_handle = drm_gem_fb_create_handle,
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.c b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-> deleted file mode 100644
-> index 259b7b0..0000000
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-> +++ /dev/null
-> @@ -1,243 +0,0 @@
-> -/*
-> - * Copyright (c) 2015 MediaTek Inc.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - */
-> -
-> -#include <drm/drmP.h>
-> -#include <drm/drm_gem.h>
-> -#include <linux/dma-buf.h>
-> -
-> -#include "mtk_drm_drv.h"
-> -#include "mtk_drm_gem.h"
-> -
-> -static struct mtk_drm_gem_obj *mtk_drm_gem_init(struct drm_device *dev,
-> -						unsigned long size)
-> -{
-> -	struct mtk_drm_gem_obj *mtk_gem_obj;
-> -	int ret;
-> -
-> -	size = round_up(size, PAGE_SIZE);
-> -
-> -	mtk_gem_obj = kzalloc(sizeof(*mtk_gem_obj), GFP_KERNEL);
-> -	if (!mtk_gem_obj)
-> -		return ERR_PTR(-ENOMEM);
-> -
-> -	ret = drm_gem_object_init(dev, &mtk_gem_obj->base, size);
-> -	if (ret < 0) {
-> -		DRM_ERROR("failed to initialize gem object\n");
-> -		kfree(mtk_gem_obj);
-> -		return ERR_PTR(ret);
-> -	}
-> -
-> -	return mtk_gem_obj;
-> -}
-> -
-> -struct mtk_drm_gem_obj *mtk_drm_gem_create(struct drm_device *dev,
-> -					   size_t size, bool alloc_kmap)
-> -{
-> -	struct mtk_drm_private *priv = dev->dev_private;
-> -	struct mtk_drm_gem_obj *mtk_gem;
-> -	struct drm_gem_object *obj;
-> -	int ret;
-> -
-> -	mtk_gem = mtk_drm_gem_init(dev, size);
-> -	if (IS_ERR(mtk_gem))
-> -		return ERR_CAST(mtk_gem);
-> -
-> -	obj = &mtk_gem->base;
-> -
-> -	mtk_gem->dma_attrs = DMA_ATTR_WRITE_COMBINE;
-> -
-> -	if (!alloc_kmap)
-> -		mtk_gem->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
-> -
-> -	mtk_gem->cookie = dma_alloc_attrs(priv->dma_dev, obj->size,
-> -					  &mtk_gem->dma_addr, GFP_KERNEL,
-> -					  mtk_gem->dma_attrs);
-> -	if (!mtk_gem->cookie) {
-> -		DRM_ERROR("failed to allocate %zx byte dma buffer", obj->size);
-> -		ret = -ENOMEM;
-> -		goto err_gem_free;
-> -	}
-> -
-> -	if (alloc_kmap)
-> -		mtk_gem->kvaddr = mtk_gem->cookie;
-> -
-> -	DRM_DEBUG_DRIVER("cookie = %p dma_addr = %pad size = %zu\n",
-> -			 mtk_gem->cookie, &mtk_gem->dma_addr,
-> -			 size);
-> -
-> -	return mtk_gem;
-> -
-> -err_gem_free:
-> -	drm_gem_object_release(obj);
-> -	kfree(mtk_gem);
-> -	return ERR_PTR(ret);
-> -}
-> -
-> -void mtk_drm_gem_free_object(struct drm_gem_object *obj)
-> -{
-> -	struct mtk_drm_gem_obj *mtk_gem = to_mtk_gem_obj(obj);
-> -	struct mtk_drm_private *priv = obj->dev->dev_private;
-> -
-> -	if (mtk_gem->sg)
-> -		drm_prime_gem_destroy(obj, mtk_gem->sg);
-> -	else
-> -		dma_free_attrs(priv->dma_dev, obj->size, mtk_gem->cookie,
-> -			       mtk_gem->dma_addr, mtk_gem->dma_attrs);
-> -
-> -	/* release file pointer to gem object. */
-> -	drm_gem_object_release(obj);
-> -
-> -	kfree(mtk_gem);
-> -}
-> -
-> -int mtk_drm_gem_dumb_create(struct drm_file *file_priv, struct drm_device *dev,
-> -			    struct drm_mode_create_dumb *args)
-> -{
-> -	struct mtk_drm_gem_obj *mtk_gem;
-> -	int ret;
-> -
-> -	args->pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
-> -	args->size = args->pitch * args->height;
-> -
-> -	mtk_gem = mtk_drm_gem_create(dev, args->size, false);
-> -	if (IS_ERR(mtk_gem))
-> -		return PTR_ERR(mtk_gem);
-> -
-> -	/*
-> -	 * allocate a id of idr table where the obj is registered
-> -	 * and handle has the id what user can see.
-> -	 */
-> -	ret = drm_gem_handle_create(file_priv, &mtk_gem->base, &args->handle);
-> -	if (ret)
-> -		goto err_handle_create;
-> -
-> -	/* drop reference from allocate - handle holds it now. */
-> -	drm_gem_object_put_unlocked(&mtk_gem->base);
-> -
-> -	return 0;
-> -
-> -err_handle_create:
-> -	mtk_drm_gem_free_object(&mtk_gem->base);
-> -	return ret;
-> -}
-> -
-> -static int mtk_drm_gem_object_mmap(struct drm_gem_object *obj,
-> -				   struct vm_area_struct *vma)
-> -
-> -{
-> -	int ret;
-> -	struct mtk_drm_gem_obj *mtk_gem = to_mtk_gem_obj(obj);
-> -	struct mtk_drm_private *priv = obj->dev->dev_private;
-> -
-> -	/*
-> -	 * dma_alloc_attrs() allocated a struct page table for mtk_gem, so clear
-> -	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
-> -	 */
-> -	vma->vm_flags &= ~VM_PFNMAP;
-> -	vma->vm_pgoff = 0;
-> -
-> -	ret = dma_mmap_attrs(priv->dma_dev, vma, mtk_gem->cookie,
-> -			     mtk_gem->dma_addr, obj->size, mtk_gem->dma_attrs);
-> -	if (ret)
-> -		drm_gem_vm_close(vma);
-> -
-> -	return ret;
-> -}
-> -
-> -int mtk_drm_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
-> -{
-> -	int ret;
-> -
-> -	ret = drm_gem_mmap_obj(obj, obj->size, vma);
-> -	if (ret)
-> -		return ret;
-> -
-> -	return mtk_drm_gem_object_mmap(obj, vma);
-> -}
-> -
-> -int mtk_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
-> -{
-> -	struct drm_gem_object *obj;
-> -	int ret;
-> -
-> -	ret = drm_gem_mmap(filp, vma);
-> -	if (ret)
-> -		return ret;
-> -
-> -	obj = vma->vm_private_data;
-> -
-> -	return mtk_drm_gem_object_mmap(obj, vma);
-> -}
-> -
-> -/*
-> - * Allocate a sg_table for this GEM object.
-> - * Note: Both the table's contents, and the sg_table itself must be freed by
-> - *       the caller.
-> - * Returns a pointer to the newly allocated sg_table, or an ERR_PTR() error.
-> - */
-> -struct sg_table *mtk_gem_prime_get_sg_table(struct drm_gem_object *obj)
-> -{
-> -	struct mtk_drm_gem_obj *mtk_gem = to_mtk_gem_obj(obj);
-> -	struct mtk_drm_private *priv = obj->dev->dev_private;
-> -	struct sg_table *sgt;
-> -	int ret;
-> -
-> -	sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
-> -	if (!sgt)
-> -		return ERR_PTR(-ENOMEM);
-> -
-> -	ret = dma_get_sgtable_attrs(priv->dma_dev, sgt, mtk_gem->cookie,
-> -				    mtk_gem->dma_addr, obj->size,
-> -				    mtk_gem->dma_attrs);
-> -	if (ret) {
-> -		DRM_ERROR("failed to allocate sgt, %d\n", ret);
-> -		kfree(sgt);
-> -		return ERR_PTR(ret);
-> -	}
-> -
-> -	return sgt;
-> -}
-> -
-> -struct drm_gem_object *mtk_gem_prime_import_sg_table(struct drm_device *dev,
-> -			struct dma_buf_attachment *attach, struct sg_table *sg)
-> -{
-> -	struct mtk_drm_gem_obj *mtk_gem;
-> -	int ret;
-> -	struct scatterlist *s;
-> -	unsigned int i;
-> -	dma_addr_t expected;
-> -
-> -	mtk_gem = mtk_drm_gem_init(dev, attach->dmabuf->size);
-> -
-> -	if (IS_ERR(mtk_gem))
-> -		return ERR_CAST(mtk_gem);
-> -
-> -	expected = sg_dma_address(sg->sgl);
-> -	for_each_sg(sg->sgl, s, sg->nents, i) {
-> -		if (sg_dma_address(s) != expected) {
-> -			DRM_ERROR("sg_table is not contiguous");
-> -			ret = -EINVAL;
-> -			goto err_gem_free;
-> -		}
-> -		expected = sg_dma_address(s) + sg_dma_len(s);
-> -	}
-> -
-> -	mtk_gem->dma_addr = sg_dma_address(sg->sgl);
-> -	mtk_gem->sg = sg;
-> -
-> -	return &mtk_gem->base;
-> -
-> -err_gem_free:
-> -	kfree(mtk_gem);
-> -	return ERR_PTR(ret);
-> -}
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.h b/drivers/gpu/drm/mediatek/mtk_drm_gem.h
-> deleted file mode 100644
-> index 534639b..0000000
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_gem.h
-> +++ /dev/null
-> @@ -1,56 +0,0 @@
-> -/*
-> - * Copyright (c) 2015 MediaTek Inc.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - */
-> -
-> -#ifndef _MTK_DRM_GEM_H_
-> -#define _MTK_DRM_GEM_H_
-> -
-> -#include <drm/drm_gem.h>
-> -
-> -/*
-> - * mtk drm buffer structure.
-> - *
-> - * @base: a gem object.
-> - *	- a new handle to this gem object would be created
-> - *	by drm_gem_handle_create().
-> - * @cookie: the return value of dma_alloc_attrs(), keep it for dma_free_attrs()
-> - * @kvaddr: kernel virtual address of gem buffer.
-> - * @dma_addr: dma address of gem buffer.
-> - * @dma_attrs: dma attributes of gem buffer.
-> - *
-> - * P.S. this object would be transferred to user as kms_bo.handle so
-> - *	user can access the buffer through kms_bo.handle.
-> - */
-> -struct mtk_drm_gem_obj {
-> -	struct drm_gem_object	base;
-> -	void			*cookie;
-> -	void			*kvaddr;
-> -	dma_addr_t		dma_addr;
-> -	unsigned long		dma_attrs;
-> -	struct sg_table		*sg;
-> -};
-> -
-> -#define to_mtk_gem_obj(x)	container_of(x, struct mtk_drm_gem_obj, base)
-> -
-> -void mtk_drm_gem_free_object(struct drm_gem_object *gem);
-> -struct mtk_drm_gem_obj *mtk_drm_gem_create(struct drm_device *dev, size_t size,
-> -					   bool alloc_kmap);
-> -int mtk_drm_gem_dumb_create(struct drm_file *file_priv, struct drm_device *dev,
-> -			    struct drm_mode_create_dumb *args);
-> -int mtk_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma);
-> -int mtk_drm_gem_mmap_buf(struct drm_gem_object *obj,
-> -			 struct vm_area_struct *vma);
-> -struct sg_table *mtk_gem_prime_get_sg_table(struct drm_gem_object *obj);
-> -struct drm_gem_object *mtk_gem_prime_import_sg_table(struct drm_device *dev,
-> -			struct dma_buf_attachment *attach, struct sg_table *sg);
-> -
-> -#endif
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> index f7e6aa1..62de9d5 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> @@ -15,13 +15,13 @@
->  #include <drm/drmP.h>
->  #include <drm/drm_atomic.h>
->  #include <drm/drm_atomic_helper.h>
-> +#include <drm/drm_gem_cma_helper.h>
->  #include <drm/drm_plane_helper.h>
->  
->  #include "mtk_drm_crtc.h"
->  #include "mtk_drm_ddp_comp.h"
->  #include "mtk_drm_drv.h"
->  #include "mtk_drm_fb.h"
-> -#include "mtk_drm_gem.h"
->  #include "mtk_drm_plane.h"
->  
->  static const u32 formats[] = {
-> @@ -115,7 +115,7 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
->  	struct drm_crtc *crtc = plane->state->crtc;
->  	struct drm_framebuffer *fb = plane->state->fb;
->  	struct drm_gem_object *gem;
-> -	struct mtk_drm_gem_obj *mtk_gem;
-> +	struct drm_gem_cma_object *cma_obj;
->  	unsigned int pitch, format;
->  	dma_addr_t addr;
->  
-> @@ -123,8 +123,8 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
->  		return;
->  
->  	gem = fb->obj[0];
-> -	mtk_gem = to_mtk_gem_obj(gem);
-> -	addr = mtk_gem->dma_addr;
-> +	cma_obj = to_drm_gem_cma_obj(gem);
-> +	addr = cma_obj->paddr;
->  	pitch = fb->pitches[0];
->  	format = fb->format->format;
->  
-> -- 
-> 1.9.1
+>> Since PWMs with more than one output per channel could be used as one
+>> output PWM the normal mode is the default mode for all PWMs (if not
+>> specified otherwise).
+>>
+>> Complementary mode - for PWM channels with two outputs; output waveforms
+>> for a PWM channel in complementary mode looks line this:
+>>              __    __    __    __
+>>     PWMH1 __|  |__|  |__|  |__|  |__
+>>           __    __    __    __    __
+>>     PWML1   |__|  |__|  |__|  |__|
+>>             <--T-->
+>>
+>>     Where T is the signal period.
+> 
+> So this translates to (I think):
+> 
+>            __       __       __       __       __
+>  PWMH   __/  \_____/  \_____/  \_____/  \_____/  \_____/
+>         __    _____    _____    _____    _____    _____
+>  PWML     \__/     \__/     \__/     \__/     \__/     \
+>           ^        ^        ^        ^        ^        ^
+> 
+> That is PWML always pulls in the opposite direction of PWMH. Maybe we
+> could come up with better terms than PWMH and PWML (which might be
+> specific for the Atmel implementation?).
+
+Yes, this is Atmel implementation naming.
+
+> Maybe "normal" and
+> "complement"?
+
+I will think about it try to come with new naming. Normal and Complement
+may be confusing for users with regards to PWM modes.
+
+> 
+>> Push-pull mode - for PWM channels with two outputs; output waveforms for a
+>> PWM channel in push-pull mode with normal polarity looks like this:
+>>             __          __
+>>     PWMH __|  |________|  |________
+>>                   __          __
+>>     PWML ________|  |________|  |__
+>>            <--T-->
+> 
+> That again with the alternative display method and duty cycle 1/3:
+> 
+>            __                __                __
+>  PWMA   __/  \______________/  \______________/  \______
+>                     __                __
+>  PWMB   ___________/  \______________/  \______________/
+>           ^        ^        ^        ^        ^        ^
+Ok.
+
+> 
+> That is PWMA and PWMB are active only every 2nd period taking alternate
+> turns, right?
+
+Yes.
+
+> 
+> 
+>>     If polarity is inversed:
+>>          __    ________    ________
+>>     PWMH   |__|        |__|
+>>          ________    ________    __
+>>     PWML         |__|        |__|
+>>            <--T-->
+> 
+> That's again with duty cycle 1/3:
+> 
+>         __    ______________    ______________    ______
+>  PWMA     \__/              \__/              \__/
+>         ___________    ______________    ______________
+>  PWMB              \__/              \__/              \
+>           ^        ^        ^        ^        ^        ^
 > 
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Ok.
+
+> Given that the start of period isn't externally visible this is
+> equivalent to using a duty cycle 2/3 and not inverting which results in:
+> 
+>         __    ______________    ______________    ______
+>  PWMA     \__/              \__/              \__/
+>         ___________    ______________    ______________
+>  PWMB              \__/              \__/              \
+>              ^        ^        ^        ^        ^
+> 
+> I would really like if a more detailed description of the modes would be
+> created as part of this series.
+
+Sure, I will try to document it better.
+
+> Currently there are a few implied
+> properties hidden in the PWM API (unrelated to this series) which I try
+> to resolve together with Thierry. Getting this documented right from the
+> start would be great here.
+
+Could you tell me if you want something specific to be touch as part of
+documentation process for these PWM modes?
+
+> 
+> I didn't look in detail into the driver implementation, but from the
+> PWMs implemented in the STM32F4 family I would have chosen a different
+> model which makes me wonder if we should stick to a more general way to
+> describe two outputs from a single PWM channel.
+> 
+> I would use four values with nanosecond resolution to describe these:
+> 
+>   .period
+>   .duty_cycle
+>   .alt_duty_cycle
+>   .alt_offset
+> 
+> period and duty_cycle is as before for the primary output and then the
+> alt_* values describe offset and duty cycle of the secondary output.
+> 
+> What you called "normal mode" would then be specified using
+> 
+>   .period = $period
+>   .duty_cycle = $duty_cycle
+>   .alt_duty_cycle = 0
+>   .alt_offset = dontcare
+> 
+> Your "push pull mode" would be:
+> 
+>   .period = 2 * $period
+>   .duty_cycle = $duty_cycle
+>   .alt_duty_cycle = $duty_cycle
+>   .alt_offset = $period
+> 
+> and complementary mode would be specified using:
+> 
+>   .period = $period
+>   .duty_cycle = $duty_cycle
+>   .alt_duty_cycle = $period - $duty_cycle
+>   .alt_offset = $duty_cycle
+> 
+
+On Atmel PWM controller the push-pull mode is hardware generated based on
+period and duty cycles that are setup for only one channel. The hardware
+will take care of the synchronization b/w the outputs so that the push-pull
+characteristic to be generated.
+
+Having different configuration for every output part of the push-pull
+waveform will allow users to generate every kind of outputs. But for IPs
+that are capable of push-pull or complementary modes the generation of the
+2 outputs are done in hardware (true in case of Atmel PWM controller). In
+case of STM32F4 as far as I can see from [1] "The advanced-control timers
+(TIM1 and TIM8 ) can output two complementary signals and
+manage the switching-off and the switching-on instants of the outputs."
+Maybe, in this case, if there are 2 hardware blocks that could be synced to
+work together, e.g. in complementary mode, the setting of these two timers
+should be done in driver so that the hardware blocks to be configured
+together, atomically, so that the complementary characteristics to be obtained.
+
+>From my point of view it is better to implement in PWM core the concepts,
+e.g. push-pull, complementary, even dead-time (I had something in my queue
+for this) and the driver to do what it takes so that the IP to generate
+implemented concepts. Mostly, the applications of PWM will use the PWM in
+normal mode, push-pull, complementary or complementary with dead-time
+insertion.
+
+[1]
+https://www.st.com/content/ccc/resource/technical/document/reference_manual/3d/6d/5a/66/b4/99/40/d4/DM00031020.pdf/files/DM00031020.pdf/jcr:content/translations/en.DM00031020.pdf
+
+
+> With this abstraction stuff like "complementary output with dead-time
+> insertion" (something like:
+> 
+>            __                __                __
+>  PWMA   __/  \______________/  \______________/  \______
+>                 __________        __________          __
+>  PWMB   _______/          \______/          \______/
+>           ^                 ^                 ^
+> 
+> ) could be modelled.
+
+Same for this, my opinion is that we should implement generic things in
+core and drivers should configure properly the IP so that it generates the
+proper signals.
+
+> 
+>> The PWM working modes are per PWM channel registered as PWM's capabilities.
+>> The driver registers itself to PWM core a get_caps() function, in
+>> struct pwm_ops, that will be used by PWM core to retrieve PWM capabilities.
+>> If this function is not registered in driver's probe, a default function
+>> will be used to retrieve PWM capabilities. Currently, the default
+>> capabilities includes only PWM normal mode.
+> 
+> In the i2c framework this is a function, too, and I wonder if simplicity
+> is better served when this is just a flags member in the pwm_ops
+> structure.
+
+Thierry proposed this so that we could retrieve capabilities per PWM channel.
+
+> 
+>> PWM state has been updated to keep PWM mode. PWM mode could be configured
+>> via sysfs or via DT. pwm_apply_state() will do the preliminary validation
+>> for PWM mode to be applied.
+>>
+>> In sysfs, user could get PWM modes by reading mode file of PWM device:
+>> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# ls -l
+>> total 0
+>> -r--r--r-- 1 root root 4096 Oct  9 09:07 capture
+>> lrwxrwxrwx 1 root root    0 Oct  9 09:07 device -> ../../pwmchip0
+>> -rw-r--r-- 1 root root 4096 Oct  9 08:42 duty_cycle
+>> -rw-r--r-- 1 root root 4096 Oct  9 08:44 enable
+>> --w------- 1 root root 4096 Oct  9 09:07 export
+>> -rw-r--r-- 1 root root 4096 Oct  9 08:43 mode
+>> -r--r--r-- 1 root root 4096 Oct  9 09:07 npwm
+>> -rw-r--r-- 1 root root 4096 Oct  9 08:42 period
+>> -rw-r--r-- 1 root root 4096 Oct  9 08:44 polarity
+>> drwxr-xr-x 2 root root    0 Oct  9 09:07 power
+>> lrwxrwxrwx 1 root root    0 Oct  9 09:07 subsystem -> ../../../../../../../../class/pwm
+>> -rw-r--r-- 1 root root 4096 Oct  9 08:42 uevent
+>> --w------- 1 root root 4096 Oct  9 09:07 unexport
+>> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# cat mode
+>> normal complementary [push-pull]
+>>
+>> The mode enclosed in bracket is the currently active mode.
+>>
+>> The mode could be set, via sysfs, by writing to mode file one of the modes
+>> displayed at read:
+>> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# echo normal > mode
+>> root at sama5d2-xplained:/sys/class/pwm/pwmchip0/pwm2# cat mode
+>> [normal] complementary push-pull 
+> 
+> Getting a simple user of this into the kernel would be beneficial, too.
+> In my discussion with Thierry I'm faced with arguments like: You're
+> simplifying stuff which might destroy a use-case for sysfs users. This
+> is hard to argue against because it involves some guesswork to
+> reconstruct or contradict such arguments.
+
+Yep, currently only sysfs is using this. I will see what I can do about
+this to also have an in kernel user (I'll have to check, at least, how
+pwm-regulator is working with this).
+
+Thank you,
+Claudiu Beznea
+
+> 
+> Best regards
+> Uwe
+> 
