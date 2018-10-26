@@ -1,68 +1,40 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 26 Oct 2018 13:16:30 +0200
-Subject: [PATCH 1/9] mailbox: Support blocking transfers in atomic context
+Date: Fri, 26 Oct 2018 13:16:31 +0200
+Subject: [PATCH 2/9] mailbox: Allow multiple controllers per device
 In-Reply-To: <20181026111638.10759-1-thierry.reding@gmail.com>
 References: <20181026111638.10759-1-thierry.reding@gmail.com>
-Message-ID: <20181026111638.10759-2-thierry.reding@gmail.com>
+Message-ID: <20181026111638.10759-3-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+From: Mikko Perttunen <mperttunen@nvidia.com>
 
-The mailbox framework supports blocking transfers via completions for
-clients that can sleep. In order to support blocking transfers in cases
-where the transmission is not permitted to sleep, add a new ->flush()
-callback that controller drivers can implement to busy loop until the
-transmission has been completed. This will automatically be called when
-available and interrupts are disabled for clients that request blocking
-transfers.
+Look through the whole controller list when mapping device tree
+phandles to controllers instead of stopping at the first one.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Each controller is intended to only contain one kind of mailbox,
+but some devices (like Tegra HSP) implement multiple kinds and use
+the same device tree node for all of them. As such, we need to allow
+multiple mbox_controllers per device tree node.
+
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- drivers/mailbox/mailbox.c          | 8 ++++++++
- include/linux/mailbox_controller.h | 4 ++++
- 2 files changed, 12 insertions(+)
+ drivers/mailbox/mailbox.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 674b35f402f5..0eaf21259874 100644
+index 0eaf21259874..f34820bcf33c 100644
 --- a/drivers/mailbox/mailbox.c
 +++ b/drivers/mailbox/mailbox.c
-@@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
- 		unsigned long wait;
- 		int ret;
+@@ -335,7 +335,8 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ 	list_for_each_entry(mbox, &mbox_cons, node)
+ 		if (mbox->dev->of_node == spec.np) {
+ 			chan = mbox->of_xlate(mbox, &spec);
+-			break;
++			if (!IS_ERR(chan))
++				break;
+ 		}
  
-+		if (irqs_disabled() && chan->mbox->ops->flush) {
-+			ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
-+			if (ret < 0)
-+				tx_tick(chan, ret);
-+
-+			return ret;
-+		}
-+
- 		if (!chan->cl->tx_tout) /* wait forever */
- 			wait = msecs_to_jiffies(3600000);
- 		else
-diff --git a/include/linux/mailbox_controller.h b/include/linux/mailbox_controller.h
-index 74deadb42d76..2a07d93f781a 100644
---- a/include/linux/mailbox_controller.h
-+++ b/include/linux/mailbox_controller.h
-@@ -24,6 +24,9 @@ struct mbox_chan;
-  *		transmission of data is reported by the controller via
-  *		mbox_chan_txdone (if it has some TX ACK irq). It must not
-  *		sleep.
-+ * @flush:	Called when a client requests transmissions to be blocking but
-+ *		the context doesn't allow sleeping. Typically the controller
-+ *		will implement a busy loop waiting for the data to flush out.
-  * @startup:	Called when a client requests the chan. The controller
-  *		could ask clients for additional parameters of communication
-  *		to be provided via client's chan_data. This call may
-@@ -46,6 +49,7 @@ struct mbox_chan;
-  */
- struct mbox_chan_ops {
- 	int (*send_data)(struct mbox_chan *chan, void *data);
-+	int (*flush)(struct mbox_chan *chan, unsigned long timeout);
- 	int (*startup)(struct mbox_chan *chan);
- 	void (*shutdown)(struct mbox_chan *chan);
- 	bool (*last_tx_done)(struct mbox_chan *chan);
+ 	of_node_put(spec.np);
 -- 
 2.19.1
