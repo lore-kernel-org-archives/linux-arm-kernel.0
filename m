@@ -1,55 +1,52 @@
-From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Fri, 26 Oct 2018 12:55:07 +0200
-Subject: [PATCH RFC 11/11] staging: bcm2835-camera: Add hint about
- possible faulty config
-In-Reply-To: <1540481375-15952-12-git-send-email-stefan.wahren@i2se.com>
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
- <1540481375-15952-12-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <705a68b26f08996e069aafa273a8ea50197d2dd9.camel@suse.de>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 26 Oct 2018 12:56:56 +0200
+Subject: [PATCH] mm/page_owner: use vmalloc instead of kmalloc
+In-Reply-To: <20181025192701.GK25444@bombadil.infradead.org>
+References: <1540492481-4144-1-git-send-email-miles.chen@mediatek.com>
+ <20181025192701.GK25444@bombadil.infradead.org>
+Message-ID: <20181026085410.GA8277@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-10-25 at 17:29 +0200, Stefan Wahren wrote:
-> As per default the GPU memory config of the Raspberry Pi isn't
-> sufficient
-> for the camera usage. Even worse the bcm2835 camera driver doesn't
-> provide a
-> helpful error message in this case. So let's add a hint to point the
-> user
-> to the likely cause.
+On Thu 25-10-18 12:27:01, Matthew Wilcox wrote:
+> On Fri, Oct 26, 2018 at 02:34:41AM +0800, miles.chen at mediatek.com wrote:
+> > The kbuf used by page owner is allocated by kmalloc(),
+> > which means it can use only normal memory and there might
+> > be a "out of memory" issue when we're out of normal memory.
+> > 
+> > Use vmalloc() so we can also allocate kbuf from highmem
+> > on 32bit kernel.
 > 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+> ... hang on, there's a bigger problem here.
 > 
-> diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-
-> vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-> index cc2d993..bffd75d 100644
-> --- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-> +++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-> @@ -1623,8 +1623,11 @@ int vchiq_mmal_component_init(struct
-> vchiq_mmal_instance *instance,
->  	component = &instance->component[instance->component_idx];
->  
->  	ret = create_component(instance, component, name);
-> -	if (ret < 0)
-> +	if (ret < 0) {
-> +		pr_err("%s: failed to create component %d (Not enough
-> GPU mem?)\n",
-> +		       __func__, ret);
->  		goto unlock;
-> +	}
->  
->  	/* ports info needs gathering */
->  	component->control.type = MMAL_PORT_TYPE_CONTROL;
+> static const struct file_operations proc_page_owner_operations = {
+>         .read           = read_page_owner,
+> };
+> 
+> read_page_owner(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+> {
+> ...
+>                 return print_page_owner(buf, count, pfn, page,
+>                                 page_owner, handle);
+> }
+> 
+> static ssize_t
+> print_page_owner(char __user *buf, size_t count, unsigned long pfn,
+>                 struct page *page, struct page_owner *page_owner,
+>                 depot_stack_handle_t handle)
+> {
+> ...
+>       kbuf = kmalloc(count, GFP_KERNEL);
+> 
+> So I can force the kernel to make an arbitrary size allocation, triggering
+> OOMs and forcing swapping if I can get a file handle to this file.
+> The only saving grace is that (a) this is a debugfs file and (b) it's
+> root-only (mode 0400).  Nevertheless, I feel some clamping is called
+> for here.  Do we really need to output more than 4kB worth of text here?
 
-Nice, had to deal with this the hard way, would have saved me some
-time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181026/04268762/attachment.sig>
+Completely agreed. Let's just clamp it to a single page. Userspace can
+easily loop around the syscall.
+
+-- 
+Michal Hocko
+SUSE Labs
