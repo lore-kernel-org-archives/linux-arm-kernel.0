@@ -1,67 +1,65 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 26 Oct 2018 13:16:35 +0200
-Subject: [PATCH 6/9] dt-bindings: serial: Add bindings for nvidia, tegra194-tcu
+Date: Fri, 26 Oct 2018 13:16:34 +0200
+Subject: [PATCH 5/9] mailbox: tegra-hsp: Add suspend/resume support
 In-Reply-To: <20181026111638.10759-1-thierry.reding@gmail.com>
 References: <20181026111638.10759-1-thierry.reding@gmail.com>
-Message-ID: <20181026111638.10759-7-thierry.reding@gmail.com>
+Message-ID: <20181026111638.10759-6-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mikko Perttunen <mperttunen@nvidia.com>
+From: Thierry Reding <treding@nvidia.com>
 
-Add bindings for the Tegra Combined UART device used to talk to the
-UART console on Tegra194 systems.
+Upon resuming from a system sleep state, the interrupts for all active
+shared mailboxes need to be reenabled, otherwise they will not work.
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- .../bindings/serial/nvidia,tegra194-tcu.txt   | 35 +++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+ drivers/mailbox/tegra-hsp.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
-new file mode 100644
-index 000000000000..a8becf6efd2a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
-@@ -0,0 +1,35 @@
-+NVIDIA Tegra Combined UART (TCU)
+diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
+index d070c8e38375..043f7173af8f 100644
+--- a/drivers/mailbox/tegra-hsp.c
++++ b/drivers/mailbox/tegra-hsp.c
+@@ -18,6 +18,7 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
++#include <linux/pm.h>
+ #include <linux/slab.h>
+ 
+ #include <dt-bindings/mailbox/tegra186-hsp.h>
+@@ -802,6 +803,23 @@ static int tegra_hsp_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int tegra_hsp_resume(struct device *dev)
++{
++	struct tegra_hsp *hsp = dev_get_drvdata(dev);
++	unsigned int i;
 +
-+The TCU is a system for sharing a hardware UART instance among multiple
-+systems within the Tegra SoC. It is implemented through a mailbox-
-+based protocol where each "virtual UART" has a pair of mailboxes, one
-+for transmitting and one for receiving, that is used to communicate
-+with the hardware implementing the TCU.
++	for (i = 0; i < hsp->num_sm; i++) {
++		struct tegra_hsp_mailbox *mb = &hsp->mailboxes[i];
 +
-+Required properties:
-+- name : Should be tcu
-+- compatible
-+    Array of strings
-+    One of:
-+    - "nvidia,tegra194-tcu"
-+- mbox-names:
-+    "rx" - Mailbox for receiving data from hardware UART
-+    "tx" - Mailbox for transmitting data to hardware UART
-+- mboxes: Mailboxes corresponding to the mbox-names. 
++		if (mb->channel.chan->cl)
++			tegra_hsp_mailbox_startup(mb->channel.chan);
++	}
 +
-+This node is a mailbox consumer. See the following files for details of
-+the mailbox subsystem, and the specifiers implemented by the relevant
-+provider(s):
++	return 0;
++}
 +
-+- .../mailbox/mailbox.txt
-+- .../mailbox/nvidia,tegra186-hsp.txt
++static SIMPLE_DEV_PM_OPS(tegra_hsp_pm_ops, NULL, tegra_hsp_resume);
 +
-+Example bindings:
-+-----------------
-+
-+tcu: tcu {
-+	compatible = "nvidia,tegra194-tcu";
-+	mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
-+	         <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
-+	mbox-names = "rx", "tx";
-+};
+ static const struct tegra_hsp_db_map tegra186_hsp_db_map[] = {
+ 	{ "ccplex", TEGRA_HSP_DB_MASTER_CCPLEX, HSP_DB_CCPLEX, },
+ 	{ "bpmp",   TEGRA_HSP_DB_MASTER_BPMP,   HSP_DB_BPMP,   },
+@@ -821,6 +839,7 @@ static struct platform_driver tegra_hsp_driver = {
+ 	.driver = {
+ 		.name = "tegra-hsp",
+ 		.of_match_table = tegra_hsp_match,
++		.pm = &tegra_hsp_pm_ops,
+ 	},
+ 	.probe = tegra_hsp_probe,
+ 	.remove = tegra_hsp_remove,
 -- 
 2.19.1
