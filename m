@@ -1,45 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Oct 2018 09:01:19 +0200
-Subject: [PATCH 3/6] PCI: layerscape: Add the EP mode support
-In-Reply-To: <HE1PR04MB149735C7EF2A23AEE982BB9FF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
-References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
- <20181025110901.5680-3-xiaowei.bao@nxp.com>
- <20181025215246.GA14861@bogus>
- <HE1PR04MB149735C7EF2A23AEE982BB9FF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
-Message-ID: <CAK8P3a3Ty4bRuHiVHY6dh55b1ms8z7RpG2sALM0Dn_8Yd39-xQ@mail.gmail.com>
+From: open.sudheer@gmail.com (sudheer.v)
+Date: Fri, 26 Oct 2018 12:37:28 +0530
+Subject: [[PATCH] 8/9] DMA-UART-Driver-for-AST2500
+In-Reply-To: <20181020162624.GC2894@vkoul-mobl>
+References: <1539749466-3912-1-git-send-email-open.sudheer@gmail.com>
+ <1539749466-3912-9-git-send-email-open.sudheer@gmail.com>
+ <20181017060531.GU2400@vkoul-mobl>
+ <351eecd5b1b21893e94f76b34c058c6257b7f837.camel@kernel.crashing.org>
+ <20181018095507.GC2400@vkoul-mobl>
+ <a3fecf7913d6a85a6294afbc5a1a18b7714d6756.camel@kernel.crashing.org>
+ <20181019071154.GE13642@Pilot130>
+ <20181020162624.GC2894@vkoul-mobl>
+Message-ID: <20181026070726.GA30088@Pilot130>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/18, Xiaowei Bao <xiaowei.bao@nxp.com> wrote:
-> From: Rob Herring <robh@kernel.org>
->> On Thu, Oct 25, 2018 at 07:08:58PM +0800, Xiaowei Bao wrote:
->>>          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
->>>          "fsl,ls2088a-pcie"
->>>          "fsl,ls1088a-pcie"
->>>          "fsl,ls1046a-pcie"
->>>          "fsl,ls1012a-pcie"
->>> +  EP mode:
->>> +        "fsl,ls-pcie-ep"
->>
-> > You need SoC specific compatibles for the same reasons as the RC.
->
-> [Xiaowei Bao] I want to contains all layerscape platform use one compatible
-> if the PCIe controller work in EP mode.
+On Sat, Oct 20, 2018 at 09:56:24PM +0530, Vinod wrote:
+> On 19-10-18, 12:41, sudheer.v wrote:
+> > On Fri, Oct 19, 2018 at 10:32:24AM +1100, Benjamin Herrenschmidt wrote:
+> > > On Thu, 2018-10-18 at 15:25 +0530, Vinod wrote:
+> > > > 
+> > > > > It's not a dmaengine driver. It's a serial UART driver that happens to
+> > > > > use a dedicated DMA engine.
+> > > > 
+> > > > Then I see no reason for it to use dmaengine APIs. The framework allows
+> > > > people to share a controller for many clients, but if you have dedicated
+> > > > one then you may use it directly
+> > > 
+> > > Well... the engine is shared by a few UARTs, they have dedicated rings
+> > > but there's a common set of regs for interrupt handling etc.
+> > > 
+> > > That said, I still think it could be contained within a UART driver,
+> > > there's little benefit in adding the framework overhead, esp since
+> > > these are really weak cores, any overhead will be felt.
+> > > 
+> > > Ben.
+> > > 
+> > > > > It's unclear whether it should be split into two drivers, or just have
+> > > > > the serial driver directly use the dma engine since that engine is
+> > > > > dedicated in HW to only work on those UARTs and nothing else...
+> > > > > 
+> > > > > Cheers,
+> > > > > Ben.
+> > 
+> > Initially we wanted to have  a single driver,
+> > however we had an informal discussion with one of the maintainer 
+> > and based on the feedback, followed the Linux DMA and UART architecture.
+> > 
+> > If this seperate DMA-engine driver adds more overhead than benifit,
+> > we will merge them into a single UART driver and resubmitt the patches.
+> > Vinod,
+> >       can this dma-controller driver sit under dma subsystem?.
+> >       or better to move it under UART framework.
+> 
+> 
+> My advise would be to see what you can do with the DMA IP block. If this
+> can/would be used in different places then it would make sense to do a
+> dmaengine driver and solve the problem for everyone.
+> 
+> If this is always going to be hidden behind serial then maybe it makes
+> sense to be inside serial driver and not use dmaengine APIs
+> 
+> If you decide to prefer the former case, please move it to dmaengine and
+> resubmit :)
+> 
+> HTH
+> -- 
+> ~Vinod
 
-Do you mean only one of the SoCs that support RC mode has EP mode?
-I think you still need a SoC specific compatible as Rob explained, in case
-there will be a second one in the future.
-
-If you want to ensure that you don't have to update the device driver
-for each new chip that comes in when the EP mode is compatible,
-the way this is handled is to list multiple values in the compatible
-property, listing the first SoC that introduced the specific version of
-that IP block as the most generic type, e.g.
-
-  copatible = "fsl,ls2088a-pcie-ep", "fsl,ls1012a-pcie-ep", "snps,dw-pcie-ep";
-
-For consistency, it probably is best to match each RC mode value with
-the corresponding EP mode string for each device that can support both
-(if there is more than one).
-
-      Arnd
+Hi All,
+ As the DMA engine is dedicated only to UART,we have decided 
+ to rewrite the driver so that no code will come under 
+ drivers/dma.
+ 
+ I will resubmitt the patches after merging dma controller
+ code and uart driver code.
+Regards
+-sudheer
