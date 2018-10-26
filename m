@@ -1,39 +1,97 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 26 Oct 2018 20:13:41 +0530
-Subject: [PATCH v3 22/25] dt-bindings: sun6i-dsi: Add compatible for A64 DPHY
+Date: Fri, 26 Oct 2018 20:13:35 +0530
+Subject: [PATCH v3 16/25] drm/sun4i: sun6i_mipi_dsi: Add support for VCC-DSI
+ voltage regulator
 In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
 References: <20181026144344.27778-1-jagan@amarulasolutions.com>
-Message-ID: <20181026144344.27778-23-jagan@amarulasolutions.com>
+Message-ID: <20181026144344.27778-17-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIPI DSI PHY HDMI controller on Allwinner A64 is similar
-on the one on A31.
+Some boards have VCC-DSI pin connected to voltage regulator which may
+not be turned on by default.
 
-Add A64 compatible and append A31 compatible as fallback.
+Add support for such boards by adding voltage regulator handling code to
+MIPI DSI driver.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Tested-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v3:
-- none
-Changes for v2:
 - new patch
+Changes for v2:
+- none
 
- Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 14 ++++++++++++++
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h |  3 +++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-index 9fa6e7a758ad..704fb31962f2 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-@@ -36,7 +36,7 @@ D-PHY
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index 42bd7506abaf..bc57343592e0 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -949,6 +949,12 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
  
- Required properties:
-   - compatible: value must be one of:
--    * allwinner,sun6i-a31-mipi-dphy
-+    * "allwinner,sun50i-a64-mipi-dphy", "allwinner,sun6i-a31-mipi-dphy"
-   - reg: base address and size of memory-mapped region
-   - clocks: phandles to the clocks feeding the DSI encoder
-     * bus: the DSI interface clock
+ 	dsi->drv = drv;
+ 
++	ret = regulator_enable(dsi->regulator);
++	if (ret) {
++		dev_err(dev, "Failed to enable regulator\n");
++		return ret;
++	}
++
+ 	drm_encoder_helper_add(&dsi->encoder,
+ 			       &sun6i_dsi_enc_helper_funcs);
+ 	ret = drm_encoder_init(drm,
+@@ -980,6 +986,7 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
+ 
+ err_cleanup_connector:
+ 	drm_encoder_cleanup(&dsi->encoder);
++	regulator_disable(dsi->regulator);
+ 	return ret;
+ }
+ 
+@@ -989,6 +996,7 @@ static void sun6i_dsi_unbind(struct device *dev, struct device *master,
+ 	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
+ 
+ 	drm_panel_detach(dsi->panel);
++	regulator_disable(dsi->regulator);
+ }
+ 
+ static const struct component_ops sun6i_dsi_ops = {
+@@ -1022,6 +1030,12 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+ 		return PTR_ERR(base);
+ 	}
+ 
++	dsi->regulator = devm_regulator_get(dev, "vcc-dsi");
++	if (IS_ERR(dsi->regulator)) {
++		dev_err(dev, "Couldn't get regulator\n");
++		return PTR_ERR(dsi->regulator);
++	}
++
+ 	dsi->regs = devm_regmap_init_mmio_clk(dev, "bus", base,
+ 					      &sun6i_dsi_regmap_config);
+ 	if (IS_ERR(dsi->regs)) {
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+index 597b62227019..0df60f84bab3 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+@@ -13,6 +13,8 @@
+ #include <drm/drm_encoder.h>
+ #include <drm/drm_mipi_dsi.h>
+ 
++#include <linux/regulator/consumer.h>
++
+ struct sun6i_dphy {
+ 	struct clk		*bus_clk;
+ 	struct clk		*mod_clk;
+@@ -32,6 +34,7 @@ struct sun6i_dsi {
+ 	struct clk		*bus_clk;
+ 	struct clk		*mod_clk;
+ 	struct regmap		*regs;
++	struct regulator	*regulator;
+ 	struct reset_control	*reset;
+ 	struct sun6i_dphy	*dphy;
+ 
 -- 
 2.18.0.321.gffc6fa0e3
