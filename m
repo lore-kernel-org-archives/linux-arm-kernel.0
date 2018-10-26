@@ -1,63 +1,57 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 26 Oct 2018 20:13:28 +0530
-Subject: [PATCH v3 09/25] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
- start delay
-In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
-Message-ID: <20181026144344.27778-10-jagan@amarulasolutions.com>
+From: jpoimboe@redhat.com (Josh Poimboeuf)
+Date: Fri, 26 Oct 2018 10:37:04 -0500
+Subject: [PATCH v4 3/3] arm64: reliable stacktraces
+In-Reply-To: <20181026142157.B8FAA68C97@newverein.lst.de>
+References: <20181026142008.D922868C94@newverein.lst.de>
+ <20181026142157.B8FAA68C97@newverein.lst.de>
+Message-ID: <20181026153704.7g34j3gtlklepyvb@treble>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Video start delay can be computed by subtracting total vertical
-timing with front porch timing and with adding 1 delay line for TCON.
+On Fri, Oct 26, 2018 at 04:21:57PM +0200, Torsten Duwe wrote:
+> Enhance the stack unwinder so that it reports whether it had to stop
+> normally or due to an error condition; unwind_frame() will report
+> continue/error/normal ending and walk_stackframe() will pass that
+> info. __save_stack_trace() is used to check the validity of a stack;
+> save_stack_trace_tsk_reliable() can now trivially be implemented.
+> Modify arch/arm64/kernel/time.c as the only external caller so far
+> to recognise the new semantics.
+> 
+> I had to introduce a marker symbol kthread_return_to_user to tell
+> the normal origin of a kernel thread.
+> 
+> Signed-off-by: Torsten Duwe <duwe@suse.de>
 
-BSP code form BPI-M64-bsp is computing video start delay as
-(in linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+I haven't looked at the code, but the commit log doesn't inspire much
+confidence.  It's missing everything I previously asked for in the
+powerpc version.
 
-u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
-=> (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
-=> (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
-   - panel->lcd_y - (panel->lcd_vbp)
-=> timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
-  			     - panel->lcd_y - panel->lcd_vbp
-=> timmings->ver_front_porch
+There's zero mention of objtool.  What analysis was done to indicate
+that we can rely on frame pointers?
 
-So, update the start delay computation accordingly.
+Such a frame pointer analysis should be included in the commit log.  It
+should describe *at least* the following:
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Tested-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v3:
-- Fixed proper commit message
-- add tested credit
-Changes for v2:
-- none
+- whether inline asm statements with call/branch instructions will
+  confuse GCC into skipping the frame pointer setup if it considers the
+  function to be a leaf function;
 
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+- whether hand-coded non-leaf assembly functions can accidentally omit
+  the frame pointer prologue setup;
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 8d154cf2e6d6..6bece492b1f7 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
- static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
- 					   struct drm_display_mode *mode)
- {
--	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-+	u32 vfp = mode->vsync_start - mode->vdisplay;
-+	u32 start_delay;
-+
-+	start_delay = mode->vtotal - vfp + 1;
-+	if (start_delay > mode->vtotal)
-+		start_delay -= mode->vtotal;
-+
-+	if (!start_delay)
-+		start_delay = 1;
-+
-+	return start_delay;
- }
- 
- static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+- whether GCC can generally be relied upon to get arm64 frame pointers
+  right, in both normal operation and edge cases.
+
+
+The commit log should also describe whether the unwinder itself can be
+considered reliable for all edge cases:
+
+- detection and reporting of preemption and page faults;
+
+- detection and recovery from function graph tracing;
+
+- detection and reporting of other unexpected conditions,
+  including when the unwinder doesn't reach the end of the stack.
+
 -- 
-2.18.0.321.gffc6fa0e3
+Josh
