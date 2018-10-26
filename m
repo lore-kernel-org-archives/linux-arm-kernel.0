@@ -1,37 +1,80 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Fri, 26 Oct 2018 15:48:04 +0200
-Subject: [PATCH RFC 09/18] staging: vchiq_core: do not initialize semaphores
- twice
+Date: Fri, 26 Oct 2018 15:48:09 +0200
+Subject: [PATCH RFC 14/18] staging: vchiq_util: get rid of unneeded memory
+ barriers
 In-Reply-To: <20181026134813.7775-1-nsaenzjulienne@suse.de>
 References: <20181026134813.7775-1-nsaenzjulienne@suse.de>
-Message-ID: <20181026134813.7775-10-nsaenzjulienne@suse.de>
+Message-ID: <20181026134813.7775-15-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vchiq_init_state() initialises a series of semaphores to then call
-remote_event_create() on the same semaphores, which initializes them
-again.
+All the memory operations featured in this file modify/access memory
+that is only accessed by the CPU. So we can assume that all the memory
+barrier handling done by the completion routines is good enough for us.
 
 Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
 ---
- .../staging/vc04_services/interface/vchiq_arm/vchiq_core.c   | 5 -----
- 1 file changed, 5 deletions(-)
+ .../interface/vchiq_arm/vchiq_util.c          | 32 -------------------
+ 1 file changed, 32 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index dee5ea7bfe4f..6242357735b9 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -2200,11 +2200,6 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero)
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
+index 44b954daa74a..4b8554bc647e 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
+@@ -84,20 +84,7 @@ void vchiu_queue_push(VCHIU_QUEUE_T *queue, VCHIQ_HEADER_T *header)
+ 			flush_signals(current);
+ 	}
  
- 	sema_init(&state->connect, 0);
- 	mutex_init(&state->mutex);
--	sema_init(&state->trigger_event, 0);
--	sema_init(&state->recycle_event, 0);
--	sema_init(&state->sync_trigger_event, 0);
--	sema_init(&state->sync_release_event, 0);
+-	/*
+-	 * Write to queue->storage must be visible after read from
+-	 * queue->read
+-	 */
+-	smp_mb();
 -
- 	mutex_init(&state->slot_mutex);
- 	mutex_init(&state->recycle_mutex);
- 	mutex_init(&state->sync_mutex);
+ 	queue->storage[queue->write & (queue->size - 1)] = header;
+-
+-	/*
+-	 * Write to queue->storage must be visible before write to
+-	 * queue->write
+-	 */
+-	smp_wmb();
+-
+ 	queue->write++;
+ 
+ 	complete(&queue->push);
+@@ -112,12 +99,6 @@ VCHIQ_HEADER_T *vchiu_queue_peek(VCHIU_QUEUE_T *queue)
+ 
+ 	complete(&queue->push); // We haven't removed anything from the queue.
+ 
+-	/*
+-	 * Read from queue->storage must be visible after read from
+-	 * queue->write
+-	 */
+-	smp_rmb();
+-
+ 	return queue->storage[queue->read & (queue->size - 1)];
+ }
+ 
+@@ -130,20 +111,7 @@ VCHIQ_HEADER_T *vchiu_queue_pop(VCHIU_QUEUE_T *queue)
+ 			flush_signals(current);
+ 	}
+ 
+-	/*
+-	 * Read from queue->storage must be visible after read from
+-	 * queue->write
+-	 */
+-	smp_rmb();
+-
+ 	header = queue->storage[queue->read & (queue->size - 1)];
+-
+-	/*
+-	 * Read from queue->storage must be visible before write to
+-	 * queue->read
+-	 */
+-	smp_mb();
+-
+ 	queue->read++;
+ 
+ 	complete(&queue->pop);
 -- 
 2.19.1
