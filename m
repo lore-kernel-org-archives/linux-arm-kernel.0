@@ -1,79 +1,93 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 26 Oct 2018 16:48:43 +0200
-Subject: [PATCH 1/2] ARM: cpuidle: Don't register the driver when back-end
- init returns -ENXIO
-In-Reply-To: <../../misc/pm_patches/submitted_patches/cpuidle_arm_consolidate/0002-ARM-cpuidle-Convert-to-use-cpuidle_register-unregist.patch>
-References: <../../misc/pm_patches/submitted_patches/cpuidle_arm_consolidate/0002-ARM-cpuidle-Convert-to-use-cpuidle_register-unregist.patch>
-Message-ID: <20181026144843.3028-1-ulf.hansson@linaro.org>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Fri, 26 Oct 2018 20:13:42 +0530
+Subject: [PATCH v3 23/25] arm64: dts: allwinner: a64: Add DSI pipeline
+In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+Message-ID: <20181026144344.27778-24-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no point to register the cpuidle driver for the current CPU, when
-the initialization of the arch specific back-end data fails by returning
--ENXIO.
+The A64 has a MIPI-DSI block which is similar to A31
+without mod clock.
 
-Instead, let's re-order the sequence to its original flow, by first trying
-to initialize the back-end part and then act accordingly on the returned
-error code. Additionally, let's print the error message, no matter of what
-error code that was returned.
+So, add dsi node with A64 compatible, dphy node with
+A31 compatible and finally connect dsi to tcon0 to
+make proper DSI pipeline.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Tested-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
+Changes for v3:
+- add allwinner,tcon-channel property
+- add dsi nodes in ascending physical address 
+Changes for v2:
+- use A64 dphy compatible
 
-Note, as far as I can tell it's only qcom-spm that may return -ENXIO, which also
-was original reason to why this error path was invented.
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 45 +++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-Unfurtunate I don't have a qcom spm platfrom at hand, however I manually tried
-this by hacking the PSCI driver to return -ENXIO for some CPUs. So I assume it
-should then also work for qcom spm.
-
----
- drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 073557f433eb..df564d783216 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
- 		goto out_kfree_drv;
- 	}
- 
--	ret = cpuidle_register_driver(drv);
--	if (ret) {
--		if (ret != -EBUSY)
--			pr_err("Failed to register cpuidle driver\n");
--		goto out_kfree_drv;
--	}
--
- 	/*
- 	 * Call arch CPU operations in order to initialize
- 	 * idle states suspend back-end specific data
-@@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
- 	ret = arm_cpuidle_init(cpu);
- 
- 	/*
--	 * Skip the cpuidle device initialization if the reported
-+	 * Allow the initialization to continue for other CPUs, if the reported
- 	 * failure is a HW misconfiguration/breakage (-ENXIO).
- 	 */
--	if (ret == -ENXIO)
--		return 0;
--
- 	if (ret) {
- 		pr_err("CPU %d failed to init idle CPU ops\n", cpu);
--		goto out_unregister_drv;
-+		ret = ret == -ENXIO ? 0 : ret;
-+		goto out_kfree_drv;
-+	}
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index f3a66f888205..d6f269883759 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -320,6 +320,12 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 					reg = <1>;
 +
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		if (ret != -EBUSY)
-+			pr_err("Failed to register cpuidle driver\n");
-+		goto out_kfree_drv;
- 	}
++					tcon0_out_dsi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&dsi_in_tcon0>;
++						allwinner,tcon-channel = <1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -829,6 +835,45 @@
+ 			status = "disabled";
+ 		};
  
- 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
++		dsi: dsi at 1ca0000 {
++			compatible = "allwinner,sun50i-a64-mipi-dsi";
++			reg = <0x01ca0000 0x1000>;
++			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_MIPI_DSI>;
++			clock-names = "bus";
++			resets = <&ccu RST_BUS_MIPI_DSI>;
++			phys = <&dphy>;
++			phy-names = "dphy";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					dsi_in_tcon0: endpoint {
++						remote-endpoint = <&tcon0_out_dsi>;
++					};
++				};
++			};
++		};
++
++		dphy: d-phy at 1ca1000 {
++			compatible = "allwinner,sun50i-a64-mipi-dphy",
++				     "allwinner,sun6i-a31-mipi-dphy";
++			reg = <0x01ca1000 0x1000>;
++			clocks = <&ccu CLK_BUS_MIPI_DSI>,
++				 <&ccu CLK_DSI_DPHY>;
++			clock-names = "bus", "mod";
++			resets = <&ccu RST_BUS_MIPI_DSI>;
++			status = "disabled";
++			#phy-cells = <0>;
++		};
++
+ 		hdmi: hdmi at 1ee0000 {
+ 			compatible = "allwinner,sun50i-a64-dw-hdmi",
+ 				     "allwinner,sun8i-a83t-dw-hdmi";
 -- 
-2.17.1
+2.18.0.321.gffc6fa0e3
