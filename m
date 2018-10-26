@@ -1,83 +1,67 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 26 Oct 2018 13:16:37 +0200
-Subject: [PATCH 8/9] arm64: tegra: Add nodes for TCU on Tegra194
+Date: Fri, 26 Oct 2018 13:16:35 +0200
+Subject: [PATCH 6/9] dt-bindings: serial: Add bindings for nvidia, tegra194-tcu
 In-Reply-To: <20181026111638.10759-1-thierry.reding@gmail.com>
 References: <20181026111638.10759-1-thierry.reding@gmail.com>
-Message-ID: <20181026111638.10759-9-thierry.reding@gmail.com>
+Message-ID: <20181026111638.10759-7-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mikko Perttunen <mperttunen@nvidia.com>
 
-Add nodes required for communication through the Tegra Combined UART.
-This includes the AON HSP instance, addition of shared interrupts
-for the TOP0 HSP instance, and finally the TCU node itself. Also
-mark the HSP instances as compatible to tegra194-hsp, as the hardware
-is not identical but is compatible to tegra186-hsp.
+Add bindings for the Tegra Combined UART device used to talk to the
+UART console on Tegra194 systems.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra194.dtsi | 38 ++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 3 deletions(-)
+ .../bindings/serial/nvidia,tegra194-tcu.txt   | 35 +++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-index c2091bb16546..521d13be0457 100644
---- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-@@ -340,10 +340,35 @@
- 		};
- 
- 		hsp_top0: hsp at 3c00000 {
--			compatible = "nvidia,tegra186-hsp";
-+			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
- 			reg = <0x03c00000 0xa0000>;
--			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-names = "doorbell";
-+			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "doorbell", "shared0", "shared1", "shared2",
-+			                  "shared3", "shared4", "shared5", "shared6",
-+			                  "shared7";
-+			#mbox-cells = <2>;
-+		};
+diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+new file mode 100644
+index 000000000000..a8becf6efd2a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+@@ -0,0 +1,35 @@
++NVIDIA Tegra Combined UART (TCU)
 +
-+		hsp_aon: hsp at c150000 {
-+			compatible = "nvidia,tegra194-hsp", "nvidia,tegra186-hsp";
-+			reg = <0x0c150000 0xa0000>;
-+			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-+			/*
-+			 * Shared interrupt 0 is routed only to AON/SPE, so
-+			 * we only have 4 shared interrupts for the CCPLEX.
-+			 */
-+			interrupt-names = "shared1", "shared2", "shared3", "shared4";
- 			#mbox-cells = <2>;
- 		};
- 
-@@ -531,6 +556,13 @@
- 		method = "smc";
- 	};
- 
-+	tcu: tcu {
-+		compatible = "nvidia,tegra194-tcu";
-+		mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
-+		         <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
-+		mbox-names = "rx", "tx";
-+	};
++The TCU is a system for sharing a hardware UART instance among multiple
++systems within the Tegra SoC. It is implemented through a mailbox-
++based protocol where each "virtual UART" has a pair of mailboxes, one
++for transmitting and one for receiving, that is used to communicate
++with the hardware implementing the TCU.
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
++Required properties:
++- name : Should be tcu
++- compatible
++    Array of strings
++    One of:
++    - "nvidia,tegra194-tcu"
++- mbox-names:
++    "rx" - Mailbox for receiving data from hardware UART
++    "tx" - Mailbox for transmitting data to hardware UART
++- mboxes: Mailboxes corresponding to the mbox-names. 
++
++This node is a mailbox consumer. See the following files for details of
++the mailbox subsystem, and the specifiers implemented by the relevant
++provider(s):
++
++- .../mailbox/mailbox.txt
++- .../mailbox/nvidia,tegra186-hsp.txt
++
++Example bindings:
++-----------------
++
++tcu: tcu {
++	compatible = "nvidia,tegra194-tcu";
++	mboxes = <&hsp_top0 TEGRA_HSP_MBOX_TYPE_SM 0>,
++	         <&hsp_aon TEGRA_HSP_MBOX_TYPE_SM 1>;
++	mbox-names = "rx", "tx";
++};
 -- 
 2.19.1
