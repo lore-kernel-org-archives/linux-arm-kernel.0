@@ -1,46 +1,28 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri, 26 Oct 2018 09:46:09 +0000
-Subject: [PATCH 7/7] ARM: shmobile: Enable USB [EO]HCI HCD PLATFORM
- support in shmobile_defconfig
-In-Reply-To: <1540475819-47950-8-git-send-email-biju.das@bp.renesas.com>
-References: <1540475819-47950-1-git-send-email-biju.das@bp.renesas.com>
- <1540475819-47950-8-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <TYXPR01MB17753A4004A82A87E7434E71C0F00@TYXPR01MB1775.jpnprd01.prod.outlook.com>
+From: qiangqing.zhang@nxp.com (Joakim Zhang)
+Date: Fri, 26 Oct 2018 09:46:58 +0000
+Subject: [PATCH V2 0/4] ARM: dts: imx: Add flexcan stop mode wakeup
+Message-ID: <20181026094444.25305-1-qiangqing.zhang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: [PATCH 7/7] ARM: shmobile: Enable USB [EO]HCI HCD PLATFORM support in shmobile_defconfig
->
-> The USB [EO]HCI controller on RZ/G1C SoC doesn't have PCI bridge like
-> other R-Car Gen2 devices. So enable generic USB [EO]HCI HCD PLATFORM
-> support in shmobile_defconfig.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+This patchset intends to add flexcan stop mode wakeup support on IMX6/7
+platforms.
 
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+ChangeLog:
+V1->V2:
+	*update stop mode property(stop-mode -> fsl,stop-mode).
 
-> ---
->  arch/arm/configs/shmobile_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index f8faf37..b0db52c 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -163,7 +163,9 @@ CONFIG_USB=y
->  CONFIG_USB_XHCI_HCD=y
->  CONFIG_USB_XHCI_PLATFORM=y
->  CONFIG_USB_EHCI_HCD=y
-> +CONFIG_USB_EHCI_HCD_PLATFORM=y
->  CONFIG_USB_OHCI_HCD=y
-> +CONFIG_USB_OHCI_HCD_PLATFORM=y
->  CONFIG_USB_R8A66597_HCD=y
->  CONFIG_USB_RENESAS_USBHS=y
->  CONFIG_USB_GADGET=y
-> --
-> 2.7.4
+Dong Aisheng (4):
+  ARM: dts: imx6sx: Add flexcan stop mode wakeup support
+  ARM: dts: imx6qdl: Add flexcan stop mode wakeup support
+  ARM: dts: imx6ul: Add flexcan stop mode wakeup support
+  ARM: dts: imx7s: Add flexcan stop mode wakeup support
 
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 ++
+ arch/arm/boot/dts/imx6sx.dtsi  | 2 ++
+ arch/arm/boot/dts/imx6ul.dtsi  | 2 ++
+ arch/arm/boot/dts/imx7s.dtsi   | 2 ++
+ 4 files changed, 8 insertions(+)
 
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-- 
+2.17.1
