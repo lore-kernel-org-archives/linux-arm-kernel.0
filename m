@@ -1,102 +1,60 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Sat, 27 Oct 2018 01:49:41 +0530
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
- <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
-Message-ID: <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Fri, 26 Oct 2018 15:28:33 -0500
+Subject: [PATCH 3/6] PCI: layerscape: Add the EP mode support
+In-Reply-To: <HE1PR04MB14972C9176E68EEDBD3AD64BF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
+References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
+ <20181025110901.5680-3-xiaowei.bao@nxp.com>
+ <20181025215246.GA14861@bogus>
+ <HE1PR04MB149735C7EF2A23AEE982BB9FF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
+ <CAK8P3a3Ty4bRuHiVHY6dh55b1ms8z7RpG2sALM0Dn_8Yd39-xQ@mail.gmail.com>
+ <HE1PR04MB14972C9176E68EEDBD3AD64BF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
+Message-ID: <CADRPPNRP5RORVr0O59=O-PhRRerirFkPeOmAcKq3pNumf4Mriw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Fri, Oct 26, 2018 at 2:43 AM Xiaowei Bao <xiaowei.bao@nxp.com> wrote:
+>
+>
+>
+> -----Original Message-----
+> From: arndbergmann at gmail.com <arndbergmann@gmail.com> On Behalf Of Arnd Bergmann
+> Sent: 2018?10?26? 15:01
+> To: Xiaowei Bao <xiaowei.bao@nxp.com>
+> Cc: Rob Herring <robh@kernel.org>; bhelgaas at google.com; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; kishon at ti.com; lorenzo.pieralisi at arm.com; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+> Subject: Re: [PATCH 3/6] PCI: layerscape: Add the EP mode support
+>
+> On 10/26/18, Xiaowei Bao <xiaowei.bao@nxp.com> wrote:
+> > From: Rob Herring <robh@kernel.org>
+> >> On Thu, Oct 25, 2018 at 07:08:58PM +0800, Xiaowei Bao wrote:
+> >>>          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
+> >>>          "fsl,ls2088a-pcie"
+> >>>          "fsl,ls1088a-pcie"
+> >>>          "fsl,ls1046a-pcie"
+> >>>          "fsl,ls1012a-pcie
+> >>> +  EP mode:
+> >>> +        "fsl,ls-pcie-ep"
+> >>
+> > > You need SoC specific compatibles for the same reasons as the RC.
+> >
+> > [Xiaowei Bao] I want to contains all layerscape platform use one
+> > compatible if the PCIe controller work in EP mode.
+>
+> Do you mean only one of the SoCs that support RC mode has EP mode?
+> I think you still need a SoC specific compatible as Rob explained, in case there will be a second one in the future.
+>
+> If you want to ensure that you don't have to update the device driver for each new chip that comes in when the EP mode is compatible, the way this is handled is to list multiple values in the compatible property, listing the first SoC that introduced the specific version of that IP block as the most generic type, e.g.
+>
+>   copatible = "fsl,ls2088a-pcie-ep", "fsl,ls1012a-pcie-ep", "snps,dw-pcie-ep";
+>
+> For consistency, it probably is best to match each RC mode value with the corresponding EP mode string for each device that can support both (if there is more than one).
+>
+>       Arnd
+> [Xiaowei Bao] My mean is that the ls-pcie-ep compatibles will contain all layerscape SOCs of NXP, e.g: ls1046a-pcie-ep, fsl,ls2088a-pcie-ep, ls2088a-pcie-ep and so on, other layerscape SOCs have not test except the ls1046a, I think it is compatible if the new chip or other SOCs use the DW core, OK, I will discuss this issue internally, and reply to you later.
 
-[..snip..]
->> [...]
->>
->>>>> +/**
->>>>> + * ti_sci_inta_register_event() - Register a event to an interrupt aggregator
->>>>> + * @dev:	Device pointer to source generating the event
->>>>> + * @src_id:	TISCI device ID of the event source
->>>>> + * @src_index:	Event source index within the device.
->>>>> + * @virq:	Linux Virtual IRQ number
->>>>> + * @flags:	Corresponding IRQ flags
->>>>> + * @ack_needed:	If explicit clearing of event is required.
->>>>> + *
->>>>> + * Creates a new irq and attaches to IA domain if virq is not specified
->>>>> + * else attaches the event to vint corresponding to virq.
->>>>> + * When using TISCI within the client drivers, source indexes are always
->>>>> + * generated dynamically and cannot be represented in DT. So client
->>>>> + * drivers should call this API instead of platform_get_irq().
->>>>
->>>> NAK. Either this fits in the standard model, or we adapt the standard
->>>> model to catter for your particular use case. But we don't define a new,
->>>> TI specific API.
->>>>
->>>> I have a hunch that if the IDs are generated dynamically, then the model
->>>> we use for MSIs would fit this thing. I also want to understand what
->>>
->>> hmm..I haven't thought about using MSI. Will try to explore it. But
->>> the "struct msi_msg" is not applicable in this case as device does not
->>> write to a specific location.
->>
->> It doesn't need to. You can perfectly ignore the address field and
->> only be concerned with the data. We already have MSI users that do not
->> need programming of the doorbell address, just the data.
-> 
+You can define a generic compatible string for the EP mode of all
+these platforms.  But like Rob and Arnd mentioned, it is good to also
+define the SoC specific compatible strings just in case that we need
+special treatment for certain SoCs in the future.
 
-Just one more clarification.
-
-First let me explain the IRQ routes a bit deeply. As I said earlier there are 
-three ways in which IRQ can flow in AM65x SoC
-1) Device directly connected to GIC
-	- Device IRQ --> GIC
-2) Device connected to INTR.
-	- Device IRQ --> INTR --> GIC
-3) Devices connected to INTA.
-	- Device IRQ --> INTA --> INTR --> GIC
-
-1 and 2 are straight forward and we use DT for IRQ representation. Coming to 3 
-the trickier part is that Input to INTA and output from INTA and dynamically 
-managed. To be more specific:
-- By hardware design there are certain set of physical global events(interrupts) 
-attached to an INTA. Out of which a certain range are assigned to the current 
-linux host that can be queried from system-controller.
-- Similarly out of all the INTA outputs(referenced as vints) a certain range can 
-be used by the current linux host.
-
-
-So for configuring an IRQ route in case 3, the following steps are needed:
-- Device id and device resource index for which the interrupt is needed
-- A free event id from the range assigned to the INTA in this host context
-- A free vint from the range assigned to the INTA in this host context
-- A free gic IRQ from the range assigned to the INTR in this host context.
-
-With the above information, linux should send a message to system-controller 
-using TISCI protocol. After policing the given information, system-controller 
-does the following:
-- Attaches the interrupt(INTA input) to the device resource index
-- Muxes the interrupt(INTA input) to corresponding vint(INTA output)
-- Muxes the vint(INTR input) to GIC irq(INTR output).
-
-For grouping of interrupts, the same vint number is to be passed to 
-system-controller for all the requests.
-
-Keeping all the above in mind, I see the following as software IRQ Domain Hierarchy:
-
-1) INTA multi MSI --> 2)INTA  -->3) MSI --> 4) INTR  -->5) GIC
-
-INTA driver has to set a chained IRQ using virq allocated from its parent MSI. 
-This is to differentiate the grouped interrupts within INTA.
-
-Inorder to cover the above two MSI domains, a new bus driver has to be created 
-as I couldn't find a fit with the existing bus drivers.
-
-Does the above approach make sense? Please correct me if i am wrong.
-
-Thanks and regards,
-Lokesh
+Regards,
+Leo
