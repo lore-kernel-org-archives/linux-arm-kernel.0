@@ -1,74 +1,105 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Fri, 26 Oct 2018 15:47:55 +0200
-Subject: [PATCH RFC 00/18] staging: vchiq: remove dead code & misc fixes
-Message-ID: <20181026134813.7775-1-nsaenzjulienne@suse.de>
+Date: Fri, 26 Oct 2018 15:47:57 +0200
+Subject: [PATCH RFC 02/18] staging: vchiq_arm: rework close/remove_service
+ IOCTLS
+In-Reply-To: <20181026134813.7775-1-nsaenzjulienne@suse.de>
+References: <20181026134813.7775-1-nsaenzjulienne@suse.de>
+Message-ID: <20181026134813.7775-3-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+The implementation of both IOCTLS was the same except for one function
+call. This joins both implementations and updates the code to avoid
+unneeded indentations.
 
-This series was written in parallel with reading and understanding the
-vchiq code. So excuse me for the lack of logic in the sequence of
-patches.
+Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+---
+ .../interface/vchiq_arm/vchiq_arm.c           | 66 +++++++------------
+ 1 file changed, 24 insertions(+), 42 deletions(-)
 
-It's an RFC for various reasons, first I think it's going to clash with
-the last Stefan's series. Also I'm not used to doing big series.
-
-The main focus was to delete as much code as possible, I've counted
-around 550 lines, which is not bad. Apart from that there are some
-patches enforcing proper kernel APIs usage.
-
-The only patch that really changes code is the
-vchiq_ioc_copy_element_data() rewrite, I was having doubts whether to
-add it into the series, but since it's a RFC, I don't think it hurts.
-
-The last commit updates the TODO list with some of my observations, I
-realise some of the might be a little opinionated. If anything it's
-going to force a discussion on the topic, which is nice.
-
-The series was developed on top of linux-next, and was tested on a
-RPIv3B+ with audio, video and running vchiq_test.
-
-Regards,
-Nicolas
-
-===
-
-Nicolas Saenz Julienne (18):
-  staging: vchiq_core: rework vchiq_get_config
-  staging: vchiq_arm: rework close/remove_service IOCTLS
-  staging: vchiq_shim: delete vchi_service_create
-  stagning: vchiq_arm: use list_for_each_entry when accessing
-    bulk_waiter_list
-  staging: vchiq_arm: get rid of vchi_mh.h
-  staging: vchiq_arm: rework vchiq_ioc_copy_element_data
-  staging: vchiq-core: get rid of is_master distinction
-  staging: vchiq_core: remove unnecessary safety checks in
-    vchiq_init_state
-  staging: vchiq_core: do not initialize semaphores twice
-  staging: vchiq_core: don't add a wmb() before remote_event_signal()
-  staging: vchiq_arm: use completions instead of semaphores
-  staging: vchiq_util: use completions instead of semaphores
-  staging: vchiq_core: use completions instead of semaphores
-  staging: vchiq_util: get rid of unneeded memory barriers
-  stagning: vchiq_core: fix logic redundancy in parse_open
-  staging: vchiq_arm: rework probe and init functions
-  staging: vchiq_arm: fix open/release cdev functions
-  staging: vchiq: add more tasks to the TODO list
-
- .../staging/vc04_services/interface/vchi/TODO |  46 +-
- .../vc04_services/interface/vchi/vchi.h       |   8 -
- .../vc04_services/interface/vchi/vchi_mh.h    |  42 --
- .../interface/vchiq_arm/vchiq_2835_arm.c      |  18 +-
- .../interface/vchiq_arm/vchiq_arm.c           | 598 ++++++++----------
- .../interface/vchiq_arm/vchiq_core.c          | 511 +++------------
- .../interface/vchiq_arm/vchiq_core.h          |  47 +-
- .../interface/vchiq_arm/vchiq_if.h            |  11 +-
- .../interface/vchiq_arm/vchiq_shim.c          |  32 -
- .../interface/vchiq_arm/vchiq_util.c          |  48 +-
- .../interface/vchiq_arm/vchiq_util.h          |   6 +-
- 11 files changed, 429 insertions(+), 938 deletions(-)
- delete mode 100644 drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index 6d503392341e..d88dd7415e1e 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -1019,55 +1019,37 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		}
+ 	} break;
+ 
+-	case VCHIQ_IOC_CLOSE_SERVICE: {
++	case VCHIQ_IOC_CLOSE_SERVICE:
++	case VCHIQ_IOC_REMOVE_SERVICE: {
+ 		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
++		USER_SERVICE_T *user_service;
+ 
+ 		service = find_service_for_instance(instance, handle);
+-		if (service != NULL) {
+-			USER_SERVICE_T *user_service =
+-				(USER_SERVICE_T *)service->base.userdata;
+-			/* close_pending is false on first entry, and when the
+-			   wait in vchiq_close_service has been interrupted. */
+-			if (!user_service->close_pending) {
+-				status = vchiq_close_service(service->handle);
+-				if (status != VCHIQ_SUCCESS)
+-					break;
+-			}
+-
+-			/* close_pending is true once the underlying service
+-			   has been closed until the client library calls the
+-			   CLOSE_DELIVERED ioctl, signalling close_event. */
+-			if (user_service->close_pending &&
+-				down_interruptible(&user_service->close_event))
+-				status = VCHIQ_RETRY;
+-		} else
++		if (!service) {
+ 			ret = -EINVAL;
+-	} break;
++			break;
++		}
+ 
+-	case VCHIQ_IOC_REMOVE_SERVICE: {
+-		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
++		user_service = service->base.userdata;
+ 
+-		service = find_service_for_instance(instance, handle);
+-		if (service != NULL) {
+-			USER_SERVICE_T *user_service =
+-				(USER_SERVICE_T *)service->base.userdata;
+-			/* close_pending is false on first entry, and when the
+-			   wait in vchiq_close_service has been interrupted. */
+-			if (!user_service->close_pending) {
+-				status = vchiq_remove_service(service->handle);
+-				if (status != VCHIQ_SUCCESS)
+-					break;
+-			}
++		/* close_pending is false on first entry, and when the
++		   wait in vchiq_close_service has been interrupted. */
++		if (!user_service->close_pending) {
++			status = (cmd == VCHIQ_IOC_CLOSE_SERVICE) ?
++				 vchiq_close_service(service->handle) :
++				 vchiq_remove_service(service->handle);
++			if (status != VCHIQ_SUCCESS)
++				break;
++		}
+ 
+-			/* close_pending is true once the underlying service
+-			   has been closed until the client library calls the
+-			   CLOSE_DELIVERED ioctl, signalling close_event. */
+-			if (user_service->close_pending &&
+-				down_interruptible(&user_service->close_event))
+-				status = VCHIQ_RETRY;
+-		} else
+-			ret = -EINVAL;
+-	} break;
++		/* close_pending is true once the underlying service
++		   has been closed until the client library calls the
++		   CLOSE_DELIVERED ioctl, signalling close_event. */
++		if (user_service->close_pending &&
++			down_interruptible(&user_service->close_event))
++			status = VCHIQ_RETRY;
++		break;
++	}
+ 
+ 	case VCHIQ_IOC_USE_SERVICE:
+ 	case VCHIQ_IOC_RELEASE_SERVICE:	{
 -- 
 2.19.1
