@@ -1,52 +1,63 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 26 Oct 2018 12:56:56 +0200
-Subject: [PATCH] mm/page_owner: use vmalloc instead of kmalloc
-In-Reply-To: <20181025192701.GK25444@bombadil.infradead.org>
-References: <1540492481-4144-1-git-send-email-miles.chen@mediatek.com>
- <20181025192701.GK25444@bombadil.infradead.org>
-Message-ID: <20181026085410.GA8277@dhcp22.suse.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 26 Oct 2018 12:56:59 +0200
+Subject: [PATCH V2 7/8] dts: fsl: add imx7ulp evk support
+In-Reply-To: <AM0PR04MB421195B48BA336AD7078110D80F60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
+ <1540295058-26090-8-git-send-email-aisheng.dong@nxp.com>
+ <CAOMZO5C3Fv+s-bLeHGZ6LEB=ZqRxf=gXuzbtwfNS=PvQeVJ1Ag@mail.gmail.com>
+ <AM0PR04MB42110E5309341D1626EB6EF980F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CAOMZO5BLXGYfvq6GqK66Qe1aTNHmYJOBhKTPKTwNx=tDROKw6Q@mail.gmail.com>
+ <AM0PR04MB421195B48BA336AD7078110D80F60@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20181026105659.yixb64lqia5kisgf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 25-10-18 12:27:01, Matthew Wilcox wrote:
-> On Fri, Oct 26, 2018 at 02:34:41AM +0800, miles.chen at mediatek.com wrote:
-> > The kbuf used by page owner is allocated by kmalloc(),
-> > which means it can use only normal memory and there might
-> > be a "out of memory" issue when we're out of normal memory.
+On Wed, Oct 24, 2018 at 08:14:01AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Fabio Estevam [mailto:festevam at gmail.com]
+> > Sent: Wednesday, October 24, 2018 12:26 AM
+> [...]
+> > On Tue, Oct 23, 2018 at 11:42 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
 > > 
-> > Use vmalloc() so we can also allocate kbuf from highmem
-> > on 32bit kernel.
+> > > I'm a bit hesitate to do that as the driver already supports it.
+> > > There's no extra effort to use it. And we probably could take ULP as a
+> > > special case to test generic binding rather then simply drop it and
+> > > drop driver features. Once we get objection from users later, we still can
+> > simply fallback as there's still only official boards using it.
+> > 
+> > We had this same discussion some months ago when we were reviewing
+> > i.MX8 support.
+> >
+> > I don't see the value in doing pinctrl differently on i.MX7ULP.
+> >
 > 
-> ... hang on, there's a bigger problem here.
+> I thought the situation is different as ULP actually already supports generic binding
+> before that discussion.
 > 
-> static const struct file_operations proc_page_owner_operations = {
->         .read           = read_page_owner,
-> };
+> > > Last, it's not correct that there's not only one method for all i.MX devices.
+> > > MX23/28 are different ones and ULP is more like MX23/28.
+> > > And I saw no objections from users for MX23/28.
+> > 
+> > Yes, but these are legacy platforms.
+> > 
+> > For new ones, we should try to keep consistency, just like we discussed during
+> > i.MX8 review.
 > 
-> read_page_owner(struct file *file, char __user *buf, size_t count, loff_t *ppos)
-> {
-> ...
->                 return print_page_owner(buf, count, pfn, page,
->                                 page_owner, handle);
-> }
+> So the question is whether it's necessary to switch generic binding back to the
+> legacy one for ULP. Personally I'm not strongly against this, but I need some
+> confirmation from Shawn and Sascha.
 > 
-> static ssize_t
-> print_page_owner(char __user *buf, size_t count, unsigned long pfn,
->                 struct page *page, struct page_owner *page_owner,
->                 depot_stack_handle_t handle)
-> {
-> ...
->       kbuf = kmalloc(count, GFP_KERNEL);
-> 
-> So I can force the kernel to make an arbitrary size allocation, triggering
-> OOMs and forcing swapping if I can get a file handle to this file.
-> The only saving grace is that (a) this is a debugfs file and (b) it's
-> root-only (mode 0400).  Nevertheless, I feel some clamping is called
-> for here.  Do we really need to output more than 4kB worth of text here?
+> Shawn & Sascha, would you make a judgement call?
+> If you also strongly request that, I will try to make it patch to test Linus W.
+> Hopefully our agreement could satisfy Linus W.
 
-Completely agreed. Let's just clamp it to a single page. Userspace can
-easily loop around the syscall.
+For consistency reasons I vote for using the legacy binding for i.MX7ulp
+aswell.
+
+Sascha
 
 -- 
-Michal Hocko
-SUSE Labs
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
