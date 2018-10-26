@@ -1,45 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 26 Oct 2018 10:59:52 +0100
-Subject: [PATCH 09/10] swiotlb: add support for non-coherent DMA
-In-Reply-To: <20181026080421.GA6100@lst.de>
-References: <20181008080246.20543-1-hch@lst.de>
- <20181008080246.20543-10-hch@lst.de>
- <9ea28547-dd1a-b4bd-2e91-f71e70417e7d@arm.com> <20181026080421.GA6100@lst.de>
-Message-ID: <f8910e6d-d864-07cd-12f2-551149a66d42@arm.com>
+From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
+Date: Fri, 26 Oct 2018 12:55:07 +0200
+Subject: [PATCH RFC 11/11] staging: bcm2835-camera: Add hint about
+ possible faulty config
+In-Reply-To: <1540481375-15952-12-git-send-email-stefan.wahren@i2se.com>
+References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
+ <1540481375-15952-12-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <705a68b26f08996e069aafa273a8ea50197d2dd9.camel@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-10-26 9:04 am, Christoph Hellwig wrote:
-> On Mon, Oct 22, 2018 at 06:11:04PM +0100, Robin Murphy wrote:
->>>    +	if (!dev_is_dma_coherent(dev) &&
->>> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
->>
->> Nit: other parts of the file are already using the "!(...)" style rather
->> than "(...) == 0".
+On Thu, 2018-10-25 at 17:29 +0200, Stefan Wahren wrote:
+> As per default the GPU memory config of the Raspberry Pi isn't
+> sufficient
+> for the camera usage. Even worse the bcm2835 camera driver doesn't
+> provide a
+> helpful error message in this case. So let's add a hint to point the
+> user
+> to the likely cause.
 > 
-> Indeed.  Probably some kind of copy and past error..
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
->> I had a quick play at moving the cache maintenance here out into the
->> callers, which comes out arguably looking perhaps a little cleaner (only +1
->> source line overall, and actually reduces text size by 32 bytes for my
->> build), but sadly I can't really see any way of doing the equivalent for
->> map/unmap short of duplicating the whole 3-line arch_sync_*() block, which
->> just makes for a different readability problem. As you mentioned on patch
->> #7, I guess this really is just one of those things which has no nice
->> solution, so cosmetics aside,
-> 
-> It looks pretty ok, but given that I want to send this version to
-> Linus for the merge window I don't really dare to touch it.
-> 
-> The master plan for 4.21 is to actually merge swiotlb into dma-direct
-> and to allow direct calls to dma-direct given how expensive indirect
-> calls are with spectre, and dma mappings show up badly in various
-> benchmarks.  I'll see if I can do that in a way following what you've
-> done.
+> diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-
+> vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+> index cc2d993..bffd75d 100644
+> --- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+> +++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+> @@ -1623,8 +1623,11 @@ int vchiq_mmal_component_init(struct
+> vchiq_mmal_instance *instance,
+>  	component = &instance->component[instance->component_idx];
+>  
+>  	ret = create_component(instance, component, name);
+> -	if (ret < 0)
+> +	if (ret < 0) {
+> +		pr_err("%s: failed to create component %d (Not enough
+> GPU mem?)\n",
+> +		       __func__, ret);
+>  		goto unlock;
+> +	}
+>  
+>  	/* ports info needs gathering */
+>  	component->control.type = MMAL_PORT_TYPE_CONTROL;
 
-Right, if we're going to be coming back here soon to make it efficient, 
-there's even less need to worry about how beautiful it is at this point 
-when we're just making it functional. I'll save up all my optimisation 
-urges for the next round :)
-
-Robin.
+Nice, had to deal with this the hard way, would have saved me some
+time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181026/04268762/attachment.sig>
