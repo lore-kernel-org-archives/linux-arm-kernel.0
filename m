@@ -1,187 +1,167 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Fri, 26 Oct 2018 17:54:23 +0530
-Subject: [PATCH v2 2/3] dt-bindings: reset: Add bindings for ZynqMP reset
- driver
+Date: Fri, 26 Oct 2018 17:54:24 +0530
+Subject: [PATCH v2 3/3] reset: reset-zynqmp: Adding support for Xilinx zynqmp
+ reset controller.
 In-Reply-To: <20181026122424.30831-1-nava.manne@xilinx.com>
 References: <20181026122424.30831-1-nava.manne@xilinx.com>
-Message-ID: <20181026122424.30831-3-nava.manne@xilinx.com>
+Message-ID: <20181026122424.30831-4-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation to describe Xilinx ZynqMP reset driver
-bindings.
+Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
+The zynqmp reset-controller has the ability to reset lines
+connected to different blocks and peripheral in the Soc.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
 Changes for v2:
-		-None.
+		-Fixed some minor coding issues as suggested
+		 by philipp.
 
 Changes for v1:
-		-Created a Seperate(New) DT binding file as
-		 suggested by Rob.
+		-None.
 
 Changes for RFC-V3:
-		-Corrected Commit Msg.
+		-None.
 
 Changes for RFC-V2:
-		-Moved reset node as a child to firwmare
-		 node.
+		-Moved eemi_ops into a priv struct as suggested
+		 by philipp.
 
- .../bindings/reset/xlnx,zynqmp-reset.txt           | 146 +++++++++++++++++++++
- 1 file changed, 146 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
+ drivers/reset/Makefile       |   1 +
+ drivers/reset/reset-zynqmp.c | 114 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 115 insertions(+)
+ create mode 100644 drivers/reset/reset-zynqmp.c
 
-diff --git a/Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt b/Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 4243c38..eb315d1 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -24,4 +24,5 @@ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+ obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+ obj-$(CONFIG_RESET_UNIPHIER_USB3) += reset-uniphier-usb3.o
+ obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
++obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
+ 
+diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
 new file mode 100644
-index 0000000..c42b6a2
+index 0000000..cff63d9
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
-@@ -0,0 +1,146 @@
-+--------------------------------------------------------------------------
-+ =  Zynq UltraScale+ MPSoC reset driver binding =
-+--------------------------------------------------------------------------
-+The Zynq UltraScale+ MPSoC has several different resets.
++++ b/drivers/reset/reset-zynqmp.c
+@@ -0,0 +1,114 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2018 Xilinx, Inc.
++ *
++ */
 +
-+See Chapter 36 of the Zynq UltraScale+ MPSoC TRM (UG) for more information
-+about zynqmp resets.
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/firmware/xlnx-zynqmp.h>
 +
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
++#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
++#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
 +
-+Required Properties:
-+- compatible:	"xlnx,zynqmp-reset"
-+- #reset-cells:	Specifies the number of cells needed to encode reset
-+		line, should be 1
++struct zynqmp_reset_data {
++	struct reset_controller_dev rcdev;
++	const struct zynqmp_eemi_ops *eemi_ops;
++};
 +
-+Reset outputs:
-+	0   :PCIE config reset.
-+	1   :PCIE bridge block level reset (AXI interface).
-+	2   :PCIE control block level,reset.
-+	3   :Display Port block level reset (includes DPDMA).
-+	4   :FPD WDT reset.
-+	5   :AF_FM5 block level reset.
-+	6   :AF_FM4 block level reset.
-+	7   :AF_FM3 block level reset.
-+	8   :AF_FM2 block level reset.
-+	9   :AF_FM1 block level reset.
-+	10  :AF_FM0 block level reset.
-+	11  :GDMA block level reset.
-+	12  :Pixel Processor (GPU_PP1) block level reset.
-+	13  :Pixel Processor (GPU_PP0) block level reset.
-+	14  :GPU block level reset.
-+	15  :GT block level reset.
-+	16  :Sata block level reset.
-+	17  :ACPU3 power on reset.
-+	18  :ACPU2 power on reset.
-+	19  :ACPU1 power on reset.
-+	20  :ACPU0 power on reset.
-+	21  :APU L2 reset.
-+	22  :ACPU3 reset.
-+	23  :ACPU2 reset.
-+	24  :ACPU1 reset.
-+	25  :ACPU0 reset.
-+	26  :DDR block level reset inside of the DDR Sub System.
-+	27  :APM block level reset inside of the DDR Sub System.
-+	28  :soft reset.
-+	29  :GEM 0 reset.
-+	30  :GEM 1 reset.
-+	31  :GEM 2 reset.
-+	32  :GEM 3 reset.
-+	33  :qspi reset.
-+	34  :uart0 reset.
-+	35  :uart1 reset.
-+	36  :spi0 reset.
-+	37  :spi1 reset.
-+	38  :sdio0 reset.
-+	39  :sdio1 reset.
-+	40  :can0 reset.
-+	41  :can1 reset.
-+	42  :i2c0 reset.
-+	43  :i2c1 reset.
-+	44  :ttc0 reset.
-+	45  :ttc1 reset.
-+	46  :ttc2 reset.
-+	47  :ttc3 reset.
-+	48  :swdt reset.
-+	49  :nand reset.
-+	50  :adma reset.
-+	51  :gpio reset.
-+	52  :iou_cc reset.
-+	53  :timestamp reset.
-+	54  :rpu_r50 reset.
-+	55  :rpu r51 reset.
-+	56  :rpu_amba reset.
-+	57  :ocm reset.
-+	58  :rpu_pge reset.
-+	59  :usb0_core reset.
-+	60  :usb1_core reset.
-+	61  :usb0_hiber reset.
-+	62  :usb1_hiber reset.
-+	63  :usb0_apb reset.
-+	64  :usb1_apb reset.
-+	65  :ipi reset.
-+	66  :apm reset.
-+	67  :rtc reset.
-+	68  :sysmon reset.
-+	69  :afi_fm6 reset.
-+	70  :lpd_swdt reset.
-+	71  :fpd_reset.
-+	72  :rpu_dbg1 reset.
-+	73  :rpu_dbg0 reset.
-+	74  :dbg_lpd reset.
-+	75  :dbg_fpd reset.
-+	76  :apll reset.
-+	77  :dpll reset.
-+	78  :vpll reset.
-+	79  :iopll reset.
-+	80  :rpll reset.
-+	81  :gpio_pl_0 reset.
-+	82  :gpio_pl_1 reset.
-+	83  :gpio_pl_2 reset.
-+	84  :gpio_pl_3 reset.
-+	85  :gpio_pl_4 reset.
-+	86  :gpio_pl_5 reset.
-+	87  :gpio_pl_6 reset.
-+	88  :gpio_pl_7 reset.
-+	89  :gpio_pl_8 reset.
-+	90  :gpio_pl_9 reset.
-+	91  :gpio_pl_10 reset.
-+	92  :gpio_pl_11 reset.
-+	93  :gpio_pl_12 reset.
-+	94  :gpio_pl_13 reset.
-+	95  :gpio_pl_14 reset.
-+	96  :gpio_pl_15 reset.
-+	97  :gpio_pl_16 reset.
-+	98  :gpio_pl_17 reset.
-+	99  :gpio_pl_18 reset.
-+	100 :gpio_pl_19 reset.
-+	101 :gpio_pl_20 reset.
-+	102 :gpio_pl_21 reset.
-+	103 :gpio_pl_22 reset.
-+	104 :gpio_pl_23 reset.
-+	105 :gpio_pl_24 reset.
-+	106 :gpio_pl_25 reset.
-+	107 :gpio_pl_26 reset.
-+	108 :gpio_pl_27 reset.
-+	109 :gpio_pl_28 reset.
-+	110 :gpio_pl_29 reset.
-+	111 :gpio_pl_30 reset.
-+	112 :gpio_pl_31 reset.
-+	113 :rpu_ls reset.
-+	114 :ps_only reset.
-+	115 :pl reset.
-+	116 :ps_pl0 reset
-+	117 :ps_pl1 reset
-+	118 :ps_pl2 reset
-+	119 :ps_pl3 reset
++static inline struct zynqmp_reset_data *
++to_zynqmp_reset_data(struct reset_controller_dev *rcdev)
++{
++	return container_of(rcdev, struct zynqmp_reset_data, rcdev);
++}
 +
-+-------
-+Example
-+-------
++static int zynqmp_reset_assert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
 +
-+	reset-controller {
-+		compatible = "xlnx,zynqmp-reset";
-+		#reset-cells = <1>;
-+	};
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_ASSERT);
++}
++
++static int zynqmp_reset_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_RELEASE);
++}
++
++static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++	int val, err;
++
++	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
++	if (!err)
++		return err;
++
++	return val;
++}
++
++static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_PULSE);
++}
++
++static struct reset_control_ops zynqmp_reset_ops = {
++	.reset = zynqmp_reset_reset,
++	.assert = zynqmp_reset_assert,
++	.deassert = zynqmp_reset_deassert,
++	.status = zynqmp_reset_status,
++};
++
++static int zynqmp_reset_probe(struct platform_device *pdev)
++{
++	struct zynqmp_reset_data *priv;
++
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, priv);
++
++	priv->eemi_ops = zynqmp_pm_get_eemi_ops();
++	if (!priv->eemi_ops)
++		return -ENXIO;
++
++	priv->rcdev.ops = &zynqmp_reset_ops;
++	priv->rcdev.owner = THIS_MODULE;
++	priv->rcdev.of_node = pdev->dev.of_node;
++	priv->rcdev.nr_resets = ZYNQMP_NR_RESETS;
++
++	return devm_reset_controller_register(&pdev->dev, &priv->rcdev);
++}
++
++static const struct of_device_id zynqmp_reset_dt_ids[] = {
++	{ .compatible = "xlnx,zynqmp-reset", },
++	{ /* sentinel */ },
++};
++
++static struct platform_driver zynqmp_reset_driver = {
++	.probe	= zynqmp_reset_probe,
++	.driver = {
++		.name		= KBUILD_MODNAME,
++		.of_match_table	= zynqmp_reset_dt_ids,
++	},
++};
++
++static int __init zynqmp_reset_init(void)
++{
++	return platform_driver_register(&zynqmp_reset_driver);
++}
++
++arch_initcall(zynqmp_reset_init);
 -- 
 2.7.4
