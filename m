@@ -1,63 +1,79 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Oct 2018 12:56:59 +0200
-Subject: [PATCH V2 7/8] dts: fsl: add imx7ulp evk support
-In-Reply-To: <AM0PR04MB421195B48BA336AD7078110D80F60@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1540295058-26090-1-git-send-email-aisheng.dong@nxp.com>
- <1540295058-26090-8-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5C3Fv+s-bLeHGZ6LEB=ZqRxf=gXuzbtwfNS=PvQeVJ1Ag@mail.gmail.com>
- <AM0PR04MB42110E5309341D1626EB6EF980F50@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAOMZO5BLXGYfvq6GqK66Qe1aTNHmYJOBhKTPKTwNx=tDROKw6Q@mail.gmail.com>
- <AM0PR04MB421195B48BA336AD7078110D80F60@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <20181026105659.yixb64lqia5kisgf@pengutronix.de>
+From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
+Date: Fri, 26 Oct 2018 11:05:30 +0000
+Subject: [PATCH] power: reset: at91-reset: enable I-cache for
+ at91sam9260_reset
+In-Reply-To: <CALDOjzhgqcx5XEWon9EQXEGxt9J280Z6AvuFQcBa=nh-9VA6PQ@mail.gmail.com>
+References: <20181007125815.8392-1-jonas@threetimestwo.org>
+ <80993f04-c8ce-5a71-4f04-7edab5e1857b@microchip.com>
+ <2351196.3BzoFE0xYq@ws-140106>
+ <CALDOjzhZg3X1y22KE1yw_0ZFjuvaa=3GhEF2iU=KUk6-eRZN2g@mail.gmail.com>
+ <11b4bcb4-8882-bdd2-c7f7-6a74d0758cbc@microchip.com>
+ <CALDOjzhgqcx5XEWon9EQXEGxt9J280Z6AvuFQcBa=nh-9VA6PQ@mail.gmail.com>
+Message-ID: <f8ed781a-2ee7-9d0e-1220-b23ccf3fdbb2@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 08:14:01AM +0000, A.s. Dong wrote:
-> > -----Original Message-----
-> > From: Fabio Estevam [mailto:festevam at gmail.com]
-> > Sent: Wednesday, October 24, 2018 12:26 AM
-> [...]
-> > On Tue, Oct 23, 2018 at 11:42 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
-> > 
-> > > I'm a bit hesitate to do that as the driver already supports it.
-> > > There's no extra effort to use it. And we probably could take ULP as a
-> > > special case to test generic binding rather then simply drop it and
-> > > drop driver features. Once we get objection from users later, we still can
-> > simply fallback as there's still only official boards using it.
-> > 
-> > We had this same discussion some months ago when we were reviewing
-> > i.MX8 support.
-> >
-> > I don't see the value in doing pinctrl differently on i.MX7ULP.
-> >
-> 
-> I thought the situation is different as ULP actually already supports generic binding
-> before that discussion.
-> 
-> > > Last, it's not correct that there's not only one method for all i.MX devices.
-> > > MX23/28 are different ones and ULP is more like MX23/28.
-> > > And I saw no objections from users for MX23/28.
-> > 
-> > Yes, but these are legacy platforms.
-> > 
-> > For new ones, we should try to keep consistency, just like we discussed during
-> > i.MX8 review.
-> 
-> So the question is whether it's necessary to switch generic binding back to the
-> legacy one for ULP. Personally I'm not strongly against this, but I need some
-> confirmation from Shawn and Sascha.
-> 
-> Shawn & Sascha, would you make a judgement call?
-> If you also strongly request that, I will try to make it patch to test Linus W.
-> Hopefully our agreement could satisfy Linus W.
 
-For consistency reasons I vote for using the legacy binding for i.MX7ulp
-aswell.
 
-Sascha
+On 19.10.2018 13:30, Jonas Danielsson wrote:
+> On Wed, Oct 17, 2018 at 3:10 PM <Claudiu.Beznea@microchip.com> wrote:
+>>
+>>>
+>>> We take the normal path of sys_reboot => kernel_restart => machine_restart ...
+>>>
+>>> I added code to print the c1 register in different paths. And I-cache
+>>> is enabled.
+>>> So now I am really confused about why the patch worked.
+>>
+>> Just saying... maybe your instructions add some delay on the execution path
+>> and this is why it helps... try to access cp15 co-processor for read and
+>> write back the value you read without actually to modify it, to see if this
+>> could be the reason: e.g.:
+>>
+>> mrc     p15, 0, r0, c1, c0, 0
+>> orr     r1, r1, #4096           // whatever is in r1, doesn't matter
+>> mcr     p15, 0, r0, c1, c0, 0
+>>
+> 
+> Yes, this also seems to work. I have over 100 reboots completed with this code.
+> So what could be the issue here? It seem related to the powering down
+> of the sdram at least.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I don't know what could be the issue here. 
+
+> 
+> This thread on the AT91SAM community deals with the same issue:
+> http://www.at91.com/viewtopic.php?t=25830
+> There the solution people chose was removing the SDRAM powering down.
+> But that leaves one open to the cause of the errata.
+> 
+> Do you have any thought on how to approach this?
+
+For now, no. I didn't dug this issue.
+
+Thank you,
+Claudiu
+
+> 
+>> Thank you,
+>> Claudiu Beznea
+>>
+> 
+> Regards
+> Jonas
+> 
+> 
+>>>
+>>>> Best regards,
+>>>> Alexander
+>>>
+>>> Jonas
+>>>
+>>>>
+>>>>
+>>>>
+>>>
+>>>
+> 
+> 
+> 
