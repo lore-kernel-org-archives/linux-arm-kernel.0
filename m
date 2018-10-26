@@ -1,42 +1,83 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Fri, 26 Oct 2018 14:58:45 +0900
-Subject: [PATCH v2 2/2] spi: uniphier: re-add addressing properties
-In-Reply-To: <1540533525-1816-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1540533525-1816-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1540533525-1816-3-git-send-email-hayashibara.keiji@socionext.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 26 Oct 2018 12:09:01 +0530
+Subject: [PATCH v2 00/10] Add support for TISCI irqchip drivers
+In-Reply-To: <38811dd7-0645-0439-092d-6759ab52cb0a@oracle.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <942981b8-7536-2b6b-ad49-dc59671cbda6@oracle.com>
+ <050161aa-a257-9bf8-b3c9-35b13925b556@ti.com>
+ <38811dd7-0645-0439-092d-6759ab52cb0a@oracle.com>
+Message-ID: <bc7312c2-b068-ddda-b183-54e6bc3f8219@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 7662d1dc17d4 ("spi: uniphier: fix incorrect property items")
-addressing properties of #address-cells and #size-cells were removed.
-Since it is not necessary to remove them, they are back again.
+Hi Santosh,
 
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
----
- Documentation/devicetree/bindings/spi/spi-uniphier.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+On Tuesday 23 October 2018 11:04 PM, Santosh Shilimkar wrote:
+> On 10/23/2018 1:17 AM, Lokesh Vutla wrote:
+>> Hi Santosh,
+>>
+>> On Tuesday 23 October 2018 02:09 AM, Santosh Shilimkar wrote:
+>>> On 10/18/2018 8:40 AM, Lokesh Vutla wrote:
+>>>> TISCI abstracts the handling of IRQ routes where interrupt sources
+>>>> are not directly connected to host interrupt controller. This series
+>>>> adds support for:
+>>>> - TISCI commands needed for IRQ configuration
+>>>> - Interrupt Router(INTR) and Interrupt Aggregator(INTA) drivers
+>>>>
+>>>> More information on TISCI IRQ management can be found here[1].
+>>>> Complete TISCI resource management information can be found here[2].
+>>>> AM65x SoC related TISCI information can be found here[3].
+>>>> INTR and INTA related information can be found in TRM[4].
+>>>>
+>>> I didn't read the specs but from what you described in
+>>> INTA and INTR bindings, does the flow of IRQs like below ?
+>>>
+>>> Device IRQ(e.g USB) -->INTR-->INTA--->HOST IRQ controller(GIC)
+>>
+>> Not all devices in SoC are connected to INTA. Only the devices that are
+>> capable of generating events are connected to INTA. And INTA is
+>> connected to INTR.
+>>
+>> So there are three ways in which IRQ can flow in AM65x SoC:
+>> 1) Device directly connected to GIC
+>>   ????- Device IRQ --> GIC
+>>   ????- (Most legacy peripherals like MMC, UART falls in this case)
+>> 2) Device connected to INTR.
+>>   ????- Device IRQ --> INTR --> GIC
+>>   ????- This is cases where you want to mux IRQs. Used for GPIOs and
+>> Mailboxes
+>>   ????- (This is somewhat similar to crossbar on DRA7 devices)
+>> 3) Devices connected to INTA.
+>>   ????- Device Event --> INTA --> INTR --> GIC
+>>   ????- Used for DMA and networking devices.
+>>
+>> Events are messages based on a hw protocol, sent by a master over a
+>> dedicated Event transport lane. Events are highly precise that no
+>> under/over flow of data transfer occurs at source/destination regardless
+>> of distance and latency. So this is mostly preferred in DMA and
+>> networking usecases. Now Interrupt Aggregator(IA) has the logic to
+>> converts these events to Interrupts.
+>>
+> This helps but none of the kernel doc you added, makes this clear so
+> perhaps you want to add this info to make that clear for reviewers
+> as well as for future reference.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-uniphier.txt b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-index b04e66a..e120157 100644
---- a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-@@ -5,6 +5,8 @@ UniPhier SoCs have SCSSI which supports SPI single channel.
- Required properties:
-  - compatible: should be "socionext,uniphier-scssi"
-  - reg: address and length of the spi master registers
-+ - #address-cells: must be <1>, see spi-bus.txt
-+ - #size-cells: must be <0>, see spi-bus.txt
-  - interrupts: a single interrupt specifier
-  - pinctrl-names: should be "default"
-  - pinctrl-0: pin control state for the default mode
-@@ -16,6 +18,8 @@ Example:
- spi0: spi at 54006000 {
- 	compatible = "socionext,uniphier-scssi";
- 	reg = <0x54006000 0x100>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
- 	interrupts = <0 39 4>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_spi0>;
--- 
-2.7.4
+Sure will add it.
+
+> 
+> Now regarding the events, no matter how they are routed/processed
+> within SOC, they are essentially interrupts so I do agree with
+> Marc's other comment.
+
+Agreed. Marc suggested to use MSI in this scenario. Currently working in that 
+direction. Will repost the series once it is done.
+
+Thanks and regards,
+Lokesh
+
+> 
+> Thanks for explanation again !!
+> 
+> regards,
+> Santosh
+> 
