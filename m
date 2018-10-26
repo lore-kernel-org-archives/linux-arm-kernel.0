@@ -1,70 +1,37 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Fri, 26 Oct 2018 16:01:07 +0800
-Subject: [PATCH] mm/page_owner: use vmalloc instead of kmalloc
-In-Reply-To: <e0cd65fdd6afc17b2be9b3ac64d50b95b2c2f32e.camel@perches.com>
-References: <1540492481-4144-1-git-send-email-miles.chen@mediatek.com>
- <e0cd65fdd6afc17b2be9b3ac64d50b95b2c2f32e.camel@perches.com>
-Message-ID: <1540540867.21297.2.camel@mtkswgap22>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 26 Oct 2018 10:04:21 +0200
+Subject: [PATCH 09/10] swiotlb: add support for non-coherent DMA
+In-Reply-To: <9ea28547-dd1a-b4bd-2e91-f71e70417e7d@arm.com>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-10-hch@lst.de>
+ <9ea28547-dd1a-b4bd-2e91-f71e70417e7d@arm.com>
+Message-ID: <20181026080421.GA6100@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-10-25 at 11:44 -0700, Joe Perches wrote:
-> On Fri, 2018-10-26 at 02:34 +0800, miles.chen at mediatek.com wrote:
-> > From: Miles Chen <miles.chen@mediatek.com>
-> > 
-> > The kbuf used by page owner is allocated by kmalloc(),
-> > which means it can use only normal memory and there might
-> > be a "out of memory" issue when we're out of normal memory.
-> > 
-> > Use vmalloc() so we can also allocate kbuf from highmem
-> > on 32bit kernel.
-> 
-> If this is really necessary, using kvmalloc/kvfree would
-> be better as the vmalloc space is also limited.
+On Mon, Oct 22, 2018 at 06:11:04PM +0100, Robin Murphy wrote:
+>>   +	if (!dev_is_dma_coherent(dev) &&
+>> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+>
+> Nit: other parts of the file are already using the "!(...)" style rather 
+> than "(...) == 0".
 
-thanks for the advise.
-kvmalloc/kvfree is better here.
+Indeed.  Probably some kind of copy and past error..
 
-> 
-> > diff --git a/mm/page_owner.c b/mm/page_owner.c
-> []
-> > @@ -1,7 +1,6 @@
-> >  // SPDX-License-Identifier: GPL-2.0
-> >  #include <linux/debugfs.h>
-> >  #include <linux/mm.h>
-> > -#include <linux/slab.h>
-> >  #include <linux/uaccess.h>
-> >  #include <linux/bootmem.h>
-> >  #include <linux/stacktrace.h>
-> > @@ -10,6 +9,7 @@
-> >  #include <linux/migrate.h>
-> >  #include <linux/stackdepot.h>
-> >  #include <linux/seq_file.h>
-> > +#include <linux/vmalloc.h>
-> >  
-> >  #include "internal.h"
-> >  
-> > @@ -351,7 +351,7 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
-> >  		.skip = 0
-> >  	};
-> >  
-> > -	kbuf = kmalloc(count, GFP_KERNEL);
-> > +	kbuf = vmalloc(count);
-> >  	if (!kbuf)
-> >  		return -ENOMEM;
-> >  
-> > @@ -397,11 +397,11 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
-> >  	if (copy_to_user(buf, kbuf, ret))
-> >  		ret = -EFAULT;
-> >  
-> > -	kfree(kbuf);
-> > +	vfree(kbuf);
-> >  	return ret;
-> >  
-> >  err:
-> > -	kfree(kbuf);
-> > +	vfree(kbuf);
-> >  	return -ENOMEM;
-> >  }
-> >  
-> 
+> I had a quick play at moving the cache maintenance here out into the 
+> callers, which comes out arguably looking perhaps a little cleaner (only +1 
+> source line overall, and actually reduces text size by 32 bytes for my 
+> build), but sadly I can't really see any way of doing the equivalent for 
+> map/unmap short of duplicating the whole 3-line arch_sync_*() block, which 
+> just makes for a different readability problem. As you mentioned on patch 
+> #7, I guess this really is just one of those things which has no nice 
+> solution, so cosmetics aside,
+
+It looks pretty ok, but given that I want to send this version to
+Linus for the merge window I don't really dare to touch it.
+
+The master plan for 4.21 is to actually merge swiotlb into dma-direct
+and to allow direct calls to dma-direct given how expensive indirect
+calls are with spectre, and dma mappings show up badly in various
+benchmarks.  I'll see if I can do that in a way following what you've
+done.
