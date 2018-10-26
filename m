@@ -1,61 +1,59 @@
-From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Fri, 26 Oct 2018 13:06:23 +0200
-Subject: [PATCH RFC 00/11] staging: vc04_services: Improve driver
- load/unload
-In-Reply-To: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-References: <1540481375-15952-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <f9670cb6f44dc63dd7a475f843572f4c16359181.camel@suse.de>
+From: rppt@linux.ibm.com (Mike Rapoport)
+Date: Fri, 26 Oct 2018 12:07:09 +0100
+Subject: [PATCH v2 0/2] arm64: Cut rebuild time when changing
+ CONFIG_BLK_DEV_INITRD
+In-Reply-To: <1bb3bd63-a88e-b668-ea36-f0f985c0e2b1@gmail.com>
+References: <20181024193256.23734-1-f.fainelli@gmail.com>
+ <CAL_Jsq+KCOv6pXXHhHDZ+7-QUrmtMDvSjEVhK15yZ3qbnn61Ag@mail.gmail.com>
+ <20181025093833.GA23607@rapoport-lnx>
+ <CAL_JsqL62ttsGSbE1BS5v-mX3pKE-p_HyvuZD6nB+GUbQyetzg@mail.gmail.com>
+ <20181025172935.GA27364@rapoport-lnx>
+ <CAL_JsqJrMq+QHvuOsqEdCFchmXsd4s2XKUD_TboKzeEQprJvjg@mail.gmail.com>
+ <1bb3bd63-a88e-b668-ea36-f0f985c0e2b1@gmail.com>
+Message-ID: <20181026110708.GA3814@rapoport-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Thu, Oct 25, 2018 at 04:07:13PM -0700, Florian Fainelli wrote:
+> On 10/25/18 2:13 PM, Rob Herring wrote:
+> > On Thu, Oct 25, 2018 at 12:30 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
+> >>
+> >> On Thu, Oct 25, 2018 at 08:15:15AM -0500, Rob Herring wrote:
+> >>> +Ard
+> >>>
+> >>> On Thu, Oct 25, 2018 at 4:38 AM Mike Rapoport <rppt@linux.ibm.com> wrote:
+> >>>>
+> >>>> On Wed, Oct 24, 2018 at 02:55:17PM -0500, Rob Herring wrote:
+> >>>>> On Wed, Oct 24, 2018 at 2:33 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+> >>>>>>
+> >>>>>> Hi all,
+> >>>>>>
+> >>>>>> While investigating why ARM64 required a ton of objects to be rebuilt
+> >>>>>> when toggling CONFIG_DEV_BLK_INITRD, it became clear that this was
+> >>>>>> because we define __early_init_dt_declare_initrd() differently and we do
+> >>>>>> that in arch/arm64/include/asm/memory.h which gets included by a fair
+> >>>>>> amount of other header files, and translation units as well.
+> >>>>>
+> >>>> I think arm64 does not have to redefine __early_init_dt_declare_initrd().
+> >>>> Something like this might be just all we need (completely untested,
+> >>>> probably it won't even compile):
 
-On Thu, 2018-10-25 at 17:29 +0200, Stefan Wahren wrote:
-> This patch series improves the load/unload of bcm2835 camera and
-> audio
-> drivers. It has been tested with Raspberry Pi 3 B and a camera module
-> V1.
-> 
-> This series based on current linux-next and Phil Elwell's series
-> ("Improve VCHIQ
-> cache line size handling"). After Nicolas' series ("staging:
-> vc04_services:
-> Some dead code removal") has been applied, i will rebase my series.
-> 
-> Stefan Wahren (11):
->   staging: bcm2835-camera: Abort probe if there is no camera
->   staging: bcm2835-camera: fix module autoloading
->   staging: bcm2835-camera: Move module info to the end
->   staging: vchiq_arm: Fix platform device unregistration
->   staging: vchiq_arm: Fix camera device registration
->   staging: vchiq_arm: Register a platform device for audio
->   staging: bcm2835-audio: Enable compile test
->   staging: bcm2835-audio: use module_platform_driver() macro
->   staging: bcm2835-audio: Drop DT dependency
->   staging: bcm2835-camera: Provide more specific probe error messages
->   staging: bcm2835-camera: Add hint about possible faulty config
-> 
->  .../staging/vc04_services/bcm2835-audio/Kconfig    |  2 +-
->  .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 61 ++++++----
-> -------
->  .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 78
-> +++++++++++++++-------
->  .../vc04_services/bcm2835-camera/mmal-vchiq.c      |  5 +-
->  .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 27 ++++++--
->  5 files changed, 102 insertions(+), 71 deletions(-)
+[ ... ]
+ 
+> FWIW, I am extracting the ARM implementation that parses the initrd
+> early command line parameter and the "setup" code doing the page
+> boundary alignment and memblock checking into a helper into lib/ that
+> other architectures can re-use. So far, this removes the need for
+> unicore32, arc and arm to duplicate essentially the same logic.
+
+Presuming you are going to need asm-generic/initrd.h for that as well,
+using override for __early_init_dt_declare_initrd in arm64 version of
+initrd.h might be the simplest option.
+
+> -- 
+> Florian
 > 
 
-I prefer Dan's approach to error checking in vchiq_probe(). Apart from
-that seems good to me.
-
-Reviewed-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
-
-Regards,
-Nicolas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181026/a9837357/attachment.sig>
+-- 
+Sincerely yours,
+Mike.
