@@ -1,57 +1,117 @@
-From: jpoimboe@redhat.com (Josh Poimboeuf)
-Date: Fri, 26 Oct 2018 10:37:04 -0500
-Subject: [PATCH v4 3/3] arm64: reliable stacktraces
-In-Reply-To: <20181026142157.B8FAA68C97@newverein.lst.de>
-References: <20181026142008.D922868C94@newverein.lst.de>
- <20181026142157.B8FAA68C97@newverein.lst.de>
-Message-ID: <20181026153704.7g34j3gtlklepyvb@treble>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Fri, 26 Oct 2018 20:13:43 +0530
+Subject: [PATCH v3 24/25] [DO NOT MERGE] arm64: dts: allwinner: bananapi-m64:
+ Bananapi S070WV20-CT16 DSI panel
+In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+Message-ID: <20181026144344.27778-25-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 04:21:57PM +0200, Torsten Duwe wrote:
-> Enhance the stack unwinder so that it reports whether it had to stop
-> normally or due to an error condition; unwind_frame() will report
-> continue/error/normal ending and walk_stackframe() will pass that
-> info. __save_stack_trace() is used to check the validity of a stack;
-> save_stack_trace_tsk_reliable() can now trivially be implemented.
-> Modify arch/arm64/kernel/time.c as the only external caller so far
-> to recognise the new semantics.
-> 
-> I had to introduce a marker symbol kthread_return_to_user to tell
-> the normal origin of a kernel thread.
-> 
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
+This patch add support for Bananapi S070WV20-CT16 DSI panel to
+BPI-M64 board.
 
-I haven't looked at the code, but the commit log doesn't inspire much
-confidence.  It's missing everything I previously asked for in the
-powerpc version.
+DSI panel connected via board DSI port with,
+- DC1SW as AVDD supply
+- DCDC1 as DVDD supply
+- PD6 gpio for reset pin
+- PD5 gpio for backlight enable pin
+- PD7 gpio for backlight vdd supply
 
-There's zero mention of objtool.  What analysis was done to indicate
-that we can rely on frame pointers?
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Tested-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v2:
+- remove unit address 0
+- add nodes in alphabetical order
+- Use backlight instead of backlight_dsi
+- add tested credit
+Changes for v2:
+- Use quadratic rule on pwm brightness
 
-Such a frame pointer analysis should be included in the commit log.  It
-should describe *at least* the following:
+ .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 42 +++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-- whether inline asm statements with call/branch instructions will
-  confuse GCC into skipping the frame pointer setup if it considers the
-  function to be a leaf function;
-
-- whether hand-coded non-leaf assembly functions can accidentally omit
-  the frame pointer prologue setup;
-
-- whether GCC can generally be relied upon to get arm64 frame pointers
-  right, in both normal operation and edge cases.
-
-
-The commit log should also describe whether the unwinder itself can be
-considered reliable for all edge cases:
-
-- detection and reporting of preemption and page faults;
-
-- detection and recovery from function graph tracing;
-
-- detection and reporting of other unexpected conditions,
-  including when the unwinder doesn't reach the end of the stack.
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index ef1c90401bb2..6cb010e3bbd9 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -45,6 +45,7 @@
+ #include "sun50i-a64.dtsi"
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pwm/pwm.h>
+ 
+ / {
+ 	model = "BananaPi-M64";
+@@ -56,6 +57,15 @@
+ 		serial1 = &uart1;
+ 	};
+ 
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&r_pwm 0 50000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <1 2 4 8 16 32 64 128 512>;
++		default-brightness-level = <2>;
++		enable-gpios = <&pio 3 5 GPIO_ACTIVE_HIGH>; /* LCD-BL-EN: PD5 */
++		power-supply = <&reg_vdd_backlight>;
++	};
++
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
+@@ -91,6 +101,15 @@
+ 		};
+ 	};
+ 
++	reg_vdd_backlight: vdd-backlight {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd-backlight";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pio 3 7 GPIO_ACTIVE_HIGH>; /* LCD-PWR-EN: PD7 */
++		enable-active-high;
++	};
++
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+@@ -101,6 +120,23 @@
+ 	status = "okay";
+ };
+ 
++&dphy {
++	status = "okay";
++};
++
++&dsi {
++	status = "okay";
++
++	panel at 0 {
++		compatible = "bananapi,s070wv20-ct16-icn6211";
++		reg = <0>;
++		avdd-supply = <&reg_dc1sw>;
++		dvdd-supply = <&reg_dldo1>;
++		reset-gpios = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* LCD-RST: PD6 */
++		backlight = <&backlight>;
++	};
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -193,6 +229,12 @@
+ 	status = "okay";
+ };
+ 
++&r_pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r_pwm_pin>;
++	status = "okay";
++};
++
+ &r_rsb {
+ 	status = "okay";
+ 
 -- 
-Josh
+2.18.0.321.gffc6fa0e3
