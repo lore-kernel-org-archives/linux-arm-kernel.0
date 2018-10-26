@@ -1,13 +1,13 @@
 From: peng.ma@nxp.com (Peng Ma)
-Date: Fri, 26 Oct 2018 17:52:37 +0800
-Subject: [PATCH 4/7] arm: dts: ls1021a: add qdma device tree nodes
+Date: Fri, 26 Oct 2018 17:52:38 +0800
+Subject: [PATCH 5/7] arm64: dts: ls1043a: add qdma device tree nodes
 In-Reply-To: <20181026095240.33668-1-peng.ma@nxp.com>
 References: <20181026095240.33668-1-peng.ma@nxp.com>
-Message-ID: <20181026095240.33668-4-peng.ma@nxp.com>
+Message-ID: <20181026095240.33668-5-peng.ma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add the qDMA device tree nodes for LS1021A devices.
+add the qDMA device tree nodes for LS1043A devices.
 
 Signed-off-by: Wen He <wen.he_1@nxp.com>
 Signed-off-by: Peng Ma <peng.ma@nxp.com>
@@ -15,31 +15,33 @@ Signed-off-by: Peng Ma <peng.ma@nxp.com>
 change in v10:
 	- no
 
- arch/arm/boot/dts/ls1021a.dtsi |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index f184905..c0ed6be 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -806,5 +806,25 @@
- 			#size-cells = <1>;
- 			ranges = <0x0 0x0 0x10010000 0x10000>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 7881e3d..d560141 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -734,6 +734,28 @@
+ 					<0000 0 0 3 &gic 0 156 0x4>,
+ 					<0000 0 0 4 &gic 0 157 0x4>;
  		};
 +
-+		qdma: dma-controller at 8390000 {
-+			compatible = "fsl,ls1021a-qdma";
-+			reg = <0x0 0x8388000 0x0 0x1000>, /* Controller regs */
-+			      <0x0 0x8389000 0x0 0x1000>, /* Status regs */
-+			      <0x0 0x838a000 0x0 0x2000>; /* Block regs */
-+			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "qdma-error",
-+				"qdma-queue0", "qdma-queue1";
++		qdma: dma-controller at 8380000 {
++			compatible = "fsl,ls1021a-qdma", "fsl,ls1043a-qdma";
++			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
++			      <0x0 0x8390000 0x0 0x10000>, /* Status regs */
++			      <0x0 0x83a0000 0x0 0x40000>; /* Block regs */
++			interrupts = <0 153 0x4>,
++				     <0 39 0x4>,
++				     <0 40 0x4>,
++				     <0 41 0x4>,
++				     <0 42 0x4>;
++			interrupt-names = "qdma-error", "qdma-queue0",
++				"qdma-queue1", "qdma-queue2", "qdma-queue3";
 +			dma-channels = <8>;
 +			block-number = <1>;
-+			block-offset = <0x1000>;
++			block-offset = <0x10000>;
 +			fsl,dma-queues = <2>;
 +			status-sizes = <64>;
 +			queue-sizes = <64 64>;
@@ -47,6 +49,7 @@ index f184905..c0ed6be 100644
 +		};
 +
  	};
- };
+ 
+ 	firmware {
 -- 
 1.7.1
