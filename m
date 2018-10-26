@@ -1,42 +1,52 @@
-From: qiangqing.zhang@nxp.com (Joakim Zhang)
-Date: Fri, 26 Oct 2018 09:47:14 +0000
-Subject: [PATCH V2 4/4] ARM: dts: imx7s: Add flexcan stop mode wakeup support
-In-Reply-To: <20181026094444.25305-1-qiangqing.zhang@nxp.com>
-References: <20181026094444.25305-1-qiangqing.zhang@nxp.com>
-Message-ID: <20181026094444.25305-5-qiangqing.zhang@nxp.com>
+From: peng.ma@nxp.com (Peng Ma)
+Date: Fri, 26 Oct 2018 17:52:37 +0800
+Subject: [PATCH 4/7] arm: dts: ls1021a: add qdma device tree nodes
+In-Reply-To: <20181026095240.33668-1-peng.ma@nxp.com>
+References: <20181026095240.33668-1-peng.ma@nxp.com>
+Message-ID: <20181026095240.33668-4-peng.ma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <aisheng.dong@nxp.com>
+add the qDMA device tree nodes for LS1021A devices.
 
-Add stop-mode property which is required by stop mode wakeup
-feature.
-
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
+Signed-off-by: Wen He <wen.he_1@nxp.com>
+Signed-off-by: Peng Ma <peng.ma@nxp.com>
 ---
- arch/arm/boot/dts/imx7s.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+change in v10:
+	- no
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index aa8df7d93b2e..25571f31016c 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -875,6 +875,7 @@
- 				clocks = <&clks IMX7D_CLK_DUMMY>,
- 					<&clks IMX7D_CAN1_ROOT_CLK>;
- 				clock-names = "ipg", "per";
-+				fsl,stop-mode = <&gpr 0x10 1 0x10 17>;
- 				status = "disabled";
- 			};
- 
-@@ -885,6 +886,7 @@
- 				clocks = <&clks IMX7D_CLK_DUMMY>,
- 					<&clks IMX7D_CAN2_ROOT_CLK>;
- 				clock-names = "ipg", "per";
-+				fsl,stop-mode = <&gpr 0x10 2 0x10 18>;
- 				status = "disabled";
- 			};
- 
+ arch/arm/boot/dts/ls1021a.dtsi |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index f184905..c0ed6be 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -806,5 +806,25 @@
+ 			#size-cells = <1>;
+ 			ranges = <0x0 0x0 0x10010000 0x10000>;
+ 		};
++
++		qdma: dma-controller at 8390000 {
++			compatible = "fsl,ls1021a-qdma";
++			reg = <0x0 0x8388000 0x0 0x1000>, /* Controller regs */
++			      <0x0 0x8389000 0x0 0x1000>, /* Status regs */
++			      <0x0 0x838a000 0x0 0x2000>; /* Block regs */
++			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "qdma-error",
++				"qdma-queue0", "qdma-queue1";
++			dma-channels = <8>;
++			block-number = <1>;
++			block-offset = <0x1000>;
++			fsl,dma-queues = <2>;
++			status-sizes = <64>;
++			queue-sizes = <64 64>;
++			big-endian;
++		};
++
+ 	};
+ };
 -- 
-2.17.1
+1.7.1
