@@ -1,84 +1,31 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Fri, 26 Oct 2018 09:12:09 +0900
-Subject: [PATCH] spi: uniphier: fix incorrect property items
-In-Reply-To: <20181025195906.GA22391@bogus>
-References: <1540373669-18969-1-git-send-email-hayashibara.keiji@socionext.com>
- <20181025195906.GA22391@bogus>
-Message-ID: <000c01d46cc0$89d0a520$9d71ef60$@socionext.com>
+From: sudaraja@codeaurora.org (Sudarshan Rajagopalan)
+Date: Thu, 25 Oct 2018 17:14:36 -0700
+Subject: [PATCH] arm64: Log the Fault Status Code (FSC) upon memory aborts
+Message-ID: <1540512876-12011-1-git-send-email-sudaraja@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+When decoding the information from ESR on mem faults, log the
+FSC value, which is commonly shared for Data and Instruction aborts.
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Friday, October 26, 2018 4:59 AM
-> To: Hayashibara, Keiji/?? ?? <hayashibara.keiji@socionext.com>
-> Cc: broonie at kernel.org; mark.rutland at arm.com; Yamada, Masahiro/?? ?? <yamada.masahiro@socionext.com>;
-> linux-spi at vger.kernel.org; linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> stable at vger.kernel.org; masami.hiramatsu at linaro.org; jaswinder.singh at linaro.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH] spi: uniphier: fix incorrect property items
-> 
-> On Wed, Oct 24, 2018 at 06:34:29PM +0900, Keiji Hayashibara wrote:
-> > This commit fixes incorrect property because it was different from the
-> > actual.
-> > The parameters of '#address-cells' and '#size-cells' were removed, and
-> > 'interrupts', 'pinctrl-names' and 'pinctrl-0' were added.
-> >
-> > Fixes: 4dcd5c2781f3 ("spi: add DT bindings for UniPhier SPI
-> > controller")
-> > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> > ---
-> >  Documentation/devicetree/bindings/spi/spi-uniphier.txt | 14
-> > ++++++++------
-> >  1 file changed, 8 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-> > b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-> > index 504a4ec..b04e66a 100644
-> > --- a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-> > +++ b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
-> > @@ -5,18 +5,20 @@ UniPhier SoCs have SCSSI which supports SPI single channel.
-> >  Required properties:
-> >   - compatible: should be "socionext,uniphier-scssi"
-> >   - reg: address and length of the spi master registers
-> > - - #address-cells: must be <1>, see spi-bus.txt
-> > - - #size-cells: must be <0>, see spi-bus.txt
-> 
-> How is removing these correct? They are needed if you have any child devices.
-
-They are necessary when the child device is connected.
-I removed it because it was specified in spi-bus.txt,
-but I will leave them in next patch.
-
-> 
-> > - - clocks: A phandle to the clock for the device.
-> > - - resets: A phandle to the reset control for the device.
-> > + - interrupts: a single interrupt specifier
-> > + - pinctrl-names: should be "default"
-> > + - pinctrl-0: pin control state for the default mode
-> > + - clocks: a phandle to the clock for the device
-> > + - resets: a phandle to the reset control for the device
-> >
-> >  Example:
-> >
-> >  spi0: spi at 54006000 {
-> >  	compatible = "socionext,uniphier-scssi";
-> >  	reg = <0x54006000 0x100>;
-> > -	#address-cells = <1>;
-> > -	#size-cells = <0>;
-> > +	interrupts = <0 39 4>;
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_spi0>;
-> >  	clocks = <&peri_clk 11>;
-> >  	resets = <&peri_rst 11>;
-> >  };
-> > --
-> > 2.7.4
-> >
-
-Thank you.
-
+Change-Id: If7d7f6027958864d99dfb7e79d368e82415dce97
+Signed-off-by: Sudarshan Rajagopalan <sudaraja@codeaurora.org>
 ---
-Best Regards,
-Keiji Hayashibara
+ arch/arm64/mm/fault.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index b8eecc7..e9d07ab 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -120,6 +120,7 @@ static void mem_abort_decode(unsigned int esr)
+ 	pr_alert("  EA = %lu, S1PTW = %lu\n",
+ 		 (esr & ESR_ELx_EA) >> ESR_ELx_EA_SHIFT,
+ 		 (esr & ESR_ELx_S1PTW) >> ESR_ELx_S1PTW_SHIFT);
++	pr_alert("  FSC = %lu\n", (esr & ESR_ELx_FSC));
+ 
+ 	if (esr_is_data_abort(esr))
+ 		data_abort_decode(esr);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
