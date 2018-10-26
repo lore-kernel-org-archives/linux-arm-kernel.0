@@ -1,38 +1,102 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Fri, 26 Oct 2018 15:15:32 -0500
-Subject: [PATCH] arm64: dts: stratix10: Correct System Manager register
- size
-In-Reply-To: <1537889512-586-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1537889512-586-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <ecd3e018-758a-3fd6-3524-379f84b67030@linux.intel.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Sat, 27 Oct 2018 01:49:41 +0530
+Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
+ Aggregator driver
+In-Reply-To: <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <20181018154017.7112-10-lokeshvutla@ti.com>
+ <b20127dc-be43-3b00-9960-663738df0069@arm.com>
+ <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
+ <86va5ssrfm.wl-marc.zyngier@arm.com>
+ <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
+Message-ID: <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle ping...
+Hi Marc,
 
-On 9/25/18 10:31 AM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+[..snip..]
+>> [...]
+>>
+>>>>> +/**
+>>>>> + * ti_sci_inta_register_event() - Register a event to an interrupt aggregator
+>>>>> + * @dev:	Device pointer to source generating the event
+>>>>> + * @src_id:	TISCI device ID of the event source
+>>>>> + * @src_index:	Event source index within the device.
+>>>>> + * @virq:	Linux Virtual IRQ number
+>>>>> + * @flags:	Corresponding IRQ flags
+>>>>> + * @ack_needed:	If explicit clearing of event is required.
+>>>>> + *
+>>>>> + * Creates a new irq and attaches to IA domain if virq is not specified
+>>>>> + * else attaches the event to vint corresponding to virq.
+>>>>> + * When using TISCI within the client drivers, source indexes are always
+>>>>> + * generated dynamically and cannot be represented in DT. So client
+>>>>> + * drivers should call this API instead of platform_get_irq().
+>>>>
+>>>> NAK. Either this fits in the standard model, or we adapt the standard
+>>>> model to catter for your particular use case. But we don't define a new,
+>>>> TI specific API.
+>>>>
+>>>> I have a hunch that if the IDs are generated dynamically, then the model
+>>>> we use for MSIs would fit this thing. I also want to understand what
+>>>
+>>> hmm..I haven't thought about using MSI. Will try to explore it. But
+>>> the "struct msi_msg" is not applicable in this case as device does not
+>>> write to a specific location.
+>>
+>> It doesn't need to. You can perfectly ignore the address field and
+>> only be concerned with the data. We already have MSI users that do not
+>> need programming of the doorbell address, just the data.
 > 
-> Correct the register size of the System Manager node.
-> 
-> Cc: stable at vger.kernel.org
-> Fixes: 78cd6a9d8e154 ("arm64: dts: Add base stratix 10 dtsi")
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->   arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> index 67dac595dc72..3989876ab699 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> @@ -327,7 +327,7 @@
->   
->   		sysmgr: sysmgr at ffd12000 {
->   			compatible = "altr,sys-mgr", "syscon";
-> -			reg = <0xffd12000 0x1000>;
-> +			reg = <0xffd12000 0x228>;
->   		};
->   
->   		/* Local timer */
-> 
+
+Just one more clarification.
+
+First let me explain the IRQ routes a bit deeply. As I said earlier there are 
+three ways in which IRQ can flow in AM65x SoC
+1) Device directly connected to GIC
+	- Device IRQ --> GIC
+2) Device connected to INTR.
+	- Device IRQ --> INTR --> GIC
+3) Devices connected to INTA.
+	- Device IRQ --> INTA --> INTR --> GIC
+
+1 and 2 are straight forward and we use DT for IRQ representation. Coming to 3 
+the trickier part is that Input to INTA and output from INTA and dynamically 
+managed. To be more specific:
+- By hardware design there are certain set of physical global events(interrupts) 
+attached to an INTA. Out of which a certain range are assigned to the current 
+linux host that can be queried from system-controller.
+- Similarly out of all the INTA outputs(referenced as vints) a certain range can 
+be used by the current linux host.
+
+
+So for configuring an IRQ route in case 3, the following steps are needed:
+- Device id and device resource index for which the interrupt is needed
+- A free event id from the range assigned to the INTA in this host context
+- A free vint from the range assigned to the INTA in this host context
+- A free gic IRQ from the range assigned to the INTR in this host context.
+
+With the above information, linux should send a message to system-controller 
+using TISCI protocol. After policing the given information, system-controller 
+does the following:
+- Attaches the interrupt(INTA input) to the device resource index
+- Muxes the interrupt(INTA input) to corresponding vint(INTA output)
+- Muxes the vint(INTR input) to GIC irq(INTR output).
+
+For grouping of interrupts, the same vint number is to be passed to 
+system-controller for all the requests.
+
+Keeping all the above in mind, I see the following as software IRQ Domain Hierarchy:
+
+1) INTA multi MSI --> 2)INTA  -->3) MSI --> 4) INTR  -->5) GIC
+
+INTA driver has to set a chained IRQ using virq allocated from its parent MSI. 
+This is to differentiate the grouped interrupts within INTA.
+
+Inorder to cover the above two MSI domains, a new bus driver has to be created 
+as I couldn't find a fit with the existing bus drivers.
+
+Does the above approach make sense? Please correct me if i am wrong.
+
+Thanks and regards,
+Lokesh
