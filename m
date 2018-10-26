@@ -1,1330 +1,509 @@
-From: peng.ma@nxp.com (Peng Ma)
-Date: Fri, 26 Oct 2018 17:52:36 +0800
-Subject: [PATCH 3/7] dmaengine: fsl-qdma: Add qDMA controller driver for
- Layerscape SoCs
-In-Reply-To: <20181026095240.33668-1-peng.ma@nxp.com>
-References: <20181026095240.33668-1-peng.ma@nxp.com>
-Message-ID: <20181026095240.33668-3-peng.ma@nxp.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 26 Oct 2018 12:21:56 +0200
+Subject: [PATCH 3/3] drm/mediatek: Use drm_gem_cma_object instead of
+ mtk_drm_gem_obj
+In-Reply-To: <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
+References: <1540538523-1973-1-git-send-email-ck.hu@mediatek.com>
+ <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
+Message-ID: <20181026102156.GH21967@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NXP Queue DMA controller(qDMA) on Layerscape SoCs supports channel
-virtuallization by allowing DMA jobs to be enqueued into different
-command queues.
+On Fri, Oct 26, 2018 at 03:22:03PM +0800, CK Hu wrote:
+> After adding dma_dev in struct drm_device and
+> drm_gem_cma_dumb_create_no_kmap(), drm_gem_cma_object could replace
+> mtk_drm_gem_obj, so use drm_gem_cma_object instead of mtk_drm_gem_obj to
+> reduce redundant code.
+> 
+> Signed-off-by: CK Hu <ck.hu@mediatek.com>
 
-Note that this module depends on NXP DPAA.
+A few questions/thoughts:
 
-Signed-off-by: Wen He <wen.he_1@nxp.com>
-Signed-off-by: Jiaheng Fan <jiaheng.fan@nxp.com>
-Signed-off-by: Peng Ma <peng.ma@nxp.com>
----
-change in v10:
-	- no
+- Why do you need both drm_device->dev and drm_device->dma_dev? Can't you
+  just register the drm_device with the right struct device?
 
- drivers/dma/Kconfig    |   13 +
- drivers/dma/Makefile   |    1 +
- drivers/dma/fsl-qdma.c | 1257 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 1271 insertions(+), 0 deletions(-)
- create mode 100644 drivers/dma/fsl-qdma.c
+- You don't use drm_gem_prime_import_dev, so prime import isn't using the
+  right device either.
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index dacf3f4..50e19d7 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -218,6 +218,19 @@ config FSL_EDMA
- 	  multiplexing capability for DMA request sources(slot).
- 	  This module can be found on Freescale Vybrid and LS-1 SoCs.
- 
-+config FSL_QDMA
-+       tristate "NXP Layerscape qDMA engine support"
-+       depends on ARM || ARM64
-+       select DMA_ENGINE
-+       select DMA_VIRTUAL_CHANNELS
-+       select DMA_ENGINE_RAID
-+       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
-+       help
-+         Support the NXP Layerscape qDMA engine with command queue and legacy mode.
-+         Channel virtualization is supported through enqueuing of DMA jobs to,
-+         or dequeuing DMA jobs from, different work queues.
-+         This module can be found on NXP Layerscape SoCs.
-+
- config FSL_RAID
-         tristate "Freescale RAID engine Support"
-         depends on FSL_SOC && !ASYNC_TX_ENABLE_CHANNEL_SWITCH
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index c91702d..2d1b586 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -32,6 +32,7 @@ obj-$(CONFIG_DW_DMAC_CORE) += dw/
- obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
- obj-$(CONFIG_FSL_DMA) += fsldma.o
- obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
-+obj-$(CONFIG_FSL_QDMA) += fsl-qdma.o
- obj-$(CONFIG_FSL_RAID) += fsl_raid.o
- obj-$(CONFIG_HSU_DMA) += hsu/
- obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
-diff --git a/drivers/dma/fsl-qdma.c b/drivers/dma/fsl-qdma.c
-new file mode 100644
-index 0000000..404869e
---- /dev/null
-+++ b/drivers/dma/fsl-qdma.c
-@@ -0,0 +1,1257 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright 2018 NXP
-+
-+/*
-+ * Driver for NXP Layerscape Queue Direct Memory Access Controller
-+ *
-+ * Author:
-+ *  Wen He <wen.he_1@nxp.com>
-+ *  Jiaheng Fan <jiaheng.fan@nxp.com>
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/delay.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_dma.h>
-+#include <linux/dma-mapping.h>
-+
-+#include "virt-dma.h"
-+#include "fsldma.h"
-+
-+/* Register related definition */
-+#define FSL_QDMA_DMR			0x0
-+#define FSL_QDMA_DSR			0x4
-+#define FSL_QDMA_DEIER			0xe00
-+#define FSL_QDMA_DEDR			0xe04
-+#define FSL_QDMA_DECFDW0R		0xe10
-+#define FSL_QDMA_DECFDW1R		0xe14
-+#define FSL_QDMA_DECFDW2R		0xe18
-+#define FSL_QDMA_DECFDW3R		0xe1c
-+#define FSL_QDMA_DECFQIDR		0xe30
-+#define FSL_QDMA_DECBR			0xe34
-+
-+#define FSL_QDMA_BCQMR(x)		(0xc0 + 0x100 * (x))
-+#define FSL_QDMA_BCQSR(x)		(0xc4 + 0x100 * (x))
-+#define FSL_QDMA_BCQEDPA_SADDR(x)	(0xc8 + 0x100 * (x))
-+#define FSL_QDMA_BCQDPA_SADDR(x)	(0xcc + 0x100 * (x))
-+#define FSL_QDMA_BCQEEPA_SADDR(x)	(0xd0 + 0x100 * (x))
-+#define FSL_QDMA_BCQEPA_SADDR(x)	(0xd4 + 0x100 * (x))
-+#define FSL_QDMA_BCQIER(x)		(0xe0 + 0x100 * (x))
-+#define FSL_QDMA_BCQIDR(x)		(0xe4 + 0x100 * (x))
-+
-+#define FSL_QDMA_SQDPAR			0x80c
-+#define FSL_QDMA_SQEPAR			0x814
-+#define FSL_QDMA_BSQMR			0x800
-+#define FSL_QDMA_BSQSR			0x804
-+#define FSL_QDMA_BSQICR			0x828
-+#define FSL_QDMA_CQMR			0xa00
-+#define FSL_QDMA_CQDSCR1		0xa08
-+#define FSL_QDMA_CQDSCR2                0xa0c
-+#define FSL_QDMA_CQIER			0xa10
-+#define FSL_QDMA_CQEDR			0xa14
-+#define FSL_QDMA_SQCCMR			0xa20
-+
-+/* Registers for bit and genmask */
-+#define FSL_QDMA_CQIDR_SQT		BIT(15)
-+#define QDMA_CCDF_FOTMAT		BIT(29)
-+#define QDMA_CCDF_SER			BIT(30)
-+#define QDMA_SG_FIN			BIT(30)
-+#define QDMA_SG_LEN_MASK		GENMASK(29, 0)
-+#define QDMA_CCDF_MASK			GENMASK(28, 20)
-+
-+#define FSL_QDMA_DEDR_CLEAR		GENMASK(31, 0)
-+#define FSL_QDMA_BCQIDR_CLEAR		GENMASK(31, 0)
-+#define FSL_QDMA_DEIER_CLEAR		GENMASK(31, 0)
-+
-+#define FSL_QDMA_BCQIER_CQTIE		BIT(15)
-+#define FSL_QDMA_BCQIER_CQPEIE		BIT(23)
-+#define FSL_QDMA_BSQICR_ICEN		BIT(31)
-+
-+#define FSL_QDMA_BSQICR_ICST(x)		((x) << 16)
-+#define FSL_QDMA_CQIER_MEIE		BIT(31)
-+#define FSL_QDMA_CQIER_TEIE		BIT(0)
-+#define FSL_QDMA_SQCCMR_ENTER_WM	BIT(21)
-+
-+#define FSL_QDMA_BCQMR_EN		BIT(31)
-+#define FSL_QDMA_BCQMR_EI		BIT(30)
-+#define FSL_QDMA_BCQMR_CD_THLD(x)	((x) << 20)
-+#define FSL_QDMA_BCQMR_CQ_SIZE(x)	((x) << 16)
-+
-+#define FSL_QDMA_BCQSR_QF		BIT(16)
-+#define FSL_QDMA_BCQSR_XOFF		BIT(0)
-+
-+#define FSL_QDMA_BSQMR_EN		BIT(31)
-+#define FSL_QDMA_BSQMR_DI		BIT(30)
-+#define FSL_QDMA_BSQMR_CQ_SIZE(x)	((x) << 16)
-+
-+#define FSL_QDMA_BSQSR_QE		BIT(17)
-+
-+#define FSL_QDMA_DMR_DQD		BIT(30)
-+#define FSL_QDMA_DSR_DB		BIT(31)
-+
-+/* Size related definition */
-+#define FSL_QDMA_QUEUE_MAX		8
-+#define FSL_QDMA_COMMAND_BUFFER_SIZE	64
-+#define FSL_QDMA_DESCRIPTOR_BUFFER_SIZE 32
-+#define FSL_QDMA_CIRCULAR_DESC_SIZE_MIN	64
-+#define FSL_QDMA_CIRCULAR_DESC_SIZE_MAX	16384
-+#define FSL_QDMA_QUEUE_NUM_MAX		8
-+
-+/* Field definition for CMD */
-+#define FSL_QDMA_CMD_RWTTYPE		0x4
-+#define FSL_QDMA_CMD_LWC                0x2
-+#define FSL_QDMA_CMD_RWTTYPE_OFFSET	28
-+#define FSL_QDMA_CMD_NS_OFFSET		27
-+#define FSL_QDMA_CMD_DQOS_OFFSET	24
-+#define FSL_QDMA_CMD_WTHROTL_OFFSET	20
-+#define FSL_QDMA_CMD_DSEN_OFFSET	19
-+#define FSL_QDMA_CMD_LWC_OFFSET		16
-+
-+/* Field definition for Descriptor offset */
-+#define QDMA_CCDF_STATUS		20
-+#define QDMA_CCDF_OFFSET		20
-+
-+/* Field definition for safe loop count*/
-+#define FSL_QDMA_HALT_COUNT		1500
-+#define FSL_QDMA_MAX_SIZE		16385
-+#define	FSL_QDMA_COMP_TIMEOUT		1000
-+#define FSL_COMMAND_QUEUE_OVERFLLOW	10
-+
-+#define FSL_QDMA_BLOCK_BASE_OFFSET(fsl_qdma_engine, x)			\
-+	(((fsl_qdma_engine)->block_offset) * (x))
-+
-+/**
-+ * struct fsl_qdma_format - This is the struct holding describing compound
-+ *			    descriptor format with qDMA.
-+ * @status:		    Command status and enqueue status notification.
-+ * @cfg:		    Frame offset and frame format.
-+ * @addr_lo:		    Holding the compound descriptor of the lower
-+ *			    32-bits address in memory 40-bit address.
-+ * @addr_hi:		    Same as above member, but point high 8-bits in
-+ *			    memory 40-bit address.
-+ * @__reserved1:	    Reserved field.
-+ * @cfg8b_w1:		    Compound descriptor command queue origin produced
-+ *			    by qDMA and dynamic debug field.
-+ * @data		    Pointer to the memory 40-bit address, describes DMA
-+ *			    source information and DMA destination information.
-+ */
-+struct fsl_qdma_format {
-+	__le32 status;
-+	__le32 cfg;
-+	union {
-+		struct {
-+			__le32 addr_lo;
-+			u8 addr_hi;
-+			u8 __reserved1[2];
-+			u8 cfg8b_w1;
-+		} __packed;
-+		__le64 data;
-+	};
-+} __packed;
-+
-+/* qDMA status notification pre information */
-+struct fsl_pre_status {
-+	u64 addr;
-+	u8 queue;
-+};
-+
-+static DEFINE_PER_CPU(struct fsl_pre_status, pre);
-+
-+struct fsl_qdma_chan {
-+	struct virt_dma_chan		vchan;
-+	struct virt_dma_desc		vdesc;
-+	enum dma_status			status;
-+	struct fsl_qdma_engine		*qdma;
-+	struct fsl_qdma_queue		*queue;
-+};
-+
-+struct fsl_qdma_queue {
-+	struct fsl_qdma_format	*virt_head;
-+	struct fsl_qdma_format	*virt_tail;
-+	struct list_head	comp_used;
-+	struct list_head	comp_free;
-+	struct dma_pool		*comp_pool;
-+	struct dma_pool		*desc_pool;
-+	spinlock_t		queue_lock;
-+	dma_addr_t		bus_addr;
-+	u32                     n_cq;
-+	u32			id;
-+	struct fsl_qdma_format	*cq;
-+	void __iomem		*block_base;
-+};
-+
-+struct fsl_qdma_comp {
-+	dma_addr_t              bus_addr;
-+	dma_addr_t              desc_bus_addr;
-+	struct fsl_qdma_format	*virt_addr;
-+	struct fsl_qdma_format	*desc_virt_addr;
-+	struct fsl_qdma_chan	*qchan;
-+	struct virt_dma_desc    vdesc;
-+	struct list_head	list;
-+};
-+
-+struct fsl_qdma_engine {
-+	struct dma_device	dma_dev;
-+	void __iomem		*ctrl_base;
-+	void __iomem            *status_base;
-+	void __iomem		*block_base;
-+	u32			n_chans;
-+	u32			n_queues;
-+	struct mutex            fsl_qdma_mutex;
-+	int			error_irq;
-+	int			*queue_irq;
-+	u32			feature;
-+	struct fsl_qdma_queue	*queue;
-+	struct fsl_qdma_queue	**status;
-+	struct fsl_qdma_chan	*chans;
-+	int			block_number;
-+	int			block_offset;
-+	int			irq_base;
-+	int			desc_allocated;
-+
-+};
-+
-+static inline u64
-+qdma_ccdf_addr_get64(const struct fsl_qdma_format *ccdf)
-+{
-+	return le64_to_cpu(ccdf->data) & (U64_MAX >> 24);
-+}
-+
-+static inline void
-+qdma_desc_addr_set64(struct fsl_qdma_format *ccdf, u64 addr)
-+{
-+	ccdf->addr_hi = upper_32_bits(addr);
-+	ccdf->addr_lo = cpu_to_le32(lower_32_bits(addr));
-+}
-+
-+static inline u8
-+qdma_ccdf_get_queue(const struct fsl_qdma_format *ccdf)
-+{
-+	return ccdf->cfg8b_w1 & U8_MAX;
-+}
-+
-+static inline int
-+qdma_ccdf_get_offset(const struct fsl_qdma_format *ccdf)
-+{
-+	return (le32_to_cpu(ccdf->cfg) & QDMA_CCDF_MASK) >> QDMA_CCDF_OFFSET;
-+}
-+
-+static inline void
-+qdma_ccdf_set_format(struct fsl_qdma_format *ccdf, int offset)
-+{
-+	ccdf->cfg = cpu_to_le32(QDMA_CCDF_FOTMAT | offset);
-+}
-+
-+static inline int
-+qdma_ccdf_get_status(const struct fsl_qdma_format *ccdf)
-+{
-+	return (le32_to_cpu(ccdf->status) & QDMA_CCDF_MASK) >> QDMA_CCDF_STATUS;
-+}
-+
-+static inline void
-+qdma_ccdf_set_ser(struct fsl_qdma_format *ccdf, int status)
-+{
-+	ccdf->status = cpu_to_le32(QDMA_CCDF_SER | status);
-+}
-+
-+static inline void qdma_csgf_set_len(struct fsl_qdma_format *csgf, int len)
-+{
-+	csgf->cfg = cpu_to_le32(len & QDMA_SG_LEN_MASK);
-+}
-+
-+static inline void qdma_csgf_set_f(struct fsl_qdma_format *csgf, int len)
-+{
-+	csgf->cfg = cpu_to_le32(QDMA_SG_FIN | (len & QDMA_SG_LEN_MASK));
-+}
-+
-+static u32 qdma_readl(struct fsl_qdma_engine *qdma, void __iomem *addr)
-+{
-+	return FSL_DMA_IN(qdma, addr, 32);
-+}
-+
-+static void qdma_writel(struct fsl_qdma_engine *qdma, u32 val,
-+			void __iomem *addr)
-+{
-+	FSL_DMA_OUT(qdma, addr, val, 32);
-+}
-+
-+static struct fsl_qdma_chan *to_fsl_qdma_chan(struct dma_chan *chan)
-+{
-+	return container_of(chan, struct fsl_qdma_chan, vchan.chan);
-+}
-+
-+static struct fsl_qdma_comp *to_fsl_qdma_comp(struct virt_dma_desc *vd)
-+{
-+	return container_of(vd, struct fsl_qdma_comp, vdesc);
-+}
-+
-+static void fsl_qdma_free_chan_resources(struct dma_chan *chan)
-+{
-+	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
-+	struct fsl_qdma_queue *fsl_queue = fsl_chan->queue;
-+	struct fsl_qdma_engine *fsl_qdma = fsl_chan->qdma;
-+	struct fsl_qdma_comp *comp_temp, *_comp_temp;
-+	unsigned long flags;
-+	LIST_HEAD(head);
-+
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+
-+	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-+
-+	if (!fsl_queue->comp_pool && !fsl_queue->comp_pool)
-+		return;
-+
-+	list_for_each_entry_safe(comp_temp, _comp_temp,
-+				 &fsl_queue->comp_used,	list) {
-+		dma_pool_free(fsl_queue->comp_pool,
-+			      comp_temp->virt_addr,
-+			      comp_temp->bus_addr);
-+		dma_pool_free(fsl_queue->desc_pool,
-+			      comp_temp->desc_virt_addr,
-+			      comp_temp->desc_bus_addr);
-+		list_del(&comp_temp->list);
-+		kfree(comp_temp);
-+	}
-+
-+	list_for_each_entry_safe(comp_temp, _comp_temp,
-+				 &fsl_queue->comp_free, list) {
-+		dma_pool_free(fsl_queue->comp_pool,
-+			      comp_temp->virt_addr,
-+			      comp_temp->bus_addr);
-+		dma_pool_free(fsl_queue->desc_pool,
-+			      comp_temp->desc_virt_addr,
-+			      comp_temp->desc_bus_addr);
-+		list_del(&comp_temp->list);
-+		kfree(comp_temp);
-+	}
-+
-+	dma_pool_destroy(fsl_queue->comp_pool);
-+	dma_pool_destroy(fsl_queue->desc_pool);
-+
-+	fsl_qdma->desc_allocated--;
-+	fsl_queue->comp_pool = NULL;
-+	fsl_queue->desc_pool = NULL;
-+}
-+
-+static void fsl_qdma_comp_fill_memcpy(struct fsl_qdma_comp *fsl_comp,
-+				      dma_addr_t dst, dma_addr_t src, u32 len)
-+{
-+	struct fsl_qdma_format *sdf, *ddf;
-+	struct fsl_qdma_format *ccdf, *csgf_desc, *csgf_src, *csgf_dest;
-+
-+	ccdf = fsl_comp->virt_addr;
-+	csgf_desc = fsl_comp->virt_addr + 1;
-+	csgf_src = fsl_comp->virt_addr + 2;
-+	csgf_dest = fsl_comp->virt_addr + 3;
-+	sdf = fsl_comp->desc_virt_addr;
-+	ddf = fsl_comp->desc_virt_addr + 1;
-+
-+	memset(fsl_comp->virt_addr, 0, FSL_QDMA_COMMAND_BUFFER_SIZE);
-+	memset(fsl_comp->desc_virt_addr, 0, FSL_QDMA_DESCRIPTOR_BUFFER_SIZE);
-+	/* Head Command Descriptor(Frame Descriptor) */
-+	qdma_desc_addr_set64(ccdf, fsl_comp->bus_addr + 16);
-+	qdma_ccdf_set_format(ccdf, qdma_ccdf_get_offset(ccdf));
-+	qdma_ccdf_set_ser(ccdf, qdma_ccdf_get_status(ccdf));
-+	/* Status notification is enqueued to status queue. */
-+	/* Compound Command Descriptor(Frame List Table) */
-+	qdma_desc_addr_set64(csgf_desc, fsl_comp->desc_bus_addr);
-+	/* It must be 32 as Compound S/G Descriptor */
-+	qdma_csgf_set_len(csgf_desc, 32);
-+	qdma_desc_addr_set64(csgf_src, src);
-+	qdma_csgf_set_len(csgf_src, len);
-+	qdma_desc_addr_set64(csgf_dest, dst);
-+	qdma_csgf_set_len(csgf_dest, len);
-+	/* This entry is the last entry. */
-+	qdma_csgf_set_f(csgf_dest, len);
-+	/* Descriptor Buffer */
-+	sdf->data =
-+		cpu_to_le64(FSL_QDMA_CMD_RWTTYPE <<
-+			    FSL_QDMA_CMD_RWTTYPE_OFFSET);
-+	ddf->data =
-+		cpu_to_le64(FSL_QDMA_CMD_RWTTYPE <<
-+			    FSL_QDMA_CMD_RWTTYPE_OFFSET);
-+	ddf->data |=
-+		cpu_to_le64(FSL_QDMA_CMD_LWC << FSL_QDMA_CMD_LWC_OFFSET);
-+}
-+
-+/*
-+ * Pre-request full command descriptor for enqueue.
-+ */
-+static int fsl_qdma_pre_request_enqueue_desc(struct fsl_qdma_queue *queue)
-+{
-+	int i;
-+	struct fsl_qdma_comp *comp_temp, *_comp_temp;
-+
-+	for (i = 0; i < queue->n_cq + FSL_COMMAND_QUEUE_OVERFLLOW; i++) {
-+		comp_temp = kzalloc(sizeof(*comp_temp), GFP_KERNEL);
-+		if (!comp_temp)
-+			goto err_alloc;
-+		comp_temp->virt_addr =
-+			dma_pool_alloc(queue->comp_pool, GFP_KERNEL,
-+				       &comp_temp->bus_addr);
-+		if (!comp_temp->virt_addr)
-+			goto err_dma_alloc;
-+
-+		comp_temp->desc_virt_addr =
-+			dma_pool_alloc(queue->desc_pool, GFP_KERNEL,
-+				       &comp_temp->desc_bus_addr);
-+		if (!comp_temp->desc_virt_addr)
-+			goto err_desc_dma_alloc;
-+
-+		list_add_tail(&comp_temp->list, &queue->comp_free);
-+	}
-+
-+	return 0;
-+
-+err_desc_dma_alloc:
-+	dma_pool_free(queue->comp_pool, comp_temp->virt_addr,
-+		      comp_temp->bus_addr);
-+
-+err_dma_alloc:
-+	kfree(comp_temp);
-+
-+err_alloc:
-+	list_for_each_entry_safe(comp_temp, _comp_temp,
-+				 &queue->comp_free, list) {
-+		if (comp_temp->virt_addr)
-+			dma_pool_free(queue->comp_pool,
-+				      comp_temp->virt_addr,
-+				      comp_temp->bus_addr);
-+		if (comp_temp->desc_virt_addr)
-+			dma_pool_free(queue->desc_pool,
-+				      comp_temp->desc_virt_addr,
-+				      comp_temp->desc_bus_addr);
-+
-+		list_del(&comp_temp->list);
-+		kfree(comp_temp);
-+	}
-+
-+	return -ENOMEM;
-+}
-+
-+/*
-+ * Request a command descriptor for enqueue.
-+ */
-+static struct fsl_qdma_comp
-+*fsl_qdma_request_enqueue_desc(struct fsl_qdma_chan *fsl_chan)
-+{
-+	unsigned long flags;
-+	struct fsl_qdma_comp *comp_temp;
-+	int timeout = FSL_QDMA_COMP_TIMEOUT;
-+	struct fsl_qdma_queue *queue = fsl_chan->queue;
-+
-+	while (timeout--) {
-+		spin_lock_irqsave(&queue->queue_lock, flags);
-+		if (!list_empty(&queue->comp_free)) {
-+			comp_temp = list_first_entry(&queue->comp_free,
-+						     struct fsl_qdma_comp,
-+						     list);
-+			list_del(&comp_temp->list);
-+
-+			spin_unlock_irqrestore(&queue->queue_lock, flags);
-+			comp_temp->qchan = fsl_chan;
-+			return comp_temp;
-+		}
-+		spin_unlock_irqrestore(&queue->queue_lock, flags);
-+		udelay(1);
-+	}
-+
-+	return NULL;
-+}
-+
-+static struct fsl_qdma_queue
-+*fsl_qdma_alloc_queue_resources(struct platform_device *pdev,
-+				struct fsl_qdma_engine *fsl_qdma)
-+{
-+	int ret, len, i, j;
-+	int queue_num, block_number;
-+	unsigned int queue_size[FSL_QDMA_QUEUE_MAX];
-+	struct fsl_qdma_queue *queue_head, *queue_temp;
-+
-+	queue_num = fsl_qdma->n_queues;
-+	block_number = fsl_qdma->block_number;
-+
-+	if (queue_num > FSL_QDMA_QUEUE_MAX)
-+		queue_num = FSL_QDMA_QUEUE_MAX;
-+	len = sizeof(*queue_head) * queue_num * block_number;
-+	queue_head = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
-+	if (!queue_head)
-+		return NULL;
-+
-+	ret = device_property_read_u32_array(&pdev->dev, "queue-sizes",
-+					     queue_size, queue_num);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't get queue-sizes.\n");
-+		return NULL;
-+	}
-+	for (j = 0; j < block_number; j++) {
-+		for (i = 0; i < queue_num; i++) {
-+			if (queue_size[i] > FSL_QDMA_CIRCULAR_DESC_SIZE_MAX ||
-+			    queue_size[i] < FSL_QDMA_CIRCULAR_DESC_SIZE_MIN) {
-+				dev_err(&pdev->dev,
-+					"Get wrong queue-sizes.\n");
-+				return NULL;
-+			}
-+			queue_temp = queue_head + i + (j * queue_num);
-+
-+			queue_temp->cq =
-+			dma_alloc_coherent(&pdev->dev,
-+					   sizeof(struct fsl_qdma_format) *
-+					   queue_size[i],
-+					   &queue_temp->bus_addr,
-+					   GFP_KERNEL);
-+			if (!queue_temp->cq)
-+				return NULL;
-+			queue_temp->block_base = fsl_qdma->block_base +
-+				FSL_QDMA_BLOCK_BASE_OFFSET(fsl_qdma, j);
-+			queue_temp->n_cq = queue_size[i];
-+			queue_temp->id = i;
-+			queue_temp->virt_head = queue_temp->cq;
-+			queue_temp->virt_tail = queue_temp->cq;
-+			/*
-+			 * List for queue command buffer
-+			 */
-+			INIT_LIST_HEAD(&queue_temp->comp_used);
-+			spin_lock_init(&queue_temp->queue_lock);
-+		}
-+	}
-+	return queue_head;
-+}
-+
-+static struct fsl_qdma_queue
-+*fsl_qdma_prep_status_queue(struct platform_device *pdev)
-+{
-+	int ret;
-+	unsigned int status_size;
-+	struct fsl_qdma_queue *status_head;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	ret = of_property_read_u32(np, "status-sizes", &status_size);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't get status-sizes.\n");
-+		return NULL;
-+	}
-+	if (status_size > FSL_QDMA_CIRCULAR_DESC_SIZE_MAX ||
-+	    status_size < FSL_QDMA_CIRCULAR_DESC_SIZE_MIN) {
-+		dev_err(&pdev->dev, "Get wrong status_size.\n");
-+		return NULL;
-+	}
-+	status_head = devm_kzalloc(&pdev->dev,
-+				   sizeof(*status_head), GFP_KERNEL);
-+	if (!status_head)
-+		return NULL;
-+
-+	/*
-+	 * Buffer for queue command
-+	 */
-+	status_head->cq = dma_alloc_coherent(&pdev->dev,
-+					     sizeof(struct fsl_qdma_format) *
-+					     status_size,
-+					     &status_head->bus_addr,
-+					     GFP_KERNEL);
-+	if (!status_head->cq) {
-+		devm_kfree(&pdev->dev, status_head);
-+		return NULL;
-+	}
-+	status_head->n_cq = status_size;
-+	status_head->virt_head = status_head->cq;
-+	status_head->virt_tail = status_head->cq;
-+	status_head->comp_pool = NULL;
-+
-+	return status_head;
-+}
-+
-+static int fsl_qdma_halt(struct fsl_qdma_engine *fsl_qdma)
-+{
-+	u32 reg;
-+	int i, j, count = FSL_QDMA_HALT_COUNT;
-+	void __iomem *block, *ctrl = fsl_qdma->ctrl_base;
-+
-+	/* Disable the command queue and wait for idle state. */
-+	reg = qdma_readl(fsl_qdma, ctrl + FSL_QDMA_DMR);
-+	reg |= FSL_QDMA_DMR_DQD;
-+	qdma_writel(fsl_qdma, reg, ctrl + FSL_QDMA_DMR);
-+	for (j = 0; j < fsl_qdma->block_number; j++) {
-+		block = fsl_qdma->block_base +
-+			FSL_QDMA_BLOCK_BASE_OFFSET(fsl_qdma, j);
-+		for (i = 0; i < FSL_QDMA_QUEUE_NUM_MAX; i++)
-+			qdma_writel(fsl_qdma, 0, block + FSL_QDMA_BCQMR(i));
-+	}
-+	while (1) {
-+		reg = qdma_readl(fsl_qdma, ctrl + FSL_QDMA_DSR);
-+		if (!(reg & FSL_QDMA_DSR_DB))
-+			break;
-+		if (count-- < 0)
-+			return -EBUSY;
-+		udelay(100);
-+	}
-+
-+	for (j = 0; j < fsl_qdma->block_number; j++) {
-+		block = fsl_qdma->block_base +
-+			FSL_QDMA_BLOCK_BASE_OFFSET(fsl_qdma, j);
-+
-+		/* Disable status queue. */
-+		qdma_writel(fsl_qdma, 0, block + FSL_QDMA_BSQMR);
-+
-+		/*
-+		 * clear the command queue interrupt detect register for
-+		 * all queues.
-+		 */
-+		qdma_writel(fsl_qdma, FSL_QDMA_BCQIDR_CLEAR,
-+			    block + FSL_QDMA_BCQIDR(0));
-+	}
-+
-+	return 0;
-+}
-+
-+static int
-+fsl_qdma_queue_transfer_complete(struct fsl_qdma_engine *fsl_qdma,
-+				 void *block,
-+				 int id)
-+{
-+	bool duplicate;
-+	u32 reg, i, count;
-+	struct fsl_qdma_queue *temp_queue;
-+	struct fsl_qdma_format *status_addr;
-+	struct fsl_qdma_comp *fsl_comp = NULL;
-+	struct fsl_qdma_queue *fsl_queue = fsl_qdma->queue;
-+	struct fsl_qdma_queue *fsl_status = fsl_qdma->status[id];
-+
-+	count = FSL_QDMA_MAX_SIZE;
-+
-+	while (count--) {
-+		duplicate = 0;
-+		reg = qdma_readl(fsl_qdma, block + FSL_QDMA_BSQSR);
-+		if (reg & FSL_QDMA_BSQSR_QE)
-+			return 0;
-+
-+		status_addr = fsl_status->virt_head;
-+
-+		if (qdma_ccdf_get_queue(status_addr) ==
-+		   __this_cpu_read(pre.queue) &&
-+			qdma_ccdf_addr_get64(status_addr) ==
-+			__this_cpu_read(pre.addr))
-+			duplicate = 1;
-+		i = qdma_ccdf_get_queue(status_addr) +
-+			id * fsl_qdma->n_queues;
-+		__this_cpu_write(pre.addr, qdma_ccdf_addr_get64(status_addr));
-+		__this_cpu_write(pre.queue, qdma_ccdf_get_queue(status_addr));
-+		temp_queue = fsl_queue + i;
-+
-+		spin_lock(&temp_queue->queue_lock);
-+		if (list_empty(&temp_queue->comp_used)) {
-+			if (!duplicate) {
-+				spin_unlock(&temp_queue->queue_lock);
-+				return -EAGAIN;
-+			}
-+		} else {
-+			fsl_comp = list_first_entry(&temp_queue->comp_used,
-+						    struct fsl_qdma_comp, list);
-+			if (fsl_comp->bus_addr + 16 !=
-+				__this_cpu_read(pre.addr)) {
-+				if (!duplicate) {
-+					spin_unlock(&temp_queue->queue_lock);
-+					return -EAGAIN;
-+				}
-+			}
-+		}
-+
-+		if (duplicate) {
-+			reg = qdma_readl(fsl_qdma, block + FSL_QDMA_BSQMR);
-+			reg |= FSL_QDMA_BSQMR_DI;
-+			qdma_desc_addr_set64(status_addr, 0x0);
-+			fsl_status->virt_head++;
-+			if (fsl_status->virt_head == fsl_status->cq
-+						   + fsl_status->n_cq)
-+				fsl_status->virt_head = fsl_status->cq;
-+			qdma_writel(fsl_qdma, reg, block + FSL_QDMA_BSQMR);
-+			spin_unlock(&temp_queue->queue_lock);
-+			continue;
-+		}
-+		list_del(&fsl_comp->list);
-+
-+		reg = qdma_readl(fsl_qdma, block + FSL_QDMA_BSQMR);
-+		reg |= FSL_QDMA_BSQMR_DI;
-+		qdma_desc_addr_set64(status_addr, 0x0);
-+		fsl_status->virt_head++;
-+		if (fsl_status->virt_head == fsl_status->cq + fsl_status->n_cq)
-+			fsl_status->virt_head = fsl_status->cq;
-+		qdma_writel(fsl_qdma, reg, block + FSL_QDMA_BSQMR);
-+		spin_unlock(&temp_queue->queue_lock);
-+
-+		spin_lock(&fsl_comp->qchan->vchan.lock);
-+		vchan_cookie_complete(&fsl_comp->vdesc);
-+		fsl_comp->qchan->status = DMA_COMPLETE;
-+		spin_unlock(&fsl_comp->qchan->vchan.lock);
-+	}
-+
-+	return 0;
-+}
-+
-+static irqreturn_t fsl_qdma_error_handler(int irq, void *dev_id)
-+{
-+	unsigned int intr;
-+	struct fsl_qdma_engine *fsl_qdma = dev_id;
-+	void __iomem *status = fsl_qdma->status_base;
-+
-+	intr = qdma_readl(fsl_qdma, status + FSL_QDMA_DEDR);
-+
-+	if (intr) {
-+		dev_err(fsl_qdma->dma_dev.dev, "DMA transaction error!\n");
-+		return IRQ_NONE;
-+	}
-+
-+	qdma_writel(fsl_qdma, FSL_QDMA_DEDR_CLEAR, status + FSL_QDMA_DEDR);
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t fsl_qdma_queue_handler(int irq, void *dev_id)
-+{
-+	int id;
-+	unsigned int intr, reg;
-+	struct fsl_qdma_engine *fsl_qdma = dev_id;
-+	void __iomem *block, *ctrl = fsl_qdma->ctrl_base;
-+
-+	id = irq - fsl_qdma->irq_base;
-+	if (id < 0 && id > fsl_qdma->block_number) {
-+		dev_err(fsl_qdma->dma_dev.dev,
-+			"irq %d is wrong irq_base is %d\n",
-+			irq, fsl_qdma->irq_base);
-+	}
-+
-+	block = fsl_qdma->block_base +
-+		FSL_QDMA_BLOCK_BASE_OFFSET(fsl_qdma, id);
-+
-+	intr = qdma_readl(fsl_qdma, block + FSL_QDMA_BCQIDR(0));
-+
-+	if ((intr & FSL_QDMA_CQIDR_SQT) != 0)
-+		intr = fsl_qdma_queue_transfer_complete(fsl_qdma, block, id);
-+
-+	if (intr != 0) {
-+		reg = qdma_readl(fsl_qdma, ctrl + FSL_QDMA_DMR);
-+		reg |= FSL_QDMA_DMR_DQD;
-+		qdma_writel(fsl_qdma, reg, ctrl + FSL_QDMA_DMR);
-+		qdma_writel(fsl_qdma, 0, block + FSL_QDMA_BCQIER(0));
-+		dev_err(fsl_qdma->dma_dev.dev, "QDMA: status err!\n");
-+	}
-+
-+	/* Clear all detected events and interrupts. */
-+	qdma_writel(fsl_qdma, FSL_QDMA_BCQIDR_CLEAR,
-+		    block + FSL_QDMA_BCQIDR(0));
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int
-+fsl_qdma_irq_init(struct platform_device *pdev,
-+		  struct fsl_qdma_engine *fsl_qdma)
-+{
-+	int i;
-+	int cpu;
-+	int ret;
-+	char irq_name[20];
-+
-+	fsl_qdma->error_irq =
-+		platform_get_irq_byname(pdev, "qdma-error");
-+	if (fsl_qdma->error_irq < 0) {
-+		dev_err(&pdev->dev, "Can't get qdma controller irq.\n");
-+		return fsl_qdma->error_irq;
-+	}
-+
-+	ret = devm_request_irq(&pdev->dev, fsl_qdma->error_irq,
-+			       fsl_qdma_error_handler, 0,
-+			       "qDMA error", fsl_qdma);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't register qDMA controller IRQ.\n");
-+		return  ret;
-+	}
-+
-+	for (i = 0; i < fsl_qdma->block_number; i++) {
-+		sprintf(irq_name, "qdma-queue%d", i);
-+		fsl_qdma->queue_irq[i] =
-+				platform_get_irq_byname(pdev, irq_name);
-+
-+		if (fsl_qdma->queue_irq[i] < 0) {
-+			dev_err(&pdev->dev,
-+				"Can't get qdma queue %d irq.\n", i);
-+			return fsl_qdma->queue_irq[i];
-+		}
-+
-+		ret = devm_request_irq(&pdev->dev,
-+				       fsl_qdma->queue_irq[i],
-+				       fsl_qdma_queue_handler,
-+				       0,
-+				       "qDMA queue",
-+				       fsl_qdma);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"Can't register qDMA queue IRQ.\n");
-+			return  ret;
-+		}
-+
-+		cpu = i % num_online_cpus();
-+		ret = irq_set_affinity_hint(fsl_qdma->queue_irq[i],
-+					    get_cpu_mask(cpu));
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"Can't set cpu %d affinity to IRQ %d.\n",
-+				cpu,
-+				fsl_qdma->queue_irq[i]);
-+			return  ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void fsl_qdma_irq_exit(struct platform_device *pdev,
-+			      struct fsl_qdma_engine *fsl_qdma)
-+{
-+	int i;
-+
-+	devm_free_irq(&pdev->dev, fsl_qdma->error_irq, fsl_qdma);
-+	for (i = 0; i < fsl_qdma->block_number; i++)
-+		devm_free_irq(&pdev->dev, fsl_qdma->queue_irq[i], fsl_qdma);
-+}
-+
-+static int fsl_qdma_reg_init(struct fsl_qdma_engine *fsl_qdma)
-+{
-+	u32 reg;
-+	int i, j, ret;
-+	struct fsl_qdma_queue *temp;
-+	void __iomem *status = fsl_qdma->status_base;
-+	void __iomem *block, *ctrl = fsl_qdma->ctrl_base;
-+	struct fsl_qdma_queue *fsl_queue = fsl_qdma->queue;
-+
-+	/* Try to halt the qDMA engine first. */
-+	ret = fsl_qdma_halt(fsl_qdma);
-+	if (ret) {
-+		dev_err(fsl_qdma->dma_dev.dev, "DMA halt failed!");
-+		return ret;
-+	}
-+
-+	for (i = 0; i < fsl_qdma->block_number; i++) {
-+		/*
-+		 * Clear the command queue interrupt detect register for
-+		 * all queues.
-+		 */
-+
-+		block = fsl_qdma->block_base +
-+			FSL_QDMA_BLOCK_BASE_OFFSET(fsl_qdma, i);
-+		qdma_writel(fsl_qdma, FSL_QDMA_BCQIDR_CLEAR,
-+			    block + FSL_QDMA_BCQIDR(0));
-+	}
-+
-+	for (j = 0; j < fsl_qdma->block_number; j++) {
-+		block = fsl_qdma->block_base +
-+			FSL_QDMA_BLOCK_BASE_OFFSET(fsl_qdma, j);
-+		for (i = 0; i < fsl_qdma->n_queues; i++) {
-+			temp = fsl_queue + i + (j * fsl_qdma->n_queues);
-+			/*
-+			 * Initialize Command Queue registers to
-+			 * point to the first
-+			 * command descriptor in memory.
-+			 * Dequeue Pointer Address Registers
-+			 * Enqueue Pointer Address Registers
-+			 */
-+
-+			qdma_writel(fsl_qdma, temp->bus_addr,
-+				    block + FSL_QDMA_BCQDPA_SADDR(i));
-+			qdma_writel(fsl_qdma, temp->bus_addr,
-+				    block + FSL_QDMA_BCQEPA_SADDR(i));
-+
-+			/* Initialize the queue mode. */
-+			reg = FSL_QDMA_BCQMR_EN;
-+			reg |= FSL_QDMA_BCQMR_CD_THLD(ilog2(temp->n_cq) - 4);
-+			reg |= FSL_QDMA_BCQMR_CQ_SIZE(ilog2(temp->n_cq) - 6);
-+			qdma_writel(fsl_qdma, reg, block + FSL_QDMA_BCQMR(i));
-+		}
-+
-+		/*
-+		 * Workaround for erratum: ERR010812.
-+		 * We must enable XOFF to avoid the enqueue rejection occurs.
-+		 * Setting SQCCMR ENTER_WM to 0x20.
-+		 */
-+
-+		qdma_writel(fsl_qdma, FSL_QDMA_SQCCMR_ENTER_WM,
-+			    block + FSL_QDMA_SQCCMR);
-+
-+		/*
-+		 * Initialize status queue registers to point to the first
-+		 * command descriptor in memory.
-+		 * Dequeue Pointer Address Registers
-+		 * Enqueue Pointer Address Registers
-+		 */
-+
-+		qdma_writel(fsl_qdma, fsl_qdma->status[j]->bus_addr,
-+			    block + FSL_QDMA_SQEPAR);
-+		qdma_writel(fsl_qdma, fsl_qdma->status[j]->bus_addr,
-+			    block + FSL_QDMA_SQDPAR);
-+		/* Initialize status queue interrupt. */
-+		qdma_writel(fsl_qdma, FSL_QDMA_BCQIER_CQTIE,
-+			    block + FSL_QDMA_BCQIER(0));
-+		qdma_writel(fsl_qdma, FSL_QDMA_BSQICR_ICEN |
-+				   FSL_QDMA_BSQICR_ICST(5) | 0x8000,
-+				   block + FSL_QDMA_BSQICR);
-+		qdma_writel(fsl_qdma, FSL_QDMA_CQIER_MEIE |
-+				   FSL_QDMA_CQIER_TEIE,
-+				   block + FSL_QDMA_CQIER);
-+
-+		/* Initialize the status queue mode. */
-+		reg = FSL_QDMA_BSQMR_EN;
-+		reg |= FSL_QDMA_BSQMR_CQ_SIZE(ilog2
-+			(fsl_qdma->status[j]->n_cq) - 6);
-+
-+		qdma_writel(fsl_qdma, reg, block + FSL_QDMA_BSQMR);
-+		reg = qdma_readl(fsl_qdma, block + FSL_QDMA_BSQMR);
-+	}
-+
-+	/* Initialize controller interrupt register. */
-+	qdma_writel(fsl_qdma, FSL_QDMA_DEDR_CLEAR, status + FSL_QDMA_DEDR);
-+	qdma_writel(fsl_qdma, FSL_QDMA_DEIER_CLEAR, status + FSL_QDMA_DEIER);
-+
-+	reg = qdma_readl(fsl_qdma, ctrl + FSL_QDMA_DMR);
-+	reg &= ~FSL_QDMA_DMR_DQD;
-+	qdma_writel(fsl_qdma, reg, ctrl + FSL_QDMA_DMR);
-+
-+	return 0;
-+}
-+
-+static struct dma_async_tx_descriptor *
-+fsl_qdma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
-+		     dma_addr_t src, size_t len, unsigned long flags)
-+{
-+	struct fsl_qdma_comp *fsl_comp;
-+	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
-+
-+	fsl_comp = fsl_qdma_request_enqueue_desc(fsl_chan);
-+
-+	if (!fsl_comp)
-+		return NULL;
-+
-+	fsl_qdma_comp_fill_memcpy(fsl_comp, dst, src, len);
-+
-+	return vchan_tx_prep(&fsl_chan->vchan, &fsl_comp->vdesc, flags);
-+}
-+
-+static void fsl_qdma_enqueue_desc(struct fsl_qdma_chan *fsl_chan)
-+{
-+	u32 reg;
-+	struct virt_dma_desc *vdesc;
-+	struct fsl_qdma_comp *fsl_comp;
-+	struct fsl_qdma_queue *fsl_queue = fsl_chan->queue;
-+	void __iomem *block = fsl_queue->block_base;
-+
-+	reg = qdma_readl(fsl_chan->qdma, block + FSL_QDMA_BCQSR(fsl_queue->id));
-+	if (reg & (FSL_QDMA_BCQSR_QF | FSL_QDMA_BCQSR_XOFF))
-+		return;
-+	vdesc = vchan_next_desc(&fsl_chan->vchan);
-+	if (!vdesc)
-+		return;
-+	list_del(&vdesc->node);
-+	fsl_comp = to_fsl_qdma_comp(vdesc);
-+
-+	memcpy(fsl_queue->virt_head++,
-+	       fsl_comp->virt_addr, sizeof(struct fsl_qdma_format));
-+	if (fsl_queue->virt_head == fsl_queue->cq + fsl_queue->n_cq)
-+		fsl_queue->virt_head = fsl_queue->cq;
-+
-+	list_add_tail(&fsl_comp->list, &fsl_queue->comp_used);
-+	barrier();
-+	reg = qdma_readl(fsl_chan->qdma, block + FSL_QDMA_BCQMR(fsl_queue->id));
-+	reg |= FSL_QDMA_BCQMR_EI;
-+	qdma_writel(fsl_chan->qdma, reg, block + FSL_QDMA_BCQMR(fsl_queue->id));
-+	fsl_chan->status = DMA_IN_PROGRESS;
-+}
-+
-+static void fsl_qdma_free_desc(struct virt_dma_desc *vdesc)
-+{
-+	unsigned long flags;
-+	struct fsl_qdma_comp *fsl_comp;
-+	struct fsl_qdma_queue *fsl_queue;
-+
-+	fsl_comp = to_fsl_qdma_comp(vdesc);
-+	fsl_queue = fsl_comp->qchan->queue;
-+
-+	spin_lock_irqsave(&fsl_queue->queue_lock, flags);
-+	list_add_tail(&fsl_comp->list, &fsl_queue->comp_free);
-+	spin_unlock_irqrestore(&fsl_queue->queue_lock, flags);
-+}
-+
-+static void fsl_qdma_issue_pending(struct dma_chan *chan)
-+{
-+	unsigned long flags;
-+	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
-+	struct fsl_qdma_queue *fsl_queue = fsl_chan->queue;
-+
-+	spin_lock_irqsave(&fsl_queue->queue_lock, flags);
-+	spin_lock(&fsl_chan->vchan.lock);
-+	if (vchan_issue_pending(&fsl_chan->vchan))
-+		fsl_qdma_enqueue_desc(fsl_chan);
-+	spin_unlock(&fsl_chan->vchan.lock);
-+	spin_unlock_irqrestore(&fsl_queue->queue_lock, flags);
-+}
-+
-+static void fsl_qdma_synchronize(struct dma_chan *chan)
-+{
-+	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
-+
-+	vchan_synchronize(&fsl_chan->vchan);
-+}
-+
-+static int fsl_qdma_terminate_all(struct dma_chan *chan)
-+{
-+	LIST_HEAD(head);
-+	unsigned long flags;
-+	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
-+
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-+	return 0;
-+}
-+
-+static int fsl_qdma_alloc_chan_resources(struct dma_chan *chan)
-+{
-+	int ret;
-+	struct fsl_qdma_chan *fsl_chan = to_fsl_qdma_chan(chan);
-+	struct fsl_qdma_engine *fsl_qdma = fsl_chan->qdma;
-+	struct fsl_qdma_queue *fsl_queue = fsl_chan->queue;
-+
-+	if (fsl_queue->comp_pool && fsl_queue->desc_pool)
-+		return fsl_qdma->desc_allocated;
-+
-+	INIT_LIST_HEAD(&fsl_queue->comp_free);
-+
-+	/*
-+	 * The dma pool for queue command buffer
-+	 */
-+	fsl_queue->comp_pool =
-+	dma_pool_create("comp_pool",
-+			chan->device->dev,
-+			FSL_QDMA_COMMAND_BUFFER_SIZE,
-+			64, 0);
-+	if (!fsl_queue->comp_pool)
-+		return -ENOMEM;
-+
-+	/*
-+	 * The dma pool for Descriptor(SD/DD) buffer
-+	 */
-+	fsl_queue->desc_pool =
-+	dma_pool_create("desc_pool",
-+			chan->device->dev,
-+			FSL_QDMA_DESCRIPTOR_BUFFER_SIZE,
-+			32, 0);
-+	if (!fsl_queue->desc_pool)
-+		goto err_desc_pool;
-+
-+	ret = fsl_qdma_pre_request_enqueue_desc(fsl_queue);
-+	if (ret) {
-+		dev_err(chan->device->dev,
-+			"failed to alloc dma buffer for S/G descriptor\n");
-+		goto err_mem;
-+	}
-+
-+	fsl_qdma->desc_allocated++;
-+	return fsl_qdma->desc_allocated;
-+
-+err_mem:
-+	dma_pool_destroy(fsl_queue->desc_pool);
-+err_desc_pool:
-+	dma_pool_destroy(fsl_queue->comp_pool);
-+	return -ENOMEM;
-+}
-+
-+static int fsl_qdma_probe(struct platform_device *pdev)
-+{
-+	int ret, i;
-+	int blk_num, blk_off;
-+	u32 len, chans, queues;
-+	struct resource *res;
-+	struct fsl_qdma_chan *fsl_chan;
-+	struct fsl_qdma_engine *fsl_qdma;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	ret = of_property_read_u32(np, "dma-channels", &chans);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't get dma-channels.\n");
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(np, "block-offset", &blk_off);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't get block-offset.\n");
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(np, "block-number", &blk_num);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't get block-number.\n");
-+		return ret;
-+	}
-+
-+	blk_num = min_t(int, blk_num, num_online_cpus());
-+
-+	len = sizeof(*fsl_qdma);
-+	fsl_qdma = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
-+	if (!fsl_qdma)
-+		return -ENOMEM;
-+
-+	len = sizeof(*fsl_chan) * chans;
-+	fsl_qdma->chans = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
-+	if (!fsl_qdma->chans)
-+		return -ENOMEM;
-+
-+	len = sizeof(struct fsl_qdma_queue *) * blk_num;
-+	fsl_qdma->status = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
-+	if (!fsl_qdma->status)
-+		return -ENOMEM;
-+
-+	len = sizeof(int) * blk_num;
-+	fsl_qdma->queue_irq = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
-+	if (!fsl_qdma->queue_irq)
-+		return -ENOMEM;
-+
-+	ret = of_property_read_u32(np, "fsl,dma-queues", &queues);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't get queues.\n");
-+		return ret;
-+	}
-+
-+	fsl_qdma->desc_allocated = 0;
-+	fsl_qdma->n_chans = chans;
-+	fsl_qdma->n_queues = queues;
-+	fsl_qdma->block_number = blk_num;
-+	fsl_qdma->block_offset = blk_off;
-+
-+	mutex_init(&fsl_qdma->fsl_qdma_mutex);
-+
-+	for (i = 0; i < fsl_qdma->block_number; i++) {
-+		fsl_qdma->status[i] = fsl_qdma_prep_status_queue(pdev);
-+		if (!fsl_qdma->status[i])
-+			return -ENOMEM;
-+	}
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	fsl_qdma->ctrl_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(fsl_qdma->ctrl_base))
-+		return PTR_ERR(fsl_qdma->ctrl_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	fsl_qdma->status_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(fsl_qdma->status_base))
-+		return PTR_ERR(fsl_qdma->status_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-+	fsl_qdma->block_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(fsl_qdma->block_base))
-+		return PTR_ERR(fsl_qdma->block_base);
-+	fsl_qdma->queue = fsl_qdma_alloc_queue_resources(pdev, fsl_qdma);
-+	if (!fsl_qdma->queue)
-+		return -ENOMEM;
-+
-+	ret = fsl_qdma_irq_init(pdev, fsl_qdma);
-+	if (ret)
-+		return ret;
-+
-+	fsl_qdma->irq_base = platform_get_irq_byname(pdev, "qdma-queue0");
-+	fsl_qdma->feature = of_property_read_bool(np, "big-endian");
-+	INIT_LIST_HEAD(&fsl_qdma->dma_dev.channels);
-+
-+	for (i = 0; i < fsl_qdma->n_chans; i++) {
-+		struct fsl_qdma_chan *fsl_chan = &fsl_qdma->chans[i];
-+
-+		fsl_chan->qdma = fsl_qdma;
-+		fsl_chan->queue = fsl_qdma->queue + i % (fsl_qdma->n_queues *
-+							fsl_qdma->block_number);
-+		fsl_chan->vchan.desc_free = fsl_qdma_free_desc;
-+		vchan_init(&fsl_chan->vchan, &fsl_qdma->dma_dev);
-+	}
-+
-+	dma_cap_set(DMA_MEMCPY, fsl_qdma->dma_dev.cap_mask);
-+
-+	fsl_qdma->dma_dev.dev = &pdev->dev;
-+	fsl_qdma->dma_dev.device_free_chan_resources =
-+		fsl_qdma_free_chan_resources;
-+	fsl_qdma->dma_dev.device_alloc_chan_resources =
-+		fsl_qdma_alloc_chan_resources;
-+	fsl_qdma->dma_dev.device_tx_status = dma_cookie_status;
-+	fsl_qdma->dma_dev.device_prep_dma_memcpy = fsl_qdma_prep_memcpy;
-+	fsl_qdma->dma_dev.device_issue_pending = fsl_qdma_issue_pending;
-+	fsl_qdma->dma_dev.device_synchronize = fsl_qdma_synchronize;
-+	fsl_qdma->dma_dev.device_terminate_all = fsl_qdma_terminate_all;
-+
-+	dma_set_mask(&pdev->dev, DMA_BIT_MASK(40));
-+
-+	platform_set_drvdata(pdev, fsl_qdma);
-+
-+	ret = dma_async_device_register(&fsl_qdma->dma_dev);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Can't register NXP Layerscape qDMA engine.\n");
-+		return ret;
-+	}
-+
-+	ret = fsl_qdma_reg_init(fsl_qdma);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't Initialize the qDMA engine.\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void fsl_qdma_cleanup_vchan(struct dma_device *dmadev)
-+{
-+	struct fsl_qdma_chan *chan, *_chan;
-+
-+	list_for_each_entry_safe(chan, _chan,
-+				 &dmadev->channels, vchan.chan.device_node) {
-+		list_del(&chan->vchan.chan.device_node);
-+		tasklet_kill(&chan->vchan.task);
-+	}
-+}
-+
-+static int fsl_qdma_remove(struct platform_device *pdev)
-+{
-+	int i;
-+	struct fsl_qdma_queue *status;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct fsl_qdma_engine *fsl_qdma = platform_get_drvdata(pdev);
-+
-+	fsl_qdma_irq_exit(pdev, fsl_qdma);
-+	fsl_qdma_cleanup_vchan(&fsl_qdma->dma_dev);
-+	of_dma_controller_free(np);
-+	dma_async_device_unregister(&fsl_qdma->dma_dev);
-+
-+	for (i = 0; i < fsl_qdma->block_number; i++) {
-+		status = fsl_qdma->status[i];
-+		dma_free_coherent(&pdev->dev, sizeof(struct fsl_qdma_format) *
-+				status->n_cq, status->cq, status->bus_addr);
-+	}
-+	return 0;
-+}
-+
-+static const struct of_device_id fsl_qdma_dt_ids[] = {
-+	{ .compatible = "fsl,ls1021a-qdma", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, fsl_qdma_dt_ids);
-+
-+static struct platform_driver fsl_qdma_driver = {
-+	.driver		= {
-+		.name	= "fsl-qdma",
-+		.of_match_table = fsl_qdma_dt_ids,
-+	},
-+	.probe          = fsl_qdma_probe,
-+	.remove		= fsl_qdma_remove,
-+};
-+
-+module_platform_driver(fsl_qdma_driver);
-+
-+MODULE_ALIAS("platform:fsl-qdma");
-+MODULE_DESCRIPTION("NXP Layerscape qDMA engine driver");
+- exynos seems to have the same or at least similar issue, stronger case
+  for your patches if you can solve both.
+
+- I'd start out with using struct drm_gem_cma_object in mtk (similar to
+  what vc4 does), and then reusing as much as possible of the existing
+  helpers. And then looking later on what's still left (like the support
+  for leaving out the virtual mapping).
+
+-Daniel
+
+> ---
+>  drivers/gpu/drm/mediatek/Makefile        |   1 -
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |   1 -
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c   |  15 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h   |   1 -
+>  drivers/gpu/drm/mediatek/mtk_drm_fb.c    |   1 -
+>  drivers/gpu/drm/mediatek/mtk_drm_gem.c   | 243 -------------------------------
+>  drivers/gpu/drm/mediatek/mtk_drm_gem.h   |  56 -------
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.c |   8 +-
+>  8 files changed, 11 insertions(+), 315 deletions(-)
+>  delete mode 100644 drivers/gpu/drm/mediatek/mtk_drm_gem.c
+>  delete mode 100644 drivers/gpu/drm/mediatek/mtk_drm_gem.h
+> 
+> diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
+> index ce83c39..c4fa126 100644
+> --- a/drivers/gpu/drm/mediatek/Makefile
+> +++ b/drivers/gpu/drm/mediatek/Makefile
+> @@ -7,7 +7,6 @@ mediatek-drm-y := mtk_disp_color.o \
+>  		  mtk_drm_ddp_comp.o \
+>  		  mtk_drm_drv.o \
+>  		  mtk_drm_fb.o \
+> -		  mtk_drm_gem.o \
+>  		  mtk_drm_plane.o \
+>  		  mtk_dsi.o \
+>  		  mtk_mipi_tx.o \
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> index 92ecb9b..534c22a 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> @@ -24,7 +24,6 @@
+>  #include "mtk_drm_crtc.h"
+>  #include "mtk_drm_ddp.h"
+>  #include "mtk_drm_ddp_comp.h"
+> -#include "mtk_drm_gem.h"
+>  #include "mtk_drm_plane.h"
+>  
+>  /**
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index 47ec604..306ba29 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -30,7 +30,6 @@
+>  #include "mtk_drm_ddp_comp.h"
+>  #include "mtk_drm_drv.h"
+>  #include "mtk_drm_fb.h"
+> -#include "mtk_drm_gem.h"
+>  
+>  #define DRIVER_NAME "mediatek"
+>  #define DRIVER_DESC "Mediatek SoC DRM"
+> @@ -282,7 +281,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
+>  		goto err_component_unbind;
+>  	}
+>  
+> -	private->dma_dev = &pdev->dev;
+> +	drm->dma_dev = &pdev->dev;
+>  
+>  	/*
+>  	 * We don't use the drm_irq_install() helpers provided by the DRM
+> @@ -320,7 +319,7 @@ static void mtk_drm_kms_deinit(struct drm_device *drm)
+>  	.open = drm_open,
+>  	.release = drm_release,
+>  	.unlocked_ioctl = drm_ioctl,
+> -	.mmap = mtk_drm_gem_mmap,
+> +	.mmap = drm_gem_cma_mmap,
+>  	.poll = drm_poll,
+>  	.read = drm_read,
+>  	.compat_ioctl = drm_compat_ioctl,
+> @@ -330,17 +329,17 @@ static void mtk_drm_kms_deinit(struct drm_device *drm)
+>  	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME |
+>  			   DRIVER_ATOMIC,
+>  
+> -	.gem_free_object_unlocked = mtk_drm_gem_free_object,
+> +	.gem_free_object_unlocked = drm_gem_cma_free_object,
+>  	.gem_vm_ops = &drm_gem_cma_vm_ops,
+> -	.dumb_create = mtk_drm_gem_dumb_create,
+> +	.dumb_create = drm_gem_cma_dumb_create_no_kmap,
+>  
+>  	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+>  	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+>  	.gem_prime_export = drm_gem_prime_export,
+>  	.gem_prime_import = drm_gem_prime_import,
+> -	.gem_prime_get_sg_table = mtk_gem_prime_get_sg_table,
+> -	.gem_prime_import_sg_table = mtk_gem_prime_import_sg_table,
+> -	.gem_prime_mmap = mtk_drm_gem_mmap_buf,
+> +	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
+> +	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
+> +	.gem_prime_mmap = drm_gem_cma_prime_mmap,
+>  	.fops = &mtk_drm_fops,
+>  
+>  	.name = DRIVER_NAME,
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> index ecc00ca..cbbe63b 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> @@ -41,7 +41,6 @@ struct mtk_mmsys_driver_data {
+>  
+>  struct mtk_drm_private {
+>  	struct drm_device *drm;
+> -	struct device *dma_dev;
+>  
+>  	unsigned int num_pipes;
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
+> index be5f6f1..45c22aa 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
+> @@ -21,7 +21,6 @@
+>  
+>  #include "mtk_drm_drv.h"
+>  #include "mtk_drm_fb.h"
+> -#include "mtk_drm_gem.h"
+>  
+>  static const struct drm_framebuffer_funcs mtk_drm_fb_funcs = {
+>  	.create_handle = drm_gem_fb_create_handle,
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.c b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
+> deleted file mode 100644
+> index 259b7b0..0000000
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
+> +++ /dev/null
+> @@ -1,243 +0,0 @@
+> -/*
+> - * Copyright (c) 2015 MediaTek Inc.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -#include <drm/drmP.h>
+> -#include <drm/drm_gem.h>
+> -#include <linux/dma-buf.h>
+> -
+> -#include "mtk_drm_drv.h"
+> -#include "mtk_drm_gem.h"
+> -
+> -static struct mtk_drm_gem_obj *mtk_drm_gem_init(struct drm_device *dev,
+> -						unsigned long size)
+> -{
+> -	struct mtk_drm_gem_obj *mtk_gem_obj;
+> -	int ret;
+> -
+> -	size = round_up(size, PAGE_SIZE);
+> -
+> -	mtk_gem_obj = kzalloc(sizeof(*mtk_gem_obj), GFP_KERNEL);
+> -	if (!mtk_gem_obj)
+> -		return ERR_PTR(-ENOMEM);
+> -
+> -	ret = drm_gem_object_init(dev, &mtk_gem_obj->base, size);
+> -	if (ret < 0) {
+> -		DRM_ERROR("failed to initialize gem object\n");
+> -		kfree(mtk_gem_obj);
+> -		return ERR_PTR(ret);
+> -	}
+> -
+> -	return mtk_gem_obj;
+> -}
+> -
+> -struct mtk_drm_gem_obj *mtk_drm_gem_create(struct drm_device *dev,
+> -					   size_t size, bool alloc_kmap)
+> -{
+> -	struct mtk_drm_private *priv = dev->dev_private;
+> -	struct mtk_drm_gem_obj *mtk_gem;
+> -	struct drm_gem_object *obj;
+> -	int ret;
+> -
+> -	mtk_gem = mtk_drm_gem_init(dev, size);
+> -	if (IS_ERR(mtk_gem))
+> -		return ERR_CAST(mtk_gem);
+> -
+> -	obj = &mtk_gem->base;
+> -
+> -	mtk_gem->dma_attrs = DMA_ATTR_WRITE_COMBINE;
+> -
+> -	if (!alloc_kmap)
+> -		mtk_gem->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
+> -
+> -	mtk_gem->cookie = dma_alloc_attrs(priv->dma_dev, obj->size,
+> -					  &mtk_gem->dma_addr, GFP_KERNEL,
+> -					  mtk_gem->dma_attrs);
+> -	if (!mtk_gem->cookie) {
+> -		DRM_ERROR("failed to allocate %zx byte dma buffer", obj->size);
+> -		ret = -ENOMEM;
+> -		goto err_gem_free;
+> -	}
+> -
+> -	if (alloc_kmap)
+> -		mtk_gem->kvaddr = mtk_gem->cookie;
+> -
+> -	DRM_DEBUG_DRIVER("cookie = %p dma_addr = %pad size = %zu\n",
+> -			 mtk_gem->cookie, &mtk_gem->dma_addr,
+> -			 size);
+> -
+> -	return mtk_gem;
+> -
+> -err_gem_free:
+> -	drm_gem_object_release(obj);
+> -	kfree(mtk_gem);
+> -	return ERR_PTR(ret);
+> -}
+> -
+> -void mtk_drm_gem_free_object(struct drm_gem_object *obj)
+> -{
+> -	struct mtk_drm_gem_obj *mtk_gem = to_mtk_gem_obj(obj);
+> -	struct mtk_drm_private *priv = obj->dev->dev_private;
+> -
+> -	if (mtk_gem->sg)
+> -		drm_prime_gem_destroy(obj, mtk_gem->sg);
+> -	else
+> -		dma_free_attrs(priv->dma_dev, obj->size, mtk_gem->cookie,
+> -			       mtk_gem->dma_addr, mtk_gem->dma_attrs);
+> -
+> -	/* release file pointer to gem object. */
+> -	drm_gem_object_release(obj);
+> -
+> -	kfree(mtk_gem);
+> -}
+> -
+> -int mtk_drm_gem_dumb_create(struct drm_file *file_priv, struct drm_device *dev,
+> -			    struct drm_mode_create_dumb *args)
+> -{
+> -	struct mtk_drm_gem_obj *mtk_gem;
+> -	int ret;
+> -
+> -	args->pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
+> -	args->size = args->pitch * args->height;
+> -
+> -	mtk_gem = mtk_drm_gem_create(dev, args->size, false);
+> -	if (IS_ERR(mtk_gem))
+> -		return PTR_ERR(mtk_gem);
+> -
+> -	/*
+> -	 * allocate a id of idr table where the obj is registered
+> -	 * and handle has the id what user can see.
+> -	 */
+> -	ret = drm_gem_handle_create(file_priv, &mtk_gem->base, &args->handle);
+> -	if (ret)
+> -		goto err_handle_create;
+> -
+> -	/* drop reference from allocate - handle holds it now. */
+> -	drm_gem_object_put_unlocked(&mtk_gem->base);
+> -
+> -	return 0;
+> -
+> -err_handle_create:
+> -	mtk_drm_gem_free_object(&mtk_gem->base);
+> -	return ret;
+> -}
+> -
+> -static int mtk_drm_gem_object_mmap(struct drm_gem_object *obj,
+> -				   struct vm_area_struct *vma)
+> -
+> -{
+> -	int ret;
+> -	struct mtk_drm_gem_obj *mtk_gem = to_mtk_gem_obj(obj);
+> -	struct mtk_drm_private *priv = obj->dev->dev_private;
+> -
+> -	/*
+> -	 * dma_alloc_attrs() allocated a struct page table for mtk_gem, so clear
+> -	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
+> -	 */
+> -	vma->vm_flags &= ~VM_PFNMAP;
+> -	vma->vm_pgoff = 0;
+> -
+> -	ret = dma_mmap_attrs(priv->dma_dev, vma, mtk_gem->cookie,
+> -			     mtk_gem->dma_addr, obj->size, mtk_gem->dma_attrs);
+> -	if (ret)
+> -		drm_gem_vm_close(vma);
+> -
+> -	return ret;
+> -}
+> -
+> -int mtk_drm_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
+> -{
+> -	int ret;
+> -
+> -	ret = drm_gem_mmap_obj(obj, obj->size, vma);
+> -	if (ret)
+> -		return ret;
+> -
+> -	return mtk_drm_gem_object_mmap(obj, vma);
+> -}
+> -
+> -int mtk_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+> -{
+> -	struct drm_gem_object *obj;
+> -	int ret;
+> -
+> -	ret = drm_gem_mmap(filp, vma);
+> -	if (ret)
+> -		return ret;
+> -
+> -	obj = vma->vm_private_data;
+> -
+> -	return mtk_drm_gem_object_mmap(obj, vma);
+> -}
+> -
+> -/*
+> - * Allocate a sg_table for this GEM object.
+> - * Note: Both the table's contents, and the sg_table itself must be freed by
+> - *       the caller.
+> - * Returns a pointer to the newly allocated sg_table, or an ERR_PTR() error.
+> - */
+> -struct sg_table *mtk_gem_prime_get_sg_table(struct drm_gem_object *obj)
+> -{
+> -	struct mtk_drm_gem_obj *mtk_gem = to_mtk_gem_obj(obj);
+> -	struct mtk_drm_private *priv = obj->dev->dev_private;
+> -	struct sg_table *sgt;
+> -	int ret;
+> -
+> -	sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
+> -	if (!sgt)
+> -		return ERR_PTR(-ENOMEM);
+> -
+> -	ret = dma_get_sgtable_attrs(priv->dma_dev, sgt, mtk_gem->cookie,
+> -				    mtk_gem->dma_addr, obj->size,
+> -				    mtk_gem->dma_attrs);
+> -	if (ret) {
+> -		DRM_ERROR("failed to allocate sgt, %d\n", ret);
+> -		kfree(sgt);
+> -		return ERR_PTR(ret);
+> -	}
+> -
+> -	return sgt;
+> -}
+> -
+> -struct drm_gem_object *mtk_gem_prime_import_sg_table(struct drm_device *dev,
+> -			struct dma_buf_attachment *attach, struct sg_table *sg)
+> -{
+> -	struct mtk_drm_gem_obj *mtk_gem;
+> -	int ret;
+> -	struct scatterlist *s;
+> -	unsigned int i;
+> -	dma_addr_t expected;
+> -
+> -	mtk_gem = mtk_drm_gem_init(dev, attach->dmabuf->size);
+> -
+> -	if (IS_ERR(mtk_gem))
+> -		return ERR_CAST(mtk_gem);
+> -
+> -	expected = sg_dma_address(sg->sgl);
+> -	for_each_sg(sg->sgl, s, sg->nents, i) {
+> -		if (sg_dma_address(s) != expected) {
+> -			DRM_ERROR("sg_table is not contiguous");
+> -			ret = -EINVAL;
+> -			goto err_gem_free;
+> -		}
+> -		expected = sg_dma_address(s) + sg_dma_len(s);
+> -	}
+> -
+> -	mtk_gem->dma_addr = sg_dma_address(sg->sgl);
+> -	mtk_gem->sg = sg;
+> -
+> -	return &mtk_gem->base;
+> -
+> -err_gem_free:
+> -	kfree(mtk_gem);
+> -	return ERR_PTR(ret);
+> -}
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.h b/drivers/gpu/drm/mediatek/mtk_drm_gem.h
+> deleted file mode 100644
+> index 534639b..0000000
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_gem.h
+> +++ /dev/null
+> @@ -1,56 +0,0 @@
+> -/*
+> - * Copyright (c) 2015 MediaTek Inc.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -#ifndef _MTK_DRM_GEM_H_
+> -#define _MTK_DRM_GEM_H_
+> -
+> -#include <drm/drm_gem.h>
+> -
+> -/*
+> - * mtk drm buffer structure.
+> - *
+> - * @base: a gem object.
+> - *	- a new handle to this gem object would be created
+> - *	by drm_gem_handle_create().
+> - * @cookie: the return value of dma_alloc_attrs(), keep it for dma_free_attrs()
+> - * @kvaddr: kernel virtual address of gem buffer.
+> - * @dma_addr: dma address of gem buffer.
+> - * @dma_attrs: dma attributes of gem buffer.
+> - *
+> - * P.S. this object would be transferred to user as kms_bo.handle so
+> - *	user can access the buffer through kms_bo.handle.
+> - */
+> -struct mtk_drm_gem_obj {
+> -	struct drm_gem_object	base;
+> -	void			*cookie;
+> -	void			*kvaddr;
+> -	dma_addr_t		dma_addr;
+> -	unsigned long		dma_attrs;
+> -	struct sg_table		*sg;
+> -};
+> -
+> -#define to_mtk_gem_obj(x)	container_of(x, struct mtk_drm_gem_obj, base)
+> -
+> -void mtk_drm_gem_free_object(struct drm_gem_object *gem);
+> -struct mtk_drm_gem_obj *mtk_drm_gem_create(struct drm_device *dev, size_t size,
+> -					   bool alloc_kmap);
+> -int mtk_drm_gem_dumb_create(struct drm_file *file_priv, struct drm_device *dev,
+> -			    struct drm_mode_create_dumb *args);
+> -int mtk_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma);
+> -int mtk_drm_gem_mmap_buf(struct drm_gem_object *obj,
+> -			 struct vm_area_struct *vma);
+> -struct sg_table *mtk_gem_prime_get_sg_table(struct drm_gem_object *obj);
+> -struct drm_gem_object *mtk_gem_prime_import_sg_table(struct drm_device *dev,
+> -			struct dma_buf_attachment *attach, struct sg_table *sg);
+> -
+> -#endif
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> index f7e6aa1..62de9d5 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> @@ -15,13 +15,13 @@
+>  #include <drm/drmP.h>
+>  #include <drm/drm_atomic.h>
+>  #include <drm/drm_atomic_helper.h>
+> +#include <drm/drm_gem_cma_helper.h>
+>  #include <drm/drm_plane_helper.h>
+>  
+>  #include "mtk_drm_crtc.h"
+>  #include "mtk_drm_ddp_comp.h"
+>  #include "mtk_drm_drv.h"
+>  #include "mtk_drm_fb.h"
+> -#include "mtk_drm_gem.h"
+>  #include "mtk_drm_plane.h"
+>  
+>  static const u32 formats[] = {
+> @@ -115,7 +115,7 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
+>  	struct drm_crtc *crtc = plane->state->crtc;
+>  	struct drm_framebuffer *fb = plane->state->fb;
+>  	struct drm_gem_object *gem;
+> -	struct mtk_drm_gem_obj *mtk_gem;
+> +	struct drm_gem_cma_object *cma_obj;
+>  	unsigned int pitch, format;
+>  	dma_addr_t addr;
+>  
+> @@ -123,8 +123,8 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
+>  		return;
+>  
+>  	gem = fb->obj[0];
+> -	mtk_gem = to_mtk_gem_obj(gem);
+> -	addr = mtk_gem->dma_addr;
+> +	cma_obj = to_drm_gem_cma_obj(gem);
+> +	addr = cma_obj->paddr;
+>  	pitch = fb->pitches[0];
+>  	format = fb->format->format;
+>  
+> -- 
+> 1.9.1
+> 
+
 -- 
-1.7.1
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
