@@ -1,31 +1,37 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 26 Oct 2018 20:13:29 +0530
-Subject: [PATCH v3 10/25] drm/sun4i: sun6i_mipi_dsi: Fix DSI hbp timing value
+Date: Fri, 26 Oct 2018 20:13:26 +0530
+Subject: [PATCH v3 07/25] drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
 In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
 References: <20181026144344.27778-1-jagan@amarulasolutions.com>
-Message-ID: <20181026144344.27778-11-jagan@amarulasolutions.com>
+Message-ID: <20181026144344.27778-8-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current driver is calculating hbp maximum value by subtracting
-hsync_start with hdisplay which is front porch value, but the
-hbp refers to back porch.
+The horizontal and vertical back porch calculation in BSP
+code is simply following the Linux drm comment diagram, in
+include/drm/drm_modes.h which is
 
-Back porch value is calculating by subtracting htotal with
-hsync_end as per drm_mode timings, and BSP code from BPI-M64-bsp
-is eventually following the same.
+[hv]back porch = [hv]total - [hv]sync_end
 
-BPI-M64-bsp is computing hbp as
-(in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-dsi_hbp = (hbp-hspw)*dsi_pixel_bits[format]/8 - (4+2);
-=> (panel->lcd_hbp - timmings->hor_sync_time)
-=> (timmings->hor_back_porch + timmings->hor_sync_time - timmings->hor_sync_time)
-=> timmings->hor_back_porch
-=> mode->htotal - mode->hsync_end
+BSP code form BPI-M64-bsp is calculating vertical back porch as
+(from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
 
-So, update the MIPI-DSI hbp value accordingly.
+timmings->ver_sync_time= panel_info->lcd_vspw;
+timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
 
-Tested on 2-lane, 4-lane DSI LCD panels.
+vbp = panel->lcd_vbp;
+vspw = panel->lcd_vspw;
+dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
+dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
+=>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
+=>  timmings->ver_back_porch
+=>  mode->vtotal - mode->end
+
+Which evatually same as mode->vtotal - mode->vsync_end so update the
+same in SUN6I_DSI_BASIC_SIZE0_VBP
+
+On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
+value.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Tested-by: Jagan Teki <jagan@amarulasolutions.com>
@@ -36,21 +42,23 @@ Changes for v3:
 Changes for v2:
 - none
 
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 6bece492b1f7..78bad71045ca 100644
+index fc8560607147..3a1d48bc1996 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -482,7 +482,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	 */
- #define HBP_PACKET_OVERHEAD	6
- 	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
--		  (mode->hsync_start - mode->hdisplay) * Bpp - HBP_PACKET_OVERHEAD);
-+		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
+@@ -526,8 +526,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
+ 		     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
+ 					       mode->vsync_start) |
+-		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
+-					       mode->vdisplay));
++		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
++					       mode->vsync_end));
  
- 	/*
- 	 * The frontporch is set using a blanking packet (4 bytes +
+ 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE1_REG,
+ 		     SUN6I_DSI_BASIC_SIZE1_VACT(mode->vdisplay) |
 -- 
 2.18.0.321.gffc6fa0e3
