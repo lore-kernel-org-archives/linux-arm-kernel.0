@@ -1,72 +1,199 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Fri, 26 Oct 2018 16:50:34 +0800
-Subject: [PATCH] mm/page_owner: use vmalloc instead of kmalloc
-In-Reply-To: <20181025192701.GK25444@bombadil.infradead.org>
-References: <1540492481-4144-1-git-send-email-miles.chen@mediatek.com>
- <20181025192701.GK25444@bombadil.infradead.org>
-Message-ID: <1540543834.21297.14.camel@mtkswgap22>
+From: xiaowei.bao@nxp.com (Xiaowei Bao)
+Date: Fri, 26 Oct 2018 09:18:38 +0000
+Subject: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+In-Reply-To: <d9d07e05-556b-a56d-bb7f-eaec9fb739b8@ti.com>
+References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
+ <20181025110901.5680-5-xiaowei.bao@nxp.com>
+ <d9d07e05-556b-a56d-bb7f-eaec9fb739b8@ti.com>
+Message-ID: <HE1PR04MB1497DF7D9428A5C791CB6A03F5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-10-25 at 12:27 -0700, Matthew Wilcox wrote:
-> On Fri, Oct 26, 2018 at 02:34:41AM +0800, miles.chen at mediatek.com wrote:
-> > The kbuf used by page owner is allocated by kmalloc(),
-> > which means it can use only normal memory and there might
-> > be a "out of memory" issue when we're out of normal memory.
-> > 
-> > Use vmalloc() so we can also allocate kbuf from highmem
-> > on 32bit kernel.
-> 
-> ... hang on, there's a bigger problem here.
-> 
-> static const struct file_operations proc_page_owner_operations = {
->         .read           = read_page_owner,
-> };
-> 
-> read_page_owner(struct file *file, char __user *buf, size_t count, loff_t *ppos)
-> {
-> ...
->                 return print_page_owner(buf, count, pfn, page,
->                                 page_owner, handle);
-> }
-> 
-> static ssize_t
-> print_page_owner(char __user *buf, size_t count, unsigned long pfn,
->                 struct page *page, struct page_owner *page_owner,
->                 depot_stack_handle_t handle)
-> {mount -t debugfs none /sys/kernel/debug/
-> ...
->       kbuf = kmalloc(count, GFP_KERNEL);
-> 
-> So I can force the kernel to make an arbitrary size allocation, triggering
-> OOMs and forcing swapping if I can get a file handle to this file.
-> The only saving grace is that (a) this is a debugfs file and (b) it's
-> root-only (mode 0400).  Nevertheless, I feel some clamping is called
-> for here.  Do we really need to output more than 4kB worth of text here?
-> 
-I did a test on my device, the allocation count is 4096 and around 6xx
-bytes are used each print_page_owner() is called. It looks like that
-clamping the reading count to PAGE_SIZE is ok.
 
-The following output from print_page_owner() is 660 bytes long, I think
-PAGE_SIZE should be enough to print the information we need.
 
-Page allocated via order 0, mask 0x6200ca(GFP_HIGHUSER_MOVABLE)
-PFN 262199 type Movable Block 512 type Movable Flags 0x4003c(referenced|
-uptodate|dirty|lru|swapbacked)
- get_page_from_freelist+0x1580/0x1650
- __alloc_pages_nodemask+0xcc/0xfa4
- shmem_alloc_page+0xa4/0xc8
- shmem_alloc_and_acct_page+0x138/0x2b8
- shmem_getpage_gfp.isra.54+0x164/0xfc8
- shmem_write_begin+0x84/0xcc
- generic_perform_write+0xe8/0x210
- __generic_file_write_iter+0x1d4/0x230
- generic_file_write_iter+0x184/0x2e8
- new_sync_write+0x144/0x1c4
- vfs_write+0x194/0x278
- ksys_write+0x64/0xd4
- xwrite+0x34/0x84
- do_copy+0xf4/0x168
- flush_buffer+0x68/0xec
- __gunzip+0x370/0x448
+-----Original Message-----
+From: Kishon Vijay Abraham I <kishon@ti.com> 
+Sent: 2018?10?26? 13:29
+To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+
+Hi,
+
+On Thursday 25 October 2018 04:39 PM, Xiaowei Bao wrote:
+> Add the PCIe EP mode support for layerscape platform.
+> 
+> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
+> ---
+>  drivers/pci/controller/dwc/Makefile            |    2 +-
+>  drivers/pci/controller/dwc/pci-layerscape-ep.c |  161 
+> ++++++++++++++++++++++++
+>  2 files changed, 162 insertions(+), 1 deletions(-)  create mode 
+> 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
+> 
+> diff --git a/drivers/pci/controller/dwc/Makefile 
+> b/drivers/pci/controller/dwc/Makefile
+> index 5d2ce72..b26d617 100644
+> --- a/drivers/pci/controller/dwc/Makefile
+> +++ b/drivers/pci/controller/dwc/Makefile
+> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
+>  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
+>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+>  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
+> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
+> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
+>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o diff --git 
+> a/drivers/pci/controller/dwc/pci-layerscape-ep.c 
+> b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+> new file mode 100644
+> index 0000000..3b33bbc
+> --- /dev/null
+> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+> @@ -0,0 +1,161 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * PCIe controller EP driver for Freescale Layerscape SoCs
+> + *
+> + * Copyright (C) 2018 NXP Semiconductor.
+> + *
+> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>  */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <linux/pci.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/resource.h>
+> +
+> +#include "pcie-designware.h"
+> +
+> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
+
+The base address should come from dt.
+> +
+> +struct ls_pcie_ep {
+> +	struct dw_pcie		*pci;
+> +};
+> +
+> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
+> +
+> +static bool ls_pcie_is_bridge(struct ls_pcie_ep *pcie) {
+> +	struct dw_pcie *pci = pcie->pci;
+> +	u32 header_type;
+> +
+> +	header_type = ioread8(pci->dbi_base + PCI_HEADER_TYPE);
+> +	header_type &= 0x7f;
+> +
+> +	return header_type == PCI_HEADER_TYPE_BRIDGE; }
+> +
+> +static int ls_pcie_establish_link(struct dw_pcie *pci) {
+> +	return 0;
+> +}
+
+There should be some way by which EP should tell RC that it is not configured yet. Are there no bits to control LTSSM state initialization or Configuration retry status enabling?
+[Xiaowei Bao] There have not bits to control LTSSM state to tell the RC it is configured. The start link is auto completed.
+> +
+> +static const struct dw_pcie_ops ls_pcie_ep_ops = {
+> +	.start_link = ls_pcie_establish_link, };
+> +
+> +static const struct of_device_id ls_pcie_ep_of_match[] = {
+> +	{ .compatible = "fsl,ls-pcie-ep",},
+> +	{ },
+> +};
+> +
+> +static void ls_pcie_ep_init(struct dw_pcie_ep *ep) {
+> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
+> +	struct pci_epc *epc = ep->epc;
+> +	enum pci_barno bar;
+> +
+> +	for (bar = BAR_0; bar <= BAR_5; bar++)
+> +		dw_pcie_ep_reset_bar(pci, bar);
+> +
+> +	epc->features |= EPC_FEATURE_NO_LINKUP_NOTIFIER; }
+> +
+> +static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
+> +				  enum pci_epc_irq_type type, u16 interrupt_num) {
+> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
+> +
+> +	switch (type) {
+> +	case PCI_EPC_IRQ_LEGACY:
+> +		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
+> +	case PCI_EPC_IRQ_MSI:
+> +		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
+> +	case PCI_EPC_IRQ_MSIX:
+> +		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
+> +	default:
+> +		dev_err(pci->dev, "UNKNOWN IRQ type\n");
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct dw_pcie_ep_ops pcie_ep_ops = {
+> +	.ep_init = ls_pcie_ep_init,
+> +	.raise_irq = ls_pcie_ep_raise_irq,
+> +};
+> +
+> +static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
+> +					struct platform_device *pdev)
+> +{
+> +	struct dw_pcie *pci = pcie->pci;
+> +	struct device *dev = pci->dev;
+> +	struct dw_pcie_ep *ep;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	ep = &pci->ep;
+> +	ep->ops = &pcie_ep_ops;
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
+> +	if (!res)
+> +		return -EINVAL;
+> +
+> +	ep->phys_base = res->start;
+> +	ep->addr_size = resource_size(res);
+> +
+> +	ret = dw_pcie_ep_init(ep);
+> +	if (ret) {
+> +		dev_err(dev, "failed to initialize endpoint\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init ls_pcie_ep_probe(struct platform_device *pdev) {
+> +	struct device *dev = &pdev->dev;
+> +	struct dw_pcie *pci;
+> +	struct ls_pcie_ep *pcie;
+> +	struct resource *dbi_base;
+> +	int ret;
+> +
+> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
+> +	if (!pcie)
+> +		return -ENOMEM;
+> +
+> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +	if (!pci)
+> +		return -ENOMEM;
+> +
+> +	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
+> +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
+> +	if (IS_ERR(pci->dbi_base))
+> +		return PTR_ERR(pci->dbi_base);
+> +
+> +	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
+> +	pci->dev = dev;
+> +	pci->ops = &ls_pcie_ep_ops;
+> +	pcie->pci = pci;
+> +
+> +	if (ls_pcie_is_bridge(pcie))
+> +		return -ENODEV;
+
+For an endpoint this condition should never occur. This should only mean, a wrong compatible has been used in dt.
+[Xiaowei Bao] This function is a way that can check the PCI controller whether work in EP mode, I think it is more safer. Of course, it can be removed.
+Thanks
+Kishon
