@@ -1,61 +1,69 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 Oct 2018 09:33:18 +0100
-Subject: [PATCH] arm64: Log the Fault Status Code (FSC) upon memory aborts
-In-Reply-To: <1540512876-12011-1-git-send-email-sudaraja@codeaurora.org>
-References: <1540512876-12011-1-git-send-email-sudaraja@codeaurora.org>
-Message-ID: <20181026083318.xbeo3drinb5ptiba@blommer>
+Date: Fri, 26 Oct 2018 09:42:58 +0100
+Subject: [PATCH] arm64: Don't flush tlb while clearing the accessed bit
+In-Reply-To: <1540483944-22718-1-git-send-email-amhetre@nvidia.com>
+References: <1540483944-22718-1-git-send-email-amhetre@nvidia.com>
+Message-ID: <20181026084258.sjp2vmarmsfj2wbz@blommer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 05:14:36PM -0700, Sudarshan Rajagopalan wrote:
-> When decoding the information from ESR on mem faults, log the
-> FSC value, which is commonly shared for Data and Instruction aborts.
+On Thu, Oct 25, 2018 at 09:42:24PM +0530, Ashish Mhetre wrote:
+> From: Alex Van Brunt <avanbrunt@nvidia.com>
+> 
+> Accessed bit is used to age a page and in generic implementation there is
+> flush_tlb while clearing the accessed bit.
+> Flushing a TLB is overhead on ARM64 as access flag faults don't get
+> translation table entries cached into TLB's. Flushing TLB is not necessary
+> for this. Clearing the accessed bit without flushing TLB doesn't cause data
+> corruption on ARM64.
+> In our case with this patch, speed of reading from fast NVMe/SSD through
+> PCIe got improved by 10% ~ 15% and writing got improved by 20% ~ 40%.
+> So for performance optimisation don't flush TLB when clearing the accessed
+> bit on ARM64.
+> x86 made the same optimization even though their TLB invalidate is much
+> faster as it doesn't broadcast to other CPUs.
 
-Given we extract the other fields, extracting the FSC makes sense to me.
+To save others the time, the relevant x86 commit is:
+
+  b13b1d2d8692b437 ("x86/mm: In the PTE swapout page reclaim case clear the accessed bit instead of flushing the TLB")
+
+That does call out the fact that this means page aging will be imprecise, and
+hot pages might be reclaimed, with the claim being that the chance of this is
+relatively low.
+
+Do we have any numbers for other workloads?
 
 > 
-> Change-Id: If7d7f6027958864d99dfb7e79d368e82415dce97
-
-Please drop any Change-Id tag when sending patches upstream.
-
-> Signed-off-by: Sudarshan Rajagopalan <sudaraja@codeaurora.org>
+> Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
+> Signed-off-by: Ashish Mhetre <amhetre@nvidia.com>
 > ---
->  arch/arm64/mm/fault.c | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm64/include/asm/pgtable.h | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index b8eecc7..e9d07ab 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -120,6 +120,7 @@ static void mem_abort_decode(unsigned int esr)
->  	pr_alert("  EA = %lu, S1PTW = %lu\n",
->  		 (esr & ESR_ELx_EA) >> ESR_ELx_EA_SHIFT,
->  		 (esr & ESR_ELx_S1PTW) >> ESR_ELx_S1PTW_SHIFT);
-> +	pr_alert("  FSC = %lu\n", (esr & ESR_ELx_FSC));
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 2ab2031..42931f6 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -652,6 +652,13 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
+>  	return __ptep_test_and_clear_young(ptep);
+>  }
+>  
+> +#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
+> +static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
+> +					 unsigned long address, pte_t *ptep)
+> +{
+> +	return ptep_test_and_clear_young(vma, address, ptep);
+> +}
 
-I think it would make sense to log this immediately after the ESR and decoded
-exception class, before the other fault fields.
+As with the x86 commit, we should comment why we're not flushing the TLB here.
 
-It would be nice if we could factor out the strings from the fault_info table,
-so that we can print a human-readable string as we do for the ESR, but I think
-that can be a future addition.
-
-FWIW, with this moved immediately after the dump of the ESR (and decoded ESR
-string):
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
+Thanks,
 Mark.
 
->  
->  	if (esr_is_data_abort(esr))
->  		data_abort_decode(esr);
+> +
+>  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+>  #define __HAVE_ARCH_PMDP_TEST_AND_CLEAR_YOUNG
+>  static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 > -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> 2.7.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
