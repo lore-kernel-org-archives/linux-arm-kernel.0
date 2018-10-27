@@ -1,129 +1,147 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat, 27 Oct 2018 15:25:29 +0530
-Subject: [linux-sunxi] [PATCH v3 20/25] drm/panel: Add Techstar TS8550B
- MIPI-DSI LCD panel
-In-Reply-To: <20181026161324.qbpcpkpwyixi7juk@plaes.org>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181026144344.27778-21-jagan@amarulasolutions.com>
- <20181026161324.qbpcpkpwyixi7juk@plaes.org>
-Message-ID: <CAMty3ZDc84ErYB9LR_Y7OJtUOx+AAhTV1RwC7-Jr1Br8yN6hUw@mail.gmail.com>
+From: chenyu56@huawei.com (Yu Chen)
+Date: Sat, 27 Oct 2018 17:58:20 +0800
+Subject: [PATCH 10/10] dts: hi3660: Add support for usb on Hikey960
+In-Reply-To: <20181027095820.40056-1-chenyu56@huawei.com>
+References: <20181027095820.40056-1-chenyu56@huawei.com>
+Message-ID: <20181027095820.40056-11-chenyu56@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 9:43 PM Priit Laes <plaes@plaes.org> wrote:
->
-> On Fri, Oct 26, 2018 at 08:13:39PM +0530, Jagan Teki wrote:
-> > Techstar TS8550B MIPI DSI panel is 480x854, 2-lane MIPI DSI
-> > LCD panel. Add panel driver for it.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > Tested-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> > Changes for v3:
-> > - new patch
-> > Changes for v2:
-> > - none
-> >
-> >  drivers/gpu/drm/panel/Kconfig                 |   9 +
-> >  drivers/gpu/drm/panel/Makefile                |   1 +
-> >  .../gpu/drm/panel/panel-techstar-ts8550b.c    | 346 ++++++++++++++++++
-> >  3 files changed, 356 insertions(+)
-> >  create mode 100644 drivers/gpu/drm/panel/panel-techstar-ts8550b.c
-> >
-> > diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-> > index 20b88c275421..d0d4e60f5153 100644
-> > --- a/drivers/gpu/drm/panel/Kconfig
-> > +++ b/drivers/gpu/drm/panel/Kconfig
-> > @@ -195,4 +195,13 @@ config DRM_PANEL_SITRONIX_ST7789V
-> >         Say Y here if you want to enable support for the Sitronix
-> >         ST7789V controller for 240x320 LCD panels
-> >
-> > +config DRM_PANEL_TECHSTAR_TS8550B
-> > +     tristate "Techstar TS8550B MIPI-DSI panel driver"
-> > +     depends on OF
-> > +     depends on DRM_MIPI_DSI
-> > +     depends on BACKLIGHT_CLASS_DEVICE
-> > +     help
-> > +       Say Y if you want to enable support for panels based on the
-> > +       Techstar TS8550B MIPI-DSI interface.
-> > +
-> >  endmenu
-> > diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-> > index 04696bb85218..88011f06edb8 100644
-> > --- a/drivers/gpu/drm/panel/Makefile
-> > +++ b/drivers/gpu/drm/panel/Makefile
-> > @@ -20,3 +20,4 @@ obj-$(CONFIG_DRM_PANEL_SEIKO_43WVF1G) += panel-seiko-43wvf1g.o
-> >  obj-$(CONFIG_DRM_PANEL_SHARP_LQ101R1SX01) += panel-sharp-lq101r1sx01.o
-> >  obj-$(CONFIG_DRM_PANEL_SHARP_LS043T1LE01) += panel-sharp-ls043t1le01.o
-> >  obj-$(CONFIG_DRM_PANEL_SITRONIX_ST7789V) += panel-sitronix-st7789v.o
-> > +obj-$(CONFIG_DRM_PANEL_TECHSTAR_TS8550B) += panel-techstar-ts8550b.o
-> > diff --git a/drivers/gpu/drm/panel/panel-techstar-ts8550b.c b/drivers/gpu/drm/panel/panel-techstar-ts8550b.c
-> > new file mode 100644
-> > index 000000000000..8baca71595a7
-> > --- /dev/null
-> > +++ b/drivers/gpu/drm/panel/panel-techstar-ts8550b.c
-> > @@ -0,0 +1,346 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * Copyright (C) 2019, Amarula Solutions.
-> > + * Author: Jagan Teki <jagan@amarulasolutions.com>
-> > + */
-> > +
-> > +#include <linux/backlight.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/device.h>
-> > +#include <linux/err.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/fb.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +
-> > +#include <linux/gpio/consumer.h>
-> > +#include <linux/regulator/consumer.h>
-> > +
-> > +#include <drm/drm_mipi_dsi.h>
-> > +#include <drm/drm_modes.h>
-> > +#include <drm/drm_panel.h>
-> > +
-> > +#include <video/mipi_display.h>
-> > +
-> > +struct ts8550b {
-> > +     struct drm_panel        panel;
-> > +     struct mipi_dsi_device  *dsi;
-> > +
-> > +     struct backlight_device *backlight;
-> > +     struct regulator        *dvdd;
-> > +     struct regulator        *avdd;
-> > +     struct gpio_desc        *reset;
-> > +
-> > +     bool                    is_enabled;
-> > +     bool                    is_prepared;
-> > +};
-> > +
-> > +static inline struct ts8550b *panel_to_ts8550b(struct drm_panel *panel)
-> > +{
-> > +     return container_of(panel, struct ts8550b, panel);
-> > +}
-> > +
-> > +static inline int ts8550b_dcs_write_seq(struct ts8550b *ctx, const void *seq,
-> > +                                     size_t len)
-> > +{
-> > +     return mipi_dsi_dcs_write_buffer(ctx->dsi, seq, len);
-> > +};
-> > +
-> > +#define ts8550b_dcs_write_seq_static(ctx, seq...)            \
-> > +     ({                                                      \
-> > +             static const u8 d[] = { seq };                  \
-> > +             ts8550b_dcs_write_seq(ctx, d, ARRAY_SIZE(d));   \
-> > +     })
-> > +
-> > +static void ts8550b_init_sequence(struct ts8550b *ctx)
->
-> This seems to be pretty "standard" MIPI-based display, utilizing
-> bunch of manufacturer-specific commands during init sequence.
->
-> Standard MIPI commands fall between 0x00..0xAF and are defined in <video/mipi.h>
+This patch adds support for usb on Hikey960.
 
-Where is this file? we have include/video/mipi_display.h with
-0x00..0xA8. Not all commands in sequence is listed in this, may be I
-will update DCS commands macros and rest as-it-is. what do you think?
+Cc: Wei Xu <xuwei5@hisilicon.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Binghui Wang <wangbinghui@hisilicon.com>
+Signed-off-by: Yu Chen <chenyu56@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 35 +++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 52 +++++++++++++++++++++++
+ 2 files changed, 87 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index c98bcbc8dfba..49b6965a96c8 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -13,6 +13,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/usb/pd.h>
+ 
+ / {
+ 	model = "HiKey960";
+@@ -196,6 +197,17 @@
+ 			method = "smc";
+ 		};
+ 	};
++
++	hisi_hikey_usb: hisi_hikey_usb {
++		compatible = "hisilicon,hikey960_usb";
++		typc_vbus_int_gpio,typec-gpios = <&gpio25 2 0>;
++		typc_vbus_enable_val = <1>;
++		otg_gpio = <&gpio25 6 0>;
++		hub_vdd33_en_gpio = <&gpio5 6 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usbhub5734_pmx_func>;
++	};
++
+ };
+ 
+ /*
+@@ -526,6 +538,29 @@
+ &i2c1 {
+ 	status = "okay";
+ 
++	rt1711h: rt1711h at 4e {
++		compatible = "richtek,rt1711h";
++		reg = <0x4e>;
++		status = "ok";
++		interrupt-parent = <&gpio27>;
++		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb_cfg_func>;
++		dev-conn-end = "hisi_hikey_usb-role-switch";
++
++		usb_con: connector {
++			compatible = "usb-c-connector";
++			label = "USB-C";
++			data-role = "dual";
++			power-role = "dual";
++			try-power-role = "sink";
++			source-pdos = <PDO_FIXED(5000, 500, PDO_FIXED_USB_COMM)>;
++			sink-pdos = <PDO_FIXED(5000, 500, PDO_FIXED_USB_COMM)
++				PDO_VAR(5000, 5000, 1000)>;
++			op-sink-microwatt = <10000000>;
++		};
++	};
++
+ 	adv7533: adv7533 at 39 {
+ 		status = "ok";
+ 		compatible = "adi,adv7533";
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index f432b0a88c65..d0af1cd4db80 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -1122,5 +1122,57 @@
+ 				};
+ 			};
+ 		};
++
++		usb3_otg_bc: usb3_otg_bc at ff200000 {
++			compatible = "syscon";
++			reg = <0x0 0xff200000 0x0 0x1000>;
++		};
++
++		usb_phy: usbphy {
++			compatible = "hisilicon,hi3660-usb-phy";
++			#phy-cells = <0>;
++			hisilicon,pericrg-syscon = <&crg_ctrl>;
++			hisilicon,pctrl-syscon = <&pctrl>;
++			hisilicon,usb3-otg-bc-syscon = <&usb3_otg_bc>;
++			eye-diagram-param = <0x22466e4>;
++		};
++
++		usb3: hisi_dwc3 {
++			compatible = "hisilicon,hi3660-dwc3";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++
++			clocks = <&crg_ctrl HI3660_CLK_ABB_USB>,
++				 <&crg_ctrl HI3660_ACLK_GATE_USB3OTG>;
++			clock-names = "clk_usb3phy_ref", "aclk_usb3otg";
++
++			assigned-clocks = <&crg_ctrl HI3660_ACLK_GATE_USB3OTG>;
++			assigned-clock-rates = <229000000>;
++			resets = <&crg_rst 0x90 8>,
++				 <&crg_rst 0x90 7>,
++				 <&crg_rst 0x90 6>,
++				 <&crg_rst 0x90 5>;
++
++			dwc3 at ff100000 {
++				compatible = "snps,dwc3";
++				reg = <0x0 0xff100000 0x0 0x100000>;
++				interrupts = <0 159 4>, <0 161 4>;
++				phys = <&usb_phy>;
++				phy-names = "usb3-phy";
++				dr_mode = "otg";
++				maximum-speed = "super-speed";
++				phy_type = "utmi";
++				snps,dis-del-phy-power-chg-quirk;
++				snps,lfps_filter_quirk;
++				snps,dis_u2_susphy_quirk;
++				snps,dis_u3_susphy_quirk;
++				snps,tx_de_emphasis_quirk;
++				snps,tx_de_emphasis = <1>;
++				snps,dis_enblslpm_quirk;
++				snps,gctl-reset-quirk;
++				extcon = <&hisi_hikey_usb>;
++			};
++		};
+ 	};
+ };
+-- 
+2.15.0-rc2
