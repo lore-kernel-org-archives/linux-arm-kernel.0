@@ -1,36 +1,40 @@
 From: changbin.du@gmail.com (Changbin Du)
-Date: Sun, 28 Oct 2018 13:09:42 +0000
-Subject: [PATCH v3 1/4] x86/mm: declare check_la57_support() as inline
+Date: Sun, 28 Oct 2018 13:09:44 +0000
+Subject: [PATCH v3 3/4] ARM: mm: fix build error in fix_to_virt with
+ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
 In-Reply-To: <20181028130945.23581-1-changbin.du@gmail.com>
 References: <20181028130945.23581-1-changbin.du@gmail.com>
-Message-ID: <20181028130945.23581-2-changbin.du@gmail.com>
+Message-ID: <20181028130945.23581-4-changbin.du@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The level4_kernel_pgt is only defined when X86_5LEVEL is enabled.
-So declare check_la57_support() as inline to make sure the code
-referring to level4_kernel_pgt is optimized out. This is a preparation
-for CONFIG_CC_OPTIMIZE_FOR_DEBUGGING.
+With '-Og' optimization level, GCC would not optimize a count for a loop
+as a constant value. But BUILD_BUG_ON() only accept compile-time constant
+values. Let's use __fix_to_virt() to avoid the error.
+
+arch/arm/mm/mmu.o: In function `fix_to_virt':
+/home/changbin/work/linux/./include/asm-generic/fixmap.h:31: undefined reference to `__compiletime_assert_31'
+Makefile:1051: recipe for target 'vmlinux' failed
+make: *** [vmlinux] Error 1
 
 Signed-off-by: Changbin Du <changbin.du@gmail.com>
-Cc: Steven Rostedt (VMware) <rostedt@goodmis.org>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 ---
- arch/x86/kernel/head64.c | 2 +-
+ arch/arm/mm/mmu.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/x86/kernel/head64.c b/arch/x86/kernel/head64.c
-index 5dc377dc9d7b..5ae682f2aa83 100644
---- a/arch/x86/kernel/head64.c
-+++ b/arch/x86/kernel/head64.c
-@@ -98,7 +98,7 @@ static bool __head check_la57_support(unsigned long physaddr)
- 	return true;
- }
- #else
--static bool __head check_la57_support(unsigned long physaddr)
-+static inline bool __head check_la57_support(unsigned long physaddr)
- {
- 	return false;
- }
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e46a6a446cdd..c08d74e76714 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1599,7 +1599,7 @@ static void __init early_fixmap_shutdown(void)
+ 		pte_t *pte;
+ 		struct map_desc map;
+ 
+-		map.virtual = fix_to_virt(i);
++		map.virtual = __fix_to_virt(i);
+ 		pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
+ 
+ 		/* Only i/o device mappings are supported ATM */
 -- 
 2.17.1
