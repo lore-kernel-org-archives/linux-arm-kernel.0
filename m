@@ -1,40 +1,72 @@
 From: changbin.du@gmail.com (Changbin Du)
-Date: Sun, 28 Oct 2018 13:09:44 +0000
-Subject: [PATCH v3 3/4] ARM: mm: fix build error in fix_to_virt with
- CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+Date: Sun, 28 Oct 2018 13:09:43 +0000
+Subject: [PATCH v3 2/4] kernel hacking: new config NO_AUTO_INLINE to disable
+ compiler auto-inline optimizations
 In-Reply-To: <20181028130945.23581-1-changbin.du@gmail.com>
 References: <20181028130945.23581-1-changbin.du@gmail.com>
-Message-ID: <20181028130945.23581-4-changbin.du@gmail.com>
+Message-ID: <20181028130945.23581-3-changbin.du@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With '-Og' optimization level, GCC would not optimize a count for a loop
-as a constant value. But BUILD_BUG_ON() only accept compile-time constant
-values. Let's use __fix_to_virt() to avoid the error.
+This patch add a new kernel hacking option NO_AUTO_INLINE. Selecting
+this option will prevent the compiler from optimizing the kernel by
+auto-inlining functions not marked with the inline keyword.
 
-arch/arm/mm/mmu.o: In function `fix_to_virt':
-/home/changbin/work/linux/./include/asm-generic/fixmap.h:31: undefined reference to `__compiletime_assert_31'
-Makefile:1051: recipe for target 'vmlinux' failed
-make: *** [vmlinux] Error 1
+With this option, only functions explicitly marked with "inline" will
+be inlined. This will allow the function tracer to trace more functions
+because it only traces functions that the compiler has not inlined.
 
 Signed-off-by: Changbin Du <changbin.du@gmail.com>
 Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 ---
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Makefile          |  6 ++++++
+ lib/Kconfig.debug | 17 +++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e46a6a446cdd..c08d74e76714 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1599,7 +1599,7 @@ static void __init early_fixmap_shutdown(void)
- 		pte_t *pte;
- 		struct map_desc map;
+diff --git a/Makefile b/Makefile
+index 7d4ba5196010..04beb822ddfc 100644
+--- a/Makefile
++++ b/Makefile
+@@ -749,6 +749,12 @@ KBUILD_CFLAGS 	+= $(call cc-option, -femit-struct-debug-baseonly) \
+ 		   $(call cc-option,-fno-var-tracking)
+ endif
  
--		map.virtual = fix_to_virt(i);
-+		map.virtual = __fix_to_virt(i);
- 		pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
++ifdef CONFIG_NO_AUTO_INLINE
++KBUILD_CFLAGS   += $(call cc-option, -fno-inline-functions) \
++		   $(call cc-option, -fno-inline-small-functions) \
++		   $(call cc-option, -fno-inline-functions-called-once)
++endif
++
+ ifdef CONFIG_FUNCTION_TRACER
+ ifdef CONFIG_FTRACE_MCOUNT_RECORD
+   # gcc 5 supports generating the mcount tables directly
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 04adfc3b185e..d50711b41dad 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -211,6 +211,23 @@ config GDB_SCRIPTS
+ 	  instance. See Documentation/dev-tools/gdb-kernel-debugging.rst
+ 	  for further details.
  
- 		/* Only i/o device mappings are supported ATM */
++config NO_AUTO_INLINE
++	bool "Disable compiler auto-inline optimizations"
++	help
++	  This will prevent the compiler from optimizing the kernel by
++	  auto-inlining functions not marked with the inline keyword.
++	  With this option, only functions explicitly marked with
++	  "inline" will be inlined. This will allow the function tracer
++	  to trace more functions because it only traces functions that
++	  the compiler has not inlined.
++
++	  Enabling this function can help debugging a kernel if using
++	  the function tracer. But it can also change how the kernel
++	  works, because inlining functions may change the timing,
++	  which could make it difficult while debugging race conditions.
++
++	  If unsure, select N.
++
+ config ENABLE_MUST_CHECK
+ 	bool "Enable __must_check logic"
+ 	default y
 -- 
 2.17.1
