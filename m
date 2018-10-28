@@ -1,39 +1,40 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 28 Oct 2018 22:34:50 +0000
-Subject: [PATCH v2 0/2] i2c-omap: Enable i2c-omap driver for AM654 SoCs
-In-Reply-To: <09a6b1d4-f8f4-ea90-f361-bd3a92088430@ti.com>
-References: <20180928052557.21663-1-vigneshr@ti.com>
- <09a6b1d4-f8f4-ea90-f361-bd3a92088430@ti.com>
-Message-ID: <20181028223450.GK1882@kunai>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 29 Oct 2018 10:08:31 +1100
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+Message-ID: <20181029100831.73b12672@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2018 at 01:23:40PM +0530, Vignesh R wrote:
-> 
-> 
-> On 28-Sep-18 10:55 AM, Vignesh R wrote:
-> > Couple of patches to enable i2c-omap driver to be used with TI's new
-> > AM654 platforms.
-> > 
-> > 
-> > Vignesh R (2):
-> >   dt-bindings: i2c-omap: Add new compatible for AM654 SoCs
-> >   i2c: busses: Kconfig: Enable I2C_OMAP for ARCH_K3
-> > 
-> >  Documentation/devicetree/bindings/i2c/i2c-omap.txt | 8 ++++++--
-> >  drivers/i2c/busses/Kconfig                         | 2 +-
-> >  2 files changed, 7 insertions(+), 3 deletions(-)
-> > 
-> 
-> Gentle ping...
+Hi all,
 
-Maintainer tags are missing. Tony is listed for this driver on OMAP2+.
-Is this his realm? Do we need a specific maintainer for this driver?
+Today's linux-next merge of the arm-soc tree got a conflict in:
 
+  drivers/soc/qcom/Kconfig
+
+between commit:
+
+  a978a5b8d83f ("net/kconfig: Make QCOM_QMI_HELPERS available when COMPILE_TEST")
+
+from Linus' tree and commit:
+
+  ccfb464cd106 ("soc: qcom: Allow COMPILE_TEST of qcom SoC Kconfigs")
+
+from the arm-soc tree.
+
+I fixed it up (I just used the version in Linus' tree) and can carry the
+fix as necessary. This is now fixed as far as linux-next is concerned,
+but any non trivial conflicts should be mentioned to your upstream
+maintainer when your tree is submitted for merging.  You may also want
+to consider cooperating with the maintainer of the conflicting tree to
+minimise any particularly complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181028/a78e623f/attachment-0001.sig>
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/fd484807/attachment.sig>
