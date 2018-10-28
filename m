@@ -1,75 +1,40 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 28 Oct 2018 13:55:01 +0100
-Subject: [PATCH 2/2] clocksource: meson6_timer: implement ARM delay timer
-In-Reply-To: <20181028125501.17336-1-martin.blumenstingl@googlemail.com>
-References: <20181028125501.17336-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181028125501.17336-3-martin.blumenstingl@googlemail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 28 Oct 2018 22:09:21 +0900
+Subject: [PATCH v2 4/4] kernel hacking: new config
+ CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og optimization
+In-Reply-To: <20181028125106.azcn2dxia3snplin@mail.google.com>
+References: <20181019124921.13780-1-changbin.du@gmail.com>
+ <20181019124921.13780-5-changbin.du@gmail.com>
+ <CAK7LNARW0=0d7m5DAgZOir=h0Y4tssqZoQRGasnGPNnvNf_+pg@mail.gmail.com>
+ <20181028125106.azcn2dxia3snplin@mail.google.com>
+Message-ID: <CAK7LNARr7bE=DVuzim5771heuN5os0=5-D+jXfUyBb2e1xYoRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement an ARM delay timer to be used for udelay(). This allows us to
-skip the delay loop calibration at boot.
+Hi Changbin,
 
-With this patch udelay() is now independent of CPU frequency changes.
-This is a good thing on Meson8, Meson8b and Meson8m2 because changing
-the CPU frequency requires running the CPU clock off the XTAL while
-changing the PLL or it's dividers. After changing the CPU clocks we need
-to wait a few usecs for the clock to become stable. So having an
-udelay() implementation that doesn't depend on the CPU frequency is
-beneficial.
+On Sun, Oct 28, 2018 at 9:52 PM Changbin Du <changbin.du@gmail.com> wrote:
 
-Suggested-by: Jianxin Pan <jianxin.pan@amlogic.com>
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/clocksource/meson6_timer.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+> >
+> Thanks for pointing this out and kind suggestions. I have tested with your
+> modification. Will update patch serias soon.
 
-diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
-index c622135bee9d..5ee2a575069b 100644
---- a/drivers/clocksource/meson6_timer.c
-+++ b/drivers/clocksource/meson6_timer.c
-@@ -22,6 +22,10 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- 
-+#ifdef CONFIG_ARM
-+#include <linux/delay.h>
-+#endif
-+
- enum meson6_timera_input_clock {
- 	MESON_TIMERA_CLOCK_1US = 0x0,
- 	MESON_TIMERA_CLOCK_10US = 0x1,
-@@ -60,6 +64,18 @@ enum meson6_timere_input_clock {
- 
- static void __iomem *timer_base;
- 
-+#ifdef CONFIG_ARM
-+static unsigned long meson6_read_current_timer(void)
-+{
-+	return readl_relaxed(timer_base + MESON_ISA_TIMERE);
-+}
-+
-+static struct delay_timer meson6_delay_timer = {
-+	.read_current_timer = meson6_read_current_timer,
-+	.freq = 1000 * 1000,
-+};
-+#endif
-+
- static u64 notrace meson6_timer_sched_read(void)
- {
- 	return (u64)readl(timer_base + MESON_ISA_TIMERE);
-@@ -198,6 +214,12 @@ static int __init meson6_timer_init(struct device_node *node)
- 
- 	clockevents_config_and_register(&meson6_clockevent, USEC_PER_SEC,
- 					1, 0xfffe);
-+
-+#ifdef CONFIG_ARM
-+	/* Also use MESON_ISA_TIMERE for delays */
-+	register_current_timer_delay(&meson6_delay_timer);
-+#endif
-+
- 	return 0;
- }
- TIMER_OF_DECLARE(meson6, "amlogic,meson6-timer",
+
+I have one more request.
+
+The patch subject
+"kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og
+optimization"
+is too long (83 characters)
+
+
+I'd like the subject to be within 70 columns or so.
+
+Thanks.
+
+
+
+
 -- 
-2.19.1
+Best Regards
+Masahiro Yamada
