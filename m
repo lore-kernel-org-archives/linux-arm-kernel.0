@@ -1,136 +1,34 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sun, 28 Oct 2018 15:19:48 +0000
-Subject: [PATCH V8 4/5] firmware: imx: add pm svc headfile
-In-Reply-To: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
-References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1540739690-23750-5-git-send-email-aisheng.dong@nxp.com>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Sun, 28 Oct 2018 15:40:11 +0000
+Subject: [PATCH v5 04/11] dt-bindings: iio: adc: add AXP803 ADC bindings
+In-Reply-To: <20181024135633.GA342@bogus>
+References: <20181023185330.10472-1-oskari@lemmela.net>
+ <20181023185330.10472-5-oskari@lemmela.net>
+ <20181024135633.GA342@bogus>
+Message-ID: <20181028154011.04efdecf@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SCU PM SVC related protocol definitions which will be used by
-a number of PM functions like Power Domain, Clock, Reset and etc.
-The detailed implementation of each function will put in the individual
-function drivers.
+On Wed, 24 Oct 2018 08:56:33 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v4->v8:
- * no changes
-v3->v4:
- * update firmware headfile patch from include/soc/imx to
-   include/linux/firmware/imx
-v2->v3:
- * name updated with IMX_SC prefix
-v1->v2:
- * new introduced
----
- include/linux/firmware/imx/sci.h    |  1 +
- include/linux/firmware/imx/svc/pm.h | 85 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
- create mode 100644 include/linux/firmware/imx/svc/pm.h
+> On Tue, 23 Oct 2018 21:53:23 +0300, Oskari Lemmela wrote:
+> > The AXP803 ADC is compatible with AXP813 ADC, but add
+> > specific compatible for it.
+> > 
+> > Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> > ---
+> >  Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >   
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-diff --git a/include/linux/firmware/imx/sci.h b/include/linux/firmware/imx/sci.h
-index 29ada60..ebc5509 100644
---- a/include/linux/firmware/imx/sci.h
-+++ b/include/linux/firmware/imx/sci.h
-@@ -14,4 +14,5 @@
- #include <linux/firmware/imx/types.h>
- 
- #include <linux/firmware/imx/svc/misc.h>
-+#include <linux/firmware/imx/svc/pm.h>
- #endif /* _SC_SCI_H */
-diff --git a/include/linux/firmware/imx/svc/pm.h b/include/linux/firmware/imx/svc/pm.h
-new file mode 100644
-index 0000000..1f6975d
---- /dev/null
-+++ b/include/linux/firmware/imx/svc/pm.h
-@@ -0,0 +1,85 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017-2018 NXP
-+ *
-+ * Header file containing the public API for the System Controller (SC)
-+ * Power Management (PM) function. This includes functions for power state
-+ * control, clock control, reset control, and wake-up event control.
-+ *
-+ * PM_SVC (SVC) Power Management Service
-+ *
-+ * Module for the Power Management (PM) service.
-+ */
-+
-+#ifndef _SC_PM_API_H
-+#define _SC_PM_API_H
-+
-+#include <linux/firmware/imx/sci.h>
-+
-+/*
-+ * This type is used to indicate RPC PM function calls.
-+ */
-+enum imx_sc_pm_func {
-+	IMX_SC_PM_FUNC_UNKNOWN = 0,
-+	IMX_SC_PM_FUNC_SET_SYS_POWER_MODE = 19,
-+	IMX_SC_PM_FUNC_SET_PARTITION_POWER_MODE = 1,
-+	IMX_SC_PM_FUNC_GET_SYS_POWER_MODE = 2,
-+	IMX_SC_PM_FUNC_SET_RESOURCE_POWER_MODE = 3,
-+	IMX_SC_PM_FUNC_GET_RESOURCE_POWER_MODE = 4,
-+	IMX_SC_PM_FUNC_REQ_LOW_POWER_MODE = 16,
-+	IMX_SC_PM_FUNC_SET_CPU_RESUME_ADDR = 17,
-+	IMX_SC_PM_FUNC_REQ_SYS_IF_POWER_MODE = 18,
-+	IMX_SC_PM_FUNC_SET_CLOCK_RATE = 5,
-+	IMX_SC_PM_FUNC_GET_CLOCK_RATE = 6,
-+	IMX_SC_PM_FUNC_CLOCK_ENABLE = 7,
-+	IMX_SC_PM_FUNC_SET_CLOCK_PARENT = 14,
-+	IMX_SC_PM_FUNC_GET_CLOCK_PARENT = 15,
-+	IMX_SC_PM_FUNC_RESET = 13,
-+	IMX_SC_PM_FUNC_RESET_REASON = 10,
-+	IMX_SC_PM_FUNC_BOOT = 8,
-+	IMX_SC_PM_FUNC_REBOOT = 9,
-+	IMX_SC_PM_FUNC_REBOOT_PARTITION = 12,
-+	IMX_SC_PM_FUNC_CPU_START = 11,
-+};
-+
-+/*
-+ * Defines for ALL parameters
-+ */
-+#define IMX_SC_PM_CLK_ALL		UINT8_MAX	/* All clocks */
-+
-+/*
-+ * Defines for SC PM Power Mode
-+ */
-+#define IMX_SC_PM_PW_MODE_OFF	0	/* Power off */
-+#define IMX_SC_PM_PW_MODE_STBY	1	/* Power in standby */
-+#define IMX_SC_PM_PW_MODE_LP	2	/* Power in low-power */
-+#define IMX_SC_PM_PW_MODE_ON	3	/* Power on */
-+
-+/*
-+ * Defines for SC PM CLK
-+ */
-+#define IMX_SC_PM_CLK_SLV_BUS	0	/* Slave bus clock */
-+#define IMX_SC_PM_CLK_MST_BUS	1	/* Master bus clock */
-+#define IMX_SC_PM_CLK_PER	2	/* Peripheral clock */
-+#define IMX_SC_PM_CLK_PHY	3	/* Phy clock */
-+#define IMX_SC_PM_CLK_MISC	4	/* Misc clock */
-+#define IMX_SC_PM_CLK_MISC0	0	/* Misc 0 clock */
-+#define IMX_SC_PM_CLK_MISC1	1	/* Misc 1 clock */
-+#define IMX_SC_PM_CLK_MISC2	2	/* Misc 2 clock */
-+#define IMX_SC_PM_CLK_MISC3	3	/* Misc 3 clock */
-+#define IMX_SC_PM_CLK_MISC4	4	/* Misc 4 clock */
-+#define IMX_SC_PM_CLK_CPU	2	/* CPU clock */
-+#define IMX_SC_PM_CLK_PLL	4	/* PLL */
-+#define IMX_SC_PM_CLK_BYPASS	4	/* Bypass clock */
-+
-+/*
-+ * Defines for SC PM CLK Parent
-+ */
-+#define IMX_SC_PM_PARENT_XTAL	0	/* Parent is XTAL. */
-+#define IMX_SC_PM_PARENT_PLL0	1	/* Parent is PLL0 */
-+#define IMX_SC_PM_PARENT_PLL1	2	/* Parent is PLL1 or PLL0/2 */
-+#define IMX_SC_PM_PARENT_PLL2	3	/* Parent in PLL2 or PLL0/4 */
-+#define IMX_SC_PM_PARENT_BYPS	4	/* Parent is a bypass clock. */
-+
-+#endif /* _SC_PM_API_H */
--- 
-2.7.4
+This doesn't seem to have any dependencies with the other patches
+so applied to the togreg branch of iio.git and pushed out as testing
+for the autobuilders to ignore.  However I am a little curious to know
+why we would add the ID and then not use it (that I can see)?
+
+Thanks,
+
+Jonathan
