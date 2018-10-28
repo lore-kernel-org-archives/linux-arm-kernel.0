@@ -1,34 +1,42 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Sun, 28 Oct 2018 15:40:11 +0000
-Subject: [PATCH v5 04/11] dt-bindings: iio: adc: add AXP803 ADC bindings
-In-Reply-To: <20181024135633.GA342@bogus>
-References: <20181023185330.10472-1-oskari@lemmela.net>
- <20181023185330.10472-5-oskari@lemmela.net>
- <20181024135633.GA342@bogus>
-Message-ID: <20181028154011.04efdecf@archlinux>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Sun, 28 Oct 2018 14:09:11 -0400
+Subject: [PATCH v3 1/4] x86/mm: declare check_la57_support() as inline
+In-Reply-To: <20181028130945.23581-2-changbin.du@gmail.com>
+References: <20181028130945.23581-1-changbin.du@gmail.com>
+ <20181028130945.23581-2-changbin.du@gmail.com>
+Message-ID: <20181028140911.21d49629@vmware.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Oct 2018 08:56:33 -0500
-Rob Herring <robh@kernel.org> wrote:
+On Sun, 28 Oct 2018 13:09:42 +0000
+Changbin Du <changbin.du@gmail.com> wrote:
 
-> On Tue, 23 Oct 2018 21:53:23 +0300, Oskari Lemmela wrote:
-> > The AXP803 ADC is compatible with AXP813 ADC, but add
-> > specific compatible for it.
-> > 
-> > Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> > ---
-> >  Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >   
+> The level4_kernel_pgt is only defined when X86_5LEVEL is enabled.
+> So declare check_la57_support() as inline to make sure the code
+> referring to level4_kernel_pgt is optimized out. This is a preparation
+> for CONFIG_CC_OPTIMIZE_FOR_DEBUGGING.
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Changbin Du <changbin.du@gmail.com>
 
-This doesn't seem to have any dependencies with the other patches
-so applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to ignore.  However I am a little curious to know
-why we would add the ID and then not use it (that I can see)?
+Reviewed-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 
-Thanks,
+-- Steve
 
-Jonathan
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>  arch/x86/kernel/head64.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/x86/kernel/head64.c b/arch/x86/kernel/head64.c
+> index 5dc377dc9d7b..5ae682f2aa83 100644
+> --- a/arch/x86/kernel/head64.c
+> +++ b/arch/x86/kernel/head64.c
+> @@ -98,7 +98,7 @@ static bool __head check_la57_support(unsigned long physaddr)
+>  	return true;
+>  }
+>  #else
+> -static bool __head check_la57_support(unsigned long physaddr)
+> +static inline bool __head check_la57_support(unsigned long physaddr)
+>  {
+>  	return false;
+>  }
