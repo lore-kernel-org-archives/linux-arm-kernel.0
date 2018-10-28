@@ -1,25 +1,38 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 28 Oct 2018 22:11:24 +0000
-Subject: [PATCH v1 3/3] i2c: imx: don't print error if DMA is not
- configured
-In-Reply-To: <20181018112615.29362-4-o.rempel@pengutronix.de>
-References: <20181018112615.29362-1-o.rempel@pengutronix.de>
- <20181018112615.29362-4-o.rempel@pengutronix.de>
-Message-ID: <20181028221123.GE1882@kunai>
+Date: Sun, 28 Oct 2018 22:19:52 +0000
+Subject: [PATCH V3 4/8] dt-bindings: i2c: i2c-imx-lpi2c: add imx8qxp
+ compatible string
+In-Reply-To: <1539886483-15775-5-git-send-email-aisheng.dong@nxp.com>
+References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
+ <1539886483-15775-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181028221952.GF1882@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2018 at 01:26:15PM +0200, Oleksij Rempel wrote:
-> At least on i.MX5x variants is DMA event for I2C muxed with SDHC. So
-> it is project specific configuration and not an error.
+Hi,
+
+On Thu, Oct 18, 2018 at 06:19:29PM +0000, A.s. Dong wrote:
+> Add imx8qxp compatible string
 > 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: linux-i2c at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-So, the first patch is not I2C realm, and the second is dropped. No
-comment about the third one?
+Doesn't apply...
 
-And is maybe someone from Pengutronix interested in maintaining this
-driver? Uwe maybe? That would speed up things for it...
+>    - "fsl,imx8dv-lpi2c" for LPI2C compatible with the one integrated on i.MX8DV soc
+
+... I don't have this line in my tree.
+
+Would you maybe volunteer to maintain this driver? To prevent stuff like
+this from happening? :)
+
+Regards,
+
+   Wolfram
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -27,4 +40,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181028/88739af1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181028/5f0c92c1/attachment.sig>
