@@ -1,40 +1,121 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 28 Oct 2018 22:09:21 +0900
-Subject: [PATCH v2 4/4] kernel hacking: new config
- CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og optimization
-In-Reply-To: <20181028125106.azcn2dxia3snplin@mail.google.com>
-References: <20181019124921.13780-1-changbin.du@gmail.com>
- <20181019124921.13780-5-changbin.du@gmail.com>
- <CAK7LNARW0=0d7m5DAgZOir=h0Y4tssqZoQRGasnGPNnvNf_+pg@mail.gmail.com>
- <20181028125106.azcn2dxia3snplin@mail.google.com>
-Message-ID: <CAK7LNARr7bE=DVuzim5771heuN5os0=5-D+jXfUyBb2e1xYoRA@mail.gmail.com>
+From: changbin.du@gmail.com (Changbin Du)
+Date: Sun, 28 Oct 2018 13:09:41 +0000
+Subject: [PATCH v3 0/4] kernel hacking: GCC optimization for better debug
+ experience (-Og)
+Message-ID: <20181028130945.23581-1-changbin.du@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Changbin,
+Hi all,
+I have posted this series several months ago but interrupted by personal
+affairs. Now I get time to complete this task. Thanks for all of the
+reviewers.
 
-On Sun, Oct 28, 2018 at 9:52 PM Changbin Du <changbin.du@gmail.com> wrote:
+I know some kernel developers was searching for a method to dissable GCC
+optimizations, probably they want to apply GCC '-O0' option. But since Linux
+kernel relies on GCC optimization to remove some dead code, so '-O0' just
+breaks the build. They do need this because they want to debug kernel with
+qemu, simics, kgtp or kgdb.
 
-> >
-> Thanks for pointing this out and kind suggestions. I have tested with your
-> modification. Will update patch serias soon.
+Thanks for the GCC '-Og' optimization level introduced in GCC 4.8, which
+offers a reasonable level of optimization while maintaining fast compilation
+and a good debugging experience. It is similar to '-O1' while perferring to
+keep debug ability over runtime speed. With '-Og', we can build a kernel with
+better debug ability and little performance drop after some simple change.
+
+In this series, firstly introduce a new config CONFIG_NO_AUTO_INLINE after two
+fixes for this new option. With this option, only functions explicitly marked
+with "inline" will  be inlined. This will allow the function tracer to trace
+more functions because it only traces functions that the compiler has not
+inlined.
+
+Then introduce new config CC_OPTIMIZE_FOR_DEBUGGING which apply '-Og'
+optimization level for whole kernel, with a simple fix in fix_to_virt().
+Currently I have only tested this option on x86 and ARM platform. Other
+platforms should also work but probably need some compiling fixes as what
+having done in this series. I leave that to who want to try this debug
+option.
+
+Comparison of vmlinux size: a bit smaller.
+
+    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ size vmlinux
+       text    data     bss     dec     hex filename
+    22665554   9709674  2920908 35296136        21a9388 vmlinux
+
+    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ size vmlinux
+       text    data     bss     dec     hex filename
+    21499032   10102758 2920908 34522698        20ec64a vmlinux
 
 
-I have one more request.
+Comparison of system performance: a bit drop (~6%).
+    This benchmark of kernel compilation is suggested by Ingo Molnar.
+    https://lkml.org/lkml/2018/5/2/74
 
-The patch subject
-"kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og
-optimization"
-is too long (83 characters)
+    Preparation: Set cpufreq to 'performance'.
+    for ((cpu=0; cpu<120; cpu++)); do
+      G=/sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_governor
+      [ -f $G ] && echo performance > $G
+    done
 
+    w/o CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ perf stat --repeat 5 --null --pre                 '\
+        cp -a kernel ../kernel.copy.$(date +%s);         \
+        rm -rf *;                                        \
+        git checkout .;                                  \
+        echo 1 > /proc/sys/vm/drop_caches;               \
+        find ../kernel* -type f | xargs cat >/dev/null;  \
+        make -j kernel >/dev/null;                       \
+        make clean >/dev/null 2>&1;                      \
+        sync                                            '\
+                                                         \
+        make -j8 >/dev/null
 
-I'd like the subject to be within 70 columns or so.
+     Performance counter stats for 'make -j8' (5 runs):
 
-Thanks.
+        219.764246652 seconds time elapsed                   ( +-  0.78% )
 
+    w/ CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+    $ perf stat --repeat 5 --null --pre                 '\
+        cp -a kernel ../kernel.copy.$(date +%s);         \
+        rm -rf *;                                        \
+        git checkout .;                                  \
+        echo 1 > /proc/sys/vm/drop_caches;               \
+        find ../kernel* -type f | xargs cat >/dev/null;  \
+        make -j kernel >/dev/null;                       \
+        make clean >/dev/null 2>&1;                      \
+        sync                                            '\
+                                                         \
+        make -j8 >/dev/null
 
+    Performance counter stats for 'make -j8' (5 runs):
 
+         233.574187771 seconds time elapsed                  ( +-  0.19% )
+
+v3:
+  o Take suggestions from Masahiro Yamada.
+v2:
+  o rebase on top of mainline.
+
+Changbin Du (4):
+  x86/mm: declare check_la57_support() as inline
+  kernel hacking: new config NO_AUTO_INLINE to disable compiler
+    auto-inline optimizations
+  ARM: mm: fix build error in fix_to_virt with
+    CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
+  kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og
+    optimization
+
+ Makefile                     | 11 +++++++++++
+ arch/arm/mm/mmu.c            |  2 +-
+ arch/x86/kernel/head64.c     |  2 +-
+ include/linux/compiler-gcc.h |  2 +-
+ include/linux/compiler.h     |  2 +-
+ init/Kconfig                 | 20 ++++++++++++++++++++
+ kernel/configs/tiny.config   |  1 +
+ lib/Kconfig.debug            | 17 +++++++++++++++++
+ 8 files changed, 53 insertions(+), 4 deletions(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+2.17.1
