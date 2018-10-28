@@ -1,143 +1,54 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Sun, 28 Oct 2018 23:12:59 +0800
-Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <f4d239df2f1333b005680f9bfdd2eba93e7f86e5.camel@baylibre.com>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
- <a8d359208edfdc75cb5c6de378796f76e0572a0f.camel@baylibre.com>
- <eda2faf2-cf06-902d-36ff-48ceafcb4a4b@amlogic.com>
- <f4d239df2f1333b005680f9bfdd2eba93e7f86e5.camel@baylibre.com>
-Message-ID: <d284b4dd-b479-f7a7-1527-7e36b4b7451f@amlogic.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Sun, 28 Oct 2018 15:19:30 +0000
+Subject: [PATCH V8 0/5] soc: imx: add scu power domain driver
+Message-ID: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+This patch set adds the scu based power domain driver.
+It depends on SCU driver.
 
-On 2018/10/25 20:54, Jerome Brunet wrote:
-> On Thu, 2018-10-25 at 19:48 +0800, Jianxin Pan wrote:
->> Hi Jerome,
->>
->> On 2018/10/24 17:01, Jerome Brunet wrote:
->>> On Thu, 2018-10-18 at 13:07 +0800, Jianxin Pan wrote:
->>>> From: Yixun Lan <yixun.lan@amlogic.com>
->>>>
->>>> The patch will add a MMC clock controller driver which used by MMC or NAND,
->>>> It provide a mux and divider clock, and three phase clocks - core, tx, tx.
->>>>
-[...]
->>>>  
->>>> -/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
->>>> +static void clk_regmap_div_init(struct clk_hw *hw)
->>>> +{
->>>> +	struct clk_regmap *clk = to_clk_regmap(hw);
->>>> +	struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk);
->>>> +	unsigned int val;
->>>> +	int ret;
->>>> +
->>>> +	ret = regmap_read(clk->map, div->offset, &val);
->>>> +	if (ret)
->>>> +		return;
->>>>  
->>>> +	val &= (clk_div_mask(div->width) << div->shift);
->>>> +	if (!val)
->>>> +		regmap_update_bits(clk->map, div->offset,
->>>> +				   clk_div_mask(div->width) << div->shift,
->>>> +				   clk_div_mask(div->width));
->>>
->>> This is wrong for several reasons:
->>> * You should hard code the initial value in the driver.
->>> * If shift is not 0, I doubt this will give the expected result.
->>
->> The value 0x00 of divider means nand clock off then read/write nand register is forbidden.
-> 
-> That is not entirely true, you can access the clock register or you'd be in a
-> chicken and egg situation.
-> 
->> Should we set the initial value in nand driver, or in sub emmc clk driver?
-> 
-> In the nand driver, which is the consumer of the clock. see my previous comments
-> about it.
-> 
-> If your device (nand in your case) needs a (sane) clock before doing anything
-> else, just call clk_set_rate() and enable it with clk_prepare_enable().
-> 
-> Look at our MMC driver, this is the first thing done after registering the
-> clocks.
-> 
-> The controller does no care at all about the clock rate or state. It is up to
-> the consumer to express their needs.
-> 
-> On a more general note:
-> I agree that having a 0 value for CLK_DIVIDER_ONE_BASED divider makes no sense.
-> If you think this point needs to be addressed, please:
-> 
-> * make separated generic patch
-> * against driver/clk/clk-divider.c 
-> * addressing specifically CLK_DIVIDER_ONE_BASED dividers (not all, as your
-> change does)
-> * with some comments explaining the intent.
-In our emmc driver, the CLK_DIV_MASK is hard coded before clock registering in meson_mmc_clk_init():
- clk_reg |= CLK_DIV_MASK;
- writel(clk_reg, host->regs + SD_EMMC_CLOCK);
-It's hard coded In previous version of nand driver.  I will drop the new ops.
+Change Log:
+v7->v8:
+ * update to #power-domain-cells 1 binding
+v6->v7:
+ * keep "fsl,scu-pd" as fall back compatible string
+v5->v6:
+ * only compatible string name updated from fsl,scu-pd to fsl,imx8qxp-scu-pd
+   accordingly
+v4->v5:
+ * some minor improvements according to Sascha's suggestion
+   Note: did not use dev_* print functions due to we already have proper
+         prefix by redefining pr_fmt. So it seems not quite neccesary
+	 to pass in a struct device * pointer for debug purpose only in
+	 each functions.
+v3->v4:
+ * only scu headfile path update
 
-In addition , Martin suggested in previous discussions that "sclk-div" could be used [0][1]. 
-This divider is just like a "sclk-div" with sclk->hi->width ==0. 
+v2->v3:
+ * structure and enums name update
+ * api usage update
 
 
-> 
->>  
->>>
->>>> +}
->>>
->>> Please drop this. 
-OK. Thank you.
->>>
->>>> +
->>>> +/* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
->>>>  const struct clk_ops clk_regmap_divider_ops = {
->>>>  	.recalc_rate = clk_regmap_div_recalc_rate,
->>>>  	.round_rate = clk_regmap_div_round_rate,
->>>> @@ -122,6 +139,14 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, unsigned long rate,
->>>>  };
->>>>  EXPORT_SYMBOL_GPL(clk_regmap_divider_ops);
->>>>  
-[...]
->>>> +
->>>> +static struct clk_regmap_mux_data mmc_clkc_mux_data = {
->>>> +	.offset		= SD_EMMC_CLOCK,
->>>> +	.mask		= 0x3,
->>>> +	.shift		= 6,
->>>> +	.flags		= CLK_DIVIDER_ROUND_CLOSEST,
-> 
-> Missed that earlier
-> 
-> This flag makes no sense for a mux.
-> Anyway this particular mux should never round up has doing so would be unsafe.
-> The clock provided to the nand or the eMMC should be the requested or lower.
-> 
-OK, I will drop it. Thanks for your time.
->>>> +};
->>>> +
->>>> +static struct clk_regmap_div_data mmc_clkc_div_data = {
->>>> +	.offset		= SD_EMMC_CLOCK,
->>>> +	.shift		= 0,
->>>> +	.width		= 6,
->>>> +	.flags		= CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
-> 
-> Same here, drop CLK_DIVIDER_ROUND_CLOSEST
-OK, I will drop it. Thank you!
-> 
->>>> +};
->>>> +
->>>> +static struct meson_clk_phase_data mmc_clkc_core_phase = {
->>>> +	.ph = {
->>>> +		.reg_off	= SD_EMMC_CLOCK,
->>>> +		.shift	= 8,
-[...]
-> 
-> .
-> 
+Dong Aisheng (5):
+  dt-bindings: imx: add scu resource id headfile
+  firmware: imx: remove resource id enums
+  dt-bindings: fsl: scu: update power domain binding
+  firmware: imx: add pm svc headfile
+  firmware: imx: add SCU power domain driver
 
-[0] https://patchwork.kernel.org/patch/10607157/#22238243
-[1]https://lore.kernel.org/lkml/CAFBinCCuqUmVNdwUm7WbkHy1eWvOA5oQ5FcOuytbYNbgGcXnRQ at mail.gmail.com/T/#u
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt  |  37 +-
+ drivers/firmware/imx/Kconfig                       |   6 +
+ drivers/firmware/imx/Makefile                      |   3 +-
+ drivers/firmware/imx/scu-pd.c                      | 302 +++++++++++
+ include/dt-bindings/firmware/imx/rsrc.h            | 559 +++++++++++++++++++++
+ include/linux/firmware/imx/sci.h                   |   1 +
+ include/linux/firmware/imx/svc/pm.h                |  85 ++++
+ include/linux/firmware/imx/types.h                 | 552 --------------------
+ 8 files changed, 963 insertions(+), 582 deletions(-)
+ create mode 100644 drivers/firmware/imx/scu-pd.c
+ create mode 100644 include/dt-bindings/firmware/imx/rsrc.h
+ create mode 100644 include/linux/firmware/imx/svc/pm.h
+
+-- 
+2.7.4
