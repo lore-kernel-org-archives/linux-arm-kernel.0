@@ -1,160 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 28 Oct 2018 13:31:34 +0000
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
- <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
- <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
-Message-ID: <86va5myz7t.wl-marc.zyngier@arm.com>
+From: mikebrady@eircom.net (Mike Brady)
+Date: Sun, 28 Oct 2018 14:24:56 +0000
+Subject: [alsa-devel] [PATCH v2] staging: bcm2835-audio: interpolate audio
+ delay
+In-Reply-To: <5bc8295a-1e38-99b5-d54c-72e920600f83@gmail.com>
+References: <20181022191708.GA4659@ubuntu>
+ <a703f8a2-e85a-bc5b-750a-cc43ef252ba5@gmail.com>
+ <EA85FEC9-B1C7-4548-88F5-F0E7BC12158E@eircom.net>
+ <046aea96-e0d3-60f4-c61a-c26bb1b5c193@gmail.com>
+ <B9A84822-3780-4E01-96AD-FD3B42C44B45@eircom.net>
+ <9884c4f5-2343-e3a4-8d8b-dd2db404ef27@gmail.com>
+ <s5hftwuo4t0.wl-tiwai@suse.de>
+ <5bc8295a-1e38-99b5-d54c-72e920600f83@gmail.com>
+Message-ID: <4E95A62E-951C-4432-BCE4-A2BA64029551@eircom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lokesh,
+Hi Kirill. Thanks for the post.
+Mike
 
-On Fri, 26 Oct 2018 21:19:41 +0100,
-Lokesh Vutla <lokeshvutla@ti.com> wrote:
+> On 25 Oct 2018, at 18:20, Kirill Marinushkin <k.marinushkin@gmail.com> wrote:
 > 
-> Hi Marc,
+> Hello Takashi, Mike,
 > 
-> [..snip..]
-> >> [...]
-> >> 
-> >>>>> +/**
-> >>>>> + * ti_sci_inta_register_event() - Register a event to an interrupt aggregator
-> >>>>> + * @dev:	Device pointer to source generating the event
-> >>>>> + * @src_id:	TISCI device ID of the event source
-> >>>>> + * @src_index:	Event source index within the device.
-> >>>>> + * @virq:	Linux Virtual IRQ number
-> >>>>> + * @flags:	Corresponding IRQ flags
-> >>>>> + * @ack_needed:	If explicit clearing of event is required.
-> >>>>> + *
-> >>>>> + * Creates a new irq and attaches to IA domain if virq is not specified
-> >>>>> + * else attaches the event to vint corresponding to virq.
-> >>>>> + * When using TISCI within the client drivers, source indexes are always
-> >>>>> + * generated dynamically and cannot be represented in DT. So client
-> >>>>> + * drivers should call this API instead of platform_get_irq().
-> >>>> 
-> >>>> NAK. Either this fits in the standard model, or we adapt the standard
-> >>>> model to catter for your particular use case. But we don't define a new,
-> >>>> TI specific API.
-> >>>> 
-> >>>> I have a hunch that if the IDs are generated dynamically, then the model
-> >>>> we use for MSIs would fit this thing. I also want to understand what
-> >>> 
-> >>> hmm..I haven't thought about using MSI. Will try to explore it. But
-> >>> the "struct msi_msg" is not applicable in this case as device does not
-> >>> write to a specific location.
-> >> 
-> >> It doesn't need to. You can perfectly ignore the address field and
-> >> only be concerned with the data. We already have MSI users that do not
-> >> need programming of the doorbell address, just the data.
-> > 
+> @Takashi
 > 
-> Just one more clarification.
+> On 10/25/18 09:37, Takashi Iwai wrote:
+>> Well, in the API POV, it's nothing wrong to keep hwptr sticking while
+>> updating only delay value.  It implies that the hardware chip doesn't
+>> provide the hwptr update.
 > 
-> First let me explain the IRQ routes a bit deeply. As I said earlier
-> there are three ways in which IRQ can flow in AM65x SoC
-> 1) Device directly connected to GIC
-> 	- Device IRQ --> GIC
-> 2) Device connected to INTR.
-> 	- Device IRQ --> INTR --> GIC
-> 3) Devices connected to INTA.
-> 	- Device IRQ --> INTA --> INTR --> GIC
+> Thank you for the clarification. Modifying `runtime->delay` from the `pointer`
+> function looked wrong for me. Now I understand the motivation and the use-case.
+> I will be more careful when analyzing the code which doesn't fit my expectations.
 > 
-> 1 and 2 are straight forward and we use DT for IRQ
-> representation. Coming to 3 the trickier part is that Input to INTA
-> and output from INTA and dynamically managed. To be more specific:
-> - By hardware design there are certain set of physical global
-> events(interrupts) attached to an INTA. Out of which a certain range
-> are assigned to the current linux host that can be queried from
-> system-controller.
-> - Similarly out of all the INTA outputs(referenced as vints) a certain
-> range can be used by the current linux host.
+> @Mike
 > 
+> I was wrong. You can ignore my comments. Please don't take them personal: it's
+> all about having high-quality code in kernel.
 > 
-> So for configuring an IRQ route in case 3, the following steps are needed:
-> - Device id and device resource index for which the interrupt is needed
-
-THat is no different from a PCI device for example, where we need the
-requester ID and the number of the interrupt in the MSI-X table.
-
-> - A free event id from the range assigned to the INTA in this host context
-> - A free vint from the range assigned to the INTA in this host context
-> - A free gic IRQ from the range assigned to the INTR in this host context.
-
->From what I understand of the driver, at least some of that is under
-the responsibility of the firmware, right? Or is the driver under
-control of all three parameters? To be honest, it doesn't really
-matter, as the as far as the kernel is concerned, the irqchip drivers
-are free to deal with the routing anyway they want.
-
-> With the above information, linux should send a message to
-> system-controller using TISCI protocol. After policing the given
-> information, system-controller does the following:
-> - Attaches the interrupt(INTA input) to the device resource index
-> - Muxes the interrupt(INTA input) to corresponding vint(INTA output)
-> - Muxes the vint(INTR input) to GIC irq(INTR output).
-
-Isn't there a 1:1 mapping between *used* INTR inputs and outputs?
-Since INTR is a router, there is no real muxing. I assume that the
-third point above is just a copy-paste error.
-
-> 
-> For grouping of interrupts, the same vint number is to be passed to
-> system-controller for all the requests.
-> 
-> Keeping all the above in mind, I see the following as software IRQ
-> Domain Hierarchy:
-> 
-> 1) INTA multi MSI --> 2)INTA  -->3) MSI --> 4) INTR  -->5) GIC
-> 
-> INTA driver has to set a chained IRQ using virq allocated from its
-> parent MSI. This is to differentiate the grouped interrupts within
-> INTA.
-> 
-> Inorder to cover the above two MSI domains, a new bus driver has to be
-> created as I couldn't find a fit with the existing bus drivers.
-> 
-> Does the above approach make sense? Please correct me if i am wrong.
-
-I think this can be further simplified, as you seem to assume that
-dynamic allocation implies MSI. This is not the case. You can
-perfectly use dynamically allocated interrupts and still not use MSIs.
-
-INTA is indeed a chained interrupt controller, as it may mux several
-inputs onto a single output. But the output of INTA is not an MSI. It
-is just a regular interrupt that can allocated when the first mapping
-gets established.
-
-Also, INTA shouldn't offer any "multi-MSI". This is a PCI-specific
-concept that doesn't translate on any other type of bus. What you want
-is something that should behave like MSI-X for its allocation part,
-where each MSI gets allocated independently.
-
-Hierarchy-wise, you should end-up with something like this:
-
-       TISCI-MSI       Chained-intr       SPI
-Device ---------> INTA ------------> INTR ---> GIC
-
-As for the bus, you have two choices:
-
-- You create a new one altogether. See drivers/bus/fsl-mc for
-  an example of something totally over the top. This implies that all
-  your devices are following the exact same programming model for more
-  than just interrupts.
-
-- You use the platform-MSI framework to build your interrupt
-  infrastructure, and you don't have to implement much more than
-  that.
-
-Hope this helps,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+> Best Regards,
+> Kirill
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
