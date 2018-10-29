@@ -1,62 +1,47 @@
 From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Mon, 29 Oct 2018 08:57:28 +0000
-Subject: [PATCH v7 1/6] dt-bindings: arm64: add compatible for LX2160A
+Date: Mon, 29 Oct 2018 08:57:41 +0000
+Subject: [PATCH v7 3/6] clk: qoriq: increase array size of cmux_to_group
 In-Reply-To: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
 References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <1540759926-3641-2-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <1540759926-3641-4-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible for LX2160A SoC,QDS and RDB board
-Add lx2160a compatible for clockgen and dcfg
+From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 
+Increase size of cmux_to_group array, to accomdate entry of
+-1 termination.
+
+Added -1, terminated, entry for 4080_cmux_grpX.
+
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt           | 14 +++++++++++++-
- Documentation/devicetree/bindings/clock/qoriq-clock.txt |  1 +
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ drivers/clk/clk-qoriq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 8a1baa2..71adce2 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -130,7 +130,7 @@ core start address and release the secondary core from holdoff and startup.
-   - compatible: Should contain a chip-specific compatible string,
- 	Chip-specific strings are of the form "fsl,<chip>-dcfg",
- 	The following <chip>s are known to be supported:
--	ls1012a, ls1021a, ls1043a, ls1046a, ls2080a.
-+	ls1012a, ls1021a, ls1043a, ls1046a, ls2080a, lx2160a.
- 
-   - reg : should contain base address and length of DCFG memory-mapped registers
- 
-@@ -222,3 +222,15 @@ Required root node properties:
- LS2088A ARMv8 based RDB Board
- Required root node properties:
-     - compatible = "fsl,ls2088a-rdb", "fsl,ls2088a";
-+
-+LX2160A SoC
-+Required root node properties:
-+    - compatible = "fsl,lx2160a";
-+
-+LX2160A ARMv8 based QDS Board
-+Required root node properties:
-+    - compatible = "fsl,lx2160a-qds", "fsl,lx2160a";
-+
-+LX2160A ARMv8 based RDB Board
-+Required root node properties:
-+    - compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
-diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-index 97f46ad..3fb9995 100644
---- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-@@ -37,6 +37,7 @@ Required properties:
- 	* "fsl,ls1046a-clockgen"
- 	* "fsl,ls1088a-clockgen"
- 	* "fsl,ls2080a-clockgen"
-+	* "fsl,lx2160a-clockgen"
- 	Chassis-version clock strings include:
- 	* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
- 	* "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
+diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+index 3a1812f..e152bfb 100644
+--- a/drivers/clk/clk-qoriq.c
++++ b/drivers/clk/clk-qoriq.c
+@@ -79,7 +79,7 @@ struct clockgen_chipinfo {
+ 	const struct clockgen_muxinfo *cmux_groups[2];
+ 	const struct clockgen_muxinfo *hwaccel[NUM_HWACCEL];
+ 	void (*init_periph)(struct clockgen *cg);
+-	int cmux_to_group[NUM_CMUX]; /* -1 terminates if fewer than NUM_CMUX */
++	int cmux_to_group[NUM_CMUX+1]; /* array should be -1 terminated */
+ 	u32 pll_mask;	/* 1 << n bit set if PLL n is valid */
+ 	u32 flags;	/* CG_xxx */
+ };
+@@ -601,7 +601,7 @@ static const struct clockgen_chipinfo chipinfo[] = {
+ 			&p4080_cmux_grp1, &p4080_cmux_grp2
+ 		},
+ 		.cmux_to_group = {
+-			0, 0, 0, 0, 1, 1, 1, 1
++			0, 0, 0, 0, 1, 1, 1, 1, -1
+ 		},
+ 		.pll_mask = 0x1f,
+ 	},
 -- 
 2.7.4
