@@ -1,65 +1,78 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 29 Oct 2018 12:14:49 +0100
-Subject: [PATCH V8 0/5] soc: imx: add scu power domain driver
-In-Reply-To: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
-References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CAPDyKFq0dGiEEiveFeDyYeie74VjxCyK9N5zARNvaSOLLSzWpg@mail.gmail.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Mon, 29 Oct 2018 11:16:15 +0000
+Subject: [PATCH v2 2/3] arm64: lib: use C string functions with KASAN
+ enabled.
+In-Reply-To: <20181029102922.GC14127@arm.com>
+References: <20180914152800.GB6236@arm.com>
+ <20180920135631.23833-1-aryabinin@virtuozzo.com>
+ <20180920135631.23833-2-aryabinin@virtuozzo.com>
+ <20181029102922.GC14127@arm.com>
+Message-ID: <9cf4a5ff-b68d-5703-720a-bce05409428a@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2018 at 16:19, A.s. Dong <aisheng.dong@nxp.com> wrote:
-> This patch set adds the scu based power domain driver.
-> It depends on SCU driver.
->
-> Change Log:
-> v7->v8:
->  * update to #power-domain-cells 1 binding
-> v6->v7:
->  * keep "fsl,scu-pd" as fall back compatible string
-> v5->v6:
->  * only compatible string name updated from fsl,scu-pd to fsl,imx8qxp-scu-pd
->    accordingly
-> v4->v5:
->  * some minor improvements according to Sascha's suggestion
->    Note: did not use dev_* print functions due to we already have proper
->          prefix by redefining pr_fmt. So it seems not quite neccesary
->          to pass in a struct device * pointer for debug purpose only in
->          each functions.
-> v3->v4:
->  * only scu headfile path update
->
-> v2->v3:
->  * structure and enums name update
->  * api usage update
->
->
-> Dong Aisheng (5):
->   dt-bindings: imx: add scu resource id headfile
->   firmware: imx: remove resource id enums
->   dt-bindings: fsl: scu: update power domain binding
->   firmware: imx: add pm svc headfile
->   firmware: imx: add SCU power domain driver
->
->  .../devicetree/bindings/arm/freescale/fsl,scu.txt  |  37 +-
->  drivers/firmware/imx/Kconfig                       |   6 +
->  drivers/firmware/imx/Makefile                      |   3 +-
->  drivers/firmware/imx/scu-pd.c                      | 302 +++++++++++
->  include/dt-bindings/firmware/imx/rsrc.h            | 559 +++++++++++++++++++++
->  include/linux/firmware/imx/sci.h                   |   1 +
->  include/linux/firmware/imx/svc/pm.h                |  85 ++++
->  include/linux/firmware/imx/types.h                 | 552 --------------------
->  8 files changed, 963 insertions(+), 582 deletions(-)
->  create mode 100644 drivers/firmware/imx/scu-pd.c
->  create mode 100644 include/dt-bindings/firmware/imx/rsrc.h
->  create mode 100644 include/linux/firmware/imx/svc/pm.h
->
-> --
-> 2.7.4
->
 
-For patch 1 -> 4 (comments on patch5 is on its way).
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On 10/29/2018 01:29 PM, Will Deacon wrote:
+> On Thu, Sep 20, 2018 at 04:56:30PM +0300, Andrey Ryabinin wrote:
+>> ARM64 has asm implementation of memchr(), memcmp(), str[r]chr(),
+>> str[n]cmp(), str[n]len(). KASAN don't see memory accesses in asm
+>> code, thus it can potentially miss many bugs.
+>>
+>> Ifdef out __HAVE_ARCH_* defines of these functions when KASAN is
+>> enabled, so the generic implementations from lib/string.c will be used.
+>>
+>> We can't just remove the asm functions because efistub uses them.
+>> And we can't have two non-weak functions either, so declare the asm
+>> functions as weak.
+>>
+>> Reported-by: Kyeongdon Kim <kyeongdon.kim@lge.com>
+>> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> ---
+>> Changes since v1:
+>>  - Use WEAK() instead of .weak
+>>
+>>  arch/arm64/include/asm/string.h | 14 ++++++++------
+>>  arch/arm64/kernel/arm64ksyms.c  |  7 +++++--
+>>  arch/arm64/lib/memchr.S         |  2 +-
+>>  arch/arm64/lib/memcmp.S         |  2 +-
+>>  arch/arm64/lib/strchr.S         |  2 +-
+>>  arch/arm64/lib/strcmp.S         |  2 +-
+>>  arch/arm64/lib/strlen.S         |  2 +-
+>>  arch/arm64/lib/strncmp.S        |  2 +-
+>>  arch/arm64/lib/strnlen.S        |  2 +-
+>>  arch/arm64/lib/strrchr.S        |  2 +-
+>>  10 files changed, 21 insertions(+), 16 deletions(-)
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Please post these again after the merge window and we'll figure out how to
+> get them queued.
+> 
 
-Kind regards
-Uffe
+
+Andrew sent these patches to Linus couple days ago, so they are in tree already.
+
+Something went wrong with mail notification though. I didn't even realize that they
+were in -mm tree, because I didn't receive the usual 'the patch has been added to -mm tree' email.
+But I did receive email that was sent to Linus.
+
+Also there was no you or Catalin in Cc tags in 2,3 patches, and in the first patch, the Cc tags were
+corrupted:
+
+From: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Subject: include/linux/linkage.h: align weak symbols
+
+Since WEAK() supposed to be used instead of ENTRY() to define weak
+symbols, but unlike ENTRY() it doesn't have ALIGN directive.  It seems
+there is no actual reason to not have, so let's add ALIGN to WEAK() too.
+
+Link: http://lkml.kernel.org/r/20180920135631.23833-1-aryabinin at virtuozzo.com
+Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Will Deacon <will.deacon@arm.com>, Catalin Marinas <catalin.marinas@arm.com>
+Cc: Kyeongdon Kim <kyeongdon.kim@lge.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Alexander Potapenko <glider@google.com>
+Cc: Dmitry Vyukov <dvyukov@google.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
