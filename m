@@ -1,64 +1,68 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 29 Oct 2018 10:14:01 +1100
-Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
-Message-ID: <20181029101401.5687153e@canb.auug.org.au>
+From: miles.chen@mediatek.com (miles.chen at mediatek.com)
+Date: Mon, 29 Oct 2018 10:16:43 +0800
+Subject: [PATCHv2] mm/page_owner: use kvmalloc instead of kmalloc
+Message-ID: <1540779403-27622-1-git-send-email-miles.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Miles Chen <miles.chen@mediatek.com>
 
-Today's linux-next merge of the arm-soc tree got a conflict in:
+The kbuf used by page owner is allocated by kmalloc(), which means it
+can use only normal memory and there might be a "out of memory"
+issue when we're out of normal memory.
 
-  include/linux/platform_data/gpio-omap.h
+Use kvmalloc() so we can also allocate kbuf from
+normal/hihghmem on 32bit kernel.
 
-between commit:
+Clamp the kbuf size to PAGE_SIZE.
 
-  b764a5863fd8 ("gpio: omap: Remove custom PM calls and use cpu_pm instead")
+Change since v1:
+  - use kvmalloc()
+  - clamp buffer size to PAGE_SIZE
 
-from Linus' tree and commit:
+Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+Cc: Joe Perches <joe@perches.com>
+Cc: Matthew Wilcox <willy@infradead.org>
+Cc: Michal Hocko <mhocko@kernel.org>
+---
+ mm/page_owner.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-  26683316c92a ("ARM: OMAP1: ams-delta-fiq: Use <linux/platform_data/gpio-omap.h>")
-
-from the arm-soc tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
+diff --git a/mm/page_owner.c b/mm/page_owner.c
+index d80adfe..a064cd0 100644
+--- a/mm/page_owner.c
++++ b/mm/page_owner.c
+@@ -1,7 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <linux/debugfs.h>
+ #include <linux/mm.h>
+-#include <linux/slab.h>
+ #include <linux/uaccess.h>
+ #include <linux/bootmem.h>
+ #include <linux/stacktrace.h>
+@@ -351,7 +350,8 @@ void pagetypeinfo_showmixedcount_print(struct seq_file *m,
+ 		.skip = 0
+ 	};
+ 
+-	kbuf = kmalloc(count, GFP_KERNEL);
++	count = count > PAGE_SIZE ? PAGE_SIZE : count;
++	kbuf = kvmalloc(count, GFP_KERNEL);
+ 	if (!kbuf)
+ 		return -ENOMEM;
+ 
+@@ -397,11 +397,11 @@ void pagetypeinfo_showmixedcount_print(struct seq_file *m,
+ 	if (copy_to_user(buf, kbuf, ret))
+ 		ret = -EFAULT;
+ 
+-	kfree(kbuf);
++	kvfree(kbuf);
+ 	return ret;
+ 
+ err:
+-	kfree(kbuf);
++	kvfree(kbuf);
+ 	return -ENOMEM;
+ }
+ 
 -- 
-Cheers,
-Stephen Rothwell
-
-diff --cc include/linux/platform_data/gpio-omap.h
-index 8485c6a9a383,ed071f76b642..000000000000
---- a/include/linux/platform_data/gpio-omap.h
-+++ b/include/linux/platform_data/gpio-omap.h
-@@@ -205,4 -206,18 +208,6 @@@ struct omap_gpio_platform_data 
-  	int (*get_context_loss_count)(struct device *dev);
-  };
-  
- -#if IS_BUILTIN(CONFIG_GPIO_OMAP)
- -extern void omap2_gpio_prepare_for_idle(int off_mode);
- -extern void omap2_gpio_resume_after_idle(void);
- -#else
- -static inline void omap2_gpio_prepare_for_idle(int off_mode)
- -{
- -}
- -
- -static inline void omap2_gpio_resume_after_idle(void)
- -{
- -}
- -#endif
-+ #endif /* __ASSEMBLER__ */
-+ 
-  #endif
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/1efa1939/attachment.sig>
+1.9.1
