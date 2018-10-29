@@ -1,10 +1,10 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 29 Oct 2018 15:12:44 +0530
-Subject: [PATCH v3 6/7] arm64: dts: xilinx: ultra96: Standardize LED labels
+Date: Mon, 29 Oct 2018 15:12:41 +0530
+Subject: [PATCH v3 3/7] arm64: dts: hisilicon: hikey: Standardize LED labels
  and triggers
 In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
 References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181029094245.7886-7-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181029094245.7886-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,56 +17,73 @@ green:user4  default-trigger: none, panic-indicator
 yellow:wlan  default-trigger: phy0tx
 blue:bt      default-trigger: hci0-power
 
-So lets adopt the same for Ultra96, which is one of the 96Boards
-CE and AI platform. Since the WLAN and BT LEDs are hardwired onboard,
-consolidate only User LEDs.
+So lets adopt the same for HiKey, which is one of the 96Boards
+CE platform.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ .../arm64/boot/dts/hisilicon/hi6220-hikey.dts | 25 ++++++++++---------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-index eb5e8bddb610..c08a8753215b 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-@@ -57,29 +57,30 @@
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index f4964bee6a1a..610235028cc7 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -340,42 +340,43 @@
+ 
  	leds {
  		compatible = "gpio-leds";
- 		ds2 {
--			label = "ds2";
+-		user_led4 {
+-			label = "user_led4";
++
++		user_led1 {
 +			label = "green:user1";
- 			gpios = <&gpio 20 GPIO_ACTIVE_HIGH>;
+ 			gpios = <&gpio4 0 0>; /* <&gpio_user_led_1>; */
  			linux,default-trigger = "heartbeat";
  		};
  
- 		ds3 {
--			label = "ds3";
+-		user_led3 {
+-			label = "user_led3";
++		user_led2 {
 +			label = "green:user2";
- 			gpios = <&gpio 19 GPIO_ACTIVE_HIGH>;
--			linux,default-trigger = "phy0tx"; /* WLAN tx */
-+			linux,default-trigger = "mmc0";
- 			default-state = "off";
+ 			gpios = <&gpio4 1 0>; /* <&gpio_user_led_2>; */
+ 			linux,default-trigger = "mmc0";
  		};
  
- 		ds4 {
--			label = "ds4";
+-		user_led2 {
+-			label = "user_led2";
++		user_led3 {
 +			label = "green:user3";
- 			gpios = <&gpio 18 GPIO_ACTIVE_HIGH>;
--			linux,default-trigger = "phy0rx"; /* WLAN rx */
-+			linux,default-trigger = "mmc1";
+ 			gpios = <&gpio4 2 0>; /* <&gpio_user_led_3>; */
+ 			linux,default-trigger = "mmc1";
+ 		};
+ 
+-		user_led1 {
+-			label = "user_led1";
++		user_led4 {
++			label = "green:user4";
+ 			gpios = <&gpio4 3 0>; /* <&gpio_user_led_4>; */
+ 			panic-indicator;
+-			linux,default-trigger = "cpu0";
++			linux,default-trigger = "none";
+ 		};
+ 
+ 		wlan_active_led {
+-			label = "wifi_active";
++			label = "yellow:wlan";
+ 			gpios = <&gpio3 5 0>; /* <&gpio_wlan_active_led>; */
+ 			linux,default-trigger = "phy0tx";
  			default-state = "off";
  		};
  
- 		ds5 {
--			label = "ds5";
-+			label = "green:user4";
- 			gpios = <&gpio 17 GPIO_ACTIVE_HIGH>;
--			linux,default-trigger = "bluetooth-power";
-+			linux,default-trigger = "none";
-+			panic-indicator;
+ 		bt_active_led {
+-			label = "bt_active";
++			label = "blue:bt";
+ 			gpios = <&gpio4 7 0>; /* <&gpio_bt_active_led>; */
+-			linux,default-trigger = "hci0rx";
++			linux,default-trigger = "hci0-power";
+ 			default-state = "off";
  		};
- 
- 		vbus_det { /* U5 USB5744 VBUS detection via MIO25 */
+ 	};
 -- 
 2.17.1
