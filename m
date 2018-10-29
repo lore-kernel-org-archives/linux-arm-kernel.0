@@ -1,64 +1,74 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 10:01:18 +0100
-Subject: [PATCH v2 14/15] arm64: dts: allwinner: a64: Add DSI pipeline
-In-Reply-To: <CAMty3ZC1jCfuP8tFKvgcdJ5R_Ou0ejAT_VYv=fV1Kh4UanLWcg@mail.gmail.com>
-References: <20181023155035.9101-1-jagan@amarulasolutions.com>
- <20181023155035.9101-15-jagan@amarulasolutions.com>
- <20181024181048.w4iwebtac6wzmgt4@flea>
- <CAMty3ZC1jCfuP8tFKvgcdJ5R_Ou0ejAT_VYv=fV1Kh4UanLWcg@mail.gmail.com>
-Message-ID: <20181029090118.mqha2wgghtqhnyyd@flea>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 29 Oct 2018 14:30:04 +0530
+Subject: [PATCH v2 5/7] arm64: dts: hisilicon: poplar: Standardize LED labels
+ and triggers
+In-Reply-To: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
+References: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181029090006.4353-6-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 06:51:14PM +0530, Jagan Teki wrote:
-> On Wed, Oct 24, 2018 at 11:40 PM Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Tue, Oct 23, 2018 at 09:20:34PM +0530, Jagan Teki wrote:
-> > > The A64 has a MIPI-DSI block which is similar to A31
-> > > without mod clock.
-> > >
-> > > So, add dsi node with A64 compatible, dphy node with
-> > > A31 compatible and finally connect dsi to tcon0 to
-> > > make proper DSI pipeline.
-> > >
-> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > ---
-> > > Changes for v2:
-> > > - use A64 dphy compatible
-> > >
-> > >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 45 +++++++++++++++++++
-> > >  1 file changed, 45 insertions(+)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > > index f3a66f888205..f82e6b165d57 100644
-> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > > @@ -320,6 +320,11 @@
-> > >                                       #address-cells = <1>;
-> > >                                       #size-cells = <0>;
-> > >                                       reg = <1>;
-> > > +
-> > > +                                     tcon0_out_dsi: endpoint at 1 {
-> > > +                                             reg = <1>;
-> > > +                                             remote-endpoint = <&dsi_in_tcon0>;
-> >
-> > You need to set the allwinner,channel property there.
-> 
-> Are you referring to allwinner,tcon-channel = <1> ?
+For all 96Boards, the following standard is used for onboard LEDs.
 
-Yep
+green:user1  default-trigger: heartbeat
+green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
+green:user3  default-trigger: mmc1 (SD-card)
+green:user4  default-trigger: none, panic-indicator
+yellow:wlan  default-trigger: phy0tx
+blue:bt      default-trigger: hci0-power
 
-Maxime
+So lets adopt the same for Poplar, which is one of the 96Boards
+Enterprise edition platform.
 
+Due to absence of WLAN and BT support, corresponding LED nodes are not
+considered.
+
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ .../arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+index d30f6eb8a5ee..32716c96b457 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+@@ -35,30 +35,31 @@
+ 		compatible = "gpio-leds";
+ 
+ 		user-led0 {
+-			label = "USER-LED0";
++			label = "green:user1";
+ 			gpios = <&gpio6 3 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "heartbeat";
+ 			default-state = "off";
+ 		};
+ 
+ 		user-led1 {
+-			label = "USER-LED1";
++			label = "green:user2";
+ 			gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "mmc0";
+ 			default-state = "off";
+ 		};
+ 
+ 		user-led2 {
+-			label = "USER-LED2";
++			label = "green:user3";
+ 			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "none";
++			linux,default-trigger = "mmc1";
+ 			default-state = "off";
+ 		};
+ 
+ 		user-led3 {
+-			label = "USER-LED3";
++			label = "green:user4";
+ 			gpios = <&gpio10 6 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "cpu0";
++			linux,default-trigger = "none";
++			panic-indicator;
+ 			default-state = "off";
+ 		};
+ 	};
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/eae37f0e/attachment-0001.sig>
+2.17.1
