@@ -1,56 +1,33 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 29 Oct 2018 16:52:00 -0700
-Subject: [PATCH 0/6]  arm64: Get rid of __early_init_dt_declare_initrd()
-Message-ID: <20181029235206.30060-1-f.fainelli@gmail.com>
+Date: Mon, 29 Oct 2018 16:52:01 -0700
+Subject: [PATCH 1/6] nds32: Remove phys_initrd_start and phys_initrd_size
+In-Reply-To: <20181029235206.30060-1-f.fainelli@gmail.com>
+References: <20181029235206.30060-1-f.fainelli@gmail.com>
+Message-ID: <20181029235206.30060-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This will conflict with a subsequent change making phys_initrd_start and
+phys_initrd_size global variables. nds32 does not make use of those nor
+provides a suitable declarations so just get rid of them.
 
-The numbers no longer make any sense since I either did not correctly
-understand the feedback being given, or dramatically changed the
-approach.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/nds32/mm/init.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-This version introduces an architecture symbol: ARCH_HAS_PHYS_INITRD
-which indicates whether the architecture cares/supports parsing the
-physical address of the initrd. Currently ARM (32-bit), Unicore32 and
-now ARM64 support that.
-
-When that symbol is defined, we also have the generic FDT code populate
-the initrd physical address and size, and we can later make use of that
-within architecture specific code to populate the memblock regions and
-do the righ physical to virtual address conversion.
-
-Rob, hopefully this is what you had in mind.
-
-Previous discussions/submissions list here:
-
-v3:
-https://www.spinics.net/lists/arm-kernel/msg683566.html
-v2:
-https://lkml.org/lkml/2018/10/25/4
-
-
-Florian Fainelli (6):
-  nds32: Remove phys_initrd_start and phys_initrd_size
-  arch: Make phys_initrd_start and phys_initrd_size global variables
-  arch: Define ARCH_HAS_PHYS_INITRD for ARM and Unicore32
-  of/fdt: Populate phys_initrd_start/phys_initrd_size from FDT
-  arm64: Utilize ARCH_HAS_PHYS_INITRD
-  of/fdt: Remove definition check for __early_init_dt_declare_initrd()
-
- arch/Kconfig                    |  7 +++++++
- arch/arm/Kconfig                |  1 +
- arch/arm/mm/init.c              |  6 +++---
- arch/arm64/Kconfig              |  1 +
- arch/arm64/include/asm/memory.h |  8 --------
- arch/arm64/mm/init.c            | 23 +++++++++++------------
- arch/nds32/mm/init.c            |  2 --
- arch/unicore32/Kconfig          |  1 +
- arch/unicore32/mm/init.c        |  4 ++--
- drivers/of/fdt.c                |  6 ++++--
- include/linux/initrd.h          |  3 +++
- 11 files changed, 33 insertions(+), 29 deletions(-)
-
+diff --git a/arch/nds32/mm/init.c b/arch/nds32/mm/init.c
+index c713d2ad55dc..32f55a24ccbb 100644
+--- a/arch/nds32/mm/init.c
++++ b/arch/nds32/mm/init.c
+@@ -22,8 +22,6 @@
+ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+ DEFINE_SPINLOCK(anon_alias_lock);
+ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+-extern unsigned long phys_initrd_start;
+-extern unsigned long phys_initrd_size;
+ 
+ /*
+  * empty_zero_page is a special page that is used for
 -- 
 2.17.1
