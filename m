@@ -1,65 +1,175 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 29 Oct 2018 09:07:08 +0100
-Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
-In-Reply-To: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
-References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
-Message-ID: <20181029080708.GA32673@dhcp22.suse.cz>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Mon, 29 Oct 2018 09:06:35 +0100
+Subject: [PATCH v4] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
+Message-ID: <20181029080635.28973-1-vincent.whitchurch@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 29-10-18 13:16:16, miles.chen at mediatek.com wrote:
-> From: Miles Chen <miles.chen@mediatek.com>
-> 
-> The kbuf used by page owner is allocated by kmalloc(), which means it
-> can use only normal memory and there might be a "out of memory"
-> issue when we're out of normal memory.
-> 
-> To solve this problem, use kvmalloc() to allocate kbuf
-> from normal/highmem. But there is one problem here: kvmalloc()
-> does not fallback to vmalloc for sub page allocations. So sub
-> page allocation fails due to out of normal memory cannot fallback
-> to vmalloc.
-> 
-> Modify kvmalloc() to allow sub page allocations fallback to
-> vmalloc when CONFIG_HIGHMEM=y and use kvmalloc() to allocate
-> kbuf.
-> 
-> Clamp buffer size to PAGE_SIZE to avoid arbitrary size allocation.
-> 
-> Change since v2:
->   - improve kvmalloc, allow sub page allocations fallback to
->     vmalloc when CONFIG_HIGHMEM=y
+ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
+ldr/str instructions in copy_{from/to}_user.  They are currently
+unnecessarily using single ldr/str instructions and can use ldm/stm
+instructions instead like memcpy does (but with appropriate fixup
+tables).
 
-Matthew has suggested a much more viable way to go around this. We do
-not really want to allow an unbound kernel allocation - even if the
-interface is root only.
+This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
+about 4% on my Cortex-A9.
 
-Besides that, the following doesn't make much sense to me. It simply
-makes no sense to use vmalloc for sub page allocation regardless of
-HIGHMEM.
+before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
+before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
+before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
+before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
+before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
+before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
+before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
 
-> diff --git a/mm/util.c b/mm/util.c
-> index 8bf08b5b5760..7b1c59b9bfbf 100644
-> --- a/mm/util.c
-> +++ b/mm/util.c
-> @@ -416,10 +416,10 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
->  	ret = kmalloc_node(size, kmalloc_flags, node);
->  
->  	/*
-> -	 * It doesn't really make sense to fallback to vmalloc for sub page
-> -	 * requests
-> +	 * It only makes sense to fallback to vmalloc for sub page
-> +	 * requests if we might be able to allocate highmem pages.
->  	 */
-> -	if (ret || size <= PAGE_SIZE)
-> +	if (ret || (!IS_ENABLED(CONFIG_HIGHMEM) && size <= PAGE_SIZE))
->  		return ret;
->  
->  	return __vmalloc_node_flags_caller(size, node, flags,
-> -- 
-> 2.18.0
-> 
+ after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
+ after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
+ after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
+ after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
+ after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
 
+Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+---
+v4: Do not modify str1b/ldr1b
+v3: Explicitly add IT instructions to fix fault handling on Thumb-2
+v2: Group *_SHIFT #defines with respective .macro implementations
+
+ arch/arm/include/asm/assembler.h |  6 ++++--
+ arch/arm/lib/copy_from_user.S    | 23 ++++++++++++++++++++++-
+ arch/arm/lib/copy_to_user.S      | 27 ++++++++++++++++++++++-----
+ 3 files changed, 48 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index b17ee03d280b..da16d31c7ef9 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -243,13 +243,15 @@
+ 	.endm
+ #endif
+ 
+-#define USER(x...)				\
++#define USERL(l, x...)				\
+ 9999:	x;					\
+ 	.pushsection __ex_table,"a";		\
+ 	.align	3;				\
+-	.long	9999b,9001f;			\
++	.long	9999b,l;			\
+ 	.popsection
+ 
++#define USER(x...)	USERL(9001f, x)
++
+ #ifdef CONFIG_SMP
+ #define ALT_SMP(instr...)					\
+ 9998:	instr
+diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
+index a826df3d3814..3f79001830fe 100644
+--- a/arch/arm/lib/copy_from_user.S
++++ b/arch/arm/lib/copy_from_user.S
+@@ -34,12 +34,13 @@
+  *	Number of bytes NOT copied.
+  */
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
++
+ #ifndef CONFIG_THUMB2_KERNEL
+ #define LDR1W_SHIFT	0
+ #else
+ #define LDR1W_SHIFT	1
+ #endif
+-#define STR1W_SHIFT	0
+ 
+ 	.macro ldr1w ptr reg abort
+ 	ldrusr	\reg, \ptr, 4, abort=\abort
+@@ -57,10 +58,30 @@
+ 	ldr4w \ptr, \reg5, \reg6, \reg7, \reg8, \abort
+ 	.endm
+ 
++#else
++
++#define LDR1W_SHIFT	0
++
++	.macro ldr1w ptr reg abort
++	USERL(\abort, W(ldr) \reg, [\ptr], #4)
++	.endm
++
++	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
++	.endm
++
++	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
++
++#endif /* CONFIG_CPU_USE_DOMAINS */
++
+ 	.macro ldr1b ptr reg cond=al abort
+ 	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
+ 
++#define STR1W_SHIFT	0
++
+ 	.macro str1w ptr reg abort
+ 	W(str) \reg, [\ptr], #4
+ 	.endm
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index caf5019d8161..5cb28f6c7941 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -35,11 +35,6 @@
+  */
+ 
+ #define LDR1W_SHIFT	0
+-#ifndef CONFIG_THUMB2_KERNEL
+-#define STR1W_SHIFT	0
+-#else
+-#define STR1W_SHIFT	1
+-#endif
+ 
+ 	.macro ldr1w ptr reg abort
+ 	W(ldr) \reg, [\ptr], #4
+@@ -57,6 +52,14 @@
+ 	ldr\cond\()b \reg, [\ptr], #1
+ 	.endm
+ 
++#ifdef CONFIG_CPU_USE_DOMAINS
++
++#ifndef CONFIG_THUMB2_KERNEL
++#define STR1W_SHIFT	0
++#else
++#define STR1W_SHIFT	1
++#endif
++
+ 	.macro str1w ptr reg abort
+ 	strusr	\reg, \ptr, 4, abort=\abort
+ 	.endm
+@@ -72,6 +75,20 @@
+ 	str1w \ptr, \reg8, \abort
+ 	.endm
+ 
++#else
++
++#define STR1W_SHIFT	0
++
++	.macro str1w ptr reg abort
++	USERL(\abort, W(str) \reg, [\ptr], #4)
++	.endm
++
++	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
++	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
++	.endm
++
++#endif /* CONFIG_CPU_USE_DOMAINS */
++
+ 	.macro str1b ptr reg cond=al abort
+ 	strusr	\reg, \ptr, 1, \cond, abort=\abort
+ 	.endm
 -- 
-Michal Hocko
-SUSE Labs
+2.11.0
