@@ -1,83 +1,130 @@
-From: jliang@xilinx.com (Jiaying Liang)
-Date: Mon, 29 Oct 2018 18:01:06 +0000
-Subject: [PATCH v4 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <CAA07jV_FWxMRq=4hmTdCXJG6e3=-8AejfpKxmh9KUi9KQDH7yQ@mail.gmail.com>
-References: <1539155912-29760-1-git-send-email-wendy.liang@xilinx.com>
- <1539155912-29760-3-git-send-email-wendy.liang@xilinx.com>
- <20181010095741.GA14472@e107155-lin>
- <CAA07jV_FWxMRq=4hmTdCXJG6e3=-8AejfpKxmh9KUi9KQDH7yQ@mail.gmail.com>
-Message-ID: <DM5PR02MB2233AC6A0276887869AF72C9B0F30@DM5PR02MB2233.namprd02.prod.outlook.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Mon, 29 Oct 2018 11:07:05 -0700
+Subject: [PATCH 5/7] serial: 8250: Process sysrq at port unlock time
+In-Reply-To: <20181029180707.207546-1-dianders@chromium.org>
+References: <20181029180707.207546-1-dianders@chromium.org>
+Message-ID: <20181029180707.207546-6-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Let's take advantage of the new ("serial: core: Allow processing sysrq
+at port unlock time") to handle sysrqs more cleanly.
 
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+I don't have a great way to test all 8250 variants, but I've at least
+tested rk3288 / rk3399 and they seem to work.  Hopefully I got the
+aspeed_vuart / fsl / omap variants right (I only compile tested
+those).
 
-> -----Original Message-----
-> From: Wendy Liang [mailto:sunnyliangjy at gmail.com]
-> Sent: Wednesday, October 10, 2018 3:54 PM
-> To: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Jiaying Liang <jliang@xilinx.com>; Jassi Brar <jassisinghbrar@gmail.com>;
-> Michal Simek <michals@xilinx.com>; Rob Herring <robh+dt@kernel.org>;
-> Mark Rutland <mark.rutland@arm.com>; Devicetree List
-> <devicetree@vger.kernel.org>; Linux Kernel Mailing List <linux-
-> kernel at vger.kernel.org>; linux-arm-kernel <linux-arm-
-> kernel at lists.infradead.org>
-> Subject: Re: [PATCH v4 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-> 
-> On Wed, Oct 10, 2018 at 2:59 AM Sudeep Holla <sudeep.holla@arm.com>
-> wrote:
-> >
-> > On Wed, Oct 10, 2018 at 12:18:32AM -0700, Wendy Liang wrote:
-> > > Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block in
-> > > ZynqMP SoC used for the communication between various processor
-> > > systems.
-> > >
-> > > Signed-off-by: Wendy Liang <wendy.liang@xilinx.com>
-> >
-> > [...]
-> >
-> > > +Optional properties:
-> > > +--------------------
-> > > +- method:              The method of accessing the IPI agent registers.
-> > > +                       Permitted values are: "smc" and "hvc". Default is
-> > > +                       "smc".
-> >
-> > You are mixing the hardware messaging based mailbox and the software
-> > "smc/hvc" based mailbox together here. Please keep them separated.
-> > IIUC smc/hvc based mailcox is used for "tx" or too keep it simple in
-> > one direction and hardware based is used for "rx" or the other
-> > direction for communication.
-> >
-> Hi Sudeep,
-> 
-> Thanks for your comments.
-> 
-> The IPI hardware block has both buffers and registers. The hardware block
-> has dedicated buffers for each mailboxes, and thus, in the implementation,
-> we directly access the buffers from IPI driver. However, the controller
-> registers are shared between mailboxes in the hardware, as the ATF will also
-> access the registers, we need to use SMC/HVC to access the registers (control
-> or ISR). And the SMC/HVC here is for the register access.
-> 
-> I am not clear on smc/hvc based mailbox is used for tx, and hardware based
-> is used for  "rx". As for both TX and RX, we need to write/read the registers
-> (through SMC) and write/read the buffers provided by the IPI hardware block
-> directly.
-[Wendy] Hi Sudeep,
+ drivers/tty/serial/8250/8250_aspeed_vuart.c | 6 +++++-
+ drivers/tty/serial/8250/8250_fsl.c          | 6 +++++-
+ drivers/tty/serial/8250/8250_omap.c         | 6 +++++-
+ drivers/tty/serial/8250/8250_port.c         | 8 +++-----
+ 4 files changed, 18 insertions(+), 8 deletions(-)
 
-The SMC/HVC is for hardware registers access as but not sending messages.
-Do you have further comments or are you fine with the explanation?
-
-Thanks,
-Wendy
-
-> 
-> Thanks,
-> Wendy
-> 
-> > You *should not* mix them as single unit. Also lots of other vendor
-> > need SMC/HVC based mailbox. So make it generic and keep it separate.
-> >
-> > --
-> > Regards,
-> > Sudeep
+diff --git a/drivers/tty/serial/8250/8250_aspeed_vuart.c b/drivers/tty/serial/8250/8250_aspeed_vuart.c
+index 435bec40dee6..0438d9a905ce 100644
+--- a/drivers/tty/serial/8250/8250_aspeed_vuart.c
++++ b/drivers/tty/serial/8250/8250_aspeed_vuart.c
+@@ -5,6 +5,10 @@
+  *    Copyright (C) 2016 Jeremy Kerr <jk@ozlabs.org>, IBM Corp.
+  *    Copyright (C) 2006 Arnd Bergmann <arnd@arndb.de>, IBM Corp.
+  */
++#if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
++#define SUPPORT_SYSRQ
++#endif
++
+ #include <linux/device.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+@@ -293,7 +297,7 @@ static int aspeed_vuart_handle_irq(struct uart_port *port)
+ 	if (lsr & UART_LSR_THRE)
+ 		serial8250_tx_chars(up);
+ 
+-	spin_unlock_irqrestore(&port->lock, flags);
++	uart_unlock_and_check_sysrq(port, flags);
+ 
+ 	return 1;
+ }
+diff --git a/drivers/tty/serial/8250/8250_fsl.c b/drivers/tty/serial/8250/8250_fsl.c
+index 6640a4c7ddd1..ff3dcaea5d93 100644
+--- a/drivers/tty/serial/8250/8250_fsl.c
++++ b/drivers/tty/serial/8250/8250_fsl.c
+@@ -1,4 +1,8 @@
+ // SPDX-License-Identifier: GPL-2.0
++#if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
++#define SUPPORT_SYSRQ
++#endif
++
+ #include <linux/serial_reg.h>
+ #include <linux/serial_8250.h>
+ 
+@@ -54,7 +58,7 @@ int fsl8250_handle_irq(struct uart_port *port)
+ 		serial8250_tx_chars(up);
+ 
+ 	up->lsr_saved_flags = orig_lsr;
+-	spin_unlock_irqrestore(&up->port.lock, flags);
++	uart_unlock_and_check_sysrq(&up->port, flags);
+ 	return 1;
+ }
+ EXPORT_SYMBOL_GPL(fsl8250_handle_irq);
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index a019286f8bb6..ad7ba7d0f28d 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -8,6 +8,10 @@
+  *
+  */
+ 
++#if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
++#define SUPPORT_SYSRQ
++#endif
++
+ #include <linux/device.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+@@ -1085,7 +1089,7 @@ static int omap_8250_dma_handle_irq(struct uart_port *port)
+ 		}
+ 	}
+ 
+-	spin_unlock_irqrestore(&port->lock, flags);
++	uart_unlock_and_check_sysrq(port, flags);
+ 	serial8250_rpm_put(up);
+ 	return 1;
+ }
+diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
+index f776b3eafb96..c39482b96111 100644
+--- a/drivers/tty/serial/8250/8250_port.c
++++ b/drivers/tty/serial/8250/8250_port.c
+@@ -1755,7 +1755,7 @@ void serial8250_read_char(struct uart_8250_port *up, unsigned char lsr)
+ 		else if (lsr & UART_LSR_FE)
+ 			flag = TTY_FRAME;
+ 	}
+-	if (uart_handle_sysrq_char(port, ch))
++	if (uart_prepare_sysrq_char(port, ch))
+ 		return;
+ 
+ 	uart_insert_char(port, lsr, UART_LSR_OE, ch, flag);
+@@ -1897,7 +1897,7 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
+ 	if ((!up->dma || up->dma->tx_err) && (status & UART_LSR_THRE))
+ 		serial8250_tx_chars(up);
+ 
+-	spin_unlock_irqrestore(&port->lock, flags);
++	uart_unlock_and_check_sysrq(port, flags);
+ 	return 1;
+ }
+ EXPORT_SYMBOL_GPL(serial8250_handle_irq);
+@@ -3258,9 +3258,7 @@ void serial8250_console_write(struct uart_8250_port *up, const char *s,
+ 
+ 	serial8250_rpm_get(up);
+ 
+-	if (port->sysrq)
+-		locked = 0;
+-	else if (oops_in_progress)
++	if (oops_in_progress)
+ 		locked = spin_trylock_irqsave(&port->lock, flags);
+ 	else
+ 		spin_lock_irqsave(&port->lock, flags);
+-- 
+2.19.1.568.g152ad8e336-goog
