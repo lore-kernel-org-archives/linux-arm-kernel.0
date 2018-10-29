@@ -1,89 +1,60 @@
-From: avanbrunt@nvidia.com (Alexander Van Brunt)
-Date: Mon, 29 Oct 2018 15:13:08 +0000
-Subject: [PATCH V3] arm64: Don't flush tlb while clearing the accessed bit
-In-Reply-To: <20181029105515.GD14127@arm.com>
-References: <1540805158-618-1-git-send-email-amhetre@nvidia.com>,
- <20181029105515.GD14127@arm.com>
-Message-ID: <BN7PR12MB2708B742FD3448589AD0F259CFF30@BN7PR12MB2708.namprd12.prod.outlook.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Oct 2018 15:12:29 +0000
+Subject: [PATCH] arm: mm: fault: check ADFSR in case of abort
+In-Reply-To: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
+References: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
+Message-ID: <20181029151228.GG30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->?If we roll a TLB invalidation routine without the trailing DSB, what sort of
->?performance does that get you?
-
-We have been doing our testing on our Carmel CPUs. Carmel will effectively
-ignore a TLB invalidate that doesn't have a DSB (until the invalidate buffer
-overflows). So, I expect the performance to be the same as with no TLB
-invalidate, but not represent the performance of other ARMv8 CPUs
-
-
-From: Will Deacon <will.deacon@arm.com>
-Sent: Monday, October 29, 2018 3:55 AM
-To: Ashish Mhetre
-Cc: mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org; linux-tegra at vger.kernel.org; Alexander Van Brunt; Sachin Nikam; linux-kernel at vger.kernel.org
-Subject: Re: [PATCH V3] arm64: Don't flush tlb while clearing the accessed bit
-? 
-
-On Mon, Oct 29, 2018 at 02:55:58PM +0530, Ashish Mhetre wrote:
-> From: Alex Van Brunt <avanbrunt@nvidia.com>
+On Mon, Oct 29, 2018 at 02:20:51PM +0000, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
+> When running into situations like:
+> "Unhandled fault: synchronous external abort (0x210) at 0xXXX"
+> or
+> "Unhandled prefetch abort: synchronous external abort (0x210) at 0xXXX"
+> it is useful to know the content of ADFSR (Auxiliary Data Fault Status
+> Register) to indicate an ECC double-bit error in L1 or L2 cache.
 > 
-> Accessed bit is used to age a page and in generic implementation there is
-> flush_tlb while clearing the accessed bit.
-> Flushing a TLB is overhead on ARM64 as access flag faults don't get
-> translation table entries cached into TLB's. Flushing TLB is not necessary
-> for this. Clearing the accessed bit without flushing TLB doesn't cause data
-> corruption on ARM64.
-> In our case with this patch, speed of reading from fast NVMe/SSD through
-> PCIe got improved by 10% ~ 15% and writing got improved by 20% ~ 40%.
-> So for performance optimisation don't flush TLB when clearing the accessed
-> bit on ARM64.
-> x86 made the same optimization even though their TLB invalidate is much
-> faster as it doesn't broadcast to other CPUs.
+> Refer to:
+> Cortex-A15 Technical Reference Manual, Revision: r2p1
+> [6.4.8. Error Correction Code]
 
-Ok, but they may end up using IPIs so lets avoid these vague performance
-claims in the log unless they're backed up with numbers.
+This is CPU independent code, and so must only access registers that are
+present on all CPUs which may run that code.
 
-> Please refer to:
-> 'commit b13b1d2d8692 ("x86/mm: In the PTE swapout page reclaim case clear
-> the accessed bit instead of flushing the TLB")'
-> 
-> Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
-> Signed-off-by: Ashish Mhetre <amhetre@nvidia.com>
-> ---
->? arch/arm64/include/asm/pgtable.h | 20 ++++++++++++++++++++
->? 1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 2ab2031..080d842 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -652,6 +652,26 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
->??????? return __ptep_test_and_clear_young(ptep);
->? }
->? 
-> +#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
-> +static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
-> +????????????????????????????????????? unsigned long address, pte_t *ptep)
-> +{
-> +???? /*
-> +????? * On ARM64 CPUs, clearing the accessed bit without a TLB flush
-> +????? * doesn't cause data corruption. [ It could cause incorrect
-> +????? * page aging and the (mistaken) reclaim of hot pages, but the
-> +????? * chance of that should be relatively low. ]
-> +????? *
-> +????? * So as a performance optimization don't flush the TLB when
-> +????? * clearing the accessed bit, it will eventually be flushed by
-> +????? * a context switch or a VM operation anyway. [ In the rare
-> +????? * event of it not getting flushed for a long time the delay
-> +????? * shouldn't really matter because there's no real memory
-> +????? * pressure for swapout to react to. ]
+Here's the extract from the ARM ARM for the ADFSR and AIFSR:
 
-This is blindly copied from x86 and isn't true for us: we don't invalidate
-the TLB on context switch. That means our window for keeping the stale
-entries around is potentially much bigger and might not be a great idea.
+  The position of these registers is architecturally-defined, but the
+  content and use of the registers is IMPLEMENTATION DEFINED. An
+  implementation can use these registers to return additional fault
+  status information. An example use of these registers is to return
+  more information for diagnosing parity errors.
 
-If we roll a TLB invalidation routine without the trailing DSB, what sort of
-performance does that get you?
+So by testing bits in this register, you are making use of
+implementation defined values.
 
-Will
-    
+It also goes on to say:
+
+  These registers are not implemented in architecture versions before
+  ARMv7.
+
+So before ARMv7, we have to take note of the unimplemented CP15 rules:
+
+2. In an allocated CP15 primary register, accesses to all unallocated
+   encodings are UNPREDICTABLE for accesses at PL1 or higher.  This
+   means that any MCR or MRC access from PL1 or higher with a
+   combination of <CRn>, <opc1>, <CRm> and <opc2> values not shown in,
+   or referenced from, Full list of VMSA CP15 registers, by coprocessor
+   register number on page B3-1481, that would access an allocated
+   CP15 primary register, is UNPREDICTABLE. As indicated by rule 1, for
+   the ARMv7-Aarchitecture, the allocated CP15 primary registers are:
+   ? in any VMSA implementation, c0-c3, c5-c11, c13, and c15
+   ...
+
+So I'd prefer if we didn't attempt to read this register on CPUs where
+this isn't explicitly implemented.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
