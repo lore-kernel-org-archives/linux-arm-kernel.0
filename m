@@ -1,123 +1,99 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 29 Oct 2018 15:12:40 +0530
-Subject: [PATCH v3 2/7] arm64: dts: rockchip: rock960: Add on-board LED support
-In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181029094245.7886-3-manivannan.sadhasivam@linaro.org>
+Date: Mon, 29 Oct 2018 15:02:10 +0530
+Subject: [PATCH v2 7/7] arm64: dts: qcom: apq8016-sbc: Standardize LED
+ labels
+In-Reply-To: <CAHLCerM91ukzAJZHaxXxwoHU-6mVUV+X9_y_Rs0zmybNnRJCfA@mail.gmail.com>
+References: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
+ <20181029090006.4353-8-manivannan.sadhasivam@linaro.org>
+ <CAHLCerM91ukzAJZHaxXxwoHU-6mVUV+X9_y_Rs0zmybNnRJCfA@mail.gmail.com>
+Message-ID: <20181029093210.GA6110@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add on-board LED support for Rock960 board based on the following
-standard used by rest of the 96Boards:
+On Mon, Oct 29, 2018 at 02:47:11PM +0530, Amit Kucheria wrote:
+> On Mon, Oct 29, 2018 at 2:31 PM Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> >
+> > For all 96Boards, the following standard is used for onboard LEDs.
+> >
+> > green:user1  default-trigger: heartbeat
+> > green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
+> > green:user3  default-trigger: mmc1 (SD-card)
+> > green:user4  default-trigger: none, panic-indicator
+> > yellow:wlan  default-trigger: phy0tx
+> > blue:bt      default-trigger: hci0-power
+> >
+> > So lets adopt the same for APQ8016 SBC (Dragonboard410c), which is
+> > one of the 96Boards CE platform.
+> 
+> You are missing a signed-off here :-)
+>
 
-green:user1  default-trigger: heartbeat
-green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
-green:user3  default-trigger: mmc1 (SD-card)
-green:user4  default-trigger: none, panic-indicator
-yellow:wlan  default-trigger: phy0tx
-blue:bt      default-trigger: hci0-power
+ahh, my bad. Will fix it in next revision.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- .../boot/dts/rockchip/rk3399-rock960.dts      | 79 +++++++++++++++++++
- 1 file changed, 79 insertions(+)
+Thanks,
+Mani
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
-index 3c3308daec98..12285c51cceb 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
-@@ -13,6 +13,53 @@
- 	chosen {
- 		stdout-path = "serial2:1500000n8";
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&user_led1>, <&user_led2>, <&user_led3>,
-+			    <&user_led4>, <&wlan_led>, <&bt_led>;
-+
-+		user_led1 {
-+			label = "green:user1";
-+			gpios = <&gpio4 RK_PC2 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		user_led2 {
-+			label = "green:user2";
-+			gpios = <&gpio4 RK_PC6 0>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		user_led3 {
-+			label = "green:user3";
-+			gpios = <&gpio4 RK_PD0 0>;
-+			linux,default-trigger = "mmc1";
-+		};
-+
-+		user_led4 {
-+			label = "green:user4";
-+			gpios = <&gpio4 RK_PD4 0>;
-+			panic-indicator;
-+			linux,default-trigger = "none";
-+		};
-+
-+		wlan_active_led {
-+			label = "yellow:wlan";
-+			gpios = <&gpio4 RK_PD5 0>;
-+			linux,default-trigger = "phy0tx";
-+			default-state = "off";
-+		};
-+
-+		bt_active_led {
-+			label = "blue:bt";
-+			gpios = <&gpio4 RK_PD6 0>;
-+			linux,default-trigger = "hci0-power";
-+			default-state = "off";
-+		};
-+	};
-+
- };
- 
- &pcie0 {
-@@ -20,6 +67,38 @@
- };
- 
- &pinctrl {
-+	leds {
-+		user_led1: user_led1 {
-+			rockchip,pins =
-+				<4 RK_PC2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led2: user_led2 {
-+			rockchip,pins =
-+				<4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led3: user_led3 {
-+			rockchip,pins =
-+				<4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led4: user_led4 {
-+			rockchip,pins =
-+				<4 RK_PD4 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		wlan_led: wlan_led {
-+			rockchip,pins =
-+				<4 RK_PD5 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		bt_led: bt_led {
-+			rockchip,pins =
-+				<4 RK_PD6 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	pcie {
- 		pcie_drv: pcie-drv {
- 			rockchip,pins =
--- 
-2.17.1
+> Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
+> 
+> > ---
+> >  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > index 46feedf7c989..35f95154316b 100644
+> > --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > @@ -300,28 +300,28 @@
+> >                         compatible = "gpio-leds";
+> >
+> >                         led at 1 {
+> > -                               label = "apq8016-sbc:green:user1";
+> > +                               label = "green:user1";
+> >                                 gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
+> >                                 linux,default-trigger = "heartbeat";
+> >                                 default-state = "off";
+> >                         };
+> >
+> >                         led at 2 {
+> > -                               label = "apq8016-sbc:green:user2";
+> > +                               label = "green:user2";
+> >                                 gpios = <&msmgpio 120 GPIO_ACTIVE_HIGH>;
+> >                                 linux,default-trigger = "mmc0";
+> >                                 default-state = "off";
+> >                         };
+> >
+> >                         led at 3 {
+> > -                               label = "apq8016-sbc:green:user3";
+> > +                               label = "green:user3";
+> >                                 gpios = <&pm8916_gpios 1 GPIO_ACTIVE_HIGH>;
+> >                                 linux,default-trigger = "mmc1";
+> >                                 default-state = "off";
+> >                         };
+> >
+> >                         led at 4 {
+> > -                               label = "apq8016-sbc:green:user4";
+> > +                               label = "green:user4";
+> >                                 gpios = <&pm8916_gpios 2 GPIO_ACTIVE_HIGH>;
+> >                                 linux,default-trigger = "none";
+> >                                 panic-indicator;
+> > @@ -329,14 +329,14 @@
+> >                         };
+> >
+> >                         led at 5 {
+> > -                               label = "apq8016-sbc:yellow:wlan";
+> > +                               label = "yellow:wlan";
+> >                                 gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
+> >                                 linux,default-trigger = "phy0tx";
+> >                                 default-state = "off";
+> >                         };
+> >
+> >                         led at 6 {
+> > -                               label = "apq8016-sbc:blue:bt";
+> > +                               label = "blue:bt";
+> >                                 gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
+> >                                 linux,default-trigger = "bluetooth-power";
+> >                                 default-state = "off";
+> > --
+> > 2.17.1
+> >
