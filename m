@@ -1,39 +1,69 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Oct 2018 17:53:04 +0000
-Subject: [PATCH v2 1/6] mm: Introduce common STRUCT_PAGE_MAX_SHIFT define
-In-Reply-To: <20181015175702.9036-2-logang@deltatee.com>
-References: <20181015175702.9036-1-logang@deltatee.com>
- <20181015175702.9036-2-logang@deltatee.com>
-Message-ID: <20181029175303.GB16739@arm.com>
+Date: Mon, 29 Oct 2018 17:59:05 +0000
+Subject: [PATCH v2 1/1] iommu/arm-smmu-v3: eliminate a potential memory
+ corruption on Hi16xx soc
+In-Reply-To: <1540021014-8176-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1540021014-8176-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20181029175905.GC16739@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Logan,
-
-On Mon, Oct 15, 2018 at 11:56:57AM -0600, Logan Gunthorpe wrote:
-> This define is used by arm64 to calculate the size of the vmemmap
-> region. It is defined as the log2 of the upper bound on the size
-> of a struct page.
+On Sat, Oct 20, 2018 at 03:36:54PM +0800, Zhen Lei wrote:
+> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but
+> Hisilicon expands the next 4 bytes to carry some IMPDEF information. That
+> means, total 8 bytes data will be written to MSIAddress each time.
 > 
-> We move it into mm_types.h so it can be defined properly instead of
-> set and checked with a build bug. This also allows us to use the same
-> define for riscv.
+> MSIAddr: |----4bytes----|----4bytes----|
+> 	 |    MSIData   |    IMPDEF    |
 > 
-> Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Christoph Hellwig <hch@lst.de>
+> There is no problem for ITS, because the next 4 bytes space is reserved
+> in ITS. But it will overwrite the 4 bytes memory following "sync_count".
+> It's very fortunately that the previous and the next neighbour of the
+> "sync_count" are both aligned by 8 bytes, so no problem is met now.
+> 
+> It's good to explicitly add a workaround:
+> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is
+>    always aligned by 8 bytes.
+> 2. Add a "int" struct member to make sure the 4 bytes padding is always
+>    exist.
+> 
+> There is no functional change.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 > ---
->  arch/arm64/include/asm/memory.h | 9 ---------
->  arch/arm64/mm/init.c            | 8 --------
->  include/asm-generic/fixmap.h    | 1 +
->  include/linux/mm_types.h        | 5 +++++
->  4 files changed, 6 insertions(+), 17 deletions(-)
+>  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 5059d09..624fdd0 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -586,7 +586,20 @@ struct arm_smmu_device {
+>  
+>  	struct arm_smmu_strtab_cfg	strtab_cfg;
+>  
+> -	u32				sync_count;
+> +	/*
+> +	 * The alignment and padding is required by Hi16xx of Hisilicon.
+> +	 * Because the ITS hardware on Hi16xx will truncate the MSIAddress(Here
+> +	 * it's the address of "sync_count") to 8 bytes boundary first, then
+> +	 * write 32 bits MSIdata at offset 0, and 32 bits IMPDEF data at offset
+> +	 * 4. Without this workaround, the adjacent member maybe overwritten.
+> +	 *
+> +	 *                    |---4bytes---|---4bytes---|
+> +	 * MSIAddress & (~0x7):   MSIdata  | IMPDEF data|
+> +	 */
+> +	struct {
+> +		u32			sync_count;
+> +		int			padding;
+> +	} __attribute__((aligned(8)));
 
-This looks like a really good cleanup to me, thanks:
+I thought the conclusion after reviewing your original patch was to maintain
+the union and drop the alignment directive? e.g.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+	union {
+		u32	sync_count;
+		u64	padding; /* Hi16xx writes an extra 32 bits of goodness */
+	};
 
 Will
