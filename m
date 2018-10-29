@@ -1,166 +1,64 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 29 Oct 2018 09:55:23 -0700
-Subject: [PATCH] ARM: dts: NSP: Move aliases to bcm-nsp.dtsi
-Message-ID: <20181029165524.26162-1-f.fainelli@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Oct 2018 17:02:26 +0000
+Subject: [PATCH] arm64: kprobe: make page to RO mode when allocate it
+In-Reply-To: <CAK8P3a0oSn8Z6wJT1X2si8+A2wttkh7EjqD_MZYt4+L5a_XKLg@mail.gmail.com>
+References: <20181015111600.5479-1-anders.roxell@linaro.org>
+ <20181029120434.GA15446@arm.com>
+ <CAK8P3a0oSn8Z6wJT1X2si8+A2wttkh7EjqD_MZYt4+L5a_XKLg@mail.gmail.com>
+Message-ID: <20181029170226.GA16739@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All boards replicate the aliases node, move the aliases node to
-bcm-nsp.dtsi and add all the serial and ethernet ports such that a boot
-program like u-boot can populate MAC addresses accordingly.
+On Mon, Oct 29, 2018 at 01:11:24PM +0100, Arnd Bergmann wrote:
+> On 10/29/18, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Oct 15, 2018 at 01:16:00PM +0200, Anders Roxell wrote:
+> 
+> >> -static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
+> >> +void *alloc_insn_page(void)
+> >>  {
+> >> -	void *addrs[1];
+> >> -	u32 insns[1];
+> >> +	void *page;
+> >>
+> >> -	addrs[0] = (void *)addr;
+> >> -	insns[0] = (u32)opcode;
+> >> +	page = vmalloc_exec(PAGE_SIZE);
+> >> +	if (page)
+> >> +		set_memory_ro((unsigned long)page & PAGE_MASK, 1);
+> >
+> > This looks a bit strange to me -- you're allocating PAGE_SIZE bytes so
+> > that we can adjust the permissions, yet we can't guarantee that page is
+> > actually page-aligned and therefore end up explicitly masking down.
+> >
+> > In which case allocating an entire page isn't actually helping us, and
+> > we could end up racing with somebody else changing permission on the
+> > same page afaict.
+> >
+> > I think we need to ensure we really have an entire page, perhaps using
+> > vmap() instead? Or have I missed some subtle detail here?
+> 
+> I'm fairly sure that vmalloc() and vmalloc_exec() is guaranteed to be page
+> aligned everywhere. The documentation is a bit vague here, but I'm
+> still confident enough that we can make that assumption based on
+> 
+> /**
+>  *      vmalloc_exec  -  allocate virtually contiguous, executable memory
+>  *      @size:          allocation size
+>  *
+>  *      Kernel-internal function to allocate enough pages to cover @size
+>  *      the page level allocator and map them into contiguous and
+>  *      executable kernel virtual space.
+>  *
+>  *      For tight control over page level allocator and protection flags
+>  *      use __vmalloc() instead.
+>  */
+> void *vmalloc_exec(unsigned long size)
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi     | 8 ++++++++
- arch/arm/boot/dts/bcm958522er.dts  | 4 ----
- arch/arm/boot/dts/bcm958525er.dts  | 4 ----
- arch/arm/boot/dts/bcm958525xmc.dts | 4 ----
- arch/arm/boot/dts/bcm958622hr.dts  | 4 ----
- arch/arm/boot/dts/bcm958623hr.dts  | 4 ----
- arch/arm/boot/dts/bcm958625hr.dts  | 4 ----
- arch/arm/boot/dts/bcm958625k.dts   | 5 -----
- arch/arm/boot/dts/bcm988312hr.dts  | 4 ----
- 9 files changed, 8 insertions(+), 33 deletions(-)
+FWIW, I did a bit of digging and I agree with your conclusion. vmalloc()
+allocations end up getting installed in map_vm_area() via
+__vmalloc_area_node(), which allocates things a page at a time.
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index ec869a80f9ba..cbe6c6453d76 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -41,6 +41,14 @@
- 	model = "Broadcom Northstar Plus SoC";
- 	interrupt-parent = <&gic>;
- 
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		ethernet0 = &amac0;
-+		ethernet1 = &amac1;
-+		ethernet2 = &amac2;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/bcm958522er.dts b/arch/arm/boot/dts/bcm958522er.dts
-index f9dd342cc2ae..21479b4ce823 100644
---- a/arch/arm/boot/dts/bcm958522er.dts
-+++ b/arch/arm/boot/dts/bcm958522er.dts
-@@ -39,10 +39,6 @@
- 	model = "NorthStar Plus SVK (BCM958522ER)";
- 	compatible = "brcm,bcm58522", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-diff --git a/arch/arm/boot/dts/bcm958525er.dts b/arch/arm/boot/dts/bcm958525er.dts
-index 374508a9cfbf..cda3d790965b 100644
---- a/arch/arm/boot/dts/bcm958525er.dts
-+++ b/arch/arm/boot/dts/bcm958525er.dts
-@@ -39,10 +39,6 @@
- 	model = "NorthStar Plus SVK (BCM958525ER)";
- 	compatible = "brcm,bcm58525", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-diff --git a/arch/arm/boot/dts/bcm958525xmc.dts b/arch/arm/boot/dts/bcm958525xmc.dts
-index 403250c5ad8e..f86649812b59 100644
---- a/arch/arm/boot/dts/bcm958525xmc.dts
-+++ b/arch/arm/boot/dts/bcm958525xmc.dts
-@@ -39,10 +39,6 @@
- 	model = "NorthStar Plus XMC (BCM958525xmc)";
- 	compatible = "brcm,bcm58525", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-diff --git a/arch/arm/boot/dts/bcm958622hr.dts b/arch/arm/boot/dts/bcm958622hr.dts
-index ecd05e26c262..df60602b054d 100644
---- a/arch/arm/boot/dts/bcm958622hr.dts
-+++ b/arch/arm/boot/dts/bcm958622hr.dts
-@@ -39,10 +39,6 @@
- 	model = "NorthStar Plus SVK (BCM958622HR)";
- 	compatible = "brcm,bcm58622", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-diff --git a/arch/arm/boot/dts/bcm958623hr.dts b/arch/arm/boot/dts/bcm958623hr.dts
-index f5e85b301497..3893e7af343a 100644
---- a/arch/arm/boot/dts/bcm958623hr.dts
-+++ b/arch/arm/boot/dts/bcm958623hr.dts
-@@ -39,10 +39,6 @@
- 	model = "NorthStar Plus SVK (BCM958623HR)";
- 	compatible = "brcm,bcm58623", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-index a53a2f629d74..cf226b02141f 100644
---- a/arch/arm/boot/dts/bcm958625hr.dts
-+++ b/arch/arm/boot/dts/bcm958625hr.dts
-@@ -39,10 +39,6 @@
- 	model = "NorthStar Plus SVK (BCM958625HR)";
- 	compatible = "brcm,bcm58625", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index 3ea5f739e90b..10b3d512bb33 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -38,11 +38,6 @@
- 	model = "NorthStar Plus SVK (BCM958625K)";
- 	compatible = "brcm,bcm58625", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--		serial1 = &uart1;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-diff --git a/arch/arm/boot/dts/bcm988312hr.dts b/arch/arm/boot/dts/bcm988312hr.dts
-index ea9a0806b446..e39db14d805e 100644
---- a/arch/arm/boot/dts/bcm988312hr.dts
-+++ b/arch/arm/boot/dts/bcm988312hr.dts
-@@ -39,10 +39,6 @@
- 	model = "NorthStar Plus SVK (BCM988312HR)";
- 	compatible = "brcm,bcm88312", "brcm,nsp";
- 
--	aliases {
--		serial0 = &uart0;
--	};
--
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
--- 
-2.17.1
+So we can simplify this patch to drop the masking when calling
+set_memory_ro().
+
+Will
