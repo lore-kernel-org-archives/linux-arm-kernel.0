@@ -1,44 +1,74 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 29 Oct 2018 15:13:05 +0530
-Subject: [PATCH V2] dt-bindings: arm: Explain capacities-dmips-mhz
- calculations in example
-Message-ID: <1cd2594fff3fb54948dcd2af65ae1867dd1c541a.1540806119.git.viresh.kumar@linaro.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 29 Oct 2018 15:12:43 +0530
+Subject: [PATCH v3 5/7] arm64: dts: hisilicon: poplar: Standardize LED labels
+ and triggers
+In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181029094245.7886-6-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The example contains two values for the capacity currently, 446 in text
-and 578 in code. The numbers are all correct but can confuse some of the
-readers. This patch tries to explain how the numbers are calculated to
-avoid same confusion going forward.
+For all 96Boards, the following standard is used for onboard LEDs.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+green:user1  default-trigger: heartbeat
+green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
+green:user3  default-trigger: mmc1 (SD-card)
+green:user4  default-trigger: none, panic-indicator
+yellow:wlan  default-trigger: phy0tx
+blue:bt      default-trigger: hci0-power
+
+So lets adopt the same for Poplar, which is one of the 96Boards
+Enterprise edition platform.
+
+Due to absence of WLAN and BT support, corresponding LED nodes are not
+considered.
+
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
-V1->V2:
-- The numbers weren't incorrect in the example, just that it needs a
-  bit more explanation for some people.
+ .../arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
- Documentation/devicetree/bindings/arm/cpu-capacity.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-index 9b5685a1d15d..84262cdb8d29 100644
---- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-+++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-@@ -59,9 +59,11 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
- ===========================================
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+index d30f6eb8a5ee..32716c96b457 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+@@ -35,30 +35,31 @@
+ 		compatible = "gpio-leds";
  
- Example 1 (ARM 64-bit, 6-cpu system, two clusters):
--capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
--supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
--final capacities are 1024 for cluster0 and 446 for cluster1
-+The capacities-dmips-mhz or DMIPS/MHz values (scaled to 1024)
-+are 1024 and 578 for cluster0 and cluster1. Further normalization
-+is done by the operating system based on cluster0 at max-freq=1100 and
-+custer1 at max-freq=850, final capacities are 1024 for cluster0 and
-+446 for cluster1 (576*850/1100).
+ 		user-led0 {
+-			label = "USER-LED0";
++			label = "green:user1";
+ 			gpios = <&gpio6 3 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "heartbeat";
+ 			default-state = "off";
+ 		};
  
- cpus {
- 	#address-cells = <2>;
+ 		user-led1 {
+-			label = "USER-LED1";
++			label = "green:user2";
+ 			gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "mmc0";
+ 			default-state = "off";
+ 		};
+ 
+ 		user-led2 {
+-			label = "USER-LED2";
++			label = "green:user3";
+ 			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "none";
++			linux,default-trigger = "mmc1";
+ 			default-state = "off";
+ 		};
+ 
+ 		user-led3 {
+-			label = "USER-LED3";
++			label = "green:user4";
+ 			gpios = <&gpio10 6 GPIO_ACTIVE_LOW>;
+-			linux,default-trigger = "cpu0";
++			linux,default-trigger = "none";
++			panic-indicator;
+ 			default-state = "off";
+ 		};
+ 	};
 -- 
-2.19.1.568.g152ad8e3369a
+2.17.1
