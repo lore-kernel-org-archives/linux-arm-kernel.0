@@ -1,42 +1,80 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 10:15:08 +0100
-Subject: [PATCH v3 00/25] drm/sun4i: Allwinner A64 MIPI-DSI support
-In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
-Message-ID: <20181029091508.gyhn2m5fnbucvb34@flea>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 29 Oct 2018 14:30:06 +0530
+Subject: [PATCH v2 7/7] arm64: dts: qcom: apq8016-sbc: Standardize LED labels
+In-Reply-To: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
+References: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181029090006.4353-8-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 08:13:19PM +0530, Jagan Teki wrote:
-> This series fixed the issues related to work DSI on 2-lane panel
-> which is reported on previous version[1].
-> 
-> Few comments from previous version still in discussion, but I just
-> send this version just to group all working changes together.
-> anyway I will fix in this in next version if any.
-> 
-> PLL_MIPI min rate is still weird, I tried many possible dclock rate
-> from panel driver to satisfy manual suggested min rate 500MHz but
-> none working so eventually moved 300MHz. any inputs on this area
-> are welcome.
-> 
-> All these changes are tested in 2-lane, 4-lane MIPI-DSI panels.
-> 
-> If anyone wants to test, use this repo [2] with WIP-A64-DSI branch.
+For all 96Boards, the following standard is used for onboard LEDs.
 
-A changelog would be nice here, and usually you shouldn't send a new
-version while there is ongoing discussion on the previous version.
+green:user1  default-trigger: heartbeat
+green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
+green:user3  default-trigger: mmc1 (SD-card)
+green:user4  default-trigger: none, panic-indicator
+yellow:wlan  default-trigger: phy0tx
+blue:bt      default-trigger: hci0-power
 
-Maxime
+So lets adopt the same for APQ8016 SBC (Dragonboard410c), which is
+one of the 96Boards CE platform.
+---
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index 46feedf7c989..35f95154316b 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -300,28 +300,28 @@
+ 			compatible = "gpio-leds";
+ 
+ 			led at 1 {
+-				label = "apq8016-sbc:green:user1";
++				label = "green:user1";
+ 				gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
+ 				linux,default-trigger = "heartbeat";
+ 				default-state = "off";
+ 			};
+ 
+ 			led at 2 {
+-				label = "apq8016-sbc:green:user2";
++				label = "green:user2";
+ 				gpios = <&msmgpio 120 GPIO_ACTIVE_HIGH>;
+ 				linux,default-trigger = "mmc0";
+ 				default-state = "off";
+ 			};
+ 
+ 			led at 3 {
+-				label = "apq8016-sbc:green:user3";
++				label = "green:user3";
+ 				gpios = <&pm8916_gpios 1 GPIO_ACTIVE_HIGH>;
+ 				linux,default-trigger = "mmc1";
+ 				default-state = "off";
+ 			};
+ 
+ 			led at 4 {
+-				label = "apq8016-sbc:green:user4";
++				label = "green:user4";
+ 				gpios = <&pm8916_gpios 2 GPIO_ACTIVE_HIGH>;
+ 				linux,default-trigger = "none";
+ 				panic-indicator;
+@@ -329,14 +329,14 @@
+ 			};
+ 
+ 			led at 5 {
+-				label = "apq8016-sbc:yellow:wlan";
++				label = "yellow:wlan";
+ 				gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
+ 				linux,default-trigger = "phy0tx";
+ 				default-state = "off";
+ 			};
+ 
+ 			led at 6 {
+-				label = "apq8016-sbc:blue:bt";
++				label = "blue:bt";
+ 				gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
+ 				linux,default-trigger = "bluetooth-power";
+ 				default-state = "off";
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/edf87041/attachment-0001.sig>
+2.17.1
