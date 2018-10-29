@@ -1,72 +1,39 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 29 Oct 2018 14:14:09 -0700
-Subject: [PATCH i2c-next v8 0/5] i2c: aspeed: Add bus idle waiting logic for
- multi-master use cases
-Message-ID: <20181029211414.20771-1-jae.hyun.yoo@linux.intel.com>
+Date: Mon, 29 Oct 2018 14:14:12 -0700
+Subject: [PATCH i2c-next v8 3/5] dt-bindings: i2c: aspeed: Add
+ 'bus-timeout-ms' property as an optional property
+In-Reply-To: <20181029211414.20771-1-jae.hyun.yoo@linux.intel.com>
+References: <20181029211414.20771-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20181029211414.20771-4-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In multi-master environment, this driver's master cannot know
-exactly when a peer master sends data to this driver's slave so a
-case can be happened that this master tries to send data through
-the master_xfer function but slave data from peer master is still
-being processed by this driver. To prevent state corruption in the
-case, this patch adds checking code if any slave operation is
-ongoing and it waits up to the bus timeout duration before starting
-a master_xfer operation.
+This commit adds 'bus-timeout-ms' property as an optional property
+which can be used for setting the bus timeout value of an adapter.
+With this patch, the bus timeout value can be set through this
+property at the probing time of this module. Still the bus timeout
+value can be set by an I2C_TIMEOUT ioctl on cdev at runtime too.
 
-To support this change, it introduces changes on i2c-core-base to
-make that able to read the bus timeout and master transfer retries
-count values from device tree properties.
+Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/i2c/i2c-aspeed.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Please review this patch set.
-
-Thanks,
-
--Jae
-
-Changes since v7:
-- Simplified the bus idle waiting logic using jiffy based timer APIs.
-
-Changes since v6:
-- Changed the 'timeout-ms' property name to 'bus-timeout-ms'.
-
-Changes since v5:
-- Changed using of property reading API to device_property_read_u32.
-
-Changes since v4:
-- Moved the property reading code into i2c-base-core and changed the
-  property name to 'timeout-ms'. Also, added '#retries' property reading
-  code.
-- Changed bus busy checking logic to make that check slave_state instead
-  of 'Transfer Mode State Machine' reg value.
-
-Changes since v3:
-- Changed the property name to 'timeout' and made it use the
-  default setting in i2c-core when not specified.
-
-Changes since v2:
-- Changed the property name to 'aspeed,timeout' and made it to
-  update the adapter's timeout configuration.
-
-Changes since v1:
-- Changed define names of timeout related.
-
-Jae Hyun Yoo (5):
-  dt-bindings: i2c: Add 'bus-timeout-ms' and '#retries' properties as
-    common optional
-  i2c: core: Add support reading of 'bus-timeout-ms' and '#retries'
-    properties
-  dt-bindings: i2c: aspeed: Add 'bus-timeout-ms' property as an optional
-    property
-  i2c: aspeed: Remove hard-coded bus timeout value setting
-  i2c: aspeed: Add bus idle waiting logic for multi-master use cases
-
- .../devicetree/bindings/i2c/i2c-aspeed.txt    |  3 ++
- Documentation/devicetree/bindings/i2c/i2c.txt |  6 +++
- drivers/i2c/busses/i2c-aspeed.c               | 53 +++++++++++++------
- drivers/i2c/i2c-core-base.c                   | 12 ++++-
- 4 files changed, 56 insertions(+), 18 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
+index 8fbd8633a387..ce1f07620368 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
+@@ -17,6 +17,9 @@ Optional Properties:
+ 		  specified
+ - multi-master	: states that there is another master active on this bus.
+ 
++- bus-timeout-ms: bus timeout in milliseconds defaults to 1 second when not
++		  specified.
++
+ Example:
+ 
+ i2c {
 -- 
 2.19.1
