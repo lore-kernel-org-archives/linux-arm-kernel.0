@@ -1,122 +1,44 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 29 Oct 2018 15:12:39 +0530
-Subject: [PATCH v3 1/7] arm64: dts: rockchip: ficus: Add on-board LED support
-In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181029094245.7886-2-manivannan.sadhasivam@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 29 Oct 2018 15:13:05 +0530
+Subject: [PATCH V2] dt-bindings: arm: Explain capacities-dmips-mhz
+ calculations in example
+Message-ID: <1cd2594fff3fb54948dcd2af65ae1867dd1c541a.1540806119.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add on-board LED support for Ficus board based on the following
-standard used by other 96Boards:
+The example contains two values for the capacity currently, 446 in text
+and 578 in code. The numbers are all correct but can confuse some of the
+readers. This patch tries to explain how the numbers are calculated to
+avoid same confusion going forward.
 
-red:user1  default-trigger: heartbeat
-red:user2  default-trigger: mmc0/disk-activity (onboard-storage)
-red:user3  default-trigger: mmc1 (SD-card)
-red:user4  default-trigger: none, panic-indicator
-red:wlan   default-trigger: phy0tx
-red:bt     default-trigger: hci0-power
-
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 78 +++++++++++++++++++
- 1 file changed, 78 insertions(+)
+V1->V2:
+- The numbers weren't incorrect in the example, just that it needs a
+  bit more explanation for some people.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-index cce266da28cd..027d428917b8 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-@@ -23,6 +23,52 @@
- 		clock-output-names = "clkin_gmac";
- 		#clock-cells = <0>;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&user_led1>, <&user_led2>, <&user_led3>,
-+			    <&user_led4>, <&wlan_led>, <&bt_led>;
-+
-+		user_led1 {
-+			label = "red:user1";
-+			gpios = <&gpio4 25 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		user_led2 {
-+			label = "red:user2";
-+			gpios = <&gpio4 26 0>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		user_led3 {
-+			label = "red:user3";
-+			gpios = <&gpio4 30 0>;
-+			linux,default-trigger = "mmc1";
-+		};
-+
-+		user_led4 {
-+			label = "red:user4";
-+			gpios = <&gpio1 0 0>;
-+			panic-indicator;
-+			linux,default-trigger = "none";
-+		};
-+
-+		wlan_active_led {
-+			label = "red:wlan";
-+			gpios = <&gpio1 1 0>;
-+			linux,default-trigger = "phy0tx";
-+			default-state = "off";
-+		};
-+
-+		bt_active_led {
-+			label = "red:bt";
-+			gpios = <&gpio1 4 0>;
-+			linux,default-trigger = "hci0-power";
-+			default-state = "off";
-+		};
-+	};
- };
+ Documentation/devicetree/bindings/arm/cpu-capacity.txt | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+index 9b5685a1d15d..84262cdb8d29 100644
+--- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
++++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+@@ -59,9 +59,11 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
+ ===========================================
  
- &gmac {
-@@ -66,6 +112,38 @@
- 				<4 27 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
-+
-+	leds {
-+		user_led1: user_led1 {
-+			rockchip,pins =
-+				<4 25 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led2: user_led2 {
-+			rockchip,pins =
-+				<4 26 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led3: user_led3 {
-+			rockchip,pins =
-+				<4 30 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led4: user_led4 {
-+			rockchip,pins =
-+				<1 0 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		wlan_led: wlan_led {
-+			rockchip,pins =
-+				<1 1 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		bt_led: bt_led {
-+			rockchip,pins =
-+				<1 4 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
- };
+ Example 1 (ARM 64-bit, 6-cpu system, two clusters):
+-capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
+-supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
+-final capacities are 1024 for cluster0 and 446 for cluster1
++The capacities-dmips-mhz or DMIPS/MHz values (scaled to 1024)
++are 1024 and 578 for cluster0 and cluster1. Further normalization
++is done by the operating system based on cluster0 at max-freq=1100 and
++custer1 at max-freq=850, final capacities are 1024 for cluster0 and
++446 for cluster1 (576*850/1100).
  
- &usbdrd_dwc3_0 {
+ cpus {
+ 	#address-cells = <2>;
 -- 
-2.17.1
+2.19.1.568.g152ad8e3369a
