@@ -1,163 +1,42 @@
-From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Mon, 29 Oct 2018 08:58:01 +0000
-Subject: [PATCH v7 6/6] arm64: dts: add LX2160ARDB board support
-In-Reply-To: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
-References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <1540759926-3641-7-git-send-email-vabhav.sharma@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 10:15:08 +0100
+Subject: [PATCH v3 00/25] drm/sun4i: Allwinner A64 MIPI-DSI support
+In-Reply-To: <20181026144344.27778-1-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+Message-ID: <20181029091508.gyhn2m5fnbucvb34@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LX2160A reference design board (RDB) is a high-performance
-computing, evaluation, and development platform with LX2160A
-SoC.
+On Fri, Oct 26, 2018 at 08:13:19PM +0530, Jagan Teki wrote:
+> This series fixed the issues related to work DSI on 2-lane panel
+> which is reported on previous version[1].
+> 
+> Few comments from previous version still in discussion, but I just
+> send this version just to group all working changes together.
+> anyway I will fix in this in next version if any.
+> 
+> PLL_MIPI min rate is still weird, I tried many possible dclock rate
+> from panel driver to satisfy manual suggested min rate 500MHz but
+> none working so eventually moved 300MHz. any inputs on this area
+> are welcome.
+> 
+> All these changes are tested in 2-lane, 4-lane MIPI-DSI panels.
+> 
+> If anyone wants to test, use this repo [2] with WIP-A64-DSI branch.
 
-Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
-Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-Signed-off-by: Horia Geanta <horia.geanta@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
-Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
-Acked-by: Li Yang <leoyang.li@nxp.com>
----
- arch/arm64/boot/dts/freescale/Makefile            |   1 +
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 119 ++++++++++++++++++++++
- 2 files changed, 120 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+A changelog would be nice here, and usually you shouldn't send a new
+version while there is ongoing discussion on the previous version.
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 86e18ad..445b72b 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-new file mode 100644
-index 0000000..6481e5f
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-@@ -0,0 +1,119 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Device Tree file for LX2160ARDB
-+//
-+// Copyright 2018 NXP
-+
-+/dts-v1/;
-+
-+#include "fsl-lx2160a.dtsi"
-+
-+/ {
-+	model = "NXP Layerscape LX2160ARDB";
-+	compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
-+
-+	aliases {
-+		crypto = &crypto;
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	sb_3v3: regulator-sb3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "MC34717-3.3VSB";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
-+&crypto {
-+	status = "okay";
-+};
-+
-+&esdhc0 {
-+	sd-uhs-sdr104;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr12;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	mmc-hs200-1_8v;
-+	mmc-hs400-1_8v;
-+	bus-width = <8>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	i2c-mux at 77 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+
-+			power-monitor at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			temperature-sensor at 4c {
-+				compatible = "nxp,sa56004";
-+				reg = <0x4c>;
-+				vcc-supply = <&sb_3v3>;
-+			};
-+
-+			temperature-sensor at 4d {
-+				compatible = "nxp,sa56004";
-+				reg = <0x4d>;
-+				vcc-supply = <&sb_3v3>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+
-+	rtc at 51 {
-+		compatible = "nxp,pcf2129";
-+		reg = <0x51>;
-+		// IRQ10_B
-+		interrupts = <0 150 0x4>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/edf87041/attachment-0001.sig>
