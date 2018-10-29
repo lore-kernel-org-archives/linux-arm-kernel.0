@@ -1,145 +1,85 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 10:08:56 +0100
-Subject: [PATCH v2 12/15] clk: sunxi-ng: a64: Add min and max rate for
- PLL_MIPI
-In-Reply-To: <CAMty3ZBJcH1fz5FyhT1rk9qiJ-aWoQYiH7P1ZyQPLKmVWOCkdA@mail.gmail.com>
-References: <20181023155035.9101-1-jagan@amarulasolutions.com>
- <20181023155035.9101-13-jagan@amarulasolutions.com>
- <20181024181334.lul7ta7ijluwfb7v@flea>
- <CAMty3ZBJcH1fz5FyhT1rk9qiJ-aWoQYiH7P1ZyQPLKmVWOCkdA@mail.gmail.com>
-Message-ID: <20181029090856.yyjnvaruyasgnzyz@flea>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 29 Oct 2018 14:30:02 +0530
+Subject: [PATCH v2 3/7] arm64: dts: hisilicon: hikey: Standardize LED labels
+ and triggers
+In-Reply-To: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
+References: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181029090006.4353-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 09:21:31PM +0530, Jagan Teki wrote:
-> On Wed, Oct 24, 2018 at 11:43 PM Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Tue, Oct 23, 2018 at 09:20:32PM +0530, Jagan Teki wrote:
-> > > A64 manual say PLL_MIPI rates are 500MHz to 1.4GHz, but
-> > > using minimum 500MHz can't release the clock and which
-> > > is not working.
-> > >
-> > > So use working minimum rate as 300MHz which is tested on
-> > > Bananapi DSI panel.
-> >
-> > I'm not quite sure what you mean by that. What do you mean by "500MHz
-> > can't release the clock"? Why would 300MHz work better then? Should be
-> > avoid reaching 500MHz if it's a frequency in the valid range?
-> 
-> PLL_MIPI can't be work with existing nkm where rate set to 270MHz
-> (from PLL_VIDEO)
-> /*** round rate call in ccu_nkm.c */
-> [    2.408356] round: rate = 118800000
-> [    2.408359] round: parent_rate = 158740688
-> [    2.408417] round: rate = 148500000
-> [    2.408420] round: parent_rate = 158740688
-> [    2.408439] round: rate = 178200000
-> [    2.408441] round: parent_rate = 158740688
-> [    2.408460] round: rate = 205615384
-> [    2.408462] round: parent_rate = 158740688
-> [    2.408481] round: rate = 237600000
-> [    2.408483] round: parent_rate = 158740688
-> [    2.408502] round: rate = 270000000
-> [    2.408504] round: parent_rate = 158740688
-> [    2.408523] round: rate = 118800000
-> [    2.408525] round: parent_rate = 158740560
-> [    2.408544] round: rate = 148500000
-> [    2.408546] round: parent_rate = 158740560
-> [    2.408565] round: rate = 178200000
-> [    2.408567] round: parent_rate = 158740560
-> [    2.408586] round: rate = 205615384
-> [    2.408588] round: parent_rate = 158740560
-> [    2.408607] round: rate = 237600000
-> [    2.408609] round: parent_rate = 158740560
-> [    2.408627] round: rate = 270000000
-> [    2.408630] round: parent_rate = 158740560
-> [    2.408648] round: rate = 270000000
-> [    2.408651] round: parent_rate = 158740640
-> [    2.408670] round: rate = 270000000
-> [    2.408672] round: parent_rate = 158740704
-> 
-> /** set rate call in ccu_nkm **/
-> [    2.408685] set: rate = 270000000
-> [    2.408688] set: parent_rate = 297000000
-> 
-> By using min and max rate as per A64 manual page 94 range of PLL can
-> be 500MHz~1.4GHz getting 1,2,1 nkm dividers which can't be work.
-> [    2.423589] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-> [    2.423643] ideal = 220000000, rounded = 0
-> [    2.423647] ideal = 275000000, rounded = 0
-> [    2.423651] ideal = 330000000, rounded = 0
-> [    2.423692] ideal = 385000000, rounded = 384000000
-> [    2.423732] ideal = 440000000, rounded = 440000000
-> [    2.423736] sun4i_dclk_round_rate: div = 8 rate = 55000000
-> [    2.423740] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-> [    2.423744] ideal = 220000000, rounded = 0
-> [    2.423748] ideal = 275000000, rounded = 0
-> [    2.423751] ideal = 330000000, rounded = 0
-> [    2.423791] ideal = 385000000, rounded = 384000000
-> [    2.423831] ideal = 440000000, rounded = 440000000
-> [    2.423834] sun4i_dclk_round_rate: div = 8 rate = 55000000
-> [    2.423957] sun4i_dclk_recalc_rate: val = 1, rate = 440000000
-> [    2.423961] sun4i_dclk_recalc_rate: val = 1, rate = 440000000
-> [    2.424378] ccu_nkm_set_rate: rate = 440000000, parent_rate = 220000000
-> [    2.424381] ccu_nkm_set_rate: _nkm.n = 1
-> [    2.424383] ccu_nkm_set_rate: _nkm.k = 2
-> [    2.424385] ccu_nkm_set_rate: _nkm.m = 1
-> [    2.424725] sun4i_dclk_set_rate div 8
-> [    2.424732] sun4i_dclk_recalc_rate: val = 8, rate = 55000000
-> [    2.561271] usb 3-1: new high-speed USB device number 2 using ehci-platform
-> [    2.718486] hub 3-1:1.0: USB hub found
-> [    2.718606] hub 3-1:1.0: 4 ports detected
-> [    3.437263] ------------[ cut here ]------------
-> [    3.437270] [CRTC:36:crtc-0] vblank wait timed out
-> 
-> So, lowering the min rate by 300MHz seems working with bounded nkm
-> dividers 5, 2, 9. Tested on two different panels.
-> 
-> [    2.415773] [drm] No driver support for vblank timestamp query.
-> [    2.424116] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-> [    2.424172] ideal = 220000000, rounded = 0
-> [    2.424176] ideal = 275000000, rounded = 0
-> [    2.424194] ccu_nkm_round_rate: rate = 330000000
-> [    2.424197] ideal = 330000000, rounded = 330000000
-> [    2.424201] sun4i_dclk_round_rate: div = 6 rate = 55000000
-> [    2.424205] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-> [    2.424209] ideal = 220000000, rounded = 0
-> [    2.424213] ideal = 275000000, rounded = 0
-> [    2.424230] ccu_nkm_round_rate: rate = 330000000
-> [    2.424233] ideal = 330000000, rounded = 330000000
-> [    2.424236] sun4i_dclk_round_rate: div = 6 rate = 55000000
-> [    2.424253] ccu_nkm_round_rate: rate = 330000000
-> [    2.424270] ccu_nkm_round_rate: rate = 330000000
-> [    2.424278] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
-> [    2.424281] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
-> [    2.424306] ccu_nkm_set_rate: rate = 330000000, parent_rate = 297000000
-> [    2.424309] ccu_nkm_set_rate: _nkm.n = 5
-> [    2.424311] ccu_nkm_set_rate: _nkm.k = 2
-> [    2.424313] ccu_nkm_set_rate: _nkm.m = 9
-> [    2.424661] sun4i_dclk_set_rate div 6
-> [    2.424668] sun4i_dclk_recalc_rate: val = 6, rate = 55000000
-> 
-> Note: BPI-M64-bsp is setting the rate directly to 180MHz with 297MHz
-> parent with resulting dividers as 1, 2, 5. ans we can't produce this
-> 180MHz rate with dclk_round_rate and ccu_nkm.
+For all 96Boards, the following standard is used for onboard LEDs.
 
-I'm still not quite sure what you mean by "500MHz can't release the
-clock".
+green:user1  default-trigger: heartbeat
+green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
+green:user3  default-trigger: mmc1 (SD-card)
+green:user4  default-trigger: none, panic-indicator
+yellow:wlan  default-trigger: phy0tx
+blue:bt      default-trigger: hci0-power
 
->From what you're saying, this seems to be related to the boundaries of
-the dividers rather than the rate itself.
+So lets adopt the same for HiKey, which is one of the 96Boards
+CE platform.
 
-Maxime
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index f4964bee6a1a..d2bb5912dee7 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -340,42 +340,43 @@
+ 
+ 	leds {
+ 		compatible = "gpio-leds";
++
+ 		user_led4 {
+-			label = "user_led4";
++			label = "green:user1";
+ 			gpios = <&gpio4 0 0>; /* <&gpio_user_led_1>; */
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 
+ 		user_led3 {
+-			label = "user_led3";
++			label = "green:user2";
+ 			gpios = <&gpio4 1 0>; /* <&gpio_user_led_2>; */
+ 			linux,default-trigger = "mmc0";
+ 		};
+ 
+ 		user_led2 {
+-			label = "user_led2";
++			label = "green:user3";
+ 			gpios = <&gpio4 2 0>; /* <&gpio_user_led_3>; */
+ 			linux,default-trigger = "mmc1";
+ 		};
+ 
+ 		user_led1 {
+-			label = "user_led1";
++			label = "green:user4";
+ 			gpios = <&gpio4 3 0>; /* <&gpio_user_led_4>; */
+ 			panic-indicator;
+-			linux,default-trigger = "cpu0";
++			linux,default-trigger = "none";
+ 		};
+ 
+ 		wlan_active_led {
+-			label = "wifi_active";
++			label = "yellow:wlan";
+ 			gpios = <&gpio3 5 0>; /* <&gpio_wlan_active_led>; */
+ 			linux,default-trigger = "phy0tx";
+ 			default-state = "off";
+ 		};
+ 
+ 		bt_active_led {
+-			label = "bt_active";
++			label = "blue:bt";
+ 			gpios = <&gpio4 7 0>; /* <&gpio_bt_active_led>; */
+-			linux,default-trigger = "hci0rx";
++			linux,default-trigger = "hci0-power";
+ 			default-state = "off";
+ 		};
+ 	};
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/206c8354/attachment.sig>
+2.17.1
