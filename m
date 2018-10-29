@@ -1,93 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 29 Oct 2018 17:45:05 +0000
-Subject: [PATCH 1/2] ARM: cpuidle: Don't register the driver when
- back-end init returns -ENXIO
-In-Reply-To: <20181026144843.3028-1-ulf.hansson@linaro.org>
-References: <../../misc/pm_patches/submitted_patches/cpuidle_arm_consolidate/0002-ARM-cpuidle-Convert-to-use-cpuidle_register-unregist.patch>
- <20181026144843.3028-1-ulf.hansson@linaro.org>
-Message-ID: <20181029174456.GA9687@e107981-ln.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Oct 2018 17:53:04 +0000
+Subject: [PATCH v2 1/6] mm: Introduce common STRUCT_PAGE_MAX_SHIFT define
+In-Reply-To: <20181015175702.9036-2-logang@deltatee.com>
+References: <20181015175702.9036-1-logang@deltatee.com>
+ <20181015175702.9036-2-logang@deltatee.com>
+Message-ID: <20181029175303.GB16739@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 04:48:43PM +0200, Ulf Hansson wrote:
-> There's no point to register the cpuidle driver for the current CPU, when
-> the initialization of the arch specific back-end data fails by returning
-> -ENXIO.
+Hi Logan,
+
+On Mon, Oct 15, 2018 at 11:56:57AM -0600, Logan Gunthorpe wrote:
+> This define is used by arm64 to calculate the size of the vmemmap
+> region. It is defined as the log2 of the upper bound on the size
+> of a struct page.
 > 
-> Instead, let's re-order the sequence to its original flow, by first trying
-> to initialize the back-end part and then act accordingly on the returned
-> error code. Additionally, let's print the error message, no matter of what
-> error code that was returned.
+> We move it into mm_types.h so it can be defined properly instead of
+> set and checked with a build bug. This also allows us to use the same
+> define for riscv.
 > 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Christoph Hellwig <hch@lst.de>
 > ---
-> 
-> Note, as far as I can tell it's only qcom-spm that may return -ENXIO, which also
-> was original reason to why this error path was invented.
-> 
-> Unfurtunate I don't have a qcom spm platfrom at hand, however I manually tried
-> this by hacking the PSCI driver to return -ENXIO for some CPUs. So I assume it
-> should then also work for qcom spm.
-> 
-> ---
->  drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
->  1 file changed, 10 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 073557f433eb..df564d783216 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
->  		goto out_kfree_drv;
->  	}
->  
-> -	ret = cpuidle_register_driver(drv);
-> -	if (ret) {
-> -		if (ret != -EBUSY)
-> -			pr_err("Failed to register cpuidle driver\n");
-> -		goto out_kfree_drv;
-> -	}
-> -
->  	/*
->  	 * Call arch CPU operations in order to initialize
->  	 * idle states suspend back-end specific data
-> @@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
->  	ret = arm_cpuidle_init(cpu);
->  
->  	/*
-> -	 * Skip the cpuidle device initialization if the reported
-> +	 * Allow the initialization to continue for other CPUs, if the reported
->  	 * failure is a HW misconfiguration/breakage (-ENXIO).
->  	 */
-> -	if (ret == -ENXIO)
-> -		return 0;
+>  arch/arm64/include/asm/memory.h | 9 ---------
+>  arch/arm64/mm/init.c            | 8 --------
+>  include/asm-generic/fixmap.h    | 1 +
+>  include/linux/mm_types.h        | 5 +++++
+>  4 files changed, 6 insertions(+), 17 deletions(-)
 
-I wonder whether moving the drv allocation and dt initialization after
-arm_cpuidle_init(cpu) would simplify the error path; the patch makes sense
-the error path is getting a bit hard to read - maybe we can simplify it.
+This looks like a really good cleanup to me, thanks:
 
-I think, if you can single it out, it would be good to add a Fixes:
-tag too.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks,
-Lorenzo
-
-> -
->  	if (ret) {
->  		pr_err("CPU %d failed to init idle CPU ops\n", cpu);
-> -		goto out_unregister_drv;
-> +		ret = ret == -ENXIO ? 0 : ret;
-> +		goto out_kfree_drv;
-> +	}
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		if (ret != -EBUSY)
-> +			pr_err("Failed to register cpuidle driver\n");
-> +		goto out_kfree_drv;
->  	}
->  
->  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-> -- 
-> 2.17.1
-> 
+Will
