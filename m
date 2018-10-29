@@ -1,348 +1,172 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 29 Oct 2018 15:15:13 +0100
-Subject: [PATCH v6 7/7] drm/rockchip: dsi: add dual mipi support
-In-Reply-To: <20181001123845.11818-8-heiko@sntech.de>
-References: <20181001123845.11818-1-heiko@sntech.de>
- <CGME20181001123907epcas4p1a0537f565124dbb5a90aa67dec24604e@epcas4p1.samsung.com>
- <20181001123845.11818-8-heiko@sntech.de>
-Message-ID: <700d5f2e-7351-de83-0384-8423df39d8bd@samsung.com>
+From: lsun@mellanox.com (Liming Sun)
+Date: Mon, 29 Oct 2018 14:17:42 +0000
+Subject: [PATCH v4 1/4] soc: Add TmFifo driver for Mellanox BlueField Soc
+In-Reply-To: <CAK8P3a3pi26FJ=vfU3QN=xUS+ktv1W-oqGWkdxc9s_S2HaYf6w@mail.gmail.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1540403734-137721-1-git-send-email-lsun@mellanox.com>
+ <CAK8P3a0VJkQgqaq7na1_KTQzVs4-PvxYghv5_LysW7EdeBM7fw@mail.gmail.com>
+ <AM4PR05MB322089E21DD27295C1B0A946A1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
+ <CAK8P3a3pi26FJ=vfU3QN=xUS+ktv1W-oqGWkdxc9s_S2HaYf6w@mail.gmail.com>
+Message-ID: <DB6PR05MB322336054C526251D2A3780CA1F30@DB6PR05MB3223.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.10.2018 14:38, Heiko Stuebner wrote:
-> Add the Rockchip-sepcific dual-dsi setup and hook it into the VOP as well.
-> As described in the general dual-dsi devicetree binding, the panel should
-> define two input ports and point each of them to one of the used dsi-
-> controllers, as well as declare one of them as clock-master.
-> This is used to determine the dual-dsi state and get access to both
-> controller instances.
->
-> v6:
->   handle master+slave component in dsi-attach
-> v5:
->   use driver-internal mechanism to find dual dsi slave
-> v4:
->   add component directly in probe when adding empty dsi slave controller
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Thanks. Please see my response inline.
 
-This is not what I really like (putting dual display functionality into
-poor dsi driver), but it at least works.
-So:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> -----Original Message-----
+> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> Behalf Of Arnd Bergmann
+> Sent: Friday, October 26, 2018 2:35 PM
+> To: Liming Sun <lsun@mellanox.com>
+> Cc: Olof Johansson <olof@lixom.net>; David Woods
+> <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-
+> soc <arm@kernel.org>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 1/4] soc: Add TmFifo driver for Mellanox BlueField
+> Soc
+> 
+> On 10/26/18, Liming Sun <lsun@mellanox.com> wrote:
+> >> -----Original Message-----
+> >> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> >> Behalf Of Arnd Bergmann
+> >> Sent: Thursday, October 25, 2018 11:58 AM
+> >> To: Liming Sun <lsun@mellanox.com>
+> >> Cc: Olof Johansson <olof@lixom.net>; David Woods
+> >> <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>;
+> arm-
+> >> soc <arm@kernel.org>; devicetree at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org
+> >> Subject: Re: [PATCH v4 1/4] soc: Add TmFifo driver for Mellanox BlueField
+> >> Soc
+> >>
+> >> On 10/24/18, Liming Sun <lsun@mellanox.com> wrote:
+> >> > +struct tmfifo_vdev {
+> >> > +	struct virtio_device vdev;	/* virtual device */
+> >> > +	u8 status;
+> >> > +	u64 features;
+> >> > +	union {				/* virtio config space */
+> >> > +		struct virtio_console_config cons;
+> >> > +		struct virtio_net_config net;
+> >> > +	} config;
+> >> > +	struct tmfifo_vring vrings[TMFIFO_VRING_NUM];
+> >> > +	u8 *tx_buf;			/* tx buffer */
+> >> > +	u32 tx_head;			/* tx buffer head */
+> >> > +	u32 tx_tail;			/* tx buffer tail */
+> >> > +};
+> >>
+> >> I suppose you did this to keep the driver simple, but it seems a
+> >> little inflexible
+> >> to only support two specific device types. Wouldn't we also want e.g.
+> >> 9pfs
+> >> or virtio_blk in some configurations?
+> >
+> > We could definitely add more when needed, which should be
+> straightforward
+> > due to the virtio framework. For now only network and console are
+> supported
+> > and ben been verified.
+> 
+> Wouldn't that require a new PCI ID to have the driver on the host
+> side match what this side does? I guess I'll see when you post the
+> other driver.
 
-The patchset is quite long on the list so if there will be no objections
-I will merge it tomorrow.
+Yes, the PCI ID is in the host side driver which will be included in patch v5.
 
-?--
-Regards
-Andrzej
+> 
+> >> > +/* TMFIFO device structure */
+> >> > +struct tmfifo {
+> >> > +	struct tmfifo_vdev *vdev[TMFIFO_VDEV_MAX];	/* virtual devices */
+> >> > +	struct platform_device *pdev;	/* platform device */
+> >> > +	struct mutex lock;
+> >> > +	void __iomem *rx_base;		/* mapped register base */
+> >> > +	void __iomem *tx_base;		/* mapped register base */
+> >> > +	int tx_fifo_size;		/* number of entries of the Tx FIFO */
+> >> > +	int rx_fifo_size;		/* number of entries of the Rx FIFO */
+> >> > +	unsigned long pend_events;	/* pending bits for deferred process
+> >> */
+> >> > +	int irq[TM_IRQ_CNT];		/* irq numbers */
+> >> > +	struct work_struct work;	/* work struct for deferred process
+> >> */
+> >> > +	struct timer_list timer;	/* keepalive timer */
+> >> > +	struct tmfifo_vring *vring[2];	/* current Tx/Rx ring */
+> >> > +};
+> >> > +
+> >> > +union tmfifo_msg_hdr {
+> >> > +	struct {
+> >> > +		u8 type;		/* message type */
+> >> > +		__be16 len;		/* payload length */
+> >> > +		u8 unused[5];		/* reserved, set to 0 */
+> >> > +	} __packed;
+> >> > +	u64 data;
+> >> > +};
+> >> > +
+> >> > +/*
+> >> > + * Default MAC.
+> >> > + * This MAC address will be read from EFI persistent variable if
+> >> > configured.
+> >> > + * It can also be reconfigured with standard Linux tools.
+> >> > + */
+> >> > +static u8 tmfifo_net_default_mac[6] = {0x00, 0x1A, 0xCA, 0xFF, 0xFF,
+> >> > 0x01};
+> >> > +
+> >>
+> >> Is a predefined MAC address better than a random one here?
+> >>
+> >> For DT based systems, we tend to also call of_get_mac_address()
+> >> in order to allow setting a unique address from firmware.
+> >
+> > A predefined default MAC address is simpler in this case, which makes
+> > DHCP or PXE boot easier in development environment.
+> >
+> > For production, the MAC address is stored in persistent UEFI variable
+> > on the eeprom, which is read in function tmfifo_get_cfg_mac() which
+> > calls efi.get_variable() to get the MAC address.
+> 
+> Ok, fair enough. Generally speaking the recommended way of doing
+> this is to update the DT properties from eeprom when a network
+> driver has no way to store the mac address itself, but I suppose
+> you always have UEFI anyway, and this also makes it work in
+> the same way across both DT and ACPI.
 
-> ---
->  .../gpu/drm/rockchip/dw-mipi-dsi-rockchip.c   | 136 ++++++++++++++++++
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.h   |   1 +
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c   |   3 +
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.h   |   4 +
->  drivers/gpu/drm/rockchip/rockchip_vop_reg.c   |   1 +
->  5 files changed, 145 insertions(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
-> index b3aae8439aa3..63b028602d08 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
-> @@ -218,6 +218,10 @@ struct dw_mipi_dsi_rockchip {
->  	struct clk *grf_clk;
->  	struct clk *phy_cfg_clk;
->  
-> +	/* dual-channel */
-> +	bool is_slave;
-> +	struct dw_mipi_dsi_rockchip *slave;
-> +
->  	unsigned int lane_mbps; /* per lane */
->  	u16 input_div;
->  	u16 feedback_div;
-> @@ -226,6 +230,7 @@ struct dw_mipi_dsi_rockchip {
->  	struct dw_mipi_dsi *dmd;
->  	const struct rockchip_dw_dsi_chip_data *cdata;
->  	struct dw_mipi_dsi_plat_data pdata;
-> +	int devcnt;
->  };
->  
->  struct dphy_pll_parameter_map {
-> @@ -602,6 +607,8 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
->  	}
->  
->  	s->output_type = DRM_MODE_CONNECTOR_DSI;
-> +	if (dsi->slave)
-> +		s->output_flags = ROCKCHIP_OUTPUT_DSI_DUAL;
->  
->  	return 0;
->  }
-> @@ -617,6 +624,8 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
->  		return;
->  
->  	pm_runtime_get_sync(dsi->dev);
-> +	if (dsi->slave)
-> +		pm_runtime_get_sync(dsi->slave->dev);
->  
->  	/*
->  	 * For the RK3399, the clk of grf must be enabled before writing grf
-> @@ -630,6 +639,8 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
->  	}
->  
->  	dw_mipi_dsi_rockchip_config(dsi, mux);
-> +	if (dsi->slave)
-> +		dw_mipi_dsi_rockchip_config(dsi->slave, mux);
->  
->  	clk_disable_unprepare(dsi->grf_clk);
->  }
-> @@ -638,6 +649,8 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
->  {
->  	struct dw_mipi_dsi_rockchip *dsi = to_dsi(encoder);
->  
-> +	if (dsi->slave)
-> +		pm_runtime_put(dsi->slave->dev);
->  	pm_runtime_put(dsi->dev);
->  }
->  
-> @@ -673,14 +686,113 @@ static int rockchip_dsi_drm_create_encoder(struct dw_mipi_dsi_rockchip *dsi,
->  	return 0;
->  }
->  
-> +static struct device
-> +*dw_mipi_dsi_rockchip_find_second(struct dw_mipi_dsi_rockchip *dsi)
-> +{
-> +	const struct of_device_id *match;
-> +	struct device_node *node = NULL, *local;
-> +
-> +	match = of_match_device(dsi->dev->driver->of_match_table, dsi->dev);
-> +
-> +	local = of_graph_get_remote_node(dsi->dev->of_node, 1, 0);
-> +	if (!local)
-> +		return NULL;
-> +
-> +	while ((node = of_find_compatible_node(node, NULL,
-> +					       match->compatible))) {
-> +		struct device_node *remote;
-> +
-> +		/* found ourself */
-> +		if (node == dsi->dev->of_node)
-> +			continue;
-> +
-> +		remote = of_graph_get_remote_node(node, 1, 0);
-> +		if (!remote)
-> +			continue;
-> +
-> +		/* same display device in port1-ep0 for both */
-> +		if (remote == local) {
-> +			struct dw_mipi_dsi_rockchip *dsi2;
-> +			struct platform_device *pdev;
-> +
-> +			pdev = of_find_device_by_node(node);
-> +
-> +			/*
-> +			 * we have found the second, so will either return it
-> +			 * or return with an error. In any case won't need the
-> +			 * nodes anymore nor continue the loop.
-> +			 */
-> +			of_node_put(remote);
-> +			of_node_put(node);
-> +			of_node_put(local);
-> +
-> +			if (!pdev)
-> +				return ERR_PTR(-EPROBE_DEFER);
-> +
-> +			dsi2 = platform_get_drvdata(pdev);
-> +			if (!dsi2) {
-> +				platform_device_put(pdev);
-> +				return ERR_PTR(-EPROBE_DEFER);
-> +			}
-> +
-> +			return &pdev->dev;
-> +		}
-> +
-> +		of_node_put(remote);
-> +	}
-> +
-> +	of_node_put(local);
-> +
-> +	return NULL;
-> +}
-> +
->  static int dw_mipi_dsi_rockchip_bind(struct device *dev,
->  				     struct device *master,
->  				     void *data)
->  {
->  	struct dw_mipi_dsi_rockchip *dsi = dev_get_drvdata(dev);
->  	struct drm_device *drm_dev = data;
-> +	struct device *second;
-> +	bool master1, master2;
->  	int ret;
->  
-> +	second = dw_mipi_dsi_rockchip_find_second(dsi);
-> +	if (IS_ERR(second))
-> +		return PTR_ERR(second);
-> +
-> +	if (second) {
-> +		master1 = of_property_read_bool(dsi->dev->of_node,
-> +						"clock-master");
-> +		master2 = of_property_read_bool(second->of_node,
-> +						"clock-master");
-> +
-> +		if (master1 && master2) {
-> +			DRM_DEV_ERROR(dsi->dev, "only one clock-master allowed\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		if (!master1 && !master2) {
-> +			DRM_DEV_ERROR(dsi->dev, "no clock-master defined\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		/* we are the slave in dual-DSI */
-> +		if (!master1) {
-> +			dsi->is_slave = true;
-> +			return 0;
-> +		}
-> +
-> +		dsi->slave = dev_get_drvdata(second);
-> +		if (!dsi->slave) {
-> +			DRM_DEV_ERROR(dev, "could not get slaves data\n");
-> +			return -ENODEV;
-> +		}
-> +
-> +		dsi->slave->is_slave = true;
-> +		dw_mipi_dsi_set_slave(dsi->dmd, dsi->slave->dmd);
-> +		put_device(second);
-> +	}
-> +
->  	ret = clk_prepare_enable(dsi->pllref_clk);
->  	if (ret) {
->  		DRM_DEV_ERROR(dev, "Failed to enable pllref_clk: %d\n", ret);
-> @@ -708,6 +819,9 @@ static void dw_mipi_dsi_rockchip_unbind(struct device *dev,
->  {
->  	struct dw_mipi_dsi_rockchip *dsi = dev_get_drvdata(dev);
->  
-> +	if (dsi->is_slave)
-> +		return;
-> +
->  	dw_mipi_dsi_unbind(dsi->dmd);
->  
->  	clk_disable_unprepare(dsi->pllref_clk);
-> @@ -722,6 +836,7 @@ static int dw_mipi_dsi_rockchip_host_attach(void *priv_data,
->  					    struct mipi_dsi_device *device)
->  {
->  	struct dw_mipi_dsi_rockchip *dsi = priv_data;
-> +	struct device *second;
->  	int ret;
->  
->  	ret = component_add(dsi->dev, &dw_mipi_dsi_rockchip_ops);
-> @@ -731,6 +846,19 @@ static int dw_mipi_dsi_rockchip_host_attach(void *priv_data,
->  		return ret;
->  	}
->  
-> +	second = dw_mipi_dsi_rockchip_find_second(dsi);
-> +	if (IS_ERR(second))
-> +		return PTR_ERR(second);
-> +	if (second) {
-> +		ret = component_add(second, &dw_mipi_dsi_rockchip_ops);
-> +		if (ret) {
-> +			DRM_DEV_ERROR(second,
-> +				      "Failed to register component: %d\n",
-> +				      ret);
-> +			return ret;
-> +		}
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -738,6 +866,11 @@ static int dw_mipi_dsi_rockchip_host_detach(void *priv_data,
->  					    struct mipi_dsi_device *device)
->  {
->  	struct dw_mipi_dsi_rockchip *dsi = priv_data;
-> +	struct device *second;
-> +
-> +	second = dw_mipi_dsi_rockchip_find_second(dsi);
-> +	if (second && !IS_ERR(second))
-> +		component_del(second, &dw_mipi_dsi_rockchip_ops);
->  
->  	component_del(dsi->dev, &dw_mipi_dsi_rockchip_ops);
->  
-> @@ -846,6 +979,9 @@ static int dw_mipi_dsi_rockchip_remove(struct platform_device *pdev)
->  {
->  	struct dw_mipi_dsi_rockchip *dsi = platform_get_drvdata(pdev);
->  
-> +	if (dsi->devcnt == 0)
-> +		component_del(dsi->dev, &dw_mipi_dsi_rockchip_ops);
-> +
->  	dw_mipi_dsi_remove(dsi->dmd);
->  
->  	return 0;
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> index 453fef6a55b9..ce48568ec8a0 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> @@ -37,6 +37,7 @@ struct rockchip_crtc_state {
->  	int output_type;
->  	int output_mode;
->  	int output_bpc;
-> +	int output_flags;
->  };
->  #define to_rockchip_crtc_state(s) \
->  		container_of(s, struct rockchip_crtc_state, base)
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 0c35a88e33dd..fb70fb486fbf 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -916,6 +916,7 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
->  	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ?
->  		   BIT(VSYNC_POSITIVE) : 0;
->  	VOP_REG_SET(vop, output, pin_pol, pin_pol);
-> +	VOP_REG_SET(vop, output, mipi_dual_channel_en, 0);
->  
->  	switch (s->output_type) {
->  	case DRM_MODE_CONNECTOR_LVDS:
-> @@ -933,6 +934,8 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
->  	case DRM_MODE_CONNECTOR_DSI:
->  		VOP_REG_SET(vop, output, mipi_pin_pol, pin_pol);
->  		VOP_REG_SET(vop, output, mipi_en, 1);
-> +		VOP_REG_SET(vop, output, mipi_dual_channel_en,
-> +			    !!(s->output_flags & ROCKCHIP_OUTPUT_DSI_DUAL));
->  		break;
->  	case DRM_MODE_CONNECTOR_DisplayPort:
->  		pin_pol &= ~BIT(DCLK_INVERT);
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> index fd5765dfd637..0fe40e1983d9 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> @@ -60,6 +60,7 @@ struct vop_output {
->  	struct vop_reg edp_en;
->  	struct vop_reg hdmi_en;
->  	struct vop_reg mipi_en;
-> +	struct vop_reg mipi_dual_channel_en;
->  	struct vop_reg rgb_en;
->  };
->  
-> @@ -214,6 +215,9 @@ struct vop_data {
->  /* for use special outface */
->  #define ROCKCHIP_OUT_MODE_AAAA	15
->  
-> +/* output flags */
-> +#define ROCKCHIP_OUTPUT_DSI_DUAL	BIT(0)
-> +
->  enum alpha_mode {
->  	ALPHA_STRAIGHT,
->  	ALPHA_INVERSE,
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> index 047a8867af90..08fc40af52c8 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> @@ -634,6 +634,7 @@ static const struct vop_output rk3399_output = {
->  	.hdmi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 13),
->  	.edp_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 14),
->  	.mipi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 15),
-> +	.mipi_dual_channel_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 3),
->  };
->  
->  static const struct vop_data rk3399_vop_big = {
+Yes, we always have UEFI available.
+
+> 
+> >> > +/* Interrupt handler. */
+> >> > +static irqreturn_t tmfifo_irq_handler(int irq, void *dev_id)
+> >> > +{
+> >> > +	int i = (uintptr_t)dev_id % sizeof(void *);
+> >> > +	struct tmfifo *fifo = dev_id - i;
+> >> > +
+> >> > +	if (i < TM_IRQ_CNT && !test_and_set_bit(i, &fifo->pend_events))
+> >> > +		schedule_work(&fifo->work);
+> >> > +
+> >> > +	return IRQ_HANDLED;
+> >> > +}
+> >>
+> >> Maybe using a request_threaded_irq() would be a better way to defer
+> >> the handler into IRQ context.
+> >
+> > Not sure if I understand this comment correctly... In this case, the
+> > implemented handler
+> > has some mutex_lock() used, which tries to make the logic simple since
+> > multiple services
+> > (network & console) are sharing the same fifo. Thus schedule_work() is
+> > used.
+> 
+> schedule_work() and threaded IRQs are just two different ways of deferring
+> into process context where you can do the mutex_lock(). The effect is
+> almost the same, but work queues can be delayed for a substantial
+> amount of time depending on what other work functions have been
+> queued at the same time, and request_threaded_irq() is the more normal
+> way of doing this specifically for an IRQ handler, probably saving a couple
+> of lines of source code.
+> 
+> If you have any kind of real-time requirement, you can also assign a
+> specific realtime priority to that interrupt thread.
+
+Good information! Currently this FIFO is mainly for mgmt purpose. I'll try the threaded 
+IRQs approach to see whether it can be easily converted and make it into the v5 patch.
+If not easily, probably a separate commit to improve it later?
+
+> 
+>        Arnd
