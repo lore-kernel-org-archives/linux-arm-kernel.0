@@ -1,49 +1,77 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 29 Oct 2018 15:49:18 +0100
-Subject: [RESEND PATCH 1/2] i2c: enable buses to save their clock
- frequency in adapter
-In-Reply-To: <20181023092025.32463-2-tudor.ambarus@microchip.com>
-References: <20181023092025.32463-1-tudor.ambarus@microchip.com>
- <20181023092025.32463-2-tudor.ambarus@microchip.com>
-Message-ID: <20181029144918.3iukhksa522xna2e@M43218.corp.atmel.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 29 Oct 2018 14:52:01 +0000
+Subject: [PATCH] arm: mm: fault: check ADFSR in case of abort
+In-Reply-To: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
+References: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
+Message-ID: <d9195ffb-f766-363e-21f3-e3737526c7de@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 11:20:39AM +0200, Tudor Ambarus - M18064 wrote:
-> The clock-frequency property is not mandatory for the i2c buses. If it's
-> not present in the device tree, the buses __usually__ assume it's 100kHZ
-> (see altera, at91, axxia, etc.). Broadcom uses a 375kHZ default
-> clock-frequency, so the default clock frequency varies from bus to bus.
+On 29/10/2018 14:20, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
+> When running into situations like:
+> "Unhandled fault: synchronous external abort (0x210) at 0xXXX"
+> or
+> "Unhandled prefetch abort: synchronous external abort (0x210) at 0xXXX"
+> it is useful to know the content of ADFSR (Auxiliary Data Fault Status
+> Register) to indicate an ECC double-bit error in L1 or L2 cache.
 > 
-> There are i2c clients that need to know the bus clock frequency in order to
-> compute their wake token (see atecc508a i2c client).
-> 
-> The clock-frequency value has to be propagated to the i2c clients, otherwise,
-> if they will not find the i2c bus clock frequency in the device tree, they
-> will have to make their own assumption of the clock frequency.
-> 
-> Spare the i2c clients of making wrong assumptions of the i2c bus clock
-> frequency and enable the buses to save their clock frequency in adapter.
-> 
-> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-Reviwed-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> Refer to:
+> Cortex-A15 Technical Reference Manual, Revision: r2p1
+> [6.4.8. Error Correction Code]
 
+The contents of ADFSR are implementation-defined, though, so this 
+interpretation is *only* valid on Cortex-A15. Other processors may use 
+those bit positions to report something else, at which point printing a 
+message about ECC errors would be totally misleading.
+
+Robin.
+
+> Signed-off-by: Wladislav Wiebe <wladislav.wiebe@nokia.com>
 > ---
->  include/linux/i2c.h | 1 +
->  1 file changed, 1 insertion(+)
+>   arch/arm/mm/fault.c | 18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
 > 
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index 65b4eaed1d96..f238da204c49 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -677,6 +677,7 @@ struct i2c_adapter {
->  	struct rt_mutex bus_lock;
->  	struct rt_mutex mux_lock;
->  
-> +	u32 bus_freq_hz;
->  	int timeout;			/* in jiffies */
->  	int retries;
->  	struct device dev;		/* the adapter device */
-> -- 
-> 2.9.4
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index 3232afb6fdc0..5e240deb6ed6 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -547,6 +547,22 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
+>   	fsr_info[nr].name = name;
+>   }
+>   
+> +/*
+> + * Check for ECC double-bit errors in Auxiliary Data Fault Status Register
+> + */
+> +static void check_adfsr_for_ecc(void)
+> +{
+> +	u32 adfsr = 0;
+> +
+> +	asm("mrc p15, 0, %0, c5, c1, 0" : "=r" (adfsr));
+> +
+> +	if (adfsr & (BIT(31) | BIT(23))) {
+> +		pr_alert("ADFSR status 0x%x indicates that an L1 or L2 cache\n"
+> +			 "ECC double-bit error occurred at some time.\n",
+> +			  adfsr);
+> +	}
+> +}
+> +
+>   /*
+>    * Dispatch a data abort to the relevant handler.
+>    */
+> @@ -559,6 +575,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>   	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
+>   		return;
+>   
+> +	check_adfsr_for_ecc();
+>   	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
+>   		inf->name, fsr, addr);
+>   	show_pte(current->mm, addr);
+> @@ -593,6 +610,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+>   	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
+>   		return;
+>   
+> +	check_adfsr_for_ecc();
+>   	pr_alert("Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
+>   		inf->name, ifsr, addr);
+>   
 > 
