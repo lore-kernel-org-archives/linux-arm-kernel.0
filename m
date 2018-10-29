@@ -1,101 +1,54 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 29 Oct 2018 19:57:56 +0530
-Subject: [PATCH v3 14/25] drm/sun4i: sun6i_mipi_dsi: Increase hfp packet
- overhead
-In-Reply-To: <20181029092754.2tl7i5k5qpbn4557@flea>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181026144344.27778-15-jagan@amarulasolutions.com>
- <20181029092754.2tl7i5k5qpbn4557@flea>
-Message-ID: <CAMty3ZC6B-o1Oij_FLpotjN_900kF6OikK323y=bQ9VPzSPDgg@mail.gmail.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 29 Oct 2018 15:32:10 +0100
+Subject: [PATCH 5/5] pinctrl: pinctrl-at91-pio4: simplify getting
+ .driver_data
+In-Reply-To: <20181021200032.1833-6-wsa+renesas@sang-engineering.com>
+References: <20181021200032.1833-1-wsa+renesas@sang-engineering.com>
+ <20181021200032.1833-6-wsa+renesas@sang-engineering.com>
+Message-ID: <20181029143210.m3ymirqjkhoty2wu@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 2:58 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Fri, Oct 26, 2018 at 08:13:33PM +0530, Jagan Teki wrote:
-> > Increase the hfp packet overhead with another 10 bytes, the extra
-> > 10 bytes(which is hblk packet overhead) is adding for hfp packet
-> > overhead since hfp depends on hblk.
-> >
-> > This is truely as per BSP code from BPI-M64-bsp.
-> > The real computation from BSP is
-> > (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> > dsi_hbp = (hbp-hspw)*dsi_pixel_bits[format]/8 - (4+2);
-> > dsi_hact = x * dsi_pixel_bits[format]/8;
-> > dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
-> > dsi_hfp = dsi_hblk - (4+dsi_hact+2) - (4+dsi_hbp+2);
-> >
-> > Example,
-> > u32 fmt = dsi_pixel_bits[format]/8;
-> > => ((ht-hspw)*fmt - 10) - (6 + x * fmt) - (6 + (hbp-hspw)*fmt - 6)
-> > => (ht - hspw - x - (hbp - hspw)) * fmt - 16
-> > => (ht - x - hbp) * fmt - 16
-> > => (ht - x - (timmings->hor_total_time - timmings->hor_front_porch - x)
-> > * fmt - 16
-> > => (timmings->hor_total_time - x - timmings->hor_total_time +
-> > timmings->hor_front_porch + x) * fmt - 16
-> > => timmings->hor_front_porch * fmt - 16
-> >
-> > So, increase the DSI hfp packet overhead by hblk packet overhead.
-> >
-> > Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > Tested-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> > Changes for v3:
-> > - new patch
-> > Changes for v2:
-> > - none
-> >
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 22 +++++++++++++---------
-> >  1 file changed, 13 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > index 6584b51736a9..20e330186b7f 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -461,7 +461,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
-> >  {
-> >       struct mipi_dsi_device *device = dsi->device;
-> >       unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-> > -     u16 hbp, hfp, hsa, hblk_max, hblk, vblk;
-> > +     u16 hbp, hfp_pkt_overhead, hfp, hsa, hblk_max, hblk, vblk;
-> >       size_t bytes;
-> >       u8 *buffer;
-> >
-> > @@ -484,14 +484,6 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
-> >       hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
-> >                 (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
-> >
-> > -     /*
-> > -      * The frontporch is set using a blanking packet (4 bytes +
-> > -      * payload + 2 bytes). Its minimal size is therefore 6 bytes
-> > -      */
-> > -#define HFP_PACKET_OVERHEAD  6
-> > -     hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
-> > -               (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
-> > -
-> >       /*
-> >        * hblk seems to be the line + porches length.
-> >        * The blank is set using a blanking packet (4 bytes + 4 bytes +
-> > @@ -502,6 +494,18 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
-> >       hblk_max -= HBLK_PACKET_OVERHEAD;
-> >       hblk = max((unsigned int)HBLK_PACKET_OVERHEAD, hblk_max);
-> >
-> > +     /*
-> > +      * The frontporch is set using a blanking packet (4 bytes +
-> > +      * payload + 2 bytes). Its minimal size is therefore 6 bytes
-> > +      *
-> > +      * According to BSP code, extra 10 bytes(which is hblk packet overhead)
-> > +      * is adding for hfp packet overhead since hfp depends on hblk.
->
-> "According to the BSP code, another 10 bytes (the HBLK packet
-> overhead) need to be added to the front porch overhead."
->
-> How has this been verified? Since we have registers to set all the
-> parameters, this seems kind of weird.
+On Sun, Oct 21, 2018 at 10:00:31PM +0200, Wolfram Sang wrote:
+> We should get 'driver_data' from 'struct device' directly. Going via
+> platform_device is an unneeded step back and forth.
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-Verified based on the BSP calculation which I explained in commit
-message and tested by validating these numbers with mainline vs bsp
-code.
+Thanks
+
+> ---
+> 
+> Build tested only. buildbot is happy.
+> 
+>  drivers/pinctrl/pinctrl-at91-pio4.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+> index 5a850491a5cb..4ee135d7b883 100644
+> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
+> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+> @@ -868,8 +868,7 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
+>  
+>  static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
+> +	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
+>  	int i, j;
+>  
+>  	/*
+> @@ -897,8 +896,7 @@ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
+>  
+>  static int __maybe_unused atmel_pctrl_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
+> +	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
+>  	int i, j;
+>  
+>  	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
+> -- 
+> 2.19.0
+> 
