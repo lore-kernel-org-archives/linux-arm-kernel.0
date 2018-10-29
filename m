@@ -1,41 +1,68 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 10:33:06 +0100
-Subject: [PATCH v3 18/25] drm/panel: Add Bananapi S070WV20-CT16 ICN6211
- MIPI-DSI to RGB bridge
-In-Reply-To: <20181026144344.27778-19-jagan@amarulasolutions.com>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181026144344.27778-19-jagan@amarulasolutions.com>
-Message-ID: <20181029093306.ysyfgnrozbo2ywcu@flea>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Mon, 29 Oct 2018 10:34:00 +0100 (CET)
+Subject: [PATCH 2/8] ARM: vexpress/spc: constify clk_ops structure
+In-Reply-To: <20181029091756.GA1167@e110455-lin.cambridge.arm.com>
+References: <1540619262-22681-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1540619262-22681-3-git-send-email-Julia.Lawall@lip6.fr>
+ <20181029091756.GA1167@e110455-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.20.1810291033270.3755@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 08:13:37PM +0530, Jagan Teki wrote:
-> Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB bridge
-> panel which can be used to connect via DSI port on BPI-M64 board,
-> so add a driver for it.
-> 
-> The same panel PCB comes with parallel RBG which is supported via
-> panel-simple driver with "bananapi,s070wv20-ct16" compatible.
-> 
-> BSP dclock of 30MHz is not working with existing sunxi-ng and sun4i
-> sun4i_dclk_recalc, so updated to 55MHz can result proper working
-> nkm dividers.
-> 
-> dclock, 30MHz => PLL_MIPI, 300MHz => set rate 440MHz with 1,2,1 nkm
-> dclock, 55MHz => PLL_MIPI, 300MHz => set rate 330MHz with 5,2,9 nkm
 
-That panel is generic, you don't need those details in your commit log.
 
-Maxime
+On Mon, 29 Oct 2018, Liviu Dudau wrote:
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/78392ef9/attachment.sig>
+> On Sat, Oct 27, 2018 at 07:47:36AM +0200, Julia Lawall wrote:
+> > The clk_ops structure is only stored in the ops field of a
+> > clk_init_data structure.  This field is const, so the clk_ops
+> > structure can be const as well.
+> >
+> > Identified and transformed using Coccinelle.
+> >
+> > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+>
+> Are you going to send the series to the arm-soc maintainers directly or
+> you want us to cherry-pick this patch into the Versatile tree?
+
+Please do with it whatever seems best.
+
+Thanks,
+julia
+
+>
+> Best regards,
+> Liviu
+>
+> >
+> > ---
+> >  arch/arm/mach-vexpress/spc.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+> > index 0f5381d13494..611f22de48cb 100644
+> > --- a/arch/arm/mach-vexpress/spc.c
+> > +++ b/arch/arm/mach-vexpress/spc.c
+> > @@ -521,7 +521,7 @@ static int spc_set_rate(struct clk_hw *hw, unsigned long rate,
+> >  	return ve_spc_set_performance(spc->cluster, rate / 1000);
+> >  }
+> >
+> > -static struct clk_ops clk_spc_ops = {
+> > +static const struct clk_ops clk_spc_ops = {
+> >  	.recalc_rate = spc_recalc_rate,
+> >  	.round_rate = spc_round_rate,
+> >  	.set_rate = spc_set_rate,
+> >
+>
+> --
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
+>
