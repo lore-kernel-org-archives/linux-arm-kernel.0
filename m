@@ -1,272 +1,114 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 29 Oct 2018 11:07:07 -0700
-Subject: [PATCH 7/7] kgdb: Remove irq flags and local_irq_enable/disable from
- roundup
-In-Reply-To: <20181029180707.207546-1-dianders@chromium.org>
-References: <20181029180707.207546-1-dianders@chromium.org>
-Message-ID: <20181029180707.207546-8-dianders@chromium.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 29 Oct 2018 19:10:39 +0100
+Subject: [PATCH 1/2] ARM: cpuidle: Don't register the driver when back-end
+ init returns -ENXIO
+In-Reply-To: <20181026144843.3028-1-ulf.hansson@linaro.org>
+References: <../../misc/pm_patches/submitted_patches/cpuidle_arm_consolidate/0002-ARM-cpuidle-Convert-to-use-cpuidle_register-unregist.patch>
+ <20181026144843.3028-1-ulf.hansson@linaro.org>
+Message-ID: <6313b4d7-a2a7-98c4-3951-0a1c3e4ff2d5@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function kgdb_roundup_cpus() was passed a parameter that was
-documented as:
+On 26/10/2018 16:48, Ulf Hansson wrote:
+> There's no point to register the cpuidle driver for the current CPU, when
+> the initialization of the arch specific back-end data fails by returning
+> -ENXIO.
+> 
+> Instead, let's re-order the sequence to its original flow, by first trying
+> to initialize the back-end part and then act accordingly on the returned
+> error code. Additionally, let's print the error message, no matter of what
+> error code that was returned.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+> 
+> Note, as far as I can tell it's only qcom-spm that may return -ENXIO, which also
+> was original reason to why this error path was invented.
+> 
+> Unfurtunate I don't have a qcom spm platfrom at hand, however I manually tried
+> this by hacking the PSCI driver to return -ENXIO for some CPUs. So I assume it
+> should then also work for qcom spm.
+> 
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
+>  1 file changed, 10 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index 073557f433eb..df564d783216 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
+>  		goto out_kfree_drv;
+>  	}
+>  
+> -	ret = cpuidle_register_driver(drv);
+> -	if (ret) {
+> -		if (ret != -EBUSY)
+> -			pr_err("Failed to register cpuidle driver\n");
+> -		goto out_kfree_drv;
+> -	}
+> -
 
-> the flags that will be used when restoring the interrupts. There is
-> local_irq_save() call before kgdb_roundup_cpus().
+Why not move the following block at the beginning of the function ?
 
-Nobody used those flags.  Anyone who wanted to temporarily turn on
-interrupts just did local_irq_enable() and local_irq_disable() without
-looking at them.  So we can definitely remove the flags.
+--->
 
-Speaking of calling local_irq_enable(), it seems like a bad idea and
-it caused a nice splat on my system with lockdep turned on.
-Specifically it hit:
-  DEBUG_LOCKS_WARN_ON(current->hardirq_context)
+        /*
+         * Call arch CPU operations in order to initialize
+         * idle states suspend back-end specific data
+         */
+        ret = arm_cpuidle_init(cpu);
 
-See the previous patch in this series ("smp: Don't yell about IRQs
-disabled in kgdb_roundup_cpus()") for more details, but the last few
-things on the stack were this on my arm64 board:
-  lockdep_hardirqs_on+0xf0/0x160
-  trace_hardirqs_on+0x188/0x1ac
-  kgdb_roundup_cpus+0x14/0x3c
+        /*
+         * Skip the cpuidle device initialization if the reported
+         * failure is a HW misconfiguration/breakage (-ENXIO).
+         */
+        if (ret == -ENXIO)
+                return 0;
 
-As agrued in the the commit text of ("smp: Don't yell about IRQs
-disabled in kgdb_roundup_cpus()"), it seems better to make
-smp_call_function() lenient about kgdb than to locally turn on IRQs
-here.  Thus let's totally remove all the local_irq_enable() and
-local_irq_disable() calls from all of the kgdb_roundup_cpus() calls.
+        if (ret) {
+                pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+                s/goto out_unregister_drv;/return ret;/
+        }
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
+<---
 
- arch/arc/kernel/kgdb.c     |  4 +---
- arch/arm/kernel/kgdb.c     |  4 +---
- arch/arm64/kernel/kgdb.c   |  4 +---
- arch/hexagon/kernel/kgdb.c | 11 ++---------
- arch/mips/kernel/kgdb.c    |  4 +---
- arch/powerpc/kernel/kgdb.c |  2 +-
- arch/sh/kernel/kgdb.c      |  4 +---
- arch/sparc/kernel/smp_64.c |  2 +-
- arch/x86/kernel/kgdb.c     |  9 ++-------
- include/linux/kgdb.h       |  9 ++-------
- kernel/debug/debug_core.c  |  2 +-
- 11 files changed, 14 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arc/kernel/kgdb.c b/arch/arc/kernel/kgdb.c
-index 9a3c34af2ae8..d94d3cb7f9e8 100644
---- a/arch/arc/kernel/kgdb.c
-+++ b/arch/arc/kernel/kgdb.c
-@@ -197,11 +197,9 @@ static void kgdb_call_nmi_hook(void *ignored)
- 	kgdb_nmicallback(raw_smp_processor_id(), NULL);
- }
- 
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
--	local_irq_enable();
- 	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
--	local_irq_disable();
- }
- 
- struct kgdb_arch arch_kgdb_ops = {
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index caa0dbe3dc61..a80e9259f7e9 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -175,11 +175,9 @@ static void kgdb_call_nmi_hook(void *ignored)
-        kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
- }
- 
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
--       local_irq_enable();
-        smp_call_function(kgdb_call_nmi_hook, NULL, 0);
--       local_irq_disable();
- }
- 
- static int __kgdb_notify(struct die_args *args, unsigned long cmd)
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index a20de58061a8..5d171c26788f 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -289,11 +289,9 @@ static void kgdb_call_nmi_hook(void *ignored)
- 	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
- }
- 
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
--	local_irq_enable();
- 	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
--	local_irq_disable();
- }
- 
- static int __kgdb_notify(struct die_args *args, unsigned long cmd)
-diff --git a/arch/hexagon/kernel/kgdb.c b/arch/hexagon/kernel/kgdb.c
-index 16c24b22d0b2..30fbc491cf45 100644
---- a/arch/hexagon/kernel/kgdb.c
-+++ b/arch/hexagon/kernel/kgdb.c
-@@ -119,17 +119,12 @@ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
- 
- /**
-  * kgdb_roundup_cpus - Get other CPUs into a holding pattern
-- * @flags: Current IRQ state
-  *
-  * On SMP systems, we need to get the attention of the other CPUs
-  * and get them be in a known state.  This should do what is needed
-  * to get the other CPUs to call kgdb_wait(). Note that on some arches,
-  * the NMI approach is not used for rounding up all the CPUs. For example,
-- * in case of MIPS, smp_call_function() is used to roundup CPUs. In
-- * this case, we have to make sure that interrupts are enabled before
-- * calling smp_call_function(). The argument to this function is
-- * the flags that will be used when restoring the interrupts. There is
-- * local_irq_save() call before kgdb_roundup_cpus().
-+ * in case of MIPS, smp_call_function() is used to roundup CPUs.
-  *
-  * On non-SMP systems, this is not called.
-  */
-@@ -139,11 +134,9 @@ static void hexagon_kgdb_nmi_hook(void *ignored)
- 	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
- }
- 
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
--	local_irq_enable();
- 	smp_call_function(hexagon_kgdb_nmi_hook, NULL, 0);
--	local_irq_disable();
- }
- #endif
- 
-diff --git a/arch/mips/kernel/kgdb.c b/arch/mips/kernel/kgdb.c
-index eb6c0d582626..6671a279966f 100644
---- a/arch/mips/kernel/kgdb.c
-+++ b/arch/mips/kernel/kgdb.c
-@@ -219,11 +219,9 @@ static void kgdb_call_nmi_hook(void *ignored)
- 	set_fs(old_fs);
- }
- 
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
--	local_irq_enable();
- 	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
--	local_irq_disable();
- }
- 
- static int compute_signal(int tt)
-diff --git a/arch/powerpc/kernel/kgdb.c b/arch/powerpc/kernel/kgdb.c
-index 59c578f865aa..b0e804844be0 100644
---- a/arch/powerpc/kernel/kgdb.c
-+++ b/arch/powerpc/kernel/kgdb.c
-@@ -124,7 +124,7 @@ static int kgdb_call_nmi_hook(struct pt_regs *regs)
- }
- 
- #ifdef CONFIG_SMP
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
- 	smp_send_debugger_break();
- }
-diff --git a/arch/sh/kernel/kgdb.c b/arch/sh/kernel/kgdb.c
-index 4f04c6638a4d..86b3ea927e42 100644
---- a/arch/sh/kernel/kgdb.c
-+++ b/arch/sh/kernel/kgdb.c
-@@ -319,11 +319,9 @@ static void kgdb_call_nmi_hook(void *ignored)
- 	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
- }
- 
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
--	local_irq_enable();
- 	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
--	local_irq_disable();
- }
- 
- static int __kgdb_notify(struct die_args *args, unsigned long cmd)
-diff --git a/arch/sparc/kernel/smp_64.c b/arch/sparc/kernel/smp_64.c
-index 4792e08ad36b..f45d876983f1 100644
---- a/arch/sparc/kernel/smp_64.c
-+++ b/arch/sparc/kernel/smp_64.c
-@@ -1014,7 +1014,7 @@ void flush_dcache_page_all(struct mm_struct *mm, struct page *page)
- }
- 
- #ifdef CONFIG_KGDB
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
- 	smp_cross_call(&xcall_kgdb_capture, 0, 0, 0);
- }
-diff --git a/arch/x86/kernel/kgdb.c b/arch/x86/kernel/kgdb.c
-index 8e36f249646e..ac6291a4178d 100644
---- a/arch/x86/kernel/kgdb.c
-+++ b/arch/x86/kernel/kgdb.c
-@@ -422,21 +422,16 @@ static void kgdb_disable_hw_debug(struct pt_regs *regs)
- #ifdef CONFIG_SMP
- /**
-  *	kgdb_roundup_cpus - Get other CPUs into a holding pattern
-- *	@flags: Current IRQ state
-  *
-  *	On SMP systems, we need to get the attention of the other CPUs
-  *	and get them be in a known state.  This should do what is needed
-  *	to get the other CPUs to call kgdb_wait(). Note that on some arches,
-  *	the NMI approach is not used for rounding up all the CPUs. For example,
-- *	in case of MIPS, smp_call_function() is used to roundup CPUs. In
-- *	this case, we have to make sure that interrupts are enabled before
-- *	calling smp_call_function(). The argument to this function is
-- *	the flags that will be used when restoring the interrupts. There is
-- *	local_irq_save() call before kgdb_roundup_cpus().
-+ *	in case of MIPS, smp_call_function() is used to roundup CPUs.
-  *
-  *	On non-SMP systems, this is not called.
-  */
--void kgdb_roundup_cpus(unsigned long flags)
-+void kgdb_roundup_cpus(void)
- {
- 	apic->send_IPI_allbutself(APIC_DM_NMI);
- }
-diff --git a/include/linux/kgdb.h b/include/linux/kgdb.h
-index e465bb15912d..05e5b2eb0d32 100644
---- a/include/linux/kgdb.h
-+++ b/include/linux/kgdb.h
-@@ -178,21 +178,16 @@ kgdb_arch_handle_exception(int vector, int signo, int err_code,
- 
- /**
-  *	kgdb_roundup_cpus - Get other CPUs into a holding pattern
-- *	@flags: Current IRQ state
-  *
-  *	On SMP systems, we need to get the attention of the other CPUs
-  *	and get them into a known state.  This should do what is needed
-  *	to get the other CPUs to call kgdb_wait(). Note that on some arches,
-  *	the NMI approach is not used for rounding up all the CPUs. For example,
-- *	in case of MIPS, smp_call_function() is used to roundup CPUs. In
-- *	this case, we have to make sure that interrupts are enabled before
-- *	calling smp_call_function(). The argument to this function is
-- *	the flags that will be used when restoring the interrupts. There is
-- *	local_irq_save() call before kgdb_roundup_cpus().
-+ *	in case of MIPS, smp_call_function() is used to roundup CPUs.
-  *
-  *	On non-SMP systems, this is not called.
-  */
--extern void kgdb_roundup_cpus(unsigned long flags);
-+extern void kgdb_roundup_cpus(void);
- 
- /**
-  *	kgdb_arch_set_pc - Generic call back to the program counter
-diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-index 65c0f1363788..f3cadda45f07 100644
---- a/kernel/debug/debug_core.c
-+++ b/kernel/debug/debug_core.c
-@@ -593,7 +593,7 @@ static int kgdb_cpu_enter(struct kgdb_state *ks, struct pt_regs *regs,
- 
- 	/* Signal the other CPUs to enter kgdb_wait() */
- 	else if ((!kgdb_single_step) && kgdb_do_roundup)
--		kgdb_roundup_cpus(flags);
-+		kgdb_roundup_cpus();
- #endif
- 
- 	/*
+>  	/*
+>  	 * Call arch CPU operations in order to initialize
+>  	 * idle states suspend back-end specific data
+> @@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
+>  	ret = arm_cpuidle_init(cpu);
+>  
+>  	/*
+> -	 * Skip the cpuidle device initialization if the reported
+> +	 * Allow the initialization to continue for other CPUs, if the reported
+>  	 * failure is a HW misconfiguration/breakage (-ENXIO).
+>  	 */
+> -	if (ret == -ENXIO)
+> -		return 0;
+> -
+>  	if (ret) {
+>  		pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+> -		goto out_unregister_drv;
+> +		ret = ret == -ENXIO ? 0 : ret;
+> +		goto out_kfree_drv;
+> +	}
+> +
+> +	ret = cpuidle_register_driver(drv);
+> +	if (ret) {
+> +		if (ret != -EBUSY)
+> +			pr_err("Failed to register cpuidle driver\n");
+> +		goto out_kfree_drv;
+>  	}
+>  
+>  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> 
+
+
 -- 
-2.19.1.568.g152ad8e336-goog
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
