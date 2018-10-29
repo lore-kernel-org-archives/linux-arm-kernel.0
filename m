@@ -1,28 +1,35 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 29 Oct 2018 09:07:56 +0100
-Subject: [PATCH v1 3/3] i2c: imx: don't print error if DMA is not
- configured
-In-Reply-To: <20181028221123.GE1882@kunai>
-References: <20181018112615.29362-1-o.rempel@pengutronix.de>
- <20181018112615.29362-4-o.rempel@pengutronix.de>
- <20181028221123.GE1882@kunai>
-Message-ID: <9a3fc087-2fe5-6d57-9b65-a05e176bf53d@pengutronix.de>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 09:11:52 +0100
+Subject: [PATCH v2] arm64: defconfig: Enable MFD_AXP20X_I2C
+In-Reply-To: <20181025150659.19657-1-jagan@amarulasolutions.com>
+References: <20181025150659.19657-1-jagan@amarulasolutions.com>
+Message-ID: <20181029081151.pvx5mrvngzv26agg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 28.10.18 23:11, Wolfram Sang wrote:
-> On Thu, Oct 18, 2018 at 01:26:15PM +0200, Oleksij Rempel wrote:
->> At least on i.MX5x variants is DMA event for I2C muxed with SDHC. So
->> it is project specific configuration and not an error.
->>
->> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+On Thu, Oct 25, 2018 at 08:36:59PM +0530, Jagan Teki wrote:
+> The Allwinner H6 SoC is paired with the X-Powers AXP805 PMIC
+> connected via I2C.
 > 
-> So, the first patch is not I2C realm, and the second is dropped. No
-> comment about the third one?
+> Enable the driver for this PMIC.
 > 
-> And is maybe someone from Pengutronix interested in maintaining this
-> driver? Uwe maybe? That would speed up things for it...
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Tested-by: Jagan Teki <jagan@amarulasolutions.com> # OPI-1+
 
-Should i resend it as single patch?
+Queued for 4.21
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/7f0a4738/attachment.sig>
