@@ -1,40 +1,48 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 29 Oct 2018 08:54:08 +0000
-Subject: [PATCH v1 3/3] i2c: imx: don't print error if DMA is not
- configured
-In-Reply-To: <9a3fc087-2fe5-6d57-9b65-a05e176bf53d@pengutronix.de>
-References: <20181018112615.29362-1-o.rempel@pengutronix.de>
- <20181018112615.29362-4-o.rempel@pengutronix.de>
- <20181028221123.GE1882@kunai>
- <9a3fc087-2fe5-6d57-9b65-a05e176bf53d@pengutronix.de>
-Message-ID: <20181029085408.GB4101@kunai>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 29 Oct 2018 16:54:03 +0800
+Subject: [PATCH] ARM: module: Fix function kallsyms on Thumb-2
+In-Reply-To: <20181029082555.32626-1-vincent.whitchurch@axis.com>
+References: <20181029082555.32626-1-vincent.whitchurch@axis.com>
+Message-ID: <201810291629.DTMbJE2a%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 09:07:56AM +0100, Oleksij Rempel wrote:
-> 
-> 
-> On 28.10.18 23:11, Wolfram Sang wrote:
-> > On Thu, Oct 18, 2018 at 01:26:15PM +0200, Oleksij Rempel wrote:
-> > > At least on i.MX5x variants is DMA event for I2C muxed with SDHC. So
-> > > it is project specific configuration and not an error.
-> > > 
-> > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > 
-> > So, the first patch is not I2C realm, and the second is dropped. No
-> > comment about the third one?
-> > 
-> > And is maybe someone from Pengutronix interested in maintaining this
-> > driver? Uwe maybe? That would speed up things for it...
-> 
-> Should i resend it as single patch?
+Hi Vincent,
 
-I am fine with an ack here.
+Thank you for the patch! Perhaps something to improve:
 
+[auto build test WARNING on arm/for-next]
+[also build test WARNING on v4.19 next-20181019]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Vincent-Whitchurch/ARM-module-Fix-function-kallsyms-on-Thumb-2/20181029-162842
+base:   git://git.armlinux.org.uk/~rmk/linux-arm.git for-next
+config: i386-randconfig-x000-201843 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All warnings (new ones prefixed by >>):
+
+   In file included from kernel/bpf/core.c:28:0:
+>> include/linux/moduleloader.h:89:35: warning: 'struct mod_kallsyms' declared inside parameter list will not be visible outside of this definition or declaration
+    void module_fixup_kallsyms(struct mod_kallsyms *kallsyms);
+                                      ^~~~~~~~~~~~
+
+vim +89 include/linux/moduleloader.h
+
+    88	
+  > 89	void module_fixup_kallsyms(struct mod_kallsyms *kallsyms);
+    90	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 29535 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/4e44cb1b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/a296bddc/attachment-0001.gz>
