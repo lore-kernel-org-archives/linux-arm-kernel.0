@@ -1,53 +1,60 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 29 Oct 2018 11:41:29 +0530
-Subject: [GIT PULL] Mailbox changes for v4.20
-Message-ID: <CABb+yY3twDWnmzVGitUAXSYdkbZu0EegNRYxOXTaeQFR5QEz4g@mail.gmail.com>
+From: amhetre@nvidia.com (Ashish Mhetre)
+Date: Mon, 29 Oct 2018 11:59:59 +0530
+Subject: [PATCH V2] arm64: Don't flush tlb while clearing the accessed bit
+Message-ID: <1540794599-30922-1-git-send-email-amhetre@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e704966c45e48d0220d1ee5e463034ae493a95b2:
+From: Alex Van Brunt <avanbrunt@nvidia.com>
 
-  Merge branch 'for-linus' of
-git://git.kernel.org/pub/scm/linux/kernel/git/dtor/input (2018-09-28
-18:04:50 -0700)
+Accessed bit is used to age a page and in generic implementation there is
+flush_tlb while clearing the accessed bit.
+Flushing a TLB is overhead on ARM64 as access flag faults don't get
+translation table entries cached into TLB's. Flushing TLB is not necessary
+for this. Clearing the accessed bit without flushing TLB doesn't cause data
+corruption on ARM64. [It may cause incorrect page aging but chances of that
+should be relatively low.]
+In our case with this patch, speed of reading from fast NVMe/SSD through
+PCIe got improved by 10% ~ 15% and writing got improved by 20% ~ 40%.
+So for performance optimisation don't flush TLB when clearing the accessed
+bit on ARM64.
+x86 made the same optimization even though their TLB invalidate is much
+faster as it doesn't broadcast to other CPUs.
 
-are available in the Git repository at:
+Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
+Signed-off-by: Ashish Mhetre <amhetre@nvidia.com>
+---
+v2: Added comments about why flushing is not needed while clearing accessed bit
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-tags/mailbox-v4.20
+ arch/arm64/include/asm/pgtable.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-for you to fetch changes up to 9f0a0a381c5db56e7922dbeea6831f27db58372f:
-
-  mailbox: mediatek: Add check for possible failure of kzalloc
-(2018-09-29 12:42:39 +0530)
-
-----------------------------------------------------------------
-- Convert print users to use the %pOFn format specifier
-- Enable ti-msgmr driver for the K3 platform as well
-- Add QCS404 to compatible list of QCOM's APCS IPC driver
-- Minor spelling fixes toogle -> toggle
-- kzalloc failure catch in Mediatek driver
-
-----------------------------------------------------------------
-Bjorn Andersson (1):
-      mailbox: qcom: Add QCS404 APPS Global compatible
-
-Colin Ian King (1):
-      mailbox: bcm-flexrm-mailbox: fix spelling mistake "toogle" -> "toggle"
-
-Houlong Wei (1):
-      mailbox: mediatek: Add check for possible failure of kzalloc
-
-Nishanth Menon (1):
-      drivers: mailbox: Make ti-msgmr driver depend on ARCH_K3
-
-Rob Herring (1):
-      mailbox: Convert to using %pOFn instead of device_node.name
-
- .../devicetree/bindings/mailbox/qcom,apcs-kpss-global.txt         | 1 +
- drivers/mailbox/Kconfig                                           | 8 ++++----
- drivers/mailbox/bcm-flexrm-mailbox.c                              | 6 +++---
- drivers/mailbox/mtk-cmdq-mailbox.c                                | 3 +++
- drivers/mailbox/qcom-apcs-ipc-mailbox.c                           | 1 +
- drivers/mailbox/ti-msgmgr.c                                       | 4 ++--
- 6 files changed, 14 insertions(+), 9 deletions(-)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 2ab2031..33e1940 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -652,6 +652,22 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
+ 	return __ptep_test_and_clear_young(ptep);
+ }
+ 
++#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
++static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
++					 unsigned long address, pte_t *ptep)
++{
++	/*
++	 * Flushing a TLB is overhead on ARM64 as access flag faults don't get
++	 * translation table entries cached into TLB's. Flushing TLB is not
++	 * necessary for this. Clearing the accessed bit without flushing TLB
++	 * doesn't cause data corruption on ARM64.[ It may cause imcorrect page
++	 * aging but chances of this should be comparatively low. ]
++	 * So as a performance optimization don't flush the TLB when clearing
++	 * the accessed bit.
++	 */
++	return ptep_test_and_clear_young(vma, address, ptep);
++}
++
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define __HAVE_ARCH_PMDP_TEST_AND_CLEAR_YOUNG
+ static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
+-- 
+2.7.4
