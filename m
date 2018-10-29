@@ -1,123 +1,88 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 29 Oct 2018 14:30:01 +0530
-Subject: [PATCH v2 2/7] arm64: dts: rockchip: rock960: Add on-board LED support
-In-Reply-To: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
-References: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181029090006.4353-3-manivannan.sadhasivam@linaro.org>
+From: ppessi@nvidia.com (Pekka Pessi)
+Date: Mon, 29 Oct 2018 11:04:06 +0200
+Subject: [PATCH 0/9] serial: Add Tegra Combined UART driver
+In-Reply-To: <20181026111638.10759-1-thierry.reding@gmail.com>
+References: <20181026111638.10759-1-thierry.reding@gmail.com>
+Message-ID: <85092b49-2b62-bd76-05a3-521415835b6e@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add on-board LED support for Rock960 board based on the following
-standard used by rest of the 96Boards:
+Hi Thierry,
 
-green:user1  default-trigger: heartbeat
-green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
-green:user3  default-trigger: mmc1 (SD-card)
-green:user4  default-trigger: none, panic-indicator
-yellow:wlan  default-trigger: phy0tx
-blue:bt      default-trigger: hci0-power
+What is the use case for the mailbox driver? What kind of entity will be 
+there consuming sent messages and sending messages to kernel?
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- .../boot/dts/rockchip/rk3399-rock960.dts      | 79 +++++++++++++++++++
- 1 file changed, 79 insertions(+)
+--Pekka
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
-index 3c3308daec98..12285c51cceb 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
-@@ -13,6 +13,53 @@
- 	chosen {
- 		stdout-path = "serial2:1500000n8";
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&user_led1>, <&user_led2>, <&user_led3>,
-+			    <&user_led4>, <&wlan_led>, <&bt_led>;
-+
-+		user_led1 {
-+			label = "green:user1";
-+			gpios = <&gpio4 RK_PC2 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		user_led2 {
-+			label = "green:user2";
-+			gpios = <&gpio4 RK_PC6 0>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		user_led3 {
-+			label = "green:user3";
-+			gpios = <&gpio4 RK_PD0 0>;
-+			linux,default-trigger = "mmc1";
-+		};
-+
-+		user_led4 {
-+			label = "green:user4";
-+			gpios = <&gpio4 RK_PD4 0>;
-+			panic-indicator;
-+			linux,default-trigger = "none";
-+		};
-+
-+		wlan_active_led {
-+			label = "yellow:wlan";
-+			gpios = <&gpio4 RK_PD5 0>;
-+			linux,default-trigger = "phy0tx";
-+			default-state = "off";
-+		};
-+
-+		bt_active_led {
-+			label = "blue:bt";
-+			gpios = <&gpio4 RK_PD6 0>;
-+			linux,default-trigger = "hci0-power";
-+			default-state = "off";
-+		};
-+	};
-+
- };
- 
- &pcie0 {
-@@ -20,6 +67,38 @@
- };
- 
- &pinctrl {
-+	leds {
-+		user_led1: user_led1 {
-+			rockchip,pins =
-+				<4 RK_PC2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led2: user_led2 {
-+			rockchip,pins =
-+				<4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led3: user_led3 {
-+			rockchip,pins =
-+				<4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led4: user_led4 {
-+			rockchip,pins =
-+				<4 RK_PD4 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		wlan_led: wlan_led {
-+			rockchip,pins =
-+				<4 RK_PD5 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		bt_led: bt_led {
-+			rockchip,pins =
-+				<4 RK_PD6 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	pcie {
- 		pcie_drv: pcie-drv {
- 			rockchip,pins =
--- 
-2.17.1
+On 10/26/2018 02:16 PM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> Hi everyone,
+>
+> this is a reworked version of Mikko's earlier proposal[0]. I've reworked
+> the TCU driver itself so that it relies less on global variables as well
+> as added a Kconfig option to allow the console support to be selected. I
+> also fixed a couple of issues that manifested themselves as I was moving
+> towards the IRQ driven mode (TCU was passing a pointer to a local
+> variable which was getting stored in the mailbox's ring buffer and the
+> data pointed at was becoming stale by the time the mailbox got around to
+> dequeue it).
+>
+> The biggest bulk of the changes is in the mailbox driver. This series
+> addresses all of Jassi's comments from back at the time. One notable
+> additional change is that shared mailboxes are now interrupt driven,
+> which removes the need for polling mode.
+>
+> Unfortunately there is still an issue because the TCU uses the mailbox
+> in atomic context for both TTY and console modes, so we get a sleeping-
+> while-atomic BUG when using mbox_client->tx_block = true in order to
+> rate-limit mbox_send_message(). In order to work around this, I added a
+> mechanism to mbox_send_message() that will allow blocking from atomic
+> context if the mailbox controller implements the new ->flush() callback.
+> For Tegra HSP shared mailboxes this is done by spinning on the shared
+> mailbox register until the receiver has marked the mailbox as empty. I
+> have been running this locally for a couple of days now and it works
+> perfectly.
+>
+> Furthermore this series incorporates Mikko's work in progress on
+> splitting up the mailbox controllers and allowing multiple controllers
+> to match on the same device tree node during mbox_request_channel().
+>
+> Last but not least there are no build-time dependencies between the
+> mailbox and serial drivers, so I think the easiest way to merge this is
+> if Jassi picks up patches 1-5, Greg takes patches 6 & 7 and I pick up
+> patches 8-9 into the Tegra tree.
+>
+> Thanks,
+> Thierry
+>
+> [0]: https://lore.kernel.org/patchwork/project/lkml/list/?series=357641
+>
+> Mikko Perttunen (5):
+>    mailbox: Allow multiple controllers per device
+>    dt-bindings: tegra186-hsp: Add shared interrupts
+>    dt-bindings: serial: Add bindings for nvidia,tegra194-tcu
+>    arm64: tegra: Add nodes for TCU on Tegra194
+>    arm64: tegra: Mark TCU as primary serial port on Tegra194 P2888
+>
+> Thierry Reding (4):
+>    mailbox: Support blocking transfers in atomic context
+>    mailbox: tegra-hsp: Add support for shared mailboxes
+>    mailbox: tegra-hsp: Add suspend/resume support
+>    serial: Add Tegra Combined UART driver
+>
+>   .../bindings/mailbox/nvidia,tegra186-hsp.txt  |   3 +
+>   .../bindings/serial/nvidia,tegra194-tcu.txt   |  35 ++
+>   .../arm64/boot/dts/nvidia/tegra194-p2888.dtsi |   2 +-
+>   arch/arm64/boot/dts/nvidia/tegra194.dtsi      |  38 +-
+>   drivers/mailbox/mailbox.c                     |  11 +-
+>   drivers/mailbox/tegra-hsp.c                   | 495 +++++++++++++++---
+>   drivers/tty/serial/Kconfig                    |  22 +
+>   drivers/tty/serial/Makefile                   |   1 +
+>   drivers/tty/serial/tegra-tcu.c                | 299 +++++++++++
+>   include/linux/mailbox_controller.h            |   4 +
+>   include/uapi/linux/serial_core.h              |   3 +
+>   11 files changed, 847 insertions(+), 66 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+>   create mode 100644 drivers/tty/serial/tegra-tcu.c
+>
