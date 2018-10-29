@@ -1,76 +1,72 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 10:22:27 +0100
-Subject: [PATCH v3 12/25] drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet
- overhead
-In-Reply-To: <20181026144344.27778-13-jagan@amarulasolutions.com>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181026144344.27778-13-jagan@amarulasolutions.com>
-Message-ID: <20181029092227.mdxgvg5aqzh22j72@flea>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 29 Oct 2018 15:12:44 +0530
+Subject: [PATCH v3 6/7] arm64: dts: xilinx: ultra96: Standardize LED labels
+ and triggers
+In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181029094245.7886-7-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 08:13:31PM +0530, Jagan Teki wrote:
-> Add 10 bytes packet overhead for hblk where blank is set using
-> a blanking packet like (4 bytes + 4 bytes + payload + 2 bytes)
-> 
-> This is according to BSP code from BPI-M64-bsp
-> (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
-> 
-> So, add 10 bytes packet overhead for DSI hblk.
-> 
-> Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> Tested-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v3:
-> - new patch
-> Changes for v2:
-> - none
-> 
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 596e560263bf..cf42be1f1ba1 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -461,7 +461,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  {
->  	struct mipi_dsi_device *device = dsi->device;
->  	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-> -	u16 hbp, hfp, hsa, hblk, vblk;
-> +	u16 hbp, hfp, hsa, hblk_max, hblk, vblk;
->  	size_t bytes;
->  	u8 *buffer;
->  
-> @@ -494,8 +494,13 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  
->  	/*
->  	 * hblk seems to be the line + porches length.
-> +	 * The blank is set using a blanking packet (4 bytes + 4 bytes +
-> +	 * payload + 2 bytes). So minimal size is 10 bytes
->  	 */
-> -	hblk = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
-> +#define HBLK_PACKET_OVERHEAD	10
-> +	hblk_max = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
-> +	hblk_max -= HBLK_PACKET_OVERHEAD;
-> +	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD, hblk_max);
+For all 96Boards, the following standard is used for onboard LEDs.
 
-I'd rather use the same convention than the other assignments done
-before in that function.
+green:user1  default-trigger: heartbeat
+green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
+green:user3  default-trigger: mmc1 (SD-card)
+green:user4  default-trigger: none, panic-indicator
+yellow:wlan  default-trigger: phy0tx
+blue:bt      default-trigger: hci0-power
 
-Maxime
+So lets adopt the same for Ultra96, which is one of the 96Boards
+CE and AI platform. Since the WLAN and BT LEDs are hardwired onboard,
+consolidate only User LEDs.
 
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+index eb5e8bddb610..c08a8753215b 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+@@ -57,29 +57,30 @@
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		ds2 {
+-			label = "ds2";
++			label = "green:user1";
+ 			gpios = <&gpio 20 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 
+ 		ds3 {
+-			label = "ds3";
++			label = "green:user2";
+ 			gpios = <&gpio 19 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "phy0tx"; /* WLAN tx */
++			linux,default-trigger = "mmc0";
+ 			default-state = "off";
+ 		};
+ 
+ 		ds4 {
+-			label = "ds4";
++			label = "green:user3";
+ 			gpios = <&gpio 18 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "phy0rx"; /* WLAN rx */
++			linux,default-trigger = "mmc1";
+ 			default-state = "off";
+ 		};
+ 
+ 		ds5 {
+-			label = "ds5";
++			label = "green:user4";
+ 			gpios = <&gpio 17 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "bluetooth-power";
++			linux,default-trigger = "none";
++			panic-indicator;
+ 		};
+ 
+ 		vbus_det { /* U5 USB5744 VBUS detection via MIO25 */
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/987f4c1a/attachment-0001.sig>
+2.17.1
