@@ -1,74 +1,84 @@
-From: lsun@mellanox.com (Liming Sun)
-Date: Mon, 29 Oct 2018 16:09:07 +0000
-Subject: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
-In-Reply-To: <CAK8P3a2_0mYaJ0NjWSMxpmoF9+tcoHtfhJQJ0Aj9Tds+f7KuEg@mail.gmail.com>
-References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
- <1540403734-137721-1-git-send-email-lsun@mellanox.com>
- <1540403734-137721-2-git-send-email-lsun@mellanox.com>
- <CAK8P3a1jTsvzYhS4CxvmK6tOgPn_g7=1S4xAcca2K4v70vhyEA@mail.gmail.com>
- <AM4PR05MB32204021433BBB853C50FF30A1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
- <CAK8P3a2=shWVjwrmnNTwwGwN_jhwyb+TmeALz4zzTstho51z8A@mail.gmail.com>
- <DB6PR05MB32236AAD033C20DF6414C464A1F30@DB6PR05MB3223.eurprd05.prod.outlook.com>
- <CAK8P3a2_0mYaJ0NjWSMxpmoF9+tcoHtfhJQJ0Aj9Tds+f7KuEg@mail.gmail.com>
-Message-ID: <DB6PR05MB32237D37B4A36453C83FC9BAA1F30@DB6PR05MB3223.eurprd05.prod.outlook.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Oct 2018 16:43:29 +0000
+Subject: [PATCH] arm: mm: fault: check ADFSR in case of abort
+In-Reply-To: <20181029155435.prz2htt4ktte7pxb@lakrids.cambridge.arm.com>
+References: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
+ <20181029155435.prz2htt4ktte7pxb@lakrids.cambridge.arm.com>
+Message-ID: <20181029164329.GH30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please see my response below.
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Monday, October 29, 2018 11:26 AM
-> To: Liming Sun <lsun@mellanox.com>
-> Cc: Olof Johansson <olof@lixom.net>; David Woods
-> <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-
-> soc <arm@kernel.org>; DTML <devicetree@vger.kernel.org>; Linux ARM
-> <linux-arm-kernel@lists.infradead.org>
-> Subject: Re: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
+On Mon, Oct 29, 2018 at 03:54:36PM +0000, Mark Rutland wrote:
+> On Mon, Oct 29, 2018 at 02:20:51PM +0000, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
+> > When running into situations like:
+> > "Unhandled fault: synchronous external abort (0x210) at 0xXXX"
+> > or
+> > "Unhandled prefetch abort: synchronous external abort (0x210) at 0xXXX"
+> > it is useful to know the content of ADFSR (Auxiliary Data Fault Status
+> > Register) to indicate an ECC double-bit error in L1 or L2 cache.
+> > 
+> > Refer to:
+> > Cortex-A15 Technical Reference Manual, Revision: r2p1
+> > [6.4.8. Error Correction Code]
+> > 
+> > Signed-off-by: Wladislav Wiebe <wladislav.wiebe@nokia.com>
+> > ---
+> >  arch/arm/mm/fault.c | 18 ++++++++++++++++++
+> >  1 file changed, 18 insertions(+)
+> > 
+> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> > index 3232afb6fdc0..5e240deb6ed6 100644
+> > --- a/arch/arm/mm/fault.c
+> > +++ b/arch/arm/mm/fault.c
+> > @@ -547,6 +547,22 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
+> >  	fsr_info[nr].name = name;
+> >  }
+> >  
+> > +/*
+> > + * Check for ECC double-bit errors in Auxiliary Data Fault Status Register
+> > + */
+> > +static void check_adfsr_for_ecc(void)
+> > +{
+> > +	u32 adfsr = 0;
+> > +
+> > +	asm("mrc p15, 0, %0, c5, c1, 0" : "=r" (adfsr));
+> > +
+> > +	if (adfsr & (BIT(31) | BIT(23))) {
+> > +		pr_alert("ADFSR status 0x%x indicates that an L1 or L2 cache\n"
+> > +			 "ECC double-bit error occurred at some time.\n",
+> > +			  adfsr);
+> > +	}
+> > +}
+> > +
+> >  /*
+> >   * Dispatch a data abort to the relevant handler.
+> >   */
+> > @@ -559,6 +575,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+> >  	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
+> >  		return;
+> >  
+> > +	check_adfsr_for_ecc();
+> >  	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
+> >  		inf->name, fsr, addr);
+> >  	show_pte(current->mm, addr);
+> > @@ -593,6 +610,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+> >  	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
+> >  		return;
+> >  
+> > +	check_adfsr_for_ecc();
+> >  	pr_alert("Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
+> >  		inf->name, ifsr, addr);
 > 
-> On Mon, Oct 29, 2018 at 3:58 PM Liming Sun <lsun@mellanox.com> wrote:
-> > > It would be nice if you could still include the dts sources in the submission.
-> > > Since this is not a classic server hardware, DT is probably more suitable
-> > > here, and there are likely use cases that won't work with ACPI, so it's
-> > > good to have a starting point for your users if they need to override
-> > > the ACPI tables with a DT, or build systems with a simpler boot loader.
-> >
-> > Sure, I'll keep this DT change for reference. A little explanation that
-> > Mellanox BlueField SOC could be PCIe NIC or standalone device (server)
-> form which
-> > can do PXE boot, CentOS installation even on the NIC, etc. The same
-> software/driver
-> > works on both.
-> 
-> Ok, good.
-> 
-> >  DT seems not working well for some requirement/features like
-> > NVDIMM (which requires ACPI DSM).  That's why we switched to ACPI
-> though
-> > DT support is preserved.
-> 
-> This is probably something we need to look at separately, I'm sure we will
-> want
-> to use NVDIMM with DT based systems in the future. Can you explain what
-> the DSM is used for here? Is this something that could be done in software
-> in the NVDIMM hardware specific driver?
+> IIUC at this point the task is preemptible (and interruptible),
 
-The DSM is kind of running logic instead of configuration which is provided by 
-system firmware. It's defined in the UEFI spec and supported by Linux. In the
-NVDIMM case here, it's used to do Address Range Scrub (ARS), I2C access (such as
-reading the DIMM SPD information), runtime health check, etc. 
+It may be preemptable, but isn't necessarily so.  It depends whether the
+called FSR specific function enabled interrupts or not.
 
-DSM is kind of requirement by NVDIMM, such as
-https://pmem.io/documents/NVDIMM_DSM_Interface_Example.pdf
-https://docs.microsoft.com/en-us/windows-hardware/drivers/storage/-dsm-interface-for-byte-addressable-energy-backed-function-class--function-interface-1-
+So, it would be better to read the ADFSR before calling the FSR specific
+function to guarantee that we read the values that correspond with _this_
+fault.
 
-By following the ACPI DSM definitions, there is no extra drivers needed in 
-Linux due to the existing ACPI framework.  Since it's 'standard' APIs in UEFI, 
-it has potential to support other OS other than Linux.
-
-Hardware specific driver might be able to do some of the functionality, or
-even 'simulate' some of the ACPI implementation or APIs. I guess it might need 
-a framework for it which I haven't thought a lot of details yet :)
-
-> 
->        Arnd
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
