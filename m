@@ -1,102 +1,142 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 30 Oct 2018 06:49:39 +0800
-Subject: [PATCH i2c-next v8 5/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-In-Reply-To: <20181029211414.20771-6-jae.hyun.yoo@linux.intel.com>
-References: <20181029211414.20771-6-jae.hyun.yoo@linux.intel.com>
-Message-ID: <201810300628.VVJxhkq6%fengguang.wu@intel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 29 Oct 2018 18:24:48 -0500
+Subject: [PATCH 1/2 v5] arm64: Get rid of __early_init_dt_declare_initrd()
+In-Reply-To: <CAKv+Gu-5vpSJDs3RdTtspO3WmbqTE4YQDWj2us4YOP2zi1PDTg@mail.gmail.com>
+References: <20181029190014.6455-1-f.fainelli@gmail.com>
+ <20181029190014.6455-2-f.fainelli@gmail.com>
+ <CAL_JsqL2g69Duhkqd=f09BStoAKeakJz8Wgz3is37YU0+fc80A@mail.gmail.com>
+ <CAKv+Gu-5vpSJDs3RdTtspO3WmbqTE4YQDWj2us4YOP2zi1PDTg@mail.gmail.com>
+Message-ID: <CAL_JsqJmGdExHbYA7_ABz0K4b=JPdX+O=2GRzip=_KBakqh9Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jae,
+On Mon, Oct 29, 2018 at 4:58 PM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+>
+> On 29 October 2018 at 16:59, Rob Herring <robh+dt@kernel.org> wrote:
+> > +Ard who last touched this.
+> >
+> > On Mon, Oct 29, 2018 at 2:23 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+> >>
+> >> ARM64 is the only architecture that re-defines
+> >> __early_init_dt_declare_initrd() in order for that function to populate
+> >> initrd_start/initrd_end with physical addresses instead of virtual
+> >> addresses. Instead of having an override, just get rid of that
+> >> implementation and perform the virtual to physical conversion of these
+> >> addresses in arm64_memblock_init() where relevant.
+> >>
+> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> >> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+> >> ---
+> >>  arch/arm64/include/asm/memory.h |  8 -------
+> >>  arch/arm64/mm/init.c            | 42 +++++++++++++++++++++------------
+> >>  2 files changed, 27 insertions(+), 23 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> >> index b96442960aea..dc3ca21ba240 100644
+> >> --- a/arch/arm64/include/asm/memory.h
+> >> +++ b/arch/arm64/include/asm/memory.h
+> >> @@ -168,14 +168,6 @@
+> >>  #define IOREMAP_MAX_ORDER      (PMD_SHIFT)
+> >>  #endif
+> >>
+> >> -#ifdef CONFIG_BLK_DEV_INITRD
+> >> -#define __early_init_dt_declare_initrd(__start, __end)                 \
+> >> -       do {                                                            \
+> >> -               initrd_start = (__start);                               \
+> >> -               initrd_end = (__end);                                   \
+> >> -       } while (0)
+> >> -#endif
+> >> -
+> >>  #ifndef __ASSEMBLY__
+> >>
+> >>  #include <linux/bitops.h>
+> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >> index 3cf87341859f..292570b08f85 100644
+> >> --- a/arch/arm64/mm/init.c
+> >> +++ b/arch/arm64/mm/init.c
+> >> @@ -62,6 +62,8 @@
+> >>  s64 memstart_addr __ro_after_init = -1;
+> >>  phys_addr_t arm64_dma_phys_limit __ro_after_init;
+> >>
+> >> +static phys_addr_t phys_initrd_start, phys_initrd_end;
+> >> +
+> >>  #ifdef CONFIG_BLK_DEV_INITRD
+> >>  static int __init early_initrd(char *p)
+> >>  {
+> >> @@ -72,8 +74,8 @@ static int __init early_initrd(char *p)
+> >>         if (*endp == ',') {
+> >>                 size = memparse(endp + 1, NULL);
+> >>
+> >> -               initrd_start = start;
+> >> -               initrd_end = start + size;
+> >> +               phys_initrd_start = start;
+> >> +               phys_initrd_end = start + size;
+> >>         }
+> >>         return 0;
+> >>  }
+> >> @@ -364,6 +366,7 @@ static void __init fdt_enforce_memory_region(void)
+> >>  void __init arm64_memblock_init(void)
+> >>  {
+> >>         const s64 linear_region_size = -(s64)PAGE_OFFSET;
+> >> +       u64 __maybe_unused base, size;
+> >>
+> >>         /* Handle linux,usable-memory-range property */
+> >>         fdt_enforce_memory_region();
+> >> @@ -408,14 +411,25 @@ void __init arm64_memblock_init(void)
+> >>                 memblock_add(__pa_symbol(_text), (u64)(_end - _text));
+> >>         }
+> >>
+> >> -       if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+> >> +       if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) &&
+> >> +           (initrd_start || phys_initrd_start)) {
+> >
+> > I've tried to explain already that this is broken. The problem is
+> > __early_init_dt_declare_initrd using __va() which happens before this
+> > function is called. __va() uses PHYS_OFFSET which in turn is defined
+> > as memstart_addr. However, memstart_addr may be changed just above
+> > this hunk, so the earlier conversion to a VA may not be valid at this
+> > point. This is explained if you read Ard's commit that added all this
+> > mess.
+> >
+> > You could fix this by converting back to a PA before adjusting
+> > memstart_addr, but that's 2 wrongs making a right and fragile. The
+> > better solution is the other proposal making the DT code set
+> > phys_initrd_* (whatever the ARM code calls them).
+> >
+>
+> On arm64, we have
+>
+> #define PHYS_OFFSET \
+>   ({ VM_BUG_ON(memstart_addr & 1); memstart_addr; })
+>
+> and
+>
+> s64 memstart_addr __ro_after_init = -1;
+>
+> IOW, any attempt to perform PA to VA translations before memstart_addr
+> is assigned will BUG() if CONFIG_DEBUG_VM=y, so please enable that
+> when playing with this code.
 
-Thank you for the patch! Perhaps something to improve:
+Which will result in a crashed kernel with no console output unless
+you have earlycon enabled (or maybe EFI console will be up?). A WARN
+would be better.
 
-[auto build test WARNING on wsa/i2c/for-next]
-[also build test WARNING on v4.19 next-20181029]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> The reason we have this code is because the start of the linear region
+> might not coincide with memblock_start_of_DRAM(), which could happen,
+> e.g., when running a 39-bit VA kernel on a system with a very sparse
+> memory map (which is unfortunately what some silicon vendors think is
+> what ARM recommends) and the kernel loaded near the top of that
+> memory. The ability to load the kernel anywhere in physical memory was
+> introduced to accommodate physical KASLR.
+>
+> Ideally, we'd fix this by only recording physical addresses for the
+> initrd in generic code, and deferring the translation until the point
+> where we actually do the access.
 
-url:    https://github.com/0day-ci/linux/commits/Jae-Hyun-Yoo/i2c-aspeed-Add-bus-idle-waiting-logic-for-multi-master-use-cases/20181030-051719
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
-config: xtensa-allyesconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 8.1.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
+The plan had been for the core code to set both the phys and virt
+addresses and let arm64 calculate the VA again. I guess we'll have to
+condition getting the VA on !ARM64 at least until we convert other
+platforms to use physaddr.
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-
-All warnings (new ones prefixed by >>):
-
-   In file included from include/linux/ktime.h:25,
-                    from include/linux/rcutiny.h:28,
-                    from include/linux/rcupdate.h:209,
-                    from include/linux/srcu.h:33,
-                    from include/linux/notifier.h:16,
-                    from include/linux/clk.h:17,
-                    from drivers/i2c/busses/i2c-aspeed.c:13:
-   drivers/i2c/busses/i2c-aspeed.c: In function 'aspeed_i2c_master_xfer':
->> include/linux/jiffies.h:108:15: warning: 'check_started' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      ((long)((b) - (a)) < 0))
-                  ^
-   drivers/i2c/busses/i2c-aspeed.c:607:16: note: 'check_started' was declared here
-     unsigned long check_started;
-                   ^~~~~~~~~~~~~
---
-   In file included from include/linux/ktime.h:25,
-                    from include/linux/rcutiny.h:28,
-                    from include/linux/rcupdate.h:209,
-                    from include/linux/srcu.h:33,
-                    from include/linux/notifier.h:16,
-                    from include/linux/clk.h:17,
-                    from drivers/i2c//busses/i2c-aspeed.c:13:
-   drivers/i2c//busses/i2c-aspeed.c: In function 'aspeed_i2c_master_xfer':
->> include/linux/jiffies.h:108:15: warning: 'check_started' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      ((long)((b) - (a)) < 0))
-                  ^
-   drivers/i2c//busses/i2c-aspeed.c:607:16: note: 'check_started' was declared here
-     unsigned long check_started;
-                   ^~~~~~~~~~~~~
-
-vim +/check_started +108 include/linux/jiffies.h
-
-^1da177e Linus Torvalds   2005-04-16   91  
-^1da177e Linus Torvalds   2005-04-16   92  /*
-^1da177e Linus Torvalds   2005-04-16   93   *	These inlines deal with timer wrapping correctly. You are 
-^1da177e Linus Torvalds   2005-04-16   94   *	strongly encouraged to use them
-^1da177e Linus Torvalds   2005-04-16   95   *	1. Because people otherwise forget
-^1da177e Linus Torvalds   2005-04-16   96   *	2. Because if the timer wrap changes in future you won't have to
-^1da177e Linus Torvalds   2005-04-16   97   *	   alter your driver code.
-^1da177e Linus Torvalds   2005-04-16   98   *
-^1da177e Linus Torvalds   2005-04-16   99   * time_after(a,b) returns true if the time a is after time b.
-^1da177e Linus Torvalds   2005-04-16  100   *
-^1da177e Linus Torvalds   2005-04-16  101   * Do this with "<0" and ">=0" to only test the sign of the result. A
-^1da177e Linus Torvalds   2005-04-16  102   * good compiler would generate better code (and a really good compiler
-^1da177e Linus Torvalds   2005-04-16  103   * wouldn't care). Gcc is currently neither.
-^1da177e Linus Torvalds   2005-04-16  104   */
-^1da177e Linus Torvalds   2005-04-16  105  #define time_after(a,b)		\
-^1da177e Linus Torvalds   2005-04-16  106  	(typecheck(unsigned long, a) && \
-^1da177e Linus Torvalds   2005-04-16  107  	 typecheck(unsigned long, b) && \
-5a581b36 Paul E. McKenney 2013-07-27 @108  	 ((long)((b) - (a)) < 0))
-^1da177e Linus Torvalds   2005-04-16  109  #define time_before(a,b)	time_after(b,a)
-^1da177e Linus Torvalds   2005-04-16  110  
-
-:::::: The code at line 108 was first introduced by commit
-:::::: 5a581b367b5df0531265311fc681c2abd377e5e6 jiffies: Avoid undefined behavior from signed overflow
-
-:::::: TO: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-:::::: CC: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 55213 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181030/29fa56c7/attachment-0001.gz>
+Rob
