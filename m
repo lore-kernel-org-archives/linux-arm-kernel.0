@@ -1,108 +1,82 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 10:27:54 +0100
-Subject: [PATCH v3 14/25] drm/sun4i: sun6i_mipi_dsi: Increase hfp packet
- overhead
-In-Reply-To: <20181026144344.27778-15-jagan@amarulasolutions.com>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181026144344.27778-15-jagan@amarulasolutions.com>
-Message-ID: <20181029092754.2tl7i5k5qpbn4557@flea>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 29 Oct 2018 09:28:12 +0000
+Subject: [PATCH v4 3/3] arm64: reliable stacktraces
+In-Reply-To: <20181026153704.7g34j3gtlklepyvb@treble>
+References: <20181026142008.D922868C94@newverein.lst.de>
+ <20181026142157.B8FAA68C97@newverein.lst.de>
+ <20181026153704.7g34j3gtlklepyvb@treble>
+Message-ID: <20181029092812.j7q5gfwxc3qq4vye@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 08:13:33PM +0530, Jagan Teki wrote:
-> Increase the hfp packet overhead with another 10 bytes, the extra
-> 10 bytes(which is hblk packet overhead) is adding for hfp packet
-> overhead since hfp depends on hblk.
-> 
-> This is truely as per BSP code from BPI-M64-bsp.
-> The real computation from BSP is
-> (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> dsi_hbp = (hbp-hspw)*dsi_pixel_bits[format]/8 - (4+2);
-> dsi_hact = x * dsi_pixel_bits[format]/8;
-> dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
-> dsi_hfp = dsi_hblk - (4+dsi_hact+2) - (4+dsi_hbp+2);
-> 
-> Example,
-> u32 fmt = dsi_pixel_bits[format]/8;
-> => ((ht-hspw)*fmt - 10) - (6 + x * fmt) - (6 + (hbp-hspw)*fmt - 6)
-> => (ht - hspw - x - (hbp - hspw)) * fmt - 16
-> => (ht - x - hbp) * fmt - 16
-> => (ht - x - (timmings->hor_total_time - timmings->hor_front_porch - x)
-> * fmt - 16
-> => (timmings->hor_total_time - x - timmings->hor_total_time +
-> timmings->hor_front_porch + x) * fmt - 16
-> => timmings->hor_front_porch * fmt - 16
-> 
-> So, increase the DSI hfp packet overhead by hblk packet overhead.
-> 
-> Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> Tested-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v3:
-> - new patch
-> Changes for v2:
-> - none
-> 
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 22 +++++++++++++---------
->  1 file changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 6584b51736a9..20e330186b7f 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -461,7 +461,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  {
->  	struct mipi_dsi_device *device = dsi->device;
->  	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-> -	u16 hbp, hfp, hsa, hblk_max, hblk, vblk;
-> +	u16 hbp, hfp_pkt_overhead, hfp, hsa, hblk_max, hblk, vblk;
->  	size_t bytes;
->  	u8 *buffer;
->  
-> @@ -484,14 +484,6 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
->  		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
->  
-> -	/*
-> -	 * The frontporch is set using a blanking packet (4 bytes +
-> -	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
-> -	 */
-> -#define HFP_PACKET_OVERHEAD	6
-> -	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
-> -		  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
-> -
->  	/*
->  	 * hblk seems to be the line + porches length.
->  	 * The blank is set using a blanking packet (4 bytes + 4 bytes +
-> @@ -502,6 +494,18 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  	hblk_max -= HBLK_PACKET_OVERHEAD;
->  	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD, hblk_max);
->  
-> +	/*
-> +	 * The frontporch is set using a blanking packet (4 bytes +
-> +	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
-> +	 *
-> +	 * According to BSP code, extra 10 bytes(which is hblk packet overhead)
-> +	 * is adding for hfp packet overhead since hfp depends on hblk.
+Hi Josh,
 
-"According to the BSP code, another 10 bytes (the HBLK packet
-overhead) need to be added to the front porch overhead."
+I also have a few concerns here, as it is not clear to me precisely what is
+required from arch code. Is there any documentation I should look at?
 
-How has this been verified? Since we have registers to set all the
-parameters, this seems kind of weird.
+On Fri, Oct 26, 2018 at 10:37:04AM -0500, Josh Poimboeuf wrote:
+> On Fri, Oct 26, 2018 at 04:21:57PM +0200, Torsten Duwe wrote:
+> > Enhance the stack unwinder so that it reports whether it had to stop
+> > normally or due to an error condition; unwind_frame() will report
+> > continue/error/normal ending and walk_stackframe() will pass that
+> > info. __save_stack_trace() is used to check the validity of a stack;
+> > save_stack_trace_tsk_reliable() can now trivially be implemented.
+> > Modify arch/arm64/kernel/time.c as the only external caller so far
+> > to recognise the new semantics.
 
-Maxime
+There are a number of error conditions not currently handled by the unwinder
+(mostly in the face of stack corruption), for which there have been prior
+discussions on list.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/74873631/attachment.sig>
+Do we care about those cases, or do we consider things best-effort in the face
+of stack corruption?
+
+> > I had to introduce a marker symbol kthread_return_to_user to tell
+> > the normal origin of a kernel thread.
+> > 
+> > Signed-off-by: Torsten Duwe <duwe@suse.de>
+> 
+> I haven't looked at the code, but the commit log doesn't inspire much
+> confidence.  It's missing everything I previously asked for in the
+> powerpc version.
+> 
+> There's zero mention of objtool.  What analysis was done to indicate
+> that we can rely on frame pointers?
+> 
+> Such a frame pointer analysis should be included in the commit log.  It
+> should describe *at least* the following:
+> 
+> - whether inline asm statements with call/branch instructions will
+>   confuse GCC into skipping the frame pointer setup if it considers the
+>   function to be a leaf function;
+
+There's a reasonable chance that the out-of-line LL/SC atomics could confuse
+GCC into thinking callers are leaf functions. That's the only inline asm that
+I'm aware of with BL instructions (how calls are made on arm64).
+
+> - whether hand-coded non-leaf assembly functions can accidentally omit
+>   the frame pointer prologue setup;
+
+Most of our assembly doesn't setup stackframes, and some of these are non-leaf,
+e.g. __cpu_suspend_enter.
+
+Also, I suspect our entry assembly may violate/confuse assumptions here. I've
+been working to move more of that to C, but that isn't yet complete.
+
+> - whether GCC can generally be relied upon to get arm64 frame pointers
+>   right, in both normal operation and edge cases.
+> 
+> The commit log should also describe whether the unwinder itself can be
+> considered reliable for all edge cases:
+> 
+> - detection and reporting of preemption and page faults;
+> 
+> - detection and recovery from function graph tracing;
+> 
+> - detection and reporting of other unexpected conditions,
+>   including when the unwinder doesn't reach the end of the stack.
+
+We may also have NMIs (with SDEI).
+
+Thanks,
+Mark.
