@@ -1,83 +1,41 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 29 Oct 2018 15:12:45 +0530
-Subject: [PATCH v3 7/7] arm64: dts: qcom: apq8016-sbc: Standardize LED labels
-In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181029094245.7886-8-manivannan.sadhasivam@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 29 Oct 2018 09:57:04 +0000
+Subject: [PATCH V3] arm64: Don't flush tlb while clearing the accessed bit
+In-Reply-To: <1540805158-618-1-git-send-email-amhetre@nvidia.com>
+References: <1540805158-618-1-git-send-email-amhetre@nvidia.com>
+Message-ID: <b014451f-d81e-1d02-4b04-f719bca6621d@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For all 96Boards, the following standard is used for onboard LEDs.
 
-green:user1  default-trigger: heartbeat
-green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
-green:user3  default-trigger: mmc1 (SD-card)
-green:user4  default-trigger: none, panic-indicator
-yellow:wlan  default-trigger: phy0tx
-blue:bt      default-trigger: hci0-power
+On 29/10/2018 09:25, Ashish Mhetre wrote:
+> From: Alex Van Brunt <avanbrunt@nvidia.com>
+> 
+> Accessed bit is used to age a page and in generic implementation there is
+> flush_tlb while clearing the accessed bit.
+> Flushing a TLB is overhead on ARM64 as access flag faults don't get
+> translation table entries cached into TLB's. Flushing TLB is not necessary
+> for this. Clearing the accessed bit without flushing TLB doesn't cause data
+> corruption on ARM64.
+> In our case with this patch, speed of reading from fast NVMe/SSD through
+> PCIe got improved by 10% ~ 15% and writing got improved by 20% ~ 40%.
+> So for performance optimisation don't flush TLB when clearing the accessed
+> bit on ARM64.
+> x86 made the same optimization even though their TLB invalidate is much
+> faster as it doesn't broadcast to other CPUs.
+> Please refer to:
+> 'commit b13b1d2d8692 ("x86/mm: In the PTE swapout page reclaim case clear
+> the accessed bit instead of flushing the TLB")'
+> 
+> Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
+> Signed-off-by: Ashish Mhetre <amhetre@nvidia.com>
+> ---
 
-So lets adopt the same for APQ8016 SBC (Dragonboard410c), which is
-one of the 96Boards CE platform.
+Please make sure you state here below the above line what has been
+changed between each version of the patch.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Thanks
+Jon
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index 46feedf7c989..35f95154316b 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -300,28 +300,28 @@
- 			compatible = "gpio-leds";
- 
- 			led at 1 {
--				label = "apq8016-sbc:green:user1";
-+				label = "green:user1";
- 				gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "heartbeat";
- 				default-state = "off";
- 			};
- 
- 			led at 2 {
--				label = "apq8016-sbc:green:user2";
-+				label = "green:user2";
- 				gpios = <&msmgpio 120 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "mmc0";
- 				default-state = "off";
- 			};
- 
- 			led at 3 {
--				label = "apq8016-sbc:green:user3";
-+				label = "green:user3";
- 				gpios = <&pm8916_gpios 1 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "mmc1";
- 				default-state = "off";
- 			};
- 
- 			led at 4 {
--				label = "apq8016-sbc:green:user4";
-+				label = "green:user4";
- 				gpios = <&pm8916_gpios 2 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "none";
- 				panic-indicator;
-@@ -329,14 +329,14 @@
- 			};
- 
- 			led at 5 {
--				label = "apq8016-sbc:yellow:wlan";
-+				label = "yellow:wlan";
- 				gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "phy0tx";
- 				default-state = "off";
- 			};
- 
- 			led at 6 {
--				label = "apq8016-sbc:blue:bt";
-+				label = "blue:bt";
- 				gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "bluetooth-power";
- 				default-state = "off";
 -- 
-2.17.1
+nvpublic
