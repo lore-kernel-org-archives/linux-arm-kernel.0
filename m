@@ -1,76 +1,103 @@
-From: changbin.du@gmail.com (Changbin Du)
-Date: Mon, 29 Oct 2018 14:56:56 +0000
-Subject: [PATCH v2 4/4] kernel hacking: new config
- CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og optimization
-In-Reply-To: <CAK7LNAQ0iZDHP8zQZ_Ws4Wy4H6rwiV5p-A0bM1yVJLP51sqQeg@mail.gmail.com>
-References: <20181019124921.13780-1-changbin.du@gmail.com>
- <20181019124921.13780-5-changbin.du@gmail.com>
- <CAK7LNARW0=0d7m5DAgZOir=h0Y4tssqZoQRGasnGPNnvNf_+pg@mail.gmail.com>
- <20181028125106.azcn2dxia3snplin@mail.google.com>
- <CAK7LNARr7bE=DVuzim5771heuN5os0=5-D+jXfUyBb2e1xYoRA@mail.gmail.com>
- <20181028131357.parhzj32feapxncb@mail.google.com>
- <CAK7LNAQ0iZDHP8zQZ_Ws4Wy4H6rwiV5p-A0bM1yVJLP51sqQeg@mail.gmail.com>
-Message-ID: <20181029145655.vzlhz7dipzmpw52m@mail.google.com>
+From: lsun@mellanox.com (Liming Sun)
+Date: Mon, 29 Oct 2018 14:58:21 +0000
+Subject: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
+In-Reply-To: <CAK8P3a2=shWVjwrmnNTwwGwN_jhwyb+TmeALz4zzTstho51z8A@mail.gmail.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1540403734-137721-1-git-send-email-lsun@mellanox.com>
+ <1540403734-137721-2-git-send-email-lsun@mellanox.com>
+ <CAK8P3a1jTsvzYhS4CxvmK6tOgPn_g7=1S4xAcca2K4v70vhyEA@mail.gmail.com>
+ <AM4PR05MB32204021433BBB853C50FF30A1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
+ <CAK8P3a2=shWVjwrmnNTwwGwN_jhwyb+TmeALz4zzTstho51z8A@mail.gmail.com>
+Message-ID: <DB6PR05MB32236AAD033C20DF6414C464A1F30@DB6PR05MB3223.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 10:01:44PM +0900, Masahiro Yamada wrote:
-> Hi.
+Thanks! Please see response inline.
+
+- Liming
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, October 26, 2018 3:32 PM
+> To: Liming Sun <lsun@mellanox.com>
+> Cc: Olof Johansson <olof@lixom.net>; David Woods
+> <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-
+> soc <arm@kernel.org>; DTML <devicetree@vger.kernel.org>; Linux ARM
+> <linux-arm-kernel@lists.infradead.org>
+> Subject: Re: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
 > 
-> 
-> On Sun, Oct 28, 2018 at 10:14 PM Changbin Du <changbin.du@gmail.com> wrote:
+> On Fri, Oct 26, 2018 at 9:18 PM Liming Sun <lsun@mellanox.com> wrote:
+> > > -----Original Message-----
+> > > From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> > > Behalf Of Arnd Bergmann
+> > > Sent: Thursday, October 25, 2018 11:38 AM
+> > > To: Liming Sun <lsun@mellanox.com>
+> > > Cc: Olof Johansson <olof@lixom.net>; David Woods
+> > > <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>;
+> arm-
+> > > soc <arm@kernel.org>; devicetree at vger.kernel.org; linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: Re: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config
+> option
+> > >
+> > > On 10/24/18, Liming Sun <lsun@mellanox.com> wrote:
+> > > > This commit introduces config option for Mellanox BlueField SoC,
+> > > > which can be used to build the SoC specific drivers, and enables
+> > > > it by default in configs/defconfig.
+> > > >
+> > > > Reviewed-by: David Woods <dwoods@mellanox.com>
+> > > > Signed-off-by: Liming Sun <lsun@mellanox.com>
+> > > > ---
+> > > >  arch/arm64/Kconfig.platforms | 6 ++++++
+> > > >  arch/arm64/configs/defconfig | 1 +
+> > > >  2 files changed, 7 insertions(+)
+> > >
+> > > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> > >
+> > > I'm sorry for missing your series in the past. We should definitely merge
+> > > the platform support soon. Do you also have device tree files for
+> reference
+> > > systems or even production hardware?
 > >
-> > On Sun, Oct 28, 2018 at 10:09:21PM +0900, Masahiro Yamada wrote:
-> > > Hi Changbin,
-> > >
-> > > On Sun, Oct 28, 2018 at 9:52 PM Changbin Du <changbin.du@gmail.com> wrote:
-> > >
-> > > > >
-> > > > Thanks for pointing this out and kind suggestions. I have tested with your
-> > > > modification. Will update patch serias soon.
-> > >
-> > >
-> > > I have one more request.
-> > >
-> > > The patch subject
-> > > "kernel hacking: new config CC_OPTIMIZE_FOR_DEBUGGING to apply GCC -Og
-> > > optimization"
-> > > is too long (83 characters)
-> > >
-> > >
-> > > I'd like the subject to be within 70 columns or so.
-> > >
-> > oh, I just sent new version. Could me update the title if there are more
-> > suggestions then?
+> > We have obsoleted the device tree, and mainly support ACPI now
+> > on Reference/Production HW. Below is the TMFIFO definition in the ACPI
+> > DSDT table.
+> >
+> >     // RShim TMFIFO
+> >     Device(RSH0) {
+> >       Name(_HID, "MLNXBF01")
+> >       Name(_UID, Zero)
+> >       Name(_CCA, 1)
+> >       Name(_CRS, ResourceTemplate() {
+> >         Memory32Fixed(ReadWrite, 0x00800a20, 0x00000018)
+> >         Memory32Fixed(ReadWrite, 0x00800a40, 0x00000018)
+> >         Interrupt(ResourceConsumer, Edge, ActiveHigh, Exclusive)
+> >           { BF1_RSH0_TM_HTT_LWM_INT,
+> >             BF1_RSH0_TM_HTT_HWM_INT,
+> >             BF1_RSH0_TM_TTH_LWM_INT,
+> >             BF1_RSH0_TM_TTH_HWM_INT
+> >           }
+> >       })
+> >     }
+> >
+> > The full ACPI implementation can be found in the 1.0 release:
+> > http://www.mellanox.com/downloads/BlueField/BlueField-
+> 1.0.0.10521/BlueField-1.0.0.10521.tar.xz
+> > Inside this tarball, we can see the "src/edk2/" directory which has the edk2
+> patch file including all the ACPI implementation.
 > 
-> 
-> 
-> How about this?
-> 
-> 2/4: kernel hacking: add a config option to disable compiler auto-inlining
-> 3/4: ARM: mm: fix build error in fix_to_virt with -Og optimization level
-> 4/4: kernel hacking: support building kernel with -Og optimization level
-> 
-> (The CONFIG name is so long that the subject
-> would easily exceeds 80-columns with it.)
-> 
-> 
-> I applied this series to linux-kbuild,
-> and will send another pull request in this MW.
-> 
-> 
-> If you come up with better patch titles,
-> please let me know.
-> I will fix them up locally.
->
-I am just fine with these new titles. Thanks.
+> It would be nice if you could still include the dts sources in the submission.
+> Since this is not a classic server hardware, DT is probably more suitable
+> here, and there are likely use cases that won't work with ACPI, so it's
+> good to have a starting point for your users if they need to override
+> the ACPI tables with a DT, or build systems with a simpler boot loader.
+
+Sure, I'll keep this DT change for reference. A little explanation that
+Mellanox BlueField SOC could be PCIe NIC or standalone device (server)  form which
+can do PXE boot, CentOS installation even on the NIC, etc. The same software/driver 
+works on both.  DT seems not working well for some requirement/features like 
+NVDIMM (which requires ACPI DSM).  That's why we switched to ACPI though
+DT support is preserved.
 
 > 
-> 
-> -- 
-> Best Regards
-> Masahiro Yamada
-
--- 
-Thanks,
-Changbin Du
+>        Arnd
