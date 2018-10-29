@@ -1,54 +1,65 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 29 Oct 2018 20:25:32 +1300
-Subject: [PATCH v5 5/8] ARM: l2x0: add marvell,ecc-enable property for aurora
+Date: Mon, 29 Oct 2018 20:25:33 +1300
+Subject: [PATCH v5 6/8] EDAC: Add missing debugfs_create_x32 wrapper
 In-Reply-To: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
 References: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20181029072535.31667-6-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181029072535.31667-7-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aurora cache on the Marvell Armada-XP SoC supports ECC protection
-for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
-which can be used to enable this.
+From: Jan Luebbe <jlu@pengutronix.de>
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+We already have wrappers for x8 and x16, so add the missing x32 one.
+
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Reviewed-by: Borislav Petkov <bp@suse.de>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
- arch/arm/mm/cache-l2x0.c                         | 7 +++++++
- 2 files changed, 9 insertions(+)
+ drivers/edac/debugfs.c     | 11 +++++++++++
+ drivers/edac/edac_module.h |  5 +++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-index fbe6cb21f4cf..15a84f0ba9f1 100644
---- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-+++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-@@ -76,6 +76,8 @@ Optional properties:
-   specified to indicate that such transforms are precluded.
- - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
- - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
-+- marvell,ecc-enable : enable ECC protection on the L2 cache
-+- marvell,ecc-disable : disable ECC protection on the L2 cache
- - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
-   Some core tiles, especially ARM PB11MPCore have a faulty L220 cache that
-   will randomly hang unless outer sync operations are disabled.
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index b70bee74750d..644f786e4fa9 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
- 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
- 	}
- 
-+	if (of_property_read_bool(np, "marvell,ecc-enable")) {
-+		mask |= AURORA_ACR_ECC_EN;
-+		val |= AURORA_ACR_ECC_EN;
-+	} else if (of_property_read_bool(np, "marvell,ecc-disable")) {
-+		mask |= AURORA_ACR_ECC_EN;
-+	}
+diff --git a/drivers/edac/debugfs.c b/drivers/edac/debugfs.c
+index 92dbb7e2320c..268ede7a60b2 100644
+--- a/drivers/edac/debugfs.c
++++ b/drivers/edac/debugfs.c
+@@ -161,3 +161,14 @@ struct dentry *edac_debugfs_create_x16(const char *name, umode_t mode,
+ 	return debugfs_create_x16(name, mode, parent, value);
+ }
+ EXPORT_SYMBOL_GPL(edac_debugfs_create_x16);
 +
- 	if (of_property_read_bool(np, "arm,parity-enable")) {
- 		mask |= AURORA_ACR_PARITY_EN;
- 		val |= AURORA_ACR_PARITY_EN;
++/* Wrapper for debugfs_create_x32() */
++struct dentry *edac_debugfs_create_x32(const char *name, umode_t mode,
++				       struct dentry *parent, u32 *value)
++{
++	if (!parent)
++		parent = edac_debugfs;
++
++	return debugfs_create_x32(name, mode, parent, value);
++}
++EXPORT_SYMBOL_GPL(edac_debugfs_create_x32);
+diff --git a/drivers/edac/edac_module.h b/drivers/edac/edac_module.h
+index dec88dcea036..546b16e29221 100644
+--- a/drivers/edac/edac_module.h
++++ b/drivers/edac/edac_module.h
+@@ -82,6 +82,8 @@ struct dentry *
+ edac_debugfs_create_x8(const char *name, umode_t mode, struct dentry *parent, u8 *value);
+ struct dentry *
+ edac_debugfs_create_x16(const char *name, umode_t mode, struct dentry *parent, u16 *value);
++struct dentry *
++edac_debugfs_create_x32(const char *name, umode_t mode, struct dentry *parent, u32 *value);
+ #else
+ static inline int edac_debugfs_init(void)					{ return -ENODEV; }
+ static inline void edac_debugfs_exit(void)					{ }
+@@ -98,6 +100,9 @@ edac_debugfs_create_x8(const char *name, umode_t mode,
+ static inline struct dentry *
+ edac_debugfs_create_x16(const char *name, umode_t mode,
+ 		       struct dentry *parent, u16 *value)			{ return NULL; }
++static inline struct dentry *
++edac_debugfs_create_x32(const char *name, umode_t mode,
++		       struct dentry *parent, u32 *value)			{ return NULL; }
+ #endif
+ 
+ /*
 -- 
 2.19.1
