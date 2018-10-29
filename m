@@ -1,90 +1,65 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 29 Oct 2018 20:25:30 +1300
-Subject: [PATCH v5 3/8] ARM: aurora-l2: add defines for parity and ECC
- registers
-In-Reply-To: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
-References: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20181029072535.31667-4-chris.packham@alliedtelesis.co.nz>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 29 Oct 2018 09:07:08 +0100
+Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
+In-Reply-To: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
+References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
+Message-ID: <20181029080708.GA32673@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Luebbe <jlu@pengutronix.de>
+On Mon 29-10-18 13:16:16, miles.chen at mediatek.com wrote:
+> From: Miles Chen <miles.chen@mediatek.com>
+> 
+> The kbuf used by page owner is allocated by kmalloc(), which means it
+> can use only normal memory and there might be a "out of memory"
+> issue when we're out of normal memory.
+> 
+> To solve this problem, use kvmalloc() to allocate kbuf
+> from normal/highmem. But there is one problem here: kvmalloc()
+> does not fallback to vmalloc for sub page allocations. So sub
+> page allocation fails due to out of normal memory cannot fallback
+> to vmalloc.
+> 
+> Modify kvmalloc() to allow sub page allocations fallback to
+> vmalloc when CONFIG_HIGHMEM=y and use kvmalloc() to allocate
+> kbuf.
+> 
+> Clamp buffer size to PAGE_SIZE to avoid arbitrary size allocation.
+> 
+> Change since v2:
+>   - improve kvmalloc, allow sub page allocations fallback to
+>     vmalloc when CONFIG_HIGHMEM=y
 
-These defines will be used by subsequent patches to add support for the
-parity check and error correction functionality in the Aurora L2 cache
-controller.
+Matthew has suggested a much more viable way to go around this. We do
+not really want to allow an unbound kernel allocation - even if the
+interface is root only.
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
- .../include/asm/hardware/cache-aurora-l2.h    | 48 +++++++++++++++++++
- 1 file changed, 48 insertions(+)
+Besides that, the following doesn't make much sense to me. It simply
+makes no sense to use vmalloc for sub page allocation regardless of
+HIGHMEM.
 
-diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-index dc5c479ec4c3..39769ffa0051 100644
---- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
-+++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-@@ -31,6 +31,9 @@
- #define AURORA_ACR_REPLACEMENT_TYPE_SEMIPLRU \
- 	(3 << AURORA_ACR_REPLACEMENT_OFFSET)
- 
-+#define AURORA_ACR_PARITY_EN	(1 << 21)
-+#define AURORA_ACR_ECC_EN	(1 << 20)
-+
- #define AURORA_ACR_FORCE_WRITE_POLICY_OFFSET	0
- #define AURORA_ACR_FORCE_WRITE_POLICY_MASK	\
- 	(0x3 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
-@@ -41,6 +44,51 @@
- #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
- 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
- 
-+#define AURORA_ERR_CNT_REG          0x600
-+#define AURORA_ERR_ATTR_CAP_REG     0x608
-+#define AURORA_ERR_ADDR_CAP_REG     0x60c
-+#define AURORA_ERR_WAY_CAP_REG      0x610
-+#define AURORA_ERR_INJECT_CTL_REG   0x614
-+#define AURORA_ERR_INJECT_MASK_REG  0x618
-+
-+#define AURORA_ERR_CNT_CLR_OFFSET         31
-+#define AURORA_ERR_CNT_CLR		   \
-+	(0x1 << AURORA_ERR_CNT_CLR_OFFSET)
-+#define AURORA_ERR_CNT_UE_OFFSET          16
-+#define AURORA_ERR_CNT_UE_MASK             \
-+	(0x7fff << AURORA_ERR_CNT_UE_OFFSET)
-+#define AURORA_ERR_CNT_CE_OFFSET           0
-+#define AURORA_ERR_CNT_CE_MASK             \
-+	(0xffff << AURORA_ERR_CNT_CE_OFFSET)
-+
-+#define AURORA_ERR_ATTR_SRC_OFF           16
-+#define AURORA_ERR_ATTR_SRC_MSK            \
-+	(0x7 << AURORA_ERR_ATTR_SRC_OFF)
-+#define AURORA_ERR_ATTR_TXN_OFF           12
-+#define AURORA_ERR_ATTR_TXN_MSK            \
-+	(0xf << AURORA_ERR_ATTR_TXN_OFF)
-+#define AURORA_ERR_ATTR_ERR_OFF            8
-+#define AURORA_ERR_ATTR_ERR_MSK            \
-+	(0x3 << AURORA_ERR_ATTR_ERR_OFF)
-+#define AURORA_ERR_ATTR_CAP_VALID_OFF      0
-+#define AURORA_ERR_ATTR_CAP_VALID          \
-+	(0x1 << AURORA_ERR_ATTR_CAP_VALID_OFF)
-+
-+#define AURORA_ERR_ADDR_CAP_ADDR_MASK 0xffffffe0
-+
-+#define AURORA_ERR_WAY_IDX_OFF             8
-+#define AURORA_ERR_WAY_IDX_MSK             \
-+	(0xfff << AURORA_ERR_WAY_IDX_OFF)
-+#define AURORA_ERR_WAY_CAP_WAY_OFFSET      1
-+#define AURORA_ERR_WAY_CAP_WAY_MASK        \
-+	(0xf << AURORA_ERR_WAY_CAP_WAY_OFFSET)
-+
-+#define AURORA_ERR_INJECT_CTL_ADDR_MASK 0xfffffff0
-+#define AURORA_ERR_ATTR_TXN_OFF   12
-+#define AURORA_ERR_INJECT_CTL_EN_MASK          0x3
-+#define AURORA_ERR_INJECT_CTL_EN_PARITY        0x2
-+#define AURORA_ERR_INJECT_CTL_EN_ECC           0x1
-+
- #define AURORA_MAX_RANGE_SIZE	1024
- 
- #define AURORA_WAY_SIZE_SHIFT	2
+> diff --git a/mm/util.c b/mm/util.c
+> index 8bf08b5b5760..7b1c59b9bfbf 100644
+> --- a/mm/util.c
+> +++ b/mm/util.c
+> @@ -416,10 +416,10 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
+>  	ret = kmalloc_node(size, kmalloc_flags, node);
+>  
+>  	/*
+> -	 * It doesn't really make sense to fallback to vmalloc for sub page
+> -	 * requests
+> +	 * It only makes sense to fallback to vmalloc for sub page
+> +	 * requests if we might be able to allocate highmem pages.
+>  	 */
+> -	if (ret || size <= PAGE_SIZE)
+> +	if (ret || (!IS_ENABLED(CONFIG_HIGHMEM) && size <= PAGE_SIZE))
+>  		return ret;
+>  
+>  	return __vmalloc_node_flags_caller(size, node, flags,
+> -- 
+> 2.18.0
+> 
+
 -- 
-2.19.1
+Michal Hocko
+SUSE Labs
