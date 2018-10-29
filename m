@@ -1,130 +1,93 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 29 Oct 2018 11:07:05 -0700
-Subject: [PATCH 5/7] serial: 8250: Process sysrq at port unlock time
+Date: Mon, 29 Oct 2018 11:07:06 -0700
+Subject: [PATCH 6/7] smp: Don't yell about IRQs disabled in kgdb_roundup_cpus()
 In-Reply-To: <20181029180707.207546-1-dianders@chromium.org>
 References: <20181029180707.207546-1-dianders@chromium.org>
-Message-ID: <20181029180707.207546-6-dianders@chromium.org>
+Message-ID: <20181029180707.207546-7-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's take advantage of the new ("serial: core: Allow processing sysrq
-at port unlock time") to handle sysrqs more cleanly.
+In kgdb_roundup_cpus() we've got code that looks like:
+  local_irq_enable();
+  smp_call_function(kgdb_call_nmi_hook, NULL, 0);
+  local_irq_disable();
+
+In certain cases when we drop into kgdb (like with sysrq-g on a serial
+console) we'll get a big yell that looks like:
+
+  sysrq: SysRq : DEBUG
+  ------------[ cut here ]------------
+  DEBUG_LOCKS_WARN_ON(current->hardirq_context)
+  WARNING: CPU: 0 PID: 0 at .../kernel/locking/lockdep.c:2875 lockdep_hardirqs_on+0xf0/0x160
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.19.0 #27
+  pstate: 604003c9 (nZCv DAIF +PAN -UAO)
+  pc : lockdep_hardirqs_on+0xf0/0x160
+  ...
+  Call trace:
+   lockdep_hardirqs_on+0xf0/0x160
+   trace_hardirqs_on+0x188/0x1ac
+   kgdb_roundup_cpus+0x14/0x3c
+   kgdb_cpu_enter+0x53c/0x5cc
+   kgdb_handle_exception+0x180/0x1d4
+   kgdb_compiled_brk_fn+0x30/0x3c
+   brk_handler+0x134/0x178
+   do_debug_exception+0xfc/0x178
+   el1_dbg+0x18/0x78
+   kgdb_breakpoint+0x34/0x58
+   sysrq_handle_dbg+0x54/0x5c
+   __handle_sysrq+0x114/0x21c
+   handle_sysrq+0x30/0x3c
+   qcom_geni_serial_isr+0x2dc/0x30c
+  ...
+  ...
+  irq event stamp: ...45
+  hardirqs last  enabled at (...44): [...] __do_softirq+0xd8/0x4e4
+  hardirqs last disabled at (...45): [...] el1_irq+0x74/0x130
+  softirqs last  enabled at (...42): [...] _local_bh_enable+0x2c/0x34
+  softirqs last disabled at (...43): [...] irq_exit+0xa8/0x100
+  ---[ end trace adf21f830c46e638 ]---
+
+Let's add kgdb to the list of reasons not to warn in
+smp_call_function_many().  That will allow us (in a future patch) to
+stop calling local_irq_enable() which will get rid of the original
+splat.
+
+NOTE: with this change comes the obvious question: will we start
+deadlocking more often now when we drop into the debugger.  I can't
+say that for sure one way or the other, but the fact that we do the
+same logic for "oops_in_progress" makes me feel like it shouldn't
+happen too often.  Also note that the old logic of turning on
+interrupts temporarily wasn't exactly safe since (I presume) that
+could have violated spin_lock_irqsave() semantics and ended up with a
+deadlock of its own.
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
-I don't have a great way to test all 8250 variants, but I've at least
-tested rk3288 / rk3399 and they seem to work.  Hopefully I got the
-aspeed_vuart / fsl / omap variants right (I only compile tested
-those).
 
- drivers/tty/serial/8250/8250_aspeed_vuart.c | 6 +++++-
- drivers/tty/serial/8250/8250_fsl.c          | 6 +++++-
- drivers/tty/serial/8250/8250_omap.c         | 6 +++++-
- drivers/tty/serial/8250/8250_port.c         | 8 +++-----
- 4 files changed, 18 insertions(+), 8 deletions(-)
+ kernel/smp.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/8250/8250_aspeed_vuart.c b/drivers/tty/serial/8250/8250_aspeed_vuart.c
-index 435bec40dee6..0438d9a905ce 100644
---- a/drivers/tty/serial/8250/8250_aspeed_vuart.c
-+++ b/drivers/tty/serial/8250/8250_aspeed_vuart.c
-@@ -5,6 +5,10 @@
-  *    Copyright (C) 2016 Jeremy Kerr <jk@ozlabs.org>, IBM Corp.
-  *    Copyright (C) 2006 Arnd Bergmann <arnd@arndb.de>, IBM Corp.
-  */
-+#if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#define SUPPORT_SYSRQ
-+#endif
-+
- #include <linux/device.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
-@@ -293,7 +297,7 @@ static int aspeed_vuart_handle_irq(struct uart_port *port)
- 	if (lsr & UART_LSR_THRE)
- 		serial8250_tx_chars(up);
+diff --git a/kernel/smp.c b/kernel/smp.c
+index 163c451af42e..bb581e58c8dc 100644
+--- a/kernel/smp.c
++++ b/kernel/smp.c
+@@ -19,6 +19,7 @@
+ #include <linux/sched.h>
+ #include <linux/sched/idle.h>
+ #include <linux/hypervisor.h>
++#include <linux/kgdb.h>
  
--	spin_unlock_irqrestore(&port->lock, flags);
-+	uart_unlock_and_check_sysrq(port, flags);
+ #include "smpboot.h"
  
- 	return 1;
- }
-diff --git a/drivers/tty/serial/8250/8250_fsl.c b/drivers/tty/serial/8250/8250_fsl.c
-index 6640a4c7ddd1..ff3dcaea5d93 100644
---- a/drivers/tty/serial/8250/8250_fsl.c
-+++ b/drivers/tty/serial/8250/8250_fsl.c
-@@ -1,4 +1,8 @@
- // SPDX-License-Identifier: GPL-2.0
-+#if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#define SUPPORT_SYSRQ
-+#endif
-+
- #include <linux/serial_reg.h>
- #include <linux/serial_8250.h>
+@@ -413,7 +414,8 @@ void smp_call_function_many(const struct cpumask *mask,
+ 	 * can't happen.
+ 	 */
+ 	WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
+-		     && !oops_in_progress && !early_boot_irqs_disabled);
++		     && !oops_in_progress && !early_boot_irqs_disabled
++		     && !in_dbg_master());
  
-@@ -54,7 +58,7 @@ int fsl8250_handle_irq(struct uart_port *port)
- 		serial8250_tx_chars(up);
- 
- 	up->lsr_saved_flags = orig_lsr;
--	spin_unlock_irqrestore(&up->port.lock, flags);
-+	uart_unlock_and_check_sysrq(&up->port, flags);
- 	return 1;
- }
- EXPORT_SYMBOL_GPL(fsl8250_handle_irq);
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index a019286f8bb6..ad7ba7d0f28d 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -8,6 +8,10 @@
-  *
-  */
- 
-+#if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#define SUPPORT_SYSRQ
-+#endif
-+
- #include <linux/device.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -1085,7 +1089,7 @@ static int omap_8250_dma_handle_irq(struct uart_port *port)
- 		}
- 	}
- 
--	spin_unlock_irqrestore(&port->lock, flags);
-+	uart_unlock_and_check_sysrq(port, flags);
- 	serial8250_rpm_put(up);
- 	return 1;
- }
-diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-index f776b3eafb96..c39482b96111 100644
---- a/drivers/tty/serial/8250/8250_port.c
-+++ b/drivers/tty/serial/8250/8250_port.c
-@@ -1755,7 +1755,7 @@ void serial8250_read_char(struct uart_8250_port *up, unsigned char lsr)
- 		else if (lsr & UART_LSR_FE)
- 			flag = TTY_FRAME;
- 	}
--	if (uart_handle_sysrq_char(port, ch))
-+	if (uart_prepare_sysrq_char(port, ch))
- 		return;
- 
- 	uart_insert_char(port, lsr, UART_LSR_OE, ch, flag);
-@@ -1897,7 +1897,7 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
- 	if ((!up->dma || up->dma->tx_err) && (status & UART_LSR_THRE))
- 		serial8250_tx_chars(up);
- 
--	spin_unlock_irqrestore(&port->lock, flags);
-+	uart_unlock_and_check_sysrq(port, flags);
- 	return 1;
- }
- EXPORT_SYMBOL_GPL(serial8250_handle_irq);
-@@ -3258,9 +3258,7 @@ void serial8250_console_write(struct uart_8250_port *up, const char *s,
- 
- 	serial8250_rpm_get(up);
- 
--	if (port->sysrq)
--		locked = 0;
--	else if (oops_in_progress)
-+	if (oops_in_progress)
- 		locked = spin_trylock_irqsave(&port->lock, flags);
- 	else
- 		spin_lock_irqsave(&port->lock, flags);
+ 	/* Try to fastpath.  So, what's a CPU they want? Ignoring this one. */
+ 	cpu = cpumask_first_and(mask, cpu_online_mask);
 -- 
 2.19.1.568.g152ad8e336-goog
