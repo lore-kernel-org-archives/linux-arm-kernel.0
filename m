@@ -1,64 +1,16 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Oct 2018 17:02:26 +0000
-Subject: [PATCH] arm64: kprobe: make page to RO mode when allocate it
-In-Reply-To: <CAK8P3a0oSn8Z6wJT1X2si8+A2wttkh7EjqD_MZYt4+L5a_XKLg@mail.gmail.com>
-References: <20181015111600.5479-1-anders.roxell@linaro.org>
- <20181029120434.GA15446@arm.com>
- <CAK8P3a0oSn8Z6wJT1X2si8+A2wttkh7EjqD_MZYt4+L5a_XKLg@mail.gmail.com>
-Message-ID: <20181029170226.GA16739@arm.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 29 Oct 2018 10:34:36 -0700
+Subject: [GIT PULL] Mailbox changes for v4.20
+In-Reply-To: <CABb+yY3Qwkr-kJS81eQqxk6-udwdy9fFHzefdNLbJc6=UhFoTw@mail.gmail.com>
+References: <CABb+yY3Qwkr-kJS81eQqxk6-udwdy9fFHzefdNLbJc6=UhFoTw@mail.gmail.com>
+Message-ID: <CAHk-=wjotOGHQuHmL3V+b9b1f9qcvpP5QAbWcU4ki69dFnKVGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 01:11:24PM +0100, Arnd Bergmann wrote:
-> On 10/29/18, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Oct 15, 2018 at 01:16:00PM +0200, Anders Roxell wrote:
-> 
-> >> -static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
-> >> +void *alloc_insn_page(void)
-> >>  {
-> >> -	void *addrs[1];
-> >> -	u32 insns[1];
-> >> +	void *page;
-> >>
-> >> -	addrs[0] = (void *)addr;
-> >> -	insns[0] = (u32)opcode;
-> >> +	page = vmalloc_exec(PAGE_SIZE);
-> >> +	if (page)
-> >> +		set_memory_ro((unsigned long)page & PAGE_MASK, 1);
-> >
-> > This looks a bit strange to me -- you're allocating PAGE_SIZE bytes so
-> > that we can adjust the permissions, yet we can't guarantee that page is
-> > actually page-aligned and therefore end up explicitly masking down.
-> >
-> > In which case allocating an entire page isn't actually helping us, and
-> > we could end up racing with somebody else changing permission on the
-> > same page afaict.
-> >
-> > I think we need to ensure we really have an entire page, perhaps using
-> > vmap() instead? Or have I missed some subtle detail here?
-> 
-> I'm fairly sure that vmalloc() and vmalloc_exec() is guaranteed to be page
-> aligned everywhere. The documentation is a bit vague here, but I'm
-> still confident enough that we can make that assumption based on
-> 
-> /**
->  *      vmalloc_exec  -  allocate virtually contiguous, executable memory
->  *      @size:          allocation size
->  *
->  *      Kernel-internal function to allocate enough pages to cover @size
->  *      the page level allocator and map them into contiguous and
->  *      executable kernel virtual space.
->  *
->  *      For tight control over page level allocator and protection flags
->  *      use __vmalloc() instead.
->  */
-> void *vmalloc_exec(unsigned long size)
+On Sun, Oct 28, 2018 at 11:02 PM Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>
+>   git://git.linaro.org/landing-teams/working/fujitsu/integration.git tags/mailbox-v4.20
 
-FWIW, I did a bit of digging and I agree with your conclusion. vmalloc()
-allocations end up getting installed in map_vm_area() via
-__vmalloc_area_node(), which allocates things a page at a time.
+Pulled,
 
-So we can simplify this patch to drop the masking when calling
-set_memory_ro().
-
-Will
+              Linus
