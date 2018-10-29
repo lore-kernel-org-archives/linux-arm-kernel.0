@@ -1,68 +1,64 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 29 Oct 2018 10:34:00 +0100 (CET)
-Subject: [PATCH 2/8] ARM: vexpress/spc: constify clk_ops structure
-In-Reply-To: <20181029091756.GA1167@e110455-lin.cambridge.arm.com>
-References: <1540619262-22681-1-git-send-email-Julia.Lawall@lip6.fr>
- <1540619262-22681-3-git-send-email-Julia.Lawall@lip6.fr>
- <20181029091756.GA1167@e110455-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.20.1810291033270.3755@hadrien>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 29 Oct 2018 15:12:38 +0530
+Subject: [PATCH v3 0/7] Standardize onboard LED support for 96Boards
+Message-ID: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset standardizes the onboard LEDs on 96Boards by maintaining
+common labels and triggers as below:
 
+green:user1  default-trigger: heartbeat
+green:user2  default-trigger: mmc0/disk-activity (onboard-storage)
+green:user3  default-trigger: mmc1 (SD card)
+green:user4  default-trigger: none, panic-indicator
+yellow:wlan  default-trigger: phy0tx
+blue:bt      default-trigger: hci0-power
 
-On Mon, 29 Oct 2018, Liviu Dudau wrote:
+This standardization is required to provide a common behaviour of LEDs
+across all mainline supported 96Boards and also making it easier to
+control it using an userspace library like MRAA.
 
-> On Sat, Oct 27, 2018 at 07:47:36AM +0200, Julia Lawall wrote:
-> > The clk_ops structure is only stored in the ops field of a
-> > clk_init_data structure.  This field is const, so the clk_ops
-> > structure can be const as well.
-> >
-> > Identified and transformed using Coccinelle.
-> >
-> > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
->
-> Are you going to send the series to the arm-soc maintainers directly or
-> you want us to cherry-pick this patch into the Versatile tree?
+For Rock960 and Ficus boards, the LED support is added in this patchset.
+Rest of the boards are converted to adopt the standard.
 
-Please do with it whatever seems best.
+Note: Since there is no UFS trigger available for now, user2 LED trigger
+is set to none on HiKey960.
 
 Thanks,
-julia
+Mani
 
->
-> Best regards,
-> Liviu
->
-> >
-> > ---
-> >  arch/arm/mach-vexpress/spc.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-> > index 0f5381d13494..611f22de48cb 100644
-> > --- a/arch/arm/mach-vexpress/spc.c
-> > +++ b/arch/arm/mach-vexpress/spc.c
-> > @@ -521,7 +521,7 @@ static int spc_set_rate(struct clk_hw *hw, unsigned long rate,
-> >  	return ve_spc_set_performance(spc->cluster, rate / 1000);
-> >  }
-> >
-> > -static struct clk_ops clk_spc_ops = {
-> > +static const struct clk_ops clk_spc_ops = {
-> >  	.recalc_rate = spc_recalc_rate,
-> >  	.round_rate = spc_round_rate,
-> >  	.set_rate = spc_set_rate,
-> >
->
-> --
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
->
+Changes in v3:
+
+* Added missing Signed-off-by tag for APQ8016 patch
+* Added Acked-by from Amit
+* Fixed user LED node names for HiKey board
+
+Changes in v2:
+
+* Removed device-name from LED labels as per the suggestion from Simon
+  and Pavel
+* Adopted APQ8016 SBC (Dragonboard410c)
+* Tested the Ficus patch on Ficus V1.1 board
+* CCed LED mailing list
+
+Manivannan Sadhasivam (7):
+  arm64: dts: rockchip: ficus: Add on-board LED support
+  arm64: dts: rockchip: rock960: Add on-board LED support
+  arm64: dts: hisilicon: hikey: Standardize LED labels and triggers
+  arm64: dts: hisilicon: hikey960: Standardize LED labels and triggers
+  arm64: dts: hisilicon: poplar: Standardize LED labels and triggers
+  arm64: dts: xilinx: ultra96: Standardize LED labels and triggers
+  arm64: dts: qcom: apq8016-sbc: Standardize LED labels
+
+ .../boot/dts/hisilicon/hi3660-hikey960.dts    | 18 ++---
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts | 13 +--
+ .../arm64/boot/dts/hisilicon/hi6220-hikey.dts | 25 +++---
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi     | 12 +--
+ arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 78 ++++++++++++++++++
+ .../boot/dts/rockchip/rk3399-rock960.dts      | 79 +++++++++++++++++++
+ .../boot/dts/xilinx/zynqmp-zcu100-revC.dts    | 15 ++--
+ 7 files changed, 200 insertions(+), 40 deletions(-)
+
+-- 
+2.17.1
