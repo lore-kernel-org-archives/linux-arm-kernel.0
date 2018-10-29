@@ -1,88 +1,145 @@
-From: ppessi@nvidia.com (Pekka Pessi)
-Date: Mon, 29 Oct 2018 11:04:06 +0200
-Subject: [PATCH 0/9] serial: Add Tegra Combined UART driver
-In-Reply-To: <20181026111638.10759-1-thierry.reding@gmail.com>
-References: <20181026111638.10759-1-thierry.reding@gmail.com>
-Message-ID: <85092b49-2b62-bd76-05a3-521415835b6e@nvidia.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 10:08:56 +0100
+Subject: [PATCH v2 12/15] clk: sunxi-ng: a64: Add min and max rate for
+ PLL_MIPI
+In-Reply-To: <CAMty3ZBJcH1fz5FyhT1rk9qiJ-aWoQYiH7P1ZyQPLKmVWOCkdA@mail.gmail.com>
+References: <20181023155035.9101-1-jagan@amarulasolutions.com>
+ <20181023155035.9101-13-jagan@amarulasolutions.com>
+ <20181024181334.lul7ta7ijluwfb7v@flea>
+ <CAMty3ZBJcH1fz5FyhT1rk9qiJ-aWoQYiH7P1ZyQPLKmVWOCkdA@mail.gmail.com>
+Message-ID: <20181029090856.yyjnvaruyasgnzyz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Thu, Oct 25, 2018 at 09:21:31PM +0530, Jagan Teki wrote:
+> On Wed, Oct 24, 2018 at 11:43 PM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Tue, Oct 23, 2018 at 09:20:32PM +0530, Jagan Teki wrote:
+> > > A64 manual say PLL_MIPI rates are 500MHz to 1.4GHz, but
+> > > using minimum 500MHz can't release the clock and which
+> > > is not working.
+> > >
+> > > So use working minimum rate as 300MHz which is tested on
+> > > Bananapi DSI panel.
+> >
+> > I'm not quite sure what you mean by that. What do you mean by "500MHz
+> > can't release the clock"? Why would 300MHz work better then? Should be
+> > avoid reaching 500MHz if it's a frequency in the valid range?
+> 
+> PLL_MIPI can't be work with existing nkm where rate set to 270MHz
+> (from PLL_VIDEO)
+> /*** round rate call in ccu_nkm.c */
+> [    2.408356] round: rate = 118800000
+> [    2.408359] round: parent_rate = 158740688
+> [    2.408417] round: rate = 148500000
+> [    2.408420] round: parent_rate = 158740688
+> [    2.408439] round: rate = 178200000
+> [    2.408441] round: parent_rate = 158740688
+> [    2.408460] round: rate = 205615384
+> [    2.408462] round: parent_rate = 158740688
+> [    2.408481] round: rate = 237600000
+> [    2.408483] round: parent_rate = 158740688
+> [    2.408502] round: rate = 270000000
+> [    2.408504] round: parent_rate = 158740688
+> [    2.408523] round: rate = 118800000
+> [    2.408525] round: parent_rate = 158740560
+> [    2.408544] round: rate = 148500000
+> [    2.408546] round: parent_rate = 158740560
+> [    2.408565] round: rate = 178200000
+> [    2.408567] round: parent_rate = 158740560
+> [    2.408586] round: rate = 205615384
+> [    2.408588] round: parent_rate = 158740560
+> [    2.408607] round: rate = 237600000
+> [    2.408609] round: parent_rate = 158740560
+> [    2.408627] round: rate = 270000000
+> [    2.408630] round: parent_rate = 158740560
+> [    2.408648] round: rate = 270000000
+> [    2.408651] round: parent_rate = 158740640
+> [    2.408670] round: rate = 270000000
+> [    2.408672] round: parent_rate = 158740704
+> 
+> /** set rate call in ccu_nkm **/
+> [    2.408685] set: rate = 270000000
+> [    2.408688] set: parent_rate = 297000000
+> 
+> By using min and max rate as per A64 manual page 94 range of PLL can
+> be 500MHz~1.4GHz getting 1,2,1 nkm dividers which can't be work.
+> [    2.423589] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
+> [    2.423643] ideal = 220000000, rounded = 0
+> [    2.423647] ideal = 275000000, rounded = 0
+> [    2.423651] ideal = 330000000, rounded = 0
+> [    2.423692] ideal = 385000000, rounded = 384000000
+> [    2.423732] ideal = 440000000, rounded = 440000000
+> [    2.423736] sun4i_dclk_round_rate: div = 8 rate = 55000000
+> [    2.423740] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
+> [    2.423744] ideal = 220000000, rounded = 0
+> [    2.423748] ideal = 275000000, rounded = 0
+> [    2.423751] ideal = 330000000, rounded = 0
+> [    2.423791] ideal = 385000000, rounded = 384000000
+> [    2.423831] ideal = 440000000, rounded = 440000000
+> [    2.423834] sun4i_dclk_round_rate: div = 8 rate = 55000000
+> [    2.423957] sun4i_dclk_recalc_rate: val = 1, rate = 440000000
+> [    2.423961] sun4i_dclk_recalc_rate: val = 1, rate = 440000000
+> [    2.424378] ccu_nkm_set_rate: rate = 440000000, parent_rate = 220000000
+> [    2.424381] ccu_nkm_set_rate: _nkm.n = 1
+> [    2.424383] ccu_nkm_set_rate: _nkm.k = 2
+> [    2.424385] ccu_nkm_set_rate: _nkm.m = 1
+> [    2.424725] sun4i_dclk_set_rate div 8
+> [    2.424732] sun4i_dclk_recalc_rate: val = 8, rate = 55000000
+> [    2.561271] usb 3-1: new high-speed USB device number 2 using ehci-platform
+> [    2.718486] hub 3-1:1.0: USB hub found
+> [    2.718606] hub 3-1:1.0: 4 ports detected
+> [    3.437263] ------------[ cut here ]------------
+> [    3.437270] [CRTC:36:crtc-0] vblank wait timed out
+> 
+> So, lowering the min rate by 300MHz seems working with bounded nkm
+> dividers 5, 2, 9. Tested on two different panels.
+> 
+> [    2.415773] [drm] No driver support for vblank timestamp query.
+> [    2.424116] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
+> [    2.424172] ideal = 220000000, rounded = 0
+> [    2.424176] ideal = 275000000, rounded = 0
+> [    2.424194] ccu_nkm_round_rate: rate = 330000000
+> [    2.424197] ideal = 330000000, rounded = 330000000
+> [    2.424201] sun4i_dclk_round_rate: div = 6 rate = 55000000
+> [    2.424205] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
+> [    2.424209] ideal = 220000000, rounded = 0
+> [    2.424213] ideal = 275000000, rounded = 0
+> [    2.424230] ccu_nkm_round_rate: rate = 330000000
+> [    2.424233] ideal = 330000000, rounded = 330000000
+> [    2.424236] sun4i_dclk_round_rate: div = 6 rate = 55000000
+> [    2.424253] ccu_nkm_round_rate: rate = 330000000
+> [    2.424270] ccu_nkm_round_rate: rate = 330000000
+> [    2.424278] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
+> [    2.424281] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
+> [    2.424306] ccu_nkm_set_rate: rate = 330000000, parent_rate = 297000000
+> [    2.424309] ccu_nkm_set_rate: _nkm.n = 5
+> [    2.424311] ccu_nkm_set_rate: _nkm.k = 2
+> [    2.424313] ccu_nkm_set_rate: _nkm.m = 9
+> [    2.424661] sun4i_dclk_set_rate div 6
+> [    2.424668] sun4i_dclk_recalc_rate: val = 6, rate = 55000000
+> 
+> Note: BPI-M64-bsp is setting the rate directly to 180MHz with 297MHz
+> parent with resulting dividers as 1, 2, 5. ans we can't produce this
+> 180MHz rate with dclk_round_rate and ccu_nkm.
 
-What is the use case for the mailbox driver? What kind of entity will be 
-there consuming sent messages and sending messages to kernel?
+I'm still not quite sure what you mean by "500MHz can't release the
+clock".
 
---Pekka
+>From what you're saying, this seems to be related to the boundaries of
+the dividers rather than the rate itself.
 
-On 10/26/2018 02:16 PM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
->
-> Hi everyone,
->
-> this is a reworked version of Mikko's earlier proposal[0]. I've reworked
-> the TCU driver itself so that it relies less on global variables as well
-> as added a Kconfig option to allow the console support to be selected. I
-> also fixed a couple of issues that manifested themselves as I was moving
-> towards the IRQ driven mode (TCU was passing a pointer to a local
-> variable which was getting stored in the mailbox's ring buffer and the
-> data pointed at was becoming stale by the time the mailbox got around to
-> dequeue it).
->
-> The biggest bulk of the changes is in the mailbox driver. This series
-> addresses all of Jassi's comments from back at the time. One notable
-> additional change is that shared mailboxes are now interrupt driven,
-> which removes the need for polling mode.
->
-> Unfortunately there is still an issue because the TCU uses the mailbox
-> in atomic context for both TTY and console modes, so we get a sleeping-
-> while-atomic BUG when using mbox_client->tx_block = true in order to
-> rate-limit mbox_send_message(). In order to work around this, I added a
-> mechanism to mbox_send_message() that will allow blocking from atomic
-> context if the mailbox controller implements the new ->flush() callback.
-> For Tegra HSP shared mailboxes this is done by spinning on the shared
-> mailbox register until the receiver has marked the mailbox as empty. I
-> have been running this locally for a couple of days now and it works
-> perfectly.
->
-> Furthermore this series incorporates Mikko's work in progress on
-> splitting up the mailbox controllers and allowing multiple controllers
-> to match on the same device tree node during mbox_request_channel().
->
-> Last but not least there are no build-time dependencies between the
-> mailbox and serial drivers, so I think the easiest way to merge this is
-> if Jassi picks up patches 1-5, Greg takes patches 6 & 7 and I pick up
-> patches 8-9 into the Tegra tree.
->
-> Thanks,
-> Thierry
->
-> [0]: https://lore.kernel.org/patchwork/project/lkml/list/?series=357641
->
-> Mikko Perttunen (5):
->    mailbox: Allow multiple controllers per device
->    dt-bindings: tegra186-hsp: Add shared interrupts
->    dt-bindings: serial: Add bindings for nvidia,tegra194-tcu
->    arm64: tegra: Add nodes for TCU on Tegra194
->    arm64: tegra: Mark TCU as primary serial port on Tegra194 P2888
->
-> Thierry Reding (4):
->    mailbox: Support blocking transfers in atomic context
->    mailbox: tegra-hsp: Add support for shared mailboxes
->    mailbox: tegra-hsp: Add suspend/resume support
->    serial: Add Tegra Combined UART driver
->
->   .../bindings/mailbox/nvidia,tegra186-hsp.txt  |   3 +
->   .../bindings/serial/nvidia,tegra194-tcu.txt   |  35 ++
->   .../arm64/boot/dts/nvidia/tegra194-p2888.dtsi |   2 +-
->   arch/arm64/boot/dts/nvidia/tegra194.dtsi      |  38 +-
->   drivers/mailbox/mailbox.c                     |  11 +-
->   drivers/mailbox/tegra-hsp.c                   | 495 +++++++++++++++---
->   drivers/tty/serial/Kconfig                    |  22 +
->   drivers/tty/serial/Makefile                   |   1 +
->   drivers/tty/serial/tegra-tcu.c                | 299 +++++++++++
->   include/linux/mailbox_controller.h            |   4 +
->   include/uapi/linux/serial_core.h              |   3 +
->   11 files changed, 847 insertions(+), 66 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
->   create mode 100644 drivers/tty/serial/tegra-tcu.c
->
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/206c8354/attachment.sig>
