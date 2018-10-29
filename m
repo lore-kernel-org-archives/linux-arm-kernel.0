@@ -1,40 +1,37 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 14:22:12 +0100
-Subject: [PATCH 2/2] drm/sun4i: hdmi: Fix double flag assignation
-In-Reply-To: <41337136-daa0-6773-e5e4-9bea60a14a49@micronovasrl.com>
-References: <20181021163446.29135-1-maxime.ripard@bootlin.com>
- <20181021163446.29135-2-maxime.ripard@bootlin.com>
- <41337136-daa0-6773-e5e4-9bea60a14a49@micronovasrl.com>
-Message-ID: <20181029132212.hxuk4bngy6ysk2ar@flea>
+From: mbenes@suse.cz (Miroslav Benes)
+Date: Mon, 29 Oct 2018 14:24:16 +0100 (CET)
+Subject: [PATCH v2] arm64/module: use mod->klp_info section header
+ information for livepatch modules
+In-Reply-To: <20181026172500.g65bl2p7cvey3qsx@linux-8ccs>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141652.5478C68BE1@newverein.lst.de>
+ <20181023175553.gaobskk26koft6s2@linux-8ccs>
+ <20181026172500.g65bl2p7cvey3qsx@linux-8ccs>
+Message-ID: <alpine.LSU.2.21.1810291415340.22023@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 10:43:34AM +0200, Giulio Benetti wrote:
-> Il 21/10/2018 18:34, Maxime Ripard ha scritto:
-> > The is_double flag is a boolean currently assigned to the value of the d
-> > variable, that is either 1 or 2. It means that this is_double variable is
-> > always set to true, even though the initial intent was to have it set to
-> > true when d is 2.
-> > 
-> > Fix this.
-> > 
-> > Fixes: 9c5681011a0c ("drm/sun4i: Add HDMI support")
-> > Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index dd23655fda3a..490e56070a7e 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -461,5 +461,15 @@ int module_finalize(const Elf_Ehdr *hdr,
+> #endif
+> 	}
 > 
-> Reviewed-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> +#ifdef CONFIG_LIVEPATCH
+> +	/*
+> +	 * For livepatching, switch to the saved section header info for .plt
+> +	 * stored in mod->klp_info. This is needed so that livepatch is able to
+> +	 * call apply_relocate_add() after patch module load.
+> +	 */
+> +	if (is_livepatch_module(me))
+> +		me->arch.core.plt = me->klp_info->sechdrs + me->arch.core.plt_shndx;
+> +#endif
 
-Applied both, thanks!
-Maxime
+I missed it before, but the hunk should be under "#ifdef 
+CONFIG_ARM64_MODULE_PLTS" protection similarly to ftrace_trampoline just 
+above. me->arch.core.plt may not exist otherwise.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/abda975c/attachment.sig>
+Miroslav
