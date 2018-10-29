@@ -1,68 +1,81 @@
-From: wladislav.wiebe@nokia.com (Wiebe, Wladislav (Nokia - DE/Ulm))
-Date: Mon, 29 Oct 2018 14:20:51 +0000
-Subject: [PATCH] arm: mm: fault: check ADFSR in case of abort
-Message-ID: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 29 Oct 2018 19:56:27 +0530
+Subject: [PATCH v3 12/25] drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet
+ overhead
+In-Reply-To: <20181029092227.mdxgvg5aqzh22j72@flea>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-13-jagan@amarulasolutions.com>
+ <20181029092227.mdxgvg5aqzh22j72@flea>
+Message-ID: <CAMty3ZBHU5eXRLLJmUroLgSKcF6O9gHOHRM1XBnt9_Lp7B8rEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running into situations like:
-"Unhandled fault: synchronous external abort (0x210) at 0xXXX"
-or
-"Unhandled prefetch abort: synchronous external abort (0x210) at 0xXXX"
-it is useful to know the content of ADFSR (Auxiliary Data Fault Status
-Register) to indicate an ECC double-bit error in L1 or L2 cache.
+On Mon, Oct 29, 2018 at 2:52 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Fri, Oct 26, 2018 at 08:13:31PM +0530, Jagan Teki wrote:
+> > Add 10 bytes packet overhead for hblk where blank is set using
+> > a blanking packet like (4 bytes + 4 bytes + payload + 2 bytes)
+> >
+> > This is according to BSP code from BPI-M64-bsp
+> > (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> > dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
+> >
+> > So, add 10 bytes packet overhead for DSI hblk.
+> >
+> > Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
+> >
+> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > Tested-by: Jagan Teki <jagan@amarulasolutions.com>
+> > ---
+> > Changes for v3:
+> > - new patch
+> > Changes for v2:
+> > - none
+> >
+> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 9 +++++++--
+> >  1 file changed, 7 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > index 596e560263bf..cf42be1f1ba1 100644
+> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > @@ -461,7 +461,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+> >  {
+> >       struct mipi_dsi_device *device = dsi->device;
+> >       unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
+> > -     u16 hbp, hfp, hsa, hblk, vblk;
+> > +     u16 hbp, hfp, hsa, hblk_max, hblk, vblk;
+> >       size_t bytes;
+> >       u8 *buffer;
+> >
+> > @@ -494,8 +494,13 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+> >
+> >       /*
+> >        * hblk seems to be the line + porches length.
+> > +      * The blank is set using a blanking packet (4 bytes + 4 bytes +
+> > +      * payload + 2 bytes). So minimal size is 10 bytes
+> >        */
+> > -     hblk = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
+> > +#define HBLK_PACKET_OVERHEAD 10
+> > +     hblk_max = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
+> > +     hblk_max -= HBLK_PACKET_OVERHEAD;
+> > +     hblk = max((unsigned int)HBLK_PACKET_OVERHEAD, hblk_max);
+>
+> I'd rather use the same convention than the other assignments done
+> before in that function.
 
-Refer to:
-Cortex-A15 Technical Reference Manual, Revision: r2p1
-[6.4.8. Error Correction Code]
+Yes, old code did use hsa. but it's added 10 bytes packet head instead
+of subtracting it.
 
-Signed-off-by: Wladislav Wiebe <wladislav.wiebe@nokia.com>
----
- arch/arm/mm/fault.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+hblk = mode->htotal * Bpp - hsa;
+=> mode->htotal * Bpp - (mode->hsync_end - mode->hsync_start) * Bpp -
+HSA_PACKET_OVERHEAD);
+=> (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp +
+HSA_PACKET_OVERHEAD;
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 3232afb6fdc0..5e240deb6ed6 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -547,6 +547,22 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
- 	fsr_info[nr].name = name;
- }
- 
-+/*
-+ * Check for ECC double-bit errors in Auxiliary Data Fault Status Register
-+ */
-+static void check_adfsr_for_ecc(void)
-+{
-+	u32 adfsr = 0;
-+
-+	asm("mrc p15, 0, %0, c5, c1, 0" : "=r" (adfsr));
-+
-+	if (adfsr & (BIT(31) | BIT(23))) {
-+		pr_alert("ADFSR status 0x%x indicates that an L1 or L2 cache\n"
-+			 "ECC double-bit error occurred at some time.\n",
-+			  adfsr);
-+	}
-+}
-+
- /*
-  * Dispatch a data abort to the relevant handler.
-  */
-@@ -559,6 +575,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
- 		return;
- 
-+	check_adfsr_for_ecc();
- 	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
- 		inf->name, fsr, addr);
- 	show_pte(current->mm, addr);
-@@ -593,6 +610,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
- 	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
- 		return;
- 
-+	check_adfsr_for_ecc();
- 	pr_alert("Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
- 		inf->name, ifsr, addr);
- 
--- 
-2.16.1
+And it should be
+(mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp -
+HSA_PACKET_OVERHEAD;
+
+This patch is simply doing the same by explicitly adding packet over
+ahead macro, which again used in hfp.
