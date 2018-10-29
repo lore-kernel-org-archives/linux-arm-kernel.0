@@ -1,68 +1,192 @@
-From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Mon, 29 Oct 2018 08:57:47 +0000
-Subject: [PATCH v7 4/6] clk: qoriq: Add clockgen support for lx2160a
-In-Reply-To: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
-References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <1540759926-3641-5-git-send-email-vabhav.sharma@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 10:00:00 +0100
+Subject: [PATCH v2 04/15] drm/sun4i: sun6i_mipi_dsi: Add Allwinner A64
+ MIPI DSI support
+In-Reply-To: <CAMty3ZDLd=vbYUut6Cwo9VKFR4T1u1p58FLg9vhN79JS1=0rag@mail.gmail.com>
+References: <20181023155035.9101-1-jagan@amarulasolutions.com>
+ <20181023155035.9101-5-jagan@amarulasolutions.com>
+ <20181024180632.zrb3lrqsznspmwbk@flea>
+ <CAMty3ZDLd=vbYUut6Cwo9VKFR4T1u1p58FLg9vhN79JS1=0rag@mail.gmail.com>
+Message-ID: <20181029090000.woypmozwc7sbtusk@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+On Thu, Oct 25, 2018 at 04:32:06PM +0530, Jagan Teki wrote:
+> On Wed, Oct 24, 2018 at 11:36 PM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Tue, Oct 23, 2018 at 09:20:24PM +0530, Jagan Teki wrote:
+> > > The MIPI DSI controller on Allwinner A64 is similar to
+> > > Allwinner A31 without support of DSI mod clock(CLK_DSI_SCLK)
+> > >
+> > > So, alter has_mod_clk bool via driver data for respective
+> > > SoC's compatible.
+> > >
+> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > ---
+> > > Changes for v2:
+> > > - none
+> > >
+> > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 47 ++++++++++++++++++++------
+> > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h |  5 +++
+> > >  2 files changed, 41 insertions(+), 11 deletions(-)
+> > >
+> > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > index e3b34a345546..8e9c76febca2 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > @@ -10,6 +10,7 @@
+> > >  #include <linux/component.h>
+> > >  #include <linux/crc-ccitt.h>
+> > >  #include <linux/of_address.h>
+> > > +#include <linux/of_device.h>
+> > >  #include <linux/pm_runtime.h>
+> > >  #include <linux/regmap.h>
+> > >  #include <linux/reset.h>
+> > > @@ -981,6 +982,8 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+> > >       dsi->host.ops = &sun6i_dsi_host_ops;
+> > >       dsi->host.dev = dev;
+> > >
+> > > +     dsi->variant = of_device_get_match_data(dev);
+> > > +
+> > >       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > >       base = devm_ioremap_resource(dev, res);
+> > >       if (IS_ERR(base)) {
+> > > @@ -1001,17 +1004,20 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+> > >               return PTR_ERR(dsi->reset);
+> > >       }
+> > >
+> > > -     dsi->mod_clk = devm_clk_get(dev, "mod");
+> > > -     if (IS_ERR(dsi->mod_clk)) {
+> > > -             dev_err(dev, "Couldn't get the DSI mod clock\n");
+> > > -             return PTR_ERR(dsi->mod_clk);
+> > > +     if (dsi->variant->has_mod_clk) {
+> > > +             dsi->mod_clk = devm_clk_get(dev, "mod");
+> > > +             if (IS_ERR(dsi->mod_clk)) {
+> > > +                     dev_err(dev, "Couldn't get the DSI mod clock\n");
+> > > +                     return PTR_ERR(dsi->mod_clk);
+> > > +             }
+> > >       }
+> > >
+> > >       /*
+> > >        * In order to operate properly, that clock seems to be always
+> > >        * set to 297MHz.
+> > >        */
+> > > -     clk_set_rate_exclusive(dsi->mod_clk, 297000000);
+> > > +     if (dsi->variant->has_mod_clk)
+> > > +             clk_set_rate_exclusive(dsi->mod_clk, 297000000);
+> > >
+> > >       dphy_node = of_parse_phandle(dev->of_node, "phys", 0);
+> > >       ret = sun6i_dphy_probe(dsi, dphy_node);
+> > > @@ -1043,7 +1049,8 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+> > >       pm_runtime_disable(dev);
+> > >       sun6i_dphy_remove(dsi);
+> > >  err_unprotect_clk:
+> > > -     clk_rate_exclusive_put(dsi->mod_clk);
+> > > +     if (dsi->variant->has_mod_clk)
+> > > +             clk_rate_exclusive_put(dsi->mod_clk);
+> > >       return ret;
+> > >  }
+> > >
+> > > @@ -1056,7 +1063,8 @@ static int sun6i_dsi_remove(struct platform_device *pdev)
+> > >       mipi_dsi_host_unregister(&dsi->host);
+> > >       pm_runtime_disable(dev);
+> > >       sun6i_dphy_remove(dsi);
+> > > -     clk_rate_exclusive_put(dsi->mod_clk);
+> > > +     if (dsi->variant->has_mod_clk)
+> > > +             clk_rate_exclusive_put(dsi->mod_clk);
+> > >
+> > >       return 0;
+> > >  }
+> > > @@ -1066,7 +1074,8 @@ static int __maybe_unused sun6i_dsi_runtime_resume(struct device *dev)
+> > >       struct sun6i_dsi *dsi = dev_get_drvdata(dev);
+> > >
+> > >       reset_control_deassert(dsi->reset);
+> > > -     clk_prepare_enable(dsi->mod_clk);
+> > > +     if (dsi->variant->has_mod_clk)
+> > > +             clk_prepare_enable(dsi->mod_clk);
+> > >
+> > >       /*
+> > >        * Enable the DSI block.
+> > > @@ -1094,7 +1103,8 @@ static int __maybe_unused sun6i_dsi_runtime_suspend(struct device *dev)
+> > >  {
+> > >       struct sun6i_dsi *dsi = dev_get_drvdata(dev);
+> > >
+> > > -     clk_disable_unprepare(dsi->mod_clk);
+> > > +     if (dsi->variant->has_mod_clk)
+> > > +             clk_disable_unprepare(dsi->mod_clk);
+> > >       reset_control_assert(dsi->reset);
+> > >
+> > >       return 0;
+> > > @@ -1106,9 +1116,24 @@ static const struct dev_pm_ops sun6i_dsi_pm_ops = {
+> > >                          NULL)
+> > >  };
+> > >
+> > > +static const struct sun6i_dsi_variant sun6i_a31_dsi = {
+> > > +     .has_mod_clk = true,
+> > > +};
+> > > +
+> > > +static const struct sun6i_dsi_variant sun50i_a64_dsi = {
+> > > +     .has_mod_clk = false,
+> >
+> > This is the default already.
+> 
+> True but we need to assign the .data. how about checking device
+> compatible? I'm thinking of difference in driver data in future
+> between SoC's
 
-Add clockgen support for lx2160a.
-Added entry for compat 'fsl,lx2160a-clockgen'.
+That's not my point. You'll need the structure, but has_mod_clk will
+be initialised to false already, so you can drop the explicit
+assignment.
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/clk/clk-qoriq.c         | 12 ++++++++++++
- drivers/cpufreq/qoriq-cpufreq.c |  1 +
- 2 files changed, 13 insertions(+)
+> >
+> > > +};
+> > > +
+> > >  static const struct of_device_id sun6i_dsi_of_table[] = {
+> > > -     { .compatible = "allwinner,sun6i-a31-mipi-dsi" },
+> > > -     { }
+> > > +     {
+> > > +             .compatible = "allwinner,sun6i-a31-mipi-dsi",
+> > > +             .data = &sun6i_a31_dsi,
+> > > +     },
+> > > +     {
+> > > +             .compatible = "allwinner,sun50i-a64-mipi-dsi",
+> > > +             .data = &sun50i_a64_dsi,
+> > > +     },
+> > > +     { /* sentinel */ }
+> > >  };
+> > >  MODULE_DEVICE_TABLE(of, sun6i_dsi_of_table);
+> > >
+> > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+> > > index dbbc5b3ecbda..597b62227019 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+> > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+> > > @@ -20,6 +20,10 @@ struct sun6i_dphy {
+> > >       struct reset_control    *reset;
+> > >  };
+> > >
+> > > +struct sun6i_dsi_variant {
+> > > +     bool                    has_mod_clk;
+> > > +};
+> > > +
+> >
+> > This should be part of a separate patch.
+> 
+> How come, because has_mod_clk is using in driver file?
 
-diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-index e152bfb..99675de 100644
---- a/drivers/clk/clk-qoriq.c
-+++ b/drivers/clk/clk-qoriq.c
-@@ -570,6 +570,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
- 		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
- 	},
- 	{
-+		.compat = "fsl,lx2160a-clockgen",
-+		.cmux_groups = {
-+			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
-+		},
-+		.cmux_to_group = {
-+			0, 0, 0, 0, 1, 1, 1, 1, -1
-+		},
-+		.pll_mask = 0x37,
-+		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-+	},
-+	{
- 		.compat = "fsl,p2041-clockgen",
- 		.guts_compat = "fsl,qoriq-device-config-1.0",
- 		.init_periph = p2041_init_periph,
-@@ -1424,6 +1435,7 @@ CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1046a, "fsl,ls1046a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1088a, "fsl,ls1088a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
-+CLK_OF_DECLARE(qoriq_clockgen_lx2160a, "fsl,lx2160a-clockgen", clockgen_init);
- 
- /* Legacy nodes */
- CLK_OF_DECLARE(qoriq_sysclk_1, "fsl,qoriq-sysclk-1.0", sysclk_init);
-diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
-index 3d773f6..83921b7 100644
---- a/drivers/cpufreq/qoriq-cpufreq.c
-+++ b/drivers/cpufreq/qoriq-cpufreq.c
-@@ -295,6 +295,7 @@ static const struct of_device_id node_matches[] __initconst = {
- 	{ .compatible = "fsl,ls1046a-clockgen", },
- 	{ .compatible = "fsl,ls1088a-clockgen", },
- 	{ .compatible = "fsl,ls2080a-clockgen", },
-+	{ .compatible = "fsl,lx2160a-clockgen", },
- 	{ .compatible = "fsl,p4080-clockgen", },
- 	{ .compatible = "fsl,qoriq-clockgen-1.0", },
- 	{ .compatible = "fsl,qoriq-clockgen-2.0", },
+You're doing two things here: Adding a quirk structure, and adding
+support for an SoC. This should be two patches.
+
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/954195a8/attachment.sig>
