@@ -1,64 +1,89 @@
-From: amhetre@nvidia.com (Ashish Mhetre)
-Date: Mon, 29 Oct 2018 14:55:58 +0530
-Subject: [PATCH V3] arm64: Don't flush tlb while clearing the accessed bit
-Message-ID: <1540805158-618-1-git-send-email-amhetre@nvidia.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 29 Oct 2018 10:26:57 +0100
+Subject: [PATCH] dt-bindings: arm: Fix cpu capacity mismatch in example
+In-Reply-To: <20181029063450.3o3ay7pazik5tgne@vireshk-i7>
+References: <138600f5d504b41202a29a1e130a7aa4e51f1925.1540451976.git.viresh.kumar@linaro.org>
+ <80206cb7-b550-1cf6-abf4-e4b17de4cdb5@linaro.org>
+ <20181026041107.4hofhlcubbo5claq@vireshk-i7>
+ <d4d6af05-61f1-4123-c2dc-4ee0946f79e8@linaro.org>
+ <20181029063450.3o3ay7pazik5tgne@vireshk-i7>
+Message-ID: <1297c984-789f-0298-c3b8-8668f5b898de@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Van Brunt <avanbrunt@nvidia.com>
+On 29/10/2018 07:34, Viresh Kumar wrote:
+> On 26-10-18, 10:30, Daniel Lezcano wrote:
+>> On 26/10/2018 06:11, Viresh Kumar wrote:
+>>> On 25-10-18, 14:04, Daniel Lezcano wrote:
+>>>> I think it is actually correct. The example is confusing on what the
+>>>> numbers are. IIUC, it is:
+>>>>
+>>>> (after normalizing)
+>>>>
+>>>> dhrystone result on big CPU is 1024 at 1100MHz
+>>>> dhrystone result on little CPU is 446 at 850MHz
+>>>>
+>>>> We have to scale the result of the little for 1100MHz in order to compare.
+>>>>
+>>>> 1100/850 = 1.294
+>>>>
+>>>> dhrystone result on little CPU is 446 * 1.294 = 577 at 1100MHz
+>>>>
+>>>> So we put the normalized values 1024 and 577. The arch_topology will
+>>>> scale 577 back to 446 as it will compute the max capacity based on the
+>>>> max freq which is 850MHz.
+>>>>
+>>>> The *final* capacities are 1024 for cluster0 and 446 for cluster1 (read
+>>>> the cpu max capacity, the ones showed in the sysfs).
+>>>>
+>>>> Did I miss something ?
+>>>
+>>> No. What about making it more clear in the example to save the next idiot (like
+>>> me) from wasting time :)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+>>> index 9b5685a1d15d..d061e6575bde 100644
+>>> --- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+>>> @@ -61,7 +61,10 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
+>>>  Example 1 (ARM 64-bit, 6-cpu system, two clusters):
+>>>  capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
+>>>  supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
+>>> -final capacities are 1024 for cluster0 and 446 for cluster1
+>>> +final capacities are 1024 for cluster0 and 446 for cluster1.
+>>> +Note that the values mentioned below in the example (1024 and 578)
+>>> +aren't normalized based on max frequency of each cluster and that is
+>>> +left for the operating system to do.
+>>
+>> Yes, it will help but if you want to make things even more clear, I
+>> suggest to elaborate the text a bit and give the numbers above to
+>> explain (1100/850=1.294, 446 * 1.294 = 577, ...)
+> 
+> I didn't wanted to explain way too much, but how about this..
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+> index 9b5685a1d15d..84262cdb8d29 100644
+> --- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+> @@ -59,9 +59,11 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
+>  ===========================================
+>  
+>  Example 1 (ARM 64-bit, 6-cpu system, two clusters):
+> -capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
+> -supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
+> -final capacities are 1024 for cluster0 and 446 for cluster1
+> +The capacities-dmips-mhz or DMIPS/MHz values (scaled to 1024)
+> +are 1024 and 578 for cluster0 and cluster1. Further normalization
+> +is done by the operating system based on cluster0 at max-freq=1100 and
+> +custer1 at max-freq=850, final capacities are 1024 for cluster0 and
+> +446 for cluster1 (576*850/1100).
 
-Accessed bit is used to age a page and in generic implementation there is
-flush_tlb while clearing the accessed bit.
-Flushing a TLB is overhead on ARM64 as access flag faults don't get
-translation table entries cached into TLB's. Flushing TLB is not necessary
-for this. Clearing the accessed bit without flushing TLB doesn't cause data
-corruption on ARM64.
-In our case with this patch, speed of reading from fast NVMe/SSD through
-PCIe got improved by 10% ~ 15% and writing got improved by 20% ~ 40%.
-So for performance optimisation don't flush TLB when clearing the accessed
-bit on ARM64.
-x86 made the same optimization even though their TLB invalidate is much
-faster as it doesn't broadcast to other CPUs.
-Please refer to:
-'commit b13b1d2d8692 ("x86/mm: In the PTE swapout page reclaim case clear
-the accessed bit instead of flushing the TLB")'
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
-Signed-off-by: Ashish Mhetre <amhetre@nvidia.com>
----
- arch/arm64/include/asm/pgtable.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 2ab2031..080d842 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -652,6 +652,26 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
- 	return __ptep_test_and_clear_young(ptep);
- }
- 
-+#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
-+static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
-+					 unsigned long address, pte_t *ptep)
-+{
-+	/*
-+	 * On ARM64 CPUs, clearing the accessed bit without a TLB flush
-+	 * doesn't cause data corruption. [ It could cause incorrect
-+	 * page aging and the (mistaken) reclaim of hot pages, but the
-+	 * chance of that should be relatively low. ]
-+	 *
-+	 * So as a performance optimization don't flush the TLB when
-+	 * clearing the accessed bit, it will eventually be flushed by
-+	 * a context switch or a VM operation anyway. [ In the rare
-+	 * event of it not getting flushed for a long time the delay
-+	 * shouldn't really matter because there's no real memory
-+	 * pressure for swapout to react to. ]
-+	 */
-+	return ptep_test_and_clear_young(vma, address, ptep);
-+}
-+
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
- #define __HAVE_ARCH_PMDP_TEST_AND_CLEAR_YOUNG
- static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 -- 
-2.7.4
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
