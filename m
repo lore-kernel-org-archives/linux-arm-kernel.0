@@ -1,79 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Oct 2018 19:10:00 +0000
-Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
-In-Reply-To: <20180927224609.19515-1-robdclark@gmail.com>
-References: <20180927224609.19515-1-robdclark@gmail.com>
-Message-ID: <20181029191000.GD16739@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 29 Oct 2018 12:00:12 -0700
+Subject: [PATCH 0/2 v5] arm64: Get rid of __early_init_dt_declare_initrd()
+Message-ID: <20181029190014.6455-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 06:46:07PM -0400, Rob Clark wrote:
-> We seem to need to set either this or CFCFG (stall), otherwise gpu
-> faults trigger problems with other in-flight transactions from the
-> GPU causing CP errors, etc.
-> 
-> In the ARM SMMU spec, the 'Hit under previous context fault' bit is
-> described as:
-> 
->  '0' - Stall or terminate subsequent transactions in the presence
->        of an outstanding context fault
->  '1' - Process all subsequent transactions independently of any
->        outstanding context fault.
-> 
-> Since we don't enable CFCFG (stall) the behavior of terminating
-> other transactions makes sense.  And is probably not what we want
-> (and definately not what we want for GPU).
-> 
-> Signed-off-by: Rob Clark <robdclark@gmail.com>
-> ---
-> So I hit this issue a long time back on 820 (msm8996) and at the
-> time I solved it with a patch that enabled CFCFG.  And it resurfaced
-> more recently on sdm845.  But at the time CFCFG was rejected, iirc
-> because of concern that it would cause problems on other non-qcom
-> arm smmu implementations.  And I think I forgot to send this version
-> of the solution.
-> 
-> If enabling HUPCF is anticipated to cause problems on other ARM
-> SMMU implementations, I think I can come up with a variant of this
-> patch which conditionally enables it for snapdragon.
-> 
-> Either way, I'd really like to get some variant of this fix merged
-> (and probably it would be a good idea for stable kernel branches
-> too), since current behaviour with the GPU means faults turn into
-> a fantastic cascade of fail.
+Hi all,
 
-Can you describe how this fantastic cascade of fail improves with this
-patch, please? If you're getting context faults then something has already
-gone horribly wrong, so I'm trying to work out how this improves things.
+I numbered this v5 because this is still revolving around the same
+initial desire to cut the build time of an ARM64 kernel when toggling
+CONFIG_BLK_DEV_INITRD. This 4th version is basically the 3rd possible
+way to just get rid of __early_init_dt_declare_initrd() for ARM64.
 
-> diff --git a/drivers/iommu/arm-smmu-regs.h b/drivers/iommu/arm-smmu-regs.h
-> index a1226e4ab5f8..2291925eb800 100644
-> --- a/drivers/iommu/arm-smmu-regs.h
-> +++ b/drivers/iommu/arm-smmu-regs.h
-> @@ -178,6 +178,7 @@ enum arm_smmu_s2cr_privcfg {
->  #define ARM_SMMU_CB_ATSR		0x8f0
->  
->  #define SCTLR_S1_ASIDPNE		(1 << 12)
-> +#define SCTLR_HUPCF			(1 << 8)
->  #define SCTLR_CFCFG			(1 << 7)
->  #define SCTLR_CFIE			(1 << 6)
->  #define SCTLR_CFRE			(1 << 5)
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index f7a96bcf94a6..47ffc9aade72 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -713,9 +713,9 @@ static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
->  	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
->  	if (stage1)
->  		reg |= SCTLR_S1_ASIDPNE;
-> +	reg |= SCTLR_HUPCF;
+I previously mentioned that I was working on making
+phys_initrd_start/phys_initrd_size generic across architectures that
+make use of it, which would cover ARM (32-bit), unicore32 and possibly
+arm64, but upon second glance, this does not necessarily help, or rather
+this patch series actually helps make a smoother conversion in the
+future.
 
-Maybe just throw this into the assignment a couple of lines above?
+Previous discussions/submissions list here:
 
->  	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
->  		reg |= SCTLR_E;
-> -
+v3:
+https://www.spinics.net/lists/arm-kernel/msg683566.html
+v2:
+https://lkml.org/lkml/2018/10/25/4
 
-Random whitespace change.
+Changes in v5:
 
-Will
+- incorporate Mike's version which properly takes care of command-line
+  specified and FDT specified initrd location
+
+Changes in v4:
+
+- perform the physical to virtual initrd conversion straight within
+  arm64_memblock_init() to get the correct memblock reservation to occur
+
+Changes in v3:
+- attempt to change drivers/of/fdt.c to absorb ARM64's specific behavior
+
+Changes in v2:
+
+- put an /* empty */ comment in the asm-generic/initrd.h file
+- trim down the CC list to maximize the chances of people receiving this
+
+Florian Fainelli (2):
+  arm64: Get rid of __early_init_dt_declare_initrd()
+  of/fdt: Remove definition check for __early_init_dt_declare_initrd()
+
+ arch/arm64/include/asm/memory.h |  8 -------
+ arch/arm64/mm/init.c            | 42 +++++++++++++++++++++------------
+ drivers/of/fdt.c                |  2 --
+ 3 files changed, 27 insertions(+), 25 deletions(-)
+
+-- 
+2.17.1
