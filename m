@@ -1,35 +1,72 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 29 Oct 2018 18:04:35 +0530
-Subject: [PATCH v3 00/25] drm/sun4i: Allwinner A64 MIPI-DSI support
-In-Reply-To: <20181029091508.gyhn2m5fnbucvb34@flea>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181029091508.gyhn2m5fnbucvb34@flea>
-Message-ID: <CAMty3ZAvv58MF1itMOq+x7x4KgVQTOssHgpCkXb8n0u+vxbHdQ@mail.gmail.com>
+From: jagan@openedev.com (Jagan Teki)
+Date: Mon, 29 Oct 2018 18:10:47 +0530
+Subject: [linux-sunxi] Re: [PATCH v2 02/15] clk: sunxi-ng: Add check for
+ minimal rate to NKM PLLs
+In-Reply-To: <20181029085843.3bslqwktxbp2ywk2@flea>
+References: <20181023155035.9101-1-jagan@amarulasolutions.com>
+ <20181023155035.9101-3-jagan@amarulasolutions.com>
+ <20181024180436.5n3i3z6h2yezc4cv@flea>
+ <CAMty3ZC2wn-DjR+93yc-n-bAmVCHaEqR_=4XPddoo+7LjebTEg@mail.gmail.com>
+ <20181029085843.3bslqwktxbp2ywk2@flea>
+Message-ID: <e7566001-8933-adbb-4c30-7a3f66ebae4e@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 2:45 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Fri, Oct 26, 2018 at 08:13:19PM +0530, Jagan Teki wrote:
-> > This series fixed the issues related to work DSI on 2-lane panel
-> > which is reported on previous version[1].
-> >
-> > Few comments from previous version still in discussion, but I just
-> > send this version just to group all working changes together.
-> > anyway I will fix in this in next version if any.
-> >
-> > PLL_MIPI min rate is still weird, I tried many possible dclock rate
-> > from panel driver to satisfy manual suggested min rate 500MHz but
-> > none working so eventually moved 300MHz. any inputs on this area
-> > are welcome.
-> >
-> > All these changes are tested in 2-lane, 4-lane MIPI-DSI panels.
-> >
-> > If anyone wants to test, use this repo [2] with WIP-A64-DSI branch.
->
-> A changelog would be nice here, and usually you shouldn't send a new
-> version while there is ongoing discussion on the previous version.
+On 29/10/18 2:28 PM, Maxime Ripard wrote:
+> On Thu, Oct 25, 2018 at 04:25:59PM +0530, Jagan Teki wrote:
+>> On Wed, Oct 24, 2018 at 11:34 PM Maxime Ripard
+>> <maxime.ripard@bootlin.com> wrote:
+>>>
+>>> On Tue, Oct 23, 2018 at 09:20:22PM +0530, Jagan Teki wrote:
+>>>> Some NKM PLLs doesn't work well when their output clock rate is set below
+>>>> certain rate.
+>>>>
+>>>> So, add support for minimal rate for relevant PLLs.
+>>>>
+>>>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>>>> ---
+>>>> Changes for v2:
+>>>> - new patch
+>>>>
+>>>>   drivers/clk/sunxi-ng/ccu_nkm.c | 7 +++++++
+>>>>   drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
+>>>>   2 files changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+>>>> index 841840e35e61..d17539dc88dd 100644
+>>>> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
+>>>> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+>>>> @@ -125,6 +125,13 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+>>>>        if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>>>>                rate *= nkm->fixed_post_div;
+>>>>
+>>>> +     if (rate < nkm->min_rate) {
+>>>> +             rate = nkm->min_rate;
+>>>> +             if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>>>> +                     rate /= nkm->fixed_post_div;
+>>>
+>>> I'm not sure this is right. Is the post divider taken into account to
+>>> calculate the minimum, or is the minimum on the rate before the fixed
+>>> post divider.
+>>
+>> Since we are returning from here, we need to take care post div which
+>> is actually doing at the end of round_rate.
+> 
+> That's not my point though. Does the rate needs to be superior to min
+> / post_div, or min?
 
-True, I have few patches that fixes 2-lane device, I just grouped all
-of these working-set together for further communication. mentioned the
-same thing above.
+ie what I'm trying to say, since it's common code min or max should / 
+post_div and PLL_MIPI doesn't use any post_div.
+
+We need to take care post_div though the current test (PLL_MIPI) in not 
+used since it's common code. just like nkmp, nm etc.
+
+> 
+>>>
+>>> How did you test this?
+>>
+>> I've not used this on PLL_MIPI atleast, so I didn't test this.
+> 
+> If you've never tested this, why are you adding that code?
+
+Like above, it's common code. otherwise might effect.
