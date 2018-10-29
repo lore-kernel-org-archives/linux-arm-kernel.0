@@ -1,60 +1,272 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Oct 2018 15:12:29 +0000
-Subject: [PATCH] arm: mm: fault: check ADFSR in case of abort
-In-Reply-To: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
-References: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
-Message-ID: <20181029151228.GG30658@n2100.armlinux.org.uk>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 16:20:52 +0100
+Subject: [PATCH] dts: sun8i-h3: Add DTS for Mapleboard MP130
+In-Reply-To: <20181025195519.hil6o66h4ev2m62q@earth.li>
+References: <20181025195519.hil6o66h4ev2m62q@earth.li>
+Message-ID: <20181029152052.q75feg6ipsbysvfg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 02:20:51PM +0000, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
-> When running into situations like:
-> "Unhandled fault: synchronous external abort (0x210) at 0xXXX"
-> or
-> "Unhandled prefetch abort: synchronous external abort (0x210) at 0xXXX"
-> it is useful to know the content of ADFSR (Auxiliary Data Fault Status
-> Register) to indicate an ECC double-bit error in L1 or L2 cache.
+Hi Jonathan,
+
+Thanks for your patch.
+
+On Thu, Oct 25, 2018 at 08:55:19PM +0100, Jonathan McDowell wrote:
 > 
-> Refer to:
-> Cortex-A15 Technical Reference Manual, Revision: r2p1
-> [6.4.8. Error Correction Code]
+> The Mapleboard MP130 is a single board computer based on the Allwinner
+> H3 SoC, with all schematics freely available. The Lite version includes
+> 1GB main memory and 8GB eMMC.
+> 
+> https://www.mapleboard.org/en (still mostly in Chinese even when English
+> is selected)
+> 
+> This DTS is based upon the DTS shipped with the board which uses
+> mapleboard,mp130- prefixes instead of the allwinner,sun8i variants.
+> 
+> Signed-off-by: Jonathan McDowell <noodles@earth.li>
 
-This is CPU independent code, and so must only access registers that are
-present on all CPUs which may run that code.
+The prefix of your patch should be "ARM: dts: sun8i-h3: ..."
 
-Here's the extract from the ARM ARM for the ADFSR and AIFSR:
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b5bd3de87c33..dcf1b9e7f71e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -1035,6 +1035,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>  	sun8i-h3-bananapi-m2-plus.dtb \
+>  	sun8i-h3-beelink-x2.dtb \
+>  	sun8i-h3-libretech-all-h3-cc.dtb \
+> +	sun8i-h3-mapleboard-mp130.dtb \
+>  	sun8i-h3-nanopi-m1.dtb	\
+>  	sun8i-h3-nanopi-m1-plus.dtb \
+>  	sun8i-h3-nanopi-neo.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-h3-mapleboard-mp130.dts b/arch/arm/boot/dts/sun8i-h3-mapleboard-mp130.dts
+> new file mode 100644
+> index 000000000000..bf948128af94
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h3-mapleboard-mp130.dts
+> @@ -0,0 +1,179 @@
+> +/*
+> + * Copyright (C) 2017 Centrum Embedded Systems, Jia-Bin Huang <jb@ces.com.tw>
+> + * Copyright (C) 2018 Jonathan McDowell <noodles@earth.li>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
 
-  The position of these registers is architecturally-defined, but the
-  content and use of the registers is IMPLEMENTATION DEFINED. An
-  implementation can use these registers to return additional fault
-  status information. An example use of these registers is to return
-  more information for diagnosing parity errors.
+You should add a SPDX tag instead of the license.
 
-So by testing bits in this register, you are making use of
-implementation defined values.
+We're also trying to license the DT under a dual GPL/MIT license,
+since they can be used by projects under a license that is not the
+GPL. But that's your call, obviously.
 
-It also goes on to say:
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun8i-h3.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +
+> +/ {
+> +	model = "MapleBoard MP130 Board";
+> +	compatible = "mapleboard,mp130_board", "allwinner,sun8i-h3";
 
-  These registers are not implemented in architecture versions before
-  ARMv7.
+The "board" in both the model and compatible is redundant.
 
-So before ARMv7, we have to take note of the unimplemented CP15 rules:
+> +
+> +	aliases {
+> +		ethernet0 = &emac;
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&leds_pio>, <&leds_r_pio>;
 
-2. In an allocated CP15 primary register, accesses to all unallocated
-   encodings are UNPREDICTABLE for accesses at PL1 or higher.  This
-   means that any MCR or MRC access from PL1 or higher with a
-   combination of <CRn>, <opc1>, <CRm> and <opc2> values not shown in,
-   or referenced from, Full list of VMSA CP15 registers, by coprocessor
-   register number on page B3-1481, that would access an allocated
-   CP15 primary register, is UNPREDICTABLE. As indicated by rule 1, for
-   the ARMv7-Aarchitecture, the allocated CP15 primary registers are:
-   ? in any VMSA implementation, c0-c3, c5-c11, c13, and c15
-   ...
+You can drop those pinctrl nodes
 
-So I'd prefer if we didn't attempt to read this register on CPUs where
-this isn't explicitly implemented.
+> +		pwr_led {
+> +			label = "mp130_board:orange:pwr";
+> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+
+A new line here would be nice
+
+> +		status_led {
+> +			label = "mp130_board:orange:status";
+> +			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	r_gpio_keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sw_r_pio>;
+
+Samething the pinctrl reference can be dropped
+
+> +		power {
+> +			label = "power";
+> +			linux,code = <KEY_POWER>;
+> +			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>; /* PL3 */
+> +		};
+> +
+> +		user {
+> +			label = "user";
+> +			linux,code = <BTN_0>;
+> +			gpios = <&r_pio 0 4 GPIO_ACTIVE_LOW>;
+> +		};
+
+The labels should be under the form "board:color:function"
+
+> +	};
+> +};
+> +
+> +&codec {
+> +	allwinner,audio-routing =
+> +		"Line Out", "LINEOUT",
+> +		"LINEIN", "Line In";
+> +	status = "okay";
+> +};
+> +
+> +&ehci1 {
+> +	status = "okay";
+> +};
+> +
+> +&ehci2 {
+> +	status = "okay";
+> +};
+> +
+> +&ehci3 {
+> +	status = "okay";
+> +};
+> +
+> +&ir {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&ir_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&mmc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc2_8bit_pins>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <8>;
+> +	non-removable;
+> +	cap-mmc-hw-reset;
+> +	status = "okay";
+> +};
+> +
+> +&ohci1 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci2 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci3 {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	leds_pio: led_pins {
+> +		pins = "PA15";
+> +		function = "gpio_out";
+> +	};
+> +};
+> +
+> +&r_pio {
+> +	leds_r_pio: led_pins {
+> +		pins = "PL10";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	sw_r_pio: key_pins {
+> +		pins = "PL3", "PL4";
+> +		function = "gpio_in";
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart1_pins>;
+> +	status = "disabled";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart2_pins>;
+> +	status = "disabled";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart3_pins>;
+> +	status = "disabled";
+> +};
+> +
+> +&usb_otg {
+> +	dr_mode = "peripheral";
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	/* USB VBUS is always on */
+> +	status = "okay";
+> +};
+> +
+> +&emac {
+> +	phy-handle = <&int_mii_phy>;
+> +	phy-mode = "mii";
+> +	allwinner,leds-active-low;
+> +	status = "okay";
+> +};
+> +
+
+This should be ordered alphabetically
+
+> J.
+> 
+> -- 
+> Revd Jonathan McDowell, ULC | Do you believe in happy endings?
+
+Please don't send patches through your mailer. git send-email can be
+configured to send the patches directly, this should be your preferred
+option.
+
+Thanks!
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/2d390263/attachment.sig>
