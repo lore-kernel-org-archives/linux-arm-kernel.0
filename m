@@ -1,64 +1,46 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 10:01:00 +0100
-Subject: [PATCH v2 13/15] dt-bindings: sun6i-dsi: Add compatible for A64
- DPHY
-In-Reply-To: <CAMty3ZC3jXKBVrrCSd0Un+ZNvNKPj4C0WpcpNOYJBK1=vehBQg@mail.gmail.com>
-References: <20181023155035.9101-1-jagan@amarulasolutions.com>
- <20181023155035.9101-14-jagan@amarulasolutions.com>
- <20181024180927.ejt7odo23ebzjgfg@flea>
- <CAMty3ZC3jXKBVrrCSd0Un+ZNvNKPj4C0WpcpNOYJBK1=vehBQg@mail.gmail.com>
-Message-ID: <20181029090100.h2zzdchyb3ls2hxe@flea>
+From: vabhav.sharma@nxp.com (Vabhav Sharma)
+Date: Mon, 29 Oct 2018 08:57:34 +0000
+Subject: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
+In-Reply-To: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
+References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <1540759926-3641-3-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 06:22:51PM +0530, Jagan Teki wrote:
-> On Wed, Oct 24, 2018 at 11:39 PM Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Tue, Oct 23, 2018 at 09:20:33PM +0530, Jagan Teki wrote:
-> > > The MIPI DSI PHY HDMI controller on Allwinner A64 is similar
-> > > on the one on A31.
-> > >
-> > > Add A64 compatible and append A31 compatible as fallback.
-> > >
-> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > ---
-> > > Changes for v2:
-> > > - new patch
-> > >
-> > >  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> > > index 9fa6e7a758ad..704fb31962f2 100644
-> > > --- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> > > @@ -36,7 +36,7 @@ D-PHY
-> > >
-> > >  Required properties:
-> > >    - compatible: value must be one of:
-> > > -    * allwinner,sun6i-a31-mipi-dphy
-> > > +    * "allwinner,sun50i-a64-mipi-dphy", "allwinner,sun6i-a31-mipi-dphy"
-> >
-> > No. you need both. The A64 MIPI DPHY one needs to be always set with
-> > the A31 fallback, but the A31 is also usable on its own.
-> 
-> Why wouldn't be, because we don't have any difference dphy right?
+Adding compatible string "lx2160a-dcfg" to
+initialize guts driver for lx2160 and SoC die
+attribute definition for LX2160A
 
-That's not my point. You removed from the binding documentation that
-allwinner,sun6i-a31-mipi-dphy was a valid option on its own. It's not
-ok to do so.
+Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
+Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
+Acked-by: Li Yang <leoyang.li@nxp.com>
+---
+ drivers/soc/fsl/guts.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Maxime
-
+diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
+index 302e0c8..bcab1ee 100644
+--- a/drivers/soc/fsl/guts.c
++++ b/drivers/soc/fsl/guts.c
+@@ -100,6 +100,11 @@ static const struct fsl_soc_die_attr fsl_soc_die[] = {
+ 	  .svr		= 0x87000000,
+ 	  .mask		= 0xfff70000,
+ 	},
++	/* Die: LX2160A, SoC: LX2160A/LX2120A/LX2080A */
++	{ .die          = "LX2160A",
++	  .svr          = 0x87360000,
++	  .mask         = 0xff3f0000,
++	},
+ 	{ },
+ };
+ 
+@@ -222,6 +227,7 @@ static const struct of_device_id fsl_guts_of_match[] = {
+ 	{ .compatible = "fsl,ls1088a-dcfg", },
+ 	{ .compatible = "fsl,ls1012a-dcfg", },
+ 	{ .compatible = "fsl,ls1046a-dcfg", },
++	{ .compatible = "fsl,lx2160a-dcfg", },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/221b2ff4/attachment.sig>
+2.7.4
