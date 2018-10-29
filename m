@@ -1,42 +1,54 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 29 Oct 2018 20:25:28 +1300
-Subject: [PATCH v5 1/8] ARM: l2c: move cache-aurora-l2.h to asm/hardware
+Date: Mon, 29 Oct 2018 20:25:32 +1300
+Subject: [PATCH v5 5/8] ARM: l2x0: add marvell,ecc-enable property for aurora
 In-Reply-To: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
 References: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20181029072535.31667-2-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181029072535.31667-6-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Luebbe <jlu@pengutronix.de>
+The aurora cache on the Marvell Armada-XP SoC supports ECC protection
+for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
+which can be used to enable this.
 
-This include file will be used by the AURORA EDAC code.
-
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h | 0
- arch/arm/mm/cache-l2x0.c                                | 2 +-
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h (100%)
+ Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
+ arch/arm/mm/cache-l2x0.c                         | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/mm/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-similarity index 100%
-rename from arch/arm/mm/cache-aurora-l2.h
-rename to arch/arm/include/asm/hardware/cache-aurora-l2.h
+diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+index fbe6cb21f4cf..15a84f0ba9f1 100644
+--- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+@@ -76,6 +76,8 @@ Optional properties:
+   specified to indicate that such transforms are precluded.
+ - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+ - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
++- marvell,ecc-enable : enable ECC protection on the L2 cache
++- marvell,ecc-disable : disable ECC protection on the L2 cache
+ - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
+   Some core tiles, especially ARM PB11MPCore have a faulty L220 cache that
+   will randomly hang unless outer sync operations are disabled.
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 808efbb89b88..a00d6f7fd34c 100644
+index b70bee74750d..644f786e4fa9 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -30,8 +30,8 @@
- #include <asm/cp15.h>
- #include <asm/cputype.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/hardware/cache-aurora-l2.h>
- #include "cache-tauros3.h"
--#include "cache-aurora-l2.h"
+@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
+ 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
+ 	}
  
- struct l2c_init_data {
- 	const char *type;
++	if (of_property_read_bool(np, "marvell,ecc-enable")) {
++		mask |= AURORA_ACR_ECC_EN;
++		val |= AURORA_ACR_ECC_EN;
++	} else if (of_property_read_bool(np, "marvell,ecc-disable")) {
++		mask |= AURORA_ACR_ECC_EN;
++	}
++
+ 	if (of_property_read_bool(np, "arm,parity-enable")) {
+ 		mask |= AURORA_ACR_PARITY_EN;
+ 		val |= AURORA_ACR_PARITY_EN;
 -- 
 2.19.1
