@@ -1,75 +1,163 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 29 Oct 2018 09:58:43 +0100
-Subject: [PATCH v2 02/15] clk: sunxi-ng: Add check for minimal rate to
- NKM PLLs
-In-Reply-To: <CAMty3ZC2wn-DjR+93yc-n-bAmVCHaEqR_=4XPddoo+7LjebTEg@mail.gmail.com>
-References: <20181023155035.9101-1-jagan@amarulasolutions.com>
- <20181023155035.9101-3-jagan@amarulasolutions.com>
- <20181024180436.5n3i3z6h2yezc4cv@flea>
- <CAMty3ZC2wn-DjR+93yc-n-bAmVCHaEqR_=4XPddoo+7LjebTEg@mail.gmail.com>
-Message-ID: <20181029085843.3bslqwktxbp2ywk2@flea>
+From: vabhav.sharma@nxp.com (Vabhav Sharma)
+Date: Mon, 29 Oct 2018 08:58:01 +0000
+Subject: [PATCH v7 6/6] arm64: dts: add LX2160ARDB board support
+In-Reply-To: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
+References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <1540759926-3641-7-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 04:25:59PM +0530, Jagan Teki wrote:
-> On Wed, Oct 24, 2018 at 11:34 PM Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Tue, Oct 23, 2018 at 09:20:22PM +0530, Jagan Teki wrote:
-> > > Some NKM PLLs doesn't work well when their output clock rate is set below
-> > > certain rate.
-> > >
-> > > So, add support for minimal rate for relevant PLLs.
-> > >
-> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > ---
-> > > Changes for v2:
-> > > - new patch
-> > >
-> > >  drivers/clk/sunxi-ng/ccu_nkm.c | 7 +++++++
-> > >  drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
-> > >  2 files changed, 8 insertions(+)
-> > >
-> > > diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> > > index 841840e35e61..d17539dc88dd 100644
-> > > --- a/drivers/clk/sunxi-ng/ccu_nkm.c
-> > > +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> > > @@ -125,6 +125,13 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
-> > >       if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> > >               rate *= nkm->fixed_post_div;
-> > >
-> > > +     if (rate < nkm->min_rate) {
-> > > +             rate = nkm->min_rate;
-> > > +             if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> > > +                     rate /= nkm->fixed_post_div;
-> >
-> > I'm not sure this is right. Is the post divider taken into account to
-> > calculate the minimum, or is the minimum on the rate before the fixed
-> > post divider.
-> 
-> Since we are returning from here, we need to take care post div which
-> is actually doing at the end of round_rate.
+LX2160A reference design board (RDB) is a high-performance
+computing, evaluation, and development platform with LX2160A
+SoC.
 
-That's not my point though. Does the rate needs to be superior to min
-/ post_div, or min?
+Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
+Signed-off-by: Horia Geanta <horia.geanta@nxp.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
+Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
+Acked-by: Li Yang <leoyang.li@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/Makefile            |   1 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 119 ++++++++++++++++++++++
+ 2 files changed, 120 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
 
-> >
-> > How did you test this?
-> 
-> I've not used this on PLL_MIPI atleast, so I didn't test this.
-
-If you've never tested this, why are you adding that code?
-
-Maxime
-
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 86e18ad..445b72b 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+new file mode 100644
+index 0000000..6481e5f
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+@@ -0,0 +1,119 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++//
++// Device Tree file for LX2160ARDB
++//
++// Copyright 2018 NXP
++
++/dts-v1/;
++
++#include "fsl-lx2160a.dtsi"
++
++/ {
++	model = "NXP Layerscape LX2160ARDB";
++	compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
++
++	aliases {
++		crypto = &crypto;
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	sb_3v3: regulator-sb3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "MC34717-3.3VSB";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++};
++
++&crypto {
++	status = "okay";
++};
++
++&esdhc0 {
++	sd-uhs-sdr104;
++	sd-uhs-sdr50;
++	sd-uhs-sdr25;
++	sd-uhs-sdr12;
++	status = "okay";
++};
++
++&esdhc1 {
++	mmc-hs200-1_8v;
++	mmc-hs400-1_8v;
++	bus-width = <8>;
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	i2c-mux at 77 {
++		compatible = "nxp,pca9547";
++		reg = <0x77>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x2>;
++
++			power-monitor at 40 {
++				compatible = "ti,ina220";
++				reg = <0x40>;
++				shunt-resistor = <1000>;
++			};
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x3>;
++
++			temperature-sensor at 4c {
++				compatible = "nxp,sa56004";
++				reg = <0x4c>;
++				vcc-supply = <&sb_3v3>;
++			};
++
++			temperature-sensor at 4d {
++				compatible = "nxp,sa56004";
++				reg = <0x4d>;
++				vcc-supply = <&sb_3v3>;
++			};
++		};
++	};
++};
++
++&i2c4 {
++	status = "okay";
++
++	rtc at 51 {
++		compatible = "nxp,pcf2129";
++		reg = <0x51>;
++		// IRQ10_B
++		interrupts = <0 150 0x4>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/2fe219e0/attachment.sig>
+2.7.4
