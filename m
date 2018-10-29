@@ -1,16 +1,93 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Mon, 29 Oct 2018 10:34:36 -0700
-Subject: [GIT PULL] Mailbox changes for v4.20
-In-Reply-To: <CABb+yY3Qwkr-kJS81eQqxk6-udwdy9fFHzefdNLbJc6=UhFoTw@mail.gmail.com>
-References: <CABb+yY3Qwkr-kJS81eQqxk6-udwdy9fFHzefdNLbJc6=UhFoTw@mail.gmail.com>
-Message-ID: <CAHk-=wjotOGHQuHmL3V+b9b1f9qcvpP5QAbWcU4ki69dFnKVGA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 29 Oct 2018 17:45:05 +0000
+Subject: [PATCH 1/2] ARM: cpuidle: Don't register the driver when
+ back-end init returns -ENXIO
+In-Reply-To: <20181026144843.3028-1-ulf.hansson@linaro.org>
+References: <../../misc/pm_patches/submitted_patches/cpuidle_arm_consolidate/0002-ARM-cpuidle-Convert-to-use-cpuidle_register-unregist.patch>
+ <20181026144843.3028-1-ulf.hansson@linaro.org>
+Message-ID: <20181029174456.GA9687@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 28, 2018 at 11:02 PM Jassi Brar <jassisinghbrar@gmail.com> wrote:
->
->   git://git.linaro.org/landing-teams/working/fujitsu/integration.git tags/mailbox-v4.20
+On Fri, Oct 26, 2018 at 04:48:43PM +0200, Ulf Hansson wrote:
+> There's no point to register the cpuidle driver for the current CPU, when
+> the initialization of the arch specific back-end data fails by returning
+> -ENXIO.
+> 
+> Instead, let's re-order the sequence to its original flow, by first trying
+> to initialize the back-end part and then act accordingly on the returned
+> error code. Additionally, let's print the error message, no matter of what
+> error code that was returned.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+> 
+> Note, as far as I can tell it's only qcom-spm that may return -ENXIO, which also
+> was original reason to why this error path was invented.
+> 
+> Unfurtunate I don't have a qcom spm platfrom at hand, however I manually tried
+> this by hacking the PSCI driver to return -ENXIO for some CPUs. So I assume it
+> should then also work for qcom spm.
+> 
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
+>  1 file changed, 10 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index 073557f433eb..df564d783216 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
+>  		goto out_kfree_drv;
+>  	}
+>  
+> -	ret = cpuidle_register_driver(drv);
+> -	if (ret) {
+> -		if (ret != -EBUSY)
+> -			pr_err("Failed to register cpuidle driver\n");
+> -		goto out_kfree_drv;
+> -	}
+> -
+>  	/*
+>  	 * Call arch CPU operations in order to initialize
+>  	 * idle states suspend back-end specific data
+> @@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
+>  	ret = arm_cpuidle_init(cpu);
+>  
+>  	/*
+> -	 * Skip the cpuidle device initialization if the reported
+> +	 * Allow the initialization to continue for other CPUs, if the reported
+>  	 * failure is a HW misconfiguration/breakage (-ENXIO).
+>  	 */
+> -	if (ret == -ENXIO)
+> -		return 0;
 
-Pulled,
+I wonder whether moving the drv allocation and dt initialization after
+arm_cpuidle_init(cpu) would simplify the error path; the patch makes sense
+the error path is getting a bit hard to read - maybe we can simplify it.
 
-              Linus
+I think, if you can single it out, it would be good to add a Fixes:
+tag too.
+
+Thanks,
+Lorenzo
+
+> -
+>  	if (ret) {
+>  		pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+> -		goto out_unregister_drv;
+> +		ret = ret == -ENXIO ? 0 : ret;
+> +		goto out_kfree_drv;
+> +	}
+> +
+> +	ret = cpuidle_register_driver(drv);
+> +	if (ret) {
+> +		if (ret != -EBUSY)
+> +			pr_err("Failed to register cpuidle driver\n");
+> +		goto out_kfree_drv;
+>  	}
+>  
+>  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> -- 
+> 2.17.1
+> 
