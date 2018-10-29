@@ -1,43 +1,52 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 29 Oct 2018 19:10:39 +0100
-Subject: [PATCH 1/2] ARM: cpuidle: Don't register the driver when back-end
- init returns -ENXIO
-In-Reply-To: <20181026144843.3028-1-ulf.hansson@linaro.org>
-References: <../../misc/pm_patches/submitted_patches/cpuidle_arm_consolidate/0002-ARM-cpuidle-Convert-to-use-cpuidle_register-unregist.patch>
- <20181026144843.3028-1-ulf.hansson@linaro.org>
-Message-ID: <6313b4d7-a2a7-98c4-3951-0a1c3e4ff2d5@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 29 Oct 2018 18:12:09 +0000
+Subject: [PATCH 2/2] ARM: cpuidle: Convert to use
+ cpuidle_register|unregister()
+In-Reply-To: <20181026144915.3084-1-ulf.hansson@linaro.org>
+References: <20181026144915.3084-1-ulf.hansson@linaro.org>
+Message-ID: <20181029181209.GB9687@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/10/2018 16:48, Ulf Hansson wrote:
-> There's no point to register the cpuidle driver for the current CPU, when
-> the initialization of the arch specific back-end data fails by returning
-> -ENXIO.
-> 
-> Instead, let's re-order the sequence to its original flow, by first trying
-> to initialize the back-end part and then act accordingly on the returned
-> error code. Additionally, let's print the error message, no matter of what
-> error code that was returned.
+On Fri, Oct 26, 2018 at 04:49:15PM +0200, Ulf Hansson wrote:
+> The only reason that remains, to why the ARM cpuidle driver calls
+> cpuidle_register_driver(), is to avoid printing an error message in case
+> another driver already have been registered for the CPU. This seems a bit
+> silly, but more importantly, if that is a common scenario, perhaps we
+> should change cpuidle_register() accordingly instead.
+
+I can't remember if there was a specific reason why we wanted to avoid
+the kernel log on -EBUSY but I agree that's questionable.
+
+> In either case, let's consolidate the code, by converting to use
+> cpuidle_register|unregsiter(), which also avoids the unnecessary allocation
+
+s/unregsiter/unregister/
+
+> of the struct cpuidle_device.
 > 
 > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
-> 
-> Note, as far as I can tell it's only qcom-spm that may return -ENXIO, which also
-> was original reason to why this error path was invented.
-> 
-> Unfurtunate I don't have a qcom spm platfrom at hand, however I manually tried
-> this by hacking the PSCI driver to return -ENXIO for some CPUs. So I assume it
-> should then also work for qcom spm.
-> 
-> ---
->  drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
->  1 file changed, 10 insertions(+), 12 deletions(-)
-> 
+>  drivers/cpuidle/cpuidle-arm.c | 30 +++---------------------------
+>  1 file changed, 3 insertions(+), 27 deletions(-)
+
+It seems correct to me:
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
 > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 073557f433eb..df564d783216 100644
+> index df564d783216..3a407a3ef22b 100644
 > --- a/drivers/cpuidle/cpuidle-arm.c
 > +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
+> @@ -82,7 +82,6 @@ static int __init arm_idle_init_cpu(int cpu)
+>  {
+>  	int ret;
+>  	struct cpuidle_driver *drv;
+> -	struct cpuidle_device *dev;
+>  
+>  	drv = kmemdup(&arm_idle_driver, sizeof(*drv), GFP_KERNEL);
+>  	if (!drv)
+> @@ -119,33 +118,12 @@ static int __init arm_idle_init_cpu(int cpu)
 >  		goto out_kfree_drv;
 >  	}
 >  
@@ -45,70 +54,45 @@ On 26/10/2018 16:48, Ulf Hansson wrote:
 > -	if (ret) {
 > -		if (ret != -EBUSY)
 > -			pr_err("Failed to register cpuidle driver\n");
-> -		goto out_kfree_drv;
+> +	ret = cpuidle_register(drv, NULL);
+> +	if (ret)
+>  		goto out_kfree_drv;
 > -	}
 > -
-
-Why not move the following block at the beginning of the function ?
-
---->
-
-        /*
-         * Call arch CPU operations in order to initialize
-         * idle states suspend back-end specific data
-         */
-        ret = arm_cpuidle_init(cpu);
-
-        /*
-         * Skip the cpuidle device initialization if the reported
-         * failure is a HW misconfiguration/breakage (-ENXIO).
-         */
-        if (ret == -ENXIO)
-                return 0;
-
-        if (ret) {
-                pr_err("CPU %d failed to init idle CPU ops\n", cpu);
-                s/goto out_unregister_drv;/return ret;/
-        }
-
-<---
-
-
->  	/*
->  	 * Call arch CPU operations in order to initialize
->  	 * idle states suspend back-end specific data
-> @@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
->  	ret = arm_cpuidle_init(cpu);
->  
->  	/*
-> -	 * Skip the cpuidle device initialization if the reported
-> +	 * Allow the initialization to continue for other CPUs, if the reported
->  	 * failure is a HW misconfiguration/breakage (-ENXIO).
->  	 */
-> -	if (ret == -ENXIO)
-> -		return 0;
-> -
->  	if (ret) {
->  		pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+> -	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> -	if (!dev) {
+> -		ret = -ENOMEM;
 > -		goto out_unregister_drv;
-> +		ret = ret == -ENXIO ? 0 : ret;
-> +		goto out_kfree_drv;
-> +	}
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		if (ret != -EBUSY)
-> +			pr_err("Failed to register cpuidle driver\n");
-> +		goto out_kfree_drv;
+> -	}
+> -	dev->cpu = cpu;
+> -
+> -	ret = cpuidle_register_device(dev);
+> -	if (ret) {
+> -		pr_err("Failed to register cpuidle device for CPU %d\n",
+> -		       cpu);
+> -		goto out_kfree_dev;
+> -	}
+>  
+>  	return 0;
+>  
+> -out_kfree_dev:
+> -	kfree(dev);
+> -out_unregister_drv:
+> -	cpuidle_unregister_driver(drv);
+>  out_kfree_drv:
+>  	kfree(drv);
+>  	return ret;
+> @@ -176,9 +154,7 @@ static int __init arm_idle_init(void)
+>  	while (--cpu >= 0) {
+>  		dev = per_cpu(cpuidle_devices, cpu);
+>  		drv = cpuidle_get_cpu_driver(dev);
+> -		cpuidle_unregister_device(dev);
+> -		cpuidle_unregister_driver(drv);
+> -		kfree(dev);
+> +		cpuidle_unregister(drv);
+>  		kfree(drv);
 >  	}
 >  
->  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> -- 
+> 2.17.1
 > 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
