@@ -1,81 +1,165 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 29 Oct 2018 19:56:27 +0530
-Subject: [PATCH v3 12/25] drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet
- overhead
-In-Reply-To: <20181029092227.mdxgvg5aqzh22j72@flea>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181026144344.27778-13-jagan@amarulasolutions.com>
- <20181029092227.mdxgvg5aqzh22j72@flea>
-Message-ID: <CAMty3ZBHU5eXRLLJmUroLgSKcF6O9gHOHRM1XBnt9_Lp7B8rEA@mail.gmail.com>
+From: RAJANV@xilinx.com (Rajan Vaja)
+Date: Mon, 29 Oct 2018 14:27:18 +0000
+Subject: [PATCH v3 0/4] drivers: soc: xilinx: Add support for ZynqMP power
+ domain driver
+In-Reply-To: <20181012145251.GA6489@bogus>
+References: <1538688221-9823-1-git-send-email-jollys@xilinx.com>
+ <BL2PR02MB2130719D4A82F429745DDBEEB8E00@BL2PR02MB2130.namprd02.prod.outlook.com>
+ <20181012145251.GA6489@bogus>
+Message-ID: <BYAPR02MB40556D3EDE9892943073662DB7F30@BYAPR02MB4055.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 2:52 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Fri, Oct 26, 2018 at 08:13:31PM +0530, Jagan Teki wrote:
-> > Add 10 bytes packet overhead for hblk where blank is set using
-> > a blanking packet like (4 bytes + 4 bytes + payload + 2 bytes)
-> >
-> > This is according to BSP code from BPI-M64-bsp
-> > (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> > dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
-> >
-> > So, add 10 bytes packet overhead for DSI hblk.
-> >
-> > Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > Tested-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> > Changes for v3:
-> > - new patch
-> > Changes for v2:
-> > - none
-> >
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 9 +++++++--
-> >  1 file changed, 7 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > index 596e560263bf..cf42be1f1ba1 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -461,7 +461,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
-> >  {
-> >       struct mipi_dsi_device *device = dsi->device;
-> >       unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-> > -     u16 hbp, hfp, hsa, hblk, vblk;
-> > +     u16 hbp, hfp, hsa, hblk_max, hblk, vblk;
-> >       size_t bytes;
-> >       u8 *buffer;
-> >
-> > @@ -494,8 +494,13 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
-> >
-> >       /*
-> >        * hblk seems to be the line + porches length.
-> > +      * The blank is set using a blanking packet (4 bytes + 4 bytes +
-> > +      * payload + 2 bytes). So minimal size is 10 bytes
-> >        */
-> > -     hblk = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
-> > +#define HBLK_PACKET_OVERHEAD 10
-> > +     hblk_max = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
-> > +     hblk_max -= HBLK_PACKET_OVERHEAD;
-> > +     hblk = max((unsigned int)HBLK_PACKET_OVERHEAD, hblk_max);
->
-> I'd rather use the same convention than the other assignments done
-> before in that function.
+Hi Rob,
 
-Yes, old code did use hsa. but it's added 10 bytes packet head instead
-of subtracting it.
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: 12 October 2018 08:23 PM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
+> geert+renesas at glider.be; bjorn.andersson at linaro.org; sean.wang at mediatek.com;
+> m.szyprowski at samsung.com; Michal Simek <michals@xilinx.com>;
+> mark.rutland at arm.com; devicetree at vger.kernel.org; Rajan Vaja
+> <RAJANV@xilinx.com>; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 0/4] drivers: soc: xilinx: Add support for ZynqMP power
+> domain driver
+> 
+> On Wed, Oct 10, 2018 at 06:41:44PM +0000, Jolly Shah wrote:
+> > Ping for comments
+> 
+> Please see my comments on other ZynqMP firmware patches. In summary, I
+> need to see a complete binding, not piecemeal additions.
+[Rajan] Based on your suggestion to have complete zynqmp firmware binding, we can
+have two options:
 
-hblk = mode->htotal * Bpp - hsa;
-=> mode->htotal * Bpp - (mode->hsync_end - mode->hsync_start) * Bpp -
-HSA_PACKET_OVERHEAD);
-=> (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp +
-HSA_PACKET_OVERHEAD;
+1. Use firmware node instead of having separate subnodes for dependent
+drivers(genpd, reset, nvmem, etc). In this case, firmware driver
+needs to take care of probing of depedent drivers. We have thought of
+MFD approach to probe depedent drivers. Firmware driver would register
+depedent drivers as MFD child devices from firmware probe. 
 
-And it should be
-(mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp -
-HSA_PACKET_OVERHEAD;
+	firmware {
+		zynqmp_firmware: zynqmp-firmware {
+			compatible = "xlnx,zynqmp-firmware";
+			method = "smc";
+			#power-domain-cells = <1>;
+		};
+	};
 
-This patch is simply doing the same by explicitly adding packet over
-ahead macro, which again used in hfp.
+	sata {
+		...
+		power-domains = <&zynqmp_firmware 2>;
+		...
+	};
+
+drivers/firmware/xilinx/zynqmp.c: zynqmp_firmware_probe(struct platform_device *pdev)
+	static const struct mfd_cell firmware_devs[] = {
+		{
+			.name = "zynqmp_power_controller",
+		},
+	};
+
+	ret = mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE, firmware_devs,
+				ARRAY_SIZE(firmware_devs), NULL, 0, NULL);
+
+2. Keep separate node for each device outside (in parralel to) zynqmp-firmware node.
+In this case, each firmware driver consumer is independet driver/binding.
+Order of probe can be taken care by -EPROBE defer mechanism.
+
+Example:
+	firmware {
+		zynqmp_firmware: zynqmp-firmware {
+			compatible = "xlnx,zynqmp-firmware";
+			method = "smc";
+		};
+	};
+		
+	zynqmp_power_domains: zynqmp-power-domains {
+		...
+		compatible = "xlnx,zynqmp-genpd";
+		#power-domain-cells = <1>;
+		...
+	};
+
+	sata {
+		...
+		power-domains = <&zynqmp_power_domains 2>;
+		...
+	};
+
+Please let us know your inputs and suggest better approach so we can submit
+changes accordingly.
+
+Thanks,
+Rajan
+> 
+> Rob
+> 
+> >
+> > Thanks,
+> > Jolly Shah
+> >
+> > > -----Original Message-----
+> > > From: Jolly Shah [mailto:jolly.shah at xilinx.com]
+> > > Sent: Thursday, October 04, 2018 2:24 PM
+> > > To: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
+> > > geert+renesas at glider.be; bjorn.andersson at linaro.org;
+> > > sean.wang at mediatek.com; m.szyprowski at samsung.com; Michal Simek
+> > > <michals@xilinx.com>; robh+dt at kernel.org; mark.rutland at arm.com
+> > > Cc: Rajan Vaja <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+> > > kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
+> > > <JOLLYS@xilinx.com>
+> > > Subject: [PATCH v3 0/4] drivers: soc: xilinx: Add support for ZynqMP power
+> > > domain driver
+> > >
+> > > The zynqmp power domain driver communicates the usage requirements for
+> > > logical power domains / devices to the platform FW.
+> > > FW is responsible for choosing appropriate power states, taking Linux' usage
+> > > information into account.
+> > >
+> > > This patch series is based on top of Xilinx firmware patch set:
+> > > https://patchwork.kernel.org/cover/10555405/
+> > >
+> > > v3:
+> > >  - Changed binding to have FW node as a power controller as suggested by Rob
+> > >  - Updated FW driver to register it as mfd child devices from firmware probe
+> > >  - Move bindings location as suggested
+> > >
+> > > v2:
+> > >  - Rebased on top of latest firmware driver patch series
+> > >  - Updated driver name from zynqmp-genpd to zynqmp-power-controller
+> > >  - Updated device tree bindings to move power controller node under firmware
+> > > node
+> > >
+> > > Jolly Shah (1):
+> > >   drivers: soc: xilinx: Add ZynqMP power domain driver
+> > >
+> > > Rajan Vaja (3):
+> > >   dt-bindings: power: Add ZynqMP power domain bindings
+> > >   firmware: xilinx: Add APIs to control node status/power
+> > >   firmware: xilinx: Add node IDs for zynqmp firmware
+> > >
+> > >  .../bindings/power/xlnx,zynqmp-genpd.txt           |  34 ++
+> > >  drivers/firmware/xilinx/Kconfig                    |   1 +
+> > >  drivers/firmware/xilinx/zynqmp.c                   |  73 ++++
+> > >  drivers/soc/xilinx/Kconfig                         |   9 +
+> > >  drivers/soc/xilinx/Makefile                        |   2 +
+> > >  drivers/soc/xilinx/zynqmp_pm_domains.c             | 403
+> > > +++++++++++++++++++++
+> > >  include/dt-bindings/power/xlnx-zynqmp-power.h      |  39 ++
+> > >  include/linux/firmware/xlnx-zynqmp.h               |  98 +++++
+> > >  8 files changed, 659 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/power/xlnx,zynqmp-
+> > > genpd.txt
+> > >  create mode 100644 drivers/soc/xilinx/zynqmp_pm_domains.c
+> > >  create mode 100644 include/dt-bindings/power/xlnx-zynqmp-power.h
+> > >
+> > > --
+> > > 2.7.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
