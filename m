@@ -1,185 +1,348 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 29 Oct 2018 09:49:10 -0400 (EDT)
-Subject: [PATCH v4] ARM: Optimise copy_{from/to}_user for !CPU_USE_DOMAINS
-In-Reply-To: <20181029080635.28973-1-vincent.whitchurch@axis.com>
-References: <20181029080635.28973-1-vincent.whitchurch@axis.com>
-Message-ID: <nycvar.YSQ.7.76.1810290948230.1498@knanqh.ubzr>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 29 Oct 2018 15:15:13 +0100
+Subject: [PATCH v6 7/7] drm/rockchip: dsi: add dual mipi support
+In-Reply-To: <20181001123845.11818-8-heiko@sntech.de>
+References: <20181001123845.11818-1-heiko@sntech.de>
+ <CGME20181001123907epcas4p1a0537f565124dbb5a90aa67dec24604e@epcas4p1.samsung.com>
+ <20181001123845.11818-8-heiko@sntech.de>
+Message-ID: <700d5f2e-7351-de83-0384-8423df39d8bd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Oct 2018, Vincent Whitchurch wrote:
+On 01.10.2018 14:38, Heiko Stuebner wrote:
+> Add the Rockchip-sepcific dual-dsi setup and hook it into the VOP as well.
+> As described in the general dual-dsi devicetree binding, the panel should
+> define two input ports and point each of them to one of the used dsi-
+> controllers, as well as declare one of them as clock-master.
+> This is used to determine the dual-dsi state and get access to both
+> controller instances.
+>
+> v6:
+>   handle master+slave component in dsi-attach
+> v5:
+>   use driver-internal mechanism to find dual dsi slave
+> v4:
+>   add component directly in probe when adding empty dsi slave controller
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-> ARMv6+ processors do not use CONFIG_CPU_USE_DOMAINS and use privileged
-> ldr/str instructions in copy_{from/to}_user.  They are currently
-> unnecessarily using single ldr/str instructions and can use ldm/stm
-> instructions instead like memcpy does (but with appropriate fixup
-> tables).
-> 
-> This speeds up a "dd if=foo of=bar bs=32k" on a tmpfs filesystem by
-> about 4% on my Cortex-A9.
-> 
-> before:134217728 bytes (128.0MB) copied, 0.543848 seconds, 235.4MB/s
-> before:134217728 bytes (128.0MB) copied, 0.538610 seconds, 237.6MB/s
-> before:134217728 bytes (128.0MB) copied, 0.544356 seconds, 235.1MB/s
-> before:134217728 bytes (128.0MB) copied, 0.544364 seconds, 235.1MB/s
-> before:134217728 bytes (128.0MB) copied, 0.537130 seconds, 238.3MB/s
-> before:134217728 bytes (128.0MB) copied, 0.533443 seconds, 240.0MB/s
-> before:134217728 bytes (128.0MB) copied, 0.545691 seconds, 234.6MB/s
-> before:134217728 bytes (128.0MB) copied, 0.534695 seconds, 239.4MB/s
-> before:134217728 bytes (128.0MB) copied, 0.540561 seconds, 236.8MB/s
-> before:134217728 bytes (128.0MB) copied, 0.541025 seconds, 236.6MB/s
-> 
->  after:134217728 bytes (128.0MB) copied, 0.520445 seconds, 245.9MB/s
->  after:134217728 bytes (128.0MB) copied, 0.527846 seconds, 242.5MB/s
->  after:134217728 bytes (128.0MB) copied, 0.519510 seconds, 246.4MB/s
->  after:134217728 bytes (128.0MB) copied, 0.527231 seconds, 242.8MB/s
->  after:134217728 bytes (128.0MB) copied, 0.525030 seconds, 243.8MB/s
->  after:134217728 bytes (128.0MB) copied, 0.524236 seconds, 244.2MB/s
->  after:134217728 bytes (128.0MB) copied, 0.523659 seconds, 244.4MB/s
->  after:134217728 bytes (128.0MB) copied, 0.525018 seconds, 243.8MB/s
->  after:134217728 bytes (128.0MB) copied, 0.519249 seconds, 246.5MB/s
->  after:134217728 bytes (128.0MB) copied, 0.518527 seconds, 246.9MB/s
-> 
-> Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+This is not what I really like (putting dual display functionality into
+poor dsi driver), but it at least works.
+So:
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
+The patchset is quite long on the list so if there will be no objections
+I will merge it tomorrow.
 
+?--
+Regards
+Andrzej
 
 > ---
-> v4: Do not modify str1b/ldr1b
-> v3: Explicitly add IT instructions to fix fault handling on Thumb-2
-> v2: Group *_SHIFT #defines with respective .macro implementations
-> 
->  arch/arm/include/asm/assembler.h |  6 ++++--
->  arch/arm/lib/copy_from_user.S    | 23 ++++++++++++++++++++++-
->  arch/arm/lib/copy_to_user.S      | 27 ++++++++++++++++++++++-----
->  3 files changed, 48 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index b17ee03d280b..da16d31c7ef9 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -243,13 +243,15 @@
->  	.endm
->  #endif
+>  .../gpu/drm/rockchip/dw-mipi-dsi-rockchip.c   | 136 ++++++++++++++++++
+>  drivers/gpu/drm/rockchip/rockchip_drm_drv.h   |   1 +
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c   |   3 +
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.h   |   4 +
+>  drivers/gpu/drm/rockchip/rockchip_vop_reg.c   |   1 +
+>  5 files changed, 145 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+> index b3aae8439aa3..63b028602d08 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+> @@ -218,6 +218,10 @@ struct dw_mipi_dsi_rockchip {
+>  	struct clk *grf_clk;
+>  	struct clk *phy_cfg_clk;
 >  
-> -#define USER(x...)				\
-> +#define USERL(l, x...)				\
->  9999:	x;					\
->  	.pushsection __ex_table,"a";		\
->  	.align	3;				\
-> -	.long	9999b,9001f;			\
-> +	.long	9999b,l;			\
->  	.popsection
+> +	/* dual-channel */
+> +	bool is_slave;
+> +	struct dw_mipi_dsi_rockchip *slave;
+> +
+>  	unsigned int lane_mbps; /* per lane */
+>  	u16 input_div;
+>  	u16 feedback_div;
+> @@ -226,6 +230,7 @@ struct dw_mipi_dsi_rockchip {
+>  	struct dw_mipi_dsi *dmd;
+>  	const struct rockchip_dw_dsi_chip_data *cdata;
+>  	struct dw_mipi_dsi_plat_data pdata;
+> +	int devcnt;
+>  };
 >  
-> +#define USER(x...)	USERL(9001f, x)
-> +
->  #ifdef CONFIG_SMP
->  #define ALT_SMP(instr...)					\
->  9998:	instr
-> diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-> index a826df3d3814..3f79001830fe 100644
-> --- a/arch/arm/lib/copy_from_user.S
-> +++ b/arch/arm/lib/copy_from_user.S
-> @@ -34,12 +34,13 @@
->   *	Number of bytes NOT copied.
->   */
+>  struct dphy_pll_parameter_map {
+> @@ -602,6 +607,8 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+>  	}
 >  
-> +#ifdef CONFIG_CPU_USE_DOMAINS
-> +
->  #ifndef CONFIG_THUMB2_KERNEL
->  #define LDR1W_SHIFT	0
->  #else
->  #define LDR1W_SHIFT	1
->  #endif
-> -#define STR1W_SHIFT	0
+>  	s->output_type = DRM_MODE_CONNECTOR_DSI;
+> +	if (dsi->slave)
+> +		s->output_flags = ROCKCHIP_OUTPUT_DSI_DUAL;
 >  
->  	.macro ldr1w ptr reg abort
->  	ldrusr	\reg, \ptr, 4, abort=\abort
-> @@ -57,10 +58,30 @@
->  	ldr4w \ptr, \reg5, \reg6, \reg7, \reg8, \abort
->  	.endm
+>  	return 0;
+>  }
+> @@ -617,6 +624,8 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  		return;
 >  
-> +#else
-> +
-> +#define LDR1W_SHIFT	0
-> +
-> +	.macro ldr1w ptr reg abort
-> +	USERL(\abort, W(ldr) \reg, [\ptr], #4)
-> +	.endm
-> +
-> +	.macro ldr4w ptr reg1 reg2 reg3 reg4 abort
-> +	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4})
-> +	.endm
-> +
-> +	.macro ldr8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-> +	USERL(\abort, ldmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
-> +	.endm
-> +
-> +#endif /* CONFIG_CPU_USE_DOMAINS */
-> +
->  	.macro ldr1b ptr reg cond=al abort
->  	ldrusr	\reg, \ptr, 1, \cond, abort=\abort
->  	.endm
+>  	pm_runtime_get_sync(dsi->dev);
+> +	if (dsi->slave)
+> +		pm_runtime_get_sync(dsi->slave->dev);
 >  
-> +#define STR1W_SHIFT	0
-> +
->  	.macro str1w ptr reg abort
->  	W(str) \reg, [\ptr], #4
->  	.endm
-> diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-> index caf5019d8161..5cb28f6c7941 100644
-> --- a/arch/arm/lib/copy_to_user.S
-> +++ b/arch/arm/lib/copy_to_user.S
-> @@ -35,11 +35,6 @@
->   */
+>  	/*
+>  	 * For the RK3399, the clk of grf must be enabled before writing grf
+> @@ -630,6 +639,8 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  	}
 >  
->  #define LDR1W_SHIFT	0
-> -#ifndef CONFIG_THUMB2_KERNEL
-> -#define STR1W_SHIFT	0
-> -#else
-> -#define STR1W_SHIFT	1
-> -#endif
+>  	dw_mipi_dsi_rockchip_config(dsi, mux);
+> +	if (dsi->slave)
+> +		dw_mipi_dsi_rockchip_config(dsi->slave, mux);
 >  
->  	.macro ldr1w ptr reg abort
->  	W(ldr) \reg, [\ptr], #4
-> @@ -57,6 +52,14 @@
->  	ldr\cond\()b \reg, [\ptr], #1
->  	.endm
+>  	clk_disable_unprepare(dsi->grf_clk);
+>  }
+> @@ -638,6 +649,8 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+>  {
+>  	struct dw_mipi_dsi_rockchip *dsi = to_dsi(encoder);
 >  
-> +#ifdef CONFIG_CPU_USE_DOMAINS
-> +
-> +#ifndef CONFIG_THUMB2_KERNEL
-> +#define STR1W_SHIFT	0
-> +#else
-> +#define STR1W_SHIFT	1
-> +#endif
-> +
->  	.macro str1w ptr reg abort
->  	strusr	\reg, \ptr, 4, abort=\abort
->  	.endm
-> @@ -72,6 +75,20 @@
->  	str1w \ptr, \reg8, \abort
->  	.endm
+> +	if (dsi->slave)
+> +		pm_runtime_put(dsi->slave->dev);
+>  	pm_runtime_put(dsi->dev);
+>  }
 >  
-> +#else
+> @@ -673,14 +686,113 @@ static int rockchip_dsi_drm_create_encoder(struct dw_mipi_dsi_rockchip *dsi,
+>  	return 0;
+>  }
+>  
+> +static struct device
+> +*dw_mipi_dsi_rockchip_find_second(struct dw_mipi_dsi_rockchip *dsi)
+> +{
+> +	const struct of_device_id *match;
+> +	struct device_node *node = NULL, *local;
 > +
-> +#define STR1W_SHIFT	0
+> +	match = of_match_device(dsi->dev->driver->of_match_table, dsi->dev);
 > +
-> +	.macro str1w ptr reg abort
-> +	USERL(\abort, W(str) \reg, [\ptr], #4)
-> +	.endm
+> +	local = of_graph_get_remote_node(dsi->dev->of_node, 1, 0);
+> +	if (!local)
+> +		return NULL;
 > +
-> +	.macro str8w ptr reg1 reg2 reg3 reg4 reg5 reg6 reg7 reg8 abort
-> +	USERL(\abort, stmia \ptr!, {\reg1, \reg2, \reg3, \reg4, \reg5, \reg6, \reg7, \reg8})
-> +	.endm
+> +	while ((node = of_find_compatible_node(node, NULL,
+> +					       match->compatible))) {
+> +		struct device_node *remote;
 > +
-> +#endif /* CONFIG_CPU_USE_DOMAINS */
+> +		/* found ourself */
+> +		if (node == dsi->dev->of_node)
+> +			continue;
 > +
->  	.macro str1b ptr reg cond=al abort
->  	strusr	\reg, \ptr, 1, \cond, abort=\abort
->  	.endm
-> -- 
-> 2.11.0
-> 
-> 
+> +		remote = of_graph_get_remote_node(node, 1, 0);
+> +		if (!remote)
+> +			continue;
+> +
+> +		/* same display device in port1-ep0 for both */
+> +		if (remote == local) {
+> +			struct dw_mipi_dsi_rockchip *dsi2;
+> +			struct platform_device *pdev;
+> +
+> +			pdev = of_find_device_by_node(node);
+> +
+> +			/*
+> +			 * we have found the second, so will either return it
+> +			 * or return with an error. In any case won't need the
+> +			 * nodes anymore nor continue the loop.
+> +			 */
+> +			of_node_put(remote);
+> +			of_node_put(node);
+> +			of_node_put(local);
+> +
+> +			if (!pdev)
+> +				return ERR_PTR(-EPROBE_DEFER);
+> +
+> +			dsi2 = platform_get_drvdata(pdev);
+> +			if (!dsi2) {
+> +				platform_device_put(pdev);
+> +				return ERR_PTR(-EPROBE_DEFER);
+> +			}
+> +
+> +			return &pdev->dev;
+> +		}
+> +
+> +		of_node_put(remote);
+> +	}
+> +
+> +	of_node_put(local);
+> +
+> +	return NULL;
+> +}
+> +
+>  static int dw_mipi_dsi_rockchip_bind(struct device *dev,
+>  				     struct device *master,
+>  				     void *data)
+>  {
+>  	struct dw_mipi_dsi_rockchip *dsi = dev_get_drvdata(dev);
+>  	struct drm_device *drm_dev = data;
+> +	struct device *second;
+> +	bool master1, master2;
+>  	int ret;
+>  
+> +	second = dw_mipi_dsi_rockchip_find_second(dsi);
+> +	if (IS_ERR(second))
+> +		return PTR_ERR(second);
+> +
+> +	if (second) {
+> +		master1 = of_property_read_bool(dsi->dev->of_node,
+> +						"clock-master");
+> +		master2 = of_property_read_bool(second->of_node,
+> +						"clock-master");
+> +
+> +		if (master1 && master2) {
+> +			DRM_DEV_ERROR(dsi->dev, "only one clock-master allowed\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		if (!master1 && !master2) {
+> +			DRM_DEV_ERROR(dsi->dev, "no clock-master defined\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		/* we are the slave in dual-DSI */
+> +		if (!master1) {
+> +			dsi->is_slave = true;
+> +			return 0;
+> +		}
+> +
+> +		dsi->slave = dev_get_drvdata(second);
+> +		if (!dsi->slave) {
+> +			DRM_DEV_ERROR(dev, "could not get slaves data\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		dsi->slave->is_slave = true;
+> +		dw_mipi_dsi_set_slave(dsi->dmd, dsi->slave->dmd);
+> +		put_device(second);
+> +	}
+> +
+>  	ret = clk_prepare_enable(dsi->pllref_clk);
+>  	if (ret) {
+>  		DRM_DEV_ERROR(dev, "Failed to enable pllref_clk: %d\n", ret);
+> @@ -708,6 +819,9 @@ static void dw_mipi_dsi_rockchip_unbind(struct device *dev,
+>  {
+>  	struct dw_mipi_dsi_rockchip *dsi = dev_get_drvdata(dev);
+>  
+> +	if (dsi->is_slave)
+> +		return;
+> +
+>  	dw_mipi_dsi_unbind(dsi->dmd);
+>  
+>  	clk_disable_unprepare(dsi->pllref_clk);
+> @@ -722,6 +836,7 @@ static int dw_mipi_dsi_rockchip_host_attach(void *priv_data,
+>  					    struct mipi_dsi_device *device)
+>  {
+>  	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+> +	struct device *second;
+>  	int ret;
+>  
+>  	ret = component_add(dsi->dev, &dw_mipi_dsi_rockchip_ops);
+> @@ -731,6 +846,19 @@ static int dw_mipi_dsi_rockchip_host_attach(void *priv_data,
+>  		return ret;
+>  	}
+>  
+> +	second = dw_mipi_dsi_rockchip_find_second(dsi);
+> +	if (IS_ERR(second))
+> +		return PTR_ERR(second);
+> +	if (second) {
+> +		ret = component_add(second, &dw_mipi_dsi_rockchip_ops);
+> +		if (ret) {
+> +			DRM_DEV_ERROR(second,
+> +				      "Failed to register component: %d\n",
+> +				      ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> @@ -738,6 +866,11 @@ static int dw_mipi_dsi_rockchip_host_detach(void *priv_data,
+>  					    struct mipi_dsi_device *device)
+>  {
+>  	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+> +	struct device *second;
+> +
+> +	second = dw_mipi_dsi_rockchip_find_second(dsi);
+> +	if (second && !IS_ERR(second))
+> +		component_del(second, &dw_mipi_dsi_rockchip_ops);
+>  
+>  	component_del(dsi->dev, &dw_mipi_dsi_rockchip_ops);
+>  
+> @@ -846,6 +979,9 @@ static int dw_mipi_dsi_rockchip_remove(struct platform_device *pdev)
+>  {
+>  	struct dw_mipi_dsi_rockchip *dsi = platform_get_drvdata(pdev);
+>  
+> +	if (dsi->devcnt == 0)
+> +		component_del(dsi->dev, &dw_mipi_dsi_rockchip_ops);
+> +
+>  	dw_mipi_dsi_remove(dsi->dmd);
+>  
+>  	return 0;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> index 453fef6a55b9..ce48568ec8a0 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> @@ -37,6 +37,7 @@ struct rockchip_crtc_state {
+>  	int output_type;
+>  	int output_mode;
+>  	int output_bpc;
+> +	int output_flags;
+>  };
+>  #define to_rockchip_crtc_state(s) \
+>  		container_of(s, struct rockchip_crtc_state, base)
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 0c35a88e33dd..fb70fb486fbf 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -916,6 +916,7 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
+>  	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ?
+>  		   BIT(VSYNC_POSITIVE) : 0;
+>  	VOP_REG_SET(vop, output, pin_pol, pin_pol);
+> +	VOP_REG_SET(vop, output, mipi_dual_channel_en, 0);
+>  
+>  	switch (s->output_type) {
+>  	case DRM_MODE_CONNECTOR_LVDS:
+> @@ -933,6 +934,8 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
+>  	case DRM_MODE_CONNECTOR_DSI:
+>  		VOP_REG_SET(vop, output, mipi_pin_pol, pin_pol);
+>  		VOP_REG_SET(vop, output, mipi_en, 1);
+> +		VOP_REG_SET(vop, output, mipi_dual_channel_en,
+> +			    !!(s->output_flags & ROCKCHIP_OUTPUT_DSI_DUAL));
+>  		break;
+>  	case DRM_MODE_CONNECTOR_DisplayPort:
+>  		pin_pol &= ~BIT(DCLK_INVERT);
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+> index fd5765dfd637..0fe40e1983d9 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+> @@ -60,6 +60,7 @@ struct vop_output {
+>  	struct vop_reg edp_en;
+>  	struct vop_reg hdmi_en;
+>  	struct vop_reg mipi_en;
+> +	struct vop_reg mipi_dual_channel_en;
+>  	struct vop_reg rgb_en;
+>  };
+>  
+> @@ -214,6 +215,9 @@ struct vop_data {
+>  /* for use special outface */
+>  #define ROCKCHIP_OUT_MODE_AAAA	15
+>  
+> +/* output flags */
+> +#define ROCKCHIP_OUTPUT_DSI_DUAL	BIT(0)
+> +
+>  enum alpha_mode {
+>  	ALPHA_STRAIGHT,
+>  	ALPHA_INVERSE,
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> index 047a8867af90..08fc40af52c8 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> @@ -634,6 +634,7 @@ static const struct vop_output rk3399_output = {
+>  	.hdmi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 13),
+>  	.edp_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 14),
+>  	.mipi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 15),
+> +	.mipi_dual_channel_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 3),
+>  };
+>  
+>  static const struct vop_data rk3399_vop_big = {
