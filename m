@@ -1,98 +1,79 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 29 Oct 2018 18:12:09 +0000
-Subject: [PATCH 2/2] ARM: cpuidle: Convert to use
- cpuidle_register|unregister()
-In-Reply-To: <20181026144915.3084-1-ulf.hansson@linaro.org>
-References: <20181026144915.3084-1-ulf.hansson@linaro.org>
-Message-ID: <20181029181209.GB9687@e107981-ln.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Oct 2018 19:10:00 +0000
+Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
+In-Reply-To: <20180927224609.19515-1-robdclark@gmail.com>
+References: <20180927224609.19515-1-robdclark@gmail.com>
+Message-ID: <20181029191000.GD16739@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 04:49:15PM +0200, Ulf Hansson wrote:
-> The only reason that remains, to why the ARM cpuidle driver calls
-> cpuidle_register_driver(), is to avoid printing an error message in case
-> another driver already have been registered for the CPU. This seems a bit
-> silly, but more importantly, if that is a common scenario, perhaps we
-> should change cpuidle_register() accordingly instead.
-
-I can't remember if there was a specific reason why we wanted to avoid
-the kernel log on -EBUSY but I agree that's questionable.
-
-> In either case, let's consolidate the code, by converting to use
-> cpuidle_register|unregsiter(), which also avoids the unnecessary allocation
-
-s/unregsiter/unregister/
-
-> of the struct cpuidle_device.
+On Thu, Sep 27, 2018 at 06:46:07PM -0400, Rob Clark wrote:
+> We seem to need to set either this or CFCFG (stall), otherwise gpu
+> faults trigger problems with other in-flight transactions from the
+> GPU causing CP errors, etc.
 > 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> In the ARM SMMU spec, the 'Hit under previous context fault' bit is
+> described as:
+> 
+>  '0' - Stall or terminate subsequent transactions in the presence
+>        of an outstanding context fault
+>  '1' - Process all subsequent transactions independently of any
+>        outstanding context fault.
+> 
+> Since we don't enable CFCFG (stall) the behavior of terminating
+> other transactions makes sense.  And is probably not what we want
+> (and definately not what we want for GPU).
+> 
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
 > ---
->  drivers/cpuidle/cpuidle-arm.c | 30 +++---------------------------
->  1 file changed, 3 insertions(+), 27 deletions(-)
-
-It seems correct to me:
-
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index df564d783216..3a407a3ef22b 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -82,7 +82,6 @@ static int __init arm_idle_init_cpu(int cpu)
->  {
->  	int ret;
->  	struct cpuidle_driver *drv;
-> -	struct cpuidle_device *dev;
->  
->  	drv = kmemdup(&arm_idle_driver, sizeof(*drv), GFP_KERNEL);
->  	if (!drv)
-> @@ -119,33 +118,12 @@ static int __init arm_idle_init_cpu(int cpu)
->  		goto out_kfree_drv;
->  	}
->  
-> -	ret = cpuidle_register_driver(drv);
-> -	if (ret) {
-> -		if (ret != -EBUSY)
-> -			pr_err("Failed to register cpuidle driver\n");
-> +	ret = cpuidle_register(drv, NULL);
-> +	if (ret)
->  		goto out_kfree_drv;
-> -	}
-> -
-> -	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-> -	if (!dev) {
-> -		ret = -ENOMEM;
-> -		goto out_unregister_drv;
-> -	}
-> -	dev->cpu = cpu;
-> -
-> -	ret = cpuidle_register_device(dev);
-> -	if (ret) {
-> -		pr_err("Failed to register cpuidle device for CPU %d\n",
-> -		       cpu);
-> -		goto out_kfree_dev;
-> -	}
->  
->  	return 0;
->  
-> -out_kfree_dev:
-> -	kfree(dev);
-> -out_unregister_drv:
-> -	cpuidle_unregister_driver(drv);
->  out_kfree_drv:
->  	kfree(drv);
->  	return ret;
-> @@ -176,9 +154,7 @@ static int __init arm_idle_init(void)
->  	while (--cpu >= 0) {
->  		dev = per_cpu(cpuidle_devices, cpu);
->  		drv = cpuidle_get_cpu_driver(dev);
-> -		cpuidle_unregister_device(dev);
-> -		cpuidle_unregister_driver(drv);
-> -		kfree(dev);
-> +		cpuidle_unregister(drv);
->  		kfree(drv);
->  	}
->  
-> -- 
-> 2.17.1
+> So I hit this issue a long time back on 820 (msm8996) and at the
+> time I solved it with a patch that enabled CFCFG.  And it resurfaced
+> more recently on sdm845.  But at the time CFCFG was rejected, iirc
+> because of concern that it would cause problems on other non-qcom
+> arm smmu implementations.  And I think I forgot to send this version
+> of the solution.
 > 
+> If enabling HUPCF is anticipated to cause problems on other ARM
+> SMMU implementations, I think I can come up with a variant of this
+> patch which conditionally enables it for snapdragon.
+> 
+> Either way, I'd really like to get some variant of this fix merged
+> (and probably it would be a good idea for stable kernel branches
+> too), since current behaviour with the GPU means faults turn into
+> a fantastic cascade of fail.
+
+Can you describe how this fantastic cascade of fail improves with this
+patch, please? If you're getting context faults then something has already
+gone horribly wrong, so I'm trying to work out how this improves things.
+
+> diff --git a/drivers/iommu/arm-smmu-regs.h b/drivers/iommu/arm-smmu-regs.h
+> index a1226e4ab5f8..2291925eb800 100644
+> --- a/drivers/iommu/arm-smmu-regs.h
+> +++ b/drivers/iommu/arm-smmu-regs.h
+> @@ -178,6 +178,7 @@ enum arm_smmu_s2cr_privcfg {
+>  #define ARM_SMMU_CB_ATSR		0x8f0
+>  
+>  #define SCTLR_S1_ASIDPNE		(1 << 12)
+> +#define SCTLR_HUPCF			(1 << 8)
+>  #define SCTLR_CFCFG			(1 << 7)
+>  #define SCTLR_CFIE			(1 << 6)
+>  #define SCTLR_CFRE			(1 << 5)
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index f7a96bcf94a6..47ffc9aade72 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -713,9 +713,9 @@ static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
+>  	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
+>  	if (stage1)
+>  		reg |= SCTLR_S1_ASIDPNE;
+> +	reg |= SCTLR_HUPCF;
+
+Maybe just throw this into the assignment a couple of lines above?
+
+>  	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+>  		reg |= SCTLR_E;
+> -
+
+Random whitespace change.
+
+Will
