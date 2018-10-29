@@ -1,89 +1,108 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 29 Oct 2018 10:26:57 +0100
-Subject: [PATCH] dt-bindings: arm: Fix cpu capacity mismatch in example
-In-Reply-To: <20181029063450.3o3ay7pazik5tgne@vireshk-i7>
-References: <138600f5d504b41202a29a1e130a7aa4e51f1925.1540451976.git.viresh.kumar@linaro.org>
- <80206cb7-b550-1cf6-abf4-e4b17de4cdb5@linaro.org>
- <20181026041107.4hofhlcubbo5claq@vireshk-i7>
- <d4d6af05-61f1-4123-c2dc-4ee0946f79e8@linaro.org>
- <20181029063450.3o3ay7pazik5tgne@vireshk-i7>
-Message-ID: <1297c984-789f-0298-c3b8-8668f5b898de@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 10:27:54 +0100
+Subject: [PATCH v3 14/25] drm/sun4i: sun6i_mipi_dsi: Increase hfp packet
+ overhead
+In-Reply-To: <20181026144344.27778-15-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-15-jagan@amarulasolutions.com>
+Message-ID: <20181029092754.2tl7i5k5qpbn4557@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/10/2018 07:34, Viresh Kumar wrote:
-> On 26-10-18, 10:30, Daniel Lezcano wrote:
->> On 26/10/2018 06:11, Viresh Kumar wrote:
->>> On 25-10-18, 14:04, Daniel Lezcano wrote:
->>>> I think it is actually correct. The example is confusing on what the
->>>> numbers are. IIUC, it is:
->>>>
->>>> (after normalizing)
->>>>
->>>> dhrystone result on big CPU is 1024 at 1100MHz
->>>> dhrystone result on little CPU is 446 at 850MHz
->>>>
->>>> We have to scale the result of the little for 1100MHz in order to compare.
->>>>
->>>> 1100/850 = 1.294
->>>>
->>>> dhrystone result on little CPU is 446 * 1.294 = 577 at 1100MHz
->>>>
->>>> So we put the normalized values 1024 and 577. The arch_topology will
->>>> scale 577 back to 446 as it will compute the max capacity based on the
->>>> max freq which is 850MHz.
->>>>
->>>> The *final* capacities are 1024 for cluster0 and 446 for cluster1 (read
->>>> the cpu max capacity, the ones showed in the sysfs).
->>>>
->>>> Did I miss something ?
->>>
->>> No. What about making it more clear in the example to save the next idiot (like
->>> me) from wasting time :)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
->>> index 9b5685a1d15d..d061e6575bde 100644
->>> --- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
->>> +++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
->>> @@ -61,7 +61,10 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
->>>  Example 1 (ARM 64-bit, 6-cpu system, two clusters):
->>>  capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
->>>  supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
->>> -final capacities are 1024 for cluster0 and 446 for cluster1
->>> +final capacities are 1024 for cluster0 and 446 for cluster1.
->>> +Note that the values mentioned below in the example (1024 and 578)
->>> +aren't normalized based on max frequency of each cluster and that is
->>> +left for the operating system to do.
->>
->> Yes, it will help but if you want to make things even more clear, I
->> suggest to elaborate the text a bit and give the numbers above to
->> explain (1100/850=1.294, 446 * 1.294 = 577, ...)
+On Fri, Oct 26, 2018 at 08:13:33PM +0530, Jagan Teki wrote:
+> Increase the hfp packet overhead with another 10 bytes, the extra
+> 10 bytes(which is hblk packet overhead) is adding for hfp packet
+> overhead since hfp depends on hblk.
 > 
-> I didn't wanted to explain way too much, but how about this..
+> This is truely as per BSP code from BPI-M64-bsp.
+> The real computation from BSP is
+> (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> dsi_hbp = (hbp-hspw)*dsi_pixel_bits[format]/8 - (4+2);
+> dsi_hact = x * dsi_pixel_bits[format]/8;
+> dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
+> dsi_hfp = dsi_hblk - (4+dsi_hact+2) - (4+dsi_hbp+2);
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> index 9b5685a1d15d..84262cdb8d29 100644
-> --- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> @@ -59,9 +59,11 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
->  ===========================================
+> Example,
+> u32 fmt = dsi_pixel_bits[format]/8;
+> => ((ht-hspw)*fmt - 10) - (6 + x * fmt) - (6 + (hbp-hspw)*fmt - 6)
+> => (ht - hspw - x - (hbp - hspw)) * fmt - 16
+> => (ht - x - hbp) * fmt - 16
+> => (ht - x - (timmings->hor_total_time - timmings->hor_front_porch - x)
+> * fmt - 16
+> => (timmings->hor_total_time - x - timmings->hor_total_time +
+> timmings->hor_front_porch + x) * fmt - 16
+> => timmings->hor_front_porch * fmt - 16
+> 
+> So, increase the DSI hfp packet overhead by hblk packet overhead.
+> 
+> Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Tested-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v3:
+> - new patch
+> Changes for v2:
+> - none
+> 
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> index 6584b51736a9..20e330186b7f 100644
+> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> @@ -461,7 +461,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+>  {
+>  	struct mipi_dsi_device *device = dsi->device;
+>  	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
+> -	u16 hbp, hfp, hsa, hblk_max, hblk, vblk;
+> +	u16 hbp, hfp_pkt_overhead, hfp, hsa, hblk_max, hblk, vblk;
+>  	size_t bytes;
+>  	u8 *buffer;
 >  
->  Example 1 (ARM 64-bit, 6-cpu system, two clusters):
-> -capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
-> -supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
-> -final capacities are 1024 for cluster0 and 446 for cluster1
-> +The capacities-dmips-mhz or DMIPS/MHz values (scaled to 1024)
-> +are 1024 and 578 for cluster0 and cluster1. Further normalization
-> +is done by the operating system based on cluster0 at max-freq=1100 and
-> +custer1 at max-freq=850, final capacities are 1024 for cluster0 and
-> +446 for cluster1 (576*850/1100).
+> @@ -484,14 +484,6 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+>  	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
+>  		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
+>  
+> -	/*
+> -	 * The frontporch is set using a blanking packet (4 bytes +
+> -	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
+> -	 */
+> -#define HFP_PACKET_OVERHEAD	6
+> -	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
+> -		  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
+> -
+>  	/*
+>  	 * hblk seems to be the line + porches length.
+>  	 * The blank is set using a blanking packet (4 bytes + 4 bytes +
+> @@ -502,6 +494,18 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+>  	hblk_max -= HBLK_PACKET_OVERHEAD;
+>  	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD, hblk_max);
+>  
+> +	/*
+> +	 * The frontporch is set using a blanking packet (4 bytes +
+> +	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
+> +	 *
+> +	 * According to BSP code, extra 10 bytes(which is hblk packet overhead)
+> +	 * is adding for hfp packet overhead since hfp depends on hblk.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+"According to the BSP code, another 10 bytes (the HBLK packet
+overhead) need to be added to the front porch overhead."
 
+How has this been verified? Since we have registers to set all the
+parameters, this seems kind of weird.
+
+Maxime
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/74873631/attachment.sig>
