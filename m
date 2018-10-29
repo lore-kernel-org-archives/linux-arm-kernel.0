@@ -1,113 +1,41 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 29 Oct 2018 10:16:19 +0100
-Subject: [PATCH 3/3] drm/mediatek: Use drm_gem_cma_object instead of
- mtk_drm_gem_obj
-In-Reply-To: <1540782676.13715.4.camel@mtksdaap41>
-References: <1540538523-1973-1-git-send-email-ck.hu@mediatek.com>
- <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
- <20181026102156.GH21967@phenom.ffwll.local>
- <1540782676.13715.4.camel@mtksdaap41>
-Message-ID: <20181029091619.GT21967@phenom.ffwll.local>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 10:33:06 +0100
+Subject: [PATCH v3 18/25] drm/panel: Add Bananapi S070WV20-CT16 ICN6211
+ MIPI-DSI to RGB bridge
+In-Reply-To: <20181026144344.27778-19-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-19-jagan@amarulasolutions.com>
+Message-ID: <20181029093306.ysyfgnrozbo2ywcu@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 11:11:16AM +0800, CK Hu wrote:
-> Hi,Daniel:
+On Fri, Oct 26, 2018 at 08:13:37PM +0530, Jagan Teki wrote:
+> Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB bridge
+> panel which can be used to connect via DSI port on BPI-M64 board,
+> so add a driver for it.
 > 
-> On Fri, 2018-10-26 at 12:21 +0200, Daniel Vetter wrote:
-> > On Fri, Oct 26, 2018 at 03:22:03PM +0800, CK Hu wrote:
-> > > After adding dma_dev in struct drm_device and
-> > > drm_gem_cma_dumb_create_no_kmap(), drm_gem_cma_object could replace
-> > > mtk_drm_gem_obj, so use drm_gem_cma_object instead of mtk_drm_gem_obj to
-> > > reduce redundant code.
-> > > 
-> > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
-> > 
-> > A few questions/thoughts:
-> > 
-> > - Why do you need both drm_device->dev and drm_device->dma_dev? Can't you
-> >   just register the drm_device with the right struct device?
-> > 
+> The same panel PCB comes with parallel RBG which is supported via
+> panel-simple driver with "bananapi,s070wv20-ct16" compatible.
 > 
-> In [1], mmsys is the drm driver and ovl0 and ovl1 is the sub device
-> which has dma function.
-> In this drm, there are two crtc and each one is comprised of many
-> component.
-> This is an example of mt8173:
+> BSP dclock of 30MHz is not working with existing sunxi-ng and sun4i
+> sun4i_dclk_recalc, so updated to 55MHz can result proper working
+> nkm dividers.
 > 
-> crtc0: ovl0, color0, aal, od, rdma0, ufoe, dsi0
-> crtc1: ovl1, color1, gamma, rdma1, dpi0
-> 
-> In the device node of ovl0 and ovl1, there is a 'iommus' parameter in
-> it, so use dma_alloc_xxx() and dma_map_xxx() with that device would get
-> iova rather than pa. I don't think it's a good idea to register ovl0 or
-> ovl1 as drm device because each one is just a component in a pipeline.
-> mmsys controls the clock and routing of multi-media system which include
-> this drm system, so it's better to register mmsys as drm device. Maybe
-> we could move 'iommus' parameter from ovl device to mmsys device, so the
-> dma device changes from ovl device to mmsys device. I'm not sure this
-> would be a good choice, how do you think?
-> 
-> [1]
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/mediatek/mt8173.dtsi?h=v4.19
+> dclock, 30MHz => PLL_MIPI, 300MHz => set rate 440MHz with 1,2,1 nkm
+> dclock, 55MHz => PLL_MIPI, 300MHz => set rate 330MHz with 5,2,9 nkm
 
-Ah ok. But if you have 2 blocks that make up the overall drm device, why
-don't you need to switch at runtime between them? I.e. buffer allocated
-for crtc0 needs to be dma-mapped to crtc0, buffer allocated to crtc1 needs
-to be dma-mapped on crtc1?
+That panel is generic, you don't need those details in your commit log.
 
-And if they're both the exact same iommu, then imo it would make indeed
-sense to move the iommu attribute up. Since your current code cant'
-actually handle truly separate dma-mappings. And neither can your patch
-series here handled separate iommu for crtc0 and crtc1.
+Maxime
 
-> > - You don't use drm_gem_prime_import_dev, so prime import isn't using the
-> >   right device either.
-> 
-> Yes, you are right. I'm not familiar with whore drm core, so I start to
-> modify what Mediatek drm use. But this function still works for the drm
-> device that itself is dma device. If one day there is a drm device which
-> itself is not a dma device and need this function, send a patch to
-> modify this function and test it with that drm device. If you want me to
-> modify all in advance, I'm ok but need others to test it because
-> Mediatek drm driver does not use them.
-
-I meant to say that mediatek should use drm_gem_prime_import_dev, but
-currently isn't using that. And your patch series here doesn't fix that
-either. So there's more bugs left in this area.
-
-> > - exynos seems to have the same or at least similar issue, stronger case
-> >   for your patches if you can solve both.
-> 
-> I'm still Mediatek's employee. If I modify other company's driver and it
-> is not a MUST-BE for Mediatek, Mediatek may think I give contribution to
-> other company. So I've better not to modify exynos driver.
-
-This isn't how upstream works :-)
-
-> > - I'd start out with using struct drm_gem_cma_object in mtk (similar to
-> >   what vc4 does), and then reusing as much as possible of the existing
-> >   helpers. And then looking later on what's still left (like the support
-> >   for leaving out the virtual mapping).
-> 
-> I'm not clear what vc4 does. It looks like that you want me to redefine
-> mtk_drm_gem_obj based on drm_gem_cma_object. So it would be like
-> 
-> struct mtk_drm_gem_obj {
-> 	struct drm_gem_cma_object base;
-> 	void *cookie;
-> 	unsigned long dma_attrs;
-> };
-> 
-> I could try to modify as this and see what have left.
-
-Yup, that's my suggestion. Then we can look at what mtk can use unchanged
-from the core helpers. And what would need to change and so better
-evaluate whether it makes sense to do that.
-
-I still think just moving the iommu is probably best.
--Daniel
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/78392ef9/attachment.sig>
