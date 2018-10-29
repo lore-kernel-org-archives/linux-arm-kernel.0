@@ -1,84 +1,136 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Oct 2018 16:43:29 +0000
-Subject: [PATCH] arm: mm: fault: check ADFSR in case of abort
-In-Reply-To: <20181029155435.prz2htt4ktte7pxb@lakrids.cambridge.arm.com>
-References: <HE1PR0702MB37567D530C1C1D45949C164BFAF30@HE1PR0702MB3756.eurprd07.prod.outlook.com>
- <20181029155435.prz2htt4ktte7pxb@lakrids.cambridge.arm.com>
-Message-ID: <20181029164329.GH30658@n2100.armlinux.org.uk>
+From: lsun@mellanox.com (Liming Sun)
+Date: Mon, 29 Oct 2018 16:48:11 +0000
+Subject: [PATCH v4 3/4] dt-bindings: soc: Add TmFifo binding for Mellanox
+ BlueField SoC
+In-Reply-To: <CAK8P3a21y1jm+1aZ8is7Rp=Re++BxL3mJM-Zj=_3c-Lq4y_Few@mail.gmail.com>
+References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
+ <1540403734-137721-1-git-send-email-lsun@mellanox.com>
+ <1540403734-137721-3-git-send-email-lsun@mellanox.com>
+ <CAK8P3a1K7BjgZRyBMKFrqWfcr-Bb3HQus+QE7qTpd27voE9e0A@mail.gmail.com>
+ <AM4PR05MB3220F4E5EEB673F0CC97C11DA1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
+ <CAK8P3a21y1jm+1aZ8is7Rp=Re++BxL3mJM-Zj=_3c-Lq4y_Few@mail.gmail.com>
+Message-ID: <DB6PR05MB3223D0AE812FEDE9BAB39E6BA1F30@DB6PR05MB3223.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 03:54:36PM +0000, Mark Rutland wrote:
-> On Mon, Oct 29, 2018 at 02:20:51PM +0000, Wiebe, Wladislav (Nokia - DE/Ulm) wrote:
-> > When running into situations like:
-> > "Unhandled fault: synchronous external abort (0x210) at 0xXXX"
-> > or
-> > "Unhandled prefetch abort: synchronous external abort (0x210) at 0xXXX"
-> > it is useful to know the content of ADFSR (Auxiliary Data Fault Status
-> > Register) to indicate an ECC double-bit error in L1 or L2 cache.
-> > 
-> > Refer to:
-> > Cortex-A15 Technical Reference Manual, Revision: r2p1
-> > [6.4.8. Error Correction Code]
-> > 
-> > Signed-off-by: Wladislav Wiebe <wladislav.wiebe@nokia.com>
-> > ---
-> >  arch/arm/mm/fault.c | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> > 
-> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> > index 3232afb6fdc0..5e240deb6ed6 100644
-> > --- a/arch/arm/mm/fault.c
-> > +++ b/arch/arm/mm/fault.c
-> > @@ -547,6 +547,22 @@ hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *)
-> >  	fsr_info[nr].name = name;
-> >  }
-> >  
-> > +/*
-> > + * Check for ECC double-bit errors in Auxiliary Data Fault Status Register
-> > + */
-> > +static void check_adfsr_for_ecc(void)
-> > +{
-> > +	u32 adfsr = 0;
-> > +
-> > +	asm("mrc p15, 0, %0, c5, c1, 0" : "=r" (adfsr));
-> > +
-> > +	if (adfsr & (BIT(31) | BIT(23))) {
-> > +		pr_alert("ADFSR status 0x%x indicates that an L1 or L2 cache\n"
-> > +			 "ECC double-bit error occurred at some time.\n",
-> > +			  adfsr);
-> > +	}
-> > +}
-> > +
-> >  /*
-> >   * Dispatch a data abort to the relevant handler.
-> >   */
-> > @@ -559,6 +575,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-> >  	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
-> >  		return;
-> >  
-> > +	check_adfsr_for_ecc();
-> >  	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
-> >  		inf->name, fsr, addr);
-> >  	show_pte(current->mm, addr);
-> > @@ -593,6 +610,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
-> >  	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
-> >  		return;
-> >  
-> > +	check_adfsr_for_ecc();
-> >  	pr_alert("Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
-> >  		inf->name, ifsr, addr);
+Thanks for the comments! Please see my response/questions inline.
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, October 26, 2018 4:34 PM
+> To: Liming Sun <lsun@mellanox.com>
+> Cc: Olof Johansson <olof@lixom.net>; David Woods
+> <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-
+> soc <arm@kernel.org>; DTML <devicetree@vger.kernel.org>; Linux ARM
+> <linux-arm-kernel@lists.infradead.org>
+> Subject: Re: [PATCH v4 3/4] dt-bindings: soc: Add TmFifo binding for Mellanox
+> BlueField SoC
 > 
-> IIUC at this point the task is preemptible (and interruptible),
+> On Fri, Oct 26, 2018 at 9:36 PM Liming Sun <lsun@mellanox.com> wrote:
+> > > -----Original Message-----
+> > > From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+> > > > @@ -0,0 +1,23 @@
+> > > > +* Mellanox BlueField SoC TmFifo
+> > > > +
+> > > > +BlueField TmFifo provides a shared FIFO between the target and the
+> > > > +external host machine, which can be accessed by external host via
+> > > > +USB or PCIe. In the current tmfifo driver, this FIFO has been demuxed
+> > > > +to implement virtual console and network interface based on the virtio
+> > > > +framework.
+> > > > +
+> > > > +Required properties:
+> > > > +
+> > > > +- compatible:      Should be "mellanox,bf-tmfifo"
+> > > > +- reg:             Physical base address and length of Rx/Tx block
+> > > > +- interrupts:      The interrupt number of Rx low water mark, Rx high
+> water
+> > > > mark
+> > > > +           Tx low water mark, Tx high water mark respectively.
+> > >
+> > >
+> > > This sounds like it might fit into the mailbox subsystem, and perhaps
+> > > it should use the mailbox DT bindings. Have you had a look at that?
+> >
+> > This commit of dt-bindings is mainly to solve the warning of checkpatch.pl.
+> > Like the response to patch 2/4, ACPI is actually used now instead of device
+> tree.
+> > The TMFIFO definition in the ACPI DSDT table would be something like
+> below.
+> >
+> >     // RShim TMFIFO
+> >     Device(RSH0) {
+> >       Name(_HID, "MLNXBF01")
+> >       Name(_UID, Zero)
+> >       Name(_CCA, 1)
+> >       Name(_CRS, ResourceTemplate() {
+> >         Memory32Fixed(ReadWrite, 0x00800a20, 0x00000018)
+> >         Memory32Fixed(ReadWrite, 0x00800a40, 0x00000018)
+> >         Interrupt(ResourceConsumer, Edge, ActiveHigh, Exclusive)
+> >           { BF1_RSH0_TM_HTT_LWM_INT,
+> >             BF1_RSH0_TM_HTT_HWM_INT,
+> >             BF1_RSH0_TM_TTH_LWM_INT,
+> >             BF1_RSH0_TM_TTH_HWM_INT
+> >           }
+> >       })
+> >     }
+> >
+> > Any suggestion how it should be added into Linux Documentation, or maybe
+> I
+> > should just remove this commit from this patch series?
+> 
+> Maybe the best way here would be to not use ACPI for the case
+> where bluefin is integrated into a PCIe endpoint, since ACPI is
+> not as flexible here and generally relies on having an SBSA
+> compliant hardware that you no longer have if you require
+> random platform devices for booting from and for your console.
+> 
+> For the case where a bluefin SoC is used in a standalone system,
+> having ACPI makes more sense, as that lets you install Red Hat
+> Linux or other operating systems that rely on SBBR and SBSA.
 
-It may be preemptable, but isn't necessarily so.  It depends whether the
-called FSR specific function enabled interrupts or not.
+A little explanation for this SoC:
+In the PCIe case, it's not just an endpoint. It can work in a PCIe "multi-host" mode
+which behaves just like standalone system, such as doing PXE boot and CentOS 
+or other OS installation on the eMMC and boot from it. It can run fully isolated 
+from the x86 host. Below is a link of brief introduction.
+http://www.mellanox.com/related-docs/prod_adapter_cards/PB_BlueField_Smart_NIC.pdf
 
-So, it would be better to read the ADFSR before calling the FSR specific
-function to guarantee that we read the values that correspond with _this_
-fault.
+So for now the same SW with ACPI configuration is used on all the boards for simplicity. 
+But I think DT could definitely be used on customized board or when needed.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+> 
+> > As for the sub-component of this driver, the "soc" might be better fit than
+> the mailbox
+> > for some reasons. It's a communication between extern machines and the
+> SoC via
+> > USB / PCIe,  like pushing boot stream, console and network mgmt. Some of
+> the features,
+> > like pushing boot stream, doesn't communicate with the ARM core. The
+> boot stream
+> > is pushed to the SoC HW logic directly. I'll add the host-side virtio-based
+> driver in patch v5.
+> 
+> Right, the drivers/mailbox subsystem was not the right idea here,
+> I noticed that myself after actually reading the driver. Drivers/soc
+> may also not be the best fit, since this is not really about it being
+> a SoC, but rather a way to encapsulate virtual devices. The
+> mic driver I mentioned is in drivers/misc, but I don't like to add stuff
+> there if we can avoid it.
+> 
+> drivers/virtio, drivers/bus or drivers/mfd might also be an option that
+> could fit better than drivers/soc, or you could have your own subdir
+> below drivers/ as some others do. Finally, drivers/platform/mellanox
+> might be a reasonable choice, and it would let you keep both sides
+> of the driver in one place.
+
+We actually have more drivers coming for this SoC, such for I2C, GPIO, PKA, 
+performance counter, L3 cache profile, etc, which could be found at the link below
+https://git.launchpad.net/~dcwoods/ubuntu/+source/linux/+git/cosmic/log/?h=mellanox_bluefield
+
+Since it's not just the FIFO driver, any suggestion which one would be better, 
+the "soc" or still the 'platform' ? Thanks!
+
+> 
+>        Arnd
