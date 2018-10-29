@@ -1,103 +1,65 @@
-From: lsun@mellanox.com (Liming Sun)
-Date: Mon, 29 Oct 2018 14:58:21 +0000
-Subject: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
-In-Reply-To: <CAK8P3a2=shWVjwrmnNTwwGwN_jhwyb+TmeALz4zzTstho51z8A@mail.gmail.com>
-References: <b143b40446c1870fb8d422b364ead95d54552be9.1527264077.git.lsun@mellanox.com>
- <1540403734-137721-1-git-send-email-lsun@mellanox.com>
- <1540403734-137721-2-git-send-email-lsun@mellanox.com>
- <CAK8P3a1jTsvzYhS4CxvmK6tOgPn_g7=1S4xAcca2K4v70vhyEA@mail.gmail.com>
- <AM4PR05MB32204021433BBB853C50FF30A1F00@AM4PR05MB3220.eurprd05.prod.outlook.com>
- <CAK8P3a2=shWVjwrmnNTwwGwN_jhwyb+TmeALz4zzTstho51z8A@mail.gmail.com>
-Message-ID: <DB6PR05MB32236AAD033C20DF6414C464A1F30@DB6PR05MB3223.eurprd05.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Oct 2018 08:02:27 -0700
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+In-Reply-To: <20181029101401.5687153e@canb.auug.org.au>
+References: <20181029101401.5687153e@canb.auug.org.au>
+Message-ID: <20181029150227.GA56754@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks! Please see response inline.
-
-- Liming
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Friday, October 26, 2018 3:32 PM
-> To: Liming Sun <lsun@mellanox.com>
-> Cc: Olof Johansson <olof@lixom.net>; David Woods
-> <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>; arm-
-> soc <arm@kernel.org>; DTML <devicetree@vger.kernel.org>; Linux ARM
-> <linux-arm-kernel@lists.infradead.org>
-> Subject: Re: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config option
+* Stephen Rothwell <sfr@canb.auug.org.au> [181028 23:14]:
+> Hi all,
 > 
-> On Fri, Oct 26, 2018 at 9:18 PM Liming Sun <lsun@mellanox.com> wrote:
-> > > -----Original Message-----
-> > > From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
-> > > Behalf Of Arnd Bergmann
-> > > Sent: Thursday, October 25, 2018 11:38 AM
-> > > To: Liming Sun <lsun@mellanox.com>
-> > > Cc: Olof Johansson <olof@lixom.net>; David Woods
-> > > <dwoods@mellanox.com>; Robin Murphy <robin.murphy@arm.com>;
-> arm-
-> > > soc <arm@kernel.org>; devicetree at vger.kernel.org; linux-arm-
-> > > kernel at lists.infradead.org
-> > > Subject: Re: [PATCH v4 2/4] arm64: Add Mellanox BlueField SoC config
-> option
-> > >
-> > > On 10/24/18, Liming Sun <lsun@mellanox.com> wrote:
-> > > > This commit introduces config option for Mellanox BlueField SoC,
-> > > > which can be used to build the SoC specific drivers, and enables
-> > > > it by default in configs/defconfig.
-> > > >
-> > > > Reviewed-by: David Woods <dwoods@mellanox.com>
-> > > > Signed-off-by: Liming Sun <lsun@mellanox.com>
-> > > > ---
-> > > >  arch/arm64/Kconfig.platforms | 6 ++++++
-> > > >  arch/arm64/configs/defconfig | 1 +
-> > > >  2 files changed, 7 insertions(+)
-> > >
-> > > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> > >
-> > > I'm sorry for missing your series in the past. We should definitely merge
-> > > the platform support soon. Do you also have device tree files for
-> reference
-> > > systems or even production hardware?
-> >
-> > We have obsoleted the device tree, and mainly support ACPI now
-> > on Reference/Production HW. Below is the TMFIFO definition in the ACPI
-> > DSDT table.
-> >
-> >     // RShim TMFIFO
-> >     Device(RSH0) {
-> >       Name(_HID, "MLNXBF01")
-> >       Name(_UID, Zero)
-> >       Name(_CCA, 1)
-> >       Name(_CRS, ResourceTemplate() {
-> >         Memory32Fixed(ReadWrite, 0x00800a20, 0x00000018)
-> >         Memory32Fixed(ReadWrite, 0x00800a40, 0x00000018)
-> >         Interrupt(ResourceConsumer, Edge, ActiveHigh, Exclusive)
-> >           { BF1_RSH0_TM_HTT_LWM_INT,
-> >             BF1_RSH0_TM_HTT_HWM_INT,
-> >             BF1_RSH0_TM_TTH_LWM_INT,
-> >             BF1_RSH0_TM_TTH_HWM_INT
-> >           }
-> >       })
-> >     }
-> >
-> > The full ACPI implementation can be found in the 1.0 release:
-> > http://www.mellanox.com/downloads/BlueField/BlueField-
-> 1.0.0.10521/BlueField-1.0.0.10521.tar.xz
-> > Inside this tarball, we can see the "src/edk2/" directory which has the edk2
-> patch file including all the ACPI implementation.
+> Today's linux-next merge of the arm-soc tree got a conflict in:
 > 
-> It would be nice if you could still include the dts sources in the submission.
-> Since this is not a classic server hardware, DT is probably more suitable
-> here, and there are likely use cases that won't work with ACPI, so it's
-> good to have a starting point for your users if they need to override
-> the ACPI tables with a DT, or build systems with a simpler boot loader.
-
-Sure, I'll keep this DT change for reference. A little explanation that
-Mellanox BlueField SOC could be PCIe NIC or standalone device (server)  form which
-can do PXE boot, CentOS installation even on the NIC, etc. The same software/driver 
-works on both.  DT seems not working well for some requirement/features like 
-NVDIMM (which requires ACPI DSM).  That's why we switched to ACPI though
-DT support is preserved.
-
+>   include/linux/platform_data/gpio-omap.h
 > 
->        Arnd
+> between commit:
+> 
+>   b764a5863fd8 ("gpio: omap: Remove custom PM calls and use cpu_pm instead")
+> 
+> from Linus' tree and commit:
+> 
+>   26683316c92a ("ARM: OMAP1: ams-delta-fiq: Use <linux/platform_data/gpio-omap.h>")
+> 
+> from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary. This
+> is now fixed as far as linux-next is concerned, but any non trivial
+> conflicts should be mentioned to your upstream maintainer when your tree
+> is submitted for merging.  You may also want to consider cooperating
+> with the maintainer of the conflicting tree to minimise any particularly
+> complex conflicts.
+
+Thanks it probably makes sense to merge in the immutable gpio branch
+also into arm-soc tree that Linus Walleij has set up earlier. That's the
+ib-omap branch at commit 5284521a290e ("gpio: omap: Get rid of
+pm_runtime_irq_safe()").
+
+Regards,
+
+Tony
+
+> diff --cc include/linux/platform_data/gpio-omap.h
+> index 8485c6a9a383,ed071f76b642..000000000000
+> --- a/include/linux/platform_data/gpio-omap.h
+> +++ b/include/linux/platform_data/gpio-omap.h
+> @@@ -205,4 -206,18 +208,6 @@@ struct omap_gpio_platform_data 
+>   	int (*get_context_loss_count)(struct device *dev);
+>   };
+>   
+>  -#if IS_BUILTIN(CONFIG_GPIO_OMAP)
+>  -extern void omap2_gpio_prepare_for_idle(int off_mode);
+>  -extern void omap2_gpio_resume_after_idle(void);
+>  -#else
+>  -static inline void omap2_gpio_prepare_for_idle(int off_mode)
+>  -{
+>  -}
+>  -
+>  -static inline void omap2_gpio_resume_after_idle(void)
+>  -{
+>  -}
+>  -#endif
+> + #endif /* __ASSEMBLER__ */
+> + 
+>   #endif
