@@ -1,84 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 29 Oct 2018 12:04:50 +0530
-Subject: [PATCH] dt-bindings: arm: Fix cpu capacity mismatch in example
-In-Reply-To: <d4d6af05-61f1-4123-c2dc-4ee0946f79e8@linaro.org>
-References: <138600f5d504b41202a29a1e130a7aa4e51f1925.1540451976.git.viresh.kumar@linaro.org>
- <80206cb7-b550-1cf6-abf4-e4b17de4cdb5@linaro.org>
- <20181026041107.4hofhlcubbo5claq@vireshk-i7>
- <d4d6af05-61f1-4123-c2dc-4ee0946f79e8@linaro.org>
-Message-ID: <20181029063450.3o3ay7pazik5tgne@vireshk-i7>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon, 29 Oct 2018 20:25:28 +1300
+Subject: [PATCH v5 1/8] ARM: l2c: move cache-aurora-l2.h to asm/hardware
+In-Reply-To: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
+References: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181029072535.31667-2-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-10-18, 10:30, Daniel Lezcano wrote:
-> On 26/10/2018 06:11, Viresh Kumar wrote:
-> > On 25-10-18, 14:04, Daniel Lezcano wrote:
-> >> I think it is actually correct. The example is confusing on what the
-> >> numbers are. IIUC, it is:
-> >>
-> >> (after normalizing)
-> >>
-> >> dhrystone result on big CPU is 1024 at 1100MHz
-> >> dhrystone result on little CPU is 446 at 850MHz
-> >>
-> >> We have to scale the result of the little for 1100MHz in order to compare.
-> >>
-> >> 1100/850 = 1.294
-> >>
-> >> dhrystone result on little CPU is 446 * 1.294 = 577 at 1100MHz
-> >>
-> >> So we put the normalized values 1024 and 577. The arch_topology will
-> >> scale 577 back to 446 as it will compute the max capacity based on the
-> >> max freq which is 850MHz.
-> >>
-> >> The *final* capacities are 1024 for cluster0 and 446 for cluster1 (read
-> >> the cpu max capacity, the ones showed in the sysfs).
-> >>
-> >> Did I miss something ?
-> > 
-> > No. What about making it more clear in the example to save the next idiot (like
-> > me) from wasting time :)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> > index 9b5685a1d15d..d061e6575bde 100644
-> > --- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> > +++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> > @@ -61,7 +61,10 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
-> >  Example 1 (ARM 64-bit, 6-cpu system, two clusters):
-> >  capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
-> >  supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
-> > -final capacities are 1024 for cluster0 and 446 for cluster1
-> > +final capacities are 1024 for cluster0 and 446 for cluster1.
-> > +Note that the values mentioned below in the example (1024 and 578)
-> > +aren't normalized based on max frequency of each cluster and that is
-> > +left for the operating system to do.
-> 
-> Yes, it will help but if you want to make things even more clear, I
-> suggest to elaborate the text a bit and give the numbers above to
-> explain (1100/850=1.294, 446 * 1.294 = 577, ...)
+From: Jan Luebbe <jlu@pengutronix.de>
 
-I didn't wanted to explain way too much, but how about this..
+This include file will be used by the AURORA EDAC code.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-index 9b5685a1d15d..84262cdb8d29 100644
---- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-+++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-@@ -59,9 +59,11 @@ mhz values (normalized w.r.t. the highest value found while parsing the DT).
- ===========================================
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+ arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h | 0
+ arch/arm/mm/cache-l2x0.c                                | 2 +-
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h (100%)
+
+diff --git a/arch/arm/mm/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+similarity index 100%
+rename from arch/arm/mm/cache-aurora-l2.h
+rename to arch/arm/include/asm/hardware/cache-aurora-l2.h
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 808efbb89b88..a00d6f7fd34c 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -30,8 +30,8 @@
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/hardware/cache-aurora-l2.h>
+ #include "cache-tauros3.h"
+-#include "cache-aurora-l2.h"
  
- Example 1 (ARM 64-bit, 6-cpu system, two clusters):
--capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
--supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
--final capacities are 1024 for cluster0 and 446 for cluster1
-+The capacities-dmips-mhz or DMIPS/MHz values (scaled to 1024)
-+are 1024 and 578 for cluster0 and cluster1. Further normalization
-+is done by the operating system based on cluster0 at max-freq=1100 and
-+custer1 at max-freq=850, final capacities are 1024 for cluster0 and
-+446 for cluster1 (576*850/1100).
- 
- cpus {
-        #address-cells = <2>;
-
-
+ struct l2c_init_data {
+ 	const char *type;
 -- 
-viresh
+2.19.1
