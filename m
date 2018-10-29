@@ -1,130 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Oct 2018 12:04:35 +0000
-Subject: [PATCH] arm64: kprobe: make page to RO mode when allocate it
-In-Reply-To: <20181015111600.5479-1-anders.roxell@linaro.org>
-References: <20181015111600.5479-1-anders.roxell@linaro.org>
-Message-ID: <20181029120434.GA15446@arm.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Mon, 29 Oct 2018 17:40:23 +0530
+Subject: [PATCH v3 0/3] Add Xilinx AMS Driver
+Message-ID: <1540815026-1012-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anders,
+Add Xilinx AMS driver which is used for Xilinx's ZynqMP AMS controller.
+This AMS driver is used to report various interface voltages and temperatures
+across the system.
+This driver will be used by iio-hwmon to repport voltages and temperatures
+across the system by using various channel interfaces.
+This driver handles AMS module including PS-Sysmon & PL-Sysmon. The binding
+documentation is added for understanding of AMS, PS, PL Sysmon Channels.
 
-On Mon, Oct 15, 2018 at 01:16:00PM +0200, Anders Roxell wrote:
-> Commit 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
-> has successfully identified code that leaves a page with W+X
-> permissions.
-> 
-> [    3.245140] arm64/mm: Found insecure W+X mapping at address (____ptrval____)/0xffff000000d90000
-> [    3.245771] WARNING: CPU: 0 PID: 1 at ../arch/arm64/mm/dump.c:232 note_page+0x410/0x420
-> [    3.246141] Modules linked in:
-> [    3.246653] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc5-next-20180928-00001-ge70ae259b853-dirty #62
-> [    3.247008] Hardware name: linux,dummy-virt (DT)
-> [    3.247347] pstate: 80000005 (Nzcv daif -PAN -UAO)
-> [    3.247623] pc : note_page+0x410/0x420
-> [    3.247898] lr : note_page+0x410/0x420
-> [    3.248071] sp : ffff00000804bcd0
-> [    3.248254] x29: ffff00000804bcd0 x28: ffff000009274000
-> [    3.248578] x27: ffff00000921a000 x26: ffff80007dfff000
-> [    3.248845] x25: ffff0000093f5000 x24: ffff000009526f6a
-> [    3.249109] x23: 0000000000000004 x22: ffff000000d91000
-> [    3.249396] x21: ffff000000d90000 x20: 0000000000000000
-> [    3.249661] x19: ffff00000804bde8 x18: 0000000000000400
-> [    3.249924] x17: 0000000000000000 x16: 0000000000000000
-> [    3.250271] x15: ffffffffffffffff x14: 295f5f5f5f6c6176
-> [    3.250594] x13: 7274705f5f5f5f28 x12: 2073736572646461
-> [    3.250941] x11: 20746120676e6970 x10: 70616d20582b5720
-> [    3.251252] x9 : 6572756365736e69 x8 : 3039643030303030
-> [    3.251519] x7 : 306666666678302f x6 : ffff0000095467b2
-> [    3.251802] x5 : 0000000000000000 x4 : 0000000000000000
-> [    3.252060] x3 : 0000000000000000 x2 : ffffffffffffffff
-> [    3.252323] x1 : 4d151327adc50b00 x0 : 0000000000000000
-> [    3.252664] Call trace:
-> [    3.252953]  note_page+0x410/0x420
-> [    3.253186]  walk_pgd+0x12c/0x238
-> [    3.253417]  ptdump_check_wx+0x68/0xf8
-> [    3.253637]  mark_rodata_ro+0x68/0x98
-> [    3.253847]  kernel_init+0x38/0x160
-> [    3.254103]  ret_from_fork+0x10/0x18
-> 
-> Reworked to that when allocate a page it sets mode RO. Inspired by
-> commit 63fef14fc98a ("kprobes/x86: Make insn buffer always ROX and use text_poke()").
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Co-developed-by: Arnd Bergmann <arnd@arndb.de>
-> Co-developed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> ---
->  arch/arm64/kernel/probes/kprobes.c | 27 ++++++++++++++++++++-------
->  1 file changed, 20 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> index 9b65132e789a..b842e908b423 100644
-> --- a/arch/arm64/kernel/probes/kprobes.c
-> +++ b/arch/arm64/kernel/probes/kprobes.c
-> @@ -23,7 +23,9 @@
->  #include <linux/slab.h>
->  #include <linux/stop_machine.h>
->  #include <linux/sched/debug.h>
-> +#include <linux/set_memory.h>
->  #include <linux/stringify.h>
-> +#include <linux/vmalloc.h>
->  #include <asm/traps.h>
->  #include <asm/ptrace.h>
->  #include <asm/cacheflush.h>
-> @@ -42,10 +44,21 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
->  static void __kprobes
->  post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
->  
-> +static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
-> +{
-> +	void *addrs[1];
-> +	u32 insns[1];
-> +
-> +	addrs[0] = (void *)addr;
-> +	insns[0] = (u32)opcode;
-> +
-> +	return aarch64_insn_patch_text(addrs, insns, 1);
-> +}
-> +
->  static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
->  {
->  	/* prepare insn slot */
-> -	p->ainsn.api.insn[0] = cpu_to_le32(p->opcode);
-> +	patch_text(p->ainsn.api.insn, p->opcode);
->  
->  	flush_icache_range((uintptr_t) (p->ainsn.api.insn),
->  			   (uintptr_t) (p->ainsn.api.insn) +
-> @@ -118,15 +131,15 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->  	return 0;
->  }
->  
-> -static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
-> +void *alloc_insn_page(void)
->  {
-> -	void *addrs[1];
-> -	u32 insns[1];
-> +	void *page;
->  
-> -	addrs[0] = (void *)addr;
-> -	insns[0] = (u32)opcode;
-> +	page = vmalloc_exec(PAGE_SIZE);
-> +	if (page)
-> +		set_memory_ro((unsigned long)page & PAGE_MASK, 1);
+Changes in v2:
+	- Added documentation for sysfs (Patch-2)
+	- Addressed code style review comments
+	- Patch-2 (Now it is Patch-3)
+		- Arranged the includes in alphabetical order
+		- Removed the wrapper 'ams_pl_write_reg()' and used writel
+		  instead
+		- Removed the unnecessary delay of 1ms and used polling of EOC
+		  instead
+		- Removed spin_lock and used mutex only.
+		- Used request_irq() instead of devm_request_irq() and handled
+		  respective error conditions
+		- Moved contents of xilinx-ams.h to inline with xilinx-ams.c
+	- Patch-1
+		- Addressed Documentation style comments
 
-This looks a bit strange to me -- you're allocating PAGE_SIZE bytes so
-that we can adjust the permissions, yet we can't guarantee that page is
-actually page-aligned and therefore end up explicitly masking down.
+Changes in v3:
+	- Updated bindings document with the suggested modification in v2 review
+	- Removed documentation for sysfs
+	- Removed extended names for channels in the Xilinx AMS driver
+	- Modified dts to use ranges for child nodes
+	- Reduced address and size cells to 32-bit instead of 64-bit
 
-In which case allocating an entire page isn't actually helping us, and
-we could end up racing with somebody else changing permission on the
-same page afaict.
+Manish Narani (3):
+  dt-bindings: iio: adc: Add Xilinx AMS binding documentation
+  iio: adc: Add Xilinx AMS driver
+  arm64: zynqmp: DT: Add Xilinx AMS node
 
-I think we need to ensure we really have an entire page, perhaps using
-vmap() instead? Or have I missed some subtle detail here?
+ .../devicetree/bindings/iio/adc/xilinx-ams.txt     |  183 +++
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   27 +
+ drivers/iio/adc/Kconfig                            |   10 +
+ drivers/iio/adc/Makefile                           |    1 +
+ drivers/iio/adc/xilinx-ams.c                       | 1343 ++++++++++++++++++++
+ 5 files changed, 1564 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt
+ create mode 100644 drivers/iio/adc/xilinx-ams.c
 
-Cheers,
-
-Will
+-- 
+2.1.1
