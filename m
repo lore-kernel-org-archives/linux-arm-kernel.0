@@ -1,122 +1,58 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 29 Oct 2018 14:30:00 +0530
-Subject: [PATCH v2 1/7] arm64: dts: rockchip: ficus: Add on-board LED support
-In-Reply-To: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
-References: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181029090006.4353-2-manivannan.sadhasivam@linaro.org>
+Date: Mon, 29 Oct 2018 14:29:59 +0530
+Subject: [PATCH v2 0/7] Standardize onboard LED support for 96Boards
+Message-ID: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add on-board LED support for Ficus board based on the following
-standard used by other 96Boards:
+This patchset standardizes the onboard LEDs on 96Boards by maintaining
+common labels and triggers as below:
 
-red:user1  default-trigger: heartbeat
-red:user2  default-trigger: mmc0/disk-activity (onboard-storage)
-red:user3  default-trigger: mmc1 (SD-card)
-red:user4  default-trigger: none, panic-indicator
-red:wlan   default-trigger: phy0tx
-red:bt     default-trigger: hci0-power
+green:user1  default-trigger: heartbeat
+green:user2  default-trigger: mmc0/disk-activity (onboard-storage)
+green:user3  default-trigger: mmc1 (SD card)
+green:user4  default-trigger: none, panic-indicator
+yellow:wlan  default-trigger: phy0tx
+blue:bt      default-trigger: hci0-power
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 78 +++++++++++++++++++
- 1 file changed, 78 insertions(+)
+This standardization is required to provide a common behaviour of LEDs
+across all mainline supported 96Boards and also making it easier to
+control it using an userspace library like MRAA.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-index cce266da28cd..027d428917b8 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-@@ -23,6 +23,52 @@
- 		clock-output-names = "clkin_gmac";
- 		#clock-cells = <0>;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&user_led1>, <&user_led2>, <&user_led3>,
-+			    <&user_led4>, <&wlan_led>, <&bt_led>;
-+
-+		user_led1 {
-+			label = "red:user1";
-+			gpios = <&gpio4 25 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		user_led2 {
-+			label = "red:user2";
-+			gpios = <&gpio4 26 0>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		user_led3 {
-+			label = "red:user3";
-+			gpios = <&gpio4 30 0>;
-+			linux,default-trigger = "mmc1";
-+		};
-+
-+		user_led4 {
-+			label = "red:user4";
-+			gpios = <&gpio1 0 0>;
-+			panic-indicator;
-+			linux,default-trigger = "none";
-+		};
-+
-+		wlan_active_led {
-+			label = "red:wlan";
-+			gpios = <&gpio1 1 0>;
-+			linux,default-trigger = "phy0tx";
-+			default-state = "off";
-+		};
-+
-+		bt_active_led {
-+			label = "red:bt";
-+			gpios = <&gpio1 4 0>;
-+			linux,default-trigger = "hci0-power";
-+			default-state = "off";
-+		};
-+	};
- };
- 
- &gmac {
-@@ -66,6 +112,38 @@
- 				<4 27 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
-+
-+	leds {
-+		user_led1: user_led1 {
-+			rockchip,pins =
-+				<4 25 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led2: user_led2 {
-+			rockchip,pins =
-+				<4 26 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led3: user_led3 {
-+			rockchip,pins =
-+				<4 30 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		user_led4: user_led4 {
-+			rockchip,pins =
-+				<1 0 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		wlan_led: wlan_led {
-+			rockchip,pins =
-+				<1 1 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		bt_led: bt_led {
-+			rockchip,pins =
-+				<1 4 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
- };
- 
- &usbdrd_dwc3_0 {
+For Rock960 and Ficus boards, the LED support is added in this patchset.
+Rest of the boards are converted to adopt the standard.
+
+Note: Since there is no UFS trigger available for now, user2 LED trigger
+is set to none on HiKey960.
+
+Thanks,
+Mani
+
+Changes in v2:
+
+* Removed device-name from LED labels as per the suggestion from Simon
+  and Pavel
+* Adopted APQ8016 SBC (Dragonboard410c)
+* Tested the Ficus patch on Ficus V1.1 board
+* CCed LED mailing list
+
+Manivannan Sadhasivam (7):
+  arm64: dts: rockchip: ficus: Add on-board LED support
+  arm64: dts: rockchip: rock960: Add on-board LED support
+  arm64: dts: hisilicon: hikey: Standardize LED labels and triggers
+  arm64: dts: hisilicon: hikey960: Standardize LED labels and triggers
+  arm64: dts: hisilicon: poplar: Standardize LED labels and triggers
+  arm64: dts: xilinx: ultra96: Standardize LED labels and triggers
+  arm64: dts: qcom: apq8016-sbc: Standardize LED labels
+
+ .../boot/dts/hisilicon/hi3660-hikey960.dts    | 18 ++---
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts | 13 +--
+ .../arm64/boot/dts/hisilicon/hi6220-hikey.dts | 17 ++--
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi     | 12 +--
+ arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 78 ++++++++++++++++++
+ .../boot/dts/rockchip/rk3399-rock960.dts      | 79 +++++++++++++++++++
+ .../boot/dts/xilinx/zynqmp-zcu100-revC.dts    | 15 ++--
+ 7 files changed, 196 insertions(+), 36 deletions(-)
+
 -- 
 2.17.1
