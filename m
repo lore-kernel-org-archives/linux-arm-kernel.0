@@ -1,50 +1,41 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 29 Oct 2018 16:52:04 -0700
-Subject: [PATCH 4/6] of/fdt: Populate phys_initrd_start/phys_initrd_size from
- FDT
+Date: Mon, 29 Oct 2018 16:52:06 -0700
+Subject: [PATCH 6/6] of/fdt: Remove definition check for
+ __early_init_dt_declare_initrd()
 In-Reply-To: <20181029235206.30060-1-f.fainelli@gmail.com>
 References: <20181029235206.30060-1-f.fainelli@gmail.com>
-Message-ID: <20181029235206.30060-5-f.fainelli@gmail.com>
+Message-ID: <20181029235206.30060-7-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the architecture implements ARCH_HAS_PHYS_INITRD, make the FDT
-scanning code populate the physical address of the start of the FDT and
-its size.
+With the one and only architecture (ARM64) no longer defining a custom
+__early_init_dt_declare_initrd() function, just get rid of the check for
+that function being already defined.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mm/init.c | 2 +-
- drivers/of/fdt.c   | 4 ++++
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ drivers/of/fdt.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 8f364aa24172..517e95cfb5d2 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -237,7 +237,7 @@ static void __init arm_initrd_init(void)
- 	phys_addr_t start;
- 	unsigned long size;
- 
--	/* FDT scan will populate initrd_start */
-+	/* FDT scan will populate initrd_start and phys_initrd_start */
- 	if (initrd_start && !phys_initrd_size) {
- 		phys_initrd_start = __virt_to_phys(initrd_start);
- 		phys_initrd_size = initrd_end - initrd_start;
 diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 76c83c1ffeda..313cd4f24258 100644
+index 313cd4f24258..3d84fe79eeb4 100644
 --- a/drivers/of/fdt.c
 +++ b/drivers/of/fdt.c
-@@ -899,6 +899,10 @@ static void __early_init_dt_declare_initrd(unsigned long start,
- 	initrd_start = (unsigned long)__va(start);
- 	initrd_end = (unsigned long)__va(end);
- 	initrd_below_start_ok = 1;
-+#ifdef CONFIG_ARCH_HAS_PHYS_INITRD
-+	phys_initrd_start = start;
-+	phys_initrd_size = end - start;
-+#endif
+@@ -892,7 +892,6 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
  }
- #endif
  
+ #ifdef CONFIG_BLK_DEV_INITRD
+-#ifndef __early_init_dt_declare_initrd
+ static void __early_init_dt_declare_initrd(unsigned long start,
+ 					   unsigned long end)
+ {
+@@ -904,7 +903,6 @@ static void __early_init_dt_declare_initrd(unsigned long start,
+ 	phys_initrd_size = end - start;
+ #endif
+ }
+-#endif
+ 
+ /**
+  * early_init_dt_check_for_initrd - Decode initrd location from flat tree
 -- 
 2.17.1
