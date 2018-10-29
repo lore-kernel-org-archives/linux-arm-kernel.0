@@ -1,77 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 29 Oct 2018 08:57:50 +0000
-Subject: [PATCH V2] arm64: Don't flush tlb while clearing the accessed bit
-In-Reply-To: <1540794599-30922-1-git-send-email-amhetre@nvidia.com>
-References: <1540794599-30922-1-git-send-email-amhetre@nvidia.com>
-Message-ID: <20181029085738.kcjiwf5p6rdqeb6j@salmiak>
+From: vabhav.sharma@nxp.com (Vabhav Sharma)
+Date: Mon, 29 Oct 2018 08:57:47 +0000
+Subject: [PATCH v7 4/6] clk: qoriq: Add clockgen support for lx2160a
+In-Reply-To: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
+References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <1540759926-3641-5-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 11:59:59AM +0530, Ashish Mhetre wrote:
-> From: Alex Van Brunt <avanbrunt@nvidia.com>
-> 
-> Accessed bit is used to age a page and in generic implementation there is
-> flush_tlb while clearing the accessed bit.
-> Flushing a TLB is overhead on ARM64 as access flag faults don't get
-> translation table entries cached into TLB's. Flushing TLB is not necessary
-> for this. Clearing the accessed bit without flushing TLB doesn't cause data
-> corruption on ARM64. [It may cause incorrect page aging but chances of that
-> should be relatively low.]
-> In our case with this patch, speed of reading from fast NVMe/SSD through
-> PCIe got improved by 10% ~ 15% and writing got improved by 20% ~ 40%.
-> So for performance optimisation don't flush TLB when clearing the accessed
-> bit on ARM64.
-> x86 made the same optimization even though their TLB invalidate is much
-> faster as it doesn't broadcast to other CPUs.
+From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 
-Please specifically refer to commit:
+Add clockgen support for lx2160a.
+Added entry for compat 'fsl,lx2160a-clockgen'.
 
-  b13b1d2d8692b437 ("x86/mm: In the PTE swapout page reclaim case clear the accessed bit instead of flushing the TLB")
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/clk/clk-qoriq.c         | 12 ++++++++++++
+ drivers/cpufreq/qoriq-cpufreq.c |  1 +
+ 2 files changed, 13 insertions(+)
 
-... so that it's easy for people to track down the relevant x86 change.
-
-> 
-> Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
-> Signed-off-by: Ashish Mhetre <amhetre@nvidia.com>
-> ---
-> v2: Added comments about why flushing is not needed while clearing accessed bit
-> 
->  arch/arm64/include/asm/pgtable.h | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 2ab2031..33e1940 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -652,6 +652,22 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
->  	return __ptep_test_and_clear_young(ptep);
->  }
->  
-> +#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
-> +static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
-> +					 unsigned long address, pte_t *ptep)
-> +{
-> +	/*
-> +	 * Flushing a TLB is overhead on ARM64 as access flag faults don't get
-> +	 * translation table entries cached into TLB's. Flushing TLB is not
-> +	 * necessary for this. Clearing the accessed bit without flushing TLB
-> +	 * doesn't cause data corruption on ARM64.[ It may cause imcorrect page
-> +	 * aging but chances of this should be comparatively low. ]
-> +	 * So as a performance optimization don't flush the TLB when clearing
-> +	 * the accessed bit.
-> +	 */
-
-Can we just copy the x86 comment from commit b13b1d2d8692b437?
-
-Thanks,
-Mark.
-
-> +	return ptep_test_and_clear_young(vma, address, ptep);
-> +}
-> +
->  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
->  #define __HAVE_ARCH_PMDP_TEST_AND_CLEAR_YOUNG
->  static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+index e152bfb..99675de 100644
+--- a/drivers/clk/clk-qoriq.c
++++ b/drivers/clk/clk-qoriq.c
+@@ -570,6 +570,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
+ 		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
+ 	},
+ 	{
++		.compat = "fsl,lx2160a-clockgen",
++		.cmux_groups = {
++			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
++		},
++		.cmux_to_group = {
++			0, 0, 0, 0, 1, 1, 1, 1, -1
++		},
++		.pll_mask = 0x37,
++		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
++	},
++	{
+ 		.compat = "fsl,p2041-clockgen",
+ 		.guts_compat = "fsl,qoriq-device-config-1.0",
+ 		.init_periph = p2041_init_periph,
+@@ -1424,6 +1435,7 @@ CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen", clockgen_init);
+ CLK_OF_DECLARE(qoriq_clockgen_ls1046a, "fsl,ls1046a-clockgen", clockgen_init);
+ CLK_OF_DECLARE(qoriq_clockgen_ls1088a, "fsl,ls1088a-clockgen", clockgen_init);
+ CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
++CLK_OF_DECLARE(qoriq_clockgen_lx2160a, "fsl,lx2160a-clockgen", clockgen_init);
+ 
+ /* Legacy nodes */
+ CLK_OF_DECLARE(qoriq_sysclk_1, "fsl,qoriq-sysclk-1.0", sysclk_init);
+diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
+index 3d773f6..83921b7 100644
+--- a/drivers/cpufreq/qoriq-cpufreq.c
++++ b/drivers/cpufreq/qoriq-cpufreq.c
+@@ -295,6 +295,7 @@ static const struct of_device_id node_matches[] __initconst = {
+ 	{ .compatible = "fsl,ls1046a-clockgen", },
+ 	{ .compatible = "fsl,ls1088a-clockgen", },
+ 	{ .compatible = "fsl,ls2080a-clockgen", },
++	{ .compatible = "fsl,lx2160a-clockgen", },
+ 	{ .compatible = "fsl,p4080-clockgen", },
+ 	{ .compatible = "fsl,qoriq-clockgen-1.0", },
+ 	{ .compatible = "fsl,qoriq-clockgen-2.0", },
+-- 
+2.7.4
