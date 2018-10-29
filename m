@@ -1,49 +1,79 @@
-From: willy@infradead.org (Matthew Wilcox)
-Date: Sun, 28 Oct 2018 19:30:26 -0700
-Subject: [PATCHv2] mm/page_owner: use kvmalloc instead of kmalloc
-In-Reply-To: <1540779403-27622-1-git-send-email-miles.chen@mediatek.com>
-References: <1540779403-27622-1-git-send-email-miles.chen@mediatek.com>
-Message-ID: <20181029023026.GC28520@bombadil.infradead.org>
+From: xiaowei.bao@nxp.com (Xiaowei Bao)
+Date: Mon, 29 Oct 2018 02:35:12 +0000
+Subject: [PATCH 3/6] PCI: layerscape: Add the EP mode support
+In-Reply-To: <CADRPPNRP5RORVr0O59=O-PhRRerirFkPeOmAcKq3pNumf4Mriw@mail.gmail.com>
+References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
+ <20181025110901.5680-3-xiaowei.bao@nxp.com> <20181025215246.GA14861@bogus>
+ <HE1PR04MB149735C7EF2A23AEE982BB9FF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
+ <CAK8P3a3Ty4bRuHiVHY6dh55b1ms8z7RpG2sALM0Dn_8Yd39-xQ@mail.gmail.com>
+ <HE1PR04MB14972C9176E68EEDBD3AD64BF5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
+ <CADRPPNRP5RORVr0O59=O-PhRRerirFkPeOmAcKq3pNumf4Mriw@mail.gmail.com>
+Message-ID: <HE1PR04MB1497239B4B6F8AA48E284F4FF5F30@HE1PR04MB1497.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 10:16:43AM +0800, miles.chen at mediatek.com wrote:
-> The kbuf used by page owner is allocated by kmalloc(), which means it
-> can use only normal memory and there might be a "out of memory"
-> issue when we're out of normal memory.
-> 
-> Use kvmalloc() so we can also allocate kbuf from
-> normal/hihghmem on 32bit kernel.
 
-That's a misconception:
 
-        ret = kmalloc_node(size, kmalloc_flags, node);
+-----Original Message-----
+From: Li Yang <leoyang.li@nxp.com> 
+Sent: 2018?10?27? 4:29
+To: Xiaowei Bao <xiaowei.bao@nxp.com>
+Cc: Arnd Bergmann <arnd@arndb.de>; Rob Herring <robh@kernel.org>; Bjorn Helgaas <bhelgaas@google.com>; Mark Rutland <mark.rutland@arm.com>; Shawn Guo <shawnguo@kernel.org>; kishon at ti.com; lorenzo.pieralisi at arm.com; Greg Kroah-Hartman <gregkh@linuxfoundation.org>; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; Kate Stewart <kstewart@linuxfoundation.org>; cyrille.pitchen at free-electrons.com; Philippe Ombredanne <pombredanne@nexb.com>; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; lkml <linux-kernel@vger.kernel.org>; moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linuxppc-dev <linuxppc-dev@lists.ozlabs.org>
+Subject: Re: [PATCH 3/6] PCI: layerscape: Add the EP mode support
 
-        /*
-         * It doesn't really make sense to fallback to vmalloc for sub page
-         * requests
-         */
-        if (ret || size <= PAGE_SIZE)
-                return ret;
+On Fri, Oct 26, 2018 at 2:43 AM Xiaowei Bao <xiaowei.bao@nxp.com> wrote:
+>
+>
+>
+> -----Original Message-----
+> From: arndbergmann at gmail.com <arndbergmann@gmail.com> On Behalf Of 
+> Arnd Bergmann
+> Sent: 2018?10?26? 15:01
+> To: Xiaowei Bao <xiaowei.bao@nxp.com>
+> Cc: Rob Herring <robh@kernel.org>; bhelgaas at google.com; 
+> mark.rutland at arm.com; shawnguo at kernel.org; Leo Li 
+> <leoyang.li@nxp.com>; kishon at ti.com; lorenzo.pieralisi at arm.com; 
+> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai 
+> Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
+> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; 
+> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
+> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+> Subject: Re: [PATCH 3/6] PCI: layerscape: Add the EP mode support
+>
+> On 10/26/18, Xiaowei Bao <xiaowei.bao@nxp.com> wrote:
+> > From: Rob Herring <robh@kernel.org>
+> >> On Thu, Oct 25, 2018 at 07:08:58PM +0800, Xiaowei Bao wrote:
+> >>>          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
+> >>>          "fsl,ls2088a-pcie"
+> >>>          "fsl,ls1088a-pcie"
+> >>>          "fsl,ls1046a-pcie"
+> >>>          "fsl,ls1012a-pcie
+> >>> +  EP mode:
+> >>> +        "fsl,ls-pcie-ep"
+> >>
+> > > You need SoC specific compatibles for the same reasons as the RC.
+> >
+> > [Xiaowei Bao] I want to contains all layerscape platform use one 
+> > compatible if the PCIe controller work in EP mode.
+>
+> Do you mean only one of the SoCs that support RC mode has EP mode?
+> I think you still need a SoC specific compatible as Rob explained, in case there will be a second one in the future.
+>
+> If you want to ensure that you don't have to update the device driver for each new chip that comes in when the EP mode is compatible, the way this is handled is to list multiple values in the compatible property, listing the first SoC that introduced the specific version of that IP block as the most generic type, e.g.
+>
+>   copatible = "fsl,ls2088a-pcie-ep", "fsl,ls1012a-pcie-ep", 
+> "snps,dw-pcie-ep";
+>
+> For consistency, it probably is best to match each RC mode value with the corresponding EP mode string for each device that can support both (if there is more than one).
+>
+>       Arnd
+> [Xiaowei Bao] My mean is that the ls-pcie-ep compatibles will contain all layerscape SOCs of NXP, e.g: ls1046a-pcie-ep, fsl,ls2088a-pcie-ep, ls2088a-pcie-ep and so on, other layerscape SOCs have not test except the ls1046a, I think it is compatible if the new chip or other SOCs use the DW core, OK, I will discuss this issue internally, and reply to you later.
 
-Now, maybe this is an opportunity for us to improve kvmalloc.  Maybe like
-this ...
+You can define a generic compatible string for the EP mode of all these platforms.  But like Rob and Arnd mentioned, it is good to also define the SoC specific compatible strings just in case that we need special treatment for certain SoCs in the future.
 
-diff --git a/mm/util.c b/mm/util.c
-index 8bf08b5b5760..fdf5b34d2c28 100644
---- a/mm/util.c
-+++ b/mm/util.c
-@@ -416,10 +416,10 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
- 	ret = kmalloc_node(size, kmalloc_flags, node);
- 
- 	/*
--	 * It doesn't really make sense to fallback to vmalloc for sub page
--	 * requests
-+	 * It only makes sense to fallback to vmalloc for sub page
-+	 * requests if we might be able to allocate highmem pages.
- 	 */
--	if (ret || size <= PAGE_SIZE)
-+	if (ret || (!IS_ENABLED(CONFIG_HIGHMEM) && size <= PAGE_SIZE))
- 		return ret;
- 
- 	return __vmalloc_node_flags_caller(size, node, flags,
+Regards,
+Leo
+
+[Xiaowei Bao] Hi Leo, OK, I will add the SoC specific compatible strings in patch-v2, thanks a lot.
