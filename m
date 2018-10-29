@@ -1,46 +1,36 @@
-From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Mon, 29 Oct 2018 08:57:34 +0000
-Subject: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
-In-Reply-To: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
-References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <1540759926-3641-3-git-send-email-vabhav.sharma@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 29 Oct 2018 10:17:07 +0100
+Subject: [PATCH v3 06/25] drm/sun4i: sun6i_mipi_dsi: Add DSI Generic
+ short write 2 param transfer
+In-Reply-To: <20181026144344.27778-7-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-7-jagan@amarulasolutions.com>
+Message-ID: <20181029091707.shfxcqe5xchoqjqw@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding compatible string "lx2160a-dcfg" to
-initialize guts driver for lx2160 and SoC die
-attribute definition for LX2160A
+On Fri, Oct 26, 2018 at 08:13:25PM +0530, Jagan Teki wrote:
+> Short transfer write support for DCS and Generic transfer types
+> share similar way to process command sequence in DSI block so
+> add generic write 2 param transfer type macro so-that the panels
+> which are requesting similar transfer type may process properly.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Tested-by: Jagan Teki <jagan@amarulasolutions.com>
 
-Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
-Acked-by: Li Yang <leoyang.li@nxp.com>
----
- drivers/soc/fsl/guts.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+I'm not sure why you have a Tested-by tag here. Of course we're
+expecting you to test your patches before sending them.
 
-diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
-index 302e0c8..bcab1ee 100644
---- a/drivers/soc/fsl/guts.c
-+++ b/drivers/soc/fsl/guts.c
-@@ -100,6 +100,11 @@ static const struct fsl_soc_die_attr fsl_soc_die[] = {
- 	  .svr		= 0x87000000,
- 	  .mask		= 0xfff70000,
- 	},
-+	/* Die: LX2160A, SoC: LX2160A/LX2120A/LX2080A */
-+	{ .die          = "LX2160A",
-+	  .svr          = 0x87360000,
-+	  .mask         = 0xff3f0000,
-+	},
- 	{ },
- };
- 
-@@ -222,6 +227,7 @@ static const struct of_device_id fsl_guts_of_match[] = {
- 	{ .compatible = "fsl,ls1088a-dcfg", },
- 	{ .compatible = "fsl,ls1012a-dcfg", },
- 	{ .compatible = "fsl,ls1046a-dcfg", },
-+	{ .compatible = "fsl,lx2160a-dcfg", },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181029/626a2cfa/attachment.sig>
