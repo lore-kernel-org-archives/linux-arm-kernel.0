@@ -1,9 +1,10 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 29 Oct 2018 14:30:06 +0530
-Subject: [PATCH v2 7/7] arm64: dts: qcom: apq8016-sbc: Standardize LED labels
+Date: Mon, 29 Oct 2018 14:30:05 +0530
+Subject: [PATCH v2 6/7] arm64: dts: xilinx: ultra96: Standardize LED labels
+ and triggers
 In-Reply-To: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
 References: <20181029090006.4353-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181029090006.4353-8-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181029090006.4353-7-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,65 +17,56 @@ green:user4  default-trigger: none, panic-indicator
 yellow:wlan  default-trigger: phy0tx
 blue:bt      default-trigger: hci0-power
 
-So lets adopt the same for APQ8016 SBC (Dragonboard410c), which is
-one of the 96Boards CE platform.
----
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+So lets adopt the same for Ultra96, which is one of the 96Boards
+CE and AI platform. Since the WLAN and BT LEDs are hardwired onboard,
+consolidate only User LEDs.
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index 46feedf7c989..35f95154316b 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -300,28 +300,28 @@
- 			compatible = "gpio-leds";
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+index eb5e8bddb610..c08a8753215b 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+@@ -57,29 +57,30 @@
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		ds2 {
+-			label = "ds2";
++			label = "green:user1";
+ 			gpios = <&gpio 20 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
  
- 			led at 1 {
--				label = "apq8016-sbc:green:user1";
-+				label = "green:user1";
- 				gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "heartbeat";
- 				default-state = "off";
- 			};
+ 		ds3 {
+-			label = "ds3";
++			label = "green:user2";
+ 			gpios = <&gpio 19 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "phy0tx"; /* WLAN tx */
++			linux,default-trigger = "mmc0";
+ 			default-state = "off";
+ 		};
  
- 			led at 2 {
--				label = "apq8016-sbc:green:user2";
-+				label = "green:user2";
- 				gpios = <&msmgpio 120 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "mmc0";
- 				default-state = "off";
- 			};
+ 		ds4 {
+-			label = "ds4";
++			label = "green:user3";
+ 			gpios = <&gpio 18 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "phy0rx"; /* WLAN rx */
++			linux,default-trigger = "mmc1";
+ 			default-state = "off";
+ 		};
  
- 			led at 3 {
--				label = "apq8016-sbc:green:user3";
-+				label = "green:user3";
- 				gpios = <&pm8916_gpios 1 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "mmc1";
- 				default-state = "off";
- 			};
+ 		ds5 {
+-			label = "ds5";
++			label = "green:user4";
+ 			gpios = <&gpio 17 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "bluetooth-power";
++			linux,default-trigger = "none";
++			panic-indicator;
+ 		};
  
- 			led at 4 {
--				label = "apq8016-sbc:green:user4";
-+				label = "green:user4";
- 				gpios = <&pm8916_gpios 2 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "none";
- 				panic-indicator;
-@@ -329,14 +329,14 @@
- 			};
- 
- 			led at 5 {
--				label = "apq8016-sbc:yellow:wlan";
-+				label = "yellow:wlan";
- 				gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "phy0tx";
- 				default-state = "off";
- 			};
- 
- 			led at 6 {
--				label = "apq8016-sbc:blue:bt";
-+				label = "blue:bt";
- 				gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger = "bluetooth-power";
- 				default-state = "off";
+ 		vbus_det { /* U5 USB5744 VBUS detection via MIO25 */
 -- 
 2.17.1
