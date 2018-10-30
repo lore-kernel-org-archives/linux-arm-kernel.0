@@ -1,34 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Oct 2018 14:30:27 -0500
-Subject: [PATCH V8 3/5] dt-bindings: fsl: scu: update power domain binding
-In-Reply-To: <1540739690-23750-4-git-send-email-aisheng.dong@nxp.com>
-References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
- <1540739690-23750-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20181030193027.GA26215@bogus>
+Date: Tue, 30 Oct 2018 14:31:37 -0500
+Subject: [PATCH v5 5/8] ARM: l2x0: add marvell,ecc-enable property for
+ aurora
+In-Reply-To: <20181029072535.31667-6-chris.packham@alliedtelesis.co.nz>
+References: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
+ <20181029072535.31667-6-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181030193137.GA28258@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Oct 2018 15:19:44 +0000, "A.s. Dong" wrote:
-> Update the power domain binding with #power-domain-cells 1 format.
-> The first cell can be a global SCU power domain and the 2nd cell
-> the device ID. With this approach, we may remove all the sub power
-> domain nodes from device tree which can relief the device tree a lot.
+On Mon, 29 Oct 2018 20:25:32 +1300, Chris Packham wrote:
+> The aurora cache on the Marvell Armada-XP SoC supports ECC protection
+> for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
+> which can be used to enable this.
 > 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: linux-pm at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> Suggested-by: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> [jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 > ---
-> ChangeLog:
-> v7->v8:
->  * new patch
-> ---
->  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 37 +++++-----------------
->  1 file changed, 8 insertions(+), 29 deletions(-)
+>  Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
+>  arch/arm/mm/cache-l2x0.c                         | 7 +++++++
+>  2 files changed, 9 insertions(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
