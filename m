@@ -1,98 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 30 Oct 2018 15:06:24 +0200
-Subject: [PATCH v12 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <1540887143-27904-1-git-send-email-yong.deng@magewell.com>
-References: <1540887143-27904-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <308184907.pMD7ZDI2dr@avalon>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 30 Oct 2018 07:06:01 +0100
+Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
+In-Reply-To: <1540862950.12374.40.camel@mtkswgap22>
+References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
+ <20181029080708.GA32673@dhcp22.suse.cz>
+ <20181029081706.GC32673@dhcp22.suse.cz>
+ <1540862950.12374.40.camel@mtkswgap22>
+Message-ID: <20181030060601.GR32673@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
-
-Thank you for the patch.
-
-On Tuesday, 30 October 2018 10:12:23 EET Yong Deng wrote:
-> Add binding documentation for Allwinner V3s CSI.
+On Tue 30-10-18 09:29:10, Miles Chen wrote:
+> On Mon, 2018-10-29 at 09:17 +0100, Michal Hocko wrote:
+> > On Mon 29-10-18 09:07:08, Michal Hocko wrote:
+> > [...]
+> > > Besides that, the following doesn't make much sense to me. It simply
+> > > makes no sense to use vmalloc for sub page allocation regardless of
+> > > HIGHMEM.
+> > 
+> > OK, it is still early morning here. Now I get the point of the patch.
+> > You just want to (ab)use highmeme for smaller requests. I do not like
+> > this, to be honest. It causes an internal fragmentation and more
+> > importantly the VMALLOC space on 32b where HIGHMEM is enabled (do we
+> > have any 64b with HIGHMEM btw?) is quite small to be wasted like that.
+> > 
+> thanks for your comment. It looks like that using vmalloc fallback for
+> sub page allocation is not good here.
 > 
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  .../devicetree/bindings/media/sun6i-csi.txt        | 56 +++++++++++++++++++
->  1 file changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> Your comment gave another idea:
 > 
-> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
-> 100644
-> index 000000000000..443e18c181b3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> @@ -0,0 +1,56 @@
-> +Allwinner V3s Camera Sensor Interface
-> +-------------------------------------
-> +
-> +Allwinner V3s SoC features a CSI module(CSI1) with parallel interface.
-> +
-> +Required properties:
-> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> +  - reg: base address and size of the memory-mapped region.
-> +  - interrupts: interrupt associated to this IP
-> +  - clocks: phandles to the clocks feeding the CSI
-> +    * bus: the CSI interface clock
-> +    * mod: the CSI module clock
-> +    * ram: the CSI DRAM clock
-> +  - clock-names: the clock names mentioned above
-> +  - resets: phandles to the reset line driving the CSI
-> +
-> +The CSI node should contain one 'port' child node with one child 'endpoint'
-> +node, according to the bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +Endpoint node properties for CSI
-> +---------------------------------
-> +See the video-interfaces.txt for a detailed description of these
-> properties. +- remote-endpoint	: (required) a phandle to the bus receiver's
-> endpoint +			   node
-> +- bus-width:		: (required) must be 8, 10, 12 or 16
-> +- pclk-sample		: (optional) (default: sample on falling edge)
-> +- hsync-active		: (required; parallel-only)
-> +- vsync-active		: (required; parallel-only)
-> +
-> +Example:
-> +
-> +csi1: csi at 1cb4000 {
-> +	compatible = "allwinner,sun8i-v3s-csi";
-> +	reg = <0x01cb4000 0x1000>;
-> +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&ccu CLK_BUS_CSI>,
-> +		 <&ccu CLK_CSI1_SCLK>,
-> +		 <&ccu CLK_DRAM_CSI>;
-> +	clock-names = "bus", "mod", "ram";
-> +	resets = <&ccu RST_BUS_CSI>;
-> +
-> +	port {
-> +		/* Parallel bus endpoint */
-> +		csi1_ep: endpoint {
-> +			remote-endpoint = <&adv7611_ep>;
-> +			bus-width = <16>;
-> +
-> +			/* If hsync-active/vsync-active are missing,
-> +			   embedded BT.656 sync is used */
-> +			hsync-active = <0>; /* Active low */
-> +			vsync-active = <0>; /* Active low */
-> +			pclk-sample = <1>;  /* Rising */
-> +		};
-> +	};
-> +};
+> 1. force kbuf to PAGE_SIZE
+> 2. allocate a page by alloc_page(GFP_KERNEL | __GFP_HIGHMEM); so we can
+> get a highmem page if possible
+> 3. use kmap/kunmap pair to create mapping for this page. No vmalloc
+> space is used.
+> 4. do not change kvmalloc logic.
 
+If you mean for this particular situation then is this really worth
+it? I mean this is a short term allocation for root only so you do not
+have to worry about low mem depletion.
 
+If you are thiking in more generic terms to allow kmalloc to use highmem
+then I am not really sure this will work out.
 -- 
-Regards,
-
-Laurent Pinchart
+Michal Hocko
+SUSE Labs
