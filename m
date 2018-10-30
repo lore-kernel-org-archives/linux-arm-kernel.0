@@ -1,60 +1,54 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 30 Oct 2018 10:10:59 -0500
-Subject: [PATCH 2/6] arch: Make phys_initrd_start and phys_initrd_size
- global variables
-In-Reply-To: <20181029235206.30060-3-f.fainelli@gmail.com>
-References: <20181029235206.30060-1-f.fainelli@gmail.com>
- <20181029235206.30060-3-f.fainelli@gmail.com>
-Message-ID: <CAL_JsqKrrmMOQrV62L0QXAPiLGceMbvA7HZ=1U3PW0_MpqtC=w@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 30 Oct 2018 14:56:41 +0000
+Subject: [PATCH V3 4/8] dt-bindings: i2c: i2c-imx-lpi2c: add imx8qxp
+ compatible string
+In-Reply-To: <20181028221952.GF1882@kunai>
+References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
+ <1539886483-15775-5-git-send-email-aisheng.dong@nxp.com>
+ <20181028221952.GF1882@kunai>
+Message-ID: <AM0PR04MB42110EB0836E9610CDA2746680CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 6:52 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
->
-> Make phys_initrd_start and phys_initrd_size global variables that will
-> later be referenced by generic code under drivers/of/fdt.c.
->
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/mm/init.c       | 4 ++--
->  arch/unicore32/mm/init.c | 4 ++--
->  include/linux/initrd.h   | 3 +++
->  3 files changed, 7 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 0cc8e04295a4..8f364aa24172 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -51,8 +51,8 @@ unsigned long __init __clear_cr(unsigned long mask)
->  }
->  #endif
->
-> -static phys_addr_t phys_initrd_start __initdata = 0;
-> -static unsigned long phys_initrd_size __initdata = 0;
-> +phys_addr_t phys_initrd_start __initdata = 0;
-> +unsigned long phys_initrd_size __initdata = 0;
+Hi Wolfram,
 
-I would declare these in common initrd code instead. Then you don't
-need a kconfig symbol.
+[...]
 
->  static int __init early_initrd(char *p)
->  {
-> diff --git a/arch/unicore32/mm/init.c b/arch/unicore32/mm/init.c
-> index 8f8699e62bd5..4dd26d6f02e5 100644
-> --- a/arch/unicore32/mm/init.c
-> +++ b/arch/unicore32/mm/init.c
-> @@ -31,8 +31,8 @@
->
->  #include "mm.h"
->
-> -static unsigned long phys_initrd_start __initdata = 0x01000000;
-> -static unsigned long phys_initrd_size __initdata = SZ_8M;
-> +phys_addr_t phys_initrd_start __initdata = 0x01000000;
-> +unsigned long phys_initrd_size __initdata = SZ_8M;
+> Hi,
+> 
+> On Thu, Oct 18, 2018 at 06:19:29PM +0000, A.s. Dong wrote:
+> > Add imx8qxp compatible string
+> >
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Wolfram Sang <wsa@the-dreams.de>
+> > Cc: linux-i2c at vger.kernel.org
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> Doesn't apply...
+> 
+> >    - "fsl,imx8dv-lpi2c" for LPI2C compatible with the one integrated
+> > on i.MX8DV soc
+> 
+> ... I don't have this line in my tree.
+> 
 
-You'll have to set these at runtime though. However, I seem to
-remember that an exact size was needed for decompressing an initrd
-which would make these defaults pointless. Maybe that was only certain
-compression formats.
+It seems to be caused by the following commit during the 4.19 RC2+.
+f6eb89349078 dt-bindings: imx-lpi2c: Remove mx8dv compatible entry
 
-Rob
+> Would you maybe volunteer to maintain this driver? To prevent stuff like this
+> from happening? :)
+
+Sure, I will open an eye on this driver patches from now on.
+And I will resend the patch against your tree.
+
+Thanks
+
+Regards
+Dong Aisheng
+
+> 
+> Regards,
+> 
+>    Wolfram
