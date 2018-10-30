@@ -1,38 +1,49 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 30 Oct 2018 19:08:41 +0100
-Subject: [PATCH] firmware: raspberrypi: Define timeout for transactions
-Message-ID: <1540922921-3653-1-git-send-email-stefan.wahren@i2se.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 30 Oct 2018 11:25:11 -0700 (PDT)
+Subject: [PATCH 1/2] net: axienet: recheck condition after timeout in
+ mdio_wait()
+In-Reply-To: <20181030093139.10226-2-kurt@linutronix.de>
+References: <20181030093139.10226-1-kurt@linutronix.de>
+ <20181030093139.10226-2-kurt@linutronix.de>
+Message-ID: <20181030.112511.957438343014682098.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should never assume to get a reply from the firmware otherwise
-the call could block forever and the user don't get informed. So
-define a timeout of 1 sec and print a stacktrace once in the unlikely
-case the timeout expired.
+From: Kurt Kanzenbach <kurt@linutronix.de>
+Date: Tue, 30 Oct 2018 10:31:38 +0100
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/firmware/raspberrypi.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+> The function could report a false positive if it gets preempted between reading
+> the XAE_MDIO_MCR_OFFSET register and checking for the timeout.  In such a case,
+> the condition has to be rechecked to avoid false positives.
+> 
+> Therefore, check for expected condition even after the timeout occurred.
+> 
+> Signed-off-by: Kurt Kanzenbach <kurt@linutronix.de>
+ ...
+>  		if (time_before_eq(end, jiffies)) {
+> -			WARN_ON(1);
+> -			return -ETIMEDOUT;
+> +			val = axienet_ior(lp, XAE_MDIO_MCR_OFFSET);
+> +			break;
+>  		}
+> +
+>  		udelay(1);
+>  	}
+> -	return 0;
+> +	if (val & XAE_MDIO_MCR_READY_MASK)
+> +		return 0;
+> +
+> +	WARN_ON(1);
+> +	return -ETIMEDOUT;
 
-diff --git a/drivers/firmware/raspberrypi.c b/drivers/firmware/raspberrypi.c
-index a200a21..bf45ac4 100644
---- a/drivers/firmware/raspberrypi.c
-+++ b/drivers/firmware/raspberrypi.c
-@@ -56,8 +56,12 @@ rpi_firmware_transaction(struct rpi_firmware *fw, u32 chan, u32 data)
- 	reinit_completion(&fw->c);
- 	ret = mbox_send_message(fw->chan, &message);
- 	if (ret >= 0) {
--		wait_for_completion(&fw->c);
--		ret = 0;
-+		if (wait_for_completion_timeout(&fw->c, HZ)) {
-+			ret = 0;
-+		} else {
-+			ret = -ETIMEDOUT;
-+			WARN_ONCE(1, "Firmware transaction timeout");
-+		}
- 	} else {
- 		dev_err(fw->cl.dev, "mbox_send_message returned %d\n", ret);
- 	}
--- 
-2.7.4
+You are not fundamentally changing the situation at all.
+
+The condtion could change right after your last read of
+XAR_MDIO_MCR_OFFSET, which is the same thing that happens before your
+modifications to this code.
+
+It sounds more like the timeout is slightly too short, and that's the
+real problem that causes whatever behavior you think you are fixing
+here.
+
+I'm not applying this.
