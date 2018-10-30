@@ -1,51 +1,59 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 30 Oct 2018 09:25:25 +0100
-Subject: [PATCH 6/7] smp: Don't yell about IRQs disabled in
- kgdb_roundup_cpus()
-In-Reply-To: <20181029180707.207546-7-dianders@chromium.org>
-References: <20181029180707.207546-1-dianders@chromium.org>
- <20181029180707.207546-7-dianders@chromium.org>
-Message-ID: <20181030082525.GA13436@hirez.programming.kicks-ass.net>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 30 Oct 2018 08:43:44 +0100
+Subject: Warnings in arch/arm64/mm/dma-mapping.c
+In-Reply-To: <a771d5ce-28a2-609e-5fd7-338fadc20743@gmail.com>
+References: <a771d5ce-28a2-609e-5fd7-338fadc20743@gmail.com>
+Message-ID: <20181030074344.GA24697@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 11:07:06AM -0700, Douglas Anderson wrote:
-> In kgdb_roundup_cpus() we've got code that looks like:
->   local_irq_enable();
->   smp_call_function(kgdb_call_nmi_hook, NULL, 0);
->   local_irq_disable();
-
-> Let's add kgdb to the list of reasons not to warn in
-> smp_call_function_many().  That will allow us (in a future patch) to
-> stop calling local_irq_enable() which will get rid of the original
-> splat.
+On Mon, Oct 29, 2018 at 04:51:47PM -0700, Florian Fainelli wrote:
+> Hi,
 > 
-> NOTE: with this change comes the obvious question: will we start
-> deadlocking more often now when we drop into the debugger.  I can't
-> say that for sure one way or the other, but the fact that we do the
-> same logic for "oops_in_progress" makes me feel like it shouldn't
-> happen too often.  Also note that the old logic of turning on
-> interrupts temporarily wasn't exactly safe since (I presume) that
-> could have violated spin_lock_irqsave() semantics and ended up with a
-> deadlock of its own.
+> I have not a chance to run a bisection yet, but I suspect this is coming
+> from Christoph's latest batch of DMA-API changes in ARM64 under the
+> merge commit befa93633193e5327e4045d1e5fa29114580fa5d ("Merge tag
+> 'dma-mapping-4.20-1' of git://git.infradead.org/users/hch/dma-mapping"),
+> here are the warnings:
 
-How is any of that not utterly and terminally broken?
+This should fix it:
 
-> @@ -413,7 +414,8 @@ void smp_call_function_many(const struct cpumask *mask,
->  	 * can't happen.
->  	 */
->  	WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
-> -		     && !oops_in_progress && !early_boot_irqs_disabled);
-> +		     && !oops_in_progress && !early_boot_irqs_disabled
-> +		     && !in_dbg_master());
->  
->  	/* Try to fastpath.  So, what's a CPU they want? Ignoring this one. */
->  	cpu = cpumask_first_and(mask, cpu_online_mask);
+---
+>From 773c5e097c5cf3868443ffb79ae64d79f70e3ccf Mon Sep 17 00:00:00 2001
+From: Christoph Hellwig <hch@lst.de>
+Date: Tue, 30 Oct 2018 09:41:29 +0200
+Subject: arm64: fix warnings without CONFIG_IOMMU_DMA
 
-Not a fan of this. There is a distinct difference between
-oops_in_progress and dropping into kgdb in that you don't ever expect to
-return/survive oopses, whereas we do expect to survive kgdb.
+__swiotlb_get_sgtable_page and __swiotlb_mmap_pfn are not only misnamed
+but also only used if CONFIG_IOMMU_DMA is set.  Just add a simple ifdef
+for now, given that we plan to remove them entirely for the next merge
+window.
 
-Also, how does kgdb work at all without actual NMIs ?
+Reported-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+---
+ arch/arm64/mm/dma-mapping.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-So no, NAK on this.
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index d190612b8f33..560756a7290e 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -160,6 +160,7 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
+ 	__dma_unmap_area(phys_to_virt(paddr), size, dir);
+ }
+ 
++#ifdef CONFIG_IOMMU_DMA
+ static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
+ 				      struct page *page, size_t size)
+ {
+@@ -188,6 +189,7 @@ static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
+ 
+ 	return ret;
+ }
++#endif /* CONFIG_IOMMU_DMA */
+ 
+ static int __init atomic_pool_init(void)
+ {
+-- 
+2.19.1
