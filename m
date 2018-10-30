@@ -1,29 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 30 Oct 2018 16:25:28 -0300
-Subject: [PATCH] ARM: dts: fsl: Fix improperly quoted stdout-path values
-In-Reply-To: <20181030190802.20722-1-robh@kernel.org>
-References: <20181030190802.20722-1-robh@kernel.org>
-Message-ID: <CAOMZO5BHnzYWPQ4NJmcFUe8NjPYyCR9HEUj2-wJ22zx9g7j=gg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 Oct 2018 14:30:11 -0500
+Subject: [PATCH V8 1/5] dt-bindings: imx: add scu resource id headfile
+In-Reply-To: <1540739690-23750-2-git-send-email-aisheng.dong@nxp.com>
+References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
+ <1540739690-23750-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181030193011.GA25741@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 4:08 PM Rob Herring <robh@kernel.org> wrote:
->
-> A quoted label reference doesn't expand to the node path and is taken as
-> a literal string. Dropping the quotes can fix this unless the baudrate
-> string is appended in which case we have to use the alias.
->
-> At least on VF610, the problem was masked by setting the console in
-> bootargs. Use the alias syntax with baudrate parameter so we can drop
-> setting the console in bootargs.
->
+On Sun, 28 Oct 2018 15:19:35 +0000, "A.s. Dong" wrote:
+> SCU firmware uses resource id to provide services. Every device on
+> a SCU based system has a resource id. Exported it in device tree to
+> allow service bindings to use it. e.g. power domain.
+> 
 > Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
 > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: NXP Linux Team <linux-imx@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+> v7->v8:
+>  * new patch
+> ---
+>  include/dt-bindings/firmware/imx/rsrc.h | 559 ++++++++++++++++++++++++++++++++
+>  1 file changed, 559 insertions(+)
+>  create mode 100644 include/dt-bindings/firmware/imx/rsrc.h
+> 
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
