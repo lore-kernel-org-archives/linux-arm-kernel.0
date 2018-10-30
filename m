@@ -1,45 +1,43 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Tue, 30 Oct 2018 08:38:17 -0500
-Subject: [PATCHv4 0/2] iommu/arm-smmu: Add Stratix10 SMMU Support
-In-Reply-To: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <65377977-8534-557a-b77b-f5f8f6962385@linux.intel.com>
+From: kurt.kanzenbach@linutronix.de (Kurt Kanzenbach)
+Date: Tue, 30 Oct 2018 14:47:04 +0100
+Subject: [PATCH 0/2] net: xlinx: mdio: recheck condition after timeout
+In-Reply-To: <20181030120831.GC27873@lunn.ch>
+References: <20181030093139.10226-1-kurt@linutronix.de>
+ <20181030120831.GC27873@lunn.ch>
+Message-ID: <20181030134704.l673d7pm5mwysx2o@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle ping...
+Hi Andrew,
 
-On 10/05/2018 03:56 PM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
-> 
-> Add SMMU support for the Stratix10 SOCFPGA. This patch requires
-> clock enables for the master TBUs and therefore has a dependency
-> on patches currently being reviewed.
-> 
-> This patchset is dependent on the patch series [1]
-> 
-> v4  Address Vivek's comment.
->      Abandon dependency on [2] (no recent activity/reviews)
->      Implement device tree parsing of clock on top of [1].
-> v3  Address comment from Robin and change dependency on device
->      tree bulk clock patches [2].
-> v2  Change to dependency on [1].
-> 
-> [1] [v16,0/5] iommu/arm-smmu: Add runtime pm/sleep support
-> https://patchwork.kernel.org/cover/10581891/
-> 
-> [2] [PATCH V6 0/4] clk: new APIs to handle all available clocks
-> https://lkml.org/lkml/2018/8/31/97
-> 
-> Thor Thayer (2):
->    arm64: dts: stratix10: Add Stratix10 SMMU support
->    iommu/arm-smmu: Get clock config from device tree
-> 
->   arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 29 ++++++++++++++++++++++
->   drivers/iommu/arm-smmu.c                          | 30 ++++++++++++++++++++---
->   2 files changed, 56 insertions(+), 3 deletions(-)
-> 
+On Tue, Oct 30, 2018 at 01:08:31PM +0100, Andrew Lunn wrote:
+> On Tue, Oct 30, 2018 at 10:31:37AM +0100, Kurt Kanzenbach wrote:
+> > Hi,
+> >
+> > the Xilinx mdio wait functions may return false positives under certain
+> > circumstances: If the functions get preempted between reading the corresponding
+> > mdio register and checking for the timeout, they could falsely indicate a
+> > timeout.
+>
+> Hi Kurt
+>
+> I wonder if it would be possible to add a readx_poll_timeout() which
+> passes two parameters to op()?
 
-Any comments on this patchset? I realize the dependency still needs to 
-be accepted but the clock portion of the dependency which is what this 
-patch builds on hasn't changed in the last iterations.
+actually I was thinking about using readx_poll_timeout(). But as you
+already pointed out, it expects only one parameter for op(). I'm not
+sure about adding a new readx_poll_timeout() macro.
+
+>
+> I keep seeing this basic problem in various drivers, and try to point
+> people towards readx_poll_timeout(), but it is not the best of fit.
+>
+> Otherwise, could you add a axienet_ior_read_mcr(lp), and use
+> readx_poll_timeout() as is?
+
+I guess that would work.
+
+I'll use readx_poll_timeout() for both wait functions and send a v2.
+
+Thanks,
+Kurt
