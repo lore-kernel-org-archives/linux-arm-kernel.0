@@ -1,58 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Oct 2018 14:08:02 -0500
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 30 Oct 2018 16:25:28 -0300
 Subject: [PATCH] ARM: dts: fsl: Fix improperly quoted stdout-path values
-Message-ID: <20181030190802.20722-1-robh@kernel.org>
+In-Reply-To: <20181030190802.20722-1-robh@kernel.org>
+References: <20181030190802.20722-1-robh@kernel.org>
+Message-ID: <CAOMZO5BHnzYWPQ4NJmcFUe8NjPYyCR9HEUj2-wJ22zx9g7j=gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A quoted label reference doesn't expand to the node path and is taken as
-a literal string. Dropping the quotes can fix this unless the baudrate
-string is appended in which case we have to use the alias.
+On Tue, Oct 30, 2018 at 4:08 PM Rob Herring <robh@kernel.org> wrote:
+>
+> A quoted label reference doesn't expand to the node path and is taken as
+> a literal string. Dropping the quotes can fix this unless the baudrate
+> string is appended in which case we have to use the alias.
+>
+> At least on VF610, the problem was masked by setting the console in
+> bootargs. Use the alias syntax with baudrate parameter so we can drop
+> setting the console in bootargs.
+>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: NXP Linux Team <linux-imx@nxp.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-At least on VF610, the problem was masked by setting the console in
-bootargs. Use the alias syntax with baudrate parameter so we can drop
-setting the console in bootargs.
-
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: NXP Linux Team <linux-imx@nxp.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- arch/arm/boot/dts/imx53-ppd.dts       | 2 +-
- arch/arm/boot/dts/vf610m4-colibri.dts | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
-index cdb90bee7b4a..f202396e3f2a 100644
---- a/arch/arm/boot/dts/imx53-ppd.dts
-+++ b/arch/arm/boot/dts/imx53-ppd.dts
-@@ -55,7 +55,7 @@
- 	};
- 
- 	chosen {
--		stdout-path = "&uart1:115200n8";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	memory at 70000000 {
-diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
-index 41ec66a96990..1a7356b841d2 100644
---- a/arch/arm/boot/dts/vf610m4-colibri.dts
-+++ b/arch/arm/boot/dts/vf610m4-colibri.dts
-@@ -50,8 +50,8 @@
- 	compatible = "fsl,vf610m4";
- 
- 	chosen {
--		bootargs = "console=ttyLP2,115200 clk_ignore_unused init=/linuxrc rw";
--		stdout-path = "&uart2";
-+		bootargs = "clk_ignore_unused init=/linuxrc rw";
-+		stdout-path = "serial2:115200;
- 	};
- 
- 	memory at 8c000000 {
--- 
-2.19.1
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
