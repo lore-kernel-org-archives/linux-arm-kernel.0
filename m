@@ -1,13 +1,13 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 30 Oct 2018 10:15:04 -0700
+Date: Tue, 30 Oct 2018 10:18:08 -0700
 Subject: [PATCH] soc: ti: QMSS: Fix usage of irq_set_affinity_hint
 In-Reply-To: <20181030111103.12110-1-marc.zyngier@arm.com>
 References: <20181030111103.12110-1-marc.zyngier@arm.com>
-Message-ID: <0a20aaf3-65ce-a7ae-8a0e-877313483969@oracle.com>
+Message-ID: <ea4e3273-39da-d9f9-49ce-f18268767ce3@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Greg,
 
 On 10/30/2018 4:11 AM, Marc Zyngier wrote:
 > The Keystone QMSS driver is pretty damaged, in the sense that it
@@ -24,7 +24,118 @@ On 10/30/2018 4:11 AM, Marc Zyngier wrote:
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-Could you please add this patch to your fixes branch ?
+> I found this one by inspection after finding a similar bug in an
+> unrelated driver. It is only compile-tested. It would probably
+> a Cc stable, but that's Santosh's decision.
 
-FWIW,
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Would be able to apply this fix from Marc for stable or it needs
+to be re-posted with CC to stable ?
+
+> 
+>   drivers/soc/ti/knav_qmss.h       |  4 ++--
+>   drivers/soc/ti/knav_qmss_acc.c   | 10 +++++-----
+>   drivers/soc/ti/knav_qmss_queue.c | 22 +++++++++++++++-------
+>   3 files changed, 22 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
+> index 3efc47e82973..bd040c29c4bf 100644
+> --- a/drivers/soc/ti/knav_qmss.h
+> +++ b/drivers/soc/ti/knav_qmss.h
+> @@ -329,8 +329,8 @@ struct knav_range_ops {
+>   };
+>   
+>   struct knav_irq_info {
+> -	int	irq;
+> -	u32	cpu_map;
+> +	int		irq;
+> +	struct cpumask	*cpu_mask;
+>   };
+>   
+>   struct knav_range_info {
+> diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
+> index 316e82e46f6c..2f7fb2dcc1d6 100644
+> --- a/drivers/soc/ti/knav_qmss_acc.c
+> +++ b/drivers/soc/ti/knav_qmss_acc.c
+> @@ -205,18 +205,18 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
+>   {
+>   	struct knav_device *kdev = range->kdev;
+>   	struct knav_acc_channel *acc;
+> -	unsigned long cpu_map;
+> +	struct cpumask *cpu_mask;
+>   	int ret = 0, irq;
+>   	u32 old, new;
+>   
+>   	if (range->flags & RANGE_MULTI_QUEUE) {
+>   		acc = range->acc;
+>   		irq = range->irqs[0].irq;
+> -		cpu_map = range->irqs[0].cpu_map;
+> +		cpu_mask = range->irqs[0].cpu_mask;
+>   	} else {
+>   		acc = range->acc + queue;
+>   		irq = range->irqs[queue].irq;
+> -		cpu_map = range->irqs[queue].cpu_map;
+> +		cpu_mask = range->irqs[queue].cpu_mask;
+>   	}
+>   
+>   	old = acc->open_mask;
+> @@ -239,8 +239,8 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
+>   			acc->name, acc->name);
+>   		ret = request_irq(irq, knav_acc_int_handler, 0, acc->name,
+>   				  range);
+> -		if (!ret && cpu_map) {
+> -			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
+> +		if (!ret && cpu_mask) {
+> +			ret = irq_set_affinity_hint(irq, cpu_mask);
+>   			if (ret) {
+>   				dev_warn(range->kdev->dev,
+>   					 "Failed to set IRQ affinity\n");
+> diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+> index b5d5673c255c..8b418379272d 100644
+> --- a/drivers/soc/ti/knav_qmss_queue.c
+> +++ b/drivers/soc/ti/knav_qmss_queue.c
+> @@ -118,19 +118,17 @@ static int knav_queue_setup_irq(struct knav_range_info *range,
+>   			  struct knav_queue_inst *inst)
+>   {
+>   	unsigned queue = inst->id - range->queue_base;
+> -	unsigned long cpu_map;
+>   	int ret = 0, irq;
+>   
+>   	if (range->flags & RANGE_HAS_IRQ) {
+>   		irq = range->irqs[queue].irq;
+> -		cpu_map = range->irqs[queue].cpu_map;
+>   		ret = request_irq(irq, knav_queue_int_handler, 0,
+>   					inst->irq_name, inst);
+>   		if (ret)
+>   			return ret;
+>   		disable_irq(irq);
+> -		if (cpu_map) {
+> -			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
+> +		if (range->irqs[queue].cpu_mask) {
+> +			ret = irq_set_affinity_hint(irq, range->irqs[queue].cpu_mask);
+>   			if (ret) {
+>   				dev_warn(range->kdev->dev,
+>   					 "Failed to set IRQ affinity\n");
+> @@ -1262,9 +1260,19 @@ static int knav_setup_queue_range(struct knav_device *kdev,
+>   
+>   		range->num_irqs++;
+>   
+> -		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3)
+> -			range->irqs[i].cpu_map =
+> -				(oirq.args[2] & 0x0000ff00) >> 8;
+> +		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3) {
+> +			unsigned long mask;
+> +			int bit;
+> +
+> +			range->irqs[i].cpu_mask = devm_kzalloc(dev,
+> +							       cpumask_size(), GFP_KERNEL);
+> +			if (!range->irqs[i].cpu_mask)
+> +				return -ENOMEM;
+> +
+> +			mask = (oirq.args[2] & 0x0000ff00) >> 8;
+> +			for_each_set_bit(bit, &mask, BITS_PER_LONG)
+> +				cpumask_set_cpu(bit, range->irqs[i].cpu_mask);
+> +		}
+>   	}
+>   
+>   	range->num_irqs = min(range->num_irqs, range->num_queues);
+> 
