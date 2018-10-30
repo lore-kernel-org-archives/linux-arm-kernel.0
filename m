@@ -1,126 +1,96 @@
-From: tony.xie@rock-chips.com (Tony Xie)
-Date: Tue, 30 Oct 2018 18:17:06 +0800
-Subject: [PATCH v6 6/6] clk: RK808: add RK809 and RK817 support.
-In-Reply-To: <1540894081-31270-1-git-send-email-tony.xie@rock-chips.com>
-References: <1540894081-31270-1-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <1540894626-3003-1-git-send-email-tony.xie@rock-chips.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 30 Oct 2018 17:30:55 +0200
+Subject: [PATCH] perf cs-etm: Correct CPU mode for samples
+In-Reply-To: <20181030151137.GF23310@kernel.org>
+References: <1540883908-17018-1-git-send-email-leo.yan@linaro.org>
+ <20181030143226.GA23310@kernel.org>
+ <20181030150449.GB8344@leoy-ThinkPad-X240s>
+ <20181030151137.GF23310@kernel.org>
+Message-ID: <b00357d2-10ab-e75e-6748-13341641f107@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK809 and RK817 are power management IC chips for multimedia products.
-most of their functions and registers are same, including the clkout
-funciton.
+On 30/10/18 5:11 PM, Arnaldo Carvalho de Melo wrote:
+> Em Tue, Oct 30, 2018 at 11:04:49PM +0800, leo.yan at linaro.org escreveu:
+>> Hi Arnaldo,
+>>
+>> On Tue, Oct 30, 2018 at 11:32:26AM -0300, Arnaldo Carvalho de Melo wrote:
+>>> Em Tue, Oct 30, 2018 at 03:18:28PM +0800, Leo Yan escreveu:
+>>>> Since commit 9042f5e3539e ("perf tools: Stop fallbacking to kallsyms
+>>>> for vdso symbols lookup"), the kernel address cannot be properly parsed
+>>>> to kernel symbol with command 'perf script -k vmlinux'.  The reason is
+>>>> CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
+>>>> thus it fails to find corresponding map/dso in below flows:
+>>>>
+>>>>   process_sample_event()
+>>>>     `-> machine__resolve()
+>>>> 	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
+>>>>
+>>>> In this flow it needs to pass argument 'sample->cpumode' to tell what's
+>>>> the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
+>>>> any failure until the commit 9042f5e3539e ("perf tools: Stop fallbacking
+>>>> to kallsyms for vdso symbols lookup") has been merged.  The reason is
+>>>> even with the wrong CPU mode the function thread__find_map() firstly
+>>>> fails to find map but it will rollback to find kernel map for vdso
+>>>> symbols lookup.  In the latest code it has removed the fallback code,
+>>>> thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
+>>>> anymore with kernel address.
+>>>>
+>>>> This patch is to correct samples CPU mode setting, it creates a new
+>>>> helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
+>>>> the address with the info from machine structure; this patch has a bit
+>>>> extension to check not only kernel and user mode, but also check for
+>>>> host/guest and hypervisor mode.  Finally this patch uses the function
+>>>> in instruction and branch samples and also apply in cs_etm__mem_access()
+>>>> for a minor polishing.
+>>>
+>>> Mathieu, can I have your Acked-by, please? Leo, thanks for acting so
+>>> quickly on this one! 
+>>
+>> Thanks for reivewing.  Yeah, let's wait for Mathieu reviewing as well,
+>> as I know he is travelling so might be delay a bit.
+> 
+> I'm tentatively applying the patch, as this needs fixing ASAP, and I
+> take that you have tested it and it cured the problem for you, so should
+> be a good indication for the acceptance of the patch.
+> 
+> We can always fix some detail later.
+>  
+>> Just remind, we might need the similiar change for util/intel-pt.c and
+>> util/intel-bts.c when generate samples, otherwise they might have the
+>> same regression for kernel symbols.  I am not the best person to change
+>> these two files, but bring up this for attention.
+> 
+> Right, I think Adrian is working on it, Adrian?
 
-Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
----
- drivers/clk/Kconfig     |  9 ++++---
- drivers/clk/clk-rk808.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 67 insertions(+), 6 deletions(-)
+Yes although I am more concerned with branches from user space to kernel
+space and vice versa, which this patch doesn't deal with.  Also there are
+many cpumode issues in perf tools, and really the only way to deal with
+them simply at the moment is to put back the fallback for arches other
+than sparc i.e.
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 721572a..92cf5ad 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -46,13 +46,12 @@ config COMMON_CLK_MAX77686
- 	  clock.
+diff --git a/tools/perf/util/event.c b/tools/perf/util/event.c
+index bc646185f8d9..b7a79cf490ad 100644
+--- a/tools/perf/util/event.c
++++ b/tools/perf/util/event.c
+@@ -1561,9 +1561,18 @@ struct map *thread__find_map(struct thread *thread, u8 cpumode, u64 addr,
  
- config COMMON_CLK_RK808
--	tristate "Clock driver for RK805/RK808/RK818"
-+	tristate "Clock driver for RK805/RK808/RK809/RK817/RK818"
- 	depends on MFD_RK808
- 	---help---
--	  This driver supports RK805, RK808 and RK818 crystal oscillator clock. These
--	  multi-function devices have two fixed-rate oscillators,
--	  clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
--	  by control register.
-+	  This driver supports RK805, RK809 and RK817, RK808 and RK818 crystal oscillator clock.
-+	  These multi-function devices have two fixed-rate oscillators, clocked at 32KHz each.
-+	  Clkout1 is always on, Clkout2 can off by control register.
- 
- config COMMON_CLK_HI655X
- 	tristate "Clock driver for Hi655x" if EXPERT
-diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
-index 6461f28..7f9a56b 100644
---- a/drivers/clk/clk-rk808.c
-+++ b/drivers/clk/clk-rk808.c
-@@ -96,6 +96,68 @@ static int rk808_clkout2_is_prepared(struct clk_hw *hw)
- 	return idx ? &rk808_clkout->clkout2_hw : &rk808_clkout->clkout1_hw;
- }
- 
-+static int rk817_clkout2_enable(struct clk_hw *hw, bool enable)
-+{
-+	struct rk808_clkout *rk808_clkout = container_of(hw,
-+							 struct rk808_clkout,
-+							 clkout2_hw);
-+	struct rk808 *rk808 = rk808_clkout->rk808;
-+
-+	return regmap_update_bits(rk808->regmap, RK817_SYS_CFG(1),
-+				  RK817_CLK32KOUT2_EN,
-+				  enable ? RK817_CLK32KOUT2_EN : 0);
-+}
-+
-+static int rk817_clkout2_prepare(struct clk_hw *hw)
-+{
-+	return rk817_clkout2_enable(hw, true);
-+}
-+
-+static void rk817_clkout2_unprepare(struct clk_hw *hw)
-+{
-+	rk817_clkout2_enable(hw, false);
-+}
-+
-+static int rk817_clkout2_is_prepared(struct clk_hw *hw)
-+{
-+	struct rk808_clkout *rk808_clkout = container_of(hw,
-+							 struct rk808_clkout,
-+							 clkout2_hw);
-+	struct rk808 *rk808 = rk808_clkout->rk808;
-+	unsigned int val;
-+
-+	int ret = regmap_read(rk808->regmap, RK817_SYS_CFG(1), &val);
-+
-+	if (ret < 0)
-+		return 0;
-+
-+	return (val & RK817_CLK32KOUT2_EN) ? 1 : 0;
-+}
-+
-+static const struct clk_ops rk817_clkout2_ops = {
-+	.prepare = rk817_clkout2_prepare,
-+	.unprepare = rk817_clkout2_unprepare,
-+	.is_prepared = rk817_clkout2_is_prepared,
-+	.recalc_rate = rk808_clkout_recalc_rate,
-+};
-+
-+static const struct clk_ops *rkpmic_get_ops(long variant)
-+{
-+	switch (variant) {
-+	case RK809_ID:
-+	case RK817_ID:
-+		return &rk817_clkout2_ops;
-+	/*
-+	 * For the default case, it match the following PMIC type.
-+	 * RK805_ID
-+	 * RK808_ID
-+	 * RK818_ID
-+	 */
-+	default:
-+		return &rk808_clkout2_ops;
-+	}
-+}
-+
- static int rk808_clkout_probe(struct platform_device *pdev)
- {
- 	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
-@@ -127,7 +189,7 @@ static int rk808_clkout_probe(struct platform_device *pdev)
- 		return ret;
- 
- 	init.name = "rk808-clkout2";
--	init.ops = &rk808_clkout2_ops;
-+	init.ops = rkpmic_get_ops(rk808->variant);
- 	rk808_clkout->clkout2_hw.init = &init;
- 
- 	/* optional override of the clockname */
--- 
-1.9.1
+ 		return NULL;
+ 	}
+-
++try_again:
+ 	al->map = map_groups__find(mg, al->addr);
+-	if (al->map != NULL) {
++	if (al->map == NULL) {
++		if (cpumode == PERF_RECORD_MISC_USER && machine &&
++		    strcmp(perf_env__arch(machine->env), "sparc") &&
++		    mg != &machine->kmaps &&
++		    machine__kernel_ip(machine, al->addr)) {
++			mg = &machine->kmaps;
++			load_map = true;
++			goto try_again;
++		}
++	} else {
+ 		/*
+ 		 * Kernel maps might be changed when loading symbols so loading
+ 		 * must be done prior to using kernel maps.
