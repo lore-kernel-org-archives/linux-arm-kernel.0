@@ -1,82 +1,51 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 30 Oct 2018 09:52:58 +0800
-Subject: [PATCH v2 1/1] iommu/arm-smmu-v3: eliminate a potential memory
- corruption on Hi16xx soc
-In-Reply-To: <20181029175905.GC16739@arm.com>
-References: <1540021014-8176-1-git-send-email-thunder.leizhen@huawei.com>
- <20181029175905.GC16739@arm.com>
-Message-ID: <5BD7B97A.1050408@huawei.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 30 Oct 2018 09:25:25 +0100
+Subject: [PATCH 6/7] smp: Don't yell about IRQs disabled in
+ kgdb_roundup_cpus()
+In-Reply-To: <20181029180707.207546-7-dianders@chromium.org>
+References: <20181029180707.207546-1-dianders@chromium.org>
+ <20181029180707.207546-7-dianders@chromium.org>
+Message-ID: <20181030082525.GA13436@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 29, 2018 at 11:07:06AM -0700, Douglas Anderson wrote:
+> In kgdb_roundup_cpus() we've got code that looks like:
+>   local_irq_enable();
+>   smp_call_function(kgdb_call_nmi_hook, NULL, 0);
+>   local_irq_disable();
 
+> Let's add kgdb to the list of reasons not to warn in
+> smp_call_function_many().  That will allow us (in a future patch) to
+> stop calling local_irq_enable() which will get rid of the original
+> splat.
+> 
+> NOTE: with this change comes the obvious question: will we start
+> deadlocking more often now when we drop into the debugger.  I can't
+> say that for sure one way or the other, but the fact that we do the
+> same logic for "oops_in_progress" makes me feel like it shouldn't
+> happen too often.  Also note that the old logic of turning on
+> interrupts temporarily wasn't exactly safe since (I presume) that
+> could have violated spin_lock_irqsave() semantics and ended up with a
+> deadlock of its own.
 
-On 2018/10/30 1:59, Will Deacon wrote:
-> On Sat, Oct 20, 2018 at 03:36:54PM +0800, Zhen Lei wrote:
->> The standard GITS_TRANSLATER register in ITS is only 4 bytes, but
->> Hisilicon expands the next 4 bytes to carry some IMPDEF information. That
->> means, total 8 bytes data will be written to MSIAddress each time.
->>
->> MSIAddr: |----4bytes----|----4bytes----|
->> 	 |    MSIData   |    IMPDEF    |
->>
->> There is no problem for ITS, because the next 4 bytes space is reserved
->> in ITS. But it will overwrite the 4 bytes memory following "sync_count".
->> It's very fortunately that the previous and the next neighbour of the
->> "sync_count" are both aligned by 8 bytes, so no problem is met now.
->>
->> It's good to explicitly add a workaround:
->> 1. Add gcc __attribute__((aligned(8))) to make sure that "sync_count" is
->>    always aligned by 8 bytes.
->> 2. Add a "int" struct member to make sure the 4 bytes padding is always
->>    exist.
->>
->> There is no functional change.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 5059d09..624fdd0 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -586,7 +586,20 @@ struct arm_smmu_device {
->>  
->>  	struct arm_smmu_strtab_cfg	strtab_cfg;
->>  
->> -	u32				sync_count;
->> +	/*
->> +	 * The alignment and padding is required by Hi16xx of Hisilicon.
->> +	 * Because the ITS hardware on Hi16xx will truncate the MSIAddress(Here
->> +	 * it's the address of "sync_count") to 8 bytes boundary first, then
->> +	 * write 32 bits MSIdata at offset 0, and 32 bits IMPDEF data at offset
->> +	 * 4. Without this workaround, the adjacent member maybe overwritten.
->> +	 *
->> +	 *                    |---4bytes---|---4bytes---|
->> +	 * MSIAddress & (~0x7):   MSIdata  | IMPDEF data|
->> +	 */
->> +	struct {
->> +		u32			sync_count;
->> +		int			padding;
->> +	} __attribute__((aligned(8)));
-> 
-> I thought the conclusion after reviewing your original patch was to maintain
-> the union and drop the alignment directive? e.g.
-> 
-> 	union {
-> 		u32	sync_count;
-> 		u64	padding; /* Hi16xx writes an extra 32 bits of goodness */
-> 	};
-OK, I will sent v3.
+How is any of that not utterly and terminally broken?
 
-> 
-> Will
-> 
-> .
-> 
+> @@ -413,7 +414,8 @@ void smp_call_function_many(const struct cpumask *mask,
+>  	 * can't happen.
+>  	 */
+>  	WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
+> -		     && !oops_in_progress && !early_boot_irqs_disabled);
+> +		     && !oops_in_progress && !early_boot_irqs_disabled
+> +		     && !in_dbg_master());
+>  
+>  	/* Try to fastpath.  So, what's a CPU they want? Ignoring this one. */
+>  	cpu = cpumask_first_and(mask, cpu_online_mask);
 
--- 
-Thanks!
-BestRegards
+Not a fan of this. There is a distinct difference between
+oops_in_progress and dropping into kgdb in that you don't ever expect to
+return/survive oopses, whereas we do expect to survive kgdb.
+
+Also, how does kgdb work at all without actual NMIs ?
+
+So no, NAK on this.
