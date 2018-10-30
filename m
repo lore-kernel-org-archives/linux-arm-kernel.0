@@ -1,34 +1,58 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Tue, 30 Oct 2018 12:05:18 -0700
-Subject: [PATCH] soc: ti: QMSS: Fix usage of irq_set_affinity_hint
-In-Reply-To: <20181030190051.GA1697@kroah.com>
-References: <20181030111103.12110-1-marc.zyngier@arm.com>
- <ea4e3273-39da-d9f9-49ce-f18268767ce3@oracle.com>
- <20181030190051.GA1697@kroah.com>
-Message-ID: <e5dba35a-03bf-70e7-ad3c-8f08631400bc@oracle.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 Oct 2018 14:08:02 -0500
+Subject: [PATCH] ARM: dts: fsl: Fix improperly quoted stdout-path values
+Message-ID: <20181030190802.20722-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/18 12:00 PM, Greg Kroah-Hartman wrote:
-> On Tue, Oct 30, 2018 at 10:18:08AM -0700, Santosh Shilimkar wrote:
->> Hi Greg,
+A quoted label reference doesn't expand to the node path and is taken as
+a literal string. Dropping the quotes can fix this unless the baudrate
+string is appended in which case we have to use the alias.
 
-[...]
+At least on VF610, the problem was masked by setting the console in
+bootargs. Use the alias syntax with baudrate parameter so we can drop
+setting the console in bootargs.
 
->> Would be able to apply this fix from Marc for stable or it needs
->> to be re-posted with CC to stable ?
-> 
-> <formletter>
-> 
-> This is not the correct way to submit patches for inclusion in the
-> stable kernel tree.  Please read:
->      https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
-> for how to do this properly.
-> 
-Thanks Greg !!
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: NXP Linux Team <linux-imx@nxp.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ arch/arm/boot/dts/imx53-ppd.dts       | 2 +-
+ arch/arm/boot/dts/vf610m4-colibri.dts | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Hi Marc,
-Could you please resend the patch to the stable ?
-
-Regards,
-Santosh
+diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
+index cdb90bee7b4a..f202396e3f2a 100644
+--- a/arch/arm/boot/dts/imx53-ppd.dts
++++ b/arch/arm/boot/dts/imx53-ppd.dts
+@@ -55,7 +55,7 @@
+ 	};
+ 
+ 	chosen {
+-		stdout-path = "&uart1:115200n8";
++		stdout-path = "serial0:115200n8";
+ 	};
+ 
+ 	memory at 70000000 {
+diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+index 41ec66a96990..1a7356b841d2 100644
+--- a/arch/arm/boot/dts/vf610m4-colibri.dts
++++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+@@ -50,8 +50,8 @@
+ 	compatible = "fsl,vf610m4";
+ 
+ 	chosen {
+-		bootargs = "console=ttyLP2,115200 clk_ignore_unused init=/linuxrc rw";
+-		stdout-path = "&uart2";
++		bootargs = "clk_ignore_unused init=/linuxrc rw";
++		stdout-path = "serial2:115200;
+ 	};
+ 
+ 	memory at 8c000000 {
+-- 
+2.19.1
