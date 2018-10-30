@@ -1,74 +1,72 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 30 Oct 2018 16:07:19 -0700
-Subject: [PATCH v2 4/6] arm64: Utilize phys_initrd_start/phys_initrd_size
+Date: Tue, 30 Oct 2018 16:07:20 -0700
+Subject: [PATCH v2 5/6] of/fdt: Remove custom __early_init_dt_declare_initrd()
+ implementation
 In-Reply-To: <20181030230721.28429-1-f.fainelli@gmail.com>
 References: <20181030230721.28429-1-f.fainelli@gmail.com>
-Message-ID: <20181030230721.28429-5-f.fainelli@gmail.com>
+Message-ID: <20181030230721.28429-6-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 is the only architecture that re-defines
-__early_init_dt_declare_initrd() in order for that function to populate
-initrd_start/initrd_end with physical addresses instead of virtual
-addresses. Instead of having an override we can leverage
-drivers/of/fdt.c populating phys_initrd_start/phys_initrd_size to
-populate those variables for us.
+Now that ARM64 uses phys_initrd_start/phys_initrd_size, we can get rid
+of its custom __early_init_dt_declare_initrd() which causes a fair
+amount of objects rebuild when changing CONFIG_BLK_DEV_INITRD. In order
+to make sure ARM64 does not produce a BUG() when VM debugging is turned
+on though, we must avoid early calls to __va() which is what
+__early_init_dt_declare_initrd() does and wrap this around to avoid
+running that code on ARM64.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm64/mm/init.c | 21 +++++++++------------
- 1 file changed, 9 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/memory.h | 8 --------
+ drivers/of/fdt.c                | 9 +++++++--
+ 2 files changed, 7 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 3cf87341859f..e95cee656a55 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -72,8 +72,8 @@ static int __init early_initrd(char *p)
- 	if (*endp == ',') {
- 		size = memparse(endp + 1, NULL);
- 
--		initrd_start = start;
--		initrd_end = start + size;
-+		phys_initrd_start = start;
-+		phys_initrd_size = size;
- 	}
- 	return 0;
- }
-@@ -408,14 +408,14 @@ void __init arm64_memblock_init(void)
- 		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
- 	}
- 
--	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
-+	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
- 		/*
- 		 * Add back the memory we just removed if it results in the
- 		 * initrd to become inaccessible via the linear mapping.
- 		 * Otherwise, this is a no-op
- 		 */
--		u64 base = initrd_start & PAGE_MASK;
--		u64 size = PAGE_ALIGN(initrd_end) - base;
-+		u64 base = phys_initrd_start & PAGE_MASK;
-+		u64 size = PAGE_ALIGN(phys_initrd_size);
- 
- 		/*
- 		 * We can only add back the initrd memory if we don't end up
-@@ -460,13 +460,10 @@ void __init arm64_memblock_init(void)
- 	 */
- 	memblock_reserve(__pa_symbol(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (initrd_start) {
--		memblock_reserve(initrd_start, initrd_end - initrd_start);
--
--		/* the generic initrd code expects virtual addresses */
--		initrd_start = __phys_to_virt(initrd_start);
--		initrd_end = __phys_to_virt(initrd_end);
--	}
-+	/* the generic initrd code expects virtual addresses */
-+	initrd_start = __phys_to_virt(phys_initrd_start);
-+	initrd_end = initrd_start + phys_initrd_size;
-+	initrd_below_start_ok = 0;
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index b96442960aea..dc3ca21ba240 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -168,14 +168,6 @@
+ #define IOREMAP_MAX_ORDER	(PMD_SHIFT)
  #endif
  
- 	early_init_fdt_scan_reserved_mem();
+-#ifdef CONFIG_BLK_DEV_INITRD
+-#define __early_init_dt_declare_initrd(__start, __end)			\
+-	do {								\
+-		initrd_start = (__start);				\
+-		initrd_end = (__end);					\
+-	} while (0)
+-#endif
+-
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/bitops.h>
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index e34cb49231b5..f2b5becae96a 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -892,15 +892,20 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
+ }
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+-#ifndef __early_init_dt_declare_initrd
+ static void __early_init_dt_declare_initrd(unsigned long start,
+ 					   unsigned long end)
+ {
++	/* ARM64 would cause a BUG to occur here when CONFIG_DEBUG_VM is
++	 * enabled since __va() is called too early. ARM64 does make use
++	 * of phys_initrd_start/phys_initrd_size so we can skip this
++	 * conversion.
++	 */
++#if (!IS_ENABLED(CONFIG_ARM64))
+ 	initrd_start = (unsigned long)__va(start);
+ 	initrd_end = (unsigned long)__va(end);
+ 	initrd_below_start_ok = 1;
+-}
+ #endif
++}
+ 
+ /**
+  * early_init_dt_check_for_initrd - Decode initrd location from flat tree
 -- 
 2.17.1
