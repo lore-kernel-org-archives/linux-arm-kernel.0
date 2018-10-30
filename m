@@ -1,42 +1,66 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 30 Oct 2018 15:22:40 -0700
-Subject: [PATCH 7/7] kgdb: Remove irq flags and local_irq_enable/disable
- from roundup
-In-Reply-To: <20181030114603.xdvyvayzw2an5c3q@holly.lan>
-References: <20181029180707.207546-1-dianders@chromium.org>
- <20181029180707.207546-8-dianders@chromium.org>
- <20181030114603.xdvyvayzw2an5c3q@holly.lan>
-Message-ID: <CAD=FV=WxoJ2LgUyR7Jm=xJHTqWGMvan7o18gOK-qPKdCrRRQtw@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 30 Oct 2018 23:52:46 +0100
+Subject: [PATCH] ARM: dts: fsl: Fix improperly quoted stdout-path values
+In-Reply-To: <20181030190802.20722-1-robh@kernel.org>
+References: <20181030190802.20722-1-robh@kernel.org>
+Message-ID: <1526c53ef581afef7bb0ec195185483f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 30.10.2018 20:08, Rob Herring wrote:
+> A quoted label reference doesn't expand to the node path and is taken as
+> a literal string. Dropping the quotes can fix this unless the baudrate
+> string is appended in which case we have to use the alias.
+> 
+> At least on VF610, the problem was masked by setting the console in
+> bootargs. Use the alias syntax with baudrate parameter so we can drop
+> setting the console in bootargs.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: NXP Linux Team <linux-imx@nxp.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-On Tue, Oct 30, 2018 at 4:46 AM Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
->
-> On Mon, Oct 29, 2018 at 11:07:07AM -0700, Douglas Anderson wrote:
-> > The function kgdb_roundup_cpus() was passed a parameter that was
-> > documented as:
-> >
-> > > the flags that will be used when restoring the interrupts. There is
-> > > local_irq_save() call before kgdb_roundup_cpus().
-> >
-> > Nobody used those flags.  Anyone who wanted to temporarily turn on
-> > interrupts just did local_irq_enable() and local_irq_disable() without
-> > looking at them.  So we can definitely remove the flags.
->
-> On the whole I'd rather that this change...
->
->
-> > Speaking of calling local_irq_enable(), it seems like a bad idea and
-> > it caused a nice splat on my system with lockdep turned on.
-> > Specifically it hit:
-> >   DEBUG_LOCKS_WARN_ON(current->hardirq_context)
->
-> ... and fixes for this this were in separate patches. They don't appear
-> especially related.
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-Agreed that this is cleaner.  Done for v2.
+--
+Stefan
 
--Doug
+> ---
+>  arch/arm/boot/dts/imx53-ppd.dts       | 2 +-
+>  arch/arm/boot/dts/vf610m4-colibri.dts | 4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
+> index cdb90bee7b4a..f202396e3f2a 100644
+> --- a/arch/arm/boot/dts/imx53-ppd.dts
+> +++ b/arch/arm/boot/dts/imx53-ppd.dts
+> @@ -55,7 +55,7 @@
+>  	};
+>  
+>  	chosen {
+> -		stdout-path = "&uart1:115200n8";
+> +		stdout-path = "serial0:115200n8";
+>  	};
+>  
+>  	memory at 70000000 {
+> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts
+> b/arch/arm/boot/dts/vf610m4-colibri.dts
+> index 41ec66a96990..1a7356b841d2 100644
+> --- a/arch/arm/boot/dts/vf610m4-colibri.dts
+> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+> @@ -50,8 +50,8 @@
+>  	compatible = "fsl,vf610m4";
+>  
+>  	chosen {
+> -		bootargs = "console=ttyLP2,115200 clk_ignore_unused init=/linuxrc rw";
+> -		stdout-path = "&uart2";
+> +		bootargs = "clk_ignore_unused init=/linuxrc rw";
+> +		stdout-path = "serial2:115200;
+>  	};
+>  
+>  	memory at 8c000000 {
