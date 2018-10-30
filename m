@@ -1,65 +1,43 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 30 Oct 2018 14:13:33 +0000
-Subject: [PATCH RESEND V3 0/2] pinctrl: imx: add imx8qxp pinctrl support
-In-Reply-To: <1540908354-26809-1-git-send-email-aisheng.dong@nxp.com>
-References: <1540908354-26809-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <AM0PR04MB4211450F716707D2EE7112FD80CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Oct 2018 13:01:32 +0100
+Subject: [PATCH V3 0/2] pinctrl: imx: add imx8qxp pinctrl support
+In-Reply-To: <1539756011-32559-1-git-send-email-aisheng.dong@nxp.com>
+References: <1539756011-32559-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdaYD9S4n0__=Ff8-U3Ze1RFDQHNK3t62Yo8TOhqVdcj5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Oct 17, 2018 at 8:04 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Tuesday, October 30, 2018 10:11 PM
-> To: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linus.walleij at linaro.org;
-> shawnguo at kernel.org; stefan at agner.ch; A.s. Dong <aisheng.dong@nxp.com>;
-> dongas86 at gmail.com; dl-linux-imx <linux-imx@nxp.com>;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>
-> Subject: [PATCH RESEND V3 0/2] pinctrl: imx: add imx8qxp pinctrl support
-> 
-> Rebased with latest pinctrl/for-next tree, compiling and function tested on
-> IMX6Q SDB.
-> 
-
-Can you please check if this version can be applied?
-
-Regards
-Dong Aisheng
-
-> This patch series adds i.MX8QXP pinctrl support which is based on the pad
-> service provided by SCU firmware.
-> 
-> The binding part is also merged into scu binding doc according to Rob's
-> suggestion.
+> This patch series adds i.MX8QXP pinctrl support which is based on
+> the pad service provided by SCU firmware.
+>
+> Note it depends on SCU APIs patch set which has already been merged by Shawn.
+> So suppose this patch series can go through shawn's tree.
+>
+> Note the binding part is also merged into scu binding doc according to
+> Rob's suggestion.
 > https://www.spinics.net/lists/arm-kernel/msg680738.html
-> 
+>
 > v2->v3:
 >  * Pad name update (add IMX8QXP prefix)
-> 
-> v1->v2:
->  * scu firmware headfile path update
->  * structure name and api usage update
->  * move SCU Pad API implementation into driver
->  * add binding headfile pad-imx8qxp.h
-> 
-> Dong Aisheng (2):
->   pinctrl: fsl: add scu based pinctrl support
->   pinctrl: imx: add imx8qxp driver
-> 
->  drivers/pinctrl/freescale/Kconfig           |  11 +
->  drivers/pinctrl/freescale/Makefile          |   2 +
->  drivers/pinctrl/freescale/pinctrl-imx.c     | 425 ++++++++++------
->  drivers/pinctrl/freescale/pinctrl-imx.h     |  67 ++-
->  drivers/pinctrl/freescale/pinctrl-imx8qxp.c | 232 +++++++++
->  drivers/pinctrl/freescale/pinctrl-scu.c     | 121 +++++
->  include/dt-bindings/pinctrl/pads-imx8qxp.h  | 751
-> ++++++++++++++++++++++++++++
->  7 files changed, 1439 insertions(+), 170 deletions(-)  create mode 100644
-> drivers/pinctrl/freescale/pinctrl-imx8qxp.c
->  create mode 100644 drivers/pinctrl/freescale/pinctrl-scu.c
->  create mode 100644 include/dt-bindings/pinctrl/pads-imx8qxp.h
-> 
-> --
-> 2.7.4
+
+I wanted to apply this series for v4.21 but it doesn't work. The patches
+look very weird, I think because of the Exchange server you are using
+to send them. It contains things like this:
+
+ontent-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id:
+5ed53ba8-dd6f-4c85-7264-08d633f66fd7
+X-MS-Exchange-CrossTenant-originalarrivaltime: 17 Oct 2018 06:04:45.7080 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4179
+
+Can you double-check and resend?
+
+Yours,
+Linus Walleij
