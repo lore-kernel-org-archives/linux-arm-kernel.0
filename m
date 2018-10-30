@@ -1,53 +1,22 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 30 Oct 2018 17:22:22 +0100
-Subject: [PATCH 2/2] thermal: broadcom: constify
- thermal_zone_of_device_ops structure
-In-Reply-To: <1540912500-21941-3-git-send-email-Julia.Lawall@lip6.fr>
-References: <1540912500-21941-1-git-send-email-Julia.Lawall@lip6.fr>
- <1540912500-21941-3-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <b0442517-ea11-9366-b17d-c60acf5c9cb3@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 30 Oct 2018 16:33:19 +0000
+Subject: [alsa-devel] [PATCH] ASoC: stm32: sai: fix invalid use of sizeof
+ in stm32_sai_add_mclk_provider()
+In-Reply-To: <1540606799-164510-1-git-send-email-weiyongjun1@huawei.com>
+References: <1540606799-164510-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <20181030163319.GA6462@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/2018 16:15, Julia Lawall wrote:
-> The thermal_zone_of_device_ops structure can be const as it is only
-> passed as the last argument of thermal_zone_of_sensor_register
-> and the corresponding parameter is declared as const.
-> 
-> Done with the help of Coccinelle.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+On Sat, Oct 27, 2018 at 02:19:59AM +0000, Wei Yongjun wrote:
+> sizeof() when applied to a pointer typed expression gives the
+> size of the pointer, not that of the pointed data.
 
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-> ---
-> 
-> Unrelated to this change, is there a reason not to use
-> devm_thermal_zone_of_sensor_register?
-
-Agree, it would make sense to use the devm* version.
-
->  drivers/thermal/broadcom/brcmstb_thermal.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff -u -p a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
-> --- a/drivers/thermal/broadcom/brcmstb_thermal.c
-> +++ b/drivers/thermal/broadcom/brcmstb_thermal.c
-> @@ -299,7 +299,7 @@ static int brcmstb_set_trips(void *data,
->  	return 0;
->  }
->  
-> -static struct thermal_zone_of_device_ops of_ops = {
-> +static const struct thermal_zone_of_device_ops of_ops = {
->  	.get_temp	= brcmstb_get_temp,
->  	.set_trips	= brcmstb_set_trips,
->  };
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Someone else already sent a fix for this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181030/b2e07a4e/attachment.sig>
