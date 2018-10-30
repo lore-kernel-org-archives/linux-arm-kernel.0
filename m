@@ -1,133 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Oct 2018 11:11:03 +0000
-Subject: [PATCH] soc: ti: QMSS: Fix usage of irq_set_affinity_hint
-Message-ID: <20181030111103.12110-1-marc.zyngier@arm.com>
+From: anshuman.khandual@arm.com (Anshuman Khandual)
+Date: Tue, 30 Oct 2018 08:16:21 +0530
+Subject: [PATCH] arm64/numa: Add more vetting in numa_set_distance()
+In-Reply-To: <bc7bd118-82f2-86be-71ea-46704df864a5@huawei.com>
+References: <1540562267-101152-1-git-send-email-john.garry@huawei.com>
+ <20181029112504.GF14127@arm.com>
+ <925009c6-226d-213f-dbcb-68b772d80a18@huawei.com>
+ <20181029121638.GB15446@arm.com>
+ <839acfc7-6b3a-b7ac-2f4a-713960ece457@huawei.com>
+ <17e3006a-7ecd-968e-7e67-ea7d08858ec3@arm.com>
+ <bc7bd118-82f2-86be-71ea-46704df864a5@huawei.com>
+Message-ID: <45a8e09d-b32b-df32-ba34-5aa1909fb11f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone QMSS driver is pretty damaged, in the sense that it
-does things like this:
 
-	irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
 
-where cpu_map is a local variable. As we leave the function, this
-will point to nowhere-land, and things will end-up badly.
+On 10/29/2018 08:14 PM, John Garry wrote:
+>>>>>
+>>>>> ?I think we should either factor out the sanity check
+>>>>>> into a core helper or make the core code robust to these funny configurations.
+>>>>>
+>>>>> OK, so to me it would make sense to factor out a sanity check into a core
+>>>>> helper.
+>>>>
+>>>> That, or have the OF code perform the same validation that slit_valid() is
+>>>> doing for ACPI. I'm just trying to avoid other architectures running into
+>>>> this problem down the line.
+>>>>
+>>>
+>>> Right, OF code should do this validation job if ACPI is doing it (especially since the DT bindings actually specify the distance rules), and not rely on the arch NUMA code to accept/reject numa_set_distance() combinations.
+>>
+>> I would say this particular condition checking still falls under arch NUMA init
+>> code sanity check like other basic tests what numa_set_distance() currently does
+>> already but it should not be a necessity for the OF driver to check these.
+> 
+> The checks in the arch NUMA code mean that invalid inter-node distance combinations are ignored.
 
-Instead, let's use a proper cpumask that gets allocated, giving
-the driver a chance to actually work with things like irqbalance
-as well as have a hypothetical 64bit future.
+Right and should not this new test (from != to && distance == LOCAL_DISTANCE) be
+one of them as well ? numa_set_distance() updates the table or just throws some
+warnings while skipping entries it deems invalid. It would be okay to have this
+new check there in addition to others like this patch suggests.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-I found this one by inspection after finding a similar bug in an
-unrelated driver. It is only compile-tested. It would probably
-a Cc stable, but that's Santosh's decision.
+> 
+> However, if any entries in the table are invalid, then the whole table can be discarded as none of it can be believed, i.e. it's better to validate the table.
+>
 
- drivers/soc/ti/knav_qmss.h       |  4 ++--
- drivers/soc/ti/knav_qmss_acc.c   | 10 +++++-----
- drivers/soc/ti/knav_qmss_queue.c | 22 +++++++++++++++-------
- 3 files changed, 22 insertions(+), 14 deletions(-)
+Agreed. slit_valid() on the ACPI parsing is currently enforcing that before
+acpi_numa_slit_init() which would call into numa_set_distance(). Hence arch
+NUMA code numa_set_distance() never had the opportunity to do the sanity
+checks as ACPI slit_valid() has completely invalidated the table.
 
-diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
-index 3efc47e82973..bd040c29c4bf 100644
---- a/drivers/soc/ti/knav_qmss.h
-+++ b/drivers/soc/ti/knav_qmss.h
-@@ -329,8 +329,8 @@ struct knav_range_ops {
- };
- 
- struct knav_irq_info {
--	int	irq;
--	u32	cpu_map;
-+	int		irq;
-+	struct cpumask	*cpu_mask;
- };
- 
- struct knav_range_info {
-diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
-index 316e82e46f6c..2f7fb2dcc1d6 100644
---- a/drivers/soc/ti/knav_qmss_acc.c
-+++ b/drivers/soc/ti/knav_qmss_acc.c
-@@ -205,18 +205,18 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
- {
- 	struct knav_device *kdev = range->kdev;
- 	struct knav_acc_channel *acc;
--	unsigned long cpu_map;
-+	struct cpumask *cpu_mask;
- 	int ret = 0, irq;
- 	u32 old, new;
- 
- 	if (range->flags & RANGE_MULTI_QUEUE) {
- 		acc = range->acc;
- 		irq = range->irqs[0].irq;
--		cpu_map = range->irqs[0].cpu_map;
-+		cpu_mask = range->irqs[0].cpu_mask;
- 	} else {
- 		acc = range->acc + queue;
- 		irq = range->irqs[queue].irq;
--		cpu_map = range->irqs[queue].cpu_map;
-+		cpu_mask = range->irqs[queue].cpu_mask;
- 	}
- 
- 	old = acc->open_mask;
-@@ -239,8 +239,8 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
- 			acc->name, acc->name);
- 		ret = request_irq(irq, knav_acc_int_handler, 0, acc->name,
- 				  range);
--		if (!ret && cpu_map) {
--			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
-+		if (!ret && cpu_mask) {
-+			ret = irq_set_affinity_hint(irq, cpu_mask);
- 			if (ret) {
- 				dev_warn(range->kdev->dev,
- 					 "Failed to set IRQ affinity\n");
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index b5d5673c255c..8b418379272d 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -118,19 +118,17 @@ static int knav_queue_setup_irq(struct knav_range_info *range,
- 			  struct knav_queue_inst *inst)
- {
- 	unsigned queue = inst->id - range->queue_base;
--	unsigned long cpu_map;
- 	int ret = 0, irq;
- 
- 	if (range->flags & RANGE_HAS_IRQ) {
- 		irq = range->irqs[queue].irq;
--		cpu_map = range->irqs[queue].cpu_map;
- 		ret = request_irq(irq, knav_queue_int_handler, 0,
- 					inst->irq_name, inst);
- 		if (ret)
- 			return ret;
- 		disable_irq(irq);
--		if (cpu_map) {
--			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
-+		if (range->irqs[queue].cpu_mask) {
-+			ret = irq_set_affinity_hint(irq, range->irqs[queue].cpu_mask);
- 			if (ret) {
- 				dev_warn(range->kdev->dev,
- 					 "Failed to set IRQ affinity\n");
-@@ -1262,9 +1260,19 @@ static int knav_setup_queue_range(struct knav_device *kdev,
- 
- 		range->num_irqs++;
- 
--		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3)
--			range->irqs[i].cpu_map =
--				(oirq.args[2] & 0x0000ff00) >> 8;
-+		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3) {
-+			unsigned long mask;
-+			int bit;
-+
-+			range->irqs[i].cpu_mask = devm_kzalloc(dev,
-+							       cpumask_size(), GFP_KERNEL);
-+			if (!range->irqs[i].cpu_mask)
-+				return -ENOMEM;
-+
-+			mask = (oirq.args[2] & 0x0000ff00) >> 8;
-+			for_each_set_bit(bit, &mask, BITS_PER_LONG)
-+				cpumask_set_cpu(bit, range->irqs[i].cpu_mask);
-+		}
- 	}
- 
- 	range->num_irqs = min(range->num_irqs, range->num_queues);
--- 
-2.19.1
+Unlike ACPI path, of_numa_parse_distance_map_v1() does not do any sanity
+checks on the distance values parse from the "distance-matrix" property
+and all the checks directly falls on numa_set_distance(). This needs to
+be fixed in line with ACPI
+
+* If (to == from) ---> distance = LOCAL_DISTANCE
+* If (to != from) ---> distance > LOCAL_DISTANCE
+
+At the same time its okay to just enhance numa_set_distance() test coverage
+to include this new test. If we would have trusted firmware parsing all the
+way, existing basic checks about node range, distance stuff should not have
+been there in numa_set_distance(). Hence IMHO even if we fix the OF driver
+part, we should include this new check there as well.
+
+> It can
+>> choose to check but arch NUMA should check basic things like two different NUMA
+>> nodes should not have LOCAL_DISTANCE as distance like in this case.
+>>
+>> ????(from == to && distance != LOCAL_DISTANCE) ||
+>> ??????? (from != to && distance == LOCAL_DISTANCE))
+>>
+>>
+>>>
+>>> And, in addition to this, I'd say OF should disable NUMA if given an invalid table (like ACPI does).
+>>
+>> Taking a decision to disable NUMA should be with kernel (arch NUMA) once kernel
+>> starts booting. Platform should have sent right values, OF driver trying to
+>> adjust stuff what platform has sent with FDT once the kernel starts booting is
+>> not right. For example "Kernel NUMA wont like the distance factors lets clean
+>> then up before passing on to MM".
+> 
+> Sorry, but I don't know who was advocating this.
+
+I was just giving an example. Invalidating NUMA distance table during firmware
+table (ACPI or FDT) parsing forces arm64_numa_init() to fall back on dummy NUMA
+node which is like disabling NUMA. But that is the current semantics with ACPI
+parsing which I overlooked. Fixing OF driver to do the same wont extend this
+any further, hence my previous concern does not stand valid.
+
+> 
+> Disabling NUMA is one such major decision which
+>> should be with arch NUMA code not with OF driver.
+> 
+> I meant parsing the table would fail, so arch NUMA would fall back on dummy NUMA.
+
+Right and ACPI parsing does that and can force a fallback on a dummy NUMA node.
