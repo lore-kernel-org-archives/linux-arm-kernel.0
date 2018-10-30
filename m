@@ -1,22 +1,18 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 30 Oct 2018 16:33:19 +0000
-Subject: [alsa-devel] [PATCH] ASoC: stm32: sai: fix invalid use of sizeof
- in stm32_sai_add_mclk_provider()
-In-Reply-To: <1540606799-164510-1-git-send-email-weiyongjun1@huawei.com>
-References: <1540606799-164510-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <20181030163319.GA6462@sirena.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 30 Oct 2018 13:33:50 -0300
+Subject: [PATCH V2] regulator: pfuze100-regulator: add coin support to
+ PF0100
+In-Reply-To: <20181030145507.10462-1-aford173@gmail.com>
+References: <20181030145507.10462-1-aford173@gmail.com>
+Message-ID: <CAOMZO5D-JR5_4er5uHCz_5hdzDcsL3hZJiUgtbALrpBC-eduOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 27, 2018 at 02:19:59AM +0000, Wei Yongjun wrote:
-> sizeof() when applied to a pointer typed expression gives the
-> size of the pointer, not that of the pointed data.
+On Tue, Oct 30, 2018 at 1:10 PM Adam Ford <aford173@gmail.com> wrote:
+>
+> The driver currently supports coin cell / super cap charging, so
+> this patch extends it to support PF0100.
+>
+> Signed-off-by: Adam Ford <aford173@gmail.com>
 
-Someone else already sent a fix for this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181030/b2e07a4e/attachment.sig>
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
