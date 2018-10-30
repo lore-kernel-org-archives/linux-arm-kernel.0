@@ -1,28 +1,115 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Oct 2018 13:51:11 +0100
-Subject: [PATCH 5/5] pinctrl: mediatek: Add initial pinctrl driver for
- MT6797 SoC
-In-Reply-To: <CAGp9LzoP2zkryhJCQNGpe9X0+7yUd31ffV7vM4j6KvTdfPpCrA@mail.gmail.com>
-References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
- <20181008191411.32555-6-manivannan.sadhasivam@linaro.org>
- <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
- <20181011164429.GA18174@Mani-XPS-13-9360>
- <e7abee72-23a3-4716-baf0-484514bbb019@gmail.com>
- <CAGp9LzoP2zkryhJCQNGpe9X0+7yUd31ffV7vM4j6KvTdfPpCrA@mail.gmail.com>
-Message-ID: <CACRpkdb-Er8z6JdvYWE8UXUa3dfVSu4S-VbnqvcV+vf9erJuNw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 30 Oct 2018 16:59:59 +0100
+Subject: [PATCH V8 5/5] firmware: imx: add SCU power domain driver
+In-Reply-To: <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
+ <1540739690-23750-6-git-send-email-aisheng.dong@nxp.com>
+ <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
+ <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <CAPDyKFpzvN1R91ByRUmZ8XDsm6L2SF92oOrDSn3qv-d9wWGYtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2018 at 5:06 PM Sean Wang <sean.wang@kernel.org> wrote:
+On 30 October 2018 at 14:20, A.s. Dong <aisheng.dong@nxp.com> wrote:
+> [...]
+>
+>> }
+>> > +
+>> > +static struct imx_sc_pm_domain *
+>> > +imx_scu_add_pm_domain(struct device *dev, int idx,
+>> > +                     const struct imx_sc_pd_range *pd_ranges) {
+>> > +       struct imx_sc_pm_domain *sc_pd;
+>> > +       int ret;
+>> > +
+>> > +       sc_pd = devm_kzalloc(dev, sizeof(*sc_pd), GFP_KERNEL);
+>> > +       if (!sc_pd)
+>> > +               return ERR_PTR(-ENOMEM);
+>> > +
+>> > +       sc_pd->rsrc = pd_ranges->rsrc + idx;
+>> > +       sc_pd->pd.power_off = imx_sc_pd_power_off;
+>> > +       sc_pd->pd.power_on = imx_sc_pd_power_on;
+>>
+>> So, this means you are going to register one genpd per device (one for each
+>> uart, pwm etc), but there is actually a better option.
+>>
+>> What you seems to be needing is a way to "power on/off" devices, rather than
+>> the PM domain. Right? The PM domain, is managed internally by the FW, no?
+>>
+>
+> Yes, you're right.
+>
+>> In any case, it looks like what you should do is to implement the
+>> ->attach|detach_dev() callback for the genpd and use the regular
+>> of_genpd_add_provider_simple(). From within the ->attach_dev(), you should
+>> get the OF node for the device that is being attached and then parse the
+>> power-domain cell containing the "resource id" and store that in the per device
+>> struct generic_pm_domain_data (we have void pointer there for storing these
+>> kind of things).
+>>
+>> Additionally, you need to implement the ->stop() and ->start() callbacks of
+>> genpd, which is where you "power on/off" devices, rather than using the above
+>> ->power_on|off() callbacks.
+>>
+>> Please have a look a drivers/soc/ti/ti_sci_pm_domains.c. Apologize, I should
+>> have pointed you towards that reference already in the earlier version.
+>>
+>
+> Appreciated for such detailed explanation. lt's a good suggestion and I really like to
+> switch to it.  However, after digged a bit more, i found a few blocking issues:
+> 1. The .attach_dev() of power domain infrastructure still does not support multi domains case.
+>
+> It looks like there's no way for .attach_dev() to understand which sub 'power domain'
+> the device is attaching for one global power domain provider like ti_sci as you suggested.
+> Secondly, the struct device *dev passed into is a virtual PD device. It does not help
+> for parsing the real device resource id.
+>
+> So framework probably needs some extension to support multi power domain cases.
 
-> the driver currently only supports the basic operation, not including
-> driving operation, so
-> what value for the driving mode for a certain pin seems not really
-> matter in the early patch. I think these advanced operations can be
-> added with another patch.
+Right, you are correct.
 
-Sean can you provide an Acked-by for the pinctrl part so I can merge
-it once Manivannan resends it for v4.21?
+Let me think about this and see what I can come up with - unless you
+already have something you want to propose?
 
-Yours,
-Linus Walleij
+>
+> 2. It also breaks most of current drivers as the driver probe sequence behavior changed
+> If removing .power_on() and .power_off() callback and use .start() and .stop() instead.
+>
+> genpd_dev_pm_attach will only power up the domain and attach device, but will not call .start()
+> which relies on device runtime pm. That means the device power is still not up before
+> running driver probe function. For SCU enabled platforms, all device drivers accessing registers/clock
+> without power domain enabled will trigger a HW access error. That means we need fix most
+> of drivers probe sequence with proper runtime pm. So I'm a bit wondering whether we should
+> still keep the exist way.
+
+I see what you are trying to say, but I am not sure why you consider
+this as they would break? How did they work in the first place?
+
+Anyway, the problem you are talking about have so far been addressed
+by making buses/drivers to call pm_runtime_enable() and
+pm_runtime_get_sync() - before trying to probe their devices.
+
+Do you have an idea of the amount of drivers that needs to fixed, in
+regards to this?
+
+I guess an option could be to, that via the ->attach_dev() callback
+perform the same operations as also being done during ->start(). Of
+course, you may need to keep a flag about this being done, so that
+operations that need to be balanced with get/put or the like is
+managed correctly, the next time ->start|stop() becomes called.
+
+>
+> In summary, we probably may not be able to try ti_sci way before fixing above two issues.
+>
+> Do you think I should wait for them to be fixed or if we could use the current way at first?
+> I might be a little intend to the second way as we now have a lot upstreaming work pending on
+> this. But please let me know if you have a different idea.
+
+As this is also about deploying a DTB with a correctly modeled HW, I
+think we need to fix the above issues.
+
+I am happy to help, in one way or the other.
+
+[...]
+
+Kind regards
+Uffe
