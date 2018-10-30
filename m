@@ -1,75 +1,51 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 30 Oct 2018 14:36:37 +0800
-Subject: [PATCH i2c-next v8 5/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-In-Reply-To: <20181029211414.20771-6-jae.hyun.yoo@linux.intel.com>
-References: <20181029211414.20771-6-jae.hyun.yoo@linux.intel.com>
-Message-ID: <201810301404.KLB29BHz%fengguang.wu@intel.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Tue, 30 Oct 2018 09:55:07 -0500
+Subject: [PATCH V2] regulator: pfuze100-regulator: add coin support to PF0100
+Message-ID: <20181030145507.10462-1-aford173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jae,
+The driver currently supports coin cell / super cap charging, so
+this patch extends it to support PF0100.
 
-Thank you for the patch! Yet something to improve:
-
-[auto build test ERROR on wsa/i2c/for-next]
-[also build test ERROR on v4.19 next-20181029]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Jae-Hyun-Yoo/i2c-aspeed-Add-bus-idle-waiting-logic-for-multi-master-use-cases/20181030-051719
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
-config: arm-multi_v5_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   drivers/i2c//busses/i2c-aspeed.c: In function 'aspeed_i2c_check_bus_busy':
->> drivers/i2c//busses/i2c-aspeed.c:617:12: error: 'struct aspeed_i2c_bus' has no member named 'slave_state'; did you mean 'master_state'?
-          bus->slave_state == ASPEED_I2C_SLAVE_STOP)
-               ^~~~~~~~~~~
-               master_state
-
-vim +617 drivers/i2c//busses/i2c-aspeed.c
-
-   604	
-   605	static int aspeed_i2c_check_bus_busy(struct aspeed_i2c_bus *bus)
-   606	{
-   607		unsigned long check_started;
-   608	
-   609		if (bus->multi_master) {
-   610			might_sleep();
-   611			check_started = jiffies;
-   612		}
-   613	
-   614		for (;;) {
-   615			if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
-   616			      ASPEED_I2CD_BUS_BUSY_STS) &&
- > 617			    bus->slave_state == ASPEED_I2C_SLAVE_STOP)
-   618				return 0;
-   619			if (!bus->multi_master)
-   620				break;
-   621			if (time_after(jiffies, check_started + bus->adap.timeout))
-   622				break;
-   623			usleep_range((ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US >> 2) + 1,
-   624				     ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US);
-   625		}
-   626	
-   627		return aspeed_i2c_recover_bus(bus);
-   628	}
-   629	
-
+Signed-off-by: Adam Ford <aford173@gmail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30010 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181030/2e20b451/attachment-0001.gz>
+V2:  Rebase from correct branch.
+V1:  Ooops, sorry about the noise.
+
+diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
+index dd41a9bb3f5c..df5df1c495ad 100644
+--- a/drivers/regulator/pfuze100-regulator.c
++++ b/drivers/regulator/pfuze100-regulator.c
+@@ -370,6 +370,7 @@ static struct pfuze_regulator pfuze100_regulators[] = {
+ 	PFUZE100_VGEN_REG(PFUZE100, VGEN4, PFUZE100_VGEN4VOL, 1800000, 3300000, 100000),
+ 	PFUZE100_VGEN_REG(PFUZE100, VGEN5, PFUZE100_VGEN5VOL, 1800000, 3300000, 100000),
+ 	PFUZE100_VGEN_REG(PFUZE100, VGEN6, PFUZE100_VGEN6VOL, 1800000, 3300000, 100000),
++	PFUZE100_COIN_REG(PFUZE100, COIN, PFUZE100_COINVOL, 0x7, pfuze100_coin),
+ };
+ 
+ static struct pfuze_regulator pfuze200_regulators[] = {
+@@ -436,6 +437,7 @@ static struct of_regulator_match pfuze100_matches[] = {
+ 	{ .name = "vgen4",	},
+ 	{ .name = "vgen5",	},
+ 	{ .name = "vgen6",	},
++	{ .name = "coin",	},
+ };
+ 
+ /* PFUZE200 */
+diff --git a/include/linux/regulator/pfuze100.h b/include/linux/regulator/pfuze100.h
+index cb5aecd40f07..331d7d940c7a 100644
+--- a/include/linux/regulator/pfuze100.h
++++ b/include/linux/regulator/pfuze100.h
+@@ -33,7 +33,8 @@
+ #define PFUZE100_VGEN4		12
+ #define PFUZE100_VGEN5		13
+ #define PFUZE100_VGEN6		14
+-#define PFUZE100_MAX_REGULATOR	15
++#define PFUZE100_COIN		15
++#define PFUZE100_MAX_REGULATOR	16
+ 
+ #define PFUZE200_SW1AB		0
+ #define PFUZE200_SW2		1
+-- 
+2.17.1
