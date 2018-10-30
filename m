@@ -1,46 +1,37 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Tue, 30 Oct 2018 15:11:05 -0700
-Subject: [PATCH v2 3/5] serial: qcom_geni_serial: Process sysrq at port unlock
- time
+Date: Tue, 30 Oct 2018 15:11:06 -0700
+Subject: [PATCH v2 4/5] serial: core: Include console.h from serial_core.h
 In-Reply-To: <20181030221107.79758-1-dianders@chromium.org>
 References: <20181030221107.79758-1-dianders@chromium.org>
-Message-ID: <20181030221107.79758-4-dianders@chromium.org>
+Message-ID: <20181030221107.79758-5-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's take advantage of the new ("serial: core: Allow processing sysrq
-at port unlock time") to handle sysrqs more cleanly.
+In the static inline function uart_handle_break() in serial_core.h we
+dereference port->cons.  That gives an error unless console.h is also
+included.
+
+This error hasn't shown up till now because everyone who has defined
+SUPPORT_SYSRQ has also included console.h, but it's a bit ugly to make
+this requirement.  Let's make the include explicit.
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
 
- drivers/tty/serial/qcom_geni_serial.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ include/linux/serial_core.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/tty/serial/qcom_geni_serial.c b/drivers/tty/serial/qcom_geni_serial.c
-index b83e3554bced..29ddc1fc65f8 100644
---- a/drivers/tty/serial/qcom_geni_serial.c
-+++ b/drivers/tty/serial/qcom_geni_serial.c
-@@ -499,9 +499,7 @@ static int handle_rx_console(struct uart_port *uport, u32 bytes, bool drop)
- 					continue;
- 			}
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index 3460b15a2607..ff9d0ee32f11 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -22,6 +22,7 @@
  
--			spin_unlock(&uport->lock);
--			sysrq = uart_handle_sysrq_char(uport, buf[c]);
--			spin_lock(&uport->lock);
-+			sysrq = uart_prepare_sysrq_char(uport, buf[c]);
- 
- 			if (!sysrq)
- 				tty_insert_flip_char(tport, buf[c], TTY_NORMAL);
-@@ -811,7 +809,8 @@ static irqreturn_t qcom_geni_serial_isr(int isr, void *dev)
- 		qcom_geni_serial_handle_rx(uport, drop_rx);
- 
- out_unlock:
--	spin_unlock_irqrestore(&uport->lock, flags);
-+	uart_unlock_and_check_sysrq(uport, flags);
-+
- 	return IRQ_HANDLED;
- }
- 
+ #include <linux/bitops.h>
+ #include <linux/compiler.h>
++#include <linux/console.h>
+ #include <linux/interrupt.h>
+ #include <linux/circ_buf.h>
+ #include <linux/spinlock.h>
 -- 
 2.19.1.568.g152ad8e336-goog
