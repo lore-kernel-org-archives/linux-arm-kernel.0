@@ -1,102 +1,42 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 31 Oct 2018 06:22:21 +0800
-Subject: [PATCH i2c-next v9 5/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-In-Reply-To: <20181030210917.32711-6-jae.hyun.yoo@linux.intel.com>
-References: <20181030210917.32711-6-jae.hyun.yoo@linux.intel.com>
-Message-ID: <201810310601.Odxb7qSY%fengguang.wu@intel.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 30 Oct 2018 15:22:40 -0700
+Subject: [PATCH 7/7] kgdb: Remove irq flags and local_irq_enable/disable
+ from roundup
+In-Reply-To: <20181030114603.xdvyvayzw2an5c3q@holly.lan>
+References: <20181029180707.207546-1-dianders@chromium.org>
+ <20181029180707.207546-8-dianders@chromium.org>
+ <20181030114603.xdvyvayzw2an5c3q@holly.lan>
+Message-ID: <CAD=FV=WxoJ2LgUyR7Jm=xJHTqWGMvan7o18gOK-qPKdCrRRQtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jae,
+Hi,
 
-Thank you for the patch! Perhaps something to improve:
+On Tue, Oct 30, 2018 at 4:46 AM Daniel Thompson
+<daniel.thompson@linaro.org> wrote:
+>
+> On Mon, Oct 29, 2018 at 11:07:07AM -0700, Douglas Anderson wrote:
+> > The function kgdb_roundup_cpus() was passed a parameter that was
+> > documented as:
+> >
+> > > the flags that will be used when restoring the interrupts. There is
+> > > local_irq_save() call before kgdb_roundup_cpus().
+> >
+> > Nobody used those flags.  Anyone who wanted to temporarily turn on
+> > interrupts just did local_irq_enable() and local_irq_disable() without
+> > looking at them.  So we can definitely remove the flags.
+>
+> On the whole I'd rather that this change...
+>
+>
+> > Speaking of calling local_irq_enable(), it seems like a bad idea and
+> > it caused a nice splat on my system with lockdep turned on.
+> > Specifically it hit:
+> >   DEBUG_LOCKS_WARN_ON(current->hardirq_context)
+>
+> ... and fixes for this this were in separate patches. They don't appear
+> especially related.
 
-[auto build test WARNING on wsa/i2c/for-next]
-[also build test WARNING on v4.19 next-20181030]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Agreed that this is cleaner.  Done for v2.
 
-url:    https://github.com/0day-ci/linux/commits/Jae-Hyun-Yoo/dt-bindings-i2c-Add-bus-timeout-ms-and-retries-properties-as-common-optional/20181031-051152
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
-config: xtensa-allyesconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 8.1.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
-
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-
-All warnings (new ones prefixed by >>):
-
-   In file included from include/linux/ktime.h:25,
-                    from include/linux/rcutiny.h:28,
-                    from include/linux/rcupdate.h:209,
-                    from include/linux/srcu.h:33,
-                    from include/linux/notifier.h:16,
-                    from include/linux/clk.h:17,
-                    from drivers/i2c/busses/i2c-aspeed.c:13:
-   drivers/i2c/busses/i2c-aspeed.c: In function 'aspeed_i2c_master_xfer':
->> include/linux/jiffies.h:108:15: warning: 'timeout' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      ((long)((b) - (a)) < 0))
-                  ^
-   drivers/i2c/busses/i2c-aspeed.c:607:16: note: 'timeout' was declared here
-     unsigned long timeout;
-                   ^~~~~~~
---
-   In file included from include/linux/ktime.h:25,
-                    from include/linux/rcutiny.h:28,
-                    from include/linux/rcupdate.h:209,
-                    from include/linux/srcu.h:33,
-                    from include/linux/notifier.h:16,
-                    from include/linux/clk.h:17,
-                    from drivers/i2c//busses/i2c-aspeed.c:13:
-   drivers/i2c//busses/i2c-aspeed.c: In function 'aspeed_i2c_master_xfer':
->> include/linux/jiffies.h:108:15: warning: 'timeout' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      ((long)((b) - (a)) < 0))
-                  ^
-   drivers/i2c//busses/i2c-aspeed.c:607:16: note: 'timeout' was declared here
-     unsigned long timeout;
-                   ^~~~~~~
-
-vim +/timeout +108 include/linux/jiffies.h
-
-^1da177e Linus Torvalds   2005-04-16   91  
-^1da177e Linus Torvalds   2005-04-16   92  /*
-^1da177e Linus Torvalds   2005-04-16   93   *	These inlines deal with timer wrapping correctly. You are 
-^1da177e Linus Torvalds   2005-04-16   94   *	strongly encouraged to use them
-^1da177e Linus Torvalds   2005-04-16   95   *	1. Because people otherwise forget
-^1da177e Linus Torvalds   2005-04-16   96   *	2. Because if the timer wrap changes in future you won't have to
-^1da177e Linus Torvalds   2005-04-16   97   *	   alter your driver code.
-^1da177e Linus Torvalds   2005-04-16   98   *
-^1da177e Linus Torvalds   2005-04-16   99   * time_after(a,b) returns true if the time a is after time b.
-^1da177e Linus Torvalds   2005-04-16  100   *
-^1da177e Linus Torvalds   2005-04-16  101   * Do this with "<0" and ">=0" to only test the sign of the result. A
-^1da177e Linus Torvalds   2005-04-16  102   * good compiler would generate better code (and a really good compiler
-^1da177e Linus Torvalds   2005-04-16  103   * wouldn't care). Gcc is currently neither.
-^1da177e Linus Torvalds   2005-04-16  104   */
-^1da177e Linus Torvalds   2005-04-16  105  #define time_after(a,b)		\
-^1da177e Linus Torvalds   2005-04-16  106  	(typecheck(unsigned long, a) && \
-^1da177e Linus Torvalds   2005-04-16  107  	 typecheck(unsigned long, b) && \
-5a581b36 Paul E. McKenney 2013-07-27 @108  	 ((long)((b) - (a)) < 0))
-^1da177e Linus Torvalds   2005-04-16  109  #define time_before(a,b)	time_after(b,a)
-^1da177e Linus Torvalds   2005-04-16  110  
-
-:::::: The code at line 108 was first introduced by commit
-:::::: 5a581b367b5df0531265311fc681c2abd377e5e6 jiffies: Avoid undefined behavior from signed overflow
-
-:::::: TO: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-:::::: CC: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 55213 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181031/ce27fe2c/attachment-0001.gz>
+-Doug
