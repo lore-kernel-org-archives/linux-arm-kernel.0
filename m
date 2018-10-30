@@ -1,82 +1,60 @@
-From: sashal@kernel.org (Sasha Levin)
-Date: Tue, 30 Oct 2018 09:26:45 -0400
-Subject: [PATCH AUTOSEL 4.18 21/33] perf evsel: Store ids for events with
- their own cpus perf_event__synthesize_event_update_cpus
-In-Reply-To: <20181030132657.217970-1-sashal@kernel.org>
-References: <20181030132657.217970-1-sashal@kernel.org>
-Message-ID: <20181030132657.217970-21-sashal@kernel.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 30 Oct 2018 10:10:59 -0500
+Subject: [PATCH 2/6] arch: Make phys_initrd_start and phys_initrd_size
+ global variables
+In-Reply-To: <20181029235206.30060-3-f.fainelli@gmail.com>
+References: <20181029235206.30060-1-f.fainelli@gmail.com>
+ <20181029235206.30060-3-f.fainelli@gmail.com>
+Message-ID: <CAL_JsqKrrmMOQrV62L0QXAPiLGceMbvA7HZ=1U3PW0_MpqtC=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiri Olsa <jolsa@redhat.com>
+On Mon, Oct 29, 2018 at 6:52 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+>
+> Make phys_initrd_start and phys_initrd_size global variables that will
+> later be referenced by generic code under drivers/of/fdt.c.
+>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/mm/init.c       | 4 ++--
+>  arch/unicore32/mm/init.c | 4 ++--
+>  include/linux/initrd.h   | 3 +++
+>  3 files changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 0cc8e04295a4..8f364aa24172 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -51,8 +51,8 @@ unsigned long __init __clear_cr(unsigned long mask)
+>  }
+>  #endif
+>
+> -static phys_addr_t phys_initrd_start __initdata = 0;
+> -static unsigned long phys_initrd_size __initdata = 0;
+> +phys_addr_t phys_initrd_start __initdata = 0;
+> +unsigned long phys_initrd_size __initdata = 0;
 
-[ Upstream commit 4ab8455f8bd83298bf7f67ab9357e3b1cc765c7d ]
+I would declare these in common initrd code instead. Then you don't
+need a kconfig symbol.
 
-John reported crash when recording on an event under PMU with cpumask defined:
+>  static int __init early_initrd(char *p)
+>  {
+> diff --git a/arch/unicore32/mm/init.c b/arch/unicore32/mm/init.c
+> index 8f8699e62bd5..4dd26d6f02e5 100644
+> --- a/arch/unicore32/mm/init.c
+> +++ b/arch/unicore32/mm/init.c
+> @@ -31,8 +31,8 @@
+>
+>  #include "mm.h"
+>
+> -static unsigned long phys_initrd_start __initdata = 0x01000000;
+> -static unsigned long phys_initrd_size __initdata = SZ_8M;
+> +phys_addr_t phys_initrd_start __initdata = 0x01000000;
+> +unsigned long phys_initrd_size __initdata = SZ_8M;
 
-  root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-  perf: Segmentation fault
-  Obtained 9 stack frames.
-  ./perf_debug_() [0x4c5ef8]
-  [0xffff82ba267c]
-  ./perf_debug_() [0x4bc5a8]
-  ./perf_debug_() [0x419550]
-  ./perf_debug_() [0x41a928]
-  ./perf_debug_() [0x472f58]
-  ./perf_debug_() [0x473210]
-  ./perf_debug_() [0x4070f4]
-  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe0) [0xffff8294c8a0]
-  Segmentation fault (core dumped)
+You'll have to set these at runtime though. However, I seem to
+remember that an exact size was needed for decompressing an initrd
+which would make these defaults pointless. Maybe that was only certain
+compression formats.
 
-We synthesize an update event that needs to touch the evsel id array, which is
-not defined at that time. Fixing this by forcing the id allocation for events
-with their own cpus.
-
-Reported-by: John Garry <john.garry@huawei.com>
-Signed-off-by: Jiri Olsa <jolsa@kernel.org>
-Tested-by: John Garry <john.garry@huawei.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Andi Kleen <ak@linux.intel.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxarm at huawei.com
-Fixes: bfd8f72c2778 ("perf record: Synthesize unit/scale/... in event update")
-Link: http://lkml.kernel.org/r/20181003212052.GA32371 at krava
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-Signed-off-by: Sasha Levin <sashal@kernel.org>
----
- tools/perf/builtin-report.c | 1 +
- tools/perf/util/evsel.c     | 3 +++
- 2 files changed, 4 insertions(+)
-
-diff --git a/tools/perf/builtin-report.c b/tools/perf/builtin-report.c
-index c04dc7b53797..82a3c8be19ee 100644
---- a/tools/perf/builtin-report.c
-+++ b/tools/perf/builtin-report.c
-@@ -981,6 +981,7 @@ int cmd_report(int argc, const char **argv)
- 			.id_index	 = perf_event__process_id_index,
- 			.auxtrace_info	 = perf_event__process_auxtrace_info,
- 			.auxtrace	 = perf_event__process_auxtrace,
-+			.event_update	 = perf_event__process_event_update,
- 			.feature	 = process_feature_event,
- 			.ordered_events	 = true,
- 			.ordering_requires_timestamps = true,
-diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-index 6324afba8fdd..86ad1389ff5a 100644
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -1078,6 +1078,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
- 		attr->exclude_user   = 1;
- 	}
- 
-+	if (evsel->own_cpus)
-+		evsel->attr.read_format |= PERF_FORMAT_ID;
-+
- 	/*
- 	 * Apply event specific term settings,
- 	 * it overloads any global configuration.
--- 
-2.17.1
+Rob
