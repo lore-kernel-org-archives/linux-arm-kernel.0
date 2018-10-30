@@ -1,105 +1,23 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 30 Oct 2018 16:04:24 -0700
-Subject: [PATCH i2c-next v9 5/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-In-Reply-To: <201810310601.Odxb7qSY%fengguang.wu@intel.com>
-References: <20181030210917.32711-6-jae.hyun.yoo@linux.intel.com>
- <201810310601.Odxb7qSY%fengguang.wu@intel.com>
-Message-ID: <f5d3d3a3-daa3-fef7-853a-2b543fce0379@linux.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 Oct 2018 18:05:19 -0500
+Subject: [PATCH v1 1/4] drm/panel: simple: Add AUO G101EVN010 panel support
+In-Reply-To: <1540480173-12009-2-git-send-email-alex.gonzalez@digi.com>
+References: <1540480173-12009-1-git-send-email-alex.gonzalez@digi.com>
+ <1540480173-12009-2-git-send-email-alex.gonzalez@digi.com>
+Message-ID: <20181030230519.GA13247@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2018 3:22 PM, kbuild test robot wrote:
-> Hi Jae,
+On Thu, 25 Oct 2018 17:09:30 +0200, Alex Gonzalez wrote:
+> The change adds support for the AU Optronics G101EVN010 10.1" TFT LCD
+> panel.
 > 
-> Thank you for the patch! Perhaps something to improve:
-> 
-> [auto build test WARNING on wsa/i2c/for-next]
-> [also build test WARNING on v4.19 next-20181030]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Jae-Hyun-Yoo/dt-bindings-i2c-Add-bus-timeout-ms-and-retries-properties-as-common-optional/20181031-051152
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
-> config: xtensa-allyesconfig (attached as .config)
-> compiler: xtensa-linux-gcc (GCC) 8.1.0
-> reproduce:
->          wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->          chmod +x ~/bin/make.cross
->          # save the attached .config to linux build tree
->          GCC_VERSION=8.1.0 make.cross ARCH=xtensa
-> 
-> Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-> http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-> 
-> All warnings (new ones prefixed by >>):
-> 
->     In file included from include/linux/ktime.h:25,
->                      from include/linux/rcutiny.h:28,
->                      from include/linux/rcupdate.h:209,
->                      from include/linux/srcu.h:33,
->                      from include/linux/notifier.h:16,
->                      from include/linux/clk.h:17,
->                      from drivers/i2c/busses/i2c-aspeed.c:13:
->     drivers/i2c/busses/i2c-aspeed.c: In function 'aspeed_i2c_master_xfer':
->>> include/linux/jiffies.h:108:15: warning: 'timeout' may be used uninitialized in this function [-Wmaybe-uninitialized]
->        ((long)((b) - (a)) < 0))
->                    ^
->     drivers/i2c/busses/i2c-aspeed.c:607:16: note: 'timeout' was declared here
->       unsigned long timeout;
->                     ^~~~~~~
-> --
->     In file included from include/linux/ktime.h:25,
->                      from include/linux/rcutiny.h:28,
->                      from include/linux/rcupdate.h:209,
->                      from include/linux/srcu.h:33,
->                      from include/linux/notifier.h:16,
->                      from include/linux/clk.h:17,
->                      from drivers/i2c//busses/i2c-aspeed.c:13:
->     drivers/i2c//busses/i2c-aspeed.c: In function 'aspeed_i2c_master_xfer':
->>> include/linux/jiffies.h:108:15: warning: 'timeout' may be used uninitialized in this function [-Wmaybe-uninitialized]
->        ((long)((b) - (a)) < 0))
->                    ^
->     drivers/i2c//busses/i2c-aspeed.c:607:16: note: 'timeout' was declared here
->       unsigned long timeout;
->                     ^~~~~~~
-> 
-> vim +/timeout +108 include/linux/jiffies.h
-> 
-> ^1da177e Linus Torvalds   2005-04-16   91
-> ^1da177e Linus Torvalds   2005-04-16   92  /*
-> ^1da177e Linus Torvalds   2005-04-16   93   *	These inlines deal with timer wrapping correctly. You are
-> ^1da177e Linus Torvalds   2005-04-16   94   *	strongly encouraged to use them
-> ^1da177e Linus Torvalds   2005-04-16   95   *	1. Because people otherwise forget
-> ^1da177e Linus Torvalds   2005-04-16   96   *	2. Because if the timer wrap changes in future you won't have to
-> ^1da177e Linus Torvalds   2005-04-16   97   *	   alter your driver code.
-> ^1da177e Linus Torvalds   2005-04-16   98   *
-> ^1da177e Linus Torvalds   2005-04-16   99   * time_after(a,b) returns true if the time a is after time b.
-> ^1da177e Linus Torvalds   2005-04-16  100   *
-> ^1da177e Linus Torvalds   2005-04-16  101   * Do this with "<0" and ">=0" to only test the sign of the result. A
-> ^1da177e Linus Torvalds   2005-04-16  102   * good compiler would generate better code (and a really good compiler
-> ^1da177e Linus Torvalds   2005-04-16  103   * wouldn't care). Gcc is currently neither.
-> ^1da177e Linus Torvalds   2005-04-16  104   */
-> ^1da177e Linus Torvalds   2005-04-16  105  #define time_after(a,b)		\
-> ^1da177e Linus Torvalds   2005-04-16  106  	(typecheck(unsigned long, a) && \
-> ^1da177e Linus Torvalds   2005-04-16  107  	 typecheck(unsigned long, b) && \
-> 5a581b36 Paul E. McKenney 2013-07-27 @108  	 ((long)((b) - (a)) < 0))
-> ^1da177e Linus Torvalds   2005-04-16  109  #define time_before(a,b)	time_after(b,a)
-> ^1da177e Linus Torvalds   2005-04-16  110
-> 
-> :::::: The code at line 108 was first introduced by commit
-> :::::: 5a581b367b5df0531265311fc681c2abd377e5e6 jiffies: Avoid undefined behavior from signed overflow
-> 
-> :::::: TO: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> :::::: CC: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> 
+> Signed-off-by: Alex Gonzalez <alex.gonzalez@digi.com>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  .../bindings/display/panel/auo,g101evn010          | 12 ++++++++++
+>  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+>  2 files changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/auo,g101evn010
 > 
 
-This is a false warning.
-
-The 'timeout' local variable will be initialized properly if it's gonna
-be used when the multi-master property is set.
-
--Jae
+Reviewed-by: Rob Herring <robh@kernel.org>
