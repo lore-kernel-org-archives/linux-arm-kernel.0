@@ -1,62 +1,44 @@
-From: kurt@linutronix.de (Kurt Kanzenbach)
-Date: Tue, 30 Oct 2018 10:31:39 +0100
-Subject: [PATCH 2/2] net: xilinx_emaclite: recheck condition after timeout in
- mdio_wait()
-In-Reply-To: <20181030093139.10226-1-kurt@linutronix.de>
-References: <20181030093139.10226-1-kurt@linutronix.de>
-Message-ID: <20181030093139.10226-3-kurt@linutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Oct 2018 09:32:39 +0000
+Subject: [PATCH 4/6] of/fdt: Populate phys_initrd_start/phys_initrd_size
+ from FDT
+In-Reply-To: <20181029235206.30060-5-f.fainelli@gmail.com>
+References: <20181029235206.30060-1-f.fainelli@gmail.com>
+ <20181029235206.30060-5-f.fainelli@gmail.com>
+Message-ID: <20181030093239.GJ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function could report a false positive if it gets preempted between reading
-the XEL_MDIOCTRL_OFFSET register and checking for the timeout.  In such a case,
-the condition has to be rechecked to avoid false positives.
+On Mon, Oct 29, 2018 at 04:52:04PM -0700, Florian Fainelli wrote:
+> If the architecture implements ARCH_HAS_PHYS_INITRD, make the FDT
+> scanning code populate the physical address of the start of the FDT and
+> its size.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/mm/init.c | 2 +-
+>  drivers/of/fdt.c   | 4 ++++
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 8f364aa24172..517e95cfb5d2 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -237,7 +237,7 @@ static void __init arm_initrd_init(void)
+>  	phys_addr_t start;
+>  	unsigned long size;
+>  
+> -	/* FDT scan will populate initrd_start */
+> +	/* FDT scan will populate initrd_start and phys_initrd_start */
+>  	if (initrd_start && !phys_initrd_size) {
+>  		phys_initrd_start = __virt_to_phys(initrd_start);
+>  		phys_initrd_size = initrd_end - initrd_start;
 
-Therefore, check for expected condition even after the timeout occurred.
+We should be able to delete the whole if () { } block and comment as
+a result of this series - it was added by Rob in 65939301acdb to
+unify the DT initrd code.
 
-Signed-off-by: Kurt Kanzenbach <kurt@linutronix.de>
----
- drivers/net/ethernet/xilinx/xilinx_emaclite.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 639e3e99af46..957d03085bd0 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -714,19 +714,29 @@ static irqreturn_t xemaclite_interrupt(int irq, void *dev_id)
- static int xemaclite_mdio_wait(struct net_local *lp)
- {
- 	unsigned long end = jiffies + 2;
-+	u32 val;
- 
- 	/* wait for the MDIO interface to not be busy or timeout
- 	 * after some time.
- 	 */
--	while (xemaclite_readl(lp->base_addr + XEL_MDIOCTRL_OFFSET) &
--			XEL_MDIOCTRL_MDIOSTS_MASK) {
-+	while (1) {
-+		val = xemaclite_readl(lp->base_addr + XEL_MDIOCTRL_OFFSET);
-+
-+		if (!(val & XEL_MDIOCTRL_MDIOSTS_MASK))
-+			return 0;
-+
- 		if (time_before_eq(end, jiffies)) {
--			WARN_ON(1);
--			return -ETIMEDOUT;
-+			val = xemaclite_readl(lp->base_addr + XEL_MDIOCTRL_OFFSET);
-+			break;
- 		}
-+
- 		msleep(1);
- 	}
--	return 0;
-+	if (!(val & XEL_MDIOCTRL_MDIOSTS_MASK))
-+		return 0;
-+
-+	WARN_ON(1);
-+	return -ETIMEDOUT;
- }
- 
- /**
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
