@@ -1,168 +1,46 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 30 Oct 2018 16:06:14 +0100
-Subject: [PATCH] arm64: dts: meson-axg: fix dtc warning about unit address
-Message-ID: <20181030150614.19461-1-jbrunet@baylibre.com>
+From: biao.huang@mediatek.com (biao huang)
+Date: Tue, 30 Oct 2018 15:11:52 +0800
+Subject: [PATCH 1/2] net:stmmac: dwmac-mediatek: add support for mt2712
+In-Reply-To: <20181029122731.GA9174@lunn.ch>
+References: <1540782294-27721-1-git-send-email-biao.huang@mediatek.com>
+ <1540782294-27721-2-git-send-email-biao.huang@mediatek.com>
+ <20181029122731.GA9174@lunn.ch>
+Message-ID: <1540883512.26982.10.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-section 2.2.1 of the DT specs says: " If the node has no reg property,
-the @unit-address must be omitted and the node-name alone differentiates
-the node from other nodes at the same level in the tree"
-
-Simply replace the '@' with a '-' to fix this warning.
-
-Cc: Fabio Estevam <festevam@gmail.com>
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 30 +++++++++----------
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi    |  6 ++--
- 2 files changed, 18 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index c74ff1efebb8..be6df3cc1b98 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -60,7 +60,7 @@
- 		serial1 = &uart_A;
- 	};
- 
--	linein: audio-codec at 0 {
-+	linein: audio-codec-0 {
- 		#sound-dai-cells = <0>;
- 		compatible = "everest,es7241";
- 		VDDA-supply = <&vcc_3v3>;
-@@ -70,7 +70,7 @@
- 		sound-name-prefix = "Linein";
- 	};
- 
--	lineout: audio-codec at 1 {
-+	lineout: audio-codec-1 {
- 		#sound-dai-cells = <0>;
- 		compatible = "everest,es7154";
- 		VDD-supply = <&vcc_3v3>;
-@@ -79,14 +79,14 @@
- 		sound-name-prefix = "Lineout";
- 	};
- 
--	spdif_dit: audio-codec at 2 {
-+	spdif_dit: audio-codec-2 {
- 		#sound-dai-cells = <0>;
- 		compatible = "linux,spdif-dit";
- 		status = "okay";
- 		sound-name-prefix = "DIT";
- 	};
- 
--	dmics: audio-codec at 3 {
-+	dmics: audio-codec-3 {
- 		#sound-dai-cells = <0>;
- 		compatible = "dmic-codec";
- 		num-channels = <7>;
-@@ -95,7 +95,7 @@
- 		sound-name-prefix = "MIC";
- 	};
- 
--	spdif_dir: audio-codec at 4 {
-+	spdif_dir: audio-codec-4 {
- 		#sound-dai-cells = <0>;
- 		compatible = "linux,spdif-dir";
- 		status = "okay";
-@@ -282,31 +282,31 @@
- 				       <393216000>;
- 		status = "okay";
- 
--		dai-link at 0 {
-+		dai-link-0 {
- 			sound-dai = <&frddr_a>;
- 		};
- 
--		dai-link at 1 {
-+		dai-link-1 {
- 			sound-dai = <&frddr_b>;
- 		};
- 
--		dai-link at 2 {
-+		dai-link-2 {
- 			sound-dai = <&frddr_c>;
- 		};
- 
--		dai-link at 3 {
-+		dai-link-3 {
- 			sound-dai = <&toddr_a>;
- 		};
- 
--		dai-link at 4 {
-+		dai-link-4 {
- 			sound-dai = <&toddr_b>;
- 		};
- 
--		dai-link at 5 {
-+		dai-link-5 {
- 			sound-dai = <&toddr_c>;
- 		};
- 
--		dai-link at 6 {
-+		dai-link-6 {
- 			sound-dai = <&tdmif_c>;
- 			dai-format = "i2s";
- 			dai-tdm-slot-tx-mask-2 = <1 1>;
-@@ -327,7 +327,7 @@
- 
- 		};
- 
--		dai-link at 7 {
-+		dai-link-7 {
- 			sound-dai = <&spdifout>;
- 
- 			codec {
-@@ -335,7 +335,7 @@
- 			};
- 		};
- 
--		dai-link at 8 {
-+		dai-link-8 {
- 			sound-dai = <&spdifin>;
- 
- 			codec {
-@@ -343,7 +343,7 @@
- 			};
- 		};
- 
--		dai-link at 9 {
-+		dai-link-9 {
- 			sound-dai = <&pdm>;
- 
- 			codec {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 8746433c71be..7ab1a627951f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -23,7 +23,7 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
--	tdmif_a: audio-controller at 0 {
-+	tdmif_a: audio-controller-0 {
- 		compatible = "amlogic,axg-tdm-iface";
- 		#sound-dai-cells = <0>;
- 		sound-name-prefix = "TDM_A";
-@@ -34,7 +34,7 @@
- 		status = "disabled";
- 	};
- 
--	tdmif_b: audio-controller at 1 {
-+	tdmif_b: audio-controller-1 {
- 		compatible = "amlogic,axg-tdm-iface";
- 		#sound-dai-cells = <0>;
- 		sound-name-prefix = "TDM_B";
-@@ -45,7 +45,7 @@
- 		status = "disabled";
- 	};
- 
--	tdmif_c: audio-controller at 2 {
-+	tdmif_c: audio-controller-2 {
- 		compatible = "amlogic,axg-tdm-iface";
- 		#sound-dai-cells = <0>;
- 		sound-name-prefix = "TDM_C";
--- 
-2.17.2
+Thanks for your kindly comments.
+On Mon, 2018-10-29 at 13:27 +0100, Andrew Lunn wrote:
+> > +static int mt2712_config_dt(struct mediatek_dwmac_plat_data *plat)
+> > +{
+> > +	u32 mac_timings[4];
+> > +
+> > +	plat->peri_regmap = syscon_regmap_lookup_by_compatible("mediatek,mt2712-pericfg");
+> > +	if (IS_ERR(plat->peri_regmap)) {
+> > +		dev_err(plat->dev, "Failed to get pericfg syscon\n");
+> > +		return PTR_ERR(plat->peri_regmap);
+> > +	}
+> > +
+> > +	if (!of_property_read_u32_array(plat->np, "mac-delay", mac_timings,
+> > +					ARRAY_SIZE(mac_timings))) {
+> > +		plat->mac_delay.tx_delay = mac_timings[0];
+> > +		plat->mac_delay.rx_delay = mac_timings[1];
+> > +		plat->mac_delay.tx_inv = mac_timings[2];
+> > +		plat->mac_delay.rx_inv = mac_timings[3];
+> > +	}
+> > +
+> > +	plat->fine_tune = of_property_read_bool(plat->np, "fine-tune");
+> > +
+> > +	plat->rmii_rxc = of_property_read_bool(plat->np, "rmii-rxc");
+> 
+> Please add document for these properties in the binding.
+ok, I forgot these properties.
+> 
+> Ideally, you should reuse the binding that some of the other stmmac
+> glue layer uses. e.g. there is already allwinner,tx-delay-ps,
+> allwinner,rx-delay-ps.
+take it, seems that tx-delay/rx-delay will be more readable than
+mac-delay in dts. will be changed in next patch.
+> 
+>        Thanks
+>               Andrew
