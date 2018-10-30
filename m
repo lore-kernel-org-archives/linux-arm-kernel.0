@@ -1,47 +1,44 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 30 Oct 2018 07:06:01 +0100
-Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
-In-Reply-To: <1540862950.12374.40.camel@mtkswgap22>
-References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
- <20181029080708.GA32673@dhcp22.suse.cz>
- <20181029081706.GC32673@dhcp22.suse.cz>
- <1540862950.12374.40.camel@mtkswgap22>
-Message-ID: <20181030060601.GR32673@dhcp22.suse.cz>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 30 Oct 2018 15:18:06 +0100
+Subject: [PATCH V2] DT: rockchip: Fix stability issues with the
+ 'performance' governor on rock960
+In-Reply-To: <1539767918-26587-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1539767918-26587-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <10930709.0rTHelch2x@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 30-10-18 09:29:10, Miles Chen wrote:
-> On Mon, 2018-10-29 at 09:17 +0100, Michal Hocko wrote:
-> > On Mon 29-10-18 09:07:08, Michal Hocko wrote:
-> > [...]
-> > > Besides that, the following doesn't make much sense to me. It simply
-> > > makes no sense to use vmalloc for sub page allocation regardless of
-> > > HIGHMEM.
-> > 
-> > OK, it is still early morning here. Now I get the point of the patch.
-> > You just want to (ab)use highmeme for smaller requests. I do not like
-> > this, to be honest. It causes an internal fragmentation and more
-> > importantly the VMALLOC space on 32b where HIGHMEM is enabled (do we
-> > have any 64b with HIGHMEM btw?) is quite small to be wasted like that.
-> > 
-> thanks for your comment. It looks like that using vmalloc fallback for
-> sub page allocation is not good here.
+Am Mittwoch, 17. Oktober 2018, 11:18:30 CET schrieb Daniel Lezcano:
+> When the performance governor is set as default, the rock960 hangs
+> around one minute after booting, whatever the activity is (idle, key
+> pressed, loaded, ...).
 > 
-> Your comment gave another idea:
+> Based on the commit log found at https://patchwork.kernel.org/patch/10092377/
 > 
-> 1. force kbuf to PAGE_SIZE
-> 2. allocate a page by alloc_page(GFP_KERNEL | __GFP_HIGHMEM); so we can
-> get a highmem page if possible
-> 3. use kmap/kunmap pair to create mapping for this page. No vmalloc
-> space is used.
-> 4. do not change kvmalloc logic.
+> "vdd_log has no consumer and therefore will not be set to a specific
+> voltage. Still the PWM output pin gets configured and thence the vdd_log
+> output voltage will changed from it's default. Depending on the idle
+> state of the PWM this will slightly over or undervoltage the logic supply
+> of the RK3399 and cause instability with GbE (undervoltage) and PCIe
+> (overvoltage). Since the default value set by a voltage divider is the
+> correct supply voltage and we don't need to change it during runtime we
+> remove the rail from the devicetree completely so the PWM pin will not
+> be configured."
+> 
+> After removing the vdd-log from the rock960's specific DT, the board
+> does no longer hang and shows a stable behavior.
+> 
+> Apply the same change for the rock960 by removing the vdd-log from the
+> DT.
+> 
+> Fixes: 874846f1fccd ("arm64: dts: rockchip: add 96boards RK3399 Ficus board")
+> Tested-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-If you mean for this particular situation then is this really worth
-it? I mean this is a short term allocation for root only so you do not
-have to worry about low mem depletion.
+applied as fix for 4.20
+after including a stable-tag (board entered in previous kernel version)
+and modified subject line a bit.
 
-If you are thiking in more generic terms to allow kmalloc to use highmem
-then I am not really sure this will work out.
--- 
-Michal Hocko
-SUSE Labs
+
+Thanks
+Heiko
