@@ -1,143 +1,123 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 30 Oct 2018 11:16:29 +0100
-Subject: [PATCH] mmc: mmci: add variant property to send stop cmd if a command
- fail
-Message-ID: <1540894589-4004-1-git-send-email-ludovic.Barre@st.com>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 30 Oct 2018 09:55:47 +0000
+Subject: Crash report: Broken NUMA distance map causes crash on arm64
+ system
+In-Reply-To: <20181030092640.GE1459@hirez.programming.kicks-ass.net>
+References: <b89bf686-05bd-a3de-e7ef-4ab9ab7bdb6c@huawei.com>
+ <20181030092640.GE1459@hirez.programming.kicks-ass.net>
+Message-ID: <d126099d-2698-8e3a-06ca-f229e57c3052@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+On 30/10/2018 09:26, Peter Zijlstra wrote:
+> On Tue, Oct 23, 2018 at 11:30:11AM +0100, John Garry wrote:
+>> Hi all,
+>>
+>> I have stumbled upon this crash on my arm64 system:
+>>
+>> [    7.040874] SMP: Total of 64 processors activated.
+>> [    7.045720] CPU features: detected: GIC system register CPU interface
+>> [    7.052240] CPU features: detected: 32-bit EL0 Support
+>> [    7.144026] CPU: All CPU(s) started at EL2
+>> [    7.148298] alternatives: patching kernel code
+>> [    7.155277] Unable to handle kernel NULL pointer dereference at virtual
+>> address 0000000000000000
+>> [    7.164163] Mem abort info:
+>> [    7.166978]   ESR = 0x96000004
+>> [    7.170061]   Exception class = DABT (current EL), IL = 32 bits
+>> [    7.176043]   SET = 0, FnV = 0
+>> [    7.179121]   EA = 0, S1PTW = 0
+>> [    7.182291] Data abort info:
+>> [    7.185193]   ISV = 0, ISS = 0x00000004
+>> [    7.189066]   CM = 0, WnR = 0
+>> [    7.192056] [0000000000000000] user address but active_mm is swapper
+>> [    7.198480] Internal error: Oops: 96000004 [#1] PREEMPT SMP
+>> [    7.204107] Modules linked in:
+>> [    7.207189] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W
+>> 4.19.0-00002-g3ed52fd-dirty #807
+>> [    7.216596] Hardware name: Hisilicon Hip07 D05 Development Board (DT)
+>> [    7.223102] pstate: 20000005 (nzCv daif -PAN -UAO)
+>> [    7.227946] pc : __ll_sc_atomic_sub_return+0x4/0x20
+>> [    7.232873] lr : free_sched_groups.part.1+0x40/0x98
+>> [    7.237797] sp : ffff00000947bc60
+>> [    7.241138] x29: ffff00000947bc60 x28: ffff801fb49ba000
+>> [    7.246504] x27: ffff000009109b38 x26: ffff801fb4a38000
+>> [    7.251869] x25: ffff801fb48cc000 x24: ffff000009109000
+>> [    7.257235] x23: 0000000000000010 x22: 0000000000000001
+>> [    7.262599] x21: ffff801fb4a0b000 x20: ffff801fb4a65f00
+>> [    7.267964] x19: ffff801fb4a65f80 x18: 0000000000000400
+>> [    7.273329] x17: 00000000ffffffff x16: 0000000000000000
+>> [    7.278694] x15: ffff801ffbffef80 x14: ffff7e007ed14bc0
+>> [    7.284059] x13: 00000000000000c0 x12: 000000000000003f
+>> [    7.289423] x11: ffff801fb62258b8 x10: 0000000000000001
+>> [    7.294788] x9 : ffff801fb44b0100 x8 : 000000000000000f
+>> [    7.300153] x7 : ffff801fb48b1900 x6 : 0000801ff2efb000
+>> [    7.305518] x5 : ffff0000091096f0 x4 : 0000000000000400
+>> [    7.310882] x3 : ffff801fb4a65000 x2 : ffff801fb4a0b000
+>> [    7.316247] x1 : 0000000000000000 x0 : 0000000000000001
+>> [    7.321613] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
+>> [    7.328382] Call trace:
+>> [    7.330847]  __ll_sc_atomic_sub_return+0x4/0x20
+>> [    7.335420]  destroy_sched_domain+0x20/0x70
+>> [    7.339642]  cpu_attach_domain+0xc8/0x2e8
+>> [    7.343687]  build_sched_domains+0xd44/0xde0
+>> [    7.347996]  sched_init_domains+0x68/0x88
+>> [    7.352044]  sched_init_smp+0x2c/0x7c
+>> [    7.355738]  kernel_init_freeable+0xdc/0x244
+>> [    7.360049]  kernel_init+0x10/0x108
+>> [    7.363567]  ret_from_fork+0x10/0x18
+>> [    7.367174] Code: 88107c31 35ffffb0 d65f03c0 f9800031 (885f7c31)
+>> [    7.373400] ---[ end trace 8150af869a14363f ]---
+>> [    7.378076] Kernel panic - not syncing: Attempted to kill init!
+>> exitcode=0x0000000b
+>> [    7.378076]
+>> [    7.387320] SMP: stopping secondary CPUs
+>> [    7.391297] ---[ end Kernel panic - not syncing: Attempted to kill init!
+>> exitcode=0x0000000b
+>> [    7.391297]  ]---
+>>
+>> I will straightaway note that I have been fiddling with my board's device
+>> tree, specifically (breaking!) the NUMA distance map, like this:
+>>
+>> distance-matrix = <0 0 10>,
+>>                    <0 1 15>,
+>>                    <0 2 20>,
+>>                    <0 3 25>,
+>>                    <1 0 15>,
+>>                    <1 1 10>,
+>>                    <1 2 25>,
+>>                    <1 3 30>,
+>>                    <2 0 20>,
+>>                    <2 1 25>,
+>>                    <2 2 10>,
+>>                    <2 3 15>,
+>>                    <3 0 10>,* should be same as 0->3 and > 10
+>>                    <3 1 10>,* should be same as 1->3 and > 10
+>>                    <3 2 15>,
+>>                    <3 3 15>;* should be 10
+>>
+>> However I don't think that this should crash the kernel. I'd say
+>> of_numa_parse_distance_map_v1() should robustly handle broken maps, probably
+>> by erroring and causing NUMA to be disabled.
+>
+> If build with CONFIG_SCHED_DEBUG=y and boot with "sched_debug" I think
+> sched_init_numa() should yell at you for the above 'mistake'.
+>
 
-The mmc framework follows the requirement of SD_Specification:
-the STOP_TRANSMISSION is sent on multiple write/read commands
-and the stop command (alone), not needed on other ADTC commands.
+Right, I have since turned on debug and it was complaining - I'll 
+provide a log.
 
-But, if an error happens on command or data step, some variants
-require a stop command "STOP_TRANSMISION" to clear the DPSM
-"Data Path State Machine". If it's not done the next data
-command freezes hardware block.
-Needed to support the STM32 sdmmc variant.
+>> However I am interested to know if the scheduler crash is a real problem.
+>
+> Ideally we'd not crash of course.. let me see if I can still make sense
+> of that topology code.
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/mmc/host/mmci.c | 33 +++++++++++++++++++++++++++++++++
- drivers/mmc/host/mmci.h |  4 ++++
- 2 files changed, 37 insertions(+)
+JFYI, https://lkml.org/lkml/2018/10/26/527
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 19650ed..ecedca3 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -21,6 +21,7 @@
- #include <linux/err.h>
- #include <linux/highmem.h>
- #include <linux/log2.h>
-+#include <linux/mmc/mmc.h>
- #include <linux/mmc/pm.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
-@@ -57,6 +58,8 @@ void sdmmc_variant_init(struct mmci_host *host);
- #else
- static inline void sdmmc_variant_init(struct mmci_host *host) {}
- #endif
-+static void
-+mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c);
- 
- static unsigned int fmax = 515633;
- 
-@@ -274,6 +277,7 @@ static struct variant_data variant_stm32_sdmmc = {
- 	.cmdreg_lrsp_crc	= MCI_CPSM_STM32_LRSP_CRC,
- 	.cmdreg_srsp_crc	= MCI_CPSM_STM32_SRSP_CRC,
- 	.cmdreg_srsp		= MCI_CPSM_STM32_SRSP,
-+	.cmdreg_stop		= MCI_CPSM_STM32_CMDSTOP,
- 	.data_cmd_enable	= MCI_CPSM_STM32_CMDTRANS,
- 	.irq_pio_mask		= MCI_IRQ_PIO_STM32_MASK,
- 	.datactrl_first		= true,
-@@ -574,6 +578,24 @@ void mmci_dma_error(struct mmci_host *host)
- static void
- mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
- {
-+	/*
-+	 * If an error happens on command or data step, some variants
-+	 * require a stop command to reinit the DPSM.
-+	 * If it's not done the next data command freeze hardware block.
-+	 */
-+	if (host->variant->cmdreg_stop) {
-+		u32 dpsm;
-+
-+		dpsm = readl_relaxed(host->base + MMCISTATUS);
-+		dpsm &= MCI_STM32_DPSMACTIVE;
-+
-+		if (dpsm && ((mrq->cmd && mrq->cmd->error) ||
-+			     (mrq->data && mrq->data->error))) {
-+			mmci_start_command(host, &host->stop_abort, 0);
-+			return;
-+		}
-+	}
-+
- 	writel(0, host->base + MMCICOMMAND);
- 
- 	BUG_ON(host->data);
-@@ -1106,6 +1128,10 @@ mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
- 		mmci_reg_delay(host);
- 	}
- 
-+	if (host->variant->cmdreg_stop &&
-+	    cmd->opcode == MMC_STOP_TRANSMISSION)
-+		c |= host->variant->cmdreg_stop;
-+
- 	c |= cmd->opcode | host->variant->cmdreg_cpsm_enable;
- 	if (cmd->flags & MMC_RSP_PRESENT) {
- 		if (cmd->flags & MMC_RSP_136)
-@@ -1957,6 +1983,13 @@ static int mmci_probe(struct amba_device *dev,
- 		mmc->max_busy_timeout = 0;
- 	}
- 
-+	/* prepare the stop command, used to abort and reinitialized the DPSM */
-+	if (variant->cmdreg_stop) {
-+		host->stop_abort.opcode = MMC_STOP_TRANSMISSION;
-+		host->stop_abort.arg = 0;
-+		host->stop_abort.flags = MMC_RSP_R1B | MMC_CMD_AC;
-+	}
-+
- 	mmc->ops = &mmci_ops;
- 
- 	/* We support these PM capabilities. */
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index ec13d90..afb6ec4 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -166,6 +166,7 @@
- #define MCI_ST_CEATAEND		(1 << 23)
- #define MCI_ST_CARDBUSY		(1 << 24)
- /* Extended status bits for the STM32 variants */
-+#define MCI_STM32_DPSMACTIVE	BIT(12)
- #define MCI_STM32_BUSYD0	BIT(20)
- 
- #define MMCICLEAR		0x038
-@@ -269,6 +270,7 @@ struct mmci_host;
-  * @cmdreg_lrsp_crc: enable value for long response with crc
-  * @cmdreg_srsp_crc: enable value for short response with crc
-  * @cmdreg_srsp: enable value for short response without crc
-+ * @cmdreg_stop: enable value for stop and abort transmission
-  * @datalength_bits: number of bits in the MMCIDATALENGTH register
-  * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
-  *	      is asserted (likewise for RX)
-@@ -322,6 +324,7 @@ struct variant_data {
- 	unsigned int		cmdreg_lrsp_crc;
- 	unsigned int		cmdreg_srsp_crc;
- 	unsigned int		cmdreg_srsp;
-+	unsigned int		cmdreg_stop;
- 	unsigned int		datalength_bits;
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
-@@ -384,6 +387,7 @@ struct mmci_host {
- 	void __iomem		*base;
- 	struct mmc_request	*mrq;
- 	struct mmc_command	*cmd;
-+	struct mmc_command	stop_abort;
- 	struct mmc_data		*data;
- 	struct mmc_host		*mmc;
- 	struct clk		*clk;
--- 
-2.7.4
+So it seems to be that setting the distance between separate nodes to 
+LOCAL_DISTANCE causes the problem. x86 NUMA code - like arm64 - allows 
+this. However ACPI SLIT validation rejects this, unlike OF distance map 
+parsing.
+
+Thanks,
+John
