@@ -1,13 +1,14 @@
 From: peng.ma@nxp.com (Peng Ma)
-Date: Tue, 30 Oct 2018 10:36:01 +0800
-Subject: [v11 4/7] arm: dts: ls1021a: add qdma device tree nodes
-In-Reply-To: <20181030023604.34027-1-peng.ma@nxp.com>
-References: <20181030023604.34027-1-peng.ma@nxp.com>
-Message-ID: <20181030023604.34027-4-peng.ma@nxp.com>
+Date: Tue, 30 Oct 2018 10:35:58 +0800
+Subject: [v11 1/7] dmaengine: fsldma: Replace DMA_IN/OUT by FSL_DMA_IN/OUT
+Message-ID: <20181030023604.34027-1-peng.ma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add the qDMA device tree nodes for LS1021A devices.
+From: Wen He <wen.he_1@nxp.com>
+
+This patch implement a standard macro call functions is
+used to NXP dma drivers.
 
 Signed-off-by: Wen He <wen.he_1@nxp.com>
 Signed-off-by: Peng Ma <peng.ma@nxp.com>
@@ -15,38 +16,81 @@ Signed-off-by: Peng Ma <peng.ma@nxp.com>
 change in v11:
 	- no
 
- arch/arm/boot/dts/ls1021a.dtsi |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+ drivers/dma/fsldma.c |   16 ++++++++--------
+ drivers/dma/fsldma.h |    4 ++--
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index f184905..c0ed6be 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -806,5 +806,25 @@
- 			#size-cells = <1>;
- 			ranges = <0x0 0x0 0x10010000 0x10000>;
- 		};
-+
-+		qdma: dma-controller at 8390000 {
-+			compatible = "fsl,ls1021a-qdma";
-+			reg = <0x0 0x8388000 0x0 0x1000>, /* Controller regs */
-+			      <0x0 0x8389000 0x0 0x1000>, /* Status regs */
-+			      <0x0 0x838a000 0x0 0x2000>; /* Block regs */
-+			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "qdma-error",
-+				"qdma-queue0", "qdma-queue1";
-+			dma-channels = <8>;
-+			block-number = <1>;
-+			block-offset = <0x1000>;
-+			fsl,dma-queues = <2>;
-+			status-sizes = <64>;
-+			queue-sizes = <64 64>;
-+			big-endian;
-+		};
-+
- 	};
- };
+diff --git a/drivers/dma/fsldma.c b/drivers/dma/fsldma.c
+index 1117b51..39871e0 100644
+--- a/drivers/dma/fsldma.c
++++ b/drivers/dma/fsldma.c
+@@ -53,42 +53,42 @@
+ 
+ static void set_sr(struct fsldma_chan *chan, u32 val)
+ {
+-	DMA_OUT(chan, &chan->regs->sr, val, 32);
++	FSL_DMA_OUT(chan, &chan->regs->sr, val, 32);
+ }
+ 
+ static u32 get_sr(struct fsldma_chan *chan)
+ {
+-	return DMA_IN(chan, &chan->regs->sr, 32);
++	return FSL_DMA_IN(chan, &chan->regs->sr, 32);
+ }
+ 
+ static void set_mr(struct fsldma_chan *chan, u32 val)
+ {
+-	DMA_OUT(chan, &chan->regs->mr, val, 32);
++	FSL_DMA_OUT(chan, &chan->regs->mr, val, 32);
+ }
+ 
+ static u32 get_mr(struct fsldma_chan *chan)
+ {
+-	return DMA_IN(chan, &chan->regs->mr, 32);
++	return FSL_DMA_IN(chan, &chan->regs->mr, 32);
+ }
+ 
+ static void set_cdar(struct fsldma_chan *chan, dma_addr_t addr)
+ {
+-	DMA_OUT(chan, &chan->regs->cdar, addr | FSL_DMA_SNEN, 64);
++	FSL_DMA_OUT(chan, &chan->regs->cdar, addr | FSL_DMA_SNEN, 64);
+ }
+ 
+ static dma_addr_t get_cdar(struct fsldma_chan *chan)
+ {
+-	return DMA_IN(chan, &chan->regs->cdar, 64) & ~FSL_DMA_SNEN;
++	return FSL_DMA_IN(chan, &chan->regs->cdar, 64) & ~FSL_DMA_SNEN;
+ }
+ 
+ static void set_bcr(struct fsldma_chan *chan, u32 val)
+ {
+-	DMA_OUT(chan, &chan->regs->bcr, val, 32);
++	FSL_DMA_OUT(chan, &chan->regs->bcr, val, 32);
+ }
+ 
+ static u32 get_bcr(struct fsldma_chan *chan)
+ {
+-	return DMA_IN(chan, &chan->regs->bcr, 32);
++	return FSL_DMA_IN(chan, &chan->regs->bcr, 32);
+ }
+ 
+ /*
+diff --git a/drivers/dma/fsldma.h b/drivers/dma/fsldma.h
+index 4787d48..982845b 100644
+--- a/drivers/dma/fsldma.h
++++ b/drivers/dma/fsldma.h
+@@ -223,10 +223,10 @@ static void out_le64(u64 __iomem *addr, u64 val)
+ }
+ #endif
+ 
+-#define DMA_IN(fsl_chan, addr, width)					\
++#define FSL_DMA_IN(fsl_chan, addr, width)				\
+ 		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
+ 			in_be##width(addr) : in_le##width(addr))
+-#define DMA_OUT(fsl_chan, addr, val, width)				\
++#define FSL_DMA_OUT(fsl_chan, addr, val, width)			\
+ 		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
+ 			out_be##width(addr, val) : out_le##width(addr, val))
+ 
 -- 
 1.7.1
