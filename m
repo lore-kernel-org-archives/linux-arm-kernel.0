@@ -1,43 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Oct 2018 15:22:56 +0000
-Subject: [BUG] MVPP2 driver exploding in presence of a tap interface
-In-Reply-To: <20181030161007.360d5a53@windsurf>
-References: <6355174d-4ab6-595d-17db-311bce607aef@arm.com>
- <20181030105015.GB3407@kwain> <7bd72963-1e7c-5175-ba88-fc020d786f0c@arm.com>
- <CAPv3WKfn6QFPnNjpY2dU5-OHftObzdcrHopX8Y9w5h37Zd4BNw@mail.gmail.com>
- <20181030140056.2fc69efc@windsurf>
- <6bf82e04-5463-aa7d-bbac-f09519ff9815@arm.com>
- <20181030161007.360d5a53@windsurf>
-Message-ID: <f016bdf8-9986-962c-dff1-5dcf8b9087ad@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 30 Oct 2018 09:45:49 -0300
+Subject: revisit arm64 per-task stack canaries
+In-Reply-To: <20181030103502.GD19955@arm.com>
+References: <CAKv+Gu9RAXhMAwKJgNAZEBZRMNfpyDNS-rxa+U2EpNxEVq77vQ@mail.gmail.com>
+ <20180213125201.otz3cse4wftcq4fe@lakrids.cambridge.arm.com>
+ <CAKv+Gu-WVMnk2AhB9ziupL-TQoR8gZ121mkQAV9mvbgjirhbmg@mail.gmail.com>
+ <20180213180436.GA21758@arm.com>
+ <CAKv+Gu_q9mbjHhuU8g_nM6vBS_F3ypAvnuKLAg-Oaf+2wf2ePw@mail.gmail.com>
+ <20181030103502.GD19955@arm.com>
+Message-ID: <CAKv+Gu96pRfneQ-SLL3a9d-uLAqOPvkLcB25Md=f+z9f5Yg+fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/18 15:10, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Tue, 30 Oct 2018 14:55:01 +0000, Marc Zyngier wrote:
-> 
->>> I.e, isn't the firmware fix papering over a bug that should be fixed in
->>> Linux mvpp2 driver anyway ?  
+On 30 October 2018 at 07:35, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Oct 12, 2018 at 12:37:46PM +0200, Ard Biesheuvel wrote:
+>> To recap, my proof of concept was based on using the task struct
+>> pointer directly (which we keep in sp_el0 in the kernel). That way, we
+>> don't care about per-CPU vars and preemption etc, since the stack
+>> canary value is tied to the task anyway, regardless on which CPU it
+>> executes.
 >>
->> Absolutely. Leaving this unpatched in the kernel, with a 100% chance of
->> memory corruption is just mad.
+>> So my suggestion was to turn this (the current sequence emitted by the compiler)
 >>
->> I'm pretty sure there should be a way to sanely reset the interface
->> before it starts repainting the memory.
-> 
-> I agree here. Do you still have an image of that old firmware version,
-> so that we can try to reproduce, and see if we can come up with a way
-> to reset the BM on boot up that would avoid this issue ?
+>> adrp    x0, __stack__chk_guard
+>> ldr     x0, [x0, :lo12:__stack_chk_guard]
+>>
+>> into this
+>>
+>> mrs     x0, <sysreg>
+>> ldr     x0, [x0, :lo12:<offset>]
+>>
+>> where 'sysreg' and 'offset' are the names of 1) a system register and
+>> 2) an absolute ELF symbol, respectively.
+>>
+>> At Ramana's request (and with Arnd's help) I looked into whether we
+>> can provide offsetof(struct task_struct, stack_canary) as a bare
+>> number on the GCC command line instead, but this is turning out to be
+>> rather cumbersome, given that we need to run the compiler to find the
+>> offset in the first place. (The most promising approach would be to
+>> generate a file and include it with @filename so its contents are
+>> parsed as command line options but even that is rather fiddly to add
+>> into our build system)
+>>
+>> My approach of exposing the offset via the linker script works fine,
+>> and we wouldn't even need a separate GCC command line option in that
+>> case: we could just settle on __stack_chk_guard_sysreg_offset and
+>> stipulate that it is exposed as an absolute ELF symbol in the range
+>> [0..1023] when -mstack-protector-guard=<sysreg> is passed to GCC.
+>
+> That sounds like a sensible proposal to me. I'm assuming that the sysreg
+> is specified on the compiler command line as well?
+>
 
-Yup. I still have both the original build tree as well as the sdcard, so
-you should be able to trigger on demand.
+Yes, hence the -mstack-protector-guard=<sysreg>  :-)
 
-I'll email you the stuff separately, unless you want another delivery
-method.
+>> Ramana, could you elaborate on your preference for a bare number on
+>> the command line? Do you see any alternatives?
+>
+> With CONFIG_THREAD_INFO_IN_TASK I suppose we could bodge things so that
+> this constant is also zero, but it seems to me that all we gain is
+> fragility when compared to exposing a named symbol.
+>
 
-Thanks,
+Yeah, I looked into that as well: we could copy the stack_canary
+member into our thread_info struct, but it is indeed a bodge.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Ramana -- was this just a cosmetic preference, or are there good technical
+> reasons to avoid the new symbol (which isn't an awful lot different to what
+> we currently use).
+>
+
+I suppose absolute ELF symbols are somewhat unusual, but they are
+clearly defined by the ELF spec and we already use them in other
+places as well.
