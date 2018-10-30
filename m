@@ -1,61 +1,128 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Tue, 30 Oct 2018 23:04:49 +0800
-Subject: [PATCH] perf cs-etm: Correct CPU mode for samples
-In-Reply-To: <20181030143226.GA23310@kernel.org>
-References: <1540883908-17018-1-git-send-email-leo.yan@linaro.org>
- <20181030143226.GA23310@kernel.org>
-Message-ID: <20181030150449.GB8344@leoy-ThinkPad-X240s>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 30 Oct 2018 14:54:31 +0800
+Subject: [PATCH 3/3] drm/mediatek: Use drm_gem_cma_object instead of
+ mtk_drm_gem_obj
+In-Reply-To: <20181029091619.GT21967@phenom.ffwll.local>
+References: <1540538523-1973-1-git-send-email-ck.hu@mediatek.com>
+ <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
+ <20181026102156.GH21967@phenom.ffwll.local>
+ <1540782676.13715.4.camel@mtksdaap41>
+ <20181029091619.GT21967@phenom.ffwll.local>
+Message-ID: <1540882471.31817.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+Hi, Daniel:
 
-On Tue, Oct 30, 2018 at 11:32:26AM -0300, Arnaldo Carvalho de Melo wrote:
-> Em Tue, Oct 30, 2018 at 03:18:28PM +0800, Leo Yan escreveu:
-> > Since commit 9042f5e3539e ("perf tools: Stop fallbacking to kallsyms
-> > for vdso symbols lookup"), the kernel address cannot be properly parsed
-> > to kernel symbol with command 'perf script -k vmlinux'.  The reason is
-> > CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
-> > thus it fails to find corresponding map/dso in below flows:
+On Mon, 2018-10-29 at 10:16 +0100, Daniel Vetter wrote:
+> On Mon, Oct 29, 2018 at 11:11:16AM +0800, CK Hu wrote:
+> > Hi,Daniel:
 > > 
-> >   process_sample_event()
-> >     `-> machine__resolve()
-> > 	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
+> > On Fri, 2018-10-26 at 12:21 +0200, Daniel Vetter wrote:
+> > > On Fri, Oct 26, 2018 at 03:22:03PM +0800, CK Hu wrote:
+> > > > After adding dma_dev in struct drm_device and
+> > > > drm_gem_cma_dumb_create_no_kmap(), drm_gem_cma_object could replace
+> > > > mtk_drm_gem_obj, so use drm_gem_cma_object instead of mtk_drm_gem_obj to
+> > > > reduce redundant code.
+> > > > 
+> > > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
+> > > 
+> > > A few questions/thoughts:
+> > > 
+> > > - Why do you need both drm_device->dev and drm_device->dma_dev? Can't you
+> > >   just register the drm_device with the right struct device?
+> > > 
 > > 
-> > In this flow it needs to pass argument 'sample->cpumode' to tell what's
-> > the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
-> > any failure until the commit 9042f5e3539e ("perf tools: Stop fallbacking
-> > to kallsyms for vdso symbols lookup") has been merged.  The reason is
-> > even with the wrong CPU mode the function thread__find_map() firstly
-> > fails to find map but it will rollback to find kernel map for vdso
-> > symbols lookup.  In the latest code it has removed the fallback code,
-> > thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
-> > anymore with kernel address.
+> > In [1], mmsys is the drm driver and ovl0 and ovl1 is the sub device
+> > which has dma function.
+> > In this drm, there are two crtc and each one is comprised of many
+> > component.
+> > This is an example of mt8173:
 > > 
-> > This patch is to correct samples CPU mode setting, it creates a new
-> > helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
-> > the address with the info from machine structure; this patch has a bit
-> > extension to check not only kernel and user mode, but also check for
-> > host/guest and hypervisor mode.  Finally this patch uses the function
-> > in instruction and branch samples and also apply in cs_etm__mem_access()
-> > for a minor polishing.
+> > crtc0: ovl0, color0, aal, od, rdma0, ufoe, dsi0
+> > crtc1: ovl1, color1, gamma, rdma1, dpi0
+> > 
+> > In the device node of ovl0 and ovl1, there is a 'iommus' parameter in
+> > it, so use dma_alloc_xxx() and dma_map_xxx() with that device would get
+> > iova rather than pa. I don't think it's a good idea to register ovl0 or
+> > ovl1 as drm device because each one is just a component in a pipeline.
+> > mmsys controls the clock and routing of multi-media system which include
+> > this drm system, so it's better to register mmsys as drm device. Maybe
+> > we could move 'iommus' parameter from ovl device to mmsys device, so the
+> > dma device changes from ovl device to mmsys device. I'm not sure this
+> > would be a good choice, how do you think?
+> > 
+> > [1]
+> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/mediatek/mt8173.dtsi?h=v4.19
 > 
-> Mathieu, can I have your Acked-by, please? Leo, thanks for acting so
-> quickly on this one! 
+> Ah ok. But if you have 2 blocks that make up the overall drm device, why
+> don't you need to switch at runtime between them? I.e. buffer allocated
+> for crtc0 needs to be dma-mapped to crtc0, buffer allocated to crtc1 needs
+> to be dma-mapped on crtc1?
+> 
+> And if they're both the exact same iommu, then imo it would make indeed
+> sense to move the iommu attribute up. Since your current code cant'
+> actually handle truly separate dma-mappings. And neither can your patch
+> series here handled separate iommu for crtc0 and crtc1.
 
-Thanks for reivewing.  Yeah, let's wait for Mathieu reviewing as well,
-as I know he is travelling so might be delay a bit.
+Yes, they're the exact same iommu. So I would move iommu attribute up.
 
-Just remind, we might need the similiar change for util/intel-pt.c and
-util/intel-bts.c when generate samples, otherwise they might have the
-same regression for kernel symbols.  I am not the best person to change
-these two files, but bring up this for attention.
+> 
+> > > - You don't use drm_gem_prime_import_dev, so prime import isn't using the
+> > >   right device either.
+> > 
+> > Yes, you are right. I'm not familiar with whore drm core, so I start to
+> > modify what Mediatek drm use. But this function still works for the drm
+> > device that itself is dma device. If one day there is a drm device which
+> > itself is not a dma device and need this function, send a patch to
+> > modify this function and test it with that drm device. If you want me to
+> > modify all in advance, I'm ok but need others to test it because
+> > Mediatek drm driver does not use them.
+> 
+> I meant to say that mediatek should use drm_gem_prime_import_dev, but
+> currently isn't using that. And your patch series here doesn't fix that
+> either. So there's more bugs left in this area.
 
-> Now processing coresight traces should be faster, less lookups :-)
+Great, you find a bug. My test only include export but not import. This
+would take time to generate import-test environment.
 
-Thanks!
+> 
+> > > - exynos seems to have the same or at least similar issue, stronger case
+> > >   for your patches if you can solve both.
+> > 
+> > I'm still Mediatek's employee. If I modify other company's driver and it
+> > is not a MUST-BE for Mediatek, Mediatek may think I give contribution to
+> > other company. So I've better not to modify exynos driver.
+> 
+> This isn't how upstream works :-)
 
-[...]
+OK, because now I would not modify drm core, I would focus on Mediatek
+drm driver first. If the modification of exynos driver is easy, I could
+try. But if the modification of exynos is huge, I suggest that someone
+who is familiar with exynos driver and have exynos platform to do it.
 
-Thanks,
-Leo Yan
+Regards,
+CK
+> 
+> > > - I'd start out with using struct drm_gem_cma_object in mtk (similar to
+> > >   what vc4 does), and then reusing as much as possible of the existing
+> > >   helpers. And then looking later on what's still left (like the support
+> > >   for leaving out the virtual mapping).
+> > 
+> > I'm not clear what vc4 does. It looks like that you want me to redefine
+> > mtk_drm_gem_obj based on drm_gem_cma_object. So it would be like
+> > 
+> > struct mtk_drm_gem_obj {
+> > 	struct drm_gem_cma_object base;
+> > 	void *cookie;
+> > 	unsigned long dma_attrs;
+> > };
+> > 
+> > I could try to modify as this and see what have left.
+> 
+> Yup, that's my suggestion. Then we can look at what mtk can use unchanged
+> from the core helpers. And what would need to change and so better
+> evaluate whether it makes sense to do that.
+> 
+> I still think just moving the iommu is probably best.
+> -Daniel
