@@ -1,144 +1,28 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 30 Oct 2018 10:02:33 +0100
-Subject: [PATCH 3/3] drm/mediatek: Use drm_gem_cma_object instead of
- mtk_drm_gem_obj
-In-Reply-To: <1540882471.31817.9.camel@mtksdaap41>
-References: <1540538523-1973-1-git-send-email-ck.hu@mediatek.com>
- <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
- <20181026102156.GH21967@phenom.ffwll.local>
- <1540782676.13715.4.camel@mtksdaap41>
- <20181029091619.GT21967@phenom.ffwll.local>
- <1540882471.31817.9.camel@mtksdaap41>
-Message-ID: <20181030090233.GH21967@phenom.ffwll.local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Oct 2018 13:51:11 +0100
+Subject: [PATCH 5/5] pinctrl: mediatek: Add initial pinctrl driver for
+ MT6797 SoC
+In-Reply-To: <CAGp9LzoP2zkryhJCQNGpe9X0+7yUd31ffV7vM4j6KvTdfPpCrA@mail.gmail.com>
+References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
+ <20181008191411.32555-6-manivannan.sadhasivam@linaro.org>
+ <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
+ <20181011164429.GA18174@Mani-XPS-13-9360>
+ <e7abee72-23a3-4716-baf0-484514bbb019@gmail.com>
+ <CAGp9LzoP2zkryhJCQNGpe9X0+7yUd31ffV7vM4j6KvTdfPpCrA@mail.gmail.com>
+Message-ID: <CACRpkdb-Er8z6JdvYWE8UXUa3dfVSu4S-VbnqvcV+vf9erJuNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 02:54:31PM +0800, CK Hu wrote:
-> Hi, Daniel:
-> 
-> On Mon, 2018-10-29 at 10:16 +0100, Daniel Vetter wrote:
-> > On Mon, Oct 29, 2018 at 11:11:16AM +0800, CK Hu wrote:
-> > > Hi,Daniel:
-> > > 
-> > > On Fri, 2018-10-26 at 12:21 +0200, Daniel Vetter wrote:
-> > > > On Fri, Oct 26, 2018 at 03:22:03PM +0800, CK Hu wrote:
-> > > > > After adding dma_dev in struct drm_device and
-> > > > > drm_gem_cma_dumb_create_no_kmap(), drm_gem_cma_object could replace
-> > > > > mtk_drm_gem_obj, so use drm_gem_cma_object instead of mtk_drm_gem_obj to
-> > > > > reduce redundant code.
-> > > > > 
-> > > > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
-> > > > 
-> > > > A few questions/thoughts:
-> > > > 
-> > > > - Why do you need both drm_device->dev and drm_device->dma_dev? Can't you
-> > > >   just register the drm_device with the right struct device?
-> > > > 
-> > > 
-> > > In [1], mmsys is the drm driver and ovl0 and ovl1 is the sub device
-> > > which has dma function.
-> > > In this drm, there are two crtc and each one is comprised of many
-> > > component.
-> > > This is an example of mt8173:
-> > > 
-> > > crtc0: ovl0, color0, aal, od, rdma0, ufoe, dsi0
-> > > crtc1: ovl1, color1, gamma, rdma1, dpi0
-> > > 
-> > > In the device node of ovl0 and ovl1, there is a 'iommus' parameter in
-> > > it, so use dma_alloc_xxx() and dma_map_xxx() with that device would get
-> > > iova rather than pa. I don't think it's a good idea to register ovl0 or
-> > > ovl1 as drm device because each one is just a component in a pipeline.
-> > > mmsys controls the clock and routing of multi-media system which include
-> > > this drm system, so it's better to register mmsys as drm device. Maybe
-> > > we could move 'iommus' parameter from ovl device to mmsys device, so the
-> > > dma device changes from ovl device to mmsys device. I'm not sure this
-> > > would be a good choice, how do you think?
-> > > 
-> > > [1]
-> > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/mediatek/mt8173.dtsi?h=v4.19
-> > 
-> > Ah ok. But if you have 2 blocks that make up the overall drm device, why
-> > don't you need to switch at runtime between them? I.e. buffer allocated
-> > for crtc0 needs to be dma-mapped to crtc0, buffer allocated to crtc1 needs
-> > to be dma-mapped on crtc1?
-> > 
-> > And if they're both the exact same iommu, then imo it would make indeed
-> > sense to move the iommu attribute up. Since your current code cant'
-> > actually handle truly separate dma-mappings. And neither can your patch
-> > series here handled separate iommu for crtc0 and crtc1.
-> 
-> Yes, they're the exact same iommu. So I would move iommu attribute up.
-> 
-> > 
-> > > > - You don't use drm_gem_prime_import_dev, so prime import isn't using the
-> > > >   right device either.
-> > > 
-> > > Yes, you are right. I'm not familiar with whore drm core, so I start to
-> > > modify what Mediatek drm use. But this function still works for the drm
-> > > device that itself is dma device. If one day there is a drm device which
-> > > itself is not a dma device and need this function, send a patch to
-> > > modify this function and test it with that drm device. If you want me to
-> > > modify all in advance, I'm ok but need others to test it because
-> > > Mediatek drm driver does not use them.
-> > 
-> > I meant to say that mediatek should use drm_gem_prime_import_dev, but
-> > currently isn't using that. And your patch series here doesn't fix that
-> > either. So there's more bugs left in this area.
-> 
-> Great, you find a bug. My test only include export but not import. This
-> would take time to generate import-test environment.
+On Thu, Oct 18, 2018 at 5:06 PM Sean Wang <sean.wang@kernel.org> wrote:
 
-igt has a bunch of import tests for display iirc, using vgem.
+> the driver currently only supports the basic operation, not including
+> driving operation, so
+> what value for the driving mode for a certain pin seems not really
+> matter in the early patch. I think these advanced operations can be
+> added with another patch.
 
-> > > > - exynos seems to have the same or at least similar issue, stronger case
-> > > >   for your patches if you can solve both.
-> > > 
-> > > I'm still Mediatek's employee. If I modify other company's driver and it
-> > > is not a MUST-BE for Mediatek, Mediatek may think I give contribution to
-> > > other company. So I've better not to modify exynos driver.
-> > 
-> > This isn't how upstream works :-)
-> 
-> OK, because now I would not modify drm core, I would focus on Mediatek
-> drm driver first. If the modification of exynos driver is easy, I could
-> try. But if the modification of exynos is huge, I suggest that someone
-> who is familiar with exynos driver and have exynos platform to do it.
+Sean can you provide an Acked-by for the pinctrl part so I can merge
+it once Manivannan resends it for v4.21?
 
-Since we now clarified that you only have 1 iommu (and that it's kinda
-misplaced in the DT) I think exonys is a different case. This was more
-about your original patch series, which looked like exynos could need too.
--Daniel
-
-> 
-> Regards,
-> CK
-> > 
-> > > > - I'd start out with using struct drm_gem_cma_object in mtk (similar to
-> > > >   what vc4 does), and then reusing as much as possible of the existing
-> > > >   helpers. And then looking later on what's still left (like the support
-> > > >   for leaving out the virtual mapping).
-> > > 
-> > > I'm not clear what vc4 does. It looks like that you want me to redefine
-> > > mtk_drm_gem_obj based on drm_gem_cma_object. So it would be like
-> > > 
-> > > struct mtk_drm_gem_obj {
-> > > 	struct drm_gem_cma_object base;
-> > > 	void *cookie;
-> > > 	unsigned long dma_attrs;
-> > > };
-> > > 
-> > > I could try to modify as this and see what have left.
-> > 
-> > Yup, that's my suggestion. Then we can look at what mtk can use unchanged
-> > from the core helpers. And what would need to change and so better
-> > evaluate whether it makes sense to do that.
-> > 
-> > I still think just moving the iommu is probably best.
-> > -Daniel
-> 
-> 
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Yours,
+Linus Walleij
