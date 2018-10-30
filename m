@@ -1,59 +1,46 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 30 Oct 2018 08:43:44 +0100
-Subject: Warnings in arch/arm64/mm/dma-mapping.c
-In-Reply-To: <a771d5ce-28a2-609e-5fd7-338fadc20743@gmail.com>
-References: <a771d5ce-28a2-609e-5fd7-338fadc20743@gmail.com>
-Message-ID: <20181030074344.GA24697@lst.de>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 30 Oct 2018 19:17:24 +1100
+Subject: [RFC PATCH v2 11/12] crypto: adiantum - add Adiantum support
+In-Reply-To: <20181024220614.GA13497@gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <20181015175424.97147-12-ebiggers@kernel.org>
+ <CAKv+Gu9wrOOk-LGPYmxgLbv86uXzMeHN6th3mMEDT3Vg893HWw@mail.gmail.com>
+ <20181020071206.GE876@sol.localdomain>
+ <CAKv+Gu9zBKK7ughbBAKkHdfgX2KrBXkF6MhH3xrSdLegrjjYJQ@mail.gmail.com>
+ <20181024220614.GA13497@gmail.com>
+Message-ID: <20181030081724.GA2730@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 04:51:47PM -0700, Florian Fainelli wrote:
-> Hi,
+On Wed, Oct 24, 2018 at 03:06:17PM -0700, Eric Biggers wrote:
+>
+> The patch I've been using just exposes a file /proc/cryptobench (note: it maybe
+> should be made into a char device instead) to which you can write commands like:
 > 
-> I have not a chance to run a bisection yet, but I suspect this is coming
-> from Christoph's latest batch of DMA-API changes in ARM64 under the
-> merge commit befa93633193e5327e4045d1e5fa29114580fa5d ("Merge tag
-> 'dma-mapping-4.20-1' of git://git.infradead.org/users/hch/dma-mapping"),
-> here are the warnings:
+> 	algtype=skcipher algname=adiantum(xchacha12,aes) keysize=32 bufsize=4096 niter=1000
+> 
+> Then userspace reads back the result:
+> 
+> 	SUCCESS algname=adiantum(xchacha12,aes) driver_name=adiantum(xchacha12-software,aes-aesni,nhpoly1305-generic) measurement=0x30a5abd5776e0af enc_time=44831104 dec_time=38303077
+> 
+> It's then pretty straightforward to wrap this API in a userspace script that
+> does all the benchmarks you need, and formats the results nicely.
+> 
+> For correctness testing there's also an option 'sgl_fuzz' that randomizes the
+> scatterlist division.
+> 
+> Currently the patch is missing some features such as AEAD support, but at some
+> point I'd like to get it into a state where it can be included upstream.
 
-This should fix it:
+I completely agree that a new interface would be much better for
+tcrypt.
 
----
->From 773c5e097c5cf3868443ffb79ae64d79f70e3ccf Mon Sep 17 00:00:00 2001
-From: Christoph Hellwig <hch@lst.de>
-Date: Tue, 30 Oct 2018 09:41:29 +0200
-Subject: arm64: fix warnings without CONFIG_IOMMU_DMA
+However, we're trying to avoid using /proc for new APIs.  So perhaps
+netlink would be a better choice given the existing configuration and
+stats APIs that already exist for it.
 
-__swiotlb_get_sgtable_page and __swiotlb_mmap_pfn are not only misnamed
-but also only used if CONFIG_IOMMU_DMA is set.  Just add a simple ifdef
-for now, given that we plan to remove them entirely for the next merge
-window.
-
-Reported-by: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/arm64/mm/dma-mapping.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index d190612b8f33..560756a7290e 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -160,6 +160,7 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
- 	__dma_unmap_area(phys_to_virt(paddr), size, dir);
- }
- 
-+#ifdef CONFIG_IOMMU_DMA
- static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
- 				      struct page *page, size_t size)
- {
-@@ -188,6 +189,7 @@ static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
- 
- 	return ret;
- }
-+#endif /* CONFIG_IOMMU_DMA */
- 
- static int __init atomic_pool_init(void)
- {
+Thanks,
 -- 
-2.19.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
