@@ -1,33 +1,142 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 30 Oct 2018 15:03:57 +0000
-Subject: [PATCH V3 4/8] dt-bindings: i2c: i2c-imx-lpi2c: add imx8qxp
- compatible string
-In-Reply-To: <20181030145925.GC2459@kunai>
-References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
- <1539886483-15775-5-git-send-email-aisheng.dong@nxp.com>
- <20181028221952.GF1882@kunai>
- <AM0PR04MB42110EB0836E9610CDA2746680CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20181030145925.GC2459@kunai>
-Message-ID: <AM0PR04MB421190D30048AB9AE39FA8C780CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 30 Oct 2018 11:10:51 -0300
+Subject: [PATCH v2] arm64: kprobe: make page to RO mode when allocate it
+In-Reply-To: <DAC371D3-7D52-49D5-BA99-9B90389F3197@linaro.org>
+References: <20181030113850.31150-1-anders.roxell@linaro.org>
+ <DAC371D3-7D52-49D5-BA99-9B90389F3197@linaro.org>
+Message-ID: <CAKv+Gu_w1QaB_BEFgTHPUnMXwJGSsbT7wLYGazZDOAt7nNZNXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
- 
-> > > Would you maybe volunteer to maintain this driver? To prevent stuff
-> > > like this from happening? :)
-> >
-> > Sure, I will open an eye on this driver patches from now on.
-> 
-> Great, thank you! Can you add an entry to MAINTAINERS and send this as a
-> patch, too?
-> 
+On 30 October 2018 at 08:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Hi Anders,
+>
+>> On 30 Oct 2018, at 08:38, Anders Roxell <anders.roxell@linaro.org> wrote:
+>>
+>> Commit 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
+>> has successfully identified code that leaves a page with W+X
+>> permissions.
+>>
+>> [    3.245140] arm64/mm: Found insecure W+X mapping at address (____ptrval____)/0xffff000000d90000
+>> [    3.245771] WARNING: CPU: 0 PID: 1 at ../arch/arm64/mm/dump.c:232 note_page+0x410/0x420
+>> [    3.246141] Modules linked in:
+>> [    3.246653] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc5-next-20180928-00001-ge70ae259b853-dirty #62
+>> [    3.247008] Hardware name: linux,dummy-virt (DT)
+>> [    3.247347] pstate: 80000005 (Nzcv daif -PAN -UAO)
+>> [    3.247623] pc : note_page+0x410/0x420
+>> [    3.247898] lr : note_page+0x410/0x420
+>> [    3.248071] sp : ffff00000804bcd0
+>> [    3.248254] x29: ffff00000804bcd0 x28: ffff000009274000
+>> [    3.248578] x27: ffff00000921a000 x26: ffff80007dfff000
+>> [    3.248845] x25: ffff0000093f5000 x24: ffff000009526f6a
+>> [    3.249109] x23: 0000000000000004 x22: ffff000000d91000
+>> [    3.249396] x21: ffff000000d90000 x20: 0000000000000000
+>> [    3.249661] x19: ffff00000804bde8 x18: 0000000000000400
+>> [    3.249924] x17: 0000000000000000 x16: 0000000000000000
+>> [    3.250271] x15: ffffffffffffffff x14: 295f5f5f5f6c6176
+>> [    3.250594] x13: 7274705f5f5f5f28 x12: 2073736572646461
+>> [    3.250941] x11: 20746120676e6970 x10: 70616d20582b5720
+>> [    3.251252] x9 : 6572756365736e69 x8 : 3039643030303030
+>> [    3.251519] x7 : 306666666678302f x6 : ffff0000095467b2
+>> [    3.251802] x5 : 0000000000000000 x4 : 0000000000000000
+>> [    3.252060] x3 : 0000000000000000 x2 : ffffffffffffffff
+>> [    3.252323] x1 : 4d151327adc50b00 x0 : 0000000000000000
+>> [    3.252664] Call trace:
+>> [    3.252953]  note_page+0x410/0x420
+>> [    3.253186]  walk_pgd+0x12c/0x238
+>> [    3.253417]  ptdump_check_wx+0x68/0xf8
+>> [    3.253637]  mark_rodata_ro+0x68/0x98
+>> [    3.253847]  kernel_init+0x38/0x160
+>> [    3.254103]  ret_from_fork+0x10/0x18
+>>
+>> kprobes allocates a writable executable page with module_alloc() in
+>> order to store executable code.
+>> Reworked to that when allocate a page it sets mode RO. Inspired by
+>> commit 63fef14fc98a ("kprobes/x86: Make insn buffer always ROX and use text_poke()").
+>>
+>> Cc: Laura Abbott <labbott@redhat.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Co-developed-by: Arnd Bergmann <arnd@arndb.de>
+>> Co-developed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> Please remove these SOBs, Arnd and I provided input to this patch but you are the one sending it (sob does not assert authorship or anything like that, it just asserts that the code in the patch was made available under a compatible license)
+>
 
-Got it. Thanks
+As Anders points out in a private communication, the Documentation/
+explicitly requires signoffs for Co-developed-by credits. Perhaps we
+should enhance that document to clarify that that does not mean you
+can simply add signoffs on someone else's behalf.
 
-Regards
-Dong Aisheng
+But the patch is fine as it stands (with the received acks added)
 
-> > And I will resend the patch against your tree.
-> 
-> Thanks!
+> Also, please add the acks you received from Masami and Laura.
+>
+>> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+>> ---
+>> arch/arm64/kernel/probes/kprobes.c | 27 ++++++++++++++++++++-------
+>> 1 file changed, 20 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+>> index 9b65132e789a..decf483b4153 100644
+>> --- a/arch/arm64/kernel/probes/kprobes.c
+>> +++ b/arch/arm64/kernel/probes/kprobes.c
+>> @@ -23,7 +23,9 @@
+>> #include <linux/slab.h>
+>> #include <linux/stop_machine.h>
+>> #include <linux/sched/debug.h>
+>> +#include <linux/set_memory.h>
+>> #include <linux/stringify.h>
+>> +#include <linux/vmalloc.h>
+>> #include <asm/traps.h>
+>> #include <asm/ptrace.h>
+>> #include <asm/cacheflush.h>
+>> @@ -42,10 +44,21 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+>> static void __kprobes
+>> post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
+>>
+>> +static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
+>> +{
+>> +    void *addrs[1];
+>> +    u32 insns[1];
+>> +
+>> +    addrs[0] = (void *)addr;
+>> +    insns[0] = (u32)opcode;
+>> +
+>> +    return aarch64_insn_patch_text(addrs, insns, 1);
+>> +}
+>> +
+>> static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+>> {
+>>    /* prepare insn slot */
+>> -    p->ainsn.api.insn[0] = cpu_to_le32(p->opcode);
+>> +    patch_text(p->ainsn.api.insn, p->opcode);
+>>
+>>    flush_icache_range((uintptr_t) (p->ainsn.api.insn),
+>>               (uintptr_t) (p->ainsn.api.insn) +
+>> @@ -118,15 +131,15 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>>    return 0;
+>> }
+>>
+>> -static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
+>> +void *alloc_insn_page(void)
+>> {
+>> -    void *addrs[1];
+>> -    u32 insns[1];
+>> +    void *page;
+>>
+>> -    addrs[0] = (void *)addr;
+>> -    insns[0] = (u32)opcode;
+>> +    page = vmalloc_exec(PAGE_SIZE);
+>> +    if (page)
+>> +        set_memory_ro((unsigned long)page, 1);
+>>
+>> -    return aarch64_insn_patch_text(addrs, insns, 1);
+>> +    return page;
+>> }
+>>
+>> /* arm kprobe: install breakpoint in text */
+>> --
+>> 2.19.1
+>>
