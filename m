@@ -1,43 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Oct 2018 12:59:52 +0000
-Subject: [BUG] MVPP2 driver exploding in presence of a tap interface
-In-Reply-To: <CAPv3WKfn6QFPnNjpY2dU5-OHftObzdcrHopX8Y9w5h37Zd4BNw@mail.gmail.com>
-References: <6355174d-4ab6-595d-17db-311bce607aef@arm.com>
- <20181030105015.GB3407@kwain> <7bd72963-1e7c-5175-ba88-fc020d786f0c@arm.com>
- <CAPv3WKfn6QFPnNjpY2dU5-OHftObzdcrHopX8Y9w5h37Zd4BNw@mail.gmail.com>
-Message-ID: <0899d630-782d-a60e-154e-e26c467aba72@arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 30 Oct 2018 09:15:37 +0100
+Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
+In-Reply-To: <1540882551.23278.12.camel@mtkswgap22>
+References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
+ <20181029080708.GA32673@dhcp22.suse.cz>
+ <20181029081706.GC32673@dhcp22.suse.cz>
+ <1540862950.12374.40.camel@mtkswgap22>
+ <20181030060601.GR32673@dhcp22.suse.cz>
+ <1540882551.23278.12.camel@mtkswgap22>
+Message-ID: <20181030081537.GV32673@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marcin,
+On Tue 30-10-18 14:55:51, Miles Chen wrote:
+[...]
+> It's a real problem when using page_owner.
+> I found this issue recently: I'm not able to read page_owner information
+> during a overnight test. (error: read failed: Out of memory). I replace
+> kmalloc() with vmalloc() and it worked well.
 
-On 30/10/18 12:37, Marcin Wojtas wrote:
-> [Resend in UTF-8]
-> 
-> Hi Marc,
-> 
-> You use _really_ archaic firmware, the bug you see is 99% caused by a
-
-Please let me fix this for you:
-
-s/_really_ archaic/released/
-
-> bug already fixed long time ago (cleanup all PP2 BM pools correctly
-> during exit boot services). 
-
-How long ago? Why didn't you say so when I reported the bug to you and
-Antoine back in January? Also, why isn't that "clean-up" taken care of
-by the Linux driver? Exiting boot services itself doesn't seem to cause
-the issue, and it is setting the interface up that causes it.
-
-> Please grab the latest release:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/wiki/files/flash-image-18.09.4.bin
-> and let know if you observe any further issues with vanilla kernel.
-
-What does this image contain?
-
-Thanks,
-
-	M.
+Is this with trimming the allocation to a single page and doing shorter
+than requested reads?
 -- 
-Jazz is not dead. It just smells funny...
+Michal Hocko
+SUSE Labs
