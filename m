@@ -1,113 +1,92 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 30 Oct 2018 09:41:59 +0000
-Subject: [PATCH 6/7] smp: Don't yell about IRQs disabled in
- kgdb_roundup_cpus()
-In-Reply-To: <20181029180707.207546-7-dianders@chromium.org>
-References: <20181029180707.207546-1-dianders@chromium.org>
- <20181029180707.207546-7-dianders@chromium.org>
-Message-ID: <20181030094159.zt6akmyxwrbzoe2x@holly.lan>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 30 Oct 2018 17:54:53 +0100
+Subject: [PATCH] thermal: broadcom: use
+ devm_thermal_zone_of_sensor_register
+In-Reply-To: <1540915731-22312-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1540915731-22312-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <14095608-e080-d907-c9ea-788a3abe1645@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 11:07:06AM -0700, Douglas Anderson wrote:
-> In kgdb_roundup_cpus() we've got code that looks like:
->   local_irq_enable();
->   smp_call_function(kgdb_call_nmi_hook, NULL, 0);
->   local_irq_disable();
+On 30/10/2018 17:08, Julia Lawall wrote:
+> Using devm_thermal_zone_of_sensor_register allows to simplify some
+> error handling code, drop a label, and drop the remove function.
 > 
-> In certain cases when we drop into kgdb (like with sysrq-g on a serial
-> console) we'll get a big yell that looks like:
-> 
->   sysrq: SysRq : DEBUG
->   ------------[ cut here ]------------
->   DEBUG_LOCKS_WARN_ON(current->hardirq_context)
->   WARNING: CPU: 0 PID: 0 at .../kernel/locking/lockdep.c:2875 lockdep_hardirqs_on+0xf0/0x160
->   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.19.0 #27
->   pstate: 604003c9 (nZCv DAIF +PAN -UAO)
->   pc : lockdep_hardirqs_on+0xf0/0x160
->   ...
->   Call trace:
->    lockdep_hardirqs_on+0xf0/0x160
->    trace_hardirqs_on+0x188/0x1ac
->    kgdb_roundup_cpus+0x14/0x3c
->    kgdb_cpu_enter+0x53c/0x5cc
->    kgdb_handle_exception+0x180/0x1d4
->    kgdb_compiled_brk_fn+0x30/0x3c
->    brk_handler+0x134/0x178
->    do_debug_exception+0xfc/0x178
->    el1_dbg+0x18/0x78
->    kgdb_breakpoint+0x34/0x58
->    sysrq_handle_dbg+0x54/0x5c
->    __handle_sysrq+0x114/0x21c
->    handle_sysrq+0x30/0x3c
->    qcom_geni_serial_isr+0x2dc/0x30c
->   ...
->   ...
->   irq event stamp: ...45
->   hardirqs last  enabled at (...44): [...] __do_softirq+0xd8/0x4e4
->   hardirqs last disabled at (...45): [...] el1_irq+0x74/0x130
->   softirqs last  enabled at (...42): [...] _local_bh_enable+0x2c/0x34
->   softirqs last disabled at (...43): [...] irq_exit+0xa8/0x100
->   ---[ end trace adf21f830c46e638 ]---
-> 
-> Let's add kgdb to the list of reasons not to warn in
-> smp_call_function_many().  That will allow us (in a future patch) to
-> stop calling local_irq_enable() which will get rid of the original
-> splat.
-> 
-> NOTE: with this change comes the obvious question: will we start
-> deadlocking more often now when we drop into the debugger.  I can't
-> say that for sure one way or the other, but the fact that we do the
-> same logic for "oops_in_progress" makes me feel like it shouldn't
-> happen too often.  Also note that the old logic of turning on
-> interrupts temporarily wasn't exactly safe since (I presume) that
-> could have violated spin_lock_irqsave() semantics and ended up with a
-> deadlock of its own.
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-This is part of the code to bring all the cores to a halt and since
-the other cores are still running kgdb isn't yet able to use the fact
-all the CPUs are halted to bend the rules. It is better for this code
-to play by the rules if it can.
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Is is possible to get the roundup functions to use a private csd
-alongside smp_call_function_single_async()? We could add a helper
-function to the debug core to avoid having to add cpu_online loops into
-every kgdb_roundup_cpus() implementaton.
-
-
-Daniel.
-
-
-
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 > ---
 > 
->  kernel/smp.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> This patch is completely orthogonal to the recent constification
+> patch.
 > 
-> diff --git a/kernel/smp.c b/kernel/smp.c
-> index 163c451af42e..bb581e58c8dc 100644
-> --- a/kernel/smp.c
-> +++ b/kernel/smp.c
-> @@ -19,6 +19,7 @@
->  #include <linux/sched.h>
->  #include <linux/sched/idle.h>
->  #include <linux/hypervisor.h>
-> +#include <linux/kgdb.h>
->  
->  #include "smpboot.h"
->  
-> @@ -413,7 +414,8 @@ void smp_call_function_many(const struct cpumask *mask,
->  	 * can't happen.
->  	 */
->  	WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
-> -		     && !oops_in_progress && !early_boot_irqs_disabled);
-> +		     && !oops_in_progress && !early_boot_irqs_disabled
-> +		     && !in_dbg_master());
->  
->  	/* Try to fastpath.  So, what's a CPU they want? Ignoring this one. */
->  	cpu = cpumask_first_and(mask, cpu_online_mask);
-> -- 
-> 2.19.1.568.g152ad8e336-goog
+>  drivers/thermal/broadcom/brcmstb_thermal.c |   24 ++++--------------------
+>  1 file changed, 4 insertions(+), 20 deletions(-)
 > 
+> diff --git a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
+> index 1919f91fa756..956eef8717bb 100644
+> --- a/drivers/thermal/broadcom/brcmstb_thermal.c
+> +++ b/drivers/thermal/broadcom/brcmstb_thermal.c
+> @@ -329,7 +329,8 @@ static int brcmstb_thermal_probe(struct platform_device *pdev)
+>  	priv->dev = &pdev->dev;
+>  	platform_set_drvdata(pdev, priv);
+>  
+> -	thermal = thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &of_ops);
+> +	thermal = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv,
+> +						       &of_ops);
+>  	if (IS_ERR(thermal)) {
+>  		ret = PTR_ERR(thermal);
+>  		dev_err(&pdev->dev, "could not register sensor: %d\n", ret);
+> @@ -341,40 +342,23 @@ static int brcmstb_thermal_probe(struct platform_device *pdev)
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+>  		dev_err(&pdev->dev, "could not get IRQ\n");
+> -		ret = irq;
+> -		goto err;
+> +		return irq;
+>  	}
+>  	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+>  					brcmstb_tmon_irq_thread, IRQF_ONESHOT,
+>  					DRV_NAME, priv);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "could not request IRQ: %d\n", ret);
+> -		goto err;
+> +		return ret;
+>  	}
+>  
+>  	dev_info(&pdev->dev, "registered AVS TMON of-sensor driver\n");
+>  
+>  	return 0;
+> -
+> -err:
+> -	thermal_zone_of_sensor_unregister(&pdev->dev, thermal);
+> -	return ret;
+> -}
+> -
+> -static int brcmstb_thermal_exit(struct platform_device *pdev)
+> -{
+> -	struct brcmstb_thermal_priv *priv = platform_get_drvdata(pdev);
+> -	struct thermal_zone_device *thermal = priv->thermal;
+> -
+> -	if (thermal)
+> -		thermal_zone_of_sensor_unregister(&pdev->dev, priv->thermal);
+> -
+> -	return 0;
+>  }
+>  
+>  static struct platform_driver brcmstb_thermal_driver = {
+>  	.probe = brcmstb_thermal_probe,
+> -	.remove = brcmstb_thermal_exit,
+>  	.driver = {
+>  		.name = DRV_NAME,
+>  		.of_match_table = brcmstb_thermal_id_table,
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
