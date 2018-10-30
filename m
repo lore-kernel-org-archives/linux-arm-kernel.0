@@ -1,55 +1,52 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Tue, 30 Oct 2018 11:50:15 +0100
-Subject: [BUG] MVPP2 driver exploding in presence of a tap interface
-In-Reply-To: <6355174d-4ab6-595d-17db-311bce607aef@arm.com>
-References: <6355174d-4ab6-595d-17db-311bce607aef@arm.com>
-Message-ID: <20181030105015.GB3407@kwain>
+From: peng.ma@nxp.com (Peng Ma)
+Date: Tue, 30 Oct 2018 10:36:01 +0800
+Subject: [v11 4/7] arm: dts: ls1021a: add qdma device tree nodes
+In-Reply-To: <20181030023604.34027-1-peng.ma@nxp.com>
+References: <20181030023604.34027-1-peng.ma@nxp.com>
+Message-ID: <20181030023604.34027-4-peng.ma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+add the qDMA device tree nodes for LS1021A devices.
 
-On Mon, Oct 29, 2018 at 03:05:53PM +0000, Marc Zyngier wrote:
-> 
-> This is a follow-up on the conversation Thomas and I had last week at 
-> ELC, with me ranting at the sorry state of the MVPP2 driver.
+Signed-off-by: Wen He <wen.he_1@nxp.com>
+Signed-off-by: Peng Ma <peng.ma@nxp.com>
+---
+change in v11:
+	- no
 
-> Triggering this is dead simple:
-> - Add a macvtap to one of the MVPP2 interfaces
-> - Bring it online
-> - Watch the kernel exploding and memory being corrupted
-> 
-> You don't even need anything listening on the tap interface, just its
-> simple existence triggers it. I use a similar setup on a large variety 
-> of machines, and this box is the only one that catches fire. Removing
-> the macvtap interface makes it (more) reliable.
-> 
-> Given that I cannot reproduce this issue on any other ARM (32 or 64bit)
-> platform, including other Marvell stuff, I can only conclude that the
-> MVPP2 driver is responsible for this.
-> 
-> Example crash and .config below (4.19 vanilla, as linux/master dies in
-> new and wonderful ways on this box). I'm looking forward to testing any
-> idea you may have.
+ arch/arm/boot/dts/ls1021a.dtsi |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-I used a 4.19 vanilla kernel, with both your configuration and mine,
-on 2 different Macchiatobins, but was unable to trigger the issue:
-
-  # ip link set eth0 up
-  # ip link add link eth0 name macvtap0 type macvtap
-  # ip link set macvtap0 up
-
-I can even configure the eth0/macvtap0 interfaces, and use them
-generating or receiving tcp/udp/icmp traffic.
-
-(I also made other tests using macvtap and tap interfaces).
-
-How much memory do you have on the board? What version of ATF are you
-using? Version of U-Boot?
-
-Antoine
-
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index f184905..c0ed6be 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -806,5 +806,25 @@
+ 			#size-cells = <1>;
+ 			ranges = <0x0 0x0 0x10010000 0x10000>;
+ 		};
++
++		qdma: dma-controller at 8390000 {
++			compatible = "fsl,ls1021a-qdma";
++			reg = <0x0 0x8388000 0x0 0x1000>, /* Controller regs */
++			      <0x0 0x8389000 0x0 0x1000>, /* Status regs */
++			      <0x0 0x838a000 0x0 0x2000>; /* Block regs */
++			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "qdma-error",
++				"qdma-queue0", "qdma-queue1";
++			dma-channels = <8>;
++			block-number = <1>;
++			block-offset = <0x1000>;
++			fsl,dma-queues = <2>;
++			status-sizes = <64>;
++			queue-sizes = <64 64>;
++			big-endian;
++		};
++
+ 	};
+ };
 -- 
-Antoine T?nart, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+1.7.1
