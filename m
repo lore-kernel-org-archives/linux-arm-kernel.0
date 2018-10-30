@@ -1,51 +1,138 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Tue, 30 Oct 2018 09:55:07 -0500
-Subject: [PATCH V2] regulator: pfuze100-regulator: add coin support to PF0100
-Message-ID: <20181030145507.10462-1-aford173@gmail.com>
+From: qiangqing.zhang@nxp.com (Joakim Zhang)
+Date: Tue, 30 Oct 2018 08:42:47 +0000
+Subject: [PATCH V2 3/3] ARM: dts: sabreauto: Add flexcan support
+In-Reply-To: <20181030083954.26440-1-qiangqing.zhang@nxp.com>
+References: <20181030083954.26440-1-qiangqing.zhang@nxp.com>
+Message-ID: <20181030083954.26440-4-qiangqing.zhang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver currently supports coin cell / super cap charging, so
-this patch extends it to support PF0100.
+From: Dong Aisheng <aisheng.dong@nxp.com>
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
+The flexcan1 is pin conflict with fec. So we add a new dts file with
+flexcan1 enabled with fec disabled for user to use.
+
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
 ---
-V2:  Rebase from correct branch.
-V1:  Ooops, sorry about the noise.
+ .../boot/dts/imx6dl-sabreauto-flexcan1.dts    | 14 ++++++
+ .../arm/boot/dts/imx6q-sabreauto-flexcan1.dts | 14 ++++++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi      | 47 +++++++++++++++++++
+ 3 files changed, 75 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
 
-diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
-index dd41a9bb3f5c..df5df1c495ad 100644
---- a/drivers/regulator/pfuze100-regulator.c
-+++ b/drivers/regulator/pfuze100-regulator.c
-@@ -370,6 +370,7 @@ static struct pfuze_regulator pfuze100_regulators[] = {
- 	PFUZE100_VGEN_REG(PFUZE100, VGEN4, PFUZE100_VGEN4VOL, 1800000, 3300000, 100000),
- 	PFUZE100_VGEN_REG(PFUZE100, VGEN5, PFUZE100_VGEN5VOL, 1800000, 3300000, 100000),
- 	PFUZE100_VGEN_REG(PFUZE100, VGEN6, PFUZE100_VGEN6VOL, 1800000, 3300000, 100000),
-+	PFUZE100_COIN_REG(PFUZE100, COIN, PFUZE100_COINVOL, 0x7, pfuze100_coin),
+diff --git a/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+new file mode 100644
+index 000000000000..4ebcc283f549
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+@@ -0,0 +1,14 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright (C) 2013 Freescale Semiconductor, Inc.
++
++#include "imx6dl-sabreauto.dts"
++
++&can1{
++	status = "okay";
++};
++
++&fec {
++	/* pin conflict with flexcan1 */
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts b/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
+new file mode 100644
+index 000000000000..e7e684656f09
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
+@@ -0,0 +1,14 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright (C) 2013 Freescale Semiconductor, Inc.
++
++#include "imx6q-sabreauto.dts"
++
++&can1{
++	status = "okay";
++};
++
++&fec {
++	/* pin conflict with flexcan1 */
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index a10f0ad0bfb1..c1111b972b46 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -101,6 +101,25 @@
+ 		enable-active-high;
+ 	};
+ 
++	reg_can_en: regulator-can-en {
++		compatible = "regulator-fixed";
++		regulator-name = "can-en";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&max7310_b 6 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_can_stby: regulator-can-stby {
++		compatible = "regulator-fixed";
++		regulator-name = "can-stby";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&max7310_b 5 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		vin-supply = <&reg_can_en>;
++	};
++
+ 	sound-cs42888 {
+ 		compatible = "fsl,imx6-sabreauto-cs42888",
+ 			"fsl,imx-audio-cs42888";
+@@ -279,6 +298,20 @@
+ 	status = "okay";
  };
  
- static struct pfuze_regulator pfuze200_regulators[] = {
-@@ -436,6 +437,7 @@ static struct of_regulator_match pfuze100_matches[] = {
- 	{ .name = "vgen4",	},
- 	{ .name = "vgen5",	},
- 	{ .name = "vgen6",	},
-+	{ .name = "coin",	},
- };
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	xceiver-supply = <&reg_can_stby>;
++	status = "disabled"; /* pin conflict with fec */
++};
++
++&can2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	xceiver-supply = <&reg_can_stby>;
++	status = "okay";
++};
++
+ &gpmi {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_gpmi_nand>;
+@@ -494,6 +527,20 @@
+ 			>;
+ 		};
  
- /* PFUZE200 */
-diff --git a/include/linux/regulator/pfuze100.h b/include/linux/regulator/pfuze100.h
-index cb5aecd40f07..331d7d940c7a 100644
---- a/include/linux/regulator/pfuze100.h
-+++ b/include/linux/regulator/pfuze100.h
-@@ -33,7 +33,8 @@
- #define PFUZE100_VGEN4		12
- #define PFUZE100_VGEN5		13
- #define PFUZE100_VGEN6		14
--#define PFUZE100_MAX_REGULATOR	15
-+#define PFUZE100_COIN		15
-+#define PFUZE100_MAX_REGULATOR	16
- 
- #define PFUZE200_SW1AB		0
- #define PFUZE200_SW2		1
++		pinctrl_flexcan1: flexcan1grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX        0x17059
++				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x17059
++			>;
++		};
++
++		pinctrl_flexcan2: flexcan2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX	0x17059
++				MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX	0x17059
++			>;
++		};
++
+ 		pinctrl_gpio_keys: gpiokeysgrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD2_CMD__GPIO1_IO11		0x1b0b0
 -- 
 2.17.1
