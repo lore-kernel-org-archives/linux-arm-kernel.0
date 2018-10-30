@@ -1,58 +1,59 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Tue, 30 Oct 2018 14:55:51 +0800
-Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
-In-Reply-To: <20181030060601.GR32673@dhcp22.suse.cz>
-References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
- <20181029080708.GA32673@dhcp22.suse.cz>
- <20181029081706.GC32673@dhcp22.suse.cz>
- <1540862950.12374.40.camel@mtkswgap22>
- <20181030060601.GR32673@dhcp22.suse.cz>
-Message-ID: <1540882551.23278.12.camel@mtkswgap22>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 30 Oct 2018 10:49:03 +0100
+Subject: Clock configuration for the SAMA5D2 NAND controller
+In-Reply-To: <CAGkQfmMphvck9rraYq+o8zA254q7ETYyniiUV-QBsUR9X+OFKQ@mail.gmail.com>
+References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+ <CAGkQfmMphvck9rraYq+o8zA254q7ETYyniiUV-QBsUR9X+OFKQ@mail.gmail.com>
+Message-ID: <20181030104903.518f1fdd@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-10-30 at 07:06 +0100, Michal Hocko wrote:
-> On Tue 30-10-18 09:29:10, Miles Chen wrote:
-> > On Mon, 2018-10-29 at 09:17 +0100, Michal Hocko wrote:
-> > > On Mon 29-10-18 09:07:08, Michal Hocko wrote:
-> > > [...]
-> > > > Besides that, the following doesn't make much sense to me. It simply
-> > > > makes no sense to use vmalloc for sub page allocation regardless of
-> > > > HIGHMEM.
-> > > 
-> > > OK, it is still early morning here. Now I get the point of the patch.
-> > > You just want to (ab)use highmeme for smaller requests. I do not like
-> > > this, to be honest. It causes an internal fragmentation and more
-> > > importantly the VMALLOC space on 32b where HIGHMEM is enabled (do we
-> > > have any 64b with HIGHMEM btw?) is quite small to be wasted like that.
-> > > 
-> > thanks for your comment. It looks like that using vmalloc fallback for
-> > sub page allocation is not good here.
-> > 
-> > Your comment gave another idea:
-> > 
-> > 1. force kbuf to PAGE_SIZE
-> > 2. allocate a page by alloc_page(GFP_KERNEL | __GFP_HIGHMEM); so we can
-> > get a highmem page if possible
-> > 3. use kmap/kunmap pair to create mapping for this page. No vmalloc
-> > space is used.
-> > 4. do not change kvmalloc logic.
+Hi Romain,
+
+Romain Izard <romain.izard.pro@gmail.com> wrote on Wed, 17 Oct 2018
+12:42:28 +0200:
+
+> +linux-mtd, linux-clk
 > 
-> If you mean for this particular situation then is this really worth
-> it? I mean this is a short term allocation for root only so you do not
-> have to worry about low mem depletion.
+> Le mer. 10 oct. 2018 ? 19:05, Romain Izard
+> <romain.izard.pro@gmail.com> a ?crit :
+> >
+> > Hello,
+> >
+> > While evaluating a new flash memory chip for my product based on a SAMA5D2
+> > chip, I tried to update my software to use the latest device tree bindings.
+> >
+> > Until now, I was using the legacy bindings for the NAND controller, that
+> > preserved the timings configured by the bootloader in the EBI registers. The
+> > bindings introduced in Linux 4.13 are used together with the NAND driver to
+> > reconfigure the timings of the memory interface to match the speed profile
+> > declared by some NAND components.
+> >
+> > However, when comparing the timings in the registers, there was a large
+> > difference between what I calculated by hand in the past and the values
+> > configured by the drivers. The difference was in fact a 2 factor.
+> >
+> > For me, the issue is due to the clock configuration declared in the SAMA5D2
+> > device tree: The reference clock used by the nand-controller driver is the
+> > clock for its parent node, which is directly the Master Clock. And on my
+> > end, what I understood when writing the clock settings for my bootloader was
+> > that the reference clock was the HSMC clock, which derives from the H32MX
+> > clock, which runs at half the rate of the Master Clock.
+> >
+> > The documentation for the SAMA5D2 is not very precise on this topic, so I
+> > would like to have some feedback. Is the clock used as a reference for the
+> > chip select configuration registers the Master Clock itself, or is it the
+> > peripheral clock for the HSMC module ?
+> >
 
-The 1...3 are applied to print_page_owner(), not in kmalloc() or
-kvmalloc() logic. 
+FYI I had the same issue on the Marvell NAND controller: the actual
+frequency of the controller clock was half of the "parent" clock
+retrieved by clk_get_rate(), hence I needed to double the clock period
+for the timings derivation in ->setup_data_interface().
+
+If you can't get more feedback from SAMA5 people and if this works for
+you, please send a patch with a nice comment.
 
 
-It's a real problem when using page_owner.
-I found this issue recently: I'm not able to read page_owner information
-during a overnight test. (error: read failed: Out of memory). I replace
-kmalloc() with vmalloc() and it worked well.
-
-> 
-> If you are thiking in more generic terms to allow kmalloc to use highmem
-> then I am not really sure this will work out.
-
-I'm thinking about modify print_page_owner().
+Thanks,
+Miqu?l
