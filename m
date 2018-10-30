@@ -1,116 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 29 Oct 2018 16:52:05 -0700
-Subject: [PATCH 5/6] arm64: Utilize ARCH_HAS_PHYS_INITRD
-In-Reply-To: <20181029235206.30060-1-f.fainelli@gmail.com>
-References: <20181029235206.30060-1-f.fainelli@gmail.com>
-Message-ID: <20181029235206.30060-6-f.fainelli@gmail.com>
+From: miles.chen@mediatek.com (Miles Chen)
+Date: Tue, 30 Oct 2018 09:29:10 +0800
+Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
+In-Reply-To: <20181029081706.GC32673@dhcp22.suse.cz>
+References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
+ <20181029080708.GA32673@dhcp22.suse.cz>
+ <20181029081706.GC32673@dhcp22.suse.cz>
+Message-ID: <1540862950.12374.40.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 is the only architecture that re-defines
-__early_init_dt_declare_initrd() in order for that function to populate
-initrd_start/initrd_end with physical addresses instead of virtual
-addresses. Instead of having an override, just get rid of that
-implementation and select ARCH_HAS_PHYS_INITRD which would do that for
-us.
+On Mon, 2018-10-29 at 09:17 +0100, Michal Hocko wrote:
+> On Mon 29-10-18 09:07:08, Michal Hocko wrote:
+> [...]
+> > Besides that, the following doesn't make much sense to me. It simply
+> > makes no sense to use vmalloc for sub page allocation regardless of
+> > HIGHMEM.
+> 
+> OK, it is still early morning here. Now I get the point of the patch.
+> You just want to (ab)use highmeme for smaller requests. I do not like
+> this, to be honest. It causes an internal fragmentation and more
+> importantly the VMALLOC space on 32b where HIGHMEM is enabled (do we
+> have any 64b with HIGHMEM btw?) is quite small to be wasted like that.
+> 
+thanks for your comment. It looks like that using vmalloc fallback for
+sub page allocation is not good here.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm64/Kconfig              |  1 +
- arch/arm64/include/asm/memory.h |  8 --------
- arch/arm64/mm/init.c            | 23 +++++++++++------------
- 3 files changed, 12 insertions(+), 20 deletions(-)
+Your comment gave another idea:
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 964f682a2b7b..302fb721d412 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -21,6 +21,7 @@ config ARM64
- 	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
- 	select ARCH_HAS_KCOV
- 	select ARCH_HAS_MEMBARRIER_SYNC_CORE
-+	select ARCH_HAS_PHYS_INITRD
- 	select ARCH_HAS_PTE_SPECIAL
- 	select ARCH_HAS_SET_MEMORY
- 	select ARCH_HAS_SG_CHAIN
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index b96442960aea..dc3ca21ba240 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -168,14 +168,6 @@
- #define IOREMAP_MAX_ORDER	(PMD_SHIFT)
- #endif
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--#define __early_init_dt_declare_initrd(__start, __end)			\
--	do {								\
--		initrd_start = (__start);				\
--		initrd_end = (__end);					\
--	} while (0)
--#endif
--
- #ifndef __ASSEMBLY__
- 
- #include <linux/bitops.h>
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 3cf87341859f..fef9eb7fdb50 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -61,6 +61,8 @@
-  */
- s64 memstart_addr __ro_after_init = -1;
- phys_addr_t arm64_dma_phys_limit __ro_after_init;
-+phys_addr_t phys_initrd_start __initdata;
-+unsigned long phys_initrd_size __initdata;
- 
- #ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
-@@ -72,8 +74,8 @@ static int __init early_initrd(char *p)
- 	if (*endp == ',') {
- 		size = memparse(endp + 1, NULL);
- 
--		initrd_start = start;
--		initrd_end = start + size;
-+		phys_initrd_start = start;
-+		phys_initrd_size = size;
- 	}
- 	return 0;
- }
-@@ -408,14 +410,14 @@ void __init arm64_memblock_init(void)
- 		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
- 	}
- 
--	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
-+	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
- 		/*
- 		 * Add back the memory we just removed if it results in the
- 		 * initrd to become inaccessible via the linear mapping.
- 		 * Otherwise, this is a no-op
- 		 */
--		u64 base = initrd_start & PAGE_MASK;
--		u64 size = PAGE_ALIGN(initrd_end) - base;
-+		u64 base = phys_initrd_start & PAGE_MASK;
-+		u64 size = PAGE_ALIGN(phys_initrd_size);
- 
- 		/*
- 		 * We can only add back the initrd memory if we don't end up
-@@ -460,13 +462,10 @@ void __init arm64_memblock_init(void)
- 	 */
- 	memblock_reserve(__pa_symbol(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (initrd_start) {
--		memblock_reserve(initrd_start, initrd_end - initrd_start);
--
--		/* the generic initrd code expects virtual addresses */
--		initrd_start = __phys_to_virt(initrd_start);
--		initrd_end = __phys_to_virt(initrd_end);
--	}
-+	/* the generic initrd code expects virtual addresses */
-+	initrd_start = __phys_to_virt(phys_initrd_start);
-+	initrd_end = initrd_start + phys_initrd_size;
-+	initrd_below_start_ok = 0;
- #endif
- 
- 	early_init_fdt_scan_reserved_mem();
--- 
-2.17.1
+1. force kbuf to PAGE_SIZE
+2. allocate a page by alloc_page(GFP_KERNEL | __GFP_HIGHMEM); so we can
+get a highmem page if possible
+3. use kmap/kunmap pair to create mapping for this page. No vmalloc
+space is used.
+4. do not change kvmalloc logic.
+
+
+> In any case such a changes should come with some numbers and as a
+> separate patch for sure.
+> 
+> > > diff --git a/mm/util.c b/mm/util.c
+> > > index 8bf08b5b5760..7b1c59b9bfbf 100644
+> > > --- a/mm/util.c
+> > > +++ b/mm/util.c
+> > > @@ -416,10 +416,10 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
+> > >  	ret = kmalloc_node(size, kmalloc_flags, node);
+> > >  
+> > >  	/*
+> > > -	 * It doesn't really make sense to fallback to vmalloc for sub page
+> > > -	 * requests
+> > > +	 * It only makes sense to fallback to vmalloc for sub page
+> > > +	 * requests if we might be able to allocate highmem pages.
+> > >  	 */
+> > > -	if (ret || size <= PAGE_SIZE)
+> > > +	if (ret || (!IS_ENABLED(CONFIG_HIGHMEM) && size <= PAGE_SIZE))
+> > >  		return ret;
+> > >  
+> > >  	return __vmalloc_node_flags_caller(size, node, flags,
+> > > -- 
+> > > 2.18.0
+> > > 
+> > 
+> > -- 
+> > Michal Hocko
+> > SUSE Labs
+> 
