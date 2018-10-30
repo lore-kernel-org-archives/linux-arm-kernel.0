@@ -1,117 +1,144 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 30 Oct 2018 13:20:00 +0000
-Subject: [PATCH V8 5/5] firmware: imx: add SCU power domain driver
-In-Reply-To: <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
-References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
- <1540739690-23750-6-git-send-email-aisheng.dong@nxp.com>
- <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
-Message-ID: <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 30 Oct 2018 10:02:33 +0100
+Subject: [PATCH 3/3] drm/mediatek: Use drm_gem_cma_object instead of
+ mtk_drm_gem_obj
+In-Reply-To: <1540882471.31817.9.camel@mtksdaap41>
+References: <1540538523-1973-1-git-send-email-ck.hu@mediatek.com>
+ <1540538523-1973-4-git-send-email-ck.hu@mediatek.com>
+ <20181026102156.GH21967@phenom.ffwll.local>
+ <1540782676.13715.4.camel@mtksdaap41>
+ <20181029091619.GT21967@phenom.ffwll.local>
+ <1540882471.31817.9.camel@mtksdaap41>
+Message-ID: <20181030090233.GH21967@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-
-> }
-> > +
-> > +static struct imx_sc_pm_domain *
-> > +imx_scu_add_pm_domain(struct device *dev, int idx,
-> > +                     const struct imx_sc_pd_range *pd_ranges) {
-> > +       struct imx_sc_pm_domain *sc_pd;
-> > +       int ret;
-> > +
-> > +       sc_pd = devm_kzalloc(dev, sizeof(*sc_pd), GFP_KERNEL);
-> > +       if (!sc_pd)
-> > +               return ERR_PTR(-ENOMEM);
-> > +
-> > +       sc_pd->rsrc = pd_ranges->rsrc + idx;
-> > +       sc_pd->pd.power_off = imx_sc_pd_power_off;
-> > +       sc_pd->pd.power_on = imx_sc_pd_power_on;
+On Tue, Oct 30, 2018 at 02:54:31PM +0800, CK Hu wrote:
+> Hi, Daniel:
 > 
-> So, this means you are going to register one genpd per device (one for each
-> uart, pwm etc), but there is actually a better option.
+> On Mon, 2018-10-29 at 10:16 +0100, Daniel Vetter wrote:
+> > On Mon, Oct 29, 2018 at 11:11:16AM +0800, CK Hu wrote:
+> > > Hi,Daniel:
+> > > 
+> > > On Fri, 2018-10-26 at 12:21 +0200, Daniel Vetter wrote:
+> > > > On Fri, Oct 26, 2018 at 03:22:03PM +0800, CK Hu wrote:
+> > > > > After adding dma_dev in struct drm_device and
+> > > > > drm_gem_cma_dumb_create_no_kmap(), drm_gem_cma_object could replace
+> > > > > mtk_drm_gem_obj, so use drm_gem_cma_object instead of mtk_drm_gem_obj to
+> > > > > reduce redundant code.
+> > > > > 
+> > > > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
+> > > > 
+> > > > A few questions/thoughts:
+> > > > 
+> > > > - Why do you need both drm_device->dev and drm_device->dma_dev? Can't you
+> > > >   just register the drm_device with the right struct device?
+> > > > 
+> > > 
+> > > In [1], mmsys is the drm driver and ovl0 and ovl1 is the sub device
+> > > which has dma function.
+> > > In this drm, there are two crtc and each one is comprised of many
+> > > component.
+> > > This is an example of mt8173:
+> > > 
+> > > crtc0: ovl0, color0, aal, od, rdma0, ufoe, dsi0
+> > > crtc1: ovl1, color1, gamma, rdma1, dpi0
+> > > 
+> > > In the device node of ovl0 and ovl1, there is a 'iommus' parameter in
+> > > it, so use dma_alloc_xxx() and dma_map_xxx() with that device would get
+> > > iova rather than pa. I don't think it's a good idea to register ovl0 or
+> > > ovl1 as drm device because each one is just a component in a pipeline.
+> > > mmsys controls the clock and routing of multi-media system which include
+> > > this drm system, so it's better to register mmsys as drm device. Maybe
+> > > we could move 'iommus' parameter from ovl device to mmsys device, so the
+> > > dma device changes from ovl device to mmsys device. I'm not sure this
+> > > would be a good choice, how do you think?
+> > > 
+> > > [1]
+> > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/mediatek/mt8173.dtsi?h=v4.19
+> > 
+> > Ah ok. But if you have 2 blocks that make up the overall drm device, why
+> > don't you need to switch at runtime between them? I.e. buffer allocated
+> > for crtc0 needs to be dma-mapped to crtc0, buffer allocated to crtc1 needs
+> > to be dma-mapped on crtc1?
+> > 
+> > And if they're both the exact same iommu, then imo it would make indeed
+> > sense to move the iommu attribute up. Since your current code cant'
+> > actually handle truly separate dma-mappings. And neither can your patch
+> > series here handled separate iommu for crtc0 and crtc1.
 > 
-> What you seems to be needing is a way to "power on/off" devices, rather than
-> the PM domain. Right? The PM domain, is managed internally by the FW, no?
+> Yes, they're the exact same iommu. So I would move iommu attribute up.
+> 
+> > 
+> > > > - You don't use drm_gem_prime_import_dev, so prime import isn't using the
+> > > >   right device either.
+> > > 
+> > > Yes, you are right. I'm not familiar with whore drm core, so I start to
+> > > modify what Mediatek drm use. But this function still works for the drm
+> > > device that itself is dma device. If one day there is a drm device which
+> > > itself is not a dma device and need this function, send a patch to
+> > > modify this function and test it with that drm device. If you want me to
+> > > modify all in advance, I'm ok but need others to test it because
+> > > Mediatek drm driver does not use them.
+> > 
+> > I meant to say that mediatek should use drm_gem_prime_import_dev, but
+> > currently isn't using that. And your patch series here doesn't fix that
+> > either. So there's more bugs left in this area.
+> 
+> Great, you find a bug. My test only include export but not import. This
+> would take time to generate import-test environment.
+
+igt has a bunch of import tests for display iirc, using vgem.
+
+> > > > - exynos seems to have the same or at least similar issue, stronger case
+> > > >   for your patches if you can solve both.
+> > > 
+> > > I'm still Mediatek's employee. If I modify other company's driver and it
+> > > is not a MUST-BE for Mediatek, Mediatek may think I give contribution to
+> > > other company. So I've better not to modify exynos driver.
+> > 
+> > This isn't how upstream works :-)
+> 
+> OK, because now I would not modify drm core, I would focus on Mediatek
+> drm driver first. If the modification of exynos driver is easy, I could
+> try. But if the modification of exynos is huge, I suggest that someone
+> who is familiar with exynos driver and have exynos platform to do it.
+
+Since we now clarified that you only have 1 iommu (and that it's kinda
+misplaced in the DT) I think exonys is a different case. This was more
+about your original patch series, which looked like exynos could need too.
+-Daniel
+
+> 
+> Regards,
+> CK
+> > 
+> > > > - I'd start out with using struct drm_gem_cma_object in mtk (similar to
+> > > >   what vc4 does), and then reusing as much as possible of the existing
+> > > >   helpers. And then looking later on what's still left (like the support
+> > > >   for leaving out the virtual mapping).
+> > > 
+> > > I'm not clear what vc4 does. It looks like that you want me to redefine
+> > > mtk_drm_gem_obj based on drm_gem_cma_object. So it would be like
+> > > 
+> > > struct mtk_drm_gem_obj {
+> > > 	struct drm_gem_cma_object base;
+> > > 	void *cookie;
+> > > 	unsigned long dma_attrs;
+> > > };
+> > > 
+> > > I could try to modify as this and see what have left.
+> > 
+> > Yup, that's my suggestion. Then we can look at what mtk can use unchanged
+> > from the core helpers. And what would need to change and so better
+> > evaluate whether it makes sense to do that.
+> > 
+> > I still think just moving the iommu is probably best.
+> > -Daniel
+> 
 > 
 
-Yes, you're right.
-
-> In any case, it looks like what you should do is to implement the
-> ->attach|detach_dev() callback for the genpd and use the regular
-> of_genpd_add_provider_simple(). From within the ->attach_dev(), you should
-> get the OF node for the device that is being attached and then parse the
-> power-domain cell containing the "resource id" and store that in the per device
-> struct generic_pm_domain_data (we have void pointer there for storing these
-> kind of things).
-> 
-> Additionally, you need to implement the ->stop() and ->start() callbacks of
-> genpd, which is where you "power on/off" devices, rather than using the above
-> ->power_on|off() callbacks.
-> 
-> Please have a look a drivers/soc/ti/ti_sci_pm_domains.c. Apologize, I should
-> have pointed you towards that reference already in the earlier version.
-> 
-
-Appreciated for such detailed explanation. lt's a good suggestion and I really like to
-switch to it.  However, after digged a bit more, i found a few blocking issues:
-1. The .attach_dev() of power domain infrastructure still does not support multi domains case.
-
-It looks like there's no way for .attach_dev() to understand which sub 'power domain'
-the device is attaching for one global power domain provider like ti_sci as you suggested.
-Secondly, the struct device *dev passed into is a virtual PD device. It does not help
-for parsing the real device resource id. 
-
-So framework probably needs some extension to support multi power domain cases.
-
-2. It also breaks most of current drivers as the driver probe sequence behavior changed
-If removing .power_on() and .power_off() callback and use .start() and .stop() instead.
-
-genpd_dev_pm_attach will only power up the domain and attach device, but will not call .start()
-which relies on device runtime pm. That means the device power is still not up before
-running driver probe function. For SCU enabled platforms, all device drivers accessing registers/clock
-without power domain enabled will trigger a HW access error. That means we need fix most
-of drivers probe sequence with proper runtime pm. So I'm a bit wondering whether we should
-still keep the exist way.
-
-In summary, we probably may not be able to try ti_sci way before fixing above two issues.
-
-Do you think I should wait for them to be fixed or if we could use the current way at first?
-I might be a little intend to the second way as we now have a lot upstreaming work pending on
-this. But please let me know if you have a different idea.
-
-Regards
-Dong Aisheng
-
-> > +
-> > +       if (pd_ranges->postfix)
-> > +               snprintf(sc_pd->name, sizeof(sc_pd->name),
-> > +                        "%s%i", pd_ranges->name, idx);
-> > +       else
-> > +               snprintf(sc_pd->name, sizeof(sc_pd->name),
-> > +                        "%s", pd_ranges->name);
-> > +
-> > +       sc_pd->pd.name = sc_pd->name;
-> > +
-> > +       if (sc_pd->rsrc >= IMX_SC_R_LAST) {
-> > +               dev_warn(dev, "invalid pd %s rsrc id %d found",
-> > +                        sc_pd->name, sc_pd->rsrc);
-> > +
-> > +               devm_kfree(dev, sc_pd);
-> > +               return NULL;
-> > +       }
-> > +
-> > +       ret = pm_genpd_init(&sc_pd->pd, NULL, true);
-> > +       if (ret) {
-> > +               dev_warn(dev, "failed to init pd %s rsrc id %d",
-> > +                        sc_pd->name, sc_pd->rsrc);
-> > +               devm_kfree(dev, sc_pd);
-> > +               return NULL;
-> > +       }
-> > +
-> > +       return sc_pd;
-> > +}
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
