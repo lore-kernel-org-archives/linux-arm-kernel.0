@@ -1,54 +1,38 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 30 Oct 2018 14:56:41 +0000
-Subject: [PATCH V3 4/8] dt-bindings: i2c: i2c-imx-lpi2c: add imx8qxp
- compatible string
-In-Reply-To: <20181028221952.GF1882@kunai>
-References: <1539886483-15775-1-git-send-email-aisheng.dong@nxp.com>
- <1539886483-15775-5-git-send-email-aisheng.dong@nxp.com>
- <20181028221952.GF1882@kunai>
-Message-ID: <AM0PR04MB42110EB0836E9610CDA2746680CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Tue, 30 Oct 2018 16:10:07 +0100
+Subject: [BUG] MVPP2 driver exploding in presence of a tap interface
+In-Reply-To: <6bf82e04-5463-aa7d-bbac-f09519ff9815@arm.com>
+References: <6355174d-4ab6-595d-17db-311bce607aef@arm.com>
+ <20181030105015.GB3407@kwain>
+ <7bd72963-1e7c-5175-ba88-fc020d786f0c@arm.com>
+ <CAPv3WKfn6QFPnNjpY2dU5-OHftObzdcrHopX8Y9w5h37Zd4BNw@mail.gmail.com>
+ <20181030140056.2fc69efc@windsurf>
+ <6bf82e04-5463-aa7d-bbac-f09519ff9815@arm.com>
+Message-ID: <20181030161007.360d5a53@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hello,
 
-[...]
+On Tue, 30 Oct 2018 14:55:01 +0000, Marc Zyngier wrote:
 
-> Hi,
+> > I.e, isn't the firmware fix papering over a bug that should be fixed in
+> > Linux mvpp2 driver anyway ?  
 > 
-> On Thu, Oct 18, 2018 at 06:19:29PM +0000, A.s. Dong wrote:
-> > Add imx8qxp compatible string
-> >
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Wolfram Sang <wsa@the-dreams.de>
-> > Cc: linux-i2c at vger.kernel.org
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Absolutely. Leaving this unpatched in the kernel, with a 100% chance of
+> memory corruption is just mad.
 > 
-> Doesn't apply...
-> 
-> >    - "fsl,imx8dv-lpi2c" for LPI2C compatible with the one integrated
-> > on i.MX8DV soc
-> 
-> ... I don't have this line in my tree.
-> 
+> I'm pretty sure there should be a way to sanely reset the interface
+> before it starts repainting the memory.
 
-It seems to be caused by the following commit during the 4.19 RC2+.
-f6eb89349078 dt-bindings: imx-lpi2c: Remove mx8dv compatible entry
+I agree here. Do you still have an image of that old firmware version,
+so that we can try to reproduce, and see if we can come up with a way
+to reset the BM on boot up that would avoid this issue ?
 
-> Would you maybe volunteer to maintain this driver? To prevent stuff like this
-> from happening? :)
+Thanks,
 
-Sure, I will open an eye on this driver patches from now on.
-And I will resend the patch against your tree.
-
-Thanks
-
-Regards
-Dong Aisheng
-
-> 
-> Regards,
-> 
->    Wolfram
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
