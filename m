@@ -1,141 +1,45 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 30 Oct 2018 10:18:08 -0700
-Subject: [PATCH] soc: ti: QMSS: Fix usage of irq_set_affinity_hint
-In-Reply-To: <20181030111103.12110-1-marc.zyngier@arm.com>
-References: <20181030111103.12110-1-marc.zyngier@arm.com>
-Message-ID: <ea4e3273-39da-d9f9-49ce-f18268767ce3@oracle.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Tue, 30 Oct 2018 13:40:27 -0400
+Subject: [PATCH] ARM: kprobes: Fix false positive with FORTIFY_SOURCE
+In-Reply-To: <20181022093023.GA8920@beast>
+References: <20181022093023.GA8920@beast>
+Message-ID: <cbeccaf1-33ec-0e54-0cfa-8cff81bbc1cd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On 10/30/2018 4:11 AM, Marc Zyngier wrote:
-> The Keystone QMSS driver is pretty damaged, in the sense that it
-> does things like this:
+On 10/22/18 5:30 AM, Kees Cook wrote:
+> The arm compiler internally interprets an inline assembly label
+> as an unsigned long value, not a pointer. As a result, under
+> CONFIG_FORTIFY_SOURCE, the size of the array pointed to by an address
+> of a label is 4 bytes, which was tripping the runtime checks. Instead,
+> we can just cast the label (as done with the size calculations earlier)
+> to avoid the problem.
 > 
-> 	irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
-> 
-> where cpu_map is a local variable. As we leave the function, this
-> will point to nowhere-land, and things will end-up badly.
-> 
-> Instead, let's use a proper cpumask that gets allocated, giving
-> the driver a chance to actually work with things like irqbalance
-> as well as have a hypothetical 64bit future.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Reported-by: William Cohen <wcohen@redhat.com>
+> Fixes: 6974f0c4555e ("include/linux/string.h: add the option of fortified string.h functions")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 > ---
-> I found this one by inspection after finding a similar bug in an
-> unrelated driver. It is only compile-tested. It would probably
-> a Cc stable, but that's Santosh's decision.
+>  arch/arm/probes/kprobes/opt-arm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+> index b2aa9b32bff2..2c118a6ab358 100644
+> --- a/arch/arm/probes/kprobes/opt-arm.c
+> +++ b/arch/arm/probes/kprobes/opt-arm.c
+> @@ -247,7 +247,7 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
+>  	}
+>  
+>  	/* Copy arch-dep-instance from template. */
+> -	memcpy(code, &optprobe_template_entry,
+> +	memcpy(code, (unsigned char *)optprobe_template_entry,
+>  			TMPL_END_IDX * sizeof(kprobe_opcode_t));
+>  
+>  	/* Adjust buffer according to instruction. */
+> 
 
-Would be able to apply this fix from Marc for stable or it needs
-to be re-posted with CC to stable ?
+The patch fixes the issue for kretprobes.  It looks good to me.
 
-> 
->   drivers/soc/ti/knav_qmss.h       |  4 ++--
->   drivers/soc/ti/knav_qmss_acc.c   | 10 +++++-----
->   drivers/soc/ti/knav_qmss_queue.c | 22 +++++++++++++++-------
->   3 files changed, 22 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
-> index 3efc47e82973..bd040c29c4bf 100644
-> --- a/drivers/soc/ti/knav_qmss.h
-> +++ b/drivers/soc/ti/knav_qmss.h
-> @@ -329,8 +329,8 @@ struct knav_range_ops {
->   };
->   
->   struct knav_irq_info {
-> -	int	irq;
-> -	u32	cpu_map;
-> +	int		irq;
-> +	struct cpumask	*cpu_mask;
->   };
->   
->   struct knav_range_info {
-> diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
-> index 316e82e46f6c..2f7fb2dcc1d6 100644
-> --- a/drivers/soc/ti/knav_qmss_acc.c
-> +++ b/drivers/soc/ti/knav_qmss_acc.c
-> @@ -205,18 +205,18 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
->   {
->   	struct knav_device *kdev = range->kdev;
->   	struct knav_acc_channel *acc;
-> -	unsigned long cpu_map;
-> +	struct cpumask *cpu_mask;
->   	int ret = 0, irq;
->   	u32 old, new;
->   
->   	if (range->flags & RANGE_MULTI_QUEUE) {
->   		acc = range->acc;
->   		irq = range->irqs[0].irq;
-> -		cpu_map = range->irqs[0].cpu_map;
-> +		cpu_mask = range->irqs[0].cpu_mask;
->   	} else {
->   		acc = range->acc + queue;
->   		irq = range->irqs[queue].irq;
-> -		cpu_map = range->irqs[queue].cpu_map;
-> +		cpu_mask = range->irqs[queue].cpu_mask;
->   	}
->   
->   	old = acc->open_mask;
-> @@ -239,8 +239,8 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
->   			acc->name, acc->name);
->   		ret = request_irq(irq, knav_acc_int_handler, 0, acc->name,
->   				  range);
-> -		if (!ret && cpu_map) {
-> -			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
-> +		if (!ret && cpu_mask) {
-> +			ret = irq_set_affinity_hint(irq, cpu_mask);
->   			if (ret) {
->   				dev_warn(range->kdev->dev,
->   					 "Failed to set IRQ affinity\n");
-> diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-> index b5d5673c255c..8b418379272d 100644
-> --- a/drivers/soc/ti/knav_qmss_queue.c
-> +++ b/drivers/soc/ti/knav_qmss_queue.c
-> @@ -118,19 +118,17 @@ static int knav_queue_setup_irq(struct knav_range_info *range,
->   			  struct knav_queue_inst *inst)
->   {
->   	unsigned queue = inst->id - range->queue_base;
-> -	unsigned long cpu_map;
->   	int ret = 0, irq;
->   
->   	if (range->flags & RANGE_HAS_IRQ) {
->   		irq = range->irqs[queue].irq;
-> -		cpu_map = range->irqs[queue].cpu_map;
->   		ret = request_irq(irq, knav_queue_int_handler, 0,
->   					inst->irq_name, inst);
->   		if (ret)
->   			return ret;
->   		disable_irq(irq);
-> -		if (cpu_map) {
-> -			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
-> +		if (range->irqs[queue].cpu_mask) {
-> +			ret = irq_set_affinity_hint(irq, range->irqs[queue].cpu_mask);
->   			if (ret) {
->   				dev_warn(range->kdev->dev,
->   					 "Failed to set IRQ affinity\n");
-> @@ -1262,9 +1260,19 @@ static int knav_setup_queue_range(struct knav_device *kdev,
->   
->   		range->num_irqs++;
->   
-> -		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3)
-> -			range->irqs[i].cpu_map =
-> -				(oirq.args[2] & 0x0000ff00) >> 8;
-> +		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3) {
-> +			unsigned long mask;
-> +			int bit;
-> +
-> +			range->irqs[i].cpu_mask = devm_kzalloc(dev,
-> +							       cpumask_size(), GFP_KERNEL);
-> +			if (!range->irqs[i].cpu_mask)
-> +				return -ENOMEM;
-> +
-> +			mask = (oirq.args[2] & 0x0000ff00) >> 8;
-> +			for_each_set_bit(bit, &mask, BITS_PER_LONG)
-> +				cpumask_set_cpu(bit, range->irqs[i].cpu_mask);
-> +		}
->   	}
->   
->   	range->num_irqs = min(range->num_irqs, range->num_queues);
-> 
+Thanks,
+
+-Will
