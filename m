@@ -1,19 +1,45 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 30 Oct 2018 15:13:58 +0100
-Subject: [PATCH] arm64: dts: rockchip: enable HS200 for eMMC on rock64
-In-Reply-To: <20181020175756.28072-1-anarsoul@gmail.com>
-References: <20181020175756.28072-1-anarsoul@gmail.com>
-Message-ID: <2163438.OLGNrv2Hku@phil>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Tue, 30 Oct 2018 08:38:17 -0500
+Subject: [PATCHv4 0/2] iommu/arm-smmu: Add Stratix10 SMMU Support
+In-Reply-To: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <65377977-8534-557a-b77b-f5f8f6962385@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 20. Oktober 2018, 19:57:56 CET schrieb Vasily Khoruzhick:
-> eMMC that's sold by Pine64 can do HS200, rk3328 can do it
-> as well, so update DTS to enable it.
+Gentle ping...
+
+On 10/05/2018 03:56 PM, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> Add SMMU support for the Stratix10 SOCFPGA. This patch requires
+> clock enables for the master TBUs and therefore has a dependency
+> on patches currently being reviewed.
+> 
+> This patchset is dependent on the patch series [1]
+> 
+> v4  Address Vivek's comment.
+>      Abandon dependency on [2] (no recent activity/reviews)
+>      Implement device tree parsing of clock on top of [1].
+> v3  Address comment from Robin and change dependency on device
+>      tree bulk clock patches [2].
+> v2  Change to dependency on [1].
+> 
+> [1] [v16,0/5] iommu/arm-smmu: Add runtime pm/sleep support
+> https://patchwork.kernel.org/cover/10581891/
+> 
+> [2] [PATCH V6 0/4] clk: new APIs to handle all available clocks
+> https://lkml.org/lkml/2018/8/31/97
+> 
+> Thor Thayer (2):
+>    arm64: dts: stratix10: Add Stratix10 SMMU support
+>    iommu/arm-smmu: Get clock config from device tree
+> 
+>   arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 29 ++++++++++++++++++++++
+>   drivers/iommu/arm-smmu.c                          | 30 ++++++++++++++++++++---
+>   2 files changed, 56 insertions(+), 3 deletions(-)
+> 
 
-applied for 4.21 or whatever it will get called
-
-Thanks
-Heiko
+Any comments on this patchset? I realize the dependency still needs to 
+be accepted but the clock portion of the dependency which is what this 
+patch builds on hasn't changed in the last iterations.
