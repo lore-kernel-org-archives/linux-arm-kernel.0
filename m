@@ -1,31 +1,22 @@
-From: qiangqing.zhang@nxp.com (Joakim Zhang)
-Date: Tue, 30 Oct 2018 08:42:33 +0000
-Subject: [PATCH V2 0/3] ARM: dts: sabreauto: Add flexcan support
-Message-ID: <20181030083954.26440-1-qiangqing.zhang@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Oct 2018 14:19:39 +0100
+Subject: [PATCH 6/6] gpio: gpio-zynq: simplify getting .driver_data
+In-Reply-To: <20181021200002.1472-7-wsa+renesas@sang-engineering.com>
+References: <20181021200002.1472-1-wsa+renesas@sang-engineering.com>
+ <20181021200002.1472-7-wsa+renesas@sang-engineering.com>
+Message-ID: <CACRpkdawU7QaQEmM0-o=FBB9=-EYBUs9Rt2=Y_ZTF5xiL69Rdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series intends to add flexcan support for IMX6 platforms.
+On Sun, Oct 21, 2018 at 10:00 PM Wolfram Sang
+<wsa+renesas@sang-engineering.com> wrote:
 
-ChangeLog:
-V1-V2:
- *using SPDX tag for new files and remove pinctrl-assert-gpios property.
+> We should get 'driver_data' from 'struct device' directly. Going via
+> platform_device is an unneeded step back and forth.
+>
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Dong Aisheng (3):
-  ARM: dts: imx6sx-sdb: Add flexcan support
-  ARM: dts: imx6sx-sabreauto: Add flexcan support
-  ARM: dts: sabreauto: Add flexcan support
+Patch applied.
 
- .../boot/dts/imx6dl-sabreauto-flexcan1.dts    | 14 +++++
- .../arm/boot/dts/imx6q-sabreauto-flexcan1.dts | 14 +++++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi      | 47 +++++++++++++++
- arch/arm/boot/dts/imx6sx-sabreauto.dts        | 57 +++++++++++++++++++
- arch/arm/boot/dts/imx6sx-sdb-reva.dts         | 12 ++++
- arch/arm/boot/dts/imx6sx-sdb.dts              |  5 ++
- arch/arm/boot/dts/imx6sx-sdb.dtsi             | 42 ++++++++++++++
- 7 files changed, 191 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
- create mode 100644 arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
-
--- 
-2.17.1
+Yours,
+Linus Walleij
