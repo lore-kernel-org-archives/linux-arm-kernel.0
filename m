@@ -1,44 +1,101 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Oct 2018 09:32:39 +0000
-Subject: [PATCH 4/6] of/fdt: Populate phys_initrd_start/phys_initrd_size
- from FDT
-In-Reply-To: <20181029235206.30060-5-f.fainelli@gmail.com>
-References: <20181029235206.30060-1-f.fainelli@gmail.com>
- <20181029235206.30060-5-f.fainelli@gmail.com>
-Message-ID: <20181030093239.GJ30658@n2100.armlinux.org.uk>
+From: yinbo.zhu@nxp.com (Yinbo Zhu)
+Date: Tue, 30 Oct 2018 03:39:13 +0000
+Subject: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
+In-Reply-To: <VI1PR04MB4976D4A33E0561D125BE837486F30@VI1PR04MB4976.eurprd04.prod.outlook.com>
+References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
+ <1540759926-3641-3-git-send-email-vabhav.sharma@nxp.com>
+ <VI1PR04MB4976D4A33E0561D125BE837486F30@VI1PR04MB4976.eurprd04.prod.outlook.com>
+Message-ID: <VI1PR04MB41589506EDE16676AB561FBDE9CC0@VI1PR04MB4158.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 04:52:04PM -0700, Florian Fainelli wrote:
-> If the architecture implements ARCH_HAS_PHYS_INITRD, make the FDT
-> scanning code populate the physical address of the start of the FDT and
-> its size.
+
+
+-----Original Message-----
+From: Poonam Aggrwal 
+Sent: 2018?10?29? 19:09
+To: Vabhav Sharma <vabhav.sharma@nxp.com>; sudeep.holla at arm.com; oss at buserror.net; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; robh+dt at kernel.org; mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com; sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org; linux-clk at vger.kernel.org; linux-pm at vger.kernel.org; linux-kernel-owner at vger.kernel.org; catalin.marinas at arm.com; will.deacon at arm.com; gregkh at linuxfoundation.org; arnd at arndb.de; kstewart at linuxfoundation.org; yamada.masahiro at socionext.com; Leo Li <leoyang.li@nxp.com>; shawnguo at kernel.org
+Cc: ulf.hansson at linaro.org; Udit Kumar <udit.kumar@nxp.com>; Pankaj Bansal <pankaj.bansal@nxp.com>; linux at armlinux.org.uk; adrian.hunter at intel.com; Varun Sethi <V.Sethi@nxp.com>; Vabhav Sharma <vabhav.sharma@nxp.com>; Yinbo Zhu <yinbo.zhu@nxp.com>
+Subject: RE: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
+
+
+
+> -----Original Message-----
+> From: linux-arm-kernel 
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Vabhav Sharma
+> Sent: Monday, October 29, 2018 2:28 PM
+> To: sudeep.holla at arm.com; oss at buserror.net; 
+> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; 
+> robh+dt at kernel.org; mark.rutland at arm.com; 
+> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org;
+> mturquette at baylibre.com; sboyd at kernel.org; rjw at rjwysocki.net; 
+> viresh.kumar at linaro.org; linux-clk at vger.kernel.org; 
+> linux-pm at vger.kernel.org; linux-kernel-owner at vger.kernel.org; 
+> catalin.marinas at arm.com; will.deacon at arm.com; 
+> gregkh at linuxfoundation.org; arnd at arndb.de; 
+> kstewart at linuxfoundation.org; yamada.masahiro at socionext.com; Leo Li 
+> <leoyang.li@nxp.com>; shawnguo at kernel.org
+> Cc: ulf.hansson at linaro.org; Udit Kumar <udit.kumar@nxp.com>; Pankaj 
+> Bansal <pankaj.bansal@nxp.com>; linux at armlinux.org.uk; 
+> adrian.hunter at intel.com; Varun Sethi <V.Sethi@nxp.com>; Vabhav Sharma 
+> <vabhav.sharma@nxp.com>; Yinbo Zhu <yinbo.zhu@nxp.com>
+> Subject: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Adding compatible string "lx2160a-dcfg" to initialize guts driver for 
+> lx2160 and SoC die attribute definition for LX2160A
+> 
+> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
+> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
+> Acked-by: Li Yang <leoyang.li@nxp.com>
 > ---
->  arch/arm/mm/init.c | 2 +-
->  drivers/of/fdt.c   | 4 ++++
->  2 files changed, 5 insertions(+), 1 deletion(-)
+>  drivers/soc/fsl/guts.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 8f364aa24172..517e95cfb5d2 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -237,7 +237,7 @@ static void __init arm_initrd_init(void)
->  	phys_addr_t start;
->  	unsigned long size;
->  
-> -	/* FDT scan will populate initrd_start */
-> +	/* FDT scan will populate initrd_start and phys_initrd_start */
->  	if (initrd_start && !phys_initrd_size) {
->  		phys_initrd_start = __virt_to_phys(initrd_start);
->  		phys_initrd_size = initrd_end - initrd_start;
+> diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c index 
+> 302e0c8..bcab1ee 100644
+> --- a/drivers/soc/fsl/guts.c
+> +++ b/drivers/soc/fsl/guts.c
+> @@ -100,6 +100,11 @@ static const struct fsl_soc_die_attr fsl_soc_die[] = {
+>  	  .svr		= 0x87000000,
+>  	  .mask		= 0xfff70000,
+>  	},
+> +	/* Die: LX2160A, SoC: LX2160A/LX2120A/LX2080A */
+> +	{ .die          = "LX2160A",
+> +	  .svr          = 0x87360000,
+>Do all  the threevariants " LX2160A/LX2120A/LX2080A"  have same SVR?
+Dear Poonam Aggrwal,
 
-We should be able to delete the whole if () { } block and comment as
-a result of this series - it was added by Rob in 65939301acdb to
-unify the DT initrd code.
+No, but the threevariants " LX2160A/LX2120A/LX2080A" has same svr value in this struct,
+Because they all are variants of lx2160, the svr value in this struct is equal the soc svr && mask
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Best Regards,
+Yinbo Zhu.
+
+> +	  .mask         = 0xff3f0000,
+> +	},
+>  	{ },
+>  };
+> 
+> @@ -222,6 +227,7 @@ static const struct of_device_id fsl_guts_of_match[] = {
+>  	{ .compatible = "fsl,ls1088a-dcfg", },
+>  	{ .compatible = "fsl,ls1012a-dcfg", },
+>  	{ .compatible = "fsl,ls1046a-dcfg", },
+> +	{ .compatible = "fsl,lx2160a-dcfg", },
+>  	{}
+>  };
+>  MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
+> --
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
+> s.infr
+> adead.org%2Fmailman%2Flistinfo%2Flinux-arm-
+> kernel&amp;data=02%7C01%7Cpoonam.aggrwal%40nxp.com%7Cd9b7c36c786
+> 54cd6dc4008d63d7fee63%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0
+> %7C636764017001504288&amp;sdata=pqFMlw6yVrHrvn4YRhqj%2FmoOnSscrZu
+> tcoYn3In8OJc%3D&amp;reserved=0
