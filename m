@@ -1,112 +1,182 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 30 Oct 2018 16:07:17 -0700
-Subject: [PATCH v2 2/6] arch: Make phys_initrd_start and phys_initrd_size
- global variables
+Date: Tue, 30 Oct 2018 16:07:21 -0700
+Subject: [PATCH v2 6/6] arch: Move initrd= parsing into do_mounts_initrd.c
 In-Reply-To: <20181030230721.28429-1-f.fainelli@gmail.com>
 References: <20181030230721.28429-1-f.fainelli@gmail.com>
-Message-ID: <20181030230721.28429-3-f.fainelli@gmail.com>
+Message-ID: <20181030230721.28429-7-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make phys_initrd_start and phys_initrd_size global variables declared in
-init/do_mounts_initrd.c such that we can later have generic code in
-drivers/of/fdt.c populate those variables for us.
-
-This requires both the ARM and unicore32 implementations to be properly
-guarded against CONFIG_BLK_DEV_INITRD, and also initialize the variables
-to the expected default values (unicore32).
+ARC, ARM, ARM64 and Unicore32 are all capable of parsing the "initrd="
+command line parameter to allow specifying the physical address and size
+of an initrd. Move that parsing into init/do_mounts_initrd.c such that
+we no longer duplicate that logic.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mm/init.c       |  5 ++---
- arch/unicore32/mm/init.c | 10 +++++++---
- include/linux/initrd.h   |  3 +++
- init/do_mounts_initrd.c  |  3 +++
- 4 files changed, 15 insertions(+), 6 deletions(-)
+ arch/arc/mm/init.c       | 25 +++++--------------------
+ arch/arm/mm/init.c       | 17 -----------------
+ arch/arm64/mm/init.c     | 18 ------------------
+ arch/unicore32/mm/init.c | 18 ------------------
+ init/do_mounts_initrd.c  | 17 +++++++++++++++++
+ 5 files changed, 22 insertions(+), 73 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 0cc8e04295a4..87d59a53861d 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -51,9 +51,7 @@ unsigned long __init __clear_cr(unsigned long mask)
+diff --git a/arch/arc/mm/init.c b/arch/arc/mm/init.c
+index ba145065c579..369d3d699929 100644
+--- a/arch/arc/mm/init.c
++++ b/arch/arc/mm/init.c
+@@ -79,24 +79,6 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+ 		base, TO_MB(size), !in_use ? "Not used":"");
  }
+ 
+-#ifdef CONFIG_BLK_DEV_INITRD
+-static int __init early_initrd(char *p)
+-{
+-	unsigned long start, size;
+-	char *endp;
+-
+-	start = memparse(p, &endp);
+-	if (*endp == ',') {
+-		size = memparse(endp + 1, NULL);
+-
+-		initrd_start = (unsigned long)__va(start);
+-		initrd_end = (unsigned long)__va(start + size);
+-	}
+-	return 0;
+-}
+-early_param("initrd", early_initrd);
+-#endif
+-
+ /*
+  * First memory setup routine called from setup_arch()
+  * 1. setup swapper's mm @init_mm
+@@ -141,8 +123,11 @@ void __init setup_arch_memory(void)
+ 	memblock_reserve(low_mem_start, __pa(_end) - low_mem_start);
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+-	if (initrd_start)
+-		memblock_reserve(__pa(initrd_start), initrd_end - initrd_start);
++	if (phys_initrd_size) {
++		memblock_reserve(phys_initrd_start, phys_initrd_size);
++		initrd_start = __va(phys_initrd_start);
++		initrd_end = initrd_start + phys_initrd_size;
++	}
  #endif
  
--static phys_addr_t phys_initrd_start __initdata = 0;
--static unsigned long phys_initrd_size __initdata = 0;
+ 	early_init_fdt_reserve_self();
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 4bfa08e27319..58ec68709606 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -52,23 +52,6 @@ unsigned long __init __clear_cr(unsigned long mask)
+ #endif
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+-static int __init early_initrd(char *p)
+-{
+-	phys_addr_t start;
+-	unsigned long size;
+-	char *endp;
 -
-+#ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
+-	start = memparse(p, &endp);
+-	if (*endp == ',') {
+-		size = memparse(endp + 1, NULL);
+-
+-		phys_initrd_start = start;
+-		phys_initrd_size = size;
+-	}
+-	return 0;
+-}
+-early_param("initrd", early_initrd);
+-
+ static int __init parse_tag_initrd(const struct tag *tag)
  {
- 	phys_addr_t start;
-@@ -90,6 +88,7 @@ static int __init parse_tag_initrd2(const struct tag *tag)
- }
+ 	pr_warn("ATAG_INITRD is deprecated; "
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index e95cee656a55..9045afacd10b 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -62,24 +62,6 @@
+ s64 memstart_addr __ro_after_init = -1;
+ phys_addr_t arm64_dma_phys_limit __ro_after_init;
  
- __tagtable(ATAG_INITRD2, parse_tag_initrd2);
-+#endif
- 
- static void __init find_limits(unsigned long *min, unsigned long *max_low,
- 			       unsigned long *max_high)
+-#ifdef CONFIG_BLK_DEV_INITRD
+-static int __init early_initrd(char *p)
+-{
+-	unsigned long start, size;
+-	char *endp;
+-
+-	start = memparse(p, &endp);
+-	if (*endp == ',') {
+-		size = memparse(endp + 1, NULL);
+-
+-		phys_initrd_start = start;
+-		phys_initrd_size = size;
+-	}
+-	return 0;
+-}
+-early_param("initrd", early_initrd);
+-#endif
+-
+ #ifdef CONFIG_KEXEC_CORE
+ /*
+  * reserve_crashkernel() - reserves memory for crash kernel
 diff --git a/arch/unicore32/mm/init.c b/arch/unicore32/mm/init.c
-index 8f8699e62bd5..f2f815d46846 100644
+index f2f815d46846..99acdb829a7e 100644
 --- a/arch/unicore32/mm/init.c
 +++ b/arch/unicore32/mm/init.c
-@@ -31,9 +31,7 @@
+@@ -31,24 +31,6 @@
  
  #include "mm.h"
  
--static unsigned long phys_initrd_start __initdata = 0x01000000;
--static unsigned long phys_initrd_size __initdata = SZ_8M;
+-#ifdef CONFIG_BLK_DEV_INITRD
+-static int __init early_initrd(char *p)
+-{
+-	unsigned long start, size;
+-	char *endp;
 -
-+#ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
- {
- 	unsigned long start, size;
-@@ -49,6 +47,7 @@ static int __init early_initrd(char *p)
- 	return 0;
- }
- early_param("initrd", early_initrd);
-+#endif
- 
+-	start = memparse(p, &endp);
+-	if (*endp == ',') {
+-		size = memparse(endp + 1, NULL);
+-
+-		phys_initrd_start = start;
+-		phys_initrd_size = size;
+-	}
+-	return 0;
+-}
+-early_param("initrd", early_initrd);
+-#endif
+-
  /*
   * This keeps memory configuration data used by a couple memory
-@@ -157,6 +156,11 @@ void __init uc32_memblock_init(struct meminfo *mi)
- 	memblock_reserve(__pa(_text), _end - _text);
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-+	if (!phys_initrd_size) {
-+		phys_initrd_start = 0x01000000;
-+		phys_initrd_size = SZ_8M;
-+	}
-+
- 	if (phys_initrd_size) {
- 		memblock_reserve(phys_initrd_start, phys_initrd_size);
- 
-diff --git a/include/linux/initrd.h b/include/linux/initrd.h
-index 84b423044088..14beaff9b445 100644
---- a/include/linux/initrd.h
-+++ b/include/linux/initrd.h
-@@ -21,4 +21,7 @@ extern int initrd_below_start_ok;
- extern unsigned long initrd_start, initrd_end;
- extern void free_initrd_mem(unsigned long, unsigned long);
- 
-+extern phys_addr_t phys_initrd_start;
-+extern unsigned long phys_initrd_size;
-+
- extern unsigned int real_root_dev;
+  * initialization functions, as well as show_mem() for the skipping
 diff --git a/init/do_mounts_initrd.c b/init/do_mounts_initrd.c
-index d1a5d885ce13..45865b72f4ea 100644
+index 45865b72f4ea..732d21f4a637 100644
 --- a/init/do_mounts_initrd.c
 +++ b/init/do_mounts_initrd.c
-@@ -16,6 +16,9 @@ int initrd_below_start_ok;
- unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
- static int __initdata mount_initrd = 1;
+@@ -27,6 +27,23 @@ static int __init no_initrd(char *str)
  
-+phys_addr_t phys_initrd_start __initdata;
-+unsigned long phys_initrd_size __initdata;
+ __setup("noinitrd", no_initrd);
+ 
++static int __init early_initrd(char *p)
++{
++	phys_addr_t start;
++	unsigned long size;
++	char *endp;
 +
- static int __init no_initrd(char *str)
++	start = memparse(p, &endp);
++	if (*endp == ',') {
++		size = memparse(endp + 1, NULL);
++
++		phys_initrd_start = start;
++		phys_initrd_size = size;
++	}
++	return 0;
++}
++early_param("initrd", early_initrd);
++
+ static int init_linuxrc(struct subprocess_info *info, struct cred *new)
  {
- 	mount_initrd = 0;
+ 	ksys_unshare(CLONE_FS | CLONE_FILES);
 -- 
 2.17.1
