@@ -1,67 +1,130 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Oct 2018 10:13:42 +0000
-Subject: Warnings in arch/arm64/mm/dma-mapping.c
-In-Reply-To: <20181030074344.GA24697@lst.de>
-References: <a771d5ce-28a2-609e-5fd7-338fadc20743@gmail.com>
- <20181030074344.GA24697@lst.de>
-Message-ID: <20181030101342.GC19955@arm.com>
+From: qiangqing.zhang@nxp.com (Joakim Zhang)
+Date: Tue, 30 Oct 2018 08:42:38 +0000
+Subject: [PATCH V2 1/3] ARM: dts: imx6sx-sdb: Add flexcan support
+In-Reply-To: <20181030083954.26440-1-qiangqing.zhang@nxp.com>
+References: <20181030083954.26440-1-qiangqing.zhang@nxp.com>
+Message-ID: <20181030083954.26440-2-qiangqing.zhang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 08:43:44AM +0100, Christoph Hellwig wrote:
-> On Mon, Oct 29, 2018 at 04:51:47PM -0700, Florian Fainelli wrote:
-> > I have not a chance to run a bisection yet, but I suspect this is coming
-> > from Christoph's latest batch of DMA-API changes in ARM64 under the
-> > merge commit befa93633193e5327e4045d1e5fa29114580fa5d ("Merge tag
-> > 'dma-mapping-4.20-1' of git://git.infradead.org/users/hch/dma-mapping"),
-> > here are the warnings:
-> 
-> This should fix it:
+From: Dong Aisheng <aisheng.dong@nxp.com>
 
-Tested-by: Will Deacon <will.deacon@arm.com>
+CAN transceiver is different on RevA and RevB board.
+It's active high on RevA while active low on Rev B.
 
-I guess Catalin can pick this up for -rc1, since there's also the kprobes
-RO fix kicking around for arm64?
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
+---
+ arch/arm/boot/dts/imx6sx-sdb-reva.dts | 12 ++++++++
+ arch/arm/boot/dts/imx6sx-sdb.dts      |  5 ++++
+ arch/arm/boot/dts/imx6sx-sdb.dtsi     | 42 +++++++++++++++++++++++++++
+ 3 files changed, 59 insertions(+)
 
-Will
-
-> ---
-> From 773c5e097c5cf3868443ffb79ae64d79f70e3ccf Mon Sep 17 00:00:00 2001
-> From: Christoph Hellwig <hch@lst.de>
-> Date: Tue, 30 Oct 2018 09:41:29 +0200
-> Subject: arm64: fix warnings without CONFIG_IOMMU_DMA
-> 
-> __swiotlb_get_sgtable_page and __swiotlb_mmap_pfn are not only misnamed
-> but also only used if CONFIG_IOMMU_DMA is set.  Just add a simple ifdef
-> for now, given that we plan to remove them entirely for the next merge
-> window.
-> 
-> Reported-by: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/arm64/mm/dma-mapping.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index d190612b8f33..560756a7290e 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -160,6 +160,7 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
->  	__dma_unmap_area(phys_to_virt(paddr), size, dir);
->  }
->  
-> +#ifdef CONFIG_IOMMU_DMA
->  static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
->  				      struct page *page, size_t size)
->  {
-> @@ -188,6 +189,7 @@ static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
->  
->  	return ret;
->  }
-> +#endif /* CONFIG_IOMMU_DMA */
->  
->  static int __init atomic_pool_init(void)
->  {
-> -- 
-> 2.19.1
-> 
+diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+index 9cc6ff206aea..d98dcf00b9c4 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+@@ -10,6 +10,18 @@
+ 
+ / {
+ 	model = "Freescale i.MX6 SoloX SDB RevA Board";
++
++	/* Transceiver EN/STBY is active high on RevA board */
++	reg_can_en: regulator-can-en {
++		gpio = <&gpio4 25 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_can_stby: regulator-can-stby {
++		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		vin-supply = <&reg_can_en>;
++	};
+ };
+ 
+ &i2c1 {
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 6dd9bebfe027..092b8de142a8 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -10,6 +10,11 @@
+ 
+ / {
+ 	model = "Freescale i.MX6 SoloX SDB RevB Board";
++
++	/* Transceiver EN/STBY is active low on RevB board */
++	reg_can_stby: regulator-can-stby {
++		gpio = <&gpio4 27 GPIO_ACTIVE_LOW>;
++	};
+ };
+ 
+ &i2c1 {
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index 53b3408b5fab..4de2473293aa 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -138,6 +138,20 @@
+ 		regulator-max-microvolt = <5000000>;
+ 	};
+ 
++	reg_can_en: regulator-can-en {
++		compatible = "regulator-fixed";
++		regulator-name = "can-en";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	reg_can_stby: regulator-can-stby {
++		compatible = "regulator-fixed";
++		regulator-name = "can-stby";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
+ 	sound {
+ 		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
+ 		model = "wm8962-audio";
+@@ -204,6 +218,20 @@
+ 	status = "okay";
+ };
+ 
++&flexcan1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	xceiver-supply = <&reg_can_stby>;
++	status = "okay";
++};
++
++&flexcan2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	xceiver-supply = <&reg_can_stby>;
++	status = "okay";
++};
++
+ &i2c3 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -399,6 +427,20 @@
+ 			>;
+ 		};
+ 
++		pinctrl_flexcan1: flexcan1grp {
++			fsl,pins = <
++				MX6SX_PAD_QSPI1B_DQS__CAN1_TX		0x1b020
++				MX6SX_PAD_QSPI1A_SS1_B__CAN1_RX		0x1b020
++			>;
++		};
++
++		pinctrl_flexcan2: flexcan2grp {
++			fsl,pins = <
++				MX6SX_PAD_QSPI1B_SS1_B__CAN2_RX		0x1b020
++				MX6SX_PAD_QSPI1A_DQS__CAN2_TX		0x1b020
++			>;
++		};
++
+ 		pinctrl_gpio_keys: gpio_keysgrp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_CSI_DATA04__GPIO1_IO_18 0x17059
+-- 
+2.17.1
