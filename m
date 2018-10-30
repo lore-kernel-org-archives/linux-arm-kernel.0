@@ -1,48 +1,131 @@
-From: anders.roxell@linaro.org (Anders Roxell)
-Date: Tue, 30 Oct 2018 12:35:45 +0100
-Subject: [PATCH v2 2/2] writeback: don't decrement wb->refcnt if !wb->bdi
-In-Reply-To: <20181030113545.30999-1-anders.roxell@linaro.org>
-References: <20181030113545.30999-1-anders.roxell@linaro.org>
-Message-ID: <20181030113545.30999-2-anders.roxell@linaro.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 30 Oct 2018 15:18:28 +0800
+Subject: [PATCH] perf cs-etm: Correct CPU mode for samples
+Message-ID: <1540883908-17018-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This happened while running in qemu-system-aarch64, the AMBA PL011 UART
-driver when enabling CONFIG_DEBUG_TEST_DRIVER_REMOVE.
-arch_initcall(pl011_init) came before subsys_initcall(default_bdi_init),
-devtmpfs' handle_remove() crashes because the reference count is a NULL
-pointer only because wb->bdi hasn't been initialized yet.
+Since commit 9042f5e3539e ("perf tools: Stop fallbacking to kallsyms
+for vdso symbols lookup"), the kernel address cannot be properly parsed
+to kernel symbol with command 'perf script -k vmlinux'.  The reason is
+CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
+thus it fails to find corresponding map/dso in below flows:
 
-Rework so that wb_put have an extra check if wb->bdi before decrement
-wb->refcnt and also add a WARN_ON_ONCE to get a warning if it happens again
-in other drivers.
+  process_sample_event()
+    `-> machine__resolve()
+	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
 
-Fixes: 52ebea749aae ("writeback: make backing_dev_info host cgroup-specific bdi_writebacks")
-Co-developed-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+In this flow it needs to pass argument 'sample->cpumode' to tell what's
+the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
+any failure until the commit 9042f5e3539e ("perf tools: Stop fallbacking
+to kallsyms for vdso symbols lookup") has been merged.  The reason is
+even with the wrong CPU mode the function thread__find_map() firstly
+fails to find map but it will rollback to find kernel map for vdso
+symbols lookup.  In the latest code it has removed the fallback code,
+thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
+anymore with kernel address.
+
+This patch is to correct samples CPU mode setting, it creates a new
+helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
+the address with the info from machine structure; this patch has a bit
+extension to check not only kernel and user mode, but also check for
+host/guest and hypervisor mode.  Finally this patch uses the function
+in instruction and branch samples and also apply in cs_etm__mem_access()
+for a minor polishing.
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- include/linux/backing-dev-defs.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ tools/perf/util/cs-etm.c | 39 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 30 insertions(+), 9 deletions(-)
 
-diff --git a/include/linux/backing-dev-defs.h b/include/linux/backing-dev-defs.h
-index 9a6bc0951cfa..c31157135598 100644
---- a/include/linux/backing-dev-defs.h
-+++ b/include/linux/backing-dev-defs.h
-@@ -258,6 +258,14 @@ static inline void wb_get(struct bdi_writeback *wb)
-  */
- static inline void wb_put(struct bdi_writeback *wb)
- {
-+	if (WARN_ON_ONCE(!wb->bdi)) {
-+		/*
-+		 * A driver bug might cause a file to be removed before bdi was
-+		 * initialized.
-+		 */
-+		return;
-+	}
-+
- 	if (wb != &wb->bdi->wb)
- 		percpu_ref_put(&wb->refcnt);
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 3b37d66..73430b7 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -244,6 +244,27 @@ static void cs_etm__free(struct perf_session *session)
+ 	zfree(&aux);
  }
+ 
++static u8 cs_etm__cpu_mode(struct cs_etm_queue *etmq, u64 address)
++{
++	struct machine *machine;
++
++	machine = etmq->etm->machine;
++
++	if (address >= etmq->etm->kernel_start) {
++		if (machine__is_host(machine))
++			return PERF_RECORD_MISC_KERNEL;
++		else
++			return PERF_RECORD_MISC_GUEST_KERNEL;
++	} else {
++		if (machine__is_host(machine))
++			return PERF_RECORD_MISC_USER;
++		else if (perf_guest)
++			return PERF_RECORD_MISC_GUEST_USER;
++		else
++			return PERF_RECORD_MISC_HYPERVISOR;
++	}
++}
++
+ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
+ 			      size_t size, u8 *buffer)
+ {
+@@ -258,10 +279,7 @@ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
+ 		return -1;
+ 
+ 	machine = etmq->etm->machine;
+-	if (address >= etmq->etm->kernel_start)
+-		cpumode = PERF_RECORD_MISC_KERNEL;
+-	else
+-		cpumode = PERF_RECORD_MISC_USER;
++	cpumode = cs_etm__cpu_mode(etmq, address);
+ 
+ 	thread = etmq->thread;
+ 	if (!thread) {
+@@ -653,7 +671,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
+ 	struct perf_sample sample = {.ip = 0,};
+ 
+ 	event->sample.header.type = PERF_RECORD_SAMPLE;
+-	event->sample.header.misc = PERF_RECORD_MISC_USER;
++	event->sample.header.misc = cs_etm__cpu_mode(etmq, addr);
+ 	event->sample.header.size = sizeof(struct perf_event_header);
+ 
+ 	sample.ip = addr;
+@@ -665,7 +683,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
+ 	sample.cpu = etmq->packet->cpu;
+ 	sample.flags = 0;
+ 	sample.insn_len = 1;
+-	sample.cpumode = event->header.misc;
++	sample.cpumode = event->sample.header.misc;
+ 
+ 	if (etm->synth_opts.last_branch) {
+ 		cs_etm__copy_last_branch_rb(etmq);
+@@ -706,12 +724,15 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
+ 		u64			nr;
+ 		struct branch_entry	entries;
+ 	} dummy_bs;
++	u64 ip;
++
++	ip = cs_etm__last_executed_instr(etmq->prev_packet);
+ 
+ 	event->sample.header.type = PERF_RECORD_SAMPLE;
+-	event->sample.header.misc = PERF_RECORD_MISC_USER;
++	event->sample.header.misc = cs_etm__cpu_mode(etmq, ip);
+ 	event->sample.header.size = sizeof(struct perf_event_header);
+ 
+-	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
++	sample.ip = ip;
+ 	sample.pid = etmq->pid;
+ 	sample.tid = etmq->tid;
+ 	sample.addr = cs_etm__first_executed_instr(etmq->packet);
+@@ -720,7 +741,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
+ 	sample.period = 1;
+ 	sample.cpu = etmq->packet->cpu;
+ 	sample.flags = 0;
+-	sample.cpumode = PERF_RECORD_MISC_USER;
++	sample.cpumode = event->sample.header.misc;
+ 
+ 	/*
+ 	 * perf report cannot handle events without a branch stack
 -- 
-2.19.1
+2.7.4
