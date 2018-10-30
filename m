@@ -1,101 +1,75 @@
-From: yinbo.zhu@nxp.com (Yinbo Zhu)
-Date: Tue, 30 Oct 2018 03:39:13 +0000
-Subject: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
-In-Reply-To: <VI1PR04MB4976D4A33E0561D125BE837486F30@VI1PR04MB4976.eurprd04.prod.outlook.com>
-References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
- <1540759926-3641-3-git-send-email-vabhav.sharma@nxp.com>
- <VI1PR04MB4976D4A33E0561D125BE837486F30@VI1PR04MB4976.eurprd04.prod.outlook.com>
-Message-ID: <VI1PR04MB41589506EDE16676AB561FBDE9CC0@VI1PR04MB4158.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 30 Oct 2018 14:36:37 +0800
+Subject: [PATCH i2c-next v8 5/5] i2c: aspeed: Add bus idle waiting logic
+ for multi-master use cases
+In-Reply-To: <20181029211414.20771-6-jae.hyun.yoo@linux.intel.com>
+References: <20181029211414.20771-6-jae.hyun.yoo@linux.intel.com>
+Message-ID: <201810301404.KLB29BHz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jae,
 
+Thank you for the patch! Yet something to improve:
 
------Original Message-----
-From: Poonam Aggrwal 
-Sent: 2018?10?29? 19:09
-To: Vabhav Sharma <vabhav.sharma@nxp.com>; sudeep.holla at arm.com; oss at buserror.net; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; robh+dt at kernel.org; mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com; sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org; linux-clk at vger.kernel.org; linux-pm at vger.kernel.org; linux-kernel-owner at vger.kernel.org; catalin.marinas at arm.com; will.deacon at arm.com; gregkh at linuxfoundation.org; arnd at arndb.de; kstewart at linuxfoundation.org; yamada.masahiro at socionext.com; Leo Li <leoyang.li@nxp.com>; shawnguo at kernel.org
-Cc: ulf.hansson at linaro.org; Udit Kumar <udit.kumar@nxp.com>; Pankaj Bansal <pankaj.bansal@nxp.com>; linux at armlinux.org.uk; adrian.hunter at intel.com; Varun Sethi <V.Sethi@nxp.com>; Vabhav Sharma <vabhav.sharma@nxp.com>; Yinbo Zhu <yinbo.zhu@nxp.com>
-Subject: RE: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
+[auto build test ERROR on wsa/i2c/for-next]
+[also build test ERROR on v4.19 next-20181029]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
+url:    https://github.com/0day-ci/linux/commits/Jae-Hyun-Yoo/i2c-aspeed-Add-bus-idle-waiting-logic-for-multi-master-use-cases/20181030-051719
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
+config: arm-multi_v5_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
+All errors (new ones prefixed by >>):
 
-> -----Original Message-----
-> From: linux-arm-kernel 
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> On Behalf Of Vabhav Sharma
-> Sent: Monday, October 29, 2018 2:28 PM
-> To: sudeep.holla at arm.com; oss at buserror.net; 
-> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; 
-> robh+dt at kernel.org; mark.rutland at arm.com; 
-> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org;
-> mturquette at baylibre.com; sboyd at kernel.org; rjw at rjwysocki.net; 
-> viresh.kumar at linaro.org; linux-clk at vger.kernel.org; 
-> linux-pm at vger.kernel.org; linux-kernel-owner at vger.kernel.org; 
-> catalin.marinas at arm.com; will.deacon at arm.com; 
-> gregkh at linuxfoundation.org; arnd at arndb.de; 
-> kstewart at linuxfoundation.org; yamada.masahiro at socionext.com; Leo Li 
-> <leoyang.li@nxp.com>; shawnguo at kernel.org
-> Cc: ulf.hansson at linaro.org; Udit Kumar <udit.kumar@nxp.com>; Pankaj 
-> Bansal <pankaj.bansal@nxp.com>; linux at armlinux.org.uk; 
-> adrian.hunter at intel.com; Varun Sethi <V.Sethi@nxp.com>; Vabhav Sharma 
-> <vabhav.sharma@nxp.com>; Yinbo Zhu <yinbo.zhu@nxp.com>
-> Subject: [PATCH v7 2/6] soc/fsl/guts: Add definition for LX2160A
-> 
-> Adding compatible string "lx2160a-dcfg" to initialize guts driver for 
-> lx2160 and SoC die attribute definition for LX2160A
-> 
-> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
-> Acked-by: Li Yang <leoyang.li@nxp.com>
-> ---
->  drivers/soc/fsl/guts.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c index 
-> 302e0c8..bcab1ee 100644
-> --- a/drivers/soc/fsl/guts.c
-> +++ b/drivers/soc/fsl/guts.c
-> @@ -100,6 +100,11 @@ static const struct fsl_soc_die_attr fsl_soc_die[] = {
->  	  .svr		= 0x87000000,
->  	  .mask		= 0xfff70000,
->  	},
-> +	/* Die: LX2160A, SoC: LX2160A/LX2120A/LX2080A */
-> +	{ .die          = "LX2160A",
-> +	  .svr          = 0x87360000,
->Do all  the threevariants " LX2160A/LX2120A/LX2080A"  have same SVR?
-Dear Poonam Aggrwal,
+   drivers/i2c//busses/i2c-aspeed.c: In function 'aspeed_i2c_check_bus_busy':
+>> drivers/i2c//busses/i2c-aspeed.c:617:12: error: 'struct aspeed_i2c_bus' has no member named 'slave_state'; did you mean 'master_state'?
+          bus->slave_state == ASPEED_I2C_SLAVE_STOP)
+               ^~~~~~~~~~~
+               master_state
 
-No, but the threevariants " LX2160A/LX2120A/LX2080A" has same svr value in this struct,
-Because they all are variants of lx2160, the svr value in this struct is equal the soc svr && mask
+vim +617 drivers/i2c//busses/i2c-aspeed.c
 
-Best Regards,
-Yinbo Zhu.
+   604	
+   605	static int aspeed_i2c_check_bus_busy(struct aspeed_i2c_bus *bus)
+   606	{
+   607		unsigned long check_started;
+   608	
+   609		if (bus->multi_master) {
+   610			might_sleep();
+   611			check_started = jiffies;
+   612		}
+   613	
+   614		for (;;) {
+   615			if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
+   616			      ASPEED_I2CD_BUS_BUSY_STS) &&
+ > 617			    bus->slave_state == ASPEED_I2C_SLAVE_STOP)
+   618				return 0;
+   619			if (!bus->multi_master)
+   620				break;
+   621			if (time_after(jiffies, check_started + bus->adap.timeout))
+   622				break;
+   623			usleep_range((ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US >> 2) + 1,
+   624				     ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US);
+   625		}
+   626	
+   627		return aspeed_i2c_recover_bus(bus);
+   628	}
+   629	
 
-> +	  .mask         = 0xff3f0000,
-> +	},
->  	{ },
->  };
-> 
-> @@ -222,6 +227,7 @@ static const struct of_device_id fsl_guts_of_match[] = {
->  	{ .compatible = "fsl,ls1088a-dcfg", },
->  	{ .compatible = "fsl,ls1012a-dcfg", },
->  	{ .compatible = "fsl,ls1046a-dcfg", },
-> +	{ .compatible = "fsl,lx2160a-dcfg", },
->  	{}
->  };
->  MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
-> --
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
-> s.infr
-> adead.org%2Fmailman%2Flistinfo%2Flinux-arm-
-> kernel&amp;data=02%7C01%7Cpoonam.aggrwal%40nxp.com%7Cd9b7c36c786
-> 54cd6dc4008d63d7fee63%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0
-> %7C636764017001504288&amp;sdata=pqFMlw6yVrHrvn4YRhqj%2FmoOnSscrZu
-> tcoYn3In8OJc%3D&amp;reserved=0
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 30010 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181030/2e20b451/attachment-0001.gz>
