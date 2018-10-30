@@ -1,306 +1,98 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 30 Oct 2018 12:33:39 +0530
-Subject: [PATCH] x86_64,
- vmcoreinfo: Append 'page_offset_base' to vmcoreinfo
-In-Reply-To: <20181030020752.GB11408@MiWiFi-R3L-srv>
-References: <1540593788-28181-1-git-send-email-bhsharma@redhat.com>
- <20181027100241.GB1884@MiWiFi-R3L-srv>
- <CACi5LpPf9Zr1beowRNGmLZY7DtS3JDt8D=FONjqas9yo7TyCjg@mail.gmail.com>
- <20181030020752.GB11408@MiWiFi-R3L-srv>
-Message-ID: <CACi5LpP0_s9zAF+QfKpU+kG6BKqqkiwQhcW-WFZ0=SnBeX7ZXA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 30 Oct 2018 15:06:24 +0200
+Subject: [PATCH v12 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1540887143-27904-1-git-send-email-yong.deng@magewell.com>
+References: <1540887143-27904-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <308184907.pMD7ZDI2dr@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baoquan,
+Hi Yong,
 
-On Tue, Oct 30, 2018 at 7:37 AM Baoquan He <bhe@redhat.com> wrote:
->
-> On 10/29/18 at 04:07pm, Bhupesh Sharma wrote:
-> > I am sorry, I understand that the commit log is a bit long and
->
-> Yes, it's too long. Please summarize well so that it can save reviewers'
-> time.
+Thank you for the patch.
 
-I have tried to include all the points in the log which might be
-relevant to folks (there
-are user-space utility maintainers in Cc as well) who might not be
-aware of complete
-background on this (especially the kernel side of the things), while I
-am discussing the
-user-space changes with them :)
+On Tuesday, 30 October 2018 10:12:23 EET Yong Deng wrote:
+> Add binding documentation for Allwinner V3s CSI.
+> 
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
 
-> > probably this part
-> > is not easy to infer. Currently, I see that the 'makedumpfile' utility
-> > is broken with newer kernels
-> > (I tested on 4.19-rc8+) as we KCORE_REMAP  was added to recent kernels
-> > thus leading to an additional section in kcore.
-> > [see <http://lists.infradead.org/pipermail/kexec/2018-October/021769.html>
-> > for details].
->
-> Why it's broken? Have you investigated and figured out why it's broken?
-> If fix, what patch will it look like? Does the patch prove it's not
-> worth using the current way?
->
-> Have you thought about this in advance? Or still like before, you said
-> on arm64 you found different boards have different behaviour, then
-> makedumpfile maintainer Kazu said he investigated and found it may be
-> caused by KALSR. This time, for this KCORE_REMAP adding, can you help to
-> investigate further and give an answer to the issue you found and
-> raised?
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Ofcourse, the patchset which added vmcoreinfo into kcore was discussed
-and it was agreed that this was a better approach to move forward and hence
-accepted in mainline.
-
-Regarding the makedumpfile issue, I have already provided a detailed
-reply to Kazu (you are Cc'ed on the thread) and also proposed a
-makedumpfile approach which
-reads the 'page_offset_base' value from kcore (using the kernel
-interface provided by this patch),
-[on which you are Cc'ed as well]:
-
-[1]. https://www.spinics.net/lists/kexec/msg21717.html
-[2]. https://www.spinics.net/lists/kexec/msg21722.html
-
-Again I think we are discussing on a wrong tangent here. The idea is
-not limited to only makedumpfile - it
-affects other user-space utilities (like crash) which are used for
-live debugging a running kernel.
-
-> > The details of the makedumpfile utility can be seen via the man page
-> > [MAKEDUMPFILE(8)],
-> > but in short it tries to make a small DUMPFILE by compressing dump
-> > data or by excluding
-> > unnecessary pages for analysis, or both.
-> >
-> > However the bigger problem is how we export machine specific details
-> > from kernel-space
-> > to user-land in a standardized way. As I mentioned in brief in the git
-> > log, I was seeing
-> > issues when I upgrade kernels or try to bring up user-space utilities
-> > on newer hardware,
-> > as currently we use different (and often flaky approaches) to
-> > calculate machine specific details in
-> > user-space code as there used to be lack of a clear ABI between the
-> > kernel and user-space on how
-> > machine specific details would be shared.
-> >
-> > Later on, kernel commit 23c85094fe1895caefdd came, which adds
-> > vmcoreinfo to 'kcore',
-> > as an arch agnostic approach to unify the differences existing in
-> > exporting kernel space information
-> > to the user-space code and James suggested that I use the same for
-> > user-space purposes to fix
-> > the issues I was observing.
-> >
-> > > Sorry I didn't get what problem this patch is trying to fix from the
-> > > patch log.
-> >
-> > So, here since the 'page_offset_base' variable (which holds the start
-> > of direct mapping of all physical
-> > memory) is not exported by the x86_64 kernel to the user-space via a
-> > standard interface, we resort
-> > to calculating the same via reading PT_LOADs in user-space (as an
-> > example from the makedumpfile
-> > implementation ). Now this implementation is usually different across
-> > user-space utilities.
-> >
-> > Also, if the PT_LOAD ordering changes (as we saw with the newer
-> > kernels), this approach will need
-> > fixing to calculate the addresses. In addition, we normally need
-> > 'page_offset_base' value in user-space (and retrieve it via
-> > vmlinux file in another user case from the same makedumpfile code) for
-> > calculating the start of direct mapping of all physical
-> > memory specifically for KASLR boot cases.
-> >
-> > Instead, if we can export 'page_offset_base' via vmcoreinfo, we can
-> > easily use the same
-> > for live-debugging a running kernel via user-space utilities, which
-> > can benefit by reading this value
-> > from the vmcoreinfo note inside kcore directly without relying on other methods.
->
-> We have got a method, what's wrong with that? Only KCORE_REMAP adding,
-> again? if fix, what is the defect? Where's patch, analysis, only one
-> sentence to say KCORE_REMAP caused that?
-
-Please see above, this is not limited to one use-case of makedumpfile
-tool. Also, it extends
-to other user-space utilities (like crash) as well.
-
-See, why would we want to have every user-space utility implement a
-different mechanism for solving the same problem, right? If a standard interface
-is available from the kernel side we better use the same across all user-land.
-
-Plus, if this interface (vmcoreinfo in kcore) is available from the
-kernel side for all archs (like it is currently), it solves
-another set of problem in the user-space tools, i.e. we don't need to
-keep different arch specific
-implementations across different user-space tool (see [1] above for
-e.g., both x86_64 and arm64 makedumpfile code
-bases use an almost similar approach now). I understand that such
-changes are always
-obstructive, but hopefully it saves us the effort to manage
-differences across user-land in the longer run.
-
-So, via this patch I propose that the kernel export 'page_offset_base'
-variable via vmcoreinfo
-and user-space uses its uniformly to determine the start of direct
-mapping of all physical
-memory.
-
-Hope this clarifies the background.
-
-Regads,
-Bhupesh
+> ---
+>  .../devicetree/bindings/media/sun6i-csi.txt        | 56 +++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
+> 100644
+> index 000000000000..443e18c181b3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> @@ -0,0 +1,56 @@
+> +Allwinner V3s Camera Sensor Interface
+> +-------------------------------------
+> +
+> +Allwinner V3s SoC features a CSI module(CSI1) with parallel interface.
+> +
+> +Required properties:
+> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> +  - reg: base address and size of the memory-mapped region.
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the CSI
+> +    * bus: the CSI interface clock
+> +    * mod: the CSI module clock
+> +    * ram: the CSI DRAM clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandles to the reset line driving the CSI
+> +
+> +The CSI node should contain one 'port' child node with one child 'endpoint'
+> +node, according to the bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Endpoint node properties for CSI
+> +---------------------------------
+> +See the video-interfaces.txt for a detailed description of these
+> properties. +- remote-endpoint	: (required) a phandle to the bus receiver's
+> endpoint +			   node
+> +- bus-width:		: (required) must be 8, 10, 12 or 16
+> +- pclk-sample		: (optional) (default: sample on falling edge)
+> +- hsync-active		: (required; parallel-only)
+> +- vsync-active		: (required; parallel-only)
+> +
+> +Example:
+> +
+> +csi1: csi at 1cb4000 {
+> +	compatible = "allwinner,sun8i-v3s-csi";
+> +	reg = <0x01cb4000 0x1000>;
+> +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&ccu CLK_BUS_CSI>,
+> +		 <&ccu CLK_CSI1_SCLK>,
+> +		 <&ccu CLK_DRAM_CSI>;
+> +	clock-names = "bus", "mod", "ram";
+> +	resets = <&ccu RST_BUS_CSI>;
+> +
+> +	port {
+> +		/* Parallel bus endpoint */
+> +		csi1_ep: endpoint {
+> +			remote-endpoint = <&adv7611_ep>;
+> +			bus-width = <16>;
+> +
+> +			/* If hsync-active/vsync-active are missing,
+> +			   embedded BT.656 sync is used */
+> +			hsync-active = <0>; /* Active low */
+> +			vsync-active = <0>; /* Active low */
+> +			pclk-sample = <1>;  /* Rising */
+> +		};
+> +	};
+> +};
 
 
-> >
-> > The x86_64 kernel code ('arch/x86/kernel/head64.c'), already sets the same as:
-> > unsigned long page_offset_base __ro_after_init = __PAGE_OFFSET_BASE_L4;
-> >
-> > and also uses the same to indicate the base of KASLR regions on x86_64:
-> > static __initdata struct kaslr_memory_region {
-> >     unsigned long *base;
-> >     unsigned long size_tb;
-> > } kaslr_regions[] = {
-> >     { &page_offset_base, 0 },
-> >
-> > so it can be used for both the above purposes across user-space utilities.
-> >
-> > Hope this explains the intention behind this patch.
-> >
-> > Thanks,
-> > Bhupesh
-> >
-> > > About this, I have replied to you in
-> > > lkml.kernel.org/r/20181025063446.GD2120 at MiWiFi-R3L-srv
-> > > You might miss it.
-> > >
-> > > About this exporting, I ever posted patch to upstream and we have had
-> > > discussion, please check
-> > > https://lore.kernel.org/patchwork/patch/723472/
-> > >
-> > > In makedumpfile and crash, we have had a clear method to analyze and
-> > > deduce it from kcore or vmcore.
-> > >
-> > > Thanks
-> > > Baoquan
-> > >
-> > > On 10/27/18 at 04:13am, Bhupesh Sharma wrote:
-> > > > Since commit 23c85094fe1895caefdd
-> > > > ["proc/kcore: add vmcoreinfo note to /proc/kcore"]), '/proc/kcore'
-> > > > contains a new PT_NOTE which carries the VMCOREINFO information.
-> > > >
-> > > > If the same is available, one can use it in user-land to
-> > > > retrieve machine specific symbols or strings being appended to the
-> > > > vmcoreinfo even for live-debugging of the primary kernel as a
-> > > > standard interface exposed by kernel for sharing machine specific
-> > > > details with the user-land.
-> > > >
-> > > > In the past I had a discussion with James, where he suggested this
-> > > > approach (please see [0]) and I really liked the idea. Since then I
-> > > > have been working on unifying the implementations of
-> > > > (atleast) the commonly used user-space utilities that provide
-> > > > live-debugging capabilities (tools like 'makedumpfile' and
-> > > > 'crash-utility', see [1] for details of these tools).
-> > > >
-> > > > For the same, when live debugging on x86_64 machines, user-space
-> > > > tools currently rely on different mechanisms to determine
-> > > > the 'page_offset_base' value (i.e. start of direct mapping of all
-> > > > physical memory). One of the approach used by 'makedumpfile'
-> > > > user-space tool for e.g. is to calculate the same from the last
-> > > > PT_LOAD available in '/proc/kcore', which can be flaky as and when
-> > > > new sections (for e.g. KCORE_REMAP which was added
-> > > > to recent kernels) are added to kcore.
-> > > >
-> > > > For other architectures like arm64, I have already proposed using
-> > > > the vmcoreinfo note (in '/proc/kcore') in the user-space utilities to
-> > > > determine machine specific details like VA_BITS, PAGE_OFFSET,
-> > > > kasrl_offset() (see [2] for details), for which different user-space
-> > > > tools earlier used different (and at times flaky) approaches like:
-> > > >
-> > > > - Reading kernel CONFIGs from user-space and determining CONFIG values
-> > > >    like VA_BITS from there.
-> > > >  - Reading symbols from '/proc/kallsyms' and determining their values
-> > > >    via '/dev/mem' interface.
-> > > >  - Reading symbols from 'vmlinux' and determing their values from
-> > > >    reading memory.
-> > > >
-> > > > This patch allows appending 'page_offset_base' for x86_64 platforms
-> > > > to vmcoreinfo, so that user-space tools can use the same as a standard
-> > > > interface to determine the start of direct mapping of all physical
-> > > > memory.
-> > > >
-> > > > Testing:
-> > > > -------
-> > > >  - I tested this patch (rebased on 'linux-next') on a x86_64 machine
-> > > >    using the modified 'makedumpfile' user-space code (see [3] for my
-> > > >    github tree which contains the same) for determining how many pages
-> > > >    are dumpable when different dump_level is specified (which is
-> > > >    one use-case of live-debugging via 'makedumpfile').
-> > > >  - I tested both the KASLR and non-KASLR boot cases with this patch.
-> > > >  - Here is one sample log (for KASLR boot case) on my x86_64 machine:
-> > > >
-> > > >    < snip..>
-> > > >    The kernel doesn't support mmap(),read() will be used instead.
-> > > >
-> > > >    TYPE               PAGES                   EXCLUDABLE      DESCRIPTION
-> > > >    ----------------------------------------------------------------------
-> > > >    ZERO               21299                   yes             Pages filled
-> > > >    with zero
-> > > >    NON_PRI_CACHE      91785                   yes             Cache
-> > > >    pages without private flag
-> > > >    PRI_CACHE  1                       yes             Cache pages with
-> > > >    private flag
-> > > >    USER               14057                   yes             User process
-> > > >    pages
-> > > >    FREE               740346                  yes             Free pages
-> > > >    KERN_DATA  58152                   no              Dumpable kernel
-> > > >    data
-> > > >
-> > > >    page size:         4096
-> > > >    Total pages on system:     925640
-> > > >    Total size on system:      3791421440       Byte
-> > > >
-> > > > I understand that there might be some reservations about exporting
-> > > > such machine-specific details in the vmcoreinfo, but to unify
-> > > > the implementations across user-land and archs, perhaps this would be
-> > > > good starting point to start a discussion.
-> > > >
-> > > > [0]. https://www.mail-archive.com/kexec at lists.infradead.org/msg20300.html
-> > > > [1]. MAN pages -> MAKEDUMPFILE(8) and CRASH(8)
-> > > > [2]. https://www.spinics.net/lists/kexec/msg21608.html
-> > > >      http://lists.infradead.org/pipermail/kexec/2018-October/021725.html
-> > > > [3]. https://github.com/bhupesh-sharma/makedumpfile/tree/add-page-offset-base-to-vmcore-v1
-> > > >
-> > > > Cc: Boris Petkov <bp@alien8.de>
-> > > > Cc: Baoquan He <bhe@redhat.com>
-> > > > Cc: Ingo Molnar <mingo@kernel.org>
-> > > > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > > > Cc: Kazuhito Hagio <k-hagio@ab.jp.nec.com>
-> > > > Cc: Dave Anderson <anderson@redhat.com>
-> > > > Cc: James Morse <james.morse@arm.com>
-> > > > Cc: Omar Sandoval <osandov@fb.com>
-> > > > Cc: x86 at kernel.org
-> > > > Cc: kexec at lists.infradead.org
-> > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > > Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
-> > > > ---
-> > > >  arch/x86/kernel/machine_kexec_64.c | 1 +
-> > > >  1 file changed, 1 insertion(+)
-> > > >
-> > > > diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
-> > > > index 4c8acdfdc5a7..834ccefef867 100644
-> > > > --- a/arch/x86/kernel/machine_kexec_64.c
-> > > > +++ b/arch/x86/kernel/machine_kexec_64.c
-> > > > @@ -356,6 +356,7 @@ void arch_crash_save_vmcoreinfo(void)
-> > > >       VMCOREINFO_SYMBOL(init_top_pgt);
-> > > >       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
-> > > >                       pgtable_l5_enabled());
-> > > > +     VMCOREINFO_NUMBER(page_offset_base);
-> > > >
-> > > >  #ifdef CONFIG_NUMA
-> > > >       VMCOREINFO_SYMBOL(node_data);
-> > > > --
-> > > > 2.7.4
-> > > >
+-- 
+Regards,
+
+Laurent Pinchart
