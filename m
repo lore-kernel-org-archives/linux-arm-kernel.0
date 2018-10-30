@@ -1,38 +1,117 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Tue, 30 Oct 2018 16:15:00 +0100
-Subject: [PATCH 2/2] thermal: broadcom: constify thermal_zone_of_device_ops
- structure
-In-Reply-To: <1540912500-21941-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1540912500-21941-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1540912500-21941-3-git-send-email-Julia.Lawall@lip6.fr>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 30 Oct 2018 13:20:00 +0000
+Subject: [PATCH V8 5/5] firmware: imx: add SCU power domain driver
+In-Reply-To: <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
+References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
+ <1540739690-23750-6-git-send-email-aisheng.dong@nxp.com>
+ <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
+Message-ID: <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thermal_zone_of_device_ops structure can be const as it is only
-passed as the last argument of thermal_zone_of_sensor_register
-and the corresponding parameter is declared as const.
+[...]
 
-Done with the help of Coccinelle.
+> }
+> > +
+> > +static struct imx_sc_pm_domain *
+> > +imx_scu_add_pm_domain(struct device *dev, int idx,
+> > +                     const struct imx_sc_pd_range *pd_ranges) {
+> > +       struct imx_sc_pm_domain *sc_pd;
+> > +       int ret;
+> > +
+> > +       sc_pd = devm_kzalloc(dev, sizeof(*sc_pd), GFP_KERNEL);
+> > +       if (!sc_pd)
+> > +               return ERR_PTR(-ENOMEM);
+> > +
+> > +       sc_pd->rsrc = pd_ranges->rsrc + idx;
+> > +       sc_pd->pd.power_off = imx_sc_pd_power_off;
+> > +       sc_pd->pd.power_on = imx_sc_pd_power_on;
+> 
+> So, this means you are going to register one genpd per device (one for each
+> uart, pwm etc), but there is actually a better option.
+> 
+> What you seems to be needing is a way to "power on/off" devices, rather than
+> the PM domain. Right? The PM domain, is managed internally by the FW, no?
+> 
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Yes, you're right.
 
----
+> In any case, it looks like what you should do is to implement the
+> ->attach|detach_dev() callback for the genpd and use the regular
+> of_genpd_add_provider_simple(). From within the ->attach_dev(), you should
+> get the OF node for the device that is being attached and then parse the
+> power-domain cell containing the "resource id" and store that in the per device
+> struct generic_pm_domain_data (we have void pointer there for storing these
+> kind of things).
+> 
+> Additionally, you need to implement the ->stop() and ->start() callbacks of
+> genpd, which is where you "power on/off" devices, rather than using the above
+> ->power_on|off() callbacks.
+> 
+> Please have a look a drivers/soc/ti/ti_sci_pm_domains.c. Apologize, I should
+> have pointed you towards that reference already in the earlier version.
+> 
 
-Unrelated to this change, is there a reason not to use
-devm_thermal_zone_of_sensor_register?
+Appreciated for such detailed explanation. lt's a good suggestion and I really like to
+switch to it.  However, after digged a bit more, i found a few blocking issues:
+1. The .attach_dev() of power domain infrastructure still does not support multi domains case.
 
- drivers/thermal/broadcom/brcmstb_thermal.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It looks like there's no way for .attach_dev() to understand which sub 'power domain'
+the device is attaching for one global power domain provider like ti_sci as you suggested.
+Secondly, the struct device *dev passed into is a virtual PD device. It does not help
+for parsing the real device resource id. 
 
-diff -u -p a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
---- a/drivers/thermal/broadcom/brcmstb_thermal.c
-+++ b/drivers/thermal/broadcom/brcmstb_thermal.c
-@@ -299,7 +299,7 @@ static int brcmstb_set_trips(void *data,
- 	return 0;
- }
- 
--static struct thermal_zone_of_device_ops of_ops = {
-+static const struct thermal_zone_of_device_ops of_ops = {
- 	.get_temp	= brcmstb_get_temp,
- 	.set_trips	= brcmstb_set_trips,
- };
+So framework probably needs some extension to support multi power domain cases.
+
+2. It also breaks most of current drivers as the driver probe sequence behavior changed
+If removing .power_on() and .power_off() callback and use .start() and .stop() instead.
+
+genpd_dev_pm_attach will only power up the domain and attach device, but will not call .start()
+which relies on device runtime pm. That means the device power is still not up before
+running driver probe function. For SCU enabled platforms, all device drivers accessing registers/clock
+without power domain enabled will trigger a HW access error. That means we need fix most
+of drivers probe sequence with proper runtime pm. So I'm a bit wondering whether we should
+still keep the exist way.
+
+In summary, we probably may not be able to try ti_sci way before fixing above two issues.
+
+Do you think I should wait for them to be fixed or if we could use the current way at first?
+I might be a little intend to the second way as we now have a lot upstreaming work pending on
+this. But please let me know if you have a different idea.
+
+Regards
+Dong Aisheng
+
+> > +
+> > +       if (pd_ranges->postfix)
+> > +               snprintf(sc_pd->name, sizeof(sc_pd->name),
+> > +                        "%s%i", pd_ranges->name, idx);
+> > +       else
+> > +               snprintf(sc_pd->name, sizeof(sc_pd->name),
+> > +                        "%s", pd_ranges->name);
+> > +
+> > +       sc_pd->pd.name = sc_pd->name;
+> > +
+> > +       if (sc_pd->rsrc >= IMX_SC_R_LAST) {
+> > +               dev_warn(dev, "invalid pd %s rsrc id %d found",
+> > +                        sc_pd->name, sc_pd->rsrc);
+> > +
+> > +               devm_kfree(dev, sc_pd);
+> > +               return NULL;
+> > +       }
+> > +
+> > +       ret = pm_genpd_init(&sc_pd->pd, NULL, true);
+> > +       if (ret) {
+> > +               dev_warn(dev, "failed to init pd %s rsrc id %d",
+> > +                        sc_pd->name, sc_pd->rsrc);
+> > +               devm_kfree(dev, sc_pd);
+> > +               return NULL;
+> > +       }
+> > +
+> > +       return sc_pd;
+> > +}
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
