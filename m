@@ -1,26 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Oct 2018 14:31:37 -0500
-Subject: [PATCH v5 5/8] ARM: l2x0: add marvell,ecc-enable property for
- aurora
-In-Reply-To: <20181029072535.31667-6-chris.packham@alliedtelesis.co.nz>
-References: <20181029072535.31667-1-chris.packham@alliedtelesis.co.nz>
- <20181029072535.31667-6-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20181030193137.GA28258@bogus>
+Date: Tue, 30 Oct 2018 15:23:07 -0500
+Subject: [PATCH v3 17/25] dt-bindings: panel: Add Bananapi S070WV20-CT16
+ ICN6211 MIPI-DSI to RGB bridge
+In-Reply-To: <20181026144344.27778-18-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-18-jagan@amarulasolutions.com>
+Message-ID: <20181030202307.GA13705@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Oct 2018 20:25:32 +1300, Chris Packham wrote:
-> The aurora cache on the Marvell Armada-XP SoC supports ECC protection
-> for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
-> which can be used to enable this.
+On Fri, 26 Oct 2018 20:13:36 +0530, Jagan Teki wrote:
+> Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB
+> bridge panel, which is available on same PCB with 24-bit RGB interface.
 > 
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> [jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> So, this patch adds DSI specific binding details on existing
+> dt-bindings file.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > ---
->  Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
->  arch/arm/mm/cache-l2x0.c                         | 7 +++++++
->  2 files changed, 9 insertions(+)
+> Changes for v3:
+> - Use existing binding doc and update dsi details
+> Changes for v2:
+> - none
+> 
+>  .../display/panel/bananapi,s070wv20-ct16.txt  | 31 +++++++++++++++++--
+>  1 file changed, 29 insertions(+), 2 deletions(-)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
