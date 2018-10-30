@@ -1,141 +1,133 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Tue, 30 Oct 2018 11:32:26 -0300
-Subject: [PATCH] perf cs-etm: Correct CPU mode for samples
-In-Reply-To: <1540883908-17018-1-git-send-email-leo.yan@linaro.org>
-References: <1540883908-17018-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20181030143226.GA23310@kernel.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Oct 2018 11:11:03 +0000
+Subject: [PATCH] soc: ti: QMSS: Fix usage of irq_set_affinity_hint
+Message-ID: <20181030111103.12110-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, Oct 30, 2018 at 03:18:28PM +0800, Leo Yan escreveu:
-> Since commit 9042f5e3539e ("perf tools: Stop fallbacking to kallsyms
-> for vdso symbols lookup"), the kernel address cannot be properly parsed
-> to kernel symbol with command 'perf script -k vmlinux'.  The reason is
-> CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
-> thus it fails to find corresponding map/dso in below flows:
-> 
->   process_sample_event()
->     `-> machine__resolve()
-> 	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
-> 
-> In this flow it needs to pass argument 'sample->cpumode' to tell what's
-> the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
-> any failure until the commit 9042f5e3539e ("perf tools: Stop fallbacking
-> to kallsyms for vdso symbols lookup") has been merged.  The reason is
-> even with the wrong CPU mode the function thread__find_map() firstly
-> fails to find map but it will rollback to find kernel map for vdso
-> symbols lookup.  In the latest code it has removed the fallback code,
-> thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
-> anymore with kernel address.
-> 
-> This patch is to correct samples CPU mode setting, it creates a new
-> helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
-> the address with the info from machine structure; this patch has a bit
-> extension to check not only kernel and user mode, but also check for
-> host/guest and hypervisor mode.  Finally this patch uses the function
-> in instruction and branch samples and also apply in cs_etm__mem_access()
-> for a minor polishing.
+The Keystone QMSS driver is pretty damaged, in the sense that it
+does things like this:
 
-Mathieu, can I have your Acked-by, please? Leo, thanks for acting so
-quickly on this one! 
+	irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
 
-Now processing coresight traces should be faster, less lookups :-)
+where cpu_map is a local variable. As we leave the function, this
+will point to nowhere-land, and things will end-up badly.
 
-- Arnaldo
+Instead, let's use a proper cpumask that gets allocated, giving
+the driver a chance to actually work with things like irqbalance
+as well as have a hypothetical 64bit future.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+I found this one by inspection after finding a similar bug in an
+unrelated driver. It is only compile-tested. It would probably
+a Cc stable, but that's Santosh's decision.
+
+ drivers/soc/ti/knav_qmss.h       |  4 ++--
+ drivers/soc/ti/knav_qmss_acc.c   | 10 +++++-----
+ drivers/soc/ti/knav_qmss_queue.c | 22 +++++++++++++++-------
+ 3 files changed, 22 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
+index 3efc47e82973..bd040c29c4bf 100644
+--- a/drivers/soc/ti/knav_qmss.h
++++ b/drivers/soc/ti/knav_qmss.h
+@@ -329,8 +329,8 @@ struct knav_range_ops {
+ };
  
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  tools/perf/util/cs-etm.c | 39 ++++++++++++++++++++++++++++++---------
->  1 file changed, 30 insertions(+), 9 deletions(-)
-> 
-> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-> index 3b37d66..73430b7 100644
-> --- a/tools/perf/util/cs-etm.c
-> +++ b/tools/perf/util/cs-etm.c
-> @@ -244,6 +244,27 @@ static void cs_etm__free(struct perf_session *session)
->  	zfree(&aux);
->  }
->  
-> +static u8 cs_etm__cpu_mode(struct cs_etm_queue *etmq, u64 address)
-> +{
-> +	struct machine *machine;
-> +
-> +	machine = etmq->etm->machine;
-> +
-> +	if (address >= etmq->etm->kernel_start) {
-> +		if (machine__is_host(machine))
-> +			return PERF_RECORD_MISC_KERNEL;
-> +		else
-> +			return PERF_RECORD_MISC_GUEST_KERNEL;
-> +	} else {
-> +		if (machine__is_host(machine))
-> +			return PERF_RECORD_MISC_USER;
-> +		else if (perf_guest)
-> +			return PERF_RECORD_MISC_GUEST_USER;
-> +		else
-> +			return PERF_RECORD_MISC_HYPERVISOR;
-> +	}
-> +}
-> +
->  static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
->  			      size_t size, u8 *buffer)
->  {
-> @@ -258,10 +279,7 @@ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
->  		return -1;
->  
->  	machine = etmq->etm->machine;
-> -	if (address >= etmq->etm->kernel_start)
-> -		cpumode = PERF_RECORD_MISC_KERNEL;
-> -	else
-> -		cpumode = PERF_RECORD_MISC_USER;
-> +	cpumode = cs_etm__cpu_mode(etmq, address);
->  
->  	thread = etmq->thread;
->  	if (!thread) {
-> @@ -653,7 +671,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
->  	struct perf_sample sample = {.ip = 0,};
->  
->  	event->sample.header.type = PERF_RECORD_SAMPLE;
-> -	event->sample.header.misc = PERF_RECORD_MISC_USER;
-> +	event->sample.header.misc = cs_etm__cpu_mode(etmq, addr);
->  	event->sample.header.size = sizeof(struct perf_event_header);
->  
->  	sample.ip = addr;
-> @@ -665,7 +683,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
->  	sample.cpu = etmq->packet->cpu;
->  	sample.flags = 0;
->  	sample.insn_len = 1;
-> -	sample.cpumode = event->header.misc;
-> +	sample.cpumode = event->sample.header.misc;
->  
->  	if (etm->synth_opts.last_branch) {
->  		cs_etm__copy_last_branch_rb(etmq);
-> @@ -706,12 +724,15 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
->  		u64			nr;
->  		struct branch_entry	entries;
->  	} dummy_bs;
-> +	u64 ip;
-> +
-> +	ip = cs_etm__last_executed_instr(etmq->prev_packet);
->  
->  	event->sample.header.type = PERF_RECORD_SAMPLE;
-> -	event->sample.header.misc = PERF_RECORD_MISC_USER;
-> +	event->sample.header.misc = cs_etm__cpu_mode(etmq, ip);
->  	event->sample.header.size = sizeof(struct perf_event_header);
->  
-> -	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
-> +	sample.ip = ip;
->  	sample.pid = etmq->pid;
->  	sample.tid = etmq->tid;
->  	sample.addr = cs_etm__first_executed_instr(etmq->packet);
-> @@ -720,7 +741,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
->  	sample.period = 1;
->  	sample.cpu = etmq->packet->cpu;
->  	sample.flags = 0;
-> -	sample.cpumode = PERF_RECORD_MISC_USER;
-> +	sample.cpumode = event->sample.header.misc;
->  
->  	/*
->  	 * perf report cannot handle events without a branch stack
-> -- 
-> 2.7.4
+ struct knav_irq_info {
+-	int	irq;
+-	u32	cpu_map;
++	int		irq;
++	struct cpumask	*cpu_mask;
+ };
+ 
+ struct knav_range_info {
+diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
+index 316e82e46f6c..2f7fb2dcc1d6 100644
+--- a/drivers/soc/ti/knav_qmss_acc.c
++++ b/drivers/soc/ti/knav_qmss_acc.c
+@@ -205,18 +205,18 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
+ {
+ 	struct knav_device *kdev = range->kdev;
+ 	struct knav_acc_channel *acc;
+-	unsigned long cpu_map;
++	struct cpumask *cpu_mask;
+ 	int ret = 0, irq;
+ 	u32 old, new;
+ 
+ 	if (range->flags & RANGE_MULTI_QUEUE) {
+ 		acc = range->acc;
+ 		irq = range->irqs[0].irq;
+-		cpu_map = range->irqs[0].cpu_map;
++		cpu_mask = range->irqs[0].cpu_mask;
+ 	} else {
+ 		acc = range->acc + queue;
+ 		irq = range->irqs[queue].irq;
+-		cpu_map = range->irqs[queue].cpu_map;
++		cpu_mask = range->irqs[queue].cpu_mask;
+ 	}
+ 
+ 	old = acc->open_mask;
+@@ -239,8 +239,8 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
+ 			acc->name, acc->name);
+ 		ret = request_irq(irq, knav_acc_int_handler, 0, acc->name,
+ 				  range);
+-		if (!ret && cpu_map) {
+-			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
++		if (!ret && cpu_mask) {
++			ret = irq_set_affinity_hint(irq, cpu_mask);
+ 			if (ret) {
+ 				dev_warn(range->kdev->dev,
+ 					 "Failed to set IRQ affinity\n");
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index b5d5673c255c..8b418379272d 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -118,19 +118,17 @@ static int knav_queue_setup_irq(struct knav_range_info *range,
+ 			  struct knav_queue_inst *inst)
+ {
+ 	unsigned queue = inst->id - range->queue_base;
+-	unsigned long cpu_map;
+ 	int ret = 0, irq;
+ 
+ 	if (range->flags & RANGE_HAS_IRQ) {
+ 		irq = range->irqs[queue].irq;
+-		cpu_map = range->irqs[queue].cpu_map;
+ 		ret = request_irq(irq, knav_queue_int_handler, 0,
+ 					inst->irq_name, inst);
+ 		if (ret)
+ 			return ret;
+ 		disable_irq(irq);
+-		if (cpu_map) {
+-			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
++		if (range->irqs[queue].cpu_mask) {
++			ret = irq_set_affinity_hint(irq, range->irqs[queue].cpu_mask);
+ 			if (ret) {
+ 				dev_warn(range->kdev->dev,
+ 					 "Failed to set IRQ affinity\n");
+@@ -1262,9 +1260,19 @@ static int knav_setup_queue_range(struct knav_device *kdev,
+ 
+ 		range->num_irqs++;
+ 
+-		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3)
+-			range->irqs[i].cpu_map =
+-				(oirq.args[2] & 0x0000ff00) >> 8;
++		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3) {
++			unsigned long mask;
++			int bit;
++
++			range->irqs[i].cpu_mask = devm_kzalloc(dev,
++							       cpumask_size(), GFP_KERNEL);
++			if (!range->irqs[i].cpu_mask)
++				return -ENOMEM;
++
++			mask = (oirq.args[2] & 0x0000ff00) >> 8;
++			for_each_set_bit(bit, &mask, BITS_PER_LONG)
++				cpumask_set_cpu(bit, range->irqs[i].cpu_mask);
++		}
+ 	}
+ 
+ 	range->num_irqs = min(range->num_irqs, range->num_queues);
+-- 
+2.19.1
