@@ -1,98 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Oct 2018 11:45:40 +0000
-Subject: [PATCH v2] arm64: kprobe: make page to RO mode when allocate it
-In-Reply-To: <20181030113850.31150-1-anders.roxell@linaro.org>
-References: <20181030113850.31150-1-anders.roxell@linaro.org>
-Message-ID: <20181030114539.GA18992@arm.com>
+From: leo.yan@linaro.org (leo.yan at linaro.org)
+Date: Tue, 30 Oct 2018 23:04:49 +0800
+Subject: [PATCH] perf cs-etm: Correct CPU mode for samples
+In-Reply-To: <20181030143226.GA23310@kernel.org>
+References: <1540883908-17018-1-git-send-email-leo.yan@linaro.org>
+ <20181030143226.GA23310@kernel.org>
+Message-ID: <20181030150449.GB8344@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 12:38:50PM +0100, Anders Roxell wrote:
-> Commit 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
-> has successfully identified code that leaves a page with W+X
-> permissions.
+Hi Arnaldo,
+
+On Tue, Oct 30, 2018 at 11:32:26AM -0300, Arnaldo Carvalho de Melo wrote:
+> Em Tue, Oct 30, 2018 at 03:18:28PM +0800, Leo Yan escreveu:
+> > Since commit 9042f5e3539e ("perf tools: Stop fallbacking to kallsyms
+> > for vdso symbols lookup"), the kernel address cannot be properly parsed
+> > to kernel symbol with command 'perf script -k vmlinux'.  The reason is
+> > CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
+> > thus it fails to find corresponding map/dso in below flows:
+> > 
+> >   process_sample_event()
+> >     `-> machine__resolve()
+> > 	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
+> > 
+> > In this flow it needs to pass argument 'sample->cpumode' to tell what's
+> > the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
+> > any failure until the commit 9042f5e3539e ("perf tools: Stop fallbacking
+> > to kallsyms for vdso symbols lookup") has been merged.  The reason is
+> > even with the wrong CPU mode the function thread__find_map() firstly
+> > fails to find map but it will rollback to find kernel map for vdso
+> > symbols lookup.  In the latest code it has removed the fallback code,
+> > thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
+> > anymore with kernel address.
+> > 
+> > This patch is to correct samples CPU mode setting, it creates a new
+> > helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
+> > the address with the info from machine structure; this patch has a bit
+> > extension to check not only kernel and user mode, but also check for
+> > host/guest and hypervisor mode.  Finally this patch uses the function
+> > in instruction and branch samples and also apply in cs_etm__mem_access()
+> > for a minor polishing.
 > 
-> [    3.245140] arm64/mm: Found insecure W+X mapping at address (____ptrval____)/0xffff000000d90000
-> [    3.245771] WARNING: CPU: 0 PID: 1 at ../arch/arm64/mm/dump.c:232 note_page+0x410/0x420
-> [    3.246141] Modules linked in:
-> [    3.246653] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc5-next-20180928-00001-ge70ae259b853-dirty #62
-> [    3.247008] Hardware name: linux,dummy-virt (DT)
-> [    3.247347] pstate: 80000005 (Nzcv daif -PAN -UAO)
-> [    3.247623] pc : note_page+0x410/0x420
-> [    3.247898] lr : note_page+0x410/0x420
-> [    3.248071] sp : ffff00000804bcd0
-> [    3.248254] x29: ffff00000804bcd0 x28: ffff000009274000
-> [    3.248578] x27: ffff00000921a000 x26: ffff80007dfff000
-> [    3.248845] x25: ffff0000093f5000 x24: ffff000009526f6a
-> [    3.249109] x23: 0000000000000004 x22: ffff000000d91000
-> [    3.249396] x21: ffff000000d90000 x20: 0000000000000000
-> [    3.249661] x19: ffff00000804bde8 x18: 0000000000000400
-> [    3.249924] x17: 0000000000000000 x16: 0000000000000000
-> [    3.250271] x15: ffffffffffffffff x14: 295f5f5f5f6c6176
-> [    3.250594] x13: 7274705f5f5f5f28 x12: 2073736572646461
-> [    3.250941] x11: 20746120676e6970 x10: 70616d20582b5720
-> [    3.251252] x9 : 6572756365736e69 x8 : 3039643030303030
-> [    3.251519] x7 : 306666666678302f x6 : ffff0000095467b2
-> [    3.251802] x5 : 0000000000000000 x4 : 0000000000000000
-> [    3.252060] x3 : 0000000000000000 x2 : ffffffffffffffff
-> [    3.252323] x1 : 4d151327adc50b00 x0 : 0000000000000000
-> [    3.252664] Call trace:
-> [    3.252953]  note_page+0x410/0x420
-> [    3.253186]  walk_pgd+0x12c/0x238
-> [    3.253417]  ptdump_check_wx+0x68/0xf8
-> [    3.253637]  mark_rodata_ro+0x68/0x98
-> [    3.253847]  kernel_init+0x38/0x160
-> [    3.254103]  ret_from_fork+0x10/0x18
-> 
-> kprobes allocates a writable executable page with module_alloc() in
-> order to store executable code.
-> Reworked to that when allocate a page it sets mode RO. Inspired by
-> commit 63fef14fc98a ("kprobes/x86: Make insn buffer always ROX and use text_poke()").
-> 
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Co-developed-by: Arnd Bergmann <arnd@arndb.de>
-> Co-developed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> ---
->  arch/arm64/kernel/probes/kprobes.c | 27 ++++++++++++++++++++-------
->  1 file changed, 20 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> index 9b65132e789a..decf483b4153 100644
-> --- a/arch/arm64/kernel/probes/kprobes.c
-> +++ b/arch/arm64/kernel/probes/kprobes.c
-> @@ -23,7 +23,9 @@
->  #include <linux/slab.h>
->  #include <linux/stop_machine.h>
->  #include <linux/sched/debug.h>
-> +#include <linux/set_memory.h>
->  #include <linux/stringify.h>
-> +#include <linux/vmalloc.h>
->  #include <asm/traps.h>
->  #include <asm/ptrace.h>
->  #include <asm/cacheflush.h>
-> @@ -42,10 +44,21 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
->  static void __kprobes
->  post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
->  
-> +static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
-> +{
-> +	void *addrs[1];
-> +	u32 insns[1];
-> +
-> +	addrs[0] = (void *)addr;
-> +	insns[0] = (u32)opcode;
+> Mathieu, can I have your Acked-by, please? Leo, thanks for acting so
+> quickly on this one! 
 
-I know they exist already, but I think you can drop these casts (Catalin can
-do it when he picks this up -- no need to respin).
+Thanks for reivewing.  Yeah, let's wait for Mathieu reviewing as well,
+as I know he is travelling so might be delay a bit.
 
-With that:
+Just remind, we might need the similiar change for util/intel-pt.c and
+util/intel-bts.c when generate samples, otherwise they might have the
+same regression for kernel symbols.  I am not the best person to change
+these two files, but bring up this for attention.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> Now processing coresight traces should be faster, less lookups :-)
 
-Thanks for respinning so quickly.
+Thanks!
 
-Will
+[...]
+
+Thanks,
+Leo Yan
