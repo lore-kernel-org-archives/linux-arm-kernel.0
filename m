@@ -1,29 +1,29 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 31 Oct 2018 15:54:30 -0700
-Subject: [PATCH v2] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
- disabled
-In-Reply-To: <20181025192621.GB16785@lunn.ch>
-References: <20181025190110.7564-1-f.fainelli@gmail.com>
- <20181025192621.GB16785@lunn.ch>
-Message-ID: <caf4adfa-9938-0f53-75c1-48bce6095093@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 31 Oct 2018 23:37:47 +0000
+Subject: [PATCH 1/2] dt-bindings: i2c: i2c-imx-lpi2c: add imx8qxp
+ compatible string
+In-Reply-To: <1540913007-28343-1-git-send-email-aisheng.dong@nxp.com>
+References: <1540913007-28343-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181031233747.GC8321@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/18 12:26 PM, Andrew Lunn wrote:
-> On Thu, Oct 25, 2018 at 12:01:08PM -0700, Florian Fainelli wrote:
->> Some software such as perf makes unconditional use of the special
->> [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
->> enabled in the kernel.
->>
->> Facilitate the debugging of such situations by printing a debug message
->> to the kernel log showing the task name and the faulting address.
+On Tue, Oct 30, 2018 at 03:28:11PM +0000, A.s. Dong wrote:
+> Add imx8qxp compatible string
 > 
-> Hi Florian
-> 
-> Nice. I wish we had this a couple of months ago.
-> 
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: linux-i2c at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Thanks Andrew, submitted as 8807/1.
--- 
-Florian
+Applied to for-current, thanks!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181031/cb30b738/attachment.sig>
