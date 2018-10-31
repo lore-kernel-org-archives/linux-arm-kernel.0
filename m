@@ -1,30 +1,55 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 31 Oct 2018 12:20:00 +0100
-Subject: [PATCH v1 00/14] Rockchip SPI cleanup and use interrupts
-In-Reply-To: <20181031105711.19575-1-esmil@mailme.dk>
-References: <20181031105711.19575-1-esmil@mailme.dk>
-Message-ID: <4443653.p1DpZLIVTj@diego>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 31 Oct 2018 12:41:07 +0100
+Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
+In-Reply-To: <1540981182.16084.1.camel@mtkswgap22>
+References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
+ <20181029080708.GA32673@dhcp22.suse.cz>
+ <20181029081706.GC32673@dhcp22.suse.cz>
+ <1540862950.12374.40.camel@mtkswgap22>
+ <20181030060601.GR32673@dhcp22.suse.cz>
+ <1540882551.23278.12.camel@mtkswgap22>
+ <20181030081537.GV32673@dhcp22.suse.cz>
+ <1540975637.10275.10.camel@mtkswgap22>
+ <20181031101501.GL32673@dhcp22.suse.cz>
+ <1540981182.16084.1.camel@mtkswgap22>
+Message-ID: <20181031114107.GM32673@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 31. Oktober 2018, 11:56:57 CET schrieb Emil Renner Berthing:
-> Emil Renner Berthing (14):
->   spi: rockchip: make spi_enable_chip take bool
->   spi: rockchip: use designated init for dma config
->   spi: rockchip: always use SPI mode
->   spi: rockchip: use atomic_t state
->   spi: rockchip: disable spi on error
->   spi: rockchip: read transfer info directly
->   spi: rockchip: don't store dma channels twice
->   spi: rockchip: remove master pointer from dev data
->   spi: rockchip: simplify use_dma logic
->   spi: rockchip: set min/max speed
->   spi: rockchip: precompute rx sample delay
->   spi: rockchip: use irq rather than polling
->   spi: rockchip: support 4bit words
->   spi: rockchip: support lsb-first mode
+On Wed 31-10-18 18:19:42, Miles Chen wrote:
+> On Wed, 2018-10-31 at 11:15 +0100, Michal Hocko wrote:
+> > On Wed 31-10-18 16:47:17, Miles Chen wrote:
+> > > On Tue, 2018-10-30 at 09:15 +0100, Michal Hocko wrote:
+> > > > On Tue 30-10-18 14:55:51, Miles Chen wrote:
+> > > > [...]
+> > > > > It's a real problem when using page_owner.
+> > > > > I found this issue recently: I'm not able to read page_owner information
+> > > > > during a overnight test. (error: read failed: Out of memory). I replace
+> > > > > kmalloc() with vmalloc() and it worked well.
+> > > > 
+> > > > Is this with trimming the allocation to a single page and doing shorter
+> > > > than requested reads?
+> > > 
+> > > 
+> > > I printed out the allocate count on my device the request count is <=
+> > > 4096. So I tested this scenario by trimming the count to from 4096 to
+> > > 1024 bytes and it works fine. 
+> > > 
+> > > count = count > 1024? 1024: count;
+> > > 
+> > > It tested it on both 32bit and 64bit kernel.
+> > 
+> > Are you saying that you see OOMs for 4k size?
+> > 
+> yes, because kmalloc only use normal memor, not highmem + normal memory
+> I think that's why vmalloc() works.
 
-The series, on rk3288 with cros-ec and spi-flash, rk3328 with a spi-flash, 
-rk3399 with cros-ec and spi-flash:
+Can I see an OOM report please? I am especially interested that 1k
+doesn't cause the problem because there shouldn't be that much of a
+difference between the two. Larger allocations could be a result of
+memory fragmentation but 1k vs. 4k to make a difference really seems
+unexpected.
 
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+-- 
+Michal Hocko
+SUSE Labs
