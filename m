@@ -1,80 +1,160 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 31 Oct 2018 14:52:20 +0000
-Subject: [PATCH v8 1/9] KVM: arm/arm64: Ensure only THP is candidate for
- adjustment
-In-Reply-To: <20181031143646.GE12057@e113682-lin.lund.arm.com> (Christoffer
- Dall's message of "Wed, 31 Oct 2018 15:36:46 +0100")
-References: <20181001155443.23032-1-punit.agrawal@arm.com>
- <20181001155443.23032-2-punit.agrawal@arm.com>
- <20181031143646.GE12057@e113682-lin.lund.arm.com>
-Message-ID: <87h8h2rwwr.fsf@e105922-lin.cambridge.arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 31 Oct 2018 14:43:30 +0000
+Subject: [PATCH V3 09/10] dts: fsl: add imx7ulp evk support
+In-Reply-To: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
+References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1540996688-23681-10-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <christoffer.dall@arm.com> writes:
+The NXP i.MX 7ULP Evaluation Kit (EVK) provides a platform for rapid
+evaluation of the i.MX 7ULP, which features NXP's advanced implementation
+of the Arm Cortex-A7 core, the Arm Cortex-M4 core, as well as a 3D and
+2D Graphics Processing Units (GPUs).
 
-> On Mon, Oct 01, 2018 at 04:54:35PM +0100, Punit Agrawal wrote:
->> PageTransCompoundMap() returns true for hugetlbfs and THP
->> hugepages. This behaviour incorrectly leads to stage 2 faults for
->> unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
->> treated as THP faults.
->> 
->> Tighten the check to filter out hugetlbfs pages. This also leads to
->> consistently mapping all unsupported hugepage sizes as PTE level
->> entries at stage 2.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: stable at vger.kernel.org # v4.13+
->
->
-> Hmm, this function is only actually called from user_mem_abort() if we
-> have (!hugetlb), so I'm not sure the cc stable here was actually
-> warranted, nor that this patch is strictly necessary.
->
-> It doesn't hurt, and makes the code potentially more robust for the
-> future though.
->
-> Am I missing something?
+The EVK enables HDMI output for simple out-of-the-box to bring up but
+allows reconfiguration for MIPI displays. The EVK is designed as a
+System-On-Module(SOM) board that connects to an associated baseboard.
+The SOM provides 1 GB LPDDR3, 8 MB Quad SPI flash, Micro SD 3.0 card
+socket, WiFi/ Bluetooth capability, USB 2.0 OTG with Type C connector
+and an NXP PF1550 power management IC (PMIC). The baseboard provides
+additional capabilities including a full SD/MMC 3.0 card socket, audio
+codec, multiple sensors, an HDMI connector, and an alternate MIPI display
+connector. Additionally, the EVK facilitates software development with the
+ultimate goal of faster time to market through the support of both
+Linux OS and AndroidTM rich operating systems, as well as FreeRTOS.
 
-!hugetlb is only true for hugepage sizes supported at stage 2. The
-function also got called for unsupported hugepage size at stage 2, e.g.,
-64k hugepage with 4k page size, which then ended up doing the wrong
-thing.
+This patch aims to support the preliminary booting up features
+as follows:
+GPIO
+LPUART
+FEC
+SD/MMC
 
-Hope that adds some context. I should've added this to the commit log.
+See more board details:
+https://www.nxp.com/products/processors-and-microcontrollers/
+arm-based-processors-and-mcus/i.mx-applications-processors/
+i.mx-7-processors/evaluation-kit-for-the-i.mx-7ulp-applications
+-processor:MCIMX7ULP-EVK
 
->
-> Thanks,
->
->     Christoffer
->
->> ---
->>  virt/kvm/arm/mmu.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
->> 
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 7e477b3cae5b..c23a1b323aad 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1231,8 +1231,14 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
->>  {
->>  	kvm_pfn_t pfn = *pfnp;
->>  	gfn_t gfn = *ipap >> PAGE_SHIFT;
->> +	struct page *page = pfn_to_page(pfn);
->>  
->> -	if (PageTransCompoundMap(pfn_to_page(pfn))) {
->> +	/*
->> +	 * PageTransCompoungMap() returns true for THP and
->> +	 * hugetlbfs. Make sure the adjustment is done only for THP
->> +	 * pages.
->> +	 */
->> +	if (!PageHuge(page) && PageTransCompoundMap(page)) {
->>  		unsigned long mask;
->>  		/*
->>  		 * The address we faulted on is backed by a transparent huge
->> -- 
->> 2.18.0
->> 
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ChangeLog:
+v2->v3:
+ * remove "Generic DT based system"
+ * add device_type property for memory node
+ * back to old pinctrl binding according to SoC maintainer's suggestions
+v1->v2:
+ * switch to SPDX license
+ * pad name update
+ * fix Character '_' not recommended in node name
+ * separate from soc.dtsi file
+---
+ arch/arm/boot/dts/Makefile        |  2 +
+ arch/arm/boot/dts/imx7ulp-evk.dts | 77 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d7268ae..39eac9c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -573,6 +573,8 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7d-sdb-sht11.dtb \
+ 	imx7s-colibri-eval-v3.dtb \
+ 	imx7s-warp.dtb
++dtb-$(CONFIG_SOC_IMX7ULP) += \
++	imx7ulp-evk.dtb
+ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-moxa-uc-8410a.dtb \
+ 	ls1021a-qds.dtb \
+diff --git a/arch/arm/boot/dts/imx7ulp-evk.dts b/arch/arm/boot/dts/imx7ulp-evk.dts
+new file mode 100644
+index 0000000..07796f3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx7ulp-evk.dts
+@@ -0,0 +1,77 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP
++ *   Dong Aisheng <aisheng.dong@nxp.com>
++ */
++
++/dts-v1/;
++
++#include "imx7ulp.dtsi"
++
++/ {
++	model = "NXP i.MX7ULP EVK";
++	compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp";
++
++	chosen {
++		stdout-path = &lpuart4;
++	};
++
++	memory at 60000000 {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
++	};
++
++	reg_vsd_3v3: regulator-vsd-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "VSD_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usdhc0_rst>;
++		gpio = <&gpio_ptd 0 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&lpuart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_lpuart4>;
++	status = "okay";
++};
++
++&usdhc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc0>;
++	cd-gpios = <&gpio_ptc 10 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&reg_vsd_3v3>;
++	status = "okay";
++};
++
++&iomuxc1 {
++	pinctrl_lpuart4: lpuart4grp {
++		fsl,pins = <
++			IMX7ULP_PAD_PTC3__LPUART4_RX	0x1
++			IMX7ULP_PAD_PTC2__LPUART4_TX	0x1
++		>;
++		bias-pull-up;
++	};
++
++	pinctrl_usdhc0: usdhc0grp {
++		fsl,pins = <
++			IMX7ULP_PAD_PTD1__SDHC0_CMD	0x41
++			IMX7ULP_PAD_PTD2__SDHC0_CLK	0x40
++			IMX7ULP_PAD_PTD7__SDHC0_D3	0x41
++			IMX7ULP_PAD_PTD8__SDHC0_D2	0x41
++			IMX7ULP_PAD_PTD9__SDHC0_D1	0x41
++			IMX7ULP_PAD_PTD10__SDHC0_D0	0x41
++			IMX7ULP_PAD_PTC10__PTC10	0x1	/* CD */
++		>;
++	};
++
++	pinctrl_usdhc0_rst: usdhc0-gpio-rst-grp {
++		fsl,pins = <
++			IMX7ULP_PAD_PTD0__PTD0		0x1
++		>;
++	};
++};
+-- 
+2.7.4
