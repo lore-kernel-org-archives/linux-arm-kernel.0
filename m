@@ -1,50 +1,41 @@
 From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Wed, 31 Oct 2018 10:33:23 +0200
-Subject: [PATCH 6/8] clk: rk808: use managed version of of_provider
- registration
+Date: Wed, 31 Oct 2018 10:34:32 +0200
+Subject: [PATCH 8/8] clk: apcs-msm8916: simplify probe cleanup by using devm
 In-Reply-To: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
 References: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <e90180fb30d5e47603ab8ccebb6dba45e73a9eef.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <0495e02e0a7e7afe5b16e606fd83ad928a3eed4d.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify clean-up for rk808 by using managed version of of_provider
-registration.
+use devm variant for of_provider registration.
 
 Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 ---
- drivers/clk/clk-rk808.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/clk/qcom/apcs-msm8916.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
-index 6461f2820a5b..177340edaae5 100644
---- a/drivers/clk/clk-rk808.c
-+++ b/drivers/clk/clk-rk808.c
-@@ -138,23 +138,12 @@ static int rk808_clkout_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
+diff --git a/drivers/clk/qcom/apcs-msm8916.c b/drivers/clk/qcom/apcs-msm8916.c
+index b1cc8dbcd327..f4e0c136ab1a 100644
+--- a/drivers/clk/qcom/apcs-msm8916.c
++++ b/drivers/clk/qcom/apcs-msm8916.c
+@@ -96,8 +96,8 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
  
--	return of_clk_add_hw_provider(node, of_clk_rk808_get, rk808_clkout);
--}
--
--static int rk808_clkout_remove(struct platform_device *pdev)
--{
--	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
--	struct i2c_client *client = rk808->i2c;
--	struct device_node *node = client->dev.of_node;
--
--	of_clk_del_provider(node);
--
--	return 0;
-+	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
-+					of_clk_rk808_get, rk808_clkout);
+-	ret = of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
+-				     &a53cc->clkr.hw);
++	ret = devm_of_clk_add_parent_hw_provider(dev, of_clk_hw_simple_get,
++						 &a53cc->clkr.hw);
+ 	if (ret) {
+ 		dev_err(dev, "failed to add clock provider: %d\n", ret);
+ 		goto err;
+@@ -118,7 +118,6 @@ static int qcom_apcs_msm8916_clk_remove(struct platform_device *pdev)
+ 	struct device *parent = pdev->dev.parent;
+ 
+ 	clk_notifier_unregister(a53cc->pclk, &a53cc->clk_nb);
+-	of_clk_del_provider(parent->of_node);
+ 
+ 	return 0;
  }
- 
- static struct platform_driver rk808_clkout_driver = {
- 	.probe = rk808_clkout_probe,
--	.remove = rk808_clkout_remove,
- 	.driver		= {
- 		.name	= "rk808-clkout",
- 	},
 -- 
 2.14.3
