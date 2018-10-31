@@ -1,112 +1,73 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 31 Oct 2018 12:28:39 -0700
-Subject: [PATCH v3 2/6] arch: Make phys_initrd_start and phys_initrd_size
- global variables
+Date: Wed, 31 Oct 2018 12:28:41 -0700
+Subject: [PATCH v3 4/6] arm64: Utilize phys_initrd_start/phys_initrd_size
 In-Reply-To: <20181031192843.13230-1-f.fainelli@gmail.com>
 References: <20181031192843.13230-1-f.fainelli@gmail.com>
-Message-ID: <20181031192843.13230-3-f.fainelli@gmail.com>
+Message-ID: <20181031192843.13230-5-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make phys_initrd_start and phys_initrd_size global variables declared in
-init/do_mounts_initrd.c such that we can later have generic code in
-drivers/of/fdt.c populate those variables for us.
-
-This requires both the ARM and unicore32 implementations to be properly
-guarded against CONFIG_BLK_DEV_INITRD, and also initialize the variables
-to the expected default values (unicore32).
+ARM64 is the only architecture that re-defines
+__early_init_dt_declare_initrd() in order for that function to populate
+initrd_start/initrd_end with physical addresses instead of virtual
+addresses. Instead of having an override we can leverage
+drivers/of/fdt.c populating phys_initrd_start/phys_initrd_size to
+populate those variables for us.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mm/init.c       |  5 ++---
- arch/unicore32/mm/init.c | 10 +++++++---
- include/linux/initrd.h   |  3 +++
- init/do_mounts_initrd.c  |  3 +++
- 4 files changed, 15 insertions(+), 6 deletions(-)
+ arch/arm64/mm/init.c | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 0cc8e04295a4..87d59a53861d 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -51,9 +51,7 @@ unsigned long __init __clear_cr(unsigned long mask)
- }
- #endif
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 3cf87341859f..00ef2166bb73 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -72,8 +72,8 @@ static int __init early_initrd(char *p)
+ 	if (*endp == ',') {
+ 		size = memparse(endp + 1, NULL);
  
--static phys_addr_t phys_initrd_start __initdata = 0;
--static unsigned long phys_initrd_size __initdata = 0;
--
-+#ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
- {
- 	phys_addr_t start;
-@@ -90,6 +88,7 @@ static int __init parse_tag_initrd2(const struct tag *tag)
- }
- 
- __tagtable(ATAG_INITRD2, parse_tag_initrd2);
-+#endif
- 
- static void __init find_limits(unsigned long *min, unsigned long *max_low,
- 			       unsigned long *max_high)
-diff --git a/arch/unicore32/mm/init.c b/arch/unicore32/mm/init.c
-index 8f8699e62bd5..f2f815d46846 100644
---- a/arch/unicore32/mm/init.c
-+++ b/arch/unicore32/mm/init.c
-@@ -31,9 +31,7 @@
- 
- #include "mm.h"
- 
--static unsigned long phys_initrd_start __initdata = 0x01000000;
--static unsigned long phys_initrd_size __initdata = SZ_8M;
--
-+#ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
- {
- 	unsigned long start, size;
-@@ -49,6 +47,7 @@ static int __init early_initrd(char *p)
+-		initrd_start = start;
+-		initrd_end = start + size;
++		phys_initrd_start = start;
++		phys_initrd_size = size;
+ 	}
  	return 0;
  }
- early_param("initrd", early_initrd);
-+#endif
+@@ -408,14 +408,14 @@ void __init arm64_memblock_init(void)
+ 		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
+ 	}
  
- /*
-  * This keeps memory configuration data used by a couple memory
-@@ -157,6 +156,11 @@ void __init uc32_memblock_init(struct meminfo *mi)
- 	memblock_reserve(__pa(_text), _end - _text);
+-	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
++	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
+ 		/*
+ 		 * Add back the memory we just removed if it results in the
+ 		 * initrd to become inaccessible via the linear mapping.
+ 		 * Otherwise, this is a no-op
+ 		 */
+-		u64 base = initrd_start & PAGE_MASK;
+-		u64 size = PAGE_ALIGN(initrd_end) - base;
++		u64 base = phys_initrd_start & PAGE_MASK;
++		u64 size = PAGE_ALIGN(phys_initrd_size);
  
+ 		/*
+ 		 * We can only add back the initrd memory if we don't end up
+@@ -460,12 +460,11 @@ void __init arm64_memblock_init(void)
+ 	 */
+ 	memblock_reserve(__pa_symbol(_text), _end - _text);
  #ifdef CONFIG_BLK_DEV_INITRD
-+	if (!phys_initrd_size) {
-+		phys_initrd_start = 0x01000000;
-+		phys_initrd_size = SZ_8M;
-+	}
-+
- 	if (phys_initrd_size) {
- 		memblock_reserve(phys_initrd_start, phys_initrd_size);
+-	if (initrd_start) {
+-		memblock_reserve(initrd_start, initrd_end - initrd_start);
+-
++	if (phys_initrd_size) {
+ 		/* the generic initrd code expects virtual addresses */
+-		initrd_start = __phys_to_virt(initrd_start);
+-		initrd_end = __phys_to_virt(initrd_end);
++		initrd_start = __phys_to_virt(phys_initrd_start);
++		initrd_end = initrd_start + phys_initrd_size;
++		initrd_below_start_ok = 0;
+ 	}
+ #endif
  
-diff --git a/include/linux/initrd.h b/include/linux/initrd.h
-index 84b423044088..14beaff9b445 100644
---- a/include/linux/initrd.h
-+++ b/include/linux/initrd.h
-@@ -21,4 +21,7 @@ extern int initrd_below_start_ok;
- extern unsigned long initrd_start, initrd_end;
- extern void free_initrd_mem(unsigned long, unsigned long);
- 
-+extern phys_addr_t phys_initrd_start;
-+extern unsigned long phys_initrd_size;
-+
- extern unsigned int real_root_dev;
-diff --git a/init/do_mounts_initrd.c b/init/do_mounts_initrd.c
-index d1a5d885ce13..45865b72f4ea 100644
---- a/init/do_mounts_initrd.c
-+++ b/init/do_mounts_initrd.c
-@@ -16,6 +16,9 @@ int initrd_below_start_ok;
- unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
- static int __initdata mount_initrd = 1;
- 
-+phys_addr_t phys_initrd_start __initdata;
-+unsigned long phys_initrd_size __initdata;
-+
- static int __init no_initrd(char *str)
- {
- 	mount_initrd = 0;
 -- 
 2.17.1
