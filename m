@@ -1,166 +1,145 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 31 Oct 2018 01:45:49 +0000
-Subject: [PATCH V8 5/5] firmware: imx: add SCU power domain driver
-In-Reply-To: <CAPDyKFpzvN1R91ByRUmZ8XDsm6L2SF92oOrDSn3qv-d9wWGYtA@mail.gmail.com>
-References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
- <1540739690-23750-6-git-send-email-aisheng.dong@nxp.com>
- <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
- <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFpzvN1R91ByRUmZ8XDsm6L2SF92oOrDSn3qv-d9wWGYtA@mail.gmail.com>
-Message-ID: <AM0PR04MB4211084AB67D86ED162FDB1280CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 31 Oct 2018 09:51:16 +0800
+Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
+ smp_call_function()
+In-Reply-To: <20181030221843.121254-3-dianders@chromium.org>
+References: <20181030221843.121254-3-dianders@chromium.org>
+Message-ID: <201810310910.2tQCnmCV%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
-> Sent: Wednesday, October 31, 2018 12:00 AM
-[...]
-> On 30 October 2018 at 14:20, A.s. Dong <aisheng.dong@nxp.com> wrote:
-> > [...]
-> >
-> >> }
-> >> > +
-> >> > +static struct imx_sc_pm_domain *
-> >> > +imx_scu_add_pm_domain(struct device *dev, int idx,
-> >> > +                     const struct imx_sc_pd_range *pd_ranges) {
-> >> > +       struct imx_sc_pm_domain *sc_pd;
-> >> > +       int ret;
-> >> > +
-> >> > +       sc_pd = devm_kzalloc(dev, sizeof(*sc_pd), GFP_KERNEL);
-> >> > +       if (!sc_pd)
-> >> > +               return ERR_PTR(-ENOMEM);
-> >> > +
-> >> > +       sc_pd->rsrc = pd_ranges->rsrc + idx;
-> >> > +       sc_pd->pd.power_off = imx_sc_pd_power_off;
-> >> > +       sc_pd->pd.power_on = imx_sc_pd_power_on;
-> >>
-> >> So, this means you are going to register one genpd per device (one
-> >> for each uart, pwm etc), but there is actually a better option.
-> >>
-> >> What you seems to be needing is a way to "power on/off" devices,
-> >> rather than the PM domain. Right? The PM domain, is managed internally
-> by the FW, no?
-> >>
-> >
-> > Yes, you're right.
-> >
-> >> In any case, it looks like what you should do is to implement the
-> >> ->attach|detach_dev() callback for the genpd and use the regular
-> >> of_genpd_add_provider_simple(). From within the ->attach_dev(), you
-> >> should get the OF node for the device that is being attached and then
-> >> parse the power-domain cell containing the "resource id" and store
-> >> that in the per device struct generic_pm_domain_data (we have void
-> >> pointer there for storing these kind of things).
-> >>
-> >> Additionally, you need to implement the ->stop() and ->start()
-> >> callbacks of genpd, which is where you "power on/off" devices, rather
-> >> than using the above
-> >> ->power_on|off() callbacks.
-> >>
-> >> Please have a look a drivers/soc/ti/ti_sci_pm_domains.c. Apologize, I
-> >> should have pointed you towards that reference already in the earlier
-> version.
-> >>
-> >
-> > Appreciated for such detailed explanation. lt's a good suggestion and
-> > I really like to switch to it.  However, after digged a bit more, i found a few
-> blocking issues:
-> > 1. The .attach_dev() of power domain infrastructure still does not support
-> multi domains case.
-> >
-> > It looks like there's no way for .attach_dev() to understand which sub 'power
-> domain'
-> > the device is attaching for one global power domain provider like ti_sci as
-> you suggested.
-> > Secondly, the struct device *dev passed into is a virtual PD device.
-> > It does not help for parsing the real device resource id.
-> >
-> > So framework probably needs some extension to support multi power
-> domain cases.
-> 
-> Right, you are correct.
-> 
-> Let me think about this and see what I can come up with - unless you already
-> have something you want to propose?
-> 
+Hi Douglas,
 
-I have thought we may need add two more params (real dev and pd index) for
-.attach_dev().detach_dev() and .start()/.stop() for multi PDs case.
-But I'm not sure if they are proper.
+Thank you for the patch! Perhaps something to improve:
 
+[auto build test WARNING on kgdb/kgdb-next]
+[also build test WARNING on v4.19 next-20181030]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> >
-> > 2. It also breaks most of current drivers as the driver probe sequence
-> > behavior changed If removing .power_on() and .power_off() callback and
-> use .start() and .stop() instead.
-> >
-> > genpd_dev_pm_attach will only power up the domain and attach device,
-> > but will not call .start() which relies on device runtime pm. That
-> > means the device power is still not up before running driver probe
-> > function. For SCU enabled platforms, all device drivers accessing
-> > registers/clock without power domain enabled will trigger a HW access
-> > error. That means we need fix most of drivers probe sequence with proper
-> runtime pm. So I'm a bit wondering whether we should still keep the exist way.
-> 
-> I see what you are trying to say, but I am not sure why you consider this as
-> they would break? How did they work in the first place?
-> 
+url:    https://github.com/0day-ci/linux/commits/Douglas-Anderson/kgdb-Fix-kgdb_roundup_cpus/20181031-063733
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/jwessel/kgdb.git kgdb-next
+reproduce: make htmldocs
 
-Most drivers does not require power domains before. E.g. GPIO, I2C, PWM, MMC.
-Or even we need power domain(PUs/PCIE), they're enabled in .power_on()/.power_off()
-which has been already up before probe.
+All warnings (new ones prefixed by >>):
 
-> Anyway, the problem you are talking about have so far been addressed by
-> making buses/drivers to call pm_runtime_enable() and
-> pm_runtime_get_sync() - before trying to probe their devices.
->
+   WARNING: convert(1) not found, for SVG to PDF conversion install ImageMagick (https://www.imagemagick.org)
+   include/linux/srcu.h:175: warning: Function parameter or member 'p' not described in 'srcu_dereference_notrace'
+   include/linux/srcu.h:175: warning: Function parameter or member 'sp' not described in 'srcu_dereference_notrace'
+   include/linux/gfp.h:1: warning: no structured comments found
+>> include/linux/kgdb.h:188: warning: Function parameter or member 'ignored' not described in 'kgdb_call_nmi_hook'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.ibss' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.connect' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.keys' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.ie' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.ie_len' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.bssid' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.ssid' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.default_key' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.default_mgmt_key' not described in 'wireless_dev'
+   include/net/cfg80211.h:4381: warning: Function parameter or member 'wext.prev_bssid_valid' not described in 'wireless_dev'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
+   include/net/cfg80211.h:4869: warning: Excess function parameter 'ptr' description in 'reg_query_regdb_wmm'
 
-Yes, called them early before accessing clock and hw registers.
+vim +188 include/linux/kgdb.h
 
-> Do you have an idea of the amount of drivers that needs to fixed, in regards to
-> this?
-> 
+ > 188	
+   189	
 
-So far all enabled devices I tested need fixes. GPIO/I2C/FEC/MMC and etc.
-Suppose other need the same fix as we have not met this situation before.
-
-> I guess an option could be to, that via the ->attach_dev() callback perform the
-> same operations as also being done during ->start(). Of course, you may need
-> to keep a flag about this being done, so that operations that need to be
-> balanced with get/put or the like is managed correctly, the next time
-> ->start|stop() becomes called.
-> 
-
-That might be a way to try. The follow seems may introduce a bit complexities
-and driver needs to maintainer the runtime status along with framework in order to 
-keep the balance?
-
-> >
-> > In summary, we probably may not be able to try ti_sci way before fixing
-> above two issues.
-> >
-> > Do you think I should wait for them to be fixed or if we could use the current
-> way at first?
-> > I might be a little intend to the second way as we now have a lot
-> > upstreaming work pending on this. But please let me know if you have a
-> different idea.
-> 
-> As this is also about deploying a DTB with a correctly modeled HW, I think we
-> need to fix the above issues.
-> 
-
-DTB are the same with #power-domain-cells 1 (resource ID) in either case.
-So DTB don't need change and driver could be optimized.
-
-> I am happy to help, in one way or the other.
-> 
-
-Thanks.
-
-Regards
-Dong Aisheng
-
-> [...]
-> 
-> Kind regards
-> Uffe
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6570 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181031/746ccb8b/attachment-0001.gz>
