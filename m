@@ -1,57 +1,100 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 31 Oct 2018 14:58:11 +0800
-Subject: [PATCH v2 2/2] dt-bindings: Add compatible string for LS1028A-QDS
-In-Reply-To: <1539760132-3386-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1539760132-3386-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <1539760132-3386-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <20181031065809.GH10386@tiger>
+From: rppt@linux.ibm.com (Mike Rapoport)
+Date: Wed, 31 Oct 2018 09:03:50 +0200
+Subject: [PATCH v2 4/6] arm64: Utilize phys_initrd_start/phys_initrd_size
+In-Reply-To: <20181030230721.28429-5-f.fainelli@gmail.com>
+References: <20181030230721.28429-1-f.fainelli@gmail.com>
+ <20181030230721.28429-5-f.fainelli@gmail.com>
+Message-ID: <20181031070350.GA12503@rapoport-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 11:49:48AM +0000, Bhaskar Upadhaya wrote:
-> Signed-off-by: Sudhanshu Gupta <sudhanshu.gupta@nxp.com>
-> Signed-off-by: Rai Harninder <harninder.rai@nxp.com>
-> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-
-The bindings patch should generally go before rather than after the one
-using it in a series.
-
-Shawn
-
+On Tue, Oct 30, 2018 at 04:07:19PM -0700, Florian Fainelli wrote:
+> ARM64 is the only architecture that re-defines
+> __early_init_dt_declare_initrd() in order for that function to populate
+> initrd_start/initrd_end with physical addresses instead of virtual
+> addresses. Instead of having an override we can leverage
+> drivers/of/fdt.c populating phys_initrd_start/phys_initrd_size to
+> populate those variables for us.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/fsl.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  arch/arm64/mm/init.c | 21 +++++++++------------
+>  1 file changed, 9 insertions(+), 12 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index ea08bf2..3e44804 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -163,6 +163,18 @@ LS1012A ARMv8 based QDS Board
->  Required root node properties:
->      - compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 3cf87341859f..e95cee656a55 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -72,8 +72,8 @@ static int __init early_initrd(char *p)
+>  	if (*endp == ',') {
+>  		size = memparse(endp + 1, NULL);
 >  
-> +LS1028A SoC
-> +Required root node properties:
-> +    - compatible = "fsl,ls1028a";
-> +
-> +LS1028A ARMv8 based RDB Board
-> +Required root node properties:
-> +    - compatible = "fsl,ls1028a-rdb", "fsl,ls1028a"
-> +
-> +LS1028A ARMv8 based QDS Board
-> +Required root node properties:
-> +    - compatible = "fsl,ls1028a-qds", "fsl,ls1028a";
-> +
->  LS1043A SoC
->  Required root node properties:
->      - compatible = "fsl,ls1043a";
+> -		initrd_start = start;
+> -		initrd_end = start + size;
+> +		phys_initrd_start = start;
+> +		phys_initrd_size = size;
+>  	}
+>  	return 0;
+>  }
+> @@ -408,14 +408,14 @@ void __init arm64_memblock_init(void)
+>  		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
+>  	}
+>  
+> -	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+> +	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
+>  		/*
+>  		 * Add back the memory we just removed if it results in the
+>  		 * initrd to become inaccessible via the linear mapping.
+>  		 * Otherwise, this is a no-op
+>  		 */
+> -		u64 base = initrd_start & PAGE_MASK;
+> -		u64 size = PAGE_ALIGN(initrd_end) - base;
+> +		u64 base = phys_initrd_start & PAGE_MASK;
+> +		u64 size = PAGE_ALIGN(phys_initrd_size);
+>  
+>  		/*
+>  		 * We can only add back the initrd memory if we don't end up
+> @@ -460,13 +460,10 @@ void __init arm64_memblock_init(void)
+>  	 */
+>  	memblock_reserve(__pa_symbol(_text), _end - _text);
+>  #ifdef CONFIG_BLK_DEV_INITRD
+> -	if (initrd_start) {
+
+There may be no initrd at all, so the condition here would rather become
+
+	if (phys_initrd_start)
+
+> -		memblock_reserve(initrd_start, initrd_end - initrd_start);
+> -
+> -		/* the generic initrd code expects virtual addresses */
+> -		initrd_start = __phys_to_virt(initrd_start);
+> -		initrd_end = __phys_to_virt(initrd_end);
+> -	}
+> +	/* the generic initrd code expects virtual addresses */
+> +	initrd_start = __phys_to_virt(phys_initrd_start);
+> +	initrd_end = initrd_start + phys_initrd_size;
+> +	initrd_below_start_ok = 0;
+>  #endif
+
+I also wonder what is the reason to keep memstart_addr randomization and
+initrd setup interleaved?
+
+What we have now is roughly:
+
+1) set memstart_addr
+2) enforce memory_limit
+3) reserve initrd
+4) randomize memstart_addr
+5) reserve text + data
+6) reserve initrd again and set virtual addresses of initrd_{start,end}
+
+Maybe it's possible to merge (3) into (6) ?
+
+>  	early_init_fdt_scan_reserved_mem();
 > -- 
-> 1.9.1
+> 2.17.1
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Sincerely yours,
+Mike.
