@@ -1,39 +1,44 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 31 Oct 2018 14:43:33 +0000
-Subject: [PATCH V3 10/10] ARM: imx_v6_v7_defconfig: add imx7ulp support
-In-Reply-To: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
-References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1540996688-23681-11-git-send-email-aisheng.dong@nxp.com>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Wed, 31 Oct 2018 16:08:10 +0100
+Subject: [PATCH] net: stmmac: Fix stmmac_mdio_reset() when building stmmac as
+ modules
+Message-ID: <20181031150810.16665-1-niklas.cassel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select CONFIG_SOC_IMX7ULP by default.
-Patch generated via make ARCH=arm savedefconfig
+When building stmmac, it is only possible to select CONFIG_DWMAC_GENERIC,
+or any of the glue drivers, when CONFIG_STMMAC_PLATFORM is set.
+The only exception is CONFIG_STMMAC_PCI.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v2->v3:
- * no changes
-v1->v2:
- * rebase to new version
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+When calling of_mdiobus_register(), it will call our ->reset()
+callback, which is set to stmmac_mdio_reset().
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 1ad5736..27ee422 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -38,6 +38,7 @@ CONFIG_SOC_IMX6SLL=y
- CONFIG_SOC_IMX6SX=y
- CONFIG_SOC_IMX6UL=y
- CONFIG_SOC_IMX7D=y
-+CONFIG_SOC_IMX7ULP=y
- CONFIG_SOC_VF610=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
+Most of the code in stmmac_mdio_reset() is protected by a
+"#if defined(CONFIG_STMMAC_PLATFORM)", which will evaluate
+to false when CONFIG_STMMAC_PLATFORM=m.
+
+Because of this, the phy reset gpio will only be pulled when
+stmmac is built as built-in, but not when built as modules.
+
+Fix this by using "#if IS_ENABLED()" instead of "#if defined()".
+
+Signed-off-by: Niklas Cassel <niklas.cassel@linaro.org>
+---
+ drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c
+index b72ef171477e..bdd351597b55 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c
+@@ -243,7 +243,7 @@ static int stmmac_mdio_write(struct mii_bus *bus, int phyaddr, int phyreg,
+  */
+ int stmmac_mdio_reset(struct mii_bus *bus)
+ {
+-#if defined(CONFIG_STMMAC_PLATFORM)
++#if IS_ENABLED(CONFIG_STMMAC_PLATFORM)
+ 	struct net_device *ndev = bus->priv;
+ 	struct stmmac_priv *priv = netdev_priv(ndev);
+ 	unsigned int mii_address = priv->hw->mii.addr;
 -- 
-2.7.4
+2.17.2
