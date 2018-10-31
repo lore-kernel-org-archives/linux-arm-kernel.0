@@ -1,90 +1,26 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 31 Oct 2018 17:15:10 +0000
-Subject: [PATCH v8 1/9] KVM: arm/arm64: Ensure only THP is candidate for
- adjustment
-In-Reply-To: <87h8h2rwwr.fsf@e105922-lin.cambridge.arm.com> (Punit Agrawal's
- message of "Wed, 31 Oct 2018 14:52:20 +0000")
-References: <20181001155443.23032-1-punit.agrawal@arm.com>
- <20181001155443.23032-2-punit.agrawal@arm.com>
- <20181031143646.GE12057@e113682-lin.lund.arm.com>
- <87h8h2rwwr.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <87d0rqrqap.fsf@e105922-lin.cambridge.arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 31 Oct 2018 10:16:20 -0700
+Subject: [PATCH] firmware: raspberrypi: Define timeout for transactions
+In-Reply-To: <1540922921-3653-1-git-send-email-stefan.wahren@i2se.com>
+References: <1540922921-3653-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87k1lyghp7.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Punit Agrawal <punit.agrawal@arm.com> writes:
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-> Christoffer Dall <christoffer.dall@arm.com> writes:
+> We should never assume to get a reply from the firmware otherwise
+> the call could block forever and the user don't get informed. So
+> define a timeout of 1 sec and print a stacktrace once in the unlikely
+> case the timeout expired.
 >
->> On Mon, Oct 01, 2018 at 04:54:35PM +0100, Punit Agrawal wrote:
->>> PageTransCompoundMap() returns true for hugetlbfs and THP
->>> hugepages. This behaviour incorrectly leads to stage 2 faults for
->>> unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
->>> treated as THP faults.
->>> 
->>> Tighten the check to filter out hugetlbfs pages. This also leads to
->>> consistently mapping all unsupported hugepage sizes as PTE level
->>> entries at stage 2.
->>> 
->>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
->>> Cc: Christoffer Dall <christoffer.dall@arm.com>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: stable at vger.kernel.org # v4.13+
->>
->>
->> Hmm, this function is only actually called from user_mem_abort() if we
->> have (!hugetlb), so I'm not sure the cc stable here was actually
->> warranted, nor that this patch is strictly necessary.
->>
->> It doesn't hurt, and makes the code potentially more robust for the
->> future though.
->>
->> Am I missing something?
->
-> !hugetlb is only true for hugepage sizes supported at stage 2. 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-Of course I meant "hugetlb" above (Note the lack of "!").
-
-> The function also got called for unsupported hugepage size at stage 2,
-> e.g., 64k hugepage with 4k page size, which then ended up doing the
-> wrong thing.
->
-> Hope that adds some context. I should've added this to the commit log.
->
->>
->> Thanks,
->>
->>     Christoffer
->>
->>> ---
->>>  virt/kvm/arm/mmu.c | 8 +++++++-
->>>  1 file changed, 7 insertions(+), 1 deletion(-)
->>> 
->>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->>> index 7e477b3cae5b..c23a1b323aad 100644
->>> --- a/virt/kvm/arm/mmu.c
->>> +++ b/virt/kvm/arm/mmu.c
->>> @@ -1231,8 +1231,14 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
->>>  {
->>>  	kvm_pfn_t pfn = *pfnp;
->>>  	gfn_t gfn = *ipap >> PAGE_SHIFT;
->>> +	struct page *page = pfn_to_page(pfn);
->>>  
->>> -	if (PageTransCompoundMap(pfn_to_page(pfn))) {
->>> +	/*
->>> +	 * PageTransCompoungMap() returns true for THP and
->>> +	 * hugetlbfs. Make sure the adjustment is done only for THP
->>> +	 * pages.
->>> +	 */
->>> +	if (!PageHuge(page) && PageTransCompoundMap(page)) {
->>>  		unsigned long mask;
->>>  		/*
->>>  		 * The address we faulted on is backed by a transparent huge
->>> -- 
->>> 2.18.0
->>> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181031/94508108/attachment.sig>
