@@ -1,81 +1,100 @@
 From: esmil@mailme.dk (Emil Renner Berthing)
-Date: Wed, 31 Oct 2018 11:57:06 +0100
-Subject: [PATCH v1 09/14] spi: rockchip: simplify use_dma logic
+Date: Wed, 31 Oct 2018 11:56:58 +0100
+Subject: [PATCH v1 01/14] spi: rockchip: make spi_enable_chip take bool
 In-Reply-To: <20181031105711.19575-1-esmil@mailme.dk>
 References: <20181031105711.19575-1-esmil@mailme.dk>
-Message-ID: <20181031105711.19575-10-esmil@mailme.dk>
+Message-ID: <20181031105711.19575-2-esmil@mailme.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Emil Renner Berthing <kernel@esmil.dk>
 
-We only need to know if we're using dma when setting
-up the transfer, so just use a local variable for
-that.
+The spi_enable_chip function takes a boolean
+argument. Change the type to reflect that.
 
 Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
 ---
- drivers/spi/spi-rockchip.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+ drivers/spi/spi-rockchip.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 45a1479c1a29..ba60cbcd45c2 100644
+index 51ef632bca52..7e54e1a69cc8 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -184,8 +184,6 @@ struct rockchip_spi {
- 	void *rx_end;
- 
- 	bool cs_asserted[ROCKCHIP_SPI_MAX_CS_NUM];
--
--	bool use_dma;
+@@ -208,9 +208,9 @@ struct rockchip_spi {
+ 	struct rockchip_spi_dma_data dma_tx;
  };
  
- static inline void spi_enable_chip(struct rockchip_spi *rs, bool enable)
-@@ -450,7 +448,8 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs,
+-static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
++static inline void spi_enable_chip(struct rockchip_spi *rs, bool enable)
+ {
+-	writel_relaxed((enable ? 1 : 0), rs->regs + ROCKCHIP_SPI_SSIENR);
++	writel_relaxed((enable ? 1U : 0U), rs->regs + ROCKCHIP_SPI_SSIENR);
  }
  
- static void rockchip_spi_config(struct rockchip_spi *rs,
--		struct spi_device *spi, struct spi_transfer *xfer)
-+		struct spi_device *spi, struct spi_transfer *xfer,
-+		bool use_dma)
- {
- 	u32 div = 0;
- 	u32 dmacr = 0;
-@@ -471,7 +470,7 @@ static void rockchip_spi_config(struct rockchip_spi *rs,
- 	else
- 		cr0 |= CR0_XFM_TO << CR0_XFM_OFFSET;
- 
--	if (rs->use_dma) {
-+	if (use_dma) {
- 		if (xfer->tx_buf)
- 			dmacr |= TF_DMA_EN;
- 		if (xfer->rx_buf)
-@@ -537,6 +536,7 @@ static int rockchip_spi_transfer_one(
- 		struct spi_transfer *xfer)
+ static inline void spi_set_clk(struct rockchip_spi *rs, u16 div)
+@@ -339,7 +339,7 @@ static int rockchip_spi_unprepare_message(struct spi_master *master,
  {
  	struct rockchip_spi *rs = spi_master_get_devdata(master);
-+	bool use_dma;
  
- 	WARN_ON(readl_relaxed(rs->regs + ROCKCHIP_SPI_SSIENR) &&
- 		(readl_relaxed(rs->regs + ROCKCHIP_SPI_SR) & SR_BUSY));
-@@ -559,15 +559,11 @@ static int rockchip_spi_transfer_one(
- 	rs->rx = xfer->rx_buf;
- 	rs->rx_end = rs->rx + xfer->len;
+-	spi_enable_chip(rs, 0);
++	spi_enable_chip(rs, false);
  
--	/* we need prepare dma before spi was enabled */
--	if (master->can_dma && master->can_dma(master, spi, xfer))
--		rs->use_dma = true;
--	else
--		rs->use_dma = false;
-+	use_dma = master->can_dma ? master->can_dma(master, spi, xfer) : false;
+ 	return 0;
+ }
+@@ -379,7 +379,7 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
+ {
+ 	int remain = 0;
  
--	rockchip_spi_config(rs, spi, xfer);
-+	rockchip_spi_config(rs, spi, xfer, use_dma);
+-	spi_enable_chip(rs, 1);
++	spi_enable_chip(rs, true);
  
--	if (rs->use_dma)
-+	if (use_dma)
- 		return rockchip_spi_prepare_dma(rs, master, xfer);
+ 	do {
+ 		if (rs->tx) {
+@@ -399,7 +399,7 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
+ 	if (rs->tx)
+ 		wait_for_idle(rs);
  
- 	return rockchip_spi_pio_transfer(rs);
+-	spi_enable_chip(rs, 0);
++	spi_enable_chip(rs, false);
+ 
+ 	return 0;
+ }
+@@ -413,7 +413,7 @@ static void rockchip_spi_dma_rxcb(void *data)
+ 
+ 	rs->state &= ~RXBUSY;
+ 	if (!(rs->state & TXBUSY)) {
+-		spi_enable_chip(rs, 0);
++		spi_enable_chip(rs, false);
+ 		spi_finalize_current_transfer(rs->master);
+ 	}
+ 
+@@ -432,7 +432,7 @@ static void rockchip_spi_dma_txcb(void *data)
+ 
+ 	rs->state &= ~TXBUSY;
+ 	if (!(rs->state & RXBUSY)) {
+-		spi_enable_chip(rs, 0);
++		spi_enable_chip(rs, false);
+ 		spi_finalize_current_transfer(rs->master);
+ 	}
+ 
+@@ -503,7 +503,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ 		dma_async_issue_pending(rs->dma_rx.ch);
+ 	}
+ 
+-	spi_enable_chip(rs, 1);
++	spi_enable_chip(rs, true);
+ 
+ 	if (txdesc) {
+ 		spin_lock_irqsave(&rs->lock, flags);
+@@ -705,7 +705,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 		goto err_disable_apbclk;
+ 	}
+ 
+-	spi_enable_chip(rs, 0);
++	spi_enable_chip(rs, false);
+ 
+ 	rs->type = SSI_MOTO_SPI;
+ 	rs->master = master;
 -- 
 2.19.1
