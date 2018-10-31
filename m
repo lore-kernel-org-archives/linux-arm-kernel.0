@@ -1,73 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 31 Oct 2018 12:28:41 -0700
-Subject: [PATCH v3 4/6] arm64: Utilize phys_initrd_start/phys_initrd_size
-In-Reply-To: <20181031192843.13230-1-f.fainelli@gmail.com>
-References: <20181031192843.13230-1-f.fainelli@gmail.com>
-Message-ID: <20181031192843.13230-5-f.fainelli@gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 31 Oct 2018 11:38:00 -0700
+Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
+ Aggregator driver
+In-Reply-To: <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <20181018154017.7112-10-lokeshvutla@ti.com>
+ <b20127dc-be43-3b00-9960-663738df0069@arm.com>
+ <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
+ <86va5ssrfm.wl-marc.zyngier@arm.com>
+ <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
+ <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
+Message-ID: <18df8960-9165-ba50-2c25-9f00d32198e8@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 is the only architecture that re-defines
-__early_init_dt_declare_initrd() in order for that function to populate
-initrd_start/initrd_end with physical addresses instead of virtual
-addresses. Instead of having an override we can leverage
-drivers/of/fdt.c populating phys_initrd_start/phys_initrd_size to
-populate those variables for us.
+On 10/31/2018 11:21 AM, Marc Zyngier wrote:
+> Hi Grygorii,
+> 
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm64/mm/init.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+[...]
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 3cf87341859f..00ef2166bb73 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -72,8 +72,8 @@ static int __init early_initrd(char *p)
- 	if (*endp == ',') {
- 		size = memparse(endp + 1, NULL);
- 
--		initrd_start = start;
--		initrd_end = start + size;
-+		phys_initrd_start = start;
-+		phys_initrd_size = size;
- 	}
- 	return 0;
- }
-@@ -408,14 +408,14 @@ void __init arm64_memblock_init(void)
- 		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
- 	}
- 
--	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
-+	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
- 		/*
- 		 * Add back the memory we just removed if it results in the
- 		 * initrd to become inaccessible via the linear mapping.
- 		 * Otherwise, this is a no-op
- 		 */
--		u64 base = initrd_start & PAGE_MASK;
--		u64 size = PAGE_ALIGN(initrd_end) - base;
-+		u64 base = phys_initrd_start & PAGE_MASK;
-+		u64 size = PAGE_ALIGN(phys_initrd_size);
- 
- 		/*
- 		 * We can only add back the initrd memory if we don't end up
-@@ -460,12 +460,11 @@ void __init arm64_memblock_init(void)
- 	 */
- 	memblock_reserve(__pa_symbol(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (initrd_start) {
--		memblock_reserve(initrd_start, initrd_end - initrd_start);
--
-+	if (phys_initrd_size) {
- 		/* the generic initrd code expects virtual addresses */
--		initrd_start = __phys_to_virt(initrd_start);
--		initrd_end = __phys_to_virt(initrd_end);
-+		initrd_start = __phys_to_virt(phys_initrd_start);
-+		initrd_end = initrd_start + phys_initrd_size;
-+		initrd_below_start_ok = 0;
- 	}
- #endif
- 
--- 
-2.17.1
+> 
+> Well, I'm convinced that we do not want a networking driver to be tied
+> to an interrupt architecture, and that the two should be completely
+> independent. But that's my own opinion. I can only see two solutions
+> moving forward:
+> 
+> 1) You make the IA a real interrupt controller that exposes real
+> interrupts (one per event), and write your networking driver
+> independently of the underlying interrupt architecture.
+> 
+> 2) you make the IA an integral part of your network driver, not exposing
+> anything outside of it, and limiting the interactions with the IR
+> *through the standard IRQ API*. You duplicate this knowledge throughout
+> the other client drivers.
+> 
+> I believe that (2) would be a massive design mistake as it locks the
+> driver to a single of the HW (and potentially a single revision of the
+> firmware) while (1) gives you the required level of flexibility by
+> hiding the whole event "concept" at a single location.
+> 
+> Yes, (1) makes you rewrite your existing, out of tree drivers. Oh well...
+> 
+My preference is also not tie the network driver with IA. BTW, this is
+very standard functionality with other network drivers too. And this
+is handled using MSI-X.
+
+So strong NO for 1) from me as well.
+
+regards,
+Santosh
