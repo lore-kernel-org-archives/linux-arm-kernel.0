@@ -1,18 +1,20 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 31 Oct 2018 14:27:41 +0800
-Subject: [PATCH v3] arm64: dts: add LX2160AQDS board support
-In-Reply-To: <20181017160430.22381-1-pankaj.bansal@nxp.com>
-References: <20181005081053.27105-1-pankaj.bansal@nxp.com>
- <20181017160430.22381-1-pankaj.bansal@nxp.com>
-Message-ID: <20181031062738.GE10386@tiger>
+Date: Wed, 31 Oct 2018 14:48:12 +0800
+Subject: [PATCH v2] dt-bindings: ls1012a: Add FRWY-LS1012A device tree
+ binding
+In-Reply-To: <20181026084554.32290-1-pramod.kumar_1@nxp.com>
+References: <20181026084554.32290-1-pramod.kumar_1@nxp.com>
+Message-ID: <20181031064809.GF10386@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 10:32:45AM +0000, Pankaj Bansal wrote:
-> The LX2160A QorIQ Development System (QDS) is a test, evaluation, and
-> development platform, supporting QorIQ LX2160A processor.
+On Fri, Oct 26, 2018 at 08:45:26AM +0000, Pramod Kumar wrote:
+> LS1012A-FRWY is an ls1012a based SoC board
+> Add device tree binding for LS1012A-FRWY board
 > 
-> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-> Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+> Signed-off-by: Pramod Kumar <pramod.kumar_1@nxp.com>
+
+It should really be sent together with "arm64: dts: ls1012a: Add
+FRWY-LS1012A board support" as a patch series.
 
 Applied, thanks.
