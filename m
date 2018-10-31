@@ -1,33 +1,34 @@
 From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Wed, 31 Oct 2018 10:32:21 +0200
-Subject: [PATCH 4/8] clk: clk-st: avoid clkdev lookup leak at remove
+Date: Wed, 31 Oct 2018 10:32:56 +0200
+Subject: [PATCH 5/8] clk: clk-hi655x: Free of_provider at remove
 In-Reply-To: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
 References: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <ae2234e4b639d2e80c8e5b8f7e25f3d0fe7acfde.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <6705a681118488ea905a5d3c29266683bf1a8a6c.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm based clkdev lookup registration to avoid leaking lookup
-structures.
+use devm variant for of_provider registration so provider is freed
+at exit.
 
 Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 ---
- drivers/clk/x86/clk-st.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/clk/clk-hi655x.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/x86/clk-st.c b/drivers/clk/x86/clk-st.c
-index fb62f3938008..32d8df9bd853 100644
---- a/drivers/clk/x86/clk-st.c
-+++ b/drivers/clk/x86/clk-st.c
-@@ -52,7 +52,8 @@ static int st_clk_probe(struct platform_device *pdev)
- 		0, st_data->base + MISCCLKCNTL1, OSCCLKENB,
- 		CLK_GATE_SET_TO_DISABLE, NULL);
+diff --git a/drivers/clk/clk-hi655x.c b/drivers/clk/clk-hi655x.c
+index 403a0188634a..394d0109104d 100644
+--- a/drivers/clk/clk-hi655x.c
++++ b/drivers/clk/clk-hi655x.c
+@@ -107,8 +107,8 @@ static int hi655x_clk_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
  
--	clk_hw_register_clkdev(hws[ST_CLK_GATE], "oscout1", NULL);
-+	devm_clk_hw_register_clkdev(&pdev->dev, hws[ST_CLK_GATE], "oscout1",
-+				    NULL);
- 
- 	return 0;
+-	return of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
+-				     &hi655x_clk->clk_hw);
++	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
++				of_clk_hw_simple_get, &hi655x_clk->clk_hw);
  }
+ 
+ static struct platform_driver hi655x_clk_driver = {
 -- 
 2.14.3
