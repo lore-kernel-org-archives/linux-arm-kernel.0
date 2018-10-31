@@ -1,41 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 31 Oct 2018 14:38:56 +0100
-Subject: [PATCH v3 0/7] Standardize onboard LED support for 96Boards
-In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdYThcGjdV9Ezs4qMr8K6_jH40SDUgt0Tps8d+_4sSESyg@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 31 Oct 2018 14:43:40 +0100
+Subject: [RFC PATCH v2 0/6] New QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <20180627131609.13681-1-bugalski.piotr@gmail.com>
+References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
+Message-ID: <20181031144340.4f1a030a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 10:43 AM Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
+Hi Piotr, Tudor,
 
-> This patchset standardizes the onboard LEDs on 96Boards by maintaining
-> common labels and triggers as below:
->
-> green:user1  default-trigger: heartbeat
-> green:user2  default-trigger: mmc0/disk-activity (onboard-storage)
-> green:user3  default-trigger: mmc1 (SD card)
-> green:user4  default-trigger: none, panic-indicator
-> yellow:wlan  default-trigger: phy0tx
-> blue:bt      default-trigger: hci0-power
->
-> This standardization is required to provide a common behaviour of LEDs
-> across all mainline supported 96Boards and also making it easier to
-> control it using an userspace library like MRAA.
->
-> For Rock960 and Ficus boards, the LED support is added in this patchset.
-> Rest of the boards are converted to adopt the standard.
->
-> Note: Since there is no UFS trigger available for now, user2 LED trigger
-> is set to none on HiKey960.
+On Wed, 27 Jun 2018 15:16:03 +0200
+Piotr Bugalski <bugalski.piotr@gmail.com> wrote:
 
-This series:
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Hello,
+> 
+> Atmel SAMA5D2 is equipped with two QSPI interfaces. These interfaces can
+> work as in SPI-compatible mode or use two / four lines to improve
+> communication speed. At the moment there is QSPI driver strongly tied to
+> NOR-flash memory and MTD subsystem.
+> Intention of this change is to provide new driver which will not be tied
+> to MTD and allows using QSPI with NAND-flash memory or other peripherals
+> New spi-mem API provides abstraction layer which can disconnect QSPI
+> from MTD. This driver doesn't support regular SPI interface, it should
+> be used with spi-mem interface only.
+> Unfortunately SAMA5D2 hardware by default supports only NOR-flash
+> memory. It allows 24- and 32-bit addressing while NAND-flash requires
+> 16-bit long. To workaround hardware limitation driver is a bit more
+> complicated.
+> 
+> Request to spi-mem contains three fiels: opcode (command), address,
+> dummy bytes. SAMA5D2 QSPI hardware supports opcode, address, dummy and
+> option byte where address field can only be 24- or 32- bytes long.
+> Handling 8-bits long addresses is done using option field. For 16-bits
+> address behaviour depends of number of requested dummy bits. If there
+> are 8 or more dummy cycles, address is shifted and sent with first dummy
+> byte. Otherwise opcode is disabled and first byte of address contains
+> command opcode (works only if opcode and address use the same buswidth).
+> The limitation is when 16-bit address is used without enough dummy
+> cycles and opcode is using different buswidth than address. Other modes
+> are supported with described workaround.
+> 
+> It looks like hardware has some limitation in performance. The same issue
+> exists in current QSPI driver (MTD/nor-flash) and soft-pack (bare-metal
+> library from Atmel). Without using DMA read speed is much worse than
+> maximum bandwidth (efficiency 30-40%). Any help with performance
+> improvement is highly welcome, especially for NAND-flash memories which
+> offers higher capacity than NOR-flash used with previous driver.
+> 
+> Best Regards,
+> Piotr
+> 
+> v2 changes:
+>  - driver is now replacement of existing atmel-quadspi
+>  - code was re-written to follow original code structure
+>  - deinitialization order fixed
+>  - empty atmel_qspi_adjust_op_size function removed
+>  - code formatting fixes
+>  - use spi_device->max_speed_hz to get spi speed
+>  - spi freqency set in spi_controller->setup() hook
+>  - address range checkng for 4-bytes addressing
+>  - use timeout to avoid infinite waiting
 
-It makes a lot of sense to try to unify the userspace ABI so we get
-some kind of order here instead of trying to counteract it with
-per-device kludges in userspace. It definately makes things better!
+IIRC, this version was almost ready to be merged except for the missing
+->get_name() implementation which should be easy to add.
 
-Yours,
-Linus Walleij
+Can one of you post a new version of this patchset?
+
+Thanks,
+
+Boris
