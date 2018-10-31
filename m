@@ -1,35 +1,37 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Wed, 31 Oct 2018 10:34:01 +0200
-Subject: [PATCH 7/8] clk: clk-twl6040: Free of_provider at remove
-In-Reply-To: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <5281ac8223e5ec2673341e2655abf1144e997d10.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Wed, 31 Oct 2018 16:49:16 +0800
+Subject: [PATCH] spi: mediatek: use correct mata->xfer_len when in fifo
+ transfer
+Message-ID: <1540975756-2021-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm variant for of_provider registration so provider is freed
-at exit.
+when xfer_len is greater than 64 bytes and use fifo mode
+to transfer, the actual length from the third time is mata->xfer_len
+but not len in mtk_spi_interrupt().
 
-Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
- drivers/clk/clk-twl6040.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/spi/spi-mt65xx.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
-index 25dfe050ae9f..e9da09453eb2 100644
---- a/drivers/clk/clk-twl6040.c
-+++ b/drivers/clk/clk-twl6040.c
-@@ -108,9 +108,8 @@ static int twl6040_pdmclk_probe(struct platform_device *pdev)
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 3dc3162..0c2867d 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -522,11 +522,11 @@ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
+ 		mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, len);
+ 		mtk_spi_setup_packet(master);
  
- 	platform_set_drvdata(pdev, clkdata);
+-		cnt = len / 4;
++		cnt = mdata->xfer_len / 4;
+ 		iowrite32_rep(mdata->base + SPI_TX_DATA_REG,
+ 				trans->tx_buf + mdata->num_xfered, cnt);
  
--	return of_clk_add_hw_provider(pdev->dev.parent->of_node,
--				      of_clk_hw_simple_get,
--				      &clkdata->pdmclk_hw);
-+	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
-+			of_clk_hw_simple_get, &clkdata->pdmclk_hw);
- }
- 
- static struct platform_driver twl6040_pdmclk_driver = {
+-		remainder = len % 4;
++		remainder = mdata->xfer_len % 4;
+ 		if (remainder > 0) {
+ 			reg_val = 0;
+ 			memcpy(&reg_val,
 -- 
-2.14.3
+1.7.9.5
