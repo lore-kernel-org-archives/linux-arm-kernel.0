@@ -1,78 +1,167 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Oct 2018 18:12:27 +0000
-Subject: [PATCH 5/5] ARM: spectre-v2: per-CPU vtables to work around
- big.Little systems
-In-Reply-To: <99a5f366-4d96-1069-0638-4e036e57afc8@samsung.com>
-References: <20180919094802.GH30658@n2100.armlinux.org.uk>
- <CGME20180919095028epcas3p3e1a927bb7e88c6891d43abfdc51603e7@epcas3p3.samsung.com>
- <E1g2Z6e-0003es-CI@rmk-PC.armlinux.org.uk>
- <20181005090941eucas1p14031cd38d78e9d561975925bf977727d~aq0-OFZeE1866318663eucas1p1b@eucas1p1.samsung.com>
- <20181005094618.GG30658@n2100.armlinux.org.uk>
- <20181030105017.GK30658@n2100.armlinux.org.uk>
- <99a5f366-4d96-1069-0638-4e036e57afc8@samsung.com>
-Message-ID: <20181031181227.GM30658@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Oct 2018 18:21:31 +0000
+Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
+ Aggregator driver
+In-Reply-To: <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <20181018154017.7112-10-lokeshvutla@ti.com>
+ <b20127dc-be43-3b00-9960-663738df0069@arm.com>
+ <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
+ <86va5ssrfm.wl-marc.zyngier@arm.com>
+ <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
+Message-ID: <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2018 at 04:21:30PM +0100, Marek Szyprowski wrote:
-> Hi Russell,
+Hi Grygorii,
+
+On 31/10/18 16:39, Grygorii Strashko wrote:
+
+[...]
+
+> I'd try to provide some additional information here.
+> (Sry, I'll still use term "events")
 > 
-> On 2018-10-30 11:50, Russell King - ARM Linux wrote:
-> > On Fri, Oct 05, 2018 at 10:46:19AM +0100, Russell King - ARM Linux wrote:
-> >> On Fri, Oct 05, 2018 at 11:09:40AM +0200, Marek Szyprowski wrote:
-> >>> This patch causes lots of kernel 'BUG' messages on all Samsung Exynos
-> >>> boards.? It started to appear since it has been merged to linux-next
-> >>> on 20181002.? I wonder if this issue is Exynos specific or there are
-> >>> some patches missing in linux-next, which should fix those 'BUGS'.
-> >>> If this is Exynos specific, please let us know what should be changed
-> >>> in Exynos platform code to avoid this issue.
-> >> Thanks for the report.
-> >>
-> >> It looks like my solution for big.Little isn't possible... back to
-> >> the drawing board, and big.Little will have to remain vulnerable to
-> >> Spectre for another release cycle.
-> > I've pushed out a new version in my build branch for the autobuilders
-> > to chew on, but I've little confidence in validating that the problem
-> > is fixed because the boot results are completely unreliable.
-> >
-> > It really doesn't help that kernelci.org flags boot logs as "green"
-> > and "successful" when they contain such stuff as:
-> >
-> > 01:08:40.181846  [    9.309984] Unable to handle kernel paging request at virtual address e7fddef0
-> >
-> > which is the kernel hitting a BUG() - for the full log, see:
-> >
-> > https://storage.kernelci.org/rmk/to-build/v4.16-38-g9fa10446d304/arm/multi_v7_defconfig/lab-collabora/boot-exynos5800-peach-pi.html
-> >
-> > This means the only way to check is to _manually_ go through reading
-> > each and every boot log - to see if your reported BUG: messages are
-> > there - no thanks.
-> >
-> > If kernelci thinks that a boot which hits a kernel BUG(), but still
-> > manages to get to a shell prompt is successful, it's giving very
-> > misleading boot results.  What about a WARN_ON() or an oops that
-> > still allows it to reach a shell prompt.
-> >
-> > Yes, these may be "successful" in so far as reaching the shell prompt,
-> > but they should at least be flagged for further inspection, not
-> > effectively marked as "there is nothing wrong here".
+> As Lokesh explained in other mail on K3 SoC everything is generic and most
+> of resources allocated dynamicaly:
+> - generic DMA channels
+> - generic HW rings (used by DMA channel)
+> - generic events (assigned to the rings) and muxed to different cores/hosts
 > 
-> I've run my own tests on various Exynos SoC based boards and your
-> 'for-next' branch works fine and don't cause any regressions.
+> So, when some driver would like to perform DMA transaction It's
+> required to build (configure) DMA channel by allocating different type of
+> resources and link them together to get finally working Data Movement path
+> (situation complicated by ti-sci firmware which policies resources between cores/hosts):
+> - get UDMA channel from available range
+> - get HW rings and attach them to the UDMA channel
+> - get event, assign it to the ring and mux it to the core/host through IA->IR-> chain
+>    (and this step is done by ti_sci_inta_register_event() - no DT as everything is dynamic).
+> 
+> Next, how this is working now - ti_sci_inta_register_event():
+> - first call does similar things as regular DT irq mapping (end up calling irq_create_fwspec_mapping()
+>    and builds IRQ chain as below:
+>    linux_virq = ti_sci_inta_register_event(dev, <ringacc tisci_dev_id>,
+> 				<ringacc id>, 0, IRQF_TRIGGER_HIGH, false);
+> 
+>               +---------------------+
+>               |         IA          |
+> +--------+   |            +------+ |        +--------+         +------+
+> | ring 1 +----->evtA+----->VintX +---------->   IR   +--------->  GIC +-->
+> +--------+   |            +------+ |        +--------+         +------+  Linux IRQ Y
+>     evtA      |                     |
+>               |                     |
+>               +---------------------+
+> 
+> - second call updates only IA input part while keeping other parts of IRQ chain the same
+>    if valid <linux_virq> passed as input parameter:
+>    linux_virq = ti_sci_inta_register_event(dev, <ringacc tisci_dev_id>,
+> 				<ringacc id>, linux_virq, IRQF_TRIGGER_HIGH, false);
+>               +---------------------+
+>               |         IA          |
+> +--------+   |            +------+ |        +--------+         +------+
+> | ring 1 +----->evtA+--^-->VintX +---------->   IR   +--------->  GIC +-->
+> +--------+   |         |  +------+ |        +--------+         +------+  Linux IRQ Y
+>               |         |           |
+> +--------+   |         |           |
+> | ring 2 +----->evtB+--+           |
+> +--------+   |                     |
+>               +---------------------+
 
-The code isn't in for-next because we're in a merge window, and
-linux-next is supposed to be stable for the duration of that, only
-accepting bug fixes.
+This is basically equivalent requesting a bunch of MSIs for a single
+device, and obtaining a set of corresponding interrupts. The fact that
+you end-up muxing them in the IA block is an implementation detail.
 
-It was added briefly to for-next (carefully timed and discussed
-with Stephen to ensure it didn't appear in linux-next), to try
-and get fuller builder coverage, which is when the above issue was
-found.
+> 
+>    As per above, irq-ti-sci-inta and tisci fw creates shared IRQ on HW layer by attaching
+>    events to already established IA->IR->GIC IRQ chain. Any Rings events will trigger
+>    Linux IRQ Y line and keep it active until Rings are not empty.
+> 
+> Now why this was done this way?
+> Note. I'm not saying this is right, but it is the way we've done it as of now. And I hope MSI
+> will help to move forward, but I'm not very familiar with it.
+> 
+> The consumer of this approach is K3 Networking driver, first of all, and
+> this approach allows to eliminate runtime overhead in Networking hot path and
+> provides possibility to implement driver's specific queues/rings handling policies
+> - like round-robin vs priority.
+> 
+> CPSW networking driver doesn't need to know exact ring generated IRQ - it
 
-If you want to test, please use its separate branch, 'spectre'.
-Thanks.
+Well, to fit the Linux model, you'll have to know. Events needs to be
+signalled as individual IRQs.
 
+> need to know if there is packet for processing, so current IRQ handling sequence we have (simplified):
+> - any ring evt -> IA -> IR -> GIC -> Linux IRQ Y
+>    handle_fasteoi_irq() -> cpsw_irq_handler -> disable_irq() -> napi_schedule()
+
+Here, disable_irq() will only affect a single "event".
+
+>    ...
+>    soft_irq() -> cpsw_poll():
+> 	- [1] for each ring from Hi prio to Low prio
+> 	      [2] get packet
+> 	      [3] if (packet) process packet & goto [2]
+> 	          else goto [1]
+> 	       if (no more packets) goto [4]
+> 	  [4] enable_irq()
+> 
+> As can be seen there is no intermediate IRQ dispatchers on IA/IR levels and no IRQs-per-rings,
+> and NAPI poll cycle allows to implement driver's specific rings handling policy.
+> 
+> Next: depending on the use case following optimizations are possible:
+> 1) throughput: split all TX (or RX) rings on X groups, where X = num_cpus
+> and allocate assign IRQ to each group for Networking XPS/RPS/RSS.
+> For example, CPSW2G has 8 TX channels and so 8 completion rings, 4 CPUs:
+>   rings[0,1] -(IA/IR) - Linux IRQ 1
+>   rings[2,3] -(IA/IR) - Linux IRQ 2
+>   rings[4,5] -(IA/IR) - Linux IRQ 3
+>   rings[6,7] -(IA/IR) - Linux IRQ 4
+> each Linux IRQ assigned to separate CPU.
+
+What you call "Linux IRQ" is what ends up being generated at the GIC
+level, and isn't the interrupt the driver will get. It will get an
+interrupt number which represent a single event. We absolutely need to
+maintain this 1:1 mapping between event and driver-visible interrupts.
+Whatever happens between the scenes is none of the driver problem.
+
+In your "one interrupt, multiple events" paradigm, the whole IA thing
+would be conceptually part of your networking IP. I don't believe this
+is the case, and trawling the documentation seems to confirm this view.
+
+> 2) min latency:
+>   Ring X is used by RT application for TX/RX some traffic (using AF_XDP sockets for example)
+>   Ring X can be assigned with separate IRQ while other rings still grouped to
+>   produce 1 IRQ
+>   rings[0,6] - (IA/IR) - Linux IRQ 1
+>   rings[7] - (IA/IR) - Linux IRQ 2
+>   Linux IRQ 2 assigned to separate CPU where RT application is running.
+> 
+> Hope above will help to clarify some K3 AM6 IRQ generation questions and
+> find the way to move forward.
+
+Well, I'm convinced that we do not want a networking driver to be tied
+to an interrupt architecture, and that the two should be completely
+independent. But that's my own opinion. I can only see two solutions
+moving forward:
+
+1) You make the IA a real interrupt controller that exposes real
+interrupts (one per event), and write your networking driver
+independently of the underlying interrupt architecture.
+
+2) you make the IA an integral part of your network driver, not exposing
+anything outside of it, and limiting the interactions with the IR
+*through the standard IRQ API*. You duplicate this knowledge throughout
+the other client drivers.
+
+I believe that (2) would be a massive design mistake as it locks the
+driver to a single of the HW (and potentially a single revision of the
+firmware) while (1) gives you the required level of flexibility by
+hiding the whole event "concept" at a single location.
+
+Yes, (1) makes you rewrite your existing, out of tree drivers. Oh well...
+
+Thanks,
+	
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Jazz is not dead. It just smells funny...
