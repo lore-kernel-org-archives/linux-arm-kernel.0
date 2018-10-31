@@ -1,45 +1,58 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 31 Oct 2018 14:42:55 +0000
-Subject: [PATCH V3 01/10] dt-bindings: fsl: add compatible for imx7ulp evk
+Date: Wed, 31 Oct 2018 14:42:59 +0000
+Subject: [PATCH V3 02/10] dt-bindings: fsl: add imx7ulp pm related components
+ bindings
 In-Reply-To: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
 References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1540996688-23681-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1540996688-23681-3-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
+Add imx7ulp pm related components bindings
+
 Cc: Shawn Guo <shawnguo@kernel.org>
-Acked-by: Rob Herring <robh@kernel.org>
+Cc: devicetree at vger.kernel.org
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ChangeLog:
+v2->v3:
+ * no changes
+v1->v2:
+ * new patch
+---
+ .../bindings/arm/freescale/fsl,imx7ulp-pm.txt      | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 7b964d8..9c7c788 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -101,6 +101,10 @@ i.MX7 SabreSD Board
- Required root node properties:
-     - compatible = "fsl,imx7d-sdb", "fsl,imx7d";
- 
-+i.MX7ULP Evaluation Kit
-+Required root node properties:
-+    - compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp";
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
+new file mode 100644
+index 0000000..75195be
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
+@@ -0,0 +1,23 @@
++Freescale i.MX7ULP Power Management Components
++----------------------------------------------
 +
- Generic i.MX boards
- -------------------
- 
-@@ -123,6 +127,10 @@ i.MX6q generic board
- Required root node properties:
-     - compatible = "fsl,imx6q";
- 
-+i.MX7ULP generic board
-+Required root node properties:
-+    - compatible = "fsl,imx7ulp";
++The Multi-System Mode Controller (MSMC) is responsible for sequencing
++the MCU into and out of all stop and run power modes. Specifically, it
++monitors events to trigger transitions between power modes while
++controlling the power, clocks, and memories of the MCU to achieve the
++power consumption and functionality of that mode.
 +
- Freescale Vybrid Platform Device Tree Bindings
- ----------------------------------------------
- 
++The WFI or WFE instruction is used to invoke a Sleep, Deep Sleep or
++Standby modes for either Cortex family. Run, Wait, and Stop are the
++common terms used for the primary operating modes of Kinetis
++microcontrollers.
++
++Required properties:
++- compatible:	Should be "fsl,imx7ulp-smc1".
++- reg:		Specifies base physical address and size of the register sets.
++
++Example:
++smc1: smc1 at 40410000 {
++	compatible = "fsl,imx7ulp-smc1";
++	reg = <0x40410000 0x1000>;
++};
 -- 
 2.7.4
