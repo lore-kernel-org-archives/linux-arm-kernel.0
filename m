@@ -1,39 +1,29 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 31 Oct 2018 15:21:16 -0700
-Subject: [PATCH 0/2] perf tests: Check for ARM [vectors] page
-In-Reply-To: <20181025000905.6095-1-f.fainelli@gmail.com>
-References: <20181025000905.6095-1-f.fainelli@gmail.com>
-Message-ID: <b4fffe21-cc0d-f691-29fe-a9deda2f7ba1@gmail.com>
+Date: Wed, 31 Oct 2018 15:54:30 -0700
+Subject: [PATCH v2] ARM: mm: Facilitate debugging CONFIG_KUSER_HELPERS
+ disabled
+In-Reply-To: <20181025192621.GB16785@lunn.ch>
+References: <20181025190110.7564-1-f.fainelli@gmail.com>
+ <20181025192621.GB16785@lunn.ch>
+Message-ID: <caf4adfa-9938-0f53-75c1-48bce6095093@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/18 5:09 PM, Florian Fainelli wrote:
-> Hi all,
+On 10/25/18 12:26 PM, Andrew Lunn wrote:
+> On Thu, Oct 25, 2018 at 12:01:08PM -0700, Florian Fainelli wrote:
+>> Some software such as perf makes unconditional use of the special
+>> [vectors] page which is only provided when CONFIG_KUSER_HELPERS is
+>> enabled in the kernel.
+>>
+>> Facilitate the debugging of such situations by printing a debug message
+>> to the kernel log showing the task name and the faulting address.
 > 
-> I just painfully learned that perf would segfault when
-> CONFIG_KUSER_HELPERS is disabled because it unconditionally makes use of
-> it. This patch series adds an ARM test for that by leveraging the
-> existing find_vdso_map() function and making it more generic and capable
-> of location any map within /proc/self/maps.
-
-Any feedback on this?
-
+> Hi Florian
 > 
-> Florian Fainelli (2):
->   perf tools: Make find_vdso_map() more modular
->   perf tests: Add a test for the ARM 32-bit [vectors] page
+> Nice. I wish we had this a couple of months ago.
 > 
->  tools/perf/arch/arm/tests/Build          |  1 +
->  tools/perf/arch/arm/tests/arch-tests.c   |  4 +++
->  tools/perf/arch/arm/tests/vectors-page.c | 20 +++++++++++++++
->  tools/perf/tests/tests.h                 |  5 ++++
->  tools/perf/util/find-map.c               | 31 ++++++++++++++++++++++++
->  tools/perf/util/find-vdso-map.c          | 30 +++--------------------
->  6 files changed, 64 insertions(+), 27 deletions(-)
->  create mode 100644 tools/perf/arch/arm/tests/vectors-page.c
->  create mode 100644 tools/perf/util/find-map.c
-> 
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-
+Thanks Andrew, submitted as 8807/1.
 -- 
 Florian
