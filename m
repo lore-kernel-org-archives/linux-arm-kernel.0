@@ -1,33 +1,90 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Wed, 31 Oct 2018 18:58:00 +0100
-Subject: [PATCH v4 1/3] arm64: implement ftrace with regs
-In-Reply-To: <20181031141819.lv2tuj4ne5nf3lh3@lakrids.cambridge.arm.com>
-References: <20181026142008.D922868C94@newverein.lst.de>
- <20181026142148.6353A68C94@newverein.lst.de>
- <20181031121002.hmag2mwvlpzwobvf@lakrids.cambridge.arm.com>
- <nycvar.YFH.7.76.1810311417361.30233@cbobk.fhfr.pm>
- <20181031141819.lv2tuj4ne5nf3lh3@lakrids.cambridge.arm.com>
-Message-ID: <20181031185800.6aa17c91@blackhole>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 31 Oct 2018 17:57:39 +0000
+Subject: [PATCH v9 2/8] KVM: arm/arm64: Re-factor setting the Stage 2 entry to
+ exec on fault
+In-Reply-To: <20181031175745.18650-1-punit.agrawal@arm.com>
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+Message-ID: <20181031175745.18650-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Oct 2018 14:18:19 +0000
-Mark Rutland <mark.rutland@arm.com> wrote:
+Stage 2 fault handler marks a page as executable if it is handling an
+execution fault or if it was a permission fault in which case the
+executable bit needs to be preserved.
 
-> On Wed, Oct 31, 2018 at 02:19:07PM +0100, Jiri Kosina wrote:
+The logic to decide if the page should be marked executable is
+duplicated for PMD and PTE entries. To avoid creating another copy
+when support for PUD hugepages is introduced refactor the code to
+share the checks needed to mark a page table entry as executable.
 
-> > Other architectures do rely on that. That's exactly for example why
-> > on x86 we use '-pg -mfentry', to make sure we hook the function
-> > *before* prologue.  
-> 
-> Ah, I'd missed -mfentry for x86. I now see that's also the case with
-> __gnu_mcount_nc on arch/arm, so that covers my confusion.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/mmu.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
 
-Yes, fentry used to be the prerequisite, but it's everything but
-portable. PPC64 already had the profile-kernel switch, which was
-becoming just usable as we got at live patching.
-
-I'm hoping that the patchable-function-entry will become the future
-de-facto standard.
-
-	Torsten
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 59595207c5e1..6912529946fb 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1475,7 +1475,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  unsigned long fault_status)
+ {
+ 	int ret;
+-	bool write_fault, exec_fault, writable, force_pte = false;
++	bool write_fault, writable, force_pte = false;
++	bool exec_fault, needs_exec;
+ 	unsigned long mmu_seq;
+ 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+ 	struct kvm *kvm = vcpu->kvm;
+@@ -1598,19 +1599,25 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (exec_fault)
+ 		invalidate_icache_guest_page(pfn, vma_pagesize);
+ 
++	/*
++	 * If we took an execution fault we have made the
++	 * icache/dcache coherent above and should now let the s2
++	 * mapping be executable.
++	 *
++	 * Write faults (!exec_fault && FSC_PERM) are orthogonal to
++	 * execute permissions, and we preserve whatever we have.
++	 */
++	needs_exec = exec_fault ||
++		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
++
+ 	if (vma_pagesize == PMD_SIZE) {
+ 		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+ 		new_pmd = pmd_mkhuge(new_pmd);
+ 		if (writable)
+ 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+ 
+-		if (exec_fault) {
++		if (needs_exec)
+ 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+-		} else if (fault_status == FSC_PERM) {
+-			/* Preserve execute if XN was already cleared */
+-			if (stage2_is_exec(kvm, fault_ipa))
+-				new_pmd = kvm_s2pmd_mkexec(new_pmd);
+-		}
+ 
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+@@ -1621,13 +1628,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			mark_page_dirty(kvm, gfn);
+ 		}
+ 
+-		if (exec_fault) {
++		if (needs_exec)
+ 			new_pte = kvm_s2pte_mkexec(new_pte);
+-		} else if (fault_status == FSC_PERM) {
+-			/* Preserve execute if XN was already cleared */
+-			if (stage2_is_exec(kvm, fault_ipa))
+-				new_pte = kvm_s2pte_mkexec(new_pte);
+-		}
+ 
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+ 	}
+-- 
+2.19.1
