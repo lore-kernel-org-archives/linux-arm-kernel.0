@@ -1,52 +1,78 @@
-From: lsun@mellanox.com (Liming Sun)
-Date: Wed, 31 Oct 2018 14:09:55 -0400
-Subject: [PATCH v5 3/5] dt-bindings: soc: Add TmFifo binding for Mellanox
- BlueField SoC
-In-Reply-To: <1541009397-76223-1-git-send-email-lsun@mellanox.com>
-References: <1541009397-76223-1-git-send-email-lsun@mellanox.com>
-Message-ID: <1541009397-76223-3-git-send-email-lsun@mellanox.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 31 Oct 2018 18:40:50 +0000
+Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
+ smp_call_function()
+In-Reply-To: <20181030221843.121254-3-dianders@chromium.org>
+References: <20181030221843.121254-1-dianders@chromium.org>
+ <20181030221843.121254-3-dianders@chromium.org>
+Message-ID: <20181031184050.sd5opni3mznaapkv@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree bindings for the TmFifo which is found on Mellanox
-BlueField SoCs.
+On Tue, Oct 30, 2018 at 03:18:43PM -0700, Douglas Anderson wrote:
+> diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
+> index f3cadda45f07..9a3f952de6ed 100644
+> --- a/kernel/debug/debug_core.c
+> +++ b/kernel/debug/debug_core.c
+> @@ -55,6 +55,7 @@
+>  #include <linux/mm.h>
+>  #include <linux/vmacache.h>
+>  #include <linux/rcupdate.h>
+> +#include <linux/irq.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/byteorder.h>
+> @@ -220,6 +221,39 @@ int __weak kgdb_skipexception(int exception, struct pt_regs *regs)
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Default (weak) implementation for kgdb_roundup_cpus
+> + */
+> +
+> +static DEFINE_PER_CPU(call_single_data_t, kgdb_roundup_csd);
+> +
+> +void __weak kgdb_call_nmi_hook(void *ignored)
+> +{
+> +	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
+> +}
+> +
+> +void __weak kgdb_roundup_cpus(void)
+> +{
+> +	call_single_data_t *csd;
+> +	int cpu;
+> +
+> +	for_each_cpu(cpu, cpu_online_mask) {
+> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
+> +		smp_call_function_single_async(cpu, csd);
+> +	}
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: David Woods <dwoods@mellanox.com>
-Signed-off-by: Liming Sun <lsun@mellanox.com>
----
- .../devicetree/bindings/soc/mellanox/tmfifo.txt    | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+smp_call_function() automatically skips the calling CPU but this code does
+not. It isn't a hard bug since kgdb_nmicallback() does a re-entrancy
+check but I'd still prefer to skip the calling CPU.
 
-diff --git a/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
-new file mode 100644
-index 0000000..8a13fa6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
-@@ -0,0 +1,23 @@
-+* Mellanox BlueField SoC TmFifo
-+
-+BlueField TmFifo provides a shared FIFO between the target and the
-+external host machine, which can be accessed by external host via
-+USB or PCIe. In the current tmfifo driver, this FIFO has been demuxed
-+to implement virtual console and network interface based on the virtio
-+framework.
-+
-+Required properties:
-+
-+- compatible:	Should be "mellanox,bf-tmfifo"
-+- reg:		Physical base address and length of Rx/Tx block
-+- interrupts:	The interrupt number of Rx low water mark, Rx high water mark
-+		Tx low water mark, Tx high water mark respectively.
-+
-+Example:
-+
-+tmfifo at 800a20 {
-+	compatible = "mellanox,bf-tmfifo";
-+	reg = <0x00800a20 0x00000018
-+	       0x00800a40 0x00000018>;
-+	interrupts = <41, 42, 43, 44>;
-+};
--- 
-1.8.3.1
+As mentioned in another part of the thread we can also add robustness
+by skipping a cpu where csd->flags != 0 (and adding an appropriately
+large comment regarding why). Doing the check directly is abusing
+internal knowledge that smp.c normally keeps to itself so an accessor
+of some kind would be needed.
+
+
+> +}
+> +
+> +static void kgdb_generic_roundup_init(void)
+> +{
+> +	call_single_data_t *csd;
+> +	int cpu;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
+> +		csd->func = kgdb_call_nmi_hook;
+> +	}
+> +}
+
+I can't help noticing this code is very similar to kgdb_roundup_cpus. Do
+we really gain much from ahead-of-time initializing csd->func?
+
+
+Daniel.
