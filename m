@@ -1,221 +1,787 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 31 Oct 2018 09:45:21 +0530
-Subject: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-In-Reply-To: <HE1PR04MB14979058170FA16A7465FF9EF5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
-References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
- <20181025110901.5680-5-xiaowei.bao@nxp.com>
- <d9d07e05-556b-a56d-bb7f-eaec9fb739b8@ti.com>
- <HE1PR04MB1497DF7D9428A5C791CB6A03F5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <HE1PR04MB14979058170FA16A7465FF9EF5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
-Message-ID: <a85a6900-2478-0750-6f33-2e787cf80d1d@ti.com>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Wed, 31 Oct 2018 12:47:42 +0800
+Subject: [PATCH] arm64: dts: nxp: ls208xa: add more thermal zone support
+Message-ID: <20181031044742.26327-1-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ls208xa has several thermal sensors. Add all the sensor id to dts
+to enable them.
 
-On 31/10/18 8:03 AM, Xiaowei Bao wrote:
-> 
-> 
-> -----Original Message-----
-> From: Xiaowei Bao 
-> Sent: 2018?10?26? 17:19
-> To: 'Kishon Vijay Abraham I' <kishon@ti.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-> Cc: Jiafei Pan <jiafei.pan@nxp.com>
-> Subject: RE: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-> 
-> 
-> 
-> -----Original Message-----
-> From: Kishon Vijay Abraham I <kishon@ti.com>
-> Sent: 2018?10?26? 13:29
-> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-> 
-> Hi,
-> 
-> On Thursday 25 October 2018 04:39 PM, Xiaowei Bao wrote:
->> Add the PCIe EP mode support for layerscape platform.
->>
->> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
->> ---
->>  drivers/pci/controller/dwc/Makefile            |    2 +-
->>  drivers/pci/controller/dwc/pci-layerscape-ep.c |  161
->> ++++++++++++++++++++++++
->>  2 files changed, 162 insertions(+), 1 deletions(-)  create mode
->> 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
->>
->> diff --git a/drivers/pci/controller/dwc/Makefile
->> b/drivers/pci/controller/dwc/Makefile
->> index 5d2ce72..b26d617 100644
->> --- a/drivers/pci/controller/dwc/Makefile
->> +++ b/drivers/pci/controller/dwc/Makefile
->> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
->>  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
->>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
->>  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
->> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
->> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
->>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
->>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
->>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o diff --git 
->> a/drivers/pci/controller/dwc/pci-layerscape-ep.c
->> b/drivers/pci/controller/dwc/pci-layerscape-ep.c
->> new file mode 100644
->> index 0000000..3b33bbc
->> --- /dev/null
->> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
->> @@ -0,0 +1,161 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * PCIe controller EP driver for Freescale Layerscape SoCs
->> + *
->> + * Copyright (C) 2018 NXP Semiconductor.
->> + *
->> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>  */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/of_pci.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/of_address.h>
->> +#include <linux/pci.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/resource.h>
->> +
->> +#include "pcie-designware.h"
->> +
->> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
-> 
-> The base address should come from dt.
->> +
->> +struct ls_pcie_ep {
->> +	struct dw_pcie		*pci;
->> +};
->> +
->> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
->> +
->> +static bool ls_pcie_is_bridge(struct ls_pcie_ep *pcie) {
->> +	struct dw_pcie *pci = pcie->pci;
->> +	u32 header_type;
->> +
->> +	header_type = ioread8(pci->dbi_base + PCI_HEADER_TYPE);
->> +	header_type &= 0x7f;
->> +
->> +	return header_type == PCI_HEADER_TYPE_BRIDGE; }
->> +
->> +static int ls_pcie_establish_link(struct dw_pcie *pci) {
->> +	return 0;
->> +}
-> 
-> There should be some way by which EP should tell RC that it is not configured yet. Are there no bits to control LTSSM state initialization or Configuration retry status enabling?
-> [Xiaowei Bao] There have not bits to control LTSSM state to tell the RC it is configured. The start link is auto completed.
-> [Xiaowei Bao] Hi Kishon, is there any advice?
+To make the dts cleaner, re-organize the nodes to split out the
+common part so that it can be shared with other SoCs.
 
-If there is no HW support, I don't think anything could be done here. This
-could result in RC reading configuration space even before EP is fully initialized.
->> +
->> +static const struct dw_pcie_ops ls_pcie_ep_ops = {
->> +	.start_link = ls_pcie_establish_link, };
->> +
->> +static const struct of_device_id ls_pcie_ep_of_match[] = {
->> +	{ .compatible = "fsl,ls-pcie-ep",},
->> +	{ },
->> +};
->> +
->> +static void ls_pcie_ep_init(struct dw_pcie_ep *ep) {
->> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
->> +	struct pci_epc *epc = ep->epc;
->> +	enum pci_barno bar;
->> +
->> +	for (bar = BAR_0; bar <= BAR_5; bar++)
->> +		dw_pcie_ep_reset_bar(pci, bar);
->> +
->> +	epc->features |= EPC_FEATURE_NO_LINKUP_NOTIFIER; }
->> +
->> +static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
->> +				  enum pci_epc_irq_type type, u16 interrupt_num) {
->> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
->> +
->> +	switch (type) {
->> +	case PCI_EPC_IRQ_LEGACY:
->> +		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
->> +	case PCI_EPC_IRQ_MSI:
->> +		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
->> +	case PCI_EPC_IRQ_MSIX:
->> +		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
->> +	default:
->> +		dev_err(pci->dev, "UNKNOWN IRQ type\n");
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static struct dw_pcie_ep_ops pcie_ep_ops = {
->> +	.ep_init = ls_pcie_ep_init,
->> +	.raise_irq = ls_pcie_ep_raise_irq,
->> +};
->> +
->> +static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
->> +					struct platform_device *pdev)
->> +{
->> +	struct dw_pcie *pci = pcie->pci;
->> +	struct device *dev = pci->dev;
->> +	struct dw_pcie_ep *ep;
->> +	struct resource *res;
->> +	int ret;
->> +
->> +	ep = &pci->ep;
->> +	ep->ops = &pcie_ep_ops;
->> +
->> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
->> +	if (!res)
->> +		return -EINVAL;
->> +
->> +	ep->phys_base = res->start;
->> +	ep->addr_size = resource_size(res);
->> +
->> +	ret = dw_pcie_ep_init(ep);
->> +	if (ret) {
->> +		dev_err(dev, "failed to initialize endpoint\n");
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int __init ls_pcie_ep_probe(struct platform_device *pdev) {
->> +	struct device *dev = &pdev->dev;
->> +	struct dw_pcie *pci;
->> +	struct ls_pcie_ep *pcie;
->> +	struct resource *dbi_base;
->> +	int ret;
->> +
->> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
->> +	if (!pcie)
->> +		return -ENOMEM;
->> +
->> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
->> +	if (!pci)
->> +		return -ENOMEM;
->> +
->> +	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
->> +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
->> +	if (IS_ERR(pci->dbi_base))
->> +		return PTR_ERR(pci->dbi_base);
->> +
->> +	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
->> +	pci->dev = dev;
->> +	pci->ops = &ls_pcie_ep_ops;
->> +	pcie->pci = pci;
->> +
->> +	if (ls_pcie_is_bridge(pcie))
->> +		return -ENODEV;
-> 
-> For an endpoint this condition should never occur. This should only mean, a wrong compatible has been used in dt.
-> [Xiaowei Bao] This function is a way that can check the PCI controller whether work in EP mode, I think it is more safer. Of course, it can be removed.
-> [Xiaowei Bao] Hi Kishon, is there any advice?
+Signed-off-by: Yuantian Tang <andy.tang@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi  |    8 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi  |    8 +-
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi  |   83 +++-----
+ arch/arm64/boot/dts/freescale/fsl-tmu-map1.dtsi |   99 +++++++++
+ arch/arm64/boot/dts/freescale/fsl-tmu-map2.dtsi |   99 +++++++++
+ arch/arm64/boot/dts/freescale/fsl-tmu-map3.dtsi |   99 +++++++++
+ arch/arm64/boot/dts/freescale/fsl-tmu.dtsi      |  251 +++++++++++++++++++++++
+ 7 files changed, 591 insertions(+), 56 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-tmu-map1.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-tmu-map2.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-tmu-map3.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-tmu.dtsi
 
-IMHO this check is not required.
-
-Thanks
-Kishon
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index f9c1d30..8f9788c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -12,7 +12,7 @@
+ #include "fsl-ls208xa.dtsi"
+ 
+ &cpu {
+-	cpu0: cpu at 0 {
++	cooling_map0: cpu0: cpu at 0 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a57";
+ 		reg = <0x0>;
+@@ -32,7 +32,7 @@
+ 		#cooling-cells = <2>;
+ 	};
+ 
+-	cpu2: cpu at 100 {
++	cooling_map1: cpu2: cpu at 100 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a57";
+ 		reg = <0x100>;
+@@ -52,7 +52,7 @@
+ 		#cooling-cells = <2>;
+ 	};
+ 
+-	cpu4: cpu at 200 {
++	cooling_map2: cpu4: cpu at 200 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a57";
+ 		reg = <0x200>;
+@@ -72,7 +72,7 @@
+ 		#cooling-cells = <2>;
+ 	};
+ 
+-	cpu6: cpu at 300 {
++	cooling_map3: cpu6: cpu at 300 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a57";
+ 		reg = <0x300>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+index 7c882da..013fe16 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+@@ -12,7 +12,7 @@
+ #include "fsl-ls208xa.dtsi"
+ 
+ &cpu {
+-	cpu0: cpu at 0 {
++	cooling_map0: cpu0: cpu at 0 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a72";
+ 		reg = <0x0>;
+@@ -32,7 +32,7 @@
+ 		#cooling-cells = <2>;
+ 	};
+ 
+-	cpu2: cpu at 100 {
++	cooling_map1: cpu2: cpu at 100 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a72";
+ 		reg = <0x100>;
+@@ -52,7 +52,7 @@
+ 		#cooling-cells = <2>;
+ 	};
+ 
+-	cpu4: cpu at 200 {
++	cooling_map2: cpu4: cpu at 200 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a72";
+ 		reg = <0x200>;
+@@ -72,7 +72,7 @@
+ 		#cooling-cells = <2>;
+ 	};
+ 
+-	cpu6: cpu at 300 {
++	cooling_map3: cpu6: cpu at 300 {
+ 		device_type = "cpu";
+ 		compatible = "arm,cortex-a72";
+ 		reg = <0x300>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+index 8cb78dd..4102317 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+@@ -75,54 +75,7 @@
+ 		mask = <0x2>;
+ 	};
+ 
+-	thermal-zones {
+-		cpu_thermal: cpu-thermal {
+-			polling-delay-passive = <1000>;
+-			polling-delay = <5000>;
+-
+-			thermal-sensors = <&tmu 4>;
+-
+-			trips {
+-				cpu_alert: cpu-alert {
+-					temperature = <75000>;
+-					hysteresis = <2000>;
+-					type = "passive";
+-				};
+-				cpu_crit: cpu-crit {
+-					temperature = <85000>;
+-					hysteresis = <2000>;
+-					type = "critical";
+-				};
+-			};
+-
+-			cooling-maps {
+-				map0 {
+-					trip = <&cpu_alert>;
+-					cooling-device =
+-						<&cpu0 THERMAL_NO_LIMIT
+-						THERMAL_NO_LIMIT>;
+-				};
+-				map1 {
+-					trip = <&cpu_alert>;
+-					cooling-device =
+-						<&cpu2 THERMAL_NO_LIMIT
+-						THERMAL_NO_LIMIT>;
+-				};
+-				map2 {
+-					trip = <&cpu_alert>;
+-					cooling-device =
+-						<&cpu4 THERMAL_NO_LIMIT
+-						THERMAL_NO_LIMIT>;
+-				};
+-				map3 {
+-					trip = <&cpu_alert>;
+-					cooling-device =
+-						<&cpu6 THERMAL_NO_LIMIT
+-						THERMAL_NO_LIMIT>;
+-				};
+-			};
+-		};
+-	};
++	#include "fsl-tmu.dtsi"
+ 
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+@@ -692,6 +645,7 @@
+ 					<0000 0 0 4 &gic 0 0 0 127 4>;
+ 		};
+ 
++
+ 		sata0: sata at 3200000 {
+ 			status = "disabled";
+ 			compatible = "fsl,ls2080a-ahci";
+@@ -758,3 +712,36 @@
+ 		};
+ 	};
+ };
++
++#include "fsl-tmu-map1.dtsi"
++#include "fsl-tmu-map2.dtsi"
++#include "fsl-tmu-map3.dtsi"
++&thermal_zones {
++	thermal-zone1 {
++		status = "okay";
++	};
++
++	thermal-zone2{
++		status = "okay";
++	};
++
++	thermal-zone3{
++		status = "okay";
++	};
++
++	thermal-zone4{
++		status = "okay";
++	};
++
++	thermal-zone5{
++		status = "okay";
++	};
++
++	thermal-zone6{
++		status = "okay";
++	};
++
++	thermal-zone7 {
++		status = "okay";
++	};
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-tmu-map1.dtsi b/arch/arm64/boot/dts/freescale/fsl-tmu-map1.dtsi
+new file mode 100644
+index 0000000..87e0d2e
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-tmu-map1.dtsi
+@@ -0,0 +1,99 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device Tree Include file for Thermal Monitor Unit.
++ *
++ * Copyright 2018 NXP
++ *
++ * Tang Yuantian <andy.tang@nxp.com>
++ *
++ */
++
++&thermal_zones {
++	thermal-zone0 {
++		cooling-maps {
++			map1 {
++				trip = <&alert0>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone1 {
++		cooling-maps {
++			map1 {
++				trip = <&alert1>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone2 {
++		cooling-maps {
++			map1 {
++				trip = <&alert2>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone3 {
++		cooling-maps {
++			map1 {
++				trip = <&alert3>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone4 {
++		cooling-maps {
++			map1 {
++				trip = <&alert4>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone5 {
++		cooling-maps {
++			map1 {
++				trip = <&alert5>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone6 {
++		cooling-maps {
++			map1 {
++				trip = <&alert6>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone7 {
++		cooling-maps {
++			map1 {
++				trip = <&alert7>;
++				cooling-device =
++					<&cooling_map1 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-tmu-map2.dtsi b/arch/arm64/boot/dts/freescale/fsl-tmu-map2.dtsi
+new file mode 100644
+index 0000000..7e35073
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-tmu-map2.dtsi
+@@ -0,0 +1,99 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device Tree Include file for Thermal Monitor Unit.
++ *
++ * Copyright 2018 NXP
++ *
++ * Tang Yuantian <andy.tang@nxp.com>
++ *
++ */
++
++&thermal_zones {
++	thermal-zone0 {
++		cooling-maps {
++			map2 {
++				trip = <&alert0>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone1 {
++		cooling-maps {
++			map2 {
++				trip = <&alert1>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone2 {
++		cooling-maps {
++			map2 {
++				trip = <&alert2>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone3 {
++		cooling-maps {
++			map2 {
++				trip = <&alert3>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone4 {
++		cooling-maps {
++			map2 {
++				trip = <&alert4>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone5 {
++		cooling-maps {
++			map2 {
++				trip = <&alert5>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone6 {
++		cooling-maps {
++			map2 {
++				trip = <&alert6>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone7 {
++		cooling-maps {
++			map2 {
++				trip = <&alert7>;
++				cooling-device =
++					<&cooling_map2 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-tmu-map3.dtsi b/arch/arm64/boot/dts/freescale/fsl-tmu-map3.dtsi
+new file mode 100644
+index 0000000..dcde943
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-tmu-map3.dtsi
+@@ -0,0 +1,99 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device Tree Include file for Thermal Monitor Unit.
++ *
++ * Copyright 2018 NXP
++ *
++ * Tang Yuantian <andy.tang@nxp.com>
++ *
++ */
++
++&thermal_zones {
++	thermal-zone0 {
++		cooling-maps {
++			map3 {
++				trip = <&alert0>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone1 {
++		cooling-maps {
++			map3 {
++				trip = <&alert1>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone2 {
++		cooling-maps {
++			map3 {
++				trip = <&alert2>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone3 {
++		cooling-maps {
++			map3 {
++				trip = <&alert3>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone4 {
++		cooling-maps {
++			map3 {
++				trip = <&alert4>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone5 {
++		cooling-maps {
++			map3 {
++				trip = <&alert5>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone6 {
++		cooling-maps {
++			map3 {
++				trip = <&alert6>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone7 {
++		cooling-maps {
++			map3 {
++				trip = <&alert7>;
++				cooling-device =
++					<&cooling_map3 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-tmu.dtsi b/arch/arm64/boot/dts/freescale/fsl-tmu.dtsi
+new file mode 100644
+index 0000000..133d2dc
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-tmu.dtsi
+@@ -0,0 +1,251 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device Tree Include file for Thermal Monitor Unit.
++ *
++ * Copyright 2018 NXP
++ *
++ * Tang Yuantian <andy.tang@nxp.com>
++ *
++ */
++
++thermal_zones: thermal-zones {
++	thermal_zone0: thermal-zone0 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 0>;
++		status = "disabled";
++
++		trips {
++			alert0: alert0 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit0: crit0 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert0>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone1 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 1>;
++		status = "disabled";
++
++		trips {
++			alert1: alert1 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit1: crit1 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert1>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone2 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 2>;
++		status = "disabled";
++
++		trips {
++			alert2: alert2 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit2: crit2 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert2>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone3 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 3>;
++		status = "disabled";
++
++		trips {
++			alert3: alert3 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit3: crit3 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert3>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone4 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 4>;
++		status = "disabled";
++
++		trips {
++			alert4: alert4 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit4: crit4 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert4>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone5 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 5>;
++		status = "disabled";
++
++		trips {
++			alert5: alert5 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit5: crit5 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert5>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone6 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 6>;
++		status = "disabled";
++
++		trips {
++			alert6: alert6 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit6: crit6 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert6>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++
++	thermal-zone7 {
++		polling-delay-passive = <1000>;
++		polling-delay = <5000>;
++		thermal-sensors = <&tmu 7>;
++		status = "disabled";
++
++		trips {
++			alert7: alert7 {
++				temperature = <75000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++
++			crit7: crit7 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++
++		cooling-maps {
++			map0 {
++				trip = <&alert7>;
++				cooling-device =
++					<&cooling_map0 THERMAL_NO_LIMIT
++					THERMAL_NO_LIMIT>;
++			};
++		};
++	};
++};
+-- 
+1.7.1
