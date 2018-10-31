@@ -1,50 +1,60 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 31 Oct 2018 10:24:32 +0800
-Subject: [PATCH v3 22/25] dt-bindings: sun6i-dsi: Add compatible for A64
- DPHY
-In-Reply-To: <20181026144344.27778-23-jagan@amarulasolutions.com>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <20181026144344.27778-23-jagan@amarulasolutions.com>
-Message-ID: <CAGb2v65a-+-U74QWBvHLJ9e+_dWY3Cy+h9CfAFHqmFnB0GmcBw@mail.gmail.com>
+Date: Wed, 31 Oct 2018 10:29:59 +0800
+Subject: [PATCH v5 04/11] dt-bindings: iio: adc: add AXP803 ADC bindings
+In-Reply-To: <20181029130757.m5okrfvusjl5fu5m@qschulz>
+References: <20181023185330.10472-1-oskari@lemmela.net>
+ <20181023185330.10472-5-oskari@lemmela.net>
+ <20181024135633.GA342@bogus> <20181028154011.04efdecf@archlinux>
+ <20181029130757.m5okrfvusjl5fu5m@qschulz>
+Message-ID: <CAGb2v65JKj_7VcEr1KuZVop85hn-3h73NrExprpmLbKZiosD5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 10:46 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+On Mon, Oct 29, 2018 at 9:10 PM Quentin Schulz
+<quentin.schulz@bootlin.com> wrote:
 >
-> The MIPI DSI PHY HDMI controller on Allwinner A64 is similar
-> on the one on A31.
+> Hi Jonathan,
 >
-> Add A64 compatible and append A31 compatible as fallback.
+> On Sun, Oct 28, 2018 at 03:40:11PM +0000, Jonathan Cameron wrote:
+> > On Wed, 24 Oct 2018 08:56:33 -0500
+> > Rob Herring <robh@kernel.org> wrote:
+> >
+> > > On Tue, 23 Oct 2018 21:53:23 +0300, Oskari Lemmela wrote:
+> > > > The AXP803 ADC is compatible with AXP813 ADC, but add
+> > > > specific compatible for it.
+> > > >
+> > > > Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
+> > > > ---
+> > > >  Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt | 2 ++
+> > > >  1 file changed, 2 insertions(+)
+> > > >
+> > >
+> > > Reviewed-by: Rob Herring <robh@kernel.org>
+> >
+> > This doesn't seem to have any dependencies with the other patches
+> > so applied to the togreg branch of iio.git and pushed out as testing
+> > for the autobuilders to ignore.  However I am a little curious to know
+> > why we would add the ID and then not use it (that I can see)?
+> >
 >
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v3:
-> - none
-> Changes for v2:
-> - new patch
+> Sometimes with Allwinner (and X-Powers), two IPs seem identical until we
+> discover something that is slightly different. When this happens, we
+> have to add a compatible to differentiate both. However, we would also
+> need to change the Device Tree to change the compatible. We would need
+> to handle the driver behaviour for both Device Trees.
 >
->  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> So better anticipate a possible difference so that we don't have to do
+> some hacks in the driver to handle the device correctly.
 >
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> index 9fa6e7a758ad..704fb31962f2 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> @@ -36,7 +36,7 @@ D-PHY
->
->  Required properties:
->    - compatible: value must be one of:
-> -    * allwinner,sun6i-a31-mipi-dphy
-> +    * "allwinner,sun50i-a64-mipi-dphy", "allwinner,sun6i-a31-mipi-dphy"
+> As always, Chen-Yu or Maxime may know better so I'm just stating what I
+> seem to recall.
 
-The format for this is one "combination" per line. You need to keep the
-original "allwinner,sun6i-a31-mipi-dphy".
+With Allwinner stuff (X-Powers included), sometimes the documents are
+incomplete or have errors. We tend to add a model-specific compatible
+just in case things turn out not to be so compatible, unless someone
+has triple-checked everything, documents and actual hardware included.
+
+However we don't actually document these, so this patch isn't strictly
+needed. (I suppose this might annoy the device tree binding maintainers.)
 
 ChenYu
-
->    - reg: base address and size of memory-mapped region
->    - clocks: phandles to the clocks feeding the DSI encoder
->      * bus: the DSI interface clock
-> --
-> 2.18.0.321.gffc6fa0e3
->
