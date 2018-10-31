@@ -1,28 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 31 Oct 2018 12:01:17 +0100
-Subject: [PATCH RESEND V3 2/2] pinctrl: imx: add imx8qxp driver
-In-Reply-To: <1540908354-26809-3-git-send-email-aisheng.dong@nxp.com>
-References: <1540908354-26809-1-git-send-email-aisheng.dong@nxp.com>
- <1540908354-26809-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdZmpOkOV8__KVn6=HB2vwioS_x+aZf8UuxNHSStzUy6=Q@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 31 Oct 2018 12:20:00 +0100
+Subject: [PATCH v1 00/14] Rockchip SPI cleanup and use interrupts
+In-Reply-To: <20181031105711.19575-1-esmil@mailme.dk>
+References: <20181031105711.19575-1-esmil@mailme.dk>
+Message-ID: <4443653.p1DpZLIVTj@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 3:10 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
+Am Mittwoch, 31. Oktober 2018, 11:56:57 CET schrieb Emil Renner Berthing:
+> Emil Renner Berthing (14):
+>   spi: rockchip: make spi_enable_chip take bool
+>   spi: rockchip: use designated init for dma config
+>   spi: rockchip: always use SPI mode
+>   spi: rockchip: use atomic_t state
+>   spi: rockchip: disable spi on error
+>   spi: rockchip: read transfer info directly
+>   spi: rockchip: don't store dma channels twice
+>   spi: rockchip: remove master pointer from dev data
+>   spi: rockchip: simplify use_dma logic
+>   spi: rockchip: set min/max speed
+>   spi: rockchip: precompute rx sample delay
+>   spi: rockchip: use irq rather than polling
+>   spi: rockchip: support 4bit words
+>   spi: rockchip: support lsb-first mode
 
-> MX8QXP contains a system controller that is responsible for controlling
-> the pad setting of the IPs that are present. Communication between the
-> host processor running an OS and the system controller happens through
-> a SCU protocol. This patch adds the SCU based MX8QXP pinctrl driver.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+The series, on rk3288 with cros-ec and spi-flash, rk3328 with a spi-flash, 
+rk3399 with cros-ec and spi-flash:
 
-Patch applied.
-
-Yours,
-Linus Walleij
+Tested-by: Heiko Stuebner <heiko@sntech.de>
