@@ -1,25 +1,18 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 31 Oct 2018 14:25:57 +0800
-Subject: [PATCH v7 6/6] arm64: dts: add LX2160ARDB board support
-In-Reply-To: <1540759926-3641-7-git-send-email-vabhav.sharma@nxp.com>
-References: <1540759926-3641-1-git-send-email-vabhav.sharma@nxp.com>
- <1540759926-3641-7-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <20181031062555.GD10386@tiger>
+Date: Wed, 31 Oct 2018 14:27:41 +0800
+Subject: [PATCH v3] arm64: dts: add LX2160AQDS board support
+In-Reply-To: <20181017160430.22381-1-pankaj.bansal@nxp.com>
+References: <20181005081053.27105-1-pankaj.bansal@nxp.com>
+ <20181017160430.22381-1-pankaj.bansal@nxp.com>
+Message-ID: <20181031062738.GE10386@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 08:58:01AM +0000, Vabhav Sharma wrote:
-> LX2160A reference design board (RDB) is a high-performance
-> computing, evaluation, and development platform with LX2160A
-> SoC.
+On Wed, Oct 17, 2018 at 10:32:45AM +0000, Pankaj Bansal wrote:
+> The LX2160A QorIQ Development System (QDS) is a test, evaluation, and
+> development platform, supporting QorIQ LX2160A processor.
 > 
-> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
 > Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> Signed-off-by: Horia Geanta <horia.geanta@nxp.com>
-> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
-> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
-> Acked-by: Li Yang <leoyang.li@nxp.com>
+> Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
 
 Applied, thanks.
