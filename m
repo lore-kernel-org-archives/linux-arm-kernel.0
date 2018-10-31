@@ -1,211 +1,83 @@
-From: xiaowei.bao@nxp.com (Xiaowei Bao)
-Date: Wed, 31 Oct 2018 02:33:04 +0000
-Subject: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-In-Reply-To: <HE1PR04MB1497DF7D9428A5C791CB6A03F5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
-References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
- <20181025110901.5680-5-xiaowei.bao@nxp.com>
- <d9d07e05-556b-a56d-bb7f-eaec9fb739b8@ti.com>
- <HE1PR04MB1497DF7D9428A5C791CB6A03F5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR04MB14979058170FA16A7465FF9EF5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 31 Oct 2018 10:33:58 +0800
+Subject: [PATCH v5 00/11] AXP8x3 AC and battery power supply support
+In-Reply-To: <20181025133017.2rdnbgmvdlx67kcz@earth.universe>
+References: <20181023185330.10472-1-oskari@lemmela.net>
+ <20181025133017.2rdnbgmvdlx67kcz@earth.universe>
+Message-ID: <CAGb2v64oGFyUenJ9-054RCXoG0Z+z5ziiTiL95Ga-5yy3xFyxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 26, 2018 at 3:08 AM Sebastian Reichel
+<sebastian.reichel@collabora.com> wrote:
+>
+> Hi,
+>
+> Patches 1, 2 & 9 look good to me and do not seem to have any
+> dependencies. I plan to merge them after the merge window
+> for 4.20 closes.
 
+Patches 2, 3 & 4 aren't needed. They aren't in the correct format
+for model-specific + fallback compatibles either.
 
------Original Message-----
-From: Xiaowei Bao 
-Sent: 2018?10?26? 17:19
-To: 'Kishon Vijay Abraham I' <kishon@ti.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-Cc: Jiafei Pan <jiafei.pan@nxp.com>
-Subject: RE: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+ChenYu
 
-
-
------Original Message-----
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Sent: 2018?10?26? 13:29
-To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-
-Hi,
-
-On Thursday 25 October 2018 04:39 PM, Xiaowei Bao wrote:
-> Add the PCIe EP mode support for layerscape platform.
-> 
-> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
-> ---
->  drivers/pci/controller/dwc/Makefile            |    2 +-
->  drivers/pci/controller/dwc/pci-layerscape-ep.c |  161
-> ++++++++++++++++++++++++
->  2 files changed, 162 insertions(+), 1 deletions(-)  create mode
-> 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
-> 
-> diff --git a/drivers/pci/controller/dwc/Makefile
-> b/drivers/pci/controller/dwc/Makefile
-> index 5d2ce72..b26d617 100644
-> --- a/drivers/pci/controller/dwc/Makefile
-> +++ b/drivers/pci/controller/dwc/Makefile
-> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
->  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
->  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
->  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
-> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
-> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
->  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
->  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
->  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o diff --git 
-> a/drivers/pci/controller/dwc/pci-layerscape-ep.c
-> b/drivers/pci/controller/dwc/pci-layerscape-ep.c
-> new file mode 100644
-> index 0000000..3b33bbc
-> --- /dev/null
-> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
-> @@ -0,0 +1,161 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * PCIe controller EP driver for Freescale Layerscape SoCs
-> + *
-> + * Copyright (C) 2018 NXP Semiconductor.
-> + *
-> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>  */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
-> +#include <linux/pci.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/resource.h>
-> +
-> +#include "pcie-designware.h"
-> +
-> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
-
-The base address should come from dt.
-> +
-> +struct ls_pcie_ep {
-> +	struct dw_pcie		*pci;
-> +};
-> +
-> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
-> +
-> +static bool ls_pcie_is_bridge(struct ls_pcie_ep *pcie) {
-> +	struct dw_pcie *pci = pcie->pci;
-> +	u32 header_type;
-> +
-> +	header_type = ioread8(pci->dbi_base + PCI_HEADER_TYPE);
-> +	header_type &= 0x7f;
-> +
-> +	return header_type == PCI_HEADER_TYPE_BRIDGE; }
-> +
-> +static int ls_pcie_establish_link(struct dw_pcie *pci) {
-> +	return 0;
-> +}
-
-There should be some way by which EP should tell RC that it is not configured yet. Are there no bits to control LTSSM state initialization or Configuration retry status enabling?
-[Xiaowei Bao] There have not bits to control LTSSM state to tell the RC it is configured. The start link is auto completed.
-[Xiaowei Bao] Hi Kishon, is there any advice?
-> +
-> +static const struct dw_pcie_ops ls_pcie_ep_ops = {
-> +	.start_link = ls_pcie_establish_link, };
-> +
-> +static const struct of_device_id ls_pcie_ep_of_match[] = {
-> +	{ .compatible = "fsl,ls-pcie-ep",},
-> +	{ },
-> +};
-> +
-> +static void ls_pcie_ep_init(struct dw_pcie_ep *ep) {
-> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
-> +	struct pci_epc *epc = ep->epc;
-> +	enum pci_barno bar;
-> +
-> +	for (bar = BAR_0; bar <= BAR_5; bar++)
-> +		dw_pcie_ep_reset_bar(pci, bar);
-> +
-> +	epc->features |= EPC_FEATURE_NO_LINKUP_NOTIFIER; }
-> +
-> +static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
-> +				  enum pci_epc_irq_type type, u16 interrupt_num) {
-> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
-> +
-> +	switch (type) {
-> +	case PCI_EPC_IRQ_LEGACY:
-> +		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
-> +	case PCI_EPC_IRQ_MSI:
-> +		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
-> +	case PCI_EPC_IRQ_MSIX:
-> +		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
-> +	default:
-> +		dev_err(pci->dev, "UNKNOWN IRQ type\n");
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct dw_pcie_ep_ops pcie_ep_ops = {
-> +	.ep_init = ls_pcie_ep_init,
-> +	.raise_irq = ls_pcie_ep_raise_irq,
-> +};
-> +
-> +static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
-> +					struct platform_device *pdev)
-> +{
-> +	struct dw_pcie *pci = pcie->pci;
-> +	struct device *dev = pci->dev;
-> +	struct dw_pcie_ep *ep;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	ep = &pci->ep;
-> +	ep->ops = &pcie_ep_ops;
-> +
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
-> +	if (!res)
-> +		return -EINVAL;
-> +
-> +	ep->phys_base = res->start;
-> +	ep->addr_size = resource_size(res);
-> +
-> +	ret = dw_pcie_ep_init(ep);
-> +	if (ret) {
-> +		dev_err(dev, "failed to initialize endpoint\n");
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init ls_pcie_ep_probe(struct platform_device *pdev) {
-> +	struct device *dev = &pdev->dev;
-> +	struct dw_pcie *pci;
-> +	struct ls_pcie_ep *pcie;
-> +	struct resource *dbi_base;
-> +	int ret;
-> +
-> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
-> +	if (!pcie)
-> +		return -ENOMEM;
-> +
-> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> +	if (!pci)
-> +		return -ENOMEM;
-> +
-> +	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-> +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
-> +	if (IS_ERR(pci->dbi_base))
-> +		return PTR_ERR(pci->dbi_base);
-> +
-> +	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
-> +	pci->dev = dev;
-> +	pci->ops = &ls_pcie_ep_ops;
-> +	pcie->pci = pci;
-> +
-> +	if (ls_pcie_is_bridge(pcie))
-> +		return -ENODEV;
-
-For an endpoint this condition should never occur. This should only mean, a wrong compatible has been used in dt.
-[Xiaowei Bao] This function is a way that can check the PCI controller whether work in EP mode, I think it is more safer. Of course, it can be removed.
-[Xiaowei Bao] Hi Kishon, is there any advice?
-Thanks
-Kishon
+>
+> -- Sebastian
+>
+> On Tue, Oct 23, 2018 at 09:53:19PM +0300, Oskari Lemmela wrote:
+> > AXP813 AC power supply support with input current and
+> > voltage limiting support.
+> >
+> > AXP803 AC and battery power supply support.
+> >
+> > Changes in v5:
+> > * Return correct input current limit for values 0x6 and 0x7
+> > * Add specific compatibles for AXP803
+> > * Change commit messages
+> > * Add Vasily Khoruzhick Pinebook DTS patch
+> >
+> > Changes in v4:
+> > * Change order of axp20x-gpio in axp20x.c
+> > * Fix indentation and spaces to tabs in axp20x.c
+> >
+> > Changes in v3:
+> > * Reorder ac_power_supply DT node
+> > * Rename axp20x_ac_power_set_property function
+> > * Split mfd commit
+> >
+> > Changes in v2:
+> > * Reuse axp813 compatibles for axp803
+> > * Refactor axp20x_ac_power.c
+> >
+> > Oskari Lemmela (10):
+> >   dt-bindings: power: supply: axp20x: add AXP813 AC power DT binding
+> >   dt-bindings: power: supply: axp20x: add AXP803 power bindings
+> >   dt-bindings: gpio: gpio-axp209: add AXP803 GPIO bindings
+> >   dt-bindings: iio: adc: add AXP803 ADC bindings
+> >   ARM: dts: axp81x: add AC power supply subnode
+> >   arm64: dts: allwinner: axp803: add AC and battery power supplies
+> >   arm64: dts: allwinner: a64: sopine-baseboard: enable power supplies
+> >   power: supply: add AC power supply driver for AXP813
+> >   mfd: axp20x: Add AC power supply cell for AXP813
+> >   mfd: axp20x: Add supported cells for AXP803
+> >
+> > Vasily Khoruzhick (1):
+> >   arm64: dts: allwinner: a64: pinebook: enable power supplies
+> >
+> >  .../devicetree/bindings/gpio/gpio-axp209.txt  |  2 +
+> >  .../bindings/iio/adc/axp20x_adc.txt           |  2 +
+> >  .../bindings/power/supply/axp20x_ac_power.txt |  4 +
+> >  .../bindings/power/supply/axp20x_battery.txt  |  1 +
+> >  arch/arm/boot/dts/axp81x.dtsi                 |  5 +
+> >  arch/arm64/boot/dts/allwinner/axp803.dtsi     | 33 +++++++
+> >  .../dts/allwinner/sun50i-a64-pinebook.dts     |  8 ++
+> >  .../allwinner/sun50i-a64-sopine-baseboard.dts |  8 ++
+> >  drivers/mfd/axp20x.c                          | 20 ++++
+> >  drivers/power/supply/axp20x_ac_power.c        | 94 +++++++++++++++++++
+> >  include/linux/mfd/axp20x.h                    |  1 +
+> >  11 files changed, 178 insertions(+)
+> >
+> > --
+> > 2.17.1
+> >
