@@ -1,250 +1,38 @@
-From: xiaowei.bao@nxp.com (Xiaowei Bao)
-Date: Wed, 31 Oct 2018 10:38:14 +0000
-Subject: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-In-Reply-To: <a85a6900-2478-0750-6f33-2e787cf80d1d@ti.com>
-References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
- <20181025110901.5680-5-xiaowei.bao@nxp.com>
- <d9d07e05-556b-a56d-bb7f-eaec9fb739b8@ti.com>
- <HE1PR04MB1497DF7D9428A5C791CB6A03F5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <HE1PR04MB14979058170FA16A7465FF9EF5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <a85a6900-2478-0750-6f33-2e787cf80d1d@ti.com>
-Message-ID: <HE1PR04MB1497DF7378927C9BB5DF3E15F5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 31 Oct 2018 10:46:52 +0000
+Subject: [PATCH v4 2/4] crypto: mxs-dcp - Add support for dcp clk
+References: <cover.1539779579.git.leonard.crestez@nxp.com>
+ <95dce7010676581691b1ac9906e9298470e0aa1a.1539779579.git.leonard.crestez@nxp.com>
+ <CAOMZO5BMeHjsyZWhUb5RmEBRCYViUN-Vx8KyLBWtDJGKBHHpCg@mail.gmail.com>
+ <a97517bf72f649915bccf555ab7d3c8c4551298d.camel@nxp.com>
+ <CAOMZO5DCzM_NnqD4tHTAn4pAaUdQGo38Ami1h3pu9SzgyQ7GnQ@mail.gmail.com>
+Message-ID: <AM0PR04MB4290A361A92B782DC5A9F8BDEECD0@AM0PR04MB4290.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/17/2018 4:02 PM, Fabio Estevam wrote:
+> On Wed, Oct 17, 2018 at 9:59 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> 
+>> There is a changelog in the cover letter.
+> 
+> It did not show up:
+> https://lkml.org/lkml/2018/10/17/673
 
+Sorry, I forgot to copy the changelog for v4. The only change is the one 
+we discussed earlier in this thread.
 
------Original Message-----
-From: Kishon Vijay Abraham I <kishon@ti.com> 
-Sent: 2018?10?31? 12:15
-To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; niklas.cassel at axis.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-Cc: Jiafei Pan <jiafei.pan@nxp.com>
-Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-
-Hi,
-
-On 31/10/18 8:03 AM, Xiaowei Bao wrote:
-> 
-> 
-> -----Original Message-----
-> From: Xiaowei Bao
-> Sent: 2018?10?26? 17:19
-> To: 'Kishon Vijay Abraham I' <kishon@ti.com>; bhelgaas at google.com; 
-> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li 
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
-> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai 
-> Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
-> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; 
-> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
-> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-> Cc: Jiafei Pan <jiafei.pan@nxp.com>
-> Subject: RE: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-> 
-> 
-> 
-> -----Original Message-----
-> From: Kishon Vijay Abraham I <kishon@ti.com>
-> Sent: 2018?10?26? 13:29
-> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; 
-> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li 
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
-> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai 
-> Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
-> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; 
-> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
-> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-> 
-> Hi,
-> 
-> On Thursday 25 October 2018 04:39 PM, Xiaowei Bao wrote:
->> Add the PCIe EP mode support for layerscape platform.
+>> This only looks slightly odd in git diff but it's not unrelated.
 >>
->> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
->> ---
->>  drivers/pci/controller/dwc/Makefile            |    2 +-
->>  drivers/pci/controller/dwc/pci-layerscape-ep.c |  161
->> ++++++++++++++++++++++++
->>  2 files changed, 162 insertions(+), 1 deletions(-)  create mode
->> 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
->>
->> diff --git a/drivers/pci/controller/dwc/Makefile
->> b/drivers/pci/controller/dwc/Makefile
->> index 5d2ce72..b26d617 100644
->> --- a/drivers/pci/controller/dwc/Makefile
->> +++ b/drivers/pci/controller/dwc/Makefile
->> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
->>  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
->>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
->>  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
->> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
->> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
->>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
->>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
->>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o diff --git 
->> a/drivers/pci/controller/dwc/pci-layerscape-ep.c
->> b/drivers/pci/controller/dwc/pci-layerscape-ep.c
->> new file mode 100644
->> index 0000000..3b33bbc
->> --- /dev/null
->> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
->> @@ -0,0 +1,161 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * PCIe controller EP driver for Freescale Layerscape SoCs
->> + *
->> + * Copyright (C) 2018 NXP Semiconductor.
->> + *
->> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>  */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/of_pci.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/of_address.h>
->> +#include <linux/pci.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/resource.h>
->> +
->> +#include "pcie-designware.h"
->> +
->> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
+>> I placed clk get/prepare/enable just before stmp_reset_block and made
+>> stmp_reset_block print a message and goto err_disable_unprepare_clk on
+>> failure instead of just "if (ret) return ret;"
 > 
-> The base address should come from dt.
->> +
->> +struct ls_pcie_ep {
->> +	struct dw_pcie		*pci;
->> +};
->> +
->> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
->> +
->> +static bool ls_pcie_is_bridge(struct ls_pcie_ep *pcie) {
->> +	struct dw_pcie *pci = pcie->pci;
->> +	u32 header_type;
->> +
->> +	header_type = ioread8(pci->dbi_base + PCI_HEADER_TYPE);
->> +	header_type &= 0x7f;
->> +
->> +	return header_type == PCI_HEADER_TYPE_BRIDGE; }
->> +
->> +static int ls_pcie_establish_link(struct dw_pcie *pci) {
->> +	return 0;
->> +}
+> Got it! Then it looks fine, thanks:
 > 
-> There should be some way by which EP should tell RC that it is not configured yet. Are there no bits to control LTSSM state initialization or Configuration retry status enabling?
-> [Xiaowei Bao] There have not bits to control LTSSM state to tell the RC it is configured. The start link is auto completed.
-> [Xiaowei Bao] Hi Kishon, is there any advice?
+> Reviewed-by: Fabio Estevam <festevam@gmail.com>
 
-If there is no HW support, I don't think anything could be done here. This could result in RC reading configuration space even before EP is fully initialized.
-[Xiaowei Bao] The bootloader have initialized the EP device and set the config ready bit, and the kernel don't need to do anything. 
->> +
->> +static const struct dw_pcie_ops ls_pcie_ep_ops = {
->> +	.start_link = ls_pcie_establish_link, };
->> +
->> +static const struct of_device_id ls_pcie_ep_of_match[] = {
->> +	{ .compatible = "fsl,ls-pcie-ep",},
->> +	{ },
->> +};
->> +
->> +static void ls_pcie_ep_init(struct dw_pcie_ep *ep) {
->> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
->> +	struct pci_epc *epc = ep->epc;
->> +	enum pci_barno bar;
->> +
->> +	for (bar = BAR_0; bar <= BAR_5; bar++)
->> +		dw_pcie_ep_reset_bar(pci, bar);
->> +
->> +	epc->features |= EPC_FEATURE_NO_LINKUP_NOTIFIER; }
->> +
->> +static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
->> +				  enum pci_epc_irq_type type, u16 interrupt_num) {
->> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
->> +
->> +	switch (type) {
->> +	case PCI_EPC_IRQ_LEGACY:
->> +		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
->> +	case PCI_EPC_IRQ_MSI:
->> +		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
->> +	case PCI_EPC_IRQ_MSIX:
->> +		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
->> +	default:
->> +		dev_err(pci->dev, "UNKNOWN IRQ type\n");
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static struct dw_pcie_ep_ops pcie_ep_ops = {
->> +	.ep_init = ls_pcie_ep_init,
->> +	.raise_irq = ls_pcie_ep_raise_irq,
->> +};
->> +
->> +static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
->> +					struct platform_device *pdev)
->> +{
->> +	struct dw_pcie *pci = pcie->pci;
->> +	struct device *dev = pci->dev;
->> +	struct dw_pcie_ep *ep;
->> +	struct resource *res;
->> +	int ret;
->> +
->> +	ep = &pci->ep;
->> +	ep->ops = &pcie_ep_ops;
->> +
->> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
->> +	if (!res)
->> +		return -EINVAL;
->> +
->> +	ep->phys_base = res->start;
->> +	ep->addr_size = resource_size(res);
->> +
->> +	ret = dw_pcie_ep_init(ep);
->> +	if (ret) {
->> +		dev_err(dev, "failed to initialize endpoint\n");
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int __init ls_pcie_ep_probe(struct platform_device *pdev) {
->> +	struct device *dev = &pdev->dev;
->> +	struct dw_pcie *pci;
->> +	struct ls_pcie_ep *pcie;
->> +	struct resource *dbi_base;
->> +	int ret;
->> +
->> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
->> +	if (!pcie)
->> +		return -ENOMEM;
->> +
->> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
->> +	if (!pci)
->> +		return -ENOMEM;
->> +
->> +	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
->> +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
->> +	if (IS_ERR(pci->dbi_base))
->> +		return PTR_ERR(pci->dbi_base);
->> +
->> +	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
->> +	pci->dev = dev;
->> +	pci->ops = &ls_pcie_ep_ops;
->> +	pcie->pci = pci;
->> +
->> +	if (ls_pcie_is_bridge(pcie))
->> +		return -ENODEV;
-> 
-> For an endpoint this condition should never occur. This should only mean, a wrong compatible has been used in dt.
-> [Xiaowei Bao] This function is a way that can check the PCI controller whether work in EP mode, I think it is more safer. Of course, it can be removed.
-> [Xiaowei Bao] Hi Kishon, is there any advice?
+Thanks for looking at this series.
 
-IMHO this check is not required.
-[Xiaowei Bao] OK, I will remove this function in patch-v2.
-
-Thanks
-Kishon
+Shawn already applied patches 3/4, I guess parts 1/2 should go through 
+the crypto tree? I don't know how crypto treats patches in the merge 
+window, I can resend with all the ack/review tags after rc1 is out.
