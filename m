@@ -1,312 +1,465 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 31 Oct 2018 11:39:04 -0500
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <86va5ssrfm.wl-marc.zyngier@arm.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
-Message-ID: <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Wed, 31 Oct 2018 13:44:40 -0300
+Subject: [GIT PULL 00/24] perf/urgent improvements and fixes
+Message-ID: <20181031164508.4784-1-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Ingo,
 
-On 10/23/18 8:50 AM, Marc Zyngier wrote:
-> On Mon, 22 Oct 2018 15:35:41 +0100,
-> Lokesh Vutla <lokeshvutla@ti.com> wrote:
->> On Friday 19 October 2018 08:52 PM, Marc Zyngier wrote:
->>> On 18/10/18 16:40, Lokesh Vutla wrote:
->>>> Texas Instruments' K3 generation SoCs has an IP Interrupt Aggregator
->>>> which is an interrupt controller that does the following:
->>>> - Converts events to interrupts that can be understood by
->>>>     an interrupt router.
->>>> - Allows for multiplexing of events to interrupts.
->>>> - Allows for grouping of multiple events to a single interrupt.
->>>
->>> Aren't the last two points the same thing? Also, can you please define
->>> what an "event" is? What is its semantic? If they look like interrupts,
->>> can we just name them as such?
->>
->> Event is actually a message sent by a master via an Event transport
->> lane. Based on the id within the message, each message is directed to
->> corresponding Interrupt Aggregator(IA). In turn IA raises a
->> corresponding interrupt as configured for this event.
-> 
-> Ergo, this is an interrupt, and there is nothing more to it. HW folks
-> may want to give it a sexy name, but as far as SW is concerned, it has
-> the properties of an interrupt and should be modelled as such.
-> 
-> [...]
-> 
->>>> +	for_each_set_bit(bit, vint_desc->event_map, MAX_EVENTS_PER_VINT) {
->>>> +		val = 1 << bit;
->>>> +		__raw_writeq(val, inta->base + data->hwirq * 0x1000 +
->>>> +			     VINT_ENABLE_CLR_OFFSET);
->>>> +	}
->>>
->>> If you need an ack callback, why is this part of the eoi? We have
->>> interrupt flows that allow you to combine both, so why don't you use that?
->>
->> Actually I started with ack_irq. But I did not see this callback being
->> triggered when interrupt is raised. Then I was suggested to use
->> irq_roi. Will see why ack_irq is not being triggered and  update it in
->> next version.
-> 
-> It is probably because you're not using the right interrupt flow.
-> 
->>> Also, the __raw_writeq call is probably wrong, as it assumes that both
->>> the CPU and the INTA have the same endianness.
->>
->> hmm.. May I know what is the right call to use here?
-> 
-> writeq_relaxed is most probably what you want. I assume this code will
-> never run on a 32bit platform, right?
-> 
-> [...]
-> 
->>>> +/**
->>>> + * ti_sci_inta_irq_domain_free() - Free an IRQ from the IRQ domain
->>>> + * @domain:	Domain to which the irqs belong
->>>> + * @virq:	base linux virtual IRQ to be freed.
->>>> + * @nr_irqs:	Number of continuous irqs to be freed
->>>> + */
->>>> +static void ti_sci_inta_irq_domain_free(struct irq_domain *domain,
->>>> +					unsigned int virq, unsigned int nr_irqs)
->>>> +{
->>>> +	struct ti_sci_inta_irq_domain *inta = domain->host_data;
->>>> +	struct ti_sci_inta_vint_desc *vint_desc;
->>>> +	struct irq_data *data, *gic_data;
->>>> +	int event_index;
->>>> +
->>>> +	data = irq_domain_get_irq_data(domain, virq);
->>>> +	gic_data = irq_domain_get_irq_data(domain->parent->parent, virq);
->>>
->>> That's absolutely horrid...
->>
->> I agree. But I need to get GIC irq for sending TISCI message. Can you
->> suggest a better way of doing it?
-> 
-> I'd say "fix the firmware to have a layered approach". But I guess
-> that's not an option, right?
-> 
-> [...]
-> 
->>>> +/**
->>>> + * ti_sci_allocate_event_irq() - Allocate an event to a IA vint.
->>>> + * @inta:	Pointer to Interrupt Aggregator IRQ domain
->>>> + * @vint_desc:	Virtual interrupt descriptor to which the event gets attached.
->>>> + * @src_id:	TISCI device id of the event source
->>>> + * @src_index:	Event index with in the device.
->>>> + * @dst_irq:	Destination host irq
->>>> + * @vint:	Interrupt number within interrupt aggregator.
->>>> + *
->>>> + * Return 0 if all went ok else appropriate error value.
->>>> + */
->>>> +static int ti_sci_allocate_event_irq(struct ti_sci_inta_irq_domain *inta,
->>>> +				     struct ti_sci_inta_vint_desc *vint_desc,
->>>> +				     u16 src_id, u16 src_index, u16 dst_irq,
->>>> +				     u16 vint)
->>>> +{
->>>> +	struct ti_sci_inta_event_desc *event;
->>>> +	unsigned long flags;
->>>> +	u32 free_bit;
->>>> +	int err;
->>>> +
->>>> +	raw_spin_lock_irqsave(&vint_desc->lock, flags);
->>>> +	free_bit = find_first_zero_bit(vint_desc->event_map,
->>>> +				       MAX_EVENTS_PER_VINT);
->>>> +	if (free_bit != MAX_EVENTS_PER_VINT)
->>>> +		set_bit(free_bit, vint_desc->event_map);
->>>> +	raw_spin_unlock_irqrestore(&vint_desc->lock, flags);
->>>
->>> Why disabling the interrupts? Do you expect to take this lock
->>> concurrently with an interrupt? Why isn't it enough to just have a mutex
->>> instead?
->>
->> I have thought about this while coding. We are attaching multiple
->> events to the same interrupt. Technically the events from different
->> IPs can be attached to the same interrupt or events from the same IP
->> can be registered at different times. So I thought it is possible that
->> when an event is being allocated to an interrupt, an event can be
->> raised that belongs to the same interrupt.
-> 
-> I strongly dispute this. Events are interrupts, and we're not
-> requesting an interrupt from an interrupt handler. That would be just
-> crazy.
-> 
-> [...]
-> 
->>>> +/**
->>>> + * ti_sci_inta_register_event() - Register a event to an interrupt aggregator
->>>> + * @dev:	Device pointer to source generating the event
->>>> + * @src_id:	TISCI device ID of the event source
->>>> + * @src_index:	Event source index within the device.
->>>> + * @virq:	Linux Virtual IRQ number
->>>> + * @flags:	Corresponding IRQ flags
->>>> + * @ack_needed:	If explicit clearing of event is required.
->>>> + *
->>>> + * Creates a new irq and attaches to IA domain if virq is not specified
->>>> + * else attaches the event to vint corresponding to virq.
->>>> + * When using TISCI within the client drivers, source indexes are always
->>>> + * generated dynamically and cannot be represented in DT. So client
->>>> + * drivers should call this API instead of platform_get_irq().
->>>
->>> NAK. Either this fits in the standard model, or we adapt the standard
->>> model to catter for your particular use case. But we don't define a new,
->>> TI specific API.
->>>
->>> I have a hunch that if the IDs are generated dynamically, then the model
->>> we use for MSIs would fit this thing. I also want to understand what
->>
->> hmm..I haven't thought about using MSI. Will try to explore it. But
->> the "struct msi_msg" is not applicable in this case as device does not
->> write to a specific location.
-> 
-> It doesn't need to. You can perfectly ignore the address field and
-> only be concerned with the data. We already have MSI users that do not
-> need programming of the doorbell address, just the data.
-> 
->>
->>> this event is, and how drivers get notified that such an event has fired.
->>
->> As said above, Event is a message being sent by a device using a
->> hardware protocol. This message is sent over an Event Transport
->> Lane(ETL) that understands this protocol. Based on the message ETL re
->> directs the message to a specificed target(In our case it is interrupt
->> Aggregator).
->>
->>  From a client drivers(that generates this event) prespective, the
->> following needs to be done:
->> - Get an index that is free and allocate it to a particular task.
->> - Request INTA driver to assign an irq for this index.
->> - do a request_irq baseed on the return value from the above step.
-> 
-> All of that can be done in the using the current MSI framework. You
-> can either implement your own bus framework or use the platform MSI
-> stuff. You can then rewrite the INTA driver to be what it really is,
-> an interrupt multiplexer.
-> 
->> In case of grouping events, the client drivers has its own mechanism
->> to identify the index that caused an interrupt(at least that is the
->> case for the existing user).
-> 
-> This simply isn't acceptable. Each event must be the result of a
-> single interrupt allocation from the point of view of the driver. If
-> events are shared, they should be modelled as a shared interrupt.
-> 
-> Overall, I'm extremely concerned that you're reinventing the wheel and
-> coming up with a new "concept" that seems incredibly similar to what
-> we already have everywhere else, just offering an incompatible
-> API. This means that your drivers become specialised for your new API,
-> and this isn't going to fly.
-> 
-> I can only urge you to reconsider the way you provide these events,
-> and make sure that you use the existing API to its full potential. If
-> something is not up to the task, we can then fix it in core code.
+	Please consider pulling, next ones should be concentrating just
+on bug fixes, been busy with some, so some were left in the queue,
+flushing them now.
 
-I'd try to provide some additional information here.
-(Sry, I'll still use term "events")
+- Arnaldo
 
-As Lokesh explained in other mail on K3 SoC everything is generic and most
-of resources allocated dynamicaly:
-- generic DMA channels
-- generic HW rings (used by DMA channel)
-- generic events (assigned to the rings) and muxed to different cores/hosts
+Test results at the end of this message, as usual.
 
-So, when some driver would like to perform DMA transaction It's
-required to build (configure) DMA channel by allocating different type of
-resources and link them together to get finally working Data Movement path
-(situation complicated by ti-sci firmware which policies resources between cores/hosts):
-- get UDMA channel from available range
-- get HW rings and attach them to the UDMA channel
-- get event, assign it to the ring and mux it to the core/host through IA->IR-> chain
-   (and this step is done by ti_sci_inta_register_event() - no DT as everything is dynamic).
+The following changes since commit 28fa741c27e6d57f6bf594ba3c444ce79e671e09:
 
-Next, how this is working now - ti_sci_inta_register_event():
-- first call does similar things as regular DT irq mapping (end up calling irq_create_fwspec_mapping()
-   and builds IRQ chain as below:
-   linux_virq = ti_sci_inta_register_event(dev, <ringacc tisci_dev_id>,
-				<ringacc id>, 0, IRQF_TRIGGER_HIGH, false);
+  perf/core: Clean up inconsisent indentation (2018-10-30 09:51:58 +0100)
 
-              +---------------------+
-              |         IA          |
-+--------+   |            +------+ |        +--------+         +------+
-| ring 1 +----->evtA+----->VintX +---------->   IR   +--------->  GIC +-->
-+--------+   |            +------+ |        +--------+         +------+  Linux IRQ Y
-    evtA      |                     |
-              |                     |
-              +---------------------+
+are available in the Git repository at:
 
-- second call updates only IA input part while keeping other parts of IRQ chain the same
-   if valid <linux_virq> passed as input parameter:
-   linux_virq = ti_sci_inta_register_event(dev, <ringacc tisci_dev_id>,
-				<ringacc id>, linux_virq, IRQF_TRIGGER_HIGH, false);
-              +---------------------+
-              |         IA          |
-+--------+   |            +------+ |        +--------+         +------+
-| ring 1 +----->evtA+--^-->VintX +---------->   IR   +--------->  GIC +-->
-+--------+   |         |  +------+ |        +--------+         +------+  Linux IRQ Y
-              |         |           |
-+--------+   |         |           |
-| ring 2 +----->evtB+--+           |
-+--------+   |                     |
-              +---------------------+
+  git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.20-20181031
 
-   As per above, irq-ti-sci-inta and tisci fw creates shared IRQ on HW layer by attaching
-   events to already established IA->IR->GIC IRQ chain. Any Rings events will trigger
-   Linux IRQ Y line and keep it active until Rings are not empty.
+for you to fetch changes up to 5d4f0edaa3ac4f1844ed7c64cd2bae6f1912bac5:
 
-Now why this was done this way?
-Note. I'm not saying this is right, but it is the way we've done it as of now. And I hope MSI
-will help to move forward, but I'm not very familiar with it.
+  perf intel-pt/bts: Calculate cpumode for synthesized samples (2018-10-31 12:56:26 -0300)
 
-The consumer of this approach is K3 Networking driver, first of all, and
-this approach allows to eliminate runtime overhead in Networking hot path and
-provides possibility to implement driver's specific queues/rings handling policies
-- like round-robin vs priority.
+----------------------------------------------------------------
+perf/urgent improvements and fixes:
 
-CPSW networking driver doesn't need to know exact ring generated IRQ - it
-need to know if there is packet for processing, so current IRQ handling sequence we have (simplified):
-- any ring evt -> IA -> IR -> GIC -> Linux IRQ Y
-   handle_fasteoi_irq() -> cpsw_irq_handler -> disable_irq() -> napi_schedule()
-   ...
-   soft_irq() -> cpsw_poll():
-	- [1] for each ring from Hi prio to Low prio
-	      [2] get packet
-	      [3] if (packet) process packet & goto [2]
-	          else goto [1]
-	       if (no more packets) goto [4]
-	  [4] enable_irq()
+- Fixes dealing with the removal of the fallback to looking up samples
+  marked as userspace in the kernel maps, done recently:
 
-As can be seen there is no intermediate IRQ dispatchers on IA/IR levels and no IRQs-per-rings,
-and NAPI poll cycle allows to implement driver's specific rings handling policy.
+  - For intel-pt, that was setting the synthesized header misc field
+    as PERF_RECORD_MISC_USER, depending thus on the fallback to take
+    place, now it sets as USER or KERNEL according to x86 specific
+    knowledge. Also now it inserts the PERF_CONTEXT_{USER,KERNEL} into
+    the PERF_SAMPLE_CALLCHAINs it synthesizes from hw traces (Adrian Hunter)
 
-Next: depending on the use case following optimizations are possible:
-1) throughput: split all TX (or RX) rings on X groups, where X = num_cpus
-and allocate assign IRQ to each group for Networking XPS/RPS/RSS.
-For example, CPSW2G has 8 TX channels and so 8 completion rings, 4 CPUs:
-  rings[0,1] -(IA/IR) - Linux IRQ 1
-  rings[2,3] -(IA/IR) - Linux IRQ 2
-  rings[4,5] -(IA/IR) - Linux IRQ 3
-  rings[6,7] -(IA/IR) - Linux IRQ 4
-each Linux IRQ assigned to separate CPU.
+  - Similar fixes for the cs-etm ARM HW trace code, that used the Intel PT
+    model as a starting point (Leo Yan)
 
-2) min latency:
-  Ring X is used by RT application for TX/RX some traffic (using AF_XDP sockets for example)
-  Ring X can be assigned with separate IRQ while other rings still grouped to
-  produce 1 IRQ
-  rings[0,6] - (IA/IR) - Linux IRQ 1
-  rings[7] - (IA/IR) - Linux IRQ 2
-  Linux IRQ 2 assigned to separate CPU where RT application is running.
+  - For the "caller" callchain order, where the callchain returned by the
+    kernel was simply reversed without taking into account the
+    PERF_CONTEXT_{USER,KERNEL,etc} markers from where to define if an entry
+    was for kernel or userspace, working just because the map lookup fallback
+    was in place (David S. Miller)
 
-Hope above will help to clarify some K3 AM6 IRQ generation questions and
-find the way to move forward.
+- Allow for selecting if 'overwrite' mode should be used in 'perf top' and
+  make the default for it not to be used. This is due to problems with the
+  current implementation where the pausing used ends up making 'perf top'
+  miss PERF_RECORD_{MMAP,FORK,EXEC,etc} events, which with short lifetime
+  threads workloads leads quickly to many "unknown" maps (and thus symbols)
+  to appear in the UI. Workloads with long thread lifetimes and with few
+  metadata events can still use --overwrite to take advantage of the
+  overwrite mode (Arnaldo Carvalho de Melo)
 
-Thanks a lot for you review and comments.
+- Start 'perf top''s display thread earlier, so that the screen doesn't
+  remain blank for too long at tool start (David S. Miller)
 
--- 
-regards,
--grygorii
+- Don't clone maps from parent when synthesizing forks, to avoid the inevitable
+  flurry of overlapping maps as we process the synthesized MMAP2 events that get
+  delivered shortly thereafter. (David S. Miller)
+
+- Take pgoff into account when reporting elf to libdwfl, now the unwinding
+  results are the same with elfutils's libdwfl and libunwind (Milian Wolff)
+
+- Update lotsa kernel ABI headers (Arnaldo Carvalho de Melo)
+
+- 'perf trace' syscall arg beautification improvements to allow for
+  handling args such as mount's 'flags', where maks have to be ignored
+  before considering what is left, that, if only zeroes, is suppressed
+  like other args without such masks (Arnaldo Carvalho de Melo)
+
+- Beautify mount's 'source' and 'flags' args (Arnaldo Carvalho de Melo)
+
+- Generate mmap's flags bit constants from linux/mman.h and all the
+  arch specific mman.h files, so that no changes in the main 'perf trace'
+  source files is required when new flags get added (Arnaldo Carvalho de Melo)
+
+- Consider syscall aliases, so that 'perf trace -e umount' works and we don't
+  have to use 'umount2' (that works as well, just not required) (Arnaldo Carvalho de Melo)
+
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+
+----------------------------------------------------------------
+Adrian Hunter (2):
+      perf intel-pt: Insert callchain context into synthesized callchains
+      perf intel-pt/bts: Calculate cpumode for synthesized samples
+
+Arnaldo Carvalho de Melo (21):
+      tools include uapi: Grab a copy of linux/fs.h
+      perf beauty: Add a generator for MS_ mount/umount's flag constants
+      perf beauty: Switch from GPL v2.0 to LGPL v2.1
+      perf beauty: Introduce strarray__scnprintf_flags()
+      perf trace beauty: Allow syscalls to mask an argument before considering it
+      perf trace beauty: Beautify mount/umount's 'flags' argument
+      perf trace: Consider syscall aliases too
+      perf trace: Beautify the umount's 'name' argument
+      perf trace: Beautify mount's first pathname arg
+      perf top: Allow disabling the overwrite mode
+      perf top: Do not use overwrite mode by default
+      tools include uapi: Update linux/fs.h copy
+      tools arch uapi: Update asm-generic/unistd.h and arm64 unistd.h copies
+      tools include uapi: Update asound.h copy
+      perf beauty: Add a generator for MAP_ mmap's flag constants
+      perf beauty: Wire up the mmap flags table generator to the Makefile
+      perf trace beauty: Use the mmap flags table generated from headers
+      tools include uapi: Update linux/mmap.h copy
+      tools headers: Sync the various kvm.h header copies
+      tools headers uapi: Update linux/netlink.h header copy
+      tools headers uapi: Update linux/if_link.h header copy
+
+David Miller (2):
+      perf top: Start display thread earlier
+      perf tools: Don't clone maps from parent when synthesizing forks
+
+David S. Miller (1):
+      perf callchain: Honour the ordering of PERF_CONTEXT_{USER,KERNEL,etc}
+
+Leo Yan (1):
+      perf cs-etm: Correct CPU mode for samples
+
+Milian Wolff (1):
+      perf unwind: Take pgoff into account when reporting elf to libdwfl
+
+ include/uapi/linux/perf_event.h                    |   2 +
+ tools/arch/arm64/include/uapi/asm/unistd.h         |   1 +
+ tools/arch/powerpc/include/uapi/asm/kvm.h          |   1 +
+ tools/arch/s390/include/uapi/asm/kvm.h             |   2 +
+ tools/arch/x86/include/uapi/asm/kvm.h              |   6 +-
+ tools/include/uapi/asm-generic/unistd.h            |   2 +
+ tools/include/uapi/linux/fs.h                      | 393 +++++++++++++++++++++
+ tools/include/uapi/linux/if_link.h                 |   1 +
+ tools/include/uapi/linux/kvm.h                     |  21 +-
+ tools/include/uapi/linux/mman.h                    |   2 +
+ tools/include/uapi/linux/netlink.h                 |   1 +
+ tools/include/uapi/linux/perf_event.h              |   2 +
+ tools/include/uapi/sound/asound.h                  |   2 +-
+ tools/perf/Documentation/perf-top.txt              |  10 +
+ tools/perf/Makefile.perf                           |  19 +
+ tools/perf/builtin-top.c                           |  21 +-
+ tools/perf/builtin-trace.c                         |  48 ++-
+ tools/perf/check-headers.sh                        |   1 +
+ tools/perf/trace/beauty/Build                      |   1 +
+ tools/perf/trace/beauty/beauty.h                   |   7 +
+ tools/perf/trace/beauty/clone.c                    |   3 +-
+ tools/perf/trace/beauty/drm_ioctl.sh               |   1 +
+ tools/perf/trace/beauty/eventfd.c                  |   2 +-
+ tools/perf/trace/beauty/fcntl.c                    |   3 +-
+ tools/perf/trace/beauty/flock.c                    |   2 +-
+ tools/perf/trace/beauty/futex_op.c                 |   2 +-
+ tools/perf/trace/beauty/futex_val3.c               |   2 +-
+ tools/perf/trace/beauty/ioctl.c                    |   3 +-
+ tools/perf/trace/beauty/kcmp.c                     |   3 +-
+ tools/perf/trace/beauty/kcmp_type.sh               |   1 +
+ tools/perf/trace/beauty/kvm_ioctl.sh               |   1 +
+ tools/perf/trace/beauty/madvise_behavior.sh        |   1 +
+ tools/perf/trace/beauty/mmap.c                     |  50 +--
+ tools/perf/trace/beauty/mmap_flags.sh              |  32 ++
+ tools/perf/trace/beauty/mode_t.c                   |   2 +-
+ tools/perf/trace/beauty/mount_flags.c              |  43 +++
+ tools/perf/trace/beauty/mount_flags.sh             |  15 +
+ tools/perf/trace/beauty/msg_flags.c                |   2 +-
+ tools/perf/trace/beauty/open_flags.c               |   2 +-
+ tools/perf/trace/beauty/perf_event_open.c          |   2 +-
+ tools/perf/trace/beauty/perf_ioctl.sh              |   1 +
+ tools/perf/trace/beauty/pid.c                      |   3 +-
+ tools/perf/trace/beauty/pkey_alloc.c               |  30 +-
+ .../perf/trace/beauty/pkey_alloc_access_rights.sh  |   1 +
+ tools/perf/trace/beauty/prctl.c                    |   3 +-
+ tools/perf/trace/beauty/prctl_option.sh            |   1 +
+ tools/perf/trace/beauty/sched_policy.c             |   2 +-
+ tools/perf/trace/beauty/seccomp.c                  |   2 +-
+ tools/perf/trace/beauty/signum.c                   |   2 +-
+ tools/perf/trace/beauty/sndrv_ctl_ioctl.sh         |   1 +
+ tools/perf/trace/beauty/sndrv_pcm_ioctl.sh         |   1 +
+ tools/perf/trace/beauty/sockaddr.c                 |   2 +-
+ tools/perf/trace/beauty/socket.c                   |   2 +-
+ tools/perf/trace/beauty/socket_ipproto.sh          |   1 +
+ tools/perf/trace/beauty/socket_type.c              |   2 +-
+ tools/perf/trace/beauty/statx.c                    |   3 +-
+ tools/perf/trace/beauty/vhost_virtio_ioctl.sh      |   1 +
+ tools/perf/trace/beauty/waitid_options.c           |   2 +-
+ tools/perf/util/cs-etm.c                           |  39 +-
+ tools/perf/util/event.c                            |   1 +
+ tools/perf/util/intel-bts.c                        |  17 +-
+ tools/perf/util/intel-pt.c                         |  28 +-
+ tools/perf/util/machine.c                          |  54 ++-
+ tools/perf/util/thread-stack.c                     |  44 ++-
+ tools/perf/util/thread-stack.h                     |   2 +-
+ tools/perf/util/thread.c                           |  13 +-
+ tools/perf/util/thread.h                           |   2 +-
+ tools/perf/util/unwind-libdw.c                     |   4 +-
+ 68 files changed, 837 insertions(+), 142 deletions(-)
+ create mode 100644 tools/include/uapi/linux/fs.h
+ create mode 100755 tools/perf/trace/beauty/mmap_flags.sh
+ create mode 100644 tools/perf/trace/beauty/mount_flags.c
+ create mode 100755 tools/perf/trace/beauty/mount_flags.sh
+
+Test results:
+
+The first ones are container (docker) based builds of tools/perf with
+and without libelf support.  Where clang is available, it is also used
+to build perf with/without libelf, and building with LIBCLANGLLVM=1
+(built-in clang) with gcc and clang when clang and its devel libraries
+are installed.
+
+The objtool and samples/bpf/ builds are disabled now that I'm switching from
+using the sources in a local volume to fetching them from a http server to
+build it inside the container, to make it easier to build in a container cluster.
+Those will come back later.
+
+Several are cross builds, the ones with -x-ARCH and the android one, and those
+may not have all the features built, due to lack of multi-arch devel packages,
+available and being used so far on just a few, like
+debian:experimental-x-{arm64,mipsel}.
+
+The 'perf test' one will perform a variety of tests exercising
+tools/perf/util/, tools/lib/{bpf,traceevent,etc}, as well as run perf commands
+with a variety of command line event specifications to then intercept the
+sys_perf_event syscall to check that the perf_event_attr fields are set up as
+expected, among a variety of other unit tests.
+
+Then there is the 'make -C tools/perf build-test' ones, that build tools/perf/
+with a variety of feature sets, exercising the build with an incomplete set of
+features as well as with a complete one. It is planned to have it run on each
+of the containers mentioned above, using some container orchestration
+infrastructure. Get in contact if interested in helping having this in place.
+
+The failures are minor and will be fixed soon.
+
+  50     6.21 ubuntu:16.04-x-arm64          : FAIL aarch64-linux-gnu-gcc (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
+
+This one is related to smp_load_{acquire,release} expansions in this specific
+gcc version, reported to Daniel Borkmann
+
+  60     3.70 ubuntu:18.04-x-m68k           : FAIL m68k-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  64     3.48 ubuntu:18.04-x-riscv64        : FAIL riscv64-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+
+These two need mman.h files added to its directories in tools/arch/, will fix later.
+
+  66     3.84 ubuntu:18.04-x-sh4            : FAIL sh4-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+
+Needs to normalize sh4 -> sh so that it finds
+tools/arch/sh/include/uapi/asm/mman.h.
+
+  # dm
+   1 alpine:3.4                    : Ok   gcc (Alpine 5.3.0) 5.3.0
+   2 alpine:3.5                    : Ok   gcc (Alpine 6.2.1) 6.2.1 20160822
+   3 alpine:3.6                    : Ok   gcc (Alpine 6.3.0) 6.3.0
+   4 alpine:3.7                    : Ok   gcc (Alpine 6.4.0) 6.4.0
+   5 alpine:3.8                    : Ok   gcc (Alpine 6.4.0) 6.4.0
+   6 alpine:edge                   : Ok   gcc (Alpine 6.4.0) 6.4.0
+   7 amazonlinux:1                 : Ok   gcc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-28)
+   8 amazonlinux:2                 : Ok   gcc (GCC) 7.3.1 20180303 (Red Hat 7.3.1-5)
+   9 android-ndk:r12b-arm          : Ok   arm-linux-androideabi-gcc (GCC) 4.9.x 20150123 (prerelease)
+  10 android-ndk:r15c-arm          : Ok   arm-linux-androideabi-gcc (GCC) 4.9.x 20150123 (prerelease)
+  11 centos:5                      : Ok   gcc (GCC) 4.1.2 20080704 (Red Hat 4.1.2-55)
+  12 centos:6                      : Ok   gcc (GCC) 4.4.7 20120313 (Red Hat 4.4.7-23)
+  13 centos:7                      : Ok   gcc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-28)
+  14 clearlinux:latest             : Ok   gcc (Clear Linux OS for Intel Architecture) 8.2.1 20180502
+  15 debian:7                      : Ok   gcc (Debian 4.7.2-5) 4.7.2
+  16 debian:8                      : Ok   gcc (Debian 4.9.2-10+deb8u1) 4.9.2
+  17 debian:9                      : Ok   gcc (Debian 6.3.0-18+deb9u1) 6.3.0 20170516
+  18 debian:experimental           : Ok   gcc (Debian 8.2.0-8) 8.2.0
+  19 debian:experimental-x-arm64   : Ok   aarch64-linux-gnu-gcc (Debian 8.2.0-7) 8.2.0
+  20 debian:experimental-x-mips    : Ok   mips-linux-gnu-gcc (Debian 8.2.0-7) 8.2.0
+  21 debian:experimental-x-mips64  : Ok   mips64-linux-gnuabi64-gcc (Debian 8.1.0-12) 8.1.0
+  22 debian:experimental-x-mipsel  : Ok   mipsel-linux-gnu-gcc (Debian 8.2.0-7) 8.2.0
+  23 fedora:20                     : Ok   gcc (GCC) 4.8.3 20140911 (Red Hat 4.8.3-7)
+  24 fedora:21                     : Ok   gcc (GCC) 4.9.2 20150212 (Red Hat 4.9.2-6)
+  25 fedora:22                     : Ok   gcc (GCC) 5.3.1 20160406 (Red Hat 5.3.1-6)
+  26 fedora:23                     : Ok   gcc (GCC) 5.3.1 20160406 (Red Hat 5.3.1-6)
+  27 fedora:24                     : Ok   gcc (GCC) 6.3.1 20161221 (Red Hat 6.3.1-1)
+  28 fedora:24-x-ARC-uClibc        : Ok   arc-linux-gcc (ARCompact ISA Linux uClibc toolchain 2017.09-rc2) 7.1.1 20170710
+  29 fedora:25                     : Ok   gcc (GCC) 6.4.1 20170727 (Red Hat 6.4.1-1)
+  30 fedora:26                     : Ok   gcc (GCC) 7.3.1 20180130 (Red Hat 7.3.1-2)
+  31 fedora:27                     : Ok   gcc (GCC) 7.3.1 20180712 (Red Hat 7.3.1-6)
+  32 fedora:28                     : Ok   gcc (GCC) 8.1.1 20180712 (Red Hat 8.1.1-5)
+  33 fedora:29                     : Ok   gcc (GCC) 8.2.1 20181011 (Red Hat 8.2.1-4)
+  34 fedora:rawhide                : Ok   gcc (GCC) 8.2.1 20180905 (Red Hat 8.2.1-3)
+  35 gentoo-stage3-amd64:latest    : Ok   gcc (Gentoo 7.3.0-r3 p1.4) 7.3.0
+  36 mageia:5                      : Ok   gcc (GCC) 4.9.2
+  37 mageia:6                      : Ok   gcc (Mageia 5.5.0-1.mga6) 5.5.0
+  38 opensuse:13.2                 : Ok   gcc (SUSE Linux) 4.8.3 20140627 [gcc-4_8-branch revision 212064]
+  39 opensuse:42.1                 : Ok   gcc (SUSE Linux) 4.8.5
+  40 opensuse:42.2                 : Ok   gcc (SUSE Linux) 4.8.5
+  41 opensuse:42.3                 : Ok   gcc (SUSE Linux) 4.8.5
+  42 opensuse:tumbleweed           : Ok   gcc (SUSE Linux) 7.3.1 20180323 [gcc-7-branch revision 258812]
+  43 oraclelinux:6                 : Ok   gcc (GCC) 4.4.7 20120313 (Red Hat 4.4.7-23.0.1)
+  44 oraclelinux:7                 : Ok   gcc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-28.0.1)
+  45 ubuntu:12.04.5                : Ok   gcc (Ubuntu/Linaro 4.6.3-1ubuntu5) 4.6.3
+  46 ubuntu:14.04.4                : Ok   gcc (Ubuntu 4.8.4-2ubuntu1~14.04.3) 4.8.4
+  47 ubuntu:14.04.4-x-linaro-arm64 : Ok   aarch64-linux-gnu-gcc (Linaro GCC 5.5-2017.10) 5.5.0
+  48 ubuntu:16.04                  : Ok   gcc (Ubuntu 5.4.0-6ubuntu1~16.04.10) 5.4.0 20160609
+  49 ubuntu:16.04-x-arm            : Ok   arm-linux-gnueabihf-gcc (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
+  50 ubuntu:16.04-x-arm64          : FAIL aarch64-linux-gnu-gcc (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
+  51 ubuntu:16.04-x-powerpc        : Ok   powerpc-linux-gnu-gcc (Ubuntu 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
+  52 ubuntu:16.04-x-powerpc64      : Ok   powerpc64-linux-gnu-gcc (Ubuntu/IBM 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
+  53 ubuntu:16.04-x-powerpc64el    : Ok   powerpc64le-linux-gnu-gcc (Ubuntu/IBM 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
+  54 ubuntu:16.04-x-s390           : Ok   s390x-linux-gnu-gcc (Ubuntu 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
+  55 ubuntu:16.10                  : Ok   gcc (Ubuntu 6.2.0-5ubuntu12) 6.2.0 20161005
+  56 ubuntu:17.10                  : Ok   gcc (Ubuntu 7.2.0-8ubuntu3.2) 7.2.0
+  57 ubuntu:18.04                  : Ok   gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  58 ubuntu:18.04-x-arm            : Ok   arm-linux-gnueabihf-gcc (Ubuntu/Linaro 7.3.0-27ubuntu1~18.04) 7.3.0
+  59 ubuntu:18.04-x-arm64          : Ok   aarch64-linux-gnu-gcc (Ubuntu/Linaro 7.3.0-27ubuntu1~18.04) 7.3.0
+  60 ubuntu:18.04-x-m68k           : FAIL m68k-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  61 ubuntu:17.04-x-powerpc        : Ok   powerpc-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  62 ubuntu:18.04-x-powerpc64      : Ok   powerpc64-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  63 ubuntu:18.04-x-powerpc64el    : Ok   powerpc64le-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  64 ubuntu:18.04-x-riscv64        : FAIL riscv64-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  65 ubuntu:18.04-x-s390           : Ok   s390x-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  66 ubuntu:18.04-x-sh4            : FAIL sh4-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  67 ubuntu:18.04-x-sparc64        : Ok   sparc64-linux-gnu-gcc (Ubuntu 7.3.0-27ubuntu1~18.04) 7.3.0
+  68 ubuntu:18.10                  : Ok   gcc (Ubuntu 8.2.0-7ubuntu1) 8.2.0
+
+  # uname -a
+  Linux seventh 4.19.0-rc8-00014-gc0cff31be705 #1 SMP Wed Oct 17 09:00:22 -03 2018 x86_64 x86_64 x86_64 GNU/Linux
+  # git log --oneline -1
+  5d4f0edaa3ac perf intel-pt/bts: Calculate cpumode for synthesized samples
+  # perf version --build-options
+  perf version 4.19.g5d4f0e
+                   dwarf: [ on  ]  # HAVE_DWARF_SUPPORT
+      dwarf_getlocations: [ on  ]  # HAVE_DWARF_GETLOCATIONS_SUPPORT
+                   glibc: [ on  ]  # HAVE_GLIBC_SUPPORT
+                    gtk2: [ on  ]  # HAVE_GTK2_SUPPORT
+           syscall_table: [ on  ]  # HAVE_SYSCALL_TABLE_SUPPORT
+                  libbfd: [ on  ]  # HAVE_LIBBFD_SUPPORT
+                  libelf: [ on  ]  # HAVE_LIBELF_SUPPORT
+                 libnuma: [ on  ]  # HAVE_LIBNUMA_SUPPORT
+  numa_num_possible_cpus: [ on  ]  # HAVE_LIBNUMA_SUPPORT
+                 libperl: [ on  ]  # HAVE_LIBPERL_SUPPORT
+               libpython: [ on  ]  # HAVE_LIBPYTHON_SUPPORT
+                libslang: [ on  ]  # HAVE_SLANG_SUPPORT
+               libcrypto: [ on  ]  # HAVE_LIBCRYPTO_SUPPORT
+               libunwind: [ on  ]  # HAVE_LIBUNWIND_SUPPORT
+      libdw-dwarf-unwind: [ on  ]  # HAVE_DWARF_SUPPORT
+                    zlib: [ on  ]  # HAVE_ZLIB_SUPPORT
+                    lzma: [ on  ]  # HAVE_LZMA_SUPPORT
+               get_cpuid: [ on  ]  # HAVE_AUXTRACE_SUPPORT
+                     bpf: [ on  ]  # HAVE_LIBBPF_SUPPORT
+  # perf test
+   1: vmlinux symtab matches kallsyms                       : Ok
+   2: Detect openat syscall event                           : Ok
+   3: Detect openat syscall event on all cpus               : Ok
+   4: Read samples using the mmap interface                 : Ok
+   5: Test data source output                               : Ok
+   6: Parse event definition strings                        : Ok
+   7: Simple expression parser                              : Ok
+   8: PERF_RECORD_* events & perf_sample fields             : Ok
+   9: Parse perf pmu format                                 : Ok
+  10: DSO data read                                         : Ok
+  11: DSO data cache                                        : Ok
+  12: DSO data reopen                                       : Ok
+  13: Roundtrip evsel->name                                 : Ok
+  14: Parse sched tracepoints fields                        : Ok
+  15: syscalls:sys_enter_openat event fields                : Ok
+  16: Setup struct perf_event_attr                          : Ok
+  17: Match and link multiple hists                         : Ok
+  18: 'import perf' in python                               : Ok
+  19: Breakpoint overflow signal handler                    : Ok
+  20: Breakpoint overflow sampling                          : Ok
+  21: Breakpoint accounting                                 : Ok
+  22: Watchpoint                                            :
+  22.1: Read Only Watchpoint                                : Skip
+  22.2: Write Only Watchpoint                               : Ok
+  22.3: Read / Write Watchpoint                             : Ok
+  22.4: Modify Watchpoint                                   : Ok
+  23: Number of exit events of a simple workload            : Ok
+  24: Software clock events period values                   : Ok
+  25: Object code reading                                   : Ok
+  26: Sample parsing                                        : Ok
+  27: Use a dummy software event to keep tracking           : Ok
+  28: Parse with no sample_id_all bit set                   : Ok
+  29: Filter hist entries                                   : Ok
+  30: Lookup mmap thread                                    : Ok
+  31: Share thread mg                                       : Ok
+  32: Sort output of hist entries                           : Ok
+  33: Cumulate child hist entries                           : Ok
+  34: Track with sched_switch                               : Ok
+  35: Filter fds with revents mask in a fdarray             : Ok
+  36: Add fd to a fdarray, making it autogrow               : Ok
+  37: kmod_path__parse                                      : Ok
+  38: Thread map                                            : Ok
+  39: LLVM search and compile                               :
+  39.1: Basic BPF llvm compile                              : Ok
+  39.2: kbuild searching                                    : Ok
+  39.3: Compile source for BPF prologue generation          : Ok
+  39.4: Compile source for BPF relocation                   : Ok
+  40: Session topology                                      : Ok
+  41: BPF filter                                            :
+  41.1: Basic BPF filtering                                 : Ok
+  41.2: BPF pinning                                         : Ok
+  41.3: BPF prologue generation                             : Ok
+  41.4: BPF relocation checker                              : Ok
+  42: Synthesize thread map                                 : Ok
+  43: Remove thread map                                     : Ok
+  44: Synthesize cpu map                                    : Ok
+  45: Synthesize stat config                                : Ok
+  46: Synthesize stat                                       : Ok
+  47: Synthesize stat round                                 : Ok
+  48: Synthesize attr update                                : Ok
+  49: Event times                                           : Ok
+  50: Read backward ring buffer                             : Ok
+  51: Print cpu map                                         : Ok
+  52: Probe SDT events                                      : Ok
+  53: is_printable_array                                    : Ok
+  54: Print bitmap                                          : Ok
+  55: perf hooks                                            : Ok
+  56: builtin clang support                                 : Skip (not compiled in)
+  57: unit_number__scnprintf                                : Ok
+  58: mem2node                                              : Ok
+  59: x86 rdpmc                                             : Ok
+  60: Convert perf time to TSC                              : Ok
+  61: DWARF unwind                                          : Ok
+  62: x86 instruction decoder - new instructions            : Ok
+  63: x86 bp modify                                         : Ok
+  64: probe libc's inet_pton & backtrace it with ping       : Ok
+  65: Check open filename arg using perf trace + vfs_getname: Ok
+  66: Use vfs_getname probe to get syscall args filenames   : Ok
+  67: Add vfs_getname probe to get syscall args filenames   : Ok
+
+  $ make -C tools/perf build-test
+  make: Entering directory '/home/acme/git/perf/tools/perf'
+  - tarpkg: ./tests/perf-targz-src-pkg .
+         make_with_clangllvm_O: make LIBCLANGLLVM=1
+             make_no_libperl_O: make NO_LIBPERL=1
+         make_install_prefix_O: make install prefix=/tmp/krava
+   make_install_prefix_slash_O: make install prefix=/tmp/krava/
+           make_no_libpython_O: make NO_LIBPYTHON=1
+                 make_perf_o_O: make perf.o
+                 make_static_O: make LDFLAGS=-static
+                make_no_newt_O: make NO_NEWT=1
+            make_no_auxtrace_O: make NO_AUXTRACE=1
+       make_util_pmu_bison_o_O: make util/pmu-bison.o
+             make_util_map_o_O: make util/map.o
+                make_minimal_O: make NO_LIBPERL=1 NO_LIBPYTHON=1 NO_NEWT=1 NO_GTK2=1 NO_DEMANGLE=1 NO_LIBELF=1 NO_LIBUNWIND=1 NO_BACKTRACE=1 NO_LIBNUMA=1 NO_LIBAUDIT=1 NO_LIBBIONIC=1 NO_LIBDW_DWARF_UNWIND=1 NO_AUXTRACE=1 NO_LIBBPF=1 NO_LIBCRYPTO=1 NO_SDT=1 NO_JVMTI=1
+              make_no_libelf_O: make NO_LIBELF=1
+           make_no_backtrace_O: make NO_BACKTRACE=1
+              make_no_libbpf_O: make NO_LIBBPF=1
+           make_no_libunwind_O: make NO_LIBUNWIND=1
+                make_no_gtk2_O: make NO_GTK2=1
+            make_install_bin_O: make install-bin
+            make_no_demangle_O: make NO_DEMANGLE=1
+           make_no_libbionic_O: make NO_LIBBIONIC=1
+             make_no_libnuma_O: make NO_LIBNUMA=1
+        make_with_babeltrace_O: make LIBBABELTRACE=1
+                   make_pure_O: make
+                   make_tags_O: make tags
+  make_no_libdw_dwarf_unwind_O: make NO_LIBDW_DWARF_UNWIND=1
+                make_install_O: make install
+              make_clean_all_O: make clean all
+               make_no_slang_O: make NO_SLANG=1
+                    make_doc_O: make doc
+                  make_debug_O: make DEBUG=1
+            make_no_libaudit_O: make NO_LIBAUDIT=1
+                   make_help_O: make help
+                  make_no_ui_O: make NO_NEWT=1 NO_SLANG=1 NO_GTK2=1
+             make_no_scripts_O: make NO_LIBPYTHON=1 NO_LIBPERL=1
+  OK
+  make: Leaving directory '/home/acme/git/perf/tools/perf'
+  $
