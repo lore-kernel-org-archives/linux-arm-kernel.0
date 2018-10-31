@@ -1,58 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 Oct 2018 18:42:28 +0000
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <18df8960-9165-ba50-2c25-9f00d32198e8@oracle.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
- <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
- <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
- <18df8960-9165-ba50-2c25-9f00d32198e8@oracle.com>
-Message-ID: <e799646e-1fff-f96b-38e8-3d46b0160867@arm.com>
+From: colin.king@canonical.com (Colin King)
+Date: Wed, 31 Oct 2018 18:42:41 +0000
+Subject: [PATCH] pinctrl: mediatek: clean up indentation issues,
+ add missing tab
+Message-ID: <20181031184241.5439-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/18 18:38, Santosh Shilimkar wrote:
-> On 10/31/2018 11:21 AM, Marc Zyngier wrote:
->> Hi Grygorii,
->>
-> 
-> [...]
-> 
->>
->> Well, I'm convinced that we do not want a networking driver to be tied
->> to an interrupt architecture, and that the two should be completely
->> independent. But that's my own opinion. I can only see two solutions
->> moving forward:
->>
->> 1) You make the IA a real interrupt controller that exposes real
->> interrupts (one per event), and write your networking driver
->> independently of the underlying interrupt architecture.
->>
->> 2) you make the IA an integral part of your network driver, not exposing
->> anything outside of it, and limiting the interactions with the IR
->> *through the standard IRQ API*. You duplicate this knowledge throughout
->> the other client drivers.
->>
->> I believe that (2) would be a massive design mistake as it locks the
->> driver to a single of the HW (and potentially a single revision of the
->> firmware) while (1) gives you the required level of flexibility by
->> hiding the whole event "concept" at a single location.
->>
->> Yes, (1) makes you rewrite your existing, out of tree drivers. Oh well...
->>
-> My preference is also not tie the network driver with IA. BTW, this is
-> very standard functionality with other network drivers too. And this
-> is handled using MSI-X.
-> 
-> So strong NO for 1) from me as well.
+From: Colin Ian King <colin.king@canonical.com>
 
-Err. Are you opposing to (1) or (2)? From the above, I cannot really
-tell... ;-)
+Trivial fix to clean up indentation issues, add one level of
+indentation on two if statements.
 
-	M.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-moore.c | 4 ++--
+ drivers/pinctrl/mediatek/pinctrl-paris.c | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-moore.c b/drivers/pinctrl/mediatek/pinctrl-moore.c
+index 3133ec0f2e67..aa1068d2867f 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-moore.c
++++ b/drivers/pinctrl/mediatek/pinctrl-moore.c
+@@ -310,8 +310,8 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
+ 		case PIN_CONFIG_DRIVE_STRENGTH:
+ 			if (hw->soc->drive_set) {
+ 				err = hw->soc->drive_set(hw, desc, arg);
+-			if (err)
+-				return err;
++				if (err)
++					return err;
+ 			} else {
+ 				err = -ENOTSUPP;
+ 			}
+diff --git a/drivers/pinctrl/mediatek/pinctrl-paris.c b/drivers/pinctrl/mediatek/pinctrl-paris.c
+index d2179028f134..50e68b1e9065 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-paris.c
++++ b/drivers/pinctrl/mediatek/pinctrl-paris.c
+@@ -282,8 +282,8 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
+ 	case PIN_CONFIG_DRIVE_STRENGTH:
+ 		if (hw->soc->drive_set) {
+ 			err = hw->soc->drive_set(hw, desc, arg);
+-		if (err)
+-			return err;
++			if (err)
++				return err;
+ 		} else {
+ 			return -ENOTSUPP;
+ 		}
 -- 
-Jazz is not dead. It just smells funny...
+2.19.1
