@@ -1,166 +1,183 @@
-From: jeyu@kernel.org (Jessica Yu)
-Date: Wed, 31 Oct 2018 16:53:41 +0100
-Subject: [PATCH v2] ARM: module: Fix function kallsyms on Thumb-2
-In-Reply-To: <20181031084253.9650-1-vincent.whitchurch@axis.com>
-References: <20181031084253.9650-1-vincent.whitchurch@axis.com>
-Message-ID: <20181031155341.GA27878@linux-8ccs>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 31 Oct 2018 16:55:32 +0100
+Subject: [PATCH V8 5/5] firmware: imx: add SCU power domain driver
+In-Reply-To: <AM0PR04MB4211084AB67D86ED162FDB1280CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
+ <1540739690-23750-6-git-send-email-aisheng.dong@nxp.com>
+ <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
+ <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CAPDyKFpzvN1R91ByRUmZ8XDsm6L2SF92oOrDSn3qv-d9wWGYtA@mail.gmail.com>
+ <AM0PR04MB4211084AB67D86ED162FDB1280CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <CAPDyKFoEbuLcA5AZPQob0PgK=A3pAH5N8CacHb3WO+54-0svrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Vincent Whitchurch [31/10/18 09:42 +0100]:
->Thumb-2 functions have the lowest bit set in the symbol value in the
->symtab.  When kallsyms are generated for the vmlinux, the kallsyms are
->generated from the output of nm, and nm clears the lowest bit.
+On 31 October 2018 at 02:45, A.s. Dong <aisheng.dong@nxp.com> wrote:
+>> -----Original Message-----
+>> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+>> Sent: Wednesday, October 31, 2018 12:00 AM
+> [...]
+>> On 30 October 2018 at 14:20, A.s. Dong <aisheng.dong@nxp.com> wrote:
+>> > [...]
+>> >
+>> >> }
+>> >> > +
+>> >> > +static struct imx_sc_pm_domain *
+>> >> > +imx_scu_add_pm_domain(struct device *dev, int idx,
+>> >> > +                     const struct imx_sc_pd_range *pd_ranges) {
+>> >> > +       struct imx_sc_pm_domain *sc_pd;
+>> >> > +       int ret;
+>> >> > +
+>> >> > +       sc_pd = devm_kzalloc(dev, sizeof(*sc_pd), GFP_KERNEL);
+>> >> > +       if (!sc_pd)
+>> >> > +               return ERR_PTR(-ENOMEM);
+>> >> > +
+>> >> > +       sc_pd->rsrc = pd_ranges->rsrc + idx;
+>> >> > +       sc_pd->pd.power_off = imx_sc_pd_power_off;
+>> >> > +       sc_pd->pd.power_on = imx_sc_pd_power_on;
+>> >>
+>> >> So, this means you are going to register one genpd per device (one
+>> >> for each uart, pwm etc), but there is actually a better option.
+>> >>
+>> >> What you seems to be needing is a way to "power on/off" devices,
+>> >> rather than the PM domain. Right? The PM domain, is managed internally
+>> by the FW, no?
+>> >>
+>> >
+>> > Yes, you're right.
+>> >
+>> >> In any case, it looks like what you should do is to implement the
+>> >> ->attach|detach_dev() callback for the genpd and use the regular
+>> >> of_genpd_add_provider_simple(). From within the ->attach_dev(), you
+>> >> should get the OF node for the device that is being attached and then
+>> >> parse the power-domain cell containing the "resource id" and store
+>> >> that in the per device struct generic_pm_domain_data (we have void
+>> >> pointer there for storing these kind of things).
+>> >>
+>> >> Additionally, you need to implement the ->stop() and ->start()
+>> >> callbacks of genpd, which is where you "power on/off" devices, rather
+>> >> than using the above
+>> >> ->power_on|off() callbacks.
+>> >>
+>> >> Please have a look a drivers/soc/ti/ti_sci_pm_domains.c. Apologize, I
+>> >> should have pointed you towards that reference already in the earlier
+>> version.
+>> >>
+>> >
+>> > Appreciated for such detailed explanation. lt's a good suggestion and
+>> > I really like to switch to it.  However, after digged a bit more, i found a few
+>> blocking issues:
+>> > 1. The .attach_dev() of power domain infrastructure still does not support
+>> multi domains case.
+>> >
+>> > It looks like there's no way for .attach_dev() to understand which sub 'power
+>> domain'
+>> > the device is attaching for one global power domain provider like ti_sci as
+>> you suggested.
+>> > Secondly, the struct device *dev passed into is a virtual PD device.
+>> > It does not help for parsing the real device resource id.
+>> >
+>> > So framework probably needs some extension to support multi power
+>> domain cases.
+>>
+>> Right, you are correct.
+>>
+>> Let me think about this and see what I can come up with - unless you already
+>> have something you want to propose?
+>>
 >
-> $ arm-linux-gnueabihf-readelf -a vmlinux | grep show_interrupts
->  95947: 8015dc89   686 FUNC    GLOBAL DEFAULT    2 show_interrupts
-> $ arm-linux-gnueabihf-nm vmlinux | grep show_interrupts
-> 8015dc88 T show_interrupts
-> $ cat /proc/kallsyms | grep show_interrupts
-> 8015dc88 T show_interrupts
->
->However, for modules, the kallsyms uses the values in the symbol table
->without modification, so for functions in modules, the lowest bit is set
->in kallsyms.
->
-> $ arm-linux-gnueabihf-readelf -a drivers/net/tun.ko | grep tun_get_socket
->    268: 000000e1    44 FUNC    GLOBAL DEFAULT    2 tun_get_socket
-> $ arm-linux-gnueabihf-nm drivers/net/tun.ko | grep tun_get_socket
-> 000000e0 T tun_get_socket
-> $ cat /proc/kallsyms | grep tun_get_socket
-> 7fcd30e1 t tun_get_socket  [tun]
->
->Because of this, the offset of the crashing instruction shown in oopses
->is incorrect when the crash is in a module.  For example, given a
->tun_get_socket which starts like this,
->
-> 000000e0 <tun_get_socket>:
->       e0:       b500            push    {lr}
->       e2:       f7ff fffe       bl      0 <__gnu_mcount_nc>
->       e6:       4b08            ldr     r3, [pc, #32]
->       e8:       6942            ldr     r2, [r0, #20]
->       ea:       429a            cmp     r2, r3
->       ec:       d002            beq.n   f4 <tun_get_socket+0x14>
->
->a crash when tun_get_socket is called with NULL results in:
->
-> PC is at tun_get_socket+0x7/0x2c [tun]
-> pc : [<7fcdb0e8>]
->
->which can result in the incorrect line being reported by gdb if this
->symbol+offset is used there.  If the crash is on the first instruction
->of a function, the "PC is at" line would also report the symbol name of
->the preceding function.
->
->To solve this, fix up these symbols like nm does.  For this, we need a
->new hook in the generic module loading code, before the symbols' st_info
->is overwritten by add_kallsyms().  After the fix:
->
-> $ cat /proc/kallsyms | grep tun_get_socket
-> 7fcd30e0 t tun_get_socket  [tun]
->
-> PC is at tun_get_socket+0x8/0x2c [tun]
-> pc : [<7fcdb0e8>]
->
->Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
->---
->v2: Fix build warning with !MODULES
+> I have thought we may need add two more params (real dev and pd index) for
+> .attach_dev().detach_dev() and .start()/.stop() for multi PDs case.
+> But I'm not sure if they are proper.
 
+Right.
 
-Hi Vincent,
+I don't think we need to change the definition of the callbacks.
+However, from within the callbacks (or at least the ->attach_dev()) we
+need access to the data you suggest above.
 
-Just a few questions -
+To make that data available, genpd needs to store it in the per device
+struct generic_pm_domain_data, but of course before invoking the
+->attach_dev() callback.
 
-Could this be done in modpost? I'm guessing the answer is no as some
-relocations may rely on that bit being set in st_value, right?
-Therefore we can only clear the bit _after_ relocations to the module
-are applied at runtime, correct?
-
-I'm not against having an arch-specific kallsyms fixup function, my
-only concern would be if this would interfere with the delayed
-relocations livepatching does, if there are plans in the future to
-have livepatching on arm (IIRC there was an attempt at a port in
-2016). If there exists some Thumb-2 relocation types that rely on that
-lowest bit in st_value being set in order to be applied, and we clear
-it permanently from the symtab, then livepatching wouldn't be able to
-apply those types of relocations anymore. If this is a legitimate
-concern, then perhaps an alternative solution would be to have an
-arch-specific kallsyms symbol-value-fixup function for accesses to
-sym.st_value, without modifying the module symtab.
-
-
-Thanks,
-
-Jessica
-
-> arch/arm/kernel/module.c     | 14 ++++++++++++++
-> include/linux/moduleloader.h |  3 +++
-> kernel/module.c              |  6 ++++++
-> 3 files changed, 23 insertions(+)
 >
->diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
->index 3ff571c2c71c..771f86318d84 100644
->--- a/arch/arm/kernel/module.c
->+++ b/arch/arm/kernel/module.c
->@@ -399,6 +399,20 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
-> 	return 0;
-> }
 >
->+#if defined(CONFIG_THUMB2_KERNEL) && defined(CONFIG_KALLSYMS)
->+void module_fixup_kallsyms(struct mod_kallsyms *kallsyms)
->+{
->+	int i;
->+
->+	for (i = 0; i < kallsyms->num_symtab; i++) {
->+		Elf_Sym *sym = &kallsyms->symtab[i];
->+
->+		if (ELF_ST_TYPE(sym->st_info) == STT_FUNC)
->+			sym->st_value &= ~1;
->+	}
->+}
->+#endif
->+
-> void
-> module_arch_cleanup(struct module *mod)
-> {
->diff --git a/include/linux/moduleloader.h b/include/linux/moduleloader.h
->index 31013c2effd3..b1ac5584eaa5 100644
->--- a/include/linux/moduleloader.h
->+++ b/include/linux/moduleloader.h
->@@ -86,6 +86,9 @@ void module_arch_cleanup(struct module *mod);
-> /* Any cleanup before freeing mod->module_init */
-> void module_arch_freeing_init(struct module *mod);
+>> >
+>> > 2. It also breaks most of current drivers as the driver probe sequence
+>> > behavior changed If removing .power_on() and .power_off() callback and
+>> use .start() and .stop() instead.
+>> >
+>> > genpd_dev_pm_attach will only power up the domain and attach device,
+>> > but will not call .start() which relies on device runtime pm. That
+>> > means the device power is still not up before running driver probe
+>> > function. For SCU enabled platforms, all device drivers accessing
+>> > registers/clock without power domain enabled will trigger a HW access
+>> > error. That means we need fix most of drivers probe sequence with proper
+>> runtime pm. So I'm a bit wondering whether we should still keep the exist way.
+>>
+>> I see what you are trying to say, but I am not sure why you consider this as
+>> they would break? How did they work in the first place?
+>>
 >
->+struct mod_kallsyms;
->+void module_fixup_kallsyms(struct mod_kallsyms *kallsyms);
->+
-> #ifdef CONFIG_KASAN
-> #include <linux/kasan.h>
-> #define MODULE_ALIGN (PAGE_SIZE << KASAN_SHADOW_SCALE_SHIFT)
->diff --git a/kernel/module.c b/kernel/module.c
->index 49a405891587..ded4f4b49824 100644
->--- a/kernel/module.c
->+++ b/kernel/module.c
->@@ -2659,6 +2659,10 @@ static void layout_symtab(struct module *mod, struct load_info *info)
-> 	mod->init_layout.size = debug_align(mod->init_layout.size);
-> }
+> Most drivers does not require power domains before. E.g. GPIO, I2C, PWM, MMC.
+> Or even we need power domain(PUs/PCIE), they're enabled in .power_on()/.power_off()
+> which has been already up before probe.
 >
->+void __weak module_fixup_kallsyms(struct mod_kallsyms *kallsyms)
->+{
->+}
->+
-> /*
->  * We use the full symtab and strtab which layout_symtab arranged to
->  * be appended to the init section.  Later we switch to the cut-down
->@@ -2680,6 +2684,8 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
-> 	/* Make sure we get permanent strtab: don't use info->strtab. */
-> 	mod->kallsyms->strtab = (void *)info->sechdrs[info->index.str].sh_addr;
+>> Anyway, the problem you are talking about have so far been addressed by
+>> making buses/drivers to call pm_runtime_enable() and
+>> pm_runtime_get_sync() - before trying to probe their devices.
+>>
 >
->+	module_fixup_kallsyms(mod->kallsyms);
->+
-> 	/* Set types up while we still have access to sections. */
-> 	for (i = 0; i < mod->kallsyms->num_symtab; i++)
-> 		mod->kallsyms->symtab[i].st_info
->-- 
->2.11.0
+> Yes, called them early before accessing clock and hw registers.
 >
+>> Do you have an idea of the amount of drivers that needs to fixed, in regards to
+>> this?
+>>
+>
+> So far all enabled devices I tested need fixes. GPIO/I2C/FEC/MMC and etc.
+> Suppose other need the same fix as we have not met this situation before.
+
+Okay, I see.
+
+>
+>> I guess an option could be to, that via the ->attach_dev() callback perform the
+>> same operations as also being done during ->start(). Of course, you may need
+>> to keep a flag about this being done, so that operations that need to be
+>> balanced with get/put or the like is managed correctly, the next time
+>> ->start|stop() becomes called.
+>>
+>
+> That might be a way to try. The follow seems may introduce a bit complexities
+> and driver needs to maintainer the runtime status along with framework in order to
+> keep the balance?
+
+Yeah, it's likely not going to be very elegant, but should be rather
+self contained in the PM domain driver and could serve as a way
+forward - while working on fixing the drivers long term.
+
+>
+>> >
+>> > In summary, we probably may not be able to try ti_sci way before fixing
+>> above two issues.
+>> >
+>> > Do you think I should wait for them to be fixed or if we could use the current
+>> way at first?
+>> > I might be a little intend to the second way as we now have a lot
+>> > upstreaming work pending on this. But please let me know if you have a
+>> different idea.
+>>
+>> As this is also about deploying a DTB with a correctly modeled HW, I think we
+>> need to fix the above issues.
+>>
+>
+> DTB are the same with #power-domain-cells 1 (resource ID) in either case.
+> So DTB don't need change and driver could be optimized.
+
+You are correct.
+
+Although, how does $subject patch solves the case where a device may
+have multiple PM domains attached to it? Or is left as a future
+improvement?
+
+Kind regards
+Uffe
