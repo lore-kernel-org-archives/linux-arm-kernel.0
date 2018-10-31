@@ -1,56 +1,87 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Wed, 31 Oct 2018 15:48:47 +0200
-Subject: [PATCH 1/8] clk: clkdev/of_clk - add managed lookup and provider
- registrations
-In-Reply-To: <b3954431df109827c71d25d390adf22f6991a6df.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
- <b3954431df109827c71d25d390adf22f6991a6df.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <20181031134847.GA29664@localhost.localdomain>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 31 Oct 2018 14:49:26 +0100
+Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
+ smp_call_function()
+In-Reply-To: <20181030221843.121254-3-dianders@chromium.org>
+References: <20181030221843.121254-1-dianders@chromium.org>
+ <20181030221843.121254-3-dianders@chromium.org>
+Message-ID: <20181031134926.GB13237@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2018 at 10:30:34AM +0200, Matti Vaittinen wrote:
-> With MFD devices the clk properties may be contained in MFD (parent) DT
-> node. Current devm_of_clk_add_hw_provider assumes the clk is bound to MFD
-> subdevice not to MFD device (parent). Add
-> devm_of_clk_add_hw_provider_parent to tackle this issue.
+On Tue, Oct 30, 2018 at 03:18:43PM -0700, Douglas Anderson wrote:
+> Looking closely at it, it seems like a really bad idea to be calling
+> local_irq_enable() in kgdb_roundup_cpus().  If nothing else that seems
+> like it could violate spinlock semantics and cause a deadlock.
 > 
-> Also clkdev registration lacks of managed registration functions and it
-> seems few drivers do not drop clkdev lookups at exit. Add
-> devm_clk_hw_register_clkdev and devm_clk_release_clkdev to ease lookup
-> releasing at exit.
-> 
-> Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+> Instead, let's use a private csd alongside
+> smp_call_function_single_async() to round up the other CPUs.  Using
+> smp_call_function_single_async() doesn't require interrupts to be
+> enabled so we can remove the offending bit of code.
 
-//snip
+You might want to mention that the only reason this isn't a deadlock
+itself is because there is a timeout on waiting for the slaves to
+check-in.
 
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 60c51871b04b..94c7bf471c31 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -916,6 +916,10 @@ int devm_of_clk_add_hw_provider(struct device *dev,
->  			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
->  						 void *data),
->  			   void *data);
-> +int devm_of_clk_add_parent_hw_provider(struct device *dev,
-> +			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-> +						 void *data),
-> +			   void *data);
->  void of_clk_del_provider(struct device_node *np);
->  void devm_of_clk_del_provider(struct device *dev);
->  struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
+> --- a/kernel/debug/debug_core.c
+> +++ b/kernel/debug/debug_core.c
+> @@ -55,6 +55,7 @@
+>  #include <linux/mm.h>
+>  #include <linux/vmacache.h>
+>  #include <linux/rcupdate.h>
+> +#include <linux/irq.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/byteorder.h>
+> @@ -220,6 +221,39 @@ int __weak kgdb_skipexception(int exception, struct pt_regs *regs)
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Default (weak) implementation for kgdb_roundup_cpus
+> + */
+> +
+> +static DEFINE_PER_CPU(call_single_data_t, kgdb_roundup_csd);
+> +
+> +void __weak kgdb_call_nmi_hook(void *ignored)
+> +{
+> +	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
+> +}
+> +
+> +void __weak kgdb_roundup_cpus(void)
+> +{
+> +	call_single_data_t *csd;
+> +	int cpu;
+> +
+> +	for_each_cpu(cpu, cpu_online_mask) {
+> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
+> +		smp_call_function_single_async(cpu, csd);
+> +	}
+> +}
+> +
+> +static void kgdb_generic_roundup_init(void)
+> +{
+> +	call_single_data_t *csd;
+> +	int cpu;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
+> +		csd->func = kgdb_call_nmi_hook;
+> +	}
+> +}
+> +
+>  /*
+>   * Some architectures need cache flushes when we set/clear a
+>   * breakpoint:
+> @@ -993,6 +1027,8 @@ int kgdb_register_io_module(struct kgdb_io *new_dbg_io_ops)
+>  		return -EBUSY;
+>  	}
+>  
+> +	kgdb_generic_roundup_init();
+> +
+>  	if (new_dbg_io_ops->init) {
+>  		err = new_dbg_io_ops->init();
+>  		if (err) {
 
-Right. Didn't spot the 
-#ifdef CONFIG_OF
-in clk-provider.h. So patch lacks of stub functions for non OF
-architectures. The 0-Day test system spot this. Tomorrow I'll send v2
-where the inlined stub functions for non OF architectures are added.
-
-Br,
-	Matti Vaittinen
-
--- 
-Matti Vaittinen
-ROHM Semiconductors
-
-~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
+That's a little bit of overhead for those architectures not using that
+generic code; but I suppose we can live with that.
