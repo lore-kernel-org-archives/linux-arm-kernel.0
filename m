@@ -1,54 +1,76 @@
 From: esmil@mailme.dk (Emil Renner Berthing)
-Date: Wed, 31 Oct 2018 11:56:57 +0100
-Subject: [PATCH v1 00/14] Rockchip SPI cleanup and use interrupts
-Message-ID: <20181031105711.19575-1-esmil@mailme.dk>
+Date: Wed, 31 Oct 2018 11:57:00 +0100
+Subject: [PATCH v1 03/14] spi: rockchip: always use SPI mode
+In-Reply-To: <20181031105711.19575-1-esmil@mailme.dk>
+References: <20181031105711.19575-1-esmil@mailme.dk>
+Message-ID: <20181031105711.19575-4-esmil@mailme.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Emil Renner Berthing <kernel@esmil.dk>
 
-Hi,
+The hardware supports 3 different variants of SPI
+and there were some code around it, but nothing
+to actually set it to anything but "Motorola SPI".
+Just drop that code and always use that mode.
 
-I took another look at the rockchip spi driver and ended up
-with more cleanups and implementing an interrupt handler
-to fill/empty the tx and rx fifos rather than busy-looping.
+Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
+---
+ drivers/spi/spi-rockchip.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-I have two question though:
-
-The driver sets the SPI_LOOP flag in master->mode_bits,
-but never checks if the flag is set on an spi device.
-That looks suspicious to me, but I'm not exactly sure what
-that flag means, so it might be ok?
-
-The driver registers a master->max_transfer_size function
-to always return 0xffff, but also checks each transfer
-for xfer->len > 0xffff.
-I thought that was redundant, but it turns out I can
-trigger it with a simple
-dd if=/dev/mtd0 of=/dev/null bs=[something > 0xffff]
-Is that a bug or have I just not understood what
-master->max_transfer_size is supposed to do?
-
-/Emil
-
-Emil Renner Berthing (14):
-  spi: rockchip: make spi_enable_chip take bool
-  spi: rockchip: use designated init for dma config
-  spi: rockchip: always use SPI mode
-  spi: rockchip: use atomic_t state
-  spi: rockchip: disable spi on error
-  spi: rockchip: read transfer info directly
-  spi: rockchip: don't store dma channels twice
-  spi: rockchip: remove master pointer from dev data
-  spi: rockchip: simplify use_dma logic
-  spi: rockchip: set min/max speed
-  spi: rockchip: precompute rx sample delay
-  spi: rockchip: use irq rather than polling
-  spi: rockchip: support 4bit words
-  spi: rockchip: support lsb-first mode
-
- drivers/spi/spi-rockchip.c | 579 +++++++++++++++++--------------------
- 1 file changed, 264 insertions(+), 315 deletions(-)
-
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 87d1b9837d94..7fac4253075e 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -156,12 +156,6 @@
+ 
+ #define ROCKCHIP_SPI_MAX_CS_NUM			2
+ 
+-enum rockchip_ssi_type {
+-	SSI_MOTO_SPI = 0,
+-	SSI_TI_SSP,
+-	SSI_NS_MICROWIRE,
+-};
+-
+ struct rockchip_spi_dma_data {
+ 	struct dma_chan *ch;
+ 	dma_addr_t addr;
+@@ -179,8 +173,6 @@ struct rockchip_spi {
+ 	u32 fifo_len;
+ 	/* max bus freq supported */
+ 	u32 max_freq;
+-	/* supported slave numbers */
+-	enum rockchip_ssi_type type;
+ 
+ 	u16 mode;
+ 	u8 tmode;
+@@ -525,14 +517,14 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
+ 	u32 dmacr = 0;
+ 	int rsd = 0;
+ 
+-	u32 cr0 = (CR0_BHT_8BIT << CR0_BHT_OFFSET)
+-		| (CR0_SSD_ONE << CR0_SSD_OFFSET)
+-		| (CR0_EM_BIG << CR0_EM_OFFSET);
++	u32 cr0 = CR0_FRF_SPI  << CR0_FRF_OFFSET
++	        | CR0_BHT_8BIT << CR0_BHT_OFFSET
++	        | CR0_SSD_ONE  << CR0_SSD_OFFSET
++	        | CR0_EM_BIG   << CR0_EM_OFFSET;
+ 
+ 	cr0 |= (rs->n_bytes << CR0_DFS_OFFSET);
+ 	cr0 |= ((rs->mode & 0x3) << CR0_SCPH_OFFSET);
+ 	cr0 |= (rs->tmode << CR0_XFM_OFFSET);
+-	cr0 |= (rs->type << CR0_FRF_OFFSET);
+ 
+ 	if (rs->use_dma) {
+ 		if (rs->tx)
+@@ -709,7 +701,6 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 
+ 	spi_enable_chip(rs, false);
+ 
+-	rs->type = SSI_MOTO_SPI;
+ 	rs->master = master;
+ 	rs->dev = &pdev->dev;
+ 	rs->max_freq = clk_get_rate(rs->spiclk);
 -- 
 2.19.1
