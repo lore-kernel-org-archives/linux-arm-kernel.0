@@ -1,226 +1,89 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 31 Oct 2018 15:33:33 -0500
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
- <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
- <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
-Message-ID: <ae3c35e0-6d92-10e3-c268-eb4338fbb233@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 31 Oct 2018 21:46:22 +0100
+Subject: Crash report: Broken NUMA distance map causes crash on arm64
+ system
+In-Reply-To: <ae352fe1-3c59-dcde-fd00-2c03b4491dc6@huawei.com>
+References: <b89bf686-05bd-a3de-e7ef-4ab9ab7bdb6c@huawei.com>
+ <20181030092640.GE1459@hirez.programming.kicks-ass.net>
+ <d126099d-2698-8e3a-06ca-f229e57c3052@huawei.com>
+ <ae352fe1-3c59-dcde-fd00-2c03b4491dc6@huawei.com>
+Message-ID: <20181031204622.GB3141@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 30, 2018 at 03:35:35PM +0000, John Garry wrote:
+> [    7.154740] ERROR: Node-distance not symmetric
+> [    7.154740]
+> [    7.160724]   10 15 20 25
+> [    7.163456]   15 10 25 30
+> [    7.166190]   20 25 10 15
+> [    7.168921]   10 10 15 10
+> [    7.171655]
 
+But I'm not getting the rest of those errors with my 'reproducer':
 
-On 10/31/18 1:21 PM, Marc Zyngier wrote:
-> Hi Grygorii,
+  kvm -smp 4 -m 4G -display none -monitor null -serial stdio -kernel defconfig-build/arch/x86/boot/bzImage -append "sched_debug debug ignore_loglevel earlyprintk=serial,ttyS0,115200,keep numa=fake=4:10,15,20,25,15,10,25,30,20,25,10,15,10,10,15,10,0"
+
+[    0.828331] ERROR: Node-distance not symmetric
+[    0.828331] 
+[    0.829081]   10 15 20 25 
+[    0.830079]   15 10 25 30 
+[    0.831079]   20 25 10 15 
+[    0.832079]   10 10 15 10 
+[    0.833079] 
+[    0.834373] CPU0 attaching sched-domain(s):
+[    0.835082]  domain-0: span=0-3 level=DIE
+[    0.836079]   groups: 0:{ span=0 }, 1:{ span=1 }, 2:{ span=2 }, 3:{ span=3 }
+[    0.837082] CPU1 attaching sched-domain(s):
+[    0.838081]  domain-0: span=0-3 level=DIE
+[    0.839079]   groups: 1:{ span=1 }, 2:{ span=2 }, 3:{ span=3 }, 0:{ span=0 }
+[    0.840082] CPU2 attaching sched-domain(s):
+[    0.841080]  domain-0: span=0-3 level=DIE
+[    0.842079]   groups: 2:{ span=2 }, 3:{ span=3 }, 0:{ span=0 }, 1:{ span=1 }
+[    0.843094] ------------[ cut here ]------------
+[    0.844076] kernel BUG at ../mm/slub.c:3901!
+[    0.844083] invalid opcode: 0000 [#1] SMP PTI
+[    0.845076] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc8+ #305
+[    0.845076] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.10.2-1 04/01/2014
+[    0.845076] RIP: 0010:kfree+0x113/0x160
+[    0.845076] Code: 18 48 89 da 4c 89 e6 e8 db 01 c5 00 48 8b 45 00 48 85 c0 75 e4 e9 0e ff ff ff 49 8b 02 f6 c4 80 75 0a 49 8b 42 08 a8 01 75 02 <0f> 0b 49 8b 02 31 f6 f6 c4 80 74 05 41 0f b6 72 51 5b 5d 41 5c 4c
+[    0.845076] RSP: 0000:ffffabc080633dc8 EFLAGS: 00010246
+[    0.845076] RAX: ffff9f973fff8da0 RBX: ffff9f970000001e RCX: 00000000000000f9
+[    0.845076] RDX: 0000000000000000 RSI: ffff9f963ea23c80 RDI: 0000606980000000
+[    0.845076] RBP: 0000000000020ac0 R08: 0000000000023c80 R09: ffffffff9f8a10db
+[    0.845076] R10: fffff17204000000 R11: 0000000000000001 R12: ffffffff9f8a113d
+[    0.845076] R13: 0000000000000003 R14: ffffffffa0ab4820 R15: ffff9f973e5bde00
+[    0.845076] FS:  0000000000000000(0000) GS:ffff9f963ea00000(0000) knlGS:0000000000000000
+[    0.845076] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[    0.845076] CR2: 00000000ffffffff CR3: 000000008ea0a000 CR4: 00000000000006f0
+[    0.845076] Call Trace:
+[    0.845076]  destroy_sched_domain+0x3d/0x50
+[    0.845076]  cpu_attach_domain+0x378/0x680
+[    0.845076]  ? update_group_capacity+0x20/0x2c0
+[    0.845076]  build_sched_domains+0xde9/0xed0
+[    0.845076]  ? set_debug_rodata+0xc/0xc
+[    0.845076]  sched_init_domains+0x80/0x90
+[    0.845076]  sched_init_smp+0x1d/0x63
+[    0.845076]  kernel_init_freeable+0x101/0x23f
+[    0.845076]  ? rest_init+0xb0/0xb0
+[    0.845076]  kernel_init+0x5/0x100
+[    0.845076]  ret_from_fork+0x35/0x40
+
+I'll work on that crash though..
+
+> I also note that if I apply the patch, below, to reject the invalid NUMA
+> distance, we're still getting a warning/error:
 > 
-> On 31/10/18 16:39, Grygorii Strashko wrote:
-> 
-> [...]
-> 
->> I'd try to provide some additional information here.
->> (Sry, I'll still use term "events")
->>
->> As Lokesh explained in other mail on K3 SoC everything is generic and most
->> of resources allocated dynamicaly:
->> - generic DMA channels
->> - generic HW rings (used by DMA channel)
->> - generic events (assigned to the rings) and muxed to different cores/hosts
->>
->> So, when some driver would like to perform DMA transaction It's
->> required to build (configure) DMA channel by allocating different type of
->> resources and link them together to get finally working Data Movement path
->> (situation complicated by ti-sci firmware which policies resources between cores/hosts):
->> - get UDMA channel from available range
->> - get HW rings and attach them to the UDMA channel
->> - get event, assign it to the ring and mux it to the core/host through IA->IR-> chain
->>     (and this step is done by ti_sci_inta_register_event() - no DT as everything is dynamic).
->>
->> Next, how this is working now - ti_sci_inta_register_event():
->> - first call does similar things as regular DT irq mapping (end up calling irq_create_fwspec_mapping()
->>     and builds IRQ chain as below:
->>     linux_virq = ti_sci_inta_register_event(dev, <ringacc tisci_dev_id>,
->> 				<ringacc id>, 0, IRQF_TRIGGER_HIGH, false);
->>
->>                +---------------------+
->>                |         IA          |
->> +--------+   |            +------+ |        +--------+         +------+
->> | ring 1 +----->evtA+----->VintX +---------->   IR   +--------->  GIC +-->
->> +--------+   |            +------+ |        +--------+         +------+  Linux IRQ Y
->>      evtA      |                     |
->>                |                     |
->>                +---------------------+
->>
->> - second call updates only IA input part while keeping other parts of IRQ chain the same
->>     if valid <linux_virq> passed as input parameter:
->>     linux_virq = ti_sci_inta_register_event(dev, <ringacc tisci_dev_id>,
->> 				<ringacc id>, linux_virq, IRQF_TRIGGER_HIGH, false);
->>                +---------------------+
->>                |         IA          |
->> +--------+   |            +------+ |        +--------+         +------+
->> | ring 1 +----->evtA+--^-->VintX +---------->   IR   +--------->  GIC +-->
->> +--------+   |         |  +------+ |        +--------+         +------+  Linux IRQ Y
->>                |         |           |
->> +--------+   |         |           |
->> | ring 2 +----->evtB+--+           |
->> +--------+   |                     |
->>                +---------------------+
-> 
-> This is basically equivalent requesting a bunch of MSIs for a single
-> device, and obtaining a set of corresponding interrupts. The fact that
-> you end-up muxing them in the IA block is an implementation detail.
-> 
->>
->>     As per above, irq-ti-sci-inta and tisci fw creates shared IRQ on HW layer by attaching
->>     events to already established IA->IR->GIC IRQ chain. Any Rings events will trigger
->>     Linux IRQ Y line and keep it active until Rings are not empty.
->>
->> Now why this was done this way?
->> Note. I'm not saying this is right, but it is the way we've done it as of now. And I hope MSI
->> will help to move forward, but I'm not very familiar with it.
->>
->> The consumer of this approach is K3 Networking driver, first of all, and
->> this approach allows to eliminate runtime overhead in Networking hot path and
->> provides possibility to implement driver's specific queues/rings handling policies
->> - like round-robin vs priority.
->>
->> CPSW networking driver doesn't need to know exact ring generated IRQ - it
-> 
-> Well, to fit the Linux model, you'll have to know. Events needs to be
-> signalled as individual IRQs.
+> [    7.144407] CPU: All CPU(s) started at EL2
+> [    7.148678] alternatives: patching kernel code
+> [    7.153557] ERROR: Node-0 not representative
+> [    7.153557]
+> [    7.159365]   10 15 20 25
+> [    7.162097]   15 10 25 30
+> [    7.164832]   20 25 10 15
+> [    7.167562]   25 30 15 10
 
-"
-NAK. Either this fits in the standard model, or we adapt the standard
-model to catter for your particular use case. But we don't define a new,
-TI specific API.
-"
+Yeah, that's an 'obviously' broken topology too.
 
-
-
-> 
->> need to know if there is packet for processing, so current IRQ handling sequence we have (simplified):
->> - any ring evt -> IA -> IR -> GIC -> Linux IRQ Y
->>     handle_fasteoi_irq() -> cpsw_irq_handler -> disable_irq() -> napi_schedule()
-> 
-> Here, disable_irq() will only affect a single "event".
-
-No. It will disable "Linux IRQ Y". On IA level there is no mask/unmask/ack functions for ring's events.
-sum of rings events keeps "Linux IRQ Y" line physically active until all rings are serviced - empty.
-once ring empty - corresponding event auto cleared.
-
-> 
->>     ...
->>     soft_irq() -> cpsw_poll():
->> 	- [1] for each ring from Hi prio to Low prio
->> 	      [2] get packet
->> 	      [3] if (packet) process packet & goto [2]
->> 	          else goto [1]
->> 	       if (no more packets) goto [4]
->> 	  [4] enable_irq()
->>
->> As can be seen there is no intermediate IRQ dispatchers on IA/IR levels and no IRQs-per-rings,
->> and NAPI poll cycle allows to implement driver's specific rings handling policy.
->>
->> Next: depending on the use case following optimizations are possible:
->> 1) throughput: split all TX (or RX) rings on X groups, where X = num_cpus
->> and allocate assign IRQ to each group for Networking XPS/RPS/RSS.
->> For example, CPSW2G has 8 TX channels and so 8 completion rings, 4 CPUs:
->>    rings[0,1] -(IA/IR) - Linux IRQ 1
->>    rings[2,3] -(IA/IR) - Linux IRQ 2
->>    rings[4,5] -(IA/IR) - Linux IRQ 3
->>    rings[6,7] -(IA/IR) - Linux IRQ 4
->> each Linux IRQ assigned to separate CPU.
-> 
-> What you call "Linux IRQ" is what ends up being generated at the GIC
-> level, and isn't the interrupt the driver will get. It will get an
-> interrupt number which represent a single event. 
-
-In current implementation the interrupt controller driver will not know what event was generated
-when this ti_sci_inta_register_event() is used as this is responsibility of consumer driver
-which required to get only one notification - packet received (GIC->Linux IRQ).
-
-We need this to build fast IRQ handling path for networking -
-GIC->Linux IRQ considered exclusive and no other event can be assigned to it except
-as by using ti_sci_inta_register_event().
-I think, it can be considered the same way as "reserved memory" - it exist, but linux
-knows nothing about it, while consumer drivers still can have access to it.
-
-ti_sci_inta_register_event() does mostly the same - it steals set of events from IA,
-preforms some muxing inside HW and makes one GIC->Linux IRQ visible to Linux IRQ framework
-- from Linux point of view allocated GIC->Linux IRQ is just regular irq and It
-doesn't know internals (while consumer driver does).
-
-We can't split or divide it on networking/non networking part due to fact that
-all resources are dynamic, so ti-sci-inta + FW manages/own resources - and
-ti_sci_inta_register_event() is entry point for IRQ resources allocation from
-available ranges.
-
-It's no too much different from OMAP CPSW device - just legacy CPSW IRQ generation
-schema statically implemented in HW: 8 TX/RX CPPI channels, which are representing
-8 linked lists of CPPI descriptor. Any change of linked lists state triggers
-local CPSW CPPI IRQ which are summed to generate one (and only one) GIC->Linux IRQ.
-It's responsibility of CPSW networking driver to handle CPPI channels in correct order.
-And there is no chained IRQ controller implemented simply because of (a) runtime overhead
-and (b) impossibility to implement priority handling.
-
-Difference is that CPSW CPPI IRQs need to be asked while K3 AM6 it happens automatically
-- and in K3 AM6 HW need to be configured dynamically based on allocated resources.
-
-We absolutely need to
-> maintain this 1:1 mapping between event and driver-visible interrupts.
-> Whatever happens between the scenes is none of the driver problem.
-> 
-> In your "one interrupt, multiple events" paradigm, the whole IA thing
-> would be conceptually part of your networking IP. I don't believe this
-> is the case, and trawling the documentation seems to confirm this view.
-
-not exactly - ti-sci-inta expected to work this way only when ti_sci_inta_register_event() is used.
-Other allocation will follow standard Linux approach by "maintaining "1:1 mapping".
-
-> 
->> 2) min latency:
->>    Ring X is used by RT application for TX/RX some traffic (using AF_XDP sockets for example)
->>    Ring X can be assigned with separate IRQ while other rings still grouped to
->>    produce 1 IRQ
->>    rings[0,6] - (IA/IR) - Linux IRQ 1
->>    rings[7] - (IA/IR) - Linux IRQ 2
->>    Linux IRQ 2 assigned to separate CPU where RT application is running.
->>
->> Hope above will help to clarify some K3 AM6 IRQ generation questions and
->> find the way to move forward.
-> 
-> Well, I'm convinced that we do not want a networking driver to be tied
-> to an interrupt architecture, and that the two should be completely
-> independent. But that's my own opinion. I can only see two solutions
-> moving forward:
-> 
-> 1) You make the IA a real interrupt controller that exposes real
-> interrupts (one per event), and write your networking driver
-> independently of the underlying interrupt architecture.
-
-And that's actually what is implemented IA is real interrupt controller which produces "1:1 mapping",
-but it provides possibility to steal and mux IRQ event for non-standard purposes
-- networking/ipc. IA is resource owner in this case as there is no way to preallocate/assign
-resources statically.
-
-> 
-> 2) you make the IA an integral part of your network driver, not exposing
-> anything outside of it, and limiting the interactions with the IR
-> *through the standard IRQ API*. You duplicate this knowledge throughout
-> the other client drivers.
-> 
-> I believe that (2) would be a massive design mistake as it locks the
-> driver to a single of the HW (and potentially a single revision of the
-> firmware) while (1) gives you the required level of flexibility by
-> hiding the whole event "concept" at a single location.
-> 
-> Yes, (1) makes you rewrite your existing, out of tree drivers. Oh well...
-
--- 
-regards,
--grygorii
+Clearly you're far more creative than the ACPI BIOS people have been so
+far.
