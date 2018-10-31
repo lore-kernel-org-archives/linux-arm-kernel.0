@@ -1,71 +1,17 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 31 Oct 2018 22:26:25 +0800
-Subject: [PATCH 7/8] clk: clk-twl6040: Free of_provider at remove
-In-Reply-To: <5281ac8223e5ec2673341e2655abf1144e997d10.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-References: <5281ac8223e5ec2673341e2655abf1144e997d10.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <201810312244.ltoghAUC%fengguang.wu@intel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 31 Oct 2018 15:32:53 +0100
+Subject: [PATCH 1/4] arm64: defconfig: Enable scu-simple-card driver
+In-Reply-To: <20181015095924.25794-2-horms+renesas@verge.net.au>
+References: <20181015095924.25794-1-horms+renesas@verge.net.au>
+ <20181015095924.25794-2-horms+renesas@verge.net.au>
+Message-ID: <20181031143253.h56tjjv64x5hap2d@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matti,
+On Mon, Oct 15, 2018 at 11:59:21AM +0200, Simon Horman wrote:
+> Enable the scu-simple-card which is used by
+> the R-Car E3 (r8a77990) based Ebisu board.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thank you for the patch! Yet something to improve:
-
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.19 next-20181031]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Matti-Vaittinen/clk-clkdev-managed-clk-lookup-and-provider-registrations/20181031-182055
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: x86_64-randconfig-r0-10311818 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All errors (new ones prefixed by >>):
-
-   drivers/clk/clk-twl6040.c: In function 'twl6040_pdmclk_probe':
->> drivers/clk/clk-twl6040.c:111:9: error: implicit declaration of function 'devm_of_clk_add_parent_hw_provider' [-Werror=implicit-function-declaration]
-     return devm_of_clk_add_parent_hw_provider(&pdev->dev,
-            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
-
-vim +/devm_of_clk_add_parent_hw_provider +111 drivers/clk/clk-twl6040.c
-
-    90	
-    91	static int twl6040_pdmclk_probe(struct platform_device *pdev)
-    92	{
-    93		struct twl6040 *twl6040 = dev_get_drvdata(pdev->dev.parent);
-    94		struct twl6040_pdmclk *clkdata;
-    95		int ret;
-    96	
-    97		clkdata = devm_kzalloc(&pdev->dev, sizeof(*clkdata), GFP_KERNEL);
-    98		if (!clkdata)
-    99			return -ENOMEM;
-   100	
-   101		clkdata->dev = &pdev->dev;
-   102		clkdata->twl6040 = twl6040;
-   103	
-   104		clkdata->pdmclk_hw.init = &twl6040_pdmclk_init;
-   105		ret = devm_clk_hw_register(&pdev->dev, &clkdata->pdmclk_hw);
-   106		if (ret)
-   107			return ret;
-   108	
-   109		platform_set_drvdata(pdev, clkdata);
-   110	
- > 111		return devm_of_clk_add_parent_hw_provider(&pdev->dev,
-   112				of_clk_hw_simple_get, &clkdata->pdmclk_hw);
-   113	}
-   114	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 32427 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181031/71dc530d/attachment-0001.gz>
+Applied for v4.21.
