@@ -1,41 +1,137 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Wed, 31 Oct 2018 10:34:32 +0200
-Subject: [PATCH 8/8] clk: apcs-msm8916: simplify probe cleanup by using devm
-In-Reply-To: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <0495e02e0a7e7afe5b16e606fd83ad928a3eed4d.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Oct 2018 08:41:34 +0000
+Subject: [PATCH v2] soc: ti: QMSS: Fix usage of irq_set_affinity_hint
+Message-ID: <20181031084134.96289-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm variant for of_provider registration.
+The Keystone QMSS driver is pretty damaged, in the sense that it
+does things like this:
 
-Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+	irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
+
+where cpu_map is a local variable. As we leave the function, this
+will point to nowhere-land, and things will end-up badly.
+
+Instead, let's use a proper cpumask that gets allocated, giving
+the driver a chance to actually work with things like irqbalance
+as well as have a hypothetical 64bit future.
+
+Cc: stable at vger.kernel.org
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clk/qcom/apcs-msm8916.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+* From v1:
+  - Added Santosh's Ack
+  - Cc stable
+  - Directly sent to arm-soc for immediate pick-up
+    (https://lore.kernel.org/lkml/0a20aaf3-65ce-a7ae-8a0e-877313483969 at oracle.com/)
 
-diff --git a/drivers/clk/qcom/apcs-msm8916.c b/drivers/clk/qcom/apcs-msm8916.c
-index b1cc8dbcd327..f4e0c136ab1a 100644
---- a/drivers/clk/qcom/apcs-msm8916.c
-+++ b/drivers/clk/qcom/apcs-msm8916.c
-@@ -96,8 +96,8 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
- 		goto err;
+ drivers/soc/ti/knav_qmss.h       |  4 ++--
+ drivers/soc/ti/knav_qmss_acc.c   | 10 +++++-----
+ drivers/soc/ti/knav_qmss_queue.c | 22 +++++++++++++++-------
+ 3 files changed, 22 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
+index 3efc47e82973..bd040c29c4bf 100644
+--- a/drivers/soc/ti/knav_qmss.h
++++ b/drivers/soc/ti/knav_qmss.h
+@@ -329,8 +329,8 @@ struct knav_range_ops {
+ };
+ 
+ struct knav_irq_info {
+-	int	irq;
+-	u32	cpu_map;
++	int		irq;
++	struct cpumask	*cpu_mask;
+ };
+ 
+ struct knav_range_info {
+diff --git a/drivers/soc/ti/knav_qmss_acc.c b/drivers/soc/ti/knav_qmss_acc.c
+index 316e82e46f6c..2f7fb2dcc1d6 100644
+--- a/drivers/soc/ti/knav_qmss_acc.c
++++ b/drivers/soc/ti/knav_qmss_acc.c
+@@ -205,18 +205,18 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
+ {
+ 	struct knav_device *kdev = range->kdev;
+ 	struct knav_acc_channel *acc;
+-	unsigned long cpu_map;
++	struct cpumask *cpu_mask;
+ 	int ret = 0, irq;
+ 	u32 old, new;
+ 
+ 	if (range->flags & RANGE_MULTI_QUEUE) {
+ 		acc = range->acc;
+ 		irq = range->irqs[0].irq;
+-		cpu_map = range->irqs[0].cpu_map;
++		cpu_mask = range->irqs[0].cpu_mask;
+ 	} else {
+ 		acc = range->acc + queue;
+ 		irq = range->irqs[queue].irq;
+-		cpu_map = range->irqs[queue].cpu_map;
++		cpu_mask = range->irqs[queue].cpu_mask;
  	}
  
--	ret = of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
--				     &a53cc->clkr.hw);
-+	ret = devm_of_clk_add_parent_hw_provider(dev, of_clk_hw_simple_get,
-+						 &a53cc->clkr.hw);
- 	if (ret) {
- 		dev_err(dev, "failed to add clock provider: %d\n", ret);
- 		goto err;
-@@ -118,7 +118,6 @@ static int qcom_apcs_msm8916_clk_remove(struct platform_device *pdev)
- 	struct device *parent = pdev->dev.parent;
+ 	old = acc->open_mask;
+@@ -239,8 +239,8 @@ static int knav_range_setup_acc_irq(struct knav_range_info *range,
+ 			acc->name, acc->name);
+ 		ret = request_irq(irq, knav_acc_int_handler, 0, acc->name,
+ 				  range);
+-		if (!ret && cpu_map) {
+-			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
++		if (!ret && cpu_mask) {
++			ret = irq_set_affinity_hint(irq, cpu_mask);
+ 			if (ret) {
+ 				dev_warn(range->kdev->dev,
+ 					 "Failed to set IRQ affinity\n");
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index b5d5673c255c..8b418379272d 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -118,19 +118,17 @@ static int knav_queue_setup_irq(struct knav_range_info *range,
+ 			  struct knav_queue_inst *inst)
+ {
+ 	unsigned queue = inst->id - range->queue_base;
+-	unsigned long cpu_map;
+ 	int ret = 0, irq;
  
- 	clk_notifier_unregister(a53cc->pclk, &a53cc->clk_nb);
--	of_clk_del_provider(parent->of_node);
+ 	if (range->flags & RANGE_HAS_IRQ) {
+ 		irq = range->irqs[queue].irq;
+-		cpu_map = range->irqs[queue].cpu_map;
+ 		ret = request_irq(irq, knav_queue_int_handler, 0,
+ 					inst->irq_name, inst);
+ 		if (ret)
+ 			return ret;
+ 		disable_irq(irq);
+-		if (cpu_map) {
+-			ret = irq_set_affinity_hint(irq, to_cpumask(&cpu_map));
++		if (range->irqs[queue].cpu_mask) {
++			ret = irq_set_affinity_hint(irq, range->irqs[queue].cpu_mask);
+ 			if (ret) {
+ 				dev_warn(range->kdev->dev,
+ 					 "Failed to set IRQ affinity\n");
+@@ -1262,9 +1260,19 @@ static int knav_setup_queue_range(struct knav_device *kdev,
  
- 	return 0;
- }
+ 		range->num_irqs++;
+ 
+-		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3)
+-			range->irqs[i].cpu_map =
+-				(oirq.args[2] & 0x0000ff00) >> 8;
++		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3) {
++			unsigned long mask;
++			int bit;
++
++			range->irqs[i].cpu_mask = devm_kzalloc(dev,
++							       cpumask_size(), GFP_KERNEL);
++			if (!range->irqs[i].cpu_mask)
++				return -ENOMEM;
++
++			mask = (oirq.args[2] & 0x0000ff00) >> 8;
++			for_each_set_bit(bit, &mask, BITS_PER_LONG)
++				cpumask_set_cpu(bit, range->irqs[i].cpu_mask);
++		}
+ 	}
+ 
+ 	range->num_irqs = min(range->num_irqs, range->num_queues);
 -- 
-2.14.3
+2.19.1
