@@ -1,47 +1,50 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 31 Oct 2018 10:55:23 +0900
-Subject: [RFC 2/3] USB: core: Add non-coherent buffer allocation helpers
-In-Reply-To: <CAAFQd5DhFr8ywjc41oK9q+zZXH9zsOKh_7DxWmjzcE0+5Q3hGA@mail.gmail.com>
-References: <20180830172030.23344-1-ezequiel@collabora.com>
- <20180830172030.23344-3-ezequiel@collabora.com>
- <20180830175850.GA11521@infradead.org>
- <4fc5107f93871599ead017af7ad50f22535a7683.camel@collabora.com>
- <20180831055047.GA9140@infradead.org>
- <CAAFQd5DhFr8ywjc41oK9q+zZXH9zsOKh_7DxWmjzcE0+5Q3hGA@mail.gmail.com>
-Message-ID: <CAAFQd5BjGkJf-Yz3ixiCjCaoeQJKKXbF41JyEvrm1DQ6uNnBrQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 31 Oct 2018 10:24:32 +0800
+Subject: [PATCH v3 22/25] dt-bindings: sun6i-dsi: Add compatible for A64
+ DPHY
+In-Reply-To: <20181026144344.27778-23-jagan@amarulasolutions.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-23-jagan@amarulasolutions.com>
+Message-ID: <CAGb2v65a-+-U74QWBvHLJ9e+_dWY3Cy+h9CfAFHqmFnB0GmcBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph and everyone,
-
-On Fri, Aug 31, 2018 at 3:51 PM Tomasz Figa <tfiga@chromium.org> wrote:
+On Fri, Oct 26, 2018 at 10:46 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
 >
-> On Fri, Aug 31, 2018 at 2:50 PM Christoph Hellwig <hch@infradead.org> wrote:
-> >
-> > On Thu, Aug 30, 2018 at 07:11:35PM -0300, Ezequiel Garcia wrote:
-> > > On Thu, 2018-08-30 at 10:58 -0700, Christoph Hellwig wrote:
-> > > > Please don't introduce new DMA_ATTR_NON_CONSISTENT users, it is
-> > > > a rather horrible interface, and I plan to kill it off rather sooner
-> > > > than later.  I plan to post some patches for a better interface
-> > > > that can reuse the normal dma_sync_single_* interfaces for ownership
-> > > > transfers.  I can happily include usb in that initial patch set based
-> > > > on your work here if that helps.
-> > >
-> > > Please do. Until we have proper allocators that go thru the DMA API,
-> > > drivers will have to kmalloc the USB transfer buffers, and have
-> > > streaming mappings. Which in turns mean not using IOMMU or CMA.
-> >
-> > dma_map_page will of course use the iommu.
+> The MIPI DSI PHY HDMI controller on Allwinner A64 is similar
+> on the one on A31.
 >
-> Sure, dma_map*() will, but using kmalloc() defeats (half of) the
-> purpose of it, since contiguous memory would be allocated
-> unnecessarily, risking failures due to fragmentation.
+> Add A64 compatible and append A31 compatible as fallback.
+>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v3:
+> - none
+> Changes for v2:
+> - new patch
+>
+>  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+> index 9fa6e7a758ad..704fb31962f2 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+> @@ -36,7 +36,7 @@ D-PHY
+>
+>  Required properties:
+>    - compatible: value must be one of:
+> -    * allwinner,sun6i-a31-mipi-dphy
+> +    * "allwinner,sun50i-a64-mipi-dphy", "allwinner,sun6i-a31-mipi-dphy"
 
-Have we reached a conclusion here?
+The format for this is one "combination" per line. You need to keep the
+original "allwinner,sun6i-a31-mipi-dphy".
 
-It sounds like it's a quite significant problem, at least for some of
-the camera (media) devices over there and there are people interested
-in solving it, so all we need here is a conclusion on how to do it. :)
+ChenYu
 
-Best regards,
-Tomasz
+>    - reg: base address and size of memory-mapped region
+>    - clocks: phandles to the clocks feeding the DSI encoder
+>      * bus: the DSI interface clock
+> --
+> 2.18.0.321.gffc6fa0e3
+>
