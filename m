@@ -1,78 +1,58 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 31 Oct 2018 18:40:50 +0000
-Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
- smp_call_function()
-In-Reply-To: <20181030221843.121254-3-dianders@chromium.org>
-References: <20181030221843.121254-1-dianders@chromium.org>
- <20181030221843.121254-3-dianders@chromium.org>
-Message-ID: <20181031184050.sd5opni3mznaapkv@holly.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Oct 2018 18:42:28 +0000
+Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
+ Aggregator driver
+In-Reply-To: <18df8960-9165-ba50-2c25-9f00d32198e8@oracle.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <20181018154017.7112-10-lokeshvutla@ti.com>
+ <b20127dc-be43-3b00-9960-663738df0069@arm.com>
+ <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
+ <86va5ssrfm.wl-marc.zyngier@arm.com>
+ <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
+ <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
+ <18df8960-9165-ba50-2c25-9f00d32198e8@oracle.com>
+Message-ID: <e799646e-1fff-f96b-38e8-3d46b0160867@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 03:18:43PM -0700, Douglas Anderson wrote:
-> diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-> index f3cadda45f07..9a3f952de6ed 100644
-> --- a/kernel/debug/debug_core.c
-> +++ b/kernel/debug/debug_core.c
-> @@ -55,6 +55,7 @@
->  #include <linux/mm.h>
->  #include <linux/vmacache.h>
->  #include <linux/rcupdate.h>
-> +#include <linux/irq.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/byteorder.h>
-> @@ -220,6 +221,39 @@ int __weak kgdb_skipexception(int exception, struct pt_regs *regs)
->  	return 0;
->  }
->  
-> +/*
-> + * Default (weak) implementation for kgdb_roundup_cpus
-> + */
-> +
-> +static DEFINE_PER_CPU(call_single_data_t, kgdb_roundup_csd);
-> +
-> +void __weak kgdb_call_nmi_hook(void *ignored)
-> +{
-> +	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
-> +}
-> +
-> +void __weak kgdb_roundup_cpus(void)
-> +{
-> +	call_single_data_t *csd;
-> +	int cpu;
-> +
-> +	for_each_cpu(cpu, cpu_online_mask) {
-> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
-> +		smp_call_function_single_async(cpu, csd);
-> +	}
+On 31/10/18 18:38, Santosh Shilimkar wrote:
+> On 10/31/2018 11:21 AM, Marc Zyngier wrote:
+>> Hi Grygorii,
+>>
+> 
+> [...]
+> 
+>>
+>> Well, I'm convinced that we do not want a networking driver to be tied
+>> to an interrupt architecture, and that the two should be completely
+>> independent. But that's my own opinion. I can only see two solutions
+>> moving forward:
+>>
+>> 1) You make the IA a real interrupt controller that exposes real
+>> interrupts (one per event), and write your networking driver
+>> independently of the underlying interrupt architecture.
+>>
+>> 2) you make the IA an integral part of your network driver, not exposing
+>> anything outside of it, and limiting the interactions with the IR
+>> *through the standard IRQ API*. You duplicate this knowledge throughout
+>> the other client drivers.
+>>
+>> I believe that (2) would be a massive design mistake as it locks the
+>> driver to a single of the HW (and potentially a single revision of the
+>> firmware) while (1) gives you the required level of flexibility by
+>> hiding the whole event "concept" at a single location.
+>>
+>> Yes, (1) makes you rewrite your existing, out of tree drivers. Oh well...
+>>
+> My preference is also not tie the network driver with IA. BTW, this is
+> very standard functionality with other network drivers too. And this
+> is handled using MSI-X.
+> 
+> So strong NO for 1) from me as well.
 
-smp_call_function() automatically skips the calling CPU but this code does
-not. It isn't a hard bug since kgdb_nmicallback() does a re-entrancy
-check but I'd still prefer to skip the calling CPU.
+Err. Are you opposing to (1) or (2)? From the above, I cannot really
+tell... ;-)
 
-As mentioned in another part of the thread we can also add robustness
-by skipping a cpu where csd->flags != 0 (and adding an appropriately
-large comment regarding why). Doing the check directly is abusing
-internal knowledge that smp.c normally keeps to itself so an accessor
-of some kind would be needed.
-
-
-> +}
-> +
-> +static void kgdb_generic_roundup_init(void)
-> +{
-> +	call_single_data_t *csd;
-> +	int cpu;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
-> +		csd->func = kgdb_call_nmi_hook;
-> +	}
-> +}
-
-I can't help noticing this code is very similar to kgdb_roundup_cpus. Do
-we really gain much from ahead-of-time initializing csd->func?
-
-
-Daniel.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
