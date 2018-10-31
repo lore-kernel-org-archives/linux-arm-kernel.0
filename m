@@ -1,44 +1,90 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 31 Oct 2018 17:01:36 +0000
-Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
- smp_call_function()
-In-Reply-To: <20181031134926.GB13237@hirez.programming.kicks-ass.net>
-References: <20181030221843.121254-1-dianders@chromium.org>
- <20181030221843.121254-3-dianders@chromium.org>
- <20181031134926.GB13237@hirez.programming.kicks-ass.net>
-Message-ID: <20181031170136.s3ids6tm4rxxlpma@holly.lan>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 31 Oct 2018 17:15:10 +0000
+Subject: [PATCH v8 1/9] KVM: arm/arm64: Ensure only THP is candidate for
+ adjustment
+In-Reply-To: <87h8h2rwwr.fsf@e105922-lin.cambridge.arm.com> (Punit Agrawal's
+ message of "Wed, 31 Oct 2018 14:52:20 +0000")
+References: <20181001155443.23032-1-punit.agrawal@arm.com>
+ <20181001155443.23032-2-punit.agrawal@arm.com>
+ <20181031143646.GE12057@e113682-lin.lund.arm.com>
+ <87h8h2rwwr.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <87d0rqrqap.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2018 at 02:49:26PM +0100, Peter Zijlstra wrote:
-> On Tue, Oct 30, 2018 at 03:18:43PM -0700, Douglas Anderson wrote:
-> > Looking closely at it, it seems like a really bad idea to be calling
-> > local_irq_enable() in kgdb_roundup_cpus().  If nothing else that seems
-> > like it could violate spinlock semantics and cause a deadlock.
-> > 
-> > Instead, let's use a private csd alongside
-> > smp_call_function_single_async() to round up the other CPUs.  Using
-> > smp_call_function_single_async() doesn't require interrupts to be
-> > enabled so we can remove the offending bit of code.
-> 
-> You might want to mention that the only reason this isn't a deadlock
-> itself is because there is a timeout on waiting for the slaves to
-> check-in.
+Punit Agrawal <punit.agrawal@arm.com> writes:
 
-dbg_master_lock must be owned to call kgdb_roundup_cpus() so
-the calls to smp_call_function_single_async() should never deadlock the
-calling CPU unless there has been a previous failure to round up (e.g.
-cores that cannot react to the round up signal).
+> Christoffer Dall <christoffer.dall@arm.com> writes:
+>
+>> On Mon, Oct 01, 2018 at 04:54:35PM +0100, Punit Agrawal wrote:
+>>> PageTransCompoundMap() returns true for hugetlbfs and THP
+>>> hugepages. This behaviour incorrectly leads to stage 2 faults for
+>>> unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
+>>> treated as THP faults.
+>>> 
+>>> Tighten the check to filter out hugetlbfs pages. This also leads to
+>>> consistently mapping all unsupported hugepage sizes as PTE level
+>>> entries at stage 2.
+>>> 
+>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
+>>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: stable at vger.kernel.org # v4.13+
+>>
+>>
+>> Hmm, this function is only actually called from user_mem_abort() if we
+>> have (!hugetlb), so I'm not sure the cc stable here was actually
+>> warranted, nor that this patch is strictly necessary.
+>>
+>> It doesn't hurt, and makes the code potentially more robust for the
+>> future though.
+>>
+>> Am I missing something?
+>
+> !hugetlb is only true for hugepage sizes supported at stage 2. 
 
-When there is a failure to round up when we resume, there is a window (before
-whatever locks that prevented the IPI being serviced are released) during which
-the system will deadlock if the debugger is re entered.
+Of course I meant "hugetlb" above (Note the lack of "!").
 
-I don't think there is any point trying to round up a CPU that did not
-previously respond... it should still have an IPI pending. The deadlock
-can be eliminated by getting the round up code to avoid CPUs whose csd->flags
-are non-zero either by checking the flag in the kgdb code or adding something
-like smp_trycall_function_single_async().
-
-
-Daniel.
+> The function also got called for unsupported hugepage size at stage 2,
+> e.g., 64k hugepage with 4k page size, which then ended up doing the
+> wrong thing.
+>
+> Hope that adds some context. I should've added this to the commit log.
+>
+>>
+>> Thanks,
+>>
+>>     Christoffer
+>>
+>>> ---
+>>>  virt/kvm/arm/mmu.c | 8 +++++++-
+>>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>> 
+>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>>> index 7e477b3cae5b..c23a1b323aad 100644
+>>> --- a/virt/kvm/arm/mmu.c
+>>> +++ b/virt/kvm/arm/mmu.c
+>>> @@ -1231,8 +1231,14 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
+>>>  {
+>>>  	kvm_pfn_t pfn = *pfnp;
+>>>  	gfn_t gfn = *ipap >> PAGE_SHIFT;
+>>> +	struct page *page = pfn_to_page(pfn);
+>>>  
+>>> -	if (PageTransCompoundMap(pfn_to_page(pfn))) {
+>>> +	/*
+>>> +	 * PageTransCompoungMap() returns true for THP and
+>>> +	 * hugetlbfs. Make sure the adjustment is done only for THP
+>>> +	 * pages.
+>>> +	 */
+>>> +	if (!PageHuge(page) && PageTransCompoundMap(page)) {
+>>>  		unsigned long mask;
+>>>  		/*
+>>>  		 * The address we faulted on is backed by a transparent huge
+>>> -- 
+>>> 2.18.0
+>>> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
