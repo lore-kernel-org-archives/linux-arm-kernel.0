@@ -1,36 +1,61 @@
-From: sean.wang@kernel.org (Sean Wang)
-Date: Tue, 30 Oct 2018 16:45:52 -0700
-Subject: [PATCH 5/5] pinctrl: mediatek: Add initial pinctrl driver for
- MT6797 SoC
-In-Reply-To: <CACRpkdb-Er8z6JdvYWE8UXUa3dfVSu4S-VbnqvcV+vf9erJuNw@mail.gmail.com>
-References: <20181008191411.32555-1-manivannan.sadhasivam@linaro.org>
- <20181008191411.32555-6-manivannan.sadhasivam@linaro.org>
- <c8d65395-c60c-5d06-92ad-c389642c22ba@gmail.com>
- <20181011164429.GA18174@Mani-XPS-13-9360>
- <e7abee72-23a3-4716-baf0-484514bbb019@gmail.com>
- <CAGp9LzoP2zkryhJCQNGpe9X0+7yUd31ffV7vM4j6KvTdfPpCrA@mail.gmail.com>
- <CACRpkdb-Er8z6JdvYWE8UXUa3dfVSu4S-VbnqvcV+vf9erJuNw@mail.gmail.com>
-Message-ID: <CAGp9LzpssWX2TxPdD0yWtmav2XGdG68ztx+hV1DxjRX52q0qvg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 Oct 2018 20:02:30 -0500
+Subject: [PATCH v2] ARM: dts: fsl: Fix improperly quoted stdout-path values
+Message-ID: <20181031010230.6723-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sure, the version of driver looked good to me, add the missing Acked-by from me
+A quoted label reference doesn't expand to the node path and is taken as
+a literal string. Dropping the quotes can fix this unless the baudrate
+string is appended in which case we have to use the alias.
 
-Acked-by: Sean Wang <sean.wang@kernel.org>
+At least on VF610, the problem was masked by setting the console in
+bootargs. Use the alias syntax with baudrate parameter so we can drop
+setting the console in bootargs.
 
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+Cc: NXP Linux Team <linux-imx@nxp.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+v2:
+- Fix missing closing quote in vf610m4-colibri.dts
 
-On Tue, Oct 30, 2018 at 5:51 AM Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> On Thu, Oct 18, 2018 at 5:06 PM Sean Wang <sean.wang@kernel.org> wrote:
->
-> > the driver currently only supports the basic operation, not including
-> > driving operation, so
-> > what value for the driving mode for a certain pin seems not really
-> > matter in the early patch. I think these advanced operations can be
-> > added with another patch.
->
-> Sean can you provide an Acked-by for the pinctrl part so I can merge
-> it once Manivannan resends it for v4.21?
->
-> Yours,
-> Linus Walleij
+ arch/arm/boot/dts/imx53-ppd.dts       | 2 +-
+ arch/arm/boot/dts/vf610m4-colibri.dts | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
+index cdb90bee7b4a..f202396e3f2a 100644
+--- a/arch/arm/boot/dts/imx53-ppd.dts
++++ b/arch/arm/boot/dts/imx53-ppd.dts
+@@ -55,7 +55,7 @@
+ 	};
+ 
+ 	chosen {
+-		stdout-path = "&uart1:115200n8";
++		stdout-path = "serial0:115200n8";
+ 	};
+ 
+ 	memory at 70000000 {
+diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+index 41ec66a96990..ca6249558760 100644
+--- a/arch/arm/boot/dts/vf610m4-colibri.dts
++++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+@@ -50,8 +50,8 @@
+ 	compatible = "fsl,vf610m4";
+ 
+ 	chosen {
+-		bootargs = "console=ttyLP2,115200 clk_ignore_unused init=/linuxrc rw";
+-		stdout-path = "&uart2";
++		bootargs = "clk_ignore_unused init=/linuxrc rw";
++		stdout-path = "serial2:115200";
+ 	};
+ 
+ 	memory at 8c000000 {
+-- 
+2.19.1
