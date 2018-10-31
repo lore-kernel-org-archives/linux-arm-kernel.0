@@ -1,68 +1,73 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed, 31 Oct 2018 15:36:46 +0100
-Subject: [PATCH v8 1/9] KVM: arm/arm64: Ensure only THP is candidate for
- adjustment
-In-Reply-To: <20181001155443.23032-2-punit.agrawal@arm.com>
-References: <20181001155443.23032-1-punit.agrawal@arm.com>
- <20181001155443.23032-2-punit.agrawal@arm.com>
-Message-ID: <20181031143646.GE12057@e113682-lin.lund.arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 31 Oct 2018 14:42:51 +0000
+Subject: [PATCH V3 00/10] ARM: imx: add imx7ulp support
+Message-ID: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 04:54:35PM +0100, Punit Agrawal wrote:
-> PageTransCompoundMap() returns true for hugetlbfs and THP
-> hugepages. This behaviour incorrectly leads to stage 2 faults for
-> unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
-> treated as THP faults.
-> 
-> Tighten the check to filter out hugetlbfs pages. This also leads to
-> consistently mapping all unsupported hugepage sizes as PTE level
-> entries at stage 2.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: stable at vger.kernel.org # v4.13+
+The i.MX 7ULP family of processors represents NXP?s latest achievement
+in ultra-low-power processing for use cases demanding long battery life.
+Targeted towards the growing market of portable devices, the i.MX 7ULP
+family of processors features NXP's advanced implementation of the Arm?
+Cortex?-A7 core, the Arm Cortex-M4 core, as well as a 3D and 2D Graphics
+Processing Units (GPUs). The i.MX 7ULP family provides up to 32-bit
+LPDDR2/LPDDR3 memory interface and a number of other interfaces for
+connecting peripherals, such as WLAN, Bluetooth, GPS, displays, and
+camera sensors.
 
+This patch series adds the basic support for imx7ulp. It includes machine
+level support code and device tree.
+Note: it depends on clk driver which is still under review.
 
-Hmm, this function is only actually called from user_mem_abort() if we
-have (!hugetlb), so I'm not sure the cc stable here was actually
-warranted, nor that this patch is strictly necessary.
+v2->v3:
+ * back to old pinctrl binding according to SoC maintainer's suggestions
+ * use generic node name
+ * error checking updated according to Russell's suggestion:
+   ptr == ERR_PTR(-EPROBE_DEFER)
 
-It doesn't hurt, and makes the code potentially more robust for the
-future though.
+v1->v2:
+ * switch to SPDX license
+ * rebase to latest tree
+ * pad name update
+ * add gpio clk support
+ * minor fix
 
-Am I missing something?
+Dong Aisheng (10):
+  dt-bindings: fsl: add compatible for imx7ulp evk
+  dt-bindings: fsl: add imx7ulp pm related components bindings
+  dt-bindings: gpio: vf610: add optional clocks property
+  gpio: vf610: add optional clock support
+  dt-bindings: pinctrl: imx7ulp: back to imx legacy binding for
+    consistency
+  pinctrl: fsl: imx7ulp: change to use imx legacy binding
+  ARM: imx: add initial support for imx7ulp
+  dts: imx: add common imx7ulp dtsi support
+  dts: fsl: add imx7ulp evk support
+  ARM: imx_v6_v7_defconfig: add imx7ulp support
 
-Thanks,
+ .../bindings/arm/freescale/fsl,imx7ulp-pm.txt      |  23 ++
+ Documentation/devicetree/bindings/arm/fsl.txt      |   8 +
+ .../devicetree/bindings/gpio/gpio-vf610.txt        |   6 +
+ .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       |  66 ++---
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx7ulp-evk.dts                  |  77 +++++
+ arch/arm/boot/dts/imx7ulp.dtsi                     | 314 +++++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   1 +
+ arch/arm/mach-imx/Kconfig                          |   9 +
+ arch/arm/mach-imx/Makefile                         |   1 +
+ arch/arm/mach-imx/common.h                         |   1 +
+ arch/arm/mach-imx/cpu.c                            |   3 +
+ arch/arm/mach-imx/mach-imx7ulp.c                   |  32 +++
+ arch/arm/mach-imx/mxc.h                            |   1 +
+ arch/arm/mach-imx/pm-imx7ulp.c                     |  28 ++
+ drivers/gpio/gpio-vf610.c                          |  24 ++
+ drivers/pinctrl/freescale/pinctrl-imx7ulp.c        |  42 ---
+ 17 files changed, 559 insertions(+), 79 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
+ create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+ create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
 
-    Christoffer
-
-> ---
->  virt/kvm/arm/mmu.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 7e477b3cae5b..c23a1b323aad 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1231,8 +1231,14 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
->  {
->  	kvm_pfn_t pfn = *pfnp;
->  	gfn_t gfn = *ipap >> PAGE_SHIFT;
-> +	struct page *page = pfn_to_page(pfn);
->  
-> -	if (PageTransCompoundMap(pfn_to_page(pfn))) {
-> +	/*
-> +	 * PageTransCompoungMap() returns true for THP and
-> +	 * hugetlbfs. Make sure the adjustment is done only for THP
-> +	 * pages.
-> +	 */
-> +	if (!PageHuge(page) && PageTransCompoundMap(page)) {
->  		unsigned long mask;
->  		/*
->  		 * The address we faulted on is backed by a transparent huge
-> -- 
-> 2.18.0
-> 
+-- 
+2.7.4
