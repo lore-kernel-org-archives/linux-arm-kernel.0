@@ -1,252 +1,210 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 31 Oct 2018 22:48:51 +0100
-Subject: [PATCH V8 5/5] firmware: imx: add SCU power domain driver
-In-Reply-To: <AM0PR04MB42116E6F24F4943BC999CAEE80CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
- <1540739690-23750-6-git-send-email-aisheng.dong@nxp.com>
- <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
- <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFpzvN1R91ByRUmZ8XDsm6L2SF92oOrDSn3qv-d9wWGYtA@mail.gmail.com>
- <AM0PR04MB4211084AB67D86ED162FDB1280CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFoEbuLcA5AZPQob0PgK=A3pAH5N8CacHb3WO+54-0svrA@mail.gmail.com>
- <AM0PR04MB42116E6F24F4943BC999CAEE80CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <CAPDyKFrBNoXiWgjKk7mdOEARgOV+7RQPnMcDRccS04triaUHtg@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 31 Oct 2018 22:56:01 +0100
+Subject: [GIT PULL 00/24] perf/urgent improvements and fixes
+In-Reply-To: <20181031164508.4784-1-acme@kernel.org>
+References: <20181031164508.4784-1-acme@kernel.org>
+Message-ID: <20181031215601.GA3843@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2018 at 18:24, A.s. Dong <aisheng.dong@nxp.com> wrote:
->> -----Original Message-----
->> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
->> Sent: Wednesday, October 31, 2018 11:56 PM
-> [...]
->> On 31 October 2018 at 02:45, A.s. Dong <aisheng.dong@nxp.com> wrote:
->> >> -----Original Message-----
->> >> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
->> >> Sent: Wednesday, October 31, 2018 12:00 AM
->> > [...]
->> >> On 30 October 2018 at 14:20, A.s. Dong <aisheng.dong@nxp.com> wrote:
->> >> > [...]
->> >> >
->> >> >> }
->> >> >> > +
->> >> >> > +static struct imx_sc_pm_domain * imx_scu_add_pm_domain(struct
->> >> >> > +device *dev, int idx,
->> >> >> > +                     const struct imx_sc_pd_range *pd_ranges) {
->> >> >> > +       struct imx_sc_pm_domain *sc_pd;
->> >> >> > +       int ret;
->> >> >> > +
->> >> >> > +       sc_pd = devm_kzalloc(dev, sizeof(*sc_pd), GFP_KERNEL);
->> >> >> > +       if (!sc_pd)
->> >> >> > +               return ERR_PTR(-ENOMEM);
->> >> >> > +
->> >> >> > +       sc_pd->rsrc = pd_ranges->rsrc + idx;
->> >> >> > +       sc_pd->pd.power_off = imx_sc_pd_power_off;
->> >> >> > +       sc_pd->pd.power_on = imx_sc_pd_power_on;
->> >> >>
->> >> >> So, this means you are going to register one genpd per device (one
->> >> >> for each uart, pwm etc), but there is actually a better option.
->> >> >>
->> >> >> What you seems to be needing is a way to "power on/off" devices,
->> >> >> rather than the PM domain. Right? The PM domain, is managed
->> >> >> internally
->> >> by the FW, no?
->> >> >>
->> >> >
->> >> > Yes, you're right.
->> >> >
->> >> >> In any case, it looks like what you should do is to implement the
->> >> >> ->attach|detach_dev() callback for the genpd and use the regular
->> >> >> of_genpd_add_provider_simple(). From within the ->attach_dev(),
->> >> >> you should get the OF node for the device that is being attached
->> >> >> and then parse the power-domain cell containing the "resource id"
->> >> >> and store that in the per device struct generic_pm_domain_data (we
->> >> >> have void pointer there for storing these kind of things).
->> >> >>
->> >> >> Additionally, you need to implement the ->stop() and ->start()
->> >> >> callbacks of genpd, which is where you "power on/off" devices,
->> >> >> rather than using the above
->> >> >> ->power_on|off() callbacks.
->> >> >>
->> >> >> Please have a look a drivers/soc/ti/ti_sci_pm_domains.c.
->> >> >> Apologize, I should have pointed you towards that reference
->> >> >> already in the earlier
->> >> version.
->> >> >>
->> >> >
->> >> > Appreciated for such detailed explanation. lt's a good suggestion
->> >> > and I really like to switch to it.  However, after digged a bit
->> >> > more, i found a few
->> >> blocking issues:
->> >> > 1. The .attach_dev() of power domain infrastructure still does not
->> >> > support
->> >> multi domains case.
->> >> >
->> >> > It looks like there's no way for .attach_dev() to understand which
->> >> > sub 'power
->> >> domain'
->> >> > the device is attaching for one global power domain provider like
->> >> > ti_sci as
->> >> you suggested.
->> >> > Secondly, the struct device *dev passed into is a virtual PD device.
->> >> > It does not help for parsing the real device resource id.
->> >> >
->> >> > So framework probably needs some extension to support multi power
->> >> domain cases.
->> >>
->> >> Right, you are correct.
->> >>
->> >> Let me think about this and see what I can come up with - unless you
->> >> already have something you want to propose?
->> >>
->> >
->> > I have thought we may need add two more params (real dev and pd index)
->> > for
->> > .attach_dev().detach_dev() and .start()/.stop() for multi PDs case.
->> > But I'm not sure if they are proper.
->>
->> Right.
->>
->> I don't think we need to change the definition of the callbacks.
->> However, from within the callbacks (or at least the ->attach_dev()) we need
->> access to the data you suggest above.
->>
->> To make that data available, genpd needs to store it in the per device struct
->> generic_pm_domain_data, but of course before invoking the
->> ->attach_dev() callback.
->>
->
-> Yes, that's an option.
-> Currently gpd_data is allocated in genpd_add_device() which looks like to be
-> designed to attach device to the specified power domain passed in, so it's
-> unware of whether it's multi domains or not. Then we may still need fine
-> tune those functions in different abstract layers.
 
-Yes, something like that. I don't think it should be that hard, I can
-have a stab at it of you like?
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
->
->> >
->> >
->> >> >
->> >> > 2. It also breaks most of current drivers as the driver probe
->> >> > sequence behavior changed If removing .power_on() and .power_off()
->> >> > callback and
->> >> use .start() and .stop() instead.
->> >> >
->> >> > genpd_dev_pm_attach will only power up the domain and attach
->> >> > device, but will not call .start() which relies on device runtime
->> >> > pm. That means the device power is still not up before running
->> >> > driver probe function. For SCU enabled platforms, all device
->> >> > drivers accessing registers/clock without power domain enabled will
->> >> > trigger a HW access error. That means we need fix most of drivers
->> >> > probe sequence with proper
->> >> runtime pm. So I'm a bit wondering whether we should still keep the exist
->> way.
->> >>
->> >> I see what you are trying to say, but I am not sure why you consider
->> >> this as they would break? How did they work in the first place?
->> >>
->> >
->> > Most drivers does not require power domains before. E.g. GPIO, I2C, PWM,
->> MMC.
->> > Or even we need power domain(PUs/PCIE), they're enabled in
->> > .power_on()/.power_off() which has been already up before probe.
->> >
->> >> Anyway, the problem you are talking about have so far been addressed
->> >> by making buses/drivers to call pm_runtime_enable() and
->> >> pm_runtime_get_sync() - before trying to probe their devices.
->> >>
->> >
->> > Yes, called them early before accessing clock and hw registers.
->> >
->> >> Do you have an idea of the amount of drivers that needs to fixed, in
->> >> regards to this?
->> >>
->> >
->> > So far all enabled devices I tested need fixes. GPIO/I2C/FEC/MMC and etc.
->> > Suppose other need the same fix as we have not met this situation before.
->>
->> Okay, I see.
->>
->> >
->> >> I guess an option could be to, that via the ->attach_dev() callback
->> >> perform the same operations as also being done during ->start(). Of
->> >> course, you may need to keep a flag about this being done, so that
->> >> operations that need to be balanced with get/put or the like is
->> >> managed correctly, the next time
->> >> ->start|stop() becomes called.
->> >>
->> >
->> > That might be a way to try. The follow seems may introduce a bit
->> > complexities and driver needs to maintainer the runtime status along
->> > with framework in order to keep the balance?
->>
->> Yeah, it's likely not going to be very elegant, but should be rather self
->> contained in the PM domain driver and could serve as a way forward - while
->> working on fixing the drivers long term.
->>
->> >
->> >> >
->> >> > In summary, we probably may not be able to try ti_sci way before
->> >> > fixing
->> >> above two issues.
->> >> >
->> >> > Do you think I should wait for them to be fixed or if we could use
->> >> > the current
->> >> way at first?
->> >> > I might be a little intend to the second way as we now have a lot
->> >> > upstreaming work pending on this. But please let me know if you
->> >> > have a
->> >> different idea.
->> >>
->> >> As this is also about deploying a DTB with a correctly modeled HW, I
->> >> think we need to fix the above issues.
->> >>
->> >
->> > DTB are the same with #power-domain-cells 1 (resource ID) in either case.
->> > So DTB don't need change and driver could be optimized.
->>
->> You are correct.
->>
->> Although, how does $subject patch solves the case where a device may have
->> multiple PM domains attached to it? Or is left as a future improvement?
->>
->
-> IIRC this patch does not have such issue for multi PM domains as we have
-> individual power domains for each resources. Devices will be attached to
-> each individual domains in __genpd_dev_pm_attach rather than the single
-> one global virtual SCU domain. Furthermore we're using domains .power_on()/
-> power_off() callback which means the power will be up before the probe.
-> (no the issue like when using .attach_dev()/.detach_dev() and run .start()/stop()
-> via runtime pm).
+> Hi Ingo,
+> 
+> 	Please consider pulling, next ones should be concentrating just
+> on bug fixes, been busy with some, so some were left in the queue,
+> flushing them now.
+> 
+> - Arnaldo
+> 
+> Test results at the end of this message, as usual.
+> 
+> The following changes since commit 28fa741c27e6d57f6bf594ba3c444ce79e671e09:
+> 
+>   perf/core: Clean up inconsisent indentation (2018-10-30 09:51:58 +0100)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.20-20181031
+> 
+> for you to fetch changes up to 5d4f0edaa3ac4f1844ed7c64cd2bae6f1912bac5:
+> 
+>   perf intel-pt/bts: Calculate cpumode for synthesized samples (2018-10-31 12:56:26 -0300)
+> 
+> ----------------------------------------------------------------
+> perf/urgent improvements and fixes:
+> 
+> - Fixes dealing with the removal of the fallback to looking up samples
+>   marked as userspace in the kernel maps, done recently:
+> 
+>   - For intel-pt, that was setting the synthesized header misc field
+>     as PERF_RECORD_MISC_USER, depending thus on the fallback to take
+>     place, now it sets as USER or KERNEL according to x86 specific
+>     knowledge. Also now it inserts the PERF_CONTEXT_{USER,KERNEL} into
+>     the PERF_SAMPLE_CALLCHAINs it synthesizes from hw traces (Adrian Hunter)
+> 
+>   - Similar fixes for the cs-etm ARM HW trace code, that used the Intel PT
+>     model as a starting point (Leo Yan)
+> 
+>   - For the "caller" callchain order, where the callchain returned by the
+>     kernel was simply reversed without taking into account the
+>     PERF_CONTEXT_{USER,KERNEL,etc} markers from where to define if an entry
+>     was for kernel or userspace, working just because the map lookup fallback
+>     was in place (David S. Miller)
+> 
+> - Allow for selecting if 'overwrite' mode should be used in 'perf top' and
+>   make the default for it not to be used. This is due to problems with the
+>   current implementation where the pausing used ends up making 'perf top'
+>   miss PERF_RECORD_{MMAP,FORK,EXEC,etc} events, which with short lifetime
+>   threads workloads leads quickly to many "unknown" maps (and thus symbols)
+>   to appear in the UI. Workloads with long thread lifetimes and with few
+>   metadata events can still use --overwrite to take advantage of the
+>   overwrite mode (Arnaldo Carvalho de Melo)
+> 
+> - Start 'perf top''s display thread earlier, so that the screen doesn't
+>   remain blank for too long at tool start (David S. Miller)
+> 
+> - Don't clone maps from parent when synthesizing forks, to avoid the inevitable
+>   flurry of overlapping maps as we process the synthesized MMAP2 events that get
+>   delivered shortly thereafter. (David S. Miller)
+> 
+> - Take pgoff into account when reporting elf to libdwfl, now the unwinding
+>   results are the same with elfutils's libdwfl and libunwind (Milian Wolff)
+> 
+> - Update lotsa kernel ABI headers (Arnaldo Carvalho de Melo)
+> 
+> - 'perf trace' syscall arg beautification improvements to allow for
+>   handling args such as mount's 'flags', where maks have to be ignored
+>   before considering what is left, that, if only zeroes, is suppressed
+>   like other args without such masks (Arnaldo Carvalho de Melo)
+> 
+> - Beautify mount's 'source' and 'flags' args (Arnaldo Carvalho de Melo)
+> 
+> - Generate mmap's flags bit constants from linux/mman.h and all the
+>   arch specific mman.h files, so that no changes in the main 'perf trace'
+>   source files is required when new flags get added (Arnaldo Carvalho de Melo)
+> 
+> - Consider syscall aliases, so that 'perf trace -e umount' works and we don't
+>   have to use 'umount2' (that works as well, just not required) (Arnaldo Carvalho de Melo)
+> 
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Adrian Hunter (2):
+>       perf intel-pt: Insert callchain context into synthesized callchains
+>       perf intel-pt/bts: Calculate cpumode for synthesized samples
+> 
+> Arnaldo Carvalho de Melo (21):
+>       tools include uapi: Grab a copy of linux/fs.h
+>       perf beauty: Add a generator for MS_ mount/umount's flag constants
+>       perf beauty: Switch from GPL v2.0 to LGPL v2.1
+>       perf beauty: Introduce strarray__scnprintf_flags()
+>       perf trace beauty: Allow syscalls to mask an argument before considering it
+>       perf trace beauty: Beautify mount/umount's 'flags' argument
+>       perf trace: Consider syscall aliases too
+>       perf trace: Beautify the umount's 'name' argument
+>       perf trace: Beautify mount's first pathname arg
+>       perf top: Allow disabling the overwrite mode
+>       perf top: Do not use overwrite mode by default
+>       tools include uapi: Update linux/fs.h copy
+>       tools arch uapi: Update asm-generic/unistd.h and arm64 unistd.h copies
+>       tools include uapi: Update asound.h copy
+>       perf beauty: Add a generator for MAP_ mmap's flag constants
+>       perf beauty: Wire up the mmap flags table generator to the Makefile
+>       perf trace beauty: Use the mmap flags table generated from headers
+>       tools include uapi: Update linux/mmap.h copy
+>       tools headers: Sync the various kvm.h header copies
+>       tools headers uapi: Update linux/netlink.h header copy
+>       tools headers uapi: Update linux/if_link.h header copy
+> 
+> David Miller (2):
+>       perf top: Start display thread earlier
+>       perf tools: Don't clone maps from parent when synthesizing forks
+> 
+> David S. Miller (1):
+>       perf callchain: Honour the ordering of PERF_CONTEXT_{USER,KERNEL,etc}
+> 
+> Leo Yan (1):
+>       perf cs-etm: Correct CPU mode for samples
+> 
+> Milian Wolff (1):
+>       perf unwind: Take pgoff into account when reporting elf to libdwfl
+> 
+>  include/uapi/linux/perf_event.h                    |   2 +
+>  tools/arch/arm64/include/uapi/asm/unistd.h         |   1 +
+>  tools/arch/powerpc/include/uapi/asm/kvm.h          |   1 +
+>  tools/arch/s390/include/uapi/asm/kvm.h             |   2 +
+>  tools/arch/x86/include/uapi/asm/kvm.h              |   6 +-
+>  tools/include/uapi/asm-generic/unistd.h            |   2 +
+>  tools/include/uapi/linux/fs.h                      | 393 +++++++++++++++++++++
+>  tools/include/uapi/linux/if_link.h                 |   1 +
+>  tools/include/uapi/linux/kvm.h                     |  21 +-
+>  tools/include/uapi/linux/mman.h                    |   2 +
+>  tools/include/uapi/linux/netlink.h                 |   1 +
+>  tools/include/uapi/linux/perf_event.h              |   2 +
+>  tools/include/uapi/sound/asound.h                  |   2 +-
+>  tools/perf/Documentation/perf-top.txt              |  10 +
+>  tools/perf/Makefile.perf                           |  19 +
+>  tools/perf/builtin-top.c                           |  21 +-
+>  tools/perf/builtin-trace.c                         |  48 ++-
+>  tools/perf/check-headers.sh                        |   1 +
+>  tools/perf/trace/beauty/Build                      |   1 +
+>  tools/perf/trace/beauty/beauty.h                   |   7 +
+>  tools/perf/trace/beauty/clone.c                    |   3 +-
+>  tools/perf/trace/beauty/drm_ioctl.sh               |   1 +
+>  tools/perf/trace/beauty/eventfd.c                  |   2 +-
+>  tools/perf/trace/beauty/fcntl.c                    |   3 +-
+>  tools/perf/trace/beauty/flock.c                    |   2 +-
+>  tools/perf/trace/beauty/futex_op.c                 |   2 +-
+>  tools/perf/trace/beauty/futex_val3.c               |   2 +-
+>  tools/perf/trace/beauty/ioctl.c                    |   3 +-
+>  tools/perf/trace/beauty/kcmp.c                     |   3 +-
+>  tools/perf/trace/beauty/kcmp_type.sh               |   1 +
+>  tools/perf/trace/beauty/kvm_ioctl.sh               |   1 +
+>  tools/perf/trace/beauty/madvise_behavior.sh        |   1 +
+>  tools/perf/trace/beauty/mmap.c                     |  50 +--
+>  tools/perf/trace/beauty/mmap_flags.sh              |  32 ++
+>  tools/perf/trace/beauty/mode_t.c                   |   2 +-
+>  tools/perf/trace/beauty/mount_flags.c              |  43 +++
+>  tools/perf/trace/beauty/mount_flags.sh             |  15 +
+>  tools/perf/trace/beauty/msg_flags.c                |   2 +-
+>  tools/perf/trace/beauty/open_flags.c               |   2 +-
+>  tools/perf/trace/beauty/perf_event_open.c          |   2 +-
+>  tools/perf/trace/beauty/perf_ioctl.sh              |   1 +
+>  tools/perf/trace/beauty/pid.c                      |   3 +-
+>  tools/perf/trace/beauty/pkey_alloc.c               |  30 +-
+>  .../perf/trace/beauty/pkey_alloc_access_rights.sh  |   1 +
+>  tools/perf/trace/beauty/prctl.c                    |   3 +-
+>  tools/perf/trace/beauty/prctl_option.sh            |   1 +
+>  tools/perf/trace/beauty/sched_policy.c             |   2 +-
+>  tools/perf/trace/beauty/seccomp.c                  |   2 +-
+>  tools/perf/trace/beauty/signum.c                   |   2 +-
+>  tools/perf/trace/beauty/sndrv_ctl_ioctl.sh         |   1 +
+>  tools/perf/trace/beauty/sndrv_pcm_ioctl.sh         |   1 +
+>  tools/perf/trace/beauty/sockaddr.c                 |   2 +-
+>  tools/perf/trace/beauty/socket.c                   |   2 +-
+>  tools/perf/trace/beauty/socket_ipproto.sh          |   1 +
+>  tools/perf/trace/beauty/socket_type.c              |   2 +-
+>  tools/perf/trace/beauty/statx.c                    |   3 +-
+>  tools/perf/trace/beauty/vhost_virtio_ioctl.sh      |   1 +
+>  tools/perf/trace/beauty/waitid_options.c           |   2 +-
+>  tools/perf/util/cs-etm.c                           |  39 +-
+>  tools/perf/util/event.c                            |   1 +
+>  tools/perf/util/intel-bts.c                        |  17 +-
+>  tools/perf/util/intel-pt.c                         |  28 +-
+>  tools/perf/util/machine.c                          |  54 ++-
+>  tools/perf/util/thread-stack.c                     |  44 ++-
+>  tools/perf/util/thread-stack.h                     |   2 +-
+>  tools/perf/util/thread.c                           |  13 +-
+>  tools/perf/util/thread.h                           |   2 +-
+>  tools/perf/util/unwind-libdw.c                     |   4 +-
+>  68 files changed, 837 insertions(+), 142 deletions(-)
+>  create mode 100644 tools/include/uapi/linux/fs.h
+>  create mode 100755 tools/perf/trace/beauty/mmap_flags.sh
+>  create mode 100644 tools/perf/trace/beauty/mount_flags.c
+>  create mode 100755 tools/perf/trace/beauty/mount_flags.sh
 
-I don't follow your reasoning here, sorry. You stated earlier, that
-there was a need to support multiple PM domains per device.
+Pulled, thanks a lot Arnaldo!
 
-How can that problem be resolved by using one genpd per device? What
-am I missing?
-
->
-> Actually I'm a bit wondering that if abstracting SCU domains into one
-> global virtual domain is certainly better than individual domains. For SCU based SoCs,
-> the power domain service is provided by SCU firmware, users don't have to care
-> too much about the HW internals. And according to SCU definition, each devices is
-> associated with a power domain, devices should treat it as a separate domain
-> and have to enable it before accessing HW. So one single global domain looks like
-> not exactly as SCU firmware defines. Not quite sure, but a bit feel like that....
-
-I don't agree with you here, sorry. As also pointed out by Rob
-earlier, in regards to the DT bindings. Simply put, I doubt the SoC
-deploys separate power rails/islands for each of the available
-devices. Instead, it seems like the SCU interface, allows its clients
-to controls "power" to each of the available *devices* - and not power
-domains.
-
-Anyway, we are debating how to implement this in software and not in DT. :-)
-
-That said, if you strongly feel that the short cut, about registering
-one genpd per device and thus suffer from the overhead it gives, is
-the best approach to start with, feel free to do that.
-
-Kind regards
-Uffe
+	Ingo
