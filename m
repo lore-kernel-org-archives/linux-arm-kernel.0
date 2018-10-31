@@ -1,147 +1,44 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed, 31 Oct 2018 13:44:53 -0300
-Subject: [PATCH 13/28] perf cs-etm: Correct CPU mode for samples
-In-Reply-To: <20181031164508.4784-1-acme@kernel.org>
-References: <20181031164508.4784-1-acme@kernel.org>
-Message-ID: <20181031164508.4784-14-acme@kernel.org>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 31 Oct 2018 17:01:36 +0000
+Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
+ smp_call_function()
+In-Reply-To: <20181031134926.GB13237@hirez.programming.kicks-ass.net>
+References: <20181030221843.121254-1-dianders@chromium.org>
+ <20181030221843.121254-3-dianders@chromium.org>
+ <20181031134926.GB13237@hirez.programming.kicks-ass.net>
+Message-ID: <20181031170136.s3ids6tm4rxxlpma@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+On Wed, Oct 31, 2018 at 02:49:26PM +0100, Peter Zijlstra wrote:
+> On Tue, Oct 30, 2018 at 03:18:43PM -0700, Douglas Anderson wrote:
+> > Looking closely at it, it seems like a really bad idea to be calling
+> > local_irq_enable() in kgdb_roundup_cpus().  If nothing else that seems
+> > like it could violate spinlock semantics and cause a deadlock.
+> > 
+> > Instead, let's use a private csd alongside
+> > smp_call_function_single_async() to round up the other CPUs.  Using
+> > smp_call_function_single_async() doesn't require interrupts to be
+> > enabled so we can remove the offending bit of code.
+> 
+> You might want to mention that the only reason this isn't a deadlock
+> itself is because there is a timeout on waiting for the slaves to
+> check-in.
 
-Since commit edeb0c90df35 ("perf tools: Stop fallbacking to kallsyms for
-vdso symbols lookup"), the kernel address cannot be properly parsed to
-kernel symbol with command 'perf script -k vmlinux'.  The reason is
-CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
-thus it fails to find corresponding map/dso in below flows:
+dbg_master_lock must be owned to call kgdb_roundup_cpus() so
+the calls to smp_call_function_single_async() should never deadlock the
+calling CPU unless there has been a previous failure to round up (e.g.
+cores that cannot react to the round up signal).
 
-  process_sample_event()
-    `-> machine__resolve()
-	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
+When there is a failure to round up when we resume, there is a window (before
+whatever locks that prevented the IPI being serviced are released) during which
+the system will deadlock if the debugger is re entered.
 
-In this flow it needs to pass argument 'sample->cpumode' to tell what's
-the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
-any failure until the commit edeb0c90df35 ("perf tools: Stop fallbacking
-to kallsyms for vdso symbols lookup") has been merged.  The reason is
-even with the wrong CPU mode the function thread__find_map() firstly
-fails to find map but it will rollback to find kernel map for vdso
-symbols lookup.  In the latest code it has removed the fallback code,
-thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
-anymore with kernel address.
+I don't think there is any point trying to round up a CPU that did not
+previously respond... it should still have an IPI pending. The deadlock
+can be eliminated by getting the round up code to avoid CPUs whose csd->flags
+are non-zero either by checking the flag in the kgdb code or adding something
+like smp_trycall_function_single_async().
 
-This patch is to correct samples CPU mode setting, it creates a new
-helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
-the address with the info from machine structure; this patch has a bit
-extension to check not only kernel and user mode, but also check for
-host/guest and hypervisor mode.  Finally this patch uses the function in
-instruction and branch samples and also apply in cs_etm__mem_access()
-for a minor polishing.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Cc: Adrian Hunter <adrian.hunter@intel.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: David Miller <davem@davemloft.net>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: coresight at lists.linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: stable at kernel.org # v4.19
-Link: http://lkml.kernel.org/r/1540883908-17018-1-git-send-email-leo.yan at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/util/cs-etm.c | 39 ++++++++++++++++++++++++++++++---------
- 1 file changed, 30 insertions(+), 9 deletions(-)
-
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 3b37d66dc533..73430b73570d 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -244,6 +244,27 @@ static void cs_etm__free(struct perf_session *session)
- 	zfree(&aux);
- }
- 
-+static u8 cs_etm__cpu_mode(struct cs_etm_queue *etmq, u64 address)
-+{
-+	struct machine *machine;
-+
-+	machine = etmq->etm->machine;
-+
-+	if (address >= etmq->etm->kernel_start) {
-+		if (machine__is_host(machine))
-+			return PERF_RECORD_MISC_KERNEL;
-+		else
-+			return PERF_RECORD_MISC_GUEST_KERNEL;
-+	} else {
-+		if (machine__is_host(machine))
-+			return PERF_RECORD_MISC_USER;
-+		else if (perf_guest)
-+			return PERF_RECORD_MISC_GUEST_USER;
-+		else
-+			return PERF_RECORD_MISC_HYPERVISOR;
-+	}
-+}
-+
- static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
- 			      size_t size, u8 *buffer)
- {
-@@ -258,10 +279,7 @@ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
- 		return -1;
- 
- 	machine = etmq->etm->machine;
--	if (address >= etmq->etm->kernel_start)
--		cpumode = PERF_RECORD_MISC_KERNEL;
--	else
--		cpumode = PERF_RECORD_MISC_USER;
-+	cpumode = cs_etm__cpu_mode(etmq, address);
- 
- 	thread = etmq->thread;
- 	if (!thread) {
-@@ -653,7 +671,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
- 	struct perf_sample sample = {.ip = 0,};
- 
- 	event->sample.header.type = PERF_RECORD_SAMPLE;
--	event->sample.header.misc = PERF_RECORD_MISC_USER;
-+	event->sample.header.misc = cs_etm__cpu_mode(etmq, addr);
- 	event->sample.header.size = sizeof(struct perf_event_header);
- 
- 	sample.ip = addr;
-@@ -665,7 +683,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
- 	sample.cpu = etmq->packet->cpu;
- 	sample.flags = 0;
- 	sample.insn_len = 1;
--	sample.cpumode = event->header.misc;
-+	sample.cpumode = event->sample.header.misc;
- 
- 	if (etm->synth_opts.last_branch) {
- 		cs_etm__copy_last_branch_rb(etmq);
-@@ -706,12 +724,15 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
- 		u64			nr;
- 		struct branch_entry	entries;
- 	} dummy_bs;
-+	u64 ip;
-+
-+	ip = cs_etm__last_executed_instr(etmq->prev_packet);
- 
- 	event->sample.header.type = PERF_RECORD_SAMPLE;
--	event->sample.header.misc = PERF_RECORD_MISC_USER;
-+	event->sample.header.misc = cs_etm__cpu_mode(etmq, ip);
- 	event->sample.header.size = sizeof(struct perf_event_header);
- 
--	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
-+	sample.ip = ip;
- 	sample.pid = etmq->pid;
- 	sample.tid = etmq->tid;
- 	sample.addr = cs_etm__first_executed_instr(etmq->packet);
-@@ -720,7 +741,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
- 	sample.period = 1;
- 	sample.cpu = etmq->packet->cpu;
- 	sample.flags = 0;
--	sample.cpumode = PERF_RECORD_MISC_USER;
-+	sample.cpumode = event->sample.header.misc;
- 
- 	/*
- 	 * perf report cannot handle events without a branch stack
--- 
-2.14.4
+Daniel.
