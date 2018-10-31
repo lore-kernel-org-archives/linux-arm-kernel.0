@@ -1,70 +1,96 @@
-From: kurt.kanzenbach@linutronix.de (Kurt Kanzenbach)
-Date: Wed, 31 Oct 2018 14:06:51 +0100
-Subject: [PATCH 1/2] net: axienet: recheck condition after timeout in
- mdio_wait()
-In-Reply-To: <20181030.112511.957438343014682098.davem@davemloft.net>
-References: <20181030093139.10226-1-kurt@linutronix.de>
- <20181030093139.10226-2-kurt@linutronix.de>
- <20181030.112511.957438343014682098.davem@davemloft.net>
-Message-ID: <20181031130651.l4toezvyg4etevnh@linutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 31 Oct 2018 15:10:00 +0200
+Subject: omap4: support for manually updated display
+In-Reply-To: <20181020003812.GE43338@atomide.com>
+References: <20180830090456.GA17277@amd>
+ <20181019225827.s76wapp3cxrmp5af@earth.universe>
+ <20181020003812.GE43338@atomide.com>
+Message-ID: <2348762.PvrRPAx0JW@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 11:25:11AM -0700, David Miller wrote:
-> From: Kurt Kanzenbach <kurt@linutronix.de>
-> Date: Tue, 30 Oct 2018 10:31:38 +0100
->
-> > The function could report a false positive if it gets preempted between reading
-> > the XAE_MDIO_MCR_OFFSET register and checking for the timeout.  In such a case,
-> > the condition has to be rechecked to avoid false positives.
-> >
-> > Therefore, check for expected condition even after the timeout occurred.
-> >
-> > Signed-off-by: Kurt Kanzenbach <kurt@linutronix.de>
->  ...
-> >  		if (time_before_eq(end, jiffies)) {
-> > -			WARN_ON(1);
-> > -			return -ETIMEDOUT;
-> > +			val = axienet_ior(lp, XAE_MDIO_MCR_OFFSET);
-> > +			break;
-> >  		}
-> > +
-> >  		udelay(1);
-> >  	}
-> > -	return 0;
-> > +	if (val & XAE_MDIO_MCR_READY_MASK)
-> > +		return 0;
-> > +
-> > +	WARN_ON(1);
-> > +	return -ETIMEDOUT;
->
-> You are not fundamentally changing the situation at all.
->
-> The condtion could change right after your last read of
-> XAR_MDIO_MCR_OFFSET, which is the same thing that happens before your
-> modifications to this code.
+Hi Tony,
 
-That's true. The problem is different: If the current task gets
-preempted by a higher priority task between checking the condition and
-the timeout code, then a timeout might be falsely detected. Consider the
-following events:
+On Saturday, 20 October 2018 03:38:12 EET Tony Lindgren wrote:
+> * Sebastian Reichel <sre@kernel.org> [181019 15:58]:
+> > I uploaded my current status here. It's not based on the newest
+> > -next, but contains the interesting patches from Laurent. Also
+> > the last few patches are not yet cleaned up, sorry for the mess.
+> 
+> Way to go, thanks :) Here's a quick fix for issues with loading
+> and unloading modules, seems like this should be fixed somewhere
+> else though?
 
-loop:
- check mdio condition
- ------------------------
- task with real time priority may run for a long time
- ------------------------
- check for timeout
- wait
+Thanks for the report, I'll have a look at this.
 
-That's why I've added the recheck of the condition in the timeout case.
+> 8< -----------------------
+> Unload of hdmi:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 00000278
+> (hdmi_runtime_resume [omapdss]) from [<c060d944>]
+> (__rpm_callback+0x144/0x1d8) (__rpm_callback) from [<c060d9f8>]
+> (rpm_callback+0x20/0x80)
+> (rpm_callback) from [<c060d580>] (rpm_resume+0x60c/0x828)
+> (rpm_resume) from [<c060d7e8>] (__pm_runtime_resume+0x4c/0x64)
+> (__pm_runtime_resume) from [<c06027ac>]
+> (device_release_driver_internal+0x130/0x234)
+> (device_release_driver_internal) from [<c06028f4>]
+> (driver_detach+0x38/0x6c) (driver_detach) from [<c0601658>]
+> (bus_remove_driver+0x4c/0xa4)
+> (bus_remove_driver) from [<c06041fc>]
+> (platform_unregister_drivers+0x20/0x2c) (platform_unregister_drivers) from
+> [<c01f0ef8>] (sys_delete_module+0x1c0/0x230) (sys_delete_module) from
+> [<c0101000>] (ret_fast_syscall+0x0/0x28)
+> 
+> 
+> Unload of dsi:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 00000278
+> (dsi_runtime_resume [omapdss]) from [<c060d944>]
+> (__rpm_callback+0x144/0x1d8) (__rpm_callback) from [<c060d9f8>]
+> (rpm_callback+0x20/0x80)
+> (rpm_callback) from [<c060d580>] (rpm_resume+0x60c/0x828)
+> (rpm_resume) from [<c060d7e8>] (__pm_runtime_resume+0x4c/0x64)
+> (__pm_runtime_resume) from [<c0602364>] (driver_probe_device+0x38/0x164)
+> (driver_probe_device) from [<c0602574>] (__driver_attach+0xe4/0xe8)
+> (__driver_attach) from [<c0600418>] (bus_for_each_dev+0x70/0xb4)
+> (bus_for_each_dev) from [<c06015a8>] (bus_add_driver+0x198/0x1fc)
+> (bus_add_driver) from [<c06032ec>] (driver_register+0x74/0x108)
+> (driver_register) from [<c0102fe4>] (do_one_initcall+0x80/0x31c)
+> (do_one_initcall) from [<c01f0fc4>] (do_init_module+0x5c/0x1f8)
+> (do_init_module) from [<c01f2e0c>] (load_module+0x1360/0x16c0)
+> (load_module) from [<c01f33d4>] (sys_finit_module+0xbc/0xdc)
+> (sys_finit_module) from [<c0101000>] (ret_fast_syscall+0x0/0x28)
+> 
+> diff --git a/drivers/gpu/drm/omapdrm/dss/dsi.c
+> b/drivers/gpu/drm/omapdrm/dss/dsi.c --- a/drivers/gpu/drm/omapdrm/dss/dsi.c
+> +++ b/drivers/gpu/drm/omapdrm/dss/dsi.c
+> @@ -5484,6 +5484,9 @@ static int dsi_runtime_resume(struct device *dev)
+>  	struct dsi_data *dsi = dev_get_drvdata(dev);
+>  	int r;
+> 
+> +	if (!dsi || !dsi->dss || !dsi->dss->dispc)
+> +		return -ENODEV;
+> +
+>  	r = dispc_runtime_get(dsi->dss->dispc);
+>  	if (r)
+>  		return r;
+> diff --git a/drivers/gpu/drm/omapdrm/dss/hdmi4.c
+> b/drivers/gpu/drm/omapdrm/dss/hdmi4.c ---
+> a/drivers/gpu/drm/omapdrm/dss/hdmi4.c
+> +++ b/drivers/gpu/drm/omapdrm/dss/hdmi4.c
+> @@ -847,6 +847,9 @@ static int hdmi_runtime_resume(struct device *dev)
+>  	struct omap_hdmi *hdmi = dev_get_drvdata(dev);
+>  	int r;
+> 
+> +	if (!hdmi || !hdmi->dss || !hdmi->dss->dispc)
+> +		return -ENODEV;
+> +
+>  	r = dispc_runtime_get(hdmi->dss->dispc);
+>  	if (r < 0)
+>  		return r;
 
->
-> It sounds more like the timeout is slightly too short, and that's the
-> real problem that causes whatever behavior you think you are fixing
-> here.
+-- 
+Regards,
 
-The timeout value is not the problem here.
-
-Thanks,
-Kurt
+Laurent Pinchart
