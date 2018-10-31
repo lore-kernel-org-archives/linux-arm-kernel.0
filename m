@@ -1,71 +1,56 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 31 Oct 2018 14:43:40 +0100
-Subject: [RFC PATCH v2 0/6] New QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20180627131609.13681-1-bugalski.piotr@gmail.com>
-References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
-Message-ID: <20181031144340.4f1a030a@bbrezillon>
+From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
+Date: Wed, 31 Oct 2018 15:48:47 +0200
+Subject: [PATCH 1/8] clk: clkdev/of_clk - add managed lookup and provider
+ registrations
+In-Reply-To: <b3954431df109827c71d25d390adf22f6991a6df.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
+References: <cover.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
+ <b3954431df109827c71d25d390adf22f6991a6df.1540970653.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <20181031134847.GA29664@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Piotr, Tudor,
-
-On Wed, 27 Jun 2018 15:16:03 +0200
-Piotr Bugalski <bugalski.piotr@gmail.com> wrote:
-
-> Hello,
+On Wed, Oct 31, 2018 at 10:30:34AM +0200, Matti Vaittinen wrote:
+> With MFD devices the clk properties may be contained in MFD (parent) DT
+> node. Current devm_of_clk_add_hw_provider assumes the clk is bound to MFD
+> subdevice not to MFD device (parent). Add
+> devm_of_clk_add_hw_provider_parent to tackle this issue.
 > 
-> Atmel SAMA5D2 is equipped with two QSPI interfaces. These interfaces can
-> work as in SPI-compatible mode or use two / four lines to improve
-> communication speed. At the moment there is QSPI driver strongly tied to
-> NOR-flash memory and MTD subsystem.
-> Intention of this change is to provide new driver which will not be tied
-> to MTD and allows using QSPI with NAND-flash memory or other peripherals
-> New spi-mem API provides abstraction layer which can disconnect QSPI
-> from MTD. This driver doesn't support regular SPI interface, it should
-> be used with spi-mem interface only.
-> Unfortunately SAMA5D2 hardware by default supports only NOR-flash
-> memory. It allows 24- and 32-bit addressing while NAND-flash requires
-> 16-bit long. To workaround hardware limitation driver is a bit more
-> complicated.
+> Also clkdev registration lacks of managed registration functions and it
+> seems few drivers do not drop clkdev lookups at exit. Add
+> devm_clk_hw_register_clkdev and devm_clk_release_clkdev to ease lookup
+> releasing at exit.
 > 
-> Request to spi-mem contains three fiels: opcode (command), address,
-> dummy bytes. SAMA5D2 QSPI hardware supports opcode, address, dummy and
-> option byte where address field can only be 24- or 32- bytes long.
-> Handling 8-bits long addresses is done using option field. For 16-bits
-> address behaviour depends of number of requested dummy bits. If there
-> are 8 or more dummy cycles, address is shifted and sent with first dummy
-> byte. Otherwise opcode is disabled and first byte of address contains
-> command opcode (works only if opcode and address use the same buswidth).
-> The limitation is when 16-bit address is used without enough dummy
-> cycles and opcode is using different buswidth than address. Other modes
-> are supported with described workaround.
-> 
-> It looks like hardware has some limitation in performance. The same issue
-> exists in current QSPI driver (MTD/nor-flash) and soft-pack (bare-metal
-> library from Atmel). Without using DMA read speed is much worse than
-> maximum bandwidth (efficiency 30-40%). Any help with performance
-> improvement is highly welcome, especially for NAND-flash memories which
-> offers higher capacity than NOR-flash used with previous driver.
-> 
-> Best Regards,
-> Piotr
-> 
-> v2 changes:
->  - driver is now replacement of existing atmel-quadspi
->  - code was re-written to follow original code structure
->  - deinitialization order fixed
->  - empty atmel_qspi_adjust_op_size function removed
->  - code formatting fixes
->  - use spi_device->max_speed_hz to get spi speed
->  - spi freqency set in spi_controller->setup() hook
->  - address range checkng for 4-bytes addressing
->  - use timeout to avoid infinite waiting
+> Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 
-IIRC, this version was almost ready to be merged except for the missing
-->get_name() implementation which should be easy to add.
+//snip
 
-Can one of you post a new version of this patchset?
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 60c51871b04b..94c7bf471c31 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -916,6 +916,10 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+>  			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+>  						 void *data),
+>  			   void *data);
+> +int devm_of_clk_add_parent_hw_provider(struct device *dev,
+> +			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> +						 void *data),
+> +			   void *data);
+>  void of_clk_del_provider(struct device_node *np);
+>  void devm_of_clk_del_provider(struct device *dev);
+>  struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
 
-Thanks,
+Right. Didn't spot the 
+#ifdef CONFIG_OF
+in clk-provider.h. So patch lacks of stub functions for non OF
+architectures. The 0-Day test system spot this. Tomorrow I'll send v2
+where the inlined stub functions for non OF architectures are added.
 
-Boris
+Br,
+	Matti Vaittinen
+
+-- 
+Matti Vaittinen
+ROHM Semiconductors
+
+~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
