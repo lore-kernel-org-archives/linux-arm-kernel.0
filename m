@@ -1,35 +1,33 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 31 Oct 2018 19:02:23 +0530
-Subject: [PATCH v2 0/2] pwm-tiecap: Add support for AM654 SoCs
-In-Reply-To: <20181016111541.GE8852@ulmo>
-References: <20181016060402.18756-1-vigneshr@ti.com>
- <20181016111541.GE8852@ulmo>
-Message-ID: <e3d4afac-edc3-3b2a-3c75-8eb307705dd4@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 31 Oct 2018 14:35:43 +0100
+Subject: [PATCH 2/2 v2] mfd: ab8500-core: Return zero in
+ get_register_interruptible()
+In-Reply-To: <20181025124344.xw3phqnvrwq2nj7g@kili.mountain>
+References: <20181025101037.GR4939@dell>
+ <20181025124344.xw3phqnvrwq2nj7g@kili.mountain>
+Message-ID: <CACRpkdYcmse-dRkDW-6Fvx9ojwj3XXWBWdOM-FXyWYyP11cj9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Thu, Oct 25, 2018 at 2:44 PM Dan Carpenter <dan.carpenter@oracle.com> wrote:
 
-On 16/10/18 4:45 PM, Thierry Reding wrote:
-> On Tue, Oct 16, 2018 at 11:34:00AM +0530, Vignesh R wrote:
->> Couple of patches to enable pwm-tiecap driver to be used with TI's new
->> AM654 platforms.
->>
->> Vignesh R (2):
->>   dt-bindings: pwm: tiecap: Add TI AM654 SoC specific compatible
->>   pwm: Kconfig: Enable TI ECAP driver for ARCH_K3
->>
->>  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 1 +
->>  drivers/pwm/Kconfig                                  | 5 ++---
->>  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> Applied, thanks.
-> 
+> This function is supposed to return zero on success or negative error
+> codes on error.  Unfortunately, there is a bug so it sometimes returns
+> non-zero, positive numbers on success.
+>
+> I noticed this bug during review and I can't test it.  It does appear
+> that the return is sometimes propogated back to _regmap_read() where all
+> non-zero returns are treated as failure so this may affect run time.
+>
+> Fixes: 47c1697508f2 ("mfd: Align ab8500 with the abx500 interface")
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> ---
+> v2: In v1, I introduced an new error path and forgot to drop the lock.
 
-I could not see this patch series in pwm tree here:
-https://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm.git
-Is this queued for v4.20?
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
--- 
-Regards
-Vignesh
+I've got some cleanup work to do with this driver.
+Getting to it.
+
+Yours,
+Linus Walleij
