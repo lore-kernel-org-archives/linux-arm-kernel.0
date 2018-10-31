@@ -1,71 +1,49 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 1 Nov 2018 01:05:26 +0900
-Subject: [PATCH 6/9] PCI: consolidate PCI config entry in drivers/pci
-In-Reply-To: <CAK7LNATZ8LagrTrTae_QCQbSuTW7_y6sDrdTHfTyONPrsYDs4A@mail.gmail.com>
-References: <20181019120952.32763-1-hch@lst.de>
- <20181019120952.32763-7-hch@lst.de>
- <20181019122228.GJ30658@n2100.armlinux.org.uk>
- <CAK7LNATZ8LagrTrTae_QCQbSuTW7_y6sDrdTHfTyONPrsYDs4A@mail.gmail.com>
-Message-ID: <CAK7LNASUArREw1AWUzcOoQCe5=4jyifbs+x2CdCK+qXJ+woAdw@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Thu,  1 Nov 2018 00:06:28 +0530
+Subject: [PATCH 1/7] clk: sunxi-ng: sun50i: h6: Fix MMC clock mux width
+Message-ID: <20181031183634.29640-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+MUX bits for MMC clock register range are 25:24 where 24 is shift
+and 2 is width So fix the width number from 3 to 2.
 
+Fixes: 524353ea480b ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-On Fri, Oct 19, 2018 at 9:58 PM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
->
-> On Fri, Oct 19, 2018 at 9:23 PM Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->
-> > > index a68b34183107..b185794549be 100644
-> > > --- a/arch/arm/mach-pxa/Kconfig
-> > > +++ b/arch/arm/mach-pxa/Kconfig
-> > > @@ -125,7 +125,7 @@ config MACH_ARMCORE
-> > >       bool "CompuLab CM-X255/CM-X270 modules"
-> > >       select ARCH_HAS_DMA_SET_COHERENT_MASK if PCI
-> > >       select IWMMXT
-> > > -     select MIGHT_HAVE_PCI
-> > > +     select HAVE_PCI
-> > >       select NEED_MACH_IO_H if PCI
-> > >       select PXA25x
-> > >       select PXA27x
-> >
-> > This is wrong.  "MIGHT_HAVE_PCI" is _not_ the same as "HAVE_PCI" - we
-> > have a bunch of platforms that mandatorily have PCI and these select
-> > PCI directly.  "MIGHT_HAVE_PCI" controls the _visibility_ of the PCI
-> > menu option, but does not prevent it being selected.  Your patch will
-> > cause Kconfig to complain for those which mandatorily have PCI but
-> > do not set HAVE_PCI.
->
->
-> Good catch!
-> But, adding a bunch of 'select HAVE_PCI' along with 'select PCI' is ugly.
->
-> Do you have any suggestion?
->
-> How about letting CONFIG_ARM to select HAVE_PCI ?
->
-
-
-I applied 1/9, 3/9, 4/9, 5/9.
-(I think 2/9 should be squashed to 9/9)
-
-As Russell pointed out, we need to avoid
-the unmet dependency.
-
-
-Are you planning to send
-the updated version for 6/9 through - 9/9 ?
-
-If so, could you please rebase 6/9
-so that it is cleanly applicable ?
-
-
-Thanks.
-
-
---
-Best Regards
-Masahiro Yamada
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+index 2193e1495086..e2bc612f1d3e 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+@@ -411,7 +411,7 @@ static const char * const mmc_parents[] = { "osc24M", "pll-periph0-2x",
+ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0", mmc_parents, 0x830,
+ 					  0, 4,		/* M */
+ 					  8, 2,		/* N */
+-					  24, 3,	/* mux */
++					  24, 2,	/* mux */
+ 					  BIT(31),	/* gate */
+ 					  2,		/* post-div */
+ 					  0);
+@@ -419,7 +419,7 @@ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0", mmc_parents, 0x830,
+ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1", mmc_parents, 0x834,
+ 					  0, 4,		/* M */
+ 					  8, 2,		/* N */
+-					  24, 3,	/* mux */
++					  24, 2,	/* mux */
+ 					  BIT(31),	/* gate */
+ 					  2,		/* post-div */
+ 					  0);
+@@ -427,7 +427,7 @@ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1", mmc_parents, 0x834,
+ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc2_clk, "mmc2", mmc_parents, 0x838,
+ 					  0, 4,		/* M */
+ 					  8, 2,		/* N */
+-					  24, 3,	/* mux */
++					  24, 2,	/* mux */
+ 					  BIT(31),	/* gate */
+ 					  2,		/* post-div */
+ 					  0);
+-- 
+2.18.0.321.gffc6fa0e3
