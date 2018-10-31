@@ -1,187 +1,171 @@
 From: esmil@mailme.dk (Emil Renner Berthing)
-Date: Wed, 31 Oct 2018 11:57:01 +0100
-Subject: [PATCH v1 04/14] spi: rockchip: use atomic_t state
+Date: Wed, 31 Oct 2018 11:57:07 +0100
+Subject: [PATCH v1 10/14] spi: rockchip: set min/max speed
 In-Reply-To: <20181031105711.19575-1-esmil@mailme.dk>
 References: <20181031105711.19575-1-esmil@mailme.dk>
-Message-ID: <20181031105711.19575-5-esmil@mailme.dk>
+Message-ID: <20181031105711.19575-11-esmil@mailme.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Emil Renner Berthing <kernel@esmil.dk>
 
-The state field is currently only used to make sure
-only the last of the tx and rx dma callbacks issue
-an spi_finalize_current_transfer.
-Rather than using a spinlock we can get away
-with just turning the state field into an atomic_t.
+The driver previously checked each transfer if the
+requested speed was higher than possible with the
+current spi clock rate and raised the clock rate
+accordingly.
+
+However, there is no check to see if the spi clock
+was actually set that high and no way to dynamically
+lower the spi clock rate again.
+
+So it seems any potiential users of this functionality
+are better off just setting the spi clock rate at init
+using the assigned-clock-rates devicetree property.
+
+Removing this dynamic spi clock rate raising allows
+us let the spi framework handle min/max speeds
+for us.
 
 Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
 ---
- drivers/spi/spi-rockchip.c | 75 +++++++++++++-------------------------
- 1 file changed, 25 insertions(+), 50 deletions(-)
+ drivers/spi/spi-rockchip.c | 52 +++++++++++++++-----------------------
+ 1 file changed, 20 insertions(+), 32 deletions(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 7fac4253075e..1c813797f963 100644
+index ba60cbcd45c2..d1b3ba2b1532 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -142,8 +142,9 @@
- #define RF_DMA_EN					(1 << 0)
- #define TF_DMA_EN					(1 << 1)
+@@ -115,6 +115,10 @@
+ /* Bit fields in SER, 2bit */
+ #define SER_MASK					0x3
  
--#define RXBUSY						(1 << 0)
--#define TXBUSY						(1 << 1)
-+/* Driver state flags */
-+#define RXDMA					(1 << 0)
-+#define TXDMA					(1 << 1)
++/* Bit fields in BAUDR */
++#define BAUDR_SCKDV_MIN				2
++#define BAUDR_SCKDV_MAX				65534
++
+ /* Bit fields in SR, 5bit */
+ #define SR_MASK						0x1f
+ #define SR_BUSY						(1 << 0)
+@@ -147,7 +151,7 @@
+ #define TXDMA					(1 << 1)
  
  /* sclk_out: spi master internal logic in rk3x can support 50Mhz */
- #define MAX_SCLK_OUT		50000000
-@@ -169,6 +170,9 @@ struct rockchip_spi {
- 	struct clk *apb_pclk;
+-#define MAX_SCLK_OUT		50000000
++#define MAX_SCLK_OUT				50000000U
  
- 	void __iomem *regs;
-+
-+	atomic_t state;
-+
+ /*
+  * SPI_CTRLR1 is 16-bits, so we should support lengths of 0xffff + 1. However,
+@@ -171,12 +175,11 @@ struct rockchip_spi {
+ 
  	/*depth of the FIFO buffer */
  	u32 fifo_len;
- 	/* max bus freq supported */
-@@ -187,10 +191,6 @@ struct rockchip_spi {
- 	void *rx;
- 	void *rx_end;
+-	/* max bus freq supported */
+-	u32 max_freq;
++	/* frequency of spiclk */
++	u32 freq;
  
--	u32 state;
--	/* protect state */
--	spinlock_t lock;
+ 	u8 n_bytes;
+ 	u32 rsd_nsecs;
+-	u32 speed;
+ 
+ 	const void *tx;
+ 	const void *tx_end;
+@@ -191,11 +194,6 @@ static inline void spi_enable_chip(struct rockchip_spi *rs, bool enable)
+ 	writel_relaxed((enable ? 1U : 0U), rs->regs + ROCKCHIP_SPI_SSIENR);
+ }
+ 
+-static inline void spi_set_clk(struct rockchip_spi *rs, u16 div)
+-{
+-	writel_relaxed(div, rs->regs + ROCKCHIP_SPI_BAUDR);
+-}
 -
- 	bool cs_asserted[ROCKCHIP_SPI_MAX_CS_NUM];
- 
- 	bool use_dma;
-@@ -302,28 +302,21 @@ static int rockchip_spi_prepare_message(struct spi_master *master,
- static void rockchip_spi_handle_err(struct spi_master *master,
- 				    struct spi_message *msg)
+ static inline void wait_for_idle(struct rockchip_spi *rs)
  {
--	unsigned long flags;
- 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+ 	unsigned long timeout = jiffies + msecs_to_jiffies(5);
+@@ -451,7 +449,6 @@ static void rockchip_spi_config(struct rockchip_spi *rs,
+ 		struct spi_device *spi, struct spi_transfer *xfer,
+ 		bool use_dma)
+ {
+-	u32 div = 0;
+ 	u32 dmacr = 0;
+ 	int rsd = 0;
  
--	spin_lock_irqsave(&rs->lock, flags);
--
- 	/*
- 	 * For DMA mode, we need terminate DMA channel and flush
- 	 * fifo for the next transfer if DMA thansfer timeout.
- 	 * handle_err() was called by core if transfer failed.
- 	 * Maybe it is reasonable for error handling here.
- 	 */
--	if (rs->use_dma) {
--		if (rs->state & RXBUSY) {
--			dmaengine_terminate_async(rs->dma_rx.ch);
--			flush_fifo(rs);
--		}
-+	if (atomic_read(&rs->state) & TXDMA)
-+		dmaengine_terminate_async(rs->dma_tx.ch);
- 
--		if (rs->state & TXBUSY)
--			dmaengine_terminate_async(rs->dma_tx.ch);
-+	if (atomic_read(&rs->state) & RXDMA) {
-+		dmaengine_terminate_async(rs->dma_rx.ch);
-+		flush_fifo(rs);
+@@ -477,30 +474,17 @@ static void rockchip_spi_config(struct rockchip_spi *rs,
+ 			dmacr |= RF_DMA_EN;
  	}
+ 
+-	if (WARN_ON(rs->speed > MAX_SCLK_OUT))
+-		rs->speed = MAX_SCLK_OUT;
 -
--	spin_unlock_irqrestore(&rs->lock, flags);
- }
- 
- static int rockchip_spi_unprepare_message(struct spi_master *master,
-@@ -398,48 +391,36 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
- 
- static void rockchip_spi_dma_rxcb(void *data)
- {
--	unsigned long flags;
- 	struct rockchip_spi *rs = data;
-+	int state = atomic_fetch_andnot(RXDMA, &rs->state);
- 
--	spin_lock_irqsave(&rs->lock, flags);
--
--	rs->state &= ~RXBUSY;
--	if (!(rs->state & TXBUSY)) {
--		spi_enable_chip(rs, false);
--		spi_finalize_current_transfer(rs->master);
--	}
-+	if (state & TXDMA)
-+		return;
- 
--	spin_unlock_irqrestore(&rs->lock, flags);
-+	spi_enable_chip(rs, false);
-+	spi_finalize_current_transfer(rs->master);
- }
- 
- static void rockchip_spi_dma_txcb(void *data)
- {
--	unsigned long flags;
- 	struct rockchip_spi *rs = data;
-+	int state = atomic_fetch_andnot(TXDMA, &rs->state);
-+
-+	if (state & RXDMA)
-+		return;
- 
- 	/* Wait until the FIFO data completely. */
- 	wait_for_idle(rs);
- 
--	spin_lock_irqsave(&rs->lock, flags);
--
--	rs->state &= ~TXBUSY;
--	if (!(rs->state & RXBUSY)) {
--		spi_enable_chip(rs, false);
--		spi_finalize_current_transfer(rs->master);
+-	/* the minimum divisor is 2 */
+-	if (rs->max_freq < 2 * rs->speed) {
+-		clk_set_rate(rs->spiclk, 2 * rs->speed);
+-		rs->max_freq = clk_get_rate(rs->spiclk);
 -	}
 -
--	spin_unlock_irqrestore(&rs->lock, flags);
-+	spi_enable_chip(rs, false);
-+	spi_finalize_current_transfer(rs->master);
+-	/* div doesn't support odd number */
+-	div = DIV_ROUND_UP(rs->max_freq, rs->speed);
+-	div = (div + 1) & 0xfffe;
+-
+ 	/* Rx sample delay is expressed in parent clock cycles (max 3) */
+-	rsd = DIV_ROUND_CLOSEST(rs->rsd_nsecs * (rs->max_freq >> 8),
++	rsd = DIV_ROUND_CLOSEST(rs->rsd_nsecs * (rs->freq >> 8),
+ 				1000000000 >> 8);
+ 	if (!rsd && rs->rsd_nsecs) {
+ 		pr_warn_once("rockchip-spi: %u Hz are too slow to express %u ns delay\n",
+-			     rs->max_freq, rs->rsd_nsecs);
++			     rs->freq, rs->rsd_nsecs);
+ 	} else if (rsd > 3) {
+ 		rsd = 3;
+ 		pr_warn_once("rockchip-spi: %u Hz are too fast to express %u ns delay, clamping at %u ns\n",
+-			     rs->max_freq, rs->rsd_nsecs,
+-			     rsd * 1000000000U / rs->max_freq);
++			     rs->freq, rs->rsd_nsecs,
++			     rsd * 1000000000U / rs->freq);
+ 	}
+ 	cr0 |= rsd << CR0_RSD_OFFSET;
+ 
+@@ -520,9 +504,12 @@ static void rockchip_spi_config(struct rockchip_spi *rs,
+ 	writel_relaxed(0, rs->regs + ROCKCHIP_SPI_DMARDLR);
+ 	writel_relaxed(dmacr, rs->regs + ROCKCHIP_SPI_DMACR);
+ 
+-	spi_set_clk(rs, div);
+-
+-	dev_dbg(rs->dev, "cr0 0x%x, div %d\n", cr0, div);
++	/* the hardware only supports an even clock divisor, so
++	 * round divisor = spiclk / speed up to nearest even number
++	 * so that the resulting speed is <= the requested speed
++	 */
++	writel_relaxed(2 * DIV_ROUND_UP(rs->freq, 2 * xfer->speed_hz),
++			rs->regs + ROCKCHIP_SPI_BAUDR);
  }
  
- static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- {
--	unsigned long flags;
- 	struct dma_async_tx_descriptor *rxdesc, *txdesc;
- 
--	spin_lock_irqsave(&rs->lock, flags);
--	rs->state &= ~RXBUSY;
--	rs->state &= ~TXBUSY;
--	spin_unlock_irqrestore(&rs->lock, flags);
-+	atomic_set(&rs->state, 0);
- 
- 	rxdesc = NULL;
- 	if (rs->rx) {
-@@ -490,9 +471,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 
- 	/* rx must be started before tx due to spi instinct */
- 	if (rxdesc) {
--		spin_lock_irqsave(&rs->lock, flags);
--		rs->state |= RXBUSY;
--		spin_unlock_irqrestore(&rs->lock, flags);
-+		atomic_or(RXDMA, &rs->state);
- 		dmaengine_submit(rxdesc);
- 		dma_async_issue_pending(rs->dma_rx.ch);
- 	}
-@@ -500,9 +479,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 	spi_enable_chip(rs, true);
- 
- 	if (txdesc) {
--		spin_lock_irqsave(&rs->lock, flags);
--		rs->state |= TXBUSY;
--		spin_unlock_irqrestore(&rs->lock, flags);
-+		atomic_or(TXDMA, &rs->state);
- 		dmaengine_submit(txdesc);
- 		dma_async_issue_pending(rs->dma_tx.ch);
- 	}
-@@ -716,8 +693,6 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 		goto err_disable_spiclk;
+ static size_t rockchip_spi_max_transfer_size(struct spi_device *spi)
+@@ -551,7 +538,6 @@ static int rockchip_spi_transfer_one(
+ 		return -EINVAL;
  	}
  
--	spin_lock_init(&rs->lock);
--
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
+-	rs->speed = xfer->speed_hz;
+ 	rs->n_bytes = xfer->bits_per_word >> 3;
  
+ 	rs->tx = xfer->tx_buf;
+@@ -631,7 +617,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 	spi_enable_chip(rs, false);
+ 
+ 	rs->dev = &pdev->dev;
+-	rs->max_freq = clk_get_rate(rs->spiclk);
++	rs->freq = clk_get_rate(rs->spiclk);
+ 
+ 	if (!of_property_read_u32(pdev->dev.of_node, "rx-sample-delay-ns",
+ 				  &rsd_nsecs))
+@@ -653,6 +639,8 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 	master->num_chipselect = ROCKCHIP_SPI_MAX_CS_NUM;
+ 	master->dev.of_node = pdev->dev.of_node;
+ 	master->bits_per_word_mask = SPI_BPW_MASK(16) | SPI_BPW_MASK(8);
++	master->min_speed_hz = rs->freq / BAUDR_SCKDV_MAX;
++	master->max_speed_hz = min(rs->freq / BAUDR_SCKDV_MIN, MAX_SCLK_OUT);
+ 
+ 	master->set_cs = rockchip_spi_set_cs;
+ 	master->transfer_one = rockchip_spi_transfer_one;
 -- 
 2.19.1
