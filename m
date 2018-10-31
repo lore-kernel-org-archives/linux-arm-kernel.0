@@ -1,87 +1,36 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 31 Oct 2018 14:49:26 +0100
-Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
- smp_call_function()
-In-Reply-To: <20181030221843.121254-3-dianders@chromium.org>
-References: <20181030221843.121254-1-dianders@chromium.org>
- <20181030221843.121254-3-dianders@chromium.org>
-Message-ID: <20181031134926.GB13237@hirez.programming.kicks-ass.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 31 Oct 2018 14:18:19 +0000
+Subject: [PATCH v4 1/3] arm64: implement ftrace with regs
+In-Reply-To: <nycvar.YFH.7.76.1810311417361.30233@cbobk.fhfr.pm>
+References: <20181026142008.D922868C94@newverein.lst.de>
+ <20181026142148.6353A68C94@newverein.lst.de>
+ <20181031121002.hmag2mwvlpzwobvf@lakrids.cambridge.arm.com>
+ <nycvar.YFH.7.76.1810311417361.30233@cbobk.fhfr.pm>
+Message-ID: <20181031141819.lv2tuj4ne5nf3lh3@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 03:18:43PM -0700, Douglas Anderson wrote:
-> Looking closely at it, it seems like a really bad idea to be calling
-> local_irq_enable() in kgdb_roundup_cpus().  If nothing else that seems
-> like it could violate spinlock semantics and cause a deadlock.
+On Wed, Oct 31, 2018 at 02:19:07PM +0100, Jiri Kosina wrote:
+> On Wed, 31 Oct 2018, Mark Rutland wrote:
 > 
-> Instead, let's use a private csd alongside
-> smp_call_function_single_async() to round up the other CPUs.  Using
-> smp_call_function_single_async() doesn't require interrupts to be
-> enabled so we can remove the offending bit of code.
+> > I guess skipping the original function prologue would simplify the
+> > implementation of the replacement function (and would mean that the regs
+> > held the function arguments per the procedure call standard), but AFAICT
+> > other architectures aren't relying on that, so it doesn't seem to be a
+> > strict requirement.
+> > 
+> > What am I missing?
+> > 
+> > How does livepatching handle the pre-mcount function preambles on
+> > architectures with existing support?
+> 
+> Other architectures do rely on that. That's exactly for example why on x86 
+> we use '-pg -mfentry', to make sure we hook the function *before* 
+> prologue.
 
-You might want to mention that the only reason this isn't a deadlock
-itself is because there is a timeout on waiting for the slaves to
-check-in.
+Ah, I'd missed -mfentry for x86. I now see that's also the case with
+__gnu_mcount_nc on arch/arm, so that covers my confusion.
 
-> --- a/kernel/debug/debug_core.c
-> +++ b/kernel/debug/debug_core.c
-> @@ -55,6 +55,7 @@
->  #include <linux/mm.h>
->  #include <linux/vmacache.h>
->  #include <linux/rcupdate.h>
-> +#include <linux/irq.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/byteorder.h>
-> @@ -220,6 +221,39 @@ int __weak kgdb_skipexception(int exception, struct pt_regs *regs)
->  	return 0;
->  }
->  
-> +/*
-> + * Default (weak) implementation for kgdb_roundup_cpus
-> + */
-> +
-> +static DEFINE_PER_CPU(call_single_data_t, kgdb_roundup_csd);
-> +
-> +void __weak kgdb_call_nmi_hook(void *ignored)
-> +{
-> +	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
-> +}
-> +
-> +void __weak kgdb_roundup_cpus(void)
-> +{
-> +	call_single_data_t *csd;
-> +	int cpu;
-> +
-> +	for_each_cpu(cpu, cpu_online_mask) {
-> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
-> +		smp_call_function_single_async(cpu, csd);
-> +	}
-> +}
-> +
-> +static void kgdb_generic_roundup_init(void)
-> +{
-> +	call_single_data_t *csd;
-> +	int cpu;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		csd = &per_cpu(kgdb_roundup_csd, cpu);
-> +		csd->func = kgdb_call_nmi_hook;
-> +	}
-> +}
-> +
->  /*
->   * Some architectures need cache flushes when we set/clear a
->   * breakpoint:
-> @@ -993,6 +1027,8 @@ int kgdb_register_io_module(struct kgdb_io *new_dbg_io_ops)
->  		return -EBUSY;
->  	}
->  
-> +	kgdb_generic_roundup_init();
-> +
->  	if (new_dbg_io_ops->init) {
->  		err = new_dbg_io_ops->init();
->  		if (err) {
+Thanks for correcting me, and sorry for noise!
 
-That's a little bit of overhead for those architectures not using that
-generic code; but I suppose we can live with that.
+Mark.
