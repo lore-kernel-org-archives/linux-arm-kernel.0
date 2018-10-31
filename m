@@ -1,9 +1,9 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 31 Oct 2018 14:43:26 +0000
-Subject: [PATCH V3 08/10] dts: imx: add common imx7ulp dtsi support
+Date: Wed, 31 Oct 2018 14:43:22 +0000
+Subject: [PATCH V3 07/10] ARM: imx: add initial support for imx7ulp
 In-Reply-To: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
 References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1540996688-23681-9-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1540996688-23681-8-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,354 +11,177 @@ The i.MX 7ULP family of processors features NXP's advanced implementation
 of the Arm Cortex-A7 core, the Arm Cortex-M4 core, as well as a 3D and 2D
 Graphics Processing Units (GPUs).
 
-This patch aims to add the initial support including:
-1) CLK
-2) GPIO PTC, PTD, PTE, PTF
-3) uSDHC 1/2
-4) LPUART 4/5/6/7
-5) LPI2C 6/7
+This patch aims to add an initial support for imx7ulp. Note that we need
+configure power mode to Partial Stop mode 3 with system/bus clock enabled
+first as the default enabled STOP mode will gate off system/bus clock when
+execute WFI in MX7ULP SoC.
 
-Cc: Rob Herring <robh+dt@kernel.org>
+And there's still no MXC_CPU_IMX7ULP IDs read from register as ULP has no
+anatop as before. So we encode one with 0xff in reverse order in case new
+ones will be in the future.
+
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 ChangeLog:
 v2->v3:
- * change to generic node names
- * remove arch timer due to:
-   1) arch timer is fixed to 1Mhz which is lower accurate than TPM timer (3Mhz).
-   2) no firmware progrem CNTFREQ
-   3) cpuidle driver is still not in tree will may cause system hang
+ * no changes
 v1->v2:
- * update clk part due to binding change
- * separate soc.dtsi from board.dts
+ * switch to SPDX license
+ * more description of new SOC in commit message
 ---
- arch/arm/boot/dts/imx7ulp.dtsi | 314 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 314 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+ arch/arm/mach-imx/Kconfig        |  9 +++++++++
+ arch/arm/mach-imx/Makefile       |  1 +
+ arch/arm/mach-imx/common.h       |  1 +
+ arch/arm/mach-imx/cpu.c          |  3 +++
+ arch/arm/mach-imx/mach-imx7ulp.c | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mxc.h          |  1 +
+ arch/arm/mach-imx/pm-imx7ulp.c   | 28 ++++++++++++++++++++++++++++
+ 7 files changed, 75 insertions(+)
+ create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+ create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
 
-diff --git a/arch/arm/boot/dts/imx7ulp.dtsi b/arch/arm/boot/dts/imx7ulp.dtsi
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index abc3371..c12a05c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -558,6 +558,15 @@ config SOC_IMX7D
+ 	help
+ 		This enables support for Freescale i.MX7 Dual processor.
+ 
++config SOC_IMX7ULP
++	bool "i.MX7ULP support"
++	select ARM_GIC
++	select CLKSRC_IMX_TPM
++	select HAVE_ARM_ARCH_TIMER
++	select PINCTRL_IMX7ULP
++	help
++	  This enables support for Freescale i.MX7 Ultra Low Power processor.
++
+ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+ 	select ARM_GIC if ARCH_MULTI_V7
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index bae179a..8af2f7e 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -83,6 +83,7 @@ obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+ obj-$(CONFIG_SOC_IMX7D_CA7) += mach-imx7d.o
+ obj-$(CONFIG_SOC_IMX7D_CM4) += mach-imx7d-cm4.o
++obj-$(CONFIG_SOC_IMX7ULP) += mach-imx7ulp.o pm-imx7ulp.o
+ 
+ ifeq ($(CONFIG_SUSPEND),y)
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 423dd76..bc915e5 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -120,6 +120,7 @@ void imx6dl_pm_init(void);
+ void imx6sl_pm_init(void);
+ void imx6sx_pm_init(void);
+ void imx6ul_pm_init(void);
++void imx7ulp_pm_init(void);
+ 
+ #ifdef CONFIG_PM
+ void imx51_pm_init(void);
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index c73593e..0b137ee 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -145,6 +145,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX7D:
+ 		soc_id = "i.MX7D";
+ 		break;
++	case MXC_CPU_IMX7ULP:
++		soc_id = "i.MX7ULP";
++		break;
+ 	default:
+ 		soc_id = "Unknown";
+ 	}
+diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
 new file mode 100644
-index 0000000..c06fd3e
+index 0000000..ad8be07
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx7ulp.dtsi
-@@ -0,0 +1,314 @@
++++ b/arch/arm/mach-imx/mach-imx7ulp.c
+@@ -0,0 +1,32 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017-2018 NXP
-+ *   Dong Aisheng <aisheng.dong@nxp.com>
++ *   Author: Dong Aisheng <aisheng.dong@nxp.com>
 + */
 +
-+#include <dt-bindings/clock/imx7ulp-clock.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
 +
-+#include "imx7ulp-pinfunc.h"
++#include "common.h"
++#include "hardware.h"
 +
-+/ {
-+	interrupt-parent = <&intc>;
++static void __init imx7ulp_init_machine(void)
++{
++	imx7ulp_pm_init();
 +
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++	mxc_set_cpu_type(MXC_CPU_IMX7ULP);
++	imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_1_0);
++	of_platform_default_populate(NULL, NULL, imx_soc_device_init());
++}
 +
-+	aliases {
-+		gpio0 = &gpio_ptc;
-+		gpio1 = &gpio_ptd;
-+		gpio2 = &gpio_pte;
-+		gpio3 = &gpio_ptf;
-+		i2c0 = &lpi2c6;
-+		i2c1 = &lpi2c7;
-+		mmc0 = &usdhc0;
-+		mmc1 = &usdhc1;
-+		serial0 = &lpuart4;
-+		serial1 = &lpuart5;
-+		serial2 = &lpuart6;
-+		serial3 = &lpuart7;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+	};
-+
-+	intc: interrupt-controller at 40021000 {
-+		compatible = "arm,cortex-a7-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x40021000 0x1000>,
-+		      <0x40022000 0x1000>;
-+	};
-+
-+	rosc: clock-rosc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+		clock-output-names = "rosc";
-+		#clock-cells = <0>;
-+	};
-+
-+	sosc: clock-sosc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "sosc";
-+		#clock-cells = <0>;
-+	};
-+
-+	sirc: clock-sirc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <16000000>;
-+		clock-output-names = "sirc";
-+		#clock-cells = <0>;
-+	};
-+
-+	firc: clock-firc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <48000000>;
-+		clock-output-names = "firc";
-+		#clock-cells = <0>;
-+	};
-+
-+	upll: clock-upll {
-+		compatible = "fixed-clock";
-+		clock-frequency = <480000000>;
-+		clock-output-names = "upll";
-+		#clock-cells = <0>;
-+	};
-+
-+	mpll: clock-mpll {
-+		compatible = "fixed-clock";
-+		clock-frequency = <480000000>;
-+		clock-output-names = "mpll";
-+		#clock-cells = <0>;
-+	};
-+
-+	ahbbridge0: bus at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x40000000 0x800000>;
-+		ranges;
-+
-+		lpuart4: serial at 402d0000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x402d0000 0x1000>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pcc2 IMX7ULP_CLK_LPUART4>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPUART4>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_SOSC_BUS_CLK>;
-+			assigned-clock-rates = <24000000>;
-+			status = "disabled";
-+		};
-+
-+		lpuart5: serial at 402e0000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x402e0000 0x1000>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pcc2 IMX7ULP_CLK_LPUART5>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPUART5>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		tpm5: tpm at 40260000 {
-+			compatible = "fsl,imx7ulp-tpm";
-+			reg = <0x40260000 0x1000>;
-+			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&pcc2 IMX7ULP_CLK_LPTPM5>;
-+			clock-names = "ipg", "per";
-+		};
-+
-+		usdhc0: mmc at 40370000 {
-+			compatible = "fsl,imx7ulp-usdhc", "fsl,imx6sx-usdhc";
-+			reg = <0x40370000 0x10000>;
-+			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&scg1 IMX7ULP_CLK_NIC1_DIV>,
-+				 <&pcc2 IMX7ULP_CLK_USDHC0>;
-+			clock-names ="ipg", "ahb", "per";
-+			assigned-clocks = <&pcc2 IMX7ULP_CLK_USDHC0>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_NIC1_DIV>;
-+			bus-width = <4>;
-+			fsl,tuning-start-tap = <20>;
-+			fsl,tuning-step= <2>;
-+			status = "disabled";
-+		};
-+
-+		usdhc1: mmc at 40380000 {
-+			compatible = "fsl,imx7ulp-usdhc", "fsl,imx6sx-usdhc";
-+			reg = <0x40380000 0x10000>;
-+			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&scg1 IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&scg1 IMX7ULP_CLK_NIC1_DIV>,
-+				 <&pcc2 IMX7ULP_CLK_USDHC1>;
-+			clock-names ="ipg", "ahb", "per";
-+			assigned-clocks = <&pcc2 IMX7ULP_CLK_USDHC1>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_NIC1_DIV>;
-+			bus-width = <4>;
-+			fsl,tuning-start-tap = <20>;
-+			fsl,tuning-step= <2>;
-+			status = "disabled";
-+		};
-+
-+		scg1: clock-controller at 403e0000 {
-+			compatible = "fsl,imx7ulp-scg1";
-+			reg = <0x403e0000 0x10000>;
-+			clocks = <&rosc>, <&sosc>, <&sirc>,
-+				 <&firc>, <&upll>, <&mpll>;
-+			clock-names = "rosc", "sosc", "sirc",
-+				      "firc", "upll", "mpll";
-+			#clock-cells = <1>;
-+		};
-+
-+		pcc2: clock-controller at 403f0000 {
-+			compatible = "fsl,imx7ulp-pcc2";
-+			reg = <0x403f0000 0x10000>;
-+			#clock-cells = <1>;
-+			assigned-clocks = <&pcc2 IMX7ULP_CLK_LPTPM5>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_SOSC_BUS_CLK>;
-+		};
-+
-+		smc1: smc1 at 40410000 {
-+			compatible = "fsl,imx7ulp-smc1";
-+			reg = <0x40410000 0x1000>;
-+		};
-+
-+		pcc3: clock-controller at 40b30000 {
-+			compatible = "fsl,imx7ulp-pcc3";
-+			reg = <0x40b30000 0x10000>;
-+			#clock-cells = <1>;
-+		};
-+	};
-+
-+	ahbbridge1: bus at 40800000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x40800000 0x800000>;
-+		ranges;
-+
-+		lpi2c6: i2c at 40a40000 {
-+			compatible = "fsl,imx7ulp-lpi2c";
-+			reg = <0x40a40000 0x10000>;
-+			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pcc3 IMX7ULP_CLK_LPI2C6>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPI2C6>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		lpi2c7: i2c at 40a50000 {
-+			compatible = "fsl,imx7ulp-lpi2c";
-+			reg = <0x40a50000 0x10000>;
-+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pcc3 IMX7ULP_CLK_LPI2C7>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPI2C7>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		lpuart6: serial at 40a60000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x40a60000 0x1000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pcc3 IMX7ULP_CLK_LPUART6>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPUART6>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		lpuart7: serial at 40a70000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x40a70000 0x1000>;
-+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pcc3  IMX7ULP_CLK_LPUART7>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&pcc3 IMX7ULP_CLK_LPUART7>;
-+			assigned-clock-parents = <&scg1 IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		iomuxc1: pinctrl at 40ac0000 {
-+			compatible = "fsl,imx7ulp-iomuxc1";
-+			reg = <0x40ac0000 0x1000>;
-+		};
-+
-+		gpio_ptc: gpio at 40ae0000 {
-+			compatible = "fsl,imx7ulp-gpio", "fsl,vf610-gpio";
-+			reg = <0x40ae0000 0x1000 0x400f0000 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-+				 <&pcc3 IMX7ULP_CLK_PCTLC>;
-+			clock-names = "gpio", "port";
-+			gpio-ranges = <&iomuxc1 0 0 32>;
-+		};
-+
-+		gpio_ptd: gpio at 40af0000 {
-+			compatible = "fsl,imx7ulp-gpio", "fsl,vf610-gpio";
-+			reg = <0x40af0000 0x1000 0x400f0040 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-+				 <&pcc3 IMX7ULP_CLK_PCTLD>;
-+			clock-names = "gpio", "port";
-+			gpio-ranges = <&iomuxc1 0 32 32>;
-+		};
-+
-+		gpio_pte: gpio at 40b00000 {
-+			compatible = "fsl,imx7ulp-gpio", "fsl,vf610-gpio";
-+			reg = <0x40b00000 0x1000 0x400f0080 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-+				 <&pcc3 IMX7ULP_CLK_PCTLE>;
-+			clock-names = "gpio", "port";
-+			gpio-ranges = <&iomuxc1 0 64 32>;
-+		};
-+
-+		gpio_ptf: gpio at 40b10000 {
-+			compatible = "fsl,imx7ulp-gpio", "fsl,vf610-gpio";
-+			reg = <0x40b10000 0x1000 0x400f00c0 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&pcc2 IMX7ULP_CLK_RGPIO2P1>,
-+				 <&pcc3 IMX7ULP_CLK_PCTLF>;
-+			clock-names = "gpio", "port";
-+			gpio-ranges = <&iomuxc1 0 96 32>;
-+		};
-+	};
++static const char *const imx7ulp_dt_compat[] __initconst = {
++	"fsl,imx7ulp",
++	NULL,
 +};
++
++DT_MACHINE_START(IMX7ulp, "Freescale i.MX7ULP (Device Tree)")
++	.init_machine	= imx7ulp_init_machine,
++	.dt_compat	= imx7ulp_dt_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index b130a53..8e72d4e 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -44,6 +44,7 @@
+ #define MXC_CPU_IMX6ULZ		0x6b
+ #define MXC_CPU_IMX6SLL		0x67
+ #define MXC_CPU_IMX7D		0x72
++#define MXC_CPU_IMX7ULP		0xff
+ 
+ #define IMX_DDR_TYPE_LPDDR2		1
+ 
+diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
+new file mode 100644
+index 0000000..9fb7da0
+--- /dev/null
++++ b/arch/arm/mach-imx/pm-imx7ulp.c
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP
++ *   Author: Dong Aisheng <aisheng.dong@nxp.com>
++ */
++
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#define SMC_PMCTRL		0x10
++#define BP_PMCTRL_PSTOPO        16
++#define PSTOPO_PSTOP3		0x3
++
++void __init imx7ulp_pm_init(void)
++{
++	struct device_node *np;
++	void __iomem *smc1_base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
++	smc1_base = of_iomap(np, 0);
++	WARN_ON(!smc1_base);
++
++	/* Partial Stop mode 3 with system/bus clock enabled */
++	writel_relaxed(PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO,
++		       smc1_base + SMC_PMCTRL);
++}
 -- 
 2.7.4
