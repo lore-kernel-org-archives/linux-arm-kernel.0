@@ -1,29 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 31 Oct 2018 10:43:00 +0100
-Subject: [PATCH 0/5] Add Pinctrl and GPIO support for HI3670 SoC
-In-Reply-To: <20181023190655.12004-1-manivannan.sadhasivam@linaro.org>
-References: <20181023190655.12004-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdbMSYt5aH9fwRijtO=VG1nLAnfxTsfxGza+_Z2iGj2+-A@mail.gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 31 Oct 2018 11:15:01 +0100
+Subject: [PATCH v3] mm/page_owner: use kvmalloc instead of kmalloc
+In-Reply-To: <1540975637.10275.10.camel@mtkswgap22>
+References: <1540790176-32339-1-git-send-email-miles.chen@mediatek.com>
+ <20181029080708.GA32673@dhcp22.suse.cz>
+ <20181029081706.GC32673@dhcp22.suse.cz>
+ <1540862950.12374.40.camel@mtkswgap22>
+ <20181030060601.GR32673@dhcp22.suse.cz>
+ <1540882551.23278.12.camel@mtkswgap22>
+ <20181030081537.GV32673@dhcp22.suse.cz>
+ <1540975637.10275.10.camel@mtkswgap22>
+Message-ID: <20181031101501.GL32673@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2018 at 9:07 PM Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
+On Wed 31-10-18 16:47:17, Miles Chen wrote:
+> On Tue, 2018-10-30 at 09:15 +0100, Michal Hocko wrote:
+> > On Tue 30-10-18 14:55:51, Miles Chen wrote:
+> > [...]
+> > > It's a real problem when using page_owner.
+> > > I found this issue recently: I'm not able to read page_owner information
+> > > during a overnight test. (error: read failed: Out of memory). I replace
+> > > kmalloc() with vmalloc() and it worked well.
+> > 
+> > Is this with trimming the allocation to a single page and doing shorter
+> > than requested reads?
+> 
+> 
+> I printed out the allocate count on my device the request count is <=
+> 4096. So I tested this scenario by trimming the count to from 4096 to
+> 1024 bytes and it works fine. 
+> 
+> count = count > 1024? 1024: count;
+> 
+> It tested it on both 32bit and 64bit kernel.
 
-> This patchset adds Pinctrl and GPIO support for HI3670 SoC from HiSilicon
-> found in the HiKey970 developement board. Also, the remaining UARTs are
-> enabled and GPIO line names are added based on the Schematics and the
-> 96Boards Consumer Edition spec.
->
-> Note: These patches are based on the below common clk patches pushed
-> earlier:
->
-> arm64: dts: hisilicon: Add clock nodes for Hi3670 SoC
-> arm64: dts: hisilicon: Source SoC clock for UART6
+Are you saying that you see OOMs for 4k size?
 
-All looks good to me.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-for the series.
-
-Yours,
-Linus Walleij
+-- 
+Michal Hocko
+SUSE Labs
