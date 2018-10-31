@@ -1,108 +1,64 @@
-From: dev@pschenker.ch (Philippe Schenker)
-Date: Wed, 31 Oct 2018 16:20:40 +0100
-Subject: [RFC] ARM: dts: imx: assign static phandles
-Message-ID: <a90fb286f7200b2cba60cd3c9a1be6b9a607c390.camel@pschenker.ch>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 31 Oct 2018 16:21:30 +0100
+Subject: [PATCH 5/5] ARM: spectre-v2: per-CPU vtables to work around
+ big.Little systems
+In-Reply-To: <20181030105017.GK30658@n2100.armlinux.org.uk>
+References: <20180919094802.GH30658@n2100.armlinux.org.uk>
+ <CGME20180919095028epcas3p3e1a927bb7e88c6891d43abfdc51603e7@epcas3p3.samsung.com>
+ <E1g2Z6e-0003es-CI@rmk-PC.armlinux.org.uk>
+ <20181005090941eucas1p14031cd38d78e9d561975925bf977727d~aq0-OFZeE1866318663eucas1p1b@eucas1p1.samsung.com>
+ <20181005094618.GG30658@n2100.armlinux.org.uk>
+ <20181030105017.GK30658@n2100.armlinux.org.uk>
+Message-ID: <99a5f366-4d96-1069-0638-4e036e57afc8@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Russell,
 
-For the Colibri iMX6, Toradex is providing different methods on explicit
-connectors vs. rather universal pin headers to connect the touch controller 
-to our carrier boards. Currently we are providing fdt_fixups to alter the 
-devicetree in U-Boot to select the right pins. The problem we have with this
-approach is, that the phandles are dynamically assigned to the dtb.
+On 2018-10-30 11:50, Russell King - ARM Linux wrote:
+> On Fri, Oct 05, 2018 at 10:46:19AM +0100, Russell King - ARM Linux wrote:
+>> On Fri, Oct 05, 2018 at 11:09:40AM +0200, Marek Szyprowski wrote:
+>>> This patch causes lots of kernel 'BUG' messages on all Samsung Exynos
+>>> boards.? It started to appear since it has been merged to linux-next
+>>> on 20181002.? I wonder if this issue is Exynos specific or there are
+>>> some patches missing in linux-next, which should fix those 'BUGS'.
+>>> If this is Exynos specific, please let us know what should be changed
+>>> in Exynos platform code to avoid this issue.
+>> Thanks for the report.
+>>
+>> It looks like my solution for big.Little isn't possible... back to
+>> the drawing board, and big.Little will have to remain vulnerable to
+>> Spectre for another release cycle.
+> I've pushed out a new version in my build branch for the autobuilders
+> to chew on, but I've little confidence in validating that the problem
+> is fixed because the boot results are completely unreliable.
+>
+> It really doesn't help that kernelci.org flags boot logs as "green"
+> and "successful" when they contain such stuff as:
+>
+> 01:08:40.181846  [    9.309984] Unable to handle kernel paging request at virtual address e7fddef0
+>
+> which is the kernel hitting a BUG() - for the full log, see:
+>
+> https://storage.kernelci.org/rmk/to-build/v4.16-38-g9fa10446d304/arm/multi_v7_defconfig/lab-collabora/boot-exynos5800-peach-pi.html
+>
+> This means the only way to check is to _manually_ go through reading
+> each and every boot log - to see if your reported BUG: messages are
+> there - no thanks.
+>
+> If kernelci thinks that a boot which hits a kernel BUG(), but still
+> manages to get to a shell prompt is successful, it's giving very
+> misleading boot results.  What about a WARN_ON() or an oops that
+> still allows it to reach a shell prompt.
+>
+> Yes, these may be "successful" in so far as reaching the shell prompt,
+> but they should at least be flagged for further inspection, not
+> effectively marked as "there is nothing wrong here".
 
-My question is, if it would be a feasible solution for mainline to assign
-those (vs. all) phandles statically. I put an example below. This example 
-should just provide an idea what I mean, it is not working code.
+I've run my own tests on various Exynos SoC based boards and your
+'for-next' branch works fine and don't cause any regressions.
 
-Regards,
-Philippe
-
-Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
----
-
- arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 34 ++++++++++++++++++++
- arch/arm/boot/dts/imx6dl.dtsi                |  2 ++
- 2 files changed, 36 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-index d08e0402793b..355709cd28aa 100644
---- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-@@ -172,12 +172,46 @@
-                compatible = "st,m41t0";
-                reg = <0x68>;
-        };
-+
-+       /* Atmel maxtouch controller */
-+       atmel_mxt_ts: atmel_mxt_ts at 4a {
-+               compatible = "atmel,maxtouch";
-+               pinctrl-names = "default";
-+               pinctrl-0 = <&pinctrl_mxt_ts>;
-+               reg = <0x4a>;
-+               interrupt-parent = <&gpio1>;
-+               interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
-+               status = "okay";
-+       };
- };
- 
- &ipu1_di0_disp0 {
-        remote-endpoint = <&lcd_display_in>;
- };
- 
-+&iomuxc {
-+
-+       gpio {
-+               pinctrl_pcap_1: pcap-1 {
-+                       fsl,pins = <
-+                               /* SODIMM 28, 30 */
-+                               MX6QDL_PAD_GPIO_9__GPIO1_IO09   0x130b0
-+                               MX6QDL_PAD_SD4_DAT2__GPIO2_IO10 0x130b0
-+                       >;
-+                       phandle = <0xffff0000>;
-+               };
-+
-+               pinctrl_mxt_ts: mxt-ts {
-+                       fsl,pins = <
-+                               /* SODIMM 106, 107 */
-+                               MX6QDL_PAD_EIM_CS1__GPIO2_IO24  0x130b0
-+                               MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x130b0
-+                       >;
-+                       phandle = <0xffff0001>;
-+               };
-+       };
-+};
-+
- &pwm1 {
-        status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index f0607eb41df4..984714b1ca2f 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -132,6 +132,7 @@
-                      <&iomuxc 22 123 3>, <&iomuxc 25 121 1>, <&iomuxc 26 127 1>,
-                      <&iomuxc 27 126 1>, <&iomuxc 28 128 1>, <&iomuxc 29 130 1>,
-                      <&iomuxc 30 129 1>, <&iomuxc 31 122 1>;
-+       phandle = <0xffff0002>;
- };
- 
- &gpio2 {
-@@ -140,6 +141,7 @@
-                      <&iomuxc 20  70 1>, <&iomuxc 21  69 1>, <&iomuxc 22  68 1>,
-                      <&iomuxc 23  79 2>, <&iomuxc 25 118 2>, <&iomuxc 27 117 1>,
-                      <&iomuxc 28 113 4>;
-+       phandle = <0xffff0003>;
- };
- 
- &gpio3 {
+Best regards
 -- 
-
-And then from uboot alter the devicetree like:
-
-setenv fdt_fixup 'fdt addr ${fdt_addr_r} && fdt resize && 
-fdt set /soc/aips-bus at 02100000/i2c at 21a8000/atmel_mxt_ts at 4a pinctrl-0 <0xffff0000> &&
-fdt set /soc/aips-bus at 02100000/i2c at 21a8000/atmel_mxt_ts at 4a interrupt-parent <0xffff0003>'
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
