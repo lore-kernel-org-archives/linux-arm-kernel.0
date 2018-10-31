@@ -1,130 +1,252 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 31 Oct 2018 14:41:14 -0700
-Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
- smp_call_function()
-In-Reply-To: <20181031184050.sd5opni3mznaapkv@holly.lan>
-References: <20181030221843.121254-1-dianders@chromium.org>
- <20181030221843.121254-3-dianders@chromium.org>
- <20181031184050.sd5opni3mznaapkv@holly.lan>
-Message-ID: <CAD=FV=V1eHo7Wz31DTMMNi394qwEaESTxJCYVE60Q7hpDEqRmQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 31 Oct 2018 22:48:51 +0100
+Subject: [PATCH V8 5/5] firmware: imx: add SCU power domain driver
+In-Reply-To: <AM0PR04MB42116E6F24F4943BC999CAEE80CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1540739690-23750-1-git-send-email-aisheng.dong@nxp.com>
+ <1540739690-23750-6-git-send-email-aisheng.dong@nxp.com>
+ <CAPDyKFp=ajE5gh5KnfKjm31x1oKDu3O56Yki1CvrTEf0SysS7w@mail.gmail.com>
+ <AM0PR04MB4211F8B08821BEA7CEA8950880CC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CAPDyKFpzvN1R91ByRUmZ8XDsm6L2SF92oOrDSn3qv-d9wWGYtA@mail.gmail.com>
+ <AM0PR04MB4211084AB67D86ED162FDB1280CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CAPDyKFoEbuLcA5AZPQob0PgK=A3pAH5N8CacHb3WO+54-0svrA@mail.gmail.com>
+ <AM0PR04MB42116E6F24F4943BC999CAEE80CD0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <CAPDyKFrBNoXiWgjKk7mdOEARgOV+7RQPnMcDRccS04triaUHtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Oct 31, 2018 at 11:40 AM Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
+On 31 October 2018 at 18:24, A.s. Dong <aisheng.dong@nxp.com> wrote:
+>> -----Original Message-----
+>> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+>> Sent: Wednesday, October 31, 2018 11:56 PM
+> [...]
+>> On 31 October 2018 at 02:45, A.s. Dong <aisheng.dong@nxp.com> wrote:
+>> >> -----Original Message-----
+>> >> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+>> >> Sent: Wednesday, October 31, 2018 12:00 AM
+>> > [...]
+>> >> On 30 October 2018 at 14:20, A.s. Dong <aisheng.dong@nxp.com> wrote:
+>> >> > [...]
+>> >> >
+>> >> >> }
+>> >> >> > +
+>> >> >> > +static struct imx_sc_pm_domain * imx_scu_add_pm_domain(struct
+>> >> >> > +device *dev, int idx,
+>> >> >> > +                     const struct imx_sc_pd_range *pd_ranges) {
+>> >> >> > +       struct imx_sc_pm_domain *sc_pd;
+>> >> >> > +       int ret;
+>> >> >> > +
+>> >> >> > +       sc_pd = devm_kzalloc(dev, sizeof(*sc_pd), GFP_KERNEL);
+>> >> >> > +       if (!sc_pd)
+>> >> >> > +               return ERR_PTR(-ENOMEM);
+>> >> >> > +
+>> >> >> > +       sc_pd->rsrc = pd_ranges->rsrc + idx;
+>> >> >> > +       sc_pd->pd.power_off = imx_sc_pd_power_off;
+>> >> >> > +       sc_pd->pd.power_on = imx_sc_pd_power_on;
+>> >> >>
+>> >> >> So, this means you are going to register one genpd per device (one
+>> >> >> for each uart, pwm etc), but there is actually a better option.
+>> >> >>
+>> >> >> What you seems to be needing is a way to "power on/off" devices,
+>> >> >> rather than the PM domain. Right? The PM domain, is managed
+>> >> >> internally
+>> >> by the FW, no?
+>> >> >>
+>> >> >
+>> >> > Yes, you're right.
+>> >> >
+>> >> >> In any case, it looks like what you should do is to implement the
+>> >> >> ->attach|detach_dev() callback for the genpd and use the regular
+>> >> >> of_genpd_add_provider_simple(). From within the ->attach_dev(),
+>> >> >> you should get the OF node for the device that is being attached
+>> >> >> and then parse the power-domain cell containing the "resource id"
+>> >> >> and store that in the per device struct generic_pm_domain_data (we
+>> >> >> have void pointer there for storing these kind of things).
+>> >> >>
+>> >> >> Additionally, you need to implement the ->stop() and ->start()
+>> >> >> callbacks of genpd, which is where you "power on/off" devices,
+>> >> >> rather than using the above
+>> >> >> ->power_on|off() callbacks.
+>> >> >>
+>> >> >> Please have a look a drivers/soc/ti/ti_sci_pm_domains.c.
+>> >> >> Apologize, I should have pointed you towards that reference
+>> >> >> already in the earlier
+>> >> version.
+>> >> >>
+>> >> >
+>> >> > Appreciated for such detailed explanation. lt's a good suggestion
+>> >> > and I really like to switch to it.  However, after digged a bit
+>> >> > more, i found a few
+>> >> blocking issues:
+>> >> > 1. The .attach_dev() of power domain infrastructure still does not
+>> >> > support
+>> >> multi domains case.
+>> >> >
+>> >> > It looks like there's no way for .attach_dev() to understand which
+>> >> > sub 'power
+>> >> domain'
+>> >> > the device is attaching for one global power domain provider like
+>> >> > ti_sci as
+>> >> you suggested.
+>> >> > Secondly, the struct device *dev passed into is a virtual PD device.
+>> >> > It does not help for parsing the real device resource id.
+>> >> >
+>> >> > So framework probably needs some extension to support multi power
+>> >> domain cases.
+>> >>
+>> >> Right, you are correct.
+>> >>
+>> >> Let me think about this and see what I can come up with - unless you
+>> >> already have something you want to propose?
+>> >>
+>> >
+>> > I have thought we may need add two more params (real dev and pd index)
+>> > for
+>> > .attach_dev().detach_dev() and .start()/.stop() for multi PDs case.
+>> > But I'm not sure if they are proper.
+>>
+>> Right.
+>>
+>> I don't think we need to change the definition of the callbacks.
+>> However, from within the callbacks (or at least the ->attach_dev()) we need
+>> access to the data you suggest above.
+>>
+>> To make that data available, genpd needs to store it in the per device struct
+>> generic_pm_domain_data, but of course before invoking the
+>> ->attach_dev() callback.
+>>
 >
-> On Tue, Oct 30, 2018 at 03:18:43PM -0700, Douglas Anderson wrote:
-> > diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-> > index f3cadda45f07..9a3f952de6ed 100644
-> > --- a/kernel/debug/debug_core.c
-> > +++ b/kernel/debug/debug_core.c
-> > @@ -55,6 +55,7 @@
-> >  #include <linux/mm.h>
-> >  #include <linux/vmacache.h>
-> >  #include <linux/rcupdate.h>
-> > +#include <linux/irq.h>
-> >
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/byteorder.h>
-> > @@ -220,6 +221,39 @@ int __weak kgdb_skipexception(int exception, struct pt_regs *regs)
-> >       return 0;
-> >  }
-> >
-> > +/*
-> > + * Default (weak) implementation for kgdb_roundup_cpus
-> > + */
-> > +
-> > +static DEFINE_PER_CPU(call_single_data_t, kgdb_roundup_csd);
-> > +
-> > +void __weak kgdb_call_nmi_hook(void *ignored)
-> > +{
-> > +     kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
-> > +}
-> > +
-> > +void __weak kgdb_roundup_cpus(void)
-> > +{
-> > +     call_single_data_t *csd;
-> > +     int cpu;
-> > +
-> > +     for_each_cpu(cpu, cpu_online_mask) {
-> > +             csd = &per_cpu(kgdb_roundup_csd, cpu);
-> > +             smp_call_function_single_async(cpu, csd);
-> > +     }
+> Yes, that's an option.
+> Currently gpd_data is allocated in genpd_add_device() which looks like to be
+> designed to attach device to the specified power domain passed in, so it's
+> unware of whether it's multi domains or not. Then we may still need fine
+> tune those functions in different abstract layers.
+
+Yes, something like that. I don't think it should be that hard, I can
+have a stab at it of you like?
+
 >
-> smp_call_function() automatically skips the calling CPU but this code does
-> not. It isn't a hard bug since kgdb_nmicallback() does a re-entrancy
-> check but I'd still prefer to skip the calling CPU.
-
-I'll incorporate this into the next version.
-
-
-> As mentioned in another part of the thread we can also add robustness
-> by skipping a cpu where csd->flags != 0 (and adding an appropriately
-> large comment regarding why). Doing the check directly is abusing
-> internal knowledge that smp.c normally keeps to itself so an accessor
-> of some kind would be needed.
-
-Sure.  I could add smp_async_func_finished() that just looked like:
-
-int smp_async_func_finished(call_single_data_t *csd)
-{
-  return !(csd->flags & CSD_FLAG_LOCK);
-}
-
-My understanding of all the mutual exclusion / memory barrier concepts
-employed by smp.c is pretty weak, though.  I'm hoping that it's safe
-to just access the structure and check the bit directly.
-
-...but do you think adding a generic accessor like this is better than
-just keeping track of this in kgdb directly?  I could avoid the
-accessor by adding a "rounding_up" member to "struct
-debuggerinfo_struct" and doing something like this in roundup:
-
-  /* If it didn't round up last time, don't try again */
-  if (kgdb_info[cpu].rounding_up)
-    continue
-
-  kgdb_info[cpu].rounding_up = true
-  smp_call_function_single_async(cpu, csd);
-
-...and then in kgdb_nmicallback() I could just add:
-
-  kgdb_info[cpu].rounding_up = false
-
-In that case we're not adding a generic accessor to smp.c that most
-people should never use.
-
-
-I'll wait to hear back from you if you think the accessor is OK.  It
-seems like it might be nice not to have to add something to smp.c just
-for this one use case.
-
-
-> > +}
-> > +
-> > +static void kgdb_generic_roundup_init(void)
-> > +{
-> > +     call_single_data_t *csd;
-> > +     int cpu;
-> > +
-> > +     for_each_possible_cpu(cpu) {
-> > +             csd = &per_cpu(kgdb_roundup_csd, cpu);
-> > +             csd->func = kgdb_call_nmi_hook;
-> > +     }
-> > +}
+>> >
+>> >
+>> >> >
+>> >> > 2. It also breaks most of current drivers as the driver probe
+>> >> > sequence behavior changed If removing .power_on() and .power_off()
+>> >> > callback and
+>> >> use .start() and .stop() instead.
+>> >> >
+>> >> > genpd_dev_pm_attach will only power up the domain and attach
+>> >> > device, but will not call .start() which relies on device runtime
+>> >> > pm. That means the device power is still not up before running
+>> >> > driver probe function. For SCU enabled platforms, all device
+>> >> > drivers accessing registers/clock without power domain enabled will
+>> >> > trigger a HW access error. That means we need fix most of drivers
+>> >> > probe sequence with proper
+>> >> runtime pm. So I'm a bit wondering whether we should still keep the exist
+>> way.
+>> >>
+>> >> I see what you are trying to say, but I am not sure why you consider
+>> >> this as they would break? How did they work in the first place?
+>> >>
+>> >
+>> > Most drivers does not require power domains before. E.g. GPIO, I2C, PWM,
+>> MMC.
+>> > Or even we need power domain(PUs/PCIE), they're enabled in
+>> > .power_on()/.power_off() which has been already up before probe.
+>> >
+>> >> Anyway, the problem you are talking about have so far been addressed
+>> >> by making buses/drivers to call pm_runtime_enable() and
+>> >> pm_runtime_get_sync() - before trying to probe their devices.
+>> >>
+>> >
+>> > Yes, called them early before accessing clock and hw registers.
+>> >
+>> >> Do you have an idea of the amount of drivers that needs to fixed, in
+>> >> regards to this?
+>> >>
+>> >
+>> > So far all enabled devices I tested need fixes. GPIO/I2C/FEC/MMC and etc.
+>> > Suppose other need the same fix as we have not met this situation before.
+>>
+>> Okay, I see.
+>>
+>> >
+>> >> I guess an option could be to, that via the ->attach_dev() callback
+>> >> perform the same operations as also being done during ->start(). Of
+>> >> course, you may need to keep a flag about this being done, so that
+>> >> operations that need to be balanced with get/put or the like is
+>> >> managed correctly, the next time
+>> >> ->start|stop() becomes called.
+>> >>
+>> >
+>> > That might be a way to try. The follow seems may introduce a bit
+>> > complexities and driver needs to maintainer the runtime status along
+>> > with framework in order to keep the balance?
+>>
+>> Yeah, it's likely not going to be very elegant, but should be rather self
+>> contained in the PM domain driver and could serve as a way forward - while
+>> working on fixing the drivers long term.
+>>
+>> >
+>> >> >
+>> >> > In summary, we probably may not be able to try ti_sci way before
+>> >> > fixing
+>> >> above two issues.
+>> >> >
+>> >> > Do you think I should wait for them to be fixed or if we could use
+>> >> > the current
+>> >> way at first?
+>> >> > I might be a little intend to the second way as we now have a lot
+>> >> > upstreaming work pending on this. But please let me know if you
+>> >> > have a
+>> >> different idea.
+>> >>
+>> >> As this is also about deploying a DTB with a correctly modeled HW, I
+>> >> think we need to fix the above issues.
+>> >>
+>> >
+>> > DTB are the same with #power-domain-cells 1 (resource ID) in either case.
+>> > So DTB don't need change and driver could be optimized.
+>>
+>> You are correct.
+>>
+>> Although, how does $subject patch solves the case where a device may have
+>> multiple PM domains attached to it? Or is left as a future improvement?
+>>
 >
-> I can't help noticing this code is very similar to kgdb_roundup_cpus. Do
-> we really gain much from ahead-of-time initializing csd->func?
+> IIRC this patch does not have such issue for multi PM domains as we have
+> individual power domains for each resources. Devices will be attached to
+> each individual domains in __genpd_dev_pm_attach rather than the single
+> one global virtual SCU domain. Furthermore we're using domains .power_on()/
+> power_off() callback which means the power will be up before the probe.
+> (no the issue like when using .attach_dev()/.detach_dev() and run .start()/stop()
+> via runtime pm).
 
-Oh!  Right...  At first I thought about just trying to put the "csd"
-on the stack in kgdb_roundup_cpus() but then I realized that it needed
-to persist past the end of kgdb_roundup_cpus().  ...and once I gave up
-on the idea of putting it on the stack I decided I needed the init.
+I don't follow your reasoning here, sorry. You stated earlier, that
+there was a need to support multiple PM domains per device.
 
-...but you're right that I don't really.  The only thing I'm initting
-is the function pointer and it totally wouldn't hurt to just init that
-over and over again every time kgdb_roundup_cpus() is called.
+How can that problem be resolved by using one genpd per device? What
+am I missing?
 
--Doug
+>
+> Actually I'm a bit wondering that if abstracting SCU domains into one
+> global virtual domain is certainly better than individual domains. For SCU based SoCs,
+> the power domain service is provided by SCU firmware, users don't have to care
+> too much about the HW internals. And according to SCU definition, each devices is
+> associated with a power domain, devices should treat it as a separate domain
+> and have to enable it before accessing HW. So one single global domain looks like
+> not exactly as SCU firmware defines. Not quite sure, but a bit feel like that....
+
+I don't agree with you here, sorry. As also pointed out by Rob
+earlier, in regards to the DT bindings. Simply put, I doubt the SoC
+deploys separate power rails/islands for each of the available
+devices. Instead, it seems like the SCU interface, allows its clients
+to controls "power" to each of the available *devices* - and not power
+domains.
+
+Anyway, we are debating how to implement this in software and not in DT. :-)
+
+That said, if you strongly feel that the short cut, about registering
+one genpd per device and thus suffer from the overhead it gives, is
+the best approach to start with, feel free to do that.
+
+Kind regards
+Uffe
