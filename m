@@ -1,33 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 31 Oct 2018 14:35:43 +0100
-Subject: [PATCH 2/2 v2] mfd: ab8500-core: Return zero in
- get_register_interruptible()
-In-Reply-To: <20181025124344.xw3phqnvrwq2nj7g@kili.mountain>
-References: <20181025101037.GR4939@dell>
- <20181025124344.xw3phqnvrwq2nj7g@kili.mountain>
-Message-ID: <CACRpkdYcmse-dRkDW-6Fvx9ojwj3XXWBWdOM-FXyWYyP11cj9w@mail.gmail.com>
+Date: Wed, 31 Oct 2018 14:38:56 +0100
+Subject: [PATCH v3 0/7] Standardize onboard LED support for 96Boards
+In-Reply-To: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <CACRpkdYThcGjdV9Ezs4qMr8K6_jH40SDUgt0Tps8d+_4sSESyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 2:44 PM Dan Carpenter <dan.carpenter@oracle.com> wrote:
+On Mon, Oct 29, 2018 at 10:43 AM Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
 
-> This function is supposed to return zero on success or negative error
-> codes on error.  Unfortunately, there is a bug so it sometimes returns
-> non-zero, positive numbers on success.
+> This patchset standardizes the onboard LEDs on 96Boards by maintaining
+> common labels and triggers as below:
 >
-> I noticed this bug during review and I can't test it.  It does appear
-> that the return is sometimes propogated back to _regmap_read() where all
-> non-zero returns are treated as failure so this may affect run time.
+> green:user1  default-trigger: heartbeat
+> green:user2  default-trigger: mmc0/disk-activity (onboard-storage)
+> green:user3  default-trigger: mmc1 (SD card)
+> green:user4  default-trigger: none, panic-indicator
+> yellow:wlan  default-trigger: phy0tx
+> blue:bt      default-trigger: hci0-power
 >
-> Fixes: 47c1697508f2 ("mfd: Align ab8500 with the abx500 interface")
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> ---
-> v2: In v1, I introduced an new error path and forgot to drop the lock.
+> This standardization is required to provide a common behaviour of LEDs
+> across all mainline supported 96Boards and also making it easier to
+> control it using an userspace library like MRAA.
+>
+> For Rock960 and Ficus boards, the LED support is added in this patchset.
+> Rest of the boards are converted to adopt the standard.
+>
+> Note: Since there is no UFS trigger available for now, user2 LED trigger
+> is set to none on HiKey960.
 
+This series:
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-I've got some cleanup work to do with this driver.
-Getting to it.
+It makes a lot of sense to try to unify the userspace ABI so we get
+some kind of order here instead of trying to counteract it with
+per-device kludges in userspace. It definately makes things better!
 
 Yours,
 Linus Walleij
