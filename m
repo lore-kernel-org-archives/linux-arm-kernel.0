@@ -1,143 +1,117 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 1 Nov 2018 09:32:40 +0000
-Subject: [PATCH v6 18/18] kvm: arm64: Allow tuning the physical address
- size for VM
-In-Reply-To: <20181101083622.GH12057@e113682-lin.lund.arm.com>
-References: <20180926163258.20218-1-suzuki.poulose@arm.com>
- <20180926163258.20218-19-suzuki.poulose@arm.com>
- <20181031142216.GD12057@e113682-lin.lund.arm.com>
- <ebfbc17a-5954-7a67-0ae4-b911ba5f8b9e@arm.com>
- <20181101083622.GH12057@e113682-lin.lund.arm.com>
-Message-ID: <6d251664-7331-bc24-2dd9-14a663d65bc2@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 1 Nov 2018 17:35:52 +0800
+Subject: [PATCH 5/7] arm64: allwinner: h6: Add RTC node
+In-Reply-To: <CAMty3ZBJiDrr0hqgzMMQ76R7=+agsHyjYQGTrebH=_q5Ax2xXA@mail.gmail.com>
+References: <20181031183634.29640-1-jagan@amarulasolutions.com>
+ <20181031183634.29640-5-jagan@amarulasolutions.com>
+ <CAGb2v64fnpCh_rCy-9m8xgXmAZQGab1==f7cr332QfgueyuRNw@mail.gmail.com>
+ <CAMty3ZAW5KndyJj81obK49MKczdbk4SoUncmiiE_OhH1g7qFUA@mail.gmail.com>
+ <CAGb2v67WZmG7qPqf_UoR4v=Zm2AbS8pcOQsWJPRVHr-i2NvRPA@mail.gmail.com>
+ <CAMty3ZBJiDrr0hqgzMMQ76R7=+agsHyjYQGTrebH=_q5Ax2xXA@mail.gmail.com>
+Message-ID: <CAGb2v64T0zEmyELmJ5X-isohV6FWb9C5N-h+w-s16vjth2dMJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 1, 2018 at 5:02 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Thu, Nov 1, 2018 at 1:23 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> > On Thu, Nov 1, 2018 at 3:33 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > >
+> > > On Thu, Nov 1, 2018 at 8:25 AM Chen-Yu Tsai <wens@csie.org> wrote:
+> > > >
+> > > > On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > > > >
+> > > > > From: Jagan Teki <jagan@openedev.com>
+> > > > >
+> > > > > RTC controller is similar to A31, so use the same compatible
+> > > > > for H6 and update interrupt numbers as per manual.
+> > > >
+> > > > No. Unfortunately they are not that compatible. The A31 does not have
+> > > > the RTC clock output. So everyone got it wrong. :( Plus the clock rate
+> > > > of the internal RC oscillator varies between SoCs. I'm working on a
+> > > > series of patches to correct this. Stay tuned.
+> > >
+> > > 4 bit, EXT_LOSC_EN of LOSC_CTRL_REG (0x00) seem available in H6. I can
+> > > see external clock working with WIFI for A31 compatible.
+> >
+> > That bit turns on the external crystal, i.e. X32KIN and X32KOUT pins.
+>
+> This is what I confused, the same signal pins available there in A64
+> schematics but no bit to enable external OSC in LOSC_CTRL_REG.
+>
+> But the X32KFOUT pin which is 0x60 , BIT(0) is enabled in A64, H6 w/o
+> this LOSC_CTRL_REG which I don't know exactly or may be feed it by
+> default not sure.
+>
+> >
+> > I'm talking about the X32KFOUT pin, which feeds the WiFi module the
+> > LPO clock in typical Allwinner designs. That is controlled by register
+> > 0x60, and is not present on the A31. That is the clock you say is
+> > working. You have the two confused.
+> >
+> > The clock tree looks like this:
+> >
+> > IOSC -----------------------------\
+> >                                    SUN6I_LOSC_CTRL_EXT_OSC mux ---->
+> > LOSC --> (to CCU)
+> > 32k crystal --> EXT_LOSC_EN gate -/                              \
+> >                                                                   \
+> >                                                                   /
+> >       (to WiFi) <-- X32KFOUT pin <-- LOSC_OUT_GATING_EN gate <---/
+>
+> Yes, I understand this. But for A33, A64 there is no EXT_LOSC_EN which
+> is directly feed to WIFI from LOSC as per manual but from schematic
+> signals X32KI and X32KO were present.
 
+No. Read the schematic again. CAREFULLY. The pin that feeds the WiFi module
+is called X32KFOUT. With an "F". The A33 datasheet says the pin is "Clock
+Output of LOSC (X32KFOUT can be gating)". The A64 datasheet may not mention
+the output can be gated, but the LOSC_OUT_GATING_REG register is aptly named
+"LOSC Output Gating Register".
 
-On 01/11/18 08:36, Christoffer Dall wrote:
-> On Wed, Oct 31, 2018 at 05:55:13PM +0000, Suzuki K Poulose wrote:
->> Hi Christoffer,
->>
->> On 31/10/18 14:22, Christoffer Dall wrote:
->>> On Wed, Sep 26, 2018 at 05:32:54PM +0100, Suzuki K Poulose wrote:
->>>> Allow specifying the physical address size limit for a new
->>>> VM via the kvm_type argument for the KVM_CREATE_VM ioctl. This
->>>> allows us to finalise the stage2 page table as early as possible
->>>> and hence perform the right checks on the memory slots
->>>> without complication. The size is encoded as Log2(PA_Size) in
->>>> bits[7:0] of the type field. For backward compatibility the
->>>> value 0 is reserved and implies 40bits. Also, lift the limit
->>>> of the IPA to host limit and allow lower IPA sizes (e.g, 32).
->>>>
->>>> The userspace could check the extension KVM_CAP_ARM_VM_IPA_SIZE
->>>> for the availability of this feature. The cap check returns the
->>>> maximum limit for the physical address shift supported by the host.
->>>>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Christoffer Dall <cdall@kernel.org>
->>>> Cc: Peter Maydell <peter.maydell@linaro.org>
->>>> Cc: Paolo Bonzini <pbonzini@redhat.com>
->>>> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> ---
->>
->>>> @@ -192,17 +195,23 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
->>>>   	u32 parange, phys_shift;
->>>>   	u8 lvls;
->>>> -	if (type)
->>>> +	if (type & ~KVM_VM_TYPE_ARM_IPA_SIZE_MASK)
->>>>   		return -EINVAL;
->>>> +	phys_shift = KVM_VM_TYPE_ARM_IPA_SIZE(type);
->>>> +	if (phys_shift) {
->>>> +		if (phys_shift > kvm_ipa_limit ||
->>>> +		    phys_shift < 32)
->>>> +			return -EINVAL;
->>>
->>> I am concerned here that if we allow the user to set the phys_size to 32
->>> bits, then we end up with 2 levels of stage2 page tables, which means
->>> that the size of a stage2 pmd mapping becomes the size of a stage2 pgd
->>> mapping, yet we can still decide in user_mem_abort() that a stage2 fault
->>> is backed by PMD size mappings on the host, and attempt a huge mapping
->>> at stage2, which then becomes a PGD level block map, I think.
->>
->> Yes, you're right. We will have a pgd-level block map in that case.
->> This should work transparently as PMD at stage2 is folded into PGD and
->> we endup marking the PGD entry as huge and the stage2 accessors deal
->> with it appropriately. This is similar to having a PMD huge page with
->> 64K + 42bit VA (2 level page table) on stage1.
->>
->>>
->>> Is this handled somehow?  If so, how?
->>
->> We don't prevent this. We have a guaranteed minimum number of levels
->> at 2, which implies you can map a stage1 PMD huge page at stage2.
->> I acknowledge that the Linux naming convention does cause some confusion
->> for a "level" at stage1 and stage2 levels. But if you think of it
->> from the hardware level (and like the ARM ARM defines it , Level 0-3),
->> it is much simpler. i.e, you can map a huge page at level N in stage1
->> into stage2 if you have that level N. It doesn't matter if stage2 has
->> more or less number of levels than stage1, as long as stage2 table can
->> deal with it.
->>
-> 
-> That is indeed a good way to reason about it.
-> 
->>>
->>> I can't see user_mem_abort() being modified to explicitly handle this
->>> in your code, but perhaps the stage2_set_pmd_huge() call ends up
->>> actually mapping at the stage2 pte level, but I can't tell that it does.
->>
->> The stage2_set_pmd_huge() installs it at the PGD (level 2, which would
->> have been PMD if we had levels > 2) slot.
->>
->> pmd = stage2_get_pmd(addr)
->>         \-> pud = stage2_get_pud(addr)
->>               \-> pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->>               \-> (we have stage2_pgd_none(x) = 0 and
->>               \-> stage2_pud_offset(pgd, addr) = pgd
->>               \->returns (kvm->arch.pgd + stage2_pgd_index(addr);
->>         \->  stage_pud_none(x) = 0 & stage2_pmd_offset(pud, addr) = pud
->>         \->  returns pud (kvm->arch.pgd + stage2_pgd_index(addr))
->>
->> and we install the PMD huge mapping at the location.
->>
->>> In any case, I think user_mem_abort() should give up on pmd/pud huge
->>> mappings if the size mapped by the stage2/stage1 pmd/pud levels don't
->>> line up.  What do you think?
->>
->> Does it matter ? Personally I don't think it matters much as long as we
->> are able to map the "huge" page at stage1 in the stage2 as huge, even if
->> the stage2 has lesser levels and manage it well. Given that PMD huge
->> pages are quite common, it would be good to exploit it when we can.
-> 
-> What I couldn't convince myself of was whether having 2 levels at stage2
-> implied the entry level block mapping being of the same size as the
+And see below about the EXT_LOSC_EN bit. You are confusing input to the RTC
+module vs output from the RTC module. All crystals have an IN and an OUT
+connection. It's just the way they work.
 
-The point worth noting is, PMD (in ARM ARM terms) is always Level 2, 
-irrespective of whether it is also PGD(the entry level). So as long as
-we deal with PMD or PUD (and not PGD which varies) and make sure you
-have sufficient number of levels we are fine.
+> > The bottom part does not exist in the A31. Meanwhile we've been claiming that
+> > all later RTC modules that actually have that part are compatible with the A31.
+> > Also the IOSC part has different clock rates for different chips.
+> >
+> > Do you see the problem?
+>
+> From external crystal point of view, between A33, A64 vs H6 I only see
+> the difference in EXT_LOSC_EN external oscillator enable bit only
+> available in H6 manual.
 
-For PMD it is guaranteed on all architectures and we do that explicitly
-for stage2 in arm64 KVM. Similarly for PUD we need to make sure we have
-3 levels to use a huge page or else fallback to splitting the pages.
+You are focusing on the wrong thing. From the driver's point of view,
+we simply don't care about this bit. It is by default on. We might want
+to force enable it if some broken bootloader turns it off, but that is
+besides the point here. And on all the other SoCs, the absence of this
+bit means that the external crystal will always be on.
 
-> stage1 block mapping, but given your explanation above, I think that's
-> fine.
-> 
->>
->> On the other hand, for stage2 PUD we are checking if the stage2 has a
->> PUD level (kvm_has_stage2_pud()). May be we should relax it just like
->> we do for PMD to check (kvm_stage2_levels > 2).
->>
-> 
-> Depends on how the code ends up looking like I suppose, but the more
-> symmetry we can have between the approach for host PMD and host PUD and
-> host PTE mappings, the better.
+Furthermore, this bit concerns the "input" from the crystal to the RTC.
+What I'm concerned about, and what you should be concerned about, because
+that's what you're using, is the LOSC_OUT_GATING_EN bit. As mentioned this
+does not exist on the A31.
 
-Sure. It is quite easy to confuse ourselves even later when we look at
-it. We could put in a big fat comment explaining this to avoid
-scratching our heads later.
+>
+> Regarding, rtc-sun6i. we can manage the external clock stuff via
+> "clock-output-names" with rtc->ext_losc and mentioning external
+> oscillator outputs on DTSI. since A31, don't have external clock to
+> wifi then we can skip those properties.
+>
+> What do you think?
 
-Cheers
-Suzuki
+That's not correct. On the A31, the RTC's LOSC still feeds the CCU,
+so output index 0 is always valid. Output index 1 on the A31 is invalid
+because it simply doesn't have this in the hardware. Furthermore, you're
+still not dealing with the fact that one A23/A33 the IOSC is 600~700 kHZ,
+on the A64/H3/H5/H6 it is 16 MHz, and on the V3/V3s it is 32 kHz. The
+first two cases also have prescalers to divide the clock rate down to
+around 32 kHz. All these hardware details need to be tied to new compatible
+strings, so that the driver knows about them and can handle them if needed.
+What you're describing is very fragile and pretty much a hack. We already
+have enough of those.
+
+ChenYu
