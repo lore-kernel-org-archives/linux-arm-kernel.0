@@ -1,40 +1,91 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 1 Nov 2018 11:10:48 +0100
-Subject: kvm-unit-tests gicv2 cases fail
-In-Reply-To: <CAD8of+q29DrQa4Ay6karXC19vXzX++2T8FR-V1SAjGuO0ejYhQ@mail.gmail.com>
-References: <CAD8of+q29DrQa4Ay6karXC19vXzX++2T8FR-V1SAjGuO0ejYhQ@mail.gmail.com>
-Message-ID: <20181101101048.GJ12057@e113682-lin.lund.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu,  1 Nov 2018 11:15:58 +0100
+Subject: [PATCH v2 2/2] ARM: cpuidle: Convert to use
+ cpuidle_register|unregister()
+Message-ID: <20181101101558.3035-1-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2018 at 05:17:57PM +0800, Li Zhang wrote:
-> Hi,
-> 
-> I run kvm-units-test on ARM server(QDF2400), but gicv2-ipi,
-> gicv2-active cases fail.
+The only reason that remains, to why the ARM cpuidle driver calls
+cpuidle_register_driver(), is to avoid printing an error message in case
+another driver already have been registered for the CPU. This seems a bit
+silly, but more importantly, if that is a common scenario, perhaps we
+should change cpuidle_register() accordingly instead.
 
-I didn't think QDF2400 has GICv2 on GICv3 support?
+In either case, let's consolidate the code, by converting to use
+cpuidle_register|unregister(), which also avoids the unnecessary allocation
+of the struct cpuidle_device.
 
-Do the test cases fail or are they reported as skipped?
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
 
-> By debuging kvm-unit-tests source code, I found that interrupt is not
-> handled. do_handle_exception is not called.
-> 
-> By looking into KVM source code, it has GICv2 emulation on GICv3 support.
-> I've tried a lot of kernel versions, from v4.12~v4.19 in mainline,
-> these cases always fail.
-> Is it possible that hardware/software disables this?
-> 
-> It seems that GICv2 is a little old for ARM server, I am confused when
-> we can use it.
-> Do we need to care about these cases?
-> 
+Changes in v2:
+	- Fixup spelling in changelog.
+	- Added Lorenzo's reviewed-by tag.
 
-I don't think you need to care.  I believe Marc has run the
-GICv2-on-GICv3 tests on his supported platforms with recent
-kvm-unit-tests and other have reported succes as well.
+---
+ drivers/cpuidle/cpuidle-arm.c | 30 +++---------------------------
+ 1 file changed, 3 insertions(+), 27 deletions(-)
 
-
-Thanks,
-
-    Christoffer
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index df564d783216..3a407a3ef22b 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -82,7 +82,6 @@ static int __init arm_idle_init_cpu(int cpu)
+ {
+ 	int ret;
+ 	struct cpuidle_driver *drv;
+-	struct cpuidle_device *dev;
+ 
+ 	drv = kmemdup(&arm_idle_driver, sizeof(*drv), GFP_KERNEL);
+ 	if (!drv)
+@@ -119,33 +118,12 @@ static int __init arm_idle_init_cpu(int cpu)
+ 		goto out_kfree_drv;
+ 	}
+ 
+-	ret = cpuidle_register_driver(drv);
+-	if (ret) {
+-		if (ret != -EBUSY)
+-			pr_err("Failed to register cpuidle driver\n");
++	ret = cpuidle_register(drv, NULL);
++	if (ret)
+ 		goto out_kfree_drv;
+-	}
+-
+-	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+-	if (!dev) {
+-		ret = -ENOMEM;
+-		goto out_unregister_drv;
+-	}
+-	dev->cpu = cpu;
+-
+-	ret = cpuidle_register_device(dev);
+-	if (ret) {
+-		pr_err("Failed to register cpuidle device for CPU %d\n",
+-		       cpu);
+-		goto out_kfree_dev;
+-	}
+ 
+ 	return 0;
+ 
+-out_kfree_dev:
+-	kfree(dev);
+-out_unregister_drv:
+-	cpuidle_unregister_driver(drv);
+ out_kfree_drv:
+ 	kfree(drv);
+ 	return ret;
+@@ -176,9 +154,7 @@ static int __init arm_idle_init(void)
+ 	while (--cpu >= 0) {
+ 		dev = per_cpu(cpuidle_devices, cpu);
+ 		drv = cpuidle_get_cpu_driver(dev);
+-		cpuidle_unregister_device(dev);
+-		cpuidle_unregister_driver(drv);
+-		kfree(dev);
++		cpuidle_unregister(drv);
+ 		kfree(drv);
+ 	}
+ 
+-- 
+2.17.1
