@@ -1,10 +1,11 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 1 Nov 2018 10:55:33 +0800
-Subject: [PATCH 5/7] arm64: allwinner: h6: Add RTC node
-In-Reply-To: <20181031183634.29640-5-jagan@amarulasolutions.com>
+Date: Thu, 1 Nov 2018 10:57:58 +0800
+Subject: [PATCH 6/7] arm64: allwinner: h6: Add RTC clock to phandle 32kHz
+ external oscillator
+In-Reply-To: <20181031183634.29640-6-jagan@amarulasolutions.com>
 References: <20181031183634.29640-1-jagan@amarulasolutions.com>
- <20181031183634.29640-5-jagan@amarulasolutions.com>
-Message-ID: <CAGb2v64fnpCh_rCy-9m8xgXmAZQGab1==f7cr332QfgueyuRNw@mail.gmail.com>
+ <20181031183634.29640-6-jagan@amarulasolutions.com>
+Message-ID: <CAGb2v67jZvZx38Y2_k37raQ85D7aCpvmEBqgU_Dqv6qET1VZhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,12 +13,42 @@ On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
 >
 > From: Jagan Teki <jagan@openedev.com>
 >
-> RTC controller is similar to A31, so use the same compatible
-> for H6 and update interrupt numbers as per manual.
+> Outside of SOC few chips need external clock source through RTC example
+> Wifi chip. So H6 RTC clock node need to phandle 32kHz external oscillator
+> like A64 RTC.
+>
+> Add support for it.
 
-No. Unfortunately they are not that compatible. The A31 does not have
-the RTC clock output. So everyone got it wrong. :( Plus the clock rate
-of the internal RC oscillator varies between SoCs. I'm working on a
-series of patches to correct this. Stay tuned.
+This should be part of the previous patch.
+
+> prefix rtc- with clock-output-names defined in dt-binding to avoid
+> confusion with existing osc32k name.
+
+Unfortunately we have a not so documented requirement that the actual
+LOSC be named "osc32k", which is why you see all the previous dtsi files
+with RTC clock outputs having the external 32k crystal named "ext-osc32k".
 
 ChenYu
+
+> Signed-off-by: Jagan Teki <jagan@openedev.com>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> index c8d2fe76da7e..028ec286aa0a 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> @@ -271,6 +271,9 @@
+>                         reg = <0x7000000 0x400>;
+>                         interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
+>                                      <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
+> +                       clocks = <&osc32k>;
+> +                       #clock-cells = <1>;
+>                 };
+>
+>                 r_ccu: clock at 7010000 {
+> --
+> 2.18.0.321.gffc6fa0e3
+>
