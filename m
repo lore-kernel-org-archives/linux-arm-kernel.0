@@ -1,82 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 Nov 2018 11:15:51 +0000
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <f7b6d570-a8f4-6f8b-7995-eac69fef8fa1@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
- <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
- <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
- <86va5myz7t.wl-marc.zyngier@arm.com>
- <81136b74-4b45-f44b-0168-23d191a4fb5e@ti.com>
- <49029695-79a0-141b-a9da-9764cb0ed60f@ti.com>
- <86bm792mv2.wl-marc.zyngier@arm.com>
- <f7b6d570-a8f4-6f8b-7995-eac69fef8fa1@ti.com>
-Message-ID: <8636slf3q0.wl-marc.zyngier@arm.com>
+From: wangyufen@huawei.com (Wang Yufen)
+Date: Thu, 1 Nov 2018 19:20:49 +0800
+Subject: [PATCH] ARM:kexec:offline panic_smp_self_stop CPU
+Message-ID: <1541071249-15660-1-git-send-email-wangyufen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+From: Yufen Wang <wangyufen@huawei.com>
 
-On Thu, 01 Nov 2018 09:14:15 +0000,
-Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> 
-> Hi Marc,
-> 
-> On 11/1/18 11:00 AM, Marc Zyngier wrote:
-> > On Thu, 01 Nov 2018 07:55:12 +0000,
-> > Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> >>
-> >> Lokesh,
-> >>
-> >> On 10/29/18 3:04 PM, Lokesh Vutla wrote:
-> >>>>> With the above information, linux should send a message to
-> >>>>> system-controller using TISCI protocol. After policing the given
-> >>>>> information, system-controller does the following:
-> >>>>> - Attaches the interrupt(INTA input) to the device resource index
-> >>>>> - Muxes the interrupt(INTA input) to corresponding vint(INTA output)
-> >>>>> - Muxes the vint(INTR input) to GIC irq(INTR output).
-> >>>>
-> >>>> Isn't there a 1:1 mapping between *used* INTR inputs and outputs?
-> >>>> Since INTR is a router, there is no real muxing. I assume that the
-> >>>> third point above is just a copy-paste error.
-> >>>
-> >>> Right, my bad. INTR is just a router and no read muxing.
-> >>
-> >> INTR can mux M interrupt inputs to N interrupt outputs.
-> >> One selects which interrupt input is outputted on the given interrupt
-> >> output.
-> >> It is perfectly valid (but not sane) to select the same interrupt input
-> >> to be routed to _all_ interrupt output for example.
-> >>
-> >> Not sure if we are going to use this for anything but 1:1 mapping, but
-> >> might worth keeping in mind...
-> > 
-> > It's not obvious how you'd use this "feature". Interrupt replicator,
-> > should one of the output be tied to another part of the system? Or
-> > maybe that's just the result of reusing some generic block...
-> 
-> I think the intention is that different virtualized OS would got
-> assigned with different range of NAVSS GIC irqs and there might be a
-> case when more than one virtualized environment need to get a GIC irq
-> for the same virt. Timer interrupts comes to mind first, but there could
-> be other cases when the same virt should trigger on multiple GIC line.
+In case panic() and panic() called at the same time on different CPUS.
+For example:
+CPU 0:
+  panic()
+     __crash_kexec
+       machine_crash_shutdown
+         crash_smp_send_stop
+       machine_kexec
+         BUG_ON(num_online_cpus() > 1);
 
-That would be strange. SPIs seen by a guest are always virtual, and
-the hypervisor must handle the physical interrupt to inject the
-virtual counterpart. By duplicating the interrupt, you double the
-overhead at the hypervisor level. It would be much cheaper to just
-inject the interrupt twice.
+CPU 1:
+  panic()
+    local_irq_disable
+    panic_smp_self_stop
 
-On top of that, this only works for edge interrupts, and breaks badly
-for level signalling: who talks to the device to lower the line?
+If CPU 1 calls panic_smp_self_stop() before crash_smp_send_stop(), kdump
+fails. CPU1 can't receive the ipi irq, CPU1 will be always online.
+I changed BUG_ON to WARN in kexec crash as arm64 does, kdump also fails.
+Because num_online_cpus() > 1, can't disable the L2 in _soft_restart.
+To fix this problem, this patch split out the panic_smp_self_stop()
+and add set_cpu_online(smp_processor_id(), false).
 
-Thanks,
+Signed-off-by: Yufen Wang <wangyufen@huawei.com>
+---
+ arch/arm/kernel/setup.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-	M.
-
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 31940bd..151861f 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -602,6 +602,16 @@ static void __init smp_build_mpidr_hash(void)
+ }
+ #endif
+ 
++void panic_smp_self_stop(void)
++{
++	printk(KERN_DEBUG "CPU %u will stop doing anything useful since another CPU has paniced\n",
++			smp_processor_id());
++	set_cpu_online(smp_processor_id(), false);
++	while (1)
++		cpu_relax();
++
++}
++
+ static void __init setup_processor(void)
+ {
+ 	struct proc_info_list *list;
 -- 
-Jazz is not dead, it just smell funny.
+2.7.4
