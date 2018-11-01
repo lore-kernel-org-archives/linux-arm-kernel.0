@@ -1,31 +1,76 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 1 Nov 2018 12:43:01 +0530
-Subject: [PATCH 2/7] arm64: allwinner: h6: Add common orangepi nodes into
- dtsi
-In-Reply-To: <CAGb2v66ALW1EL5+buporX8cPjkfpNdwGJEVUrC9Xpcmt3-NX7g@mail.gmail.com>
-References: <20181031183634.29640-1-jagan@amarulasolutions.com>
- <20181031183634.29640-2-jagan@amarulasolutions.com>
- <CAGb2v66ALW1EL5+buporX8cPjkfpNdwGJEVUrC9Xpcmt3-NX7g@mail.gmail.com>
-Message-ID: <CAMty3ZCv9z=uALo-PShS-RegNt2cOwOHWE=6vsRVgPm9oOQ_Fw@mail.gmail.com>
+From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
+Date: Thu, 1 Nov 2018 09:17:25 +0200
+Subject: [PATCH v2 0/8] clk: clkdev: managed clk lookup and provider
+ registrations
+Message-ID: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 8:23 AM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> >
-> > Orangepi H6 boards, One Plus and Lite2 shares common
-> > nodes like axp805, uart, mmc0 etc and the common differences
-> > between them is Ethernet is available in One Plus where
-> > as Wifi, USB3, CSI port is available in Lite2.
->
-> You can claim this for pretty much all Allwinner boards, because they mostly
-> derive from the reference designs Allwinner's design houses put out. Yet we
-> don't do this for all of them. We do this for boards that are clearly derived
-> or extended from one another. One example would be the Orange Pi PC and PC Plus.
->
-> Do you have any evidence to suggest so? This is not about common device nodes,
-> but a common hardware design.
+Patch series adding managed clkdev and of_provider registrations
 
-I got this information from hardware schematics and from Steven (added
-in to list), he too claimed the same.
+Few clk drivers appear to be leaking clkdev lookup registrations at
+driver remove. The patch series adds devm versions of lookup
+registrations and cleans up few drivers. Driver clean-up patches have
+not been tested as I lack the HW. All testing and comments if
+driver/device removal is even possible for changed drivers is highly
+appreciated. If removal is not possible I will gladly drop the patches
+from series - although leaking lookups may serve as bad example for new
+developers =)
+
+Changed drivers are:
+clk-max77686, clk-s3c2410-dclk, clk-st, clk-hi655x, rk808, clk-twl6040
+and apcs-msm8916.
+
+New devm registration variants have been tested on BeagleBoneBlack
+using ROHM BD71837 PMIC driver.
+
+Same devm variants were earlier proposed together with BD71837/BD71847
+PMIC clk driver in this series:
+https://lore.kernel.org/linux-clk/cover.1535630942.git.matti.vaittinen at fi.rohmeurope.com/
+
+The BD71837/BD71847 work is currently pending for related MFD commits to
+get merged in clk-tree and the devm functions are now submitted in this
+series.
+
+Changelog v2
+Issue spotted by 0-Day test suite
+- Add a stub function 'devm_of_clk_add_parent_hw_provider' for no OF config.
+- patches 2-8 are unchanged.
+
+This patch series is based on clk-next
+
+---
+
+Matti Vaittinen (8):
+  clk: clkdev/of_clk - add managed lookup and provider registrations
+  clk: clk-max77686: Clean clkdev lookup leak and use devm
+  clk: clk-s3c2410-dclk: clean up clkdev lookup leak
+  clk: clk-st: avoid clkdev lookup leak at remove
+  clk: clk-hi655x: Free of_provider at remove
+  clk: rk808: use managed version of of_provider registration
+  clk: clk-twl6040: Free of_provider at remove
+  clk: apcs-msm8916: simplify probe cleanup by using devm
+
+ Documentation/driver-model/devres.txt  |   3 +
+ drivers/clk/clk-hi655x.c               |   4 +-
+ drivers/clk/clk-max77686.c             |  25 ++-----
+ drivers/clk/clk-rk808.c                |  15 +---
+ drivers/clk/clk-twl6040.c              |   5 +-
+ drivers/clk/clk.c                      |  28 ++++++--
+ drivers/clk/clkdev.c                   | 122 ++++++++++++++++++++++++++-------
+ drivers/clk/qcom/apcs-msm8916.c        |   5 +-
+ drivers/clk/samsung/clk-s3c2410-dclk.c |  15 ++--
+ drivers/clk/x86/clk-st.c               |   3 +-
+ include/linux/clk-provider.h           |  11 +++
+ include/linux/clkdev.h                 |   4 ++
+ 12 files changed, 158 insertions(+), 82 deletions(-)
+
+-- 
+2.14.3
+
+
+-- 
+Matti Vaittinen
+ROHM Semiconductors
+
+~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
