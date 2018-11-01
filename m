@@ -1,64 +1,63 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 1 Nov 2018 11:09:24 +0200
+Date: Thu, 1 Nov 2018 11:14:15 +0200
 Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
  Aggregator driver
-In-Reply-To: <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
+In-Reply-To: <86bm792mv2.wl-marc.zyngier@arm.com>
 References: <20181018154017.7112-1-lokeshvutla@ti.com>
  <20181018154017.7112-10-lokeshvutla@ti.com>
  <b20127dc-be43-3b00-9960-663738df0069@arm.com>
  <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
  <86va5ssrfm.wl-marc.zyngier@arm.com>
- <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
- <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
-Message-ID: <2a869e38-47c1-0f11-8f4e-176d0d895a45@ti.com>
+ <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
+ <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
+ <86va5myz7t.wl-marc.zyngier@arm.com>
+ <81136b74-4b45-f44b-0168-23d191a4fb5e@ti.com>
+ <49029695-79a0-141b-a9da-9764cb0ed60f@ti.com>
+ <86bm792mv2.wl-marc.zyngier@arm.com>
+Message-ID: <f7b6d570-a8f4-6f8b-7995-eac69fef8fa1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Marc,
 
-On 10/31/18 8:21 PM, Marc Zyngier wrote:
-> Well, I'm convinced that we do not want a networking driver to be tied
-> to an interrupt architecture, and that the two should be completely
-> independent. But that's my own opinion. I can only see two solutions
-> moving forward:
+On 11/1/18 11:00 AM, Marc Zyngier wrote:
+> On Thu, 01 Nov 2018 07:55:12 +0000,
+> Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+>>
+>> Lokesh,
+>>
+>> On 10/29/18 3:04 PM, Lokesh Vutla wrote:
+>>>>> With the above information, linux should send a message to
+>>>>> system-controller using TISCI protocol. After policing the given
+>>>>> information, system-controller does the following:
+>>>>> - Attaches the interrupt(INTA input) to the device resource index
+>>>>> - Muxes the interrupt(INTA input) to corresponding vint(INTA output)
+>>>>> - Muxes the vint(INTR input) to GIC irq(INTR output).
+>>>>
+>>>> Isn't there a 1:1 mapping between *used* INTR inputs and outputs?
+>>>> Since INTR is a router, there is no real muxing. I assume that the
+>>>> third point above is just a copy-paste error.
+>>>
+>>> Right, my bad. INTR is just a router and no read muxing.
+>>
+>> INTR can mux M interrupt inputs to N interrupt outputs.
+>> One selects which interrupt input is outputted on the given interrupt
+>> output.
+>> It is perfectly valid (but not sane) to select the same interrupt input
+>> to be routed to _all_ interrupt output for example.
+>>
+>> Not sure if we are going to use this for anything but 1:1 mapping, but
+>> might worth keeping in mind...
 > 
-> 1) You make the IA a real interrupt controller that exposes real
-> interrupts (one per event), and write your networking driver
-> independently of the underlying interrupt architecture.
-> 
-> 2) you make the IA an integral part of your network driver, not exposing
-> anything outside of it, and limiting the interactions with the IR
-> *through the standard IRQ API*. You duplicate this knowledge throughout
-> the other client drivers.
-> 
-> I believe that (2) would be a massive design mistake as it locks the
-> driver to a single of the HW (and potentially a single revision of the
-> firmware) while (1) gives you the required level of flexibility by
-> hiding the whole event "concept" at a single location.
-> 
-> Yes, (1) makes you rewrite your existing, out of tree drivers. Oh well...
+> It's not obvious how you'd use this "feature". Interrupt replicator,
+> should one of the output be tied to another part of the system? Or
+> maybe that's just the result of reusing some generic block...
 
-We need to have generic support for INTA within the NAVSS for Linux. The
-UDMA (also part of the NAVSS) is used as system DMA and for the
-DMAengine driver we need to have ability to handle the events from Rings
-and from the UDMA itself.
-
-Option 2 is not really an option as other components need to configure
-INTA to get interrupts from the Events flying within NAVSS.
-
-In the past with Keystone II we did have similar PacketDMA engine but it
-was dedicated to service networking and crypto. For all other
-peripherals we had EDMA as generic system DMA.
-
-With AM654 this is no longer the case as we no longer have EDMA and the
-NAVSS is tasked to service all peripherals, like networking and the ones
-we used to use EDMA.
-
-> 
-> Thanks,
-> 	
-> 	M.
-> 
+I think the intention is that different virtualized OS would got
+assigned with different range of NAVSS GIC irqs and there might be a
+case when more than one virtualized environment need to get a GIC irq
+for the same virt. Timer interrupts comes to mind first, but there could
+be other cases when the same virt should trigger on multiple GIC line.
 
 - Peter
 
