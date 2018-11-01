@@ -1,34 +1,24 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 1 Nov 2018 06:48:31 +0100
-Subject: [PATCH 6/9] PCI: consolidate PCI config entry in drivers/pci
-In-Reply-To: <CAK7LNASUArREw1AWUzcOoQCe5=4jyifbs+x2CdCK+qXJ+woAdw@mail.gmail.com>
-References: <20181019120952.32763-1-hch@lst.de>
- <20181019120952.32763-7-hch@lst.de>
- <20181019122228.GJ30658@n2100.armlinux.org.uk>
- <CAK7LNATZ8LagrTrTae_QCQbSuTW7_y6sDrdTHfTyONPrsYDs4A@mail.gmail.com>
- <CAK7LNASUArREw1AWUzcOoQCe5=4jyifbs+x2CdCK+qXJ+woAdw@mail.gmail.com>
-Message-ID: <20181101054831.GA4589@lst.de>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Thu, 1 Nov 2018 14:02:17 +0800
+Subject: add SPI driver support for mt8183 
+Message-ID: <1541052139-8845-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2018 at 01:05:26AM +0900, Masahiro Yamada wrote:
-> > How about letting CONFIG_ARM to select HAVE_PCI ?
-> >
-> 
-> 
-> I applied 1/9, 3/9, 4/9, 5/9.
-> (I think 2/9 should be squashed to 9/9)
-> 
-> As Russell pointed out, we need to avoid
-> the unmet dependency.
+>From 44b1c34bc19d9bfdc736664439c0530fbb2c75b8 Mon Sep 17 00:00:00 2001
+From: Leilk Liu <leilk.liu@mediatek.com>
+Date: Thu, 1 Nov 2018 11:48:20 +0800
+Subject: [PATCH 0/2] add SPI driver support for mt8183
 
-Yes, I think the HAVE_PCI is probably the nicest way, but we'll
-need to wait what Russell as the maintainer wants.
+This series are based on 4.19-rc1 and provide two patches to support mt8183 IC.
 
-> Are you planning to send
-> the updated version for 6/9 through - 9/9 ?
-> 
-> If so, could you please rebase 6/9
-> so that it is cleanly applicable ?
+Leilk Liu (2):
+  spi: mediatek: Add bindings for mediatek MT8183 soc platform
+  spi: mediatek: add spi support for mt8183 IC
 
-Will do once I find some time after rc1.
+ Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 1 +
+ drivers/spi/spi-mt65xx.c                             | 9 +++++++++
+ 2 files changed, 10 insertions(+)
+
+-- 
+2.19.1
