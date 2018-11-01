@@ -1,78 +1,93 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Nov 2018 11:34:30 +0000
-Subject: [PATCH] ARM:kexec:offline panic_smp_self_stop CPU
-In-Reply-To: <1541071249-15660-1-git-send-email-wangyufen@huawei.com>
-References: <1541071249-15660-1-git-send-email-wangyufen@huawei.com>
-Message-ID: <20181101113430.GO30658@n2100.armlinux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 1 Nov 2018 11:38:31 +0000
+Subject: [PATCH 1/2] ARM: cpuidle: Don't register the driver when
+ back-end init returns -ENXIO
+In-Reply-To: <CAPDyKFp57pZwTzAPGkeLGj+okYvkOx_i7zZcdphJsLFeKd_m+w@mail.gmail.com>
+References: <20181026144843.3028-1-ulf.hansson@linaro.org>
+ <20181029174456.GA9687@e107981-ln.cambridge.arm.com>
+ <CAPDyKFp57pZwTzAPGkeLGj+okYvkOx_i7zZcdphJsLFeKd_m+w@mail.gmail.com>
+Message-ID: <20181101113831.GB6608@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2018 at 07:20:49PM +0800, Wang Yufen wrote:
-> From: Yufen Wang <wangyufen@huawei.com>
+On Tue, Oct 30, 2018 at 11:24:49AM +0100, Ulf Hansson wrote:
+> On 29 October 2018 at 18:45, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Fri, Oct 26, 2018 at 04:48:43PM +0200, Ulf Hansson wrote:
+> >> There's no point to register the cpuidle driver for the current CPU, when
+> >> the initialization of the arch specific back-end data fails by returning
+> >> -ENXIO.
+> >>
+> >> Instead, let's re-order the sequence to its original flow, by first trying
+> >> to initialize the back-end part and then act accordingly on the returned
+> >> error code. Additionally, let's print the error message, no matter of what
+> >> error code that was returned.
+> >>
+> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >> ---
+> >>
+> >> Note, as far as I can tell it's only qcom-spm that may return -ENXIO, which also
+> >> was original reason to why this error path was invented.
+> >>
+> >> Unfurtunate I don't have a qcom spm platfrom at hand, however I manually tried
+> >> this by hacking the PSCI driver to return -ENXIO for some CPUs. So I assume it
+> >> should then also work for qcom spm.
+> >>
+> >> ---
+> >>  drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
+> >>  1 file changed, 10 insertions(+), 12 deletions(-)
+> >>
+> >> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> >> index 073557f433eb..df564d783216 100644
+> >> --- a/drivers/cpuidle/cpuidle-arm.c
+> >> +++ b/drivers/cpuidle/cpuidle-arm.c
+> >> @@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
+> >>               goto out_kfree_drv;
+> >>       }
+> >>
+> >> -     ret = cpuidle_register_driver(drv);
+> >> -     if (ret) {
+> >> -             if (ret != -EBUSY)
+> >> -                     pr_err("Failed to register cpuidle driver\n");
+> >> -             goto out_kfree_drv;
+> >> -     }
+> >> -
+> >>       /*
+> >>        * Call arch CPU operations in order to initialize
+> >>        * idle states suspend back-end specific data
+> >> @@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
+> >>       ret = arm_cpuidle_init(cpu);
+> >>
+> >>       /*
+> >> -      * Skip the cpuidle device initialization if the reported
+> >> +      * Allow the initialization to continue for other CPUs, if the reported
+> >>        * failure is a HW misconfiguration/breakage (-ENXIO).
+> >>        */
+> >> -     if (ret == -ENXIO)
+> >> -             return 0;
+> >
+> > I wonder whether moving the drv allocation and dt initialization after
+> > arm_cpuidle_init(cpu) would simplify the error path; the patch makes sense
+> > the error path is getting a bit hard to read - maybe we can simplify it.
 > 
-> In case panic() and panic() called at the same time on different CPUS.
-> For example:
-> CPU 0:
->   panic()
->      __crash_kexec
->        machine_crash_shutdown
->          crash_smp_send_stop
->        machine_kexec
->          BUG_ON(num_online_cpus() > 1);
+> Yep, exactly that is happening in patch 2/2. But as I also told
+> Daniel, I wanted to take small steps and keep one change per patch.
 > 
-> CPU 1:
->   panic()
->     local_irq_disable
->     panic_smp_self_stop
+> Does it make sense to keep this as is, when you have looked at patch 2/2?
 > 
-> If CPU 1 calls panic_smp_self_stop() before crash_smp_send_stop(), kdump
-> fails. CPU1 can't receive the ipi irq, CPU1 will be always online.
-> I changed BUG_ON to WARN in kexec crash as arm64 does, kdump also fails.
-> Because num_online_cpus() > 1, can't disable the L2 in _soft_restart.
-> To fix this problem, this patch split out the panic_smp_self_stop()
-> and add set_cpu_online(smp_processor_id(), false).
+> >
+> > I think, if you can single it out, it would be good to add a Fixes:
+> > tag too.
+> 
+> I can do that, but I am not sure it actually solves a problem, besides
+> improving the error path.
+> 
+> Or what did you have in mind?
 
-Thanks.
+I am not sure it counts as a bug but leaving the driver registered even if
+the following set-up fails is certainly not the expected behaviour.
 
-I think this may as well go into arch/arm/kernel/smp.c - it won't be
-required for single-CPU systems, since there aren't "other" CPUs.
+Hardly urgent but still a fix.
 
-It's probably also worth a comment above the function as to why we
-have this.
-
-> 
-> Signed-off-by: Yufen Wang <wangyufen@huawei.com>
-> ---
->  arch/arm/kernel/setup.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 31940bd..151861f 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -602,6 +602,16 @@ static void __init smp_build_mpidr_hash(void)
->  }
->  #endif
->  
-> +void panic_smp_self_stop(void)
-> +{
-> +	printk(KERN_DEBUG "CPU %u will stop doing anything useful since another CPU has paniced\n",
-> +			smp_processor_id());
-> +	set_cpu_online(smp_processor_id(), false);
-> +	while (1)
-> +		cpu_relax();
-> +
-> +}
-> +
->  static void __init setup_processor(void)
->  {
->  	struct proc_info_list *list;
-> -- 
-> 2.7.4
-> 
-> 
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Thanks,
+Lorenzo
