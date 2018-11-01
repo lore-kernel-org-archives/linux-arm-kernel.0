@@ -1,161 +1,84 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 1 Nov 2018 14:40:15 +0100
-Subject: [PATCH v9 6/8] KVM: arm64: Support handling access faults for
- PUD hugepages
-In-Reply-To: <20181031175745.18650-7-punit.agrawal@arm.com>
-References: <20181031175745.18650-1-punit.agrawal@arm.com>
- <20181031175745.18650-7-punit.agrawal@arm.com>
-Message-ID: <20181101134015.GM12057@e113682-lin.lund.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Nov 2018 13:56:41 +0000
+Subject: [PATCH] RFC: ARM: do not handle Spectre V2 on Vexpress CA9
+In-Reply-To: <20181101125406.8874-1-linus.walleij@linaro.org>
+References: <20181101125406.8874-1-linus.walleij@linaro.org>
+Message-ID: <42704270-8d9f-3f7a-9af1-4bd87f413815@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2018 at 05:57:43PM +0000, Punit Agrawal wrote:
-> In preparation for creating larger hugepages at Stage 2, extend the
-> access fault handling at Stage 2 to support PUD hugepages when
-> encountered.
+Hi Linus,
+
+On 01/11/2018 12:54, Linus Walleij wrote:
+> Since the introduction of the Spectre V2 fixes for ARMv7,
+> especially the BPIALL workaround, the Versatile Express CA9
+> with its fragile CA9 core tile simply doesn't boot for me
+> anymore.
 > 
-> Provide trivial helpers for arm32 to allow sharing of code.
+> If I turn on low level debugging the boot log stops short
+> at:
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> smp: Bringing up secondary CPUs ...
+> GIC: PPI13 is secure or misconfigured
+> CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+> CPU1: Spectre v2: using BPIALL workaround
+> GIC: PPI13 is secure or misconfigured
+> CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+> CPU1: Spectre v2: using BPIALL workaround
+> 
+> This is pretty much consistent behaviour, I think it managed
+> to boot at one point but these fixes are definately rubbing
+> this CPU the wrong way.
+> 
+> This (not elegant) workaround tries to work around it by
+> simply not applying any Spectre v2 fixes on the ARM
+> Vexpress CA9. My other A9 platforms seem to work fine
+> with the fixes, so this appears to be related to the
+> fragility of the core tile on this one reference design,
+> so maybe it would be acceptable to mitigate it like this.
+> 
+> I don't know how much this could be related to my particular
+> specimen, it would be great if others with this machine
+> could verify the problem.
+
+As far as I remember, the usual V2P_CA9 problem where the L2 cache locks 
+up for unfathomable reasons can come and go reasonably consistently 
+depending on the exact kernel configuration/version, and ultimately 
+seems like it might be more sensitive to the general shape and timing of 
+the early boot code than any particular feature. As such I'd be wary 
+that there might still be some other combinations of options which would 
+manage to boot with the mitigation left enabled, and others which won't 
+even if (or at worst *because*) we do skip it.
+
+Robin.
+
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
->  arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
->  arch/arm64/include/asm/pgtable.h |  6 ++++++
->  virt/kvm/arm/mmu.c               | 22 +++++++++++-----------
->  4 files changed, 33 insertions(+), 11 deletions(-)
+>   arch/arm/mm/proc-v7-bugs.c | 6 ++++++
+>   1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 839a619873d3..fea5e723e3ac 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -85,6 +85,9 @@ void kvm_clear_hyp_idmap(void);
->  #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
->  #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
->  
-> +#define kvm_pud_pfn(pud)	({ BUG(); 0; })
+> diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+> index 5544b82a2e7a..10b9eedc3b37 100644
+> --- a/arch/arm/mm/proc-v7-bugs.c
+> +++ b/arch/arm/mm/proc-v7-bugs.c
+> @@ -3,6 +3,7 @@
+>   #include <linux/kernel.h>
+>   #include <linux/psci.h>
+>   #include <linux/smp.h>
+> +#include <linux/of.h>
+>   
+>   #include <asm/cp15.h>
+>   #include <asm/cputype.h>
+> @@ -42,6 +43,11 @@ static void cpu_v7_spectre_init(void)
+>   	const char *spectre_v2_method = NULL;
+>   	int cpu = smp_processor_id();
+>   
+> +	if (of_machine_is_compatible("arm,vexpress,v2p-ca9")) {
+> +		pr_err("CPU%u: Spectre v2: can't handle mitigations, CPU is vulnerable\n", cpu);
+> +		return;
+> +	}
 > +
-> +
->  #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
->  
->  /*
-> @@ -108,6 +111,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
->  	return false;
->  }
->  
-> +static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
-> +{
-> +	BUG();
-
-nit: I think this should be WARN now.
-
-> +	return pud;
-> +}
-> +
->  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
->  {
->  	pte_val(pte) |= L_PTE_S2_RDWR;
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index c755b37b3f92..612032bbb428 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -187,6 +187,8 @@ void kvm_clear_hyp_idmap(void);
->  #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
->  #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
->  
-> +#define kvm_pud_pfn(pud)		pud_pfn(pud)
-> +
->  #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
->  
->  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
-> @@ -266,6 +268,11 @@ static inline bool kvm_s2pud_exec(pud_t *pudp)
->  	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
->  }
->  
-> +static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
-> +{
-> +	return pud_mkyoung(pud);
-> +}
-> +
->  #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
->  
->  #ifdef __PAGETABLE_PMD_FOLDED
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 50b1ef8584c0..f51e2271e6a3 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -314,6 +314,11 @@ static inline pte_t pud_pte(pud_t pud)
->  	return __pte(pud_val(pud));
->  }
->  
-> +static inline pud_t pte_pud(pte_t pte)
-> +{
-> +	return __pud(pte_val(pte));
-> +}
-> +
->  static inline pmd_t pud_pmd(pud_t pud)
->  {
->  	return __pmd(pud_val(pud));
-> @@ -381,6 +386,7 @@ static inline int pmd_protnone(pmd_t pmd)
->  #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
->  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
->  
-> +#define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
->  #define pud_write(pud)		pte_write(pud_pte(pud))
->  
->  #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 8e44dccd1b47..bd749601195f 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1698,6 +1698,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   */
->  static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
->  {
-> +	pud_t *pud;
->  	pmd_t *pmd;
->  	pte_t *pte;
->  	kvm_pfn_t pfn;
-> @@ -1707,24 +1708,23 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
->  
->  	spin_lock(&vcpu->kvm->mmu_lock);
->  
-> -	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
-> -	if (!pmd || pmd_none(*pmd))	/* Nothing there */
-> +	if (!stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte))
->  		goto out;
->  
-> -	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
-> +	if (pud) {		/* HugeTLB */
-> +		*pud = kvm_s2pud_mkyoung(*pud);
-> +		pfn = kvm_pud_pfn(*pud);
-> +		pfn_valid = true;
-> +	} else	if (pmd) {	/* THP, HugeTLB */
->  		*pmd = pmd_mkyoung(*pmd);
->  		pfn = pmd_pfn(*pmd);
->  		pfn_valid = true;
-> -		goto out;
-> +	} else {
-> +		*pte = pte_mkyoung(*pte);	/* Just a page... */
-> +		pfn = pte_pfn(*pte);
-> +		pfn_valid = true;
->  	}
->  
-> -	pte = pte_offset_kernel(pmd, fault_ipa);
-> -	if (pte_none(*pte))		/* Nothing there either */
-> -		goto out;
-> -
-> -	*pte = pte_mkyoung(*pte);	/* Just a page... */
-> -	pfn = pte_pfn(*pte);
-> -	pfn_valid = true;
->  out:
->  	spin_unlock(&vcpu->kvm->mmu_lock);
->  	if (pfn_valid)
-> -- 
-> 2.19.1
+>   	if (per_cpu(harden_branch_predictor_fn, cpu))
+>   		return;
+>   
 > 
