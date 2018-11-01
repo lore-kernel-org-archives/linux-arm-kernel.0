@@ -1,35 +1,21 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 1 Nov 2018 15:20:42 -0300
-Subject: [PATCH V3 07/10] ARM: imx: add initial support for imx7ulp
-In-Reply-To: <1540996688-23681-8-git-send-email-aisheng.dong@nxp.com>
+Date: Thu, 1 Nov 2018 15:21:20 -0300
+Subject: [PATCH V3 10/10] ARM: imx_v6_v7_defconfig: add imx7ulp support
+In-Reply-To: <1540996688-23681-11-git-send-email-aisheng.dong@nxp.com>
 References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
- <1540996688-23681-8-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CAOMZO5ACUBLBCNMAVJ=SCsFSQour1orLrHU6un=fFY0WYC+ZHw@mail.gmail.com>
+ <1540996688-23681-11-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CAOMZO5ASO7fHe6CeJF3G4Xkn7zUgMhpAGQ8BKobCwk3P3SOkOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2018 at 12:13 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
+On Wed, Oct 31, 2018 at 11:59 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+>
+> Select CONFIG_SOC_IMX7ULP by default.
+> Patch generated via make ARCH=arm savedefconfig
+>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-> +static void __init imx7ulp_init_machine(void)
-> +{
-> +       imx7ulp_pm_init();
-> +
-> +       mxc_set_cpu_type(MXC_CPU_IMX7ULP);
-> +       imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_1_0);
-
-Why do you hardcode it as revision 1.0?
-
-> +void __init imx7ulp_pm_init(void)
-> +{
-> +       struct device_node *np;
-> +       void __iomem *smc1_base;
-> +
-> +       np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
-> +       smc1_base = of_iomap(np, 0);
-> +       WARN_ON(!smc1_base);
-> +
-> +       /* Partial Stop mode 3 with system/bus clock enabled */
-> +       writel_relaxed(PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO,
-> +                      smc1_base + SMC_PMCTRL);
-
-You should call  iounmap(smc1__base); after smc1__base is no longer used.
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
