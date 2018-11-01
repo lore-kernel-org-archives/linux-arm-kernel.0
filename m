@@ -1,116 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Nov 2018 12:05:46 -0700
-Subject: [PATCH] ARM64: dma: move swiotlb helpers under CONFIG_IOMMU_DMA
-In-Reply-To: <5b524dcf-f78c-25af-6a70-9c85aa8e4a42@gmail.com>
-References: <20181101185340.32664-1-olof@lixom.net>
- <5b524dcf-f78c-25af-6a70-9c85aa8e4a42@gmail.com>
-Message-ID: <CAOesGMin7S+xhNq3OH9zNOawpo-nWPys3k4wy_n+7Voqxh_+aQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Nov 2018 14:32:14 -0500
+Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
+In-Reply-To: <20181009115713.GE6248@arm.com>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-14-robh@kernel.org>
+ <20181009115713.GE6248@arm.com>
+Message-ID: <CAL_JsqJh08wZCyGxg7HMbtKjOJTZKMoQcNOB_hPuSfJKQQK8JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 12:03 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+On Tue, Oct 9, 2018 at 6:57 AM Will Deacon <will.deacon@arm.com> wrote:
 >
-> On 11/1/18 11:53 AM, Olof Johansson wrote:
-> > Fixes the following tinyconfig warnings:
-> > arch/arm64/mm/dma-mapping.c:174:12: warning: '__swiotlb_mmap_pfn' defined but not used [-Wunused-function]
-> > arch/arm64/mm/dma-mapping.c:163:12: warning: '__swiotlb_get_sgtable_page' defined but not used [-Wunused-function]
+> Hi Rob,
+>
+> On Fri, Oct 05, 2018 at 11:58:25AM -0500, Rob Herring wrote:
+> > Convert ARM PMU binding to DT schema format using json-schema.
 > >
-> > Signed-off-by: Olof Johansson <olof@lixom.net>
->
-> Christoph sent an alternative solution here:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-October/609480.html
-
-Thanks!
-
-This was my bad, I searched for the symbols before posting but missed
-that thread. Either patch is fine with me.
-
-
--Olof
->
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
 > > ---
-> >  arch/arm64/mm/dma-mapping.c | 58 ++++++++++++++++++++++-----------------------
-> >  1 file changed, 29 insertions(+), 29 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> > index 3a703e5d4e32..62356c64e180 100644
-> > --- a/arch/arm64/mm/dma-mapping.c
-> > +++ b/arch/arm64/mm/dma-mapping.c
-> > @@ -160,35 +160,6 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
-> >       __dma_unmap_area(phys_to_virt(paddr), size, dir);
-> >  }
-> >
-> > -static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
-> > -                                   struct page *page, size_t size)
-> > -{
-> > -     int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
-> > -
-> > -     if (!ret)
-> > -             sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
-> > -
-> > -     return ret;
-> > -}
-> > -
-> > -static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
-> > -                           unsigned long pfn, size_t size)
-> > -{
-> > -     int ret = -ENXIO;
-> > -     unsigned long nr_vma_pages = vma_pages(vma);
-> > -     unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> > -     unsigned long off = vma->vm_pgoff;
-> > -
-> > -     if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
-> > -             ret = remap_pfn_range(vma, vma->vm_start,
-> > -                                   pfn + off,
-> > -                                   vma->vm_end - vma->vm_start,
-> > -                                   vma->vm_page_prot);
-> > -     }
-> > -
-> > -     return ret;
-> > -}
-> > -
-> >  static int __init atomic_pool_init(void)
-> >  {
-> >       pgprot_t prot = __pgprot(PROT_NORMAL_NC);
-> > @@ -358,6 +329,35 @@ arch_initcall(arm64_dma_init);
-> >  #include <linux/platform_device.h>
-> >  #include <linux/amba/bus.h>
-> >
-> > +static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
-> > +                                   struct page *page, size_t size)
-> > +{
-> > +     int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
-> > +
-> > +     if (!ret)
-> > +             sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
-> > +
-> > +     return ret;
-> > +}
-> > +
-> > +static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
-> > +                           unsigned long pfn, size_t size)
-> > +{
-> > +     int ret = -ENXIO;
-> > +     unsigned long nr_vma_pages = vma_pages(vma);
-> > +     unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> > +     unsigned long off = vma->vm_pgoff;
-> > +
-> > +     if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
-> > +             ret = remap_pfn_range(vma, vma->vm_start,
-> > +                                   pfn + off,
-> > +                                   vma->vm_end - vma->vm_start,
-> > +                                   vma->vm_page_prot);
-> > +     }
-> > +
-> > +     return ret;
-> > +}
-> > +
-> >  /* Thankfully, all cache ops are by VA so we can ignore phys here */
-> >  static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
-> >  {
-> >
+> >  Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
+> >  .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
+> >  2 files changed, 96 insertions(+), 70 deletions(-)
+> >  delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
+> >  create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
 >
+> [...]
 >
-> --
-> Florian
+> > -- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+> > -               interrupt (PPI) then 1 interrupt should be specified.
+>
+> [...]
+>
+> > +  interrupts:
+> > +    oneOf:
+> > +      - maxItems: 1
+> > +      - minItems: 2
+> > +        maxItems: 8
+> > +        description: 1 interrupt per core.
+> > +
+> > +  interrupts-extended:
+> > +    $ref: '#/properties/interrupts'
+>
+> This seems like a semantic different between the two representations, or am
+> I missing something here? Specifically, both the introduction of
+> interrupts-extended and also dropping any mention of using a single per-cpu
+> interrupt (the single combined case is no longer support by Linux; not sure
+> if you want to keep it in the binding).
+
+In regards to no support for the single combined interrupt, it looks
+like Marvell Armada SoCs at least (armada-375 is what I'm looking at)
+have only a single interrupt. Though the interrupt gets routed to MPIC
+which then has a GIC PPI. So it isn't supported or happens to work
+still since it is a PPI?
+
+Rob
