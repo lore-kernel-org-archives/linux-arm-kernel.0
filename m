@@ -1,39 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 1 Nov 2018 15:20:32 +0800
-Subject: [PATCH 2/7] arm64: allwinner: h6: Add common orangepi nodes into
- dtsi
-In-Reply-To: <CAMty3ZCv9z=uALo-PShS-RegNt2cOwOHWE=6vsRVgPm9oOQ_Fw@mail.gmail.com>
-References: <20181031183634.29640-1-jagan@amarulasolutions.com>
- <20181031183634.29640-2-jagan@amarulasolutions.com>
- <CAGb2v66ALW1EL5+buporX8cPjkfpNdwGJEVUrC9Xpcmt3-NX7g@mail.gmail.com>
- <CAMty3ZCv9z=uALo-PShS-RegNt2cOwOHWE=6vsRVgPm9oOQ_Fw@mail.gmail.com>
-Message-ID: <CAGb2v66v8akRfTHMCRYUZePwg9f9DdTVrX6G9-OOu1W_Sw6tOw@mail.gmail.com>
+From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
+Date: Thu, 1 Nov 2018 09:20:49 +0200
+Subject: [PATCH v2 6/8] clk: rk808: use managed version of of_provider
+ registration
+In-Reply-To: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
+References: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <1a8f1bf8bc4fd3871ba8c87b4ea656d1dc2e870c.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 3:13 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
->
-> On Thu, Nov 1, 2018 at 8:23 AM Chen-Yu Tsai <wens@csie.org> wrote:
-> >
-> > On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > >
-> > > Orangepi H6 boards, One Plus and Lite2 shares common
-> > > nodes like axp805, uart, mmc0 etc and the common differences
-> > > between them is Ethernet is available in One Plus where
-> > > as Wifi, USB3, CSI port is available in Lite2.
-> >
-> > You can claim this for pretty much all Allwinner boards, because they mostly
-> > derive from the reference designs Allwinner's design houses put out. Yet we
-> > don't do this for all of them. We do this for boards that are clearly derived
-> > or extended from one another. One example would be the Orange Pi PC and PC Plus.
-> >
-> > Do you have any evidence to suggest so? This is not about common device nodes,
-> > but a common hardware design.
->
-> I got this information from hardware schematics and from Steven (added
-> in to list), he too claimed the same.
+Simplify clean-up for rk808 by using managed version of of_provider
+registration.
 
-Good. Please add that to the commit message. The vendor's intentions are as
-important as the actual facts.
+Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+---
+ drivers/clk/clk-rk808.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-ChenYu
+diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
+index 6461f2820a5b..177340edaae5 100644
+--- a/drivers/clk/clk-rk808.c
++++ b/drivers/clk/clk-rk808.c
+@@ -138,23 +138,12 @@ static int rk808_clkout_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	return of_clk_add_hw_provider(node, of_clk_rk808_get, rk808_clkout);
+-}
+-
+-static int rk808_clkout_remove(struct platform_device *pdev)
+-{
+-	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
+-	struct i2c_client *client = rk808->i2c;
+-	struct device_node *node = client->dev.of_node;
+-
+-	of_clk_del_provider(node);
+-
+-	return 0;
++	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
++					of_clk_rk808_get, rk808_clkout);
+ }
+ 
+ static struct platform_driver rk808_clkout_driver = {
+ 	.probe = rk808_clkout_probe,
+-	.remove = rk808_clkout_remove,
+ 	.driver		= {
+ 		.name	= "rk808-clkout",
+ 	},
+-- 
+2.14.3
