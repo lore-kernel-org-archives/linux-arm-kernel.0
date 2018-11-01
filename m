@@ -1,73 +1,104 @@
-From: john.garry@huawei.com (John Garry)
-Date: Thu, 1 Nov 2018 11:39:51 +0000
-Subject: [PATCH] arm64/numa: Add more vetting in numa_set_distance()
-In-Reply-To: <20181101112743.GB31099@arm.com>
-References: <1540562267-101152-1-git-send-email-john.garry@huawei.com>
- <20181029112504.GF14127@arm.com>
- <925009c6-226d-213f-dbcb-68b772d80a18@huawei.com>
- <20181029121638.GB15446@arm.com>
- <839acfc7-6b3a-b7ac-2f4a-713960ece457@huawei.com>
- <17e3006a-7ecd-968e-7e67-ea7d08858ec3@arm.com>
- <bc7bd118-82f2-86be-71ea-46704df864a5@huawei.com>
- <45a8e09d-b32b-df32-ba34-5aa1909fb11f@arm.com>
- <20181101112743.GB31099@arm.com>
-Message-ID: <1a2526e6-9ae7-88b1-76af-f1ef78c55580@huawei.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 1 Nov 2018 13:22:05 +0100
+Subject: [PATCH 1/2] ARM: cpuidle: Don't register the driver when back-end
+ init returns -ENXIO
+In-Reply-To: <20181101113831.GB6608@e107981-ln.cambridge.arm.com>
+References: <20181026144843.3028-1-ulf.hansson@linaro.org>
+ <20181029174456.GA9687@e107981-ln.cambridge.arm.com>
+ <CAPDyKFp57pZwTzAPGkeLGj+okYvkOx_i7zZcdphJsLFeKd_m+w@mail.gmail.com>
+ <20181101113831.GB6608@e107981-ln.cambridge.arm.com>
+Message-ID: <CAPDyKFrC83aPWEgUNUcptJXwgs8jL7D3J1xremeXzWjQ-VrxtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 1 November 2018 at 12:38, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, Oct 30, 2018 at 11:24:49AM +0100, Ulf Hansson wrote:
+>> On 29 October 2018 at 18:45, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>> > On Fri, Oct 26, 2018 at 04:48:43PM +0200, Ulf Hansson wrote:
+>> >> There's no point to register the cpuidle driver for the current CPU, when
+>> >> the initialization of the arch specific back-end data fails by returning
+>> >> -ENXIO.
+>> >>
+>> >> Instead, let's re-order the sequence to its original flow, by first trying
+>> >> to initialize the back-end part and then act accordingly on the returned
+>> >> error code. Additionally, let's print the error message, no matter of what
+>> >> error code that was returned.
+>> >>
+>> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> >> ---
+>> >>
+>> >> Note, as far as I can tell it's only qcom-spm that may return -ENXIO, which also
+>> >> was original reason to why this error path was invented.
+>> >>
+>> >> Unfurtunate I don't have a qcom spm platfrom at hand, however I manually tried
+>> >> this by hacking the PSCI driver to return -ENXIO for some CPUs. So I assume it
+>> >> should then also work for qcom spm.
+>> >>
+>> >> ---
+>> >>  drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
+>> >>  1 file changed, 10 insertions(+), 12 deletions(-)
+>> >>
+>> >> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+>> >> index 073557f433eb..df564d783216 100644
+>> >> --- a/drivers/cpuidle/cpuidle-arm.c
+>> >> +++ b/drivers/cpuidle/cpuidle-arm.c
+>> >> @@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
+>> >>               goto out_kfree_drv;
+>> >>       }
+>> >>
+>> >> -     ret = cpuidle_register_driver(drv);
+>> >> -     if (ret) {
+>> >> -             if (ret != -EBUSY)
+>> >> -                     pr_err("Failed to register cpuidle driver\n");
+>> >> -             goto out_kfree_drv;
+>> >> -     }
+>> >> -
+>> >>       /*
+>> >>        * Call arch CPU operations in order to initialize
+>> >>        * idle states suspend back-end specific data
+>> >> @@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
+>> >>       ret = arm_cpuidle_init(cpu);
+>> >>
+>> >>       /*
+>> >> -      * Skip the cpuidle device initialization if the reported
+>> >> +      * Allow the initialization to continue for other CPUs, if the reported
+>> >>        * failure is a HW misconfiguration/breakage (-ENXIO).
+>> >>        */
+>> >> -     if (ret == -ENXIO)
+>> >> -             return 0;
+>> >
+>> > I wonder whether moving the drv allocation and dt initialization after
+>> > arm_cpuidle_init(cpu) would simplify the error path; the patch makes sense
+>> > the error path is getting a bit hard to read - maybe we can simplify it.
 >>
->> Agreed. slit_valid() on the ACPI parsing is currently enforcing that before
->> acpi_numa_slit_init() which would call into numa_set_distance(). Hence arch
->> NUMA code numa_set_distance() never had the opportunity to do the sanity
->> checks as ACPI slit_valid() has completely invalidated the table.
+>> Yep, exactly that is happening in patch 2/2. But as I also told
+>> Daniel, I wanted to take small steps and keep one change per patch.
 >>
->> Unlike ACPI path, of_numa_parse_distance_map_v1() does not do any sanity
->> checks on the distance values parse from the "distance-matrix" property
->> and all the checks directly falls on numa_set_distance(). This needs to
->> be fixed in line with ACPI
+>> Does it make sense to keep this as is, when you have looked at patch 2/2?
 >>
->> * If (to == from) ---> distance = LOCAL_DISTANCE
->> * If (to != from) ---> distance > LOCAL_DISTANCE
+>> >
+>> > I think, if you can single it out, it would be good to add a Fixes:
+>> > tag too.
 >>
->> At the same time its okay to just enhance numa_set_distance() test coverage
->> to include this new test. If we would have trusted firmware parsing all the
->> way, existing basic checks about node range, distance stuff should not have
->> been there in numa_set_distance(). Hence IMHO even if we fix the OF driver
->> part, we should include this new check there as well.
+>> I can do that, but I am not sure it actually solves a problem, besides
+>> improving the error path.
+>>
+>> Or what did you have in mind?
 >
-> I don't see what we gain by duplicating the check. In fact, it has a few
-> downsides:
->
->   (1) It confuses the semantics of the API, because it is no longer clear
->       who "owns" the check
->
->   (2) It duplicates code in each architecture
->
->   (3) Some clever-cloggs will remove at least some of the duplication in
->       future
->
-> I'm not willing to accept the check in the arm64 code if we update the
-> OF code.
->
-> I think the way forward here is for John to fix the crash he reported by
-> adding the check to the OF code.
+> I am not sure it counts as a bug but leaving the driver registered even if
+> the following set-up fails is certainly not the expected behaviour.
 
-I was planning on doing that.
-
-If somebody wants to follow up with
-> subsequent patches to move more of the checking out of the arch code, then
-> we can review that as a separate series.
-
-Cheers,
-John
+I agree.
 
 >
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> .
->
+> Hardly urgent but still a fix.
+
+You have a point. However, the fixes tag would point to a rather old
+commit. Anyway, I can provide a stable tag as well, to point to what
+release it can be picked without conflicts. Then it's up to others to
+make a backport to older releases, if they like.
+
+Kind regards
+Uffe
