@@ -1,34 +1,39 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Thu, 1 Nov 2018 09:20:20 +0200
-Subject: [PATCH v2 5/8] clk: clk-hi655x: Free of_provider at remove
-In-Reply-To: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <3b6742f090502f1f75cba283bc6d29e8ccbd92d3.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 1 Nov 2018 15:20:32 +0800
+Subject: [PATCH 2/7] arm64: allwinner: h6: Add common orangepi nodes into
+ dtsi
+In-Reply-To: <CAMty3ZCv9z=uALo-PShS-RegNt2cOwOHWE=6vsRVgPm9oOQ_Fw@mail.gmail.com>
+References: <20181031183634.29640-1-jagan@amarulasolutions.com>
+ <20181031183634.29640-2-jagan@amarulasolutions.com>
+ <CAGb2v66ALW1EL5+buporX8cPjkfpNdwGJEVUrC9Xpcmt3-NX7g@mail.gmail.com>
+ <CAMty3ZCv9z=uALo-PShS-RegNt2cOwOHWE=6vsRVgPm9oOQ_Fw@mail.gmail.com>
+Message-ID: <CAGb2v66v8akRfTHMCRYUZePwg9f9DdTVrX6G9-OOu1W_Sw6tOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm variant for of_provider registration so provider is freed
-at exit.
+On Thu, Nov 1, 2018 at 3:13 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Thu, Nov 1, 2018 at 8:23 AM Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> > On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > >
+> > > Orangepi H6 boards, One Plus and Lite2 shares common
+> > > nodes like axp805, uart, mmc0 etc and the common differences
+> > > between them is Ethernet is available in One Plus where
+> > > as Wifi, USB3, CSI port is available in Lite2.
+> >
+> > You can claim this for pretty much all Allwinner boards, because they mostly
+> > derive from the reference designs Allwinner's design houses put out. Yet we
+> > don't do this for all of them. We do this for boards that are clearly derived
+> > or extended from one another. One example would be the Orange Pi PC and PC Plus.
+> >
+> > Do you have any evidence to suggest so? This is not about common device nodes,
+> > but a common hardware design.
+>
+> I got this information from hardware schematics and from Steven (added
+> in to list), he too claimed the same.
 
-Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
----
- drivers/clk/clk-hi655x.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Good. Please add that to the commit message. The vendor's intentions are as
+important as the actual facts.
 
-diff --git a/drivers/clk/clk-hi655x.c b/drivers/clk/clk-hi655x.c
-index 403a0188634a..394d0109104d 100644
---- a/drivers/clk/clk-hi655x.c
-+++ b/drivers/clk/clk-hi655x.c
-@@ -107,8 +107,8 @@ static int hi655x_clk_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	return of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
--				     &hi655x_clk->clk_hw);
-+	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
-+				of_clk_hw_simple_get, &hi655x_clk->clk_hw);
- }
- 
- static struct platform_driver hi655x_clk_driver = {
--- 
-2.14.3
+ChenYu
