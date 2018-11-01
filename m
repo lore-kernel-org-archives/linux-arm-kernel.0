@@ -1,119 +1,164 @@
-From: john.garry@huawei.com (John Garry)
-Date: Thu, 1 Nov 2018 10:01:05 +0000
-Subject: Crash report: Broken NUMA distance map causes crash on arm64
- system
-In-Reply-To: <20181031204622.GB3141@hirez.programming.kicks-ass.net>
-References: <b89bf686-05bd-a3de-e7ef-4ab9ab7bdb6c@huawei.com>
- <20181030092640.GE1459@hirez.programming.kicks-ass.net>
- <d126099d-2698-8e3a-06ca-f229e57c3052@huawei.com>
- <ae352fe1-3c59-dcde-fd00-2c03b4491dc6@huawei.com>
- <20181031204622.GB3141@hirez.programming.kicks-ass.net>
-Message-ID: <bf2b890a-4ce7-d0f6-0663-84a1a6e8dbd2@huawei.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 01 Nov 2018 11:02:54 +0100
+Subject: [PATCH] PCI: imx: Add imx6sx suspend/resume support
+In-Reply-To: <AM0PR04MB42907F7BFDBF9648381DED49EECD0@AM0PR04MB4290.eurprd04.prod.outlook.com>
+References: <e57884e2dbc429918db81662ddbafe22c472385c.1539019758.git.leonard.crestez@nxp.com>
+ <AM0PR04MB42907F7BFDBF9648381DED49EECD0@AM0PR04MB4290.eurprd04.prod.outlook.com>
+Message-ID: <1541066574.3593.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/2018 20:46, Peter Zijlstra wrote:
-> On Tue, Oct 30, 2018 at 03:35:35PM +0000, John Garry wrote:
->> [    7.154740] ERROR: Node-distance not symmetric
->> [    7.154740]
->> [    7.160724]   10 15 20 25
->> [    7.163456]   15 10 25 30
->> [    7.166190]   20 25 10 15
->> [    7.168921]   10 10 15 10
->> [    7.171655]
->
-> But I'm not getting the rest of those errors with my 'reproducer':
->
->   kvm -smp 4 -m 4G -display none -monitor null -serial stdio -kernel defconfig-build/arch/x86/boot/bzImage -append "sched_debug debug ignore_loglevel earlyprintk=serial,ttyS0,115200,keep numa=fake=4:10,15,20,25,15,10,25,30,20,25,10,15,10,10,15,10,0"
->
-> [    0.828331] ERROR: Node-distance not symmetric
-> [    0.828331]
-> [    0.829081]   10 15 20 25
-> [    0.830079]   15 10 25 30
-> [    0.831079]   20 25 10 15
-> [    0.832079]   10 10 15 10
-> [    0.833079]
-> [    0.834373] CPU0 attaching sched-domain(s):
-> [    0.835082]  domain-0: span=0-3 level=DIE
-> [    0.836079]   groups: 0:{ span=0 }, 1:{ span=1 }, 2:{ span=2 }, 3:{ span=3 }
-> [    0.837082] CPU1 attaching sched-domain(s):
-> [    0.838081]  domain-0: span=0-3 level=DIE
-> [    0.839079]   groups: 1:{ span=1 }, 2:{ span=2 }, 3:{ span=3 }, 0:{ span=0 }
-> [    0.840082] CPU2 attaching sched-domain(s):
-> [    0.841080]  domain-0: span=0-3 level=DIE
-> [    0.842079]   groups: 2:{ span=2 }, 3:{ span=3 }, 0:{ span=0 }, 1:{ span=1 }
-> [    0.843094] ------------[ cut here ]------------
-> [    0.844076] kernel BUG at ../mm/slub.c:3901!
-> [    0.844083] invalid opcode: 0000 [#1] SMP PTI
-> [    0.845076] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc8+ #305
-> [    0.845076] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.10.2-1 04/01/2014
-> [    0.845076] RIP: 0010:kfree+0x113/0x160
-> [    0.845076] Code: 18 48 89 da 4c 89 e6 e8 db 01 c5 00 48 8b 45 00 48 85 c0 75 e4 e9 0e ff ff ff 49 8b 02 f6 c4 80 75 0a 49 8b 42 08 a8 01 75 02 <0f> 0b 49 8b 02 31 f6 f6 c4 80 74 05 41 0f b6 72 51 5b 5d 41 5c 4c
-> [    0.845076] RSP: 0000:ffffabc080633dc8 EFLAGS: 00010246
-> [    0.845076] RAX: ffff9f973fff8da0 RBX: ffff9f970000001e RCX: 00000000000000f9
-> [    0.845076] RDX: 0000000000000000 RSI: ffff9f963ea23c80 RDI: 0000606980000000
-> [    0.845076] RBP: 0000000000020ac0 R08: 0000000000023c80 R09: ffffffff9f8a10db
-> [    0.845076] R10: fffff17204000000 R11: 0000000000000001 R12: ffffffff9f8a113d
-> [    0.845076] R13: 0000000000000003 R14: ffffffffa0ab4820 R15: ffff9f973e5bde00
-> [    0.845076] FS:  0000000000000000(0000) GS:ffff9f963ea00000(0000) knlGS:0000000000000000
-> [    0.845076] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-> [    0.845076] CR2: 00000000ffffffff CR3: 000000008ea0a000 CR4: 00000000000006f0
-> [    0.845076] Call Trace:
-> [    0.845076]  destroy_sched_domain+0x3d/0x50
-> [    0.845076]  cpu_attach_domain+0x378/0x680
-> [    0.845076]  ? update_group_capacity+0x20/0x2c0
-> [    0.845076]  build_sched_domains+0xde9/0xed0
-> [    0.845076]  ? set_debug_rodata+0xc/0xc
-> [    0.845076]  sched_init_domains+0x80/0x90
-> [    0.845076]  sched_init_smp+0x1d/0x63
-> [    0.845076]  kernel_init_freeable+0x101/0x23f
-> [    0.845076]  ? rest_init+0xb0/0xb0
-> [    0.845076]  kernel_init+0x5/0x100
-> [    0.845076]  ret_from_fork+0x35/0x40
->
-> I'll work on that crash though..
+Hi Leonard,
 
-The actual crash callchain seems to be
-destroy_sched_domain()->free_sched_groups():
+On Wed, 2018-10-31 at 11:02 +0000, Leonard Crestez wrote:
+> On 10/8/2018 8:38 PM, Leonard Crestez wrote:
+> > Enable PCI suspend/resume support on imx6sx socs. This is similar to
+> > imx7d with a few differences:
+> > 
+> > * The PM_Turn_Off bit is exposed through an IOMUX GPR, like all other
+> > pcie control bits on 6sx.
+> > * The pcie_inbound_axi clk needs to be turned off in suspend. On resume
+> > it is restored via resume -> deassert_core_reset -> enable_ref_clk.
+> > 
+> > Most of the resume logic is shared with the initial reset after probe.
+> > 
+> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> 
+> This is a gentle reminder that this patch was posted ~3 weeks ago and 
+> there is yet no reply. It's a mostly straight-forward extension of imx7d 
+> pci suspend/resume support to a different SOC.
+> 
+> Lucas/Philipp: can you please take a brief look?
 
-static void free_sched_groups(struct sched_group *sg, int free_sgc)
-{
-...
-     do {
-         tmp = sg->next;
+This is a bit out of my wheelhouse, but I'll try my best.
 
-         if (free_sgc && atomic_dec_and_test(&sg->sgc->ref))***
-             kfree(sg->sgc);
+> > ---
+> >   drivers/pci/controller/dwc/pci-imx6.c       | 40 ++++++++++++++++++---
+> >   include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  1 +
+> >   2 files changed, 36 insertions(+), 5 deletions(-)
+> > 
+> > Patch is again linux-next, meant to apply here:
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/pci.git/log/?h=pci/dwc
+> > 
+> > This is quite an old patch, mostly did it to prove that imx7d suspend
+> > support is indeed generic.
+> > 
+> > diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> > index 2cbef2d7c207..6171171db1fc 100644
+> > --- a/drivers/pci/controller/dwc/pci-imx6.c
+> > +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> > @@ -771,12 +771,29 @@ static void imx6_pcie_ltssm_disable(struct device *dev)
+> >   	}
+> >   }
+> >   
+> >   static void imx6_pcie_pm_turnoff(struct imx6_pcie *imx6_pcie)
+> >   {
+> > -	reset_control_assert(imx6_pcie->turnoff_reset);
+> > -	reset_control_deassert(imx6_pcie->turnoff_reset);
+> > +	struct device *dev = imx6_pcie->pci->dev;
+> > +
+> > +	/*
+> > +	 * Some variants have a turnoff reset in DT while
+> > +	 * others poke at iomuxc registers.
+> > +	 */
+> > +	if (imx6_pcie->turnoff_reset) {
+> > +		reset_control_assert(imx6_pcie->turnoff_reset);
+> > +		reset_control_deassert(imx6_pcie->turnoff_reset);
+> > +	} else if (imx6_pcie->variant == IMX6SX) {
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				IMX6SX_GPR12_PCIE_PM_TURN_OFF,
+> > +				IMX6SX_GPR12_PCIE_PM_TURN_OFF);
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				IMX6SX_GPR12_PCIE_PM_TURN_OFF, 0);
+> > +	} else {
+> > +		dev_err(dev, "PME_Turn_Off not implemented\n");
+> > +		return;
+> > +	}
 
-...
-}
+I'd use switch(imx6_pcie->variant) for consistency with the other places
+where different variants need to be handled separately.
 
-*** crash occurs when free_sgc is non-zero and sg->sgc is NULL
+> >   
+> >   	/*
+> >   	 * Components with an upstream port must respond to
+> >   	 * PME_Turn_Off with PME_TO_Ack but we can't check.
+> >   	 *
+> > @@ -790,22 +807,35 @@ static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
+> >   {
+> >   	clk_disable_unprepare(imx6_pcie->pcie);
+> >   	clk_disable_unprepare(imx6_pcie->pcie_phy);
+> >   	clk_disable_unprepare(imx6_pcie->pcie_bus);
+> >   
+> > -	if (imx6_pcie->variant == IMX7D) {
+> > +	switch (imx6_pcie->variant) {
+> > +	case IMX6SX:
+> > +		clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
+> > +		break;
+> > +	case IMX7D:
+> >   		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> >   				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
+> >   				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
+> > +		break;
+> > +	default:
+> > +		break;
+> >   	}
 
-And, as I mentioned earlier, I bisected this problem to 58d5af59d55b.
+This disables the ref clock. Should this be split into a separate
+function imx6_pcie_disable_ref_clk() for symmetry with the already
+existing imx6_pcie_enable_ref_clk() ?
 
->
->> I also note that if I apply the patch, below, to reject the invalid NUMA
->> distance, we're still getting a warning/error:
->>
->> [    7.144407] CPU: All CPU(s) started at EL2
->> [    7.148678] alternatives: patching kernel code
->> [    7.153557] ERROR: Node-0 not representative
->> [    7.153557]
->> [    7.159365]   10 15 20 25
->> [    7.162097]   15 10 25 30
->> [    7.164832]   20 25 10 15
->> [    7.167562]   25 30 15 10
->
-> Yeah, that's an 'obviously' broken topology too.
->
+That could then also be used to disable pcie_inbound_axi in the error
+path of imx6_pcie_deassert_core_reset().
 
-AFAICT, this conforms to ACPI spec SLIT rules, and the kernel SLIT 
-validation allows this also. So maybe we should shout louder here or 
-even mark the SLIT as invalid if totally broken.
+> >   }
+> >   
+> > +static inline bool imx6_pcie_supports_suspend(struct imx6_pcie *imx6_pcie)
+> > +{
+> > +	return (imx6_pcie->variant == IMX7D ||
+> > +		imx6_pcie->variant == IMX6SX);
+> > +}
+> > +
+> >   static int imx6_pcie_suspend_noirq(struct device *dev)
+> >   {
+> >   	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> >   
+> > -	if (imx6_pcie->variant != IMX7D)
+> > +	if (!imx6_pcie_supports_suspend(imx6_pcie))
+> >   		return 0;
+> >   
+> >   	imx6_pcie_pm_turnoff(imx6_pcie);
+> >   	imx6_pcie_clk_disable(imx6_pcie);
+> >   	imx6_pcie_ltssm_disable(dev);
+> > @@ -817,11 +847,11 @@ static int imx6_pcie_resume_noirq(struct device *dev)
+> >   {
+> >   	int ret;
+> >   	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> >   	struct pcie_port *pp = &imx6_pcie->pci->pp;
+> >   
+> > -	if (imx6_pcie->variant != IMX7D)
+> > +	if (!imx6_pcie_supports_suspend(imx6_pcie))
+> >   		return 0;
+> >   
+> >   	imx6_pcie_assert_core_reset(imx6_pcie);
+> >   	imx6_pcie_init_phy(imx6_pcie);
+> >   	imx6_pcie_deassert_core_reset(imx6_pcie);
+> > diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> > index 6c1ad160ed87..c1b25f5e386d 100644
+> > --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> > +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> > @@ -438,10 +438,11 @@
+> >   #define IMX6SX_GPR5_DISP_MUX_DCIC1_LCDIF1		(0x0 << 1)
+> >   #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS			(0x1 << 1)
+> >   #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK			(0x1 << 1)
+> >   
+> >   #define IMX6SX_GPR12_PCIE_TEST_POWERDOWN		BIT(30)
+> > +#define IMX6SX_GPR12_PCIE_PM_TURN_OFF			BIT(16)
+> >   #define IMX6SX_GPR12_PCIE_RX_EQ_MASK			(0x7 << 0)
+> >   #define IMX6SX_GPR12_PCIE_RX_EQ_2			(0x2 << 0)
+> >   
+> >   /* For imx6ul iomux gpr register field define */
+> >   #define IMX6UL_GPR1_ENET1_CLK_DIR		(0x1 << 17)
+> > 
 
-> Clearly you're far more creative than the ACPI BIOS people have been so
-> far.
-
-Cheers,
-John
+regards
+Philipp
