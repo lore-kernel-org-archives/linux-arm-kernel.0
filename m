@@ -1,75 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu,  1 Nov 2018 13:22:38 +0100
-Subject: [PATCH v2 1/2] ARM: cpuidle: Don't register the driver when back-end
- init returns -ENXIO
-Message-ID: <20181101122238.4167-1-ulf.hansson@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu,  1 Nov 2018 13:36:38 +0100
+Subject: [PATCH v2 1/2] arm64: dts: rockchip: add missing address and size
+ cells for rk3399 mipi dsi
+Message-ID: <20181101123639.15560-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no point to register the cpuidle driver for the current CPU, when
-the initialization of the arch specific back-end data fails by returning
--ENXIO.
+DSI controllers are also the hosts of their dsi bus and therefore contain
+nodes describing the attached panels with their reg properties containing
+the virtual ids.
 
-Instead, let's re-order the sequence to its original flow, by first trying
-to initialize the back-end part and then act accordingly on the returned
-error code. Additionally, let's print the error message, no matter of what
-error code that was returned.
+The dsi controller nodes on rk3399 lacked the #address-cells and #size-cells
+for these subnodes, so add them.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Fixes: a0d46a3dfdc3 ("ARM: cpuidle: Register per cpuidle device")
-Cc: <stable@vger.kernel.org> # v4.19+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
+changes in v2: none
 
-Changes in v2:
-	- Added a fixes and a stable tag.
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
----
- drivers/cpuidle/cpuidle-arm.c | 22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 073557f433eb..df564d783216 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -103,13 +103,6 @@ static int __init arm_idle_init_cpu(int cpu)
- 		goto out_kfree_drv;
- 	}
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index c88e603396f6..4ac7bf547916 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1720,6 +1720,8 @@
+ 		resets = <&cru SRST_P_MIPI_DSI0>;
+ 		reset-names = "apb";
+ 		rockchip,grf = <&grf>;
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		status = "disabled";
  
--	ret = cpuidle_register_driver(drv);
--	if (ret) {
--		if (ret != -EBUSY)
--			pr_err("Failed to register cpuidle driver\n");
--		goto out_kfree_drv;
--	}
--
- 	/*
- 	 * Call arch CPU operations in order to initialize
- 	 * idle states suspend back-end specific data
-@@ -117,15 +110,20 @@ static int __init arm_idle_init_cpu(int cpu)
- 	ret = arm_cpuidle_init(cpu);
+ 		ports {
+@@ -1754,6 +1756,8 @@
+ 		resets = <&cru SRST_P_MIPI_DSI1>;
+ 		reset-names = "apb";
+ 		rockchip,grf = <&grf>;
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		status = "disabled";
  
- 	/*
--	 * Skip the cpuidle device initialization if the reported
-+	 * Allow the initialization to continue for other CPUs, if the reported
- 	 * failure is a HW misconfiguration/breakage (-ENXIO).
- 	 */
--	if (ret == -ENXIO)
--		return 0;
--
- 	if (ret) {
- 		pr_err("CPU %d failed to init idle CPU ops\n", cpu);
--		goto out_unregister_drv;
-+		ret = ret == -ENXIO ? 0 : ret;
-+		goto out_kfree_drv;
-+	}
-+
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		if (ret != -EBUSY)
-+			pr_err("Failed to register cpuidle driver\n");
-+		goto out_kfree_drv;
- 	}
- 
- 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+ 		ports {
 -- 
-2.17.1
+2.17.0
