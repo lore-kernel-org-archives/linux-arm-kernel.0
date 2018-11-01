@@ -1,19 +1,28 @@
 From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Wed, 31 Oct 2018 17:46:54 -0700
-Subject: [PATCH] pinctrl: bcm2835: Use define directive for
- BCM2835_PINCONF_PARAM_PULL
-Message-ID: <20181101004653.7552-1-natechancellor@gmail.com>
+Date: Wed, 31 Oct 2018 17:52:57 -0700
+Subject: [PATCH] pinctrl: lpc18xx: Use define directive for
+ PIN_CONFIG_GPIO_PIN_INT
+Message-ID: <20181101005257.8778-1-natechancellor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Clang warns when one enumerated type is implicitly converted to another:
 
-drivers/pinctrl/bcm/pinctrl-bcm2835.c:707:40: warning: implicit
-conversion from enumeration type 'enum bcm2835_pinconf_param' to
-different enumeration type 'enum pin_config_param' [-Wenum-conversion]
-        configs[0] = pinconf_to_config_packed(BCM2835_PINCONF_PARAM_PULL, pull);
-                     ~~~~~~~~~~~~~~~~~~~~~~~~ ^~~~~~~~~~~~~~~~~~~~~~~~~~
-1 warning generated.
+drivers/pinctrl/pinctrl-lpc18xx.c:643:29: warning: implicit conversion
+from enumeration type 'enum lpc18xx_pin_config_param' to different
+enumeration type 'enum pin_config_param' [-Wenum-conversion]
+        {"nxp,gpio-pin-interrupt", PIN_CONFIG_GPIO_PIN_INT, 0},
+        ~                          ^~~~~~~~~~~~~~~~~~~~~~~
+drivers/pinctrl/pinctrl-lpc18xx.c:648:12: warning: implicit conversion
+from enumeration type 'enum lpc18xx_pin_config_param' to different
+enumeration type 'enum pin_config_param' [-Wenum-conversion]
+        PCONFDUMP(PIN_CONFIG_GPIO_PIN_INT, "gpio pin int", NULL, true),
+        ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
+macro 'PCONFDUMP'
+        .param = a, .display = b, .format = c, .has_arg = d     \
+                 ^
+2 warnings generated.
 
 It is expected that pinctrl drivers can extend pin_config_param because
 of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
@@ -21,27 +30,30 @@ isn't an issue. Most drivers that take advantage of this define the
 PIN_CONFIG variables as constants, rather than enumerated values. Do the
 same thing here so that Clang no longer warns.
 
+Link: https://github.com/ClangBuiltLinux/linux/issues/140
 Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
 ---
- drivers/pinctrl/bcm/pinctrl-bcm2835.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/pinctrl/pinctrl-lpc18xx.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index fa530913a2c8..b035c3fc0471 100644
---- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -72,10 +72,8 @@
- #define GPIO_REG_OFFSET(p)	((p) / 32)
- #define GPIO_REG_SHIFT(p)	((p) % 32)
+diff --git a/drivers/pinctrl/pinctrl-lpc18xx.c b/drivers/pinctrl/pinctrl-lpc18xx.c
+index a14bc5e5fc24..4bee606088e1 100644
+--- a/drivers/pinctrl/pinctrl-lpc18xx.c
++++ b/drivers/pinctrl/pinctrl-lpc18xx.c
+@@ -631,13 +631,10 @@ static const struct pinctrl_pin_desc lpc18xx_pins[] = {
+ };
  
--enum bcm2835_pinconf_param {
--	/* argument: bcm2835_pinconf_pull */
--	BCM2835_PINCONF_PARAM_PULL = (PIN_CONFIG_END + 1),
+ /**
+- * enum lpc18xx_pin_config_param - possible pin configuration parameters
+  * @PIN_CONFIG_GPIO_PIN_INT: route gpio to the gpio pin interrupt
+  * 	controller.
+  */
+-enum lpc18xx_pin_config_param {
+-	PIN_CONFIG_GPIO_PIN_INT = PIN_CONFIG_END + 1,
 -};
-+/* argument: bcm2835_pinconf_pull */
-+#define BCM2835_PINCONF_PARAM_PULL	(PIN_CONFIG_END + 1)
++#define PIN_CONFIG_GPIO_PIN_INT		(PIN_CONFIG_END + 1)
  
- struct bcm2835_pinctrl {
- 	struct device *dev;
+ static const struct pinconf_generic_params lpc18xx_params[] = {
+ 	{"nxp,gpio-pin-interrupt", PIN_CONFIG_GPIO_PIN_INT, 0},
 -- 
 2.19.1
