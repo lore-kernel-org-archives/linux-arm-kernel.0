@@ -1,40 +1,79 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Thu, 1 Nov 2018 16:35:50 +0800
-Subject: [GIT PULL] sprd dts for kernel v4.20-rc1
-In-Reply-To: <CAAfSe-v47=pr9pCoM_mATbd0sRApU+TjB8L_e01TwAibn2Qj9g@mail.gmail.com>
-References: <1539854253-4784-1-git-send-email-chunyan.zhang@unisoc.com>
- <CAAfSe-v47=pr9pCoM_mATbd0sRApU+TjB8L_e01TwAibn2Qj9g@mail.gmail.com>
-Message-ID: <CAAfSe-vi_b-sK2YeNfazLQbiQr4vbmkbavdwKBef1=nN4_qq_A@mail.gmail.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 1 Nov 2018 10:52:14 +0200
+Subject: [PATCH] pinctrl: lpc18xx: Use define directive for
+ PIN_CONFIG_GPIO_PIN_INT
+In-Reply-To: <20181101005257.8778-1-natechancellor@gmail.com>
+References: <20181101005257.8778-1-natechancellor@gmail.com>
+Message-ID: <0af2686f-3d9a-3ca6-e5c2-2955ffbd8bd5@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Nov 2018 at 14:36, Chunyan Zhang <zhang.lyra@gmail.com> wrote:
->
-> Hi Arnd,
->
-> I guess you may have missed this pull request.
->
-> Thanks,
-> Chunyan
-> On Thu, 18 Oct 2018 at 17:19, Chunyan Zhang <chunyan.zhang@unisoc.com> wrote:
-> >
-> > Hi Arnd,
-> >
-> > For 4.20-rc1 there's one patch only for sprd devicetree, please pull from my git tree:
-> >
-> > https://github.com/lyrazhang/linux.git m-v4.19-rc1
-> >
-> > Please let me know if there's some problem.
-> >
-> > Thanks,
-> > Chunyan
-> >
-> > ----------------------------------------------------------------
-> >
-> > Suzuki K Poulose (1):
-> >   arm64: dts: sc9836/sc9860: Update coresight bindings for hardware
-> >     ports
-> >
-> >  arch/arm64/boot/dts/sprd/sc9836.dtsi |  78 +++++++------
-> >  arch/arm64/boot/dts/sprd/sc9860.dtsi | 215 ++++++++++++++++++-----------------
-> >  2 files changed, 151 insertions(+), 142 deletions(-)
+Hi Nathan,
+
+thank you for your patch.
+
+On 11/01/2018 02:52 AM, Nathan Chancellor wrote:
+> Clang warns when one enumerated type is implicitly converted to another:
+> 
+> drivers/pinctrl/pinctrl-lpc18xx.c:643:29: warning: implicit conversion
+> from enumeration type 'enum lpc18xx_pin_config_param' to different
+> enumeration type 'enum pin_config_param' [-Wenum-conversion]
+>         {"nxp,gpio-pin-interrupt", PIN_CONFIG_GPIO_PIN_INT, 0},
+>         ~                          ^~~~~~~~~~~~~~~~~~~~~~~
+> drivers/pinctrl/pinctrl-lpc18xx.c:648:12: warning: implicit conversion
+> from enumeration type 'enum lpc18xx_pin_config_param' to different
+> enumeration type 'enum pin_config_param' [-Wenum-conversion]
+>         PCONFDUMP(PIN_CONFIG_GPIO_PIN_INT, "gpio pin int", NULL, true),
+>         ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
+> macro 'PCONFDUMP'
+>         .param = a, .display = b, .format = c, .has_arg = d     \
+>                  ^
+> 2 warnings generated.
+> 
+> It is expected that pinctrl drivers can extend pin_config_param because
+> of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
+> isn't an issue. Most drivers that take advantage of this define the
+> PIN_CONFIG variables as constants, rather than enumerated values. Do the
+> same thing here so that Clang no longer warns.
+> 
+> Link: https://github.com/ClangBuiltLinux/linux/issues/140
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> ---
+>  drivers/pinctrl/pinctrl-lpc18xx.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-lpc18xx.c b/drivers/pinctrl/pinctrl-lpc18xx.c
+> index a14bc5e5fc24..4bee606088e1 100644
+> --- a/drivers/pinctrl/pinctrl-lpc18xx.c
+> +++ b/drivers/pinctrl/pinctrl-lpc18xx.c
+> @@ -631,13 +631,10 @@ static const struct pinctrl_pin_desc lpc18xx_pins[] = {
+>  };
+>  
+>  /**
+> - * enum lpc18xx_pin_config_param - possible pin configuration parameters
+>   * @PIN_CONFIG_GPIO_PIN_INT: route gpio to the gpio pin interrupt
+>   * 	controller.
+>   */
+> -enum lpc18xx_pin_config_param {
+> -	PIN_CONFIG_GPIO_PIN_INT = PIN_CONFIG_END + 1,
+> -};
+> +#define PIN_CONFIG_GPIO_PIN_INT		(PIN_CONFIG_END + 1)
+>  
+>  static const struct pinconf_generic_params lpc18xx_params[] = {
+>  	{"nxp,gpio-pin-interrupt", PIN_CONFIG_GPIO_PIN_INT, 0},
+> 
+
+The change, if it is applied, starts to produce a W=1 warning:
+
+	drivers/pinctrl/pinctrl-lpc18xx.c:634: warning: Cannot understand  * @PIN_CONFIG_GPIO_PIN_INT: route gpio to the gpio pin interrupt on line 634 - I thought it was a doc line
+
+Could you please take a look how to satisfy process_name() check from scripts/kernel-doc?
+
+My proposals are:
+1) change the first line of the comment block from '/**' to '/*',
+2) remove '@' prefix symbol and place pinconf description on one line.
+
+--
+Best wishes,
+Vladimir
