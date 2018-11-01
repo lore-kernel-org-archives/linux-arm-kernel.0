@@ -1,63 +1,78 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 1 Nov 2018 11:31:36 +0000
-Subject: [PATCH 2/2] arm64: acpi: Prepare for longer MADTs
-In-Reply-To: <20181012192937.3819951-1-jeremy.linton@arm.com>
-References: <20181012192937.3819951-1-jeremy.linton@arm.com>
-Message-ID: <20181101113136.GA6608@e107981-ln.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Nov 2018 11:34:30 +0000
+Subject: [PATCH] ARM:kexec:offline panic_smp_self_stop CPU
+In-Reply-To: <1541071249-15660-1-git-send-email-wangyufen@huawei.com>
+References: <1541071249-15660-1-git-send-email-wangyufen@huawei.com>
+Message-ID: <20181101113430.GO30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 02:29:37PM -0500, Jeremy Linton wrote:
-> The BAD_MADT_GICC_ENTRY check is a little too strict because
-> it rejects MADT entries that don't match the currently known
-> lengths. We should remove this restriction to avoid problems
-> if the table length changes. Future code which might depend on
-> additional fields should be written to validate those fields
-> before using them, rather than trying to globally check
-> known MADT version lengths.
+On Thu, Nov 01, 2018 at 07:20:49PM +0800, Wang Yufen wrote:
+> From: Yufen Wang <wangyufen@huawei.com>
 > 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> In case panic() and panic() called at the same time on different CPUS.
+> For example:
+> CPU 0:
+>   panic()
+>      __crash_kexec
+>        machine_crash_shutdown
+>          crash_smp_send_stop
+>        machine_kexec
+>          BUG_ON(num_online_cpus() > 1);
+> 
+> CPU 1:
+>   panic()
+>     local_irq_disable
+>     panic_smp_self_stop
+> 
+> If CPU 1 calls panic_smp_self_stop() before crash_smp_send_stop(), kdump
+> fails. CPU1 can't receive the ipi irq, CPU1 will be always online.
+> I changed BUG_ON to WARN in kexec crash as arm64 does, kdump also fails.
+> Because num_online_cpus() > 1, can't disable the L2 in _soft_restart.
+> To fix this problem, this patch split out the panic_smp_self_stop()
+> and add set_cpu_online(smp_processor_id(), false).
+
+Thanks.
+
+I think this may as well go into arch/arm/kernel/smp.c - it won't be
+required for single-CPU systems, since there aren't "other" CPUs.
+
+It's probably also worth a comment above the function as to why we
+have this.
+
+> 
+> Signed-off-by: Yufen Wang <wangyufen@huawei.com>
 > ---
->  arch/arm64/include/asm/acpi.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-
-Hi Jeremy,
-
-I assume there is no [PATCH 1/2] (to make sure I have not missed
-anything).
-
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 709208dfdc8b..4d0946bd485a 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -22,12 +22,12 @@
->  #include <asm/tlbflush.h>
->  
->  /* Macros for consistency checks of the GICC subtable of MADT */
-> -#define ACPI_MADT_GICC_LENGTH	\
-> -	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
-> +#define ACPI_MADT_GICC_MIN_LENGTH   ACPI_OFFSET(  \
-> +	struct acpi_madt_generic_interrupt, efficiency_class)
-
-I would add a comment explaining why the efficiency_class offset
-corresponds to the min length, I will do it myself before sending it
-upstream.
-
-I will take this patch and send it to Will/Catalin with ARM64 ACPI
-material for v4.21.
-
-Thanks,
-Lorenzo
-
->  
->  #define BAD_MADT_GICC_ENTRY(entry, end)					\
-> -	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
-> -	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
-> +	(!(entry) || (entry)->header.length < ACPI_MADT_GICC_MIN_LENGTH || \
-> +	(unsigned long)(entry) + (entry)->header.length > (end))
->  
->  /* Basic configuration for ACPI */
->  #ifdef	CONFIG_ACPI
-> -- 
-> 2.14.3
+>  arch/arm/kernel/setup.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 31940bd..151861f 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -602,6 +602,16 @@ static void __init smp_build_mpidr_hash(void)
+>  }
+>  #endif
+>  
+> +void panic_smp_self_stop(void)
+> +{
+> +	printk(KERN_DEBUG "CPU %u will stop doing anything useful since another CPU has paniced\n",
+> +			smp_processor_id());
+> +	set_cpu_online(smp_processor_id(), false);
+> +	while (1)
+> +		cpu_relax();
+> +
+> +}
+> +
+>  static void __init setup_processor(void)
+>  {
+>  	struct proc_info_list *list;
+> -- 
+> 2.7.4
+> 
+> 
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
