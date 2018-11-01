@@ -1,27 +1,29 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 1 Nov 2018 13:03:43 +0530
-Subject: [PATCH 5/7] arm64: allwinner: h6: Add RTC node
-In-Reply-To: <CAGb2v64fnpCh_rCy-9m8xgXmAZQGab1==f7cr332QfgueyuRNw@mail.gmail.com>
+Date: Thu, 1 Nov 2018 13:05:08 +0530
+Subject: [RFC PATCH 7/7] arm64: allwinner: h6: orangepi-liet2: Enable
+ AP6356S WiFi support
+In-Reply-To: <20181031183634.29640-7-jagan@amarulasolutions.com>
 References: <20181031183634.29640-1-jagan@amarulasolutions.com>
- <20181031183634.29640-5-jagan@amarulasolutions.com>
- <CAGb2v64fnpCh_rCy-9m8xgXmAZQGab1==f7cr332QfgueyuRNw@mail.gmail.com>
-Message-ID: <CAMty3ZAW5KndyJj81obK49MKczdbk4SoUncmiiE_OhH1g7qFUA@mail.gmail.com>
+ <20181031183634.29640-7-jagan@amarulasolutions.com>
+Message-ID: <CAMty3ZCeZzXYy4XRwTeQjYfpB6KKjEVRWyhjoca9Os4foLYL4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 8:25 AM Chen-Yu Tsai <wens@csie.org> wrote:
+On Thu, Nov 1, 2018 at 12:07 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
 >
-> On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> >
-> > From: Jagan Teki <jagan@openedev.com>
-> >
-> > RTC controller is similar to A31, so use the same compatible
-> > for H6 and update interrupt numbers as per manual.
+> From: Jagan Teki <jagan@openedev.com>
 >
-> No. Unfortunately they are not that compatible. The A31 does not have
-> the RTC clock output. So everyone got it wrong. :( Plus the clock rate
-> of the internal RC oscillator varies between SoCs. I'm working on a
-> series of patches to correct this. Stay tuned.
+> Enable AP6356S WiFi/BT combo chip on Orangepi Lite2 board:
+> - WiFi SDIO interface is connected to MMC1
+> - WiFi WL-PMU-EN pin connected to gpio PM3: attach to mmc-pwrseq
+> - WiFi WL-WAKE-AP pin connected to gpio PM0
+> - 32kHz external oscillator gate clock from RTC
+>
+> Signed-off-by: Jagan Teki <jagan@openedev.com>
+> ---
+> Note:
+> - chip detected, but failed to connect
+> [  129.084504] brcmfmac: brcmf_sdio_hostmail: mailbox indicates firmware halted
+> [  135.906409] brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
 
-4 bit, EXT_LOSC_EN of LOSC_CTRL_REG (0x00) seem available in H6. I can
-see external clock working with WIFI for A31 compatible.
+This got fixed. Will send next version.
