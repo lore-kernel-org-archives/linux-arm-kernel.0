@@ -1,48 +1,47 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 1 Nov 2018 09:55:12 +0200
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <81136b74-4b45-f44b-0168-23d191a4fb5e@ti.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
- <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
- <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
- <86va5myz7t.wl-marc.zyngier@arm.com>
- <81136b74-4b45-f44b-0168-23d191a4fb5e@ti.com>
-Message-ID: <49029695-79a0-141b-a9da-9764cb0ed60f@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 1 Nov 2018 15:58:13 +0800
+Subject: [RFC PATCH 7/7] arm64: allwinner: h6: orangepi-liet2: Enable
+ AP6356S WiFi support
+In-Reply-To: <CAMty3ZCeZzXYy4XRwTeQjYfpB6KKjEVRWyhjoca9Os4foLYL4g@mail.gmail.com>
+References: <20181031183634.29640-1-jagan@amarulasolutions.com>
+ <20181031183634.29640-7-jagan@amarulasolutions.com>
+ <CAMty3ZCeZzXYy4XRwTeQjYfpB6KKjEVRWyhjoca9Os4foLYL4g@mail.gmail.com>
+Message-ID: <CAGb2v67xCnH20Hga2P2Ekk3vhhOWUSgtOmRVAte+HDuodjsjkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lokesh,
+On Thu, Nov 1, 2018 at 3:35 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Thu, Nov 1, 2018 at 12:07 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> >
+> > From: Jagan Teki <jagan@openedev.com>
+> >
+> > Enable AP6356S WiFi/BT combo chip on Orangepi Lite2 board:
+> > - WiFi SDIO interface is connected to MMC1
+> > - WiFi WL-PMU-EN pin connected to gpio PM3: attach to mmc-pwrseq
+> > - WiFi WL-WAKE-AP pin connected to gpio PM0
+> > - 32kHz external oscillator gate clock from RTC
 
-On 10/29/18 3:04 PM, Lokesh Vutla wrote:
->>> With the above information, linux should send a message to
->>> system-controller using TISCI protocol. After policing the given
->>> information, system-controller does the following:
->>> - Attaches the interrupt(INTA input) to the device resource index
->>> - Muxes the interrupt(INTA input) to corresponding vint(INTA output)
->>> - Muxes the vint(INTR input) to GIC irq(INTR output).
->>
->> Isn't there a 1:1 mapping between *used* INTR inputs and outputs?
->> Since INTR is a router, there is no real muxing. I assume that the
->> third point above is just a copy-paste error.
-> 
-> Right, my bad. INTR is just a router and no read muxing.
+You never specified a clock rate for it, so it might actually be wrong.
+The default clock rate would be something "around" 32 kHz, but not very
+accurate. Meanwhile the WiFi module would have very specific requirements
+on frequency and accuracy of this clock. The WiFi part doesn't seem to
+care that much, but the Bluetooth part cares very much. It doesn't work
+or it would seem to work but you don't get anything off the radio if the
+frequency is off (as in off-frequency).
 
-INTR can mux M interrupt inputs to N interrupt outputs.
-One selects which interrupt input is outputted on the given interrupt
-output.
-It is perfectly valid (but not sane) to select the same interrupt input
-to be routed to _all_ interrupt output for example.
+> >
+> > Signed-off-by: Jagan Teki <jagan@openedev.com>
+> > ---
+> > Note:
+> > - chip detected, but failed to connect
+> > [  129.084504] brcmfmac: brcmf_sdio_hostmail: mailbox indicates firmware halted
+> > [  135.906409] brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
+>
+> This got fixed. Will send next version.
 
-Not sure if we are going to use this for anything but 1:1 mapping, but
-might worth keeping in mind...
+Could you wait until I get my RTC changes out? I also have some Bluetooth
+patches for AP621x, which is what started all this RTC work, which you might
+find interesting.
 
-
-- Peter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+ChenYu
