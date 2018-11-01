@@ -1,55 +1,94 @@
-From: atull@kernel.org (Alan Tull)
-Date: Thu, 1 Nov 2018 13:33:39 -0500
-Subject: [PATCH v2] zynq-fpga: Only route PR via PCAP when required
-In-Reply-To: <1540367583-5413-1-git-send-email-mike.looijmans@topic.nl>
-References: <1540276279-2903-1-git-send-email-mike.looijmans@topic.nl>
- <1540367583-5413-1-git-send-email-mike.looijmans@topic.nl>
-Message-ID: <CANk1AXRS=K65arg+JGmWsnpi1qoRm7ccQCsjo1C=d-85YGjeOQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu,  1 Nov 2018 11:53:40 -0700
+Subject: [PATCH] ARM64: dma: move swiotlb helpers under CONFIG_IOMMU_DMA
+Message-ID: <20181101185340.32664-1-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2018 at 2:53 AM Mike Looijmans <mike.looijmans@topic.nl> wrote:
+Fixes the following tinyconfig warnings:
+arch/arm64/mm/dma-mapping.c:174:12: warning: '__swiotlb_mmap_pfn' defined but not used [-Wunused-function]
+arch/arm64/mm/dma-mapping.c:163:12: warning: '__swiotlb_get_sgtable_page' defined but not used [-Wunused-function]
 
-Hi Mike,
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm64/mm/dma-mapping.c | 58 ++++++++++++++++++++++-----------------------
+ 1 file changed, 29 insertions(+), 29 deletions(-)
 
->
-> The Xilinx Zynq FPGA driver takes ownership of the PR interface, making
-> it impossible to use the ICAP interface for partial reconfiguration.
->
-> This patch changes the driver to only activate PR over PCAP while the
-> device is actively being accessed by the driver for programming.
->
-> This allows both PCAP and ICAP interfaces to be used for PR.
->
-> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
-> Reviewed-by: Moritz Fischer <mdf@kernel.org>
-Acked-by: Alan Tull <atull@kernel.org>
-
-Thanks for submitting!
-
-Alan
-
-> ---
-> v2: Move the register setting in between the clock enable/disable
->
->  drivers/fpga/zynq-fpga.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-> index 3110e00..ff3a427 100644
-> --- a/drivers/fpga/zynq-fpga.c
-> +++ b/drivers/fpga/zynq-fpga.c
-> @@ -501,6 +501,10 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr,
->         if (err)
->                 return err;
->
-> +       /* Release 'PR' control back to the ICAP */
-> +       zynq_fpga_write(priv, CTRL_OFFSET,
-> +               zynq_fpga_read(priv, CTRL_OFFSET) & ~CTRL_PCAP_PR_MASK);
-> +
->         err = zynq_fpga_poll_timeout(priv, INT_STS_OFFSET, intr_status,
->                                      intr_status & IXR_PCFG_DONE_MASK,
->                                      INIT_POLL_DELAY,
-> --
-> 1.9.1
->
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 3a703e5d4e32..62356c64e180 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -160,35 +160,6 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
+ 	__dma_unmap_area(phys_to_virt(paddr), size, dir);
+ }
+ 
+-static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
+-				      struct page *page, size_t size)
+-{
+-	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+-
+-	if (!ret)
+-		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+-
+-	return ret;
+-}
+-
+-static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
+-			      unsigned long pfn, size_t size)
+-{
+-	int ret = -ENXIO;
+-	unsigned long nr_vma_pages = vma_pages(vma);
+-	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+-	unsigned long off = vma->vm_pgoff;
+-
+-	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
+-		ret = remap_pfn_range(vma, vma->vm_start,
+-				      pfn + off,
+-				      vma->vm_end - vma->vm_start,
+-				      vma->vm_page_prot);
+-	}
+-
+-	return ret;
+-}
+-
+ static int __init atomic_pool_init(void)
+ {
+ 	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
+@@ -358,6 +329,35 @@ arch_initcall(arm64_dma_init);
+ #include <linux/platform_device.h>
+ #include <linux/amba/bus.h>
+ 
++static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
++				      struct page *page, size_t size)
++{
++	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
++
++	if (!ret)
++		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
++
++	return ret;
++}
++
++static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
++			      unsigned long pfn, size_t size)
++{
++	int ret = -ENXIO;
++	unsigned long nr_vma_pages = vma_pages(vma);
++	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long off = vma->vm_pgoff;
++
++	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      vma->vm_end - vma->vm_start,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
+ /* Thankfully, all cache ops are by VA so we can ignore phys here */
+ static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
+ {
+-- 
+2.11.0
