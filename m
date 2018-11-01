@@ -1,52 +1,38 @@
 From: lsun@mellanox.com (Liming Sun)
-Date: Thu,  1 Nov 2018 12:25:31 -0400
-Subject: [PATCH v6 2/9] arm64: Add Mellanox BlueField SoC config option
+Date: Thu,  1 Nov 2018 12:25:33 -0400
+Subject: [PATCH v6 4/9] MAINTAINERS: Add entry for Mellanox Bluefield Soc
 In-Reply-To: <1541089538-175682-1-git-send-email-lsun@mellanox.com>
 References: <1541089538-175682-1-git-send-email-lsun@mellanox.com>
-Message-ID: <1541089538-175682-2-git-send-email-lsun@mellanox.com>
+Message-ID: <1541089538-175682-4-git-send-email-lsun@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit introduces config option for Mellanox BlueField SoC,
-which can be used to build the SoC specific drivers, and enables
-it by default in configs/defconfig.
+Add maintainer information for Mellanox BlueField SoC.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 Reviewed-by: David Woods <dwoods@mellanox.com>
 Signed-off-by: Liming Sun <lsun@mellanox.com>
 ---
- arch/arm64/Kconfig.platforms | 6 ++++++
- arch/arm64/configs/defconfig | 1 +
- 2 files changed, 7 insertions(+)
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 393d2b5..1e28eb6 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -117,6 +117,12 @@ config ARCH_MESON
- 	help
- 	  This enables support for the Amlogic S905 SoCs.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 42a2f31..44fb693 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1694,6 +1694,14 @@ S:	Maintained
+ F:	drivers/phy/mediatek/
+ F:	Documentation/devicetree/bindings/phy/phy-mtk-*
  
-+config ARCH_MLNX_BLUEFIELD
-+	bool "Mellanox BlueField SoC Family"
-+	select SOC_MLNX
-+	help
-+	  This enables support for the Mellanox BlueField SoC.
++ARM/Mellanox BlueField SoC support
++M:	David Woods <dwoods@mellanox.com>
++M:	Liming Sun <lsun@mellanox.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	drivers/soc/mellanox/*
++F:	Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
 +
- config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
- 	select ARMADA_AP806_SYSCON
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index db8d364..8865ada 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -44,6 +44,7 @@ CONFIG_ARCH_LG1K=y
- CONFIG_ARCH_HISI=y
- CONFIG_ARCH_MEDIATEK=y
- CONFIG_ARCH_MESON=y
-+CONFIG_ARCH_MLNX_BLUEFIELD=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_ARCH_QCOM=y
- CONFIG_ARCH_ROCKCHIP=y
+ ARM/MICREL KS8695 ARCHITECTURE
+ M:	Greg Ungerer <gerg@uclinux.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 1.8.3.1
