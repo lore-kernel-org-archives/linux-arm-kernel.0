@@ -1,50 +1,35 @@
 From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Thu, 1 Nov 2018 09:20:49 +0200
-Subject: [PATCH v2 6/8] clk: rk808: use managed version of of_provider
- registration
+Date: Thu, 1 Nov 2018 09:21:20 +0200
+Subject: [PATCH v2 7/8] clk: clk-twl6040: Free of_provider at remove
 In-Reply-To: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
 References: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <1a8f1bf8bc4fd3871ba8c87b4ea656d1dc2e870c.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <4119302cc34182967ae79169e8eb34c59ffcebaf.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify clean-up for rk808 by using managed version of of_provider
-registration.
+use devm variant for of_provider registration so provider is freed
+at exit.
 
 Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 ---
- drivers/clk/clk-rk808.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/clk/clk-twl6040.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
-index 6461f2820a5b..177340edaae5 100644
---- a/drivers/clk/clk-rk808.c
-+++ b/drivers/clk/clk-rk808.c
-@@ -138,23 +138,12 @@ static int rk808_clkout_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
+diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
+index 25dfe050ae9f..e9da09453eb2 100644
+--- a/drivers/clk/clk-twl6040.c
++++ b/drivers/clk/clk-twl6040.c
+@@ -108,9 +108,8 @@ static int twl6040_pdmclk_probe(struct platform_device *pdev)
  
--	return of_clk_add_hw_provider(node, of_clk_rk808_get, rk808_clkout);
--}
--
--static int rk808_clkout_remove(struct platform_device *pdev)
--{
--	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
--	struct i2c_client *client = rk808->i2c;
--	struct device_node *node = client->dev.of_node;
--
--	of_clk_del_provider(node);
--
--	return 0;
+ 	platform_set_drvdata(pdev, clkdata);
+ 
+-	return of_clk_add_hw_provider(pdev->dev.parent->of_node,
+-				      of_clk_hw_simple_get,
+-				      &clkdata->pdmclk_hw);
 +	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
-+					of_clk_rk808_get, rk808_clkout);
++			of_clk_hw_simple_get, &clkdata->pdmclk_hw);
  }
  
- static struct platform_driver rk808_clkout_driver = {
- 	.probe = rk808_clkout_probe,
--	.remove = rk808_clkout_remove,
- 	.driver		= {
- 		.name	= "rk808-clkout",
- 	},
+ static struct platform_driver twl6040_pdmclk_driver = {
 -- 
 2.14.3
