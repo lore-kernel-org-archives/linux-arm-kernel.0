@@ -1,37 +1,60 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 1 Nov 2018 14:22:47 +0000
-Subject: [PATCH 2/2] arm64: acpi: Prepare for longer MADTs
-In-Reply-To: <20181101113136.GA6608@e107981-ln.cambridge.arm.com>
-References: <20181012192937.3819951-1-jeremy.linton@arm.com>
- <20181101113136.GA6608@e107981-ln.cambridge.arm.com>
-Message-ID: <20181101142247.GB27913@e107155-lin>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Thu, 1 Nov 2018 23:41:02 +0900
+Subject: [PATCH] ARM: kprobes: Fix false positive with FORTIFY_SOURCE
+In-Reply-To: <cbeccaf1-33ec-0e54-0cfa-8cff81bbc1cd@redhat.com>
+References: <20181022093023.GA8920@beast>
+ <cbeccaf1-33ec-0e54-0cfa-8cff81bbc1cd@redhat.com>
+Message-ID: <20181101234102.5fd16894fefffe18fccd6999@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2018 at 11:31:36AM +0000, Lorenzo Pieralisi wrote:
-> On Fri, Oct 12, 2018 at 02:29:37PM -0500, Jeremy Linton wrote:
-> > The BAD_MADT_GICC_ENTRY check is a little too strict because
-> > it rejects MADT entries that don't match the currently known
-> > lengths. We should remove this restriction to avoid problems
-> > if the table length changes. Future code which might depend on
-> > additional fields should be written to validate those fields
-> > before using them, rather than trying to globally check
-> > known MADT version lengths.
-> >
-> > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+On Tue, 30 Oct 2018 13:40:27 -0400
+William Cohen <wcohen@redhat.com> wrote:
+
+> On 10/22/18 5:30 AM, Kees Cook wrote:
+> > The arm compiler internally interprets an inline assembly label
+> > as an unsigned long value, not a pointer. As a result, under
+> > CONFIG_FORTIFY_SOURCE, the size of the array pointed to by an address
+> > of a label is 4 bytes, which was tripping the runtime checks. Instead,
+> > we can just cast the label (as done with the size calculations earlier)
+> > to avoid the problem.
+> > 
+> > Reported-by: William Cohen <wcohen@redhat.com>
+> > Fixes: 6974f0c4555e ("include/linux/string.h: add the option of fortified string.h functions")
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Kees Cook <keescook@chromium.org>
 > > ---
-> >  arch/arm64/include/asm/acpi.h | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> Hi Jeremy,
->
-> I assume there is no [PATCH 1/2] (to make sure I have not missed
-> anything).
->
+> >  arch/arm/probes/kprobes/opt-arm.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+> > index b2aa9b32bff2..2c118a6ab358 100644
+> > --- a/arch/arm/probes/kprobes/opt-arm.c
+> > +++ b/arch/arm/probes/kprobes/opt-arm.c
+> > @@ -247,7 +247,7 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
+> >  	}
+> >  
+> >  	/* Copy arch-dep-instance from template. */
+> > -	memcpy(code, &optprobe_template_entry,
+> > +	memcpy(code, (unsigned char *)optprobe_template_entry,
+> >  			TMPL_END_IDX * sizeof(kprobe_opcode_t));
+> >  
+> >  	/* Adjust buffer according to instruction. */
+> > 
+> 
+> The patch fixes the issue for kretprobes.  It looks good to me.
 
-IIRC, it's a patch fixing module device table entry for SPE. They are
-independent, just happened to be put out together.
+This looks good to me too. Thank you for finding and fixing it :)
 
---
-Regards,
-Sudeep
+Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+
+Thanks!
+
+> 
+> Thanks,
+> 
+> -Will
+
+
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
