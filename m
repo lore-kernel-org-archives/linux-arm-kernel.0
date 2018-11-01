@@ -1,49 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 1 Nov 2018 07:36:27 -0300
-Subject: [PATCH V3 09/10] dts: fsl: add imx7ulp evk support
-In-Reply-To: <CAOMZO5AZejEAHeB0hQ9T5U2ZJ7MXK=BYm8jY+yyZjbDHo4utGA@mail.gmail.com>
-References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
- <1540996688-23681-10-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5AZejEAHeB0hQ9T5U2ZJ7MXK=BYm8jY+yyZjbDHo4utGA@mail.gmail.com>
-Message-ID: <CAOMZO5CGsVYX_xYud_JDTikWAR6guW8-pfPhsBTG7MFbjdUtiw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 01 Nov 2018 11:49:08 +0100
+Subject: [PATCH v3 0/7] Standardize onboard LED support for 96Boards
+In-Reply-To: <CACRpkdarkLuErC_F4ALqOB5Wuf7TnDXmWZVKvfR7iGvOy=j++g@mail.gmail.com>
+References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+ <CAHTX3dJTXtuA0i-ffPjoiWuxEcF_5JY55VJtWd9zxW4HxK1K3w@mail.gmail.com>
+ <CACRpkdarkLuErC_F4ALqOB5Wuf7TnDXmWZVKvfR7iGvOy=j++g@mail.gmail.com>
+Message-ID: <1590147.nMxYQPWRVN@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 7:28 AM Fabio Estevam <festevam@gmail.com> wrote:
->
-> Hi Dong,
->
-> On Wed, Oct 31, 2018 at 11:46 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
->
-> > +       reg_vsd_3v3: regulator-vsd-3v3 {
-> > +               compatible = "regulator-fixed";
-> > +               regulator-name = "VSD_3V3";
-> > +               regulator-min-microvolt = <3300000>;
-> > +               regulator-max-microvolt = <3300000>;
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_usdhc0_rst>;
-> > +               gpio = <&gpio_ptd 0 GPIO_ACTIVE_HIGH>;
-> > +               enable-active-high;
->
-> You model this as a regulator...
->
-> > +&usdhc0 {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_usdhc0>;
-> > +       cd-gpios = <&gpio_ptc 10 GPIO_ACTIVE_LOW>;
-> > +       vmmc-supply = <&reg_vsd_3v3>;
->
-> but as this pins controls the reset of the SD port it seems that using
-> mmc-pwrseq would be more appropriate.
->
-> This way you could pass 'reset-gpios' inside the pwrseq node, which
-> would describe the hardware more accurately.
+Am Mittwoch, 31. Oktober 2018, 22:17:29 CET schrieb Linus Walleij:
+> On Wed, Oct 31, 2018 at 4:47 PM Michal Simek <monstr@monstr.eu> wrote:
+> > No doubt about it that this is good. If this is there from day 1 all will
+> > be good. I am just saying that we are all the time
+> > saying that we shouldn't break userspace. Right now if there is single
+> > application which uses existing names we are breaking it.
+> 
+> Yeah that's the problem, the approach is usually that if a tree falls
+> in the forest and noone is there to hear it, then it doesn't make a
+> sound.
+> 
+> But we can't assume someone is there as the safe default either.
+> 
+> I'd say apply it and see what happens, people are supposed to test.
 
-Just looked at the schematics and the SD0_nRST signals is only used
-when the eMMC is populated.
+At least for the Rockchip boards I'm somewhat confident, that they should
+be new enough to not have anybody building cludges - especially as I think
+LEDs might not be the most interesting device on such boards :-) .
 
-As you are only defining SD0_DATA0-DATA3 it means you are using the
-microSD option (option 1 as per the schematics).
+So while I can apply the Rockchip patches, I'm still hoping for some
+kind of consensus beforehand, least we roll it back after the fact  ;-) .
 
-In the microSD option the SD0_nRST is not used, so better not to
-describe it in device tree.
+Heiko
