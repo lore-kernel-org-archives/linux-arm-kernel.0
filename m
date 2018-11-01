@@ -1,185 +1,47 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Wed, 31 Oct 2018 16:48:36 -0700
-Subject: [PATCH v2 5/5] arm64: tegra: Add SMMU nodes to Tegra194 device tree
-In-Reply-To: <1541029716-14353-2-git-send-email-vdumpa@nvidia.com>
-References: <1541029716-14353-2-git-send-email-vdumpa@nvidia.com>
-Message-ID: <1541029716-14353-6-git-send-email-vdumpa@nvidia.com>
+From: natechancellor@gmail.com (Nathan Chancellor)
+Date: Wed, 31 Oct 2018 17:46:54 -0700
+Subject: [PATCH] pinctrl: bcm2835: Use define directive for
+ BCM2835_PINCONF_PARAM_PULL
+Message-ID: <20181101004653.7552-1-natechancellor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SMMU nodes and dma-ranges to Tegra194 device tree.
-Tegra194 has three ARM SMMU Instances. Two of them are used
-together to access IOVA interleaved. The third one is used
-as regular ARM SMMU.
+Clang warns when one enumerated type is implicitly converted to another:
 
-Signed-off-by: Krishna Reddy <vdumpa@nvidia.com>
+drivers/pinctrl/bcm/pinctrl-bcm2835.c:707:40: warning: implicit
+conversion from enumeration type 'enum bcm2835_pinconf_param' to
+different enumeration type 'enum pin_config_param' [-Wenum-conversion]
+        configs[0] = pinconf_to_config_packed(BCM2835_PINCONF_PARAM_PULL, pull);
+                     ~~~~~~~~~~~~~~~~~~~~~~~~ ^~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+
+It is expected that pinctrl drivers can extend pin_config_param because
+of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
+isn't an issue. Most drivers that take advantage of this define the
+PIN_CONFIG variables as constants, rather than enumerated values. Do the
+same thing here so that Clang no longer warns.
+
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra194.dtsi | 148 +++++++++++++++++++++++++++++++
- 1 file changed, 148 insertions(+)
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-index 9fc14bb..03fe2b4 100644
---- a/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-@@ -10,6 +10,7 @@
- 	interrupt-parent = <&gic>;
- 	#address-cells = <2>;
- 	#size-cells = <2>;
-+	dma-ranges = <0x0 0x0 0x0 0x0 0x8 0x0>;
+diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+index fa530913a2c8..b035c3fc0471 100644
+--- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+@@ -72,10 +72,8 @@
+ #define GPIO_REG_OFFSET(p)	((p) / 32)
+ #define GPIO_REG_SHIFT(p)	((p) % 32)
  
- 	/* control backbone */
- 	cbb {
-@@ -447,4 +448,151 @@
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 		interrupt-parent = <&gic>;
- 	};
-+
-+	dualsmmu: iommu at 12000000 {
-+		compatible = "tegra194,arm,mmu-500";
-+		reg = <0 0x12000000 0 0x800000>,
-+		      <0 0x11000000 0 0x800000>;
-+		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
-+		stream-match-mask = <0x7f80>;
-+		#global-interrupts = <1>;
-+		#iommu-cells = <1>;
-+	};
-+
-+	smmu: iommu at 10000000 {
-+		compatible = "arm,mmu-500";
-+		reg = <0 0x10000000 0 0x800000>;
-+		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
-+		stream-match-mask = <0x7f80>;
-+		#global-interrupts = <1>;
-+		#iommu-cells = <1>;
-+	};
- };
+-enum bcm2835_pinconf_param {
+-	/* argument: bcm2835_pinconf_pull */
+-	BCM2835_PINCONF_PARAM_PULL = (PIN_CONFIG_END + 1),
+-};
++/* argument: bcm2835_pinconf_pull */
++#define BCM2835_PINCONF_PARAM_PULL	(PIN_CONFIG_END + 1)
+ 
+ struct bcm2835_pinctrl {
+ 	struct device *dev;
 -- 
-2.1.4
+2.19.1
