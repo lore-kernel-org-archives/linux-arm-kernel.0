@@ -1,31 +1,49 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Thu, 1 Nov 2018 14:02:18 +0800
-Subject: [PATCH 1/2] spi: mediatek: Add bindings for mediatek MT8183 soc
- platform
-In-Reply-To: <1541052139-8845-1-git-send-email-leilk.liu@mediatek.com>
-References: <1541052139-8845-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1541052139-8845-2-git-send-email-leilk.liu@mediatek.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu,  1 Nov 2018 11:49:03 +0530
+Subject: [PATCH v2 0/4] Add initial pinctrl support for MT6797 SoC
+Message-ID: <20181101061907.20224-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a DT binding documentation for the MT8183 soc.
+This patchset adds initial pinctrl support for Mediatek MT6797 SoC.
+The pinctrl driver is based on the vendor binding as like MT6765 and
+implements only GPIO and pinmux functionalities.
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
- 1 file changed, 1 insertion(+)
+The devicetree binding document consists of pinmux, pinconf and
+interrupt functionalities documented since the binding should describe
+what the hardware is capable of rather than what the driver offers.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index 236dcb0..7940940 100644
---- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -8,6 +8,7 @@ Required properties:
-     - mediatek,mt7622-spi: for mt7622 platforms
-     - mediatek,mt8135-spi: for mt8135 platforms
-     - mediatek,mt8173-spi: for mt8173 platforms
-+    - mediatek,mt8183-spi: for mt8183 platforms
- 
- - #address-cells: should be 1.
- 
+This patchset has been tested on 96Boards MediatekX20 development board.
+
+Thanks,
+Mani
+
+Changes in v2:
+
+* Added devicetree bindings for Pin Controller
+* Dropped the applied warning fix patch
+* Added Tested-by tag from Matthias Brugger
+* Added Acked-by tag from Sean Wang
+
+Manivannan Sadhasivam (4):
+  dt-bindings: pinctrl: Add devicetree bindings for MT6797 SoC Pinctrl
+  arm64: dts: mediatek: mt6797: Add pinctrl support
+  arm64: dts: mediatek: x20: Add pinmux support for UART1
+  pinctrl: mediatek: Add initial pinctrl driver for MT6797 SoC
+
+ .../bindings/pinctrl/pinctrl-mt6797.txt       |   74 +
+ .../boot/dts/mediatek/mt6797-x20-dev.dts      |    2 +
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi      |   21 +
+ drivers/pinctrl/mediatek/Kconfig              |    7 +
+ drivers/pinctrl/mediatek/Makefile             |    1 +
+ drivers/pinctrl/mediatek/pinctrl-mt6797.c     |   82 +
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h | 2430 +++++++++++++++++
+ include/dt-bindings/pinctrl/mt6797-pinfunc.h  | 1368 ++++++++++
+ 8 files changed, 3985 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt6797.txt
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt6797.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt6797.h
+ create mode 100644 include/dt-bindings/pinctrl/mt6797-pinfunc.h
+
 -- 
-1.7.9.5
+2.17.1
