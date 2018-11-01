@@ -1,47 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 1 Nov 2018 15:58:13 +0800
-Subject: [RFC PATCH 7/7] arm64: allwinner: h6: orangepi-liet2: Enable
- AP6356S WiFi support
-In-Reply-To: <CAMty3ZCeZzXYy4XRwTeQjYfpB6KKjEVRWyhjoca9Os4foLYL4g@mail.gmail.com>
-References: <20181031183634.29640-1-jagan@amarulasolutions.com>
- <20181031183634.29640-7-jagan@amarulasolutions.com>
- <CAMty3ZCeZzXYy4XRwTeQjYfpB6KKjEVRWyhjoca9Os4foLYL4g@mail.gmail.com>
-Message-ID: <CAGb2v67xCnH20Hga2P2Ekk3vhhOWUSgtOmRVAte+HDuodjsjkw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 1 Nov 2018 09:18:34 +0100
+Subject: [PATCH] pinctrl: bcm2835: Use define directive for
+ BCM2835_PINCONF_PARAM_PULL
+In-Reply-To: <20181101004653.7552-1-natechancellor@gmail.com>
+References: <20181101004653.7552-1-natechancellor@gmail.com>
+Message-ID: <4619d04e-3f17-f1d8-2cca-a9b62f063d75@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 3:35 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+Am 01.11.18 um 01:46 schrieb Nathan Chancellor:
+> Clang warns when one enumerated type is implicitly converted to another:
 >
-> On Thu, Nov 1, 2018 at 12:07 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> >
-> > From: Jagan Teki <jagan@openedev.com>
-> >
-> > Enable AP6356S WiFi/BT combo chip on Orangepi Lite2 board:
-> > - WiFi SDIO interface is connected to MMC1
-> > - WiFi WL-PMU-EN pin connected to gpio PM3: attach to mmc-pwrseq
-> > - WiFi WL-WAKE-AP pin connected to gpio PM0
-> > - 32kHz external oscillator gate clock from RTC
-
-You never specified a clock rate for it, so it might actually be wrong.
-The default clock rate would be something "around" 32 kHz, but not very
-accurate. Meanwhile the WiFi module would have very specific requirements
-on frequency and accuracy of this clock. The WiFi part doesn't seem to
-care that much, but the Bluetooth part cares very much. It doesn't work
-or it would seem to work but you don't get anything off the radio if the
-frequency is off (as in off-frequency).
-
-> >
-> > Signed-off-by: Jagan Teki <jagan@openedev.com>
-> > ---
-> > Note:
-> > - chip detected, but failed to connect
-> > [  129.084504] brcmfmac: brcmf_sdio_hostmail: mailbox indicates firmware halted
-> > [  135.906409] brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
+> drivers/pinctrl/bcm/pinctrl-bcm2835.c:707:40: warning: implicit
+> conversion from enumeration type 'enum bcm2835_pinconf_param' to
+> different enumeration type 'enum pin_config_param' [-Wenum-conversion]
+>         configs[0] = pinconf_to_config_packed(BCM2835_PINCONF_PARAM_PULL, pull);
+>                      ~~~~~~~~~~~~~~~~~~~~~~~~ ^~~~~~~~~~~~~~~~~~~~~~~~~~
+> 1 warning generated.
 >
-> This got fixed. Will send next version.
+> It is expected that pinctrl drivers can extend pin_config_param because
+> of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
+> isn't an issue. Most drivers that take advantage of this define the
+> PIN_CONFIG variables as constants, rather than enumerated values. Do the
+> same thing here so that Clang no longer warns.
+>
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> ---
+>  
 
-Could you wait until I get my RTC changes out? I also have some Bluetooth
-patches for AP621x, which is what started all this RTC work, which you might
-find interesting.
-
-ChenYu
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
