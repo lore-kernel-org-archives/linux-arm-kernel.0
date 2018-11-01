@@ -1,68 +1,41 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Thu,  1 Nov 2018 08:00:08 -0700
-Subject: [PATCH v2] pinctrl: lpc18xx: Use define directive for
- PIN_CONFIG_GPIO_PIN_INT
-In-Reply-To: <20181101005257.8778-1-natechancellor@gmail.com>
-References: <20181101005257.8778-1-natechancellor@gmail.com>
-Message-ID: <20181101150007.14145-1-natechancellor@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Nov 2018 16:11:55 +0100
+Subject: [PATCH] RFC: ARM: do not handle Spectre V2 on Vexpress CA9
+In-Reply-To: <20181101140143.GA27913@e107155-lin>
+References: <20181101125406.8874-1-linus.walleij@linaro.org>
+ <42704270-8d9f-3f7a-9af1-4bd87f413815@arm.com>
+ <20181101140143.GA27913@e107155-lin>
+Message-ID: <CACRpkda-_ENuFpUsxWcYO_mOGnHqUc8d+c8CnYgwWvi7mXsKTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang warns when one enumerated type is implicitly converted to another:
+On Thu, Nov 1, 2018 at 3:01 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On Thu, Nov 01, 2018 at 01:56:41PM +0000, Robin Murphy wrote:
 
-drivers/pinctrl/pinctrl-lpc18xx.c:643:29: warning: implicit conversion
-from enumeration type 'enum lpc18xx_pin_config_param' to different
-enumeration type 'enum pin_config_param' [-Wenum-conversion]
-        {"nxp,gpio-pin-interrupt", PIN_CONFIG_GPIO_PIN_INT, 0},
-        ~                          ^~~~~~~~~~~~~~~~~~~~~~~
-drivers/pinctrl/pinctrl-lpc18xx.c:648:12: warning: implicit conversion
-from enumeration type 'enum lpc18xx_pin_config_param' to different
-enumeration type 'enum pin_config_param' [-Wenum-conversion]
-        PCONFDUMP(PIN_CONFIG_GPIO_PIN_INT, "gpio pin int", NULL, true),
-        ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
-macro 'PCONFDUMP'
-        .param = a, .display = b, .format = c, .has_arg = d     \
-                 ^
-2 warnings generated.
+> > As far as I remember, the usual V2P_CA9 problem where the L2 cache locks up
+> > for unfathomable reasons can come and go reasonably consistently depending
+> > on the exact kernel configuration/version, and ultimately seems like it
+> > might be more sensitive to the general shape and timing of the early boot
+> > code than any particular feature. As such I'd be wary that there might still
+> > be some other combinations of options which would manage to boot with the
+> > mitigation left enabled, and others which won't even if (or at worst
+> > *because*) we do skip it.
+>
+> Indeed, I was about ask if disabling L2 makes it any consistent.
+> We did try increasing the read/write/tag latencies in the past but never
+> got it fully consistent to push the change.
 
-It is expected that pinctrl drivers can extend pin_config_param because
-of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
-isn't an issue. Most drivers that take advantage of this define the
-PIN_CONFIG variables as constants, rather than enumerated values. Do the
-same thing here so that Clang no longer warns.
+Yeah I have a patch increasing tag latencies in my tree that I got from
+Russell, but it doesn't help with this.
 
-Link: https://github.com/ClangBuiltLinux/linux/issues/140
-Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
----
+I will try to run it with L2 disabled, if that works maybe the solution is
+simply to permanently disable L2 on Vexpress CA9 if it's this
+unpredictable, or are there people using this reference design in
+performance-critical setups so that is an absolute nono?
 
-v1 -> v2:
+I remember I even saw Android ported to this machine at one point,
+is that something that is being continously maintained to newer
+kernels and Adroid AOSPs?
 
-* Improve comment so kernel-doc doesn't warn.
-
- drivers/pinctrl/pinctrl-lpc18xx.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-lpc18xx.c b/drivers/pinctrl/pinctrl-lpc18xx.c
-index a14bc5e5fc24..06be55dab341 100644
---- a/drivers/pinctrl/pinctrl-lpc18xx.c
-+++ b/drivers/pinctrl/pinctrl-lpc18xx.c
-@@ -630,14 +630,8 @@ static const struct pinctrl_pin_desc lpc18xx_pins[] = {
- 	LPC18XX_PIN(i2c0_sda, PIN_I2C0_SDA),
- };
- 
--/**
-- * enum lpc18xx_pin_config_param - possible pin configuration parameters
-- * @PIN_CONFIG_GPIO_PIN_INT: route gpio to the gpio pin interrupt
-- * 	controller.
-- */
--enum lpc18xx_pin_config_param {
--	PIN_CONFIG_GPIO_PIN_INT = PIN_CONFIG_END + 1,
--};
-+/* PIN_CONFIG_GPIO_PIN_INT: route gpio to the gpio pin interrupt controller */
-+#define PIN_CONFIG_GPIO_PIN_INT		(PIN_CONFIG_END + 1)
- 
- static const struct pinconf_generic_params lpc18xx_params[] = {
- 	{"nxp,gpio-pin-interrupt", PIN_CONFIG_GPIO_PIN_INT, 0},
--- 
-2.19.1
+Yours,
+Linus Walleij
