@@ -1,117 +1,84 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 1 Nov 2018 17:35:52 +0800
-Subject: [PATCH 5/7] arm64: allwinner: h6: Add RTC node
-In-Reply-To: <CAMty3ZBJiDrr0hqgzMMQ76R7=+agsHyjYQGTrebH=_q5Ax2xXA@mail.gmail.com>
+Date: Thu, 1 Nov 2018 17:49:12 +0800
+Subject: [RFC PATCH 7/7] arm64: allwinner: h6: orangepi-liet2: Enable
+ AP6356S WiFi support
+In-Reply-To: <CAMty3ZBNdg43nL-HviyHufwQtTbC4wv20JVYBBT8LDpWiV0wTQ@mail.gmail.com>
 References: <20181031183634.29640-1-jagan@amarulasolutions.com>
- <20181031183634.29640-5-jagan@amarulasolutions.com>
- <CAGb2v64fnpCh_rCy-9m8xgXmAZQGab1==f7cr332QfgueyuRNw@mail.gmail.com>
- <CAMty3ZAW5KndyJj81obK49MKczdbk4SoUncmiiE_OhH1g7qFUA@mail.gmail.com>
- <CAGb2v67WZmG7qPqf_UoR4v=Zm2AbS8pcOQsWJPRVHr-i2NvRPA@mail.gmail.com>
- <CAMty3ZBJiDrr0hqgzMMQ76R7=+agsHyjYQGTrebH=_q5Ax2xXA@mail.gmail.com>
-Message-ID: <CAGb2v64T0zEmyELmJ5X-isohV6FWb9C5N-h+w-s16vjth2dMJg@mail.gmail.com>
+ <20181031183634.29640-7-jagan@amarulasolutions.com>
+ <CAMty3ZCeZzXYy4XRwTeQjYfpB6KKjEVRWyhjoca9Os4foLYL4g@mail.gmail.com>
+ <CAGb2v67xCnH20Hga2P2Ekk3vhhOWUSgtOmRVAte+HDuodjsjkw@mail.gmail.com>
+ <CAMty3ZBNdg43nL-HviyHufwQtTbC4wv20JVYBBT8LDpWiV0wTQ@mail.gmail.com>
+Message-ID: <CAGb2v66MohJC9fBYhwJgaf+HP_AZb-c5B9CZr1GaAABc+Qj0vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 5:02 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+On Thu, Nov 1, 2018 at 5:08 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
 >
-> On Thu, Nov 1, 2018 at 1:23 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> On Thu, Nov 1, 2018 at 1:28 PM Chen-Yu Tsai <wens@csie.org> wrote:
 > >
-> > On Thu, Nov 1, 2018 at 3:33 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > On Thu, Nov 1, 2018 at 3:35 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
 > > >
-> > > On Thu, Nov 1, 2018 at 8:25 AM Chen-Yu Tsai <wens@csie.org> wrote:
+> > > On Thu, Nov 1, 2018 at 12:07 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
 > > > >
-> > > > On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > > > >
-> > > > > From: Jagan Teki <jagan@openedev.com>
-> > > > >
-> > > > > RTC controller is similar to A31, so use the same compatible
-> > > > > for H6 and update interrupt numbers as per manual.
+> > > > From: Jagan Teki <jagan@openedev.com>
 > > > >
-> > > > No. Unfortunately they are not that compatible. The A31 does not have
-> > > > the RTC clock output. So everyone got it wrong. :( Plus the clock rate
-> > > > of the internal RC oscillator varies between SoCs. I'm working on a
-> > > > series of patches to correct this. Stay tuned.
-> > >
-> > > 4 bit, EXT_LOSC_EN of LOSC_CTRL_REG (0x00) seem available in H6. I can
-> > > see external clock working with WIFI for A31 compatible.
+> > > > Enable AP6356S WiFi/BT combo chip on Orangepi Lite2 board:
+> > > > - WiFi SDIO interface is connected to MMC1
+> > > > - WiFi WL-PMU-EN pin connected to gpio PM3: attach to mmc-pwrseq
+> > > > - WiFi WL-WAKE-AP pin connected to gpio PM0
+> > > > - 32kHz external oscillator gate clock from RTC
 > >
-> > That bit turns on the external crystal, i.e. X32KIN and X32KOUT pins.
+> > You never specified a clock rate for it, so it might actually be wrong.
+> > The default clock rate would be something "around" 32 kHz, but not very
+> > accurate. Meanwhile the WiFi module would have very specific requirements
+> > on frequency and accuracy of this clock. The WiFi part doesn't seem to
+> > care that much, but the Bluetooth part cares very much. It doesn't work
+> > or it would seem to work but you don't get anything off the radio if the
+> > frequency is off (as in off-frequency).
 >
-> This is what I confused, the same signal pins available there in A64
-> schematics but no bit to enable external OSC in LOSC_CTRL_REG.
->
-> But the X32KFOUT pin which is 0x60 , BIT(0) is enabled in A64, H6 w/o
-> this LOSC_CTRL_REG which I don't know exactly or may be feed it by
-> default not sure.
->
-> >
-> > I'm talking about the X32KFOUT pin, which feeds the WiFi module the
-> > LPO clock in typical Allwinner designs. That is controlled by register
-> > 0x60, and is not present on the A31. That is the clock you say is
-> > working. You have the two confused.
-> >
-> > The clock tree looks like this:
-> >
-> > IOSC -----------------------------\
-> >                                    SUN6I_LOSC_CTRL_EXT_OSC mux ---->
-> > LOSC --> (to CCU)
-> > 32k crystal --> EXT_LOSC_EN gate -/                              \
-> >                                                                   \
-> >                                                                   /
-> >       (to WiFi) <-- X32KFOUT pin <-- LOSC_OUT_GATING_EN gate <---/
->
-> Yes, I understand this. But for A33, A64 there is no EXT_LOSC_EN which
-> is directly feed to WIFI from LOSC as per manual but from schematic
-> signals X32KI and X32KO were present.
+> True, but why it's not 32K which is stated in manual and schematics do
+> we need to measure the actual rate with oscilloscope?
 
-No. Read the schematic again. CAREFULLY. The pin that feeds the WiFi module
-is called X32KFOUT. With an "F". The A33 datasheet says the pin is "Clock
-Output of LOSC (X32KFOUT can be gating)". The A64 datasheet may not mention
-the output can be gated, but the LOSC_OUT_GATING_REG register is aptly named
-"LOSC Output Gating Register".
+I suppose it's just shorthand. The datasheet describes the actual requirements
+for both oscillators, where it clearly states the 32K one should be 32768 Hz.
+A scope shouldn't be needed as we expect the board design to at least conform
+to constraints outlined in datasheets.
 
-And see below about the EXT_LOSC_EN bit. You are confusing input to the RTC
-module vs output from the RTC module. All crystals have an IN and an OUT
-connection. It's just the way they work.
+On the side, the LOSC be _around_ 32kHz if you clocked it from the internal
+RC oscillator, which is not very stable. This is actually the hardware default.
+But the WiFi module (and also the RTC) needs 32.768K, a slight difference,
+but enough to throw off calculations for other clocks. When the RTC module
+isn't clocked from the external crystal, the RTC clock will drift. This has
+been reported and is why we have
 
-> > The bottom part does not exist in the A31. Meanwhile we've been claiming that
-> > all later RTC modules that actually have that part are compatible with the A31.
-> > Also the IOSC part has different clock rates for different chips.
-> >
-> > Do you see the problem?
->
-> From external crystal point of view, between A33, A64 vs H6 I only see
-> the difference in EXT_LOSC_EN external oscillator enable bit only
-> available in H6 manual.
+    /* Switch to the external, more precise, oscillator */
+    writel(SUN6I_LOSC_CTRL_KEY | SUN6I_LOSC_CTRL_EXT_OSC,
+           rtc->base + SUN6I_LOSC_CTRL);
 
-You are focusing on the wrong thing. From the driver's point of view,
-we simply don't care about this bit. It is by default on. We might want
-to force enable it if some broken bootloader turns it off, but that is
-besides the point here. And on all the other SoCs, the absence of this
-bit means that the external crystal will always be on.
+in the RTC driver's clock probe function. See these two patches:
 
-Furthermore, this bit concerns the "input" from the crystal to the RTC.
-What I'm concerned about, and what you should be concerned about, because
-that's what you're using, is the LOSC_OUT_GATING_EN bit. As mentioned this
-does not exist on the A31.
+    fb61bb82cb46 rtc: sun6i: Switch to the external oscillator
+    3855c2c3e546 rtc: sun6i: Expose the 32kHz oscillator
 
->
-> Regarding, rtc-sun6i. we can manage the external clock stuff via
-> "clock-output-names" with rtc->ext_losc and mentioning external
-> oscillator outputs on DTSI. since A31, don't have external clock to
-> wifi then we can skip those properties.
->
-> What do you think?
+Note the commit message for the second patch is incorrect. We actually force
+the RTC module to use the external crystal regardless of the "clocks" property.
 
-That's not correct. On the A31, the RTC's LOSC still feeds the CCU,
-so output index 0 is always valid. Output index 1 on the A31 is invalid
-because it simply doesn't have this in the hardware. Furthermore, you're
-still not dealing with the fact that one A23/A33 the IOSC is 600~700 kHZ,
-on the A64/H3/H5/H6 it is 16 MHz, and on the V3/V3s it is 32 kHz. The
-first two cases also have prescalers to divide the clock rate down to
-around 32 kHz. All these hardware details need to be tied to new compatible
-strings, so that the driver knows about them and can handle them if needed.
-What you're describing is very fragile and pretty much a hack. We already
-have enough of those.
+I actually forgot about this. So even without assigning clock rates your patch
+would work fine. Hope this doesn't confuse you more than it already has.
 
 ChenYu
+
+> > > > Signed-off-by: Jagan Teki <jagan@openedev.com>
+> > > > ---
+> > > > Note:
+> > > > - chip detected, but failed to connect
+> > > > [  129.084504] brcmfmac: brcmf_sdio_hostmail: mailbox indicates firmware halted
+> > > > [  135.906409] brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
+> > >
+> > > This got fixed. Will send next version.
+> >
+> > Could you wait until I get my RTC changes out? I also have some Bluetooth
+> > patches for AP621x, which is what started all this RTC work, which you might
+> > find interesting.
+>
+> Yes, my intention is the same.
