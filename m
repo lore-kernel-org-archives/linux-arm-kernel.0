@@ -1,50 +1,49 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu,  1 Nov 2018 11:49:05 +0530
-Subject: [PATCH v2 2/4] arm64: dts: mediatek: mt6797: Add pinctrl support
+Date: Thu,  1 Nov 2018 11:49:06 +0530
+Subject: [PATCH v2 3/4] arm64: dts: mediatek: x20: Add pinmux support for UART1
 In-Reply-To: <20181101061907.20224-1-manivannan.sadhasivam@linaro.org>
 References: <20181101061907.20224-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181101061907.20224-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181101061907.20224-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl support for Mediatek MT6797 SoC.
+Add pinmux support for UART1 on MediatekX20 Development board based
+on Mediatek MT6797 SoC.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/mediatek/mt6797.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts | 2 ++
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi        | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+index 742938a1a548..13939d55b85b 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+@@ -30,4 +30,6 @@
+ 
+ &uart1 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>;
+ };
 diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-index 4beaa71107d7..231230d32d09 100644
+index 231230d32d09..a64bb84bdec3 100644
 --- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt6797-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/pinctrl/mt6797-pinfunc.h>
- 
- / {
- 	compatible = "mediatek,mt6797";
-@@ -129,6 +130,19 @@
- 		#clock-cells = <1>;
+@@ -141,6 +141,13 @@
+ 			    "iocfgr", "iocfgt";
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++
++		uart1_pins_a: uart1 {
++			pins1 {
++				pinmux = <MT6797_GPIO232__FUNC_URXD1>,
++					 <MT6797_GPIO233__FUNC_UTXD1>;
++			};
++		};
  	};
  
-+	pio: pinctrl at 10005000 {
-+		compatible = "mediatek,mt6797-pinctrl";
-+		reg = <0 0x10005000 0 0x1000>,
-+		      <0 0x10002000 0 0x400>,
-+		      <0 0x10002400 0 0x400>,
-+		      <0 0x10002800 0 0x400>,
-+		      <0 0x10002C00 0 0x400>;
-+		reg-names = "gpio", "iocfgl", "iocfgb",
-+			    "iocfgr", "iocfgt";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
  	scpsys: scpsys at 10006000 {
- 		compatible = "mediatek,mt6797-scpsys";
- 		#power-domain-cells = <1>;
 -- 
 2.17.1
