@@ -1,24 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Nov 2018 22:36:38 +0100
-Subject: [PATCH] RFC: ARM: do not handle Spectre V2 on Vexpress CA9
-In-Reply-To: <20181101172512.GP30658@n2100.armlinux.org.uk>
-References: <20181101125406.8874-1-linus.walleij@linaro.org>
- <42704270-8d9f-3f7a-9af1-4bd87f413815@arm.com>
- <20181101172512.GP30658@n2100.armlinux.org.uk>
-Message-ID: <CACRpkdZ9CKssFR3kT_rkFLeG7eJM95zZJ0GfT7vz488i51_Vtg@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 1 Nov 2018 14:47:23 -0700
+Subject: [PATCH v4] mm/page_owner: clamp read count to PAGE_SIZE
+In-Reply-To: <1541091607-27402-1-git-send-email-miles.chen@mediatek.com>
+References: <1541091607-27402-1-git-send-email-miles.chen@mediatek.com>
+Message-ID: <20181101144723.3ddc1fa1ab7f81184bc2fdb8@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2018 at 6:25 PM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
+On Fri, 2 Nov 2018 01:00:07 +0800 <miles.chen@mediatek.com> wrote:
 
-> The platform is basically unreliable - it's not called a "test chip"
-> for no reason!
+> From: Miles Chen <miles.chen@mediatek.com>
+> 
+> The page owner read might allocate a large size of memory with
+> a large read count. Allocation fails can easily occur when doing
+> high order allocations.
+> 
+> Clamp buffer size to PAGE_SIZE to avoid arbitrary size allocation
+> and avoid allocation fails due to high order allocation.
+> 
+> ...
+>
+> --- a/mm/page_owner.c
+> +++ b/mm/page_owner.c
+> @@ -351,6 +351,7 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
+>  		.skip = 0
+>  	};
+>  
+> +	count = count > PAGE_SIZE ? PAGE_SIZE : count;
+>  	kbuf = kmalloc(count, GFP_KERNEL);
+>  	if (!kbuf)
+>  		return -ENOMEM;
 
-I think you're right. Since I have qemu working for it, I just stick
-with that in my development for now, and do the odd test on hardware
-on the days it happens to be working. I guess this patch doesn't
-help in general, it just helped today.
+A bit tidier:
 
-Yours,
-Linus Walleij
+--- a/mm/page_owner.c~mm-page_owner-clamp-read-count-to-page_size-fix
++++ a/mm/page_owner.c
+@@ -351,7 +351,7 @@ print_page_owner(char __user *buf, size_
+ 		.skip = 0
+ 	};
+ 
+-	count = count > PAGE_SIZE ? PAGE_SIZE : count;
++	count = min_t(size_t, count, PAGE_SIZE);
+ 	kbuf = kmalloc(count, GFP_KERNEL);
+ 	if (!kbuf)
+ 		return -ENOMEM;
