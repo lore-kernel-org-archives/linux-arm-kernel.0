@@ -1,58 +1,32 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Wed, 31 Oct 2018 17:57:24 -0700
-Subject: [PATCH] pinctrl: zynq: Use define directive for PIN_CONFIG_IO_STANDARD
-Message-ID: <20181101005724.9622-1-natechancellor@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 31 Oct 2018 18:36:28 -0700 (PDT)
+Subject: [PATCH] net: stmmac: Fix stmmac_mdio_reset() when building
+ stmmac as modules
+In-Reply-To: <20181031150810.16665-1-niklas.cassel@linaro.org>
+References: <20181031150810.16665-1-niklas.cassel@linaro.org>
+Message-ID: <20181031.183628.2259691990575006225.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang warns when one enumerated type is implicitly converted to another:
+From: Niklas Cassel <niklas.cassel@linaro.org>
+Date: Wed, 31 Oct 2018 16:08:10 +0100
 
-drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
-enumeration type 'enum zynq_pin_config_param' to different enumeration
-type 'enum pin_config_param' [-Wenum-conversion]
-        {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
-        ~               ^~~~~~~~~~~~~~~~~~~~~
-drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
-enumeration type 'enum zynq_pin_config_param' to different enumeration
-type 'enum pin_config_param' [-Wenum-conversion]
-        = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
-            ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
-macro 'PCONFDUMP'
-        .param = a, .display = b, .format = c, .has_arg = d     \
-                 ^
-2 warnings generated.
+> When building stmmac, it is only possible to select CONFIG_DWMAC_GENERIC,
+> or any of the glue drivers, when CONFIG_STMMAC_PLATFORM is set.
+> The only exception is CONFIG_STMMAC_PCI.
+> 
+> When calling of_mdiobus_register(), it will call our ->reset()
+> callback, which is set to stmmac_mdio_reset().
+> 
+> Most of the code in stmmac_mdio_reset() is protected by a
+> "#if defined(CONFIG_STMMAC_PLATFORM)", which will evaluate
+> to false when CONFIG_STMMAC_PLATFORM=m.
+> 
+> Because of this, the phy reset gpio will only be pulled when
+> stmmac is built as built-in, but not when built as modules.
+> 
+> Fix this by using "#if IS_ENABLED()" instead of "#if defined()".
+> 
+> Signed-off-by: Niklas Cassel <niklas.cassel@linaro.org>
 
-It is expected that pinctrl drivers can extend pin_config_param because
-of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
-isn't an issue. Most drivers that take advantage of this define the
-PIN_CONFIG variables as constants, rather than enumerated values. Do the
-same thing here so that Clang no longer warns.
-
-Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
----
- drivers/pinctrl/pinctrl-zynq.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-index a0daf27042bd..57046c221756 100644
---- a/drivers/pinctrl/pinctrl-zynq.c
-+++ b/drivers/pinctrl/pinctrl-zynq.c
-@@ -972,14 +972,11 @@ enum zynq_io_standards {
- };
- 
- /**
-- * enum zynq_pin_config_param - possible pin configuration parameters
-  * @PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the argument to
-  *	this parameter (on a custom format) tells the driver which alternative
-  *	IO standard to use.
-  */
--enum zynq_pin_config_param {
--	PIN_CONFIG_IOSTANDARD = PIN_CONFIG_END + 1,
--};
-+#define PIN_CONFIG_IOSTANDARD		(PIN_CONFIG_END + 1)
- 
- static const struct pinconf_generic_params zynq_dt_params[] = {
- 	{"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
--- 
-2.19.1
+Applied and queued up for -stable, thanks.
