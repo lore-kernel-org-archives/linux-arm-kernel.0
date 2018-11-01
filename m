@@ -1,81 +1,42 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 2 Nov 2018 01:44:58 +0800
-Subject: [PATCH i2c-next v9 5/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-In-Reply-To: <20181030210917.32711-6-jae.hyun.yoo@linux.intel.com>
-References: <20181030210917.32711-6-jae.hyun.yoo@linux.intel.com>
-Message-ID: <201811020154.eziM0emr%fengguang.wu@intel.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu,  1 Nov 2018 10:46:21 -0700
+Subject: [PATCH] i2c: aspeed: Fix an incorrect error log printing
+Message-ID: <20181101174621.8266-1-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jae,
+Usually a SLAVE_MATCH and an RX_DONE intterupts come together at
+the same time in most cases but rarely these come separately like
+SLAVE_MATCH first and then RX_DONE right after that.
 
-Thank you for the patch! Perhaps something to improve:
+Current slave irq handler prints out an error message if the
+latter case happens but this is not an actual error, so this commit
+fixes the incorrect error log printing and makes the handler
+initialize slave state if an incorrect state actually happens.
 
-[auto build test WARNING on wsa/i2c/for-next]
-[also build test WARNING on v4.19 next-20181101]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Jae-Hyun-Yoo/dt-bindings-i2c-Add-bus-timeout-ms-and-retries-properties-as-common-optional/20181031-051152
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
-config: i386-allyesconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-
-All warnings (new ones prefixed by >>):
-
-   drivers/i2c/busses/i2c-aspeed.c: In function 'aspeed_i2c_master_xfer':
->> drivers/i2c/busses/i2c-aspeed.c:624:210: warning: 'timeout' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      if (time_after(jiffies, timeout))
-                                                                                                                                                                                                                     ^           
-   drivers/i2c/busses/i2c-aspeed.c:607:16: note: 'timeout' was declared here
-     unsigned long timeout;
-                   ^~~~~~~
-
-vim +/timeout +624 drivers/i2c/busses/i2c-aspeed.c
-
-   604	
-   605	static int aspeed_i2c_check_bus_busy(struct aspeed_i2c_bus *bus)
-   606	{
-   607		unsigned long timeout;
-   608	
-   609		if (bus->multi_master) {
-   610			might_sleep();
-   611			/* Initialize it only when multi_master is set */
-   612			timeout = jiffies + bus->adap.timeout;
-   613		}
-   614	
-   615		for (;;) {
-   616			if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
-   617			      ASPEED_I2CD_BUS_BUSY_STS))
-   618	#if IS_ENABLED(CONFIG_I2C_SLAVE)
-   619				if (bus->slave_state == ASPEED_I2C_SLAVE_STOP)
-   620	#endif
-   621					return 0;
-   622			if (!bus->multi_master)
-   623				break;
- > 624			if (time_after(jiffies, timeout))
-   625				break;
-   626			usleep_range((ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US >> 2) + 1,
-   627				     ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US);
-   628		}
-   629	
-   630		return aspeed_i2c_recover_bus(bus);
-   631	}
-   632	
-
+Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 64563 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181102/9bc6f6c4/attachment-0001.gz>
+ drivers/i2c/busses/i2c-aspeed.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+index 8dc9161ced38..e9312d90ff7d 100644
+--- a/drivers/i2c/busses/i2c-aspeed.c
++++ b/drivers/i2c/busses/i2c-aspeed.c
+@@ -311,9 +311,13 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
+ 	case ASPEED_I2C_SLAVE_STOP:
+ 		i2c_slave_event(slave, I2C_SLAVE_STOP, &value);
+ 		break;
++	case ASPEED_I2C_SLAVE_START:
++		/* Slave was just started. Waiting for the next irq. */;
++		break;
+ 	default:
+-		dev_err(bus->dev, "unhandled slave_state: %d\n",
++		dev_err(bus->dev, "unknown slave_state: %d\n",
+ 			bus->slave_state);
++		bus->slave_state = ASPEED_I2C_SLAVE_STOP;
+ 		break;
+ 	}
+ 
+-- 
+2.19.1
