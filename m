@@ -1,69 +1,175 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  1 Nov 2018 13:54:06 +0100
-Subject: [PATCH] RFC: ARM: do not handle Spectre V2 on Vexpress CA9
-Message-ID: <20181101125406.8874-1-linus.walleij@linaro.org>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 1 Nov 2018 14:38:48 +0100
+Subject: [PATCH v9 5/8] KVM: arm64: Support PUD hugepage in
+ stage2_is_exec()
+In-Reply-To: <20181031175745.18650-6-punit.agrawal@arm.com>
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-6-punit.agrawal@arm.com>
+Message-ID: <20181101133848.GL12057@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the introduction of the Spectre V2 fixes for ARMv7,
-especially the BPIALL workaround, the Versatile Express CA9
-with its fragile CA9 core tile simply doesn't boot for me
-anymore.
+On Wed, Oct 31, 2018 at 05:57:42PM +0000, Punit Agrawal wrote:
+> In preparation for creating PUD hugepages at stage 2, add support for
+> detecting execute permissions on PUD page table entries. Faults due to
+> lack of execute permissions on page table entries is used to perform
+> i-cache invalidation on first execute.
+> 
+> Provide trivial implementations of arm32 helpers to allow sharing of
+> code.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h         |  6 +++
+>  arch/arm64/include/asm/kvm_mmu.h       |  5 +++
+>  arch/arm64/include/asm/pgtable-hwdef.h |  2 +
+>  virt/kvm/arm/mmu.c                     | 53 +++++++++++++++++++++++---
+>  4 files changed, 61 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 37bf85d39607..839a619873d3 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -102,6 +102,12 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
+>  	return false;
+>  }
+>  
+> +static inline bool kvm_s2pud_exec(pud_t *pud)
+> +{
+> +	BUG();
 
-If I turn on low level debugging the boot log stops short
-at:
+nit: I think this should be WARN() now :)
 
-smp: Bringing up secondary CPUs ...
-GIC: PPI13 is secure or misconfigured
-CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-CPU1: Spectre v2: using BPIALL workaround
-GIC: PPI13 is secure or misconfigured
-CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-CPU1: Spectre v2: using BPIALL workaround
+> +	return false;
+> +}
+> +
+>  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+>  {
+>  	pte_val(pte) |= L_PTE_S2_RDWR;
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 8da6d1b2a196..c755b37b3f92 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -261,6 +261,11 @@ static inline bool kvm_s2pud_readonly(pud_t *pudp)
+>  	return kvm_s2pte_readonly((pte_t *)pudp);
+>  }
+>  
+> +static inline bool kvm_s2pud_exec(pud_t *pudp)
+> +{
+> +	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
+> +}
+> +
+>  #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
+>  
+>  #ifdef __PAGETABLE_PMD_FOLDED
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 1d7d8da2ef9b..336e24cddc87 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -193,6 +193,8 @@
+>  #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>  #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
+>  
+> +#define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
+> +
+>  /*
+>   * Memory Attribute override for Stage-2 (MemAttr[3:0])
+>   */
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 1c669c3c1208..8e44dccd1b47 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1083,23 +1083,66 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>  	return 0;
+>  }
+>  
+> -static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
+> +/*
+> + * stage2_get_leaf_entry - walk the stage2 VM page tables and return
+> + * true if a valid and present leaf-entry is found. A pointer to the
+> + * leaf-entry is returned in the appropriate level variable - pudpp,
+> + * pmdpp, ptepp.
+> + */
+> +static bool stage2_get_leaf_entry(struct kvm *kvm, phys_addr_t addr,
+> +				  pud_t **pudpp, pmd_t **pmdpp, pte_t **ptepp)
 
-This is pretty much consistent behaviour, I think it managed
-to boot at one point but these fixes are definately rubbing
-this CPU the wrong way.
+Do we need this type madness or could this just return a u64 pointer
+(NULL if nothing is found) and pass that to kvm_s2pte_exec (because we
+know it's the same bit we need to check regardless of the pgtable level
+on both arm and arm64)?
 
-This (not elegant) workaround tries to work around it by
-simply not applying any Spectre v2 fixes on the ARM
-Vexpress CA9. My other A9 platforms seem to work fine
-with the fixes, so this appears to be related to the
-fragility of the core tile on this one reference design,
-so maybe it would be acceptable to mitigate it like this.
+Or do we consider that bad for some reason?
 
-I don't know how much this could be related to my particular
-specimen, it would be great if others with this machine
-could verify the problem.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mm/proc-v7-bugs.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
-index 5544b82a2e7a..10b9eedc3b37 100644
---- a/arch/arm/mm/proc-v7-bugs.c
-+++ b/arch/arm/mm/proc-v7-bugs.c
-@@ -3,6 +3,7 @@
- #include <linux/kernel.h>
- #include <linux/psci.h>
- #include <linux/smp.h>
-+#include <linux/of.h>
- 
- #include <asm/cp15.h>
- #include <asm/cputype.h>
-@@ -42,6 +43,11 @@ static void cpu_v7_spectre_init(void)
- 	const char *spectre_v2_method = NULL;
- 	int cpu = smp_processor_id();
- 
-+	if (of_machine_is_compatible("arm,vexpress,v2p-ca9")) {
-+		pr_err("CPU%u: Spectre v2: can't handle mitigations, CPU is vulnerable\n", cpu);
-+		return;
-+	}
-+
- 	if (per_cpu(harden_branch_predictor_fn, cpu))
- 		return;
- 
--- 
-2.17.2
+    Christoffer
+
+>  {
+> +	pud_t *pudp;
+>  	pmd_t *pmdp;
+>  	pte_t *ptep;
+>  
+> -	pmdp = stage2_get_pmd(kvm, NULL, addr);
+> +	*pudpp = NULL;
+> +	*pmdpp = NULL;
+> +	*ptepp = NULL;
+> +
+> +	pudp = stage2_get_pud(kvm, NULL, addr);
+> +	if (!pudp || stage2_pud_none(kvm, *pudp) || !stage2_pud_present(kvm, *pudp))
+> +		return false;
+> +
+> +	if (stage2_pud_huge(kvm, *pudp)) {
+> +		*pudpp = pudp;
+> +		return true;
+> +	}
+> +
+> +	pmdp = stage2_pmd_offset(kvm, pudp, addr);
+>  	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
+>  		return false;
+>  
+> -	if (pmd_thp_or_huge(*pmdp))
+> -		return kvm_s2pmd_exec(pmdp);
+> +	if (pmd_thp_or_huge(*pmdp)) {
+> +		*pmdpp = pmdp;
+> +		return true;
+> +	}
+>  
+>  	ptep = pte_offset_kernel(pmdp, addr);
+>  	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
+>  		return false;
+>  
+> -	return kvm_s2pte_exec(ptep);
+> +	*ptepp = ptep;
+> +	return true;
+> +}
+> +
+> +static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
+> +{
+> +	pud_t *pudp;
+> +	pmd_t *pmdp;
+> +	pte_t *ptep;
+> +	bool found;
+> +
+> +	found = stage2_get_leaf_entry(kvm, addr, &pudp, &pmdp, &ptep);
+> +	if (!found)
+> +		return false;
+> +
+> +	if (pudp)
+> +		return kvm_s2pud_exec(pudp);
+> +	else if (pmdp)
+> +		return kvm_s2pmd_exec(pmdp);
+> +	else
+> +		return kvm_s2pte_exec(ptep);
+>  }
+>  
+>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> -- 
+> 2.19.1
+> 
