@@ -1,39 +1,36 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 1 Nov 2018 10:36:10 -0500
-Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-In-Reply-To: <8bd930f3-a5c9-0490-d676-fb1e0f2f3ad8@arm.com>
-References: <20181018154017.7112-1-lokeshvutla@ti.com>
- <20181018154017.7112-10-lokeshvutla@ti.com>
- <b20127dc-be43-3b00-9960-663738df0069@arm.com>
- <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
- <86va5ssrfm.wl-marc.zyngier@arm.com>
- <2369ea50-55db-c97b-5b43-99d572c97dc9@ti.com>
- <da27ecc5-db32-cf3a-c194-962c44bc782f@arm.com>
- <ae3c35e0-6d92-10e3-c268-eb4338fbb233@ti.com>
- <8bd930f3-a5c9-0490-d676-fb1e0f2f3ad8@arm.com>
-Message-ID: <43fe38d2-4698-4ee7-da36-6ea196aa6f4c@ti.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Thu,  1 Nov 2018 11:37:49 -0400
+Subject: [PATCH] i2c: rk3x: fix some typo
+Message-ID: <20181101153749.22935-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
-On 11/1/18 9:52 AM, Marc Zyngier wrote:
-> On 31/10/18 20:33, Grygorii Strashko wrote:
-
->>
->> "
->> NAK. Either this fits in the standard model, or we adapt the standard
->> model to catter for your particular use case. But we don't define a new,
->> TI specific API.
->> "
-> 
-> And I stand by what I've written.
-> 
-
-Sry, this was added by mistake during copy-pasting/editing.
-
-
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index b8a2728dd4b6..fe347e8e2a23 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
+  *
+  * @clk_rate: I2C input clock rate
+  * @t: Known I2C timing information
+- * @t_calc: Caculated rk3x private timings that would be written into regs
++ * @t_calc: Calculated rk3x private timings that would be written into regs
+  *
+  * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+  * a best-effort divider value is returned in divs. If the target rate is
+@@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
+  *
+  * @clk_rate: I2C input clock rate
+  * @t: Known I2C timing information
+- * @t_calc: Caculated rk3x private timings that would be written into regs
++ * @t_calc: Calculated rk3x private timings that would be written into regs
+  *
+  * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+  * a best-effort divider value is returned in divs. If the target rate is
 -- 
-regards,
--grygorii
+2.17.0
