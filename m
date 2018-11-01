@@ -1,392 +1,154 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Fri, 2 Nov 2018 00:30:55 +0800
-Subject: [PATCH v6 3/3] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <1541089855-19356-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1541089855-19356-1-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <1541089855-19356-4-git-send-email-jianxin.pan@amlogic.com>
+From: Robin.Murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Nov 2018 16:34:21 +0000
+Subject: [PATCH v2 04/14] iommu/io-pgtable-arm-v7s: Add paddr_to_iopte and
+ iopte_to_paddr helpers
+In-Reply-To: <1537779534-23575-5-git-send-email-yong.wu@mediatek.com>
+References: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
+ <1537779534-23575-5-git-send-email-yong.wu@mediatek.com>
+Message-ID: <d24bd2a4-1030-e255-b339-d02eadc93f28@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yixun Lan <yixun.lan@amlogic.com>
+[ apologies if anyone gets this twice, looks like our email's eaten 
+itself again... ]
 
-The patch will add a MMC clock controller driver which used by MMC or NAND,
-It provide a mux and divider clock, and three phase clocks - core, tx, tx.
+On 24/09/2018 09:58, Yong Wu wrote:
+> Add two helper functions: paddr_to_iopte and iopte_to_paddr.
 
-Two clocks are provided as the parent of MMC clock controller from
-upper layer clock controller - eg "amlogic,axg-clkc" in AXG platform.
+Nice and tidy! (although it will need rebasing now, but I think that's 
+just context conflicts)
 
-To specify which clock the MMC or NAND driver may consume,
-the preprocessor macros in the dt-bindings/clock/amlogic,mmc-clkc.h header
-can be used in the device tree sources.
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+>   drivers/iommu/io-pgtable-arm-v7s.c | 45 ++++++++++++++++++++++++++++----------
+>   1 file changed, 33 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> index b5948ba..fa3b9ec 100644
+> --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> @@ -173,18 +173,38 @@ struct arm_v7s_io_pgtable {
+>   	spinlock_t		split_lock;
+>   };
+>   
+> +static bool arm_v7s_pte_is_cont(arm_v7s_iopte pte, int lvl);
+> +
+>   static dma_addr_t __arm_v7s_dma_addr(void *pages)
+>   {
+>   	return (dma_addr_t)virt_to_phys(pages);
+>   }
+>   
+> -static arm_v7s_iopte *iopte_deref(arm_v7s_iopte pte, int lvl)
+> +static arm_v7s_iopte paddr_to_iopte(phys_addr_t paddr, int lvl,
+> +				    struct arm_v7s_io_pgtable *data)
 
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
----
- drivers/clk/meson/Kconfig      |  10 ++
- drivers/clk/meson/Makefile     |   1 +
- drivers/clk/meson/clk-regmap.c |   1 -
- drivers/clk/meson/mmc-clkc.c   | 310 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 321 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/meson/mmc-clkc.c
+Nit: it seems to work out a little cleaner if we pass the io_pgtable_cfg 
+to these helpers directly, rather than re-deriving it from data each time.
 
-diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
-index efaa70f..6bb0d44 100644
---- a/drivers/clk/meson/Kconfig
-+++ b/drivers/clk/meson/Kconfig
-@@ -15,6 +15,16 @@ config COMMON_CLK_MESON_AO
- 	select COMMON_CLK_REGMAP_MESON
- 	select RESET_CONTROLLER
- 
-+config COMMON_CLK_MMC_MESON
-+	tristate "Meson MMC Sub Clock Controller Driver"
-+	select MFD_SYSCON
-+	select COMMON_CLK_AMLOGIC
-+	select COMMON_CLK_AMLOGIC_AUDIO
-+	help
-+	  Support for the MMC sub clock controller on Amlogic Meson Platform,
-+	  which include S905 (GXBB, GXL), A113D/X (AXG) devices.
-+	  Say Y if you want this clock enabled.
-+
- config COMMON_CLK_REGMAP_MESON
- 	bool
- 	select REGMAP
-diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-index 39ce566..31c16d5 100644
---- a/drivers/clk/meson/Makefile
-+++ b/drivers/clk/meson/Makefile
-@@ -9,4 +9,5 @@ obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
- obj-$(CONFIG_COMMON_CLK_GXBB)	 += gxbb.o gxbb-aoclk.o gxbb-aoclk-32k.o
- obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o axg-aoclk.o
- obj-$(CONFIG_COMMON_CLK_AXG_AUDIO)	+= axg-audio.o
-+obj-$(CONFIG_COMMON_CLK_MMC_MESON) 	+= mmc-clkc.o
- obj-$(CONFIG_COMMON_CLK_REGMAP_MESON)	+= clk-regmap.o
-diff --git a/drivers/clk/meson/clk-regmap.c b/drivers/clk/meson/clk-regmap.c
-index 305ee30..89cee4a 100644
---- a/drivers/clk/meson/clk-regmap.c
-+++ b/drivers/clk/meson/clk-regmap.c
-@@ -114,7 +114,6 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, unsigned long rate,
- };
- 
- /* Would prefer clk_regmap_div_ro_ops but clashes with qcom */
--
- const struct clk_ops clk_regmap_divider_ops = {
- 	.recalc_rate = clk_regmap_div_recalc_rate,
- 	.round_rate = clk_regmap_div_round_rate,
-diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
-new file mode 100644
-index 0000000..a3e4c91
---- /dev/null
-+++ b/drivers/clk/meson/mmc-clkc.c
-@@ -0,0 +1,310 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Amlogic Meson MMC Sub Clock Controller Driver
-+ *
-+ * Copyright (c) 2017 Baylibre SAS.
-+ * Author: Jerome Brunet <jbrunet@baylibre.com>
-+ *
-+ * Copyright (c) 2018 Amlogic, inc.
-+ * Author: Yixun Lan <yixun.lan@amlogic.com>
-+ * Author: Jianxin Pan <jianxin.pan@amlogic.com>
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+#include <linux/of_device.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/platform_device.h>
-+#include <dt-bindings/clock/amlogic,mmc-clkc.h>
-+
-+#include "clkc.h"
-+#include "clkc-audio.h"
-+
-+/* clock ID used by internal driver */
-+#define CLKID_MMC_MUX			0
-+
-+#define   SD_EMMC_CLOCK		0
-+#define   CLK_DELAY_STEP_PS		200
-+#define   CLK_PHASE_STEP		30
-+#define   CLK_PHASE_POINT_NUM		(360 / CLK_PHASE_STEP)
-+
-+#define MUX_CLK_NUM_PARENTS		2
-+#define MMC_MAX_CLKS			5
-+
-+struct mmc_clkc_data {
-+	struct meson_clk_phase_delay_data	tx;
-+	struct meson_clk_phase_delay_data	rx;
-+};
-+
-+static struct clk_regmap_mux_data mmc_clkc_mux_data = {
-+	.offset		= SD_EMMC_CLOCK,
-+	.mask		= 0x3,
-+	.shift		= 6,
-+};
-+
-+struct meson_sclk_div_data  mmc_clkc_div_data = {
-+	.div = {
-+		.reg_off = SD_EMMC_CLOCK,
-+		.shift   = (0),
-+		.width   = (6),
-+	},
-+	.hi = {
-+		.reg_off = 0,
-+		.shift   = 0,
-+		.width   = 0,
-+	},
-+};
-+
-+static struct meson_clk_phase_data mmc_clkc_core_phase = {
-+	.ph = {
-+		.reg_off	= SD_EMMC_CLOCK,
-+		.shift	= 8,
-+		.width	= 2,
-+	}
-+};
-+
-+static const struct mmc_clkc_data mmc_clkc_gx_data = {
-+	.tx = {
-+		.phase = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 10,
-+			.width	= 2,
-+		},
-+		.delay = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 16,
-+			.width	= 4,
-+		},
-+		.delay_step_ps	= CLK_DELAY_STEP_PS,
-+	},
-+	.rx = {
-+		.phase = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 12,
-+			.width	= 2,
-+		},
-+		.delay = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 20,
-+			.width	= 4,
-+		},
-+		.delay_step_ps	= CLK_DELAY_STEP_PS,
-+	},
-+};
-+
-+static const struct mmc_clkc_data mmc_clkc_axg_data = {
-+	.tx = {
-+		.phase = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 10,
-+			.width	= 2,
-+		},
-+		.delay = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 16,
-+			.width	= 6,
-+		},
-+		.delay_step_ps	= CLK_DELAY_STEP_PS,
-+	},
-+	.rx = {
-+		.phase = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 12,
-+			.width	= 2,
-+		},
-+		.delay = {
-+			.reg_off	= SD_EMMC_CLOCK,
-+			.shift	= 22,
-+			.width	= 6,
-+		},
-+		.delay_step_ps	= CLK_DELAY_STEP_PS,
-+	},
-+};
-+
-+static const struct of_device_id mmc_clkc_match_table[] = {
-+	{
-+		.compatible	= "amlogic,gx-mmc-clkc",
-+		.data		= &mmc_clkc_gx_data
-+	},
-+	{
-+		.compatible	= "amlogic,axg-mmc-clkc",
-+		.data		= &mmc_clkc_axg_data
-+	},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, mmc_clkc_match_table);
-+
-+static struct clk_regmap *
-+mmc_clkc_register_clk(struct device *dev, struct regmap *map,
-+		      struct clk_init_data *init,
-+		      const char *suffix, void *data)
-+{
-+	struct clk_regmap *clk;
-+	char *name;
-+	int ret;
-+
-+	clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
-+	if (!clk)
-+		return ERR_PTR(-ENOMEM);
-+
-+	name = kasprintf(GFP_KERNEL, "%s#%s", dev_name(dev), suffix);
-+	if (!name)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init->name = name;
-+
-+	clk->map = map;
-+	clk->data = data;
-+	clk->hw.init = init;
-+
-+	ret = devm_clk_hw_register(dev, &clk->hw);
-+	if (ret)
-+		clk = ERR_PTR(ret);
-+
-+	kfree(name);
-+	return clk;
-+}
-+
-+static struct clk_regmap *mmc_clkc_register_mux(struct device *dev,
-+						struct regmap *map)
-+{
-+	const char *parent_names[MUX_CLK_NUM_PARENTS];
-+	struct clk_init_data init;
-+	struct clk_regmap *mux;
-+	struct clk *clk;
-+	int i;
-+
-+	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
-+		char name[8];
-+
-+		snprintf(name, sizeof(name), "clkin%d", i);
-+		clk = devm_clk_get(dev, name);
-+		if (IS_ERR(clk)) {
-+			if (clk != ERR_PTR(-EPROBE_DEFER))
-+				dev_err(dev, "Missing clock %s\n", name);
-+			return ERR_PTR((long)clk);
-+		}
-+
-+		parent_names[i] = __clk_get_name(clk);
-+	}
-+
-+	init.ops = &clk_regmap_mux_ops;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	init.parent_names = parent_names;
-+	init.num_parents = MUX_CLK_NUM_PARENTS;
-+
-+	mux = mmc_clkc_register_clk(dev, map, &init, "mux", &mmc_clkc_mux_data);
-+	if (IS_ERR(mux))
-+		dev_err(dev, "Mux clock registration failed\n");
-+
-+	return mux;
-+}
-+
-+static struct clk_regmap *
-+mmc_clkc_register_clk_with_parent(struct device *dev, struct regmap *map,
-+				  char *suffix, const struct clk_hw *hw,
-+				  unsigned long flags,
-+				  const struct clk_ops *ops, void *data)
-+{
-+	struct clk_init_data init;
-+	struct clk_regmap *clk;
-+	const char *parent_name = clk_hw_get_name(hw);
-+
-+	init.ops = ops;
-+	init.flags = flags;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	clk = mmc_clkc_register_clk(dev, map, &init, suffix, data);
-+	if (IS_ERR(clk))
-+		dev_err(dev, "Core %s clock registration failed\n", suffix);
-+
-+	return clk;
-+}
-+
-+static int mmc_clkc_probe(struct platform_device *pdev)
-+{
-+	struct clk_hw_onecell_data *onecell_data;
-+	struct device *dev = &pdev->dev;
-+	struct mmc_clkc_data *data;
-+	struct regmap *map;
-+	struct clk_regmap *clk, *core;
-+
-+	/*cast to drop the const in match->data*/
-+	data = (struct mmc_clkc_data *)of_device_get_match_data(dev);
-+	if (!data)
-+		return -ENODEV;
-+
-+	map = syscon_node_to_regmap(dev->of_node);
-+	if (IS_ERR(map)) {
-+		dev_err(dev, "could not find mmc clock controller\n");
-+		return PTR_ERR(map);
-+	}
-+
-+	onecell_data = devm_kzalloc(dev, sizeof(*onecell_data) +
-+				    sizeof(*onecell_data->hws) * MMC_MAX_CLKS,
-+				    GFP_KERNEL);
-+	if (!onecell_data)
-+		return -ENOMEM;
-+
-+	clk = mmc_clkc_register_mux(dev, map);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+	onecell_data->hws[CLKID_MMC_MUX]		= &clk->hw,
-+
-+	clk = mmc_clkc_register_clk_with_parent(dev, map, "div",
-+						&clk->hw,
-+						CLK_SET_RATE_PARENT,
-+						&meson_sclk_div_ops,
-+						&mmc_clkc_div_data);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+	onecell_data->hws[CLKID_MMC_DIV]		= &clk->hw,
-+
-+	core = mmc_clkc_register_clk_with_parent(dev, map, "core",
-+						 &clk->hw,
-+						 CLK_SET_RATE_PARENT,
-+						 &meson_clk_phase_ops,
-+						 &mmc_clkc_core_phase);
-+	if (IS_ERR(core))
-+		return PTR_ERR(core);
-+	onecell_data->hws[CLKID_MMC_PHASE_CORE]		= &core->hw,
-+
-+	clk = mmc_clkc_register_clk_with_parent(dev, map, "rx",
-+						&core->hw,  0,
-+						&meson_clk_phase_delay_ops,
-+						&data->rx);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+	onecell_data->hws[CLKID_MMC_PHASE_RX]		= &clk->hw,
-+
-+	clk = mmc_clkc_register_clk_with_parent(dev, map, "tx",
-+						&core->hw,  0,
-+						&meson_clk_phase_delay_ops,
-+						&data->tx);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+	onecell_data->hws[CLKID_MMC_PHASE_TX]		= &clk->hw,
-+
-+	onecell_data->num				= MMC_MAX_CLKS;
-+
-+	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
-+					   onecell_data);
-+}
-+
-+static struct platform_driver mmc_clkc_driver = {
-+	.probe		= mmc_clkc_probe,
-+	.driver		= {
-+		.name	= "meson-mmc-clkc",
-+		.of_match_table = of_match_ptr(mmc_clkc_match_table),
-+	},
-+};
-+
-+module_platform_driver(mmc_clkc_driver);
-+
-+MODULE_DESCRIPTION("Amlogic AXG MMC clock driver");
-+MODULE_AUTHOR("Jianxin Pan <jianxin.pan@amlogic.com>");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+Otherwise, though,
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+>   {
+> +	return paddr & ARM_V7S_LVL_MASK(lvl);
+> +}
+> +
+> +static phys_addr_t iopte_to_paddr(arm_v7s_iopte pte, int lvl,
+> +				  struct arm_v7s_io_pgtable *data)
+> +{
+> +	arm_v7s_iopte mask;
+> +
+>   	if (ARM_V7S_PTE_IS_TABLE(pte, lvl))
+> -		pte &= ARM_V7S_TABLE_MASK;
+> +		mask = ARM_V7S_TABLE_MASK;
+> +	else if (arm_v7s_pte_is_cont(pte, lvl))
+> +		mask = ARM_V7S_LVL_MASK(lvl) * ARM_V7S_CONT_PAGES;
+>   	else
+> -		pte &= ARM_V7S_LVL_MASK(lvl);
+> -	return phys_to_virt(pte);
+> +		mask = ARM_V7S_LVL_MASK(lvl);
+> +
+> +	return pte & mask;
+> +}
+> +
+> +static arm_v7s_iopte *iopte_deref(arm_v7s_iopte pte, int lvl,
+> +				  struct arm_v7s_io_pgtable *data)
+> +{
+> +	return phys_to_virt(iopte_to_paddr(pte, lvl, data));
+>   }
+>   
+>   static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
+> @@ -396,7 +416,7 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
+>   	if (num_entries > 1)
+>   		pte = arm_v7s_pte_to_cont(pte, lvl);
+>   
+> -	pte |= paddr & ARM_V7S_LVL_MASK(lvl);
+> +	pte |= paddr_to_iopte(paddr, lvl, data);
+>   
+>   	__arm_v7s_set_pte(ptep, pte, num_entries, cfg);
+>   	return 0;
+> @@ -462,7 +482,7 @@ static int __arm_v7s_map(struct arm_v7s_io_pgtable *data, unsigned long iova,
+>   	}
+>   
+>   	if (ARM_V7S_PTE_IS_TABLE(pte, lvl)) {
+> -		cptep = iopte_deref(pte, lvl);
+> +		cptep = iopte_deref(pte, lvl, data);
+>   	} else if (pte) {
+>   		/* We require an unmap first */
+>   		WARN_ON(!selftest_running);
+> @@ -512,7 +532,8 @@ static void arm_v7s_free_pgtable(struct io_pgtable *iop)
+>   		arm_v7s_iopte pte = data->pgd[i];
+>   
+>   		if (ARM_V7S_PTE_IS_TABLE(pte, 1))
+> -			__arm_v7s_free_table(iopte_deref(pte, 1), 2, data);
+> +			__arm_v7s_free_table(iopte_deref(pte, 1, data),
+> +					     2, data);
+>   	}
+>   	__arm_v7s_free_table(data->pgd, 1, data);
+>   	kmem_cache_destroy(data->l2_tables);
+> @@ -582,7 +603,7 @@ static size_t arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
+>   		if (!ARM_V7S_PTE_IS_TABLE(pte, 1))
+>   			return 0;
+>   
+> -		tablep = iopte_deref(pte, 1);
+> +		tablep = iopte_deref(pte, 1, data);
+>   		return __arm_v7s_unmap(data, iova, size, 2, tablep);
+>   	}
+>   
+> @@ -640,7 +661,7 @@ static size_t __arm_v7s_unmap(struct arm_v7s_io_pgtable *data,
+>   				io_pgtable_tlb_add_flush(iop, iova, blk_size,
+>   					ARM_V7S_BLOCK_SIZE(lvl + 1), false);
+>   				io_pgtable_tlb_sync(iop);
+> -				ptep = iopte_deref(pte[i], lvl);
+> +				ptep = iopte_deref(pte[i], lvl, data);
+>   				__arm_v7s_free_table(ptep, lvl + 1, data);
+>   			} else {
+>   				io_pgtable_tlb_add_flush(iop, iova, blk_size,
+> @@ -658,7 +679,7 @@ static size_t __arm_v7s_unmap(struct arm_v7s_io_pgtable *data,
+>   	}
+>   
+>   	/* Keep on walkin' */
+> -	ptep = iopte_deref(pte[0], lvl);
+> +	ptep = iopte_deref(pte[0], lvl, data);
+>   	return __arm_v7s_unmap(data, iova, size, lvl + 1, ptep);
+>   }
+>   
+> @@ -684,7 +705,7 @@ static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
+>   	do {
+>   		ptep += ARM_V7S_LVL_IDX(iova, ++lvl);
+>   		pte = READ_ONCE(*ptep);
+> -		ptep = iopte_deref(pte, lvl);
+> +		ptep = iopte_deref(pte, lvl, data);
+>   	} while (ARM_V7S_PTE_IS_TABLE(pte, lvl));
+>   
+>   	if (!ARM_V7S_PTE_IS_VALID(pte))
+> @@ -693,7 +714,7 @@ static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
+>   	mask = ARM_V7S_LVL_MASK(lvl);
+>   	if (arm_v7s_pte_is_cont(pte, lvl))
+>   		mask *= ARM_V7S_CONT_PAGES;
+> -	return (pte & mask) | (iova & ~mask);
+> +	return iopte_to_paddr(pte, lvl, data) | (iova & ~mask);
+>   }
+>   
+>   static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
+> 
