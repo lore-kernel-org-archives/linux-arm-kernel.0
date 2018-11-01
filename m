@@ -1,53 +1,31 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 Nov 2018 16:56:52 +0100
-Subject: [PATCH] i2c: rk3x: fix some typo
-In-Reply-To: <20181101153749.22935-1-tiny.windzz@gmail.com>
-References: <20181101153749.22935-1-tiny.windzz@gmail.com>
-Message-ID: <5544442.bXqbKBZQMR@diego>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 1 Nov 2018 13:01:00 -0300
+Subject: [PATCH V3 09/10] dts: fsl: add imx7ulp evk support
+In-Reply-To: <VI1PR04MB422271C6CA5F7E000BFDE1A580CE0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
+ <1540996688-23681-10-git-send-email-aisheng.dong@nxp.com>
+ <CAOMZO5AZejEAHeB0hQ9T5U2ZJ7MXK=BYm8jY+yyZjbDHo4utGA@mail.gmail.com>
+ <CAOMZO5CGsVYX_xYud_JDTikWAR6guW8-pfPhsBTG7MFbjdUtiw@mail.gmail.com>
+ <VI1PR04MB422271C6CA5F7E000BFDE1A580CE0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5CSLC+Pntt=Y5MaOD_=Va__v+KSgQ2kNSizVJt3i829dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 1, 2018 at 12:53 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
 
-Am Donnerstag, 1. November 2018, 16:37:49 CET schrieb Yangtao Li:
-> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> Can you tell which version were you looking at?
+> From my version SPF-29163_A1, it's populated by default.
 
-while the changes really are pretty self-explanatory, it is always
-nice to describe changes in a real commit message, like
+Mine is sch-29163-b and it shows both micro SD card and eMMC on the schematics.
 
-Fix multiple instances of a misspelled "Calculates".
+On my board I see only the micro SD card populated, not the eMMC.
 
-Change itself looks good, so
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Also, if you are describing the eMMC then why do you pass the card
+detect property and only 4 data lines?
 
+SD0_nRST is only connected to the eMMC card.
 
-Thanks
-Heiko
+eMMC does not have card detect signal and it uses 8 data lines, so
+clearly there is something inconsistent in your dts.
 
-> ---
->  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index b8a2728dd4b6..fe347e8e2a23 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -555,7 +555,7 @@ static const struct i2c_spec_values
-> *rk3x_i2c_get_spec(unsigned int speed) *
->   * @clk_rate: I2C input clock rate
->   * @t: Known I2C timing information
-> - * @t_calc: Caculated rk3x private timings that would be written into regs
-> + * @t_calc: Calculated rk3x private timings that would be written into regs
-> *
->   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that
-> case * a best-effort divider value is returned in divs. If the target rate
-> is @@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long
-> clk_rate, *
->   * @clk_rate: I2C input clock rate
->   * @t: Known I2C timing information
-> - * @t_calc: Caculated rk3x private timings that would be written into regs
-> + * @t_calc: Calculated rk3x private timings that would be written into regs
-> *
->   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that
-> case * a best-effort divider value is returned in divs. If the target rate
-> is
+What exactly do you want to describe: the SD card or the eMMC?
