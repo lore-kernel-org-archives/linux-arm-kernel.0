@@ -1,78 +1,56 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Thu, 01 Nov 2018 08:52:17 +0100
-Subject: [PATCH] ARM: dtsi: sun8i-r40: add mali node
-In-Reply-To: <20181101073833.2936-1-lothar.felten@gmail.com>
-References: <20181101073833.2936-1-lothar.felten@gmail.com>
-Message-ID: <1868657.3A2CuZcRV2@jernej-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 1 Nov 2018 15:53:36 +0800
+Subject: [PATCH 5/7] arm64: allwinner: h6: Add RTC node
+In-Reply-To: <CAMty3ZAW5KndyJj81obK49MKczdbk4SoUncmiiE_OhH1g7qFUA@mail.gmail.com>
+References: <20181031183634.29640-1-jagan@amarulasolutions.com>
+ <20181031183634.29640-5-jagan@amarulasolutions.com>
+ <CAGb2v64fnpCh_rCy-9m8xgXmAZQGab1==f7cr332QfgueyuRNw@mail.gmail.com>
+ <CAMty3ZAW5KndyJj81obK49MKczdbk4SoUncmiiE_OhH1g7qFUA@mail.gmail.com>
+Message-ID: <CAGb2v67WZmG7qPqf_UoR4v=Zm2AbS8pcOQsWJPRVHr-i2NvRPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?etrtek, 01. november 2018 ob 08:38:33 CET je Lothar Felten napisal(a):
-> This patch adds a node for the mali 400 GPU of the R40/V40 SoC
-> 
-> Signed-off-by: Lothar Felten <lothar.felten@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-r40.dtsi | 28 +++++++++++++++++++++++++++-
->  1 file changed, 27 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi
-> b/arch/arm/boot/dts/sun8i-r40.dtsi index 6f4c9ca5a3ee..ddf765e931f3 100644
-> --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> @@ -542,6 +542,31 @@
-> 
->  		};
-> 
-> +		mali: gpu at 1c40000 {
-> +			compatible = "allwinner,sun7i-a20-mali", "arm,mali-400";
-> +			reg = <0x01c40000 0x10000>;
-> +			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "gp",
-> +					  "gpmmu",
-> +					  "pp0",
-> +					  "ppmmu0",
-> +					  "pp1",
-> +					  "ppmmu1",
-> +					  "pmu";
-> +			clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
-> +			clock-names = "bus", "core";
-> +			resets = <&ccu RST_BUS_GPU>;
-> +
-> +			assigned-clocks = <&ccu CLK_GPU>;
-> +			assigned-clock-rates = <384000000>;
+On Thu, Nov 1, 2018 at 3:33 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Thu, Nov 1, 2018 at 8:25 AM Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> > On Thu, Nov 1, 2018 at 2:37 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > >
+> > > From: Jagan Teki <jagan@openedev.com>
+> > >
+> > > RTC controller is similar to A31, so use the same compatible
+> > > for H6 and update interrupt numbers as per manual.
+> >
+> > No. Unfortunately they are not that compatible. The A31 does not have
+> > the RTC clock output. So everyone got it wrong. :( Plus the clock rate
+> > of the internal RC oscillator varies between SoCs. I'm working on a
+> > series of patches to correct this. Stay tuned.
+>
+> 4 bit, EXT_LOSC_EN of LOSC_CTRL_REG (0x00) seem available in H6. I can
+> see external clock working with WIFI for A31 compatible.
 
-In previous e-mail I already stated that above 2 lines doesn't belong here. 
-Driver is responsible for clock rate management.
+That bit turns on the external crystal, i.e. X32KIN and X32KOUT pins.
 
-> +		};
-> +
->  		gmac: ethernet at 1c50000 {
->  			compatible = "allwinner,sun8i-r40-gmac";
->  			syscon = <&ccu>;
-> @@ -813,7 +838,8 @@
->  		};
-> 
->  		hdmi_phy: hdmi-phy at 1ef0000 {
-> -			compatible = "allwinner,sun8i-r40-hdmi-phy";
-> +			compatible = "allwinner,sun8i-r40-hdmi-phy",
-> +				     "allwinner,sun50i-a64-hdmi-phy";
+I'm talking about the X32KFOUT pin, which feeds the WiFi module the
+LPO clock in typical Allwinner designs. That is controlled by register
+0x60, and is not present on the A31. That is the clock you say is
+working. You have the two confused.
 
-In previous e-mail I also stated that above changes are not related to GPU 
-node and they are also not needed, since HDMI on R40 works without this.
+The clock tree looks like this:
 
->  			reg = <0x01ef0000 0x10000>;
->  			clocks = <&ccu CLK_BUS_HDMI1>, <&ccu CLK_HDMI_SLOW>,
->  				 <&ccu 7>, <&ccu 16>;
+IOSC -----------------------------\
+                                   SUN6I_LOSC_CTRL_EXT_OSC mux ---->
+LOSC --> (to CCU)
+32k crystal --> EXT_LOSC_EN gate -/                              \
+                                                                  \
+                                                                  /
+      (to WiFi) <-- X32KFOUT pin <-- LOSC_OUT_GATING_EN gate <---/
 
-You cleary didn't read rules for patch submission. When you are sending new 
-version of the patch, you have to state which version is it in subject line 
-and write a changelog below "---" line.
+The bottom part does not exist in the A31. Meanwhile we've been claiming that
+all later RTC modules that actually have that part are compatible with the A31.
+Also the IOSC part has different clock rates for different chips.
 
-Best regards,
-Jernej
+Do you see the problem?
+
+
+ChenYu
