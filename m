@@ -1,91 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu,  1 Nov 2018 11:15:58 +0100
-Subject: [PATCH v2 2/2] ARM: cpuidle: Convert to use
- cpuidle_register|unregister()
-Message-ID: <20181101101558.3035-1-ulf.hansson@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Nov 2018 10:24:58 +0000
+Subject: [PATCH 6/9] PCI: consolidate PCI config entry in drivers/pci
+In-Reply-To: <CAK7LNATZ8LagrTrTae_QCQbSuTW7_y6sDrdTHfTyONPrsYDs4A@mail.gmail.com>
+References: <20181019120952.32763-1-hch@lst.de>
+ <20181019120952.32763-7-hch@lst.de>
+ <20181019122228.GJ30658@n2100.armlinux.org.uk>
+ <CAK7LNATZ8LagrTrTae_QCQbSuTW7_y6sDrdTHfTyONPrsYDs4A@mail.gmail.com>
+Message-ID: <20181101102458.GN30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only reason that remains, to why the ARM cpuidle driver calls
-cpuidle_register_driver(), is to avoid printing an error message in case
-another driver already have been registered for the CPU. This seems a bit
-silly, but more importantly, if that is a common scenario, perhaps we
-should change cpuidle_register() accordingly instead.
+On Fri, Oct 19, 2018 at 09:58:46PM +0900, Masahiro Yamada wrote:
+> On Fri, Oct 19, 2018 at 9:23 PM Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> 
+> > > index a68b34183107..b185794549be 100644
+> > > --- a/arch/arm/mach-pxa/Kconfig
+> > > +++ b/arch/arm/mach-pxa/Kconfig
+> > > @@ -125,7 +125,7 @@ config MACH_ARMCORE
+> > >       bool "CompuLab CM-X255/CM-X270 modules"
+> > >       select ARCH_HAS_DMA_SET_COHERENT_MASK if PCI
+> > >       select IWMMXT
+> > > -     select MIGHT_HAVE_PCI
+> > > +     select HAVE_PCI
+> > >       select NEED_MACH_IO_H if PCI
+> > >       select PXA25x
+> > >       select PXA27x
+> >
+> > This is wrong.  "MIGHT_HAVE_PCI" is _not_ the same as "HAVE_PCI" - we
+> > have a bunch of platforms that mandatorily have PCI and these select
+> > PCI directly.  "MIGHT_HAVE_PCI" controls the _visibility_ of the PCI
+> > menu option, but does not prevent it being selected.  Your patch will
+> > cause Kconfig to complain for those which mandatorily have PCI but
+> > do not set HAVE_PCI.
+> 
+> 
+> Good catch!
+> But, adding a bunch of 'select HAVE_PCI' along with 'select PCI' is ugly.
+> 
+> Do you have any suggestion?
+> 
+> How about letting CONFIG_ARM to select HAVE_PCI ?
 
-In either case, let's consolidate the code, by converting to use
-cpuidle_register|unregister(), which also avoids the unnecessary allocation
-of the struct cpuidle_device.
+Well, the situation we have on ARM is rather optimal - when the
+rest of the configuration supports PCI, PCI is made visible.  When
+there's no hardware support for PCI, PCI is hidden.  When PCI is
+mandatory, PCI is selected and mostly always hidden.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
+It seems that with this consolidation, we lose that - we end up
+with PCI being visible for every ARM config, not only those where
+PCI is "impossible" but also for those where PCI is forcefully
+selected.
 
-Changes in v2:
-	- Fixup spelling in changelog.
-	- Added Lorenzo's reviewed-by tag.
+That said, offering PCI for platforms that do not have any possibility
+of PCI hardware shouldn't cause any compile issues, and would increase
+build coverage - but I'd say it wouldn't _usefully_ increase build
+coverage.
 
----
- drivers/cpuidle/cpuidle-arm.c | 30 +++---------------------------
- 1 file changed, 3 insertions(+), 27 deletions(-)
-
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index df564d783216..3a407a3ef22b 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -82,7 +82,6 @@ static int __init arm_idle_init_cpu(int cpu)
- {
- 	int ret;
- 	struct cpuidle_driver *drv;
--	struct cpuidle_device *dev;
- 
- 	drv = kmemdup(&arm_idle_driver, sizeof(*drv), GFP_KERNEL);
- 	if (!drv)
-@@ -119,33 +118,12 @@ static int __init arm_idle_init_cpu(int cpu)
- 		goto out_kfree_drv;
- 	}
- 
--	ret = cpuidle_register_driver(drv);
--	if (ret) {
--		if (ret != -EBUSY)
--			pr_err("Failed to register cpuidle driver\n");
-+	ret = cpuidle_register(drv, NULL);
-+	if (ret)
- 		goto out_kfree_drv;
--	}
--
--	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
--	if (!dev) {
--		ret = -ENOMEM;
--		goto out_unregister_drv;
--	}
--	dev->cpu = cpu;
--
--	ret = cpuidle_register_device(dev);
--	if (ret) {
--		pr_err("Failed to register cpuidle device for CPU %d\n",
--		       cpu);
--		goto out_kfree_dev;
--	}
- 
- 	return 0;
- 
--out_kfree_dev:
--	kfree(dev);
--out_unregister_drv:
--	cpuidle_unregister_driver(drv);
- out_kfree_drv:
- 	kfree(drv);
- 	return ret;
-@@ -176,9 +154,7 @@ static int __init arm_idle_init(void)
- 	while (--cpu >= 0) {
- 		dev = per_cpu(cpuidle_devices, cpu);
- 		drv = cpuidle_get_cpu_driver(dev);
--		cpuidle_unregister_device(dev);
--		cpuidle_unregister_driver(drv);
--		kfree(dev);
-+		cpuidle_unregister(drv);
- 		kfree(drv);
- 	}
- 
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
