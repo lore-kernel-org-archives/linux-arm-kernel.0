@@ -1,56 +1,52 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 1 Nov 2018 16:46:33 +0000
-Subject: [PATCH V3 09/10] dts: fsl: add imx7ulp evk support
-In-Reply-To: <VI1PR04MB42223D6930DA633E106340FD80CE0@VI1PR04MB4222.eurprd04.prod.outlook.com>
-References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
- <1540996688-23681-10-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5AZejEAHeB0hQ9T5U2ZJ7MXK=BYm8jY+yyZjbDHo4utGA@mail.gmail.com>
- <CAOMZO5CGsVYX_xYud_JDTikWAR6guW8-pfPhsBTG7MFbjdUtiw@mail.gmail.com>
- <VI1PR04MB422271C6CA5F7E000BFDE1A580CE0@VI1PR04MB4222.eurprd04.prod.outlook.com>
- <CAOMZO5CSLC+Pntt=Y5MaOD_=Va__v+KSgQ2kNSizVJt3i829dg@mail.gmail.com>
- <VI1PR04MB42223D6930DA633E106340FD80CE0@VI1PR04MB4222.eurprd04.prod.outlook.com>
-Message-ID: <VI1PR04MB422294CC7108B7EF0F74BC3E80CE0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+From: lsun@mellanox.com (Liming Sun)
+Date: Thu,  1 Nov 2018 12:25:32 -0400
+Subject: [PATCH v6 3/9] dt-bindings: soc: Add TmFifo binding for Mellanox
+ BlueField SoC
+In-Reply-To: <1541089538-175682-1-git-send-email-lsun@mellanox.com>
+References: <1541089538-175682-1-git-send-email-lsun@mellanox.com>
+Message-ID: <1541089538-175682-3-git-send-email-lsun@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Add devicetree bindings for the TmFifo which is found on Mellanox
+BlueField SoCs.
 
-> > -----Original Message-----
-> > From: Fabio Estevam [mailto:festevam at gmail.com]
-> > Sent: Friday, November 2, 2018 12:01 AM
-> [...]
-> >
-> > On Thu, Nov 1, 2018 at 12:53 PM A.s. Dong <aisheng.dong@nxp.com>
-> wrote:
-> >
-> > > Can you tell which version were you looking at?
-> > > From my version SPF-29163_A1, it's populated by default.
-> >
-> > Mine is sch-29163-b and it shows both micro SD card and eMMC on the
-> > schematics.
-> >
-> 
-> I will check it later. But Rev B may be supported later if changed.
-> 
-> > On my board I see only the micro SD card populated, not the eMMC.
-> >
-> > Also, if you are describing the eMMC then why do you pass the card
-> > detect property and only 4 data lines?
-> >
-> > SD0_nRST is only connected to the eMMC card.
-> >
-> > eMMC does not have card detect signal and it uses 8 data lines, so
-> > clearly there is something inconsistent in your dts.
-> >
-> > What exactly do you want to describe: the SD card or the eMMC?
-> 
-> I guess we're talking about different schematic versions.
-> The patch is supposed to support Rev A.
-> 
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: David Woods <dwoods@mellanox.com>
+Signed-off-by: Liming Sun <lsun@mellanox.com>
+---
+ .../devicetree/bindings/soc/mellanox/tmfifo.txt    | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
 
-I just checked RevB schematic and SD card circuit seems the same
-as Rev A that SD0_nRST is used to control the SD power and there's CD pin.
-So the SD binding should work for both.
-
-Regards
-Dong Aisheng
+diff --git a/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+new file mode 100644
+index 0000000..8a13fa6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mellanox/tmfifo.txt
+@@ -0,0 +1,23 @@
++* Mellanox BlueField SoC TmFifo
++
++BlueField TmFifo provides a shared FIFO between the target and the
++external host machine, which can be accessed by external host via
++USB or PCIe. In the current tmfifo driver, this FIFO has been demuxed
++to implement virtual console and network interface based on the virtio
++framework.
++
++Required properties:
++
++- compatible:	Should be "mellanox,bf-tmfifo"
++- reg:		Physical base address and length of Rx/Tx block
++- interrupts:	The interrupt number of Rx low water mark, Rx high water mark
++		Tx low water mark, Tx high water mark respectively.
++
++Example:
++
++tmfifo at 800a20 {
++	compatible = "mellanox,bf-tmfifo";
++	reg = <0x00800a20 0x00000018
++	       0x00800a40 0x00000018>;
++	interrupts = <41, 42, 43, 44>;
++};
+-- 
+1.8.3.1
