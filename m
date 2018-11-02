@@ -1,34 +1,64 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Nov 2018 17:26:51 +0000
-Subject: [PATCH] arm64: makefile fix build of .i file in external module
- case
-In-Reply-To: <20181030233710.5529-1-kamensky@cisco.com>
-References: <20181030233710.5529-1-kamensky@cisco.com>
-Message-ID: <20181102172651.GF218059@arrakis.emea.arm.com>
+Date: Fri, 2 Nov 2018 17:31:59 +0000
+Subject: [PATCH v2] arm64: kprobe: make page to RO mode when allocate it
+In-Reply-To: <20181030113850.31150-1-anders.roxell@linaro.org>
+References: <20181030113850.31150-1-anders.roxell@linaro.org>
+Message-ID: <20181102173159.GG218059@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 04:37:10PM -0700, Victor Kamensky wrote:
-> After 'a66649dab350 arm64: fix vdso-offsets.h dependency' if
-> one will try to build .i file in case of external kernel module,
-> build fails complaining that prepare0 target is missing. This
-> issue came up with SystemTap when it tries to build variety
-> of .i files for its own generated kernel modules trying to
-> figure given kernel features/capabilities.
+On Tue, Oct 30, 2018 at 12:38:50PM +0100, Anders Roxell wrote:
+> Commit 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
+> has successfully identified code that leaves a page with W+X
+> permissions.
 > 
-> The issue is that prepare0 is defined in top level Makefile
-> only if KBUILD_EXTMOD is not defined. .i file rule depends
-> on prepare and in case KBUILD_EXTMOD defined top level Makefile
-> contains empty rule for prepare. But after mentioned commit
-> arch/arm64/Makefile would introduce dependency on prepare0
-> through its own prepare target.
+> [    3.245140] arm64/mm: Found insecure W+X mapping at address (____ptrval____)/0xffff000000d90000
+> [    3.245771] WARNING: CPU: 0 PID: 1 at ../arch/arm64/mm/dump.c:232 note_page+0x410/0x420
+> [    3.246141] Modules linked in:
+> [    3.246653] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc5-next-20180928-00001-ge70ae259b853-dirty #62
+> [    3.247008] Hardware name: linux,dummy-virt (DT)
+> [    3.247347] pstate: 80000005 (Nzcv daif -PAN -UAO)
+> [    3.247623] pc : note_page+0x410/0x420
+> [    3.247898] lr : note_page+0x410/0x420
+> [    3.248071] sp : ffff00000804bcd0
+> [    3.248254] x29: ffff00000804bcd0 x28: ffff000009274000
+> [    3.248578] x27: ffff00000921a000 x26: ffff80007dfff000
+> [    3.248845] x25: ffff0000093f5000 x24: ffff000009526f6a
+> [    3.249109] x23: 0000000000000004 x22: ffff000000d91000
+> [    3.249396] x21: ffff000000d90000 x20: 0000000000000000
+> [    3.249661] x19: ffff00000804bde8 x18: 0000000000000400
+> [    3.249924] x17: 0000000000000000 x16: 0000000000000000
+> [    3.250271] x15: ffffffffffffffff x14: 295f5f5f5f6c6176
+> [    3.250594] x13: 7274705f5f5f5f28 x12: 2073736572646461
+> [    3.250941] x11: 20746120676e6970 x10: 70616d20582b5720
+> [    3.251252] x9 : 6572756365736e69 x8 : 3039643030303030
+> [    3.251519] x7 : 306666666678302f x6 : ffff0000095467b2
+> [    3.251802] x5 : 0000000000000000 x4 : 0000000000000000
+> [    3.252060] x3 : 0000000000000000 x2 : ffffffffffffffff
+> [    3.252323] x1 : 4d151327adc50b00 x0 : 0000000000000000
+> [    3.252664] Call trace:
+> [    3.252953]  note_page+0x410/0x420
+> [    3.253186]  walk_pgd+0x12c/0x238
+> [    3.253417]  ptdump_check_wx+0x68/0xf8
+> [    3.253637]  mark_rodata_ro+0x68/0x98
+> [    3.253847]  kernel_init+0x38/0x160
+> [    3.254103]  ret_from_fork+0x10/0x18
 > 
-> Fix it to put proper ifdef KBUILD_EXTMOD around code introduced
-> by mentioned commit. It matches what top level Makefile does.
+> kprobes allocates a writable executable page with module_alloc() in
+> order to store executable code.
+> Reworked to that when allocate a page it sets mode RO. Inspired by
+> commit 63fef14fc98a ("kprobes/x86: Make insn buffer always ROX and use text_poke()").
 > 
-> Signed-off-by: Victor Kamensky <kamensky@cisco.com>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Co-developed-by: Arnd Bergmann <arnd@arndb.de>
+> Co-developed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
 
-Queued for 4.20. Thanks.
+Queued for 4.20 (and removed the signed-off-bys, added acks, removed
+unnecessary casts). Thanks.
 
 -- 
 Catalin
