@@ -1,69 +1,95 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 2 Nov 2018 11:41:40 -0700
-Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
-In-Reply-To: <20180926034055.yj3re5o4oesda4x5@localhost>
-References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
- <20180923123438.kyvxpeqq6q6xo6cs@localhost>
- <d952b14a-644e-a067-9615-f0d35f370893@st.com>
- <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
- <0f424a8e-67e0-cdc2-0276-660e455e3df6@st.com>
- <20180926034055.yj3re5o4oesda4x5@localhost>
-Message-ID: <CAOesGMiwe5B84jPzyybGEb20CGv6G2DMFtYFG0y7VqKjqPPvvQ@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Fri, 2 Nov 2018 19:45:33 +0100
+Subject: [PATCH 16/16] KVM: arm/arm64: vgic: Replace spin_is_locked()
+ with lockdep
+In-Reply-To: <20181003053902.6910-17-ldr709@gmail.com>
+References: <20181003053902.6910-1-ldr709@gmail.com>
+ <20181003053902.6910-17-ldr709@gmail.com>
+Message-ID: <20181102184533.GA12057@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 8:42 PM Olof Johansson <olof@lixom.net> wrote:
->
-> On Mon, Sep 24, 2018 at 11:28:17AM +0200, Alexandre Torgue wrote:
-> > Olof
-> >
-> > On 09/24/2018 11:19 AM, Olof Johansson wrote:
-> > > Hi,
-> > >
-> > >
-> > > On Mon, Sep 24, 2018 at 7:55 AM, Alexandre Torgue
-> > > <alexandre.torgue@st.com> wrote:
-> > > > Hi Olof
-> > > >
-> > > > On 09/23/2018 02:34 PM, Olof Johansson wrote:
-> > > > >
-> > > > > Hi Alexandre,
-> > > > >
-> > > > > On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
-> > > > > >
-> > > > > > Hi Arnd, olof and Kevin
-> > > > > >
-> > > > > > Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
-> > > > > > binding inside stm32mp157c.dts file. Can you please add them as fixe for
-> > > > > > 4.19 ?
-> > > > >
-> > > > >
-> > > > > The patches only mention removing unused property contents, not what the
-> > > > > bug is
-> > > > > that it fixes (or if it's even causing any problems). Care you clarify?
-> > > >
-> > > >
-> > > > Sure.
-> > > > Concerning SPI patch: without this patch, DMA request will fail but there
-> > > > will be no crash because SPI will switch in interrupt mode.
-> > > > Concerning HASH one, it's just to align DT with dt-bindings documentation.
-> > > > Regarding the minor issue that they fix I could understand that you postpone
-> > > > the merge of those two patches for 4.20.
-> > >
-> > > The former sounds like an appropriate fix, but the latter is probably
-> > > 4.20 material, indeed.
-> > >
-> > > Should I just cherry-pick the two patches, or do you want to re-stage
-> > > new branches?
-> >
-> > I have nothing else to send for v4.20 so if you can directly take those two
-> > patches for v4.20, I agree.
->
-> Thanks! Applied to fixes and next/dt respectively.
+On Tue, Oct 02, 2018 at 10:39:02PM -0700, Lance Roy wrote:
+> lockdep_assert_held() is better suited to checking locking requirements,
+> since it won't get confused when someone else holds the lock. This is
+> also a step towards possibly removing spin_is_locked().
+> 
+> Signed-off-by: Lance Roy <ldr709@gmail.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Eric Auger <eric.auger@redhat.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: <kvmarm@lists.cs.columbia.edu>
 
-Looks like "ARM: dts: stm32: update HASH1 dmas property on
-stm32mp157c" got dropped due to being applied to the wrong
-tree/branch, so included it in fixes now.
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 
-
--Olof
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index 7cfdfbc910e0..50e25438fb3c 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -196,7 +196,7 @@ void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active)
+>   */
+>  static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+>  {
+> -	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> +	lockdep_assert_held(&irq->irq_lock);
+>  
+>  	/* If the interrupt is active, it must stay on the current vcpu */
+>  	if (irq->active)
+> @@ -273,7 +273,7 @@ static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>  
+> -	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
+> +	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+>  
+>  	list_sort(NULL, &vgic_cpu->ap_list_head, vgic_irq_cmp);
+>  }
+> @@ -311,7 +311,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
+>  {
+>  	struct kvm_vcpu *vcpu;
+>  
+> -	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> +	lockdep_assert_held(&irq->irq_lock);
+>  
+>  retry:
+>  	vcpu = vgic_target_oracle(irq);
+> @@ -702,7 +702,7 @@ static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+>  static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
+>  				    struct vgic_irq *irq, int lr)
+>  {
+> -	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> +	lockdep_assert_held(&irq->irq_lock);
+>  
+>  	if (kvm_vgic_global_state.type == VGIC_V2)
+>  		vgic_v2_populate_lr(vcpu, irq, lr);
+> @@ -736,7 +736,7 @@ static int compute_ap_list_depth(struct kvm_vcpu *vcpu,
+>  
+>  	*multi_sgi = false;
+>  
+> -	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
+> +	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+>  
+>  	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+>  		int w;
+> @@ -761,7 +761,7 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+>  	bool multi_sgi;
+>  	u8 prio = 0xff;
+>  
+> -	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
+> +	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+>  
+>  	count = compute_ap_list_depth(vcpu, &multi_sgi);
+>  	if (count > kvm_vgic_global_state.nr_lr || multi_sgi)
+> -- 
+> 2.19.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
