@@ -1,47 +1,153 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 2 Nov 2018 12:49:22 +0530
-Subject: [RFC PATCH 13/40] dt-bindings: PCI: keystone: Add "reg-names"
- binding information
-In-Reply-To: <5baa1b0e.1c69fb81.4f57b.32f7@mx.google.com>
-References: <20180921102155.22839-1-kishon@ti.com>
- <20180921102155.22839-14-kishon@ti.com>
- <5baa1b0e.1c69fb81.4f57b.32f7@mx.google.com>
-Message-ID: <ba9f2c1d-c1e0-b920-fdf1-22445fb6eb5a@ti.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Fri,  2 Nov 2018 08:53:22 +0100
+Subject: [PATCH] KVM: arm/arm64: Fix unintended stage 2 PMD mappings
+Message-ID: <20181102075322.20549-1-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+There are two things we need to take care of when we create block
+mappings in the stage 2 page tables:
 
-On 25/09/18 4:30 AM, Rob Herring wrote:
-> On Fri, Sep 21, 2018 at 03:51:28PM +0530, Kishon Vijay Abraham I wrote:
->> Add "reg-names" binding information in order for device tree node
->> to be populated with the correct register strings.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/pci/pci-keystone.txt | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
->> index 2030ee0dc4f9..3a551687cfa2 100644
->> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
->> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
->> @@ -12,8 +12,10 @@ described here as well as properties that are not applicable.
->>  Required Properties:-
->>  
->>  compatibility: "ti,keystone-pcie"
->> -reg:	index 1 is the base address and length of DW application registers.
->> -	index 2 is the base address and length of PCI device ID register.
->> +reg: Three register ranges as listed in the reg-names property
->> +reg-names: "dbics" for the DesignWare PCIe registers, "app" for the
->> +	   TI specific application registers, "config" for the
->> +	   configuration space address
-> 
-> This doesn't doesn't look like a compatible change.
+  (1) The alignment within a PMD between the host address range and the
+  guest IPA range must be the same, since otherwise we end up mapping
+  pages with the wrong offset.
 
-The pcie-keystone driver hasn't worked in mainline because of lack of serdes
-support. Since the same driver is used for am654 SoC (which has serdes support
-included in this series), I'm trying to cleanup the binding.
+  (2) The head and tail of a memory slot may not cover a full block
+  size, and we have to take care to not map those with block
+  descriptors, since we could expose memory to the guest that the host
+  did not intend to expose.
 
-Thanks
-Kishon
+So far, we have been taking care of (1), but not (2), and our commentary
+describing (1) was somewhat confusing.
+
+This commit attempts to factor out the checks of both into a common
+function, and if we don't pass the check, we won't attempt any PMD
+mappings for neither hugetlbfs nor THP.
+
+Note that we used to only check the alignment for THP, not for
+hugetlbfs, but as far as I can tell the check needs to be applied to
+both scenarios.
+
+Cc: Ralph Palutke <ralph.palutke@fau.de>
+Cc: Lukas Braun <koomi@moshbit.net>
+Reported-by: Lukas Braun <koomi@moshbit.net>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ virt/kvm/arm/mmu.c | 79 +++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 64 insertions(+), 15 deletions(-)
+
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 5eca48bdb1a6..4e7572656b5c 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1470,6 +1470,63 @@ static void kvm_send_hwpoison_signal(unsigned long address,
+ 	send_sig_mceerr(BUS_MCEERR_AR, (void __user *)address, lsb, current);
+ }
+ 
++static bool fault_supports_stage2_pmd_mappings(struct kvm_memory_slot *memslot,
++					       unsigned long hva)
++{
++	gpa_t gpa_start, gpa_end;
++	hva_t uaddr_start, uaddr_end;
++	size_t size;
++
++	size = memslot->npages * PAGE_SIZE;
++
++	gpa_start = memslot->base_gfn << PAGE_SHIFT;
++	gpa_end = gpa_start + size;
++
++	uaddr_start = memslot->userspace_addr;
++	uaddr_end = uaddr_start + size;
++
++	/*
++	 * Pages belonging to memslots that don't have the same alignment
++	 * within a PMD for userspace and IPA cannot be mapped with stage-2
++	 * PMD entries, because we'll end up mapping the wrong pages.
++	 *
++	 * Consider a layout like the following:
++	 *
++	 *    memslot->userspace_addr:
++	 *    +-----+--------------------+--------------------+---+
++	 *    |abcde|fgh  Stage-1 PMD    |    Stage-1 PMD   tv|xyz|
++	 *    +-----+--------------------+--------------------+---+
++	 *
++	 *    memslot->base_gfn << PAGE_SIZE:
++	 *      +---+--------------------+--------------------+-----+
++	 *      |abc|def  Stage-2 PMD    |    Stage-2 PMD     |tvxyz|
++	 *      +---+--------------------+--------------------+-----+
++	 *
++	 * If we create those stage-2 PMDs, we'll end up with this incorrect
++	 * mapping:
++	 *   d -> f
++	 *   e -> g
++	 *   f -> h
++	 */
++	if ((gpa_start & ~S2_PMD_MASK) != (uaddr_start & ~S2_PMD_MASK))
++		return false;
++
++	/*
++	 * Next, let's make sure we're not trying to map anything not covered
++	 * by the memslot. This means we have to prohibit PMD size mappings
++	 * for the beginning and end of a non-PMD aligned and non-PMD sized
++	 * memory slot (illustrated by the head and tail parts of the
++	 * userspace view above containing pages 'abcde' and 'xyz',
++	 * respectively).
++	 *
++	 * Note that it doesn't matter if we do the check using the
++	 * userspace_addr or the base_gfn, as both are equally aligned (per
++	 * the check above) and equally sized.
++	 */
++	return (hva & S2_PMD_MASK) >= uaddr_start &&
++	       (hva & S2_PMD_MASK) + S2_PMD_SIZE <= uaddr_end;
++}
++
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -1495,6 +1552,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
++	if (!fault_supports_stage2_pmd_mappings(memslot, hva))
++		force_pte = true;
++
++	if (logging_active)
++		force_pte = true;
++
+ 	/* Let's check if we will get back a huge page backed by hugetlbfs */
+ 	down_read(&current->mm->mmap_sem);
+ 	vma = find_vma_intersection(current->mm, hva, hva + 1);
+@@ -1504,22 +1567,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
+-	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
++	if (vma_kernel_pagesize(vma) == PMD_SIZE && !force_pte) {
+ 		hugetlb = true;
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+-	} else {
+-		/*
+-		 * Pages belonging to memslots that don't have the same
+-		 * alignment for userspace and IPA cannot be mapped using
+-		 * block descriptors even if the pages belong to a THP for
+-		 * the process, because the stage-2 block descriptor will
+-		 * cover more than a single THP and we loose atomicity for
+-		 * unmapping, updates, and splits of the THP or other pages
+-		 * in the stage-2 block range.
+-		 */
+-		if ((memslot->userspace_addr & ~PMD_MASK) !=
+-		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
+-			force_pte = true;
+ 	}
+ 	up_read(&current->mm->mmap_sem);
+ 
+@@ -1558,7 +1608,6 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		 * should not be mapped with huge pages (it introduces churn
+ 		 * and performance degradation), so force a pte mapping.
+ 		 */
+-		force_pte = true;
+ 		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
+ 
+ 		/*
+-- 
+2.18.0
