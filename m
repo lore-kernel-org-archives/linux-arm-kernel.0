@@ -1,211 +1,93 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 2 Nov 2018 11:50:03 +0100
-Subject: Crash report: Broken NUMA distance map causes crash on arm64
- system
-In-Reply-To: <bf2b890a-4ce7-d0f6-0663-84a1a6e8dbd2@huawei.com>
-References: <b89bf686-05bd-a3de-e7ef-4ab9ab7bdb6c@huawei.com>
- <20181030092640.GE1459@hirez.programming.kicks-ass.net>
- <d126099d-2698-8e3a-06ca-f229e57c3052@huawei.com>
- <ae352fe1-3c59-dcde-fd00-2c03b4491dc6@huawei.com>
- <20181031204622.GB3141@hirez.programming.kicks-ass.net>
- <bf2b890a-4ce7-d0f6-0663-84a1a6e8dbd2@huawei.com>
-Message-ID: <20181102105003.GK3178@hirez.programming.kicks-ass.net>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 2 Nov 2018 11:02:38 +0000
+Subject: [PATCH] KVM: arm64: Clarify explanation of STAGE2_PGTABLE_LEVELS
+In-Reply-To: <20181102075352.20636-1-christoffer.dall@arm.com>
+References: <20181102075352.20636-1-christoffer.dall@arm.com>
+Message-ID: <404f2d39-5dc5-602f-0594-0997b409ff84@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2018 at 10:01:05AM +0000, John Garry wrote:
-> On 31/10/2018 20:46, Peter Zijlstra wrote:
+Hi
 
-> > > I also note that if I apply the patch, below, to reject the invalid NUMA
-> > > distance, we're still getting a warning/error:
-> > > 
-> > > [    7.144407] CPU: All CPU(s) started at EL2
-> > > [    7.148678] alternatives: patching kernel code
-> > > [    7.153557] ERROR: Node-0 not representative
-> > > [    7.153557]
-> > > [    7.159365]   10 15 20 25
-> > > [    7.162097]   15 10 25 30
-> > > [    7.164832]   20 25 10 15
-> > > [    7.167562]   25 30 15 10
-> > 
-> > Yeah, that's an 'obviously' broken topology too.
-> > 
+On 02/11/18 07:53, Christoffer Dall wrote:
+> In attempting to re-construct the logic for our stage 2 page table
+> layout I found the reaoning in the comment explaining how we calculate
+> the number of levels used for stage 2 page tables a bit backwards.
 > 
-> AFAICT, this conforms to ACPI spec SLIT rules, and the kernel SLIT
-> validation allows this also. So maybe we should shout louder here or even
-> mark the SLIT as invalid if totally broken.
+> This commit attempts to clarify the comment, to make it slightly easier
+> to read without having the Arm ARM open on the right page.
+> 
+> While we're at it, fixup a typo in a comment that was recently changed.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> ---
+>   arch/arm64/include/asm/stage2_pgtable.h | 17 ++++++++++-------
+>   virt/kvm/arm/mmu.c                      |  2 +-
+>   2 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+> index d352f6df8d2c..9c387320b28c 100644
+> --- a/arch/arm64/include/asm/stage2_pgtable.h
+> +++ b/arch/arm64/include/asm/stage2_pgtable.h
+> @@ -31,15 +31,18 @@
+>   
+>   /*
+>    * The hardware supports concatenation of up to 16 tables at stage2 entry level
+> - * and we use the feature whenever possible.
+> + * and we use the feature whenever possible, which means we resolve 4 bits of
 
-Right. Part of the problem is that I only have a few necessary
-conditions (symmetry, trace-identity, node0-complete-distance) for the
-distance table, but together they are not sufficient to determine if a
-topology is 'good'.
+s/we resolve 4 bits/we resolve 4 additional bits/ ?
 
-(also, strictly speaking, non-symmetric topologies are possible -- think
-uni-directional mesh links -- we've just not ever seen and validated
-those)
+> + * address at the entry level.
+>    *
+> - * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
+> + * This implies, the total number of page table levels required for
+> + * IPA_SHIFT at stage2 expected by the hardware can be calculated using
+> + * the same logic used for the (non-collapsable) stage1 page tables but for
+> + * (IPA_SHIFT - 4).
+> + *
+> + * Note, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
 
-That said; I can certainly make this code give up and warn harder on
-those conditions.
+May be we could improve it further by :
 
-How is something like the below?
+s/resolved at any level/resolved at any *non-entry* level/
 
----
+as, we could resolve as small as 1 bit at the entry level.
 
-diff --git a/kernel/sched/topology.c b/kernel/sched/topology.c
-index 9d74371e4aad..41e703dd875f 100644
---- a/kernel/sched/topology.c
-+++ b/kernel/sched/topology.c
-@@ -1207,6 +1218,11 @@ sd_init(struct sched_domain_topology_level *tl,
- 	return sd;
- }
- 
-+static const struct cpumask *cpu_system_mask(int cpu)
-+{
-+	return cpu_online_mask;
-+}
-+
- /*
-  * Topology list, bottom-up.
-  */
-@@ -1337,7 +1353,7 @@ void sched_init_numa(void)
- 	int level = 0;
- 	int i, j, k;
- 
--	sched_domains_numa_distance = kzalloc(sizeof(int) * nr_node_ids, GFP_KERNEL);
-+	sched_domains_numa_distance = kzalloc(sizeof(int) * (nr_node_ids + 1), GFP_KERNEL);
- 	if (!sched_domains_numa_distance)
- 		return;
- 
-@@ -1353,39 +1369,22 @@ void sched_init_numa(void)
- 	 * node_distance(i,j) in order to avoid cubic time.
- 	 */
- 	next_distance = curr_distance;
-+
- 	for (i = 0; i < nr_node_ids; i++) {
- 		for (j = 0; j < nr_node_ids; j++) {
--			for (k = 0; k < nr_node_ids; k++) {
--				int distance = node_distance(i, k);
--
--				if (distance > curr_distance &&
--				    (distance < next_distance ||
--				     next_distance == curr_distance))
--					next_distance = distance;
--
--				/*
--				 * While not a strong assumption it would be nice to know
--				 * about cases where if node A is connected to B, B is not
--				 * equally connected to A.
--				 */
--				if (sched_debug() && node_distance(k, i) != distance)
--					sched_numa_warn("Node-distance not symmetric");
--
--				if (sched_debug() && i && !find_numa_distance(distance))
--					sched_numa_warn("Node-0 not representative");
--			}
--			if (next_distance != curr_distance) {
--				sched_domains_numa_distance[level++] = next_distance;
--				sched_domains_numa_levels = level;
--				curr_distance = next_distance;
--			} else break;
--		}
-+			int distance = node_distance(0, j);
- 
--		/*
--		 * In case of sched_debug() we verify the above assumption.
--		 */
--		if (!sched_debug())
--			break;
-+			if (distance > curr_distance &&
-+			    (distance < next_distance ||
-+			     next_distance == curr_distance))
-+				next_distance = distance;
-+
-+		}
-+		if (next_distance != curr_distance) {
-+			sched_domains_numa_distance[level++] = next_distance;
-+			sched_domains_numa_levels = level;
-+			curr_distance = next_distance;
-+		} else break;
- 	}
- 
- 	/*
-@@ -1428,7 +1427,24 @@ void sched_init_numa(void)
- 			sched_domains_numa_masks[i][j] = mask;
- 
- 			for_each_node(k) {
--				if (node_distance(j, k) > sched_domains_numa_distance[i])
-+				int distance = node_distance(j, k);
-+
-+				if (!i && j != k) {
-+					sched_numa_warn("Non-trace locality\n");
-+					goto fail;
-+				}
-+
-+				if (distance > curr_distance) {
-+					sched_numa_warn("Node-0 not complete\n");
-+					goto fail;
-+				}
-+
-+				if (distance != node_distance(k, j)) {
-+					sched_numa_warn("Non symmetric\n");
-+					goto fail;
-+				}
-+
-+				if (distance > sched_domains_numa_distance[i])
- 					continue;
- 
- 				cpumask_or(mask, mask, cpumask_of_node(k));
-@@ -1437,9 +1453,10 @@ void sched_init_numa(void)
- 	}
- 
- 	/* Compute default topology size */
--	for (i = 0; sched_domain_topology[i].mask; i++);
-+	for (k = 0; sched_domain_topology[k].mask; k++)
-+		;
- 
--	tl = kzalloc((i + level + 1) *
-+	tl = kzalloc((k + level + 1) *
- 			sizeof(struct sched_domain_topology_level), GFP_KERNEL);
- 	if (!tl)
- 		return;
-@@ -1447,7 +1464,7 @@ void sched_init_numa(void)
- 	/*
- 	 * Copy the default topology bits..
- 	 */
--	for (i = 0; sched_domain_topology[i].mask; i++)
-+	for (i = 0; i < k; i++)
- 		tl[i] = sched_domain_topology[i];
- 
- 	/*
-@@ -1478,6 +1495,31 @@ void sched_init_numa(void)
- 	sched_max_numa_distance = sched_domains_numa_distance[level - 1];
- 
- 	init_numa_topology_type();
-+
-+	return;
-+
-+fail:
-+	/* Compute default topology size */
-+	for (k = 0; sched_domain_topology[k].mask; k++)
-+		;
-+
-+	tl = kzalloc((k + 2) *
-+			sizeof(struct sched_domain_topology_level), GFP_KERNEL);
-+	if (!tl)
-+		return;
-+
-+	/*
-+	 * Copy the default topology bits..
-+	 */
-+	for (i = 0; i < k; i++)
-+		tl[i] = sched_domain_topology[i];
-+
-+	tl[i] = (struct sched_domain_topology_level){
-+		.mask = cpu_system_mask,
-+		SD_INIT_NAME(SYSTEM)
-+	};
-+
-+	sched_domain_topology = tl;
- }
- 
- void sched_domains_numa_masks_set(unsigned int cpu)
+
+>    * On arm64, the smallest PAGE_SIZE supported is 4k, which means
+> - *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
+> - * This implies, the total number of page table levels at stage2 expected
+> - * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
+> - * in normal translations(e.g, stage1), since we cannot have another level in
+> - * the range (IPA_SHIFT, IPA_SHIFT - 4).
+> + *             (PAGE_SHIFT - 3) > 4 holds for all page sizes
+> + * and therefore we will need a minimum of two levels for stage2 in all cases.
+
+I think the above statement is misleading. The minimum number of
+levels has nothing to do with the concatenation. For e.g, we could
+still create a stage2 with 1 level (32bit IPA on 64K, 29bit + 3bit
+concatenated), going by the same rules above. The only reason why
+we limit the number of levels to 2, is to prevent splitting stage1 PMD
+huge mappings (which are quite common) at stage2.
+
+>    */
+>   #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
+>   #define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 4e7572656b5c..78d8020df4a4 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1234,7 +1234,7 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
+>   	struct page *page = pfn_to_page(pfn);
+>   
+>   	/*
+> -	 * PageTransCompoungMap() returns true for THP and
+> +	 * PageTransCompoundMap() returns true for THP and
+>   	 * hugetlbfs. Make sure the adjustment is done only for THP
+>   	 * pages.
+>   	 */
+> 
+
+Thanks
+Suzuki
