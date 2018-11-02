@@ -1,51 +1,43 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 2 Nov 2018 12:58:37 +0000
-Subject: [PATCH v2] i2c: rk3x: fix some typo
-In-Reply-To: <20181102124535.24331-1-tiny.windzz@gmail.com>
-References: <20181102124535.24331-1-tiny.windzz@gmail.com>
-Message-ID: <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
+From: jbrunet@baylibre.com (jbrunet at baylibre.com)
+Date: Fri, 02 Nov 2018 14:05:14 +0100
+Subject: [PATCH v6 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <1541089855-19356-4-git-send-email-jianxin.pan@amlogic.com>
+References: <1541089855-19356-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541089855-19356-4-git-send-email-jianxin.pan@amlogic.com>
+Message-ID: <ce0a3e6bf6ef438987f3ad390c2aa1bccc75f5ea.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-11-02 13:45, Yangtao Li wrote:
-> Fix multiple instances of a misspelled "Calculates".
+On Fri, 2018-11-02 at 00:30 +0800, Jianxin Pan wrote:
+> +struct meson_sclk_div_data  mmc_clkc_div_data = {
+> +       .div = {
+> +               .reg_off = SD_EMMC_CLOCK,
+> +               .shift   = (0),
+> +               .width   = (6),
+> +       },
+> +       .hi = {
+> +               .reg_off = 0,
+> +               .shift   = 0,
+> +               .width   = 0,
+> +       },
+> +};
 
-Yes, it sure is hard to spell "Calcluated," it's almost impossible to
-get it completely right and not introduce another typo somewhere... :-)
+Jianxin,
 
-Cheers,
-Peter
+When replying to v5: https://patchwork.kernel.org/patch/10646723/#22288117
+I think I have clearly explained that:
+a. sclk needs some change you want to use it for the eMMC (not done )
+b. you can't declare sclk statically like that since there is cached data in
+it and this would forbib multiple instance of the controller which is not
+acceptable for this pariticular controller
 
-> 
-> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> Changes in v2:
-> -add commit message
-> ---
->  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index b8a2728dd4b6..fe347e8e2a23 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
->   *
->   * @clk_rate: I2C input clock rate
->   * @t: Known I2C timing information
-> - * @t_calc: Caculated rk3x private timings that would be written into regs
-> + * @t_calc: Calculated rk3x private timings that would be written into regs
->   *
->   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
->   * a best-effort divider value is returned in divs. If the target rate is
-> @@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
->   *
->   * @clk_rate: I2C input clock rate
->   * @t: Known I2C timing information
-> - * @t_calc: Caculated rk3x private timings that would be written into regs
-> + * @t_calc: Calculated rk3x private timings that would be written into regs
->   *
->   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
->   * a best-effort divider value is returned in divs. If the target rate is
-> 
+This is just not adressed in your series.
+
+Also some comments from Martin about useless definition were already given on
+past version.
+
+Seeing this, I did not review the rest of series.
+Please make sure you have addressed all the comments of past reviews before
+reposting. It is OK to ask questions if things are unclear.
+
+Jerome
