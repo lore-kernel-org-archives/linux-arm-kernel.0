@@ -1,37 +1,18 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri,  2 Nov 2018 21:26:51 -0700
-Subject: [PATCH] ASoC: sunxi: rename SND_SUNXI_ADDA_PR_REGMAP to
- SND_SUN8I_ADDA_PR_REGMAP
-Message-ID: <20181103042651.6641-1-anarsoul@gmail.com>
+From: exata@acexata.com.br (Mariah Hills)
+Date: Fri, 02 Nov 2018 14:32:52 -0700
+Subject: I have a business proposal
+Message-ID: <20181102213256.2945734B0FC2@zmail.grupoparanet.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SND_SUN50I_CODEC_ANALOG selects SND_SUNXI_ADDA_PR_REGMAP which is leftover
-of renaming SND_SUNXI_ADDA_PR_REGMAP to SND_SUN8I_ADDA_PR_REGMAP. Replace
-it with SND_SUN8I_ADDA_PR_REGMAP to fix possible link errors for some
-configurations:
+Hello,
 
-sound/soc/sunxi/sun50i-codec-analog.o: In function `sun50i_codec_analog_probe':
-sun50i-codec-analog.c:(.text+0x62): undefined reference to `sun8i_adda_pr_regmap_init'
+ 
+I have a business to discuss with you. Please do not ignore this message, just let me know you received it and I will tell you more about this business which will benefit the both of us.
 
-Fixes: 42371f327df0 ("ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path controls")
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- sound/soc/sunxi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ 
+Thanks and I look forward to read from you soon.
 
-diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-index 66aad0d3f9c7..8134c3c94229 100644
---- a/sound/soc/sunxi/Kconfig
-+++ b/sound/soc/sunxi/Kconfig
-@@ -31,7 +31,7 @@ config SND_SUN8I_CODEC_ANALOG
- config SND_SUN50I_CODEC_ANALOG
- 	tristate "Allwinner sun50i Codec Analog Controls Support"
- 	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
--	select SND_SUNXI_ADDA_PR_REGMAP
-+	select SND_SUN8I_ADDA_PR_REGMAP
- 	help
- 	  Say Y or M if you want to add support for the analog controls for
- 	  the codec embedded in Allwinner A64 SoC.
--- 
-2.19.1
+ 
+Warm Regards
+Mariah Hills.
