@@ -1,81 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 2 Nov 2018 19:29:21 +0100
-Subject: [PATCH v2] arm64: kprobe: make page to RO mode when allocate it
-In-Reply-To: <20181102174051.GH218059@arrakis.emea.arm.com>
-References: <20181030113850.31150-1-anders.roxell@linaro.org>
- <DAC371D3-7D52-49D5-BA99-9B90389F3197@linaro.org>
- <CAKv+Gu_w1QaB_BEFgTHPUnMXwJGSsbT7wLYGazZDOAt7nNZNXw@mail.gmail.com>
- <20181102174051.GH218059@arrakis.emea.arm.com>
-Message-ID: <CAKv+Gu_Ktzh6T=h8A7g3Xjaw3=anXmwRR_f84reY-mmTYnWUFw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 2 Nov 2018 11:41:40 -0700
+Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
+In-Reply-To: <20180926034055.yj3re5o4oesda4x5@localhost>
+References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
+ <20180923123438.kyvxpeqq6q6xo6cs@localhost>
+ <d952b14a-644e-a067-9615-f0d35f370893@st.com>
+ <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
+ <0f424a8e-67e0-cdc2-0276-660e455e3df6@st.com>
+ <20180926034055.yj3re5o4oesda4x5@localhost>
+Message-ID: <CAOesGMiwe5B84jPzyybGEb20CGv6G2DMFtYFG0y7VqKjqPPvvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 November 2018 at 18:40, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Oct 30, 2018 at 11:10:51AM -0300, Ard Biesheuvel wrote:
->> On 30 October 2018 at 08:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> >> On 30 Oct 2018, at 08:38, Anders Roxell <anders.roxell@linaro.org> wrote:
->> >>
->> >> Commit 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
->> >> has successfully identified code that leaves a page with W+X
->> >> permissions.
->> >>
->> >> [    3.245140] arm64/mm: Found insecure W+X mapping at address (____ptrval____)/0xffff000000d90000
->> >> [    3.245771] WARNING: CPU: 0 PID: 1 at ../arch/arm64/mm/dump.c:232 note_page+0x410/0x420
->> >> [    3.246141] Modules linked in:
->> >> [    3.246653] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc5-next-20180928-00001-ge70ae259b853-dirty #62
->> >> [    3.247008] Hardware name: linux,dummy-virt (DT)
->> >> [    3.247347] pstate: 80000005 (Nzcv daif -PAN -UAO)
->> >> [    3.247623] pc : note_page+0x410/0x420
->> >> [    3.247898] lr : note_page+0x410/0x420
->> >> [    3.248071] sp : ffff00000804bcd0
->> >> [    3.248254] x29: ffff00000804bcd0 x28: ffff000009274000
->> >> [    3.248578] x27: ffff00000921a000 x26: ffff80007dfff000
->> >> [    3.248845] x25: ffff0000093f5000 x24: ffff000009526f6a
->> >> [    3.249109] x23: 0000000000000004 x22: ffff000000d91000
->> >> [    3.249396] x21: ffff000000d90000 x20: 0000000000000000
->> >> [    3.249661] x19: ffff00000804bde8 x18: 0000000000000400
->> >> [    3.249924] x17: 0000000000000000 x16: 0000000000000000
->> >> [    3.250271] x15: ffffffffffffffff x14: 295f5f5f5f6c6176
->> >> [    3.250594] x13: 7274705f5f5f5f28 x12: 2073736572646461
->> >> [    3.250941] x11: 20746120676e6970 x10: 70616d20582b5720
->> >> [    3.251252] x9 : 6572756365736e69 x8 : 3039643030303030
->> >> [    3.251519] x7 : 306666666678302f x6 : ffff0000095467b2
->> >> [    3.251802] x5 : 0000000000000000 x4 : 0000000000000000
->> >> [    3.252060] x3 : 0000000000000000 x2 : ffffffffffffffff
->> >> [    3.252323] x1 : 4d151327adc50b00 x0 : 0000000000000000
->> >> [    3.252664] Call trace:
->> >> [    3.252953]  note_page+0x410/0x420
->> >> [    3.253186]  walk_pgd+0x12c/0x238
->> >> [    3.253417]  ptdump_check_wx+0x68/0xf8
->> >> [    3.253637]  mark_rodata_ro+0x68/0x98
->> >> [    3.253847]  kernel_init+0x38/0x160
->> >> [    3.254103]  ret_from_fork+0x10/0x18
->> >>
->> >> kprobes allocates a writable executable page with module_alloc() in
->> >> order to store executable code.
->> >> Reworked to that when allocate a page it sets mode RO. Inspired by
->> >> commit 63fef14fc98a ("kprobes/x86: Make insn buffer always ROX and use text_poke()").
->> >>
->> >> Cc: Laura Abbott <labbott@redhat.com>
->> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> >> Co-developed-by: Arnd Bergmann <arnd@arndb.de>
->> >> Co-developed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > Please remove these SOBs, Arnd and I provided input to this patch
->> > but you are the one sending it (sob does not assert authorship or
->> > anything like that, it just asserts that the code in the patch was
->> > made available under a compatible license)
->>
->> As Anders points out in a private communication, the Documentation/
->> explicitly requires signoffs for Co-developed-by credits. Perhaps we
->> should enhance that document to clarify that that does not mean you
->> can simply add signoffs on someone else's behalf.
+On Tue, Sep 25, 2018 at 8:42 PM Olof Johansson <olof@lixom.net> wrote:
 >
-> I think I'll rename co-developed-by with suggested-by to keep things
-> simpler. Are you ok with this (or are you providing an explicit
-> signed-off-by)?
+> On Mon, Sep 24, 2018 at 11:28:17AM +0200, Alexandre Torgue wrote:
+> > Olof
+> >
+> > On 09/24/2018 11:19 AM, Olof Johansson wrote:
+> > > Hi,
+> > >
+> > >
+> > > On Mon, Sep 24, 2018 at 7:55 AM, Alexandre Torgue
+> > > <alexandre.torgue@st.com> wrote:
+> > > > Hi Olof
+> > > >
+> > > > On 09/23/2018 02:34 PM, Olof Johansson wrote:
+> > > > >
+> > > > > Hi Alexandre,
+> > > > >
+> > > > > On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
+> > > > > >
+> > > > > > Hi Arnd, olof and Kevin
+> > > > > >
+> > > > > > Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
+> > > > > > binding inside stm32mp157c.dts file. Can you please add them as fixe for
+> > > > > > 4.19 ?
+> > > > >
+> > > > >
+> > > > > The patches only mention removing unused property contents, not what the
+> > > > > bug is
+> > > > > that it fixes (or if it's even causing any problems). Care you clarify?
+> > > >
+> > > >
+> > > > Sure.
+> > > > Concerning SPI patch: without this patch, DMA request will fail but there
+> > > > will be no crash because SPI will switch in interrupt mode.
+> > > > Concerning HASH one, it's just to align DT with dt-bindings documentation.
+> > > > Regarding the minor issue that they fix I could understand that you postpone
+> > > > the merge of those two patches for 4.20.
+> > >
+> > > The former sounds like an appropriate fix, but the latter is probably
+> > > 4.20 material, indeed.
+> > >
+> > > Should I just cherry-pick the two patches, or do you want to re-stage
+> > > new branches?
+> >
+> > I have nothing else to send for v4.20 so if you can directly take those two
+> > patches for v4.20, I agree.
 >
+> Thanks! Applied to fixes and next/dt respectively.
 
-Either is fine with me.
+Looks like "ARM: dts: stm32: update HASH1 dmas property on
+stm32mp157c" got dropped due to being applied to the wrong
+tree/branch, so included it in fixes now.
+
+
+-Olof
