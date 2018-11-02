@@ -1,95 +1,160 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 2 Nov 2018 09:13:03 +0000
-Subject: [PATCH V4 06/10] pinctrl: fsl: imx7ulp: change to use imx legacy
- binding
+Date: Fri, 2 Nov 2018 09:13:16 +0000
+Subject: [PATCH V4 09/10] dts: fsl: add imx7ulp evk support
 In-Reply-To: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
 References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1541149669-10857-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1541149669-10857-10-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already had an earlier conclusion that all new i.MX Socs will keep
-using the legacy i.MX Pinctrl bindings instead of generic pin config.
-However, MX7ULP generic pin config binding support has already been in
-tree before that time. Per SoC maintainers' suggestions, in order to
-get a better consistency for all i.MX devices, we'd like to go back to
-imx legacy binding for MX7ULP as well.
+The NXP i.MX 7ULP Evaluation Kit (EVK) provides a platform for rapid
+evaluation of the i.MX 7ULP, which features NXP's advanced implementation
+of the Arm Cortex-A7 core, the Arm Cortex-M4 core, as well as a 3D and
+2D Graphics Processing Units (GPUs).
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+The EVK enables HDMI output for simple out-of-the-box to bring up but
+allows reconfiguration for MIPI displays. The EVK is designed as a
+System-On-Module(SOM) board that connects to an associated baseboard.
+The SOM provides 1 GB LPDDR3, 8 MB Quad SPI flash, Micro SD 3.0 card
+socket, WiFi/ Bluetooth capability, USB 2.0 OTG with Type C connector
+and an NXP PF1550 power management IC (PMIC). The baseboard provides
+additional capabilities including a full SD/MMC 3.0 card socket, audio
+codec, multiple sensors, an HDMI connector, and an alternate MIPI display
+connector. Additionally, the EVK facilitates software development with the
+ultimate goal of faster time to market through the support of both
+Linux OS and AndroidTM rich operating systems, as well as FreeRTOS.
+
+This patch aims to support the preliminary booting up features
+as follows:
+GPIO
+LPUART
+FEC
+SD/MMC
+
+See more board details:
+https://www.nxp.com/products/processors-and-microcontrollers/
+arm-based-processors-and-mcus/i.mx-applications-processors/
+i.mx-7-processors/evaluation-kit-for-the-i.mx-7ulp-applications
+-processor:MCIMX7ULP-EVK
+
+Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Stefan Agner <stefan@agner.ch>
+Cc: devicetree at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: linux-gpio at vger.kernel.org
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 ChangeLog:
-v3: new patch
+v2->v3:
+ * remove "Generic DT based system"
+ * add device_type property for memory node
+ * back to old pinctrl binding according to SoC maintainer's suggestions
+v1->v2:
+ * switch to SPDX license
+ * pad name update
+ * fix Character '_' not recommended in node name
+ * separate from soc.dtsi file
 ---
- drivers/pinctrl/freescale/pinctrl-imx7ulp.c | 42 -----------------------------
- 1 file changed, 42 deletions(-)
+ arch/arm/boot/dts/Makefile        |  2 +
+ arch/arm/boot/dts/imx7ulp-evk.dts | 77 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-index f521bdb..922ff73 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7ulp.c
-@@ -256,46 +256,8 @@ static const struct pinctrl_pin_desc imx7ulp_pinctrl_pads[] = {
- 
- #define BM_OBE_ENABLED		BIT(17)
- #define BM_IBE_ENABLED		BIT(16)
--#define BM_LK_ENABLED		BIT(15)
- #define BM_MUX_MODE		0xf00
- #define BP_MUX_MODE		8
--#define BM_PULL_ENABLED		BIT(1)
--
--static const struct imx_cfg_params_decode imx7ulp_cfg_decodes[] = {
--	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_DRIVE_STRENGTH, 		BIT(6), 6),
--	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_DRIVE_PUSH_PULL,		BIT(5), 5),
--	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_SLEW_RATE,			BIT(2), 2),
--	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_DISABLE,			BIT(1), 1),
--	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_PULL_UP,			BIT(0), 0),
--
--	IMX_CFG_PARAMS_DECODE_INVERT(PIN_CONFIG_DRIVE_OPEN_DRAIN,	BIT(5), 5),
--	IMX_CFG_PARAMS_DECODE_INVERT(PIN_CONFIG_BIAS_PULL_DOWN,		BIT(0), 0),
--};
--
--static void imx7ulp_cfg_params_fixup(unsigned long *configs,
--				    unsigned int num_configs,
--				    u32 *raw_config)
--{
--	enum pin_config_param param;
--	u32 param_val;
--	int i;
--
--	/* lock field disabled */
--	*raw_config &= ~BM_LK_ENABLED;
--
--	for (i = 0; i < num_configs; i++) {
--		param = pinconf_to_config_param(configs[i]);
--		param_val = pinconf_to_config_argument(configs[i]);
--
--		if ((param == PIN_CONFIG_BIAS_PULL_UP) ||
--		    (param == PIN_CONFIG_BIAS_PULL_DOWN)) {
--			/* pull enabled */
--			*raw_config |= BM_PULL_ENABLED;
--
--			return;
--		}
--	}
--}
- 
- static int imx7ulp_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
- 					  struct pinctrl_gpio_range *range,
-@@ -326,10 +288,6 @@ static const struct imx_pinctrl_soc_info imx7ulp_pinctrl_info = {
- 	.gpio_set_direction = imx7ulp_pmx_gpio_set_direction,
- 	.mux_mask = BM_MUX_MODE,
- 	.mux_shift = BP_MUX_MODE,
--	.generic_pinconf = true,
--	.decodes = imx7ulp_cfg_decodes,
--	.num_decodes = ARRAY_SIZE(imx7ulp_cfg_decodes),
--	.fixup = imx7ulp_cfg_params_fixup,
- };
- 
- static const struct of_device_id imx7ulp_pinctrl_of_match[] = {
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d7268ae..39eac9c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -573,6 +573,8 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7d-sdb-sht11.dtb \
+ 	imx7s-colibri-eval-v3.dtb \
+ 	imx7s-warp.dtb
++dtb-$(CONFIG_SOC_IMX7ULP) += \
++	imx7ulp-evk.dtb
+ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-moxa-uc-8410a.dtb \
+ 	ls1021a-qds.dtb \
+diff --git a/arch/arm/boot/dts/imx7ulp-evk.dts b/arch/arm/boot/dts/imx7ulp-evk.dts
+new file mode 100644
+index 0000000..07796f3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx7ulp-evk.dts
+@@ -0,0 +1,77 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP
++ *   Dong Aisheng <aisheng.dong@nxp.com>
++ */
++
++/dts-v1/;
++
++#include "imx7ulp.dtsi"
++
++/ {
++	model = "NXP i.MX7ULP EVK";
++	compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp";
++
++	chosen {
++		stdout-path = &lpuart4;
++	};
++
++	memory at 60000000 {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
++	};
++
++	reg_vsd_3v3: regulator-vsd-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "VSD_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usdhc0_rst>;
++		gpio = <&gpio_ptd 0 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&lpuart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_lpuart4>;
++	status = "okay";
++};
++
++&usdhc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc0>;
++	cd-gpios = <&gpio_ptc 10 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&reg_vsd_3v3>;
++	status = "okay";
++};
++
++&iomuxc1 {
++	pinctrl_lpuart4: lpuart4grp {
++		fsl,pins = <
++			IMX7ULP_PAD_PTC3__LPUART4_RX	0x1
++			IMX7ULP_PAD_PTC2__LPUART4_TX	0x1
++		>;
++		bias-pull-up;
++	};
++
++	pinctrl_usdhc0: usdhc0grp {
++		fsl,pins = <
++			IMX7ULP_PAD_PTD1__SDHC0_CMD	0x41
++			IMX7ULP_PAD_PTD2__SDHC0_CLK	0x40
++			IMX7ULP_PAD_PTD7__SDHC0_D3	0x41
++			IMX7ULP_PAD_PTD8__SDHC0_D2	0x41
++			IMX7ULP_PAD_PTD9__SDHC0_D1	0x41
++			IMX7ULP_PAD_PTD10__SDHC0_D0	0x41
++			IMX7ULP_PAD_PTC10__PTC10	0x1	/* CD */
++		>;
++	};
++
++	pinctrl_usdhc0_rst: usdhc0-gpio-rst-grp {
++		fsl,pins = <
++			IMX7ULP_PAD_PTD0__PTD0		0x1
++		>;
++	};
++};
 -- 
 2.7.4
