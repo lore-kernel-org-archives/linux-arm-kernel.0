@@ -1,33 +1,30 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Nov 2018 17:47:24 +0000
-Subject: Warnings in arch/arm64/mm/dma-mapping.c
-In-Reply-To: <20181030101342.GC19955@arm.com>
-References: <a771d5ce-28a2-609e-5fd7-338fadc20743@gmail.com>
- <20181030074344.GA24697@lst.de> <20181030101342.GC19955@arm.com>
-Message-ID: <20181102174723.GI218059@arrakis.emea.arm.com>
+Date: Fri, 2 Nov 2018 17:49:50 +0000
+Subject: [PATCH] arm64: hide unused swiotlb functions
+In-Reply-To: <20181102152624.1189250-1-arnd@arndb.de>
+References: <20181102152624.1189250-1-arnd@arndb.de>
+Message-ID: <20181102174949.GJ218059@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 10:13:42AM +0000, Will Deacon wrote:
-> On Tue, Oct 30, 2018 at 08:43:44AM +0100, Christoph Hellwig wrote:
-> > On Mon, Oct 29, 2018 at 04:51:47PM -0700, Florian Fainelli wrote:
-> > > I have not a chance to run a bisection yet, but I suspect this is coming
-> > > from Christoph's latest batch of DMA-API changes in ARM64 under the
-> > > merge commit befa93633193e5327e4045d1e5fa29114580fa5d ("Merge tag
-> > > 'dma-mapping-4.20-1' of git://git.infradead.org/users/hch/dma-mapping"),
-> > > here are the warnings:
-> > 
-> > This should fix it:
+On Fri, Nov 02, 2018 at 04:26:07PM +0100, Arnd Bergmann wrote:
+> After a good chunk of the swiotlb code has been replaced with the generic
+> version, two functions are only used from inside of an #ifdef:
 > 
-> Tested-by: Will Deacon <will.deacon@arm.com>
+> arch/arm64/mm/dma-mapping.c:174:12: error: '__swiotlb_mmap_pfn' defined but not used [-Werror=unused-function]
+>  static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
+>             ^~~~~~~~~~~~~~~~~~
+> arch/arm64/mm/dma-mapping.c:163:12: error: '__swiotlb_get_sgtable_page' defined but not used [-Werror=unused-function]
+>  static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
 > 
-> I guess Catalin can pick this up for -rc1, since there's also the kprobes
-> RO fix kicking around for arm64?
+> Move them into the same #ifdef section to avoid that warning.
+> 
+> Fixes: 886643b76632 ("arm64: use the generic swiotlb_dma_ops")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I can pick it up at -rc1 as I don't have Christoph's patches in my tree
-(and don't want to base a branch on some random point in the merging
-window).
+Christoph already proposed a fix here:
 
-Alternatively, it could go via Christoph's tree for -rc1.
+https://marc.info/?l=linux-arm-kernel&m=154091441602535
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+-- 
+Catalin
