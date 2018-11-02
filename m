@@ -1,71 +1,76 @@
-From: bhaskar.upadhaya@nxp.com (Bhaskar Upadhaya)
-Date: Fri, 2 Nov 2018 09:51:49 +0000
-Subject: [PATCH v2 1/2] arm64: dts: Add support for NXP LS1028A SoC
-In-Reply-To: <20181031071413.GI10386@tiger>
-References: <1539760132-3386-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20181031071413.GI10386@tiger>
-Message-ID: <AM6PR04MB4407CDF0EC1DE0442CF205508CCF0@AM6PR04MB4407.eurprd04.prod.outlook.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Nov 2018 09:55:14 +0000
+Subject: [PATCH v2] ARM:kexec:offline panic_smp_self_stop CPU
+In-Reply-To: <5BDBB6FF.6080907@huawei.com>
+References: <1541071249-15660-1-git-send-email-wangyufen@huawei.com>
+ <20181101113430.GO30658@n2100.armlinux.org.uk>
+ <5BDBB6FF.6080907@huawei.com>
+Message-ID: <20181102095513.GQ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 02, 2018 at 10:31:27AM +0800, wangyufen wrote:
+> In case panic() and panic() called at the same time on different CPUS.
+> For example:
+> CPU 0:
+>   panic()
+>      __crash_kexec
+>        machine_crash_shutdown
+>          crash_smp_send_stop
+>        machine_kexec
+>          BUG_ON(num_online_cpus() > 1);
+> 
+> CPU 1:
+>   panic()
+>     local_irq_disable
+>     panic_smp_self_stop
+> 
+> If CPU 1 calls panic_smp_self_stop() before crash_smp_send_stop(), kdump
+> fails. CPU1 can't receive the ipi irq, CPU1 will be always online.
+> To fix this problem, this patch split out the panic_smp_self_stop()
+> and add set_cpu_online(smp_processor_id(), false).
 
+Looks fine now, please send it to the patch system (details in my
+signature.)  Thanks.
 
->-----Original Message-----
->From: Shawn Guo <shawnguo@kernel.org>
->Sent: Wednesday, October 31, 2018 12:44 PM
->To: Bhaskar Upadhaya <bhaskar.upadhaya@nxp.com>
->Cc: devicetree at vger.kernel.org; Harninder Rai <harninder.rai@nxp.com>;
->Sudhanshu Gupta <sudhanshu.gupta@nxp.com>; Rajesh Bhagat
-><rajesh.bhagat@nxp.com>; linux-arm-kernel at lists.infradead.org; Leo Li
-><leoyang.li@nxp.com>
->Subject: Re: [PATCH v2 1/2] arm64: dts: Add support for NXP LS1028A SoC
->> +	compatible = "fsl,ls1028a";
->> +	interrupt-parent = <&gic>;
->> +	#address-cells = <2>;
->> +	#size-cells = <2>;
->> +
->> +	cpus {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		cpu0: cpu at 0 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a72";
->> +			reg = <0x0>;
->> +			enable-method = "psci";
->> +			clocks = <&clockgen 1 0>;
->> +			next-level-cache = <&l2>;
->> +			cpu-idle-states = <&CPU_PH20>;
->> +		};
->> +
->> +		cpu1: cpu at 1 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a72";
->> +			reg = <0x1>;
->> +			enable-method = "psci";
->> +			clocks = <&clockgen 1 0>;
->> +			next-level-cache = <&l2>;
->> +			cpu-idle-states = <&CPU_PH20>;
->> +		};
->> +
->> +		l2: l2-cache {
->> +			compatible = "cache";
->> +		};
->
->Not sure what's the point of this node without any properties.
+> 
+> Signed-off-by: Yufen Wang <wangyufen@huawei.com>
+> ---
+>  arch/arm/kernel/smp.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 9000d8b..d7b86e4 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -682,6 +682,21 @@ void smp_send_stop(void)
+>  		pr_warn("SMP: failed to stop secondary CPUs\n");
+>  }
+>  
+> +/* In case panic() and panic() called at the same time on CPU1 and CPU2,
+> + * and CPU 1 calls panic_smp_self_stop() before crash_smp_send_stop()
+> + * CPU1 can't receive the ipi irqs from CPU2, CPU1 will be always online,
+> + * kdump fails. So split out the panic_smp_self_stop() and add
+> + * set_cpu_online(smp_processor_id(), false).
+> + */
+> +void panic_smp_self_stop(void)
+> +{
+> +	pr_debug("CPU %u will stop doing anything useful since another CPU has paniced\n",
+> +	         smp_processor_id());
+> +	set_cpu_online(smp_processor_id(), false);
+> +	while (1)
+> +		cpu_relax();
+> +}
+> +
+>  /*
+>   * not supported here
+>   */
+> -- 
+> 2.7.4
+> 
+> 
 
-Shawn, I looked into the NXP and non-NXP platforms, but all are creating cache nodes with "compatible" being the only property.
-
-Below are example code of how other platforms are creating cache nodes.
-
-1 # xgene_L2_3: l2-cache-3 {
-                        compatible = "cache";
-                };
-
-2 # L3_0: l3-cache {
-                                      compatible = "cache";
-                               };
-
-3 # cluster0_l2: l2-cache0 {
-                compatible = "cache";
-        };
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
