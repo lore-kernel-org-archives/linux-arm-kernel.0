@@ -1,186 +1,225 @@
-From: jeyu@kernel.org (Jessica Yu)
-Date: Fri, 2 Nov 2018 14:53:22 +0100
-Subject: [PATCH v2] ARM: module: Fix function kallsyms on Thumb-2
-In-Reply-To: <20181101152913.r2isskngiahi6o2u@axis.com>
-References: <20181031084253.9650-1-vincent.whitchurch@axis.com>
- <20181031155341.GA27878@linux-8ccs>
- <20181101152913.r2isskngiahi6o2u@axis.com>
-Message-ID: <20181102135322.GA5289@linux-8ccs>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Fri, 2 Nov 2018 14:57:25 +0100
+Subject: [PATCH] mmc: mmci: add variant property to send stop cmd if a
+ command fail
+In-Reply-To: <CAPDyKFoyvKeFFwvJppg=NFDQNnDmL83+BR0fhkX=5DwpsGZ11g@mail.gmail.com>
+References: <1540894589-4004-1-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFoyvKeFFwvJppg=NFDQNnDmL83+BR0fhkX=5DwpsGZ11g@mail.gmail.com>
+Message-ID: <805f43ce-81f3-15f6-ab46-4b25ee3911f3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Vincent Whitchurch [01/11/18 16:29 +0100]:
->On Wed, Oct 31, 2018 at 04:53:41PM +0100, Jessica Yu wrote:
->> Could this be done in modpost? I'm guessing the answer is no as some
->> relocations may rely on that bit being set in st_value, right?
->> Therefore we can only clear the bit _after_ relocations to the module
->> are applied at runtime, correct?
->
->Yes, that's correct, it needs to be done after the relocations.
->
->> I'm not against having an arch-specific kallsyms fixup function, my
->> only concern would be if this would interfere with the delayed
->> relocations livepatching does, if there are plans in the future to
->> have livepatching on arm (IIRC there was an attempt at a port in
->> 2016). If there exists some Thumb-2 relocation types that rely on that
->> lowest bit in st_value being set in order to be applied, and we clear
->> it permanently from the symtab, then livepatching wouldn't be able to
->> apply those types of relocations anymore. If this is a legitimate
->> concern, then perhaps an alternative solution would be to have an
->> arch-specific kallsyms symbol-value-fixup function for accesses to
->> sym.st_value, without modifying the module symtab.
->
->I'm not familiar with livepatching, but yes, if it needs to do
->relocations later I guess we should preserve the original value.
+hi Ulf
 
-Yeah, I think the symtab needs to remain unmodified for livepatch to
-be able to do delayed relocations after module load.
+On 10/31/18 4:16 PM, Ulf Hansson wrote:
+> On 30 October 2018 at 11:16, Ludovic Barre <ludovic.Barre@st.com> wrote:
+>> From: Ludovic Barre <ludovic.barre@st.com>
+>>
+>> The mmc framework follows the requirement of SD_Specification:
+>> the STOP_TRANSMISSION is sent on multiple write/read commands
+>> and the stop command (alone), not needed on other ADTC commands.
+> 
+> Well, there is a bit more to it than that.
+> 
+> Host drivers may set MMC_CAP_CMD23 support, which means pre-defined
+> multi-block transfers, becomes preferable to open-ended ones.
+> 
+> However, even for pre-defined transfers, a CM12 (stop transmission)
+> should be sent, in case of data transfer errors. At least if I
+> understand the specs correctly.
 
->I gave the alternative solution a go and it seems to work.
->add_kallsyms() currently overwrites st_info so I had to move the
->elf_type to the unused st_other field instead to preserve st_info:
+About CMD23 (sbc)
+yes are right, if you refer to "4.15 Set Block Count Command" of sd 
+specification:
+-CMD23 is useful for the host to stop multiple read/write operation 
+instead of CMD12.
+-"Host needs to issue CMD12 if any error is detected in the CMD18 and
+CMD25 operations" (multiple block read/write).
 
-I think that's fine, I think the only usages of st_other I've found
-are during relocations, and the field is big enough for a char, so it
-should be fine to reuse it afterwards.
+> 
+> By looking at the code in mmci_data_irq(), I realize that it's not
+> considering this case - so I think that need to be fixed as to start
+> with.
 
->diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
->index 3ff571c2c71c..f443d0ccd1a0 100644
->--- a/arch/arm/kernel/module.c
->+++ b/arch/arm/kernel/module.c
->@@ -336,6 +336,16 @@ static const Elf_Shdr *find_mod_section(const Elf32_Ehdr *hdr,
-> extern void fixup_pv_table(const void *, unsigned long);
-> extern void fixup_smp(const void *, unsigned long);
->
->+#ifdef CONFIG_THUMB2_KERNEL
->+unsigned long symbol_value(Elf_Sym *sym)
->+{
->+	if (ELF_ST_TYPE(sym->st_info) == STT_FUNC)
->+		return sym->st_value & ~1;
->+
->+	return sym->st_value;
->+}
->+#endif
->+
-> int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
-> 		    struct module *mod)
-> {
->diff --git a/include/linux/moduleloader.h b/include/linux/moduleloader.h
->index 31013c2effd3..6bf6118db37f 100644
->--- a/include/linux/moduleloader.h
->+++ b/include/linux/moduleloader.h
->@@ -86,6 +86,8 @@ void module_arch_cleanup(struct module *mod);
-> /* Any cleanup before freeing mod->module_init */
-> void module_arch_freeing_init(struct module *mod);
->
->+unsigned long symbol_value(Elf_Sym *sym);
->+
-> #ifdef CONFIG_KASAN
-> #include <linux/kasan.h>
-> #define MODULE_ALIGN (PAGE_SIZE << KASAN_SHADOW_SCALE_SHIFT)
->diff --git a/kernel/module.c b/kernel/module.c
->index 49a405891587..871bf4450e9d 100644
->--- a/kernel/module.c
->+++ b/kernel/module.c
->@@ -2682,7 +2682,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
->
-> 	/* Set types up while we still have access to sections. */
-> 	for (i = 0; i < mod->kallsyms->num_symtab; i++)
->-		mod->kallsyms->symtab[i].st_info
->+		mod->kallsyms->symtab[i].st_other
-> 			= elf_type(&mod->kallsyms->symtab[i], info);
->
-> 	/* Now populate the cut down core kallsyms for after init. */
->@@ -3916,6 +3916,11 @@ static const char *symname(struct mod_kallsyms *kallsyms, unsigned int symnum)
-> 	return kallsyms->strtab + kallsyms->symtab[symnum].st_name;
-> }
->
->+unsigned long __weak symbol_value(Elf_Sym *sym)
->+{
->+	return sym->st_value;
->+}
->+
-> static const char *get_ksymbol(struct module *mod,
-> 			       unsigned long addr,
-> 			       unsigned long *size,
->@@ -3934,6 +3939,9 @@ static const char *get_ksymbol(struct module *mod,
-> 	/* Scan for closest preceding symbol, and next symbol. (ELF
-> 	   starts real symbols at 1). */
-> 	for (i = 1; i < kallsyms->num_symtab; i++) {
->+		unsigned long thisval = symbol_value(&kallsyms->symtab[i]);
->+		unsigned long bestval = symbol_value(&kallsyms->symtab[best]);
->+
-> 		if (kallsyms->symtab[i].st_shndx == SHN_UNDEF)
-> 			continue;
->
->@@ -3943,21 +3951,21 @@ static const char *get_ksymbol(struct module *mod,
-> 		    || is_arm_mapping_symbol(symname(kallsyms, i)))
-> 			continue;
->
->-		if (kallsyms->symtab[i].st_value <= addr
->-		    && kallsyms->symtab[i].st_value > kallsyms->symtab[best].st_value)
->+		if (thisval <= addr
->+		    && thisval > bestval)
-> 			best = i;
->-		if (kallsyms->symtab[i].st_value > addr
->-		    && kallsyms->symtab[i].st_value < nextval)
->-			nextval = kallsyms->symtab[i].st_value;
->+		if (thisval > addr
->+		    && thisval < nextval)
->+			nextval = thisval;
-> 	}
->
-> 	if (!best)
-> 		return NULL;
->
-> 	if (size)
->-		*size = nextval - kallsyms->symtab[best].st_value;
->+		*size = nextval - symbol_value(&kallsyms->symtab[best]);
-> 	if (offset)
->-		*offset = addr - kallsyms->symtab[best].st_value;
->+		*offset = addr - symbol_value(&kallsyms->symtab[best]);
-> 	return symname(kallsyms, best);
-> }
->
->@@ -4060,8 +4068,8 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
-> 			continue;
-> 		kallsyms = rcu_dereference_sched(mod->kallsyms);
-> 		if (symnum < kallsyms->num_symtab) {
->-			*value = kallsyms->symtab[symnum].st_value;
->-			*type = kallsyms->symtab[symnum].st_info;
->+			*value = symbol_value(&kallsyms->symtab[symnum]);
->+			*type = kallsyms->symtab[symnum].st_other;
-> 			strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
-> 			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
-> 			*exported = is_exported(name, *value, mod);
->@@ -4082,7 +4090,7 @@ static unsigned long mod_find_symname(struct module *mod, const char *name)
-> 	for (i = 0; i < kallsyms->num_symtab; i++)
-> 		if (strcmp(name, symname(kallsyms, i)) == 0 &&
-> 		    kallsyms->symtab[i].st_shndx != SHN_UNDEF)
->-			return kallsyms->symtab[i].st_value;
->+			return symbol_value(&kallsyms->symtab[i]);
-> 	return 0;
-> }
->
->@@ -4132,7 +4140,7 @@ int module_kallsyms_on_each_symbol(int (*fn)(void *, const char *,
-> 				continue;
->
-> 			ret = fn(data, symname(kallsyms, i),
->-				 mod, kallsyms->symtab[i].st_value);
->+				 mod, symbol_value(&kallsyms->symtab[i]));
-> 			if (ret != 0)
-> 				return ret;
-> 		}
+for "it's not considering this case" you're referring to line:
+	if (!data->stop || host->mrq->sbc) {
+		mmci_request_end(host, data->mrq);
+  	} else {
+  		mmci_start_command(host, data->stop, 0);
+  	}
 
-This looks pretty good, could you submit it as a real patch? My only
-suggestion is to maybe rename symbol_value() to something more
-specific, so we could distinguish it from kernel_symbol_value() and
-kernel_symbol_name(), which are used for exported syms that operate on
-struct kernel_symbol. Maybe kallsyms_symbol_value() or
-module_kallsyms_symbol_value()? (That reminds me, I really should
-clean up all the kallsyms/exported symbol code in module.c, the naming
-scheme is a confusing mess :-/)
+MMC framework, sets a data->stop command for requests
+read/write multi block:
+mmc_blk_data_prep:
+	brq->stop.opcode = MMC_STOP_TRANSMISSION;
+mmc_blk_rw_rq_prep:
+	brq->mrq.stop = &brq->stop
 
-Thanks!
+mmc_start_request
+	mmc_mrq_prep
+		if (mrq->stop) {
+			mrq->data->stop = mrq->stop;
 
-Jessica
+Normally, the framework set a data->stop command for sbc request.
+so we could replace the previous line by:
+
+	if (!data->stop || (host->mrq->sbc && !data->error))
+		mmci_request_end(host, data->mrq);
+	else
+		mmci_start_command(host, data->stop, 0);
+
+> 
+>>
+>> But, if an error happens on command or data step, some variants
+>> require a stop command "STOP_TRANSMISION" to clear the DPSM
+>> "Data Path State Machine". If it's not done the next data
+>> command freezes hardware block.
+>> Needed to support the STM32 sdmmc variant.
+> 
+> I don't really follow this, sorry. Could you start by clarifying what
+> you mean by "data step", according to the above?
+
+perhaps more explicit with:
+"if an error happens while command/data transmission
+
+> 
+> As far as I understand, you need to send a CMD12 to clear the DPSM, in
+> case of any errors happening during a data transfer (which includes
+> ADTC commands as well), right?
+
+yes, that's right.
+
+Regards
+Ludo
+
+> 
+> Or is there anything else to it?
+> 
+> Kind regards
+> Uffe
+> 
+>>
+>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>> ---
+>>   drivers/mmc/host/mmci.c | 33 +++++++++++++++++++++++++++++++++
+>>   drivers/mmc/host/mmci.h |  4 ++++
+>>   2 files changed, 37 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+>> index 19650ed..ecedca3 100644
+>> --- a/drivers/mmc/host/mmci.c
+>> +++ b/drivers/mmc/host/mmci.c
+>> @@ -21,6 +21,7 @@
+>>   #include <linux/err.h>
+>>   #include <linux/highmem.h>
+>>   #include <linux/log2.h>
+>> +#include <linux/mmc/mmc.h>
+>>   #include <linux/mmc/pm.h>
+>>   #include <linux/mmc/host.h>
+>>   #include <linux/mmc/card.h>
+>> @@ -57,6 +58,8 @@ void sdmmc_variant_init(struct mmci_host *host);
+>>   #else
+>>   static inline void sdmmc_variant_init(struct mmci_host *host) {}
+>>   #endif
+>> +static void
+>> +mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c);
+>>
+>>   static unsigned int fmax = 515633;
+>>
+>> @@ -274,6 +277,7 @@ static struct variant_data variant_stm32_sdmmc = {
+>>          .cmdreg_lrsp_crc        = MCI_CPSM_STM32_LRSP_CRC,
+>>          .cmdreg_srsp_crc        = MCI_CPSM_STM32_SRSP_CRC,
+>>          .cmdreg_srsp            = MCI_CPSM_STM32_SRSP,
+>> +       .cmdreg_stop            = MCI_CPSM_STM32_CMDSTOP,
+>>          .data_cmd_enable        = MCI_CPSM_STM32_CMDTRANS,
+>>          .irq_pio_mask           = MCI_IRQ_PIO_STM32_MASK,
+>>          .datactrl_first         = true,
+>> @@ -574,6 +578,24 @@ void mmci_dma_error(struct mmci_host *host)
+>>   static void
+>>   mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
+>>   {
+>> +       /*
+>> +        * If an error happens on command or data step, some variants
+>> +        * require a stop command to reinit the DPSM.
+>> +        * If it's not done the next data command freeze hardware block.
+>> +        */
+>> +       if (host->variant->cmdreg_stop) {
+>> +               u32 dpsm;
+>> +
+>> +               dpsm = readl_relaxed(host->base + MMCISTATUS);
+>> +               dpsm &= MCI_STM32_DPSMACTIVE;
+>> +
+>> +               if (dpsm && ((mrq->cmd && mrq->cmd->error) ||
+>> +                            (mrq->data && mrq->data->error))) {
+>> +                       mmci_start_command(host, &host->stop_abort, 0);
+>> +                       return;
+>> +               }
+>> +       }
+>> +
+>>          writel(0, host->base + MMCICOMMAND);
+>>
+>>          BUG_ON(host->data);
+>> @@ -1106,6 +1128,10 @@ mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
+>>                  mmci_reg_delay(host);
+>>          }
+>>
+>> +       if (host->variant->cmdreg_stop &&
+>> +           cmd->opcode == MMC_STOP_TRANSMISSION)
+>> +               c |= host->variant->cmdreg_stop;
+>> +
+>>          c |= cmd->opcode | host->variant->cmdreg_cpsm_enable;
+>>          if (cmd->flags & MMC_RSP_PRESENT) {
+>>                  if (cmd->flags & MMC_RSP_136)
+>> @@ -1957,6 +1983,13 @@ static int mmci_probe(struct amba_device *dev,
+>>                  mmc->max_busy_timeout = 0;
+>>          }
+>>
+>> +       /* prepare the stop command, used to abort and reinitialized the DPSM */
+>> +       if (variant->cmdreg_stop) {
+>> +               host->stop_abort.opcode = MMC_STOP_TRANSMISSION;
+>> +               host->stop_abort.arg = 0;
+>> +               host->stop_abort.flags = MMC_RSP_R1B | MMC_CMD_AC;
+>> +       }
+>> +
+>>          mmc->ops = &mmci_ops;
+>>
+>>          /* We support these PM capabilities. */
+>> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+>> index ec13d90..afb6ec4 100644
+>> --- a/drivers/mmc/host/mmci.h
+>> +++ b/drivers/mmc/host/mmci.h
+>> @@ -166,6 +166,7 @@
+>>   #define MCI_ST_CEATAEND                (1 << 23)
+>>   #define MCI_ST_CARDBUSY                (1 << 24)
+>>   /* Extended status bits for the STM32 variants */
+>> +#define MCI_STM32_DPSMACTIVE   BIT(12)
+>>   #define MCI_STM32_BUSYD0       BIT(20)
+>>
+>>   #define MMCICLEAR              0x038
+>> @@ -269,6 +270,7 @@ struct mmci_host;
+>>    * @cmdreg_lrsp_crc: enable value for long response with crc
+>>    * @cmdreg_srsp_crc: enable value for short response with crc
+>>    * @cmdreg_srsp: enable value for short response without crc
+>> + * @cmdreg_stop: enable value for stop and abort transmission
+>>    * @datalength_bits: number of bits in the MMCIDATALENGTH register
+>>    * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
+>>    *           is asserted (likewise for RX)
+>> @@ -322,6 +324,7 @@ struct variant_data {
+>>          unsigned int            cmdreg_lrsp_crc;
+>>          unsigned int            cmdreg_srsp_crc;
+>>          unsigned int            cmdreg_srsp;
+>> +       unsigned int            cmdreg_stop;
+>>          unsigned int            datalength_bits;
+>>          unsigned int            fifosize;
+>>          unsigned int            fifohalfsize;
+>> @@ -384,6 +387,7 @@ struct mmci_host {
+>>          void __iomem            *base;
+>>          struct mmc_request      *mrq;
+>>          struct mmc_command      *cmd;
+>> +       struct mmc_command      stop_abort;
+>>          struct mmc_data         *data;
+>>          struct mmc_host         *mmc;
+>>          struct clk              *clk;
+>> --
+>> 2.7.4
+>>
