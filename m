@@ -1,67 +1,56 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 2 Nov 2018 09:11:19 +0100
-Subject: [RFC PATCH v2 10/23] KVM: arm64: Extend reset_unknown() to
- handle mixed RES0/UNKNOWN registers
-In-Reply-To: <1538141967-15375-11-git-send-email-Dave.Martin@arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-11-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20181102081119.GR12057@e113682-lin.lund.arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 2 Nov 2018 09:15:17 +0100
+Subject: [PATCH v2 2/8] clk: clk-max77686: Clean clkdev lookup leak and
+ use devm
+In-Reply-To: <83e985f2f60a68f89fac777aa29c55b1edb8769f.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
+References: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
+ <83e985f2f60a68f89fac777aa29c55b1edb8769f.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <CAJKOXPd=E+S3j3XnpCVRs3JdStY2z+pHe0bh_HNzQTmJW_dH=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 02:39:14PM +0100, Dave Martin wrote:
-> The reset_unknown() system register helper initialises a guest
-> register to a distinctive junk value on vcpu reset, to help expose
-> and debug deficient register initialisation within the guest.
-> 
-> Some registers such as the SVE control register ZCR_EL1 contain a
-> mixture of UNKNOWN fields and RES0 bits.  For these,
-> reset_unknown() does not work at present, since it sets all bits to
-> junk values instead of just the wanted bits.
-> 
-> There is no need to craft another special helper just for that,
-> since reset_unknown() almost does the appropriate thing anyway.
-> This patch takes advantage of the ununused val field in struct
-> sys_reg_desc to specify a mask of bits that should be initialised
-> to zero instead of junk.
-> 
-> All existing users of reset_unknown() do not (and should not)
-> define a value for val, so they will implicitly set it to zero,
-> resulting in all bits being made UNKNOWN by this function: thus,
-> this patch makes no functional change for currently defined
-> registers.
-> 
-> Future patches will make use of non-zero val.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+On Thu, 1 Nov 2018 at 08:19, Matti Vaittinen
+<matti.vaittinen@fi.rohmeurope.com> wrote:
+>
+> clk-max77686 never clean clkdev lookup at remove. This can cause
+> oops if clk-max77686 is removed and inserted again. Fix leak by
+> using new devm clkdev lookup registration. Simplify also error
+> path by using new devm_of_clk_add_parent_hw_provider.
+>
+> Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 > ---
->  arch/arm64/kvm/sys_regs.h | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-> index cd710f8..24bac06 100644
-> --- a/arch/arm64/kvm/sys_regs.h
-> +++ b/arch/arm64/kvm/sys_regs.h
-> @@ -89,7 +89,9 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
->  {
->  	BUG_ON(!r->reg);
->  	BUG_ON(r->reg >= NR_SYS_REGS);
-> -	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
-> +
-> +	/* If non-zero, r->val specifies which register bits are RES0: */
-> +	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL & ~r->val;
+>  drivers/clk/clk-max77686.c | 25 ++++---------------------
+>  1 file changed, 4 insertions(+), 21 deletions(-)
+>
+> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
+> index 02551fe4b87c..b1920c1d9b76 100644
+> --- a/drivers/clk/clk-max77686.c
+> +++ b/drivers/clk/clk-max77686.c
+> @@ -235,7 +235,7 @@ static int max77686_clk_probe(struct platform_device *pdev)
+>                         return ret;
+>                 }
+>
+> -               ret = clk_hw_register_clkdev(&max_clk_data->hw,
+> +               ret = devm_clk_hw_register_clkdev(dev, &max_clk_data->hw,
+>                                              max_clk_data->clk_idata.name, NULL);
 
-nit: it would be nice to document this feature on the val field in the
-sys_reg_desc structure above as well.
+You need to re-align the next line.
 
+>                 if (ret < 0) {
+>                         dev_err(dev, "Failed to clkdev register: %d\n", ret);
+> @@ -244,8 +244,8 @@ static int max77686_clk_probe(struct platform_device *pdev)
+>         }
+>
+>         if (parent->of_node) {
+> -               ret = of_clk_add_hw_provider(parent->of_node, of_clk_max77686_get,
+> -                                            drv_data);
+> +               ret = devm_of_clk_add_parent_hw_provider(dev,
+> +                                               of_clk_max77686_get, drv_data);
 
->  }
->  
->  static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> -- 
-> 2.1.4
-> 
+The same, please.
 
-Thanks,
+Rest looks good, so with these changes:
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-    Christoffer
+Best regards,
+Krzysztof
