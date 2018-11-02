@@ -1,41 +1,42 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Fri, 2 Nov 2018 14:38:27 +0200
-Subject: [PATCH v3 7/7] clk: apcs-msm8916: simplify probe cleanup by using devm
-In-Reply-To: <cover.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <fa3bfb55703033b39dd7454cb49706fd3a3d43ee.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Fri,  2 Nov 2018 08:45:35 -0400
+Subject: [PATCH v2] i2c: rk3x: fix some typo
+Message-ID: <20181102124535.24331-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm variant for of_provider registration.
+Fix multiple instances of a misspelled "Calculates".
 
-Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/qcom/apcs-msm8916.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+Changes in v2:
+-add commit message
+---
+ drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/qcom/apcs-msm8916.c b/drivers/clk/qcom/apcs-msm8916.c
-index b1cc8dbcd327..f4e0c136ab1a 100644
---- a/drivers/clk/qcom/apcs-msm8916.c
-+++ b/drivers/clk/qcom/apcs-msm8916.c
-@@ -96,8 +96,8 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
--	ret = of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
--				     &a53cc->clkr.hw);
-+	ret = devm_of_clk_add_parent_hw_provider(dev, of_clk_hw_simple_get,
-+						 &a53cc->clkr.hw);
- 	if (ret) {
- 		dev_err(dev, "failed to add clock provider: %d\n", ret);
- 		goto err;
-@@ -118,7 +118,6 @@ static int qcom_apcs_msm8916_clk_remove(struct platform_device *pdev)
- 	struct device *parent = pdev->dev.parent;
- 
- 	clk_notifier_unregister(a53cc->pclk, &a53cc->clk_nb);
--	of_clk_del_provider(parent->of_node);
- 
- 	return 0;
- }
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index b8a2728dd4b6..fe347e8e2a23 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
+  *
+  * @clk_rate: I2C input clock rate
+  * @t: Known I2C timing information
+- * @t_calc: Caculated rk3x private timings that would be written into regs
++ * @t_calc: Calculated rk3x private timings that would be written into regs
+  *
+  * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+  * a best-effort divider value is returned in divs. If the target rate is
+@@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
+  *
+  * @clk_rate: I2C input clock rate
+  * @t: Known I2C timing information
+- * @t_calc: Caculated rk3x private timings that would be written into regs
++ * @t_calc: Calculated rk3x private timings that would be written into regs
+  *
+  * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+  * a best-effort divider value is returned in divs. If the target rate is
 -- 
-2.14.3
+2.17.0
