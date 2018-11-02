@@ -1,31 +1,71 @@
-From: Ramana.Radhakrishnan@arm.com (Ramana Radhakrishnan)
-Date: Fri, 2 Nov 2018 09:46:47 +0000
-Subject: [PATCH v5 11/17] arm64: docs: document pointer authentication
-In-Reply-To: <CAGXu5j+73z1dPS13xrOgPpn47sfwzNd9BO-USr7V+7quJt7yjA@mail.gmail.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <20181005084754.20950-12-kristina.martsenko@arm.com>
- <CAGXu5j+73z1dPS13xrOgPpn47sfwzNd9BO-USr7V+7quJt7yjA@mail.gmail.com>
-Message-ID: <7f9c1bc4-2e82-e930-7d00-c26791ab9eef@arm.com>
+From: bhaskar.upadhaya@nxp.com (Bhaskar Upadhaya)
+Date: Fri, 2 Nov 2018 09:51:49 +0000
+Subject: [PATCH v2 1/2] arm64: dts: Add support for NXP LS1028A SoC
+In-Reply-To: <20181031071413.GI10386@tiger>
+References: <1539760132-3386-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <20181031071413.GI10386@tiger>
+Message-ID: <AM6PR04MB4407CDF0EC1DE0442CF205508CCF0@AM6PR04MB4407.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+
+>-----Original Message-----
+>From: Shawn Guo <shawnguo@kernel.org>
+>Sent: Wednesday, October 31, 2018 12:44 PM
+>To: Bhaskar Upadhaya <bhaskar.upadhaya@nxp.com>
+>Cc: devicetree at vger.kernel.org; Harninder Rai <harninder.rai@nxp.com>;
+>Sudhanshu Gupta <sudhanshu.gupta@nxp.com>; Rajesh Bhagat
+><rajesh.bhagat@nxp.com>; linux-arm-kernel at lists.infradead.org; Leo Li
+><leoyang.li@nxp.com>
+>Subject: Re: [PATCH v2 1/2] arm64: dts: Add support for NXP LS1028A SoC
+>> +	compatible = "fsl,ls1028a";
+>> +	interrupt-parent = <&gic>;
+>> +	#address-cells = <2>;
+>> +	#size-cells = <2>;
 >> +
->> +When CONFIG_ARM64_PTR_AUTH is selected, and relevant HW support is
->> +present, the kernel will assign a random APIAKey value to each process
->> +at exec*() time. This key is shared by all threads within the process,
->> +and the key is preserved across fork(). Presence of functionality using
->> +APIAKey is advertised via HWCAP_APIA.
-> 
-> It might be useful to include documentation here on how many bits of
-> the address are being used for the PAC bits (I'm assuming it's 7?)
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x0>;
+>> +			enable-method = "psci";
+>> +			clocks = <&clockgen 1 0>;
+>> +			next-level-cache = <&l2>;
+>> +			cpu-idle-states = <&CPU_PH20>;
+>> +		};
+>> +
+>> +		cpu1: cpu at 1 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a72";
+>> +			reg = <0x1>;
+>> +			enable-method = "psci";
+>> +			clocks = <&clockgen 1 0>;
+>> +			next-level-cache = <&l2>;
+>> +			cpu-idle-states = <&CPU_PH20>;
+>> +		};
+>> +
+>> +		l2: l2-cache {
+>> +			compatible = "cache";
+>> +		};
+>
+>Not sure what's the point of this node without any properties.
 
+Shawn, I looked into the NXP and non-NXP platforms, but all are creating cache nodes with "compatible" being the only property.
 
-the number of bits available depends on the VA size, so you can't really 
-document a number.
+Below are example code of how other platforms are creating cache nodes.
 
-Ramana
+1 # xgene_L2_3: l2-cache-3 {
+                        compatible = "cache";
+                };
 
-> 
-> -Kees
-> 
+2 # L3_0: l3-cache {
+                                      compatible = "cache";
+                               };
+
+3 # cluster0_l2: l2-cache0 {
+                compatible = "cache";
+        };
