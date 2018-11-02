@@ -1,75 +1,109 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Fri, 2 Nov 2018 13:04:45 +0200
-Subject: [PATCH v2 2/8] clk: clk-max77686: Clean clkdev lookup leak and
- use devm
-In-Reply-To: <CAJKOXPd=E+S3j3XnpCVRs3JdStY2z+pHe0bh_HNzQTmJW_dH=Q@mail.gmail.com>
-References: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
- <83e985f2f60a68f89fac777aa29c55b1edb8769f.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
- <CAJKOXPd=E+S3j3XnpCVRs3JdStY2z+pHe0bh_HNzQTmJW_dH=Q@mail.gmail.com>
-Message-ID: <20181102110445.GC29664@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  2 Nov 2018 12:20:39 +0100
+Subject: [PATCH] ASoC: pxa: change ac97 dependencies
+Message-ID: <20181102112055.659197-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for taking the time and reviewing this!
+Enabling both the old AC97_BUS code and the new AC97_BUS_COMPAT causes
+problems because both modules provide an exported snd_ac97_reset()
+function.
 
-On Fri, Nov 02, 2018 at 09:15:17AM +0100, Krzysztof Kozlowski wrote:
-> On Thu, 1 Nov 2018 at 08:19, Matti Vaittinen
-> <matti.vaittinen@fi.rohmeurope.com> wrote:
-> >
-> > clk-max77686 never clean clkdev lookup at remove. This can cause
-> > oops if clk-max77686 is removed and inserted again. Fix leak by
-> > using new devm clkdev lookup registration. Simplify also error
-> > path by using new devm_of_clk_add_parent_hw_provider.
-> >
-> > Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-> > ---
-> >  drivers/clk/clk-max77686.c | 25 ++++---------------------
-> >  1 file changed, 4 insertions(+), 21 deletions(-)
-> >
-> > diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-> > index 02551fe4b87c..b1920c1d9b76 100644
-> > --- a/drivers/clk/clk-max77686.c
-> > +++ b/drivers/clk/clk-max77686.c
-> > @@ -235,7 +235,7 @@ static int max77686_clk_probe(struct platform_device *pdev)
-> >                         return ret;
-> >                 }
-> >
-> > -               ret = clk_hw_register_clkdev(&max_clk_data->hw,
-> > +               ret = devm_clk_hw_register_clkdev(dev, &max_clk_data->hw,
-> >                                              max_clk_data->clk_idata.name, NULL);
-> 
-> You need to re-align the next line.
+I had tried to fix the problem of having both coexist earlier, but
+my patch only prevented them from being built-in. This is because
+of a special Kconfig feature that lets a symbol have a dependency
+on another one being disabled, but still allow both to be loadable
+modules.
 
-I'll change this to
-		ret = devm_clk_hw_register_clkdev(dev, &max_clk_data->hw,
-						  max_clk_data->clk_idata.name,
-						  NULL);
-> >                 if (ret < 0) {
-> >                         dev_err(dev, "Failed to clkdev register: %d\n", ret);
-> > @@ -244,8 +244,8 @@ static int max77686_clk_probe(struct platform_device *pdev)
-> >         }
-> >
-> >         if (parent->of_node) {
-> > -               ret = of_clk_add_hw_provider(parent->of_node, of_clk_max77686_get,
-> > -                                            drv_data);
-> > +               ret = devm_of_clk_add_parent_hw_provider(dev,
-> > +                                               of_clk_max77686_get, drv_data);
-> 
-> The same, please.
+Changing the dependency to =n avoids that problem, now we can only
+build the new driver if the old one is completely disabled.
 
-I will change this to 
-		ret = devm_of_clk_add_parent_hw_provider(dev,
-							 of_clk_max77686_get,
-							 drv_data);
-> 
-> Rest looks good, so with these changes:
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> Best regards,
-> Krzysztof
+If we could figure out a way to let rename one of the reset
+functions and have each driver link to exactly the old or
+the compat code, that would also work, but I could not find if
+that's possible.
 
+Fixes: bec5ecdf41d4 ("ASoC: pxa: avoid AC97_BUS build warning")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ sound/soc/pxa/Kconfig | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index 943b44de1464..6075fc32e6b9 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -79,7 +79,7 @@ config SND_PXA2XX_SOC_TOSA
+ 	tristate "SoC AC97 Audio support for Tosa"
+ 	depends on SND_PXA2XX_SOC && MACH_TOSA
+ 	depends on MFD_TC6393XB
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+ 	select SND_PXA2XX_SOC_AC97
+ 	select SND_SOC_WM9712
+ 	help
+@@ -89,7 +89,7 @@ config SND_PXA2XX_SOC_TOSA
+ config SND_PXA2XX_SOC_E740
+ 	tristate "SoC AC97 Audio support for e740"
+ 	depends on SND_PXA2XX_SOC && MACH_E740
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+ 	select SND_SOC_WM9705
+ 	select SND_PXA2XX_SOC_AC97
+ 	help
+@@ -99,7 +99,7 @@ config SND_PXA2XX_SOC_E740
+ config SND_PXA2XX_SOC_E750
+ 	tristate "SoC AC97 Audio support for e750"
+ 	depends on SND_PXA2XX_SOC && MACH_E750
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+ 	select SND_SOC_WM9705
+ 	select SND_PXA2XX_SOC_AC97
+ 	help
+@@ -109,7 +109,7 @@ config SND_PXA2XX_SOC_E750
+ config SND_PXA2XX_SOC_E800
+ 	tristate "SoC AC97 Audio support for e800"
+ 	depends on SND_PXA2XX_SOC && MACH_E800
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+ 	select SND_SOC_WM9712
+ 	select SND_PXA2XX_SOC_AC97
+ 	help
+@@ -120,7 +120,7 @@ config SND_PXA2XX_SOC_EM_X270
+ 	tristate "SoC Audio support for CompuLab EM-x270, eXeda and CM-X300"
+ 	depends on SND_PXA2XX_SOC && (MACH_EM_X270 || MACH_EXEDA || \
+ 			MACH_CM_X300)
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+ 	select SND_PXA2XX_SOC_AC97
+ 	select SND_SOC_WM9712
+ 	help
+@@ -131,7 +131,7 @@ config SND_PXA2XX_SOC_PALM27X
+ 	bool "SoC Audio support for Palm T|X, T5, E2 and LifeDrive"
+ 	depends on SND_PXA2XX_SOC && (MACH_PALMLD || MACH_PALMTX || \
+ 			MACH_PALMT5 || MACH_PALMTE2)
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+ 	select SND_PXA2XX_SOC_AC97
+ 	select SND_SOC_WM9712
+ 	help
+@@ -161,7 +161,7 @@ config SND_SOC_TTC_DKB
+ config SND_SOC_ZYLONITE
+ 	tristate "SoC Audio support for Marvell Zylonite"
+ 	depends on SND_PXA2XX_SOC && MACH_ZYLONITE
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+ 	select SND_PXA2XX_SOC_AC97
+ 	select SND_PXA_SOC_SSP
+ 	select SND_SOC_WM9713
+@@ -201,7 +201,7 @@ config SND_PXA2XX_SOC_MAGICIAN
+ config SND_PXA2XX_SOC_MIOA701
+         tristate "SoC Audio support for MIO A701"
+         depends on SND_PXA2XX_SOC && MACH_MIOA701
+-	depends on !AC97_BUS
++	depends on AC97_BUS=n
+         select SND_PXA2XX_SOC_AC97
+         select SND_SOC_WM9713
+         help
 -- 
-Matti Vaittinen
-ROHM Semiconductors
-
-~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
+2.18.0
