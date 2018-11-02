@@ -1,65 +1,75 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 02 Nov 2018 09:00:36 -0700
-Subject: [PATCH] ASoC: sunxi: rename SND_SUN8I_ADDA_PR_REGMAP
-In-Reply-To: <20181102153406.1528053-1-arnd@arndb.de>
-References: <20181102153406.1528053-1-arnd@arndb.de>
-Message-ID: <13542843.KjxkD9786N@anarsoul-thinkpad>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 02 Nov 2018 10:17:05 -0700
+Subject: [PATCH 5/5] ARM: spectre-v2: per-CPU vtables to work around
+ big.Little systems
+In-Reply-To: <20181030105017.GK30658@n2100.armlinux.org.uk>
+References: <20180919094802.GH30658@n2100.armlinux.org.uk>
+ <CGME20180919095028epcas3p3e1a927bb7e88c6891d43abfdc51603e7@epcas3p3.samsung.com>
+ <E1g2Z6e-0003es-CI@rmk-PC.armlinux.org.uk>
+ <20181005090941eucas1p14031cd38d78e9d561975925bf977727d~aq0-OFZeE1866318663eucas1p1b@eucas1p1.samsung.com>
+ <20181005094618.GG30658@n2100.armlinux.org.uk>
+ <20181030105017.GK30658@n2100.armlinux.org.uk>
+Message-ID: <7hk1lv4cxa.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 2, 2018 8:33:40 AM PDT Arnd Bergmann wrote:
-> The newly added SND_SUN50I_CODEC_ANALOG driver selects a nonexisting
-> symbol SND_SUNXI_ADDA_PR_REGMAP, which was evidently intended to replace
-> SND_SUN8I_ADDA_PR_REGMAP, but since they are now mismatched, we can run
-> into link errors for some configurations:
-> 
-> sound/soc/sunxi/sun50i-codec-analog.o: In function
-> `sun50i_codec_analog_probe': sun50i-codec-analog.c:(.text+0x62): undefined
-> reference to `sun8i_adda_pr_regmap_init'
-> 
-> The new name appears to be more sensible, and as the symbol is hidden,
-> there are no downsides in the rename, so use that consistently now.
+Hi Russell,
 
-Maxime asked it to be SND_SUN8I_ADDA_PR_REGMAP, and also it would be easier to 
-fix it my renaming last remaining SND_SUNXI_ADDA_PR_REGMAP to 
-SND_SUN8I_ADDA_PR_REGMAP.
+Russell King - ARM Linux writes:
 
-> Fixes: 42371f327df0 ("ASoC: sunxi: Add new driver for Allwinner A64 codec's
-> analog path controls") Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  sound/soc/sunxi/Kconfig  | 4 ++--
->  sound/soc/sunxi/Makefile | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-> index 66aad0d3f9c7..0f992bdf1a10 100644
-> --- a/sound/soc/sunxi/Kconfig
-> +++ b/sound/soc/sunxi/Kconfig
-> @@ -23,7 +23,7 @@ config SND_SUN8I_CODEC
->  config SND_SUN8I_CODEC_ANALOG
->  	tristate "Allwinner sun8i Codec Analog Controls Support"
->  	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
-> -	select SND_SUN8I_ADDA_PR_REGMAP
-> +	select SND_SUNXI_ADDA_PR_REGMAP
->  	help
->  	  Say Y or M if you want to add support for the analog controls for
->  	  the codec embedded in newer Allwinner SoCs.
-> @@ -54,7 +54,7 @@ config SND_SUN4I_SPDIF
->  	  Say Y or M to add support for the S/PDIF audio block in the Allwinner
->  	  A10 and affiliated SoCs.
-> 
-> -config SND_SUN8I_ADDA_PR_REGMAP
-> +config SND_SUNXI_ADDA_PR_REGMAP
->  	tristate
->  	select REGMAP
-> 
-> diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
-> index a86be340a076..c4dd2803a011 100644
-> --- a/sound/soc/sunxi/Makefile
-> +++ b/sound/soc/sunxi/Makefile
-> @@ -5,4 +5,4 @@ obj-$(CONFIG_SND_SUN4I_SPDIF) += sun4i-spdif.o
->  obj-$(CONFIG_SND_SUN8I_CODEC_ANALOG) += sun8i-codec-analog.o
->  obj-$(CONFIG_SND_SUN50I_CODEC_ANALOG) += sun50i-codec-analog.o
->  obj-$(CONFIG_SND_SUN8I_CODEC) += sun8i-codec.o
-> -obj-$(CONFIG_SND_SUN8I_ADDA_PR_REGMAP) += sun8i-adda-pr-regmap.o
-> +obj-$(CONFIG_SND_SUNXI_ADDA_PR_REGMAP) += sun8i-adda-pr-regmap.o
+> On Fri, Oct 05, 2018 at 10:46:19AM +0100, Russell King - ARM Linux wrote:
+>> On Fri, Oct 05, 2018 at 11:09:40AM +0200, Marek Szyprowski wrote:
+>> > This patch causes lots of kernel 'BUG' messages on all Samsung Exynos
+>> > boards. It started to appear since it has been merged to linux-next
+>> > on 20181002. I wonder if this issue is Exynos specific or there are
+>> > some patches missing in linux-next, which should fix those 'BUGS'.
+>> > If this is Exynos specific, please let us know what should be changed
+>> > in Exynos platform code to avoid this issue.
+>>
+>> Thanks for the report.
+>>
+>> It looks like my solution for big.Little isn't possible... back to
+>> the drawing board, and big.Little will have to remain vulnerable to
+>> Spectre for another release cycle.
+>
+> I've pushed out a new version in my build branch for the autobuilders
+> to chew on, but I've little confidence in validating that the problem
+> is fixed because the boot results are completely unreliable.
+>
+> It really doesn't help that kernelci.org flags boot logs as "green"
+> and "successful" when they contain such stuff as:
+>
+> 01:08:40.181846  [    9.309984] Unable to handle kernel paging request at virtual address e7fddef0
+>
+> which is the kernel hitting a BUG() - for the full log, see:
+>
+> https://storage.kernelci.org/rmk/to-build/v4.16-38-g9fa10446d304/arm/multi_v7_defconfig/lab-collabora/boot-exynos5800-peach-pi.html
+>
+> This means the only way to check is to _manually_ go through reading
+> each and every boot log - to see if your reported BUG: messages are
+> there - no thanks.
+
+You're right, we should be flagging these as boot failures.
+
+> If kernelci thinks that a boot which hits a kernel BUG(), but still
+> manages to get to a shell prompt is successful, it's giving very
+> misleading boot results.  What about a WARN_ON() or an oops that
+> still allows it to reach a shell prompt.
+>
+> Yes, these may be "successful" in so far as reaching the shell prompt,
+> but they should at least be flagged for further inspection, not
+> effectively marked as "there is nothing wrong here".
+
+We currently catch stack bactraces like this, and flag them as boot
+warnings, and they are shown in the overview:
+https://kernelci.org/boot/id/5bd7af1b59b514ece774be08/
+
+But, as you pointed out, that still requires knowing what you're looking
+for and manually digging for them as we con't have a good way of
+flagging them currently.
+
+What we need to do is catch both warnings (e.g. WARN_ON) etc. as well as
+real errors (e.g. BUG/panic/etc.).  In the case of errors, we should
+mark the boot test as FAIL.
+
+Kevin
