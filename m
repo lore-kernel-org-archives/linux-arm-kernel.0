@@ -1,35 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Nov 2018 10:26:57 +0100
-Subject: [PATCH V3 03/10] dt-bindings: gpio: vf610: add optional clocks
- property
-In-Reply-To: <1540996688-23681-4-git-send-email-aisheng.dong@nxp.com>
-References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
- <1540996688-23681-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdZS_VEh-wzPm+fptrqStaDmP=fNcW0=Fk8r+Y+4Pd94nQ@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 2 Nov 2018 09:13:20 +0000
+Subject: [PATCH V4 10/10] ARM: imx_v6_v7_defconfig: add imx7ulp support
+In-Reply-To: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
+References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1541149669-10857-11-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2018 at 3:43 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
+Select CONFIG_SOC_IMX7ULP by default.
+Patch generated via make ARCH=arm savedefconfig
 
-> On some SoCs(e.g. MX7ULP), GPIO clock is gatable and maybe
-> disabled by default. Users have to make sure it's enabled before
-> being able to access controller registers, otherwise an external
-> abort error may occur. Let's add the optional clocks property to
-> handle this case.
->
-> For ULP GPIO clock, it includes two separate clocks: one is for
-> GPIO controller Input/Output function clock while another is
-> GPIO port control clock for interrupt function.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+v2->v3:
+ * no changes
+v1->v2:
+ * rebase to new version
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Patch applied.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 1ad5736..27ee422 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -38,6 +38,7 @@ CONFIG_SOC_IMX6SLL=y
+ CONFIG_SOC_IMX6SX=y
+ CONFIG_SOC_IMX6UL=y
+ CONFIG_SOC_IMX7D=y
++CONFIG_SOC_IMX7ULP=y
+ CONFIG_SOC_VF610=y
+ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+-- 
+2.7.4
