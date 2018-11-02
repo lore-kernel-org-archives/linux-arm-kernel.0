@@ -1,46 +1,51 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 2 Nov 2018 14:49:51 +0200
-Subject: [PATCH v3 6/7] clk: clk-twl6040: Free of_provider at remove
-In-Reply-To: <855d60c35f092de196b131838fe0b07e9d3080d3.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
- <855d60c35f092de196b131838fe0b07e9d3080d3.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <4b0cceec-ddc8-5398-33a1-e0e91dabdcdf@ti.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 2 Nov 2018 12:58:37 +0000
+Subject: [PATCH v2] i2c: rk3x: fix some typo
+In-Reply-To: <20181102124535.24331-1-tiny.windzz@gmail.com>
+References: <20181102124535.24331-1-tiny.windzz@gmail.com>
+Message-ID: <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2018-11-02 13:45, Yangtao Li wrote:
+> Fix multiple instances of a misspelled "Calculates".
 
+Yes, it sure is hard to spell "Calcluated," it's almost impossible to
+get it completely right and not introduce another typo somewhere... :-)
 
-On 11/2/18 2:37 PM, Matti Vaittinen wrote:
-> use devm variant for of_provider registration so provider is freed
-> at exit.
-
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cheers,
+Peter
 
 > 
-> Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  drivers/clk/clk-twl6040.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+> Changes in v2:
+> -add commit message
+> ---
+>  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
-> index 25dfe050ae9f..e9da09453eb2 100644
-> --- a/drivers/clk/clk-twl6040.c
-> +++ b/drivers/clk/clk-twl6040.c
-> @@ -108,9 +108,8 @@ static int twl6040_pdmclk_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, clkdata);
->  
-> -	return of_clk_add_hw_provider(pdev->dev.parent->of_node,
-> -				      of_clk_hw_simple_get,
-> -				      &clkdata->pdmclk_hw);
-> +	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
-> +			of_clk_hw_simple_get, &clkdata->pdmclk_hw);
->  }
->  
->  static struct platform_driver twl6040_pdmclk_driver = {
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index b8a2728dd4b6..fe347e8e2a23 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
+>   *
+>   * @clk_rate: I2C input clock rate
+>   * @t: Known I2C timing information
+> - * @t_calc: Caculated rk3x private timings that would be written into regs
+> + * @t_calc: Calculated rk3x private timings that would be written into regs
+>   *
+>   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+>   * a best-effort divider value is returned in divs. If the target rate is
+> @@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
+>   *
+>   * @clk_rate: I2C input clock rate
+>   * @t: Known I2C timing information
+> - * @t_calc: Caculated rk3x private timings that would be written into regs
+> + * @t_calc: Calculated rk3x private timings that would be written into regs
+>   *
+>   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+>   * a best-effort divider value is returned in divs. If the target rate is
 > 
-
-- Peter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
