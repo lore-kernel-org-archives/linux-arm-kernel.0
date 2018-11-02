@@ -1,179 +1,211 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 2 Nov 2018 10:26:37 +0000
-Subject: [PATCH] KVM: arm/arm64: Fix unintended stage 2 PMD mappings
-In-Reply-To: <20181102075322.20549-1-christoffer.dall@arm.com>
-References: <20181102075322.20549-1-christoffer.dall@arm.com>
-Message-ID: <9ed2e006-2233-bde9-ab2f-46cd6cddb321@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 2 Nov 2018 11:50:03 +0100
+Subject: Crash report: Broken NUMA distance map causes crash on arm64
+ system
+In-Reply-To: <bf2b890a-4ce7-d0f6-0663-84a1a6e8dbd2@huawei.com>
+References: <b89bf686-05bd-a3de-e7ef-4ab9ab7bdb6c@huawei.com>
+ <20181030092640.GE1459@hirez.programming.kicks-ass.net>
+ <d126099d-2698-8e3a-06ca-f229e57c3052@huawei.com>
+ <ae352fe1-3c59-dcde-fd00-2c03b4491dc6@huawei.com>
+ <20181031204622.GB3141@hirez.programming.kicks-ass.net>
+ <bf2b890a-4ce7-d0f6-0663-84a1a6e8dbd2@huawei.com>
+Message-ID: <20181102105003.GK3178@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Thu, Nov 01, 2018 at 10:01:05AM +0000, John Garry wrote:
+> On 31/10/2018 20:46, Peter Zijlstra wrote:
 
-On 02/11/18 07:53, Christoffer Dall wrote:
-> There are two things we need to take care of when we create block
-> mappings in the stage 2 page tables:
+> > > I also note that if I apply the patch, below, to reject the invalid NUMA
+> > > distance, we're still getting a warning/error:
+> > > 
+> > > [    7.144407] CPU: All CPU(s) started at EL2
+> > > [    7.148678] alternatives: patching kernel code
+> > > [    7.153557] ERROR: Node-0 not representative
+> > > [    7.153557]
+> > > [    7.159365]   10 15 20 25
+> > > [    7.162097]   15 10 25 30
+> > > [    7.164832]   20 25 10 15
+> > > [    7.167562]   25 30 15 10
+> > 
+> > Yeah, that's an 'obviously' broken topology too.
+> > 
 > 
->    (1) The alignment within a PMD between the host address range and the
->    guest IPA range must be the same, since otherwise we end up mapping
->    pages with the wrong offset.
-> 
->    (2) The head and tail of a memory slot may not cover a full block
->    size, and we have to take care to not map those with block
->    descriptors, since we could expose memory to the guest that the host
->    did not intend to expose.
-> 
-> So far, we have been taking care of (1), but not (2), and our commentary
-> describing (1) was somewhat confusing.
-> 
-> This commit attempts to factor out the checks of both into a common
-> function, and if we don't pass the check, we won't attempt any PMD
-> mappings for neither hugetlbfs nor THP.
-> 
-> Note that we used to only check the alignment for THP, not for
-> hugetlbfs, but as far as I can tell the check needs to be applied to
-> both scenarios.
-> 
-> Cc: Ralph Palutke <ralph.palutke@fau.de>
-> Cc: Lukas Braun <koomi@moshbit.net>
-> Reported-by: Lukas Braun <koomi@moshbit.net>
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> ---
->   virt/kvm/arm/mmu.c | 79 +++++++++++++++++++++++++++++++++++++---------
->   1 file changed, 64 insertions(+), 15 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 5eca48bdb1a6..4e7572656b5c 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1470,6 +1470,63 @@ static void kvm_send_hwpoison_signal(unsigned long address,
->   	send_sig_mceerr(BUS_MCEERR_AR, (void __user *)address, lsb, current);
->   }
->   
-> +static bool fault_supports_stage2_pmd_mappings(struct kvm_memory_slot *memslot,
-> +					       unsigned long hva)
-> +{
-> +	gpa_t gpa_start, gpa_end;
-> +	hva_t uaddr_start, uaddr_end;
-> +	size_t size;
-> +
-> +	size = memslot->npages * PAGE_SIZE;
-> +
-> +	gpa_start = memslot->base_gfn << PAGE_SHIFT;
-> +	gpa_end = gpa_start + size;
-> +
-> +	uaddr_start = memslot->userspace_addr;
-> +	uaddr_end = uaddr_start + size;
-> +
-> +	/*
-> +	 * Pages belonging to memslots that don't have the same alignment
-> +	 * within a PMD for userspace and IPA cannot be mapped with stage-2
-> +	 * PMD entries, because we'll end up mapping the wrong pages.
-> +	 *
-> +	 * Consider a layout like the following:
-> +	 *
-> +	 *    memslot->userspace_addr:
-> +	 *    +-----+--------------------+--------------------+---+
-> +	 *    |abcde|fgh  Stage-1 PMD    |    Stage-1 PMD   tv|xyz|
-> +	 *    +-----+--------------------+--------------------+---+
-> +	 *
-> +	 *    memslot->base_gfn << PAGE_SIZE:
-> +	 *      +---+--------------------+--------------------+-----+
-> +	 *      |abc|def  Stage-2 PMD    |    Stage-2 PMD     |tvxyz|
-> +	 *      +---+--------------------+--------------------+-----+
-> +	 *
-> +	 * If we create those stage-2 PMDs, we'll end up with this incorrect
-> +	 * mapping:
-> +	 *   d -> f
-> +	 *   e -> g
-> +	 *   f -> h
-> +	 */
+> AFAICT, this conforms to ACPI spec SLIT rules, and the kernel SLIT
+> validation allows this also. So maybe we should shout louder here or even
+> mark the SLIT as invalid if totally broken.
 
-Nice ! The comment makes it so easy to understand the problem.
+Right. Part of the problem is that I only have a few necessary
+conditions (symmetry, trace-identity, node0-complete-distance) for the
+distance table, but together they are not sufficient to determine if a
+topology is 'good'.
 
-> +	if ((gpa_start & ~S2_PMD_MASK) != (uaddr_start & ~S2_PMD_MASK))
-> +		return false;
-> +
-> +	/*
-> +	 * Next, let's make sure we're not trying to map anything not covered
-> +	 * by the memslot. This means we have to prohibit PMD size mappings
-> +	 * for the beginning and end of a non-PMD aligned and non-PMD sized
-> +	 * memory slot (illustrated by the head and tail parts of the
-> +	 * userspace view above containing pages 'abcde' and 'xyz',
-> +	 * respectively).
-> +	 *
-> +	 * Note that it doesn't matter if we do the check using the
-> +	 * userspace_addr or the base_gfn, as both are equally aligned (per
-> +	 * the check above) and equally sized.
-> +	 */
-> +	return (hva & S2_PMD_MASK) >= uaddr_start &&
-> +	       (hva & S2_PMD_MASK) + S2_PMD_SIZE <= uaddr_end;
+(also, strictly speaking, non-symmetric topologies are possible -- think
+uni-directional mesh links -- we've just not ever seen and validated
+those)
 
-Shouldn't this be :
+That said; I can certainly make this code give up and warn harder on
+those conditions.
 
-		(hva & S2_PMD_MASK) + S2_PMD_SIZE < uaddr_end;
+How is something like the below?
 
-		or
+---
 
-		(hva & S2_PMD_MASK) + S2_PMD_SIZE <= (uaddr_end - 1);
-
-> +}
-> +
->   static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   			  struct kvm_memory_slot *memslot, unsigned long hva,
->   			  unsigned long fault_status)
-> @@ -1495,6 +1552,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   		return -EFAULT;
->   	}
->   
-> +	if (!fault_supports_stage2_pmd_mappings(memslot, hva))
-> +		force_pte = true;
-> +
-> +	if (logging_active)
-> +		force_pte = true;
-
-super minor nit: If we combine the checks, may be we could skip checking
-the  alignments, when logging is active.
-
-	if (logging_active ||
-	    !fault_supports_stage2_pmd_mappings(memslot, hva))
-		force_pte = true;
-
-> +
->   	/* Let's check if we will get back a huge page backed by hugetlbfs */
->   	down_read(&current->mm->mmap_sem);
->   	vma = find_vma_intersection(current->mm, hva, hva + 1);
-> @@ -1504,22 +1567,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   		return -EFAULT;
->   	}
->   
-> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
-> +	if (vma_kernel_pagesize(vma) == PMD_SIZE && !force_pte) {
->   		hugetlb = true;
->   		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-> -	} else {
-> -		/*
-> -		 * Pages belonging to memslots that don't have the same
-> -		 * alignment for userspace and IPA cannot be mapped using
-> -		 * block descriptors even if the pages belong to a THP for
-> -		 * the process, because the stage-2 block descriptor will
-> -		 * cover more than a single THP and we loose atomicity for
-> -		 * unmapping, updates, and splits of the THP or other pages
-> -		 * in the stage-2 block range.
-> -		 */
-> -		if ((memslot->userspace_addr & ~PMD_MASK) !=
-> -		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
-> -			force_pte = true;
->   	}
->   	up_read(&current->mm->mmap_sem);
->   
-> @@ -1558,7 +1608,6 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   		 * should not be mapped with huge pages (it introduces churn
->   		 * and performance degradation), so force a pte mapping.
->   		 */
-> -		force_pte = true;
->   		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
->   
-
-Otherwise looks good to me.
-
-Suzuki
+diff --git a/kernel/sched/topology.c b/kernel/sched/topology.c
+index 9d74371e4aad..41e703dd875f 100644
+--- a/kernel/sched/topology.c
++++ b/kernel/sched/topology.c
+@@ -1207,6 +1218,11 @@ sd_init(struct sched_domain_topology_level *tl,
+ 	return sd;
+ }
+ 
++static const struct cpumask *cpu_system_mask(int cpu)
++{
++	return cpu_online_mask;
++}
++
+ /*
+  * Topology list, bottom-up.
+  */
+@@ -1337,7 +1353,7 @@ void sched_init_numa(void)
+ 	int level = 0;
+ 	int i, j, k;
+ 
+-	sched_domains_numa_distance = kzalloc(sizeof(int) * nr_node_ids, GFP_KERNEL);
++	sched_domains_numa_distance = kzalloc(sizeof(int) * (nr_node_ids + 1), GFP_KERNEL);
+ 	if (!sched_domains_numa_distance)
+ 		return;
+ 
+@@ -1353,39 +1369,22 @@ void sched_init_numa(void)
+ 	 * node_distance(i,j) in order to avoid cubic time.
+ 	 */
+ 	next_distance = curr_distance;
++
+ 	for (i = 0; i < nr_node_ids; i++) {
+ 		for (j = 0; j < nr_node_ids; j++) {
+-			for (k = 0; k < nr_node_ids; k++) {
+-				int distance = node_distance(i, k);
+-
+-				if (distance > curr_distance &&
+-				    (distance < next_distance ||
+-				     next_distance == curr_distance))
+-					next_distance = distance;
+-
+-				/*
+-				 * While not a strong assumption it would be nice to know
+-				 * about cases where if node A is connected to B, B is not
+-				 * equally connected to A.
+-				 */
+-				if (sched_debug() && node_distance(k, i) != distance)
+-					sched_numa_warn("Node-distance not symmetric");
+-
+-				if (sched_debug() && i && !find_numa_distance(distance))
+-					sched_numa_warn("Node-0 not representative");
+-			}
+-			if (next_distance != curr_distance) {
+-				sched_domains_numa_distance[level++] = next_distance;
+-				sched_domains_numa_levels = level;
+-				curr_distance = next_distance;
+-			} else break;
+-		}
++			int distance = node_distance(0, j);
+ 
+-		/*
+-		 * In case of sched_debug() we verify the above assumption.
+-		 */
+-		if (!sched_debug())
+-			break;
++			if (distance > curr_distance &&
++			    (distance < next_distance ||
++			     next_distance == curr_distance))
++				next_distance = distance;
++
++		}
++		if (next_distance != curr_distance) {
++			sched_domains_numa_distance[level++] = next_distance;
++			sched_domains_numa_levels = level;
++			curr_distance = next_distance;
++		} else break;
+ 	}
+ 
+ 	/*
+@@ -1428,7 +1427,24 @@ void sched_init_numa(void)
+ 			sched_domains_numa_masks[i][j] = mask;
+ 
+ 			for_each_node(k) {
+-				if (node_distance(j, k) > sched_domains_numa_distance[i])
++				int distance = node_distance(j, k);
++
++				if (!i && j != k) {
++					sched_numa_warn("Non-trace locality\n");
++					goto fail;
++				}
++
++				if (distance > curr_distance) {
++					sched_numa_warn("Node-0 not complete\n");
++					goto fail;
++				}
++
++				if (distance != node_distance(k, j)) {
++					sched_numa_warn("Non symmetric\n");
++					goto fail;
++				}
++
++				if (distance > sched_domains_numa_distance[i])
+ 					continue;
+ 
+ 				cpumask_or(mask, mask, cpumask_of_node(k));
+@@ -1437,9 +1453,10 @@ void sched_init_numa(void)
+ 	}
+ 
+ 	/* Compute default topology size */
+-	for (i = 0; sched_domain_topology[i].mask; i++);
++	for (k = 0; sched_domain_topology[k].mask; k++)
++		;
+ 
+-	tl = kzalloc((i + level + 1) *
++	tl = kzalloc((k + level + 1) *
+ 			sizeof(struct sched_domain_topology_level), GFP_KERNEL);
+ 	if (!tl)
+ 		return;
+@@ -1447,7 +1464,7 @@ void sched_init_numa(void)
+ 	/*
+ 	 * Copy the default topology bits..
+ 	 */
+-	for (i = 0; sched_domain_topology[i].mask; i++)
++	for (i = 0; i < k; i++)
+ 		tl[i] = sched_domain_topology[i];
+ 
+ 	/*
+@@ -1478,6 +1495,31 @@ void sched_init_numa(void)
+ 	sched_max_numa_distance = sched_domains_numa_distance[level - 1];
+ 
+ 	init_numa_topology_type();
++
++	return;
++
++fail:
++	/* Compute default topology size */
++	for (k = 0; sched_domain_topology[k].mask; k++)
++		;
++
++	tl = kzalloc((k + 2) *
++			sizeof(struct sched_domain_topology_level), GFP_KERNEL);
++	if (!tl)
++		return;
++
++	/*
++	 * Copy the default topology bits..
++	 */
++	for (i = 0; i < k; i++)
++		tl[i] = sched_domain_topology[i];
++
++	tl[i] = (struct sched_domain_topology_level){
++		.mask = cpu_system_mask,
++		SD_INIT_NAME(SYSTEM)
++	};
++
++	sched_domain_topology = tl;
+ }
+ 
+ void sched_domains_numa_masks_set(unsigned int cpu)
