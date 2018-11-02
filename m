@@ -1,102 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  2 Nov 2018 16:26:07 +0100
-Subject: [PATCH] arm64: hide unused swiotlb functions
-Message-ID: <20181102152624.1189250-1-arnd@arndb.de>
+Date: Fri,  2 Nov 2018 16:33:40 +0100
+Subject: [PATCH] ASoC: sunxi: rename SND_SUN8I_ADDA_PR_REGMAP
+Message-ID: <20181102153406.1528053-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a good chunk of the swiotlb code has been replaced with the generic
-version, two functions are only used from inside of an #ifdef:
+The newly added SND_SUN50I_CODEC_ANALOG driver selects a nonexisting
+symbol SND_SUNXI_ADDA_PR_REGMAP, which was evidently intended to replace
+SND_SUN8I_ADDA_PR_REGMAP, but since they are now mismatched, we can run
+into link errors for some configurations:
 
-arch/arm64/mm/dma-mapping.c:174:12: error: '__swiotlb_mmap_pfn' defined but not used [-Werror=unused-function]
- static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
-            ^~~~~~~~~~~~~~~~~~
-arch/arm64/mm/dma-mapping.c:163:12: error: '__swiotlb_get_sgtable_page' defined but not used [-Werror=unused-function]
- static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
+sound/soc/sunxi/sun50i-codec-analog.o: In function `sun50i_codec_analog_probe':
+sun50i-codec-analog.c:(.text+0x62): undefined reference to `sun8i_adda_pr_regmap_init'
 
-Move them into the same #ifdef section to avoid that warning.
+The new name appears to be more sensible, and as the symbol is hidden,
+there are no downsides in the rename, so use that consistently now.
 
-Fixes: 886643b76632 ("arm64: use the generic swiotlb_dma_ops")
+Fixes: 42371f327df0 ("ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path controls")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/mm/dma-mapping.c | 58 ++++++++++++++++++-------------------
- 1 file changed, 29 insertions(+), 29 deletions(-)
+ sound/soc/sunxi/Kconfig  | 4 ++--
+ sound/soc/sunxi/Makefile | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 3a703e5d4e32..62356c64e180 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -160,35 +160,6 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
- 	__dma_unmap_area(phys_to_virt(paddr), size, dir);
- }
+diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+index 66aad0d3f9c7..0f992bdf1a10 100644
+--- a/sound/soc/sunxi/Kconfig
++++ b/sound/soc/sunxi/Kconfig
+@@ -23,7 +23,7 @@ config SND_SUN8I_CODEC
+ config SND_SUN8I_CODEC_ANALOG
+ 	tristate "Allwinner sun8i Codec Analog Controls Support"
+ 	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+-	select SND_SUN8I_ADDA_PR_REGMAP
++	select SND_SUNXI_ADDA_PR_REGMAP
+ 	help
+ 	  Say Y or M if you want to add support for the analog controls for
+ 	  the codec embedded in newer Allwinner SoCs.
+@@ -54,7 +54,7 @@ config SND_SUN4I_SPDIF
+ 	  Say Y or M to add support for the S/PDIF audio block in the Allwinner
+ 	  A10 and affiliated SoCs.
  
--static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
--				      struct page *page, size_t size)
--{
--	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
--
--	if (!ret)
--		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
--
--	return ret;
--}
--
--static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
--			      unsigned long pfn, size_t size)
--{
--	int ret = -ENXIO;
--	unsigned long nr_vma_pages = vma_pages(vma);
--	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
--	unsigned long off = vma->vm_pgoff;
--
--	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
--		ret = remap_pfn_range(vma, vma->vm_start,
--				      pfn + off,
--				      vma->vm_end - vma->vm_start,
--				      vma->vm_page_prot);
--	}
--
--	return ret;
--}
--
- static int __init atomic_pool_init(void)
- {
- 	pgprot_t prot = __pgprot(PROT_NORMAL_NC);
-@@ -358,6 +329,35 @@ arch_initcall(arm64_dma_init);
- #include <linux/platform_device.h>
- #include <linux/amba/bus.h>
+-config SND_SUN8I_ADDA_PR_REGMAP
++config SND_SUNXI_ADDA_PR_REGMAP
+ 	tristate
+ 	select REGMAP
  
-+static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
-+				      struct page *page, size_t size)
-+{
-+	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
-+
-+	if (!ret)
-+		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
-+
-+	return ret;
-+}
-+
-+static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
-+			      unsigned long pfn, size_t size)
-+{
-+	int ret = -ENXIO;
-+	unsigned long nr_vma_pages = vma_pages(vma);
-+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned long off = vma->vm_pgoff;
-+
-+	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
-+		ret = remap_pfn_range(vma, vma->vm_start,
-+				      pfn + off,
-+				      vma->vm_end - vma->vm_start,
-+				      vma->vm_page_prot);
-+	}
-+
-+	return ret;
-+}
-+
- /* Thankfully, all cache ops are by VA so we can ignore phys here */
- static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
- {
+diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
+index a86be340a076..c4dd2803a011 100644
+--- a/sound/soc/sunxi/Makefile
++++ b/sound/soc/sunxi/Makefile
+@@ -5,4 +5,4 @@ obj-$(CONFIG_SND_SUN4I_SPDIF) += sun4i-spdif.o
+ obj-$(CONFIG_SND_SUN8I_CODEC_ANALOG) += sun8i-codec-analog.o
+ obj-$(CONFIG_SND_SUN50I_CODEC_ANALOG) += sun50i-codec-analog.o
+ obj-$(CONFIG_SND_SUN8I_CODEC) += sun8i-codec.o
+-obj-$(CONFIG_SND_SUN8I_ADDA_PR_REGMAP) += sun8i-adda-pr-regmap.o
++obj-$(CONFIG_SND_SUNXI_ADDA_PR_REGMAP) += sun8i-adda-pr-regmap.o
 -- 
 2.18.0
