@@ -1,109 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  2 Nov 2018 12:20:39 +0100
-Subject: [PATCH] ASoC: pxa: change ac97 dependencies
-Message-ID: <20181102112055.659197-1-arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 2 Nov 2018 12:24:12 +0100
+Subject: [PATCH v2 2/2] ARM: cpuidle: Convert to use
+ cpuidle_register|unregister()
+In-Reply-To: <20181101101558.3035-1-ulf.hansson@linaro.org>
+References: <20181101101558.3035-1-ulf.hansson@linaro.org>
+Message-ID: <e167cd49-1547-17ad-1bba-9dbf892e8286@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling both the old AC97_BUS code and the new AC97_BUS_COMPAT causes
-problems because both modules provide an exported snd_ac97_reset()
-function.
+On 01/11/2018 11:15, Ulf Hansson wrote:
+> The only reason that remains, to why the ARM cpuidle driver calls
+> cpuidle_register_driver(), is to avoid printing an error message in case
+> another driver already have been registered for the CPU. This seems a bit
+> silly, but more importantly, if that is a common scenario, perhaps we
+> should change cpuidle_register() accordingly instead.
+> 
+> In either case, let's consolidate the code, by converting to use
+> cpuidle_register|unregister(), which also avoids the unnecessary allocation
+> of the struct cpuidle_device.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-I had tried to fix the problem of having both coexist earlier, but
-my patch only prevented them from being built-in. This is because
-of a special Kconfig feature that lets a symbol have a dependency
-on another one being disabled, but still allow both to be loadable
-modules.
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Changing the dependency to =n avoids that problem, now we can only
-build the new driver if the old one is completely disabled.
+> ---
+> 
+> Changes in v2:
+> 	- Fixup spelling in changelog.
+> 	- Added Lorenzo's reviewed-by tag.
+> 
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 30 +++---------------------------
+>  1 file changed, 3 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index df564d783216..3a407a3ef22b 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -82,7 +82,6 @@ static int __init arm_idle_init_cpu(int cpu)
+>  {
+>  	int ret;
+>  	struct cpuidle_driver *drv;
+> -	struct cpuidle_device *dev;
+>  
+>  	drv = kmemdup(&arm_idle_driver, sizeof(*drv), GFP_KERNEL);
+>  	if (!drv)
+> @@ -119,33 +118,12 @@ static int __init arm_idle_init_cpu(int cpu)
+>  		goto out_kfree_drv;
+>  	}
+>  
+> -	ret = cpuidle_register_driver(drv);
+> -	if (ret) {
+> -		if (ret != -EBUSY)
+> -			pr_err("Failed to register cpuidle driver\n");
+> +	ret = cpuidle_register(drv, NULL);
+> +	if (ret)
+>  		goto out_kfree_drv;
+> -	}
+> -
+> -	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> -	if (!dev) {
+> -		ret = -ENOMEM;
+> -		goto out_unregister_drv;
+> -	}
+> -	dev->cpu = cpu;
+> -
+> -	ret = cpuidle_register_device(dev);
+> -	if (ret) {
+> -		pr_err("Failed to register cpuidle device for CPU %d\n",
+> -		       cpu);
+> -		goto out_kfree_dev;
+> -	}
+>  
+>  	return 0;
+>  
+> -out_kfree_dev:
+> -	kfree(dev);
+> -out_unregister_drv:
+> -	cpuidle_unregister_driver(drv);
+>  out_kfree_drv:
+>  	kfree(drv);
+>  	return ret;
+> @@ -176,9 +154,7 @@ static int __init arm_idle_init(void)
+>  	while (--cpu >= 0) {
+>  		dev = per_cpu(cpuidle_devices, cpu);
+>  		drv = cpuidle_get_cpu_driver(dev);
+> -		cpuidle_unregister_device(dev);
+> -		cpuidle_unregister_driver(drv);
+> -		kfree(dev);
+> +		cpuidle_unregister(drv);
+>  		kfree(drv);
+>  	}
+>  
+> 
 
-If we could figure out a way to let rename one of the reset
-functions and have each driver link to exactly the old or
-the compat code, that would also work, but I could not find if
-that's possible.
 
-Fixes: bec5ecdf41d4 ("ASoC: pxa: avoid AC97_BUS build warning")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- sound/soc/pxa/Kconfig | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 943b44de1464..6075fc32e6b9 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -79,7 +79,7 @@ config SND_PXA2XX_SOC_TOSA
- 	tristate "SoC AC97 Audio support for Tosa"
- 	depends on SND_PXA2XX_SOC && MACH_TOSA
- 	depends on MFD_TC6393XB
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -89,7 +89,7 @@ config SND_PXA2XX_SOC_TOSA
- config SND_PXA2XX_SOC_E740
- 	tristate "SoC AC97 Audio support for e740"
- 	depends on SND_PXA2XX_SOC && MACH_E740
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
- 	select SND_SOC_WM9705
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -99,7 +99,7 @@ config SND_PXA2XX_SOC_E740
- config SND_PXA2XX_SOC_E750
- 	tristate "SoC AC97 Audio support for e750"
- 	depends on SND_PXA2XX_SOC && MACH_E750
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
- 	select SND_SOC_WM9705
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -109,7 +109,7 @@ config SND_PXA2XX_SOC_E750
- config SND_PXA2XX_SOC_E800
- 	tristate "SoC AC97 Audio support for e800"
- 	depends on SND_PXA2XX_SOC && MACH_E800
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
- 	select SND_SOC_WM9712
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -120,7 +120,7 @@ config SND_PXA2XX_SOC_EM_X270
- 	tristate "SoC Audio support for CompuLab EM-x270, eXeda and CM-X300"
- 	depends on SND_PXA2XX_SOC && (MACH_EM_X270 || MACH_EXEDA || \
- 			MACH_CM_X300)
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -131,7 +131,7 @@ config SND_PXA2XX_SOC_PALM27X
- 	bool "SoC Audio support for Palm T|X, T5, E2 and LifeDrive"
- 	depends on SND_PXA2XX_SOC && (MACH_PALMLD || MACH_PALMTX || \
- 			MACH_PALMT5 || MACH_PALMTE2)
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -161,7 +161,7 @@ config SND_SOC_TTC_DKB
- config SND_SOC_ZYLONITE
- 	tristate "SoC Audio support for Marvell Zylonite"
- 	depends on SND_PXA2XX_SOC && MACH_ZYLONITE
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_PXA_SOC_SSP
- 	select SND_SOC_WM9713
-@@ -201,7 +201,7 @@ config SND_PXA2XX_SOC_MAGICIAN
- config SND_PXA2XX_SOC_MIOA701
-         tristate "SoC Audio support for MIO A701"
-         depends on SND_PXA2XX_SOC && MACH_MIOA701
--	depends on !AC97_BUS
-+	depends on AC97_BUS=n
-         select SND_PXA2XX_SOC_AC97
-         select SND_SOC_WM9713
-         help
 -- 
-2.18.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
