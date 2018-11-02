@@ -1,32 +1,41 @@
-From: tiny.windzz@gmail.com (Yangtao Li)
-Date: Fri,  2 Nov 2018 08:36:19 -0400
-Subject: [PATCH v2] arm64: kdump: fix small typo
-Message-ID: <20181102123619.24199-1-tiny.windzz@gmail.com>
+From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
+Date: Fri, 2 Nov 2018 14:36:42 +0200
+Subject: [PATCH v3 4/7] clk: clk-hi655x: Free of_provider at remove
+In-Reply-To: <cover.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
+References: <cover.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <0f66b67315e67192ada302304e2d133fff4989f9.1541161503.git.matti.vaittinen@fi.rohmeurope.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This brings the kernel doc in line with the function signature.
+use devm variant for of_provider registration so provider is freed
+at exit.
 
-Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
 ---
-Changes in v2:
--add commit message
----
- arch/arm64/kernel/crash_dump.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/clk-hi655x.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-index f46d57c31443..6b5037ed15b2 100644
---- a/arch/arm64/kernel/crash_dump.c
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -58,7 +58,7 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
- /**
-  * elfcorehdr_read - read from ELF core header
-  * @buf: buffer where the data is placed
-- * @csize: number of bytes to read
-+ * @count: number of bytes to read
-  * @ppos: address in the memory
-  *
-  * This function reads @count bytes from elf core header which exists
+diff --git a/drivers/clk/clk-hi655x.c b/drivers/clk/clk-hi655x.c
+index 403a0188634a..394d0109104d 100644
+--- a/drivers/clk/clk-hi655x.c
++++ b/drivers/clk/clk-hi655x.c
+@@ -107,8 +107,8 @@ static int hi655x_clk_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	return of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
+-				     &hi655x_clk->clk_hw);
++	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
++				of_clk_hw_simple_get, &hi655x_clk->clk_hw);
+ }
+ 
+ static struct platform_driver hi655x_clk_driver = {
 -- 
-2.17.0
+2.14.3
+
+
+-- 
+Matti Vaittinen
+ROHM Semiconductors
+
+~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
