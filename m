@@ -1,54 +1,29 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 2 Nov 2018 08:54:11 +0000
-Subject: [PATCH V3 07/10] ARM: imx: add initial support for imx7ulp
-In-Reply-To: <CAOMZO5ACUBLBCNMAVJ=SCsFSQour1orLrHU6un=fFY0WYC+ZHw@mail.gmail.com>
-References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
- <1540996688-23681-8-git-send-email-aisheng.dong@nxp.com>
- <CAOMZO5ACUBLBCNMAVJ=SCsFSQour1orLrHU6un=fFY0WYC+ZHw@mail.gmail.com>
-Message-ID: <AM0PR04MB4211CBFA992F60261683CEF580CF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 2 Nov 2018 09:58:24 +0100
+Subject: [PATCH v10 0/6] EDAC: Enhancements to Synopsys EDAC driver
+In-Reply-To: <DM6PR02MB52271A9C7D7829CA1467B657C1CF0@DM6PR02MB5227.namprd02.prod.outlook.com>
+References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
+ <DM6PR02MB52271A9C7D7829CA1467B657C1CF0@DM6PR02MB5227.namprd02.prod.outlook.com>
+Message-ID: <20181102085824.GA14602@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Friday, November 2, 2018 2:21 AM
-[...]
-> On Wed, Oct 31, 2018 at 12:13 PM A.s. Dong <aisheng.dong@nxp.com>
-> wrote:
-> 
-> > +static void __init imx7ulp_init_machine(void) {
-> > +       imx7ulp_pm_init();
-> > +
-> > +       mxc_set_cpu_type(MXC_CPU_IMX7ULP);
-> > +       imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_1_0);
-> 
-> Why do you hardcode it as revision 1.0?
-> 
+On Fri, Nov 02, 2018 at 08:38:52AM +0000, Manish Narani wrote:
+> Ping!
 
-Because so far there're still no way to restrieve SoC version as we did
-via anatop before. So we encode it to 1.0 temporarily on which this code
-was initially based.
+Let me paste to you what I replied to a similar ping during the merge
+window:
 
-I think I can change it to unknown directly to reflect the real situation.
-e.g.
-imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_UNKNOWN) 
+You do realize that we're right in the merge window right now, right?
 
-> > +void __init imx7ulp_pm_init(void)
-> > +{
-> > +       struct device_node *np;
-> > +       void __iomem *smc1_base;
-> > +
-> > +       np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
-> > +       smc1_base = of_iomap(np, 0);
-> > +       WARN_ON(!smc1_base);
-> > +
-> > +       /* Partial Stop mode 3 with system/bus clock enabled */
-> > +       writel_relaxed(PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO,
-> > +                      smc1_base + SMC_PMCTRL);
-> 
-> You should call  iounmap(smc1__base); after smc1__base is no longer used.
+And people are busy sending pull requests and fixing fallout.
 
-Good suggestion, will add it.
+So sending new stuff during the two weeks of the merge window, will
+kinda put you on the backburner. Try to remember that next time and be
+patient.
 
-Regards
-Dong Aisheng
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
