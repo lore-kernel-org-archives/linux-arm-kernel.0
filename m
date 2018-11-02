@@ -1,36 +1,35 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Fri, 2 Nov 2018 11:18:25 +0200
-Subject: [PATCH v2 3/8] clk: clk-s3c2410-dclk: clean up clkdev lookup leak
-In-Reply-To: <CAJKOXPeM18c3a2nWeGGGw+Fn-GQ2C0ridwE3eqRsd1gVQ6zB5w@mail.gmail.com>
-References: <cover.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
- <8e396e22b328f35538a01193797fbd0d001f885d.1541054985.git.matti.vaittinen@fi.rohmeurope.com>
- <CAJKOXPeM18c3a2nWeGGGw+Fn-GQ2C0ridwE3eqRsd1gVQ6zB5w@mail.gmail.com>
-Message-ID: <20181102091825.GB29664@localhost.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 2 Nov 2018 10:26:57 +0100
+Subject: [PATCH V3 03/10] dt-bindings: gpio: vf610: add optional clocks
+ property
+In-Reply-To: <1540996688-23681-4-git-send-email-aisheng.dong@nxp.com>
+References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
+ <1540996688-23681-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdZS_VEh-wzPm+fptrqStaDmP=fNcW0=Fk8r+Y+4Pd94nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Krzysztof!
+On Wed, Oct 31, 2018 at 3:43 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
 
-On Fri, Nov 02, 2018 at 09:19:10AM +0100, Krzysztof Kozlowski wrote:
-> On Thu, 1 Nov 2018 at 08:19, Matti Vaittinen
-> <matti.vaittinen@fi.rohmeurope.com> wrote:
-> >
-> > Use devm variant of clkdev lookup registration in order to avoid
-> > clkdev lookup leak at device remove.
-> >
-> > Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-> > ---
-> >  drivers/clk/samsung/clk-s3c2410-dclk.c | 15 ++++++++-------
-> >  1 file changed, 8 insertions(+), 7 deletions(-)
-> 
-> Driver has suppress_bind_attrs and it cannot be built as module so
-> device removal should not be possible. There is no need to use devm.
+> On some SoCs(e.g. MX7ULP), GPIO clock is gatable and maybe
+> disabled by default. Users have to make sure it's enabled before
+> being able to access controller registers, otherwise an external
+> abort error may occur. Let's add the optional clocks property to
+> handle this case.
+>
+> For ULP GPIO clock, it includes two separate clocks: one is for
+> GPIO controller Input/Output function clock while another is
+> GPIO port control clock for interrupt function.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-This is exactly what I wanted to hear =) I will drop this patch from
-series.
+Patch applied.
 
--- 
-Matti Vaittinen
-ROHM Semiconductors
-
-~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
+Yours,
+Linus Walleij
