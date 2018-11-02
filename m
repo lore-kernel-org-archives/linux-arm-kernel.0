@@ -1,32 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Nov 2018 10:36:35 +0100
-Subject: [PATCH V4 04/10] gpio: vf610: add optional clock support
-In-Reply-To: <1541149669-10857-5-git-send-email-aisheng.dong@nxp.com>
+Date: Fri, 2 Nov 2018 10:37:50 +0100
+Subject: [PATCH V4 05/10] dt-bindings: pinctrl: imx7ulp: back to imx
+ legacy binding for consistency
+In-Reply-To: <1541149669-10857-6-git-send-email-aisheng.dong@nxp.com>
 References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
- <1541149669-10857-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
+ <1541149669-10857-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdb=1gKHCnd2njRdDbf_dg8H-H3Zmzy8J_H2OoRNa7omnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 2, 2018 at 10:12 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+On Fri, Nov 2, 2018 at 10:13 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
 
-> Some SoCs need the gpio clock to be enabled before accessing
-> HW registers. This patch add the optional clock handling.
+> We already had an earlier conclusion that all new i.MX Socs will keep
+> using the legacy i.MX Pinctrl bindings instead of generic pin config.
+> However, MX7ULP generic pin config binding support has already been in
+> tree before that time. Per SoC maintainers' suggestions, in order to
+> get a better consistency for all i.MX devices, we'd like to go back to
+> imx legacy binding for MX7ULP as well.
 >
+> Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Stefan Agner <stefan@agner.ch>
 > Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
 > Cc: linux-gpio at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
 > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
-> v2->v3:
->  * error checking updated according to Russell's suggestion:
->    ptr == ERR_PTR(-EPROBE_DEFER)
->  * clock independently checking
+> ChangeLog:
+>  v3: new patch
 
-Please look at my feedback for v2 as well, sorry for
-the synchronization problems here... Didn't see this
-version until after replying.
+Can I have some ACKs from the other Freescale people on this
+so I see that there is a wide consensus for this?
 
 Yours,
 Linus Walleij
