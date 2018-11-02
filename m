@@ -1,39 +1,60 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 2 Nov 2018 09:13:20 +0000
-Subject: [PATCH V4 10/10] ARM: imx_v6_v7_defconfig: add imx7ulp support
-In-Reply-To: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
-References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1541149669-10857-11-git-send-email-aisheng.dong@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 2 Nov 2018 10:32:37 +0100
+Subject: [PATCH V3 04/10] gpio: vf610: add optional clock support
+In-Reply-To: <1540996688-23681-5-git-send-email-aisheng.dong@nxp.com>
+References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
+ <1540996688-23681-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkda2XUXBCvb5mYgDrYtCL8dA24uQXaBrHrMLH4PFNdq_MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select CONFIG_SOC_IMX7ULP by default.
-Patch generated via make ARCH=arm savedefconfig
+On Wed, Oct 31, 2018 at 3:43 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v2->v3:
- * no changes
-v1->v2:
- * rebase to new version
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> +       clk_port = devm_clk_get(&pdev->dev, "port");
+> +       if (clk_port == ERR_PTR(-EPROBE_DEFER))
+> +               return -EPROBE_DEFER;
+> +
+> +       clk_gpio = devm_clk_get(&pdev->dev, "gpio");
+> +       if (clk_gpio == ERR_PTR(-EPROBE_DEFER))
+> +               return -EPROBE_DEFER;
+> +
+> +       if (!IS_ERR_OR_NULL(clk_port)) {
+> +               ret = clk_prepare_enable(clk_port);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+> +       if (!IS_ERR_OR_NULL(clk_gpio)) {
+> +               ret = clk_prepare_enable(clk_gpio);
+> +               if (ret) {
+> +                       clk_disable_unprepare(clk_port);
+> +                       return ret;
+> +               }
+> +       }
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 1ad5736..27ee422 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -38,6 +38,7 @@ CONFIG_SOC_IMX6SLL=y
- CONFIG_SOC_IMX6SX=y
- CONFIG_SOC_IMX6UL=y
- CONFIG_SOC_IMX7D=y
-+CONFIG_SOC_IMX7ULP=y
- CONFIG_SOC_VF610=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
--- 
-2.7.4
+I think IS_ERR_OR_NULL() is considered harmful among other
+things.
+
+What about this pattern:
+
+        clk = devm_clk_get(dev, "foo");
+        if (!IS_ERR(clk)) {
+                ret = clk_prepare_enable(clk);
+                if (ret)
+                        return ret;
+        } else if (PTR_ERR(clk) == -EPROBE_DEFER) {
+                /*
+                 * Percolate deferrals, for anything else,
+                 * just live without the clocking.
+                 */
+                return PTR_ERR(clk);
+        }
+
+You also need to introduce code to disable the clock on
+.remove() or the clock will always be on after this module
+has probed. This applies also to builtin drivers, unless
+you suppress the sysfs attributes and use
+platform_driver_probe()
+
+Yours,
+Linus Walleij
