@@ -1,30 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 2 Nov 2018 11:33:25 -0700
-Subject: [PATCH v3 0/2] dt-bindings: uniphier: two trivial DT bindings
- patches
-In-Reply-To: <1539945019-24950-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1539945019-24950-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20181102183325.awq7auc7qwn4amlz@localhost>
+From: colin.king@canonical.com (Colin King)
+Date: Fri,  2 Nov 2018 19:01:26 +0000
+Subject: [PATCH][staging-next] drivers: staging: cedrus: find ctx before
+ dereferencing it ctx
+Message-ID: <20181102190126.5628-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 07:30:16PM +0900, Masahiro Yamada wrote:
-> 
-> Arnd, Olof,
-> 
-> I know it is very late in this development cycle.
-> 
-> If possible, could you directly apply these two patches
-> to your ARM-SoC, aiming for the upcoming v4.20-rc1 MW?
-> 
-> If not, I can wait for v4.21-rc1.
+From: Colin Ian King <colin.king@canonical.com>
 
-Hi,
+Currently if count is an invalid value the v4l2_info message will
+dereference a null ctx pointer to get the dev information. Fix
+this by finding ctx first and then checking for an invalid count,
+this way ctxt will be non-null hence avoiding the null pointer
+dereference.
 
-As you've noticed by now, this didn't make it in but we'll be happy to take it
-if you resend after -rc1.
+Detected by CoverityScan, CID#1475337 ("Explicit null dereferenced")
 
-Thanks!
+Fixes: 50e761516f2b ("media: platform: Add Cedrus VPU decoder driver")
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/staging/media/sunxi/cedrus/cedrus.c | 22 ++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-
--Olof
+diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c b/drivers/staging/media/sunxi/cedrus/cedrus.c
+index 82558455384a..699d62dceb6c 100644
+--- a/drivers/staging/media/sunxi/cedrus/cedrus.c
++++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
+@@ -108,17 +108,6 @@ static int cedrus_request_validate(struct media_request *req)
+ 	unsigned int count;
+ 	unsigned int i;
+ 
+-	count = vb2_request_buffer_cnt(req);
+-	if (!count) {
+-		v4l2_info(&ctx->dev->v4l2_dev,
+-			  "No buffer was provided with the request\n");
+-		return -ENOENT;
+-	} else if (count > 1) {
+-		v4l2_info(&ctx->dev->v4l2_dev,
+-			  "More than one buffer was provided with the request\n");
+-		return -EINVAL;
+-	}
+-
+ 	list_for_each_entry(obj, &req->objects, list) {
+ 		struct vb2_buffer *vb;
+ 
+@@ -133,6 +122,17 @@ static int cedrus_request_validate(struct media_request *req)
+ 	if (!ctx)
+ 		return -ENOENT;
+ 
++	count = vb2_request_buffer_cnt(req);
++	if (!count) {
++		v4l2_info(&ctx->dev->v4l2_dev,
++			  "No buffer was provided with the request\n");
++		return -ENOENT;
++	} else if (count > 1) {
++		v4l2_info(&ctx->dev->v4l2_dev,
++			  "More than one buffer was provided with the request\n");
++		return -EINVAL;
++	}
++
+ 	parent_hdl = &ctx->hdl;
+ 
+ 	hdl = v4l2_ctrl_request_hdl_find(req, parent_hdl);
+-- 
+2.19.1
