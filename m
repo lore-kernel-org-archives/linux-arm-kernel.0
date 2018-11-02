@@ -1,60 +1,102 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 2 Nov 2018 09:39:39 +0100
-Subject: [PATCH v3 6/7] arm64: docs: document KVM support of pointer
- authentication
-In-Reply-To: <1539773280-4159-7-git-send-email-amit.kachhap@arm.com>
-References: <1539773280-4159-1-git-send-email-amit.kachhap@arm.com>
- <1539773280-4159-7-git-send-email-amit.kachhap@arm.com>
-Message-ID: <20181102083939.GW12057@e113682-lin.lund.arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 02 Nov 2018 16:41:54 +0800
+Subject: [PATCH v4 03/10] phy: sun4i-usb: add support for H6 USB2 PHY
+In-Reply-To: <20181004122855.22981-4-icenowy@aosc.io>
+References: <20181004122855.22981-1-icenowy@aosc.io>
+ <20181004122855.22981-4-icenowy@aosc.io>
+Message-ID: <9cca3453d646f38793df411c4471d062769b4f72.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 04:17:59PM +0530, Amit Daniel Kachhap wrote:
-> The documentation is updated to help in using pointer authentication
-> for KVM guests.
+? 2018-10-04?? 20:28 +0800?Icenowy Zheng???
+> The USB 2.0 PHY on Allwinner H6 SoC is similar to older Allwinner
+> SoCs,
+> with some USB0 quirk like A83T and PHY index 1/2 missing.
 > 
-> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
+> Add support for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+
+Excuse me.
+
+Kishon, could you check PATCH 1~3 and queue them?
+
+Even if USB3 support is pending, USB2 support will still be useful, and
+they're independent.
+
 > ---
->  Documentation/arm64/pointer-authentication.txt | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+> No changes in v4.
 > 
-> diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
-> index 8a9cb57..b00d735 100644
-> --- a/Documentation/arm64/pointer-authentication.txt
-> +++ b/Documentation/arm64/pointer-authentication.txt
-> @@ -78,7 +78,13 @@ to TTBR1 addresses (e.g. kernel pointers).
->  Virtualization
->  --------------
+> Changes in v3:
+> - Added Chen-Yu's Review tag.
+> 
+>  drivers/phy/allwinner/phy-sun4i-usb.c | 19 +++++++++++++++++--
+>  1 file changed, 17 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c
+> b/drivers/phy/allwinner/phy-sun4i-usb.c
+> index 881078ff73f6..ae16854a770a 100644
+> --- a/drivers/phy/allwinner/phy-sun4i-usb.c
+> +++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+> @@ -115,6 +115,7 @@ enum sun4i_usb_phy_type {
+>  	sun8i_r40_phy,
+>  	sun8i_v3s_phy,
+>  	sun50i_a64_phy,
+> +	sun50i_h6_phy,
+>  };
 >  
-> -Pointer authentication is not currently supported in KVM guests. KVM
-> +Pointer authentication is enabled in KVM guest when virtual machine is
-> +created by passing a flag requesting this feature to be enabled. Without
-> +this flag, pointer authentication is not enabled in KVM guests and KVM
->  will mask the feature bits from ID_AA64ISAR1_EL1, and attempted use of
->  the feature will result in an UNDEFINED exception being injected into
->  the guest.
+>  struct sun4i_usb_phy_cfg {
+> @@ -295,7 +296,8 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  		return ret;
+>  	}
+>  
+> -	if (data->cfg->type == sun8i_a83t_phy) {
+> +	if (data->cfg->type == sun8i_a83t_phy ||
+> +	    data->cfg->type == sun50i_h6_phy) {
+>  		if (phy->index == 0) {
+>  			val = readl(data->base + data->cfg-
+> >phyctl_offset);
+>  			val |= PHY_CTL_VBUSVLDEXT;
+> @@ -344,7 +346,8 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
+>  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>  
+>  	if (phy->index == 0) {
+> -		if (data->cfg->type == sun8i_a83t_phy) {
+> +		if (data->cfg->type == sun8i_a83t_phy ||
+> +		    data->cfg->type == sun50i_h6_phy) {
+>  			void __iomem *phyctl = data->base +
+>  				data->cfg->phyctl_offset;
+>  
+> @@ -959,6 +962,17 @@ static const struct sun4i_usb_phy_cfg
+> sun50i_a64_cfg = {
+>  	.phy0_dual_route = true,
+>  };
+>  
+> +static const struct sun4i_usb_phy_cfg sun50i_h6_cfg = {
+> +	.num_phys = 4,
+> +	.type = sun50i_h6_phy,
+> +	.disc_thresh = 3,
+> +	.phyctl_offset = REG_PHYCTL_A33,
+> +	.dedicated_clocks = true,
+> +	.enable_pmu_unk1 = true,
+> +	.phy0_dual_route = true,
+> +	.missing_phys = BIT(1) | BIT(2),
+> +};
 > +
-> +The flag to enable this feature is KVM_ARM_VCPU_PTRAUTH and should be
-> +used in KVM API KVM_ARM_VCPU_INIT. The pointer authentication key
-> +registers are hidden from userspace if this feature is not enabled.
-> -- 
-> 2.7.4
-> 
-
-I think this is placed in the wrong file.
-
-Any information about the KVM API should go in
-Documentation/virtual/kvm/api.txt.
-
-The only information about KVM that belongs in this file would be host
-running a VM with ptrauth can affect the host's ptrauth state (if that
-applies).
-
-
-Thanks,
-
-    Christoffer
+>  static const struct of_device_id sun4i_usb_phy_of_match[] = {
+>  	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data =
+> &sun4i_a10_cfg },
+>  	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data =
+> &sun5i_a13_cfg },
+> @@ -972,6 +986,7 @@ static const struct of_device_id
+> sun4i_usb_phy_of_match[] = {
+>  	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data =
+> &sun8i_v3s_cfg },
+>  	{ .compatible = "allwinner,sun50i-a64-usb-phy",
+>  	  .data = &sun50i_a64_cfg},
+> +	{ .compatible = "allwinner,sun50i-h6-usb-phy", .data =
+> &sun50i_h6_cfg },
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
