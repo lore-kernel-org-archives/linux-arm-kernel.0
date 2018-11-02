@@ -1,103 +1,60 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Fri, 2 Nov 2018 08:38:52 +0000
-Subject: [PATCH v10 0/6] EDAC: Enhancements to Synopsys EDAC driver
-In-Reply-To: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
-References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <DM6PR02MB52271A9C7D7829CA1467B657C1CF0@DM6PR02MB5227.namprd02.prod.outlook.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Fri, 2 Nov 2018 09:39:39 +0100
+Subject: [PATCH v3 6/7] arm64: docs: document KVM support of pointer
+ authentication
+In-Reply-To: <1539773280-4159-7-git-send-email-amit.kachhap@arm.com>
+References: <1539773280-4159-1-git-send-email-amit.kachhap@arm.com>
+ <1539773280-4159-7-git-send-email-amit.kachhap@arm.com>
+Message-ID: <20181102083939.GW12057@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!
+On Wed, Oct 17, 2018 at 04:17:59PM +0530, Amit Daniel Kachhap wrote:
+> The documentation is updated to help in using pointer authentication
+> for KVM guests.
+> 
+> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> ---
+>  Documentation/arm64/pointer-authentication.txt | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
+> index 8a9cb57..b00d735 100644
+> --- a/Documentation/arm64/pointer-authentication.txt
+> +++ b/Documentation/arm64/pointer-authentication.txt
+> @@ -78,7 +78,13 @@ to TTBR1 addresses (e.g. kernel pointers).
+>  Virtualization
+>  --------------
+>  
+> -Pointer authentication is not currently supported in KVM guests. KVM
+> +Pointer authentication is enabled in KVM guest when virtual machine is
+> +created by passing a flag requesting this feature to be enabled. Without
+> +this flag, pointer authentication is not enabled in KVM guests and KVM
+>  will mask the feature bits from ID_AA64ISAR1_EL1, and attempted use of
+>  the feature will result in an UNDEFINED exception being injected into
+>  the guest.
+> +
+> +The flag to enable this feature is KVM_ARM_VCPU_PTRAUTH and should be
+> +used in KVM API KVM_ARM_VCPU_INIT. The pointer authentication key
+> +registers are hidden from userspace if this feature is not enabled.
+> -- 
+> 2.7.4
+> 
+
+I think this is placed in the wrong file.
+
+Any information about the KVM API should go in
+Documentation/virtual/kvm/api.txt.
+
+The only information about KVM that belongs in this file would be host
+running a VM with ptrauth can affect the host's ptrauth state (if that
+applies).
 
 
-> -----Original Message-----
-> From: Manish Narani [mailto:manish.narani at xilinx.com]
-> Sent: Thursday, October 25, 2018 11:37 AM
-> To: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
-> <michals@xilinx.com>; bp at alien8.de; mchehab at kernel.org; Manish Narani
-> <MNARANI@xilinx.com>; amit.kucheria at linaro.org; sudeep.holla at arm.com;
-> leoyang.li at nxp.com
-> Cc: devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-edac at vger.kernel.org
-> Subject: [PATCH v10 0/6] EDAC: Enhancements to Synopsys EDAC driver
-> 
-> This patch series enhances the current EDAC driver to support different
-> platforms. This series adds support for ZynqMP DDRC controller in synopsys
-> EDAC driver. This series also adds Device tree properties and relevant binding
-> documentation.
-> 
-> Changes in v2:
-> 	- Moved checking of DDR_ECC_INTR_SUPPORT from (1/4) to (3/4) as it
-> is
-> 	  a feature of ZynqMP DDRC
-> 	- The Binding Documentation in (2/4) is modified as per the review
-> 	  comments
-> 
-> Changes in v3:
-> 	- The commit message in (2/4) is modified (Synopsys EDAC Driver -->
-> 	  ZynqMP DDRC)
-> 
-> Changes in v4:
-> 	- Updated the commit message in (1/4)
-> 	- Renamed function pointer names removing 'synps_' in (1/4)
-> 	- Shortened unnecessary long lines as per the review comment on (1/4)
-> 
-> Changes in v5:
-> 	- Updated the commit message in (2/4) and (4/4).
-> 	- Removed the unnecessary check for match data in probe() in (1/4)
-> 	- Some Indentation changes for better readability in (1/4) and (3/4)
-> 	- Removed repeated code in (3/4)
-> 	- Used 'zynq' and 'zynqmp' instead of 'synps_enh_edac' in function
-> names
-> 
-> Changes in v6:
-> 	- Splitted the patches according to functionalities
-> 	- Addressed code style comments from v5 review
-> 	- Moved the Error Injection to CONFIG_EDAC_DEBUG mode
-> 
-> Changes in v7:
-> 	- Included DTS patch (6/7) which was missed in v6 patch set
-> 
-> Changes in v8:
-> 	- patch (1/7) from v7 is split in to 3 different logically different patches
-> 		1. functional changes like code cleanup
-> 		2. functions renaming
-> 		3. comments cleanup
-> 	- Added a separate patch (4) for making always successful functions as
-> void
-> 	- Corrected 'Too many parentheses' review comment in patch (5)
-> 	- Corrected comments as per the v7 review feedback
-> 	- Made dedicated functions for IRQ setup, IRQ enable and IRQ disable
-> in patch (8)
-> 	- Addressed review comments in patch (10)
-> 
-> Changes in v9:
-> 	- Added check for return value of of_device_get_match_data() function
-> 	  in (1/6).
-> 	- From v8 the first 5 patches are removed in this series as they are
-> 	  applied on:
-> 
-> 	https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/?h=edac-for-
-> 4.20-synps
-> 	- Updated Kconfig to check for ARCH_ZYNQMP instead of ARM64
-> 
-> Change in v10:
-> 	- Moved the checking for ce_cnt and ue_cnt before the readl() call
-> 	- Aligned arguments on the opening brace in setup_irq()
-> 
-> Manish Narani (6):
->   edac: synopsys: Add error handling for NULL in probe()
->   dt: bindings: Document ZynqMP DDRC in Synopsys documentation
->   edac: synopsys: Add macro defines for ZynqMP DDRC
->   edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
->   arm64: zynqmp: Add DDRC node
->   edac: synopsys: Add Error Injection support for ZynqMP DDRC
-> 
->  .../bindings/memory-controllers/synopsys.txt       |  27 +-
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   7 +
->  drivers/edac/Kconfig                               |   2 +-
->  drivers/edac/synopsys_edac.c                       | 911 ++++++++++++++++++++-
->  4 files changed, 918 insertions(+), 29 deletions(-)
-> 
-> --
-> 2.1.1
+Thanks,
+
+    Christoffer
