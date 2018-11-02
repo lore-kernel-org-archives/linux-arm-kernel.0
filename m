@@ -1,58 +1,55 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 2 Nov 2018 09:12:43 +0000
-Subject: [PATCH V4 02/10] dt-bindings: fsl: add imx7ulp pm related components
- bindings
+Date: Fri, 2 Nov 2018 09:12:48 +0000
+Subject: [PATCH V4 03/10] dt-bindings: gpio: vf610: add optional clocks
+ property
 In-Reply-To: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
 References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1541149669-10857-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1541149669-10857-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx7ulp pm related components bindings
+On some SoCs(e.g. MX7ULP), GPIO clock is gatable and maybe
+disabled by default. Users have to make sure it's enabled before
+being able to access controller registers, otherwise an external
+abort error may occur. Let's add the optional clocks property to
+handle this case.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
+For ULP GPIO clock, it includes two separate clocks: one is for
+GPIO controller Input/Output function clock while another is
+GPIO port control clock for interrupt function.
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: linux-gpio at vger.kernel.org
 Cc: devicetree at vger.kernel.org
 Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-ChangeLog:
 v2->v3:
  * no changes
 v1->v2:
  * new patch
 ---
- .../bindings/arm/freescale/fsl,imx7ulp-pm.txt      | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
+ Documentation/devicetree/bindings/gpio/gpio-vf610.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
-new file mode 100644
-index 0000000..75195be
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
-@@ -0,0 +1,23 @@
-+Freescale i.MX7ULP Power Management Components
-+----------------------------------------------
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+index 0ccbae4..ae254aa 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+@@ -24,6 +24,12 @@ Required properties for GPIO node:
+       4 = active high level-sensitive.
+       8 = active low level-sensitive.
+ 
++Optional properties:
++-clocks:	Must contain an entry for each entry in clock-names.
++		See common clock-bindings.txt for details.
++-clock-names:	A list of clock names. For imx7ulp, it must contain
++		"gpio", "port".
 +
-+The Multi-System Mode Controller (MSMC) is responsible for sequencing
-+the MCU into and out of all stop and run power modes. Specifically, it
-+monitors events to trigger transitions between power modes while
-+controlling the power, clocks, and memories of the MCU to achieve the
-+power consumption and functionality of that mode.
-+
-+The WFI or WFE instruction is used to invoke a Sleep, Deep Sleep or
-+Standby modes for either Cortex family. Run, Wait, and Stop are the
-+common terms used for the primary operating modes of Kinetis
-+microcontrollers.
-+
-+Required properties:
-+- compatible:	Should be "fsl,imx7ulp-smc1".
-+- reg:		Specifies base physical address and size of the register sets.
-+
-+Example:
-+smc1: smc1 at 40410000 {
-+	compatible = "fsl,imx7ulp-smc1";
-+	reg = <0x40410000 0x1000>;
-+};
+ Note: Each GPIO port should have an alias correctly numbered in "aliases"
+ node.
+ 
 -- 
 2.7.4
