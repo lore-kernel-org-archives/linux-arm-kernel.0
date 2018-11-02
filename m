@@ -1,63 +1,35 @@
-From: wangyufen@huawei.com (wangyufen)
-Date: Fri, 2 Nov 2018 10:31:27 +0800
-Subject: [PATCH v2] ARM:kexec:offline panic_smp_self_stop CPU
-In-Reply-To: <20181101113430.GO30658@n2100.armlinux.org.uk>
-References: <1541071249-15660-1-git-send-email-wangyufen@huawei.com>
- <20181101113430.GO30658@n2100.armlinux.org.uk>
-Message-ID: <5BDBB6FF.6080907@huawei.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu,  1 Nov 2018 19:57:28 -0700
+Subject: [PATCH] pinctrl: mediatek: Fix dependencies for EINT_MTK
+Message-ID: <20181102025728.963-1-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case panic() and panic() called at the same time on different CPUS.
-For example:
-CPU 0:
-  panic()
-     __crash_kexec
-       machine_crash_shutdown
-         crash_smp_send_stop
-       machine_kexec
-         BUG_ON(num_online_cpus() > 1);
+Fixes the following config-time warning:
 
-CPU 1:
-  panic()
-    local_irq_disable
-    panic_smp_self_stop
+WARNING: unmet direct dependencies detected for EINT_MTK
+  Depends on [n]: PINCTRL [=y] && (ARCH_MEDIATEK [=y] || COMPILE_TEST [=n]) && (PINCTRL_MTK [=n] || PINCTRL_MTK_MOORE [=n] || COMPILE_TEST [=n])
+  Selected by [y]:
+  - PINCTRL_MTK_PARIS [=y] && PINCTRL [=y] && OF [=y] && (ARCH_MEDIATEK [=y] || COMPILE_TEST [=n])
 
-If CPU 1 calls panic_smp_self_stop() before crash_smp_send_stop(), kdump
-fails. CPU1 can't receive the ipi irq, CPU1 will be always online.
-To fix this problem, this patch split out the panic_smp_self_stop()
-and add set_cpu_online(smp_processor_id(), false).
-
-Signed-off-by: Yufen Wang <wangyufen@huawei.com>
+Fixes: 805250982bb5 ("pinctrl: mediatek: add pinctrl-paris that implements the vendor dt-bindings")
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/kernel/smp.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/pinctrl/mediatek/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 9000d8b..d7b86e4 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -682,6 +682,21 @@ void smp_send_stop(void)
- 		pr_warn("SMP: failed to stop secondary CPUs\n");
- }
+diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
+index 9d142e1da567..50efc9cc8ee7 100644
+--- a/drivers/pinctrl/mediatek/Kconfig
++++ b/drivers/pinctrl/mediatek/Kconfig
+@@ -3,7 +3,7 @@ menu "MediaTek pinctrl drivers"
  
-+/* In case panic() and panic() called at the same time on CPU1 and CPU2,
-+ * and CPU 1 calls panic_smp_self_stop() before crash_smp_send_stop()
-+ * CPU1 can't receive the ipi irqs from CPU2, CPU1 will be always online,
-+ * kdump fails. So split out the panic_smp_self_stop() and add
-+ * set_cpu_online(smp_processor_id(), false).
-+ */
-+void panic_smp_self_stop(void)
-+{
-+	pr_debug("CPU %u will stop doing anything useful since another CPU has paniced\n",
-+	         smp_processor_id());
-+	set_cpu_online(smp_processor_id(), false);
-+	while (1)
-+		cpu_relax();
-+}
-+
- /*
-  * not supported here
-  */
+ config EINT_MTK
+ 	bool "MediaTek External Interrupt Support"
+-	depends on PINCTRL_MTK || PINCTRL_MTK_MOORE || COMPILE_TEST
++	depends on PINCTRL_MTK || PINCTRL_MTK_MOORE || PINCTRL_MTK_PARIS || COMPILE_TEST
+ 	select GPIOLIB
+ 	select IRQ_DOMAIN
+ 
 -- 
-2.7.4
+2.11.0
