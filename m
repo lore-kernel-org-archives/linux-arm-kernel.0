@@ -1,68 +1,54 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Sat, 3 Nov 2018 10:21:53 +0000
-Subject: [PATCH v5 04/11] dt-bindings: iio: adc: add AXP803 ADC bindings
-In-Reply-To: <CAGb2v65JKj_7VcEr1KuZVop85hn-3h73NrExprpmLbKZiosD5Q@mail.gmail.com>
-References: <20181023185330.10472-1-oskari@lemmela.net>
- <20181023185330.10472-5-oskari@lemmela.net>
- <20181024135633.GA342@bogus> <20181028154011.04efdecf@archlinux>
- <20181029130757.m5okrfvusjl5fu5m@qschulz>
- <CAGb2v65JKj_7VcEr1KuZVop85hn-3h73NrExprpmLbKZiosD5Q@mail.gmail.com>
-Message-ID: <20181103102153.4f0481ad@archlinux>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Sat,  3 Nov 2018 15:38:57 +0530
+Subject: [PATCH 07/10] drm/sun4i: sun6i_mipi_dsi: Enable burst mode HBP,
+ HSA_HSE
+In-Reply-To: <20181103100900.30313-1-jagan@amarulasolutions.com>
+References: <20181103100900.30313-1-jagan@amarulasolutions.com>
+Message-ID: <20181103100900.30313-8-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Oct 2018 10:29:59 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+Horizontal back porch, sync active and sync end bits are
+needed to enable for burst mode panel operations.
 
-> On Mon, Oct 29, 2018 at 9:10 PM Quentin Schulz
-> <quentin.schulz@bootlin.com> wrote:
-> >
-> > Hi Jonathan,
-> >
-> > On Sun, Oct 28, 2018 at 03:40:11PM +0000, Jonathan Cameron wrote:  
-> > > On Wed, 24 Oct 2018 08:56:33 -0500
-> > > Rob Herring <robh@kernel.org> wrote:
-> > >  
-> > > > On Tue, 23 Oct 2018 21:53:23 +0300, Oskari Lemmela wrote:  
-> > > > > The AXP803 ADC is compatible with AXP813 ADC, but add
-> > > > > specific compatible for it.
-> > > > >
-> > > > > Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-> > > > > ---
-> > > > >  Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt | 2 ++
-> > > > >  1 file changed, 2 insertions(+)
-> > > > >  
-> > > >
-> > > > Reviewed-by: Rob Herring <robh@kernel.org>  
-> > >
-> > > This doesn't seem to have any dependencies with the other patches
-> > > so applied to the togreg branch of iio.git and pushed out as testing
-> > > for the autobuilders to ignore.  However I am a little curious to know
-> > > why we would add the ID and then not use it (that I can see)?
-> > >  
-> >
-> > Sometimes with Allwinner (and X-Powers), two IPs seem identical until we
-> > discover something that is slightly different. When this happens, we
-> > have to add a compatible to differentiate both. However, we would also
-> > need to change the Device Tree to change the compatible. We would need
-> > to handle the driver behaviour for both Device Trees.
-> >
-> > So better anticipate a possible difference so that we don't have to do
-> > some hacks in the driver to handle the device correctly.
-> >
-> > As always, Chen-Yu or Maxime may know better so I'm just stating what I
-> > seem to recall.  
-> 
-> With Allwinner stuff (X-Powers included), sometimes the documents are
-> incomplete or have errors. We tend to add a model-specific compatible
-> just in case things turn out not to be so compatible, unless someone
-> has triple-checked everything, documents and actual hardware included.
-> 
-> However we don't actually document these, so this patch isn't strictly
-> needed. (I suppose this might annoy the device tree binding maintainers.)
-> 
-> ChenYu
-I don't think it does any harm so I'll leave it in place.  Thanks for
-the explanations.
+So, enable them via dsi base control register.
 
-Jonathan
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index 2d34e5f48d29..feb8c54c5146 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -518,6 +518,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 	u16 hbp, hfp_pkt_overhead, hfp, hsa, hblk, vblk;
+ 	size_t bytes;
+ 	u8 *buffer;
++	u32 val = 0;
+ 
+ 	/* Do all timing calculations up front to allocate buffer space */
+ 
+@@ -527,6 +528,10 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 		hblk = mode->hdisplay * Bpp;
+ 		hfp = 0;
+ 		vblk = 0;
++
++		regmap_read(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, &val);
++		val |= SUN6I_DSI_BASIC_CTL_HBP_DIS;
++		val |= SUN6I_DSI_BASIC_CTL_HSA_HSE_DIS;
+ 	} else {
+ 		/*
+ 		 * A sync period is composed of a blanking packet (4 bytes +
+@@ -594,7 +599,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 	if (WARN_ON(!buffer))
+ 		return;
+ 
+-	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, 0);
++	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, val);
+ 
+ 	regmap_write(dsi->regs, SUN6I_DSI_SYNC_HSS_REG,
+ 		     sun6i_dsi_build_sync_pkt(MIPI_DSI_H_SYNC_START,
+-- 
+2.18.0.321.gffc6fa0e3
