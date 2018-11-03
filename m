@@ -1,94 +1,40 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sat, 03 Nov 2018 13:56:56 +0100
-Subject: FOSDEM 2019 Hardware Enablement Devroom Call for Participation
-Message-ID: <afd41f3ade22c5cb1677a7a719ccc49cca0387d2.camel@paulk.fr>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 3 Nov 2018 15:25:45 +0100
+Subject: [PATCH 1/4] pwm: Add new helper to initialize a pwm_state
+ variable with defaults
+In-Reply-To: <20181029113337.GA9500@ulmo>
+References: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
+ <20181029113337.GA9500@ulmo>
+Message-ID: <20181103142545.m3gdh6aqxpow7na5@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Thierry,
 
-The Hardware Enablement devroom is back for a second year at FOSDEM!
-It will take place on Sunday 3 February 2019.
+On Mon, Oct 29, 2018 at 12:33:37PM +0100, Thierry Reding wrote:
+> On Fri, Oct 26, 2018 at 08:41:55PM +0200, Uwe Kleine-K?nig wrote:
+> > This helps to convert drivers from the legacy API to pwm_apply_state without
+> > having to make the aware of the configured polarity (and in some cases even
+> > period).
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  include/linux/pwm.h | 13 ++++++++++---
+> >  1 file changed, 10 insertions(+), 3 deletions(-)
+> 
+> You're going to have to at least Cc me on patches 2 & 3 so that I can
+> see how you intend this to be used.
 
-# Call for Participation
+you were in To: for all four patches:
 
-We are opening the call for participation to our devroom, with the
-deadline for talk proposals set to Saturday 1 December 2018.
+  patch 1: https://www.spinics.net/lists/linux-pwm/msg08178.html
+  patch 2: https://www.spinics.net/lists/linux-pwm/msg08179.html
+  patch 3: https://www.spinics.net/lists/linux-pwm/msg08180.html
+  patch 4: https://www.spinics.net/lists/linux-pwm/msg08181.html
 
-# Devroom Scope
+Best regards
+Uwe
 
-This devroom covers topics related to hardware support and enablement
-with free software. It includes the following topics:
-* peripheral/controller firmwares
-* boot software
-* kernel drivers and hardware interfaces
-* hardware-related adaptation in operating systems
-* tools for firmware flashing
-* tools for low-level development
-
-Despite this large scope, the focus of the devroom is set on
-highlighting the technical aspects of the hardware and its enablement
-in free projects, rather than the specific applications and use cases
-that benefit from it. We also want to avoid purely commercial vague
-talks with marketing content, which leave little place to technical
-aspects.
-
-This year, we are looking to particularly highlighting free software
-outside of the operating system boundaries, especially with boot
-software as well as controller and peripheral firmwares.
-
-# Talk Format
-
-Since no Embedded devroom is taking place this year (and our devroom
-also covers embedded devices), we are expecting a significant number of
-submissions.
-
-In order to cover as much ground as we can, a new talk will be
-scheduled every half-hour, so accepted talks will follow this format:
-
- 20 minutes for the talk
-+ 5 minutes for questions
-+ 5 minutes for speaker setup
-
-We ask speakers to be present in the room before their talk so that
-speaker setup can go smoothly.
-
-# Submission
-
-Talks that fit in our devroom's scope can be submitted to the FOSDEM
-Pentabarf interface at https://penta.fosdem.org/submission/FOSDEM19
-
-We encourage reusing accounts from previous years instead of creating
-new ones:
-* lost password: https://penta.fosdem.org/user/forgot_password
-* new Account: https://penta.fosdem.org/user/new_account/FOSDEM19
-
-Here are a few guidelines when submitting a talk:
-* select the Hardware Enablement devroom as track
-* include an abstract for every submission and optionally a full
-  description
-* make sure your contact details are up to date
-
-# Video
-
-Talks will be streamed live during the event and recorded. They will be
-available under a Creative Commons Attribution (BY) license later.
-
-# Contact
-
-For more information or questions about the devroom and this CFP, feel
-free to email hardware-devroom-manager at fosdem.org
-
-We're looking forward to lots of interesting proposals and hoping to
-see you all in Brussels at the event!
-
-Cheers,
-
-Paul for the Hardware Enablement devroom
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181103/55ea1682/attachment.sig>
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
