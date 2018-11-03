@@ -1,47 +1,62 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 3 Nov 2018 10:41:19 +0000
-Subject: [GIT PULL] arm64 2nd round of updates for 4.20
-Message-ID: <20181103104115.7imtevbiauvd3qls@mbp>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Sat, 3 Nov 2018 10:45:03 +0000
+Subject: [PATCH v2 2/2] kgdb: Fix kgdb_roundup_cpus() for arches who used
+ smp_call_function()
+In-Reply-To: <CAD=FV=V1eHo7Wz31DTMMNi394qwEaESTxJCYVE60Q7hpDEqRmQ@mail.gmail.com>
+References: <20181030221843.121254-1-dianders@chromium.org>
+ <20181030221843.121254-3-dianders@chromium.org>
+ <20181031184050.sd5opni3mznaapkv@holly.lan>
+ <CAD=FV=V1eHo7Wz31DTMMNi394qwEaESTxJCYVE60Q7hpDEqRmQ@mail.gmail.com>
+Message-ID: <20181103104503.eftn5btx7otgufro@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Oct 31, 2018 at 02:41:14PM -0700, Doug Anderson wrote:
+> > As mentioned in another part of the thread we can also add robustness
+> > by skipping a cpu where csd->flags != 0 (and adding an appropriately
+> > large comment regarding why). Doing the check directly is abusing
+> > internal knowledge that smp.c normally keeps to itself so an accessor
+> > of some kind would be needed.
+> 
+> Sure.  I could add smp_async_func_finished() that just looked like:
+> 
+> int smp_async_func_finished(call_single_data_t *csd)
+> {
+>   return !(csd->flags & CSD_FLAG_LOCK);
+> }
+> 
+> My understanding of all the mutual exclusion / memory barrier concepts
+> employed by smp.c is pretty weak, though.  I'm hoping that it's safe
+> to just access the structure and check the bit directly.
+> 
+> ...but do you think adding a generic accessor like this is better than
+> just keeping track of this in kgdb directly?  I could avoid the
+> accessor by adding a "rounding_up" member to "struct
+> debuggerinfo_struct" and doing something like this in roundup:
+> 
+>   /* If it didn't round up last time, don't try again */
+>   if (kgdb_info[cpu].rounding_up)
+>     continue
+> 
+>   kgdb_info[cpu].rounding_up = true
+>   smp_call_function_single_async(cpu, csd);
+> 
+> ...and then in kgdb_nmicallback() I could just add:
+> 
+>   kgdb_info[cpu].rounding_up = false
+> 
+> In that case we're not adding a generic accessor to smp.c that most
+> people should never use.
 
-Please pull the arm64 updates below. Thank you.
+Whilst it is very tempting to make a sarcastic reply here ("Of course! What
+kgdb really needs is yet another set of condition variables") I can't
+because I actually agree with the proposal. I don't really want kgdb to
+be too "special" especially when it doesn't need to be.
 
-The following changes since commit 4debef5510071032c6d5dace31ca1cc42a120073:
+Only thing to note is that rounding_up will not be manipulated within a
+common spin lock so you might have to invest a bit of thought to make
+sure any races between the master and slave as the slave CPU clears the
+flag are benign.
 
-  arm64: KVM: Guests can skip __install_bp_hardening_cb()s HYP work (2018-10-19 15:37:25 +0100)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
-
-for you to fetch changes up to 966866892cf89d606544bca22d584ba2ef9ec208:
-
-  arm64: kprobe: make page to RO mode when allocate it (2018-11-02 18:15:07 +0000)
-
-----------------------------------------------------------------
-arm64 2nd round of updates for 4.20:
-
-- Fix W+X page (mark RO) allocated by the arm64 kprobes code
-
-- Makefile fix for .i files in out of tree modules
-
-----------------------------------------------------------------
-Anders Roxell (1):
-      arm64: kprobe: make page to RO mode when allocate it
-
-Victor Kamensky (1):
-      arm64: makefile fix build of .i file in external module case
-
-Yangtao Li (1):
-      arm64: kdump: fix small typo
-
- arch/arm64/Makefile                |  2 ++
- arch/arm64/kernel/crash_dump.c     |  2 +-
- arch/arm64/kernel/probes/kprobes.c | 27 ++++++++++++++++++++-------
- 3 files changed, 23 insertions(+), 8 deletions(-)
-
--- 
-Catalin
+Daniel.
