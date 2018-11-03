@@ -1,25 +1,37 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sat, 3 Nov 2018 14:57:52 +1100
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-Message-ID: <20181103145752.6c1d10c8@canb.auug.org.au>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri,  2 Nov 2018 21:26:51 -0700
+Subject: [PATCH] ASoC: sunxi: rename SND_SUNXI_ADDA_PR_REGMAP to
+ SND_SUN8I_ADDA_PR_REGMAP
+Message-ID: <20181103042651.6641-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+SND_SUN50I_CODEC_ANALOG selects SND_SUNXI_ADDA_PR_REGMAP which is leftover
+of renaming SND_SUNXI_ADDA_PR_REGMAP to SND_SUN8I_ADDA_PR_REGMAP. Replace
+it with SND_SUN8I_ADDA_PR_REGMAP to fix possible link errors for some
+configurations:
 
-Commit
+sound/soc/sunxi/sun50i-codec-analog.o: In function `sun50i_codec_analog_probe':
+sun50i-codec-analog.c:(.text+0x62): undefined reference to `sun8i_adda_pr_regmap_init'
 
-  cda58c80fe27 ("ARM: OMAP1: ams-delta: Fix impossible .irq < 0")
+Fixes: 42371f327df0 ("ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path controls")
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ sound/soc/sunxi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-is missing a Signed-off-by from its committer.
-
+diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+index 66aad0d3f9c7..8134c3c94229 100644
+--- a/sound/soc/sunxi/Kconfig
++++ b/sound/soc/sunxi/Kconfig
+@@ -31,7 +31,7 @@ config SND_SUN8I_CODEC_ANALOG
+ config SND_SUN50I_CODEC_ANALOG
+ 	tristate "Allwinner sun50i Codec Analog Controls Support"
+ 	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+-	select SND_SUNXI_ADDA_PR_REGMAP
++	select SND_SUN8I_ADDA_PR_REGMAP
+ 	help
+ 	  Say Y or M if you want to add support for the analog controls for
+ 	  the codec embedded in Allwinner A64 SoC.
 -- 
-Cheers,
-Stephen Rothwell
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181103/5deaa3c4/attachment.sig>
+2.19.1
