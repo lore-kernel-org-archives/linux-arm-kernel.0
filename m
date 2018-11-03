@@ -1,41 +1,152 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat,  3 Nov 2018 15:38:52 +0530
-Subject: [PATCH 02/10] drm/sun4i: sun6i_mipi_dsi: Support instruction loop
- selection
+Date: Sat,  3 Nov 2018 15:38:53 +0530
+Subject: [PATCH 03/10] drm/sun4i: sun6i_mipi_dsi: Setup burst mode timings
 In-Reply-To: <20181103100900.30313-1-jagan@amarulasolutions.com>
 References: <20181103100900.30313-1-jagan@amarulasolutions.com>
-Message-ID: <20181103100900.30313-3-jagan@amarulasolutions.com>
+Message-ID: <20181103100900.30313-4-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instruction loop selection would require before writing
-loop number registers, so enable idle, LP11 bits on
-loop selection register.
+Burst mode display timings are different from convectional
+video mode so update the horizontal and vertical timings.
 
-Reference code available in BSP
+Reference code taken from BSP
 (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-(dsi_dev[sel]->dsi_inst_loop_sel.dwval = 2<<(4*DSI_INST_ID_LP11) |
-	3<<(4*DSI_INST_ID_DLY);
+dsi_hsa  = 0;
+dsi_hbp  = 0;
+dsi_hact = x*dsi_pixel_bits[format]/8;
+dsi_hblk = dsi_hact;
+dsi_hfp  = 0;
+dsi_vblk = 0;
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 108 ++++++++++++++-----------
+ 1 file changed, 60 insertions(+), 48 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index da152c21ec62..077b57ec964c 100644
+index 077b57ec964c..4965b2c71e4c 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -397,6 +397,10 @@ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
- 	struct mipi_dsi_device *device = dsi->device;
- 	u16 delay;
+@@ -479,59 +479,71 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
  
-+	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
-+		     DSI_INST_ID_HSC  << (4 * DSI_INST_ID_LP11) |
-+		     DSI_INST_ID_HSD  << (4 * DSI_INST_ID_DLY));
+ 	/* Do all timing calculations up front to allocate buffer space */
+ 
+-	/*
+-	 * A sync period is composed of a blanking packet (4 bytes +
+-	 * payload + 2 bytes) and a sync event packet (4 bytes). Its
+-	 * minimal size is therefore 10 bytes
+-	 */
++	if (device->mode_flags == MIPI_DSI_MODE_VIDEO_BURST) {
++		hsa = 0;
++		hbp = 0;
++		hblk = mode->hdisplay * Bpp;
++		hfp = 0;
++		vblk = 0;
++	} else {
++		/*
++		 * A sync period is composed of a blanking packet (4 bytes +
++		 * payload + 2 bytes) and a sync event packet (4 bytes). Its
++		 * minimal size is therefore 10 bytes
++		 */
+ #define HSA_PACKET_OVERHEAD	10
+-	hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
+-		  (mode->hsync_end - mode->hsync_start) * Bpp - HSA_PACKET_OVERHEAD);
+-
+-	/*
+-	 * The backporch is set using a blanking packet (4 bytes +
+-	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
+-	 */
++		hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
++			  (mode->hsync_end - mode->hsync_start) * Bpp -
++			  HSA_PACKET_OVERHEAD);
 +
- 	if (device->mode_flags == MIPI_DSI_MODE_VIDEO_BURST)
- 		delay = (((mode->htotal - mode->hdisplay) * 150) /
- 			((mode->clock / 1000) * 8)) - 50;
++		/*
++		 * The backporch is set using a blanking packet (4 bytes +
++		 * payload + 2 bytes). Its minimal size is therefore 6 bytes
++		 */
+ #define HBP_PACKET_OVERHEAD	6
+-	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
+-		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
+-
+-	/*
+-	 * hblk seems to be the line + porches length.
+-	 * The blank is set using a blanking packet (4 bytes + 4 bytes +
+-	 * payload + 2 bytes). So minimal size is 10 bytes
+-	 */
++		hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
++			  (mode->htotal - mode->hsync_end) * Bpp -
++			  HBP_PACKET_OVERHEAD);
++
++		/*
++		 * hblk seems to be the line + porches length.
++		 * The blank is set using a blanking packet (4 bytes + 4 bytes
++		 * + payload + 2 bytes). So minimal size is 10 bytes
++		 */
+ #define HBLK_PACKET_OVERHEAD	10
+-	hblk_max = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
+-	hblk_max -= HBLK_PACKET_OVERHEAD;
+-	hblk = max_t(unsigned int, HBLK_PACKET_OVERHEAD, hblk_max);
+-
+-	/*
+-	 * The frontporch is set using a blanking packet (4 bytes +
+-	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
+-	 *
+-	 * According to BSP code, extra 10 bytes(which is hblk packet overhead)
+-	 * is adding for hfp packet overhead since hfp depends on hblk.
+-	 */
++		hblk_max = (mode->htotal -
++			   (mode->hsync_end - mode->hsync_start)) * Bpp;
++		hblk_max -= HBLK_PACKET_OVERHEAD;
++		hblk = max_t(unsigned int, HBLK_PACKET_OVERHEAD, hblk_max);
++
++		/*
++		 * The frontporch is set using a blanking packet (4 bytes +
++		 * payload + 2 bytes). Its minimal size is therefore 6 bytes
++		 *
++		 * According to BSP code, extra 10 bytes(which is hblk packet
++		 * overhead) is adding for hfp packet overhead since hfp
++		 * depends on hblk.
++		 */
+ #define HFP_PACKET_OVERHEAD	6
+-	hfp_pkt_overhead = (HFP_PACKET_OVERHEAD + HBLK_PACKET_OVERHEAD);
+-	hfp = max((unsigned int)hfp_pkt_overhead,
+-		  (mode->hsync_start - mode->hdisplay) * Bpp -
+-		  hfp_pkt_overhead);
+-
+-	/*
+-	 * The vertical blank is set using a blanking packet (4 bytes +
+-	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
+-	 */
++		hfp_pkt_overhead = (HFP_PACKET_OVERHEAD + HBLK_PACKET_OVERHEAD);
++		hfp = max((unsigned int)hfp_pkt_overhead,
++			  (mode->hsync_start - mode->hdisplay) * Bpp -
++			  hfp_pkt_overhead);
++
++		/*
++		 * The vertical blank is set using a blanking packet (4 bytes +
++		 * payload + 2 bytes). Its minimal size is therefore 6 bytes
++		 */
+ #define VBLK_PACKET_OVERHEAD	6
+-	if (device->lanes == 4) {
+-		int tmp;
+-
+-		tmp = (mode->htotal * Bpp) * mode->vtotal -
+-		      (hblk + VBLK_PACKET_OVERHEAD);
+-		vblk = (device->lanes - tmp % device->lanes);
+-	} else {
+-		vblk = 0;
++		if (device->lanes == 4) {
++			int tmp;
++
++			tmp = (mode->htotal * Bpp) * mode->vtotal -
++			      (hblk + VBLK_PACKET_OVERHEAD);
++			vblk = (device->lanes - tmp % device->lanes);
++		} else {
++			vblk = 0;
++		}
+ 	}
+ 
+ 	/* How many bytes do we need to send all payloads? */
 -- 
 2.18.0.321.gffc6fa0e3
