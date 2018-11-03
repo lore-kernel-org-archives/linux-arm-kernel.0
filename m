@@ -1,74 +1,94 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  3 Nov 2018 20:32:38 +0800
-Subject: [PATCH v2 3/3] arm64: allwinner: h6: add support for the Ethernet on
- Pine H64
-In-Reply-To: <20181103123238.4665-1-icenowy@aosc.io>
-References: <20181103123238.4665-1-icenowy@aosc.io>
-Message-ID: <20181103123238.4665-4-icenowy@aosc.io>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sat, 03 Nov 2018 13:56:56 +0100
+Subject: FOSDEM 2019 Hardware Enablement Devroom Call for Participation
+Message-ID: <afd41f3ade22c5cb1677a7a719ccc49cca0387d2.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine H64 board has an Ethernet port, which is connected to a
-RTL8211E PHY, then the PHY is connected to the MAC on H6 SoC.
+Hi,
 
-Add support for the Ethernet port.
+The Hardware Enablement devroom is back for a second year at FOSDEM!
+It will take place on Sunday 3 February 2019.
 
-The PHY needs some time to start up, and the time is modelled as enable
-ramp delay of the regulator.
+# Call for Participation
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-Changes in v2:
-- Adapted the decision by Pine64 on the final version of Pine H64 (the
-  current scheme on model B's).
+We are opening the call for participation to our devroom, with the
+deadline for talk proposals set to Saturday 1 December 2018.
 
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 20 +++++++++++++++++++
- 1 file changed, 20 insertions(+)
+# Devroom Scope
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-index 48daec7f78ba..fcf3c1de4aa2 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -14,6 +14,7 @@
- 	compatible = "pine64,pine-h64", "allwinner,sun50i-h6";
- 
- 	aliases {
-+		ethernet0 = &emac;
- 		serial0 = &uart0;
- 	};
- 
-@@ -41,6 +42,24 @@
- 	};
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ext_rgmii_pins>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-supply = <&reg_aldo2>;
-+	allwinner,rx-delay-ps = <200>;
-+	allwinner,tx-delay-ps = <200>;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -85,6 +104,7 @@
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
- 				regulator-name = "vcc-ac200";
-+				regulator-enable-ramp-delay = <100000>;
- 			};
- 
- 			reg_aldo3: aldo3 {
--- 
-2.18.1
+This devroom covers topics related to hardware support and enablement
+with free software. It includes the following topics:
+* peripheral/controller firmwares
+* boot software
+* kernel drivers and hardware interfaces
+* hardware-related adaptation in operating systems
+* tools for firmware flashing
+* tools for low-level development
+
+Despite this large scope, the focus of the devroom is set on
+highlighting the technical aspects of the hardware and its enablement
+in free projects, rather than the specific applications and use cases
+that benefit from it. We also want to avoid purely commercial vague
+talks with marketing content, which leave little place to technical
+aspects.
+
+This year, we are looking to particularly highlighting free software
+outside of the operating system boundaries, especially with boot
+software as well as controller and peripheral firmwares.
+
+# Talk Format
+
+Since no Embedded devroom is taking place this year (and our devroom
+also covers embedded devices), we are expecting a significant number of
+submissions.
+
+In order to cover as much ground as we can, a new talk will be
+scheduled every half-hour, so accepted talks will follow this format:
+
+ 20 minutes for the talk
++ 5 minutes for questions
++ 5 minutes for speaker setup
+
+We ask speakers to be present in the room before their talk so that
+speaker setup can go smoothly.
+
+# Submission
+
+Talks that fit in our devroom's scope can be submitted to the FOSDEM
+Pentabarf interface at https://penta.fosdem.org/submission/FOSDEM19
+
+We encourage reusing accounts from previous years instead of creating
+new ones:
+* lost password: https://penta.fosdem.org/user/forgot_password
+* new Account: https://penta.fosdem.org/user/new_account/FOSDEM19
+
+Here are a few guidelines when submitting a talk:
+* select the Hardware Enablement devroom as track
+* include an abstract for every submission and optionally a full
+  description
+* make sure your contact details are up to date
+
+# Video
+
+Talks will be streamed live during the event and recorded. They will be
+available under a Creative Commons Attribution (BY) license later.
+
+# Contact
+
+For more information or questions about the devroom and this CFP, feel
+free to email hardware-devroom-manager at fosdem.org
+
+We're looking forward to lots of interesting proposals and hoping to
+see you all in Brussels at the event!
+
+Cheers,
+
+Paul for the Hardware Enablement devroom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181103/55ea1682/attachment.sig>
