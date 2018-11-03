@@ -1,43 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 3 Nov 2018 21:59:32 +0100
-Subject: [PATCH v1 3/3] i2c: imx: don't print error if DMA is not
- configured
-In-Reply-To: <20181029085408.GB4101@kunai>
-References: <20181018112615.29362-1-o.rempel@pengutronix.de>
- <20181018112615.29362-4-o.rempel@pengutronix.de>
- <20181028221123.GE1882@kunai>
- <9a3fc087-2fe5-6d57-9b65-a05e176bf53d@pengutronix.de>
- <20181029085408.GB4101@kunai>
-Message-ID: <20181103205932.hxqhwclb2jo6wo5n@pengutronix.de>
+From: benwolsieffer@gmail.com (Ben Wolsieffer)
+Date: Sat,  3 Nov 2018 18:30:27 -0400
+Subject: [PATCH] staging: vchiq_arm: fix compat VCHIQ_IOC_AWAIT_COMPLETION
+Message-ID: <20181103223027.26245-1-benwolsieffer@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram, hello Oleksij,
+The compatibility ioctl wrapper for VCHIQ_IOC_AWAIT_COMPLETION assumes that
+the native ioctl always uses a message buffer and decrements msgbufcount.
+Certain message types do not use a message buffer and in this case
+msgbufcount is not decremented, and completion->header for the message is
+NULL. Because the wrapper unconditionally decrements msgbufcount, the
+calling process may assume that a message buffer has been used even when
+it has not.
 
-On Mon, Oct 29, 2018 at 08:54:08AM +0000, Wolfram Sang wrote:
-> On Mon, Oct 29, 2018 at 09:07:56AM +0100, Oleksij Rempel wrote:
-> > On 28.10.18 23:11, Wolfram Sang wrote:
-> > > On Thu, Oct 18, 2018 at 01:26:15PM +0200, Oleksij Rempel wrote:
-> > > > At least on i.MX5x variants is DMA event for I2C muxed with SDHC. So
-> > > > it is project specific configuration and not an error.
-> > > > 
-> > > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > > 
-> > > So, the first patch is not I2C realm, and the second is dropped. No
-> > > comment about the third one?
-> > > 
-> > > And is maybe someone from Pengutronix interested in maintaining this
-> > > driver? Uwe maybe? That would speed up things for it...
-> > 
-> > Should i resend it as single patch?
-> 
-> I am fine with an ack here.
+This results in a memory leak in the userspace code that interfaces with
+this driver. When msgbufcount is decremented, the userspace code assumes
+that the buffer can be freed though the reference in completion->header,
+which cannot happen when the reference is NULL.
 
-With patch 1 dropped this patch needs adaption I think.
+This patch causes the wrapper to only decrement msgbufcount when the
+native ioctl decrements it. Note that we cannot simply copy the native
+ioctl's value of msgbufcount, because the wrapper only retrieves messages
+from the native ioctl one at a time, while userspace may request multiple
+messages.
 
-Best regards
-Uwe
+Fixes: 5569a12 ("staging: vchiq_arm: Add compatibility wrappers for ioctls")
 
+Signed-off-by: Ben Wolsieffer <benwolsieffer@gmail.com>
+---
+ .../staging/vc04_services/interface/vchiq_arm/vchiq_arm.c  | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index d67987fbf25e..8ff0e7e860f3 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -1461,6 +1461,7 @@ vchiq_compat_ioctl_await_completion(struct file *file,
+ 	struct vchiq_await_completion32 args32;
+ 	struct vchiq_completion_data32 completion32;
+ 	unsigned int *msgbufcount32;
++	unsigned int msgbufcount_native;
+ 	compat_uptr_t msgbuf32;
+ 	void *msgbuf;
+ 	void **msgbufptr;
+@@ -1572,7 +1573,11 @@ vchiq_compat_ioctl_await_completion(struct file *file,
+ 			 sizeof(completion32)))
+ 		return -EFAULT;
+ 
+-	args32.msgbufcount--;
++	if (get_user(msgbufcount_native, &args->msgbufcount))
++		return -EFAULT;
++
++	if (!msgbufcount_native)
++		args32.msgbufcount--;
+ 
+ 	msgbufcount32 =
+ 		&((struct vchiq_await_completion32 __user *)arg)->msgbufcount;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.19.1
