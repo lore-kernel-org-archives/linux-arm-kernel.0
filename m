@@ -1,92 +1,48 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 3 Nov 2018 20:05:47 +0100
-Subject: [PATCH 2/2] DT: marvell,mmp2: add more TWSI controllers
-In-Reply-To: <20180917113947.12626-3-lkundrak@v3.sk>
-References: <20180917113947.12626-1-lkundrak@v3.sk>
- <20180917113947.12626-3-lkundrak@v3.sk>
-Message-ID: <20181103190547.GD31179@amd>
+Date: Sat, 3 Nov 2018 20:14:50 +0100
+Subject: [PATCH v2 1/4] dt-bindings: mrvl,mmp-timer: add clock
+In-Reply-To: <20180918205455.25464-2-lkundrak@v3.sk>
+References: <20180918205455.25464-1-lkundrak@v3.sk>
+ <20180918205455.25464-2-lkundrak@v3.sk>
+Message-ID: <20181103191449.GG31179@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2018-09-17 13:39:47, Lubomir Rintel wrote:
-> I've gotten the base addresses, clocks and interrupts from an rusty and old
-> out-of-tree driver. I haven't actually checked against the datasheet, since
-> that one is reserved for the Marvell inner circle.
+On Tue 2018-09-18 22:54:52, Lubomir Rintel wrote:
+> The timer needs the timer clock to be enabled, otherwise it stops
+> ticking.
 > 
-> Tested with an accelerometer on TWSI6 on an OLPC XO 1.75 machine.
-> 
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
 > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
 Acked-by: Pavel Machek <pavel@ucw.cz>
 
+
 > ---
->  arch/arm/boot/dts/mmp2.dtsi | 49 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
+> Changes since v1:
+> - Made the clock optional, to keep compatibility with DTs without it
 > 
-> diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-> index 47e5b63339d1..2bd4e94501ce 100644
-> --- a/arch/arm/boot/dts/mmp2.dtsi
-> +++ b/arch/arm/boot/dts/mmp2.dtsi
-> @@ -232,6 +232,55 @@
->  				status = "disabled";
->  			};
+>  Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+> index 9a6e251462e7..b8f02c663521 100644
+> --- a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+> @@ -5,9 +5,13 @@ Required properties:
+>  - reg : Address and length of the register set of timer controller.
+>  - interrupts : Should be the interrupt number.
 >  
-> +			twsi3: i2c at d4032000 {
-> +				compatible = "mrvl,mmp-twsi";
-> +				reg = <0xd4032000 0x1000>;
-> +				interrupt-parent = <&intcmux17>;
-> +				interrupts = <1>;
-> +				clocks = <&soc_clocks MMP2_CLK_TWSI2>;
-> +				resets = <&soc_clocks MMP2_CLK_TWSI2>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
+> +Optional properties:
+> +- clocks : Should contain a single entry describing the clock input.
 > +
-> +			twsi4: i2c at d4033000 {
-> +				compatible = "mrvl,mmp-twsi";
-> +				reg = <0xd4033000 0x1000>;
-> +				interrupt-parent = <&intcmux17>;
-> +				interrupts = <2>;
-> +				clocks = <&soc_clocks MMP2_CLK_TWSI3>;
-> +				resets = <&soc_clocks MMP2_CLK_TWSI3>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
-> +
-> +			twsi5: i2c at d4033800 {
-> +				compatible = "mrvl,mmp-twsi";
-> +				reg = <0xd4033800 0x1000>;
-> +				interrupt-parent = <&intcmux17>;
-> +				interrupts = <3>;
-> +				clocks = <&soc_clocks MMP2_CLK_TWSI4>;
-> +				resets = <&soc_clocks MMP2_CLK_TWSI4>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			twsi6: i2c at d4034000 {
-> +				compatible = "mrvl,mmp-twsi";
-> +				reg = <0xd4034000 0x1000>;
-> +				interrupt-parent = <&intcmux17>;
-> +				interrupts = <4>;
-> +				clocks = <&soc_clocks MMP2_CLK_TWSI5>;
-> +				resets = <&soc_clocks MMP2_CLK_TWSI5>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
->  			rtc: rtc at d4010000 {
->  				compatible = "mrvl,mmp-rtc";
->  				reg = <0xd4010000 0x1000>;
+>  Example:
+>  	timer0: timer at d4014000 {
+>  		compatible = "mrvl,mmp-timer";
+>  		reg = <0xd4014000 0x100>;
+>  		interrupts = <13>;
+> +		clocks = <&coreclk 2>;
+>  	};
 
 -- 
 (english) http://www.livejournal.com/~pavelmachek
@@ -97,4 +53,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181103/7b405c9b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181103/3932b2a0/attachment.sig>
