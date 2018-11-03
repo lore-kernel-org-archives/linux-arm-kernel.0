@@ -1,34 +1,47 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat,  3 Nov 2018 15:38:55 +0530
-Subject: [PATCH 05/10] drm/sun4i: sun6i_mipi_dsi: Enable burst mode
-In-Reply-To: <20181103100900.30313-1-jagan@amarulasolutions.com>
-References: <20181103100900.30313-1-jagan@amarulasolutions.com>
-Message-ID: <20181103100900.30313-6-jagan@amarulasolutions.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 3 Nov 2018 10:41:19 +0000
+Subject: [GIT PULL] arm64 2nd round of updates for 4.20
+Message-ID: <20181103104115.7imtevbiauvd3qls@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable video_mode_burst bit from dsi base control register
-for burst mode display panels.
+Hi Linus,
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Please pull the arm64 updates below. Thank you.
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index b6c01891df36..b18a01361f11 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -421,6 +421,10 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- 	regmap_write(dsi->regs, SUN6I_DSI_BURST_LINE_REG,
- 		     SUN6I_DSI_BURST_LINE_NUM(line_num) |
- 		     SUN6I_DSI_BURST_LINE_SYNC_POINT(sync_point));
-+
-+	regmap_read(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, &val);
-+	val |= SUN6I_DSI_BASIC_CTL_VIDEO_BURST;
-+	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, val);
- }
- 
- static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
+The following changes since commit 4debef5510071032c6d5dace31ca1cc42a120073:
+
+  arm64: KVM: Guests can skip __install_bp_hardening_cb()s HYP work (2018-10-19 15:37:25 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
+
+for you to fetch changes up to 966866892cf89d606544bca22d584ba2ef9ec208:
+
+  arm64: kprobe: make page to RO mode when allocate it (2018-11-02 18:15:07 +0000)
+
+----------------------------------------------------------------
+arm64 2nd round of updates for 4.20:
+
+- Fix W+X page (mark RO) allocated by the arm64 kprobes code
+
+- Makefile fix for .i files in out of tree modules
+
+----------------------------------------------------------------
+Anders Roxell (1):
+      arm64: kprobe: make page to RO mode when allocate it
+
+Victor Kamensky (1):
+      arm64: makefile fix build of .i file in external module case
+
+Yangtao Li (1):
+      arm64: kdump: fix small typo
+
+ arch/arm64/Makefile                |  2 ++
+ arch/arm64/kernel/crash_dump.c     |  2 +-
+ arch/arm64/kernel/probes/kprobes.c | 27 ++++++++++++++++++++-------
+ 3 files changed, 23 insertions(+), 8 deletions(-)
+
 -- 
-2.18.0.321.gffc6fa0e3
+Catalin
