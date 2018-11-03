@@ -1,96 +1,78 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat,  3 Nov 2018 15:38:54 +0530
-Subject: [PATCH 04/10] drm/sun4i: sun6i_mipi_dsi: Setup burst mode
+Date: Sat,  3 Nov 2018 15:39:00 +0530
+Subject: [PATCH 10/10] [DO NOT MERGE] arm64: allwinner: a64: pine64-lts:
+ Enable Feiyang FY07024DI26A30-D DSI panel
 In-Reply-To: <20181103100900.30313-1-jagan@amarulasolutions.com>
 References: <20181103100900.30313-1-jagan@amarulasolutions.com>
-Message-ID: <20181103100900.30313-5-jagan@amarulasolutions.com>
+Message-ID: <20181103100900.30313-11-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting up burst mode display would require to compute
-- Horizontal timing edge values to fill burst drq register
-- Line, sync values to fill burst line register
+Feiyang FY07024DI26A30-D MIPI_DSI panel is desiged to attach with
+DSI connector on pine64 boards, enable the same for pine64 LTS.
 
-Since there is no direct documentation for these computations
-the edge and line formulas are taken from BSP code
-(in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-line_num = panel->lcd_ht*dsi_pixel_bits[panel->lcd_dsi_format]/
-	  (8*panel->lcd_dsi_lane);
-edge1 = sync_point+(panel->lcd_x+panel->lcd_hbp+20)*
-	dsi_pixel_bits[panel->lcd_dsi_format] /(8*panel->lcd_dsi_lane);
-edge1 = (edge1>line_num)?line_num:edge1;
-edge0 = edge1+(panel->lcd_x+40)*tcon_div/8;
-edge0 = (edge0>line_num)?(edge0-line_num):1;
+DSI panel connected via board DSI port with,
+- DC1SW as AVDD supply
+- DLDO2 as DVDD supply
+- DLDO1 as VCC-DSI supply
+- PD24 gpio for reset pin
+- PH10 gpio for backlight enable pin
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 48 +++++++++++++++++++++-----
- 1 file changed, 40 insertions(+), 8 deletions(-)
+ .../dts/allwinner/sun50i-a64-pine64-lts.dts   | 37 +++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 4965b2c71e4c..b6c01891df36 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -375,20 +375,52 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- 				  struct drm_display_mode *mode)
- {
- 	struct mipi_dsi_device *device = dsi->device;
-+	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format);
-+	u32 line_num, edge0, edge1, hact_sync_bp;
-+	u32 sync_point, tcon_div;
- 	u32 val = 0;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+index 72d6961dc312..a5097cf7a8dc 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+@@ -5,9 +5,46 @@
+  */
  
--	if ((mode->hsync_start - mode->hdisplay) > 20) {
--		/* Maaaaaagic */
--		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
-+	if (device->mode_flags != MIPI_DSI_MODE_VIDEO_BURST) {
-+		if ((mode->hsync_start - mode->hdisplay) > 20) {
-+			/* Maaaaaagic */
-+			u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+ #include "sun50i-a64-sopine-baseboard.dts"
++#include <dt-bindings/pwm/pwm.h>
  
--		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
--		drq /= 32;
-+			drq *= Bpp;
-+			drq /= 32;
- 
--		val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
--		       SUN6I_DSI_TCON_DRQ_SET(drq));
-+			val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
-+			       SUN6I_DSI_TCON_DRQ_SET(drq));
-+		}
+ / {
+ 	model = "Pine64 LTS";
+ 	compatible = "pine64,pine64-lts", "allwinner,sun50i-r18",
+ 		     "allwinner,sun50i-a64";
 +
-+		regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&r_pwm 0 50000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <1 2 4 8 16 32 64 128 512>;
++		default-brightness-level = <8>;
++		enable-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* LCD-BL-EN: PH10 */
++	};
++};
 +
-+		return;
- 	}
- 
--	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
-+	sync_point = 40;
-+	tcon_div = 8;	/* FIXME need to retrive the divider from TCON */
++&de {
++	status = "okay";
++};
 +
-+	line_num = mode->htotal * Bpp / (8 * device->lanes);
-+	/* Horizental timings duration excluding front porch */
-+	hact_sync_bp = (mode->hdisplay + mode->htotal - mode->hsync_start);
-+	edge1 = sync_point + ((hact_sync_bp + 20) * Bpp / (8 * device->lanes));
-+	if (edge1 > line_num)
-+		edge1 = line_num;
++&dphy {
++	status = "okay";
++};
 +
-+	edge0 = edge1 + (mode->hdisplay + 40) * tcon_div / 8;
-+	if (edge0 > line_num)
-+		edge0 -= line_num;
-+	else
-+		edge0 = 1;
++&dsi {
++	vcc-dsi-supply = <&reg_dldo1>;
++	status = "okay";
 +
-+	regmap_write(dsi->regs, SUN6I_DSI_BURST_DRQ_REG,
-+		     SUN6I_DSI_BURST_DRQ_EDGE1(edge1) |
-+		     SUN6I_DSI_BURST_DRQ_EDGE0(edge0));
-+	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
-+		     SUN6I_DSI_TCON_DRQ_ENABLE_MODE);
-+	regmap_write(dsi->regs, SUN6I_DSI_BURST_LINE_REG,
-+		     SUN6I_DSI_BURST_LINE_NUM(line_num) |
-+		     SUN6I_DSI_BURST_LINE_SYNC_POINT(sync_point));
- }
- 
- static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
++	panel at 0 {
++		compatible = "feiyang,fy07024di26a30d";
++		reg = <0>;
++		avdd-supply = <&reg_dc1sw>;
++		dvdd-supply = <&reg_dldo2>;
++		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* LCD-RST: PD24 */
++		backlight = <&backlight>;
++	};
++};
++
++&r_pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r_pwm_pin>;
++	status = "okay";
+ };
 -- 
 2.18.0.321.gffc6fa0e3
