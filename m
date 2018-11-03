@@ -1,33 +1,25 @@
-From: mikelley@microsoft.com (Michael Kelley)
-Date: Sat, 3 Nov 2018 00:15:25 +0000
-Subject: [PATCH v3 4/4] Drivers: hv: Enable CONFIG_HYPERV on ARM64
-In-Reply-To: <1541204037-18043-1-git-send-email-mikelley@microsoft.com>
-References: <1541204037-18043-1-git-send-email-mikelley@microsoft.com>
-Message-ID: <1541204037-18043-5-git-send-email-mikelley@microsoft.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Sat, 3 Nov 2018 14:57:52 +1100
+Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
+Message-ID: <20181103145752.6c1d10c8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update drivers/hv/Kconfig so CONFIG_HYPERV can be selected on ARM64,
-causing the Hyper-V specific code to be built.
+Hi all,
 
-Signed-off-by: Michael Kelley <mikelley@microsoft.com>
----
- drivers/hv/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Commit
 
-diff --git a/drivers/hv/Kconfig b/drivers/hv/Kconfig
-index 97954f5..c3e11a2 100644
---- a/drivers/hv/Kconfig
-+++ b/drivers/hv/Kconfig
-@@ -4,7 +4,8 @@ menu "Microsoft Hyper-V guest support"
- 
- config HYPERV
- 	tristate "Microsoft Hyper-V client drivers"
--	depends on X86 && ACPI && PCI && X86_LOCAL_APIC && HYPERVISOR_GUEST
-+	depends on ACPI && PCI && \
-+			((X86 && X86_LOCAL_APIC && HYPERVISOR_GUEST) || ARM64)
- 	select PARAVIRT
- 	help
- 	  Select this option to run Linux as a Hyper-V client operating
+  cda58c80fe27 ("ARM: OMAP1: ams-delta: Fix impossible .irq < 0")
+
+is missing a Signed-off-by from its committer.
+
 -- 
-1.8.3.1
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181103/5deaa3c4/attachment.sig>
