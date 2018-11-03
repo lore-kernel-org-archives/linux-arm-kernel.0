@@ -1,131 +1,63 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Sun, 4 Nov 2018 02:01:32 +0800
-Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <3723695d951e0d30e8a0117d336d8f268269a030.camel@baylibre.com>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
- <a8d359208edfdc75cb5c6de378796f76e0572a0f.camel@baylibre.com>
- <eda2faf2-cf06-902d-36ff-48ceafcb4a4b@amlogic.com>
- <f4d239df2f1333b005680f9bfdd2eba93e7f86e5.camel@baylibre.com>
- <CAFBinCCuqUmVNdwUm7WbkHy1eWvOA5oQ5FcOuytbYNbgGcXnRQ@mail.gmail.com>
- <3723695d951e0d30e8a0117d336d8f268269a030.camel@baylibre.com>
-Message-ID: <66c2915a-4ecd-8a6e-6493-4318ae7bb620@amlogic.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 3 Nov 2018 11:45:28 -0700
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20181103184528.apzyn447zjk27dat@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+Hi Linus,
 
-Thanks for the review, we really appreciate your time.
+The following changes since commit 4b42745211af552f170f38a1b97f4a112b5da6b2:
 
-I'm very sorry maybe I don't catch all your meaning very well. 
+  Merge tag 'armsoc-soc' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2018-10-29 15:37:33 -0700)
 
-Please see my comments below.
+are available in the git repository at:
 
-On 2018/10/29 3:16, Jerome Brunet wrote:
-> On Thu, 2018-10-25 at 22:58 +0200, Martin Blumenstingl wrote:
->> Hi Jerome,
->>
->> On Thu, Oct 25, 2018 at 2:54 PM Jerome Brunet <jbrunet@baylibre.com> wrote:
->> [snip]
->>>>>> +static void clk_regmap_div_init(struct clk_hw *hw)
->>>>>> +{
->>>>>> + struct clk_regmap *clk = to_clk_regmap(hw);
->>>>>> + struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk);
->>>>>> + unsigned int val;
->>>>>> + int ret;
->>>>>> +
->>>>>> + ret = regmap_read(clk->map, div->offset, &val);
->>>>>> + if (ret)
->>>>>> +         return;
->>>>>>
->>>>>> + val &= (clk_div_mask(div->width) << div->shift);
->>>>>> + if (!val)
->>>>>> +         regmap_update_bits(clk->map, div->offset,
->>>>>> +                            clk_div_mask(div->width) << div->shift,
->>>>>> +                            clk_div_mask(div->width));
->>>>>
->>>>> This is wrong for several reasons:
->>>>> * You should hard code the initial value in the driver.
->>>>> * If shift is not 0, I doubt this will give the expected result.
->>>>
->>>> The value 0x00 of divider means nand clock off then read/write nand register is forbidden.
->>>
->>> That is not entirely true, you can access the clock register or you'd be in a
->>> chicken and egg situation.
->>>
->>>> Should we set the initial value in nand driver, or in sub emmc clk driver?
->>>
->>> In the nand driver, which is the consumer of the clock. see my previous comments
->>> about it.
->>
->> an old version of this series had the code still in the NAND driver
->> (by writing to the registers directly instead of using the clk API).
->> this looks pretty much like a "sclk-div" to me (as I commented in v3
->> of this series: [0]):
->> - value 0 means disabled
->> - positive divider values
->> - (probably no duty control, but that's optional as far as I
->> understand sclk-div)
->> - uses max divider value when enabling the clock
->>
->> if switching to sclk-div works then we can get rid of some duplicate code
-> 
-> It is possible:
-> There is a couple of things to note though:
-> 
-> * sclk does not 'uses max divider value when enabling the clock': Since this
-> divider can gate, it needs to save the divider value when disabling, since the
-> divider value is no longer stored in the register,
-> On init, this cached value is  saved as it is. If the divider is initially
-> disabled, we have to set the cached value to something that makes sense, in case
-> the clock is enabled without a prior call to clk_set_rate().
->> So in sclk, the clock setting is not changed nor hard coded in init, and this is
-> a very important difference.
->
-I think It's ok for the latest sub mmc clock and nand driver now:
-1. in mmc_clkc_register_clk_with_parent("div", ...) from mmc_clkc_probe():
-   cached_div is set to div_max durning clk register?but is not set to div hw register.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
 
-2. In meson nand driver v6: 	https://lore.kernel.org/lkml/1541090542-19618-3-git-send-email-jianxin.pan at amlogic.com
-1) In meson_nfc_clk_init() from probe:   get clock handle, then prepare_enable and set default rate.
-   nfc->device_clk = devm_clk_get(nfc->dev, "device");
-   ret = clk_prepare_enable(nfc->device_clk);			//Here div hw register changed from 0 -> cached_div.
-   default_clk_rate = clk_round_rate(nfc->device_clk, 24000000);
-   ret = clk_set_rate(nfc->device_clk, default_clk_rate);	//Then register and cached_div are both updated to the default 24M.
-2) In meson_nfc_select_chip(), set the actual frequency
-  ret = clk_set_rate(nfc->device_clk, meson_chip->clk_rate);	//Here register and cached_div are changed again.
-3) if clk_disable() is called, set div hw register to zero, and cached_div  keep unchagned.
-   if clk_disable() is called again,  cached_div is restored to div hw register.
+for you to fetch changes up to 8008cc78d3d6f5191ffcb2b85a423d516000e7f4:
 
-When enabling the clock, divider register does not need to be div_max.  
-Any value is OK except ZERO, the cached_div from init or set_rate is ok
->  
-> * Even if sclk zero value means gated, it is still a zero based divider, while
-> eMMC/Nand divider is one based. It this controller was to sclk, then something
-> needs to be done for this.
-Could I add another patch to this patchset for sclk to support CLK_DIVIDER_ONE_BASED ?
-> 
-> * Since sclk caches a value in its data, and there can multiple instance of eMMC
-> /NAND clock controller, some care must be taken when registering the data.
-OK, I will fix it and alloc mmc_clkc_div_data danymicly durning probe.
-Thank you. 
-> 
-> Both the generic divider and sclk could work here ... it's up to you Jianxin.
-> 
-== Why use meson_sclk_div_ops instead of clk_regmap_divider_ops?
-The default divider hw register vaule is 0 when system power on.
-Then there is a WARNING in divider_recalc_rate() durning clk_hw_register():
-[    0.918238] ffe05000.clock-controller#div: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set
-[    0.925581] WARNING: CPU: 3 PID: 1 at drivers/clk/clk-divider.c:127 divider_recalc_rate+0x88/0x90
-Then I still need to hard code the initual value to nand driver without CLK_DIVIDER_ALLOW_ZERO flags.
->>
->>
->> Regards
->> Martin
->>
->>
->> [0] https://patchwork.kernel.org/patch/10607157/#22238243
-> 
-> 
-> .
-> 
+  Merge tag 'omap-for-v4.20/omap1-fix-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2018-11-02 22:31:40 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes
+
+A few fixes who have come in near or during the merge window:
+
+ - Removal of a VLA usage in Marvell mpp platform code
+ - Enable some IPMI options for ARM64 servers by default, helps testing
+ - Enable PREEMPT on 32-bit ARMv7 defconfig
+ - Minor fix for stm32 DT (removal of an unused DMA property)
+ - Bugfix for TI OMAP1-based ams-delta (-EINVAL -> IRQ_NOTCONNECTED)
+
+----------------------------------------------------------------
+Alexandre Torgue (1):
+      ARM: dts: stm32: update HASH1 dmas property on stm32mp157c
+
+Arnd Bergmann (1):
+      ARM: orion: avoid VLA in orion_mpp_conf
+
+Janusz Krzysztofik (1):
+      ARM: OMAP1: ams-delta: Fix impossible .irq < 0
+
+John Garry (1):
+      arm64: defconfig: Enable some IPMI configs
+
+Linus Walleij (1):
+      ARM: defconfig: Update multi_v7 to use PREEMPT
+
+Marc Zyngier (1):
+      soc: ti: QMSS: Fix usage of irq_set_affinity_hint
+
+Olof Johansson (1):
+      Merge tag 'omap-for-v4.20/omap1-fix-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+ arch/arm/boot/dts/stm32mp157c.dtsi    |  2 +-
+ arch/arm/configs/multi_v7_defconfig   |  1 +
+ arch/arm/mach-omap1/board-ams-delta.c |  8 ++------
+ arch/arm/plat-orion/mpp.c             |  7 ++++++-
+ arch/arm64/configs/defconfig          |  3 +++
+ drivers/soc/ti/knav_qmss.h            |  4 ++--
+ drivers/soc/ti/knav_qmss_acc.c        | 10 +++++-----
+ drivers/soc/ti/knav_qmss_queue.c      | 22 +++++++++++++++-------
+ 8 files changed, 35 insertions(+), 22 deletions(-)
