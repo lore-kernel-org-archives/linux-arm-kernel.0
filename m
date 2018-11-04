@@ -1,65 +1,52 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:26:55 +0100
-Subject: [PATCH v3 18/28] dt-bindings: display: sunxi: add DT binding for
- Allwinner H6 DW HDMI
-In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
-References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-19-jernej.skrabec@siol.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 4 Nov 2018 15:36:53 -0500 (EST)
+Subject: [RFC/RFT PATCH] ARM: smp: add support for per-task stack canaries
+In-Reply-To: <20181104162845.16938-1-ard.biesheuvel@linaro.org>
+References: <20181104162845.16938-1-ard.biesheuvel@linaro.org>
+Message-ID: <nycvar.YSQ.7.76.1811041519100.1498@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+On Sun, 4 Nov 2018, Ard Biesheuvel wrote:
 
-The Allwinner H6 SoC uses a v2.12a DesignWare HDMI controller, with
-dedicated CEC and HDCP clocks added; the PHY connected is a standard
-DesignWare HDMI PHY.
+> On ARM, we currently only change the value of the stack canary when
+> switching tasks if the kernel was built for UP. On SMP kernels, this
+> is impossible since the stack canary value is obtained via a global
+> symbol reference, which means
+> a) all running tasks on all CPUs must use the same value
+> b) we can only modify the value when no kernel stack frames are live,
+>    which is effectively never.
+> 
+> So instead, use a GCC plugin to add a RTL pass that replaces each
+> reference to the address of the __stack_chk_guard symbol with an
+> expression that produces the address of the 'stack_canary' field
+> that is added to struct thread_info. This way, each task will use
+> its own randomized value.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> Known issues:
+> - The plugin requires the values of THREAD_SIZE and the offset of
+>   stack_canary in struct thread_info at a really early stage in the
+>   build, so I had to redefine them in the plugin source.
 
-Add binding for it.
+Can't you rely on the asm-offsets.c mechanism before the plugin is used?
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-[added HDCP clock and reset]
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- .../devicetree/bindings/display/sunxi/sun4i-drm.txt   | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+> Questions:
+> - Are there any execution contexts except for the decompressor and the
+>   EFI stub where we should disable this? KVM perhaps?
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 62c83b351344..478b288eebd9 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -79,6 +79,7 @@ Required properties:
-   - compatible: value must be one of:
-     * "allwinner,sun8i-a83t-dw-hdmi"
-     * "allwinner,sun50i-a64-dw-hdmi", "allwinner,sun8i-a83t-dw-hdmi"
-+    * "allwinner,sun50i-h6-dw-hdmi"
-   - reg: base address and size of memory-mapped region
-   - reg-io-width: See dw_hdmi.txt. Shall be 1.
-   - interrupts: HDMI interrupt number
-@@ -86,9 +87,14 @@ Required properties:
-     * iahb: the HDMI bus clock
-     * isfr: the HDMI register clock
-     * tmds: TMDS clock
-+    * cec: HDMI CEC clock (H6 only)
-+    * hdcp: HDCP clock (H6 only)
-+    * hdcp-bus: HDCP bus clock (H6 only)
-   - clock-names: the clock names mentioned above
--  - resets: phandle to the reset controller
--  - reset-names: must be "ctrl"
-+  - resets:
-+    * ctrl: HDMI controller reset
-+    * hdcp: HDCP reset (H6 only)
-+  - reset-names: reset names mentioned above
-   - phys: phandle to the DWC HDMI PHY
-   - phy-names: must be "phy"
- 
-@@ -109,6 +115,7 @@ Required properties:
-     * allwinner,sun8i-h3-hdmi-phy
-     * allwinner,sun8i-r40-hdmi-phy
-     * allwinner,sun50i-a64-hdmi-phy
-+    * allwinner,sun50i-h6-hdmi-phy
-   - reg: base address and size of memory-mapped region
-   - clocks: phandles to the clocks feeding the HDMI PHY
-     * bus: the HDMI PHY interface clock
--- 
-2.19.1
+Most certainly head-inflate-data.c... who knows if someone will use an 
+XIP kernel on an SMP system someday.
+
+[...]
+> +#ifdef CONFIG_STACKPROTECTOR_PER_TASK
+> +	BUILD_BUG_ON(offsetof(struct thread_info, stack_canary) != 100);
+> +	BUILD_BUG_ON(THREAD_SIZE != 0x2000);
+
+You should at least define those values in a header file that gets 
+included by both this code and the plugin source. But asm-offsets.c 
+would be best.
+
+
+Nicolas
