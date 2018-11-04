@@ -1,384 +1,278 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Sun, 4 Nov 2018 17:07:37 +0100
-Subject: [PATCH v7 4/5] clocksource: add driver for i.MX EPIT timer
-In-Reply-To: <27e8d6f0-b415-f31e-ae89-0b35397d0cf2@linaro.org>
-References: <20180611155001.3506-1-peron.clem@gmail.com>
- <20180611155001.3506-5-peron.clem@gmail.com>
- <27e8d6f0-b415-f31e-ae89-0b35397d0cf2@linaro.org>
-Message-ID: <CAJiuCcftA0EmmXueNw60ScLZMuxJVUSaZji0KFfSWAdgnR2OXw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun,  4 Nov 2018 17:28:45 +0100
+Subject: [RFC/RFT PATCH] ARM: smp: add support for per-task stack canaries
+Message-ID: <20181104162845.16938-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On ARM, we currently only change the value of the stack canary when
+switching tasks if the kernel was built for UP. On SMP kernels, this
+is impossible since the stack canary value is obtained via a global
+symbol reference, which means
+a) all running tasks on all CPUs must use the same value
+b) we can only modify the value when no kernel stack frames are live,
+   which is effectively never.
 
-Thanks for the review and sorry for the delay.
+So instead, use a GCC plugin to add a RTL pass that replaces each
+reference to the address of the __stack_chk_guard symbol with an
+expression that produces the address of the 'stack_canary' field
+that is added to struct thread_info. This way, each task will use
+its own randomized value.
 
-On Tue, 10 Jul 2018 at 18:20, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->
-> On 11/06/2018 17:50, Cl?ment P?ron wrote:
-> > From: Colin Didier <colin.didier@devialet.com>
-> >
-> > Add driver for NXP's EPIT timer used in i.MX SoC.
->
-> Give a description on how works this timer.
-Ok,
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Known issues:
+- The plugin requires the values of THREAD_SIZE and the offset of
+  stack_canary in struct thread_info at a really early stage in the
+  build, so I had to redefine them in the plugin source.
 
->
->
-> > Signed-off-by: Colin Didier <colin.didier@devialet.com>
-> > Signed-off-by: Cl?ment Peron <clement.peron@devialet.com>
-> > Reviewed-by: Vladimir Zapolskiy <vz@mleia.com>
-> > Tested-by: Vladimir Zapolskiy <vz@mleia.com>
-> > ---
-> >  drivers/clocksource/Kconfig          |  11 ++
-> >  drivers/clocksource/Makefile         |   1 +
-> >  drivers/clocksource/timer-imx-epit.c | 265 +++++++++++++++++++++++++++
-> >  3 files changed, 277 insertions(+)
-> >  create mode 100644 drivers/clocksource/timer-imx-epit.c
-> >
-> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> > index 8e8a09755d10..790478afd02c 100644
-> > --- a/drivers/clocksource/Kconfig
-> > +++ b/drivers/clocksource/Kconfig
-> > @@ -576,6 +576,17 @@ config H8300_TPU
-> >         This enables the clocksource for the H8300 platform with the
-> >         H8S2678 cpu.
-> >
-> > +config CLKSRC_IMX_EPIT
-> > +     bool "Clocksource using i.MX EPIT"
-> > +     depends on CLKDEV_LOOKUP && (ARCH_MXC || COMPILE_TEST)
-> > +     select CLKSRC_MMIO
-> > +     help
-> > +       This enables EPIT support available on some i.MX platforms.
-> > +       Normally you don't have a reason to do so as the EPIT has
-> > +       the same features and uses the same clocks as the GPT.
-> > +       Anyway, on some systems the GPT may be in use for other
-> > +       purposes.
-> > +
-> >  config CLKSRC_IMX_GPT
-> >       bool "Clocksource using i.MX GPT" if COMPILE_TEST
-> >       depends on ARM && CLKDEV_LOOKUP
-> > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> > index 00caf37e52f9..d9426f69ec69 100644
-> > --- a/drivers/clocksource/Makefile
-> > +++ b/drivers/clocksource/Makefile
-> > @@ -69,6 +69,7 @@ obj-$(CONFIG_INTEGRATOR_AP_TIMER)   += timer-integrator-ap.o
-> >  obj-$(CONFIG_CLKSRC_VERSATILE)               += versatile.o
-> >  obj-$(CONFIG_CLKSRC_MIPS_GIC)                += mips-gic-timer.o
-> >  obj-$(CONFIG_CLKSRC_TANGO_XTAL)              += tango_xtal.o
-> > +obj-$(CONFIG_CLKSRC_IMX_EPIT)                += timer-imx-epit.o
-> >  obj-$(CONFIG_CLKSRC_IMX_GPT)         += timer-imx-gpt.o
-> >  obj-$(CONFIG_CLKSRC_IMX_TPM)         += timer-imx-tpm.o
-> >  obj-$(CONFIG_ASM9260_TIMER)          += asm9260_timer.o
-> > diff --git a/drivers/clocksource/timer-imx-epit.c b/drivers/clocksource/timer-imx-epit.c
-> > new file mode 100644
-> > index 000000000000..7f1c8e2e00aa
-> > --- /dev/null
-> > +++ b/drivers/clocksource/timer-imx-epit.c
-> > @@ -0,0 +1,265 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * i.MX EPIT Timer
-> > + *
-> > + * Copyright (C) 2010 Sascha Hauer <s.hauer@pengutronix.de>
-> > + * Copyright (C) 2018 Colin Didier <colin.didier@devialet.com>
-> > + * Copyright (C) 2018 Cl?ment P?ron <clement.peron@devialet.com>
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/clockchips.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/sched_clock.h>
-> > +#include <linux/slab.h>
-> > +
-> > +#define EPITCR                               0x00
-> > +#define EPITSR                               0x04
-> > +#define EPITLR                               0x08
-> > +#define EPITCMPR                     0x0c
-> > +#define EPITCNR                              0x10
-> > +
-> > +#define EPITCR_EN                    BIT(0)
-> > +#define EPITCR_ENMOD                 BIT(1)
-> > +#define EPITCR_OCIEN                 BIT(2)
-> > +#define EPITCR_RLD                   BIT(3)
-> > +#define EPITCR_PRESC(x)                      (((x) & 0xfff) << 4)
-> > +#define EPITCR_SWR                   BIT(16)
-> > +#define EPITCR_IOVW                  BIT(17)
-> > +#define EPITCR_DBGEN                 BIT(18)
-> > +#define EPITCR_WAITEN                        BIT(19)
-> > +#define EPITCR_RES                   BIT(20)
-> > +#define EPITCR_STOPEN                        BIT(21)
-> > +#define EPITCR_OM_DISCON             (0 << 22)
-> > +#define EPITCR_OM_TOGGLE             (1 << 22)
-> > +#define EPITCR_OM_CLEAR                      (2 << 22)
-> > +#define EPITCR_OM_SET                        (3 << 22)
-> > +#define EPITCR_CLKSRC_OFF            (0 << 24)
-> > +#define EPITCR_CLKSRC_PERIPHERAL     (1 << 24)
-> > +#define EPITCR_CLKSRC_REF_HIGH               (2 << 24)
-> > +#define EPITCR_CLKSRC_REF_LOW                (3 << 24)
-> > +
-> > +#define EPITSR_OCIF                  BIT(0)
-> > +
-> > +struct epit_timer {
-> > +     void __iomem *base;
-> > +     int irq;
-> > +     struct clk *clk;
-> > +     struct clock_event_device ced;
-> > +     struct irqaction act;
-> > +};
-> > +
-> > +static void __iomem *sched_clock_reg;
-> > +
-> > +static inline struct epit_timer *to_epit_timer(struct clock_event_device *ced)
-> > +{
-> > +     return container_of(ced, struct epit_timer, ced);
-> > +}
-> > +
-> > +static inline void epit_irq_disable(struct epit_timer *epittm)
-> > +{
-> > +     u32 val;
-> > +
-> > +     val = readl_relaxed(epittm->base + EPITCR);
-> > +     writel_relaxed(val & ~EPITCR_OCIEN, epittm->base + EPITCR);
-> > +}
-> > +
-> > +static inline void epit_irq_enable(struct epit_timer *epittm)
-> > +{
-> > +     u32 val;
-> > +
-> > +     val = readl_relaxed(epittm->base + EPITCR);
-> > +     writel_relaxed(val | EPITCR_OCIEN, epittm->base + EPITCR);
-> > +}
-> > +
-> > +static void epit_irq_acknowledge(struct epit_timer *epittm)
-> > +{
-> > +     writel_relaxed(EPITSR_OCIF, epittm->base + EPITSR);
-> > +}
-> > +
-> > +static u64 notrace epit_read_sched_clock(void)
-> > +{
-> > +     return ~readl_relaxed(sched_clock_reg);
-> > +}
-> > +
-> > +static int epit_set_next_event(unsigned long cycles,
-> > +                            struct clock_event_device *ced)
-> > +{
-> > +     struct epit_timer *epittm = to_epit_timer(ced);
-> > +     unsigned long tcmp;
-> > +
-> > +     tcmp = readl_relaxed(epittm->base + EPITCNR) - cycles;
-> > +     writel_relaxed(tcmp, epittm->base + EPITCMPR);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +/* Left event sources disabled, no more interrupts appear */
-> > +static int epit_shutdown(struct clock_event_device *ced)
-> > +{
-> > +     struct epit_timer *epittm = to_epit_timer(ced);
-> > +     unsigned long flags;
-> > +
-> > +     /*
-> > +      * The timer interrupt generation is disabled at least
-> > +      * for enough time to call epit_set_next_event()
-> > +      */
-> > +     local_irq_save(flags);
->
-> This is not necessary. This function is called with interrupt disabled.
+Questions:
+- Are there any execution contexts except for the decompressor and the
+  EFI stub where we should disable this? KVM perhaps?
 
-I took this from the i.MX GPT Timer :
-https://elixir.bootlin.com/linux/latest/source/drivers/clocksource/timer-imx-gpt.c#L208
+Comments and test results welcome.
 
-Do you think i should also fix on the imx gpt timer ?
+ arch/arm/Kconfig                              | 16 ++++
+ arch/arm/boot/compressed/Makefile             |  1 +
+ arch/arm/include/asm/stackprotector.h         | 12 ++-
+ arch/arm/include/asm/thread_info.h            |  3 +
+ arch/arm/kernel/process.c                     |  9 ++-
+ scripts/Makefile.gcc-plugins                  |  6 ++
+ scripts/gcc-plugins/Kconfig                   |  4 +
+ scripts/gcc-plugins/arm_ssp_per_task_plugin.c | 78 ++++++++++++++++++++
+ 8 files changed, 126 insertions(+), 3 deletions(-)
 
->
-> > +     /* Disable interrupt in EPIT module */
-> > +     epit_irq_disable(epittm);
-> > +
-> > +     /* Clear pending interrupt */
-> > +     epit_irq_acknowledge(epittm);
->
-> No irq ack is needed here. Neither disabling the interrupt.
-Is it done by the framework ?
-
-I took also this from the IMX GPT driver
-
->
-> Why not just stop the counter ?
-I will check the datasheet.
->
-> > +     local_irq_restore(flags);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static int epit_set_oneshot(struct clock_event_device *ced)
-> > +{
-> > +     struct epit_timer *epittm = to_epit_timer(ced);
-> > +     unsigned long flags;
-> > +
-> > +     /*
-> > +      * The timer interrupt generation is disabled at least
-> > +      * for enough time to call epit_set_next_event()
-> > +      */
-> > +     local_irq_save(flags);
->
-> This is not necessary. This function is called with interrupt disabled.
->
-> > +     /* Disable interrupt in EPIT module */
-> > +     epit_irq_disable(epittm);
-> > +
-> > +     /* Clear pending interrupt, only while switching mode */
-> > +     if (!clockevent_state_oneshot(ced))
-> > +             epit_irq_acknowledge(epittm);
->
-> Why do you need to ack the interrupt here ?
->
-> > +     /*
-> > +      * Do not put overhead of interrupt enable/disable into
-> > +      * epit_set_next_event(), the core has about 4 minutes
-> > +      * to call epit_set_next_event() or shutdown clock after
-> > +      * mode switching
-> > +      */
-> > +     epit_irq_enable(epittm);
-> > +     local_irq_restore(flags);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static irqreturn_t epit_timer_interrupt(int irq, void *dev_id)
-> > +{
-> > +     struct clock_event_device *ced = dev_id;
-> > +     struct epit_timer *epittm = to_epit_timer(ced);
-> > +
-> > +     epit_irq_acknowledge(epittm);
-> > +
-> > +     ced->event_handler(ced);
-> > +
-> > +     return IRQ_HANDLED;
-> > +}
-> > +
-> > +static int __init epit_clocksource_init(struct epit_timer *epittm)
-> > +{
-> > +     unsigned int c = clk_get_rate(epittm->clk);
-> > +
-> > +     sched_clock_reg = epittm->base + EPITCNR;
-> > +     sched_clock_register(epit_read_sched_clock, 32, c);
-> > +
-> > +     return clocksource_mmio_init(epittm->base + EPITCNR, "epit", c, 200, 32,
-> > +                                  clocksource_mmio_readl_down);
-> > +}
-> > +
-> > +static int __init epit_clockevent_init(struct epit_timer *epittm)
-> > +{
-> > +     struct clock_event_device *ced = &epittm->ced;
-> > +     struct irqaction *act = &epittm->act;
-> > +
-> > +     ced->name = "epit";
-> > +     ced->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_DYNIRQ;
-> > +     ced->set_state_shutdown = epit_shutdown;
-> > +     ced->tick_resume = epit_shutdown;
-> > +     ced->set_state_oneshot = epit_set_oneshot;
-> > +     ced->set_next_event = epit_set_next_event;
-> > +     ced->rating = 200;
-> > +     ced->cpumask = cpumask_of(0);
-> > +     ced->irq = epittm->irq;
-> > +     clockevents_config_and_register(ced, clk_get_rate(epittm->clk),
-> > +                                     0xff, 0xfffffffe);
-> > +
-> > +     act->name = "i.MX EPIT Timer Tick",
-> > +     act->flags = IRQF_TIMER | IRQF_IRQPOLL;
-> > +     act->handler = epit_timer_interrupt;
-> > +     act->dev_id = ced;
-> > +
-> > +     /* Make irqs happen */
-> > +     return setup_irq(epittm->irq, act);
-> > +}
-> > +
-> > +static int __init epit_timer_init(struct device_node *np)
-> > +{
-> > +     struct epit_timer *epittm;
-> > +     int ret;
-> > +
-> > +     epittm = kzalloc(sizeof(*epittm), GFP_KERNEL);
-> > +     if (!epittm)
-> > +             return -ENOMEM;
-> > +
-> > +     epittm->base = of_iomap(np, 0);
-> > +     if (!epittm->base) {
-> > +             ret = -ENXIO;
-> > +             goto out_kfree;
-> > +     }
-> > +
-> > +     epittm->irq = irq_of_parse_and_map(np, 0);
-> > +     if (!epittm->irq) {
-> > +             ret = -EINVAL;
-> > +             goto out_iounmap;
-> > +     }
-> > +
-> > +     /* Get EPIT clock */
-> > +     epittm->clk = of_clk_get(np, 0);
-> > +     if (IS_ERR(epittm->clk)) {
-> > +             pr_err("i.MX EPIT: unable to get clk\n");
-> > +             ret = PTR_ERR(epittm->clk);
-> > +             goto out_iounmap;
-> > +     }
-> > +
-> > +     ret = clk_prepare_enable(epittm->clk);
-> > +     if (ret) {
-> > +             pr_err("i.MX EPIT: unable to prepare+enable clk\n");
-> > +             goto out_iounmap;
-> > +     }
->
-> Please replace all the above with the timer-of API as:
-Ok I will,
-
-Thanks
-Clement
-
->
-> https://patchwork.kernel.org/patch/10510443/
->
->
-> > +     /* Initialise to a known state (all timers off, and timing reset) */
-> > +     writel_relaxed(0x0, epittm->base + EPITCR);
-> > +     writel_relaxed(0xffffffff, epittm->base + EPITLR);
-> > +     writel_relaxed(EPITCR_EN | EPITCR_CLKSRC_REF_HIGH | EPITCR_WAITEN,
-> > +                    epittm->base + EPITCR);
-> > +
-> > +     ret = epit_clocksource_init(epittm);
-> > +     if (ret) {
-> > +             pr_err("i.MX EPIT: failed to init clocksource\n");
-> > +             goto out_clk_disable;
-> > +     }
-> > +
-> > +     ret = epit_clockevent_init(epittm);
-> > +     if (ret) {
-> > +             pr_err("i.MX EPIT: failed to init clockevent\n");
-> > +             goto out_clk_disable;
-> > +     }
-> > +
-> > +     return 0;
-> > +
-> > +out_clk_disable:
-> > +     clk_disable_unprepare(epittm->clk);
-> > +out_iounmap:
-> > +     iounmap(epittm->base);
-> > +out_kfree:
-> > +     kfree(epittm);
-> > +
-> > +     return ret;
-> > +}
-> > +TIMER_OF_DECLARE(epit_timer, "fsl,imx31-epit", epit_timer_init);
-> >
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 91be74d8df65..7b50d5e3d030 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1810,6 +1810,22 @@ config XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+ 
++config STACKPROTECTOR_PER_TASK
++	bool "Use a unique stack canary value for each task"
++	depends on GCC_PLUGINS && STACKPROTECTOR && SMP
++	select GCC_PLUGIN_ARM_SSP_PER_TASK
++	help
++	  Due to the fact that GCC uses an ordinary symbol reference from
++	  which to load the value of the stack canary, this value can only
++	  change at reboot time on SMP systems, and all tasks running in the
++	  kernel's address space are forced to use the same canary value for
++	  the entire duration that the system is up.
++
++	  Enable this option to switch to a different method that uses a
++	  different canary value for each task.
++
++	  This is not enabled by default since it relies on a GCC plugin.
++
+ endmenu
+ 
+ menu "Boot options"
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 1f5a5ffe7fcf..01bf2585a0fa 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -101,6 +101,7 @@ clean-files += piggy_data lib1funcs.S ashldi3.S bswapsdi2.S \
+ 		$(libfdt) $(libfdt_hdrs) hyp-stub.S
+ 
+ KBUILD_CFLAGS += -DDISABLE_BRANCH_PROFILING
++KBUILD_CFLAGS += $(DISABLE_ARM_SSP_PER_TASK_PLUGIN)
+ 
+ ifeq ($(CONFIG_FUNCTION_TRACER),y)
+ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+diff --git a/arch/arm/include/asm/stackprotector.h b/arch/arm/include/asm/stackprotector.h
+index ef5f7b69443e..72a20c3a0a90 100644
+--- a/arch/arm/include/asm/stackprotector.h
++++ b/arch/arm/include/asm/stackprotector.h
+@@ -6,8 +6,10 @@
+  * the stack frame and verifying that it hasn't been overwritten when
+  * returning from the function.  The pattern is called stack canary
+  * and gcc expects it to be defined by a global variable called
+- * "__stack_chk_guard" on ARM.  This unfortunately means that on SMP
+- * we cannot have a different canary value per task.
++ * "__stack_chk_guard" on ARM.  This prevents SMP systems from using a
++ * different value for each task unless we enable a GCC plugin that
++ * replaces these symbol references with references to each task's own
++ * value.
+  */
+ 
+ #ifndef _ASM_STACKPROTECTOR_H
+@@ -16,6 +18,8 @@
+ #include <linux/random.h>
+ #include <linux/version.h>
+ 
++#include <asm/thread_info.h>
++
+ extern unsigned long __stack_chk_guard;
+ 
+ /*
+@@ -33,7 +37,11 @@ static __always_inline void boot_init_stack_canary(void)
+ 	canary ^= LINUX_VERSION_CODE;
+ 
+ 	current->stack_canary = canary;
++#ifndef CONFIG_STACKPROTECTOR_PER_TASK
+ 	__stack_chk_guard = current->stack_canary;
++#else
++	current_thread_info()->stack_canary = current->stack_canary;
++#endif
+ }
+ 
+ #endif	/* _ASM_STACKPROTECTOR_H */
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index 8f55dc520a3e..bd661c7681b1 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -57,6 +57,9 @@ struct thread_info {
+ 	__u32			syscall;	/* syscall number */
+ 	__u8			used_cp[16];	/* thread used copro */
+ 	unsigned long		tp_value[2];	/* TLS registers */
++#ifdef CONFIG_STACKPROTECTOR_PER_TASK
++	unsigned long		stack_canary;
++#endif
+ #ifdef CONFIG_CRUNCH
+ 	struct crunch_state	crunchstate;
+ #endif
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 82ab015bf42b..ca2e220ec892 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -39,7 +39,7 @@
+ #include <asm/tls.h>
+ #include <asm/vdso.h>
+ 
+-#ifdef CONFIG_STACKPROTECTOR
++#if defined(CONFIG_STACKPROTECTOR) && !defined(CONFIG_STACKPROTECTOR_PER_TASK)
+ #include <linux/stackprotector.h>
+ unsigned long __stack_chk_guard __read_mostly;
+ EXPORT_SYMBOL(__stack_chk_guard);
+@@ -267,6 +267,13 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 
+ 	thread_notify(THREAD_NOTIFY_COPY, thread);
+ 
++#ifdef CONFIG_STACKPROTECTOR_PER_TASK
++	BUILD_BUG_ON(offsetof(struct thread_info, stack_canary) != 100);
++	BUILD_BUG_ON(THREAD_SIZE != 0x2000);
++
++	thread->stack_canary = p->stack_canary;
++#endif
++
+ 	return 0;
+ }
+ 
+diff --git a/scripts/Makefile.gcc-plugins b/scripts/Makefile.gcc-plugins
+index 46c5c6809806..048179d8c07f 100644
+--- a/scripts/Makefile.gcc-plugins
++++ b/scripts/Makefile.gcc-plugins
+@@ -36,6 +36,12 @@ ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+ endif
+ export DISABLE_STACKLEAK_PLUGIN
+ 
++gcc-plugin-$(CONFIG_GCC_PLUGIN_ARM_SSP_PER_TASK) += arm_ssp_per_task_plugin.so
++ifdef CONFIG_GCC_PLUGIN_ARM_SSP_PER_TASK
++    DISABLE_ARM_SSP_PER_TASK_PLUGIN += -fplugin-arg-arm_ssp_per_task_plugin-disable
++endif
++export DISABLE_ARM_SSP_PER_TASK_PLUGIN
++
+ # All the plugin CFLAGS are collected here in case a build target needs to
+ # filter them out of the KBUILD_CFLAGS.
+ GCC_PLUGINS_CFLAGS := $(strip $(addprefix -fplugin=$(objtree)/scripts/gcc-plugins/, $(gcc-plugin-y)) $(gcc-plugin-cflags-y))
+diff --git a/scripts/gcc-plugins/Kconfig b/scripts/gcc-plugins/Kconfig
+index 0d5c799688f0..d45f7f36b859 100644
+--- a/scripts/gcc-plugins/Kconfig
++++ b/scripts/gcc-plugins/Kconfig
+@@ -190,4 +190,8 @@ config STACKLEAK_RUNTIME_DISABLE
+ 	  runtime to control kernel stack erasing for kernels built with
+ 	  CONFIG_GCC_PLUGIN_STACKLEAK.
+ 
++config GCC_PLUGIN_ARM_SSP_PER_TASK
++	bool
++	depends on GCC_PLUGINS && ARM
++
+ endif
+diff --git a/scripts/gcc-plugins/arm_ssp_per_task_plugin.c b/scripts/gcc-plugins/arm_ssp_per_task_plugin.c
+new file mode 100644
+index 000000000000..97d090e08b40
+--- /dev/null
++++ b/scripts/gcc-plugins/arm_ssp_per_task_plugin.c
+@@ -0,0 +1,78 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#include "gcc-common.h"
++
++/* TODO: wire these up to the .h files that define them */
++#define THREAD_SIZE			0x2000
++#define TI_STACK_CANARY_OFFSET		100
++
++__visible int plugin_is_GPL_compatible;
++
++static unsigned int arm_pertask_ssp_rtl_execute(void)
++{
++	rtx_insn *insn;
++
++	for (insn = get_insns(); insn; insn = NEXT_INSN(insn)) {
++		const char *sym;
++		rtx body;
++		rtx masked_sp;
++
++		/*
++		 * Find a SET insn involving a SYMBOL_REF to __stack_chk_guard
++		 */
++		if (!INSN_P(insn))
++			continue;
++		body = PATTERN(insn);
++		if (GET_CODE(body) != SET ||
++		    GET_CODE(SET_SRC(body)) != SYMBOL_REF)
++			continue;
++		sym = XSTR(SET_SRC(body), 0);
++		if (strcmp(sym, "__stack_chk_guard"))
++			continue;
++
++		/*
++		 * Replace the source of the SET insn with an expression that
++		 * produces the address of the copy of the stack canary value
++		 * stored in struct thread_info
++		 */
++		masked_sp = gen_reg_rtx(Pmode);
++
++		emit_insn_before(gen_rtx_SET(masked_sp,
++					     gen_rtx_AND(Pmode,
++							 stack_pointer_rtx,
++							 GEN_INT(~(THREAD_SIZE - 1)))),
++				 insn);
++
++		SET_SRC(body) = gen_rtx_PLUS(Pmode, masked_sp,
++					     GEN_INT(TI_STACK_CANARY_OFFSET));
++	}
++	return 0;
++}
++
++#define PASS_NAME arm_pertask_ssp_rtl
++
++#define NO_GATE
++#include "gcc-generate-rtl-pass.h"
++
++__visible int plugin_init(struct plugin_name_args *plugin_info,
++			  struct plugin_gcc_version *version)
++{
++	int i;
++
++	if (!plugin_default_version_check(version, &gcc_version)) {
++		error(G_("incompatible gcc/plugin versions"));
++		return 1;
++	}
++
++	for (i = 0; i < plugin_info->argc; i++) {
++		if (strcmp(plugin_info->argv[i].key, "disable") == 0)
++			return 0;
++	}
++
++	PASS_INFO(arm_pertask_ssp_rtl, "expand", 1, PASS_POS_INSERT_AFTER);
++
++	register_callback(plugin_info->base_name, PLUGIN_PASS_MANAGER_SETUP,
++			  NULL, &arm_pertask_ssp_rtl_pass_info);
++
++	return 0;
++}
+-- 
+2.19.1
