@@ -1,35 +1,52 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:26:51 +0100
-Subject: [PATCH v3 14/28] drm/bridge/synopsys: dw-hdmi: Enable workaround for
- v2.12a
+Date: Sun,  4 Nov 2018 19:26:50 +0100
+Subject: [PATCH v3 13/28] drm/sun4i: Add support for H6 DE3 mixer 0
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-15-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-14-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that even new DW HDMI controllers exhibits same magenta
-line issues as older versions.
-
-Enable workaround for v2.12a.
+Mixer 0 has 1 VI and 3 UI planes, scaler on all planes and can output
+4K image @60Hz. It also support 10 bit colors, which are not yet
+implemented.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 5971976284bf..df1c7a2d6961 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -1664,6 +1664,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
- 	case 0x131a:
- 	case 0x132a:
- 	case 0x201a:
-+	case 0x212a:
- 		count = 1;
- 		break;
- 	default:
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index ca402cf0f5ba..44a9ba7d8433 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -613,6 +613,15 @@ static const struct sun8i_mixer_cfg sun50i_a64_mixer1_cfg = {
+ 	.vi_num		= 1,
+ };
+ 
++static const struct sun8i_mixer_cfg sun50i_h6_mixer0_cfg = {
++	.ccsc		= 0,
++	.is_de3		= true,
++	.mod_rate	= 600000000,
++	.scaler_mask	= 0xf,
++	.ui_num		= 3,
++	.vi_num		= 1,
++};
++
+ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 	{
+ 		.compatible = "allwinner,sun8i-a83t-de2-mixer-0",
+@@ -646,6 +655,10 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 		.compatible = "allwinner,sun50i-a64-de2-mixer-1",
+ 		.data = &sun50i_a64_mixer1_cfg,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-h6-de3-mixer-0",
++		.data = &sun50i_h6_mixer0_cfg,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_mixer_of_table);
 -- 
 2.19.1
