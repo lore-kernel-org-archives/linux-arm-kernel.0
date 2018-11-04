@@ -1,197 +1,65 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:26:59 +0100
-Subject: [PATCH v3 22/28] drm/sun4i: Add support for H6 HDMI PHY
+Date: Sun,  4 Nov 2018 19:26:55 +0100
+Subject: [PATCH v3 18/28] dt-bindings: display: sunxi: add DT binding for
+ Allwinner H6 DW HDMI
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-23-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-19-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H6 has Synopsys DWC HDMI 2.0 TX PHY.
+From: Icenowy Zheng <icenowy@aosc.io>
 
-There is no freely available documentation for it, only code found in
-BSP kernel. However, judging by the code, PHY is very similar to older
-Synopsys HDMI PHY described in i.MX6 documentation. Most registers seem
-to be the same.
+The Allwinner H6 SoC uses a v2.12a DesignWare HDMI controller, with
+dedicated CEC and HDCP clocks added; the PHY connected is a standard
+DesignWare HDMI PHY.
 
-According to i.MX6 documentation, mpll settings are based on pixel clock
-and are not specific to each SoC. Because of that, mpll table in this
-commit is based on that documentation and not on BSP code. Other PHY
-settings were derived from BSP PHY driver code.
+Add binding for it.
 
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+[added HDCP clock and reset]
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 137 +++++++++++++++++++++++++
- 1 file changed, 137 insertions(+)
+ .../devicetree/bindings/display/sunxi/sun4i-drm.txt   | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 635825b55648..66ea3a902e36 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -14,6 +14,122 @@
-  */
- #define I2C_ADDR	0x69
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 62c83b351344..478b288eebd9 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -79,6 +79,7 @@ Required properties:
+   - compatible: value must be one of:
+     * "allwinner,sun8i-a83t-dw-hdmi"
+     * "allwinner,sun50i-a64-dw-hdmi", "allwinner,sun8i-a83t-dw-hdmi"
++    * "allwinner,sun50i-h6-dw-hdmi"
+   - reg: base address and size of memory-mapped region
+   - reg-io-width: See dw_hdmi.txt. Shall be 1.
+   - interrupts: HDMI interrupt number
+@@ -86,9 +87,14 @@ Required properties:
+     * iahb: the HDMI bus clock
+     * isfr: the HDMI register clock
+     * tmds: TMDS clock
++    * cec: HDMI CEC clock (H6 only)
++    * hdcp: HDCP clock (H6 only)
++    * hdcp-bus: HDCP bus clock (H6 only)
+   - clock-names: the clock names mentioned above
+-  - resets: phandle to the reset controller
+-  - reset-names: must be "ctrl"
++  - resets:
++    * ctrl: HDMI controller reset
++    * hdcp: HDCP reset (H6 only)
++  - reset-names: reset names mentioned above
+   - phys: phandle to the DWC HDMI PHY
+   - phy-names: must be "phy"
  
-+static const struct dw_hdmi_mpll_config sun50i_h6_mpll_cfg[] = {
-+	{
-+		30666000, {
-+			{ 0x00b3, 0x0000 },
-+			{ 0x2153, 0x0000 },
-+			{ 0x40f3, 0x0000 },
-+		},
-+	},  {
-+		36800000, {
-+			{ 0x00b3, 0x0000 },
-+			{ 0x2153, 0x0000 },
-+			{ 0x40a2, 0x0001 },
-+		},
-+	},  {
-+		46000000, {
-+			{ 0x00b3, 0x0000 },
-+			{ 0x2142, 0x0001 },
-+			{ 0x40a2, 0x0001 },
-+		},
-+	},  {
-+		61333000, {
-+			{ 0x0072, 0x0001 },
-+			{ 0x2142, 0x0001 },
-+			{ 0x40a2, 0x0001 },
-+		},
-+	},  {
-+		73600000, {
-+			{ 0x0072, 0x0001 },
-+			{ 0x2142, 0x0001 },
-+			{ 0x4061, 0x0002 },
-+		},
-+	},  {
-+		92000000, {
-+			{ 0x0072, 0x0001 },
-+			{ 0x2145, 0x0002 },
-+			{ 0x4061, 0x0002 },
-+		},
-+	},  {
-+		122666000, {
-+			{ 0x0051, 0x0002 },
-+			{ 0x2145, 0x0002 },
-+			{ 0x4061, 0x0002 },
-+		},
-+	},  {
-+		147200000, {
-+			{ 0x0051, 0x0002 },
-+			{ 0x2145, 0x0002 },
-+			{ 0x4064, 0x0003 },
-+		},
-+	},  {
-+		184000000, {
-+			{ 0x0051, 0x0002 },
-+			{ 0x214c, 0x0003 },
-+			{ 0x4064, 0x0003 },
-+		},
-+	},  {
-+		226666000, {
-+			{ 0x0040, 0x0003 },
-+			{ 0x214c, 0x0003 },
-+			{ 0x4064, 0x0003 },
-+		},
-+	},  {
-+		272000000, {
-+			{ 0x0040, 0x0003 },
-+			{ 0x214c, 0x0003 },
-+			{ 0x5a64, 0x0003 },
-+		},
-+	},  {
-+		340000000, {
-+			{ 0x0040, 0x0003 },
-+			{ 0x3b4c, 0x0003 },
-+			{ 0x5a64, 0x0003 },
-+		},
-+	},  {
-+		594000000, {
-+			{ 0x1a40, 0x0003 },
-+			{ 0x3b4c, 0x0003 },
-+			{ 0x5a64, 0x0003 },
-+		},
-+	}, {
-+		~0UL, {
-+			{ 0x0000, 0x0000 },
-+			{ 0x0000, 0x0000 },
-+			{ 0x0000, 0x0000 },
-+		},
-+	}
-+};
-+
-+static const struct dw_hdmi_curr_ctrl sun50i_h6_cur_ctr[] = {
-+	/* pixelclk    bpp8    bpp10   bpp12 */
-+	{ 25175000,  { 0x0000, 0x0000, 0x0000 }, },
-+	{ 27000000,  { 0x0012, 0x0000, 0x0000 }, },
-+	{ 59400000,  { 0x0008, 0x0008, 0x0008 }, },
-+	{ 72000000,  { 0x0008, 0x0008, 0x001b }, },
-+	{ 74250000,  { 0x0013, 0x0013, 0x0013 }, },
-+	{ 90000000,  { 0x0008, 0x001a, 0x001b }, },
-+	{ 118800000, { 0x001b, 0x001a, 0x001b }, },
-+	{ 144000000, { 0x001b, 0x001a, 0x0034 }, },
-+	{ 180000000, { 0x001b, 0x0033, 0x0034 }, },
-+	{ 216000000, { 0x0036, 0x0033, 0x0034 }, },
-+	{ 237600000, { 0x0036, 0x0033, 0x001b }, },
-+	{ 288000000, { 0x0036, 0x001b, 0x001b }, },
-+	{ 297000000, { 0x0019, 0x001b, 0x0019 }, },
-+	{ 330000000, { 0x0036, 0x001b, 0x001b }, },
-+	{ 594000000, { 0x003f, 0x001b, 0x001b }, },
-+	{ ~0UL,      { 0x0000, 0x0000, 0x0000 }, }
-+};
-+
-+static const struct dw_hdmi_phy_config sun50i_h6_phy_config[] = {
-+	/*pixelclk   symbol   term   vlev*/
-+	{ 74250000,  0x8009, 0x0004, 0x0232},
-+	{ 148500000, 0x8029, 0x0004, 0x0273},
-+	{ 594000000, 0x8039, 0x0004, 0x014a},
-+	{ ~0UL,	     0x0000, 0x0000, 0x0000}
-+};
-+
- static int sun8i_hdmi_phy_config_a83t(struct dw_hdmi *hdmi,
- 				      struct sun8i_hdmi_phy *phy,
- 				      unsigned int clk_rate)
-@@ -290,6 +406,16 @@ static void sun8i_hdmi_phy_unlock(struct sun8i_hdmi_phy *phy)
- 		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
- }
- 
-+static void sun50i_hdmi_phy_init_h6(struct sun8i_hdmi_phy *phy)
-+{
-+	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
-+			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
-+			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN);
-+
-+	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
-+			   0xffff0000, 0x80c00000);
-+}
-+
- static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
- {
- 	sun8i_hdmi_phy_unlock(phy);
-@@ -446,6 +572,13 @@ static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
- 	.phy_config = &sun8i_hdmi_phy_config_h3,
- };
- 
-+static const struct sun8i_hdmi_phy_variant sun50i_h6_hdmi_phy = {
-+	.cur_ctr  = sun50i_h6_cur_ctr,
-+	.mpll_cfg = sun50i_h6_mpll_cfg,
-+	.phy_cfg  = sun50i_h6_phy_config,
-+	.phy_init = &sun50i_hdmi_phy_init_h6,
-+};
-+
- static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
- 	{
- 		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
-@@ -463,6 +596,10 @@ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
- 		.compatible = "allwinner,sun50i-a64-hdmi-phy",
- 		.data = &sun50i_a64_hdmi_phy,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-h6-hdmi-phy",
-+		.data = &sun50i_h6_hdmi_phy,
-+	},
- 	{ /* sentinel */ }
- };
- 
+@@ -109,6 +115,7 @@ Required properties:
+     * allwinner,sun8i-h3-hdmi-phy
+     * allwinner,sun8i-r40-hdmi-phy
+     * allwinner,sun50i-a64-hdmi-phy
++    * allwinner,sun50i-h6-hdmi-phy
+   - reg: base address and size of memory-mapped region
+   - clocks: phandles to the clocks feeding the HDMI PHY
+     * bus: the HDMI PHY interface clock
 -- 
 2.19.1
