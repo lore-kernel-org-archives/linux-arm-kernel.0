@@ -1,30 +1,56 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 4 Nov 2018 15:39:54 +0100
-Subject: [PATCH 15/15] power: supply: olpc_battery: Add OLPC XO 1.75
- support
-In-Reply-To: <20181010172300.317643-16-lkundrak@v3.sk>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-16-lkundrak@v3.sk>
-Message-ID: <20181104143954.GH23864@amd>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 4 Nov 2018 22:46:16 +0800
+Subject: [PATCH] ARM: dts: i.MX25: add the clocks for the EPIT blocks
+In-Reply-To: <1541093567-29205-1-git-send-email-martin@kaiser.cx>
+References: <1541093567-29205-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20181104144614.GJ26016@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-10-10 19:23:00, Lubomir Rintel wrote:
-> The battery and the protocol are essentially the same as OLPC XO 1.5,
-> but the responses from the EC are LSB first.
+On Thu, Nov 01, 2018 at 06:32:47PM +0100, Martin Kaiser wrote:
+> The i.MX25 contains two EPIT (Enhanced Periodic Interrupt Timer)
+> function blocks. Add their ipg and per clocks to the device tree.
 > 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+Are these EPIT devices actually used in upstream kernel, or just
+somewhere else?
 
+Shawn
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181104/49ccdc67/attachment.sig>
+> ---
+> 
+> I tried to make this similar to gpt1 and gpt2.
+> 
+>  arch/arm/boot/dts/imx25.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index b25309d26ea5..e80101847aff 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -388,12 +388,16 @@
+>  			epit1: timer at 53f94000 {
+>  				compatible = "fsl,imx25-epit";
+>  				reg = <0x53f94000 0x4000>;
+> +				clocks = <&clks 83>, <&clks 43>;
+> +				clock-names = "ipg", "per";
+>  				interrupts = <28>;
+>  			};
+>  
+>  			epit2: timer at 53f98000 {
+>  				compatible = "fsl,imx25-epit";
+>  				reg = <0x53f98000 0x4000>;
+> +				clocks = <&clks 84>, <&clks 43>;
+> +				clock-names = "ipg", "per";
+>  				interrupts = <27>;
+>  			};
+>  
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
