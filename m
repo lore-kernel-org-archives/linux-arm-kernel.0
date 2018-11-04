@@ -1,46 +1,110 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:26:41 +0100
-Subject: [PATCH v3 04/28] clk: sunxi-ng: h6: Set video PLLs limits
+Date: Sun,  4 Nov 2018 19:26:39 +0100
+Subject: [PATCH v3 02/28] clk: sunxi-ng: Adjust MP clock parent rate when
+ allowed
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-5-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Video PLL factors can be set in a way that final PLL rate is outside
-stable range. H6 user manual specifically says that N factor should not
-be below 12. While it doesn't says anything about maximum stable rate, it
-is clear that PLL doesn't work at 6.096 GHz (254 * 24 MHz).
+Currently MP clocks don't consider adjusting parent rate even if they
+are allowed to do so. Such behaviour considerably lowers amount of
+possible rates, which is very inconvenient when such clock is used for
+pixel clock, for example.
 
-Set minimum allowed PLL video rate to 288 MHz (12 * 24 MHz) and maximum
-to 2.4 GHz, which is maximum in BSP driver.
+In order to improve the situation, adjusting parent rate is considered
+when allowed.
+
+This code is inspired by clk_divider_bestdiv() function, which does
+basically the same thing for different clock type.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/clk/sunxi-ng/ccu_mp.c | 64 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 62 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-index 2193e1495086..19ff09f610e4 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-@@ -120,6 +120,8 @@ static struct ccu_nm pll_video0_clk = {
- 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
- 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
- 	.fixed_post_div	= 4,
-+	.min_rate	= 288000000,
-+	.max_rate	= 2400000000UL,
- 	.common		= {
- 		.reg		= 0x040,
- 		.features	= CCU_FEATURE_FIXED_POSTDIV,
-@@ -136,6 +138,8 @@ static struct ccu_nm pll_video1_clk = {
- 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
- 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
- 	.fixed_post_div	= 4,
-+	.min_rate	= 288000000,
-+	.max_rate	= 2400000000UL,
- 	.common		= {
- 		.reg		= 0x048,
- 		.features	= CCU_FEATURE_FIXED_POSTDIV,
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+index 5d0af4051737..0357349eb767 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.c
++++ b/drivers/clk/sunxi-ng/ccu_mp.c
+@@ -40,6 +40,61 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
+ 	*p = best_p;
+ }
+ 
++static unsigned long ccu_mp_find_best_with_parent_adj(struct clk_hw *hw,
++						      unsigned long *parent,
++						      unsigned long rate,
++						      unsigned int max_m,
++						      unsigned int max_p)
++{
++	unsigned long parent_rate_saved;
++	unsigned long parent_rate, now;
++	unsigned long best_rate = 0;
++	unsigned int _m, _p, div;
++	unsigned long maxdiv;
++
++	parent_rate_saved = *parent;
++
++	/*
++	 * The maximum divider we can use without overflowing
++	 * unsigned long in rate * m * p below
++	 */
++	maxdiv = max_m * max_p;
++	maxdiv = min(ULONG_MAX / rate, maxdiv);
++
++	for (_p = 1; _p <= max_p; _p <<= 1) {
++		for (_m = 1; _m <= max_m; _m++) {
++			div = _m * _p;
++
++			if (div > maxdiv)
++				break;
++
++			if (rate * div == parent_rate_saved) {
++				/*
++				 * It's the most ideal case if the requested
++				 * rate can be divided from parent clock without
++				 * needing to change parent rate, so return the
++				 * divider immediately.
++				 */
++				*parent = parent_rate_saved;
++				return rate;
++			}
++
++			parent_rate = clk_hw_round_rate(hw, rate * div);
++			now = parent_rate / div;
++
++			if (now <= rate && now > best_rate) {
++				best_rate = now;
++				*parent = parent_rate;
++
++				if (now == rate)
++					return rate;
++			}
++		}
++	}
++
++	return best_rate;
++}
++
+ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+ 				       struct clk_hw *hw,
+ 				       unsigned long *parent_rate,
+@@ -56,8 +111,13 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+ 	max_m = cmp->m.max ?: 1 << cmp->m.width;
+ 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ 
+-	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
+-	rate = *parent_rate / p / m;
++	if (!(clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT)) {
++		ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
++		rate = *parent_rate / p / m;
++	} else {
++		rate = ccu_mp_find_best_with_parent_adj(hw, parent_rate, rate,
++							max_m, max_p);
++	}
+ 
+ 	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate /= cmp->fixed_post_div;
 -- 
 2.19.1
