@@ -1,75 +1,35 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:26:52 +0100
-Subject: [PATCH v3 15/28] drm/sun4i: Not all DW HDMI controllers has scrambled
- addresses
+Date: Sun,  4 Nov 2018 19:26:51 +0100
+Subject: [PATCH v3 14/28] drm/bridge/synopsys: dw-hdmi: Enable workaround for
+ v2.12a
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-16-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-15-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently supported Allwinner SoCs with DW HDMI controller have
-scrambled addresses and read lock. However, that is not true in general.
-For example, A80 and H6 have normal addresses and normal read access.
+It turns out that even new DW HDMI controllers exhibits same magenta
+line issues as older versions.
 
-Move code for unscrambling addresses and unlocking read access to it's
-own function and call it from init function.
+Enable workaround for v2.12a.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 471993097ced..365cb5a9fb77 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -279,8 +279,21 @@ static const struct dw_hdmi_phy_ops sun8i_hdmi_phy_ops = {
- 	.setup_hpd = &dw_hdmi_phy_setup_hpd,
- };
- 
-+static void sun8i_hdmi_phy_unlock(struct sun8i_hdmi_phy *phy)
-+{
-+	/* enable read access to HDMI controller */
-+	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
-+		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
-+
-+	/* unscramble register offsets */
-+	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
-+		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
-+}
-+
- static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
- {
-+	sun8i_hdmi_phy_unlock(phy);
-+
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
- 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK,
- 			   SUN8I_HDMI_PHY_DBG_CTRL_PX_LOCK);
-@@ -298,6 +311,8 @@ static void sun8i_hdmi_phy_init_h3(struct sun8i_hdmi_phy *phy)
- {
- 	unsigned int val;
- 
-+	sun8i_hdmi_phy_unlock(phy);
-+
- 	regmap_write(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG, 0);
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG,
- 			   SUN8I_HDMI_PHY_ANA_CFG1_ENBI,
-@@ -372,14 +387,6 @@ static void sun8i_hdmi_phy_init_h3(struct sun8i_hdmi_phy *phy)
- 
- void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
- {
--	/* enable read access to HDMI controller */
--	regmap_write(phy->regs, SUN8I_HDMI_PHY_READ_EN_REG,
--		     SUN8I_HDMI_PHY_READ_EN_MAGIC);
--
--	/* unscramble register offsets */
--	regmap_write(phy->regs, SUN8I_HDMI_PHY_UNSCRAMBLE_REG,
--		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
--
- 	phy->variant->phy_init(phy);
- }
- 
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index 5971976284bf..df1c7a2d6961 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1664,6 +1664,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+ 	case 0x131a:
+ 	case 0x132a:
+ 	case 0x201a:
++	case 0x212a:
+ 		count = 1;
+ 		break;
+ 	default:
 -- 
 2.19.1
