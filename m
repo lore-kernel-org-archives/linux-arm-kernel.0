@@ -1,109 +1,70 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:27:01 +0100
-Subject: [PATCH v3 24/28] drm: sun4i: add quirks for TCON TOP
+Date: Sun,  4 Nov 2018 19:26:57 +0100
+Subject: [PATCH v3 20/28] drm/sun4i: dw-hdmi-phy: Reorder quirks by family
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-25-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-21-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+Currently, quirks and compatibles are sorted alphabetically. However,
+they should be sorted by family release date and then alphabetically.
 
-Some SoCs, such as H6, doesn't have a full-featured TCON TOP.
+Fix that by moving A64 quirks and compatible to bottom. No functional
+change is made.
 
-Add quirks support for TCON TOP.
-
-Currently the presence of TCON_TV1 and DSI is controlled via the quirks
-structure.
-
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-[Fixed code style and removed unnecessary initialization]
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 37 +++++++++++++++++++-------
- 1 file changed, 28 insertions(+), 9 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-index 37158548b447..e94e3fb1736b 100644
---- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-@@ -9,11 +9,17 @@
- #include <linux/component.h>
- #include <linux/device.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/platform_device.h>
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 365cb5a9fb77..adc3ba7df7e3 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -403,13 +403,6 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+ 	.name		= "phy"
+ };
  
- #include "sun8i_tcon_top.h"
+-static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
+-	.has_phy_clk = true,
+-	.phy_init = &sun8i_hdmi_phy_init_h3,
+-	.phy_disable = &sun8i_hdmi_phy_disable_h3,
+-	.phy_config = &sun8i_hdmi_phy_config_h3,
+-};
+-
+ static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
+ 	.phy_init = &sun8i_hdmi_phy_init_a83t,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
+@@ -431,11 +424,14 @@ static const struct sun8i_hdmi_phy_variant sun8i_r40_hdmi_phy = {
+ 	.phy_config = &sun8i_hdmi_phy_config_h3,
+ };
  
-+struct sun8i_tcon_top_quirks {
-+	bool has_tcon_tv1;
-+	bool has_dsi;
++static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
++	.has_phy_clk = true,
++	.phy_init = &sun8i_hdmi_phy_init_h3,
++	.phy_disable = &sun8i_hdmi_phy_disable_h3,
++	.phy_config = &sun8i_hdmi_phy_config_h3,
 +};
 +
- static bool sun8i_tcon_top_node_is_tcon_top(struct device_node *node)
- {
- 	return !!of_match_node(sun8i_tcon_top_of_table, node);
-@@ -121,10 +127,13 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct clk_hw_onecell_data *clk_data;
- 	struct sun8i_tcon_top *tcon_top;
-+	const struct sun8i_tcon_top_quirks *quirks;
- 	struct resource *res;
- 	void __iomem *regs;
- 	int ret, i;
- 
-+	quirks = of_device_get_match_data(&pdev->dev);
-+
- 	tcon_top = devm_kzalloc(dev, sizeof(*tcon_top), GFP_KERNEL);
- 	if (!tcon_top)
- 		return -ENOMEM;
-@@ -187,15 +196,17 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
- 					     &tcon_top->reg_lock,
- 					     TCON_TOP_TCON_TV0_GATE, 0);
- 
--	clk_data->hws[CLK_TCON_TOP_TV1] =
--		sun8i_tcon_top_register_gate(dev, "tcon-tv1", regs,
--					     &tcon_top->reg_lock,
--					     TCON_TOP_TCON_TV1_GATE, 1);
-+	if (quirks->has_tcon_tv1)
-+		clk_data->hws[CLK_TCON_TOP_TV1] =
-+			sun8i_tcon_top_register_gate(dev, "tcon-tv1", regs,
-+						     &tcon_top->reg_lock,
-+						     TCON_TOP_TCON_TV1_GATE, 1);
- 
--	clk_data->hws[CLK_TCON_TOP_DSI] =
--		sun8i_tcon_top_register_gate(dev, "dsi", regs,
--					     &tcon_top->reg_lock,
--					     TCON_TOP_TCON_DSI_GATE, 2);
-+	if (quirks->has_dsi)
-+		clk_data->hws[CLK_TCON_TOP_DSI] =
-+			sun8i_tcon_top_register_gate(dev, "dsi", regs,
-+						     &tcon_top->reg_lock,
-+						     TCON_TOP_TCON_DSI_GATE, 2);
- 
- 	for (i = 0; i < CLK_NUM; i++)
- 		if (IS_ERR(clk_data->hws[i])) {
-@@ -257,9 +268,17 @@ static int sun8i_tcon_top_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+const struct sun8i_tcon_top_quirks sun8i_r40_tcon_top_quirks = {
-+	.has_tcon_tv1	= true,
-+	.has_dsi	= true,
-+};
-+
- /* sun4i_drv uses this list to check if a device node is a TCON TOP */
- const struct of_device_id sun8i_tcon_top_of_table[] = {
--	{ .compatible = "allwinner,sun8i-r40-tcon-top" },
+ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
+-	{
+-		.compatible = "allwinner,sun50i-a64-hdmi-phy",
+-		.data = &sun50i_a64_hdmi_phy,
+-	},
+ 	{
+ 		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
+ 		.data = &sun8i_a83t_hdmi_phy,
+@@ -448,6 +444,10 @@ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
+ 		.compatible = "allwinner,sun8i-r40-hdmi-phy",
+ 		.data = &sun8i_r40_hdmi_phy,
+ 	},
 +	{
-+		.compatible = "allwinner,sun8i-r40-tcon-top",
-+		.data = &sun8i_r40_tcon_top_quirks
++		.compatible = "allwinner,sun50i-a64-hdmi-phy",
++		.data = &sun50i_a64_hdmi_phy,
 +	},
  	{ /* sentinel */ }
  };
- MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
+ 
 -- 
 2.19.1
