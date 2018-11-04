@@ -1,40 +1,128 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:27:00 +0100
-Subject: [PATCH v3 23/28] drm/sun4i: Initialize registers in tcon-top driver
+Date: Sun,  4 Nov 2018 19:26:58 +0100
+Subject: [PATCH v3 21/28] drm/sun4i: Add support for Synopsys HDMI PHY
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-24-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-22-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that TCON TOP registers in H6 SoC have non-zero reset
-value. This may cause issues if bits are not changed during
-configuration.
+Currently sun8i-hdmi-phy driver supports only custom PHYs connected to
+DW HDMI controller. Since newest Allwinner SoCs have unmodified Synopsys
+PHY, driver has to be reorganized to support them.
 
-To prevent that, initialize registers to 0.
+Variant structure is expanded to allow differentiation between custom
+and Sysnopsys PHYs and to hold Synopsys PHY settings.
+
+Since DW HDMI bridge platform data has different fields for custom and
+Sysnopsys PHY, function sun8i_hdmi_phy_get_ops() is replaced with
+sun8i_hdmi_phy_set_ops().
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c  |  4 +---
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h  |  7 ++++++-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 19 +++++++++++++++++--
+ 3 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-index 3040a79f298f..37158548b447 100644
---- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-@@ -167,6 +167,13 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
- 		goto err_assert_reset;
- 	}
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 445cca8d9a26..dc47720c99ba 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -184,9 +184,7 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 	sun8i_hdmi_phy_init(hdmi->phy);
  
-+	/*
-+	 * At least on H6, some registers have some bits set by default
-+	 * which may cause issues. Clear them here.
-+	 */
-+	writel(0, regs + TCON_TOP_PORT_SEL_REG);
-+	writel(0, regs + TCON_TOP_GATE_SRC_REG);
+ 	plat_data->mode_valid = hdmi->quirks->mode_valid;
+-	plat_data->phy_ops = sun8i_hdmi_phy_get_ops();
+-	plat_data->phy_name = "sun8i_dw_hdmi_phy";
+-	plat_data->phy_data = hdmi->phy;
++	sun8i_hdmi_phy_set_ops(hdmi->phy, plat_data);
+ 
+ 	platform_set_drvdata(pdev, hdmi);
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+index 49c9e80c46ea..720c5aa8adc1 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+@@ -150,6 +150,10 @@ struct sun8i_hdmi_phy;
+ struct sun8i_hdmi_phy_variant {
+ 	bool has_phy_clk;
+ 	bool has_second_pll;
++	unsigned int is_custom_phy : 1;
++	const struct dw_hdmi_curr_ctrl *cur_ctr;
++	const struct dw_hdmi_mpll_config *mpll_cfg;
++	const struct dw_hdmi_phy_config *phy_cfg;
+ 	void (*phy_init)(struct sun8i_hdmi_phy *phy);
+ 	void (*phy_disable)(struct dw_hdmi *hdmi,
+ 			    struct sun8i_hdmi_phy *phy);
+@@ -198,7 +202,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node);
+ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi);
+ 
+ void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy);
+-const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void);
++void sun8i_hdmi_phy_set_ops(struct sun8i_hdmi_phy *phy,
++			    struct dw_hdmi_plat_data *plat_data);
+ 
+ int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
+ 			 bool second_parent);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index adc3ba7df7e3..635825b55648 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -390,9 +390,20 @@ void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
+ 	phy->variant->phy_init(phy);
+ }
+ 
+-const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void)
++void sun8i_hdmi_phy_set_ops(struct sun8i_hdmi_phy *phy,
++			    struct dw_hdmi_plat_data *plat_data)
+ {
+-	return &sun8i_hdmi_phy_ops;
++	struct sun8i_hdmi_phy_variant *variant = phy->variant;
 +
- 	/*
- 	 * TCON TOP has two muxes, which select parent clock for each TCON TV
- 	 * channel clock. Parent could be either TCON TV or TVE clock. For now
++	if (variant->is_custom_phy) {
++		plat_data->phy_ops = &sun8i_hdmi_phy_ops;
++		plat_data->phy_name = "sun8i_dw_hdmi_phy";
++		plat_data->phy_data = phy;
++	} else {
++		plat_data->mpll_cfg = variant->mpll_cfg;
++		plat_data->cur_ctr = variant->cur_ctr;
++		plat_data->phy_config = variant->phy_cfg;
++	}
+ }
+ 
+ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+@@ -404,6 +415,7 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+ };
+ 
+ static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
++	.is_custom_phy = true,
+ 	.phy_init = &sun8i_hdmi_phy_init_a83t,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
+ 	.phy_config = &sun8i_hdmi_phy_config_a83t,
+@@ -411,6 +423,7 @@ static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
+ 
+ static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
+ 	.has_phy_clk = true,
++	.is_custom_phy = true,
+ 	.phy_init = &sun8i_hdmi_phy_init_h3,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_h3,
+ 	.phy_config = &sun8i_hdmi_phy_config_h3,
+@@ -419,6 +432,7 @@ static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
+ static const struct sun8i_hdmi_phy_variant sun8i_r40_hdmi_phy = {
+ 	.has_phy_clk = true,
+ 	.has_second_pll = true,
++	.is_custom_phy = true,
+ 	.phy_init = &sun8i_hdmi_phy_init_h3,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_h3,
+ 	.phy_config = &sun8i_hdmi_phy_config_h3,
+@@ -426,6 +440,7 @@ static const struct sun8i_hdmi_phy_variant sun8i_r40_hdmi_phy = {
+ 
+ static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
+ 	.has_phy_clk = true,
++	.is_custom_phy = true,
+ 	.phy_init = &sun8i_hdmi_phy_init_h3,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_h3,
+ 	.phy_config = &sun8i_hdmi_phy_config_h3,
 -- 
 2.19.1
