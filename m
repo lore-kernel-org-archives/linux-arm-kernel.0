@@ -1,28 +1,90 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 4 Nov 2018 22:37:39 +0800
-Subject: [PATCH v2] ARM: dts: fsl: Fix improperly quoted stdout-path values
-In-Reply-To: <20181031010230.6723-1-robh@kernel.org>
-References: <20181031010230.6723-1-robh@kernel.org>
-Message-ID: <20181104143738.GI26016@tiger>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 4 Nov 2018 15:37:43 +0100
+Subject: [PATCH 13/15] power: supply: olpc_battery: Move priv data to a
+ struct
+In-Reply-To: <20181010172300.317643-14-lkundrak@v3.sk>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-14-lkundrak@v3.sk>
+Message-ID: <20181104143743.GF23864@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 08:02:30PM -0500, Rob Herring wrote:
-> A quoted label reference doesn't expand to the node path and is taken as
-> a literal string. Dropping the quotes can fix this unless the baudrate
-> string is appended in which case we have to use the alias.
-> 
-> At least on VF610, the problem was masked by setting the console in
-> bootargs. Use the alias syntax with baudrate parameter so we can drop
-> setting the console in bootargs.
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-> Cc: NXP Linux Team <linux-imx@nxp.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Fabio Estevam <festevam@gmail.com>
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Hi!
 
-Applied, thanks.
+> The global variables for private data are not too nice. I'd like some
+> more, and that would clutter the global name space even further.
+> 
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+
+Ok...
+
+> -	olpc_bat = power_supply_register(&pdev->dev, &olpc_bat_desc, NULL);
+> -	if (IS_ERR(olpc_bat)) {
+> -		ret = PTR_ERR(olpc_bat);
+> -		goto battery_failed;
+> -	}
+> +	data->olpc_bat = devm_power_supply_register(&pdev->dev, &olpc_bat_desc, &psy_cfg);
+> +	if (IS_ERR(data->olpc_bat))
+> +		return PTR_ERR(data->olpc_bat);
+>  
+> -	ret = device_create_bin_file(&olpc_bat->dev, &olpc_bat_eeprom);
+> +	ret = device_create_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
+>  	if (ret)
+> -		goto eeprom_failed;
+> +		return ret;
+>  
+> -	ret = device_create_file(&olpc_bat->dev, &olpc_bat_error);
+> +	ret = device_create_file(&data->olpc_bat->dev, &olpc_bat_error);
+>  	if (ret)
+>  		goto error_failed;
+>  
+>  	if (olpc_ec_wakeup_available()) {
+> -		device_set_wakeup_capable(&olpc_ac->dev, true);
+> -		device_set_wakeup_capable(&olpc_bat->dev, true);
+> +		device_set_wakeup_capable(&data->olpc_ac->dev, true);
+> +		device_set_wakeup_capable(&data->olpc_bat->dev, true);
+>  	}
+>  
+>  	return 0;
+>  
+>  error_failed:
+> -	device_remove_bin_file(&olpc_bat->dev, &olpc_bat_eeprom);
+> -eeprom_failed:
+> -	power_supply_unregister(olpc_bat);
+> -battery_failed:
+> -	power_supply_unregister(olpc_ac);
+> +	device_remove_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
+>  	return ret;
+>  }
+
+...but you are changing error handling here, which is not mentioned in
+the changelog, and I'm nut sure you got it right.
+
+Are you sure?
+
+>  static int olpc_battery_remove(struct platform_device *pdev)
+>  {
+> -	device_remove_file(&olpc_bat->dev, &olpc_bat_error);
+> -	device_remove_bin_file(&olpc_bat->dev, &olpc_bat_eeprom);
+> -	power_supply_unregister(olpc_bat);
+> -	power_supply_unregister(olpc_ac);
+> +	struct olpc_battery_data *data = platform_get_drvdata(pdev);
+> +
+> +	device_remove_file(&data->olpc_bat->dev, &olpc_bat_error);
+> +	device_remove_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
+>  	return 0;
+>  }
+
+Here too.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181104/c6262847/attachment.sig>
