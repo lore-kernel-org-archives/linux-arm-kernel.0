@@ -1,62 +1,50 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Sun, 4 Nov 2018 17:57:13 +0000
-Subject: [linux-sunxi] [PATCH 01/10] drm/sun4i: sun6i_mipi_dsi: Compute
- burst mode loop N1 instruction delay
-In-Reply-To: <20181103100900.30313-2-jagan@amarulasolutions.com>
-References: <20181103100900.30313-1-jagan@amarulasolutions.com>
- <20181103100900.30313-2-jagan@amarulasolutions.com>
-Message-ID: <20181104175713.cpiygzkq2tw2ygwk@plaes.org>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Sun,  4 Nov 2018 19:26:38 +0100
+Subject: [PATCH v3 01/28] dt-bindings: bus: add H6 DE3 bus binding
+In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
+References: <20181104182705.18047-1-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-2-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 03, 2018 at 03:38:51PM +0530, Jagan Teki wrote:
-> Loop N1 instruction delay for burst mode lcd panel are
-> computed as per BSP code.
-> 
-> Reference code is available in BSP
-> (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> dsi_dev[sel]->dsi_inst_loop_num.bits.loop_n1=
-> (panel->lcd_ht-panel->lcd_x)*(150)/(panel->lcd_dclk_freq*8) - 50;
-> => (((mode->htotal - mode->hdisplay) * 150) / ((mode->clock / 1000) * 8)) - 50;
-> 
-> So use the similar computation for loop N1 delay.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 86430efd9054..da152c21ec62 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -394,7 +394,14 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
->  static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
->  				      struct drm_display_mode *mode)
->  {
-> -	u16 delay = 50 - 1;
-> +	struct mipi_dsi_device *device = dsi->device;
-> +	u16 delay;
-> +
-> +	if (device->mode_flags == MIPI_DSI_MODE_VIDEO_BURST)
+From: Icenowy Zheng <icenowy@aosc.io>
 
-This looks fishy, as mode_flags is supposedly bitfield.
+The Allwinner H6 DE3 bus is similar to the A64 DE2 one.
 
-I guess you actually want mode_flags & MIPI_DSI_MODE_VIDEO_BURST. Other
-patches are also affected by this.
+Add its compatible string with the A64 string as fallback to the
+binding.
 
+Some description of the binding is modified to make it more generic.
 
-> +		delay = (((mode->htotal - mode->hdisplay) * 150) /
-> +			((mode->clock / 1000) * 8)) - 50;
-> +	else
-> +		delay = 50 - 1;
->  
->  	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_NUM_REG(0),
->  		     SUN6I_DSI_INST_LOOP_NUM_N0(50 - 1) |
-> -- 
-> 2.18.0.321.gffc6fa0e3
-> 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+[Fixed compatible name]
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+index 87dfb33fb3be..b9d533717dff 100644
+--- a/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
++++ b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+@@ -1,11 +1,14 @@
+-Device tree bindings for Allwinner A64 DE2 bus
++Device tree bindings for Allwinner DE2/3 bus
+ 
+ The Allwinner A64 DE2 is on a special bus, which needs a SRAM region (SRAM C)
+-to be claimed for enabling the access.
++to be claimed for enabling the access. The DE3 on Allwinner H6 is at the same
++situation, and the binding also applies.
+ 
+ Required properties:
+ 
+- - compatible:		Should contain "allwinner,sun50i-a64-de2"
++ - compatible:		Should be one of:
++				- "allwinner,sun50i-a64-de2"
++				- "allwinner,sun50i-h6-de3", "allwinner,sun50i-a64-de2"
+  - reg:			A resource specifier for the register space
+  - #address-cells:	Must be set to 1
+  - #size-cells:		Must be set to 1
+-- 
+2.19.1
