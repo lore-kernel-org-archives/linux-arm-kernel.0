@@ -1,56 +1,115 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 4 Nov 2018 22:46:16 +0800
-Subject: [PATCH] ARM: dts: i.MX25: add the clocks for the EPIT blocks
-In-Reply-To: <1541093567-29205-1-git-send-email-martin@kaiser.cx>
-References: <1541093567-29205-1-git-send-email-martin@kaiser.cx>
-Message-ID: <20181104144614.GJ26016@tiger>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Sun, 4 Nov 2018 23:12:17 +0800
+Subject: [PATCH v6 1/3] clk: meson: add emmc sub clock phase delay driver
+In-Reply-To: <154130056376.88331.17004780065573288593@swboyd.mtv.corp.google.com>
+References: <1541089855-19356-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541089855-19356-2-git-send-email-jianxin.pan@amlogic.com>
+ <154130056376.88331.17004780065573288593@swboyd.mtv.corp.google.com>
+Message-ID: <efb9f8e2-8937-2a0a-6f13-2c4ed66fd6e4@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2018 at 06:32:47PM +0100, Martin Kaiser wrote:
-> The i.MX25 contains two EPIT (Enhanced Periodic Interrupt Timer)
-> function blocks. Add their ipg and per clocks to the device tree.
-> 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+Hi Stephen,
 
-Are these EPIT devices actually used in upstream kernel, or just
-somewhere else?
+Thanks for your review. 
+Please see me comments below.
 
-Shawn
-
-> ---
+On 2018/11/4 11:02, Stephen Boyd wrote:
+> Quoting Jianxin Pan (2018-11-01 09:30:53)
+>> diff --git a/drivers/clk/meson/clk-phase-delay.c b/drivers/clk/meson/clk-phase-delay.c
+>> new file mode 100644
+>> index 0000000..83e74ed
+>> --- /dev/null
+>> +++ b/drivers/clk/meson/clk-phase-delay.c
+>> @@ -0,0 +1,66 @@
+>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>> +/*
+>> + * Amlogic Meson MMC Sub Clock Controller Driver
+>> + *
+>> + * Copyright (c) 2017 Baylibre SAS.
+>> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+>> + *
+>> + * Copyright (c) 2018 Amlogic, inc.
+>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
+>> + * Author: Jianxin Pan <jianxin.pan@amlogic.com>
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include "clkc.h"
+>> +
+>> +static int meson_clk_phase_delay_get_phase(struct clk_hw *hw)
+>> +{
+>> +       struct clk_regmap *clk = to_clk_regmap(hw);
+>> +       struct meson_clk_phase_delay_data *ph =
+>> +               meson_clk_get_phase_delay_data(clk);
 > 
-> I tried to make this similar to gpt1 and gpt2.
+> Nitpick: Do this after declaring variables because it splits a line.
+OK. I will split the assignment into another line. Thank you.
 > 
->  arch/arm/boot/dts/imx25.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+>> +       unsigned long period_ps, p, d;
+>> +       int degrees;
+>> +
+>> +       p = meson_parm_read(clk->map, &ph->phase);
+>> +       degrees = p * 360 / (1 << (ph->phase.width));
 > 
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index b25309d26ea5..e80101847aff 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -388,12 +388,16 @@
->  			epit1: timer at 53f94000 {
->  				compatible = "fsl,imx25-epit";
->  				reg = <0x53f94000 0x4000>;
-> +				clocks = <&clks 83>, <&clks 43>;
-> +				clock-names = "ipg", "per";
->  				interrupts = <28>;
->  			};
->  
->  			epit2: timer at 53f98000 {
->  				compatible = "fsl,imx25-epit";
->  				reg = <0x53f98000 0x4000>;
-> +				clocks = <&clks 84>, <&clks 43>;
-> +				clock-names = "ipg", "per";
->  				interrupts = <27>;
->  			};
->  
-> -- 
-> 2.1.4
+> Nitpick: Remove useless parenthesis.
+OK. I will remove them.
 > 
+>> +
+>> +       period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Is the cast necessary?
+Yes, the cast can be droped. NSEC_PER_SEC is already defined wit type long.
+> 
+>> +                                clk_hw_get_rate(hw));
+>> +
+>> +       d = meson_parm_read(clk->map, &ph->delay);
+>> +       degrees += d * ph->delay_step_ps * 360 / period_ps;
+>> +       degrees %= 360;
+>> +
+>> +       return degrees;
+>> +}
+>> +
+>> +static int meson_clk_phase_delay_set_phase(struct clk_hw *hw, int degrees)
+>> +{
+>> +       struct clk_regmap *clk = to_clk_regmap(hw);
+>> +       struct meson_clk_phase_delay_data *ph =
+>> +               meson_clk_get_phase_delay_data(clk);
+>> +       unsigned long period_ps, d = 0, r;
+>> +       u64 p;
+>> +
+>> +       p = degrees % 360;
+> 
+> We don't allow phase to be larger than 360 so this isn't needed.
+OK, Thank you.
+> 
+>> +       period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
+> 
+> Drop the cast?
+OK.
+> 
+>> +                                clk_hw_get_rate(hw));
+>> +
+>> +       /* First compute the phase index (p), the remainder (r) is the
+> 
+> Nitpick: Please leave /* on it's own line.
+OK.
+> 
+>> +        * part we'll try to acheive using the delays (d).
+>> +        */
+>> +       r = do_div(p, 360 / (1 << (ph->phase.width)));
+> 
+> Drop useless parenthesis please.
+OK, I will fix it. Thank you.
+> 
+>> +       d = DIV_ROUND_CLOSEST(r * period_ps,
+>> +                             360 * ph->delay_step_ps);
+>> +       d = min(d, PMASK(ph->delay.width));
+>> +
+>> +       meson_parm_write(clk->map, &ph->phase, p);
+>> +       meson_parm_write(clk->map, &ph->delay, d);
+>> +       return 0;
+>> +}
+> 
+> .
+> 
