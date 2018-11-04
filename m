@@ -1,76 +1,147 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 4 Nov 2018 13:37:10 +0100
-Subject: [PATCH 12/15] power: supply: olpc_battery: Use DT to get battery
- version
-In-Reply-To: <20181010172300.317643-13-lkundrak@v3.sk>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-13-lkundrak@v3.sk>
-Message-ID: <20181104123710.GE23864@amd>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 4 Nov 2018 22:26:51 +0800
+Subject: [PATCH V2 3/3] ARM: dts: sabreauto: Add flexcan support
+In-Reply-To: <20181030083954.26440-4-qiangqing.zhang@nxp.com>
+References: <20181030083954.26440-1-qiangqing.zhang@nxp.com>
+ <20181030083954.26440-4-qiangqing.zhang@nxp.com>
+Message-ID: <20181104142647.GH26016@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-10-10 19:22:57, Lubomir Rintel wrote:
-> Avoid using the x86 OLPC platform specific call to get the board
-> version. It won't work on FDT-based ARM MMP2 platform.
+On Tue, Oct 30, 2018 at 08:42:47AM +0000, Joakim Zhang wrote:
+> From: Dong Aisheng <aisheng.dong@nxp.com>
 > 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> The flexcan1 is pin conflict with fec. So we add a new dts file with
+> flexcan1 enabled with fec disabled for user to use.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Signed-off-by: Joakim Zhang <qiangqing.zhang@nxp.com>
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+We do not want to maintain a pile of DTS files for a single development
+board with pin sharing among different devices.
 
-AFAICT, this should go earlier in the series; first, add support in
-the code, then switch to new name in DTS.
-								Pavel
+Shawn
 
 > ---
->  drivers/power/supply/olpc_battery.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
+>  .../boot/dts/imx6dl-sabreauto-flexcan1.dts    | 14 ++++++
+>  .../arm/boot/dts/imx6q-sabreauto-flexcan1.dts | 14 ++++++
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi      | 47 +++++++++++++++++++
+>  3 files changed, 75 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
 > 
-> diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
-> index 5a97e42a3547..540d44bf536f 100644
-> --- a/drivers/power/supply/olpc_battery.c
-> +++ b/drivers/power/supply/olpc_battery.c
-> @@ -19,6 +19,7 @@
->  #include <linux/jiffies.h>
->  #include <linux/sched.h>
->  #include <linux/olpc-ec.h>
-> +#include <linux/of.h>
->  #include <asm/olpc.h>
+> diff --git a/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+> new file mode 100644
+> index 000000000000..4ebcc283f549
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-sabreauto-flexcan1.dts
+> @@ -0,0 +1,14 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +//
+> +// Copyright (C) 2013 Freescale Semiconductor, Inc.
+> +
+> +#include "imx6dl-sabreauto.dts"
+> +
+> +&can1{
+> +	status = "okay";
+> +};
+> +
+> +&fec {
+> +	/* pin conflict with flexcan1 */
+> +	status = "disabled";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts b/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
+> new file mode 100644
+> index 000000000000..e7e684656f09
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-sabreauto-flexcan1.dts
+> @@ -0,0 +1,14 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +//
+> +// Copyright (C) 2013 Freescale Semiconductor, Inc.
+> +
+> +#include "imx6q-sabreauto.dts"
+> +
+> +&can1{
+> +	status = "okay";
+> +};
+> +
+> +&fec {
+> +	/* pin conflict with flexcan1 */
+> +	status = "disabled";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index a10f0ad0bfb1..c1111b972b46 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -101,6 +101,25 @@
+>  		enable-active-high;
+>  	};
 >  
->  
-> @@ -622,11 +623,13 @@ static int olpc_battery_probe(struct platform_device *pdev)
->  	olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc, NULL);
->  	if (IS_ERR(olpc_ac))
->  		return PTR_ERR(olpc_ac);
-> -
-> -	if (olpc_board_at_least(olpc_board_pre(0xd0))) { /* XO-1.5 */
-> +	if (of_property_match_string(pdev->dev.of_node, "compatible",
-> +					"olpc,xo1.5-battery") >= 0) {
-> +		/* XO-1.5 */
->  		olpc_bat_desc.properties = olpc_xo15_bat_props;
->  		olpc_bat_desc.num_properties = ARRAY_SIZE(olpc_xo15_bat_props);
-> -	} else { /* XO-1 */
-> +	} else {
-> +		/* XO-1 */
->  		olpc_bat_desc.properties = olpc_xo1_bat_props;
->  		olpc_bat_desc.num_properties = ARRAY_SIZE(olpc_xo1_bat_props);
->  	}
-> @@ -672,6 +675,7 @@ static int olpc_battery_remove(struct platform_device *pdev)
->  
->  static const struct of_device_id olpc_battery_ids[] = {
->  	{ .compatible = "olpc,xo1-battery" },
-> +	{ .compatible = "olpc,xo1.5-battery" },
->  	{}
+> +	reg_can_en: regulator-can-en {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "can-en";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&max7310_b 6 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+> +	reg_can_stby: regulator-can-stby {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "can-stby";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&max7310_b 5 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +		vin-supply = <&reg_can_en>;
+> +	};
+> +
+>  	sound-cs42888 {
+>  		compatible = "fsl,imx6-sabreauto-cs42888",
+>  			"fsl,imx-audio-cs42888";
+> @@ -279,6 +298,20 @@
+>  	status = "okay";
 >  };
->  MODULE_DEVICE_TABLE(of, olpc_battery_ids);
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181104/0054373d/attachment.sig>
+>  
+> +&can1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_flexcan1>;
+> +	xceiver-supply = <&reg_can_stby>;
+> +	status = "disabled"; /* pin conflict with fec */
+> +};
+> +
+> +&can2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_flexcan2>;
+> +	xceiver-supply = <&reg_can_stby>;
+> +	status = "okay";
+> +};
+> +
+>  &gpmi {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_gpmi_nand>;
+> @@ -494,6 +527,20 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_flexcan1: flexcan1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX        0x17059
+> +				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x17059
+> +			>;
+> +		};
+> +
+> +		pinctrl_flexcan2: flexcan2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX	0x17059
+> +				MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX	0x17059
+> +			>;
+> +		};
+> +
+>  		pinctrl_gpio_keys: gpiokeysgrp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_SD2_CMD__GPIO1_IO11		0x1b0b0
+> -- 
+> 2.17.1
+> 
