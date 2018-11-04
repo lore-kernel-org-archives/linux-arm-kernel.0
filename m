@@ -1,77 +1,46 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:26:40 +0100
-Subject: [PATCH v3 03/28] clk: sunxi-ng: Use u64 for calculation of NM rate
+Date: Sun,  4 Nov 2018 19:26:41 +0100
+Subject: [PATCH v3 04/28] clk: sunxi-ng: h6: Set video PLLs limits
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-4-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-5-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H6 SoC has multiplier N range between 1 and 254. Since parent
-rate is 24MHz, intermediate result when calculating final rate easily
-overflows 32 bit variable.
+Video PLL factors can be set in a way that final PLL rate is outside
+stable range. H6 user manual specifically says that N factor should not
+be below 12. While it doesn't says anything about maximum stable rate, it
+is clear that PLL doesn't work at 6.096 GHz (254 * 24 MHz).
 
-Because of that, introduce function for calculating clock rate which
-uses 64 bit variable for intermediate result.
+Set minimum allowed PLL video rate to 288 MHz (12 * 24 MHz) and maximum
+to 2.4 GHz, which is maximum in BSP driver.
 
-Fixes: 6174a1e24b0d ("clk: sunxi-ng: Add N-M-factor clock support")
-Fixes: ee28648cb2b4 ("clk: sunxi-ng: Remove the use of rational computations")
-
-CC: <stable@vger.kernel.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_nm.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-index 6fe3c14f7b2d..424d8635b053 100644
---- a/drivers/clk/sunxi-ng/ccu_nm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nm.c
-@@ -19,6 +19,17 @@ struct _ccu_nm {
- 	unsigned long	m, min_m, max_m;
- };
- 
-+static unsigned long ccu_nm_calc_rate(unsigned long parent,
-+				      unsigned long n, unsigned long m)
-+{
-+	u64 rate = parent;
-+
-+	rate *= n;
-+	do_div(rate, m);
-+
-+	return rate;
-+}
-+
- static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
- 			     struct _ccu_nm *nm)
- {
-@@ -28,7 +39,8 @@ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
- 
- 	for (_n = nm->min_n; _n <= nm->max_n; _n++) {
- 		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
--			unsigned long tmp_rate = parent * _n  / _m;
-+			unsigned long tmp_rate = ccu_nm_calc_rate(parent,
-+								  _n, _m);
- 
- 			if (tmp_rate > rate)
- 				continue;
-@@ -100,7 +112,7 @@ static unsigned long ccu_nm_recalc_rate(struct clk_hw *hw,
- 	if (ccu_sdm_helper_is_enabled(&nm->common, &nm->sdm))
- 		rate = ccu_sdm_helper_read_rate(&nm->common, &nm->sdm, m, n);
- 	else
--		rate = parent_rate * n / m;
-+		rate = ccu_nm_calc_rate(parent_rate, n, m);
- 
- 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate /= nm->fixed_post_div;
-@@ -149,7 +161,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
- 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
- 
- 	ccu_nm_find_best(*parent_rate, rate, &_nm);
--	rate = *parent_rate * _nm.n / _nm.m;
-+	rate = ccu_nm_calc_rate(*parent_rate, _nm.n, _nm.m);
- 
- 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate /= nm->fixed_post_div;
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+index 2193e1495086..19ff09f610e4 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+@@ -120,6 +120,8 @@ static struct ccu_nm pll_video0_clk = {
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
+ 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
+ 	.fixed_post_div	= 4,
++	.min_rate	= 288000000,
++	.max_rate	= 2400000000UL,
+ 	.common		= {
+ 		.reg		= 0x040,
+ 		.features	= CCU_FEATURE_FIXED_POSTDIV,
+@@ -136,6 +138,8 @@ static struct ccu_nm pll_video1_clk = {
+ 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
+ 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
+ 	.fixed_post_div	= 4,
++	.min_rate	= 288000000,
++	.max_rate	= 2400000000UL,
+ 	.common		= {
+ 		.reg		= 0x048,
+ 		.features	= CCU_FEATURE_FIXED_POSTDIV,
 -- 
 2.19.1
