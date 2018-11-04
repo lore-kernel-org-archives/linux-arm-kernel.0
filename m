@@ -1,57 +1,67 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  4 Nov 2018 19:26:44 +0100
-Subject: [PATCH v3 07/28] dt-bindings: display: sun4i-drm: Add H6 display
- engine compatibles
+Date: Sun,  4 Nov 2018 19:26:42 +0100
+Subject: [PATCH v3 05/28] dt-bindings: clock: sun8i-de2: Add H6 DE3 clock
+ description
 In-Reply-To: <20181104182705.18047-1-jernej.skrabec@siol.net>
 References: <20181104182705.18047-1-jernej.skrabec@siol.net>
-Message-ID: <20181104182705.18047-8-jernej.skrabec@siol.net>
+Message-ID: <20181104182705.18047-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds compatibles used in H6 display pipeline, namely for
-display engine, mixer and TV TCON.
-
-H6 display engine is somewhat similar to R40, just less TCONs and
-mixer support more features.
+This commit adds necessary description and dt includes for H6 DE3 clock.
+It is very similar to others, but memory region has some additional
+registers not found in DE2.
 
 Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
+ include/dt-bindings/clock/sun8i-de2.h                 | 3 +++
+ include/dt-bindings/reset/sun8i-de2.h                 | 1 +
+ 3 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 7854fff4fc16..62c83b351344 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -158,6 +158,7 @@ Required properties:
-    * allwinner,sun9i-a80-tcon-tv
-    * "allwinner,sun50i-a64-tcon-lcd", "allwinner,sun8i-a83t-tcon-lcd"
-    * "allwinner,sun50i-a64-tcon-tv", "allwinner,sun8i-a83t-tcon-tv"
-+   * allwinner,sun50i-h6-tcon-tv, allwinner,sun8i-r40-tcon-tv
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
-@@ -381,6 +382,7 @@ Required properties:
-     * allwinner,sun8i-v3s-de2-mixer
-     * allwinner,sun50i-a64-de2-mixer-0
-     * allwinner,sun50i-a64-de2-mixer-1
-+    * allwinner,sun50i-h6-de3-mixer-0
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-     * bus: the mixer interface clock
-@@ -415,9 +417,10 @@ Required properties:
-     * allwinner,sun8i-v3s-display-engine
-     * allwinner,sun9i-a80-display-engine
-     * allwinner,sun50i-a64-display-engine
-+    * allwinner,sun50i-h6-display-engine
+diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+index e94582e8b8a9..41a52c2acffd 100644
+--- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
++++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+@@ -1,5 +1,5 @@
+-Allwinner Display Engine 2.0 Clock Control Binding
+---------------------------------------------------
++Allwinner Display Engine 2.0/3.0 Clock Control Binding
++------------------------------------------------------
  
-   - allwinner,pipelines: list of phandle to the display engine
--    frontends (DE 1.0) or mixers (DE 2.0) available.
-+    frontends (DE 1.0) or mixers (DE 2.0/3.0) available.
+ Required properties :
+ - compatible: must contain one of the following compatibles:
+@@ -8,6 +8,7 @@ Required properties :
+ 		- "allwinner,sun8i-v3s-de2-clk"
+ 		- "allwinner,sun50i-a64-de2-clk"
+ 		- "allwinner,sun50i-h5-de2-clk"
++		- "allwinner,sun50i-h6-de3-clk"
  
- Example:
+ - reg: Must contain the registers base address and length
+ - clocks: phandle to the clocks feeding the display engine subsystem.
+diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
+index 3bed63b524aa..7768f73b051e 100644
+--- a/include/dt-bindings/clock/sun8i-de2.h
++++ b/include/dt-bindings/clock/sun8i-de2.h
+@@ -15,4 +15,7 @@
+ #define CLK_MIXER1		7
+ #define CLK_WB			8
  
++#define CLK_BUS_ROT		9
++#define CLK_ROT			10
++
+ #endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
+index 9526017432f0..1c36a6ac86d6 100644
+--- a/include/dt-bindings/reset/sun8i-de2.h
++++ b/include/dt-bindings/reset/sun8i-de2.h
+@@ -10,5 +10,6 @@
+ #define RST_MIXER0	0
+ #define RST_MIXER1	1
+ #define RST_WB		2
++#define RST_ROT		3
+ 
+ #endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
 -- 
 2.19.1
