@@ -1,69 +1,98 @@
-From: benwolsieffer@gmail.com (Ben Wolsieffer)
-Date: Sat,  3 Nov 2018 19:32:20 -0400
-Subject: [PATCH v2] staging: vchiq_arm: fix compat VCHIQ_IOC_AWAIT_COMPLETION
-In-Reply-To: <101171304.143617.1541286450992@email.ionos.de>
-References: <101171304.143617.1541286450992@email.ionos.de>
-Message-ID: <20181103233219.13685-1-benwolsieffer@gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Sat, 03 Nov 2018 20:02:43 -0700
+Subject: [PATCH v6 1/3] clk: meson: add emmc sub clock phase delay driver
+In-Reply-To: <1541089855-19356-2-git-send-email-jianxin.pan@amlogic.com>
+References: <1541089855-19356-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541089855-19356-2-git-send-email-jianxin.pan@amlogic.com>
+Message-ID: <154130056376.88331.17004780065573288593@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatibility ioctl wrapper for VCHIQ_IOC_AWAIT_COMPLETION assumes that
-the native ioctl always uses a message buffer and decrements msgbufcount.
-Certain message types do not use a message buffer and in this case
-msgbufcount is not decremented, and completion->header for the message is
-NULL. Because the wrapper unconditionally decrements msgbufcount, the
-calling process may assume that a message buffer has been used even when
-it has not.
+Quoting Jianxin Pan (2018-11-01 09:30:53)
+> diff --git a/drivers/clk/meson/clk-phase-delay.c b/drivers/clk/meson/clk-phase-delay.c
+> new file mode 100644
+> index 0000000..83e74ed
+> --- /dev/null
+> +++ b/drivers/clk/meson/clk-phase-delay.c
+> @@ -0,0 +1,66 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Amlogic Meson MMC Sub Clock Controller Driver
+> + *
+> + * Copyright (c) 2017 Baylibre SAS.
+> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Yixun Lan <yixun.lan@amlogic.com>
+> + * Author: Jianxin Pan <jianxin.pan@amlogic.com>
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include "clkc.h"
+> +
+> +static int meson_clk_phase_delay_get_phase(struct clk_hw *hw)
+> +{
+> +       struct clk_regmap *clk = to_clk_regmap(hw);
+> +       struct meson_clk_phase_delay_data *ph =
+> +               meson_clk_get_phase_delay_data(clk);
 
-This results in a memory leak in the userspace code that interfaces with
-this driver. When msgbufcount is decremented, the userspace code assumes
-that the buffer can be freed though the reference in completion->header,
-which cannot happen when the reference is NULL.
+Nitpick: Do this after declaring variables because it splits a line.
 
-This patch causes the wrapper to only decrement msgbufcount when the
-native ioctl decrements it. Note that we cannot simply copy the native
-ioctl's value of msgbufcount, because the wrapper only retrieves messages
-from the native ioctl one at a time, while userspace may request multiple
-messages.
+> +       unsigned long period_ps, p, d;
+> +       int degrees;
+> +
+> +       p = meson_parm_read(clk->map, &ph->phase);
+> +       degrees = p * 360 / (1 << (ph->phase.width));
 
-See https://github.com/raspberrypi/linux/pull/2703 for more discussion of
-this patch.
+Nitpick: Remove useless parenthesis.
 
-Fixes: 5569a12 ("staging: vchiq_arm: Add compatibility wrappers for ioctls")
+> +
+> +       period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
 
-Signed-off-by: Ben Wolsieffer <benwolsieffer@gmail.com>
----
+Is the cast necessary?
 
-I added the missing recipients and a link to the GitHub PR in the commit
-message.
+> +                                clk_hw_get_rate(hw));
+> +
+> +       d = meson_parm_read(clk->map, &ph->delay);
+> +       degrees += d * ph->delay_step_ps * 360 / period_ps;
+> +       degrees %= 360;
+> +
+> +       return degrees;
+> +}
+> +
+> +static int meson_clk_phase_delay_set_phase(struct clk_hw *hw, int degrees)
+> +{
+> +       struct clk_regmap *clk = to_clk_regmap(hw);
+> +       struct meson_clk_phase_delay_data *ph =
+> +               meson_clk_get_phase_delay_data(clk);
+> +       unsigned long period_ps, d = 0, r;
+> +       u64 p;
+> +
+> +       p = degrees % 360;
 
- .../staging/vc04_services/interface/vchiq_arm/vchiq_arm.c  | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+We don't allow phase to be larger than 360 so this isn't needed.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index d67987fbf25e..8ff0e7e860f3 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -1461,6 +1461,7 @@ vchiq_compat_ioctl_await_completion(struct file *file,
- 	struct vchiq_await_completion32 args32;
- 	struct vchiq_completion_data32 completion32;
- 	unsigned int *msgbufcount32;
-+	unsigned int msgbufcount_native;
- 	compat_uptr_t msgbuf32;
- 	void *msgbuf;
- 	void **msgbufptr;
-@@ -1572,7 +1573,11 @@ vchiq_compat_ioctl_await_completion(struct file *file,
- 			 sizeof(completion32)))
- 		return -EFAULT;
- 
--	args32.msgbufcount--;
-+	if (get_user(msgbufcount_native, &args->msgbufcount))
-+		return -EFAULT;
-+
-+	if (!msgbufcount_native)
-+		args32.msgbufcount--;
- 
- 	msgbufcount32 =
- 		&((struct vchiq_await_completion32 __user *)arg)->msgbufcount;
--- 
-2.19.1
+> +       period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
+
+Drop the cast?
+
+> +                                clk_hw_get_rate(hw));
+> +
+> +       /* First compute the phase index (p), the remainder (r) is the
+
+Nitpick: Please leave /* on it's own line.
+
+> +        * part we'll try to acheive using the delays (d).
+> +        */
+> +       r = do_div(p, 360 / (1 << (ph->phase.width)));
+
+Drop useless parenthesis please.
+
+> +       d = DIV_ROUND_CLOSEST(r * period_ps,
+> +                             360 * ph->delay_step_ps);
+> +       d = min(d, PMASK(ph->delay.width));
+> +
+> +       meson_parm_write(clk->map, &ph->phase, p);
+> +       meson_parm_write(clk->map, &ph->delay, d);
+> +       return 0;
+> +}
