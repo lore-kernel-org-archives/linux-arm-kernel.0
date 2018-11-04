@@ -1,115 +1,49 @@
 From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Sun, 4 Nov 2018 23:12:17 +0800
-Subject: [PATCH v6 1/3] clk: meson: add emmc sub clock phase delay driver
-In-Reply-To: <154130056376.88331.17004780065573288593@swboyd.mtv.corp.google.com>
-References: <1541089855-19356-1-git-send-email-jianxin.pan@amlogic.com>
- <1541089855-19356-2-git-send-email-jianxin.pan@amlogic.com>
- <154130056376.88331.17004780065573288593@swboyd.mtv.corp.google.com>
-Message-ID: <efb9f8e2-8937-2a0a-6f13-2c4ed66fd6e4@amlogic.com>
+Date: Sun, 4 Nov 2018 23:39:44 +0800
+Subject: [PATCH v5 2/3] clk: meson: add DT documentation for emmc clock
+ controller
+In-Reply-To: <154130064120.88331.5081431734592584205@swboyd.mtv.corp.google.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-3-git-send-email-jianxin.pan@amlogic.com>
+ <ca95948abd58876a23b2eb3e52b96124e9eed793.camel@baylibre.com>
+ <20181024145513.GA6647@ofant>
+ <154130064120.88331.5081431734592584205@swboyd.mtv.corp.google.com>
+Message-ID: <fe4b3d70-12ae-84ae-0451-f5d67aa99fcd@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 Hi Stephen,
 
-Thanks for your review. 
-Please see me comments below.
+Thank you for the review.
 
-On 2018/11/4 11:02, Stephen Boyd wrote:
-> Quoting Jianxin Pan (2018-11-01 09:30:53)
->> diff --git a/drivers/clk/meson/clk-phase-delay.c b/drivers/clk/meson/clk-phase-delay.c
->> new file mode 100644
->> index 0000000..83e74ed
->> --- /dev/null
->> +++ b/drivers/clk/meson/clk-phase-delay.c
->> @@ -0,0 +1,66 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * Amlogic Meson MMC Sub Clock Controller Driver
->> + *
->> + * Copyright (c) 2017 Baylibre SAS.
->> + * Author: Jerome Brunet <jbrunet@baylibre.com>
->> + *
->> + * Copyright (c) 2018 Amlogic, inc.
->> + * Author: Yixun Lan <yixun.lan@amlogic.com>
->> + * Author: Jianxin Pan <jianxin.pan@amlogic.com>
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include "clkc.h"
->> +
->> +static int meson_clk_phase_delay_get_phase(struct clk_hw *hw)
->> +{
->> +       struct clk_regmap *clk = to_clk_regmap(hw);
->> +       struct meson_clk_phase_delay_data *ph =
->> +               meson_clk_get_phase_delay_data(clk);
+On 2018/11/4 11:04, Stephen Boyd wrote:
+> Quoting Yixun Lan (2018-10-25 00:29:15)
+>> yes, I think the documentation need to be fixed
+>>
+>> for the final solution, we decide to make 'mmc-clkc' an independent node
+>> instead of being a sub-node of 'mmc', so both of them may exist in parallel..
+>>
+>> the DT part may like this:
+>>
+>>                         sd_emmc_c_clkc: clock-controller at 7000 {
+>>                                 compatible = "amlogic,axg-mmc-clkc", "syscon";
+>>                                 reg = <0x0 0x7000 0x0 0x4>;
+>>                                 ...
+>>                         };
+>>
+>>                         sd_emmc_c: mmc at 7000 {
+>>                                 compatible = "amlogic,axg-mmc";
+>>                                 reg = <0x0 0x7000 0x0 0x800>;
+>>                                 ...
+>>                         };
 > 
-> Nitpick: Do this after declaring variables because it splits a line.
-OK. I will split the assignment into another line. Thank you.
-> 
->> +       unsigned long period_ps, p, d;
->> +       int degrees;
->> +
->> +       p = meson_parm_read(clk->map, &ph->phase);
->> +       degrees = p * 360 / (1 << (ph->phase.width));
-> 
-> Nitpick: Remove useless parenthesis.
-OK. I will remove them.
-> 
->> +
->> +       period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
-> 
-> Is the cast necessary?
-Yes, the cast can be droped. NSEC_PER_SEC is already defined wit type long.
-> 
->> +                                clk_hw_get_rate(hw));
->> +
->> +       d = meson_parm_read(clk->map, &ph->delay);
->> +       degrees += d * ph->delay_step_ps * 360 / period_ps;
->> +       degrees %= 360;
->> +
->> +       return degrees;
->> +}
->> +
->> +static int meson_clk_phase_delay_set_phase(struct clk_hw *hw, int degrees)
->> +{
->> +       struct clk_regmap *clk = to_clk_regmap(hw);
->> +       struct meson_clk_phase_delay_data *ph =
->> +               meson_clk_get_phase_delay_data(clk);
->> +       unsigned long period_ps, d = 0, r;
->> +       u64 p;
->> +
->> +       p = degrees % 360;
-> 
-> We don't allow phase to be larger than 360 so this isn't needed.
-OK, Thank you.
-> 
->> +       period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
-> 
-> Drop the cast?
-OK.
-> 
->> +                                clk_hw_get_rate(hw));
->> +
->> +       /* First compute the phase index (p), the remainder (r) is the
-> 
-> Nitpick: Please leave /* on it's own line.
-OK.
-> 
->> +        * part we'll try to acheive using the delays (d).
->> +        */
->> +       r = do_div(p, 360 / (1 << (ph->phase.width)));
-> 
-> Drop useless parenthesis please.
-OK, I will fix it. Thank you.
-> 
->> +       d = DIV_ROUND_CLOSEST(r * period_ps,
->> +                             360 * ph->delay_step_ps);
->> +       d = min(d, PMASK(ph->delay.width));
->> +
->> +       meson_parm_write(clk->map, &ph->phase, p);
->> +       meson_parm_write(clk->map, &ph->delay, d);
->> +       return 0;
->> +}
+> That's improper usage of DT. We don't want two devices at the same
+> register offset.
+sd_emmc_c_clkc is shared by nand and sd_emmc_c controller, and this clock is part of the MMC controller's register space.
+ 
+The idea of adding the clock-controller at 7000is introduced during the discussion in the NAND driver mainline effort:
+https://lkml.kernel.org/r/20180628090034.0637a062 at xps13
 > 
 > .
 > 
