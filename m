@@ -1,30 +1,104 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  5 Nov 2018 15:09:19 -0800
-Subject: [PATCH] ARM: BCM63XX: Enable reset controller support
-Message-ID: <20181105230920.26270-1-f.fainelli@gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Tue,  6 Nov 2018 00:11:26 +0100
+Subject: [PATCH] ARM: OMAP1: ams-delta: make board header file local to
+ mach-omap1
+Message-ID: <20181105231126.12674-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow BCM63xx to compile support for reset controllers since we will
-require a specific reset controller to release resets for on-chip
-peripherals.
+Now as the board header file is no longer included by drivers, move it
+to the root directory of mach-omap1.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- arch/arm/mach-bcm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changelog:
+v4:
+- rebased on top of v4.20-rc1
+- resubmitted as a standalone patch, other patches of the series it
+  depended on have been already applied
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 25aac6ee2ab1..005f4e98dfb7 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -189,6 +189,7 @@ config ARCH_BCM_63XX
- 	bool "Broadcom BCM63xx DSL SoC"
- 	depends on ARCH_MULTI_V7
- 	depends on MMU
-+	select ARCH_HAS_RESET_CONTROLLER
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_764369 if SMP
- 	select ARM_GIC
+v3:
+- rebased on top of v4.19-rc1
+- submitted as PATCH v3 3/3
+
+v2:
+- resent as PATCH v2 3/3
+
+Initially submitted in series as PATCH 6/6
+
+
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S              | 2 +-
+ arch/arm/mach-omap1/ams-delta-fiq.c                      | 3 +--
+ arch/arm/mach-omap1/board-ams-delta.c                    | 2 +-
+ arch/arm/mach-omap1/{include/mach => }/board-ams-delta.h | 2 +-
+ 4 files changed, 4 insertions(+), 5 deletions(-)
+ rename arch/arm/mach-omap1/{include/mach => }/board-ams-delta.h (97%)
+
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq-handler.S b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
+index e3faa0274b56..7c9fb7fe0070 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq-handler.S
++++ b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
+@@ -18,9 +18,9 @@
+ #include <linux/platform_data/gpio-omap.h>
+ 
+ #include <asm/assembler.h>
+-#include <mach/board-ams-delta.h>
+ 
+ #include "ams-delta-fiq.h"
++#include "board-ams-delta.h"
+ #include "iomap.h"
+ #include "soc.h"
+ 
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
+index b0dc7ddf5877..14c3d3f5255e 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq.c
++++ b/arch/arm/mach-omap1/ams-delta-fiq.c
+@@ -22,11 +22,10 @@
+ #include <linux/platform_data/ams-delta-fiq.h>
+ #include <linux/platform_device.h>
+ 
+-#include <mach/board-ams-delta.h>
+-
+ #include <asm/fiq.h>
+ 
+ #include "ams-delta-fiq.h"
++#include "board-ams-delta.h"
+ 
+ static struct fiq_handler fh = {
+ 	.name	= "ams-delta-fiq"
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 3d191fd52910..b8acc9912a58 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -36,7 +36,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+-#include <mach/board-ams-delta.h>
+ #include <linux/platform_data/keypad-omap.h>
+ #include <mach/mux.h>
+ 
+@@ -45,6 +44,7 @@
+ #include <mach/usb.h>
+ 
+ #include "ams-delta-fiq.h"
++#include "board-ams-delta.h"
+ #include "iomap.h"
+ #include "common.h"
+ 
+diff --git a/arch/arm/mach-omap1/include/mach/board-ams-delta.h b/arch/arm/mach-omap1/board-ams-delta.h
+similarity index 97%
+rename from arch/arm/mach-omap1/include/mach/board-ams-delta.h
+rename to arch/arm/mach-omap1/board-ams-delta.h
+index 3b2d8019238a..a74a306d7e77 100644
+--- a/arch/arm/mach-omap1/include/mach/board-ams-delta.h
++++ b/arch/arm/mach-omap1/board-ams-delta.h
+@@ -1,5 +1,5 @@
+ /*
+- * arch/arm/plat-omap/include/mach/board-ams-delta.h
++ * arch/arm/mach-omap1/board-ams-delta.h
+  *
+  * Copyright (C) 2006 Jonathan McDowell <noodles@earth.li>
+  *
 -- 
-2.17.1
+2.16.4
