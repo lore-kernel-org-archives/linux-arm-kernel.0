@@ -1,36 +1,26 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 5 Nov 2018 15:24:09 +0100
-Subject: linux-4.20-rc1/sound/soc/stm/stm32_sai_sub.c:343: Faulty error
- check
-In-Reply-To: <VI1PR08MB3342060AF73044939F5273F59CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
-References: <VI1PR08MB3342060AF73044939F5273F59CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
-Message-ID: <ccd8a02d-13a0-432a-ecd0-94234a2cfd83@st.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 5 Nov 2018 15:30:11 +0100
+Subject: [PATCH] clocksource: imx-gpt: remove unnecessary irq protection
+In-Reply-To: <20181105141511.30657-1-peron.clem@gmail.com>
+References: <20181105141511.30657-1-peron.clem@gmail.com>
+Message-ID: <daf4fbee-b433-62c7-9dc6-e6fff058568d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello David,
+On 05/11/2018 15:15, Cl?ment P?ron wrote:
+> shutdown and oneshot are already protected against irq interruptions
+> 
+> Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+> ---
 
-On 11/5/18 2:33 PM, David Binderman wrote:
-> Hello there,
-> 
-> linux-4.20-rc1/sound/soc/stm/stm32_sai_sub.c:343]: (style) Checking if
-> unsigned variable 'div' is less than zero.
-> 
-> Source code is
-> 
-> ??????? div = stm32_sai_get_clk_div(sai, parent_rate, rate);
-> ??????? if (div < 0)
-> ??????????????? return div;
-> 
-> Suggest store return value from function in int local variable, test it
-> and only then assign it into an unsigned variable.
-> 
-> Regards
-> 
-> David Binderman
+Applied, thanks!
 
-Thanks for your feedback, a patch has already been sent and applied to
-fix this warning: https://lkml.org/lkml/2018/11/5/510.
+  -- Daniel
 
-Regards,
-Arnaud
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
