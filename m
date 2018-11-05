@@ -1,278 +1,49 @@
 From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
-Date: Tue,  6 Nov 2018 00:55:43 +0800
-Subject: [PATCH V2 5/7] net: maclorawan: Implement the crypto of maclorawan
- module
+Date: Tue,  6 Nov 2018 00:55:45 +0800
+Subject: [PATCH V2 7/7] net: lorawan: List LORAWAN in menuconfig
 In-Reply-To: <fc737f3940bbe91341fb15d85ac11931eb56d1fc.1535039998.git.starnight@g.ncu.edu.tw>
 References: <fc737f3940bbe91341fb15d85ac11931eb56d1fc.1535039998.git.starnight@g.ncu.edu.tw>
-Message-ID: <20181105165544.5215-6-starnight@g.ncu.edu.tw>
+Message-ID: <20181105165544.5215-8-starnight@g.ncu.edu.tw>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the crypto for encryption/decryption and message
-integrity code (MIC) according to LoRaWAN(TM) Specification Ver. 1.0.2.
+List LORAWAN and MACLORAWAN in menuconfig and enable them to be built.
 
 Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
 ---
 V2:
 - Split the LoRaWAN class module patch in V1 into LoRaWAN socket and
   LoRaWAN Soft MAC modules
-- Rename the lrwsec files to crypto files
-- Modify for Big/Little-Endian
-- Use SPDX license identifiers
 
- net/maclorawan/crypto.c | 209 ++++++++++++++++++++++++++++++++++++++++
- net/maclorawan/crypto.h |  27 ++++++
- 2 files changed, 236 insertions(+)
- create mode 100644 net/maclorawan/crypto.c
- create mode 100644 net/maclorawan/crypto.h
+ net/Kconfig  | 2 ++
+ net/Makefile | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/net/maclorawan/crypto.c b/net/maclorawan/crypto.c
-new file mode 100644
-index 000000000000..a839fd074ad8
---- /dev/null
-+++ b/net/maclorawan/crypto.c
-@@ -0,0 +1,209 @@
-+/* SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause */
-+/*-
-+ * LoRaWAN soft MAC
-+ *
-+ * Copyright (c) 2018 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
-+ *
-+ */
-+
-+#include <linux/scatterlist.h>
-+#include <crypto/hash.h>
-+#include <crypto/skcipher.h>
-+#include "crypto.h"
-+
-+struct crypto_shash *
-+lrw_mic_key_setup(u8 *k, size_t k_len)
-+{
-+	char *algo = "cmac(aes)";
-+	struct crypto_shash *tfm;
-+	int err;
-+
-+	tfm = crypto_alloc_shash(algo, 0, 0);
-+	if (!IS_ERR(tfm)) {
-+		err = crypto_shash_setkey(tfm, k, k_len);
-+		if (err) {
-+			crypto_free_shash(tfm);
-+			tfm = NULL;
-+		}
-+	}
-+
-+	return tfm;
-+}
-+
-+int
-+lrw_aes_cmac(struct crypto_shash *tfm, u8 *bz, u8 *data, size_t len, u8 *out)
-+{
-+	SHASH_DESC_ON_STACK(desc, tfm);
-+	int err;
-+
-+	desc->tfm = tfm;
-+
-+	err = crypto_shash_init(desc);
-+	if (err)
-+		goto lrw_aes_cmac_end;
-+
-+	err = crypto_shash_update(desc, bz, 16);
-+	if (err)
-+		goto lrw_aes_cmac_end;
-+
-+	err = crypto_shash_update(desc, data, len);
-+	if (err)
-+		goto lrw_aes_cmac_end;
-+
-+	err = crypto_shash_final(desc, out);
-+
-+lrw_aes_cmac_end:
-+	return err;
-+}
-+
-+int
-+lrw_set_bzero(u8 dir, u32 devaddr, u32 fcnt, u8 len, u8 *bz)
-+{
-+	__le32 le_devaddr = cpu_to_le32(devaddr);
-+	__le32 _fcnt = cpu_to_le32(fcnt);
-+
-+	bz[0] = 0x49;
-+	memset(bz + 1, 0x00, 4);
-+	bz[5] = dir;
-+	memcpy(bz + 6, &le_devaddr, 4);
-+	memcpy(bz + 10, &_fcnt, 4);
-+	bz[14] = 0x00;
-+	bz[15] = len;
-+
-+	return 0;
-+}
-+
-+int
-+lrw_calc_mic(struct crypto_shash *tfm,
-+	     u8 dir, u32 devaddr, u32 fcnt, u8* buf, size_t len, u8 *mic4)
-+{
-+	u8 mic[16];
-+	u8 bz[16];
-+	int err;
-+
-+	/* According to LoRaWAN Specification Version 1.0.2
-+	 * - 4.4 Massege Integrity Code (MIC) */
-+	lrw_set_bzero(dir, devaddr, fcnt, len, bz);
-+	err = lrw_aes_cmac(tfm, bz, buf, len, mic);
-+	if (!err)
-+		memcpy(mic4, mic, 4);
-+
-+	return err;
-+}
-+
-+void
-+lrw_mic_key_free(struct crypto_shash *tfm)
-+{
-+	crypto_free_shash(tfm);
-+}
-+
-+struct crypto_skcipher *
-+lrw_aes_enc_key_setup(char *algo, u8 *k, size_t k_len)
-+{
-+	struct crypto_skcipher *tfm;
-+	int err;
-+
-+	tfm = crypto_alloc_skcipher(algo, 0, CRYPTO_ALG_ASYNC);
-+	if (!IS_ERR(tfm)) {
-+		err = crypto_skcipher_setkey(tfm, k, k_len);
-+		if (err) {
-+			crypto_free_skcipher(tfm);
-+			tfm = NULL;
-+		}
-+	}
-+
-+	return tfm;
-+}
-+
-+struct crypto_skcipher *
-+lrw_encrypt_key_setup(u8 *k, size_t k_len)
-+{
-+	return lrw_aes_enc_key_setup("cbc(aes)", k, k_len);
-+}
-+
-+int
-+lrw_aes_enc(struct crypto_skcipher *tfm, u8 *in, size_t len, u8 *out)
-+{
-+	u8 iv[16];
-+	struct scatterlist src, dst;
-+	SKCIPHER_REQUEST_ON_STACK(req, tfm);
-+	int err;
-+
-+	memset(iv, 0, 16);
-+	/* The buffer for sg_init_one cannot be a global or const local
-+	 * (will confuse the scatterlist) */
-+	sg_init_one(&src, in, len);
-+	sg_init_one(&dst, out, len);
-+
-+	skcipher_request_set_tfm(req, tfm);
-+	skcipher_request_set_callback(req, 0, NULL, NULL);
-+	skcipher_request_set_crypt(req, &src, &dst, len, iv);
-+	err = crypto_skcipher_encrypt(req);
-+	skcipher_request_zero(req);
-+
-+	return err;
-+}
-+
-+#define	LRW_SEQUENCE_OF_BLOCK_LEN	16
-+
-+int
-+lrw_set_sob(u8 dir, u32 devaddr, u32 fcnt, u8 index, u8 *sob)
-+{
-+	__le32 le_devaddr = cpu_to_le32(devaddr);
-+	__le32 _fcnt = cpu_to_le32(fcnt);
-+
-+	sob[0] = 0x01;
-+	memset(sob + 1, 0x00, 4);
-+	sob[5] = dir;
-+	memcpy(sob + 6, &le_devaddr, 4);
-+	memcpy(sob + 10, &_fcnt, 4);
-+	sob[14] = 0x00;
-+	sob[15] = index;
-+
-+	return 0;
-+}
-+
-+int
-+lrw_encrypt_sob(struct crypto_skcipher *tfm, u8 *sob)
-+{
-+	return lrw_aes_enc(tfm, sob, LRW_SEQUENCE_OF_BLOCK_LEN, sob);
-+}
-+
-+int
-+lrw_encrypt_buf(struct crypto_skcipher *tfm,
-+		u8 dir, u32 devaddr, u32 fcnt, u8 *buf, size_t len)
-+{
-+	u8 sob[LRW_SEQUENCE_OF_BLOCK_LEN];
-+	u8 i, j;
-+
-+	/* According to LoRaWAN Specification Version 1.0.2
-+	 * - 4.3.3 MAC Frame Payload Encryption (FRMPayload) */
-+	for (i = 0; (i * LRW_SEQUENCE_OF_BLOCK_LEN) < len; i++) {
-+		lrw_set_sob(dir, devaddr, fcnt, i, sob);
-+		lrw_encrypt_sob(tfm, sob);
-+		for (j = 0; (i * LRW_SEQUENCE_OF_BLOCK_LEN + j) < len; j++)
-+			buf[i * LRW_SEQUENCE_OF_BLOCK_LEN + j] ^= sob[j];
-+	}
-+
-+	return 0;
-+}
-+
-+int
-+lrw_decrypt_buf(struct crypto_skcipher *tfm,
-+		u8 dir, u32 devaddr, u32 fcnt, u8 *buf, size_t len)
-+{
-+	/* Accoding to XOR swap algorithm */
-+	return lrw_encrypt_buf(tfm, dir, devaddr, fcnt, buf, len);
-+}
-+
-+void
-+lrw_aes_enc_key_free(struct crypto_skcipher *tfm)
-+{
-+	crypto_free_skcipher(tfm);
-+}
-+
-+void
-+lrw_encrypt_key_free(struct crypto_skcipher *tfm)
-+{
-+	lrw_aes_enc_key_free(tfm);
-+}
-diff --git a/net/maclorawan/crypto.h b/net/maclorawan/crypto.h
-new file mode 100644
-index 000000000000..2ede02efb8c6
---- /dev/null
-+++ b/net/maclorawan/crypto.h
-@@ -0,0 +1,27 @@
-+/* SPDX-License-Identifier: GPL-2.0-or-later OR BSD-3-Clause */
-+/*-
-+ * LoRaWAN soft MAC
-+ *
-+ * Copyright (c) 2018 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
-+ *
-+ */
-+
-+#ifndef __LORAWAN_CRYPTO_H__
-+#define __LORAWAN_CRYPTO_H__
-+
-+#include <crypto/hash.h>
-+#include <crypto/skcipher.h>
-+
-+struct crypto_shash *lrw_mic_key_setup(u8 *k, size_t k_len);
-+int lrw_calc_mic(struct crypto_shash *tfm,
-+		 u8 dir, u32 devaddr, u32 fcnt, u8* buf, size_t len, u8 *mic4);
-+void lrw_mic_key_free(struct crypto_shash *tfm);
-+
-+struct crypto_skcipher *lrw_encrypt_key_setup(u8 *k, size_t k_len);
-+int lrw_encrypt_buf(struct crypto_skcipher *tfm,
-+		    u8 dir, u32 devaddr, u32 fcnt, u8 *buf, size_t len);
-+int lrw_decrypt_buf(struct crypto_skcipher *tfm,
-+		    u8 dir, u32 devaddr, u32 fcnt, u8 *buf, size_t len);
-+void lrw_encrypt_key_free(struct crypto_skcipher *tfm);
-+
-+#endif
+diff --git a/net/Kconfig b/net/Kconfig
+index 053b36998c18..b12b8bed6abb 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -224,6 +224,8 @@ source "net/6lowpan/Kconfig"
+ source "net/ieee802154/Kconfig"
+ source "net/mac802154/Kconfig"
+ source "net/lora/Kconfig"
++source "net/lorawan/Kconfig"
++source "net/maclorawan/Kconfig"
+ source "net/sched/Kconfig"
+ source "net/dcb/Kconfig"
+ source "net/dns_resolver/Kconfig"
+diff --git a/net/Makefile b/net/Makefile
+index e80b84313851..9d5515965a8f 100644
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -63,6 +63,8 @@ obj-$(CONFIG_6LOWPAN)		+= 6lowpan/
+ obj-$(CONFIG_IEEE802154)	+= ieee802154/
+ obj-$(CONFIG_MAC802154)		+= mac802154/
+ obj-$(CONFIG_LORA)		+= lora/
++obj-$(CONFIG_LORAWAN)		+= lorawan/
++obj-$(CONFIG_MACLORAWAN)	+= maclorawan/
+ 
+ ifeq ($(CONFIG_NET),y)
+ obj-$(CONFIG_SYSCTL)		+= sysctl_net.o
 -- 
 2.19.1
