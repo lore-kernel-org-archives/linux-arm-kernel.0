@@ -1,234 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Nov 2018 19:56:44 +0100
-Subject: [PATCH v2] arm64/module: use plt section indices for relocations
-In-Reply-To: <20181105185323.hgoflyvkyujdyjxj@redbean>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <20181105175722.removbbpilqxu7tr@redbean>
- <20181105185323.hgoflyvkyujdyjxj@redbean>
-Message-ID: <CAKv+Gu8f+dcL-049YnWJt9Ar2tP9x1DXLAG_cg1thExvnnvY4g@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Nov 2018 19:00:07 +0000
+Subject: [PATCH 2/6] ARM: compressed: move sa1100 startup code into
+ subroutine
+In-Reply-To: <20181105184438.19494-3-ard.biesheuvel@linaro.org>
+References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
+ <20181105184438.19494-3-ard.biesheuvel@linaro.org>
+Message-ID: <20181105190007.GT30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2018 at 19:53, Jessica Yu <jeyu@kernel.org> wrote:
-> Instead of saving a pointer to the .plt and .init.plt sections to apply
-> plt-based relocations, save and use their section indices instead.
->
-> The mod->arch.{core,init}.plt pointers were problematic for livepatch
-> because they pointed within temporary section headers (provided by the
-> module loader via info->sechdrs) that would be freed after module load.
-> Since livepatch modules may need to apply relocations post-module-load
-> (for example, to patch a module that is loaded later), using section
-> indices to offset into the section headers (instead of accessing them
-> through a saved pointer) allows livepatch modules on arm64 to pass in
-> their own copy of the section headers to apply_relocate_add() to apply
-> delayed relocations.
->
-> Signed-off-by: Jessica Yu <jeyu@kernel.org>
+On Mon, Nov 05, 2018 at 07:44:34PM +0100, Ard Biesheuvel wrote:
+> Instead of relying on unspecified linker behavior, move the
+> SA1100 startup code into a subroutine and call it from the
+> location we expect the linker to put the code.
 
-Thanks Jessica
+Same comments as patch 1, I don't think this is warranted.
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->
-> v2:
-> - Do sechdrs[pltsec->plt_shndx].sh_addr instead of pointer math
->
-> Note: Addressed Will's comment about the pltsec -> plt_info rename and
-> removed that change to reduce unnecessary code churn. I didn't include the
->
-> Ack's for this reason so let me know if this version is OK as well.
->
-> arch/arm64/include/asm/module.h |  8 +++++---
-> arch/arm64/kernel/module-plts.c | 36 ++++++++++++++++++++----------------
-> arch/arm64/kernel/module.c      |  9 +++++----
-> 3 files changed, 30 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/module.h
-> b/arch/arm64/include/asm/module.h
-> index 97d0ef12e2ff..f81c1847312d 100644
-> --- a/arch/arm64/include/asm/module.h
-> +++ b/arch/arm64/include/asm/module.h
-> @@ -22,7 +22,7 @@
->
-> #ifdef CONFIG_ARM64_MODULE_PLTS
-> struct mod_plt_sec {
-> -       struct elf64_shdr       *plt;
-> +       int                     plt_shndx;
->         int                     plt_num_entries;
->         int                     plt_max_entries;
-> };
-> @@ -36,10 +36,12 @@ struct mod_arch_specific {
-> };
-> #endif
->
-> -u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela
-> *rela,
-> +u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
-> +                         void *loc, const Elf64_Rela *rela,
->                           Elf64_Sym *sym);
->
-> -u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val);
-> +u64 module_emit_veneer_for_adrp(struct module *mod, Elf64_Shdr *sechdrs,
-> +                               void *loc, u64 val);
->
-> #ifdef CONFIG_RANDOMIZE_BASE
-> extern u64 module_alloc_base;
-> diff --git a/arch/arm64/kernel/module-plts.c
-> b/arch/arm64/kernel/module-plts.c
-> index f0690c2ca3e0..a0efe30211d6 100644
-> --- a/arch/arm64/kernel/module-plts.c
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -16,12 +16,13 @@ static bool in_init(const struct module *mod, void *loc)
->         return (u64)loc - (u64)mod->init_layout.base <
-> mod->init_layout.size;
-> }
->
-> -u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela
-> *rela,
-> +u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
-> +                         void *loc, const Elf64_Rela *rela,
->                           Elf64_Sym *sym)
-> {
->         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
->                                                           &mod->arch.init;
-> -       struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
-> +       struct plt_entry *plt = (struct plt_entry
-> *)sechdrs[pltsec->plt_shndx].sh_addr;
->         int i = pltsec->plt_num_entries;
->         u64 val = sym->st_value + rela->r_addend;
->
-> @@ -43,11 +44,12 @@ u64 module_emit_plt_entry(struct module *mod, void *loc,
-> const Elf64_Rela *rela,
-> }
->
-> #ifdef CONFIG_ARM64_ERRATUM_843419
-> -u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
-> +u64 module_emit_veneer_for_adrp(struct module *mod, Elf64_Shdr *sechdrs,
-> +                               void *loc, u64 val)
-> {
->         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
->                                                           &mod->arch.init;
-> -       struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
-> +       struct plt_entry *plt = (struct plt_entry
-> *)sechdrs[pltsec->plt_shndx].sh_addr;
->
->         int i = pltsec->plt_num_entries++;
->         u32 mov0, mov1, mov2, br;
->         int rd;
-> @@ -202,7 +204,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->         unsigned long core_plts = 0;
->         unsigned long init_plts = 0;
->         Elf64_Sym *syms = NULL;
-> -       Elf_Shdr *tramp = NULL;
-> +       Elf_Shdr *pltsec, *tramp = NULL;
->         int i;
->
->         /*
-> @@ -211,9 +213,9 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->          */
->         for (i = 0; i < ehdr->e_shnum; i++) {
->                 if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
-> -                       mod->arch.core.plt = sechdrs + i;
-> +                       mod->arch.core.plt_shndx = i;
->                 else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> ".init.plt"))
-> -                       mod->arch.init.plt = sechdrs + i;
-> +                       mod->arch.init.plt_shndx = i;
->                 else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
->                          !strcmp(secstrings + sechdrs[i].sh_name,
->                                  ".text.ftrace_trampoline"))
-> @@ -222,7 +224,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->                         syms = (Elf64_Sym *)sechdrs[i].sh_addr;
->         }
->
-> -       if (!mod->arch.core.plt || !mod->arch.init.plt) {
-> +       if (!mod->arch.core.plt_shndx || !mod->arch.init.plt_shndx) {
->                 pr_err("%s: module PLT section(s) missing\n", mod->name);
->                 return -ENOEXEC;
->         }
-> @@ -254,17 +256,19 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->                                                 sechdrs[i].sh_info, dstsec);
->         }
->
-> -       mod->arch.core.plt->sh_type = SHT_NOBITS;
-> -       mod->arch.core.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> -       mod->arch.core.plt->sh_addralign = L1_CACHE_BYTES;
-> -       mod->arch.core.plt->sh_size = (core_plts  + 1) * sizeof(struct
-> plt_entry);
-> +       pltsec = sechdrs + mod->arch.core.plt_shndx;
-> +       pltsec->sh_type = SHT_NOBITS;
-> +       pltsec->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       pltsec->sh_addralign = L1_CACHE_BYTES;
-> +       pltsec->sh_size = (core_plts  + 1) * sizeof(struct plt_entry);
->         mod->arch.core.plt_num_entries = 0;
->         mod->arch.core.plt_max_entries = core_plts;
->
-> -       mod->arch.init.plt->sh_type = SHT_NOBITS;
-> -       mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> -       mod->arch.init.plt->sh_addralign = L1_CACHE_BYTES;
-> -       mod->arch.init.plt->sh_size = (init_plts + 1) * sizeof(struct
-> plt_entry);
-> +       pltsec = sechdrs + mod->arch.init.plt_shndx;
-> +       pltsec->sh_type = SHT_NOBITS;
-> +       pltsec->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       pltsec->sh_addralign = L1_CACHE_BYTES;
-> +       pltsec->sh_size = (init_plts + 1) * sizeof(struct plt_entry);
->         mod->arch.init.plt_num_entries = 0;
->         mod->arch.init.plt_max_entries = init_plts;
->
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index f0f27aeefb73..c2abe59c6f8f 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -198,7 +198,8 @@ static int reloc_insn_imm(enum aarch64_reloc_op op,
-> __le32 *place, u64 val,
->         return 0;
-> }
->
-> -static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
-> +static int reloc_insn_adrp(struct module *mod, Elf64_Shdr *sechdrs,
-> +                          __le32 *place, u64 val)
-> {
->         u32 insn;
->
-> @@ -215,7 +216,7 @@ static int reloc_insn_adrp(struct module *mod, __le32
-> *place, u64 val)
->                 insn &= ~BIT(31);
->         } else {
->                 /* out of range for ADR -> emit a veneer */
-> -               val = module_emit_veneer_for_adrp(mod, place, val & ~0xfff);
-> +               val = module_emit_veneer_for_adrp(mod, sechdrs, place, val &
-> ~0xfff);
->                 if (!val)
->                         return -ENOEXEC;
->                 insn = aarch64_insn_gen_branch_imm((u64)place, val,
-> @@ -368,7 +369,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->                 case R_AARCH64_ADR_PREL_PG_HI21_NC:
->                         overflow_check = false;
->                 case R_AARCH64_ADR_PREL_PG_HI21:
-> -                       ovf = reloc_insn_adrp(me, loc, val);
-> +                       ovf = reloc_insn_adrp(me, sechdrs, loc, val);
->                         if (ovf && ovf != -ERANGE)
->                                 return ovf;
->                         break;
-> @@ -413,7 +414,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->
->                         if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
->                             ovf == -ERANGE) {
-> -                               val = module_emit_plt_entry(me, loc,
-> &rel[i], sym);
-> +                               val = module_emit_plt_entry(me, sechdrs,
-> loc, &rel[i], sym);
->                                 if (!val)
->                                         return -ENOEXEC;
->                                 ovf = reloc_insn_imm(RELOC_OP_PREL, loc,
-> val, 2,
-> --
-> 2.14.5
->
+>  arch/arm/boot/compressed/head-sa1100.S | 9 +++++----
+>  arch/arm/boot/compressed/head.S        | 3 +++
+>  2 files changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head-sa1100.S b/arch/arm/boot/compressed/head-sa1100.S
+> index 95abdd850fe3..89a7e9dfd5c0 100644
+> --- a/arch/arm/boot/compressed/head-sa1100.S
+> +++ b/arch/arm/boot/compressed/head-sa1100.S
+> @@ -4,18 +4,17 @@
+>   * 
+>   * Copyright (C) 1999 Nicolas Pitre <nico@fluxnic.net>
+>   * 
+> - * SA1100 specific tweaks.  This is merged into head.S by the linker.
+> + * SA1100 specific tweaks.
+>   *
+>   */
+>  
+>  #include <linux/linkage.h>
+>  #include <asm/mach-types.h>
+>  
+> -		.section        ".start", "ax"
+> +		.text
+>  		.arch	armv4
+>  
+> -__SA1100_start:
+> -
+> +ENTRY(__SA1100_start)
+>  		@ Preserve r8/r7 i.e. kernel entry values
+>  #ifdef CONFIG_SA1100_COLLIE
+>  		mov	r7, #MACH_TYPE_COLLIE
+> @@ -47,3 +46,5 @@ __SA1100_start:
+>  		bic	r0, r0, #0x1000		@ clear Icache
+>  		mcr	p15, 0, r0, c1, c0, 0
+>  99:
+> +		mov	pc, lr
+> +ENDPROC(__SA1100_start)
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 5067f287fa5a..c5355f929cee 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -216,6 +216,9 @@ not_angel:
+>  #ifdef CONFIG_PXA_SHARPSL_DETECT_MACH_ID
+>  		bl	__SharpSL_start
+>  #endif
+> +#ifdef CONFIG_ARCH_SA1100
+> +		bl	__SA1100_start
+> +#endif
+>  
+>  #ifdef CONFIG_AUTO_ZRELADDR
+>  		/*
+> -- 
+> 2.19.1
+> 
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
