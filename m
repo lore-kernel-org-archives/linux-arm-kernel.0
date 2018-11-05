@@ -1,40 +1,81 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 5 Nov 2018 14:45:14 +0100
-Subject: [PATCH v10 5/6] arm64: zynqmp: Add DDRC node
-In-Reply-To: <20181105134218.GD7937@zn.tnic>
-References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
- <1540447621-22870-6-git-send-email-manish.narani@xilinx.com>
- <20181105125644.GA7937@zn.tnic>
- <41c5ca53-ed4b-38d0-c612-e1229004293e@xilinx.com>
- <20181105132007.GB7937@zn.tnic>
- <a81f47e0-1778-a6ac-4cd8-634502661d6f@xilinx.com>
- <20181105134218.GD7937@zn.tnic>
-Message-ID: <cab338b6-e4d6-0436-6eb8-cbd6c33115f2@xilinx.com>
+From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
+Date: Mon, 5 Nov 2018 14:55:48 +0100
+Subject: [PATCH] ARM: dts: i.MX25: add the clocks for the EPIT blocks
+In-Reply-To: <0298f7ec-fbff-8edb-92bb-70a736ddaf25@mentor.com>
+References: <1541093567-29205-1-git-send-email-martin@kaiser.cx>
+ <20181104144614.GJ26016@tiger>
+ <0298f7ec-fbff-8edb-92bb-70a736ddaf25@mentor.com>
+Message-ID: <CAJiuCcde0n5VGnqsXgnevKEk9KkPHf=_JMo7yyBBvX-PF_v2-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05. 11. 18 14:42, Borislav Petkov wrote:
-> On Mon, Nov 05, 2018 at 02:32:55PM +0100, Michal Simek wrote:
->> you don't have that HW anyway.
-> 
-> Grrr, I'm not talking about me - I'm talking about people testing
-> linux-next. And perhaps in this particular case it won't matter because
-> this hw is not shipping yet or whatever but the question is about the
-> principle of the whole thing.
+Hi,
+
+On Mon, 5 Nov 2018 at 09:58, Vladimir Zapolskiy
+<vladimir_zapolskiy@mentor.com> wrote:
 >
->> I looked at v10 and I can't see your ack there. Can you please give me
->> a link?
-> 
-> I'm talking about *other* patches for another driver.
-> 
-> Please note that I'm replying to this thread as an example - the
-> procedural question I have is not only related to the synopsys changes
-> but the synopsys changes are a good example for the problem of EDAC
-> changes being sent to me along with DT additions.
-> 
-> As such, the question was aimed more at arm-soc people - that's why they
-> were in To: - not at you.
+> Adding Cl?ment.
+>
+> On 11/04/2018 04:46 PM, Shawn Guo wrote:
+> > On Thu, Nov 01, 2018 at 06:32:47PM +0100, Martin Kaiser wrote:
+> >> The i.MX25 contains two EPIT (Enhanced Periodic Interrupt Timer)
+> >> function blocks. Add their ipg and per clocks to the device tree.
+> >>
+> >> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> >
+> > Are these EPIT devices actually used in upstream kernel, or just
+> > somewhere else?
+>
+> Cl?ment wrote a good driver, which has already passed a series of reviews,
+> but this clocks add-on is actually missing.
+>
+> Cl?ment, can you please add clock-names property and the corresponding
+> functional change to your driver? Thank you in advance.
 
-ok. Got it.
+I'm converting it with the new timer-of framework, will check for
+adding both clocks.
 
-M
+New patch should come this week I hope.
+
+Regards,
+Clement>
+> --
+> Best wishes,
+> Vladimir
+>
+> >> ---
+> >>
+> >> I tried to make this similar to gpt1 and gpt2.
+> >>
+> >>  arch/arm/boot/dts/imx25.dtsi | 4 ++++
+> >>  1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> >> index b25309d26ea5..e80101847aff 100644
+> >> --- a/arch/arm/boot/dts/imx25.dtsi
+> >> +++ b/arch/arm/boot/dts/imx25.dtsi
+> >> @@ -388,12 +388,16 @@
+> >>                      epit1: timer at 53f94000 {
+> >>                              compatible = "fsl,imx25-epit";
+> >>                              reg = <0x53f94000 0x4000>;
+> >> +                            clocks = <&clks 83>, <&clks 43>;
+> >> +                            clock-names = "ipg", "per";
+> >>                              interrupts = <28>;
+> >>                      };
+> >>
+> >>                      epit2: timer at 53f98000 {
+> >>                              compatible = "fsl,imx25-epit";
+> >>                              reg = <0x53f98000 0x4000>;
+> >> +                            clocks = <&clks 84>, <&clks 43>;
+> >> +                            clock-names = "ipg", "per";
+> >>                              interrupts = <27>;
+> >>                      };
+> >>
+> >> --
+> >> 2.1.4
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
