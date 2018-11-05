@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon,  5 Nov 2018 12:05:51 +0000 (GMT)
-Subject: Applied "spi: mediatek: add spi support for mt8183 IC" to the spi tree
-In-Reply-To: <1541052139-8845-3-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20181105120551.59AF31124D98@debutante.sirena.org.uk>
+Date: Mon,  5 Nov 2018 12:05:55 +0000 (GMT)
+Subject: Applied "spi: mediatek: Add bindings for mediatek MT8183 soc
+ platform" to the spi tree
+In-Reply-To: <1541052139-8845-2-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <20181105120555.D73F21124D98@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: mediatek: add spi support for mt8183 IC
+   spi: mediatek: Add bindings for mediatek MT8183 soc platform
 
 has been applied to the spi tree at
 
@@ -33,45 +34,30 @@ to this mail.
 Thanks,
 Mark
 
->From b654aa6f2bbb00508ea0abc1cdc98ba8baa13682 Mon Sep 17 00:00:00 2001
+>From f611dfdb8544b5ac4228f4e3cb3b06ce15b9c74b Mon Sep 17 00:00:00 2001
 From: Leilk Liu <leilk.liu@mediatek.com>
-Date: Thu, 1 Nov 2018 14:02:19 +0800
-Subject: [PATCH] spi: mediatek: add spi support for mt8183 IC
+Date: Thu, 1 Nov 2018 14:02:18 +0800
+Subject: [PATCH] spi: mediatek: Add bindings for mediatek MT8183 soc platform
 
-this patch add support for mt8183 IC.
+This patch adds a DT binding documentation for the MT8183 soc.
 
 Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-mt65xx.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 3dc31627c655..f3119d82150e 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -120,6 +120,12 @@ static const struct mtk_spi_compatible mt8173_compat = {
- 	.must_tx = true,
- };
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+index 236dcb0faf37..7940940b43e6 100644
+--- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -8,6 +8,7 @@ Required properties:
+     - mediatek,mt7622-spi: for mt7622 platforms
+     - mediatek,mt8135-spi: for mt8135 platforms
+     - mediatek,mt8173-spi: for mt8173 platforms
++    - mediatek,mt8183-spi: for mt8183 platforms
  
-+static const struct mtk_spi_compatible mt8183_compat = {
-+	.need_pad_sel = true,
-+	.must_tx = true,
-+	.enhance_timing = true,
-+};
-+
- /*
-  * A piece of default chip info unless the platform
-  * supplies it.
-@@ -150,6 +156,9 @@ static const struct of_device_id mtk_spi_of_match[] = {
- 	{ .compatible = "mediatek,mt8173-spi",
- 		.data = (void *)&mt8173_compat,
- 	},
-+	{ .compatible = "mediatek,mt8183-spi",
-+		.data = (void *)&mt8183_compat,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, mtk_spi_of_match);
+ - #address-cells: should be 1.
+ 
 -- 
 2.19.0.rc2
