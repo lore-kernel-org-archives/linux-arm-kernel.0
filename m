@@ -1,363 +1,77 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 5 Nov 2018 12:23:46 +0530
-Subject: [PATCH 09/10] drm/panel: Add Feiyang FY07024DI26A30-D MIPI-DSI
- LCD panel
-In-Reply-To: <20181104204354.GA12651@ravnborg.org>
-References: <20181103100900.30313-1-jagan@amarulasolutions.com>
- <20181103100900.30313-10-jagan@amarulasolutions.com>
- <20181104204354.GA12651@ravnborg.org>
-Message-ID: <CAMty3ZDhg2w4_0byeLN6r811tdWUf2v3_LDx2nbDbnOye7fy+w@mail.gmail.com>
+From: zhlcindy@gmail.com (Li Zhang)
+Date: Mon, 5 Nov 2018 15:19:50 +0800
+Subject: kvm-unit-tests gicv2 cases fail
+In-Reply-To: <86a7mt2ix9.wl-marc.zyngier@arm.com>
+References: <CAD8of+q29DrQa4Ay6karXC19vXzX++2T8FR-V1SAjGuO0ejYhQ@mail.gmail.com>
+ <20181101101048.GJ12057@e113682-lin.lund.arm.com>
+ <86a7mt2ix9.wl-marc.zyngier@arm.com>
+Message-ID: <CAD8of+qMPs=miB6O_wyS6E8cyO3PjubDUmLV0p6Oikb9g15s1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 5, 2018 at 2:14 AM Sam Ravnborg <sam@ravnborg.org> wrote:
+On Thu, Nov 1, 2018 at 6:25 PM Marc Zyngier <marc.zyngier@arm.com> wrote:
 >
-> Hi Jagan.
+> [Thanks Christoffer for cc'ing me]
 >
-> Reading through the driver triggered a few comments.
-> Read and decide what is usefull.
->
->         Sam
->
-> > Add panel driver for it.
+> On Thu, 01 Nov 2018 10:10:48 +0000,
+> Christoffer Dall <christoffer.dall@arm.com> wrote:
 > >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> > Note: init sequence is referenced from
-> > https://github.com/longsleep/linux-pine64/blob/pine64-hacks-1.2/drivers/video/sunxi/disp2/disp/lcd/mb709_mipi.c
+> > On Thu, Oct 18, 2018 at 05:17:57PM +0800, Li Zhang wrote:
+> > > Hi,
+> > >
+> > > I run kvm-units-test on ARM server(QDF2400), but gicv2-ipi,
+> > > gicv2-active cases fail.
+> >
+> > I didn't think QDF2400 has GICv2 on GICv3 support?
+> >
+> > Do the test cases fail or are they reported as skipped?
+> >
+> > > By debuging kvm-unit-tests source code, I found that interrupt is not
+> > > handled. do_handle_exception is not called.
+> > >
+> > > By looking into KVM source code, it has GICv2 emulation on GICv3 support.
+> > > I've tried a lot of kernel versions, from v4.12~v4.19 in mainline,
+> > > these cases always fail.
+> > > Is it possible that hardware/software disables this?
 >
-> This note should perferably be part of the commit message or maybe included
-> in the code so it is easie to track back.
->
->
-> > +++ b/drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
-> > +/*
-> > + * Copyright (C) 2018 Amarula Solutions
-> > + * Author: Jagan Teki <jagan@amarulasolutions.com>
-> > + */
-> > +
-> > +#include <linux/backlight.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/device.h>
-> > +#include <linux/err.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/fb.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +
-> > +#include <linux/gpio/consumer.h>
-> > +#include <linux/regulator/consumer.h>
-> > +
-> > +#include <drm/drm_mipi_dsi.h>
-> > +#include <drm/drm_modes.h>
-> > +#include <drm/drm_panel.h>
-> > +
->
->
->
-> > +#include <video/mipi_display.h>
->
-> I cannot see this include is used anywhere in this .c file.
-> The few MIPI_ constants originates from <drm/drm_mipi_dsi.h>
-> and I think the include can be dropped.
->
-> > +struct fy07024di26a30d {
-> > +     struct drm_panel        panel;
-> > +     struct mipi_dsi_device  *dsi;
-> > +
-> > +     struct backlight_device *backlight;
-> > +     struct regulator        *dvdd;
-> > +     struct regulator        *avdd;
-> > +     struct gpio_desc        *reset;
-> > +
-> > +     bool                    is_enabled;
-> > +     bool                    is_prepared;
-> > +};
-> Maybe bikeshedding a little here.
-> But the use of names like fy07024di26a30d does not help readability.
-> Just name it feiyang like for example we see in panel-innolux-p079zca.c
-> where this drives is somehow inspired from. (Here the name is innolux).
->
->
->
-> > +
-> > +static inline struct fy07024di26a30d *panel_to_fy07024di26a30d(struct drm_panel *panel)
-> > +{
-> > +     return container_of(panel, struct fy07024di26a30d, panel);
-> > +}
-> > +
-> > +struct fy07024di26a30d_init_cmd {
-> > +     size_t len;
-> > +     const char *data;
-> > +};
-> > +
-> > +#define FY07024DI26A30D(...) { \
-> > +     .len = sizeof((char[]){__VA_ARGS__}), \
-> > +     .data = (char[]){__VA_ARGS__} }
-> > +
-> > +static const struct fy07024di26a30d_init_cmd fy07024di26a30d_init_cmds[] = {
-> > +     FY07024DI26A30D(0x80, 0x58),
-> > +     FY07024DI26A30D(0x81, 0x47),
-> > +     FY07024DI26A30D(0x82, 0xD4),
-> > +     FY07024DI26A30D(0x83, 0x88),
-> > +     FY07024DI26A30D(0x84, 0xA9),
-> > +     FY07024DI26A30D(0x85, 0xC3),
-> > +     FY07024DI26A30D(0x86, 0x82),
-> > +};
-> > +
-> > +static int fy07024di26a30d_prepare(struct drm_panel *panel)
-> > +{
-> > +     struct fy07024di26a30d *ctx = panel_to_fy07024di26a30d(panel);
-> > +     struct mipi_dsi_device *dsi = ctx->dsi;
-> > +     unsigned int i;
-> > +     int ret;
-> > +
-> > +     if (ctx->is_prepared)
-> > +             return 0;
-> > +
-> > +     gpiod_set_value(ctx->reset, 1);
-> > +     msleep(50);
-> > +
-> > +     gpiod_set_value(ctx->reset, 0);
-> > +     msleep(20);
-> > +
-> > +     gpiod_set_value(ctx->reset, 1);
-> > +     msleep(200);
-> > +
-> > +     for (i = 0; i < ARRAY_SIZE(fy07024di26a30d_init_cmds); i++) {
-> > +             const struct fy07024di26a30d_init_cmd *cmd =
-> > +                                             &fy07024di26a30d_init_cmds[i];
-> > +
-> > +             ret = mipi_dsi_dcs_write_buffer(dsi, cmd->data, cmd->len);
-> > +             if (ret < 0)
-> > +                     return ret;
-> > +     }
-> > +
-> > +     ret = mipi_dsi_dcs_set_display_on(dsi);
-> > +     if (ret < 0) {
-> > +             dev_err(panel->dev, "failed to set display on: %d\n", ret);
-> > +             return ret;
-> > +     }
-> General comment.
-> Consider using DRM_DEV_ERROR(...) to be consistent with
-> what is used in many other drm drivers.
->
->
-> > +static int fy07024di26a30d_enable(struct drm_panel *panel)
-> > +{
-> > +     struct fy07024di26a30d *ctx = panel_to_fy07024di26a30d(panel);
-> > +
-> > +     if (ctx->is_enabled)
-> > +             return 0;
-> > +
-> > +     msleep(120);
-> This msleep() looks unjustified, as no other statement preceed it.
-> If prepare() requires a delay then maybe the delay should be there?
+> Most implementations do not have the v2 compatibility interface, and
+> nobody really needs it. This is a convenient way to run older VMs that
+> do not know about GICv3 (32bit VMs, for example), but that's in no way
+> a common setup.
 
-I will use mipi_dsi_dcs_set_display_on in enable and this can be
-proper place other than prepare, since after prepare enable is the
-caller.
+I see, thanks for your explanation.
 
 >
-> > +
-> > +static int fy07024di26a30d_unprepare(struct drm_panel *panel)
-> > +{
-> > +     struct fy07024di26a30d *ctx = panel_to_fy07024di26a30d(panel);
-> > +     int ret;
-> > +
-> > +     if (!ctx->is_prepared)
-> > +             return 0;
-> > +
-> > +     ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
-> > +     if (ret < 0)
-> > +             dev_err(panel->dev, "failed to set display off: %d\n", ret);
-> > +
-> > +     ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
-> > +     if (ret < 0)
-> > +             dev_err(panel->dev, "failed to enter sleep mode: %d\n", ret);
-> > +
-> > +     msleep(100);
-> > +
-> > +     regulator_disable(ctx->avdd);
-> > +
-> > +     regulator_disable(ctx->dvdd);
-> > +
-> > +     gpiod_set_value(ctx->reset, 0);
-> > +
-> > +     gpiod_set_value(ctx->reset, 1);
-> > +
-> > +     gpiod_set_value(ctx->reset, 0);
+> > >
+> > > It seems that GICv2 is a little old for ARM server, I am confused when
+> > > we can use it.
+> > > Do we need to care about these cases?
+> > >
+> >
+> > I don't think you need to care.  I believe Marc has run the
+> > GICv2-on-GICv3 tests on his supported platforms with recent
+> > kvm-unit-tests and other have reported succes as well.
 >
-> In prepare() there are dealys around asserting reset and releasing again.
-> Consider using a small helper function and be consistent with the
-> delays.
-
-Do you think exit calls also need delays?
-
+> Here you go (on my Chromebook running 4.18):
 >
-> > +
-> > +     ctx->is_prepared = false;
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static const struct drm_display_mode fy07024di26a30d_default_mode = {
-> > +     .clock = 55000,
-> > +     .vrefresh = 60,
-> > +
-> > +     .hdisplay = 1024,
-> > +     .hsync_start = 1024 + 396,
-> > +     .hsync_end = 1024 + 396 + 20,
-> > +     .htotal = 1024 + 396 + 20 + 100,
-> > +
-> > +     .vdisplay = 600,
-> > +     .vsync_start = 600 + 12,
-> > +     .vsync_end = 600 + 12 + 2,
-> > +     .vtotal = 600 + 12 + 2 + 21,
-> > +};
-> Consider to assign .flags - if for nothign else then to document
-> the default values.
-> Many panels have started to do so in panel-simple.c for instance.
-
-I don't see .flags handle is done via bsp driver or with dts, ie
-reason I didn't use it.
-
+> PASS gicv2-ipi (3 tests)
+> PASS gicv2-mmio (17 tests)
+> PASS gicv2-mmio-up (17 tests)
+> PASS gicv2-mmio-3p (17 tests)
+> PASS gicv3-ipi (3 tests)
+> PASS gicv2-active (1 tests)
+> PASS gicv3-active (1 tests)
 >
-> This is also a proper place to specify the width_mm and height_mm,
-> so the physical size is available.
-> Assuming this is known.
-
-Correct, I saw these active width, height is mentioned in datasheet.
-but the BSP tested dts simply initialized to 0 so I'm not using it.
-[2]
-
+> Thanks,
 >
-> > +
-> > +static int fy07024di26a30d_get_modes(struct drm_panel *panel)
-> > +{
-> > +     struct drm_connector *connector = panel->connector;
-> > +     struct fy07024di26a30d *ctx = panel_to_fy07024di26a30d(panel);
-> > +     struct drm_display_mode *mode;
-> > +
-> > +     mode = drm_mode_duplicate(panel->drm, &fy07024di26a30d_default_mode);
-> > +     if (!mode) {
-> > +             dev_err(&ctx->dsi->dev, "failed to add mode %ux%ux@%u\n",
-> > +                     fy07024di26a30d_default_mode.hdisplay,
-> > +                     fy07024di26a30d_default_mode.vdisplay,
-> > +                     fy07024di26a30d_default_mode.vrefresh);
-> > +             return -ENOMEM;
-> > +     }
-> > +
-> > +     drm_mode_set_name(mode);
-> > +
-> > +     mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-> > +     drm_mode_probed_add(connector, mode);
-> > +
-> > +     return 1;
-> > +}
-> > +
-> > +static const struct drm_panel_funcs fy07024di26a30d_funcs = {
-> > +     .disable = fy07024di26a30d_disable,
-> > +     .unprepare = fy07024di26a30d_unprepare,
-> > +     .prepare = fy07024di26a30d_prepare,
-> > +     .enable = fy07024di26a30d_enable,
-> > +     .get_modes = fy07024di26a30d_get_modes,
-> > +};
-> > +
-> > +static int fy07024di26a30d_dsi_probe(struct mipi_dsi_device *dsi)
-> > +{
-> > +     struct device_node *np;
-> > +     struct fy07024di26a30d *ctx;
-> > +     int ret;
-> > +
-> > +     ctx = devm_kzalloc(&dsi->dev, sizeof(*ctx), GFP_KERNEL);
-> > +     if (!ctx)
-> > +             return -ENOMEM;
-> > +     mipi_dsi_set_drvdata(dsi, ctx);
-> > +     ctx->dsi = dsi;
-> > +
-> > +     drm_panel_init(&ctx->panel);
-> > +     ctx->panel.dev = &dsi->dev;
-> > +     ctx->panel.funcs = &fy07024di26a30d_funcs;
-> > +
-> > +     ctx->dvdd = devm_regulator_get(&dsi->dev, "dvdd");
-> > +     if (IS_ERR(ctx->dvdd)) {
-> > +             dev_err(&dsi->dev, "Couldn't get dvdd regulator\n");
-> > +             return PTR_ERR(ctx->dvdd);
-> > +     }
-> > +
-> > +     ctx->avdd = devm_regulator_get(&dsi->dev, "avdd");
-> > +     if (IS_ERR(ctx->avdd)) {
-> > +             dev_err(&dsi->dev, "Couldn't get avdd regulator\n");
-> > +             return PTR_ERR(ctx->avdd);
-> > +     }
-> > +
-> > +     ret = regulator_enable(ctx->dvdd);
-> > +     if (ret)
-> > +             return ret;
-> > +
-> > +     msleep(100);
-> > +
-> > +     ret = regulator_enable(ctx->avdd);
-> > +     if (ret)
-> > +             return ret;
-> > +
-> > +     msleep(5);
-> The regulators are only enabled in the probe function.
-> But disabled in the unprepare() function.
+>         M.
 >
-> Looking at other drivers is seems that the common way is
-> to enable these in prepare() and disable these in unprepare().
-> Any particular reason the regulators are enabled in probe()?
-> Maybe something to do with backlight?
-> If so, then please put a comment.
-> Also consider if there is somethign missing, as the panel cannot
-> be used anymore after an unpreare()
+> --
+> Jazz is not dead, it just smell funny.
 
-Yes, ie true with many panels resides in mainline. but this panel is
-enabling regulators separately wrt reset. not done in inline. But it
-still work for me if I enable regulators in prepare, but not sure does
-it may any issues.
 
->
->
-> > +
-> > +     ctx->reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
-> > +     if (IS_ERR(ctx->reset)) {
-> > +             dev_err(&dsi->dev, "Couldn't get our reset GPIO\n");
-> > +             return PTR_ERR(ctx->reset);
-> > +     }
-> > +
-> > +     np = of_parse_phandle(dsi->dev.of_node, "backlight", 0);
-> > +     if (np) {
-> > +             ctx->backlight = of_find_backlight_by_node(np);
-> > +             of_node_put(np);
-> > +
-> > +             if (!ctx->backlight)
-> > +                     return -EPROBE_DEFER;
-> > +     }
-> > +
-> > +     ret = drm_panel_add(&ctx->panel);
-> > +     if (ret < 0)
-> > +             return ret;
-> > +
-> > +     dsi->mode_flags = MIPI_DSI_MODE_VIDEO_BURST;
-> > +     dsi->format = MIPI_DSI_FMT_RGB888;
-> > +     dsi->lanes = 4;
-> > +
-> > +     return mipi_dsi_attach(dsi);
-> Several drivers undo the drm_panel_add() if mipi_dsi_attach() fails.
-> I dunno if this is correct and when it may fail.
 
-Yes it should be drm_panel_remove for fail case, will take care.
+-- 
 
->
->
-> > +MODULE_DESCRIPTION("Feiyang FY07024DI26A30-D MIPI-DSI LCD panel");
->
-> > +MODULE_LICENSE("GPL v2");
-> The SPDX tag mentioned MIT - so the above may not be correct.
-
-Correct, "GPL V2+ MIT" is fine?
-
-[2] https://github.com/armbian/build/blob/master/packages/blobs/sunxi/a64/pine64so.dts#L2182
+Best Regards
+-Li
