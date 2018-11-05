@@ -1,91 +1,49 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 5 Nov 2018 10:32:12 +0100
-Subject: [PATCH] arm64: dts: zynqmp: replace gpio-key,wakeup with
- wakeup-source property
-In-Reply-To: <20181024114540.5196-2-sudeep.holla@arm.com>
-References: <20181024114540.5196-1-sudeep.holla@arm.com>
- <20181024114540.5196-2-sudeep.holla@arm.com>
-Message-ID: <5f430204-9c97-0351-ff63-e64e8d42da69@xilinx.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 5 Nov 2018 10:20:04 +0100
+Subject: [PATCH 13/14] DT: marvell,mmp2: add OTG PHY
+In-Reply-To: <20180822204307.13251-14-lkundrak@v3.sk>
+References: <20180822204307.13251-1-lkundrak@v3.sk>
+ <20180822204307.13251-14-lkundrak@v3.sk>
+Message-ID: <20181105092004.GK4439@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24. 10. 18 13:45, Sudeep Holla wrote:
-> Most of the legacy "gpio-key,wakeup" boolean property is already
-> replaced with "wakeup-source". However few occurrences of old property
-> has popped up again, probably from the remnants in downstream trees.
+On Wed 2018-08-22 22:43:06, Lubomir Rintel wrote:
+> The USB OTG PHY chip. To be used by the OTG controller.
 > 
-> This patch replaces the legacy properties with the unified
-> "wakeup-source" property.
-> 
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 2 +-
->  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts | 2 +-
->  arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts | 2 +-
->  arch/arm64/boot/dts/xilinx/zynqmp-zcu111-revA.dts | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> index eb5e8bddb610..527b4d0f88e2 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-> @@ -49,7 +49,7 @@
->  			label = "sw4";
->  			gpios = <&gpio 23 GPIO_ACTIVE_LOW>;
->  			linux,code = <KEY_POWER>;
-> -			gpio-key,wakeup;
-> +			wakeup-source;
->  			autorepeat;
->  		};
->  	};
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
-> index 25dd57485323..0397bf66b2e7 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
-> @@ -46,7 +46,7 @@
->  			label = "sw19";
->  			gpios = <&gpio 22 GPIO_ACTIVE_HIGH>;
->  			linux,code = <KEY_DOWN>;
-> -			gpio-key,wakeup;
-> +			wakeup-source;
->  			autorepeat;
->  		};
->  	};
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts
-> index 259f21b0c001..7238f022a671 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts
-> @@ -46,7 +46,7 @@
->  			label = "sw19";
->  			gpios = <&gpio 22 GPIO_ACTIVE_HIGH>;
->  			linux,code = <KEY_DOWN>;
-> -			gpio-key,wakeup;
-> +			wakeup-source;
->  			autorepeat;
->  		};
->  	};
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu111-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu111-revA.dts
-> index a61b3cc6f4c9..fa055e718d4b 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu111-revA.dts
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu111-revA.dts
-> @@ -46,7 +46,7 @@
->  			label = "sw19";
->  			gpios = <&gpio 22 GPIO_ACTIVE_HIGH>;
->  			linux,code = <KEY_DOWN>;
-> -			gpio-key,wakeup;
-> +			wakeup-source;
->  			autorepeat;
->  		};
->  	};
-> --
-> 2.17.1
-> 
-> 
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 
-Will be good to point to 700a38b27eefc which introduced but that's fine.
+Acked-by: Pavel Machek <pavel@ucw.cz>
 
-Applied.
+>  arch/arm/boot/dts/mmp2.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
+> index 766bbb8495b6..14a3448f38b9 100644
+> --- a/arch/arm/boot/dts/mmp2.dtsi
+> +++ b/arch/arm/boot/dts/mmp2.dtsi
+> @@ -117,6 +117,13 @@
+>  				reg-names = "mux status", "mux mask";
+>  				mrvl,intc-nr-irqs = <2>;
+>  			};
+> +
+> +			usb_otg_phy0: usb-otg-phy at d4207000 {
+> +				compatible = "marvell,mmp2-usb-phy";
+> +				reg = <0xd4207000 0x40>;
+> +				#phy-cells = <0>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		apb at d4000000 {	/* APB */
 
-Thanks,
-Michal
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/727a271a/attachment.sig>
