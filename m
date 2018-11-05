@@ -1,112 +1,69 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  5 Nov 2018 14:54:27 -0800
-Subject: [PATCH v4 2/6] arch: Make phys_initrd_start and phys_initrd_size
- global variables
-In-Reply-To: <20181105225431.24485-1-f.fainelli@gmail.com>
-References: <20181105225431.24485-1-f.fainelli@gmail.com>
-Message-ID: <20181105225431.24485-3-f.fainelli@gmail.com>
+Date: Mon,  5 Nov 2018 14:54:25 -0800
+Subject: [PATCH v4 0/6] arm64: Get rid of __early_init_dt_declare_initrd()
+Message-ID: <20181105225431.24485-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make phys_initrd_start and phys_initrd_size global variables declared in
-init/do_mounts_initrd.c such that we can later have generic code in
-drivers/of/fdt.c populate those variables for us.
+Hi all,
 
-This requires both the ARM and unicore32 implementations to be properly
-guarded against CONFIG_BLK_DEV_INITRD, and also initialize the variables
-to the expected default values (unicore32).
+Changes in v4:
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mm/init.c       |  5 ++---
- arch/unicore32/mm/init.c | 10 +++++++---
- include/linux/initrd.h   |  3 +++
- init/do_mounts_initrd.c  |  3 +++
- 4 files changed, 15 insertions(+), 6 deletions(-)
+- dropped initrd_below_start_ok assignment in ARM64, not necessary at
+  all (Ard)
+- replace #ifdef CONFIG_BLK_DEV_INITRD with if
+  (IS_ENABLED(CONFIG_BLK_DEV_INITRD) for consistency with other parts
+  of arm64_memblock_init() (Rob)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 32e4845af2b6..438625764ccd 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -50,9 +50,7 @@ unsigned long __init __clear_cr(unsigned long mask)
- }
- #endif
- 
--static phys_addr_t phys_initrd_start __initdata = 0;
--static unsigned long phys_initrd_size __initdata = 0;
--
-+#ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
- {
- 	phys_addr_t start;
-@@ -89,6 +87,7 @@ static int __init parse_tag_initrd2(const struct tag *tag)
- }
- 
- __tagtable(ATAG_INITRD2, parse_tag_initrd2);
-+#endif
- 
- static void __init find_limits(unsigned long *min, unsigned long *max_low,
- 			       unsigned long *max_high)
-diff --git a/arch/unicore32/mm/init.c b/arch/unicore32/mm/init.c
-index cf4eb9481fd6..02aa2c0b295e 100644
---- a/arch/unicore32/mm/init.c
-+++ b/arch/unicore32/mm/init.c
-@@ -30,9 +30,7 @@
- 
- #include "mm.h"
- 
--static unsigned long phys_initrd_start __initdata = 0x01000000;
--static unsigned long phys_initrd_size __initdata = SZ_8M;
--
-+#ifdef CONFIG_BLK_DEV_INITRD
- static int __init early_initrd(char *p)
- {
- 	unsigned long start, size;
-@@ -48,6 +46,7 @@ static int __init early_initrd(char *p)
- 	return 0;
- }
- early_param("initrd", early_initrd);
-+#endif
- 
- /*
-  * This keeps memory configuration data used by a couple memory
-@@ -156,6 +155,11 @@ void __init uc32_memblock_init(struct meminfo *mi)
- 	memblock_reserve(__pa(_text), _end - _text);
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-+	if (!phys_initrd_size) {
-+		phys_initrd_start = 0x01000000;
-+		phys_initrd_size = SZ_8M;
-+	}
-+
- 	if (phys_initrd_size) {
- 		memblock_reserve(phys_initrd_start, phys_initrd_size);
- 
-diff --git a/include/linux/initrd.h b/include/linux/initrd.h
-index 84b423044088..14beaff9b445 100644
---- a/include/linux/initrd.h
-+++ b/include/linux/initrd.h
-@@ -21,4 +21,7 @@ extern int initrd_below_start_ok;
- extern unsigned long initrd_start, initrd_end;
- extern void free_initrd_mem(unsigned long, unsigned long);
- 
-+extern phys_addr_t phys_initrd_start;
-+extern unsigned long phys_initrd_size;
-+
- extern unsigned int real_root_dev;
-diff --git a/init/do_mounts_initrd.c b/init/do_mounts_initrd.c
-index d1a5d885ce13..45865b72f4ea 100644
---- a/init/do_mounts_initrd.c
-+++ b/init/do_mounts_initrd.c
-@@ -16,6 +16,9 @@ int initrd_below_start_ok;
- unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
- static int __initdata mount_initrd = 1;
- 
-+phys_addr_t phys_initrd_start __initdata;
-+unsigned long phys_initrd_size __initdata;
-+
- static int __init no_initrd(char *str)
- {
- 	mount_initrd = 0;
+Changes in v3:
+
+- use C conditionals in drivers/of/fdt.c
+- added check on phys_initrd_size in arch/arm64/mm/init.c to determine
+  whether initrd_start must be populated
+- fixed a build warning with ARC that was just missing an (unsigned
+  long) cast
+
+Changes in v2:
+
+- get rid of ARCH_HAS_PHYS_INITRD and instead define
+  phys_initrd_start/phys_initrd_size in init/do_mounts_initrd.c
+
+- make __early_init_dt_declare_initrd() account for ARM64 specific
+  behavior with __va() when having CONFIG_DEBUG_VM enabled
+
+- consolidate early_initrd() command line parsing into
+  init/do_mounts_initrd.c
+
+Because phys_initrd_start/phys_initrd_size are now compiled in
+ini/do_mounts_initrd.c which is only built with CONFIG_BLK_DEV_INITRD=y,
+we need to be a bit careful about the uses throughout architecture
+specific code.
+
+Previous discussions/submissions list here:
+
+v3:
+https://www.spinics.net/lists/arm-kernel/msg683566.html
+v2:
+https://lkml.org/lkml/2018/10/25/4
+
+Florian Fainelli (6):
+  nds32: Remove phys_initrd_start and phys_initrd_size
+  arch: Make phys_initrd_start and phys_initrd_size global variables
+  of/fdt: Populate phys_initrd_start/phys_initrd_size from FDT
+  arm64: Utilize phys_initrd_start/phys_initrd_size
+  of/fdt: Remove custom __early_init_dt_declare_initrd() implementation
+  arch: Move initrd= parsing into do_mounts_initrd.c
+
+ arch/arc/mm/init.c              | 25 +++++-------------------
+ arch/arm/mm/init.c              | 28 ++-------------------------
+ arch/arm64/include/asm/memory.h |  8 --------
+ arch/arm64/mm/init.c            | 34 ++++++---------------------------
+ arch/nds32/mm/init.c            |  2 --
+ arch/unicore32/mm/init.c        | 24 +++++------------------
+ drivers/of/fdt.c                | 17 ++++++++++++-----
+ include/linux/initrd.h          |  3 +++
+ init/do_mounts_initrd.c         | 20 +++++++++++++++++++
+ 9 files changed, 53 insertions(+), 108 deletions(-)
+
 -- 
 2.17.1
