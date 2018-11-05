@@ -1,113 +1,195 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Nov 2018 16:13:05 +0000
-Subject: [PATCH] arm64: KVM: Don't generate UNDEF when LORegion feature
- is present
-In-Reply-To: <20181105153026.169248-1-marc.zyngier@arm.com>
-References: <20181105153026.169248-1-marc.zyngier@arm.com>
-Message-ID: <20181105161305.i56nv2exikmko347@lakrids.cambridge.arm.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 5 Nov 2018 21:50:36 +0530
+Subject: [PATCH v2 09/10] irqchip: ti-sci-inta: Add support for Interrupt
+ Aggregator driver
+In-Reply-To: <c2e7c31d-95c7-5ae2-fea3-ed4fcbb73746@arm.com>
+References: <20181018154017.7112-1-lokeshvutla@ti.com>
+ <20181018154017.7112-10-lokeshvutla@ti.com>
+ <b20127dc-be43-3b00-9960-663738df0069@arm.com>
+ <9969f24c-cdb0-1f5c-d0f4-b1c1f587325c@ti.com>
+ <86va5ssrfm.wl-marc.zyngier@arm.com>
+ <b3a71622-7734-04be-0b0c-38e9dc6542d4@ti.com>
+ <63ba5353-8470-b4c1-64a8-a1df5bf48614@ti.com>
+ <86va5myz7t.wl-marc.zyngier@arm.com>
+ <81136b74-4b45-f44b-0168-23d191a4fb5e@ti.com>
+ <c8778f4a-148a-2b4d-6dd9-7b7ca89b20a9@ti.com>
+ <c2e7c31d-95c7-5ae2-fea3-ed4fcbb73746@arm.com>
+Message-ID: <a7e3095f-0ceb-838b-d8dc-b2e864c02d20@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 03:30:26PM +0000, Marc Zyngier wrote:
-> We currently hide the LORegion feature, and generate an UNDEF
-> if the guest dares using the corresponding registers. This is
-> a bit extreme, as ARMv8.1 guarantees the feature to be present.
-> 
-> The guest should check the feature register before doing anything,
-> but we could also give the guest some slack (read "allow the
-> guest to be a bit stupid").
-> 
-> So instead of unconditionnaly deliver an exception, let's
-> only do it when the host doesn't support LORegion at all (or
-> when the feature has been sanitized out), and treat the registers
-> as RAZ/WI otherwise (with the exception of LORID_EL1 being RO).
-> 
-> Fixes: cc33c4e20185 ("arm64/kvm: Prohibit guest LOR accesses")
-> Suggested-by: Richard Henderson <richard.henderson@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 42 +++++++++++++++++++++++++--------------
->  1 file changed, 27 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 22fbbdbece3c..1133b74065f1 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -314,12 +314,29 @@ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
->  		return read_zero(vcpu, p);
->  }
->  
-> -static bool trap_undef(struct kvm_vcpu *vcpu,
-> -		       struct sys_reg_params *p,
-> -		       const struct sys_reg_desc *r)
-> +/*
-> + * ARMv8.1 mandates at least a trivial LORegion implementation, where all the
-> + * RW registers are RES0 (which we can implement as RAZ/WI). On an ARMv8.0
-> + * system, these registers should UNDEF. LORID_EL1 being a RO register, we
-> + * treat it separately.
-> + */
-> +static bool trap_loregion(struct kvm_vcpu *vcpu,
-> +			  struct sys_reg_params *p,
-> +			  const struct sys_reg_desc *r)
->  {
-> -	kvm_inject_undefined(vcpu);
-> -	return false;
-> +	u64 val = read_sanitised_ftr_reg(SYS_ID_AA64MMFR1_EL1);
-> +	u32 sr = sys_reg((u32)r->Op0, (u32)r->Op1,
-> +			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-> +
+Hi Marc,
 
-It might be worth factoring this into a helper (e.g. param_to_reg(p)),
-since there are a few other places that this would help us to use
-mnemonics for.
-
-Either way:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> +	if (!(val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))) {
-> +		kvm_inject_undefined(vcpu);
-> +		return false;
-> +	}
-> +
-> +	if (p->is_write && sr == SYS_LORID_EL1)
-> +		return write_to_read_only(vcpu, p, r);
-> +
-> +	return trap_raz_wi(vcpu, p, r);
->  }
->  
->  static bool trap_oslsr_el1(struct kvm_vcpu *vcpu,
-> @@ -1040,11 +1057,6 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
->  			kvm_debug("SVE unsupported for guests, suppressing\n");
->  
->  		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-> -	} else if (id == SYS_ID_AA64MMFR1_EL1) {
-> -		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
-> -			kvm_debug("LORegions unsupported for guests, suppressing\n");
-> -
-> -		val &= ~(0xfUL << ID_AA64MMFR1_LOR_SHIFT);
->  	}
->  
->  	return val;
-> @@ -1330,11 +1342,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	{ SYS_DESC(SYS_MAIR_EL1), access_vm_reg, reset_unknown, MAIR_EL1 },
->  	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
->  
-> -	{ SYS_DESC(SYS_LORSA_EL1), trap_undef },
-> -	{ SYS_DESC(SYS_LOREA_EL1), trap_undef },
-> -	{ SYS_DESC(SYS_LORN_EL1), trap_undef },
-> -	{ SYS_DESC(SYS_LORC_EL1), trap_undef },
-> -	{ SYS_DESC(SYS_LORID_EL1), trap_undef },
-> +	{ SYS_DESC(SYS_LORSA_EL1), trap_loregion },
-> +	{ SYS_DESC(SYS_LOREA_EL1), trap_loregion },
-> +	{ SYS_DESC(SYS_LORN_EL1), trap_loregion },
-> +	{ SYS_DESC(SYS_LORC_EL1), trap_loregion },
-> +	{ SYS_DESC(SYS_LORID_EL1), trap_loregion },
->  
->  	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
->  	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
-> -- 
-> 2.19.1
+On Monday 05 November 2018 09:06 PM, Marc Zyngier wrote:
+> On 05/11/18 08:08, Lokesh Vutla wrote:
+>> Hi Marc,
+>>
+>> On Monday 29 October 2018 06:34 PM, Lokesh Vutla wrote:
+>>> Hi Marc,
+>>>
+>>> On Sunday 28 October 2018 07:01 PM, Marc Zyngier wrote:
+>>>> Hi Lokesh,
+>>>>
+>>>> On Fri, 26 Oct 2018 21:19:41 +0100,
+>>>> Lokesh Vutla <lokeshvutla@ti.com> wrote:
+>>>>>
+>>>>> Hi Marc,
+>>>>>
+>>>>> [..snip..]
+>>>>>>> [...]
+>>>>>>>
+>>>>>>>>>> +/**
+>>>>>>>>>> + * ti_sci_inta_register_event() - Register a event to an interrupt aggregator
+>>>>>>>>>> + * @dev:	Device pointer to source generating the event
+>>>>>>>>>> + * @src_id:	TISCI device ID of the event source
+>>>>>>>>>> + * @src_index:	Event source index within the device.
+>>>>>>>>>> + * @virq:	Linux Virtual IRQ number
+>>>>>>>>>> + * @flags:	Corresponding IRQ flags
+>>>>>>>>>> + * @ack_needed:	If explicit clearing of event is required.
+>>>>>>>>>> + *
+>>>>>>>>>> + * Creates a new irq and attaches to IA domain if virq is not specified
+>>>>>>>>>> + * else attaches the event to vint corresponding to virq.
+>>>>>>>>>> + * When using TISCI within the client drivers, source indexes are always
+>>>>>>>>>> + * generated dynamically and cannot be represented in DT. So client
+>>>>>>>>>> + * drivers should call this API instead of platform_get_irq().
+>>>>>>>>>
+>>>>>>>>> NAK. Either this fits in the standard model, or we adapt the standard
+>>>>>>>>> model to catter for your particular use case. But we don't define a new,
+>>>>>>>>> TI specific API.
+>>>>>>>>>
+>>>>>>>>> I have a hunch that if the IDs are generated dynamically, then the model
+>>>>>>>>> we use for MSIs would fit this thing. I also want to understand what
+>>>>>>>>
+>>>>>>>> hmm..I haven't thought about using MSI. Will try to explore it. But
+>>>>>>>> the "struct msi_msg" is not applicable in this case as device does not
+>>>>>>>> write to a specific location.
+>>>>>>>
+>>>>>>> It doesn't need to. You can perfectly ignore the address field and
+>>>>>>> only be concerned with the data. We already have MSI users that do not
+>>>>>>> need programming of the doorbell address, just the data.
+>>>>>>
+>>>>>
+>>>>> Just one more clarification.
+>>>>>
+>>>>> First let me explain the IRQ routes a bit deeply. As I said earlier
+>>>>> there are three ways in which IRQ can flow in AM65x SoC
+>>>>> 1) Device directly connected to GIC
+>>>>> 	- Device IRQ --> GIC
+>>>>> 2) Device connected to INTR.
+>>>>> 	- Device IRQ --> INTR --> GIC
+>>>>> 3) Devices connected to INTA.
+>>>>> 	- Device IRQ --> INTA --> INTR --> GIC
+>>>>>
+>>>>> 1 and 2 are straight forward and we use DT for IRQ
+>>>>> representation. Coming to 3 the trickier part is that Input to INTA
+>>>>> and output from INTA and dynamically managed. To be more specific:
+>>>>> - By hardware design there are certain set of physical global
+>>>>> events(interrupts) attached to an INTA. Out of which a certain range
+>>>>> are assigned to the current linux host that can be queried from
+>>>>> system-controller.
+>>>>> - Similarly out of all the INTA outputs(referenced as vints) a certain
+>>>>> range can be used by the current linux host.
+>>>>>
+>>>>>
+>>>>> So for configuring an IRQ route in case 3, the following steps are needed:
+>>>>> - Device id and device resource index for which the interrupt is needed
+>>>>
+>>>> THat is no different from a PCI device for example, where we need the
+>>>> requester ID and the number of the interrupt in the MSI-X table.
+>>>>
+>>>>> - A free event id from the range assigned to the INTA in this host context
+>>>>> - A free vint from the range assigned to the INTA in this host context
+>>>>> - A free gic IRQ from the range assigned to the INTR in this host context.
+>>>>
+>>>>    From what I understand of the driver, at least some of that is under
+>>>> the responsibility of the firmware, right? Or is the driver under
+>>>> control of all three parameters? To be honest, it doesn't really
+>>>
+>>> Driver should control all three parameters.
+>>>
+>>>> matter, as the as far as the kernel is concerned, the irqchip drivers
+>>>> are free to deal with the routing anyway they want.
+>>>
+>>> Correct, that's my understanding as well.
+>>>
+>>>>
+>>>>> With the above information, linux should send a message to
+>>>>> system-controller using TISCI protocol. After policing the given
+>>>>> information, system-controller does the following:
+>>>>> - Attaches the interrupt(INTA input) to the device resource index
+>>>>> - Muxes the interrupt(INTA input) to corresponding vint(INTA output)
+>>>>> - Muxes the vint(INTR input) to GIC irq(INTR output).
+>>>>
+>>>> Isn't there a 1:1 mapping between *used* INTR inputs and outputs?
+>>>> Since INTR is a router, there is no real muxing. I assume that the
+>>>> third point above is just a copy-paste error.
+>>>
+>>> Right, my bad. INTR is just a router and no read muxing.
+>>>
+>>>>
+>>>>>
+>>>>> For grouping of interrupts, the same vint number is to be passed to
+>>>>> system-controller for all the requests.
+>>>>>
+>>>>> Keeping all the above in mind, I see the following as software IRQ
+>>>>> Domain Hierarchy:
+>>>>>
+>>>>> 1) INTA multi MSI --> 2)INTA  -->3) MSI --> 4) INTR  -->5) GIC
+>>>>>
+>>>>> INTA driver has to set a chained IRQ using virq allocated from its
+>>>>> parent MSI. This is to differentiate the grouped interrupts within
+>>>>> INTA.
+>>>>>
+>>>>> Inorder to cover the above two MSI domains, a new bus driver has to be
+>>>>> created as I couldn't find a fit with the existing bus drivers.
+>>>>>
+>>>>> Does the above approach make sense? Please correct me if i am wrong.
+>>>>
+>>>> I think this can be further simplified, as you seem to assume that
+>>>> dynamic allocation implies MSI. This is not the case. You can
+>>>> perfectly use dynamically allocated interrupts and still not use MSIs.
+>>>>
+>>>> INTA is indeed a chained interrupt controller, as it may mux several
+>>>> inputs onto a single output. But the output of INTA is not an MSI. It
+>>>> is just a regular interrupt that can allocated when the first mapping
+>>>> gets established.
+>>>
+>>> okay. I guess it can just be done using irq_create_fwspec_mapping().
+>>>
+>>
+>> I am facing an issue with this approach as I am trying to call
+>> irq_create_fwspec_mapping() from alloc callback of INTA driver. During
+>> allocation the function call flow looks like:
+>>
+>> inta_msi_domain_alloc_irqs()
+>> 	msi_domain_alloc_irqs()
+>> 		__irq_domain_alloc_irqs()
+>> 			*mutex_lock(&irq_domain_mutex);*
+>> 			irq_domain_alloc_irqs_hierarchy()
+>> 				ti_sci_inta_irq_domain_alloc()
+>> 					if (first event in group)
+>> 							irq_create_fwspec_mapping()
+>> 								irq_find_matching_fwspec()
+>> 									*mutex_lock(&irq_domain_mutex);*
+>> 									
+>>
+>> The mutex_lock is called again if INTR IRQ gets allocated in alloc callback of
+>> INTA driver. So I am clearly calling irq_create_fwspec_mapping() from a wrong place.
 > 
+> The real issue is that you're are calling irq_create_fwspec_mapping at
+> all. This is only supposed to be called by the high level code, not an
+> irqchip driver in the middle of its own allocation.
+> 
+> The right API to use is irq_domain_alloc_irqs_parent(), which calls into
+> the parent domain allocation. See the multiple uses in the tree already.
+
+But irq_domain_alloc_irqs_parent() doesn't create a new IRQ mapping. Or your 
+suggestion is that when first event mapping gets established in the group, use 
+the same Linux virq number to allocate the parent interrupts?
+
+If yes, then wouldn't it be a problem during free irqs? client driver should 
+make sure that first event that gets allocated in the group should be the last 
+to be freed.
+
+Thanks and regards,
+Lokesh
