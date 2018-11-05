@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon,  5 Nov 2018 12:05:55 +0000 (GMT)
-Subject: Applied "spi: mediatek: Add bindings for mediatek MT8183 soc
- platform" to the spi tree
-In-Reply-To: <1541052139-8845-2-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20181105120555.D73F21124D98@debutante.sirena.org.uk>
+Date: Mon,  5 Nov 2018 12:06:04 +0000 (GMT)
+Subject: Applied "spi: rockchip: support lsb-first mode" to the spi tree
+In-Reply-To: <20181031105711.19575-15-esmil@mailme.dk>
+Message-ID: <20181105120604.996891124D98@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: mediatek: Add bindings for mediatek MT8183 soc platform
+   spi: rockchip: support lsb-first mode
 
 has been applied to the spi tree at
 
@@ -34,30 +33,41 @@ to this mail.
 Thanks,
 Mark
 
->From f611dfdb8544b5ac4228f4e3cb3b06ce15b9c74b Mon Sep 17 00:00:00 2001
-From: Leilk Liu <leilk.liu@mediatek.com>
-Date: Thu, 1 Nov 2018 14:02:18 +0800
-Subject: [PATCH] spi: mediatek: Add bindings for mediatek MT8183 soc platform
+>From 04290192f7ebe892828f69ac57c4684e25da378d Mon Sep 17 00:00:00 2001
+From: Emil Renner Berthing <kernel@esmil.dk>
+Date: Wed, 31 Oct 2018 11:57:11 +0100
+Subject: [PATCH] spi: rockchip: support lsb-first mode
 
-This patch adds a DT binding documentation for the MT8183 soc.
+Add missing support for lsb-first mode.
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/spi/spi-rockchip.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index 236dcb0faf37..7940940b43e6 100644
---- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -8,6 +8,7 @@ Required properties:
-     - mediatek,mt7622-spi: for mt7622 platforms
-     - mediatek,mt8135-spi: for mt8135 platforms
-     - mediatek,mt8173-spi: for mt8173 platforms
-+    - mediatek,mt8183-spi: for mt8183 platforms
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 9e47e81553a1..3912526ead66 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -476,6 +476,8 @@ static void rockchip_spi_config(struct rockchip_spi *rs,
  
- - #address-cells: should be 1.
+ 	cr0 |= rs->rsd << CR0_RSD_OFFSET;
+ 	cr0 |= (spi->mode & 0x3U) << CR0_SCPH_OFFSET;
++	if (spi->mode & SPI_LSB_FIRST)
++		cr0 |= CR0_FBM_LSB << CR0_FBM_OFFSET;
  
+ 	if (xfer->rx_buf && xfer->tx_buf)
+ 		cr0 |= CR0_XFM_TR << CR0_XFM_OFFSET;
+@@ -681,7 +683,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 
+ 	master->auto_runtime_pm = true;
+ 	master->bus_num = pdev->id;
+-	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP;
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP | SPI_LSB_FIRST;
+ 	master->num_chipselect = ROCKCHIP_SPI_MAX_CS_NUM;
+ 	master->dev.of_node = pdev->dev.of_node;
+ 	master->bits_per_word_mask = SPI_BPW_MASK(16) | SPI_BPW_MASK(8) | SPI_BPW_MASK(4);
 -- 
 2.19.0.rc2
