@@ -1,57 +1,34 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 5 Nov 2018 10:07:31 +0100
-Subject: [PATCH v3] ARM: dtsi: sun8i-r40: add mali node
-In-Reply-To: <20181101085710.15774-1-lothar.felten@gmail.com>
-References: <20181101085710.15774-1-lothar.felten@gmail.com>
-Message-ID: <20181105090731.vkcdwde5zmkxjzmc@flea>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Mon, 5 Nov 2018 10:12:30 +0100
+Subject: [PATCH] ARM: dts: i.MX25: add the clocks for the EPIT blocks
+In-Reply-To: <20181104144614.GJ26016@tiger>
+References: <1541093567-29205-1-git-send-email-martin@kaiser.cx>
+ <20181104144614.GJ26016@tiger>
+Message-ID: <20181105091230.z2ooz7olbdpopxyd@viti.kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,x
+Hi,
 
-On Thu, Nov 01, 2018 at 09:57:10AM +0100, Lothar Felten wrote:
-> This patch adds a node for the mali 400 GPU of the R40/V40 SoC
-> 
-> Signed-off-by: Lothar Felten <lothar.felten@gmail.com>
-> ---
-> Changes v2->v3:
-> - remove mali clock rates
-> - drop hdmi-phy sun50i-a64 compatibility  
-> - patch version, change log added
-> 
-> Changes v1->v2:
-> - commit message uppercase ARM prefix
-> - wrong patch submitted by mistake
-> ---
-> 
->  arch/arm/boot/dts/sun8i-r40.dtsi | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-> index 6f4c9ca5a3ee..136c248cc7d1 100644
-> --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> @@ -542,6 +542,28 @@
->  
->  		};
->  
-> +		mali: gpu at 1c40000 {
-> +			compatible = "allwinner,sun7i-a20-mali", "arm,mali-400";
+Thus wrote Shawn Guo (shawnguo at kernel.org):
 
-You should have an r40 compatible here. You can have a look at the
-A23-A33 DTSI compatible for an example if you want.
+> On Thu, Nov 01, 2018 at 06:32:47PM +0100, Martin Kaiser wrote:
+> > The i.MX25 contains two EPIT (Enhanced Periodic Interrupt Timer)
+> > function blocks. Add their ipg and per clocks to the device tree.
 
-Thanks!
-Maxime
+> > Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/5662b15f/attachment.sig>
+> Are these EPIT devices actually used in upstream kernel, or just
+> somewhere else?
+
+Until I saw Vladimir's mail this morning, I wasn't aware of any mainline
+driver that's using the EPIT devices. I found that the clocks are
+missing when I tried to use EPIT with a company-internal driver that's
+not suitable for mainline integration.
+
+Still, I think that merging this patch does no harm. If the EPIT devices
+are present in the DT, we should add all resources they're using.
+
+Thanks & best regards,
+
+   Martin
