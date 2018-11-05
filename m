@@ -1,55 +1,94 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 5 Nov 2018 11:38:57 +0100
-Subject: [PATCH 02/10] drm/sun4i: sun6i_mipi_dsi: Support instruction
- loop selection
-In-Reply-To: <20181103100900.30313-3-jagan@amarulasolutions.com>
-References: <20181103100900.30313-1-jagan@amarulasolutions.com>
- <20181103100900.30313-3-jagan@amarulasolutions.com>
-Message-ID: <20181105103857.lp7ayw3p6dbthehg@flea>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 5 Nov 2018 12:02:19 +0100
+Subject: [PATCH v3 0/6] New QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <20181105103625.9644-1-bugalski.piotr@gmail.com>
+References: <20181105103625.9644-1-bugalski.piotr@gmail.com>
+Message-ID: <20181105120219.03ab3b4c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 03, 2018 at 03:38:52PM +0530, Jagan Teki wrote:
-> Instruction loop selection would require before writing
-> loop number registers, so enable idle, LP11 bits on
-> loop selection register.
-> 
-> Reference code available in BSP
-> (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> (dsi_dev[sel]->dsi_inst_loop_sel.dwval = 2<<(4*DSI_INST_ID_LP11) |
-> 	3<<(4*DSI_INST_ID_DLY);
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index da152c21ec62..077b57ec964c 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -397,6 +397,10 @@ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
->  	struct mipi_dsi_device *device = dsi->device;
->  	u16 delay;
->  
-> +	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
-> +		     DSI_INST_ID_HSC  << (4 * DSI_INST_ID_LP11) |
-> +		     DSI_INST_ID_HSD  << (4 * DSI_INST_ID_DLY));
-> +
+Hi Piotr,
 
-Please put this with the other instructions settings below.
+On Mon,  5 Nov 2018 11:36:19 +0100
+Piotr Bugalski <bugalski.piotr@gmail.com> wrote:
 
-hanks!
-Maxime
- 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/3b9baa0b/attachment.sig>
+> Hello,
+> 
+> Atmel SAMA5D2 is equipped with two QSPI interfaces. These interfaces can
+> work as in SPI-compatible mode or use two / four lines to improve
+> communication speed. At the moment there is QSPI driver strongly tied to
+> NOR-flash memory and MTD subsystem.
+> Intention of this change is to provide new driver which will not be tied
+> to MTD and allows using QSPI with NAND-flash memory or other peripherals
+> New spi-mem API provides abstraction layer which can disconnect QSPI
+> from MTD. This driver doesn't support regular SPI interface, it should
+> be used with spi-mem interface only.
+> Unfortunately SAMA5D2 hardware by default supports only NOR-flash
+> memory. It allows 24- and 32-bit addressing while NAND-flash requires
+> 16-bit long. To workaround hardware limitation driver is a bit more
+> complicated.
+> 
+> Request to spi-mem contains three fiels: opcode (command), address,
+> dummy bytes. SAMA5D2 QSPI hardware supports opcode, address, dummy and
+> option byte where address field can only be 24- or 32- bytes long.
+> Handling 8-bits long addresses is done using option field. For 16-bits
+> address behaviour depends of number of requested dummy bits. If there
+> are 8 or more dummy cycles, address is shifted and sent with first dummy
+> byte. Otherwise opcode is disabled and first byte of address contains
+> command opcode (works only if opcode and address use the same buswidth).
+> The limitation is when 16-bit address is used without enough dummy
+> cycles and opcode is using different buswidth than address. Other modes
+> are supported with described workaround.
+> 
+> It looks like hardware has some limitation in performance. The same issue
+> exists in current QSPI driver (MTD/nor-flash) and soft-pack (bare-metal
+> library from Atmel). Without using DMA read speed is much worse than
+> maximum bandwidth (efficiency 30-40%). Any help with performance
+> improvement is highly welcome, especially for NAND-flash memories which
+> offers higher capacity than NOR-flash used with previous driver.
+
+I think you can try to implement the dirmap interface proposed here [1]
+and use DMA+TRSFR_READ/WRITE_MEMORY for such direct mappings. This
+should optimize path where we really matter about perfs.
+
+> 
+> Best Regards,
+> Piotr
+> 
+> v3 changes:
+>  - add get_name implementation
+>  - email address fix
+> 
+> v2 changes:
+>  - driver is now replacement of existing atmel-quadspi
+>  - code was re-written to follow original code structure
+>  - deinitialization order fixed
+>  - empty atmel_qspi_adjust_op_size function removed
+>  - code formatting fixes
+>  - use spi_device->max_speed_hz to get spi speed
+>  - spi freqency set in spi_controller->setup() hook
+>  - address range checkng for 4-bytes addressing
+>  - use timeout to avoid infinite waiting
+> 
+> Piotr Bugalski (6):
+>   mtd: spi-nor: atmel-quaspi: Typo fix
+>   mtd: spi-nor: atmel-quadspi: Add spi-mem support to atmel-quadspi
+>   mtd: spi-nor: atmel-quadspi: Use spi-mem interface for atmel-quadspi
+>     driver
+>   mtd: spi-nor: atmel-quadspi: Remove unused code from atmel-quadspi
+>     driver
+>   spi: Add QuadSPI driver for Atmel SAMA5D2
+>   dt-bindings: spi: QuadSPI driver for Atmel SAMA5D2
+
+The patch series is
+
+Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+
+Mark, if you're okay with the new implementation, would you mind taking
+those patches in the spi tree?
+
+Thanks,
+
+Boris
+
+[1]http://patchwork.ozlabs.org/project/linux-mtd/list/?series=73235
