@@ -1,60 +1,47 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 5 Nov 2018 13:32:52 +0000
-Subject: [PATCH] ARM: proc-v7: fix Thumb annotation of cpu_v7_hvc_switch_mm
-In-Reply-To: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
-References: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181105133212.GA3505@e103592.cambridge.arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 5 Nov 2018 14:32:55 +0100
+Subject: [PATCH v10 5/6] arm64: zynqmp: Add DDRC node
+In-Reply-To: <20181105132007.GB7937@zn.tnic>
+References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
+ <1540447621-22870-6-git-send-email-manish.narani@xilinx.com>
+ <20181105125644.GA7937@zn.tnic>
+ <41c5ca53-ed4b-38d0-c612-e1229004293e@xilinx.com>
+ <20181105132007.GB7937@zn.tnic>
+Message-ID: <a81f47e0-1778-a6ac-4cd8-634502661d6f@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 06:29:19PM +0200, Ard Biesheuvel wrote:
-> Due to what appears to be a copy/paste error, the opening ENTRY()
-> of cpu_v7_hvc_switch_mm() lacks a matching ENDPROC(), and instead,
-> the one for cpu_v7_smc_switch_mm() is duplicated.
+On 05. 11. 18 14:20, Borislav Petkov wrote:
+> On Mon, Nov 05, 2018 at 02:06:11PM +0100, Michal Simek wrote:
+>> I don't think that driver will be broken. You can build them, use them
+>> on out of tree HW. And when this patch is merged to mainline it will be
+>> enabled for xilinx soc.
 > 
-> Given that it is ENDPROC() that emits the Thumb annotation, the
-> cpu_v7_hvc_switch_mm() routine will be called in ARM mode on a
-> Thumb2 kernel, resulting in the following splat:
-> 
->   Internal error: Oops - undefined instruction: 0 [#1] SMP THUMB2
->   Modules linked in:
->   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.0-rc1-00030-g4d28ad89189d-dirty #488
->   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
->   PC is at cpu_v7_hvc_switch_mm+0x12/0x18
->   LR is at flush_old_exec+0x31b/0x570
->   pc : [<c0316efe>]    lr : [<c04117c7>]    psr: 00000013
->   sp : ee899e50  ip : 00000000  fp : 00000001
->   r10: eda28f34  r9 : eda31800  r8 : c12470e0
->   r7 : eda1fc00  r6 : eda53000  r5 : 00000000  r4 : ee88c000
->   r3 : c0316eec  r2 : 00000001  r1 : eda53000  r0 : 6da6c000
->   Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> 
-> Note the 'ISA ARM' in the last line.
-> 
-> Fix this by using the correct name in ENDPROC().
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/mm/proc-v7.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 6fe52819e014..339eb17c9808 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -112,7 +112,7 @@ ENTRY(cpu_v7_hvc_switch_mm)
->  	hvc	#0
->  	ldmfd	sp!, {r0 - r3}
->  	b	cpu_v7_switch_mm
-> -ENDPROC(cpu_v7_smc_switch_mm)
-> +ENDPROC(cpu_v7_hvc_switch_mm)
+> But if the DT entries are missing, the driver won't load, would it?
 
-FWIW,
+you don't have that HW anyway.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> 
+>> TBH I can't see any reason to do merges but if you want to do that way
+>> we can also do it.
+> 
+> The reason is because there's a separate DT tree and all those arm
+> drivers need DT.
+> 
+> I have already acked EDAC patches to go through other trees too, FWIW.
 
-(I'll have a think about whether we can flag these mismatches up at
-build time...)
+I looked at v10 and I can't see your ack there. Can you please give me a
+link?
+I see Rob's reviewed by in v10 2/6
 
-Cheers
----Dave
+> Which is not optimal either if someone sends fixes ontop but I cannot
+> apply them yet because the dependent patches are in a different tree.
+> 
+> So yes, there are at least two good reasons for merging a shared branch.
+
+I have not a problem with that. I can simply take patch (process via
+arm-soc) with pointing to reviewed binding doc and you will take the
+rest when this is in arm-soc tree.
+
+Thanks,
+Michal
