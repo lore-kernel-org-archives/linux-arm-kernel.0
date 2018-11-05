@@ -1,73 +1,73 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  5 Nov 2018 13:06:48 +0000
-Subject: [PATCH 09/10] arm64: frace: use asm EXPORT_SYMBOL()
+Date: Mon,  5 Nov 2018 13:06:49 +0000
+Subject: [PATCH 10/10] arm64: remove arm64ksyms.c
 In-Reply-To: <20181105130649.29429-1-mark.rutland@arm.com>
 References: <20181105130649.29429-1-mark.rutland@arm.com>
-Message-ID: <20181105130649.29429-10-mark.rutland@arm.com>
+Message-ID: <20181105130649.29429-11-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a while now it's been possible to use EXPORT_SYMBOL() in assembly
-files, which allows us to place exports immediately after assembly
-functions, as we do for C functions.
-
-As a step towards removing arm64ksyms.c, let's move the ftrace exports
-to the assembly files the functions are defined in.
-
-There should be no functional change as a result of this patch.
+Now that arm64ksyms.c has been reduced to a stub, let's remove it
+entirely. New exports should be associated with their function
+definition.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/arm64ksyms.c   | 5 -----
- arch/arm64/kernel/entry-ftrace.S | 6 ++++++
- 2 files changed, 6 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/Makefile     |  2 +-
+ arch/arm64/kernel/arm64ksyms.c | 30 ------------------------------
+ 2 files changed, 1 insertion(+), 31 deletions(-)
+ delete mode 100644 arch/arm64/kernel/arm64ksyms.c
 
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 4c8b13bede80..e069f957ec28 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -30,7 +30,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+-arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
++arm64-obj-$(CONFIG_MODULES)		+= module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
 diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index c142103bc0fe..4ca8d2b245d2 100644
+deleted file mode 100644
+index 4ca8d2b245d2..000000000000
 --- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -28,8 +28,3 @@
- 
- #include <asm/checksum.h>
- 
--#ifdef CONFIG_FUNCTION_TRACER
--EXPORT_SYMBOL(_mcount);
--NOKPROBE_SYMBOL(_mcount);
--#endif
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * Based on arch/arm/kernel/armksyms.c
+- *
+- * Copyright (C) 2000 Russell King
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
 -
-diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index 1175f5827ae1..98f029c7d4f4 100644
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -10,7 +10,9 @@
-  */
- 
- #include <linux/linkage.h>
-+
- #include <asm/assembler.h>
-+#include <asm/export.h>
- #include <asm/ftrace.h>
- #include <asm/insn.h>
- 
-@@ -121,6 +123,8 @@ skip_ftrace_call:			// }
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
- 	mcount_exit
- ENDPROC(_mcount)
-+EXPORT_SYMBOL(_mcount)
-+NOKPROBE(_mcount)
- 
- #else /* CONFIG_DYNAMIC_FTRACE */
- /*
-@@ -132,6 +136,8 @@ ENDPROC(_mcount)
- ENTRY(_mcount)
- 	ret
- ENDPROC(_mcount)
-+EXPORT_SYMBOL(_mcount)
-+NOKPROBE(_mcount)
- 
- /*
-  * void ftrace_caller(unsigned long return_address)
+-#include <linux/export.h>
+-#include <linux/sched.h>
+-#include <linux/cryptohash.h>
+-#include <linux/delay.h>
+-#include <linux/in6.h>
+-#include <linux/syscalls.h>
+-#include <linux/io.h>
+-#include <linux/kprobes.h>
+-
+-#include <asm/checksum.h>
+-
 -- 
 2.11.0
