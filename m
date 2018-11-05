@@ -1,40 +1,60 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 05 Nov 2018 21:23:08 +0800
-Subject: [PATCH v3 2/2] drm/sun4i: tcon: prevent tcon->panel dereference
- if NULL
-In-Reply-To: <20181008092111.qcufr4o7cy3nnj4b@flea>
-References: <20181004195605.txvbkshvxklyzxyb@flea>
- <20181005215951.99003-1-giulio.benetti@micronovasrl.com>
- <20181005215951.99003-2-giulio.benetti@micronovasrl.com>
- <20181008092111.qcufr4o7cy3nnj4b@flea>
-Message-ID: <f140c083f59eabf6ea323d15d655473e8a77d813.camel@aosc.io>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 5 Nov 2018 13:32:52 +0000
+Subject: [PATCH] ARM: proc-v7: fix Thumb annotation of cpu_v7_hvc_switch_mm
+In-Reply-To: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
+References: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181105133212.GA3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-10-08?? 11:21 +0200?Maxime Ripard???
-> On Fri, Oct 05, 2018 at 11:59:51PM +0200, Giulio Benetti wrote:
-> > If tcon->panel pointer is NULL, trying to dereference from it
-> > (i.e. tcon->panel->connector) will cause a null pointer
-> > dereference.
-> > 
-> > Add tcon->panel null pointer check before calling
-> > sun4i_tcon0_mode_set_dithering().
-> > 
-> > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> > Fixes: f11adcecbd5f ("drm/sun4i: tcon: Add dithering support for
-> >                       RGB565/RGB666 LCD panels")
-> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On Tue, Jun 19, 2018 at 06:29:19PM +0200, Ard Biesheuvel wrote:
+> Due to what appears to be a copy/paste error, the opening ENTRY()
+> of cpu_v7_hvc_switch_mm() lacks a matching ENDPROC(), and instead,
+> the one for cpu_v7_smc_switch_mm() is duplicated.
 > 
-> Applied both, thanks!
-
-Please bring them to 4.20.
-
-Currently in 4.20-rc1, bridge support of sun4i-drm is broken because of
-this problem.
-
-> Maxime
+> Given that it is ENDPROC() that emits the Thumb annotation, the
+> cpu_v7_hvc_switch_mm() routine will be called in ARM mode on a
+> Thumb2 kernel, resulting in the following splat:
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   Internal error: Oops - undefined instruction: 0 [#1] SMP THUMB2
+>   Modules linked in:
+>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.0-rc1-00030-g4d28ad89189d-dirty #488
+>   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
+>   PC is at cpu_v7_hvc_switch_mm+0x12/0x18
+>   LR is at flush_old_exec+0x31b/0x570
+>   pc : [<c0316efe>]    lr : [<c04117c7>]    psr: 00000013
+>   sp : ee899e50  ip : 00000000  fp : 00000001
+>   r10: eda28f34  r9 : eda31800  r8 : c12470e0
+>   r7 : eda1fc00  r6 : eda53000  r5 : 00000000  r4 : ee88c000
+>   r3 : c0316eec  r2 : 00000001  r1 : eda53000  r0 : 6da6c000
+>   Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> 
+> Note the 'ISA ARM' in the last line.
+> 
+> Fix this by using the correct name in ENDPROC().
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/mm/proc-v7.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 6fe52819e014..339eb17c9808 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -112,7 +112,7 @@ ENTRY(cpu_v7_hvc_switch_mm)
+>  	hvc	#0
+>  	ldmfd	sp!, {r0 - r3}
+>  	b	cpu_v7_switch_mm
+> -ENDPROC(cpu_v7_smc_switch_mm)
+> +ENDPROC(cpu_v7_hvc_switch_mm)
+
+FWIW,
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+(I'll have a think about whether we can flag these mismatches up at
+build time...)
+
+Cheers
+---Dave
