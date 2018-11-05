@@ -1,86 +1,105 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Mon, 5 Nov 2018 10:16:03 +0100
-Subject: [PATCH 1/2] net: axienet: recheck condition after timeout in
- mdio_wait()
-In-Reply-To: <20181030.112511.957438343014682098.davem@davemloft.net>
-References: <20181030093139.10226-1-kurt@linutronix.de>
- <20181030093139.10226-2-kurt@linutronix.de>
- <20181030.112511.957438343014682098.davem@davemloft.net>
-Message-ID: <20181105091601.5dgwkcd4wcsw2cvp@breakpoint.cc>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 5 Nov 2018 10:19:22 +0100
+Subject: sama5d: using the ebi interface from another driver
+In-Reply-To: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
+References: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
+Message-ID: <20181105091922.gws52ledkqwc46xx@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-10-30 11:25:11 [-0700], David Miller wrote:
-> From: Kurt Kanzenbach <kurt@linutronix.de>
-> Date: Tue, 30 Oct 2018 10:31:38 +0100
+Hi Jean-Michel,
+
+On Fri, Nov 02, 2018 at 02:35:26PM +0100, Jean-Michel Hautbois wrote:
+> Hi all,
 > 
-> > The function could report a false positive if it gets preempted between reading
-> > the XAE_MDIO_MCR_OFFSET register and checking for the timeout.  In such a case,
-> > the condition has to be rechecked to avoid false positives.
-> > 
-> > Therefore, check for expected condition even after the timeout occurred.
-> > 
-> > Signed-off-by: Kurt Kanzenbach <kurt@linutronix.de>
->  ...
-> >  		if (time_before_eq(end, jiffies)) {
-> > -			WARN_ON(1);
-> > -			return -ETIMEDOUT;
-> > +			val = axienet_ior(lp, XAE_MDIO_MCR_OFFSET);
-> > +			break;
-> >  		}
-> > +
-> >  		udelay(1);
-> >  	}
-> > -	return 0;
-> > +	if (val & XAE_MDIO_MCR_READY_MASK)
-> > +		return 0;
-> > +
-> > +	WARN_ON(1);
-> > +	return -ETIMEDOUT;
+> I have a custom board based on a sama5d3 chip. The SoC is connected to
+> 2 pef24628 SHDSL transceivers, the first one on ebi at 40000000 and the
+> second one on ebi at 50000000.
+> I tried to write a basic char driver, using request_mem_region and
+> ioremap but I can't read or write into the device.
+> I have to say that the driver is based on a proprietary one, and
+> tested years ago on a PowerPC board.
 > 
-> You are not fundamentally changing the situation at all.
-
-> The condtion could change right after your last read of
-> XAR_MDIO_MCR_OFFSET, which is the same thing that happens before your
-> modifications to this code.
+> Then, after looking into deeper details in the datasheet I understand
+> it is connected through EBI and it sounds not so easy :D.
 > 
-> It sounds more like the timeout is slightly too short, and that's the
-> real problem that causes whatever behavior you think you are fixing
-> here.
+> I would appreciate some help/pointers on this, as there is (at least,
+> I could find) few documentation on how to use it except for NAND
+> cases.
+> 
+> I have something like that in my DTS, but not sure this is the correct
+> way to do it :
+> 
+>         ebi: ebi at 10000000 {
+>             pinctrl-0 = <&pinctrl_ebi_nand_addr>;
+>             pinctrl-names = "default";
+>             status = "okay";
+> 
+>             dsp0: pef24628 at 1 {
+>                 status = "okay";
+>                 compatible = "intel,pef24628";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 reg = <0x1 0x0 0x8000>;
+>                 pinctrl-0 = <&pinctrl_dsp_cs1>;
+>             };
+> 
+>             dsp1: pef24628 at 2 {
+>                 status = "okay";
+>                 compatible = "intel,pef24628";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 reg = <0x2 0x0 0x8000>;
+>                 pinctrl-0 = <&pinctrl_dsp_cs2>;
+>             };
+> 
+>             nand_controller: nand-controller {
+>                 status = "okay";
+> 
+>                 nand at 3 {
+>                     reg = <0x3 0x0 0x2>;
+>                     atmel,rb = <0>;
+>                     nand-bus-width = <8>;
+>                     nand-ecc-mode = "hw";
+>                     nand-ecc-strength = <4>;
+>                     nand-ecc-step-size = <512>;
+>                     nand-on-flash-bbt;
+>                     label = "atmel_nand";
+> 
+>                     partitions {
+>                         compatible = "fixed-partitions";
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+> [...]
+>                     };
+>                 };
+>             };
+> 
+> The pinctrl for ebi should probably be changed however, I am wondering
+> how the (platform ?) driver can access the adress ? Should it parse
+> itself the parent, and find range, etc. Or is there an accessor for it
+> ?
 
-There is a timeout of two jiffies. If the condition is not true within
-those two jiffies it will attempt to check condition one last time after
-the timeout occured.
-If the task got preempted after the reading from the register but before
-the timeout it is possible that the task gets back on the CPU after the
-timeout occured. And since the timeout occured it won't check if the
-condition changed:
-Time
- 0   +---+
-     | c | Check for condition (false)
-     | c |
-     | c |
-     | c |
-     | c |
-     | P | Task gets preempted
-     |   |
-     | O | Condition is true, task still preempted, no check
-     |   |
- 2   | T | The timeout is true
-     |   |
-     |   |
-     |   |
-     | p | Task gets back on the CPU, no re-check of condition
+At first look, your DT seems correct. You have nothing special to do,
+the usual platform_get_resource() and devm_ioremap_resource() calls are enough.
+The address translation should be done automatically according to ranges
+property.
 
-In the last step, there is no checking of the condition after the
-timeout occured and it wrongly assumes that the condition is not true.
-Increasing the timeout would help as long as the task gets not preempted
-past the new timeout.
-The same pattern (check condition after timeout) is also used in
-wait_event_timeout() or readx_poll_timeout().  Would you prefer to
-refactor this with readx_poll_timeout() instead?
+Another hint is to check and specify the signals timings.
 
-> I'm not applying this.
-Please reconsider.
+Regards
 
-Sebastian
+Ludovic
+
+> 
+> Maybe can I just manually toggle the CS GPIO, and don't try to make
+> anything more complex than what it should be ? The driver should not
+> be atmel dependant...
+> 
+> Thanks !
+> JM
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
