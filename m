@@ -1,116 +1,178 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Nov 2018 12:11:03 +0100
-Subject: [Bug Report] kdump crashes after latest EFI memblock changes on
- arm64 machines with large number of CPUs
-In-Reply-To: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
-References: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
-Message-ID: <CAKv+Gu_1PNiGbgRqd3_0k6CGzh-2P+iAmqk=oSSek69kBCnb8Q@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 5 Nov 2018 19:10:17 +0800
+Subject: [stericsson:ux500-mcde 8/8] drivers/gpu/drm/mcde/mcde_dsi.c:571:4:
+ warning: format '%u' expects argument of type 'unsigned int', but argument 4
+ has type 'size_t {aka long unsigned int}'
+Message-ID: <201811051913.66WOXnG4%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Marc)
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-mcde
+head:   bd2ef0e5589e833546c3f299bb394cf0ffc65f1d
+commit: bd2ef0e5589e833546c3f299bb394cf0ffc65f1d [8/8] drm/mcde: Add new driver for ST-Ericsson MCDE
+config: sparc64-allmodconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout bd2ef0e5589e833546c3f299bb394cf0ffc65f1d
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
-On 1 November 2018 at 22:14, Bhupesh Sharma <bhsharma@redhat.com> wrote:
-> Hi,
->
-> With the latest EFI changes for memblock reservation across kdump
-> kernel from Ard (Commit 71e0940d52e107748b270213a01d3b1546657d74
-> ["efi: honour memory reservations passed via a linux specific config
-> table"]), we hit a panic while trying to boot the kdump kernel on
-> machines which have large number of CPUs.
->
+All warnings (new ones prefixed by >>):
 
-Just for my understanding: why do you boot all 224 CPus when running
-the crash kernel?
+   In file included from include/linux/platform_device.h:14:0,
+                    from drivers/gpu/drm/mcde/mcde_dsi.c:2:
+   drivers/gpu/drm/mcde/mcde_dsi.c: In function 'mcde_dsi_host_transfer':
+>> drivers/gpu/drm/mcde/mcde_dsi.c:571:4: warning: format '%u' expects argument of type 'unsigned int', but argument 4 has type 'size_t {aka long unsigned int}' [-Wformat=]
+       "message to channel %d, %u bytes",
+       ^
+   include/linux/device.h:1370:22: note: in definition of macro 'dev_fmt'
+    #define dev_fmt(fmt) fmt
+                         ^~~
+   drivers/gpu/drm/mcde/mcde_dsi.c:570:2: note: in expansion of macro 'dev_info'
+     dev_info(d->dev,
+     ^~~~~~~~
 
-I'm not saying we shouldn't fix the underlying issue, I'm just curious.
+vim +571 drivers/gpu/drm/mcde/mcde_dsi.c
 
-> I have a arm64 board which has 224 CPUS:
-> # lscpu
-> <..snip..>
-> CPU(s):              224
-> On-line CPU(s) list: 0-223
-> <..snip..>
->
-> Here are the crash logs in the kdump kernel on this machine:
->
-> [    0.000000] Unable to handle kernel paging request at virtual
-> address ffff80003ffe0000
-> val____)nt EL), IL ata abort info:
-> [    0.or: Oops: 960000inted 4.18.0+ #3
-> [    0.000000] pstate: 20400089 (nzCv daIf +PAN -UAO)
-> [    0.000000] pc : __memcpy+0x110/0x180
-> [    0.000000] lr : memblock_double_array+0x240/0x348
-> [    0.000000] sp : ffff0000092efc80 x28: 00000000bffe0000
-> [    0.000000] x27: 0000000000001800 x26: ffff000009d59000
-> [    0.000000] x25: ffff80003ffe0000 x24: 0000000000000000
-> [    0.000000] x23: 0000000000010000 x22: ffff000009d594e8
-> [    0.000000] x21: ffff000009d594f4 x20: ffff0000093c7268
-> [    0.000000] x19: 0000000000000c00 x18: 0000000000000010
-> [    0.000000] x17: 0000000000000000 x16: 0000000000000000
-> [    0.000000] x15: ffffffffffffffff3: 0000000fc18d0000 x12: 0000000800000000
-> [    0.000000] x11: 0000000000000018 x10: 00000000ddab9e18
-> [    0.000000] x9 : 0000000800000000 x8 : 00000000000002c1
-> [    0.000000] x7 : 0000000091b90000 x6 : ffff80003ffe0000
-> [    0.000000] x5 : 0000000000000001 x4 : 0000000000000000
-> [    0.000000] x3 : 0000000000000000 x2 : 0000000000000b80
-> [    0.000000] x1 : ffff000009d59540 x0 : ffff80003ffe0000
-> [    0.000000] Process swapper)
-> [    0.000000] Call trace:
-> [    0.000000]  __memcpy+0x110/0x180
-> [    0.000000]  memblock_add_range+0x134/0x2e8
-> [    0.000000]  memblock_reserve+0x70/0xb8
-> [    0.000000]  memblock_alloc_base_nid+0x6c/0x88
-> [    0.000000]  __memblock_alloc_base+0x3c/0x4c
-> [    0.000000]  memblock_alloc_base+0x28/0x4c
-> [    0.000000]  memblock_alloc+0x2c/0x38
-> [    0.000000]  early_pgtable_alloc+0x20/0xb0
-> [    0.000000]  paging_init+0x28/0x7f8
-> [   0.000000]  start_kernel+0x78/0x4cc
-> [    0.000000] Code: a8c12027 a8c12829 a8c1302b a8c1382d (a88120c7)
-> [    0.000000] random: get_random_bytes called from
-> print_oops_end_marker+0x30/0x58 with crng_init=0
-> [    0.000000] ---[ end trace 0000000000000000 ]---
-> [    0.000000] Kernel panic - not syncing: Fatal exception
-> [    0.000000] ---[ end Kernel panic - not syncing: Fatal exception ]---
->
-> Adding more debug logs via 'memblock=debug' being passed to the kdump
-> kernel, (and adding a few more prints to 'mm/memblock.c'), I can see
-> that the panic happens while trying to resize array inside
-> 'memblock_double_array' (which doubles the size of the memblock
-> regions array):
->
-> [    0.000000] Reserving 13KB of memory at 0xbfff0000 for elfcorehdr
-> [    0.000000] memblock_reserve:
-> [0x00000000bfff0000-0x00000000bfffffff]
-> memblock_alloc_base_nid+0x6c/0x88
-> [    0.000000] memblock: use_slab is 0, new_area_start=bfff0000,
-> new_area_size=10000
-> [    0.000000] memblock: use_slab is 0, addr=0, new_area_size=10000
-> [    0.000000] memblock: addr=bffe0000, __va(addr)=ffff80003ffe0000
-> [    0.00000 [0xbffe0000-0xbffe17ff]
-> [    0.000000] Unable to handle kernel paging request at virtual
-> address ffff80003ffe0000
->
-> which indicates that after Ard's patch the memblocks being reserved
-> across kdump swell up on systems which have large number of CPUs and
-> hence 'memblock_double_array' is called up in early kdump boot code to
-> double the size of the memblock regions array.
->
-> To confirm the above, I reduced the number of SMP CPUs available to
-> the kernel on this system, by specifying 'nr_cpus=46' in the kernel
-> bootargs for the primary kernel. As expected this makes the kdump
-> kernel boot successfully and also save the crash dump properly.
->
-> I saw another arm64 kdump user report this issue to me privately, so I
-> am sending this to a wider audience, so that kdump users are aware
-> that this is a known issue.
->
-> I am working on a RFC patch which seems to fix the issue on my board
-> and will try to send it out for wider review in coming days after some
-> more checks at my end.
->
-> Any advices on the same are also welcome :)
->
-> Thanks,
-> Bhupesh
+   544	
+   545	#define MCDE_DSI_HOST_IS_READ(type)			    \
+   546	        ((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
+   547		 (type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
+   548		 (type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
+   549		 (type == MIPI_DSI_DCS_READ))
+   550	
+   551	static ssize_t mcde_dsi_host_transfer(struct mipi_dsi_host *host,
+   552					      const struct mipi_dsi_msg *msg)
+   553	{
+   554		struct mcde_dsi *d = host_to_mcde_dsi(host);
+   555		const u32 loop_delay_us = 10; /* us */
+   556		const u8 *tx = msg->tx_buf;
+   557		u32 loop_counter;
+   558		size_t txlen;
+   559		u32 val;
+   560		int ret;
+   561		int i;
+   562	
+   563		txlen = msg->tx_len;
+   564		if (txlen > 12) {
+   565			dev_err(d->dev,
+   566				"dunno how to write more than 12 bytes yet\n");
+   567			return -EIO;
+   568		}
+   569	
+   570		dev_info(d->dev,
+ > 571			 "message to channel %d, %u bytes",
+   572			 msg->channel,
+   573			 txlen);
+   574	
+   575		/* Command "nature" */
+   576		if (MCDE_DSI_HOST_IS_READ(msg->type))
+   577			/* MCTL_MAIN_DATA_CTL already set up */
+   578			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_READ;
+   579		else
+   580			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_WRITE;
+   581		/*
+   582		 * More than 2 bytes will not fit in a single packet, so it's
+   583		 * time to set the "long not short" bit. One byte is used by
+   584		 * the MIPI DCS command leaving just one byte for the payload
+   585		 * in a short package.
+   586		 */
+   587		if (mipi_dsi_packet_format_is_long(msg->type))
+   588			val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT;
+   589		val |= 0 << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_SHIFT;
+   590		/* Add one to the length for the MIPI DCS command */
+   591		val |= txlen
+   592			<< DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_SHIFT;
+   593		val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN;
+   594	        val |= msg->type << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_SHIFT;
+   595		writel(val, d->regs + DSI_DIRECT_CMD_MAIN_SETTINGS);
+   596	
+   597		/* MIPI DCS command is part of the data */
+   598		if (txlen > 0) {
+   599			val = 0;
+   600			for (i = 0; i < 4 && i < txlen; i++)
+   601				val |= tx[i] << (i & 3) * 8;
+   602		}
+   603		writel(val, d->regs + DSI_DIRECT_CMD_WRDAT0);
+   604		if (txlen > 4) {
+   605			val = 0;
+   606			for (i = 0; i < 4 && (i + 4) < txlen; i++)
+   607				val |= tx[i + 4] << (i & 3) * 8;
+   608			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT1);
+   609		}
+   610		if (txlen > 8) {
+   611			val = 0;
+   612			for (i = 0; i < 4 && (i + 8) < txlen; i++)
+   613				val |= tx[i + 8] << (i & 3) * 8;
+   614			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT2);
+   615		}
+   616		if (txlen > 12) {
+   617			val = 0;
+   618			for (i = 0; i < 4 && (i + 12) < txlen; i++)
+   619				val |= tx[i + 12] << (i & 3) * 8;
+   620			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT3);
+   621		}
+   622	
+   623		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   624		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   625		/* Send command */
+   626		writel(1, d->regs + DSI_DIRECT_CMD_SEND);
+   627	
+   628		loop_counter = 1000 * 1000 / loop_delay_us;
+   629		while (!(readl(d->regs + DSI_DIRECT_CMD_STS) &
+   630			 DSI_DIRECT_CMD_STS_WRITE_COMPLETED)
+   631		       && --loop_counter)
+   632			usleep_range(loop_delay_us, (loop_delay_us * 3) / 2);
+   633	
+   634		if (!loop_counter) {
+   635	                dev_err(d->dev, "DSI write timeout!\n");
+   636	                return -ETIME;
+   637	        }
+   638	
+   639		val = readl(d->regs + DSI_DIRECT_CMD_STS);
+   640		if (val & DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED) {
+   641			val >>= DSI_DIRECT_CMD_STS_ACK_VAL_SHIFT;
+   642			dev_err(d->dev, "error during transmission: %04x\n",
+   643				val);
+   644			return -EIO;
+   645		}
+   646	
+   647		if (!MCDE_DSI_HOST_IS_READ(msg->type)) {
+   648			/* Return number of bytes written */
+   649			if (mipi_dsi_packet_format_is_long(msg->type))
+   650				ret = 4 + txlen;
+   651			else
+   652				ret = 4;
+   653		} else {
+   654			/* OK this is a read command, get the response */
+   655			u32 rdsz;
+   656			u32 rddat;
+   657			u8 *rx = msg->rx_buf;
+   658	
+   659			rdsz = readl(d->regs + DSI_DIRECT_CMD_RD_PROPERTY);
+   660			rdsz &= DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE_MASK;
+   661			rddat = readl(d->regs + DSI_DIRECT_CMD_RDDAT);
+   662			for (i = 0; i < 4 && i < rdsz; i++)
+   663				rx[i] = (rddat >> (i * 8)) & 0xff;
+   664			ret = rdsz;
+   665		}
+   666	
+   667		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   668		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   669	
+   670		return ret;
+   671	}
+   672	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 55846 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/3b53a2e3/attachment-0001.gz>
