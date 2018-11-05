@@ -1,71 +1,109 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  5 Nov 2018 19:44:37 +0100
-Subject: [PATCH 5/6] ARM: compressed: put zImage header and EFI header in
- dedicated section
+Date: Mon,  5 Nov 2018 19:44:38 +0100
+Subject: [PATCH 6/6] ARM: efi: add PE/COFF debug table to EFI header
 In-Reply-To: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
 References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181105184438.19494-6-ard.biesheuvel@linaro.org>
+Message-ID: <20181105184438.19494-7-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To align the PE/COFF and the ELF headers of the decompressor binary, put
-the zImage header and the EFI header in a separate .start section, and
-emit it at the start of the Image. This change is necessary for UEFI
-based debug tooling to be able to use the vmlinux ELF binary, since it
-gets confused if the PE/COFF .text section and the ELF .text section live
-at different offsets.
+This updates the PE/COFF header to emit the absolute path to the
+decompressor vmlinux ELF file into a so-called NB10 Codeview entry.
 
-With this change, we also stop relying on the code to flow from one
-section to the next simply because the order in which the linker emits
-the sections happens to be what we expect.
+On DEBUG builds of EDK2 for ARM, this will result in output to be
+printed as follows
+
+  add-symbol-file /home/ard/linux-build-arm/arch/arm/boot/compressed/vmlinux 0x43889000
+
+which can be consumed by GDB directly, and load the decompressor
+ELF symbols at the correct offset in the UEFI address space. With
+both the decompressor and the firmware's ELF symbols loaded, we can
+do single step debugging of calls made from the EFI stub into the
+firmware and back, which is *really* helpful when debugging the
+handover from UEFI to the decompressor.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/boot/compressed/head.S        | 6 +++---
- arch/arm/boot/compressed/vmlinux.lds.S | 4 +++-
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/boot/compressed/Makefile     |  4 ++
+ arch/arm/boot/compressed/efi-header.S | 47 ++++++++++++++++++++
+ 2 files changed, 51 insertions(+)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 55c227077207..e3c43fdb6371 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -176,6 +176,8 @@ start:
- 		.word	_magic_table	@ additional data table
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index d1862621556f..b3c7aff96b92 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -194,3 +194,7 @@ AFLAGS_hyp-stub.o := -Wa,-march=armv7-a
  
- 		__EFI_HEADER
+ $(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
+ 	$(call cmd,shipped)
 +
-+		.text
- 1:
-  ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
-  AR_CLASS(	mrs	r9, cpsr	)
-@@ -209,10 +211,8 @@ not_angel:
++ifeq ($(CONFIG_EFI)$(CONFIG_DEBUG_INFO),yy)
++AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(obj)/vmlinux)\""
++endif
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index c94a88ae834d..5c29b31e7080 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -98,6 +98,11 @@ extra_header_fields:
+ 		.quad	0				@ CertificationTable
+ 		.quad	0				@ BaseRelocationTable
  
- 		/*
- 		 * some architecture specific code can be inserted
--		 * by the linker here, but it should preserve r7, r8, and r9.
-+		 * here, but it should preserve r7, r8, and r9.
- 		 */
--
--		.text
- #ifdef CONFIG_PXA_SHARPSL_DETECT_MACH_ID
- 		bl	__SharpSL_start
++#ifdef CONFIG_DEBUG_INFO
++		.long	efi_debug_table - start		@ DebugTable
++		.long	efi_debug_table_size
++#endif
++
+ section_table:
+ 		.ascii	".text\0\0\0"
+ 		.long	__pecoff_code_size		@ VirtualSize
+@@ -127,6 +132,48 @@ section_table:
+ 
+ 		.set	section_count, (. - section_table) / 40
+ 
++#ifdef CONFIG_DEBUG_INFO
++		/*
++		 * The debug table is referenced via its Relative Virtual
++		 * Address (RVA), which is only defined for those parts of
++		 * the image that are covered by a section declaration. Since
++		 * this header is not covered by any section, the debug table
++		 * must be emitted elsewhere. So stick it in the .rodata
++		 * section instead.
++		 *
++		 * Note that the EFI debug entry itself may legally have a
++		 * zero RVA, which means we can simply put it right after the
++		 * section headers.
++		 */
++		.section	".rodata", #alloc
++
++		.align	2
++efi_debug_table:
++		// EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
++		.long	0				@ Characteristics
++		.long	0				@ TimeDateStamp
++		.short	0				@ MajorVersion
++		.short	0				@ MinorVersion
++		.long	IMAGE_DEBUG_TYPE_CODEVIEW	@ Type
++		.long	efi_debug_entry_size		@ SizeOfData
++		.long	0				@ RVA
++		.long	efi_debug_entry - start		@ FileOffset
++
++		.set	efi_debug_table_size, . - efi_debug_table
++		.previous
++
++efi_debug_entry:
++		// EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
++		.ascii	"NB10"				@ Signature
++		.long	0				@ Unknown
++		.long	0				@ Unknown2
++		.long	0				@ Unknown3
++
++		.asciz	VMLINUX_PATH
++
++		.set	efi_debug_entry_size, . - efi_debug_entry
++#endif
++
+ 		.align	12
+ __efi_start:
  #endif
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-index 2b963d8e76dd..ad9921490034 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.S
-+++ b/arch/arm/boot/compressed/vmlinux.lds.S
-@@ -34,9 +34,11 @@ SECTIONS
-   . = TEXT_START;
-   _text = .;
- 
--  .text : {
-+  .start : {
-     _start = .;
-     *(.start)
-+  }
-+  .text : {
-     *(.text)
-     *(.text.*)
-     *(.fixup)
 -- 
 2.19.1
