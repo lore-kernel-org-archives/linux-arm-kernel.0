@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon,  5 Nov 2018 11:59:40 +0000 (GMT)
-Subject: Applied "ASoC: sunxi: rename SND_SUNXI_ADDA_PR_REGMAP to
- SND_SUN8I_ADDA_PR_REGMAP" to the asoc tree
-In-Reply-To: <20181103042651.6641-1-anarsoul@gmail.com>
-Message-ID: <20181105115940.676651124D98@debutante.sirena.org.uk>
+Date: Mon,  5 Nov 2018 12:01:45 +0000 (GMT)
+Subject: Applied "spi: spi-zynqmp-gqspi: simplify getting .driver_data" to the
+ spi tree
+In-Reply-To: <20181021200048.2114-4-wsa+renesas@sang-engineering.com>
+Message-ID: <20181105120145.0D9251124D98@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: sunxi: rename SND_SUNXI_ADDA_PR_REGMAP to SND_SUN8I_ADDA_PR_REGMAP
+   spi: spi-zynqmp-gqspi: simplify getting .driver_data
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,40 +34,43 @@ to this mail.
 Thanks,
 Mark
 
->From 2f5d94123ce3c12a1e15802e6d5ee98f304ccb71 Mon Sep 17 00:00:00 2001
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Fri, 2 Nov 2018 21:26:51 -0700
-Subject: [PATCH] ASoC: sunxi: rename SND_SUNXI_ADDA_PR_REGMAP to
- SND_SUN8I_ADDA_PR_REGMAP
+>From 6eee6d317aa2511ea86c4f8f28d79bfd3d621826 Mon Sep 17 00:00:00 2001
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Date: Sun, 21 Oct 2018 22:00:47 +0200
+Subject: [PATCH] spi: spi-zynqmp-gqspi: simplify getting .driver_data
 
-SND_SUN50I_CODEC_ANALOG selects SND_SUNXI_ADDA_PR_REGMAP which is leftover
-of renaming SND_SUNXI_ADDA_PR_REGMAP to SND_SUN8I_ADDA_PR_REGMAP. Replace
-it with SND_SUN8I_ADDA_PR_REGMAP to fix possible link errors for some
-configurations:
+We should get 'driver_data' from 'struct device' directly. Going via
+platform_device is an unneeded step back and forth.
 
-sound/soc/sunxi/sun50i-codec-analog.o: In function `sun50i_codec_analog_probe':
-sun50i-codec-analog.c:(.text+0x62): undefined reference to `sun8i_adda_pr_regmap_init'
-
-Fixes: 42371f327df0 ("ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path controls")
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/sunxi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-zynqmp-gqspi.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-index 66aad0d3f9c7..8134c3c94229 100644
---- a/sound/soc/sunxi/Kconfig
-+++ b/sound/soc/sunxi/Kconfig
-@@ -31,7 +31,7 @@ config SND_SUN8I_CODEC_ANALOG
- config SND_SUN50I_CODEC_ANALOG
- 	tristate "Allwinner sun50i Codec Analog Controls Support"
- 	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
--	select SND_SUNXI_ADDA_PR_REGMAP
-+	select SND_SUN8I_ADDA_PR_REGMAP
- 	help
- 	  Say Y or M if you want to add support for the analog controls for
- 	  the codec embedded in Allwinner A64 SoC.
+diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
+index cc4d31033494..9f83e1b17aa1 100644
+--- a/drivers/spi/spi-zynqmp-gqspi.c
++++ b/drivers/spi/spi-zynqmp-gqspi.c
+@@ -960,8 +960,7 @@ static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
+  */
+ static int __maybe_unused zynqmp_runtime_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct spi_master *master = platform_get_drvdata(pdev);
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
+ 
+ 	clk_disable(xqspi->refclk);
+@@ -980,8 +979,7 @@ static int __maybe_unused zynqmp_runtime_suspend(struct device *dev)
+  */
+ static int __maybe_unused zynqmp_runtime_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct spi_master *master = platform_get_drvdata(pdev);
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
+ 	int ret;
+ 
 -- 
 2.19.0.rc2
