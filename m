@@ -1,11 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 5 Nov 2018 16:05:16 +0100
-Subject: [PATCH 2/5] thermal: rockchip_thermal: simplify getting
- .driver_data
-In-Reply-To: <20181021200053.2194-3-wsa+renesas@sang-engineering.com>
+Date: Mon, 5 Nov 2018 16:07:19 +0100
+Subject: [PATCH 5/5] thermal: zx2967_thermal: simplify getting .driver_data
+In-Reply-To: <20181021200053.2194-6-wsa+renesas@sang-engineering.com>
 References: <20181021200053.2194-1-wsa+renesas@sang-engineering.com>
- <20181021200053.2194-3-wsa+renesas@sang-engineering.com>
-Message-ID: <e022320e-3a85-070c-4f9e-700457ae4386@linaro.org>
+ <20181021200053.2194-6-wsa+renesas@sang-engineering.com>
+Message-ID: <1de46d0b-a241-8ee6-7bf3-eb8ae4c22251@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,42 +20,33 @@ Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
 > Build tested only. buildbot is happy.
 > 
->  drivers/thermal/rockchip_thermal.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
+>  drivers/thermal/zx2967_thermal.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index f36375d5a16c..9c7643d62ed7 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -1327,8 +1327,7 @@ static int rockchip_thermal_remove(struct platform_device *pdev)
->  
->  static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+> diff --git a/drivers/thermal/zx2967_thermal.c b/drivers/thermal/zx2967_thermal.c
+> index 6acce0bce7c0..145ebf371598 100644
+> --- a/drivers/thermal/zx2967_thermal.c
+> +++ b/drivers/thermal/zx2967_thermal.c
+> @@ -207,8 +207,7 @@ MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
+>  #ifdef CONFIG_PM_SLEEP
+>  static int zx2967_thermal_suspend(struct device *dev)
 >  {
 > -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
-> +	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
->  	int i;
+> -	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
+> +	struct zx2967_thermal_priv *priv = dev_get_drvdata(dev);
 >  
->  	for (i = 0; i < thermal->chip->chn_num; i++)
-> @@ -1346,8 +1345,7 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+>  	if (priv && priv->clk_topcrm)
+>  		clk_disable_unprepare(priv->clk_topcrm);
+> @@ -221,8 +220,7 @@ static int zx2967_thermal_suspend(struct device *dev)
 >  
->  static int __maybe_unused rockchip_thermal_resume(struct device *dev)
+>  static int zx2967_thermal_resume(struct device *dev)
 >  {
 > -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
-> +	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
->  	int i;
+> -	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
+> +	struct zx2967_thermal_priv *priv = dev_get_drvdata(dev);
 >  	int error;
 >  
-> @@ -1376,7 +1374,7 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
->  					      id, thermal->regs,
->  					      thermal->tshut_temp);
->  		if (error)
-> -			dev_err(&pdev->dev, "%s: invalid tshut=%d, error=%d\n",
-> +			dev_err(dev, "%s: invalid tshut=%d, error=%d\n",
->  				__func__, thermal->tshut_temp, error);
->  	}
->  
+>  	error = clk_prepare_enable(priv->clk_topcrm);
 > 
 
 
