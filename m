@@ -1,26 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 5 Nov 2018 15:30:11 +0100
-Subject: [PATCH] clocksource: imx-gpt: remove unnecessary irq protection
-In-Reply-To: <20181105141511.30657-1-peron.clem@gmail.com>
-References: <20181105141511.30657-1-peron.clem@gmail.com>
-Message-ID: <daf4fbee-b433-62c7-9dc6-e6fff058568d@linaro.org>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Mon,  5 Nov 2018 09:32:34 -0500
+Subject: [PATCH] ARM: mm: dump: Change to use DEFINE_SHOW_ATTRIBUTE macro
+Message-ID: <20181105143234.6015-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2018 15:15, Cl?ment P?ron wrote:
-> shutdown and oneshot are already protected against irq interruptions
-> 
-> Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
-> ---
+Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
-Applied, thanks!
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ arch/arm/mm/ptdump_debugfs.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-  -- Daniel
-
-
+diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
+index be8d87be4b93..201cd467a739 100644
+--- a/arch/arm/mm/ptdump_debugfs.c
++++ b/arch/arm/mm/ptdump_debugfs.c
+@@ -12,17 +12,7 @@ static int ptdump_show(struct seq_file *m, void *v)
+ 	return 0;
+ }
+ 
+-static int ptdump_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, ptdump_show, inode->i_private);
+-}
+-
+-static const struct file_operations ptdump_fops = {
+-	.open		= ptdump_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-};
++DEFINE_SHOW_ATTRIBUTE(ptdump);
+ 
+ int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
+ {
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.17.0
