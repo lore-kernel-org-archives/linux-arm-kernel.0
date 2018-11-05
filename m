@@ -1,70 +1,69 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 5 Nov 2018 13:34:44 +0000
-Subject: [PATCH V3 04/10] gpio: vf610: add optional clock support
-In-Reply-To: <CACRpkda2XUXBCvb5mYgDrYtCL8dA24uQXaBrHrMLH4PFNdq_MQ@mail.gmail.com>
-References: <1540996688-23681-1-git-send-email-aisheng.dong@nxp.com>
- <1540996688-23681-5-git-send-email-aisheng.dong@nxp.com>
- <CACRpkda2XUXBCvb5mYgDrYtCL8dA24uQXaBrHrMLH4PFNdq_MQ@mail.gmail.com>
-Message-ID: <AM0PR04MB4211ED21CABA5434F2E7BF9180CA0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 5 Nov 2018 13:35:01 +0000
+Subject: [PATCH] ARM: proc-v7: fix Thumb annotation of cpu_v7_hvc_switch_mm
+In-Reply-To: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
+References: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
+Message-ID: <c3de69e0-1408-4ac7-d2e2-8d8bcc936df3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Friday, November 2, 2018 5:33 PM
-[...]
-> On Wed, Oct 31, 2018 at 3:43 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
+Hi all,
+
+On 19/06/18 17:29, Ard Biesheuvel wrote:
+> Due to what appears to be a copy/paste error, the opening ENTRY()
+> of cpu_v7_hvc_switch_mm() lacks a matching ENDPROC(), and instead,
+> the one for cpu_v7_smc_switch_mm() is duplicated.
 > 
-> > +       clk_port = devm_clk_get(&pdev->dev, "port");
-> > +       if (clk_port == ERR_PTR(-EPROBE_DEFER))
-> > +               return -EPROBE_DEFER;
-> > +
-> > +       clk_gpio = devm_clk_get(&pdev->dev, "gpio");
-> > +       if (clk_gpio == ERR_PTR(-EPROBE_DEFER))
-> > +               return -EPROBE_DEFER;
-> > +
-> > +       if (!IS_ERR_OR_NULL(clk_port)) {
-> > +               ret = clk_prepare_enable(clk_port);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> > +
-> > +       if (!IS_ERR_OR_NULL(clk_gpio)) {
-> > +               ret = clk_prepare_enable(clk_gpio);
-> > +               if (ret) {
-> > +                       clk_disable_unprepare(clk_port);
-> > +                       return ret;
-> > +               }
-> > +       }
+> Given that it is ENDPROC() that emits the Thumb annotation, the
+> cpu_v7_hvc_switch_mm() routine will be called in ARM mode on a
+> Thumb2 kernel, resulting in the following splat:
 > 
-> I think IS_ERR_OR_NULL() is considered harmful among other things.
+>   Internal error: Oops - undefined instruction: 0 [#1] SMP THUMB2
+>   Modules linked in:
+>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.0-rc1-00030-g4d28ad89189d-dirty #488
+>   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
+>   PC is at cpu_v7_hvc_switch_mm+0x12/0x18
+>   LR is at flush_old_exec+0x31b/0x570
+>   pc : [<c0316efe>]    lr : [<c04117c7>]    psr: 00000013
+>   sp : ee899e50  ip : 00000000  fp : 00000001
+>   r10: eda28f34  r9 : eda31800  r8 : c12470e0
+>   r7 : eda1fc00  r6 : eda53000  r5 : 00000000  r4 : ee88c000
+>   r3 : c0316eec  r2 : 00000001  r1 : eda53000  r0 : 6da6c000
+>   Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
 > 
-> What about this pattern:
+> Note the 'ISA ARM' in the last line.
 > 
->         clk = devm_clk_get(dev, "foo");
->         if (!IS_ERR(clk)) {
->                 ret = clk_prepare_enable(clk);
->                 if (ret)
->                         return ret;
->         } else if (PTR_ERR(clk) == -EPROBE_DEFER) {
->                 /*
->                  * Percolate deferrals, for anything else,
->                  * just live without the clocking.
->                  */
->                 return PTR_ERR(clk);
->         }
+> Fix this by using the correct name in ENDPROC().
 > 
-> You also need to introduce code to disable the clock on
-> .remove() or the clock will always be on after this module has probed. This
-> applies also to builtin drivers, unless you suppress the sysfs attributes and use
-> platform_driver_probe()
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/mm/proc-v7.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 6fe52819e014..339eb17c9808 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -112,7 +112,7 @@ ENTRY(cpu_v7_hvc_switch_mm)
+>  	hvc	#0
+>  	ldmfd	sp!, {r0 - r3}
+>  	b	cpu_v7_switch_mm
+> -ENDPROC(cpu_v7_smc_switch_mm)
+> +ENDPROC(cpu_v7_hvc_switch_mm)
+>  #endif
+>  ENTRY(cpu_v7_iciallu_switch_mm)
+>  	mov	r3, #0
 > 
 
-Looks good to me. Will update the patch.
-Thanks for the suggestion.
+I've just spent a couple of hours chasing this exact bug, only to notice
+that the problem was already known. Ard, can you please send this to
+RMK's patch system so that it doesn't get dropped?
 
-Regards
-Dong Aisheng
+Please add my: Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+and Cc stable, as this is quite an annoying regression.
 
-> Yours,
-> Linus Walleij
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
