@@ -1,37 +1,54 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 5 Nov 2018 13:46:48 -0600
-Subject: [PATCH V4 05/10] dt-bindings: pinctrl: imx7ulp: back to imx
- legacy binding for consistency
-In-Reply-To: <1541149669-10857-6-git-send-email-aisheng.dong@nxp.com>
-References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
- <1541149669-10857-6-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CAL_JsqJN-RqxLzchCUJbCm3uxY22VZMZHVdqXAJSzhLzsBgHZg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Nov 2018 20:35:18 +0100
+Subject: [PATCH 1/6] ARM: compressed: move sharpsl startup code into
+ subroutine
+In-Reply-To: <nycvar.YSQ.7.76.1811051413250.1498@knanqh.ubzr>
+References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
+ <20181105184438.19494-2-ard.biesheuvel@linaro.org>
+ <nycvar.YSQ.7.76.1811051413250.1498@knanqh.ubzr>
+Message-ID: <CAKv+Gu-dZZ7T4gzAghoBeDk4NcW98rUhuHUEA5yu_R4QwEE5Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 2, 2018 at 4:13 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+On 5 November 2018 at 20:25, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Mon, 5 Nov 2018, Ard Biesheuvel wrote:
 >
-> We already had an earlier conclusion that all new i.MX Socs will keep
-> using the legacy i.MX Pinctrl bindings instead of generic pin config.
-> However, MX7ULP generic pin config binding support has already been in
-> tree before that time. Per SoC maintainers' suggestions, in order to
-> get a better consistency for all i.MX devices, we'd like to go back to
-> imx legacy binding for MX7ULP as well.
+>> Instead of relying on unspecified linker behavior, move the
+>> SharpSL startup code into a subroutine and call it from the
+>> location we expect the linker to put the code.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+> [...]
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -213,6 +213,9 @@ not_angel:
+>>                */
+>>
+>>               .text
+>> +#ifdef CONFIG_PXA_SHARPSL_DETECT_MACH_ID
+>> +             bl      __SharpSL_start
+>> +#endif
 >
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> ChangeLog:
->  v3: new patch
-> ---
->  .../bindings/pinctrl/fsl,imx7ulp-pinctrl.txt       | 66 ++++++++++------------
->  1 file changed, 29 insertions(+), 37 deletions(-)
+> Independently from Russell's points, I don't like the above. that will
+> turn into an ugly list of #ifdefs and machine specific calls. I think
+> you should use:
+>
+>                 bl      __early_arch_specific_start
+>
+> and somewhere else in head.S:
+>
+> WEAK(__early_arch_specific_start)
+>                 mov     pc, lr
+> ENDPROC(__early_arch_specific_start)
+>
+> That would make this change more palatable.
+>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Yeah.
+
+In any case, I will try a different approach that leaves the .start
+and .text sections alone, given that the issue that I thought I was
+addressing on the side does not turn out to exist in practice.
+
+Thanks
