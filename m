@@ -1,50 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Nov 2018 19:26:38 +0000
-Subject: [PATCH v2] arm64/module: use plt section indices for relocations
-In-Reply-To: <20181105185323.hgoflyvkyujdyjxj@redbean>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <20181105175722.removbbpilqxu7tr@redbean>
- <20181105185323.hgoflyvkyujdyjxj@redbean>
-Message-ID: <20181105192637.GB25023@brain-police>
+From: daniel@zonque.org (Daniel Mack)
+Date: Mon,  5 Nov 2018 20:45:03 +0100
+Subject: [PATCH RESEND] dmaengine: pxa: make the filter function internal
+Message-ID: <20181105194503.25639-1-daniel@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 07:53:23PM +0100, Jessica Yu wrote:
-> Instead of saving a pointer to the .plt and .init.plt sections to apply
-> plt-based relocations, save and use their section indices instead.
-> 
-> The mod->arch.{core,init}.plt pointers were problematic for livepatch
-> because they pointed within temporary section headers (provided by the
-> module loader via info->sechdrs) that would be freed after module load.
-> Since livepatch modules may need to apply relocations post-module-load
-> (for example, to patch a module that is loaded later), using section
-> indices to offset into the section headers (instead of accessing them
-> through a saved pointer) allows livepatch modules on arm64 to pass in
-> their own copy of the section headers to apply_relocate_add() to apply
-> delayed relocations.
-> 
-> Signed-off-by: Jessica Yu <jeyu@kernel.org>
-> ---
-> 
-> v2:
-> 
-> - Do sechdrs[pltsec->plt_shndx].sh_addr instead of pointer math
-> 
-> Note: Addressed Will's comment about the pltsec -> plt_info rename and
-> removed that change to reduce unnecessary code churn. I didn't include the
-> Ack's for this reason so let me know if this version is OK as well.
+From: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Thanks, Jessica!
+As the pxa architecture and all its related drivers do not rely anymore
+on the filter function, thanks to the slave map conversion, make
+pxad_filter_fn() static, and remove it from the global namespace.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Vinod Koul <vkoul@kernel.org>
+---
 
-> arch/arm64/include/asm/module.h |  8 +++++---
-> arch/arm64/kernel/module-plts.c | 36 ++++++++++++++++++++----------------
-> arch/arm64/kernel/module.c      |  9 +++++----
-> 3 files changed, 30 insertions(+), 23 deletions(-)
+I'm resending this as it appears to be the last patch that's missing
+from the PXA DMA transition series.
 
-Actually, I guess I should just queue this for 4.21 given that it's
-completely self-contained.
+Robert, any reason why it wasn't applied?
 
-Will
+
+Thanks,
+Daniel
+
+ drivers/dma/pxa_dma.c       |  5 ++---
+ include/linux/dma/pxa-dma.h | 11 -----------
+ 2 files changed, 2 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 825725057e00..c7a328f81485 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -179,7 +179,7 @@ static unsigned int pxad_drcmr(unsigned int line)
+ 	return 0x1000 + line * 4;
+ }
+ 
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
++static bool pxad_filter_fn(struct dma_chan *chan, void *param);
+ 
+ /*
+  * Debug fs
+@@ -1500,7 +1500,7 @@ static struct platform_driver pxad_driver = {
+ 	.remove		= pxad_remove,
+ };
+ 
+-bool pxad_filter_fn(struct dma_chan *chan, void *param)
++static bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ {
+ 	struct pxad_chan *c = to_pxad_chan(chan);
+ 	struct pxad_param *p = param;
+@@ -1513,7 +1513,6 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ 
+ 	return true;
+ }
+-EXPORT_SYMBOL_GPL(pxad_filter_fn);
+ 
+ module_platform_driver(pxad_driver);
+ 
+diff --git a/include/linux/dma/pxa-dma.h b/include/linux/dma/pxa-dma.h
+index 9fc594f69eff..fceb5df07097 100644
+--- a/include/linux/dma/pxa-dma.h
++++ b/include/linux/dma/pxa-dma.h
+@@ -23,15 +23,4 @@ struct pxad_param {
+ 	enum pxad_chan_prio prio;
+ };
+ 
+-struct dma_chan;
+-
+-#ifdef CONFIG_PXA_DMA
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
+-#else
+-static inline bool pxad_filter_fn(struct dma_chan *chan, void *param)
+-{
+-	return false;
+-}
+-#endif
+-
+ #endif /* _PXA_DMA_H_ */
+-- 
+2.17.2
