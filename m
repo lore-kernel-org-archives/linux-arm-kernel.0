@@ -1,31 +1,30 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 5 Nov 2018 16:23:03 +0100
-Subject: [PATCH v2 3/3] arm64: allwinner: h6: Add OrangePi Lite2 initial
- support
-In-Reply-To: <20181105074842.21988-3-jagan@amarulasolutions.com>
-References: <20181105074842.21988-1-jagan@amarulasolutions.com>
- <20181105074842.21988-3-jagan@amarulasolutions.com>
-Message-ID: <20181105152303.pcpq4btw5ecwzs2y@flea>
+Date: Mon, 5 Nov 2018 16:25:40 +0100
+Subject: [PATCH][staging-next] drivers: staging: cedrus: find ctx before
+ dereferencing it ctx
+In-Reply-To: <20181102190126.5628-1-colin.king@canonical.com>
+References: <20181102190126.5628-1-colin.king@canonical.com>
+Message-ID: <20181105152540.htkdtrcdsnngu7pk@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 01:18:42PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@openedev.com>
+On Fri, Nov 02, 2018 at 07:01:26PM +0000, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> OrangePi Lite2 is Allwinner H6 based open-source SBC,
-> which support:
-> - Allwinner H6 Quad-core 64-bit ARM Cortex-A53
-> - GPU Mali-T720
-> - 1GB LPDDR3 RAM
-> - AXP805 PMIC
-> - AP6356S Wifi/BT
-> - USB 2.0, USB 3.0 Host, OTG
-> - HDMI port
-> - 5V/2A DC power supply
+> Currently if count is an invalid value the v4l2_info message will
+> dereference a null ctx pointer to get the dev information. Fix
+> this by finding ctx first and then checking for an invalid count,
+> this way ctxt will be non-null hence avoiding the null pointer
+> dereference.
 > 
-> Signed-off-by: Jagan Teki <jagan@openedev.com>
+> Detected by CoverityScan, CID#1475337 ("Explicit null dereferenced")
+> 
+> Fixes: 50e761516f2b ("media: platform: Add Cedrus VPU decoder driver")
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-Applied patch 2 and 3, thanks!
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+
+Thanks!
 Maxime
 
 -- 
@@ -38,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 228 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/d97a776a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/bcf2cebe/attachment.sig>
