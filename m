@@ -1,56 +1,68 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 Nov 2018 07:00:42 -0800
-Subject: [PATCH v2] ARM: dts: replace gpio-key,
- wakeup with wakeup-source property
-In-Reply-To: <20181105145924.GA25318@e107155-lin>
-References: <20181105134225.24146-1-sudeep.holla@arm.com>
- <20181105144330.5zkg4qkacb6afpcm@localhost>
- <20181105145924.GA25318@e107155-lin>
-Message-ID: <CAOesGMizjKnbDL4nCH5xKMe6=62up-BWJjzRx4TFY-n3XDM6+Q@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 5 Nov 2018 16:05:16 +0100
+Subject: [PATCH 2/5] thermal: rockchip_thermal: simplify getting
+ .driver_data
+In-Reply-To: <20181021200053.2194-3-wsa+renesas@sang-engineering.com>
+References: <20181021200053.2194-1-wsa+renesas@sang-engineering.com>
+ <20181021200053.2194-3-wsa+renesas@sang-engineering.com>
+Message-ID: <e022320e-3a85-070c-4f9e-700457ae4386@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 5, 2018 at 6:59 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
->
-> On Mon, Nov 05, 2018 at 06:43:30AM -0800, Olof Johansson wrote:
-> > On Mon, Nov 05, 2018 at 01:42:25PM +0000, Sudeep Holla wrote:
-> > > Most of the legacy "gpio-key,wakeup" and "enable-sdio-wakeup" boolean
-> > > properties are already replaced with "wakeup-source". However few
-> > > occurrences of old property has popped up again, probably from the
-> > > remnants in downstream trees. Almost all of those were remove couple
-> > > of years back.
-> > >
-> > > Replace those legacy properties with the unified "wakeup-source"
-> > > property.
-> > >
-> > > Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > > Acked-by: Peter Rosin <peda@axentia.se>
-> > > Reviewed-by: Fabio Estevam <festevam@gmail.com>
-> > > Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-> > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > > ---
-> > >  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 2 +-
-> > >  arch/arm/boot/dts/at91-wb45n.dts            | 2 +-
-> > >  arch/arm/boot/dts/at91-wb50n.dts            | 4 ++--
-> > >  arch/arm/boot/dts/imx6q-pistachio.dts       | 2 +-
-> > >  arch/arm/boot/dts/imx6sll-evk.dts           | 2 +-
-> > >  arch/arm/boot/dts/zynq-zturn.dts            | 2 +-
-> > >  6 files changed, 7 insertions(+), 7 deletions(-)
-> > >
-> > > Hi ARM SoC Team,
-> > >
-> > > Though it's more a cleanup, I prefer if this can be pushed as fix
-> > > to avoid more duplication in downstream as well as having to split into
-> > > 3 different patches.
-> >
-> > Is there a reason you're not fixing up xilinx on arm64 while you're at it? Sort
-> > of defeats the purpose of removing all usage of it.
-> >
->
-> Yes, ZynqMP is the only platform using legacy bindings in arm64 and
-> as Michal mentions he has already taken that one.
+On 21/10/2018 22:00, Wolfram Sang wrote:
+> We should get 'driver_data' from 'struct device' directly. Going via
+> platform_device is an unneeded step back and forth.
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Ok, please send the others the same way through maintainers then.
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+> ---
+> 
+> Build tested only. buildbot is happy.
+> 
+>  drivers/thermal/rockchip_thermal.c | 8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> index f36375d5a16c..9c7643d62ed7 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -1327,8 +1327,7 @@ static int rockchip_thermal_remove(struct platform_device *pdev)
+>  
+>  static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
+> +	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
+>  	int i;
+>  
+>  	for (i = 0; i < thermal->chip->chn_num; i++)
+> @@ -1346,8 +1345,7 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+>  
+>  static int __maybe_unused rockchip_thermal_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
+> +	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
+>  	int i;
+>  	int error;
+>  
+> @@ -1376,7 +1374,7 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
+>  					      id, thermal->regs,
+>  					      thermal->tshut_temp);
+>  		if (error)
+> -			dev_err(&pdev->dev, "%s: invalid tshut=%d, error=%d\n",
+> +			dev_err(dev, "%s: invalid tshut=%d, error=%d\n",
+>  				__func__, thermal->tshut_temp, error);
+>  	}
+>  
+> 
 
 
--Olof
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
