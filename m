@@ -1,100 +1,67 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 05 Nov 2018 19:49:59 +0800
-Subject: [PATCH] Revert "clk: sunxi-ng: sun50i: h6: Add 2x fixed
- post-divider to MMC module clocks"
-In-Reply-To: <20181105105112.5631-1-icenowy@aosc.io>
-References: <20181105105112.5631-1-icenowy@aosc.io>
-Message-ID: <d95d8cc3dac2849821a0c1acd5efd488e745af18.camel@aosc.io>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon,  5 Nov 2018 11:55:13 +0000
+Subject: [PATCH 3/7] arm64: capabilities: Merge duplicate entries for Qualcomm
+ erratum 1003
+In-Reply-To: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
+References: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1541418917-14219-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-11-05?? 18:51 +0800?Icenowy Zheng???
-> This reverts commit c2ff8383cc33c2d9c169e4daf1e37a434c3bb420.
-> 
-> This commit seems to lead to eMMC instability on Pine H64 board, both
-> model A and model B.
+Remove duplicate entries for Qualcomm erratum 1003. Since the entries
+are not purely based on generic MIDR checks, use the multi_cap_entry
+type to merge the entries.
 
-Sorry.
+Cc: Christopher Covington <cov@codeaurora.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpu_errata.c | 25 ++++++++++++++++---------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
 
-Please ignore this revert patch.
-
-Commit 07bafc1e3536 ("mmc: sunxi: Use new timing mode for A64 eMMC
-controller") seems to fixed this issue on 4.20, so the issue only
-appear when apply this patch onto 4.19, which is not a valid supported
-situation.
-
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 43 +++++++++++++-------------
-> --
->  1 file changed, 20 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-> b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-> index 2193e1495086..d425b47cef17 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-> @@ -408,29 +408,26 @@ static SUNXI_CCU_GATE(bus_nand_clk, "bus-nand", 
-> "ahb3", 0x82c, BIT(0), 0);
->  
->  static const char * const mmc_parents[] = { "osc24M", "pll-periph0-
-> 2x",
->  					    "pll-periph1-2x" };
-> -static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0",
-> mmc_parents, 0x830,
-> -					  0, 4,		/* M */
-> -					  8, 2,		/* N */
-> -					  24, 3,	/* mux */
-> -					  BIT(31),	/* gate */
-> -					  2,		/* post-div
-> */
-> -					  0);
-> -
-> -static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1",
-> mmc_parents, 0x834,
-> -					  0, 4,		/* M */
-> -					  8, 2,		/* N */
-> -					  24, 3,	/* mux */
-> -					  BIT(31),	/* gate */
-> -					  2,		/* post-div
-> */
-> -					  0);
-> -
-> -static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc2_clk, "mmc2",
-> mmc_parents, 0x838,
-> -					  0, 4,		/* M */
-> -					  8, 2,		/* N */
-> -					  24, 3,	/* mux */
-> -					  BIT(31),	/* gate */
-> -					  2,		/* post-div
-> */
-> -					  0);
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_parents,
-> 0x830,
-> +					0, 4,	/* M */
-> +					8, 2,	/* N */
-> +					24, 3,	/* mux */
-> +					BIT(31),/* gate */
-> +					0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_parents,
-> 0x834,
-> +					0, 4,	/* M */
-> +					8, 2,	/* N */
-> +					24, 3,	/* mux */
-> +					BIT(31),/* gate */
-> +					0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_parents,
-> 0x838,
-> +					0, 4,	/* M */
-> +					8, 2,	/* N */
-> +					24, 3,	/* mux */
-> +					BIT(31),/* gate */
-> +					0);
->  
->  static SUNXI_CCU_GATE(bus_mmc0_clk, "bus-mmc0", "ahb3", 0x84c,
-> BIT(0), 0);
->  static SUNXI_CCU_GATE(bus_mmc1_clk, "bus-mmc1", "ahb3", 0x84c,
-> BIT(1), 0);
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 7242e4c..64525b2 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -592,6 +592,19 @@ static const struct midr_range cavium_erratum_30115_cpus[] = {
+ };
+ #endif
+ 
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
++static const struct arm64_cpu_capabilities qcom_erratum_1003_list[] = {
++	{
++		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
++	},
++	{
++		.midr_range.model = MIDR_QCOM_KRYO,
++		.matches = is_kryo_midr,
++	},
++	{},
++};
++#endif
++
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+@@ -676,16 +689,10 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	},
+ #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+ 	{
+-		.desc = "Qualcomm Technologies Falkor erratum 1003",
++		.desc = "Qualcomm Technologies Falkor/Kryo erratum 1003",
+ 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
+-		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
+-	},
+-	{
+-		.desc = "Qualcomm Technologies Kryo erratum 1003",
+-		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
+-		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+-		.midr_range.model = MIDR_QCOM_KRYO,
+-		.matches = is_kryo_midr,
++		.matches = multi_entry_cap_matches,
++		.match_list = qcom_erratum_1003_list,
+ 	},
+ #endif
+ #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
+-- 
+2.7.4
