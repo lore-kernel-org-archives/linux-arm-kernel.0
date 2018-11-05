@@ -1,67 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 Nov 2018 07:14:27 -0800
-Subject: [PATCH v2] ARM: dts: replace gpio-key,
- wakeup with wakeup-source property
-In-Reply-To: <20181105151031.GB25318@e107155-lin>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 5 Nov 2018 15:20:52 +0000
+Subject: [PATCH v2] ARM: dts: replace gpio-key, wakeup with wakeup-source
+ property
+In-Reply-To: <CAOesGMg-GtpMxW7rj5rwkVB=_AYLzuz2T_ovROTwRg6dGDG9Ww@mail.gmail.com>
 References: <20181105134225.24146-1-sudeep.holla@arm.com>
  <20181105144330.5zkg4qkacb6afpcm@localhost>
  <20181105145924.GA25318@e107155-lin>
  <CAOesGMizjKnbDL4nCH5xKMe6=62up-BWJjzRx4TFY-n3XDM6+Q@mail.gmail.com>
  <20181105151031.GB25318@e107155-lin>
-Message-ID: <CAOesGMg-GtpMxW7rj5rwkVB=_AYLzuz2T_ovROTwRg6dGDG9Ww@mail.gmail.com>
+ <CAOesGMg-GtpMxW7rj5rwkVB=_AYLzuz2T_ovROTwRg6dGDG9Ww@mail.gmail.com>
+Message-ID: <20181105152052.GC25318@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 5, 2018 at 7:10 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
->
-> On Mon, Nov 05, 2018 at 07:00:42AM -0800, Olof Johansson wrote:
-> > On Mon, Nov 5, 2018 at 6:59 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
-> > >
-> > > On Mon, Nov 05, 2018 at 06:43:30AM -0800, Olof Johansson wrote:
-> > > > On Mon, Nov 05, 2018 at 01:42:25PM +0000, Sudeep Holla wrote:
-> > > > > Most of the legacy "gpio-key,wakeup" and "enable-sdio-wakeup" boolean
-> > > > > properties are already replaced with "wakeup-source". However few
-> > > > > occurrences of old property has popped up again, probably from the
-> > > > > remnants in downstream trees. Almost all of those were remove couple
-> > > > > of years back.
-> > > > >
-> > > > > Replace those legacy properties with the unified "wakeup-source"
-> > > > > property.
-> > > > >
-> > > > > Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > > > > Acked-by: Peter Rosin <peda@axentia.se>
-> > > > > Reviewed-by: Fabio Estevam <festevam@gmail.com>
-> > > > > Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-> > > > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > > > > ---
-> > > > >  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 2 +-
-> > > > >  arch/arm/boot/dts/at91-wb45n.dts            | 2 +-
-> > > > >  arch/arm/boot/dts/at91-wb50n.dts            | 4 ++--
-> > > > >  arch/arm/boot/dts/imx6q-pistachio.dts       | 2 +-
-> > > > >  arch/arm/boot/dts/imx6sll-evk.dts           | 2 +-
-> > > > >  arch/arm/boot/dts/zynq-zturn.dts            | 2 +-
-> > > > >  6 files changed, 7 insertions(+), 7 deletions(-)
-> > > > >
-> > > > > Hi ARM SoC Team,
-> > > > >
-> > > > > Though it's more a cleanup, I prefer if this can be pushed as fix
-> > > > > to avoid more duplication in downstream as well as having to split into
-> > > > > 3 different patches.
-> > > >
-> > > > Is there a reason you're not fixing up xilinx on arm64 while you're at it? Sort
-> > > > of defeats the purpose of removing all usage of it.
-> > > >
-> > >
-> > > Yes, ZynqMP is the only platform using legacy bindings in arm64 and
-> > > as Michal mentions he has already taken that one.
+On Mon, Nov 05, 2018 at 07:14:27AM -0800, Olof Johansson wrote:
+> On Mon, Nov 5, 2018 at 7:10 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
 > >
-> > Ok, please send the others the same way through maintainers then.
-> >
+
+[...]
+
+> > OK, I will do so. I was avoiding to put this silly change in 3 different
+> > patches :)
 >
-> OK, I will do so. I was avoiding to put this silly change in 3 different
-> patches :)
+> I'm maybe a little confused over that, since you already split it up in two.
+>
 
-I'm maybe a little confused over that, since you already split it up in two.
+Extremely sorry for the confusion. I have separate patches for ARM and arm64.
+I was referring individual platforms within ARM above.
 
-
--Olof
+--
+Regards,
+Sudeep
