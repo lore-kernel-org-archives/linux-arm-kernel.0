@@ -1,36 +1,44 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 05 Nov 2018 23:36:32 +0100
-Subject: [PATCH RESEND] dmaengine: pxa: make the filter function internal
-In-Reply-To: <20181105194503.25639-1-daniel@zonque.org> (Daniel Mack's message
- of "Mon, 5 Nov 2018 20:45:03 +0100")
-References: <20181105194503.25639-1-daniel@zonque.org>
-Message-ID: <874lcvm9sf.fsf@belgarion.home>
+From: wendy.liang@xilinx.com (Wendy Liang)
+Date: Mon, 5 Nov 2018 14:36:59 -0800
+Subject: [PATCH v5 0/2] Xilinx ZynqMP IPI Mailbox Controller Driver
+Message-ID: <1541457421-14820-1-git-send-email-wendy.liang@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+Introduce mailbox controller driver for ZynqMP IPI(Inter-processor
+interrupt) IP core.
 
-> From: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> As the pxa architecture and all its related drivers do not rely anymore
-> on the filter function, thanks to the slave map conversion, make
-> pxad_filter_fn() static, and remove it from the global namespace.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Acked-by: Vinod Koul <vkoul@kernel.org>
-> ---
->
-> I'm resending this as it appears to be the last patch that's missing
-> from the PXA DMA transition series.
->
-> Robert, any reason why it wasn't applied?
-Ah this is because my pull request was ... not taken into account.
+As the device tree bindings have been updated. Do not have "Reviewed-by"
+nor "Acked-by" in the dt-bindings commit.
 
-Arnd, Kevin, Olof, did you receive this
-https://www.spinics.net/lists/arm-kernel/msg679383.html ? It might be my mailer
-getting me into trouble once more.
+v5:
+ - fix check patch warning on write a paragraph to describe the kconfig
+   symbol.
 
-Cheers.
+v4:
+ - make IPI mailboxes as subnodes to the IPI agent device node to properly
+   describe the hardware.
 
---
-Robert
+v3:
+ - add NULL entry to of_device_id of IPI controller
+
+v2:
+ - change SPDX-License-Identifier license text style in .c file
+ - replace xlnx-ipi-ids with xlnx,ipi-ids
+
+Wendy Liang (2):
+  mailbox: ZynqMP IPI mailbox controller
+  dt-bindings: mailbox: Add Xilinx IPI Mailbox
+
+ .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 128 ++++
+ drivers/mailbox/Kconfig                            |   9 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/zynqmp-ipi-mailbox.c               | 762 +++++++++++++++++++++
+ include/linux/mailbox/zynqmp-ipi-message.h         |  24 +
+ 5 files changed, 925 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+ create mode 100644 drivers/mailbox/zynqmp-ipi-mailbox.c
+ create mode 100644 include/linux/mailbox/zynqmp-ipi-message.h
+
+-- 
+2.7.4
