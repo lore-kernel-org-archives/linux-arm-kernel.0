@@ -1,35 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Nov 2018 11:31:37 +0000
-Subject: [Bug Report] kdump crashes after latest EFI memblock changes on
- arm64 machines with large number of CPUs
-In-Reply-To: <CAKv+Gu_1PNiGbgRqd3_0k6CGzh-2P+iAmqk=oSSek69kBCnb8Q@mail.gmail.com>
-References: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
- <CAKv+Gu_1PNiGbgRqd3_0k6CGzh-2P+iAmqk=oSSek69kBCnb8Q@mail.gmail.com>
-Message-ID: <f5c4c03a-e88f-ea42-b791-e50808e8247b@arm.com>
+From: dkos@cadence.com (Damian Kos)
+Date: Mon, 5 Nov 2018 11:34:31 +0000
+Subject: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
+In-Reply-To: <d6db03aa-6f61-f902-85f6-2245547186bc@samsung.com>
+References: <1539034953-11274-1-git-send-email-dkos@cadence.com>
+ <CY1PR0701MB166434BBB71DB76593E0F513CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
+ <3056496.a8qoricJmv@avalon>
+ <CGME20181105103448epcas1p29a9889a9a19fc56629dcc7e24785556c@epcas1p2.samsung.com>
+ <CY1PR0701MB16644A2C7EF670F5AC732BF8CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
+ <d6db03aa-6f61-f902-85f6-2245547186bc@samsung.com>
+Message-ID: <CY1PR0701MB16643016AC6D9D3901CA6786CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/18 11:11, Ard Biesheuvel wrote:
-> (+ Marc)
-> 
-> On 1 November 2018 at 22:14, Bhupesh Sharma <bhsharma@redhat.com> wrote:
->> Hi,
+Hi Andrzej,
+
+Thanks!
+
+Damian
+
+-----Original Message-----
+From: Andrzej Hajda <a.hajda@samsung.com> 
+Sent: Monday, November 5, 2018 12:10
+To: Damian Kos <dkos@cadence.com>; Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: David Airlie <airlied@linux.ie>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Archit Taneja <architt@codeaurora.org>; Gustavo Padovan <gustavo@padovan.org>; Maarten Lankhorst <maarten.lankhorst@linux.intel.com>; Sean Paul <sean@poorly.run>; Sandy Huang <hjc@rock-chips.com>; Heiko St?bner <heiko@sntech.de>; Quentin Schulz <quentin.schulz@free-electrons.com>; Piotr Sroka <piotrs@cadence.com>; dri-devel at lists.freedesktop.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-rockchip at lists.infradead.org; Rafal Ciepiela <rafalc@cadence.com>; quentin.schulz at bootlin.com; jbergsagel at ti.com
+Subject: Re: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
+
+EXTERNAL MAIL
+
+
+On 05.11.2018 11:33, Damian Kos wrote:
+> Hi Laurent,
+>
+> Understood. Thanks.
+
+
+I will look at it today or tomorrow.
+
+
+Regards
+
+Andrzej
+
+
+>
+> Damian
+>
+> -----Original Message-----
+> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Sent: Monday, November 5, 2018 11:30
+> To: Damian Kos <dkos@cadence.com>
+> Cc: David Airlie <airlied@linux.ie>; Rob Herring <robh+dt@kernel.org>; 
+> Mark Rutland <mark.rutland@arm.com>; Archit Taneja 
+> <architt@codeaurora.org>; Andrzej Hajda <a.hajda@samsung.com>; Gustavo 
+> Padovan <gustavo@padovan.org>; Maarten Lankhorst 
+> <maarten.lankhorst@linux.intel.com>; Sean Paul <sean@poorly.run>; 
+> Sandy Huang <hjc@rock-chips.com>; Heiko St?bner <heiko@sntech.de>; 
+> Quentin Schulz <quentin.schulz@free-electrons.com>; Piotr Sroka 
+> <piotrs@cadence.com>; dri-devel at lists.freedesktop.org; 
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; 
+> linux-rockchip at lists.infradead.org; Rafal Ciepiela 
+> <rafalc@cadence.com>; quentin.schulz at bootlin.com; jbergsagel at ti.com
+> Subject: Re: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
+>
+> EXTERNAL MAIL
+>
+>
+> Hi Damian,
+>
+> On Monday, 5 November 2018 11:44:53 EET Damian Kos wrote:
+>> Hi Guys,
 >>
->> With the latest EFI changes for memblock reservation across kdump
->> kernel from Ard (Commit 71e0940d52e107748b270213a01d3b1546657d74
->> ["efi: honour memory reservations passed via a linux specific config
->> table"]), we hit a panic while trying to boot the kdump kernel on
->> machines which have large number of CPUs.
->>
-> 
-> Just for my understanding: why do you boot all 224 CPus when running
-> the crash kernel?
-
-FWIW, I've used these patches to kexec a kernel on a 256 CPUs system,
-without any issue. Why am I not seeing this problem?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>> I'm wondering if this time patch is so good that there're no change 
+>> requests, or is it so bad that it was rejected without a comment : ) 
+>> Please let me know if this patch is being in review or was rejected 
+>> and, if so, what needs to be changed.
+> I unfortunately don't have time to review your series for the time being. 
+> Hopefully someone else will have a better review bandwidth :-) Sorry about that.
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+>
+>
+>
+>
