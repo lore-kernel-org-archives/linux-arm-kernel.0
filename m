@@ -1,173 +1,51 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Nov 2018 20:07:10 +0100
-Subject: [PATCH 1/6] ARM: compressed: move sharpsl startup code into
- subroutine
-In-Reply-To: <20181105185944.GS30658@n2100.armlinux.org.uk>
+Date: Mon, 5 Nov 2018 20:10:48 +0100
+Subject: [PATCH 0/6] ARM: compressed: clean up section layout and enable
+ EFI debugging
+In-Reply-To: <20181105190908.GV30658@n2100.armlinux.org.uk>
 References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
- <20181105184438.19494-2-ard.biesheuvel@linaro.org>
- <20181105185944.GS30658@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu-XcWy0jYG-u9rQRuWZOshQALiMsJY_uZLUij-5Vcp4-Q@mail.gmail.com>
+ <20181105190908.GV30658@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu8rQZ49uB6qVqZj4QWGjCLv1LGcSkDrZ-TEZMN5JbQ6FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2018 at 19:59, Russell King - ARM Linux
+On 5 November 2018 at 20:09, Russell King - ARM Linux
 <linux@armlinux.org.uk> wrote:
-> On Mon, Nov 05, 2018 at 07:44:33PM +0100, Ard Biesheuvel wrote:
->> Instead of relying on unspecified linker behavior, move the
->> SharpSL startup code into a subroutine and call it from the
->> location we expect the linker to put the code.
+> On Mon, Nov 05, 2018 at 07:44:32PM +0100, Ard Biesheuvel wrote:
+>> Currently, the decompressor section layout is somewhat unusual: head.S
+>> puts code into a .start and a .text section, which are expected to be
+>> emitted back to back, unless other objects are included that define a
+>> .start section as well, in which case execution is expected to proceed
+>> linearly from head.S's section .start section into the other .start
+>> section and then onward into head.S's .text section.
+>>
+>> This relies on the input files to be consumed by the linker in the same
+>> order they were specified on the command line, but this is not actually
+>> guaranteed by the linker, so it is better to make the inclusion of this
+>> code specific by using function calls.
 >
-> Why is it "unspecified linker behaviour" ?  Lots of libraries and
-> programs rely on the linker building tables, whether it be data or
-> code from sections.
+> I think you're wrong about that - as I've pointed out, this behaviour
+> is relied upon quite heavily when linking programs using GCC, so while
+> it may not be explicitly specified, the fact that GCC relies upon it
+> when creating shared libraries (using crti.o before any object files,
+> and crtn.o at the end) means that it's pretty much guaranteed.
 >
-> For example, programs build a section called .init which starts with
-> the code in crti.o, code from other files, and finishes with code
-> from crtn.o.
+> What is less guaranteed is proceeding between two sections, but these
+> separate sections in object files are combined into one .text section
+> in the output file, and so we know that code in .start will be present
+> _before_ any code in .text.
 >
-> crti.o:
+> Put the two things together, and the code from head.S will be listed
+> first, and therefore will be output first in the .start and .text
+> sections.  Other object files will have code placed into the output
+> .text section accordingly.
 >
-> Disassembly of section .init:
+> So really I see no point to your patch 1 to 5, other than change for
+> change's sake.
 >
-> 00000000 <_init>:
->    0:   e92d4008        push    {r3, lr}
->    4:   ebfffffe        bl      0 <_init>
->                         4: R_ARM_CALL   call_weak_fn
->
-> crtn.o:
->
-> Disassembly of section .init:
->
-> 00000000 <.init>:
->    0:   e8bd8008        pop     {r3, pc}
->
-> So, I don't think there's anything "unspecified" here.
->
-
-In that case, we should do what GCC's builtin linker script uses:
-
-  .init           :
-  {
-    KEEP (*(SORT_NONE(.init)))
-  } =0
-
-> We also rely heavily on this in the kernel to build exception tables,
-> symbol tables, and so forth.
+> Can you _prove_ that there is a problem here - if you can, it's likely
+> that such a problem also affects gcc -shared too.
 >
 
-No, not really. In that case, they are arrays of data structures, not
-sequences of instructions, and if they need to appear in a particular
-order, they are sorted explicitly.
-
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/boot/compressed/head-sharpsl.S | 24 ++++++++++----------
->>  arch/arm/boot/compressed/head.S         |  3 +++
->>  2 files changed, 15 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/boot/compressed/head-sharpsl.S b/arch/arm/boot/compressed/head-sharpsl.S
->> index 992e784500fa..f4e6ad318376 100644
->> --- a/arch/arm/boot/compressed/head-sharpsl.S
->> +++ b/arch/arm/boot/compressed/head-sharpsl.S
->> @@ -20,9 +20,10 @@
->>  #error What am I doing here...
->>  #endif
->>
->> -             .section        ".start", "ax"
->> +     .text
->>
->> -__SharpSL_start:
->> +ENTRY(__SharpSL_start)
->> +     mov     ip, lr                  @ preserve lr
->>
->>  /* Check for TC6393 - if found we have a Tosa */
->>       ldr     r7, .TOSAID
->> @@ -30,7 +31,7 @@ __SharpSL_start:
->>       mov     r6, #0x03
->>       ldrh    r3, [r1, #8]            @ Load TC6393XB Revison: This is 0x0003
->>       cmp     r6, r3
->> -     beq     .SHARPEND               @ Success -> tosa
->> +     moveq   pc, ip                  @ Success -> tosa
->>
->>  /* Check for pxa270 - if found, branch */
->>       mrc p15, 0, r4, c0, c0          @ Get Processor ID
->> @@ -55,30 +56,30 @@ __SharpSL_start:
->>       ldr     r3, .W100ID
->>       ldr     r7, .POODLEID
->>       cmp     r6, r3
->> -     bne     .SHARPEND                       @ We have no w100 - Poodle
->> +     movne   pc, ip                          @ We have no w100 - Poodle
->>
->>  /* Check for pxa250 - if found we have a Corgi */
->>       ldr     r7, .CORGIID
->>       ldr     r3, .PXA255ID
->>       cmp     r4, r3
->> -     blo     .SHARPEND                       @ We have a PXA250 - Corgi
->> +     movlo   pc, ip                          @ We have a PXA250 - Corgi
->>
->>  /* Check for 64MiB flash - if found we have a Shepherd */
->>       bl      get_flash_ids
->>       ldr     r7, .SHEPHERDID
->>       cmp     r3, #0x76                       @ 64MiB flash
->> -     beq     .SHARPEND                       @ We have Shepherd
->> +     moveq   pc, ip                          @ We have Shepherd
->>
->>  /* Must be a Husky */
->>       ldr     r7, .HUSKYID            @ Must be Husky
->> -     b .SHARPEND
->> +     mov     pc, ip                  @ return
->>
->>  .PXA270:
->>  /* Check for 16MiB flash - if found we have Spitz */
->>       bl      get_flash_ids
->>       ldr     r7, .SPITZID
->>       cmp     r3, #0x73                       @ 16MiB flash
->> -     beq     .SHARPEND                       @ We have Spitz
->> +     moveq   pc, ip                          @ We have Spitz
->>
->>  /* Check for a second SCOOP chip - if found we have Borzoi */
->>       ldr     r1, .SCOOP2ADDR
->> @@ -87,11 +88,12 @@ __SharpSL_start:
->>       strh    r6, [r1]
->>       ldrh    r6, [r1]
->>       cmp     r6, #0x0140
->> -     beq     .SHARPEND                       @ We have Borzoi
->> +     moveq   pc, ip                          @ We have Borzoi
->>
->>  /* Must be Akita */
->>       ldr     r7, .AKITAID
->> -     b       .SHARPEND                       @ We have Borzoi
->> +     mov     pc, ip                          @ We have Borzoi
->> +ENDPROC(__SharpSL_start)
->>
->>  .PXA255ID:
->>       .word   0x69052d00              @ PXA255 Processor ID
->> @@ -147,5 +149,3 @@ get_flash_ids:
->>       ldrb    r2, [r1, #20]           @ NAND Manufacturer ID
->>       ldrb    r3, [r1, #20]           @ NAND Chip ID
->>       mov     pc, lr
->> -
->> -.SHARPEND:
->> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
->> index 6c7ccb428c07..5067f287fa5a 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -213,6 +213,9 @@ not_angel:
->>                */
->>
->>               .text
->> +#ifdef CONFIG_PXA_SHARPSL_DETECT_MACH_ID
->> +             bl      __SharpSL_start
->> +#endif
->>
->>  #ifdef CONFIG_AUTO_ZRELADDR
->>               /*
->> --
->> 2.19.1
->>
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-> According to speedtest.net: 11.9Mbps down 500kbps up
+As I replied in the other patch, GCC's builtin linker script uses
+SORT_NONE(), and probably does so for a reason.
