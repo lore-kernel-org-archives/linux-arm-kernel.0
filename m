@@ -1,34 +1,48 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  5 Nov 2018 15:48:31 -0800
-Subject: [GIT PULL 2/2] Broadcom maintainers changes for 4.20 part 2
-In-Reply-To: <20181105234831.30526-1-f.fainelli@gmail.com>
-References: <20181105234831.30526-1-f.fainelli@gmail.com>
-Message-ID: <20181105234831.30526-2-f.fainelli@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Nov 2018 15:59:15 -0800
+Subject: [PATCH RESEND] dmaengine: pxa: make the filter function internal
+In-Reply-To: <874lcvm9sf.fsf@belgarion.home>
+References: <20181105194503.25639-1-daniel@zonque.org>
+ <874lcvm9sf.fsf@belgarion.home>
+Message-ID: <CAOesGMjrdhQqSygAZbAjd2Gzwfgs78ZK=vJZj+L-Ns_MY=tvJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+On Mon, Nov 5, 2018 at 2:37 PM Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+> Daniel Mack <daniel@zonque.org> writes:
+>
+> > From: Robert Jarzmik <robert.jarzmik@free.fr>
+> >
+> > As the pxa architecture and all its related drivers do not rely anymore
+> > on the filter function, thanks to the slave map conversion, make
+> > pxad_filter_fn() static, and remove it from the global namespace.
+> >
+> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> > Acked-by: Vinod Koul <vkoul@kernel.org>
+> > ---
+> >
+> > I'm resending this as it appears to be the last patch that's missing
+> > from the PXA DMA transition series.
+> >
+> > Robert, any reason why it wasn't applied?
+> Ah this is because my pull request was ... not taken into account.
+>
+> Arnd, Kevin, Olof, did you receive this
+> https://www.spinics.net/lists/arm-kernel/msg679383.html ? It might be my mailer
+> getting me into trouble once more.
 
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+I only have a record of the DT pull request here, so yeah, something
+must have happened to that one. It's odd that it got to the archive
+but not my mail client though.
 
-are available in the Git repository at:
+Either that, or it got labelled as Spam and auto-purged since it was a
+little while ago.
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.20/maintainers-part2
+In the future, if we haven't merged in 1 or 2 weeks, feel free to ping.
 
-for you to fetch changes up to 7900f06c3feedbe74d79f28a0d062dbf11fd10bf:
 
-  MAINTAINERS: Remove self from Broadcom SoCs (2018-11-05 10:41:44 -0800)
+-Olof
 
-----------------------------------------------------------------
-This pull request contains update to the MAINTAINERS file for Broadcom
-SoCs, please pull the following changes for 4.20:
 
-- Jon removes himself from the MAINTAINERS file since he is no longer
-  with Broadcom
-
-----------------------------------------------------------------
-Jon Mason (1):
-      MAINTAINERS: Remove self from Broadcom SoCs
-
- MAINTAINERS | 2 --
- 1 file changed, 2 deletions(-)
+-Olof
