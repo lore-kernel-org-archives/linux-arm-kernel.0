@@ -1,67 +1,58 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  5 Nov 2018 11:55:13 +0000
-Subject: [PATCH 3/7] arm64: capabilities: Merge duplicate entries for Qualcomm
- erratum 1003
-In-Reply-To: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
-References: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1541418917-14219-4-git-send-email-suzuki.poulose@arm.com>
+Date: Mon,  5 Nov 2018 11:55:10 +0000
+Subject: [PATCH 0/7] arm64: capabilities: Optimize checking and enabling
+Message-ID: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicate entries for Qualcomm erratum 1003. Since the entries
-are not purely based on generic MIDR checks, use the multi_cap_entry
-type to merge the entries.
+We maintain two separate tables (i.e, arm64_features and arm64_errata) of
+struct arm64_cpu_capabilities which decide the capabilities of the system.
+We iterate over the two tables for detecting/verifying/enabling the capabilities.
+e.g, this_cpu_has_cap() needs to iterate over the two tables one by one to
+find the "capability" structure corresponding to the cap number and then
+check it on the CPU.
 
-Cc: Christopher Covington <cov@codeaurora.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpu_errata.c | 25 ++++++++++++++++---------
- 1 file changed, 16 insertions(+), 9 deletions(-)
+Also, we enable all the non-boot scoped capabilities after all the SMP cpus
+are brought up by the kernel, using stop_machine() for each available
+capability. We could batch all the "enabling" activity to a single
+stop_machine() callback. But that implies you need a way to map
+a given capability number to the corresponding capability entry
+to finish the operation quickly.
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 7242e4c..64525b2 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -592,6 +592,19 @@ static const struct midr_range cavium_erratum_30115_cpus[] = {
- };
- #endif
- 
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-+static const struct arm64_cpu_capabilities qcom_erratum_1003_list[] = {
-+	{
-+		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
-+	},
-+	{
-+		.midr_range.model = MIDR_QCOM_KRYO,
-+		.matches = is_kryo_midr,
-+	},
-+	{},
-+};
-+#endif
-+
- const struct arm64_cpu_capabilities arm64_errata[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
-@@ -676,16 +689,10 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	},
- #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
- 	{
--		.desc = "Qualcomm Technologies Falkor erratum 1003",
-+		.desc = "Qualcomm Technologies Falkor/Kryo erratum 1003",
- 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
--		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
--	},
--	{
--		.desc = "Qualcomm Technologies Kryo erratum 1003",
--		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
--		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
--		.midr_range.model = MIDR_QCOM_KRYO,
--		.matches = is_kryo_midr,
-+		.matches = multi_entry_cap_matches,
-+		.match_list = qcom_erratum_1003_list,
- 	},
- #endif
- #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
+So we need a quicker way to access the entry for a given capability.
+We have two choices :
+
+ 1) Unify both the tables to a static/dynamic sorted entry based on
+    the capability number. This has the following drawbacks :
+     a) The entries must be unique. i.e, no duplicate entries for a
+        capability.
+     b) Looses the separation of "features" vs. "errata" classification
+     c) Statically sorting the list is error prone. Runtime sorting the
+        array means more time for booting.
+
+ 2) Keep an array of pointers to the capability sorted at boot time
+    based on the capability.
+     a) As for (1), the entries must be unique for a capability.
+
+This series implements (2) and uses the new list for optimizing the
+operations on the entries. As a prepatory step, we remove the
+duplicate entries for the same capabilities (Patch 1-3).
+
+
+Suzuki K Poulose (7):
+  arm64: capabilities: Merge entries for ARM64_WORKAROUND_CLEAN_CACHE
+  arm64: capabilities: Merge duplicate Cavium erratum entries
+  arm64: capabilities: Merge duplicate entries for Qualcomm erratum 1003
+  arm64: capabilities: Speed up capability lookup
+  arm64: capabilities: Optimize this_cpu_has_cap
+  arm64: capabilities: Use linear array for detection and verification
+  arm64: capabilities: Batch cpu_enable callbacks
+
+ arch/arm64/include/asm/cpufeature.h |   3 +
+ arch/arm64/include/asm/cputype.h    |   2 +
+ arch/arm64/kernel/cpu_errata.c      |  94 ++++++++++----------
+ arch/arm64/kernel/cpufeature.c      | 165 ++++++++++++++++++++----------------
+ 4 files changed, 145 insertions(+), 119 deletions(-)
+
 -- 
 2.7.4
