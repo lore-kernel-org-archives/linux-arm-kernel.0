@@ -1,155 +1,57 @@
-From: wendy.liang@xilinx.com (Wendy Liang)
-Date: Mon, 5 Nov 2018 14:37:01 -0800
-Subject: [PATCH v5 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <1541457421-14820-1-git-send-email-wendy.liang@xilinx.com>
-References: <1541457421-14820-1-git-send-email-wendy.liang@xilinx.com>
-Message-ID: <1541457421-14820-3-git-send-email-wendy.liang@xilinx.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon,  5 Nov 2018 14:54:28 -0800
+Subject: [PATCH v4 3/6] of/fdt: Populate phys_initrd_start/phys_initrd_size
+ from FDT
+In-Reply-To: <20181105225431.24485-1-f.fainelli@gmail.com>
+References: <20181105225431.24485-1-f.fainelli@gmail.com>
+Message-ID: <20181105225431.24485-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block
-in ZynqMP SoC used for the communication between various processor
-systems.
+Now that we have central and global variables holding the physical
+address and size of the initrd, we can have
+early_init_dt_check_for_initrd() populate
+phys_initrd_start/phys_initrd_size for us.
 
-Signed-off-by: Wendy Liang <wendy.liang@xilinx.com>
+This allows us to remove a chunk of code from arch/arm/mm/init.c
+introduced with commit 65939301acdb ("arm: set initrd_start/initrd_end
+for fdt scan").
+
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 128 +++++++++++++++++++++
- 1 file changed, 128 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+ arch/arm/mm/init.c | 6 ------
+ drivers/of/fdt.c   | 2 ++
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-new file mode 100644
-index 0000000..18fd7b4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-@@ -0,0 +1,128 @@
-+Xilinx IPI Mailbox Controller
-+========================================
-+
-+The Xilinx IPI(Inter Processor Interrupt) mailbox controller is to manage
-+messaging between two Xilinx Zynq UltraScale+ MPSoC IPI agents. Each IPI
-+agent owns registers used for notification and buffers for message.
-+
-+               +-------------------------------------+
-+               | Xilinx ZynqMP IPI Controller        |
-+               +-------------------------------------+
-+    +--------------------------------------------------+
-+ATF                    |                     |
-+                       |                     |
-+                       |                     |
-+    +--------------------------+             |
-+                       |                     |
-+                       |                     |
-+    +--------------------------------------------------+
-+            +------------------------------------------+
-+            |  +----------------+   +----------------+ |
-+Hardware    |  |  IPI Agent     |   |  IPI Buffers   | |
-+            |  |  Registers     |   |                | |
-+            |  |                |   |                | |
-+            |  +----------------+   +----------------+ |
-+            |                                          |
-+            | Xilinx IPI Agent Block                   |
-+            +------------------------------------------+
-+
-+
-+Controller Device Node:
-+===========================
-+Required properties:
-+--------------------
-+IPI agent node:
-+- compatible:		Shall be: "xlnx,zynqmp-ipi-mailbox"
-+- interrupt-parent:	Phandle for the interrupt controller
-+- interrupts:		Interrupt information corresponding to the
-+			interrupt-names property.
-+- xlnx,ipi-id:		local Xilinx IPI agent ID
-+- #address-cells:	number of address cells of internal IPI mailbox nodes
-+- #size-cells:		number of size cells of internal IPI mailbox nodes
-+
-+Internal IPI mailbox node:
-+- reg:			IPI buffers address ranges
-+- reg-names:		Names of the reg resources. It should have:
-+			* local_request_region
-+			  - IPI request msg buffer written by local and read
-+			    by remote
-+			* local_response_region
-+			  - IPI response msg buffer written by local and read
-+			    by remote
-+			* remote_request_region
-+			  - IPI request msg buffer written by remote and read
-+			    by local
-+			* remote_response_region
-+			  - IPI response msg buffer written by remote and read
-+			    by local
-+- #mbox-cells:		Shall be 1. It contains:
-+			* tx(0) or rx(1) channel
-+- xlnx,ipi-id:		remote Xilinx IPI agent ID of which the mailbox is
-+			connected to.
-+
-+Optional properties:
-+--------------------
-+- method:              The method of accessing the IPI agent registers.
-+                       Permitted values are: "smc" and "hvc". Default is
-+                       "smc".
-+
-+Client Device Node:
-+===========================
-+Required properties:
-+--------------------
-+- mboxes:		Standard property to specify a mailbox
-+			(See ./mailbox.txt)
-+- mbox-names:		List of identifier  strings for each mailbox
-+			channel.
-+
-+Example:
-+===========================
-+	zynqmp_ipi {
-+		compatible = "xlnx,zynqmp-ipi-mailbox";
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 29 4>;
-+		xlnx,ipi-id = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		/* APU<->RPU0 IPI mailbox controller */
-+		ipi_mailbox_rpu0: mailbox at ff90400 {
-+			compatible = "xlnx,zynqmp-ipi-mailbox";
-+			reg = <0xff990400 0x20>,
-+			      <0xff990420 0x20>,
-+			      <0xff990080 0x20>,
-+			      <0xff9900a0 0x20>;
-+			reg-names = "local_request_region",
-+				    "local_response_region",
-+				    "remote_request_region",
-+				    "remote_response_region";
-+			#mbox-cells = <1>;
-+			xlnx,ipi-id = <1>;
-+		};
-+		/* APU<->RPU1 IPI mailbox controller */
-+		ipi_mailbox_rpu1: mailbox at ff990440 {
-+			compatible = "xlnx,zynqmp-ipi-mailbox";
-+			reg = <0xff990440 0x20>,
-+			      <0xff990460 0x20>,
-+			      <0xff990280 0x20>,
-+			      <0xff9902a0 0x20>;
-+			reg-names = "local_request_region",
-+				    "local_response_region",
-+				    "remote_request_region",
-+				    "remote_response_region";
-+			#mbox-cells = <1>;
-+			xlnx,ipi-id = <2>;
-+		};
-+	};
-+	rpu0 {
-+		...
-+		mboxes = <&ipi_mailbox_rpu0 0>,
-+			 <&ipi_mailbox_rpu0 1>;
-+		mbox-names = "tx", "rx";
-+	};
-+	rpu1 {
-+		...
-+		mboxes = <&ipi_mailbox_rpu1 0>,
-+			 <&ipi_mailbox_rpu1 1>;
-+		mbox-names = "tx", "rx";
-+	};
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 438625764ccd..a3b6f1f1cbaf 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -235,12 +235,6 @@ static void __init arm_initrd_init(void)
+ 	phys_addr_t start;
+ 	unsigned long size;
+ 
+-	/* FDT scan will populate initrd_start */
+-	if (initrd_start && !phys_initrd_size) {
+-		phys_initrd_start = __virt_to_phys(initrd_start);
+-		phys_initrd_size = initrd_end - initrd_start;
+-	}
+-
+ 	initrd_start = initrd_end = 0;
+ 
+ 	if (!phys_initrd_size)
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index bb532aae0d92..88760a0983a7 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -924,6 +924,8 @@ static void __init early_init_dt_check_for_initrd(unsigned long node)
+ 	end = of_read_number(prop, len/4);
+ 
+ 	__early_init_dt_declare_initrd(start, end);
++	phys_initrd_start = start;
++	phys_initrd_size = end - start;
+ 
+ 	pr_debug("initrd_start=0x%llx  initrd_end=0x%llx\n",
+ 		 (unsigned long long)start, (unsigned long long)end);
 -- 
-2.7.4
+2.17.1
