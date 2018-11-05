@@ -1,123 +1,170 @@
-From: dkos@cadence.com (Damian Kos)
-Date: Mon, 5 Nov 2018 09:44:53 +0000
-Subject: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
-In-Reply-To: <1539034953-11274-1-git-send-email-dkos@cadence.com>
-References: <1539034953-11274-1-git-send-email-dkos@cadence.com>
-Message-ID: <CY1PR0701MB166434BBB71DB76593E0F513CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
+From: jbrunet@baylibre.com (jbrunet at baylibre.com)
+Date: Mon, 05 Nov 2018 10:46:36 +0100
+Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
+In-Reply-To: <66c2915a-4ecd-8a6e-6493-4318ae7bb620@amlogic.com>
+References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
+ <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
+ <a8d359208edfdc75cb5c6de378796f76e0572a0f.camel@baylibre.com>
+ <eda2faf2-cf06-902d-36ff-48ceafcb4a4b@amlogic.com>
+ <f4d239df2f1333b005680f9bfdd2eba93e7f86e5.camel@baylibre.com>
+ <CAFBinCCuqUmVNdwUm7WbkHy1eWvOA5oQ5FcOuytbYNbgGcXnRQ@mail.gmail.com>
+ <3723695d951e0d30e8a0117d336d8f268269a030.camel@baylibre.com>
+ <66c2915a-4ecd-8a6e-6493-4318ae7bb620@amlogic.com>
+Message-ID: <bba47660e7d48c391caad8214570e81527624662.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
+On Sun, 2018-11-04 at 02:01 +0800, Jianxin Pan wrote:
+> Hi Jerome,
+> 
+> Thanks for the review, we really appreciate your time.
+> 
+> I'm very sorry maybe I don't catch all your meaning very well. 
+> 
+> Please see my comments below.
+> 
+> On 2018/10/29 3:16, Jerome Brunet wrote:
+> > On Thu, 2018-10-25 at 22:58 +0200, Martin Blumenstingl wrote:
+> > > Hi Jerome,
+> > > 
+> > > On Thu, Oct 25, 2018 at 2:54 PM Jerome Brunet <jbrunet@baylibre.com>
+> > > wrote:
+> > > [snip]
+> > > > > > > +static void clk_regmap_div_init(struct clk_hw *hw)
+> > > > > > > +{
+> > > > > > > + struct clk_regmap *clk = to_clk_regmap(hw);
+> > > > > > > + struct clk_regmap_div_data *div =
+> > > > > > > clk_get_regmap_div_data(clk);
+> > > > > > > + unsigned int val;
+> > > > > > > + int ret;
+> > > > > > > +
+> > > > > > > + ret = regmap_read(clk->map, div->offset, &val);
+> > > > > > > + if (ret)
+> > > > > > > +         return;
+> > > > > > > 
+> > > > > > > + val &= (clk_div_mask(div->width) << div->shift);
+> > > > > > > + if (!val)
+> > > > > > > +         regmap_update_bits(clk->map, div->offset,
+> > > > > > > +                            clk_div_mask(div->width) << div-
+> > > > > > > >shift,
+> > > > > > > +                            clk_div_mask(div->width));
+> > > > > > 
+> > > > > > This is wrong for several reasons:
+> > > > > > * You should hard code the initial value in the driver.
+> > > > > > * If shift is not 0, I doubt this will give the expected result.
+> > > > > 
+> > > > > The value 0x00 of divider means nand clock off then read/write nand
+> > > > > register is forbidden.
+> > > > 
+> > > > That is not entirely true, you can access the clock register or you'd
+> > > > be in a
+> > > > chicken and egg situation.
+> > > > 
+> > > > > Should we set the initial value in nand driver, or in sub emmc clk
+> > > > > driver?
+> > > > 
+> > > > In the nand driver, which is the consumer of the clock. see my
+> > > > previous comments
+> > > > about it.
+> > > 
+> > > an old version of this series had the code still in the NAND driver
+> > > (by writing to the registers directly instead of using the clk API).
+> > > this looks pretty much like a "sclk-div" to me (as I commented in v3
+> > > of this series: [0]):
+> > > - value 0 means disabled
+> > > - positive divider values
+> > > - (probably no duty control, but that's optional as far as I
+> > > understand sclk-div)
+> > > - uses max divider value when enabling the clock
+> > > 
+> > > if switching to sclk-div works then we can get rid of some duplicate
+> > > code
+> > 
+> > It is possible:
+> > There is a couple of things to note though:
+> > 
+> > * sclk does not 'uses max divider value when enabling the clock': Since
+> > this
+> > divider can gate, it needs to save the divider value when disabling, since
+> > the
+> > divider value is no longer stored in the register,
+> > On init, this cached value is  saved as it is. If the divider is initially
+> > disabled, we have to set the cached value to something that makes sense,
+> > in case
+> > the clock is enabled without a prior call to clk_set_rate().
+> > > So in sclk, the clock setting is not changed nor hard coded in init, and
+> > > this is
+> > a very important difference.
+> > 
+> I think It's ok for the latest sub mmc clock and nand driver now:
+> 1. in mmc_clkc_register_clk_with_parent("div", ...) from mmc_clkc_probe():
+>    cached_div is set to div_max durning clk register?but is not set to div
+> hw register.
+> 
+> 2. In meson nand driver v6: 	
+> https://lore.kernel.org/lkml/1541090542-19618-3-git-send-email-jianxin.pan at amlogic.com
+> 1) In meson_nfc_clk_init() from probe:   get clock handle, then
+> prepare_enable and set default rate.
+>    nfc->device_clk = devm_clk_get(nfc->dev, "device");
+>    ret = clk_prepare_enable(nfc->device_clk);			//Here div hw
+> register changed from 0 -> cached_div.
+>    default_clk_rate = clk_round_rate(nfc->device_clk, 24000000);
+>    ret = clk_set_rate(nfc->device_clk, default_clk_rate);	//Then
+> register and cached_div are both updated to the default 24M.
+> 2) In meson_nfc_select_chip(), set the actual frequency
+>   ret = clk_set_rate(nfc->device_clk, meson_chip->clk_rate);	//Here
+> register and cached_div are changed again.
+> 3) if clk_disable() is called, set div hw register to zero, and
+> cached_div  keep unchagned.
+>    if clk_disable() is called again,  cached_div is restored to div hw
+> register.
 
-I'm wondering if this time patch is so good that there're no change requests, or is it so bad that it was rejected without a comment : )
-Please let me know if this patch is being in review or was rejected and, if so, what needs to be changed.
+You don't need to do all this in your NAND driver: enable - round - set_rate -
+disable is a waste of time. 
 
-Regards,
-Damian
+Directly calling set_rate(24000000), with the clock still off, will have the
+same result. Then if your HW needs this clock to be ON to access registers
+(like you told us) you should probably turn it on.
 
------Original Message-----
-From: Damian Kos <dkos@cadence.com> 
-Sent: Monday, October 8, 2018 23:42
-To: David Airlie <airlied@linux.ie>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Archit Taneja <architt@codeaurora.org>; Andrzej Hajda <a.hajda@samsung.com>; Laurent Pinchart <Laurent.pinchart@ideasonboard.com>; Gustavo Padovan <gustavo@padovan.org>; Maarten Lankhorst <maarten.lankhorst@linux.intel.com>; Sean Paul <sean@poorly.run>; Sandy Huang <hjc@rock-chips.com>; Heiko St?bner <heiko@sntech.de>; Quentin Schulz <quentin.schulz@free-electrons.com>; Damian Kos <dkos@cadence.com>; Piotr Sroka <piotrs@cadence.com>; dri-devel at lists.freedesktop.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-rockchip at lists.infradead.org
-Cc: Rafal Ciepiela <rafalc@cadence.com>; quentin.schulz at bootlin.com; jbergsagel at ti.com
-Subject: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
+> 
+> When enabling the clock, divider register does not need to be div_max.  
+> Any value is OK except ZERO, the cached_div from init or set_rate is ok
+> >  
+> > * Even if sclk zero value means gated, it is still a zero based divider,
+> > while
+> > eMMC/Nand divider is one based. It this controller was to sclk, then
+> > something
+> > needs to be done for this.
+> Could I add another patch to this patchset for sclk to support
+> CLK_DIVIDER_ONE_BASED ?
 
-Hello!
+Yes, you should otherwise the calculation are just wrong for your clock.
 
-This is the series of patches that will add support for the Cadence's DPI/DP bridge. Please note that this is a preliminary version of the driver and there will be more patches in the future with updates, fixes and improvements.
-Please keep that in mind when looking at FIXME/TODO/XXX comments.
-
-Initially, MHDP driver was developed as a DRM bridge driver and was planed to be placed in drivers/gpu/drm/bridge/mhdp.c.  However, there was already a driver for Cadence's DP controller developed by RockChip, but that driver uses the different DRM framework and looks like a part of a bigger system.
-Both controllers (including firmware) are quite different internally (MST/FEC/DSC support, link training done by driver, additional commands, IRQ's
-etc.) but they have similar register map, except for Framer/Streamer (which is noticeably different), so they appear similar.
-
-The following patches contain:
-- Moving common code to drivers/gpu/drm/bridge/cdns-mhdp-common.* and
-  modifying it a bit (mostly new prefixes for functions and data types) so it
-  can be used by two, higher level, drivers.
-- Modifying existing RockChip's DP driver to use the common code after changes
-  made to it (use the new cdns_mhdp_device structure and new function names).
-- Modifying DRM helpers a bit. Some are required for new driver, some are
-  updates from DP 1.2 to 1.3 or 1.4.
-- Adding documentation for device tree bindings.
-- Adding preliminary Cadence DPI/DP bridge driver.
-
-Some of the things that will be added later on include (but are not limited
-to):
-- DSC support
-- FEC support
-- HDCP support
-
-Changes in v2:
-- Added actual description of what the patch contains, what is it for and
-  what's going on here in general.
-- New structure. Now we have one common low level driver + two high level
-  drivers - one for RockChip with minimum changes and one, more general, for
-  Cadence.
-- Dropped some changes made to DRM helpers.
-- Updated the device tree bindings document.
-
-Changes in v3:
-- Corrected dt-bindings document
-- Enabled some clocks at startup (since FW doesn't do that anymore).
-- Changed Firmware file name to match the file on Linux Firmware repo.
-- Added SST audio support
-- Made common functions (in cdns-mhdp-common.*) public.
-
-Changes in v4:
-- Fixed Kconfig in drm/rockchip
-- Fixed Signed-offs
-- dp_link_status() is no longer public since it's used only in drm_dp_helper.c
-- Replaced EXTRA_CFLAGS with ccflags-y in drm/rockchip Makefile
-
-Changes in v5:
-- Fixed Kconfig in drm/rockchip again
-- Moved cdn-dp-reg.h (cdns-mhdp-common.h) to include/drm/bridge instead of
-    drivers/gpu/drm/bridge/
-- Updated the mhdp_validate_cr function
-
-Changes in v6:
-- Added Reviewed-bys for already reviewed patches
-- Dropped patch v5-0003 (that made dp_get_lane_status helper public)
-- Added patch with MST support
-- Added patch with Cadence SD0801 PHY init
-
-
-Damian Kos (2):
-  drm/rockchip: prepare common code for cdns and rk dpi/dp driver
-  drm/bridge: add PHY initialization in mhdp8546 driver.
-
-Piotr Sroka (1):
-  drm/bridge: add support for MST in mhdp8546 driver
-
-Quentin Schulz (3):
-  drm/dp: fix link probing for devices supporting DP 1.4+
-  dt-bindings: drm/bridge: Document Cadence MHDP bridge bindings
-  drm: bridge: add support for Cadence MHDP DPI/DP bridge
-
- .../bindings/display/bridge/cdns,mhdp.txt     |   43 +
- drivers/gpu/drm/bridge/Kconfig                |    9 +
- drivers/gpu/drm/bridge/Makefile               |    3 +
- drivers/gpu/drm/bridge/cdns-mhdp-common.c     | 1107 +++++++++++++
- drivers/gpu/drm/bridge/cdns-mhdp-mst.c        |  594 +++++++
- drivers/gpu/drm/bridge/cdns-mhdp.c            | 1371 +++++++++++++++++
- drivers/gpu/drm/bridge/cdns-mhdp.h            |  209 +++
- drivers/gpu/drm/drm_dp_helper.c               |   30 +-
- drivers/gpu/drm/rockchip/Kconfig              |    4 +-
- drivers/gpu/drm/rockchip/Makefile             |    2 +-
- drivers/gpu/drm/rockchip/cdn-dp-core.c        |  234 +--
- drivers/gpu/drm/rockchip/cdn-dp-core.h        |   43 +-
- drivers/gpu/drm/rockchip/cdn-dp-reg.c         |  969 ------------
- include/drm/bridge/cdns-mhdp-cbs.h            |   27 +
- .../drm/bridge/cdns-mhdp-common.h             |  174 ++-
- 15 files changed, 3669 insertions(+), 1150 deletions(-)  create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
- create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp-common.c
- create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp-mst.c
- create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.c
- create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.h
- delete mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
- create mode 100644 include/drm/bridge/cdns-mhdp-cbs.h
- rename drivers/gpu/drm/rockchip/cdn-dp-reg.h => include/drm/bridge/cdns-mhdp-common.h (77%)
-
---
-2.17.1
+> > * Since sclk caches a value in its data, and there can multiple instance
+> > of eMMC
+> > /NAND clock controller, some care must be taken when registering the data.
+> OK, I will fix it and alloc mmc_clkc_div_data danymicly durning probe.
+> Thank you. 
+> > Both the generic divider and sclk could work here ... it's up to you
+> > Jianxin.
+> > 
+> == Why use meson_sclk_div_ops instead of clk_regmap_divider_ops?
+> The default divider hw register vaule is 0 when system power on.
+> Then there is a WARNING in divider_recalc_rate() durning clk_hw_register():
+> [    0.918238] ffe05000.clock-controller#div: Zero divisor and
+> CLK_DIVIDER_ALLOW_ZERO not set
+> [    0.925581] WARNING: CPU: 3 PID: 1 at drivers/clk/clk-divider.c:127
+> divider_recalc_rate+0x88/0x90
+> Then I still need to hard code the initual value to nand driver without
+> CLK_DIVIDER_ALLOW_ZERO flags.
+> > > 
+> > > Regards
+> > > Martin
+> > > 
+> > > 
+> > > [0] https://patchwork.kernel.org/patch/10607157/#22238243
+> > 
+> > .
+> > 
+> 
+> 
