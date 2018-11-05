@@ -1,28 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 5 Nov 2018 16:42:03 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add all HSCIF nodes
-In-Reply-To: <1540071027-27130-1-git-send-email-ykaneko0929@gmail.com>
-References: <1540071027-27130-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <20181105154202.bchgx2yxnmjxygte@verge.net.au>
+From: ren_guo@c-sky.com (Guo Ren)
+Date: Mon, 5 Nov 2018 23:47:22 +0800
+Subject: [PATCH 7/9] csky: don't select DMA_NONCOHERENT_OPS
+In-Reply-To: <20181105121931.13481-8-hch@lst.de>
+References: <20181105121931.13481-1-hch@lst.de>
+ <20181105121931.13481-8-hch@lst.de>
+Message-ID: <20181105154721.GA25126@guoren-Inspiron-7460>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 21, 2018 at 06:30:27AM +0900, Yoshihiro Kaneko wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On Mon, Nov 05, 2018 at 01:19:29PM +0100, Christoph Hellwig wrote:
+> This option is gone past Linux 4.19.
 > 
-> This patch adds the device nodes for all HSCIF serial ports to
-> the R8A77990 SoC.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
+>  arch/csky/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> This patch is based on the devel branch of Simon Horman's renesas tree.
+> diff --git a/arch/csky/Kconfig b/arch/csky/Kconfig
+> index 8a30e006a845..c0cf8e948821 100644
+> --- a/arch/csky/Kconfig
+> +++ b/arch/csky/Kconfig
+> @@ -8,7 +8,6 @@ config CSKY
+>  	select CLKSRC_MMIO
+>  	select CLKSRC_OF
+>  	select DMA_DIRECT_OPS
+> -	select DMA_NONCOHERENT_OPS
+>  	select DMA_REMAP
+>  	select IRQ_DOMAIN
+>  	select HANDLE_DOMAIN_IRQ
+> -- 
+> 2.19.1
 
-Thanks.
-
-I don't believe this can (easily) be tested as HSCIF
-does not appear to be exposed on the Ebisu board.
-
-I have checked this patch with reference to the documentation
-and it looks good to me. I have applied if for v4.21.
+Acked-by: Guo Ren <ren_guo@c-sky.com>
