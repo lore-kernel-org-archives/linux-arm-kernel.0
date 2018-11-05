@@ -1,47 +1,91 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 5 Nov 2018 09:54:36 +0000
-Subject: [GIT PULL] sprd dts for kernel v4.20-rc1
-In-Reply-To: <20181102183246.r5xxwsic2mxwihsi@localhost>
-References: <1539854253-4784-1-git-send-email-chunyan.zhang@unisoc.com>
- <20181102183246.r5xxwsic2mxwihsi@localhost>
-Message-ID: <8fe7491c-74de-3192-c583-37cd1583cfd6@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 5 Nov 2018 11:11:10 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 02/15] clk: sunxi-ng: Add check for
+ minimal rate to NKM PLLs
+In-Reply-To: <e7566001-8933-adbb-4c30-7a3f66ebae4e@openedev.com>
+References: <20181023155035.9101-1-jagan@amarulasolutions.com>
+ <20181023155035.9101-3-jagan@amarulasolutions.com>
+ <20181024180436.5n3i3z6h2yezc4cv@flea>
+ <CAMty3ZC2wn-DjR+93yc-n-bAmVCHaEqR_=4XPddoo+7LjebTEg@mail.gmail.com>
+ <20181029085843.3bslqwktxbp2ywk2@flea>
+ <e7566001-8933-adbb-4c30-7a3f66ebae4e@openedev.com>
+Message-ID: <20181105101110.agfik3oppd6ck25c@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On 02/11/18 18:32, Olof Johansson wrote:
-> On Thu, Oct 18, 2018 at 05:17:33PM +0800, Chunyan Zhang wrote:
->> Hi Arnd,
->>
->> For 4.20-rc1 there's one patch only for sprd devicetree, please pull from my git tree:
->>
->> https://github.com/lyrazhang/linux.git m-v4.19-rc1
->>
->> Please let me know if there's some problem.
->>
->> Thanks,
->> Chunyan
->>
->> ----------------------------------------------------------------
->>
->> Suzuki K Poulose (1):
->>    arm64: dts: sc9836/sc9860: Update coresight bindings for hardware
->>      ports
->>
->>   arch/arm64/boot/dts/sprd/sc9836.dtsi |  78 +++++++------
->>   arch/arm64/boot/dts/sprd/sc9860.dtsi | 215 ++++++++++++++++++-----------------
->>   2 files changed, 151 insertions(+), 142 deletions(-)
+On Mon, Oct 29, 2018 at 06:10:47PM +0530, Jagan Teki wrote:
+> On 29/10/18 2:28 PM, Maxime Ripard wrote:
+> > On Thu, Oct 25, 2018 at 04:25:59PM +0530, Jagan Teki wrote:
+> > > On Wed, Oct 24, 2018 at 11:34 PM Maxime Ripard
+> > > <maxime.ripard@bootlin.com> wrote:
+> > > > 
+> > > > On Tue, Oct 23, 2018 at 09:20:22PM +0530, Jagan Teki wrote:
+> > > > > Some NKM PLLs doesn't work well when their output clock rate is set below
+> > > > > certain rate.
+> > > > > 
+> > > > > So, add support for minimal rate for relevant PLLs.
+> > > > > 
+> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > > > ---
+> > > > > Changes for v2:
+> > > > > - new patch
+> > > > > 
+> > > > >   drivers/clk/sunxi-ng/ccu_nkm.c | 7 +++++++
+> > > > >   drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
+> > > > >   2 files changed, 8 insertions(+)
+> > > > > 
+> > > > > diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+> > > > > index 841840e35e61..d17539dc88dd 100644
+> > > > > --- a/drivers/clk/sunxi-ng/ccu_nkm.c
+> > > > > +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+> > > > > @@ -125,6 +125,13 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+> > > > >        if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> > > > >                rate *= nkm->fixed_post_div;
+> > > > > 
+> > > > > +     if (rate < nkm->min_rate) {
+> > > > > +             rate = nkm->min_rate;
+> > > > > +             if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> > > > > +                     rate /= nkm->fixed_post_div;
+> > > > 
+> > > > I'm not sure this is right. Is the post divider taken into account to
+> > > > calculate the minimum, or is the minimum on the rate before the fixed
+> > > > post divider.
+> > > 
+> > > Since we are returning from here, we need to take care post div which
+> > > is actually doing at the end of round_rate.
+> > 
+> > That's not my point though. Does the rate needs to be superior to min
+> > / post_div, or min?
 > 
-> Hi,
+> ie what I'm trying to say, since it's common code min or max should /
+> post_div and PLL_MIPI doesn't use any post_div.
 > 
-> This came in right before the merge window so it wasn't included since
-> it's more of a cleanup.
+> We need to take care post_div though the current test (PLL_MIPI) in not used
+> since it's common code. just like nkmp, nm etc.
+> 
+> > 
+> > > > 
+> > > > How did you test this?
+> > > 
+> > > I've not used this on PLL_MIPI atleast, so I didn't test this.
+> > 
+> > If you've never tested this, why are you adding that code?
+> 
+> Like above, it's common code. otherwise might effect.
 
-A minor correction. This is not really a cleanup, but upgrading the
-bindings to the new DTS bindings for Coresight. The driver will now
-complain about old bindings, which could be hit on these boards. Not
-the end of the world, it could be queued for 4.21.
+Adding untested, unverified and unneeded code is just bloat, nothing
+else.
 
-Cheers
-Suzuki
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/f346d14c/attachment.sig>
