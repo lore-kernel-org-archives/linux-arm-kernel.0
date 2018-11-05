@@ -1,23 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Nov 2018 15:21:48 -0600
-Subject: [PATCH v3 6/6] dt-bindings: spi: QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20181105103625.9644-7-bugalski.piotr@gmail.com>
-References: <20181105103625.9644-1-bugalski.piotr@gmail.com>
- <20181105103625.9644-7-bugalski.piotr@gmail.com>
-Message-ID: <20181105212148.GA13045@bogus>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon,  5 Nov 2018 22:38:59 +0100
+Subject: [PATCH] arm64: dts: r8a77990: ebisu: Add serial console pins
+Message-ID: <20181105213859.11408-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Nov 2018 11:36:25 +0100, Piotr Bugalski wrote:
-> Atmel SAMA5D2 QuadSPI driver was moved from mtd to spi subsystem,
-> this change is just moving DT-binding documentation.
-> 
-> Suggested-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> Signed-off-by: Piotr Bugalski <bugalski.piotr@gmail.com>
-> ---
->  Documentation/devicetree/bindings/{mtd => spi}/atmel-quadspi.txt | 0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/{mtd => spi}/atmel-quadspi.txt (100%)
-> 
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+This patch adds pin control for SCIF2 on R8A77990 E3 Ebisu.
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Cc: linux-renesas-soc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index f342dd85b152..611f0265fcc5 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -321,6 +321,11 @@
+ 		function = "pwm5";
+ 	};
+ 
++	scif2_pins: scif2 {
++		groups = "scif2_data_a";
++		function = "scif2";
++	};
++
+ 	usb0_pins: usb {
+ 		groups = "usb0_b";
+ 		function = "usb0";
+@@ -352,6 +357,9 @@
+ };
+ 
+ &scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
+ 
+-- 
+2.18.0
