@@ -1,32 +1,32 @@
 From: mjourdan@baylibre.com (Maxime Jourdan)
-Date: Mon,  5 Nov 2018 11:45:07 +0100
-Subject: [PATCH 1/2] dt-bindings: display: amlogic,
- meson-vpu: Add optional canvas provider node
-In-Reply-To: <20181105104508.23090-1-mjourdan@baylibre.com>
-References: <20181105104508.23090-1-mjourdan@baylibre.com>
-Message-ID: <20181105104508.23090-2-mjourdan@baylibre.com>
+Date: Mon,  5 Nov 2018 11:45:06 +0100
+Subject: [PATCH 0/2] drm/meson: Allow using optional canvas provider
+Message-ID: <20181105104508.23090-1-mjourdan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allows using the new canvas provider module if present.
+The meson DRM driver currently uses constant, static canvas indexes.
 
-Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
----
- Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt | 2 ++
- 1 file changed, 2 insertions(+)
+This is not optimal and could conflict with other drivers also using
+canvases.
 
-diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-index 057b81335775..c65fd7a7467c 100644
---- a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-+++ b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-@@ -67,6 +67,8 @@ Required properties:
- Optional properties:
- - power-domains: Optional phandle to associated power domain as described in
- 	the file ../power/power_domain.txt
-+- amlogic,canvas: phandle to canvas provider node as described in the file
-+	../soc/amlogic/amlogic,canvas.txt
- 
- Required nodes:
- 
+This patch series allows the driver to optionnally use a canvas provider
+module that is able to dispatch canvases, on demand and free of conflict.
+
+In the future, the current way of doing things will be deprecated.
+
+Maxime Jourdan (2):
+  dt-bindings: display: amlogic, meson-vpu: Add optional canvas provider
+    node
+  drm/meson: Use optional canvas provider
+
+ .../bindings/display/amlogic,meson-vpu.txt    |  2 +
+ drivers/gpu/drm/meson/Kconfig                 |  1 +
+ drivers/gpu/drm/meson/meson_crtc.c            | 14 ++++--
+ drivers/gpu/drm/meson/meson_drv.c             | 46 ++++++++++++-------
+ drivers/gpu/drm/meson/meson_drv.h             |  4 ++
+ drivers/gpu/drm/meson/meson_plane.c           |  8 +++-
+ 6 files changed, 53 insertions(+), 22 deletions(-)
+
 -- 
 2.19.1
