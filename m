@@ -1,33 +1,39 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 05 Nov 2018 13:35:01 +0100
-Subject: [PATCH v3 0/7] ARM: rockchip: add power-domains for Cortex-A9 socs
-In-Reply-To: <20181023103820.6464-1-heiko@sntech.de>
-References: <20181023103820.6464-1-heiko@sntech.de>
-Message-ID: <6192722.1hSScp9ivE@phil>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 5 Nov 2018 13:40:53 +0100
+Subject: [PATCH] ARM: dts: replace gpio-key,wakeup with wakeup-source
+ property
+In-Reply-To: <20181024114540.5196-1-sudeep.holla@arm.com>
+References: <20181024114540.5196-1-sudeep.holla@arm.com>
+Message-ID: <71a26287-1c64-ba4a-50da-d058d8ab0bb6@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 23. Oktober 2018, 12:38:13 CET schrieb Heiko Stuebner:
-> Domain values are done by the book (aka soc documentation for pmu and
-> power-domain <-> ip block connections) and tested with the gpu and the
-> wip lima kernel driver as well as te new vop support on rk3188.
+On 24. 10. 18 13:45, Sudeep Holla wrote:
+> Most of the legacy "gpio-key,wakeup" and "enable-sdio-wakeup" boolean
+> properties are already replaced with "wakeup-source". However few
+> occurrences of old property has popped up again, probably from the
+> remnants in downstream trees.
 > 
-> changes in v3:
-> - added spdx license header to dt-binding headers
-> - added Rob's Review for the added compatibles in patch 3
-> changes in v2:
-> - fix typos found by Julien
-> - adapt to changes happening in the power-domain driver since v1
-> - add vop power-domain links for rk3188
-> - drop already applied clock fixes
+> This patch replaces the legacy properties with the unified
+> "wakeup-source" property.
 > 
-> Heiko Stuebner (7):
->   dt-bindings: add power-domain header for RK3188 SoCs
->   dt-bindings: add power-domain header for RK3066 SoCs
->   dt-bindings: add compatibles for rk3066/rk3188 power controllers
->   soc: rockchip: power-domain: add rk3188 powerdomains
->   soc: rockchip: power-domain: add rk3066 powerdomains
->   ARM: dts: rockchip: add qos nodes found on rk3066 and rk3188
->   ARM: dts: rockchip: add rk3066/rk3188 power-domains
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: Peter Rosin <peda@axentia.se>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 2 +-
+>  arch/arm/boot/dts/at91-wb45n.dts            | 2 +-
+>  arch/arm/boot/dts/at91-wb50n.dts            | 4 ++--
+>  arch/arm/boot/dts/imx6q-pistachio.dts       | 2 +-
+>  arch/arm/boot/dts/imx6sll-evk.dts           | 2 +-
+>  arch/arm/boot/dts/zynq-zturn.dts            | 2 +-
 
-applied for 4.21
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks,
+Michal
