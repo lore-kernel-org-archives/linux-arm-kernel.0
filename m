@@ -1,170 +1,54 @@
-From: jbrunet@baylibre.com (jbrunet at baylibre.com)
-Date: Mon, 05 Nov 2018 10:46:36 +0100
-Subject: [PATCH v5 3/3] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <66c2915a-4ecd-8a6e-6493-4318ae7bb620@amlogic.com>
-References: <1539839245-13793-1-git-send-email-jianxin.pan@amlogic.com>
- <1539839245-13793-4-git-send-email-jianxin.pan@amlogic.com>
- <a8d359208edfdc75cb5c6de378796f76e0572a0f.camel@baylibre.com>
- <eda2faf2-cf06-902d-36ff-48ceafcb4a4b@amlogic.com>
- <f4d239df2f1333b005680f9bfdd2eba93e7f86e5.camel@baylibre.com>
- <CAFBinCCuqUmVNdwUm7WbkHy1eWvOA5oQ5FcOuytbYNbgGcXnRQ@mail.gmail.com>
- <3723695d951e0d30e8a0117d336d8f268269a030.camel@baylibre.com>
- <66c2915a-4ecd-8a6e-6493-4318ae7bb620@amlogic.com>
-Message-ID: <bba47660e7d48c391caad8214570e81527624662.camel@baylibre.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 5 Nov 2018 10:20:10 +0100
+Subject: [PATCH 14/14] DT: marvell,mmp2: add USB OTG host controller
+In-Reply-To: <20180822204307.13251-15-lkundrak@v3.sk>
+References: <20180822204307.13251-1-lkundrak@v3.sk>
+ <20180822204307.13251-15-lkundrak@v3.sk>
+Message-ID: <20181105092010.GL4439@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2018-11-04 at 02:01 +0800, Jianxin Pan wrote:
-> Hi Jerome,
-> 
-> Thanks for the review, we really appreciate your time.
-> 
-> I'm very sorry maybe I don't catch all your meaning very well. 
-> 
-> Please see my comments below.
-> 
-> On 2018/10/29 3:16, Jerome Brunet wrote:
-> > On Thu, 2018-10-25 at 22:58 +0200, Martin Blumenstingl wrote:
-> > > Hi Jerome,
-> > > 
-> > > On Thu, Oct 25, 2018 at 2:54 PM Jerome Brunet <jbrunet@baylibre.com>
-> > > wrote:
-> > > [snip]
-> > > > > > > +static void clk_regmap_div_init(struct clk_hw *hw)
-> > > > > > > +{
-> > > > > > > + struct clk_regmap *clk = to_clk_regmap(hw);
-> > > > > > > + struct clk_regmap_div_data *div =
-> > > > > > > clk_get_regmap_div_data(clk);
-> > > > > > > + unsigned int val;
-> > > > > > > + int ret;
-> > > > > > > +
-> > > > > > > + ret = regmap_read(clk->map, div->offset, &val);
-> > > > > > > + if (ret)
-> > > > > > > +         return;
-> > > > > > > 
-> > > > > > > + val &= (clk_div_mask(div->width) << div->shift);
-> > > > > > > + if (!val)
-> > > > > > > +         regmap_update_bits(clk->map, div->offset,
-> > > > > > > +                            clk_div_mask(div->width) << div-
-> > > > > > > >shift,
-> > > > > > > +                            clk_div_mask(div->width));
-> > > > > > 
-> > > > > > This is wrong for several reasons:
-> > > > > > * You should hard code the initial value in the driver.
-> > > > > > * If shift is not 0, I doubt this will give the expected result.
-> > > > > 
-> > > > > The value 0x00 of divider means nand clock off then read/write nand
-> > > > > register is forbidden.
-> > > > 
-> > > > That is not entirely true, you can access the clock register or you'd
-> > > > be in a
-> > > > chicken and egg situation.
-> > > > 
-> > > > > Should we set the initial value in nand driver, or in sub emmc clk
-> > > > > driver?
-> > > > 
-> > > > In the nand driver, which is the consumer of the clock. see my
-> > > > previous comments
-> > > > about it.
-> > > 
-> > > an old version of this series had the code still in the NAND driver
-> > > (by writing to the registers directly instead of using the clk API).
-> > > this looks pretty much like a "sclk-div" to me (as I commented in v3
-> > > of this series: [0]):
-> > > - value 0 means disabled
-> > > - positive divider values
-> > > - (probably no duty control, but that's optional as far as I
-> > > understand sclk-div)
-> > > - uses max divider value when enabling the clock
-> > > 
-> > > if switching to sclk-div works then we can get rid of some duplicate
-> > > code
-> > 
-> > It is possible:
-> > There is a couple of things to note though:
-> > 
-> > * sclk does not 'uses max divider value when enabling the clock': Since
-> > this
-> > divider can gate, it needs to save the divider value when disabling, since
-> > the
-> > divider value is no longer stored in the register,
-> > On init, this cached value is  saved as it is. If the divider is initially
-> > disabled, we have to set the cached value to something that makes sense,
-> > in case
-> > the clock is enabled without a prior call to clk_set_rate().
-> > > So in sclk, the clock setting is not changed nor hard coded in init, and
-> > > this is
-> > a very important difference.
-> > 
-> I think It's ok for the latest sub mmc clock and nand driver now:
-> 1. in mmc_clkc_register_clk_with_parent("div", ...) from mmc_clkc_probe():
->    cached_div is set to div_max durning clk register?but is not set to div
-> hw register.
-> 
-> 2. In meson nand driver v6: 	
-> https://lore.kernel.org/lkml/1541090542-19618-3-git-send-email-jianxin.pan at amlogic.com
-> 1) In meson_nfc_clk_init() from probe:   get clock handle, then
-> prepare_enable and set default rate.
->    nfc->device_clk = devm_clk_get(nfc->dev, "device");
->    ret = clk_prepare_enable(nfc->device_clk);			//Here div hw
-> register changed from 0 -> cached_div.
->    default_clk_rate = clk_round_rate(nfc->device_clk, 24000000);
->    ret = clk_set_rate(nfc->device_clk, default_clk_rate);	//Then
-> register and cached_div are both updated to the default 24M.
-> 2) In meson_nfc_select_chip(), set the actual frequency
->   ret = clk_set_rate(nfc->device_clk, meson_chip->clk_rate);	//Here
-> register and cached_div are changed again.
-> 3) if clk_disable() is called, set div hw register to zero, and
-> cached_div  keep unchagned.
->    if clk_disable() is called again,  cached_div is restored to div hw
-> register.
+On Wed 2018-08-22 22:43:07, Lubomir Rintel wrote:
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> ---
+>  arch/arm/boot/dts/mmp2.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 
-You don't need to do all this in your NAND driver: enable - round - set_rate -
-disable is a waste of time. 
+Again, I guess this could be merged with the previous patch. Anyway,
+it is also good to go as-is.
 
-Directly calling set_rate(24000000), with the clock still off, will have the
-same result. Then if your HW needs this clock to be ON to access registers
-(like you told us) you should probably turn it on.
+Acked-by: Pavel Machek <pavel@ucw.cz>
 
-> 
-> When enabling the clock, divider register does not need to be div_max.  
-> Any value is OK except ZERO, the cached_div from init or set_rate is ok
-> >  
-> > * Even if sclk zero value means gated, it is still a zero based divider,
-> > while
-> > eMMC/Nand divider is one based. It this controller was to sclk, then
-> > something
-> > needs to be done for this.
-> Could I add another patch to this patchset for sclk to support
-> CLK_DIVIDER_ONE_BASED ?
+> diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
+> index 14a3448f38b9..63d4d5c6fd83 100644
+> --- a/arch/arm/boot/dts/mmp2.dtsi
+> +++ b/arch/arm/boot/dts/mmp2.dtsi
+> @@ -124,6 +124,17 @@
+>  				#phy-cells = <0>;
+>  				status = "disabled";
+>  			};
+> +
+> +			usb_otg0: usb-otg at d4208000 {
+> +				compatible = "marvell,pxau2o-ehci";
+> +				reg = <0xd4208000 0x200>;
+> +				interrupts = <44>;
+> +				clocks = <&soc_clocks MMP2_CLK_USB>;
+> +				clock-names = "USBCLK";
+> +				phys = <&usb_otg_phy0>;
+> +				phy-names = "usb";
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		apb at d4000000 {	/* APB */
 
-Yes, you should otherwise the calculation are just wrong for your clock.
-
-> > * Since sclk caches a value in its data, and there can multiple instance
-> > of eMMC
-> > /NAND clock controller, some care must be taken when registering the data.
-> OK, I will fix it and alloc mmc_clkc_div_data danymicly durning probe.
-> Thank you. 
-> > Both the generic divider and sclk could work here ... it's up to you
-> > Jianxin.
-> > 
-> == Why use meson_sclk_div_ops instead of clk_regmap_divider_ops?
-> The default divider hw register vaule is 0 when system power on.
-> Then there is a WARNING in divider_recalc_rate() durning clk_hw_register():
-> [    0.918238] ffe05000.clock-controller#div: Zero divisor and
-> CLK_DIVIDER_ALLOW_ZERO not set
-> [    0.925581] WARNING: CPU: 3 PID: 1 at drivers/clk/clk-divider.c:127
-> divider_recalc_rate+0x88/0x90
-> Then I still need to hard code the initual value to nand driver without
-> CLK_DIVIDER_ALLOW_ZERO flags.
-> > > 
-> > > Regards
-> > > Martin
-> > > 
-> > > 
-> > > [0] https://patchwork.kernel.org/patch/10607157/#22238243
-> > 
-> > .
-> > 
-> 
-> 
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/72251b82/attachment.sig>
