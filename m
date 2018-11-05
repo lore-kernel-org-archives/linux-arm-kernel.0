@@ -1,49 +1,49 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 5 Nov 2018 10:20:04 +0100
-Subject: [PATCH 13/14] DT: marvell,mmp2: add OTG PHY
-In-Reply-To: <20180822204307.13251-14-lkundrak@v3.sk>
-References: <20180822204307.13251-1-lkundrak@v3.sk>
- <20180822204307.13251-14-lkundrak@v3.sk>
-Message-ID: <20181105092004.GK4439@amd>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 5 Nov 2018 09:43:04 +0000
+Subject: [PATCH] ASoC: sunxi: rename SND_SUNXI_ADDA_PR_REGMAP to
+ SND_SUN8I_ADDA_PR_REGMAP
+In-Reply-To: <20181103042651.6641-1-anarsoul@gmail.com>
+References: <20181103042651.6641-1-anarsoul@gmail.com>
+Message-ID: <20181105094304.3ce0d12c@donnerap.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-08-22 22:43:06, Lubomir Rintel wrote:
-> The USB OTG PHY chip. To be used by the OTG controller.
+On Fri,  2 Nov 2018 21:26:51 -0700
+Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+
+> SND_SUN50I_CODEC_ANALOG selects SND_SUNXI_ADDA_PR_REGMAP which is
+> leftover of renaming SND_SUNXI_ADDA_PR_REGMAP to
+> SND_SUN8I_ADDA_PR_REGMAP. Replace it with SND_SUN8I_ADDA_PR_REGMAP to
+> fix possible link errors for some configurations:
+
 > 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-
-Acked-by: Pavel Machek <pavel@ucw.cz>
-
->  arch/arm/boot/dts/mmp2.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+> sound/soc/sunxi/sun50i-codec-analog.o: In function `sun50i_codec_analog_probe':
+> sun50i-codec-analog.c:(.text+0x62): undefined reference to `sun8i_adda_pr_regmap_init'
 > 
-> diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-> index 766bbb8495b6..14a3448f38b9 100644
-> --- a/arch/arm/boot/dts/mmp2.dtsi
-> +++ b/arch/arm/boot/dts/mmp2.dtsi
-> @@ -117,6 +117,13 @@
->  				reg-names = "mux status", "mux mask";
->  				mrvl,intc-nr-irqs = <2>;
->  			};
-> +
-> +			usb_otg_phy0: usb-otg-phy at d4207000 {
-> +				compatible = "marvell,mmp2-usb-phy";
-> +				reg = <0xd4207000 0x40>;
-> +				#phy-cells = <0>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		apb at d4000000 {	/* APB */
+> Fixes: 42371f327df0 ("ASoC: sunxi: Add new driver for Allwinner A64 codec's analog path controls")
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/727a271a/attachment.sig>
+Just stumbled over the same thing when building 4.20-rc1.
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+Thanks!
+Andre.
+
+---
+>  sound/soc/sunxi/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+> index 66aad0d3f9c7..8134c3c94229 100644
+> --- a/sound/soc/sunxi/Kconfig
+> +++ b/sound/soc/sunxi/Kconfig
+> @@ -31,7 +31,7 @@ config SND_SUN8I_CODEC_ANALOG
+>  config SND_SUN50I_CODEC_ANALOG
+>  	tristate "Allwinner sun50i Codec Analog Controls Support"
+>  	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+> -	select SND_SUNXI_ADDA_PR_REGMAP
+> +	select SND_SUN8I_ADDA_PR_REGMAP
+>  	help
+>  	  Say Y or M if you want to add support for the analog
+> controls for the codec embedded in Allwinner A64 SoC.
