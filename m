@@ -1,53 +1,148 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 05 Nov 2018 10:16:10 -0800 (PST)
-Subject: [PATCH V2 2/7] net: lorawan: Add LoRaWAN socket module
-In-Reply-To: <20181105165544.5215-3-starnight@g.ncu.edu.tw>
-References: <fc737f3940bbe91341fb15d85ac11931eb56d1fc.1535039998.git.starnight@g.ncu.edu.tw>
- <20181105165544.5215-3-starnight@g.ncu.edu.tw>
-Message-ID: <20181105.101610.1437737564548154497.davem@davemloft.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  5 Nov 2018 16:22:57 -0200
+Subject: [PATCH 1/2] ARM: dts: imx51: Fix memory node duplicaton
+Message-ID: <1541442178-16051-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jian-Hong Pan <starnight@g.ncu.edu.tw>
-Date: Tue,  6 Nov 2018 00:55:40 +0800
+Boards based on imx51 have duplicate memory nodes:
 
-> +static inline struct lrw_mac_cb * mac_cb(struct sk_buff *skb)
+- One coming from the board dts file: memory@
 
-"mac_cb()" is pretty generic for a name, and leads to namespace pollution,
-please use lrw_mac_cb() or similar.
+- One coming from the imx51.dtsi file.
 
-> +static inline struct dgram_sock *
-> +dgram_sk(const struct sock *sk)
-> +{
-> +	return container_of(sk, struct dgram_sock, sk);
-> +}
-> +
-> +static inline struct net_device *
-> +lrw_get_dev_by_addr(struct net *net, u32 devaddr)
+Fix the duplication by removing the memory node from the dtsi file
+and by adding 'device_type = "memory";' in the board dts.
 
-Never use inline for functions in a foo.c file, let the compiler decide.
+Reported-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+---
+Hi,
 
-> +{
-> +	struct net_device *ndev = NULL;
-> +	__be32 be_addr = cpu_to_be32(devaddr);
+I plan to fix all imx dts files, but I am doing it in steps and starting
+with imx51 and imx53.
 
-Always order local variables from longest to shortest line.
+ arch/arm/boot/dts/imx51-apf51.dts                 | 1 +
+ arch/arm/boot/dts/imx51-babbage.dts               | 1 +
+ arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi | 1 +
+ arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi      | 1 +
+ arch/arm/boot/dts/imx51-ts4800.dts                | 1 +
+ arch/arm/boot/dts/imx51-zii-rdu1.dts              | 1 +
+ arch/arm/boot/dts/imx51-zii-scu2-mezz.dts         | 1 +
+ arch/arm/boot/dts/imx51-zii-scu3-esb.dts          | 1 +
+ arch/arm/boot/dts/imx51.dtsi                      | 2 --
+ 9 files changed, 8 insertions(+), 2 deletions(-)
 
-> +static int
-> +dgram_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
-> +	      int noblock, int flags, int *addr_len)
-> +{
-> +	struct sk_buff *skb;
-> +	size_t copied = 0;
-> +	DECLARE_SOCKADDR(struct sockaddr_lorawan *, saddr, msg->msg_name);
-> +	int err;
-
-Likewise.
-
-I'm not going to point out every single place where you have made these
-two errors.
-
-Please audit your entire submission and fix the problems wherever they
-occur.
-
-Thank you.
+diff --git a/arch/arm/boot/dts/imx51-apf51.dts b/arch/arm/boot/dts/imx51-apf51.dts
+index 79d8003..1eddf29 100644
+--- a/arch/arm/boot/dts/imx51-apf51.dts
++++ b/arch/arm/boot/dts/imx51-apf51.dts
+@@ -22,6 +22,7 @@
+ 	compatible = "armadeus,imx51-apf51", "fsl,imx51";
+ 
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0x20000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 35ee1b4..ed6a3ce 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -15,6 +15,7 @@
+ 	};
+ 
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0x20000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+index 5761a66..82d8df0 100644
+--- a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
++++ b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+@@ -17,6 +17,7 @@
+ 	compatible = "digi,connectcore-ccxmx51-som", "fsl,imx51";
+ 
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0x08000000>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+index f8902a3..2e31253 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
++++ b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+@@ -23,6 +23,7 @@
+ 	compatible = "eukrea,cpuimx51", "fsl,imx51";
+ 
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0x10000000>; /* 256M */
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
+index 39eb067..4344632 100644
+--- a/arch/arm/boot/dts/imx51-ts4800.dts
++++ b/arch/arm/boot/dts/imx51-ts4800.dts
+@@ -18,6 +18,7 @@
+ 	};
+ 
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0x10000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+index e45a15c..3ca4f9b 100644
+--- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
++++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+@@ -53,6 +53,7 @@
+ 
+ 	/* Will be filled by the bootloader */
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts b/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts
+index 243d1c8..aa91e5d 100644
+--- a/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts
++++ b/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts
+@@ -18,6 +18,7 @@
+ 
+ 	/* Will be filled by the bootloader */
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
+index 14b2077..875b10a 100644
+--- a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
++++ b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
+@@ -18,6 +18,7 @@
+ 
+ 	/* Will be filled by the bootloader */
+ 	memory at 90000000 {
++		device_type = "memory";
+ 		reg = <0x90000000 0>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 67d4627..7651bed 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -16,10 +16,8 @@
+ 	 * The decompressor and also some bootloaders rely on a
+ 	 * pre-existing /chosen node to be available to insert the
+ 	 * command line and merge other ATAGS info.
+-	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; };
+ 
+ 	aliases {
+ 		ethernet0 = &fec;
+-- 
+2.7.4
