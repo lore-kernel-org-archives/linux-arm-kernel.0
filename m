@@ -1,148 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Nov 2018 21:18:39 +0100
-Subject: [PATCH v2] arm64/mm: unmap the linear alias of module allocations
-In-Reply-To: <20181105193139.GA25195@brain-police>
-References: <20180711170426.11133-1-ard.biesheuvel@linaro.org>
- <20181101151702.GF15788@arm.com>
- <CAKv+Gu-G+qced2Cyx9UHx2DPxVC+ignft6azYLcmUzAtPCW8XA@mail.gmail.com>
- <20181105193139.GA25195@brain-police>
-Message-ID: <CAKv+Gu_KutMRosQOv=S=jxHkM+XN1QD9ONKjcnbMA8xnZU2J9A@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 5 Nov 2018 14:33:42 -0600
+Subject: [PATCH v3 4/6] arm64: Utilize phys_initrd_start/phys_initrd_size
+In-Reply-To: <20181031192843.13230-5-f.fainelli@gmail.com>
+References: <20181031192843.13230-1-f.fainelli@gmail.com>
+ <20181031192843.13230-5-f.fainelli@gmail.com>
+Message-ID: <20181105203342.GB21852@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2018 at 20:31, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 05, 2018 at 01:29:34PM +0100, Ard Biesheuvel wrote:
->> On 1 November 2018 at 16:17, Will Deacon <will.deacon@arm.com> wrote:
->> > On Wed, Jul 11, 2018 at 07:04:26PM +0200, Ard Biesheuvel wrote:
->> >> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
->> >> index 97d0ef12e2ff..f16f0073642b 100644
->> >> --- a/arch/arm64/include/asm/module.h
->> >> +++ b/arch/arm64/include/asm/module.h
->> >> @@ -91,4 +91,10 @@ static inline bool plt_entries_equal(const struct plt_entry *a,
->> >>              a->mov2 == b->mov2;
->> >>  }
->> >>
->> >> +#ifdef CONFIG_STRICT_KERNEL_RWX
->> >> +void remap_linear_module_alias(void *module_region, bool ro);
->> >> +#else
->> >> +static inline void remap_linear_module_alias(void *module_region, bool ro) {}
->> >> +#endif
->> >> +
->> >>  #endif /* __ASM_MODULE_H */
->> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
->> >> index f0f27aeefb73..2b61ca0285eb 100644
->> >> --- a/arch/arm64/kernel/module.c
->> >> +++ b/arch/arm64/kernel/module.c
->> >> @@ -26,10 +26,51 @@
->> >>  #include <linux/mm.h>
->> >>  #include <linux/moduleloader.h>
->> >>  #include <linux/vmalloc.h>
->> >> +#include <linux/workqueue.h>
->> >>  #include <asm/alternative.h>
->> >>  #include <asm/insn.h>
->> >>  #include <asm/sections.h>
->> >>
->> >> +#ifdef CONFIG_STRICT_KERNEL_RWX
->> >> +
->> >> +static struct workqueue_struct *module_free_wq;
->> >> +
->> >> +static int init_workqueue(void)
->> >> +{
->> >> +     module_free_wq = alloc_ordered_workqueue("module_free_wq", 0);
->> >> +     WARN_ON(!module_free_wq);
->> >> +
->> >> +     return 0;
->> >> +}
->> >> +pure_initcall(init_workqueue);
->> >> +
->> >> +static void module_free_wq_worker(struct work_struct *work)
->> >> +{
->> >> +     remap_linear_module_alias(work, false);
->> >> +     vfree(work);
->> >> +}
->> >> +
->> >> +void module_memfree(void *module_region)
->> >> +{
->> >> +     struct work_struct *work;
->> >> +
->> >> +     if (!module_region)
->> >> +             return;
->> >> +
->> >> +     /*
->> >> +      * At this point, module_region is a pointer to an allocation of at
->> >> +      * least PAGE_SIZE bytes that is mapped read-write. So instead of
->> >> +      * allocating memory for a data structure containing a work_struct
->> >> +      * instance and a copy of the value of module_region, just reuse the
->> >> +      * allocation directly.
->> >> +      */
->> >> +     work = module_region;
->> >> +     INIT_WORK(work, module_free_wq_worker);
->> >> +     queue_work(module_free_wq, work);
->> >> +}
->> >
->> > Whilst I can see that this works, it's a bit grotty because we're
->> > duplicating much of the hoop-jumping that vfree() also has to go through.
->> > Given that we allocate the module memory in the arch code, could we grab
->> > the pages at alloc time and stash them in the mod_arch_specific field?
->> >
->>
->> Yeah that should work
->
-> Great!
->
+On Wed, Oct 31, 2018 at 12:28:41PM -0700, Florian Fainelli wrote:
+> ARM64 is the only architecture that re-defines
+> __early_init_dt_declare_initrd() in order for that function to populate
+> initrd_start/initrd_end with physical addresses instead of virtual
+> addresses. Instead of having an override we can leverage
+> drivers/of/fdt.c populating phys_initrd_start/phys_initrd_size to
+> populate those variables for us.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm64/mm/init.c | 19 +++++++++----------
+>  1 file changed, 9 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 3cf87341859f..00ef2166bb73 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -72,8 +72,8 @@ static int __init early_initrd(char *p)
+>  	if (*endp == ',') {
+>  		size = memparse(endp + 1, NULL);
+>  
+> -		initrd_start = start;
+> -		initrd_end = start + size;
+> +		phys_initrd_start = start;
+> +		phys_initrd_size = size;
+>  	}
+>  	return 0;
+>  }
+> @@ -408,14 +408,14 @@ void __init arm64_memblock_init(void)
+>  		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
+>  	}
+>  
+> -	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
+> +	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
+>  		/*
+>  		 * Add back the memory we just removed if it results in the
+>  		 * initrd to become inaccessible via the linear mapping.
+>  		 * Otherwise, this is a no-op
+>  		 */
+> -		u64 base = initrd_start & PAGE_MASK;
+> -		u64 size = PAGE_ALIGN(initrd_end) - base;
+> +		u64 base = phys_initrd_start & PAGE_MASK;
+> +		u64 size = PAGE_ALIGN(phys_initrd_size);
+>  
+>  		/*
+>  		 * We can only add back the initrd memory if we don't end up
+> @@ -460,12 +460,11 @@ void __init arm64_memblock_init(void)
+>  	 */
+>  	memblock_reserve(__pa_symbol(_text), _end - _text);
+>  #ifdef CONFIG_BLK_DEV_INITRD
+> -	if (initrd_start) {
+> -		memblock_reserve(initrd_start, initrd_end - initrd_start);
+> -
+> +	if (phys_initrd_size) {
 
-I may have spoken too soon: module_memfree() receives a void* pointer
-to the allocation to be freed, and we can't access the module struct
-from that.
+Since we're touching the if anyways, perhaps convert the #ifdef to a C 
+IS_ENABLED().
 
-But looking into this a bit more, I wonder why this doesn not affect
-other architectures as well, and it might make sense to solve this
-generically, or at least, provide the hooks in generic code.
-
->> >> +#endif
->> >> +
->> >>  void *module_alloc(unsigned long size)
->> >>  {
->> >>       gfp_t gfp_mask = GFP_KERNEL;
->> >> @@ -65,6 +106,7 @@ void *module_alloc(unsigned long size)
->> >>               return NULL;
->> >>       }
->> >>
->> >> +     remap_linear_module_alias(p, true);
->> >>       return p;
->> >>  }
->> >>
->> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> >> index 493ff75670ff..5492b691aafd 100644
->> >> --- a/arch/arm64/mm/mmu.c
->> >> +++ b/arch/arm64/mm/mmu.c
->> >> @@ -432,7 +432,7 @@ static void __init map_mem(pgd_t *pgdp)
->> >>       struct memblock_region *reg;
->> >>       int flags = 0;
->> >>
->> >> -     if (debug_pagealloc_enabled())
->> >> +     if (rodata_enabled || debug_pagealloc_enabled())
->> >>               flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
->> >
->> > I suppose this is the most contentious part of the patch. Perhaps a
->> > better solution would be to tweak CONFIG_STRICT_MODULE_RWX so that it's
->> > structured more like CONFIG_STACKPROTECTOR. That way, your patch here
->> > could be the "strong" version, which comes with more of a performance
->> > cost.
->> >
->>
->> I'd like to understand whether this performance hit is theoretical or
->> not. It is obviously less efficient to map the linear region at page
->> granularity, but which workloads will actually notice the difference?
->>
->> Also, I think this should be a runtime setting, perhaps rodata=full?
->> With a CONFIG_ option to set the default.
->
-> Yes, that's a better idea. We could even default to "full" if we don't have
-> any performance data (if people start shouting then we'll know it's an
-> issue!).
->
-> Do you plan to spin a v2?
->
-
-Yes, but I'll do some digging first.
+>  		/* the generic initrd code expects virtual addresses */
+> -		initrd_start = __phys_to_virt(initrd_start);
+> -		initrd_end = __phys_to_virt(initrd_end);
+> +		initrd_start = __phys_to_virt(phys_initrd_start);
+> +		initrd_end = initrd_start + phys_initrd_size;
+> +		initrd_below_start_ok = 0;
+>  	}
+>  #endif
+>  
+> -- 
+> 2.17.1
+> 
