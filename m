@@ -1,30 +1,106 @@
-From: tengfei@codeaurora.org (tengfei at codeaurora.org)
-Date: Mon, 05 Nov 2018 16:21:48 +0800
-Subject: [PATCH] arm: kernel: add support for detecting armv8 cpu cache
- information
-In-Reply-To: <20181018085609.GI30658@n2100.armlinux.org.uk>
-References: <1539843407-7439-1-git-send-email-tengfei@codeaurora.org>
- <20181018085609.GI30658@n2100.armlinux.org.uk>
-Message-ID: <8a260ff92ceaf2c673327fd390780434@codeaurora.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 5 Nov 2018 09:31:25 +0100
+Subject: [PATCH v3 12/25] drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet
+ overhead
+In-Reply-To: <CAMty3ZBHU5eXRLLJmUroLgSKcF6O9gHOHRM1XBnt9_Lp7B8rEA@mail.gmail.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <20181026144344.27778-13-jagan@amarulasolutions.com>
+ <20181029092227.mdxgvg5aqzh22j72@flea>
+ <CAMty3ZBHU5eXRLLJmUroLgSKcF6O9gHOHRM1XBnt9_Lp7B8rEA@mail.gmail.com>
+Message-ID: <20181105083125.xyfwdrkrjzrltfzf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-     our team team was trying to check L1, L2 cache size with adb 
-commands help on 32bit ARMv8 platform, so we submit this patch.
-
-Thanks,
-Tengfei Fan
-
-On 2018-10-18 16:56, Russell King - ARM Linux wrote:
-> On Thu, Oct 18, 2018 at 02:16:47PM +0800, Teng Fei Fan wrote:
->> This patch adds support for cacheinfo on 32bit ARMv8 platform.
->> Add support for detecting cpu cache information cpu cache information
->> via sysfs for 32bit armv8 platform. And export to sysfs then userspace
->> can get from /sys/devices/system/cpu/cpuX/cache.
+On Mon, Oct 29, 2018 at 07:56:27PM +0530, Jagan Teki wrote:
+> On Mon, Oct 29, 2018 at 2:52 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Fri, Oct 26, 2018 at 08:13:31PM +0530, Jagan Teki wrote:
+> > > Add 10 bytes packet overhead for hblk where blank is set using
+> > > a blanking packet like (4 bytes + 4 bytes + payload + 2 bytes)
+> > >
+> > > This is according to BSP code from BPI-M64-bsp
+> > > (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> > > dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
+> > >
+> > > So, add 10 bytes packet overhead for DSI hblk.
+> > >
+> > > Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
+> > >
+> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > Tested-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > ---
+> > > Changes for v3:
+> > > - new patch
+> > > Changes for v2:
+> > > - none
+> > >
+> > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 9 +++++++--
+> > >  1 file changed, 7 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > index 596e560263bf..cf42be1f1ba1 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > @@ -461,7 +461,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+> > >  {
+> > >       struct mipi_dsi_device *device = dsi->device;
+> > >       unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
+> > > -     u16 hbp, hfp, hsa, hblk, vblk;
+> > > +     u16 hbp, hfp, hsa, hblk_max, hblk, vblk;
+> > >       size_t bytes;
+> > >       u8 *buffer;
+> > >
+> > > @@ -494,8 +494,13 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+> > >
+> > >       /*
+> > >        * hblk seems to be the line + porches length.
+> > > +      * The blank is set using a blanking packet (4 bytes + 4 bytes +
+> > > +      * payload + 2 bytes). So minimal size is 10 bytes
+> > >        */
+> > > -     hblk = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
+> > > +#define HBLK_PACKET_OVERHEAD 10
+> > > +     hblk_max = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
+> > > +     hblk_max -= HBLK_PACKET_OVERHEAD;
+> > > +     hblk = max((unsigned int)HBLK_PACKET_OVERHEAD, hblk_max);
+> >
+> > I'd rather use the same convention than the other assignments done
+> > before in that function.
 > 
-> You don't explain why this is needed.
+> Yes, old code did use hsa. but it's added 10 bytes packet head instead
+> of subtracting it.
 > 
-> We don't do this for previous 32-bit CPUs, so why should we do this
-> for ARMv8 running on a 32-bit kernel?
+> hblk = mode->htotal * Bpp - hsa;
+> => mode->htotal * Bpp - (mode->hsync_end - mode->hsync_start) * Bpp -
+> HSA_PACKET_OVERHEAD);
+> => (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp +
+> HSA_PACKET_OVERHEAD;
+> 
+> And it should be
+> (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp -
+> HSA_PACKET_OVERHEAD;
+> 
+> This patch is simply doing the same by explicitly adding packet over
+> ahead macro, which again used in hfp.
+
+That's not my point.
+
+The rest of the driver uses a construct that would be:
+
+hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
+           (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp - HBLK_PACKET_OVERHEAD);
+
+We want to remain consistent.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/0b67ef26/attachment.sig>
