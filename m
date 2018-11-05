@@ -1,61 +1,116 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 5 Nov 2018 12:09:35 +0100
-Subject: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
-In-Reply-To: <CY1PR0701MB16644A2C7EF670F5AC732BF8CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
-References: <1539034953-11274-1-git-send-email-dkos@cadence.com>
- <CY1PR0701MB166434BBB71DB76593E0F513CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
- <3056496.a8qoricJmv@avalon>
- <CGME20181105103448epcas1p29a9889a9a19fc56629dcc7e24785556c@epcas1p2.samsung.com>
- <CY1PR0701MB16644A2C7EF670F5AC732BF8CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
-Message-ID: <d6db03aa-6f61-f902-85f6-2245547186bc@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Nov 2018 12:11:03 +0100
+Subject: [Bug Report] kdump crashes after latest EFI memblock changes on
+ arm64 machines with large number of CPUs
+In-Reply-To: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
+References: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
+Message-ID: <CAKv+Gu_1PNiGbgRqd3_0k6CGzh-2P+iAmqk=oSSek69kBCnb8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.11.2018 11:33, Damian Kos wrote:
-> Hi Laurent,
->
-> Understood. Thanks.
+(+ Marc)
 
+On 1 November 2018 at 22:14, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> Hi,
+>
+> With the latest EFI changes for memblock reservation across kdump
+> kernel from Ard (Commit 71e0940d52e107748b270213a01d3b1546657d74
+> ["efi: honour memory reservations passed via a linux specific config
+> table"]), we hit a panic while trying to boot the kdump kernel on
+> machines which have large number of CPUs.
+>
 
-I will look at it today or tomorrow.
+Just for my understanding: why do you boot all 224 CPus when running
+the crash kernel?
 
+I'm not saying we shouldn't fix the underlying issue, I'm just curious.
 
-Regards
-
-Andrzej
-
-
+> I have a arm64 board which has 224 CPUS:
+> # lscpu
+> <..snip..>
+> CPU(s):              224
+> On-line CPU(s) list: 0-223
+> <..snip..>
 >
-> Damian
+> Here are the crash logs in the kdump kernel on this machine:
 >
-> -----Original Message-----
-> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com> 
-> Sent: Monday, November 5, 2018 11:30
-> To: Damian Kos <dkos@cadence.com>
-> Cc: David Airlie <airlied@linux.ie>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Archit Taneja <architt@codeaurora.org>; Andrzej Hajda <a.hajda@samsung.com>; Gustavo Padovan <gustavo@padovan.org>; Maarten Lankhorst <maarten.lankhorst@linux.intel.com>; Sean Paul <sean@poorly.run>; Sandy Huang <hjc@rock-chips.com>; Heiko St?bner <heiko@sntech.de>; Quentin Schulz <quentin.schulz@free-electrons.com>; Piotr Sroka <piotrs@cadence.com>; dri-devel at lists.freedesktop.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-rockchip at lists.infradead.org; Rafal Ciepiela <rafalc@cadence.com>; quentin.schulz at bootlin.com; jbergsagel at ti.com
-> Subject: Re: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
+> [    0.000000] Unable to handle kernel paging request at virtual
+> address ffff80003ffe0000
+> val____)nt EL), IL ata abort info:
+> [    0.or: Oops: 960000inted 4.18.0+ #3
+> [    0.000000] pstate: 20400089 (nzCv daIf +PAN -UAO)
+> [    0.000000] pc : __memcpy+0x110/0x180
+> [    0.000000] lr : memblock_double_array+0x240/0x348
+> [    0.000000] sp : ffff0000092efc80 x28: 00000000bffe0000
+> [    0.000000] x27: 0000000000001800 x26: ffff000009d59000
+> [    0.000000] x25: ffff80003ffe0000 x24: 0000000000000000
+> [    0.000000] x23: 0000000000010000 x22: ffff000009d594e8
+> [    0.000000] x21: ffff000009d594f4 x20: ffff0000093c7268
+> [    0.000000] x19: 0000000000000c00 x18: 0000000000000010
+> [    0.000000] x17: 0000000000000000 x16: 0000000000000000
+> [    0.000000] x15: ffffffffffffffff3: 0000000fc18d0000 x12: 0000000800000000
+> [    0.000000] x11: 0000000000000018 x10: 00000000ddab9e18
+> [    0.000000] x9 : 0000000800000000 x8 : 00000000000002c1
+> [    0.000000] x7 : 0000000091b90000 x6 : ffff80003ffe0000
+> [    0.000000] x5 : 0000000000000001 x4 : 0000000000000000
+> [    0.000000] x3 : 0000000000000000 x2 : 0000000000000b80
+> [    0.000000] x1 : ffff000009d59540 x0 : ffff80003ffe0000
+> [    0.000000] Process swapper)
+> [    0.000000] Call trace:
+> [    0.000000]  __memcpy+0x110/0x180
+> [    0.000000]  memblock_add_range+0x134/0x2e8
+> [    0.000000]  memblock_reserve+0x70/0xb8
+> [    0.000000]  memblock_alloc_base_nid+0x6c/0x88
+> [    0.000000]  __memblock_alloc_base+0x3c/0x4c
+> [    0.000000]  memblock_alloc_base+0x28/0x4c
+> [    0.000000]  memblock_alloc+0x2c/0x38
+> [    0.000000]  early_pgtable_alloc+0x20/0xb0
+> [    0.000000]  paging_init+0x28/0x7f8
+> [   0.000000]  start_kernel+0x78/0x4cc
+> [    0.000000] Code: a8c12027 a8c12829 a8c1302b a8c1382d (a88120c7)
+> [    0.000000] random: get_random_bytes called from
+> print_oops_end_marker+0x30/0x58 with crng_init=0
+> [    0.000000] ---[ end trace 0000000000000000 ]---
+> [    0.000000] Kernel panic - not syncing: Fatal exception
+> [    0.000000] ---[ end Kernel panic - not syncing: Fatal exception ]---
 >
-> EXTERNAL MAIL
+> Adding more debug logs via 'memblock=debug' being passed to the kdump
+> kernel, (and adding a few more prints to 'mm/memblock.c'), I can see
+> that the panic happens while trying to resize array inside
+> 'memblock_double_array' (which doubles the size of the memblock
+> regions array):
 >
+> [    0.000000] Reserving 13KB of memory at 0xbfff0000 for elfcorehdr
+> [    0.000000] memblock_reserve:
+> [0x00000000bfff0000-0x00000000bfffffff]
+> memblock_alloc_base_nid+0x6c/0x88
+> [    0.000000] memblock: use_slab is 0, new_area_start=bfff0000,
+> new_area_size=10000
+> [    0.000000] memblock: use_slab is 0, addr=0, new_area_size=10000
+> [    0.000000] memblock: addr=bffe0000, __va(addr)=ffff80003ffe0000
+> [    0.00000 [0xbffe0000-0xbffe17ff]
+> [    0.000000] Unable to handle kernel paging request at virtual
+> address ffff80003ffe0000
 >
-> Hi Damian,
+> which indicates that after Ard's patch the memblocks being reserved
+> across kdump swell up on systems which have large number of CPUs and
+> hence 'memblock_double_array' is called up in early kdump boot code to
+> double the size of the memblock regions array.
 >
-> On Monday, 5 November 2018 11:44:53 EET Damian Kos wrote:
->> Hi Guys,
->>
->> I'm wondering if this time patch is so good that there're no change 
->> requests, or is it so bad that it was rejected without a comment : ) 
->> Please let me know if this patch is being in review or was rejected 
->> and, if so, what needs to be changed.
-> I unfortunately don't have time to review your series for the time being. 
-> Hopefully someone else will have a better review bandwidth :-) Sorry about that.
+> To confirm the above, I reduced the number of SMP CPUs available to
+> the kernel on this system, by specifying 'nr_cpus=46' in the kernel
+> bootargs for the primary kernel. As expected this makes the kdump
+> kernel boot successfully and also save the crash dump properly.
 >
-> --
-> Regards,
+> I saw another arm64 kdump user report this issue to me privately, so I
+> am sending this to a wider audience, so that kdump users are aware
+> that this is a known issue.
 >
-> Laurent Pinchart
+> I am working on a RFC patch which seems to fix the issue on my board
+> and will try to send it out for wider review in coming days after some
+> more checks at my end.
 >
+> Any advices on the same are also welcome :)
 >
->
->
->
+> Thanks,
+> Bhupesh
