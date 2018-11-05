@@ -1,54 +1,49 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 5 Nov 2018 18:34:35 +0000
-Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
- erratum 1165522
-In-Reply-To: <20181105143617.120602-5-marc.zyngier@arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-5-marc.zyngier@arm.com>
-Message-ID: <a13dfb2d-df5b-7783-2e8b-8a8ffe50b436@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  5 Nov 2018 19:44:32 +0100
+Subject: [PATCH 0/6] ARM: compressed: clean up section layout and enable EFI
+ debugging
+Message-ID: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Currently, the decompressor section layout is somewhat unusual: head.S
+puts code into a .start and a .text section, which are expected to be
+emitted back to back, unless other objects are included that define a
+.start section as well, in which case execution is expected to proceed 
+linearly from head.S's section .start section into the other .start
+section and then onward into head.S's .text section.
 
-On 05/11/2018 14:36, Marc Zyngier wrote:
-> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
-> speculate an AT instruction in during a guest switch while the
+This relies on the input files to be consumed by the linker in the same
+order they were specified on the command line, but this is not actually
+guaranteed by the linker, so it is better to make the inclusion of this
+code specific by using function calls. Also, it is better to use a jump
+instruction when going from one section to the next rather than relying
+on code flow to proceed seamlessly from one to the other.
 
-                              (in during?)
+The reason I am cleaning this up is because I want to modify the section
+layout slightly, so that the ELF and PE/COFF layouts are identical. This
+permits a debug feature to be enabled that makes it possible to do single
+step debugging from the EFI stub into the firmware and back, which is very
+useful for debugging the handover from UEFI to the decompressor.
 
-> S1/S2 system registers are in an inconsistent state.
-> 
-> Work around it by:
-> - Mandating VHE
-> - Make sure that S1 and S2 system registers are consistent before
->    clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
->    regime
-> 
-> These two things together ensure that we cannot hit this erratum.
+Ard Biesheuvel (6):
+  ARM: compressed: move sharpsl startup code into subroutine
+  ARM: compressed: move sa1100 startup code into subroutine
+  ARM: compressed: move xscale startup code into subroutine
+  ARM: compressed: move BE32 handling into head.S
+  ARM: compressed: put zImage header and EFI header in dedicated section
+  ARM: efi: add PE/COFF debug table to EFI header
 
+ arch/arm/boot/compressed/Makefile       | 12 ++---
+ arch/arm/boot/compressed/big-endian.S   | 14 ------
+ arch/arm/boot/compressed/efi-header.S   | 47 ++++++++++++++++++++
+ arch/arm/boot/compressed/head-sa1100.S  |  9 ++--
+ arch/arm/boot/compressed/head-sharpsl.S | 24 +++++-----
+ arch/arm/boot/compressed/head-xscale.S  |  7 +--
+ arch/arm/boot/compressed/head.S         | 20 +++++++--
+ arch/arm/boot/compressed/vmlinux.lds.S  |  4 +-
+ 8 files changed, 92 insertions(+), 45 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/big-endian.S
 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 51d5d966d9e5..322109183853 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -143,6 +143,13 @@ static void deactivate_traps_vhe(void)
->   {
->   	extern char vectors[];	/* kernel exception vectors */
->   	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> +
-> +	/*
-> +	 * ARM erratum 1165522 requires the actual execution of the
-> +	 * above before we can switch to the host translation regime.
-> +	 */
-> +	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
-> +
-
-Host regime too ... does __tlb_switch_to_host_vhe() need the same 
-treatment? It writes vttbr_el2 and hcr_el2 back to back.
-
-
-
-Thanks,
-
-James
+-- 
+2.19.1
