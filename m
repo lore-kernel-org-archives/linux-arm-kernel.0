@@ -1,34 +1,36 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon,  5 Nov 2018 15:26:30 -0700
-Subject: [PATCH 3/3] coresight: etm3x: Release CLAIM tag when operated from
- perf
-In-Reply-To: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1541456790-28282-4-git-send-email-mathieu.poirier@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 05 Nov 2018 23:36:32 +0100
+Subject: [PATCH RESEND] dmaengine: pxa: make the filter function internal
+In-Reply-To: <20181105194503.25639-1-daniel@zonque.org> (Daniel Mack's message
+ of "Mon, 5 Nov 2018 20:45:03 +0100")
+References: <20181105194503.25639-1-daniel@zonque.org>
+Message-ID: <874lcvm9sf.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch deals with the release of the CLAIM tag when the ETM is
-operated from perf.  Otherwise the tag is left asserted and subsequent
-requests to use the device fail.
+Daniel Mack <daniel@zonque.org> writes:
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm3x.c | 2 ++
- 1 file changed, 2 insertions(+)
+> From: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> As the pxa architecture and all its related drivers do not rely anymore
+> on the filter function, thanks to the slave map conversion, make
+> pxad_filter_fn() static, and remove it from the global namespace.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Acked-by: Vinod Koul <vkoul@kernel.org>
+> ---
+>
+> I'm resending this as it appears to be the last patch that's missing
+> from the PXA DMA transition series.
+>
+> Robert, any reason why it wasn't applied?
+Ah this is because my pull request was ... not taken into account.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index fd5c4cca7db5..000796394662 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -603,6 +603,8 @@ static void etm_disable_perf(struct coresight_device *csdev)
- 	 */
- 	etm_set_pwrdwn(drvdata);
- 
-+	coresight_disclaim_device_unlocked(drvdata->base);
-+
- 	CS_LOCK(drvdata->base);
- }
- 
--- 
-2.7.4
+Arnd, Kevin, Olof, did you receive this
+https://www.spinics.net/lists/arm-kernel/msg679383.html ? It might be my mailer
+getting me into trouble once more.
+
+Cheers.
+
+--
+Robert
