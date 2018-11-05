@@ -1,33 +1,52 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 5 Nov 2018 08:38:35 +0100
-Subject: [PATCH] clk: zynqmp: handle fixed factor param query error
-In-Reply-To: <153978972088.5275.4505414322881956934@swboyd.mtv.corp.google.com>
-References: <1539762392-12512-1-git-send-email-rajan.vaja@xilinx.com>
- <153978972088.5275.4505414322881956934@swboyd.mtv.corp.google.com>
-Message-ID: <26e50d25-a02b-5ece-d12d-8c6ee208a845@xilinx.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon,  5 Nov 2018 13:18:40 +0530
+Subject: [PATCH v2 1/3] clk: sunxi-ng: sun50i: h6: Fix MMC clock mux width
+Message-ID: <20181105074842.21988-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17. 10. 18 17:22, Stephen Boyd wrote:
-> Quoting Rajan Vaja (2018-10-17 00:46:32)
->> Return proper error code in case query for fixed factor
->> parameter fails. This also fixes build warning for set
->> but not used variable 'ret'.
->>
->> Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-> 
-> Fixes tag? And I think this is going through arm-soc already? If so,
-> 
-> Acked-by: Stephen Boyd <sboyd@kernel.org>
-> 
-> with the appropriate fixes tag added.
+MUX bits for MMC clock register range are 25:24 where 24 is shift
+and 2 is width So fix the width number from 3 to 2.
 
-It was really just about to merge this via arm-soc tree because of
-dependency on firmware itself.
-It is the part of v4.20-rc1 now and it can go via your tree.
+Fixes: 524353ea480b ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v2:
+- none
 
-Anyway v2 is required with Fixed tag anyway.
-Rajan: Please send it v2 with Acked above.
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Thanks,
-Michal
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+index 2193e1495086..e2bc612f1d3e 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+@@ -411,7 +411,7 @@ static const char * const mmc_parents[] = { "osc24M", "pll-periph0-2x",
+ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0", mmc_parents, 0x830,
+ 					  0, 4,		/* M */
+ 					  8, 2,		/* N */
+-					  24, 3,	/* mux */
++					  24, 2,	/* mux */
+ 					  BIT(31),	/* gate */
+ 					  2,		/* post-div */
+ 					  0);
+@@ -419,7 +419,7 @@ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0", mmc_parents, 0x830,
+ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1", mmc_parents, 0x834,
+ 					  0, 4,		/* M */
+ 					  8, 2,		/* N */
+-					  24, 3,	/* mux */
++					  24, 2,	/* mux */
+ 					  BIT(31),	/* gate */
+ 					  2,		/* post-div */
+ 					  0);
+@@ -427,7 +427,7 @@ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1", mmc_parents, 0x834,
+ static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc2_clk, "mmc2", mmc_parents, 0x838,
+ 					  0, 4,		/* M */
+ 					  8, 2,		/* N */
+-					  24, 3,	/* mux */
++					  24, 2,	/* mux */
+ 					  BIT(31),	/* gate */
+ 					  2,		/* post-div */
+ 					  0);
+-- 
+2.18.0.321.gffc6fa0e3
