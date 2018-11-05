@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon,  5 Nov 2018 12:01:45 +0000 (GMT)
-Subject: Applied "spi: spi-zynqmp-gqspi: simplify getting .driver_data" to the
- spi tree
-In-Reply-To: <20181021200048.2114-4-wsa+renesas@sang-engineering.com>
-Message-ID: <20181105120145.0D9251124D98@debutante.sirena.org.uk>
+Date: Mon,  5 Nov 2018 12:01:53 +0000 (GMT)
+Subject: Applied "spi: uniphier: re-add addressing properties" to the spi tree
+In-Reply-To: <1540533525-1816-3-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <20181105120153.EB1181124D98@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: spi-zynqmp-gqspi: simplify getting .driver_data
+   spi: uniphier: re-add addressing properties
 
 has been applied to the spi tree at
 
@@ -34,43 +33,43 @@ to this mail.
 Thanks,
 Mark
 
->From 6eee6d317aa2511ea86c4f8f28d79bfd3d621826 Mon Sep 17 00:00:00 2001
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Date: Sun, 21 Oct 2018 22:00:47 +0200
-Subject: [PATCH] spi: spi-zynqmp-gqspi: simplify getting .driver_data
+>From 2a35a643f138a97e3bfee0c599c72e5ca80ebe7c Mon Sep 17 00:00:00 2001
+From: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+Date: Fri, 26 Oct 2018 14:58:45 +0900
+Subject: [PATCH] spi: uniphier: re-add addressing properties
 
-We should get 'driver_data' from 'struct device' directly. Going via
-platform_device is an unneeded step back and forth.
+In commit 7662d1dc17d4 ("spi: uniphier: fix incorrect property items")
+addressing properties of #address-cells and #size-cells were removed.
+Since it is not necessary to remove them, they are back again.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-zynqmp-gqspi.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/spi/spi-uniphier.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
-index cc4d31033494..9f83e1b17aa1 100644
---- a/drivers/spi/spi-zynqmp-gqspi.c
-+++ b/drivers/spi/spi-zynqmp-gqspi.c
-@@ -960,8 +960,7 @@ static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
-  */
- static int __maybe_unused zynqmp_runtime_suspend(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct spi_master *master = dev_get_drvdata(dev);
- 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
- 
- 	clk_disable(xqspi->refclk);
-@@ -980,8 +979,7 @@ static int __maybe_unused zynqmp_runtime_suspend(struct device *dev)
-  */
- static int __maybe_unused zynqmp_runtime_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct spi_master *master = dev_get_drvdata(dev);
- 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
- 	int ret;
- 
+diff --git a/Documentation/devicetree/bindings/spi/spi-uniphier.txt b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
+index b04e66a52de5..e1201573a29a 100644
+--- a/Documentation/devicetree/bindings/spi/spi-uniphier.txt
++++ b/Documentation/devicetree/bindings/spi/spi-uniphier.txt
+@@ -5,6 +5,8 @@ UniPhier SoCs have SCSSI which supports SPI single channel.
+ Required properties:
+  - compatible: should be "socionext,uniphier-scssi"
+  - reg: address and length of the spi master registers
++ - #address-cells: must be <1>, see spi-bus.txt
++ - #size-cells: must be <0>, see spi-bus.txt
+  - interrupts: a single interrupt specifier
+  - pinctrl-names: should be "default"
+  - pinctrl-0: pin control state for the default mode
+@@ -16,6 +18,8 @@ Example:
+ spi0: spi at 54006000 {
+ 	compatible = "socionext,uniphier-scssi";
+ 	reg = <0x54006000 0x100>;
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	interrupts = <0 39 4>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_spi0>;
 -- 
 2.19.0.rc2
