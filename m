@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon,  5 Nov 2018 12:06:47 +0000 (GMT)
-Subject: Applied "spi: rockchip: use atomic_t state" to the spi tree
-In-Reply-To: <20181031105711.19575-5-esmil@mailme.dk>
-Message-ID: <20181105120647.0E9EF1124D98@debutante.sirena.org.uk>
+Date: Mon,  5 Nov 2018 12:06:51 +0000 (GMT)
+Subject: Applied "spi: rockchip: always use SPI mode" to the spi tree
+In-Reply-To: <20181031105711.19575-4-esmil@mailme.dk>
+Message-ID: <20181105120651.28D0E1124D98@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: rockchip: use atomic_t state
+   spi: rockchip: always use SPI mode
 
 has been applied to the spi tree at
 
@@ -33,186 +33,75 @@ to this mail.
 Thanks,
 Mark
 
->From fab3e4871f623c8f86e8a0e00749f1480ffa08db Mon Sep 17 00:00:00 2001
+>From 2410d6a3c3070e205169a1a741aa78898e30a642 Mon Sep 17 00:00:00 2001
 From: Emil Renner Berthing <kernel@esmil.dk>
-Date: Wed, 31 Oct 2018 11:57:01 +0100
-Subject: [PATCH] spi: rockchip: use atomic_t state
+Date: Wed, 31 Oct 2018 11:57:00 +0100
+Subject: [PATCH] spi: rockchip: always use SPI mode
 
-The state field is currently only used to make sure
-only the last of the tx and rx dma callbacks issue
-an spi_finalize_current_transfer.
-Rather than using a spinlock we can get away
-with just turning the state field into an atomic_t.
+The hardware supports 3 different variants of SPI
+and there were some code around it, but nothing
+to actually set it to anything but "Motorola SPI".
+Just drop that code and always use that mode.
 
 Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
 Tested-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-rockchip.c | 75 +++++++++++++-------------------------
- 1 file changed, 25 insertions(+), 50 deletions(-)
+ drivers/spi/spi-rockchip.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 7fac4253075e..1c813797f963 100644
+index 87d1b9837d94..7fac4253075e 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -142,8 +142,9 @@
- #define RF_DMA_EN					(1 << 0)
- #define TF_DMA_EN					(1 << 1)
+@@ -156,12 +156,6 @@
  
--#define RXBUSY						(1 << 0)
--#define TXBUSY						(1 << 1)
-+/* Driver state flags */
-+#define RXDMA					(1 << 0)
-+#define TXDMA					(1 << 1)
+ #define ROCKCHIP_SPI_MAX_CS_NUM			2
  
- /* sclk_out: spi master internal logic in rk3x can support 50Mhz */
- #define MAX_SCLK_OUT		50000000
-@@ -169,6 +170,9 @@ struct rockchip_spi {
- 	struct clk *apb_pclk;
- 
- 	void __iomem *regs;
-+
-+	atomic_t state;
-+
- 	/*depth of the FIFO buffer */
+-enum rockchip_ssi_type {
+-	SSI_MOTO_SPI = 0,
+-	SSI_TI_SSP,
+-	SSI_NS_MICROWIRE,
+-};
+-
+ struct rockchip_spi_dma_data {
+ 	struct dma_chan *ch;
+ 	dma_addr_t addr;
+@@ -179,8 +173,6 @@ struct rockchip_spi {
  	u32 fifo_len;
  	/* max bus freq supported */
-@@ -187,10 +191,6 @@ struct rockchip_spi {
- 	void *rx;
- 	void *rx_end;
+ 	u32 max_freq;
+-	/* supported slave numbers */
+-	enum rockchip_ssi_type type;
  
--	u32 state;
--	/* protect state */
--	spinlock_t lock;
--
- 	bool cs_asserted[ROCKCHIP_SPI_MAX_CS_NUM];
+ 	u16 mode;
+ 	u8 tmode;
+@@ -525,14 +517,14 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
+ 	u32 dmacr = 0;
+ 	int rsd = 0;
  
- 	bool use_dma;
-@@ -302,28 +302,21 @@ static int rockchip_spi_prepare_message(struct spi_master *master,
- static void rockchip_spi_handle_err(struct spi_master *master,
- 				    struct spi_message *msg)
- {
--	unsigned long flags;
- 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+-	u32 cr0 = (CR0_BHT_8BIT << CR0_BHT_OFFSET)
+-		| (CR0_SSD_ONE << CR0_SSD_OFFSET)
+-		| (CR0_EM_BIG << CR0_EM_OFFSET);
++	u32 cr0 = CR0_FRF_SPI  << CR0_FRF_OFFSET
++	        | CR0_BHT_8BIT << CR0_BHT_OFFSET
++	        | CR0_SSD_ONE  << CR0_SSD_OFFSET
++	        | CR0_EM_BIG   << CR0_EM_OFFSET;
  
--	spin_lock_irqsave(&rs->lock, flags);
--
- 	/*
- 	 * For DMA mode, we need terminate DMA channel and flush
- 	 * fifo for the next transfer if DMA thansfer timeout.
- 	 * handle_err() was called by core if transfer failed.
- 	 * Maybe it is reasonable for error handling here.
- 	 */
--	if (rs->use_dma) {
--		if (rs->state & RXBUSY) {
--			dmaengine_terminate_async(rs->dma_rx.ch);
--			flush_fifo(rs);
--		}
-+	if (atomic_read(&rs->state) & TXDMA)
-+		dmaengine_terminate_async(rs->dma_tx.ch);
+ 	cr0 |= (rs->n_bytes << CR0_DFS_OFFSET);
+ 	cr0 |= ((rs->mode & 0x3) << CR0_SCPH_OFFSET);
+ 	cr0 |= (rs->tmode << CR0_XFM_OFFSET);
+-	cr0 |= (rs->type << CR0_FRF_OFFSET);
  
--		if (rs->state & TXBUSY)
--			dmaengine_terminate_async(rs->dma_tx.ch);
-+	if (atomic_read(&rs->state) & RXDMA) {
-+		dmaengine_terminate_async(rs->dma_rx.ch);
-+		flush_fifo(rs);
- 	}
--
--	spin_unlock_irqrestore(&rs->lock, flags);
- }
+ 	if (rs->use_dma) {
+ 		if (rs->tx)
+@@ -709,7 +701,6 @@ static int rockchip_spi_probe(struct platform_device *pdev)
  
- static int rockchip_spi_unprepare_message(struct spi_master *master,
-@@ -398,48 +391,36 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
+ 	spi_enable_chip(rs, false);
  
- static void rockchip_spi_dma_rxcb(void *data)
- {
--	unsigned long flags;
- 	struct rockchip_spi *rs = data;
-+	int state = atomic_fetch_andnot(RXDMA, &rs->state);
- 
--	spin_lock_irqsave(&rs->lock, flags);
--
--	rs->state &= ~RXBUSY;
--	if (!(rs->state & TXBUSY)) {
--		spi_enable_chip(rs, false);
--		spi_finalize_current_transfer(rs->master);
--	}
-+	if (state & TXDMA)
-+		return;
- 
--	spin_unlock_irqrestore(&rs->lock, flags);
-+	spi_enable_chip(rs, false);
-+	spi_finalize_current_transfer(rs->master);
- }
- 
- static void rockchip_spi_dma_txcb(void *data)
- {
--	unsigned long flags;
- 	struct rockchip_spi *rs = data;
-+	int state = atomic_fetch_andnot(TXDMA, &rs->state);
-+
-+	if (state & RXDMA)
-+		return;
- 
- 	/* Wait until the FIFO data completely. */
- 	wait_for_idle(rs);
- 
--	spin_lock_irqsave(&rs->lock, flags);
--
--	rs->state &= ~TXBUSY;
--	if (!(rs->state & RXBUSY)) {
--		spi_enable_chip(rs, false);
--		spi_finalize_current_transfer(rs->master);
--	}
--
--	spin_unlock_irqrestore(&rs->lock, flags);
-+	spi_enable_chip(rs, false);
-+	spi_finalize_current_transfer(rs->master);
- }
- 
- static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- {
--	unsigned long flags;
- 	struct dma_async_tx_descriptor *rxdesc, *txdesc;
- 
--	spin_lock_irqsave(&rs->lock, flags);
--	rs->state &= ~RXBUSY;
--	rs->state &= ~TXBUSY;
--	spin_unlock_irqrestore(&rs->lock, flags);
-+	atomic_set(&rs->state, 0);
- 
- 	rxdesc = NULL;
- 	if (rs->rx) {
-@@ -490,9 +471,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 
- 	/* rx must be started before tx due to spi instinct */
- 	if (rxdesc) {
--		spin_lock_irqsave(&rs->lock, flags);
--		rs->state |= RXBUSY;
--		spin_unlock_irqrestore(&rs->lock, flags);
-+		atomic_or(RXDMA, &rs->state);
- 		dmaengine_submit(rxdesc);
- 		dma_async_issue_pending(rs->dma_rx.ch);
- 	}
-@@ -500,9 +479,7 @@ static int rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 	spi_enable_chip(rs, true);
- 
- 	if (txdesc) {
--		spin_lock_irqsave(&rs->lock, flags);
--		rs->state |= TXBUSY;
--		spin_unlock_irqrestore(&rs->lock, flags);
-+		atomic_or(TXDMA, &rs->state);
- 		dmaengine_submit(txdesc);
- 		dma_async_issue_pending(rs->dma_tx.ch);
- 	}
-@@ -716,8 +693,6 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 		goto err_disable_spiclk;
- 	}
- 
--	spin_lock_init(&rs->lock);
--
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
- 
+-	rs->type = SSI_MOTO_SPI;
+ 	rs->master = master;
+ 	rs->dev = &pdev->dev;
+ 	rs->max_freq = clk_get_rate(rs->spiclk);
 -- 
 2.19.0.rc2
