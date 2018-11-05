@@ -1,133 +1,56 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 5 Nov 2018 15:00:34 +0000
-Subject: [PATCH] KVM: arm64: Clarify explanation of STAGE2_PGTABLE_LEVELS
-In-Reply-To: <20181102142543.GY12057@e113682-lin.lund.arm.com>
-References: <20181102075352.20636-1-christoffer.dall@arm.com>
- <404f2d39-5dc5-602f-0594-0997b409ff84@arm.com>
- <20181102142543.GY12057@e113682-lin.lund.arm.com>
-Message-ID: <a2805e17-b9ac-40bd-ef9f-6867a4660f90@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Nov 2018 07:00:42 -0800
+Subject: [PATCH v2] ARM: dts: replace gpio-key,
+ wakeup with wakeup-source property
+In-Reply-To: <20181105145924.GA25318@e107155-lin>
+References: <20181105134225.24146-1-sudeep.holla@arm.com>
+ <20181105144330.5zkg4qkacb6afpcm@localhost>
+ <20181105145924.GA25318@e107155-lin>
+Message-ID: <CAOesGMizjKnbDL4nCH5xKMe6=62up-BWJjzRx4TFY-n3XDM6+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 5, 2018 at 6:59 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+> On Mon, Nov 05, 2018 at 06:43:30AM -0800, Olof Johansson wrote:
+> > On Mon, Nov 05, 2018 at 01:42:25PM +0000, Sudeep Holla wrote:
+> > > Most of the legacy "gpio-key,wakeup" and "enable-sdio-wakeup" boolean
+> > > properties are already replaced with "wakeup-source". However few
+> > > occurrences of old property has popped up again, probably from the
+> > > remnants in downstream trees. Almost all of those were remove couple
+> > > of years back.
+> > >
+> > > Replace those legacy properties with the unified "wakeup-source"
+> > > property.
+> > >
+> > > Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > > Acked-by: Peter Rosin <peda@axentia.se>
+> > > Reviewed-by: Fabio Estevam <festevam@gmail.com>
+> > > Reviewed-by: Michal Simek <michal.simek@xilinx.com>
+> > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > > ---
+> > >  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 2 +-
+> > >  arch/arm/boot/dts/at91-wb45n.dts            | 2 +-
+> > >  arch/arm/boot/dts/at91-wb50n.dts            | 4 ++--
+> > >  arch/arm/boot/dts/imx6q-pistachio.dts       | 2 +-
+> > >  arch/arm/boot/dts/imx6sll-evk.dts           | 2 +-
+> > >  arch/arm/boot/dts/zynq-zturn.dts            | 2 +-
+> > >  6 files changed, 7 insertions(+), 7 deletions(-)
+> > >
+> > > Hi ARM SoC Team,
+> > >
+> > > Though it's more a cleanup, I prefer if this can be pushed as fix
+> > > to avoid more duplication in downstream as well as having to split into
+> > > 3 different patches.
+> >
+> > Is there a reason you're not fixing up xilinx on arm64 while you're at it? Sort
+> > of defeats the purpose of removing all usage of it.
+> >
+>
+> Yes, ZynqMP is the only platform using legacy bindings in arm64 and
+> as Michal mentions he has already taken that one.
+
+Ok, please send the others the same way through maintainers then.
 
 
-On 02/11/18 14:25, Christoffer Dall wrote:
-> On Fri, Nov 02, 2018 at 11:02:38AM +0000, Suzuki K Poulose wrote:
->> Hi
->>
->> On 02/11/18 07:53, Christoffer Dall wrote:
->>> In attempting to re-construct the logic for our stage 2 page table
->>> layout I found the reaoning in the comment explaining how we calculate
->>> the number of levels used for stage 2 page tables a bit backwards.
->>>
->>> This commit attempts to clarify the comment, to make it slightly easier
->>> to read without having the Arm ARM open on the right page.
->>>
->>> While we're at it, fixup a typo in a comment that was recently changed.
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
->>> ---
->>>   arch/arm64/include/asm/stage2_pgtable.h | 17 ++++++++++-------
->>>   virt/kvm/arm/mmu.c                      |  2 +-
->>>   2 files changed, 11 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
->>> index d352f6df8d2c..9c387320b28c 100644
->>> --- a/arch/arm64/include/asm/stage2_pgtable.h
->>> +++ b/arch/arm64/include/asm/stage2_pgtable.h
->>> @@ -31,15 +31,18 @@
->>>   /*
->>>    * The hardware supports concatenation of up to 16 tables at stage2 entry level
->>> - * and we use the feature whenever possible.
->>> + * and we use the feature whenever possible, which means we resolve 4 bits of
->>
->> s/we resolve 4 bits/we resolve 4 additional bits/ ?
->>
-> 
-> yes
-> 
->>> + * address at the entry level.
->>>    *
->>> - * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
->>> + * This implies, the total number of page table levels required for
->>> + * IPA_SHIFT at stage2 expected by the hardware can be calculated using
->>> + * the same logic used for the (non-collapsable) stage1 page tables but for
->>> + * (IPA_SHIFT - 4).
->>> + *
->>> + * Note, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
->>
->> May be we could improve it further by :
->>
->> s/resolved at any level/resolved at any *non-entry* level/
->>
->> as, we could resolve as small as 1 bit at the entry level.
->>
->>
-> 
-> yes
-> 
->>>    * On arm64, the smallest PAGE_SIZE supported is 4k, which means
->>> - *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
->>> - * This implies, the total number of page table levels at stage2 expected
->>> - * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
->>> - * in normal translations(e.g, stage1), since we cannot have another level in
->>> - * the range (IPA_SHIFT, IPA_SHIFT - 4).
->>> + *             (PAGE_SHIFT - 3) > 4 holds for all page sizes
->>> + * and therefore we will need a minimum of two levels for stage2 in all cases.
->>
->> I think the above statement is misleading. The minimum number of
->> levels has nothing to do with the concatenation.
-> 
-> Architecturally surely it does?  (The point of concatenation is to
-> reduce the minimal number of levels required.)
-> 
-> Maybe you mean the minimum number of levels imposed by KVM here?
-> 
->> For e.g, we could
->> still create a stage2 with 1 level (32bit IPA on 64K, 29bit + 3bit
->> concatenated), going by the same rules above. The only reason why
->> we limit the number of levels to 2, is to prevent splitting stage1 PMD
->> huge mappings (which are quite common) at stage2.
->>
-> 
-> So I wasn't entirely clear what the comment was trying to say with the
-> "(PAGE_SHIFT - 3) > 4 holds for all page size" statement, so I though
-> that was there to show that we'll need a minimum of two levels, but
-> maybe that was written under the assumption of the limitations of
-> IPA_SHIFT (was KVM_PHYS_SIZE).
-
-See below.
-
-> 
-> Since you wrote the original comment, and I couldn't correctly parse
-> that, and I apparently still didn't fully understand, can you suggest an
-> alternative wording?
-
-I think trying to over explain the concept has created more confusion.
-The whole paragraph is trying to prove that we only need :
-
-	ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4)
-to map IPA_SHIFT bits at stage2 with maximum utilization of the
-concatenation at entry level.
-
-Right now the comment tries to establish it via the hard route, by
-proving that there cannot be an intermediate level in the range
-[IPA_SHIFT, IPA_SHIFT - 4]. Or in other words :
-
-(ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4) + 1) >= 	
-			ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT)
-
-I don't know if it is worth the explanation and then causing further
-confusion.
-
-May be I could replace the confusing text with something like :
-
-"A normal page table with ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4) levels
-is guaranteed to resolve minimum of (IPA_SHIFT - 4)bits (when the entry 
-level is fully used, and more bits otherwise.). For an input address of
-size IPA_SHIFT bits, we could cover the remaining 4 bits using the same
-number of levels or using the concatenation if needed."
-
-Does it help ?
-
-Suzuki
+-Olof
