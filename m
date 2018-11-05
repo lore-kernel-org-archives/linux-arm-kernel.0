@@ -1,87 +1,49 @@
-From: chris@sageembedded.com (Chris Cole)
-Date: Mon, 05 Nov 2018 11:06:54 -0800
-Subject: [PATCH] mm: improve/fix ARM v7_dma_inv_range() unaligned address
- handling
-Message-ID: <1541444814.537.8.camel@sageembedded.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Nov 2018 19:09:09 +0000
+Subject: [PATCH 0/6] ARM: compressed: clean up section layout and enable
+ EFI debugging
+In-Reply-To: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
+References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181105190908.GV30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addresses possible memory corruption when
-v7_dma_inv_range(start_address, end_address) address parameters are not
-aligned to whole cache lines. This function issues "invalidate" cache
-management operations to all cache lines from start_address (inclusive)
-to end_address (exclusive). When start_address and/or end_address are
-not aligned, the start and/or end cache lines are first issued "clean &
-invalidate" operation. The assumption is this is done to ensure that any
-dirty data addresses outside the address range (but part of the first or
-last cache lines) are cleaned/flushed so that data is not lost, which
-could happen if just an invalidate is issued.
+On Mon, Nov 05, 2018 at 07:44:32PM +0100, Ard Biesheuvel wrote:
+> Currently, the decompressor section layout is somewhat unusual: head.S
+> puts code into a .start and a .text section, which are expected to be
+> emitted back to back, unless other objects are included that define a
+> .start section as well, in which case execution is expected to proceed 
+> linearly from head.S's section .start section into the other .start
+> section and then onward into head.S's .text section.
+> 
+> This relies on the input files to be consumed by the linker in the same
+> order they were specified on the command line, but this is not actually
+> guaranteed by the linker, so it is better to make the inclusion of this
+> code specific by using function calls.
 
-The problem is that these first/last partial cache lines are issued
-"clean & invalidate" and then "invalidate". This second "invalidate" is
-not required and worse can cause "lost" writes to addresses outside the
-address range but part of the cache line. If another component writes to
-its part of the cache line between the "clean & invalidate" and
-"invalidate" operations, the write can get lost. This fix is to remove
-the extra "invalidate" operation when unaligned addressed are used.
+I think you're wrong about that - as I've pointed out, this behaviour
+is relied upon quite heavily when linking programs using GCC, so while
+it may not be explicitly specified, the fact that GCC relies upon it
+when creating shared libraries (using crti.o before any object files,
+and crtn.o at the end) means that it's pretty much guaranteed.
 
-A kernel module is available that has a stress test to reproduce the
-issue and a unit test of the updated v7_dma_inv_range(). It can be
-downloaded from
-http://ftp.sageembedded.com/outgoing/linux/cache-test-20181102.tgz.
+What is less guaranteed is proceeding between two sections, but these
+separate sections in object files are combined into one .text section
+in the output file, and so we know that code in .start will be present
+_before_ any code in .text.
 
-v7_dma_inv_range() is call by dmac_[un]map_area(addr, len, direction)
-when the direction is DMA_FROM_DEVICE. One can (I believe) successfully
-argue that DMA from a device to main memory should use buffers aligned
-to cache line size, because the "clean & invalidate" might overwrite
-data that the device just wrote using DMA. But if a driver does use
-unaligned buffers, at least this fix will prevent memory corruption
-outside the buffer.
+Put the two things together, and the code from head.S will be listed
+first, and therefore will be output first in the .start and .text
+sections.  Other object files will have code placed into the output
+.text section accordingly.
 
-Signed-off-by: chris at sageembedded.com
----
- arch/arm/mm/cache-v7.S | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+So really I see no point to your patch 1 to 5, other than change for
+change's sake.
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 215df435bfb9..4331bdac0686 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -359,18 +359,30 @@ v7_dma_inv_range:
- 	ALT_SMP(W(dsb))
- 	ALT_UP(W(nop))
- #endif
--	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line
--
-+	bne	4f
-+1:
- 	tst	r1, r3
- 	bic	r1, r1, r3
--	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D / U line
--1:
-+	bne	5f
-+2:
- 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
- 	add	r0, r0, r2
- 	cmp	r0, r1
--	blo	1b
-+	blo	2b
-+3:
- 	dsb	st
- 	ret	lr
-+4:
-+	mcr	p15, 0, r0, c7, c14, 1          @ clean & invalidate D / U line
-+	add	r0, r0, r2
-+	cmp	r0, r1
-+	bhs	3b
-+	b	1b
-+5:
-+	mcr	p15, 0, r1, c7, c14, 1          @ clean & invalidate D / U line
-+	cmp	r0, r1
-+	bhs	3b
-+	b	2b
- ENDPROC(v7_dma_inv_range)
- 
- /*
+Can you _prove_ that there is a problem here - if you can, it's likely
+that such a problem also affects gcc -shared too.
+
 -- 
-2.14.5
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
