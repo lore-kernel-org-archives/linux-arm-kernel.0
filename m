@@ -1,54 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Nov 2018 20:35:18 +0100
-Subject: [PATCH 1/6] ARM: compressed: move sharpsl startup code into
- subroutine
-In-Reply-To: <nycvar.YSQ.7.76.1811051413250.1498@knanqh.ubzr>
-References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
- <20181105184438.19494-2-ard.biesheuvel@linaro.org>
- <nycvar.YSQ.7.76.1811051413250.1498@knanqh.ubzr>
-Message-ID: <CAKv+Gu-dZZ7T4gzAghoBeDk4NcW98rUhuHUEA5yu_R4QwEE5Tg@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 5 Nov 2018 20:47:21 +0100
+Subject: [PATCH v10 5/6] arm64: zynqmp: Add DDRC node
+In-Reply-To: <CAOesGMj=EbWgcYF2Mhh6TFMCdn1ub1Ze6fbXJnFFdsttWByXYg@mail.gmail.com>
+References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
+ <1540447621-22870-6-git-send-email-manish.narani@xilinx.com>
+ <20181105125644.GA7937@zn.tnic>
+ <41c5ca53-ed4b-38d0-c612-e1229004293e@xilinx.com>
+ <20181105132007.GB7937@zn.tnic>
+ <a81f47e0-1778-a6ac-4cd8-634502661d6f@xilinx.com>
+ <20181105134218.GD7937@zn.tnic>
+ <CAOesGMj=EbWgcYF2Mhh6TFMCdn1ub1Ze6fbXJnFFdsttWByXYg@mail.gmail.com>
+Message-ID: <20181105194721.GB26868@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2018 at 20:25, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 5 Nov 2018, Ard Biesheuvel wrote:
->
->> Instead of relying on unspecified linker behavior, move the
->> SharpSL startup code into a subroutine and call it from the
->> location we expect the linker to put the code.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
-> [...]
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -213,6 +213,9 @@ not_angel:
->>                */
->>
->>               .text
->> +#ifdef CONFIG_PXA_SHARPSL_DETECT_MACH_ID
->> +             bl      __SharpSL_start
->> +#endif
->
-> Independently from Russell's points, I don't like the above. that will
-> turn into an ugly list of #ifdefs and machine specific calls. I think
-> you should use:
->
->                 bl      __early_arch_specific_start
->
-> and somewhere else in head.S:
->
-> WEAK(__early_arch_specific_start)
->                 mov     pc, lr
-> ENDPROC(__early_arch_specific_start)
->
-> That would make this change more palatable.
->
+Hi Olof,
 
-Yeah.
+On Mon, Nov 05, 2018 at 06:51:26AM -0800, Olof Johansson wrote:
+> In general, for new functionality where needing both the driver change
+> and a DT change to enable it (or a driver change and a config change
+> to enable it), we have been merging the changes separately between
+> driver trees and arm-soc. I.e. things will be in place, but not
+> enabled, until both sides land. Main reason for doing so is to cut
+> down on arbitrary dependencies between the trees, since there can
+> sometimes end up being a lot of them.
 
-In any case, I will try a different approach that leaves the .start
-and .text sections alone, given that the issue that I thought I was
-addressing on the side does not turn out to exist in practice.
+Well, makes sense too and it is the least problematic approach. :-)
 
-Thanks
+> Since DT should strive for being backwards compatible (i.e, a driver
+> change shouldn't require a DT change for the kernel to not regress
+> functionally), this has been working pretty well.
+
+Ok.
+
+> However, if there's some other reason to share a base between the two
+> trees, we can do that. For most cases we've found that it's not needed
+> though. So let us know what you prefer here.
+
+No, I just wanted to make sure drivers can still function when they go
+to linux-next. But I certainly can get on board with keeping drivers and
+DT changes separate as it requires no sync and the short period of time
+when they don't load in linux-next, is perfectly ok.
+
+So can I assume you guys are going to pick up:
+
+https://lkml.kernel.org/r/1538667328-9465-7-git-send-email-manish.narani at xilinx.com
+https://lkml.kernel.org/r/1540447621-22870-6-git-send-email-manish.narani at xilinx.com
+
+?
+
+I can then pick up the rest.
+
+And I'll be ignoring DT stuff sent to me from now on and concentrate on
+the EDAC drivers, assuming former will go through your tree.
+
+Sounds good?
+
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
