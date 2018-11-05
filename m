@@ -1,39 +1,32 @@
-From: tiny.windzz@gmail.com (Yangtao Li)
-Date: Mon,  5 Nov 2018 09:32:34 -0500
-Subject: [PATCH] ARM: mm: dump: Change to use DEFINE_SHOW_ATTRIBUTE macro
-Message-ID: <20181105143234.6015-1-tiny.windzz@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Nov 2018 06:33:20 -0800
+Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
+ beagle-xm
+In-Reply-To: <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
+ <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+Message-ID: <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
+On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
+<guillaume.tucker@collabora.com> wrote:
+>
+> Hi Linus,
+>
+> Please see below, the kernelci.org automated boot bisection found
+> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
+> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
+> log output after the bootloader so the kernel seems to be
+> crashing very early on.
 
-Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
----
- arch/arm/mm/ptdump_debugfs.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+Can you enable DEBUG_LL to capture what goes wrong?
 
-diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
-index be8d87be4b93..201cd467a739 100644
---- a/arch/arm/mm/ptdump_debugfs.c
-+++ b/arch/arm/mm/ptdump_debugfs.c
-@@ -12,17 +12,7 @@ static int ptdump_show(struct seq_file *m, void *v)
- 	return 0;
- }
- 
--static int ptdump_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, ptdump_show, inode->i_private);
--}
--
--static const struct file_operations ptdump_fops = {
--	.open		= ptdump_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--};
-+DEFINE_SHOW_ATTRIBUTE(ptdump);
- 
- int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
- {
--- 
-2.17.0
+The regression is on me. Linus sent the patch, but I was trigger happy
+and applied it to fixes instead of letting it soak in -next longer.
+
+I'll revert it in our fixes branch and send it in quickly, and apply
+it to a branch picked up by -next instead.
+
+
+-Olof
