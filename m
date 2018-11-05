@@ -1,66 +1,44 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 5 Nov 2018 14:08:48 +0000
-Subject: [RFC] arm64: Kconfig: Choose ARM64_64K_PAGES as default
-In-Reply-To: <1541421211-17561-1-git-send-email-zhangkehong@hisilicon.com>
-References: <1541421211-17561-1-git-send-email-zhangkehong@hisilicon.com>
-Message-ID: <db60f42f-c83d-7a9b-b6ba-450fb7970563@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 5 Nov 2018 14:10:31 +0000
+Subject: [PATCH V4 04/10] gpio: vf610: add optional clock support
+In-Reply-To: <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
+References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
+ <1541149669-10857-5-git-send-email-aisheng.dong@nxp.com>
+ <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
+Message-ID: <AM0PR04MB42117A904BCB651591B1075480CA0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/11/18 12:33, Kehong Zhang wrote:
-> For arm64 performance considerations, change default page size to 64K.
-
-defconfig never stands for performance. If that was the case, we must
-remove other options that could potentially slow down the performance.
-
-defconfig could be interpreted as more of a "standard" config which
-gives the best effort to make sure you get a usable system overall.
-With this change, a rootfs with AArch32 applications without 64K aligned
-segments would fail, and that breaks the assumption about defconfig.
-
-So, NAK from my side.
-
-Btw, please could you share any performance numbers from the comparison
-with 4K kernel ?
-
-Suzuki
-
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Friday, November 2, 2018 5:37 PM
+[...]
+> On Fri, Nov 2, 2018 at 10:12 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>;
-> Cc: Will Deacon <will.deacon@arm.com>;
-> Signed-off-by: Kehong Zhang <zhangkehong@hisilicon.com>
-> ---
->   arch/arm64/Kconfig | 10 +++++-----
->   1 file changed, 5 insertions(+), 5 deletions(-)
+> > Some SoCs need the gpio clock to be enabled before accessing HW
+> > registers. This patch add the optional clock handling.
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Stefan Agner <stefan@agner.ch>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: linux-gpio at vger.kernel.org
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> > v2->v3:
+> >  * error checking updated according to Russell's suggestion:
+> >    ptr == ERR_PTR(-EPROBE_DEFER)
+> >  * clock independently checking
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 787d785..56f651f 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -620,7 +620,7 @@ endmenu
->   
->   choice
->   	prompt "Page size"
-> -	default ARM64_4K_PAGES
-> +	default ARM64_64K_PAGES
->   	help
->   	  Page size (translation granule) configuration.
->   
-> @@ -639,10 +639,10 @@ config ARM64_16K_PAGES
->   config ARM64_64K_PAGES
->   	bool "64KB"
->   	help
-> -	  This feature enables 64KB pages support (4KB by default)
-> -	  allowing only two levels of page tables and faster TLB
-> -	  look-up. AArch32 emulation requires applications compiled
-> -	  with 64K aligned segments.
-> +	  This feature enables 64KB pages support allowing only two
-> +	  levels of page tables and faster TLB look-up. AArch32
-> +	  emulation requires applications compiled with 64K aligned
-> +	  segments.
->   
->   endchoice
->   
+> Please look at my feedback for v2 as well, sorry for the synchronization
+> problems here... Didn't see this version until after replying.
 > 
+
+Thanks for the suggestion.
+I just sent an updated version in reply to this thread.
+Please help check if it's okay to you.
+
+Regards
+Dong Aisheng
+
+> Yours,
+> Linus Walleij
