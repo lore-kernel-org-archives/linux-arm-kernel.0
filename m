@@ -1,81 +1,546 @@
-From: mikebrady@eircom.net (Mike Brady)
-Date: Mon, 5 Nov 2018 15:57:07 +0000
-Subject: [alsa-devel] [PATCH v2] staging: bcm2835-audio: interpolate audio
- delay
-In-Reply-To: <126FA055-050B-4AAC-9392-CA8CCA821768@eircom.net>
-References: <20181022191708.GA4659@ubuntu>
- <a703f8a2-e85a-bc5b-750a-cc43ef252ba5@gmail.com>
- <EA85FEC9-B1C7-4548-88F5-F0E7BC12158E@eircom.net>
- <046aea96-e0d3-60f4-c61a-c26bb1b5c193@gmail.com>
- <B9A84822-3780-4E01-96AD-FD3B42C44B45@eircom.net>
- <9884c4f5-2343-e3a4-8d8b-dd2db404ef27@gmail.com>
- <s5hftwuo4t0.wl-tiwai@suse.de>
- <126FA055-050B-4AAC-9392-CA8CCA821768@eircom.net>
-Message-ID: <C35AD288-063F-4197-A758-450CBB3B1184@eircom.net>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 5 Nov 2018 16:53:21 +0100
+Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
+References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
+Message-ID: <20181105165321.7ea2b45f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the comments and suggestions.
+On Fri, 2 Nov 2018 00:42:21 +0800
+Jianxin Pan <jianxin.pan@amlogic.com> wrote:
 
-> On 25 Oct 2018, at 08:37, Takashi Iwai <tiwai@suse.de> wrote:
-> 
-> Well, in the API POV, it's nothing wrong to keep hwptr sticking while
-> updating only delay value.  It implies that the hardware chip doesn't
-> provide the hwptr update.
+> +#define NFC_REG_CMD		0x00
+> +#define NFC_CMD_DRD		(0x8 << 14)
+> +#define NFC_CMD_IDLE		(0xc << 14)
+> +#define NFC_CMD_DWR		(0x4 << 14)
+> +#define NFC_CMD_CLE		(0x5 << 14)
+> +#define NFC_CMD_ALE		(0x6 << 14)
+> +#define NFC_CMD_ADL		((0 << 16) | (3 << 20))
+> +#define NFC_CMD_ADH		((1 << 16) | (3 << 20))
+> +#define NFC_CMD_AIL		((2 << 16) | (3 << 20))
+> +#define NFC_CMD_AIH		((3 << 16) | (3 << 20))
+> +#define NFC_CMD_SEED		((8 << 16) | (3 << 20))
+> +#define NFC_CMD_M2N		((0 << 17) | (2 << 20))
+> +#define NFC_CMD_N2M		((1 << 17) | (2 << 20))
+> +#define NFC_CMD_RB		BIT(20)
+> +#define NFC_CMD_IO6		((0xb << 10) | (1 << 18))
+> +#define NFC_CMD_SCRAMBLER_ENABLE	BIT(19)
+> +#define NFC_CMD_RB_INT		BIT(14)
+> +
+> +#define NFC_CMD_GET_SIZE(x)	(((x) >> 22) & GENMASK(4, 0))
+> +#define NFC_CMD_RB_TIMEOUT	0x18
 
-As I understand it, this driver stages settings, data and status information for the true audio driver which is part of VideoCore (VC). The driver communicates with the VC by sending messages. Responses come back in asynchronous callbacks. There doesn?t seem to be any other source of data or status.
+Where does this value come from? Is it the typical timeout value,
+and if it is, what's the value in milli/microseconds?
 
-When parameters such as frame format, rate and period size have been set up, the VC executes periodic callbacks to retrieve period-sized buffers of data. At 44,100 frames per second and with standard 444-frame periods, callbacks occur approximately every 10.07 milliseconds.
+> +
+> +#define NFC_REG_CFG		0x04
+> +#define NFC_REG_DADR		0x08
+> +#define NFC_REG_IADR		0x0c
+> +#define NFC_REG_BUF		0x10
+> +#define NFC_REG_INFO		0x14
+> +#define NFC_REG_DC		0x18
+> +#define NFC_REG_ADR		0x1c
+> +#define NFC_REG_DL		0x20
+> +#define NFC_REG_DH		0x24
+> +#define NFC_REG_CADR		0x28
+> +#define NFC_REG_SADR		0x2c
+> +#define NFC_REG_PINS		0x30
+> +#define NFC_REG_VER		0x38
+> +
+> +#define NFC_RB_IRQ_EN		BIT(21)
+> +#define NFC_INT_MASK		(3 << 20)
+> +
+> +#define CMDRWGEN(cmd_dir, ran, bch, short_mode, page_size, pages)	\
+> +	(								\
+> +		(cmd_dir)			|			\
+> +		((ran) << 19)			|			\
+> +		((bch) << 14)			|			\
+> +		((short_mode) << 13)		|			\
+> +		(((page_size) & 0x7f) << 6)	|			\
+> +		((pages) & 0x3f)					\
+> +	)
+> +
+> +#define GENCMDDADDRL(adl, addr)		((adl) | ((addr) & 0xffff))
+> +#define GENCMDDADDRH(adh, addr)		((adh) | (((addr) >> 16) & 0xffff))
+> +#define GENCMDIADDRL(ail, addr)		((ail) | ((addr) & 0xffff))
+> +#define GENCMDIADDRH(aih, addr)		((aih) | (((addr) >> 16) & 0xffff))
+> +
+> +#define RB_STA(x)		(1 << (26 + (x)))
+> +#define DMA_DIR(dir)		((dir) ? NFC_CMD_N2M : NFC_CMD_M2N)
+> +
+> +#define ECC_CHECK_RETURN_FF	(-1)
+> +
+> +#define NAND_CE0		(0xe << 10)
+> +#define NAND_CE1		(0xd << 10)
+> +
+> +#define DMA_BUSY_TIMEOUT	0x100000
+> +#define CMD_FIFO_EMPTY_TIMEOUT	1000
+> +
+> +#define MAX_CE_NUM		2
+> +
+> +/* eMMC clock register, misc control */
+> +#define SD_EMMC_CLOCK		0x00
+> +#define CLK_ALWAYS_ON		BIT(28)
+> +#define CLK_SELECT_NAND		BIT(31)
+> +#define CLK_DIV_MASK		GENMASK(5, 0)
+> +
+> +#define NFC_CLK_CYCLE		6
+> +
+> +/* nand flash controller delay 3 ns */
+> +#define NFC_DEFAULT_DELAY	3000
+> +
+> +#define MAX_ECC_INDEX		10
+> +
+> +#define MUX_CLK_NUM_PARENTS	2
+> +
+> +#define ROW_ADDER(page, index)	(((page) >> (8 * (index))) & 0xff)
+> +#define MAX_CYCLE_ROW_ADDRS	3
+> +#define MAX_CYCLE_COLUMN_ADDRS	2
+> +#define DIRREAD			1
+> +#define DIRWRITE		0
+> +
+> +#define ECC_PARITY_BCH8_512B	14
+> +
+> +#define PER_INFO_BYTE		8
+> +#define ECC_GET_PROTECTED_OOB_BYTE(x, y)			\
+> +		((x) >> (8 * (y)) & GENMASK(7, 0))
 
-> Though, usually the delay value is provided also from the hardware,
-> e.g. reading the link position or such.  It's a typical case like
-> USB-audio, where the hwptr gets updated and the delay indicates the
-> actual position *behind* hwptr.  That works because hwptr shows the
-> position in the ring buffer at which you can access the data.  And it
-> doesn't mean that hwptr is the actually playing position, but it can
-> be ahead of the current position, when many samples are queued on
-> FIFO.  The delay is provided to correct the position back to the
-> actual point.
+		(le64_to_cpu(x) >> (8 * (y)) & GENMASK(7, 0))
 
- The information that the alsa snd_pcm_delay() function depends on is updated during these callbacks. Thus, a user program monitoring the snc_pcm_delay() value closely will see sudden jumps in the value every 10 milliseconds or so ? a 10 millisecond jitter. 
-> 
-> But, this also doesn't mean that the delay shouldn't be used for the
-> purpose like this patchset, either.  OTOH, providing a finer hwptr
-> value would be likely more apps-friendly; there must be many programs
-> that don't evaluate the delay value properly.
+> +
+> +#define ECC_SET_PROTECTED_OOB_BYTE(x, y, z)			\
+> +	{							\
+> +		(x) &= (~((__le64)(0xff) << (8 * (y))));	\
 
-With interpolation, the number of frames that would have been output from the time of the last callback is subtracted from the delay to give a more accurate estimate of the actual delay at the time it is requested.
+It's probably better to memset(0) the info_buf so that you can drop
+this masking step.
 
-> So, I suppose that hwptr update might be a better option if the code
-> won't become too complex.  Let's see.
+> +		(x) |= ((__le64)(z) << (8 * (y)));		\
 
-Having looked at the code, there does not seem to be a good way to avoid interpolation. Later versions of the interface include a message type of VC_AUDIO_MSG_TYPE_LATENCY (see https://github.com/raspberrypi/firmware/blob/master/opt/vc/include/interface/vmcs_host/vc_vchi_audioserv_defs.h#L158) which seems to be a request to return the latency. However, the latency would be returned in an asynchronous callback (see function audio_vchi_callback in bcm2835-vchiq.c). One can wait for the result, but it seems that it could take up to 10 milliseconds (see function bcm2835_audio_send_msg_locked in bcm2835-vchiq.c). This is hardly tolerable, and to avoid it, one would have to store both the latency returned and the time the request was sent (or the time the reply was returned ? it?s not clear which would be correct) and interpolate from that to the time the delay is requested. In other words, from the point of view of avoiding interpolation, this is likely to be no better than the present suggestion. There wold also be a need to make the latency request periodically, adding to the overhead.
+		    |= cpu_to_le64((u64)z << (8 * (y)));
 
-Without getting a good deal more information about the VC, which may not be available, I?m afraid I can?t see a way of getting a better fix on the instantaneous values of pointers such as the hw_ptr. BTW, I have not been able to find a source for the file vc_vchi_audioserv_defs.h, which looks like a Broadcom file and which appears to have two  versions. If anyone could point me to the source, I?d be grateful.
+> +	}
+> +
+> +#define ECC_COMPLETE            BIT(31)
+> +#define ECC_ERR_CNT(x)		(((x) >> 24) & GENMASK(5, 0))
+> +#define ECC_ZERO_CNT(x)		(((x) >> 16) & GENMASK(5, 0))
+> +
+> +struct meson_nfc_nand_chip {
+> +	struct list_head node;
+> +	struct nand_chip nand;
+> +	int clk_rate;
+> +	int level1_divider;
+> +	int bus_timing;
+> +	int twb;
+> +	int tadl;
+> +
+> +	int bch_mode;
+> +	u8 *data_buf;
+> +	__le64 *info_buf;
+> +	int nsels;
+> +	u8 sels[0];
+> +};
 
-> One another thing I'd like to point out is that the value given in the
-> patch is nothing but an estimated position, optimistically calculated
-> via the system timer.  Mike and I had already discussion in another
-> thread, and another possible option would be to provide the proper
-> timestamp-vs-hwptr pair, instead of updating the timestamp always at
-> the status read.
+Please use unsigned integers where having a negative value is not
+possible. I'm pretty sure this is the case of all int fields in this
+struct. The same applies to the other structs.
 
-Agreed ? that would give the caller the information needed to do the interpolation for themselves if desired.
+[...]
 
-> Maybe it's worth to have a module option to suppress this optimistic
-> hwptr update behavior, in case something went wrong with clocks?
+> +
+> +static int meson_nfc_wait_cmd_finish(struct meson_nfc *nfc,
+> +				     unsigned int timeout_ms)
+> +{
+> +	u32 cmd_size = 0;
+> +	int ret;
+> +
+> +	/* wait cmd fifo is empty */
+> +	ret = readl_poll_timeout(nfc->reg_base + NFC_REG_CMD, cmd_size,
+> +				 !NFC_CMD_GET_SIZE(cmd_size),
+> +				 10, timeout_ms * 1000);
 
-Following this suggestion, I have updated the patch to include a module parameter ?enable_delay_interpolation?, and I will post that later for consideration.
+I guess you could use the relaxed version here.
 
-Regards
-Mike
+> +	if (ret)
+> +		dev_err(nfc->dev, "wait for empty cmd FIFO time out\n");
+> +
+> +	return ret;
+> +}
+> +
+> +static int meson_nfc_wait_dma_finish(struct meson_nfc *nfc)
+> +{
+> +	meson_nfc_drain_cmd(nfc);
+> +
+> +	return meson_nfc_wait_cmd_finish(nfc, DMA_BUSY_TIMEOUT);
+> +}
+> +
+> +static inline __le64 nfc_info_ptr(struct nand_chip *nand, int index)
+
+Drop inline specifiers for things that are defined in .c files. The
+compiler should be smart enough to determine when inlining is
+appropriate.
+
+> +{
+> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
+> +
+> +	return le64_to_cpu(meson_chip->info_buf[index]);
+
+According to the function prototype, you should return
+meson_chip->info_buf[index] directly, but I'm not even sure why you
+need this helper. Just access meson_chip->info_buf[] directly.
+
+> +}
+> +
+
+[...]
+
+> +
+> +static int meson_nfc_queue_rb(struct meson_nfc *nfc, int timeout_ms)
+> +{
+> +	u32 cmd, cfg;
+> +	int ret = 0;
+> +
+> +	meson_nfc_cmd_idle(nfc, nfc->timing.twb);
+> +	meson_nfc_drain_cmd(nfc);
+> +	meson_nfc_wait_cmd_finish(nfc, CMD_FIFO_EMPTY_TIMEOUT);
+> +
+> +	cfg = readl(nfc->reg_base + NFC_REG_CFG);
+> +	cfg |= (1 << 21);
+> +	writel(cfg, nfc->reg_base + NFC_REG_CFG);
+> +
+> +	init_completion(&nfc->completion);
+> +
+> +	cmd = NFC_CMD_RB | NFC_CMD_RB_INT
+> +		| nfc->param.chip_select | NFC_CMD_RB_TIMEOUT;
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +
+> +	ret = wait_for_completion_timeout(&nfc->completion,
+> +					  msecs_to_jiffies(timeout_ms));
+> +	if (ret == 0) {
+> +		dev_err(nfc->dev, "wait nand irq timeout\n");
+> +		ret = -1;
+> +	}
+> +	return ret;
+> +}
+> +
+> +static void meson_nfc_set_user_byte(struct nand_chip *nand, u8 *oob_buf)
+
+	       ^ meson_nfc_set_protected_oob_bytes()
+
+> +{
+> +	__le64 info;
+> +	int i, count;
+> +
+> +	for (i = 0, count = 0; i < nand->ecc.steps; i++, count += 2) {
+> +		info = nfc_info_ptr(nand, i);
+> +		ECC_SET_PROTECTED_OOB_BYTE(info, 0, oob_buf[count]);
+> +		ECC_SET_PROTECTED_OOB_BYTE(info, 1, oob_buf[count + 1]);
+
+This is a NOOP: info is a local variable, so, anything you put in there
+is just lost. It could work if nfc_info_ptr() was returning a pointer
+and the local info var was also a pointer, but that's not the case
+here.
+
+BTW, maybe you don't need the ECC_SET/GET_PROTECTED_OOB_BYTE() macros.
+Just do the conversion in the meson_nfc_get/set_protected_oob_bytes()
+functions.
+
+> +	}
+> +}
+> +
+> +static void meson_nfc_get_user_byte(struct nand_chip *nand, u8 *oob_buf)
+
+	       ^ meson_nfc_get_protected_oob_bytes()
+
+> +{
+> +	__le64 info;
+> +	int i, count;
+> +
+> +	for (i = 0, count = 0; i < nand->ecc.steps; i++, count += 2) {
+> +		info = nfc_info_ptr(nand, i);
+> +		oob_buf[count] = ECC_GET_PROTECTED_OOB_BYTE(info, 0);
+> +		oob_buf[count + 1] = ECC_GET_PROTECTED_OOB_BYTE(info, 1);
+> +	}
+> +}
+> +
+> +static int meson_nfc_ecc_correct(struct nand_chip *nand)
+> +{
+> +	struct mtd_info *mtd = nand_to_mtd(nand);
+> +	__le64 info;
+> +	u32 bitflips = 0, i;
+> +	int scramble;
+> +	u8 zero_cnt;
+> +
+> +	scramble = (nand->options & NAND_NEED_SCRAMBLING) ? 1 : 0;
+> +
+> +	for (i = 0; i < nand->ecc.steps; i++) {
+> +		info = nfc_info_ptr(nand, i);
+> +		if (ECC_ERR_CNT(info) == 0x3f) {
+> +			zero_cnt = ECC_ZERO_CNT(info);
+> +			if (scramble && zero_cnt < nand->ecc.strength)
+> +				return ECC_CHECK_RETURN_FF;
+> +			mtd->ecc_stats.failed++;
+> +			continue;
+> +		}
+> +		mtd->ecc_stats.corrected += ECC_ERR_CNT(info);
+> +		bitflips = max_t(u32, bitflips, ECC_ERR_CNT(info));
+> +	}
+> +
+> +	return bitflips;
+> +}
+> +
+> +static inline u8 meson_nfc_read_byte(struct mtd_info *mtd)
+> +{
+> +	struct nand_chip *nand = mtd_to_nand(mtd);
+> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> +	u32 cmd;
+> +
+> +	cmd = nfc->param.chip_select | NFC_CMD_DRD | 0;
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +
+> +	meson_nfc_drain_cmd(nfc);
+
+You probably don't want to drain the FIFO every time you read a byte on
+the bus, and I guess the INPUT FIFO is at least as big as the CMD
+FIFO, right? If that's the case, you should queue as much DRD cmd as
+possible and only sync when the user explicitly requests it or when
+the INPUT/READ FIFO is full.
+
+> +
+> +	meson_nfc_wait_cmd_finish(nfc, 1000);
+> +
+> +	return readb(nfc->reg_base + NFC_REG_BUF);
+> +}
+> +
+> +static void meson_nfc_read_buf(struct mtd_info *mtd, u8 *buf, int len)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < len; i++)
+> +		buf[i] = meson_nfc_read_byte(mtd);
+> +}
+> +
+> +static void meson_nfc_write_byte(struct mtd_info *mtd, u8 byte)
+> +{
+> +	struct meson_nfc *nfc = nand_get_controller_data(mtd_to_nand(mtd));
+> +	u32 cmd;
+> +
+> +	meson_nfc_cmd_idle(nfc, nfc->timing.twb);
+> +
+> +	cmd = nfc->param.chip_select | NFC_CMD_DWR | (byte & 0xff);
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +
+> +	meson_nfc_cmd_idle(nfc, nfc->timing.twb);
+
+Nope, tWB is not needed between 2 data-write cycles. It's only needed
+when a wait-RB is requested after a write.
+
+> +	meson_nfc_cmd_idle(nfc, 0);
+
+Why do you need that one?
+
+> +
+> +	meson_nfc_wait_cmd_finish(nfc, CMD_FIFO_EMPTY_TIMEOUT);
+
+As for the read_byte() implementation, I don't think you should force a
+sync here.
+
+> +}
+> +
+> +static void meson_nfc_write_buf(struct mtd_info *mtd,
+> +				const u8 *buf, int len)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < len; i++)
+> +		meson_nfc_write_byte(mtd, buf[i]);
+> +}
+> +
+> +static int meson_nfc_rw_cmd_prepare_and_execute(struct nand_chip *nand,
+> +						int page, bool in)
+> +{
+> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> +	const struct nand_sdr_timings *sdr =
+> +		nand_get_sdr_timings(&nand->data_interface);
+> +	int cs = nfc->param.chip_select;
+> +	int i, cmd0, cmd_num;
+> +	int ret = 0;
+> +
+> +	cmd0 = in ? NAND_CMD_READ0 : NAND_CMD_SEQIN;
+> +	cmd_num = sizeof(struct nand_rw_cmd) / sizeof(int);
+> +	if (!in)
+> +		cmd_num--;
+> +
+> +	nfc->cmdfifo.rw.cmd0 = cs | NFC_CMD_CLE | cmd0;
+> +	for (i = 0; i < MAX_CYCLE_COLUMN_ADDRS; i++)
+> +		nfc->cmdfifo.rw.col[i] = cs | NFC_CMD_ALE | 0;
+> +
+> +	for (i = 0; i < MAX_CYCLE_ROW_ADDRS; i++)
+> +		nfc->cmdfifo.rw.row[i] = cs | NFC_CMD_ALE | ROW_ADDER(page, i);
+> +
+> +	nfc->cmdfifo.rw.cmd1 = cs | NFC_CMD_CLE | NAND_CMD_READSTART;
+
+Having a fixed size array for the column and row address cycles does
+not sound like a good idea to me (depending on the NAND chip you
+connect, the number of cycles for the row and column differ), which
+makes me realize the nand_rw_cmd struct is not such a good thing...
+
+> +
+> +	for (i = 0; i < cmd_num; i++)
+> +		writel(nfc->cmdfifo.cmd[i], nfc->reg_base + NFC_REG_CMD);
+
+... why not write directly to the CMD reg?
+
+> +
+> +	if (in)
+> +		meson_nfc_queue_rb(nfc, sdr->tR_max);
+> +	else
+> +		meson_nfc_cmd_idle(nfc, nfc->timing.tadl);
+> +
+> +	return ret;
+> +}
+> +
+> +static int meson_nfc_write_page_sub(struct nand_chip *nand, const u8 *buf,
+> +				    int page, int raw)
+> +{
+> +	struct mtd_info *mtd = nand_to_mtd(nand);
+> +	const struct nand_sdr_timings *sdr =
+> +		nand_get_sdr_timings(&nand->data_interface);
+> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
+> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> +	dma_addr_t daddr, iaddr;
+> +	u32 cmd;
+> +	int ret;
+> +
+> +	daddr = dma_map_single(nfc->dev, (void *)meson_chip->data_buf,
+> +			       mtd->writesize + mtd->oobsize,
+> +			       DMA_TO_DEVICE);
+> +	ret = dma_mapping_error(nfc->dev, daddr);
+> +	if (ret) {
+> +		dev_err(nfc->dev, "dma mapping error\n");
+> +		goto err;
+> +	}
+> +
+> +	iaddr = dma_map_single(nfc->dev, (void *)meson_chip->info_buf,
+> +			       nand->ecc.steps * PER_INFO_BYTE,
+> +			       DMA_TO_DEVICE);
+> +	ret = dma_mapping_error(nfc->dev, iaddr);
+> +	if (ret) {
+> +		dev_err(nfc->dev, "dma mapping error\n");
+> +		goto err_map_daddr;
+> +	}
+> +
+> +	ret = meson_nfc_rw_cmd_prepare_and_execute(nand, page, DIRWRITE);
+> +	if (ret)
+> +		goto err_map_iaddr;
+> +
+> +	cmd = GENCMDDADDRL(NFC_CMD_ADL, daddr);
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +
+> +	cmd = GENCMDDADDRH(NFC_CMD_ADH, daddr);
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +
+> +	cmd = GENCMDIADDRL(NFC_CMD_AIL, iaddr);
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +
+> +	cmd = GENCMDIADDRH(NFC_CMD_AIH, iaddr);
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +
+> +	meson_nfc_cmd_seed(nfc, page);
+> +
+> +	meson_nfc_cmd_access(nand, raw, DIRWRITE);
+> +
+> +	ret = meson_nfc_wait_dma_finish(nfc);
+> +	cmd = nfc->param.chip_select | NFC_CMD_CLE | NAND_CMD_PAGEPROG;
+> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +	meson_nfc_queue_rb(nfc, sdr->tPROG_max);
+
+Don't you have a way to queue the PAGEPROG and WAIT_RB instructions
+before the DMA finishes?
+
+> +
+> +err_map_iaddr:
+> +	dma_unmap_single(nfc->dev, iaddr,
+> +			 nand->ecc.steps * PER_INFO_BYTE, DMA_TO_DEVICE);
+> +err_map_daddr:
+> +	dma_unmap_single(nfc->dev, daddr,
+> +			 mtd->writesize + mtd->oobsize, DMA_TO_DEVICE);
+> +err:
+> +	return ret;
+> +}
+> +
+
+[...]
+
+> +static int meson_nfc_exec_op(struct nand_chip *nand,
+> +			     const struct nand_operation *op, bool check_only)
+> +{
+> +	struct mtd_info *mtd = nand_to_mtd(nand);
+> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
+> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> +	const struct nand_op_instr *instr = NULL;
+> +	int ret = 0, cmd;
+> +	unsigned int op_id;
+> +	int i, delay_idle;
+> +
+> +	for (op_id = 0; op_id < op->ninstrs; op_id++) {
+> +		instr = &op->instrs[op_id];
+> +		delay_idle = DIV_ROUND_UP(PSEC_TO_NSEC(instr->delay_ns),
+> +					  meson_chip->level1_divider
+> +					  * NFC_CLK_CYCLE);
+
+On multi-line operations, put the operator on the previous line:
+
+					  meson_chip->level1_divider *
+					  NFC_CLK_CYCLE);
 
 
-> thanks,
-> 
-> Takashi
+> +		switch (instr->type) {
+> +		case NAND_OP_CMD_INSTR:
+> +			cmd = nfc->param.chip_select | NFC_CMD_CLE;
+> +			cmd |= instr->ctx.cmd.opcode & 0xff;
+> +			writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +			meson_nfc_cmd_idle(nfc, delay_idle);
+> +			break;
+> +
+> +		case NAND_OP_ADDR_INSTR:
+> +			for (i = 0; i < instr->ctx.addr.naddrs; i++) {
+> +				cmd = nfc->param.chip_select | NFC_CMD_ALE;
+> +				cmd |= instr->ctx.addr.addrs[i] & 0xff;
+> +				writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> +			}
+> +			meson_nfc_cmd_idle(nfc, delay_idle);
+> +			break;
+> +
+> +		case NAND_OP_DATA_IN_INSTR:
+> +			meson_nfc_read_buf(mtd, instr->ctx.data.buf.in,
+> +					   instr->ctx.data.len);
+> +			break;
+> +
+> +		case NAND_OP_DATA_OUT_INSTR:
+> +			meson_nfc_write_buf(mtd, instr->ctx.data.buf.out,
+> +					    instr->ctx.data.len);
+> +			break;
+> +
+> +		case NAND_OP_WAITRDY_INSTR:
+> +			meson_nfc_queue_rb(nfc, instr->ctx.waitrdy.timeout_ms);
+> +			meson_nfc_cmd_idle(nfc, delay_idle);
+> +			break;
+> +		}
 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+I think you could move the meson_nfc_cmd_idle() call here, and only add
+it when instr->delay_ns != 0:
+
+		if (instr->delay_ns)
+			meson_nfc_cmd_idle(nfc, delay_idle);
+
+> +	}
+
+Don't you need a call to meson_nfc_wait_cmd_finish() here?
+
+> +	return ret;
+> +}
