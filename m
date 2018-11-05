@@ -1,81 +1,324 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 12 Nov 2018 22:53:45 +0100
-Subject: [PATCH net-next v3 1/2] net: phy: replace PHY_HAS_INTERRUPT with
- a check for config_intr and ack_interrupt
-In-Reply-To: <b6f0c1bb-9c0b-a02a-1571-b2804fcbcaa1@gmail.com>
-References: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
- <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
- <20181109201307.GV5259@lunn.ch>
- <44b503b8-9f2a-50ac-c4c9-d25258d98ef5@gmail.com>
- <4330cb5b-b1a5-5004-af51-39199943639d@gmail.com>
- <c067d321-c69e-706d-304a-04e1e477b47c@gmail.com>
- <CAFBinCCmNYGp8kzy45ojjr27tEaPVs-QwMsLRrfXHCvw_taDOw@mail.gmail.com>
- <b6f0c1bb-9c0b-a02a-1571-b2804fcbcaa1@gmail.com>
-Message-ID: <CAFBinCB3v3tWb5YEjeMe=gHK5Dsu-0ONzn4PEx0s4Y9zrrLA4g@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Sun, 04 Nov 2018 16:59:28 -0800
+Subject: [PATCH RESEND V4 1/9] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE
+ clk support
+In-Reply-To: <1540127173-21346-2-git-send-email-aisheng.dong@nxp.com>
+References: <1540127173-21346-1-git-send-email-aisheng.dong@nxp.com>
+ <1540127173-21346-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181105005928.12299.56045@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2018 at 9:38 PM Heiner Kallweit <hkallweit1@gmail.com> wrote:
->
-> On 12.11.2018 21:32, Martin Blumenstingl wrote:
-> > Hi Heiner,
-> >
-> > On Fri, Nov 9, 2018 at 9:56 PM Heiner Kallweit <hkallweit1@gmail.com> wrote:
-> >>
-> >> On 09.11.2018 21:33, Florian Fainelli wrote:
-> >>> On 11/9/18 12:22 PM, Heiner Kallweit wrote:
-> >>>> On 09.11.2018 21:13, Andrew Lunn wrote:
-> >>>>> Hi Heiner
-> >>>>>
-> >>>>>> +static bool phy_drv_supports_irq(struct phy_driver *phydrv)
-> >>>>>> +{
-> >>>>>> +  return phydrv->config_intr || phydrv->ack_interrupt;
-> >>>>>> +}
-> >>>>>
-> >>>>> Should this be && not || ? I thought both needed to be provided for
-> >>>>> interrupts to work.
-> >>>>>
-> >>>>>        Andrew
-> >>>>>
-> >>>> I've seen at least one driver which configures interrupts in
-> >>>> config_init and doesn't define a config_intr callback
-> >>>> (ack_interrupt callback is there)
-> >>>
-> >>> That driver should probably be fixed, while it most likely does not make
-> >>> any significant difference during probe/connect, since config_init() and
-> >>> config_intr() are virtually happening at the same time, this is not
-> >>> necessarily true when disconnecting from the PHY where we really want
-> >>> config_intr() to effectively disable the interrupts and not leaving
-> >>> something enabled that would now become unmaskable, because no more
-> >>> driver attached.
-> >>>
-> >> Found the driver: It's the IP101A/G in icplus.c
-> >> It should be easy to fix the behavior and move the interrupt config
-> >> to a config_intr callback. But the last real changes to the driver
-> >> have been done 6 years ago, so I'm not sure there's anybody out
-> >> there who can test.
-> > if you want I can take care of the IP101A/G code.
-> > I have at least one board with an IP101A/G (PHY ID: 0x02430c54,
-> > according to the schematics it's an IP101GR-GP) where the interrupt is
-> > routed to the SoC.
-> >
-> > please let me know whether you'd like to work on it or if I should
-> > give it a try.
-> >
-> I made the change already based on the datasheet of IP101A LF which
-> is supposed to be register-compatible with IP101A/G.
-> The patch is not applied yet, you can find it in the mailing
-> list archive or in patchwork. Would be great if you could test it
-> and report problems or add a Tested-by.
-I will test it but I doubt it works out-of-the-box in my setup:
-my board routes the RXER/INTR_32 pin of the IP101GR to the SoC. that
-pin defaults to "RXER" (receive error signal). so I need to come up
-with some extra patches which toggle the bit to output the interrupt
-signal on that pin
+Hi Dong,
 
-in other words: I'll give your patches a try as soon as I have time
-and give my Tested-by along with my extra patches on top of yours.
+Quoting A.s. Dong (2018-10-21 06:10:48)
+> For dividers with zero indicating clock is disabled, instead of giving a
+> warning each time like "clkx: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not
+> set" in exist code, we'd like to introduce enable/disable function for it.
+> e.g.
+> 000b - Clock disabled
+> 001b - Divide by 1
+> 010b - Divide by 2
+> ...
 
+I feel bad to NAK this patch after it's been on the list for so long,
+but this implementation really should belong in your hardware specific
+clock provider driver.
 
-Regards
-Martin
+This patch expands clk-divider to also be a gate, which is a
+non-starter.  Basic clock types were meant to remain basic. I'm already
+imagining how this precedent would cause other submissions: "why should
+I use composite clock when we can just add new clk_ops to the basic
+clock types!" :-(
+
+Also the implementation becomes cleaner when you don't have to make it
+coexist with clk-divider.c. You can drop the flags and just implement a
+machine specific clock type that combines gates and dividers.
+
+Best regards,
+Mike
+
+> 
+> Set rate when the clk is disabled will cache the rate request and only
+> when the clk is enabled will the driver actually program the hardware to
+> have the requested divider value. Similarly, when the clk is disabled we'll
+> write a 0 there, but when the clk is enabled we'll restore whatever rate
+> (divider) was chosen last.
+> 
+> It does mean that recalc rate will be sort of odd, because when the clk is
+> off it will return 0, and when the clk is on it will return the right rate.
+> So to make things work, we'll need to return the cached rate in recalc rate
+> when the clk is off and read the hardware when the clk is on.
+> 
+> NOTE for the default off divider, the recalc rate will still return 0 as
+> there's still no proper preset rate. Enable such divider will give user
+> a reminder error message.
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> ---
+> ChangeLog:
+> v3->v4:
+>  * no changes
+> v2->v3:
+>  * split normal and gate ops
+>  * fix the possible racy
+> v1->v2:
+>  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+> ---
+>  drivers/clk/clk-divider.c    | 152 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk-provider.h |   9 +++
+>  2 files changed, 161 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index b6234a5..b3566fd 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -122,6 +122,9 @@ unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
+>  
+>         div = _get_div(table, val, flags, width);
+>         if (!div) {
+> +               if (flags & CLK_DIVIDER_ZERO_GATE)
+> +                       return 0;
+> +
+>                 WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
+>                         "%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
+>                         clk_hw_get_name(hw));
+> @@ -145,6 +148,34 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+>                                    divider->flags, divider->width);
+>  }
+>  
+> +static unsigned long clk_divider_gate_recalc_rate(struct clk_hw *hw,
+> +                                                 unsigned long parent_rate)
+> +{
+> +       struct clk_divider *divider = to_clk_divider(hw);
+> +       unsigned long flags = 0;
+> +       unsigned int val;
+> +
+> +       if (divider->lock)
+> +               spin_lock_irqsave(divider->lock, flags);
+> +       else
+> +               __acquire(divider->lock);
+> +
+> +       if (!clk_hw_is_enabled(hw)) {
+> +               val = divider->cached_val;
+> +       } else {
+> +               val = clk_readl(divider->reg) >> divider->shift;
+> +               val &= clk_div_mask(divider->width);
+> +       }
+> +
+> +       if (divider->lock)
+> +               spin_unlock_irqrestore(divider->lock, flags);
+> +       else
+> +               __release(divider->lock);
+> +
+> +       return divider_recalc_rate(hw, parent_rate, val, divider->table,
+> +                                  divider->flags, divider->width);
+> +}
+> +
+>  static bool _is_valid_table_div(const struct clk_div_table *table,
+>                                                          unsigned int div)
+>  {
+> @@ -437,6 +468,108 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+>         return 0;
+>  }
+>  
+> +static int clk_divider_gate_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                               unsigned long parent_rate)
+> +{
+> +       struct clk_divider *divider = to_clk_divider(hw);
+> +       unsigned long flags = 0;
+> +       int value;
+> +       u32 val;
+> +
+> +       value = divider_get_val(rate, parent_rate, divider->table,
+> +                               divider->width, divider->flags);
+> +       if (value < 0)
+> +               return value;
+> +
+> +       if (divider->lock)
+> +               spin_lock_irqsave(divider->lock, flags);
+> +       else
+> +               __acquire(divider->lock);
+> +
+> +       if (clk_hw_is_enabled(hw)) {
+> +               if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
+> +                       val = clk_div_mask(divider->width) << (divider->shift + 16);
+> +               } else {
+> +                       val = clk_readl(divider->reg);
+> +                       val &= ~(clk_div_mask(divider->width) << divider->shift);
+> +               }
+> +               val |= (u32)value << divider->shift;
+> +               clk_writel(val, divider->reg);
+> +       } else {
+> +               divider->cached_val = value;
+> +       }
+> +
+> +       if (divider->lock)
+> +               spin_unlock_irqrestore(divider->lock, flags);
+> +       else
+> +               __release(divider->lock);
+> +
+> +       return 0;
+> +}
+> +
+> +static int clk_divider_enable(struct clk_hw *hw)
+> +{
+> +       struct clk_divider *divider = to_clk_divider(hw);
+> +       unsigned long flags = 0;
+> +       u32 val;
+> +
+> +       if (!divider->cached_val) {
+> +               pr_err("%s: no valid preset rate\n", clk_hw_get_name(hw));
+> +               return -EINVAL;
+> +       }
+> +
+> +       if (divider->lock)
+> +               spin_lock_irqsave(divider->lock, flags);
+> +       else
+> +               __acquire(divider->lock);
+> +
+> +       /* restore div val */
+> +       val = clk_readl(divider->reg);
+> +       val |= divider->cached_val << divider->shift;
+> +       clk_writel(val, divider->reg);
+> +
+> +       if (divider->lock)
+> +               spin_unlock_irqrestore(divider->lock, flags);
+> +       else
+> +               __release(divider->lock);
+> +
+> +       return 0;
+> +}
+> +
+> +static void clk_divider_disable(struct clk_hw *hw)
+> +{
+> +       struct clk_divider *divider = to_clk_divider(hw);
+> +       unsigned long flags = 0;
+> +       u32 val;
+> +
+> +       if (divider->lock)
+> +               spin_lock_irqsave(divider->lock, flags);
+> +       else
+> +               __acquire(divider->lock);
+> +
+> +       /* store the current div val */
+> +       val = clk_readl(divider->reg) >> divider->shift;
+> +       val &= clk_div_mask(divider->width);
+> +       divider->cached_val = val;
+> +       clk_writel(0, divider->reg);
+> +
+> +       if (divider->lock)
+> +               spin_unlock_irqrestore(divider->lock, flags);
+> +       else
+> +               __release(divider->lock);
+> +}
+> +
+> +static int clk_divider_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct clk_divider *divider = to_clk_divider(hw);
+> +       u32 val;
+> +
+> +       val = clk_readl(divider->reg) >> divider->shift;
+> +       val &= clk_div_mask(divider->width);
+> +
+> +       return val ? 1 : 0;
+> +}
+> +
+>  const struct clk_ops clk_divider_ops = {
+>         .recalc_rate = clk_divider_recalc_rate,
+>         .round_rate = clk_divider_round_rate,
+> @@ -444,6 +577,16 @@ const struct clk_ops clk_divider_ops = {
+>  };
+>  EXPORT_SYMBOL_GPL(clk_divider_ops);
+>  
+> +const struct clk_ops clk_divider_gate_ops = {
+> +       .recalc_rate = clk_divider_gate_recalc_rate,
+> +       .round_rate = clk_divider_round_rate,
+> +       .set_rate = clk_divider_gate_set_rate,
+> +       .enable = clk_divider_enable,
+> +       .disable = clk_divider_disable,
+> +       .is_enabled = clk_divider_is_enabled,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_divider_gate_ops);
+> +
+>  const struct clk_ops clk_divider_ro_ops = {
+>         .recalc_rate = clk_divider_recalc_rate,
+>         .round_rate = clk_divider_round_rate,
+> @@ -459,6 +602,7 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
+>         struct clk_divider *div;
+>         struct clk_hw *hw;
+>         struct clk_init_data init;
+> +       u32 val;
+>         int ret;
+>  
+>         if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
+> @@ -476,6 +620,8 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
+>         init.name = name;
+>         if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
+>                 init.ops = &clk_divider_ro_ops;
+> +       else if (clk_divider_flags & CLK_DIVIDER_ZERO_GATE)
+> +               init.ops = &clk_divider_gate_ops;
+>         else
+>                 init.ops = &clk_divider_ops;
+>         init.flags = flags | CLK_IS_BASIC;
+> @@ -491,6 +637,12 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
+>         div->hw.init = &init;
+>         div->table = table;
+>  
+> +       if (div->flags & CLK_DIVIDER_ZERO_GATE) {
+> +               val = clk_readl(reg) >> shift;
+> +               val &= clk_div_mask(width);
+> +               div->cached_val = val;
+> +       }
+> +
+>         /* register the clock */
+>         hw = &div->hw;
+>         ret = clk_hw_register(dev, hw);
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 08b1aa7..08f135a 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -387,6 +387,7 @@ struct clk_div_table {
+>   * @shift:     shift to the divider bit field
+>   * @width:     width of the divider bit field
+>   * @table:     array of value/divider pairs, last entry should have div = 0
+> + * @cached_val: cached div hw value used for CLK_DIVIDER_ZERO_GATE
+>   * @lock:      register lock
+>   *
+>   * Clock with an adjustable divider affecting its output frequency.  Implements
+> @@ -415,6 +416,12 @@ struct clk_div_table {
+>   * CLK_DIVIDER_MAX_AT_ZERO - For dividers which are like CLK_DIVIDER_ONE_BASED
+>   *     except when the value read from the register is zero, the divisor is
+>   *     2^width of the field.
+> + * CLK_DIVIDER_ZERO_GATE - For dividers which are like CLK_DIVIDER_ONE_BASED
+> + *     when the value read from the register is zero, it means the divisor
+> + *     is gated. For this case, the cached_val will be used to store the
+> + *     intermediate div for the normal rate operation, like set_rate/get_rate/
+> + *     recalc_rate. When the divider is ungated, the driver will actually
+> + *     program the hardware to have the requested divider value.
+>   */
+>  struct clk_divider {
+>         struct clk_hw   hw;
+> @@ -423,6 +430,7 @@ struct clk_divider {
+>         u8              width;
+>         u8              flags;
+>         const struct clk_div_table      *table;
+> +       u32             cached_val;
+>         spinlock_t      *lock;
+>  };
+>  
+> @@ -436,6 +444,7 @@ struct clk_divider {
+>  #define CLK_DIVIDER_ROUND_CLOSEST      BIT(4)
+>  #define CLK_DIVIDER_READ_ONLY          BIT(5)
+>  #define CLK_DIVIDER_MAX_AT_ZERO                BIT(6)
+> +#define CLK_DIVIDER_ZERO_GATE          BIT(7)
+>  
+>  extern const struct clk_ops clk_divider_ops;
+>  extern const struct clk_ops clk_divider_ro_ops;
+> -- 
+> 2.7.4
+> 
