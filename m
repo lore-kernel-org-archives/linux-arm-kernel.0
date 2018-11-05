@@ -1,125 +1,123 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Mon, 5 Nov 2018 09:43:34 +0000
-Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
- beagle-xm
-In-Reply-To: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
-References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
-Message-ID: <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+From: dkos@cadence.com (Damian Kos)
+Date: Mon, 5 Nov 2018 09:44:53 +0000
+Subject: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
+In-Reply-To: <1539034953-11274-1-git-send-email-dkos@cadence.com>
+References: <1539034953-11274-1-git-send-email-dkos@cadence.com>
+Message-ID: <CY1PR0701MB166434BBB71DB76593E0F513CDCA0@CY1PR0701MB1664.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Guys,
 
-Please see below, the kernelci.org automated boot bisection found
-that the OMAP3 BeagleBoard-xM is failing to boot with SMP
-disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
-log output after the bootloader so the kernel seems to be
-crashing very early on.
+I'm wondering if this time patch is so good that there're no change requests, or is it so bad that it was rejected without a comment : )
+Please let me know if this patch is being in review or was rejected and, if so, what needs to be changed.
+
+Regards,
+Damian
+
+-----Original Message-----
+From: Damian Kos <dkos@cadence.com> 
+Sent: Monday, October 8, 2018 23:42
+To: David Airlie <airlied@linux.ie>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Archit Taneja <architt@codeaurora.org>; Andrzej Hajda <a.hajda@samsung.com>; Laurent Pinchart <Laurent.pinchart@ideasonboard.com>; Gustavo Padovan <gustavo@padovan.org>; Maarten Lankhorst <maarten.lankhorst@linux.intel.com>; Sean Paul <sean@poorly.run>; Sandy Huang <hjc@rock-chips.com>; Heiko St?bner <heiko@sntech.de>; Quentin Schulz <quentin.schulz@free-electrons.com>; Damian Kos <dkos@cadence.com>; Piotr Sroka <piotrs@cadence.com>; dri-devel at lists.freedesktop.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-rockchip at lists.infradead.org
+Cc: Rafal Ciepiela <rafalc@cadence.com>; quentin.schulz at bootlin.com; jbergsagel at ti.com
+Subject: [PATCH v6 0/6] drm: add support for Cadence MHDP DPI/DP bridge.
+
+Hello!
+
+This is the series of patches that will add support for the Cadence's DPI/DP bridge. Please note that this is a preliminary version of the driver and there will be more patches in the future with updates, fixes and improvements.
+Please keep that in mind when looking at FIXME/TODO/XXX comments.
+
+Initially, MHDP driver was developed as a DRM bridge driver and was planed to be placed in drivers/gpu/drm/bridge/mhdp.c.  However, there was already a driver for Cadence's DP controller developed by RockChip, but that driver uses the different DRM framework and looks like a part of a bigger system.
+Both controllers (including firmware) are quite different internally (MST/FEC/DSC support, link training done by driver, additional commands, IRQ's
+etc.) but they have similar register map, except for Framer/Streamer (which is noticeably different), so they appear similar.
+
+The following patches contain:
+- Moving common code to drivers/gpu/drm/bridge/cdns-mhdp-common.* and
+  modifying it a bit (mostly new prefixes for functions and data types) so it
+  can be used by two, higher level, drivers.
+- Modifying existing RockChip's DP driver to use the common code after changes
+  made to it (use the new cdns_mhdp_device structure and new function names).
+- Modifying DRM helpers a bit. Some are required for new driver, some are
+  updates from DP 1.2 to 1.3 or 1.4.
+- Adding documentation for device tree bindings.
+- Adding preliminary Cadence DPI/DP bridge driver.
+
+Some of the things that will be added later on include (but are not limited
+to):
+- DSC support
+- FEC support
+- HDCP support
+
+Changes in v2:
+- Added actual description of what the patch contains, what is it for and
+  what's going on here in general.
+- New structure. Now we have one common low level driver + two high level
+  drivers - one for RockChip with minimum changes and one, more general, for
+  Cadence.
+- Dropped some changes made to DRM helpers.
+- Updated the device tree bindings document.
+
+Changes in v3:
+- Corrected dt-bindings document
+- Enabled some clocks at startup (since FW doesn't do that anymore).
+- Changed Firmware file name to match the file on Linux Firmware repo.
+- Added SST audio support
+- Made common functions (in cdns-mhdp-common.*) public.
+
+Changes in v4:
+- Fixed Kconfig in drm/rockchip
+- Fixed Signed-offs
+- dp_link_status() is no longer public since it's used only in drm_dp_helper.c
+- Replaced EXTRA_CFLAGS with ccflags-y in drm/rockchip Makefile
+
+Changes in v5:
+- Fixed Kconfig in drm/rockchip again
+- Moved cdn-dp-reg.h (cdns-mhdp-common.h) to include/drm/bridge instead of
+    drivers/gpu/drm/bridge/
+- Updated the mhdp_validate_cr function
+
+Changes in v6:
+- Added Reviewed-bys for already reviewed patches
+- Dropped patch v5-0003 (that made dp_get_lane_status helper public)
+- Added patch with MST support
+- Added patch with Cadence SD0801 PHY init
 
 
-Here are the details and log of the "bad" boot:
+Damian Kos (2):
+  drm/rockchip: prepare common code for cdns and rk dpi/dp driver
+  drm/bridge: add PHY initialization in mhdp8546 driver.
 
-  https://kernelci.org/boot/id/5bde6b0459b51468bcda93e0/
+Piotr Sroka (1):
+  drm/bridge: add support for MST in mhdp8546 driver
 
-  https://storage.kernelci.org/mainline/master/v4.19-12838-g71e56028173b/arm/multi_v7_defconfig+CONFIG_SMP=n/lab-baylibre/boot-omap3-beagle-xm.html
+Quentin Schulz (3):
+  drm/dp: fix link probing for devices supporting DP 1.4+
+  dt-bindings: drm/bridge: Document Cadence MHDP bridge bindings
+  drm: bridge: add support for Cadence MHDP DPI/DP bridge
 
-and the history of all the bisection steps and checks:
+ .../bindings/display/bridge/cdns,mhdp.txt     |   43 +
+ drivers/gpu/drm/bridge/Kconfig                |    9 +
+ drivers/gpu/drm/bridge/Makefile               |    3 +
+ drivers/gpu/drm/bridge/cdns-mhdp-common.c     | 1107 +++++++++++++
+ drivers/gpu/drm/bridge/cdns-mhdp-mst.c        |  594 +++++++
+ drivers/gpu/drm/bridge/cdns-mhdp.c            | 1371 +++++++++++++++++
+ drivers/gpu/drm/bridge/cdns-mhdp.h            |  209 +++
+ drivers/gpu/drm/drm_dp_helper.c               |   30 +-
+ drivers/gpu/drm/rockchip/Kconfig              |    4 +-
+ drivers/gpu/drm/rockchip/Makefile             |    2 +-
+ drivers/gpu/drm/rockchip/cdn-dp-core.c        |  234 +--
+ drivers/gpu/drm/rockchip/cdn-dp-core.h        |   43 +-
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c         |  969 ------------
+ include/drm/bridge/cdns-mhdp-cbs.h            |   27 +
+ .../drm/bridge/cdns-mhdp-common.h             |  174 ++-
+ 15 files changed, 3669 insertions(+), 1150 deletions(-)  create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp-common.c
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp-mst.c
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.c
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.h
+ delete mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+ create mode 100644 include/drm/bridge/cdns-mhdp-cbs.h
+ rename drivers/gpu/drm/rockchip/cdn-dp-reg.h => include/drm/bridge/cdns-mhdp-common.h (77%)
 
-  http://lava.baylibre.com:10080/scheduler/device/omap3-beagle-xm-sea?recent_length=20&recent_search=lava-bisect-9615#recent_
-
-
-Please note that the board went offline after that so we don't
-know if it's already fixed in v4.20-rc1, although that would seem
-quite unlikely.
-
-
-As always, please take the automated bisection results with a
-pinch of salt: the root cause often lies somewhere else than in
-the "breaking" commit found, and there has been no further
-investigation beyond the automated bisection results.
-
-Hope this helps!
-
-Best wishes,
-Guillaume
-
-
-On 04/11/2018 09:40, kernelci.org bot wrote:
-> Bisection result for mainline/master (v4.19-12838-g71e56028173b) on beagle-xm
-> 
->   Good:       83650fd58a93 Merge tag 'arm64-upstream' of git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux
->   Bad:        71e56028173b Merge branch 'sched-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
->   Found:      513eb9859552 ARM: defconfig: Update multi_v7 to use PREEMPT
-> 
-> Details:
->   Good:       https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.19-12735-g83650fd58a93/
->   Bad:        https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.19-12838-g71e56028173b/
-> 
-> Checks:
->   revert:     PASS
->   verify:     PASS
-> 
-> Parameters:
->   Tree:       mainline
->   URL:        http://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
->   Branch:     master
->   Target:     beagle-xm
->   Lab:        lab-baylibre
->   Config:     multi_v7_defconfig+CONFIG_SMP=n
->   Plan:       boot
-> 
-> Breaking commit found:
-> 
-> -------------------------------------------------------------------------------
-> commit 513eb98595522bc0cb83831a9daee1d5738e66f1
-> Author: Linus Walleij <linus.walleij@linaro.org>
-> Date:   Fri Oct 19 11:24:26 2018 +0200
-> 
->     ARM: defconfig: Update multi_v7 to use PREEMPT
->     
->     Using CONFIG_PREEMPT as preemption model for ARMv7 systems
->     appear to be the most reasonable default.
->     
->     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->     Signed-off-by: Olof Johansson <olof@lixom.net>
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 63af6234c1b6..1c7616815a86 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -1,6 +1,7 @@
->  CONFIG_SYSVIPC=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_PREEMPT=y
->  CONFIG_CGROUPS=y
->  CONFIG_BLK_DEV_INITRD=y
->  CONFIG_EMBEDDED=y
-> -------------------------------------------------------------------------------
-> 
-> 
-> Git bisection log:
-> 
-> -------------------------------------------------------------------------------
-> git bisect start
-> # good: [83650fd58a934fad5b7735fea96905ef986c0821] Merge tag 'arm64-upstream' of git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux
-> git bisect good 83650fd58a934fad5b7735fea96905ef986c0821
-> # bad: [71e56028173bc84f01456a5679d8be9d681b49f1] Merge branch 'sched-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-> git bisect bad 71e56028173bc84f01456a5679d8be9d681b49f1
-> # good: [4e303fbe2d95806c875f5ebfcb3d980e20b4bd83] perf top: Allow disabling the overwrite mode
-> git bisect good 4e303fbe2d95806c875f5ebfcb3d980e20b4bd83
-> # bad: [01897f3e05ede4d66c0f9df465fde1d67a1d733f] Merge branch 'perf-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-> git bisect bad 01897f3e05ede4d66c0f9df465fde1d67a1d733f
-> # good: [ff27a06af6ffd3f49b9e193eb68f487ad76651e1] perf top: Start display thread earlier
-> git bisect good ff27a06af6ffd3f49b9e193eb68f487ad76651e1
-> # bad: [d2ff0ff2c23f1bacd35073bf50e6c18298a8d530] Merge tag 'armsoc-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
-> git bisect bad d2ff0ff2c23f1bacd35073bf50e6c18298a8d530
-> # bad: [d4f79cb872bd4faa44eb133c1aee5f3411342c54] ARM: orion: avoid VLA in orion_mpp_conf
-> git bisect bad d4f79cb872bd4faa44eb133c1aee5f3411342c54
-> # good: [7f3d08f5255b964827214e69967b4d5008d6ea18] arm64: defconfig: Enable some IPMI configs
-> git bisect good 7f3d08f5255b964827214e69967b4d5008d6ea18
-> # bad: [513eb98595522bc0cb83831a9daee1d5738e66f1] ARM: defconfig: Update multi_v7 to use PREEMPT
-> git bisect bad 513eb98595522bc0cb83831a9daee1d5738e66f1
-> # first bad commit: [513eb98595522bc0cb83831a9daee1d5738e66f1] ARM: defconfig: Update multi_v7 to use PREEMPT
-> -------------------------------------------------------------------------------
-> 
+--
+2.17.1
