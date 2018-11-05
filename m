@@ -1,25 +1,41 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Nov 2018 16:08:02 -0600
-Subject: [PATCH v2 3/7] dt-bindings: Add vendor prefix for LeMaker
-In-Reply-To: <20181101200045.6078-4-contact@paulk.fr>
+Date: Mon, 5 Nov 2018 16:09:09 -0600
+Subject: [PATCH v2 4/7] dt-bindings: Add bindings for the LeMaker
+ BL035-RGB-002 LCD panel
+In-Reply-To: <20181101200045.6078-5-contact@paulk.fr>
 References: <20181101200045.6078-1-contact@paulk.fr>
- <20181101200045.6078-4-contact@paulk.fr>
-Message-ID: <20181105220802.GA21348@bogus>
+ <20181101200045.6078-5-contact@paulk.fr>
+Message-ID: <20181105220909.GA24283@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2018 at 09:00:41PM +0100, Paul Kocialkowski wrote:
-> This introduces a new device-tree binding vendor prefix for Shenzhen
-> LeMaker Technology Co., Ltd.
-
-Would be nice to say this is already in use, but wasn't documented.
-
+On Thu, Nov 01, 2018 at 09:00:42PM +0100, Paul Kocialkowski wrote:
+> This adds the device-tree bindings for the LeMaker BL035-RGB-002 3.5"
+> QVGA TFT LCD panel, compatible with simple-panel.
 > 
 > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  .../bindings/display/panel/lemaker,bl035-rgb-002.txt       | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt b/Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt
+> new file mode 100644
+> index 000000000000..22cff3eb1b8f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt
+> @@ -0,0 +1,7 @@
+> +LeMaker BL035-RGB-002 3.5" QVGA TFT LCD panel
+> +
+> +Required properties:
+> +- compatible: should be "lemaker,bl035-rgb-002"
 
-In any case,
+No power supply or backlight? You need to enumerate exactly which 
+properties you are using.
 
-Reviewed-by: Rob Hering <robh@kernel.org>
+> +
+> +This binding is compatible with the simple-panel binding, which is specified
+> +in simple-panel.txt in this directory.
+> -- 
+> 2.19.1
+> 
