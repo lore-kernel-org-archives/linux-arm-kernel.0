@@ -1,42 +1,43 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  5 Nov 2018 13:06:40 +0000
-Subject: [PATCH 01/10] arm64: remove bitop exports
+Date: Mon,  5 Nov 2018 13:06:42 +0000
+Subject: [PATCH 03/10] arm64: add <asm/export.h>
 In-Reply-To: <20181105130649.29429-1-mark.rutland@arm.com>
 References: <20181105130649.29429-1-mark.rutland@arm.com>
-Message-ID: <20181105130649.29429-2-mark.rutland@arm.com>
+Message-ID: <20181105130649.29429-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the arm64 bitops are inlines built atop of the regular atomics,
-we don't need to export anything.
-
-Remove the redundant exports.
+So that we can export symbols directly from assembly files, let's make
+use of the generic <asm/export.h>. We have a few symbols that we'll want
+to conditionally export for !KASAN kernel builds, so we add a helepr for
+that.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/arm64ksyms.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm64/include/asm/export.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 arch/arm64/include/asm/export.h
 
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 72f63a59b008..c4003c18a18b 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -62,14 +62,6 @@ EXPORT_SYMBOL(__memset);
- EXPORT_SYMBOL(__memcpy);
- EXPORT_SYMBOL(__memmove);
- 
--	/* atomic bitops */
--EXPORT_SYMBOL(set_bit);
--EXPORT_SYMBOL(test_and_set_bit);
--EXPORT_SYMBOL(clear_bit);
--EXPORT_SYMBOL(test_and_clear_bit);
--EXPORT_SYMBOL(change_bit);
--EXPORT_SYMBOL(test_and_change_bit);
--
- #ifdef CONFIG_FUNCTION_TRACER
- EXPORT_SYMBOL(_mcount);
- NOKPROBE_SYMBOL(_mcount);
+diff --git a/arch/arm64/include/asm/export.h b/arch/arm64/include/asm/export.h
+new file mode 100644
+index 000000000000..d7a82246816e
+--- /dev/null
++++ b/arch/arm64/include/asm/export.h
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#ifndef __ASM_EXPORT_H
++#define __ASM_EXPORT_H
++#include <asm-generic/export.h>
++
++#ifdef CONFIG_KASAN
++#define EXPORT_SYMBOL_NOKASAN(name)
++#else
++#define EXPORT_SYMBOL_NOKASAN(name)	EXPORT_SYMBOL(name)
++#endif
++
++#endif /* __ASM_EXPORT_H */
 -- 
 2.11.0
