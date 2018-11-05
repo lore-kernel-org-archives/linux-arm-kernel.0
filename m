@@ -1,78 +1,204 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  5 Nov 2018 19:44:36 +0100
-Subject: [PATCH 4/6] ARM: compressed: move BE32 handling into head.S
-In-Reply-To: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
-References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181105184438.19494-5-ard.biesheuvel@linaro.org>
+From: jeyu@kernel.org (Jessica Yu)
+Date: Mon, 5 Nov 2018 19:53:23 +0100
+Subject: [PATCH v2] arm64/module: use plt section indices for relocations
+In-Reply-To: <20181105175722.removbbpilqxu7tr@redbean>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141652.5478C68BE1@newverein.lst.de>
+ <20181105175722.removbbpilqxu7tr@redbean>
+Message-ID: <20181105185323.hgoflyvkyujdyjxj@redbean>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BE switch only takes 3 instructions, and is currently pulled into
-the main startup code by the linker, which is not the nicest way to
-do this. Let's just pull the code into head.S and enable it using
-preprocessor conditionals.
+Instead of saving a pointer to the .plt and .init.plt sections to apply
+plt-based relocations, save and use their section indices instead.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+The mod->arch.{core,init}.plt pointers were problematic for livepatch
+because they pointed within temporary section headers (provided by the
+module loader via info->sechdrs) that would be freed after module load.
+Since livepatch modules may need to apply relocations post-module-load
+(for example, to patch a module that is loaded later), using section
+indices to offset into the section headers (instead of accessing them
+through a saved pointer) allows livepatch modules on arm64 to pass in
+their own copy of the section headers to apply_relocate_add() to apply
+delayed relocations.
+
+Signed-off-by: Jessica Yu <jeyu@kernel.org>
 ---
- arch/arm/boot/compressed/Makefile     |  8 --------
- arch/arm/boot/compressed/big-endian.S | 14 --------------
- arch/arm/boot/compressed/head.S       |  5 +++++
- 3 files changed, 5 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 01bf2585a0fa..d1862621556f 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -47,14 +47,6 @@ ifeq ($(CONFIG_PXA_SHARPSL_DETECT_MACH_ID),y)
- OBJS		+= head-sharpsl.o
- endif
+v2: 
+
+ - Do sechdrs[pltsec->plt_shndx].sh_addr instead of pointer math
+
+Note: Addressed Will's comment about the pltsec -> plt_info rename and
+removed that change to reduce unnecessary code churn. I didn't include the
+Ack's for this reason so let me know if this version is OK as well.
+
+ arch/arm64/include/asm/module.h |  8 +++++---
+ arch/arm64/kernel/module-plts.c | 36 ++++++++++++++++++++----------------
+ arch/arm64/kernel/module.c      |  9 +++++----
+ 3 files changed, 30 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index 97d0ef12e2ff..f81c1847312d 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -22,7 +22,7 @@
  
--ifeq ($(CONFIG_CPU_ENDIAN_BE32),y)
--ifeq ($(CONFIG_CPU_CP15),y)
--OBJS		+= big-endian.o
--else
--# The endian should be set by h/w design.
--endif
--endif
--
- #
- # We now have a PIC decompressor implementation.  Decompressors running
- # from RAM should not define ZTEXTADDR.  Decompressors running directly
-diff --git a/arch/arm/boot/compressed/big-endian.S b/arch/arm/boot/compressed/big-endian.S
-deleted file mode 100644
-index 88e2a88d324b..000000000000
---- a/arch/arm/boot/compressed/big-endian.S
-+++ /dev/null
-@@ -1,14 +0,0 @@
--/* SPDX-License-Identifier: GPL-2.0 */
--/*
-- *  linux/arch/arm/boot/compressed/big-endian.S
-- *
-- *  Switch CPU into big endian mode.
-- *  Author: Nicolas Pitre
-- */
--
--	.section ".start", #alloc, #execinstr
--
--	mrc	p15, 0, r0, c1, c0, 0	@ read control reg
--	orr	r0, r0, #(1 << 7)	@ enable big endian mode
--	mcr	p15, 0, r0, c1, c0, 0	@ write control reg
--
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index da93f419d1f4..55c227077207 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -222,6 +222,11 @@ not_angel:
- #ifdef CONFIG_CPU_XSCALE
- 		bl	__XScale_start
+ #ifdef CONFIG_ARM64_MODULE_PLTS
+ struct mod_plt_sec {
+-	struct elf64_shdr	*plt;
++	int			plt_shndx;
+ 	int			plt_num_entries;
+ 	int			plt_max_entries;
+ };
+@@ -36,10 +36,12 @@ struct mod_arch_specific {
+ };
  #endif
-+#if defined(CONFIG_CPU_ENDIAN_BE32) && defined(CONFIG_CPU_CP15)
-+		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
-+		orr	r0, r0, #(1 << 7)	@ enable big endian mode
-+		mcr	p15, 0, r0, c1, c0, 0	@ write control reg
-+#endif
  
- #ifdef CONFIG_AUTO_ZRELADDR
- 		/*
+-u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
++u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
++			  void *loc, const Elf64_Rela *rela,
+ 			  Elf64_Sym *sym);
+ 
+-u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val);
++u64 module_emit_veneer_for_adrp(struct module *mod, Elf64_Shdr *sechdrs,
++				void *loc, u64 val);
+ 
+ #ifdef CONFIG_RANDOMIZE_BASE
+ extern u64 module_alloc_base;
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+index f0690c2ca3e0..a0efe30211d6 100644
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -16,12 +16,13 @@ static bool in_init(const struct module *mod, void *loc)
+ 	return (u64)loc - (u64)mod->init_layout.base < mod->init_layout.size;
+ }
+ 
+-u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
++u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
++			  void *loc, const Elf64_Rela *rela,
+ 			  Elf64_Sym *sym)
+ {
+ 	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+ 							  &mod->arch.init;
+-	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
++	struct plt_entry *plt = (struct plt_entry *)sechdrs[pltsec->plt_shndx].sh_addr;
+ 	int i = pltsec->plt_num_entries;
+ 	u64 val = sym->st_value + rela->r_addend;
+ 
+@@ -43,11 +44,12 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+ }
+ 
+ #ifdef CONFIG_ARM64_ERRATUM_843419
+-u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
++u64 module_emit_veneer_for_adrp(struct module *mod, Elf64_Shdr *sechdrs,
++				void *loc, u64 val)
+ {
+ 	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+ 							  &mod->arch.init;
+-	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
++	struct plt_entry *plt = (struct plt_entry *)sechdrs[pltsec->plt_shndx].sh_addr;
+ 	int i = pltsec->plt_num_entries++;
+ 	u32 mov0, mov1, mov2, br;
+ 	int rd;
+@@ -202,7 +204,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	unsigned long core_plts = 0;
+ 	unsigned long init_plts = 0;
+ 	Elf64_Sym *syms = NULL;
+-	Elf_Shdr *tramp = NULL;
++	Elf_Shdr *pltsec, *tramp = NULL;
+ 	int i;
+ 
+ 	/*
+@@ -211,9 +213,9 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	 */
+ 	for (i = 0; i < ehdr->e_shnum; i++) {
+ 		if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
+-			mod->arch.core.plt = sechdrs + i;
++			mod->arch.core.plt_shndx = i;
+ 		else if (!strcmp(secstrings + sechdrs[i].sh_name, ".init.plt"))
+-			mod->arch.init.plt = sechdrs + i;
++			mod->arch.init.plt_shndx = i;
+ 		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
+ 			 !strcmp(secstrings + sechdrs[i].sh_name,
+ 				 ".text.ftrace_trampoline"))
+@@ -222,7 +224,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 			syms = (Elf64_Sym *)sechdrs[i].sh_addr;
+ 	}
+ 
+-	if (!mod->arch.core.plt || !mod->arch.init.plt) {
++	if (!mod->arch.core.plt_shndx || !mod->arch.init.plt_shndx) {
+ 		pr_err("%s: module PLT section(s) missing\n", mod->name);
+ 		return -ENOEXEC;
+ 	}
+@@ -254,17 +256,19 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 						sechdrs[i].sh_info, dstsec);
+ 	}
+ 
+-	mod->arch.core.plt->sh_type = SHT_NOBITS;
+-	mod->arch.core.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+-	mod->arch.core.plt->sh_addralign = L1_CACHE_BYTES;
+-	mod->arch.core.plt->sh_size = (core_plts  + 1) * sizeof(struct plt_entry);
++	pltsec = sechdrs + mod->arch.core.plt_shndx;
++	pltsec->sh_type = SHT_NOBITS;
++	pltsec->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	pltsec->sh_addralign = L1_CACHE_BYTES;
++	pltsec->sh_size = (core_plts  + 1) * sizeof(struct plt_entry);
+ 	mod->arch.core.plt_num_entries = 0;
+ 	mod->arch.core.plt_max_entries = core_plts;
+ 
+-	mod->arch.init.plt->sh_type = SHT_NOBITS;
+-	mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+-	mod->arch.init.plt->sh_addralign = L1_CACHE_BYTES;
+-	mod->arch.init.plt->sh_size = (init_plts + 1) * sizeof(struct plt_entry);
++	pltsec = sechdrs + mod->arch.init.plt_shndx;
++	pltsec->sh_type = SHT_NOBITS;
++	pltsec->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	pltsec->sh_addralign = L1_CACHE_BYTES;
++	pltsec->sh_size = (init_plts + 1) * sizeof(struct plt_entry);
+ 	mod->arch.init.plt_num_entries = 0;
+ 	mod->arch.init.plt_max_entries = init_plts;
+ 
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index f0f27aeefb73..c2abe59c6f8f 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -198,7 +198,8 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
+ 	return 0;
+ }
+ 
+-static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
++static int reloc_insn_adrp(struct module *mod, Elf64_Shdr *sechdrs,
++			   __le32 *place, u64 val)
+ {
+ 	u32 insn;
+ 
+@@ -215,7 +216,7 @@ static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
+ 		insn &= ~BIT(31);
+ 	} else {
+ 		/* out of range for ADR -> emit a veneer */
+-		val = module_emit_veneer_for_adrp(mod, place, val & ~0xfff);
++		val = module_emit_veneer_for_adrp(mod, sechdrs, place, val & ~0xfff);
+ 		if (!val)
+ 			return -ENOEXEC;
+ 		insn = aarch64_insn_gen_branch_imm((u64)place, val,
+@@ -368,7 +369,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 		case R_AARCH64_ADR_PREL_PG_HI21_NC:
+ 			overflow_check = false;
+ 		case R_AARCH64_ADR_PREL_PG_HI21:
+-			ovf = reloc_insn_adrp(me, loc, val);
++			ovf = reloc_insn_adrp(me, sechdrs, loc, val);
+ 			if (ovf && ovf != -ERANGE)
+ 				return ovf;
+ 			break;
+@@ -413,7 +414,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 
+ 			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
+ 			    ovf == -ERANGE) {
+-				val = module_emit_plt_entry(me, loc, &rel[i], sym);
++				val = module_emit_plt_entry(me, sechdrs, loc, &rel[i], sym);
+ 				if (!val)
+ 					return -ENOEXEC;
+ 				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
 -- 
-2.19.1
+2.14.5
