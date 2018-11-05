@@ -1,80 +1,71 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Nov 2018 14:33:42 -0600
-Subject: [PATCH v3 4/6] arm64: Utilize phys_initrd_start/phys_initrd_size
-In-Reply-To: <20181031192843.13230-5-f.fainelli@gmail.com>
+Date: Mon, 5 Nov 2018 14:31:39 -0600
+Subject: [PATCH v3 0/6] arm64: Get rid of __early_init_dt_declare_initrd()
+In-Reply-To: <20181031192843.13230-1-f.fainelli@gmail.com>
 References: <20181031192843.13230-1-f.fainelli@gmail.com>
- <20181031192843.13230-5-f.fainelli@gmail.com>
-Message-ID: <20181105203342.GB21852@bogus>
+Message-ID: <20181105203139.GA21852@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2018 at 12:28:41PM -0700, Florian Fainelli wrote:
-> ARM64 is the only architecture that re-defines
-> __early_init_dt_declare_initrd() in order for that function to populate
-> initrd_start/initrd_end with physical addresses instead of virtual
-> addresses. Instead of having an override we can leverage
-> drivers/of/fdt.c populating phys_initrd_start/phys_initrd_size to
-> populate those variables for us.
+On Wed, Oct 31, 2018 at 12:28:37PM -0700, Florian Fainelli wrote:
+> Hi all,
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm64/mm/init.c | 19 +++++++++----------
->  1 file changed, 9 insertions(+), 10 deletions(-)
+> Changes in v3:
 > 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 3cf87341859f..00ef2166bb73 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -72,8 +72,8 @@ static int __init early_initrd(char *p)
->  	if (*endp == ',') {
->  		size = memparse(endp + 1, NULL);
->  
-> -		initrd_start = start;
-> -		initrd_end = start + size;
-> +		phys_initrd_start = start;
-> +		phys_initrd_size = size;
->  	}
->  	return 0;
->  }
-> @@ -408,14 +408,14 @@ void __init arm64_memblock_init(void)
->  		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
->  	}
->  
-> -	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
-> +	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && phys_initrd_size) {
->  		/*
->  		 * Add back the memory we just removed if it results in the
->  		 * initrd to become inaccessible via the linear mapping.
->  		 * Otherwise, this is a no-op
->  		 */
-> -		u64 base = initrd_start & PAGE_MASK;
-> -		u64 size = PAGE_ALIGN(initrd_end) - base;
-> +		u64 base = phys_initrd_start & PAGE_MASK;
-> +		u64 size = PAGE_ALIGN(phys_initrd_size);
->  
->  		/*
->  		 * We can only add back the initrd memory if we don't end up
-> @@ -460,12 +460,11 @@ void __init arm64_memblock_init(void)
->  	 */
->  	memblock_reserve(__pa_symbol(_text), _end - _text);
->  #ifdef CONFIG_BLK_DEV_INITRD
-> -	if (initrd_start) {
-> -		memblock_reserve(initrd_start, initrd_end - initrd_start);
-> -
-> +	if (phys_initrd_size) {
+> - use C conditionals in drivers/of/fdt.c
+> - added check on phys_initrd_size in arch/arm64/mm/init.c to determine
+>   whether initrd_start must be populated
+> - fixed a build warning with ARC that was just missing an (unsigned
+>   long) cast
+> 
+> Changes in v2:
+> 
+> - get rid of ARCH_HAS_PHYS_INITRD and instead define
+>   phys_initrd_start/phys_initrd_size in init/do_mounts_initrd.c
+> 
+> - make __early_init_dt_declare_initrd() account for ARM64 specific
+>   behavior with __va() when having CONFIG_DEBUG_VM enabled
+> 
+> - consolidate early_initrd() command line parsing into
+>   init/do_mounts_initrd.c
+> 
+> Because phys_initrd_start/phys_initrd_size are now compiled in
+> ini/do_mounts_initrd.c which is only built with CONFIG_BLK_DEV_INITRD=y,
+> we need to be a bit careful about the uses throughout architecture
+> specific code.
+> 
+> Previous discussions/submissions list here:
+> 
+> v3:
+> https://www.spinics.net/lists/arm-kernel/msg683566.html
+> v2:
+> https://lkml.org/lkml/2018/10/25/4
+> 
+> Florian Fainelli (6):
+>   nds32: Remove phys_initrd_start and phys_initrd_size
+>   arch: Make phys_initrd_start and phys_initrd_size global variables
+>   of/fdt: Populate phys_initrd_start/phys_initrd_size from FDT
+>   arm64: Utilize phys_initrd_start/phys_initrd_size
+>   of/fdt: Remove custom __early_init_dt_declare_initrd() implementation
+>   arch: Move initrd= parsing into do_mounts_initrd.c
 
-Since we're touching the if anyways, perhaps convert the #ifdef to a C 
-IS_ENABLED().
+This all looks good to me. I can take it via the DT if you want. I'll 
+give folks some more time to review though.
 
->  		/* the generic initrd code expects virtual addresses */
-> -		initrd_start = __phys_to_virt(initrd_start);
-> -		initrd_end = __phys_to_virt(initrd_end);
-> +		initrd_start = __phys_to_virt(phys_initrd_start);
-> +		initrd_end = initrd_start + phys_initrd_size;
-> +		initrd_below_start_ok = 0;
->  	}
->  #endif
->  
+Rob
+
+> 
+>  arch/arc/mm/init.c              | 25 +++++--------------------
+>  arch/arm/mm/init.c              | 28 ++--------------------------
+>  arch/arm64/include/asm/memory.h |  8 --------
+>  arch/arm64/mm/init.c            | 33 +++++++--------------------------
+>  arch/nds32/mm/init.c            |  2 --
+>  arch/unicore32/mm/init.c        | 24 +++++-------------------
+>  drivers/of/fdt.c                | 17 ++++++++++++-----
+>  include/linux/initrd.h          |  3 +++
+>  init/do_mounts_initrd.c         | 20 ++++++++++++++++++++
+>  9 files changed, 54 insertions(+), 106 deletions(-)
+> 
 > -- 
 > 2.17.1
 > 
