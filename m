@@ -1,58 +1,63 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 5 Nov 2018 16:07:19 +0100
-Subject: [PATCH 5/5] thermal: zx2967_thermal: simplify getting .driver_data
-In-Reply-To: <20181021200053.2194-6-wsa+renesas@sang-engineering.com>
-References: <20181021200053.2194-1-wsa+renesas@sang-engineering.com>
- <20181021200053.2194-6-wsa+renesas@sang-engineering.com>
-Message-ID: <1de46d0b-a241-8ee6-7bf3-eb8ae4c22251@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 5 Nov 2018 15:10:31 +0000
+Subject: [PATCH v2] ARM: dts: replace gpio-key, wakeup with wakeup-source
+ property
+In-Reply-To: <CAOesGMizjKnbDL4nCH5xKMe6=62up-BWJjzRx4TFY-n3XDM6+Q@mail.gmail.com>
+References: <20181105134225.24146-1-sudeep.holla@arm.com>
+ <20181105144330.5zkg4qkacb6afpcm@localhost>
+ <20181105145924.GA25318@e107155-lin>
+ <CAOesGMizjKnbDL4nCH5xKMe6=62up-BWJjzRx4TFY-n3XDM6+Q@mail.gmail.com>
+Message-ID: <20181105151031.GB25318@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/2018 22:00, Wolfram Sang wrote:
-> We should get 'driver_data' from 'struct device' directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On Mon, Nov 05, 2018 at 07:00:42AM -0800, Olof Johansson wrote:
+> On Mon, Nov 5, 2018 at 6:59 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >
+> > On Mon, Nov 05, 2018 at 06:43:30AM -0800, Olof Johansson wrote:
+> > > On Mon, Nov 05, 2018 at 01:42:25PM +0000, Sudeep Holla wrote:
+> > > > Most of the legacy "gpio-key,wakeup" and "enable-sdio-wakeup" boolean
+> > > > properties are already replaced with "wakeup-source". However few
+> > > > occurrences of old property has popped up again, probably from the
+> > > > remnants in downstream trees. Almost all of those were remove couple
+> > > > of years back.
+> > > >
+> > > > Replace those legacy properties with the unified "wakeup-source"
+> > > > property.
+> > > >
+> > > > Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > > > Acked-by: Peter Rosin <peda@axentia.se>
+> > > > Reviewed-by: Fabio Estevam <festevam@gmail.com>
+> > > > Reviewed-by: Michal Simek <michal.simek@xilinx.com>
+> > > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 2 +-
+> > > >  arch/arm/boot/dts/at91-wb45n.dts            | 2 +-
+> > > >  arch/arm/boot/dts/at91-wb50n.dts            | 4 ++--
+> > > >  arch/arm/boot/dts/imx6q-pistachio.dts       | 2 +-
+> > > >  arch/arm/boot/dts/imx6sll-evk.dts           | 2 +-
+> > > >  arch/arm/boot/dts/zynq-zturn.dts            | 2 +-
+> > > >  6 files changed, 7 insertions(+), 7 deletions(-)
+> > > >
+> > > > Hi ARM SoC Team,
+> > > >
+> > > > Though it's more a cleanup, I prefer if this can be pushed as fix
+> > > > to avoid more duplication in downstream as well as having to split into
+> > > > 3 different patches.
+> > >
+> > > Is there a reason you're not fixing up xilinx on arm64 while you're at it? Sort
+> > > of defeats the purpose of removing all usage of it.
+> > >
+> >
+> > Yes, ZynqMP is the only platform using legacy bindings in arm64 and
+> > as Michal mentions he has already taken that one.
+>
+> Ok, please send the others the same way through maintainers then.
+>
 
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+OK, I will do so. I was avoiding to put this silly change in 3 different
+patches :)
 
-> ---
-> 
-> Build tested only. buildbot is happy.
-> 
->  drivers/thermal/zx2967_thermal.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/thermal/zx2967_thermal.c b/drivers/thermal/zx2967_thermal.c
-> index 6acce0bce7c0..145ebf371598 100644
-> --- a/drivers/thermal/zx2967_thermal.c
-> +++ b/drivers/thermal/zx2967_thermal.c
-> @@ -207,8 +207,7 @@ MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
->  #ifdef CONFIG_PM_SLEEP
->  static int zx2967_thermal_suspend(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-> +	struct zx2967_thermal_priv *priv = dev_get_drvdata(dev);
->  
->  	if (priv && priv->clk_topcrm)
->  		clk_disable_unprepare(priv->clk_topcrm);
-> @@ -221,8 +220,7 @@ static int zx2967_thermal_suspend(struct device *dev)
->  
->  static int zx2967_thermal_resume(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-> +	struct zx2967_thermal_priv *priv = dev_get_drvdata(dev);
->  	int error;
->  
->  	error = clk_prepare_enable(priv->clk_topcrm);
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+--
+Regards,
+Sudeep
