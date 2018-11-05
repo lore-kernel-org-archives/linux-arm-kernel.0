@@ -1,74 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  5 Nov 2018 18:51:12 +0800
-Subject: [PATCH] Revert "clk: sunxi-ng: sun50i: h6: Add 2x fixed post-divider
- to MMC module clocks"
-Message-ID: <20181105105112.5631-1-icenowy@aosc.io>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 5 Nov 2018 11:38:57 +0100
+Subject: [PATCH 02/10] drm/sun4i: sun6i_mipi_dsi: Support instruction
+ loop selection
+In-Reply-To: <20181103100900.30313-3-jagan@amarulasolutions.com>
+References: <20181103100900.30313-1-jagan@amarulasolutions.com>
+ <20181103100900.30313-3-jagan@amarulasolutions.com>
+Message-ID: <20181105103857.lp7ayw3p6dbthehg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit c2ff8383cc33c2d9c169e4daf1e37a434c3bb420.
+On Sat, Nov 03, 2018 at 03:38:52PM +0530, Jagan Teki wrote:
+> Instruction loop selection would require before writing
+> loop number registers, so enable idle, LP11 bits on
+> loop selection register.
+> 
+> Reference code available in BSP
+> (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> (dsi_dev[sel]->dsi_inst_loop_sel.dwval = 2<<(4*DSI_INST_ID_LP11) |
+> 	3<<(4*DSI_INST_ID_DLY);
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> index da152c21ec62..077b57ec964c 100644
+> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> @@ -397,6 +397,10 @@ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
+>  	struct mipi_dsi_device *device = dsi->device;
+>  	u16 delay;
+>  
+> +	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
+> +		     DSI_INST_ID_HSC  << (4 * DSI_INST_ID_LP11) |
+> +		     DSI_INST_ID_HSD  << (4 * DSI_INST_ID_DLY));
+> +
 
-This commit seems to lead to eMMC instability on Pine H64 board, both
-model A and model B.
+Please put this with the other instructions settings below.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 43 +++++++++++++---------------
- 1 file changed, 20 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-index 2193e1495086..d425b47cef17 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-@@ -408,29 +408,26 @@ static SUNXI_CCU_GATE(bus_nand_clk, "bus-nand", "ahb3", 0x82c, BIT(0), 0);
+hanks!
+Maxime
  
- static const char * const mmc_parents[] = { "osc24M", "pll-periph0-2x",
- 					    "pll-periph1-2x" };
--static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0", mmc_parents, 0x830,
--					  0, 4,		/* M */
--					  8, 2,		/* N */
--					  24, 3,	/* mux */
--					  BIT(31),	/* gate */
--					  2,		/* post-div */
--					  0);
--
--static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1", mmc_parents, 0x834,
--					  0, 4,		/* M */
--					  8, 2,		/* N */
--					  24, 3,	/* mux */
--					  BIT(31),	/* gate */
--					  2,		/* post-div */
--					  0);
--
--static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc2_clk, "mmc2", mmc_parents, 0x838,
--					  0, 4,		/* M */
--					  8, 2,		/* N */
--					  24, 3,	/* mux */
--					  BIT(31),	/* gate */
--					  2,		/* post-div */
--					  0);
-+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_parents, 0x830,
-+					0, 4,	/* M */
-+					8, 2,	/* N */
-+					24, 3,	/* mux */
-+					BIT(31),/* gate */
-+					0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_parents, 0x834,
-+					0, 4,	/* M */
-+					8, 2,	/* N */
-+					24, 3,	/* mux */
-+					BIT(31),/* gate */
-+					0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_parents, 0x838,
-+					0, 4,	/* M */
-+					8, 2,	/* N */
-+					24, 3,	/* mux */
-+					BIT(31),/* gate */
-+					0);
- 
- static SUNXI_CCU_GATE(bus_mmc0_clk, "bus-mmc0", "ahb3", 0x84c, BIT(0), 0);
- static SUNXI_CCU_GATE(bus_mmc1_clk, "bus-mmc1", "ahb3", 0x84c, BIT(1), 0);
 -- 
-2.18.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/3b9baa0b/attachment.sig>
