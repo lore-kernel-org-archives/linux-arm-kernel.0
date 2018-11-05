@@ -1,82 +1,46 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon,  5 Nov 2018 17:21:57 +0100
-Subject: [PATCH] arm64: dts: meson-gx: Add hdmi_5v regulator as hdmi tx supply
-Message-ID: <1541434917-18126-1-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 5 Nov 2018 17:42:31 +0100
+Subject: [PATCH] ARM64: dts: meson-gxl-s905x-khadas-vim enable Bluetooth
+In-Reply-To: <1539432427-11779-1-git-send-email-christianshewitt@gmail.com>
+References: <1539432427-11779-1-git-send-email-christianshewitt@gmail.com>
+Message-ID: <277b9fee-de65-41e6-4243-c13142191b5c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hdmi_5v regulator must be enabled to provide power to the physical HDMI
-PHY and enables the HDMI 5V presence loopback for the monitor.
+On 13/10/2018 14:07, Christian Hewitt wrote:
+> This enables Bluetooth support for the following models:
+> 
+> - Khadas VIM basic (AP6212) using firmware BCM43438A1.hcd
+> - Khadas VIM pro (AP6255) using firmware BCM4345C0.hcd
+> 
+> The AP6212 module used on the VIM basic has an ID clash with another
+> device. To get Bluetooth working you either need to apply a kernel
+> patch to drivers/bluetooth/btbcm.c so 0x2209 loads BCM43438A1 or the
+> BCM43438A1.hcd firmware must be renamed to BCM43430A1.hcd.
+> 
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+> index d32cf38..7e0717d 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+> @@ -187,6 +187,13 @@
+>  	};
+>  };
+>  
+> +&uart_A {
+> +	bluetooth {
+> +		compatible = "brcm,bcm43438-bt";
+> +		shutdown-gpios = <&gpio GPIOX_17 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> +
+>  /* This is brought out on the Linux_RX (18) and Linux_TX (19) pins: */
+>  &uart_AO {
+>  	status = "okay";
+> 
 
-Fixes: b409f625a6d5 ("ARM64: dts: meson-gx: Add HDMI_5V regulator on selected boards")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts   | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts         | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        | 1 +
- 5 files changed, 5 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-index 765247b..eb8eec8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-@@ -125,6 +125,7 @@
- 	status = "okay";
- 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
- 	pinctrl-names = "default";
-+	phy-supply = <&hdmi_5v>;
- };
- 
- &hdmi_tx_tmds_port {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-index d32cf38..69c28c4 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-@@ -78,6 +78,7 @@
- 	status = "okay";
- 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
- 	pinctrl-names = "default";
-+	phy-supply = <&hdmi_5v>;
- };
- 
- &hdmi_tx_tmds_port {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-index 90a56af..86a7be8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-@@ -155,6 +155,7 @@
- 	status = "okay";
- 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
- 	pinctrl-names = "default";
-+	phy-supply = <&hdmi_5v>;
- };
- 
- &hdmi_tx_tmds_port {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-index 5896e8a..8a39d95 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-@@ -51,6 +51,7 @@
- 	status = "okay";
- 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
- 	pinctrl-names = "default";
-+	phy-supply = <&hdmi_5v>;
- };
- 
- &hdmi_tx_tmds_port {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-index 313f88f..50d2be1 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-@@ -271,6 +271,7 @@
- 	status = "okay";
- 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
- 	pinctrl-names = "default";
-+	phy-supply = <&hdmi_5v>;
- };
- 
- &hdmi_tx_tmds_port {
--- 
-2.7.4
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
