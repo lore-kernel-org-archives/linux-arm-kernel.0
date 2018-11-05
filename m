@@ -1,116 +1,66 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 5 Nov 2018 14:08:29 +0000
-Subject: [PATCH V5 1/1] gpio: vf610: add optional clock support
-In-Reply-To: <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
-References: <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
-Message-ID: <1541426614-17299-1-git-send-email-aisheng.dong@nxp.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 5 Nov 2018 14:08:48 +0000
+Subject: [RFC] arm64: Kconfig: Choose ARM64_64K_PAGES as default
+In-Reply-To: <1541421211-17561-1-git-send-email-zhangkehong@hisilicon.com>
+References: <1541421211-17561-1-git-send-email-zhangkehong@hisilicon.com>
+Message-ID: <db60f42f-c83d-7a9b-b6ba-450fb7970563@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs need the gpio clock to be enabled before accessing
-HW registers. This patch add the optional clock handling.
+Hi,
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: linux-gpio at vger.kernel.org
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v4->v5:
- * refine gpio clk get
- * add remove
-v3->v4: no changes
-v2->v3:
- * error checking updated according to Russell's suggestion:
-   ptr == ERR_PTR(-EPROBE_DEFER)
- * clock independently checking
-v1->v2:
- * new patch
----
- drivers/gpio/gpio-vf610.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+On 05/11/18 12:33, Kehong Zhang wrote:
+> For arm64 performance considerations, change default page size to 64K.
 
-diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-index d4ad6d0..23fdb77 100644
---- a/drivers/gpio/gpio-vf610.c
-+++ b/drivers/gpio/gpio-vf610.c
-@@ -16,6 +16,7 @@
-  */
- 
- #include <linux/bitops.h>
-+#include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/init.h>
-@@ -41,6 +42,8 @@ struct vf610_gpio_port {
- 	void __iomem *gpio_base;
- 	const struct fsl_gpio_soc_data *sdata;
- 	u8 irqc[VF610_GPIO_PER_PORT];
-+	struct clk *clk_port;
-+	struct clk *clk_gpio;
- 	int irq;
- };
- 
-@@ -280,6 +283,33 @@ static int vf610_gpio_probe(struct platform_device *pdev)
- 	if (port->irq < 0)
- 		return port->irq;
- 
-+	port->clk_port = devm_clk_get(&pdev->dev, "port");
-+	if (!IS_ERR(port->clk_port)) {
-+		ret = clk_prepare_enable(port->clk_port);
-+		if (ret)
-+			return ret;
-+	} else if (port->clk_port == ERR_PTR(-EPROBE_DEFER)) {
-+		/*
-+		 * Percolate deferrals, for anything else,
-+		 * just live without the clocking.
-+		 */
-+		return PTR_ERR(port->clk_port);
-+	}
-+
-+	port->clk_gpio = devm_clk_get(&pdev->dev, "gpio");
-+	if (!IS_ERR(port->clk_gpio)) {
-+		ret = clk_prepare_enable(port->clk_gpio);
-+		if (ret) {
-+			clk_disable_unprepare(port->clk_port);
-+			return ret;
-+		}
-+	} else if (port->clk_gpio == ERR_PTR(-EPROBE_DEFER)) {
-+		clk_disable_unprepare(port->clk_port);
-+		return PTR_ERR(port->clk_gpio);
-+	}
-+
-+	platform_set_drvdata(pdev, port);
-+
- 	gc = &port->gc;
- 	gc->of_node = np;
- 	gc->parent = dev;
-@@ -314,12 +344,26 @@ static int vf610_gpio_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int vf610_gpio_remove(struct platform_device *pdev)
-+{
-+	struct vf610_gpio_port *port = platform_get_drvdata(pdev);
-+
-+	gpiochip_remove(&port->gc);
-+	if (!IS_ERR(port->clk_port))
-+		clk_disable_unprepare(port->clk_port);
-+	if (!IS_ERR(port->clk_gpio))
-+		clk_disable_unprepare(port->clk_gpio);
-+
-+	return 0;
-+}
-+
- static struct platform_driver vf610_gpio_driver = {
- 	.driver		= {
- 		.name	= "gpio-vf610",
- 		.of_match_table = vf610_gpio_dt_ids,
- 	},
- 	.probe		= vf610_gpio_probe,
-+	.remove		= vf610_gpio_remove,
- };
- 
- builtin_platform_driver(vf610_gpio_driver);
--- 
-2.7.4
+defconfig never stands for performance. If that was the case, we must
+remove other options that could potentially slow down the performance.
+
+defconfig could be interpreted as more of a "standard" config which
+gives the best effort to make sure you get a usable system overall.
+With this change, a rootfs with AArch32 applications without 64K aligned
+segments would fail, and that breaks the assumption about defconfig.
+
+So, NAK from my side.
+
+Btw, please could you share any performance numbers from the comparison
+with 4K kernel ?
+
+Suzuki
+
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>;
+> Cc: Will Deacon <will.deacon@arm.com>;
+> Signed-off-by: Kehong Zhang <zhangkehong@hisilicon.com>
+> ---
+>   arch/arm64/Kconfig | 10 +++++-----
+>   1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 787d785..56f651f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -620,7 +620,7 @@ endmenu
+>   
+>   choice
+>   	prompt "Page size"
+> -	default ARM64_4K_PAGES
+> +	default ARM64_64K_PAGES
+>   	help
+>   	  Page size (translation granule) configuration.
+>   
+> @@ -639,10 +639,10 @@ config ARM64_16K_PAGES
+>   config ARM64_64K_PAGES
+>   	bool "64KB"
+>   	help
+> -	  This feature enables 64KB pages support (4KB by default)
+> -	  allowing only two levels of page tables and faster TLB
+> -	  look-up. AArch32 emulation requires applications compiled
+> -	  with 64K aligned segments.
+> +	  This feature enables 64KB pages support allowing only two
+> +	  levels of page tables and faster TLB look-up. AArch32
+> +	  emulation requires applications compiled with 64K aligned
+> +	  segments.
+>   
+>   endchoice
+>   
+> 
