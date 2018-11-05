@@ -1,70 +1,116 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Nov 2018 15:06:02 +0100
-Subject: [PATCH] ARM: proc-v7: fix Thumb annotation of cpu_v7_hvc_switch_mm
-In-Reply-To: <c3de69e0-1408-4ac7-d2e2-8d8bcc936df3@arm.com>
-References: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
- <c3de69e0-1408-4ac7-d2e2-8d8bcc936df3@arm.com>
-Message-ID: <CAKv+Gu9y54OGb8cPxDdkcud8i=9mO4MewwMY2f57fiXUNSP=VQ@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 5 Nov 2018 14:08:29 +0000
+Subject: [PATCH V5 1/1] gpio: vf610: add optional clock support
+In-Reply-To: <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
+References: <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
+Message-ID: <1541426614-17299-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2018 at 14:35, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi all,
->
-> On 19/06/18 17:29, Ard Biesheuvel wrote:
->> Due to what appears to be a copy/paste error, the opening ENTRY()
->> of cpu_v7_hvc_switch_mm() lacks a matching ENDPROC(), and instead,
->> the one for cpu_v7_smc_switch_mm() is duplicated.
->>
->> Given that it is ENDPROC() that emits the Thumb annotation, the
->> cpu_v7_hvc_switch_mm() routine will be called in ARM mode on a
->> Thumb2 kernel, resulting in the following splat:
->>
->>   Internal error: Oops - undefined instruction: 0 [#1] SMP THUMB2
->>   Modules linked in:
->>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.0-rc1-00030-g4d28ad89189d-dirty #488
->>   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
->>   PC is at cpu_v7_hvc_switch_mm+0x12/0x18
->>   LR is at flush_old_exec+0x31b/0x570
->>   pc : [<c0316efe>]    lr : [<c04117c7>]    psr: 00000013
->>   sp : ee899e50  ip : 00000000  fp : 00000001
->>   r10: eda28f34  r9 : eda31800  r8 : c12470e0
->>   r7 : eda1fc00  r6 : eda53000  r5 : 00000000  r4 : ee88c000
->>   r3 : c0316eec  r2 : 00000001  r1 : eda53000  r0 : 6da6c000
->>   Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
->>
->> Note the 'ISA ARM' in the last line.
->>
->> Fix this by using the correct name in ENDPROC().
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/mm/proc-v7.S | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->> index 6fe52819e014..339eb17c9808 100644
->> --- a/arch/arm/mm/proc-v7.S
->> +++ b/arch/arm/mm/proc-v7.S
->> @@ -112,7 +112,7 @@ ENTRY(cpu_v7_hvc_switch_mm)
->>       hvc     #0
->>       ldmfd   sp!, {r0 - r3}
->>       b       cpu_v7_switch_mm
->> -ENDPROC(cpu_v7_smc_switch_mm)
->> +ENDPROC(cpu_v7_hvc_switch_mm)
->>  #endif
->>  ENTRY(cpu_v7_iciallu_switch_mm)
->>       mov     r3, #0
->>
->
-> I've just spent a couple of hours chasing this exact bug, only to notice
-> that the problem was already known. Ard, can you please send this to
-> RMK's patch system so that it doesn't get dropped?
->
-> Please add my: Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> and Cc stable, as this is quite an annoying regression.
->
+Some SoCs need the gpio clock to be enabled before accessing
+HW registers. This patch add the optional clock handling.
 
-Thanks
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: linux-gpio at vger.kernel.org
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+v4->v5:
+ * refine gpio clk get
+ * add remove
+v3->v4: no changes
+v2->v3:
+ * error checking updated according to Russell's suggestion:
+   ptr == ERR_PTR(-EPROBE_DEFER)
+ * clock independently checking
+v1->v2:
+ * new patch
+---
+ drivers/gpio/gpio-vf610.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-Queued as #8809
+diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+index d4ad6d0..23fdb77 100644
+--- a/drivers/gpio/gpio-vf610.c
++++ b/drivers/gpio/gpio-vf610.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <linux/bitops.h>
++#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+@@ -41,6 +42,8 @@ struct vf610_gpio_port {
+ 	void __iomem *gpio_base;
+ 	const struct fsl_gpio_soc_data *sdata;
+ 	u8 irqc[VF610_GPIO_PER_PORT];
++	struct clk *clk_port;
++	struct clk *clk_gpio;
+ 	int irq;
+ };
+ 
+@@ -280,6 +283,33 @@ static int vf610_gpio_probe(struct platform_device *pdev)
+ 	if (port->irq < 0)
+ 		return port->irq;
+ 
++	port->clk_port = devm_clk_get(&pdev->dev, "port");
++	if (!IS_ERR(port->clk_port)) {
++		ret = clk_prepare_enable(port->clk_port);
++		if (ret)
++			return ret;
++	} else if (port->clk_port == ERR_PTR(-EPROBE_DEFER)) {
++		/*
++		 * Percolate deferrals, for anything else,
++		 * just live without the clocking.
++		 */
++		return PTR_ERR(port->clk_port);
++	}
++
++	port->clk_gpio = devm_clk_get(&pdev->dev, "gpio");
++	if (!IS_ERR(port->clk_gpio)) {
++		ret = clk_prepare_enable(port->clk_gpio);
++		if (ret) {
++			clk_disable_unprepare(port->clk_port);
++			return ret;
++		}
++	} else if (port->clk_gpio == ERR_PTR(-EPROBE_DEFER)) {
++		clk_disable_unprepare(port->clk_port);
++		return PTR_ERR(port->clk_gpio);
++	}
++
++	platform_set_drvdata(pdev, port);
++
+ 	gc = &port->gc;
+ 	gc->of_node = np;
+ 	gc->parent = dev;
+@@ -314,12 +344,26 @@ static int vf610_gpio_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int vf610_gpio_remove(struct platform_device *pdev)
++{
++	struct vf610_gpio_port *port = platform_get_drvdata(pdev);
++
++	gpiochip_remove(&port->gc);
++	if (!IS_ERR(port->clk_port))
++		clk_disable_unprepare(port->clk_port);
++	if (!IS_ERR(port->clk_gpio))
++		clk_disable_unprepare(port->clk_gpio);
++
++	return 0;
++}
++
+ static struct platform_driver vf610_gpio_driver = {
+ 	.driver		= {
+ 		.name	= "gpio-vf610",
+ 		.of_match_table = vf610_gpio_dt_ids,
+ 	},
+ 	.probe		= vf610_gpio_probe,
++	.remove		= vf610_gpio_remove,
+ };
+ 
+ builtin_platform_driver(vf610_gpio_driver);
+-- 
+2.7.4
