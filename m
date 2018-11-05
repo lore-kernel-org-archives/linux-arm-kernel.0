@@ -1,46 +1,33 @@
-From: zhangkehong@hisilicon.com (Kehong Zhang)
-Date: Mon, 5 Nov 2018 20:33:31 +0800
-Subject: [RFC] arm64: Kconfig: Choose ARM64_64K_PAGES as default
-Message-ID: <1541421211-17561-1-git-send-email-zhangkehong@hisilicon.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 05 Nov 2018 13:35:01 +0100
+Subject: [PATCH v3 0/7] ARM: rockchip: add power-domains for Cortex-A9 socs
+In-Reply-To: <20181023103820.6464-1-heiko@sntech.de>
+References: <20181023103820.6464-1-heiko@sntech.de>
+Message-ID: <6192722.1hSScp9ivE@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For arm64 performance considerations, change default page size to 64K.
+Am Dienstag, 23. Oktober 2018, 12:38:13 CET schrieb Heiko Stuebner:
+> Domain values are done by the book (aka soc documentation for pmu and
+> power-domain <-> ip block connections) and tested with the gpu and the
+> wip lima kernel driver as well as te new vop support on rk3188.
+> 
+> changes in v3:
+> - added spdx license header to dt-binding headers
+> - added Rob's Review for the added compatibles in patch 3
+> changes in v2:
+> - fix typos found by Julien
+> - adapt to changes happening in the power-domain driver since v1
+> - add vop power-domain links for rk3188
+> - drop already applied clock fixes
+> 
+> Heiko Stuebner (7):
+>   dt-bindings: add power-domain header for RK3188 SoCs
+>   dt-bindings: add power-domain header for RK3066 SoCs
+>   dt-bindings: add compatibles for rk3066/rk3188 power controllers
+>   soc: rockchip: power-domain: add rk3188 powerdomains
+>   soc: rockchip: power-domain: add rk3066 powerdomains
+>   ARM: dts: rockchip: add qos nodes found on rk3066 and rk3188
+>   ARM: dts: rockchip: add rk3066/rk3188 power-domains
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>;
-Cc: Will Deacon <will.deacon@arm.com>;
-Signed-off-by: Kehong Zhang <zhangkehong@hisilicon.com>
----
- arch/arm64/Kconfig | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 787d785..56f651f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -620,7 +620,7 @@ endmenu
- 
- choice
- 	prompt "Page size"
--	default ARM64_4K_PAGES
-+	default ARM64_64K_PAGES
- 	help
- 	  Page size (translation granule) configuration.
- 
-@@ -639,10 +639,10 @@ config ARM64_16K_PAGES
- config ARM64_64K_PAGES
- 	bool "64KB"
- 	help
--	  This feature enables 64KB pages support (4KB by default)
--	  allowing only two levels of page tables and faster TLB
--	  look-up. AArch32 emulation requires applications compiled
--	  with 64K aligned segments.
-+	  This feature enables 64KB pages support allowing only two
-+	  levels of page tables and faster TLB look-up. AArch32
-+	  emulation requires applications compiled with 64K aligned
-+	  segments.
- 
- endchoice
- 
--- 
-2.7.4
+applied for 4.21
