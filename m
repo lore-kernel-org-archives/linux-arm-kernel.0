@@ -1,91 +1,105 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 5 Nov 2018 11:11:10 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 02/15] clk: sunxi-ng: Add check for
- minimal rate to NKM PLLs
-In-Reply-To: <e7566001-8933-adbb-4c30-7a3f66ebae4e@openedev.com>
-References: <20181023155035.9101-1-jagan@amarulasolutions.com>
- <20181023155035.9101-3-jagan@amarulasolutions.com>
- <20181024180436.5n3i3z6h2yezc4cv@flea>
- <CAMty3ZC2wn-DjR+93yc-n-bAmVCHaEqR_=4XPddoo+7LjebTEg@mail.gmail.com>
- <20181029085843.3bslqwktxbp2ywk2@flea>
- <e7566001-8933-adbb-4c30-7a3f66ebae4e@openedev.com>
-Message-ID: <20181105101110.agfik3oppd6ck25c@flea>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Mon, 05 Nov 2018 11:21:09 +0100
+Subject: [PATCH v2 1/7] drm/sun4i: tcon: Pass encoder instead of using
+ panel for RGB setup
+In-Reply-To: <20181105085927.tvg5vy3oyygw65z6@flea>
+References: <20181101200045.6078-1-contact@paulk.fr>
+ <20181101200045.6078-2-contact@paulk.fr>
+ <20181105085927.tvg5vy3oyygw65z6@flea>
+Message-ID: <48d864c0da9200ff052ec0cc0879d7b00de23b7a.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2018 at 06:10:47PM +0530, Jagan Teki wrote:
-> On 29/10/18 2:28 PM, Maxime Ripard wrote:
-> > On Thu, Oct 25, 2018 at 04:25:59PM +0530, Jagan Teki wrote:
-> > > On Wed, Oct 24, 2018 at 11:34 PM Maxime Ripard
-> > > <maxime.ripard@bootlin.com> wrote:
-> > > > 
-> > > > On Tue, Oct 23, 2018 at 09:20:22PM +0530, Jagan Teki wrote:
-> > > > > Some NKM PLLs doesn't work well when their output clock rate is set below
-> > > > > certain rate.
-> > > > > 
-> > > > > So, add support for minimal rate for relevant PLLs.
-> > > > > 
-> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > ---
-> > > > > Changes for v2:
-> > > > > - new patch
-> > > > > 
-> > > > >   drivers/clk/sunxi-ng/ccu_nkm.c | 7 +++++++
-> > > > >   drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
-> > > > >   2 files changed, 8 insertions(+)
-> > > > > 
-> > > > > diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> > > > > index 841840e35e61..d17539dc88dd 100644
-> > > > > --- a/drivers/clk/sunxi-ng/ccu_nkm.c
-> > > > > +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> > > > > @@ -125,6 +125,13 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
-> > > > >        if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> > > > >                rate *= nkm->fixed_post_div;
-> > > > > 
-> > > > > +     if (rate < nkm->min_rate) {
-> > > > > +             rate = nkm->min_rate;
-> > > > > +             if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> > > > > +                     rate /= nkm->fixed_post_div;
-> > > > 
-> > > > I'm not sure this is right. Is the post divider taken into account to
-> > > > calculate the minimum, or is the minimum on the rate before the fixed
-> > > > post divider.
-> > > 
-> > > Since we are returning from here, we need to take care post div which
-> > > is actually doing at the end of round_rate.
-> > 
-> > That's not my point though. Does the rate needs to be superior to min
-> > / post_div, or min?
-> 
-> ie what I'm trying to say, since it's common code min or max should /
-> post_div and PLL_MIPI doesn't use any post_div.
-> 
-> We need to take care post_div though the current test (PLL_MIPI) in not used
-> since it's common code. just like nkmp, nm etc.
-> 
-> > 
-> > > > 
-> > > > How did you test this?
-> > > 
-> > > I've not used this on PLL_MIPI atleast, so I didn't test this.
-> > 
-> > If you've never tested this, why are you adding that code?
-> 
-> Like above, it's common code. otherwise might effect.
+Hi,
 
-Adding untested, unverified and unneeded code is just bloat, nothing
-else.
+Le lundi 05 novembre 2018 ? 09:59 +0100, Maxime Ripard a ?crit :
+> Hi,
+> 
+> On Thu, Nov 01, 2018 at 09:00:39PM +0100, Paul Kocialkowski wrote:
+> > Features such as dithering and pixel data edge configuration currently
+> > rely on the panel registered with the TCON driver. However, bridges are
+> > also supported in addition panels.
+> > 
+> > Instead of retrieving the connector from the panel, pass the encoder
+> > from the calling function, as is done for other interfaces.
+> > 
+> > The connector is then retrieved from the encoder with the dedicated
+> > helper. Even in the case of bridges, the connector is registered with
+> > the encoder from our driver and is accessible when iterating connectors.
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 +++++++++-------------
+> >  1 file changed, 9 insertions(+), 13 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > index f949287d926c..262ffb6b0f82 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > @@ -478,8 +478,11 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
+> >  }
+> >  
+> >  static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+> > +				     const struct drm_encoder *encoder,
+> >  				     const struct drm_display_mode *mode)
+> >  {
+> > +	struct drm_connector *connector = sun4i_tcon_get_connector(encoder);
+> > +	struct drm_display_info display_info = connector->display_info;
+> >  	unsigned int bp, hsync, vsync;
+> >  	u8 clk_delay;
+> >  	u32 val = 0;
+> > @@ -491,8 +494,7 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+> >  	sun4i_tcon0_mode_set_common(tcon, mode);
+> >  
+> >  	/* Set dithering if needed */
+> > -	if (tcon->panel)
+> > -		sun4i_tcon0_mode_set_dithering(tcon, tcon->panel->connector);
+> > +	sun4i_tcon0_mode_set_dithering(tcon, connector);
+> >  
+> >  	/* Adjust clock delay */
+> >  	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+> > @@ -556,17 +558,11 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+> >  	 * Following code is a way to avoid quirks all around TCON
+> >  	 * and DOTCLOCK drivers.
+> >  	 */
+> > -	if (tcon->panel) {
+> > -		struct drm_panel *panel = tcon->panel;
+> > -		struct drm_connector *connector = panel->connector;
+> > -		struct drm_display_info display_info = connector->display_info;
+> > -
+> > -		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
+> > -			clk_set_phase(tcon->dclk, 240);
+> > +	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
+> > +		clk_set_phase(tcon->dclk, 240);
+> >  
+> > -		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
+> > -			clk_set_phase(tcon->dclk, 0);
+> > -	}
+> > +	if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
+> > +		clk_set_phase(tcon->dclk, 0);
+> 
+> You're doing multiple things here: you're changing the function API,
+> and then moving the display info checks outside of the tcon->panel
+> condition.
+> 
+> You should do two separate patches for that.
 
-Maxime
+Thanks, I'll do that in the next revision then.
+
+Cheers,
+
+Paul
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Developer of free digital technology and hardware support.
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/f346d14c/attachment.sig>
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/fb443ab5/attachment-0001.sig>
