@@ -1,105 +1,45 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 5 Nov 2018 10:19:22 +0100
-Subject: sama5d: using the ebi interface from another driver
-In-Reply-To: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
-References: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
-Message-ID: <20181105091922.gws52ledkqwc46xx@M43218.corp.atmel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 5 Nov 2018 10:19:37 +0100
+Subject: [PATCH 05/14] ARM: ttc_dkb: add an instance of pxa-usb-phy
+In-Reply-To: <20180822204307.13251-6-lkundrak@v3.sk>
+References: <20180822204307.13251-1-lkundrak@v3.sk>
+ <20180822204307.13251-6-lkundrak@v3.sk>
+Message-ID: <20181105091937.GG4439@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Michel,
+On Wed 2018-08-22 22:42:58, Lubomir Rintel wrote:
+> This will replace the ttc_usb_pdata.phy_{de,}init()>
 
-On Fri, Nov 02, 2018 at 02:35:26PM +0100, Jean-Michel Hautbois wrote:
-> Hi all,
-> 
-> I have a custom board based on a sama5d3 chip. The SoC is connected to
-> 2 pef24628 SHDSL transceivers, the first one on ebi at 40000000 and the
-> second one on ebi at 50000000.
-> I tried to write a basic char driver, using request_mem_region and
-> ioremap but I can't read or write into the device.
-> I have to say that the driver is based on a proprietary one, and
-> tested years ago on a PowerPC board.
-> 
-> Then, after looking into deeper details in the datasheet I understand
-> it is connected through EBI and it sounds not so easy :D.
-> 
-> I would appreciate some help/pointers on this, as there is (at least,
-> I could find) few documentation on how to use it except for NAND
-> cases.
-> 
-> I have something like that in my DTS, but not sure this is the correct
-> way to do it :
-> 
->         ebi: ebi at 10000000 {
->             pinctrl-0 = <&pinctrl_ebi_nand_addr>;
->             pinctrl-names = "default";
->             status = "okay";
-> 
->             dsp0: pef24628 at 1 {
->                 status = "okay";
->                 compatible = "intel,pef24628";
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 reg = <0x1 0x0 0x8000>;
->                 pinctrl-0 = <&pinctrl_dsp_cs1>;
->             };
-> 
->             dsp1: pef24628 at 2 {
->                 status = "okay";
->                 compatible = "intel,pef24628";
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 reg = <0x2 0x0 0x8000>;
->                 pinctrl-0 = <&pinctrl_dsp_cs2>;
->             };
-> 
->             nand_controller: nand-controller {
->                 status = "okay";
-> 
->                 nand at 3 {
->                     reg = <0x3 0x0 0x2>;
->                     atmel,rb = <0>;
->                     nand-bus-width = <8>;
->                     nand-ecc-mode = "hw";
->                     nand-ecc-strength = <4>;
->                     nand-ecc-step-size = <512>;
->                     nand-on-flash-bbt;
->                     label = "atmel_nand";
-> 
->                     partitions {
->                         compatible = "fixed-partitions";
->                         #address-cells = <1>;
->                         #size-cells = <1>;
-> [...]
->                     };
->                 };
->             };
-> 
-> The pinctrl for ebi should probably be changed however, I am wondering
-> how the (platform ?) driver can access the adress ? Should it parse
-> itself the parent, and find range, etc. Or is there an accessor for it
-> ?
+">" -> "."?
 
-At first look, your DT seems correct. You have nothing special to do,
-the usual platform_get_resource() and devm_ioremap_resource() calls are enough.
-The address translation should be done automatically according to ranges
-property.
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 
-Another hint is to check and specify the signals timings.
+Acked-by: Pavel Machek <pavel@ucw.cz>
 
-Regards
-
-Ludovic
-
+>  arch/arm/mach-mmp/ttc_dkb.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> Maybe can I just manually toggle the CS GPIO, and don't try to make
-> anything more complex than what it should be ? The driver should not
-> be atmel dependant...
-> 
-> Thanks !
-> JM
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+> index c7897fb2b6da..767dcb23ee1c 100644
+> --- a/arch/arm/mach-mmp/ttc_dkb.c
+> +++ b/arch/arm/mach-mmp/ttc_dkb.c
+> @@ -282,6 +282,10 @@ static void __init ttc_dkb_init(void)
+>  				 sizeof(struct pxa_gpio_platform_data));
+>  	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+>  
+> +#if IS_ENABLED(CONFIG_PHY_PXA_USB)
+> +	platform_device_register(&pxa168_device_usb_phy);
+> +#endif
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/a273ff2c/attachment.sig>
