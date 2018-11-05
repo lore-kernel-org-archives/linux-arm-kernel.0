@@ -1,23 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Nov 2018 16:17:27 -0600
-Subject: [PATCHv2 3/6] PCI: layerscape: Add the EP mode support
-In-Reply-To: <20181105084653.26597-3-xiaowei.bao@nxp.com>
-References: <20181105084653.26597-1-xiaowei.bao@nxp.com>
- <20181105084653.26597-3-xiaowei.bao@nxp.com>
-Message-ID: <20181105221727.GA7729@bogus>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon,  5 Nov 2018 15:26:27 -0700
+Subject: [PATCH 0/3] coresight: Fix miscellaneous problems with CLAIM tags 
+Message-ID: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Nov 2018 16:46:50 +0800, Xiaowei Bao wrote:
-> Add the EP mode support.
-> 
-> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
-> ---
-> v2:
->  - Add the SoC specific compatibles.
-> 
->  .../devicetree/bindings/pci/layerscape-pci.txt     |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
+This set addresses 3 problems observed with the CLAIM tag feature.  The first
+patch adds support for CLAIM tags to the ETB10 drivers.  The second and third
+patch deal with releasing the tags on ETF and ETM3x devices.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Review and testing would be appreciated.
+
+Regards,
+Mathieu
+
+Mathieu Poirier (3):
+  coresight: etb10: Add support for CLAIM tag
+  coresight: etf: Release CLAIM tag after disabling the HW
+  coresight: etm3x: Release CLAIM tag when operated from perf
+
+ drivers/hwtracing/coresight/coresight-etb10.c   | 23 +++++++++++++++++------
+ drivers/hwtracing/coresight/coresight-etm3x.c   |  2 ++
+ drivers/hwtracing/coresight/coresight-tmc-etf.c |  2 +-
+ 3 files changed, 20 insertions(+), 7 deletions(-)
+
+-- 
+2.7.4
