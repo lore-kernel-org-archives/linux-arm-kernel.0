@@ -1,54 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 5 Nov 2018 10:20:10 +0100
-Subject: [PATCH 14/14] DT: marvell,mmp2: add USB OTG host controller
-In-Reply-To: <20180822204307.13251-15-lkundrak@v3.sk>
-References: <20180822204307.13251-1-lkundrak@v3.sk>
- <20180822204307.13251-15-lkundrak@v3.sk>
-Message-ID: <20181105092010.GL4439@amd>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 5 Nov 2018 09:54:36 +0000
+Subject: [GIT PULL] sprd dts for kernel v4.20-rc1
+In-Reply-To: <20181102183246.r5xxwsic2mxwihsi@localhost>
+References: <1539854253-4784-1-git-send-email-chunyan.zhang@unisoc.com>
+ <20181102183246.r5xxwsic2mxwihsi@localhost>
+Message-ID: <8fe7491c-74de-3192-c583-37cd1583cfd6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-08-22 22:43:07, Lubomir Rintel wrote:
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> ---
->  arch/arm/boot/dts/mmp2.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+Hi Olof,
 
-Again, I guess this could be merged with the previous patch. Anyway,
-it is also good to go as-is.
+On 02/11/18 18:32, Olof Johansson wrote:
+> On Thu, Oct 18, 2018 at 05:17:33PM +0800, Chunyan Zhang wrote:
+>> Hi Arnd,
+>>
+>> For 4.20-rc1 there's one patch only for sprd devicetree, please pull from my git tree:
+>>
+>> https://github.com/lyrazhang/linux.git m-v4.19-rc1
+>>
+>> Please let me know if there's some problem.
+>>
+>> Thanks,
+>> Chunyan
+>>
+>> ----------------------------------------------------------------
+>>
+>> Suzuki K Poulose (1):
+>>    arm64: dts: sc9836/sc9860: Update coresight bindings for hardware
+>>      ports
+>>
+>>   arch/arm64/boot/dts/sprd/sc9836.dtsi |  78 +++++++------
+>>   arch/arm64/boot/dts/sprd/sc9860.dtsi | 215 ++++++++++++++++++-----------------
+>>   2 files changed, 151 insertions(+), 142 deletions(-)
+> 
+> Hi,
+> 
+> This came in right before the merge window so it wasn't included since
+> it's more of a cleanup.
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+A minor correction. This is not really a cleanup, but upgrading the
+bindings to the new DTS bindings for Coresight. The driver will now
+complain about old bindings, which could be hit on these boards. Not
+the end of the world, it could be queued for 4.21.
 
-> diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-> index 14a3448f38b9..63d4d5c6fd83 100644
-> --- a/arch/arm/boot/dts/mmp2.dtsi
-> +++ b/arch/arm/boot/dts/mmp2.dtsi
-> @@ -124,6 +124,17 @@
->  				#phy-cells = <0>;
->  				status = "disabled";
->  			};
-> +
-> +			usb_otg0: usb-otg at d4208000 {
-> +				compatible = "marvell,pxau2o-ehci";
-> +				reg = <0xd4208000 0x200>;
-> +				interrupts = <44>;
-> +				clocks = <&soc_clocks MMP2_CLK_USB>;
-> +				clock-names = "USBCLK";
-> +				phys = <&usb_otg_phy0>;
-> +				phy-names = "usb";
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		apb at d4000000 {	/* APB */
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181105/72251b82/attachment.sig>
+Cheers
+Suzuki
