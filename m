@@ -1,69 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Nov 2018 13:35:01 +0000
-Subject: [PATCH] ARM: proc-v7: fix Thumb annotation of cpu_v7_hvc_switch_mm
-In-Reply-To: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
-References: <20180619162919.25190-1-ard.biesheuvel@linaro.org>
-Message-ID: <c3de69e0-1408-4ac7-d2e2-8d8bcc936df3@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 5 Nov 2018 14:42:18 +0100
+Subject: [PATCH v10 5/6] arm64: zynqmp: Add DDRC node
+In-Reply-To: <a81f47e0-1778-a6ac-4cd8-634502661d6f@xilinx.com>
+References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
+ <1540447621-22870-6-git-send-email-manish.narani@xilinx.com>
+ <20181105125644.GA7937@zn.tnic>
+ <41c5ca53-ed4b-38d0-c612-e1229004293e@xilinx.com>
+ <20181105132007.GB7937@zn.tnic>
+ <a81f47e0-1778-a6ac-4cd8-634502661d6f@xilinx.com>
+Message-ID: <20181105134218.GD7937@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Nov 05, 2018 at 02:32:55PM +0100, Michal Simek wrote:
+> you don't have that HW anyway.
 
-On 19/06/18 17:29, Ard Biesheuvel wrote:
-> Due to what appears to be a copy/paste error, the opening ENTRY()
-> of cpu_v7_hvc_switch_mm() lacks a matching ENDPROC(), and instead,
-> the one for cpu_v7_smc_switch_mm() is duplicated.
-> 
-> Given that it is ENDPROC() that emits the Thumb annotation, the
-> cpu_v7_hvc_switch_mm() routine will be called in ARM mode on a
-> Thumb2 kernel, resulting in the following splat:
-> 
->   Internal error: Oops - undefined instruction: 0 [#1] SMP THUMB2
->   Modules linked in:
->   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.0-rc1-00030-g4d28ad89189d-dirty #488
->   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
->   PC is at cpu_v7_hvc_switch_mm+0x12/0x18
->   LR is at flush_old_exec+0x31b/0x570
->   pc : [<c0316efe>]    lr : [<c04117c7>]    psr: 00000013
->   sp : ee899e50  ip : 00000000  fp : 00000001
->   r10: eda28f34  r9 : eda31800  r8 : c12470e0
->   r7 : eda1fc00  r6 : eda53000  r5 : 00000000  r4 : ee88c000
->   r3 : c0316eec  r2 : 00000001  r1 : eda53000  r0 : 6da6c000
->   Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> 
-> Note the 'ISA ARM' in the last line.
-> 
-> Fix this by using the correct name in ENDPROC().
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/mm/proc-v7.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 6fe52819e014..339eb17c9808 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -112,7 +112,7 @@ ENTRY(cpu_v7_hvc_switch_mm)
->  	hvc	#0
->  	ldmfd	sp!, {r0 - r3}
->  	b	cpu_v7_switch_mm
-> -ENDPROC(cpu_v7_smc_switch_mm)
-> +ENDPROC(cpu_v7_hvc_switch_mm)
->  #endif
->  ENTRY(cpu_v7_iciallu_switch_mm)
->  	mov	r3, #0
-> 
+Grrr, I'm not talking about me - I'm talking about people testing
+linux-next. And perhaps in this particular case it won't matter because
+this hw is not shipping yet or whatever but the question is about the
+principle of the whole thing.
 
-I've just spent a couple of hours chasing this exact bug, only to notice
-that the problem was already known. Ard, can you please send this to
-RMK's patch system so that it doesn't get dropped?
+> I looked at v10 and I can't see your ack there. Can you please give me
+> a link?
 
-Please add my: Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-and Cc stable, as this is quite an annoying regression.
+I'm talking about *other* patches for another driver.
 
-Thanks,
+Please note that I'm replying to this thread as an example - the
+procedural question I have is not only related to the synopsys changes
+but the synopsys changes are a good example for the problem of EDAC
+changes being sent to me along with DT additions.
 
-	M.
+As such, the question was aimed more at arm-soc people - that's why they
+were in To: - not at you.
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
