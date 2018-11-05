@@ -1,57 +1,71 @@
-From: jeyu@kernel.org (Jessica Yu)
-Date: Mon, 5 Nov 2018 20:49:09 +0100
-Subject: [PATCH v2] arm64/module: use plt section indices for relocations
-In-Reply-To: <20181105192637.GB25023@brain-police>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <20181105175722.removbbpilqxu7tr@redbean>
- <20181105185323.hgoflyvkyujdyjxj@redbean>
- <20181105192637.GB25023@brain-police>
-Message-ID: <20181105194909.djdmrpqkgu26nbp5@redbean>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Nov 2018 20:21:31 +0100
+Subject: [PATCH 0/6] ARM: compressed: clean up section layout and enable
+ EFI debugging
+In-Reply-To: <20181105191450.GX30658@n2100.armlinux.org.uk>
+References: <20181105184438.19494-1-ard.biesheuvel@linaro.org>
+ <20181105190908.GV30658@n2100.armlinux.org.uk>
+ <CAKv+Gu8rQZ49uB6qVqZj4QWGjCLv1LGcSkDrZ-TEZMN5JbQ6FQ@mail.gmail.com>
+ <20181105191450.GX30658@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu8A4eujw=UhW-EZiaSw+p3NUT0HbcuDh-5d_3YHzmzfSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Will Deacon [05/11/18 19:26 +0000]:
->On Mon, Nov 05, 2018 at 07:53:23PM +0100, Jessica Yu wrote:
->> Instead of saving a pointer to the .plt and .init.plt sections to apply
->> plt-based relocations, save and use their section indices instead.
+On 5 November 2018 at 20:14, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Nov 05, 2018 at 08:10:48PM +0100, Ard Biesheuvel wrote:
+>> On 5 November 2018 at 20:09, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>> > On Mon, Nov 05, 2018 at 07:44:32PM +0100, Ard Biesheuvel wrote:
+>> >> Currently, the decompressor section layout is somewhat unusual: head.S
+>> >> puts code into a .start and a .text section, which are expected to be
+>> >> emitted back to back, unless other objects are included that define a
+>> >> .start section as well, in which case execution is expected to proceed
+>> >> linearly from head.S's section .start section into the other .start
+>> >> section and then onward into head.S's .text section.
+>> >>
+>> >> This relies on the input files to be consumed by the linker in the same
+>> >> order they were specified on the command line, but this is not actually
+>> >> guaranteed by the linker, so it is better to make the inclusion of this
+>> >> code specific by using function calls.
+>> >
+>> > I think you're wrong about that - as I've pointed out, this behaviour
+>> > is relied upon quite heavily when linking programs using GCC, so while
+>> > it may not be explicitly specified, the fact that GCC relies upon it
+>> > when creating shared libraries (using crti.o before any object files,
+>> > and crtn.o at the end) means that it's pretty much guaranteed.
+>> >
+>> > What is less guaranteed is proceeding between two sections, but these
+>> > separate sections in object files are combined into one .text section
+>> > in the output file, and so we know that code in .start will be present
+>> > _before_ any code in .text.
+>> >
+>> > Put the two things together, and the code from head.S will be listed
+>> > first, and therefore will be output first in the .start and .text
+>> > sections.  Other object files will have code placed into the output
+>> > .text section accordingly.
+>> >
+>> > So really I see no point to your patch 1 to 5, other than change for
+>> > change's sake.
+>> >
+>> > Can you _prove_ that there is a problem here - if you can, it's likely
+>> > that such a problem also affects gcc -shared too.
+>> >
 >>
->> The mod->arch.{core,init}.plt pointers were problematic for livepatch
->> because they pointed within temporary section headers (provided by the
->> module loader via info->sechdrs) that would be freed after module load.
->> Since livepatch modules may need to apply relocations post-module-load
->> (for example, to patch a module that is loaded later), using section
->> indices to offset into the section headers (instead of accessing them
->> through a saved pointer) allows livepatch modules on arm64 to pass in
->> their own copy of the section headers to apply_relocate_add() to apply
->> delayed relocations.
->>
->> Signed-off-by: Jessica Yu <jeyu@kernel.org>
->> ---
->>
->> v2:
->>
->> - Do sechdrs[pltsec->plt_shndx].sh_addr instead of pointer math
->>
->> Note: Addressed Will's comment about the pltsec -> plt_info rename and
->> removed that change to reduce unnecessary code churn. I didn't include the
->> Ack's for this reason so let me know if this version is OK as well.
+>> As I replied in the other patch, GCC's builtin linker script uses
+>> SORT_NONE(), and probably does so for a reason.
 >
->Thanks, Jessica!
+> To disregard any command line section sorting option that may be
+> supplied by the user.  That is not the case here.  Please read the
+> LD manual, specifically the "Input Section Wildcards" section.
 >
->Acked-by: Will Deacon <will.deacon@arm.com>
->
->> arch/arm64/include/asm/module.h |  8 +++++---
->> arch/arm64/kernel/module-plts.c | 36 ++++++++++++++++++++----------------
->> arch/arm64/kernel/module.c      |  9 +++++----
->> 3 files changed, 30 insertions(+), 23 deletions(-)
->
->Actually, I guess I should just queue this for 4.21 given that it's
->completely self-contained.
 
-Yes, that's fine :-) Then Torsten won't have to include this patch to his
-patchset.
+Ok, fair enough. So it is indeed guaranteed by the linker, but it is
+still unusual, and needlessly fragile IMHO (e.g., if anyone ever
+enables sorting by alignment for code size reasons, this could break
+subtly)
 
-Thank you!
-
-Jessica
+In any case, the changes aren't entirely pointless: they are also a
+prerequisite for tweaking the ELF output section layout to match the
+PE/COFF section layout (#5), which in turn is a prerequisite for patch
+#6. Do you have another suggestion on how to approach that?
