@@ -1,44 +1,66 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 5 Nov 2018 14:10:31 +0000
-Subject: [PATCH V4 04/10] gpio: vf610: add optional clock support
-In-Reply-To: <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
-References: <1541149669-10857-1-git-send-email-aisheng.dong@nxp.com>
- <1541149669-10857-5-git-send-email-aisheng.dong@nxp.com>
- <CACRpkdaO-cUd7wVksboUU0-qu20aBo370Rio=GkNH11U0CB4Jw@mail.gmail.com>
-Message-ID: <AM0PR04MB42117A904BCB651591B1075480CA0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Mon,  5 Nov 2018 15:15:11 +0100
+Subject: [PATCH] clocksource: imx-gpt: remove unnecessary irq protection
+Message-ID: <20181105141511.30657-1-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Friday, November 2, 2018 5:37 PM
-[...]
-> On Fri, Nov 2, 2018 at 10:12 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
-> 
-> > Some SoCs need the gpio clock to be enabled before accessing HW
-> > registers. This patch add the optional clock handling.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Stefan Agner <stefan@agner.ch>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: linux-gpio at vger.kernel.org
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> > v2->v3:
-> >  * error checking updated according to Russell's suggestion:
-> >    ptr == ERR_PTR(-EPROBE_DEFER)
-> >  * clock independently checking
-> 
-> Please look at my feedback for v2 as well, sorry for the synchronization
-> problems here... Didn't see this version until after replying.
-> 
+shutdown and oneshot are already protected against irq interruptions
 
-Thanks for the suggestion.
-I just sent an updated version in reply to this thread.
-Please help check if it's okay to you.
+Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+---
+ drivers/clocksource/timer-imx-gpt.c | 17 -----------------
+ 1 file changed, 17 deletions(-)
 
-Regards
-Dong Aisheng
-
-> Yours,
-> Linus Walleij
+diff --git a/drivers/clocksource/timer-imx-gpt.c b/drivers/clocksource/timer-imx-gpt.c
+index 165fbbb1c9a0..48e025e8dc82 100644
+--- a/drivers/clocksource/timer-imx-gpt.c
++++ b/drivers/clocksource/timer-imx-gpt.c
+@@ -198,15 +198,8 @@ static int v2_set_next_event(unsigned long evt,
+ static int mxc_shutdown(struct clock_event_device *ced)
+ {
+ 	struct imx_timer *imxtm = to_imx_timer(ced);
+-	unsigned long flags;
+ 	u32 tcn;
+ 
+-	/*
+-	 * The timer interrupt generation is disabled at least
+-	 * for enough time to call mxc_set_next_event()
+-	 */
+-	local_irq_save(flags);
+-
+ 	/* Disable interrupt in GPT module */
+ 	imxtm->gpt->gpt_irq_disable(imxtm);
+ 
+@@ -221,21 +214,12 @@ static int mxc_shutdown(struct clock_event_device *ced)
+ 	printk(KERN_INFO "%s: changing mode\n", __func__);
+ #endif /* DEBUG */
+ 
+-	local_irq_restore(flags);
+-
+ 	return 0;
+ }
+ 
+ static int mxc_set_oneshot(struct clock_event_device *ced)
+ {
+ 	struct imx_timer *imxtm = to_imx_timer(ced);
+-	unsigned long flags;
+-
+-	/*
+-	 * The timer interrupt generation is disabled at least
+-	 * for enough time to call mxc_set_next_event()
+-	 */
+-	local_irq_save(flags);
+ 
+ 	/* Disable interrupt in GPT module */
+ 	imxtm->gpt->gpt_irq_disable(imxtm);
+@@ -260,7 +244,6 @@ static int mxc_set_oneshot(struct clock_event_device *ced)
+ 	 * mode switching
+ 	 */
+ 	imxtm->gpt->gpt_irq_enable(imxtm);
+-	local_irq_restore(flags);
+ 
+ 	return 0;
+ }
+-- 
+2.19.1
