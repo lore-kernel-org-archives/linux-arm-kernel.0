@@ -1,232 +1,84 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Nov 2018 19:04:03 +0100
-Subject: [PATCH] arm64/module: use plt section indices for relocations
-In-Reply-To: <20181105175722.removbbpilqxu7tr@redbean>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141652.5478C68BE1@newverein.lst.de>
- <20181105175722.removbbpilqxu7tr@redbean>
-Message-ID: <CAKv+Gu8nd2gyX6K8uAWig7BQa=qFMTajPKgEYPLcHkxmYedgsA@mail.gmail.com>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Mon, 5 Nov 2018 18:11:36 +0000
+Subject: [PATCH v3] PCI: imx6: Check for link training status in link up check
+Message-ID: <20181105181117.23230-1-tpiepho@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2018 at 18:57, Jessica Yu <jeyu@kernel.org> wrote:
-> Instead of saving a pointer to the .plt and .init.plt sections to apply
-> plt-based relocations, save and use their section indices instead.
->
-> The mod->arch.{core,init}.plt pointers were problematic for livepatch
-> because they pointed within temporary section headers (provided by the
-> module loader via info->sechdrs) that would be freed after module load.
-> Since livepatch modules may need to apply relocations post-module-load
-> (for example, to patch a module that is loaded later), using section
-> indices to offset into the section headers (instead of accessing them
-> through a saved pointer) allows livepatch modules on arm64 to pass in
-> their own copy of the section headers to apply_relocate_add() to apply
-> delayed relocations.
->
-> Signed-off-by: Jessica Yu <jeyu@kernel.org>
-> ---
->
-> Note: Addressed Will's comment about the pltsec -> plt_info rename and
-> removed that change to reduce unnecessary code churn. That is the only
-> change from the first version. I didn't include the Ack's for this reason
-> so let me know if this version is OK as well.
->
-> arch/arm64/include/asm/module.h |  8 +++++---
-> arch/arm64/kernel/module-plts.c | 36 ++++++++++++++++++++----------------
-> arch/arm64/kernel/module.c      |  9 +++++----
-> 3 files changed, 30 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/module.h
-> b/arch/arm64/include/asm/module.h
-> index 97d0ef12e2ff..f81c1847312d 100644
-> --- a/arch/arm64/include/asm/module.h
-> +++ b/arch/arm64/include/asm/module.h
-> @@ -22,7 +22,7 @@
->
-> #ifdef CONFIG_ARM64_MODULE_PLTS
-> struct mod_plt_sec {
-> -       struct elf64_shdr       *plt;
-> +       int                     plt_shndx;
->         int                     plt_num_entries;
->         int                     plt_max_entries;
-> };
-> @@ -36,10 +36,12 @@ struct mod_arch_specific {
-> };
-> #endif
->
-> -u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela
-> *rela,
-> +u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
-> +                         void *loc, const Elf64_Rela *rela,
->                           Elf64_Sym *sym);
->
-> -u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val);
-> +u64 module_emit_veneer_for_adrp(struct module *mod, Elf64_Shdr *sechdrs,
-> +                               void *loc, u64 val);
->
-> #ifdef CONFIG_RANDOMIZE_BASE
-> extern u64 module_alloc_base;
-> diff --git a/arch/arm64/kernel/module-plts.c
-> b/arch/arm64/kernel/module-plts.c
-> index f0690c2ca3e0..c04b0d6abde0 100644
-> --- a/arch/arm64/kernel/module-plts.c
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -16,12 +16,13 @@ static bool in_init(const struct module *mod, void *loc)
->         return (u64)loc - (u64)mod->init_layout.base <
-> mod->init_layout.size;
-> }
->
-> -u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela
-> *rela,
-> +u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
-> +                         void *loc, const Elf64_Rela *rela,
->                           Elf64_Sym *sym)
-> {
->         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
->                                                           &mod->arch.init;
-> -       struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
-> +       struct plt_entry *plt = (struct plt_entry *)(sechdrs +
-> pltsec->plt_shndx)->sh_addr;
+Eliminate imx6_pcie_link_up() so that the default handler,
+dw_pcie_link_up(), is used instead.  The default handler has the correct
+code, which checks for link up and also not still training.
 
-What's wrong with
+This bug was fixed some time ago, but the fix was lost in the merge
+commit 562df5c8521e ("Merge branch 'pci/host-designware' into next").
 
-(struct plt_entry *)sechdrs[pltsec->plt_shndx].sh_addr
+This was due to the interaction for two commits on either branch of the
+merge.  Commit 4d107d3b5a68 ("PCI: imx6: Move link up check into
+imx6_pcie_wait_for_link()"), changed imx6_pcie_wait_for_link() to poll
+the link status register directly, checking for link up and not
+training, and made imx6_pcie_link_up() only check the link up bit (once,
+not a polling loop).
 
-?
+While commit commit 886bc5ceb5cc ("PCI: designware: Add generic
+dw_pcie_wait_for_link()"), replaced the loop in
+imx6_pcie_wait_for_link() with a call to a new dwc core function, which
+polled imx6_pcie_link_up(), which still checked both link up and not
+training in a loop.
 
+When these two commits were merged, the version of
+imx6_pcie_wait_for_link() from '886 was kept, which eliminated the link
+training check placed there by '4d1.  But the version of
+imx6_pcie_link_up() from '4d1 was kept, which eliminated the link
+training check that had been there and was moved to
+imx6_pcie_wait_for_link().
 
->         int i = pltsec->plt_num_entries;
->         u64 val = sym->st_value + rela->r_addend;
->
-> @@ -43,11 +44,12 @@ u64 module_emit_plt_entry(struct module *mod, void *loc,
-> const Elf64_Rela *rela,
-> }
->
-> #ifdef CONFIG_ARM64_ERRATUM_843419
-> -u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
-> +u64 module_emit_veneer_for_adrp(struct module *mod, Elf64_Shdr *sechdrs,
-> +                               void *loc, u64 val)
-> {
->         struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
->                                                           &mod->arch.init;
-> -       struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
-> +       struct plt_entry *plt = (struct plt_entry *)(sechdrs +
-> pltsec->plt_shndx)->sh_addr;
->         int i = pltsec->plt_num_entries++;
->         u32 mov0, mov1, mov2, br;
->         int rd;
-> @@ -202,7 +204,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->         unsigned long core_plts = 0;
->         unsigned long init_plts = 0;
->         Elf64_Sym *syms = NULL;
-> -       Elf_Shdr *tramp = NULL;
-> +       Elf_Shdr *pltsec, *tramp = NULL;
->         int i;
->
->         /*
-> @@ -211,9 +213,9 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->          */
->         for (i = 0; i < ehdr->e_shnum; i++) {
->                 if (!strcmp(secstrings + sechdrs[i].sh_name, ".plt"))
-> -                       mod->arch.core.plt = sechdrs + i;
-> +                       mod->arch.core.plt_shndx = i;
->                 else if (!strcmp(secstrings + sechdrs[i].sh_name,
-> ".init.plt"))
-> -                       mod->arch.init.plt = sechdrs + i;
-> +                       mod->arch.init.plt_shndx = i;
->                 else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
->                          !strcmp(secstrings + sechdrs[i].sh_name,
->                                  ".text.ftrace_trampoline"))
-> @@ -222,7 +224,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->                         syms = (Elf64_Sym *)sechdrs[i].sh_addr;
->         }
->
-> -       if (!mod->arch.core.plt || !mod->arch.init.plt) {
-> +       if (!mod->arch.core.plt_shndx || !mod->arch.init.plt_shndx) {
->                 pr_err("%s: module PLT section(s) missing\n", mod->name);
->                 return -ENOEXEC;
->         }
-> @@ -254,17 +256,19 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr
-> *sechdrs,
->                                                 sechdrs[i].sh_info, dstsec);
->         }
->
-> -       mod->arch.core.plt->sh_type = SHT_NOBITS;
-> -       mod->arch.core.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> -       mod->arch.core.plt->sh_addralign = L1_CACHE_BYTES;
-> -       mod->arch.core.plt->sh_size = (core_plts  + 1) * sizeof(struct
-> plt_entry);
-> +       pltsec = sechdrs + mod->arch.core.plt_shndx;
-> +       pltsec->sh_type = SHT_NOBITS;
-> +       pltsec->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       pltsec->sh_addralign = L1_CACHE_BYTES;
-> +       pltsec->sh_size = (core_plts  + 1) * sizeof(struct plt_entry);
->         mod->arch.core.plt_num_entries = 0;
->         mod->arch.core.plt_max_entries = core_plts;
->
-> -       mod->arch.init.plt->sh_type = SHT_NOBITS;
-> -       mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> -       mod->arch.init.plt->sh_addralign = L1_CACHE_BYTES;
-> -       mod->arch.init.plt->sh_size = (init_plts + 1) * sizeof(struct
-> plt_entry);
-> +       pltsec = sechdrs + mod->arch.init.plt_shndx;
-> +       pltsec->sh_type = SHT_NOBITS;
-> +       pltsec->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       pltsec->sh_addralign = L1_CACHE_BYTES;
-> +       pltsec->sh_size = (init_plts + 1) * sizeof(struct plt_entry);
->         mod->arch.init.plt_num_entries = 0;
->         mod->arch.init.plt_max_entries = init_plts;
->
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index f0f27aeefb73..c2abe59c6f8f 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -198,7 +198,8 @@ static int reloc_insn_imm(enum aarch64_reloc_op op,
-> __le32 *place, u64 val,
->         return 0;
-> }
->
-> -static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
-> +static int reloc_insn_adrp(struct module *mod, Elf64_Shdr *sechdrs,
-> +                          __le32 *place, u64 val)
-> {
->         u32 insn;
->
-> @@ -215,7 +216,7 @@ static int reloc_insn_adrp(struct module *mod, __le32
-> *place, u64 val)
->                 insn &= ~BIT(31);
->         } else {
->                 /* out of range for ADR -> emit a veneer */
-> -               val = module_emit_veneer_for_adrp(mod, place, val & ~0xfff);
-> +               val = module_emit_veneer_for_adrp(mod, sechdrs, place, val &
-> ~0xfff);
->                 if (!val)
->                         return -ENOEXEC;
->                 insn = aarch64_insn_gen_branch_imm((u64)place, val,
-> @@ -368,7 +369,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->                 case R_AARCH64_ADR_PREL_PG_HI21_NC:
->                         overflow_check = false;
->                 case R_AARCH64_ADR_PREL_PG_HI21:
-> -                       ovf = reloc_insn_adrp(me, loc, val);
-> +                       ovf = reloc_insn_adrp(me, sechdrs, loc, val);
->                         if (ovf && ovf != -ERANGE)
->                                 return ovf;
->                         break;
-> @@ -413,7 +414,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->
->                         if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
->                             ovf == -ERANGE) {
-> -                               val = module_emit_plt_entry(me, loc,
-> &rel[i], sym);
-> +                               val = module_emit_plt_entry(me, sechdrs,
-> loc, &rel[i], sym);
->                                 if (!val)
->                                         return -ENOEXEC;
->                                 ovf = reloc_insn_imm(RELOC_OP_PREL, loc,
-> val, 2,
-> --
-> 2.14.5
->
+And the result was the link training check got lost for the imx6 driver.
+
+Fixes: 562df5c8521e ("Merge branch 'pci/host-designware' into next")
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Richard Zhu <hongxing.zhu@nxp.com>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+---
+ drivers/pci/controller/dwc/pci-imx6.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 4a9a673b4777..975050a69494 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -80,8 +80,6 @@ struct imx6_pcie {
+ #define PCIE_PL_PFLR_FORCE_LINK			(1 << 15)
+ #define PCIE_PHY_DEBUG_R0 (PL_OFFSET + 0x28)
+ #define PCIE_PHY_DEBUG_R1 (PL_OFFSET + 0x2c)
+-#define PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING	(1 << 29)
+-#define PCIE_PHY_DEBUG_R1_XMLH_LINK_UP		(1 << 4)
+ 
+ #define PCIE_PHY_CTRL (PL_OFFSET + 0x114)
+ #define PCIE_PHY_CTRL_DATA_LOC 0
+@@ -641,12 +639,6 @@ static int imx6_pcie_host_init(struct pcie_port *pp)
+ 	return 0;
+ }
+ 
+-static int imx6_pcie_link_up(struct dw_pcie *pci)
+-{
+-	return dw_pcie_readl_dbi(pci, PCIE_PHY_DEBUG_R1) &
+-			PCIE_PHY_DEBUG_R1_XMLH_LINK_UP;
+-}
+-
+ static const struct dw_pcie_host_ops imx6_pcie_host_ops = {
+ 	.host_init = imx6_pcie_host_init,
+ };
+@@ -679,7 +671,7 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+ }
+ 
+ static const struct dw_pcie_ops dw_pcie_ops = {
+-	.link_up = imx6_pcie_link_up,
++	/* No special ops needed, but pcie-designware still expects this struct */
+ };
+ 
+ static int imx6_pcie_probe(struct platform_device *pdev)
+-- 
+2.14.4
