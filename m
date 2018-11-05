@@ -1,57 +1,44 @@
-From: tiny.windzz@gmail.com (Frank Lee)
-Date: Mon, 5 Nov 2018 23:59:58 +0800
-Subject: [PATCH v2] i2c: rk3x: fix some typo
-In-Reply-To: <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
-References: <20181102124535.24331-1-tiny.windzz@gmail.com>
- <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
-Message-ID: <CAEExFWtQrPD8hUn15Add-EuueCL5=Crb+yvDckWejG75BExGug@mail.gmail.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 05 Nov 2018 17:11:47 +0100
+Subject: [alsa-devel] [PATCH v2] staging: bcm2835-audio: interpolate audio
+ delay
+In-Reply-To: <C35AD288-063F-4197-A758-450CBB3B1184@eircom.net>
+References: <20181022191708.GA4659@ubuntu>
+ <a703f8a2-e85a-bc5b-750a-cc43ef252ba5@gmail.com>
+ <EA85FEC9-B1C7-4548-88F5-F0E7BC12158E@eircom.net>
+ <046aea96-e0d3-60f4-c61a-c26bb1b5c193@gmail.com>
+ <B9A84822-3780-4E01-96AD-FD3B42C44B45@eircom.net>
+ <9884c4f5-2343-e3a4-8d8b-dd2db404ef27@gmail.com>
+ <s5hftwuo4t0.wl-tiwai@suse.de>
+ <126FA055-050B-4AAC-9392-CA8CCA821768@eircom.net>
+ <C35AD288-063F-4197-A758-450CBB3B1184@eircom.net>
+Message-ID: <s5hsh0f1p30.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am sorry.
--- Yangtao
-On Fri, Nov 2, 2018 at 8:58 PM Peter Rosin <peda@axentia.se> wrote:
->
-> On 2018-11-02 13:45, Yangtao Li wrote:
-> > Fix multiple instances of a misspelled "Calculates".
->
-> Yes, it sure is hard to spell "Calcluated," it's almost impossible to
-> get it completely right and not introduce another typo somewhere... :-)
->
-> Cheers,
-> Peter
->
-> >
-> > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > Changes in v2:
-> > -add commit message
-> > ---
-> >  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> > index b8a2728dd4b6..fe347e8e2a23 100644
-> > --- a/drivers/i2c/busses/i2c-rk3x.c
-> > +++ b/drivers/i2c/busses/i2c-rk3x.c
-> > @@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
-> >   *
-> >   * @clk_rate: I2C input clock rate
-> >   * @t: Known I2C timing information
-> > - * @t_calc: Caculated rk3x private timings that would be written into regs
-> > + * @t_calc: Calculated rk3x private timings that would be written into regs
-> >   *
-> >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
-> >   * a best-effort divider value is returned in divs. If the target rate is
-> > @@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
-> >   *
-> >   * @clk_rate: I2C input clock rate
-> >   * @t: Known I2C timing information
-> > - * @t_calc: Caculated rk3x private timings that would be written into regs
-> > + * @t_calc: Calculated rk3x private timings that would be written into regs
-> >   *
-> >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
-> >   * a best-effort divider value is returned in divs. If the target rate is
-> >
->
+On Mon, 05 Nov 2018 16:57:07 +0100,
+Mike Brady wrote:
+> 
+> > One another thing I'd like to point out is that the value given in the
+> > patch is nothing but an estimated position, optimistically calculated
+> > via the system timer.  Mike and I had already discussion in another
+> > thread, and another possible option would be to provide the proper
+> > timestamp-vs-hwptr pair, instead of updating the timestamp always at
+> > the status read.
+> 
+> Agreed ? that would give the caller the information needed to do the
+> interpolation for themselves if desired.
+
+And now I wonder whether the problem is still present with the latest
+code.  There was a (kind of) regression in this regard when we
+introduced the fine-grained hardware timestamping, but it should have
+been addressed by the commit 20e3f985bb875fea4f86b04eba4b6cc29bfd6b71
+    ALSA: pcm: update tstamp only if audio_tstamp changed
+
+Could you double-check whether the tstamp field gets still updated
+even if no hwptr (and delay) is changed?
+
+
+thanks,
+
+Takashi
