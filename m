@@ -3,13 +3,13 @@ Date: Tue, 6 Nov 2018 20:07:23 +0800
 Subject: [PATCH] media: meson: fix semicolon.cocci warnings
 In-Reply-To: <20181106075926.19269-3-mjourdan@baylibre.com>
 References: <20181106075926.19269-3-mjourdan@baylibre.com>
-Message-ID: <20181106120723.GA78880@athens>
+Message-ID: <20181106120723.GA78582@athens>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: kbuild test robot <fengguang.wu@intel.com>
 
-drivers/media/platform/meson/vdec/vdec_helpers.c:187:3-4: Unneeded semicolon
+drivers/media/platform/meson/vdec/codec_mpeg12.c:149:2-3: Unneeded semicolon
 
 
  Remove unneeded semicolon.
@@ -24,17 +24,17 @@ Signed-off-by: kbuild test robot <fengguang.wu@intel.com>
 url:    https://github.com/0day-ci/linux/commits/Maxime-Jourdan/dt-bindings-media-add-Amlogic-Video-Decoder-Bindings/20181106-162646
 base:   git://linuxtv.org/media_tree.git master
 
- vdec_helpers.c |    2 +-
+ codec_mpeg12.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
---- a/drivers/media/platform/meson/vdec/vdec_helpers.c
-+++ b/drivers/media/platform/meson/vdec/vdec_helpers.c
-@@ -184,7 +184,7 @@ int amvdec_set_canvases(struct amvdec_se
- 			dev_err(sess->core->dev, "Unsupported pixfmt %08X\n",
- 				pixfmt);
- 			return -EINVAL;
--		};
-+		}
+--- a/drivers/media/platform/meson/vdec/codec_mpeg12.c
++++ b/drivers/media/platform/meson/vdec/codec_mpeg12.c
+@@ -146,7 +146,7 @@ static void codec_mpeg12_update_dar(stru
+ 		sess->pixelaspect.numerator = 1;
+ 		sess->pixelaspect.denominator = 1;
+ 		break;
+-	};
++	}
+ }
  
- 		reg_num_cur++;
- 		if (reg_num_cur >= reg_num[reg_base_cur]) {
+ static irqreturn_t codec_mpeg12_threaded_isr(struct amvdec_session *sess)
