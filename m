@@ -1,66 +1,40 @@
-From: mdf@kernel.org (Moritz Fischer)
-Date: Tue, 6 Nov 2018 11:07:47 -0800
-Subject: [PATCHv10 4/8] dt-bindings: fpga: add Stratix10 SoC FPGA manager
- binding
-In-Reply-To: <1541523172-5171-5-git-send-email-richard.gong@linux.intel.com>
-References: <1541523172-5171-1-git-send-email-richard.gong@linux.intel.com>
- <1541523172-5171-5-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <20181106190747.GA5690@archbook>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2018 19:08:17 +0000
+Subject: [PATCH 2/4] efi/arm: defer persistent reservations until after
+ paging_init()
+In-Reply-To: <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
+References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
+ <20181106113732.16351-3-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
+Message-ID: <20181106190817.GN30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Tue, Nov 06, 2018 at 08:02:58PM +0100, Ard Biesheuvel wrote:
+> On 6 November 2018 at 12:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > The new memory EFI reservation feature we introduced to allow memory
+> > reservations to persist across kexec may trigger an unbounded number
+> > of calls to memblock_reserve(). The memblock subsystem can deal with
+> > this fine, but not before memblock resizing is enabled, which we can
+> > only do after paging_init(), when the memory we reallocate the array
+> > into is actually mapped.
+> >
+> > So break out the memreserve table processing into a separate function
+> > and call if after paging_init() on both arm64 and ARM.
+> >
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> Russell,
+> 
+> If you are ok with this patch, may I have your ack please? I would
+> like to send it out before the end of the week.
 
-On Tue, Nov 06, 2018 at 10:52:48AM -0600, richard.gong at linux.intel.com wrote:
-> From: Alan Tull <atull@kernel.org>
-> 
-> Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
-> 
-> Signed-off-by: Alan Tull <atull@kernel.org>
-> Signed-off-by: Richard Gong <richard.gong@intel.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Moritz Fischer <mdf@kernel.org>
-> ---
-> v2: this patch is added in patch set version 2
-> v3: change to put fpga_mgr node under firmware/svc node
-> v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
->     add Richard's signed-off-by
-> v5: add Reviewed-by Rob Herring
-> v6: no change
-> v7: no change
-> v8: no change
-> v9: no change
-> v10: no change
-> ---
->  .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt      | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-> new file mode 100644
-> index 0000000..6e03f79
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-> @@ -0,0 +1,17 @@
-> +Intel Stratix10 SoC FPGA Manager
-> +
-> +Required properties:
-> +The fpga_mgr node has the following mandatory property, must be located under
-> +firmware/svc node.
-> +
-> +- compatible : should contain "intel,stratix10-soc-fpga-mgr"
-> +
-> +Example:
-> +
-> +	firmware {
-> +		svc {
-> +			fpga_mgr: fpga-mgr {
-> +				compatible = "intel,stratix10-soc-fpga-mgr";
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.7.4
-> 
-Thanks,
-Moritz
+You're not going to get a quick answer to this, because it needs me to
+investigate what the effect of this change actually is by code review.
+I can't guarantee when I'll get around to that.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
