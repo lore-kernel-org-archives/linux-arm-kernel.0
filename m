@@ -1,207 +1,300 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 06 Nov 2018 12:39:12 +0000
-Subject: [PATCH v2 5/5] ARM: spectre-v2: per-CPU vtables to work around
- big.Little systems
-In-Reply-To: <20181106123700.GA30658@n2100.armlinux.org.uk>
-References: <20181106123700.GA30658@n2100.armlinux.org.uk>
-Message-ID: <E1gK0dU-0007Mp-4h@rmk-PC.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 Nov 2018 13:41:42 +0100
+Subject: [RFC PATCH v3 07/15] crypto: arm/chacha20 - add XChaCha20 support
+In-Reply-To: <20181105232526.173947-8-ebiggers@kernel.org>
+References: <20181105232526.173947-1-ebiggers@kernel.org>
+ <20181105232526.173947-8-ebiggers@kernel.org>
+Message-ID: <CAKv+Gu8XRDqv+S8oA3AScHpC6LQv7bcfSi0Ynzu6LWOCds7Qog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In big.Little systems, some CPUs require the Spectre workarounds in
-paths such as the context switch, but other CPUs do not.  In order
-to handle these differences, we need per-CPU vtables.
+On 6 November 2018 at 00:25, Eric Biggers <ebiggers@kernel.org> wrote:
+> From: Eric Biggers <ebiggers@google.com>
+>
+> Add an XChaCha20 implementation that is hooked up to the ARM NEON
+> implementation of ChaCha20.  This is needed for use in the Adiantum
+> encryption mode; see the generic code patch,
+> "crypto: chacha20-generic - add XChaCha20 support", for more details.
+>
+> We also update the NEON code to support HChaCha20 on one block, so we
+> can use that in XChaCha20 rather than calling the generic HChaCha20.
+> This required factoring the permutation out into its own macro.
+>
+> Signed-off-by: Eric Biggers <ebiggers@google.com>
 
-We are unable to use the kernel's per-CPU variables to support this
-as per-CPU is not initialised at times when we need access to the
-vtables, so we have to use an array indexed by logical CPU number.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-We use an array-of-pointers to avoid having function pointers in
-the kernel's read/write .data section.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/include/asm/proc-fns.h | 20 ++++++++++++++++++++
- arch/arm/kernel/setup.c         |  5 +++++
- arch/arm/kernel/smp.c           | 31 +++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v7-bugs.c      | 17 ++---------------
- 4 files changed, 58 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index c259cc49c641..fe58fb3c4b4e 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -104,12 +104,32 @@ extern void cpu_do_resume(void *);
- #else
- 
- extern struct processor processor;
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+#include <linux/smp.h>
-+/*
-+ * This can't be a per-cpu variable because we need to access it before
-+ * per-cpu has been initialised.
-+ */
-+extern struct processor *cpu_vtable[];
-+#define PROC_VTABLE(f)			cpu_vtable[smp_processor_id()]->f
-+#define PROC_TABLE(f)			cpu_vtable[0]->f
-+static inline void init_proc_vtable(const struct processor *p)
-+{
-+	unsigned int cpu = smp_processor_id();
-+	*cpu_vtable[cpu] = *p;
-+	WARN_ON_ONCE(cpu_vtable[cpu]->dcache_clean_area !=
-+		     cpu_vtable[0]->dcache_clean_area);
-+	WARN_ON_ONCE(cpu_vtable[cpu]->set_pte_ext !=
-+		     cpu_vtable[0]->set_pte_ext);
-+}
-+#else
- #define PROC_VTABLE(f)			processor.f
- #define PROC_TABLE(f)			processor.f
- static inline void init_proc_vtable(const struct processor *p)
- {
- 	processor = *p;
- }
-+#endif
- 
- #define cpu_proc_init			PROC_VTABLE(_proc_init)
- #define cpu_check_bugs			PROC_VTABLE(check_bugs)
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c214bd14a1fe..cd46a595422c 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -115,6 +115,11 @@ EXPORT_SYMBOL(elf_hwcap2);
- 
- #ifdef MULTI_CPU
- struct processor processor __ro_after_init;
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+struct processor *cpu_vtable[NR_CPUS] = {
-+	[0] = &processor,
-+};
-+#endif
- #endif
- #ifdef MULTI_TLB
- struct cpu_tlb_fns cpu_tlb __ro_after_init;
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 5ad0b67b9e33..82b879db32ee 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -42,6 +42,7 @@
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- #include <asm/pgalloc.h>
-+#include <asm/procinfo.h>
- #include <asm/processor.h>
- #include <asm/sections.h>
- #include <asm/tlbflush.h>
-@@ -102,6 +103,30 @@ static unsigned long get_arch_pgd(pgd_t *pgd)
- #endif
- }
- 
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+static int secondary_biglittle_prepare(unsigned int cpu)
-+{
-+	if (!cpu_vtable[cpu])
-+		cpu_vtable[cpu] = kzalloc(sizeof(*cpu_vtable[cpu]), GFP_KERNEL);
-+
-+	return cpu_vtable[cpu] ? 0 : -ENOMEM;
-+}
-+
-+static void secondary_biglittle_init(void)
-+{
-+	init_proc_vtable(lookup_processor(read_cpuid_id())->proc);
-+}
-+#else
-+static int secondary_biglittle_prepare(unsigned int cpu)
-+{
-+	return 0;
-+}
-+
-+static void secondary_biglittle_init(void)
-+{
-+}
-+#endif
-+
- int __cpu_up(unsigned int cpu, struct task_struct *idle)
- {
- 	int ret;
-@@ -109,6 +134,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	if (!smp_ops.smp_boot_secondary)
- 		return -ENOSYS;
- 
-+	ret = secondary_biglittle_prepare(cpu);
-+	if (ret)
-+		return ret;
-+
- 	/*
- 	 * We need to tell the secondary core where to find
- 	 * its stack and the page tables.
-@@ -360,6 +389,8 @@ asmlinkage void secondary_start_kernel(void)
- 	struct mm_struct *mm = &init_mm;
- 	unsigned int cpu;
- 
-+	secondary_biglittle_init();
-+
- 	/*
- 	 * The identity mapping is uncached (strongly ordered), so
- 	 * switch away from it before attempting any exclusive accesses.
-diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
-index 5544b82a2e7a..9a07916af8dd 100644
---- a/arch/arm/mm/proc-v7-bugs.c
-+++ b/arch/arm/mm/proc-v7-bugs.c
-@@ -52,8 +52,6 @@ static void cpu_v7_spectre_init(void)
- 	case ARM_CPU_PART_CORTEX_A17:
- 	case ARM_CPU_PART_CORTEX_A73:
- 	case ARM_CPU_PART_CORTEX_A75:
--		if (processor.switch_mm != cpu_v7_bpiall_switch_mm)
--			goto bl_error;
- 		per_cpu(harden_branch_predictor_fn, cpu) =
- 			harden_branch_predictor_bpiall;
- 		spectre_v2_method = "BPIALL";
-@@ -61,8 +59,6 @@ static void cpu_v7_spectre_init(void)
- 
- 	case ARM_CPU_PART_CORTEX_A15:
- 	case ARM_CPU_PART_BRAHMA_B15:
--		if (processor.switch_mm != cpu_v7_iciallu_switch_mm)
--			goto bl_error;
- 		per_cpu(harden_branch_predictor_fn, cpu) =
- 			harden_branch_predictor_iciallu;
- 		spectre_v2_method = "ICIALLU";
-@@ -88,11 +84,9 @@ static void cpu_v7_spectre_init(void)
- 					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 			if ((int)res.a0 != 0)
- 				break;
--			if (processor.switch_mm != cpu_v7_hvc_switch_mm && cpu)
--				goto bl_error;
- 			per_cpu(harden_branch_predictor_fn, cpu) =
- 				call_hvc_arch_workaround_1;
--			processor.switch_mm = cpu_v7_hvc_switch_mm;
-+			cpu_do_switch_mm = cpu_v7_hvc_switch_mm;
- 			spectre_v2_method = "hypervisor";
- 			break;
- 
-@@ -101,11 +95,9 @@ static void cpu_v7_spectre_init(void)
- 					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 			if ((int)res.a0 != 0)
- 				break;
--			if (processor.switch_mm != cpu_v7_smc_switch_mm && cpu)
--				goto bl_error;
- 			per_cpu(harden_branch_predictor_fn, cpu) =
- 				call_smc_arch_workaround_1;
--			processor.switch_mm = cpu_v7_smc_switch_mm;
-+			cpu_do_switch_mm = cpu_v7_smc_switch_mm;
- 			spectre_v2_method = "firmware";
- 			break;
- 
-@@ -119,11 +111,6 @@ static void cpu_v7_spectre_init(void)
- 	if (spectre_v2_method)
- 		pr_info("CPU%u: Spectre v2: using %s workaround\n",
- 			smp_processor_id(), spectre_v2_method);
--	return;
--
--bl_error:
--	pr_err("CPU%u: Spectre v2: incorrect context switching function, system vulnerable\n",
--		cpu);
- }
- #else
- static void cpu_v7_spectre_init(void)
--- 
-2.7.4
+> ---
+>  arch/arm/crypto/Kconfig              |   2 +-
+>  arch/arm/crypto/chacha20-neon-core.S |  70 ++++++++++++------
+>  arch/arm/crypto/chacha20-neon-glue.c | 103 ++++++++++++++++++++-------
+>  3 files changed, 126 insertions(+), 49 deletions(-)
+>
+> diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+> index ef0c7feea6e2..0aa1471f27d2 100644
+> --- a/arch/arm/crypto/Kconfig
+> +++ b/arch/arm/crypto/Kconfig
+> @@ -117,7 +117,7 @@ config CRYPTO_CRC32_ARM_CE
+>         select CRYPTO_HASH
+>
+>  config CRYPTO_CHACHA20_NEON
+> -       tristate "NEON accelerated ChaCha20 symmetric cipher"
+> +       tristate "NEON accelerated ChaCha20 stream cipher algorithms"
+>         depends on KERNEL_MODE_NEON
+>         select CRYPTO_BLKCIPHER
+>         select CRYPTO_CHACHA20
+> diff --git a/arch/arm/crypto/chacha20-neon-core.S b/arch/arm/crypto/chacha20-neon-core.S
+> index 50e7b9896818..2335e5055d2b 100644
+> --- a/arch/arm/crypto/chacha20-neon-core.S
+> +++ b/arch/arm/crypto/chacha20-neon-core.S
+> @@ -52,27 +52,16 @@
+>         .fpu            neon
+>         .align          5
+>
+> -ENTRY(chacha20_block_xor_neon)
+> -       // r0: Input state matrix, s
+> -       // r1: 1 data block output, o
+> -       // r2: 1 data block input, i
+> -
+> -       //
+> -       // This function encrypts one ChaCha20 block by loading the state matrix
+> -       // in four NEON registers. It performs matrix operation on four words in
+> -       // parallel, but requireds shuffling to rearrange the words after each
+> -       // round.
+> -       //
+> -
+> -       // x0..3 = s0..3
+> -       add             ip, r0, #0x20
+> -       vld1.32         {q0-q1}, [r0]
+> -       vld1.32         {q2-q3}, [ip]
+> -
+> -       vmov            q8, q0
+> -       vmov            q9, q1
+> -       vmov            q10, q2
+> -       vmov            q11, q3
+> +/*
+> + * chacha20_permute - permute one block
+> + *
+> + * Permute one 64-byte block where the state matrix is stored in the four NEON
+> + * registers q0-q3.  It performs matrix operations on four words in parallel,
+> + * but requires shuffling to rearrange the words after each round.
+> + *
+> + * Clobbers: r3, ip, q4-q5
+> + */
+> +chacha20_permute:
+>
+>         adr             ip, .Lrol8_table
+>         mov             r3, #10
+> @@ -142,6 +131,27 @@ ENTRY(chacha20_block_xor_neon)
+>         subs            r3, r3, #1
+>         bne             .Ldoubleround
+>
+> +       bx              lr
+> +ENDPROC(chacha20_permute)
+> +
+> +ENTRY(chacha20_block_xor_neon)
+> +       // r0: Input state matrix, s
+> +       // r1: 1 data block output, o
+> +       // r2: 1 data block input, i
+> +       push            {lr}
+> +
+> +       // x0..3 = s0..3
+> +       add             ip, r0, #0x20
+> +       vld1.32         {q0-q1}, [r0]
+> +       vld1.32         {q2-q3}, [ip]
+> +
+> +       vmov            q8, q0
+> +       vmov            q9, q1
+> +       vmov            q10, q2
+> +       vmov            q11, q3
+> +
+> +       bl              chacha20_permute
+> +
+>         add             ip, r2, #0x20
+>         vld1.8          {q4-q5}, [r2]
+>         vld1.8          {q6-q7}, [ip]
+> @@ -166,9 +176,25 @@ ENTRY(chacha20_block_xor_neon)
+>         vst1.8          {q0-q1}, [r1]
+>         vst1.8          {q2-q3}, [ip]
+>
+> -       bx              lr
+> +       pop             {pc}
+>  ENDPROC(chacha20_block_xor_neon)
+>
+> +ENTRY(hchacha20_block_neon)
+> +       // r0: Input state matrix, s
+> +       // r1: output (8 32-bit words)
+> +       push            {lr}
+> +
+> +       vld1.32         {q0-q1}, [r0]!
+> +       vld1.32         {q2-q3}, [r0]
+> +
+> +       bl              chacha20_permute
+> +
+> +       vst1.32         {q0}, [r1]!
+> +       vst1.32         {q3}, [r1]
+> +
+> +       pop             {pc}
+> +ENDPROC(hchacha20_block_neon)
+> +
+>         .align          4
+>  .Lctrinc:      .word   0, 1, 2, 3
+>  .Lrol8_table:  .byte   3, 0, 1, 2, 7, 4, 5, 6
+> diff --git a/arch/arm/crypto/chacha20-neon-glue.c b/arch/arm/crypto/chacha20-neon-glue.c
+> index 2bc035cb8f23..f2d3b0f70a8d 100644
+> --- a/arch/arm/crypto/chacha20-neon-glue.c
+> +++ b/arch/arm/crypto/chacha20-neon-glue.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * ChaCha20 256-bit cipher algorithm, RFC7539, ARM NEON functions
+> + * ChaCha20 (RFC7539) and XChaCha20 stream ciphers, NEON accelerated
+>   *
+>   * Copyright (C) 2016 Linaro, Ltd. <ard.biesheuvel@linaro.org>
+>   *
+> @@ -30,6 +30,7 @@
+>
+>  asmlinkage void chacha20_block_xor_neon(u32 *state, u8 *dst, const u8 *src);
+>  asmlinkage void chacha20_4block_xor_neon(u32 *state, u8 *dst, const u8 *src);
+> +asmlinkage void hchacha20_block_neon(const u32 *state, u32 *out);
+>
+>  static void chacha20_doneon(u32 *state, u8 *dst, const u8 *src,
+>                             unsigned int bytes)
+> @@ -57,20 +58,16 @@ static void chacha20_doneon(u32 *state, u8 *dst, const u8 *src,
+>         }
+>  }
+>
+> -static int chacha20_neon(struct skcipher_request *req)
+> +static int chacha20_neon_stream_xor(struct skcipher_request *req,
+> +                                   struct chacha_ctx *ctx, u8 *iv)
+>  {
+> -       struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+> -       struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
+>         struct skcipher_walk walk;
+>         u32 state[16];
+>         int err;
+>
+> -       if (req->cryptlen <= CHACHA_BLOCK_SIZE || !may_use_simd())
+> -               return crypto_chacha_crypt(req);
+> -
+>         err = skcipher_walk_virt(&walk, req, false);
+>
+> -       crypto_chacha_init(state, ctx, walk.iv);
+> +       crypto_chacha_init(state, ctx, iv);
+>
+>         while (walk.nbytes > 0) {
+>                 unsigned int nbytes = walk.nbytes;
+> @@ -88,22 +85,73 @@ static int chacha20_neon(struct skcipher_request *req)
+>         return err;
+>  }
+>
+> -static struct skcipher_alg alg = {
+> -       .base.cra_name          = "chacha20",
+> -       .base.cra_driver_name   = "chacha20-neon",
+> -       .base.cra_priority      = 300,
+> -       .base.cra_blocksize     = 1,
+> -       .base.cra_ctxsize       = sizeof(struct chacha_ctx),
+> -       .base.cra_module        = THIS_MODULE,
+> -
+> -       .min_keysize            = CHACHA_KEY_SIZE,
+> -       .max_keysize            = CHACHA_KEY_SIZE,
+> -       .ivsize                 = CHACHA_IV_SIZE,
+> -       .chunksize              = CHACHA_BLOCK_SIZE,
+> -       .walksize               = 4 * CHACHA_BLOCK_SIZE,
+> -       .setkey                 = crypto_chacha20_setkey,
+> -       .encrypt                = chacha20_neon,
+> -       .decrypt                = chacha20_neon,
+> +static int chacha20_neon(struct skcipher_request *req)
+> +{
+> +       struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+> +       struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
+> +
+> +       if (req->cryptlen <= CHACHA_BLOCK_SIZE || !may_use_simd())
+> +               return crypto_chacha_crypt(req);
+> +
+> +       return chacha20_neon_stream_xor(req, ctx, req->iv);
+> +}
+> +
+> +static int xchacha20_neon(struct skcipher_request *req)
+> +{
+> +       struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+> +       struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
+> +       struct chacha_ctx subctx;
+> +       u32 state[16];
+> +       u8 real_iv[16];
+> +
+> +       if (req->cryptlen <= CHACHA_BLOCK_SIZE || !may_use_simd())
+> +               return crypto_xchacha_crypt(req);
+> +
+> +       crypto_chacha_init(state, ctx, req->iv);
+> +
+> +       kernel_neon_begin();
+> +       hchacha20_block_neon(state, subctx.key);
+> +       kernel_neon_end();
+> +
+> +       memcpy(&real_iv[0], req->iv + 24, 8);
+> +       memcpy(&real_iv[8], req->iv + 16, 8);
+> +       return chacha20_neon_stream_xor(req, &subctx, real_iv);
+> +}
+> +
+> +static struct skcipher_alg algs[] = {
+> +       {
+> +               .base.cra_name          = "chacha20",
+> +               .base.cra_driver_name   = "chacha20-neon",
+> +               .base.cra_priority      = 300,
+> +               .base.cra_blocksize     = 1,
+> +               .base.cra_ctxsize       = sizeof(struct chacha_ctx),
+> +               .base.cra_module        = THIS_MODULE,
+> +
+> +               .min_keysize            = CHACHA_KEY_SIZE,
+> +               .max_keysize            = CHACHA_KEY_SIZE,
+> +               .ivsize                 = CHACHA_IV_SIZE,
+> +               .chunksize              = CHACHA_BLOCK_SIZE,
+> +               .walksize               = 4 * CHACHA_BLOCK_SIZE,
+> +               .setkey                 = crypto_chacha20_setkey,
+> +               .encrypt                = chacha20_neon,
+> +               .decrypt                = chacha20_neon,
+> +       }, {
+> +               .base.cra_name          = "xchacha20",
+> +               .base.cra_driver_name   = "xchacha20-neon",
+> +               .base.cra_priority      = 300,
+> +               .base.cra_blocksize     = 1,
+> +               .base.cra_ctxsize       = sizeof(struct chacha_ctx),
+> +               .base.cra_module        = THIS_MODULE,
+> +
+> +               .min_keysize            = CHACHA_KEY_SIZE,
+> +               .max_keysize            = CHACHA_KEY_SIZE,
+> +               .ivsize                 = XCHACHA_IV_SIZE,
+> +               .chunksize              = CHACHA_BLOCK_SIZE,
+> +               .walksize               = 4 * CHACHA_BLOCK_SIZE,
+> +               .setkey                 = crypto_chacha20_setkey,
+> +               .encrypt                = xchacha20_neon,
+> +               .decrypt                = xchacha20_neon,
+> +       }
+>  };
+>
+>  static int __init chacha20_simd_mod_init(void)
+> @@ -111,12 +159,12 @@ static int __init chacha20_simd_mod_init(void)
+>         if (!(elf_hwcap & HWCAP_NEON))
+>                 return -ENODEV;
+>
+> -       return crypto_register_skcipher(&alg);
+> +       return crypto_register_skciphers(algs, ARRAY_SIZE(algs));
+>  }
+>
+>  static void __exit chacha20_simd_mod_fini(void)
+>  {
+> -       crypto_unregister_skcipher(&alg);
+> +       crypto_unregister_skciphers(algs, ARRAY_SIZE(algs));
+>  }
+>
+>  module_init(chacha20_simd_mod_init);
+> @@ -125,3 +173,6 @@ module_exit(chacha20_simd_mod_fini);
+>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+>  MODULE_LICENSE("GPL v2");
+>  MODULE_ALIAS_CRYPTO("chacha20");
+> +MODULE_ALIAS_CRYPTO("chacha20-neon");
+> +MODULE_ALIAS_CRYPTO("xchacha20");
+> +MODULE_ALIAS_CRYPTO("xchacha20-neon");
+> --
+> 2.19.1.930.g4563a0d9d0-goog
+>
