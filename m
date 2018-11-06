@@ -1,108 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 07 Nov 2018 01:32:59 +0200
-Subject: [Ksummit-discuss] [TECH TOPIC] SoC maintainer group
-In-Reply-To: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
-References: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
-Message-ID: <3189677.9XQFCzzJyO@avalon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2018 23:49:33 +0000
+Subject: [PATCH 2/4] efi/arm: defer persistent reservations until after
+ paging_init()
+In-Reply-To: <CAKv+Gu_r38Bk_SZW-5qvtM7cmQ4-09dcFwNz29AyMceucdhadQ@mail.gmail.com>
+References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
+ <20181106113732.16351-3-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
+ <20181106190817.GN30658@n2100.armlinux.org.uk>
+ <CAKv+Gu_r38Bk_SZW-5qvtM7cmQ4-09dcFwNz29AyMceucdhadQ@mail.gmail.com>
+Message-ID: <20181106234933.GO30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Nov 06, 2018 at 09:06:56PM +0100, Ard Biesheuvel wrote:
+> On 6 November 2018 at 20:08, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Tue, Nov 06, 2018 at 08:02:58PM +0100, Ard Biesheuvel wrote:
+> >> On 6 November 2018 at 12:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> > The new memory EFI reservation feature we introduced to allow memory
+> >> > reservations to persist across kexec may trigger an unbounded number
+> >> > of calls to memblock_reserve(). The memblock subsystem can deal with
+> >> > this fine, but not before memblock resizing is enabled, which we can
+> >> > only do after paging_init(), when the memory we reallocate the array
+> >> > into is actually mapped.
+> >> >
+> >> > So break out the memreserve table processing into a separate function
+> >> > and call if after paging_init() on both arm64 and ARM.
+> >> >
+> >> > Cc: Russell King <linux@armlinux.org.uk>
+> >> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>
+> >> Russell,
+> >>
+> >> If you are ok with this patch, may I have your ack please? I would
+> >> like to send it out before the end of the week.
+> >
+> > You're not going to get a quick answer to this, because it needs me to
+> > investigate what the effect of this change actually is by code review.
+> > I can't guarantee when I'll get around to that.
+> >
+> 
+> Fair enough.
+> 
+> I will drop the ARM hunk for now then, and we'll fix ARM when you have
+> more time.
 
-On Wednesday, 7 November 2018 00:16:27 EET Olof Johansson wrote:
-> Hi KS organizers (and others),
-> 
-> This is a late topic proposal, hopefully there is still time on the agenda.
-> 
-> We?ve recently been discussing some maintainer model changes as
-> described below, and would like a slot to discuss the idea and solicit
-> feedback/comments from the others there.
-> 
-> 
-> This started with Arnd and I finally being in one place at the same
-> time, and talking about how we want to evolve arm-soc maintainership
-> moving forward. We've been independently thinking of ways to expand
-> the group and making it more self-service for everybody, but there's a
-> bunch of tooling needed to make it run smoothly beyond the smaller
-> group we have now.
-> 
-> In the end, we ended up looking at it from a slightly different angle:
-> Right now, when contributors show up with new platform support, the
-> first hill they need to climb is figuring out how they need to carve
-> up their platform among all the various maintainers, how to make sure
-> they're all handshaking on keeping things stable, and get code
-> submitted. It's awkward, not well documented and one of the biggest
-> overheads we have on our side as well.
-> 
-> When we started talking to other maintainers, we're also realizing
-> that we are currently duplicating a lot of work. In particular, we
-> often all get cc:d on patch series, so we all need to read and filter,
-> and assume that other maintainers spot the right patches, etc.
-> 
-> We have discussed a few different options, and it seems like pooling
-> more of the contribution flow to a group of co-maintainers is a useful
-> approach. Initially, we're considering the arm-soc platforms, clock
-> drivers and pinctrl drivers, which all tend to be affected by new
-> platform contributions in this way, and often end up cross-cc:d on
-> everything. Additionally, the flow for successfully merging a new
-> platform or SoC needs to be documented and advertised. This is true
-> whether or not we change the way that maintainers coordinate amongst
-> themselves, or whether or not we change the current workflow used by
-> platform contributors today.
-> 
-> So, we're planning to change things up a bit. We're starting a new
-> group that pools current arm-soc, clk and pinctrl drivers and
-> maintainers into one funnel. We'll set up a new mail alias for the
-> maintainer group, and one shared patchwork to collect contributions.
-> We still expect developers to use existing mailing lists, and we still
-> expect for example ARM platform maintainers to keep their workflow of
-> collecting patches for their platform like they do today. Down the
-> road it might make sense to incorporate other driver subsystems as
-> well.
-> 
-> Beyond this, we're going to keep a close eye on the drm-misc tree,
-> which is exploring a move to gitlab (and working with gitlab on adding
-> the features they need to move over). If they get a broad maintainer
-> model working well in that environment it could be something we reuse
-> for ourselves too.
+I don't see how you can do that - you're dropping the processing of
+reserved areas out of the efi_config_parse_tables() path, so that
+won't happen any more on ARM if you don't apply the ARM hunk.
 
-gitlab is an umbrella term that covers many features proposed by the product. 
-Are there particular features that you already think you would be interested 
-in, or features that you already know you wouldn't want to use ?
+So what I see at the moment is that efi_config_parse_tables() is
+called prior to paging_init() - and prior to our memblock
+initialisation, and you're proposing to move the processing that
+marks blocks as reserved immediately after paging_init(), and
+to use the normal memremap() interface to map stuff.
 
-> This group will also take on the responsibility of putting together
-> the documentation and expected patch flow for new platform/SoC
-> contributors. That documentation will need to evolve a bit over time
-> as we try out this new collaboration between maintainers.
-> 
-> To avoid an appearance of "ARM is taking over all architectures",
-> we'll rename this to just the plain "SoC tree/group", and drop ARM
-> from the name. As mentioned already initially we're anticipating
-> covering ARM (32/64-bit like before) and RISC-V platform areas in a
-> similar way. For other older/minor architectures that are
-> semi-orphaned, we might pick up code as needed when it affects us,
-> depending on maintainer status at the other end.
-> 
-> We're doing the groundwork now, and will get trees/lists/patchworks
-> setup for the next release cycle.
-> 
-> 
-> People involved so far are:
-> 
-> Olof Johansson (arm-soc)
-> Arnd Bergmann (arm-soc)
-> Kevin Hilman (arm-soc)
-> Mike Turquette (clk)
-> Stephen Boyd (clk)
-> Linus Walleij (pinctrl + more)
-> Mike Brown (gpio/regmap + more)
-> 
-> 
-> Thanks!
-> 
-> -Olof (on behalf of the group)
+I'm not convinced this will work - the memory allocators have not
+been setup at this point, so using memremap() will try to allocate
+page tables and potentially fail.  If the normal allocators are
+setup, it's way too late to be calling memblock_reserve() - the
+memory will have been passed over to the page allocator according
+to which memblocks are available but not reserved.
+
+The normal page allocator is setup by mem_init(), which happens
+way after setup_arch() has returned.
+
+So, I don't see how your patch can be correct at the moment.
 
 -- 
-Regards,
-
-Laurent Pinchart
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
