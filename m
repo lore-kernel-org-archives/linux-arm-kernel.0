@@ -1,64 +1,154 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 6 Nov 2018 12:39:34 +0000
-Subject: [PATCH v2] KVM: arm64: Clarify explanation of
- STAGE2_PGTABLE_LEVELS
-In-Reply-To: <20181106123338.3786-1-christoffer.dall@arm.com>
-References: <20181106123338.3786-1-christoffer.dall@arm.com>
-Message-ID: <44340035-ed11-bbd1-cc42-5df19b6a8246@arm.com>
+From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
+Date: Tue, 6 Nov 2018 13:16:01 +0000
+Subject: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
+ huge_ptep_set_access_flags
+In-Reply-To: <20180919174437.1866-1-steve.capper@arm.com>
+References: <20180919174437.1866-1-steve.capper@arm.com>
+Message-ID: <8898674D84E3B24BA3A2D289B872026A6A031841@G01JPEXMBKW03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Steve
 
+Sorry to late.
+Thanks for your patch, and I will test your patch.
 
-On 06/11/2018 12:33, Christoffer Dall wrote:
-> In attempting to re-construct the logic for our stage 2 page table
-> layout I found the reaoning in the comment explaining how we calculate
+Best Regards,
+Lei Zhang
 
-nit: reasoning
-
-> the number of levels used for stage 2 page tables a bit backwards.
+> -----Original Message-----
+> From: linux-arm-kernel
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Steve
+> Capper
+> Sent: Thursday, September 20, 2018 2:45 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: catalin.marinas at arm.com; Steve Capper; will.deacon at arm.com; Zhang, Lei/
+> ? ?
+> Subject: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
+> huge_ptep_set_access_flags
 > 
-> This commit attempts to clarify the comment, to make it slightly easier
-> to read without having the Arm ARM open on the right page.
+> For contiguous hugetlb, huge_ptep_set_access_flags performs a
+> get_clear_flush (which then flushes the TLBs) even when no change of ptes
+> is necessary.
 > 
-> While we're at it, fixup a typo in a comment that was recently changed.
+> Unfortunately, this behaviour can lead to back-to-back page faults being
+> generated when running with multiple threads that access the same
+> contiguous huge page.
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> Thread 1                     |  Thread 2
+> -----------------------------+------------------------------
+> hugetlb_fault                |
+> huge_ptep_set_access_flags   |
+>   -> invalidate pte range    | hugetlb_fault
+> continue processing          | wait for hugetlb fault mutex
+> release mutex and return     | huge_ptep_set_access_flags
+>                              |   -> invalidate pte range
+> hugetlb_fault
+> ...
+> 
+> This patch changes huge_ptep_set_access_flags s.t. we first read the
+> contiguous range of ptes (whilst preserving dirty information); the pte
+> range is only then invalidated where necessary and this prevents further
+> spurious page faults.
+> 
+> Fixes: d8bdcff28764 ("arm64: hugetlb: Add break-before-make logic for
+> contiguous entries")
+> Reported-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> 
 > ---
-> Changes since v1:
->   - Dropped note about (PAGE_SHIFT - 3) > 4
 > 
->   arch/arm64/include/asm/stage2_pgtable.h | 14 ++++++--------
->   virt/kvm/arm/mmu.c                      |  2 +-
->   2 files changed, 7 insertions(+), 9 deletions(-)
+> I was unable to test this on any hardware as I'm away from the office.
 > 
-> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-> index d352f6df8d2c..72ecf8ac3668 100644
-> --- a/arch/arm64/include/asm/stage2_pgtable.h
-> +++ b/arch/arm64/include/asm/stage2_pgtable.h
-> @@ -31,15 +31,13 @@
->   
->   /*
->    * The hardware supports concatenation of up to 16 tables at stage2 entry level
-> - * and we use the feature whenever possible.
-> + * and we use the feature whenever possible, which means we resolve 4 bits of
-
-4 additional bits
-
-> + * address at the entry level.
->    *
-> - * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
-> - * On arm64, the smallest PAGE_SIZE supported is 4k, which means
-> - *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
-> - * This implies, the total number of page table levels at stage2 expected
-> - * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
-> - * in normal translations(e.g, stage1), since we cannot have another level in
-> - * the range (IPA_SHIFT, IPA_SHIFT - 4).
-> + * This implies, the total number of page table levels required for
-> + * IPA_SHIFT at stage2 expected by the hardware can be calculated using
-> + * the same logic used for the (non-collapsable) stage1 page tables but for
-> + * (IPA_SHIFT - 4).
-
-Thanks for cleaning up the mess. With the above changes :
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Can you please test this Lei Zhang?
+> 
+> Cheers,
+> --
+> Steve
+> ---
+>  arch/arm64/mm/hugetlbpage.c | 36 ++++++++++++++++++++++++++++++++----
+>  1 file changed, 32 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index 192b3ba07075..76d229eb6ba1 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -131,6 +131,27 @@ static pte_t get_clear_flush(struct mm_struct *mm,
+>  	return orig_pte;
+>  }
+> 
+> +static pte_t get_contig_pte(pte_t *ptep, unsigned long pgsize,
+> +		unsigned long ncontig)
+> +{
+> +	unsigned long i;
+> +	pte_t orig_pte = huge_ptep_get(ptep);
+> +
+> +	for (i = 0; i < ncontig; i++, ptep++) {
+> +		pte_t pte = huge_ptep_get(ptep);
+> +
+> +		/*
+> +		 * If HW_AFDBM is enabled, then the HW could turn on
+> +		 * the dirty bit for any page in the set, so check
+> +		 * them all.  All hugetlb entries are already young.
+> +		 */
+> +		if (pte_dirty(pte))
+> +			orig_pte = pte_mkdirty(orig_pte);
+> +	}
+> +
+> +	return orig_pte;
+> +}
+> +
+>  /*
+>   * Changing some bits of contiguous entries requires us to follow a
+>   * Break-Before-Make approach, breaking the whole contiguous set
+> @@ -324,7 +345,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct
+> *vma,
+>  			       unsigned long addr, pte_t *ptep,
+>  			       pte_t pte, int dirty)
+>  {
+> -	int ncontig, i, changed = 0;
+> +	int ncontig, i;
+>  	size_t pgsize = 0;
+>  	unsigned long pfn = pte_pfn(pte), dpfn;
+>  	pgprot_t hugeprot;
+> @@ -336,9 +357,16 @@ int huge_ptep_set_access_flags(struct vm_area_struct
+> *vma,
+>  	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
+>  	dpfn = pgsize >> PAGE_SHIFT;
+> 
+> +	orig_pte = get_contig_pte(ptep, pgsize, ncontig);
+> +	if (pte_same(orig_pte, pte))
+> +		return 0;
+> +
+> +	/*
+> +	 * we need to get our orig_pte again as HW DBM may have happened
+> since
+> +	 * above. get_clear_flush will ultimately cmpxchg with 0 to ensure
+> +	 * that we can't lose any dirty information.
+> +	 */
+>  	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize,
+> ncontig);
+> -	if (!pte_same(orig_pte, pte))
+> -		changed = 1;
+> 
+>  	/* Make sure we don't lose the dirty state */
+>  	if (pte_dirty(orig_pte))
+> @@ -348,7 +376,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct
+> *vma,
+>  	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
+>  		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn,
+> hugeprot));
+> 
+> -	return changed;
+> +	return 1;
+>  }
+> 
+>  void huge_ptep_set_wrprotect(struct mm_struct *mm,
+> --
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
