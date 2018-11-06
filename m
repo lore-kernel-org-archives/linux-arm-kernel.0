@@ -1,24 +1,30 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 6 Nov 2018 09:21:51 +0000
-Subject: [PATCH 1/3] coresight: etb10: Add support for CLAIM tag
-In-Reply-To: <1541456790-28282-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
- <1541456790-28282-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <39da792f-4197-21f9-74ae-d4c1658150a8@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 6 Nov 2018 10:22:51 +0100
+Subject: [PATCH v10 5/6] arm64: zynqmp: Add DDRC node
+In-Reply-To: <38dc38b6-25f4-194c-9ba9-577d35e92700@xilinx.com>
+References: <20181105125644.GA7937@zn.tnic>
+ <41c5ca53-ed4b-38d0-c612-e1229004293e@xilinx.com>
+ <20181105132007.GB7937@zn.tnic>
+ <a81f47e0-1778-a6ac-4cd8-634502661d6f@xilinx.com>
+ <20181105134218.GD7937@zn.tnic>
+ <CAOesGMj=EbWgcYF2Mhh6TFMCdn1ub1Ze6fbXJnFFdsttWByXYg@mail.gmail.com>
+ <20181105194721.GB26868@zn.tnic>
+ <CAOesGMjsPWeRZEeBH37uLQFBKwAWNMh5yCvuKNYrOUDfRSSYog@mail.gmail.com>
+ <20181105204322.GE26868@zn.tnic>
+ <38dc38b6-25f4-194c-9ba9-577d35e92700@xilinx.com>
+Message-ID: <20181106092251.GB13712@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+On Tue, Nov 06, 2018 at 07:46:55AM +0100, Michal Simek wrote:
+> I think Boris should take also this one (dt binding doc change) because
+> it is aligned with changes in the driver.
+> https://lkml.kernel.org/r/1538667328-9465-7-git-send-email-manish.narani at xilinx.com
 
-On 05/11/2018 22:26, Mathieu Poirier wrote:
-> Following in the footstep of what was done for other CoreSight devices,
-> add CLAIM tag support to ETB10 in order to synchronise access to the
-> HW between the kernel and an external agent.
-> 
+Ok, done.
 
-Thanks for spotting this. Somehow I missed the etb10 in the original
-series.
+-- 
+Regards/Gruss,
+    Boris.
 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Good mailing practices for 400: avoid top-posting and trim the reply.
