@@ -1,72 +1,33 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 06 Nov 2018 13:01:33 +0100
-Subject: [PATCH v2] i2c: rk3x: fix some typo
-In-Reply-To: <CAEExFWtQrPD8hUn15Add-EuueCL5=Crb+yvDckWejG75BExGug@mail.gmail.com>
-References: <20181102124535.24331-1-tiny.windzz@gmail.com>
- <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
- <CAEExFWtQrPD8hUn15Add-EuueCL5=Crb+yvDckWejG75BExGug@mail.gmail.com>
-Message-ID: <12637568.SqdzpTGmKQ@phil>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  6 Nov 2018 10:03:43 -0200
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select the PXP driver
+In-Reply-To: <1541505823-14375-1-git-send-email-festevam@gmail.com>
+References: <1541505823-14375-1-git-send-email-festevam@gmail.com>
+Message-ID: <1541505823-14375-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yangtao, Peter,
+The Pixel Pipeline (PXP) block is present on several i.MX SoCs
+such as imx6dl, imx6sl, imx6ul, imx6sx, imx6ull and imx7d.
 
-Am Montag, 5. November 2018, 16:59:58 CET schrieb Frank Lee:
-> I am sorry.
-> -- Yangtao
+Select the PXP driver by default.
 
-If anything, it is me that should be sorry, as I did suggest the
-patch description, including the new spelling error.
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-And it took me like the whole weekend to actually realize where the
-Calculated / Calculates error was hiding ;-) .
-
-
-Heiko
-
-> On Fri, Nov 2, 2018 at 8:58 PM Peter Rosin <peda@axentia.se> wrote:
-> >
-> > On 2018-11-02 13:45, Yangtao Li wrote:
-> > > Fix multiple instances of a misspelled "Calculates".
-> >
-> > Yes, it sure is hard to spell "Calcluated," it's almost impossible to
-> > get it completely right and not introduce another typo somewhere... :-)
-> >
-> > Cheers,
-> > Peter
-> >
-> > >
-> > > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > > ---
-> > > Changes in v2:
-> > > -add commit message
-> > > ---
-> > >  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> > > index b8a2728dd4b6..fe347e8e2a23 100644
-> > > --- a/drivers/i2c/busses/i2c-rk3x.c
-> > > +++ b/drivers/i2c/busses/i2c-rk3x.c
-> > > @@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
-> > >   *
-> > >   * @clk_rate: I2C input clock rate
-> > >   * @t: Known I2C timing information
-> > > - * @t_calc: Caculated rk3x private timings that would be written into regs
-> > > + * @t_calc: Calculated rk3x private timings that would be written into regs
-> > >   *
-> > >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
-> > >   * a best-effort divider value is returned in divs. If the target rate is
-> > > @@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
-> > >   *
-> > >   * @clk_rate: I2C input clock rate
-> > >   * @t: Known I2C timing information
-> > > - * @t_calc: Caculated rk3x private timings that would be written into regs
-> > > + * @t_calc: Calculated rk3x private timings that would be written into regs
-> > >   *
-> > >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
-> > >   * a best-effort divider value is returned in divs. If the target rate is
-> > >
-> >
-> 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 1ad5736..3e2ab0a 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -257,6 +257,7 @@ CONFIG_VIDEO_MUX=y
+ CONFIG_SOC_CAMERA=y
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_CODA=m
++CONFIG_VIDEO_IMX_PXP=y
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+ CONFIG_VIDEO_ADV7180=m
+ CONFIG_VIDEO_OV5640=m
+-- 
+2.7.4
