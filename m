@@ -1,179 +1,126 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Nov 2018 17:14:16 +0100
-Subject: [PATCH 3/4] ARM: merge -fdata-sections BSS data to .bss section
-In-Reply-To: <20181106160625.GG30658@n2100.armlinux.org.uk>
-References: <20181106133935.GB30658@n2100.armlinux.org.uk>
- <E1gK1ae-0000or-7R@rmk-PC.armlinux.org.uk>
- <CAKv+Gu9-t0QYCfXHtRJ=Oc-Gsa2f=RdRHTP_suB2oT5pKKy7ZQ@mail.gmail.com>
- <20181106141033.GC30658@n2100.armlinux.org.uk>
- <CAKv+Gu8nGYRYPsFZW3zcOVPMBZfA6R3PhqQ2XQBPVGLPTw9t-g@mail.gmail.com>
- <20181106142953.GE30658@n2100.armlinux.org.uk>
- <CAKv+Gu9LmzbB=LbmdRS+GfAJOzQRTj20TcbJ=XY2jypZLSTbwQ@mail.gmail.com>
- <20181106144554.GF30658@n2100.armlinux.org.uk>
- <CAKv+Gu8h461LN0oUGB45LHmQEDG+WccMgS4TQ2G5OVaJCpw1kA@mail.gmail.com>
- <20181106160625.GG30658@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu8JJMp=rCBnyDBhO+8rRv9y36L8vDPw_8KaFcWgR7ONKw@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 6 Nov 2018 17:16:55 +0100
+Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <99475361-0115-7c16-3b7e-8f0d3a779446@amlogic.com>
+References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
+ <20181105165321.7ea2b45f@bbrezillon>
+ <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
+ <20181106102851.61deb97a@bbrezillon>
+ <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
+ <20181106112206.65a70a81@bbrezillon>
+ <99475361-0115-7c16-3b7e-8f0d3a779446@amlogic.com>
+Message-ID: <20181106171655.3808d8eb@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2018 at 17:06, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Nov 06, 2018 at 04:18:46PM +0100, Ard Biesheuvel wrote:
->> On 6 November 2018 at 15:45, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->> > On Tue, Nov 06, 2018 at 03:39:58PM +0100, Ard Biesheuvel wrote:
->> >> On 6 November 2018 at 15:29, Russell King - ARM Linux
->> >> <linux@armlinux.org.uk> wrote:
->> >> > On Tue, Nov 06, 2018 at 03:13:07PM +0100, Ard Biesheuvel wrote:
->> >> >> On 6 November 2018 at 15:10, Russell King - ARM Linux
->> >> >> <linux@armlinux.org.uk> wrote:
->> >> >> > On Tue, Nov 06, 2018 at 03:08:06PM +0100, Ard Biesheuvel wrote:
->> >> >> >> On 6 November 2018 at 14:40, Russell King <rmk+kernel@armlinux.org.uk> wrote:
->> >> >> >> > When building with -fdata-sections, the BSS data is placed into separate
->> >> >> >> > sections, so we need to ask the linker to group these together into the
->> >> >> >> > .bss output section, so that they're correctly placed.
->> >> >> >> >
->> >> >> >> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> >> >> >> > ---
->> >> >> >> >  arch/arm/boot/compressed/vmlinux.lds.S | 2 +-
->> >> >> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >> >> >> >
->> >> >> >> > diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
->> >> >> >> > index 2b963d8e76dd..3b91bc3c606f 100644
->> >> >> >> > --- a/arch/arm/boot/compressed/vmlinux.lds.S
->> >> >> >> > +++ b/arch/arm/boot/compressed/vmlinux.lds.S
->> >> >> >> > @@ -118,7 +118,7 @@ SECTIONS
->> >> >> >> >
->> >> >> >> >    . = BSS_START;
->> >> >> >> >    __bss_start = .;
->> >> >> >> > -  .bss                 : { *(.bss) }
->> >> >> >> > +  .bss                 : { *(.bss) *(.bss.*) }
->> >> >> >>
->> >> >> >> Would it make sense to sort these by alignment? Otherwise, I suspect
->> >> >> >> you may get a lot of padding holes due to the number of different
->> >> >> >> input sections, each with its own alignment.
->> >> >> >
->> >> >> > We don't bother elsewhere in the kernel linker script - do you have
->> >> >> > a case where we get lots of padding?
->> >> >> >
->> >> >>
->> >> >> With -fdata-sections? How else are we ensuring that each .bss item in
->> >> >> its own section is not placed such that its alignment results in a
->> >> >> padding hole?
->> >> >
->> >> > Quite simply, we don't care (at the moment).  The alignment does not
->> >> > come from the size of each individual section, but the alignment
->> >> > requirements of data within the section.
->> >> >
->> >> > See include/asm-generic/vmlinux.lds.h and the definition of *_MAIN
->> >> > symbols from around line 60.
->> >> >
->> >>
->> >> This seems like an oversight to me: consider something like*
->> >>
->> >> unsigned char bar = 1;
->> >> unsigned long long foo = 4;
->> >>
->> >> build it with
->> >>
->> >> arm-linux-gnueabihf-gcc -fdata-sections -o /tmp/foo.o -c /tmp/foo.c
->> >>
->> >> and we end up with the following object file
->> >>
->> >> Section Headers:
->> >>   [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
->> >>   [ 0]                   NULL            00000000 000000 000000 00      0   0  0
->> >>   [ 1] .text             PROGBITS        00000000 000034 000000 00  AX  0   0  1
->> >>   [ 2] .data             PROGBITS        00000000 000034 000000 00  WA  0   0  1
->> >>   [ 3] .bss              NOBITS          00000000 000034 000000 00  WA  0   0  1
->> >>   [ 4] .data.bar         PROGBITS        00000000 000034 000001 00  WA  0   0  1
->> >>   [ 5] .data.foo         PROGBITS        00000000 000038 000008 00  WA  0   0  8
->> >>   ...
->> >>
->> >> Symbol table '.symtab' contains 13 entries:
->> >>    Num:    Value  Size Type    Bind   Vis      Ndx Name
->> >>     11: 00000000     8 OBJECT  GLOBAL DEFAULT    5 foo
->> >>     12: 00000000     1 OBJECT  GLOBAL DEFAULT    4 bar
->> >>
->> >> whereas if I remove the -fdata-sections argument, I get
->> >>
->> >> Section Headers:
->> >>   [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
->> >>   [ 0]                   NULL            00000000 000000 000000 00      0   0  0
->> >>   [ 1] .text             PROGBITS        00000000 000034 000000 00  AX  0   0  1
->> >>   [ 2] .data             PROGBITS        00000000 000038 000009 00  WA  0   0  8
->> >>   [ 3] .bss              NOBITS          00000000 000041 000000 00  WA  0   0  1
->> >>   ...
->> >>
->> >> and
->> >>
->> >> Symbol table '.symtab' contains 11 entries:
->> >>    Num:    Value  Size Type    Bind   Vis      Ndx Name
->> >>    ...
->> >>      9: 00000000     8 OBJECT  GLOBAL DEFAULT    2 foo
->> >>     10: 00000008     1 OBJECT  GLOBAL DEFAULT    2 bar
->> >>
->> >> In other words, we end up with a 7 byte padding hole by switching to
->> >> -fdata-sections, unless we sort the input objects by alignment.
->> >>
->> >> * for my test compiile, -fdata-sections would not produce different
->> >> input section so I am using .data for this example.
->> >
->> > Nevertheless, changing this is not a subject for a patch series that
->> > targets ARM.  What you've identified is a deficiency in the generic
->> > cross-arch support for this which needs a wider audience to be
->> > involved.
->> >
->>
->> Fair enough.
->>
->> For the record, when I build the arm64 defconfig kernel with
->> LD_DEAD_CODE_ELIMINATION turned on, adding --sort-section=alignment
->> reduces the image size from
->>
->>    text    data     bss     dec     hex filename
->> 11951684 6936332 385040 19273056 1261560 vmlinux
->>
->> to
->>
->>    text    data     bss     dec     hex filename
->> 11938452 6930404 383625 19252481 125c501 vmlinux
->
-> I'm not sure that's relevant when this thread is about 32bit ARM.
-> It's a little like building an x86 kernel and posting the results.
-> Two entirely different architectures with different results.
->
+On Tue, 6 Nov 2018 19:08:27 +0800
+Liang Yang <liang.yang@amlogic.com> wrote:
 
-You said it was a generic issue not an ARM issue, to which I replied
-'fair enough', after which I shared some information that is relevant
-to the generic issue under discussion.
+> On 2018/11/6 18:22, Boris Brezillon wrote:
+> > On Tue, 6 Nov 2018 18:00:37 +0800
+> > Liang Yang <liang.yang@amlogic.com> wrote:
+> >   
+> >> On 2018/11/6 17:28, Boris Brezillon wrote:  
+> >>> On Tue, 6 Nov 2018 17:08:00 +0800
+> >>> Liang Yang <liang.yang@amlogic.com> wrote:
+> >>>      
+> >>>> On 2018/11/5 23:53, Boris Brezillon wrote:  
+> >>>>> On Fri, 2 Nov 2018 00:42:21 +0800
+> >>>>> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
+> >>>>>         
+> >>>>>> +
+> >>>>>> +static inline u8 meson_nfc_read_byte(struct mtd_info *mtd)
+> >>>>>> +{
+> >>>>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
+> >>>>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> >>>>>> +	u32 cmd;
+> >>>>>> +
+> >>>>>> +	cmd = nfc->param.chip_select | NFC_CMD_DRD | 0;
+> >>>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> >>>>>> +
+> >>>>>> +	meson_nfc_drain_cmd(nfc);  
+> >>>>>
+> >>>>> You probably don't want to drain the FIFO every time you read a byte on
+> >>>>> the bus, and I guess the INPUT FIFO is at least as big as the CMD
+> >>>>> FIFO, right? If that's the case, you should queue as much DRD cmd as
+> >>>>> possible and only sync when the user explicitly requests it or when
+> >>>>> the INPUT/READ FIFO is full.
+> >>>>>         
+> >>>> Register 'NFC_REG_BUF' can holds only 4 bytes, also DRD sends only one
+> >>>> nand cycle to read one byte and covers the 1st byte every time reading.
+> >>>> i think nfc controller is faster than nand cycle, but really it is not
+> >>>> high efficiency when reading so many bytes once.
+> >>>> Or use dma command here like read_page and read_page_raw.  
+> >>>
+> >>> Yep, that's also an alternative, though you'll have to make sure the
+> >>> buffer passed through the nand_op_inst is DMA-safe, and use a bounce
+> >>> buffer when that's not the case.
+> >>>      
+> >> ok, i will try dma here.  
+> > 
+> > We should probably expose the bounce buf handling as generic helpers at
+> > the rawnand level:
+> > 
+> > void *nand_op_get_dma_safe_input_buf(struct nand_op_instr *instr)
+> > {
+> > 	void *buf;
+> > 
+> > 	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR))
+> > 		return NULL;
+> > 
+> > 	if (virt_addr_valid(instr->data.in) &&
+> > 	    !object_is_on_stack(instr->data.buf.in))
+> > 		return instr->data.buf.in;
+> > 
+> > 	return kzalloc(instr->data.len, GFP_KERNEL);
+> > }
+> > 
+> > void nand_op_put_dma_safe_input_buf(struct nand_op_instr *instr,
+> > 				    void *buf)
+> > {
+> > 	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR) ||
+> > 	    WARN_ON(!buf))
+> > 		return;
+> > 
+> > 	if (buf == instr->data.buf.in)
+> > 		return;
+> > 
+> > 	memcpy(instr->data.buf.in, buf, instr->data.len);
+> > 	kfree(buf);
+> > }
+> > 
+> > const void *nand_op_get_dma_safe_output_buf(struct nand_op_instr *instr)
+> > {
+> > 	void *buf;
+> > 
+> > 	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR))
+> > 		return NULL;
+> > 
+> > 	if (virt_addr_valid(instr->data.out) &&
+> > 	    !object_is_on_stack(instr->data.buf.out))
+> > 		return instr->data.buf.out;
+> > 
+> > 	return kmemdup(instr->data.buf.out, GFP_KERNEL);
+> > }
+> > 
+> > void nand_op_put_dma_safe_output_buf(struct nand_op_instr *instr,
+> > 				    void *buf)
+> > {
+> > 	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR) ||
+> > 	    WARN_ON(!buf))
+> > 		return;
+> > 
+> > 	if (buf != instr->data.buf.out)
+> > 		kfree(buf);
+> > }
+> >  
+> 
+> that is more convenient.
+> i will use meson_chip->databuf as the bounce mid-buffer now.
 
-> Here's the numbers for an imx6 ARM kernel:
->
->    text    data     bss      dec     hex filename
-> 8438980 3255060 9640528 21334568 1458a28 imx6-unpatched/vmlinux
-> 6164770      84    4120  6168974  5e218e imx6-unpatched/arch/arm/boot/compressed/vmlinux
-> 8438980 3255060 9640528 21334568 1458a28 imx6-dc-dis/vmlinux
-> 6164770      84    4120  6168974  5e218e imx6-dc-dis/arch/arm/boot/compressed/vmlinux
-> 8448960 3253388 9639992 21342340 145a884 imx6-dc-ena/vmlinux
-> 6175233      84    4120  6179437  5e4a6d imx6-dc-ena/arch/arm/boot/compressed/vmlinux
-> 8446700 3245700 9639212 21331612 1457e9c imx6-dc-sort/vmlinux
-> 6172284      84    4120  6176488  5e3ee8 imx6-dc-sort/arch/arm/boot/compressed/vmlinux
->
-> The interesting thing here is that while the data sizes are reduced
-> by enabling this option, but the text size actually _increases_ by
-> more than we save.  So the result is an overall bigger kernel.
->
-> Presumably this is because of the literal pools needing to be larger
-> in the .text segments, and more instructions necessary to access the
-> data as the compiler can no longer know the relative displacement
-> between neighbouring data items in the object file.
->
+It won't work: the bounce buffer is allocated after the detection, and
+the detection code is calling ->exec_op().
 
-I guess the compiler can no longer share literal pools between
-functions, so they get duplicated into each one.
-
-> So, it seems dead-code elimination is not that useful on 32-bit ARM.
->
-
-Agreed.
+Just add a new patch to you series adding these helpers to nand_base.c.
