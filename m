@@ -1,41 +1,65 @@
-From: dkos@cadence.com (Damian Kos)
-Date: Tue, 6 Nov 2018 15:37:05 +0000
-Subject: [PATCH] drm/rockchip: fix for mailbox read size
-Message-ID: <1541518625-25984-1-git-send-email-dkos@cadence.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  6 Nov 2018 13:40:45 -0200
+Subject: [PATCH 1/3] ARM: dts: imx31: Fix memory node duplicaton
+Message-ID: <1541518847-5640-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the functions (like cdn_dp_dpcd_read, cdn_dp_get_edid_block)
-allow to read 64KiB, but the cdn_dp_mailbox_read_receive, that is
-used by them, can read only up to 255 bytes at once. Normally, it's
-not a big issue as DPCD or EDID reads won't (hopefully) exceed that
-value.
-The real issue here is the revocation list read during the HDCP
-authentication process. (problematic use case:
-https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4/drivers/gpu/drm/rockchip/cdn-dp-reg.c#1152)
-The list can reach 127*5+4 bytes (num devs * 5 bytes per ID/Bksv +
-4 bytes of an additional info).
-In other words - CTSes with HDCP Repeater won't pass without this
-fix. Oh, and the driver will most likely stop working (best case
-scenario).
+Boards based on imx31 have duplicate memory nodes:
 
-Signed-off-by: Damian Kos <dkos@cadence.com>
+- One coming from the board dts file: memory@
+
+- One coming from the imx31.dtsi file.
+
+Fix the duplication by removing the memory node from the dtsi file
+and by adding 'device_type = "memory";' in the board dts.
+
+Reported-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
- drivers/gpu/drm/rockchip/cdn-dp-reg.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx31-bug.dts  | 1 +
+ arch/arm/boot/dts/imx31-lite.dts | 1 +
+ arch/arm/boot/dts/imx31.dtsi     | 2 --
+ 3 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-index 3105965fc260..5a485489a1e2 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-@@ -147,7 +147,7 @@ static int cdn_dp_mailbox_validate_receive(struct cdn_dp_device *dp,
- }
+diff --git a/arch/arm/boot/dts/imx31-bug.dts b/arch/arm/boot/dts/imx31-bug.dts
+index 6ee4ff8..9eb960c 100644
+--- a/arch/arm/boot/dts/imx31-bug.dts
++++ b/arch/arm/boot/dts/imx31-bug.dts
+@@ -17,6 +17,7 @@
+ 	compatible = "buglabs,imx31-bug", "fsl,imx31";
  
- static int cdn_dp_mailbox_read_receive(struct cdn_dp_device *dp,
--				       u8 *buff, u8 buff_size)
-+				       u8 *buff, u16 buff_size)
- {
- 	u32 i;
- 	int ret;
+ 	memory at 80000000 {
++		device_type = "memory";
+ 		reg = <0x80000000 0x8000000>; /* 128M */
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx31-lite.dts b/arch/arm/boot/dts/imx31-lite.dts
+index db52ddc..d17abdf 100644
+--- a/arch/arm/boot/dts/imx31-lite.dts
++++ b/arch/arm/boot/dts/imx31-lite.dts
+@@ -18,6 +18,7 @@
+ 	};
+ 
+ 	memory at 80000000 {
++		device_type = "memory";
+ 		reg = <0x80000000 0x8000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+index af7afcc..d7f6fb7 100644
+--- a/arch/arm/boot/dts/imx31.dtsi
++++ b/arch/arm/boot/dts/imx31.dtsi
+@@ -10,10 +10,8 @@
+ 	 * The decompressor and also some bootloaders rely on a
+ 	 * pre-existing /chosen node to be available to insert the
+ 	 * command line and merge other ATAGS info.
+-	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; };
+ 
+ 	aliases {
+ 		gpio0 = &gpio1;
 -- 
-2.17.1
+2.7.4
