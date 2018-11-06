@@ -1,191 +1,241 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 6 Nov 2018 09:52:59 +0000
-Subject: [PATCH] KVM: arm64: Clarify explanation of STAGE2_PGTABLE_LEVELS
-In-Reply-To: <20181106084215.GJ12057@e113682-lin.lund.arm.com>
-References: <20181102075352.20636-1-christoffer.dall@arm.com>
- <404f2d39-5dc5-602f-0594-0997b409ff84@arm.com>
- <20181102142543.GY12057@e113682-lin.lund.arm.com>
- <a2805e17-b9ac-40bd-ef9f-6867a4660f90@arm.com>
- <20181106084215.GJ12057@e113682-lin.lund.arm.com>
-Message-ID: <bd06cab9-66d9-9b9b-1136-b4f73f627d96@arm.com>
+From: liang.yang@amlogic.com (Liang Yang)
+Date: Tue, 6 Nov 2018 18:00:37 +0800
+Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <20181106102851.61deb97a@bbrezillon>
+References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
+ <20181105165321.7ea2b45f@bbrezillon>
+ <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
+ <20181106102851.61deb97a@bbrezillon>
+Message-ID: <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 06/11/2018 08:42, Christoffer Dall wrote:
-> On Mon, Nov 05, 2018 at 03:00:34PM +0000, Suzuki K Poulose wrote:
->>
->>
->> On 02/11/18 14:25, Christoffer Dall wrote:
->>> On Fri, Nov 02, 2018 at 11:02:38AM +0000, Suzuki K Poulose wrote:
->>>> Hi
->>>>
->>>> On 02/11/18 07:53, Christoffer Dall wrote:
->>>>> In attempting to re-construct the logic for our stage 2 page table
->>>>> layout I found the reaoning in the comment explaining how we calculate
->>>>> the number of levels used for stage 2 page tables a bit backwards.
->>>>>
->>>>> This commit attempts to clarify the comment, to make it slightly easier
->>>>> to read without having the Arm ARM open on the right page.
->>>>>
->>>>> While we're at it, fixup a typo in a comment that was recently changed.
->>>>>
->>>>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
->>>>> ---
->>>>>   arch/arm64/include/asm/stage2_pgtable.h | 17 ++++++++++-------
->>>>>   virt/kvm/arm/mmu.c                      |  2 +-
->>>>>   2 files changed, 11 insertions(+), 8 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
->>>>> index d352f6df8d2c..9c387320b28c 100644
->>>>> --- a/arch/arm64/include/asm/stage2_pgtable.h
->>>>> +++ b/arch/arm64/include/asm/stage2_pgtable.h
->>>>> @@ -31,15 +31,18 @@
->>>>>   /*
->>>>>    * The hardware supports concatenation of up to 16 tables at stage2 entry level
->>>>> - * and we use the feature whenever possible.
->>>>> + * and we use the feature whenever possible, which means we resolve 4 bits of
->>>>
->>>> s/we resolve 4 bits/we resolve 4 additional bits/ ?
->>>>
+On 2018/11/6 17:28, Boris Brezillon wrote:
+> On Tue, 6 Nov 2018 17:08:00 +0800
+> Liang Yang <liang.yang@amlogic.com> wrote:
+> 
+>> On 2018/11/5 23:53, Boris Brezillon wrote:
+>>> On Fri, 2 Nov 2018 00:42:21 +0800
+>>> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
+>>>    
+>>>> +
+>>>> +static inline u8 meson_nfc_read_byte(struct mtd_info *mtd)
+>>>> +{
+>>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
+>>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+>>>> +	u32 cmd;
+>>>> +
+>>>> +	cmd = nfc->param.chip_select | NFC_CMD_DRD | 0;
+>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +
+>>>> +	meson_nfc_drain_cmd(nfc);
 >>>
->>> yes
+>>> You probably don't want to drain the FIFO every time you read a byte on
+>>> the bus, and I guess the INPUT FIFO is at least as big as the CMD
+>>> FIFO, right? If that's the case, you should queue as much DRD cmd as
+>>> possible and only sync when the user explicitly requests it or when
+>>> the INPUT/READ FIFO is full.
+>>>    
+>> Register 'NFC_REG_BUF' can holds only 4 bytes, also DRD sends only one
+>> nand cycle to read one byte and covers the 1st byte every time reading.
+>> i think nfc controller is faster than nand cycle, but really it is not
+>> high efficiency when reading so many bytes once.
+>> Or use dma command here like read_page and read_page_raw.
+> 
+> Yep, that's also an alternative, though you'll have to make sure the
+> buffer passed through the nand_op_inst is DMA-safe, and use a bounce
+> buffer when that's not the case.
+> 
+ok, i will try dma here.
+
+>>>> +
+>>>> +	meson_nfc_wait_cmd_finish(nfc, CMD_FIFO_EMPTY_TIMEOUT);
 >>>
->>>>> + * address at the entry level.
->>>>>    *
->>>>> - * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
->>>>> + * This implies, the total number of page table levels required for
->>>>> + * IPA_SHIFT at stage2 expected by the hardware can be calculated using
->>>>> + * the same logic used for the (non-collapsable) stage1 page tables but for
->>>>> + * (IPA_SHIFT - 4).
->>>>> + *
->>>>> + * Note, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
->>>>
->>>> May be we could improve it further by :
->>>>
->>>> s/resolved at any level/resolved at any *non-entry* level/
->>>>
->>>> as, we could resolve as small as 1 bit at the entry level.
->>>>
->>>>
+>>> As for the read_byte() implementation, I don't think you should force a
+>>> sync here.
+>>>    
+>> ok, it can send 30 bytes (command fifo size subtract 2 idle command )
+>> once with a sync.
+> 
+> Okay, still better than syncing after each transmitted byte.
+> 
+>> Or use dma command.
+> 
+> I guess that's the best option.
+> 
+ok, i will try dma here.
+>>
+>>>> +}
+>>>> +
+>>>> +static void meson_nfc_write_buf(struct mtd_info *mtd,
+>>>> +				const u8 *buf, int len)
+>>>> +{
+>>>> +	int i;
+>>>> +
+>>>> +	for (i = 0; i < len; i++)
+>>>> +		meson_nfc_write_byte(mtd, buf[i]);
+>>>> +}
+>>>> +
+>>>> +static int meson_nfc_rw_cmd_prepare_and_execute(struct nand_chip *nand,
+>>>> +						int page, bool in)
+>>>> +{
+>>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+>>>> +	const struct nand_sdr_timings *sdr =
+>>>> +		nand_get_sdr_timings(&nand->data_interface);
+>>>> +	int cs = nfc->param.chip_select;
+>>>> +	int i, cmd0, cmd_num;
+>>>> +	int ret = 0;
+>>>> +
+>>>> +	cmd0 = in ? NAND_CMD_READ0 : NAND_CMD_SEQIN;
+>>>> +	cmd_num = sizeof(struct nand_rw_cmd) / sizeof(int);
+>>>> +	if (!in)
+>>>> +		cmd_num--;
+>>>> +
+>>>> +	nfc->cmdfifo.rw.cmd0 = cs | NFC_CMD_CLE | cmd0;
+>>>> +	for (i = 0; i < MAX_CYCLE_COLUMN_ADDRS; i++)
+>>>> +		nfc->cmdfifo.rw.col[i] = cs | NFC_CMD_ALE | 0;
+>>>> +
+>>>> +	for (i = 0; i < MAX_CYCLE_ROW_ADDRS; i++)
+>>>> +		nfc->cmdfifo.rw.row[i] = cs | NFC_CMD_ALE | ROW_ADDER(page, i);
+>>>> +
+>>>> +	nfc->cmdfifo.rw.cmd1 = cs | NFC_CMD_CLE | NAND_CMD_READSTART;
 >>>
->>> yes
+>>> Having a fixed size array for the column and row address cycles does
+>>> not sound like a good idea to me (depending on the NAND chip you
+>>> connect, the number of cycles for the row and column differ), which
+>>> makes me realize the nand_rw_cmd struct is not such a good thing...
+>>>    
+>> em , i will fix it by adding the size of the column and row address.
+>> is that ok?
+>>
+>>>> +
+>>>> +	for (i = 0; i < cmd_num; i++)
+>>>> +		writel(nfc->cmdfifo.cmd[i], nfc->reg_base + NFC_REG_CMD);
 >>>
->>>>>    * On arm64, the smallest PAGE_SIZE supported is 4k, which means
->>>>> - *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
->>>>> - * This implies, the total number of page table levels at stage2 expected
->>>>> - * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
->>>>> - * in normal translations(e.g, stage1), since we cannot have another level in
->>>>> - * the range (IPA_SHIFT, IPA_SHIFT - 4).
->>>>> + *             (PAGE_SHIFT - 3) > 4 holds for all page sizes
->>>>> + * and therefore we will need a minimum of two levels for stage2 in all cases.
->>>>
->>>> I think the above statement is misleading. The minimum number of
->>>> levels has nothing to do with the concatenation.
+>>> ... why not write directly to the CMD reg?
+>>>    
+>>
+>> it seems that too many writel(xxx, nfc->reg_base + NFC_REG_CMD) in one
+>> function; so I want to cache all the commands and write it in a loop.
+> 
+> Not sure why it makes a difference since you'll end up writing to
+> NFC_REG_CMD anyway.
+> 
+> BTW, you can probably use the writel_relaxed() instead of writel() when
+> writing to the CMD FIFO.
+> 
+ok.
+>>
+>>>> +
+>>>> +	if (in)
+>>>> +		meson_nfc_queue_rb(nfc, sdr->tR_max);
+>>>> +	else
+>>>> +		meson_nfc_cmd_idle(nfc, nfc->timing.tadl);
+>>>> +
+>>>> +	return ret;
+>>>> +}
+>>>> +
+>>>> +static int meson_nfc_write_page_sub(struct nand_chip *nand, const u8 *buf,
+>>>> +				    int page, int raw)
+>>>> +{
+>>>> +	struct mtd_info *mtd = nand_to_mtd(nand);
+>>>> +	const struct nand_sdr_timings *sdr =
+>>>> +		nand_get_sdr_timings(&nand->data_interface);
+>>>> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
+>>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+>>>> +	dma_addr_t daddr, iaddr;
+>>>> +	u32 cmd;
+>>>> +	int ret;
+>>>> +
+>>>> +	daddr = dma_map_single(nfc->dev, (void *)meson_chip->data_buf,
+>>>> +			       mtd->writesize + mtd->oobsize,
+>>>> +			       DMA_TO_DEVICE);
+>>>> +	ret = dma_mapping_error(nfc->dev, daddr);
+>>>> +	if (ret) {
+>>>> +		dev_err(nfc->dev, "dma mapping error\n");
+>>>> +		goto err;
+>>>> +	}
+>>>> +
+>>>> +	iaddr = dma_map_single(nfc->dev, (void *)meson_chip->info_buf,
+>>>> +			       nand->ecc.steps * PER_INFO_BYTE,
+>>>> +			       DMA_TO_DEVICE);
+>>>> +	ret = dma_mapping_error(nfc->dev, iaddr);
+>>>> +	if (ret) {
+>>>> +		dev_err(nfc->dev, "dma mapping error\n");
+>>>> +		goto err_map_daddr;
+>>>> +	}
+>>>> +
+>>>> +	ret = meson_nfc_rw_cmd_prepare_and_execute(nand, page, DIRWRITE);
+>>>> +	if (ret)
+>>>> +		goto err_map_iaddr;
+>>>> +
+>>>> +	cmd = GENCMDDADDRL(NFC_CMD_ADL, daddr);
+>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +
+>>>> +	cmd = GENCMDDADDRH(NFC_CMD_ADH, daddr);
+>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +
+>>>> +	cmd = GENCMDIADDRL(NFC_CMD_AIL, iaddr);
+>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +
+>>>> +	cmd = GENCMDIADDRH(NFC_CMD_AIH, iaddr);
+>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +
+>>>> +	meson_nfc_cmd_seed(nfc, page);
+>>>> +
+>>>> +	meson_nfc_cmd_access(nand, raw, DIRWRITE);
+>>>> +
+>>>> +	ret = meson_nfc_wait_dma_finish(nfc);
+>>>> +	cmd = nfc->param.chip_select | NFC_CMD_CLE | NAND_CMD_PAGEPROG;
+>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +	meson_nfc_queue_rb(nfc, sdr->tPROG_max);
 >>>
->>> Architecturally surely it does?  (The point of concatenation is to
->>> reduce the minimal number of levels required.)
+>>> Don't you have a way to queue the PAGEPROG and WAIT_RB instructions
+>>> before the DMA finishes?
+>>>    
+>>
+>> it runs:
+>> 1) dma transfer ddr data to nand page cache.
+>> 2) wait dma finish
+>> 3) send the PAGEPROG command
+>> 4) wait rb finish
+>>
+>> meson_nfc_wait_dma_finish(nfc) waits command fifo empty. Maybe it is
+>> difficult or uncessary to queue the PAGEPROG command and WAIT_RB between
+>> 1) and 2).
+>>
+>> is that right?
+>>
+> 
+> Isn't the controller engine able to wait on the data transfer to be
+> complete before sending the next instruction in the CMD FIFO pipe?
+> I'm pretty sure it's able to do that, which would make
+> meson_nfc_wait_dma_finish() useless, and all you'd have to do is wait
+> for the CMD FIFO to be empty (assuming it guarantees the last command
+> has been executed).
+> Maybe the nfc design is difference. dedicated nfc dma engine is 
+concatenated with the command fifo, there is no other status to check 
+whether dma is done.
+
+>>
+>>>> +	}
 >>>
->>> Maybe you mean the minimum number of levels imposed by KVM here?
->>>
->>>> For e.g, we could
->>>> still create a stage2 with 1 level (32bit IPA on 64K, 29bit + 3bit
->>>> concatenated), going by the same rules above. The only reason why
->>>> we limit the number of levels to 2, is to prevent splitting stage1 PMD
->>>> huge mappings (which are quite common) at stage2.
->>>>
->>>
->>> So I wasn't entirely clear what the comment was trying to say with the
->>> "(PAGE_SHIFT - 3) > 4 holds for all page size" statement, so I though
->>> that was there to show that we'll need a minimum of two levels, but
->>> maybe that was written under the assumption of the limitations of
->>> IPA_SHIFT (was KVM_PHYS_SIZE).
->>
->> See below.
->>
->>>
->>> Since you wrote the original comment, and I couldn't correctly parse
->>> that, and I apparently still didn't fully understand, can you suggest an
->>> alternative wording?
->>
->> I think trying to over explain the concept has created more confusion.
->> The whole paragraph is trying to prove that we only need :
->>
->> 	ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4)
->> to map IPA_SHIFT bits at stage2 with maximum utilization of the
->> concatenation at entry level.
+>>> Don't you need a call to meson_nfc_wait_cmd_finish() here?
+>>>    
+>> it will be called in queue_rb, read_buf and write_buf. but i have no
+>> idea whether it still needs to be called corresponding to
+>> CMD_INSTR/ADDR_INSTR.To be strict, it should be called.
 > 
-> Yes, I think that comes across more clearly in my rewording up to the
-> "Note, ...".
-
-Yes it does and I prefer your version than mine.
-
+> No, the synchronization is only needed before returning from
+> ->exec_op(). Everything before can be queued without being
+> executed. Of course, if you run out of entries in the CMD/INPUT
+> FIFOs you'll have to do some sort of synchronization, but that should
+> be taken care of in your helpers.
 > 
->>
->> Right now the comment tries to establish it via the hard route, by
->> proving that there cannot be an intermediate level in the range
->> [IPA_SHIFT, IPA_SHIFT - 4]. Or in other words :
->>
->> (ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4) + 1) >= 	
->> 			ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT)
->>
->> I don't know if it is worth the explanation and then causing further
->> confusion.
+ok, i will add it.
+> .
 > 
-> I think you're then actually trying to explain two things.
-> 
-> First, we can get the number of levels by using the stage 1 calculation
-> and adjust for concatenation by subtracting 4 from the number of bits we
-> need to translate.
-> 
-> Second, some further reasoning about *why* that is true.
-> 
-> It remains unclear to me exactly what your point about
->      '(PAGE_SHIFT - 3) > 4'
-> is and how that supports the second point.  Also I'm not entirely sure
-> why we need that.
-
-So, we have to prove that :
-   x + 1 >= y, where :
-
-  x = ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4)
-  y = ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT)
-
-We can prove it by contradiction. i.e let us assume
-y > x + 1, => There is an additional level between,
-(y) and (x + 1), which implies, there is an intermediate
-level covering the "bits" of the input address in the
-range [IPA_SHIFT, IPA_SHIFT - 4]. But since we must
-resolve exactly (PAGE_SHIFT - 3) bits (9bits minimum) in an intermediate
-level, that level can't exist. And thus our assumption can never
-be true.
-
-I guess we don't need to go to that level of craziness, just to prove it
-formally.
-
-> 
-> I was trying to preserve all the information you had in the original
-> comment (assuming it was important), but I honestly think that we only
-> need to explain the first part (because the confusing part of the code
-> is the reuse of a stage 1 macro and subtracting 4).
-> 
->>
->> May be I could replace the confusing text with something like :
->>
->> "A normal page table with ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4) levels
->> is guaranteed to resolve minimum of (IPA_SHIFT - 4)bits (when the entry
->> level is fully used, and more bits otherwise.). For an input address of
->> size IPA_SHIFT bits, we could cover the remaining 4 bits using the same
->> number of levels or using the concatenation if needed."
->>
-> 
-> I prefer my version above to explain this particular aspect :)
-> 
-> But this seems to exclude the stuff you originally had about
-> (PAGE_SHIFT - 3) > 4' ?
-
-Does the above make it clear ?
-
-Cheers
-Suzuki
