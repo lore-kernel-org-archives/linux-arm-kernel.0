@@ -1,59 +1,48 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 6 Nov 2018 13:20:10 +0000
-Subject: [PATCH 10/23] PCI: mobiveil: fix the INTx process error
+Date: Tue, 6 Nov 2018 13:20:16 +0000
+Subject: [PATCH 11/23] PCI: mobiveil: only fixup the Class Code field
 In-Reply-To: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
 References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181106131807.29951-11-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181106131807.29951-12-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-In the loop block, there is not code change the loop key,
-this patch updated the loop key by re-read the INTx status
-register.
-
-This patch also change to clear the handled INTx status.
-
-Note: Need MV to test this change.
+Fixup the Class Code to PCI bridge, do not change the Revision ID.
+And move the fixup to *_host_init function.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
- drivers/pci/controller/pcie-mobiveil.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ drivers/pci/controller/pcie-mobiveil.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index d03392940944..884c9f95374d 100644
+index 884c9f95374d..8e3630359597 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -361,6 +361,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
- 	/* Handle INTx */
- 	if (intr_status & PAB_INTP_INTX_MASK) {
- 		shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT);
-+		shifted_status &= PAB_INTP_INTX_MASK;
- 		shifted_status >>= PAB_INTX_START;
- 		do {
- 			for_each_set_bit(bit, &shifted_status, PCI_NUM_INTX) {
-@@ -372,12 +373,16 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
- 					dev_err_ratelimited(dev, "unexpected IRQ, INT%d\n",
- 							    bit);
- 
--				/* clear interrupt */
--				csr_writel(pcie,
--					   shifted_status << PAB_INTX_START,
-+				/* clear interrupt handled */
-+				csr_writel(pcie, 1 << (PAB_INTX_START + bit),
- 					   PAB_INTP_AMBA_MISC_STAT);
- 			}
--		} while ((shifted_status >> PAB_INTX_START) != 0);
-+
-+			shifted_status = csr_readl(pcie,
-+						   PAB_INTP_AMBA_MISC_STAT);
-+			shifted_status &= PAB_INTP_INTX_MASK;
-+			shifted_status >>= PAB_INTX_START;
-+		} while (shifted_status != 0);
+@@ -652,6 +652,12 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 				   type, resource_size(win->res));
  	}
  
- 	/* read extra MSI status register */
++	/* fixup for PCIe class register */
++	value = csr_readl(pcie, PAB_INTP_AXI_PIO_CLASS);
++	value &= 0xff;
++	value |= (PCI_CLASS_BRIDGE_PCI << 16);
++	csr_writel(pcie, value, PAB_INTP_AXI_PIO_CLASS);
++
+ 	/* setup MSI hardware registers */
+ 	mobiveil_pcie_enable_msi(pcie);
+ 
+@@ -895,9 +901,6 @@ static int mobiveil_pcie_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
+ 
+-	/* fixup for PCIe class register */
+-	csr_writel(pcie, 0x060402ab, PAB_INTP_AXI_PIO_CLASS);
+-
+ 	/* initialize the IRQ domains */
+ 	ret = mobiveil_pcie_init_irq_domain(pcie);
+ 	if (ret) {
 -- 
 2.17.1
