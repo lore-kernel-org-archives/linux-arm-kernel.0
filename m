@@ -1,31 +1,96 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 06 Nov 2018 13:40:25 +0000
-Subject: [PATCH 4/4] ARM: enable LD_DEAD_CODE_DATA_ELIMINATION
-In-Reply-To: <20181106133935.GB30658@n2100.armlinux.org.uk>
-References: <20181106133935.GB30658@n2100.armlinux.org.uk>
-Message-ID: <E1gK1aj-0000p7-Ic@rmk-PC.armlinux.org.uk>
+Date: Tue, 06 Nov 2018 13:45:10 +0000
+Subject: [PATCH] dmaengine: sa11x0: unexport sa11x0_dma_filter_fn and clean up
+Message-ID: <E1gK1fK-0000z2-Fo@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable LD_DEAD_CODE_DATA_ELIMINATION, which allows functions that are
-not called to be eliminated from the final kernel image.
+As we now have no users of sa11x0_dma_filter_fn() in the tree, we can
+unexport this function, and remove the now unused header file.
 
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/dma/sa11x0-dma.c   | 21 ++++++++-------------
+ include/linux/sa11x0-dma.h | 24 ------------------------
+ 2 files changed, 8 insertions(+), 37 deletions(-)
+ delete mode 100644 include/linux/sa11x0-dma.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 91be74d8df65..f7f65d0d5a05 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -82,6 +82,7 @@ config ARM
- 	select HAVE_KERNEL_XZ
- 	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_V7M
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
-+	select HAVE_LD_DEAD_CODE_DATA_ELIMINATION if !FUNCTION_TRACER
- 	select HAVE_MOD_ARCH_SPECIFIC
- 	select HAVE_NMI
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
+index b31d07c7d93c..784d5f1a473b 100644
+--- a/drivers/dma/sa11x0-dma.c
++++ b/drivers/dma/sa11x0-dma.c
+@@ -17,7 +17,6 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+-#include <linux/sa11x0-dma.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ 
+@@ -830,6 +829,14 @@ static const struct dma_slave_map sa11x0_dma_map[] = {
+ 	{ "sa11x0-ssp", "rx", "Ser4SSPRc" },
+ };
+ 
++static bool sa11x0_dma_filter_fn(struct dma_chan *chan, void *param)
++{
++	struct sa11x0_dma_chan *c = to_sa11x0_dma_chan(chan);
++	const char *p = param;
++
++	return !strcmp(c->name, p);
++}
++
+ static int sa11x0_dma_init_dmadev(struct dma_device *dmadev,
+ 	struct device *dev)
+ {
+@@ -1087,18 +1094,6 @@ static struct platform_driver sa11x0_dma_driver = {
+ 	.remove		= sa11x0_dma_remove,
+ };
+ 
+-bool sa11x0_dma_filter_fn(struct dma_chan *chan, void *param)
+-{
+-	if (chan->device->dev->driver == &sa11x0_dma_driver.driver) {
+-		struct sa11x0_dma_chan *c = to_sa11x0_dma_chan(chan);
+-		const char *p = param;
+-
+-		return !strcmp(c->name, p);
+-	}
+-	return false;
+-}
+-EXPORT_SYMBOL(sa11x0_dma_filter_fn);
+-
+ static int __init sa11x0_dma_init(void)
+ {
+ 	return platform_driver_register(&sa11x0_dma_driver);
+diff --git a/include/linux/sa11x0-dma.h b/include/linux/sa11x0-dma.h
+deleted file mode 100644
+index 65839a58b8e5..000000000000
+--- a/include/linux/sa11x0-dma.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/*
+- * SA11x0 DMA Engine support
+- *
+- * Copyright (C) 2012 Russell King
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __LINUX_SA11X0_DMA_H
+-#define __LINUX_SA11X0_DMA_H
+-
+-struct dma_chan;
+-
+-#if defined(CONFIG_DMA_SA11X0) || defined(CONFIG_DMA_SA11X0_MODULE)
+-bool sa11x0_dma_filter_fn(struct dma_chan *, void *);
+-#else
+-static inline bool sa11x0_dma_filter_fn(struct dma_chan *c, void *d)
+-{
+-	return false;
+-}
+-#endif
+-
+-#endif
 -- 
 2.7.4
