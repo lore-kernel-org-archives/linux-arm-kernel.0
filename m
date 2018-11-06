@@ -1,57 +1,39 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Tue, 6 Nov 2018 10:42:09 +0000
-Subject: [PATCH v10 0/6] EDAC: Enhancements to Synopsys EDAC driver
-In-Reply-To: <20181106100329.GC13712@zn.tnic>
-References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
- <20181106100329.GC13712@zn.tnic>
-Message-ID: <DM6PR02MB52278C1B02960DD084D5A25BC1CB0@DM6PR02MB5227.namprd02.prod.outlook.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Tue, 6 Nov 2018 10:54:26 +0000
+Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
+ beagle-xm
+In-Reply-To: <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
+References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
+ <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+ <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
+Message-ID: <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 05/11/2018 14:33, Olof Johansson wrote:
+> On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
+> <guillaume.tucker@collabora.com> wrote:
+>>
+>> Hi Linus,
+>>
+>> Please see below, the kernelci.org automated boot bisection found
+>> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
+>> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
+>> log output after the bootloader so the kernel seems to be
+>> crashing very early on.
+> 
+> Can you enable DEBUG_LL to capture what goes wrong?
 
-> -----Original Message-----
-> From: Borislav Petkov [mailto:bp at alien8.de]
-> Sent: Tuesday, November 6, 2018 3:34 PM
-> To: Manish Narani <MNARANI@xilinx.com>
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
-> <michals@xilinx.com>; mchehab at kernel.org; amit.kucheria at linaro.org;
-> sudeep.holla at arm.com; leoyang.li at nxp.com; devicetree at vger.kernel.org;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> edac at vger.kernel.org
-> Subject: Re: [PATCH v10 0/6] EDAC: Enhancements to Synopsys EDAC driver
-> 
-> On Thu, Oct 25, 2018 at 11:36:55AM +0530, Manish Narani wrote:
-> > Change in v10:
-> > 	- Moved the checking for ce_cnt and ue_cnt before the readl() call
-> > 	- Aligned arguments on the opening brace in setup_irq()
-> >
-> > Manish Narani (6):
-> >   edac: synopsys: Add error handling for NULL in probe()
-> >   dt: bindings: Document ZynqMP DDRC in Synopsys documentation
-> >   edac: synopsys: Add macro defines for ZynqMP DDRC
-> >   edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
-> >   arm64: zynqmp: Add DDRC node
-> >   edac: synopsys: Add Error Injection support for ZynqMP DDRC
-> >
-> >  .../bindings/memory-controllers/synopsys.txt       |  27 +-
-> >  arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   7 +
-> >  drivers/edac/Kconfig                               |   2 +-
-> >  drivers/edac/synopsys_edac.c                       | 911 ++++++++++++++++++++-
-> >  4 files changed, 918 insertions(+), 29 deletions(-)
-> 
-> Ok, patches pushed here:
-> 
-> (minus https://lkml.kernel.org/r/1540447621-22870-6-git-send-email-
-> manish.narani at xilinx.com)
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=edac-for-4.21-
-> synps
-> 
-Thanks a lot for your support.
+Yes I've scheduled a re-run of the automated bisection with
+DEBUG_LL turned on, but the beagle-xm board is currently offline
+in lab-baylibre.  I'll keep you posted when I get some results.
 
-> Please run this on the hw before I queue it for linux-next.
-I have tested this and verified as working fine on hardware. You can go ahead and queue it for linux-next.
+> The regression is on me. Linus sent the patch, but I was trigger happy
+> and applied it to fixes instead of letting it soak in -next longer.
+> 
+> I'll revert it in our fixes branch and send it in quickly, and apply
+> it to a branch picked up by -next instead.
 
-Thanks,
-Manish
+Ack - will also keep an eye on boot reports.
+
+Guillaume
