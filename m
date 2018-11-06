@@ -1,351 +1,165 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 6 Nov 2018 14:10:54 +0530
-Subject: [PATCH v3 02/13] firmware: ti_sci: Add support for RM core ops
+Date: Tue, 6 Nov 2018 14:10:53 +0530
+Subject: [PATCH v3 01/13] firmware: ti_sci: Add support to get TISCI handle
+ using of_phandle
 In-Reply-To: <20181106084105.32483-1-lokeshvutla@ti.com>
 References: <20181106084105.32483-1-lokeshvutla@ti.com>
-Message-ID: <20181106084105.32483-3-lokeshvutla@ti.com>
+Message-ID: <20181106084105.32483-2-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TISCI provides support for getting the resources(IRQ, RING etc..)
-assigned to a specific device. These resources can be handled by
-the client and in turn sends TISCI cmd to configure the resources.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-It is very important that client should keep track on usage of these
-resources.
+TISCI has been updated to have support for Resource management(likes
+interrupts etc..). And there can be multiple device instances of a
+resource type in a SoC. So every driver corresponding to a resource type
+should get a TISCI handle so that it can make TISCI calls. And each
+DT node corresponding to a device should exist under its corresponding
+bus node as per the SoC architecture.
 
-Add support for TISCI commands to get resource ranges.
+But existing apis in TISCI library assumes that all TISCI users are
+child nodes of TISCI. Which is not true in the above case. So introduce
+(devm_)ti_sci_get_by_phandle() apis that can be used by TISCI users
+to get TISCI handle using of phandle property.
 
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
 Changes since v2:
 - None
 
- drivers/firmware/ti_sci.c              | 170 +++++++++++++++++++++++++
- drivers/firmware/ti_sci.h              |  42 ++++++
- include/linux/soc/ti/ti_sci_protocol.h |  27 ++++
- 3 files changed, 239 insertions(+)
+ drivers/firmware/ti_sci.c              | 83 ++++++++++++++++++++++++++
+ include/linux/soc/ti/ti_sci_protocol.h | 17 ++++++
+ 2 files changed, 100 insertions(+)
 
 diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
-index f0cafa8a2ee9..a2a099b8f62a 100644
+index 69ed1464175c..f0cafa8a2ee9 100644
 --- a/drivers/firmware/ti_sci.c
 +++ b/drivers/firmware/ti_sci.c
-@@ -64,6 +64,22 @@ struct ti_sci_xfers_info {
- 	spinlock_t xfer_lock;
- };
+@@ -1781,6 +1781,89 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(devm_ti_sci_get_handle);
  
 +/**
-+ * struct ti_sci_rm_type_map - Structure representing TISCI Resource
-+ *				management representation of dev_ids.
-+ * @dev_id:	TISCI device ID
-+ * @type:	Corresponding id as identified by TISCI RM.
++ * ti_sci_get_by_phandle() - Get the TI SCI handle using DT phandle
++ * @np:		device node
++ * @propname:	property name containing phandle on TISCI node
 + *
-+ * Note: This is used only as a work around for using RM range apis
-+ *	for AM654 SoC. For future SoCs dev_id will be used as type
-+ *	for RM range APIs. In order to maintain ABI backward compatibility
-+ *	type is not being changed for AM654 SoC.
++ * NOTE: The function does not track individual clients of the framework
++ * and is expected to be maintained by caller of TI SCI protocol library.
++ * ti_sci_put_handle must be balanced with successful ti_sci_get_by_phandle
++ * Return: pointer to handle if successful, else:
++ * -EPROBE_DEFER if the instance is not ready
++ * -ENODEV if the required node handler is missing
++ * -EINVAL if invalid conditions are encountered.
 + */
-+struct ti_sci_rm_type_map {
-+	u32 dev_id;
-+	u16 type;
-+};
-+
- /**
-  * struct ti_sci_desc - Description of SoC integration
-  * @default_host_id:	Host identifier representing the compute entity
-@@ -71,12 +87,14 @@ struct ti_sci_xfers_info {
-  * @max_msgs: Maximum number of messages that can be pending
-  *		  simultaneously in the system
-  * @max_msg_size: Maximum size of data per message that can be handled.
-+ * @rm_type_map: RM resource type mapping structure.
-  */
- struct ti_sci_desc {
- 	u8 default_host_id;
- 	int max_rx_timeout_ms;
- 	int max_msgs;
- 	int max_msg_size;
-+	struct ti_sci_rm_type_map *rm_type_map;
- };
- 
- /**
-@@ -1617,6 +1635,153 @@ static int ti_sci_cmd_core_reboot(const struct ti_sci_handle *handle)
- 	return ret;
- }
- 
-+static int ti_sci_get_resource_type(struct ti_sci_info *info, u16 dev_id,
-+				    u16 *type)
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property)
 +{
-+	struct ti_sci_rm_type_map *rm_type_map = info->desc->rm_type_map;
-+	bool found = false;
-+	int i;
++	struct ti_sci_handle *handle = NULL;
++	struct device_node *ti_sci_np;
++	struct ti_sci_info *info;
++	struct list_head *p;
 +
-+	/* If map is not provided then assume dev_id is used as type */
-+	if (!rm_type_map) {
-+		*type = dev_id;
-+		return 0;
++	if (!np) {
++		pr_err("I need a device pointer\n");
++		return ERR_PTR(-EINVAL);
 +	}
 +
-+	for (i = 0; rm_type_map[i].dev_id; i++) {
-+		if (rm_type_map[i].dev_id == dev_id) {
-+			*type = rm_type_map[i].type;
-+			found = true;
++	ti_sci_np = of_parse_phandle(np, property, 0);
++	if (!ti_sci_np)
++		return ERR_PTR(-ENODEV);
++
++	mutex_lock(&ti_sci_list_mutex);
++	list_for_each(p, &ti_sci_list) {
++		info = list_entry(p, struct ti_sci_info, node);
++		if (ti_sci_np == info->dev->of_node) {
++			handle = &info->handle;
++			info->users++;
 +			break;
 +		}
 +	}
++	mutex_unlock(&ti_sci_list_mutex);
++	of_node_put(ti_sci_np);
 +
-+	if (!found)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+/**
-+ * ti_sci_get_resource_range - Helper to get a range of resources assigned
-+ *			       to a host. Resource is uniquely identified by
-+ *			       type and subtype.
-+ * @handle:		Pointer to TISCI handle.
-+ * @dev_id:		TISCI device ID.
-+ * @subtype:		Resource assignment subtype that is being requested
-+ *			from the given device.
-+ * @s_host:		Host processor ID to which the resources are allocated
-+ * @range_start:	Start index of the resource range
-+ * @range_num:		Number of resources in the range
-+ *
-+ * Return: 0 if all went fine, else return appropriate error.
-+ */
-+static int ti_sci_get_resource_range(const struct ti_sci_handle *handle,
-+				     u32 dev_id, u8 subtype, u8 s_host,
-+				     u16 *range_start, u16 *range_num)
-+{
-+	struct ti_sci_msg_resp_get_resource_range *resp;
-+	struct ti_sci_msg_req_get_resource_range *req;
-+	struct ti_sci_xfer *xfer;
-+	struct ti_sci_info *info;
-+	struct device *dev;
-+	u16 type;
-+	int ret = 0;
-+
-+	if (IS_ERR(handle))
-+		return PTR_ERR(handle);
 +	if (!handle)
-+		return -EINVAL;
++		return ERR_PTR(-EPROBE_DEFER);
 +
-+	info = handle_to_ti_sci_info(handle);
-+	dev = info->dev;
++	return handle;
++}
++EXPORT_SYMBOL_GPL(ti_sci_get_by_phandle);
 +
-+	xfer = ti_sci_get_one_xfer(info, TI_SCI_MSG_GET_RESOURCE_RANGE,
-+				   TI_SCI_FLAG_REQ_ACK_ON_PROCESSED,
-+				   sizeof(*req), sizeof(*resp));
-+	if (IS_ERR(xfer)) {
-+		ret = PTR_ERR(xfer);
-+		dev_err(dev, "Message alloc failed(%d)\n", ret);
-+		return ret;
-+	}
++/**
++ * devm_ti_sci_get_by_phandle() - Managed get handle using phandle
++ * @dev:	Device pointer requesting TISCI handle
++ * @propname:	property name containing phandle on TISCI node
++ *
++ * NOTE: This releases the handle once the device resources are
++ * no longer needed. MUST NOT BE released with ti_sci_put_handle.
++ * The function does not track individual clients of the framework
++ * and is expected to be maintained by caller of TI SCI protocol library.
++ *
++ * Return: 0 if all went fine, else corresponding error.
++ */
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property)
++{
++	const struct ti_sci_handle *handle;
++	const struct ti_sci_handle **ptr;
 +
-+	ret = ti_sci_get_resource_type(info, dev_id, &type);
-+	if (ret) {
-+		dev_err(dev, "rm type lookup failed for %u\n", dev_id);
-+		goto fail;
-+	}
++	ptr = devres_alloc(devm_ti_sci_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++	handle = ti_sci_get_by_phandle(dev_of_node(dev), property);
 +
-+	req = (struct ti_sci_msg_req_get_resource_range *)xfer->xfer_buf;
-+	req->secondary_host = s_host;
-+	req->type = type & MSG_RM_RESOURCE_TYPE_MASK;
-+	req->subtype = subtype & MSG_RM_RESOURCE_SUBTYPE_MASK;
-+
-+	ret = ti_sci_do_xfer(info, xfer);
-+	if (ret) {
-+		dev_err(dev, "Mbox send fail %d\n", ret);
-+		goto fail;
-+	}
-+
-+	resp = (struct ti_sci_msg_resp_get_resource_range *)xfer->xfer_buf;
-+
-+	if (!ti_sci_is_response_ack(resp)) {
-+		ret = -ENODEV;
-+	} else if (!resp->range_start && !resp->range_num) {
-+		ret = -ENODEV;
++	if (!IS_ERR(handle)) {
++		*ptr = handle;
++		devres_add(dev, ptr);
 +	} else {
-+		*range_start = resp->range_start;
-+		*range_num = resp->range_num;
-+	};
++		devres_free(ptr);
++	}
 +
-+fail:
-+	ti_sci_put_one_xfer(&info->minfo, xfer);
-+
-+	return ret;
++	return handle;
 +}
++EXPORT_SYMBOL_GPL(devm_ti_sci_get_by_phandle);
 +
-+/**
-+ * ti_sci_cmd_get_resource_range - Get a range of resources assigned to host
-+ *				   that is same as ti sci interface host.
-+ * @handle:		Pointer to TISCI handle.
-+ * @dev_id:		TISCI device ID.
-+ * @subtype:		Resource assignment subtype that is being requested
-+ *			from the given device.
-+ * @range_start:	Start index of the resource range
-+ * @range_num:		Number of resources in the range
-+ *
-+ * Return: 0 if all went fine, else return appropriate error.
-+ */
-+static int ti_sci_cmd_get_resource_range(const struct ti_sci_handle *handle,
-+					 u32 dev_id, u8 subtype,
-+					 u16 *range_start, u16 *range_num)
-+{
-+	return ti_sci_get_resource_range(handle, dev_id, subtype,
-+					 TI_SCI_IRQ_SECONDARY_HOST_INVALID,
-+					 range_start, range_num);
-+}
-+
-+/**
-+ * ti_sci_cmd_get_resource_range_from_shost - Get a range of resources
-+ *					      assigned to a specified host.
-+ * @handle:		Pointer to TISCI handle.
-+ * @dev_id:		TISCI device ID.
-+ * @subtype:		Resource assignment subtype that is being requested
-+ *			from the given device.
-+ * @s_host:		Host processor ID to which the resources are allocated
-+ * @range_start:	Start index of the resource range
-+ * @range_num:		Number of resources in the range
-+ *
-+ * Return: 0 if all went fine, else return appropriate error.
-+ */
-+static
-+int ti_sci_cmd_get_resource_range_from_shost(const struct ti_sci_handle *handle,
-+					     u32 dev_id, u8 subtype, u8 s_host,
-+					     u16 *range_start, u16 *range_num)
-+{
-+	return ti_sci_get_resource_range(handle, dev_id, subtype, s_host,
-+					 range_start, range_num);
-+}
-+
- /*
-  * ti_sci_setup_ops() - Setup the operations structures
-  * @info:	pointer to TISCI pointer
-@@ -1627,6 +1792,7 @@ static void ti_sci_setup_ops(struct ti_sci_info *info)
- 	struct ti_sci_core_ops *core_ops = &ops->core_ops;
- 	struct ti_sci_dev_ops *dops = &ops->dev_ops;
- 	struct ti_sci_clk_ops *cops = &ops->clk_ops;
-+	struct ti_sci_rm_core_ops *rm_core_ops = &ops->rm_core_ops;
- 
- 	core_ops->reboot_device = ti_sci_cmd_core_reboot;
- 
-@@ -1657,6 +1823,10 @@ static void ti_sci_setup_ops(struct ti_sci_info *info)
- 	cops->get_best_match_freq = ti_sci_cmd_clk_get_match_freq;
- 	cops->set_freq = ti_sci_cmd_clk_set_freq;
- 	cops->get_freq = ti_sci_cmd_clk_get_freq;
-+
-+	rm_core_ops->get_range = ti_sci_cmd_get_resource_range;
-+	rm_core_ops->get_range_from_shost =
-+				ti_sci_cmd_get_resource_range_from_shost;
- }
- 
- /**
-diff --git a/drivers/firmware/ti_sci.h b/drivers/firmware/ti_sci.h
-index 12bf316b68df..a043c4762791 100644
---- a/drivers/firmware/ti_sci.h
-+++ b/drivers/firmware/ti_sci.h
-@@ -35,6 +35,9 @@
- #define TI_SCI_MSG_QUERY_CLOCK_FREQ	0x010d
- #define TI_SCI_MSG_GET_CLOCK_FREQ	0x010e
- 
-+/* Resource Management Requests */
-+#define TI_SCI_MSG_GET_RESOURCE_RANGE	0x1500
-+
- /**
-  * struct ti_sci_msg_hdr - Generic Message Header for All messages and responses
-  * @type:	Type of messages: One of TI_SCI_MSG* values
-@@ -461,4 +464,43 @@ struct ti_sci_msg_resp_get_clock_freq {
- 	u64 freq_hz;
- } __packed;
- 
-+#define TI_SCI_IRQ_SECONDARY_HOST_INVALID	0xff
-+
-+/**
-+ * struct ti_sci_msg_req_get_resource_range - Request to get a host's assigned
-+ *					      range of resources.
-+ * @hdr:		Generic Header
-+ * @type:		Unique resource assignment type
-+ * @subtype:		Resource assignment subtype within the resource type.
-+ * @secondary_host:	Host processing entity to which the resources are
-+ *			allocated. This is required only when the destination
-+ *			host id id different from ti sci interface host id,
-+ *			else TI_SCI_IRQ_SECONDARY_HOST_INVALID can be passed.
-+ *
-+ * Request type is TI_SCI_MSG_GET_RESOURCE_RANGE. Responded with requested
-+ * resource range which is of type TI_SCI_MSG_GET_RESOURCE_RANGE.
-+ */
-+struct ti_sci_msg_req_get_resource_range {
-+	struct ti_sci_msg_hdr hdr;
-+#define MSG_RM_RESOURCE_TYPE_MASK	GENMASK(9, 0)
-+#define MSG_RM_RESOURCE_SUBTYPE_MASK	GENMASK(5, 0)
-+	u16 type;
-+	u8 subtype;
-+	u8 secondary_host;
-+} __packed;
-+
-+/**
-+ * struct ti_sci_msg_resp_get_resource_range - Response to resource get range.
-+ * @hdr:		Generic Header
-+ * @range_start:	Start index of the resource range.
-+ * @range_num:		Number of resources in the range.
-+ *
-+ * Response to request TI_SCI_MSG_GET_RESOURCE_RANGE.
-+ */
-+struct ti_sci_msg_resp_get_resource_range {
-+	struct ti_sci_msg_hdr hdr;
-+	u16 range_start;
-+	u16 range_num;
-+} __packed;
-+
- #endif /* __TI_SCI_H */
+ static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
+ 				void *cmd)
+ {
 diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
-index 515587e9d373..0c92a922db6a 100644
+index 18435e5c6364..515587e9d373 100644
 --- a/include/linux/soc/ti/ti_sci_protocol.h
 +++ b/include/linux/soc/ti/ti_sci_protocol.h
-@@ -192,15 +192,42 @@ struct ti_sci_clk_ops {
- 			u64 *current_freq);
- };
+@@ -217,6 +217,10 @@ struct ti_sci_handle {
+ const struct ti_sci_handle *ti_sci_get_handle(struct device *dev);
+ int ti_sci_put_handle(const struct ti_sci_handle *handle);
+ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev);
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property);
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property);
  
-+/**
-+ * struct ti_sci_rm_core_ops - Resource management core operations
-+ * @get_range:		Get a range of resources belonging to ti sci host.
-+ * @get_rage_from_shost:	Get a range of resources belonging to
-+ *				specified host id.
-+ *			- s_host: Host processing entity to which the
-+ *				  resources are allocated
-+ *
-+ * NOTE: for these functions, all the parameters are consolidated and defined
-+ * as below:
-+ * - handle:	Pointer to TISCI handle as retrieved by *ti_sci_get_handle
-+ * - dev_id:	TISCI device ID.
-+ * - subtype:	Resource assignment subtype that is being requested
-+ *		from the given device.
-+ * - range_start:	Start index of the resource range
-+ * - range_end:		Number of resources in the range
-+ */
-+struct ti_sci_rm_core_ops {
-+	int (*get_range)(const struct ti_sci_handle *handle, u32 dev_id,
-+			 u8 subtype, u16 *range_start, u16 *range_num);
-+	int (*get_range_from_shost)(const struct ti_sci_handle *handle,
-+				    u32 dev_id, u8 subtype, u8 s_host,
-+				    u16 *range_start, u16 *range_num);
-+};
+ #else	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+@@ -236,6 +240,19 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
+ 	return ERR_PTR(-EINVAL);
+ }
+ 
++static inline
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property)
++{
++	return ERR_PTR(-EINVAL);
++}
 +
- /**
-  * struct ti_sci_ops - Function support for TI SCI
-  * @dev_ops:	Device specific operations
-  * @clk_ops:	Clock specific operations
-+ * @rm_core_ops:	Resource management core operations.
-  */
- struct ti_sci_ops {
- 	struct ti_sci_core_ops core_ops;
- 	struct ti_sci_dev_ops dev_ops;
- 	struct ti_sci_clk_ops clk_ops;
-+	struct ti_sci_rm_core_ops rm_core_ops;
- };
++static inline
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property)
++{
++	return ERR_PTR(-EINVAL);
++}
+ #endif	/* CONFIG_TI_SCI_PROTOCOL */
  
- /**
+ #endif	/* __TISCI_PROTOCOL_H */
 -- 
 2.19.1
