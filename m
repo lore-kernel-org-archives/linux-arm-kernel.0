@@ -1,170 +1,40 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  6 Nov 2018 10:35:09 +0100
-Subject: [PATCH] drm/meson: Add HDMI 1.4 4k modes
-Message-ID: <1541496909-19625-1-git-send-email-narmstrong@baylibre.com>
+Date: Tue,  6 Nov 2018 10:39:59 +0100
+Subject: [PATCH 0/3] drm/meson: Add support for Overlay and OSD Plane scaling
+Message-ID: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the timings for the HDMI 1.4 4K modes support :
-- 3840x2160 at 30
-- 3840x2160 at 25
-- 3840x2160 at 24
+This serie adds support for :
+- Overlay Plane blended with the primary plane, we can describe as "behind"
+- Primary Plane up-scaling up to 5x factor to support the OSD plane being
+  upscaled from 1920x1080 when the display mode is set as 3840x2160.
 
-Since the 297000Hz pixel clock is already managed and the modes are
-compatible with the HDMI 1.4 current HDMI PHY+Controller support, only
-the missing timings values needs to be added.
+These patches depends on the "drm/meson: Allow using optional canvas provider"
+patchset from Maxime Jourdan at [1]
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/gpu/drm/meson/meson_venc.c | 129 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
+[1] https://patchwork.kernel.org/project/linux-amlogic/list/?series=38355
 
-diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
-index 514245e..bcffe8e 100644
---- a/drivers/gpu/drm/meson/meson_venc.c
-+++ b/drivers/gpu/drm/meson/meson_venc.c
-@@ -697,6 +697,132 @@ union meson_hdmi_venc_mode meson_hdmi_encp_mode_1080p60 = {
- 	},
- };
- 
-+union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p24 = {
-+	.encp = {
-+		.dvi_settings = 0x1,
-+		.video_mode = 0x4040,
-+		.video_mode_adv = 0x8,
-+		/* video_sync_mode */
-+		/* video_yc_dly */
-+		/* video_rgb_ctrl */
-+		.video_filt_ctrl = 0x1000,
-+		.video_filt_ctrl_present = true,
-+		/* video_ofld_voav_ofst */
-+		.yfp1_htime = 140,
-+		.yfp2_htime = 140+3840,
-+		.max_pxcnt = 3840+1660-1,
-+		.hspuls_begin = 2156+1920,
-+		.hspuls_end = 44,
-+		.hspuls_switch = 44,
-+		.vspuls_begin = 140,
-+		.vspuls_end = 2059+1920,
-+		.vspuls_bline = 0,
-+		.vspuls_eline = 4,
-+		.havon_begin = 148,
-+		.havon_end = 3987,
-+		.vavon_bline = 89,
-+		.vavon_eline = 2248,
-+		/* eqpuls_begin */
-+		/* eqpuls_end */
-+		/* eqpuls_bline */
-+		/* eqpuls_eline */
-+		.hso_begin = 44,
-+		.hso_end = 2156+1920,
-+		.vso_begin = 2100+1920,
-+		.vso_end = 2164+1920,
-+		.vso_bline = 51,
-+		.vso_eline = 53,
-+		.vso_eline_present = true,
-+		/* sy_val */
-+		/* sy2_val */
-+		.max_lncnt = 2249,
-+	},
-+};
-+
-+union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p25 = {
-+	.encp = {
-+		.dvi_settings = 0x1,
-+		.video_mode = 0x4040,
-+		.video_mode_adv = 0x8,
-+		/* video_sync_mode */
-+		/* video_yc_dly */
-+		/* video_rgb_ctrl */
-+		.video_filt_ctrl = 0x1000,
-+		.video_filt_ctrl_present = true,
-+		/* video_ofld_voav_ofst */
-+		.yfp1_htime = 140,
-+		.yfp2_htime = 140+3840,
-+		.max_pxcnt = 3840+1440-1,
-+		.hspuls_begin = 2156+1920,
-+		.hspuls_end = 44,
-+		.hspuls_switch = 44,
-+		.vspuls_begin = 140,
-+		.vspuls_end = 2059+1920,
-+		.vspuls_bline = 0,
-+		.vspuls_eline = 4,
-+		.havon_begin = 148,
-+		.havon_end = 3987,
-+		.vavon_bline = 89,
-+		.vavon_eline = 2248,
-+		/* eqpuls_begin */
-+		/* eqpuls_end */
-+		/* eqpuls_bline */
-+		/* eqpuls_eline */
-+		.hso_begin = 44,
-+		.hso_end = 2156+1920,
-+		.vso_begin = 2100+1920,
-+		.vso_end = 2164+1920,
-+		.vso_bline = 51,
-+		.vso_eline = 53,
-+		.vso_eline_present = true,
-+		/* sy_val */
-+		/* sy2_val */
-+		.max_lncnt = 2249,
-+	},
-+};
-+
-+union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p30 = {
-+	.encp = {
-+		.dvi_settings = 0x1,
-+		.video_mode = 0x4040,
-+		.video_mode_adv = 0x8,
-+		/* video_sync_mode */
-+		/* video_yc_dly */
-+		/* video_rgb_ctrl */
-+		.video_filt_ctrl = 0x1000,
-+		.video_filt_ctrl_present = true,
-+		/* video_ofld_voav_ofst */
-+		.yfp1_htime = 140,
-+		.yfp2_htime = 140+3840,
-+		.max_pxcnt = 3840+560-1,
-+		.hspuls_begin = 2156+1920,
-+		.hspuls_end = 44,
-+		.hspuls_switch = 44,
-+		.vspuls_begin = 140,
-+		.vspuls_end = 2059+1920,
-+		.vspuls_bline = 0,
-+		.vspuls_eline = 4,
-+		.havon_begin = 148,
-+		.havon_end = 3987,
-+		.vavon_bline = 89,
-+		.vavon_eline = 2248,
-+		/* eqpuls_begin */
-+		/* eqpuls_end */
-+		/* eqpuls_bline */
-+		/* eqpuls_eline */
-+		.hso_begin = 44,
-+		.hso_end = 2156+1920,
-+		.vso_begin = 2100+1920,
-+		.vso_end = 2164+1920,
-+		.vso_bline = 51,
-+		.vso_eline = 53,
-+		.vso_eline_present = true,
-+		/* sy_val */
-+		/* sy2_val */
-+		.max_lncnt = 2249,
-+	},
-+};
-+
- struct meson_hdmi_venc_vic_mode {
- 	unsigned int vic;
- 	union meson_hdmi_venc_mode *mode;
-@@ -717,6 +843,9 @@ struct meson_hdmi_venc_vic_mode {
- 	{ 34, &meson_hdmi_encp_mode_1080p30 },
- 	{ 31, &meson_hdmi_encp_mode_1080p50 },
- 	{ 16, &meson_hdmi_encp_mode_1080p60 },
-+	{ 93, &meson_hdmi_encp_mode_2160p24 },
-+	{ 94, &meson_hdmi_encp_mode_2160p25 },
-+	{ 95, &meson_hdmi_encp_mode_2160p30 },
- 	{ 0, NULL}, /* sentinel */
- };
- 
+Neil Armstrong (3):
+  drm/meson: Support Overlay plane for video rendering
+  drm/meson: move OSD scaler management into plane atomic update
+  drm/meson: Add primary plane scaling
+
+ drivers/gpu/drm/meson/Makefile          |   2 +-
+ drivers/gpu/drm/meson/meson_canvas.c    |   7 +-
+ drivers/gpu/drm/meson/meson_canvas.h    |  11 +-
+ drivers/gpu/drm/meson/meson_crtc.c      | 251 +++++++++++++-
+ drivers/gpu/drm/meson/meson_drv.c       |  29 +-
+ drivers/gpu/drm/meson/meson_drv.h       |  62 ++++
+ drivers/gpu/drm/meson/meson_overlay.c   | 586 ++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/meson/meson_overlay.h   |  14 +
+ drivers/gpu/drm/meson/meson_plane.c     | 177 ++++++++--
+ drivers/gpu/drm/meson/meson_registers.h |   3 +
+ drivers/gpu/drm/meson/meson_viu.c       |  15 +
+ drivers/gpu/drm/meson/meson_vpp.c       |  90 +++--
+ 12 files changed, 1156 insertions(+), 91 deletions(-)
+ create mode 100644 drivers/gpu/drm/meson/meson_overlay.c
+ create mode 100644 drivers/gpu/drm/meson/meson_overlay.h
+
 -- 
 2.7.4
