@@ -1,92 +1,40 @@
-From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Tue, 06 Nov 2018 19:28:14 +0100
-Subject: [PATCH RFC 09/18] staging: vchiq_core: do not initialize
- semaphores twice
-In-Reply-To: <9366d835-a291-2770-4409-b88ea1a155e2@i2se.com>
-References: <20181026134813.7775-1-nsaenzjulienne@suse.de>
- <20181026134813.7775-10-nsaenzjulienne@suse.de>
- <1781917429.4071.1540759539282@email.ionos.de>
- <ddef268b97543abc9de05842b92e1fc5f0134de8.camel@suse.de>
- <9366d835-a291-2770-4409-b88ea1a155e2@i2se.com>
-Message-ID: <a790978e8bcb869708833c73da1a05923f66b2d2.camel@suse.de>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue,  6 Nov 2018 10:36:05 -0800
+Subject: [PATCH 0/4] Simplify mediatek clk driver probes
+Message-ID: <20181106183609.207702-1-sboyd@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-11-06 at 17:06 +0100, Stefan Wahren wrote:
-> Am 06.11.18 um 16:41 schrieb Nicolas Saenz Julienne:
-> > Hi Stefan,
-> > thanks for spending the time reviewing the code. I took note of the
-> > rest of comments.
-> > 
-> > On Sun, 2018-10-28 at 21:45 +0100, Stefan Wahren wrote:
-> > > Hi Nicolas,
-> > > 
-> > > > Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 26.
-> > > > Oktober
-> > > > 2018 um 15:48 geschrieben:
-> > > > 
-> > > > 
-> > > > vchiq_init_state() initialises a series of semaphores to then
-> > > > call
-> > > > remote_event_create() on the same semaphores, which initializes
-> > > > them
-> > > > again.
-> > > i would prefer to have all init stuff at one place in
-> > > vchiq_init_state() and drop this ugliness from
-> > > remote_event_create()
-> > > instead. Is this possible?
-> > As I'm sure you're aware of, REMOTE_EVENT_T is shared between the
-> > CPU
-> > and VC4, which can't be expanded. And since storing a pointer is
-> > out of
-> > question because of arm64, I can only think of storing an index to
-> > an
-> > array of completions in the shared structure instead of the pointer
-> > magic implemented right now. It would be a little more explicit.
-> > Then
-> > we could completely decouple both initializations. I'm not sure if
-> > it's
-> > similar to what you had in mind. 
-> 
-> I don't think so, this was my intention:
-> 
->  static inline void
->  remote_event_create(VCHIQ_STATE_T *state, REMOTE_EVENT_T *event)
->  {
->     event->armed = 0;
->     /* Don't clear the 'fired' flag because it may already have been
-> set
->     ** by the other side. */
-> -    sema_init((struct semaphore *)((char *)state + event->event),
-> 0);
->  }
+I suggested this some time ago but nobody has gotten around to doing it
+so far. Well now I have! Here's a patch series that cuts down the
+boiler-plate code that Mediatek clk drivers have to multiplex probe
+amongst the device match data.
 
-Fair enough, even simpler.
+Rob/Frank, I'd prefer to take the first patch via clk tree so I can
+merge it all in the next release. Otherwise, I can pull a stable commit
+and merge it that way in case you want to take it through your tree.
 
-> 
-> 
-> > On a semi-related topic, I'm curious to know why these shared
-> > structures aren't set with the "__packed" preprocessor macro. Any
-> > ideas? As fas as I've been told, in general, the compiler may
-> > reorder
-> > or add unexpected padding to any structure. Which would be very bad
-> > in
-> > this case.
-> 
-> This would be better, but i assume the firmware side uses the same
-> source code. So using __packed only on ARM side could also break :-(
+Cc: Ryder Lee <ryder.lee@mediatek.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
 
-True. Yet in that case, aren't we still relying on the fact that both
-compilers are going to behave the same way?
- 
-> 
-> > Regards,
-> > Nicolas
+Stephen Boyd (4):
+  of/device: Add a way to probe drivers by match data
+  clk: mediatek: Convert to platform_driver_probe_by_match_data()
+  clk: mediatek: Drop THIS_MODULE from platform_driver
+  clk: mediatek: Simplify single driver probes
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181106/897c8eb2/attachment.sig>
+ drivers/clk/mediatek/clk-mt2701-g3d.c | 28 +++---------------------
+ drivers/clk/mediatek/clk-mt2701.c     | 20 +----------------
+ drivers/clk/mediatek/clk-mt2712.c     | 21 +-----------------
+ drivers/clk/mediatek/clk-mt6797.c     | 20 +----------------
+ drivers/clk/mediatek/clk-mt7622-aud.c | 28 +++---------------------
+ drivers/clk/mediatek/clk-mt7622-eth.c | 20 +----------------
+ drivers/clk/mediatek/clk-mt7622-hif.c | 20 +----------------
+ drivers/clk/mediatek/clk-mt7622.c     | 20 +----------------
+ drivers/of/device.c                   | 31 +++++++++++++++++++++++++++
+ include/linux/of_device.h             |  1 +
+ 10 files changed, 44 insertions(+), 165 deletions(-)
+
+-- 
+Sent by a computer through tubes
