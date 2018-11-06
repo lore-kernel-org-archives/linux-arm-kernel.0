@@ -1,70 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2018 01:30:23 +0000
-Subject: [Bug Report] kdump crashes after latest EFI memblock changes on
- arm64 machines with large number of CPUs
-In-Reply-To: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
-References: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
-Message-ID: <20181106013022.GA27793@brain-police>
+From: baijiaju1990@gmail.com (Jia-Ju Bai)
+Date: Tue,  6 Nov 2018 11:33:48 +0800
+Subject: [PATCH] dma: coh901318: Fix a double-lock bug
+Message-ID: <20181106033348.27361-1-baijiaju1990@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2018 at 02:44:10AM +0530, Bhupesh Sharma wrote:
-> With the latest EFI changes for memblock reservation across kdump
-> kernel from Ard (Commit 71e0940d52e107748b270213a01d3b1546657d74
-> ["efi: honour memory reservations passed via a linux specific config
-> table"]), we hit a panic while trying to boot the kdump kernel on
-> machines which have large number of CPUs.
-> 
-> I have a arm64 board which has 224 CPUS:
-> # lscpu
-> <..snip..>
-> CPU(s):              224
-> On-line CPU(s) list: 0-223
-> <..snip..>
-> 
-> Here are the crash logs in the kdump kernel on this machine:
-> 
-> [    0.000000] Unable to handle kernel paging request at virtual
-> address ffff80003ffe0000
-> val____)nt EL), IL ata abort info:
-> [    0.or: Oops: 960000inted 4.18.0+ #3
-> [    0.000000] pstate: 20400089 (nzCv daIf +PAN -UAO)
-> [    0.000000] pc : __memcpy+0x110/0x180
-> [    0.000000] lr : memblock_double_array+0x240/0x348
-> [    0.000000] sp : ffff0000092efc80 x28: 00000000bffe0000
-> [    0.000000] x27: 0000000000001800 x26: ffff000009d59000
-> [    0.000000] x25: ffff80003ffe0000 x24: 0000000000000000
-> [    0.000000] x23: 0000000000010000 x22: ffff000009d594e8
-> [    0.000000] x21: ffff000009d594f4 x20: ffff0000093c7268
-> [    0.000000] x19: 0000000000000c00 x18: 0000000000000010
-> [    0.000000] x17: 0000000000000000 x16: 0000000000000000
-> [    0.000000] x15: ffffffffffffffff3: 0000000fc18d0000 x12: 0000000800000000
-> [    0.000000] x11: 0000000000000018 x10: 00000000ddab9e18
-> [    0.000000] x9 : 0000000800000000 x8 : 00000000000002c1
-> [    0.000000] x7 : 0000000091b90000 x6 : ffff80003ffe0000
-> [    0.000000] x5 : 0000000000000001 x4 : 0000000000000000
-> [    0.000000] x3 : 0000000000000000 x2 : 0000000000000b80
-> [    0.000000] x1 : ffff000009d59540 x0 : ffff80003ffe0000
-> [    0.000000] Process swapper)
-> [    0.000000] Call trace:
-> [    0.000000]  __memcpy+0x110/0x180
-> [    0.000000]  memblock_add_range+0x134/0x2e8
-> [    0.000000]  memblock_reserve+0x70/0xb8
-> [    0.000000]  memblock_alloc_base_nid+0x6c/0x88
-> [    0.000000]  __memblock_alloc_base+0x3c/0x4c
-> [    0.000000]  memblock_alloc_base+0x28/0x4c
-> [    0.000000]  memblock_alloc+0x2c/0x38
-> [    0.000000]  early_pgtable_alloc+0x20/0xb0
+The function coh901318_alloc_chan_resources() calls spin_lock_irqsave() 
+before calling coh901318_config().
+But coh901318_config() calls spin_lock_irqsave() again in its
+definition, which may cause a double-lock bug.
 
-Hmm, so this seems to be the crux of the issue: early_pgtable_alloc() relies
-on memblock to allocate page-table memory, but this can be called before the
-linear mapping is up and running (or even as part of creating the linear
-mapping itself!) so the use of __va in memblock_double_array() actually
-returns an unmapped address.
+Because coh901318_config() is only called by
+coh901318_alloc_chan_resources(), the bug fix is to remove the
+calls to spin-lock and -unlock functions in coh901318_config().
 
-So I guess we either need to implement early_pgtable_alloc() some other way
-(how?) or get memblock_double_array() to use a fixmap if it's called too
-early (yuck). Alternatively, would it be possible to postpone processing of
-the EFI mem_reserve entries until after we've created the linear mapping?
+Signed-off-by: Jia-Ju Bai <baijiaju1990@gmail.com>
+---
+ drivers/dma/coh901318.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Will
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index eebaba3d9e78..fd862a478738 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -1807,8 +1807,6 @@ static int coh901318_config(struct coh901318_chan *cohc,
+ 	int channel = cohc->id;
+ 	void __iomem *virtbase = cohc->base->virtbase;
+ 
+-	spin_lock_irqsave(&cohc->lock, flags);
+-
+ 	if (param)
+ 		p = param;
+ 	else
+@@ -1828,8 +1826,6 @@ static int coh901318_config(struct coh901318_chan *cohc,
+ 	coh901318_set_conf(cohc, p->config);
+ 	coh901318_set_ctrl(cohc, p->ctrl_lli_last);
+ 
+-	spin_unlock_irqrestore(&cohc->lock, flags);
+-
+ 	return 0;
+ }
+ 
+-- 
+2.17.0
