@@ -1,126 +1,79 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Tue, 06 Nov 2018 10:57:11 +0100
-Subject: sama5d: using the ebi interface from another driver
-In-Reply-To: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
-References: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
-Message-ID: <3857132.MlRd14rs7I@ada>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2018 10:14:37 +0000
+Subject: [PATCH] mm: improve/fix ARM v7_dma_inv_range() unaligned address
+ handling
+In-Reply-To: <1541444814.537.8.camel@sageembedded.com>
+References: <1541444814.537.8.camel@sageembedded.com>
+Message-ID: <20181106101437.GY30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hei hei,
-
-Am Freitag, 2. November 2018, 14:35:26 CET schrieb Jean-Michel Hautbois:
-> Then, after looking into deeper details in the datasheet I understand
-> it is connected through EBI and it sounds not so easy :D.
-
-Did you read docs on that? You'll find the binding docs here:
-
-Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
-
-> I would appreciate some help/pointers on this, as there is (at least,
-> I could find) few documentation on how to use it except for NAND
-> cases.
-
-I use EBI with at91sam9g20 and custom FPGA on CS5 (0x6000000) and CS7 
-(0x8000000).
-
-> I have something like that in my DTS, but not sure this is the correct
-> way to do it :
+On Mon, Nov 05, 2018 at 11:06:54AM -0800, Chris Cole wrote:
+> This patch addresses possible memory corruption when
+> v7_dma_inv_range(start_address, end_address) address parameters are not
+> aligned to whole cache lines. This function issues "invalidate" cache
+> management operations to all cache lines from start_address (inclusive)
+> to end_address (exclusive). When start_address and/or end_address are
+> not aligned, the start and/or end cache lines are first issued "clean &
+> invalidate" operation. The assumption is this is done to ensure that any
+> dirty data addresses outside the address range (but part of the first or
+> last cache lines) are cleaned/flushed so that data is not lost, which
+> could happen if just an invalidate is issued.
 > 
->         ebi: ebi at 10000000 {
->             pinctrl-0 = <&pinctrl_ebi_nand_addr>;
->             pinctrl-names = "default";
->             status = "okay";
+> The problem is that these first/last partial cache lines are issued
+> "clean & invalidate" and then "invalidate". This second "invalidate" is
+> not required and worse can cause "lost" writes to addresses outside the
+> address range but part of the cache line. If another component writes to
+> its part of the cache line between the "clean & invalidate" and
+> "invalidate" operations, the write can get lost. This fix is to remove
+> the extra "invalidate" operation when unaligned addressed are used.
 > 
->             dsp0: pef24628 at 1 {
->                 status = "okay";
->                 compatible = "intel,pef24628";
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 reg = <0x1 0x0 0x8000>;
->                 pinctrl-0 = <&pinctrl_dsp_cs1>;
->             };
+> A kernel module is available that has a stress test to reproduce the
+> issue and a unit test of the updated v7_dma_inv_range(). It can be
+> downloaded from
+> http://ftp.sageembedded.com/outgoing/linux/cache-test-20181102.tgz.
 > 
->             dsp1: pef24628 at 2 {
->                 status = "okay";
->                 compatible = "intel,pef24628";
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 reg = <0x2 0x0 0x8000>;
->                 pinctrl-0 = <&pinctrl_dsp_cs2>;
->             };
+> v7_dma_inv_range() is call by dmac_[un]map_area(addr, len, direction)
+> when the direction is DMA_FROM_DEVICE. One can (I believe) successfully
+> argue that DMA from a device to main memory should use buffers aligned
+> to cache line size, because the "clean & invalidate" might overwrite
+> data that the device just wrote using DMA. But if a driver does use
+> unaligned buffers, at least this fix will prevent memory corruption
+> outside the buffer.
+> 
+> Signed-off-by: chris at sageembedded.com
 
-I'm not sure about those 'reg' settings. IIRC the first should correspond to 
-the CS line, on at91sam9g20 the 0x40000000 would be CS3 (which is used by 
-NAND, like in the dts snippet you posted) and 0x50000000 would be CS4. Are CS1 
-(which is used by SD-RAM) and CS2 free to use on sama5d3?
+I think there's a simpler patch to this:
 
-Maybe that's different on sama5d3? I would check it again.
+ arch/arm/mm/cache-v7.S | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-> The pinctrl for ebi should probably be changed however, I am wondering
-> how the (platform ?) driver can access the adress ? Should it parse
-> itself the parent, and find range, etc. Or is there an accessor for it
-> ?
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 215df435bfb9..2149b47a0c5a 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -360,14 +360,16 @@ ENDPROC(v7_flush_kern_dcache_area)
+ 	ALT_UP(W(nop))
+ #endif
+ 	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line
++	addne	r0, r0, r2			@ next cache line
+ 
+ 	tst	r1, r3
+ 	bic	r1, r1, r3
+ 	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D / U line
+-1:
+-	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
+-	add	r0, r0, r2
+ 	cmp	r0, r1
++1:
++	mcrlo	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
++	addlo	r0, r0, r2
++	cmplo	r0, r1
+ 	blo	1b
+ 	dsb	st
+ 	ret	lr
 
-Probably. This is what I have for the at91sam9g20:
-
-            pinctrl at fffff400 {                                          
-                ebi {                                                   
-                    pinctrl_ebi_cs5: ebi-cs5-0 {                        
-                        atmel,pins =                                    
-                            <AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
-                    };                                                  
-                                                                        
-                    pinctrl_ebi_cs7: ebi-cs7-0 {                        
-                        atmel,pins =                                    
-                            <AT91_PIOC 12 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
-                    };                                                  
-                                                                        
-                    pinctrl_ebi_nwait: ebi-nwait-0 {                    
-                        atmel,pins =                                    
-                            <AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
-                    };                                                  
-                };                                                      
-            };                                                          
-
-> Maybe can I just manually toggle the CS GPIO, and don't try to make
-> anything more complex than what it should be ? The driver should not
-> be atmel dependant...
-
-As Ludovic said, you should check the settings and timings for the external 
-memory interface. This could look more or less similar to that:
-
-            foo_bar: foo-bar at 5,0 {                              
-                status = "okay";                                        
-                pinctrl-0 = <&pinctrl_ebi_cs5>;                         
-                pinctrl-names = "default";                              
-                reg = <0x5 0x0 0x80000>;                                
-                                                                        
-                atmel,smc-bus-width = <8>;                              
-                atmel,smc-read-mode = "nrd";                            
-                atmel,smc-write-mode = "nwe";                           
-                atmel,smc-exnw-mode = "ready";                          
-                                                                        
-                atmel,smc-ncs-rd-setup-ns = <7>;                        
-                atmel,smc-nrd-setup-ns = <7>;                           
-                atmel,smc-ncs-wr-setup-ns = <7>;                        
-                atmel,smc-nwe-setup-ns = <7>;                           
-                                                                        
-                atmel,smc-ncs-rd-pulse-ns = <56>;                       
-                atmel,smc-nrd-pulse-ns = <56>;                          
-                atmel,smc-ncs-wr-pulse-ns = <56>;                       
-                atmel,smc-nwe-pulse-ns = <56>;                          
-                                                                        
-                atmel,smc-nwe-cycle-ns = <77>;                          
-                atmel,smc-nrd-cycle-ns = <77>;                          
-                                                                        
-                atmel,smc-tdf-ns = <0>;                                 
-            };        
-
-As you can see, quite a lot of settings are made, all depending on how the 
-memory access is supposed to be configured. You should look out for details in 
-the hardware manuals of the SoC and the devices you want to connect.
-
-HTH & Greets
-Alex
-                                                  
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
