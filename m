@@ -1,32 +1,31 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 06 Nov 2018 13:40:09 +0000
-Subject: [PATCH 1/4] EFI stub: remove -fdata-sections
+Date: Tue, 06 Nov 2018 13:40:25 +0000
+Subject: [PATCH 4/4] ARM: enable LD_DEAD_CODE_DATA_ELIMINATION
 In-Reply-To: <20181106133935.GB30658@n2100.armlinux.org.uk>
 References: <20181106133935.GB30658@n2100.armlinux.org.uk>
-Message-ID: <E1gK1aT-0000oL-Nn@rmk-PC.armlinux.org.uk>
+Message-ID: <E1gK1aj-0000p7-Ic@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove -fdata-sections from the EFI stub build as this causes problems
-for the ARM decompressor code.
+Enable LD_DEAD_CODE_DATA_ELIMINATION, which allows functions that are
+not called to be eliminated from the final kernel image.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/firmware/efi/libstub/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index c51627660dbb..98133d0577ab 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -15,7 +15,7 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__KERNEL__ -O2 \
- # disable the stackleak plugin
- cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie \
- 				   $(DISABLE_STACKLEAK_PLUGIN)
--cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
-+cflags-$(CONFIG_ARM)		:= $(filter-out -pg -fdata-sections,$(KBUILD_CFLAGS)) \
- 				   -fno-builtin -fpic \
- 				   $(call cc-option,-mno-single-pic-base)
- 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 91be74d8df65..f7f65d0d5a05 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -82,6 +82,7 @@ config ARM
+ 	select HAVE_KERNEL_XZ
+ 	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_V7M
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
++	select HAVE_LD_DEAD_CODE_DATA_ELIMINATION if !FUNCTION_TRACER
+ 	select HAVE_MOD_ARCH_SPECIFIC
+ 	select HAVE_NMI
+ 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
 -- 
 2.7.4
