@@ -1,83 +1,37 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 6 Nov 2018 08:53:53 +0100
-Subject: [PATCH 2/4] KVM: arm64: Allow implementations to be confined to
- using VHE
-In-Reply-To: <20181105143617.120602-3-marc.zyngier@arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-3-marc.zyngier@arm.com>
-Message-ID: <20181106075353.GF12057@e113682-lin.lund.arm.com>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Tue,  6 Nov 2018 08:59:26 +0100
+Subject: [PATCH v4 3/3] MAINTAINERS: Add meson video decoder
+In-Reply-To: <20181106075926.19269-1-mjourdan@baylibre.com>
+References: <20181106075926.19269-1-mjourdan@baylibre.com>
+Message-ID: <20181106075926.19269-4-mjourdan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 02:36:14PM +0000, Marc Zyngier wrote:
-> Some implementations may be forced to use VHE to work around HW
-> errata, for example. Let's introduce a helper that checks for
-> these cases.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_host.h   | 1 +
->  arch/arm64/include/asm/kvm_host.h | 6 ++++++
->  virt/kvm/arm/arm.c                | 5 +++++
->  3 files changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index c3469729f40c..0f2f782548cb 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -286,6 +286,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->  
->  static inline bool kvm_arch_sve_requires_vhe(void) { return false; }
-> +static inline bool kvm_arch_impl_requires_vhe(void) { return false; }
->  static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index ca1714148400..7d6e974d024a 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -432,6 +432,12 @@ static inline bool kvm_arch_sve_requires_vhe(void)
->  	return system_supports_sve();
->  }
->  
-> +static inline bool kvm_arch_impl_requires_vhe(void)
-> +{
-> +	/* Some implementations have defects that confine them to VHE */
-> +	return false;
-> +}
-> +
->  static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 66de2efddfca..bc90a1cdd27f 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1647,6 +1647,11 @@ int kvm_arch_init(void *opaque)
->  			kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
->  			return -ENODEV;
->  		}
-> +
-> +		if (kvm_arch_impl_requires_vhe()) {
-> +			kvm_pr_unimpl("CPU requiring VHE in non-VHE mode");
-> +			return -ENODEV;
-> +		}
+Add an entry for the meson video decoder for amlogic SoCs.
 
-So as per my previous comment, I'd prefer this function to only issue a
-single call, and have the function in kvm_host.h check for all the
-conditions, do the printing, etc.
+Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Thoughts?
-
-
-Thanks,
-
-    Christoffer
-
->  	}
->  
->  	for_each_online_cpu(cpu) {
-> -- 
-> 2.19.1
-> 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f4855974f325..df013e7758b6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9621,6 +9621,14 @@ F:	drivers/media/platform/meson/ao-cec.c
+ F:	Documentation/devicetree/bindings/media/meson-ao-cec.txt
+ T:	git git://linuxtv.org/media_tree.git
+ 
++MESON VIDEO DECODER DRIVER FOR AMLOGIC SOCS
++M:	Maxime Jourdan <mjourdan@baylibre.com>
++L:	linux-media at lists.freedesktop.org
++L:	linux-amlogic at lists.infradead.org
++S:	Supported
++F:	drivers/media/platform/meson/vdec/
++T:	git git://linuxtv.org/media_tree.git
++
+ MICROBLAZE ARCHITECTURE
+ M:	Michal Simek <monstr@monstr.eu>
+ W:	http://www.monstr.eu/fdt/
+-- 
+2.19.1
