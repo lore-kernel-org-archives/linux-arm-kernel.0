@@ -1,76 +1,99 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 6 Nov 2018 13:21:12 +0000
-Subject: [PATCH 20/23] PCI: mobiveil: change prototype of function
- mobiveil_host_init
+Date: Tue, 6 Nov 2018 13:21:19 +0000
+Subject: [PATCH 21/23] dt-bindings: pci: Add NXP LX SoCs PCIe controller
 In-Reply-To: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
 References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181106131807.29951-21-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181106131807.29951-22-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Add a parameter 'bool reinit' to identify re-initializing the
-host controller, and export it.
+Add PCIe controller DT bindings of NXP LX series SoCs.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
- .../pci/controller/mobiveil/pcie-mobiveil-host.c | 16 +++++++++-------
- drivers/pci/controller/mobiveil/pcie-mobiveil.h  |  1 +
- 2 files changed, 10 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/pci/lx-pci.txt        | 52 +++++++++++++++++++
+ MAINTAINERS                                   |  8 +++
+ 2 files changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/lx-pci.txt
 
-diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-index de24fedcb92d..b1d67a697ecc 100644
---- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-+++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-@@ -213,7 +213,7 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
- 	writel_relaxed(1, pcie->apb_csr_base + MSI_ENABLE_OFFSET);
- }
+diff --git a/Documentation/devicetree/bindings/pci/lx-pci.txt b/Documentation/devicetree/bindings/pci/lx-pci.txt
+new file mode 100644
+index 000000000000..dc602fef93b0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/lx-pci.txt
+@@ -0,0 +1,52 @@
++NXP LX PCIe controller
++
++This PCIe controller is based on the Mobiveil PCIe IP and thus inherits all
++the common properties defined in mobiveil-pcie.txt.
++
++Required properties:
++- compatible: should contain the platform identifier such as:
++  "fsl,lx2160a-pcie"
++- reg: base addresses and lengths of the PCIe controller register blocks.
++  "config_axi_slave": PCIe controller registers
++  "csr_axi_slave": Bridge config registers
++- interrupts: A list of interrupt outputs of the controller. Must contain an
++  entry for each entry in the interrupt-names property.
++- interrupt-names: It could include the following entries:
++  "intr": The interrupt that is asserted for controller interrupts
++  "aer": Asserted for aer interrupt when chip support the aer interrupt with
++		 none MSI/MSI-X/INTx mode,but there is interrupt line for aer.
++  "pme": Asserted for pme interrupt when chip support the pme interrupt with
++		 none MSI/MSI-X/INTx mode,but there is interrupt line for pme.
++- dma-coherent: Indicates that the hardware IP block can ensure the coherency
++  of the data transferred from/to the IP block. This can avoid the software
++  cache flush/invalid actions, and improve the performance significantly.
++- msi-parent : See the generic MSI binding described in
++  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
++
++Example:
++
++	pcie at 3400000 {
++		compatible = "fsl,lx2160a-pcie";
++		reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
++		       0x80 0x00000000 0x0 0x00001000>; /* configuration space */
++		reg-names = "csr_axi_slave", "config_axi_slave";
++		interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++		interrupt-names = "aer", "pme", "intr";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		apio-wins = <8>;
++		ppio-wins = <8>;
++		dma-coherent;
++		bus-range = <0x0 0xff>;
++		msi-parent = <&its>;
++		ranges = <0x82000000 0x0 0x40000000 0x80 0x40000000 0x0 0x40000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0000 0 0 1 &gic GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
++				<0000 0 0 2 &gic GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
++				<0000 0 0 3 &gic GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
++				<0000 0 0 4 &gic GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0c57ccff3188..7da555c8e2f5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11252,6 +11252,14 @@ L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	drivers/pci/controller/dwc/*layerscape*
  
--static int mobiveil_host_init(struct mobiveil_pcie *pcie)
-+int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
- {
- 	u32 value, pab_ctrl, type;
- 	struct resource_entry *win;
-@@ -225,11 +225,13 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	for (i = 0; i < pcie->ppio_wins; i++)
- 		mobiveil_pcie_disable_ib_win(pcie, i);
- 
--	/* setup bus numbers */
--	value = csr_readl(pcie, PCI_PRIMARY_BUS);
--	value &= 0xff000000;
--	value |= 0x00ff0100;
--	csr_writel(pcie, value, PCI_PRIMARY_BUS);
-+	if (!reinit) {
-+		/* setup bus numbers */
-+		value = csr_readl(pcie, PCI_PRIMARY_BUS);
-+		value &= 0xff000000;
-+		value |= 0x00ff0100;
-+		csr_writel(pcie, value, PCI_PRIMARY_BUS);
-+	}
- 
- 	/*
- 	 * program Bus Master Enable Bit in Command Register in PAB Config
-@@ -570,7 +572,7 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
- 	 * configure all inbound and outbound windows and prepare the RC for
- 	 * config access
- 	 */
--	ret = mobiveil_host_init(pcie);
-+	ret = mobiveil_host_init(pcie, false);
- 	if (ret) {
- 		dev_err(dev, "Failed to initialize host\n");
- 		goto error;
-diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-index 933c2f34bc52..51195db09347 100644
---- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-+++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-@@ -165,6 +165,7 @@ struct mobiveil_pcie {
- };
- 
- int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie);
-+int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit);
- bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie);
- int mobiveil_bringup_link(struct mobiveil_pcie *pcie);
- void program_ob_windows(struct mobiveil_pcie *pcie, int win_num, u64 cpu_addr,
++PCI DRIVER FOR NXP LX
++M:	Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/pci/lx-pci.txt
++F:	drivers/pci/controller/mobibeil/pci-lx.c
++
+ PCI DRIVER FOR GENERIC OF HOSTS
+ M:	Will Deacon <will.deacon@arm.com>
+ L:	linux-pci at vger.kernel.org
 -- 
 2.17.1
