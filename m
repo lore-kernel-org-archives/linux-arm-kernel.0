@@ -1,88 +1,78 @@
-From: tiny.windzz@gmail.com (Frank Lee)
-Date: Tue, 6 Nov 2018 21:02:40 +0800
-Subject: [PATCH v2] i2c: rk3x: fix some typo
-In-Reply-To: <CAEExFWuP2yX9cFSjStosRZZ2aZOKGtekCg-u8UwqeM1909-Hwg@mail.gmail.com>
-References: <20181102124535.24331-1-tiny.windzz@gmail.com>
- <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
- <CAEExFWtQrPD8hUn15Add-EuueCL5=Crb+yvDckWejG75BExGug@mail.gmail.com>
- <12637568.SqdzpTGmKQ@phil>
- <CAEExFWuP2yX9cFSjStosRZZ2aZOKGtekCg-u8UwqeM1909-Hwg@mail.gmail.com>
-Message-ID: <CAEExFWuCVzKdvu6VjDxabANV7WqirspBfLSGSVN95LczZfJwCA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 6 Nov 2018 12:39:22 +0000
+Subject: [RFC] arm64: Kconfig: Choose ARM64_64K_PAGES as default
+In-Reply-To: <db60f42f-c83d-7a9b-b6ba-450fb7970563@arm.com>
+References: <1541421211-17561-1-git-send-email-zhangkehong@hisilicon.com>
+ <db60f42f-c83d-7a9b-b6ba-450fb7970563@arm.com>
+Message-ID: <82025f91-b2b3-f831-4a28-45914f339d5c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add myself.
-On Tue, Nov 6, 2018 at 9:01 PM Frank Lee <tiny.windzz@gmail.com> wrote:
->
-> Hi Heiko?
->
-> please?correct it in the cimmit message.
->
-> --Yangtao
-> On Tue, Nov 6, 2018 at 8:01 PM Heiko Stuebner <heiko@sntech.de> wrote:
-> >
-> > Hi Yangtao, Peter,
-> >
-> > Am Montag, 5. November 2018, 16:59:58 CET schrieb Frank Lee:
-> > > I am sorry.
-> > > -- Yangtao
-> >
-> > If anything, it is me that should be sorry, as I did suggest the
-> > patch description, including the new spelling error.
-> >
-> > And it took me like the whole weekend to actually realize where the
-> > Calculated / Calculates error was hiding ;-) .
-> >
-> >
-> > Heiko
-> >
-> > > On Fri, Nov 2, 2018 at 8:58 PM Peter Rosin <peda@axentia.se> wrote:
-> > > >
-> > > > On 2018-11-02 13:45, Yangtao Li wrote:
-> > > > > Fix multiple instances of a misspelled "Calculates".
-> > > >
-> > > > Yes, it sure is hard to spell "Calcluated," it's almost impossible to
-> > > > get it completely right and not introduce another typo somewhere... :-)
-> > > >
-> > > > Cheers,
-> > > > Peter
-> > > >
-> > > > >
-> > > > > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> > > > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > > > > ---
-> > > > > Changes in v2:
-> > > > > -add commit message
-> > > > > ---
-> > > > >  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
-> > > > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > > >
-> > > > > diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> > > > > index b8a2728dd4b6..fe347e8e2a23 100644
-> > > > > --- a/drivers/i2c/busses/i2c-rk3x.c
-> > > > > +++ b/drivers/i2c/busses/i2c-rk3x.c
-> > > > > @@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
-> > > > >   *
-> > > > >   * @clk_rate: I2C input clock rate
-> > > > >   * @t: Known I2C timing information
-> > > > > - * @t_calc: Caculated rk3x private timings that would be written into regs
-> > > > > + * @t_calc: Calculated rk3x private timings that would be written into regs
-> > > > >   *
-> > > > >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
-> > > > >   * a best-effort divider value is returned in divs. If the target rate is
-> > > > > @@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
-> > > > >   *
-> > > > >   * @clk_rate: I2C input clock rate
-> > > > >   * @t: Known I2C timing information
-> > > > > - * @t_calc: Caculated rk3x private timings that would be written into regs
-> > > > > + * @t_calc: Calculated rk3x private timings that would be written into regs
-> > > > >   *
-> > > > >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
-> > > > >   * a best-effort divider value is returned in divs. If the target rate is
-> > > > >
-> > > >
-> > >
-> >
-> >
-> >
-> >
+On 05/11/2018 14:08, Suzuki K Poulose wrote:
+> Hi,
+> 
+> On 05/11/18 12:33, Kehong Zhang wrote:
+>> For arm64 performance considerations, change default page size to 64K.
+> 
+> defconfig never stands for performance. If that was the case, we must
+> remove other options that could potentially slow down the performance.
+> 
+> defconfig could be interpreted as more of a "standard" config which
+> gives the best effort to make sure you get a usable system overall.
+> With this change, a rootfs with AArch32 applications without 64K aligned
+> segments would fail, and that breaks the assumption about defconfig.
+
+Plus I think it's still the case that various drivers and filesystems 
+just don't work properly with PAGE_SIZE != 4K, and reducing defconfig's 
+development/testing coverage is exactly what we don't want.
+
+If you're building a distro or running production workloads with an 
+unmodified defconfig, you're probably doing it wrong.
+
+Robin.
+
+> So, NAK from my side.
+> 
+> Btw, please could you share any performance numbers from the comparison
+> with 4K kernel ?
+> 
+> Suzuki
+> 
+>>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>;
+>> Cc: Will Deacon <will.deacon@arm.com>;
+>> Signed-off-by: Kehong Zhang <zhangkehong@hisilicon.com>
+>> ---
+>> ? arch/arm64/Kconfig | 10 +++++-----
+>> ? 1 file changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 787d785..56f651f 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -620,7 +620,7 @@ endmenu
+>> ? choice
+>> ????? prompt "Page size"
+>> -??? default ARM64_4K_PAGES
+>> +??? default ARM64_64K_PAGES
+>> ????? help
+>> ??????? Page size (translation granule) configuration.
+>> @@ -639,10 +639,10 @@ config ARM64_16K_PAGES
+>> ? config ARM64_64K_PAGES
+>> ????? bool "64KB"
+>> ????? help
+>> -????? This feature enables 64KB pages support (4KB by default)
+>> -????? allowing only two levels of page tables and faster TLB
+>> -????? look-up. AArch32 emulation requires applications compiled
+>> -????? with 64K aligned segments.
+>> +????? This feature enables 64KB pages support allowing only two
+>> +????? levels of page tables and faster TLB look-up. AArch32
+>> +????? emulation requires applications compiled with 64K aligned
+>> +????? segments.
+>> ? endchoice
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
