@@ -1,61 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2018 14:29:53 +0000
-Subject: [PATCH 3/4] ARM: merge -fdata-sections BSS data to .bss section
-In-Reply-To: <CAKv+Gu8nGYRYPsFZW3zcOVPMBZfA6R3PhqQ2XQBPVGLPTw9t-g@mail.gmail.com>
-References: <20181106133935.GB30658@n2100.armlinux.org.uk>
- <E1gK1ae-0000or-7R@rmk-PC.armlinux.org.uk>
- <CAKv+Gu9-t0QYCfXHtRJ=Oc-Gsa2f=RdRHTP_suB2oT5pKKy7ZQ@mail.gmail.com>
- <20181106141033.GC30658@n2100.armlinux.org.uk>
- <CAKv+Gu8nGYRYPsFZW3zcOVPMBZfA6R3PhqQ2XQBPVGLPTw9t-g@mail.gmail.com>
-Message-ID: <20181106142953.GE30658@n2100.armlinux.org.uk>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Tue,  6 Nov 2018 09:33:55 -0500
+Subject: [PATCH] ARM: OMAP1: clock: Change to use DEFINE_SHOW_ATTRIBUTE macro
+Message-ID: <20181106143355.8340-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 03:13:07PM +0100, Ard Biesheuvel wrote:
-> On 6 November 2018 at 15:10, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Tue, Nov 06, 2018 at 03:08:06PM +0100, Ard Biesheuvel wrote:
-> >> On 6 November 2018 at 14:40, Russell King <rmk+kernel@armlinux.org.uk> wrote:
-> >> > When building with -fdata-sections, the BSS data is placed into separate
-> >> > sections, so we need to ask the linker to group these together into the
-> >> > .bss output section, so that they're correctly placed.
-> >> >
-> >> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >> > ---
-> >> >  arch/arm/boot/compressed/vmlinux.lds.S | 2 +-
-> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-> >> > index 2b963d8e76dd..3b91bc3c606f 100644
-> >> > --- a/arch/arm/boot/compressed/vmlinux.lds.S
-> >> > +++ b/arch/arm/boot/compressed/vmlinux.lds.S
-> >> > @@ -118,7 +118,7 @@ SECTIONS
-> >> >
-> >> >    . = BSS_START;
-> >> >    __bss_start = .;
-> >> > -  .bss                 : { *(.bss) }
-> >> > +  .bss                 : { *(.bss) *(.bss.*) }
-> >>
-> >> Would it make sense to sort these by alignment? Otherwise, I suspect
-> >> you may get a lot of padding holes due to the number of different
-> >> input sections, each with its own alignment.
-> >
-> > We don't bother elsewhere in the kernel linker script - do you have
-> > a case where we get lots of padding?
-> >
-> 
-> With -fdata-sections? How else are we ensuring that each .bss item in
-> its own section is not placed such that its alignment results in a
-> padding hole?
+Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
-Quite simply, we don't care (at the moment).  The alignment does not
-come from the size of each individual section, but the alignment
-requirements of data within the section.
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ arch/arm/mach-omap1/clock.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-See include/asm-generic/vmlinux.lds.h and the definition of *_MAIN
-symbols from around line 60.
-
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index fa512413a471..c8c6fe88b2d6 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -968,7 +968,7 @@ late_initcall(omap_clk_enable_autoidle_all);
+ 
+ static struct dentry *clk_debugfs_root;
+ 
+-static int clk_dbg_show_summary(struct seq_file *s, void *unused)
++static int debug_clock_show(struct seq_file *s, void *unused)
+ {
+ 	struct clk *c;
+ 	struct clk *pa;
+@@ -988,17 +988,7 @@ static int clk_dbg_show_summary(struct seq_file *s, void *unused)
+ 	return 0;
+ }
+ 
+-static int clk_dbg_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, clk_dbg_show_summary, inode->i_private);
+-}
+-
+-static const struct file_operations debug_clock_fops = {
+-	.open           = clk_dbg_open,
+-	.read           = seq_read,
+-	.llseek         = seq_lseek,
+-	.release        = single_release,
+-};
++DEFINE_SHOW_ATTRIBUTE(debug_clock);
+ 
+ static int clk_debugfs_register_one(struct clk *c)
+ {
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.17.0
