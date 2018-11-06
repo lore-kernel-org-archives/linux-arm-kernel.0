@@ -1,78 +1,116 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Nov 2018 09:44:09 +0100
-Subject: [Bug Report] kdump crashes after latest EFI memblock changes on
- arm64 machines with large number of CPUs
-In-Reply-To: <20181106013022.GA27793@brain-police>
-References: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
- <20181106013022.GA27793@brain-police>
-Message-ID: <CAKv+Gu-4f0uYrrc-eSd1YjJygGHVpB7maJ_3xpuY4vP-LfT0-w@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 6 Nov 2018 14:11:03 +0530
+Subject: [RFC PATCH v3 11/13] dt-bindings: irqchip: Introduce TISCI Interrupt
+ Aggregator bindings
+In-Reply-To: <20181106084105.32483-1-lokeshvutla@ti.com>
+References: <20181106084105.32483-1-lokeshvutla@ti.com>
+Message-ID: <20181106084105.32483-12-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2018 at 02:30, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Nov 02, 2018 at 02:44:10AM +0530, Bhupesh Sharma wrote:
->> With the latest EFI changes for memblock reservation across kdump
->> kernel from Ard (Commit 71e0940d52e107748b270213a01d3b1546657d74
->> ["efi: honour memory reservations passed via a linux specific config
->> table"]), we hit a panic while trying to boot the kdump kernel on
->> machines which have large number of CPUs.
->>
->> I have a arm64 board which has 224 CPUS:
->> # lscpu
->> <..snip..>
->> CPU(s):              224
->> On-line CPU(s) list: 0-223
->> <..snip..>
->>
->> Here are the crash logs in the kdump kernel on this machine:
->>
->> [    0.000000] Unable to handle kernel paging request at virtual
->> address ffff80003ffe0000
->> val____)nt EL), IL ata abort info:
->> [    0.or: Oops: 960000inted 4.18.0+ #3
->> [    0.000000] pstate: 20400089 (nzCv daIf +PAN -UAO)
->> [    0.000000] pc : __memcpy+0x110/0x180
->> [    0.000000] lr : memblock_double_array+0x240/0x348
->> [    0.000000] sp : ffff0000092efc80 x28: 00000000bffe0000
->> [    0.000000] x27: 0000000000001800 x26: ffff000009d59000
->> [    0.000000] x25: ffff80003ffe0000 x24: 0000000000000000
->> [    0.000000] x23: 0000000000010000 x22: ffff000009d594e8
->> [    0.000000] x21: ffff000009d594f4 x20: ffff0000093c7268
->> [    0.000000] x19: 0000000000000c00 x18: 0000000000000010
->> [    0.000000] x17: 0000000000000000 x16: 0000000000000000
->> [    0.000000] x15: ffffffffffffffff3: 0000000fc18d0000 x12: 0000000800000000
->> [    0.000000] x11: 0000000000000018 x10: 00000000ddab9e18
->> [    0.000000] x9 : 0000000800000000 x8 : 00000000000002c1
->> [    0.000000] x7 : 0000000091b90000 x6 : ffff80003ffe0000
->> [    0.000000] x5 : 0000000000000001 x4 : 0000000000000000
->> [    0.000000] x3 : 0000000000000000 x2 : 0000000000000b80
->> [    0.000000] x1 : ffff000009d59540 x0 : ffff80003ffe0000
->> [    0.000000] Process swapper)
->> [    0.000000] Call trace:
->> [    0.000000]  __memcpy+0x110/0x180
->> [    0.000000]  memblock_add_range+0x134/0x2e8
->> [    0.000000]  memblock_reserve+0x70/0xb8
->> [    0.000000]  memblock_alloc_base_nid+0x6c/0x88
->> [    0.000000]  __memblock_alloc_base+0x3c/0x4c
->> [    0.000000]  memblock_alloc_base+0x28/0x4c
->> [    0.000000]  memblock_alloc+0x2c/0x38
->> [    0.000000]  early_pgtable_alloc+0x20/0xb0
->
-> Hmm, so this seems to be the crux of the issue: early_pgtable_alloc() relies
-> on memblock to allocate page-table memory, but this can be called before the
-> linear mapping is up and running (or even as part of creating the linear
-> mapping itself!) so the use of __va in memblock_double_array() actually
-> returns an unmapped address.
->
+Add the DT binding documentation for Interrupt Aggregator driver.
 
-OK, so this means we are calling memblock_allow_resize() too early in any case
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+Changes since v2:
+- None
 
-> So I guess we either need to implement early_pgtable_alloc() some other way
-> (how?) or get memblock_double_array() to use a fixmap if it's called too
-> early (yuck). Alternatively, would it be possible to postpone processing of
-> the EFI mem_reserve entries until after we've created the linear mapping?
->
+ .../interrupt-controller/ti,sci-inta.txt      | 74 +++++++++++++++++++
+ MAINTAINERS                                   |  1 +
+ 2 files changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
 
-We could move this until after paging_init(), I suppose. I'll cook something up.
-
-Bhupesh: any comments?
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+new file mode 100644
+index 000000000000..17b1fbd90312
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+@@ -0,0 +1,74 @@
++Texas Instruments K3 Interrupt Aggregator
++=========================================
++
++The Interrupt Aggregator (INTA) provides a centralized machine
++which handles the termination of system events to that they can
++be coherently processed by the host(s) in the system. A maximum
++of 64 events can be mapped to a single interrupt.
++
++
++                              Interrupt Aggregator
++                     +-----------------------------------------+
++                     |      Intmap            VINT             |
++                     | +--------------+  +------------+        |
++            m ------>| | vint  | bit  |  | 0 |.....|63| vint0  |
++               .     | +--------------+  +------------+        |       +------+
++               .     |         .               .               |       |      |
++Globalevents  ------>|         .               .               |------>| INTA |
++               .     |         .               .               |       |      |
++               .     |         .               .               |       +------+
++            n ------>| +--------------+  +------------+        |
++                     | | vint  | bit  |  | 0 |.....|63| vintx  |
++                     | +--------------+  +------------+        |
++                     |                                         |
++                     +-----------------------------------------+
++
++Configuration of these Intmap registers that maps global events to vint is done
++by a system controller (like the Device Memory and Security Controller on K3
++AM654 SoC). Driver should request the system controller to get the range
++of global events and vints assigned to the requesting host. Management
++of these requested resources should be handled by driver and requests
++system controller to map specific global event to vint, bit pair.
++
++Communication between the host processor running an OS and the system
++controller happens through a protocol called TI System Control Interface
++(TISCI protocol). For more details refer:
++Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
++
++TISCI Interrupt Aggregator Node:
++-------------------------------
++- compatible:		Must be "ti,sci-inta".
++- reg:			Should contain registers location and length.
++- interrupt-controller:	Identifies the node as an interrupt controller
++- #interrupt-cells:	Specifies the number of cells needed to encode an
++			interrupt source. The value should be 4.
++			First cell should contain the TISCI device ID of source
++			Second cell should contain the event source offset
++			within the device
++			Third cell specified the interrupt number(vint)
++			reaching Interrupt aggregator.
++			Fourth cell specifies the trigger type as defined
++			in interrupts.txt in this directory.
++- interrupt-parent:	phandle of irq parent for TISCI intr.
++- ti,sci:		Phandle to TI-SCI compatible System controller node.
++- ti,sci-dev-id:	TISCI device ID of the Interrupt Aggregator.
++- ti,sci-rm-range-vint:	TISCI subtype id representing the virtual interrupts
++			(vints) range within this IA, assigned to the
++			requesting host context.
++- ti,sci-rm-range-global-event:	TISCI subtype id representing the global
++			events range reaching this IA and are assigned
++			to the requesting host context.
++
++Example:
++--------
++main_udmass_inta: interrupt-controller at 33d00000 {
++	compatible = "ti,sci-inta";
++	reg = <0x0 0x33d00000 0x0 0x100000>;
++	interrupt-controller;
++	interrupt-parent = <&main_navss_intr>;
++	#interrupt-cells = <4>;
++	ti,sci = <&dmsc>;
++	ti,sci-dev-id = <179>;
++	ti,sci-rm-range-vint = <0x0>;
++	ti,sci-rm-range-global-event = <0x1>;
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index de6fb2bf70f4..2f20efab4664 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -14740,6 +14740,7 @@ F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+ F:	drivers/clk/keystone/sci-clk.c
+ F:	drivers/reset/reset-ti-sci.c
+ F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
++F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
+ F:	drivers/irqchip/irq-ti-sci-intr.c
+ 
+ THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+-- 
+2.19.1
