@@ -1,37 +1,63 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Tue, 06 Nov 2018 16:54:56 +0100
-Subject: [PATCH v3 00/28] Allwinner H6 DE3 and HDMI support
-In-Reply-To: <20181105094341.qedt7jvnxooiojki@flea>
-References: <20181104182705.18047-1-jernej.skrabec@siol.net>
- <20181105094341.qedt7jvnxooiojki@flea>
-Message-ID: <4663462.5OBby1Icb2@jernej-laptop>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 6 Nov 2018 16:52:07 +0100
+Subject: [PATCH 02/10] drm/sun4i: sun6i_mipi_dsi: Support instruction
+ loop selection
+In-Reply-To: <CAMty3ZBje8F4YEfWC4qoxADhgdFjbcwZBKJwak633pUAwKAftA@mail.gmail.com>
+References: <20181103100900.30313-1-jagan@amarulasolutions.com>
+ <20181103100900.30313-3-jagan@amarulasolutions.com>
+ <20181105103857.lp7ayw3p6dbthehg@flea>
+ <CAMty3ZBje8F4YEfWC4qoxADhgdFjbcwZBKJwak633pUAwKAftA@mail.gmail.com>
+Message-ID: <20181106155207.kysq2crszzqv45ib@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ponedeljek, 05. november 2018 ob 10:43:41 CET je Maxime Ripard napisal(a):
-> On Sun, Nov 04, 2018 at 07:26:37PM +0100, Jernej Skrabec wrote:
-> > This series adds support for Display Engine 3.0 and HDMI 2.0a, which
-> > can be found on H6 SoC.
-> > 
-> > Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
-> > displaying and processing 10-bit and AFBC formats, which are not yet
-> > supported by this series.
-> > 
-> > H6 is also the first SoC which supports IOMMU, but support for it is
-> > not yet added.
-> > 
-> > This series is based on linux-next at next-20181102.
-> > 
-> > I suggest all patches go through allwinner tree, except DRM patches,
-> > which should go through drm-misc tree.
+On Mon, Nov 05, 2018 at 04:56:35PM +0530, Jagan Teki wrote:
+> On Mon, Nov 5, 2018 at 4:09 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Sat, Nov 03, 2018 at 03:38:52PM +0530, Jagan Teki wrote:
+> > > Instruction loop selection would require before writing
+> > > loop number registers, so enable idle, LP11 bits on
+> > > loop selection register.
+> > >
+> > > Reference code available in BSP
+> > > (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> > > (dsi_dev[sel]->dsi_inst_loop_sel.dwval = 2<<(4*DSI_INST_ID_LP11) |
+> > >       3<<(4*DSI_INST_ID_DLY);
+> > >
+> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > ---
+> > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++++
+> > >  1 file changed, 4 insertions(+)
+> > >
+> > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > index da152c21ec62..077b57ec964c 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > @@ -397,6 +397,10 @@ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
+> > >       struct mipi_dsi_device *device = dsi->device;
+> > >       u16 delay;
+> > >
+> > > +     regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
+> > > +                  DSI_INST_ID_HSC  << (4 * DSI_INST_ID_LP11) |
+> > > +                  DSI_INST_ID_HSD  << (4 * DSI_INST_ID_DLY));
+> > > +
+> >
+> > Please put this with the other instructions settings below.
 > 
-> Applied all patches up to the 26. The two last one however should not
-> use the clk bindings define you added in the first clk patches, since
-> clk and dt patches are going through different tree.
+> Does that mean after computation delay code?
 
-Thanks!
+Yes
 
-Should I send remaining 2 patches as v4 or can be send separately?
+Maxime
 
-Best regards,
-Jernej
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181106/c8611bea/attachment.sig>
