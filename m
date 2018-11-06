@@ -1,157 +1,25 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Nov 2018 21:27:46 +0100
-Subject: [PATCH v2] arm64/mm: unmap the linear alias of module allocations
-In-Reply-To: <CAKv+Gu_KutMRosQOv=S=jxHkM+XN1QD9ONKjcnbMA8xnZU2J9A@mail.gmail.com>
-References: <20180711170426.11133-1-ard.biesheuvel@linaro.org>
- <20181101151702.GF15788@arm.com>
- <CAKv+Gu-G+qced2Cyx9UHx2DPxVC+ignft6azYLcmUzAtPCW8XA@mail.gmail.com>
- <20181105193139.GA25195@brain-police>
- <CAKv+Gu_KutMRosQOv=S=jxHkM+XN1QD9ONKjcnbMA8xnZU2J9A@mail.gmail.com>
-Message-ID: <CAKv+Gu8QNyt6N09XhqYb7aZiG5yFT6jE+66zj14O-EnN3D=WAg@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 6 Nov 2018 14:44:52 -0600
+Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
+In-Reply-To: <20181106183609.207702-2-sboyd@kernel.org>
+References: <20181106183609.207702-1-sboyd@kernel.org>
+ <20181106183609.207702-2-sboyd@kernel.org>
+Message-ID: <CAL_JsqLvKWcJUYDyWOg3rMeEWv7JV4zw7-YkOUWiL5rfXgVRvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2018 at 21:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 5 November 2018 at 20:31, Will Deacon <will.deacon@arm.com> wrote:
->> On Mon, Nov 05, 2018 at 01:29:34PM +0100, Ard Biesheuvel wrote:
->>> On 1 November 2018 at 16:17, Will Deacon <will.deacon@arm.com> wrote:
->>> > On Wed, Jul 11, 2018 at 07:04:26PM +0200, Ard Biesheuvel wrote:
->>> >> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
->>> >> index 97d0ef12e2ff..f16f0073642b 100644
->>> >> --- a/arch/arm64/include/asm/module.h
->>> >> +++ b/arch/arm64/include/asm/module.h
->>> >> @@ -91,4 +91,10 @@ static inline bool plt_entries_equal(const struct plt_entry *a,
->>> >>              a->mov2 == b->mov2;
->>> >>  }
->>> >>
->>> >> +#ifdef CONFIG_STRICT_KERNEL_RWX
->>> >> +void remap_linear_module_alias(void *module_region, bool ro);
->>> >> +#else
->>> >> +static inline void remap_linear_module_alias(void *module_region, bool ro) {}
->>> >> +#endif
->>> >> +
->>> >>  #endif /* __ASM_MODULE_H */
->>> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
->>> >> index f0f27aeefb73..2b61ca0285eb 100644
->>> >> --- a/arch/arm64/kernel/module.c
->>> >> +++ b/arch/arm64/kernel/module.c
->>> >> @@ -26,10 +26,51 @@
->>> >>  #include <linux/mm.h>
->>> >>  #include <linux/moduleloader.h>
->>> >>  #include <linux/vmalloc.h>
->>> >> +#include <linux/workqueue.h>
->>> >>  #include <asm/alternative.h>
->>> >>  #include <asm/insn.h>
->>> >>  #include <asm/sections.h>
->>> >>
->>> >> +#ifdef CONFIG_STRICT_KERNEL_RWX
->>> >> +
->>> >> +static struct workqueue_struct *module_free_wq;
->>> >> +
->>> >> +static int init_workqueue(void)
->>> >> +{
->>> >> +     module_free_wq = alloc_ordered_workqueue("module_free_wq", 0);
->>> >> +     WARN_ON(!module_free_wq);
->>> >> +
->>> >> +     return 0;
->>> >> +}
->>> >> +pure_initcall(init_workqueue);
->>> >> +
->>> >> +static void module_free_wq_worker(struct work_struct *work)
->>> >> +{
->>> >> +     remap_linear_module_alias(work, false);
->>> >> +     vfree(work);
->>> >> +}
->>> >> +
->>> >> +void module_memfree(void *module_region)
->>> >> +{
->>> >> +     struct work_struct *work;
->>> >> +
->>> >> +     if (!module_region)
->>> >> +             return;
->>> >> +
->>> >> +     /*
->>> >> +      * At this point, module_region is a pointer to an allocation of at
->>> >> +      * least PAGE_SIZE bytes that is mapped read-write. So instead of
->>> >> +      * allocating memory for a data structure containing a work_struct
->>> >> +      * instance and a copy of the value of module_region, just reuse the
->>> >> +      * allocation directly.
->>> >> +      */
->>> >> +     work = module_region;
->>> >> +     INIT_WORK(work, module_free_wq_worker);
->>> >> +     queue_work(module_free_wq, work);
->>> >> +}
->>> >
->>> > Whilst I can see that this works, it's a bit grotty because we're
->>> > duplicating much of the hoop-jumping that vfree() also has to go through.
->>> > Given that we allocate the module memory in the arch code, could we grab
->>> > the pages at alloc time and stash them in the mod_arch_specific field?
->>> >
->>>
->>> Yeah that should work
->>
->> Great!
->>
+On Tue, Nov 6, 2018 at 12:36 PM Stephen Boyd <sboyd@kernel.org> wrote:
 >
-> I may have spoken too soon: module_memfree() receives a void* pointer
-> to the allocation to be freed, and we can't access the module struct
-> from that.
->
-> But looking into this a bit more, I wonder why this doesn not affect
-> other architectures as well, and it might make sense to solve this
-> generically, or at least, provide the hooks in generic code.
->
->>> >> +#endif
->>> >> +
->>> >>  void *module_alloc(unsigned long size)
->>> >>  {
->>> >>       gfp_t gfp_mask = GFP_KERNEL;
->>> >> @@ -65,6 +106,7 @@ void *module_alloc(unsigned long size)
->>> >>               return NULL;
->>> >>       }
->>> >>
->>> >> +     remap_linear_module_alias(p, true);
->>> >>       return p;
->>> >>  }
->>> >>
->>> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->>> >> index 493ff75670ff..5492b691aafd 100644
->>> >> --- a/arch/arm64/mm/mmu.c
->>> >> +++ b/arch/arm64/mm/mmu.c
->>> >> @@ -432,7 +432,7 @@ static void __init map_mem(pgd_t *pgdp)
->>> >>       struct memblock_region *reg;
->>> >>       int flags = 0;
->>> >>
->>> >> -     if (debug_pagealloc_enabled())
->>> >> +     if (rodata_enabled || debug_pagealloc_enabled())
->>> >>               flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
->>> >
->>> > I suppose this is the most contentious part of the patch. Perhaps a
->>> > better solution would be to tweak CONFIG_STRICT_MODULE_RWX so that it's
->>> > structured more like CONFIG_STACKPROTECTOR. That way, your patch here
->>> > could be the "strong" version, which comes with more of a performance
->>> > cost.
->>> >
->>>
->>> I'd like to understand whether this performance hit is theoretical or
->>> not. It is obviously less efficient to map the linear region at page
->>> granularity, but which workloads will actually notice the difference?
->>>
->>> Also, I think this should be a runtime setting, perhaps rodata=full?
->>> With a CONFIG_ option to set the default.
->>
->> Yes, that's a better idea. We could even default to "full" if we don't have
->> any performance data (if people start shouting then we'll know it's an
->> issue!).
->>
->> Do you plan to spin a v2?
->>
->
-> Yes, but I'll do some digging first.
+> We have a handful of clk drivers that have a collection of slightly
+> variant device support keyed off of the compatible string. In each of
+> these drivers, we demux the variant and then call the "real" probe
+> function based on whatever is stored in the match data for that
+> compatible string. Let's generalize this function so that it can be
+> re-used as the platform_driver probe function directly.
 
-OK, so the answer is that other architectures (or at least, x86) does
-this at a lower level. The set_memory_{ro,rw,x,nx} take care of the
-permission attributes of the linear alias any time they are modified.
+This looks really hacky to me. It sounds kind of general, but really
+only works if we have match data that's a single function and we lose
+any type checking on the function. What about things other than
+platform devices?
 
-So for arm64, that is probably the way to go as well. I'll update my
-patches accordingly.
+Rob
