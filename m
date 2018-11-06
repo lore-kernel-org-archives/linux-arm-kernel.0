@@ -1,81 +1,45 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue,  6 Nov 2018 18:30:26 +0100
-Subject: [PATCH v10 11/22] mm: move obj_to_index to include/linux/slab_def.h
+Date: Tue,  6 Nov 2018 18:30:27 +0100
+Subject: [PATCH v10 12/22] kasan, arm64: fix up fault handling logic
 In-Reply-To: <cover.1541525354.git.andreyknvl@google.com>
 References: <cover.1541525354.git.andreyknvl@google.com>
-Message-ID: <c4424b4917e92007a20170909460aac91710f1df.1541525354.git.andreyknvl@google.com>
+Message-ID: <4891a504adf61c0daf1e83642b6f7519328dfd5f.1541525354.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While with SLUB we can actually preassign tags for caches with contructors
-and store them in pointers in the freelist, SLAB doesn't allow that since
-the freelist is stored as an array of indexes, so there are no pointers to
-store the tags.
+show_pte in arm64 fault handling relies on the fact that the top byte of
+a kernel pointer is 0xff, which isn't always the case with tag-based
+KASAN.
 
-Instead we compute the tag twice, once when a slab is created before
-calling the constructor and then again each time when an object is
-allocated with kmalloc. Tag is computed simply by taking the lowest byte of
-the index that corresponds to the object. However in kasan_kmalloc we only
-have access to the objects pointer, so we need a way to find out which
-index this object corresponds to.
+This patch resets the top byte in show_pte.
 
-This patch moves obj_to_index from slab.c to include/linux/slab_def.h to
-be reused by KASAN.
-
-Acked-by: Christoph Lameter <cl@linux.com>
 Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
 Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- include/linux/slab_def.h | 13 +++++++++++++
- mm/slab.c                | 13 -------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm64/mm/fault.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/linux/slab_def.h b/include/linux/slab_def.h
-index 3485c58cfd1c..9a5eafb7145b 100644
---- a/include/linux/slab_def.h
-+++ b/include/linux/slab_def.h
-@@ -104,4 +104,17 @@ static inline void *nearest_obj(struct kmem_cache *cache, struct page *page,
- 		return object;
- }
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 7d9571f4ae3d..d9a84d6f3343 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -32,6 +32,7 @@
+ #include <linux/perf_event.h>
+ #include <linux/preempt.h>
+ #include <linux/hugetlb.h>
++#include <linux/kasan.h>
  
-+/*
-+ * We want to avoid an expensive divide : (offset / cache->size)
-+ *   Using the fact that size is a constant for a particular cache,
-+ *   we can replace (offset / cache->size) by
-+ *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
-+ */
-+static inline unsigned int obj_to_index(const struct kmem_cache *cache,
-+					const struct page *page, void *obj)
-+{
-+	u32 offset = (obj - page->s_mem);
-+	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
-+}
+ #include <asm/bug.h>
+ #include <asm/cmpxchg.h>
+@@ -141,6 +142,8 @@ void show_pte(unsigned long addr)
+ 	pgd_t *pgdp;
+ 	pgd_t pgd;
+ 
++	addr = (unsigned long)kasan_reset_tag((void *)addr);
 +
- #endif	/* _LINUX_SLAB_DEF_H */
-diff --git a/mm/slab.c b/mm/slab.c
-index 27859fb39889..d2f827316dfc 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -406,19 +406,6 @@ static inline void *index_to_obj(struct kmem_cache *cache, struct page *page,
- 	return page->s_mem + cache->size * idx;
- }
- 
--/*
-- * We want to avoid an expensive divide : (offset / cache->size)
-- *   Using the fact that size is a constant for a particular cache,
-- *   we can replace (offset / cache->size) by
-- *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
-- */
--static inline unsigned int obj_to_index(const struct kmem_cache *cache,
--					const struct page *page, void *obj)
--{
--	u32 offset = (obj - page->s_mem);
--	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
--}
--
- #define BOOT_CPUCACHE_ENTRIES	1
- /* internal cache of cache description objs */
- static struct kmem_cache kmem_cache_boot = {
+ 	if (addr < TASK_SIZE) {
+ 		/* TTBR0 */
+ 		mm = current->active_mm;
 -- 
 2.19.1.930.g4563a0d9d0-goog
