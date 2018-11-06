@@ -1,130 +1,67 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 6 Nov 2018 11:22:06 +0100
-Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
-References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
- <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
- <20181105165321.7ea2b45f@bbrezillon>
- <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
- <20181106102851.61deb97a@bbrezillon>
- <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
-Message-ID: <20181106112206.65a70a81@bbrezillon>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 6 Nov 2018 10:17:41 +0100
+Subject: [PATCH 2/2] arm64: dts: r8a77990: ebisu: Enable SDHI interfaces
+In-Reply-To: <OSBPR01MB2293D944698EE5776B23B00DD8CB0@OSBPR01MB2293.jpnprd01.prod.outlook.com>
+References: <20181105214117.11734-1-marek.vasut+renesas@gmail.com>
+ <20181105214117.11734-2-marek.vasut+renesas@gmail.com>
+ <OSBPR01MB2293D944698EE5776B23B00DD8CB0@OSBPR01MB2293.jpnprd01.prod.outlook.com>
+Message-ID: <cf18a8e6-e550-d7d0-c66c-fb5874b7a65c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Nov 2018 18:00:37 +0800
-Liang Yang <liang.yang@amlogic.com> wrote:
+On 11/06/2018 06:29 AM, Yoshihiro Shimoda wrote:
+> Hello Marek-san,
 
-> On 2018/11/6 17:28, Boris Brezillon wrote:
-> > On Tue, 6 Nov 2018 17:08:00 +0800
-> > Liang Yang <liang.yang@amlogic.com> wrote:
-> >   
-> >> On 2018/11/5 23:53, Boris Brezillon wrote:  
-> >>> On Fri, 2 Nov 2018 00:42:21 +0800
-> >>> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
-> >>>      
-> >>>> +
-> >>>> +static inline u8 meson_nfc_read_byte(struct mtd_info *mtd)
-> >>>> +{
-> >>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
-> >>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
-> >>>> +	u32 cmd;
-> >>>> +
-> >>>> +	cmd = nfc->param.chip_select | NFC_CMD_DRD | 0;
-> >>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
-> >>>> +
-> >>>> +	meson_nfc_drain_cmd(nfc);  
-> >>>
-> >>> You probably don't want to drain the FIFO every time you read a byte on
-> >>> the bus, and I guess the INPUT FIFO is at least as big as the CMD
-> >>> FIFO, right? If that's the case, you should queue as much DRD cmd as
-> >>> possible and only sync when the user explicitly requests it or when
-> >>> the INPUT/READ FIFO is full.
-> >>>      
-> >> Register 'NFC_REG_BUF' can holds only 4 bytes, also DRD sends only one
-> >> nand cycle to read one byte and covers the 1st byte every time reading.
-> >> i think nfc controller is faster than nand cycle, but really it is not
-> >> high efficiency when reading so many bytes once.
-> >> Or use dma command here like read_page and read_page_raw.  
-> > 
-> > Yep, that's also an alternative, though you'll have to make sure the
-> > buffer passed through the nand_op_inst is DMA-safe, and use a bounce
-> > buffer when that's not the case.
-> >   
-> ok, i will try dma here.
+Hello Shimoda-san,
 
-We should probably expose the bounce buf handling as generic helpers at
-the rawnand level:
+>> From: Marek Vasut, Sent: Tuesday, November 6, 2018 6:41 AM
+>>
+>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>
+>> This patch enables SD card slot connected to SDHI0, micro SD card slot
+>> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board using
+>> the R8A77990 SoC.
+>>
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Cc: Simon Horman <horms+renesas@verge.net.au>
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>> Cc: linux-renesas-soc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+> 
+> Thank you for the patch!
+> 
+> Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> 
+> I have a few nit comments below.
+> 
+>>  .../arm64/boot/dts/renesas/r8a77990-ebisu.dts | 136 ++++++++++++++++++
+>>  1 file changed, 136 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+>> index 611f0265fcc5..bda1765dcdbd 100644
+>> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> <snip>
+>> +	sdhi3_pins: sd3 {
+>> +		groups = "sdhi3_data8", "sdhi3_ctrl";
+>> +		function = "sdhi3";
+>> +		power-source = <1800>;
+>> +	};
+>> +
+>> +	sdhi3_pins_uhs: sd3_uhs {
+>> +		groups = "sdhi3_data8", "sdhi3_ctrl";
+>> +		function = "sdhi3";
+>> +		power-source = <1800>;
+>> +	};
+> 
+> I assumed that we will add "sdhi3_ds" into these groups when we add support for HS400 mode.
 
-void *nand_op_get_dma_safe_input_buf(struct nand_op_instr *instr)
-{
-	void *buf;
+That's a good point, I think we can add it right away, so added in V2.
 
-	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR))
-		return NULL;
-
-	if (virt_addr_valid(instr->data.in) &&
-	    !object_is_on_stack(instr->data.buf.in))
-		return instr->data.buf.in;
-
-	return kzalloc(instr->data.len, GFP_KERNEL);
-}
-
-void nand_op_put_dma_safe_input_buf(struct nand_op_instr *instr,
-				    void *buf)
-{
-	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR) ||
-	    WARN_ON(!buf))
-		return;
-
-	if (buf == instr->data.buf.in)
-		return;
-
-	memcpy(instr->data.buf.in, buf, instr->data.len);
-	kfree(buf);
-}
-
-const void *nand_op_get_dma_safe_output_buf(struct nand_op_instr *instr)
-{
-	void *buf;
-
-	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR))
-		return NULL;
-
-	if (virt_addr_valid(instr->data.out) &&
-	    !object_is_on_stack(instr->data.buf.out))
-		return instr->data.buf.out;
-
-	return kmemdup(instr->data.buf.out, GFP_KERNEL);
-}
-
-void nand_op_put_dma_safe_output_buf(struct nand_op_instr *instr,
-				    void *buf)
-{
-	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR) ||
-	    WARN_ON(!buf))
-		return;
-
-	if (buf != instr->data.buf.out)
-		kfree(buf);
-}
-
-> > 
-> > Isn't the controller engine able to wait on the data transfer to be
-> > complete before sending the next instruction in the CMD FIFO pipe?
-> > I'm pretty sure it's able to do that, which would make
-> > meson_nfc_wait_dma_finish() useless, and all you'd have to do is wait
-> > for the CMD FIFO to be empty (assuming it guarantees the last command
-> > has been executed).
-> > Maybe the nfc design is difference. dedicated nfc dma engine is   
-> concatenated with the command fifo, there is no other status to check 
-> whether dma is done.
-
-No, I mean that internally a "DMA-transfer" instruction probably
-forces the NAND controller to wait for the DMA transfer to be finished
-before dequeuing/executing the next instruction. So, it should be safe
-to queue the PROG and WAIT_RB instructions and just rely on the "FIFO
-empty" event to consider the operation as finished. Then, all you'll
-have to do is check the status reg to determine whether the
-write operation succeeded or not.
+-- 
+Best regards,
+Marek Vasut
