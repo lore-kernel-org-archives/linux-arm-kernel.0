@@ -1,102 +1,208 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 6 Nov 2018 14:41:55 +0800
-Subject: [PATCH v1 00/11] Mediatek MT8183 clock and scpsys support 
-In-Reply-To: <20181106064206.17535-1-weiyi.lu@mediatek.com>
-References: <20181106064206.17535-1-weiyi.lu@mediatek.com>
-Message-ID: <20181106064206.17535-2-weiyi.lu@mediatek.com>
+From: xiaowei.bao@nxp.com (Xiaowei Bao)
+Date: Tue, 6 Nov 2018 06:48:26 +0000
+Subject: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+In-Reply-To: <dfedeaec-9a3b-632e-af37-cb1963dcae7c@ti.com>
+References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
+ <20181025110901.5680-5-xiaowei.bao@nxp.com>
+ <d9d07e05-556b-a56d-bb7f-eaec9fb739b8@ti.com>
+ <HE1PR04MB1497DF7D9428A5C791CB6A03F5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
+ <HE1PR04MB14979058170FA16A7465FF9EF5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
+ <a85a6900-2478-0750-6f33-2e787cf80d1d@ti.com>
+ <HE1PR04MB1497DF7378927C9BB5DF3E15F5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
+ <8ec7f502-e058-2c28-9140-5d125e4af6ff@ti.com>
+ <HE1PR04MB1497DABC689F9A4A97FD4DF0F5CA0@HE1PR04MB1497.eurprd04.prod.outlook.com>
+ <dfedeaec-9a3b-632e-af37-cb1963dcae7c@ti.com>
+Message-ID: <HE1PR04MB14972FA5A46885370788B9B7F5CB0@HE1PR04MB1497.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is based on v4.20-rc1 and most of changes are
-extracted from series below
-(clock/scpsys common changes for both MT8183 & MT6765)
-https://patchwork.kernel.org/patch/10528495/
-(clock support of MT8183)
-https://patchwork.kernel.org/patch/10549891/
+Hi Kishon?
 
-The whole series is composed of
-clock common changes for both MT8183 & MT6765 (PATCH 1-3),
-scpsys common changes for both MT8183 & MT6765 (PATCH 4),
-clock support of MT8183 (PATCH 5-8), and
-scpsys support of MT8183 (PATCH 9-11).
+-----Original Message-----
+From: Kishon Vijay Abraham I <kishon@ti.com> 
+Sent: 2018?11?6? 14:07
+To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+Cc: Jiafei Pan <jiafei.pan@nxp.com>
+Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
 
-Owen Chen (4):
-  clk: mediatek: add new clkmux register API
-  clk: mediatek: add new member to mtk_pll_data
-  clk: mediatek: Disable tuner_en before change PLL rate
-  soc: mediatek: add new flow for mtcmos power.
+(Removed Niklas as mails to him is bouncing)
 
-Weiyi Lu (7):
-  dt-bindings: ARM: Mediatek: Document bindings for MT8183
-  clk: mediatek: Add dt-bindings for MT8183 clocks
-  clk: mediatek: Add flags support for mtk_gate data
-  clk: mediatek: Add MT8183 clock support
-  dt-bindings: soc: fix typo of MT8173 power dt-bindings
-  dt-bindings: soc: Add MT8183 power dt-bindings
-  soc: mediatek: Add MT8183 scpsys support
+Hi,
 
- .../arm/mediatek/mediatek,apmixedsys.txt      |    1 +
- .../bindings/arm/mediatek/mediatek,audsys.txt |    1 +
- .../bindings/arm/mediatek/mediatek,camsys.txt |   22 +
- .../bindings/arm/mediatek/mediatek,imgsys.txt |    1 +
- .../arm/mediatek/mediatek,infracfg.txt        |    1 +
- .../bindings/arm/mediatek/mediatek,ipu.txt    |   43 +
- .../bindings/arm/mediatek/mediatek,mcucfg.txt |    1 +
- .../bindings/arm/mediatek/mediatek,mfgcfg.txt |    1 +
- .../bindings/arm/mediatek/mediatek,mmsys.txt  |    1 +
- .../arm/mediatek/mediatek,topckgen.txt        |    1 +
- .../arm/mediatek/mediatek,vdecsys.txt         |    1 +
- .../arm/mediatek/mediatek,vencsys.txt         |    1 +
- .../bindings/soc/mediatek/scpsys.txt          |   14 +
- drivers/clk/mediatek/Kconfig                  |   75 +
- drivers/clk/mediatek/Makefile                 |   14 +-
- drivers/clk/mediatek/clk-gate.c               |    5 +-
- drivers/clk/mediatek/clk-gate.h               |    3 +-
- drivers/clk/mediatek/clk-mt8183-audio.c       |  112 ++
- drivers/clk/mediatek/clk-mt8183-cam.c         |   75 +
- drivers/clk/mediatek/clk-mt8183-img.c         |   75 +
- drivers/clk/mediatek/clk-mt8183-ipu0.c        |   68 +
- drivers/clk/mediatek/clk-mt8183-ipu1.c        |   68 +
- drivers/clk/mediatek/clk-mt8183-ipu_adl.c     |   66 +
- drivers/clk/mediatek/clk-mt8183-ipu_conn.c    |  155 ++
- drivers/clk/mediatek/clk-mt8183-mfgcfg.c      |   66 +
- drivers/clk/mediatek/clk-mt8183-mm.c          |  128 ++
- drivers/clk/mediatek/clk-mt8183-vdec.c        |   84 ++
- drivers/clk/mediatek/clk-mt8183-venc.c        |   71 +
- drivers/clk/mediatek/clk-mt8183.c             | 1334 +++++++++++++++++
- drivers/clk/mediatek/clk-mtk.c                |    3 +-
- drivers/clk/mediatek/clk-mtk.h                |    3 +
- drivers/clk/mediatek/clk-mux.c                |  252 ++++
- drivers/clk/mediatek/clk-mux.h                |  101 ++
- drivers/clk/mediatek/clk-pll.c                |   43 +-
- drivers/soc/mediatek/Makefile                 |    2 +-
- drivers/soc/mediatek/mtk-scpsys-ext.c         |  102 ++
- drivers/soc/mediatek/mtk-scpsys.c             |  605 +++++++-
- include/dt-bindings/clock/mt8183-clk.h        |  421 ++++++
- include/dt-bindings/power/mt8173-power.h      |    6 +-
- include/dt-bindings/power/mt8183-power.h      |   26 +
- include/linux/soc/mediatek/scpsys-ext.h       |   39 +
- 41 files changed, 4007 insertions(+), 84 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
- create mode 100644 drivers/clk/mediatek/clk-mt8183-audio.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-cam.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-img.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu0.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu1.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu_adl.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu_conn.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-mfgcfg.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-mm.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-vdec.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-venc.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183.c
- create mode 100644 drivers/clk/mediatek/clk-mux.c
- create mode 100644 drivers/clk/mediatek/clk-mux.h
- create mode 100644 drivers/soc/mediatek/mtk-scpsys-ext.c
- create mode 100644 include/dt-bindings/clock/mt8183-clk.h
- create mode 100644 include/dt-bindings/power/mt8183-power.h
- create mode 100644 include/linux/soc/mediatek/scpsys-ext.h
+Please fix your email client. Refer Documentation/process/email-clients.rst
 
--- 
-2.18.0
+On 05/11/18 2:45 PM, Xiaowei Bao wrote:
+> 
+> 
+> -----Original Message-----
+> From: Kishon Vijay Abraham I <kishon@ti.com>
+> Sent: 2018?11?5? 16:57
+> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; 
+> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li 
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
+> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai 
+> Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
+> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; 
+> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
+> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+> Cc: Jiafei Pan <jiafei.pan@nxp.com>
+> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+> 
+> Hi,
+> 
+> On 31/10/18 4:08 PM, Xiaowei Bao wrote:
+>>
+>>
+>> -----Original Message-----
+>> From: Kishon Vijay Abraham I <kishon@ti.com>
+>> Sent: 2018?10?31? 12:15
+>> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com;
+>> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li
+>> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
+>> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; 
+>> Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
+>> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com;
+>> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
+>> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
+>> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
+>> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+>> Cc: Jiafei Pan <jiafei.pan@nxp.com>
+>> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+>>
+>> Hi,
+>>
+>> On 31/10/18 8:03 AM, Xiaowei Bao wrote:
+>>>
+>>>
+>>> -----Original Message-----
+>>> From: Xiaowei Bao
+>>> Sent: 2018?10?26? 17:19
+>>> To: 'Kishon Vijay Abraham I' <kishon@ti.com>; bhelgaas at google.com;
+>>> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo 
+>>> robh+Li
+>>> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
+>>> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; 
+>>> Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
+>>> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com;
+>>> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
+>>> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
+>>> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
+>>> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+>>> Cc: Jiafei Pan <jiafei.pan@nxp.com>
+>>> Subject: RE: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+>>>
+>>>
+>>>
+>>> -----Original Message-----
+>>> From: Kishon Vijay Abraham I <kishon@ti.com>
+>>> Sent: 2018?10?26? 13:29
+>>> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com;
+>>> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo 
+>>> robh+Li
+>>> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
+>>> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; 
+>>> Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
+>>> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com;
+>>> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
+>>> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
+>>> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
+>>> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
+>>> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
+>>>
+>>> Hi,
+>>>
+>>> On Thursday 25 October 2018 04:39 PM, Xiaowei Bao wrote:
+>>>> Add the PCIe EP mode support for layerscape platform.
+>>>>
+>>>> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
+>>>> ---
+>>>>  drivers/pci/controller/dwc/Makefile            |    2 +-
+>>>>  drivers/pci/controller/dwc/pci-layerscape-ep.c |  161
+>>>> ++++++++++++++++++++++++
+>>>>  2 files changed, 162 insertions(+), 1 deletions(-)  create mode
+>>>> 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
+>>>>
+>>>> diff --git a/drivers/pci/controller/dwc/Makefile
+>>>> b/drivers/pci/controller/dwc/Makefile
+>>>> index 5d2ce72..b26d617 100644
+>>>> --- a/drivers/pci/controller/dwc/Makefile
+>>>> +++ b/drivers/pci/controller/dwc/Makefile
+>>>> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
+>>>>  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
+>>>>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+>>>>  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
+>>>> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
+>>>> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o 
+>>>> +pci-layerscape-ep.o
+>>>>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+>>>>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+>>>>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o diff --git 
+>>>> a/drivers/pci/controller/dwc/pci-layerscape-ep.c
+>>>> b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+>>>> new file mode 100644
+>>>> index 0000000..3b33bbc
+>>>> --- /dev/null
+>>>> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+>>>> @@ -0,0 +1,161 @@
+>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>> +/*
+>>>> + * PCIe controller EP driver for Freescale Layerscape SoCs
+>>>> + *
+>>>> + * Copyright (C) 2018 NXP Semiconductor.
+>>>> + *
+>>>> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>  */
+>>>> +
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/init.h>
+>>>> +#include <linux/of_pci.h>
+>>>> +#include <linux/of_platform.h>
+>>>> +#include <linux/of_address.h>
+>>>> +#include <linux/pci.h>
+>>>> +#include <linux/platform_device.h> #include <linux/resource.h>
+>>>> +
+>>>> +#include "pcie-designware.h"
+>>>> +
+>>>> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
+>>>
+>>> The base address should come from dt.
+>>>> +
+>>>> +struct ls_pcie_ep {
+>>>> +	struct dw_pcie		*pci;
+>>>> +};
+>>>> +
+>>>> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
+>>>> +
+>>>> +static bool ls_pcie_is_bridge(struct ls_pcie_ep *pcie) {
+>>>> +	struct dw_pcie *pci = pcie->pci;
+>>>> +	u32 header_type;
+>>>> +
+>>>> +	header_type = ioread8(pci->dbi_base + PCI_HEADER_TYPE);
+>>>> +	header_type &= 0x7f;
+>>>> +
+>>>> +	return header_type == PCI_HEADER_TYPE_BRIDGE; }
+>>>> +
+>>>> +static int ls_pcie_establish_link(struct dw_pcie *pci) {
+>>>> +	return 0;
+>>>> +}
+>>>
+>>> There should be some way by which EP should tell RC that it is not configured yet. Are there no bits to control LTSSM state initialization or Configuration retry status enabling?
+>>> [Xiaowei Bao] There have not bits to control LTSSM state to tell the RC it is configured. The start link is auto completed.
+>>> [Xiaowei Bao] Hi Kishon, is there any advice?
+>>
+>> If there is no HW support, I don't think anything could be done here. This could result in RC reading configuration space even before EP is fully initialized.
+>> [Xiaowei Bao] The bootloader have initialized the EP device and set the config ready bit, and the kernel don't need to do anything.
+> 
+> What does bootloader initalize? The EP driver here will reinitialize everything right?
+> [Xiaowei Bao] The bootloader initialize BAR size, outbound window, inbound window and set the config ready bit.
+
+How will bootloader know the BAR size? The BAR size is based on the function driver. How does bootloader configure the OB window? The OB window is configured based on the size and address given by the host dynamically at runtime.
+
+Thanks
+Kishon
+[Xiaowei Bao] We use the bootloader is u-boot, we implement the EP base feature in the u-boot, e.g.(MEM space access(RC<=>EP), CONFIG space access(RC=>EP)), we set the EP BAR size like kernel(set the PCI_BASE_ADDRESS_n register, but different size), and the outbound windows also be set, and the bar size will be cover by the EP framework driver when kernel start up.
+I have to set the dw_pcie_ops, if don't config the dw_pcie_ops there will have call trace, because the DW driver will call the write_dbi or read_dbi function directly but not check the dw_pcie_ops whether is null. I refer to the pcie-designware-plat.c to implement it. I don't know what you said about this, could you tell me the effect, Thanks a lot.
+
+Thanks
+Xiaowei
