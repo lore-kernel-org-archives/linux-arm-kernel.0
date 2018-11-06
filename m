@@ -1,81 +1,106 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue,  6 Nov 2018 10:36:06 -0800
-Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
+Date: Tue,  6 Nov 2018 10:36:09 -0800
+Subject: [PATCH 4/4] clk: mediatek: Simplify single driver probes
 In-Reply-To: <20181106183609.207702-1-sboyd@kernel.org>
 References: <20181106183609.207702-1-sboyd@kernel.org>
-Message-ID: <20181106183609.207702-2-sboyd@kernel.org>
+Message-ID: <20181106183609.207702-5-sboyd@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a handful of clk drivers that have a collection of slightly
-variant device support keyed off of the compatible string. In each of
-these drivers, we demux the variant and then call the "real" probe
-function based on whatever is stored in the match data for that
-compatible string. Let's generalize this function so that it can be
-re-used as the platform_driver probe function directly.
+We don't need to do the multiplex probe design here when we only have
+one compatible string. Just setup probe to point at the one probe
+function for now.
 
 Cc: Ryder Lee <ryder.lee@mediatek.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
 Signed-off-by: Stephen Boyd <sboyd@kernel.org>
 ---
- drivers/of/device.c       | 31 +++++++++++++++++++++++++++++++
- include/linux/of_device.h |  1 +
- 2 files changed, 32 insertions(+)
+ drivers/clk/mediatek/clk-mt2701-g3d.c | 28 +++------------------------
+ drivers/clk/mediatek/clk-mt7622-aud.c | 28 +++------------------------
+ 2 files changed, 6 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 0f27fad9fe94..8381f33ed2d8 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -195,6 +195,37 @@ const void *of_device_get_match_data(const struct device *dev)
+diff --git a/drivers/clk/mediatek/clk-mt2701-g3d.c b/drivers/clk/mediatek/clk-mt2701-g3d.c
+index 1328c112a38f..58b13f12051a 100644
+--- a/drivers/clk/mediatek/clk-mt2701-g3d.c
++++ b/drivers/clk/mediatek/clk-mt2701-g3d.c
+@@ -58,34 +58,12 @@ static int clk_mt2701_g3dsys_init(struct platform_device *pdev)
  }
- EXPORT_SYMBOL(of_device_get_match_data);
  
-+/**
-+ * platform_driver_probe_by_of_match_data - Probe a platform device using match data
-+ * @pdev: platform device to probe
-+ *
-+ * For use by device drivers that multiplex their probe function through DT
-+ * match data. Drivers can use this function to call their platform
-+ * device probe directly without having to implement a wrapper function.
-+ *
-+ * static const struct of_device_id probe_funcs[] = {
-+ *      { .compatible = "compat,foo", .data = foo_probe },
-+ *      {}
-+ * };
-+ *
-+ * struct platform_driver foo_driver = {
-+ *      .probe = platform_driver_probe_by_of_match_data,
-+ *      .driver = {
-+ *            of_match_table = probe_funcs,
-+ *      },
-+ * };
-+ *
-+ */
-+int platform_driver_probe_by_of_match_data(struct platform_device *pdev)
-+{
-+	int (*probe_func)(struct platform_device *pdev);
-+
-+	probe_func = of_device_get_match_data(&pdev->dev);
-+
-+	return probe_func(pdev);
-+}
-+EXPORT_SYMBOL_GPL(platform_driver_probe_by_of_match_data);
-+
- static ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
- {
- 	const char *compat;
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index 8d31e39dd564..4de84691d1c6 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -33,6 +33,7 @@ extern int of_device_add(struct platform_device *pdev);
- extern int of_device_register(struct platform_device *ofdev);
- extern void of_device_unregister(struct platform_device *ofdev);
+ static const struct of_device_id of_match_clk_mt2701_g3d[] = {
+-	{
+-		.compatible = "mediatek,mt2701-g3dsys",
+-		.data = clk_mt2701_g3dsys_init,
+-	}, {
+-		/* sentinel */
+-	}
++	{ .compatible = "mediatek,mt2701-g3dsys", },
++	{ /* sentinel */ }
+ };
  
-+extern int platform_driver_probe_by_of_match_data(struct platform_device *pdev);
- extern const void *of_device_get_match_data(const struct device *dev);
+-static int clk_mt2701_g3d_probe(struct platform_device *pdev)
+-{
+-	int (*clk_init)(struct platform_device *);
+-	int r;
+-
+-	clk_init = of_device_get_match_data(&pdev->dev);
+-	if (!clk_init)
+-		return -EINVAL;
+-
+-	r = clk_init(pdev);
+-	if (r)
+-		dev_err(&pdev->dev,
+-			"could not register clock provider: %s: %d\n",
+-			pdev->name, r);
+-
+-	return r;
+-}
+-
+ static struct platform_driver clk_mt2701_g3d_drv = {
+-	.probe = clk_mt2701_g3d_probe,
++	.probe = clk_mt2701_g3dsys_init,
+ 	.driver = {
+ 		.name = "clk-mt2701-g3d",
+ 		.of_match_table = of_match_clk_mt2701_g3d,
+diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
+index 4f3d47b41b3e..2b10d13a8a37 100644
+--- a/drivers/clk/mediatek/clk-mt7622-aud.c
++++ b/drivers/clk/mediatek/clk-mt7622-aud.c
+@@ -171,34 +171,12 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
+ }
  
- extern ssize_t of_device_modalias(struct device *dev, char *str, ssize_t len);
+ static const struct of_device_id of_match_clk_mt7622_aud[] = {
+-	{
+-		.compatible = "mediatek,mt7622-audsys",
+-		.data = clk_mt7622_audiosys_init,
+-	}, {
+-		/* sentinel */
+-	}
++	{ .compatible = "mediatek,mt7622-audsys", },
++	{ /* sentinel */ }
+ };
+ 
+-static int clk_mt7622_aud_probe(struct platform_device *pdev)
+-{
+-	int (*clk_init)(struct platform_device *);
+-	int r;
+-
+-	clk_init = of_device_get_match_data(&pdev->dev);
+-	if (!clk_init)
+-		return -EINVAL;
+-
+-	r = clk_init(pdev);
+-	if (r)
+-		dev_err(&pdev->dev,
+-			"could not register clock provider: %s: %d\n",
+-			pdev->name, r);
+-
+-	return r;
+-}
+-
+ static struct platform_driver clk_mt7622_aud_drv = {
+-	.probe = clk_mt7622_aud_probe,
++	.probe = clk_mt7622_audiosys_init,
+ 	.driver = {
+ 		.name = "clk-mt7622-aud",
+ 		.of_match_table = of_match_clk_mt7622_aud,
 -- 
 Sent by a computer through tubes
