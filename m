@@ -1,125 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Nov 2018 20:02:58 +0100
-Subject: [PATCH 2/4] efi/arm: defer persistent reservations until after
- paging_init()
-In-Reply-To: <20181106113732.16351-3-ard.biesheuvel@linaro.org>
-References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
- <20181106113732.16351-3-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Tue, 6 Nov 2018 11:07:47 -0800
+Subject: [PATCHv10 4/8] dt-bindings: fpga: add Stratix10 SoC FPGA manager
+ binding
+In-Reply-To: <1541523172-5171-5-git-send-email-richard.gong@linux.intel.com>
+References: <1541523172-5171-1-git-send-email-richard.gong@linux.intel.com>
+ <1541523172-5171-5-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <20181106190747.GA5690@archbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2018 at 12:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The new memory EFI reservation feature we introduced to allow memory
-> reservations to persist across kexec may trigger an unbounded number
-> of calls to memblock_reserve(). The memblock subsystem can deal with
-> this fine, but not before memblock resizing is enabled, which we can
-> only do after paging_init(), when the memory we reallocate the array
-> into is actually mapped.
->
-> So break out the memreserve table processing into a separate function
-> and call if after paging_init() on both arm64 and ARM.
->
-> Cc: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Richard,
 
-Russell,
-
-If you are ok with this patch, may I have your ack please? I would
-like to send it out before the end of the week.
-
-Thanks,
-
+On Tue, Nov 06, 2018 at 10:52:48AM -0600, richard.gong at linux.intel.com wrote:
+> From: Alan Tull <atull@kernel.org>
+> 
+> Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
+> 
+> Signed-off-by: Alan Tull <atull@kernel.org>
+> Signed-off-by: Richard Gong <richard.gong@intel.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Moritz Fischer <mdf@kernel.org>
 > ---
->  arch/arm/kernel/setup.c    | 1 +
->  arch/arm64/kernel/setup.c  | 1 +
->  drivers/firmware/efi/efi.c | 8 ++++++--
->  include/linux/efi.h        | 7 +++++++
->  4 files changed, 15 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index ac7e08886863..e99f12eaf390 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -1117,6 +1117,7 @@ void __init setup_arch(char **cmdline_p)
->         early_ioremap_reset();
->
->         paging_init(mdesc);
-> +       efi_apply_persistent_mem_reservations();
->         request_standard_resources(mdesc);
->
->         if (mdesc->restart)
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 953e316521fc..f4fc1e0544b7 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
->         arm64_memblock_init();
->
->         paging_init();
-> +       efi_apply_persistent_mem_reservations();
->
->         acpi_table_upgrade();
->
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index 249eb70691b0..55e4ea20bdc3 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -592,7 +592,11 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
->
->                 early_memunmap(tbl, sizeof(*tbl));
->         }
-> +       return 0;
-> +}
->
-> +int __init efi_apply_persistent_mem_reservations(void)
-> +{
->         if (efi.mem_reserve != EFI_INVALID_TABLE_ADDR) {
->                 unsigned long prsv = efi.mem_reserve;
->
-> @@ -602,7 +606,7 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
->                         /* reserve the entry itself */
->                         memblock_reserve(prsv, sizeof(*rsv));
->
-> -                       rsv = early_memremap(prsv, sizeof(*rsv));
-> +                       rsv = memremap(prsv, sizeof(*rsv), MEMREMAP_WB);
->                         if (rsv == NULL) {
->                                 pr_err("Could not map UEFI memreserve entry!\n");
->                                 return -ENOMEM;
-> @@ -612,7 +616,7 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
->                                 memblock_reserve(rsv->base, rsv->size);
->
->                         prsv = rsv->next;
-> -                       early_memunmap(rsv, sizeof(*rsv));
-> +                       memunmap(rsv);
->                 }
->         }
->
-> diff --git a/include/linux/efi.h b/include/linux/efi.h
-> index 845174e113ce..100ce4a4aff6 100644
-> --- a/include/linux/efi.h
-> +++ b/include/linux/efi.h
-> @@ -1167,6 +1167,8 @@ static inline bool efi_enabled(int feature)
->  extern void efi_reboot(enum reboot_mode reboot_mode, const char *__unused);
->
->  extern bool efi_is_table_address(unsigned long phys_addr);
+> v2: this patch is added in patch set version 2
+> v3: change to put fpga_mgr node under firmware/svc node
+> v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
+>     add Richard's signed-off-by
+> v5: add Reviewed-by Rob Herring
+> v6: no change
+> v7: no change
+> v8: no change
+> v9: no change
+> v10: no change
+> ---
+>  .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt      | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+> new file mode 100644
+> index 0000000..6e03f79
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+> @@ -0,0 +1,17 @@
+> +Intel Stratix10 SoC FPGA Manager
 > +
-> +extern int efi_apply_persistent_mem_reservations(void);
->  #else
->  static inline bool efi_enabled(int feature)
->  {
-> @@ -1185,6 +1187,11 @@ static inline bool efi_is_table_address(unsigned long phys_addr)
->  {
->         return false;
->  }
+> +Required properties:
+> +The fpga_mgr node has the following mandatory property, must be located under
+> +firmware/svc node.
 > +
-> +static inline int efi_apply_persistent_mem_reservations(void)
-> +{
-> +       return 0;
-> +}
->  #endif
->
->  extern int efi_status_to_err(efi_status_t status);
-> --
-> 2.19.1
->
+> +- compatible : should contain "intel,stratix10-soc-fpga-mgr"
+> +
+> +Example:
+> +
+> +	firmware {
+> +		svc {
+> +			fpga_mgr: fpga-mgr {
+> +				compatible = "intel,stratix10-soc-fpga-mgr";
+> +			};
+> +		};
+> +	};
+> -- 
+> 2.7.4
+> 
+Thanks,
+Moritz
