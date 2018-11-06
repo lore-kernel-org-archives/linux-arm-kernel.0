@@ -1,52 +1,40 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 6 Nov 2018 16:52:07 +0100
-Subject: [PATCH 02/10] drm/sun4i: sun6i_mipi_dsi: Support instruction
- loop selection
-In-Reply-To: <CAMty3ZBje8F4YEfWC4qoxADhgdFjbcwZBKJwak633pUAwKAftA@mail.gmail.com>
-References: <20181103100900.30313-1-jagan@amarulasolutions.com>
- <20181103100900.30313-3-jagan@amarulasolutions.com>
- <20181105103857.lp7ayw3p6dbthehg@flea>
- <CAMty3ZBje8F4YEfWC4qoxADhgdFjbcwZBKJwak633pUAwKAftA@mail.gmail.com>
-Message-ID: <20181106155207.kysq2crszzqv45ib@flea>
+Date: Tue, 6 Nov 2018 16:57:12 +0100
+Subject: [PATCH v3 2/2] drm/sun4i: tcon: prevent tcon->panel dereference
+ if NULL
+In-Reply-To: <f140c083f59eabf6ea323d15d655473e8a77d813.camel@aosc.io>
+References: <20181004195605.txvbkshvxklyzxyb@flea>
+ <20181005215951.99003-1-giulio.benetti@micronovasrl.com>
+ <20181005215951.99003-2-giulio.benetti@micronovasrl.com>
+ <20181008092111.qcufr4o7cy3nnj4b@flea>
+ <f140c083f59eabf6ea323d15d655473e8a77d813.camel@aosc.io>
+Message-ID: <20181106155712.4lcxw7yts7jixnkl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 04:56:35PM +0530, Jagan Teki wrote:
-> On Mon, Nov 5, 2018 at 4:09 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Sat, Nov 03, 2018 at 03:38:52PM +0530, Jagan Teki wrote:
-> > > Instruction loop selection would require before writing
-> > > loop number registers, so enable idle, LP11 bits on
-> > > loop selection register.
-> > >
-> > > Reference code available in BSP
-> > > (in drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> > > (dsi_dev[sel]->dsi_inst_loop_sel.dwval = 2<<(4*DSI_INST_ID_LP11) |
-> > >       3<<(4*DSI_INST_ID_DLY);
-> > >
-> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > ---
-> > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > >
-> > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > index da152c21ec62..077b57ec964c 100644
-> > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > @@ -397,6 +397,10 @@ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
-> > >       struct mipi_dsi_device *device = dsi->device;
-> > >       u16 delay;
-> > >
-> > > +     regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
-> > > +                  DSI_INST_ID_HSC  << (4 * DSI_INST_ID_LP11) |
-> > > +                  DSI_INST_ID_HSD  << (4 * DSI_INST_ID_DLY));
-> > > +
-> >
-> > Please put this with the other instructions settings below.
+On Mon, Nov 05, 2018 at 09:23:08PM +0800, Icenowy Zheng wrote:
+> ? 2018-10-08?? 11:21 +0200?Maxime Ripard???
+> > On Fri, Oct 05, 2018 at 11:59:51PM +0200, Giulio Benetti wrote:
+> > > If tcon->panel pointer is NULL, trying to dereference from it
+> > > (i.e. tcon->panel->connector) will cause a null pointer
+> > > dereference.
+> > > 
+> > > Add tcon->panel null pointer check before calling
+> > > sun4i_tcon0_mode_set_dithering().
+> > > 
+> > > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> > > Fixes: f11adcecbd5f ("drm/sun4i: tcon: Add dithering support for
+> > >                       RGB565/RGB666 LCD panels")
+> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > 
+> > Applied both, thanks!
 > 
-> Does that mean after computation delay code?
+> Please bring them to 4.20.
+> 
+> Currently in 4.20-rc1, bridge support of sun4i-drm is broken because of
+> this problem.
 
-Yes
+I've merged them in drm-misc-fixes, thanks!
 
 Maxime
 
@@ -60,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 228 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181106/c8611bea/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181106/c369b5f1/attachment.sig>
