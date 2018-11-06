@@ -1,165 +1,66 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 6 Nov 2018 09:42:15 +0100
-Subject: [PATCH] KVM: arm64: Clarify explanation of STAGE2_PGTABLE_LEVELS
-In-Reply-To: <a2805e17-b9ac-40bd-ef9f-6867a4660f90@arm.com>
-References: <20181102075352.20636-1-christoffer.dall@arm.com>
- <404f2d39-5dc5-602f-0594-0997b409ff84@arm.com>
- <20181102142543.GY12057@e113682-lin.lund.arm.com>
- <a2805e17-b9ac-40bd-ef9f-6867a4660f90@arm.com>
-Message-ID: <20181106084215.GJ12057@e113682-lin.lund.arm.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 6 Nov 2018 14:11:01 +0530
+Subject: [RFC PATCH v3 09/13] genirq/msi: Add support for .msi_unprepare
+ callback
+In-Reply-To: <20181106084105.32483-1-lokeshvutla@ti.com>
+References: <20181106084105.32483-1-lokeshvutla@ti.com>
+Message-ID: <20181106084105.32483-10-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 03:00:34PM +0000, Suzuki K Poulose wrote:
-> 
-> 
-> On 02/11/18 14:25, Christoffer Dall wrote:
-> >On Fri, Nov 02, 2018 at 11:02:38AM +0000, Suzuki K Poulose wrote:
-> >>Hi
-> >>
-> >>On 02/11/18 07:53, Christoffer Dall wrote:
-> >>>In attempting to re-construct the logic for our stage 2 page table
-> >>>layout I found the reaoning in the comment explaining how we calculate
-> >>>the number of levels used for stage 2 page tables a bit backwards.
-> >>>
-> >>>This commit attempts to clarify the comment, to make it slightly easier
-> >>>to read without having the Arm ARM open on the right page.
-> >>>
-> >>>While we're at it, fixup a typo in a comment that was recently changed.
-> >>>
-> >>>Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> >>>---
-> >>>  arch/arm64/include/asm/stage2_pgtable.h | 17 ++++++++++-------
-> >>>  virt/kvm/arm/mmu.c                      |  2 +-
-> >>>  2 files changed, 11 insertions(+), 8 deletions(-)
-> >>>
-> >>>diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-> >>>index d352f6df8d2c..9c387320b28c 100644
-> >>>--- a/arch/arm64/include/asm/stage2_pgtable.h
-> >>>+++ b/arch/arm64/include/asm/stage2_pgtable.h
-> >>>@@ -31,15 +31,18 @@
-> >>>  /*
-> >>>   * The hardware supports concatenation of up to 16 tables at stage2 entry level
-> >>>- * and we use the feature whenever possible.
-> >>>+ * and we use the feature whenever possible, which means we resolve 4 bits of
-> >>
-> >>s/we resolve 4 bits/we resolve 4 additional bits/ ?
-> >>
-> >
-> >yes
-> >
-> >>>+ * address at the entry level.
-> >>>   *
-> >>>- * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
-> >>>+ * This implies, the total number of page table levels required for
-> >>>+ * IPA_SHIFT at stage2 expected by the hardware can be calculated using
-> >>>+ * the same logic used for the (non-collapsable) stage1 page tables but for
-> >>>+ * (IPA_SHIFT - 4).
-> >>>+ *
-> >>>+ * Note, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
-> >>
-> >>May be we could improve it further by :
-> >>
-> >>s/resolved at any level/resolved at any *non-entry* level/
-> >>
-> >>as, we could resolve as small as 1 bit at the entry level.
-> >>
-> >>
-> >
-> >yes
-> >
-> >>>   * On arm64, the smallest PAGE_SIZE supported is 4k, which means
-> >>>- *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
-> >>>- * This implies, the total number of page table levels at stage2 expected
-> >>>- * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
-> >>>- * in normal translations(e.g, stage1), since we cannot have another level in
-> >>>- * the range (IPA_SHIFT, IPA_SHIFT - 4).
-> >>>+ *             (PAGE_SHIFT - 3) > 4 holds for all page sizes
-> >>>+ * and therefore we will need a minimum of two levels for stage2 in all cases.
-> >>
-> >>I think the above statement is misleading. The minimum number of
-> >>levels has nothing to do with the concatenation.
-> >
-> >Architecturally surely it does?  (The point of concatenation is to
-> >reduce the minimal number of levels required.)
-> >
-> >Maybe you mean the minimum number of levels imposed by KVM here?
-> >
-> >>For e.g, we could
-> >>still create a stage2 with 1 level (32bit IPA on 64K, 29bit + 3bit
-> >>concatenated), going by the same rules above. The only reason why
-> >>we limit the number of levels to 2, is to prevent splitting stage1 PMD
-> >>huge mappings (which are quite common) at stage2.
-> >>
-> >
-> >So I wasn't entirely clear what the comment was trying to say with the
-> >"(PAGE_SHIFT - 3) > 4 holds for all page size" statement, so I though
-> >that was there to show that we'll need a minimum of two levels, but
-> >maybe that was written under the assumption of the limitations of
-> >IPA_SHIFT (was KVM_PHYS_SIZE).
-> 
-> See below.
-> 
-> >
-> >Since you wrote the original comment, and I couldn't correctly parse
-> >that, and I apparently still didn't fully understand, can you suggest an
-> >alternative wording?
-> 
-> I think trying to over explain the concept has created more confusion.
-> The whole paragraph is trying to prove that we only need :
-> 
-> 	ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4)
-> to map IPA_SHIFT bits at stage2 with maximum utilization of the
-> concatenation at entry level.
+Add an optional callback .msi_unprepare to struct msi_domain_ops.
+This is used to clear any effect that is done by .msi_prepare callback.
 
-Yes, I think that comes across more clearly in my rewording up to the
-"Note, ...".
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+Changes since v2:
+- New patch
 
-> 
-> Right now the comment tries to establish it via the hard route, by
-> proving that there cannot be an intermediate level in the range
-> [IPA_SHIFT, IPA_SHIFT - 4]. Or in other words :
-> 
-> (ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4) + 1) >= 	
-> 			ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT)
-> 
-> I don't know if it is worth the explanation and then causing further
-> confusion.
+ include/linux/msi.h |  3 +++
+ kernel/irq/msi.c    | 10 ++++++++++
+ 2 files changed, 13 insertions(+)
 
-I think you're then actually trying to explain two things.
-
-First, we can get the number of levels by using the stage 1 calculation
-and adjust for concatenation by subtracting 4 from the number of bits we
-need to translate.
-
-Second, some further reasoning about *why* that is true.
-
-It remains unclear to me exactly what your point about
-    '(PAGE_SHIFT - 3) > 4'
-is and how that supports the second point.  Also I'm not entirely sure
-why we need that.
-
-I was trying to preserve all the information you had in the original
-comment (assuming it was important), but I honestly think that we only
-need to explain the first part (because the confusing part of the code
-is the reuse of a stage 1 macro and subtracting 4).
-
-> 
-> May be I could replace the confusing text with something like :
-> 
-> "A normal page table with ARM64_HW_PGTABLE_LEVELS(IPA_SHIFT - 4) levels
-> is guaranteed to resolve minimum of (IPA_SHIFT - 4)bits (when the entry
-> level is fully used, and more bits otherwise.). For an input address of
-> size IPA_SHIFT bits, we could cover the remaining 4 bits using the same
-> number of levels or using the concatenation if needed."
-> 
-
-I prefer my version above to explain this particular aspect :)
-
-But this seems to exclude the stuff you originally had about
-(PAGE_SHIFT - 3) > 4' ?
-
-
-Thanks,
-
-    Christoffer
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 021f789226b5..1e37aa569a3c 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -237,6 +237,8 @@ struct msi_domain_ops {
+ 	int		(*msi_prepare)(struct irq_domain *domain,
+ 				       struct device *dev, int nvec,
+ 				       msi_alloc_info_t *arg);
++	void		(*msi_unprepare)(struct irq_domain *domain, int nvec,
++					 void *data);
+ 	void		(*msi_finish)(msi_alloc_info_t *arg, int retval);
+ 	void		(*set_desc)(msi_alloc_info_t *arg,
+ 				    struct msi_desc *desc);
+@@ -317,6 +319,7 @@ void platform_msi_domain_free_irqs(struct device *dev);
+ /* When an MSI domain is used as an intermediate domain */
+ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 			    int nvec, msi_alloc_info_t *args);
++void msi_domain_unprepare_irqs(struct irq_domain *domain, int nvec, void *data);
+ int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
+ 			     int virq, int nvec, msi_alloc_info_t *args);
+ struct irq_domain *
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index e37238317fab..87ce5a5d0c6d 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -312,6 +312,16 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 	return ret;
+ }
+ 
++void msi_domain_unprepare_irqs(struct irq_domain *domain, int nvec,
++			       void *data)
++{
++	struct msi_domain_info *info = domain->host_data;
++	struct msi_domain_ops *ops = info->ops;
++
++	if (ops->msi_unprepare)
++		ops->msi_unprepare(domain, nvec, data);
++}
++
+ int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
+ 			     int virq, int nvec, msi_alloc_info_t *arg)
+ {
+-- 
+2.19.1
