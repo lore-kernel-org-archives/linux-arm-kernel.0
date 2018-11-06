@@ -1,208 +1,212 @@
-From: xiaowei.bao@nxp.com (Xiaowei Bao)
-Date: Tue, 6 Nov 2018 06:48:26 +0000
-Subject: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-In-Reply-To: <dfedeaec-9a3b-632e-af37-cb1963dcae7c@ti.com>
-References: <20181025110901.5680-1-xiaowei.bao@nxp.com>
- <20181025110901.5680-5-xiaowei.bao@nxp.com>
- <d9d07e05-556b-a56d-bb7f-eaec9fb739b8@ti.com>
- <HE1PR04MB1497DF7D9428A5C791CB6A03F5F00@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <HE1PR04MB14979058170FA16A7465FF9EF5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <a85a6900-2478-0750-6f33-2e787cf80d1d@ti.com>
- <HE1PR04MB1497DF7378927C9BB5DF3E15F5CD0@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <8ec7f502-e058-2c28-9140-5d125e4af6ff@ti.com>
- <HE1PR04MB1497DABC689F9A4A97FD4DF0F5CA0@HE1PR04MB1497.eurprd04.prod.outlook.com>
- <dfedeaec-9a3b-632e-af37-cb1963dcae7c@ti.com>
-Message-ID: <HE1PR04MB14972FA5A46885370788B9B7F5CB0@HE1PR04MB1497.eurprd04.prod.outlook.com>
+From: ren_guo@c-sky.com (Guo Ren)
+Date: Tue, 6 Nov 2018 15:01:41 +0800
+Subject: [PATCH 9/9] csky: use the generic remapping dma alloc
+ implementation
+In-Reply-To: <20181105121931.13481-10-hch@lst.de>
+References: <20181105121931.13481-1-hch@lst.de>
+ <20181105121931.13481-10-hch@lst.de>
+Message-ID: <20181106070140.GA6232@guoren-Inspiron-7460>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon?
-
------Original Message-----
-From: Kishon Vijay Abraham I <kishon@ti.com> 
-Sent: 2018?11?6? 14:07
-To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; pombredanne at nexb.com; shawn.lin at rock-chips.com; linux-pci at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-Cc: Jiafei Pan <jiafei.pan@nxp.com>
-Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-
-(Removed Niklas as mails to him is bouncing)
-
-Hi,
-
-Please fix your email client. Refer Documentation/process/email-clients.rst
-
-On 05/11/18 2:45 PM, Xiaowei Bao wrote:
+On Mon, Nov 05, 2018 at 01:19:31PM +0100, Christoph Hellwig wrote:
+> The csky code was largely copied from arm/arm64, so switch to the
+> generic arm64-based implementation instead.
 > 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/csky/Kconfig          |   2 +-
+>  arch/csky/mm/dma-mapping.c | 142 +------------------------------------
+>  2 files changed, 3 insertions(+), 141 deletions(-)
 > 
-> -----Original Message-----
-> From: Kishon Vijay Abraham I <kishon@ti.com>
-> Sent: 2018?11?5? 16:57
-> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com; 
-> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li 
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
-> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; Mingkai 
-> Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
-> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com; 
-> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
-> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
-> Cc: Jiafei Pan <jiafei.pan@nxp.com>
-> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
-> 
-> Hi,
-> 
-> On 31/10/18 4:08 PM, Xiaowei Bao wrote:
->>
->>
->> -----Original Message-----
->> From: Kishon Vijay Abraham I <kishon@ti.com>
->> Sent: 2018?10?31? 12:15
->> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com;
->> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo Li
->> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
->> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; 
->> Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
->> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com;
->> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
->> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
->> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
->> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
->> Cc: Jiafei Pan <jiafei.pan@nxp.com>
->> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
->>
->> Hi,
->>
->> On 31/10/18 8:03 AM, Xiaowei Bao wrote:
->>>
->>>
->>> -----Original Message-----
->>> From: Xiaowei Bao
->>> Sent: 2018?10?26? 17:19
->>> To: 'Kishon Vijay Abraham I' <kishon@ti.com>; bhelgaas at google.com;
->>> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo 
->>> robh+Li
->>> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
->>> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; 
->>> Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
->>> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com;
->>> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
->>> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
->>> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
->>> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
->>> Cc: Jiafei Pan <jiafei.pan@nxp.com>
->>> Subject: RE: [PATCH 5/6] pci: layerscape: Add the EP mode support.
->>>
->>>
->>>
->>> -----Original Message-----
->>> From: Kishon Vijay Abraham I <kishon@ti.com>
->>> Sent: 2018?10?26? 13:29
->>> To: Xiaowei Bao <xiaowei.bao@nxp.com>; bhelgaas at google.com;
->>> robh+dt at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; Leo 
->>> robh+Li
->>> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com; arnd at arndb.de; 
->>> gregkh at linuxfoundation.org; M.h. Lian <minghuan.lian@nxp.com>; 
->>> Mingkai Hu <mingkai.hu@nxp.com>; Roy Zang <roy.zang@nxp.com>; 
->>> kstewart at linuxfoundation.org; cyrille.pitchen at free-electrons.com;
->>> pombredanne at nexb.com; shawn.lin at rock-chips.com; 
->>> niklas.cassel at axis.com; linux-pci at vger.kernel.org; 
->>> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; 
->>> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org
->>> Subject: Re: [PATCH 5/6] pci: layerscape: Add the EP mode support.
->>>
->>> Hi,
->>>
->>> On Thursday 25 October 2018 04:39 PM, Xiaowei Bao wrote:
->>>> Add the PCIe EP mode support for layerscape platform.
->>>>
->>>> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
->>>> ---
->>>>  drivers/pci/controller/dwc/Makefile            |    2 +-
->>>>  drivers/pci/controller/dwc/pci-layerscape-ep.c |  161
->>>> ++++++++++++++++++++++++
->>>>  2 files changed, 162 insertions(+), 1 deletions(-)  create mode
->>>> 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
->>>>
->>>> diff --git a/drivers/pci/controller/dwc/Makefile
->>>> b/drivers/pci/controller/dwc/Makefile
->>>> index 5d2ce72..b26d617 100644
->>>> --- a/drivers/pci/controller/dwc/Makefile
->>>> +++ b/drivers/pci/controller/dwc/Makefile
->>>> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
->>>>  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
->>>>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
->>>>  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
->>>> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
->>>> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o 
->>>> +pci-layerscape-ep.o
->>>>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
->>>>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
->>>>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o diff --git 
->>>> a/drivers/pci/controller/dwc/pci-layerscape-ep.c
->>>> b/drivers/pci/controller/dwc/pci-layerscape-ep.c
->>>> new file mode 100644
->>>> index 0000000..3b33bbc
->>>> --- /dev/null
->>>> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
->>>> @@ -0,0 +1,161 @@
->>>> +// SPDX-License-Identifier: GPL-2.0
->>>> +/*
->>>> + * PCIe controller EP driver for Freescale Layerscape SoCs
->>>> + *
->>>> + * Copyright (C) 2018 NXP Semiconductor.
->>>> + *
->>>> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>  */
->>>> +
->>>> +#include <linux/kernel.h>
->>>> +#include <linux/init.h>
->>>> +#include <linux/of_pci.h>
->>>> +#include <linux/of_platform.h>
->>>> +#include <linux/of_address.h>
->>>> +#include <linux/pci.h>
->>>> +#include <linux/platform_device.h> #include <linux/resource.h>
->>>> +
->>>> +#include "pcie-designware.h"
->>>> +
->>>> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
->>>
->>> The base address should come from dt.
->>>> +
->>>> +struct ls_pcie_ep {
->>>> +	struct dw_pcie		*pci;
->>>> +};
->>>> +
->>>> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
->>>> +
->>>> +static bool ls_pcie_is_bridge(struct ls_pcie_ep *pcie) {
->>>> +	struct dw_pcie *pci = pcie->pci;
->>>> +	u32 header_type;
->>>> +
->>>> +	header_type = ioread8(pci->dbi_base + PCI_HEADER_TYPE);
->>>> +	header_type &= 0x7f;
->>>> +
->>>> +	return header_type == PCI_HEADER_TYPE_BRIDGE; }
->>>> +
->>>> +static int ls_pcie_establish_link(struct dw_pcie *pci) {
->>>> +	return 0;
->>>> +}
->>>
->>> There should be some way by which EP should tell RC that it is not configured yet. Are there no bits to control LTSSM state initialization or Configuration retry status enabling?
->>> [Xiaowei Bao] There have not bits to control LTSSM state to tell the RC it is configured. The start link is auto completed.
->>> [Xiaowei Bao] Hi Kishon, is there any advice?
->>
->> If there is no HW support, I don't think anything could be done here. This could result in RC reading configuration space even before EP is fully initialized.
->> [Xiaowei Bao] The bootloader have initialized the EP device and set the config ready bit, and the kernel don't need to do anything.
-> 
-> What does bootloader initalize? The EP driver here will reinitialize everything right?
-> [Xiaowei Bao] The bootloader initialize BAR size, outbound window, inbound window and set the config ready bit.
+> diff --git a/arch/csky/Kconfig b/arch/csky/Kconfig
+> index c0cf8e948821..ea74f3a9eeaf 100644
+> --- a/arch/csky/Kconfig
+> +++ b/arch/csky/Kconfig
+> @@ -8,7 +8,7 @@ config CSKY
+>  	select CLKSRC_MMIO
+>  	select CLKSRC_OF
+>  	select DMA_DIRECT_OPS
+> -	select DMA_REMAP
+> +	select DMA_DIRECT_REMAP
+>  	select IRQ_DOMAIN
+>  	select HANDLE_DOMAIN_IRQ
+>  	select DW_APB_TIMER_OF
+> diff --git a/arch/csky/mm/dma-mapping.c b/arch/csky/mm/dma-mapping.c
+> index ad4046939713..80783bb71c5c 100644
+> --- a/arch/csky/mm/dma-mapping.c
+> +++ b/arch/csky/mm/dma-mapping.c
+> @@ -14,73 +14,13 @@
+>  #include <linux/version.h>
+>  #include <asm/cache.h>
+>  
+> -static struct gen_pool *atomic_pool;
+> -static size_t atomic_pool_size __initdata = SZ_256K;
+> -
+> -static int __init early_coherent_pool(char *p)
+> -{
+> -	atomic_pool_size = memparse(p, &p);
+> -	return 0;
+> -}
+> -early_param("coherent_pool", early_coherent_pool);
+> -
+>  static int __init atomic_pool_init(void)
+>  {
+> -	struct page *page;
+> -	size_t size = atomic_pool_size;
+> -	void *ptr;
+> -	int ret;
+> -
+> -	atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+> -	if (!atomic_pool)
+> -		BUG();
+> -
+> -	page = alloc_pages(GFP_KERNEL, get_order(size));
+> -	if (!page)
+> -		BUG();
+> -
+> -	ptr = dma_common_contiguous_remap(page, size, VM_ALLOC,
+> -					  pgprot_noncached(PAGE_KERNEL),
+> -					  __builtin_return_address(0));
+> -	if (!ptr)
+> -		BUG();
+> -
+> -	ret = gen_pool_add_virt(atomic_pool, (unsigned long)ptr,
+> -				page_to_phys(page), atomic_pool_size, -1);
+> -	if (ret)
+> -		BUG();
+> -
+> -	gen_pool_set_algo(atomic_pool, gen_pool_first_fit_order_align, NULL);
+> -
+> -	pr_info("DMA: preallocated %zu KiB pool for atomic coherent pool\n",
+> -		atomic_pool_size / 1024);
+> -
+> -	pr_info("DMA: vaddr: 0x%x phy: 0x%lx,\n", (unsigned int)ptr,
+> -		page_to_phys(page));
+> -
+> -	return 0;
+> +	return dma_atomic_pool_init(GFP_KERNEL, pgprot_noncached(PAGE_KERNEL));
+>  }
+>  postcore_initcall(atomic_pool_init);
+Seems also could remove atomic_pool_init from csky, why not put them in
+common?
 
-How will bootloader know the BAR size? The BAR size is based on the function driver. How does bootloader configure the OB window? The OB window is configured based on the size and address given by the host dynamically at runtime.
+>  
+> -static void *csky_dma_alloc_atomic(struct device *dev, size_t size,
+> -				   dma_addr_t *dma_handle)
+> -{
+> -	unsigned long addr;
+> -
+> -	addr = gen_pool_alloc(atomic_pool, size);
+> -	if (addr)
+> -		*dma_handle = gen_pool_virt_to_phys(atomic_pool, addr);
+> -
+> -	return (void *)addr;
+> -}
+> -
+> -static void csky_dma_free_atomic(struct device *dev, size_t size, void *vaddr,
+> -				 dma_addr_t dma_handle, unsigned long attrs)
+> -{
+> -	gen_pool_free(atomic_pool, (unsigned long)vaddr, size);
+> -}
+> -
+> -static void __dma_clear_buffer(struct page *page, size_t size)
+> +void arch_dma_prep_coherent(struct page *page, size_t size)
+>  {
+>  	if (PageHighMem(page)) {
+>  		unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> @@ -107,84 +47,6 @@ static void __dma_clear_buffer(struct page *page, size_t size)
+>  	}
+>  }
+>  
+> -static void *csky_dma_alloc_nonatomic(struct device *dev, size_t size,
+> -				      dma_addr_t *dma_handle, gfp_t gfp,
+> -				      unsigned long attrs)
+> -{
+> -	void  *vaddr;
+> -	struct page *page;
+> -	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> -
+> -	if (DMA_ATTR_NON_CONSISTENT & attrs) {
+> -		pr_err("csky %s can't support DMA_ATTR_NON_CONSISTENT.\n", __func__);
+> -		return NULL;
+> -	}
+> -
+> -	if (IS_ENABLED(CONFIG_DMA_CMA))
+> -		page = dma_alloc_from_contiguous(dev, count, get_order(size),
+> -						 gfp);
+> -	else
+> -		page = alloc_pages(gfp, get_order(size));
+> -
+> -	if (!page) {
+> -		pr_err("csky %s no more free pages.\n", __func__);
+> -		return NULL;
+> -	}
+> -
+> -	*dma_handle = page_to_phys(page);
+> -
+> -	__dma_clear_buffer(page, size);
+> -
+> -	if (attrs & DMA_ATTR_NO_KERNEL_MAPPING)
+> -		return page;
+> -
+> -	vaddr = dma_common_contiguous_remap(page, PAGE_ALIGN(size), VM_USERMAP,
+> -		pgprot_noncached(PAGE_KERNEL), __builtin_return_address(0));
+> -	if (!vaddr)
+> -		BUG();
+> -
+> -	return vaddr;
+> -}
+> -
+> -static void csky_dma_free_nonatomic(
+> -	struct device *dev,
+> -	size_t size,
+> -	void *vaddr,
+> -	dma_addr_t dma_handle,
+> -	unsigned long attrs
+> -	)
+> -{
+> -	struct page *page = phys_to_page(dma_handle);
+> -	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> -
+> -	if ((unsigned int)vaddr >= VMALLOC_START)
+> -		dma_common_free_remap(vaddr, size, VM_USERMAP);
+> -
+> -	if (IS_ENABLED(CONFIG_DMA_CMA))
+> -		dma_release_from_contiguous(dev, page, count);
+> -	else
+> -		__free_pages(page, get_order(size));
+> -}
+> -
+> -void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+> -		     gfp_t gfp, unsigned long attrs)
+> -{
+> -	if (gfpflags_allow_blocking(gfp))
+> -		return csky_dma_alloc_nonatomic(dev, size, dma_handle, gfp,
+> -						attrs);
+> -	else
+> -		return csky_dma_alloc_atomic(dev, size, dma_handle);
+> -}
+> -
+> -void arch_dma_free(struct device *dev, size_t size, void *vaddr,
+> -		   dma_addr_t dma_handle, unsigned long attrs)
+> -{
+> -	if (!addr_in_gen_pool(atomic_pool, (unsigned int) vaddr, size))
+> -		csky_dma_free_nonatomic(dev, size, vaddr, dma_handle, attrs);
+> -	else
+> -		csky_dma_free_atomic(dev, size, vaddr, dma_handle, attrs);
+> -}
+> -
+>  static inline void cache_op(phys_addr_t paddr, size_t size,
+>  			    void (*fn)(unsigned long start, unsigned long end))
+>  {
+> -- 
+> 2.19.1
 
-Thanks
-Kishon
-[Xiaowei Bao] We use the bootloader is u-boot, we implement the EP base feature in the u-boot, e.g.(MEM space access(RC<=>EP), CONFIG space access(RC=>EP)), we set the EP BAR size like kernel(set the PCI_BASE_ADDRESS_n register, but different size), and the outbound windows also be set, and the bar size will be cover by the EP framework driver when kernel start up.
-I have to set the dw_pcie_ops, if don't config the dw_pcie_ops there will have call trace, because the DW driver will call the write_dbi or read_dbi function directly but not check the dw_pcie_ops whether is null. I refer to the pcie-designware-plat.c to implement it. I don't know what you said about this, could you tell me the effect, Thanks a lot.
+Reviewed-by: Guo Ren <ren_guo@c-sky.com>
 
-Thanks
-Xiaowei
+Compile is OK, qemu boot OK. Functions are the same and just move to common.
+
+Looks good for me.
+
+ Guo Ren
