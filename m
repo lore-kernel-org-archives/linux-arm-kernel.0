@@ -1,43 +1,126 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 6 Nov 2018 11:03:30 +0100
-Subject: [PATCH v10 0/6] EDAC: Enhancements to Synopsys EDAC driver
-In-Reply-To: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
-References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20181106100329.GC13712@zn.tnic>
+From: ada@thorsis.com (Alexander Dahl)
+Date: Tue, 06 Nov 2018 10:57:11 +0100
+Subject: sama5d: using the ebi interface from another driver
+In-Reply-To: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
+References: <CAL8zT=imudTXvbsxx42mPSQj7Qt1b=44wnPHpb09-sOqLewu-w@mail.gmail.com>
+Message-ID: <3857132.MlRd14rs7I@ada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2018 at 11:36:55AM +0530, Manish Narani wrote:
-> Change in v10:
-> 	- Moved the checking for ce_cnt and ue_cnt before the readl() call
-> 	- Aligned arguments on the opening brace in setup_irq()
+Hei hei,
+
+Am Freitag, 2. November 2018, 14:35:26 CET schrieb Jean-Michel Hautbois:
+> Then, after looking into deeper details in the datasheet I understand
+> it is connected through EBI and it sounds not so easy :D.
+
+Did you read docs on that? You'll find the binding docs here:
+
+Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+
+> I would appreciate some help/pointers on this, as there is (at least,
+> I could find) few documentation on how to use it except for NAND
+> cases.
+
+I use EBI with at91sam9g20 and custom FPGA on CS5 (0x6000000) and CS7 
+(0x8000000).
+
+> I have something like that in my DTS, but not sure this is the correct
+> way to do it :
 > 
-> Manish Narani (6):
->   edac: synopsys: Add error handling for NULL in probe()
->   dt: bindings: Document ZynqMP DDRC in Synopsys documentation
->   edac: synopsys: Add macro defines for ZynqMP DDRC
->   edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
->   arm64: zynqmp: Add DDRC node
->   edac: synopsys: Add Error Injection support for ZynqMP DDRC
+>         ebi: ebi at 10000000 {
+>             pinctrl-0 = <&pinctrl_ebi_nand_addr>;
+>             pinctrl-names = "default";
+>             status = "okay";
 > 
->  .../bindings/memory-controllers/synopsys.txt       |  27 +-
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   7 +
->  drivers/edac/Kconfig                               |   2 +-
->  drivers/edac/synopsys_edac.c                       | 911 ++++++++++++++++++++-
->  4 files changed, 918 insertions(+), 29 deletions(-)
+>             dsp0: pef24628 at 1 {
+>                 status = "okay";
+>                 compatible = "intel,pef24628";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 reg = <0x1 0x0 0x8000>;
+>                 pinctrl-0 = <&pinctrl_dsp_cs1>;
+>             };
+> 
+>             dsp1: pef24628 at 2 {
+>                 status = "okay";
+>                 compatible = "intel,pef24628";
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 reg = <0x2 0x0 0x8000>;
+>                 pinctrl-0 = <&pinctrl_dsp_cs2>;
+>             };
 
-Ok, patches pushed here:
+I'm not sure about those 'reg' settings. IIRC the first should correspond to 
+the CS line, on at91sam9g20 the 0x40000000 would be CS3 (which is used by 
+NAND, like in the dts snippet you posted) and 0x50000000 would be CS4. Are CS1 
+(which is used by SD-RAM) and CS2 free to use on sama5d3?
 
-(minus https://lkml.kernel.org/r/1540447621-22870-6-git-send-email-manish.narani at xilinx.com)
+Maybe that's different on sama5d3? I would check it again.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=edac-for-4.21-synps
+> The pinctrl for ebi should probably be changed however, I am wondering
+> how the (platform ?) driver can access the adress ? Should it parse
+> itself the parent, and find range, etc. Or is there an accessor for it
+> ?
 
-Please run this on the hw before I queue it for linux-next.
+Probably. This is what I have for the at91sam9g20:
 
-Thx.
+            pinctrl at fffff400 {                                          
+                ebi {                                                   
+                    pinctrl_ebi_cs5: ebi-cs5-0 {                        
+                        atmel,pins =                                    
+                            <AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
+                    };                                                  
+                                                                        
+                    pinctrl_ebi_cs7: ebi-cs7-0 {                        
+                        atmel,pins =                                    
+                            <AT91_PIOC 12 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
+                    };                                                  
+                                                                        
+                    pinctrl_ebi_nwait: ebi-nwait-0 {                    
+                        atmel,pins =                                    
+                            <AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
+                    };                                                  
+                };                                                      
+            };                                                          
 
--- 
-Regards/Gruss,
-    Boris.
+> Maybe can I just manually toggle the CS GPIO, and don't try to make
+> anything more complex than what it should be ? The driver should not
+> be atmel dependant...
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+As Ludovic said, you should check the settings and timings for the external 
+memory interface. This could look more or less similar to that:
+
+            foo_bar: foo-bar at 5,0 {                              
+                status = "okay";                                        
+                pinctrl-0 = <&pinctrl_ebi_cs5>;                         
+                pinctrl-names = "default";                              
+                reg = <0x5 0x0 0x80000>;                                
+                                                                        
+                atmel,smc-bus-width = <8>;                              
+                atmel,smc-read-mode = "nrd";                            
+                atmel,smc-write-mode = "nwe";                           
+                atmel,smc-exnw-mode = "ready";                          
+                                                                        
+                atmel,smc-ncs-rd-setup-ns = <7>;                        
+                atmel,smc-nrd-setup-ns = <7>;                           
+                atmel,smc-ncs-wr-setup-ns = <7>;                        
+                atmel,smc-nwe-setup-ns = <7>;                           
+                                                                        
+                atmel,smc-ncs-rd-pulse-ns = <56>;                       
+                atmel,smc-nrd-pulse-ns = <56>;                          
+                atmel,smc-ncs-wr-pulse-ns = <56>;                       
+                atmel,smc-nwe-pulse-ns = <56>;                          
+                                                                        
+                atmel,smc-nwe-cycle-ns = <77>;                          
+                atmel,smc-nrd-cycle-ns = <77>;                          
+                                                                        
+                atmel,smc-tdf-ns = <0>;                                 
+            };        
+
+As you can see, quite a lot of settings are made, all depending on how the 
+memory access is supposed to be configured. You should look out for details in 
+the hardware manuals of the SoC and the devices you want to connect.
+
+HTH & Greets
+Alex
+                                                  
