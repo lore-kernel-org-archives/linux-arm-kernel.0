@@ -1,50 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Nov 2018 15:13:07 +0100
-Subject: [PATCH 3/4] ARM: merge -fdata-sections BSS data to .bss section
-In-Reply-To: <20181106141033.GC30658@n2100.armlinux.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2018 14:21:26 +0000
+Subject: [PATCH 1/4] EFI stub: remove -fdata-sections
+In-Reply-To: <CAKv+Gu_-Vqa=TXDzmzorjcPVnxqO3BHvvDyJKViHFLCsnhfeEw@mail.gmail.com>
 References: <20181106133935.GB30658@n2100.armlinux.org.uk>
- <E1gK1ae-0000or-7R@rmk-PC.armlinux.org.uk>
- <CAKv+Gu9-t0QYCfXHtRJ=Oc-Gsa2f=RdRHTP_suB2oT5pKKy7ZQ@mail.gmail.com>
- <20181106141033.GC30658@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu8nGYRYPsFZW3zcOVPMBZfA6R3PhqQ2XQBPVGLPTw9t-g@mail.gmail.com>
+ <E1gK1aT-0000oL-Nn@rmk-PC.armlinux.org.uk>
+ <CAKv+Gu_-Vqa=TXDzmzorjcPVnxqO3BHvvDyJKViHFLCsnhfeEw@mail.gmail.com>
+Message-ID: <20181106142126.GD30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2018 at 15:10, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Nov 06, 2018 at 03:08:06PM +0100, Ard Biesheuvel wrote:
->> On 6 November 2018 at 14:40, Russell King <rmk+kernel@armlinux.org.uk> wrote:
->> > When building with -fdata-sections, the BSS data is placed into separate
->> > sections, so we need to ask the linker to group these together into the
->> > .bss output section, so that they're correctly placed.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> > ---
->> >  arch/arm/boot/compressed/vmlinux.lds.S | 2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
->> > index 2b963d8e76dd..3b91bc3c606f 100644
->> > --- a/arch/arm/boot/compressed/vmlinux.lds.S
->> > +++ b/arch/arm/boot/compressed/vmlinux.lds.S
->> > @@ -118,7 +118,7 @@ SECTIONS
->> >
->> >    . = BSS_START;
->> >    __bss_start = .;
->> > -  .bss                 : { *(.bss) }
->> > +  .bss                 : { *(.bss) *(.bss.*) }
->>
->> Would it make sense to sort these by alignment? Otherwise, I suspect
->> you may get a lot of padding holes due to the number of different
->> input sections, each with its own alignment.
->
-> We don't bother elsewhere in the kernel linker script - do you have
-> a case where we get lots of padding?
->
+On Tue, Nov 06, 2018 at 03:11:18PM +0100, Ard Biesheuvel wrote:
+> On 6 November 2018 at 14:40, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+> > Remove -fdata-sections from the EFI stub build as this causes problems
+> > for the ARM decompressor code.
+> >
+> Just out of curiosity: what kind of problems?
 
-With -fdata-sections? How else are we ensuring that each .bss item in
-its own section is not placed such that its alignment results in a
-padding hole?
+I'm afraid I don't remember - these patches are March 2018.  I suspect
+it was a result of a randconfig build failing to link, as I don't have
+any 32-bit ARM configs that have the EFI stub enabled.
 
-WIthout -fdata-sections, this is done per object, and GCC takes care
-of this itself.
+In any case, this will break:
+
+#
+# ARM discards the .data section because it disallows r/w data in the
+# decompressor. So move our .data to .data.efistub, which is preserved
+# explicitly by the decompressor linker script.
+#
+STUBCOPY_FLAGS-$(CONFIG_ARM)    += --rename-section .data=.data.efistub
+
+because with -fdata-sections enabled, there is no longer a single .data
+section, but multiple .data.* sections.  Hence, the rename no longer
+works, and all the EFI stub data ends up being discarded by the
+decompressor link stage.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
