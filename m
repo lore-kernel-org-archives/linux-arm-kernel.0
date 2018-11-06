@@ -1,39 +1,35 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 6 Nov 2018 13:19:51 +0000
-Subject: [PATCH 07/23] PCI: mobiveil: use WIN_NUM_0 explicitly for CFG
- outbound window
+Date: Tue, 6 Nov 2018 13:19:57 +0000
+Subject: [PATCH 08/23] PCI: mobiveil: use the 1st inbound window for MEM
+ inbound transactions
 In-Reply-To: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
 References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181106131807.29951-8-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181106131807.29951-9-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-As the .map_bus() use the WIN_NUM_0 for CFG transactions,
-it's better passing WIN_NUM_0 explicitly when initialize
-the CFG outbound window.
+The inbound windows have different register set with outbound windows.
+This patch change the MEM inbound window to the first one.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
- drivers/pci/controller/pcie-mobiveil.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/pci/controller/pcie-mobiveil.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index b2cc9c097fc9..df71c11b4810 100644
+index df71c11b4810..e88afc792a5c 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -612,9 +612,8 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	 */
- 
- 	/* config outbound translation window */
--	program_ob_windows(pcie, pcie->ob_wins_configured,
--			   pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
--			   resource_size(pcie->ob_io_res));
-+	program_ob_windows(pcie, WIN_NUM_0, pcie->ob_io_res->start, 0,
-+			   CFG_WINDOW_TYPE, resource_size(pcie->ob_io_res));
+@@ -616,7 +616,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 			   CFG_WINDOW_TYPE, resource_size(pcie->ob_io_res));
  
  	/* memory inbound translation window */
- 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+-	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
++	program_ib_windows(pcie, WIN_NUM_0, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+ 
+ 	/* Get the I/O and memory ranges from DT */
+ 	resource_list_for_each_entry(win, &pcie->resources) {
 -- 
 2.17.1
