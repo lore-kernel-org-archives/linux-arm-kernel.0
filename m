@@ -1,152 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  6 Nov 2018 13:40:47 -0200
-Subject: [PATCH 3/3] ARM: dts: imx7: Fix memory node duplicaton
-In-Reply-To: <1541518847-5640-1-git-send-email-festevam@gmail.com>
-References: <1541518847-5640-1-git-send-email-festevam@gmail.com>
-Message-ID: <1541518847-5640-3-git-send-email-festevam@gmail.com>
+From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
+Date: Tue, 06 Nov 2018 16:41:19 +0100
+Subject: [PATCH RFC 09/18] staging: vchiq_core: do not initialize
+ semaphores twice
+In-Reply-To: <1781917429.4071.1540759539282@email.ionos.de>
+References: <20181026134813.7775-1-nsaenzjulienne@suse.de>
+ <20181026134813.7775-10-nsaenzjulienne@suse.de>
+ <1781917429.4071.1540759539282@email.ionos.de>
+Message-ID: <ddef268b97543abc9de05842b92e1fc5f0134de8.camel@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boards based on imx7 have duplicate memory nodes:
+Hi Stefan,
+thanks for spending the time reviewing the code. I took note of the
+rest of comments.
 
-- One coming from the board dts file: memory@
+On Sun, 2018-10-28 at 21:45 +0100, Stefan Wahren wrote:
+> Hi Nicolas,
+> 
+> > Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 26. Oktober
+> > 2018 um 15:48 geschrieben:
+> > 
+> > 
+> > vchiq_init_state() initialises a series of semaphores to then call
+> > remote_event_create() on the same semaphores, which initializes
+> > them
+> > again.
+> 
+> i would prefer to have all init stuff at one place in
+> vchiq_init_state() and drop this ugliness from remote_event_create()
+> instead. Is this possible?
 
-- One coming from the imx7s.dtsi file.
+As I'm sure you're aware of, REMOTE_EVENT_T is shared between the CPU
+and VC4, which can't be expanded. And since storing a pointer is out of
+question because of arm64, I can only think of storing an index to an
+array of completions in the shared structure instead of the pointer
+magic implemented right now. It would be a little more explicit. Then
+we could completely decouple both initializations. I'm not sure if it's
+similar to what you had in mind. 
 
-Fix the duplication by removing the memory node from the dtsi file
-and by adding 'device_type = "memory";' in the board dts.
+On a semi-related topic, I'm curious to know why these shared
+structures aren't set with the "__packed" preprocessor macro. Any
+ideas? As fas as I've been told, in general, the compiler may reorder
+or add unexpected padding to any structure. Which would be very bad in
+this case.
 
-Reported-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts   | 3 ++-
- arch/arm/boot/dts/imx7d-colibri-emmc.dtsi | 1 +
- arch/arm/boot/dts/imx7d-colibri.dtsi      | 1 +
- arch/arm/boot/dts/imx7d-nitrogen7.dts     | 1 +
- arch/arm/boot/dts/imx7d-pico.dtsi         | 1 +
- arch/arm/boot/dts/imx7d-sdb.dts           | 1 +
- arch/arm/boot/dts/imx7s-colibri.dtsi      | 1 +
- arch/arm/boot/dts/imx7s-warp.dts          | 1 +
- arch/arm/boot/dts/imx7s.dtsi              | 2 --
- 9 files changed, 9 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-index 8bf365d..e615674 100644
---- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-+++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-@@ -19,6 +19,7 @@
- 	compatible = "compulab,cl-som-imx7", "fsl,imx7d";
- 
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB - minimal configuration */
- 	};
- 
-@@ -284,4 +285,4 @@
- 			MX7D_PAD_LPSR_GPIO1_IO05__GPIO1_IO5	0x14 /* OTG PWREN */
- 		>;
- 	};
--};
-\ No newline at end of file
-+};
-diff --git a/arch/arm/boot/dts/imx7d-colibri-emmc.dtsi b/arch/arm/boot/dts/imx7d-colibri-emmc.dtsi
-index 04d24ee..898f4b8 100644
---- a/arch/arm/boot/dts/imx7d-colibri-emmc.dtsi
-+++ b/arch/arm/boot/dts/imx7d-colibri-emmc.dtsi
-@@ -8,6 +8,7 @@
- 
- / {
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x40000000>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx7d-colibri.dtsi b/arch/arm/boot/dts/imx7d-colibri.dtsi
-index d9f8fb6..e2e327f 100644
---- a/arch/arm/boot/dts/imx7d-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7d-colibri.dtsi
-@@ -45,6 +45,7 @@
- 
- / {
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x20000000>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-index d8aac4a..4fb7e84 100644
---- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
-+++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-@@ -12,6 +12,7 @@
- 	compatible = "boundary,imx7d-nitrogen7", "fsl,imx7d";
- 
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x40000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx7d-pico.dtsi b/arch/arm/boot/dts/imx7d-pico.dtsi
-index 21973eb..4846df0 100644
---- a/arch/arm/boot/dts/imx7d-pico.dtsi
-+++ b/arch/arm/boot/dts/imx7d-pico.dtsi
-@@ -49,6 +49,7 @@
- 	compatible = "technexion,imx7d-pico", "fsl,imx7d";
- 
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x80000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index f1bafda..b1b613b 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -15,6 +15,7 @@
- 	};
- 
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x80000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx7s-colibri.dtsi b/arch/arm/boot/dts/imx7s-colibri.dtsi
-index fe8344c..1fb1ec5 100644
---- a/arch/arm/boot/dts/imx7s-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7s-colibri.dtsi
-@@ -45,6 +45,7 @@
- 
- / {
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x10000000>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
-index f7ba2c0..23431fa 100644
---- a/arch/arm/boot/dts/imx7s-warp.dts
-+++ b/arch/arm/boot/dts/imx7s-warp.dts
-@@ -14,6 +14,7 @@
- 	compatible = "warp,imx7s-warp", "fsl,imx7s";
- 
- 	memory at 80000000 {
-+		device_type = "memory";
- 		reg = <0x80000000 0x20000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index aa8df7d..477901c 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -17,10 +17,8 @@
- 	 * The decompressor and also some bootloaders rely on a
- 	 * pre-existing /chosen node to be available to insert the
- 	 * command line and merge other ATAGS info.
--	 * Also for U-Boot there must be a pre-existing /memory node.
- 	 */
- 	chosen {};
--	memory { device_type = "memory"; };
- 
- 	aliases {
- 		gpio0 = &gpio1;
--- 
-2.7.4
+Regards,
+Nicolas
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181106/39a145f7/attachment.sig>
