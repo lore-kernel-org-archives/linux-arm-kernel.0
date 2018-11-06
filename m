@@ -1,216 +1,61 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Nov 2018 15:28:24 +0100
-Subject: [RFC PATCH v3 10/15] crypto: poly1305 - use structures for key
- and accumulator
-In-Reply-To: <20181105232526.173947-11-ebiggers@kernel.org>
-References: <20181105232526.173947-1-ebiggers@kernel.org>
- <20181105232526.173947-11-ebiggers@kernel.org>
-Message-ID: <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2018 14:29:53 +0000
+Subject: [PATCH 3/4] ARM: merge -fdata-sections BSS data to .bss section
+In-Reply-To: <CAKv+Gu8nGYRYPsFZW3zcOVPMBZfA6R3PhqQ2XQBPVGLPTw9t-g@mail.gmail.com>
+References: <20181106133935.GB30658@n2100.armlinux.org.uk>
+ <E1gK1ae-0000or-7R@rmk-PC.armlinux.org.uk>
+ <CAKv+Gu9-t0QYCfXHtRJ=Oc-Gsa2f=RdRHTP_suB2oT5pKKy7ZQ@mail.gmail.com>
+ <20181106141033.GC30658@n2100.armlinux.org.uk>
+ <CAKv+Gu8nGYRYPsFZW3zcOVPMBZfA6R3PhqQ2XQBPVGLPTw9t-g@mail.gmail.com>
+Message-ID: <20181106142953.GE30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2018 at 00:25, Eric Biggers <ebiggers@kernel.org> wrote:
-> From: Eric Biggers <ebiggers@google.com>
->
-> In preparation for exposing a low-level Poly1305 API which implements
-> the ?-almost-?-universal (?A?U) hash function underlying the Poly1305
-> MAC and supports block-aligned inputs only, create structures
-> poly1305_key and poly1305_state which hold the limbs of the Poly1305
-> "r" key and accumulator, respectively.
->
-> Signed-off-by: Eric Biggers <ebiggers@google.com>
-> ---
->  arch/x86/crypto/poly1305_glue.c | 20 +++++++------
->  crypto/poly1305_generic.c       | 52 ++++++++++++++++-----------------
->  include/crypto/poly1305.h       | 12 ++++++--
->  3 files changed, 47 insertions(+), 37 deletions(-)
->
-> diff --git a/arch/x86/crypto/poly1305_glue.c b/arch/x86/crypto/poly1305_glue.c
-> index f012b7e28ad1..88cc01506c84 100644
-> --- a/arch/x86/crypto/poly1305_glue.c
-> +++ b/arch/x86/crypto/poly1305_glue.c
-> @@ -83,35 +83,37 @@ static unsigned int poly1305_simd_blocks(struct poly1305_desc_ctx *dctx,
->         if (poly1305_use_avx2 && srclen >= POLY1305_BLOCK_SIZE * 4) {
->                 if (unlikely(!sctx->wset)) {
->                         if (!sctx->uset) {
-> -                               memcpy(sctx->u, dctx->r, sizeof(sctx->u));
-> -                               poly1305_simd_mult(sctx->u, dctx->r);
-> +                               memcpy(sctx->u, dctx->r.r, sizeof(sctx->u));
-> +                               poly1305_simd_mult(sctx->u, dctx->r.r);
->                                 sctx->uset = true;
->                         }
->                         memcpy(sctx->u + 5, sctx->u, sizeof(sctx->u));
-> -                       poly1305_simd_mult(sctx->u + 5, dctx->r);
-> +                       poly1305_simd_mult(sctx->u + 5, dctx->r.r);
->                         memcpy(sctx->u + 10, sctx->u + 5, sizeof(sctx->u));
-> -                       poly1305_simd_mult(sctx->u + 10, dctx->r);
-> +                       poly1305_simd_mult(sctx->u + 10, dctx->r.r);
->                         sctx->wset = true;
->                 }
->                 blocks = srclen / (POLY1305_BLOCK_SIZE * 4);
-> -               poly1305_4block_avx2(dctx->h, src, dctx->r, blocks, sctx->u);
-> +               poly1305_4block_avx2(dctx->h.h, src, dctx->r.r, blocks,
-> +                                    sctx->u);
->                 src += POLY1305_BLOCK_SIZE * 4 * blocks;
->                 srclen -= POLY1305_BLOCK_SIZE * 4 * blocks;
->         }
->  #endif
->         if (likely(srclen >= POLY1305_BLOCK_SIZE * 2)) {
->                 if (unlikely(!sctx->uset)) {
-> -                       memcpy(sctx->u, dctx->r, sizeof(sctx->u));
-> -                       poly1305_simd_mult(sctx->u, dctx->r);
-> +                       memcpy(sctx->u, dctx->r.r, sizeof(sctx->u));
-> +                       poly1305_simd_mult(sctx->u, dctx->r.r);
->                         sctx->uset = true;
->                 }
->                 blocks = srclen / (POLY1305_BLOCK_SIZE * 2);
-> -               poly1305_2block_sse2(dctx->h, src, dctx->r, blocks, sctx->u);
-> +               poly1305_2block_sse2(dctx->h.h, src, dctx->r.r, blocks,
-> +                                    sctx->u);
->                 src += POLY1305_BLOCK_SIZE * 2 * blocks;
->                 srclen -= POLY1305_BLOCK_SIZE * 2 * blocks;
->         }
->         if (srclen >= POLY1305_BLOCK_SIZE) {
-> -               poly1305_block_sse2(dctx->h, src, dctx->r, 1);
-> +               poly1305_block_sse2(dctx->h.h, src, dctx->r.r, 1);
->                 srclen -= POLY1305_BLOCK_SIZE;
->         }
->         return srclen;
-> diff --git a/crypto/poly1305_generic.c b/crypto/poly1305_generic.c
-> index 47d3a6b83931..a23173f351b7 100644
-> --- a/crypto/poly1305_generic.c
-> +++ b/crypto/poly1305_generic.c
-> @@ -38,7 +38,7 @@ int crypto_poly1305_init(struct shash_desc *desc)
->  {
->         struct poly1305_desc_ctx *dctx = shash_desc_ctx(desc);
->
-> -       memset(dctx->h, 0, sizeof(dctx->h));
-> +       memset(dctx->h.h, 0, sizeof(dctx->h.h));
->         dctx->buflen = 0;
->         dctx->rset = false;
->         dctx->sset = false;
-> @@ -50,11 +50,11 @@ EXPORT_SYMBOL_GPL(crypto_poly1305_init);
->  static void poly1305_setrkey(struct poly1305_desc_ctx *dctx, const u8 *key)
->  {
->         /* r &= 0xffffffc0ffffffc0ffffffc0fffffff */
-> -       dctx->r[0] = (get_unaligned_le32(key +  0) >> 0) & 0x3ffffff;
-> -       dctx->r[1] = (get_unaligned_le32(key +  3) >> 2) & 0x3ffff03;
-> -       dctx->r[2] = (get_unaligned_le32(key +  6) >> 4) & 0x3ffc0ff;
-> -       dctx->r[3] = (get_unaligned_le32(key +  9) >> 6) & 0x3f03fff;
-> -       dctx->r[4] = (get_unaligned_le32(key + 12) >> 8) & 0x00fffff;
-> +       dctx->r.r[0] = (get_unaligned_le32(key +  0) >> 0) & 0x3ffffff;
-> +       dctx->r.r[1] = (get_unaligned_le32(key +  3) >> 2) & 0x3ffff03;
-> +       dctx->r.r[2] = (get_unaligned_le32(key +  6) >> 4) & 0x3ffc0ff;
-> +       dctx->r.r[3] = (get_unaligned_le32(key +  9) >> 6) & 0x3f03fff;
-> +       dctx->r.r[4] = (get_unaligned_le32(key + 12) >> 8) & 0x00fffff;
->  }
->
->  static void poly1305_setskey(struct poly1305_desc_ctx *dctx, const u8 *key)
-> @@ -107,22 +107,22 @@ static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
->                 srclen = datalen;
->         }
->
-> -       r0 = dctx->r[0];
-> -       r1 = dctx->r[1];
-> -       r2 = dctx->r[2];
-> -       r3 = dctx->r[3];
-> -       r4 = dctx->r[4];
-> +       r0 = dctx->r.r[0];
-> +       r1 = dctx->r.r[1];
-> +       r2 = dctx->r.r[2];
-> +       r3 = dctx->r.r[3];
-> +       r4 = dctx->r.r[4];
->
->         s1 = r1 * 5;
->         s2 = r2 * 5;
->         s3 = r3 * 5;
->         s4 = r4 * 5;
->
-> -       h0 = dctx->h[0];
-> -       h1 = dctx->h[1];
-> -       h2 = dctx->h[2];
-> -       h3 = dctx->h[3];
-> -       h4 = dctx->h[4];
-> +       h0 = dctx->h.h[0];
-> +       h1 = dctx->h.h[1];
-> +       h2 = dctx->h.h[2];
-> +       h3 = dctx->h.h[3];
-> +       h4 = dctx->h.h[4];
->
->         while (likely(srclen >= POLY1305_BLOCK_SIZE)) {
->
-> @@ -157,11 +157,11 @@ static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
->                 srclen -= POLY1305_BLOCK_SIZE;
->         }
->
-> -       dctx->h[0] = h0;
-> -       dctx->h[1] = h1;
-> -       dctx->h[2] = h2;
-> -       dctx->h[3] = h3;
-> -       dctx->h[4] = h4;
-> +       dctx->h.h[0] = h0;
-> +       dctx->h.h[1] = h1;
-> +       dctx->h.h[2] = h2;
-> +       dctx->h.h[3] = h3;
-> +       dctx->h.h[4] = h4;
->
->         return srclen;
->  }
-> @@ -220,11 +220,11 @@ int crypto_poly1305_final(struct shash_desc *desc, u8 *dst)
->         }
->
->         /* fully carry h */
-> -       h0 = dctx->h[0];
-> -       h1 = dctx->h[1];
-> -       h2 = dctx->h[2];
-> -       h3 = dctx->h[3];
-> -       h4 = dctx->h[4];
-> +       h0 = dctx->h.h[0];
-> +       h1 = dctx->h.h[1];
-> +       h2 = dctx->h.h[2];
-> +       h3 = dctx->h.h[3];
-> +       h4 = dctx->h.h[4];
->
->         h2 += (h1 >> 26);     h1 = h1 & 0x3ffffff;
->         h3 += (h2 >> 26);     h2 = h2 & 0x3ffffff;
-> diff --git a/include/crypto/poly1305.h b/include/crypto/poly1305.h
-> index f718a19da82f..493244c46664 100644
-> --- a/include/crypto/poly1305.h
-> +++ b/include/crypto/poly1305.h
-> @@ -13,13 +13,21 @@
->  #define POLY1305_KEY_SIZE      32
->  #define POLY1305_DIGEST_SIZE   16
->
-> +struct poly1305_key {
-> +       u32 r[5];       /* key, base 2^26 */
-> +};
-> +
-> +struct poly1305_state {
-> +       u32 h[5];       /* accumulator, base 2^26 */
-> +};
-> +
+On Tue, Nov 06, 2018 at 03:13:07PM +0100, Ard Biesheuvel wrote:
+> On 6 November 2018 at 15:10, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Tue, Nov 06, 2018 at 03:08:06PM +0100, Ard Biesheuvel wrote:
+> >> On 6 November 2018 at 14:40, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+> >> > When building with -fdata-sections, the BSS data is placed into separate
+> >> > sections, so we need to ask the linker to group these together into the
+> >> > .bss output section, so that they're correctly placed.
+> >> >
+> >> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> >> > ---
+> >> >  arch/arm/boot/compressed/vmlinux.lds.S | 2 +-
+> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> >> > index 2b963d8e76dd..3b91bc3c606f 100644
+> >> > --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> >> > +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> >> > @@ -118,7 +118,7 @@ SECTIONS
+> >> >
+> >> >    . = BSS_START;
+> >> >    __bss_start = .;
+> >> > -  .bss                 : { *(.bss) }
+> >> > +  .bss                 : { *(.bss) *(.bss.*) }
+> >>
+> >> Would it make sense to sort these by alignment? Otherwise, I suspect
+> >> you may get a lot of padding holes due to the number of different
+> >> input sections, each with its own alignment.
+> >
+> > We don't bother elsewhere in the kernel linker script - do you have
+> > a case where we get lots of padding?
+> >
+> 
+> With -fdata-sections? How else are we ensuring that each .bss item in
+> its own section is not placed such that its alignment results in a
+> padding hole?
 
-Sorry to bikeshed, but wouldn't it make more sense to have single definition
+Quite simply, we don't care (at the moment).  The alignment does not
+come from the size of each individual section, but the alignment
+requirements of data within the section.
 
-struct poly1305_val {
-    u32  v[5]; /* base 2^26 */
-};
+See include/asm-generic/vmlinux.lds.h and the definition of *_MAIN
+symbols from around line 60.
 
-and have 'key' and 'accum[ulator]' fields of type struct poly1305_val
-in the struct below?
-
->  struct poly1305_desc_ctx {
->         /* key */
-> -       u32 r[5];
-> +       struct poly1305_key r;
->         /* finalize key */
->         u32 s[4];
->         /* accumulator */
-> -       u32 h[5];
-> +       struct poly1305_state h;
->         /* partial buffer */
->         u8 buf[POLY1305_BLOCK_SIZE];
->         /* bytes used in partial buffer */
-> --
-> 2.19.1.930.g4563a0d9d0-goog
->
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
