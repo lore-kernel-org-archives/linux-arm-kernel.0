@@ -1,22 +1,33 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2018 13:39:35 +0000
-Subject: [PATCH 0/4] Enable deadcode elimination at link time
-Message-ID: <20181106133935.GB30658@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 06 Nov 2018 13:40:20 +0000
+Subject: [PATCH 3/4] ARM: merge -fdata-sections BSS data to .bss section
+In-Reply-To: <20181106133935.GB30658@n2100.armlinux.org.uk>
+References: <20181106133935.GB30658@n2100.armlinux.org.uk>
+Message-ID: <E1gK1ae-0000or-7R@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables elimination of dead code from the kernel at link
-time.  The changes are mostly ARM specific, except for one change in
-EFI as the EFI stub must not be compiled with -fdata-sections.
+When building with -fdata-sections, the BSS data is placed into separate
+sections, so we need to ask the linker to group these together into the
+.bss output section, so that they're correctly placed.
 
- arch/arm/Kconfig                       |  1 +
- arch/arm/boot/compressed/vmlinux.lds.S |  2 +-
- arch/arm/kernel/vmlinux.lds.S          | 10 +++++-----
- arch/arm/kernel/vmlinux.lds.h          | 18 +++++++++---------
- drivers/firmware/efi/libstub/Makefile  |  2 +-
- 5 files changed, 17 insertions(+), 16 deletions(-)
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/compressed/vmlinux.lds.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+index 2b963d8e76dd..3b91bc3c606f 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.S
++++ b/arch/arm/boot/compressed/vmlinux.lds.S
+@@ -118,7 +118,7 @@ SECTIONS
+ 
+   . = BSS_START;
+   __bss_start = .;
+-  .bss			: { *(.bss) }
++  .bss			: { *(.bss) *(.bss.*) }
+   _end = .;
+ 
+   . = ALIGN(8);		/* the stack must be 64-bit aligned */
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.7.4
