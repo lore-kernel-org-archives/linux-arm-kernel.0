@@ -1,56 +1,66 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 6 Nov 2018 16:29:54 +0000
-Subject: linux-4.20-rc1/arch/arm/vfp/vfpmodule.c:576: possible cut'n'paste
- error
-In-Reply-To: <20181106162014.GH30658@n2100.armlinux.org.uk>
-References: <VI1PR08MB3342D4ADBFBC43F2BE2FD34D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
- <VI1PR08MB33420789A2AA1096D3F5FC9D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
- <20181106162014.GH30658@n2100.armlinux.org.uk>
-Message-ID: <77f6e853-2d6d-1149-f2f2-d23ddad6c611@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 6 Nov 2018 17:33:09 +0100
+Subject: [PATCH v4 0/3] Add Amlogic video decoder driver
+In-Reply-To: <20181106075926.19269-1-mjourdan@baylibre.com>
+References: <20181106075926.19269-1-mjourdan@baylibre.com>
+Message-ID: <d248b541-d9f4-a4fc-2b9a-cd8eac377fb0@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel, David,
-
-On 06/11/18 16:20, Russell King - ARM Linux wrote:
-> On Mon, Nov 05, 2018 at 01:53:13PM +0000, David Binderman wrote:
->> Hello there,
->>
->> 2nd try. Plain text might help.
+On 06/11/2018 08:59, Maxime Jourdan wrote:
+> Hi everyone,
 > 
-> Yep, Linux kernel development generally doesn't like wasteful html
-> emails, sorry.
+> This patch series adds support for the Amlogic video decoder,
+> as well as the corresponding dt bindings for GXBB/GXL/GXM chips.
 > 
->> linux-4.20-rc1/arch/arm/vfp/vfpmodule.c:576]: (warning) Redundant assignment of 'ufp_exc->fpinst2' to itself.
->>
->> Source code is
->>
->>  ? ? ? ?ufp_exc->fpexc = hwstate->fpexc;
->>  ?? ? ? ufp_exc->fpinst = hwstate->fpinst;
->>  ?? ? ? ufp_exc->fpinst2 = ufp_exc->fpinst2;
+> It features decoding for the following formats:
+> - MPEG 1
+> - MPEG 2
 > 
-> Thanks for the report - it most certainly is a bug introduced by
-> Julien's patches, but I don't get your warning here.  Which compiler
-> produces that warning?
+> The following formats will be added in future patches:
+> - MJPEG
+> - MPEG 4 (incl. Xvid, H.263)
+> - H.264
+> - HEVC (incl. 10-bit)
+> 
+> The following formats' development has still not started, but they are
+> supported by the hardware:
+> - VC1
+> - VP9
+> 
+> The code was made in such a way to allow easy inclusion of those formats
+> in the future.
+> 
+> The decoder is single instance.
+> 
+> Files:
+>  - vdec.c handles the V4L2 M2M logic
+>  - esparser.c manages the hardware bitstream parser
+>  - vdec_helpers.c provides helpers to DONE the dst buffers as well as
+>  various common code used by the codecs
+>  - vdec_1.c manages the VDEC_1 block of the vdec IP
+>  - codec_mpeg12.c enables decoding for MPEG 1/2.
+>  - vdec_platform.c links codec units with vdec units
+>  (e.g vdec_1 with codec_mpeg12) and lists all the available
+>  src/dst formats and requirements (max width/height, etc.),
+>  per compatible chip.
+> 
+> Firmwares are necessary to run the vdec. They can currently be found at:
+> https://github.com/chewitt/meson-firmware
+> There is an ongoing effort to bring those firmwares to linux-firmware
+> but they're not in yet, currently blocked by licensing issues.
+> 
+> It was tested primarily with ffmpeg's v4l2-m2m implementation. For instance:
+> $ ffmpeg -c:v mpeg2_v4l2m2m -i sample_mpeg2.mkv -f null -
+
+Testing on Linux 4.20-rc1 with the proper DT patches using :
+- gstreamer 1.10.4 V4L2 Video Decoder support from gst-plugins-good
+- v4l2-compliance
+
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+
+> 
+> The v4l2-compliance results are available below the patch diff.
 > 
 
-Hmmm, silly typo/copy-paste from my end. Last line should be:
-
-	ufp_exc->fpinst2 = hwstate->fpinst2;
-
-Sorry about that.
-
-> Julien - unfortunately, I've just asked Linus to take another fix
-> for Spectre, so we're going to have to wait a bit before I can
-> submit something for this.
-> 
-
-It is just a one line fix, should I submit a patch to the LAKML or patch 
-system?
-Otherwise let me know when is it best for you to receive the fix then to 
-send to Linus.
-
-Thanks,
-
--- 
-Julien Thierry
+[...]
