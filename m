@@ -1,290 +1,112 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue,  6 Nov 2018 15:54:15 +0100
-Subject: [PATCH v2 3/9] phy: Add MIPI D-PHY configuration options
-In-Reply-To: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
-Message-ID: <b1f6e4c1c3487e1f048cce699a86bcf50f7fed69.1541516029.git-series.maxime.ripard@bootlin.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue,  6 Nov 2018 15:57:35 +0100
+Subject: [PATCH v2 2/4] clk: meson-gxbb: Fix HDMI PLL for GXL SoCs
+In-Reply-To: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
+References: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1541516257-16157-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have some infrastructure for it, allow the MIPI D-PHY phy's to
-be configured through the generic functions through a custom structure
-added to the generic union.
+In an attempt to better describe the HDMI PLL, a single DCO clock was
+left for GXBB and GXL, but the GXL DCO does not have a pre-multiplier.
 
-The parameters added here are the ones defined in the MIPI D-PHY spec, plus
-the number of lanes in use. The current set of parameters should cover all
-the potential users.
+This patch adds back a GXL specific HDMI PLL DCO with xtal as parent.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Fixes: 87173557d2f6 ("clk: meson: clk-pll: remove od parameters")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- include/linux/phy/phy-mipi-dphy.h | 232 +++++++++++++++++++++++++++++++-
- include/linux/phy/phy.h           |   6 +-
- 2 files changed, 238 insertions(+)
- create mode 100644 include/linux/phy/phy-mipi-dphy.h
+ drivers/clk/meson/gxbb.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 49 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/phy/phy-mipi-dphy.h b/include/linux/phy/phy-mipi-dphy.h
-new file mode 100644
-index 000000000000..0b05932916af
---- /dev/null
-+++ b/include/linux/phy/phy-mipi-dphy.h
-@@ -0,0 +1,232 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) 2018 Cadence Design Systems Inc.
-+ */
-+
-+#ifndef __PHY_MIPI_DPHY_H_
-+#define __PHY_MIPI_DPHY_H_
-+
-+#include <video/videomode.h>
-+
-+/**
-+ * struct phy_configure_opts_mipi_dphy - MIPI D-PHY configuration set
-+ *
-+ * This structure is used to represent the configuration state of a
-+ * MIPI D-PHY phy.
-+ */
-+struct phy_configure_opts_mipi_dphy {
-+	/**
-+	 * @clk_miss:
-+	 *
-+	 * Timeout, in nanoseconds, for receiver to detect absence of
-+	 * Clock transitions and disable the Clock Lane HS-RX.
-+	 */
-+	unsigned int		clk_miss;
-+
-+	/**
-+	 * @clk_post:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter continues to
-+	 * send HS clock after the last associated Data Lane has
-+	 * transitioned to LP Mode. Interval is defined as the period
-+	 * from the end of @hs_trail to the beginning of @clk_trail.
-+	 */
-+	unsigned int		clk_post;
-+
-+	/**
-+	 * @clk_pre:
-+	 *
-+	 * Time, in nanoseconds, that the HS clock shall be driven by
-+	 * the transmitter prior to any associated Data Lane beginning
-+	 * the transition from LP to HS mode.
-+	 */
-+	unsigned int		clk_pre;
-+
-+	/**
-+	 * @clk_prepare:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives the Clock
-+	 * Lane LP-00 Line state immediately before the HS-0 Line
-+	 * state starting the HS transmission.
-+	 */
-+	unsigned int		clk_prepare;
-+
-+	/**
-+	 * @clk_settle:
-+	 *
-+	 * Time interval, in nanoseconds, during which the HS receiver
-+	 * should ignore any Clock Lane HS transitions, starting from
-+	 * the beginning of @clk_prepare.
-+	 */
-+	unsigned int		clk_settle;
-+
-+	/**
-+	 * @clk_term_en:
-+	 *
-+	 * Time, in nanoseconds, for the Clock Lane receiver to enable
-+	 * the HS line termination.
-+	 */
-+	unsigned int		clk_term_en;
-+
-+	/**
-+	 * @clk_trail:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives the HS-0
-+	 * state after the last payload clock bit of a HS transmission
-+	 * burst.
-+	 */
-+	unsigned int		clk_trail;
-+
-+	/**
-+	 * @clk_zero:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives the HS-0
-+	 * state prior to starting the Clock.
-+	 */
-+	unsigned int		clk_zero;
-+
-+	/**
-+	 * @d_term_en:
-+	 *
-+	 * Time, in nanoseconds, for the Data Lane receiver to enable
-+	 * the HS line termination.
-+	 */
-+	unsigned int		d_term_en;
-+
-+	/**
-+	 * @eot:
-+	 *
-+	 * Transmitted time interval, in nanoseconds, from the start
-+	 * of @hs_trail or @clk_trail, to the start of the LP- 11
-+	 * state following a HS burst.
-+	 */
-+	unsigned int		eot;
-+
-+	/**
-+	 * @hs_exit:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives LP-11
-+	 * following a HS burst.
-+	 */
-+	unsigned int		hs_exit;
-+
-+	/**
-+	 * @hs_prepare:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives the Data
-+	 * Lane LP-00 Line state immediately before the HS-0 Line
-+	 * state starting the HS transmission
-+	 */
-+	unsigned int		hs_prepare;
-+
-+	/**
-+	 * @hs_settle:
-+	 *
-+	 * Time interval, in nanoseconds, during which the HS receiver
-+	 * shall ignore any Data Lane HS transitions, starting from
-+	 * the beginning of @hs_prepare.
-+	 */
-+	unsigned int		hs_settle;
-+
-+	/**
-+	 * @hs_skip:
-+	 *
-+	 * Time interval, in nanoseconds, during which the HS-RX
-+	 * should ignore any transitions on the Data Lane, following a
-+	 * HS burst. The end point of the interval is defined as the
-+	 * beginning of the LP-11 state following the HS burst.
-+	 */
-+	unsigned int		hs_skip;
-+
-+	/**
-+	 * @hs_trail:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives the
-+	 * flipped differential state after last payload data bit of a
-+	 * HS transmission burst
-+	 */
-+	unsigned int		hs_trail;
-+
-+	/**
-+	 * @hs_zero:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives the HS-0
-+	 * state prior to transmitting the Sync sequence.
-+	 */
-+	unsigned int		hs_zero;
-+
-+	/**
-+	 * @init:
-+	 *
-+	 * Time, in nanoseconds for the initialization period to
-+	 * complete.
-+	 */
-+	unsigned int		init;
-+
-+	/**
-+	 * @lpx:
-+	 *
-+	 * Transmitted length, in nanoseconds, of any Low-Power state
-+	 * period.
-+	 */
-+	unsigned int		lpx;
-+
-+	/**
-+	 * @ta_get:
-+	 *
-+	 * Time, in nanoseconds, that the new transmitter drives the
-+	 * Bridge state (LP-00) after accepting control during a Link
-+	 * Turnaround.
-+	 */
-+	unsigned int		ta_get;
-+
-+	/**
-+	 * @ta_go:
-+	 *
-+	 * Time, in nanoseconds, that the transmitter drives the
-+	 * Bridge state (LP-00) before releasing control during a Link
-+	 * Turnaround.
-+	 */
-+	unsigned int		ta_go;
-+
-+	/**
-+	 * @ta_sure:
-+	 *
-+	 * Time, in nanoseconds, that the new transmitter waits after
-+	 * the LP-10 state before transmitting the Bridge state
-+	 * (LP-00) during a Link Turnaround.
-+	 */
-+	unsigned int		ta_sure;
-+
-+	/**
-+	 * @wakeup:
-+	 *
-+	 * Time, in nanoseconds, that a transmitter drives a Mark-1
-+	 * state prior to a Stop state in order to initiate an exit
-+	 * from ULPS.
-+	 */
-+	unsigned int		wakeup;
-+
-+	/**
-+	 * @hs_clk_rate:
-+	 *
-+	 * Clock rate, in Hertz, of the high-speed clock.
-+	 */
-+	unsigned long		hs_clk_rate;
-+
-+	/**
-+	 * @lp_clk_rate:
-+	 *
-+	 * Clock rate, in Hertz, of the low-power clock.
-+	 */
-+	unsigned long		lp_clk_rate;
-+
-+	/**
-+	 * @lanes:
-+	 *
-+	 * Number of lanes used for the transmissions.
-+	 */
-+	unsigned char		lanes;
-+};
-+
-+#endif /* __PHY_MIPI_DPHY_H_ */
-diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-index 89cf8b685546..d7ea2dc4e2be 100644
---- a/include/linux/phy/phy.h
-+++ b/include/linux/phy/phy.h
-@@ -20,6 +20,8 @@
- #include <linux/pm_runtime.h>
- #include <linux/regulator/consumer.h>
- 
-+#include <linux/phy/phy-mipi-dphy.h>
-+
- struct phy;
- 
- enum phy_mode {
-@@ -47,8 +49,12 @@ enum phy_mode {
- 
- /**
-  * union phy_configure_opts - Opaque generic phy configuration
-+ *
-+ * @mipi_dphy:	Configuration set applicable for phys supporting
-+ *		the MIPI_DPHY phy mode.
-  */
- union phy_configure_opts {
-+	struct phy_configure_opts_mipi_dphy	mipi_dphy;
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index 9309cfa..0fd354b 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -199,6 +199,52 @@ static struct clk_regmap gxbb_hdmi_pll_dco = {
+ 	},
  };
  
- /**
++static struct clk_regmap gxl_hdmi_pll_dco = {
++	.data = &(struct meson_clk_pll_data){
++		.en = {
++			.reg_off = HHI_HDMI_PLL_CNTL,
++			.shift   = 30,
++			.width   = 1,
++		},
++		.m = {
++			.reg_off = HHI_HDMI_PLL_CNTL,
++			.shift   = 0,
++			.width   = 9,
++		},
++		.n = {
++			.reg_off = HHI_HDMI_PLL_CNTL,
++			.shift   = 9,
++			.width   = 5,
++		},
++		.frac = {
++			.reg_off = HHI_HDMI_PLL_CNTL2,
++			.shift   = 0,
++			.width   = 12,
++		},
++		.l = {
++			.reg_off = HHI_HDMI_PLL_CNTL,
++			.shift   = 31,
++			.width   = 1,
++		},
++		.rst = {
++			.reg_off = HHI_HDMI_PLL_CNTL,
++			.shift   = 28,
++			.width   = 1,
++		},
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "hdmi_pll_dco",
++		.ops = &meson_clk_pll_ro_ops,
++		.parent_names = (const char *[]){ "xtal" },
++		.num_parents = 1,
++		/*
++		 * Display directly handle hdmi pll registers ATM, we need
++		 * NOCACHE to keep our view of the clock as accurate as possible
++		 */
++		.flags = CLK_GET_RATE_NOCACHE,
++	},
++};
++
+ static struct clk_regmap gxbb_hdmi_pll_od = {
+ 	.data = &(struct clk_regmap_div_data){
+ 		.offset = HHI_HDMI_PLL_CNTL2,
+@@ -2089,7 +2135,7 @@ static struct clk_hw_onecell_data gxl_hw_onecell_data = {
+ 		[CLKID_GEN_CLK_DIV]	    = &gxbb_gen_clk_div.hw,
+ 		[CLKID_GEN_CLK]		    = &gxbb_gen_clk.hw,
+ 		[CLKID_FIXED_PLL_DCO]	    = &gxbb_fixed_pll_dco.hw,
+-		[CLKID_HDMI_PLL_DCO]	    = &gxbb_hdmi_pll_dco.hw,
++		[CLKID_HDMI_PLL_DCO]	    = &gxl_hdmi_pll_dco.hw,
+ 		[CLKID_HDMI_PLL_OD]	    = &gxl_hdmi_pll_od.hw,
+ 		[CLKID_HDMI_PLL_OD2]	    = &gxl_hdmi_pll_od2.hw,
+ 		[CLKID_SYS_PLL_DCO]	    = &gxbb_sys_pll_dco.hw,
+@@ -2104,6 +2150,7 @@ static struct clk_regmap *const gxbb_clk_regmaps[] = {
+ 	&gxbb_hdmi_pll,
+ 	&gxbb_hdmi_pll_od,
+ 	&gxbb_hdmi_pll_od2,
++	&gxbb_hdmi_pll_dco,
+ };
+ 
+ static struct clk_regmap *const gxl_clk_regmaps[] = {
+@@ -2111,6 +2158,7 @@ static struct clk_regmap *const gxl_clk_regmaps[] = {
+ 	&gxl_hdmi_pll,
+ 	&gxl_hdmi_pll_od,
+ 	&gxl_hdmi_pll_od2,
++	&gxl_hdmi_pll_dco,
+ };
+ 
+ static struct clk_regmap *const gx_clk_regmaps[] = {
+@@ -2266,7 +2314,6 @@ static struct clk_regmap *const gx_clk_regmaps[] = {
+ 	&gxbb_gen_clk_div,
+ 	&gxbb_gen_clk,
+ 	&gxbb_fixed_pll_dco,
+-	&gxbb_hdmi_pll_dco,
+ 	&gxbb_sys_pll_dco,
+ 	&gxbb_gp0_pll,
+ };
 -- 
-git-series 0.9.1
+2.7.4
