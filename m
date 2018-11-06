@@ -1,67 +1,53 @@
-From: lmark@codeaurora.org (Liam Mark)
-Date: Tue, 6 Nov 2018 13:20:33 -0800 (PST)
-Subject: [RFC PATCH v2] android: ion: How to properly clean caches for
- uncached allocations
-In-Reply-To: <CALAqxLXzVna9BG8OJhTtTjcSiy4VbJ27nBOv4fKXoMnzc4xBgw@mail.gmail.com>
-References: <alpine.DEB.2.02.1802282111320.22860@lmark-linux.qualcomm.com>
- <b1479541-13bd-85ea-f9c7-25264c91f9b9@redhat.com>
- <alpine.DEB.2.02.1803081635170.20592@lmark-linux.qualcomm.com>
- <alpine.DEB.2.10.1811011454430.23412@lmark-linux.qualcomm.com>
- <CALAqxLXzVna9BG8OJhTtTjcSiy4VbJ27nBOv4fKXoMnzc4xBgw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.10.1811061314240.16463@lmark-linux.qualcomm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Nov 2018 21:22:47 +0000
+Subject: [PATCH 1/4] arm64: memblock: don't permit memblock resizing
+ until linear mapping is up
+In-Reply-To: <20181106113732.16351-2-ard.biesheuvel@linaro.org>
+References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
+ <20181106113732.16351-2-ard.biesheuvel@linaro.org>
+Message-ID: <20181106212246.GA31298@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Nov 2018, John Stultz wrote:
-
-> On Thu, Nov 1, 2018 at 3:15 PM, Liam Mark <lmark@codeaurora.org> wrote:
-> > Based on the suggestions from Laura I created a first draft for a change
-> > which will attempt to ensure that uncached mappings are only applied to
-> > ION memory who's cache lines have been cleaned.
-> > It does this by providing cached mappings (for uncached ION allocations)
-> > until the ION buffer is dma mapped and successfully cleaned, then it drops
-> > the userspace mappings and when pages are accessed they are faulted back
-> > in and uncached mappings are created.
-> >
-> > This change has the following potential disadvantages:
-> > - It assumes that userpace clients won't attempt to access the buffer
-> > while it is being mapped as we are removing the userpspace mappings at
-> > this point (though it is okay for them to have it mapped)
-> > - It assumes that kernel clients won't hold a kernel mapping to the buffer
-> > (ie dma_buf_kmap) while it is being dma-mapped. What should we do if there
-> > is a kernel mapping at the time of dma mapping, fail the mapping, warn?
-> > - There may be a performance penalty as a result of having to fault in the
-> > pages after removing the userspace mappings.
-> >
-> > It passes basic testing involving reading writing and reading from
-> > uncached system heap allocations before and after dma mapping.
-> >
-> > Please let me know if this is heading in the right direction and if there
-> > are any concerns.
-> >
-> > Signed-off-by: Liam Mark <lmark@codeaurora.org>
+On Tue, Nov 06, 2018 at 12:37:29PM +0100, Ard Biesheuvel wrote:
+> Bhupesh reports that having numerous memblock reservations at early
+> boot may result in the following crash:
 > 
+>   Unable to handle kernel paging request at virtual address ffff80003ffe0000
+>   ...
+>   Call trace:
+>    __memcpy+0x110/0x180
+>    memblock_add_range+0x134/0x2e8
+>    memblock_reserve+0x70/0xb8
+>    memblock_alloc_base_nid+0x6c/0x88
+>    __memblock_alloc_base+0x3c/0x4c
+>    memblock_alloc_base+0x28/0x4c
+>    memblock_alloc+0x2c/0x38
+>    early_pgtable_alloc+0x20/0xb0
+>    paging_init+0x28/0x7f8
 > 
-> Thanks for sending this out! I gave this a whirl on my HiKey960. Seems
-> to work ok, but I'm not sure if the board's usage benefits much from
-> your changes.
+> This is caused by the fact that we permit memblock resizing before the
+> linear mapping is up, and so the memblock_reserved() array is moved
+> into memory that is not mapped yet.
 > 
+> So let's ensure that this crash can no longer occur, by deferring to
+> call to memblock_allow_resize() to after the linear mapping has been
+> created.
+> 
+> Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/init.c | 2 --
+>  arch/arm64/mm/mmu.c  | 2 ++
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 
-Thanks for testing this.
-I didn't expect this patch to improve performance but I was worried it
-might hurt performance.
+Thanks for posting this so quickly.
 
-I don't know how many uncached ION allocations Hikey960 makes, or how it
-uses uncached allocations.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-It is possible that Hikey960 doesn't make much usage of uncached buffers,
-or if it does it may not attempt to mmap them before dma mapping them,
-so it is possible this change isn't getting exercised very much in the
-test you ran.
+Bhupesh -- please can you give this series a spin and confirm that it fixes
+the problem you were seeing?
 
-I will need to look into how best to exercise this patch on Hikey960.
+Thanks,
 
-Liam
-
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Will
