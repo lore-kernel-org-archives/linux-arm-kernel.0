@@ -1,45 +1,108 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 6 Nov 2018 15:16:11 -0800
-Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
-In-Reply-To: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
-References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
-Message-ID: <CALAqxLWif1wjRHx5X136sBqdg0KJ8itqXPk9G6NJ70Z_QFavzQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 07 Nov 2018 01:32:59 +0200
+Subject: [Ksummit-discuss] [TECH TOPIC] SoC maintainer group
+In-Reply-To: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
+References: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
+Message-ID: <3189677.9XQFCzzJyO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2018 at 3:54 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> of_dma_configure() was *supposed* to be following the same logic as
-> acpi_dma_configure() and only setting bus_dma_mask if some range was
-> specified by the firmware. However, it seems that subtlety got lost in
-> the process of fitting it into the differently-shaped control flow, and
-> as a result the force_dma==true case ends up always setting the bus mask
-> to the 32-bit default, which is not what anyone wants.
->
-> Make sure we only touch it if the DT actually said so.
->
-> Fixes: 6c2fb2ea7636 ("of/device: Set bus DMA mask as appropriate")
-> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->
-> Sorry about that... I guess I only have test setups that either have
-> dma-ranges or where a 32-bit bus mask goes unnoticed :(
->
-> The Octeon and SMMU issues sound like they're purely down to this, and
-> it's probably related to at least one of John's Hikey woes.
+Hi Olof,
 
-Yep! This does seem to resolve the mali bifrost dma address warn-ons I
-was seeing, and makes the board seem to function more consistently, so
-that's great!
+On Wednesday, 7 November 2018 00:16:27 EET Olof Johansson wrote:
+> Hi KS organizers (and others),
+> 
+> This is a late topic proposal, hopefully there is still time on the agenda.
+> 
+> We?ve recently been discussing some maintainer model changes as
+> described below, and would like a slot to discuss the idea and solicit
+> feedback/comments from the others there.
+> 
+> 
+> This started with Arnd and I finally being in one place at the same
+> time, and talking about how we want to evolve arm-soc maintainership
+> moving forward. We've been independently thinking of ways to expand
+> the group and making it more self-service for everybody, but there's a
+> bunch of tooling needed to make it run smoothly beyond the smaller
+> group we have now.
+> 
+> In the end, we ended up looking at it from a slightly different angle:
+> Right now, when contributors show up with new platform support, the
+> first hill they need to climb is figuring out how they need to carve
+> up their platform among all the various maintainers, how to make sure
+> they're all handshaking on keeping things stable, and get code
+> submitted. It's awkward, not well documented and one of the biggest
+> overheads we have on our side as well.
+> 
+> When we started talking to other maintainers, we're also realizing
+> that we are currently duplicating a lot of work. In particular, we
+> often all get cc:d on patch series, so we all need to read and filter,
+> and assume that other maintainers spot the right patches, etc.
+> 
+> We have discussed a few different options, and it seems like pooling
+> more of the contribution flow to a group of co-maintainers is a useful
+> approach. Initially, we're considering the arm-soc platforms, clock
+> drivers and pinctrl drivers, which all tend to be affected by new
+> platform contributions in this way, and often end up cross-cc:d on
+> everything. Additionally, the flow for successfully merging a new
+> platform or SoC needs to be documented and advertised. This is true
+> whether or not we change the way that maintainers coordinate amongst
+> themselves, or whether or not we change the current workflow used by
+> platform contributors today.
+> 
+> So, we're planning to change things up a bit. We're starting a new
+> group that pools current arm-soc, clk and pinctrl drivers and
+> maintainers into one funnel. We'll set up a new mail alias for the
+> maintainer group, and one shared patchwork to collect contributions.
+> We still expect developers to use existing mailing lists, and we still
+> expect for example ARM platform maintainers to keep their workflow of
+> collecting patches for their platform like they do today. Down the
+> road it might make sense to incorporate other driver subsystems as
+> well.
+> 
+> Beyond this, we're going to keep a close eye on the drm-misc tree,
+> which is exploring a move to gitlab (and working with gitlab on adding
+> the features they need to move over). If they get a broad maintainer
+> model working well in that environment it could be something we reuse
+> for ourselves too.
 
-Tested-by: John Stultz <john.stultz@linaro.org>
+gitlab is an umbrella term that covers many features proposed by the product. 
+Are there particular features that you already think you would be interested 
+in, or features that you already know you wouldn't want to use ?
 
-Though I still find I have to revert "swiotlb: use swiotlb_map_page in
-swiotlb_map_sg_attrs" still to boot to UI successfully with AOSP.
-Still not sure whats going on there (its sort of soft hangs where some
-userland runs ok, but other bits seem to jam up, even console commands
-sometimes hang - almost seems like io stalls).
+> This group will also take on the responsibility of putting together
+> the documentation and expected patch flow for new platform/SoC
+> contributors. That documentation will need to evolve a bit over time
+> as we try out this new collaboration between maintainers.
+> 
+> To avoid an appearance of "ARM is taking over all architectures",
+> we'll rename this to just the plain "SoC tree/group", and drop ARM
+> from the name. As mentioned already initially we're anticipating
+> covering ARM (32/64-bit like before) and RISC-V platform areas in a
+> similar way. For other older/minor architectures that are
+> semi-orphaned, we might pick up code as needed when it affects us,
+> depending on maintainer status at the other end.
+> 
+> We're doing the groundwork now, and will get trees/lists/patchworks
+> setup for the next release cycle.
+> 
+> 
+> People involved so far are:
+> 
+> Olof Johansson (arm-soc)
+> Arnd Bergmann (arm-soc)
+> Kevin Hilman (arm-soc)
+> Mike Turquette (clk)
+> Stephen Boyd (clk)
+> Linus Walleij (pinctrl + more)
+> Mike Brown (gpio/regmap + more)
+> 
+> 
+> Thanks!
+> 
+> -Olof (on behalf of the group)
 
-Anyway, thanks so much again for this one!
--john
+-- 
+Regards,
+
+Laurent Pinchart
