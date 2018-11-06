@@ -1,68 +1,96 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 06 Nov 2018 12:49:40 +0000
-Subject: [PATCH 2/2] ARM: Kconfig: remove useless "default n"
-Message-ID: <E1gK0nc-0007fv-En@rmk-PC.armlinux.org.uk>
+Date: Tue, 06 Nov 2018 12:49:34 +0000
+Subject: [PATCH 1/2] ARM: Kconfig: remove useless parenthesis
+Message-ID: <E1gK0nW-0007ff-84@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default for Kconfig options is always n, so there's no need to
-explicitly state a "n" default.
+Remove useless parenthesis from the Kconfig - Kconfig is not C, and
+can cope without parenthesising e.g. single symbols to 'if'.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/Kconfig            | 1 -
- arch/arm/mach-omap2/Kconfig | 1 -
- arch/arm/mach-pxa/Kconfig   | 1 -
- arch/arm/plat-omap/Kconfig  | 1 -
- 4 files changed, 4 deletions(-)
+ arch/arm/Kconfig | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 78a8e96f5376..6b41ad365e9c 100644
+index 668f9a8c73bb..78a8e96f5376 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1803,7 +1803,6 @@ config PARAVIRT
- config PARAVIRT_TIME_ACCOUNTING
- 	bool "Paravirtual steal time accounting"
- 	select PARAVIRT
--	default n
- 	help
- 	  Select this option to enable fine granularity task steal time
- 	  accounting. Time spent executing other tasks in parallel with
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 9f27b486a536..5e33d1a90664 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -223,7 +223,6 @@ config MACH_NOKIA_N8X0
- config OMAP3_SDRC_AC_TIMING
- 	bool "Enable SDRC AC timing register changes"
- 	depends on ARCH_OMAP3
--	default n
- 	help
- 	  If you know that none of your system initiators will attempt to
- 	  access SDRAM during CORE DVFS, select Y here.  This should boost
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index fd724a71c2e1..7298d07a9f71 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -552,7 +552,6 @@ config TOSA_BT
- config TOSA_USE_EXT_KEYCODES
- 	bool "Tosa keyboard: use extended keycodes"
- 	depends on MACH_TOSA
--	default n
- 	help
- 	  Say Y here to enable the tosa keyboard driver to generate extended
- 	  (>= 127) keycodes. Be aware, that they can't be correctly interpreted
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index c0a242cae79a..93fd7fc537cf 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -92,7 +92,6 @@ config OMAP_32K_TIMER
- config OMAP3_L2_AUX_SECURE_SAVE_RESTORE
- 	bool "OMAP3 HS/EMU save and restore for L2 AUX control register"
- 	depends on ARCH_OMAP3 && PM
--	default n
- 	help
- 	  Without this option, L2 Auxiliary control register contents are
- 	  lost during off-mode entry on HS/EMU devices. This feature
+@@ -28,14 +28,14 @@ config ARM
+ 	select ARCH_WANT_IPC_PARSE_VERSION
+ 	select BUILDTIME_EXTABLE_SORT if MMU
+ 	select CLONE_BACKWARDS
+-	select CPU_PM if (SUSPEND || CPU_IDLE)
++	select CPU_PM if SUSPEND || CPU_IDLE
+ 	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
+ 	select DMA_DIRECT_OPS if !MMU
+ 	select EDAC_SUPPORT
+ 	select EDAC_ATOMIC_SCRUB
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_ARCH_TOPOLOGY if ARM_CPU_TOPOLOGY
+-	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
++	select GENERIC_ATOMIC64 if CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI
+ 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+ 	select GENERIC_CPU_AUTOPROBE
+ 	select GENERIC_EARLY_IOREMAP
+@@ -50,12 +50,12 @@ config ARM
+ 	select GENERIC_STRNLEN_USER
+ 	select HANDLE_DOMAIN_IRQ
+ 	select HARDIRQS_SW_RESEND
+-	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
++	select HAVE_ARCH_AUDITSYSCALL if AEABI && !OABI_COMPAT
+ 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_MMAP_RND_BITS if MMU
+-	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
++	select HAVE_ARCH_SECCOMP_FILTER if AEABI && !OABI_COMPAT
+ 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARM_SMCCC if CPU_V7
+@@ -64,16 +64,16 @@ config ARM
+ 	select HAVE_C_RECORDMCOUNT
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select HAVE_DMA_CONTIGUOUS if MMU
+-	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
++	select HAVE_DYNAMIC_FTRACE if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+ 	select HAVE_EXIT_THREAD
+-	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+-	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+-	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
++	select HAVE_FTRACE_MCOUNT_RECORD if !XIP_KERNEL
++	select HAVE_FUNCTION_GRAPH_TRACER if !THUMB2_KERNEL
++	select HAVE_FUNCTION_TRACER if !XIP_KERNEL
+ 	select HAVE_GCC_PLUGINS
+ 	select HAVE_GENERIC_DMA_COHERENT
+-	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
++	select HAVE_HW_BREAKPOINT if PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7)
+ 	select HAVE_IDE if PCI || ISA || PCMCIA
+ 	select HAVE_IRQ_TIME_ACCOUNTING
+ 	select HAVE_KERNEL_GZIP
+@@ -82,17 +82,17 @@ config ARM
+ 	select HAVE_KERNEL_LZO
+ 	select HAVE_KERNEL_XZ
+ 	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_V7M
+-	select HAVE_KRETPROBES if (HAVE_KPROBES)
++	select HAVE_KRETPROBES if HAVE_KPROBES
+ 	select HAVE_LD_DEAD_CODE_DATA_ELIMINATION if !FUNCTION_TRACER
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_MOD_ARCH_SPECIFIC
+ 	select HAVE_NMI
+-	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
++	select HAVE_OPROFILE if HAVE_PERF_EVENTS
+ 	select HAVE_OPTPROBES if !THUMB2_KERNEL
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
+ 	select HAVE_PERF_USER_STACK_DUMP
+-	select HAVE_RCU_TABLE_FREE if (SMP && ARM_LPAE)
++	select HAVE_RCU_TABLE_FREE if SMP && ARM_LPAE
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_RSEQ
+ 	select HAVE_STACKPROTECTOR
 -- 
 2.7.4
