@@ -1,232 +1,405 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 6 Nov 2018 14:42:00 +0800
-Subject: [PATCH v1 05/11] dt-bindings: ARM: Mediatek: Document bindings for
- MT8183
+Date: Tue, 6 Nov 2018 14:41:56 +0800
+Subject: [PATCH v1 01/11] clk: mediatek: add new clkmux register API
 In-Reply-To: <20181106064206.17535-1-weiyi.lu@mediatek.com>
 References: <20181106064206.17535-1-weiyi.lu@mediatek.com>
-Message-ID: <20181106064206.17535-7-weiyi.lu@mediatek.com>
+Message-ID: <20181106064206.17535-3-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the binding documentation for apmixedsys, audiosys,
-camsys, imgsys, infracfg, mcucfg, mfgcfg, mmsys, topckgen, vdecsys,
-vencsys and ipu for Mediatek MT8183.
+From: Owen Chen <owen.chen@mediatek.com>
 
+On both MT8183 & MT6765, there add "set/clr" register for
+each clkmux setting, and one update register to trigger value change.
+It is designed to prevent read-modify-write racing issue.
+The sw design need to add a new API to handle this hw change with
+a new mtk_clk_mux/mtk_mux struct in new file "clk-mux.c", "clk-mux.h".
+
+Signed-off-by: Owen Chen <owen.chen@mediatek.com>
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- .../arm/mediatek/mediatek,apmixedsys.txt      |  1 +
- .../bindings/arm/mediatek/mediatek,audsys.txt |  1 +
- .../bindings/arm/mediatek/mediatek,camsys.txt | 22 ++++++++++
- .../bindings/arm/mediatek/mediatek,imgsys.txt |  1 +
- .../arm/mediatek/mediatek,infracfg.txt        |  1 +
- .../bindings/arm/mediatek/mediatek,ipu.txt    | 43 +++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,mcucfg.txt |  1 +
- .../bindings/arm/mediatek/mediatek,mfgcfg.txt |  1 +
- .../bindings/arm/mediatek/mediatek,mmsys.txt  |  1 +
- .../arm/mediatek/mediatek,topckgen.txt        |  1 +
- .../arm/mediatek/mediatek,vdecsys.txt         |  1 +
- .../arm/mediatek/mediatek,vencsys.txt         |  1 +
- 12 files changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
+ drivers/clk/mediatek/Makefile  |   2 +-
+ drivers/clk/mediatek/clk-mux.c | 252 +++++++++++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-mux.h | 101 +++++++++++++
+ 3 files changed, 354 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/mediatek/clk-mux.c
+ create mode 100644 drivers/clk/mediatek/clk-mux.h
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-index 4e4a3c0ab9ab..641f19e036a2 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-@@ -13,6 +13,7 @@ Required Properties:
- 	- "mediatek,mt7623-apmixedsys", "mediatek,mt2701-apmixedsys"
- 	- "mediatek,mt8135-apmixedsys"
- 	- "mediatek,mt8173-apmixedsys"
-+	- "mediatek,mt8183-apmixedsys", "syscon"
- - #clock-cells: Must be 1
- 
- The apmixedsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-index d1606b2c3e63..f3cef1a6d95c 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-@@ -9,6 +9,7 @@ Required Properties:
- 	- "mediatek,mt2701-audsys", "syscon"
- 	- "mediatek,mt7622-audsys", "syscon"
- 	- "mediatek,mt7623-audsys", "mediatek,mt2701-audsys", "syscon"
-+	- "mediatek,mt8183-audiosys", "syscon"
- - #clock-cells: Must be 1
- 
- The AUDSYS controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index 844b55d2770d..b97980dbb738 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1,5 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o
++obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o clk-mux.o
+ obj-$(CONFIG_COMMON_CLK_MT6797) += clk-mt6797.o
+ obj-$(CONFIG_COMMON_CLK_MT6797_IMGSYS) += clk-mt6797-img.o
+ obj-$(CONFIG_COMMON_CLK_MT6797_MMSYS) += clk-mt6797-mm.o
+diff --git a/drivers/clk/mediatek/clk-mux.c b/drivers/clk/mediatek/clk-mux.c
 new file mode 100644
-index 000000000000..d8930f64aa98
+index 000000000000..18bc9a146be0
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
-@@ -0,0 +1,22 @@
-+MediaTek CAMSYS controller
-+============================
++++ b/drivers/clk/mediatek/clk-mux.c
+@@ -0,0 +1,252 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Owen Chen <owen.chen@mediatek.com>
++ */
 +
-+The MediaTek camsys controller provides various clocks to the system.
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/mfd/syscon.h>
 +
-+Required Properties:
++#include "clk-mtk.h"
++#include "clk-mux.h"
 +
-+- compatible: Should be one of:
-+	- "mediatek,mt8183-camsys", "syscon"
-+- #clock-cells: Must be 1
++static inline struct mtk_clk_mux
++	*to_mtk_clk_mux(struct clk_hw *hw)
++{
++	return container_of(hw, struct mtk_clk_mux, hw);
++}
 +
-+The camsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++static int mtk_clk_mux_enable(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = BIT(mux->gate_shift);
 +
-+Example:
++	regmap_update_bits(mux->regmap, mux->mux_ofs, mask, 0);
 +
-+camsys: camsys at 1a000000  {
-+	compatible = "mediatek,mt8183-camsys", "syscon";
-+	reg = <0 0x1a000000  0 0x1000>;
-+	#clock-cells = <1>;
++	return 0;
++}
++
++static void mtk_clk_mux_disable(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = BIT(mux->gate_shift);
++
++	regmap_update_bits(mux->regmap, mux->mux_ofs, mask, mask);
++}
++
++static int mtk_clk_mux_enable_setclr(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 val;
++
++	val = BIT(mux->gate_shift);
++	regmap_write(mux->regmap, mux->mux_clr_ofs, val);
++
++	return 0;
++}
++
++static void mtk_clk_mux_disable_setclr(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 val;
++
++	val = BIT(mux->gate_shift);
++	regmap_write(mux->regmap, mux->mux_set_ofs, val);
++}
++
++static int mtk_clk_mux_is_enabled(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 val = 0;
++
++	regmap_read(mux->regmap, mux->mux_ofs, &val);
++
++	return ((val & BIT(mux->gate_shift)) == 0) ? 1 : 0;
++}
++
++static u8 mtk_clk_mux_get_parent(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	int num_parents = clk_hw_get_num_parents(hw);
++	u32 mask = GENMASK(mux->mux_width - 1, 0);
++	u32 val;
++
++	regmap_read(mux->regmap, mux->mux_ofs, &val);
++	val = (val >> mux->mux_shift) & mask;
++
++	if (val >= num_parents || val >= U8_MAX)
++		return -ERANGE;
++
++	return val;
++}
++
++static int mtk_clk_mux_set_parent_lock(struct clk_hw *hw, u8 index)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = GENMASK(mux->mux_width - 1, 0);
++	u32 val;
++	unsigned long flags = 0;
++
++	if (mux->lock)
++		spin_lock_irqsave(mux->lock, flags);
++	else
++		__acquire(mux->lock);
++
++	regmap_read(mux->regmap, mux->mux_ofs, &val);
++	val = (val & mask) >> mux->mux_shift;
++
++	if (val != index) {
++		val = index << mux->mux_shift;
++		regmap_update_bits(mux->regmap, mux->mux_ofs, mask, val);
++	}
++
++	if (mux->lock)
++		spin_unlock_irqrestore(mux->lock, flags);
++	else
++		__release(mux->lock);
++
++	return 0;
++}
++
++static int mtk_clk_mux_set_parent_setclr_lock(struct clk_hw *hw, u8 index)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = GENMASK(mux->mux_width - 1, 0);
++	u32 val, orig;
++	unsigned long flags = 0;
++
++	if (mux->lock)
++		spin_lock_irqsave(mux->lock, flags);
++	else
++		__acquire(mux->lock);
++
++	regmap_read(mux->regmap, mux->mux_ofs, &val);
++	orig = val;
++	val &= ~(mask << mux->mux_shift);
++	val |= index << mux->mux_shift;
++
++	if (val != orig) {
++		val = (mask << mux->mux_shift);
++		regmap_write(mux->regmap, mux->mux_clr_ofs, val);
++		val = (index << mux->mux_shift);
++		regmap_write(mux->regmap, mux->mux_set_ofs, val);
++
++		if (mux->upd_shift >= 0)
++			regmap_write(mux->regmap, mux->upd_ofs,
++				     BIT(mux->upd_shift));
++	}
++
++	if (mux->lock)
++		spin_unlock_irqrestore(mux->lock, flags);
++	else
++		__release(mux->lock);
++
++	return 0;
++}
++
++const struct clk_ops mtk_mux_ops = {
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_lock,
 +};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-index 3f99672163e3..e3bc4a1e7a6e 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-@@ -11,6 +11,7 @@ Required Properties:
- 	- "mediatek,mt6797-imgsys", "syscon"
- 	- "mediatek,mt7623-imgsys", "mediatek,mt2701-imgsys", "syscon"
- 	- "mediatek,mt8173-imgsys", "syscon"
-+	- "mediatek,mt8183-imgsys", "syscon"
- - #clock-cells: Must be 1
- 
- The imgsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-index 89f4272a1441..44b2f3281c34 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-@@ -14,6 +14,7 @@ Required Properties:
- 	- "mediatek,mt7623-infracfg", "mediatek,mt2701-infracfg", "syscon"
- 	- "mediatek,mt8135-infracfg", "syscon"
- 	- "mediatek,mt8173-infracfg", "syscon"
-+	- "mediatek,mt8183-infracfg", "syscon"
- - #clock-cells: Must be 1
- - #reset-cells: Must be 1
- 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
++
++const struct clk_ops mtk_mux_clr_set_upd_ops = {
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_setclr_lock,
++};
++
++const struct clk_ops mtk_mux_gate_ops = {
++	.enable = mtk_clk_mux_enable,
++	.disable = mtk_clk_mux_disable,
++	.is_enabled = mtk_clk_mux_is_enabled,
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_lock,
++};
++
++const struct clk_ops mtk_mux_gate_clr_set_upd_ops = {
++	.enable = mtk_clk_mux_enable_setclr,
++	.disable = mtk_clk_mux_disable_setclr,
++	.is_enabled = mtk_clk_mux_is_enabled,
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_setclr_lock,
++};
++
++struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
++				 struct regmap *regmap,
++				 spinlock_t *lock)
++{
++	struct mtk_clk_mux *mtk_mux = NULL;
++	struct clk_init_data init;
++	struct clk *clk;
++
++	mtk_mux = kzalloc(sizeof(*mtk_mux), GFP_KERNEL);
++	if (!mtk_mux)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = mux->name;
++	init.flags = (mux->flags) | CLK_SET_RATE_PARENT;
++	init.parent_names = mux->parent_names;
++	init.num_parents = mux->num_parents;
++	init.ops = mux->ops;
++
++	mtk_mux->regmap = regmap;
++	mtk_mux->name = mux->name;
++	mtk_mux->mux_ofs = mux->mux_ofs;
++	mtk_mux->mux_set_ofs = mux->set_ofs;
++	mtk_mux->mux_clr_ofs = mux->clr_ofs;
++	mtk_mux->upd_ofs = mux->upd_ofs;
++	mtk_mux->mux_shift = mux->mux_shift;
++	mtk_mux->mux_width = mux->mux_width;
++	mtk_mux->gate_shift = mux->gate_shift;
++	mtk_mux->upd_shift = mux->upd_shift;
++
++	mtk_mux->lock = lock;
++	mtk_mux->hw.init = &init;
++
++	clk = clk_register(NULL, &mtk_mux->hw);
++	if (IS_ERR(clk)) {
++		kfree(mtk_mux);
++		return clk;
++	}
++
++	return clk;
++}
++
++int mtk_clk_register_muxes(const struct mtk_mux *muxes,
++			   int num, struct device_node *node,
++			   spinlock_t *lock,
++			   struct clk_onecell_data *clk_data)
++{
++	struct regmap *regmap;
++	struct clk *clk;
++	int i;
++
++	if (!clk_data)
++		return -ENOMEM;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %pOF: %ld\n", node,
++		       PTR_ERR(regmap));
++		return PTR_ERR(regmap);
++	}
++
++	for (i = 0; i < num; i++) {
++		const struct mtk_mux *mux = &muxes[i];
++
++		if (IS_ERR_OR_NULL(clk_data->clks[mux->id])) {
++			clk = mtk_clk_register_mux(mux, regmap, lock);
++
++			if (IS_ERR(clk)) {
++				pr_err("Failed to register clk %s: %ld\n",
++				       mux->name, PTR_ERR(clk));
++				continue;
++			}
++
++			clk_data->clks[mux->id] = clk;
++		}
++	}
++
++	return 0;
++}
+diff --git a/drivers/clk/mediatek/clk-mux.h b/drivers/clk/mediatek/clk-mux.h
 new file mode 100644
-index 000000000000..aabc8c5c8ed2
+index 000000000000..ff0276bb771c
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
-@@ -0,0 +1,43 @@
-+Mediatek IPU controller
-+============================
++++ b/drivers/clk/mediatek/clk-mux.h
+@@ -0,0 +1,101 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Owen Chen <owen.chen@mediatek.com>
++ */
 +
-+The Mediatek ipu controller provides various clocks to the system.
++#ifndef __DRV_CLK_MUX_H
++#define __DRV_CLK_MUX_H
 +
-+Required Properties:
++#include <linux/clk-provider.h>
 +
-+- compatible: Should be one of:
-+	- "mediatek,mt8183-ipu_conn", "syscon"
-+	- "mediatek,mt8183-ipu_adl", "syscon"
-+	- "mediatek,mt8183-ipu_core0", "syscon"
-+	- "mediatek,mt8183-ipu_core1", "syscon"
-+- #clock-cells: Must be 1
++struct mtk_clk_mux {
++	struct clk_hw hw;
++	struct regmap *regmap;
 +
-+The ipu controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++	const char *name;
 +
-+Example:
++	u32 mux_set_ofs;
++	u32 mux_clr_ofs;
++	u32 mux_ofs;
++	u32 upd_ofs;
 +
-+ipu_conn: syscon at 19000000 {
-+	compatible = "mediatek,mt8183-ipu_conn", "syscon";
-+	reg = <0 0x19000000 0 0x1000>;
-+	#clock-cells = <1>;
++	u8 mux_shift;
++	u8 mux_width;
++	u8 gate_shift;
++	u8 upd_shift;
++
++	spinlock_t *lock;
 +};
 +
-+ipu_adl: syscon at 19010000 {
-+	compatible = "mediatek,mt8183-ipu_adl", "syscon";
-+	reg = <0 0x19010000 0 0x1000>;
-+	#clock-cells = <1>;
++struct mtk_mux {
++	int id;
++	const char *name;
++	const char * const *parent_names;
++	unsigned int flags;
++
++	u32 mux_ofs;
++	u32 set_ofs;
++	u32 clr_ofs;
++	u32 upd_ofs;
++
++	u8 mux_shift;
++	u8 mux_width;
++	u8 gate_shift;
++	u8 upd_shift;
++
++	const struct clk_ops *ops;
++
++	signed char num_parents;
 +};
 +
-+ipu_core0: syscon at 19180000 {
-+	compatible = "mediatek,mt8183-ipu_core0", "syscon";
-+	reg = <0 0x19180000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
++extern const struct clk_ops mtk_mux_ops;
++extern const struct clk_ops mtk_mux_clr_set_upd_ops;
++extern const struct clk_ops mtk_mux_gate_ops;
++extern const struct clk_ops mtk_mux_gate_clr_set_upd_ops;
 +
-+ipu_core1: syscon at 19280000 {
-+	compatible = "mediatek,mt8183-ipu_core1", "syscon";
-+	reg = <0 0x19280000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-index b8fb03f3613e..2b882b7ca72e 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-@@ -7,6 +7,7 @@ Required Properties:
- 
- - compatible: Should be one of:
- 	- "mediatek,mt2712-mcucfg", "syscon"
-+	- "mediatek,mt8183-mcucfg", "syscon"
- - #clock-cells: Must be 1
- 
- The mcucfg controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-index 859e67b416d5..72787e7dd227 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-@@ -7,6 +7,7 @@ Required Properties:
- 
- - compatible: Should be one of:
- 	- "mediatek,mt2712-mfgcfg", "syscon"
-+	- "mediatek,mt8183-mfgcfg", "syscon"
- - #clock-cells: Must be 1
- 
- The mfgcfg controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-index 15d977afad31..545eab717c96 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-@@ -11,6 +11,7 @@ Required Properties:
- 	- "mediatek,mt6797-mmsys", "syscon"
- 	- "mediatek,mt7623-mmsys", "mediatek,mt2701-mmsys", "syscon"
- 	- "mediatek,mt8173-mmsys", "syscon"
-+	- "mediatek,mt8183-mmsys", "syscon"
- - #clock-cells: Must be 1
- 
- The mmsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-index d849465b8c99..08bbd37190ad 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-@@ -13,6 +13,7 @@ Required Properties:
- 	- "mediatek,mt7623-topckgen", "mediatek,mt2701-topckgen"
- 	- "mediatek,mt8135-topckgen"
- 	- "mediatek,mt8173-topckgen"
-+	- "mediatek,mt8183-topckgen", "syscon"
- - #clock-cells: Must be 1
- 
- The topckgen controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-index 3212afc753c8..57176bb8dbb5 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-@@ -11,6 +11,7 @@ Required Properties:
- 	- "mediatek,mt6797-vdecsys", "syscon"
- 	- "mediatek,mt7623-vdecsys", "mediatek,mt2701-vdecsys", "syscon"
- 	- "mediatek,mt8173-vdecsys", "syscon"
-+	- "mediatek,mt8183-vdecsys", "syscon"
- - #clock-cells: Must be 1
- 
- The vdecsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-index 851545357e94..c9faa6269087 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-@@ -9,6 +9,7 @@ Required Properties:
- 	- "mediatek,mt2712-vencsys", "syscon"
- 	- "mediatek,mt6797-vencsys", "syscon"
- 	- "mediatek,mt8173-vencsys", "syscon"
-+	- "mediatek,mt8183-vencsys", "syscon"
- - #clock-cells: Must be 1
- 
- The vencsys controller uses the common clk binding from
++#define GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,		\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd, _flags, _ops) {		\
++		.id = _id,						\
++		.name = _name,						\
++		.mux_ofs = _mux_ofs,					\
++		.set_ofs = _mux_set_ofs,				\
++		.clr_ofs = _mux_clr_ofs,				\
++		.upd_ofs = _upd_ofs,					\
++		.mux_shift = _shift,					\
++		.mux_width = _width,					\
++		.gate_shift = _gate,					\
++		.upd_shift = _upd,					\
++		.parent_names = _parents,				\
++		.num_parents = ARRAY_SIZE(_parents),			\
++		.flags = _flags,					\
++		.ops = &_ops,						\
++	}
++
++#define MUX_GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,	\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd, _flags)			\
++		GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,	\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd, _flags,			\
++			mtk_mux_gate_clr_set_upd_ops)
++
++#define MUX_GATE_CLR_SET_UPD(_id, _name, _parents, _mux_ofs,		\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd)				\
++		MUX_GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents,	\
++			_mux_ofs, _mux_set_ofs, _mux_clr_ofs, _shift,	\
++			_width, _gate, _upd_ofs, _upd,			\
++			CLK_SET_RATE_PARENT)
++
++struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
++				 struct regmap *regmap,
++				 spinlock_t *lock);
++
++int mtk_clk_register_muxes(const struct mtk_mux *muxes,
++			   int num, struct device_node *node,
++			   spinlock_t *lock,
++			   struct clk_onecell_data *clk_data);
++
++#endif /* __DRV_CLK_MUX_H */
 -- 
 2.18.0
