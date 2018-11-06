@@ -1,42 +1,22 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 6 Nov 2018 22:19:15 +0900
-Subject: [PATCH v4 0/2] dmaengine: add UniPhier MIO DMAC driver
-In-Reply-To: <1539276063-5103-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1539276063-5103-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNASsbpC53aiQGRdQaukFOLX_ZN09ZOPU1CqF_bsR2u01hQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2018 13:39:35 +0000
+Subject: [PATCH 0/4] Enable deadcode elimination at link time
+Message-ID: <20181106133935.GB30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2018 at 1:42 AM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
->
-> 1/2: DT-binding
-> 2/2: driver
->
+This series enables elimination of dead code from the kernel at link
+time.  The changes are mostly ARM specific, except for one change in
+EFI as the EFI stub must not be compiled with -fdata-sections.
 
+ arch/arm/Kconfig                       |  1 +
+ arch/arm/boot/compressed/vmlinux.lds.S |  2 +-
+ arch/arm/kernel/vmlinux.lds.S          | 10 +++++-----
+ arch/arm/kernel/vmlinux.lds.h          | 18 +++++++++---------
+ drivers/firmware/efi/libstub/Makefile  |  2 +-
+ 5 files changed, 17 insertions(+), 16 deletions(-)
 
-Gentle ping...
-
-
-
-> Masahiro Yamada (2):
->   dt-bindings: dmaengine: add DT binding for UniPhier MIO DMAC
->   dmaengine: uniphier-mdmac: add UniPhier MIO DMAC driver
->
->  .../devicetree/bindings/dma/uniphier-mio-dmac.txt  |  25 +
->  MAINTAINERS                                        |   1 +
->  drivers/dma/Kconfig                                |  11 +
->  drivers/dma/Makefile                               |   1 +
->  drivers/dma/uniphier-mdmac.c                       | 506 +++++++++++++++++++++
->  5 files changed, 544 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/uniphier-mio-dmac.txt
->  create mode 100644 drivers/dma/uniphier-mdmac.c
->
-> --
-> 2.7.4
->
-
-
---
-Best Regards
-Masahiro Yamada
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
