@@ -1,9 +1,9 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 06 Nov 2018 12:38:34 +0000
-Subject: [PATCH 1/5] ARM: make lookup_processor_type() non-__init
+Date: Tue, 06 Nov 2018 12:38:50 +0000
+Subject: [PATCH v2 1/5] ARM: make lookup_processor_type() non-__init
 In-Reply-To: <20181106123700.GA30658@n2100.armlinux.org.uk>
 References: <20181106123700.GA30658@n2100.armlinux.org.uk>
-Message-ID: <E1gK0cs-0007In-5g@rmk-PC.armlinux.org.uk>
+Message-ID: <E1gK0d8-0007Lp-Ux@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
