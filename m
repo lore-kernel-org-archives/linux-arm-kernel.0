@@ -1,81 +1,46 @@
-From: rppt@linux.ibm.com (Mike Rapoport)
-Date: Tue, 6 Nov 2018 16:06:42 +0200
-Subject: [PATCH v4 0/6] arm64: Get rid of __early_init_dt_declare_initrd()
-In-Reply-To: <20181105225431.24485-1-f.fainelli@gmail.com>
-References: <20181105225431.24485-1-f.fainelli@gmail.com>
-Message-ID: <20181106140642.GA19280@rapoport-lnx>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 Nov 2018 15:08:06 +0100
+Subject: [PATCH 3/4] ARM: merge -fdata-sections BSS data to .bss section
+In-Reply-To: <E1gK1ae-0000or-7R@rmk-PC.armlinux.org.uk>
+References: <20181106133935.GB30658@n2100.armlinux.org.uk>
+ <E1gK1ae-0000or-7R@rmk-PC.armlinux.org.uk>
+Message-ID: <CAKv+Gu9-t0QYCfXHtRJ=Oc-Gsa2f=RdRHTP_suB2oT5pKKy7ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 02:54:25PM -0800, Florian Fainelli wrote:
-> Hi all,
-> 
-> Changes in v4:
-> 
-> - dropped initrd_below_start_ok assignment in ARM64, not necessary at
->   all (Ard)
-> - replace #ifdef CONFIG_BLK_DEV_INITRD with if
->   (IS_ENABLED(CONFIG_BLK_DEV_INITRD) for consistency with other parts
->   of arm64_memblock_init() (Rob)
-> 
-> Changes in v3:
-> 
-> - use C conditionals in drivers/of/fdt.c
-> - added check on phys_initrd_size in arch/arm64/mm/init.c to determine
->   whether initrd_start must be populated
-> - fixed a build warning with ARC that was just missing an (unsigned
->   long) cast
-> 
-> Changes in v2:
-> 
-> - get rid of ARCH_HAS_PHYS_INITRD and instead define
->   phys_initrd_start/phys_initrd_size in init/do_mounts_initrd.c
-> 
-> - make __early_init_dt_declare_initrd() account for ARM64 specific
->   behavior with __va() when having CONFIG_DEBUG_VM enabled
-> 
-> - consolidate early_initrd() command line parsing into
->   init/do_mounts_initrd.c
-> 
-> Because phys_initrd_start/phys_initrd_size are now compiled in
-> ini/do_mounts_initrd.c which is only built with CONFIG_BLK_DEV_INITRD=y,
-> we need to be a bit careful about the uses throughout architecture
-> specific code.
-> 
-> Previous discussions/submissions list here:
-> 
-> v3:
-> https://www.spinics.net/lists/arm-kernel/msg683566.html
-> v2:
-> https://lkml.org/lkml/2018/10/25/4
-> 
-> Florian Fainelli (6):
->   nds32: Remove phys_initrd_start and phys_initrd_size
->   arch: Make phys_initrd_start and phys_initrd_size global variables
->   of/fdt: Populate phys_initrd_start/phys_initrd_size from FDT
->   arm64: Utilize phys_initrd_start/phys_initrd_size
->   of/fdt: Remove custom __early_init_dt_declare_initrd() implementation
->   arch: Move initrd= parsing into do_mounts_initrd.c
+On 6 November 2018 at 14:40, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+> When building with -fdata-sections, the BSS data is placed into separate
+> sections, so we need to ask the linker to group these together into the
+> .bss output section, so that they're correctly placed.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/boot/compressed/vmlinux.lds.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> index 2b963d8e76dd..3b91bc3c606f 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> @@ -118,7 +118,7 @@ SECTIONS
+>
+>    . = BSS_START;
+>    __bss_start = .;
+> -  .bss                 : { *(.bss) }
+> +  .bss                 : { *(.bss) *(.bss.*) }
 
-For the series:
+Would it make sense to sort these by alignment? Otherwise, I suspect
+you may get a lot of padding holes due to the number of different
+input sections, each with its own alignment.
 
-Reviewed-by: Mike Rapoport <rppt@linux.ibm.com>
- 
->  arch/arc/mm/init.c              | 25 +++++-------------------
->  arch/arm/mm/init.c              | 28 ++-------------------------
->  arch/arm64/include/asm/memory.h |  8 --------
->  arch/arm64/mm/init.c            | 34 ++++++---------------------------
->  arch/nds32/mm/init.c            |  2 --
->  arch/unicore32/mm/init.c        | 24 +++++------------------
->  drivers/of/fdt.c                | 17 ++++++++++++-----
->  include/linux/initrd.h          |  3 +++
->  init/do_mounts_initrd.c         | 20 +++++++++++++++++++
->  9 files changed, 53 insertions(+), 108 deletions(-)
-> 
-> -- 
-> 2.17.1
-> 
-
--- 
-Sincerely yours,
-Mike.
+>    _end = .;
+>
+>    . = ALIGN(8);                /* the stack must be 64-bit aligned */
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
