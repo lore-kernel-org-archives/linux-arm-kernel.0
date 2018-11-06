@@ -1,23 +1,41 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 6 Nov 2018 15:34:24 +0000
-Subject: [PATCH RESEND V4 0/9] clk: add imx7ulp clk support
-In-Reply-To: <AM0PR04MB4211280B09B72F637FC5650280CB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1540127173-21346-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211576EF2FE906A6B0C3F1680FB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211280B09B72F637FC5650280CB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <7e58f0dcf83a0bd8139e58e27bfa137fc186b4bf.camel@nxp.com>
+From: dkos@cadence.com (Damian Kos)
+Date: Tue, 6 Nov 2018 15:37:05 +0000
+Subject: [PATCH] drm/rockchip: fix for mailbox read size
+Message-ID: <1541518625-25984-1-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-11-06 at 15:30 +0000, A.s. Dong wrote:
-> Gently Ping...
+Some of the functions (like cdn_dp_dpcd_read, cdn_dp_get_edid_block)
+allow to read 64KiB, but the cdn_dp_mailbox_read_receive, that is
+used by them, can read only up to 255 bytes at once. Normally, it's
+not a big issue as DPCD or EDID reads won't (hopefully) exceed that
+value.
+The real issue here is the revocation list read during the HDCP
+authentication process. (problematic use case:
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4/drivers/gpu/drm/rockchip/cdn-dp-reg.c#1152)
+The list can reach 127*5+4 bytes (num devs * 5 bytes per ID/Bksv +
+4 bytes of an additional info).
+In other words - CTSes with HDCP Repeater won't pass without this
+fix. Oh, and the driver will most likely stop working (best case
+scenario).
 
-> drivers/clk/imx/clk-composite.c                    |  85 +++++++++
+Signed-off-by: Damian Kos <dkos@cadence.com>
+---
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-During review for 8m clocks a separate but different composite clk was
-added. In order to avoid confusion that was named "clk-composite-8m.c", 
-it would make sense to move the 7ulp code to clk-composite-7ulp.c.
-
---
-Regards,
-Leonard
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+index 3105965fc260..5a485489a1e2 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+@@ -147,7 +147,7 @@ static int cdn_dp_mailbox_validate_receive(struct cdn_dp_device *dp,
+ }
+ 
+ static int cdn_dp_mailbox_read_receive(struct cdn_dp_device *dp,
+-				       u8 *buff, u8 buff_size)
++				       u8 *buff, u16 buff_size)
+ {
+ 	u32 i;
+ 	int ret;
+-- 
+2.17.1
