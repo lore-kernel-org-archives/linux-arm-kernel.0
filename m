@@ -1,45 +1,72 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 6 Nov 2018 12:54:07 +0100
-Subject: [PATCH v10 5/6] arm64: zynqmp: Add DDRC node
-In-Reply-To: <1540447621-22870-6-git-send-email-manish.narani@xilinx.com>
-References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
- <1540447621-22870-6-git-send-email-manish.narani@xilinx.com>
-Message-ID: <2da1ff15-1064-3fac-750e-3b0f006ee1af@xilinx.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 06 Nov 2018 13:01:33 +0100
+Subject: [PATCH v2] i2c: rk3x: fix some typo
+In-Reply-To: <CAEExFWtQrPD8hUn15Add-EuueCL5=Crb+yvDckWejG75BExGug@mail.gmail.com>
+References: <20181102124535.24331-1-tiny.windzz@gmail.com>
+ <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
+ <CAEExFWtQrPD8hUn15Add-EuueCL5=Crb+yvDckWejG75BExGug@mail.gmail.com>
+Message-ID: <12637568.SqdzpTGmKQ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25. 10. 18 8:07, Manish Narani wrote:
-> Add ddrc memory controller node in dts. The size mentioned in dts is
-> 0x30000, because we need to access DDR_QOS INTR registers located at
-> 0xFD090208 from this driver.
-> 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> ---
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> index 29ce234..a81d3b16 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> @@ -355,6 +355,13 @@
->  			xlnx,bus-width = <64>;
->  		};
->  
-> +		mc: memory-controller at fd070000 {
-> +			compatible = "xlnx,zynqmp-ddrc-2.40a";
-> +			reg = <0x0 0xfd070000 0x0 0x30000>;
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0 112 4>;
-> +		};
-> +
->  		gem0: ethernet at ff0b0000 {
->  			compatible = "cdns,zynqmp-gem", "cdns,gem";
->  			status = "disabled";
-> 
+Hi Yangtao, Peter,
 
-Applied with changed subject "arm64: dts: zynqmp: Add DDRC node"
-to zynqmp/dt branch.
+Am Montag, 5. November 2018, 16:59:58 CET schrieb Frank Lee:
+> I am sorry.
+> -- Yangtao
 
-Thanks,
-Michal
+If anything, it is me that should be sorry, as I did suggest the
+patch description, including the new spelling error.
+
+And it took me like the whole weekend to actually realize where the
+Calculated / Calculates error was hiding ;-) .
+
+
+Heiko
+
+> On Fri, Nov 2, 2018 at 8:58 PM Peter Rosin <peda@axentia.se> wrote:
+> >
+> > On 2018-11-02 13:45, Yangtao Li wrote:
+> > > Fix multiple instances of a misspelled "Calculates".
+> >
+> > Yes, it sure is hard to spell "Calcluated," it's almost impossible to
+> > get it completely right and not introduce another typo somewhere... :-)
+> >
+> > Cheers,
+> > Peter
+> >
+> > >
+> > > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > > Changes in v2:
+> > > -add commit message
+> > > ---
+> > >  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> > > index b8a2728dd4b6..fe347e8e2a23 100644
+> > > --- a/drivers/i2c/busses/i2c-rk3x.c
+> > > +++ b/drivers/i2c/busses/i2c-rk3x.c
+> > > @@ -555,7 +555,7 @@ static const struct i2c_spec_values *rk3x_i2c_get_spec(unsigned int speed)
+> > >   *
+> > >   * @clk_rate: I2C input clock rate
+> > >   * @t: Known I2C timing information
+> > > - * @t_calc: Caculated rk3x private timings that would be written into regs
+> > > + * @t_calc: Calculated rk3x private timings that would be written into regs
+> > >   *
+> > >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+> > >   * a best-effort divider value is returned in divs. If the target rate is
+> > > @@ -716,7 +716,7 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
+> > >   *
+> > >   * @clk_rate: I2C input clock rate
+> > >   * @t: Known I2C timing information
+> > > - * @t_calc: Caculated rk3x private timings that would be written into regs
+> > > + * @t_calc: Calculated rk3x private timings that would be written into regs
+> > >   *
+> > >   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+> > >   * a best-effort divider value is returned in divs. If the target rate is
+> > >
+> >
+> 
