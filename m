@@ -1,189 +1,157 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 6 Nov 2018 20:20:35 +0000
-Subject: IOMMU breakage on arm64
-In-Reply-To: <CAMuHMdUosqWTn5yDjGMWrLpWEyZfxtGWYfqmenYVqE8g7HEt7Q@mail.gmail.com>
-References: <git-mailbomb-linux-master-b4ebe6063204da58e48600b810a97c29ae9e5d12@kernel.org>
- <CAMuHMdUosqWTn5yDjGMWrLpWEyZfxtGWYfqmenYVqE8g7HEt7Q@mail.gmail.com>
-Message-ID: <44b77976-0efe-02d0-3c4e-4e54f91c4fe7@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 Nov 2018 21:27:46 +0100
+Subject: [PATCH v2] arm64/mm: unmap the linear alias of module allocations
+In-Reply-To: <CAKv+Gu_KutMRosQOv=S=jxHkM+XN1QD9ONKjcnbMA8xnZU2J9A@mail.gmail.com>
+References: <20180711170426.11133-1-ard.biesheuvel@linaro.org>
+ <20181101151702.GF15788@arm.com>
+ <CAKv+Gu-G+qced2Cyx9UHx2DPxVC+ignft6azYLcmUzAtPCW8XA@mail.gmail.com>
+ <20181105193139.GA25195@brain-police>
+ <CAKv+Gu_KutMRosQOv=S=jxHkM+XN1QD9ONKjcnbMA8xnZU2J9A@mail.gmail.com>
+Message-ID: <CAKv+Gu8QNyt6N09XhqYb7aZiG5yFT6jE+66zj14O-EnN3D=WAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On 2018-11-06 7:44 pm, Geert Uytterhoeven wrote:
-> Hi Christoph et al,
-> 
-> On Tue, Oct 23, 2018 at 1:40 AM Linux Kernel Mailing List
-> <linux-kernel@vger.kernel.org> wrote:
->> Commit:     b4ebe6063204da58e48600b810a97c29ae9e5d12
->> Parent:     7d21ee4c719f00896767ce19c4c01a56374c2ced
->> Refname:    refs/heads/master
->> Web:        https://git.kernel.org/torvalds/c/b4ebe6063204da58e48600b810a97c29ae9e5d12
->> Author:     Christoph Hellwig <hch@lst.de>
->> AuthorDate: Thu Sep 20 14:04:08 2018 +0200
->> Committer:  Christoph Hellwig <hch@lst.de>
->> CommitDate: Mon Oct 1 07:28:03 2018 -0700
+On 5 November 2018 at 21:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 5 November 2018 at 20:31, Will Deacon <will.deacon@arm.com> wrote:
+>> On Mon, Nov 05, 2018 at 01:29:34PM +0100, Ard Biesheuvel wrote:
+>>> On 1 November 2018 at 16:17, Will Deacon <will.deacon@arm.com> wrote:
+>>> > On Wed, Jul 11, 2018 at 07:04:26PM +0200, Ard Biesheuvel wrote:
+>>> >> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+>>> >> index 97d0ef12e2ff..f16f0073642b 100644
+>>> >> --- a/arch/arm64/include/asm/module.h
+>>> >> +++ b/arch/arm64/include/asm/module.h
+>>> >> @@ -91,4 +91,10 @@ static inline bool plt_entries_equal(const struct plt_entry *a,
+>>> >>              a->mov2 == b->mov2;
+>>> >>  }
+>>> >>
+>>> >> +#ifdef CONFIG_STRICT_KERNEL_RWX
+>>> >> +void remap_linear_module_alias(void *module_region, bool ro);
+>>> >> +#else
+>>> >> +static inline void remap_linear_module_alias(void *module_region, bool ro) {}
+>>> >> +#endif
+>>> >> +
+>>> >>  #endif /* __ASM_MODULE_H */
+>>> >> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+>>> >> index f0f27aeefb73..2b61ca0285eb 100644
+>>> >> --- a/arch/arm64/kernel/module.c
+>>> >> +++ b/arch/arm64/kernel/module.c
+>>> >> @@ -26,10 +26,51 @@
+>>> >>  #include <linux/mm.h>
+>>> >>  #include <linux/moduleloader.h>
+>>> >>  #include <linux/vmalloc.h>
+>>> >> +#include <linux/workqueue.h>
+>>> >>  #include <asm/alternative.h>
+>>> >>  #include <asm/insn.h>
+>>> >>  #include <asm/sections.h>
+>>> >>
+>>> >> +#ifdef CONFIG_STRICT_KERNEL_RWX
+>>> >> +
+>>> >> +static struct workqueue_struct *module_free_wq;
+>>> >> +
+>>> >> +static int init_workqueue(void)
+>>> >> +{
+>>> >> +     module_free_wq = alloc_ordered_workqueue("module_free_wq", 0);
+>>> >> +     WARN_ON(!module_free_wq);
+>>> >> +
+>>> >> +     return 0;
+>>> >> +}
+>>> >> +pure_initcall(init_workqueue);
+>>> >> +
+>>> >> +static void module_free_wq_worker(struct work_struct *work)
+>>> >> +{
+>>> >> +     remap_linear_module_alias(work, false);
+>>> >> +     vfree(work);
+>>> >> +}
+>>> >> +
+>>> >> +void module_memfree(void *module_region)
+>>> >> +{
+>>> >> +     struct work_struct *work;
+>>> >> +
+>>> >> +     if (!module_region)
+>>> >> +             return;
+>>> >> +
+>>> >> +     /*
+>>> >> +      * At this point, module_region is a pointer to an allocation of at
+>>> >> +      * least PAGE_SIZE bytes that is mapped read-write. So instead of
+>>> >> +      * allocating memory for a data structure containing a work_struct
+>>> >> +      * instance and a copy of the value of module_region, just reuse the
+>>> >> +      * allocation directly.
+>>> >> +      */
+>>> >> +     work = module_region;
+>>> >> +     INIT_WORK(work, module_free_wq_worker);
+>>> >> +     queue_work(module_free_wq, work);
+>>> >> +}
+>>> >
+>>> > Whilst I can see that this works, it's a bit grotty because we're
+>>> > duplicating much of the hoop-jumping that vfree() also has to go through.
+>>> > Given that we allocate the module memory in the arch code, could we grab
+>>> > the pages at alloc time and stash them in the mod_arch_specific field?
+>>> >
+>>>
+>>> Yeah that should work
 >>
->>      dma-direct: implement complete bus_dma_mask handling
+>> Great!
 >>
->>      Instead of rejecting devices with a too small bus_dma_mask we can handle
->>      by taking the bus dma_mask into account for allocations and bounce
->>      buffering decisions.
+>
+> I may have spoken too soon: module_memfree() receives a void* pointer
+> to the allocation to be freed, and we can't access the module struct
+> from that.
+>
+> But looking into this a bit more, I wonder why this doesn not affect
+> other architectures as well, and it might make sense to solve this
+> generically, or at least, provide the hooks in generic code.
+>
+>>> >> +#endif
+>>> >> +
+>>> >>  void *module_alloc(unsigned long size)
+>>> >>  {
+>>> >>       gfp_t gfp_mask = GFP_KERNEL;
+>>> >> @@ -65,6 +106,7 @@ void *module_alloc(unsigned long size)
+>>> >>               return NULL;
+>>> >>       }
+>>> >>
+>>> >> +     remap_linear_module_alias(p, true);
+>>> >>       return p;
+>>> >>  }
+>>> >>
+>>> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>>> >> index 493ff75670ff..5492b691aafd 100644
+>>> >> --- a/arch/arm64/mm/mmu.c
+>>> >> +++ b/arch/arm64/mm/mmu.c
+>>> >> @@ -432,7 +432,7 @@ static void __init map_mem(pgd_t *pgdp)
+>>> >>       struct memblock_region *reg;
+>>> >>       int flags = 0;
+>>> >>
+>>> >> -     if (debug_pagealloc_enabled())
+>>> >> +     if (rodata_enabled || debug_pagealloc_enabled())
+>>> >>               flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
+>>> >
+>>> > I suppose this is the most contentious part of the patch. Perhaps a
+>>> > better solution would be to tweak CONFIG_STRICT_MODULE_RWX so that it's
+>>> > structured more like CONFIG_STACKPROTECTOR. That way, your patch here
+>>> > could be the "strong" version, which comes with more of a performance
+>>> > cost.
+>>> >
+>>>
+>>> I'd like to understand whether this performance hit is theoretical or
+>>> not. It is obviously less efficient to map the linear region at page
+>>> granularity, but which workloads will actually notice the difference?
+>>>
+>>> Also, I think this should be a runtime setting, perhaps rodata=full?
+>>> With a CONFIG_ option to set the default.
 >>
->>      Signed-off-by: Christoph Hellwig <hch@lst.de>
-> 
-> I  have bisected the following crash to the above commit:
-
-I think that commit mostly just changes the presentation of my 
-underlying cockup - see here for what should fix it: 
-https://patchwork.kernel.org/patch/10670177/
-
-I have a feeling we've ironed out crash-on-early-domain-free bugs in the 
-SMMU drivers already - arm-smmu certainly has an early return in 
-arm_smmu_destroy_domain_context() which should behave exactly like your 
-diff below, while I think arm-smmu-v3 gets away with it by virtue of 
-smmu_domain->cfg being unset, but I'll double-check that when I'm fresh 
-tomorrow (Jean-Philippe reported SMMUv3 hitting the DMA thing to me 
-internally, but didn't mention any crash).
-
-Thanks for the report,
-Robin.
-
->      ipmmu-vmsa e67b0000.mmu: Cannot accommodate DMA translation for
-> IOMMU page tables
->      sata_rcar ee300000.sata: Unable to initialize IPMMU context
->      iommu: Failed to add device ee300000.sata to group 0: -22
->      Unable to handle kernel NULL pointer dereference at virtual
-> address 0000000000000038
->      Mem abort info:
->        ESR = 0x96000004
->        Exception class = DABT (current EL), IL = 32 bits
->        SET = 0, FnV = 0
->        EA = 0, S1PTW = 0
->      Data abort info:
->        ISV = 0, ISS = 0x00000004
->        CM = 0, WnR = 0
->      [0000000000000038] user address but active_mm is swapper
->      Internal error: Oops: 96000004 [#1] PREEMPT SMP
->      CPU: 2 PID: 51 Comm: kworker/2:1 Not tainted
-> 4.20.0-rc1-arm64-renesas-dirty #74
->      Hardware name: Renesas Salvator-X 2nd version board based on
-> r8a7795 ES2.0+ (DT)
->      Workqueue: events deferred_probe_work_func
->      pstate: 60000005 (nZCv daif -PAN -UAO)
->      pc : ipmmu_domain_free+0x1c/0xa0
->      lr : ipmmu_domain_free+0x14/0xa0
->      sp : ffff000009c9b990
->      x29: ffff000009c9b990 x28: 0000000000000000
->      x27: ffff000008dff000 x26: 0000000000000000
->      x25: ffff000008dd9000 x24: 0000000000000014
->      x23: ffff8006fffdbb20 x22: ffff000008dff000
->      x21: ffff8006f898e680 x20: ffff8006f8fa6c00
->      x19: ffff8006f8fa6c08 x18: 0000000000000037
->      x17: 0000000000000020 x16: ffff000008a8f780
->      x15: ffff8006fb096f10 x14: ffff8006f93731c8
->      x13: 0000000000000000 x12: ffff8006fb096f10
->      x11: ffff8006f9372fe8 x10: ffff000008dff708
->      x9 : ffff8006fb096f50 x8 : ffff000008dff708
->      x7 : ffff0000089f1858 x6 : 0000000000000000
->      x5 : 0000000000000000 x4 : ffff8006f89a3000
->      x3 : 00008006f7131000 x2 : ffff8006fb2b5700
->      x1 : 0000000000000000 x0 : 0000000000000028
->      Process kworker/2:1 (pid: 51, stack limit = 0x(____ptrval____))
->      Call trace:
->       ipmmu_domain_free+0x1c/0xa0
->       iommu_group_release+0x48/0x68
->       kobject_put+0x74/0xe8
->       kobject_del.part.0+0x3c/0x50
->       kobject_put+0x60/0xe8
->       iommu_group_get_for_dev+0xa8/0x1f0
->       ipmmu_add_device+0x1c/0x40
->       of_iommu_configure+0x118/0x190
->       of_dma_configure+0xcc/0x1f0
->       platform_dma_configure+0x18/0x28
->       really_probe+0x94/0x2a8
->       driver_probe_device+0x58/0x100
->       __device_attach_driver+0x90/0xd0
->       bus_for_each_drv+0x64/0xc8
->       __device_attach+0xd8/0x130
->       device_initial_probe+0x10/0x18
->       bus_probe_device+0x98/0xa0
->       deferred_probe_work_func+0x74/0xb0
->       process_one_work+0x294/0x6f0
->       worker_thread+0x238/0x460
->       kthread+0x120/0x128
->       ret_from_fork+0x10/0x1c
->      Code: aa0003f3 97ffeb1a d1002274 f85f8261 (f9401c20)
->      ---[ end trace 4c46c7fd7cd07245 ]---
-> 
-> Reproducing on v4.20-rc1 requires CONFIG_IPMMU_VMSA=y, and whitelisting
-> SATA for IOMMU use (https://patchwork.kernel.org/patch/10544059/).
-> For older versions you also have to backport commit 3a0832d093693ede ("arm64:
-> dts: renesas: salvator-xs: enable SATA").
-> 
-> Actually there are two issues at hand:
-> 
-> 1) drivers/iommu/io-pgtable-arm.c:__arm_lpae_alloc_pages() allocates
->     memory (above 4 GiB) and maps it for DMA use, but it is rejected due
->     to:
-> 
->         dma_map_single(dev, pages, size, DMA_TO_DEVICE) != virt_to_phys(pages)
-> 
->> --- a/include/linux/dma-direct.h
->> +++ b/include/linux/dma-direct.h
->> @@ -27,7 +27,8 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
->>          if (!dev->dma_mask)
->>                  return false;
+>> Yes, that's a better idea. We could even default to "full" if we don't have
+>> any performance data (if people start shouting then we'll know it's an
+>> issue!).
 >>
->> -       return addr + size - 1 <= *dev->dma_mask;
->> +       return addr + size - 1 <=
->> +               min_not_zero(*dev->dma_mask, dev->bus_dma_mask);
-> 
->         *dev->dma_mask = 0xffffffffff (40-bit)
->         dev->bus_dma_mask = 0xffffffff (32-bit)
-> 
->     Hence before, we had (in __arm_lpae_alloc_pages()):
-> 
->         arm-lpae io-pgtable: pages = ffff8006f88f3000
->         arm-lpae io-pgtable: dma = 0x00000007388f3000
->         arm-lpae io-pgtable: virt_to_phys(pages) = 0x00000007388f3000
-> 
->     After this change, we have:
-> 
->         arm-lpae io-pgtable: pages = ffff8006f882b000
->         arm-lpae io-pgtable: dma = 0x0000000074009000
->         arm-lpae io-pgtable: virt_to_phys(pages) = 0x000000073882b000
-> 
->     And SATA runs without using the IOMMU.
-> 
-> 2) The Renesas IPMMU driver doesn't handle the above failure well,
->     leading to a NULL pointer dereference.
->     This can be fixed using the (gmail-whitespace-damaged) patch below:
-> 
-> --- a/drivers/iommu/ipmmu-vmsa.c
-> +++ b/drivers/iommu/ipmmu-vmsa.c
-> @@ -635,7 +635,8 @@ static void ipmmu_domain_free(struct iommu_domain
-> *io_domain)
->           * been detached.
->           */
->          iommu_put_dma_cookie(io_domain);
-> -       ipmmu_domain_destroy_context(domain);
-> +       if (domain->mmu)
-> +               ipmmu_domain_destroy_context(domain);
->          free_io_pgtable_ops(domain->iop);
->          kfree(domain);
->   }
-> 
->     I expect drivers/iommu/arm-smmu-v3.c and drivers/iommu/arm-smmu.c
->     need similar fixes.
->     I didn't check all drivers, but e.g. drivers/iommu/amd_iommu.c has
-> a similar check.
-> 
-> Does the IOMMU work on other arm64 platforms in v4.20-rc1?
-> 
-> Thanks for your comments!
-> 
-> Gr{oetje,eeting}s,
-> 
->                          Geert
-> 
+>> Do you plan to spin a v2?
+>>
+>
+> Yes, but I'll do some digging first.
+
+OK, so the answer is that other architectures (or at least, x86) does
+this at a lower level. The set_memory_{ro,rw,x,nx} take care of the
+permission attributes of the linear alias any time they are modified.
+
+So for arm64, that is probably the way to go as well. I'll update my
+patches accordingly.
