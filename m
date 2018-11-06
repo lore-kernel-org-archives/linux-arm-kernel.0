@@ -1,81 +1,238 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 6 Nov 2018 14:10:56 +0530
-Subject: [PATCH v3 04/13] firmware: ti_sci: Add RM mapping table for am654
+Date: Tue, 6 Nov 2018 14:10:57 +0530
+Subject: [PATCH v3 05/13] firmware: ti_sci: Add helper apis to manage resources
 In-Reply-To: <20181106084105.32483-1-lokeshvutla@ti.com>
 References: <20181106084105.32483-1-lokeshvutla@ti.com>
-Message-ID: <20181106084105.32483-5-lokeshvutla@ti.com>
+Message-ID: <20181106084105.32483-6-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Each resource with in the device can be uniquely identified
+by a type and subtype as defined by TISCI. Since this is generic
+across the devices, resource allocation also can be made generic
+instead of each client driver handling the resource. So add helper
+apis to manage the resource.
 
-Add the resource mapping table for AM654 SoC as defined
-in http://downloads.ti.com/tisci/esd/latest/5_soc_doc/am6x/resasg_types.html
-Introduce a new compatible for AM654 "ti,am654-sci" for using
-this resource map table.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
 Changes since v2:
-- Added Reviewed-by tag
+- None
 
- .../bindings/arm/keystone/ti,sci.txt          |  3 ++-
- drivers/firmware/ti_sci.c                     | 23 +++++++++++++++++++
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ drivers/firmware/ti_sci.c              | 128 +++++++++++++++++++++++++
+ include/linux/soc/ti/ti_sci_protocol.h |  48 ++++++++++
+ 2 files changed, 176 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-index b56a02c10ae6..6f0cd31c1520 100644
---- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-@@ -24,7 +24,8 @@ relationship between the TI-SCI parent node to the child node.
- 
- Required properties:
- -------------------
--- compatible: should be "ti,k2g-sci"
-+- compatible:	should be "ti,k2g-sci" for TI 66AK2G SoC
-+		should be "ti,am654-sci" for for TI AM654 SoC
- - mbox-names:
- 	"rx" - Mailbox corresponding to receive path
- 	"tx" - Mailbox corresponding to transmit path
 diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
-index 987bfb29475c..c2f0815edab6 100644
+index c2f0815edab6..581d7a151533 100644
 --- a/drivers/firmware/ti_sci.c
 +++ b/drivers/firmware/ti_sci.c
-@@ -2500,10 +2500,33 @@ static const struct ti_sci_desc ti_sci_pmmc_k2g_desc = {
- 	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
- 	.max_msgs = 20,
- 	.max_msg_size = 64,
-+	.rm_type_map = NULL,
-+};
+@@ -2480,6 +2480,134 @@ const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(devm_ti_sci_get_by_phandle);
+ 
++/*
++ * ti_sci_get_free_resource() - Get a free resource from TISCI resource.
++ * @res:	Pointer to the TISCI resource
++ *
++ * Return: resource num if all went ok else TI_SCI_RESOURCE_NULL.
++ */
++u16 ti_sci_get_free_resource(struct ti_sci_resource *res)
++{
++	unsigned long flags;
++	u16 set, free_bit;
 +
-+static struct ti_sci_rm_type_map ti_sci_am654_rm_type_map[] = {
-+	{.dev_id = 56, .type = 0x00b}, /* GIC_IRQ */
-+	{.dev_id = 179, .type = 0x000}, /* MAIN_NAV_UDMASS_IA0 */
-+	{.dev_id = 187, .type = 0x009}, /* MAIN_NAV_RA */
-+	{.dev_id = 188, .type = 0x006}, /* MAIN_NAV_UDMAP */
-+	{.dev_id = 194, .type = 0x007}, /* MCU_NAV_UDMAP */
-+	{.dev_id = 195, .type = 0x00a}, /* MCU_NAV_RA */
-+	{.dev_id = 0, .type = 0x000}, /* end of table */
-+};
++	raw_spin_lock_irqsave(&res->lock, flags);
++	for (set = 0; set < res->sets; set++) {
++		free_bit = find_first_zero_bit(res->desc[set].res_map,
++					       res->desc[set].num);
++		if (free_bit != res->desc[set].num) {
++			set_bit(free_bit, res->desc[set].res_map);
++			raw_spin_unlock_irqrestore(&res->lock, flags);
++			return res->desc[set].start + free_bit;
++		}
++	}
++	raw_spin_unlock_irqrestore(&res->lock, flags);
 +
-+/* Description for AM654 */
-+static const struct ti_sci_desc ti_sci_pmmc_am654_desc = {
-+	.default_host_id = 12,
-+	/* Conservative duration */
-+	.max_rx_timeout_ms = 10000,
-+	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
-+	.max_msgs = 20,
-+	.max_msg_size = 60,
-+	.rm_type_map = ti_sci_am654_rm_type_map,
++	return TI_SCI_RESOURCE_NULL;
++}
++EXPORT_SYMBOL_GPL(ti_sci_get_free_resource);
++
++/**
++ * ti_sci_release_resource() - Release a resource from TISCI resource.
++ * @res:	Pointer to the TISCI resource
++ */
++void ti_sci_release_resource(struct ti_sci_resource *res, u16 id)
++{
++	unsigned long flags;
++	u16 set;
++
++	raw_spin_lock_irqsave(&res->lock, flags);
++	for (set = 0; set < res->sets; set++) {
++		if (res->desc[set].start <= id &&
++		    (res->desc[set].num + res->desc[set].start) > id)
++			clear_bit(id - res->desc[set].start,
++				  res->desc[set].res_map);
++	}
++	raw_spin_unlock_irqrestore(&res->lock, flags);
++}
++EXPORT_SYMBOL_GPL(ti_sci_release_resource);
++
++/**
++ * devm_ti_sci_get_of_resource() - Get a TISCI resource assigned to a device
++ * @handle:	TISCI handle
++ * @dev:	Device pointer to which the resource is assigned
++ * @of_prop:	property name by which the resource are represented
++ *
++ * Note: This function expects of_prop to be in the form of tuples
++ *	<type, subtype>. Allocates and initializes ti_sci_resource structure
++ *	for each of_prop. Client driver can directly call
++ *	ti_sci_(get_free, release)_resource apis for handling the resource.
++ *
++ * Return: Pointer to ti_sci_resource if all went well else appropriate
++ *	   error pointer.
++ */
++struct ti_sci_resource *
++devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
++			    struct device *dev, u32 dev_id, char *of_prop)
++{
++	u32 resource_subtype;
++	u16 resource_type;
++	struct ti_sci_resource *res;
++	int sets, i, ret;
++
++	res = devm_kzalloc(dev, sizeof(*res), GFP_KERNEL);
++	if (!res)
++		return ERR_PTR(-ENOMEM);
++
++	sets = of_property_count_elems_of_size(dev_of_node(dev), of_prop,
++					       sizeof(u32));
++	if (sets < 0) {
++		dev_err(dev, "%s resource type ids not available\n", of_prop);
++		return ERR_PTR(sets);
++	}
++
++	res->sets = sets;
++
++	res->desc = devm_kcalloc(dev, res->sets, sizeof(*res->desc),
++				 GFP_KERNEL);
++	if (!res->desc)
++		return ERR_PTR(-ENOMEM);
++
++	ret = ti_sci_get_resource_type(handle_to_ti_sci_info(handle), dev_id,
++				       &resource_type);
++	if (ret) {
++		dev_err(dev, "No valid resource type for %u\n", dev_id);
++		return ERR_PTR(-EINVAL);
++	}
++
++	for (i = 0; i < res->sets; i++) {
++		ret = of_property_read_u32_index(dev_of_node(dev), of_prop, i,
++						 &resource_subtype);
++		if (ret)
++			return ERR_PTR(-EINVAL);
++
++		ret = handle->ops.rm_core_ops.get_range(handle, dev_id,
++							resource_subtype,
++							&res->desc[i].start,
++							&res->desc[i].num);
++		if (ret) {
++			dev_err(dev, "type %d subtype %d not allocated for host %d\n",
++				resource_type, resource_subtype,
++				handle_to_ti_sci_info(handle)->host_id);
++			return ERR_PTR(ret);
++		}
++
++		dev_dbg(dev, "res type = %d, subtype = %d, start = %d, num = %d\n",
++			resource_type, resource_subtype, res->desc[i].start,
++			res->desc[i].num);
++
++		res->desc[i].res_map =
++			devm_kzalloc(dev, BITS_TO_LONGS(res->desc[i].num) *
++				     sizeof(*res->desc[i].res_map), GFP_KERNEL);
++		if (!res->desc[i].res_map)
++			return ERR_PTR(-ENOMEM);
++	}
++	raw_spin_lock_init(&res->lock);
++
++	return res;
++}
++EXPORT_SYMBOL_GPL(devm_ti_sci_get_of_resource);
++
+ static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
+ 				void *cmd)
+ {
+diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
+index 6d17580839dc..2a1a41a17295 100644
+--- a/include/linux/soc/ti/ti_sci_protocol.h
++++ b/include/linux/soc/ti/ti_sci_protocol.h
+@@ -317,6 +317,33 @@ struct ti_sci_handle {
+ 	struct ti_sci_ops ops;
  };
  
- static const struct of_device_id ti_sci_of_match[] = {
- 	{.compatible = "ti,k2g-sci", .data = &ti_sci_pmmc_k2g_desc},
-+	{.compatible = "ti,am654-sci", .data = &ti_sci_pmmc_am654_desc},
- 	{ /* Sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, ti_sci_of_match);
++#define TI_SCI_RESOURCE_NULL	0xffff
++
++/**
++ * struct ti_sci_resource_desc - Description of TI SCI resource instance range.
++ * @start:	Start index of the resource.
++ * @num:	Number of resources.
++ * @res_map:	Bitmap to manage the allocation of these resources.
++ */
++struct ti_sci_resource_desc {
++	u16 start;
++	u16 num;
++	unsigned long *res_map;
++};
++
++/**
++ * struct ti_sci_resource - Structure representing a resource assigned
++ *			    to a device.
++ * @sets:	Number of sets available from this resource type
++ * @lock:	Lock to guard the res map in each set.
++ * @desc:	Array of resource descriptors.
++ */
++struct ti_sci_resource {
++	u16 sets;
++	raw_spinlock_t lock;
++	struct ti_sci_resource_desc *desc;
++};
++
+ #if IS_ENABLED(CONFIG_TI_SCI_PROTOCOL)
+ const struct ti_sci_handle *ti_sci_get_handle(struct device *dev);
+ int ti_sci_put_handle(const struct ti_sci_handle *handle);
+@@ -325,6 +352,11 @@ const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
+ 						  const char *property);
+ const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
+ 						       const char *property);
++u16 ti_sci_get_free_resource(struct ti_sci_resource *res);
++void ti_sci_release_resource(struct ti_sci_resource *res, u16 id);
++struct ti_sci_resource *
++devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
++			    struct device *dev, u32 dev_id, char *of_prop);
+ 
+ #else	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+@@ -357,6 +389,22 @@ const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
+ {
+ 	return ERR_PTR(-EINVAL);
+ }
++
++static inline u16 ti_sci_get_free_resource(struct ti_sci_resource *res)
++{
++	return TI_SCI_RESOURCE_NULL;
++}
++
++static inline void ti_sci_release_resource(struct ti_sci_resource *res, u16 id)
++{
++}
++
++static inline struct ti_sci_resource *
++devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
++			    struct device *dev, u32 dev_id, char *of_prop)
++{
++	return ERR_PTR(-EINVAL);
++}
+ #endif	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+ #endif	/* __TISCI_PROTOCOL_H */
 -- 
 2.19.1
