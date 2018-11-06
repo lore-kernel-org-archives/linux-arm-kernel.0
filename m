@@ -1,33 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2018 21:34:07 +0000
-Subject: [PATCH 0/4] arm/efi: fix memblock reallocation crash due to
- persistent reservations
-In-Reply-To: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
-References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181106213406.GB31298@brain-police>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 6 Nov 2018 15:34:55 -0600
+Subject: arm64 + ARM64_64K_PAGES=y
+Message-ID: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi All,
 
-On Tue, Nov 06, 2018 at 12:37:28PM +0100, Ard Biesheuvel wrote:
-> This series addresses the kexec/kdump crash on arm64 system with many CPUs
-> that was reported by Bhupesh.
-> 
-> Patches #1 and #2 fix the actual crash. Patches #3 and #4 optimize the
-> EFI persistent memreserve infrastructure so that fewer memblock reservations
-> are required.
+Do anybody tried to use ARM64 RT with 76K pages enabled?
 
-I acked the arm64 part and patches 3 and 4 look good afaict, so:
+My attempt shows that enabling  CONFIG_ARM64_64K_PAGES=y increases latencies by ~30%
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=y
 
-for those as well.
+  
 
-The only thing I was wondering is whether or not exhausting the page-sized
-array in the first list entry is rare enough that we could just realloc the
-thing and copy instead of chaining together new pages. That said, without
-seeing the code it's hard to tell whether you save much complexity with such
-a scheme so I'll leave it up to you.
+T: 0 (  772) P:98 I:1000 C: 120000 Min:      7 Act:   13 Avg:   10 Max:      85
+T: 1 (  773) P:98 I:1500 C:  79998 Min:      7 Act:   13 Avg:   10 Max:      71
+T: 2 (  774) P:98 I:2000 C:  59997 Min:      7 Act:   11 Avg:   11 Max:      64
+T: 3 (  775) P:98 I:2500 C:  47996 Min:      7 Act:   14 Avg:   12 Max:      66
 
-Will
+  
+
+cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=n
+
+  
+
+T: 0 (  697) P:98 I:1000 C: 120000 Min:      7 Act:   10 Avg:    9 Max:      38
+T: 1 (  698) P:98 I:1500 C:  79987 Min:      7 Act:   10 Avg:   10 Max:      32
+T: 2 (  699) P:98 I:2000 C:  59981 Min:      7 Act:   14 Avg:   11 Max:      46
+T: 3 (  700) P:98 I:2500 C:  47977 Min:      6 Act:   11 Avg:   10 Max:      45
+
+
+
+-- 
+regards,
+-grygorii
