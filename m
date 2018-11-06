@@ -1,36 +1,99 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Tue, 6 Nov 2018 17:49:07 +0100 (CET)
-Subject: [PATCH v4 2/3] arm64: implement live patching
-In-Reply-To: <20181026142152.5F0D868C95@newverein.lst.de>
-References: <20181026142008.D922868C94@newverein.lst.de>
- <20181026142152.5F0D868C95@newverein.lst.de>
-Message-ID: <alpine.LSU.2.21.1811061745440.30614@pobox.suse.cz>
+From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
+Date: Tue,  6 Nov 2018 10:52:45 -0600
+Subject: [PATCHv10 1/8] dt-bindings,
+ firmware: add Intel Stratix10 service layer binding
+In-Reply-To: <1541523172-5171-1-git-send-email-richard.gong@linux.intel.com>
+References: <1541523172-5171-1-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1541523172-5171-2-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Richard Gong <richard.gong@intel.com>
 
-On Fri, 26 Oct 2018, Torsten Duwe wrote:
+Add a device tree binding for the Intel Stratix10 service layer driver
 
-> Based on ftrace with regs, do the usual thing.
-> (see Documentation/livepatch/livepatch.txt)
-> 
-> Use task flag bit 6 to track patch transisiton state for the consistency
-> model. Add it to the work mask so it gets cleared on all kernel exits to
-> userland.
-> 
-> Tell livepatch regs->pc is the place to change the return address.
-> Make sure the graph tracer call hook is only called on the final function
-> entry in case regs->pc gets modified after an interception.
-> 
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
+Signed-off-by: Richard Gong <richard.gong@intel.com>
+Signed-off-by: Alan Tull <atull@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Moritz Fischer <mdf@kernel.org>
+---
+v2: change to put service layer driver node under the firmware node
+    change compatible to "intel, stratix10-svc"
+v3: no change
+v4: add Rob's Reviewed-by
+v5: no change
+v6: add Moritz's Acked-by
+v7: no change
+v8: no change
+v9: no chnage
+v10: no change
+---
+ .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
 
-It looks good now apart from arm64 asm part which should be reviewed by 
-someone else.
-
-However, could you summarize our analysis regarding post-module-load calls 
-of apply_relocate_add() in the commit log, please? It is important for 
-future reference.
-
-Thanks,
-Miroslav
+diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+new file mode 100644
+index 0000000..1fa6606
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+@@ -0,0 +1,57 @@
++Intel Service Layer Driver for Stratix10 SoC
++============================================
++Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
++processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
++configured from HPS, there needs to be a way for HPS to notify SDM the
++location and size of the configuration data. Then SDM will get the
++configuration data from that location and perform the FPGA configuration.
++
++To meet the whole system security needs and support virtual machine requesting
++communication with SDM, only the secure world of software (EL3, Exception
++Layer 3) can interface with SDM. All software entities running on other
++exception layers must channel through the EL3 software whenever it needs
++service from SDM.
++
++Intel Stratix10 service layer driver, running at privileged exception level
++(EL1, Exception Layer 1), interfaces with the service providers and provides
++the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
++driver also manages secure monitor call (SMC) to communicate with secure monitor
++code running in EL3.
++
++Required properties:
++-------------------
++The svc node has the following mandatory properties, must be located under
++the firmware node.
++
++- compatible: "intel,stratix10-svc"
++- method: smc or hvc
++        smc - Secure Monitor Call
++        hvc - Hypervisor Call
++- memory-region:
++	phandle to the reserved memory node. See
++	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++	for details
++
++Example:
++-------
++
++	reserved-memory {
++                #address-cells = <2>;
++                #size-cells = <2>;
++                ranges;
++
++                service_reserved: svcbuffer at 0 {
++                        compatible = "shared-dma-pool";
++                        reg = <0x0 0x0 0x0 0x1000000>;
++                        alignment = <0x1000>;
++                        no-map;
++                };
++        };
++
++	firmware {
++		svc {
++			compatible = "intel,stratix10-svc";
++			method = "smc";
++			memory-region = <&service_reserved>;
++		};
++	};
+-- 
+2.7.4
