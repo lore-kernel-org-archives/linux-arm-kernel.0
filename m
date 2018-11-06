@@ -1,49 +1,39 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Nov 2018 22:39:47 +0100
-Subject: [PATCH 0/4] arm/efi: fix memblock reallocation crash due to
- persistent reservations
-In-Reply-To: <20181106213406.GB31298@brain-police>
-References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
- <20181106213406.GB31298@brain-police>
-Message-ID: <CAKv+Gu81L5Xxvz72r8C8cXE9hweA-90w47HG3tBHUUoPV-gZPQ@mail.gmail.com>
+Date: Tue,  6 Nov 2018 22:44:03 +0100
+Subject: [PATCH v3 1/2] arm64: mm: purge lazily unmapped vm regions before
+ changing permissions
+In-Reply-To: <20181106214404.2497-1-ard.biesheuvel@linaro.org>
+References: <20181106214404.2497-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181106214404.2497-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2018 at 22:34, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> On Tue, Nov 06, 2018 at 12:37:28PM +0100, Ard Biesheuvel wrote:
->> This series addresses the kexec/kdump crash on arm64 system with many CPUs
->> that was reported by Bhupesh.
->>
->> Patches #1 and #2 fix the actual crash. Patches #3 and #4 optimize the
->> EFI persistent memreserve infrastructure so that fewer memblock reservations
->> are required.
->
-> I acked the arm64 part and patches 3 and 4 look good afaict, so:
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> for those as well.
->
-> The only thing I was wondering is whether or not exhausting the page-sized
-> array in the first list entry is rare enough that we could just realloc the
-> thing and copy instead of chaining together new pages. That said, without
-> seeing the code it's hard to tell whether you save much complexity with such
-> a scheme so I'll leave it up to you.
->
+Call vm_unmap_aliases() every time we apply any changes to permission
+attributes of mappings in the vmalloc region. This avoids any potential
+issues resulting from lingering writable or executable aliases of
+mappings that should be read-only or non-executable, respectively.
 
-Well, the problem is that the page-sized array may have been allocated
-by a previous kernel, and so it may be memblock_reserve()d already, in
-which case reallocating does not actually free up the memory in a
-useful way.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/pageattr.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Also, in the unlikely event that we race and allocate two new pages at
-the same time, the current scheme will not break (and we will
-ultimately fill up all the slots in both pages before allocating even
-more pages). This will become a lot trickier if we do reallocation.
-
-So if the current approach looks correct to you, then I'd prefer to
-stick with it.
-
-Do you agree with applying #3 and #4 as fixes?
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index a56359373d8b..f8cf5bc1d1f8 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -93,6 +93,12 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 	if (!numpages)
+ 		return 0;
+ 
++	/*
++	 * Get rid of potentially aliasing lazily unmapped vm areas that may
++	 * have permissions set that deviate from the ones we are setting here.
++	 */
++	vm_unmap_aliases();
++
+ 	return __change_memory_common(start, size, set_mask, clear_mask);
+ }
+ 
+-- 
+2.19.1
