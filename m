@@ -1,31 +1,31 @@
 From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 6 Nov 2018 09:19:36 +0000
-Subject: [PATCH] ARM: dts: imx6sll: remove unused property in gpc node
-Message-ID: <1541495675-14706-1-git-send-email-Anson.Huang@nxp.com>
+Date: Tue, 6 Nov 2018 09:19:41 +0000
+Subject: [PATCH] ARM: dts: imx6sl: vddpu is NOT an always-on regulator
+In-Reply-To: <1541495675-14706-1-git-send-email-Anson.Huang@nxp.com>
+References: <1541495675-14706-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1541495675-14706-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "fsl,mf-mix-wakeup-irq" is ONLY used as a temporary
-solution in NXP's internal tree for Mega/Fast Mix off
-feature after suspend, upstream kernel does NOT need it,
-remove it.
+Remove "regulator-always-on" property for vddpu regulator
+since it can be OFF when GPU power domain is OFF.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm/boot/dts/imx6sll.dtsi | 1 -
+ arch/arm/boot/dts/imx6sl.dtsi | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6sll.dtsi b/arch/arm/boot/dts/imx6sll.dtsi
-index 5ff4b99..62847c6 100644
---- a/arch/arm/boot/dts/imx6sll.dtsi
-+++ b/arch/arm/boot/dts/imx6sll.dtsi
-@@ -593,7 +593,6 @@
- 				#interrupt-cells = <3>;
- 				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-parent = <&intc>;
--				fsl,mf-mix-wakeup-irq = <0x7c00000 0x7d00 0x0 0x1400640>;
- 			};
- 
- 			iomuxc: pinctrl at 20e0000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 9bbc5b0..557d3fd 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -588,7 +588,6 @@
+ 					regulator-name = "vddpu";
+ 					regulator-min-microvolt = <725000>;
+ 					regulator-max-microvolt = <1450000>;
+-					regulator-always-on;
+ 					anatop-reg-offset = <0x140>;
+ 					anatop-vol-bit-shift = <9>;
+ 					anatop-vol-bit-width = <5>;
 -- 
 2.7.4
