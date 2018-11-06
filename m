@@ -1,41 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2018 12:37:00 +0000
-Subject: [PATCH v2 0/5] Spectre big.Little updates
-Message-ID: <20181106123700.GA30658@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 06 Nov 2018 12:38:34 +0000
+Subject: [PATCH 1/5] ARM: make lookup_processor_type() non-__init
+In-Reply-To: <20181106123700.GA30658@n2100.armlinux.org.uk>
+References: <20181106123700.GA30658@n2100.armlinux.org.uk>
+Message-ID: <E1gK0cs-0007In-5g@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches allows Spectre to be worked around on
-big.Little systems, and as far as I'm aware, completes the Spectre
-workarounds as were known at the beginning of the year for 32-bit
-ARM.
+Move lookup_processor_type() out of the __init section so it is callable
+from (eg) the secondary startup code during hotplug.
 
-In order to solve Spectre for such systems, we need to introduce
-per-CPU indirection of the "processor" vtable, but we are unable to
-use the kernel's per-CPU infrastructure as this is not initialised
-early enough.
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/kernel/head-common.S | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-To work around that, we fall back to using a static array of
-processor vtables indexed by the logical CPU number.  This should
-not be a problem as 32-bit ARM systems are limited to 8 logical
-CPUs.
-
-Changes in v2:
-We use CPU0's vtable for some of the function methods to avoid
-using the CPU number in pre-emptable code, and validate that these
-methods are identical across all CPUs in the system.
-
- arch/arm/include/asm/cputype.h  |  1 +
- arch/arm/include/asm/proc-fns.h | 58 ++++++++++++++++++++++++++++++++---------
- arch/arm/kernel/bugs.c          |  4 +--
- arch/arm/kernel/head-common.S   |  6 ++---
- arch/arm/kernel/setup.c         | 40 +++++++++++++++++-----------
- arch/arm/kernel/smp.c           | 31 ++++++++++++++++++++++
- arch/arm/mm/proc-v7-bugs.c      | 17 ++----------
- 7 files changed, 110 insertions(+), 47 deletions(-)
-
-
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 6e0375e7db05..997b02302c31 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -145,6 +145,9 @@ ENDPROC(__mmap_switched)
+ #endif
+ 	.size	__mmap_switched_data, . - __mmap_switched_data
+ 
++	__FINIT
++	.text
++
+ /*
+  * This provides a C-API version of __lookup_processor_type
+  */
+@@ -156,9 +159,6 @@ ENTRY(lookup_processor_type)
+ 	ldmfd	sp!, {r4 - r6, r9, pc}
+ ENDPROC(lookup_processor_type)
+ 
+-	__FINIT
+-	.text
+-
+ /*
+  * Read processor ID register (CP#15, CR0), and look up in the linker-built
+  * supported processor list.  Note that we can't use the absolute addresses
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.7.4
