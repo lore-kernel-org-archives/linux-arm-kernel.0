@@ -1,79 +1,130 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2018 10:14:37 +0000
-Subject: [PATCH] mm: improve/fix ARM v7_dma_inv_range() unaligned address
- handling
-In-Reply-To: <1541444814.537.8.camel@sageembedded.com>
-References: <1541444814.537.8.camel@sageembedded.com>
-Message-ID: <20181106101437.GY30658@n2100.armlinux.org.uk>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 6 Nov 2018 11:22:06 +0100
+Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
+References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
+ <20181105165321.7ea2b45f@bbrezillon>
+ <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
+ <20181106102851.61deb97a@bbrezillon>
+ <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
+Message-ID: <20181106112206.65a70a81@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 11:06:54AM -0800, Chris Cole wrote:
-> This patch addresses possible memory corruption when
-> v7_dma_inv_range(start_address, end_address) address parameters are not
-> aligned to whole cache lines. This function issues "invalidate" cache
-> management operations to all cache lines from start_address (inclusive)
-> to end_address (exclusive). When start_address and/or end_address are
-> not aligned, the start and/or end cache lines are first issued "clean &
-> invalidate" operation. The assumption is this is done to ensure that any
-> dirty data addresses outside the address range (but part of the first or
-> last cache lines) are cleaned/flushed so that data is not lost, which
-> could happen if just an invalidate is issued.
-> 
-> The problem is that these first/last partial cache lines are issued
-> "clean & invalidate" and then "invalidate". This second "invalidate" is
-> not required and worse can cause "lost" writes to addresses outside the
-> address range but part of the cache line. If another component writes to
-> its part of the cache line between the "clean & invalidate" and
-> "invalidate" operations, the write can get lost. This fix is to remove
-> the extra "invalidate" operation when unaligned addressed are used.
-> 
-> A kernel module is available that has a stress test to reproduce the
-> issue and a unit test of the updated v7_dma_inv_range(). It can be
-> downloaded from
-> http://ftp.sageembedded.com/outgoing/linux/cache-test-20181102.tgz.
-> 
-> v7_dma_inv_range() is call by dmac_[un]map_area(addr, len, direction)
-> when the direction is DMA_FROM_DEVICE. One can (I believe) successfully
-> argue that DMA from a device to main memory should use buffers aligned
-> to cache line size, because the "clean & invalidate" might overwrite
-> data that the device just wrote using DMA. But if a driver does use
-> unaligned buffers, at least this fix will prevent memory corruption
-> outside the buffer.
-> 
-> Signed-off-by: chris at sageembedded.com
+On Tue, 6 Nov 2018 18:00:37 +0800
+Liang Yang <liang.yang@amlogic.com> wrote:
 
-I think there's a simpler patch to this:
+> On 2018/11/6 17:28, Boris Brezillon wrote:
+> > On Tue, 6 Nov 2018 17:08:00 +0800
+> > Liang Yang <liang.yang@amlogic.com> wrote:
+> >   
+> >> On 2018/11/5 23:53, Boris Brezillon wrote:  
+> >>> On Fri, 2 Nov 2018 00:42:21 +0800
+> >>> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
+> >>>      
+> >>>> +
+> >>>> +static inline u8 meson_nfc_read_byte(struct mtd_info *mtd)
+> >>>> +{
+> >>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
+> >>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> >>>> +	u32 cmd;
+> >>>> +
+> >>>> +	cmd = nfc->param.chip_select | NFC_CMD_DRD | 0;
+> >>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
+> >>>> +
+> >>>> +	meson_nfc_drain_cmd(nfc);  
+> >>>
+> >>> You probably don't want to drain the FIFO every time you read a byte on
+> >>> the bus, and I guess the INPUT FIFO is at least as big as the CMD
+> >>> FIFO, right? If that's the case, you should queue as much DRD cmd as
+> >>> possible and only sync when the user explicitly requests it or when
+> >>> the INPUT/READ FIFO is full.
+> >>>      
+> >> Register 'NFC_REG_BUF' can holds only 4 bytes, also DRD sends only one
+> >> nand cycle to read one byte and covers the 1st byte every time reading.
+> >> i think nfc controller is faster than nand cycle, but really it is not
+> >> high efficiency when reading so many bytes once.
+> >> Or use dma command here like read_page and read_page_raw.  
+> > 
+> > Yep, that's also an alternative, though you'll have to make sure the
+> > buffer passed through the nand_op_inst is DMA-safe, and use a bounce
+> > buffer when that's not the case.
+> >   
+> ok, i will try dma here.
 
- arch/arm/mm/cache-v7.S | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+We should probably expose the bounce buf handling as generic helpers at
+the rawnand level:
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 215df435bfb9..2149b47a0c5a 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -360,14 +360,16 @@ ENDPROC(v7_flush_kern_dcache_area)
- 	ALT_UP(W(nop))
- #endif
- 	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line
-+	addne	r0, r0, r2			@ next cache line
- 
- 	tst	r1, r3
- 	bic	r1, r1, r3
- 	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D / U line
--1:
--	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
--	add	r0, r0, r2
- 	cmp	r0, r1
-+1:
-+	mcrlo	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
-+	addlo	r0, r0, r2
-+	cmplo	r0, r1
- 	blo	1b
- 	dsb	st
- 	ret	lr
+void *nand_op_get_dma_safe_input_buf(struct nand_op_instr *instr)
+{
+	void *buf;
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR))
+		return NULL;
+
+	if (virt_addr_valid(instr->data.in) &&
+	    !object_is_on_stack(instr->data.buf.in))
+		return instr->data.buf.in;
+
+	return kzalloc(instr->data.len, GFP_KERNEL);
+}
+
+void nand_op_put_dma_safe_input_buf(struct nand_op_instr *instr,
+				    void *buf)
+{
+	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR) ||
+	    WARN_ON(!buf))
+		return;
+
+	if (buf == instr->data.buf.in)
+		return;
+
+	memcpy(instr->data.buf.in, buf, instr->data.len);
+	kfree(buf);
+}
+
+const void *nand_op_get_dma_safe_output_buf(struct nand_op_instr *instr)
+{
+	void *buf;
+
+	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR))
+		return NULL;
+
+	if (virt_addr_valid(instr->data.out) &&
+	    !object_is_on_stack(instr->data.buf.out))
+		return instr->data.buf.out;
+
+	return kmemdup(instr->data.buf.out, GFP_KERNEL);
+}
+
+void nand_op_put_dma_safe_output_buf(struct nand_op_instr *instr,
+				    void *buf)
+{
+	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR) ||
+	    WARN_ON(!buf))
+		return;
+
+	if (buf != instr->data.buf.out)
+		kfree(buf);
+}
+
+> > 
+> > Isn't the controller engine able to wait on the data transfer to be
+> > complete before sending the next instruction in the CMD FIFO pipe?
+> > I'm pretty sure it's able to do that, which would make
+> > meson_nfc_wait_dma_finish() useless, and all you'd have to do is wait
+> > for the CMD FIFO to be empty (assuming it guarantees the last command
+> > has been executed).
+> > Maybe the nfc design is difference. dedicated nfc dma engine is   
+> concatenated with the command fifo, there is no other status to check 
+> whether dma is done.
+
+No, I mean that internally a "DMA-transfer" instruction probably
+forces the NAND controller to wait for the DMA transfer to be finished
+before dequeuing/executing the next instruction. So, it should be safe
+to queue the PROG and WAIT_RB instructions and just rely on the "FIFO
+empty" event to consider the operation as finished. Then, all you'll
+have to do is check the status reg to determine whether the
+write operation succeeded or not.
