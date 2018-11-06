@@ -1,143 +1,74 @@
-From: liang.yang@amlogic.com (Liang Yang)
-Date: Tue, 6 Nov 2018 19:08:27 +0800
-Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-In-Reply-To: <20181106112206.65a70a81@bbrezillon>
-References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
- <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
- <20181105165321.7ea2b45f@bbrezillon>
- <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
- <20181106102851.61deb97a@bbrezillon>
- <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
- <20181106112206.65a70a81@bbrezillon>
-Message-ID: <99475361-0115-7c16-3b7e-8f0d3a779446@amlogic.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 6 Nov 2018 12:13:10 +0100
+Subject: [PATCH 0/3] drm/meson: Add support for Overlay and OSD Plane
+ scaling
+In-Reply-To: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
+References: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20181106111310.GP21967@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 06, 2018 at 10:39:59AM +0100, Neil Armstrong wrote:
+> This serie adds support for :
+> - Overlay Plane blended with the primary plane, we can describe as "behind"
+> - Primary Plane up-scaling up to 5x factor to support the OSD plane being
+>   upscaled from 1920x1080 when the display mode is set as 3840x2160.
+> 
+> These patches depends on the "drm/meson: Allow using optional canvas provider"
+> patchset from Maxime Jourdan at [1]
+> 
+> [1] https://patchwork.kernel.org/project/linux-amlogic/list/?series=38355
+> 
+> Neil Armstrong (3):
+>   drm/meson: Support Overlay plane for video rendering
+>   drm/meson: move OSD scaler management into plane atomic update
+>   drm/meson: Add primary plane scaling
 
-On 2018/11/6 18:22, Boris Brezillon wrote:
-> On Tue, 6 Nov 2018 18:00:37 +0800
-> Liang Yang <liang.yang@amlogic.com> wrote:
-> 
->> On 2018/11/6 17:28, Boris Brezillon wrote:
->>> On Tue, 6 Nov 2018 17:08:00 +0800
->>> Liang Yang <liang.yang@amlogic.com> wrote:
->>>    
->>>> On 2018/11/5 23:53, Boris Brezillon wrote:
->>>>> On Fri, 2 Nov 2018 00:42:21 +0800
->>>>> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
->>>>>       
->>>>>> +
->>>>>> +static inline u8 meson_nfc_read_byte(struct mtd_info *mtd)
->>>>>> +{
->>>>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
->>>>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
->>>>>> +	u32 cmd;
->>>>>> +
->>>>>> +	cmd = nfc->param.chip_select | NFC_CMD_DRD | 0;
->>>>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
->>>>>> +
->>>>>> +	meson_nfc_drain_cmd(nfc);
->>>>>
->>>>> You probably don't want to drain the FIFO every time you read a byte on
->>>>> the bus, and I guess the INPUT FIFO is at least as big as the CMD
->>>>> FIFO, right? If that's the case, you should queue as much DRD cmd as
->>>>> possible and only sync when the user explicitly requests it or when
->>>>> the INPUT/READ FIFO is full.
->>>>>       
->>>> Register 'NFC_REG_BUF' can holds only 4 bytes, also DRD sends only one
->>>> nand cycle to read one byte and covers the 1st byte every time reading.
->>>> i think nfc controller is faster than nand cycle, but really it is not
->>>> high efficiency when reading so many bytes once.
->>>> Or use dma command here like read_page and read_page_raw.
->>>
->>> Yep, that's also an alternative, though you'll have to make sure the
->>> buffer passed through the nand_op_inst is DMA-safe, and use a bounce
->>> buffer when that's not the case.
->>>    
->> ok, i will try dma here.
-> 
-> We should probably expose the bounce buf handling as generic helpers at
-> the rawnand level:
-> 
-> void *nand_op_get_dma_safe_input_buf(struct nand_op_instr *instr)
-> {
-> 	void *buf;
-> 
-> 	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR))
-> 		return NULL;
-> 
-> 	if (virt_addr_valid(instr->data.in) &&
-> 	    !object_is_on_stack(instr->data.buf.in))
-> 		return instr->data.buf.in;
-> 
-> 	return kzalloc(instr->data.len, GFP_KERNEL);
-> }
-> 
-> void nand_op_put_dma_safe_input_buf(struct nand_op_instr *instr,
-> 				    void *buf)
-> {
-> 	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR) ||
-> 	    WARN_ON(!buf))
-> 		return;
-> 
-> 	if (buf == instr->data.buf.in)
-> 		return;
-> 
-> 	memcpy(instr->data.buf.in, buf, instr->data.len);
-> 	kfree(buf);
-> }
-> 
-> const void *nand_op_get_dma_safe_output_buf(struct nand_op_instr *instr)
-> {
-> 	void *buf;
-> 
-> 	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR))
-> 		return NULL;
-> 
-> 	if (virt_addr_valid(instr->data.out) &&
-> 	    !object_is_on_stack(instr->data.buf.out))
-> 		return instr->data.buf.out;
-> 
-> 	return kmemdup(instr->data.buf.out, GFP_KERNEL);
-> }
-> 
-> void nand_op_put_dma_safe_output_buf(struct nand_op_instr *instr,
-> 				    void *buf)
-> {
-> 	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR) ||
-> 	    WARN_ON(!buf))
-> 		return;
-> 
-> 	if (buf != instr->data.buf.out)
-> 		kfree(buf);
-> }
->
+Got bored, read a bit your patch series. Two things I've noticed:
+- We need to drop the crtc_state argument from
+  drm_atomic_helper_check_plane_state(), some drivers (not meson) do
+  really funny stuff with this.
 
-that is more convenient.
-i will use meson_chip->databuf as the bounce mid-buffer now.
+- I think your osd1_commit = true update is racy with the interrupt
+  handler checking it. Needs at least a few memory barriers. Since helpers
+  guarantee that you can't overtake a preceending update (you do the
+  vblank handling after the updating) that should be ok, except you arm
+  the vblank before setting up registers, so this might race too.
 
->>>
->>> Isn't the controller engine able to wait on the data transfer to be
->>> complete before sending the next instruction in the CMD FIFO pipe?
->>> I'm pretty sure it's able to do that, which would make
->>> meson_nfc_wait_dma_finish() useless, and all you'd have to do is wait
->>> for the CMD FIFO to be empty (assuming it guarantees the last command
->>> has been executed).
->>> Maybe the nfc design is difference. dedicated nfc dma engine is
->> concatenated with the command fifo, there is no other status to check
->> whether dma is done.
-> 
-> No, I mean that internally a "DMA-transfer" instruction probably
-> forces the NAND controller to wait for the DMA transfer to be finished
-> before dequeuing/executing the next instruction. So, it should be safe
-> to queue the PROG and WAIT_RB instructions and just rely on the "FIFO
-> empty" event to consider the operation as finished. Then, all you'll
-> have to do is check the status reg to determine whether the
-> write operation succeeded or not.
-> 
-em, i got the point. indeed, until dma is checked done, nfc will execute 
-next command in the command queue. so i will consider it.
+Anyway all unrelated, so feel free to smash an
 
-> .
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+
+on the entire series.
+
+Cheers, Daniel
+
 > 
+>  drivers/gpu/drm/meson/Makefile          |   2 +-
+>  drivers/gpu/drm/meson/meson_canvas.c    |   7 +-
+>  drivers/gpu/drm/meson/meson_canvas.h    |  11 +-
+>  drivers/gpu/drm/meson/meson_crtc.c      | 251 +++++++++++++-
+>  drivers/gpu/drm/meson/meson_drv.c       |  29 +-
+>  drivers/gpu/drm/meson/meson_drv.h       |  62 ++++
+>  drivers/gpu/drm/meson/meson_overlay.c   | 586 ++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/meson/meson_overlay.h   |  14 +
+>  drivers/gpu/drm/meson/meson_plane.c     | 177 ++++++++--
+>  drivers/gpu/drm/meson/meson_registers.h |   3 +
+>  drivers/gpu/drm/meson/meson_viu.c       |  15 +
+>  drivers/gpu/drm/meson/meson_vpp.c       |  90 +++--
+>  12 files changed, 1156 insertions(+), 91 deletions(-)
+>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.c
+>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.h
+> 
+> -- 
+> 2.7.4
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
