@@ -1,25 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2018 17:14:37 +0000
-Subject: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
- huge_ptep_set_access_flags
-In-Reply-To: <8898674D84E3B24BA3A2D289B872026A6A031841@G01JPEXMBKW03>
-References: <20180919174437.1866-1-steve.capper@arm.com>
- <8898674D84E3B24BA3A2D289B872026A6A031841@G01JPEXMBKW03>
-Message-ID: <20181106171436.GB28592@brain-police>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Tue, 06 Nov 2018 18:20:39 +0100
+Subject: [PATCH v3 00/28] Allwinner H6 DE3 and HDMI support
+In-Reply-To: <20181105094341.qedt7jvnxooiojki@flea>
+References: <20181104182705.18047-1-jernej.skrabec@siol.net>
+ <20181105094341.qedt7jvnxooiojki@flea>
+Message-ID: <3766119.46PGZN2PQn@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lei Zhang,
+Dne ponedeljek, 05. november 2018 ob 10:43:41 CET je Maxime Ripard napisal(a):
+> On Sun, Nov 04, 2018 at 07:26:37PM +0100, Jernej Skrabec wrote:
+> > This series adds support for Display Engine 3.0 and HDMI 2.0a, which
+> > can be found on H6 SoC.
+> > 
+> > Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
+> > displaying and processing 10-bit and AFBC formats, which are not yet
+> > supported by this series.
+> > 
+> > H6 is also the first SoC which supports IOMMU, but support for it is
+> > not yet added.
+> > 
+> > This series is based on linux-next at next-20181102.
+> > 
+> > I suggest all patches go through allwinner tree, except DRM patches,
+> > which should go through drm-misc tree.
+> 
+> Applied all patches up to the 26. The two last one however should not
+> use the clk bindings define you added in the first clk patches, since
+> clk and dt patches are going through different tree.
 
-On Tue, Nov 06, 2018 at 01:16:01PM +0000, Zhang, Lei wrote:
-> Sorry to late.
-> Thanks for your patch, and I will test your patch.
+I went over clock defines again, but I don't think I use anything new. New 
+defines are:
 
-Probably best to test the version that landed in mainline, as I think we
-went through a few revisions of this:
+#define CLK_BUS_ROT            9
+#define CLK_ROT                        10
+#define RST_ROT                3
 
-http://git.kernel.org/linus/031e6e6b4e12
+but none of them are actually used in DT.
 
-Thanks!
+Did I miss anything?
 
-Will
+Best regards,
+Jernej
