@@ -1,51 +1,16 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 6 Nov 2018 10:17:41 +0100
+Date: Tue, 6 Nov 2018 10:18:01 +0100
 Subject: [PATCH 2/2] arm64: dts: r8a77990: ebisu: Enable SDHI interfaces
-In-Reply-To: <OSBPR01MB2293D944698EE5776B23B00DD8CB0@OSBPR01MB2293.jpnprd01.prod.outlook.com>
+In-Reply-To: <20181106083450.GB1054@kunai>
 References: <20181105214117.11734-1-marek.vasut+renesas@gmail.com>
  <20181105214117.11734-2-marek.vasut+renesas@gmail.com>
- <OSBPR01MB2293D944698EE5776B23B00DD8CB0@OSBPR01MB2293.jpnprd01.prod.outlook.com>
-Message-ID: <cf18a8e6-e550-d7d0-c66c-fb5874b7a65c@gmail.com>
+ <20181106083450.GB1054@kunai>
+Message-ID: <3e933acf-33d1-ca27-e463-57345c79396a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2018 06:29 AM, Yoshihiro Shimoda wrote:
-> Hello Marek-san,
-
-Hello Shimoda-san,
-
->> From: Marek Vasut, Sent: Tuesday, November 6, 2018 6:41 AM
->>
->> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->>
->> This patch enables SD card slot connected to SDHI0, micro SD card slot
->> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board using
->> the R8A77990 SoC.
->>
->> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->> Cc: Simon Horman <horms+renesas@verge.net.au>
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Cc: linux-renesas-soc at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> ---
+On 11/06/2018 09:34 AM, Wolfram Sang wrote:
 > 
-> Thank you for the patch!
-> 
-> Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> 
-> I have a few nit comments below.
-> 
->>  .../arm64/boot/dts/renesas/r8a77990-ebisu.dts | 136 ++++++++++++++++++
->>  1 file changed, 136 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
->> index 611f0265fcc5..bda1765dcdbd 100644
->> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
->> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-> <snip>
 >> +	sdhi3_pins: sd3 {
 >> +		groups = "sdhi3_data8", "sdhi3_ctrl";
 >> +		function = "sdhi3";
@@ -58,9 +23,10 @@ Hello Shimoda-san,
 >> +		power-source = <1800>;
 >> +	};
 > 
-> I assumed that we will add "sdhi3_ds" into these groups when we add support for HS400 mode.
+> Shouldn't we have only one pinctrl config here, like you did recently
+> for the other Gen3 SoCs?
 
-That's a good point, I think we can add it right away, so added in V2.
+We should, thanks for pointing it out, fixed in V2.
 
 -- 
 Best regards,
