@@ -1,32 +1,42 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 6 Nov 2018 10:18:01 +0100
-Subject: [PATCH 2/2] arm64: dts: r8a77990: ebisu: Enable SDHI interfaces
-In-Reply-To: <20181106083450.GB1054@kunai>
+Date: Tue, 6 Nov 2018 10:42:11 +0100
+Subject: [PATCH 1/2] arm64: dts: r8a77990: Add SDHI device nodes
+In-Reply-To: <OSBPR01MB229351FF35C839C4E9A7F19CD8CB0@OSBPR01MB2293.jpnprd01.prod.outlook.com>
 References: <20181105214117.11734-1-marek.vasut+renesas@gmail.com>
- <20181105214117.11734-2-marek.vasut+renesas@gmail.com>
- <20181106083450.GB1054@kunai>
-Message-ID: <3e933acf-33d1-ca27-e463-57345c79396a@gmail.com>
+ <OSBPR01MB229351FF35C839C4E9A7F19CD8CB0@OSBPR01MB2293.jpnprd01.prod.outlook.com>
+Message-ID: <7ab702f0-e78c-94c5-b74f-bac1803fb513@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2018 09:34 AM, Wolfram Sang wrote:
-> 
->> +	sdhi3_pins: sd3 {
->> +		groups = "sdhi3_data8", "sdhi3_ctrl";
->> +		function = "sdhi3";
->> +		power-source = <1800>;
->> +	};
->> +
->> +	sdhi3_pins_uhs: sd3_uhs {
->> +		groups = "sdhi3_data8", "sdhi3_ctrl";
->> +		function = "sdhi3";
->> +		power-source = <1800>;
->> +	};
-> 
-> Shouldn't we have only one pinctrl config here, like you did recently
-> for the other Gen3 SoCs?
+On 11/06/2018 06:26 AM, Yoshihiro Shimoda wrote:
+> Hello Marek-san,
 
-We should, thanks for pointing it out, fixed in V2.
+Hello Shimoda-san,
+
+>> From: Marek Vasut, Sent: Tuesday, November 6, 2018 6:41 AM
+>>
+>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>
+>> This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC.
+>>
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Cc: Simon Horman <horms+renesas@verge.net.au>
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>> Cc: linux-renesas-soc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+> 
+> Thank you for the patch!
+> 
+> Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> 
+> I guess this patch and the 2/2 patch for ebisu have to be merged into a patch though.
+
+I wonder about that, 1/2 is adding SDHI DT nodes for an SoC, 2/2 is
+enabling SDHI on a particular board, which I think should be separate.
 
 -- 
 Best regards,
