@@ -1,35 +1,90 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 6 Nov 2018 08:25:12 -0500 (EST)
-Subject: [PATCH 1/2] ARM: copypage-fa: add kto and kfrom to input operands
- list
-In-Reply-To: <6a59717f-8ae8-54f7-b948-b145171c82c3@arm.com>
-References: <20181015221629.13924-1-stefan@agner.ch>
- <CACRpkdaVGKLtE-whhK3oFgY+4xoy1JqWkcBW4UO0-hJs2B-QGg@mail.gmail.com>
- <20181016084416.GF30658@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1810161357580.1498@knanqh.ubzr>
- <fe7595f5d02424c9d92e437cd20361f9@agner.ch>
- <nycvar.YSQ.7.76.1811052231220.1498@knanqh.ubzr>
- <6a59717f-8ae8-54f7-b948-b145171c82c3@arm.com>
-Message-ID: <nycvar.YSQ.7.76.1811060823150.1498@knanqh.ubzr>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 6 Nov 2018 14:36:56 +0100
+Subject: [PATCH 0/3] drm/meson: Add support for Overlay and OSD Plane
+ scaling
+In-Reply-To: <20181106111310.GP21967@phenom.ffwll.local>
+References: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
+ <20181106111310.GP21967@phenom.ffwll.local>
+Message-ID: <c991c4cc-317c-19e7-a106-ce675f239559@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Nov 2018, Robin Murphy wrote:
+Hi Daniel,
 
-> On 06/11/2018 04:49, Nicolas Pitre wrote:
-> [...]
-> >> r3 and r5 are not used above, so no need to have them in the clobber
-> >> list.
-> > 
-> > They are used. ldrd and strd instructions always use a pair of
-> > consecutive registers. So "ldrd r2, ..." loads into r2-r3 and "ldrd r4, ..."
-> > loads into r4-r5.
+On 06/11/2018 12:13, Daniel Vetter wrote:
+> On Tue, Nov 06, 2018 at 10:39:59AM +0100, Neil Armstrong wrote:
+>> This serie adds support for :
+>> - Overlay Plane blended with the primary plane, we can describe as "behind"
+>> - Primary Plane up-scaling up to 5x factor to support the OSD plane being
+>>   upscaled from 1920x1080 when the display mode is set as 3840x2160.
+>>
+>> These patches depends on the "drm/meson: Allow using optional canvas provider"
+>> patchset from Maxime Jourdan at [1]
+>>
+>> [1] https://patchwork.kernel.org/project/linux-amlogic/list/?series=38355
+>>
+>> Neil Armstrong (3):
+>>   drm/meson: Support Overlay plane for video rendering
+>>   drm/meson: move OSD scaler management into plane atomic update
+>>   drm/meson: Add primary plane scaling
 > 
-> FWIW, since we should now be enabling unified syntax everywhere, I guess we
-> could probably rewrite all those ldrd/strd to the UAL 3-operand form - i.e.
-> "ldrd r2, r3, [...]" - if we really cared for the extra clarity.
+> Got bored, read a bit your patch series. Two things I've noticed:
 
-Good idea. Worthy of a separate patch though.
+Great you got bored today !
 
+> - We need to drop the crtc_state argument from
+>   drm_atomic_helper_check_plane_state(), some drivers (not meson) do
+>   really funny stuff with this.
 
-Nicolas
+Should drm_atomic_get_crtc_state() be integrated into drm_atomic_helper_check_plane_state() ?
+
+> 
+> - I think your osd1_commit = true update is racy with the interrupt
+>   handler checking it. Needs at least a few memory barriers. Since helpers
+>   guarantee that you can't overtake a preceending update (you do the
+>   vblank handling after the updating) that should be ok, except you arm
+>   the vblank before setting up registers, so this might race too.
+
+Yeah, I need to do a cleanup of this at some point...
+
+> 
+> Anyway all unrelated, so feel free to smash an
+> 
+> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> 
+> on the entire series.
+
+thanks !
+
+Will push to drm-misc-next once the branch is ready.
+
+Neil
+
+> 
+> Cheers, Daniel
+> 
+>>
+>>  drivers/gpu/drm/meson/Makefile          |   2 +-
+>>  drivers/gpu/drm/meson/meson_canvas.c    |   7 +-
+>>  drivers/gpu/drm/meson/meson_canvas.h    |  11 +-
+>>  drivers/gpu/drm/meson/meson_crtc.c      | 251 +++++++++++++-
+>>  drivers/gpu/drm/meson/meson_drv.c       |  29 +-
+>>  drivers/gpu/drm/meson/meson_drv.h       |  62 ++++
+>>  drivers/gpu/drm/meson/meson_overlay.c   | 586 ++++++++++++++++++++++++++++++++
+>>  drivers/gpu/drm/meson/meson_overlay.h   |  14 +
+>>  drivers/gpu/drm/meson/meson_plane.c     | 177 ++++++++--
+>>  drivers/gpu/drm/meson/meson_registers.h |   3 +
+>>  drivers/gpu/drm/meson/meson_viu.c       |  15 +
+>>  drivers/gpu/drm/meson/meson_vpp.c       |  90 +++--
+>>  12 files changed, 1156 insertions(+), 91 deletions(-)
+>>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.c
+>>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.h
+>>
+>> -- 
+>> 2.7.4
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
