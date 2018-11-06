@@ -1,64 +1,58 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue,  6 Nov 2018 18:30:23 +0100
-Subject: [PATCH v10 08/22] kasan,
- arm64: untag address in __kimg_to_phys and _virt_addr_is_linear
+Date: Tue,  6 Nov 2018 18:30:19 +0100
+Subject: [PATCH v10 04/22] kasan: rename source files to reflect the new
+ naming scheme
 In-Reply-To: <cover.1541525354.git.andreyknvl@google.com>
 References: <cover.1541525354.git.andreyknvl@google.com>
-Message-ID: <b2aa056b65b8f1a410379bf2f6ef439d5d99e8eb.1541525354.git.andreyknvl@google.com>
+Message-ID: <05fbfe73d79159af71bfded4d3b46f8055329e1a.1541525354.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__kimg_to_phys (which is used by virt_to_phys) and _virt_addr_is_linear
-(which is used by virt_addr_valid) assume that the top byte of the address
-is 0xff, which isn't always the case with tag-based KASAN.
-
-This patch resets the tag in those macros.
+We now have two KASAN modes: generic KASAN and tag-based KASAN. Rename
+kasan.c to generic.c to reflect that. Also rename kasan_init.c to init.c
+as it contains initialization code for both KASAN modes.
 
 Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
 Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/include/asm/memory.h | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ mm/kasan/Makefile                 | 8 ++++----
+ mm/kasan/{kasan.c => generic.c}   | 0
+ mm/kasan/{kasan_init.c => init.c} | 0
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+ rename mm/kasan/{kasan.c => generic.c} (100%)
+ rename mm/kasan/{kasan_init.c => init.c} (100%)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 0f1e024a951f..3226a0218b0b 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -92,6 +92,15 @@
- #define KASAN_THREAD_SHIFT	0
- #endif
+diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
+index a6df14bffb6b..d643530b24aa 100644
+--- a/mm/kasan/Makefile
++++ b/mm/kasan/Makefile
+@@ -1,14 +1,14 @@
+ # SPDX-License-Identifier: GPL-2.0
+ KASAN_SANITIZE := n
+ UBSAN_SANITIZE_common.o := n
+-UBSAN_SANITIZE_kasan.o := n
++UBSAN_SANITIZE_generic.o := n
+ KCOV_INSTRUMENT := n
  
-+#ifdef CONFIG_KASAN_SW_TAGS
-+#define KASAN_TAG_SHIFTED(tag)		((unsigned long)(tag) << 56)
-+#define KASAN_SET_TAG(addr, tag)	(((addr) & ~KASAN_TAG_SHIFTED(0xff)) | \
-+						KASAN_TAG_SHIFTED(tag))
-+#define KASAN_RESET_TAG(addr)		KASAN_SET_TAG(addr, 0xff)
-+#else
-+#define KASAN_RESET_TAG(addr)		addr
-+#endif
-+
- #define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
+-CFLAGS_REMOVE_kasan.o = -pg
++CFLAGS_REMOVE_generic.o = -pg
+ # Function splitter causes unnecessary splits in __asan_load1/__asan_store1
+ # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63533
  
- /*
-@@ -232,7 +241,7 @@ static inline unsigned long kaslr_offset(void)
- #define __is_lm_address(addr)	(!!((addr) & BIT(VA_BITS - 1)))
+ CFLAGS_common.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+-CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
++CFLAGS_generic.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
  
- #define __lm_to_phys(addr)	(((addr) & ~PAGE_OFFSET) + PHYS_OFFSET)
--#define __kimg_to_phys(addr)	((addr) - kimage_voffset)
-+#define __kimg_to_phys(addr)	(KASAN_RESET_TAG(addr) - kimage_voffset)
- 
- #define __virt_to_phys_nodebug(x) ({					\
- 	phys_addr_t __x = (phys_addr_t)(x);				\
-@@ -308,7 +317,8 @@ static inline void *phys_to_virt(phys_addr_t x)
- #endif
- #endif
- 
--#define _virt_addr_is_linear(kaddr)	(((u64)(kaddr)) >= PAGE_OFFSET)
-+#define _virt_addr_is_linear(kaddr)	(KASAN_RESET_TAG((u64)(kaddr)) >= \
-+						PAGE_OFFSET)
- #define virt_addr_valid(kaddr)		(_virt_addr_is_linear(kaddr) && \
- 					 _virt_addr_valid(kaddr))
- 
+-obj-y := common.o kasan.o report.o kasan_init.o quarantine.o
++obj-y := common.o generic.o report.o init.o quarantine.o
+diff --git a/mm/kasan/kasan.c b/mm/kasan/generic.c
+similarity index 100%
+rename from mm/kasan/kasan.c
+rename to mm/kasan/generic.c
+diff --git a/mm/kasan/kasan_init.c b/mm/kasan/init.c
+similarity index 100%
+rename from mm/kasan/kasan_init.c
+rename to mm/kasan/init.c
 -- 
 2.19.1.930.g4563a0d9d0-goog
