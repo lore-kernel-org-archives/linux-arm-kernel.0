@@ -1,112 +1,56 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  6 Nov 2018 15:57:35 +0100
-Subject: [PATCH v2 2/4] clk: meson-gxbb: Fix HDMI PLL for GXL SoCs
-In-Reply-To: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
-References: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1541516257-16157-3-git-send-email-narmstrong@baylibre.com>
+Date: Tue,  6 Nov 2018 15:57:33 +0100
+Subject: [PATCH v2 0/4] clk: meson: Add video clocks path
+Message-ID: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an attempt to better describe the HDMI PLL, a single DCO clock was
-left for GXBB and GXL, but the GXL DCO does not have a pre-multiplier.
+This patchset is an attempt to handle the Amlogic Meson GX Video clock
+in the Common Clock Framework in order to move the video pipeline and
+HDMI controller clock management out of the Meson DRM Driver.
 
-This patch adds back a GXL specific HDMI PLL DCO with xtal as parent.
+In order :
+- Add support the VID_PLL fully programmable divider used right after the
+  HDMI PLL clock source.
+- Fix the GXL HDMI PLL DCO
+- Add the video clock bindings covering all the video graphics pipeline
+  and the HDMI controller.
+- Add the clocks entries used in the video clock path
 
-Fixes: 87173557d2f6 ("clk: meson: clk-pll: remove od parameters")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/clk/meson/gxbb.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 49 insertions(+), 2 deletions(-)
+The vid_pll programmable divider is introduced in its R/O form right now,
+but will be extended to be R/W in a next iteration.
 
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index 9309cfa..0fd354b 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -199,6 +199,52 @@ static struct clk_regmap gxbb_hdmi_pll_dco = {
- 	},
- };
- 
-+static struct clk_regmap gxl_hdmi_pll_dco = {
-+	.data = &(struct meson_clk_pll_data){
-+		.en = {
-+			.reg_off = HHI_HDMI_PLL_CNTL,
-+			.shift   = 30,
-+			.width   = 1,
-+		},
-+		.m = {
-+			.reg_off = HHI_HDMI_PLL_CNTL,
-+			.shift   = 0,
-+			.width   = 9,
-+		},
-+		.n = {
-+			.reg_off = HHI_HDMI_PLL_CNTL,
-+			.shift   = 9,
-+			.width   = 5,
-+		},
-+		.frac = {
-+			.reg_off = HHI_HDMI_PLL_CNTL2,
-+			.shift   = 0,
-+			.width   = 12,
-+		},
-+		.l = {
-+			.reg_off = HHI_HDMI_PLL_CNTL,
-+			.shift   = 31,
-+			.width   = 1,
-+		},
-+		.rst = {
-+			.reg_off = HHI_HDMI_PLL_CNTL,
-+			.shift   = 28,
-+			.width   = 1,
-+		},
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "hdmi_pll_dco",
-+		.ops = &meson_clk_pll_ro_ops,
-+		.parent_names = (const char *[]){ "xtal" },
-+		.num_parents = 1,
-+		/*
-+		 * Display directly handle hdmi pll registers ATM, we need
-+		 * NOCACHE to keep our view of the clock as accurate as possible
-+		 */
-+		.flags = CLK_GET_RATE_NOCACHE,
-+	},
-+};
-+
- static struct clk_regmap gxbb_hdmi_pll_od = {
- 	.data = &(struct clk_regmap_div_data){
- 		.offset = HHI_HDMI_PLL_CNTL2,
-@@ -2089,7 +2135,7 @@ static struct clk_hw_onecell_data gxl_hw_onecell_data = {
- 		[CLKID_GEN_CLK_DIV]	    = &gxbb_gen_clk_div.hw,
- 		[CLKID_GEN_CLK]		    = &gxbb_gen_clk.hw,
- 		[CLKID_FIXED_PLL_DCO]	    = &gxbb_fixed_pll_dco.hw,
--		[CLKID_HDMI_PLL_DCO]	    = &gxbb_hdmi_pll_dco.hw,
-+		[CLKID_HDMI_PLL_DCO]	    = &gxl_hdmi_pll_dco.hw,
- 		[CLKID_HDMI_PLL_OD]	    = &gxl_hdmi_pll_od.hw,
- 		[CLKID_HDMI_PLL_OD2]	    = &gxl_hdmi_pll_od2.hw,
- 		[CLKID_SYS_PLL_DCO]	    = &gxbb_sys_pll_dco.hw,
-@@ -2104,6 +2150,7 @@ static struct clk_regmap *const gxbb_clk_regmaps[] = {
- 	&gxbb_hdmi_pll,
- 	&gxbb_hdmi_pll_od,
- 	&gxbb_hdmi_pll_od2,
-+	&gxbb_hdmi_pll_dco,
- };
- 
- static struct clk_regmap *const gxl_clk_regmaps[] = {
-@@ -2111,6 +2158,7 @@ static struct clk_regmap *const gxl_clk_regmaps[] = {
- 	&gxl_hdmi_pll,
- 	&gxl_hdmi_pll_od,
- 	&gxl_hdmi_pll_od2,
-+	&gxl_hdmi_pll_dco,
- };
- 
- static struct clk_regmap *const gx_clk_regmaps[] = {
-@@ -2266,7 +2314,6 @@ static struct clk_regmap *const gx_clk_regmaps[] = {
- 	&gxbb_gen_clk_div,
- 	&gxbb_gen_clk,
- 	&gxbb_fixed_pll_dco,
--	&gxbb_hdmi_pll_dco,
- 	&gxbb_sys_pll_dco,
- 	&gxbb_gp0_pll,
- };
+All dividers are flagged with CLK_GET_RATE_NOCACHE, and all gates are flagged
+with CLK_IGNORE_UNUSED since they are currently directly handled by the
+Meson DRM Driver.
+
+Once the DRM Driver is fully migrated to using the Common Clock Framework
+to handle the video clock tree, the CLK_GET_RATE_NOCACHE and CLK_IGNORE_UNUSED
+will be dropped.
+
+Changes since v1 at [1]:
+ - Fixed comments from Martin
+ - Fixed GXL HDMI PLL DCO
+ - Added the missing HDMI controller clock
+ - Moved bindings to a separate patch
+ - Updated the commit logs
+
+[1] https://lkml.kernel.org/r/1532079581-978-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (4):
+  clk: meson: Add vid_pll divider driver
+  clk: meson-gxbb: Fix HDMI PLL for GXL SoCs
+  dt-bindings: clk: meson-gxbb: Add Video clock bindings
+  clk: meson-gxbb: Add video clocks
+
+ drivers/clk/meson/Makefile            |   2 +-
+ drivers/clk/meson/clkc.h              |   6 +
+ drivers/clk/meson/gxbb.c              | 773 +++++++++++++++++++++++++++++++++-
+ drivers/clk/meson/gxbb.h              |  26 +-
+ drivers/clk/meson/vid-pll-div.c       |  91 ++++
+ include/dt-bindings/clock/gxbb-clkc.h |  18 +
+ 6 files changed, 911 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/clk/meson/vid-pll-div.c
+
 -- 
 2.7.4
