@@ -1,41 +1,80 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 6 Nov 2018 07:46:55 +0100
-Subject: [PATCH v10 5/6] arm64: zynqmp: Add DDRC node
-In-Reply-To: <20181105204322.GE26868@zn.tnic>
-References: <1540447621-22870-1-git-send-email-manish.narani@xilinx.com>
- <1540447621-22870-6-git-send-email-manish.narani@xilinx.com>
- <20181105125644.GA7937@zn.tnic>
- <41c5ca53-ed4b-38d0-c612-e1229004293e@xilinx.com>
- <20181105132007.GB7937@zn.tnic>
- <a81f47e0-1778-a6ac-4cd8-634502661d6f@xilinx.com>
- <20181105134218.GD7937@zn.tnic>
- <CAOesGMj=EbWgcYF2Mhh6TFMCdn1ub1Ze6fbXJnFFdsttWByXYg@mail.gmail.com>
- <20181105194721.GB26868@zn.tnic>
- <CAOesGMjsPWeRZEeBH37uLQFBKwAWNMh5yCvuKNYrOUDfRSSYog@mail.gmail.com>
- <20181105204322.GE26868@zn.tnic>
-Message-ID: <38dc38b6-25f4-194c-9ba9-577d35e92700@xilinx.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Tue, 6 Nov 2018 14:41:57 +0800
+Subject: [PATCH v1 02/11] clk: mediatek: add new member to mtk_pll_data
+In-Reply-To: <20181106064206.17535-1-weiyi.lu@mediatek.com>
+References: <20181106064206.17535-1-weiyi.lu@mediatek.com>
+Message-ID: <20181106064206.17535-4-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05. 11. 18 21:43, Borislav Petkov wrote:
-> On Mon, Nov 05, 2018 at 12:38:05PM -0800, Olof Johansson wrote:
->> Yeah, that's the way we've been trying to do for various subsystems
->> and it's been working pretty well. Of course, if there's need to
->> coordinate more closely for something in the future we'll be happy to
->> do so.
-> 
-> Goodie. Let's do that for now and we can always revisit when there's
-> real need.
+From: Owen Chen <owen.chen@mediatek.com>
 
-I think Boris should take also this one (dt binding doc change) because
-it is aligned with changes in the driver.
-https://lkml.kernel.org/r/1538667328-9465-7-git-send-email-manish.narani at xilinx.com
+1. pcwibits: The integer bits of pcw for plls is extend to 8 bits,
+   add a variable to indicate this change and
+   backward-compatible.
+2. fmin: The pll freqency lower-bound is vary from 1GMhz to
+   1.5Ghz, add a variable to indicate platform-dependent.
 
-And I will take this one.
-https://lkml.kernel.org/r/1540447621-22870-6-git-send-email-manish.narani at xilinx.com
+Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+---
+ drivers/clk/mediatek/clk-mtk.h |  2 ++
+ drivers/clk/mediatek/clk-pll.c | 10 +++++++---
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
-But not a problem with taking both if you like but this make more sense
-to me.
-
-Thanks,
-Michal
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index f83c2bbb677e..1882221fe994 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -215,7 +215,9 @@ struct mtk_pll_data {
+ 	const struct clk_ops *ops;
+ 	u32 rst_bar_mask;
+ 	unsigned long fmax;
++	unsigned long fmin;
+ 	int pcwbits;
++	int pcwibits;
+ 	uint32_t pcw_reg;
+ 	int pcw_shift;
+ 	const struct mtk_pll_div_table *div_table;
+diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+index f54e4015b0b1..0ec2c62d9383 100644
+--- a/drivers/clk/mediatek/clk-pll.c
++++ b/drivers/clk/mediatek/clk-pll.c
+@@ -69,11 +69,13 @@ static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
+ {
+ 	int pcwbits = pll->data->pcwbits;
+ 	int pcwfbits;
++	int ibits;
+ 	u64 vco;
+ 	u8 c = 0;
+ 
+ 	/* The fractional part of the PLL divider. */
+-	pcwfbits = pcwbits > INTEGER_BITS ? pcwbits - INTEGER_BITS : 0;
++	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
++	pcwfbits = pcwbits > ibits ? pcwbits - ibits : 0;
+ 
+ 	vco = (u64)fin * pcw;
+ 
+@@ -138,9 +140,10 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
+ 		u32 freq, u32 fin)
+ {
+-	unsigned long fmin = 1000 * MHZ;
++	unsigned long fmin = pll->data->fmin ? pll->data->fmin : 1000 * MHZ;
+ 	const struct mtk_pll_div_table *div_table = pll->data->div_table;
+ 	u64 _pcw;
++	int ibits;
+ 	u32 val;
+ 
+ 	if (freq > pll->data->fmax)
+@@ -164,7 +167,8 @@ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
+ 	}
+ 
+ 	/* _pcw = freq * postdiv / fin * 2^pcwfbits */
+-	_pcw = ((u64)freq << val) << (pll->data->pcwbits - INTEGER_BITS);
++	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
++	_pcw = ((u64)freq << val) << (pll->data->pcwbits - ibits);
+ 	do_div(_pcw, fin);
+ 
+ 	*pcw = (u32)_pcw;
+-- 
+2.18.0
