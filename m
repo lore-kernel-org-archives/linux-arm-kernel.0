@@ -1,43 +1,39 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 6 Nov 2018 13:20:29 +0000
-Subject: [PATCH 13/23] PCI: mobiveil: move irq chained handler setup out of DT
- parse
+Date: Tue, 6 Nov 2018 13:20:35 +0000
+Subject: [PATCH 14/23] PCI: mobiveil: initialize Primary/Secondary/Subordinate
+ bus number
 In-Reply-To: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
 References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181106131807.29951-14-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181106131807.29951-15-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Move irq_set_chained_handler_and_data() out of DT parse function.
+The reset value is all zero, so set a workable value for Primary,
+Secondary and Subordinate bus numbers.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
- drivers/pci/controller/pcie-mobiveil.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pci/controller/pcie-mobiveil.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 4b21b8549664..3da924bb6b3c 100644
+index 3da924bb6b3c..8d6a1e98f655 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -460,8 +460,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
- 		return -ENODEV;
- 	}
+@@ -581,6 +581,12 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 	u32 value, pab_ctrl, type;
+ 	struct resource_entry *win;
  
--	irq_set_chained_handler_and_data(pcie->irq, mobiveil_pcie_isr, pcie);
--
- 	return 0;
- }
- 
-@@ -901,6 +899,8 @@ static int mobiveil_pcie_probe(struct platform_device *pdev)
- 		goto error;
- 	}
- 
-+	irq_set_chained_handler_and_data(pcie->irq, mobiveil_pcie_isr, pcie);
++	/* setup bus numbers */
++	value = csr_readl(pcie, PCI_PRIMARY_BUS);
++	value &= 0xff000000;
++	value |= 0x00ff0100;
++	csr_writel(pcie, value, PCI_PRIMARY_BUS);
 +
- 	ret = devm_request_pci_bus_resources(dev, &pcie->resources);
- 	if (ret)
- 		goto error;
+ 	/*
+ 	 * program Bus Master Enable Bit in Command Register in PAB Config
+ 	 * Space
 -- 
 2.17.1
