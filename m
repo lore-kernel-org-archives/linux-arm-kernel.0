@@ -1,40 +1,36 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Tue, 6 Nov 2018 09:03:23 -0800
-Subject: [PATCHv10 3/8] firmware: add Intel Stratix10 service layer driver
-In-Reply-To: <1541523172-5171-4-git-send-email-richard.gong@linux.intel.com>
-References: <1541523172-5171-1-git-send-email-richard.gong@linux.intel.com>
- <1541523172-5171-4-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <595b853f-6a8c-d608-e716-95ef1c84d0b9@infradead.org>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue,  6 Nov 2018 17:05:38 +0000
+Subject: [PATCH] ARM: vfp: Fix wrong assignement to ufp_exc
+Message-ID: <1541523938-13800-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/18 8:52 AM, richard.gong at linux.intel.com wrote:
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index 7273e50..b6813bc 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -216,6 +216,18 @@ config FW_CFG_SYSFS_CMDLINE
->  	  WARNING: Using incorrect parameters (base address in particular)
->  	  may crash your system.
->  
-> +config INTEL_STRATIX10_SERVICE
-> +       tristate "Intel Stratix10 Service Layer"
-> +       depends on HAVE_ARM_SMCCC
-> +       default n
-> +       help
-> +        Intel Stratix10 service layer runs at privileged exception level,
-> +	interfaces with the service providers (FPGA manager is one of them) and
-> +	manages secure monitor call to communicate with secure monitor software
-> +	at secure monitor exception level.
-> +
-> +        Say Y here if you want Stratix10 service layer support.
+In vfp_preserve_user_clear_hwstate, ufp_exc->fpinst2 gets assigned to
+itself. It should actually be hwstate->fpinst2 that gets assigned to the
+ufp_exc field.
 
-from Documentation/process/coding-style.rst:
+Fixes commit 3aa2df6ec2ca6bc143a65351cca4266d03a8bc41 ("ARM: 8791/1:
+vfp: use __copy_to_user() when saving VFP state").
 
-Lines under a ``config`` definition are indented with one tab,
-while help text is indented an additional two spaces.
+Reported-by: David Binderman <dcb314@hotmail.com>
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+---
+ arch/arm/vfp/vfpmodule.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-thanks.
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index aff6e6e..ee7b079 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -573,7 +573,7 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp *ufp,
+ 	 */
+ 	ufp_exc->fpexc = hwstate->fpexc;
+ 	ufp_exc->fpinst = hwstate->fpinst;
+-	ufp_exc->fpinst2 = ufp_exc->fpinst2;
++	ufp_exc->fpinst2 = hwstate->fpinst2;
+ 
+ 	/* Ensure that VFP is disabled. */
+ 	vfp_flush_hwstate(thread);
 -- 
-~Randy
+1.9.1
