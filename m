@@ -1,66 +1,34 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 6 Nov 2018 17:33:09 +0100
-Subject: [PATCH v4 0/3] Add Amlogic video decoder driver
-In-Reply-To: <20181106075926.19269-1-mjourdan@baylibre.com>
-References: <20181106075926.19269-1-mjourdan@baylibre.com>
-Message-ID: <d248b541-d9f4-a4fc-2b9a-cd8eac377fb0@baylibre.com>
+From: dcb314@hotmail.com (David Binderman)
+Date: Tue, 6 Nov 2018 16:33:26 +0000
+Subject: linux-4.20-rc1/arch/arm/vfp/vfpmodule.c:576: possible cut'n'paste
+ error
+In-Reply-To: <20181106162014.GH30658@n2100.armlinux.org.uk>
+References: <VI1PR08MB3342D4ADBFBC43F2BE2FD34D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
+ <VI1PR08MB33420789A2AA1096D3F5FC9D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>,
+ <20181106162014.GH30658@n2100.armlinux.org.uk>
+Message-ID: <VI1PR08MB33427CD1C653245DBB979B9B9CCB0@VI1PR08MB3342.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2018 08:59, Maxime Jourdan wrote:
-> Hi everyone,
-> 
-> This patch series adds support for the Amlogic video decoder,
-> as well as the corresponding dt bindings for GXBB/GXL/GXM chips.
-> 
-> It features decoding for the following formats:
-> - MPEG 1
-> - MPEG 2
-> 
-> The following formats will be added in future patches:
-> - MJPEG
-> - MPEG 4 (incl. Xvid, H.263)
-> - H.264
-> - HEVC (incl. 10-bit)
-> 
-> The following formats' development has still not started, but they are
-> supported by the hardware:
-> - VC1
-> - VP9
-> 
-> The code was made in such a way to allow easy inclusion of those formats
-> in the future.
-> 
-> The decoder is single instance.
-> 
-> Files:
->  - vdec.c handles the V4L2 M2M logic
->  - esparser.c manages the hardware bitstream parser
->  - vdec_helpers.c provides helpers to DONE the dst buffers as well as
->  various common code used by the codecs
->  - vdec_1.c manages the VDEC_1 block of the vdec IP
->  - codec_mpeg12.c enables decoding for MPEG 1/2.
->  - vdec_platform.c links codec units with vdec units
->  (e.g vdec_1 with codec_mpeg12) and lists all the available
->  src/dst formats and requirements (max width/height, etc.),
->  per compatible chip.
-> 
-> Firmwares are necessary to run the vdec. They can currently be found at:
-> https://github.com/chewitt/meson-firmware
-> There is an ongoing effort to bring those firmwares to linux-firmware
-> but they're not in yet, currently blocked by licensing issues.
-> 
-> It was tested primarily with ffmpeg's v4l2-m2m implementation. For instance:
-> $ ffmpeg -c:v mpeg2_v4l2m2m -i sample_mpeg2.mkv -f null -
+hello there Russell,
 
-Testing on Linux 4.20-rc1 with the proper DT patches using :
-- gstreamer 1.10.4 V4L2 Video Decoder support from gst-plugins-good
-- v4l2-compliance
+> linux-4.20-rc1/arch/arm/vfp/vfpmodule.c:576]: (warning) Redundant assignment of >'ufp_exc->fpinst2' to itself.
 
-Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+>Thanks for the report - it most certainly is a bug introduced by
+>Julien's patches, but I don't get your warning here.? Which compiler
+>produces that warning?
 
-> 
-> The v4l2-compliance results are available below the patch diff.
-> 
+Not a compiler, cppcheck, a static analyser for C and C++ code.
 
-[...]
+Interestingly, more of the same in file linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c
+
+[linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:84]: (warning) Redundant assignment of 'ASCR' to itself.
+[linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:85]: (warning) Redundant assignment of 'ARSR' to itself.
+[linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:120]: (warning) Redundant assignment of 'ASCR' to itself.
+[linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:121]: (warning) Redundant assignment of 'ARSR' to itself.
+
+I don't know if these four are also worth fixing.
+
+Regards
+
+David Binderman
