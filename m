@@ -1,78 +1,64 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 6 Nov 2018 12:39:22 +0000
-Subject: [RFC] arm64: Kconfig: Choose ARM64_64K_PAGES as default
-In-Reply-To: <db60f42f-c83d-7a9b-b6ba-450fb7970563@arm.com>
-References: <1541421211-17561-1-git-send-email-zhangkehong@hisilicon.com>
- <db60f42f-c83d-7a9b-b6ba-450fb7970563@arm.com>
-Message-ID: <82025f91-b2b3-f831-4a28-45914f339d5c@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 6 Nov 2018 12:39:34 +0000
+Subject: [PATCH v2] KVM: arm64: Clarify explanation of
+ STAGE2_PGTABLE_LEVELS
+In-Reply-To: <20181106123338.3786-1-christoffer.dall@arm.com>
+References: <20181106123338.3786-1-christoffer.dall@arm.com>
+Message-ID: <44340035-ed11-bbd1-cc42-5df19b6a8246@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2018 14:08, Suzuki K Poulose wrote:
-> Hi,
-> 
-> On 05/11/18 12:33, Kehong Zhang wrote:
->> For arm64 performance considerations, change default page size to 64K.
-> 
-> defconfig never stands for performance. If that was the case, we must
-> remove other options that could potentially slow down the performance.
-> 
-> defconfig could be interpreted as more of a "standard" config which
-> gives the best effort to make sure you get a usable system overall.
-> With this change, a rootfs with AArch32 applications without 64K aligned
-> segments would fail, and that breaks the assumption about defconfig.
 
-Plus I think it's still the case that various drivers and filesystems 
-just don't work properly with PAGE_SIZE != 4K, and reducing defconfig's 
-development/testing coverage is exactly what we don't want.
 
-If you're building a distro or running production workloads with an 
-unmodified defconfig, you're probably doing it wrong.
+On 06/11/2018 12:33, Christoffer Dall wrote:
+> In attempting to re-construct the logic for our stage 2 page table
+> layout I found the reaoning in the comment explaining how we calculate
 
-Robin.
+nit: reasoning
 
-> So, NAK from my side.
+> the number of levels used for stage 2 page tables a bit backwards.
 > 
-> Btw, please could you share any performance numbers from the comparison
-> with 4K kernel ?
+> This commit attempts to clarify the comment, to make it slightly easier
+> to read without having the Arm ARM open on the right page.
 > 
-> Suzuki
+> While we're at it, fixup a typo in a comment that was recently changed.
 > 
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>;
->> Cc: Will Deacon <will.deacon@arm.com>;
->> Signed-off-by: Kehong Zhang <zhangkehong@hisilicon.com>
->> ---
->> ? arch/arm64/Kconfig | 10 +++++-----
->> ? 1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 787d785..56f651f 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -620,7 +620,7 @@ endmenu
->> ? choice
->> ????? prompt "Page size"
->> -??? default ARM64_4K_PAGES
->> +??? default ARM64_64K_PAGES
->> ????? help
->> ??????? Page size (translation granule) configuration.
->> @@ -639,10 +639,10 @@ config ARM64_16K_PAGES
->> ? config ARM64_64K_PAGES
->> ????? bool "64KB"
->> ????? help
->> -????? This feature enables 64KB pages support (4KB by default)
->> -????? allowing only two levels of page tables and faster TLB
->> -????? look-up. AArch32 emulation requires applications compiled
->> -????? with 64K aligned segments.
->> +????? This feature enables 64KB pages support allowing only two
->> +????? levels of page tables and faster TLB look-up. AArch32
->> +????? emulation requires applications compiled with 64K aligned
->> +????? segments.
->> ? endchoice
->>
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> ---
+> Changes since v1:
+>   - Dropped note about (PAGE_SHIFT - 3) > 4
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   arch/arm64/include/asm/stage2_pgtable.h | 14 ++++++--------
+>   virt/kvm/arm/mmu.c                      |  2 +-
+>   2 files changed, 7 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+> index d352f6df8d2c..72ecf8ac3668 100644
+> --- a/arch/arm64/include/asm/stage2_pgtable.h
+> +++ b/arch/arm64/include/asm/stage2_pgtable.h
+> @@ -31,15 +31,13 @@
+>   
+>   /*
+>    * The hardware supports concatenation of up to 16 tables at stage2 entry level
+> - * and we use the feature whenever possible.
+> + * and we use the feature whenever possible, which means we resolve 4 bits of
+
+4 additional bits
+
+> + * address at the entry level.
+>    *
+> - * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
+> - * On arm64, the smallest PAGE_SIZE supported is 4k, which means
+> - *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
+> - * This implies, the total number of page table levels at stage2 expected
+> - * by the hardware is actually the number of levels required for (IPA_SHIFT - 4)
+> - * in normal translations(e.g, stage1), since we cannot have another level in
+> - * the range (IPA_SHIFT, IPA_SHIFT - 4).
+> + * This implies, the total number of page table levels required for
+> + * IPA_SHIFT at stage2 expected by the hardware can be calculated using
+> + * the same logic used for the (non-collapsable) stage1 page tables but for
+> + * (IPA_SHIFT - 4).
+
+Thanks for cleaning up the mess. With the above changes :
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
