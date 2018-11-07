@@ -1,105 +1,97 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 7 Nov 2018 21:20:03 +1100
-Subject: [linux-sunxi] Re: [PATCH v3 17/25] dt-bindings: panel: Add
- Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB bridge
-In-Reply-To: <CAMty3ZA7bWiJa0GVZbf3jDK+YSjJF8om6WuszeU6TX6rk+EZ1Q@mail.gmail.com>
-References: <20181026144344.27778-1-jagan@amarulasolutions.com>
- <CGME20181029111305epcas5p2ee0ca644470de4e036762e000afbb71b@epcas5p2.samsung.com>
- <20181026144344.27778-18-jagan@amarulasolutions.com>
- <3c4c8a08-8c1e-1ac6-2b53-81389d69c97b@samsung.com>
- <CAGb2v66ENhmNXPz4PfdRJjNUNdpDNZYX2a3SH8AD6SMe9g2zLA@mail.gmail.com>
- <CAGRGNgWUpaG6W92CDBy7XCun10-TnPggTgY=iZ_4dg4E1cM7ew@mail.gmail.com>
- <CAMty3ZA7bWiJa0GVZbf3jDK+YSjJF8om6WuszeU6TX6rk+EZ1Q@mail.gmail.com>
-Message-ID: <CAGRGNgX0eWUEzBUU0H_NRJitQmOgF1PxZP0BgQV+OMcDDuVVhA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Nov 2018 10:24:44 +0000
+Subject: [PATCH 2/4] efi/arm: defer persistent reservations until after
+ paging_init()
+In-Reply-To: <CAKv+Gu9b45Ue7zTLUyk9DqfJFR0vDR3a5L2FWVjoxjpZfHH64g@mail.gmail.com>
+References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
+ <20181106113732.16351-3-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
+ <20181106190817.GN30658@n2100.armlinux.org.uk>
+ <CAKv+Gu_r38Bk_SZW-5qvtM7cmQ4-09dcFwNz29AyMceucdhadQ@mail.gmail.com>
+ <20181106234933.GO30658@n2100.armlinux.org.uk>
+ <c0995c05-3e2c-844e-d531-a687b296753a@arm.com>
+ <20181107095827.GR30658@n2100.armlinux.org.uk>
+ <CAKv+Gu9b45Ue7zTLUyk9DqfJFR0vDR3a5L2FWVjoxjpZfHH64g@mail.gmail.com>
+Message-ID: <20181107102443.GS30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jagan,
-
-On Wed, Nov 7, 2018 at 5:13 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
->
-> On Wed, Oct 31, 2018 at 2:46 PM Julian Calaby <julian.calaby@gmail.com> wrote:
+On Wed, Nov 07, 2018 at 11:04:53AM +0100, Ard Biesheuvel wrote:
+> On 7 November 2018 at 10:58, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Wed, Nov 07, 2018 at 09:51:09AM +0000, Marc Zyngier wrote:
+> >> On 06/11/18 23:49, Russell King - ARM Linux wrote:
+> >> > On Tue, Nov 06, 2018 at 09:06:56PM +0100, Ard Biesheuvel wrote:
+> >> >> On 6 November 2018 at 20:08, Russell King - ARM Linux
+> >> >> <linux@armlinux.org.uk> wrote:
+> >> >>> On Tue, Nov 06, 2018 at 08:02:58PM +0100, Ard Biesheuvel wrote:
+> >> >>>> On 6 November 2018 at 12:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> >>>>> The new memory EFI reservation feature we introduced to allow memory
+> >> >>>>> reservations to persist across kexec may trigger an unbounded number
+> >> >>>>> of calls to memblock_reserve(). The memblock subsystem can deal with
+> >> >>>>> this fine, but not before memblock resizing is enabled, which we can
+> >> >>>>> only do after paging_init(), when the memory we reallocate the array
+> >> >>>>> into is actually mapped.
+> >> >>>>>
+> >> >>>>> So break out the memreserve table processing into a separate function
+> >> >>>>> and call if after paging_init() on both arm64 and ARM.
+> >> >>>>>
+> >> >>>>> Cc: Russell King <linux@armlinux.org.uk>
+> >> >>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> >>>>
+> >> >>>> Russell,
+> >> >>>>
+> >> >>>> If you are ok with this patch, may I have your ack please? I would
+> >> >>>> like to send it out before the end of the week.
+> >> >>>
+> >> >>> You're not going to get a quick answer to this, because it needs me to
+> >> >>> investigate what the effect of this change actually is by code review.
+> >> >>> I can't guarantee when I'll get around to that.
+> >> >>>
+> >> >>
+> >> >> Fair enough.
+> >> >>
+> >> >> I will drop the ARM hunk for now then, and we'll fix ARM when you have
+> >> >> more time.
+> >> >
+> >> > I don't see how you can do that - you're dropping the processing of
+> >> > reserved areas out of the efi_config_parse_tables() path, so that
+> >> > won't happen any more on ARM if you don't apply the ARM hunk.
+> >>
+> >> The only reason for the whole persistent region thing is to support
+> >> GICv3 redistributors memory tables across kexec, for those GIC
+> >> implementations where LPIs cannot be disabled once they have been
+> >> enabled.
+> >>
+> >> There is no HW platform that combines 32bit cores and GICv3 (not to
+> >> mention using EFI). The only existing "platform" is KVM/arm64, which
+> >> doesn't suffer from the above problem (LPIs can be freely disabled in
+> >> emulation). So the whole persistent region feature serves no purpose on
+> >> 32bit ARM.
+> >>
+> >> The only issue with dropping this hunk is that the memory reservation
+> >> feature is enabled on 32bit ARM the first place, which can easily be
+> >> dealt with something along those lines:
 > >
-> > Hi Jagan,
+> > So, it was a waste of my time trying to understand what's going on here
+> > with Ard's patch because it shouldn't be present on 32-bit ARM... Grr.
 > >
-> > On Wed, Oct 31, 2018 at 7:58 PM Chen-Yu Tsai <wens@csie.org> wrote:
-> > >
-> > > On Wed, Oct 31, 2018 at 4:53 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
-> > > >
-> > > > On 26.10.2018 16:43, Jagan Teki wrote:
-> > > > > Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB
-> > > > > bridge panel, which is available on same PCB with 24-bit RGB interface.
-> > > > >
-> > > > > So, this patch adds DSI specific binding details on existing
-> > > > > dt-bindings file.
-> > > > >
-> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > ---
-> > > > > Changes for v3:
-> > > > > - Use existing binding doc and update dsi details
-> > > > > Changes for v2:
-> > > > > - none
-> > > > >
-> > > > >  .../display/panel/bananapi,s070wv20-ct16.txt  | 31 +++++++++++++++++--
-> > > > >  1 file changed, 29 insertions(+), 2 deletions(-)
-> > > > >
-> > > > > diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-> > > > > index 35bc0c839f49..b7855dc7c66f 100644
-> > > > > --- a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-> > > > > +++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-> > > > > @@ -1,12 +1,39 @@
-> > > > >  Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
-> > > > >
-> > > > > +S070WV20-CT16 is 7" 800x480 panel connected through a 24-bit RGB interface.
-> > > > > +
-> > > > > +Depending on the variant, the PCB attached to the panel module either
-> > > > > +supports DSI, or DSI + 24-bit RGB. DSI is converted to 24-bit RGB via
-> > > > > +an onboard ICN6211 MIPI DSI - RGB bridge chip, then fed to the panel
-> > > > > +itself
-> > > >
-> > > > As I understand this is display board, which contains 'pure' RGB panel
-> > > > S070WV20-CT16 and optionally ICN6211 DSI->RGB bridge.
-> > > > These are separate devices, just connected by vendor to simplify its
-> > > > assembly. Why don't you create then bridge driver for ICN6211 and RGB
-> > > > panel driver for S070WV20-CT16 - it looks more generic.
-> > > > Then you can describe both in dts and voila.
-> > > > Creating drivers for every combo of devices (panel + bridge), just
-> > > > because some vendor sells them together seems incorrect - we have
-> > > > devicetree for it.
-> > >
-> > > Rob suggested this, and also the opposite: using the same
-> > > "bananapi,s070wv20-ct16"
-> > > compatible string for both types of connections, and have the driver deal with
-> > > detecting the bus type.
-> > >
-> > > The thing about the bridge chip is that there's no available datasheet that
-> > > describes all the parts of the init sequence, in fact none at all. I managed
-> > > to work out some bits, but the others remain a mystery and must be hard-coded
-> > > to match the panel. That would work against having a generic bridge driver.
-> >
-> > To me it seems logical that we'd model it as another step in the graph
-> > between the DSI component and the panel. It's conceivable that some
-> > other manufacturer will probably buy these for their panels and having
-> > a somewhat generic driver seems vaguely future proof to me.
-> >
-> > As I see it, the weird init process belongs to the bridge chip and the
-> > timings belong to the panel and we shouldn't "confuse" them by giving
-> > them the same compatible.
->
-> But the problem here is due to lack of information about the panel,
-> the init process command opcode data values seem to based on the panel
-> timings values. This look weird and ie reason for going into separate
-> panel driver with different compatible.
+> 
+> Not really. I am trying really hard to do my part when it comes to
+> keeping the maintenance level of the ARM architecture up. That means
+> that all the improvements and enhancements that are implemented for
+> EFI on arm64 are enabled on ARM as well, unless there are pressing
+> reasons not to.
+> 
+> And even though this persistent reservation feature is only used by
+> the GICv3 code at the moment, there may be other future uses as well,
+> so I'd prefer not to special case ARM in this way.
 
-I'd missed that particular wrinkle.
-
-In that case, it makes sense to produce a panel driver with the bridge
-chip's compatible.
-
-Thanks,
+Once you've come to some agreement on this, and you've looked at the
+comment I've made (which leads me to regard your patch as a complete
+non-starter for 32-bit ARM), I'll continue to look at it.
 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
