@@ -1,52 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2018 15:34:57 +0000
-Subject: [PATCH v10 00/22] kasan: add software tag-based mode for arm64
-In-Reply-To: <CAAeHK+zNgv9WxRpf7N3gmsLYGL6oUALAnyerMzeYZUz1LhoUuA@mail.gmail.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <CAAeHK+yOsP7V0gPu7EpqCbJZqbGQMZbAp6q1+=0dNGC24reyWg@mail.gmail.com>
- <20181107145922.GD2623@brain-police>
- <CAAeHK+zNgv9WxRpf7N3gmsLYGL6oUALAnyerMzeYZUz1LhoUuA@mail.gmail.com>
-Message-ID: <20181107153456.GE2623@brain-police>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2018 16:46:47 +0100
+Subject: [RFC PATCH 00/12] net: introduce Qualcomm IPA driver
+In-Reply-To: <20181107003250.5832-1-elder@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+Message-ID: <CAK8P3a15nTnL0tD4TJgtPVEKFwZRcyNy=m6_Pi3+8Nd0W6FQtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 04:11:35PM +0100, Andrey Konovalov wrote:
-> On Wed, Nov 7, 2018 at 3:59 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Nov 07, 2018 at 03:56:03PM +0100, Andrey Konovalov wrote:
-> >> On Tue, Nov 6, 2018 at 6:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> >> > This patchset adds a new software tag-based mode to KASAN [1].
-> >> > (Initially this mode was called KHWASAN, but it got renamed,
-> >> >  see the naming rationale at the end of this section).
-> >>
-> >> [...]
-> >>
-> >> > Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> >> > Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> >> > Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> >>
-> >> Hi Andrew,
-> >>
-> >> This patchset has now been reviewed-by KASAN maintainers. Could you
-> >> take a look and consider taking this into the -mm tree?
-> >
-> > I would much prefer to take the arm64 parts (which still need to be reviewed
-> > by Catalin afaict) via the arm64 tree, so please can you split those out
-> > separately?
-> 
-> Which parts do you mean exactly, which patches? I don't think it makes
-> sense to split this patchset, as one part won't function without the
-> other.
+On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+> The code has undergone considerable rework to prepare it for
+> incorporation into upstream Linux.  Parts of it bear little
+> resemblance to the original driver.  Still, some work remains
+> to be done.  The current code and its design had a preliminary
+> review, and some changes to the data path implementation were
+> recommended.   These have not yet been addressed:
+> - Use NAPI for all interfaces, not just RX (and WAN data) endpoints.
+> - Do more work in the NAPI poll function, including collecting
+>   completed TX requests and posting buffers for RX.
+> - Do not use periodic NOP requests as a way to avoid TX interrupts.
+> - The NAPI context should be associated with the hardware interrupt
+>   (it is now associated with something abstracted from the hardware).
+> - Use threaded interrupts, to avoid the need for using spinlocks and
+>   atomic variables for synchronizing between workqueue and interrupt
+>   context.
+> - Have runtime power management enable and disable IPA clock and
+>   interconnects.
+> Many thanks to Arnd Bergmann, Ilias Apalodimas, and Bjorn Andersson
+> for their early feedback.
 
-I would like the patches that touch code under arch/arm64/ to be reviewed by
-somebody from the arm64 community. Since the core parts have already been
-reviewed, I was suggesting that you could split them out so that they are
-not blocked by the architecture code. Is it not possible to preserve the
-existing KASAN behaviour for arm64 with the core parts merged? I figured it
-must be, since you're not touching any other architectures here and they
-assumedly continue to function correctly.
+Thanks for getting the current version out even with the long TODO
+list. I've had my first deeper look at some of the patches and found
+a few more things that likely require substantial rework. I also think
+there is still significant room for simplifying it further, and getting
+better performance out of it in the process.
 
-However, if you'd rather keep everything together, please can we give it a
-couple of weeks so we can at least get the architecture bits reviewed? Most
-people are out at LPC next week (and I'm at another conference this week).
+Also, despite the criticism in my patch review, I have to say you've
+done a great job at cutting out a lot of the things that were present
+in the past, it's good to see that you have come this far with the
+cleanup!
 
-Will
+      Arnd
