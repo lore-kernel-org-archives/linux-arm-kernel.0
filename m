@@ -1,32 +1,37 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Wed, 7 Nov 2018 05:35:12 +0000
-Subject: [PATCHv3 0/4] dts/layerscape-pci: removed unsuitable compatible string
-Message-ID: <20181107053500.13575-1-Zhiqiang.Hou@nxp.com>
+Date: Wed, 7 Nov 2018 05:35:17 +0000
+Subject: [PATCHv3 1/4] dt-bindings: pci: layerscape-pci: add compatible
+ strings "fsl,ls1043a-pcie"
+In-Reply-To: <20181107053500.13575-1-Zhiqiang.Hou@nxp.com>
+References: <20181107053500.13575-1-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181107053500.13575-2-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Removed the compatible string "snps,dw-pcie" from FSL layerscape-pci compatible
-string list.
+The PCIe compatible string for LS1043A was lost, so add it.
 
-Hou Zhiqiang (4):
-  dt-bindings: pci: layerscape-pci: add compatible strings
-    "fsl,ls1043a-pcie"
-  dt-bindings: pci: layerscape-pci: removed compatible string
-    "snps,dw-pcie"
-  ARM: dts: ls1021a: removed compatible string "snps,dw-pcie"
-  arm64: dts: layerscape: removed compatible string "snps,dw-pcie"
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+V3:
+ - no change
 
- .../devicetree/bindings/pci/layerscape-pci.txt       |  7 ++++---
- arch/arm/boot/dts/ls1021a.dtsi                       |  4 ++--
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi       |  2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       |  6 +++---
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi       |  6 +++---
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi       |  6 +++---
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi       |  8 ++++----
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi       | 12 ++++--------
- 8 files changed, 24 insertions(+), 27 deletions(-)
+ Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index 66df1e81e0b8..5eb1c202932f 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -18,6 +18,7 @@ Required properties:
+         "fsl,ls2088a-pcie"
+         "fsl,ls1088a-pcie"
+         "fsl,ls1046a-pcie"
++        "fsl,ls1043a-pcie"
+         "fsl,ls1012a-pcie"
+ - reg: base addresses and lengths of the PCIe controller register blocks.
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
 -- 
 2.17.1
