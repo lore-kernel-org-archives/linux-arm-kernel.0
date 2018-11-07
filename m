@@ -1,49 +1,94 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed, 07 Nov 2018 15:26:31 +0100
-Subject: [PATCH v2 3/7] dt-bindings: Add vendor prefix for LeMaker
-In-Reply-To: <20181105220802.GA21348@bogus>
-References: <20181101200045.6078-1-contact@paulk.fr>
- <20181101200045.6078-4-contact@paulk.fr> <20181105220802.GA21348@bogus>
-Message-ID: <a4bf7684b456956cfc25699a8d13edc165b33566.camel@paulk.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2018 15:36:50 +0100
+Subject: [RFC PATCH 04/12] soc: qcom: ipa: immediate commands
+In-Reply-To: <20181107003250.5832-5-elder@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-5-elder@linaro.org>
+Message-ID: <CAK8P3a3iKshE3yCG477AeZbKbLtpDwMhn5mfLySFRLOLmUv5AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+>
+> +/**
+> + * struct ipahal_context - HAL global context data
+> + * @empty_fltrt_tbl:   Empty table to be used for table initialization
+> + */
+> +static struct ipahal_context {
+> +       struct ipa_dma_mem empty_fltrt_tbl;
+> +} ipahal_ctx_struct;
+> +static struct ipahal_context *ipahal_ctx = &ipahal_ctx_struct;
 
-Le lundi 05 novembre 2018 ? 16:08 -0600, Rob Herring a ?crit :
-> On Thu, Nov 01, 2018 at 09:00:41PM +0100, Paul Kocialkowski wrote:
-> > This introduces a new device-tree binding vendor prefix for Shenzhen
-> > LeMaker Technology Co., Ltd.
-> 
-> Would be nice to say this is already in use, but wasn't documented.
+Remove the global variables here
 
-Oh right, it is indeed already used by a few devices.
+> +/* Immediate commands H/W structures */
+> +
+> +/* struct ipa_imm_cmd_hw_ip_fltrt_init - IP_V*_FILTER_INIT/IP_V*_ROUTING_INIT
+> + * command payload in H/W format.
+> + * Inits IPv4/v6 routing or filter block.
+> + * @hash_rules_addr: Addr in system mem where hashable flt/rt rules starts
+> + * @hash_rules_size: Size in bytes of the hashable tbl to cpy to local mem
+> + * @hash_local_addr: Addr in shared mem where hashable flt/rt tbl should
+> + *  be copied to
+> + * @nhash_rules_size: Size in bytes of the non-hashable tbl to cpy to local mem
+> + * @nhash_local_addr: Addr in shared mem where non-hashable flt/rt tbl should
+> + *  be copied to
+> + * @rsvd: reserved
+> + * @nhash_rules_addr: Addr in sys mem where non-hashable flt/rt tbl starts
+> + */
+> +struct ipa_imm_cmd_hw_ip_fltrt_init {
+> +       u64 hash_rules_addr;
+> +       u64 hash_rules_size     : 12,
+> +           hash_local_addr     : 16,
+> +           nhash_rules_size    : 12,
+> +           nhash_local_addr    : 16,
+> +           rsvd                : 8;
+> +       u64 nhash_rules_addr;
+> +};
 
-> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > ---
-> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
-> >  1 file changed, 1 insertion(+)
-> 
-> In any case,
-> 
-> Reviewed-by: Rob Hering <robh@kernel.org>
+In hardware structures, you should not use bit fields, as the ordering
+of the bits is not well-defined in C. The only portable way to do this
+is to use shifts and masks unfortunately.
 
-I'll change that in v3 and include your Reviewed-by.
+> +struct ipa_imm_cmd_hw_hdr_init_local {
+> +       u64 hdr_table_addr;
+> +       u32 size_hdr_table      : 12,
+> +           hdr_addr            : 16,
+> +           rsvd                : 4;
+> +};
 
-Cheers,
+I would also add a 'u32 pad' member at the end to make the padding
+explicit here, or mark the first member as '__aligned(4) __packed'
+if you want to avoid the padding.
 
-Paul
+> +void *ipahal_dma_shared_mem_write_pyld(struct ipa_dma_mem *mem, u32 offset)
+> +{
+> +       struct ipa_imm_cmd_hw_dma_shared_mem *data;
+> +
+> +       ipa_assert(mem->size < 1 << 16);        /* size is 16 bits wide */
+> +       ipa_assert(offset < 1 << 16);           /* local_addr is 16 bits wide */
+> +
+> +       data = kzalloc(sizeof(*data), GFP_KERNEL);
+> +       if (!data)
+> +               return NULL;
+> +
+> +       data->size = mem->size;
+> +       data->local_addr = offset;
+> +       data->direction = 0;    /* 0 = write to IPA; 1 = read from IPA */
+> +       data->skip_pipeline_clear = 0;
+> +       data->pipeline_clear_options = IPAHAL_HPS_CLEAR;
+> +       data->system_addr = mem->phys;
+> +
+> +       return data;
+> +}
 
--- 
-Developer of free digital technology and hardware support.
+The 'void *' return looks odd here, and also the dynamic allocation.
+It looks to me like all these functions could be better done the
+other way round, basically putting the
+ipa_imm_cmd_hw_dma_shared_mem etc structures on the stack
+of the caller. At least for this one, the dynamic allocation
+doesn't help at all because the caller is the same that
+frees it again after the command. I suspect the same is
+true for a lot of those commands.
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/52590fde/attachment.sig>
+       Arnd
