@@ -1,51 +1,16 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 7 Nov 2018 12:12:07 -0800
-Subject: [PATCH 2/2] mm/sparse: add common helper to mark all memblocks
- present
-In-Reply-To: <20181107173859.24096-3-logang@deltatee.com>
-References: <20181107173859.24096-1-logang@deltatee.com>
- <20181107173859.24096-3-logang@deltatee.com>
-Message-ID: <20181107121207.62cb37cf58484b7cc80a8fd8@linux-foundation.org>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Wed,  7 Nov 2018 21:17:43 +0100
+Subject: [PATCH 0/3] ARN: OMAP1: ams-delta: Post-GPIO-refresh cleanups
+Message-ID: <20181107201746.14705-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Nov 2018 10:38:59 -0700 Logan Gunthorpe <logang@deltatee.com> wrote:
 
-> Presently the arches arm64, arm and sh have a function which loops through
-> each memblock and calls memory present. riscv will require a similar
-> function.
-> 
-> Introduce a common memblocks_present() function that can be used by
-> all the arches. Subsequent patches will cleanup the arches that
-> make use of this.
-> 
-> ...
->
-> --- a/mm/sparse.c
-> +++ b/mm/sparse.c
-> @@ -239,6 +239,17 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
->  	}
->  }
->  
-> +void __init memblocks_present(void)
-> +{
-> +	struct memblock_region *reg;
-> +
-> +	for_each_memblock(memory, reg) {
-> +		memory_present(memblock_get_region_node(reg),
-> +			       memblock_region_memory_base_pfn(reg),
-> +			       memblock_region_memory_end_pfn(reg));
-> +	}
-> +}
-> +
+Janusz Krzysztofik (3):
+      ARM: OMAP1: ams-delta: Drop board specific global GPIO numbers
+      ARM: OMAP1: ams-delta: Drop unused symbols from the board header
+      ARM: OMAP1: ams-delta: Move AMS_DELTA_LATCH2_NGPIO to the board file
 
-I don't like the name much.  To me, memblocks_present means "are
-memblocks present" whereas this actually means "memblocks are present".
-But whatever.  A little covering comment which describes what this
-does and why it does it would be nice.
-
-Acked-by: Andrew Morton <akpm@linux-foundation.org>
-
-I can grab both patches and shall sneak them into 4.20-rcX, but feel
-free to merge them into some git tree if you'd prefer.  If I see them
-turn up in linux-next I shall drop my copy.
+ board-ams-delta.c |    9 ++++-----
+ board-ams-delta.h |   22 ----------------------
+ 2 files changed, 4 insertions(+), 27 deletions(-)
