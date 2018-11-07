@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed,  7 Nov 2018 15:01:19 +0000 (GMT)
-Subject: Applied "spi: Kconfig: Enable McSPI driver for K3 platforms" to the
- spi tree
-In-Reply-To: <20181107103926.32550-3-vigneshr@ti.com>
-Message-ID: <20181107150119.6F3831124E14@debutante.sirena.org.uk>
+Date: Wed,  7 Nov 2018 15:01:23 +0000 (GMT)
+Subject: Applied "spi: omap-spi: Add compatible for AM654 SoC" to the spi tree
+In-Reply-To: <20181107103926.32550-2-vigneshr@ti.com>
+Message-ID: <20181107150123.5C5601124E14@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: Kconfig: Enable McSPI driver for K3 platforms
+   spi: omap-spi: Add compatible for AM654 SoC
 
 has been applied to the spi tree at
 
@@ -34,32 +33,31 @@ to this mail.
 Thanks,
 Mark
 
->From 81df42d10457d3aef5321e9772c8eef173adf7f7 Mon Sep 17 00:00:00 2001
+>From abc61f47a70f7c8331f00eff1ccb6557a9d4c224 Mon Sep 17 00:00:00 2001
 From: Vignesh R <vigneshr@ti.com>
-Date: Wed, 7 Nov 2018 16:09:26 +0530
-Subject: [PATCH] spi: Kconfig: Enable McSPI driver for K3 platforms
+Date: Wed, 7 Nov 2018 16:09:25 +0530
+Subject: [PATCH] spi: omap-spi: Add compatible for AM654 SoC
 
-Enable McSPI driver to be built for K3 platforms, to support McSPI on
-AM654 SoC of K3 family.
+AM654 SoC has same McSPI IP as OMAP2+ platforms. Add new compatible to
+support McSPI on AM654 SoC.
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/spi/omap-spi.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 91d45c9ac439..b9be21cc07d2 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -435,7 +435,7 @@ config SPI_OMAP_UWIRE
+diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
+index 2ba5f9c023ac..487208c256c0 100644
+--- a/Documentation/devicetree/bindings/spi/omap-spi.txt
++++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
+@@ -2,6 +2,7 @@ OMAP2+ McSPI device
  
- config SPI_OMAP24XX
- 	tristate "McSPI driver for OMAP"
--	depends on ARCH_OMAP2PLUS || COMPILE_TEST
-+	depends on ARCH_OMAP2PLUS || ARCH_K3 || COMPILE_TEST
- 	select SG_SPLIT
- 	help
- 	  SPI master controller for OMAP24XX and later Multichannel SPI
+ Required properties:
+ - compatible :
++  - "ti,am654-mcspi" for AM654.
+   - "ti,omap2-mcspi" for OMAP2 & OMAP3.
+   - "ti,omap4-mcspi" for OMAP4+.
+ - ti,spi-num-cs : Number of chipselect supported  by the instance.
 -- 
 2.19.0.rc2
