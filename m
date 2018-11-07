@@ -1,92 +1,80 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 7 Nov 2018 13:47:03 +0100
-Subject: [PATCH] arm64: dts: meson-gx: Add hdmi_5v regulator as hdmi tx
- supply
-In-Reply-To: <1541434917-18126-1-git-send-email-narmstrong@baylibre.com>
-References: <1541434917-18126-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1b209a7e-e69a-079c-51e1-67b18410e5a0@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2018 13:34:56 +0100
+Subject: [RFC PATCH 12/12] soc: qcom: ipa: build and "ipa_i.h"
+In-Reply-To: <20181107003250.5832-13-elder@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-13-elder@linaro.org>
+Message-ID: <CAK8P3a2X1zstSWP89uDxyf+rvyzzDY98_cvE4fzc-ZGbyVz23w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2018 17:21, Neil Armstrong wrote:
-> The hdmi_5v regulator must be enabled to provide power to the physical HDMI
-> PHY and enables the HDMI 5V presence loopback for the monitor.
-> 
-> Fixes: b409f625a6d5 ("ARM64: dts: meson-gx: Add HDMI_5V regulator on selected boards")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          | 1 +
->  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts   | 1 +
->  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 1 +
->  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts         | 1 +
->  arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        | 1 +
->  5 files changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> index 765247b..eb8eec8 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> @@ -125,6 +125,7 @@
->  	status = "okay";
->  	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
->  	pinctrl-names = "default";
-> +	phy-supply = <&hdmi_5v>;
->  };
->  
->  &hdmi_tx_tmds_port {
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-> index d32cf38..69c28c4 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-> @@ -78,6 +78,7 @@
->  	status = "okay";
->  	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
->  	pinctrl-names = "default";
-> +	phy-supply = <&hdmi_5v>;
->  };
->  
->  &hdmi_tx_tmds_port {
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> index 90a56af..86a7be8 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
-> @@ -155,6 +155,7 @@
->  	status = "okay";
->  	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
->  	pinctrl-names = "default";
-> +	phy-supply = <&hdmi_5v>;
->  };
->  
->  &hdmi_tx_tmds_port {
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-> index 5896e8a..8a39d95 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-> @@ -51,6 +51,7 @@
->  	status = "okay";
->  	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
->  	pinctrl-names = "default";
-> +	phy-supply = <&hdmi_5v>;
->  };
->  
->  &hdmi_tx_tmds_port {
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> index 313f88f..50d2be1 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> @@ -271,6 +271,7 @@
->  	status = "okay";
->  	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
->  	pinctrl-names = "default";
-> +	phy-supply = <&hdmi_5v>;
->  };
->  
->  &hdmi_tx_tmds_port {
-> 
+On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+> +config IPA_ASSERT
+> +       bool "Enable IPA assertions"
+> +       depends on IPA
+> +       default y
+> +       help
+> +        Incorporate IPA assertion verification in the build.  This
+> +        cause various design assumptions to be checked at runtime,
+> +        generating a report (and a crash) if any assumed condition
+> +        does not hold.  You may wish to disable this to avoid the
+> +        overhead of checking.
 
+Maybe remove this from the submission.
 
-Oops, it should be hdmi_supply...
+> +#define ipa_debug(fmt, args...)        dev_dbg(ipa_ctx->dev, fmt, ## args)
+> +#define ipa_err(fmt, args...)  dev_err(ipa_ctx->dev, fmt, ## args)
 
-I'll resend..
+These macros refer to variables in the caller that are not passed as arguments,
+which is generally a bad idea. They also trivially wrap a standard kernel
+interface, so better just that directly.
 
-neil
+> +#define ipa_bug() \
+> +       do {                                                            \
+> +               ipa_err("an unrecoverable error has occurred\n");       \
+> +               BUG();                                                  \
+> +       } while (0)
+> +
+> +#define ipa_bug_on(condition)                                          \
+> +       do {                                                            \
+> +               if (condition) {                                \
+> +                       ipa_err("ipa_bug_on(%s) failed!\n", #condition); \
+> +                       ipa_bug();                                      \
+> +               }                                                       \
+> +       } while (0)
+
+According to a discussion at the kernel summit, we should generally
+try to avoid BUG() as it rarely does anything useful: it crashes the
+current task, but in a network driver that usually means killing the
+entire kernel since you are not in process context.
+
+Try questioning each one to see if it can possibly happen, or if the
+code can be rewritten in a way to guarantee that it cannot.
+
+If continuing after the bug was detected does not cause a security
+hole or permanent data corruption, you can also use WARN_ON()
+or WARN_ONCE() (without a wrapper).
+
+> +int ipa_wwan_init(void);
+> +void ipa_wwan_cleanup(void);
+> +
+> +int ipa_stop_gsi_channel(u32 ep_id);
+> +
+> +void ipa_cfg_ep(u32 ep_id);
+> +
+> +int ipa_tx_dp(enum ipa_client_type dst, struct sk_buff *skb);
+> +
+> +bool ipa_endp_aggr_support(u32 ep_id);
+> +enum ipa_seq_type ipa_endp_seq_type(u32 ep_id);
+> +
+> +void ipa_endp_init_hdr_cons(u32 ep_id, u32 header_size,
+> +                           u32 metadata_offset, u32 length_offset);
+> +void ipa_endp_init_hdr_prod(u32 ep_id, u32 header_size,
+> +                           u32 metadata_offset, u32 length_offset);
+
+I'm surprised to see many functions that don't take a pointer
+to an instance as the first argument, which often indicates
+that you have global state variables and the driver won't
+work with multiple hardware instances.
+
+      Arnd
