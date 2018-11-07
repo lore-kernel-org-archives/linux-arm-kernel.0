@@ -1,63 +1,44 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 7 Nov 2018 10:44:24 +0100
-Subject: [PATCH v3 00/28] Allwinner H6 DE3 and HDMI support
-In-Reply-To: <3766119.46PGZN2PQn@jernej-laptop>
-References: <20181104182705.18047-1-jernej.skrabec@siol.net>
- <20181105094341.qedt7jvnxooiojki@flea>
- <3766119.46PGZN2PQn@jernej-laptop>
-Message-ID: <20181107094424.3nbmyq3cnuzevxoa@flea>
+From: sean.wang@kernel.org (Sean Wang)
+Date: Wed, 7 Nov 2018 02:00:43 -0800
+Subject: [PATCH] pinctrl: mediatek: Fix dependencies for EINT_MTK
+In-Reply-To: <20181102025728.963-1-olof@lixom.net>
+References: <20181102025728.963-1-olof@lixom.net>
+Message-ID: <CAGp9Lzq3rgNs=uuXDVTurwgGrCjDQg=rje0rpetbzeMX7U-XLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 06:20:39PM +0100, Jernej ?krabec wrote:
-> Dne ponedeljek, 05. november 2018 ob 10:43:41 CET je Maxime Ripard napisal(a):
-> > On Sun, Nov 04, 2018 at 07:26:37PM +0100, Jernej Skrabec wrote:
-> > > This series adds support for Display Engine 3.0 and HDMI 2.0a, which
-> > > can be found on H6 SoC.
-> > > 
-> > > Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
-> > > displaying and processing 10-bit and AFBC formats, which are not yet
-> > > supported by this series.
-> > > 
-> > > H6 is also the first SoC which supports IOMMU, but support for it is
-> > > not yet added.
-> > > 
-> > > This series is based on linux-next at next-20181102.
-> > > 
-> > > I suggest all patches go through allwinner tree, except DRM patches,
-> > > which should go through drm-misc tree.
-> > 
-> > Applied all patches up to the 26. The two last one however should not
-> > use the clk bindings define you added in the first clk patches, since
-> > clk and dt patches are going through different tree.
-> 
-> I went over clock defines again, but I don't think I use anything new. New 
-> defines are:
-> 
-> #define CLK_BUS_ROT            9
-> #define CLK_ROT                        10
-> #define RST_ROT                3
-> 
-> but none of them are actually used in DT.
-> 
-> Did I miss anything?
+Thanks for the catch.
 
-No, I did. Sorry for that. Patches 27 and 28 are applied now.
+Acked-by: Sean Wang <sean.wang@kernel.org>
 
-I've fixed a few things in the patch 27, to fix the order of the de
-node, and change the de3 node name, since it's supposed to be a
-generic class name. I renamed it to display-engine.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/204cf5ad/attachment.sig>
+On Thu, Nov 1, 2018 at 7:57 PM Olof Johansson <olof@lixom.net> wrote:
+>
+> Fixes the following config-time warning:
+>
+> WARNING: unmet direct dependencies detected for EINT_MTK
+>   Depends on [n]: PINCTRL [=y] && (ARCH_MEDIATEK [=y] || COMPILE_TEST [=n]) && (PINCTRL_MTK [=n] || PINCTRL_MTK_MOORE [=n] || COMPILE_TEST [=n])
+>   Selected by [y]:
+>   - PINCTRL_MTK_PARIS [=y] && PINCTRL [=y] && OF [=y] && (ARCH_MEDIATEK [=y] || COMPILE_TEST [=n])
+>
+> Fixes: 805250982bb5 ("pinctrl: mediatek: add pinctrl-paris that implements the vendor dt-bindings")
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  drivers/pinctrl/mediatek/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
+> index 9d142e1da567..50efc9cc8ee7 100644
+> --- a/drivers/pinctrl/mediatek/Kconfig
+> +++ b/drivers/pinctrl/mediatek/Kconfig
+> @@ -3,7 +3,7 @@ menu "MediaTek pinctrl drivers"
+>
+>  config EINT_MTK
+>         bool "MediaTek External Interrupt Support"
+> -       depends on PINCTRL_MTK || PINCTRL_MTK_MOORE || COMPILE_TEST
+> +       depends on PINCTRL_MTK || PINCTRL_MTK_MOORE || PINCTRL_MTK_PARIS || COMPILE_TEST
+>         select GPIOLIB
+>         select IRQ_DOMAIN
+>
+> --
+> 2.11.0
+>
