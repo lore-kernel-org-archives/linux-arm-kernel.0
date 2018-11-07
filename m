@@ -1,35 +1,33 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 7 Nov 2018 11:59:57 +0100
-Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
- device nodes
-In-Reply-To: <20181107085056.GB31092@kunai>
-References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
- <20181107085056.GB31092@kunai>
-Message-ID: <7154affe-751a-7cb4-48ea-3d4d6f467ac8@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 7 Nov 2018 12:56:49 +0000
+Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
+In-Reply-To: <20181107080335.GA24511@lst.de>
+References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
+ <20181107080335.GA24511@lst.de>
+Message-ID: <22cbe798-612f-8c88-90e7-388202f603cf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2018 09:50 AM, Wolfram Sang wrote:
-> On Tue, Nov 06, 2018 at 09:46:47PM +0100, Marek Vasut wrote:
->> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On 2018-11-07 8:03 am, Christoph Hellwig wrote:
+> On Tue, Nov 06, 2018 at 11:54:15AM +0000, Robin Murphy wrote:
+>> of_dma_configure() was *supposed* to be following the same logic as
+>> acpi_dma_configure() and only setting bus_dma_mask if some range was
+>> specified by the firmware. However, it seems that subtlety got lost in
+>> the process of fitting it into the differently-shaped control flow, and
+>> as a result the force_dma==true case ends up always setting the bus mask
+>> to the 32-bit default, which is not what anyone wants.
 >>
->> This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC
->> and enables SD card slot connected to SDHI0, micro SD card slot
->> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board
->> using the R8A77990 SoC.
->>
->> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+>> Make sure we only touch it if the DT actually said so.
 > 
-> Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> 
-> Out of curiosity: have you tested HS400 on that board based on Niklas'
-> recent patches as well?
+> This looks good, but I think it could really use a comment as the use
+> of ret all the way down the function isn't exactly obvious.
 
-Nope. I tried that patchset on M3N again yesterday and got error -84
-while initing the eMMC, so I need to look into that first. Then I'll
-try it on E3.
+Fair point.
 
--- 
-Best regards,
-Marek Vasut
+> Let me now if you want this picked up through the OF or DMA trees.
+
+I don't mind either way; I figure I'll wait a bit longer to see if Rob 
+has any preference, then resend with the comment and the tags picked up 
+so it can hopefully make rc2.
+
+Robin.
