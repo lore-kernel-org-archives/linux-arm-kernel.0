@@ -1,32 +1,39 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  7 Nov 2018 18:13:05 +0800
-Subject: [PATCH 12/15] Bluetooth: hci_bcm: Add compatible string for BCM4330
+Date: Wed,  7 Nov 2018 18:12:58 +0800
+Subject: [PATCH 05/15] Bluetooth: hci_bcm: Handle deferred probing for the
+ clock supply
 In-Reply-To: <20181107101308.7626-1-wens@csie.org>
 References: <20181107101308.7626-1-wens@csie.org>
-Message-ID: <20181107101308.7626-13-wens@csie.org>
+Message-ID: <20181107101308.7626-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BCM4330 chip is a 802.11 a/b/g/n + Bluetooth 4.0 + HS controller.
-This patch adds a compatible string match to the serdev driver for the
-Bluetooth part of the chip.
+On some systems that actually have the bluetooth controller wired up
+with an extra clock signal, it's possible the bluetooth controller
+probes before the clock provider. clk_get would return a defer probe
+error, which was not handled by this driver.
+
+Handle this properly, so that these systems can work reliably.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/bluetooth/hci_bcm.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/bluetooth/hci_bcm.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/bluetooth/hci_bcm.c b/drivers/bluetooth/hci_bcm.c
-index 73b520622a24..b6b0b2139892 100644
+index ddbd8c6a0ceb..0a20ad48b511 100644
 --- a/drivers/bluetooth/hci_bcm.c
 +++ b/drivers/bluetooth/hci_bcm.c
-@@ -1397,6 +1397,7 @@ static void bcm_serdev_remove(struct serdev_device *serdev)
- #ifdef CONFIG_OF
- static const struct of_device_id bcm_bluetooth_of_match[] = {
- 	{ .compatible = "brcm,bcm20702a1" },
-+	{ .compatible = "brcm,bcm4330-bt" },
- 	{ .compatible = "brcm,bcm43438-bt" },
- 	{ },
- };
+@@ -907,6 +907,10 @@ static int bcm_get_resources(struct bcm_device *dev)
+ 
+ 	dev->clk = devm_clk_get(dev->dev, NULL);
+ 
++	/* Handle deferred probing */
++	if (IS_ERR(dev->clk) && PTR_ERR(dev->clk) == -EPROBE_DEFER)
++		return PTR_ERR(dev->clk);
++
+ 	dev->device_wakeup = devm_gpiod_get_optional(dev->dev, "device-wakeup",
+ 						     GPIOD_OUT_LOW);
+ 	if (IS_ERR(dev->device_wakeup))
 -- 
 2.19.1
