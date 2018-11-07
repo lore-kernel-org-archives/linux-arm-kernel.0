@@ -1,56 +1,62 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Tue, 6 Nov 2018 16:40:20 -0800
-Subject: [RFC PATCH 12/12] soc: qcom: ipa: build and "ipa_i.h"
-In-Reply-To: <20181107003250.5832-13-elder@linaro.org>
-References: <20181107003250.5832-1-elder@linaro.org>
- <20181107003250.5832-13-elder@linaro.org>
-Message-ID: <cebe0d3c-4a24-60a4-88c8-5195a5d0da4b@infradead.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue,  6 Nov 2018 16:41:48 -0800
+Subject: [PATCH] ARM: brcmstb: Add entry for 7255
+Message-ID: <20181107004151.20370-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi-
+From: Justin Chen <justinpopo6@gmail.com>
 
-On 11/6/18 4:32 PM, Alex Elder wrote:
-> diff --git a/drivers/net/ipa/Kconfig b/drivers/net/ipa/Kconfig
-> new file mode 100644
-> index 000000000000..f8ea9363f532
-> --- /dev/null
-> +++ b/drivers/net/ipa/Kconfig
-> @@ -0,0 +1,30 @@
-> +config IPA
-> +	tristate "Qualcomm IPA support"
-> +	depends on NET
-> +	select QCOM_QMI_HELPERS
-> +	select QCOM_MDT_LOADER
-> +	default n
-> +	help
-> +	  Choose Y here to include support for the Qualcomm IP
-> +	  Accelerator (IPA), a hardware block present in some
-> +	  Qualcomm SoCs.  The IPA is a programmable protocol
-> +	  processor that is capable of generic hardware handling
-> +	  of IP packets, including routing, filtering, and NAT.
-> +	  Currently the IPA driver supports only basic transport
-> +	  of network traffic between the AP and modem, on the
-> +	  Qualcomm SDM845 SoC.
-> +
-> +	  If unsure, say N.
-> +
-> +config IPA_ASSERT
-> +	bool "Enable IPA assertions"
-> +	depends on IPA
-> +	default y
-> +	help
-> +	 Incorporate IPA assertion verification in the build.  This
-> +	 cause various design assumptions to be checked at runtime,
+Add in BCM7255 entry and reorder entries to keep ascending order. Also
+moved 7278 cause it was out of order.
 
-	 causes
+Signed-off-by: Justin Chen <justinpopo6@gmail.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/include/debug/brcmstb.S | 24 +++++++++++++-----------
+ 1 file changed, 13 insertions(+), 11 deletions(-)
 
-> +	 generating a report (and a crash) if any assumed condition
-> +	 does not hold.  You may wish to disable this to avoid the
-> +	 overhead of checking.
-> +
-> +	 If unsure doubt, say "Y" here.
-
-
+diff --git a/arch/arm/include/debug/brcmstb.S b/arch/arm/include/debug/brcmstb.S
+index 0f580caa81e5..bf8702ee8f86 100644
+--- a/arch/arm/include/debug/brcmstb.S
++++ b/arch/arm/include/debug/brcmstb.S
+@@ -26,8 +26,9 @@
+ 
+ #define UARTA_3390		REG_PHYS_ADDR(0x40a900)
+ #define UARTA_7250		REG_PHYS_ADDR(0x40b400)
+-#define UARTA_7260		REG_PHYS_ADDR(0x40c000)
+-#define UARTA_7268		UARTA_7260
++#define UARTA_7255		REG_PHYS_ADDR(0x40c000)
++#define UARTA_7260		UARTA_7255
++#define UARTA_7268		UARTA_7255
+ #define UARTA_7271		UARTA_7268
+ #define UARTA_7278		REG_PHYS_ADDR_V7(0x40c000)
+ #define UARTA_7364		REG_PHYS_ADDR(0x40b000)
+@@ -82,15 +83,16 @@ ARM_BE8(	rev	\rv, \rv )
+ 		/* Chip specific detection starts here */
+ 20:		checkuart(\rp, \rv, 0x33900000, 3390)
+ 21:		checkuart(\rp, \rv, 0x72500000, 7250)
+-22:		checkuart(\rp, \rv, 0x72600000, 7260)
+-23:		checkuart(\rp, \rv, 0x72680000, 7268)
+-24:		checkuart(\rp, \rv, 0x72710000, 7271)
+-25:		checkuart(\rp, \rv, 0x73640000, 7364)
+-26:		checkuart(\rp, \rv, 0x73660000, 7366)
+-27:		checkuart(\rp, \rv, 0x07437100, 74371)
+-28:		checkuart(\rp, \rv, 0x74390000, 7439)
+-29:		checkuart(\rp, \rv, 0x74450000, 7445)
+-30:		checkuart(\rp, \rv, 0x72780000, 7278)
++22:		checkuart(\rp, \rv, 0x72550000, 7255)
++23:		checkuart(\rp, \rv, 0x72600000, 7260)
++24:		checkuart(\rp, \rv, 0x72680000, 7268)
++25:		checkuart(\rp, \rv, 0x72710000, 7271)
++26:		checkuart(\rp, \rv, 0x72780000, 7278)
++27:		checkuart(\rp, \rv, 0x73640000, 7364)
++28:		checkuart(\rp, \rv, 0x73660000, 7366)
++29:		checkuart(\rp, \rv, 0x07437100, 74371)
++30:		checkuart(\rp, \rv, 0x74390000, 7439)
++31:		checkuart(\rp, \rv, 0x74450000, 7445)
+ 
+ 		/* No valid UART found */
+ 90:		mov	\rp, #0
 -- 
-~Randy
+2.17.1
