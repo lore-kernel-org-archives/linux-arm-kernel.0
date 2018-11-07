@@ -1,30 +1,37 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 07 Nov 2018 07:48:45 -0800
-Subject: [PATCH 1/2] arm64: dts: mt7622: fix console output issue on rfb1
-In-Reply-To: <8043d487e7bd20a11b14d832702bda214a9a694f.1541566473.git.ryder.lee@mediatek.com>
- (Ryder Lee's message of "Wed, 7 Nov 2018 12:59:43 +0800")
-References: <8043d487e7bd20a11b14d832702bda214a9a694f.1541566473.git.ryder.lee@mediatek.com>
-Message-ID: <7hr2fwevmq.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 7 Nov 2018 09:52:35 -0600
+Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
+In-Reply-To: <22cbe798-612f-8c88-90e7-388202f603cf@arm.com>
+References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
+ <20181107080335.GA24511@lst.de>
+ <22cbe798-612f-8c88-90e7-388202f603cf@arm.com>
+Message-ID: <20181107155235.GA18618@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ryder Lee <ryder.lee@mediatek.com> writes:
+On Wed, Nov 07, 2018 at 12:56:49PM +0000, Robin Murphy wrote:
+> On 2018-11-07 8:03 am, Christoph Hellwig wrote:
+> > On Tue, Nov 06, 2018 at 11:54:15AM +0000, Robin Murphy wrote:
+> > > of_dma_configure() was *supposed* to be following the same logic as
+> > > acpi_dma_configure() and only setting bus_dma_mask if some range was
+> > > specified by the firmware. However, it seems that subtlety got lost in
+> > > the process of fitting it into the differently-shaped control flow, and
+> > > as a result the force_dma==true case ends up always setting the bus mask
+> > > to the 32-bit default, which is not what anyone wants.
+> > > 
+> > > Make sure we only touch it if the DT actually said so.
+> > 
+> > This looks good, but I think it could really use a comment as the use
+> > of ret all the way down the function isn't exactly obvious.
+> 
+> Fair point.
+> 
+> > Let me now if you want this picked up through the OF or DMA trees.
+> 
+> I don't mind either way; I figure I'll wait a bit longer to see if Rob has
+> any preference, then resend with the comment and the tags picked up so it
+> can hopefully make rc2.
 
-> The issue was introduced by Kernel CI:
-> https://kernelci.org/boot/id/5bbdcbad59b5146fc5b43592/
+I have other fixes to send, so I can take it.
 
-The issue was *found* by kernelCI, not introduced by kernelCI. ;)
-
-> Fix this by using a 'stdout-path' property that points to the device.
->
-> Fixes: c0d9f9ad4f76 ("arm64: dts: mt7622: add earlycon to mt7622-rfb1 board")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-
-Tested-by: Kevin Hilman <khilman@baylibre.com>
-
-Note that this patch fixes the problem where there is no more console
-output, but current mainline still doesn't boot as there's another
-crash: http://termbin.com/zitb
-
-Kevin
+Rob
