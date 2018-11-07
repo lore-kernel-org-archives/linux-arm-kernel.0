@@ -1,36 +1,34 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 7 Nov 2018 16:11:35 +0100
-Subject: [PATCH v10 00/22] kasan: add software tag-based mode for arm64
-In-Reply-To: <20181107145922.GD2623@brain-police>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <CAAeHK+yOsP7V0gPu7EpqCbJZqbGQMZbAp6q1+=0dNGC24reyWg@mail.gmail.com>
- <20181107145922.GD2623@brain-police>
-Message-ID: <CAAeHK+zNgv9WxRpf7N3gmsLYGL6oUALAnyerMzeYZUz1LhoUuA@mail.gmail.com>
+From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
+Date: Wed, 7 Nov 2018 15:12:24 +0000
+Subject: [PATCH 0/3] add sama5d2 PIOBU GPIO driver
+Message-ID: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 3:59 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Nov 07, 2018 at 03:56:03PM +0100, Andrey Konovalov wrote:
->> On Tue, Nov 6, 2018 at 6:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
->> > This patchset adds a new software tag-based mode to KASAN [1].
->> > (Initially this mode was called KHWASAN, but it got renamed,
->> >  see the naming rationale at the end of this section).
->>
->> [...]
->>
->> > Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
->> > Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
->> > Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
->>
->> Hi Andrew,
->>
->> This patchset has now been reviewed-by KASAN maintainers. Could you
->> take a look and consider taking this into the -mm tree?
->
-> I would much prefer to take the arm64 parts (which still need to be reviewed
-> by Catalin afaict) via the arm64 tree, so please can you split those out
-> separately?
+On sama5d2 SoC the PIOBU pins do not lose their
+voltage during Backup/Self-refresh mode. This can
+be useful, for example, when the voltage must remain
+positive for a peripheral during Backup/Self-refresh
+mode (suspend-to ram is the Linux equivalent state).
 
-Which parts do you mean exactly, which patches? I don't think it makes
-sense to split this patchset, as one part won't function without the
-other.
+This patch series:
+- documents the driver's necessary device tree bindings
+- adds a MAINTAINER for the driver,
+- provides a basic GPIO controller driver for them
+
+Andrei Stefanescu (3):
+  dt-bindings: gpio: add sama5d2 PIOBU support
+  MAINTAINERS: add maintainer for sama5d2 PIOBU GPIO driver
+  gpio: added driver for sama5d2 PIOBU pins
+
+ .../bindings/gpio/gpio-sama5d2-piobu.txt           |  23 ++
+ MAINTAINERS                                        |   7 +
+ drivers/gpio/Kconfig                               |  10 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-sama5d2-piobu.c                  | 254 +++++++++++++++++++++
+ 5 files changed, 295 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
+ create mode 100644 drivers/gpio/gpio-sama5d2-piobu.c
+
+-- 
+2.7.4
