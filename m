@@ -1,41 +1,90 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 7 Nov 2018 22:31:24 +0530
-Subject: [PATCH v2 0/2] i2c-omap: Enable i2c-omap driver for AM654 SoCs
-In-Reply-To: <20181028223450.GK1882@kunai>
-References: <20180928052557.21663-1-vigneshr@ti.com>
- <09a6b1d4-f8f4-ea90-f361-bd3a92088430@ti.com> <20181028223450.GK1882@kunai>
-Message-ID: <c664348b-bb5b-9cba-6ed5-040014515477@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Nov 2018 17:04:58 +0000
+Subject: [PATCH v10 05/22] kasan: add CONFIG_KASAN_GENERIC and
+ CONFIG_KASAN_SW_TAGS
+In-Reply-To: <ea8f0391d7befab4afec34d2a009028cd9e0f326.1541525354.git.andreyknvl@google.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <ea8f0391d7befab4afec34d2a009028cd9e0f326.1541525354.git.andreyknvl@google.com>
+Message-ID: <20181107170458.jirk2b3tszrcagbt@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 29/10/18 4:04 AM, Wolfram Sang wrote:
-> On Sat, Oct 20, 2018 at 01:23:40PM +0530, Vignesh R wrote:
->>
->>
->> On 28-Sep-18 10:55 AM, Vignesh R wrote:
->>> Couple of patches to enable i2c-omap driver to be used with TI's new
->>> AM654 platforms.
->>>
->>>
->>> Vignesh R (2):
->>>   dt-bindings: i2c-omap: Add new compatible for AM654 SoCs
->>>   i2c: busses: Kconfig: Enable I2C_OMAP for ARCH_K3
->>>
->>>  Documentation/devicetree/bindings/i2c/i2c-omap.txt | 8 ++++++--
->>>  drivers/i2c/busses/Kconfig                         | 2 +-
->>>  2 files changed, 7 insertions(+), 3 deletions(-)
->>>
->>
->> Gentle ping...
+On Tue, Nov 06, 2018 at 06:30:20PM +0100, Andrey Konovalov wrote:
+> This commit splits the current CONFIG_KASAN config option into two:
+> 1. CONFIG_KASAN_GENERIC, that enables the generic KASAN mode (the one
+>    that exists now);
+> 2. CONFIG_KASAN_SW_TAGS, that enables the software tag-based KASAN mode.
 > 
-> Maintainer tags are missing. Tony is listed for this driver on OMAP2+.
-> Is this his realm? Do we need a specific maintainer for this driver?
+> The name CONFIG_KASAN_SW_TAGS is chosen as in the future we will have
+> another hardware tag-based KASAN mode, that will rely on hardware memory
+> tagging support in arm64.
 > 
+> With CONFIG_KASAN_SW_TAGS enabled, compiler options are changed to
+> instrument kernel files with -fsantize=kernel-hwaddress (except the ones
+> for which KASAN_SANITIZE := n is set).
+> 
+> Both CONFIG_KASAN_GENERIC and CONFIG_KASAN_SW_TAGS support both
+> CONFIG_KASAN_INLINE and CONFIG_KASAN_OUTLINE instrumentation modes.
+> 
+> This commit also adds empty placeholder (for now) implementation of
+> tag-based KASAN specific hooks inserted by the compiler and adjusts
+> common hooks implementation to compile correctly with each of the
+> config options.
+> 
+> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+> ---
+>  arch/arm64/Kconfig                  |  1 +
+>  include/linux/compiler-clang.h      |  5 +-
+>  include/linux/compiler-gcc.h        |  6 ++
+>  include/linux/compiler_attributes.h | 13 -----
+>  include/linux/kasan.h               | 16 ++++--
+>  lib/Kconfig.kasan                   | 87 +++++++++++++++++++++++------
+>  mm/kasan/Makefile                   |  6 +-
+>  mm/kasan/generic.c                  |  2 +-
+>  mm/kasan/kasan.h                    |  3 +-
+>  mm/kasan/tags.c                     | 75 +++++++++++++++++++++++++
+>  mm/slub.c                           |  2 +-
+>  scripts/Makefile.kasan              | 27 ++++++++-
+>  12 files changed, 201 insertions(+), 42 deletions(-)
+>  create mode 100644 mm/kasan/tags.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 787d7850e064..8b331dcfb48e 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -111,6 +111,7 @@ config ARM64
+>  	select HAVE_ARCH_JUMP_LABEL
+>  	select HAVE_ARCH_JUMP_LABEL_RELATIVE
+>  	select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+> +	select HAVE_ARCH_KASAN_SW_TAGS if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
 
-I think this driver needs a separate entry, will send a patch adding my
-name as reviewer for this driver.
+Given this relies on a compiler feature, can we please gate this on
+compiler feature detection? e.g. in some common Kconfig have:
 
--- 
-Regards
-Vignesh
+	select CC_HAS_ASAN_HWADDRESS if $(cc-option -fsanitize=kernel-hwaddress)
+
+... and on arm64 we can do:
+
+	select HAVE_ARCH_KASAN_SW_TAGS if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+
+... and core KASAN Kconfig can have:
+
+config KASAN_SW_TAGS
+	depends on HAVE_ARCH_KASAN_SW_TAGS
+	depends on CC_HAS_ASAN_HWADDRESS
+
+[...]
+
+> +ifeq ($(call cc-option, $(CFLAGS_KASAN) -Werror),)
+> +    ifneq ($(CONFIG_COMPILE_TEST),y)
+> +        $(warning Cannot use CONFIG_KASAN_SW_TAGS: \
+> +            -fsanitize=hwaddress is not supported by compiler)
+> +    endif
+> +endif
+
+... and then this warning shouldn't be possible, and can go.
+
+Thanks,
+Mark.
