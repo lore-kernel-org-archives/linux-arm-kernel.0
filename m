@@ -1,114 +1,61 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2018 21:59:03 +0000
-Subject: [PATCH 3/7] arm64: Align stack when taking exception from EL1
-In-Reply-To: <1537970184-44348-4-git-send-email-julien.thierry@arm.com>
+Date: Wed, 7 Nov 2018 21:59:20 +0000
+Subject: [PATCH 5/7] arm64: Do not apply BP hardening for hyp entries
+ from EL2
+In-Reply-To: <1537970184-44348-6-git-send-email-julien.thierry@arm.com>
 References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
- <1537970184-44348-4-git-send-email-julien.thierry@arm.com>
-Message-ID: <20181107215901.GE12248@brain-police>
+ <1537970184-44348-6-git-send-email-julien.thierry@arm.com>
+Message-ID: <20181107215918.GG12248@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 02:56:20PM +0100, Julien Thierry wrote:
-> Arm64 SP needs to be aligned to 16 bytes before being used as base address
-> for loads and stores. When taking some valid exceptions from EL1 (e.g. irq,
-> dbg, data abort), there is no guarantee that SP_EL1 was aligned when
-> taking the exception.
+On Wed, Sep 26, 2018 at 02:56:22PM +0100, Julien Thierry wrote:
+> When an EL2 entry of __kvm_hyp_vector is taken, it means an entry from a
+> lower EL was previously taken to exit the guest. Taking that lower EL entry
+> already applied BP hardening if it was needed, so there is no need to do
+> it again.
 > 
-> Pad the stack on EL1 entries when misaligned.
+> Only apply BP hardening for exception coming from lower EL.
 > 
 > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
 > ---
->  arch/arm64/include/asm/assembler.h |  9 +++++++++
->  arch/arm64/kernel/entry.S          | 32 ++++++++++++++++++++++++++++++--
->  2 files changed, 39 insertions(+), 2 deletions(-)
+>  arch/arm64/kernel/cpu_errata.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 0bcc98d..a0a5415 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -701,4 +701,13 @@
->  .Lyield_out_\@ :
->  	.endm
->  
-> +/*
-> + * Echange content of register xt with sp.
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index dec1089..9db5ecc 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -103,10 +103,16 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>  	void *dst = lm_alias(__bp_harden_hyp_vecs_start + slot * SZ_2K);
+>  	int i;
+> 
+> -	for (i = 0; i < SZ_2K; i += 0x80)
+> +	/*
+> +	 * Only overwrite hyp entries for exceptions from lower EL.
+> +	 * Exception vection vector is 2K bytes, first 1K bytes concern
+> +	 * exception from EL2 (EL2t, EL2h), last 1K concert lower exception
+> +	 * levels (ELx-64bits, ELx-32bits).
+> +	 */
+> +	for (i = SZ_1K; i < SZ_2K; i += 0x80)
+>  		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
+> 
+> -	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
+> +	__flush_icache_range((uintptr_t)dst + SZ_1K, (uintptr_t)dst + SZ_2K);
+>  }
 
-Exchange contents of register Xt with SP
+I'd personally find this clearer if you did:
 
-> + */
-> +	.macro xchg_sp	xt
-> +	add	sp, sp, \xt	// sp' = sp + xt
-> +	sub	\xt, sp, \xt	// xt' = sp' - xt = sp + xt - xt = sp
-> +	sub	sp, sp, \xt	// sp'' = sp' - xt' = sp + xt - sp = xt
-> +	.endm
+	dst += SZ_1K;
 
-Having said that, this is clearly inspired by the code in kernel_ventry for
-dealing with stack overflow, yet the macro you've got here cannot be reused
-there.
+before the for loop and with your comment above it. Then the for loop
+becomes:
 
-Maybe we're better off only macro-ising:
+	for (i = 0; i < SZ_1K; i += 0x80)
 
-	.macro sp_fetch_add xt
-	add	sp, sp, \xt
-	sub	\xt, sp, \xt
-	.endm
+and the range of the cache maintenance is [dst, dst + SZ_1K)
 
-and then letting the callers handle the rest, or build an swizzle_sp macro
-on top of it?
-
-> +
->  #endif	/* __ASM_ASSEMBLER_H */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index fc5842b..8fb66e4 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -59,6 +59,19 @@
->  	.endr
->  	.endm
->  
-> +	.macro force_stack_align
-> +	xchg_sp	x0
-> +	str	x1, [x0] // store x1 far away from S_SP
-
-So this temporarily trashes pt_regs.regs[0] if the stack is already aligned,
-right? I think that's fine, but we should comment /that/ rather than vaguely
-saying it's far away from S_SP. In fact, having a block comment above this
-macro saying exactly what is clobbered would generally be a good idea (esp
-as you nobble the flags in your next patch).
-
-> +
-> +	// aligned_sp[S_SP] = old_sp
-> +	bic	x1, x0, #0xf	// align down to 16-byte
-> +	str	x0, [x1, #S_SP]
-> +
-> +	ldr	x1, [x0]
-> +	bic	x0, x0, #0xf	// x0 = aligned_sp
-> +	xchg_sp	x0
-> +	.endm
-> +
->  /*
->   * Bad Abort numbers
->   *-----------------
-> @@ -158,6 +171,10 @@ alternative_cb_end
->  	.if	\regsize == 32
->  	mov	w0, w0				// zero upper 32 bits of x0
->  	.endif
-> +	.if	\el != 0
-> +	force_stack_align
-> +	.endif
-> +
->  	stp	x0, x1, [sp, #16 * 0]
->  	stp	x2, x3, [sp, #16 * 1]
->  	stp	x4, x5, [sp, #16 * 2]
-> @@ -184,7 +201,8 @@ alternative_cb_end
->  	apply_ssbd 1, x22, x23
->  
->  	.else
-> -	add	x21, sp, #S_FRAME_SIZE
-> +	ldr	x21, [sp, #S_SP]
-> +	add	x21, x21, #S_FRAME_SIZE		// adjust stored sp
-
-Can we not just store the corrected SP in force_stack_align, rather than
-store something bogus and then have to add the frame size back here?
+But I'll leave it up to Marc.
 
 Will
