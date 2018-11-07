@@ -1,133 +1,63 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Nov 2018 09:58:27 +0000
-Subject: [PATCH 2/4] efi/arm: defer persistent reservations until after
- paging_init()
-In-Reply-To: <c0995c05-3e2c-844e-d531-a687b296753a@arm.com>
-References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
- <20181106113732.16351-3-ard.biesheuvel@linaro.org>
- <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
- <20181106190817.GN30658@n2100.armlinux.org.uk>
- <CAKv+Gu_r38Bk_SZW-5qvtM7cmQ4-09dcFwNz29AyMceucdhadQ@mail.gmail.com>
- <20181106234933.GO30658@n2100.armlinux.org.uk>
- <c0995c05-3e2c-844e-d531-a687b296753a@arm.com>
-Message-ID: <20181107095827.GR30658@n2100.armlinux.org.uk>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 7 Nov 2018 10:44:24 +0100
+Subject: [PATCH v3 00/28] Allwinner H6 DE3 and HDMI support
+In-Reply-To: <3766119.46PGZN2PQn@jernej-laptop>
+References: <20181104182705.18047-1-jernej.skrabec@siol.net>
+ <20181105094341.qedt7jvnxooiojki@flea>
+ <3766119.46PGZN2PQn@jernej-laptop>
+Message-ID: <20181107094424.3nbmyq3cnuzevxoa@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 09:51:09AM +0000, Marc Zyngier wrote:
-> On 06/11/18 23:49, Russell King - ARM Linux wrote:
-> > On Tue, Nov 06, 2018 at 09:06:56PM +0100, Ard Biesheuvel wrote:
-> >> On 6 November 2018 at 20:08, Russell King - ARM Linux
-> >> <linux@armlinux.org.uk> wrote:
-> >>> On Tue, Nov 06, 2018 at 08:02:58PM +0100, Ard Biesheuvel wrote:
-> >>>> On 6 November 2018 at 12:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >>>>> The new memory EFI reservation feature we introduced to allow memory
-> >>>>> reservations to persist across kexec may trigger an unbounded number
-> >>>>> of calls to memblock_reserve(). The memblock subsystem can deal with
-> >>>>> this fine, but not before memblock resizing is enabled, which we can
-> >>>>> only do after paging_init(), when the memory we reallocate the array
-> >>>>> into is actually mapped.
-> >>>>>
-> >>>>> So break out the memreserve table processing into a separate function
-> >>>>> and call if after paging_init() on both arm64 and ARM.
-> >>>>>
-> >>>>> Cc: Russell King <linux@armlinux.org.uk>
-> >>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>>>
-> >>>> Russell,
-> >>>>
-> >>>> If you are ok with this patch, may I have your ack please? I would
-> >>>> like to send it out before the end of the week.
-> >>>
-> >>> You're not going to get a quick answer to this, because it needs me to
-> >>> investigate what the effect of this change actually is by code review.
-> >>> I can't guarantee when I'll get around to that.
-> >>>
-> >>
-> >> Fair enough.
-> >>
-> >> I will drop the ARM hunk for now then, and we'll fix ARM when you have
-> >> more time.
+On Tue, Nov 06, 2018 at 06:20:39PM +0100, Jernej ?krabec wrote:
+> Dne ponedeljek, 05. november 2018 ob 10:43:41 CET je Maxime Ripard napisal(a):
+> > On Sun, Nov 04, 2018 at 07:26:37PM +0100, Jernej Skrabec wrote:
+> > > This series adds support for Display Engine 3.0 and HDMI 2.0a, which
+> > > can be found on H6 SoC.
+> > > 
+> > > Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
+> > > displaying and processing 10-bit and AFBC formats, which are not yet
+> > > supported by this series.
+> > > 
+> > > H6 is also the first SoC which supports IOMMU, but support for it is
+> > > not yet added.
+> > > 
+> > > This series is based on linux-next at next-20181102.
+> > > 
+> > > I suggest all patches go through allwinner tree, except DRM patches,
+> > > which should go through drm-misc tree.
 > > 
-> > I don't see how you can do that - you're dropping the processing of
-> > reserved areas out of the efi_config_parse_tables() path, so that
-> > won't happen any more on ARM if you don't apply the ARM hunk.
+> > Applied all patches up to the 26. The two last one however should not
+> > use the clk bindings define you added in the first clk patches, since
+> > clk and dt patches are going through different tree.
 > 
-> The only reason for the whole persistent region thing is to support 
-> GICv3 redistributors memory tables across kexec, for those GIC 
-> implementations where LPIs cannot be disabled once they have been 
-> enabled.
+> I went over clock defines again, but I don't think I use anything new. New 
+> defines are:
 > 
-> There is no HW platform that combines 32bit cores and GICv3 (not to 
-> mention using EFI). The only existing "platform" is KVM/arm64, which 
-> doesn't suffer from the above problem (LPIs can be freely disabled in 
-> emulation). So the whole persistent region feature serves no purpose on 
-> 32bit ARM.
+> #define CLK_BUS_ROT            9
+> #define CLK_ROT                        10
+> #define RST_ROT                3
 > 
-> The only issue with dropping this hunk is that the memory reservation 
-> feature is enabled on 32bit ARM the first place, which can easily be 
-> dealt with something along those lines:
+> but none of them are actually used in DT.
+> 
+> Did I miss anything?
 
-So, it was a waste of my time trying to understand what's going on here
-with Ard's patch because it shouldn't be present on 32-bit ARM... Grr.
+No, I did. Sorry for that. Patches 27 and 28 are applied now.
 
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 787d7850e064..8bb263c9b99a 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1290,6 +1290,7 @@ config EFI
->  	select EFI_RUNTIME_WRAPPERS
->  	select EFI_STUB
->  	select EFI_ARMSTUB
-> +	select EFI_PERSISTENT_RESERVATIONS
->  	default y
->  	help
->  	  This option provides support for runtime services provided
-> diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
-> index 89110dfc7127..b728dab9e901 100644
-> --- a/drivers/firmware/efi/Kconfig
-> +++ b/drivers/firmware/efi/Kconfig
-> @@ -198,3 +198,6 @@ config EFI_DEV_PATH_PARSER
->  	bool
->  	depends on ACPI
->  	default n
-> +
-> +config EFI_PERSISTENT_RESERVATIONS
-> +       bool
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index 249eb70691b0..2a1903ab6d21 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -962,6 +962,7 @@ bool efi_is_table_address(unsigned long phys_addr)
->  	return false;
->  }
->  
-> +#ifdef CONFIG_EFI_PERSISTENT_RESERVATIONS
->  static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
->  
->  int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
-> @@ -993,6 +994,12 @@ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->  
->  	return 0;
->  }
-> +#else
-> +int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
-> +{
-> +	return 0;
-> +}
-> +#endif
->  
->  #ifdef CONFIG_KEXEC
->  static int update_efi_random_seed(struct notifier_block *nb,
-> 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
+I've fixed a few things in the patch 27, to fix the order of the de
+node, and change the de3 node name, since it's supposed to be a
+generic class name. I renamed it to display-engine.
+
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/204cf5ad/attachment.sig>
