@@ -1,62 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue,  6 Nov 2018 16:41:48 -0800
-Subject: [PATCH] ARM: brcmstb: Add entry for 7255
-Message-ID: <20181107004151.20370-1-f.fainelli@gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Tue,  6 Nov 2018 17:00:24 -0800
+Subject: [PATCH v3 0/4] kgdb: Fix kgdb_roundup_cpus()
+Message-ID: <20181107010028.184543-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Justin Chen <justinpopo6@gmail.com>
+This series was originally part of the series ("serial: Finish kgdb on
+qcom_geni; fix many lockdep splats w/ kgdb") but it made sense to
+split it up.
 
-Add in BCM7255 entry and reorder entries to keep ascending order. Also
-moved 7278 cause it was out of order.
+It's believed that dropping into kgdb should be more robust once these
+patches are applied.
 
-Signed-off-by: Justin Chen <justinpopo6@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/include/debug/brcmstb.S | 24 +++++++++++++-----------
- 1 file changed, 13 insertions(+), 11 deletions(-)
+Changes in v3:
+- No separate init call.
+- Don't round up the CPU that is doing the rounding up.
+- Add "#ifdef CONFIG_SMP" to match the rest of the file.
+- Updated desc saying we don't solve the "failed to roundup" case.
+- Document the ignored parameter.
+- Patch #3 and #4 are new.
 
-diff --git a/arch/arm/include/debug/brcmstb.S b/arch/arm/include/debug/brcmstb.S
-index 0f580caa81e5..bf8702ee8f86 100644
---- a/arch/arm/include/debug/brcmstb.S
-+++ b/arch/arm/include/debug/brcmstb.S
-@@ -26,8 +26,9 @@
- 
- #define UARTA_3390		REG_PHYS_ADDR(0x40a900)
- #define UARTA_7250		REG_PHYS_ADDR(0x40b400)
--#define UARTA_7260		REG_PHYS_ADDR(0x40c000)
--#define UARTA_7268		UARTA_7260
-+#define UARTA_7255		REG_PHYS_ADDR(0x40c000)
-+#define UARTA_7260		UARTA_7255
-+#define UARTA_7268		UARTA_7255
- #define UARTA_7271		UARTA_7268
- #define UARTA_7278		REG_PHYS_ADDR_V7(0x40c000)
- #define UARTA_7364		REG_PHYS_ADDR(0x40b000)
-@@ -82,15 +83,16 @@ ARM_BE8(	rev	\rv, \rv )
- 		/* Chip specific detection starts here */
- 20:		checkuart(\rp, \rv, 0x33900000, 3390)
- 21:		checkuart(\rp, \rv, 0x72500000, 7250)
--22:		checkuart(\rp, \rv, 0x72600000, 7260)
--23:		checkuart(\rp, \rv, 0x72680000, 7268)
--24:		checkuart(\rp, \rv, 0x72710000, 7271)
--25:		checkuart(\rp, \rv, 0x73640000, 7364)
--26:		checkuart(\rp, \rv, 0x73660000, 7366)
--27:		checkuart(\rp, \rv, 0x07437100, 74371)
--28:		checkuart(\rp, \rv, 0x74390000, 7439)
--29:		checkuart(\rp, \rv, 0x74450000, 7445)
--30:		checkuart(\rp, \rv, 0x72780000, 7278)
-+22:		checkuart(\rp, \rv, 0x72550000, 7255)
-+23:		checkuart(\rp, \rv, 0x72600000, 7260)
-+24:		checkuart(\rp, \rv, 0x72680000, 7268)
-+25:		checkuart(\rp, \rv, 0x72710000, 7271)
-+26:		checkuart(\rp, \rv, 0x72780000, 7278)
-+27:		checkuart(\rp, \rv, 0x73640000, 7364)
-+28:		checkuart(\rp, \rv, 0x73660000, 7366)
-+29:		checkuart(\rp, \rv, 0x07437100, 74371)
-+30:		checkuart(\rp, \rv, 0x74390000, 7439)
-+31:		checkuart(\rp, \rv, 0x74450000, 7445)
- 
- 		/* No valid UART found */
- 90:		mov	\rp, #0
+Changes in v2:
+- Removing irq flags separated from fixing lockdep splat.
+- Removing irq flags separated from fixing lockdep splat.
+- Don't use smp_call_function (Daniel).
+
+Douglas Anderson (4):
+  kgdb: Remove irq flags from roundup
+  kgdb: Fix kgdb_roundup_cpus() for arches who used smp_call_function()
+  kgdb: Don't round up a CPU that failed rounding up before
+  kdb: Don't back trace on a cpu that didn't round up
+
+ arch/arc/kernel/kgdb.c     | 10 ++-----
+ arch/arm/kernel/kgdb.c     | 12 ---------
+ arch/arm64/kernel/kgdb.c   | 12 ---------
+ arch/hexagon/kernel/kgdb.c | 32 ----------------------
+ arch/mips/kernel/kgdb.c    |  9 +------
+ arch/powerpc/kernel/kgdb.c |  6 ++---
+ arch/sh/kernel/kgdb.c      | 12 ---------
+ arch/sparc/kernel/smp_64.c |  2 +-
+ arch/x86/kernel/kgdb.c     |  9 ++-----
+ include/linux/kgdb.h       | 22 +++++++++------
+ kernel/debug/debug_core.c  | 55 +++++++++++++++++++++++++++++++++++++-
+ kernel/debug/debug_core.h  |  1 +
+ kernel/debug/kdb/kdb_bt.c  | 11 +++++++-
+ 13 files changed, 88 insertions(+), 105 deletions(-)
+
 -- 
-2.17.1
+2.19.1.930.g4563a0d9d0-goog
