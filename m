@@ -1,123 +1,235 @@
-From: Robert.Richter@cavium.com (Richter, Robert)
-Date: Wed, 7 Nov 2018 12:08:29 +0000
-Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
-In-Reply-To: <20181107103150.GA14853@rric.localdomain>
-References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
- <20181107103150.GA14853@rric.localdomain>
-Message-ID: <20181107120821.GK3795@rric.localdomain>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Wed, 7 Nov 2018 12:09:47 +0000
+Subject: [PATCH v9 5/5] clk: imx: add clock driver for i.MX8MQ CCM
+In-Reply-To: <153980549223.5275.1496899374465535150@swboyd.mtv.corp.google.com>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-6-git-send-email-abel.vesa@nxp.com>
+ <153980549223.5275.1496899374465535150@swboyd.mtv.corp.google.com>
+Message-ID: <20181107120946.myvj6kaoudyi4kzf@fsr-ub1664-175>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.11.18 11:31:50, Robert Richter wrote:
-> On 06.11.18 11:54:15, Robin Murphy wrote:
-> > of_dma_configure() was *supposed* to be following the same logic as
-> > acpi_dma_configure() and only setting bus_dma_mask if some range was
-> > specified by the firmware. However, it seems that subtlety got lost in
-> > the process of fitting it into the differently-shaped control flow, and
-> > as a result the force_dma==true case ends up always setting the bus mask
-> > to the 32-bit default, which is not what anyone wants.
+On Wed, Oct 17, 2018 at 12:44:52PM -0700, Stephen Boyd wrote:
+> Quoting Abel Vesa (2018-09-24 03:39:57)
+> > From: Lucas Stach <l.stach@pengutronix.de>
 > > 
-> > Make sure we only touch it if the DT actually said so.
+> > Add driver for the Clock Control Module found on i.MX8MQ.
 > > 
-> > Fixes: 6c2fb2ea7636 ("of/device: Set bus DMA mask as appropriate")
-> > Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> > Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > This is largely based on the downstream driver from Anson Huang and
+> > Bai Ping at NXP, plus the imx composite clock from Abel Vesa at NXP,
+> > with only some small adaptions to mainline from me.
 > 
-> Tested-by: Robert Richter <robert.richter@cavium.com>
+> Can you point to the downstream driver so we can know what small
+> adaptations were made.
 > 
-> This patch makes the bad page state message on Cavium ThunderX below
-> disappear.
-> 
-> Note: The Fixes: tag suggests the issue was already in 4.19, but I
-> have seen it in 4.20-rc1 first and it was pulled into mainline with:
-> 
->  cff229491af5 Merge tag 'dma-mapping-4.20' of git://git.infradead.org/users/hch/dma-mapping
 
-I have bisected it and the issue was seen first with:
+It's was implemented originally in NXP's internal tree. The adaptations
+to the initial implementation are not that small anymore. I even changed the
+authorship since it has changed quite a lot compared to the initial version.
 
- b4ebe6063204 dma-direct: implement complete bus_dma_mask handling
-
-> 
-> -Robert
-> 
-> 
-> [   37.634555] BUG: Bad page state in process swapper/5  pfn:f3ebb
-> [   37.640483] page:ffff7e0003cfaec0 count:0 mapcount:0 mapping:0000000000000000 index:0x0
-> [   37.648493] flags: 0xffff00000001000(reserved)
-> [   37.652942] raw: 0ffff00000001000 ffff7e0003cfaec8 ffff7e0003cfaec8 0000000000000000
-> [   37.660691] raw: 0000000000000000 0000000000000000 00000000ffffffff 0000000000000000
-> [   37.668438] page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
-> [   37.674880] bad because of flags: 0x1000(reserved)
-> [   37.679672] Modules linked in: ip6t_REJECT nf_reject_ipv6 xt_tcpudp ipt_REJECT nf_reject_ipv4 xt_conntrack ip6table_nat nf_nat_ipv6 ip6table_mangle iptable_nat nf_nat_ipv4 nf_nat nf_conntrack nf_defrag_ipv6 nf_defrag_ipv4 iptable_mangle ip6table_filter ip6_tables iptable_filter crct10dif_ce cavium_rng_vf rng_core ipmi_ssif thunderx_zip thunderx_edac ipmi_devintf cavium_rng ipmi_msghandler ip_tables x_tables xfs libcrc32c nicvf nicpf thunder_bgx thunder_xcv i2c_thunderx mdio_thunder mdio_cavium ipv6
-> [   37.723866] CPU: 5 PID: 0 Comm: swapper/5 Not tainted 4.20.0-rc1-00012-gc106b1cbe843 #1
-> [   37.731874] Hardware name: Cavium ThunderX CRB/To be filled by O.E.M., BIOS 5.11 12/12/2012
-> [   37.740228] Call trace:
-> [   37.742677]  dump_backtrace+0x0/0x148
-> [   37.746334]  show_stack+0x14/0x1c
-> [   37.749643]  dump_stack+0x84/0xa8
-> [   37.752954]  bad_page+0xe4/0x144
-> [   37.756178]  free_pages_check_bad+0x7c/0x84
-> [   37.760355]  __free_pages_ok+0x22c/0x284
-> [   37.764272]  page_frag_free+0x64/0x68
-> [   37.767930]  skb_free_head+0x24/0x2c
-> [   37.771500]  skb_release_data+0x130/0x148
-> [   37.775504]  skb_release_all+0x24/0x30
-> [   37.779246]  kfree_skb+0x2c/0x54
-> [   37.782471]  ip_error+0x70/0x1d4
-> [   37.785693]  ip_rcv_finish+0x3c/0x50
-> [   37.789262]  ip_rcv+0xc0/0xd0
-> [   37.792225]  __netif_receive_skb_one_core+0x4c/0x70
-> [   37.797099]  __netif_receive_skb+0x2c/0x70
-> [   37.801190]  netif_receive_skb_internal+0x64/0x160
-> [   37.805976]  napi_gro_receive+0xa0/0xc4
-> [   37.809815]  nicvf_cq_intr_handler+0x930/0xc1c [nicvf]
-> [   37.814950]  nicvf_poll+0x30/0xb0 [nicvf]
-> [   37.818954]  net_rx_action+0x140/0x2f8
-> [   37.822697]  __do_softirq+0x11c/0x228
-> [   37.826354]  irq_exit+0xbc/0xd0
-> [   37.829491]  __handle_domain_irq+0x6c/0xb4
-> [   37.833581]  gic_handle_irq+0x8c/0x1a0
-> [   37.837324]  el1_irq+0xb0/0x128
-> [   37.840459]  arch_cpu_idle+0x10/0x18
-> [   37.844031]  default_idle_call+0x18/0x28
-> [   37.847948]  do_idle+0x194/0x258
-> [   37.851169]  cpu_startup_entry+0x20/0x24
-> [   37.855089]  secondary_start_kernel+0x144/0x168
-> 
-> 
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
 > > ---
+> >  drivers/clk/imx/Makefile     |   1 +
+> >  drivers/clk/imx/clk-imx8mq.c | 602 +++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/imx/clk.h        |  36 +++
+> >  3 files changed, 639 insertions(+)
+> >  create mode 100644 drivers/clk/imx/clk-imx8mq.c
 > > 
-> > Sorry about that... I guess I only have test setups that either have
-> > dma-ranges or where a 32-bit bus mask goes unnoticed :(
-> > 
-> > The Octeon and SMMU issues sound like they're purely down to this, and
-> > it's probably related to at least one of John's Hikey woes.
-> > 
-> > Robin.
-> > 
-> >  drivers/of/device.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/of/device.c b/drivers/of/device.c
-> > index 0f27fad9fe94..757ae867674f 100644
-> > --- a/drivers/of/device.c
-> > +++ b/drivers/of/device.c
-> > @@ -149,7 +149,8 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
-> >  	 * set by the driver.
-> >  	 */
-> >  	mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
-> > -	dev->bus_dma_mask = mask;
-> > +	if (!ret)
-> > +		dev->bus_dma_mask = mask;
-> >  	dev->coherent_dma_mask &= mask;
-> >  	*dev->dma_mask &= mask;
-> >  
-> > -- 
-> > 2.19.1.dirty
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+> > index 4fabb0a..64e695c 100644
+> > --- a/drivers/clk/imx/Makefile
+> > +++ b/drivers/clk/imx/Makefile
+> > @@ -30,3 +30,4 @@ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o
+> >  obj-$(CONFIG_SOC_IMX6UL) += clk-imx6ul.o
+> >  obj-$(CONFIG_SOC_IMX7D)  += clk-imx7d.o
+> >  obj-$(CONFIG_SOC_VF610)  += clk-vf610.o
+> > +obj-$(CONFIG_SOC_IMX8MQ) += clk-imx8mq.o
+> 
+> Please try to keep this alphabetical on CONFIG symbol.
+> 
+
+Fixed in the next version.
+
+> > diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
+> > new file mode 100644
+> > index 0000000..aadb523
+> > --- /dev/null
+> > +++ b/drivers/clk/imx/clk-imx8mq.c
+> > @@ -0,0 +1,602 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright 2018 NXP.
+> > + * Copyright (C) 2017 Pengutronix, Lucas Stach <kernel@pengutronix.de>
+> > + */
+> > +
+> > +#include <dt-bindings/clock/imx8mq-clock.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/clkdev.h>
+> 
+> Are these two includes used?
+> 
+
+clkdev.h include is removed in the next version.
+clk.h is needed by of_clk_get_by_name.
+
+> > +#include <linux/err.h>
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/types.h>
+> > +
+> > +#include "clk.h"
+> > +
+> > +static u32 share_count_sai1;
+> > +static u32 share_count_sai2;
+> > +static u32 share_count_sai3;
+> > +static u32 share_count_sai4;
+> > +static u32 share_count_sai5;
+> > +static u32 share_count_sai6;
+> > +static u32 share_count_dcss;
+> > +static u32 share_count_nand;
+> > +
+> [...]
+> > +
+> > +static const char *imx8mq_ecspi3_sels[] = {"osc_25m", "sys2_pll_200m", "sys1_pll_40m", "sys1_pll_160m",
+> > +                                          "sys1_pll_800m", "sys3_pll2_out", "sys2_pll_250m", "audio_pll2_out", };
+> > +static const char *imx8mq_dram_core_sels[] = {"dram_pll_out", "dram_alt_root", };
+> > +
+> > +static const char *imx8mq_clko2_sels[] = {"osc_25m", "sys2_pll_200m", "sys1_pll_400m", "sys2_pll_166m", "audio_pll1_out",
+> > +                                        "video_pll1_out", "ckil", };
+> > +
+> > +static struct clk_onecell_data clk_data;
+> > +
+> > +static void __init imx8mq_clocks_init(struct device_node *ccm_node)
+> > +{
+> > +       struct device_node *np;
+> > +       void __iomem *base;
+> > +       int i;
+> > +
+> > +       clks[IMX8MQ_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
+> > +       clks[IMX8MQ_CLK_32K] = of_clk_get_by_name(ccm_node, "ckil");
+> > +       clks[IMX8MQ_CLK_25M] = of_clk_get_by_name(ccm_node, "osc_25m");
+> > +       clks[IMX8MQ_CLK_27M] = of_clk_get_by_name(ccm_node, "osc_27m");
+> > +       clks[IMX8MQ_CLK_EXT1] = of_clk_get_by_name(ccm_node, "clk_ext1");
+> > +       clks[IMX8MQ_CLK_EXT2] = of_clk_get_by_name(ccm_node, "clk_ext2");
+> > +       clks[IMX8MQ_CLK_EXT3] = of_clk_get_by_name(ccm_node, "clk_ext3");
+> > +       clks[IMX8MQ_CLK_EXT4] = of_clk_get_by_name(ccm_node, "clk_ext4");
+> > +
+> > +       np = of_find_compatible_node(NULL, NULL, "fsl,imx8mq-anatop");
+> > +       base = of_iomap(np, 0);
+> > +       WARN_ON(!base);
+> 
+> And if that fails? return without continuing?
+> 
+
+Fixed in the next version.
+
+> > +
+> > +       clks[IMX8MQ_ARM_PLL_REF_SEL] = imx_clk_mux("arm_pll_ref_sel", base + 0x28, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+> > +       clks[IMX8MQ_GPU_PLL_REF_SEL] = imx_clk_mux("gpu_pll_ref_sel", base + 0x18, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+> > +       clks[IMX8MQ_VPU_PLL_REF_SEL] = imx_clk_mux("vpu_pll_ref_sel", base + 0x20, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+> > +       clks[IMX8MQ_AUDIO_PLL1_REF_SEL] = imx_clk_mux("audio_pll1_ref_sel", base + 0x0, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+> [..]
+> > +       clks[IMX8MQ_CLK_DSI_CORE] = imx_clk_composite("dsi_core", imx8mq_dsi_core_sels, base + 0xbb00);
+> > +       clks[IMX8MQ_CLK_DSI_PHY_REF] = imx_clk_composite("dsi_phy_ref", imx8mq_dsi_phy_sels, base + 0xbb80);
+> > +       clks[IMX8MQ_CLK_DSI_DBI] = imx_clk_composite("dsi_dbi", imx8mq_dsi_dbi_sels, base + 0xbc00);
+> > +       clks[IMX8MQ_CLK_DSI_ESC] = imx_clk_composite("dsi_esc", imx8mq_dsi_esc_sels, base + 0xbc80);
+> > +       clks[IMX8MQ_CLK_DSI_AHB] = imx_clk_composite("dsi_ahb", imx8mq_dsi_ahb_sels, base + 0x9200);
+> > +       clks[IMX8MQ_CLK_CSI1_CORE] = imx_clk_composite("csi1_core", imx8mq_csi1_core_sels, base + 0xbd00);
+> > +       clks[IMX8MQ_CLK_CSI1_PHY_REF] = imx_clk_composite("csi1_phy_ref", imx8mq_csi1_phy_sels, base + 0xbd80);
+> > +       clks[IMX8MQ_CLK_CSI1_ESC] = imx_clk_composite("csi1_esc", imx8mq_csi1_esc_sels, base + 0xbe00);
+> > +       clks[IMX8MQ_CLK_CSI2_CORE] = imx_clk_composite("csi2_core", imx8mq_csi2_core_sels, base + 0xbe80);
+> > +       clks[IMX8MQ_CLK_CSI2_PHY_REF] = imx_clk_composite("csi2_phy_ref", imx8mq_csi2_phy_sels, base + 0xbf00);
+> > +       clks[IMX8MQ_CLK_CSI2_ESC] = imx_clk_composite("csi2_esc", imx8mq_csi2_esc_sels, base + 0xbf80);
+> > +       clks[IMX8MQ_CLK_PCIE2_CTRL] = imx_clk_composite("pcie2_ctrl", imx8mq_pcie2_ctrl_sels, base + 0xc000);
+> > +       clks[IMX8MQ_CLK_PCIE2_PHY] = imx_clk_composite("pcie2_phy", imx8mq_pcie2_phy_sels, base + 0xc080);
+> > +       clks[IMX8MQ_CLK_PCIE2_AUX] = imx_clk_composite("pcie2_aux", imx8mq_pcie2_aux_sels, base + 0xc100);
+> > +       clks[IMX8MQ_CLK_ECSPI3] = imx_clk_composite("ecspi3", imx8mq_ecspi3_sels, base + 0xc180);
+> > +
+> > +       /*FIXME, the doc is not ready now */
+> 
+> What does this mean?
+> 
+
+The comment does not apply anymore. It is remoed in the next version.
+When the driver was initially implemented, the specs doc was not ready.
+
+> > +       clks[IMX8MQ_CLK_ECSPI1_ROOT] = imx_clk_gate4("ecspi1_root_clk", "ecspi1", base + 0x4070, 0);
+> > +       clks[IMX8MQ_CLK_ECSPI2_ROOT] = imx_clk_gate4("ecspi2_root_clk", "ecspi2", base + 0x4080, 0);
+> > +       clks[IMX8MQ_CLK_ECSPI3_ROOT] = imx_clk_gate4("ecspi3_root_clk", "ecspi3", base + 0x4090, 0);
+> > +       clks[IMX8MQ_CLK_ENET1_ROOT] = imx_clk_gate4("enet1_root_clk", "enet_axi", base + 0x40a0, 0);
+> > +       clks[IMX8MQ_CLK_GPT1_ROOT] = imx_clk_gate4("gpt1_root_clk", "gpt1", base + 0x4100, 0);
+> [...]
+> > +
+> > +       clks[IMX8MQ_GPT_3M_CLK] = imx_clk_fixed_factor("gpt_3m", "osc_25m", 1, 8);
+> > +       clks[IMX8MQ_CLK_DRAM_ALT_ROOT] = imx_clk_fixed_factor("dram_alt_root", "dram_alt", 1, 4);
+> > +
+> > +       for (i = 0; i < IMX8MQ_CLK_END; i++)
+> > +               if (IS_ERR(clks[i]))
+> > +                       pr_err("i.MX8mq clk %u register failed with %ld\n",
+> > +                              i, PTR_ERR(clks[i]));
+> > +
+> > +       clk_data.clks = clks;
+> > +       clk_data.clk_num = ARRAY_SIZE(clks);
+> > +       of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+> 
+> Any chance to move to using clk_hw based provider and clk registration
+> APIs?
+> 
+
+Since a lot of the imx clocks that are already upstream and since it's not
+quite a small change, I would prefer if this would go in as is. I intend to
+make the switch to clk_hw based registration later, but it will take some time
+for me to get that ready and that would delay the upstream of imx8mq drivers
+even more.
+
+All the new clock types introduced now are clk_hw based.
+
+> > +
+> > +       clk_set_parent(clks[IMX8MQ_CLK_AHB], clks[IMX8MQ_SYS1_PLL_133M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_NAND_USDHC_BUS], clks[IMX8MQ_SYS1_PLL_266M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_AUDIO_AHB], clks[IMX8MQ_SYS2_PLL_500M]);
+> > +
+> > +       /* config video_pll1 clock */
+> > +       clk_set_parent(clks[IMX8MQ_VIDEO_PLL1_REF_SEL], clks[IMX8MQ_CLK_27M]);
+> > +       clk_set_rate(clks[IMX8MQ_VIDEO_PLL1], 593999999);
+> > +
+> > +       /* increase NOC clock to achieve best DDR access performance */
+> > +       clk_set_rate(clks[IMX8MQ_CLK_NOC], clk_get_rate(clks[IMX8MQ_SYS1_PLL_800M]));
+> > +
+> > +       /* set pcie root's parent clk source */
+> > +       clk_set_parent(clks[IMX8MQ_CLK_PCIE1_CTRL], clks[IMX8MQ_SYS2_PLL_250M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_PCIE1_PHY], clks[IMX8MQ_SYS2_PLL_100M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_PCIE2_CTRL], clks[IMX8MQ_SYS2_PLL_250M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_PCIE2_PHY], clks[IMX8MQ_SYS2_PLL_100M]);
+> > +
+> > +       clk_set_parent(clks[IMX8MQ_CLK_CSI1_CORE], clks[IMX8MQ_SYS1_PLL_266M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_CSI1_PHY_REF], clks[IMX8MQ_SYS2_PLL_1000M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_CSI1_ESC], clks[IMX8MQ_SYS1_PLL_800M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_CSI2_CORE], clks[IMX8MQ_SYS1_PLL_266M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_CSI2_PHY_REF], clks[IMX8MQ_SYS2_PLL_1000M]);
+> > +       clk_set_parent(clks[IMX8MQ_CLK_CSI2_ESC], clks[IMX8MQ_SYS1_PLL_800M]);
+> 
+> Can this be done with assigned clock parents and assigned clock rates?
+> 
+
+Fair enough. Removed entirely in the next version. Each driver will set its
+own rate and parent in dts later on.
+
+> > +}
+> > +
+> > +CLK_OF_DECLARE(imx8mq, "fsl,imx8mq-ccm", imx8mq_clocks_init);
+> 
+> Can you please add a comment indicating why this can't be done with a
+> platform driver, or convert this to be a platform driver?
+> 
+
+Good point. Switched to platform driver.
+
+Thanks
+
+-- 
