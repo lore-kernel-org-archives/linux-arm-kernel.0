@@ -1,81 +1,33 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 7 Nov 2018 09:46:12 +0100
-Subject: [PATCH] pinctrl: zynq: Use define directive for
- PIN_CONFIG_IO_STANDARD
-In-Reply-To: <20181101005724.9622-1-natechancellor@gmail.com>
-References: <20181101005724.9622-1-natechancellor@gmail.com>
-Message-ID: <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 7 Nov 2018 09:50:57 +0100
+Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
+ device nodes
+In-Reply-To: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+Message-ID: <20181107085056.GB31092@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01. 11. 18 1:57, Nathan Chancellor wrote:
-> Clang warns when one enumerated type is implicitly converted to another:
+On Tue, Nov 06, 2018 at 09:46:47PM +0100, Marek Vasut wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > 
-> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
-> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> type 'enum pin_config_param' [-Wenum-conversion]
->         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
->         ~               ^~~~~~~~~~~~~~~~~~~~~
-> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
-> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> type 'enum pin_config_param' [-Wenum-conversion]
->         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
->             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
-> macro 'PCONFDUMP'
->         .param = a, .display = b, .format = c, .has_arg = d     \
->                  ^
-> 2 warnings generated.
-
-This is interesting. I have never tried to use llvm for building the
-kernel. Do you have any description how this can be done?
-
-
+> This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC
+> and enables SD card slot connected to SDHI0, micro SD card slot
+> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board
+> using the R8A77990 SoC.
 > 
-> It is expected that pinctrl drivers can extend pin_config_param because
-> of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
-> isn't an issue. Most drivers that take advantage of this define the
-> PIN_CONFIG variables as constants, rather than enumerated values. Do the
-> same thing here so that Clang no longer warns.
-> 
-> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
-> ---
->  drivers/pinctrl/pinctrl-zynq.c | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-> index a0daf27042bd..57046c221756 100644
-> --- a/drivers/pinctrl/pinctrl-zynq.c
-> +++ b/drivers/pinctrl/pinctrl-zynq.c
-> @@ -972,14 +972,11 @@ enum zynq_io_standards {
->  };
->  
->  /**
-> - * enum zynq_pin_config_param - possible pin configuration parameters
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 
-This is wrong. kernel-doc is reporting issue with it.
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-drivers/pinctrl/pinctrl-zynq.c:975: warning: Cannot understand  *
-@PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the
-argument to
- on line 975 - I thought it was a doc line
-1 warnings
+Out of curiosity: have you tested HS400 on that board based on Niklas'
+recent patches as well?
 
-
->   * @PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the argument to
->   *	this parameter (on a custom format) tells the driver which alternative
->   *	IO standard to use.
->   */
-> -enum zynq_pin_config_param {
-> -	PIN_CONFIG_IOSTANDARD = PIN_CONFIG_END + 1,
-> -};
-> +#define PIN_CONFIG_IOSTANDARD		(PIN_CONFIG_END + 1)
->  
->  static const struct pinconf_generic_params zynq_dt_params[] = {
->  	{"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
-> 
-
-This change is fine.
-
-Thanks,
-Michal
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/2d5d77be/attachment.sig>
