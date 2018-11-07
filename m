@@ -1,17 +1,18 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Wed,  7 Nov 2018 18:09:50 +0100
-Subject: [PATCH v2 08/11] arm: dts: exynos4: add support for thermal trip
+Date: Wed,  7 Nov 2018 18:09:52 +0100
+Subject: [PATCH v2 10/11] arm: dts: exynos5422: add support for thermal trip
  irq-mode
 In-Reply-To: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
 References: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181107171043eucas1p16be3fa901c7bceb129c70fc81dba6e48@eucas1p1.samsung.com>
-Message-ID: <1541610593-28542-9-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181107171045eucas1p26ec5feb1b2a397971c919592f6d87b40@eucas1p2.samsung.com>
+Message-ID: <1541610593-28542-11-git-send-email-l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds support for new flag which indicates
 that trip point triggers IRQ when temperature is met.
-Change existing trip points to be expicitly marked with the new flag.
+Exynos5422 supports 4 trip points which will trigger IRQ.
+Additional trip points should be registered without 'irq-mode' flag.
 
 Cc: Kukjin Kim <kgene@kernel.org>
 Cc: Krzysztof Kozlowski <krzk@kernel.org>
@@ -20,42 +21,132 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-samsung-soc at vger.kernel.org
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- arch/arm/boot/dts/exynos4-cpu-thermal.dtsi | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 40 +++++++++++++++-------
+ 1 file changed, 28 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos4-cpu-thermal.dtsi
-index 021d9fc..5e07289 100644
---- a/arch/arm/boot/dts/exynos4-cpu-thermal.dtsi
-+++ b/arch/arm/boot/dts/exynos4-cpu-thermal.dtsi
-@@ -17,22 +17,26 @@ thermal-zones {
- 			cpu_alert0: cpu-alert-0 {
- 				temperature = <70000>; /* millicelsius */
- 				hysteresis = <10000>; /* millicelsius */
--				type = "active";
-+				type = "passive";
-+				irq-mode;
- 			};
- 			cpu_alert1: cpu-alert-1 {
- 				temperature = <95000>; /* millicelsius */
- 				hysteresis = <10000>; /* millicelsius */
--				type = "active";
-+				type = "passive";
-+				irq-mode;
- 			};
- 			cpu_alert2: cpu-alert-2 {
- 				temperature = <110000>; /* millicelsius */
- 				hysteresis = <10000>; /* millicelsius */
--				type = "active";
-+				type = "passive";
-+				irq-mode;
- 			};
- 			cpu_crit0: cpu-crit-0 {
- 				temperature = <120000>; /* millicelsius */
- 				hysteresis = <0>; /* millicelsius */
- 				type = "critical";
-+				irq-mode;
- 			};
- 		};
- 		cooling-maps {
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index e522edb..389548f 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -59,22 +59,26 @@
+ 				cpu0_alert0: cpu-alert-0 {
+ 					temperature = <50000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu0_alert1: cpu-alert-1 {
+ 					temperature = <60000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu0_alert2: cpu-alert-2 {
+ 					temperature = <70000>; /* millicelsius */
+ 					hysteresis = <5000>; /* millicelsius */
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu0_crit0: cpu-crit-0 {
+ 					temperature = <120000>; /* millicelsius */
+ 					hysteresis = <0>; /* millicelsius */
+ 					type = "critical";
++					irq-mode;
+ 				};
+ 				/*
+ 				 * Exynos542x supports only 4 trip-points
+@@ -142,22 +146,26 @@
+ 				cpu1_alert0: cpu-alert-0 {
+ 					temperature = <50000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu1_alert1: cpu-alert-1 {
+ 					temperature = <60000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu1_alert2: cpu-alert-2 {
+ 					temperature = <70000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu1_crit0: cpu-crit-0 {
+ 					temperature = <120000>;
+ 					hysteresis = <0>;
+ 					type = "critical";
++					irq-mode;
+ 				};
+ 				cpu1_alert3: cpu-alert-3 {
+ 					temperature = <70000>;
+@@ -209,22 +217,26 @@
+ 				cpu2_alert0: cpu-alert-0 {
+ 					temperature = <50000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu2_alert1: cpu-alert-1 {
+ 					temperature = <60000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu2_alert2: cpu-alert-2 {
+ 					temperature = <70000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu2_crit0: cpu-crit-0 {
+ 					temperature = <120000>;
+ 					hysteresis = <0>;
+ 					type = "critical";
++					irq-mode;
+ 				};
+ 				cpu2_alert3: cpu-alert-3 {
+ 					temperature = <70000>;
+@@ -276,22 +288,26 @@
+ 				cpu3_alert0: cpu-alert-0 {
+ 					temperature = <50000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu3_alert1: cpu-alert-1 {
+ 					temperature = <60000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu3_alert2: cpu-alert-2 {
+ 					temperature = <70000>;
+ 					hysteresis = <5000>;
+-					type = "active";
++					type = "passive";
++					irq-mode;
+ 				};
+ 				cpu3_crit0: cpu-crit-0 {
+ 					temperature = <120000>;
+ 					hysteresis = <0>;
+ 					type = "critical";
++					irq-mode;
+ 				};
+ 				cpu3_alert3: cpu-alert-3 {
+ 					temperature = <70000>;
 -- 
 2.7.4
