@@ -1,131 +1,61 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  7 Nov 2018 09:40:06 +0000
-Subject: [RFC PATCH 2/4] arm64: lse: expose dependency on gas via Kconfig
-In-Reply-To: <1541583608-26375-1-git-send-email-vladimir.murzin@arm.com>
-References: <1541583608-26375-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1541583608-26375-3-git-send-email-vladimir.murzin@arm.com>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Wed, 7 Nov 2018 10:41:27 +0100
+Subject: [PATCH 1/3] drm/meson: Support Overlay plane for video rendering
+In-Reply-To: <1541497202-20570-2-git-send-email-narmstrong@baylibre.com>
+References: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
+ <1541497202-20570-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAMO6nay=te3W67b83LKv35tXL8+09rvE9EaFwLDrRBhwpEgMvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So we can simply hide LSE support if dependency is not satisfied.
+On Tue, Nov 6, 2018 at 10:40 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>
+> The Amlogic Meson GX SoCs support an Overlay plane behind the primary
+> plane for video rendering.
+>
+> This Overlay plane support various YUV layouts :
+> - YUYV
+> - NV12 / NV21
+> - YUV444 / 422 / 420 / 411 / 410
+>
+> The scaler supports a wide range of scaling ratios, but for simplicity,
+> plane atomic check limits the scaling from x5 to /5 in vertical and
+> horizontal scaling.
+>
+> The z-order is fixed and always behind the primary plane and cannot be changed.
+>
+> The scaling parameter algorithm was taken from the Amlogic vendor kernel
+> code and rewritten to match the atomic universal plane requirements.
+>
+> The video rendering using this overlay plane support has been tested using
+> the new Kodi DRM-KMS Prime rendering path along the in-review V4L2 Mem2Mem
+> Hardware Video Decoder up to 3840x2160 NV12 frames on various display modes.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/gpu/drm/meson/Makefile          |   2 +-
+>  drivers/gpu/drm/meson/meson_canvas.c    |   7 +-
+>  drivers/gpu/drm/meson/meson_canvas.h    |  11 +-
+>  drivers/gpu/drm/meson/meson_crtc.c      | 216 +++++++++++-
+>  drivers/gpu/drm/meson/meson_drv.c       |  29 +-
+>  drivers/gpu/drm/meson/meson_drv.h       |  52 +++
+>  drivers/gpu/drm/meson/meson_overlay.c   | 586 ++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/meson/meson_overlay.h   |  14 +
+>  drivers/gpu/drm/meson/meson_registers.h |   3 +
+>  drivers/gpu/drm/meson/meson_viu.c       |  15 +
+>  drivers/gpu/drm/meson/meson_vpp.c       |  44 ++-
+>  11 files changed, 971 insertions(+), 8 deletions(-)
+>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.c
+>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.h
+>
 
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm64/Kconfig              |  1 +
- arch/arm64/Makefile             | 13 ++-----------
- arch/arm64/include/asm/atomic.h |  2 +-
- arch/arm64/include/asm/lse.h    |  6 +++---
- arch/arm64/kernel/cpufeature.c  |  4 ++--
- 5 files changed, 9 insertions(+), 17 deletions(-)
+Tested by rendering video with:
+ - gstreamer 1.14.4 using kmssink
+ - ffmpeg-drm (https://github.com/Elyotna/ffmpeg-drm),
+by applying this patch on top of the video decoder patch series.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 964f682..7978aee 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1072,6 +1072,7 @@ config ARM64_PAN
- config ARM64_LSE_ATOMICS
- 	bool "Atomic instructions"
- 	default y
-+	depends on $(as-instr,.arch_extension lse)
- 	help
- 	  As part of the Large System Extensions, ARMv8.1 introduces new
- 	  atomic instructions that are designed specifically to scale in
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b4e994c..3054757 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -32,15 +32,6 @@ endif
- 
- KBUILD_DEFCONFIG := defconfig
- 
--# Check for binutils support for specific extensions
--lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
--
--ifeq ($(CONFIG_ARM64_LSE_ATOMICS), y)
--  ifeq ($(lseinstr),)
--$(warning LSE atomics not supported by binutils)
--  endif
--endif
--
- ifeq ($(CONFIG_ARM64), y)
- brokengasinst := $(call as-instr,1:\n.inst 0\n.rept . - 1b\n\nnop\n.endr\n,,-DCONFIG_BROKEN_GAS_INST=1)
- 
-@@ -49,9 +40,9 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
-   endif
- endif
- 
--KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
-+KBUILD_CFLAGS	+= -mgeneral-regs-only $(brokengasinst)
- KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
--KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
-+KBUILD_AFLAGS	+= $(brokengasinst)
- 
- KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
- KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
-diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-index 9bca54d..9d8d029 100644
---- a/arch/arm64/include/asm/atomic.h
-+++ b/arch/arm64/include/asm/atomic.h
-@@ -30,7 +30,7 @@
- 
- #define __ARM64_IN_ATOMIC_IMPL
- 
--#if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE)
-+#ifdef CONFIG_ARM64_LSE_ATOMICS
- #include <asm/atomic_lse.h>
- #else
- #include <asm/atomic_ll_sc.h>
-diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
-index 8262325..1fd31c7 100644
---- a/arch/arm64/include/asm/lse.h
-+++ b/arch/arm64/include/asm/lse.h
-@@ -2,7 +2,7 @@
- #ifndef __ASM_LSE_H
- #define __ASM_LSE_H
- 
--#if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
-+#ifdef CONFIG_ARM64_LSE_ATOMICS
- 
- #include <linux/compiler_types.h>
- #include <linux/export.h>
-@@ -36,7 +36,7 @@
- 	ALTERNATIVE(llsc, lse, ARM64_HAS_LSE_ATOMICS)
- 
- #endif	/* __ASSEMBLER__ */
--#else	/* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
-+#else	/* CONFIG_ARM64_LSE_ATOMICS */
- 
- #ifdef __ASSEMBLER__
- 
-@@ -53,5 +53,5 @@
- #define ARM64_LSE_ATOMIC_INSN(llsc, lse)	llsc
- 
- #endif	/* __ASSEMBLER__ */
--#endif	/* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
-+#endif	/* CONFIG_ARM64_LSE_ATOMICS */
- #endif	/* __ASM_LSE_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 74e9dcb..46f1bac 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1170,7 +1170,7 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
- 		.cpu_enable = cpu_enable_pan,
- 	},
- #endif /* CONFIG_ARM64_PAN */
--#if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
-+#ifdef CONFIG_ARM64_LSE_ATOMICS
- 	{
- 		.desc = "LSE atomic instructions",
- 		.capability = ARM64_HAS_LSE_ATOMICS,
-@@ -1181,7 +1181,7 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
- 		.sign = FTR_UNSIGNED,
- 		.min_field_value = 2,
- 	},
--#endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
-+#endif /* CONFIG_ARM64_LSE_ATOMICS */
- 	{
- 		.desc = "Software prefetching using PRFM",
- 		.capability = ARM64_HAS_NO_HW_PREFETCH,
--- 
-1.9.1
+Used different resolutions and pixel aspect ratios.
+
+Tested-by: Maxime Jourdan <mjourdan@baylibre.com>
+
+[snip]
