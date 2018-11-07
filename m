@@ -1,43 +1,24 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  7 Nov 2018 11:45:49 +0100
-Subject: [PATCH 3/4] arm64: dts: meson-gxbb-odroidc2: fix GPIO lines names
-In-Reply-To: <1541587550-17842-1-git-send-email-narmstrong@baylibre.com>
-References: <1541587550-17842-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1541587550-17842-4-git-send-email-narmstrong@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Nov 2018 10:51:19 +0000
+Subject: [PATCH 06/15] Bluetooth: hci_bcm: Simplify clk_get error handling
+In-Reply-To: <20181107101308.7626-7-wens@csie.org>
+References: <20181107101308.7626-1-wens@csie.org>
+ <20181107101308.7626-7-wens@csie.org>
+Message-ID: <20181107105119.GT30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio line names were set in the pinctrl node instead of the gpio node,
-at the time it was merged, it worked, but was obviously wrong.
-This patch moves the properties to the gpio nodes.
+On Wed, Nov 07, 2018 at 06:12:59PM +0800, Chen-Yu Tsai wrote:
+> @@ -911,6 +911,10 @@ static int bcm_get_resources(struct bcm_device *dev)
+>  	if (IS_ERR(dev->clk) && PTR_ERR(dev->clk) == -EPROBE_DEFER)
 
-Fixes: b03c7d6438bb ("ARM64: dts: meson-gxbb-odroidc2: Add GPIO lines names")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+You can also simplify the above test to:
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index 54954b3..00f7be6 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -187,7 +187,7 @@
- 	pinctrl-names = "default";
- };
- 
--&pinctrl_aobus {
-+&gpio_ao {
- 	gpio-line-names = "UART TX", "UART RX", "VCCK En", "TF 3V3/1V8 En",
- 			  "USB HUB nRESET", "USB OTG Power En",
- 			  "J7 Header Pin2", "IR In", "J7 Header Pin4",
-@@ -197,7 +197,7 @@
- 			  "";
- };
- 
--&pinctrl_periphs {
-+&gpio {
- 	gpio-line-names = /* Bank GPIOZ */
- 			  "Eth MDIO", "Eth MDC", "Eth RGMII RX Clk",
- 			  "Eth RX DV", "Eth RX D0", "Eth RX D1", "Eth RX D2",
+	if (dev->clk == ERR_PTR(-EPROBE_DEFER))
+
+as error pointers are uniquely different from normal pointers.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
