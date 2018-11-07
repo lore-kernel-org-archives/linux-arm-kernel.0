@@ -1,51 +1,88 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Wed, 7 Nov 2018 11:23:50 +0800
-Subject: [PATCH 3/3] coresight: etm3x: Release CLAIM tag when operated
- from perf
-In-Reply-To: <1541456790-28282-4-git-send-email-mathieu.poirier@linaro.org>
-References: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
- <1541456790-28282-4-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20181107032350.GH3983@leoy-ThinkPad-X240s>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Wed, 7 Nov 2018 04:29:19 +0000
+Subject: [PATCH v2 3/4] dts/arm/ls1021a: Clean PCIe controller compatible
+ strings
+In-Reply-To: <CADRPPNQRofR6Upe6_pTNm-bqt0HMVWBOXyYSH8xGvD2g7_nwCA@mail.gmail.com>
+References: <20181025094929.29481-1-Zhiqiang.Hou@nxp.com>
+ <20181025094929.29481-4-Zhiqiang.Hou@nxp.com>
+ <CADRPPNQRofR6Upe6_pTNm-bqt0HMVWBOXyYSH8xGvD2g7_nwCA@mail.gmail.com>
+Message-ID: <AM6PR04MB5781A4335A41AF4DC9D1D87884C40@AM6PR04MB5781.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+Hi Leo,
 
-On Mon, Nov 05, 2018 at 03:26:30PM -0700, Mathieu Poirier wrote:
-> This patch deals with the release of the CLAIM tag when the ETM is
-> operated from perf.  Otherwise the tag is left asserted and subsequent
-> requests to use the device fail.
+Thanks a lot for your comments!
+
+> -----Original Message-----
+> From: Li Yang <leoyang.li@nxp.com>
+> Sent: 2018?10?27? 4:58
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Cc: moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> <linux-arm-kernel@lists.infradead.org>; lkml <linux-kernel@vger.kernel.org>;
+> linux-pci at vger.kernel.org; open list:OPEN FIRMWARE AND FLATTENED
+> DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; Rob Herring
+> <robh+dt@kernel.org>; Shawn Guo <shawnguo@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Bjorn Helgaas <bhelgaas@google.com>; Mingkai
+> Hu <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>
+> Subject: Re: [PATCH v2 3/4] dts/arm/ls1021a: Clean PCIe controller
+> compatible strings
 > 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-etm3x.c | 2 ++
->  1 file changed, 2 insertions(+)
+> On Thu, Oct 25, 2018 at 4:52 AM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-> index fd5c4cca7db5..000796394662 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-> @@ -603,6 +603,8 @@ static void etm_disable_perf(struct coresight_device *csdev)
->  	 */
->  	etm_set_pwrdwn(drvdata);
->  
-> +	coresight_disclaim_device_unlocked(drvdata->base);
-> +
+> The correct prefix for arm dts patches should be: "ARM: dts: ls1021a:
+> ...", and it should be better to mention the string removed in the title too.
 
-Just remind, this isn't consistent with the sequency in function
-etm_disable_hw(), which has the reversed sequence between
-etm_set_pwrdwn() and coresight_disclaim_device_unlocked().
+Will correct it in v3.
 
-Not sure which one sequence is more suitable, at the first glance,
-accessing register after pwrdwn related operation might have risk for
-deadlock?
+> 
+> >
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> >
+> > Removed the wrong compatible string "snps,dw-pcie", in case match
+> > incorrect driver.
+> >
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > ---
+> > V2:
+> >  - no change
+> >
+> >  arch/arm/boot/dts/ls1021a.dtsi | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi
+> > b/arch/arm/boot/dts/ls1021a.dtsi index bdd6e66a79ad..1aaa3288a450
+> > 100644
+> > --- a/arch/arm/boot/dts/ls1021a.dtsi
+> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> > @@ -716,7 +716,7 @@
+> >                 };
+> >
+> >                 pcie at 3400000 {
+> > -                       compatible = "fsl,ls1021a-pcie",
+> "snps,dw-pcie";
+> > +                       compatible = "fsl,ls1021a-pcie";
+> >                         reg = <0x00 0x03400000 0x0 0x00010000
+> /* controller registers */
+> >                                0x40 0x00000000 0x0 0x00002000>;
+> /* configuration space */
+> >                         reg-names = "regs", "config"; @@ -739,7
+> +739,7
+> > @@
+> >                 };
+> >
+> >                 pcie at 3500000 {
+> > -                       compatible = "fsl,ls1021a-pcie",
+> "snps,dw-pcie";
+> > +                       compatible = "fsl,ls1021a-pcie";
+> >                         reg = <0x00 0x03500000 0x0 0x00010000
+> /* controller registers */
+> >                                0x48 0x00000000 0x0 0x00002000>;
+> /* configuration space */
+> >                         reg-names = "regs", "config";
+> > --
+> > 2.17.1
+> >
 
 Thanks,
-Leo Yan
-
->  	CS_LOCK(drvdata->base);
->  }
->  
-> -- 
-> 2.7.4
-> 
+Zhiqiang
