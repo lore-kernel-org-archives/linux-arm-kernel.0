@@ -1,152 +1,131 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  7 Nov 2018 09:40:08 +0000
-Subject: [RFC PATCH 4/4] ARM: crypto: expose dependency on gas via Kconfig
+Date: Wed,  7 Nov 2018 09:40:06 +0000
+Subject: [RFC PATCH 2/4] arm64: lse: expose dependency on gas via Kconfig
 In-Reply-To: <1541583608-26375-1-git-send-email-vladimir.murzin@arm.com>
 References: <1541583608-26375-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1541583608-26375-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1541583608-26375-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So we can advertise only those entries which dependency is satisfied.
+So we can simply hide LSE support if dependency is not satisfied.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/crypto/Kconfig  | 31 +++++++++++++++++++++----------
- arch/arm/crypto/Makefile | 31 ++++++-------------------------
- 2 files changed, 27 insertions(+), 35 deletions(-)
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/Makefile             | 13 ++-----------
+ arch/arm64/include/asm/atomic.h |  2 +-
+ arch/arm64/include/asm/lse.h    |  6 +++---
+ arch/arm64/kernel/cpufeature.c  |  4 ++--
+ 5 files changed, 9 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
-index ef0c7fe..f437a91f 100644
---- a/arch/arm/crypto/Kconfig
-+++ b/arch/arm/crypto/Kconfig
-@@ -9,6 +9,12 @@ menuconfig ARM_CRYPTO
- 
- if ARM_CRYPTO
- 
-+config ARM_AS_HAS_CE
-+	def_bool $(as-instr,.fpu crypto-neon-fp-armv8)
-+
-+config ARM_AS_HAS_CRC
-+	def_bool $(as-instr,.arch armv8-a\n.arch_extension crc)
-+
- config CRYPTO_SHA1_ARM
- 	tristate "SHA1 digest algorithm (ARM-asm)"
- 	select CRYPTO_SHA1
-@@ -30,21 +36,21 @@ config CRYPTO_SHA1_ARM_NEON
- 
- config CRYPTO_SHA1_ARM_CE
- 	tristate "SHA1 digest algorithm (ARM v8 Crypto Extensions)"
--	depends on KERNEL_MODE_NEON
-+	depends on KERNEL_MODE_NEON && ARM_AS_HAS_CE
- 	select CRYPTO_SHA1_ARM
- 	select CRYPTO_HASH
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 964f682..7978aee 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1072,6 +1072,7 @@ config ARM64_PAN
+ config ARM64_LSE_ATOMICS
+ 	bool "Atomic instructions"
+ 	default y
++	depends on $(as-instr,.arch_extension lse)
  	help
- 	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
--	  using special ARMv8 Crypto Extensions.
-+	  using special ARMv8 Crypto Extensions (need binutils 2.23 or higher).
+ 	  As part of the Large System Extensions, ARMv8.1 introduces new
+ 	  atomic instructions that are designed specifically to scale in
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index b4e994c..3054757 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -32,15 +32,6 @@ endif
  
- config CRYPTO_SHA2_ARM_CE
- 	tristate "SHA-224/256 digest algorithm (ARM v8 Crypto Extensions)"
--	depends on KERNEL_MODE_NEON
-+	depends on KERNEL_MODE_NEON && ARM_AS_HAS_CE
- 	select CRYPTO_SHA256_ARM
- 	select CRYPTO_HASH
- 	help
- 	  SHA-256 secure hash standard (DFIPS 180-2) implemented
--	  using special ARMv8 Crypto Extensions.
-+	  using special ARMv8 Crypto Extensions (need binutils 2.23 or higher).
+ KBUILD_DEFCONFIG := defconfig
  
- config CRYPTO_SHA256_ARM
- 	tristate "SHA-224/256 digest algorithm (ARM-asm and NEON)"
-@@ -87,16 +93,16 @@ config CRYPTO_AES_ARM_BS
- 
- config CRYPTO_AES_ARM_CE
- 	tristate "Accelerated AES using ARMv8 Crypto Extensions"
--	depends on KERNEL_MODE_NEON
-+	depends on KERNEL_MODE_NEON && ARM_AS_HAS_CE
- 	select CRYPTO_BLKCIPHER
- 	select CRYPTO_SIMD
- 	help
- 	  Use an implementation of AES in CBC, CTR and XTS modes that uses
--	  ARMv8 Crypto Extensions
-+	  ARMv8 Crypto Extensions (need binutils 2.23 or higher)
- 
- config CRYPTO_GHASH_ARM_CE
- 	tristate "PMULL-accelerated GHASH using NEON/ARMv8 Crypto Extensions"
--	depends on KERNEL_MODE_NEON
-+	depends on KERNEL_MODE_NEON && ARM_AS_HAS_CE
- 	select CRYPTO_HASH
- 	select CRYPTO_CRYPTD
- 	select CRYPTO_GF128MUL
-@@ -104,17 +110,22 @@ config CRYPTO_GHASH_ARM_CE
- 	  Use an implementation of GHASH (used by the GCM AEAD chaining mode)
- 	  that uses the 64x64 to 128 bit polynomial multiplication (vmull.p64)
- 	  that is part of the ARMv8 Crypto Extensions, or a slower variant that
--	  uses the vmull.p8 instruction that is part of the basic NEON ISA.
-+	  uses the vmull.p8 instruction that is part of the basic NEON ISA (need
-+	  binutils 2.23 or higher).
- 
- config CRYPTO_CRCT10DIF_ARM_CE
- 	tristate "CRCT10DIF digest algorithm using PMULL instructions"
--	depends on KERNEL_MODE_NEON && CRC_T10DIF
-+	depends on KERNEL_MODE_NEON && CRC_T10DIF  && ARM_AS_HAS_CE
- 	select CRYPTO_HASH
-+	help
-+	  Need binutils 2.23 or higher
- 
- config CRYPTO_CRC32_ARM_CE
- 	tristate "CRC32(C) digest algorithm using CRC and/or PMULL instructions"
--	depends on KERNEL_MODE_NEON && CRC32
-+	depends on KERNEL_MODE_NEON && CRC32 && ARM_AS_HAS_CRC
- 	select CRYPTO_HASH
-+	help
-+	  Need binutils 2.23 or higher
- 
- config CRYPTO_CHACHA20_NEON
- 	tristate "NEON accelerated ChaCha20 symmetric cipher"
-diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
-index bd5bcee..e897327 100644
---- a/arch/arm/crypto/Makefile
-+++ b/arch/arm/crypto/Makefile
-@@ -11,32 +11,13 @@ obj-$(CONFIG_CRYPTO_SHA256_ARM) += sha256-arm.o
- obj-$(CONFIG_CRYPTO_SHA512_ARM) += sha512-arm.o
- obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha20-neon.o
- 
--ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
--ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
--ce-obj-$(CONFIG_CRYPTO_SHA2_ARM_CE) += sha2-arm-ce.o
--ce-obj-$(CONFIG_CRYPTO_GHASH_ARM_CE) += ghash-arm-ce.o
--ce-obj-$(CONFIG_CRYPTO_CRCT10DIF_ARM_CE) += crct10dif-arm-ce.o
--crc-obj-$(CONFIG_CRYPTO_CRC32_ARM_CE) += crc32-arm-ce.o
-+obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
-+obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
-+obj-$(CONFIG_CRYPTO_SHA2_ARM_CE) += sha2-arm-ce.o
-+obj-$(CONFIG_CRYPTO_GHASH_ARM_CE) += ghash-arm-ce.o
-+obj-$(CONFIG_CRYPTO_CRCT10DIF_ARM_CE) += crct10dif-arm-ce.o
- 
--ifneq ($(crc-obj-y)$(crc-obj-m),)
--ifeq ($(call as-instr,.arch armv8-a\n.arch_extension crc,y,n),y)
--ce-obj-y += $(crc-obj-y)
--ce-obj-m += $(crc-obj-m)
--else
--$(warning These CRC Extensions modules need binutils 2.23 or higher)
--$(warning $(crc-obj-y) $(crc-obj-m))
--endif
+-# Check for binutils support for specific extensions
+-lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
+-
+-ifeq ($(CONFIG_ARM64_LSE_ATOMICS), y)
+-  ifeq ($(lseinstr),)
+-$(warning LSE atomics not supported by binutils)
+-  endif
 -endif
 -
--ifneq ($(ce-obj-y)$(ce-obj-m),)
--ifeq ($(call as-instr,.fpu crypto-neon-fp-armv8,y,n),y)
--obj-y += $(ce-obj-y)
--obj-m += $(ce-obj-m)
--else
--$(warning These ARMv8 Crypto Extensions modules need binutils 2.23 or higher)
--$(warning $(ce-obj-y) $(ce-obj-m))
--endif
--endif
-+obj-$(CONFIG_CRYPTO_CRC32_ARM_CE) += crc32-arm-ce.o
+ ifeq ($(CONFIG_ARM64), y)
+ brokengasinst := $(call as-instr,1:\n.inst 0\n.rept . - 1b\n\nnop\n.endr\n,,-DCONFIG_BROKEN_GAS_INST=1)
  
- aes-arm-y	:= aes-cipher-core.o aes-cipher-glue.o
- aes-arm-bs-y	:= aes-neonbs-core.o aes-neonbs-glue.o
+@@ -49,9 +40,9 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
+   endif
+ endif
+ 
+-KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
++KBUILD_CFLAGS	+= -mgeneral-regs-only $(brokengasinst)
+ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+-KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
++KBUILD_AFLAGS	+= $(brokengasinst)
+ 
+ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+index 9bca54d..9d8d029 100644
+--- a/arch/arm64/include/asm/atomic.h
++++ b/arch/arm64/include/asm/atomic.h
+@@ -30,7 +30,7 @@
+ 
+ #define __ARM64_IN_ATOMIC_IMPL
+ 
+-#if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE)
++#ifdef CONFIG_ARM64_LSE_ATOMICS
+ #include <asm/atomic_lse.h>
+ #else
+ #include <asm/atomic_ll_sc.h>
+diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
+index 8262325..1fd31c7 100644
+--- a/arch/arm64/include/asm/lse.h
++++ b/arch/arm64/include/asm/lse.h
+@@ -2,7 +2,7 @@
+ #ifndef __ASM_LSE_H
+ #define __ASM_LSE_H
+ 
+-#if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
++#ifdef CONFIG_ARM64_LSE_ATOMICS
+ 
+ #include <linux/compiler_types.h>
+ #include <linux/export.h>
+@@ -36,7 +36,7 @@
+ 	ALTERNATIVE(llsc, lse, ARM64_HAS_LSE_ATOMICS)
+ 
+ #endif	/* __ASSEMBLER__ */
+-#else	/* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++#else	/* CONFIG_ARM64_LSE_ATOMICS */
+ 
+ #ifdef __ASSEMBLER__
+ 
+@@ -53,5 +53,5 @@
+ #define ARM64_LSE_ATOMIC_INSN(llsc, lse)	llsc
+ 
+ #endif	/* __ASSEMBLER__ */
+-#endif	/* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++#endif	/* CONFIG_ARM64_LSE_ATOMICS */
+ #endif	/* __ASM_LSE_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 74e9dcb..46f1bac 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1170,7 +1170,7 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+ 		.cpu_enable = cpu_enable_pan,
+ 	},
+ #endif /* CONFIG_ARM64_PAN */
+-#if defined(CONFIG_AS_LSE) && defined(CONFIG_ARM64_LSE_ATOMICS)
++#ifdef CONFIG_ARM64_LSE_ATOMICS
+ 	{
+ 		.desc = "LSE atomic instructions",
+ 		.capability = ARM64_HAS_LSE_ATOMICS,
+@@ -1181,7 +1181,7 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+ 		.sign = FTR_UNSIGNED,
+ 		.min_field_value = 2,
+ 	},
+-#endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++#endif /* CONFIG_ARM64_LSE_ATOMICS */
+ 	{
+ 		.desc = "Software prefetching using PRFM",
+ 		.capability = ARM64_HAS_NO_HW_PREFETCH,
 -- 
 1.9.1
