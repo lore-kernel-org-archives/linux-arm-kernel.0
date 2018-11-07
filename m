@@ -1,99 +1,30 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Wed,  7 Nov 2018 10:38:58 -0700
-Subject: [PATCH 1/2] mm: Introduce common STRUCT_PAGE_MAX_SHIFT define
-In-Reply-To: <20181107173859.24096-1-logang@deltatee.com>
-References: <20181107173859.24096-1-logang@deltatee.com>
-Message-ID: <20181107173859.24096-2-logang@deltatee.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 7 Nov 2018 17:39:14 +0000
+Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
+In-Reply-To: <20181107171031.22573-1-alex.bennee@linaro.org>
+References: <20181107171031.22573-1-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA8LL0uC6o1V3W2T=2P47xZ0zGhMR5mEE+x=8qwmDKZL_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This define is used by arm64 to calculate the size of the vmemmap
-region. It is defined as the log2 of the upper bound on the size
-of a struct page.
+On 7 November 2018 at 17:10, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> Not all faults handled by handle_exit are instruction emulations. For
+> example a ESR_ELx_EC_IABT will result in the page tables being updated
+> but the instruction that triggered the fault hasn't actually executed
+> yet. We use the simple heuristic of checking for a changed PC before
+> seeing if kvm_arm_handle_step_debug wants to claim we stepped an
+> instruction.
+>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-We move it into mm_types.h so it can be defined properly instead of
-set and checked with a build bug. This also allows us to use the same
-define for riscv.
+What's the rationale for this change? Presumably it's fixing
+something, but the commit message doesn't really say what...
 
-Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Christoph Hellwig <hch@lst.de>
----
- arch/arm64/include/asm/memory.h | 9 ---------
- arch/arm64/mm/init.c            | 8 --------
- include/asm-generic/fixmap.h    | 1 +
- include/linux/mm_types.h        | 5 +++++
- 4 files changed, 6 insertions(+), 17 deletions(-)
+This feels to me like it's working around the fact that
+we've separated two things ("advance pc (or set it if we're
+going to make the guest take an exception)" and "notice that
+we have completed a single step") that should be handled
+at one point in the code.
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index b96442960aea..f0a5c9531e8b 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -34,15 +34,6 @@
-  */
- #define PCI_IO_SIZE		SZ_16M
- 
--/*
-- * Log2 of the upper bound of the size of a struct page. Used for sizing
-- * the vmemmap region only, does not affect actual memory footprint.
-- * We don't use sizeof(struct page) directly since taking its size here
-- * requires its definition to be available at this point in the inclusion
-- * chain, and it may not be a power of 2 in the first place.
-- */
--#define STRUCT_PAGE_MAX_SHIFT	6
--
- /*
-  * VMEMMAP_SIZE - allows the whole linear region to be covered by
-  *                a struct page array
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 9d9582cac6c4..1a3e411a1d08 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -612,14 +612,6 @@ void __init mem_init(void)
- 	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
- #endif
- 
--#ifdef CONFIG_SPARSEMEM_VMEMMAP
--	/*
--	 * Make sure we chose the upper bound of sizeof(struct page)
--	 * correctly when sizing the VMEMMAP array.
--	 */
--	BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
--#endif
--
- 	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
- 		extern int sysctl_overcommit_memory;
- 		/*
-diff --git a/include/asm-generic/fixmap.h b/include/asm-generic/fixmap.h
-index 827e4d3bbc7a..8cc7b09c1bc7 100644
---- a/include/asm-generic/fixmap.h
-+++ b/include/asm-generic/fixmap.h
-@@ -16,6 +16,7 @@
- #define __ASM_GENERIC_FIXMAP_H
- 
- #include <linux/bug.h>
-+#include <linux/mm_types.h>
- 
- #define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))
- #define __virt_to_fix(x)	((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
-diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
-index 5ed8f6292a53..2c471a2c43fa 100644
---- a/include/linux/mm_types.h
-+++ b/include/linux/mm_types.h
-@@ -206,6 +206,11 @@ struct page {
- #endif
- } _struct_page_alignment;
- 
-+/*
-+ * Used for sizing the vmemmap region on some architectures
-+ */
-+#define STRUCT_PAGE_MAX_SHIFT	(order_base_2(sizeof(struct page)))
-+
- #define PAGE_FRAG_CACHE_MAX_SIZE	__ALIGN_MASK(32768, ~PAGE_MASK)
- #define PAGE_FRAG_CACHE_MAX_ORDER	get_order(PAGE_FRAG_CACHE_MAX_SIZE)
- 
--- 
-2.19.0
+thanks
+-- PMM
