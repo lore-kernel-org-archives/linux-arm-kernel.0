@@ -1,48 +1,56 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Wed, 7 Nov 2018 11:36:04 -0500
-Subject: Weird OOM problem
-Message-ID: <CAF_dkJB-Z-jU3O95PrE_ToFcOTNdEqMLnPOkzPwBZZfnjyUQwQ@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 7 Nov 2018 16:50:20 +0000
+Subject: [RFC PATCH 1/4] kconfig: add as-instr macro to
+ scripts/Kconfig.include
+In-Reply-To: <20181107145552.GC2623@brain-police>
+References: <1541583608-26375-1-git-send-email-vladimir.murzin@arm.com>
+ <1541583608-26375-2-git-send-email-vladimir.murzin@arm.com>
+ <20181107145552.GC2623@brain-police>
+Message-ID: <74f9cecb-4efa-718c-b147-f7adf956c7bd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have an embedded system with 128MB of RAM and no swap.
+On 07/11/18 14:55, Will Deacon wrote:
+> On Wed, Nov 07, 2018 at 09:40:05AM +0000, Vladimir Murzin wrote:
+>> There are cases where the whole feature, for instance arm64/lse or
+>> arm/crypto, can depend on assembler. Current practice is to report
+>> buildtime that selected feature is not supported, which can be quite
+>> annoying...
+> 
+> Why is it annoying? You still end up with a working kernel.
 
-/tmp is mounted on a tmpfs
+.config doesn't really represent if option was built or not, annoying
+part is digging build logs (if anyone's saved them at all!) or relevant
+parts of dmesg (if option throws anything in there and which not always
+part of reports).
 
-Shortly after boot, I can log in and look at how much memory is free:
+> 
+>> It'd nicer if we can check assembler first and opt-in feature
+>> visibility in Kconfig.
+>>
+>> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  scripts/Kconfig.include | 4 ++++
+>>  1 file changed, 4 insertions(+)
+> 
+> One issue I have with doing the check like this is that if somebody sends
+> you a .config with e.g. ARM64_LSE_ATOMICS=y and you try to build a kernel
+> using that .config and an old toolchain, the option is silently dropped.
 
-# free
-             total       used       free     shared    buffers     cached
-Mem:        120912      45224      75688        100       7700      17900
--/+ buffers/cache:      19624     101288
-Swap:            0          0          0
+I see... at least we have some tools like ./scripts/diffconfig
 
-I create a 25MB file in /tmp, and look again:
-# dd if=/dev/urandom bs=1M count=25 of=/tmp/foo
-25+0 records in
-25+0 records out
-# free
-             total       used       free     shared    buffers     cached
-Mem:        120912      53620      67292      25700       1040      33324
--/+ buffers/cache:      19256     101656
-Swap:            0          0          0
+> 
+> I think the diagnostic is actually useful in this case.
 
-If I try to create a 2nd 25MB file (or even an 8MB file) in /tmp, then
-the OOM killer kicks in, despite the fact that I have somewhere
-between 67 and 101MB free.
+Fully agree on diagnostic side, any suggestions how it can be improved?
 
-It would appear that the OOM killer kicks in when the disk cache (aka
-"shared") grows beyond 25% of total RAM.
+Cheers
+Vladimir
 
-Is that true?  Can I tune that?
-I am running a 4.9.87 kernel.
-
-I am going to keep looking on my own now that I have learned this
-much, but I figured I would put the question out to the experts in the
-mean time.  Surprisingly, while there are lots of emails/web pages
-devoted to the OOM killer, none of them mention filling a tmpfs as
-being a trigger.  So the Google isn't helping me much here.
-
-Any help or tips would be appreciated.
-
---wpd
+> 
+> Will
+> 
