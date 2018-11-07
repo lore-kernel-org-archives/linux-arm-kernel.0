@@ -1,50 +1,56 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed,  7 Nov 2018 23:18:42 +0530
-Subject: [PATCH v3 2/4] arm64: dts: mediatek: mt6797: Add pinctrl support
-In-Reply-To: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
-References: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181107174844.5381-3-manivannan.sadhasivam@linaro.org>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Wed, 7 Nov 2018 09:48:54 -0800
+Subject: [PATCH] pinctrl: zynq: Use define directive for
+ PIN_CONFIG_IO_STANDARD
+In-Reply-To: <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
+References: <20181101005724.9622-1-natechancellor@gmail.com>
+ <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
+ <20181107085503.GA31517@flashbox>
+ <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
+Message-ID: <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl support for Mediatek MT6797 SoC.
+On Wed, Nov 7, 2018 at 1:01 AM Michal Simek <michal.simek@xilinx.com> wrote:
+>
+> On 07. 11. 18 9:55, Nathan Chancellor wrote:
+> > On Wed, Nov 07, 2018 at 09:46:12AM +0100, Michal Simek wrote:
+> >> On 01. 11. 18 1:57, Nathan Chancellor wrote:
+> >>> Clang warns when one enumerated type is implicitly converted to another:
+> >>>
+> >>> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
+> >>> enumeration type 'enum zynq_pin_config_param' to different enumeration
+> >>> type 'enum pin_config_param' [-Wenum-conversion]
+> >>>         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
+> >>>         ~               ^~~~~~~~~~~~~~~~~~~~~
+> >>> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
+> >>> enumeration type 'enum zynq_pin_config_param' to different enumeration
+> >>> type 'enum pin_config_param' [-Wenum-conversion]
+> >>>         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
+> >>>             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> >>> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
+> >>> macro 'PCONFDUMP'
+> >>>         .param = a, .display = b, .format = c, .has_arg = d     \
+> >>>                  ^
+> >>> 2 warnings generated.
+> >>
+> >> This is interesting. I have never tried to use llvm for building the
+> >> kernel. Do you have any description how this can be done?
+> >>
+> >
+> > Depending on what version of Clang you have access to, it is usually just as
+> > simple as running 'make ARCH=arm CC=clang CROSS_COMPILE=arm-linux-gnueabi-'.
+> >
+> > Clang 7.0+ is recommended but 6.0 might work too.
+>
+> TBH I would expect to download container and run this there to make sure
+> that I don't break anything else.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/mediatek/mt6797.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+This is the first request we've had for a container in order to test a
+patch.  If it comes up again from other folks, I think it makes sense
+to create one.  Until then, its nice to have.  It's definitely
+overkill for this patch.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-index 4beaa71107d7..231230d32d09 100644
---- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt6797-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/pinctrl/mt6797-pinfunc.h>
- 
- / {
- 	compatible = "mediatek,mt6797";
-@@ -129,6 +130,19 @@
- 		#clock-cells = <1>;
- 	};
- 
-+	pio: pinctrl at 10005000 {
-+		compatible = "mediatek,mt6797-pinctrl";
-+		reg = <0 0x10005000 0 0x1000>,
-+		      <0 0x10002000 0 0x400>,
-+		      <0 0x10002400 0 0x400>,
-+		      <0 0x10002800 0 0x400>,
-+		      <0 0x10002C00 0 0x400>;
-+		reg-names = "gpio", "iocfgl", "iocfgb",
-+			    "iocfgr", "iocfgt";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
- 	scpsys: scpsys at 10006000 {
- 		compatible = "mediatek,mt6797-scpsys";
- 		#power-domain-cells = <1>;
 -- 
-2.17.1
+Thanks,
+~Nick Desaulniers
