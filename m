@@ -1,80 +1,133 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Wed,  7 Nov 2018 18:09:49 +0100
-Subject: [PATCH v2 07/11] arm64: dts: exynos7: add support for thermal trip
- irq-mode
+Date: Wed,  7 Nov 2018 18:09:45 +0100
+Subject: [PATCH v2 03/11] thermal: add new sysfs file for irq-mode
 In-Reply-To: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
 References: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181107171042eucas1p1675eb589f3951e516461a0a775ee87da@eucas1p1.samsung.com>
-Message-ID: <1541610593-28542-8-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181107171037eucas1p1b475d186830d4401b50fcd2c16781f92@eucas1p1.samsung.com>
+Message-ID: <1541610593-28542-4-git-send-email-l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for new flag which indicates
-that trip point triggers IRQ when temperature is met.
-Change existing trip points to be expicitly marked with the new flag.
+Patch adds show functions for irq-mode feature.
+It allocates new attributes and extends the old list.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/thermal/thermal_sysfs.c | 53 +++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 51 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-index d3301b8..39185af 100644
---- a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-@@ -11,40 +11,48 @@ trips {
- 		temperature = <75000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-1 {
- 		temperature = <80000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-2 {
- 		temperature = <85000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-3 {
- 		temperature = <90000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-4 {
- 		temperature = <95000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-5 {
- 		temperature = <100000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-alert-6 {
- 		temperature = <110000>; /* millicelsius */
- 		hysteresis = <10000>; /* millicelsius */
- 		type = "passive";
-+		irq-mode;
- 	};
- 	cpu-crit-0 {
- 		temperature = <115000>; /* millicelsius */
- 		hysteresis = <0>; /* millicelsius */
- 		type = "critical";
-+		irq-mode;
- 	};
- };
+diff --git a/drivers/thermal/thermal_sysfs.c b/drivers/thermal/thermal_sysfs.c
+index 2241cea..372b439 100644
+--- a/drivers/thermal/thermal_sysfs.c
++++ b/drivers/thermal/thermal_sysfs.c
+@@ -21,6 +21,8 @@
+ 
+ #include "thermal_core.h"
+ 
++#define TRIP_ATTR_NUM 4
++
+ /* sys I/F for thermal zone */
+ 
+ static ssize_t
+@@ -167,6 +169,28 @@ trip_point_temp_show(struct device *dev, struct device_attribute *attr,
+ }
+ 
+ static ssize_t
++trip_point_irq_mode_show(struct device *dev, struct device_attribute *attr,
++			 char *buf)
++{
++	struct thermal_zone_device *tz = to_thermal_zone(dev);
++	int trip, ret;
++	bool mode;
++
++	if (!tz->ops->get_trip_irq_mode)
++		return -EPERM;
++
++	if (sscanf(attr->attr.name, "trip_point_%d_irq", &trip) != 1)
++		return -EINVAL;
++
++	ret = tz->ops->get_trip_irq_mode(tz, trip, &mode);
++
++	if (ret)
++		return ret;
++
++	return sprintf(buf, "%d\n", mode);
++}
++
++static ssize_t
+ trip_point_hyst_store(struct device *dev, struct device_attribute *attr,
+ 		      const char *buf, size_t count)
+ {
+@@ -520,10 +544,19 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
+ 	if (!tz->trip_type_attrs)
+ 		return -ENOMEM;
+ 
++	tz->trip_irq_mode_attrs = kcalloc(tz->trips,
++					  sizeof(*tz->trip_irq_mode_attrs),
++					  GFP_KERNEL);
++	if (!tz->trip_irq_mode_attrs) {
++		kfree(tz->trip_type_attrs);
++		return -ENOMEM;
++	}
++
+ 	tz->trip_temp_attrs = kcalloc(tz->trips, sizeof(*tz->trip_temp_attrs),
+ 				      GFP_KERNEL);
+ 	if (!tz->trip_temp_attrs) {
+ 		kfree(tz->trip_type_attrs);
++		kfree(tz->trip_irq_mode_attrs);
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -533,14 +566,17 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
+ 					      GFP_KERNEL);
+ 		if (!tz->trip_hyst_attrs) {
+ 			kfree(tz->trip_type_attrs);
++			kfree(tz->trip_irq_mode_attrs);
+ 			kfree(tz->trip_temp_attrs);
+ 			return -ENOMEM;
+ 		}
+ 	}
+ 
+-	attrs = kcalloc(tz->trips * 3 + 1, sizeof(*attrs), GFP_KERNEL);
++	attrs = kcalloc(tz->trips * TRIP_ATTR_NUM + 1, sizeof(*attrs),
++			GFP_KERNEL);
+ 	if (!attrs) {
+ 		kfree(tz->trip_type_attrs);
++		kfree(tz->trip_irq_mode_attrs);
+ 		kfree(tz->trip_temp_attrs);
+ 		if (tz->ops->get_trip_hyst)
+ 			kfree(tz->trip_hyst_attrs);
+@@ -559,6 +595,19 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
+ 		tz->trip_type_attrs[indx].attr.show = trip_point_type_show;
+ 		attrs[indx] = &tz->trip_type_attrs[indx].attr.attr;
+ 
++		/* create trip irq_mode attribute */
++		snprintf(tz->trip_irq_mode_attrs[indx].name,
++			 THERMAL_NAME_LENGTH, "trip_point_%d_irq", indx);
++
++		sysfs_attr_init(&tz->trip_irq_mode_attrs[indx].attr.attr);
++		tz->trip_irq_mode_attrs[indx].attr.attr.name =
++			tz->trip_irq_mode_attrs[indx].name;
++		tz->trip_irq_mode_attrs[indx].attr.attr.mode = S_IRUGO;
++		tz->trip_irq_mode_attrs[indx].attr.show =
++			trip_point_irq_mode_show;
++		attrs[indx + tz->trips * 3] =
++			&tz->trip_irq_mode_attrs[indx].attr.attr;
++
+ 		/* create trip temp attribute */
+ 		snprintf(tz->trip_temp_attrs[indx].name, THERMAL_NAME_LENGTH,
+ 			 "trip_point_%d_temp", indx);
+@@ -595,7 +644,7 @@ static int create_trip_attrs(struct thermal_zone_device *tz, int mask)
+ 		attrs[indx + tz->trips * 2] =
+ 					&tz->trip_hyst_attrs[indx].attr.attr;
+ 	}
+-	attrs[tz->trips * 3] = NULL;
++	attrs[tz->trips * TRIP_ATTR_NUM] = NULL;
+ 
+ 	tz->trips_attribute_group.attrs = attrs;
+ 
 -- 
 2.7.4
