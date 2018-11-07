@@ -1,68 +1,43 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 7 Nov 2018 16:57:13 +0000
-Subject: Weird OOM problem
-In-Reply-To: <CAF_dkJB-Z-jU3O95PrE_ToFcOTNdEqMLnPOkzPwBZZfnjyUQwQ@mail.gmail.com>
-References: <CAF_dkJB-Z-jU3O95PrE_ToFcOTNdEqMLnPOkzPwBZZfnjyUQwQ@mail.gmail.com>
-Message-ID: <c685343b-fc12-4933-1749-c5a8716f039d@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 Nov 2018 11:58:26 -0500 (EST)
+Subject: [PATCH 1/2] ARM: copypage-fa: add kto and kfrom to input operands
+ list
+In-Reply-To: <806401fd406b1391fd3a9f5e072c107a@agner.ch>
+References: <20181015221629.13924-1-stefan@agner.ch>
+ <CACRpkdaVGKLtE-whhK3oFgY+4xoy1JqWkcBW4UO0-hJs2B-QGg@mail.gmail.com>
+ <20181016084416.GF30658@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1810161357580.1498@knanqh.ubzr>
+ <fe7595f5d02424c9d92e437cd20361f9@agner.ch>
+ <nycvar.YSQ.7.76.1811052231220.1498@knanqh.ubzr>
+ <806401fd406b1391fd3a9f5e072c107a@agner.ch>
+Message-ID: <nycvar.YSQ.7.76.1811071154590.23219@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 7 Nov 2018, Stefan Agner wrote:
 
-On 07/11/18 16:36, Patrick Doyle wrote:
-> I have an embedded system with 128MB of RAM and no swap.
+> On 06.11.2018 05:49, Nicolas Pitre wrote:
+> > So here's the revised patch. It now has full compile-test coverage for 
+> > real this time. Would you mind reviewing it again before I resubmit it 
+> > please?
 > 
-> /tmp is mounted on a tmpfs
+> Compile tested all copypage implementations with the revised patch using
+> Clang too, everything builds fine.
 > 
-> Shortly after boot, I can log in and look at how much memory is free:
+> FWIW, I used this defconfigs:
+> copypage-fa.c: moxart_defconfig
+> copypage-feroceon.c: mvebu_v5_defconfig
+> copypage-v4mc.c: h3600_defconfig+CONFIG_AEABI
+> copypage-v4wb.c/v4wt.c: multi_v4t_defconfig
+> copypage-xsc3.c/scale.c: pxa_defconfig-CONFIG_FTRACE
 > 
-> # free
->              total       used       free     shared    buffers     cached
-> Mem:        120912      45224      75688        100       7700      17900
-> -/+ buffers/cache:      19624     101288
-> Swap:            0          0          0
+> The changes look good to me:
 > 
-> I create a 25MB file in /tmp, and look again:
-> # dd if=/dev/urandom bs=1M count=25 of=/tmp/foo
-> 25+0 records in
-> 25+0 records out
-> # free
->              total       used       free     shared    buffers     cached
-> Mem:        120912      53620      67292      25700       1040      33324
-> -/+ buffers/cache:      19256     101656
-> Swap:            0          0          0
-> 
-> If I try to create a 2nd 25MB file (or even an 8MB file) in /tmp, then
-> the OOM killer kicks in, despite the fact that I have somewhere
-> between 67 and 101MB free.
-> 
-> It would appear that the OOM killer kicks in when the disk cache (aka
-> "shared") grows beyond 25% of total RAM.
-> 
-> Is that true?  Can I tune that?
+> Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-If you specifies neither "size" nor "nr_blocks" mount option the default
-is 50% of RAM [1].
+Thanks.  Submitted here:
 
-[1] http://man7.org/linux/man-pages/man5/tmpfs.5.html
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8805/2
 
-Cheers
-Vladimir
 
-> I am running a 4.9.87 kernel.
-> 
-> I am going to keep looking on my own now that I have learned this
-> much, but I figured I would put the question out to the experts in the
-> mean time.  Surprisingly, while there are lots of emails/web pages
-> devoted to the OOM killer, none of them mention filling a tmpfs as
-> being a trigger.  So the Google isn't helping me much here.
-> 
-> Any help or tips would be appreciated.
-> 
-> --wpd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Nicolas
