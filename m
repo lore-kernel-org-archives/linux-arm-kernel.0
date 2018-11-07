@@ -1,42 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Nov 2018 16:46:47 +0100
-Subject: [RFC PATCH 00/12] net: introduce Qualcomm IPA driver
-In-Reply-To: <20181107003250.5832-1-elder@linaro.org>
-References: <20181107003250.5832-1-elder@linaro.org>
-Message-ID: <CAK8P3a15nTnL0tD4TJgtPVEKFwZRcyNy=m6_Pi3+8Nd0W6FQtQ@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 07 Nov 2018 07:48:45 -0800
+Subject: [PATCH 1/2] arm64: dts: mt7622: fix console output issue on rfb1
+In-Reply-To: <8043d487e7bd20a11b14d832702bda214a9a694f.1541566473.git.ryder.lee@mediatek.com>
+ (Ryder Lee's message of "Wed, 7 Nov 2018 12:59:43 +0800")
+References: <8043d487e7bd20a11b14d832702bda214a9a694f.1541566473.git.ryder.lee@mediatek.com>
+Message-ID: <7hr2fwevmq.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
-> The code has undergone considerable rework to prepare it for
-> incorporation into upstream Linux.  Parts of it bear little
-> resemblance to the original driver.  Still, some work remains
-> to be done.  The current code and its design had a preliminary
-> review, and some changes to the data path implementation were
-> recommended.   These have not yet been addressed:
-> - Use NAPI for all interfaces, not just RX (and WAN data) endpoints.
-> - Do more work in the NAPI poll function, including collecting
->   completed TX requests and posting buffers for RX.
-> - Do not use periodic NOP requests as a way to avoid TX interrupts.
-> - The NAPI context should be associated with the hardware interrupt
->   (it is now associated with something abstracted from the hardware).
-> - Use threaded interrupts, to avoid the need for using spinlocks and
->   atomic variables for synchronizing between workqueue and interrupt
->   context.
-> - Have runtime power management enable and disable IPA clock and
->   interconnects.
-> Many thanks to Arnd Bergmann, Ilias Apalodimas, and Bjorn Andersson
-> for their early feedback.
+Ryder Lee <ryder.lee@mediatek.com> writes:
 
-Thanks for getting the current version out even with the long TODO
-list. I've had my first deeper look at some of the patches and found
-a few more things that likely require substantial rework. I also think
-there is still significant room for simplifying it further, and getting
-better performance out of it in the process.
+> The issue was introduced by Kernel CI:
+> https://kernelci.org/boot/id/5bbdcbad59b5146fc5b43592/
 
-Also, despite the criticism in my patch review, I have to say you've
-done a great job at cutting out a lot of the things that were present
-in the past, it's good to see that you have come this far with the
-cleanup!
+The issue was *found* by kernelCI, not introduced by kernelCI. ;)
 
-      Arnd
+> Fix this by using a 'stdout-path' property that points to the device.
+>
+> Fixes: c0d9f9ad4f76 ("arm64: dts: mt7622: add earlycon to mt7622-rfb1 board")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+
+Tested-by: Kevin Hilman <khilman@baylibre.com>
+
+Note that this patch fixes the problem where there is no more console
+output, but current mainline still doesn't boot as there's another
+crash: http://termbin.com/zitb
+
+Kevin
