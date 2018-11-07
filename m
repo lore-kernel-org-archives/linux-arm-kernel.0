@@ -1,45 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Nov 2018 18:10:47 +0000
-Subject: [PATCH] arm64: mm: define NET_IP_ALIGN to 0
-In-Reply-To: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
-References: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181107181047.fx4zbpdunfpwivjc@lakrids.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Nov 2018 18:10:54 +0000
+Subject: [PATCH v10 08/22] kasan, arm64: untag address in __kimg_to_phys
+ and _virt_addr_is_linear
+In-Reply-To: <b2aa056b65b8f1a410379bf2f6ef439d5d99e8eb.1541525354.git.andreyknvl@google.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <b2aa056b65b8f1a410379bf2f6ef439d5d99e8eb.1541525354.git.andreyknvl@google.com>
+Message-ID: <20181107181054.GC255021@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 06:10:38PM +0100, Ard Biesheuvel wrote:
-> On arm64, there is no need to add 2 bytes of padding to the start of
-> each network buffer just to make the IP header appear 32-bit aligned.
-> 
-> Since this might actually adversely affect DMA performance some
-> platforms, let's override NET_IP_ALIGN to 0 to get rid of this
-> padding.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/processor.h | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 3e2091708b8e..6b0d4dff5012 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -24,6 +24,14 @@
->  #define KERNEL_DS	UL(-1)
->  #define USER_DS		(TASK_SIZE_64 - 1)
+On Tue, Nov 06, 2018 at 06:30:23PM +0100, Andrey Konovalov wrote:
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -92,6 +92,15 @@
+>  #define KASAN_THREAD_SHIFT	0
+>  #endif
 >  
-> +/*
-> + * On arm64 systems, unaligned accesses by the CPU are cheap, and so there is
-> + * no point in shifting all network buffers by 2 bytes just to make some IP
-> + * header fields appear aligned in memory, potentially sacrificing some DMA
-> + * performance on some platforms.
-> + */
-> +#define NET_IP_ALIGN	0
+> +#ifdef CONFIG_KASAN_SW_TAGS
+> +#define KASAN_TAG_SHIFTED(tag)		((unsigned long)(tag) << 56)
+> +#define KASAN_SET_TAG(addr, tag)	(((addr) & ~KASAN_TAG_SHIFTED(0xff)) | \
+> +						KASAN_TAG_SHIFTED(tag))
+> +#define KASAN_RESET_TAG(addr)		KASAN_SET_TAG(addr, 0xff)
+> +#else
+> +#define KASAN_RESET_TAG(addr)		addr
+> +#endif
 
-Might it be better for core code to do this based on
-CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS?
+I think we should reuse the untagged_addr() macro we have in uaccess.h
+(make it more general and move to another header file).
 
-We already set that for arm64.
-
-Thanks,
-Mark.
+-- 
+Catalin
