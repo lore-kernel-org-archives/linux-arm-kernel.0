@@ -1,64 +1,103 @@
 From: rrichter@cavium.com (Robert Richter)
-Date: Wed, 7 Nov 2018 22:03:08 +0000
-Subject: [PATCH 00/10] irqdomain, gic-v3-its: Implement late irq domain
- initialization
-Message-ID: <20181107220254.6116-1-rrichter@cavium.com>
+Date: Wed, 7 Nov 2018 22:03:15 +0000
+Subject: [PATCH 02/10] irqchip/gic-v3-its-platform-msi: Remove domain init
+ order dependencies
+In-Reply-To: <20181107220254.6116-1-rrichter@cavium.com>
+References: <20181107220254.6116-1-rrichter@cavium.com>
+Message-ID: <20181107220254.6116-3-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is a rework of the gic-v3-its initialization. It is
-in preparation of a further series that uses CMA memory allocation for
-ITS tables. For this the CMA framework must be available and thus ITS
-needs to be initialized after the arch_initcalls. This requires two
-major reworks.
+Use new irq_domain_request_host_*() interface which allows independent
+parent and child initialization using an irq domain request handler.
+This makes it possible to move its initialization to a later point
+during boot. All domains can be initialized in the same initcall level
+then.
 
-First we must remove all irq domain init order dependencies (patches
-#1-#5), second the ITS initialization must be split into an early
-probe and a later init part (patches #6-#10).
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 54 +++++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 12 deletions(-)
 
-Patch #1 introduces a new interface to request an irq domain, see the
-patch description for details. In patches #2-#5 all ITS related irq
-domains are converted to use the new interface. There are no order
-dependencies for parent and client irq domain initialization anymore
-which allows us to initialize all ITS irq domains in the same initcall
-(moving to the later subsys_initcall). Note that I do not have fsl
-hardware available, the code should work, but is only carefully
-reviewed and compile tested, please test on that hardware.
-
-The remaining patches #6-#10 are an incremental rework of the ITS
-initialization, basically splitting probe and init (patch #7) and
-separating it from gic-v3 code (patch #8). Patches #9 and #10 change
-initcall levels for various drivers.
-
-Patches have been tested with Cavium ThunderX and ThunderX2. I have an
-implementation of CMA ITS table allocation on top of this series
-available, I will send out patches for this in a couple of days.
-
-Robert Richter (10):
-  irqdomain: Add interface to request an irq domain
-  irqchip/gic-v3-its-platform-msi: Remove domain init order dependencies
-  irqchip/irq-gic-v3-its-pci-msi: Remove domain init order dependencies
-  irqchip/irq-gic-v3-its-fsl-mc-msi: Remove domain init order
-    dependencies
-  fsl-mc/dprc-driver: Remove domain init order dependencies
-  irqchip/gic-v3-its: Initialize its nodes in probe order
-  irqchip/gic-v3-its: Split probing from its node initialization
-  irqchip/gic-v3-its: Decouple its initialization from gic
-  irqchip/gic-v3-its: Initialize its nodes later
-  irqchip/gic-v3-its: Initialize MSIs with subsys_initcalls
-
- drivers/bus/fsl-mc/dprc-driver.c              |  41 +++++++
- drivers/bus/fsl-mc/fsl-mc-msi.c               |   6 +-
- drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c   |  49 +++++---
- drivers/irqchip/irq-gic-v3-its-pci-msi.c      |  68 ++++++-----
- drivers/irqchip/irq-gic-v3-its-platform-msi.c |  56 ++++++---
- drivers/irqchip/irq-gic-v3-its.c              | 160 +++++++++++++++++---------
- drivers/irqchip/irq-gic-v3.c                  |  12 +-
- include/linux/cpuhotplug.h                    |   1 +
- include/linux/irqchip/arm-gic-v3.h            |   5 +-
- include/linux/irqdomain.h                     |  15 +++
- kernel/irq/irqdomain.c                        | 158 +++++++++++++++++++++++++
- 11 files changed, 441 insertions(+), 130 deletions(-)
-
+diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+index 7b8e87b493fe..1f2849bc58c4 100644
+--- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+@@ -94,25 +94,56 @@ static const struct of_device_id its_device_id[] = {
+ 	{},
+ };
+ 
+-static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
+-				const char *name)
++static int __init its_pmsi_create_irq_domain(struct irq_domain *parent,
++					void *priv)
+ {
+-	struct irq_domain *parent;
++	const char *name = priv;
++	int err = 0;
+ 
+-	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
+-	if (!parent || !msi_get_domain_info(parent)) {
+-		pr_err("%s: unable to locate ITS domain\n", name);
+-		return -ENXIO;
++	if (!msi_get_domain_info(parent)) {
++		err = -ENODEV;
++		goto out;
+ 	}
+ 
+-	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
++	if (!platform_msi_create_irq_domain(parent->fwnode, &its_pmsi_domain_info,
+ 					    parent)) {
+-		pr_err("%s: unable to create platform domain\n", name);
+-		return -ENXIO;
++		err = -ENXIO;
++		goto out;
+ 	}
+ 
+ 	pr_info("Platform MSI: %s domain created\n", name);
+-	return 0;
++out:
++	if (err)
++		pr_err("Platform MSI: Failed to create %s domain\n", name);
++
++	kfree(name);
++	return err;
++}
++
++static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
++				const char *name)
++{
++	void *priv = kstrdup(name, GFP_KERNEL);
++	int err;
++
++	if (!name) {
++		err = -EINVAL;
++		goto fail;
++	}
++
++	if (!priv) {
++		err = -ENOMEM;
++		goto fail;
++	}
++
++	err = irq_domain_request_fwnode(fwnode, DOMAIN_BUS_NEXUS,
++					its_pmsi_create_irq_domain, name, priv);
++	if (!err)
++		return 0;
++fail:
++	pr_err("Platform MSI: Failed to register %s domain\n", name);
++	kfree(priv);
++	return err;
+ }
+ 
+ #ifdef CONFIG_ACPI
+@@ -135,7 +166,6 @@ its_pmsi_parse_madt(struct acpi_subtable_header *header,
+ 	}
+ 
+ 	err = its_pmsi_init_one(domain_handle, node_name);
+-
+ out:
+ 	kfree(node_name);
+ 	return err;
 -- 
 2.11.0
