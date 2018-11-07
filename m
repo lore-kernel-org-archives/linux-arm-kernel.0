@@ -1,37 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Nov 2018 09:52:35 -0600
-Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
-In-Reply-To: <22cbe798-612f-8c88-90e7-388202f603cf@arm.com>
-References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
- <20181107080335.GA24511@lst.de>
- <22cbe798-612f-8c88-90e7-388202f603cf@arm.com>
-Message-ID: <20181107155235.GA18618@bogus>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 7 Nov 2018 16:54:05 +0100
+Subject: [PATCH v10 00/22] kasan: add software tag-based mode for arm64
+In-Reply-To: <20181107153456.GE2623@brain-police>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <CAAeHK+yOsP7V0gPu7EpqCbJZqbGQMZbAp6q1+=0dNGC24reyWg@mail.gmail.com>
+ <20181107145922.GD2623@brain-police>
+ <CAAeHK+zNgv9WxRpf7N3gmsLYGL6oUALAnyerMzeYZUz1LhoUuA@mail.gmail.com>
+ <20181107153456.GE2623@brain-police>
+Message-ID: <CAAeHK+zupkT2s8o3p7GmxLn2N7idJihBG=asuEBF6v6TheGo_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 12:56:49PM +0000, Robin Murphy wrote:
-> On 2018-11-07 8:03 am, Christoph Hellwig wrote:
-> > On Tue, Nov 06, 2018 at 11:54:15AM +0000, Robin Murphy wrote:
-> > > of_dma_configure() was *supposed* to be following the same logic as
-> > > acpi_dma_configure() and only setting bus_dma_mask if some range was
-> > > specified by the firmware. However, it seems that subtlety got lost in
-> > > the process of fitting it into the differently-shaped control flow, and
-> > > as a result the force_dma==true case ends up always setting the bus mask
-> > > to the 32-bit default, which is not what anyone wants.
-> > > 
-> > > Make sure we only touch it if the DT actually said so.
-> > 
-> > This looks good, but I think it could really use a comment as the use
-> > of ret all the way down the function isn't exactly obvious.
-> 
-> Fair point.
-> 
-> > Let me now if you want this picked up through the OF or DMA trees.
-> 
-> I don't mind either way; I figure I'll wait a bit longer to see if Rob has
-> any preference, then resend with the comment and the tags picked up so it
-> can hopefully make rc2.
-
-I have other fixes to send, so I can take it.
-
-Rob
+On Wed, Nov 7, 2018 at 4:34 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Nov 07, 2018 at 04:11:35PM +0100, Andrey Konovalov wrote:
+>> On Wed, Nov 7, 2018 at 3:59 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Wed, Nov 07, 2018 at 03:56:03PM +0100, Andrey Konovalov wrote:
+>> >> On Tue, Nov 6, 2018 at 6:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>> >> > This patchset adds a new software tag-based mode to KASAN [1].
+>> >> > (Initially this mode was called KHWASAN, but it got renamed,
+>> >> >  see the naming rationale at the end of this section).
+>> >>
+>> >> [...]
+>> >>
+>> >> > Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> >> > Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+>> >> > Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+>> >>
+>> >> Hi Andrew,
+>> >>
+>> >> This patchset has now been reviewed-by KASAN maintainers. Could you
+>> >> take a look and consider taking this into the -mm tree?
+>> >
+>> > I would much prefer to take the arm64 parts (which still need to be reviewed
+>> > by Catalin afaict) via the arm64 tree, so please can you split those out
+>> > separately?
+>>
+>> Which parts do you mean exactly, which patches? I don't think it makes
+>> sense to split this patchset, as one part won't function without the
+>> other.
+>
+> I would like the patches that touch code under arch/arm64/ to be reviewed by
+> somebody from the arm64 community. Since the core parts have already been
+> reviewed, I was suggesting that you could split them out so that they are
+> not blocked by the architecture code. Is it not possible to preserve the
+> existing KASAN behaviour for arm64 with the core parts merged? I figured it
+> must be, since you're not touching any other architectures here and they
+> assumedly continue to function correctly.
+>
+> However, if you'd rather keep everything together, please can we give it a
+> couple of weeks so we can at least get the architecture bits reviewed? Most
+> people are out at LPC next week (and I'm at another conference this week).
+>
+> Will
