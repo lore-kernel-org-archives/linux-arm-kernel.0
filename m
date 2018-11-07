@@ -1,140 +1,70 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Wed,  7 Nov 2018 18:09:44 +0100
-Subject: [PATCH v2 02/11] thermal: add irq-mode configuration for trip point
+Date: Wed,  7 Nov 2018 18:09:46 +0100
+Subject: [PATCH v2 04/11] Doc: thermal: new irq-mode for trip point
 In-Reply-To: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
 References: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181107171036eucas1p13253d56b463c8f888ab8f8e418635297@eucas1p1.samsung.com>
-Message-ID: <1541610593-28542-3-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181107171038eucas1p1eb5dce12a1f5f7a3587f82f8396fa075@eucas1p1.samsung.com>
+Message-ID: <1541610593-28542-5-git-send-email-l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support irq mode in trip point.
-When that flag is set in DT, there is no need for polling
-in thermal framework. Crossing the trip point will rise an IRQ.
-The naming convention for tip point 'type' can be confussing
-and 'passive' (whic is passive cooling) might be interpretted wrongly.
+Thermal trip point gets new flag in DT: irq-mode.
+Trip point may have a new explicit flag which indicate
+IRQ support when the temperature is met (so the thermal framework
+deos not need to set polling for it).
+It is useful for 'passive' cooling trip point,
+which now will not be register for polling the temperature.
 
-This mechanism prevents from missue and adds explicit setting
-for hardware which support interrupts for pre-configured temperature
-threshold.
+Update documentation about irq-mode for trip points.
+The new sysfs file shows 1 if the trip point supports IRQ.
 
+Cc: Jonathan Corbet <corbet@lwn.net>
 Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-doc at vger.kernel.org
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- drivers/thermal/of-thermal.c   | 17 +++++++++++++++++
- drivers/thermal/thermal_core.c | 10 ++++++++--
- include/linux/thermal.h        |  5 +++++
- 3 files changed, 30 insertions(+), 2 deletions(-)
+ Documentation/thermal/sysfs-api.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-index 4bfdb4a..1a75946a 100644
---- a/drivers/thermal/of-thermal.c
-+++ b/drivers/thermal/of-thermal.c
-@@ -312,6 +312,20 @@ static int of_thermal_get_trip_type(struct thermal_zone_device *tz, int trip,
- 	return 0;
- }
+diff --git a/Documentation/thermal/sysfs-api.txt b/Documentation/thermal/sysfs-api.txt
+index 9113997..e405724 100644
+--- a/Documentation/thermal/sysfs-api.txt
++++ b/Documentation/thermal/sysfs-api.txt
+@@ -272,6 +272,7 @@ Thermal zone device sys I/F, created once it's registered:
+     |---trip_point_[0-*]_temp:	Trip point temperature
+     |---trip_point_[0-*]_type:	Trip point type
+     |---trip_point_[0-*]_hyst:	Hysteresis value for this trip point
++    |---trip_point_[0-*]_irq:	Trip point supports triggering irq
+     |---emul_temp:		Emulated temperature set node
+     |---sustainable_power:      Sustainable dissipatable power
+     |---k_po:                   Proportional term during temperature overshoot
+@@ -365,6 +366,10 @@ trip_point_[0-*]_type
+ 	thermal zone.
+ 	RO, Optional
  
-+static int
-+of_thermal_get_trip_irq_mode(struct thermal_zone_device *tz, int trip,
-+			     bool *mode)
-+{
-+	struct __thermal_zone *data = tz->devdata;
++trip_point_[0-*]_irq
++	Boolean which indicate that the trip point triggers irq.
++	RO, Optional
 +
-+	if (trip >= data->ntrips || trip < 0)
-+		return -EDOM;
-+
-+	*mode = data->trips[trip].irq_mode;
-+
-+	return 0;
-+}
-+
- static int of_thermal_get_trip_temp(struct thermal_zone_device *tz, int trip,
- 				    int *temp)
- {
-@@ -394,6 +408,7 @@ static struct thermal_zone_device_ops of_thermal_ops = {
- 	.set_mode = of_thermal_set_mode,
- 
- 	.get_trip_type = of_thermal_get_trip_type,
-+	.get_trip_irq_mode = of_thermal_get_trip_irq_mode,
- 	.get_trip_temp = of_thermal_get_trip_temp,
- 	.set_trip_temp = of_thermal_set_trip_temp,
- 	.get_trip_hyst = of_thermal_get_trip_hyst,
-@@ -827,6 +842,8 @@ static int thermal_of_populate_trip(struct device_node *np,
- 		return ret;
- 	}
- 
-+	trip->irq_mode = of_property_read_bool(np, "irq-mode");
-+
- 	/* Required for cooling map matching */
- 	trip->np = np;
- 	of_node_get(np);
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 39fc812..6d41e08 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -406,6 +406,7 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
- static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
- {
- 	enum thermal_trip_type type;
-+	bool irq_mode = false;
- 
- 	/* Ignore disabled trip points */
- 	if (test_bit(trip, &tz->trips_disabled))
-@@ -419,9 +420,14 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
- 		handle_non_critical_trips(tz, trip);
- 	/*
- 	 * Alright, we handled this trip successfully.
--	 * So, start monitoring again.
-+	 * So, start monitoring in polling mode if
-+	 * trip is not using irq HW support.
- 	 */
--	monitor_thermal_zone(tz);
-+	if (tz->ops->get_trip_irq_mode)
-+		tz->ops->get_trip_irq_mode(tz, trip, &irq_mode);
-+
-+	if (!irq_mode)
-+		monitor_thermal_zone(tz);
- }
- 
- static void update_temperature(struct thermal_zone_device *tz)
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index 5f4705f..b064565 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -103,6 +103,7 @@ struct thermal_zone_device_ops {
- 		enum thermal_device_mode);
- 	int (*get_trip_type) (struct thermal_zone_device *, int,
- 		enum thermal_trip_type *);
-+	int (*get_trip_irq_mode) (struct thermal_zone_device *, int, bool *);
- 	int (*get_trip_temp) (struct thermal_zone_device *, int, int *);
- 	int (*set_trip_temp) (struct thermal_zone_device *, int, int);
- 	int (*get_trip_hyst) (struct thermal_zone_device *, int, int *);
-@@ -196,6 +197,7 @@ struct thermal_zone_device {
- 	struct thermal_attr *trip_temp_attrs;
- 	struct thermal_attr *trip_type_attrs;
- 	struct thermal_attr *trip_hyst_attrs;
-+	struct thermal_attr *trip_irq_mode_attrs;
- 	void *devdata;
- 	int trips;
- 	unsigned long trips_disabled;	/* bitmap for disabled trips */
-@@ -364,6 +366,8 @@ struct thermal_zone_of_device_ops {
-  * @temperature: temperature value in miliCelsius
-  * @hysteresis: relative hysteresis in miliCelsius
-  * @type: trip point type
-+ * @irq_mode: to not use polling in framework set support of HW irq (which will
-+ *	      be triggered when temperature reaches this level).
-  */
- 
- struct thermal_trip {
-@@ -371,6 +375,7 @@ struct thermal_trip {
- 	int temperature;
- 	int hysteresis;
- 	enum thermal_trip_type type;
-+	bool irq_mode;
- };
- 
- /* Function declarations */
+ trip_point_[0-*]_hyst
+ 	The hysteresis value for a trip point, represented as an integer
+ 	Unit: Celsius
+@@ -544,12 +549,16 @@ method, the sys I/F structure will be built like this:
+     |---available_policies:	step_wise fair_share
+     |---trip_point_0_temp:	100000
+     |---trip_point_0_type:	critical
++    |---trip_point_0_irq:	1
+     |---trip_point_1_temp:	80000
+     |---trip_point_1_type:	passive
++    |---trip_point_1_irq:	1
+     |---trip_point_2_temp:	70000
+     |---trip_point_2_type:	active0
++    |---trip_point_2_irq:	0
+     |---trip_point_3_temp:	60000
+     |---trip_point_3_type:	active1
++    |---trip_point_3_irq:	1
+     |---cdev0:			--->/sys/class/thermal/cooling_device0
+     |---cdev0_trip_point:	1	/* cdev0 can be used for passive */
+     |---cdev0_weight:           1024
 -- 
 2.7.4
