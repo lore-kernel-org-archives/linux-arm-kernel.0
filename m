@@ -1,62 +1,105 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  7 Nov 2018 18:13:08 +0800
-Subject: [PATCH 15/15] arm64: dts: allwinner: a64: bananapi-m64: Add Bluetooth
- device node
-In-Reply-To: <20181107101308.7626-1-wens@csie.org>
-References: <20181107101308.7626-1-wens@csie.org>
-Message-ID: <20181107101308.7626-16-wens@csie.org>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Wed, 7 Nov 2018 21:20:03 +1100
+Subject: [linux-sunxi] Re: [PATCH v3 17/25] dt-bindings: panel: Add
+ Bananapi S070WV20-CT16 ICN6211 MIPI-DSI to RGB bridge
+In-Reply-To: <CAMty3ZA7bWiJa0GVZbf3jDK+YSjJF8om6WuszeU6TX6rk+EZ1Q@mail.gmail.com>
+References: <20181026144344.27778-1-jagan@amarulasolutions.com>
+ <CGME20181029111305epcas5p2ee0ca644470de4e036762e000afbb71b@epcas5p2.samsung.com>
+ <20181026144344.27778-18-jagan@amarulasolutions.com>
+ <3c4c8a08-8c1e-1ac6-2b53-81389d69c97b@samsung.com>
+ <CAGb2v66ENhmNXPz4PfdRJjNUNdpDNZYX2a3SH8AD6SMe9g2zLA@mail.gmail.com>
+ <CAGRGNgWUpaG6W92CDBy7XCun10-TnPggTgY=iZ_4dg4E1cM7ew@mail.gmail.com>
+ <CAMty3ZA7bWiJa0GVZbf3jDK+YSjJF8om6WuszeU6TX6rk+EZ1Q@mail.gmail.com>
+Message-ID: <CAGRGNgX0eWUEzBUU0H_NRJitQmOgF1PxZP0BgQV+OMcDDuVVhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AP6212 is based on the Broadcom BCM43430 or BCM43438. The WiFi side
-identifies as BCM43430, while the Bluetooth side identifies as BCM43438.
+Hi Jagan,
 
-The Bluetooth side is connected to UART1 in a 4 wire configuration. Same
-as the WiFi side, due to being the same chip and package, DLDO2 provides
-overall power via VBAT, and DLDO4 provides I/O power via VDDIO. The RTC
-clock output provides the LPO low power clock at 32.768 kHz.
+On Wed, Nov 7, 2018 at 5:13 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Wed, Oct 31, 2018 at 2:46 PM Julian Calaby <julian.calaby@gmail.com> wrote:
+> >
+> > Hi Jagan,
+> >
+> > On Wed, Oct 31, 2018 at 7:58 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> > >
+> > > On Wed, Oct 31, 2018 at 4:53 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
+> > > >
+> > > > On 26.10.2018 16:43, Jagan Teki wrote:
+> > > > > Bananapi S070WV20-CT16 ICN6211 is 800x480, 4-lane MIPI-DSI to RGB
+> > > > > bridge panel, which is available on same PCB with 24-bit RGB interface.
+> > > > >
+> > > > > So, this patch adds DSI specific binding details on existing
+> > > > > dt-bindings file.
+> > > > >
+> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > > > ---
+> > > > > Changes for v3:
+> > > > > - Use existing binding doc and update dsi details
+> > > > > Changes for v2:
+> > > > > - none
+> > > > >
+> > > > >  .../display/panel/bananapi,s070wv20-ct16.txt  | 31 +++++++++++++++++--
+> > > > >  1 file changed, 29 insertions(+), 2 deletions(-)
+> > > > >
+> > > > > diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
+> > > > > index 35bc0c839f49..b7855dc7c66f 100644
+> > > > > --- a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
+> > > > > +++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
+> > > > > @@ -1,12 +1,39 @@
+> > > > >  Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
+> > > > >
+> > > > > +S070WV20-CT16 is 7" 800x480 panel connected through a 24-bit RGB interface.
+> > > > > +
+> > > > > +Depending on the variant, the PCB attached to the panel module either
+> > > > > +supports DSI, or DSI + 24-bit RGB. DSI is converted to 24-bit RGB via
+> > > > > +an onboard ICN6211 MIPI DSI - RGB bridge chip, then fed to the panel
+> > > > > +itself
+> > > >
+> > > > As I understand this is display board, which contains 'pure' RGB panel
+> > > > S070WV20-CT16 and optionally ICN6211 DSI->RGB bridge.
+> > > > These are separate devices, just connected by vendor to simplify its
+> > > > assembly. Why don't you create then bridge driver for ICN6211 and RGB
+> > > > panel driver for S070WV20-CT16 - it looks more generic.
+> > > > Then you can describe both in dts and voila.
+> > > > Creating drivers for every combo of devices (panel + bridge), just
+> > > > because some vendor sells them together seems incorrect - we have
+> > > > devicetree for it.
+> > >
+> > > Rob suggested this, and also the opposite: using the same
+> > > "bananapi,s070wv20-ct16"
+> > > compatible string for both types of connections, and have the driver deal with
+> > > detecting the bus type.
+> > >
+> > > The thing about the bridge chip is that there's no available datasheet that
+> > > describes all the parts of the init sequence, in fact none at all. I managed
+> > > to work out some bits, but the others remain a mystery and must be hard-coded
+> > > to match the panel. That would work against having a generic bridge driver.
+> >
+> > To me it seems logical that we'd model it as another step in the graph
+> > between the DSI component and the panel. It's conceivable that some
+> > other manufacturer will probably buy these for their panels and having
+> > a somewhat generic driver seems vaguely future proof to me.
+> >
+> > As I see it, the weird init process belongs to the bridge chip and the
+> > timings belong to the panel and we shouldn't "confuse" them by giving
+> > them the same compatible.
+>
+> But the problem here is due to lack of information about the panel,
+> the init process command opcode data values seem to based on the panel
+> timings values. This look weird and ie reason for going into separate
+> panel driver with different compatible.
 
-This patch enables Bluetooth on this board, and also adds the missing
-LPO clock on the WiFi side. There is also a PCM connection for Bluetooth,
-but this is not covered here.
+I'd missed that particular wrinkle.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+In that case, it makes sense to produce a panel driver with the bridge
+chip's compatible.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index ef1c90401bb2..beca5c4979cf 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -94,6 +94,8 @@
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-+		clocks = <&rtc 1>;
-+		clock-names = "ext_clock";
- 	};
- };
- 
-@@ -335,7 +337,19 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-+	uart-has-rtscts;
- 	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm43438-bt";
-+		clocks = <&rtc 1>;
-+		clock-names = "lpo";
-+		vbat-supply = <&reg_dldo2>;
-+		vddio-supply = <&reg_dldo4>;
-+		device-wakeup-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-+		host-wakeup-gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
-+		shutdown-gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PL4 */
-+	};
- };
- 
- &usb_otg {
+Thanks,
+
 -- 
-2.19.1
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
