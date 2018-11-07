@@ -1,40 +1,40 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 7 Nov 2018 16:19:10 +0000
-Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
-In-Reply-To: <20181107155235.GA18618@bogus>
-References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
- <20181107080335.GA24511@lst.de>
- <22cbe798-612f-8c88-90e7-388202f603cf@arm.com> <20181107155235.GA18618@bogus>
-Message-ID: <fead1118-9a19-5687-8679-60054727e898@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Nov 2018 08:20:25 -0800
+Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver
+ under the SPI framework
+In-Reply-To: <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
+References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
+ <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
+Message-ID: <CAOesGMgPwwwmizC+R4W1aLpvgcuVOYQr2qR2Vqb6171zGfarRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-11-07 3:52 pm, Rob Herring wrote:
-> On Wed, Nov 07, 2018 at 12:56:49PM +0000, Robin Murphy wrote:
->> On 2018-11-07 8:03 am, Christoph Hellwig wrote:
->>> On Tue, Nov 06, 2018 at 11:54:15AM +0000, Robin Murphy wrote:
->>>> of_dma_configure() was *supposed* to be following the same logic as
->>>> acpi_dma_configure() and only setting bus_dma_mask if some range was
->>>> specified by the firmware. However, it seems that subtlety got lost in
->>>> the process of fitting it into the differently-shaped control flow, and
->>>> as a result the force_dma==true case ends up always setting the bus mask
->>>> to the 32-bit default, which is not what anyone wants.
->>>>
->>>> Make sure we only touch it if the DT actually said so.
->>>
->>> This looks good, but I think it could really use a comment as the use
->>> of ret all the way down the function isn't exactly obvious.
->>
->> Fair point.
->>
->>> Let me now if you want this picked up through the OF or DMA trees.
->>
->> I don't mind either way; I figure I'll wait a bit longer to see if Rob has
->> any preference, then resend with the comment and the tags picked up so it
->> can hopefully make rc2.
-> 
-> I have other fixes to send, so I can take it.
+On Wed, Nov 7, 2018 at 6:44 AM Frieder Schrempf
+<frieder.schrempf@kontron.de> wrote:
+>
+> From: Frieder Schrempf <frieder.schrempf@exceet.de>
+>
+> The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
+> at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
+>
+> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
 
-Cheers Rob, I'll send you that updated version momentarily.
+Hi Frieder,
 
-Robin.
+This patch is part of a series that I didn't see the rest of, but in
+general we prefer to merge these through arm-soc even if the driver
+goes in through another tree. The way we'd prefer to handle it is that
+once the driver lands, we'll take the config option change to turn it
+on. To avoid our branches to break until both sides have landed, it
+might be a good idea to keep both drivers on for a short while (one
+release).
+
+So, I'm not going to ack this since we avoid taking defconfig changes
+through driver trees (these two defconfigs tend to churn a lot and we
+don't want to create merge conflicts where we don't have to), but
+we'll be happy to pick it up when the time comes.
+
+
+Thanks,
+
+-Olof
