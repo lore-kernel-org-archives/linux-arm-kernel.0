@@ -1,75 +1,37 @@
-From: chris@sageembedded.com (Chris Cole)
-Date: Wed, 07 Nov 2018 13:26:50 -0800
-Subject: [PATCH v2] mm: improve/fix ARM v7_dma_inv_range() unaligned address
- handling
-Message-ID: <1541626010.537.49.camel@sageembedded.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Wed,  7 Nov 2018 22:30:31 +0100
+Subject: [PATCH] ARM: OMAP1: ams-delta: Fix possible use of uninitialized field
+Message-ID: <20181107213031.21650-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch addresses possible memory corruption when
-v7_dma_inv_range(start_address, end_address) address parameters are not
-aligned to whole cache lines. This function issues "invalidate" cache
-management operations to all cache lines from start_address (inclusive)
-to end_address (exclusive). When start_address and/or end_address are
-not aligned, the start and/or end cache lines are first issued "clean &
-invalidate" operation. The assumption is this is done to ensure that any
-dirty data addresses outside the address range (but part of the first or
-last cache lines) are cleaned/flushed so that data is not lost, which
-could happen if just an invalidate is issued.
+While playing with initialization order of modem device, it has been
+discovered that under some circumstances (early console init, I
+believe) its .pm() callback may be called before the
+uart_port->private_data pointer is initialized from
+plat_serial8250_port->private_data, resulting in NULL pointer
+dereference.  Fix it by checking for uninitialized pointer before using
+it in modem_pm().
 
-The problem is that these first/last partial cache lines are issued
-"clean & invalidate" and then "invalidate". This second "invalidate" is
-not required and worse can cause "lost" writes to addresses outside the
-address range but part of the cache line. If another component writes to
-its part of the cache line between the "clean & invalidate" and
-"invalidate" operations, the write can get lost. This fix is to remove
-the extra "invalidate" operation when unaligned addressed are used.
-
-A kernel module is available that has a stress test to reproduce the
-issue and a unit test of the updated v7_dma_inv_range(). It can be
-downloaded from
-http://ftp.sageembedded.com/outgoing/linux/cache-test-20181107.tgz.
-
-v7_dma_inv_range() is call by dmac_[un]map_area(addr, len, direction)
-when the direction is DMA_FROM_DEVICE. One can (I believe) successfully
-argue that DMA from a device to main memory should use buffers aligned
-to cache line size, because the "clean & invalidate" might overwrite
-data that the device just wrote using DMA. But if a driver does use
-unaligned buffers, at least this fix will prevent memory corruption
-outside the buffer.
-
-Signed-off-by: Chris Cole <chris@sageembedded.com>
-Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
+Fixes: aabf31737a6a ("ARM: OMAP1: ams-delta: update the modem to use regulator API")
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
+ arch/arm/mach-omap1/board-ams-delta.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-V2: Use simpler assembly code suggested by Russel King
-
- arch/arm/mm/cache-v7.S | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 215df435bfb9..2149b47a0c5a 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -360,14 +360,16 @@ v7_dma_inv_range:
- 	ALT_UP(W(nop))
- #endif
- 	mcrne	p15, 0, r0, c7, c14, 1		@ clean & invalidate D / U line
-+	addne	r0, r0, r2
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 1947bc63074e..17e0b386e1b2 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -764,6 +764,9 @@ static void modem_pm(struct uart_port *port, unsigned int state, unsigned old)
+ 	struct modem_private_data *priv = port->private_data;
+ 	int ret;
  
- 	tst	r1, r3
- 	bic	r1, r1, r3
- 	mcrne	p15, 0, r1, c7, c14, 1		@ clean & invalidate D / U line
--1:
--	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
--	add	r0, r0, r2
- 	cmp	r0, r1
-+1:
-+	mcrlo	p15, 0, r0, c7, c6, 1		@ invalidate D / U line
-+	addlo	r0, r0, r2
-+	cmplo	r0, r1
- 	blo	1b
- 	dsb	st
- 	ret	lr
++	if (!priv)
++		return;
++
+ 	if (IS_ERR(priv->regulator))
+ 		return;
+ 
 -- 
-2.14.5
+2.16.4
