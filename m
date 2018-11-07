@@ -1,61 +1,122 @@
-From: mjourdan@baylibre.com (Maxime Jourdan)
-Date: Wed, 7 Nov 2018 10:41:27 +0100
-Subject: [PATCH 1/3] drm/meson: Support Overlay plane for video rendering
-In-Reply-To: <1541497202-20570-2-git-send-email-narmstrong@baylibre.com>
-References: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
- <1541497202-20570-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAMO6nay=te3W67b83LKv35tXL8+09rvE9EaFwLDrRBhwpEgMvQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 7 Nov 2018 09:51:09 +0000
+Subject: [PATCH 2/4] efi/arm: defer persistent reservations until after
+ paging_init()
+In-Reply-To: <20181106234933.GO30658@n2100.armlinux.org.uk>
+References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
+ <20181106113732.16351-3-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
+ <20181106190817.GN30658@n2100.armlinux.org.uk>
+ <CAKv+Gu_r38Bk_SZW-5qvtM7cmQ4-09dcFwNz29AyMceucdhadQ@mail.gmail.com>
+ <20181106234933.GO30658@n2100.armlinux.org.uk>
+Message-ID: <c0995c05-3e2c-844e-d531-a687b296753a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2018 at 10:40 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
->
-> The Amlogic Meson GX SoCs support an Overlay plane behind the primary
-> plane for video rendering.
->
-> This Overlay plane support various YUV layouts :
-> - YUYV
-> - NV12 / NV21
-> - YUV444 / 422 / 420 / 411 / 410
->
-> The scaler supports a wide range of scaling ratios, but for simplicity,
-> plane atomic check limits the scaling from x5 to /5 in vertical and
-> horizontal scaling.
->
-> The z-order is fixed and always behind the primary plane and cannot be changed.
->
-> The scaling parameter algorithm was taken from the Amlogic vendor kernel
-> code and rewritten to match the atomic universal plane requirements.
->
-> The video rendering using this overlay plane support has been tested using
-> the new Kodi DRM-KMS Prime rendering path along the in-review V4L2 Mem2Mem
-> Hardware Video Decoder up to 3840x2160 NV12 frames on various display modes.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/gpu/drm/meson/Makefile          |   2 +-
->  drivers/gpu/drm/meson/meson_canvas.c    |   7 +-
->  drivers/gpu/drm/meson/meson_canvas.h    |  11 +-
->  drivers/gpu/drm/meson/meson_crtc.c      | 216 +++++++++++-
->  drivers/gpu/drm/meson/meson_drv.c       |  29 +-
->  drivers/gpu/drm/meson/meson_drv.h       |  52 +++
->  drivers/gpu/drm/meson/meson_overlay.c   | 586 ++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/meson/meson_overlay.h   |  14 +
->  drivers/gpu/drm/meson/meson_registers.h |   3 +
->  drivers/gpu/drm/meson/meson_viu.c       |  15 +
->  drivers/gpu/drm/meson/meson_vpp.c       |  44 ++-
->  11 files changed, 971 insertions(+), 8 deletions(-)
->  create mode 100644 drivers/gpu/drm/meson/meson_overlay.c
->  create mode 100644 drivers/gpu/drm/meson/meson_overlay.h
->
+On 06/11/18 23:49, Russell King - ARM Linux wrote:
+> On Tue, Nov 06, 2018 at 09:06:56PM +0100, Ard Biesheuvel wrote:
+>> On 6 November 2018 at 20:08, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>>> On Tue, Nov 06, 2018 at 08:02:58PM +0100, Ard Biesheuvel wrote:
+>>>> On 6 November 2018 at 12:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>> The new memory EFI reservation feature we introduced to allow memory
+>>>>> reservations to persist across kexec may trigger an unbounded number
+>>>>> of calls to memblock_reserve(). The memblock subsystem can deal with
+>>>>> this fine, but not before memblock resizing is enabled, which we can
+>>>>> only do after paging_init(), when the memory we reallocate the array
+>>>>> into is actually mapped.
+>>>>>
+>>>>> So break out the memreserve table processing into a separate function
+>>>>> and call if after paging_init() on both arm64 and ARM.
+>>>>>
+>>>>> Cc: Russell King <linux@armlinux.org.uk>
+>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>
+>>>> Russell,
+>>>>
+>>>> If you are ok with this patch, may I have your ack please? I would
+>>>> like to send it out before the end of the week.
+>>>
+>>> You're not going to get a quick answer to this, because it needs me to
+>>> investigate what the effect of this change actually is by code review.
+>>> I can't guarantee when I'll get around to that.
+>>>
+>>
+>> Fair enough.
+>>
+>> I will drop the ARM hunk for now then, and we'll fix ARM when you have
+>> more time.
+> 
+> I don't see how you can do that - you're dropping the processing of
+> reserved areas out of the efi_config_parse_tables() path, so that
+> won't happen any more on ARM if you don't apply the ARM hunk.
 
-Tested by rendering video with:
- - gstreamer 1.14.4 using kmssink
- - ffmpeg-drm (https://github.com/Elyotna/ffmpeg-drm),
-by applying this patch on top of the video decoder patch series.
+The only reason for the whole persistent region thing is to support 
+GICv3 redistributors memory tables across kexec, for those GIC 
+implementations where LPIs cannot be disabled once they have been 
+enabled.
 
-Used different resolutions and pixel aspect ratios.
+There is no HW platform that combines 32bit cores and GICv3 (not to 
+mention using EFI). The only existing "platform" is KVM/arm64, which 
+doesn't suffer from the above problem (LPIs can be freely disabled in 
+emulation). So the whole persistent region feature serves no purpose on 
+32bit ARM.
 
-Tested-by: Maxime Jourdan <mjourdan@baylibre.com>
+The only issue with dropping this hunk is that the memory reservation 
+feature is enabled on 32bit ARM the first place, which can easily be 
+dealt with something along those lines:
 
-[snip]
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 787d7850e064..8bb263c9b99a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1290,6 +1290,7 @@ config EFI
+ 	select EFI_RUNTIME_WRAPPERS
+ 	select EFI_STUB
+ 	select EFI_ARMSTUB
++	select EFI_PERSISTENT_RESERVATIONS
+ 	default y
+ 	help
+ 	  This option provides support for runtime services provided
+diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
+index 89110dfc7127..b728dab9e901 100644
+--- a/drivers/firmware/efi/Kconfig
++++ b/drivers/firmware/efi/Kconfig
+@@ -198,3 +198,6 @@ config EFI_DEV_PATH_PARSER
+ 	bool
+ 	depends on ACPI
+ 	default n
++
++config EFI_PERSISTENT_RESERVATIONS
++       bool
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 249eb70691b0..2a1903ab6d21 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -962,6 +962,7 @@ bool efi_is_table_address(unsigned long phys_addr)
+ 	return false;
+ }
+ 
++#ifdef CONFIG_EFI_PERSISTENT_RESERVATIONS
+ static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
+ 
+ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
+@@ -993,6 +994,12 @@ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
+ 
+ 	return 0;
+ }
++#else
++int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
++{
++	return 0;
++}
++#endif
+ 
+ #ifdef CONFIG_KEXEC
+ static int update_efi_random_seed(struct notifier_block *nb,
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
