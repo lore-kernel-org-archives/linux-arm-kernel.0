@@ -1,62 +1,81 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 7 Nov 2018 09:42:26 +0100
-Subject: IOMMU breakage on arm64
-In-Reply-To: <44b77976-0efe-02d0-3c4e-4e54f91c4fe7@arm.com>
-References: <git-mailbomb-linux-master-b4ebe6063204da58e48600b810a97c29ae9e5d12@kernel.org>
- <CAMuHMdUosqWTn5yDjGMWrLpWEyZfxtGWYfqmenYVqE8g7HEt7Q@mail.gmail.com>
- <44b77976-0efe-02d0-3c4e-4e54f91c4fe7@arm.com>
-Message-ID: <CAMuHMdWTe+B8=a5yz+VjJU9G+mss7+61U3jT7i_WgMCYD7ppCw@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 7 Nov 2018 09:46:12 +0100
+Subject: [PATCH] pinctrl: zynq: Use define directive for
+ PIN_CONFIG_IO_STANDARD
+In-Reply-To: <20181101005724.9622-1-natechancellor@gmail.com>
+References: <20181101005724.9622-1-natechancellor@gmail.com>
+Message-ID: <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 01. 11. 18 1:57, Nathan Chancellor wrote:
+> Clang warns when one enumerated type is implicitly converted to another:
+> 
+> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
+> enumeration type 'enum zynq_pin_config_param' to different enumeration
+> type 'enum pin_config_param' [-Wenum-conversion]
+>         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
+>         ~               ^~~~~~~~~~~~~~~~~~~~~
+> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
+> enumeration type 'enum zynq_pin_config_param' to different enumeration
+> type 'enum pin_config_param' [-Wenum-conversion]
+>         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
+>             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
+> macro 'PCONFDUMP'
+>         .param = a, .display = b, .format = c, .has_arg = d     \
+>                  ^
+> 2 warnings generated.
 
-On Tue, Nov 6, 2018 at 9:20 PM Robin Murphy <robin.murphy@arm.com> wrote:
-> On 2018-11-06 7:44 pm, Geert Uytterhoeven wrote:
-> > On Tue, Oct 23, 2018 at 1:40 AM Linux Kernel Mailing List
-> > <linux-kernel@vger.kernel.org> wrote:
-> >> Commit:     b4ebe6063204da58e48600b810a97c29ae9e5d12
-> >> Parent:     7d21ee4c719f00896767ce19c4c01a56374c2ced
-> >> Refname:    refs/heads/master
-> >> Web:        https://git.kernel.org/torvalds/c/b4ebe6063204da58e48600b810a97c29ae9e5d12
-> >> Author:     Christoph Hellwig <hch@lst.de>
-> >> AuthorDate: Thu Sep 20 14:04:08 2018 +0200
-> >> Committer:  Christoph Hellwig <hch@lst.de>
-> >> CommitDate: Mon Oct 1 07:28:03 2018 -0700
-> >>
-> >>      dma-direct: implement complete bus_dma_mask handling
-> >>
-> >>      Instead of rejecting devices with a too small bus_dma_mask we can handle
-> >>      by taking the bus dma_mask into account for allocations and bounce
-> >>      buffering decisions.
-> >>
-> >>      Signed-off-by: Christoph Hellwig <hch@lst.de>
-> >
-> > I  have bisected the following crash to the above commit:
->
-> I think that commit mostly just changes the presentation of my
-> underlying cockup - see here for what should fix it:
-> https://patchwork.kernel.org/patch/10670177/
+This is interesting. I have never tried to use llvm for building the
+kernel. Do you have any description how this can be done?
 
-Thanks, that fixed the issue.
 
-> I have a feeling we've ironed out crash-on-early-domain-free bugs in the
-> SMMU drivers already - arm-smmu certainly has an early return in
-> arm_smmu_destroy_domain_context() which should behave exactly like your
-> diff below, while I think arm-smmu-v3 gets away with it by virtue of
-> smmu_domain->cfg being unset, but I'll double-check that when I'm fresh
-> tomorrow (Jean-Philippe reported SMMUv3 hitting the DMA thing to me
-> internally, but didn't mention any crash).
+> 
+> It is expected that pinctrl drivers can extend pin_config_param because
+> of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
+> isn't an issue. Most drivers that take advantage of this define the
+> PIN_CONFIG variables as constants, rather than enumerated values. Do the
+> same thing here so that Clang no longer warns.
+> 
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> ---
+>  drivers/pinctrl/pinctrl-zynq.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+> index a0daf27042bd..57046c221756 100644
+> --- a/drivers/pinctrl/pinctrl-zynq.c
+> +++ b/drivers/pinctrl/pinctrl-zynq.c
+> @@ -972,14 +972,11 @@ enum zynq_io_standards {
+>  };
+>  
+>  /**
+> - * enum zynq_pin_config_param - possible pin configuration parameters
 
-OK, I'll send a proper patch for the ipmmu-vmsa driver.
+This is wrong. kernel-doc is reporting issue with it.
 
-Gr{oetje,eeting}s,
+drivers/pinctrl/pinctrl-zynq.c:975: warning: Cannot understand  *
+@PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the
+argument to
+ on line 975 - I thought it was a doc line
+1 warnings
 
-                        Geert
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>   * @PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the argument to
+>   *	this parameter (on a custom format) tells the driver which alternative
+>   *	IO standard to use.
+>   */
+> -enum zynq_pin_config_param {
+> -	PIN_CONFIG_IOSTANDARD = PIN_CONFIG_END + 1,
+> -};
+> +#define PIN_CONFIG_IOSTANDARD		(PIN_CONFIG_END + 1)
+>  
+>  static const struct pinconf_generic_params zynq_dt_params[] = {
+>  	{"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
+> 
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+This change is fine.
+
+Thanks,
+Michal
