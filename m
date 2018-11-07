@@ -1,33 +1,51 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Wed, 7 Nov 2018 11:19:04 +0800
-Subject: [PATCH] PCI: mediatek: Use
- devm_of_pci_get_host_bridge_resources() to parse DT
-In-Reply-To: <1541140583.10519.1.camel@mtkswgap22>
-References: <1539833014-1738-1-git-send-email-honghui.zhang@mediatek.com>
- <1541140583.10519.1.camel@mtkswgap22>
-Message-ID: <1541560744.11281.15.camel@mhfsdcap03>
+From: leo.yan@linaro.org (leo.yan at linaro.org)
+Date: Wed, 7 Nov 2018 11:23:50 +0800
+Subject: [PATCH 3/3] coresight: etm3x: Release CLAIM tag when operated
+ from perf
+In-Reply-To: <1541456790-28282-4-git-send-email-mathieu.poirier@linaro.org>
+References: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
+ <1541456790-28282-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20181107032350.GH3983@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-11-02 at 14:36 +0800, Ryder Lee wrote:
-> On Thu, 2018-10-18 at 11:23 +0800, Honghui Zhang (???) wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > Use the devm_of_pci_get_host_bridge_resources() API in place of the PCI OF
-> > DT parser.
-> > 
-> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > ---
-> >  drivers/pci/controller/pcie-mediatek.c | 109 +++++++++------------------------
-> >  1 file changed, 29 insertions(+), 80 deletions(-)
-> > 
-[......]
-> > 
-> 
-> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
-> 
-> 
+Hi Mathieu,
 
-Hi, Lorenzo, could you help take a look at this patch?
+On Mon, Nov 05, 2018 at 03:26:30PM -0700, Mathieu Poirier wrote:
+> This patch deals with the release of the CLAIM tag when the ETM is
+> operated from perf.  Otherwise the tag is left asserted and subsequent
+> requests to use the device fail.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm3x.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+> index fd5c4cca7db5..000796394662 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> @@ -603,6 +603,8 @@ static void etm_disable_perf(struct coresight_device *csdev)
+>  	 */
+>  	etm_set_pwrdwn(drvdata);
+>  
+> +	coresight_disclaim_device_unlocked(drvdata->base);
+> +
 
-Thanks.
+Just remind, this isn't consistent with the sequency in function
+etm_disable_hw(), which has the reversed sequence between
+etm_set_pwrdwn() and coresight_disclaim_device_unlocked().
+
+Not sure which one sequence is more suitable, at the first glance,
+accessing register after pwrdwn related operation might have risk for
+deadlock?
+
+Thanks,
+Leo Yan
+
+>  	CS_LOCK(drvdata->base);
+>  }
+>  
+> -- 
+> 2.7.4
+> 
