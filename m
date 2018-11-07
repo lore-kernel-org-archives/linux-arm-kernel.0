@@ -1,37 +1,59 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 7 Nov 2018 21:36:08 +0100
-Subject: [PATCH 11/15] Bluetooth: hci_bcm: Add BCM20702A1 variant
-In-Reply-To: <20181107101308.7626-12-wens@csie.org>
-References: <20181107101308.7626-1-wens@csie.org>
- <20181107101308.7626-12-wens@csie.org>
-Message-ID: <20181107203608.ff32gmb4u54kcvep@flea>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Wed, 7 Nov 2018 13:36:34 -0700
+Subject: [PATCH 2/2] mm/sparse: add common helper to mark all memblocks
+ present
+In-Reply-To: <alpine.DEB.2.21.1811072125280.1666@nanos.tec.linutronix.de>
+References: <20181107173859.24096-1-logang@deltatee.com>
+ <20181107173859.24096-3-logang@deltatee.com>
+ <20181107121207.62cb37cf58484b7cc80a8fd8@linux-foundation.org>
+ <724be9bb-59b6-33f3-7b59-3ca644d59bf7@deltatee.com>
+ <alpine.DEB.2.21.1811072125280.1666@nanos.tec.linutronix.de>
+Message-ID: <b1cc442e-7314-4a8e-3eec-9adc200d7582@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-On Wed, Nov 07, 2018 at 06:13:04PM +0800, Chen-Yu Tsai wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+On 2018-11-07 1:26 p.m., Thomas Gleixner wrote:
+> Logan,
 > 
-> The BCM20702A1 chip is a single-chip Bluetooth 4.0 controller and
-> transceiver. It is found in the AMPAK AP6210 WiFi+BT package.
+> On Wed, 7 Nov 2018, Logan Gunthorpe wrote:
+>> On 2018-11-07 1:12 p.m., Andrew Morton wrote:
+>>>> +void __init memblocks_present(void)
+>>>> +{
+>>>> +	struct memblock_region *reg;
+>>>> +
+>>>> +	for_each_memblock(memory, reg) {
+>>>> +		memory_present(memblock_get_region_node(reg),
+>>>> +			       memblock_region_memory_base_pfn(reg),
+>>>> +			       memblock_region_memory_end_pfn(reg));
+>>>> +	}
+>>>> +}
+>>>> +
+>>>
+>>> I don't like the name much.  To me, memblocks_present means "are
+>>> memblocks present" whereas this actually means "memblocks are present".
+>>> But whatever.  A little covering comment which describes what this
+>>> does and why it does it would be nice.
+>>
+>> The same argument can be made about the existing memory_present()
+>> function and I think it's worth keeping the naming consistent. I'll add
+>> a comment and resend shortly.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Actually if both names suck, then there also is the option to rename both
+> instead of adding a comment to explain the suckage.
 
-if you resubmit it, could you do s/free-electrons/bootlin/ ?
+Ok, well, I wasn't expecting to take on a big rename like that as it
+would create a patch touching a bunch of arches and mm files... But if
+we can come to some agreement on a better name and someone is willing to
+take that patch without significant delay then I'd be happy to create
+the patch and add it to the start of my series.
 
-Thanks!
-Maxime
+Some ideas for new names:
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/e2cced09/attachment.sig>
+mark_memory_present() / mark_memblocks_present()
+set_memory_present() / set_memblocks_present()
+memory_register() / memblocks_register()
+register_memory() / register_memblocks()
+
+Logan
