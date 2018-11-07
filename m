@@ -1,9 +1,9 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  7 Nov 2018 11:45:48 +0100
-Subject: [PATCH 2/4] arm64: dts: meson-gxbb-nanopi-k2: fix GPIO lines names
+Date: Wed,  7 Nov 2018 11:45:49 +0100
+Subject: [PATCH 3/4] arm64: dts: meson-gxbb-odroidc2: fix GPIO lines names
 In-Reply-To: <1541587550-17842-1-git-send-email-narmstrong@baylibre.com>
 References: <1541587550-17842-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1541587550-17842-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1541587550-17842-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,26 +11,26 @@ The gpio line names were set in the pinctrl node instead of the gpio node,
 at the time it was merged, it worked, but was obviously wrong.
 This patch moves the properties to the gpio nodes.
 
-Fixes: 12ada0513d7a ("ARM64: dts: meson-gxbb-nanopi-k2: Add GPIO lines names")
+Fixes: b03c7d6438bb ("ARM64: dts: meson-gxbb-odroidc2: Add GPIO lines names")
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-index cbe99bd..8cd50b7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-@@ -191,7 +191,7 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 54954b3..00f7be6 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -187,7 +187,7 @@
  	pinctrl-names = "default";
  };
  
 -&pinctrl_aobus {
 +&gpio_ao {
- 	gpio-line-names = "UART TX", "UART RX", "Power Control", "Power Key In",
- 			  "VCCK En", "CON1 Header Pin31",
- 			  "I2S Header Pin6", "IR In", "I2S Header Pin7",
-@@ -201,7 +201,7 @@
+ 	gpio-line-names = "UART TX", "UART RX", "VCCK En", "TF 3V3/1V8 En",
+ 			  "USB HUB nRESET", "USB OTG Power En",
+ 			  "J7 Header Pin2", "IR In", "J7 Header Pin4",
+@@ -197,7 +197,7 @@
  			  "";
  };
  
