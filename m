@@ -1,221 +1,140 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 7 Nov 2018 12:03:33 +0000
-Subject: [PATCH] PCI: mediatek: Use
- devm_of_pci_get_host_bridge_resources() to parse DT
-In-Reply-To: <1539833014-1738-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1539833014-1738-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20181107120333.GB11586@e107981-ln.cambridge.arm.com>
+From: horia.geanta@nxp.com (Horia Geanta)
+Date: Wed, 7 Nov 2018 12:07:40 +0000
+Subject: [PATCH v1 1/2] bus: mc-bus: Add support for mapping shareable
+ portals
+References: <1540931418-10697-1-git-send-email-roy.pledge@nxp.com>
+ <1540931418-10697-2-git-send-email-roy.pledge@nxp.com>
+Message-ID: <VI1PR0402MB3485275B1CB9D52F5E902D2398C40@VI1PR0402MB3485.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2018 at 11:23:34AM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+On 10/30/2018 10:31 PM, Roy Pledge wrote:
+> Starting with v5 of NXP QBMan devices the hardware supports using
+> regular cacheable/shareable memory as the backing store for the
+> portals.
 > 
-> Use the devm_of_pci_get_host_bridge_resources() API in place of the PCI OF
-> DT parser.
+> This patch adds support for the new portal mode by switching to
+> use the DPRC get object region v2 command which returns both
+> a base address and offset for the portal memory. The new portal
+> region is identified as shareable through the addition of a new
+> flag.
 > 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 > ---
->  drivers/pci/controller/pcie-mediatek.c | 109 +++++++++------------------------
->  1 file changed, 29 insertions(+), 80 deletions(-)
+>  drivers/bus/fsl-mc/dprc.c           |  3 ++-
+>  drivers/bus/fsl-mc/fsl-mc-bus.c     | 14 ++++++++++++--
+>  drivers/bus/fsl-mc/fsl-mc-private.h | 17 ++++++++++++++---
+>  3 files changed, 28 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index 2a1f97c..6632d4e 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -197,29 +197,20 @@ struct mtk_pcie_port {
->   * @dev: pointer to PCIe device
->   * @base: IO mapped register base
->   * @free_ck: free-run reference clock
-> - * @io: IO resource
-> - * @pio: PIO resource
->   * @mem: non-prefetchable memory resource
-> - * @busn: bus range
-> - * @offset: IO / Memory offset
->   * @ports: pointer to PCIe port information
->   * @soc: pointer to SoC-dependent operations
-> + * @busnr: root bus number
->   */
->  struct mtk_pcie {
->  	struct device *dev;
->  	void __iomem *base;
->  	struct clk *free_ck;
+> diff --git a/drivers/bus/fsl-mc/dprc.c b/drivers/bus/fsl-mc/dprc.c
+> index 1c3f621..bde856d 100644
+> --- a/drivers/bus/fsl-mc/dprc.c
+> +++ b/drivers/bus/fsl-mc/dprc.c
+> @@ -461,8 +461,9 @@ int dprc_get_obj_region(struct fsl_mc_io *mc_io,
 >  
-> -	struct resource io;
-> -	struct resource pio;
->  	struct resource mem;
-> -	struct resource busn;
-> -	struct {
-> -		resource_size_t mem;
-> -		resource_size_t io;
-> -	} offset;
->  	struct list_head ports;
->  	const struct mtk_pcie_soc *soc;
-> +	int busnr;
-
-If you move the code initializing and probing the pci_host_bridge into
-mtk_pcie_setup() (and rename that function) this variable becomes
-useless. It should be an unsigned int, by the way.
-
->  };
+>  	/* retrieve response parameters */
+>  	rsp_params = (struct dprc_rsp_get_obj_region *)cmd.params;
+> -	region_desc->base_offset = le64_to_cpu(rsp_params->base_addr);
+> +	region_desc->base_offset = le64_to_cpu(rsp_params->base_offset);
+>  	region_desc->size = le32_to_cpu(rsp_params->size);
+> +	region_desc->base_address = le64_to_cpu(rsp_params->base_addr);
 >  
->  static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
-> @@ -1045,55 +1036,42 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
->  {
->  	struct device *dev = pcie->dev;
->  	struct device_node *node = dev->of_node, *child;
-> -	struct of_pci_range_parser parser;
-> -	struct of_pci_range range;
-> -	struct resource res;
->  	struct mtk_pcie_port *port, *tmp;
-> +	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> +	struct list_head *windows = &host->windows;
-> +	struct resource_entry *win, *tmp_win;
-> +	resource_size_t io_base;
->  	int err;
->  
-> -	if (of_pci_range_parser_init(&parser, node)) {
-> -		dev_err(dev, "missing \"ranges\" property\n");
-> -		return -EINVAL;
-> -	}
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> +						    windows, &io_base);
-> +	if (err)
-> +		return err;
->  
-> -	for_each_of_pci_range(&parser, &range) {
-> -		err = of_pci_range_to_resource(&range, node, &res);
-> -		if (err < 0)
-> -			return err;
-> +	err = devm_request_pci_bus_resources(dev, windows);
-> +	if (err < 0)
-> +		return err;
->  
-> -		switch (res.flags & IORESOURCE_TYPE_BITS) {
-> +	/* Get the I/O and memory ranges from DT */
-> +	resource_list_for_each_entry_safe(win, tmp_win, windows) {
-> +		switch (resource_type(win->res)) {
->  		case IORESOURCE_IO:
-> -			pcie->offset.io = res.start - range.pci_addr;
-> -
-> -			memcpy(&pcie->pio, &res, sizeof(res));
-> -			pcie->pio.name = node->full_name;
-> -
-> -			pcie->io.start = range.cpu_addr;
-> -			pcie->io.end = range.cpu_addr + range.size - 1;
-> -			pcie->io.flags = IORESOURCE_MEM;
-> -			pcie->io.name = "I/O";
-> -
-> -			memcpy(&res, &pcie->io, sizeof(res));
-> -			break;
-> -
-> +			err = devm_pci_remap_iospace(dev, win->res, io_base);
-> +			if (err) {
-> +				dev_warn(dev, "error %d: failed to map resource %pR\n",
-> +					 err, win->res);
-> +				resource_list_destroy_entry(win);
-> +			}
-
-Missing a break.
-
->  		case IORESOURCE_MEM:
-> -			pcie->offset.mem = res.start - range.pci_addr;
-> -
-> -			memcpy(&pcie->mem, &res, sizeof(res));
-> +			memcpy(&pcie->mem, win->res, sizeof(*win->res));
->  			pcie->mem.name = "non-prefetchable";
->  			break;
-> +		case IORESOURCE_BUS:
-> +			pcie->busnr = win->res->start;
-> +			break;
->  		}
->  	}
->  
-> -	err = of_pci_parse_bus_range(node, &pcie->busn);
-> -	if (err < 0) {
-> -		dev_err(dev, "failed to parse bus ranges property: %d\n", err);
-> -		pcie->busn.name = node->name;
-> -		pcie->busn.start = 0;
-> -		pcie->busn.end = 0xff;
-> -		pcie->busn.flags = IORESOURCE_BUS;
-> -	}
-> -
->  	for_each_available_child_of_node(node, child) {
->  		int slot;
->  
-> @@ -1125,28 +1103,6 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
 >  	return 0;
 >  }
+> diff --git a/drivers/bus/fsl-mc/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-bus.c
+> index f0404c6..25ad422 100644
+> --- a/drivers/bus/fsl-mc/fsl-mc-bus.c
+> +++ b/drivers/bus/fsl-mc/fsl-mc-bus.c
+> @@ -487,10 +487,18 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
+>  				"dprc_get_obj_region() failed: %d\n", error);
+>  			goto error_cleanup_regions;
+>  		}
+> -
+> -		error = translate_mc_addr(mc_dev, mc_region_type,
+> +		/* Older MC only returned region offset and no base address
+Nitpick: comment style is not consistent with existing code in fsl-mc.
+
+> +		 * If base address is in the region_desc use it otherwise
+> +		 * revert to old mechanism
+> +		 */
+> +		if (region_desc.base_address)
+> +			regions[i].start = region_desc.base_address +
+> +						region_desc.base_offset;
+> +		else
+> +			error = translate_mc_addr(mc_dev, mc_region_type,
+>  					  region_desc.base_offset,
+>  					  &regions[i].start);
+> +
+>  		if (error < 0) {
+>  			dev_err(parent_dev,
+>  				"Invalid MC offset: %#x (for %s.%d\'s region %d)\n",
+> @@ -504,6 +512,8 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
+>  		regions[i].flags = IORESOURCE_IO;
+>  		if (region_desc.flags & DPRC_REGION_CACHEABLE)
+>  			regions[i].flags |= IORESOURCE_CACHEABLE;
+> +		if (region_desc.flags & DPRC_REGION_SHAREABLE)
+> +			regions[i].flags |= IORESOURCE_MEM;
+>  	}
 >  
-> -static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
-> -{
-> -	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> -	struct list_head *windows = &host->windows;
-> -	struct device *dev = pcie->dev;
-> -	int err;
-> -
-> -	pci_add_resource_offset(windows, &pcie->pio, pcie->offset.io);
-> -	pci_add_resource_offset(windows, &pcie->mem, pcie->offset.mem);
-> -	pci_add_resource(windows, &pcie->busn);
-> -
-> -	err = devm_request_pci_bus_resources(dev, windows);
-> -	if (err < 0)
-> -		return err;
-> -
-> -	err = devm_pci_remap_iospace(dev, &pcie->pio, pcie->io.start);
-> -	if (err < 0)
-> -		return err;
-> -
-> -	return 0;
-> -}
-> -
->  static int mtk_pcie_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -1169,11 +1125,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
->  	if (err)
->  		return err;
+>  	mc_dev->regions = regions;
+> diff --git a/drivers/bus/fsl-mc/fsl-mc-private.h b/drivers/bus/fsl-mc/fsl-mc-private.h
+> index ea11b4f..28e40d1 100644
+> --- a/drivers/bus/fsl-mc/fsl-mc-private.h
+> +++ b/drivers/bus/fsl-mc/fsl-mc-private.h
+> @@ -79,9 +79,11 @@ int dpmcp_reset(struct fsl_mc_io *mc_io,
 >  
-> -	err = mtk_pcie_request_resources(pcie);
-> -	if (err)
-> -		goto put_resources;
-> -
-> -	host->busnr = pcie->busn.start;
-> +	host->busnr = pcie->busnr;
->  	host->dev.parent = pcie->dev;
->  	host->ops = pcie->soc->ops;
->  	host->map_irq = of_irq_parse_and_map_pci;
-> @@ -1181,12 +1133,9 @@ static int mtk_pcie_probe(struct platform_device *pdev)
->  	host->sysdata = pcie;
+>  /* DPRC command versioning */
+>  #define DPRC_CMD_BASE_VERSION			1
+> +#define DPRC_CMD_2ND_VERSION			2
+>  #define DPRC_CMD_ID_OFFSET			4
 >  
->  	err = pci_host_probe(host);
-> -	if (err)
-> -		goto put_resources;
-> -
-> -	return 0;
-> +	if (!err)
-> +		return 0;
+>  #define DPRC_CMD(id)	(((id) << DPRC_CMD_ID_OFFSET) | DPRC_CMD_BASE_VERSION)
+> +#define DPRC_CMD_V2(id)	(((id) << DPRC_CMD_ID_OFFSET) | DPRC_CMD_2ND_VERSION)
 >  
-
-No, leave the error path.
-
-	err = pci_host_probe(host);
-	if (err)
-		goto put_resources;
-
-	return 0;
-put_resources:
-	...
-
-it is easier to follow.
-
-Thanks,
-Lorenzo
-
-> -put_resources:
->  	if (!list_empty(&pcie->ports))
->  		mtk_pcie_put_resources(pcie);
+>  /* DPRC command IDs */
+>  #define DPRC_CMDID_CLOSE                        DPRC_CMD(0x800)
+> @@ -99,7 +101,7 @@ int dpmcp_reset(struct fsl_mc_io *mc_io,
+>  #define DPRC_CMDID_GET_CONT_ID                  DPRC_CMD(0x830)
+>  #define DPRC_CMDID_GET_OBJ_COUNT                DPRC_CMD(0x159)
+>  #define DPRC_CMDID_GET_OBJ                      DPRC_CMD(0x15A)
+> -#define DPRC_CMDID_GET_OBJ_REG                  DPRC_CMD(0x15E)
+> +#define DPRC_CMDID_GET_OBJ_REG                  DPRC_CMD_V2(0x15E)
+>  #define DPRC_CMDID_SET_OBJ_IRQ                  DPRC_CMD(0x15F)
 >  
-> -- 
-> 2.6.4
-> 
+>  struct dprc_cmd_open {
+> @@ -199,9 +201,15 @@ struct dprc_rsp_get_obj_region {
+>  	/* response word 0 */
+>  	__le64 pad;
+>  	/* response word 1 */
+> -	__le64 base_addr;
+> +	__le64 base_offset;
+>  	/* response word 2 */
+>  	__le32 size;
+> +	u8 pad2[3];
+Padding size (3B) is incorrect.
+
+Either add 4B of padding:
+__le32 pad2;
+
+or expose the "type" field:
+u8 type;
+u8 pad2[3];
+
+> +	/* response word 3 */
+> +	__le32 flags;
+> +	__le32 pad3;
+> +	/* response word 4 */
+> +	__le64 base_addr;
+>  };
+>  
+>  struct dprc_cmd_set_obj_irq {
+> @@ -334,6 +342,7 @@ int dprc_set_obj_irq(struct fsl_mc_io *mc_io,
+>  /* Region flags */
+>  /* Cacheable - Indicates that region should be mapped as cacheable */
+>  #define DPRC_REGION_CACHEABLE	0x00000001
+> +#define DPRC_REGION_SHAREABLE	0x00000002
+>  
+The new flag should be added in documentation (DPAA2 UM).
+
+Regards,
+Horia
