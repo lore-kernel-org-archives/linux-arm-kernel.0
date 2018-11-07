@@ -1,38 +1,34 @@
 From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Wed, 7 Nov 2018 23:39:53 +0100
-Subject: [PATCH v2 3/9] arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
+Date: Wed, 7 Nov 2018 23:40:08 +0100
+Subject: [PATCH v2 5/9] arm64: defconfig: Replace PINCTRL_MT7622 with
+ PINCTRL_MTK_MOORE
 In-Reply-To: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
 References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
-Message-ID: <a0209bbf-52b2-e3dc-1e76-4ef02263fff5@free.fr>
+Message-ID: <a6c4875c-8b2d-321a-1db8-d83bb9345cb1@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a0ae2562c6c4 ("netfilter: conntrack: remove l3proto abstraction")
-folded NF_CONNTRACK_IPV4 and NF_CONNTRACK_IPV6 into NF_CONNTRACK.
+Commit e78d57b2f87c ("pinctrl: mediatek: add pinctrl-moore that
+implements the generic pinctrl dt-bindings") made PINCTRL_MT7622
+depend on PINCTRL_MTK_MOORE.
 
 Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
 ---
- arch/arm64/configs/defconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/configs/defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 8d6878c1e794..58741c07a6ef 100644
+index 6fe418d72337..725b9471b21c 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -156,14 +156,12 @@ CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
- CONFIG_NETFILTER_XT_TARGET_LOG=m
- CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
- CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
--CONFIG_NF_CONNTRACK_IPV4=m
- CONFIG_IP_NF_IPTABLES=m
- CONFIG_IP_NF_FILTER=m
- CONFIG_IP_NF_TARGET_REJECT=m
- CONFIG_IP_NF_NAT=m
- CONFIG_IP_NF_TARGET_MASQUERADE=m
- CONFIG_IP_NF_MANGLE=m
--CONFIG_NF_CONNTRACK_IPV6=m
- CONFIG_IP6_NF_IPTABLES=m
- CONFIG_IP6_NF_FILTER=m
- CONFIG_IP6_NF_TARGET_REJECT=m
+@@ -369,7 +369,7 @@ CONFIG_PINCTRL_MSM8994=y
+ CONFIG_PINCTRL_MSM8996=y
+ CONFIG_PINCTRL_QDF2XXX=y
+ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+-CONFIG_PINCTRL_MT7622=y
++CONFIG_PINCTRL_MTK_MOORE=y
+ CONFIG_GPIO_DWAPB=y
+ CONFIG_GPIO_MB86S7X=y
+ CONFIG_GPIO_PL061=y
 -- 
 2.17.1
