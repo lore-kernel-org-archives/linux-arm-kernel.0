@@ -1,43 +1,128 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed,  7 Nov 2018 17:10:31 +0000
-Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
-Message-ID: <20181107171031.22573-1-alex.bennee@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Nov 2018 17:23:08 +0000
+Subject: [PATCH v10 09/22] kasan: add tag related helper functions
+In-Reply-To: <b8c56d36b79eecf0c331a0a7a2df12632aefccc9.1541525354.git.andreyknvl@google.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <b8c56d36b79eecf0c331a0a7a2df12632aefccc9.1541525354.git.andreyknvl@google.com>
+Message-ID: <20181107172306.3w2pjecaggsvl5z2@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all faults handled by handle_exit are instruction emulations. For
-example a ESR_ELx_EC_IABT will result in the page tables being updated
-but the instruction that triggered the fault hasn't actually executed
-yet. We use the simple heuristic of checking for a changed PC before
-seeing if kvm_arm_handle_step_debug wants to claim we stepped an
-instruction.
+On Tue, Nov 06, 2018 at 06:30:24PM +0100, Andrey Konovalov wrote:
+> This commit adds a few helper functions, that are meant to be used to
+> work with tags embedded in the top byte of kernel pointers: to set, to
+> get or to reset (set to 0xff) the top byte.
+> 
+> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+> ---
+>  arch/arm64/mm/kasan_init.c |  2 ++
+>  include/linux/kasan.h      | 13 +++++++++
+>  mm/kasan/kasan.h           | 55 ++++++++++++++++++++++++++++++++++++++
+>  mm/kasan/tags.c            | 37 +++++++++++++++++++++++++
+>  4 files changed, 107 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+> index 18ebc8994a7b..370b19d0e2fb 100644
+> --- a/arch/arm64/mm/kasan_init.c
+> +++ b/arch/arm64/mm/kasan_init.c
+> @@ -249,6 +249,8 @@ void __init kasan_init(void)
+>  	memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+>  	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+>  
+> +	kasan_init_tags();
+> +
+>  	/* At this point kasan is fully initialized. Enable error messages */
+>  	init_task.kasan_depth = 0;
+>  	pr_info("KernelAddressSanitizer initialized\n");
+> diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+> index 7f6574c35c62..4c9d6f9029f2 100644
+> --- a/include/linux/kasan.h
+> +++ b/include/linux/kasan.h
+> @@ -169,6 +169,19 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
+>  
+>  #define KASAN_SHADOW_INIT 0xFF
+>  
+> +void kasan_init_tags(void);
+> +
+> +void *kasan_reset_tag(const void *addr);
+> +
+> +#else /* CONFIG_KASAN_SW_TAGS */
+> +
+> +static inline void kasan_init_tags(void) { }
+> +
+> +static inline void *kasan_reset_tag(const void *addr)
+> +{
+> +	return (void *)addr;
+> +}
+> +
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
----
- arch/arm64/kvm/handle_exit.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+> +#ifdef CONFIG_KASAN_SW_TAGS
+> +
+> +#define KASAN_PTR_TAG_SHIFT 56
+> +#define KASAN_PTR_TAG_MASK (0xFFUL << KASAN_PTR_TAG_SHIFT)
+> +
+> +u8 random_tag(void);
+> +
+> +static inline void *set_tag(const void *addr, u8 tag)
+> +{
+> +	u64 a = (u64)addr;
+> +
+> +	a &= ~KASAN_PTR_TAG_MASK;
+> +	a |= ((u64)tag << KASAN_PTR_TAG_SHIFT);
+> +
+> +	return (void *)a;
+> +}
+> +
+> +static inline u8 get_tag(const void *addr)
+> +{
+> +	return (u8)((u64)addr >> KASAN_PTR_TAG_SHIFT);
+> +}
+> +
+> +static inline void *reset_tag(const void *addr)
+> +{
+> +	return set_tag(addr, KASAN_TAG_KERNEL);
+> +}
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index e5e741bfffe1..b8252e72f882 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -214,6 +214,7 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
- static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	int handled;
-+        unsigned long old_pc = *vcpu_pc(vcpu);
- 
- 	/*
- 	 * See ARM ARM B1.14.1: "Hyp traps on instructions
-@@ -233,7 +234,8 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	 * kvm_arm_handle_step_debug() sets the exit_reason on the kvm_run
- 	 * structure if we need to return to userspace.
- 	 */
--	if (handled > 0 && kvm_arm_handle_step_debug(vcpu, run))
-+	if (handled > 0 && *vcpu_pc(vcpu) != old_pc &&
-+	    kvm_arm_handle_step_debug(vcpu, run))
- 		handled = 0;
- 
- 	return handled;
--- 
-2.17.1
+We seem to be duplicating this functionality in several places.
+
+Could we please make it so that the arch code defines macros:
+
+arch_kasan_set_tag(addr, tag)
+arch_kasan_get_tag(addr)
+arch_kasan_reset_tag(addr)
+
+... and use thoses consistently rather than open-coding them?
+
+> +
+> +#else /* CONFIG_KASAN_SW_TAGS */
+> +
+> +static inline u8 random_tag(void)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline void *set_tag(const void *addr, u8 tag)
+> +{
+> +	return (void *)addr;
+> +}
+> +
+> +static inline u8 get_tag(const void *addr)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline void *reset_tag(const void *addr)
+> +{
+> +	return (void *)addr;
+> +}
+
+... these can be defined in linux/kasan.h as:
+
+#define arch_kasan_set_tag(addr, tag)	(addr)
+#define arch_kasan_get_tag(addr)	0
+#define arch_kasan_reset_tag(addr)	(addr)
+
+Thanks,
+Mark.
