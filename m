@@ -1,48 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2018 14:55:11 +0000
-Subject: [PATCH v4 2/2] arm64: mm: apply r/o permissions of VM areas to
- its linear alias as well
-In-Reply-To: <20181107103620.16054-3-ard.biesheuvel@linaro.org>
-References: <20181107103620.16054-1-ard.biesheuvel@linaro.org>
- <20181107103620.16054-3-ard.biesheuvel@linaro.org>
-Message-ID: <20181107145510.GB2623@brain-police>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2018 15:55:22 +0100
+Subject: [RFC PATCH 10/12] soc: qcom: ipa: data path
+In-Reply-To: <20181107003250.5832-11-elder@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-11-elder@linaro.org>
+Message-ID: <CAK8P3a0nkfwFCCVHaTJ+kJGWxO+qFTzTLnRgB-NG0AyMEsv3bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 11:36:20AM +0100, Ard Biesheuvel wrote:
-> On arm64, we use block mappings and contiguous hints to map the linear
-> region, to minimize the TLB footprint. However, this means that the
-> entire region is mapped using read/write permissions, which we cannot
-> modify at page granularity without having to take intrusive measures to
-> prevent TLB conflicts.
-> 
-> This means the linear aliases of pages belonging to read-only mappings
-> (executable or otherwise) in the vmalloc region are also mapped read/write,
-> and could potentially be abused to modify things like module code, bpf JIT
-> code or other read-only data.
-> 
-> So let's fix this, by extending the set_memory_ro/rw routines to take
-> the linear alias into account. The consequence of enabling this is
-> that we can no longer use block mappings or contiguous hints, so in
-> cases where the TLB footprint of the linear region is a bottleneck,
-> performance may be affected.
-> 
-> Therefore, allow this feature to be runtime en/disabled, by setting
-> rodata=full (or 'on' to disable just this enhancement, or 'off' to
-> disable read-only mappings for code and r/o data entirely) on the
-> kernel command line. Also, allow the default value to be set via a
-> Kconfig option.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig                   | 14 ++++++++++++++
->  arch/arm64/include/asm/mmu_context.h |  2 ++
->  arch/arm64/mm/mmu.c                  | 16 ++++++++++++++--
->  arch/arm64/mm/pageattr.c             | 15 +++++++++++++++
->  4 files changed, 45 insertions(+), 2 deletions(-)
+On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+>
+> This patch contains "ipa_dp.c", which includes the bulk of the data
+> path code.  There is an overview in the code of how things operate,
+> but there are already plans to rework this portion of the driver.
+>
+> In particular:
+>   - Interrupt handling will be replaced with a threaded interrupt
+>     handler.  Currently handling occurs in a combination of
+>     interrupt and workqueue context, and this requires locking
+>     and atomic operations for proper synchronization.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+You probably don't want to use just a threaded IRQ handler to
+start the poll function, that would still require an extra indirection.
 
-Thanks!
+However, you can probably use the top half of the threaded
+handler to request the poll function if necessary but use
+the bottom half for anything that does not go through poll.
 
-Will
+>   - Currently, only receive endpoints use NAPI.  Transmit
+>     completion interrupts are disabled, and are handled in batches
+>     by periodically scheduling an interrupting no-op request.
+>     The plan is to arrange for transmit requests to generate
+>     interrupts, and their completion will be processed with other
+>     completions in the NAPI poll function.  This will also allow
+>     accurate feedback about packet sojourn time to be provided to
+>     queue limiting mechanisms.
+
+Right, that is definitely required here. I also had a look at
+the gsi_channel_queue() function, which sits in the middle of
+the transmit function and is rather unoptimized. I'd suggest moving
+that into the caller so we can see what is going on, and then
+optimizing it from there.
+
+>   - Not all receive endpoints use NAPI.  The plan is for *all*
+>     endpoints to use NAPI.  And because all endpoints share a
+>     common GSI interrupt, a single NAPI structure will used to
+>     managing the processing for all completions on all endpoints.
+>   - Receive buffers are posted to the hardware by a workqueue
+>     function.  Instead, the plan is to have this done by the
+>     NAPI poll routine.
+
+Makes sense, yes.
+
+      Arnd
