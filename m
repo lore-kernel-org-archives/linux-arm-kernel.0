@@ -1,56 +1,95 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 7 Nov 2018 16:50:20 +0000
-Subject: [RFC PATCH 1/4] kconfig: add as-instr macro to
- scripts/Kconfig.include
-In-Reply-To: <20181107145552.GC2623@brain-police>
-References: <1541583608-26375-1-git-send-email-vladimir.murzin@arm.com>
- <1541583608-26375-2-git-send-email-vladimir.murzin@arm.com>
- <20181107145552.GC2623@brain-police>
-Message-ID: <74f9cecb-4efa-718c-b147-f7adf956c7bd@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Nov 2018 16:52:00 +0000
+Subject: [PATCH v10 08/22] kasan, arm64: untag address in __kimg_to_phys
+ and _virt_addr_is_linear
+In-Reply-To: <b2aa056b65b8f1a410379bf2f6ef439d5d99e8eb.1541525354.git.andreyknvl@google.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <b2aa056b65b8f1a410379bf2f6ef439d5d99e8eb.1541525354.git.andreyknvl@google.com>
+Message-ID: <20181107165200.oaou6cx2lmjzmjyl@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/18 14:55, Will Deacon wrote:
-> On Wed, Nov 07, 2018 at 09:40:05AM +0000, Vladimir Murzin wrote:
->> There are cases where the whole feature, for instance arm64/lse or
->> arm/crypto, can depend on assembler. Current practice is to report
->> buildtime that selected feature is not supported, which can be quite
->> annoying...
+Hi Andrey,
+
+On Tue, Nov 06, 2018 at 06:30:23PM +0100, Andrey Konovalov wrote:
+> __kimg_to_phys (which is used by virt_to_phys) and _virt_addr_is_linear
+> (which is used by virt_addr_valid) assume that the top byte of the address
+> is 0xff, which isn't always the case with tag-based KASAN.
+
+I'm confused by this. Why/when do kimg address have a non-default tag?
+
+Any kimg address is part of the static kernel image, so it's not obvious
+to me how a kimg address would gain a tag. Could you please explain how
+this happens in the commit message?
+
+> This patch resets the tag in those macros.
 > 
-> Why is it annoying? You still end up with a working kernel.
-
-.config doesn't really represent if option was built or not, annoying
-part is digging build logs (if anyone's saved them at all!) or relevant
-parts of dmesg (if option throws anything in there and which not always
-part of reports).
-
+> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+> ---
+>  arch/arm64/include/asm/memory.h | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
 > 
->> It'd nicer if we can check assembler first and opt-in feature
->> visibility in Kconfig.
->>
->> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  scripts/Kconfig.include | 4 ++++
->>  1 file changed, 4 insertions(+)
-> 
-> One issue I have with doing the check like this is that if somebody sends
-> you a .config with e.g. ARM64_LSE_ATOMICS=y and you try to build a kernel
-> using that .config and an old toolchain, the option is silently dropped.
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 0f1e024a951f..3226a0218b0b 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -92,6 +92,15 @@
+>  #define KASAN_THREAD_SHIFT	0
+>  #endif
+>  
+> +#ifdef CONFIG_KASAN_SW_TAGS
+> +#define KASAN_TAG_SHIFTED(tag)		((unsigned long)(tag) << 56)
+> +#define KASAN_SET_TAG(addr, tag)	(((addr) & ~KASAN_TAG_SHIFTED(0xff)) | \
+> +						KASAN_TAG_SHIFTED(tag))
+> +#define KASAN_RESET_TAG(addr)		KASAN_SET_TAG(addr, 0xff)
+> +#else
+> +#define KASAN_RESET_TAG(addr)		addr
+> +#endif
 
-I see... at least we have some tools like ./scripts/diffconfig
+Nit: the rest of the helper macros in this file are lower-case, with
+specialised helpers prefixed with several underscores. Could we please
+stick with that convention?
 
-> 
-> I think the diagnostic is actually useful in this case.
+e.g. have __tag_set() and __tag_reset() helpers.
 
-Fully agree on diagnostic side, any suggestions how it can be improved?
+> +
+>  #define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
+>  
+>  /*
+> @@ -232,7 +241,7 @@ static inline unsigned long kaslr_offset(void)
+>  #define __is_lm_address(addr)	(!!((addr) & BIT(VA_BITS - 1)))
+>  
+>  #define __lm_to_phys(addr)	(((addr) & ~PAGE_OFFSET) + PHYS_OFFSET)
+> -#define __kimg_to_phys(addr)	((addr) - kimage_voffset)
+> +#define __kimg_to_phys(addr)	(KASAN_RESET_TAG(addr) - kimage_voffset)
 
-Cheers
-Vladimir
+IIUC You need to adjust __lm_to_phys() too, since that could be passed
+an address from SLAB.
 
-> 
-> Will
-> 
+Maybe that's done in a later patch, but if so it's confusing to split it
+out that way. It would be nicer to fix all the *_to_*() helpers in one
+go.
+
+>  
+>  #define __virt_to_phys_nodebug(x) ({					\
+>  	phys_addr_t __x = (phys_addr_t)(x);				\
+> @@ -308,7 +317,8 @@ static inline void *phys_to_virt(phys_addr_t x)
+>  #endif
+>  #endif
+>  
+> -#define _virt_addr_is_linear(kaddr)	(((u64)(kaddr)) >= PAGE_OFFSET)
+> +#define _virt_addr_is_linear(kaddr)	(KASAN_RESET_TAG((u64)(kaddr)) >= \
+> +						PAGE_OFFSET)
+
+This is painful to read. Could you please split this like:
+
+#define _virt_addr_is_linear(kaddr) \
+	(__tag_reset((u64)(kaddr)) >= PAGE_OFFSET)
+
+... and we could reformat virt_addr_valid() in the same way while we're
+at it.
+
+Thanks,
+Mark.
