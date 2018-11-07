@@ -1,79 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Nov 2018 17:08:55 +0000
-Subject: [PATCH v10 07/22] kasan: initialize shadow to 0xff for tag-based
- mode
-In-Reply-To: <9405f32797b52616cd0746bcea37df94e8e4256a.1541525354.git.andreyknvl@google.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <9405f32797b52616cd0746bcea37df94e8e4256a.1541525354.git.andreyknvl@google.com>
-Message-ID: <20181107170855.n4ertf5qv7ff5btl@lakrids.cambridge.arm.com>
+From: l.luba@partner.samsung.com (Lukasz Luba)
+Date: Wed,  7 Nov 2018 18:09:42 +0100
+Subject: [PATCH v2 00/11] thermal: add new flag irq-mode for trip point
+References: <CGME20181107171019eucas1p1fcb1f44e00265434548d901479f2ea94@eucas1p1.samsung.com>
+Message-ID: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 06:30:22PM +0100, Andrey Konovalov wrote:
-> A tag-based KASAN shadow memory cell contains a memory tag, that
-> corresponds to the tag in the top byte of the pointer, that points to that
-> memory. The native top byte value of kernel pointers is 0xff, so with
-> tag-based KASAN we need to initialize shadow memory to 0xff.
-> 
-> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  arch/arm64/mm/kasan_init.c | 16 ++++++++++++++--
->  include/linux/kasan.h      |  8 ++++++++
->  mm/kasan/common.c          |  3 ++-
->  3 files changed, 24 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-> index 63527e585aac..18ebc8994a7b 100644
-> --- a/arch/arm64/mm/kasan_init.c
-> +++ b/arch/arm64/mm/kasan_init.c
-> @@ -43,6 +43,15 @@ static phys_addr_t __init kasan_alloc_zeroed_page(int node)
->  	return __pa(p);
->  }
->  
-> +static phys_addr_t __init kasan_alloc_raw_page(int node)
-> +{
-> +	void *p = memblock_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
-> +						__pa(MAX_DMA_ADDRESS),
-> +						MEMBLOCK_ALLOC_ACCESSIBLE,
-> +						node);
-> +	return __pa(p);
-> +}
-> +
->  static pte_t *__init kasan_pte_offset(pmd_t *pmdp, unsigned long addr, int node,
->  				      bool early)
->  {
-> @@ -88,7 +97,9 @@ static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
->  
->  	do {
->  		phys_addr_t page_phys = early ? __pa_symbol(kasan_zero_page)
-> -					      : kasan_alloc_zeroed_page(node);
-> +					      : kasan_alloc_raw_page(node);
-> +		if (!early)
-> +			memset(__va(page_phys), KASAN_SHADOW_INIT, PAGE_SIZE);
->  		next = addr + PAGE_SIZE;
->  		set_pte(ptep, pfn_pte(__phys_to_pfn(page_phys), PAGE_KERNEL));
->  	} while (ptep++, addr = next, addr != end && pte_none(READ_ONCE(*ptep)));
-> @@ -138,6 +149,7 @@ asmlinkage void __init kasan_early_init(void)
->  		KASAN_SHADOW_END - (1UL << (64 - KASAN_SHADOW_SCALE_SHIFT)));
->  	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
->  	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
-> +
->  	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
->  			   true);
->  }
-> @@ -234,7 +246,7 @@ void __init kasan_init(void)
->  		set_pte(&kasan_zero_pte[i],
->  			pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
->  
-> -	memset(kasan_zero_page, 0, PAGE_SIZE);
-> +	memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+Hi all,
 
-If this isn't going to contain zero, can we please have a preparatory
-patch renaming this to something which isn't misleading?
+This patch set adds a new flag and mechanism in thermal trip points in
+DT.  The old implementation in thermal zone in DT sets the same
+configuration for all internal trip points. It does not work for all
+HW.  There are SoCs which support IRQs for some trip points (i.e.
+Exynos 4 has 4 trip points with IRQs). For additional one defined
+inside the thermal zone there is a need of 'polling'. When developer
+adds polling mode settings inside the thermal zone, all the trip
+points will be registered for polling, even those supporting IRQs,
+which does not make sense. Thus, developers create workarounds, which
+are confusing for some other developers.  To workaround, 
+people declare some trip points as 'active' (those with IRQ support).
+It allows to bypass polling mode in thermal framework applied for 
+all thermal zone's trip points.
 
-Perhaps kasan_common_shadow_page?
+Thermal framework defines 4 types of trip points. The 'passive' means
+passive cooling using DVFS, 'active' is designed for fan and other
+devices actively changing the outside conditions. Therefore, a workaround
+mentioned earlier is confusing when someone does not know about the
+framework limitations.
 
-Thanks,
-Mark.
+This patch set tries to solve the issue by adding one flag inside the
+trip point: 'irq-mode;'.  The trip point 'passive' declared in DT with
+explicit flag 'irq-mode;' will not register itself as polling mode.
+Thermal framework will skip it during scheduling next read out work.
+The old global-polling-mode-configuration-inside-thermal-zone is still
+valid.  Patch set does not break existing design for trip points which
+do not have 'irq-mode' flag - they will use polling.
+
+As an example please check patch #10 for Exynos4 SoC family, where there
+is 4 HW supported trip points and there is a need of 6. The rest 2 are
+declared as 'passive' without 'irq-mode;' flag, which means polling
+mode needed for them.
+
+Patch #1 is a small cleanup in thermal framework.
+
+Change log:
+v2
+- changed description in cover letter
+- change commit messages according to Krzysztof comments
+- rebase on top of current mainline (v4.20-rc1)
+
+Regards,
+Lukasz Luba
+
+Lukasz Luba (11):
+  thermal: remove unused function parameter
+  thermal: add irq-mode configuration for trip point
+  thermal: add new sysfs file for irq-mode
+  Doc: thermal: new irq-mode for trip point
+  Doc: DT: thermal: new irq-mode for trip point
+  arm64: dts: exynos5433: add support for thermal trip irq-mode
+  arm64: dts: exynos7: add support for thermal trip irq-mode
+  arm: dts: exynos4: add support for thermal trip irq-mode
+  arm: dts: exynos5420: add support for thermal trip irq-mode
+  arm: dts: exynos5422: add support for thermal trip irq-mode
+  arm: dts: exynos5410: add support for thermal trip irq-mode
+
+ .../devicetree/bindings/thermal/thermal.txt        |   7 ++
+ Documentation/thermal/sysfs-api.txt                |   9 ++
+ arch/arm/boot/dts/exynos4-cpu-thermal.dtsi         |  10 +-
+ arch/arm/boot/dts/exynos5410-odroidxu.dts          |  10 +-
+ arch/arm/boot/dts/exynos5420-trip-points.dtsi      |  10 +-
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  40 +++++---
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     | 105 ++++++++++++++-------
+ .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   8 ++
+ drivers/thermal/of-thermal.c                       |  17 ++++
+ drivers/thermal/thermal_core.c                     |  16 ++--
+ drivers/thermal/thermal_sysfs.c                    |  53 ++++++++++-
+ include/linux/thermal.h                            |   5 +
+ 12 files changed, 226 insertions(+), 64 deletions(-)
+
+-- 
+2.7.4
