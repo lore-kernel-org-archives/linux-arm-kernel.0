@@ -1,98 +1,52 @@
-From: tiny.windzz@gmail.com (Yangtao Li)
-Date: Wed,  7 Nov 2018 11:13:46 -0500
-Subject: [PATCH] cpufreq: s3c24xx: Change to use DEFINE_SHOW_ATTRIBUTE macro
-Message-ID: <20181107161346.9887-1-tiny.windzz@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Nov 2018 08:16:47 -0800
+Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
+ beagle-xm
+In-Reply-To: <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
+References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
+ <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+ <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
+ <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
+ <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
+Message-ID: <CAOesGMgAxvERhQjnyZ7P4vqhhWdBdA20XrFnDn48Na5wrEAkEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
+On Wed, Nov 7, 2018 at 8:09 AM Guillaume Tucker
+<guillaume.tucker@collabora.com> wrote:
+>
+> On 06/11/2018 10:54, Guillaume Tucker wrote:
+> > On 05/11/2018 14:33, Olof Johansson wrote:
+> >> On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
+> >> <guillaume.tucker@collabora.com> wrote:
+> >>>
+> >>> Hi Linus,
+> >>>
+> >>> Please see below, the kernelci.org automated boot bisection found
+> >>> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
+> >>> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
+> >>> log output after the bootloader so the kernel seems to be
+> >>> crashing very early on.
+> >>
+> >> Can you enable DEBUG_LL to capture what goes wrong?
+> >
+> > Yes I've scheduled a re-run of the automated bisection with
+> > DEBUG_LL turned on, but the beagle-xm board is currently offline
+> > in lab-baylibre.  I'll keep you posted when I get some results.
+>
+> Unfortunately, enabling the DEBUG_LL config didn't help.  There's
+> still no visible kernel log at all from the failing LAVA jobs:
+>
+>     http://lava.baylibre.com:10080/scheduler/alljobs?length=25&search=lava-bisect-9638#table
+>
+>
+> This might be a hard one to debug without physical access to the
+> board, but please let me know if you think there's anything else
+> I can try.  For example, if there's a known older kernel revision
+> where the combination of SMP=n and PREEMPT=y worked then I could
+> try to run an automated boot bisection based on that.
 
-Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
----
- drivers/cpufreq/s3c24xx-cpufreq-debugfs.c | 46 +++--------------------
- 1 file changed, 6 insertions(+), 40 deletions(-)
+Is this only beagle-xm, or do we see it on all OMAP3 hardware?
 
-diff --git a/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c b/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
-index 4d976e8dbb2f..0df87b6480fe 100644
---- a/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
-+++ b/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
-@@ -63,18 +63,7 @@ static int board_show(struct seq_file *seq, void *p)
- 	return 0;
- }
- 
--static int fops_board_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, board_show, NULL);
--}
--
--static const struct file_operations fops_board = {
--	.open		= fops_board_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--	.owner		= THIS_MODULE,
--};
-+DEFINE_SHOW_ATTRIBUTE(board);
- 
- static int info_show(struct seq_file *seq, void *p)
- {
-@@ -105,18 +94,7 @@ static int info_show(struct seq_file *seq, void *p)
- 	return 0;
- }
- 
--static int fops_info_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, info_show, NULL);
--}
--
--static const struct file_operations fops_info = {
--	.open		= fops_info_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--	.owner		= THIS_MODULE,
--};
-+DEFINE_SHOW_ATTRIBUTE(info);
- 
- static int io_show(struct seq_file *seq, void *p)
- {
-@@ -162,19 +140,7 @@ static int io_show(struct seq_file *seq, void *p)
- 	return 0;
- }
- 
--static int fops_io_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, io_show, NULL);
--}
--
--static const struct file_operations fops_io = {
--	.open		= fops_io_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--	.owner		= THIS_MODULE,
--};
--
-+DEFINE_SHOW_ATTRIBUTE(io);
- 
- static int __init s3c_freq_debugfs_init(void)
- {
-@@ -185,13 +151,13 @@ static int __init s3c_freq_debugfs_init(void)
- 	}
- 
- 	dbgfs_file_io = debugfs_create_file("io-timing", S_IRUGO, dbgfs_root,
--					    NULL, &fops_io);
-+					    NULL, &io_fops);
- 
- 	dbgfs_file_info = debugfs_create_file("info", S_IRUGO, dbgfs_root,
--					      NULL, &fops_info);
-+					      NULL, &info_fops);
- 
- 	dbgfs_file_board = debugfs_create_file("board", S_IRUGO, dbgfs_root,
--					       NULL, &fops_board);
-+					       NULL, &board_fops);
- 
- 	return 0;
- }
--- 
-2.17.0
+
+-Olof
