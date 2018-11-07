@@ -1,56 +1,49 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Wed, 7 Nov 2018 09:48:54 -0800
-Subject: [PATCH] pinctrl: zynq: Use define directive for
- PIN_CONFIG_IO_STANDARD
-In-Reply-To: <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
-References: <20181101005724.9622-1-natechancellor@gmail.com>
- <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
- <20181107085503.GA31517@flashbox>
- <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
-Message-ID: <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed,  7 Nov 2018 23:18:43 +0530
+Subject: [PATCH v3 3/4] arm64: dts: mediatek: x20: Add pinmux support for UART1
+In-Reply-To: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
+References: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181107174844.5381-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 1:01 AM Michal Simek <michal.simek@xilinx.com> wrote:
->
-> On 07. 11. 18 9:55, Nathan Chancellor wrote:
-> > On Wed, Nov 07, 2018 at 09:46:12AM +0100, Michal Simek wrote:
-> >> On 01. 11. 18 1:57, Nathan Chancellor wrote:
-> >>> Clang warns when one enumerated type is implicitly converted to another:
-> >>>
-> >>> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
-> >>> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> >>> type 'enum pin_config_param' [-Wenum-conversion]
-> >>>         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
-> >>>         ~               ^~~~~~~~~~~~~~~~~~~~~
-> >>> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
-> >>> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> >>> type 'enum pin_config_param' [-Wenum-conversion]
-> >>>         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
-> >>>             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
-> >>> macro 'PCONFDUMP'
-> >>>         .param = a, .display = b, .format = c, .has_arg = d     \
-> >>>                  ^
-> >>> 2 warnings generated.
-> >>
-> >> This is interesting. I have never tried to use llvm for building the
-> >> kernel. Do you have any description how this can be done?
-> >>
-> >
-> > Depending on what version of Clang you have access to, it is usually just as
-> > simple as running 'make ARCH=arm CC=clang CROSS_COMPILE=arm-linux-gnueabi-'.
-> >
-> > Clang 7.0+ is recommended but 6.0 might work too.
->
-> TBH I would expect to download container and run this there to make sure
-> that I don't break anything else.
+Add pinmux support for UART1 on MediatekX20 Development board based
+on Mediatek MT6797 SoC.
 
-This is the first request we've had for a container in order to test a
-patch.  If it comes up again from other folks, I think it makes sense
-to create one.  Until then, its nice to have.  It's definitely
-overkill for this patch.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts | 2 ++
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi        | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+index 742938a1a548..13939d55b85b 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
++++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+@@ -30,4 +30,6 @@
+ 
+ &uart1 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>;
+ };
+diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+index 231230d32d09..a64bb84bdec3 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+@@ -141,6 +141,13 @@
+ 			    "iocfgr", "iocfgt";
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++
++		uart1_pins_a: uart1 {
++			pins1 {
++				pinmux = <MT6797_GPIO232__FUNC_URXD1>,
++					 <MT6797_GPIO233__FUNC_UTXD1>;
++			};
++		};
+ 	};
+ 
+ 	scpsys: scpsys at 10006000 {
 -- 
-Thanks,
-~Nick Desaulniers
+2.17.1
