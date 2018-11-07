@@ -1,50 +1,35 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  7 Nov 2018 16:30:32 +0000
-Subject: [PATCH v2] of/device: Really only set bus DMA mask when appropriate
-Message-ID: <43b231d67abf2dc589af1c3b9d4f01211cda0b89.1541608043.git.robin.murphy@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Nov 2018 08:31:55 -0800
+Subject: [GIT PULL 0/3] arm64: tegra: Updates for v4.20-rc2
+In-Reply-To: <20181107145350.29127-1-thierry.reding@gmail.com>
+References: <20181107145350.29127-1-thierry.reding@gmail.com>
+Message-ID: <CAOesGMjcOQif8H6b5afKBwYstkbzGC7wuUcN2Srz=vJz11qSnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_dma_configure() was *supposed* to be following the same logic as
-acpi_dma_configure() and only setting bus_dma_mask if some range was
-specified by the firmware. However, it seems that subtlety got lost in
-the process of fitting it into the differently-shaped control flow, and
-as a result the force_dma==true case ends up always setting the bus mask
-to the 32-bit default, which is not what anyone wants.
+Hi Thierry,
 
-Make sure we only touch it if the DT actually said so.
+On Wed, Nov 7, 2018 at 6:53 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+>
+> Hi ARM SoC maintainers,
+>
+> These pull requests are some follow-up changes to finally enable the
+> generic power domains for the Tegra XUSB block. This builds on top of
+> changes that were merged into v4.20-rc1, but because of some non-
+> trivial runtime dependencies I decided to hold back on these until
+> after the dust had settled.
+>
+> Do you think it would be possible to merge these in for v4.20-rc2? I
+> realize that they are not actually fixes, but they merely add a couple
+> of lines to enable the power domains for XUSB as well as the
+> corresponding DT bindings.
 
-Fixes: 6c2fb2ea7636 ("of/device: Set bus DMA mask as appropriate")
-Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Tested-by: John Stultz <john.stultz@linaro.org>
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Robert Richter <robert.richter@cavium.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Is anything broken without these changes, or is it more that the
+dependency have landed and you're itching to get things enabled?
 
- v2: Add comment, collect tested-by tags
+If it's the former we should chat (since it's an unfortunate
+situation). If it's the latter I'm happy to queue them up for the next
+merge window.
 
- drivers/of/device.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 0f27fad9fe94..5592437bb3d1 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -149,9 +149,11 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
- 	 * set by the driver.
- 	 */
- 	mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
--	dev->bus_dma_mask = mask;
- 	dev->coherent_dma_mask &= mask;
- 	*dev->dma_mask &= mask;
-+	/* ...but only set bus mask if we found valid dma-ranges earlier */
-+	if (!ret)
-+		dev->bus_dma_mask = mask;
- 
- 	coherent = of_dma_is_coherent(np);
- 	dev_dbg(dev, "device is%sdma coherent\n",
--- 
-2.19.1.dirty
+-Olof
