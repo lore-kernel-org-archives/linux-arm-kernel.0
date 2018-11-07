@@ -1,35 +1,75 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 7 Nov 2018 03:00:47 +0000
-Subject: [PATCH RESEND V4 0/9] clk: add imx7ulp clk support
-In-Reply-To: <7e58f0dcf83a0bd8139e58e27bfa137fc186b4bf.camel@nxp.com>
-References: <1540127173-21346-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211576EF2FE906A6B0C3F1680FB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211280B09B72F637FC5650280CB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <7e58f0dcf83a0bd8139e58e27bfa137fc186b4bf.camel@nxp.com>
-Message-ID: <AM0PR04MB42118A6086D98F84542E954F80C40@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Date: Wed, 7 Nov 2018 03:05:51 +0000
+Subject: [PATCH V9 0/5] soc: imx: add scu power domain driver
+In-Reply-To: <1541085298-375-1-git-send-email-aisheng.dong@nxp.com>
+References: <1541085298-375-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <AM0PR04MB421199044A8EFA6B643FD68080C40@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shawn,
+
 > -----Original Message-----
-> From: Leonard Crestez
-> Sent: Tuesday, November 6, 2018 11:34 PM
+> From: A.s. Dong
+> Sent: Thursday, November 1, 2018 11:20 PM
 [...]
+> Subject: [PATCH V9 0/5] soc: imx: add scu power domain driver
 > 
-> On Tue, 2018-11-06 at 15:30 +0000, A.s. Dong wrote:
-> > Gently Ping...
-> 
-> > drivers/clk/imx/clk-composite.c                    |  85 +++++++++
-> 
-> During review for 8m clocks a separate but different composite clk was added.
-> In order to avoid confusion that was named "clk-composite-8m.c", it would
-> make sense to move the 7ulp code to clk-composite-7ulp.c.
+> This patch set adds the scu based power domain driver.
+> It depends on SCU driver.
 > 
 
-I guess we can do it, thanks.
+Do you have a chance to help look at and take this series?
 
 Regards
 Dong Aisheng
 
+> Change Log:
+> v8->v9:
+>  * add comment at the top of scu-pd.c file about how to convert
+>    to "single global domain".
+> v7->v8:
+>  * update to #power-domain-cells 1 binding
+> v6->v7:
+>  * keep "fsl,scu-pd" as fall back compatible string
+> v5->v6:
+>  * only compatible string name updated from fsl,scu-pd to fsl,imx8qxp-scu-pd
+>    accordingly
+> v4->v5:
+>  * some minor improvements according to Sascha's suggestion
+>    Note: did not use dev_* print functions due to we already have proper
+>          prefix by redefining pr_fmt. So it seems not quite neccesary
+> 	 to pass in a struct device * pointer for debug purpose only in
+> 	 each functions.
+> v3->v4:
+>  * only scu headfile path update
+> 
+> v2->v3:
+>  * structure and enums name update
+>  * api usage update
+> 
+> 
+> Dong Aisheng (5):
+>   dt-bindings: imx: add scu resource id headfile
+>   firmware: imx: remove resource id enums
+>   dt-bindings: fsl: scu: update power domain binding
+>   firmware: imx: add pm svc headfile
+>   firmware: imx: add SCU power domain driver
+> 
+>  .../devicetree/bindings/arm/freescale/fsl,scu.txt  |  37 +-
+>  drivers/firmware/imx/Kconfig                       |   6 +
+>  drivers/firmware/imx/Makefile                      |   3 +-
+>  drivers/firmware/imx/scu-pd.c                      | 339
+> +++++++++++++
+>  include/dt-bindings/firmware/imx/rsrc.h            | 559
+> +++++++++++++++++++++
+>  include/linux/firmware/imx/sci.h                   |   1 +
+>  include/linux/firmware/imx/svc/pm.h                |  85 ++++
+>  include/linux/firmware/imx/types.h                 | 552 --------------------
+>  8 files changed, 1000 insertions(+), 582 deletions(-)  create mode 100644
+> drivers/firmware/imx/scu-pd.c  create mode 100644
+> include/dt-bindings/firmware/imx/rsrc.h
+>  create mode 100644 include/linux/firmware/imx/svc/pm.h
+> 
 > --
-> Regards,
-> Leonard
+> 2.7.4
