@@ -1,146 +1,112 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 7 Nov 2018 13:57:03 +0000
-Subject: [PATCH v2] PCI: imx: Add imx6sx suspend/resume support
-Message-ID: <984fcef6d928632241a4a3bce41e2645a304d335.1541598751.git.leonard.crestez@nxp.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2018 15:08:46 +0100
+Subject: [RFC PATCH 09/12] soc: qcom: ipa: main IPA source file
+In-Reply-To: <20181107003250.5832-10-elder@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-10-elder@linaro.org>
+Message-ID: <CAK8P3a0RH4wbigKR0zsbxPzqWDjrLEkYfQk4GNxhGuxs=HJHHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PCI suspend/resume support on imx6sx socs. This is similar to
-imx7d with a few differences:
+On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
 
-* The PM_Turn_Off bit is exposed through an IOMUX GPR, like all other
-pcie control bits on 6sx.
-* The pcie_inbound_axi clk needs to be turned off in suspend. On resume
-it is restored via resume -> deassert_core_reset -> enable_ref_clk.
+> +static void ipa_client_remove_deferred(struct work_struct *work);
 
-Most of the resume logic is shared with the initial reset after probe.
+Try to avoid forward declarations by reordering the code in call order,
+it will also make it easier to read.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> +static DECLARE_WORK(ipa_client_remove_work, ipa_client_remove_deferred);
+> +
+> +static struct ipa_context ipa_ctx_struct;
+> +struct ipa_context *ipa_ctx = &ipa_ctx_struct;
 
----
-Changes since v1:
-* Use a switch statement in imx6_pcie_pm_turnoff. The DT-based turnoff
-path is still an if statement.
-* Did not split imx6_pcie_clk_disable or call it from other paths, this
-would bring complications and is somewhat unrelated.
-* See v1 comments: https://lore.kernel.org/patchwork/patch/996806/
+Global state variables should generally be removed as well, and
+passed around as function arguments.
 
- drivers/pci/controller/dwc/pci-imx6.c       | 44 ++++++++++++++++++---
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  1 +
- 2 files changed, 40 insertions(+), 5 deletions(-)
+> +static int hdr_init_local_cmd(u32 offset, u32 size)
+> +{
+> +       struct ipa_desc desc = { };
+> +       struct ipa_dma_mem mem;
+> +       void *payload;
+> +       int ret;
+> +
+> +       if (ipa_dma_alloc(&mem, size, GFP_KERNEL))
+> +               return -ENOMEM;
+> +
+> +       offset += ipa_ctx->smem_offset;
+> +
+> +       payload = ipahal_hdr_init_local_pyld(&mem, offset);
+> +       if (!payload) {
+> +               ret = -ENOMEM;
+> +               goto err_dma_free;
+> +       }
+> +
+> +       desc.type = IPA_IMM_CMD_DESC;
+> +       desc.len_opcode = IPA_IMM_CMD_HDR_INIT_LOCAL;
+> +       desc.payload = payload;
+> +
+> +       ret = ipa_send_cmd(&desc);
 
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index 2cbef2d7c207..54625569d0bc 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -771,41 +771,75 @@ static void imx6_pcie_ltssm_disable(struct device *dev)
- 	}
- }
- 
- static void imx6_pcie_pm_turnoff(struct imx6_pcie *imx6_pcie)
- {
--	reset_control_assert(imx6_pcie->turnoff_reset);
--	reset_control_deassert(imx6_pcie->turnoff_reset);
-+	struct device *dev = imx6_pcie->pci->dev;
-+
-+	/* Some variants have a turnoff reset in DT */
-+	if (imx6_pcie->turnoff_reset) {
-+		reset_control_assert(imx6_pcie->turnoff_reset);
-+		reset_control_deassert(imx6_pcie->turnoff_reset);
-+		goto pm_turnoff_sleep;
-+	}
-+
-+	/* Others poke directly at IOMUXC registers */
-+	switch (imx6_pcie->variant) {
-+	case IMX6SX:
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				IMX6SX_GPR12_PCIE_PM_TURN_OFF,
-+				IMX6SX_GPR12_PCIE_PM_TURN_OFF);
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				IMX6SX_GPR12_PCIE_PM_TURN_OFF, 0);
-+		break;
-+	default:
-+		dev_err(dev, "PME_Turn_Off not implemented\n");
-+		return;
-+	}
- 
- 	/*
- 	 * Components with an upstream port must respond to
- 	 * PME_Turn_Off with PME_TO_Ack but we can't check.
- 	 *
- 	 * The standard recommends a 1-10ms timeout after which to
- 	 * proceed anyway as if acks were received.
- 	 */
-+pm_turnoff_sleep:
- 	usleep_range(1000, 10000);
- }
- 
- static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
- {
- 	clk_disable_unprepare(imx6_pcie->pcie);
- 	clk_disable_unprepare(imx6_pcie->pcie_phy);
- 	clk_disable_unprepare(imx6_pcie->pcie_bus);
- 
--	if (imx6_pcie->variant == IMX7D) {
-+	switch (imx6_pcie->variant) {
-+	case IMX6SX:
-+		clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
-+		break;
-+	case IMX7D:
- 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
- 				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
- 				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
-+		break;
-+	default:
-+		break;
- 	}
- }
- 
-+static inline bool imx6_pcie_supports_suspend(struct imx6_pcie *imx6_pcie)
-+{
-+	return (imx6_pcie->variant == IMX7D ||
-+		imx6_pcie->variant == IMX6SX);
-+}
-+
- static int imx6_pcie_suspend_noirq(struct device *dev)
- {
- 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
- 
--	if (imx6_pcie->variant != IMX7D)
-+	if (!imx6_pcie_supports_suspend(imx6_pcie))
- 		return 0;
- 
- 	imx6_pcie_pm_turnoff(imx6_pcie);
- 	imx6_pcie_clk_disable(imx6_pcie);
- 	imx6_pcie_ltssm_disable(dev);
-@@ -817,11 +851,11 @@ static int imx6_pcie_resume_noirq(struct device *dev)
- {
- 	int ret;
- 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
- 	struct pcie_port *pp = &imx6_pcie->pci->pp;
- 
--	if (imx6_pcie->variant != IMX7D)
-+	if (!imx6_pcie_supports_suspend(imx6_pcie))
- 		return 0;
- 
- 	imx6_pcie_assert_core_reset(imx6_pcie);
- 	imx6_pcie_init_phy(imx6_pcie);
- 	imx6_pcie_deassert_core_reset(imx6_pcie);
-diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-index 6c1ad160ed87..c1b25f5e386d 100644
---- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-+++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-@@ -438,10 +438,11 @@
- #define IMX6SX_GPR5_DISP_MUX_DCIC1_LCDIF1		(0x0 << 1)
- #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS			(0x1 << 1)
- #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK			(0x1 << 1)
- 
- #define IMX6SX_GPR12_PCIE_TEST_POWERDOWN		BIT(30)
-+#define IMX6SX_GPR12_PCIE_PM_TURN_OFF			BIT(16)
- #define IMX6SX_GPR12_PCIE_RX_EQ_MASK			(0x7 << 0)
- #define IMX6SX_GPR12_PCIE_RX_EQ_2			(0x2 << 0)
- 
- /* For imx6ul iomux gpr register field define */
- #define IMX6UL_GPR1_ENET1_CLK_DIR		(0x1 << 17)
--- 
-2.17.1
+You have a bunch of dynamic allocations in here, which you
+then immediately tear down again after the command is complete.
+I can't see at all what you do with the DMA address, since you
+seem to not use the virtual address at all but only store
+the physical address in some kind of descriptor without ever
+writing to it.
+
+Am I missing something here?
+
+> +/* Remoteproc callbacks for SSR events: prepare, start, stop, unprepare */
+> +int ipa_ssr_prepare(struct rproc_subdev *subdev)
+> +{
+> +       printk("======== SSR prepare received ========\n");
+
+I think you mean dev_dbg() here. A plain printk() without a level
+is not correct and we probably don't want those messages to arrive
+on the console for normal users.
+
+> +static int ipa_firmware_load(struct de
+> +
+> +err_clear_dev:
+> +       ipa_ctx->lan_cons_ep_id = 0;
+> +       ipa_ctx->cmd_prod_ep_id = 0;
+> +       ipahal_exit();
+> +err_dma_exit:
+> +       ipa_dma_exit();
+> +err_clear_gsi:
+> +       ipa_ctx->gsi = NULL;
+> +       ipa_ctx->ipa_phys = 0;
+> +       ipa_reg_exit();
+> +err_clear_ipa_irq:
+> +       ipa_ctx->ipa_irq = 0;
+> +err_clear_filter_bitmap:
+> +       ipa_ctx->filter_bitmap = 0;
+> +err_interconnect_exit:
+> +       ipa_interconnect_exit();
+> +err_clock_exit:
+> +       ipa_clock_exit();
+> +       ipa_ctx->dev = NULL;
+> +out_smp2p_exit:
+> +       ipa_smp2p_exit(dev);
+> +
+
+No need to initialize members to zero when you are about
+to free the structure.
+
+> +static struct platform_driver ipa_plat_drv = {
+> +       .probe = ipa_plat_drv_probe,
+> +       .remove = ipa_plat_drv_remove,
+> +       .driver = {
+> +               .name = "ipa",
+> +               .owner = THIS_MODULE,
+> +               .pm = &ipa_pm_ops,
+> +               .of_match_table = ipa_plat_drv_match,
+> +       },
+> +};
+> +
+> +builtin_platform_driver(ipa_plat_drv);
+
+This should be module_platform_driver(), and allow unloading
+the driver.
+
+        Arnd
