@@ -1,50 +1,37 @@
 From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
-Date: Wed, 7 Nov 2018 15:12:32 +0000
-Subject: [PATCH 1/3] dt-bindings: gpio: add sama5d2 PIOBU support
+Date: Wed, 7 Nov 2018 15:12:36 +0000
+Subject: [PATCH 2/3] MAINTAINERS: add maintainer for sama5d2 PIOBU GPIO driver
 In-Reply-To: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
 References: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
-Message-ID: <1541603580-17448-2-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <1541603580-17448-3-git-send-email-andrei.stefanescu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch describes the compatible and the device tree
-bindings necessary for the sama5d2 PIOBU GPIO
-controller driver.
+This patch adds a maintainer for the sama5d2 GPIO controller
+driver.
 
 Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
 ---
- .../bindings/gpio/gpio-sama5d2-piobu.txt           | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt b/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
-new file mode 100644
-index 0000000..791ac51
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
-@@ -0,0 +1,23 @@
-+GPIO controller for SAMA5D2 PIOBU pins.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f485597..88369f1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9760,6 +9760,13 @@ M:	Nicolas Ferre <nicolas.ferre@microchip.com>
+ S:	Supported
+ F:	drivers/power/reset/at91-sama5d2_shdwc.c
+ 
++MICROCHIP SAMA5D2-COMPATIBLE PIOBU GPIO
++M:	Andrei Stefanescu <andrei.stefanescu@microchip.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	linux-gpio at vger.kernel.org
++F:	drivers/gpio/gpio-sama5d2-piobu.c
++F:	Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
 +
-+This pins have the property of not losing their voltage
-+during Backup/Self-refresh mode.
-+
-+These bindings should be set to a node in the dtsi file.
-+
-+Required properties:
-+- compatible:		"syscon", "microchip,sama5d2-piobu"
-+- #gpio-cells:		There are 2. The pin number is the
-+			first, the second represents additional
-+			parameters such as GPIO_ACTIVE_HIGH/LOW.
-+- gpio-controller:	Marks the port as GPIO controller.
-+
-+Example:
-+
-+	secumod at fc040000 {
-+		compatible = "syscon", "microchip,sama5d2-piobu";
-+		reg = <0xfc040000 0x100>;
-+
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
+ MICROCHIP SPI DRIVER
+ M:	Nicolas Ferre <nicolas.ferre@microchip.com>
+ S:	Supported
 -- 
 2.7.4
