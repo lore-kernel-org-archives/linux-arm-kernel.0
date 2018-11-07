@@ -1,26 +1,23 @@
-From: tytso@mit.edu (Theodore Y. Ts'o)
-Date: Wed, 7 Nov 2018 12:17:23 -0500
-Subject: [TECH TOPIC] SoC maintainer group
-In-Reply-To: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
-References: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
-Message-ID: <20181107171723.GI9919@thunk.org>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 7 Nov 2018 09:17:26 -0800
+Subject: [GIT PULL] ARM: SoC fixes
+In-Reply-To: <20181107171023.zoo6qox5eewy3pmk@localhost>
+References: <20181107171023.zoo6qox5eewy3pmk@localhost>
+Message-ID: <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 02:16:27PM -0800, Olof Johansson wrote:
-> 
-> Olof Johansson (arm-soc)
-> Arnd Bergmann (arm-soc)
-> Kevin Hilman (arm-soc)
-> Mike Turquette (clk)
-> Stephen Boyd (clk)
-> Linus Walleij (pinctrl + more)
-> Mike Brown (gpio/regmap + more)
+On Wed, Nov 7, 2018 at 9:10 AM Olof Johansson <olof@lixom.net> wrote:
+>
+> ARM: SoC fixes
 
-Could the poeple listed on this list please list potential schedule conflicts?
+Pulled.
 
-I'm going to assume we should avoid: Andriod uConf, RISC-V uConf,
-Device Tree uConf.  What are other potential conflicts.  I'm going to
-guess this might be "interesting" to schedule.  :-)
+> I was a bit too trigger happy to enable PREEMPT on multi_v7_defconfig,
+> and it ended up regressing at least BeagleBone XM boards.
 
-							- Ted
+Odd. Did it hit some "may_sleep()" test in a driver that is hidden by
+preempt being off? Otherwise I don't see how/why preempt should fail
+in a board-specific manner..
+
+                  Linus
