@@ -1,31 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 7 Nov 2018 21:56:21 +0100 (CET)
-Subject: [PATCH 2/2] mm/sparse: add common helper to mark all memblocks
- present
-In-Reply-To: <20181107123838.1b7234c98a87dec5a2b25e67@linux-foundation.org>
-References: <20181107173859.24096-1-logang@deltatee.com>
- <20181107173859.24096-3-logang@deltatee.com>
- <20181107121207.62cb37cf58484b7cc80a8fd8@linux-foundation.org>
- <724be9bb-59b6-33f3-7b59-3ca644d59bf7@deltatee.com>
- <alpine.DEB.2.21.1811072125280.1666@nanos.tec.linutronix.de>
- <b1cc442e-7314-4a8e-3eec-9adc200d7582@deltatee.com>
- <20181107123838.1b7234c98a87dec5a2b25e67@linux-foundation.org>
-Message-ID: <alpine.DEB.2.21.1811072153590.1666@nanos.tec.linutronix.de>
+From: marc.w.gonzalez@free.fr (Marc Gonzalez)
+Date: Wed, 7 Nov 2018 21:58:08 +0100
+Subject: [PATCH 4/9] arm64: defconfig: Drop USB_ULPI_BUS and
+ USB_CHIPIDEA_ULPI
+In-Reply-To: <e01448e5-9756-00a0-b51d-dbb27fe7c717@free.fr>
+References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
+ <e01448e5-9756-00a0-b51d-dbb27fe7c717@free.fr>
+Message-ID: <f47c510c-9bf4-8b3e-3904-a4caa96b738f@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Nov 2018, Andrew Morton wrote:
-> On Wed, 7 Nov 2018 13:36:34 -0700 Logan Gunthorpe <logang@deltatee.com> wrote:
-> 
-> > > Actually if both names suck, then there also is the option to rename both
-> > > instead of adding a comment to explain the suckage.
-> > 
-> > Ok, well, I wasn't expecting to take on a big rename like that as it
-> > would create a patch touching a bunch of arches and mm files... But if
-> > we can come to some agreement on a better name and someone is willing to
-> > take that patch without significant delay then I'd be happy to create
-> > the patch and add it to the start of my series.
-> 
-> Some other time ;)
+[ Add interested parties ]
 
-More precise: Manjana. You live way too close to Mexico :)
+On 07/11/2018 21:15, Marc Gonzalez wrote:
+
+> Commit a930d8bd94d8 ("usb: chipidea: Always build ULPI code")
+> 
+> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+> ---
+>  arch/arm64/configs/defconfig | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 58741c07a6ef..6fe418d72337 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -528,7 +528,6 @@ CONFIG_USB_DWC2=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_UDC=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+> -CONFIG_USB_CHIPIDEA_ULPI=y
+>  CONFIG_USB_ISP1760=y
+>  CONFIG_USB_HSIC_USB3503=y
+>  CONFIG_NOP_USB_XCEIV=y
+> @@ -536,7 +535,6 @@ CONFIG_USB_ULPI=y
+>  CONFIG_USB_GADGET=y
+>  CONFIG_USB_RENESAS_USBHS_UDC=m
+>  CONFIG_USB_RENESAS_USB3=m
+> -CONFIG_USB_ULPI_BUS=y
+>  CONFIG_MMC=y
+>  CONFIG_MMC_BLOCK_MINORS=32
+>  CONFIG_MMC_ARMMMCI=y
+> 
