@@ -1,37 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed,  7 Nov 2018 15:53:49 +0100
-Subject: [GIT PULL 2/3] soc/tegra: Updates for v4.20-rc2
-In-Reply-To: <20181107145350.29127-1-thierry.reding@gmail.com>
-References: <20181107145350.29127-1-thierry.reding@gmail.com>
-Message-ID: <20181107145350.29127-3-thierry.reding@gmail.com>
+From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
+Date: Wed, 7 Nov 2018 14:54:17 +0000
+Subject: [PATCH 2/4] power: reset: at91-poweroff: move shdwc related data
+ to one structure
+In-Reply-To: <20181106210933.GU24212@piout.net>
+References: <1541416443-4321-1-git-send-email-claudiu.beznea@microchip.com>
+ <1541416443-4321-3-git-send-email-claudiu.beznea@microchip.com>
+ <20181106210933.GU24212@piout.net>
+Message-ID: <6719a808-e704-3c63-f592-3b90d44ccbfe@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Hi Alexandre,
 
-The following changes since commit 4a37f11c8f57ffd6f7397eaf372109d67edd3769:
+On 06.11.2018 23:09, Alexandre Belloni wrote:
+> Hi Claudiu,
+> 
+> On 05/11/2018 11:14:26+0000, Claudiu.Beznea at microchip.com wrote:
+>>  static int __init at91_poweroff_probe(struct platform_device *pdev)
+>> @@ -154,16 +160,22 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
+>>  	u32 ddr_type;
+>>  	int ret;
+>>  
+>> +	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
+>> +	if (!at91_shdwc)
+>> +		return -ENOMEM;
+>> +
+> 
+> Is there any real benefit that will offset the time lost for that
+> allocation at boot time?
 
-  soc/tegra: pmc: Implement pad configuration via pinctrl (2018-08-27 12:25:18 +0200)
+No, I haven't run benchmarks on this. I only wanted to have them grouped in
+one structure. Please let me know if you have some tests in mind.
 
-are available in the Git repository at:
+> 
+> I understand you are then testing at91_shdwc to know whether the driver
+> already probed once. But, the driver will never probe twice as there is
+> only one shutdown controller on the SoC and anyway, If it was to probe
+> twice, it will still work as expected.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-rc2-soc
+I had in mind the scenario where the driver would be compiled as module. I
+know insmod already does this checking. I'm ok to remove this checking. I
+will do it in next version. With this I will also remove devm_kzalloc() of
+at91_shdwc.
 
-for you to fetch changes up to 87f9bf3040485ff13e6a5c1c83d0cc46165bdf9c:
+Thank you,
+Claudiu Beznea
 
-  soc/tegra: pmc: Don't power-up XUSB power-domains (2018-10-25 14:30:45 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-soc/tegra: Updates for v4.20-rc2
-
-Contains a single change to remove a workaround that's no longer needed.
-
-----------------------------------------------------------------
-Jon Hunter (1):
-      soc/tegra: pmc: Don't power-up XUSB power-domains
-
- drivers/soc/tegra/pmc.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+> 
+> 
