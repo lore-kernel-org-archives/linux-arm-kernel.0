@@ -1,93 +1,44 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Wed, 7 Nov 2018 20:26:25 +0000
-Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
-In-Reply-To: <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
-References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
- <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
- <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
- <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
- <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
-Message-ID: <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 7 Nov 2018 21:26:42 +0100 (CET)
+Subject: [PATCH 2/2] mm/sparse: add common helper to mark all memblocks
+ present
+In-Reply-To: <724be9bb-59b6-33f3-7b59-3ca644d59bf7@deltatee.com>
+References: <20181107173859.24096-1-logang@deltatee.com>
+ <20181107173859.24096-3-logang@deltatee.com>
+ <20181107121207.62cb37cf58484b7cc80a8fd8@linux-foundation.org>
+ <724be9bb-59b6-33f3-7b59-3ca644d59bf7@deltatee.com>
+Message-ID: <alpine.DEB.2.21.1811072125280.1666@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 11:01:02AM -0800, Stephen Boyd wrote:
-> Quoting Abel Vesa (2018-11-07 03:54:45)
-> > On Wed, Oct 17, 2018 at 12:55:52PM -0700, Stephen Boyd wrote:
-> > > Quoting Abel Vesa (2018-09-24 03:39:55)
-> > > > +static unsigned long clk_pll2_recalc_rate(struct clk_hw *hw,
-> > > > +                                        unsigned long parent_rate)
-> > > > +{
-> > > > +       struct clk_sccg_pll *pll = to_clk_sccg_pll(hw);
-> > > > +       u32 val, ref, divr1, divf1, divr2, divf2;
-> > > > +       u64 temp64;
-> > > > +
-> > > > +       val = readl_relaxed(pll->base + PLL_CFG0);
-> > > > +       switch (FIELD_GET(PLL_REF_MASK, val)) {
-> > > > +       case 0:
-> > > > +               ref = OSC_25M;
-> > > > +               break;
-> > > > +       case 1:
-> > > > +               ref = OSC_27M;
-> > > > +               break;
-> > > > +       default:
-> > > > +               ref = OSC_25M;
-> > > 
-> > > Does this information not come through 'parent_rate'?
-> > > 
+Logan,
+
+On Wed, 7 Nov 2018, Logan Gunthorpe wrote:
+> On 2018-11-07 1:12 p.m., Andrew Morton wrote:
+> >> +void __init memblocks_present(void)
+> >> +{
+> >> +	struct memblock_region *reg;
+> >> +
+> >> +	for_each_memblock(memory, reg) {
+> >> +		memory_present(memblock_get_region_node(reg),
+> >> +			       memblock_region_memory_base_pfn(reg),
+> >> +			       memblock_region_memory_end_pfn(reg));
+> >> +	}
+> >> +}
+> >> +
 > > 
-> > No. So basically both pll1 and pll2 and the divider after it form together this SCCG:
-> > 
-> > https://www.nxp.com/docs/en/reference-manual/IMX8MDQLQRM.pdf#page=834
-> > 
-> > See: Figure 5-8. SSCG PLL Block Diagram
+> > I don't like the name much.  To me, memblocks_present means "are
+> > memblocks present" whereas this actually means "memblocks are present".
+> > But whatever.  A little covering comment which describes what this
+> > does and why it does it would be nice.
 > 
-> Thanks for the link!
-> 
-> > 
-> > We're basically reading the input of the pll 1 in order to compute the output of the entire SCCG.
-> > 
-> > I know it's a mess. I'm working on cleaning it up, but for now we need this in in order to boot up.
-> 
-> What's the plan to clean it up?
+> The same argument can be made about the existing memory_present()
+> function and I think it's worth keeping the naming consistent. I'll add
+> a comment and resend shortly.
 
-So I'm doing this in our internal tree first to make sure I don't break the
-other (newer) socs.
+Actually if both names suck, then there also is the option to rename both
+instead of adding a comment to explain the suckage.
 
-I already have a prototype in testing but it's a long way to upstream it.
+Thanks,
 
-Basically, I'm replacing all of this with a single, more like a composite,
-more complex, clock type that does all the magic inside.
-
-One of the problems is the fact that the bypasses can have the same sources
-and in my case, I'm implementing that as a list of parents name, but the
-parent names list doesn't work with duplicates, so I have to find some other
-way to do it.
-
-Once I have something clean and tested enough I'll send it upstream.
-
-> 
-> > 
-> > > > +               break;
-> > > > +       }
-> > > > +
-> > > > +       val = readl_relaxed(pll->base + PLL_CFG2);
-> > > > +       divr1 = FIELD_GET(PLL_DIVR1_MASK, val);
-> > > > +       divr2 = FIELD_GET(PLL_DIVR2_MASK, val);
-> > > > +       divf1 = FIELD_GET(PLL_DIVF1_MASK, val);
-> > > > +       divf2 = FIELD_GET(PLL_DIVF2_MASK, val);
-> > > > +
-> > > > +       temp64 = ref * 2;
-> > > > +       temp64 *= (divf1 + 1) * (divf2 + 1);
-> > > > +
-> > > > +       do_div(temp64, (divr1 + 1) * (divr2 + 1));
-> > > 
-> > > Nitpicks: A comment with the equation may be helpful to newcomers.
-> > 
-> > Since the SCCG is contructed by multiple different types of clocks here, the equation doesn't help
-> > since it is spread in all constructing blocks.
-> 
-> Ok.
-> 
-
--- 
+	tglx
