@@ -1,33 +1,32 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  7 Nov 2018 16:08:52 -0700
-Subject: [PATCH v2 4/4] coresight: etm3x: Release CLAIM tag when operated from
- perf
-In-Reply-To: <1541632132-1252-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1541632132-1252-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1541632132-1252-5-git-send-email-mathieu.poirier@linaro.org>
+From: marc.w.gonzalez@free.fr (Marc Gonzalez)
+Date: Wed, 7 Nov 2018 23:39:19 +0100
+Subject: [PATCH v2 0/9] Regenerate arm64 defconfig for current kernel
+Message-ID: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch deals with the release of the CLAIM tag when the ETM is
-operated from perf.  Otherwise the tag is left asserted and subsequent
-requests to use the device fail.
+Hello ARM maintainers,
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm3x.c | 1 +
- 1 file changed, 1 insertion(+)
+v2: Improve commit message for a few patches
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 4f638d81a66a..d7f452e62193 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -602,6 +602,7 @@ static void etm_disable_perf(struct coresight_device *csdev)
- 	 * power down the tracer.
- 	 */
- 	etm_set_pwrdwn(drvdata);
-+	coresight_disclaim_device_unlocked(drvdata->base);
- 
- 	CS_LOCK(drvdata->base);
- }
+The set of Kconfig options slowly changes with every kernel version.
+This patch series regenerates the arm64 defconfig for v4.20
+No functional change intended, except adding PINCTRL_MTK_MOORE to
+keep PINCTRL_MT7622.
+
+Marc Gonzalez (9):
+  arm64: defconfig: Regenerate for v4.20
+  arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+  arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
+  arm64: defconfig: Drop USB_ULPI_BUS and USB_CHIPIDEA_ULPI
+  arm64: defconfig: Replace PINCTRL_MT7622 with PINCTRL_MTK_MOORE
+  arm64: defconfig: Drop redundant SND_SOC_ROCKCHIP_I2S
+  arm64: defconfig: Drop CRYPTO_DEV_FSL_DPAA2_CAAM
+  arm64: defconfig: Change SCSI_UFS_HISI=m
+  arm64: defconfig: Drop redundant sound codec options
+
+ arch/arm64/configs/defconfig | 105 +++++++++++++++--------------------
+ 1 file changed, 46 insertions(+), 59 deletions(-)
+
 -- 
-2.7.4
+2.17.1
