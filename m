@@ -1,37 +1,30 @@
 From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Wed, 7 Nov 2018 21:15:29 +0100
-Subject: [PATCH 3/9] arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
+Date: Wed, 7 Nov 2018 21:14:57 +0100
+Subject: [PATCH 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
 In-Reply-To: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
 References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
-Message-ID: <ddf4d390-c631-c5ef-03dc-a0579a21d484@free.fr>
+Message-ID: <596a4b64-e2ef-878d-0873-dd59d14c2d85@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a0ae2562c6c4 ("netfilter: conntrack: remove l3proto abstraction")
+Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
 
 Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
 ---
- arch/arm64/configs/defconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 8d6878c1e794..58741c07a6ef 100644
+index f786c95504d3..8d6878c1e794 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -156,14 +156,12 @@ CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
- CONFIG_NETFILTER_XT_TARGET_LOG=m
- CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
- CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
--CONFIG_NF_CONNTRACK_IPV4=m
- CONFIG_IP_NF_IPTABLES=m
- CONFIG_IP_NF_FILTER=m
- CONFIG_IP_NF_TARGET_REJECT=m
- CONFIG_IP_NF_NAT=m
- CONFIG_IP_NF_TARGET_MASQUERADE=m
- CONFIG_IP_NF_MANGLE=m
--CONFIG_NF_CONNTRACK_IPV6=m
- CONFIG_IP6_NF_IPTABLES=m
- CONFIG_IP6_NF_FILTER=m
- CONFIG_IP6_NF_TARGET_REJECT=m
+@@ -107,7 +107,6 @@ CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+ CONFIG_CPUFREQ_DT=y
+ CONFIG_ACPI_CPPC_CPUFREQ=m
+ CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
+-CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
+ CONFIG_ARM_SCPI_CPUFREQ=y
+ CONFIG_ARM_TEGRA186_CPUFREQ=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
 -- 
 2.17.1
