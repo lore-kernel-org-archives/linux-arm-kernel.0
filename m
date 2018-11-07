@@ -1,33 +1,58 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 7 Nov 2018 09:50:57 +0100
-Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
- device nodes
-In-Reply-To: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
-References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20181107085056.GB31092@kunai>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 7 Nov 2018 08:51:07 +0000
+Subject: [PATCH] ARM: dts: imx6sx: specify proper clock for nodes with dummy
+ clock
+Message-ID: <1541580363-3968-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 09:46:47PM +0100, Marek Vasut wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> 
-> This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC
-> and enables SD card slot connected to SDHI0, micro SD card slot
-> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board
-> using the R8A77990 SoC.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+>From i.MX6SX reference manual CCM chapter, KPP and
+WDOGn use IPG clock as their clock, specify IPG
+clock for KPP and WDOGn instead of DUMMY clock.
 
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6sx.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Out of curiosity: have you tested HS400 on that board based on Niklas'
-recent patches as well?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/2d5d77be/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 84b7687..07ea7d9 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -558,7 +558,7 @@
+ 				compatible = "fsl,imx6sx-kpp", "fsl,imx21-kpp";
+ 				reg = <0x020b8000 0x4000>;
+ 				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX6SX_CLK_DUMMY>;
++				clocks = <&clks IMX6SX_CLK_IPG>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -566,14 +566,14 @@
+ 				compatible = "fsl,imx6sx-wdt", "fsl,imx21-wdt";
+ 				reg = <0x020bc000 0x4000>;
+ 				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX6SX_CLK_DUMMY>;
++				clocks = <&clks IMX6SX_CLK_IPG>;
+ 			};
+ 
+ 			wdog2: wdog at 20c0000 {
+ 				compatible = "fsl,imx6sx-wdt", "fsl,imx21-wdt";
+ 				reg = <0x020c0000 0x4000>;
+ 				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX6SX_CLK_DUMMY>;
++				clocks = <&clks IMX6SX_CLK_IPG>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -1270,7 +1270,7 @@
+ 				compatible = "fsl,imx6sx-wdt", "fsl,imx21-wdt";
+ 				reg = <0x02288000 0x4000>;
+ 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX6SX_CLK_DUMMY>;
++				clocks = <&clks IMX6SX_CLK_IPG>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.7.4
