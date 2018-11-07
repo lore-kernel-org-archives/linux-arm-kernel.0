@@ -1,63 +1,49 @@
-From: frieder.schrempf@kontron.de (Frieder Schrempf)
-Date: Wed,  7 Nov 2018 15:43:23 +0100
-Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver under
- the SPI framework
-In-Reply-To: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
-References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
-Message-ID: <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 7 Nov 2018 14:53:49 +0000
+Subject: [PATCH 1/2] regulator: act8945: Implement PM functionalities
+In-Reply-To: <1540570753-16370-2-git-send-email-claudiu.beznea@microchip.com>
+References: <1540570753-16370-1-git-send-email-claudiu.beznea@microchip.com>
+ <1540570753-16370-2-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20181107145349.GA6809@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frieder Schrempf <frieder.schrempf@exceet.de>
+On Fri, Oct 26, 2018 at 04:19:48PM +0000, Claudiu.Beznea at microchip.com wrote:
 
-The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
-at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
+> +static unsigned int act8945a_of_map_mode(unsigned int mode)
+> +{
+> +	if (mode == ACT8945A_DCDC_MODE_POWER_SAVING)
+> +		return REGULATOR_MODE_STANDBY;
+> +
+> +	return REGULATOR_MODE_NORMAL;
+> +}
 
-Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
----
- arch/arm/configs/imx_v6_v7_defconfig | 2 +-
- arch/arm/configs/multi_v7_defconfig  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+This should error out if it gets an unknown value rather than silently
+mapping it to normal - we don't know what the user intended to set here.
+There should also be some binding documentation updates saying what the
+values that can be set are.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 1ad5736..1741d87 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -113,7 +113,6 @@ CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_MTD_NAND_VF610_NFC=y
- CONFIG_MTD_NAND_MXC=y
- CONFIG_MTD_SPI_NOR=y
--CONFIG_SPI_FSL_QUADSPI=y
- CONFIG_MTD_UBI=y
- CONFIG_MTD_UBI_FASTMAP=y
- CONFIG_MTD_UBI_BLOCK=y
-@@ -204,6 +203,7 @@ CONFIG_I2C_ALGOPCA=m
- CONFIG_I2C_GPIO=y
- CONFIG_I2C_IMX=y
- CONFIG_SPI=y
-+CONFIG_SPI_FSL_QSPI=y
- CONFIG_SPI_GPIO=y
- CONFIG_SPI_IMX=y
- CONFIG_SPI_FSL_DSPI=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 1c76168..faddf29 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -193,7 +193,6 @@ CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_VF610_NFC=y
- CONFIG_MTD_NAND_DAVINCI=y
- CONFIG_MTD_SPI_NOR=y
--CONFIG_SPI_FSL_QUADSPI=m
- CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
-@@ -383,6 +382,7 @@ CONFIG_SPI_BCM2835=y
- CONFIG_SPI_BCM2835AUX=y
- CONFIG_SPI_CADENCE=y
- CONFIG_SPI_DAVINCI=y
-+CONFIG_SPI_FSL_QSPI=m
- CONFIG_SPI_GPIO=m
- CONFIG_SPI_FSL_DSPI=m
- CONFIG_SPI_OMAP24XX=y
--- 
-2.7.4
+> +static void act8945a_pmic_shutdown(struct platform_device *pdev)
+> +{
+> +	struct act8945a_pmic *act8945a = platform_get_drvdata(pdev);
+> +	struct regmap *regmap = act8945a->regmap;
+> +
+> +	/*
+> +	 * Ask the PMIC to shutdown everything on the next PWRHLD transition.
+> +	 */
+> +	regmap_write(regmap, ACT8945A_SYS_CTRL, 0x0);
+>  }
+>  
+
+This shutdown function appears to be independant of the mode setting and
+would be better split out as a separate patch (you could have one patch
+adding the regmap stuff, one for this and one for the mode setting).
+It makes review a lot simpler if each patch does a minimal set of
+changes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/01b2e8ea/attachment.sig>
