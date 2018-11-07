@@ -1,33 +1,45 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 7 Nov 2018 16:56:21 +0100
-Subject: [PATCH v10 00/22] kasan: add software tag-based mode for arm64
-In-Reply-To: <20181107153456.GE2623@brain-police>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <CAAeHK+yOsP7V0gPu7EpqCbJZqbGQMZbAp6q1+=0dNGC24reyWg@mail.gmail.com>
- <20181107145922.GD2623@brain-police>
- <CAAeHK+zNgv9WxRpf7N3gmsLYGL6oUALAnyerMzeYZUz1LhoUuA@mail.gmail.com>
- <20181107153456.GE2623@brain-police>
-Message-ID: <CAAeHK+yRAVo5S1Fb__uzK=drpXRBuB8-KvL8yQL8sfUG-Tr1Mw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Nov 2018 08:02:17 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.20
+In-Reply-To: <cover.1541514075.git.horms+renesas@verge.net.au>
+References: <cover.1541514075.git.horms+renesas@verge.net.au>
+Message-ID: <CAOesGMjosJGENSm8jjAaZxcr4ehjBB5LF7OQ8PJR-J2kMktfWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 4:34 PM, Will Deacon <will.deacon@arm.com> wrote:
+On Wed, Nov 7, 2018 at 3:25 AM Simon Horman <horms+renesas@verge.net.au> wrote:
 >
-> I would like the patches that touch code under arch/arm64/ to be reviewed by
-> somebody from the arm64 community. Since the core parts have already been
-> reviewed, I was suggesting that you could split them out so that they are
-> not blocked by the architecture code. Is it not possible to preserve the
-> existing KASAN behaviour for arm64 with the core parts merged? I figured it
-> must be, since you're not touching any other architectures here and they
-> assumedly continue to function correctly.
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> Please consider these Renesas ARM based SoC fixes for v4.20.
+>
+>
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+>
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.20
+>
+> for you to fetch changes up to eab53fdfd60a84b0cc514d4f1f5d79226c76df01:
+>
+>   arm64: dts: renesas: condor: switch from EtherAVB to GEther (2018-11-05 15:08:44 +0100)
+>
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Fixes for v4.20
+>
+> * R-Car V3H (r8a77980) based Condor board
+>   - Switch from EtherAVB to GEther to match offical boards
+>
+> * RZ/G2E (ra8774c0) SoC: correct documentation of part number
 
-It's possible to split out the core mm part, but it doesn't make much
-sense to merge it separately from the arm64 changes.
+I have to admit, Renesas part numbers have got to be _really_ hard to
+deal with for anyone who has even the slightest hint of dyslexia. :-)
 
-> However, if you'd rather keep everything together, please can we give it a
-> couple of weeks so we can at least get the architecture bits reviewed? Most
-> people are out at LPC next week (and I'm at another conference this week).
+> * R-Car H3 (r8a7795) SoC: reinstate all DMA channels on HSCIF2
 
-OK, sounds good!
+Thanks Simon! I've merged this branch now.
 
-Catalin, could you take a look at the arm64 specific changes?
+
+-Olof
