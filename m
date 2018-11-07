@@ -1,39 +1,42 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed,  7 Nov 2018 19:18:40 +0100
-Subject: [PATCH v3 5/8] dt-bindings: Add bindings for the LeMaker
- BL035-RGB-002 LCD panel
+Date: Wed,  7 Nov 2018 19:18:42 +0100
+Subject: [PATCH NOT FOR MERGE v3 7/8] ARM: dts: sun7i: Add pinmux
+ configuration for LCD0 RGB888 pins
 In-Reply-To: <20181107181843.27628-1-contact@paulk.fr>
 References: <20181107181843.27628-1-contact@paulk.fr>
-Message-ID: <20181107181843.27628-6-contact@paulk.fr>
+Message-ID: <20181107181843.27628-8-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device-tree bindings for the LeMaker BL035-RGB-002 3.5"
-QVGA TFT LCD panel, compatible with simple-panel.
+This adds the pin muxing definition for configuring the PD pins in LCD0
+mode for a RGB888 format to the sun7i device-tree.
 
 Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 ---
- .../bindings/display/panel/lemaker,bl035-rgb-002.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt
+ arch/arm/boot/dts/sun7i-a20.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt b/Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt
-new file mode 100644
-index 000000000000..74ee7ea6b493
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt
-@@ -0,0 +1,12 @@
-+LeMaker BL035-RGB-002 3.5" QVGA TFT LCD panel
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 9c52712af241..26f3714eaad0 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -811,6 +811,17 @@
+ 				function = "ir1";
+ 			};
+ 
++			lcd0_rgb888_pins: lcd0-rgb888 {
++				pins = "PD0", "PD1", "PD2", "PD3",
++				       "PD4", "PD5", "PD6", "PD7",
++				       "PD8", "PD9", "PD10", "PD11",
++				       "PD12", "PD13", "PD14", "PD15",
++				       "PD16", "PD17", "PD18", "PD19",
++				       "PD20", "PD21", "PD22", "PD23",
++				       "PD24", "PD25", "PD26", "PD27";
++				function = "lcd0";
++			};
 +
-+Required properties:
-+- compatible: should be "lemaker,bl035-rgb-002"
-+- power-supply: as specified in the base binding
-+
-+Optional properties:
-+- backlight: as specified in the base binding
-+- enable-gpios: as specified in the base binding
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
+ 			mmc0_pins_a: mmc0 at 0 {
+ 				pins = "PF0", "PF1", "PF2",
+ 				       "PF3", "PF4", "PF5";
 -- 
 2.19.1
