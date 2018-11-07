@@ -1,95 +1,61 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  7 Nov 2018 15:16:11 +0100
-Subject: [PATCH v2 6/6] efi: reduce the amount of memblock reservations for
- persistent allocations
+Date: Wed,  7 Nov 2018 15:16:08 +0100
+Subject: [PATCH v2 3/6] ARM: mm: permit early_memremap() to be used in
+ paging_init()
 In-Reply-To: <20181107141611.12076-1-ard.biesheuvel@linaro.org>
 References: <20181107141611.12076-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181107141611.12076-7-ard.biesheuvel@linaro.org>
+Message-ID: <20181107141611.12076-4-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of efi_mem_reserve_persistent() is rather
-naive, in the sense that for each invocation, it creates a separate
-linked list entry to describe the reservation. Since the linked list
-entries themselves need to persist across subsequent kexec reboots,
-every reservation created this way results in two memblock_reserve()
-calls at the next boot.
+early_memremap() and early_ioremap() rely on early fixmap support,
+which shares its virtual address space with kmap(), and so it is
+taken down in paging_init().
 
-On arm64 systems with 100s of CPUs, this may result in a excessive
-number of memblock reservations, and needless fragmentation.
+In order to permit the EFI persistent memory reservation code to
+use early_memremap() when called from paging_init(), move the call
+to early_ioremap_reset() into paging_init(), right before the call
+to early_fixmap_shutdown(), creating a window where we can add the
+call to efi_apply_persistent_mem_reservations() in a subsequent patch.
 
-So instead, make use of the newly updated struct linux_efi_memreserve
-layout to put multiple reservations into a single linked list entry.
-This should get rid of the numerous tiny memblock reservations, and
-effectively cut the total number of reservations in half on arm64
-systems with many CPUs.
-
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/efi.c | 29 ++++++++++++++------
- include/linux/efi.h        |  3 ++
- 2 files changed, 24 insertions(+), 8 deletions(-)
+ arch/arm/kernel/setup.c | 2 --
+ arch/arm/mm/mmu.c       | 2 ++
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 59f8ac93c759..347028cb392f 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -978,22 +978,35 @@ static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
- int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
- {
- 	struct linux_efi_memreserve *rsv, *parent;
--	int rsvsize = EFI_MEMRESERVE_SIZE(1);
-+	unsigned long prsv;
-+	int index;
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index ac7e08886863..2f85cce38333 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1114,8 +1114,6 @@ void __init setup_arch(char **cmdline_p)
+ 	/* Memory may have been removed so recalculate the bounds. */
+ 	adjust_lowmem_bounds();
  
- 	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
- 		return -ENODEV;
- 
--	rsv = kmalloc(rsvsize, GFP_KERNEL);
--	if (!rsv)
--		return -ENOMEM;
+-	early_ioremap_reset();
 -
- 	parent = memremap(efi.mem_reserve, sizeof(*rsv), MEMREMAP_WB);
--	if (!parent) {
--		kfree(rsv);
-+	if (!parent)
- 		return -ENOMEM;
-+
-+	/* first try to find a slot in an existing linked list entry */
-+	for (prsv = parent->next; prsv; prsv = rsv->next) {
-+		rsv = __va(prsv);
-+		index = atomic_fetch_add_unless(&rsv->count, 1, rsv->size);
-+		if (index < rsv->size) {
-+			rsv->entry[index].base = addr;
-+			rsv->entry[index].size = size;
-+
-+			memunmap(parent);
-+			return 0;
-+		}
- 	}
+ 	paging_init(mdesc);
+ 	request_standard_resources(mdesc);
  
--	rsv->size = 1;
-+	/* no slot found - allocate a new linked list entry */
-+	rsv = (struct linux_efi_memreserve *)__get_free_page(GFP_KERNEL);
-+	if (!rsv)
-+		return -ENOMEM;
-+
-+	rsv->size = EFI_MEMRESERVE_COUNT(PAGE_SIZE);
- 	atomic_set(&rsv->count, 1);
- 	rsv->entry[0].base = addr;
- 	rsv->entry[0].size = size;
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index dfce82b2ca8a..1a1a081f7244 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1727,4 +1727,7 @@ struct linux_efi_memreserve {
- #define EFI_MEMRESERVE_SIZE(count) (sizeof(struct linux_efi_memreserve) + \
- 	(count) * sizeof(((struct linux_efi_memreserve *)0)->entry[0]))
- 
-+#define EFI_MEMRESERVE_COUNT(size) (((size) - sizeof(struct linux_efi_memreserve)) \
-+	/ sizeof(((struct linux_efi_memreserve *)0)->entry[0]))
-+
- #endif /* _LINUX_EFI_H */
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index f6bf6686559d..078f82f89fe5 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -22,6 +22,7 @@
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
++#include <asm/early_ioremap.h>
+ #include <asm/fixmap.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+@@ -1628,6 +1629,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ 	memblock_set_current_limit(arm_lowmem_limit);
+ 	memblock_allow_resize();
+ 	dma_contiguous_remap();
++	early_ioremap_reset();
+ 	early_fixmap_shutdown();
+ 	devicemaps_init(mdesc);
+ 	kmap_init();
 -- 
 2.19.1
