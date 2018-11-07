@@ -1,31 +1,38 @@
 From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Wed, 7 Nov 2018 23:39:42 +0100
-Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+Date: Wed, 7 Nov 2018 23:39:53 +0100
+Subject: [PATCH v2 3/9] arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
 In-Reply-To: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
 References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
-Message-ID: <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
+Message-ID: <a0209bbf-52b2-e3dc-1e76-4ef02263fff5@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
-dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
+Commit a0ae2562c6c4 ("netfilter: conntrack: remove l3proto abstraction")
+folded NF_CONNTRACK_IPV4 and NF_CONNTRACK_IPV6 into NF_CONNTRACK.
 
 Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
 ---
- arch/arm64/configs/defconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/configs/defconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f786c95504d3..8d6878c1e794 100644
+index 8d6878c1e794..58741c07a6ef 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -107,7 +107,6 @@ CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
- CONFIG_CPUFREQ_DT=y
- CONFIG_ACPI_CPPC_CPUFREQ=m
- CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
--CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
- CONFIG_ARM_SCPI_CPUFREQ=y
- CONFIG_ARM_TEGRA186_CPUFREQ=y
- CONFIG_ARM_SCPI_PROTOCOL=y
+@@ -156,14 +156,12 @@ CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
+ CONFIG_NETFILTER_XT_TARGET_LOG=m
+ CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
+ CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
+-CONFIG_NF_CONNTRACK_IPV4=m
+ CONFIG_IP_NF_IPTABLES=m
+ CONFIG_IP_NF_FILTER=m
+ CONFIG_IP_NF_TARGET_REJECT=m
+ CONFIG_IP_NF_NAT=m
+ CONFIG_IP_NF_TARGET_MASQUERADE=m
+ CONFIG_IP_NF_MANGLE=m
+-CONFIG_NF_CONNTRACK_IPV6=m
+ CONFIG_IP6_NF_IPTABLES=m
+ CONFIG_IP6_NF_FILTER=m
+ CONFIG_IP6_NF_TARGET_REJECT=m
 -- 
 2.17.1
