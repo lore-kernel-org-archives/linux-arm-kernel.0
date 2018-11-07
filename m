@@ -1,90 +1,64 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 7 Nov 2018 12:49:30 +0100
-Subject: [PATCH v6 6/6] drm/bridge: add PHY initialization in mhdp8546
- driver.
-In-Reply-To: <1539034953-11274-7-git-send-email-dkos@cadence.com>
-References: <1539034953-11274-1-git-send-email-dkos@cadence.com>
- <CGME20181008214506epcas2p2cf110c14fcc340c42e1c6da4b03d8901@epcas2p2.samsung.com>
- <1539034953-11274-7-git-send-email-dkos@cadence.com>
-Message-ID: <df739067-b1a6-2eda-cb75-e008a0e02534@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2018 12:50:29 +0100
+Subject: [RFC PATCH 01/12] dt-bindings: soc: qcom: add IPA bindings
+In-Reply-To: <20181107003250.5832-2-elder@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-2-elder@linaro.org>
+Message-ID: <CAK8P3a1rXwADsgVJ4EAtV3u_qg840tfGnbKcyxuBXDB10sYi3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.2018 23:42, Damian Kos wrote:
-> This patch modifies the mhdp8546 driver to initialize sd0801 "Torrent" PHY.
+On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
 >
-> And removes the dbg_regs field from cdns_mhdp_device structure.
+> Add the binding definitions for the "qcom,ipa" and "qcom,rmnet-ipa"
+> device tree nodes.
 >
-> Signed-off-by: Damian Kos <dkos@cadence.com>
+> Signed-off-by: Alex Elder <elder@linaro.org>
 > ---
->  drivers/gpu/drm/bridge/cdns-mhdp.c    | 9 +++++++++
->  include/drm/bridge/cdns-mhdp-common.h | 1 -
->  2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/bridge/cdns-mhdp.c b/drivers/gpu/drm/bridge/cdns-mhdp.c
-> index 48ac5cf1e031..caaf3c17d74f 100644
-> --- a/drivers/gpu/drm/bridge/cdns-mhdp.c
-> +++ b/drivers/gpu/drm/bridge/cdns-mhdp.c
-> @@ -17,6 +17,7 @@
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
-> +#include <linux/phy/phy.h>
->  
->  #include <drm/drm_atomic_helper.h>
->  #include <drm/drm_bridge.h>
-> @@ -1220,6 +1221,12 @@ static int mhdp_probe(struct platform_device *pdev)
->  	if (IS_ERR(mhdp->regs))
->  		return PTR_ERR(mhdp->regs);
->  
-> +	mhdp->phy = devm_phy_get(&pdev->dev, "dpphy");
+>  .../devicetree/bindings/soc/qcom/qcom,ipa.txt | 136 ++++++++++++++++++
+>  .../bindings/soc/qcom/qcom,rmnet-ipa.txt      |  15 ++
+>  2 files changed, 151 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt
+>  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,rmnet-ipa.txt
 
+I think this should go into bindings/net instead of bindings/soc, since it's
+mostly about networking rather than a specific detail of managing the SoC
+itself.
 
-It is not documented in the bindings.
-
-
-> +	if (IS_ERR(mhdp->phy)) {
-> +		dev_err(&pdev->dev, "no PHY configured\n");
-
-
-dev_err only if err != -EPROBE_DEFER
-
-
-> +		return PTR_ERR(mhdp->phy);
-> +	}
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt
+> new file mode 100644
+> index 000000000000..d4d3d37df029
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt
+> @@ -0,0 +1,136 @@
+> +Qualcomm IPA (IP Accelerator) Driver
 > +
->  	platform_set_drvdata(pdev, mhdp);
->  
->  	ret = load_firmware(mhdp, FW_NAME, CDNS_MHDP_IMEM);
-> @@ -1291,6 +1298,8 @@ static int mhdp_probe(struct platform_device *pdev)
->  			   mhdp->dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
->  			   &codec_data, sizeof(codec_data));
->  
-> +	phy_init(mhdp->phy);
-> +
+> +This binding describes the Qualcomm IPA.  The IPA is capable of offloading
+> +certain network processing tasks (e.g. filtering, routing, and NAT) from
+> +the main processor.  The IPA currently serves only as a network interface,
+> +providing access to an LTE network available via a modem.
 
+That doesn't belong into the binding. Say what the hardware can do here,
+not what a specific implementation of the driver does at this moment.
+The binding should be written in an OS independent way after all.
 
-Beside this:
+> +- interrupts-extended:
+> +       Specifies the IRQs used by the IPA.  Four cells are required,
+> +       specifying: the IPA IRQ; the GSI IRQ; the clock query interrupt
+> +       from the modem; and the "ready for stage 2 initialization"
+> +       interrupt from the modem.  The first two are hardware IRQs; the
+> +       third and fourth are SMP2P input interrupts.
 
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+You mean 'four interrupts', not 'four cells' -- each interrupt specifier
+already consists of at least two cells (one for the phandle to the
+irqchip, plus one or more cells to describe that interrupt).
 
-?--
-Regards
-Andrzej
+> +- interconnects:
+> +       Specifies the interconnects used by the IPA.  Three cells are
+> +       required, specifying:  the path from the IPA to memory; from
+> +       IPA to internal (SoC resident) memory; and between the AP
+> +       subsystem and IPA for register access.
 
+Same here and in the rest.
 
->  	/* Enable VIF clock for stream 0 */
->  	cdns_mhdp_reg_read(mhdp, CDNS_DPTX_CAR, &resp);
->  	cdns_mhdp_reg_write(mhdp, CDNS_DPTX_CAR,
-> diff --git a/include/drm/bridge/cdns-mhdp-common.h b/include/drm/bridge/cdns-mhdp-common.h
-> index d4711091ff2b..1e8a44138ce2 100644
-> --- a/include/drm/bridge/cdns-mhdp-common.h
-> +++ b/include/drm/bridge/cdns-mhdp-common.h
-> @@ -553,7 +553,6 @@ struct cdns_mhdp_device {
->  	struct cdns_mhdp_sink	sink;
->  	struct cdns_mhdp_bridge	bridge;
->  	struct phy		*phy;
-> -	void __iomem		*dbg_regs;
->  
->  	struct video_info	video_info;
->  	struct drm_display_mode	mode;
+      Arnd
