@@ -1,32 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2018 21:58:46 +0000
-Subject: [PATCH 2/7] arm64: sdei: Always use sdei stack for sdei events
-In-Reply-To: <1537970184-44348-3-git-send-email-julien.thierry@arm.com>
+Date: Wed, 7 Nov 2018 21:58:35 +0000
+Subject: [PATCH 1/7] arm64: Add static check for pt_regs alignment
+In-Reply-To: <1537970184-44348-2-git-send-email-julien.thierry@arm.com>
 References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
- <1537970184-44348-3-git-send-email-julien.thierry@arm.com>
-Message-ID: <20181107215844.GC12248@brain-police>
+ <1537970184-44348-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <20181107215834.GB12248@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 02:56:19PM +0100, Julien Thierry wrote:
-> SDEI events can occur at any point, including when the stack pointer is
-> not aligned. SP could be modified to respect alignment 16-byte alignement,
-> but there is a need to deal with code using SP as scratch register.
+On Wed, Sep 26, 2018 at 02:56:18PM +0100, Julien Thierry wrote:
+> The pt_regs structure's size is required to be a multiple of 16 to maintain
+> the stack alignment upon kernel entries.
 > 
-> Always reserve the SDEI stacks to handle its events.
-> 
-> Since stack allocation relies on VMAPed stacks, lets make SDEI depend on
-> VMAP_STACK.
+> Add a static check to ensure this is the case.
 > 
 > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 > ---
->  arch/arm64/include/asm/sdei.h |  2 --
->  arch/arm64/kernel/entry.S     |  2 --
->  arch/arm64/kernel/sdei.c      | 23 ++++++++---------------
->  drivers/firmware/Kconfig      |  1 +
->  4 files changed, 9 insertions(+), 19 deletions(-)
+>  arch/arm64/include/asm/ptrace.h | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index 177b851..cc17fad 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -229,6 +229,8 @@ static inline u64 regs_get_register(struct pt_regs *regs, unsigned int offset)
+>  
+>  	WARN_ON(offset & 7);
+>  
+> +	BUILD_BUG_ON((sizeof (struct pt_regs) % 16 != 0));
 
-One side-effect of this change is that SDEI cannot be enabled in conjunction
-with KASAN. James -- are you ok with that?
+This seems like a fairly random place to put this, and given that it's not
+dependent on context I reckon it would be better to put it in a C file
+rather than in a header that gets included multiple times. I still couldn't
+really find a good place though :/
 
 Will
