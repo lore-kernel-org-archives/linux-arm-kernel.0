@@ -1,37 +1,31 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Wed,  7 Nov 2018 22:30:31 +0100
-Subject: [PATCH] ARM: OMAP1: ams-delta: Fix possible use of uninitialized field
-Message-ID: <20181107213031.21650-1-jmkrzyszt@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 7 Nov 2018 21:35:51 +0100
+Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
+ device nodes
+In-Reply-To: <20181107192345.6cq6hzpqzl6j535b@ninjato>
+References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+ <20181107085056.GB31092@kunai>
+ <7154affe-751a-7cb4-48ea-3d4d6f467ac8@gmail.com>
+ <20181107130810.GA18223@kunai>
+ <f7d99456-f68f-7880-f22e-8bd47a546e82@gmail.com>
+ <20181107192345.6cq6hzpqzl6j535b@ninjato>
+Message-ID: <b94ce89b-af37-4270-a7ad-1447a88f69fb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While playing with initialization order of modem device, it has been
-discovered that under some circumstances (early console init, I
-believe) its .pm() callback may be called before the
-uart_port->private_data pointer is initialized from
-plat_serial8250_port->private_data, resulting in NULL pointer
-dereference.  Fix it by checking for uninitialized pointer before using
-it in modem_pm().
+On 11/07/2018 08:23 PM, Wolfram Sang wrote:
+> 
+>> We discussed this on IRC already, which is why I need to look into that.
+>> The HS200 works well on the M3N though.
+> 
+> Can you push the branch you used somewhere? I retested the branch from
+> Dunbar with my M3N and it works fine with my tests.
 
-Fixes: aabf31737a6a ("ARM: OMAP1: ams-delta: update the modem to use regulator API")
-Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
----
- arch/arm/mach-omap1/board-ams-delta.c | 3 +++
- 1 file changed, 3 insertions(+)
+Sure.
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 1947bc63074e..17e0b386e1b2 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -764,6 +764,9 @@ static void modem_pm(struct uart_port *port, unsigned int state, unsigned old)
- 	struct modem_private_data *priv = port->private_data;
- 	int ret;
- 
-+	if (!priv)
-+		return;
-+
- 	if (IS_ERR(priv->regulator))
- 		return;
- 
+btw I think this might even have something to do with ATF 1.0.24 or
+mainline U-Boot, which switches the eMMC card to HS200 mode.
+
 -- 
-2.16.4
+Best regards,
+Marek Vasut
