@@ -1,59 +1,45 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Nov 2018 18:08:29 +0000
-Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
-In-Reply-To: <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
-References: <20181107171031.22573-1-alex.bennee@linaro.org>
- <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
-Message-ID: <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
+Date: Wed, 7 Nov 2018 18:10:47 +0000
+Subject: [PATCH] arm64: mm: define NET_IP_ALIGN to 0
+In-Reply-To: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+References: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181107181047.fx4zbpdunfpwivjc@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 06:01:20PM +0000, Mark Rutland wrote:
-> On Wed, Nov 07, 2018 at 05:10:31PM +0000, Alex Benn?e wrote:
-> > Not all faults handled by handle_exit are instruction emulations. For
-> > example a ESR_ELx_EC_IABT will result in the page tables being updated
-> > but the instruction that triggered the fault hasn't actually executed
-> > yet. We use the simple heuristic of checking for a changed PC before
-> > seeing if kvm_arm_handle_step_debug wants to claim we stepped an
-> > instruction.
-> > 
-> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> > ---
-> >  arch/arm64/kvm/handle_exit.c | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> > index e5e741bfffe1..b8252e72f882 100644
-> > --- a/arch/arm64/kvm/handle_exit.c
-> > +++ b/arch/arm64/kvm/handle_exit.c
-> > @@ -214,6 +214,7 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
-> >  static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  {
-> >  	int handled;
-> > +        unsigned long old_pc = *vcpu_pc(vcpu);
-> >  
-> >  	/*
-> >  	 * See ARM ARM B1.14.1: "Hyp traps on instructions
-> > @@ -233,7 +234,8 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  	 * kvm_arm_handle_step_debug() sets the exit_reason on the kvm_run
-> >  	 * structure if we need to return to userspace.
-> >  	 */
-> > -	if (handled > 0 && kvm_arm_handle_step_debug(vcpu, run))
-> > +	if (handled > 0 && *vcpu_pc(vcpu) != old_pc &&
+On Wed, Nov 07, 2018 at 06:10:38PM +0100, Ard Biesheuvel wrote:
+> On arm64, there is no need to add 2 bytes of padding to the start of
+> each network buffer just to make the IP header appear 32-bit aligned.
 > 
-> This doesn't work if the emulation is equivalent to a branch-to-self, so
-> I don't think that we want to do this.
+> Since this might actually adversely affect DMA performance some
+> platforms, let's override NET_IP_ALIGN to 0 to get rid of this
+> padding.
 > 
-> When are we failing to advance the single-step state machine correctly?
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/processor.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 3e2091708b8e..6b0d4dff5012 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -24,6 +24,14 @@
+>  #define KERNEL_DS	UL(-1)
+>  #define USER_DS		(TASK_SIZE_64 - 1)
+>  
+> +/*
+> + * On arm64 systems, unaligned accesses by the CPU are cheap, and so there is
+> + * no point in shifting all network buffers by 2 bytes just to make some IP
+> + * header fields appear aligned in memory, potentially sacrificing some DMA
+> + * performance on some platforms.
+> + */
+> +#define NET_IP_ALIGN	0
 
-I don't understand how this is intended to work currently.
+Might it be better for core code to do this based on
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS?
 
-Surely kvm_skip_instr() should advance the state machine as necessary,
-so that we can rely on the HW to generate any necessary single-step
-exception when we next return to the guest?
-
-... and if userspace decides to emulate something, it's up to it to
-advance the state machine consistently.
+We already set that for arm64.
 
 Thanks,
 Mark.
