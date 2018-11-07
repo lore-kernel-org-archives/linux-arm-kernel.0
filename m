@@ -1,38 +1,71 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  7 Nov 2018 16:08:50 -0700
-Subject: [PATCH v2 2/4] coresight: etf: Release CLAIM tag after disabling the
- HW
+Date: Wed,  7 Nov 2018 16:08:51 -0700
+Subject: [PATCH v2 3/4] coresight: etm3x: Deal with CLAIM tag before and after
+ accessing HW
 In-Reply-To: <1541632132-1252-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1541632132-1252-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1541632132-1252-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1541632132-1252-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch rectifies the sequence of events in function
-tmc_etb_disable_hw() by disabling the HW first and then releasing the
-CLAIM tag.  Otherwise we could be corrupting the configuration done by an
-external agent that would have claimed the device after we have released
-it.
+This patch moves access to the CLAIM tag so that no modification to the HW
+happens before and after the CLAIM operation has been carried.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 5864ac55e275..a5f053f2db2c 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -86,8 +86,8 @@ static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index fd5c4cca7db5..4f638d81a66a 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -363,15 +363,16 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
  
- static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- {
--	coresight_disclaim_device(drvdata->base);
- 	__tmc_etb_disable_hw(drvdata);
-+	coresight_disclaim_device(drvdata->base);
+ 	CS_UNLOCK(drvdata->base);
+ 
++	rc = coresight_claim_device_unlocked(drvdata->base);
++	if (rc)
++		goto done;
++
+ 	/* Turn engine on */
+ 	etm_clr_pwrdwn(drvdata);
+ 	/* Apply power to trace registers */
+ 	etm_set_pwrup(drvdata);
+ 	/* Make sure all registers are accessible */
+ 	etm_os_unlock(drvdata);
+-	rc = coresight_claim_device_unlocked(drvdata->base);
+-	if (rc)
+-		goto done;
+ 
+ 	etm_set_prog(drvdata);
+ 
+@@ -422,12 +423,11 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
+ 	etm_clr_prog(drvdata);
+ 
+ done:
+-	if (rc)
+-		etm_set_pwrdwn(drvdata);
+ 	CS_LOCK(drvdata->base);
+ 
+-	dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
+-		drvdata->cpu, rc);
++	if (!rc)
++		dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
++			drvdata->cpu, rc);
+ 	return rc;
  }
  
- static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+@@ -577,9 +577,9 @@ static void etm_disable_hw(void *info)
+ 	for (i = 0; i < drvdata->nr_cntr; i++)
+ 		config->cntr_val[i] = etm_readl(drvdata, ETMCNTVRn(i));
+ 
++	etm_set_pwrdwn(drvdata);
+ 	coresight_disclaim_device_unlocked(drvdata->base);
+ 
+-	etm_set_pwrdwn(drvdata);
+ 	CS_LOCK(drvdata->base);
+ 
+ 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
 -- 
 2.7.4
