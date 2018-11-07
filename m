@@ -1,49 +1,22 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Nov 2018 14:53:49 +0000
-Subject: [PATCH 1/2] regulator: act8945: Implement PM functionalities
-In-Reply-To: <1540570753-16370-2-git-send-email-claudiu.beznea@microchip.com>
-References: <1540570753-16370-1-git-send-email-claudiu.beznea@microchip.com>
- <1540570753-16370-2-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20181107145349.GA6809@sirena.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed,  7 Nov 2018 15:53:47 +0100
+Subject: [GIT PULL 0/3] arm64: tegra: Updates for v4.20-rc2
+Message-ID: <20181107145350.29127-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 04:19:48PM +0000, Claudiu.Beznea at microchip.com wrote:
+Hi ARM SoC maintainers,
 
-> +static unsigned int act8945a_of_map_mode(unsigned int mode)
-> +{
-> +	if (mode == ACT8945A_DCDC_MODE_POWER_SAVING)
-> +		return REGULATOR_MODE_STANDBY;
-> +
-> +	return REGULATOR_MODE_NORMAL;
-> +}
+These pull requests are some follow-up changes to finally enable the
+generic power domains for the Tegra XUSB block. This builds on top of
+changes that were merged into v4.20-rc1, but because of some non-
+trivial runtime dependencies I decided to hold back on these until
+after the dust had settled.
 
-This should error out if it gets an unknown value rather than silently
-mapping it to normal - we don't know what the user intended to set here.
-There should also be some binding documentation updates saying what the
-values that can be set are.
+Do you think it would be possible to merge these in for v4.20-rc2? I
+realize that they are not actually fixes, but they merely add a couple
+of lines to enable the power domains for XUSB as well as the
+corresponding DT bindings.
 
-> +static void act8945a_pmic_shutdown(struct platform_device *pdev)
-> +{
-> +	struct act8945a_pmic *act8945a = platform_get_drvdata(pdev);
-> +	struct regmap *regmap = act8945a->regmap;
-> +
-> +	/*
-> +	 * Ask the PMIC to shutdown everything on the next PWRHLD transition.
-> +	 */
-> +	regmap_write(regmap, ACT8945A_SYS_CTRL, 0x0);
->  }
->  
-
-This shutdown function appears to be independant of the mode setting and
-would be better split out as a separate patch (you could have one patch
-adding the regmap stuff, one for this and one for the mode setting).
-It makes review a lot simpler if each patch does a minimal set of
-changes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181107/01b2e8ea/attachment.sig>
+Thanks,
+Thierry
