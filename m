@@ -1,73 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2018 23:49:33 +0000
-Subject: [PATCH 2/4] efi/arm: defer persistent reservations until after
- paging_init()
-In-Reply-To: <CAKv+Gu_r38Bk_SZW-5qvtM7cmQ4-09dcFwNz29AyMceucdhadQ@mail.gmail.com>
-References: <20181106113732.16351-1-ard.biesheuvel@linaro.org>
- <20181106113732.16351-3-ard.biesheuvel@linaro.org>
- <CAKv+Gu8OsFb7a5UTovN1yBXtSSY=ZtUBYUvNa_bPmcZGknNYQA@mail.gmail.com>
- <20181106190817.GN30658@n2100.armlinux.org.uk>
- <CAKv+Gu_r38Bk_SZW-5qvtM7cmQ4-09dcFwNz29AyMceucdhadQ@mail.gmail.com>
-Message-ID: <20181106234933.GO30658@n2100.armlinux.org.uk>
+From: andrealmeid@riseup.net (andrealmeid at riseup.net)
+Date: Tue,  6 Nov 2018 22:07:38 -0200
+Subject: [PATCH] Staging: vchi: Add license id and change int type
+Message-ID: <20181107000738.26963-1-andrealmeid@riseup.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 09:06:56PM +0100, Ard Biesheuvel wrote:
-> On 6 November 2018 at 20:08, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Tue, Nov 06, 2018 at 08:02:58PM +0100, Ard Biesheuvel wrote:
-> >> On 6 November 2018 at 12:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> > The new memory EFI reservation feature we introduced to allow memory
-> >> > reservations to persist across kexec may trigger an unbounded number
-> >> > of calls to memblock_reserve(). The memblock subsystem can deal with
-> >> > this fine, but not before memblock resizing is enabled, which we can
-> >> > only do after paging_init(), when the memory we reallocate the array
-> >> > into is actually mapped.
-> >> >
-> >> > So break out the memreserve table processing into a separate function
-> >> > and call if after paging_init() on both arm64 and ARM.
-> >> >
-> >> > Cc: Russell King <linux@armlinux.org.uk>
-> >> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>
-> >> Russell,
-> >>
-> >> If you are ok with this patch, may I have your ack please? I would
-> >> like to send it out before the end of the week.
-> >
-> > You're not going to get a quick answer to this, because it needs me to
-> > investigate what the effect of this change actually is by code review.
-> > I can't guarantee when I'll get around to that.
-> >
-> 
-> Fair enough.
-> 
-> I will drop the ARM hunk for now then, and we'll fix ARM when you have
-> more time.
+From: Andr? Almeida <andrealmeid@riseup.net>
 
-I don't see how you can do that - you're dropping the processing of
-reserved areas out of the efi_config_parse_tables() path, so that
-won't happen any more on ARM if you don't apply the ARM hunk.
+Fix the following checkpatch issues:
 
-So what I see at the moment is that efi_config_parse_tables() is
-called prior to paging_init() - and prior to our memblock
-initialisation, and you're proposing to move the processing that
-marks blocks as reserved immediately after paging_init(), and
-to use the normal memremap() interface to map stuff.
+WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
+CHECK: Prefer kernel type 's32' over 'int32_t'
 
-I'm not convinced this will work - the memory allocators have not
-been setup at this point, so using memremap() will try to allocate
-page tables and potentially fail.  If the normal allocators are
-setup, it's way too late to be calling memblock_reserve() - the
-memory will have been passed over to the page allocator according
-to which memblocks are available but not reserved.
+Signed-off-by: Andr? Almeida <andrealmeid@riseup.net>
 
-The normal page allocator is setup by mem_init(), which happens
-way after setup_arch() has returned.
+---
 
-So, I don't see how your patch can be correct at the moment.
+Hello! This is my first patch to Linux Kernel. Let me know any feedback
+---
+ drivers/staging/vc04_services/interface/vchi/vchi_mh.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+index 198bd076b666..42fc0c693d43 100644
+--- a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
++++ b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+@@ -1,5 +1,5 @@
+-/**
+- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Copyright (c) 2010-2012 Broadcom. All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+@@ -36,7 +36,7 @@
+ 
+ #include <linux/types.h>
+ 
+-typedef int32_t VCHI_MEM_HANDLE_T;
++typedef s32 VCHI_MEM_HANDLE_T;
+ #define VCHI_MEM_HANDLE_INVALID 0
+ 
+ #endif
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.19.1
