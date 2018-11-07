@@ -1,43 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 7 Nov 2018 11:58:26 -0500 (EST)
-Subject: [PATCH 1/2] ARM: copypage-fa: add kto and kfrom to input operands
- list
-In-Reply-To: <806401fd406b1391fd3a9f5e072c107a@agner.ch>
-References: <20181015221629.13924-1-stefan@agner.ch>
- <CACRpkdaVGKLtE-whhK3oFgY+4xoy1JqWkcBW4UO0-hJs2B-QGg@mail.gmail.com>
- <20181016084416.GF30658@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1810161357580.1498@knanqh.ubzr>
- <fe7595f5d02424c9d92e437cd20361f9@agner.ch>
- <nycvar.YSQ.7.76.1811052231220.1498@knanqh.ubzr>
- <806401fd406b1391fd3a9f5e072c107a@agner.ch>
-Message-ID: <nycvar.YSQ.7.76.1811071154590.23219@knanqh.ubzr>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 7 Nov 2018 22:31:24 +0530
+Subject: [PATCH v2 0/2] i2c-omap: Enable i2c-omap driver for AM654 SoCs
+In-Reply-To: <20181028223450.GK1882@kunai>
+References: <20180928052557.21663-1-vigneshr@ti.com>
+ <09a6b1d4-f8f4-ea90-f361-bd3a92088430@ti.com> <20181028223450.GK1882@kunai>
+Message-ID: <c664348b-bb5b-9cba-6ed5-040014515477@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Nov 2018, Stefan Agner wrote:
 
-> On 06.11.2018 05:49, Nicolas Pitre wrote:
-> > So here's the revised patch. It now has full compile-test coverage for 
-> > real this time. Would you mind reviewing it again before I resubmit it 
-> > please?
+On 29/10/18 4:04 AM, Wolfram Sang wrote:
+> On Sat, Oct 20, 2018 at 01:23:40PM +0530, Vignesh R wrote:
+>>
+>>
+>> On 28-Sep-18 10:55 AM, Vignesh R wrote:
+>>> Couple of patches to enable i2c-omap driver to be used with TI's new
+>>> AM654 platforms.
+>>>
+>>>
+>>> Vignesh R (2):
+>>>   dt-bindings: i2c-omap: Add new compatible for AM654 SoCs
+>>>   i2c: busses: Kconfig: Enable I2C_OMAP for ARCH_K3
+>>>
+>>>  Documentation/devicetree/bindings/i2c/i2c-omap.txt | 8 ++++++--
+>>>  drivers/i2c/busses/Kconfig                         | 2 +-
+>>>  2 files changed, 7 insertions(+), 3 deletions(-)
+>>>
+>>
+>> Gentle ping...
 > 
-> Compile tested all copypage implementations with the revised patch using
-> Clang too, everything builds fine.
+> Maintainer tags are missing. Tony is listed for this driver on OMAP2+.
+> Is this his realm? Do we need a specific maintainer for this driver?
 > 
-> FWIW, I used this defconfigs:
-> copypage-fa.c: moxart_defconfig
-> copypage-feroceon.c: mvebu_v5_defconfig
-> copypage-v4mc.c: h3600_defconfig+CONFIG_AEABI
-> copypage-v4wb.c/v4wt.c: multi_v4t_defconfig
-> copypage-xsc3.c/scale.c: pxa_defconfig-CONFIG_FTRACE
-> 
-> The changes look good to me:
-> 
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-Thanks.  Submitted here:
+I think this driver needs a separate entry, will send a patch adding my
+name as reviewer for this driver.
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8805/2
-
-
-Nicolas
+-- 
+Regards
+Vignesh
