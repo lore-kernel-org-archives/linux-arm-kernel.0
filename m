@@ -1,29 +1,35 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Wed, 7 Nov 2018 02:34:23 +0000
-Subject: [PATCH -next] drm/sun4i: hdmi: Use PTR_ERR_OR_ZERO in
- sun4i_tmds_create()
-Message-ID: <1541558063-100341-1-git-send-email-yuehaibing@huawei.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 7 Nov 2018 03:00:47 +0000
+Subject: [PATCH RESEND V4 0/9] clk: add imx7ulp clk support
+In-Reply-To: <7e58f0dcf83a0bd8139e58e27bfa137fc186b4bf.camel@nxp.com>
+References: <1540127173-21346-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211576EF2FE906A6B0C3F1680FB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB4211280B09B72F637FC5650280CB0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <7e58f0dcf83a0bd8139e58e27bfa137fc186b4bf.camel@nxp.com>
+Message-ID: <AM0PR04MB42118A6086D98F84542E954F80C40@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+> -----Original Message-----
+> From: Leonard Crestez
+> Sent: Tuesday, November 6, 2018 11:34 PM
+[...]
+> 
+> On Tue, 2018-11-06 at 15:30 +0000, A.s. Dong wrote:
+> > Gently Ping...
+> 
+> > drivers/clk/imx/clk-composite.c                    |  85 +++++++++
+> 
+> During review for 8m clocks a separate but different composite clk was added.
+> In order to avoid confusion that was named "clk-composite-8m.c", it would
+> make sense to move the 7ulp code to clk-composite-7ulp.c.
+> 
 
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
----
- drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+I guess we can do it, thanks.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-index fb985ba..3d5ee6f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
-@@ -232,8 +232,5 @@ int sun4i_tmds_create(struct sun4i_hdmi *hdmi)
- 	tmds->div_offset = hdmi->variant->tmds_clk_div_offset;
- 
- 	hdmi->tmds_clk = devm_clk_register(hdmi->dev, &tmds->hw);
--	if (IS_ERR(hdmi->tmds_clk))
--		return PTR_ERR(hdmi->tmds_clk);
--
--	return 0;
-+	return PTR_ERR_OR_ZERO(hdmi->tmds_clk);
- }
+Regards
+Dong Aisheng
+
+> --
+> Regards,
+> Leonard
