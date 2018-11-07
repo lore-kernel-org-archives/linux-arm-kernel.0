@@ -1,46 +1,98 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Nov 2018 08:10:21 -0800
-Subject: [GIT PULL] ARM: dts: stratix10 fix for v4.20
-In-Reply-To: <20181107160626.11892-1-dinguyen@kernel.org>
-References: <20181107160626.11892-1-dinguyen@kernel.org>
-Message-ID: <CAOesGMiZ=f5wAqXAFc6TfSc8g8Tm0Hk23B4E+nxgnFtJVbbY4g@mail.gmail.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Wed,  7 Nov 2018 11:13:46 -0500
+Subject: [PATCH] cpufreq: s3c24xx: Change to use DEFINE_SHOW_ATTRIBUTE macro
+Message-ID: <20181107161346.9887-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 8:06 AM Dinh Nguyen <dinguyen@kernel.org> wrote:
->
-> Hi Arnd, Kevin, and Olof:
->
-> Please pull in this ethernet dts entry for Stratix10.
->
-> Thanks,
-> Dinh
->
->
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
->
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/stratix10_dts_fix_for_v4.20
->
-> for you to fetch changes up to fd5ba6ee3187617287fb9cb187e3d6b3631210a3:
->
->   arm64: dts: stratix10: fix multicast filtering (2018-11-05 13:17:33 -0600)
->
-> ----------------------------------------------------------------
-> ARM: dts: stratix10: fix multicast filtering
+Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
-For future pull requests, please keep in mind to write a sentence
-about _why_ this pull request is needed. I.e. what's broken and how.
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ drivers/cpufreq/s3c24xx-cpufreq-debugfs.c | 46 +++--------------------
+ 1 file changed, 6 insertions(+), 40 deletions(-)
 
-This mirrors how we handle patch descriptions (the code shows the what
-and sometimes the how, but the description should cover the "why").
-
-That being said, I've merged this now and added the message from the patch.
-
-
-Thanks!
-
--Olof
+diff --git a/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c b/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
+index 4d976e8dbb2f..0df87b6480fe 100644
+--- a/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
++++ b/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
+@@ -63,18 +63,7 @@ static int board_show(struct seq_file *seq, void *p)
+ 	return 0;
+ }
+ 
+-static int fops_board_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, board_show, NULL);
+-}
+-
+-static const struct file_operations fops_board = {
+-	.open		= fops_board_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-	.owner		= THIS_MODULE,
+-};
++DEFINE_SHOW_ATTRIBUTE(board);
+ 
+ static int info_show(struct seq_file *seq, void *p)
+ {
+@@ -105,18 +94,7 @@ static int info_show(struct seq_file *seq, void *p)
+ 	return 0;
+ }
+ 
+-static int fops_info_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, info_show, NULL);
+-}
+-
+-static const struct file_operations fops_info = {
+-	.open		= fops_info_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-	.owner		= THIS_MODULE,
+-};
++DEFINE_SHOW_ATTRIBUTE(info);
+ 
+ static int io_show(struct seq_file *seq, void *p)
+ {
+@@ -162,19 +140,7 @@ static int io_show(struct seq_file *seq, void *p)
+ 	return 0;
+ }
+ 
+-static int fops_io_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, io_show, NULL);
+-}
+-
+-static const struct file_operations fops_io = {
+-	.open		= fops_io_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-	.owner		= THIS_MODULE,
+-};
+-
++DEFINE_SHOW_ATTRIBUTE(io);
+ 
+ static int __init s3c_freq_debugfs_init(void)
+ {
+@@ -185,13 +151,13 @@ static int __init s3c_freq_debugfs_init(void)
+ 	}
+ 
+ 	dbgfs_file_io = debugfs_create_file("io-timing", S_IRUGO, dbgfs_root,
+-					    NULL, &fops_io);
++					    NULL, &io_fops);
+ 
+ 	dbgfs_file_info = debugfs_create_file("info", S_IRUGO, dbgfs_root,
+-					      NULL, &fops_info);
++					      NULL, &info_fops);
+ 
+ 	dbgfs_file_board = debugfs_create_file("board", S_IRUGO, dbgfs_root,
+-					       NULL, &fops_board);
++					       NULL, &board_fops);
+ 
+ 	return 0;
+ }
+-- 
+2.17.0
