@@ -1,30 +1,38 @@
 From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Wed, 7 Nov 2018 21:14:57 +0100
-Subject: [PATCH 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+Date: Wed, 7 Nov 2018 21:15:59 +0100
+Subject: [PATCH 4/9] arm64: defconfig: Drop USB_ULPI_BUS and USB_CHIPIDEA_ULPI
 In-Reply-To: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
 References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
-Message-ID: <596a4b64-e2ef-878d-0873-dd59d14c2d85@free.fr>
+Message-ID: <e01448e5-9756-00a0-b51d-dbb27fe7c717@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
+Commit a930d8bd94d8 ("usb: chipidea: Always build ULPI code")
 
 Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
 ---
- arch/arm64/configs/defconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/configs/defconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f786c95504d3..8d6878c1e794 100644
+index 58741c07a6ef..6fe418d72337 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -107,7 +107,6 @@ CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
- CONFIG_CPUFREQ_DT=y
- CONFIG_ACPI_CPPC_CPUFREQ=m
- CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
--CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
- CONFIG_ARM_SCPI_CPUFREQ=y
- CONFIG_ARM_TEGRA186_CPUFREQ=y
- CONFIG_ARM_SCPI_PROTOCOL=y
+@@ -528,7 +528,6 @@ CONFIG_USB_DWC2=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+-CONFIG_USB_CHIPIDEA_ULPI=y
+ CONFIG_USB_ISP1760=y
+ CONFIG_USB_HSIC_USB3503=y
+ CONFIG_NOP_USB_XCEIV=y
+@@ -536,7 +535,6 @@ CONFIG_USB_ULPI=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=m
+ CONFIG_USB_RENESAS_USB3=m
+-CONFIG_USB_ULPI_BUS=y
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=32
+ CONFIG_MMC_ARMMMCI=y
 -- 
 2.17.1
