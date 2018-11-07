@@ -1,128 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Nov 2018 17:23:08 +0000
-Subject: [PATCH v10 09/22] kasan: add tag related helper functions
-In-Reply-To: <b8c56d36b79eecf0c331a0a7a2df12632aefccc9.1541525354.git.andreyknvl@google.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <b8c56d36b79eecf0c331a0a7a2df12632aefccc9.1541525354.git.andreyknvl@google.com>
-Message-ID: <20181107172306.3w2pjecaggsvl5z2@lakrids.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Nov 2018 09:28:11 -0800
+Subject: [GIT PULL] ARM: SoC fixes
+In-Reply-To: <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
+References: <20181107171023.zoo6qox5eewy3pmk@localhost>
+ <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
+Message-ID: <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 06:30:24PM +0100, Andrey Konovalov wrote:
-> This commit adds a few helper functions, that are meant to be used to
-> work with tags embedded in the top byte of kernel pointers: to set, to
-> get or to reset (set to 0xff) the top byte.
-> 
-> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  arch/arm64/mm/kasan_init.c |  2 ++
->  include/linux/kasan.h      | 13 +++++++++
->  mm/kasan/kasan.h           | 55 ++++++++++++++++++++++++++++++++++++++
->  mm/kasan/tags.c            | 37 +++++++++++++++++++++++++
->  4 files changed, 107 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-> index 18ebc8994a7b..370b19d0e2fb 100644
-> --- a/arch/arm64/mm/kasan_init.c
-> +++ b/arch/arm64/mm/kasan_init.c
-> @@ -249,6 +249,8 @@ void __init kasan_init(void)
->  	memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
->  	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
->  
-> +	kasan_init_tags();
-> +
->  	/* At this point kasan is fully initialized. Enable error messages */
->  	init_task.kasan_depth = 0;
->  	pr_info("KernelAddressSanitizer initialized\n");
-> diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-> index 7f6574c35c62..4c9d6f9029f2 100644
-> --- a/include/linux/kasan.h
-> +++ b/include/linux/kasan.h
-> @@ -169,6 +169,19 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
->  
->  #define KASAN_SHADOW_INIT 0xFF
->  
-> +void kasan_init_tags(void);
-> +
-> +void *kasan_reset_tag(const void *addr);
-> +
-> +#else /* CONFIG_KASAN_SW_TAGS */
-> +
-> +static inline void kasan_init_tags(void) { }
-> +
-> +static inline void *kasan_reset_tag(const void *addr)
-> +{
-> +	return (void *)addr;
-> +}
-> +
+On Wed, Nov 7, 2018 at 9:17 AM Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+>
+> On Wed, Nov 7, 2018 at 9:10 AM Olof Johansson <olof@lixom.net> wrote:
+> >
+> > ARM: SoC fixes
+>
+> Pulled.
+>
+> > I was a bit too trigger happy to enable PREEMPT on multi_v7_defconfig,
+> > and it ended up regressing at least BeagleBone XM boards.
+>
+> Odd. Did it hit some "may_sleep()" test in a driver that is hidden by
+> preempt being off? Otherwise I don't see how/why preempt should fail
+> in a board-specific manner..
 
-> +#ifdef CONFIG_KASAN_SW_TAGS
-> +
-> +#define KASAN_PTR_TAG_SHIFT 56
-> +#define KASAN_PTR_TAG_MASK (0xFFUL << KASAN_PTR_TAG_SHIFT)
-> +
-> +u8 random_tag(void);
-> +
-> +static inline void *set_tag(const void *addr, u8 tag)
-> +{
-> +	u64 a = (u64)addr;
-> +
-> +	a &= ~KASAN_PTR_TAG_MASK;
-> +	a |= ((u64)tag << KASAN_PTR_TAG_SHIFT);
-> +
-> +	return (void *)a;
-> +}
-> +
-> +static inline u8 get_tag(const void *addr)
-> +{
-> +	return (u8)((u64)addr >> KASAN_PTR_TAG_SHIFT);
-> +}
-> +
-> +static inline void *reset_tag(const void *addr)
-> +{
-> +	return set_tag(addr, KASAN_TAG_KERNEL);
-> +}
+The board hangs early during boot and the usual way of collecting
+early console doesn't seem to work when attempted (I haven't tried
+personally).
 
-We seem to be duplicating this functionality in several places.
+It's one of the major non-SMP platforms covered by tests. I'd be
+surprised if it turns out to be truly _board_ specific (and rather
+specific to OMAP3), but we don't have enough data yet. Chances are it
+either shuffles some timing around or indeed hits a may_sleep() test
+somewhere.
 
-Could we please make it so that the arch code defines macros:
+(I just realized I might have missed to attribute Guillaume in the
+revert patch. Sorry about that).
 
-arch_kasan_set_tag(addr, tag)
-arch_kasan_get_tag(addr)
-arch_kasan_reset_tag(addr)
 
-... and use thoses consistently rather than open-coding them?
+-Olof
 
-> +
-> +#else /* CONFIG_KASAN_SW_TAGS */
-> +
-> +static inline u8 random_tag(void)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline void *set_tag(const void *addr, u8 tag)
-> +{
-> +	return (void *)addr;
-> +}
-> +
-> +static inline u8 get_tag(const void *addr)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline void *reset_tag(const void *addr)
-> +{
-> +	return (void *)addr;
-> +}
 
-... these can be defined in linux/kasan.h as:
-
-#define arch_kasan_set_tag(addr, tag)	(addr)
-#define arch_kasan_get_tag(addr)	0
-#define arch_kasan_reset_tag(addr)	(addr)
-
-Thanks,
-Mark.
+-Olof
