@@ -1,31 +1,32 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 7 Nov 2018 21:35:51 +0100
-Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
- device nodes
-In-Reply-To: <20181107192345.6cq6hzpqzl6j535b@ninjato>
-References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
- <20181107085056.GB31092@kunai>
- <7154affe-751a-7cb4-48ea-3d4d6f467ac8@gmail.com>
- <20181107130810.GA18223@kunai>
- <f7d99456-f68f-7880-f22e-8bd47a546e82@gmail.com>
- <20181107192345.6cq6hzpqzl6j535b@ninjato>
-Message-ID: <b94ce89b-af37-4270-a7ad-1447a88f69fb@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2018 22:51:51 +0100
+Subject: [PATCH 0/9] Regenerate arm64 defconfig for current kernel
+In-Reply-To: <6eb79d2e-1857-39b5-90f5-29bc13bce16a@free.fr>
+References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
+ <6eb79d2e-1857-39b5-90f5-29bc13bce16a@free.fr>
+Message-ID: <CAK8P3a1QE1Vr8_3m1=dhgjWkn9HLYwpmNUVZ4+fVZdRwpX=ZEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2018 08:23 PM, Wolfram Sang wrote:
-> 
->> We discussed this on IRC already, which is why I need to look into that.
->> The HS200 works well on the M3N though.
-> 
-> Can you push the branch you used somewhere? I retested the branch from
-> Dunbar with my M3N and it works fine with my tests.
+On Wed, Nov 7, 2018 at 9:39 PM Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
+>
+> Arnd, Olof,
+>
+> The following patch series was sent to arm at kernel.org
+> but the messages bounced because the SMTP server is
+> currently blacklisted. Can you get the patches through
+> the LAKML mailing list?
 
-Sure.
+Yes, that worked fine, and they ended up in the right folder for
+me because of the to:arm at kernel.org recipient.
 
-btw I think this might even have something to do with ATF 1.0.24 or
-mainline U-Boot, which switches the eMMC card to HS200 mode.
+All patches look good to me, thanks a lot for doing this!
 
--- 
-Best regards,
-Marek Vasut
+One point about the changelogs: in some of them you just
+list the commit that changed things, but don't explain what
+the impact of that commit was (symbol dropped, always
+selected, etc). I always like to see changelog texts in full
+sentences, so if you can spend a few more minutes on this,
+would you send a v2 with that changed?
+
+       Arnd
