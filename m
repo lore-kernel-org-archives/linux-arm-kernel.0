@@ -1,32 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2018 14:59:23 +0000
-Subject: [PATCH v10 00/22] kasan: add software tag-based mode for arm64
-In-Reply-To: <CAAeHK+yOsP7V0gPu7EpqCbJZqbGQMZbAp6q1+=0dNGC24reyWg@mail.gmail.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <CAAeHK+yOsP7V0gPu7EpqCbJZqbGQMZbAp6q1+=0dNGC24reyWg@mail.gmail.com>
-Message-ID: <20181107145922.GD2623@brain-police>
+Date: Wed, 7 Nov 2018 14:55:54 +0000
+Subject: [RFC PATCH 1/4] kconfig: add as-instr macro to
+ scripts/Kconfig.include
+In-Reply-To: <1541583608-26375-2-git-send-email-vladimir.murzin@arm.com>
+References: <1541583608-26375-1-git-send-email-vladimir.murzin@arm.com>
+ <1541583608-26375-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20181107145552.GC2623@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 03:56:03PM +0100, Andrey Konovalov wrote:
-> On Tue, Nov 6, 2018 at 6:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> > This patchset adds a new software tag-based mode to KASAN [1].
-> > (Initially this mode was called KHWASAN, but it got renamed,
-> >  see the naming rationale at the end of this section).
-> 
-> [...]
-> 
-> > Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> > Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> > Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> 
-> Hi Andrew,
-> 
-> This patchset has now been reviewed-by KASAN maintainers. Could you
-> take a look and consider taking this into the -mm tree?
+On Wed, Nov 07, 2018 at 09:40:05AM +0000, Vladimir Murzin wrote:
+> There are cases where the whole feature, for instance arm64/lse or
+> arm/crypto, can depend on assembler. Current practice is to report
+> buildtime that selected feature is not supported, which can be quite
+> annoying...
 
-I would much prefer to take the arm64 parts (which still need to be reviewed
-by Catalin afaict) via the arm64 tree, so please can you split those out
-separately?
+Why is it annoying? You still end up with a working kernel.
+
+> It'd nicer if we can check assembler first and opt-in feature
+> visibility in Kconfig.
+> 
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  scripts/Kconfig.include | 4 ++++
+>  1 file changed, 4 insertions(+)
+
+One issue I have with doing the check like this is that if somebody sends
+you a .config with e.g. ARM64_LSE_ATOMICS=y and you try to build a kernel
+using that .config and an old toolchain, the option is silently dropped.
+
+I think the diagnostic is actually useful in this case.
 
 Will
