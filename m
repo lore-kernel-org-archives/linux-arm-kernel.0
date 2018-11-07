@@ -1,252 +1,146 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Nov 2018 14:30:53 +0100
-Subject: [RFC PATCH 11/12] soc: qcom: ipa: IPA rmnet interface
-In-Reply-To: <20181107003250.5832-12-elder@linaro.org>
-References: <20181107003250.5832-1-elder@linaro.org>
- <20181107003250.5832-12-elder@linaro.org>
-Message-ID: <CAK8P3a3vB6wF7KYHpk+ULYGFhEe-pyWYC6fHaaBYeSuWCNooRA@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 7 Nov 2018 13:57:03 +0000
+Subject: [PATCH v2] PCI: imx: Add imx6sx suspend/resume support
+Message-ID: <984fcef6d928632241a4a3bce41e2645a304d335.1541598751.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+Enable PCI suspend/resume support on imx6sx socs. This is similar to
+imx7d with a few differences:
 
-> Note:  This portion of the driver will be heavily affected by
-> planned rework on the data path code.
+* The PM_Turn_Off bit is exposed through an IOMUX GPR, like all other
+pcie control bits on 6sx.
+* The pcie_inbound_axi clk needs to be turned off in suspend. On resume
+it is restored via resume -> deassert_core_reset -> enable_ref_clk.
 
-Ok. I don't think the ioctl interface has a real chance of getting merged
-into the kernel. You should generally not require any custom user space
-tools for a driver like this.
+Most of the resume logic is shared with the initial reset after probe.
 
-> diff --git a/drivers/net/ipa/msm_rmnet.h b/drivers/net/ipa/msm_rmnet.h
-> new file mode 100644
-> index 000000000000..042380fd53fb
-> --- /dev/null
-> +++ b/drivers/net/ipa/msm_rmnet.h
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Just for the record: if we really wanted to define ioctls, this would go
-into 'include/linux/uapi/msm_rmnet.h' and get installed into the
-/usr/include hierarchy on all machines.
+---
+Changes since v1:
+* Use a switch statement in imx6_pcie_pm_turnoff. The DT-based turnoff
+path is still an if statement.
+* Did not split imx6_pcie_clk_disable or call it from other paths, this
+would bring complications and is somewhat unrelated.
+* See v1 comments: https://lore.kernel.org/patchwork/patch/996806/
 
-> +
-> +#define RMNET_IOCTL_SET_LLP_ETHERNET 0x000089f1 /* Set Ethernet protocol  */
-> +#define RMNET_IOCTL_SET_LLP_IP      0x000089f2 /* Set RAWIP protocol     */
-> +#define RMNET_IOCTL_GET_LLP         0x000089f3 /* Get link protocol      */
-> +#define RMNET_IOCTL_SET_QOS_ENABLE   0x000089f4 /* Set QoS header enabled */
-> +#define RMNET_IOCTL_SET_QOS_DISABLE  0x000089f5 /* Set QoS header disabled*/
-> +#define RMNET_IOCTL_GET_QOS         0x000089f6 /* Get QoS header state   */
-> +#define RMNET_IOCTL_GET_OPMODE      0x000089f7 /* Get operation mode     */
+ drivers/pci/controller/dwc/pci-imx6.c       | 44 ++++++++++++++++++---
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  1 +
+ 2 files changed, 40 insertions(+), 5 deletions(-)
 
-And the commands would be defined using _IOC/_IOR/_IOW macros that
-document which arguments they take
-
-
-> +#define RMNET_IOCTL_OPEN            0x000089f8 /* Open transport port    */
-> +#define RMNET_IOCTL_CLOSE           0x000089f9 /* Close transport port   */
-> +#define RMNET_IOCTL_FLOW_ENABLE             0x000089fa /* Flow enable            */
-> +#define RMNET_IOCTL_FLOW_DISABLE     0x000089fb /* Flow disable                  */
-> +#define RMNET_IOCTL_FLOW_SET_HNDL    0x000089fc /* Set flow handle       */
-> +#define RMNET_IOCTL_EXTENDED        0x000089fd /* Extended IOCTLs        */
-
-'extended' interfaces are obviously out of the question entirely, those
-would all need to be separate commands.
-
-
-> +/* User space may not have this defined. */
-> +#ifndef IFNAMSIZ
-> +#define IFNAMSIZ 16
-> +#endif
-
-This is in <linux/if.h>
-
-> +struct rmnet_ioctl_extended_s {
-> +       u32     extended_ioctl;
-> +       union {
-
-And unions in the ioctl interfaces also wouldn't work.
-
-> +static bool initialized;       /* Avoid duplicate initialization */
-> +
-> +static struct rmnet_ipa_context rmnet_ipa_ctx_struct;
-> +static struct rmnet_ipa_context *rmnet_ipa_ctx = &rmnet_ipa_ctx_struct;
-
-Global variables like these should be removed.
-
-> +/** ipa_wwan_xmit() - Transmits an skb.
-> + *
-> + * @skb: skb to be transmitted
-> + * @dev: network device
-> + *
-> + * Return codes:
-> + * NETDEV_TX_OK: Success
-> + * NETDEV_TX_BUSY: Error while transmitting the skb. Try again later
-> + */
-> +static int ipa_wwan_xmit(struct sk_buff *skb, struct net_device *dev)
-> +{
-> +       struct ipa_wwan_private *wwan_ptr = netdev_priv(dev);
-> +       unsigned int skb_len;
-> +       int outstanding;
-> +
-> +       if (skb->protocol != htons(ETH_P_MAP)) {
-> +               dev_kfree_skb_any(skb);
-> +               dev->stats.tx_dropped++;
-> +               return NETDEV_TX_OK;
-> +       }
-> +
-> +       /* Control packets are sent even if queue is stopped.  We
-> +        * always honor the data and control high-water marks.
-> +        */
-> +       outstanding = atomic_read(&wwan_ptr->outstanding_pkts);
-> +       if (!RMNET_MAP_GET_CD_BIT(skb)) {       /* Data packet? */
-> +               if (netif_queue_stopped(dev))
-> +                       return NETDEV_TX_BUSY;
-> +               if (outstanding >= wwan_ptr->outstanding_high)
-> +                       return NETDEV_TX_BUSY;
-> +       } else if (outstanding >= wwan_ptr->outstanding_high_ctl) {
-> +               return NETDEV_TX_BUSY;
-> +       }
-
-This seems to be a poor reimplementation of BQL. Better
-use netdev_sent_queue() and netdev_completed_queue()
-to do the same thing better.
-
-> +/** apps_ipa_packet_receive_notify() - Rx notify
-> + *
-> + * @priv: driver context
-> + * @evt: event type
-> + * @data: data provided with event
-> + *
-> + * IPA will pass a packet to the Linux network stack with skb->data
-> + */
-> +static void apps_ipa_packet_receive_notify(void *priv, enum ipa_dp_evt_type evt,
-> +                                          unsigned long data)
-> +{
-> +       struct ipa_wwan_private *wwan_ptr;
-> +       struct net_device *dev = priv;
-> +
-> +       wwan_ptr = netdev_priv(dev);
-> +       if (evt == IPA_RECEIVE) {
-> +               struct sk_buff *skb = (struct sk_buff *)data;
-> +               int ret;
-> +               unsigned int packet_len = skb->len;
-> +
-> +               skb->dev = rmnet_ipa_ctx->dev;
-> +               skb->protocol = htons(ETH_P_MAP);
-> +
-> +               ret = netif_receive_skb(skb);
-> +               if (ret) {
-> +                       pr_err_ratelimited("fail on netif_receive_skb\n");
-> +                       dev->stats.rx_dropped++;
-> +               }
-> +               dev->stats.rx_packets++;
-> +               dev->stats.rx_bytes += packet_len;
-> +       } else if (evt == IPA_CLIENT_START_POLL) {
-> +               napi_schedule(&wwan_ptr->napi);
-> +       } else if (evt == IPA_CLIENT_COMP_NAPI) {
-> +               napi_complete(&wwan_ptr->napi);
-> +       } else {
-> +               ipa_err("Invalid evt %d received in wan_ipa_receive\n", evt);
-> +       }
-> +}
-
-I don't understand the logic here. Why is this a callback function?
-You normally want the data path to be as fast as possible, and the
-indirection seems like it would get in the way of that.
-
-Since the function doesn't do much interesting work, could
-it be moved into the caller?
-
-> +/** handle_ingress_format() - Ingress data format configuration */
-> +static int handle_ingress_format(struct net_device *dev,
-> +                                struct rmnet_ioctl_extended_s *in)
-> +{
-
-Can you describe how this would be called from user space?
-I.e. what is the reason we have to configure anything here?
-
-
-> +
-> +       /* Unsupported requests */
-> +       case RMNET_IOCTL_SET_MRU:                       /* Set MRU */
-> +       case RMNET_IOCTL_GET_MRU:                       /* Get MRU */
-> +       case RMNET_IOCTL_GET_AGGREGATION_COUNT:         /* Get agg count */
-> +       case RMNET_IOCTL_SET_AGGREGATION_COUNT:         /* Set agg count */
-> +       case RMNET_IOCTL_GET_AGGREGATION_SIZE:          /* Get agg size */
-> +       case RMNET_IOCTL_SET_AGGREGATION_SIZE:          /* Set agg size */
-> +       case RMNET_IOCTL_FLOW_CONTROL:                  /* Do flow control */
-> +       case RMNET_IOCTL_GET_DFLT_CONTROL_CHANNEL:      /* For legacy use */
-> +       case RMNET_IOCTL_GET_HWSW_MAP:                  /* Get HW/SW map */
-> +       case RMNET_IOCTL_SET_RX_HEADROOM:               /* Set RX Headroom */
-> +       case RMNET_IOCTL_SET_QOS_VERSION:               /* Set 8/6 byte QoS */
-> +       case RMNET_IOCTL_GET_QOS_VERSION:               /* Get 8/6 byte QoS */
-> +       case RMNET_IOCTL_GET_SUPPORTED_QOS_MODES:       /* Get QoS modes */
-> +       case RMNET_IOCTL_SET_SLEEP_STATE:               /* Set sleep state */
-> +       case RMNET_IOCTL_SET_XLAT_DEV_INFO:             /* xlat dev name */
-> +       case RMNET_IOCTL_DEREGISTER_DEV:                /* Deregister netdev */
-> +               return -ENOTSUPP;       /* Defined, but unsupported command */
-> +
-> +       default:
-> +               return -EINVAL;         /* Invalid (unrecognized) command */
-> +       }
-> +
-> +copy_out:
-> +       return copy_to_user(data, &edata, size) ? -EFAULT : 0;
-> +}
-> +
-> +/** ipa_wwan_ioctl() - I/O control for wwan network driver */
-> +static int ipa_wwan_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
-> +{
-> +       struct rmnet_ioctl_data_s ioctl_data = { };
-> +       void __user *data;
-> +       size_t size;
-> +
-> +       data = ifr->ifr_ifru.ifru_data;
-> +       size = sizeof(ioctl_data);
-> +
-> +       switch (cmd) {
-> +       /* These features are implied; alternatives are not supported */
-> +       case RMNET_IOCTL_SET_LLP_IP:            /* RAW IP protocol */
-> +       case RMNET_IOCTL_SET_QOS_DISABLE:       /* QoS header disabled */
-> +               return 0;
-> +
-> +       /* These features are not supported; use alternatives */
-> +       case RMNET_IOCTL_SET_LLP_ETHERNET:      /* Ethernet protocol */
-> +       case RMNET_IOCTL_SET_QOS_ENABLE:        /* QoS header enabled */
-> +       case RMNET_IOCTL_GET_OPMODE:            /* Get operation mode */
-> +       case RMNET_IOCTL_FLOW_ENABLE:           /* Flow enable */
-> +       case RMNET_IOCTL_FLOW_DISABLE:          /* Flow disable */
-> +       case RMNET_IOCTL_FLOW_SET_HNDL:         /* Set flow handle */
-> +               return -ENOTSUPP;
-> +
-> +       case RMNET_IOCTL_GET_LLP:               /* Get link protocol */
-> +               ioctl_data.u.operation_mode = RMNET_MODE_LLP_IP;
-> +               goto copy_out;
-> +
-> +       case RMNET_IOCTL_GET_QOS:               /* Get QoS header state */
-> +               ioctl_data.u.operation_mode = RMNET_MODE_NONE;
-> +               goto copy_out;
-> +
-> +       case RMNET_IOCTL_OPEN:                  /* Open transport port */
-> +       case RMNET_IOCTL_CLOSE:                 /* Close transport port */
-> +               return 0;
-> +
-> +       case RMNET_IOCTL_EXTENDED:              /* Extended IOCTLs */
-> +               return ipa_wwan_ioctl_extended(dev, data);
-> +
-> +       default:
-> +               return -EINVAL;
-> +       }
-
-It would help to remove everything that is a nop or not implemented
-or that returns a constant value here, those are clearly not
-relevant for the submission here.
-
-> +
-> +static const struct of_device_id rmnet_ipa_dt_match[] = {
-> +       {.compatible = "qcom,rmnet-ipa"},
-> +       {},
-> +};
-
-The match string looks overly generic, surely there must be plans
-to have future versions of this that might require identification.
-
-     Arnd
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 2cbef2d7c207..54625569d0bc 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -771,41 +771,75 @@ static void imx6_pcie_ltssm_disable(struct device *dev)
+ 	}
+ }
+ 
+ static void imx6_pcie_pm_turnoff(struct imx6_pcie *imx6_pcie)
+ {
+-	reset_control_assert(imx6_pcie->turnoff_reset);
+-	reset_control_deassert(imx6_pcie->turnoff_reset);
++	struct device *dev = imx6_pcie->pci->dev;
++
++	/* Some variants have a turnoff reset in DT */
++	if (imx6_pcie->turnoff_reset) {
++		reset_control_assert(imx6_pcie->turnoff_reset);
++		reset_control_deassert(imx6_pcie->turnoff_reset);
++		goto pm_turnoff_sleep;
++	}
++
++	/* Others poke directly at IOMUXC registers */
++	switch (imx6_pcie->variant) {
++	case IMX6SX:
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				IMX6SX_GPR12_PCIE_PM_TURN_OFF,
++				IMX6SX_GPR12_PCIE_PM_TURN_OFF);
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				IMX6SX_GPR12_PCIE_PM_TURN_OFF, 0);
++		break;
++	default:
++		dev_err(dev, "PME_Turn_Off not implemented\n");
++		return;
++	}
+ 
+ 	/*
+ 	 * Components with an upstream port must respond to
+ 	 * PME_Turn_Off with PME_TO_Ack but we can't check.
+ 	 *
+ 	 * The standard recommends a 1-10ms timeout after which to
+ 	 * proceed anyway as if acks were received.
+ 	 */
++pm_turnoff_sleep:
+ 	usleep_range(1000, 10000);
+ }
+ 
+ static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
+ {
+ 	clk_disable_unprepare(imx6_pcie->pcie);
+ 	clk_disable_unprepare(imx6_pcie->pcie_phy);
+ 	clk_disable_unprepare(imx6_pcie->pcie_bus);
+ 
+-	if (imx6_pcie->variant == IMX7D) {
++	switch (imx6_pcie->variant) {
++	case IMX6SX:
++		clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
++		break;
++	case IMX7D:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+ 				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
+ 				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
++		break;
++	default:
++		break;
+ 	}
+ }
+ 
++static inline bool imx6_pcie_supports_suspend(struct imx6_pcie *imx6_pcie)
++{
++	return (imx6_pcie->variant == IMX7D ||
++		imx6_pcie->variant == IMX6SX);
++}
++
+ static int imx6_pcie_suspend_noirq(struct device *dev)
+ {
+ 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+ 
+-	if (imx6_pcie->variant != IMX7D)
++	if (!imx6_pcie_supports_suspend(imx6_pcie))
+ 		return 0;
+ 
+ 	imx6_pcie_pm_turnoff(imx6_pcie);
+ 	imx6_pcie_clk_disable(imx6_pcie);
+ 	imx6_pcie_ltssm_disable(dev);
+@@ -817,11 +851,11 @@ static int imx6_pcie_resume_noirq(struct device *dev)
+ {
+ 	int ret;
+ 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+ 	struct pcie_port *pp = &imx6_pcie->pci->pp;
+ 
+-	if (imx6_pcie->variant != IMX7D)
++	if (!imx6_pcie_supports_suspend(imx6_pcie))
+ 		return 0;
+ 
+ 	imx6_pcie_assert_core_reset(imx6_pcie);
+ 	imx6_pcie_init_phy(imx6_pcie);
+ 	imx6_pcie_deassert_core_reset(imx6_pcie);
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index 6c1ad160ed87..c1b25f5e386d 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -438,10 +438,11 @@
+ #define IMX6SX_GPR5_DISP_MUX_DCIC1_LCDIF1		(0x0 << 1)
+ #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS			(0x1 << 1)
+ #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK			(0x1 << 1)
+ 
+ #define IMX6SX_GPR12_PCIE_TEST_POWERDOWN		BIT(30)
++#define IMX6SX_GPR12_PCIE_PM_TURN_OFF			BIT(16)
+ #define IMX6SX_GPR12_PCIE_RX_EQ_MASK			(0x7 << 0)
+ #define IMX6SX_GPR12_PCIE_RX_EQ_2			(0x2 << 0)
+ 
+ /* For imx6ul iomux gpr register field define */
+ #define IMX6UL_GPR1_ENET1_CLK_DIR		(0x1 << 17)
+-- 
+2.17.1
