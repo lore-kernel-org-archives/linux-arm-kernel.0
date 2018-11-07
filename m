@@ -1,40 +1,73 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 7 Nov 2018 09:38:47 +0100
-Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
-In-Reply-To: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
-References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
-Message-ID: <CAMuHMdW+=cVUBBzS7F990Wci4VKOzOqtYVeVOH9s3u0X7R95xw@mail.gmail.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 7 Nov 2018 09:39:28 +0100
+Subject: [PATCH] i2c: at91: switched to resume/suspend callbacks.
+In-Reply-To: <1540203006-805-1-git-send-email-andrei.stefanescu@microchip.com>
+References: <1540203006-805-1-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <20181107083928.vqgnpw3mmczjn4el@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, Oct 22, 2018 at 12:17:47PM +0200, Andrei Stefanescu - M50506 wrote:
+> In the previous version of the driver resume/suspend_noirq callbacks
+> were used. Because of this, when resuming from suspend-to-ram,
+> an I2C (belonging to a FLEXCOM) would resume before FLEXCOM.
+> The first read on the I2C bus would then result in a timeout.
+> 
+> This patch switches to resume/suspend callbacks which are 
+> called after FLEXCOM resumes. FLEXCOM, SPI and USART drivers use
+> resume/suspend callbacks.
+> 
+> Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
+I can't figure out why we use the _noirq variant. When patches for PM
+stuff were sent, suspend/resume callbacks were used but in the latest
+version it moved to the _noirq variant without explanation.
 
-On Tue, Nov 6, 2018 at 12:54 PM Robin Murphy <robin.murphy@arm.com> wrote:
-> of_dma_configure() was *supposed* to be following the same logic as
-> acpi_dma_configure() and only setting bus_dma_mask if some range was
-> specified by the firmware. However, it seems that subtlety got lost in
-> the process of fitting it into the differently-shaped control flow, and
-> as a result the force_dma==true case ends up always setting the bus mask
-> to the 32-bit default, which is not what anyone wants.
->
-> Make sure we only touch it if the DT actually said so.
->
-> Fixes: 6c2fb2ea7636 ("of/device: Set bus DMA mask as appropriate")
-> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Excepting if someone has an argument to keep the _noirq variant,
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com> 
 
-Thanks, this fixes the problem I saw with IPMMU on Salvator-X(S).
+Thanks
 
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Regards
 
-Gr{oetje,eeting}s,
+Ludovic
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  drivers/i2c/busses/i2c-at91.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index bfd1fdf..81f7b94 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -1174,7 +1174,7 @@ static int at91_twi_runtime_resume(struct device *dev)
+>  	return clk_prepare_enable(twi_dev->clk);
+>  }
+>  
+> -static int at91_twi_suspend_noirq(struct device *dev)
+> +static int at91_twi_suspend(struct device *dev)
+>  {
+>  	if (!pm_runtime_status_suspended(dev))
+>  		at91_twi_runtime_suspend(dev);
+> @@ -1182,7 +1182,7 @@ static int at91_twi_suspend_noirq(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int at91_twi_resume_noirq(struct device *dev)
+> +static int at91_twi_resume(struct device *dev)
+>  {
+>  	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+>  	int ret;
+> @@ -1202,8 +1202,8 @@ static int at91_twi_resume_noirq(struct device *dev)
+>  }
+>  
+>  static const struct dev_pm_ops at91_twi_pm = {
+> -	.suspend_noirq	= at91_twi_suspend_noirq,
+> -	.resume_noirq	= at91_twi_resume_noirq,
+> +	.suspend	= at91_twi_suspend,
+> +	.resume		= at91_twi_resume,
+>  	.runtime_suspend	= at91_twi_runtime_suspend,
+>  	.runtime_resume		= at91_twi_runtime_resume,
+>  };
+> -- 
+> 2.7.4
+> 
