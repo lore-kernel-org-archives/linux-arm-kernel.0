@@ -1,44 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Nov 2018 09:28:11 -0800
-Subject: [GIT PULL] ARM: SoC fixes
-In-Reply-To: <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
-References: <20181107171023.zoo6qox5eewy3pmk@localhost>
- <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
-Message-ID: <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 7 Nov 2018 18:23:40 +0100
+Subject: [PATCH 2/4] power: reset: at91-poweroff: move shdwc related data
+ to one structure
+In-Reply-To: <6719a808-e704-3c63-f592-3b90d44ccbfe@microchip.com>
+References: <1541416443-4321-1-git-send-email-claudiu.beznea@microchip.com>
+ <1541416443-4321-3-git-send-email-claudiu.beznea@microchip.com>
+ <20181106210933.GU24212@piout.net>
+ <6719a808-e704-3c63-f592-3b90d44ccbfe@microchip.com>
+Message-ID: <20181107172340.GF21694@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 9:17 AM Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
->
-> On Wed, Nov 7, 2018 at 9:10 AM Olof Johansson <olof@lixom.net> wrote:
-> >
-> > ARM: SoC fixes
->
-> Pulled.
->
-> > I was a bit too trigger happy to enable PREEMPT on multi_v7_defconfig,
-> > and it ended up regressing at least BeagleBone XM boards.
->
-> Odd. Did it hit some "may_sleep()" test in a driver that is hidden by
-> preempt being off? Otherwise I don't see how/why preempt should fail
-> in a board-specific manner..
+On 07/11/2018 14:54:17+0000, Claudiu.Beznea at microchip.com wrote:
+> Hi Alexandre,
+> 
+> On 06.11.2018 23:09, Alexandre Belloni wrote:
+> > Hi Claudiu,
+> > 
+> > On 05/11/2018 11:14:26+0000, Claudiu.Beznea at microchip.com wrote:
+> >>  static int __init at91_poweroff_probe(struct platform_device *pdev)
+> >> @@ -154,16 +160,22 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
+> >>  	u32 ddr_type;
+> >>  	int ret;
+> >>  
+> >> +	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
+> >> +	if (!at91_shdwc)
+> >> +		return -ENOMEM;
+> >> +
+> > 
+> > Is there any real benefit that will offset the time lost for that
+> > allocation at boot time?
+> 
+> No, I haven't run benchmarks on this. I only wanted to have them grouped in
+> one structure. Please let me know if you have some tests in mind.
+> 
 
-The board hangs early during boot and the usual way of collecting
-early console doesn't seem to work when attempted (I haven't tried
-personally).
+Well, it is probably not much but small things adds up. Havinf it as a
+global structure is probably good enough.
 
-It's one of the major non-SMP platforms covered by tests. I'd be
-surprised if it turns out to be truly _board_ specific (and rather
-specific to OMAP3), but we don't have enough data yet. Chances are it
-either shuffles some timing around or indeed hits a may_sleep() test
-somewhere.
+> > 
+> > I understand you are then testing at91_shdwc to know whether the driver
+> > already probed once. But, the driver will never probe twice as there is
+> > only one shutdown controller on the SoC and anyway, If it was to probe
+> > twice, it will still work as expected.
+> 
+> I had in mind the scenario where the driver would be compiled as module. I
+> know insmod already does this checking. I'm ok to remove this checking. I
+> will do it in next version. With this I will also remove devm_kzalloc() of
+> at91_shdwc.
+> 
 
-(I just realized I might have missed to attribute Guillaume in the
-revert patch. Sorry about that).
+Thanks,
 
-
--Olof
-
-
--Olof
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
