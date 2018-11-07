@@ -1,59 +1,26 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  7 Nov 2018 11:42:38 +0100
-Subject: [PATCH] pinctrl: meson-gxl: remove invalid GPIOX tsin_a pins
-Message-ID: <1541587358-17654-1-git-send-email-narmstrong@baylibre.com>
+Date: Wed,  7 Nov 2018 11:45:46 +0100
+Subject: [PATCH 0/4] arm64: dts: meson-gx: fix GPIO lines names
+Message-ID: <1541587550-17842-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIOX tsin_a pins wrongly uses the SDCard pinctrl bits, this
-patch completely removes these pins entries until we find out what
-are the correct bits and registers to be used instead.
+The gpio line names were set in the pinctrl node instead of the gpio node,
+at the time it was merged, it worked, but was obviously wrong.
+This patches moves the properties to the gpio nodes for the board DT having
+the GPIO lines names.
 
-Fixes: 5a6ae9b80139 ("pinctrl: meson-gxl: add tsin_a pins")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxl.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+Neil Armstrong (4):
+  arm64: dts: meson-gxl-libretech-cc: fix GPIO lines names
+  arm64: dts: meson-gxbb-nanopi-k2: fix GPIO lines names
+  arm64: dts: meson-gxbb-odroidc2: fix GPIO lines names
+  arm64: dts: meson-gxl-khadas-vim: fix GPIO lines names
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-index 7dae1d7..3277d17 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-@@ -239,13 +239,9 @@ static const unsigned int eth_link_led_pins[]	= { GPIOZ_14 };
- static const unsigned int eth_act_led_pins[]	= { GPIOZ_15 };
- 
- static const unsigned int tsin_a_d0_pins[]	= { GPIODV_0 };
--static const unsigned int tsin_a_d0_x_pins[]	= { GPIOX_10 };
- static const unsigned int tsin_a_clk_pins[]	= { GPIODV_8 };
--static const unsigned int tsin_a_clk_x_pins[]	= { GPIOX_11 };
- static const unsigned int tsin_a_sop_pins[]	= { GPIODV_9 };
--static const unsigned int tsin_a_sop_x_pins[]	= { GPIOX_8 };
- static const unsigned int tsin_a_d_valid_pins[] = { GPIODV_10 };
--static const unsigned int tsin_a_d_valid_x_pins[] = { GPIOX_9 };
- static const unsigned int tsin_a_fail_pins[]	= { GPIODV_11 };
- static const unsigned int tsin_a_dp_pins[] = {
- 	GPIODV_1, GPIODV_2, GPIODV_3, GPIODV_4, GPIODV_5, GPIODV_6, GPIODV_7,
-@@ -432,10 +428,6 @@ static struct meson_pmx_group meson_gxl_periphs_groups[] = {
- 	GROUP(spi_miso,		5,	2),
- 	GROUP(spi_ss0,		5,	1),
- 	GROUP(spi_sclk,		5,	0),
--	GROUP(tsin_a_sop_x,	6,	3),
--	GROUP(tsin_a_d_valid_x,	6,	2),
--	GROUP(tsin_a_d0_x,	6,	1),
--	GROUP(tsin_a_clk_x,	6,	0),
- 
- 	/* Bank Z */
- 	GROUP(eth_mdio,		4,	23),
-@@ -698,8 +690,8 @@ static const char * const eth_led_groups[] = {
- };
- 
- static const char * const tsin_a_groups[] = {
--	"tsin_a_clk", "tsin_a_clk_x", "tsin_a_sop", "tsin_a_sop_x",
--	"tsin_a_d_valid", "tsin_a_d_valid_x", "tsin_a_d0", "tsin_a_d0_x",
-+	"tsin_a_clk", "tsin_a_sop",
-+	"tsin_a_d_valid", "tsin_a_d0",
- 	"tsin_a_dp", "tsin_a_fail",
- };
- 
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts         | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts          | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts   | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
+
 -- 
 2.7.4
