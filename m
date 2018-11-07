@@ -1,37 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 7 Nov 2018 15:00:59 -0600
-Subject: [PATCH] arm64: dts: k3-am65-wakeup: Fix wakeup_uart reg address
-In-Reply-To: <8dc7a5d5-3e21-c2be-fde1-3f2bc6396bec@ti.com>
-References: <20180927050146.17847-1-vigneshr@ti.com>
- <8dc7a5d5-3e21-c2be-fde1-3f2bc6396bec@ti.com>
-Message-ID: <20181107210059.j2wd4v2uawsjniol@kahuna>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Nov 2018 21:14:29 +0000
+Subject: [PATCH] arm64: mm: define NET_IP_ALIGN to 0
+In-Reply-To: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+References: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181107211427.GA12248@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:10-20181005, Vutla, Lokesh wrote:
+On Wed, Nov 07, 2018 at 06:10:38PM +0100, Ard Biesheuvel wrote:
+> On arm64, there is no need to add 2 bytes of padding to the start of
+> each network buffer just to make the IP header appear 32-bit aligned.
 > 
+> Since this might actually adversely affect DMA performance some
+> platforms, let's override NET_IP_ALIGN to 0 to get rid of this
+> padding.
 > 
-> On Thursday 27 September 2018 10:31 AM, Vignesh R wrote:
-> > cbass_wakeup interconnect which is the parent of wakeup_uart node
-> > defines address-cells=1 and size-cells=1, therefore fix up reg property
-> > of wakeup_uart node accordingly. Otherwise, this UART instance fails to
-> > probe if enabled.
-> > 
-> > Fixes: 4201af2544b3 ("arm64: dts: ti: am654: Add uart nodes")
-> > Signed-off-by: Vignesh R <vigneshr@ti.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/processor.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 3e2091708b8e..6b0d4dff5012 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -24,6 +24,14 @@
+>  #define KERNEL_DS	UL(-1)
+>  #define USER_DS		(TASK_SIZE_64 - 1)
+>  
+> +/*
+> + * On arm64 systems, unaligned accesses by the CPU are cheap, and so there is
+> + * no point in shifting all network buffers by 2 bytes just to make some IP
+> + * header fields appear aligned in memory, potentially sacrificing some DMA
+> + * performance on some platforms.
+> + */
+> +#define NET_IP_ALIGN	0
 
-Tero:
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Could we pick this up for rc2? looks like $subject might be good to fix
-up to:
-arm64: dts: ti: k3-am65-wakeup: Fix wakeup_uart reg address
-instead of
-arm64: dts: k3-am65-wakeup: Fix wakeup_uart reg address
+If you end up refactoring this in the core code as Mark suggested, that's
+great, but I don't think it should hold this patch up.
 
-could be fixed locally.
-
--- 
-Regards,
-Nishanth Menon
+Will
