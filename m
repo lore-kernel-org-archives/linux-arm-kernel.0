@@ -1,36 +1,56 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed,  7 Nov 2018 10:06:26 -0600
-Subject: [GIT PULL] ARM: dts: stratix10 fix for v4.20
-Message-ID: <20181107160626.11892-1-dinguyen@kernel.org>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Wed, 7 Nov 2018 16:09:17 +0000
+Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
+ beagle-xm
+In-Reply-To: <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
+References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
+ <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+ <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
+ <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
+Message-ID: <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+On 06/11/2018 10:54, Guillaume Tucker wrote:
+> On 05/11/2018 14:33, Olof Johansson wrote:
+>> On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
+>> <guillaume.tucker@collabora.com> wrote:
+>>>
+>>> Hi Linus,
+>>>
+>>> Please see below, the kernelci.org automated boot bisection found
+>>> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
+>>> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
+>>> log output after the bootloader so the kernel seems to be
+>>> crashing very early on.
+>>
+>> Can you enable DEBUG_LL to capture what goes wrong?
+> 
+> Yes I've scheduled a re-run of the automated bisection with
+> DEBUG_LL turned on, but the beagle-xm board is currently offline
+> in lab-baylibre.  I'll keep you posted when I get some results.
 
-Please pull in this ethernet dts entry for Stratix10.
+Unfortunately, enabling the DEBUG_LL config didn't help.  There's
+still no visible kernel log at all from the failing LAVA jobs:
 
-Thanks,
-Dinh
+    http://lava.baylibre.com:10080/scheduler/alljobs?length=25&search=lava-bisect-9638#table
 
 
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+This might be a hard one to debug without physical access to the
+board, but please let me know if you think there's anything else
+I can try.  For example, if there's a known older kernel revision
+where the combination of SMP=n and PREEMPT=y worked then I could
+try to run an automated boot bisection based on that.
 
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+Guillaume
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/stratix10_dts_fix_for_v4.20
-
-for you to fetch changes up to fd5ba6ee3187617287fb9cb187e3d6b3631210a3:
-
-  arm64: dts: stratix10: fix multicast filtering (2018-11-05 13:17:33 -0600)
-
-----------------------------------------------------------------
-ARM: dts: stratix10: fix multicast filtering
-
-----------------------------------------------------------------
-Aaro Koskinen (1):
-      arm64: dts: stratix10: fix multicast filtering
-
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+>> The regression is on me. Linus sent the patch, but I was trigger happy
+>> and applied it to fixes instead of letting it soak in -next longer.
+>>
+>> I'll revert it in our fixes branch and send it in quickly, and apply
+>> it to a branch picked up by -next instead.
+> 
+> Ack - will also keep an eye on boot reports.
+> 
+> Guillaume
+> 
