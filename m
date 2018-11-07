@@ -1,58 +1,40 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 7 Nov 2018 18:23:40 +0100
-Subject: [PATCH 2/4] power: reset: at91-poweroff: move shdwc related data
- to one structure
-In-Reply-To: <6719a808-e704-3c63-f592-3b90d44ccbfe@microchip.com>
-References: <1541416443-4321-1-git-send-email-claudiu.beznea@microchip.com>
- <1541416443-4321-3-git-send-email-claudiu.beznea@microchip.com>
- <20181106210933.GU24212@piout.net>
- <6719a808-e704-3c63-f592-3b90d44ccbfe@microchip.com>
-Message-ID: <20181107172340.GF21694@piout.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Nov 2018 09:35:09 -0800
+Subject: [TECH TOPIC] SoC maintainer group
+In-Reply-To: <20181107171723.GI9919@thunk.org>
+References: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
+ <20181107171723.GI9919@thunk.org>
+Message-ID: <CAOesGMheCcvDQCd+7fyh4yOk4BYDfm2QRqsdawqA_fg8s9YYEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2018 14:54:17+0000, Claudiu.Beznea at microchip.com wrote:
-> Hi Alexandre,
-> 
-> On 06.11.2018 23:09, Alexandre Belloni wrote:
-> > Hi Claudiu,
-> > 
-> > On 05/11/2018 11:14:26+0000, Claudiu.Beznea at microchip.com wrote:
-> >>  static int __init at91_poweroff_probe(struct platform_device *pdev)
-> >> @@ -154,16 +160,22 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
-> >>  	u32 ddr_type;
-> >>  	int ret;
-> >>  
-> >> +	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
-> >> +	if (!at91_shdwc)
-> >> +		return -ENOMEM;
-> >> +
-> > 
-> > Is there any real benefit that will offset the time lost for that
-> > allocation at boot time?
-> 
-> No, I haven't run benchmarks on this. I only wanted to have them grouped in
-> one structure. Please let me know if you have some tests in mind.
-> 
+On Wed, Nov 7, 2018 at 9:17 AM Theodore Y. Ts'o <tytso@mit.edu> wrote:
+>
+> On Tue, Nov 06, 2018 at 02:16:27PM -0800, Olof Johansson wrote:
+> >
+> > Olof Johansson (arm-soc)
+> > Arnd Bergmann (arm-soc)
+> > Kevin Hilman (arm-soc)
+> > Mike Turquette (clk)
+> > Stephen Boyd (clk)
+> > Linus Walleij (pinctrl + more)
+> > Mike Brown (gpio/regmap + more)
+>
+> Could the poeple listed on this list please list potential schedule conflicts?
+>
+> I'm going to assume we should avoid: Andriod uConf, RISC-V uConf,
+> Device Tree uConf.  What are other potential conflicts.  I'm going to
+> guess this might be "interesting" to schedule.  :-)
 
-Well, it is probably not much but small things adds up. Havinf it as a
-global structure is probably good enough.
+Yeah, apologies for adding a bunch of cross-coordination this late too.
 
-> > 
-> > I understand you are then testing at91_shdwc to know whether the driver
-> > already probed once. But, the driver will never probe twice as there is
-> > only one shutdown controller on the SoC and anyway, If it was to probe
-> > twice, it will still work as expected.
-> 
-> I had in mind the scenario where the driver would be compiled as module. I
-> know insmod already does this checking. I'm ok to remove this checking. I
-> will do it in next version. With this I will also remove devm_kzalloc() of
-> at91_shdwc.
-> 
+It's likely going to be conflict-ridden no matter what we do. RISC-V
+and DT are the main conflicts, Android probably has a bit less.
 
-Thanks,
+Tuesday afternoon looks least conflict-y when I squint at the
+schedule, or Thursday afternoon (but ideally not overlapping with
+Daniel's DRM/gitlab session).
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+
+
+-Olof
