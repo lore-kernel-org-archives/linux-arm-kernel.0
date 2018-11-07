@@ -1,43 +1,56 @@
-From: pcc@google.com (Peter Collingbourne)
-Date: Tue,  6 Nov 2018 16:39:13 -0800
-Subject: [PATCH] arm64: Build vDSO with -ffixed-x18
-Message-ID: <20181107003913.19061-1-pcc@google.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 6 Nov 2018 16:40:20 -0800
+Subject: [RFC PATCH 12/12] soc: qcom: ipa: build and "ipa_i.h"
+In-Reply-To: <20181107003250.5832-13-elder@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-13-elder@linaro.org>
+Message-ID: <cebe0d3c-4a24-60a4-88c8-5195a5d0da4b@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vDSO needs to be build with x18 reserved in order to accommodate
-userspace platform ABIs built on top of Linux that use the register
-to carry inter-procedural state, as provided for by the AAPCS.
-An example of such a platform ABI is the one that will be used by an
-upcoming version of Android.
+Hi-
 
-Although this change is currently a no-op due to the fact that the vDSO
-is currently implemented in pure assembly on arm64, it is necessary
-in order to prepare for another change [1] that will add C code to
-the vDSO.
+On 11/6/18 4:32 PM, Alex Elder wrote:
+> diff --git a/drivers/net/ipa/Kconfig b/drivers/net/ipa/Kconfig
+> new file mode 100644
+> index 000000000000..f8ea9363f532
+> --- /dev/null
+> +++ b/drivers/net/ipa/Kconfig
+> @@ -0,0 +1,30 @@
+> +config IPA
+> +	tristate "Qualcomm IPA support"
+> +	depends on NET
+> +	select QCOM_QMI_HELPERS
+> +	select QCOM_MDT_LOADER
+> +	default n
+> +	help
+> +	  Choose Y here to include support for the Qualcomm IP
+> +	  Accelerator (IPA), a hardware block present in some
+> +	  Qualcomm SoCs.  The IPA is a programmable protocol
+> +	  processor that is capable of generic hardware handling
+> +	  of IP packets, including routing, filtering, and NAT.
+> +	  Currently the IPA driver supports only basic transport
+> +	  of network traffic between the AP and modem, on the
+> +	  Qualcomm SDM845 SoC.
+> +
+> +	  If unsure, say N.
+> +
+> +config IPA_ASSERT
+> +	bool "Enable IPA assertions"
+> +	depends on IPA
+> +	default y
+> +	help
+> +	 Incorporate IPA assertion verification in the build.  This
+> +	 cause various design assumptions to be checked at runtime,
 
-[1] https://patchwork.kernel.org/patch/10044501/
+	 causes
 
-Signed-off-by: Peter Collingbourne <pcc@google.com>
-Cc: Mark Salyzyn <salyzyn@google.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm64/kernel/vdso/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> +	 generating a report (and a crash) if any assumed condition
+> +	 does not hold.  You may wish to disable this to avoid the
+> +	 overhead of checking.
+> +
+> +	 If unsure doubt, say "Y" here.
 
-diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-index b215c712d897..8cd4707f832a 100644
---- a/arch/arm64/kernel/vdso/Makefile
-+++ b/arch/arm64/kernel/vdso/Makefile
-@@ -12,7 +12,7 @@ obj-vdso := gettimeofday.o note.o sigreturn.o
- targets := $(obj-vdso) vdso.so vdso.so.dbg
- obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
- 
--ccflags-y := -shared -fno-common -fno-builtin
-+ccflags-y := -shared -fno-common -fno-builtin -ffixed-x18
- ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
- 		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
- 
+
 -- 
-2.19.1.930.g4563a0d9d0-goog
+~Randy
