@@ -1,32 +1,59 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 7 Nov 2018 16:09:26 +0530
-Subject: [PATCH 2/2] spi: Kconfig: Enable McSPI driver for K3 platforms
-In-Reply-To: <20181107103926.32550-1-vigneshr@ti.com>
-References: <20181107103926.32550-1-vigneshr@ti.com>
-Message-ID: <20181107103926.32550-3-vigneshr@ti.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed,  7 Nov 2018 11:42:38 +0100
+Subject: [PATCH] pinctrl: meson-gxl: remove invalid GPIOX tsin_a pins
+Message-ID: <1541587358-17654-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable McSPI driver to be built for K3 platforms, to support McSPI on
-AM654 SoC of K3 family.
+The GPIOX tsin_a pins wrongly uses the SDCard pinctrl bits, this
+patch completely removes these pins entries until we find out what
+are the correct bits and registers to be used instead.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
+Fixes: 5a6ae9b80139 ("pinctrl: meson-gxl: add tsin_a pins")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/spi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/meson/pinctrl-meson-gxl.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 7d3a5c94727e..51e620264b62 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -435,7 +435,7 @@ config SPI_OMAP_UWIRE
+diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+index 7dae1d7..3277d17 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
++++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+@@ -239,13 +239,9 @@ static const unsigned int eth_link_led_pins[]	= { GPIOZ_14 };
+ static const unsigned int eth_act_led_pins[]	= { GPIOZ_15 };
  
- config SPI_OMAP24XX
- 	tristate "McSPI driver for OMAP"
--	depends on ARCH_OMAP2PLUS || COMPILE_TEST
-+	depends on ARCH_OMAP2PLUS || ARCH_K3 || COMPILE_TEST
- 	select SG_SPLIT
- 	help
- 	  SPI master controller for OMAP24XX and later Multichannel SPI
+ static const unsigned int tsin_a_d0_pins[]	= { GPIODV_0 };
+-static const unsigned int tsin_a_d0_x_pins[]	= { GPIOX_10 };
+ static const unsigned int tsin_a_clk_pins[]	= { GPIODV_8 };
+-static const unsigned int tsin_a_clk_x_pins[]	= { GPIOX_11 };
+ static const unsigned int tsin_a_sop_pins[]	= { GPIODV_9 };
+-static const unsigned int tsin_a_sop_x_pins[]	= { GPIOX_8 };
+ static const unsigned int tsin_a_d_valid_pins[] = { GPIODV_10 };
+-static const unsigned int tsin_a_d_valid_x_pins[] = { GPIOX_9 };
+ static const unsigned int tsin_a_fail_pins[]	= { GPIODV_11 };
+ static const unsigned int tsin_a_dp_pins[] = {
+ 	GPIODV_1, GPIODV_2, GPIODV_3, GPIODV_4, GPIODV_5, GPIODV_6, GPIODV_7,
+@@ -432,10 +428,6 @@ static struct meson_pmx_group meson_gxl_periphs_groups[] = {
+ 	GROUP(spi_miso,		5,	2),
+ 	GROUP(spi_ss0,		5,	1),
+ 	GROUP(spi_sclk,		5,	0),
+-	GROUP(tsin_a_sop_x,	6,	3),
+-	GROUP(tsin_a_d_valid_x,	6,	2),
+-	GROUP(tsin_a_d0_x,	6,	1),
+-	GROUP(tsin_a_clk_x,	6,	0),
+ 
+ 	/* Bank Z */
+ 	GROUP(eth_mdio,		4,	23),
+@@ -698,8 +690,8 @@ static const char * const eth_led_groups[] = {
+ };
+ 
+ static const char * const tsin_a_groups[] = {
+-	"tsin_a_clk", "tsin_a_clk_x", "tsin_a_sop", "tsin_a_sop_x",
+-	"tsin_a_d_valid", "tsin_a_d_valid_x", "tsin_a_d0", "tsin_a_d0_x",
++	"tsin_a_clk", "tsin_a_sop",
++	"tsin_a_d_valid", "tsin_a_d0",
+ 	"tsin_a_dp", "tsin_a_fail",
+ };
+ 
 -- 
-2.19.1
+2.7.4
