@@ -1,143 +1,183 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  7 Nov 2018 18:13:02 +0800
-Subject: [PATCH 09/15] Bluetooth: hci_bcm: Add support for regulator supplies
+Date: Wed,  7 Nov 2018 18:13:07 +0800
+Subject: [PATCH 14/15] ARM: dts: sunxi: Enable Broadcom-based Bluetooth for
+ multiple boards
 In-Reply-To: <20181107101308.7626-1-wens@csie.org>
 References: <20181107101308.7626-1-wens@csie.org>
-Message-ID: <20181107101308.7626-10-wens@csie.org>
+Message-ID: <20181107101308.7626-15-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom Bluetooth chips have two power inputs, VBAT and VDDIO.
-The former provides overall power for the chip, while the latter powers
-the I/O pins and buffers.
+This patch adds the Bluetooth node, and the underlying UART node if it's
+missing, to the board device tree file for several boards. The LPO clock
+is also added to the WiFi side's power sequencing node if it's missing,
+to correctly represent the shared connections. There is also a PCM
+connection for Bluetooth, but this is not covered in this patch.
 
-Model these two as regulator supplies, and let the driver manage them
-in the same way as it does the clock supply.
+These boards all have a WiFi+BT module from AMPAK, which contains one or
+two Broadcom chips, depending on the model. The older AP6210 contains
+two, while the newer AP6212 and AP6330 contain just one, as they use
+two-in-one combo chips.
+
+The Bluetooth side of the module is always connected to a UART on the
+same pingroup as the SDIO pins for the WiFi side, in a 4 wire
+configuration. Power to the VBAT and VDDIO pins are provided either by
+the PMIC, using one or several of its regulator outputs, or other fixed
+regulators on the board. The VBAT and VDDIO pins are shared with the
+WiFi side, which would correspond to vmmc-supply and vqmmc-supply in the
+mmc host node. A clock output from the SoC or the external X-Powers RTC
+provides the LPO low power clock at 32.768 kHz.
+
+All the boards covered in this patch are ones that do not require extra
+changes to the SoC's dtsi file. For the remaining boards that I have
+worked on, properties or device nodes for the LPO clock's source are
+missing.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/bluetooth/hci_bcm.c | 39 ++++++++++++++++++++++++++++---------
- 1 file changed, 30 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts    | 22 +++++++++++++++++++
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts  | 18 +++++++++++++++
+ .../boot/dts/sun8i-a83t-cubietruck-plus.dts   | 18 +++++++++++++++
+ arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts  | 14 ++++++++++++
+ 4 files changed, 72 insertions(+)
 
-diff --git a/drivers/bluetooth/hci_bcm.c b/drivers/bluetooth/hci_bcm.c
-index ab6e527952a9..060001f11a98 100644
---- a/drivers/bluetooth/hci_bcm.c
-+++ b/drivers/bluetooth/hci_bcm.c
-@@ -31,6 +31,7 @@
- #include <linux/property.h>
- #include <linux/platform_data/x86/apple.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/clk.h>
- #include <linux/gpio/consumer.h>
- #include <linux/tty.h>
-@@ -53,6 +54,8 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 5649161de1d7..ccbf3b7a062b 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -103,6 +103,8 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&mmc3_pwrseq_pin_cubietruck>;
+ 		reset-gpios = <&pio 7 9 GPIO_ACTIVE_LOW>; /* PH9 WIFI_EN */
++		clocks = <&ccu CLK_OUT_A>;
++		clock-names = "ext_clock";
+ 	};
  
- #define BCM_AUTOSUSPEND_DELAY	5000 /* default autosleep delay */
+ 	sound {
+@@ -246,6 +248,10 @@
+ };
  
-+#define BCM_NUM_SUPPLIES 2
+ &pio {
++	/* Pin outputs low power clock for WiFi and BT */
++	pinctrl-0 = <&clk_out_a_pins_a>;
++	pinctrl-names = "default";
 +
- /**
-  * struct bcm_device - device driver resources
-  * @serdev_hu: HCI UART controller struct
-@@ -73,7 +76,8 @@
-  * @btpd: Apple ACPI method to drive BT_REG_ON pin low ("Bluetooth Power Down")
-  * @txco_clk: external reference frequency clock used by Bluetooth device
-  * @lpo_clk: external LPO clock used by Bluetooth device
-- * @clk_enabled: whether clocks are prepared and enabled
-+ * @supplies: VBAT and VDDIO supplies used by Bluetooth device
-+ * @res_enabled: whether clocks and supplies are prepared and enabled
-  * @init_speed: default baudrate of Bluetooth device;
-  *	the host UART is initially set to this baudrate so that
-  *	it can configure the Bluetooth device for @oper_speed
-@@ -105,7 +109,8 @@ struct bcm_device {
+ 	ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 {
+ 		pins = "PH12";
+ 		function = "gpio_out";
+@@ -350,6 +356,22 @@
+ 	status = "okay";
+ };
  
- 	struct clk		*txco_clk;
- 	struct clk		*lpo_clk;
--	bool			clk_enabled;
-+	struct regulator_bulk_data supplies[BCM_NUM_SUPPLIES];
-+	bool			res_enabled;
- 
- 	u32			init_speed;
- 	u32			oper_speed;
-@@ -216,17 +221,21 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
- {
- 	int err;
- 
--	if (powered && !dev->clk_enabled) {
-+	if (powered && !dev->res_enabled) {
-+		err = regulator_bulk_enable(BCM_NUM_SUPPLIES, dev->supplies);
-+		if (err)
-+			return err;
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins_a>;
++	status = "okay";
 +
- 		/* LPO clock needs to be 32.768 kHz */
- 		err = clk_set_rate(dev->lpo_clk, 32768);
- 		if (err) {
- 			dev_err(dev->dev, "Could not set LPO clock rate\n");
--			return err;
-+			goto err_regulator_disable;
- 		}
- 
- 		err = clk_prepare_enable(dev->lpo_clk);
- 		if (err)
--			return err;
-+			goto err_regulator_disable;
- 
- 		err = clk_prepare_enable(dev->txco_clk);
- 		if (err)
-@@ -241,23 +250,27 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
- 	if (err)
- 		goto err_revert_shutdown;
- 
--	if (!powered && dev->clk_enabled) {
-+	if (!powered && dev->res_enabled) {
- 		clk_disable_unprepare(dev->txco_clk);
- 		clk_disable_unprepare(dev->lpo_clk);
-+		regulator_bulk_disable(BCM_NUM_SUPPLIES, dev->supplies);
- 	}
- 
--	dev->clk_enabled = powered;
-+	dev->res_enabled = powered;
- 
- 	return 0;
- 
- err_revert_shutdown:
- 	dev->set_shutdown(dev, !powered);
- err_txco_clk_disable:
--	if (powered && !dev->clk_enabled)
-+	if (powered && !dev->res_enabled)
- 		clk_disable_unprepare(dev->txco_clk);
- err_lpo_clk_disable:
--	if (powered && !dev->clk_enabled)
-+	if (powered && !dev->res_enabled)
- 		clk_disable_unprepare(dev->lpo_clk);
-+err_regulator_disable:
-+	if (powered && !dev->res_enabled)
-+		regulator_bulk_disable(BCM_NUM_SUPPLIES, dev->supplies);
- 	return err;
- }
- 
-@@ -936,6 +949,7 @@ static struct clk *bcm_get_txco(struct device *dev)
- static int bcm_get_resources(struct bcm_device *dev)
- {
- 	const struct dmi_system_id *dmi_id;
-+	int err;
- 
- 	dev->name = dev_name(dev->dev);
- 
-@@ -978,6 +992,13 @@ static int bcm_get_resources(struct bcm_device *dev)
- 	dev->set_device_wakeup = bcm_gpio_set_device_wakeup;
- 	dev->set_shutdown = bcm_gpio_set_shutdown;
- 
-+	dev->supplies[0].supply = "vbat";
-+	dev->supplies[1].supply = "vddio";
-+	err = devm_regulator_bulk_get(dev->dev, BCM_NUM_SUPPLIES,
-+				      dev->supplies);
-+	if (err)
-+		return err;
++	bluetooth {
++		compatible = "brcm,bcm20702a1";
++		clocks = <&ccu CLK_OUT_A>;
++		clock-names = "lpo";
++		device-wakeup-gpios = <&pio 7 24 GPIO_ACTIVE_LOW>; /* PH24 */
++		host-wakeup-gpios = <&pio 7 25 GPIO_ACTIVE_LOW>; /* PH25 */
++		shutdown-gpios = <&pio 7 18 GPIO_ACTIVE_HIGH>; /* PH18 */
++		max-speed = <1500000>;
++	};
++};
 +
- 	/* IRQ can be declared in ACPI table as Interrupt or GpioInt */
- 	if (dev->irq <= 0) {
- 		struct gpio_desc *gpio;
+ &usb_otg {
+ 	dr_mode = "otg";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 742d2946b08b..c21320c4f4c2 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -363,6 +363,24 @@
+ 	status = "okay";
+ };
+ 
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
++	uart-has-rtscts;
++	status = "okay";
++
++	bluetooth {
++		compatible = "brcm,bcm43438-bt";
++		clocks = <&ac100_rtc 1>;
++		clock-names = "lpo";
++		vbat-supply = <&reg_dldo1>;
++		vddio-supply = <&reg_dldo1>;
++		device-wakeup-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
++		host-wakeup-gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
++		shutdown-gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PL4 */
++	};
++};
++
+ &usbphy {
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+index e5f0645e53a7..a5a9f5a0603e 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+@@ -394,6 +394,24 @@
+ 	status = "okay";
+ };
+ 
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
++	uart-has-rtscts;
++	status = "okay";
++
++	bluetooth {
++		compatible = "brcm,bcm4330-bt";
++		clocks = <&ac100_rtc 1>;
++		clock-names = "lpo";
++		vbat-supply = <&reg_dcdc1>;
++		vddio-supply = <&reg_sw>;
++		device-wakeup-gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
++		host-wakeup-gpios = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
++		shutdown-gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PL4 */
++	};
++};
++
+ &usbphy {
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+diff --git a/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
+index 0dbdb29a8fff..b85acca94441 100644
+--- a/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
++++ b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
+@@ -91,6 +91,8 @@
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* PL06 */
++		clocks = <&rtc 1>;
++		clock-names = "ext_clock";
+ 	};
+ };
+ 
+@@ -299,7 +301,19 @@
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_a>, <&uart1_pins_cts_rts_a>;
++	uart-has-rtscts;
+ 	status = "okay";
++
++	bluetooth {
++		compatible = "brcm,bcm43438-bt";
++		clocks = <&rtc 1>;
++		clock-names = "lpo";
++		vbat-supply = <&reg_dldo1>;
++		vddio-supply = <&reg_aldo3>;
++		device-wakeup-gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
++		host-wakeup-gpios = <&r_pio 0 9 GPIO_ACTIVE_HIGH>; /* PL9 */
++		shutdown-gpios = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
++	};
+ };
+ 
+ &usb_otg {
 -- 
 2.19.1
