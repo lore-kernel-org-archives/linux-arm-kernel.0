@@ -1,94 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Nov 2018 15:36:50 +0100
-Subject: [RFC PATCH 04/12] soc: qcom: ipa: immediate commands
-In-Reply-To: <20181107003250.5832-5-elder@linaro.org>
-References: <20181107003250.5832-1-elder@linaro.org>
- <20181107003250.5832-5-elder@linaro.org>
-Message-ID: <CAK8P3a3iKshE3yCG477AeZbKbLtpDwMhn5mfLySFRLOLmUv5AQ@mail.gmail.com>
+From: frieder.schrempf@kontron.de (Frieder Schrempf)
+Date: Wed,  7 Nov 2018 15:43:21 +0100
+Subject: [PATCH v4 04/10] ARM: dts: Reflect change of FSL QSPI driver and
+ remove unused properties
+In-Reply-To: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
+References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
+Message-ID: <1541601809-16950-5-git-send-email-frieder.schrempf@kontron.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
->
-> +/**
-> + * struct ipahal_context - HAL global context data
-> + * @empty_fltrt_tbl:   Empty table to be used for table initialization
-> + */
-> +static struct ipahal_context {
-> +       struct ipa_dma_mem empty_fltrt_tbl;
-> +} ipahal_ctx_struct;
-> +static struct ipahal_context *ipahal_ctx = &ipahal_ctx_struct;
+From: Frieder Schrempf <frieder.schrempf@exceet.de>
 
-Remove the global variables here
+The FSL QSPI driver was moved to the SPI framework and it now
+acts as a SPI controller. Therefore the subnodes need to set
+spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
 
-> +/* Immediate commands H/W structures */
-> +
-> +/* struct ipa_imm_cmd_hw_ip_fltrt_init - IP_V*_FILTER_INIT/IP_V*_ROUTING_INIT
-> + * command payload in H/W format.
-> + * Inits IPv4/v6 routing or filter block.
-> + * @hash_rules_addr: Addr in system mem where hashable flt/rt rules starts
-> + * @hash_rules_size: Size in bytes of the hashable tbl to cpy to local mem
-> + * @hash_local_addr: Addr in shared mem where hashable flt/rt tbl should
-> + *  be copied to
-> + * @nhash_rules_size: Size in bytes of the non-hashable tbl to cpy to local mem
-> + * @nhash_local_addr: Addr in shared mem where non-hashable flt/rt tbl should
-> + *  be copied to
-> + * @rsvd: reserved
-> + * @nhash_rules_addr: Addr in sys mem where non-hashable flt/rt tbl starts
-> + */
-> +struct ipa_imm_cmd_hw_ip_fltrt_init {
-> +       u64 hash_rules_addr;
-> +       u64 hash_rules_size     : 12,
-> +           hash_local_addr     : 16,
-> +           nhash_rules_size    : 12,
-> +           nhash_local_addr    : 16,
-> +           rsvd                : 8;
-> +       u64 nhash_rules_addr;
-> +};
+Also the properties 'bus-num', 'fsl,spi-num-chipselects' and
+'fsl,spi-flash-chipselects' were never read by the driver and
+can be removed.
 
-In hardware structures, you should not use bit fields, as the ordering
-of the bits is not well-defined in C. The only portable way to do this
-is to use shifts and masks unfortunately.
+The 'reg' properties are adjusted to reflect the what bus and
+chipselect the flash is connected to, as the new driver needs
+this information.
 
-> +struct ipa_imm_cmd_hw_hdr_init_local {
-> +       u64 hdr_table_addr;
-> +       u32 size_hdr_table      : 12,
-> +           hdr_addr            : 16,
-> +           rsvd                : 4;
-> +};
+The property 'fsl,qspi-has-second-chip' is not needed anymore
+and will be removed after the old driver was disabled to avoid
+breaking ls1021a-moxa-uc-8410a.dts.
 
-I would also add a 'u32 pad' member at the end to make the padding
-explicit here, or mark the first member as '__aligned(4) __packed'
-if you want to avoid the padding.
+Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
+---
+ arch/arm/boot/dts/imx6sx-sdb-reva.dts       | 8 ++++++--
+ arch/arm/boot/dts/imx6sx-sdb.dts            | 8 ++++++--
+ arch/arm/boot/dts/imx6ul-14x14-evk.dtsi     | 2 ++
+ arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 5 ++---
+ 4 files changed, 16 insertions(+), 7 deletions(-)
 
-> +void *ipahal_dma_shared_mem_write_pyld(struct ipa_dma_mem *mem, u32 offset)
-> +{
-> +       struct ipa_imm_cmd_hw_dma_shared_mem *data;
-> +
-> +       ipa_assert(mem->size < 1 << 16);        /* size is 16 bits wide */
-> +       ipa_assert(offset < 1 << 16);           /* local_addr is 16 bits wide */
-> +
-> +       data = kzalloc(sizeof(*data), GFP_KERNEL);
-> +       if (!data)
-> +               return NULL;
-> +
-> +       data->size = mem->size;
-> +       data->local_addr = offset;
-> +       data->direction = 0;    /* 0 = write to IPA; 1 = read from IPA */
-> +       data->skip_pipeline_clear = 0;
-> +       data->pipeline_clear_options = IPAHAL_HPS_CLEAR;
-> +       data->system_addr = mem->phys;
-> +
-> +       return data;
-> +}
-
-The 'void *' return looks odd here, and also the dynamic allocation.
-It looks to me like all these functions could be better done the
-other way round, basically putting the
-ipa_imm_cmd_hw_dma_shared_mem etc structures on the stack
-of the caller. At least for this one, the dynamic allocation
-doesn't help at all because the caller is the same that
-frees it again after the command. I suspect the same is
-true for a lot of those commands.
-
-       Arnd
+diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+index 9cc6ff2..9997156 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+@@ -132,13 +132,17 @@
+ 		#size-cells = <1>;
+ 		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+ 		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 	};
+ 
+-	flash1: s25fl128s at 1 {
+-		reg = <1>;
++	flash1: s25fl128s at 2 {
++		reg = <2>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+ 		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 6dd9beb..9acfda8 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -117,15 +117,19 @@
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a", "jedec,spi-nor";
+ 		spi-max-frequency = <29000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ 
+-	flash1: n25q256a at 1 {
++	flash1: n25q256a at 2 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a", "jedec,spi-nor";
+ 		spi-max-frequency = <29000000>;
+-		reg = <1>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
++		reg = <2>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi b/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
+index 32a0723..c2c9a2a 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
+@@ -176,6 +176,8 @@
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a";
+ 		spi-max-frequency = <29000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+index d01f64b..6a83f30 100644
+--- a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
++++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+@@ -203,9 +203,6 @@
+ };
+ 
+ &qspi {
+-	bus-num = <0>;
+-	fsl,spi-num-chipselects = <2>;
+-	fsl,spi-flash-chipselects = <0>;
+ 	fsl,qspi-has-second-chip;
+ 	status = "okay";
+ 
+@@ -214,6 +211,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 
+ 		partitions at 0 {
+-- 
+2.7.4
