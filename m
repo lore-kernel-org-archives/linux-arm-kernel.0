@@ -1,1298 +1,838 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue,  6 Nov 2018 18:32:44 -0600
-Subject: [RFC PATCH 06/12] soc: qcom: ipa: QMI modem communication
+Date: Tue,  6 Nov 2018 18:32:42 -0600
+Subject: [RFC PATCH 04/12] soc: qcom: ipa: immediate commands
 In-Reply-To: <20181107003250.5832-1-elder@linaro.org>
 References: <20181107003250.5832-1-elder@linaro.org>
-Message-ID: <20181107003250.5832-7-elder@linaro.org>
+Message-ID: <20181107003250.5832-5-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-QMI is a mechanism that allows entities on the AP to communicate and
-coordinate with peer entities on a modem.  Each peer can create an
-endpoint for communicating with the other.  QMI defines a way for
-the format of messages sent between endpoints to be described, and
-uses a service to route and deliver these messages.
+This patch contains (mostly) code implementing "immediate commands."
+(The source files are still named "ipahal" for historical reasons.)
 
-For IPA, QMI is used to synchronize the startup sequence of the IPA
-drivers resident on the AP and modem.  The documentation in
-"ipa_qmi.c" below provides more detail about the message interchange
-involved.  The IPA QMI code is divided into the "main" code that
-implements message handling and synchronization, and the message
-code that defines the structure and layout of the messages used.
+One channel (APPS CMD_PROD) is used for sending commands *to* the
+IPA itself, rather than passing data through it.  These immediate
+commands are issued to the IPA using the normal GSI queueing
+mechanism.  And each command's completion is handled using the
+normal GSI transfer completion mechanisms.
+
+In addition to immediate commands, the "IPA HAL" includes code for
+interpreting status packets that are supplied to the IPA on consumer
+channels.
 
 Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- drivers/net/ipa/ipa_qmi.c     | 406 +++++++++++++++++++++++
- drivers/net/ipa/ipa_qmi.h     |  12 +
- drivers/net/ipa/ipa_qmi_msg.c | 587 ++++++++++++++++++++++++++++++++++
- drivers/net/ipa/ipa_qmi_msg.h | 233 ++++++++++++++
- 4 files changed, 1238 insertions(+)
- create mode 100644 drivers/net/ipa/ipa_qmi.c
- create mode 100644 drivers/net/ipa/ipa_qmi.h
- create mode 100644 drivers/net/ipa/ipa_qmi_msg.c
- create mode 100644 drivers/net/ipa/ipa_qmi_msg.h
+ drivers/net/ipa/ipahal.c | 541 +++++++++++++++++++++++++++++++++++++++
+ drivers/net/ipa/ipahal.h | 253 ++++++++++++++++++
+ 2 files changed, 794 insertions(+)
+ create mode 100644 drivers/net/ipa/ipahal.c
+ create mode 100644 drivers/net/ipa/ipahal.h
 
-diff --git a/drivers/net/ipa/ipa_qmi.c b/drivers/net/ipa/ipa_qmi.c
+diff --git a/drivers/net/ipa/ipahal.c b/drivers/net/ipa/ipahal.c
 new file mode 100644
-index 000000000000..a19cfc4043d3
+index 000000000000..de00bcd54d4f
 --- /dev/null
-+++ b/drivers/net/ipa/ipa_qmi.c
-@@ -0,0 +1,406 @@
++++ b/drivers/net/ipa/ipahal.c
+@@ -0,0 +1,541 @@
 +// SPDX-License-Identifier: GPL-2.0
 +
-+/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
 + * Copyright (C) 2018 Linaro Ltd.
 + */
 +
 +#include <linux/types.h>
-+#include <linux/string.h>
 +#include <linux/slab.h>
-+#include <linux/qrtr.h>
-+#include <linux/soc/qcom/qmi.h>
++#include <asm/unaligned.h>
 +
-+#include "ipa_qmi_msg.h"
-+
++#include "ipahal.h"
 +#include "ipa_i.h"	/* ipa_err() */
++#include "ipa_dma.h"
 +
-+#define QMI_INIT_DRIVER_TIMEOUT	60000	/* A minute in milliseconds */
-+
-+static bool ipa_qmi_initialized;
-+
-+/* The AP and modem perform a "handshake" at initialization time to
-+ * ensure each side knows the other side is ready.  Two pairs of QMI
-+ * handles (endpoints) are used for this; one provides service on
-+ * the modem for AP requests, and the other is on the AP to service
-+ * modem requests (and to supply an indication from the AP).
++/**
++ * DOC:  IPA Immediate Commands
 + *
-+ * The QMI service on the modem expects to receive an INIT_DRIVER
-+ * request from the AP, which contains parameters used by the
-+ * modem during initialization.  The AP sends this request as soon
-+ * as it is knows the service is available.  The modem responds to
-+ * this request immediately.
++ * The APPS_CMD_PROD channel is used to issue immediate commands to
++ * the IPA.  An immediate command is generally used to request the
++ * IPA do something other than data transfer.
 + *
-+ * When the modem learns the AP service is available, it is able
-+ * to communicate its status to the AP.  The modem uses this to
-+ * tell the AP when it is ready to receive an indication, sending
-+ * an INDICATION_REGISTER request to the handle served by the AP.
-+ * This is separate from the modem driver initialization.
++ * An immediate command is represented by a GSI transfer element.
++ * Each immediate command has a well-defined format, with a known
++ * length.  The transfer element's length field can therefore be
++ * used to hold a command's opcode.  The "payload" of an immediate
++ * command contains additional information required for the command.
++ * It resides in DRAM and is referred to using the DMA memory data
++ * pointer (the same one used to refer to the data in a "normal"
++ * transfer).
 + *
-+ * When the modem has completed the driver initialization requested
-+ * by the AP, it sends a DRIVER_INIT_COMPLETE request to the AP.
-+ * This request could arrive at the AP either before or after the
-+ * INDICATION_REGISTER request.
-+ *
-+ * The final step in the handshake occurs after the AP has received
-+ * both requests from the modem.  The AP completes the handshake by
-+ * sending an INIT_COMPLETE_IND indication message to the modem.
++ * Immediate commands are issued to the IPA through the APPS_CMD_PROD
++ * channel using the normal GSI queueing mechanism.  And each command's
++ * completion is handled using the normal GSI transfer completion
++ * mechanisms.
 + */
 +
-+#define IPA_HOST_SERVICE_SVC_ID		0x31
-+#define IPA_HOST_SVC_VERS		1
-+#define IPA_HOST_SERVICE_INS_ID		1
-+
-+#define IPA_MODEM_SERVICE_SVC_ID	0x31
-+#define IPA_MODEM_SERVICE_INS_ID	2
-+#define IPA_MODEM_SVC_VERS		1
-+
-+/* Used to send an INIT_DRIVER request to the modem */
-+static struct qmi_handle client_handle;
-+
-+/* Requests from the modem arrive on the server handle to tell us
-+ * when it is prepared to receive an INIT_COMPLETE indication, and
-+ * when its driver initialization is complete.  The AP sends the
-+ * indication after it has received and responded to both requests.
++/**
++ * struct ipahal_context - HAL global context data
++ * @empty_fltrt_tbl:	Empty table to be used for table initialization
 + */
-+static struct qmi_handle server_handle;
++static struct ipahal_context {
++	struct ipa_dma_mem empty_fltrt_tbl;
++} ipahal_ctx_struct;
++static struct ipahal_context *ipahal_ctx = &ipahal_ctx_struct;
 +
-+/* These track state during the handshake */
-+static bool indication_register_received;
-+static bool init_driver_response_received;
++/* enum ipa_pipeline_clear_option - Values for pipeline clear waiting options
++ * @IPAHAL_HPS_CLEAR: Wait for HPS clear. All queues except high priority queue
++ *  shall not be serviced until HPS is clear of packets or immediate commands.
++ *  The high priority Rx queue / Q6ZIP group shall still be serviced normally.
++ *
++ * @IPAHAL_SRC_GRP_CLEAR: Wait for originating source group to be clear
++ *  (for no packet contexts allocated to the originating source group).
++ *  The source group / Rx queue shall not be serviced until all previously
++ *  allocated packet contexts are released. All other source groups/queues shall
++ *  be serviced normally.
++ *
++ * @IPAHAL_FULL_PIPELINE_CLEAR: Wait for full pipeline to be clear.
++ *  All groups / Rx queues shall not be serviced until IPA pipeline is fully
++ *  clear. This should be used for debug only.
++ *
++ *  The values assigned to these are assumed by the REGISTER_WRITE
++ *  (struct ipa_imm_cmd_hw_register_write) and the DMA_SHARED_MEM
++ *  (struct ipa_imm_cmd_hw_dma_shared_mem) immediate commands for
++ *  IPA version 3 hardware.  They are also used to modify the opcode
++ *  used to implement these commands for IPA version 4 hardware.
++ */
++enum ipahal_pipeline_clear_option {
++	IPAHAL_HPS_CLEAR		= 0,
++	IPAHAL_SRC_GRP_CLEAR		= 1,
++	IPAHAL_FULL_PIPELINE_CLEAR	= 2,
++};
 +
-+/* Send an INIT_COMPLETE_IND indication message to the modem */
-+static int ipa_send_master_driver_init_complete_ind(struct qmi_handle *qmi,
-+						    struct sockaddr_qrtr *sq)
++/* Immediate commands H/W structures */
++
++/* struct ipa_imm_cmd_hw_ip_fltrt_init - IP_V*_FILTER_INIT/IP_V*_ROUTING_INIT
++ * command payload in H/W format.
++ * Inits IPv4/v6 routing or filter block.
++ * @hash_rules_addr: Addr in system mem where hashable flt/rt rules starts
++ * @hash_rules_size: Size in bytes of the hashable tbl to cpy to local mem
++ * @hash_local_addr: Addr in shared mem where hashable flt/rt tbl should
++ *  be copied to
++ * @nhash_rules_size: Size in bytes of the non-hashable tbl to cpy to local mem
++ * @nhash_local_addr: Addr in shared mem where non-hashable flt/rt tbl should
++ *  be copied to
++ * @rsvd: reserved
++ * @nhash_rules_addr: Addr in sys mem where non-hashable flt/rt tbl starts
++ */
++struct ipa_imm_cmd_hw_ip_fltrt_init {
++	u64 hash_rules_addr;
++	u64 hash_rules_size	: 12,
++	    hash_local_addr	: 16,
++	    nhash_rules_size	: 12,
++	    nhash_local_addr	: 16,
++	    rsvd		: 8;
++	u64 nhash_rules_addr;
++};
++
++/* struct ipa_imm_cmd_hw_hdr_init_local - HDR_INIT_LOCAL command payload
++ *  in H/W format.
++ * Inits hdr table within local mem with the hdrs and their length.
++ * @hdr_table_addr: Word address in sys mem where the table starts (SRC)
++ * @size_hdr_table: Size of the above (in bytes)
++ * @hdr_addr: header address in IPA sram (used as DST for memory copy)
++ * @rsvd: reserved
++ */
++struct ipa_imm_cmd_hw_hdr_init_local {
++	u64 hdr_table_addr;
++	u32 size_hdr_table	: 12,
++	    hdr_addr		: 16,
++	    rsvd		: 4;
++};
++
++/* struct ipa_imm_cmd_hw_dma_shared_mem - DMA_SHARED_MEM command payload
++ *  in H/W format.
++ * Perform mem copy into or out of the SW area of IPA local mem
++ * @sw_rsvd: Ignored by H/W. My be used by S/W
++ * @size: Size in bytes of data to copy. Expected size is up to 2K bytes
++ * @local_addr: Address in IPA local memory
++ * @direction: Read or write?
++ *	0: IPA write, Write to local address from system address
++ *	1: IPA read, Read from local address to system address
++ * @skip_pipeline_clear: 0 to wait until IPA pipeline is clear. 1 don't wait
++ * @pipeline_clear_options: options for pipeline to clear
++ *	0: HPS - no pkt inside HPS (not grp specific)
++ *	1: source group - The immediate cmd src grp does npt use any pkt ctxs
++ *	2: Wait until no pkt reside inside IPA pipeline
++ *	3: reserved
++ * @rsvd: reserved - should be set to zero
++ * @system_addr: Address in system memory
++ */
++struct ipa_imm_cmd_hw_dma_shared_mem {
++	u16 sw_rsvd;
++	u16 size;
++	u16 local_addr;
++	u16 direction			: 1,
++	    skip_pipeline_clear		: 1,
++	    pipeline_clear_options	: 2,
++	    rsvd			: 12;
++	u64 system_addr;
++};
++
++/* struct ipa_imm_cmd_hw_dma_task_32b_addr -
++ *	IPA_DMA_TASK_32B_ADDR command payload in H/W format.
++ * Used by clients using 32bit addresses. Used to perform DMA operation on
++ *  multiple descriptors.
++ *  The Opcode is dynamic, where it holds the number of buffer to process
++ * @sw_rsvd: Ignored by H/W. My be used by S/W
++ * @cmplt: Complete flag: When asserted IPA will interrupt SW when the entire
++ *  DMA related data was completely xfered to its destination.
++ * @eof: Enf Of Frame flag: When asserted IPA will assert the EOT to the
++ *  dest client. This is used used for aggr sequence
++ * @flsh: Flush flag: When asserted, pkt will go through the IPA blocks but
++ *  will not be xfered to dest client but rather will be discarded
++ * @lock: Lock endpoint flag: When asserted, IPA will stop processing
++ *  descriptors from other EPs in the same src grp (RX queue)
++ * @unlock: Unlock endpoint flag: When asserted, IPA will stop exclusively
++ *  servicing current EP out of the src EPs of the grp (RX queue)
++ * @size1: Size of buffer1 data
++ * @addr1: Pointer to buffer1 data
++ * @packet_size: Total packet size. If a pkt send using multiple DMA_TASKs,
++ *  only the first one needs to have this field set. It will be ignored
++ *  in subsequent DMA_TASKs until the packet ends (EOT). First DMA_TASK
++ *  must contain this field (2 or more buffers) or EOT.
++ */
++struct ipa_imm_cmd_hw_dma_task_32b_addr {
++	u16 sw_rsvd	: 11,
++	    cmplt	: 1,
++	    eof		: 1,
++	    flsh	: 1,
++	    lock	: 1,
++	    unlock	: 1;
++	u16 size1;
++	u32 addr1;
++	u16 packet_size;
++	u16 rsvd1;
++	u32 rsvd2;
++};
++
++/* IPA Status packet H/W structures and info */
++
++/* struct ipa_status_pkt_hw - IPA status packet payload in H/W format.
++ *  This structure describes the status packet H/W structure for the
++ *   following statuses: IPA_STATUS_PACKET, IPA_STATUS_DROPPED_PACKET,
++ *   IPA_STATUS_SUSPENDED_PACKET.
++ *  Other statuses types has different status packet structure.
++ * @status_opcode: The Type of the status (Opcode).
++ * @exception: (not bitmask) - the first exception that took place.
++ *  In case of exception, src endp and pkt len are always valid.
++ * @status_mask: Bit mask specifying on which H/W blocks the pkt was processed.
++ * @pkt_len: Pkt payload len including hdr, include retained hdr if used. Does
++ *  not include padding or checksum trailer len.
++ * @endp_src_idx: Source end point index.
++ * @rsvd1: reserved
++ * @endp_dest_idx: Destination end point index.
++ *  Not valid in case of exception
++ * @rsvd2: reserved
++ * @metadata: meta data value used by packet
++ * @flt_local: Filter table location flag: Does matching flt rule belongs to
++ *  flt tbl that resides in lcl memory? (if not, then system mem)
++ * @flt_hash: Filter hash hit flag: Does matching flt rule was in hash tbl?
++ * @flt_global: Global filter rule flag: Does matching flt rule belongs to
++ *  the global flt tbl? (if not, then the per endp tables)
++ * @flt_ret_hdr: Retain header in filter rule flag: Does matching flt rule
++ *  specifies to retain header?
++ * @flt_rule_id: The ID of the matching filter rule. This info can be combined
++ *  with endp_src_idx to locate the exact rule. ID=0x3ff reserved to specify
++ *  flt miss. In case of miss, all flt info to be ignored
++ * @rt_local: Route table location flag: Does matching rt rule belongs to
++ *  rt tbl that resides in lcl memory? (if not, then system mem)
++ * @rt_hash: Route hash hit flag: Does matching rt rule was in hash tbl?
++ * @ucp: UC Processing flag.
++ * @rt_tbl_idx: Index of rt tbl that contains the rule on which was a match
++ * @rt_rule_id: The ID of the matching rt rule. This info can be combined
++ *  with rt_tbl_idx to locate the exact rule. ID=0x3ff reserved to specify
++ *  rt miss. In case of miss, all rt info to be ignored
++ * @nat_hit: NAT hit flag: Was their NAT hit?
++ * @nat_entry_idx: Index of the NAT entry used of NAT processing
++ * @nat_type: Defines the type of the NAT operation (ignored for now)
++ * @tag_info: S/W defined value provided via immediate command
++ * @seq_num: Per source endp unique packet sequence number
++ * @time_of_day_ctr: running counter from IPA clock
++ * @hdr_local: Header table location flag: In header insertion, was the header
++ *  taken from the table resides in local memory? (If no, then system mem)
++ * @hdr_offset: Offset of used header in the header table
++ * @frag_hit: Frag hit flag: Was their frag rule hit in H/W frag table?
++ * @frag_rule: Frag rule index in H/W frag table in case of frag hit
++ * @hw_specific: H/W specific reserved value
++ */
++#define IPA_RULE_ID_BITS	10	/* See ipahal_is_rule_miss_id() */
++struct ipa_pkt_status_hw {
++	u8  status_opcode;
++	u8  exception;
++	u16 status_mask;
++	u16 pkt_len;
++	u8  endp_src_idx	: 5,
++	    rsvd1		: 3;
++	u8  endp_dest_idx	: 5,
++	    rsvd2		: 3;
++	u32 metadata;
++	u16 flt_local		: 1,
++	    flt_hash		: 1,
++	    flt_global		: 1,
++	    flt_ret_hdr		: 1,
++	    flt_rule_id		: IPA_RULE_ID_BITS,
++	    rt_local		: 1,
++	    rt_hash		: 1;
++	u16 ucp			: 1,
++	    rt_tbl_idx		: 5,
++	    rt_rule_id		: IPA_RULE_ID_BITS;
++	u64 nat_hit		: 1,
++	    nat_entry_idx	: 13,
++	    nat_type		: 2,
++	    tag_info		: 48;
++	u32 seq_num		: 8,
++	    time_of_day_ctr	: 24;
++	u16 hdr_local		: 1,
++	    hdr_offset		: 10,
++	    frag_hit		: 1,
++	    frag_rule		: 4;
++	u16 hw_specific;
++};
++
++void *ipahal_dma_shared_mem_write_pyld(struct ipa_dma_mem *mem, u32 offset)
 +{
-+	struct ipa_init_complete_ind ind = { };
++	struct ipa_imm_cmd_hw_dma_shared_mem *data;
 +
-+	ind.status.result = QMI_RESULT_SUCCESS_V01;
-+	ind.status.error = QMI_ERR_NONE_V01;
++	ipa_assert(mem->size < 1 << 16);	/* size is 16 bits wide */
++	ipa_assert(offset < 1 << 16);		/* local_addr is 16 bits wide */
 +
-+	return qmi_send_indication(qmi, sq, IPA_QMI_INIT_COMPLETE_IND,
-+				   IPA_QMI_INIT_COMPLETE_IND_SZ,
-+				   ipa_init_complete_ind_ei, &ind);
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return NULL;
++
++	data->size = mem->size;
++	data->local_addr = offset;
++	data->direction = 0;	/* 0 = write to IPA; 1 = read from IPA */
++	data->skip_pipeline_clear = 0;
++	data->pipeline_clear_options = IPAHAL_HPS_CLEAR;
++	data->system_addr = mem->phys;
++
++	return data;
 +}
 +
-+/* This function is called to determine whether to complete the
-+ * handshake by sending an INIT_COMPLETE_IND indication message to
-+ * the modem.  The "init_driver" parameter is false when we've
-+ * received an INDICATION_REGISTER request message from the modem,
-+ * or true when we've received the response from the INIT_DRIVER
-+ * request message we send.  If this function decides the message
-+ * should be sent, it calls ipa_send_master_driver_init_complete_ind()
-+ * to send it.
-+ */
-+static void ipa_handshake_complete(struct qmi_handle *qmi,
-+				   struct sockaddr_qrtr *sq, bool init_driver)
++void *ipahal_hdr_init_local_pyld(struct ipa_dma_mem *mem, u32 offset)
 +{
-+	bool send_it;
-+	int ret;
++	struct ipa_imm_cmd_hw_hdr_init_local *data;
 +
-+	if (init_driver) {
-+		init_driver_response_received = true;
-+		send_it = indication_register_received;
-+	} else {
-+		indication_register_received = true;
-+		send_it = init_driver_response_received;
++	ipa_assert(mem->size < 1 << 12);  /* size_hdr_table is 12 bits wide */
++	ipa_assert(offset < 1 << 16);		/* hdr_addr is 16 bits wide */
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return NULL;
++
++	data->hdr_table_addr = mem->phys;
++	data->size_hdr_table = mem->size;
++	data->hdr_addr = offset;
++
++	return data;
++}
++
++static void *fltrt_init_common(struct ipa_dma_mem *mem, u32 hash_offset,
++			       u32 nhash_offset)
++{
++	struct ipa_imm_cmd_hw_ip_fltrt_init *data;
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return NULL;
++
++	data->hash_rules_addr = (u64)mem->phys;
++	data->hash_rules_size = (u32)mem->size;
++	data->hash_local_addr = hash_offset;
++	data->nhash_rules_addr = (u64)mem->phys;
++	data->nhash_rules_size = (u32)mem->size;
++	data->nhash_local_addr = nhash_offset;
++
++	return data;
++}
++
++void *ipahal_ip_v4_routing_init_pyld(struct ipa_dma_mem *mem, u32 hash_offset,
++			       u32 nhash_offset)
++{
++	return fltrt_init_common(mem, hash_offset, nhash_offset);
++}
++
++void *ipahal_ip_v6_routing_init_pyld(struct ipa_dma_mem *mem, u32 hash_offset,
++				     u32 nhash_offset)
++{
++	return fltrt_init_common(mem, hash_offset, nhash_offset);
++}
++
++void *ipahal_ip_v4_filter_init_pyld(struct ipa_dma_mem *mem, u32 hash_offset,
++				    u32 nhash_offset)
++{
++	return fltrt_init_common(mem, hash_offset, nhash_offset);
++}
++
++void *ipahal_ip_v6_filter_init_pyld(struct ipa_dma_mem *mem, u32 hash_offset,
++				    u32 nhash_offset)
++{
++	return fltrt_init_common(mem, hash_offset, nhash_offset);
++}
++
++void *ipahal_dma_task_32b_addr_pyld(struct ipa_dma_mem *mem)
++{
++	struct ipa_imm_cmd_hw_dma_task_32b_addr *data;
++
++	/* size1 and packet_size are both 16 bits wide */
++	ipa_assert(mem->size < 1 << 16);
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return NULL;
++
++	data->cmplt = 0;
++	data->eof = 0;
++	data->flsh = 1;
++	data->lock = 0;
++	data->unlock = 0;
++	data->size1 = mem->size;
++	data->addr1 = mem->phys;
++	data->packet_size = mem->size;
++
++	return data;
++}
++
++void ipahal_payload_free(void *payload)
++{
++	kfree(payload);
++}
++
++/* IPA Packet Status Logic */
++
++/* Maps an exception type returned in a ipa_pkt_status_hw structure
++ * to the ipahal_pkt_status_exception value that represents it in
++ * the exception field of a ipahal_pkt_status structure.  Returns
++ * IPAHAL_PKT_STATUS_EXCEPTION_MAX for an unrecognized value.
++ */
++static enum ipahal_pkt_status_exception
++exception_map(u8 exception, bool is_ipv6)
++{
++	switch (exception) {
++	case 0x00:	return IPAHAL_PKT_STATUS_EXCEPTION_NONE;
++	case 0x01:	return IPAHAL_PKT_STATUS_EXCEPTION_DEAGGR;
++	case 0x04:	return IPAHAL_PKT_STATUS_EXCEPTION_IPTYPE;
++	case 0x08:	return IPAHAL_PKT_STATUS_EXCEPTION_PACKET_LENGTH;
++	case 0x10:	return IPAHAL_PKT_STATUS_EXCEPTION_FRAG_RULE_MISS;
++	case 0x20:	return IPAHAL_PKT_STATUS_EXCEPTION_SW_FILT;
++	case 0x40:	return is_ipv6 ? IPAHAL_PKT_STATUS_EXCEPTION_IPV6CT
++				       : IPAHAL_PKT_STATUS_EXCEPTION_NAT;
++	default:	return IPAHAL_PKT_STATUS_EXCEPTION_MAX;
 +	}
-+	if (!send_it)
-+		return;
-+
-+	ret = ipa_send_master_driver_init_complete_ind(qmi, sq);
-+	if (ret)
-+		ipa_err("error %d sending init complete indication\n", ret);
 +}
 +
-+/* Callback function to handle an INDICATION_REGISTER request message
-+ * from the modem.  This informs the AP that the modem is now ready to
-+ * receive the INIT_COMPLETE_IND indication message.
-+ */
-+static void ipa_indication_register_fn(struct qmi_handle *qmi,
-+				       struct sockaddr_qrtr *sq,
-+				       struct qmi_txn *txn,
-+				       const void *decoded)
++/* ipahal_pkt_status_get_size() - Get H/W size of packet status */
++u32 ipahal_pkt_status_get_size(void)
 +{
-+	struct ipa_indication_register_rsp rsp = { };
-+	int ret;
-+
-+	rsp.rsp.result = QMI_RESULT_SUCCESS_V01;
-+	rsp.rsp.error = QMI_ERR_NONE_V01;
-+
-+	ret = qmi_send_response(qmi, sq, txn, IPA_QMI_INDICATION_REGISTER,
-+				IPA_QMI_INDICATION_REGISTER_RSP_SZ,
-+				ipa_indication_register_rsp_ei, &rsp);
-+	if (ret)
-+		ipa_err("error %d sending response\n", ret);
-+	else
-+		ipa_handshake_complete(qmi, sq, false);
++	return sizeof(struct ipa_pkt_status_hw);
 +}
 +
-+/* Callback function to handle a DRIVER_INIT_COMPLETE request message
-+ * from the modem.  This informs the AP that the modem has completed
-+ * the initializion of its driver.
++/* ipahal_pkt_status_parse() - Parse Packet Status payload to abstracted form
++ * @unparsed_status: Pointer to H/W format of the packet status as read from H/W
++ * @status: Pointer to pre-allocated buffer where the parsed info will be stored
 + */
-+static void ipa_driver_init_complete_fn(struct qmi_handle *qmi,
-+					struct sockaddr_qrtr *sq,
-+					struct qmi_txn *txn,
-+					const void *decoded)
++void ipahal_pkt_status_parse(const void *unparsed_status,
++			     struct ipahal_pkt_status *status)
 +{
-+	struct ipa_driver_init_complete_rsp rsp = { };
-+	int ret;
++	const struct ipa_pkt_status_hw *hw_status = unparsed_status;
++	bool is_ipv6;
 +
-+	rsp.rsp.result = QMI_RESULT_SUCCESS_V01;
-+	rsp.rsp.error = QMI_ERR_NONE_V01;
-+
-+	ret = qmi_send_response(qmi, sq, txn, IPA_QMI_DRIVER_INIT_COMPLETE,
-+				IPA_QMI_DRIVER_INIT_COMPLETE_RSP_SZ,
-+				ipa_driver_init_complete_rsp_ei, &rsp);
-+	if (ret)
-+		ipa_err("error %d sending response\n", ret);
++	status->status_opcode =
++			(enum ipahal_pkt_status_opcode)hw_status->status_opcode;
++	is_ipv6 = hw_status->status_mask & BIT(7) ? false : true;
++	/* If hardware status values change we may have to re-map this */
++	status->status_mask =
++			(enum ipahal_pkt_status_mask)hw_status->status_mask;
++	status->exception = exception_map(hw_status->exception, is_ipv6);
++	status->pkt_len = hw_status->pkt_len;
++	status->endp_src_idx = hw_status->endp_src_idx;
++	status->endp_dest_idx = hw_status->endp_dest_idx;
++	status->metadata = hw_status->metadata;
++	status->rt_miss = ipahal_is_rule_miss_id(hw_status->rt_rule_id);
 +}
 +
-+/* The server handles two request message types sent by the modem. */
-+static struct qmi_msg_handler ipa_server_msg_handlers[] = {
-+	{
-+		.type		= QMI_REQUEST,
-+		.msg_id		= IPA_QMI_INDICATION_REGISTER,
-+		.ei		= ipa_indication_register_req_ei,
-+		.decoded_size	= IPA_QMI_INDICATION_REGISTER_REQ_SZ,
-+		.fn		= ipa_indication_register_fn,
-+	},
-+	{
-+		.type		= QMI_REQUEST,
-+		.msg_id		= IPA_QMI_DRIVER_INIT_COMPLETE,
-+		.ei		= ipa_driver_init_complete_req_ei,
-+		.decoded_size	= IPA_QMI_DRIVER_INIT_COMPLETE_REQ_SZ,
-+		.fn		= ipa_driver_init_complete_fn,
-+	},
-+};
-+
-+/* Callback function to handle an IPA_QMI_INIT_DRIVER response message
-+ * from the modem.  This only acknowledges that the modem received the
-+ * request.  The modem will eventually report that it has completed its
-+ * modem initialization by sending a IPA_QMI_DRIVER_INIT_COMPLETE request.
-+ */
-+static void ipa_init_driver_rsp_fn(struct qmi_handle *qmi,
-+				   struct sockaddr_qrtr *sq,
-+				   struct qmi_txn *txn,
-+				   const void *decoded)
++int ipahal_init(void)
 +{
-+	txn->result = 0;	/* IPA_QMI_INIT_DRIVER request was successful */
-+	complete(&txn->completion);
++	struct ipa_dma_mem *mem = &ipahal_ctx->empty_fltrt_tbl;
 +
-+	ipa_handshake_complete(qmi, sq, true);
++	/* Set up an empty filter/route table entry in system
++	 * memory.  This will be used, for example, to delete a
++	 * route safely.
++	 */
++	if (ipa_dma_alloc(mem, IPA_HW_TBL_WIDTH, GFP_KERNEL)) {
++		ipa_err("error allocating empty filter/route table\n");
++		return -ENOMEM;
++	}
++
++	return 0;
 +}
 +
-+/* The client handles one response message type sent by the modem. */
-+static struct qmi_msg_handler ipa_client_msg_handlers[] = {
-+	{
-+		.type		= QMI_RESPONSE,
-+		.msg_id		= IPA_QMI_INIT_DRIVER,
-+		.ei		= ipa_init_modem_driver_rsp_ei,
-+		.decoded_size	= IPA_QMI_INIT_DRIVER_RSP_SZ,
-+		.fn		= ipa_init_driver_rsp_fn,
-+	},
-+};
-+
-+/* Return a pointer to an init modem driver request structure, which
-+ * contains configuration parameters for the modem.  The modem may
-+ * be started multiple times, but generally these parameters don't
-+ * change so we can reuse the request structure once it's initialized.
-+ * The only exception is the skip_uc_load field, which will be set
-+ * only after the microcontroller has reported it has completed its
-+ * initialization.
-+ */
-+static const struct ipa_init_modem_driver_req *init_modem_driver_req(void)
++void ipahal_exit(void)
 +{
-+	static struct ipa_init_modem_driver_req req;
-+	u32 base;
-+
-+	/* This is not the first boot if the microcontroller is loaded */
-+	req.skip_uc_load = ipa_uc_loaded() ? 1 : 0;
-+	req.skip_uc_load_valid = true;
-+
-+	/* We only have to initialize most of it once */
-+	if (req.platform_type_valid)
-+		return &req;
-+
-+	/* All offsets are relative to the start of IPA shared memory */
-+	base = (u32)ipa_ctx->smem_offset;
-+
-+	req.platform_type_valid = true;
-+	req.platform_type = IPA_QMI_PLATFORM_TYPE_MSM_ANDROID;
-+
-+	req.hdr_tbl_info_valid = IPA_MEM_MODEM_HDR_SIZE ? 1 : 0;
-+	req.hdr_tbl_info.start = base + IPA_MEM_MODEM_HDR_OFST;
-+	req.hdr_tbl_info.end = req.hdr_tbl_info.start +
-+					IPA_MEM_MODEM_HDR_SIZE - 1;
-+
-+	req.v4_route_tbl_info_valid = true;
-+	req.v4_route_tbl_info.start = base + IPA_MEM_V4_RT_NHASH_OFST;
-+	req.v4_route_tbl_info.count = IPA_MEM_MODEM_RT_COUNT;
-+
-+	req.v6_route_tbl_info_valid = true;
-+	req.v6_route_tbl_info.start = base + IPA_MEM_V6_RT_NHASH_OFST;
-+	req.v6_route_tbl_info.count = IPA_MEM_MODEM_RT_COUNT;
-+
-+	req.v4_filter_tbl_start_valid = true;
-+	req.v4_filter_tbl_start = base + IPA_MEM_V4_FLT_NHASH_OFST;
-+
-+	req.v6_filter_tbl_start_valid = true;
-+	req.v6_filter_tbl_start = base + IPA_MEM_V6_FLT_NHASH_OFST;
-+
-+	req.modem_mem_info_valid = IPA_MEM_MODEM_SIZE ? 1 : 0;
-+	req.modem_mem_info.start = base + IPA_MEM_MODEM_OFST;
-+	req.modem_mem_info.size = IPA_MEM_MODEM_SIZE;
-+
-+	req.ctrl_comm_dest_end_pt_valid = true;
-+	req.ctrl_comm_dest_end_pt = ipa_client_ep_id(IPA_CLIENT_APPS_WAN_CONS);
-+
-+	req.hdr_proc_ctx_tbl_info_valid =
-+			IPA_MEM_MODEM_HDR_PROC_CTX_SIZE ? 1 : 0;
-+	req.hdr_proc_ctx_tbl_info.start =
-+			base + IPA_MEM_MODEM_HDR_PROC_CTX_OFST;
-+	req.hdr_proc_ctx_tbl_info.end = req.hdr_proc_ctx_tbl_info.start +
-+			IPA_MEM_MODEM_HDR_PROC_CTX_SIZE - 1;
-+
-+	req.v4_hash_route_tbl_info_valid = true;
-+	req.v4_hash_route_tbl_info.start = base + IPA_MEM_V4_RT_HASH_OFST;
-+	req.v4_hash_route_tbl_info.count = IPA_MEM_MODEM_RT_COUNT;
-+
-+	req.v6_hash_route_tbl_info_valid = true;
-+	req.v6_hash_route_tbl_info.start = base + IPA_MEM_V6_RT_HASH_OFST;
-+	req.v6_hash_route_tbl_info.count = IPA_MEM_MODEM_RT_COUNT;
-+
-+	req.v4_hash_filter_tbl_start_valid = true;
-+	req.v4_hash_filter_tbl_start = base + IPA_MEM_V4_FLT_HASH_OFST;
-+
-+	req.v6_hash_filter_tbl_start_valid = true;
-+	req.v6_hash_filter_tbl_start = base + IPA_MEM_V6_FLT_HASH_OFST;
-+
-+	return &req;
++	ipa_dma_free(&ipahal_ctx->empty_fltrt_tbl);
 +}
 +
-+/* The modem service we requested is now available via the client
-+ * handle.  Send an INIT_DRIVER request to the modem.
++/* Does the given rule ID represent a routing or filter rule miss?
++ * A rule miss is indicated as an all-1's value in the rt_rule_id
++ * or flt_rule_id field of the ipahal_pkt_status structure.
 + */
-+static int
-+ipa_client_new_server(struct qmi_handle *qmi, struct qmi_service *svc)
++bool ipahal_is_rule_miss_id(u32 id)
 +{
-+	const struct ipa_init_modem_driver_req *req = init_modem_driver_req();
-+	struct sockaddr_qrtr sq;
-+	struct qmi_txn *txn;
-+	int ret;
++	BUILD_BUG_ON(IPA_RULE_ID_BITS < 2);
 +
-+	txn = kzalloc(sizeof(*txn), GFP_KERNEL);
-+	if (!txn)
++	return id == (1U << IPA_RULE_ID_BITS) - 1;
++}
++
++/**
++ * ipahal_rt_generate_empty_img() - Generate empty route table header
++ * @route_count:	Number of table entries
++ * @mem:		DMA memory object representing the header structure
++ *
++ * Allocates and fills an "empty" route table header having the given
++ * number of entries.  Each entry in the table contains the DMA address
++ * of a routing entry.
++ *
++ * This function initializes all entries to point@the preallocated
++ * empty routing entry in system RAM.
++ *
++ * Return:	0 if successful, or a negative error code otherwise
++ */
++int ipahal_rt_generate_empty_img(u32 route_count, struct ipa_dma_mem *mem)
++{
++	u64 addr;
++	int i;
++
++	BUILD_BUG_ON(!IPA_HW_TBL_HDR_WIDTH);
++
++	if (ipa_dma_alloc(mem, route_count * IPA_HW_TBL_HDR_WIDTH, GFP_KERNEL))
 +		return -ENOMEM;
 +
-+	ret = qmi_txn_init(qmi, txn, NULL, NULL);
-+	if (ret) {
-+		kfree(txn);
-+		return ret;
-+	}
-+
-+	sq.sq_family = AF_QIPCRTR;
-+	sq.sq_node = svc->node;
-+	sq.sq_port = svc->port;
-+
-+	ret = qmi_send_request(qmi, &sq, txn, IPA_QMI_INIT_DRIVER,
-+			       IPA_QMI_INIT_DRIVER_REQ_SZ,
-+			       ipa_init_modem_driver_req_ei, req);
-+	if (!ret)
-+		ret = qmi_txn_wait(txn, MAX_SCHEDULE_TIMEOUT);
-+	if (ret)
-+		qmi_txn_cancel(txn);
-+	kfree(txn);
-+
-+	return ret;
-+}
-+
-+/* The only callback we supply for the client handle is notification
-+ * that the service on the modem has become available.
-+ */
-+static struct qmi_ops ipa_client_ops = {
-+	.new_server	= ipa_client_new_server,
-+};
-+
-+static int ipa_qmi_initialize(void)
-+{
-+	int ret;
-+
-+	/* The only handle operation that might be interesting for the
-+	 * server would be del_client, to find out when the modem side
-+	 * client has disappeared.  But other than reporting the event,
-+	 * we wouldn't do anything about that.  So we just pass a null
-+	 * pointer for its handle operations.  All the real work is
-+	 * done by the message handlers.
-+	 */
-+	ret = qmi_handle_init(&server_handle, IPA_QMI_SERVER_MAX_RCV_SZ,
-+			      NULL, ipa_server_msg_handlers);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = qmi_add_server(&server_handle, IPA_HOST_SERVICE_SVC_ID,
-+			     IPA_HOST_SVC_VERS, IPA_HOST_SERVICE_INS_ID);
-+	if (ret < 0)
-+		goto err_release_server_handle;
-+
-+	/* The client handle is only used for sending an INIT_DRIVER
-+	 * request to the modem, and receiving its response message.
-+	 */
-+	ret = qmi_handle_init(&client_handle, IPA_QMI_CLIENT_MAX_RCV_SZ,
-+			      &ipa_client_ops, ipa_client_msg_handlers);
-+	if (ret < 0)
-+		goto err_release_server_handle;
-+
-+	ret = qmi_add_lookup(&client_handle, IPA_MODEM_SERVICE_SVC_ID,
-+			     IPA_MODEM_SVC_VERS, IPA_MODEM_SERVICE_INS_ID);
-+	if (ret < 0)
-+		goto err_release_client_handle;
-+
-+	ipa_qmi_initialized = true;
-+
-+	return 0;
-+
-+err_release_client_handle:
-+	/* Releasing the handle also removes registered lookups */
-+	qmi_handle_release(&client_handle);
-+	memset(&client_handle, 0, sizeof(client_handle));
-+err_release_server_handle:
-+	/* Releasing the handle also removes registered services */
-+	qmi_handle_release(&server_handle);
-+	memset(&server_handle, 0, sizeof(server_handle));
-+
-+	return ret;
-+}
-+
-+/* This is called by the rmnet probe routine.  The rmnet driver can
-+ * be unregistered after it has been initialized as a result of a
-+ * subsystem shutdown; it can later be registered again if a
-+ * subsystem restart occurs.  This function can therefore be called
-+ * more than once.
-+ */
-+int ipa_qmi_init(void)
-+{
-+	init_driver_response_received = false;
-+	indication_register_received = false;
-+
-+	if (!ipa_qmi_initialized)
-+		return ipa_qmi_initialize();
++	addr = (u64)ipahal_ctx->empty_fltrt_tbl.phys;
++	for (i = 0; i < route_count; i++)
++		put_unaligned(addr, mem->virt + i * IPA_HW_TBL_HDR_WIDTH);
 +
 +	return 0;
 +}
 +
-+void ipa_qmi_exit(void)
++/**
++ * ipahal_flt_generate_empty_img() - Generate empty filter table header
++ * @filter_bitmap:	Bitmap representing which endpoints support filtering
++ * @mem:		DMA memory object representing the header structure
++ *
++ * Allocates and fills an "empty" filter table header based on the
++ * given filter bitmap.
++ *
++ * The first slot in a filter table header is a 64-bit bitmap whose
++ * set bits define which endpoints support filtering.  Following
++ * this, each set bit in the mask has the DMA address of the filter
++ * used for the corresponding endpoint.
++ *
++ * This function initializes all endpoints that support filtering to
++ * point at the preallocated empty filter in system RAM.
++ *
++ * Note:  the (software) bitmap here uses bit 0 to represent
++ * endpoint 0, bit 1 for endpoint 1, and so on.  This is different
++ * from the hardware (which uses bit 1 to represent filter 0, etc.).
++ *
++ * Return:	0 if successful, or a negative error code
++ */
++int ipahal_flt_generate_empty_img(u64 filter_bitmap, struct ipa_dma_mem *mem)
 +{
-+	if (!ipa_qmi_initialized)
-+		return;
++	u32 filter_count = hweight32(filter_bitmap) + 1;
++	u64 addr;
++	int i;
 +
-+	qmi_handle_release(&client_handle);
-+	memset(&client_handle, 0, sizeof(client_handle));
++	ipa_assert(filter_bitmap);
 +
-+	qmi_handle_release(&server_handle);
-+	memset(&server_handle, 0, sizeof(server_handle));
++	if (ipa_dma_alloc(mem, filter_count * IPA_HW_TBL_HDR_WIDTH, GFP_KERNEL))
++		return -ENOMEM;
 +
-+	ipa_qmi_initialized = false;
++	/* Save the endpoint bitmap in the first slot of the table.
++	 * Convert it from software to hardware representation by
++	 * shifting it left one position.
++	 * XXX Does bit position 0 represent global?  At IPA3, global
++	 * XXX configuration is possible but not used.
++	 */
++	put_unaligned(filter_bitmap << 1, mem->virt);
++
++	/* Point every entry in the table at the empty filter */
++	addr = (u64)ipahal_ctx->empty_fltrt_tbl.phys;
++	for (i = 1; i < filter_count; i++)
++		put_unaligned(addr, mem->virt + i * IPA_HW_TBL_HDR_WIDTH);
++
++	return 0;
 +}
-diff --git a/drivers/net/ipa/ipa_qmi.h b/drivers/net/ipa/ipa_qmi.h
++
++void ipahal_free_empty_img(struct ipa_dma_mem *mem)
++{
++	ipa_dma_free(mem);
++}
+diff --git a/drivers/net/ipa/ipahal.h b/drivers/net/ipa/ipahal.h
 new file mode 100644
-index 000000000000..3c03ff5c0454
+index 000000000000..940254940d90
 --- /dev/null
-+++ b/drivers/net/ipa/ipa_qmi.h
-@@ -0,0 +1,12 @@
++++ b/drivers/net/ipa/ipahal.h
+@@ -0,0 +1,253 @@
 +// SPDX-License-Identifier: GPL-2.0
 +
-+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
 + * Copyright (C) 2018 Linaro Ltd.
 + */
-+#ifndef _IPA_QMI_H_
-+#define _IPA_QMI_H_
++#ifndef _IPAHAL_H_
++#define _IPAHAL_H_
 +
-+int ipa_qmi_init(void);
-+void ipa_qmi_exit(void);
++#include <linux/types.h>
 +
-+#endif /* !_IPA_QMI_H_ */
-diff --git a/drivers/net/ipa/ipa_qmi_msg.c b/drivers/net/ipa/ipa_qmi_msg.c
-new file mode 100644
-index 000000000000..c5347c63ef41
---- /dev/null
-+++ b/drivers/net/ipa/ipa_qmi_msg.c
-@@ -0,0 +1,587 @@
-+// SPDX-License-Identifier: GPL-2.0
++#include "ipa_dma.h"
 +
-+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+ * Copyright (C) 2018 Linaro Ltd.
++/* The IPA implements offloaded packet filtering and routing
++ * capabilities.  This is managed by programming IPA-resident
++ * tables of rules that define the processing that should be
++ * performed by the IPA and the conditions under which they
++ * should be applied.  Aspects of these rules are constrained
++ * by things like table entry sizes and alignment requirements;
++ * all of these are in units of bytes.  These definitions are
++ * subject to some constraints:
++ * - IPA_HW_TBL_WIDTH must be non-zero
++ * - IPA_HW_TBL_SYSADDR_ALIGN must be a non-zero power of 2
++ * - IPA_HW_TBL_HDR_WIDTH must be non-zero
++ *
++ * Values could differ for different versions of IPA hardware.
++ * These values are for v3.5.1, found in the SDM845.
 + */
-+#include <linux/stddef.h>
-+#include <linux/soc/qcom/qmi.h>
++#define IPA_HW_TBL_WIDTH		8
++#define IPA_HW_TBL_SYSADDR_ALIGN	128
++#define IPA_HW_TBL_HDR_WIDTH		8
 +
-+#include "ipa_qmi_msg.h"
-+
-+#ifndef sizeof_field
-+#define sizeof_field(TYPE, MEMBER)	sizeof(((TYPE *)0)->MEMBER)
-+#endif /* !sizeof_field */
-+
-+/* QMI message structure definition for struct ipa_indication_register_req */
-+struct qmi_elem_info ipa_indication_register_req_ei[] = {
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_indication_register_req,
-+				     master_driver_init_complete_valid),
-+		.tlv_type	= 0x10,
-+		.offset		= offsetof(struct ipa_indication_register_req,
-+					   master_driver_init_complete_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_1_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_indication_register_req,
-+				     master_driver_init_complete),
-+		.tlv_type	= 0x10,
-+		.offset		= offsetof(struct ipa_indication_register_req,
-+					   master_driver_init_complete),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_indication_register_req,
-+				     data_usage_quota_reached_valid),
-+		.tlv_type	= 0x11,
-+		.offset		= offsetof(struct ipa_indication_register_req,
-+					   data_usage_quota_reached_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_1_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_indication_register_req,
-+				     data_usage_quota_reached),
-+		.tlv_type	= 0x11,
-+		.offset		= offsetof(struct ipa_indication_register_req,
-+					   data_usage_quota_reached),
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_indication_register_rsp */
-+struct qmi_elem_info ipa_indication_register_rsp_ei[] = {
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_indication_register_rsp,
-+				     rsp),
-+		.tlv_type	= 0x02,
-+		.offset		= offsetof(struct ipa_indication_register_rsp,
-+					   rsp),
-+		.ei_array	= qmi_response_type_v01_ei,
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_driver_init_complete_req */
-+struct qmi_elem_info ipa_driver_init_complete_req_ei[] = {
-+	{
-+		.data_type	= QMI_UNSIGNED_1_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_driver_init_complete_req,
-+				     status),
-+		.tlv_type	= 0x01,
-+		.offset		= offsetof(struct ipa_driver_init_complete_req,
-+					   status),
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_driver_init_complete_rsp */
-+struct qmi_elem_info ipa_driver_init_complete_rsp_ei[] = {
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_driver_init_complete_rsp,
-+				     rsp),
-+		.tlv_type	= 0x02,
-+		.elem_size	= offsetof(struct ipa_driver_init_complete_rsp,
-+					   rsp),
-+		.ei_array	= qmi_response_type_v01_ei,
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_init_complete_ind */
-+struct qmi_elem_info ipa_init_complete_ind_ei[] = {
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_complete_ind,
-+				     status),
-+		.tlv_type	= 0x02,
-+		.elem_size	= offsetof(struct ipa_init_complete_ind,
-+					   status),
-+		.ei_array	= qmi_response_type_v01_ei,
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_mem_bounds */
-+struct qmi_elem_info ipa_mem_bounds_ei[] = {
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_mem_bounds, start),
-+		.offset		= offsetof(struct ipa_mem_bounds, start),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_mem_bounds, end),
-+		.offset		= offsetof(struct ipa_mem_bounds, end),
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_mem_array */
-+struct qmi_elem_info ipa_mem_array_ei[] = {
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_mem_array, start),
-+		.offset		= offsetof(struct ipa_mem_array, start),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_mem_array, count),
-+		.offset		= offsetof(struct ipa_mem_array, count),
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_mem_range */
-+struct qmi_elem_info ipa_mem_range_ei[] = {
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_mem_range, start),
-+		.offset		= offsetof(struct ipa_mem_range, start),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_mem_range, size),
-+		.offset		= offsetof(struct ipa_mem_range, size),
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_init_modem_driver_req */
-+struct qmi_elem_info ipa_init_modem_driver_req_ei[] = {
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     platform_type_valid),
-+		.tlv_type	= 0x10,
-+		.elem_size	= offsetof(struct ipa_init_modem_driver_req,
-+					   platform_type_valid),
-+	},
-+	{
-+		.data_type	= QMI_SIGNED_4_BYTE_ENUM,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     platform_type),
-+		.tlv_type	= 0x10,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   platform_type),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     hdr_tbl_info_valid),
-+		.tlv_type	= 0x11,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   hdr_tbl_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     hdr_tbl_info),
-+		.tlv_type	= 0x11,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   hdr_tbl_info),
-+		.ei_array	= ipa_mem_bounds_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_route_tbl_info_valid),
-+		.tlv_type	= 0x12,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_route_tbl_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_route_tbl_info),
-+		.tlv_type	= 0x12,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_route_tbl_info),
-+		.ei_array	= ipa_mem_array_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_route_tbl_info_valid),
-+		.tlv_type	= 0x13,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_route_tbl_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_route_tbl_info),
-+		.tlv_type	= 0x13,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_route_tbl_info),
-+		.ei_array	= ipa_mem_array_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_filter_tbl_start_valid),
-+		.tlv_type	= 0x14,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_filter_tbl_start_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_filter_tbl_start),
-+		.tlv_type	= 0x14,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_filter_tbl_start),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_filter_tbl_start_valid),
-+		.tlv_type	= 0x15,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_filter_tbl_start_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_filter_tbl_start),
-+		.tlv_type	= 0x15,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_filter_tbl_start),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     modem_mem_info_valid),
-+		.tlv_type	= 0x16,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   modem_mem_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     modem_mem_info),
-+		.tlv_type	= 0x16,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   modem_mem_info),
-+		.ei_array	= ipa_mem_range_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     ctrl_comm_dest_end_pt_valid),
-+		.tlv_type	= 0x17,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   ctrl_comm_dest_end_pt_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     ctrl_comm_dest_end_pt),
-+		.tlv_type	= 0x17,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   ctrl_comm_dest_end_pt),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     skip_uc_load_valid),
-+		.tlv_type	= 0x18,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   skip_uc_load_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_1_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     skip_uc_load),
-+		.tlv_type	= 0x18,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   skip_uc_load),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     hdr_proc_ctx_tbl_info_valid),
-+		.tlv_type	= 0x19,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   hdr_proc_ctx_tbl_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     hdr_proc_ctx_tbl_info),
-+		.tlv_type	= 0x19,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   hdr_proc_ctx_tbl_info),
-+		.ei_array	= ipa_mem_bounds_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     zip_tbl_info_valid),
-+		.tlv_type	= 0x1a,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   zip_tbl_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     zip_tbl_info),
-+		.tlv_type	= 0x1a,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   zip_tbl_info),
-+		.ei_array	= ipa_mem_bounds_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_hash_route_tbl_info_valid),
-+		.tlv_type	= 0x1b,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_hash_route_tbl_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_hash_route_tbl_info),
-+		.tlv_type	= 0x1b,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_hash_route_tbl_info),
-+		.ei_array	= ipa_mem_array_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_hash_route_tbl_info_valid),
-+		.tlv_type	= 0x1c,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_hash_route_tbl_info_valid),
-+	},
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_hash_route_tbl_info),
-+		.tlv_type	= 0x1c,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_hash_route_tbl_info),
-+		.ei_array	= ipa_mem_array_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_hash_filter_tbl_start_valid),
-+		.tlv_type	= 0x1d,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_hash_filter_tbl_start_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v4_hash_filter_tbl_start),
-+		.tlv_type	= 0x1d,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v4_hash_filter_tbl_start),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_hash_filter_tbl_start_valid),
-+		.tlv_type	= 0x1e,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_hash_filter_tbl_start_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_req,
-+				     v6_hash_filter_tbl_start),
-+		.tlv_type	= 0x1e,
-+		.offset		= offsetof(struct ipa_init_modem_driver_req,
-+					   v6_hash_filter_tbl_start),
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-+
-+/* QMI message structure definition for struct ipa_init_modem_driver_rsp */
-+struct qmi_elem_info ipa_init_modem_driver_rsp_ei[] = {
-+	{
-+		.data_type	= QMI_STRUCT,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_rsp,
-+				     rsp),
-+		.tlv_type	= 0x02,
-+		.offset		= offsetof(struct ipa_init_modem_driver_rsp,
-+					   rsp),
-+		.ei_array	= qmi_response_type_v01_ei,
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_rsp,
-+				     ctrl_comm_dest_end_pt_valid),
-+		.tlv_type	= 0x10,
-+		.offset		= offsetof(struct ipa_init_modem_driver_rsp,
-+					   ctrl_comm_dest_end_pt_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_rsp,
-+				     ctrl_comm_dest_end_pt),
-+		.tlv_type	= 0x10,
-+		.offset		= offsetof(struct ipa_init_modem_driver_rsp,
-+					   ctrl_comm_dest_end_pt),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_rsp,
-+				     default_end_pt_valid),
-+		.tlv_type	= 0x11,
-+		.offset		= offsetof(struct ipa_init_modem_driver_rsp,
-+					   default_end_pt_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_4_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_rsp,
-+				     default_end_pt),
-+		.tlv_type	= 0x11,
-+		.offset		= offsetof(struct ipa_init_modem_driver_rsp,
-+					   default_end_pt),
-+	},
-+	{
-+		.data_type	= QMI_OPT_FLAG,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_rsp,
-+				     modem_driver_init_pending_valid),
-+		.tlv_type	= 0x12,
-+		.offset		= offsetof(struct ipa_init_modem_driver_rsp,
-+					   modem_driver_init_pending_valid),
-+	},
-+	{
-+		.data_type	= QMI_UNSIGNED_1_BYTE,
-+		.elem_len	= 1,
-+		.elem_size	=
-+			sizeof_field(struct ipa_init_modem_driver_rsp,
-+				     modem_driver_init_pending),
-+		.tlv_type	= 0x12,
-+		.offset		= offsetof(struct ipa_init_modem_driver_rsp,
-+					   modem_driver_init_pending),
-+	},
-+	{
-+		.data_type	= QMI_EOTI,
-+	},
-+};
-diff --git a/drivers/net/ipa/ipa_qmi_msg.h b/drivers/net/ipa/ipa_qmi_msg.h
-new file mode 100644
-index 000000000000..009ce65ea114
---- /dev/null
-+++ b/drivers/net/ipa/ipa_qmi_msg.h
-@@ -0,0 +1,233 @@
-+// SPDX-License-Identifier: GPL-2.0
-+
-+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+ * Copyright (C) 2018 Linaro Ltd.
++/**
++ * ipahal_dma_shared_mem_write_pyld() - Write to shared memory command payload
++ *
++ * Return a pointer to the payload for a DMA shared memory write immediate
++ * command, or null if one can't be allocated.  Result is dynamically
++ * allocated, and caller must ensure it gets released by providing it to
++ * ipahal_destroy_imm_cmd() when it is no longer needed.
++ *
++ * Return:	 Pointer to the immediate command payload, or NULL
 + */
-+#ifndef _IPA_QMI_MSG_H_
-+#define _IPA_QMI_MSG_H_
++void *ipahal_dma_shared_mem_write_pyld(struct ipa_dma_mem *mem, u32 offset);
 +
-+/* Request/response/indication QMI message ids used for IPA.  Receiving
-+ * end issues a response for requests; indications require no response.
++/**
++ * ipahal_hdr_init_local_pyld() - Header initialization command payload
++ * mem:		DMA buffer containing data for initialization
++ * offset:	Where in location IPA local memory to write
++ *
++ * Return a pointer to the payload for a header init local immediate
++ * command, or null if one can't be allocated.  Caller must ensure result
++ * gets released by providing it to ipahal_destroy_imm_cmd().
++ *
++ * Return:	 Pointer to the immediate command payload, or NULL
 + */
-+#define IPA_QMI_INDICATION_REGISTER	0x20	/* modem -> AP request */
-+#define IPA_QMI_INIT_DRIVER		0x21	/* AP -> modem request */
-+#define IPA_QMI_INIT_COMPLETE_IND	0x22	/* AP -> modem indication */
-+#define IPA_QMI_DRIVER_INIT_COMPLETE	0x35	/* modem -> AP request */
++void *ipahal_hdr_init_local_pyld(struct ipa_dma_mem *mem, u32 offset);
 +
-+/* The maximum size required for message types.  These sizes include
-+ * the message data, along with type (1 byte) and length (2 byte)
-+ * information for each field.  The qmi_send_*() interfaces require
-+ * the message size to be provided.
++/**
++ * ipahal_ip_v4_routing_init_pyld() - IPv4 routing table initialization payload
++ * mem:		The IPv4 routing table data to be written
++ * hash_offset:	The location in IPA memory for a hashed routing table
++ * nhash_offset: The location in IPA memory for a non-hashed routing table
++ *
++ * Return a pointer to the payload for an IPv4 routing init immediate
++ * command, or null if one can't be allocated.  Caller must ensure result
++ * gets released by providing it to ipahal_destroy_imm_cmd().
++ *
++ * Return:	 Pointer to the immediate command payload, or NULL
 + */
-+#define IPA_QMI_INDICATION_REGISTER_REQ_SZ	8	/* -> server handle */
-+#define IPA_QMI_INDICATION_REGISTER_RSP_SZ	7	/* <- server handle */
-+#define IPA_QMI_INIT_DRIVER_REQ_SZ		134	/* client handle -> */
-+#define IPA_QMI_INIT_DRIVER_RSP_SZ		25	/* client handle <- */
-+#define IPA_QMI_INIT_COMPLETE_IND_SZ		7	/* server handle -> */
-+#define IPA_QMI_DRIVER_INIT_COMPLETE_REQ_SZ	4	/* -> server handle */
-+#define IPA_QMI_DRIVER_INIT_COMPLETE_RSP_SZ	7	/* <- server handle */
++void *ipahal_ip_v4_routing_init_pyld(struct ipa_dma_mem *mem,
++				     u32 hash_offset, u32 nhash_offset);
 +
-+/* Maximum size of messages we expect the AP to receive (max of above) */
-+#define IPA_QMI_SERVER_MAX_RCV_SZ		8
-+#define IPA_QMI_CLIENT_MAX_RCV_SZ		25
-+
-+/* Request message for the IPA_QMI_INDICATION_REGISTER request */
-+struct ipa_indication_register_req {
-+	u8 master_driver_init_complete_valid;
-+	u8 master_driver_init_complete;
-+	u8 data_usage_quota_reached_valid;
-+	u8 data_usage_quota_reached;
-+};
-+
-+/* The response to a IPA_QMI_INDICATION_REGISTER request consists only of
-+ * a standard QMI response.
++/**
++ * ipahal_ip_v6_routing_init_pyld() - IPv6 routing table initialization payload
++ * mem:		The IPv6 routing table data to be written
++ * hash_offset:	The location in IPA memory for a hashed routing table
++ * nhash_offset: The location in IPA memory for a non-hashed routing table
++ *
++ * Return a pointer to the payload for an IPv4 routing init immediate
++ * command, or null if one can't be allocated.  Caller must ensure result
++ * gets released by providing it to ipahal_destroy_imm_cmd().
++ *
++ * Return:	 Pointer to the immediate command payload, or NULL
 + */
-+struct ipa_indication_register_rsp {
-+	struct qmi_response_type_v01 rsp;
-+};
++void *ipahal_ip_v6_routing_init_pyld(struct ipa_dma_mem *mem,
++				     u32 hash_offset, u32 nhash_offset);
 +
-+/* Request message for the IPA_QMI_DRIVER_INIT_COMPLETE request */
-+struct ipa_driver_init_complete_req {
-+	u8 status;
-+};
-+
-+/* The response to a IPA_QMI_DRIVER_INIT_COMPLETE request consists only
-+ * of a standard QMI response.
++/**
++ * ipahal_ip_v4_filter_init_pyld() - IPv4 filter table initialization payload
++ * mem:		The IPv4 filter table data to be written
++ * hash_offset:	The location in IPA memory for a hashed filter table
++ * nhash_offset: The location in IPA memory for a non-hashed filter table
++ *
++ * Return a pointer to the payload for an IPv4 filter init immediate
++ * command, or null if one can't be allocated.  Caller must ensure result
++ * gets released by providing it to ipahal_destroy_imm_cmd().
++ *
++ * Return:	 Pointer to the immediate command payload, or NULL
 + */
-+struct ipa_driver_init_complete_rsp {
-+	struct qmi_response_type_v01 rsp;
-+};
++void *ipahal_ip_v4_filter_init_pyld(struct ipa_dma_mem *mem,
++				    u32 hash_offset, u32 nhash_offset);
 +
-+/* The message for the IPA_QMI_INIT_COMPLETE_IND indication consists
-+ * only of a standard QMI response.
++/**
++ * ipahal_ip_v6_filter_init_pyld() - IPv6 filter table initialization payload
++ * mem:		The IPv6 filter table data to be written
++ * hash_offset:	The location in IPA memory for a hashed filter table
++ * nhash_offset: The location in IPA memory for a non-hashed filter table
++ *
++ * Return a pointer to the payload for an IPv4 filter init immediate
++ * command, or null if one can't be allocated.  Caller must ensure result
++ * gets released by providing it to ipahal_destroy_imm_cmd().
++ *
++ * Return:	 Pointer to the immediate command payload, or NULL
 + */
-+struct ipa_init_complete_ind {
-+	struct qmi_response_type_v01 status;
-+};
++void *ipahal_ip_v6_filter_init_pyld(struct ipa_dma_mem *mem,
++				    u32 hash_offset, u32 nhash_offset);
 +
-+/* The AP tells the modem its platform type.  We assume Android. */
-+enum ipa_platform_type {
-+	IPA_QMI_PLATFORM_TYPE_INVALID		= 0,	/* Invalid */
-+	IPA_QMI_PLATFORM_TYPE_TN		= 1,	/* Data card */
-+	IPA_QMI_PLATFORM_TYPE_LE		= 2,	/* Data router */
-+	IPA_QMI_PLATFORM_TYPE_MSM_ANDROID	= 3,	/* Android MSM */
-+	IPA_QMI_PLATFORM_TYPE_MSM_WINDOWS	= 4,	/* Windows MSM */
-+	IPA_QMI_PLATFORM_TYPE_MSM_QNX_V01	= 5,	/* QNX MSM */
-+};
-+
-+/* This defines the start and end offset of a range of memory.  Both
-+ * fields are offsets relative to the start of IPA shared memory.
-+ * The end value is the last addressable byte *within* the range.
++/**
++ * ipahal_dma_task_32b_addr_pyld() - 32-bit DMA task command payload
++ * mem:		DMA memory involved in the task
++ *
++ * Return a pointer to the payload for DMA task 32-bit address immediate
++ * command, or null if one can't be allocated.  Caller must ensure result
++ * gets released by providing it to ipahal_destroy_imm_cmd().
 + */
-+struct ipa_mem_bounds {
-+	u32 start;
-+	u32 end;
-+};
++void *ipahal_dma_task_32b_addr_pyld(struct ipa_dma_mem *mem);
 +
-+/* This defines the location and size of an array.  The start value
-+ * is an offset relative to the start of IPA shared memory.  The
-+ * size of the array is implied by the number of entries (the entry
-+ * size is assumed to be known).
++/**
++ * ipahal_payload_free() - Release an allocated immediate command payload
++ * @payload:	Payload to be released
 + */
-+struct ipa_mem_array {
-+	u32 start;
-+	u32 count;
-+};
++void ipahal_payload_free(void *payload);
 +
-+/* This defines the location and size of a range of memory.  The
-+ * start is an offset relative to the start of IPA shared memory.
-+ * This differs from the ipa_mem_bounds structure in that the size
-+ * (in bytes) of the memory region is specified rather than the
-+ * offset of its last byte.
++/**
++ * enum ipahal_pkt_status_opcode - Packet Status Opcode
++ * @IPAHAL_STATUS_OPCODE_PACKET_2ND_PASS: Packet Status generated as part of
++ *  IPA second processing pass for a packet (i.e. IPA XLAT processing for
++ *  the translated packet).
++ *
++ *  The values assigned here are assumed by ipa_pkt_status_parse()
++ *  to match values returned in the status_opcode field of a
++ *  ipa_pkt_status_hw structure inserted by the IPA in received
++ *  buffer.
 + */
-+struct ipa_mem_range {
-+	u32 start;
-+	u32 size;
++enum ipahal_pkt_status_opcode {
++	IPAHAL_PKT_STATUS_OPCODE_PACKET			= 0x01,
++	IPAHAL_PKT_STATUS_OPCODE_NEW_FRAG_RULE		= 0x02,
++	IPAHAL_PKT_STATUS_OPCODE_DROPPED_PACKET		= 0x04,
++	IPAHAL_PKT_STATUS_OPCODE_SUSPENDED_PACKET	= 0x08,
++	IPAHAL_PKT_STATUS_OPCODE_LOG			= 0x10,
++	IPAHAL_PKT_STATUS_OPCODE_DCMP			= 0x20,
++	IPAHAL_PKT_STATUS_OPCODE_PACKET_2ND_PASS	= 0x40,
 +};
 +
-+/* The message for the IPA_QMI_INIT_DRIVER request contains information
-+ * from the AP that affects modem initialization.
++/**
++ * enum ipahal_pkt_status_exception - Packet Status exception type
++ * @IPAHAL_PKT_STATUS_EXCEPTION_PACKET_LENGTH: formerly IHL exception.
++ *
++ * Note: IPTYPE, PACKET_LENGTH and PACKET_THRESHOLD exceptions means that
++ *  partial / no IP processing took place and corresponding Status Mask
++ *  fields should be ignored. Flt and rt info is not valid.
++ *
++ * NOTE:: Any change to this enum, need to change to
++ *	ipahal_pkt_status_exception_to_str array as well.
 + */
-+struct ipa_init_modem_driver_req {
-+	u8			platform_type_valid;
-+	u32			platform_type;	/* enum ipa_platform_type */
-+
-+	/* Modem header table information.  This defines the IPA shared
-+	 * memory in which the modem may insert header table entries.
++enum ipahal_pkt_status_exception {
++	IPAHAL_PKT_STATUS_EXCEPTION_NONE = 0,
++	IPAHAL_PKT_STATUS_EXCEPTION_DEAGGR,
++	IPAHAL_PKT_STATUS_EXCEPTION_IPTYPE,
++	IPAHAL_PKT_STATUS_EXCEPTION_PACKET_LENGTH,
++	IPAHAL_PKT_STATUS_EXCEPTION_PACKET_THRESHOLD,
++	IPAHAL_PKT_STATUS_EXCEPTION_FRAG_RULE_MISS,
++	IPAHAL_PKT_STATUS_EXCEPTION_SW_FILT,
++	/* NAT and IPv6CT have the same value at HW.
++	 * NAT for IPv4 and IPv6CT for IPv6 exceptions
 +	 */
-+	u8			hdr_tbl_info_valid;
-+	struct ipa_mem_bounds	hdr_tbl_info;
-+
-+	/* Routing table information.  These define the location and size of
-+	 * non-hashable IPv4 and IPv6 filter tables.  The start values are
-+	 * offsets relative to the start of IPA shared memory.
-+	 */
-+	u8			v4_route_tbl_info_valid;
-+	struct ipa_mem_array	v4_route_tbl_info;
-+	u8			v6_route_tbl_info_valid;
-+	struct ipa_mem_array	v6_route_tbl_info;
-+
-+	/* Filter table information.  These define the location and size of
-+	 * non-hashable IPv4 and IPv6 filter tables.  The start values are
-+	 * offsets relative to the start of IPA shared memory.
-+	 */
-+	u8			v4_filter_tbl_start_valid;
-+	u32			v4_filter_tbl_start;
-+	u8			v6_filter_tbl_start_valid;
-+	u32			v6_filter_tbl_start;
-+
-+	/* Modem memory information.  This defines the location and
-+	 * size of memory available for the modem to use.
-+	 */
-+	u8			modem_mem_info_valid;
-+	struct ipa_mem_range	modem_mem_info;
-+
-+	/* This defines the destination endpoint on the AP to which
-+	 * the modem driver can send control commands.  IPA supports
-+	 * 20 endpoints, so this must be 19 or less.
-+	 */
-+	u8			ctrl_comm_dest_end_pt_valid;
-+	u32			ctrl_comm_dest_end_pt;
-+
-+	/* This defines whether the modem should load the microcontroller
-+	 * or not.  It is unnecessary to reload it if the modem is being
-+	 * restarted.
-+	 *
-+	 * NOTE: this field is named "is_ssr_bootup" elsewhere.
-+	 */
-+	u8			skip_uc_load_valid;
-+	u8			skip_uc_load;
-+
-+	/* Processing context memory information.  This defines the memory in
-+	 * which the modem may insert header processing context table entries.
-+	 */
-+	u8			hdr_proc_ctx_tbl_info_valid;
-+	struct ipa_mem_bounds	hdr_proc_ctx_tbl_info;
-+
-+	/* Compression command memory information.  This defines the memory
-+	 * in which the modem may insert compression/decompression commands.
-+	 */
-+	u8			zip_tbl_info_valid;
-+	struct ipa_mem_bounds	zip_tbl_info;
-+
-+	/* Routing table information.  These define the location and size
-+	 * of hashable IPv4 and IPv6 filter tables.  The start values are
-+	 * offsets relative to the start of IPA shared memory.
-+	 */
-+	u8			v4_hash_route_tbl_info_valid;
-+	struct ipa_mem_array	v4_hash_route_tbl_info;
-+	u8			v6_hash_route_tbl_info_valid;
-+	struct ipa_mem_array	v6_hash_route_tbl_info;
-+
-+	/* Filter table information.  These define the location and size
-+	 * of hashable IPv4 and IPv6 filter tables.  The start values are
-+	 * offsets relative to the start of IPA shared memory.
-+	 */
-+	u8			v4_hash_filter_tbl_start_valid;
-+	u32			v4_hash_filter_tbl_start;
-+	u8			v6_hash_filter_tbl_start_valid;
-+	u32			v6_hash_filter_tbl_start;
++	IPAHAL_PKT_STATUS_EXCEPTION_NAT,
++	IPAHAL_PKT_STATUS_EXCEPTION_IPV6CT,
++	IPAHAL_PKT_STATUS_EXCEPTION_MAX,
 +};
 +
-+/* The response to a IPA_QMI_INIT_DRIVER request begins with a standard
-+ * QMI response, but contains other information as well.  Currently we
-+ * simply wait for the the INIT_DRIVER transaction to complete and
-+ * ignore any other data that might be returned.
++/**
++ * enum ipahal_pkt_status_mask - Packet Status bitmask values of
++ *  the contained flags. This bitmask indicates flags on the properties of
++ *  the packet as well as IPA processing it may had.
++ * @TAG_VALID: Flag specifying if TAG and TAG info valid?
++ * @CKSUM_PROCESS: CSUM block processing flag: Was pkt processed by csum block?
++ *  If so, csum trailer exists
 + */
-+struct ipa_init_modem_driver_rsp {
-+	struct qmi_response_type_v01	rsp;
-+
-+	/* This defines the destination endpoint on the modem to which
-+	 * the AP driver can send control commands.  IPA supports
-+	 * 20 endpoints, so this must be 19 or less.
-+	 */
-+	u8				ctrl_comm_dest_end_pt_valid;
-+	u32				ctrl_comm_dest_end_pt;
-+
-+	/* This defines the default endpoint.  The AP driver is not
-+	 * required to configure the hardware with this value.  IPA
-+	 * supports 20 endpoints, so this must be 19 or less.
-+	 */
-+	u8				default_end_pt_valid;
-+	u32				default_end_pt;
-+
-+	/* This defines whether a second handshake is required to complete
-+	 * initialization.
-+	 */
-+	u8				modem_driver_init_pending_valid;
-+	u8				modem_driver_init_pending;
++enum ipahal_pkt_status_mask {
++	/* Other values are defined but are not specifically handled yet. */
++	IPAHAL_PKT_STATUS_MASK_CKSUM_PROCESS	= 0x0100,
 +};
 +
-+/* Message structure definitions defined in "ipa_qmi_msg.c" */
-+extern struct qmi_elem_info ipa_indication_register_req_ei[];
-+extern struct qmi_elem_info ipa_indication_register_rsp_ei[];
-+extern struct qmi_elem_info ipa_driver_init_complete_req_ei[];
-+extern struct qmi_elem_info ipa_driver_init_complete_rsp_ei[];
-+extern struct qmi_elem_info ipa_init_complete_ind_ei[];
-+extern struct qmi_elem_info ipa_mem_bounds_ei[];
-+extern struct qmi_elem_info ipa_mem_array_ei[];
-+extern struct qmi_elem_info ipa_mem_range_ei[];
-+extern struct qmi_elem_info ipa_init_modem_driver_req_ei[];
-+extern struct qmi_elem_info ipa_init_modem_driver_rsp_ei[];
++/**
++ * struct ipahal_pkt_status - IPA status packet abstracted payload.
++ * @status_opcode: The type of status (Opcode).
++ * @exception: The first exception that took place.
++ *  In case of exception, endp_src_idx and pkt_len are always valid.
++ * @status_mask: Bit mask for flags on several properties on the packet
++ *  and processing it may passed at IPA.
++ * @pkt_len: Pkt pyld len including hdr and retained hdr if used. Does
++ *  not include padding or checksum trailer len.
++ * @endp_src_idx: Source end point index.
++ * @endp_dest_idx: Destination end point index.
++ *  Not valid in case of exception
++ * @metadata: meta data value used by packet
++ * @rt_miss: Routing miss flag: Was their a routing rule miss?
++ *
++ * This structure describes the status packet fields for the following
++ * status values: IPA_STATUS_PACKET, IPA_STATUS_DROPPED_PACKET,
++ * IPA_STATUS_SUSPENDED_PACKET.  Other status types have different status
++ * packet structure.  Note that the hardware supplies additional status
++ * information that is currently unused.
++ */
++struct ipahal_pkt_status {
++	enum ipahal_pkt_status_opcode status_opcode;
++	enum ipahal_pkt_status_exception exception;
++	enum ipahal_pkt_status_mask status_mask;
++	u32 pkt_len;
++	u8 endp_src_idx;
++	u8 endp_dest_idx;
++	u32 metadata;
++	bool rt_miss;
++};
 +
-+#endif /* !_IPA_QMI_MSG_H_ */
++/**
++ * ipahal_pkt_status_get_size() - Get size of a hardware packet status
++ */
++u32 ipahal_pkt_status_get_size(void);
++
++/* ipahal_pkt_status_parse() - Parse packet status payload
++ * @unparsed_status:	Packet status read from hardware
++ * @status:		Buffer to hold parsed status information
++ */
++void ipahal_pkt_status_parse(const void *unparsed_status,
++			     struct ipahal_pkt_status *status);
++
++int ipahal_init(void);
++void ipahal_exit(void);
++
++/* Does the given ID represent rule miss? */
++bool ipahal_is_rule_miss_id(u32 id);
++
++int ipahal_rt_generate_empty_img(u32 route_count, struct ipa_dma_mem *mem);
++int ipahal_flt_generate_empty_img(u64 ep_bitmap, struct ipa_dma_mem *mem);
++
++/**
++ * ipahal_free_empty_img() - Free empty filter or route image
++ * @mem:	DMA memory containing filter/route data
++ */
++void ipahal_free_empty_img(struct ipa_dma_mem *mem);
++
++#endif /* _IPAHAL_H_ */
 -- 
 2.17.1
