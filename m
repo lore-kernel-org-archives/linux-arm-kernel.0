@@ -1,45 +1,30 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Wed, 7 Nov 2018 13:19:08 -0700
-Subject: [PATCH 2/2] mm/sparse: add common helper to mark all memblocks
- present
-In-Reply-To: <20181107121207.62cb37cf58484b7cc80a8fd8@linux-foundation.org>
-References: <20181107173859.24096-1-logang@deltatee.com>
- <20181107173859.24096-3-logang@deltatee.com>
- <20181107121207.62cb37cf58484b7cc80a8fd8@linux-foundation.org>
-Message-ID: <724be9bb-59b6-33f3-7b59-3ca644d59bf7@deltatee.com>
+From: marc.w.gonzalez@free.fr (Marc Gonzalez)
+Date: Wed, 7 Nov 2018 21:12:21 +0100
+Subject: [PATCH 0/9] Regenerate arm64 defconfig for current kernel
+Message-ID: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello ARM maintainers,
 
+The set of Kconfig options slowly changes with every kernel version.
+This patch series regenerates the arm64 defconfig for v4.20
+No functional change intended, except adding PINCTRL_MTK_MOORE to
+keep PINCTRL_MT7622.
 
-On 2018-11-07 1:12 p.m., Andrew Morton wrote:
->> +void __init memblocks_present(void)
->> +{
->> +	struct memblock_region *reg;
->> +
->> +	for_each_memblock(memory, reg) {
->> +		memory_present(memblock_get_region_node(reg),
->> +			       memblock_region_memory_base_pfn(reg),
->> +			       memblock_region_memory_end_pfn(reg));
->> +	}
->> +}
->> +
-> 
-> I don't like the name much.  To me, memblocks_present means "are
-> memblocks present" whereas this actually means "memblocks are present".
-> But whatever.  A little covering comment which describes what this
-> does and why it does it would be nice.
+Marc Gonzalez (9):
+  arm64: defconfig: Regenerate for v4.20
+  arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+  arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
+  arm64: defconfig: Drop USB_ULPI_BUS and USB_CHIPIDEA_ULPI
+  arm64: defconfig: Replace PINCTRL_MT7622 with PINCTRL_MTK_MOORE
+  arm64: defconfig: Drop redundant SND_SOC_ROCKCHIP_I2S
+  arm64: defconfig: Drop CRYPTO_DEV_FSL_DPAA2_CAAM
+  arm64: defconfig: Change SCSI_UFS_HISI=m
+  arm64: defconfig: Drop redundant sound codec options
 
-The same argument can be made about the existing memory_present()
-function and I think it's worth keeping the naming consistent. I'll add
-a comment and resend shortly.
+ arch/arm64/configs/defconfig | 105 +++++++++++++++--------------------
+ 1 file changed, 46 insertions(+), 59 deletions(-)
 
-> Acked-by: Andrew Morton <akpm@linux-foundation.org>
-> 
-> I can grab both patches and shall sneak them into 4.20-rcX, but feel
-> free to merge them into some git tree if you'd prefer.  If I see them
-> turn up in linux-next I shall drop my copy.
-
-Sounds good, thanks.
-
-Logan
+-- 
+2.17.1
