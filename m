@@ -1,27 +1,49 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 7 Nov 2018 12:38:38 -0800
-Subject: [PATCH 2/2] mm/sparse: add common helper to mark all memblocks
- present
-In-Reply-To: <b1cc442e-7314-4a8e-3eec-9adc200d7582@deltatee.com>
-References: <20181107173859.24096-1-logang@deltatee.com>
- <20181107173859.24096-3-logang@deltatee.com>
- <20181107121207.62cb37cf58484b7cc80a8fd8@linux-foundation.org>
- <724be9bb-59b6-33f3-7b59-3ca644d59bf7@deltatee.com>
- <alpine.DEB.2.21.1811072125280.1666@nanos.tec.linutronix.de>
- <b1cc442e-7314-4a8e-3eec-9adc200d7582@deltatee.com>
-Message-ID: <20181107123838.1b7234c98a87dec5a2b25e67@linux-foundation.org>
+From: richard.gong@linux.intel.com (Richard Gong)
+Date: Wed, 7 Nov 2018 14:47:13 -0600
+Subject: [PATCHv10 3/8] firmware: add Intel Stratix10 service layer driver
+In-Reply-To: <595b853f-6a8c-d608-e716-95ef1c84d0b9@infradead.org>
+References: <1541523172-5171-1-git-send-email-richard.gong@linux.intel.com>
+ <1541523172-5171-4-git-send-email-richard.gong@linux.intel.com>
+ <595b853f-6a8c-d608-e716-95ef1c84d0b9@infradead.org>
+Message-ID: <f266e76a-6222-252e-dc79-c13044602a98@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Nov 2018 13:36:34 -0700 Logan Gunthorpe <logang@deltatee.com> wrote:
+Hi Randy,
 
-> > Actually if both names suck, then there also is the option to rename both
-> > instead of adding a comment to explain the suckage.
+On 11/6/18 11:03 AM, Randy Dunlap wrote:
+> On 11/6/18 8:52 AM, richard.gong at linux.intel.com wrote:
+>> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+>> index 7273e50..b6813bc 100644
+>> --- a/drivers/firmware/Kconfig
+>> +++ b/drivers/firmware/Kconfig
+>> @@ -216,6 +216,18 @@ config FW_CFG_SYSFS_CMDLINE
+>>   	  WARNING: Using incorrect parameters (base address in particular)
+>>   	  may crash your system.
+>>   
+>> +config INTEL_STRATIX10_SERVICE
+>> +       tristate "Intel Stratix10 Service Layer"
+>> +       depends on HAVE_ARM_SMCCC
+>> +       default n
+>> +       help
+>> +        Intel Stratix10 service layer runs at privileged exception level,
+>> +	interfaces with the service providers (FPGA manager is one of them) and
+>> +	manages secure monitor call to communicate with secure monitor software
+>> +	at secure monitor exception level.
+>> +
+>> +        Say Y here if you want Stratix10 service layer support.
 > 
-> Ok, well, I wasn't expecting to take on a big rename like that as it
-> would create a patch touching a bunch of arches and mm files... But if
-> we can come to some agreement on a better name and someone is willing to
-> take that patch without significant delay then I'd be happy to create
-> the patch and add it to the start of my series.
+> from Documentation/process/coding-style.rst:
+> 
+> Lines under a ``config`` definition are indented with one tab,
+> while help text is indented an additional two spaces.
+> 
+>
 
-Some other time ;)  Let's just get the missing documentation added for now?
+I will correct that in the next submission.
+
+> thanks.
+> 
+
+Regards,
+Richard
