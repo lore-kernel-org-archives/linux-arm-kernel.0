@@ -1,73 +1,62 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 7 Nov 2018 09:39:28 +0100
-Subject: [PATCH] i2c: at91: switched to resume/suspend callbacks.
-In-Reply-To: <1540203006-805-1-git-send-email-andrei.stefanescu@microchip.com>
-References: <1540203006-805-1-git-send-email-andrei.stefanescu@microchip.com>
-Message-ID: <20181107083928.vqgnpw3mmczjn4el@M43218.corp.atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 7 Nov 2018 09:42:26 +0100
+Subject: IOMMU breakage on arm64
+In-Reply-To: <44b77976-0efe-02d0-3c4e-4e54f91c4fe7@arm.com>
+References: <git-mailbomb-linux-master-b4ebe6063204da58e48600b810a97c29ae9e5d12@kernel.org>
+ <CAMuHMdUosqWTn5yDjGMWrLpWEyZfxtGWYfqmenYVqE8g7HEt7Q@mail.gmail.com>
+ <44b77976-0efe-02d0-3c4e-4e54f91c4fe7@arm.com>
+Message-ID: <CAMuHMdWTe+B8=a5yz+VjJU9G+mss7+61U3jT7i_WgMCYD7ppCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2018 at 12:17:47PM +0200, Andrei Stefanescu - M50506 wrote:
-> In the previous version of the driver resume/suspend_noirq callbacks
-> were used. Because of this, when resuming from suspend-to-ram,
-> an I2C (belonging to a FLEXCOM) would resume before FLEXCOM.
-> The first read on the I2C bus would then result in a timeout.
-> 
-> This patch switches to resume/suspend callbacks which are 
-> called after FLEXCOM resumes. FLEXCOM, SPI and USART drivers use
-> resume/suspend callbacks.
-> 
-> Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
-I can't figure out why we use the _noirq variant. When patches for PM
-stuff were sent, suspend/resume callbacks were used but in the latest
-version it moved to the _noirq variant without explanation.
+Hi Robin,
 
-Excepting if someone has an argument to keep the _noirq variant,
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com> 
+On Tue, Nov 6, 2018 at 9:20 PM Robin Murphy <robin.murphy@arm.com> wrote:
+> On 2018-11-06 7:44 pm, Geert Uytterhoeven wrote:
+> > On Tue, Oct 23, 2018 at 1:40 AM Linux Kernel Mailing List
+> > <linux-kernel@vger.kernel.org> wrote:
+> >> Commit:     b4ebe6063204da58e48600b810a97c29ae9e5d12
+> >> Parent:     7d21ee4c719f00896767ce19c4c01a56374c2ced
+> >> Refname:    refs/heads/master
+> >> Web:        https://git.kernel.org/torvalds/c/b4ebe6063204da58e48600b810a97c29ae9e5d12
+> >> Author:     Christoph Hellwig <hch@lst.de>
+> >> AuthorDate: Thu Sep 20 14:04:08 2018 +0200
+> >> Committer:  Christoph Hellwig <hch@lst.de>
+> >> CommitDate: Mon Oct 1 07:28:03 2018 -0700
+> >>
+> >>      dma-direct: implement complete bus_dma_mask handling
+> >>
+> >>      Instead of rejecting devices with a too small bus_dma_mask we can handle
+> >>      by taking the bus dma_mask into account for allocations and bounce
+> >>      buffering decisions.
+> >>
+> >>      Signed-off-by: Christoph Hellwig <hch@lst.de>
+> >
+> > I  have bisected the following crash to the above commit:
+>
+> I think that commit mostly just changes the presentation of my
+> underlying cockup - see here for what should fix it:
+> https://patchwork.kernel.org/patch/10670177/
 
-Thanks
+Thanks, that fixed the issue.
 
-Regards
+> I have a feeling we've ironed out crash-on-early-domain-free bugs in the
+> SMMU drivers already - arm-smmu certainly has an early return in
+> arm_smmu_destroy_domain_context() which should behave exactly like your
+> diff below, while I think arm-smmu-v3 gets away with it by virtue of
+> smmu_domain->cfg being unset, but I'll double-check that when I'm fresh
+> tomorrow (Jean-Philippe reported SMMUv3 hitting the DMA thing to me
+> internally, but didn't mention any crash).
 
-Ludovic
+OK, I'll send a proper patch for the ipmmu-vmsa driver.
 
-> ---
->  drivers/i2c/busses/i2c-at91.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index bfd1fdf..81f7b94 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -1174,7 +1174,7 @@ static int at91_twi_runtime_resume(struct device *dev)
->  	return clk_prepare_enable(twi_dev->clk);
->  }
->  
-> -static int at91_twi_suspend_noirq(struct device *dev)
-> +static int at91_twi_suspend(struct device *dev)
->  {
->  	if (!pm_runtime_status_suspended(dev))
->  		at91_twi_runtime_suspend(dev);
-> @@ -1182,7 +1182,7 @@ static int at91_twi_suspend_noirq(struct device *dev)
->  	return 0;
->  }
->  
-> -static int at91_twi_resume_noirq(struct device *dev)
-> +static int at91_twi_resume(struct device *dev)
->  {
->  	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
->  	int ret;
-> @@ -1202,8 +1202,8 @@ static int at91_twi_resume_noirq(struct device *dev)
->  }
->  
->  static const struct dev_pm_ops at91_twi_pm = {
-> -	.suspend_noirq	= at91_twi_suspend_noirq,
-> -	.resume_noirq	= at91_twi_resume_noirq,
-> +	.suspend	= at91_twi_suspend,
-> +	.resume		= at91_twi_resume,
->  	.runtime_suspend	= at91_twi_runtime_suspend,
->  	.runtime_resume		= at91_twi_runtime_resume,
->  };
-> -- 
-> 2.7.4
-> 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
