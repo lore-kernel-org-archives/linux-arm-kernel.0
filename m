@@ -1,52 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Nov 2018 08:16:47 -0800
-Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
- beagle-xm
-In-Reply-To: <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
-References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
- <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
- <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
- <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
- <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
-Message-ID: <CAOesGMgAxvERhQjnyZ7P4vqhhWdBdA20XrFnDn48Na5wrEAkEA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 7 Nov 2018 16:19:10 +0000
+Subject: [PATCH] of/device: Really only set bus DMA mask when appropriate
+In-Reply-To: <20181107155235.GA18618@bogus>
+References: <b06321ac25a1211e572e650a630e5e1aa9f8173f.1541504601.git.robin.murphy@arm.com>
+ <20181107080335.GA24511@lst.de>
+ <22cbe798-612f-8c88-90e7-388202f603cf@arm.com> <20181107155235.GA18618@bogus>
+Message-ID: <fead1118-9a19-5687-8679-60054727e898@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 8:09 AM Guillaume Tucker
-<guillaume.tucker@collabora.com> wrote:
->
-> On 06/11/2018 10:54, Guillaume Tucker wrote:
-> > On 05/11/2018 14:33, Olof Johansson wrote:
-> >> On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
-> >> <guillaume.tucker@collabora.com> wrote:
-> >>>
-> >>> Hi Linus,
-> >>>
-> >>> Please see below, the kernelci.org automated boot bisection found
-> >>> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
-> >>> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
-> >>> log output after the bootloader so the kernel seems to be
-> >>> crashing very early on.
-> >>
-> >> Can you enable DEBUG_LL to capture what goes wrong?
-> >
-> > Yes I've scheduled a re-run of the automated bisection with
-> > DEBUG_LL turned on, but the beagle-xm board is currently offline
-> > in lab-baylibre.  I'll keep you posted when I get some results.
->
-> Unfortunately, enabling the DEBUG_LL config didn't help.  There's
-> still no visible kernel log at all from the failing LAVA jobs:
->
->     http://lava.baylibre.com:10080/scheduler/alljobs?length=25&search=lava-bisect-9638#table
->
->
-> This might be a hard one to debug without physical access to the
-> board, but please let me know if you think there's anything else
-> I can try.  For example, if there's a known older kernel revision
-> where the combination of SMP=n and PREEMPT=y worked then I could
-> try to run an automated boot bisection based on that.
+On 2018-11-07 3:52 pm, Rob Herring wrote:
+> On Wed, Nov 07, 2018 at 12:56:49PM +0000, Robin Murphy wrote:
+>> On 2018-11-07 8:03 am, Christoph Hellwig wrote:
+>>> On Tue, Nov 06, 2018 at 11:54:15AM +0000, Robin Murphy wrote:
+>>>> of_dma_configure() was *supposed* to be following the same logic as
+>>>> acpi_dma_configure() and only setting bus_dma_mask if some range was
+>>>> specified by the firmware. However, it seems that subtlety got lost in
+>>>> the process of fitting it into the differently-shaped control flow, and
+>>>> as a result the force_dma==true case ends up always setting the bus mask
+>>>> to the 32-bit default, which is not what anyone wants.
+>>>>
+>>>> Make sure we only touch it if the DT actually said so.
+>>>
+>>> This looks good, but I think it could really use a comment as the use
+>>> of ret all the way down the function isn't exactly obvious.
+>>
+>> Fair point.
+>>
+>>> Let me now if you want this picked up through the OF or DMA trees.
+>>
+>> I don't mind either way; I figure I'll wait a bit longer to see if Rob has
+>> any preference, then resend with the comment and the tags picked up so it
+>> can hopefully make rc2.
+> 
+> I have other fixes to send, so I can take it.
 
-Is this only beagle-xm, or do we see it on all OMAP3 hardware?
+Cheers Rob, I'll send you that updated version momentarily.
 
-
--Olof
+Robin.
