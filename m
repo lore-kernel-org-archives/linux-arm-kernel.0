@@ -1,93 +1,48 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 07 Nov 2018 10:37:31 -0800
-Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
-In-Reply-To: <CAL_JsqLvKWcJUYDyWOg3rMeEWv7JV4zw7-YkOUWiL5rfXgVRvQ@mail.gmail.com>
-References: <20181106183609.207702-1-sboyd@kernel.org>
- <20181106183609.207702-2-sboyd@kernel.org>
- <CAL_JsqLvKWcJUYDyWOg3rMeEWv7JV4zw7-YkOUWiL5rfXgVRvQ@mail.gmail.com>
-Message-ID: <154161585170.88331.1822872519370217248@swboyd.mtv.corp.google.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Nov 2018 10:47:24 -0800
+Subject: [TECH TOPIC] SoC maintainer group
+In-Reply-To: <CAOesGMheCcvDQCd+7fyh4yOk4BYDfm2QRqsdawqA_fg8s9YYEQ@mail.gmail.com>
+References: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
+ <20181107171723.GI9919@thunk.org>
+ <CAOesGMheCcvDQCd+7fyh4yOk4BYDfm2QRqsdawqA_fg8s9YYEQ@mail.gmail.com>
+Message-ID: <CAOesGMg+jW7SN2+E_FYbwi8GdNhc8KrEsahB-Nn+AseO6kLGXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2018-11-06 12:44:52)
-> On Tue, Nov 6, 2018 at 12:36 PM Stephen Boyd <sboyd@kernel.org> wrote:
+On Wed, Nov 7, 2018 at 9:35 AM Olof Johansson <olof@lixom.net> wrote:
+>
+> On Wed, Nov 7, 2018 at 9:17 AM Theodore Y. Ts'o <tytso@mit.edu> wrote:
 > >
-> > We have a handful of clk drivers that have a collection of slightly
-> > variant device support keyed off of the compatible string. In each of
-> > these drivers, we demux the variant and then call the "real" probe
-> > function based on whatever is stored in the match data for that
-> > compatible string. Let's generalize this function so that it can be
-> > re-used as the platform_driver probe function directly.
-> 
-> This looks really hacky to me. It sounds kind of general, but really
-> only works if we have match data that's a single function and we lose
-> any type checking on the function.
+> > On Tue, Nov 06, 2018 at 02:16:27PM -0800, Olof Johansson wrote:
+> > >
+> > > Olof Johansson (arm-soc)
+> > > Arnd Bergmann (arm-soc)
+> > > Kevin Hilman (arm-soc)
+> > > Mike Turquette (clk)
+> > > Stephen Boyd (clk)
+> > > Linus Walleij (pinctrl + more)
+> > > Mike Brown (gpio/regmap + more)
+> >
+> > Could the poeple listed on this list please list potential schedule conflicts?
+> >
+> > I'm going to assume we should avoid: Andriod uConf, RISC-V uConf,
+> > Device Tree uConf.  What are other potential conflicts.  I'm going to
+> > guess this might be "interesting" to schedule.  :-)
+>
+> Yeah, apologies for adding a bunch of cross-coordination this late too.
+>
+> It's likely going to be conflict-ridden no matter what we do. RISC-V
+> and DT are the main conflicts, Android probably has a bit less.
+>
+> Tuesday afternoon looks least conflict-y when I squint at the
+> schedule, or Thursday afternoon (but ideally not overlapping with
+> Daniel's DRM/gitlab session).
 
-I don't know what this means. Are you saying that we lose the ability to
-type check the function pointer stored in the data member? I don't have
-a good answer for this besides it's not any worse than the status quo
-for the mediatek drivers.
+Ted,
 
-One alternative is to add a DT only array to the platform_driver struct
-that has the platform driver probe function type and matches the index
-in the of_device_id table. Then we can add some logic into
-platform_drv_probe() to look for this table being set and find the probe
-function to call. Then we still have match data for anything that wants
-that (maybe it could be passed in to the probe function) at the cost of
-having another array. I don't have a use-case for this right now so I'm
-not sure this is a great idea.
+Can we have 3pm-3:30pm on Thursday? It seems relatively low on
+embedded-related conflicts and at 3  people would have time to migrate
+from Daniel Vetter's gitlab talk if needed.
 
-  struct of_platform_driver_probe_func {
-  	int (*probe)(struct platform_device *pdev);
-  };
 
-  struct of_platform_driver_probe_func mtk_probes[] = {
-  	mtk_probe1,
-	mtk_probe2,
-	mtk_probe3,
-  };
-
-  struct platform_driver mtk_driver = {
-  	.of_probes = &mtk_probes;
-  	.driver = {
-		.name = "mtk-foo";
-		.of_match_table = mtk_match_table,
-	},
-  };
-
-> What about things other than
-> platform devices?
-> 
-
-I suppose those would need similar functions that take the right struct
-type and match the driver probe function signature. To make the above
-more generic we could try to figure out a way to put the 'of_probes'
-array inside struct device_driver. That would require dropping
-platform_device specifically from the probe functions and having those
-take a plain 'struct device' that those probe functions turn into the
-appropriate structure with to_platform_device() or to_i2c_client()?
-
-So the example would become
-
-  struct of_driver_probe_func {
-  	int (*probe)(struct device *dev);
-  };
-
-  struct of_driver_probe_func mtk_probes[] = {
-  	mtk_probe1,
-	mtk_probe2,
-	mtk_probe3,
-  };
-
-  struct platform_driver mtk_driver = {
-  	.driver = {
-		.name = "mtk-foo";
-		.of_match_table = mtk_match_table,
-		.of_probes = &mtk_probes;
-	},
-  };
-
-And the probe functions might need to container_of() the device pointer
-to get the struct they know they need. The probe function could also be
-added to of_device_id and then we would have to look and see if that
-pointer is populated when the device is matched in generic device code.
+-Olof
