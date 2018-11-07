@@ -1,98 +1,90 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  7 Nov 2018 11:48:30 +0000
-Subject: [RFC PATCH] ARM: NOMMU: Toggle only bits in EXC_RETURN we are really
- care of
-Message-ID: <1541591310-31799-1-git-send-email-vladimir.murzin@arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 7 Nov 2018 12:49:30 +0100
+Subject: [PATCH v6 6/6] drm/bridge: add PHY initialization in mhdp8546
+ driver.
+In-Reply-To: <1539034953-11274-7-git-send-email-dkos@cadence.com>
+References: <1539034953-11274-1-git-send-email-dkos@cadence.com>
+ <CGME20181008214506epcas2p2cf110c14fcc340c42e1c6da4b03d8901@epcas2p2.samsung.com>
+ <1539034953-11274-7-git-send-email-dkos@cadence.com>
+Message-ID: <df739067-b1a6-2eda-cb75-e008a0e02534@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8M introduces support for Security extension to M class, among
-other things it affects exception handling, especially, encoding of
-EXC_RETURN.
+On 08.10.2018 23:42, Damian Kos wrote:
+> This patch modifies the mhdp8546 driver to initialize sd0801 "Torrent" PHY.
+>
+> And removes the dbg_regs field from cdns_mhdp_device structure.
+>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
+> ---
+>  drivers/gpu/drm/bridge/cdns-mhdp.c    | 9 +++++++++
+>  include/drm/bridge/cdns-mhdp-common.h | 1 -
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/cdns-mhdp.c b/drivers/gpu/drm/bridge/cdns-mhdp.c
+> index 48ac5cf1e031..caaf3c17d74f 100644
+> --- a/drivers/gpu/drm/bridge/cdns-mhdp.c
+> +++ b/drivers/gpu/drm/bridge/cdns-mhdp.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> +#include <linux/phy/phy.h>
+>  
+>  #include <drm/drm_atomic_helper.h>
+>  #include <drm/drm_bridge.h>
+> @@ -1220,6 +1221,12 @@ static int mhdp_probe(struct platform_device *pdev)
+>  	if (IS_ERR(mhdp->regs))
+>  		return PTR_ERR(mhdp->regs);
+>  
+> +	mhdp->phy = devm_phy_get(&pdev->dev, "dpphy");
 
-The new bits have been added:
 
-Bit [6]	Secure or Non-secure stack
-Bit [5]	Default callee register stacking
-Bit [0]	Exception Secure
+It is not documented in the bindings.
 
-which conflicts with hard-coded value of EXC_RETURN:
 
-In fact, we only care of few bits:
+> +	if (IS_ERR(mhdp->phy)) {
+> +		dev_err(&pdev->dev, "no PHY configured\n");
 
-Bit [3]	 Mode (0 - Handler, 1 - Thread)
-Bit [2]	 Stack pointer selection (0 - Main, 1 - Process)
 
-We can toggle only those bits and left other bits as they were on
-exception entry.
+dev_err only if err != -EPROBE_DEFER
 
-It is basically, what patch does - saves EXC_RETURN when we do
-transition form Thread to Handler mode (it is first svc), so later
-saved value is used instead of EXC_RET_THREADMODE_PROCESSSTACK.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
+> +		return PTR_ERR(mhdp->phy);
+> +	}
+> +
+>  	platform_set_drvdata(pdev, mhdp);
+>  
+>  	ret = load_firmware(mhdp, FW_NAME, CDNS_MHDP_IMEM);
+> @@ -1291,6 +1298,8 @@ static int mhdp_probe(struct platform_device *pdev)
+>  			   mhdp->dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
+>  			   &codec_data, sizeof(codec_data));
+>  
+> +	phy_init(mhdp->phy);
+> +
 
-Kernel Version: v4.20-rc1
 
- arch/arm/include/asm/v7m.h     | 2 +-
- arch/arm/kernel/entry-header.S | 3 ++-
- arch/arm/kernel/entry-v7m.S    | 4 ++++
- arch/arm/mm/proc-v7m.S         | 3 +++
- 4 files changed, 10 insertions(+), 2 deletions(-)
+Beside this:
 
-diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
-index 187ccf6..2cb00d1 100644
---- a/arch/arm/include/asm/v7m.h
-+++ b/arch/arm/include/asm/v7m.h
-@@ -49,7 +49,7 @@
-  * (0 -> msp; 1 -> psp). Bits [1:0] are fixed to 0b01.
-  */
- #define EXC_RET_STACK_MASK			0x00000004
--#define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
-+#define EXC_RET_THREADMODE_PROCESSSTACK		(3 << 2)
- 
- /* Cache related definitions */
- 
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 7734248..62db1c9 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -127,7 +127,8 @@
-          */
- 	.macro	v7m_exception_slow_exit ret_r0
- 	cpsid	i
--	ldr	lr, =EXC_RET_THREADMODE_PROCESSSTACK
-+	ldr	lr, =exc_ret
-+	ldr	lr, [lr]
- 
- 	@ read original r12, sp, lr, pc and xPSR
- 	add	r12, sp, #S_IP
-diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-index abcf478..19d2dcd 100644
---- a/arch/arm/kernel/entry-v7m.S
-+++ b/arch/arm/kernel/entry-v7m.S
-@@ -146,3 +146,7 @@ ENTRY(vector_table)
- 	.rept	CONFIG_CPU_V7M_NUM_IRQ
- 	.long	__irq_entry		@ External Interrupts
- 	.endr
-+	.align	2
-+	.globl	exc_ret
-+exc_ret:
-+	.space	4
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 47a5acc..92e8418 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -139,6 +139,9 @@ __v7m_setup_cont:
- 	cpsie	i
- 	svc	#0
- 1:	cpsid	i
-+	ldr	r0, =exc_ret
-+	orr	lr, lr, #EXC_RET_THREADMODE_PROCESSSTACK
-+	str	lr, [r0]
- 	ldmia	sp, {r0-r3, r12}
- 	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
- 	mov	lr, r6			@ restore LR
--- 
-2.0.0
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+
+?--
+Regards
+Andrzej
+
+
+>  	/* Enable VIF clock for stream 0 */
+>  	cdns_mhdp_reg_read(mhdp, CDNS_DPTX_CAR, &resp);
+>  	cdns_mhdp_reg_write(mhdp, CDNS_DPTX_CAR,
+> diff --git a/include/drm/bridge/cdns-mhdp-common.h b/include/drm/bridge/cdns-mhdp-common.h
+> index d4711091ff2b..1e8a44138ce2 100644
+> --- a/include/drm/bridge/cdns-mhdp-common.h
+> +++ b/include/drm/bridge/cdns-mhdp-common.h
+> @@ -553,7 +553,6 @@ struct cdns_mhdp_device {
+>  	struct cdns_mhdp_sink	sink;
+>  	struct cdns_mhdp_bridge	bridge;
+>  	struct phy		*phy;
+> -	void __iomem		*dbg_regs;
+>  
+>  	struct video_info	video_info;
+>  	struct drm_display_mode	mode;
