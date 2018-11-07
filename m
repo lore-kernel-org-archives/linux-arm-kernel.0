@@ -1,69 +1,62 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Wed,  7 Nov 2018 01:56:40 -0700
-Subject: [PATCH v2] pinctrl: zynq: Use define directive for
- PIN_CONFIG_IO_STANDARD
-In-Reply-To: <20181101005724.9622-1-natechancellor@gmail.com>
-References: <20181101005724.9622-1-natechancellor@gmail.com>
-Message-ID: <20181107085639.32366-1-natechancellor@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 7 Nov 2018 09:57:20 +0100
+Subject: [PATCH] Staging: vchi: Add license id and change int type
+In-Reply-To: <20181107000738.26963-1-andrealmeid@riseup.net>
+References: <20181107000738.26963-1-andrealmeid@riseup.net>
+Message-ID: <20181107085720.GA29581@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang warns when one enumerated type is implicitly converted to another:
+On Tue, Nov 06, 2018 at 10:07:38PM -0200, andrealmeid at riseup.net wrote:
+> From: Andr? Almeida <andrealmeid@riseup.net>
+> 
+> Fix the following checkpatch issues:
+> 
+> WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
+> CHECK: Prefer kernel type 's32' over 'int32_t'
+> 
+> Signed-off-by: Andr? Almeida <andrealmeid@riseup.net>
+> 
+> ---
+> 
+> Hello! This is my first patch to Linux Kernel. Let me know any feedback
+> ---
+>  drivers/staging/vc04_services/interface/vchi/vchi_mh.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+> index 198bd076b666..42fc0c693d43 100644
+> --- a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+> +++ b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+> @@ -1,5 +1,5 @@
+> -/**
 
-drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
-enumeration type 'enum zynq_pin_config_param' to different enumeration
-type 'enum pin_config_param' [-Wenum-conversion]
-        {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
-        ~               ^~~~~~~~~~~~~~~~~~~~~
-drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
-enumeration type 'enum zynq_pin_config_param' to different enumeration
-type 'enum pin_config_param' [-Wenum-conversion]
-        = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
-            ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
-macro 'PCONFDUMP'
-        .param = a, .display = b, .format = c, .has_arg = d     \
-                 ^
-2 warnings generated.
+Why change this line?
 
-It is expected that pinctrl drivers can extend pin_config_param because
-of the gap between PIN_CONFIG_END and PIN_CONFIG_MAX so this conversion
-isn't an issue. Most drivers that take advantage of this define the
-PIN_CONFIG variables as constants, rather than enumerated values. Do the
-same thing here so that Clang no longer warns.
+> - * Copyright (c) 2010-2012 Broadcom. All rights reserved.
+> +/* SPDX-License-Identifier: GPL-2.0 */
 
-Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
----
+That is not the correct license for this file.  Please never make a
+change like this unless you really know your license information.
 
-v1 -> v2:
 
-* Avoid kernel-doc warning
+> +/* Copyright (c) 2010-2012 Broadcom. All rights reserved.
+>   *
+>   * Redistribution and use in source and binary forms, with or without
+>   * modification, are permitted provided that the following conditions
+> @@ -36,7 +36,7 @@
+>  
+>  #include <linux/types.h>
+>  
+> -typedef int32_t VCHI_MEM_HANDLE_T;
+> +typedef s32 VCHI_MEM_HANDLE_T;
 
- drivers/pinctrl/pinctrl-zynq.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+You are doing multiple things in the same patch, which isn't allowed.
+Please break all patches up into one "logical" thing per patch and send
+a patch series.
 
-diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-index a0daf27042bd..90fd37e8207b 100644
---- a/drivers/pinctrl/pinctrl-zynq.c
-+++ b/drivers/pinctrl/pinctrl-zynq.c
-@@ -971,15 +971,12 @@ enum zynq_io_standards {
- 	zynq_iostd_max
- };
- 
--/**
-- * enum zynq_pin_config_param - possible pin configuration parameters
-- * @PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the argument to
-+/*
-+ * PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the argument to
-  *	this parameter (on a custom format) tells the driver which alternative
-  *	IO standard to use.
-  */
--enum zynq_pin_config_param {
--	PIN_CONFIG_IOSTANDARD = PIN_CONFIG_END + 1,
--};
-+#define PIN_CONFIG_IOSTANDARD		(PIN_CONFIG_END + 1)
- 
- static const struct pinconf_generic_params zynq_dt_params[] = {
- 	{"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
--- 
-2.19.1
+Also, are you sure this type change is correct?
+
+thanks,
+
+greg k-h
