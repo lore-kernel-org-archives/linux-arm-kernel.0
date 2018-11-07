@@ -1,50 +1,48 @@
-From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
-Date: Wed, 7 Nov 2018 14:54:17 +0000
-Subject: [PATCH 2/4] power: reset: at91-poweroff: move shdwc related data
- to one structure
-In-Reply-To: <20181106210933.GU24212@piout.net>
-References: <1541416443-4321-1-git-send-email-claudiu.beznea@microchip.com>
- <1541416443-4321-3-git-send-email-claudiu.beznea@microchip.com>
- <20181106210933.GU24212@piout.net>
-Message-ID: <6719a808-e704-3c63-f592-3b90d44ccbfe@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Nov 2018 14:55:11 +0000
+Subject: [PATCH v4 2/2] arm64: mm: apply r/o permissions of VM areas to
+ its linear alias as well
+In-Reply-To: <20181107103620.16054-3-ard.biesheuvel@linaro.org>
+References: <20181107103620.16054-1-ard.biesheuvel@linaro.org>
+ <20181107103620.16054-3-ard.biesheuvel@linaro.org>
+Message-ID: <20181107145510.GB2623@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On 06.11.2018 23:09, Alexandre Belloni wrote:
-> Hi Claudiu,
+On Wed, Nov 07, 2018 at 11:36:20AM +0100, Ard Biesheuvel wrote:
+> On arm64, we use block mappings and contiguous hints to map the linear
+> region, to minimize the TLB footprint. However, this means that the
+> entire region is mapped using read/write permissions, which we cannot
+> modify at page granularity without having to take intrusive measures to
+> prevent TLB conflicts.
 > 
-> On 05/11/2018 11:14:26+0000, Claudiu.Beznea at microchip.com wrote:
->>  static int __init at91_poweroff_probe(struct platform_device *pdev)
->> @@ -154,16 +160,22 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
->>  	u32 ddr_type;
->>  	int ret;
->>  
->> +	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
->> +	if (!at91_shdwc)
->> +		return -ENOMEM;
->> +
+> This means the linear aliases of pages belonging to read-only mappings
+> (executable or otherwise) in the vmalloc region are also mapped read/write,
+> and could potentially be abused to modify things like module code, bpf JIT
+> code or other read-only data.
 > 
-> Is there any real benefit that will offset the time lost for that
-> allocation at boot time?
-
-No, I haven't run benchmarks on this. I only wanted to have them grouped in
-one structure. Please let me know if you have some tests in mind.
-
+> So let's fix this, by extending the set_memory_ro/rw routines to take
+> the linear alias into account. The consequence of enabling this is
+> that we can no longer use block mappings or contiguous hints, so in
+> cases where the TLB footprint of the linear region is a bottleneck,
+> performance may be affected.
 > 
-> I understand you are then testing at91_shdwc to know whether the driver
-> already probed once. But, the driver will never probe twice as there is
-> only one shutdown controller on the SoC and anyway, If it was to probe
-> twice, it will still work as expected.
-
-I had in mind the scenario where the driver would be compiled as module. I
-know insmod already does this checking. I'm ok to remove this checking. I
-will do it in next version. With this I will also remove devm_kzalloc() of
-at91_shdwc.
-
-Thank you,
-Claudiu Beznea
-
+> Therefore, allow this feature to be runtime en/disabled, by setting
+> rodata=full (or 'on' to disable just this enhancement, or 'off' to
+> disable read-only mappings for code and r/o data entirely) on the
+> kernel command line. Also, allow the default value to be set via a
+> Kconfig option.
 > 
-> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Kconfig                   | 14 ++++++++++++++
+>  arch/arm64/include/asm/mmu_context.h |  2 ++
+>  arch/arm64/mm/mmu.c                  | 16 ++++++++++++++--
+>  arch/arm64/mm/pageattr.c             | 15 +++++++++++++++
+>  4 files changed, 45 insertions(+), 2 deletions(-)
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks!
+
+Will
