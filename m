@@ -1,91 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Nov 2018 16:54:38 +0000
-Subject: [PATCH v10 06/22] kasan, arm64: adjust shadow size for tag-based
- mode
-In-Reply-To: <86d1b17c755d8bfd6e44e6869a16f4a409e7bd06.1541525354.git.andreyknvl@google.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <86d1b17c755d8bfd6e44e6869a16f4a409e7bd06.1541525354.git.andreyknvl@google.com>
-Message-ID: <20181107165438.34kb5ufoe5ve2f6i@lakrids.cambridge.arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 7 Nov 2018 16:57:13 +0000
+Subject: Weird OOM problem
+In-Reply-To: <CAF_dkJB-Z-jU3O95PrE_ToFcOTNdEqMLnPOkzPwBZZfnjyUQwQ@mail.gmail.com>
+References: <CAF_dkJB-Z-jU3O95PrE_ToFcOTNdEqMLnPOkzPwBZZfnjyUQwQ@mail.gmail.com>
+Message-ID: <c685343b-fc12-4933-1749-c5a8716f039d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+Hi,
 
-On Tue, Nov 06, 2018 at 06:30:21PM +0100, Andrey Konovalov wrote:
-> Tag-based KASAN uses 1 shadow byte for 16 bytes of kernel memory, so it
-> requires 1/16th of the kernel virtual address space for the shadow memory.
+On 07/11/18 16:36, Patrick Doyle wrote:
+> I have an embedded system with 128MB of RAM and no swap.
 > 
-> This commit sets KASAN_SHADOW_SCALE_SHIFT to 4 when the tag-based KASAN
-> mode is enabled.
+> /tmp is mounted on a tmpfs
 > 
-> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  arch/arm64/Makefile             |  2 +-
->  arch/arm64/include/asm/memory.h | 13 +++++++++----
->  2 files changed, 10 insertions(+), 5 deletions(-)
+> Shortly after boot, I can log in and look at how much memory is free:
 > 
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 6cb9fc7e9382..9887492381d9 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -94,7 +94,7 @@ endif
->  # KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
->  #				 - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
->  # in 32-bit arithmetic
-> -KASAN_SHADOW_SCALE_SHIFT := 3
-> +KASAN_SHADOW_SCALE_SHIFT := $(if $(CONFIG_KASAN_SW_TAGS), 4, 3)
+> # free
+>              total       used       free     shared    buffers     cached
+> Mem:        120912      45224      75688        100       7700      17900
+> -/+ buffers/cache:      19624     101288
+> Swap:            0          0          0
+> 
+> I create a 25MB file in /tmp, and look again:
+> # dd if=/dev/urandom bs=1M count=25 of=/tmp/foo
+> 25+0 records in
+> 25+0 records out
+> # free
+>              total       used       free     shared    buffers     cached
+> Mem:        120912      53620      67292      25700       1040      33324
+> -/+ buffers/cache:      19256     101656
+> Swap:            0          0          0
+> 
+> If I try to create a 2nd 25MB file (or even an 8MB file) in /tmp, then
+> the OOM killer kicks in, despite the fact that I have somewhere
+> between 67 and 101MB free.
+> 
+> It would appear that the OOM killer kicks in when the disk cache (aka
+> "shared") grows beyond 25% of total RAM.
+> 
+> Is that true?  Can I tune that?
 
+If you specifies neither "size" nor "nr_blocks" mount option the default
+is 50% of RAM [1].
 
-We could make this something like:
+[1] http://man7.org/linux/man-pages/man5/tmpfs.5.html
 
-ifeq ($(CONFIG_KASAN_SW_TAGS), y)
-KASAN_SHADOW_SCALE_SHIFT := 4
-else
-KASAN_SHADOW_SCALE_SHIFT := 3
-endif
+Cheers
+Vladimir
 
-KBUILD_CFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-
->  KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
->  	(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
->  	+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) \
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index b96442960aea..0f1e024a951f 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -74,12 +74,17 @@
->  #define KERNEL_END        _end
->  
->  /*
-> - * KASAN requires 1/8th of the kernel virtual address space for the shadow
-> - * region. KASAN can bloat the stack significantly, so double the (minimum)
-> - * stack size when KASAN is in use.
-> + * Generic and tag-based KASAN require 1/8th and 1/16th of the kernel virtual
-> + * address space for the shadow region respectively. They can bloat the stack
-> + * significantly, so double the (minimum) stack size when they are in use.
->   */
-> -#ifdef CONFIG_KASAN
-> +#ifdef CONFIG_KASAN_GENERIC
->  #define KASAN_SHADOW_SCALE_SHIFT 3
-> +#endif
-> +#ifdef CONFIG_KASAN_SW_TAGS
-> +#define KASAN_SHADOW_SCALE_SHIFT 4
-> +#endif
-> +#ifdef CONFIG_KASAN
-
-... and remove the constant entirely here, avoiding duplication.
-
-Maybe factor that into a Makefile.kasan if things are going to get much
-more complicated.
-
-Thanks,
-Mark.
-
->  #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
->  #define KASAN_THREAD_SHIFT	1
->  #else
-> -- 
-> 2.19.1.930.g4563a0d9d0-goog
+> I am running a 4.9.87 kernel.
+> 
+> I am going to keep looking on my own now that I have learned this
+> much, but I figured I would put the question out to the experts in the
+> mean time.  Surprisingly, while there are lots of emails/web pages
+> devoted to the OOM killer, none of them mention filling a tmpfs as
+> being a trigger.  So the Google isn't helping me much here.
+> 
+> Any help or tips would be appreciated.
+> 
+> --wpd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
