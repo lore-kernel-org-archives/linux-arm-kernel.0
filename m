@@ -1,55 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Nov 2018 15:55:22 +0100
-Subject: [RFC PATCH 10/12] soc: qcom: ipa: data path
-In-Reply-To: <20181107003250.5832-11-elder@linaro.org>
-References: <20181107003250.5832-1-elder@linaro.org>
- <20181107003250.5832-11-elder@linaro.org>
-Message-ID: <CAK8P3a0nkfwFCCVHaTJ+kJGWxO+qFTzTLnRgB-NG0AyMEsv3bA@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 7 Nov 2018 15:56:03 +0100
+Subject: [PATCH v10 00/22] kasan: add software tag-based mode for arm64
+In-Reply-To: <cover.1541525354.git.andreyknvl@google.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+Message-ID: <CAAeHK+yOsP7V0gPu7EpqCbJZqbGQMZbAp6q1+=0dNGC24reyWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
->
-> This patch contains "ipa_dp.c", which includes the bulk of the data
-> path code.  There is an overview in the code of how things operate,
-> but there are already plans to rework this portion of the driver.
->
-> In particular:
->   - Interrupt handling will be replaced with a threaded interrupt
->     handler.  Currently handling occurs in a combination of
->     interrupt and workqueue context, and this requires locking
->     and atomic operations for proper synchronization.
+On Tue, Nov 6, 2018 at 6:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> This patchset adds a new software tag-based mode to KASAN [1].
+> (Initially this mode was called KHWASAN, but it got renamed,
+>  see the naming rationale at the end of this section).
 
-You probably don't want to use just a threaded IRQ handler to
-start the poll function, that would still require an extra indirection.
+[...]
 
-However, you can probably use the top half of the threaded
-handler to request the poll function if necessary but use
-the bottom half for anything that does not go through poll.
+> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 
->   - Currently, only receive endpoints use NAPI.  Transmit
->     completion interrupts are disabled, and are handled in batches
->     by periodically scheduling an interrupting no-op request.
->     The plan is to arrange for transmit requests to generate
->     interrupts, and their completion will be processed with other
->     completions in the NAPI poll function.  This will also allow
->     accurate feedback about packet sojourn time to be provided to
->     queue limiting mechanisms.
+Hi Andrew,
 
-Right, that is definitely required here. I also had a look at
-the gsi_channel_queue() function, which sits in the middle of
-the transmit function and is rather unoptimized. I'd suggest moving
-that into the caller so we can see what is going on, and then
-optimizing it from there.
+This patchset has now been reviewed-by KASAN maintainers. Could you
+take a look and consider taking this into the -mm tree?
 
->   - Not all receive endpoints use NAPI.  The plan is for *all*
->     endpoints to use NAPI.  And because all endpoints share a
->     common GSI interrupt, a single NAPI structure will used to
->     managing the processing for all completions on all endpoints.
->   - Receive buffers are posted to the hardware by a workqueue
->     function.  Instead, the plan is to have this done by the
->     NAPI poll routine.
-
-Makes sense, yes.
-
-      Arnd
+Thanks!
