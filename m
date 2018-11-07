@@ -1,318 +1,40 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Wed, 7 Nov 2018 04:30:20 +0000
-Subject: [PATCH v2 4/4] dts/arm64/layerscape: Clean PCIe controller
- compatible strings
-In-Reply-To: <CADRPPNQ=cyi5b+86VvoS2XRycU-WvWM5s2RXYopi=RaMjjYpLg@mail.gmail.com>
-References: <20181025094929.29481-1-Zhiqiang.Hou@nxp.com>
- <20181025094929.29481-5-Zhiqiang.Hou@nxp.com>
- <CADRPPNQ=cyi5b+86VvoS2XRycU-WvWM5s2RXYopi=RaMjjYpLg@mail.gmail.com>
-Message-ID: <AM6PR04MB57819B0390F48B1C6CB946CF84C40@AM6PR04MB5781.eurprd04.prod.outlook.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 7 Nov 2018 12:59:43 +0800
+Subject: [PATCH 1/2] arm64: dts: mt7622: fix console output issue on rfb1
+Message-ID: <8043d487e7bd20a11b14d832702bda214a9a694f.1541566473.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+The issue was introduced by Kernel CI:
+https://kernelci.org/boot/id/5bbdcbad59b5146fc5b43592/
 
-Thanks a lot for your comments!
+Fix this by using a 'stdout-path' property that points to the device.
 
-> -----Original Message-----
-> From: Li Yang <leoyang.li@nxp.com>
-> Sent: 2018?10?27? 5:01
-> To: Z.q. Hou <zhiqiang.hou@nxp.com>
-> Cc: moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
-> <linux-arm-kernel@lists.infradead.org>; lkml <linux-kernel@vger.kernel.org>;
-> linux-pci at vger.kernel.org; open list:OPEN FIRMWARE AND FLATTENED
-> DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; Rob Herring
-> <robh+dt@kernel.org>; Shawn Guo <shawnguo@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Bjorn Helgaas <bhelgaas@google.com>; Mingkai
-> Hu <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>
-> Subject: Re: [PATCH v2 4/4] dts/arm64/layerscape: Clean PCIe controller
-> compatible strings
-> 
-> On Thu, Oct 25, 2018 at 4:53 AM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
-> 
-> The correct prefix for arm64 dts patches should be: "arm64: dts:
-> layerscape: ...", and it should be better to mention the string removed in the
-> title too.
+Fixes: c0d9f9ad4f76 ("arm64: dts: mt7622: add earlycon to mt7622-rfb1 board")
+Cc: stable at vger.kernel.org
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Will fix it in v3.
-> 
-> >
-> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> >
-> > Removed the wrong compatible string "snps,dw-pcie", in case match
-> > incorrect driver.
-> >
-> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > ---
-> > V2:
-> >  - no change
-> >
-> >  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi |  2 +-
-> > arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |  6 +++---
-> > arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi |  6 +++---
-> > arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi |  6 +++---
-> > arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi |  8 ++++----
-> > arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 12 ++++--------
-> >  6 files changed, 18 insertions(+), 22 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > index 5da732f82fa0..028a6daa5597 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> > @@ -475,7 +475,7 @@
-> >                 };
-> >
-> >                 pcie at 3400000 {
-> > -                       compatible = "fsl,ls1012a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1012a-pcie";
-> >                         reg = <0x00 0x03400000 0x0 0x00100000
-> /* controller registers */
-> >                                0x40 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; diff --git
-> > a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> > index 3fed504b5381..5480d6c4c548 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> > @@ -661,7 +661,7 @@
-> >                 };
-> >
-> >                 pcie at 3400000 {
-> > -                       compatible = "fsl,ls1043a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1043a-pcie";
-> >                         reg = <0x00 0x03400000 0x0 0x00100000
-> /* controller registers */
-> >                                0x40 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; @@ -686,7
-> +686,7
-> > @@
-> >                 };
-> >
-> >                 pcie at 3500000 {
-> > -                       compatible = "fsl,ls1043a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1043a-pcie";
-> >                         reg = <0x00 0x03500000 0x0 0x00100000
-> /* controller registers */
-> >                                0x48 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; @@ -711,7
-> +711,7
-> > @@
-> >                 };
-> >
-> >                 pcie at 3600000 {
-> > -                       compatible = "fsl,ls1043a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1043a-pcie";
-> >                         reg = <0x00 0x03600000 0x0 0x00100000
-> /* controller registers */
-> >                                0x50 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; diff --git
-> > a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> > index 51cbd50012d6..519315c5d507 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> > @@ -630,7 +630,7 @@
-> >                 };
-> >
-> >                 pcie at 3400000 {
-> > -                       compatible = "fsl,ls1046a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1046a-pcie";
-> >                         reg = <0x00 0x03400000 0x0 0x00100000
-> /* controller registers */
-> >                                0x40 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; @@ -655,7
-> +655,7
-> > @@
-> >                 };
-> >
-> >                 pcie at 3500000 {
-> > -                       compatible = "fsl,ls1046a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1046a-pcie";
-> >                         reg = <0x00 0x03500000 0x0 0x00100000
-> /* controller registers */
-> >                                0x48 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; @@ -680,7
-> +680,7
-> > @@
-> >                 };
-> >
-> >                 pcie at 3600000 {
-> > -                       compatible = "fsl,ls1046a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1046a-pcie";
-> >                         reg = <0x00 0x03600000 0x0 0x00100000
-> /* controller registers */
-> >                                0x50 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; diff --git
-> > a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> > index a07f612ab56b..10b253c88a16 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> > @@ -512,7 +512,7 @@
-> >                 };
-> >
-> >                 pcie at 3400000 {
-> > -                       compatible = "fsl,ls1088a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1088a-pcie";
-> >                         reg = <0x00 0x03400000 0x0 0x00100000
-> /* controller registers */
-> >                                0x20 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; @@ -536,7
-> +536,7
-> > @@
-> >                 };
-> >
-> >                 pcie at 3500000 {
-> > -                       compatible = "fsl,ls1088a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1088a-pcie";
-> >                         reg = <0x00 0x03500000 0x0 0x00100000
-> /* controller registers */
-> >                                0x28 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; @@ -560,7
-> +560,7
-> > @@
-> >                 };
-> >
-> >                 pcie at 3600000 {
-> > -                       compatible = "fsl,ls1088a-pcie",
-> "snps,dw-pcie";
-> > +                       compatible = "fsl,ls1088a-pcie";
-> >                         reg = <0x00 0x03600000 0x0 0x00100000
-> /* controller registers */
-> >                                0x30 0x00000000 0x0 0x00002000>;
-> /* configuration space */
-> >                         reg-names = "regs", "config"; diff --git
-> > a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > index 7c882da3f6b0..a5f668d786b8 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-> > @@ -119,7 +119,7 @@
-> >  };
-> >
-> >  &pcie1 {
-> > -       compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-> > +       compatible = "fsl,ls2088a-pcie";
-> >         reg = <0x00 0x03400000 0x0 0x00100000   /* controller
-> registers */
-> >                0x20 0x00000000 0x0 0x00002000>; /* configuration
-> space
-> > */
-> >
-> > @@ -128,7 +128,7 @@
-> >  };
-> >
-> >  &pcie2 {
-> > -       compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-> > +       compatible = "fsl,ls2088a-pcie";
-> >         reg = <0x00 0x03500000 0x0 0x00100000   /* controller
-> registers */
-> >                0x28 0x00000000 0x0 0x00002000>; /* configuration
-> space
-> > */
-> >
-> > @@ -137,7 +137,7 @@
-> >  };
-> >
-> >  &pcie3 {
-> > -       compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-> > +       compatible = "fsl,ls2088a-pcie";
-> >         reg = <0x00 0x03600000 0x0 0x00100000   /* controller
-> registers */
-> >                0x30 0x00000000 0x0 0x00002000>; /* configuration
-> space
-> > */
-> >
-> > @@ -146,7 +146,7 @@
-> >  };
-> >
-> >  &pcie4 {
-> > -       compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
-> > +       compatible = "fsl,ls2088a-pcie";
-> >         reg = <0x00 0x03700000 0x0 0x00100000   /* controller
-> registers */
-> >                0x38 0x00000000 0x0 0x00002000>; /* configuration
-> space
-> > */
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > index d188774a36e8..80cc40f76a4a 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > @@ -630,8 +630,7 @@
-> >                 };
-> >
-> >                 pcie1: pcie at 3400000 {
-> > -                       compatible = "fsl,ls2080a-pcie",
-> "fsl,ls2085a-pcie",
-> > -                                    "snps,dw-pcie";
-> > +                       compatible = "fsl,ls2080a-pcie",
-> > + "fsl,ls2085a-pcie";
-> >                         reg-names = "regs", "config";
-> >                         interrupts = <0 108 0x4>; /* Level high type
-> */
-> >                         interrupt-names = "intr"; @@ -651,8 +650,7
-> @@
-> >                 };
-> >
-> >                 pcie2: pcie at 3500000 {
-> > -                       compatible = "fsl,ls2080a-pcie",
-> "fsl,ls2085a-pcie",
-> > -                                    "snps,dw-pcie";
-> > +                       compatible = "fsl,ls2080a-pcie",
-> > + "fsl,ls2085a-pcie";
-> >                         reg-names = "regs", "config";
-> >                         interrupts = <0 113 0x4>; /* Level high type
-> */
-> >                         interrupt-names = "intr"; @@ -672,8 +670,7
-> @@
-> >                 };
-> >
-> >                 pcie3: pcie at 3600000 {
-> > -                       compatible = "fsl,ls2080a-pcie",
-> "fsl,ls2085a-pcie",
-> > -                                    "snps,dw-pcie";
-> > +                       compatible = "fsl,ls2080a-pcie",
-> > + "fsl,ls2085a-pcie";
-> >                         reg-names = "regs", "config";
-> >                         interrupts = <0 118 0x4>; /* Level high type
-> */
-> >                         interrupt-names = "intr"; @@ -693,8 +690,7
-> @@
-> >                 };
-> >
-> >                 pcie4: pcie at 3700000 {
-> > -                       compatible = "fsl,ls2080a-pcie",
-> "fsl,ls2085a-pcie",
-> > -                                    "snps,dw-pcie";
-> > +                       compatible = "fsl,ls2080a-pcie",
-> > + "fsl,ls2085a-pcie";
-> >                         reg-names = "regs", "config";
-> >                         interrupts = <0 123 0x4>; /* Level high type
-> */
-> >                         interrupt-names = "intr";
-> > --
-> > 2.17.1
-> >
-Thanks,
-Zhiqiang
+diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+index dcad086..3f78334 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+@@ -17,8 +17,13 @@
+ 	model = "MediaTek MT7622 RFB1 board";
+ 	compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
+ 
++	aliases {
++		serial0 = &uart0;
++	};
++
+ 	chosen {
+-		bootargs = "earlycon=uart8250,mmio32,0x11002000 console=ttyS0,115200n1 swiotlb=512";
++		stdout-path = "serial0:115200n8";
++		bootargs = "earlycon=uart8250,mmio32,0x11002000 swiotlb=512";
+ 	};
+ 
+ 	cpus {
+-- 
+1.9.1
