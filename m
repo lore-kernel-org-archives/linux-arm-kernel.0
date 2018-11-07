@@ -1,38 +1,38 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed,  7 Nov 2018 15:53:50 +0100
-Subject: [GIT PULL 3/3] arm64: tegra: Device tree updates for v4.20-rc2
+Date: Wed,  7 Nov 2018 15:53:48 +0100
+Subject: [GIT PULL 1/3] dt-bindings: Updates for v4.20-rc2
 In-Reply-To: <20181107145350.29127-1-thierry.reding@gmail.com>
 References: <20181107145350.29127-1-thierry.reding@gmail.com>
-Message-ID: <20181107145350.29127-4-thierry.reding@gmail.com>
+Message-ID: <20181107145350.29127-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi ARM SoC maintainers,
 
-The following changes since commit d9fd22447ba59a9b53a202fade977e82bfba8d8d:
+The following changes since commit d9be10edf7d6040468f89824df0dfcfcbf3a693b:
 
-  arm64: tegra: I2C on Tegra194 is not compatible with Tegra114 (2018-09-26 15:50:59 +0200)
+  dt-bindings: Add Tegra PMC pad configuration bindings (2018-08-27 12:21:43 +0200)
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-rc2-arm64-dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-rc2-dt-bindings
 
-for you to fetch changes up to 47787b6b7d6981d979bdb01475cd3dd7626dbda3:
+for you to fetch changes up to 20c33013eaab16576ed9f13082481a0d9d45d365:
 
-  arm64: dts: tegra210: Add power-domains for xHCI (2018-10-25 14:31:25 +0200)
+  dt-bindings: usb: xhci-tegra: Add power-domain details (2018-10-25 14:30:07 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-arm64: tegra: Device tree updates for v4.20-rc2
+dt-bindings: Update for v4.20-rc2
 
-This contains a single change to populate power domains for the XUSB
-device on Tegra210.
+This contains device tree binding updates for the XUSB controller to
+allow multiple power domains to be specified.
 
 ----------------------------------------------------------------
 Jon Hunter (1):
-      arm64: dts: tegra210: Add power-domains for xHCI
+      dt-bindings: usb: xhci-tegra: Add power-domain details
 
- arch/arm64/boot/dts/nvidia/tegra210.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
