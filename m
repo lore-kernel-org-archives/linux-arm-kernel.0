@@ -1,49 +1,40 @@
-From: richard.gong@linux.intel.com (Richard Gong)
-Date: Wed, 7 Nov 2018 14:47:13 -0600
-Subject: [PATCHv10 3/8] firmware: add Intel Stratix10 service layer driver
-In-Reply-To: <595b853f-6a8c-d608-e716-95ef1c84d0b9@infradead.org>
-References: <1541523172-5171-1-git-send-email-richard.gong@linux.intel.com>
- <1541523172-5171-4-git-send-email-richard.gong@linux.intel.com>
- <595b853f-6a8c-d608-e716-95ef1c84d0b9@infradead.org>
-Message-ID: <f266e76a-6222-252e-dc79-c13044602a98@linux.intel.com>
+From: marc.w.gonzalez@free.fr (Marc Gonzalez)
+Date: Wed, 7 Nov 2018 21:39:26 +0100
+Subject: [PATCH 0/9] Regenerate arm64 defconfig for current kernel
+In-Reply-To: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
+References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
+Message-ID: <6eb79d2e-1857-39b5-90f5-29bc13bce16a@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+Arnd, Olof,
 
-On 11/6/18 11:03 AM, Randy Dunlap wrote:
-> On 11/6/18 8:52 AM, richard.gong at linux.intel.com wrote:
->> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
->> index 7273e50..b6813bc 100644
->> --- a/drivers/firmware/Kconfig
->> +++ b/drivers/firmware/Kconfig
->> @@ -216,6 +216,18 @@ config FW_CFG_SYSFS_CMDLINE
->>   	  WARNING: Using incorrect parameters (base address in particular)
->>   	  may crash your system.
->>   
->> +config INTEL_STRATIX10_SERVICE
->> +       tristate "Intel Stratix10 Service Layer"
->> +       depends on HAVE_ARM_SMCCC
->> +       default n
->> +       help
->> +        Intel Stratix10 service layer runs at privileged exception level,
->> +	interfaces with the service providers (FPGA manager is one of them) and
->> +	manages secure monitor call to communicate with secure monitor software
->> +	at secure monitor exception level.
->> +
->> +        Say Y here if you want Stratix10 service layer support.
-> 
-> from Documentation/process/coding-style.rst:
-> 
-> Lines under a ``config`` definition are indented with one tab,
-> while help text is indented an additional two spaces.
-> 
->
+The following patch series was sent to arm at kernel.org
+but the messages bounced because the SMTP server is
+currently blacklisted. Can you get the patches through
+the LAKML mailing list?
 
-I will correct that in the next submission.
+Regards.
 
-> thanks.
+On 07/11/2018 21:12, Marc Gonzalez wrote:
+
+> Hello ARM maintainers,
 > 
-
-Regards,
-Richard
+> The set of Kconfig options slowly changes with every kernel version.
+> This patch series regenerates the arm64 defconfig for v4.20
+> No functional change intended, except adding PINCTRL_MTK_MOORE to
+> keep PINCTRL_MT7622.
+> 
+> Marc Gonzalez (9):
+>   arm64: defconfig: Regenerate for v4.20
+>   arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+>   arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
+>   arm64: defconfig: Drop USB_ULPI_BUS and USB_CHIPIDEA_ULPI
+>   arm64: defconfig: Replace PINCTRL_MT7622 with PINCTRL_MTK_MOORE
+>   arm64: defconfig: Drop redundant SND_SOC_ROCKCHIP_I2S
+>   arm64: defconfig: Drop CRYPTO_DEV_FSL_DPAA2_CAAM
+>   arm64: defconfig: Change SCSI_UFS_HISI=m
+>   arm64: defconfig: Drop redundant sound codec options
+> 
+>  arch/arm64/configs/defconfig | 105 +++++++++++++++--------------------
+>  1 file changed, 46 insertions(+), 59 deletions(-)
