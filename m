@@ -1,32 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Nov 2018 22:51:51 +0100
-Subject: [PATCH 0/9] Regenerate arm64 defconfig for current kernel
-In-Reply-To: <6eb79d2e-1857-39b5-90f5-29bc13bce16a@free.fr>
-References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
- <6eb79d2e-1857-39b5-90f5-29bc13bce16a@free.fr>
-Message-ID: <CAK8P3a1QE1Vr8_3m1=dhgjWkn9HLYwpmNUVZ4+fVZdRwpX=ZEQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Nov 2018 21:58:46 +0000
+Subject: [PATCH 2/7] arm64: sdei: Always use sdei stack for sdei events
+In-Reply-To: <1537970184-44348-3-git-send-email-julien.thierry@arm.com>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <20181107215844.GC12248@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 9:39 PM Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
->
-> Arnd, Olof,
->
-> The following patch series was sent to arm at kernel.org
-> but the messages bounced because the SMTP server is
-> currently blacklisted. Can you get the patches through
-> the LAKML mailing list?
+On Wed, Sep 26, 2018 at 02:56:19PM +0100, Julien Thierry wrote:
+> SDEI events can occur at any point, including when the stack pointer is
+> not aligned. SP could be modified to respect alignment 16-byte alignement,
+> but there is a need to deal with code using SP as scratch register.
+> 
+> Always reserve the SDEI stacks to handle its events.
+> 
+> Since stack allocation relies on VMAPed stacks, lets make SDEI depend on
+> VMAP_STACK.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> ---
+>  arch/arm64/include/asm/sdei.h |  2 --
+>  arch/arm64/kernel/entry.S     |  2 --
+>  arch/arm64/kernel/sdei.c      | 23 ++++++++---------------
+>  drivers/firmware/Kconfig      |  1 +
+>  4 files changed, 9 insertions(+), 19 deletions(-)
 
-Yes, that worked fine, and they ended up in the right folder for
-me because of the to:arm at kernel.org recipient.
+One side-effect of this change is that SDEI cannot be enabled in conjunction
+with KASAN. James -- are you ok with that?
 
-All patches look good to me, thanks a lot for doing this!
-
-One point about the changelogs: in some of them you just
-list the commit that changed things, but don't explain what
-the impact of that commit was (symbol dropped, always
-selected, etc). I always like to see changelog texts in full
-sentences, so if you can spend a few more minutes on this,
-would you send a v2 with that changed?
-
-       Arnd
+Will
