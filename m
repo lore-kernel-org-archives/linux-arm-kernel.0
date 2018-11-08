@@ -1,23 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Nov 2018 17:51:00 +0000
-Subject: [PATCH] arm64: mm: define NET_IP_ALIGN to 0
-In-Reply-To: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
-References: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181108175059.GE144107@arrakis.emea.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 8 Nov 2018 17:51:53 +0000
+Subject: [PATCH 2/4] KVM: arm64: Allow implementations to be confined to
+ using VHE
+In-Reply-To: <20181106075353.GF12057@e113682-lin.lund.arm.com>
+References: <20181105143617.120602-1-marc.zyngier@arm.com>
+ <20181105143617.120602-3-marc.zyngier@arm.com>
+ <20181106075353.GF12057@e113682-lin.lund.arm.com>
+Message-ID: <f75dfeda-63ce-73c1-4798-f47607c45cb3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 06:10:38PM +0100, Ard Biesheuvel wrote:
-> On arm64, there is no need to add 2 bytes of padding to the start of
-> each network buffer just to make the IP header appear 32-bit aligned.
+On 06/11/18 07:53, Christoffer Dall wrote:
+> On Mon, Nov 05, 2018 at 02:36:14PM +0000, Marc Zyngier wrote:
+>> Some implementations may be forced to use VHE to work around HW
+>> errata, for example. Let's introduce a helper that checks for
+>> these cases.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h   | 1 +
+>>  arch/arm64/include/asm/kvm_host.h | 6 ++++++
+>>  virt/kvm/arm/arm.c                | 5 +++++
+>>  3 files changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index c3469729f40c..0f2f782548cb 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -286,6 +286,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>>  
+>>  static inline bool kvm_arch_sve_requires_vhe(void) { return false; }
+>> +static inline bool kvm_arch_impl_requires_vhe(void) { return false; }
+>>  static inline void kvm_arch_hardware_unsetup(void) {}
+>>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index ca1714148400..7d6e974d024a 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -432,6 +432,12 @@ static inline bool kvm_arch_sve_requires_vhe(void)
+>>  	return system_supports_sve();
+>>  }
+>>  
+>> +static inline bool kvm_arch_impl_requires_vhe(void)
+>> +{
+>> +	/* Some implementations have defects that confine them to VHE */
+>> +	return false;
+>> +}
+>> +
+>>  static inline void kvm_arch_hardware_unsetup(void) {}
+>>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>> index 66de2efddfca..bc90a1cdd27f 100644
+>> --- a/virt/kvm/arm/arm.c
+>> +++ b/virt/kvm/arm/arm.c
+>> @@ -1647,6 +1647,11 @@ int kvm_arch_init(void *opaque)
+>>  			kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
+>>  			return -ENODEV;
+>>  		}
+>> +
+>> +		if (kvm_arch_impl_requires_vhe()) {
+>> +			kvm_pr_unimpl("CPU requiring VHE in non-VHE mode");
+>> +			return -ENODEV;
+>> +		}
 > 
-> Since this might actually adversely affect DMA performance some
-> platforms, let's override NET_IP_ALIGN to 0 to get rid of this
-> padding.
+> So as per my previous comment, I'd prefer this function to only issue a
+> single call, and have the function in kvm_host.h check for all the
+> conditions, do the printing, etc.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Thoughts?
 
-Queued for 4.20. Thanks
+Indeed, this seems a sensible alternative.
 
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
