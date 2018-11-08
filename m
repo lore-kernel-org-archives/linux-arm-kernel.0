@@ -1,22 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 8 Nov 2018 13:37:43 -0200
-Subject: [PATCH] ARM: dts: imx7d-sdb: add rev-a board support
-In-Reply-To: <DB3PR0402MB3916B027A9C724D349C7969EF5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-References: <1541567625-11812-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5AL03yy6Vj_eC=h7scSDnuja1G8rsWER+r7w3FEVaceDg@mail.gmail.com>
- <DB3PR0402MB3916B318947B803BC5ADF4A6F5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <CAOMZO5DiTbEsVXTCfE8fJ=4+yU4oXR1gex7Bj-k=FowKHWJaxw@mail.gmail.com>
- <DB3PR0402MB3916B027A9C724D349C7969EF5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5CPZKqJdTPzZDw=19HW_YCg_JGvLpw9i3iKsi+EJF-yNg@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Thu, 8 Nov 2018 09:38:38 -0600
+Subject: [PATCH v2 1/3] ARM: socfpga: Clean unused functions
+In-Reply-To: <CAJiuCcdKFKmwB5mqW-bP+4A4HtVr=1z9avxoDPrD3NL9X9i8MQ@mail.gmail.com>
+References: <20181009112021.756-1-peron.clem@gmail.com>
+ <CAJiuCceqyPY+dYr+1xdSyUh5x1Fr=M_p1nsMF9h52v5CXt1uYw@mail.gmail.com>
+ <20181023085208.GL30658@n2100.armlinux.org.uk>
+ <CAJiuCcdKFKmwB5mqW-bP+4A4HtVr=1z9avxoDPrD3NL9X9i8MQ@mail.gmail.com>
+Message-ID: <27e04998-8e67-e543-d717-2ac7e47b1732@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+Hi Cl?ment,
 
-On Thu, Nov 8, 2018 at 12:30 AM Anson Huang <anson.huang@nxp.com> wrote:
+On 11/2/18 10:58 AM, Cl?ment P?ron wrote:
+> Hi Dinh,
+> 
+> Could you have a look at this serie ?
+> 
 
-> Thanks for pointing out this issue, I made a mistake when doing the search in git repo..
-> So, if we have to assert a GPIO, there is no common way in pinctrl driver? Have to
-> do it in driver itself? Like this case, we have to assert the GPIO in fec driver?
+I've applied 1/3 and 3/3. I need to look over 2/3 to determine if that
+patch is still valid. I think a better solution would be to set a clock
+as critical so that it doesn't get gated.
 
-You could pass "phy-supply" property  and model it as gpio controlled regulator.
+Thanks,
+Dinh
