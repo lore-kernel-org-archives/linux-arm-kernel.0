@@ -1,110 +1,92 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Nov 2018 20:13:44 +0100
-Subject: [PATCH v2 1/2] mm: Introduce common STRUCT_PAGE_MAX_SHIFT define
-In-Reply-To: <20181107205433.3875-2-logang@deltatee.com>
-References: <20181107205433.3875-1-logang@deltatee.com>
- <20181107205433.3875-2-logang@deltatee.com>
-Message-ID: <CAKv+Gu9c+img+yqpmG9HD_bOihXLzQ70W+5Wki0FTmx7wYj37w@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Nov 2018 19:14:22 +0000
+Subject: [PATCH 1/4] KVM: arm64: Rework detection of SVE, !VHE systems
+In-Reply-To: <20181106075251.GE12057@e113682-lin.lund.arm.com>
+References: <20181105143617.120602-1-marc.zyngier@arm.com>
+ <20181105143617.120602-2-marc.zyngier@arm.com>
+ <20181106075251.GE12057@e113682-lin.lund.arm.com>
+Message-ID: <20181108191421.GG3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2018 at 21:54, Logan Gunthorpe <logang@deltatee.com> wrote:
-> This define is used by arm64 to calculate the size of the vmemmap
-> region. It is defined as the log2 of the upper bound on the size
-> of a struct page.
->
-> We move it into mm_types.h so it can be defined properly instead of
-> set and checked with a build bug. This also allows us to use the same
-> define for riscv.
->
-> Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Christoph Hellwig <hch@lst.de>
+On Tue, Nov 06, 2018 at 08:52:51AM +0100, Christoffer Dall wrote:
+> On Mon, Nov 05, 2018 at 02:36:13PM +0000, Marc Zyngier wrote:
+> > An SVE system is so far the only case where we mandate VHE. As we're
+> > starting to grow this requirements, let's slightly rework the way we
+> > deal with that situation, allowing for easy extension of this check.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm/include/asm/kvm_host.h   |  2 +-
+> >  arch/arm64/include/asm/kvm_host.h |  7 ++-----
+> >  virt/kvm/arm/arm.c                | 12 +++++++-----
+> >  3 files changed, 10 insertions(+), 11 deletions(-)
+> > 
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+[...]
 
-> ---
->  arch/arm64/include/asm/memory.h | 9 ---------
->  arch/arm64/mm/init.c            | 8 --------
->  include/asm-generic/fixmap.h    | 1 +
->  include/linux/mm_types.h        | 5 +++++
->  4 files changed, 6 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index b96442960aea..f0a5c9531e8b 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -34,15 +34,6 @@
->   */
->  #define PCI_IO_SIZE            SZ_16M
->
-> -/*
-> - * Log2 of the upper bound of the size of a struct page. Used for sizing
-> - * the vmemmap region only, does not affect actual memory footprint.
-> - * We don't use sizeof(struct page) directly since taking its size here
-> - * requires its definition to be available at this point in the inclusion
-> - * chain, and it may not be a power of 2 in the first place.
-> - */
-> -#define STRUCT_PAGE_MAX_SHIFT  6
-> -
->  /*
->   * VMEMMAP_SIZE - allows the whole linear region to be covered by
->   *                a struct page array
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 9d9582cac6c4..1a3e411a1d08 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -612,14 +612,6 @@ void __init mem_init(void)
->         BUILD_BUG_ON(TASK_SIZE_32                       > TASK_SIZE_64);
->  #endif
->
-> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -       /*
-> -        * Make sure we chose the upper bound of sizeof(struct page)
-> -        * correctly when sizing the VMEMMAP array.
-> -        */
-> -       BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
-> -#endif
-> -
->         if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
->                 extern int sysctl_overcommit_memory;
->                 /*
-> diff --git a/include/asm-generic/fixmap.h b/include/asm-generic/fixmap.h
-> index 827e4d3bbc7a..8cc7b09c1bc7 100644
-> --- a/include/asm-generic/fixmap.h
-> +++ b/include/asm-generic/fixmap.h
-> @@ -16,6 +16,7 @@
->  #define __ASM_GENERIC_FIXMAP_H
->
->  #include <linux/bug.h>
-> +#include <linux/mm_types.h>
->
->  #define __fix_to_virt(x)       (FIXADDR_TOP - ((x) << PAGE_SHIFT))
->  #define __virt_to_fix(x)       ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
-> diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
-> index 5ed8f6292a53..2c471a2c43fa 100644
-> --- a/include/linux/mm_types.h
-> +++ b/include/linux/mm_types.h
-> @@ -206,6 +206,11 @@ struct page {
->  #endif
->  } _struct_page_alignment;
->
-> +/*
-> + * Used for sizing the vmemmap region on some architectures
-> + */
-> +#define STRUCT_PAGE_MAX_SHIFT  (order_base_2(sizeof(struct page)))
-> +
->  #define PAGE_FRAG_CACHE_MAX_SIZE       __ALIGN_MASK(32768, ~PAGE_MASK)
->  #define PAGE_FRAG_CACHE_MAX_ORDER      get_order(PAGE_FRAG_CACHE_MAX_SIZE)
->
-> --
-> 2.19.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index 52fbc823ff8c..ca1714148400 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -422,17 +422,14 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+> >  	}
+> >  }
+> >  
+> > -static inline bool kvm_arch_check_sve_has_vhe(void)
+> > +static inline bool kvm_arch_sve_requires_vhe(void)
+> >  {
+> >  	/*
+> >  	 * The Arm architecture specifies that implementation of SVE
+> >  	 * requires VHE also to be implemented.  The KVM code for arm64
+> >  	 * relies on this when SVE is present:
+> >  	 */
+> > -	if (system_supports_sve())
+> > -		return has_vhe();
+> > -	else
+> > -		return true;
+> > +	return system_supports_sve();
+> >  }
+> 
+> nit: Can we call this function 'kvm_arch_requires_vhe()' and let it test
+> for all the cases (maybe that's coming in future patches though).  I
+> just find this naming confusing.
+
+Agreed.  I was never keen on my original name, and the logic was
+somewhat backwards anyway.
+
+"kvm_arch_requires_vhe()" is a reasonable name for a function that
+returns true iff the kernel needs VHE as a consequence of some other
+prior runtime decision.
+
+> >  
+> >  static inline void kvm_arch_hardware_unsetup(void) {}
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index 23774970c9df..66de2efddfca 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -1640,9 +1640,13 @@ int kvm_arch_init(void *opaque)
+> >  		return -ENODEV;
+> >  	}
+> >  
+> > -	if (!kvm_arch_check_sve_has_vhe()) {
+> > -		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
+> > -		return -ENODEV;
+> > +	in_hyp_mode = is_kernel_in_hyp_mode();
+> > +
+> > +	if (!in_hyp_mode) {
+> > +		if (kvm_arch_sve_requires_vhe()) {
+
+Can we just have
+
+	if (!in_hyp_mode && kvm_arch_requires_vhe()) {
+
+That's less nesty but still readable (for me, at least).
+
+Otherwise, Ack.
+
+
+[...]
+
+Cheers
+---Dave
