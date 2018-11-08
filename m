@@ -1,92 +1,117 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Nov 2018 19:14:22 +0000
-Subject: [PATCH 1/4] KVM: arm64: Rework detection of SVE, !VHE systems
-In-Reply-To: <20181106075251.GE12057@e113682-lin.lund.arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-2-marc.zyngier@arm.com>
- <20181106075251.GE12057@e113682-lin.lund.arm.com>
-Message-ID: <20181108191421.GG3505@e103592.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Nov 2018 20:14:42 +0100
+Subject: [PATCH v2 0/6] arm/efi: fix memblock reallocation crash due to
+ persistent reservations
+In-Reply-To: <CACi5LpPWo6wjOLdXP1ZO1scdbyyus6_D6C+gdg6YjUszsiaMaA@mail.gmail.com>
+References: <20181107141611.12076-1-ard.biesheuvel@linaro.org>
+ <CACi5LpPWo6wjOLdXP1ZO1scdbyyus6_D6C+gdg6YjUszsiaMaA@mail.gmail.com>
+Message-ID: <CAKv+Gu_99GNTE9aXAtEuykKEwi0bPfUL0PqFOQQVJajqXHgG0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 08:52:51AM +0100, Christoffer Dall wrote:
-> On Mon, Nov 05, 2018 at 02:36:13PM +0000, Marc Zyngier wrote:
-> > An SVE system is so far the only case where we mandate VHE. As we're
-> > starting to grow this requirements, let's slightly rework the way we
-> > deal with that situation, allowing for easy extension of this check.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm/include/asm/kvm_host.h   |  2 +-
-> >  arch/arm64/include/asm/kvm_host.h |  7 ++-----
-> >  virt/kvm/arm/arm.c                | 12 +++++++-----
-> >  3 files changed, 10 insertions(+), 11 deletions(-)
-> > 
+On 8 November 2018 at 20:13, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> Hi Ard,
+>
+> On Wed, Nov 7, 2018 at 7:46 PM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>
+>> This series addresses the kexec/kdump crash on arm64 system with many CPUs
+>> that was reported by Bhupesh.
+>>
+>> Patch #1 fixes the actual crash, but may result in memblock_reserve() to
+>> fail. This is fixed in patch #4, where the point that the persistent
+>> reservations are applied is moved to after memblock_allow_resize() has
+>> been called.
+>>
+>> Patches #2 and #3 contain some minor preparatory changes that are
+>> required on ARM to ensure that efi_apply_persistent_mem_reservations()
+>> can be called at some point (i.e., when memblock resizing is already
+>> permitted and early memremap() is still usable)
+>>
+>> Patches #5 and #6 optimize the EFI persistent memreserve infrastructure
+>> so that fewer memblock reservations are required.
+>>
+>> Changes since v1:
+>> - Russell pointed out that switching to ordinary memremap() was not
+>>   possible this early, and so I refactored the ARM early boot code
+>>   slightly so that we can keep using early_memremap().
+>>
+>> Ard Biesheuvel (6):
+>>   arm64: memblock: don't permit memblock resizing until linear mapping
+>>     is up
+>>   ARM: mm: permit memblock resizing right after mapping the linear
+>>     region
+>>   ARM: mm: permit early_memremap() to be used in paging_init()
+>>   efi/arm: defer persistent reservations until after paging_init()
+>>   efi: permit multiple entries in persistent memreserve data structure
+>>   efi: reduce the amount of memblock reservations for persistent
+>>     allocations
+>>
+>>  arch/arm/kernel/setup.c                 |  2 -
+>>  arch/arm/mm/init.c                      |  1 -
+>>  arch/arm/mm/mmu.c                       |  5 ++
+>>  arch/arm64/kernel/setup.c               |  1 +
+>>  arch/arm64/mm/init.c                    |  2 -
+>>  arch/arm64/mm/mmu.c                     |  2 +
+>>  drivers/firmware/efi/efi.c              | 59 ++++++++++++++------
+>>  drivers/firmware/efi/libstub/arm-stub.c |  2 +-
+>>  include/linux/efi.h                     | 23 +++++++-
+>>  9 files changed, 72 insertions(+), 25 deletions(-)
+>>
+>> --
+>> 2.19.1
+>>
+>
+> I did some quick checks (as I just returned from my holidays and got
+> hold of the hardware just now) and I haven't had the opportunity to
+> look closely at the entire patch set, but it looks like a step in the
+> right direction especially as we try to have fewer memblock
+> reservations (I will have a closer look at the patchset perhaps over
+> the weekend).
+>
+> I tested this on the hardware (with 224 CPUs) where I was seeing the
+> crash initially and kdump seems to work fine on the same. Here are
+> some kdump kernel logs with 'memblock=debug' set in bootargs:
+>
+> [    0.000000] memblock_reserve:
+> [0x00000000e2e02e18-0x00000000e2e02e4f] efi_mem_reserve+0x3c/0x54
+> [    0.000000] memblock_reserve:
+> [0x00000000dac70000-0x00000000dac7ffff] efi_init+0xc4/0x17c
+> [    0.000000] memblock_remove:
+> [0x0001000000000000-0x0000fffffffffffe] arm64_memblock_init+0x6c/0x418
+> [    0.000000] memblock_remove:
+> [0x0000800080000000-0x000080007ffffffe] arm64_memblock_init+0xac/0x418
+> [    0.0001dd0000-0x00000000a2cfffff] arm64_memblock_init+0x184/0x418
+> [    0.000000] memblock_add: [0x00000000a1dd0000-0x00000000a2cfffff]
+> arm64_memblock_init+0x190/0x418
+> [    0.000000] memblock_reserve:
+> [0x00000000a1dd0000-0x00000000a2cfffff]
+> arm64_memblock_init+0x19c/0x418
+> [    0.000000] memblock_reserve:
+> [0x00000000a0080000-0x00000000a1dcffff]
+> arm64_memblock_init+0x1f8/0x418
+> [    0.000000] memblock_reserve:
+> [0x00000000a1dd0000-0x00000000a2cfb402]     0.000000]
+> memblock_reserve: [0x00000000bfff0000-0x00000000bfff33ff]
+> arm64_memblock_init+0x3b4/0x418
+> [    0.000000] Reserving 13KB of memory at 0xbfff0000 for elfcorehdr
+> [    0.000000] memblock_reserve:
+> [0x00000000bffe0000-0x00000000bffeffff]
+> memblock_alloc_base_nid+0x70/0x8c
+> [    0.000000] memblock_reserve:
+> [0x00000000bffd0000-0x00000000bffdffff]
+> memblock_alloc_base_nid+0x70/0x8c
+> [    0.000000] memblock_reserve: [0x00000000bffc0se_nid+0x70/0x8c
+> [    0.000000] memblock_reserve:
+> [0x00000000bffb0000-0x00000000bffbffff]
+> memblock_alloc_base_nid+0x70/0x8c
+> [    0.000000]    memblock_free:
+> [0x00000000a1d80000-0x00000000a1dcffff] paging_init+0x6d4/0x6fc
+> [    0.000000] memblock_reserve:
+> [0x00000000ddab9e18-0x00000000ddab9e27]
+> efi_apply_persistent_mem_reservations+0x8c/0xbc
+>
+> So, things look great so far. So, please feel free to add:
+> Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
+>
 
-[...]
-
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 52fbc823ff8c..ca1714148400 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -422,17 +422,14 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
-> >  	}
-> >  }
-> >  
-> > -static inline bool kvm_arch_check_sve_has_vhe(void)
-> > +static inline bool kvm_arch_sve_requires_vhe(void)
-> >  {
-> >  	/*
-> >  	 * The Arm architecture specifies that implementation of SVE
-> >  	 * requires VHE also to be implemented.  The KVM code for arm64
-> >  	 * relies on this when SVE is present:
-> >  	 */
-> > -	if (system_supports_sve())
-> > -		return has_vhe();
-> > -	else
-> > -		return true;
-> > +	return system_supports_sve();
-> >  }
-> 
-> nit: Can we call this function 'kvm_arch_requires_vhe()' and let it test
-> for all the cases (maybe that's coming in future patches though).  I
-> just find this naming confusing.
-
-Agreed.  I was never keen on my original name, and the logic was
-somewhat backwards anyway.
-
-"kvm_arch_requires_vhe()" is a reasonable name for a function that
-returns true iff the kernel needs VHE as a consequence of some other
-prior runtime decision.
-
-> >  
-> >  static inline void kvm_arch_hardware_unsetup(void) {}
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index 23774970c9df..66de2efddfca 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -1640,9 +1640,13 @@ int kvm_arch_init(void *opaque)
-> >  		return -ENODEV;
-> >  	}
-> >  
-> > -	if (!kvm_arch_check_sve_has_vhe()) {
-> > -		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
-> > -		return -ENODEV;
-> > +	in_hyp_mode = is_kernel_in_hyp_mode();
-> > +
-> > +	if (!in_hyp_mode) {
-> > +		if (kvm_arch_sve_requires_vhe()) {
-
-Can we just have
-
-	if (!in_hyp_mode && kvm_arch_requires_vhe()) {
-
-That's less nesty but still readable (for me, at least).
-
-Otherwise, Ack.
-
-
-[...]
-
-Cheers
----Dave
+Thanks!
