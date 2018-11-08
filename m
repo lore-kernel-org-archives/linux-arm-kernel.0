@@ -1,51 +1,25 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 7 Nov 2018 22:51:03 -0800
-Subject: [PATCH 3/5] ARM: dts: stm32: Add hwspinlock node for stm32mp157
- SoC
-In-Reply-To: <20181031093032.20386-4-benjamin.gaignard@st.com>
-References: <20181031093032.20386-1-benjamin.gaignard@st.com>
- <20181031093032.20386-4-benjamin.gaignard@st.com>
-Message-ID: <20181108065103.GD12063@builder>
+From: martin@strongswan.org (Martin Willi)
+Date: Thu, 08 Nov 2018 07:47:23 +0100
+Subject: [RFC PATCH v3 00/15] crypto: Adiantum support
+In-Reply-To: <20181105232526.173947-1-ebiggers@kernel.org>
+References: <20181105232526.173947-1-ebiggers@kernel.org>
+Message-ID: <757b2f06657d68929ce14d2bac3eb111bb06e6ab.camel@strongswan.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 31 Oct 02:30 PDT 2018, Benjamin Gaignard wrote:
+Hi Eric,
 
-> Declare hwspinlock device for stm32mp157 SoC
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> This patchset adds Adiantum to Linux's crypto API, focusing on
+> generic and ARM32 implementations.  Patches 1-9 add support for
+> XChaCha20 and XChaCha12.  Patches 10-13 add NHPoly1305 support,
+> needed for Adiantum hashing. Patch 14 adds Adiantum support as a
+> skcipher template.
 
-Pending the clock-names question,
+Nice work. I did a quick review only, but you may add my
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+  Acked-by: Martin Willi <martin@strongswan.org>
 
-Regards,
-Bjorn
+for patches 1-5, 10 and 11.
 
-> ---
->  arch/arm/boot/dts/stm32mp157c.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-> index 185541a5b69f..9b16c28f8ac3 100644
-> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
-> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-> @@ -803,6 +803,15 @@
->  			status = "disabled";
->  		};
->  
-> +		hsem: hwspinlock at 4c000000 {
-> +			compatible = "st,stm32-hwspinlock";
-> +			#hwlock-cells = <1>;
-> +			reg = <0x4c000000 0x400>;
-> +			clocks = <&rcc HSEM>;
-> +			clock-names = "hwspinlock";
-> +			status = "disabled";
-> +		};
-> +
->  		rcc: rcc at 50000000 {
->  			compatible = "st,stm32mp1-rcc", "syscon";
->  			reg = <0x50000000 0x1000>;
-> -- 
-> 2.15.0
-> 
+Thanks,
+Martin
