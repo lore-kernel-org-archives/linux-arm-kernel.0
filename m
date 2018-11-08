@@ -1,270 +1,44 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 7 Nov 2018 18:36:16 -0600
-Subject: [PATCH 4/5] phy: mvebu-cp110-comphy: convert to use eth phy mode and
- submode
-In-Reply-To: <20181108003617.10334-1-grygorii.strashko@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Nov 2018 00:42:00 +0000
+Subject: [PATCH 2/5] phy: core: add PHY_MODE_ETHERNET
+In-Reply-To: <20181108003617.10334-3-grygorii.strashko@ti.com>
 References: <20181108003617.10334-1-grygorii.strashko@ti.com>
-Message-ID: <20181108003617.10334-5-grygorii.strashko@ti.com>
+ <20181108003617.10334-3-grygorii.strashko@ti.com>
+Message-ID: <20181108004200.GW30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert mvebu-cp110-comphy PHY driver to use recently introduced
-PHY_MODE_ETHERNET and phy_set_mode_ext().
+On Wed, Nov 07, 2018 at 06:36:14PM -0600, Grygorii Strashko wrote:
+> Add new PHY's mode to be used by Ethernet PHY interface drivers or
+> multipurpose PHYs like serdes. It will be reused in further changes.
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  include/linux/phy/phy.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index b17e770..02c9ef0 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -42,6 +42,7 @@ enum phy_mode {
+>  	PHY_MODE_UFS_HS_A,
+>  	PHY_MODE_UFS_HS_B,
+>  	PHY_MODE_PCIE,
+> +	PHY_MODE_ETHERNET,
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c | 21 ++-----
- drivers/phy/marvell/phy-mvebu-cp110-comphy.c    | 80 +++++++++++++------------
- 2 files changed, 48 insertions(+), 53 deletions(-)
+Are you sure about this - we already have a bunch of "ethernet" modes
+that are more specific, like PHY_MODE_SGMII, PHY_MODE_2500SGMII and
+PHY_MODE_10GKR which require PHYs to be configured differently.  Having
+a very generic "ethernet" mode brings up questions about when it should
+be used vs the more specific modes.
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
-index 7a37a37..fb28b71 100644
---- a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
-+++ b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
-@@ -1165,28 +1165,17 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
-  */
- static int mvpp22_comphy_init(struct mvpp2_port *port)
- {
--	enum phy_mode mode;
-+	int submode;
- 	int ret;
- 
- 	if (!port->comphy)
- 		return 0;
- 
--	switch (port->phy_interface) {
--	case PHY_INTERFACE_MODE_SGMII:
--	case PHY_INTERFACE_MODE_1000BASEX:
--		mode = PHY_MODE_SGMII;
--		break;
--	case PHY_INTERFACE_MODE_2500BASEX:
--		mode = PHY_MODE_2500SGMII;
--		break;
--	case PHY_INTERFACE_MODE_10GKR:
--		mode = PHY_MODE_10GKR;
--		break;
--	default:
--		return -EINVAL;
--	}
-+	submode = port->phy_interface;
-+	if (submode == PHY_INTERFACE_MODE_1000BASEX)
-+		submode = PHY_INTERFACE_MODE_SGMII;
- 
--	ret = phy_set_mode(port->comphy, mode);
-+	ret = phy_set_mode_ext(port->comphy, PHY_MODE_ETHERNET, submode);
- 	if (ret)
- 		return ret;
- 
-diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-index 79b52c3..3f89cc0 100644
---- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-+++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-@@ -9,6 +9,7 @@
- #include <linux/iopoll.h>
- #include <linux/mfd/syscon.h>
- #include <linux/module.h>
-+#include <linux/phy.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-@@ -131,26 +132,26 @@ struct mvebu_comhy_conf {
- 
- static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
- 	/* lane 0 */
--	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
--	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(0, 1, PHY_INTERFACE_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(0, 1, PHY_INTERFACE_MODE_2500BASEX, 0x1),
- 	/* lane 1 */
--	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_SGMII, 0x1),
--	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(1, 2, PHY_INTERFACE_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(1, 2, PHY_INTERFACE_MODE_2500BASEX, 0x1),
- 	/* lane 2 */
--	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII, 0x1),
--	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII, 0x1),
--	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR, 0x1),
-+	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_2500BASEX, 0x1),
-+	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_10GKR, 0x1),
- 	/* lane 3 */
--	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII, 0x2),
--	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII, 0x2),
-+	MVEBU_COMPHY_CONF(3, 1, PHY_INTERFACE_MODE_SGMII, 0x2),
-+	MVEBU_COMPHY_CONF(3, 1, PHY_INTERFACE_MODE_2500BASEX, 0x2),
- 	/* lane 4 */
--	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_SGMII, 0x2),
--	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_2500SGMII, 0x2),
--	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR, 0x2),
--	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_SGMII, 0x2),
-+	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_2500BASEX, 0x2),
-+	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_10GKR, 0x2),
-+	MVEBU_COMPHY_CONF(4, 1, PHY_INTERFACE_MODE_SGMII, 0x1),
- 	/* lane 5 */
--	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII, 0x1),
--	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(5, 2, PHY_INTERFACE_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(5, 2, PHY_INTERFACE_MODE_2500BASEX, 0x1),
- };
- 
- struct mvebu_comphy_priv {
-@@ -163,10 +164,12 @@ struct mvebu_comphy_lane {
- 	struct mvebu_comphy_priv *priv;
- 	unsigned id;
- 	enum phy_mode mode;
-+	int submode;
- 	int port;
- };
- 
--static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
-+static int mvebu_comphy_get_mux(int lane, int port,
-+				enum phy_mode mode, int submode)
- {
- 	int i, n = ARRAY_SIZE(mvebu_comphy_cp110_modes);
- 
-@@ -177,7 +180,7 @@ static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
- 	for (i = 0; i < n; i++) {
- 		if (mvebu_comphy_cp110_modes[i].lane == lane &&
- 		    mvebu_comphy_cp110_modes[i].port == port &&
--		    mvebu_comphy_cp110_modes[i].mode == mode)
-+		    mvebu_comphy_cp110_modes[i].mode == submode)
- 			break;
- 	}
- 
-@@ -187,8 +190,7 @@ static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
- 	return mvebu_comphy_cp110_modes[i].mux;
- }
- 
--static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
--					     enum phy_mode mode)
-+static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane)
- {
- 	struct mvebu_comphy_priv *priv = lane->priv;
- 	u32 val;
-@@ -206,14 +208,14 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
- 		 MVEBU_COMPHY_SERDES_CFG0_HALF_BUS |
- 		 MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xf) |
- 		 MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xf));
--	if (mode == PHY_MODE_10GKR)
-+	if (lane->submode == PHY_INTERFACE_MODE_10GKR)
- 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xe) |
- 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xe);
--	else if (mode == PHY_MODE_2500SGMII)
-+	else if (lane->submode == PHY_INTERFACE_MODE_2500BASEX)
- 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x8) |
- 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x8) |
- 		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
--	else if (mode == PHY_MODE_SGMII)
-+	else if (lane->submode == PHY_INTERFACE_MODE_SGMII)
- 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x6) |
- 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x6) |
- 		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
-@@ -243,7 +245,7 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
- 	/* refclk selection */
- 	val = readl(priv->base + MVEBU_COMPHY_MISC_CTRL0(lane->id));
- 	val &= ~MVEBU_COMPHY_MISC_CTRL0_REFCLK_SEL;
--	if (mode == PHY_MODE_10GKR)
-+	if (lane->submode == PHY_INTERFACE_MODE_10GKR)
- 		val |= MVEBU_COMPHY_MISC_CTRL0_ICP_FORCE;
- 	writel(val, priv->base + MVEBU_COMPHY_MISC_CTRL0(lane->id));
- 
-@@ -261,8 +263,7 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
- 	writel(val, priv->base + MVEBU_COMPHY_LOOPBACK(lane->id));
- }
- 
--static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
--				  enum phy_mode mode)
-+static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane)
- {
- 	struct mvebu_comphy_priv *priv = lane->priv;
- 	u32 val;
-@@ -303,13 +304,13 @@ static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
- 	return 0;
- }
- 
--static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
-+static int mvebu_comphy_set_mode_sgmii(struct phy *phy)
- {
- 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
- 	struct mvebu_comphy_priv *priv = lane->priv;
- 	u32 val;
- 
--	mvebu_comphy_ethernet_init_reset(lane, mode);
-+	mvebu_comphy_ethernet_init_reset(lane);
- 
- 	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
- 	val &= ~MVEBU_COMPHY_RX_CTRL1_CLK8T_EN;
-@@ -330,7 +331,7 @@ static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
- 	val |= MVEBU_COMPHY_GEN1_S0_TX_EMPH(0x1);
- 	writel(val, priv->base + MVEBU_COMPHY_GEN1_S0(lane->id));
- 
--	return mvebu_comphy_init_plls(lane, PHY_MODE_SGMII);
-+	return mvebu_comphy_init_plls(lane);
- }
- 
- static int mvebu_comphy_set_mode_10gkr(struct phy *phy)
-@@ -339,7 +340,7 @@ static int mvebu_comphy_set_mode_10gkr(struct phy *phy)
- 	struct mvebu_comphy_priv *priv = lane->priv;
- 	u32 val;
- 
--	mvebu_comphy_ethernet_init_reset(lane, PHY_MODE_10GKR);
-+	mvebu_comphy_ethernet_init_reset(lane);
- 
- 	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
- 	val |= MVEBU_COMPHY_RX_CTRL1_RXCLK2X_SEL |
-@@ -469,7 +470,7 @@ static int mvebu_comphy_set_mode_10gkr(struct phy *phy)
- 	val |= MVEBU_COMPHY_EXT_SELV_RX_SAMPL(0x1a);
- 	writel(val, priv->base + MVEBU_COMPHY_EXT_SELV(lane->id));
- 
--	return mvebu_comphy_init_plls(lane, PHY_MODE_10GKR);
-+	return mvebu_comphy_init_plls(lane);
- }
- 
- static int mvebu_comphy_power_on(struct phy *phy)
-@@ -479,7 +480,8 @@ static int mvebu_comphy_power_on(struct phy *phy)
- 	int ret, mux;
- 	u32 val;
- 
--	mux = mvebu_comphy_get_mux(lane->id, lane->port, lane->mode);
-+	mux = mvebu_comphy_get_mux(lane->id, lane->port,
-+				   lane->mode, lane->submode);
- 	if (mux < 0)
- 		return -ENOTSUPP;
- 
-@@ -492,12 +494,12 @@ static int mvebu_comphy_power_on(struct phy *phy)
- 	val |= mux << MVEBU_COMPHY_SELECTOR_PHY(lane->id);
- 	regmap_write(priv->regmap, MVEBU_COMPHY_SELECTOR, val);
- 
--	switch (lane->mode) {
--	case PHY_MODE_SGMII:
--	case PHY_MODE_2500SGMII:
--		ret = mvebu_comphy_set_mode_sgmii(phy, lane->mode);
-+	switch (lane->submode) {
-+	case PHY_INTERFACE_MODE_SGMII:
-+	case PHY_INTERFACE_MODE_2500BASEX:
-+		ret = mvebu_comphy_set_mode_sgmii(phy);
- 		break;
--	case PHY_MODE_10GKR:
-+	case PHY_INTERFACE_MODE_10GKR:
- 		ret = mvebu_comphy_set_mode_10gkr(phy);
- 		break;
- 	default:
-@@ -517,10 +519,14 @@ static int mvebu_comphy_set_mode(struct phy *phy,
- {
- 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
- 
--	if (mvebu_comphy_get_mux(lane->id, lane->port, mode) < 0)
-+	if (mode != PHY_MODE_ETHERNET)
-+		return -EINVAL;
-+
-+	if (mvebu_comphy_get_mux(lane->id, lane->port, mode, submode) < 0)
- 		return -EINVAL;
- 
- 	lane->mode = mode;
-+	lane->submode = submode;
- 	return 0;
- }
- 
+(I've already mentioned that the SGMII modes are mis-named, since
+they also apply to 1000base-X and 2500base-X - the only difference
+is how one 16-bit word in the data stream is used which has no effect
+on the PHY.)
+
 -- 
-2.10.5
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
