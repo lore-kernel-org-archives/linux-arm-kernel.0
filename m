@@ -1,36 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  8 Nov 2018 08:52:21 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable 8250-omap serial driver and
- use it by default
-Message-ID: <20181108165221.22775-1-tony@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Nov 2018 16:53:36 +0000
+Subject: [PATCH 1/7] arm64: Add static check for pt_regs alignment
+In-Reply-To: <1d848166-66cf-f8c9-4f0b-8bf88c2d96d7@arm.com>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-2-git-send-email-julien.thierry@arm.com>
+ <20181107215834.GB12248@brain-police>
+ <20181108101633.fseoda3dcizrfqrp@salmiak>
+ <1d848166-66cf-f8c9-4f0b-8bf88c2d96d7@arm.com>
+Message-ID: <20181108165335.GA19447@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've already moved omap2plus_defconfig over to use 8250-omap instead of
-omap-serial driver. Let's update multi_v7_defconfig too.
+On Thu, Nov 08, 2018 at 11:57:27AM +0000, Julien Thierry wrote:
+> 
+> 
+> On 08/11/18 10:16, Mark Rutland wrote:
+> > On Wed, Nov 07, 2018 at 09:58:35PM +0000, Will Deacon wrote:
+> > > On Wed, Sep 26, 2018 at 02:56:18PM +0100, Julien Thierry wrote:
+> > > > The pt_regs structure's size is required to be a multiple of 16 to maintain
+> > > > the stack alignment upon kernel entries.
+> > > > 
+> > > > Add a static check to ensure this is the case.
+> > > > 
+> > > > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> > > > ---
+> > > >   arch/arm64/include/asm/ptrace.h | 2 ++
+> > > >   1 file changed, 2 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> > > > index 177b851..cc17fad 100644
+> > > > --- a/arch/arm64/include/asm/ptrace.h
+> > > > +++ b/arch/arm64/include/asm/ptrace.h
+> > > > @@ -229,6 +229,8 @@ static inline u64 regs_get_register(struct pt_regs *regs, unsigned int offset)
+> > > >   	WARN_ON(offset & 7);
+> > > > +	BUILD_BUG_ON((sizeof (struct pt_regs) % 16 != 0));
+> > > 
+> > > This seems like a fairly random place to put this, and given that it's not
+> > > dependent on context I reckon it would be better to put it in a C file
+> > > rather than in a header that gets included multiple times. I still couldn't
+> > > really find a good place though :/
+> > 
+> > Perhaps asm-offsets.c, when we define S_FRAME_SIZE?
+> > 
+> 
+> That sounds like a good option to me. If Will thinks so as well I'll move
+> that in asm-offsets.c.
 
-By default we also enable SERIAL_8250_OMAP_TTYO_FIXUP that updates the
-kernel serial console to point to 8250 driver and warns about it during
-the boot.
+Fine by me.
 
-Users with ttyO[0123] in their /etc/inittab should update inittab to
-to use ttyS[0123] instead.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -305,6 +305,7 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
- CONFIG_SERIAL_8250_BCM2835AUX=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_EM=y
-+CONFIG_SERIAL_8250_OMAP=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_8250_UNIPHIER=y
- CONFIG_SERIAL_OF_PLATFORM=y
--- 
-2.19.1
+Will
