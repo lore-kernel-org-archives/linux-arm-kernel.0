@@ -1,59 +1,42 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Nov 2018 10:14:10 +0000
-Subject: [PATCH 3/9] arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
-In-Reply-To: <ddf4d390-c631-c5ef-03dc-a0579a21d484@free.fr>
-References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
- <ddf4d390-c631-c5ef-03dc-a0579a21d484@free.fr>
-Message-ID: <20181108101410.ir3tws7wduxtdsay@salmiak>
+Date: Thu, 8 Nov 2018 10:16:34 +0000
+Subject: [PATCH 1/7] arm64: Add static check for pt_regs alignment
+In-Reply-To: <20181107215834.GB12248@brain-police>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-2-git-send-email-julien.thierry@arm.com>
+ <20181107215834.GB12248@brain-police>
+Message-ID: <20181108101633.fseoda3dcizrfqrp@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 09:15:29PM +0100, Marc Gonzalez wrote:
-> Commit a0ae2562c6c4 ("netfilter: conntrack: remove l3proto abstraction")
+On Wed, Nov 07, 2018 at 09:58:35PM +0000, Will Deacon wrote:
+> On Wed, Sep 26, 2018 at 02:56:18PM +0100, Julien Thierry wrote:
+> > The pt_regs structure's size is required to be a multiple of 16 to maintain
+> > the stack alignment upon kernel entries.
+> > 
+> > Add a static check to ensure this is the case.
+> > 
+> > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> > ---
+> >  arch/arm64/include/asm/ptrace.h | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> > index 177b851..cc17fad 100644
+> > --- a/arch/arm64/include/asm/ptrace.h
+> > +++ b/arch/arm64/include/asm/ptrace.h
+> > @@ -229,6 +229,8 @@ static inline u64 regs_get_register(struct pt_regs *regs, unsigned int offset)
+> >  
+> >  	WARN_ON(offset & 7);
+> >  
+> > +	BUILD_BUG_ON((sizeof (struct pt_regs) % 16 != 0));
 > 
-> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+> This seems like a fairly random place to put this, and given that it's not
+> dependent on context I reckon it would be better to put it in a C file
+> rather than in a header that gets included multiple times. I still couldn't
+> really find a good place though :/
 
-Again, please describe things in the commit message, e.g.
-
-  CONFIG_NF_CONNTRACK_IPV4 and CONFIG_NF_CONNTRACK_IPV6 haven't existed since
-  commit:
-
-    a0ae2562c6c4 ("netfilter: conntrack: remove l3proto abstraction")
-
-  ... so we can remove them from the arm64 defconfig.
-
-With that:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-For the rest of this series, please update the commit messages to describe why
-the cited commit means it's safe to drop the option.
+Perhaps asm-offsets.c, when we define S_FRAME_SIZE?
 
 Thanks,
 Mark.
-
-> ---
->  arch/arm64/configs/defconfig | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 8d6878c1e794..58741c07a6ef 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -156,14 +156,12 @@ CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
->  CONFIG_NETFILTER_XT_TARGET_LOG=m
->  CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
->  CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
-> -CONFIG_NF_CONNTRACK_IPV4=m
->  CONFIG_IP_NF_IPTABLES=m
->  CONFIG_IP_NF_FILTER=m
->  CONFIG_IP_NF_TARGET_REJECT=m
->  CONFIG_IP_NF_NAT=m
->  CONFIG_IP_NF_TARGET_MASQUERADE=m
->  CONFIG_IP_NF_MANGLE=m
-> -CONFIG_NF_CONNTRACK_IPV6=m
->  CONFIG_IP6_NF_IPTABLES=m
->  CONFIG_IP6_NF_FILTER=m
->  CONFIG_IP6_NF_TARGET_REJECT=m
-> -- 
-> 2.17.1
