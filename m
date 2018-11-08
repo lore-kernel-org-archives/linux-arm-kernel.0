@@ -1,96 +1,38 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Thu, 8 Nov 2018 11:28:11 +0530
-Subject: [Bug Report] kdump crashes after latest EFI memblock changes on
- arm64 machines with large number of CPUs
-In-Reply-To: <CAKv+Gu-4f0uYrrc-eSd1YjJygGHVpB7maJ_3xpuY4vP-LfT0-w@mail.gmail.com>
-References: <CACi5LpOyy0YkhEzWWqt8hAQfKku2Vzp5+da_dGS23JMyHReNew@mail.gmail.com>
- <20181106013022.GA27793@brain-police>
- <CAKv+Gu-4f0uYrrc-eSd1YjJygGHVpB7maJ_3xpuY4vP-LfT0-w@mail.gmail.com>
-Message-ID: <CACi5LpP3O2BeFaRku1uVgHwEN+JB9iL3Z7d1W5W+5QV8WmXM0w@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed,  7 Nov 2018 22:39:26 -0800
+Subject: [PATCH v6 0/3] Add support for audiocodec in Allwinner A64
+Message-ID: <20181108063929.29720-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+This series enables sound on Pine64, SoPine boards and Pinebook.
 
-I am sorry for the delay. I was away for my Diwali holidays and came
-back to office today.
+v2: - Use simple-amplifier for speaker amp on Pinebook
+    - Rename sun50i-a64-i2s to sun50i-a64-codec-i2s to preserve compatible
+      string for other 3 I2S modules in A64 in case if there's any
+      incompatibility with H3
+v3: - renamed sunxi-adda-pr-regmap to sun8i-adda-pr-regmap
+    - use ilog2() to calculate reg value for LRCK div instead of using a
+      table
+v4: - dts: don't use 'Mic' and 'Headset Mic' widgets from sun8i-codec,
+      define our board-level widgets instead.
+v5: - collect all the tags
+v6: - driver patches has been merged through ASoC tree
+    - rebase onto 4.20-rc1
+    - Drop 'Speaker' from routes on sopine and pine64, they don't have
+      speaker.
 
-On Tue, Nov 6, 2018 at 2:14 PM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
-> On 6 November 2018 at 02:30, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Nov 02, 2018 at 02:44:10AM +0530, Bhupesh Sharma wrote:
-> >> With the latest EFI changes for memblock reservation across kdump
-> >> kernel from Ard (Commit 71e0940d52e107748b270213a01d3b1546657d74
-> >> ["efi: honour memory reservations passed via a linux specific config
-> >> table"]), we hit a panic while trying to boot the kdump kernel on
-> >> machines which have large number of CPUs.
-> >>
-> >> I have a arm64 board which has 224 CPUS:
-> >> # lscpu
-> >> <..snip..>
-> >> CPU(s):              224
-> >> On-line CPU(s) list: 0-223
-> >> <..snip..>
-> >>
-> >> Here are the crash logs in the kdump kernel on this machine:
-> >>
-> >> [    0.000000] Unable to handle kernel paging request at virtual
-> >> address ffff80003ffe0000
-> >> val____)nt EL), IL ata abort info:
-> >> [    0.or: Oops: 960000inted 4.18.0+ #3
-> >> [    0.000000] pstate: 20400089 (nzCv daIf +PAN -UAO)
-> >> [    0.000000] pc : __memcpy+0x110/0x180
-> >> [    0.000000] lr : memblock_double_array+0x240/0x348
-> >> [    0.000000] sp : ffff0000092efc80 x28: 00000000bffe0000
-> >> [    0.000000] x27: 0000000000001800 x26: ffff000009d59000
-> >> [    0.000000] x25: ffff80003ffe0000 x24: 0000000000000000
-> >> [    0.000000] x23: 0000000000010000 x22: ffff000009d594e8
-> >> [    0.000000] x21: ffff000009d594f4 x20: ffff0000093c7268
-> >> [    0.000000] x19: 0000000000000c00 x18: 0000000000000010
-> >> [    0.000000] x17: 0000000000000000 x16: 0000000000000000
-> >> [    0.000000] x15: ffffffffffffffff3: 0000000fc18d0000 x12: 0000000800000000
-> >> [    0.000000] x11: 0000000000000018 x10: 00000000ddab9e18
-> >> [    0.000000] x9 : 0000000800000000 x8 : 00000000000002c1
-> >> [    0.000000] x7 : 0000000091b90000 x6 : ffff80003ffe0000
-> >> [    0.000000] x5 : 0000000000000001 x4 : 0000000000000000
-> >> [    0.000000] x3 : 0000000000000000 x2 : 0000000000000b80
-> >> [    0.000000] x1 : ffff000009d59540 x0 : ffff80003ffe0000
-> >> [    0.000000] Process swapper)
-> >> [    0.000000] Call trace:
-> >> [    0.000000]  __memcpy+0x110/0x180
-> >> [    0.000000]  memblock_add_range+0x134/0x2e8
-> >> [    0.000000]  memblock_reserve+0x70/0xb8
-> >> [    0.000000]  memblock_alloc_base_nid+0x6c/0x88
-> >> [    0.000000]  __memblock_alloc_base+0x3c/0x4c
-> >> [    0.000000]  memblock_alloc_base+0x28/0x4c
-> >> [    0.000000]  memblock_alloc+0x2c/0x38
-> >> [    0.000000]  early_pgtable_alloc+0x20/0xb0
-> >
-> > Hmm, so this seems to be the crux of the issue: early_pgtable_alloc() relies
-> > on memblock to allocate page-table memory, but this can be called before the
-> > linear mapping is up and running (or even as part of creating the linear
-> > mapping itself!) so the use of __va in memblock_double_array() actually
-> > returns an unmapped address.
-> >
->
-> OK, so this means we are calling memblock_allow_resize() too early in any case
->
-> > So I guess we either need to implement early_pgtable_alloc() some other way
-> > (how?) or get memblock_double_array() to use a fixmap if it's called too
-> > early (yuck). Alternatively, would it be possible to postpone processing of
-> > the EFI mem_reserve entries until after we've created the linear mapping?
-> >
->
-> We could move this until after paging_init(), I suppose. I'll cook something up.
->
-> Bhupesh: any comments?
+Vasily Khoruzhick (3):
+  arm64: dts: allwinner: a64: add nodes necessary for analog sound
+    support
+  arm64: dts: allwinner: a64: enable sound on Pine64 and SoPine
+  arm64: dts: allwinner: a64: enable sound on Pinebook
 
-Since Ard has already shared a patchset which seems to fix this issue
-[Thanks Ard :)], and my approach is still hackish, I will try to
-verify his v2 patchset on the system I was having issues with and get
-back with my results.
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 28 +++++++++
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 42 ++++++++++++++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts | 28 +++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 58 +++++++++++++++++++
+ 4 files changed, 156 insertions(+)
 
-Thanks for all the help.
-
-Regards,
-Bhupesh
+-- 
+2.19.1
