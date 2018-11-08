@@ -1,50 +1,81 @@
-From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Thu, 8 Nov 2018 17:10:18 +0000
-Subject: [PATCH v10 17/22] kasan: add hooks implementation for tag-based
- mode
-In-Reply-To: <5dd9582d3e4c6a8b144aea3913659c5a1befa0ac.1541525354.git.andreyknvl@google.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <5dd9582d3e4c6a8b144aea3913659c5a1befa0ac.1541525354.git.andreyknvl@google.com>
-Message-ID: <6c56c19b-6929-af8d-d26b-31c969397a46@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 8 Nov 2018 10:10:19 -0700
+Subject: [PATCH 3/3] coresight: etm3x: Release CLAIM tag when operated
+ from perf
+In-Reply-To: <054f82c1-451f-3c82-d5ab-e156c50e0c10@arm.com>
+References: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
+ <1541456790-28282-4-git-send-email-mathieu.poirier@linaro.org>
+ <20181107032350.GH3983@leoy-ThinkPad-X240s>
+ <054f82c1-451f-3c82-d5ab-e156c50e0c10@arm.com>
+Message-ID: <CANLsYkyi_0hzJ5fXFfq6FrsebFMCATQP3oqeU6aBmAw6BTGuGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2018 17:30, Andrey Konovalov wrote:
-> This commit adds tag-based KASAN specific hooks implementation and
-> adjusts common generic and tag-based KASAN ones.
-> 
-> 1. When a new slab cache is created, tag-based KASAN rounds up the size of
->    the objects in this cache to KASAN_SHADOW_SCALE_SIZE (== 16).
-> 
-> 2. On each kmalloc tag-based KASAN generates a random tag, sets the shadow
->    memory, that corresponds to this object to this tag, and embeds this
->    tag value into the top byte of the returned pointer.
-> 
-> 3. On each kfree tag-based KASAN poisons the shadow memory with a random
->    tag to allow detection of use-after-free bugs.
-> 
-> The rest of the logic of the hook implementation is very much similar to
-> the one provided by generic KASAN. Tag-based KASAN saves allocation and
-> free stack metadata to the slab object the same way generic KASAN does.
-> 
-> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  mm/kasan/common.c | 116 ++++++++++++++++++++++++++++++++++++++--------
->  mm/kasan/kasan.h  |   8 ++++
->  mm/kasan/tags.c   |  48 +++++++++++++++++++
->  3 files changed, 153 insertions(+), 19 deletions(-)
-> 
+On Thu, 8 Nov 2018 at 02:49, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>
+> Leo,
+>
+> On 07/11/2018 03:23, leo.yan at linaro.org wrote:
+> > Hi Mathieu,
+> >
+> > On Mon, Nov 05, 2018 at 03:26:30PM -0700, Mathieu Poirier wrote:
+> >> This patch deals with the release of the CLAIM tag when the ETM is
+> >> operated from perf.  Otherwise the tag is left asserted and subsequent
+> >> requests to use the device fail.
+> >>
+> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >> ---
+> >>   drivers/hwtracing/coresight/coresight-etm3x.c | 2 ++
+> >>   1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+> >> index fd5c4cca7db5..000796394662 100644
+> >> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> >> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> >> @@ -603,6 +603,8 @@ static void etm_disable_perf(struct coresight_device *csdev)
+> >>       */
+> >>      etm_set_pwrdwn(drvdata);
+> >>
+> >> +    coresight_disclaim_device_unlocked(drvdata->base);
+> >> +
+>
+>
+> >
+> > Just remind, this isn't consistent with the sequency in function
+> > etm_disable_hw(), which has the reversed sequence between
+> > etm_set_pwrdwn() and coresight_disclaim_device_unlocked().
+> >
+> > Not sure which one sequence is more suitable, at the first glance,
+> > accessing register after pwrdwn related operation might have risk for
+> > deadlock?
+>
+> Good point.
+>
+> I assume that the CLAIMSET/CLR registers are in the same power domain as
+> the LAR (Software Lock Access register) accessed below. But I will
+> confirm this with the architect. Based on the response, we could
+> streamline both the sequences.
 
-...
+In this case etm_set_pwrdwn() sets bit 0 of ETMCR, which disables the
+ETM.  That being said the Embedded Trace Macrocell Architecture
+Specification (ID101211) mentions in section 3.5.1 that despite ETMCR
+bit 0 being set to 1, it is always possible to write to the claim set
+registers.  As such I moved the release of the claim tag in function
+etm_disable_hw() below etm_set_pwrdwn() in the second revision of this
+set [1].
 
->  
-> +	cache->align = round_up(cache->align, KASAN_SHADOW_SCALE_SIZE);
-> +
+[1]. https://lkml.org/lkml/2018/11/8/223
 
-Did you consider to set ARCH_SLAB_MINALIGN instead of this round up?
-
--- 
-Regards,
-Vincenzo
+>
+> Suzuki
+>
+> >
+> > Thanks,
+> > Leo Yan
+> >
+> >>      CS_LOCK(drvdata->base);
+> >>   }
+> >>
+> >> --
+> >> 2.7.4
+> >>
