@@ -1,57 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Nov 2018 07:54:59 -0800
-Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
- beagle-xm
-In-Reply-To: <CAOesGMgAxvERhQjnyZ7P4vqhhWdBdA20XrFnDn48Na5wrEAkEA@mail.gmail.com>
-References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
- <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
- <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
- <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
- <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
- <CAOesGMgAxvERhQjnyZ7P4vqhhWdBdA20XrFnDn48Na5wrEAkEA@mail.gmail.com>
-Message-ID: <20181108155459.GJ56134@atomide.com>
+From: jbrunet@baylibre.com (jbrunet at baylibre.com)
+Date: Thu, 08 Nov 2018 16:56:40 +0100
+Subject: [PATCH 3/3] ARM64: dts: meson-gxl: Add support for the
+ Smartlabs SML-5442TW
+In-Reply-To: <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
+References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
+ <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
+Message-ID: <bafa32609200e57d8efe9843247429a46916bbef.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [181107 16:17]:
-> On Wed, Nov 7, 2018 at 8:09 AM Guillaume Tucker
-> <guillaume.tucker@collabora.com> wrote:
-> >
-> > On 06/11/2018 10:54, Guillaume Tucker wrote:
-> > > On 05/11/2018 14:33, Olof Johansson wrote:
-> > >> On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
-> > >> <guillaume.tucker@collabora.com> wrote:
-> > >>>
-> > >>> Hi Linus,
-> > >>>
-> > >>> Please see below, the kernelci.org automated boot bisection found
-> > >>> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
-> > >>> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
-> > >>> log output after the bootloader so the kernel seems to be
-> > >>> crashing very early on.
-> > >>
-> > >> Can you enable DEBUG_LL to capture what goes wrong?
-> > >
-> > > Yes I've scheduled a re-run of the automated bisection with
-> > > DEBUG_LL turned on, but the beagle-xm board is currently offline
-> > > in lab-baylibre.  I'll keep you posted when I get some results.
-> >
-> > Unfortunately, enabling the DEBUG_LL config didn't help.  There's
-> > still no visible kernel log at all from the failing LAVA jobs:
-> >
-> >     http://lava.baylibre.com:10080/scheduler/alljobs?length=25&search=lava-bisect-9638#table
-> >
-> >
-> > This might be a hard one to debug without physical access to the
-> > board, but please let me know if you think there's anything else
-> > I can try.  For example, if there's a known older kernel revision
-> > where the combination of SMP=n and PREEMPT=y worked then I could
-> > try to run an automated boot bisection based on that.
+On Thu, 2018-11-08 at 19:33 +0400, Christian Hewitt wrote:
 > 
-> Is this only beagle-xm, or do we see it on all OMAP3 hardware?
+> +&audio {
+> +	status = "okay";
+> +};
+> +
+> +&aiu_i2s_dma {
+> +	status = "okay";
+> +};
+> +
+> +&i2s_dai {
+> +	status = "okay";
+> +};
 
-Seems to not happen on three other omap3 boards I've tried with.
+The audio stuff has not made it's way upstream (yet) please drop this
 
-Regards,
+> +
+> +&cvbs_vdac_port {
+> +	cvbs_vdac_out: endpoint {
+> +		remote-endpoint = <&cvbs_connector_in>;
+> +	};
+> +};
+> +
+> 
+[ ... ]
 
-Tony
+> +
+> +/* This is connected to the Bluetooth module: */
+> +&uart_A {
+> +	status = "okay";
+> +	pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
+> +	pinctrl-names = "default";
+
+Did you forget to put 'uart-has-rtscts;' here ?
+
+> +};
+> +
+> +/* This UART is brought out to the debug header */
+> +&uart_AO {
+> +	status = "okay";
+> +	pinctrl-0 = <&uart_ao_a_pins>;
+> +	pinctrl-names = "default";
+> +};
+> +
+> +&usb0 {
+> +	status = "okay";
+> +};
+
+Also, you sent a multipatch series. Such patchset should start with a cover
+letter describing the general intent ... even if it is obvious.
