@@ -1,86 +1,89 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Nov 2018 07:49:26 -0800
-Subject: [GIT PULL] ARM: SoC fixes
-In-Reply-To: <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
-References: <20181107171023.zoo6qox5eewy3pmk@localhost>
- <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
- <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
-Message-ID: <20181108154926.GI56134@atomide.com>
+From: horia.geanta@nxp.com (Horia Geanta)
+Date: Thu, 8 Nov 2018 15:51:56 +0000
+Subject: [PATCH 7/9] arm64: defconfig: Drop CRYPTO_DEV_FSL_DPAA2_CAAM
+References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
+ <e6e0105f-3135-e5b7-8224-419c9f730a09@free.fr>
+ <85a73243-0c53-43e5-5002-90631c0a8c90@free.fr>
+ <VI1PR0402MB3485342DB8A0F5C5791E213798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
+ <VI1PR0402MB348569B15DBAB6503303D41798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
+ <2ABE50FD-FF08-4E16-8D8F-A81A92722478@free.fr>
+Message-ID: <VI1PR0402MB3485E2C824DD151B8E482DDD98C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [181107 09:28]:
-> On Wed, Nov 7, 2018 at 9:17 AM Linus Torvalds
-> <torvalds@linux-foundation.org> wrote:
-> >
-> > On Wed, Nov 7, 2018 at 9:10 AM Olof Johansson <olof@lixom.net> wrote:
-> > >
-> > > ARM: SoC fixes
-> >
-> > Pulled.
-> >
-> > > I was a bit too trigger happy to enable PREEMPT on multi_v7_defconfig,
-> > > and it ended up regressing at least BeagleBone XM boards.
-> >
-> > Odd. Did it hit some "may_sleep()" test in a driver that is hidden by
-> > preempt being off? Otherwise I don't see how/why preempt should fail
-> > in a board-specific manner..
+On 11/8/2018 3:23 PM, Marc Gonzalez wrote:
 > 
-> The board hangs early during boot and the usual way of collecting
-> early console doesn't seem to work when attempted (I haven't tried
-> personally).
 > 
-> It's one of the major non-SMP platforms covered by tests. I'd be
-> surprised if it turns out to be truly _board_ specific (and rather
-> specific to OMAP3), but we don't have enough data yet. Chances are it
-> either shuffles some timing around or indeed hits a may_sleep() test
-> somewhere.
+> On November 8, 2018 12:38:10 PM GMT+01:00, Horia Geanta <horia.geanta@nxp.com> wrote:
+>> On 11/8/2018 1:23 PM, Horia Geanta wrote:
+>>> On 11/7/2018 10:49 PM, Marc Gonzalez wrote:
+>>>> [ Add interested parties ]
+>>>>
+>>>> On 07/11/2018 21:18, Marc Gonzalez wrote:
+>>>>
+>>>>> Commit e8342cc7954e ("enable CAAM crypto engine on QorIQ DPAA2
+>> SoCs")
+>>>>> enabled CRYPTO_DEV_FSL_DPAA2_CAAM, which depends on FSL_MC_DPIO,
+>>>>> which is not set.
+>>>>>
+>>> Thanks Marc.
+>>>
+>>> Though I would prefer enabling the dependencies:
+>>> dpaa2-caam driver -> dpio driver (FSL_MC_DPIO) -> fsl-mc driver
+>> (FSL_MC_BUS).
+>>>
+>> Could you instead incorporate below patch in your series?
+>> (I am pretty sure it won't apply clean)
+>>
+>> Thanks,
+>> Horia
+>>
+>> -- >8 --
+>>
+>> Subject: [PATCH] arm64: defconfig: enable DPAA2 fsl-mc bus and DPIO
+>> driver
+>>
+>> Enable fsl-mc bus and DPIO (Datapath I/O) driver, which are needed on
+>> Layerscape SoCs with QorIQ Data Path Acceleration Architecture (DPAA)
+>> v2.
+>>
+>> Suggested-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+>> Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+>> ---
+>> arch/arm64/configs/defconfig | 2 ++
+>> 1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/configs/defconfig
+>> b/arch/arm64/configs/defconfig
+>> index c9a57d11330b..7c3785e61ef9 100644
+>> --- a/arch/arm64/configs/defconfig
+>> +++ b/arch/arm64/configs/defconfig
+>> @@ -181,6 +181,7 @@ CONFIG_DMA_CMA=y
+>> CONFIG_CMA_SIZE_MBYTES=32
+>> CONFIG_HISILICON_LPC=y
+>> CONFIG_SIMPLE_PM_BUS=y
+>> +CONFIG_FSL_MC_BUS=y
+>> CONFIG_MTD=y
+>> CONFIG_MTD_BLOCK=y
+>> CONFIG_MTD_M25P80=y
+>> @@ -615,6 +616,7 @@ CONFIG_QCOM_IOMMU=y
+>> CONFIG_RPMSG_QCOM_GLINK_RPM=y
+>> CONFIG_RPMSG_QCOM_SMD=y
+>> CONFIG_RASPBERRYPI_POWER=y
+>> +CONFIG_FSL_MC_DPIO=y
+>> CONFIG_QCOM_SMEM=y
+>> CONFIG_QCOM_SMD_RPM=y
+>> CONFIG_QCOM_SMP2P=y
+>> -- 
+>> 2.16.2
 > 
-> (I just realized I might have missed to attribute Guillaume in the
-> revert patch. Sorry about that).
+> Are CRYPTO_DEV_FSL_DPAA2_CAAM and CONFIG_FSL_MC_DPIO required to boot the platform? If not, we will build them as modules. I can send a v3 tonight with that change, as well as the various Acks.
+> 
+No, the platform is able to boot without them, so I am ok with:
++CONFIG_FSL_MC_BUS=y
++CONFIG_FSL_MC_DPIO=m
+-CONFIG_CRYPTO_DEV_FSL_DPAA2_CAAM=y
++CONFIG_CRYPTO_DEV_FSL_DPAA2_CAAM=m
 
-Looks like we're missing the stdout-path for earlycon, maybe try
-with the following patch? I can't find my Beagleboard-xm right now,
-time to clean-up a bit I guess.
-
-At least omap3-evm, logicpd-torpedo and n900 all boot with PREEMPT.
-
-Regards,
-
-Tony
-
-8< ----------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 8 Nov 2018 07:43:28 -0800
-Subject: [PATCH] ARM: dts: Add missing earlycon UART for Beagleboard
-
-We can get early boot messages if CONFIG_SERIAL_EARLYCON=y is set, and
-kernel commandline has debug earlycon. But we're missing the related dts
-entry for Beagleboard.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
-
-Note: Untested, I can't find my Beagleboard-XM right now..
-
----
- arch/arm/boot/dts/omap3-beagle.dts | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -24,6 +24,10 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
- 
-+	chosen {
-+		stdout-path = &uart3;
-+	};
-+
- 	aliases {
- 		display0 = &dvi0;
- 		display1 = &tv0;
--- 
-2.19.1
+Thanks,
+Horia
