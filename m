@@ -1,48 +1,86 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Nov 2018 15:46:17 +0000
-Subject: [PATCH] ARM: vfp: Fix wrong assignement to ufp_exc
-In-Reply-To: <1541523938-13800-1-git-send-email-julien.thierry@arm.com>
-References: <1541523938-13800-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <20181108154616.GX30658@n2100.armlinux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Nov 2018 07:49:26 -0800
+Subject: [GIT PULL] ARM: SoC fixes
+In-Reply-To: <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
+References: <20181107171023.zoo6qox5eewy3pmk@localhost>
+ <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
+ <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
+Message-ID: <20181108154926.GI56134@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 05:05:38PM +0000, Julien Thierry wrote:
-> In vfp_preserve_user_clear_hwstate, ufp_exc->fpinst2 gets assigned to
-> itself. It should actually be hwstate->fpinst2 that gets assigned to the
-> ufp_exc field.
+* Olof Johansson <olof@lixom.net> [181107 09:28]:
+> On Wed, Nov 7, 2018 at 9:17 AM Linus Torvalds
+> <torvalds@linux-foundation.org> wrote:
+> >
+> > On Wed, Nov 7, 2018 at 9:10 AM Olof Johansson <olof@lixom.net> wrote:
+> > >
+> > > ARM: SoC fixes
+> >
+> > Pulled.
+> >
+> > > I was a bit too trigger happy to enable PREEMPT on multi_v7_defconfig,
+> > > and it ended up regressing at least BeagleBone XM boards.
+> >
+> > Odd. Did it hit some "may_sleep()" test in a driver that is hidden by
+> > preempt being off? Otherwise I don't see how/why preempt should fail
+> > in a board-specific manner..
 > 
-> Fixes commit 3aa2df6ec2ca6bc143a65351cca4266d03a8bc41 ("ARM: 8791/1:
-> vfp: use __copy_to_user() when saving VFP state").
+> The board hangs early during boot and the usual way of collecting
+> early console doesn't seem to work when attempted (I haven't tried
+> personally).
 > 
-> Reported-by: David Binderman <dcb314@hotmail.com>
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
+> It's one of the major non-SMP platforms covered by tests. I'd be
+> surprised if it turns out to be truly _board_ specific (and rather
+> specific to OMAP3), but we don't have enough data yet. Chances are it
+> either shuffles some timing around or indeed hits a may_sleep() test
+> somewhere.
+> 
+> (I just realized I might have missed to attribute Guillaume in the
+> revert patch. Sorry about that).
 
-Please put this in the patch system, thanks.
+Looks like we're missing the stdout-path for earlycon, maybe try
+with the following patch? I can't find my Beagleboard-xm right now,
+time to clean-up a bit I guess.
 
-> ---
->  arch/arm/vfp/vfpmodule.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index aff6e6e..ee7b079 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -573,7 +573,7 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp *ufp,
->  	 */
->  	ufp_exc->fpexc = hwstate->fpexc;
->  	ufp_exc->fpinst = hwstate->fpinst;
-> -	ufp_exc->fpinst2 = ufp_exc->fpinst2;
-> +	ufp_exc->fpinst2 = hwstate->fpinst2;
->  
->  	/* Ensure that VFP is disabled. */
->  	vfp_flush_hwstate(thread);
-> -- 
-> 1.9.1
-> 
+At least omap3-evm, logicpd-torpedo and n900 all boot with PREEMPT.
 
+Regards,
+
+Tony
+
+8< ----------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 8 Nov 2018 07:43:28 -0800
+Subject: [PATCH] ARM: dts: Add missing earlycon UART for Beagleboard
+
+We can get early boot messages if CONFIG_SERIAL_EARLYCON=y is set, and
+kernel commandline has debug earlycon. But we're missing the related dts
+entry for Beagleboard.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+
+Note: Untested, I can't find my Beagleboard-XM right now..
+
+---
+ arch/arm/boot/dts/omap3-beagle.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -24,6 +24,10 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ 
++	chosen {
++		stdout-path = &uart3;
++	};
++
+ 	aliases {
+ 		display0 = &dvi0;
+ 		display1 = &tv0;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.19.1
