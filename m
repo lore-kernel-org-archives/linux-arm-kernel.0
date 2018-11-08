@@ -1,98 +1,25 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 8 Nov 2018 09:34:54 +0000
-Subject: [PATCH v2] mm: improve/fix ARM v7_dma_inv_range() unaligned
- address handling
-In-Reply-To: <1541626010.537.49.camel@sageembedded.com>
-References: <1541626010.537.49.camel@sageembedded.com>
-Message-ID: <16a08785-4999-ea6c-83cd-3e15775ef641@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 8 Nov 2018 09:36:17 +0000
+Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+In-Reply-To: <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
+References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
+ <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
+Message-ID: <20181108093617.GB8433@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
+> Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
+> dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
+>
 
-On 07/11/18 21:26, Chris Cole wrote:
-> This patch addresses possible memory corruption when
-> v7_dma_inv_range(start_address, end_address) address parameters are not
-> aligned to whole cache lines. This function issues "invalidate" cache
-> management operations to all cache lines from start_address (inclusive)
-> to end_address (exclusive). When start_address and/or end_address are
-> not aligned, the start and/or end cache lines are first issued "clean &
-> invalidate" operation. The assumption is this is done to ensure that any
-> dirty data addresses outside the address range (but part of the first or
-> last cache lines) are cleaned/flushed so that data is not lost, which
-> could happen if just an invalidate is issued.
-> 
-> The problem is that these first/last partial cache lines are issued
-> "clean & invalidate" and then "invalidate". This second "invalidate" is
-> not required and worse can cause "lost" writes to addresses outside the
-> address range but part of the cache line. If another component writes to
-> its part of the cache line between the "clean & invalidate" and
-> "invalidate" operations, the write can get lost. This fix is to remove
-> the extra "invalidate" operation when unaligned addressed are used.
-> 
-> A kernel module is available that has a stress test to reproduce the
-> issue and a unit test of the updated v7_dma_inv_range(). It can be
-> downloaded from
-> http://ftp.sageembedded.com/outgoing/linux/cache-test-20181107.tgz.
-> 
-> v7_dma_inv_range() is call by dmac_[un]map_area(addr, len, direction)
-> when the direction is DMA_FROM_DEVICE. One can (I believe) successfully
-> argue that DMA from a device to main memory should use buffers aligned
-> to cache line size, because the "clean & invalidate" might overwrite
-> data that the device just wrote using DMA. But if a driver does use
-> unaligned buffers, at least this fix will prevent memory corruption
-> outside the buffer.
-> 
-> Signed-off-by: Chris Cole <chris@sageembedded.com>
-> Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
-> ---
-> 
-> V2: Use simpler assembly code suggested by Russel King
+Looks good,
 
-I'm wondering if you can update v7m_dma_inv_range as well? The whole
-cache-v7m.S was lifted form cache-v7.S, so it is likely suffers from
-the same issue.
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-This is build tested diff (I have no access to DMA capable platform
-I can test the diff on; hope Alex or Andr?s can give it a go)
+But I left it intentionally to avoid churn assuming it will go away when
+ARM SoC team runs savedefconfig and sync the defconfig.
 
-diff --git a/arch/arm/mm/cache-v7m.S b/arch/arm/mm/cache-v7m.S
-index 788486e8..1059d5e 100644
---- a/arch/arm/mm/cache-v7m.S
-+++ b/arch/arm/mm/cache-v7m.S
-@@ -73,9 +73,11 @@
- /*
-  * dcimvac: Invalidate data cache line by MVA to PoC
-  */
--.macro dcimvac, rt, tmp
--	v7m_cacheop \rt, \tmp, V7M_SCB_DCIMVAC
-+.irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
-+.macro dcimvac\c, rt, tmp
-+	v7m_cacheop \rt, \tmp, V7M_SCB_DCIMVAC, \c
- .endm
-+.endr
- 
- /*
-  * dccmvau: Clean data cache line by MVA to PoU
-@@ -369,14 +371,15 @@ v7m_dma_inv_range:
- 	tst	r0, r3
- 	bic	r0, r0, r3
- 	dccimvacne r0, r3
-+	addne	r0, r0, r2
- 	subne	r3, r2, #1	@ restore r3, corrupted by v7m's dccimvac
- 	tst	r1, r3
- 	bic	r1, r1, r3
- 	dccimvacne r1, r3
- 1:
--	dcimvac r0, r3
--	add	r0, r0, r2
--	cmp	r0, r1
-+	dcimvaclo r0, r3
-+	addlo	r0, r0, r2
-+	cmplo	r0, r1
- 	blo	1b
- 	dsb	st
- 	ret	lr
-
-Cheers
-Vladimir
+--
+Regards,
+Sudeep
