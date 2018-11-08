@@ -1,30 +1,42 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Thu,  8 Nov 2018 10:05:02 +0100
-Subject: [PATCH v2 4/4] ARM: dts: stm32: enable hwspinlock on stm32mp157c-ed1
+Date: Thu,  8 Nov 2018 10:05:01 +0100
+Subject: [PATCH v2 3/4] ARM: dts: stm32: Add hwspinlock node for stm32mp157 SoC
 In-Reply-To: <20181108090502.14543-1-benjamin.gaignard@st.com>
 References: <20181108090502.14543-1-benjamin.gaignard@st.com>
-Message-ID: <20181108090502.14543-5-benjamin.gaignard@st.com>
+Message-ID: <20181108090502.14543-4-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Activate hwspinlock for stm32mp157c-ed1
+Declare hwspinlock device for stm32mp157 SoC
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- arch/arm/boot/dts/stm32mp157c-ed1.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+version 2 :
+- change clock name from hwspinlock to hsem to be align with hardware
+  documentation
 
-diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-index f77bea49c079..158a337b3129 100644
---- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-@@ -94,3 +94,7 @@
- 	vdda1v1-supply = <&reg11>;
- 	vdda1v8-supply = <&reg18>;
- };
+ arch/arm/boot/dts/stm32mp157c.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index 185541a5b69f..98f824d8b0f0 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -803,6 +803,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		hsem: hwspinlock at 4c000000 {
++			compatible = "st,stm32-hwspinlock";
++			#hwlock-cells = <1>;
++			reg = <0x4c000000 0x400>;
++			clocks = <&rcc HSEM>;
++			clock-names = "hwsem";
++			status = "disabled";
++		};
 +
-+&hsem {
-+	status = "okay";
-+};
+ 		rcc: rcc at 50000000 {
+ 			compatible = "st,stm32mp1-rcc", "syscon";
+ 			reg = <0x50000000 0x1000>;
 -- 
 2.15.0
