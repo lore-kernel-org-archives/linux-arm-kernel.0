@@ -1,46 +1,22 @@
-From: christianshewitt@gmail.com (Christian Hewitt)
-Date: Thu,  8 Nov 2018 19:33:21 +0400
-Subject: [PATCH 2/3] dt-bindings: arm: amlogic: Add support for the Smartlabs
- SML-5442TW
-In-Reply-To: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
-References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
-Message-ID: <1541691207-24768-2-git-send-email-christianshewitt@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 8 Nov 2018 13:37:43 -0200
+Subject: [PATCH] ARM: dts: imx7d-sdb: add rev-a board support
+In-Reply-To: <DB3PR0402MB3916B027A9C724D349C7969EF5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+References: <1541567625-11812-1-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5AL03yy6Vj_eC=h7scSDnuja1G8rsWER+r7w3FEVaceDg@mail.gmail.com>
+ <DB3PR0402MB3916B318947B803BC5ADF4A6F5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <CAOMZO5DiTbEsVXTCfE8fJ=4+yU4oXR1gex7Bj-k=FowKHWJaxw@mail.gmail.com>
+ <DB3PR0402MB3916B027A9C724D349C7969EF5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5CPZKqJdTPzZDw=19HW_YCg_JGvLpw9i3iKsi+EJF-yNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SML-5442TW is an STB for O2 Czech IPTV/VOD and DVB-S based on the
-Amlogic P231 reference design using the S905D chipset. Specs:
+Hi Anson,
 
-2GB DDR3 RAM
-8GB eMMC storage
-10/100 Base-T Ethernet
-802.11 a/b/g/n/ac + BT 4.1 HS sdio wireless module (QCA9377)
-2x single colour and 1x dual colour LEDs on the front panel
-1x reset button on the front panel
-HDMI 2.0 (4k at 60p) video
-Composite video + 2-channel audio output on 3.5mm jack
-S/PDIF audio output
-Single DVB-S tuner (AVL6762/MxL608)
-2x USB 2.0 ports
-1x micro SD card slot
-UART pins (internal)
+On Thu, Nov 8, 2018 at 12:30 AM Anson Huang <anson.huang@nxp.com> wrote:
 
-Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
----
- Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
- 1 file changed, 1 insertion(+)
+> Thanks for pointing out this issue, I made a mistake when doing the search in git repo..
+> So, if we have to assert a GPIO, there is no common way in pinctrl driver? Have to
+> do it in driver itself? Like this case, we have to assert the GPIO in fec driver?
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 4498292..ad79f2d 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -91,6 +91,7 @@ Board compatible values (alphabetically, grouped by SoC):
- 
-   - "amlogic,p230" (Meson gxl s905d)
-   - "amlogic,p231" (Meson gxl s905d)
-+  - "smartlabs,sml5442tw" (Meson gxl s905d)
- 
-   - "amlogic,p241" (Meson gxl s805x)
- 
--- 
-2.7.4
+You could pass "phy-supply" property  and model it as gpio controlled regulator.
