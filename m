@@ -1,38 +1,44 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu,  8 Nov 2018 14:53:50 +0100
-Subject: [PATCH 2/4] arm64: dts: meson-axg: correct sram shared mem
- unit-address
-In-Reply-To: <20181108135352.8459-1-jbrunet@baylibre.com>
-References: <20181108135352.8459-1-jbrunet@baylibre.com>
-Message-ID: <20181108135352.8459-3-jbrunet@baylibre.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 8 Nov 2018 15:09:35 +0100
+Subject: [PATCH v7 0/7] clocksource: rework Atmel TCB timer driver
+In-Reply-To: <20181108124327.iqdiif6atfrxdkef@linutronix.de>
+References: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
+ <5f19043a-3be3-e25a-849f-6ca610ed6da2@linaro.org>
+ <20180925201456.GD3112@piout.net>
+ <20181108124327.iqdiif6atfrxdkef@linutronix.de>
+Message-ID: <20181108140935.GI21694@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct the unit-address in the node name of the SRAM shared memory
+On 08/11/2018 13:43:27+0100, Sebastian Andrzej Siewior wrote:
+> On 2018-09-25 22:14:56 [+0200], Alexandre Belloni wrote:
+> > On 22/09/2018 13:29:48+0200, Daniel Lezcano wrote:
+> > > You say for rt the PIT is not suitable because of the shared irq but in
+> > > the driver, the interrupt is flagged as shared.
+> > > 
+> > 
+> > Well, it is not simply sharing the interrupt that is an issue, it is the
+> > mismatch between the PIT and the UART interrupt flags and that only
+> > happens when using preempt-rt.
+> 
+> This should also happen on !RT with the threadedirq command line switch.
+> The UART will be threaded and the PIT will not, and this is the problem.
+> So we need to split those or disable the UART. The other important thing
+> for RT is the higher resolution of the clocksource/clockevents device (I
+> don't know if this is part of the series or not?).
+> 
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+It is not part of that series as I prefer to keep the discussion of how
+to configure that for later. This has been raised previously without any
+conclusion and I'd really like to see this rework enter upstream soon.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index ff8b3406aff6..b8893675e39c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -1659,12 +1659,12 @@
- 			#size-cells = <1>;
- 			ranges = <0 0x0 0xfffc0000 0x20000>;
- 
--			cpu_scp_lpri: scp-shmem at 0 {
-+			cpu_scp_lpri: scp-shmem at 13000 {
- 				compatible = "amlogic,meson-axg-scp-shmem";
- 				reg = <0x13000 0x400>;
- 			};
- 
--			cpu_scp_hpri: scp-shmem at 200 {
-+			cpu_scp_hpri: scp-shmem at 13400 {
- 				compatible = "amlogic,meson-axg-scp-shmem";
- 				reg = <0x13400 0x400>;
- 			};
+> I'm currently replacing the v6 with this v7 in my RT tree. What is the
+> status of this series upstream wise?
+> 
+
+I'll send v8 sometimes next week.
+
 -- 
-2.19.1
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
