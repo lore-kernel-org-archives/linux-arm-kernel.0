@@ -1,258 +1,449 @@
-From: stefanb@linux.ibm.com (Stefan Berger)
-Date: Thu, 8 Nov 2018 10:02:19 -0500
-Subject: [PATCH v5 07/17] tpm: declare struct tpm_header
-In-Reply-To: <20181108141541.12832-8-jarkko.sakkinen@linux.intel.com>
-References: <20181108141541.12832-1-jarkko.sakkinen@linux.intel.com>
- <20181108141541.12832-8-jarkko.sakkinen@linux.intel.com>
-Message-ID: <0683a6db-109f-e08e-eae7-636ee9c28540@linux.ibm.com>
+From: Robert.Richter@cavium.com (Richter, Robert)
+Date: Thu, 8 Nov 2018 15:05:16 +0000
+Subject: [PATCH 01/10] irqdomain: Add interface to request an irq domain
+In-Reply-To: <e640a85d-6e2c-835b-d104-ef42eada8fde@arm.com>
+References: <20181107220254.6116-1-rrichter@cavium.com>
+ <20181107220254.6116-2-rrichter@cavium.com>
+ <e640a85d-6e2c-835b-d104-ef42eada8fde@arm.com>
+Message-ID: <20181108150355.GA4064@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/8/18 9:15 AM, Jarkko Sakkinen wrote:
-> Decleare struct tpm_header that replaces struct tpm_input_header and
-> struct tpm_output_header.
->
-> Signed-off-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
+Julien,
 
-Reviewed-by: Stefan Berger <stefanb@linux.ibm.com>
+thanks for your review. See my comments below.
 
+On 08.11.18 10:19:52, Julien Thierry wrote:
+> On 07/11/18 22:03, Robert Richter wrote:
+> >This patch introduces a new interface to allow irq domain
+> >initialization regardless of order dependencies. This is done by
+> >requesting a domain and registering a callback function that is called
+> >as soon as a domain becomes available.
+> >
+> >A typical irq domain initialization code is the following:
+> >
+> >Parent initialization:
+> >
+> >      ...
+> >      domain = msi_create_irq_domain(fwnode, info, parent);
+> >      if (domain)
+> >              irq_domain_update_bus_token(domain, bus_token);
+> >      ...
+> >
+> >Child initialization:
+> >
+> >      ...
+> >      parent = irq_find_matching_fwnode(fwnode, bus_token);
+> >      if (!parent)
+> >              ...
+> >      create_irq_domain(parent, ...);
+> 
+> What is that function?
 
-> ---
->   drivers/char/tpm/tpm-interface.c  |  9 ++++-----
->   drivers/char/tpm/tpm.h            | 27 ++++++++++++---------------
->   drivers/char/tpm/tpm2-cmd.c       |  4 ++--
->   drivers/char/tpm/tpm2-space.c     |  6 +++---
->   drivers/char/tpm/tpm_i2c_atmel.c  |  5 ++---
->   drivers/char/tpm/tpm_vtpm_proxy.c |  8 ++++----
->   drivers/char/tpm/xen-tpmfront.c   |  2 +-
->   7 files changed, 28 insertions(+), 33 deletions(-)
->
-> diff --git a/drivers/char/tpm/tpm-interface.c b/drivers/char/tpm/tpm-interface.c
-> index 28d48799b044..6abbcedc87a3 100644
-> --- a/drivers/char/tpm/tpm-interface.c
-> +++ b/drivers/char/tpm/tpm-interface.c
-> @@ -67,7 +67,7 @@ static int tpm_validate_command(struct tpm_chip *chip,
->   				 const u8 *cmd,
->   				 size_t len)
->   {
-> -	const struct tpm_input_header *header = (const void *)cmd;
-> +	const struct tpm_header *header = (const void *)cmd;
->   	int i;
->   	u32 cc;
->   	u32 attrs;
-> @@ -166,7 +166,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
->   				u8 *buf, size_t bufsiz,
->   				unsigned int flags)
->   {
-> -	struct tpm_output_header *header = (void *)buf;
-> +	struct tpm_header *header = (void *)buf;
->   	int rc;
->   	ssize_t len = 0;
->   	u32 count, ordinal;
-> @@ -276,7 +276,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
->   ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
->   		     u8 *buf, size_t bufsiz, unsigned int flags)
->   {
-> -	struct tpm_output_header *header = (struct tpm_output_header *)buf;
-> +	struct tpm_header *header = (struct tpm_header *)buf;
->   	/* space for header and handles */
->   	u8 save[TPM_HEADER_SIZE + 3*sizeof(u32)];
->   	unsigned int delay_msec = TPM2_DURATION_SHORT;
-> @@ -375,8 +375,7 @@ ssize_t tpm_transmit_cmd(struct tpm_chip *chip, struct tpm_space *space,
->   			 struct tpm_buf *buf, size_t min_rsp_body_length,
->   			 unsigned int flags, const char *desc)
->   {
-> -	const struct tpm_output_header *header =
-> -		(struct tpm_output_header *)buf->data;
-> +	const struct tpm_header *header = (struct tpm_header *)buf->data;
->   	int err;
->   	ssize_t len;
->
-> diff --git a/drivers/char/tpm/tpm.h b/drivers/char/tpm/tpm.h
-> index 229ac42b644e..92638ec6ec97 100644
-> --- a/drivers/char/tpm/tpm.h
-> +++ b/drivers/char/tpm/tpm.h
-> @@ -273,16 +273,13 @@ struct tpm_chip {
->
->   #define to_tpm_chip(d) container_of(d, struct tpm_chip, dev)
->
-> -struct tpm_input_header {
-> -	__be16	tag;
-> -	__be32	length;
-> -	__be32	ordinal;
-> -} __packed;
-> -
-> -struct tpm_output_header {
-> -	__be16	tag;
-> -	__be32	length;
-> -	__be32	return_code;
-> +struct tpm_header {
-> +	__be16 tag;
-> +	__be32 length;
-> +	union {
-> +		__be32 ordinal;
-> +		__be32 return_code;
-> +	};
->   } __packed;
->
->   #define TPM_TAG_RQU_COMMAND 193
-> @@ -401,8 +398,8 @@ struct tpm_buf {
->
->   static inline void tpm_buf_reset(struct tpm_buf *buf, u16 tag, u32 ordinal)
->   {
-> -	struct tpm_input_header *head;
-> -	head = (struct tpm_input_header *)buf->data;
-> +	struct tpm_header *head = (struct tpm_header *)buf->data;
-> +
->   	head->tag = cpu_to_be16(tag);
->   	head->length = cpu_to_be32(sizeof(*head));
->   	head->ordinal = cpu_to_be32(ordinal);
-> @@ -428,14 +425,14 @@ static inline void tpm_buf_destroy(struct tpm_buf *buf)
->
->   static inline u32 tpm_buf_length(struct tpm_buf *buf)
->   {
-> -	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-> +	struct tpm_header *head = (struct tpm_header *) buf->data;
->
->   	return be32_to_cpu(head->length);
->   }
->
->   static inline u16 tpm_buf_tag(struct tpm_buf *buf)
->   {
-> -	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-> +	struct tpm_header *head = (struct tpm_header *) buf->data;
->
->   	return be16_to_cpu(head->tag);
->   }
-> @@ -444,7 +441,7 @@ static inline void tpm_buf_append(struct tpm_buf *buf,
->   				  const unsigned char *new_data,
->   				  unsigned int new_len)
->   {
-> -	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-> +	struct tpm_header *head = (struct tpm_header *) buf->data;
->   	u32 len = tpm_buf_length(buf);
->
->   	/* Return silently if overflow has already happened. */
-> diff --git a/drivers/char/tpm/tpm2-cmd.c b/drivers/char/tpm/tpm2-cmd.c
-> index 2bcf470c8e5d..ab03f8600f89 100644
-> --- a/drivers/char/tpm/tpm2-cmd.c
-> +++ b/drivers/char/tpm/tpm2-cmd.c
-> @@ -784,7 +784,7 @@ static int tpm2_do_selftest(struct tpm_chip *chip)
->    */
->   int tpm2_probe(struct tpm_chip *chip)
->   {
-> -	struct tpm_output_header *out;
-> +	struct tpm_header *out;
->   	struct tpm_buf buf;
->   	int rc;
->
-> @@ -797,7 +797,7 @@ int tpm2_probe(struct tpm_chip *chip)
->   	rc = tpm_transmit_cmd(chip, NULL, &buf, 0, 0, NULL);
->   	/* We ignore TPM return codes on purpose. */
->   	if (rc >=  0) {
-> -		out = (struct tpm_output_header *)buf.data;
-> +		out = (struct tpm_header *)buf.data;
->   		if (be16_to_cpu(out->tag) == TPM2_ST_NO_SESSIONS)
->   			chip->flags |= TPM_CHIP_FLAG_TPM2;
->   	}
-> diff --git a/drivers/char/tpm/tpm2-space.c b/drivers/char/tpm/tpm2-space.c
-> index 3d5f9577e5de..393d9aadadce 100644
-> --- a/drivers/char/tpm/tpm2-space.c
-> +++ b/drivers/char/tpm/tpm2-space.c
-> @@ -334,7 +334,7 @@ static int tpm2_map_response_header(struct tpm_chip *chip, u32 cc, u8 *rsp,
->   				    size_t len)
->   {
->   	struct tpm_space *space = &chip->work_space;
-> -	struct tpm_output_header *header = (void *)rsp;
-> +	struct tpm_header *header = (void *)rsp;
->   	u32 phandle;
->   	u32 phandle_type;
->   	u32 vhandle;
-> @@ -394,7 +394,7 @@ static int tpm2_map_response_body(struct tpm_chip *chip, u32 cc, u8 *rsp,
->   				  size_t len)
->   {
->   	struct tpm_space *space = &chip->work_space;
-> -	struct tpm_output_header *header = (void *)rsp;
-> +	struct tpm_header *header = (void *)rsp;
->   	struct tpm2_cap_handles *data;
->   	u32 phandle;
->   	u32 phandle_type;
-> @@ -492,7 +492,7 @@ static int tpm2_save_space(struct tpm_chip *chip)
->   int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
->   		      u32 cc, u8 *buf, size_t *bufsiz)
->   {
-> -	struct tpm_output_header *header = (void *)buf;
-> +	struct tpm_header *header = (void *)buf;
->   	int rc;
->
->   	if (!space)
-> diff --git a/drivers/char/tpm/tpm_i2c_atmel.c b/drivers/char/tpm/tpm_i2c_atmel.c
-> index 95ce2e9ccdc6..4720b2442ffe 100644
-> --- a/drivers/char/tpm/tpm_i2c_atmel.c
-> +++ b/drivers/char/tpm/tpm_i2c_atmel.c
-> @@ -46,7 +46,7 @@ struct priv_data {
->   	/* This is the amount we read on the first try. 25 was chosen to fit a
->   	 * fair number of read responses in the buffer so a 2nd retry can be
->   	 * avoided in small message cases. */
-> -	u8 buffer[sizeof(struct tpm_output_header) + 25];
-> +	u8 buffer[sizeof(struct tpm_header) + 25];
->   };
->
->   static int i2c_atmel_send(struct tpm_chip *chip, u8 *buf, size_t len)
-> @@ -72,8 +72,7 @@ static int i2c_atmel_recv(struct tpm_chip *chip, u8 *buf, size_t count)
->   {
->   	struct priv_data *priv = dev_get_drvdata(&chip->dev);
->   	struct i2c_client *client = to_i2c_client(chip->dev.parent);
-> -	struct tpm_output_header *hdr =
-> -		(struct tpm_output_header *)priv->buffer;
-> +	struct tpm_header *hdr = (struct tpm_header *)priv->buffer;
->   	u32 expected_len;
->   	int rc;
->
-> diff --git a/drivers/char/tpm/tpm_vtpm_proxy.c b/drivers/char/tpm/tpm_vtpm_proxy.c
-> index 5f95fbfb7f6b..28eb5ab15b99 100644
-> --- a/drivers/char/tpm/tpm_vtpm_proxy.c
-> +++ b/drivers/char/tpm/tpm_vtpm_proxy.c
-> @@ -303,9 +303,9 @@ static int vtpm_proxy_tpm_op_recv(struct tpm_chip *chip, u8 *buf, size_t count)
->   static int vtpm_proxy_is_driver_command(struct tpm_chip *chip,
->   					u8 *buf, size_t count)
->   {
-> -	struct tpm_input_header *hdr = (struct tpm_input_header *)buf;
-> +	struct tpm_header *hdr = (struct tpm_header *)buf;
->
-> -	if (count < sizeof(struct tpm_input_header))
-> +	if (count < sizeof(struct tpm_header))
->   		return 0;
->
->   	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
-> @@ -402,7 +402,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
->   {
->   	struct tpm_buf buf;
->   	int rc;
-> -	const struct tpm_output_header *header;
-> +	const struct tpm_header *header;
->   	struct proxy_dev *proxy_dev = dev_get_drvdata(&chip->dev);
->
->   	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-> @@ -427,7 +427,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
->   		goto out;
->   	}
->
-> -	header = (const struct tpm_output_header *)buf.data;
-> +	header = (const struct tpm_header *)buf.data;
->   	rc = be32_to_cpu(header->return_code);
->   	if (rc)
->   		locality = -1;
-> diff --git a/drivers/char/tpm/xen-tpmfront.c b/drivers/char/tpm/xen-tpmfront.c
-> index b150f87f38f5..1259e935fd58 100644
-> --- a/drivers/char/tpm/xen-tpmfront.c
-> +++ b/drivers/char/tpm/xen-tpmfront.c
-> @@ -163,7 +163,7 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
->   	wmb();
->   	notify_remote_via_evtchn(priv->evtchn);
->
-> -	ordinal = be32_to_cpu(((struct tpm_input_header*)buf)->ordinal);
-> +	ordinal = be32_to_cpu(((struct tpm_header *)buf)->ordinal);
->   	duration = tpm_calc_ordinal_duration(chip, ordinal);
->
->   	if (wait_for_tpm_stat(chip, VTPM_STATUS_IDLE, duration,
+This functions is just an example, all others are part of the api.  I
+will rename it for more clarity, e.g. do_some_irq_domain_setup().
+
+> 
+> >      ...
+> >
+> >In case the parent is not yet available, the child initialization
+> >fails. Thus, the current implementation requires the parent domain
+> >being initialized before the child domain. With a complex irq domain
+> >hierarchy it becomes more and more difficult to grant that order as
+> >irq domains are enabled in separate subsystems. Care must be taken
+> >when initializing parent and child domains in the same initcall
+> >level. E.g. Arm's gic-v3-its implementation might have the following
+> >tree and dependencies:
+> >
+> >      gic-v3
+> >      ??? its-node-0
+> >      ?   ??? pci-host-0
+> >      ?   ??? platform-bus
+> >      ?   ...
+> >      ??? its-node-1
+> >      ?   ??? pci-host-1
+> >      ...
+> >
+> >All domains must be initialized in top-down order of the tree.
+> >
+> >This patch introduces an interface that allows domain initialization
+> >without any order requirements, e.g. to be able to initialize the irq
+> >domains in the same initcall level. The following functions have been
+> >introduced to allow the registration of a callback handler:
+> >
+> >      irq_domain_request_fwnode()
+> >      irq_domain_request_host()
+> >
+> >Instead of using the irq_find_matching_fwnode() function and it's
+> >variants the child code replaces them with the new functions and
+> >looks e.g. like the following:
+> >
+> >      ...
+> >      irq_domain_request_fwnode(fwnode, bus_token,
+> >                              create_irq_domain, name, priv);
+> >      ...
+> >
+> >Here, the callback function create_irq_domain() is called as soon as
+> >the parent becomes available. All registered handlers are stored in a
+> >list. With each update of the bus token using irq_domain_update_bus_
+> >token(), the list is checked if that domain is requested by a handler
+> >and if that is the case it's callback function is called and the
+> >request removed from the list.
+> >
+> >With a late_initcall all requests from the list should already have
+> >been handled, otherwise all remaining requests are removed with an
+> >error reported.
+> >
+> >Signed-off-by: Robert Richter <rrichter@cavium.com>
+> >---
+> >  include/linux/irqdomain.h |  15 +++++
+> >  kernel/irq/irqdomain.c    | 158 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 173 insertions(+)
+> >
+> >diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> >index 068aa46f0d55..27e83803627d 100644
+> >--- a/include/linux/irqdomain.h
+> >+++ b/include/linux/irqdomain.h
+> >@@ -311,6 +311,21 @@ static inline struct irq_domain *irq_find_host(struct device_node *node)
+> >      return d;
+> >  }
+> >
+> >+typedef int (*irq_domain_callback_t)(struct irq_domain *, void *);
+> >+int irq_domain_request_fwnode(struct fwnode_handle *fwnode,
+> >+                     enum irq_domain_bus_token bus_token,
+> >+                     irq_domain_callback_t callback,
+> >+                     const char *name, void *priv);
+> >+
+> >+static inline int irq_domain_request_host(struct device_node *node,
+> >+                                     enum irq_domain_bus_token bus_token,
+> >+                                     irq_domain_callback_t callback,
+> >+                                     void *priv)
+> >+{
+> >+     return irq_domain_request_fwnode(of_node_to_fwnode(node), bus_token,
+> >+                                     callback, node->full_name, priv);
+> >+}
+> >+
+> 
+> A little documentation here? Why do we need both irq_domain_request_host
+> and irq_domain_request_fwnode?
+
+irq_domain_request_fwnode() is documented in kernel/irq/irqdomain.c.
+Functions are equivalent to it's irq_find_matching_*() counterparts.
+*_host() is for devicetree only nodes.
+
+> 
+> Also, you introduced this for domain creation, but the callback here is
+> very generic. Is it intended to allow any kind of action once a fwnode
+> is available?
+
+Yes, it is generic, see patch #5 where it is used for late device
+probing. Domain creation is the main use case to setup the irq domain
+hierarchy. It can be used as a replacement for irq_find_matching_*().
+Any users of that functions are suitable for being used with the new
+interface.
+
+> 
+> >  /**
+> >   * irq_domain_add_linear() - Allocate and register a linear revmap irq_domain.
+> >   * @of_node: pointer to interrupt controller's device tree node.
+> >diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> >index 3366d11c3e02..9e33d873d8f6 100644
+> >--- a/kernel/irq/irqdomain.c
+> >+++ b/kernel/irq/irqdomain.c
+> >@@ -21,6 +21,7 @@
+> >  #include <linux/fs.h>
+> >
+> >  static LIST_HEAD(irq_domain_list);
+> >+static LIST_HEAD(irq_domain_requests);
+> >  static DEFINE_MUTEX(irq_domain_mutex);
+> >
+> >  static struct irq_domain *irq_default_domain;
+> >@@ -45,6 +46,106 @@ static inline void debugfs_remove_domain_dir(struct irq_domain *d) { }
+> >  const struct fwnode_operations irqchip_fwnode_ops;
+> >  EXPORT_SYMBOL_GPL(irqchip_fwnode_ops);
+> >
+> >+struct irq_domain_request {
+> >+     struct list_head                list;
+> >+     struct fwnode_handle            *fwnode;
+> >+     enum irq_domain_bus_token       bus_token;
+> >+     irq_domain_callback_t           callback;
+> >+     char                            *name;
+> >+     void                            *priv;
+> >+};
+> >+
+> >+static void irq_domain_call_handler(struct irq_domain *domain,
+> >+             irq_domain_callback_t callback, const char *name, void *priv)
+> >+{
+> >+     int ret;
+> >+
+> >+     ret = callback(domain, priv);
+> >+     if (ret)
+> >+             pr_err("%s: Domain request handler failed: %d\n",
+> >+                     name, ret);
+> >+
+> >+     of_node_put(irq_domain_get_of_node(domain));
+> >+}
+> >+
+> >+static void irq_domain_free_request(struct irq_domain_request *request)
+> >+{
+> >+     kfree(request->name);
+> >+     kfree(request);
+> >+}
+> >+
+> >+static void irq_domain_handle_requests(struct fwnode_handle *fwnode,
+> >+                        enum irq_domain_bus_token bus_token)
+> >+{
+> >+     struct irq_domain *domain;
+> >+     struct irq_domain_request *request;
+> >+
+> >+     if (!fwnode)
+> >+             return;
+> >+redo:
+> >+     domain = irq_find_matching_fwnode(fwnode, bus_token);
+> >+     if (!domain)
+> >+             return;
+> >+
+> >+     mutex_lock(&irq_domain_mutex);
+> >+
+> 
+> Why do we need to take the mutex before checking the domain fields?
+> Can't we delay it?
+
+The list is protected by the mutex. irq_find_matching_fwnode() also
+accesses the list and must use the same mutex.
+
+> 
+> >+     if ((domain->fwnode != fwnode) && (domain->bus_token != bus_token)) {
+> 
+> Why do we even need that check?
+
+The domain token might have changed after irq_find_matching_fwnode()
+and before mutex_lock(), we do a recheck here. Some sort of try-lock.
+
+Note: I found the check being wrong here, it needs to be corrected to:
+
+	if ((domain->fwnode != fwnode) || (domain->bus_token != bus_token)) {
+
+> 
+> Isn't the point of passing fwnode and bus_token to
+> irq_find_matching_fwnode to find a domain with those properties?
+
+Yes, but properties may change and also the list itself.
+
+> 
+> >+             mutex_unlock(&irq_domain_mutex);
+> >+             goto redo;
+> >+     }
+> >+
+> >+     list_for_each_entry(request, &irq_domain_requests, list) {
+> 
+> Shouldn't you use list_for_each_safe if you want to remove elements of
+> the list inside the loop?
+
+No, we do a complete redo again without further iterating the list. We
+need to do this since the handler must be called with the mutex
+unlocked (to be able to manipulate the irq domain list in the callback
+and to be in non-atomic context). After we unlocked the mutex, we must
+restart again as the list may have changed.
+
+> 
+> >+             if (request->fwnode != fwnode ||
+> >+                 request->bus_token != bus_token)
+> >+                     continue;
+> >+
+> >+             list_del(&request->list);
+> >+             mutex_unlock(&irq_domain_mutex);
+> >+
+> >+             irq_domain_call_handler(domain, request->callback,
+> >+                                     request->name, request->priv);
+> >+             irq_domain_free_request(request);
+> >+
+> >+             goto redo;
+> >+     }
+> >+
+> >+     mutex_unlock(&irq_domain_mutex);
+> >+}
+> >+
+> >+static int __init irq_domain_drain_requests(void)
+> >+{
+> >+     struct irq_domain_request *request;
+> >+     struct irq_domain *domain;
+> >+     int ret = 0;
+> >+redo:
+> >+     mutex_lock(&irq_domain_mutex);
+> >+
+> >+     list_for_each_entry(request, &irq_domain_requests, list) {
+> 
+> Same remark.
+
+Same here, the difference is that we can directly operate with the
+request, no need to check the domain.
+
+> 
+> >+             list_del(&request->list);
+> >+             mutex_unlock(&irq_domain_mutex);
+> >+
+> >+             domain = irq_find_matching_fwnode(request->fwnode,
+> >+                                             request->bus_token);
+> >+             if (domain) {
+> >+                     irq_domain_call_handler(domain, request->callback,
+> >+                                             request->name, request->priv);
+> >+             } else {
+> >+                     ret = -ENODEV;
+> >+                     pr_err("%s-%d: Unhandled domain request\n",
+> >+                             request->name, request->bus_token);
+> >+             }
+> >+
+> >+             irq_domain_free_request(request);
+> >+
+> >+             goto redo;
+> 
+> Hmmm, are you starting a loop to break out of it at each iteration?
+
+We have to as the list lock was released which is needed for
+irq_find_matching_fwnode() and the callback handler.
+
+> 
+> Wouldn't it be much simpler to have something like the following?
+> 
+>        while (!list_empty(&irq_domain_requests) {
+>                mutex_lock(&irq_domain_mutex);
+>                request = list_first_entry_or_null(&irq_domain_requests,
+>                                        struct irq_domain_request,
+>                                        list);
+>                if (request)
+>                        list_del(&request->list);
+>                mutex_unlock(&irq_domain_mutex);
+
+At this point my implmentation has only 5 lines of code and uses one
+list command less than your's. I am also not happy using list_empty()
+without the lock hold (though it seems to be used that way elsewhere).
+
+> 
+>                <...>
+>        }
+> 
+> If you really need to consider possible additions to the list while
+> draining it.
+> 
+> Otherwise, just consider doing:
+
+I let the callback handler run again which might change the list again
+(e.g. by adding new handlers). Just using list_for_each_entry() looks
+straight forward to me.
+
+> 
+>        mutex_lock(&irq_domain_mutex);
+>        while (!list_empty(&irq_domain_requests)) {
+>                request = list_first_entry(&irq_domain_requests,
+>                                        struct irq_domain_request,
+>                                        list);
+>                list_del(&request->list);
+>        }
+>        mutex_unlock(&irq_domain_mutex);
+> 
+> >+     }
+> >+
+> >+     mutex_unlock(&irq_domain_mutex);
+> >+
+> >+     return ret;
+> >+}
+> >+late_initcall(irq_domain_drain_requests);
+> 
+> Overall the code for irq_domain_drain_requests and
+> irq_domain_handle_requests feels very similar.
+> 
+> The only difference is that one filters the elements it processes based
+> on an irq_domain while the other just goes through all of them.
+> 
+> You can probably factor that code.
+
+Both functions serve different purposes and factoring the small set of
+similarity out just adds more complexity.
+
+Thanks,
+
+-Robert
+
+> 
+> Cheers,
+> 
+> >+
+> >  /**
+> >   * irq_domain_alloc_fwnode - Allocate a fwnode_handle suitable for
+> >   *                           identifying an irq domain
+> >@@ -293,6 +394,8 @@ void irq_domain_update_bus_token(struct irq_domain *domain,
+> >      debugfs_add_domain_dir(domain);
+> >
+> >      mutex_unlock(&irq_domain_mutex);
+> >+
+> >+     irq_domain_handle_requests(domain->fwnode, bus_token);
+> >  }
+> >
+> >  /**
+> >@@ -417,6 +520,61 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+> >  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+> >
+> >  /**
+> >+ * irq_domain_request_fwnode() - Requests a domain for a given fwspec
+> >+ * @fwspec: FW specifier for an interrupt
+> >+ * @bus_token: domain-specific data
+> >+ * @callback: function to be called once domain becomes available
+> >+ * @name: name to be used for fwnode
+> >+ * @priv: private data to be passed to callback
+> >+ *
+> >+ * The callback function is called as soon as the domain is available.
+> >+ */
+> >+int irq_domain_request_fwnode(struct fwnode_handle *fwnode,
+> >+                     enum irq_domain_bus_token bus_token,
+> >+                     irq_domain_callback_t callback,
+> >+                     const char *name, void *priv)
+> >+{
+> >+     struct irq_domain *parent;
+> >+     struct irq_domain_request *request;
+> >+
+> >+     if (!fwnode || bus_token == DOMAIN_BUS_ANY || !callback || !name)
+> >+             return -EINVAL;
+> >+
+> >+     parent = irq_find_matching_fwnode(fwnode, bus_token);
+> >+     if (parent) {
+> >+             irq_domain_call_handler(parent, callback, name, priv);
+> >+             return 0;
+> >+     }
+> >+
+> >+     request = kzalloc(sizeof(*request), GFP_KERNEL);
+> >+     if (!request)
+> >+             return -ENOMEM;
+> >+
+> >+     request->fwnode = fwnode;
+> >+     request->bus_token = bus_token;
+> >+     request->callback = callback;
+> >+     request->name = kstrdup(name, GFP_KERNEL);
+> >+     request->priv = priv;
+> >+     INIT_LIST_HEAD(&request->list);
+> >+
+> >+     if (!request->name) {
+> >+             kfree(request);
+> >+             return -ENOMEM;
+> >+     }
+> >+
+> >+     of_node_get(to_of_node(fwnode));
+> >+
+> >+     mutex_lock(&irq_domain_mutex);
+> >+     list_add_tail(&request->list, &irq_domain_requests);
+> >+     mutex_unlock(&irq_domain_mutex);
+> >+
+> >+     /* recheck in case list changed */
+> >+     irq_domain_handle_requests(fwnode, bus_token);
+> >+
+> >+     return 0;
+> >+}
+> >+
+> >+/**
+> >   * irq_domain_check_msi_remap - Check whether all MSI irq domains implement
+> >   * IRQ remapping
+> >   *
+> >
+> 
+> --
+> Julien Thierry
