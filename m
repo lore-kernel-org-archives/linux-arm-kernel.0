@@ -1,120 +1,110 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Thu, 8 Nov 2018 19:50:33 +0530
-Subject: [PATCH] arm64/numa: Add more vetting in numa_set_distance()
-In-Reply-To: <20181101112743.GB31099@arm.com>
-References: <1540562267-101152-1-git-send-email-john.garry@huawei.com>
- <20181029112504.GF14127@arm.com>
- <925009c6-226d-213f-dbcb-68b772d80a18@huawei.com>
- <20181029121638.GB15446@arm.com>
- <839acfc7-6b3a-b7ac-2f4a-713960ece457@huawei.com>
- <17e3006a-7ecd-968e-7e67-ea7d08858ec3@arm.com>
- <bc7bd118-82f2-86be-71ea-46704df864a5@huawei.com>
- <45a8e09d-b32b-df32-ba34-5aa1909fb11f@arm.com>
- <20181101112743.GB31099@arm.com>
-Message-ID: <d51511b3-009d-8adf-464a-ac8f7d106045@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 08 Nov 2018 14:28:37 +0000
+Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
+In-Reply-To: <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
+References: <20181107171031.22573-1-alex.bennee@linaro.org>
+ <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
+ <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
+ <87r2fv68us.fsf@linaro.org>
+ <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
+Message-ID: <87pnvf63u2.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Mark Rutland <mark.rutland@arm.com> writes:
 
-On 11/01/2018 04:57 PM, Will Deacon wrote:
-> [ Nit: Please wrap your lines when replying -- I've done it for you here ]
-> 
-> On Tue, Oct 30, 2018 at 08:16:21AM +0530, Anshuman Khandual wrote:
->> On 10/29/2018 08:14 PM, John Garry wrote:
->>>>>>> ?I think we should either factor out the sanity check
->>>>>>>> into a core helper or make the core code robust to these funny configurations.
->>>>>>>
->>>>>>> OK, so to me it would make sense to factor out a sanity check into a core
->>>>>>> helper.
->>>>>>
->>>>>> That, or have the OF code perform the same validation that slit_valid() is
->>>>>> doing for ACPI. I'm just trying to avoid other architectures running into
->>>>>> this problem down the line.
->>>>>>
->>>>>
->>>>> Right, OF code should do this validation job if ACPI is doing it
->>>>> (especially since the DT bindings actually specify the distance
->>>>> rules), and not rely on the arch NUMA code to accept/reject
->>>>> numa_set_distance() combinations.
->>>>
->>>> I would say this particular condition checking still falls under arch NUMA init
->>>> code sanity check like other basic tests what numa_set_distance() currently does
->>>> already but it should not be a necessity for the OF driver to check these.
->>>
->>> The checks in the arch NUMA code mean that invalid inter-node distance
->>> combinations are ignored.
+> On Thu, Nov 08, 2018 at 12:40:11PM +0000, Alex Benn?e wrote:
+>> Mark Rutland <mark.rutland@arm.com> writes:
+>> > On Wed, Nov 07, 2018 at 06:01:20PM +0000, Mark Rutland wrote:
+>> >> On Wed, Nov 07, 2018 at 05:10:31PM +0000, Alex Benn?e wrote:
+>> >> > Not all faults handled by handle_exit are instruction emulations. For
+>> >> > example a ESR_ELx_EC_IABT will result in the page tables being updated
+>> >> > but the instruction that triggered the fault hasn't actually executed
+>> >> > yet. We use the simple heuristic of checking for a changed PC before
+>> >> > seeing if kvm_arm_handle_step_debug wants to claim we stepped an
+>> >> > instruction.
+>> >> >
+>> >> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+<snip>
+>> >> > @@ -233,7 +234,8 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> >> >  	 * kvm_arm_handle_step_debug() sets the exit_reason on the kvm_run
+>> >> >  	 * structure if we need to return to userspace.
+>> >> >  	 */
+>> >> > -	if (handled > 0 && kvm_arm_handle_step_debug(vcpu, run))
+>> >> > +	if (handled > 0 && *vcpu_pc(vcpu) != old_pc &&
+>> >>
+<snip>
+>> >> When are we failing to advance the single-step state machine
+>> >> correctly?
 >>
->> Right and should not this new test (from != to && distance == LOCAL_DISTANCE) be
->> one of them as well ? numa_set_distance() updates the table or just throws some
->> warnings while skipping entries it deems invalid. It would be okay to have this
->> new check there in addition to others like this patch suggests.
+>> When the trap is not actually an instruction emulation - e.g. setting up
+>> the page tables on a fault. Because we are in the act of single-stepping
+>> an instruction that didn't actually execute we erroneously return to
+>> userspace pretending we did even though we shouldn't.
+>
+> I think one problem here is that we're trying to use one bit of state
+> (the KVM_GUESTDBG_SINGLESTEP) when we actually need two.
+>
+> I had expected that we'd follow the architectural single-step state
+> machine, and have three states:
+>
+> * inactive/disabled: not single stepping
+>
+> * active-not-pending: the current instruction will be stepped, and we'll
+>   transition to active-pending before executing the next instruction.
+>
+> * active-pending: the current instruction will raise a software step
+>   debug exception, before being executed.
+>
+> For that to work, all we have to do is advence the state machine when we
+> emulate/skip an instruction, and the HW will raise the exception for us
+> when we enter the guest (which is the only place we have to handle the
+> step exception).
 
-I missed this response due to some problem in my mail client and re-iterated
-some of the same points again on the V2 (https://lkml.org/lkml/2018/11/8/734).
-My apologies for the same.
+We also elide the fact that single-stepping is happening from the guest
+here by piggy backing the step bit onto cpsr() as we enter KVM rather
+than just tracking the state of the bit.
 
-> 
-> If we're changing numa_set_distance(), I'd actually be inclined to do the
-> opposite of what you're suggesting and move as much of this boilerplate
-> checking into the core code. Perhaps we could add something like
-> check_fw_numa_topology() and have both ACPI and OF call that so that the
-> arch doesn't need to worry about malformed tables at all.
+The current flow of guest debug is very much "as I enter what do I need
+to set" rather than tracking state between VCPU_RUN events.
 
-Right although I doubt that we could ever have a common check_fw_numa_topology()
-check as the semantics for the table and individual entries there in for DT and
-ACPI might be different. But I agree what you are saying.
+> We need two bits of internal state for that, but KVM only gives us a
+> single KVM_GUESTDBG_SINGLESTEP flag, and we might exit to userspace
+> mid-emulation (e.g. for MMIO). To avoid that resulting in skipping two
+> instructions at a time, we currently add explicit
+> kvm_arm_handle_step_debug() checks everywhere after we've (possibly)
+> emulated an instruction, but these seem to hit too often.
 
-> 
->>> However, if any entries in the table are invalid, then the whole table
->>> can be discarded as none of it can be believed, i.e. it's better to
->>> validate the table.
->>>
->>
->> Agreed. slit_valid() on the ACPI parsing is currently enforcing that before
->> acpi_numa_slit_init() which would call into numa_set_distance(). Hence arch
->> NUMA code numa_set_distance() never had the opportunity to do the sanity
->> checks as ACPI slit_valid() has completely invalidated the table.
->>
->> Unlike ACPI path, of_numa_parse_distance_map_v1() does not do any sanity
->> checks on the distance values parse from the "distance-matrix" property
->> and all the checks directly falls on numa_set_distance(). This needs to
->> be fixed in line with ACPI
->>
->> * If (to == from) ---> distance = LOCAL_DISTANCE
->> * If (to != from) ---> distance > LOCAL_DISTANCE
->>
->> At the same time its okay to just enhance numa_set_distance() test coverage
->> to include this new test. If we would have trusted firmware parsing all the
->> way, existing basic checks about node range, distance stuff should not have
->> been there in numa_set_distance(). Hence IMHO even if we fix the OF driver
->> part, we should include this new check there as well.
-> 
-> I don't see what we gain by duplicating the check. In fact, it has a few
-> downsides:
-> 
->   (1) It confuses the semantics of the API, because it is no longer clear
->       who "owns" the check
-> 
->   (2) It duplicates code in each architecture
-> 
->   (3) Some clever-cloggs will remove at least some of the duplication in
->       future
+Yes - treating all exits as potential emulations is problematic and we
+are increasing complexity to track which exits are and aren't
+actual *completed* instruction emulations which can also be a
+multi-stage thing split between userspace and the kernel.
 
-Agreed, it has down sides.
+> One problem is that I couldn't spot when we advance the PC for an MMIO
+> trap. I presume we do that in the kernel, *after* the MMIO trap, but I
+> can't see where that happens.
 
-> 
-> I'm not willing to accept the check in the arm64 code if we update the
-> OF code.
+Nope it gets done before during decode_hsr in mmio.c:
 
-Okay, we should remove them instead.
+	/*
+	 * The MMIO instruction is emulated and should not be re-executed
+	 * in the guest.
+	 */
+	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
 
-> 
-> I think the way forward here is for John to fix the crash he reported by
-> adding the check to the OF code. If somebody wants to follow up with
-> subsequent patches to move more of the checking out of the arch code, then
-> we can review that as a separate series.
+That is a little non-obvious but before guest debug support was added it
+makes sense as the whole trap->kernel->user->kernel->guest cycle is
+"atomic" w.r.t the guest. It's also common code for
+in-kernel/in-userspace emulation.
 
-Okay. Anyways I had some other comments related to semantics checking at
-the OF driver level but I can probably send them out as a separate patch
-later. Once again it was my bad to miss this response in the first place.
+For single-step we just built on that and completed the single-step
+after mmio was complete.
+
+>
+> Thanks,
+> Mark.
+
+
+--
+Alex Benn?e
