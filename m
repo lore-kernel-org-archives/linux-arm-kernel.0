@@ -1,338 +1,230 @@
-From: christianshewitt@gmail.com (Christian Hewitt)
-Date: Thu,  8 Nov 2018 23:43:53 +0400
-Subject: [PATCH v3 3/3] ARM64: dts: meson-gxl: Add support for the Smartlabs
- SML-5442TW
-In-Reply-To: <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
-References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
- <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
-Message-ID: <1541706240-30036-4-git-send-email-christianshewitt@gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 8 Nov 2018 21:10:54 +0100
+Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
+ erratum 1165522
+In-Reply-To: <ec7d0e34-022f-125e-00b4-b06be23ee2a8@arm.com>
+References: <20181105143617.120602-1-marc.zyngier@arm.com>
+ <20181105143617.120602-5-marc.zyngier@arm.com>
+ <20181106081546.GH12057@e113682-lin.lund.arm.com>
+ <ec7d0e34-022f-125e-00b4-b06be23ee2a8@arm.com>
+Message-ID: <20181108201054.GG3835@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Smartlabs SML-5442TW is broadly similar to the P231 reference design
-but with the following differences:
+On Thu, Nov 08, 2018 at 06:05:55PM +0000, Marc Zyngier wrote:
+> On 06/11/18 08:15, Christoffer Dall wrote:
+> > On Mon, Nov 05, 2018 at 02:36:16PM +0000, Marc Zyngier wrote:
+> >> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
+> >> speculate an AT instruction in during a guest switch while the
+> >> S1/S2 system registers are in an inconsistent state.
+> >>
+> >> Work around it by:
+> >> - Mandating VHE
+> >> - Make sure that S1 and S2 system registers are consistent before
+> >>   clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
+> >>   regime
+> >>
+> >> These two things together ensure that we cannot hit this erratum.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  Documentation/arm64/silicon-errata.txt |  1 +
+> >>  arch/arm64/Kconfig                     | 12 ++++++++++++
+> >>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
+> >>  arch/arm64/include/asm/kvm_host.h      |  3 +++
+> >>  arch/arm64/include/asm/kvm_hyp.h       |  6 ++++++
+> >>  arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
+> >>  arch/arm64/kvm/hyp/switch.c            | 14 ++++++++++++++
+> >>  7 files changed, 46 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> >> index 76ccded8b74c..04f0bc4690c6 100644
+> >> --- a/Documentation/arm64/silicon-errata.txt
+> >> +++ b/Documentation/arm64/silicon-errata.txt
+> >> @@ -57,6 +57,7 @@ stable kernels.
+> >>  | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
+> >>  | ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
+> >>  | ARM            | Cortex-A76      | #1188873        | ARM64_ERRATUM_1188873       |
+> >> +| ARM            | Cortex-A76      | #1165522        | ARM64_ERRATUM_1165522       |
+> >>  | ARM            | MMU-500         | #841119,#826419 | N/A                         |
+> >>  |                |                 |                 |                             |
+> >>  | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index 787d7850e064..a68bc6cc2167 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -497,6 +497,18 @@ config ARM64_ERRATUM_1188873
+> >>  
+> >>  	  If unsure, say Y.
+> >>  
+> >> +config ARM64_ERRATUM_1165522
+> >> +	bool "Cortex-A76: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
+> >> +	default y
+> >> +	help
+> >> +	  This option adds work arounds for ARM Cortex-A76 erratum 1165522
+> >> +
+> >> +	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could end-up with
+> >> +	  corrupted TLBs by speculating an AT instruction during a guest
+> >> +	  context switch.
+> >> +
+> >> +	  If unsure, say Y.
+> >> +
+> >>  config CAVIUM_ERRATUM_22375
+> >>  	bool "Cavium erratum 22375, 24313"
+> >>  	default y
+> >> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> >> index 6e2d254c09eb..62d8cd15fdf2 100644
+> >> --- a/arch/arm64/include/asm/cpucaps.h
+> >> +++ b/arch/arm64/include/asm/cpucaps.h
+> >> @@ -54,7 +54,8 @@
+> >>  #define ARM64_HAS_CRC32				33
+> >>  #define ARM64_SSBS				34
+> >>  #define ARM64_WORKAROUND_1188873		35
+> >> +#define ARM64_WORKAROUND_1165522		36
+> >>  
+> >> -#define ARM64_NCAPS				36
+> >> +#define ARM64_NCAPS				37
+> >>  
+> >>  #endif /* __ASM_CPUCAPS_H */
+> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> >> index 7d6e974d024a..8f486026ac87 100644
+> >> --- a/arch/arm64/include/asm/kvm_host.h
+> >> +++ b/arch/arm64/include/asm/kvm_host.h
+> >> @@ -435,6 +435,9 @@ static inline bool kvm_arch_sve_requires_vhe(void)
+> >>  static inline bool kvm_arch_impl_requires_vhe(void)
+> >>  {
+> >>  	/* Some implementations have defects that confine them to VHE */
+> >> +	if (cpus_have_cap(ARM64_WORKAROUND_1165522))
+> >> +		return true;
+> >> +
+> >>  	return false;
+> >>  }
+> >>  
+> >> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> >> index 23aca66767f9..9681360d0959 100644
+> >> --- a/arch/arm64/include/asm/kvm_hyp.h
+> >> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> >> @@ -163,6 +163,12 @@ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
+> >>  {
+> >>  	write_sysreg(kvm->arch.vtcr, vtcr_el2);
+> >>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> >> +
+> >> +	/*
+> >> +	 * ARM erratum 1165522 requires the actual execution of the
+> >> +	 * above before we can switch to the guest translation regime.
+> >> +	 */
+> > 
+> > Is it about a guest translation 'regime' or should this just say before
+> > we can enable stage 2 translation?
+> 
+> No, this isn't strictly about enabling stage-2 translation. This is
+> about making sure that anything that impacts the guest translations is
+> actually executed.
+> 
+> I wonder if it would be clearer to move this outside of
+> __load_guest_stage2 and make it explicit in the callers of this helper...
 
-- Yellow and Blue front-panel LEDs are available but disabled
-- Red/Green LED is used to signal off/on status
-- GPIOX_17 is set high to enable the QCA9377 wireless module
-- uart_AO can be accessed after opening the case; soldered pins exist
+I think it makes sense to have this here to explain the alternative.
 
-Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
----
- arch/arm64/boot/dts/amlogic/Makefile               |   1 +
- .../boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts | 292 +++++++++++++++++++++
- 2 files changed, 293 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts
+But it's the 'switch to guest translation regime' thing that bothers me
+a bit.  Is that an architectural concept (I thought we only had EL1 and
+EL2 translation regimes in stage 1, and then stage 2 translations).  So
+When you say 'guest translation regime' I'm just not entirely sure what
+that means, unless I'm missing something.
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index c31f29d6..37d7dbd 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -18,6 +18,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-sml5442tw.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s805x-p241.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-tx3-mini.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts
-new file mode 100644
-index 0000000..44d02c2
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts
-@@ -0,0 +1,292 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2016 Endless Computers, Inc.
-+ * Author: Carlo Caione <carlo@endlessm.com>
-+ * Copyright (c) 2018 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxl-s905d.dtsi"
-+
-+/ {
-+	compatible = "smartlabs,sml5442tw", "amlogic,s905d", "amlogic,meson-gxl";
-+	model = "Smartlabs SML-5442TW";
-+
-+	aliases {
-+		serial0 = &uart_AO;
-+		serial1 = &uart_A;
-+		ethernet0 = &ethmac;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		yellow {
-+			label = "sml5442tw:yellow";
-+			gpios = <&gpio_ao GPIOAO_6 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		blue {
-+			label = "sml5442tw:blue";
-+			gpios = <&gpio GPIODV_28 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		green {
-+			label = "sml5442tw:green";
-+			gpios = <&gpio_ao GPIOAO_9 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		red {
-+			label = "sml5442tw:red";
-+			gpios = <&gpio GPIODV_27 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	hdmi_5v: regulator-hdmi-5v {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "HDMI_5V";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+
-+		gpio = <&gpio GPIOH_3 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
-+
-+	vddio_ao18: regulator-vddio_ao18 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_AO18";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vddio_boot: regulator-vddio_boot {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_BOOT";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vddao_3v3: regulator-vddao_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDAO_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_3v3: regulator-vcc_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	wifi32k: wifi32k {
-+		compatible = "pwm-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-+		clocks = <&wifi32k>;
-+		clock-names = "ext_clock";
-+	};
-+
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
-+
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
-+		};
-+	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_tx_tmds_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&cec_AO {
-+	status = "okay";
-+	pinctrl-0 = <&ao_cec_pins>;
-+	pinctrl-names = "default";
-+	hdmi-phandle = <&hdmi_tx>;
-+};
-+
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
-+};
-+
-+&ethmac {
-+	status = "okay";
-+	phy-mode = "rmii";
-+	phy-handle = <&internal_phy>;
-+};
-+
-+/* This will enable the bluetooth module */
-+&gpio {
-+	bt-en {
-+		gpio-hog;
-+		gpios = <GPIOX_17 GPIO_ACTIVE_HIGH>;
-+		output-high;
-+		line-name = "bt-en";
-+	};
-+};
-+
-+&hdmi_tx {
-+	status = "okay";
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-+	pinctrl-names = "default";
-+	hdmi-supply = <&hdmi_5v>;
-+};
-+
-+&hdmi_tx_tmds_port {
-+	hdmi_tx_tmds_out: endpoint {
-+		remote-endpoint = <&hdmi_connector_in>;
-+	};
-+};
-+
-+&i2c_A {
-+	status = "okay";
-+	pinctrl-0 = <&i2c_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&internal_phy {
-+	pinctrl-0 = <&eth_link_led_pins>, <&eth_act_led_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&ir {
-+	status = "okay";
-+	pinctrl-0 = <&remote_input_ao_pins>;
-+	pinctrl-names = "default";
-+	linux,rc-map-name = "rc-o2cz-khamsin";
-+};
-+
-+&pwm_ef {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
-+
-+&saradc {
-+	status = "okay";
-+	vref-supply = <&vddio_ao18>;
-+};
-+
-+/* Wireless SDIO Module */
-+&sd_emmc_a {
-+	status = "okay";
-+	pinctrl-0 = <&sdio_pins>;
-+	pinctrl-1 = <&sdio_clk_gate_pins>;
-+	pinctrl-names = "default", "clk-gate";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	max-frequency = <100000000>;
-+
-+	non-removable;
-+	disable-wp;
-+
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+
-+	vmmc-supply = <&vddao_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+/* SD card */
-+&sd_emmc_b {
-+	status = "okay";
-+	pinctrl-0 = <&sdcard_pins>;
-+	pinctrl-1 = <&sdcard_clk_gate_pins>;
-+	pinctrl-names = "default", "clk-gate";
-+
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	max-frequency = <100000000>;
-+	disable-wp;
-+
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+
-+	vmmc-supply = <&vddao_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+/* eMMC */
-+&sd_emmc_c {
-+	status = "okay";
-+	pinctrl-0 = <&emmc_pins>, <&emmc_ds_pins>;
-+	pinctrl-1 = <&emmc_clk_gate_pins>;
-+	pinctrl-names = "default", "clk-gate";
-+
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	max-frequency = <100000000>;
-+	non-removable;
-+	disable-wp;
-+	mmc-ddr-1_8v;
-+	mmc-hs200-1_8v;
-+
-+	mmc-pwrseq = <&emmc_pwrseq>;
-+	vmmc-supply = <&vcc_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+/* This is connected to the Bluetooth module: */
-+&uart_A {
-+	status = "okay";
-+	pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
-+	pinctrl-names = "default";
-+	uart-has-rtscts;
-+};
-+
-+/* This UART is brought out to the debug header */
-+&uart_AO {
-+	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
--- 
-2.7.4
+> > 
+> >> +	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
+> >>  }
+> >>  
+> >>  #endif /* __ARM64_KVM_HYP_H__ */
+> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> >> index a509e35132d2..476e738e6c46 100644
+> >> --- a/arch/arm64/kernel/cpu_errata.c
+> >> +++ b/arch/arm64/kernel/cpu_errata.c
+> >> @@ -739,6 +739,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+> >>  		.capability = ARM64_WORKAROUND_1188873,
+> >>  		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
+> >>  	},
+> >> +#endif
+> >> +#ifdef CONFIG_ARM64_ERRATUM_1165522
+> >> +	{
+> >> +		/* Cortex-A76 r0p0 to r2p0 */
+> >> +		.desc = "ARM erratum 1165522",
+> >> +		.capability = ARM64_WORKAROUND_1165522,
+> >> +		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
+> >> +	},
+> >>  #endif
+> >>  	{
+> >>  	}
+> >> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> >> index 51d5d966d9e5..322109183853 100644
+> >> --- a/arch/arm64/kvm/hyp/switch.c
+> >> +++ b/arch/arm64/kvm/hyp/switch.c
+> >> @@ -143,6 +143,13 @@ static void deactivate_traps_vhe(void)
+> >>  {
+> >>  	extern char vectors[];	/* kernel exception vectors */
+> >>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+> >> +
+> >> +	/*
+> >> +	 * ARM erratum 1165522 requires the actual execution of the
+> >> +	 * above before we can switch to the host translation regime.
+> >> +	 */
+> > 
+> > same here, is it not rather about disabling stage 2 translation than
+> > about the host (EL2 and EL0 stage 1) translation regimes?
+> > 
+> >> +	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
+> >> +
+> >>  	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+> >>  	write_sysreg(vectors, vbar_el1);
+> >>  }
+> >> @@ -499,6 +506,13 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+> >>  
+> >>  	sysreg_save_host_state_vhe(host_ctxt);
+> >>  
+> >> +	/*
+> >> +	 * ARM erratum 1165522 requires us to have all the translation
+> >> +	 * context in place before we clear HCR_TGE. All the offending
+> >> +	 * guest sysregs are loaded in kvm_vcpu_load_sysregs, and
+> >> +	 * __activate_vm has the stage-2 configuration. Once this is
+> >> +	 * done, __activate_trap clears HCR_TGE (among other things).
+> >> +	 */
+> > 
+> > I'm not this comment is needed or is helpful here.  For example, I don't
+> > understand what you mean with the offending guest sysregs and how that
+> 
+> TTBR*, TCR, SCTLR... Anything that deals with stage-1 translations.
+> 
+> > relates to the problem of configuring stage 2 before clearing TGE.  Is
+> > this about gettting the stage 1 configuration in place first?
+> 
+> Not only stage-1. Stage-2 is involved as well, as the CPU could
+> otherwise end-up with the wrong translations (bypassing stage-2 altogether).
+> 
+> > 
+> > If so, could I suggest a reword along the lines of:
+> > 
+> > 	/*
+> > 	 * ARM erratum 1165522 requires us to configure both stage 1 and
+> > 	 * stage 2 translation for the guest context before we clear
+> > 	 * HCR_EL2.TGE.
+> > 	 *
+> > 	 * We have already configured the guest's stage 1 translation in
+> > 	 * kvm_vcpu_load_sysregs above.  We must now call __activate_vm
+> > 	 * before __activate_traps, because __activate_vm configures
+> > 	 * stage 2 translation, and __activate_traps clear HCR_EL2.TGE
+> > 	 * (among other things).
+> > 	 */
+> 
+> Works for me (and shows that contrary to what you wrote above, you have
+> perfectly understood the problem)!.
+> 
+
+I may have actually understood the problem by writing up that piece of
+commentary.
+
+Great!
+
+Thanks,
+
+    Christoffer
