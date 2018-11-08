@@ -1,87 +1,64 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 8 Nov 2018 09:29:46 +0100
-Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
-In-Reply-To: <20181106183609.207702-2-sboyd@kernel.org>
-References: <20181106183609.207702-1-sboyd@kernel.org>
- <20181106183609.207702-2-sboyd@kernel.org>
-Message-ID: <efa13e0b-0daf-3bf3-27ba-ed90f15c7dfe@gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 8 Nov 2018 09:34:51 +0100
+Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver
+ under the SPI framework
+In-Reply-To: <b12936f5-871d-a982-13c5-9d894f4a1521@kontron.de>
+References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
+ <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
+ <CAOesGMgPwwwmizC+R4W1aLpvgcuVOYQr2qR2Vqb6171zGfarRw@mail.gmail.com>
+ <b12936f5-871d-a982-13c5-9d894f4a1521@kontron.de>
+Message-ID: <20181108093451.08dfe63e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 7 Nov 2018 16:36:13 +0000
+Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
 
-
-On 06/11/2018 19:36, Stephen Boyd wrote:
-> We have a handful of clk drivers that have a collection of slightly
-> variant device support keyed off of the compatible string. In each of
-> these drivers, we demux the variant and then call the "real" probe
-> function based on whatever is stored in the match data for that
-> compatible string. Let's generalize this function so that it can be
-> re-used as the platform_driver probe function directly.
+> Hi Olof,
 > 
-> Cc: Ryder Lee <ryder.lee@mediatek.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Frank Rowand <frowand.list@gmail.com>
-> Signed-off-by: Stephen Boyd <sboyd@kernel.org>
-> ---
->  drivers/of/device.c       | 31 +++++++++++++++++++++++++++++++
->  include/linux/of_device.h |  1 +
->  2 files changed, 32 insertions(+)
+> On 07.11.18 17:20, Olof Johansson wrote:
+> > On Wed, Nov 7, 2018 at 6:44 AM Frieder Schrempf
+> > <frieder.schrempf@kontron.de> wrote:  
+> >>
+> >> From: Frieder Schrempf <frieder.schrempf@exceet.de>
+> >>
+> >> The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
+> >> at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
+> >>
+> >> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>  
+> > 
+> > Hi Frieder,
+> > 
+> > This patch is part of a series that I didn't see the rest of, but in
+> > general we prefer to merge these through arm-soc even if the driver
+> > goes in through another tree. The way we'd prefer to handle it is that
+> > once the driver lands, we'll take the config option change to turn it
+> > on. To avoid our branches to break until both sides have landed, it
+> > might be a good idea to keep both drivers on for a short while (one
+> > release).
+> > 
+> > So, I'm not going to ack this since we avoid taking defconfig changes
+> > through driver trees (these two defconfigs tend to churn a lot and we
+> > don't want to create merge conflicts where we don't have to), but
+> > we'll be happy to pick it up when the time comes.  
 > 
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 0f27fad9fe94..8381f33ed2d8 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -195,6 +195,37 @@ const void *of_device_get_match_data(const struct device *dev)
->  }
->  EXPORT_SYMBOL(of_device_get_match_data);
->  
-> +/**
-> + * platform_driver_probe_by_of_match_data - Probe a platform device using match data
-> + * @pdev: platform device to probe
-> + *
-> + * For use by device drivers that multiplex their probe function through DT
-> + * match data. Drivers can use this function to call their platform
-> + * device probe directly without having to implement a wrapper function.
-> + *
-> + * static const struct of_device_id probe_funcs[] = {
-> + *      { .compatible = "compat,foo", .data = foo_probe },
-> + *      {}
-> + * };
-> + *
-> + * struct platform_driver foo_driver = {
-> + *      .probe = platform_driver_probe_by_of_match_data,
-> + *      .driver = {
-> + *            of_match_table = probe_funcs,
-> + *      },
-> + * };
-> + *
-> + */
-> +int platform_driver_probe_by_of_match_data(struct platform_device *pdev)
-> +{
-> +	int (*probe_func)(struct platform_device *pdev);
-> +
-> +	probe_func = of_device_get_match_data(&pdev->dev);
-
-Shouldn't we check if probe_func is not NULL?
-
-> +
-> +	return probe_func(pdev);
-> +}
-> +EXPORT_SYMBOL_GPL(platform_driver_probe_by_of_match_data);
-> +
->  static ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
->  {
->  	const char *compat;
-> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> index 8d31e39dd564..4de84691d1c6 100644
-> --- a/include/linux/of_device.h
-> +++ b/include/linux/of_device.h
-> @@ -33,6 +33,7 @@ extern int of_device_add(struct platform_device *pdev);
->  extern int of_device_register(struct platform_device *ofdev);
->  extern void of_device_unregister(struct platform_device *ofdev);
->  
-> +extern int platform_driver_probe_by_of_match_data(struct platform_device *pdev);
->  extern const void *of_device_get_match_data(const struct device *dev);
->  
->  extern ssize_t of_device_modalias(struct device *dev, char *str, ssize_t len);
+> Ok, thank you for explaining the common practice. I will drop the config 
+> changes for the next version and send it separately when the time is ready.
 > 
+> Both the old driver and the new one use the same compatible strings for 
+> probing. Wouldn't that cause problems if both drivers are enabled for a 
+> while, or am I missing something?
+
+Or maybe we should not introduce a new Kconfig option and just reuse
+the old one. It probably requires re-ordering patches a bit (patch 1
+should be moved after patch 5). Then you have 2 choices:
+
+1/ merge patch 1 and 6 so that the new driver effectively replaces the
+   old one but uses the same Kconfig option
+2/ remove the ability to compile the old driver when the new one is
+   introduced: remove the line from drivers/mtd/spi-nor Makefile and
+   move the Kconfig entry from drivers/mtd/spi-nor/Kconfig to
+   drivers/spi/Kconfig. And remove the old code in a separate patch
+
+I'm fine either way, but option #2 will probably make the patch
+introducing the new driver bigger and hurt readability.
