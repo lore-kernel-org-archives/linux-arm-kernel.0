@@ -1,126 +1,70 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu,  8 Nov 2018 13:50:13 -0800
-Subject: [PATCH 3.18 042/144] pinctrl: at91: fix null pointer dereference
-In-Reply-To: <20181108215054.826084593@linuxfoundation.org>
-References: <20181108215054.826084593@linuxfoundation.org>
-Message-ID: <20181108215057.891168645@linuxfoundation.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Nov 2018 22:21:23 +0000
+Subject: [PATCH 4/5] phy: mvebu-cp110-comphy: convert to use eth phy mode
+ and submode
+In-Reply-To: <20181108003617.10334-5-grygorii.strashko@ti.com>
+References: <20181108003617.10334-1-grygorii.strashko@ti.com>
+ <20181108003617.10334-5-grygorii.strashko@ti.com>
+Message-ID: <20181108222123.GZ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.18-stable review patch.  If anyone has any objections, please let me know.
+On Wed, Nov 07, 2018 at 06:36:16PM -0600, Grygorii Strashko wrote:
+> diff --git a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> index 7a37a37..fb28b71 100644
+> --- a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> +++ b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> @@ -1165,28 +1165,17 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
+>   */
+>  static int mvpp22_comphy_init(struct mvpp2_port *port)
+>  {
+> -	enum phy_mode mode;
+> +	int submode;
+>  	int ret;
+>  
+>  	if (!port->comphy)
+>  		return 0;
+>  
+> -	switch (port->phy_interface) {
+> -	case PHY_INTERFACE_MODE_SGMII:
+> -	case PHY_INTERFACE_MODE_1000BASEX:
+> -		mode = PHY_MODE_SGMII;
+> -		break;
+> -	case PHY_INTERFACE_MODE_2500BASEX:
+> -		mode = PHY_MODE_2500SGMII;
+> -		break;
+> -	case PHY_INTERFACE_MODE_10GKR:
+> -		mode = PHY_MODE_10GKR;
+> -		break;
+> -	default:
+> -		return -EINVAL;
+> -	}
+> +	submode = port->phy_interface;
+> +	if (submode == PHY_INTERFACE_MODE_1000BASEX)
+> +		submode = PHY_INTERFACE_MODE_SGMII;
 
-------------------
+If the intention is to move the ethernet PHY mode into the generic PHY
+layer, I'd suggest that the equivalence of 1000base-X and SGMII is
+handled in the generic PHY driver rather than ethernet drivers.  Just
+move this into this hunk of the comphy driver:
 
-[ Upstream commit 1ab36387ea4face01aac3560b396b1e2ce07c4ff ]
+> @@ -517,10 +519,14 @@ static int mvebu_comphy_set_mode(struct phy *phy,
+>  {
+>  	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
+>  
+> -	if (mvebu_comphy_get_mux(lane->id, lane->port, mode) < 0)
+> +	if (mode != PHY_MODE_ETHERNET)
+> +		return -EINVAL;
+> +
+> +	if (mvebu_comphy_get_mux(lane->id, lane->port, mode, submode) < 0)
+>  		return -EINVAL;
+>  
+>  	lane->mode = mode;
+> +	lane->submode = submode;
+>  	return 0;
+>  }
 
-Not all gpio banks are necessarily enabled, in the current code this can
-lead to null pointer dereferences.
-
-[   51.130000] Unable to handle kernel NULL pointer dereference at virtual address 00000058
-[   51.130000] pgd = dee04000
-[   51.130000] [00000058] *pgd=3f66d831, *pte=00000000, *ppte=00000000
-[   51.140000] Internal error: Oops: 17 [#1] ARM
-[   51.140000] Modules linked in:
-[   51.140000] CPU: 0 PID: 1664 Comm: cat Not tainted 4.1.1+ #6
-[   51.140000] Hardware name: Atmel SAMA5
-[   51.140000] task: df6dd880 ti: dec60000 task.ti: dec60000
-[   51.140000] PC is at at91_pinconf_get+0xb4/0x200
-[   51.140000] LR is at at91_pinconf_get+0xb4/0x200
-[   51.140000] pc : [<c01e71a0>]    lr : [<c01e71a0>]    psr: 600f0013
-sp : dec61e48  ip : 600f0013  fp : df522538
-[   51.140000] r10: df52250c  r9 : 00000058  r8 : 00000068
-[   51.140000] r7 : 00000000  r6 : df53c910  r5 : 00000000  r4 : dec61e7c
-[   51.140000] r3 : 00000000  r2 : c06746d4  r1 : 00000000  r0 : 00000003
-[   51.140000] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   51.140000] Control: 10c53c7d  Table: 3ee04059  DAC: 00000015
-[   51.140000] Process cat (pid: 1664, stack limit = 0xdec60208)
-[   51.140000] Stack: (0xdec61e48 to 0xdec62000)
-[   51.140000] 1e40:                   00000358 00000000 df522500 ded15f80 c05a9d08 ded15f80
-[   51.140000] 1e60: 0000048c 00000061 df522500 ded15f80 c05a9d08 c01e7304 ded15f80 00000000
-[   51.140000] 1e80: c01e6008 00000060 0000048c c01e6034 c01e5f6c ded15f80 dec61ec0 00000000
-[   51.140000] 1ea0: 00020000 ded6f280 dec61f80 00000001 00000001 c00ae0b8 b6e80000 ded15fb0
-[   51.140000] 1ec0: 00000000 00000000 df4bc974 00000055 00000800 ded6f280 b6e80000 ded6f280
-[   51.140000] 1ee0: ded6f280 00020000 b6e80000 00000000 00020000 c0090dec c0671e1c dec61fb0
-[   51.140000] 1f00: b6f8b510 00000001 00004201 c000924c 00000000 00000003 00000003 00000000
-[   51.140000] 1f20: df4bc940 00022000 00000022 c066e188 b6e7f000 c00836f4 000b6e7f ded6f280
-[   51.140000] 1f40: ded6f280 b6e80000 dec61f80 ded6f280 00020000 c0091508 00000000 00000003
-[   51.140000] 1f60: 00022000 00000000 00000000 ded6f280 ded6f280 00020000 b6e80000 c0091d9c
-[   51.140000] 1f80: 00000000 00000000 ffffffff 00020000 00020000 b6e80000 00000003 c000f124
-[   51.140000] 1fa0: dec60000 c000efa0 00020000 00020000 00000003 b6e80000 00020000 000271c4
-[   51.140000] 1fc0: 00020000 00020000 b6e80000 00000003 7fffe000 00000000 00000000 00020000
-[   51.140000] 1fe0: 00000000 bef50b64 00013835 b6f29c76 400f0030 00000003 00000000 00000000
-[   51.140000] [<c01e71a0>] (at91_pinconf_get) from [<c01e7304>] (at91_pinconf_dbg_show+0x18/0x2c0)
-[   51.140000] [<c01e7304>] (at91_pinconf_dbg_show) from [<c01e6034>] (pinconf_pins_show+0xc8/0xf8)
-[   51.140000] [<c01e6034>] (pinconf_pins_show) from [<c00ae0b8>] (seq_read+0x1a0/0x464)
-[   51.140000] [<c00ae0b8>] (seq_read) from [<c0090dec>] (__vfs_read+0x20/0xd0)
-[   51.140000] [<c0090dec>] (__vfs_read) from [<c0091508>] (vfs_read+0x7c/0x108)
-[   51.140000] [<c0091508>] (vfs_read) from [<c0091d9c>] (SyS_read+0x40/0x94)
-[   51.140000] [<c0091d9c>] (SyS_read) from [<c000efa0>] (ret_fast_syscall+0x0/0x3c)
-[   51.140000] Code: eb010ec2 e30a0d08 e34c005a eb0ae5a7 (e5993000)
-[   51.150000] ---[ end trace fb3c370da3ea4794 ]---
-
-Fixes: a0b957f306fa ("pinctrl: at91: allow to have disabled gpio bank")
-Cc: stable at vger.kernel.org # 3.18
-Signed-off-by: David Dueck <davidcdueck@googlemail.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Sasha Levin <sashal@kernel.org>
----
- drivers/pinctrl/pinctrl-at91.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index d6380c187db6..ceebe2e3882f 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -322,6 +322,9 @@ static const struct pinctrl_ops at91_pctrl_ops = {
- static void __iomem *pin_to_controller(struct at91_pinctrl *info,
- 				 unsigned int bank)
- {
-+	if (!gpio_chips[bank])
-+		return NULL;
-+
- 	return gpio_chips[bank]->regbase;
- }
- 
-@@ -731,6 +734,10 @@ static int at91_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
- 		pin = &pins_conf[i];
- 		at91_pin_dbg(info->dev, pin);
- 		pio = pin_to_controller(info, pin->bank);
-+
-+		if (!pio)
-+			continue;
-+
- 		mask = pin_to_mask(pin->pin);
- 		at91_mux_disable_interrupt(pio, mask);
- 		switch (pin->mux) {
-@@ -850,6 +857,10 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
- 	*config = 0;
- 	dev_dbg(info->dev, "%s:%d, pin_id=%d", __func__, __LINE__, pin_id);
- 	pio = pin_to_controller(info, pin_to_bank(pin_id));
-+
-+	if (!pio)
-+		return -EINVAL;
-+
- 	pin = pin_id % MAX_NB_GPIO_PER_BANK;
- 
- 	if (at91_mux_get_multidrive(pio, pin))
-@@ -891,6 +902,10 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
- 			"%s:%d, pin_id=%d, config=0x%lx",
- 			__func__, __LINE__, pin_id, config);
- 		pio = pin_to_controller(info, pin_to_bank(pin_id));
-+
-+		if (!pio)
-+			return -EINVAL;
-+
- 		pin = pin_id % MAX_NB_GPIO_PER_BANK;
- 		mask = pin_to_mask(pin);
- 
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
