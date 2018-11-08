@@ -1,19 +1,21 @@
 From: Ramana.Radhakrishnan@arm.com (Ramana Radhakrishnan)
-Date: Thu, 8 Nov 2018 15:33:01 +0000
+Date: Thu, 8 Nov 2018 15:33:11 +0000
 Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
-In-Reply-To: <20181108153032.GC3505@e103592.cambridge.arm.com>
+In-Reply-To: <45592bdd-2f2f-211b-8d58-bcc2c651509e@arm.com>
 References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
  <CAKv+Gu-jVTWyy61Q--HE_Hw+RZVxYcTypZmF+YUhmX1p_QkLKQ@mail.gmail.com>
  <8382cafd-9fb7-7121-0de2-5091ba079d31@arm.com>
  <CAKv+Gu_K9p5FvQGtvgzKmveiQvHQp1H1PxAzxqcFnJfDQt4huw@mail.gmail.com>
  <cdae83fa-dc71-e635-acda-be363695bf0c@arm.com>
- <20181108153032.GC3505@e103592.cambridge.arm.com>
-Message-ID: <312bdb62-4361-2475-da62-a42b9d22e8bb@arm.com>
+ <45592bdd-2f2f-211b-8d58-bcc2c651509e@arm.com>
+Message-ID: <9073dd77-84f3-3a90-0d22-b3700da319f7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2018 15:30, Dave Martin wrote:
-> On Thu, Nov 08, 2018 at 02:19:14PM +0000, Ramana Radhakrishnan wrote:
+On 08/11/2018 15:01, Julien Thierry wrote:
+> 
+> 
+> On 08/11/18 14:19, Ramana Radhakrishnan wrote:
 >> On 08/11/2018 14:10, Ard Biesheuvel wrote:
 >>> (+ Ramana)
 >>>
@@ -52,13 +54,50 @@ On 08/11/2018 15:30, Dave Martin wrote:
 >> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
 >>
 >> <quote>
+>>
+>> 5.2.2.1 Universal stack constraints
+>>
+>> <...>
+>>
+>> Additionally, at any point at which memory is accessed
+>> via SP, the hardware requires that SP mod 16 = 0.  The stack must be
+>> quad-word aligned
+>>
+>> </end quote>
+>>
 > 
-> Surely This only applies at public interfaces?
-> 
+> Thanks Ramana. Sadly I don't think this clarifies things. The issue is
+> that the guarantee is only that SP is aligned when we will use it to
+> access memory, but still allows for a scenario like:
 
-I don't think this has anything to do with public interfaces. If there 
-is a trap with a 16byte misaligned access of the SP then it doesn't 
-matter whether it's a public interface or not.
+
+That is certainly a correct interpretation of the ABI language.
+
+> 
+> -> Updating SP with non 16bytes-aligned value (it's fine as long as the
+> following code takes care to align it before accessing memory)
+> -> IRQ is raised before SP gets aligned
+> -> Vector entry starts saving context on misaligned stack
+> -> Misaligned SP exception
+> 
+> The only thing that would avoid us the trouble is a guarantee that GCC
+> never modifies SP in such a way that SP is not 16-bytes aligned.
+
+
+I think it sort of falls out in the implementation from what I remember 
+and see (and empirically checked with a couple of colleagues).
+
+I don't think there is an ABI requirement that SP should left 16 byte 
+aligned even for intermediate calculations.
+
+Whether GCC does this or not today is immaterial and for userland it's 
+certainly not the only code generator in town for this sort of question. 
+The question also arises with other jits and other code generators which 
+may leave the stack temporarily not aligned at 16 bytes. So it does 
+sound like the right thing to do in the kernel defensively.
 
 regards
 Ramana
+> 
+> Thanks,
+> 
