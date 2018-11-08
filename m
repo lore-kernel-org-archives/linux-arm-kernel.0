@@ -1,52 +1,57 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 8 Nov 2018 16:45:41 -0600
-Subject: [PATCH 6/9] PCI: consolidate PCI config entry in drivers/pci
-In-Reply-To: <20181019120952.32763-7-hch@lst.de>
-References: <20181019120952.32763-1-hch@lst.de>
- <20181019120952.32763-7-hch@lst.de>
-Message-ID: <20181108224540.GG41183@google.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Fri, 9 Nov 2018 00:26:08 +0100
+Subject: [PATCH net-next v2 0/2] net: phy: replace PHY_HAS_INTERRUPT with a
+ check for config_intr and ack_interrupt
+Message-ID: <a02d084d-291a-dd62-c370-c1a2dec451c7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2018 at 02:09:49PM +0200, Christoph Hellwig wrote:
-> There is no good reason to duplicate the PCI menu in every architecture.
-> Instead provide a selectable HAVE_PCI symbol that indicates availability
-> of PCI support and the handle the rest in drivers/pci.
-> 
-> Note that for powerpc we now select HAVE_PCI globally instead of the
-> convoluted mess of conditional or or non-conditional support per board,
-> similar to what we do e.g. on x86.  For alpha PCI is selected for the
-> non-jensen configs as it was the default before, and a lot of code does
-> not compile without PCI enabled.  On other architectures with limited
-> PCI support that wasn't as complicated I've left the selection as-is.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Flag PHY_HAS_INTERRUPT is used only here for this small check. I think
+using interrupts isn't possible if a driver defines neither
+config_intr nor ack_interrupts callback. So we can replace checking
+flag PHY_HAS_INTERRUPT with checking for these callbacks.
+This allows to remove this flag from all driver configs.
 
-Sounds like Masahiro plans to take this series and I'm fine with that.
-Minor typo below, since it sounds like there's another revision coming.
+v2:
+- add helper for check in patch 1
+- remove PHY_HAS_INTERRUPT from all drivers, not only Realtek
+- remove flag PHY_HAS_INTERRUPT completely
 
-> --- a/drivers/pci/Kconfig
-> +++ b/drivers/pci/Kconfig
-> @@ -3,6 +3,18 @@
->  # PCI configuration
->  #
->  
-> +config HAVE_PCI
-> +	bool
-> +
-> +menuconfig PCI
-> +	bool "PCI support"
-> +	depends on HAVE_PCI
-> +
-> +	help
-> +	  This option enables support for the PCI local bus, including
-> +	  support for PCI-X and the fundations for PCI Express support.
+Heiner Kallweit (2):
+  net: phy: replace PHY_HAS_INTERRUPT with a check for config_intr and ack_interrupt
+  net: phy: realtek: remove flag PHY_HAS_INTERRUPT from driver configs
 
-s/fundations/foundations/
+ drivers/net/phy/amd.c          |  1 -
+ drivers/net/phy/aquantia.c     |  6 ------
+ drivers/net/phy/at803x.c       |  3 ---
+ drivers/net/phy/bcm63xx.c      |  4 ++--
+ drivers/net/phy/bcm87xx.c      |  2 --
+ drivers/net/phy/broadcom.c     | 16 ----------------
+ drivers/net/phy/cicada.c       |  2 --
+ drivers/net/phy/davicom.c      |  4 ----
+ drivers/net/phy/dp83640.c      |  1 -
+ drivers/net/phy/dp83822.c      |  1 -
+ drivers/net/phy/dp83848.c      |  1 -
+ drivers/net/phy/dp83867.c      |  1 -
+ drivers/net/phy/dp83tc811.c    |  1 -
+ drivers/net/phy/icplus.c       |  1 -
+ drivers/net/phy/intel-xway.c   | 10 ----------
+ drivers/net/phy/lxt.c          |  2 --
+ drivers/net/phy/marvell.c      | 15 ---------------
+ drivers/net/phy/meson-gxl.c    |  2 +-
+ drivers/net/phy/micrel.c       | 14 --------------
+ drivers/net/phy/microchip.c    |  1 -
+ drivers/net/phy/microchip_t1.c |  1 -
+ drivers/net/phy/mscc.c         |  6 ------
+ drivers/net/phy/national.c     |  1 -
+ drivers/net/phy/phy_device.c   |  8 ++++++--
+ drivers/net/phy/qsemi.c        |  1 -
+ drivers/net/phy/realtek.c      |  7 -------
+ drivers/net/phy/smsc.c         |  7 +------
+ drivers/net/phy/ste10Xp.c      |  2 --
+ drivers/net/phy/vitesse.c      |  9 ---------
+ include/linux/phy.h            |  5 ++---
+ 30 files changed, 12 insertions(+), 123 deletions(-)
 
-> +	  Say 'Y' here unless you know what you are doing.
-> +
->  source "drivers/pci/pcie/Kconfig"
+-- 
+2.19.1
