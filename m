@@ -1,94 +1,184 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 08 Nov 2018 12:40:11 +0000
-Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
-In-Reply-To: <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
-References: <20181107171031.22573-1-alex.bennee@linaro.org>
- <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
- <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
-Message-ID: <87r2fv68us.fsf@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Nov 2018 13:42:35 +0100
+Subject: [PATCH v4 2/3] arm64: implement live patching
+In-Reply-To: <20181026142152.5F0D868C95@newverein.lst.de>
+References: <20181026142008.D922868C94@newverein.lst.de>
+ <20181026142152.5F0D868C95@newverein.lst.de>
+Message-ID: <CAKv+Gu_D2vzk-sBkufK7JvaPawC+QnpZwkC0+ikTb7A6qko8ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Mark Rutland <mark.rutland@arm.com> writes:
-
-> On Wed, Nov 07, 2018 at 06:01:20PM +0000, Mark Rutland wrote:
->> On Wed, Nov 07, 2018 at 05:10:31PM +0000, Alex Benn?e wrote:
->> > Not all faults handled by handle_exit are instruction emulations. For
->> > example a ESR_ELx_EC_IABT will result in the page tables being updated
->> > but the instruction that triggered the fault hasn't actually executed
->> > yet. We use the simple heuristic of checking for a changed PC before
->> > seeing if kvm_arm_handle_step_debug wants to claim we stepped an
->> > instruction.
->> >
->> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> > ---
->> >  arch/arm64/kvm/handle_exit.c | 4 +++-
->> >  1 file changed, 3 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> > index e5e741bfffe1..b8252e72f882 100644
->> > --- a/arch/arm64/kvm/handle_exit.c
->> > +++ b/arch/arm64/kvm/handle_exit.c
->> > @@ -214,6 +214,7 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->> >  static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> >  {
->> >  	int handled;
->> > +        unsigned long old_pc = *vcpu_pc(vcpu);
->> >
->> >  	/*
->> >  	 * See ARM ARM B1.14.1: "Hyp traps on instructions
->> > @@ -233,7 +234,8 @@ static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> >  	 * kvm_arm_handle_step_debug() sets the exit_reason on the kvm_run
->> >  	 * structure if we need to return to userspace.
->> >  	 */
->> > -	if (handled > 0 && kvm_arm_handle_step_debug(vcpu, run))
->> > +	if (handled > 0 && *vcpu_pc(vcpu) != old_pc &&
->>
->> This doesn't work if the emulation is equivalent to a branch-to-self, so
->> I don't think that we want to do this.
->>
->> When are we failing to advance the single-step state machine
->> correctly?
-
-When the trap is not actually an instruction emulation - e.g. setting up
-the page tables on a fault. Because we are in the act of single-stepping
-an instruction that didn't actually execute we erroneously return to
-userspace pretending we did even though we shouldn't.
-
+On 26 October 2018 at 16:21, Torsten Duwe <duwe@lst.de> wrote:
+> Based on ftrace with regs, do the usual thing.
+> (see Documentation/livepatch/livepatch.txt)
 >
-> I don't understand how this is intended to work currently.
+> Use task flag bit 6 to track patch transisiton state for the consistency
+> model. Add it to the work mask so it gets cleared on all kernel exits to
+> userland.
 >
-> Surely kvm_skip_instr() should advance the state machine as necessary,
-> so that we can rely on the HW to generate any necessary single-step
-> exception when we next return to the guest?
-
-It doesn't currently (at least for aarch64, the aarch32 skip code does
-more messing about). But the decision isn't really about futzing with
-the single-step flags but about returning to userspace so the
-single-step is seen. Changing a > 0 to return to the guest to a 0 to
-exit to userspace while setting the exit reason.
+> Tell livepatch regs->pc is the place to change the return address.
+> Make sure the graph tracer call hook is only called on the final function
+> entry in case regs->pc gets modified after an interception.
 >
-> ... and if userspace decides to emulate something, it's up to it to
-> advance the state machine consistently.
-
-Well that's a little more complex. We actually exit to handle the MMIO
-stuff and then return so it can complete before exiting again for the
-step (see virt/kvm/arm/arm.c):
-
-	if (run->exit_reason == KVM_EXIT_MMIO) {
-		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
-		if (ret)
-			return ret;
-		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
-			return 0;
-	}
-
-
+> Signed-off-by: Torsten Duwe <duwe@suse.de>
 >
-> Thanks,
-> Mark.
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -120,6 +120,7 @@ config ARM64
+>         select HAVE_GENERIC_DMA_COHERENT
+>         select HAVE_HW_BREAKPOINT if PERF_EVENTS
+>         select HAVE_IRQ_TIME_ACCOUNTING
+> +       select HAVE_LIVEPATCH
+>         select HAVE_MEMBLOCK
+>         select HAVE_MEMBLOCK_NODE_MAP if NUMA
+>         select HAVE_NMI
+> @@ -1350,4 +1351,6 @@ if CRYPTO
+>  source "arch/arm64/crypto/Kconfig"
+>  endif
+>
+> +source "kernel/livepatch/Kconfig"
+> +
+>  source "lib/Kconfig"
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -76,6 +76,7 @@ void arch_release_task_struct(struct tas
+>  #define TIF_FOREIGN_FPSTATE    3       /* CPU's FP state is not current's */
+>  #define TIF_UPROBE             4       /* uprobe breakpoint or singlestep */
+>  #define TIF_FSCHECK            5       /* Check FS is USER_DS on return */
+> +#define TIF_PATCH_PENDING      6
+>  #define TIF_NOHZ               7
+>  #define TIF_SYSCALL_TRACE      8
+>  #define TIF_SYSCALL_AUDIT      9
+> @@ -94,6 +95,7 @@ void arch_release_task_struct(struct tas
+>  #define _TIF_NEED_RESCHED      (1 << TIF_NEED_RESCHED)
+>  #define _TIF_NOTIFY_RESUME     (1 << TIF_NOTIFY_RESUME)
+>  #define _TIF_FOREIGN_FPSTATE   (1 << TIF_FOREIGN_FPSTATE)
+> +#define _TIF_PATCH_PENDING     (1 << TIF_PATCH_PENDING)
+>  #define _TIF_NOHZ              (1 << TIF_NOHZ)
+>  #define _TIF_SYSCALL_TRACE     (1 << TIF_SYSCALL_TRACE)
+>  #define _TIF_SYSCALL_AUDIT     (1 << TIF_SYSCALL_AUDIT)
+> @@ -106,7 +108,8 @@ void arch_release_task_struct(struct tas
+>
+>  #define _TIF_WORK_MASK         (_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+>                                  _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
+> -                                _TIF_UPROBE | _TIF_FSCHECK)
+> +                                _TIF_UPROBE | _TIF_FSCHECK | \
+> +                                _TIF_PATCH_PENDING)
+>
+>  #define _TIF_SYSCALL_WORK      (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+>                                  _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/livepatch.h
+> @@ -0,0 +1,35 @@
+> +/* SPDX-License-Identifier: GPL-2.0
+> + *
+> + * livepatch.h - arm64-specific Kernel Live Patching Core
+> + *
+> + * Copyright (C) 2016,2018 SUSE
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef _ASM_ARM64_LIVEPATCH_H
+> +#define _ASM_ARM64_LIVEPATCH_H
+> +
+> +#include <asm/ptrace.h>
+> +
+> +static inline int klp_check_compiler_support(void)
+> +{
+> +       return 0;
+> +}
+> +
+> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
+> +{
+> +       regs->pc = ip;
+> +}
+> +
+> +#endif /* _ASM_ARM64_LIVEPATCH_H */
+> --- a/arch/arm64/kernel/entry-ftrace.S
+> +++ b/arch/arm64/kernel/entry-ftrace.S
+> @@ -226,6 +226,7 @@ ftrace_common:
+>
+>         /* The program counter just after the ftrace call site */
+>         str     lr, [x9, #S_PC]
+> +
+>         /* The stack pointer as it was on ftrace_caller entry... */
+>         add     x28, fp, #16
+>         str     x28, [x9, #S_SP]
 
+Please drop this hunk
 
---
-Alex Benn?e
+> @@ -233,6 +234,10 @@ ftrace_common:
+>         ldr     x28, [fp, 8]
+>         str     x28, [x9, #S_LR]        /* to pt_regs.r[30] */
+>
+> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
+> +       mov     x28, lr         /* remember old return address */
+> +#endif
+> +
+>         ldr_l   x2, function_trace_op, x0
+>         ldr     x1, [fp, #8]
+>         sub     x0, lr, #8      /* function entry == IP */
+> @@ -245,6 +250,17 @@ ftrace_call:
+>
+>         bl      ftrace_stub
+>
+> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
+> +       /* Is the trace function a live patcher an has messed with
+> +        * the return address?
+> +        */
+> +       add     x9, sp, #16     /* advance to pt_regs for restore */
+> +       ldr     x0, [x9, #S_PC]
+> +       cmp     x0, x28         /* compare with the value we remembered */
+> +       /* to not call graph tracer's "call" mechanism twice! */
+> +       b.ne    ftrace_common_return
+
+Is ftrace_common_return guaranteed to be in range? Conditional
+branches have only -/+ 1 MB range IIRC.
+
+Better to do
+
+b.eq ftrace_graph_call
+b   ftrace_common_return
+
+to be sure
+
+> +#endif
+> +
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+
+Can we fold these #ifdef blocks together (i.e, incorporate the
+conditional livepatch sequence here)
+
+>         .global ftrace_graph_call
+>  ftrace_graph_call:                     // ftrace_graph_caller();
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/sizes.h>
+>  #include <linux/string.h>
+>  #include <linux/tracehook.h>
+> +#include <linux/livepatch.h>
+>  #include <linux/ratelimit.h>
+>  #include <linux/syscalls.h>
+>
+> @@ -934,6 +935,9 @@ asmlinkage void do_notify_resume(struct
+>                         if (thread_flags & _TIF_UPROBE)
+>                                 uprobe_notify_resume(regs);
+>
+> +                       if (thread_flags & _TIF_PATCH_PENDING)
+> +                               klp_update_patch_state(current);
+> +
+>                         if (thread_flags & _TIF_SIGPENDING)
+>                                 do_signal(regs);
+>
