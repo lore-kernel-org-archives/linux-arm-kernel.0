@@ -1,98 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Nov 2018 12:52:20 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add I2C-DVFS device
- node
-In-Reply-To: <CAMuHMdW=f77EafYXSzD3BiuMLirm+gjMnQZ7WzE0kX-TjXwkdg@mail.gmail.com>
-References: <1540071349-27483-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdV=ZinKOWZco9t4rGncYY5BqghXxGE6w9qCNW55UVSa+A@mail.gmail.com>
- <20181107123002.t6xg4m4vbq7cuapb@verge.net.au>
- <20181108102201.kuheale47tqygoe4@verge.net.au>
- <CAMuHMdW=f77EafYXSzD3BiuMLirm+gjMnQZ7WzE0kX-TjXwkdg@mail.gmail.com>
-Message-ID: <20181108115219.47lf5iauoygomdbh@verge.net.au>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 8 Nov 2018 11:57:27 +0000
+Subject: [PATCH 1/7] arm64: Add static check for pt_regs alignment
+In-Reply-To: <20181108101633.fseoda3dcizrfqrp@salmiak>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-2-git-send-email-julien.thierry@arm.com>
+ <20181107215834.GB12248@brain-police>
+ <20181108101633.fseoda3dcizrfqrp@salmiak>
+Message-ID: <1d848166-66cf-f8c9-4f0b-8bf88c2d96d7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 11:27:31AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+
+
+On 08/11/18 10:16, Mark Rutland wrote:
+> On Wed, Nov 07, 2018 at 09:58:35PM +0000, Will Deacon wrote:
+>> On Wed, Sep 26, 2018 at 02:56:18PM +0100, Julien Thierry wrote:
+>>> The pt_regs structure's size is required to be a multiple of 16 to maintain
+>>> the stack alignment upon kernel entries.
+>>>
+>>> Add a static check to ensure this is the case.
+>>>
+>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>> ---
+>>>   arch/arm64/include/asm/ptrace.h | 2 ++
+>>>   1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+>>> index 177b851..cc17fad 100644
+>>> --- a/arch/arm64/include/asm/ptrace.h
+>>> +++ b/arch/arm64/include/asm/ptrace.h
+>>> @@ -229,6 +229,8 @@ static inline u64 regs_get_register(struct pt_regs *regs, unsigned int offset)
+>>>   
+>>>   	WARN_ON(offset & 7);
+>>>   
+>>> +	BUILD_BUG_ON((sizeof (struct pt_regs) % 16 != 0));
+>>
+>> This seems like a fairly random place to put this, and given that it's not
+>> dependent on context I reckon it would be better to put it in a C file
+>> rather than in a header that gets included multiple times. I still couldn't
+>> really find a good place though :/
 > 
-> On Thu, Nov 8, 2018 at 11:22 AM Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Nov 07, 2018 at 01:30:10PM +0100, Simon Horman wrote:
-> > > On Mon, Nov 05, 2018 at 09:52:48AM +0100, Geert Uytterhoeven wrote:
-> > > > On Sat, Oct 20, 2018 at 11:35 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > > > > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > >
-> > > > > This patch adds I2C-DVFS device node for the R8A77990 SoC.
-> > > > >
-> > > > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> > > >
-> > > > Thanks for your patch!
-> > > >
-> > > > > --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-> > > > > +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+> Perhaps asm-offsets.c, when we define S_FRAME_SIZE?
 > 
-> > > > >         };
-> > > > >
-> > > > >         cpus {
-> > > > > @@ -337,6 +338,22 @@
-> > > > >                         reg = <0 0xe6060000 0 0x508>;
-> > > > >                 };
-> > > > >
-> > > > > +               i2c_dvfs: i2c at e60b0000 {
-> > > > > +                       #address-cells = <1>;
-> > > > > +                       #size-cells = <0>;
-> > > > > +                       compatible = "renesas,iic-r8a77990",
-> > > >
-> > > > "renesas,iic-r8a77990" is not yet documented.
-> > >
-> > > Thanks, as per my comment below I wonder if as well as documenting
-> > > "renesas,iic-r8a77990" we also to teach the driver about it.
-> > >
-> > > >
-> > > > > +                                    "renesas,rcar-gen3-iic",
-> > > > > +                                    "renesas,rmobile-iic";
-> > > >
-> > > > Also, IIC on R-Car E3 does not have the automatic transmission registers.
-> > > > Does this affect claiming compatibility with the family-specific or generic
-> > > > compatible values?
-> > >
-> > > My cursory reading of the driver indicates that only register that is
-> > > used by it but documented as not existing on E3 is ICSTART (offset 0x70).
-> > >
-> > > It seems to me that we should confirm with Renesas that the register does
-> > > indeed not exist - as this patch comes from the BSP which implies it is
-> > > being used there. And if it does not exist we should try teaching the
-> > > driver not to use ICSTART via the "renesas,iic-r8a77990" compat string.
-> > > What do you think?
-> >
-> > Further examination by Wolfram Sang has shown that the code in question is
-> > only used on the r8a7740. I don't think there is any compatibility issue
-> > for r8a77990 when using the current driver.
-> 
-> "When using the current driver".
-> Do we want to claim compatibility with "renesas,rcar-gen3-iic" and/or
-> "renesas,rmobile-iic"?
 
-Thinking a bit more since I wrote my previous email.
+That sounds like a good option to me. If Will thinks so as well I'll 
+move that in asm-offsets.c.
 
-It seems that the r8a77990 has a different feature set to other R-Car Gen3
-SoCs but that the current driver implementation "renesas,rcar-gen3-iic"
-and "renesas,rmobile-iic" do not exceed that feature set.
+Thanks,
 
-In future we could expand the features supported by the driver for other
-Gen3 SoCs beyond what is supported for r8a77990. If we chose to describe
-r8a77990 as compatible with renesas,rcar-gen3-iic then that implies those
-new features would not be activated by matching on "renesas,rcar-gen3-iic",
-though we could choose to control that using soc_match. Conversely if we
-decide that r8a77990 is not compatible with renesas,rcar-gen3-iic then we
-have more freedom to move with regards to adding features not supported by
-r8a77990 to renesas,rcar-gen3-iic in future.
-
-So perhaps it would be wise to be conservative and, for now,
-not document r8a77990 as being compatible with renesas,iic-r8a77990.
-
-I'm tempted to say that renesas,rmobile-iic is a lowest common denominator
-and r8a77990 can be documented as being compatible with it. But we could
-say the same of renesas,rcar-gen3-iic.
-
-What do you think?
+-- 
+Julien Thierry
