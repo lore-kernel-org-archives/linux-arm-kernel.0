@@ -1,95 +1,43 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu,  8 Nov 2018 15:36:15 +0100
-Subject: [PATCH v8 8/8] selftests,
- arm64: add a selftest for passing tagged pointers to kernel
-In-Reply-To: <cover.1541687720.git.andreyknvl@google.com>
-References: <cover.1541687720.git.andreyknvl@google.com>
-Message-ID: <08e86fb73c3f0aeb60888939e34b0c0fa69063b5.1541687720.git.andreyknvl@google.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 8 Nov 2018 14:38:43 +0000
+Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
+In-Reply-To: <87pnvf63u2.fsf@linaro.org>
+References: <20181107171031.22573-1-alex.bennee@linaro.org>
+ <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
+ <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
+ <87r2fv68us.fsf@linaro.org>
+ <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
+ <87pnvf63u2.fsf@linaro.org>
+Message-ID: <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a simple test, that calls the uname syscall with a
-tagged user pointer as an argument. Without the kernel accepting tagged
-user pointers the test fails with EFAULT.
+On 8 November 2018 at 14:28, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>
+> Mark Rutland <mark.rutland@arm.com> writes:
+>> One problem is that I couldn't spot when we advance the PC for an MMIO
+>> trap. I presume we do that in the kernel, *after* the MMIO trap, but I
+>> can't see where that happens.
+>
+> Nope it gets done before during decode_hsr in mmio.c:
+>
+>         /*
+>          * The MMIO instruction is emulated and should not be re-executed
+>          * in the guest.
+>          */
+>         kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- tools/testing/selftests/arm64/.gitignore      |  1 +
- tools/testing/selftests/arm64/Makefile        | 11 +++++++++++
- .../testing/selftests/arm64/run_tags_test.sh  | 12 ++++++++++++
- tools/testing/selftests/arm64/tags_test.c     | 19 +++++++++++++++++++
- 4 files changed, 43 insertions(+)
- create mode 100644 tools/testing/selftests/arm64/.gitignore
- create mode 100644 tools/testing/selftests/arm64/Makefile
- create mode 100755 tools/testing/selftests/arm64/run_tags_test.sh
- create mode 100644 tools/testing/selftests/arm64/tags_test.c
+I think that this attempt to do the PC-advance early is
+probably an underlying problem that is not helping the
+code structure here.
 
-diff --git a/tools/testing/selftests/arm64/.gitignore b/tools/testing/selftests/arm64/.gitignore
-new file mode 100644
-index 000000000000..e8fae8d61ed6
---- /dev/null
-+++ b/tools/testing/selftests/arm64/.gitignore
-@@ -0,0 +1 @@
-+tags_test
-diff --git a/tools/testing/selftests/arm64/Makefile b/tools/testing/selftests/arm64/Makefile
-new file mode 100644
-index 000000000000..a61b2e743e99
---- /dev/null
-+++ b/tools/testing/selftests/arm64/Makefile
-@@ -0,0 +1,11 @@
-+# SPDX-License-Identifier: GPL-2.0
-+
-+# ARCH can be overridden by the user for cross compiling
-+ARCH ?= $(shell uname -m 2>/dev/null || echo not)
-+
-+ifneq (,$(filter $(ARCH),aarch64 arm64))
-+TEST_GEN_PROGS := tags_test
-+TEST_PROGS := run_tags_test.sh
-+endif
-+
-+include ../lib.mk
-diff --git a/tools/testing/selftests/arm64/run_tags_test.sh b/tools/testing/selftests/arm64/run_tags_test.sh
-new file mode 100755
-index 000000000000..745f11379930
---- /dev/null
-+++ b/tools/testing/selftests/arm64/run_tags_test.sh
-@@ -0,0 +1,12 @@
-+#!/bin/sh
-+# SPDX-License-Identifier: GPL-2.0
-+
-+echo "--------------------"
-+echo "running tags test"
-+echo "--------------------"
-+./tags_test
-+if [ $? -ne 0 ]; then
-+	echo "[FAIL]"
-+else
-+	echo "[PASS]"
-+fi
-diff --git a/tools/testing/selftests/arm64/tags_test.c b/tools/testing/selftests/arm64/tags_test.c
-new file mode 100644
-index 000000000000..1452ed7d33f9
---- /dev/null
-+++ b/tools/testing/selftests/arm64/tags_test.c
-@@ -0,0 +1,19 @@
-+// SPDX-License-Identifier: GPL-2.0
-+
-+#include <stdio.h>
-+#include <unistd.h>
-+#include <stdint.h>
-+#include <sys/utsname.h>
-+
-+#define SHIFT_TAG(tag)		((uint64_t)(tag) << 56)
-+#define SET_TAG(ptr, tag)	(((uint64_t)(ptr) & ~SHIFT_TAG(0xff)) | \
-+					SHIFT_TAG(tag))
-+
-+int main(void)
-+{
-+	struct utsname utsname;
-+	void *ptr = &utsname;
-+	void *tagged_ptr = (void *)SET_TAG(ptr, 0x42);
-+	int err = uname(tagged_ptr);
-+	return err;
-+}
--- 
-2.19.1.930.g4563a0d9d0-goog
+An enhancement that's been floated previously is that the
+MMIO emulation in userspace should be able to report back
+to KVM "nope, that access should generate a guest synchronous
+external abort (with ESR_EL1.EA = 0/1)".
+If we have that, then we definitely need to not advance the
+PC until after userspace has done the emulation and told
+us whether the memory access succeeded or not...
+
+thanks
+-- PMM
