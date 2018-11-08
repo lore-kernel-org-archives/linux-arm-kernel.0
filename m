@@ -1,252 +1,83 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 8 Nov 2018 11:26:02 +0000
-Subject: [PATCH 08/10] irqchip/gic-v3-its: Decouple its initialization
- from gic
-In-Reply-To: <20181107220254.6116-9-rrichter@cavium.com>
-References: <20181107220254.6116-1-rrichter@cavium.com>
- <20181107220254.6116-9-rrichter@cavium.com>
-Message-ID: <21a0183b-bf4b-1895-d10b-8287dbff930a@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 8 Nov 2018 16:56:47 +0530
+Subject: [PATCH 2/2] arm64: dts: ti: k3-am65: Add pinctrl regions
+In-Reply-To: <20181108112647.7205-1-vigneshr@ti.com>
+References: <20181108112647.7205-1-vigneshr@ti.com>
+Message-ID: <20181108112647.7205-3-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Tero Kristo <t-kristo@ti.com>
 
+Add pinctrl regions for the main and wkup mmr.
 
-On 07/11/18 22:03, Robert Richter wrote:
-> This patch separates its initialization from the gic. Probing and
-> initialization of its nodes is separate now. There is an own cpu
-> notifier for its now.
-> 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->   drivers/irqchip/irq-gic-v3-its.c   | 58 +++++++++++++++++++++++++-------------
->   drivers/irqchip/irq-gic-v3.c       | 14 ++++-----
->   include/linux/cpuhotplug.h         |  1 +
->   include/linux/irqchip/arm-gic-v3.h |  2 +-
->   4 files changed, 48 insertions(+), 27 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index c28f4158ff70..fd8561fcfdf3 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -167,6 +167,7 @@ static struct {
->   } vpe_proxy;
->   
->   static LIST_HEAD(its_nodes);
-> +static LIST_HEAD(its_probed);
->   static DEFINE_RAW_SPINLOCK(its_lock);
->   static struct rdists *gic_rdists;
->   static struct irq_domain *its_parent;
-> @@ -3482,20 +3483,13 @@ static int __init its_compute_its_list_map(struct its_node *its)
->   
->   static void its_free(struct its_node *its)
->   {
-> -	raw_spin_lock(&its_lock);
-> -	list_del(&its->entry);
-> -	raw_spin_unlock(&its_lock);
-> -
->   	kfree(its);
->   }
->   
-> -static int __init its_init_one(struct its_node *its);
-> -
->   static int __init its_probe_one(struct resource *res,
->   				struct fwnode_handle *handle, int numa_node)
->   {
->   	struct its_node *its;
-> -	int err;
->   
->   	its = kzalloc(sizeof(*its), GFP_KERNEL);
->   	if (!its)
-> @@ -3510,16 +3504,12 @@ static int __init its_probe_one(struct resource *res,
->   	its->numa_node = numa_node;
->   
->   	raw_spin_lock(&its_lock);
-> -	list_add_tail(&its->entry, &its_nodes);
-> +	list_add_tail(&its->entry, &its_probed);
->   	raw_spin_unlock(&its_lock);
->   
->   	pr_info("ITS %pR\n", res);
->   
-> -	err = its_init_one(its);
-> -	if (err)
-> -		its_free(its);
-> -
-> -	return err;
-> +	return 0;
->   }
->   
->   static int __init its_init_one(struct its_node *its)
-> @@ -3717,7 +3707,7 @@ static int redist_disable_lpis(void)
->   	return 0;
->   }
->   
-> -int its_cpu_init(void)
-> +static int its_cpu_init(unsigned int cpu)
->   {
->   	if (!list_empty(&its_nodes)) {
->   		int ret;
-> @@ -3913,8 +3903,6 @@ static void __init its_acpi_probe(void)
->   static void __init its_acpi_probe(void) { }
->   #endif
->   
-> -static int __init its_init(void);
-> -
->   int __init its_probe(struct fwnode_handle *handle, struct rdists *rdists,
->   		     struct irq_domain *parent_domain)
->   {
-> @@ -3929,23 +3917,51 @@ int __init its_probe(struct fwnode_handle *handle, struct rdists *rdists,
->   
->   	gic_rdists = rdists;
->   
-> -	return its_init();
-> +	return 0;
->   }
->   
-> -static int __init its_init(void)
-> +int __init its_init(void)
->   {
->   	struct its_node *its;
->   	bool has_v4 = false;
->   	int err;
->   
-> +	if (list_empty(&its_probed))
-> +		return 0;
-> +
-> +	raw_spin_lock(&its_lock);
-> +redo:
-> +	list_for_each_entry(its, &its_probed, entry) {
-> +		list_del_init(&its->entry);
-> +
-> +		raw_spin_unlock(&its_lock);
-> +
-> +		/* Needs to be called in non-atomic context */
-> +		err = its_init_one(its);
-> +		if (err)
-> +			its_free(its);
-> +
-> +		raw_spin_lock(&its_lock);
-> +
-> +		if (!err)
-> +			list_add_tail(&its->entry, &its_nodes);
-> +
-> +		goto redo;
+The range for main pinctrl region contains a gap
+at offset 0x2e4, and because of this, the pinctrl
+range is split into two sections.
 
-Again, you're starting a loop only to work on the first element and then 
-restarting the loop.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi   | 16 ++++++++++++++++
+ arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi |  8 ++++++++
+ arch/arm64/boot/dts/ti/k3-am65.dtsi        |  1 +
+ 3 files changed, 25 insertions(+)
 
-Just do a while (!list_empty()), and without gotos...
-
-> +	}
-> +
-> +	raw_spin_unlock(&its_lock);
-> +
->   	if (list_empty(&its_nodes)) {
->   		pr_warn("ITS: No ITS available, not enabling LPIs\n");
->   		return -ENXIO;
->   	}
->   
->   	err = allocate_lpi_tables();
-> -	if (err)
-> +	if (err) {
-> +		pr_warn("ITS: Failed to initialize (%d), not enabling LPIs\n",
-> +			err);
->   		return err;
-> +	}
->   
->   	list_for_each_entry(its, &its_nodes, entry)
->   		has_v4 |= its->is_v4;
-> @@ -3960,5 +3976,9 @@ static int __init its_init(void)
->   
->   	register_syscore_ops(&its_syscore_ops);
->   
-> +	cpuhp_setup_state(CPUHP_AP_IRQ_GIC_ITS_STARTING,
-> +			"irqchip/arm/gicv3-its:starting",
-> +			its_cpu_init, NULL);
-> +
->   	return 0;
->   }
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index e04108b7c6b7..d2942efdb6d5 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -685,9 +685,6 @@ static int gic_starting_cpu(unsigned int cpu)
->   {
->   	gic_cpu_init();
->   
-> -	if (gic_dist_supports_lpis())
-> -		its_cpu_init();
-> -
->   	return 0;
->   }
->   
-> @@ -815,7 +812,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->   #else
->   #define gic_set_affinity	NULL
->   #define gic_smp_init()		do { } while(0)
-> -#endif
-> +#endif	/* CONFIG_SMP */
->   
->   #ifdef CONFIG_CPU_PM
->   /* Check whether it's single security state view */
-> @@ -1131,10 +1128,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
->   	gic_cpu_init();
->   	gic_cpu_pm_init();
->   
-> -	if (gic_dist_supports_lpis()) {
-> +	if (gic_dist_supports_lpis())
->   		its_probe(handle, &gic_data.rdists, gic_data.domain);
-> -		its_cpu_init();
-> -	}
->   
->   	return 0;
->   
-> @@ -1327,6 +1322,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
->   
->   	if (static_branch_likely(&supports_deactivate_key))
->   		gic_of_setup_kvm_info(node);
-> +
-> +	its_init();
-> +
->   	return 0;
->   
->   out_unmap_rdist:
-> @@ -1630,6 +1628,8 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
->   	if (static_branch_likely(&supports_deactivate_key))
->   		gic_acpi_setup_kvm_info();
->   
-> +	its_init();
-> +
->   	return 0;
->   
->   out_fwhandle_free:
-> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-> index e0cd2baa8380..584f73585142 100644
-> --- a/include/linux/cpuhotplug.h
-> +++ b/include/linux/cpuhotplug.h
-> @@ -96,6 +96,7 @@ enum cpuhp_state {
->   	CPUHP_AP_SCHED_STARTING,
->   	CPUHP_AP_RCUTREE_DYING,
->   	CPUHP_AP_IRQ_GIC_STARTING,
-> +	CPUHP_AP_IRQ_GIC_ITS_STARTING,
->   	CPUHP_AP_IRQ_HIP04_STARTING,
->   	CPUHP_AP_IRQ_ARMADA_XP_STARTING,
->   	CPUHP_AP_IRQ_BCM2836_STARTING,
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index a6fdb2910f73..f4348fa4260a 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -602,9 +602,9 @@ struct rdists {
->   
->   struct irq_domain;
->   struct fwnode_handle;
-> -int its_cpu_init(void);
->   int its_probe(struct fwnode_handle *handle, struct rdists *rdists,
->   	      struct irq_domain *domain);
-> +int its_init(void);
->   int mbi_init(struct fwnode_handle *fwnode, struct irq_domain *parent);
->   
->   static inline bool gic_enable_sre(void)
-> 
-
+diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+index adcd6341e40c..f7c2a60d5c80 100644
+--- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+@@ -69,4 +69,20 @@
+ 		clock-frequency = <48000000>;
+ 		current-speed = <115200>;
+ 	};
++
++	main_pmx0: pinmux at 11c000 {
++		compatible = "pinctrl-single";
++		reg = <0x0 0x11c000 0x0 0x2e4>;
++		#pinctrl-cells = <1>;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0xffffffff>;
++	};
++
++	main_pmx1: pinmux at 11c2e8 {
++		compatible = "pinctrl-single";
++		reg = <0x0 0x11c2e8 0x0 0x24>;
++		#pinctrl-cells = <1>;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0xffffffff>;
++	};
+ };
+diff --git a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+index 8d7b47f9dfbf..19b46f40789b 100644
+--- a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+@@ -34,6 +34,14 @@
+ 		};
+ 	};
+ 
++	wkup_pmx0: pinmux at 4301c000 {
++		compatible = "pinctrl-single";
++		reg = <0x4301c000 0x118>;
++		#pinctrl-cells = <1>;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0xffffffff>;
++	};
++
+ 	wkup_uart0: serial at 42300000 {
+ 		compatible = "ti,am654-uart";
+ 		reg = <0x42300000 0x100>;
+diff --git a/arch/arm64/boot/dts/ti/k3-am65.dtsi b/arch/arm64/boot/dts/ti/k3-am65.dtsi
+index 3d4bf369d030..873dca1d0813 100644
+--- a/arch/arm64/boot/dts/ti/k3-am65.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am65.dtsi
+@@ -8,6 +8,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/k3-am65.h>
+ 
+ / {
+ 	model = "Texas Instruments K3 AM654 SoC";
 -- 
-Julien Thierry
+2.19.1
