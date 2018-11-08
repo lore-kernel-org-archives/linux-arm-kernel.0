@@ -1,58 +1,33 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu,  8 Nov 2018 20:41:28 +0100
-Subject: [PATCH] locking/atomics: Fix out-of-tree build
-Message-ID: <20181108194128.13368-1-bp@alien8.de>
+From: christianshewitt@gmail.com (Christian Hewitt)
+Date: Thu,  8 Nov 2018 23:43:50 +0400
+Subject: [PATCH v3 0/3] ARM64: dts: meson-gxl: Add dts and bindings for
+ Smartlabs SML-5442TW
+In-Reply-To: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
+References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
+Message-ID: <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Borislav Petkov <bp@suse.de>
+This series adds new bindings and a device-tree file for the Smartlabs
+SML-5442TW set-top box.
 
-Building a kernel out of tree with:
+v3 - change to Smartlabs LLC
+   - removed sound node
+v2 - removed audio nodes
+   - changes soundcard name to "meson-gx-audio"
+   - added missing uart-has-rtscts;
 
-  make O=/tmp/b oldconfig
-  cd /tmp/b
-  make
+Christian Hewitt (3):
+  dt-bindings: Add vendor prefix for Smartlabs LLC
+  dt-bindings: arm: amlogic: Add support for the Smartlabs SML-5442TW
+  ARM64: dts: meson-gxl: Add support for the Smartlabs SML-5442TW
 
-gives this:
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+ .../boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts | 292 +++++++++++++++++++++
+ 4 files changed, 295 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts
 
-  CALL    /mnt/kernel/kernel/linux/scripts/atomic/check-atomics.sh
-/bin/bash: scripts/atomic/check-atomics.sh: No such file or directory
-make[3]: *** [/mnt/kernel/kernel/linux/./Kbuild:86: old-atomics] Error 127
-make[3]: *** Waiting for unfinished jobs....
-
-Make the command use the proper build prerequisite which is the absolute
-path to the script.
-
-Fixes: 8d32588077bd ("locking/atomics: Check generated headers are up-to-date")
-Signed-off-by: Borislav Petkov <bp@suse.de>
-Cc: arnd at arndb.de
-Cc: aryabinin at virtuozzo.com
-Cc: Boqun Feng <boqun.feng@gmail.com>
-Cc: catalin.marinas at arm.com
-Cc: dvyukov at google.com
-Cc: glider at google.com
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxdrivers at attotech.com
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Zijlstra (Intel) <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- Kbuild | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/Kbuild b/Kbuild
-index 47c9fe175bd9..780048056ac5 100644
---- a/Kbuild
-+++ b/Kbuild
-@@ -80,7 +80,7 @@ always += old-atomics
- targets += old-atomics
- 
- quiet_cmd_atomics = CALL    $<
--      cmd_atomics = $(CONFIG_SHELL) scripts/atomic/check-atomics.sh
-+      cmd_atomics = $(CONFIG_SHELL) $<
- 
- old-atomics: scripts/atomic/check-atomics.sh FORCE
- 	$(call cmd,atomics)
 -- 
-2.19.1
+2.7.4
