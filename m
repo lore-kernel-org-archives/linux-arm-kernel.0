@@ -1,230 +1,282 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 8 Nov 2018 21:10:54 +0100
-Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
- erratum 1165522
-In-Reply-To: <ec7d0e34-022f-125e-00b4-b06be23ee2a8@arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-5-marc.zyngier@arm.com>
- <20181106081546.GH12057@e113682-lin.lund.arm.com>
- <ec7d0e34-022f-125e-00b4-b06be23ee2a8@arm.com>
-Message-ID: <20181108201054.GG3835@e113682-lin.lund.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 8 Nov 2018 13:48:27 -0700
+Subject: [PATCH v4] perf: Support for Arm A32/T32 instruction sets in
+ CoreSight trace
+In-Reply-To: <1541588652-17380-1-git-send-email-robert.walker@arm.com>
+References: <1541588652-17380-1-git-send-email-robert.walker@arm.com>
+Message-ID: <20181108204827.GA19009@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 06:05:55PM +0000, Marc Zyngier wrote:
-> On 06/11/18 08:15, Christoffer Dall wrote:
-> > On Mon, Nov 05, 2018 at 02:36:16PM +0000, Marc Zyngier wrote:
-> >> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
-> >> speculate an AT instruction in during a guest switch while the
-> >> S1/S2 system registers are in an inconsistent state.
-> >>
-> >> Work around it by:
-> >> - Mandating VHE
-> >> - Make sure that S1 and S2 system registers are consistent before
-> >>   clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
-> >>   regime
-> >>
-> >> These two things together ensure that we cannot hit this erratum.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  Documentation/arm64/silicon-errata.txt |  1 +
-> >>  arch/arm64/Kconfig                     | 12 ++++++++++++
-> >>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
-> >>  arch/arm64/include/asm/kvm_host.h      |  3 +++
-> >>  arch/arm64/include/asm/kvm_hyp.h       |  6 ++++++
-> >>  arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
-> >>  arch/arm64/kvm/hyp/switch.c            | 14 ++++++++++++++
-> >>  7 files changed, 46 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> >> index 76ccded8b74c..04f0bc4690c6 100644
-> >> --- a/Documentation/arm64/silicon-errata.txt
-> >> +++ b/Documentation/arm64/silicon-errata.txt
-> >> @@ -57,6 +57,7 @@ stable kernels.
-> >>  | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
-> >>  | ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
-> >>  | ARM            | Cortex-A76      | #1188873        | ARM64_ERRATUM_1188873       |
-> >> +| ARM            | Cortex-A76      | #1165522        | ARM64_ERRATUM_1165522       |
-> >>  | ARM            | MMU-500         | #841119,#826419 | N/A                         |
-> >>  |                |                 |                 |                             |
-> >>  | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >> index 787d7850e064..a68bc6cc2167 100644
-> >> --- a/arch/arm64/Kconfig
-> >> +++ b/arch/arm64/Kconfig
-> >> @@ -497,6 +497,18 @@ config ARM64_ERRATUM_1188873
-> >>  
-> >>  	  If unsure, say Y.
-> >>  
-> >> +config ARM64_ERRATUM_1165522
-> >> +	bool "Cortex-A76: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
-> >> +	default y
-> >> +	help
-> >> +	  This option adds work arounds for ARM Cortex-A76 erratum 1165522
-> >> +
-> >> +	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could end-up with
-> >> +	  corrupted TLBs by speculating an AT instruction during a guest
-> >> +	  context switch.
-> >> +
-> >> +	  If unsure, say Y.
-> >> +
-> >>  config CAVIUM_ERRATUM_22375
-> >>  	bool "Cavium erratum 22375, 24313"
-> >>  	default y
-> >> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> >> index 6e2d254c09eb..62d8cd15fdf2 100644
-> >> --- a/arch/arm64/include/asm/cpucaps.h
-> >> +++ b/arch/arm64/include/asm/cpucaps.h
-> >> @@ -54,7 +54,8 @@
-> >>  #define ARM64_HAS_CRC32				33
-> >>  #define ARM64_SSBS				34
-> >>  #define ARM64_WORKAROUND_1188873		35
-> >> +#define ARM64_WORKAROUND_1165522		36
-> >>  
-> >> -#define ARM64_NCAPS				36
-> >> +#define ARM64_NCAPS				37
-> >>  
-> >>  #endif /* __ASM_CPUCAPS_H */
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index 7d6e974d024a..8f486026ac87 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -435,6 +435,9 @@ static inline bool kvm_arch_sve_requires_vhe(void)
-> >>  static inline bool kvm_arch_impl_requires_vhe(void)
-> >>  {
-> >>  	/* Some implementations have defects that confine them to VHE */
-> >> +	if (cpus_have_cap(ARM64_WORKAROUND_1165522))
-> >> +		return true;
-> >> +
-> >>  	return false;
-> >>  }
-> >>  
-> >> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> >> index 23aca66767f9..9681360d0959 100644
-> >> --- a/arch/arm64/include/asm/kvm_hyp.h
-> >> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> >> @@ -163,6 +163,12 @@ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
-> >>  {
-> >>  	write_sysreg(kvm->arch.vtcr, vtcr_el2);
-> >>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> >> +
-> >> +	/*
-> >> +	 * ARM erratum 1165522 requires the actual execution of the
-> >> +	 * above before we can switch to the guest translation regime.
-> >> +	 */
-> > 
-> > Is it about a guest translation 'regime' or should this just say before
-> > we can enable stage 2 translation?
-> 
-> No, this isn't strictly about enabling stage-2 translation. This is
-> about making sure that anything that impacts the guest translations is
-> actually executed.
-> 
-> I wonder if it would be clearer to move this outside of
-> __load_guest_stage2 and make it explicit in the callers of this helper...
+Hi Robert,
 
-I think it makes sense to have this here to explain the alternative.
+On Wed, Nov 07, 2018 at 11:04:12AM +0000, Robert Walker wrote:
+> This patch adds support for generating instruction samples from trace of
+> AArch32 programs using the A32 and T32 instruction sets.
+> 
+> T32 has variable 2 or 4 byte instruction size, so the conversion between
+> addresses and instruction counts requires extra information from the trace
+> decoder, requiring version 0.10.0 of OpenCSD.  A check for the OpenCSD
+> library version has been added to the feature check for OpenCSD.
+> 
+> Signed-off-by: Robert Walker <robert.walker@arm.com>
+> ---
+>  tools/build/feature/test-libopencsd.c           |  8 +++
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 29 ++++++++++
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 10 ++++
+>  tools/perf/util/cs-etm.c                        | 71 +++++++++++--------------
+>  4 files changed, 78 insertions(+), 40 deletions(-)
+> 
+> diff --git a/tools/build/feature/test-libopencsd.c b/tools/build/feature/test-libopencsd.c
+> index 5ff1246..d68eb4f 100644
+> --- a/tools/build/feature/test-libopencsd.c
+> +++ b/tools/build/feature/test-libopencsd.c
+> @@ -1,6 +1,14 @@
+>  // SPDX-License-Identifier: GPL-2.0
+>  #include <opencsd/c_api/opencsd_c_api.h>
+>  
+> +/*
+> + * Check OpenCSD library version is sufficient to provide required features
+> + */
+> +#define OCSD_MIN_VER ((0 << 16) | (10 << 8) | (0))
+> +#if !defined(OCSD_VER_NUM) || (OCSD_VER_NUM < OCSD_MIN_VER)
+> +#error "OpenCSD >= 0.10.0 is required"
+> +#endif
+> +
+>  int main(void)
+>  {
+>  	(void)ocsd_get_version();
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> index 938def6..5efb616 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> @@ -263,9 +263,12 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+>  	decoder->tail = 0;
+>  	decoder->packet_count = 0;
+>  	for (i = 0; i < MAX_BUFFER; i++) {
+> +		decoder->packet_buffer[i].isa = CS_ETM_ISA_UNKNOWN;
+>  		decoder->packet_buffer[i].start_addr = CS_ETM_INVAL_ADDR;
+>  		decoder->packet_buffer[i].end_addr = CS_ETM_INVAL_ADDR;
+> +		decoder->packet_buffer[i].instr_count = 0;
+>  		decoder->packet_buffer[i].last_instr_taken_branch = false;
+> +		decoder->packet_buffer[i].last_instr_size = 0;
+>  		decoder->packet_buffer[i].exc = false;
+>  		decoder->packet_buffer[i].exc_ret = false;
+>  		decoder->packet_buffer[i].cpu = INT_MIN;
+> @@ -294,11 +297,15 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+>  	decoder->packet_count++;
+>  
+>  	decoder->packet_buffer[et].sample_type = sample_type;
+> +	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
+>  	decoder->packet_buffer[et].exc = false;
+>  	decoder->packet_buffer[et].exc_ret = false;
+>  	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
+>  	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
+>  	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
+> +	decoder->packet_buffer[et].instr_count = 0;
+> +	decoder->packet_buffer[et].last_instr_taken_branch = false;
+> +	decoder->packet_buffer[et].last_instr_size = 0;
+>  
+>  	if (decoder->packet_count == MAX_BUFFER - 1)
+>  		return OCSD_RESP_WAIT;
+> @@ -321,8 +328,28 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+>  
+>  	packet = &decoder->packet_buffer[decoder->tail];
+>  
+> +	switch (elem->isa) {
+> +	case ocsd_isa_aarch64:
+> +		packet->isa = CS_ETM_ISA_A64;
+> +		break;
+> +	case ocsd_isa_arm:
+> +		packet->isa = CS_ETM_ISA_A32;
+> +		break;
+> +	case ocsd_isa_thumb2:
+> +		packet->isa = CS_ETM_ISA_T32;
+> +		break;
+> +	case ocsd_isa_tee:
+> +	case ocsd_isa_jazelle:
+> +	case ocsd_isa_custom:
+> +	case ocsd_isa_unknown:
+> +	default:
+> +		packet->isa = CS_ETM_ISA_UNKNOWN;
+> +	}
+> +
+>  	packet->start_addr = elem->st_addr;
+>  	packet->end_addr = elem->en_addr;
+> +	packet->instr_count = elem->num_instr_range;
+> +
+>  	switch (elem->last_i_type) {
+>  	case OCSD_INSTR_BR:
+>  	case OCSD_INSTR_BR_INDIRECT:
+> @@ -336,6 +363,8 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+>  		break;
+>  	}
+>  
+> +	packet->last_instr_size = elem->last_instr_sz;
+> +
+>  	return ret;
+>  }
+>  
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> index 612b575..9351bd1 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> @@ -28,11 +28,21 @@ enum cs_etm_sample_type {
+>  	CS_ETM_TRACE_ON = 1 << 1,
+>  };
+>  
+> +enum cs_etm_isa {
+> +	CS_ETM_ISA_UNKNOWN,
+> +	CS_ETM_ISA_A64,
+> +	CS_ETM_ISA_A32,
+> +	CS_ETM_ISA_T32,
+> +};
+> +
+>  struct cs_etm_packet {
+>  	enum cs_etm_sample_type sample_type;
+> +	enum cs_etm_isa isa;
+>  	u64 start_addr;
+>  	u64 end_addr;
+> +	u32 instr_count;
+>  	u8 last_instr_taken_branch;
+> +	u8 last_instr_size;
+>  	u8 exc;
+>  	u8 exc_ret;
+>  	int cpu;
+> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> index 73430b7..cad133c 100644
+> --- a/tools/perf/util/cs-etm.c
+> +++ b/tools/perf/util/cs-etm.c
+> @@ -31,14 +31,6 @@
+>  
+>  #define MAX_TIMESTAMP (~0ULL)
+>  
+> -/*
+> - * A64 instructions are always 4 bytes
+> - *
+> - * Only A64 is supported, so can use this constant for converting between
+> - * addresses and instruction counts, calculting offsets etc
+> - */
+> -#define A64_INSTR_SIZE 4
+> -
+>  struct cs_etm_auxtrace {
+>  	struct auxtrace auxtrace;
+>  	struct auxtrace_queues queues;
+> @@ -510,21 +502,16 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+>  	etmq->last_branch_rb->nr = 0;
+>  }
+>  
+> -static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+> -{
+> -	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+> -	if (packet->sample_type == CS_ETM_TRACE_ON)
+> -		return 0;
+> +static inline int cs_etm__t32_instr_size(struct cs_etm_queue *etmq,
+> +					 u64 addr) {
+> +	u8 instrBytes[2];
+>  
+> -	/*
+> -	 * The packet records the execution range with an exclusive end address
+> -	 *
+> -	 * A64 instructions are constant size, so the last executed
+> -	 * instruction is A64_INSTR_SIZE before the end address
+> -	 * Will need to do instruction level decode for T32 instructions as
+> -	 * they can be variable size (not yet supported).
+> +	cs_etm__mem_access(etmq, addr, ARRAY_SIZE(instrBytes), instrBytes);
+> +	/* T32 instruction size is indicated by bits[15:11] of the first
+> +	 * 16-bit word of the instruction: 0b11101, 0b11110 and 0b11111
+> +	 * denote a 32-bit instruction.
+>  	 */
 
-But it's the 'switch to guest translation regime' thing that bothers me
-a bit.  Is that an architectural concept (I thought we only had EL1 and
-EL2 translation regimes in stage 1, and then stage 2 translations).  So
-When you say 'guest translation regime' I'm just not entirely sure what
-that means, unless I'm missing something.
+Event if checkpatch doesn't complain the opening of a multi-line comment should
+sit on a line by itself, like below: 
 
-> > 
-> >> +	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
-> >>  }
-> >>  
-> >>  #endif /* __ARM64_KVM_HYP_H__ */
-> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> >> index a509e35132d2..476e738e6c46 100644
-> >> --- a/arch/arm64/kernel/cpu_errata.c
-> >> +++ b/arch/arm64/kernel/cpu_errata.c
-> >> @@ -739,6 +739,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
-> >>  		.capability = ARM64_WORKAROUND_1188873,
-> >>  		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
-> >>  	},
-> >> +#endif
-> >> +#ifdef CONFIG_ARM64_ERRATUM_1165522
-> >> +	{
-> >> +		/* Cortex-A76 r0p0 to r2p0 */
-> >> +		.desc = "ARM erratum 1165522",
-> >> +		.capability = ARM64_WORKAROUND_1165522,
-> >> +		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
-> >> +	},
-> >>  #endif
-> >>  	{
-> >>  	}
-> >> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> >> index 51d5d966d9e5..322109183853 100644
-> >> --- a/arch/arm64/kvm/hyp/switch.c
-> >> +++ b/arch/arm64/kvm/hyp/switch.c
-> >> @@ -143,6 +143,13 @@ static void deactivate_traps_vhe(void)
-> >>  {
-> >>  	extern char vectors[];	/* kernel exception vectors */
-> >>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> >> +
-> >> +	/*
-> >> +	 * ARM erratum 1165522 requires the actual execution of the
-> >> +	 * above before we can switch to the host translation regime.
-> >> +	 */
-> > 
-> > same here, is it not rather about disabling stage 2 translation than
-> > about the host (EL2 and EL0 stage 1) translation regimes?
-> > 
-> >> +	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
-> >> +
-> >>  	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
-> >>  	write_sysreg(vectors, vbar_el1);
-> >>  }
-> >> @@ -499,6 +506,13 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
-> >>  
-> >>  	sysreg_save_host_state_vhe(host_ctxt);
-> >>  
-> >> +	/*
-> >> +	 * ARM erratum 1165522 requires us to have all the translation
-> >> +	 * context in place before we clear HCR_TGE. All the offending
-> >> +	 * guest sysregs are loaded in kvm_vcpu_load_sysregs, and
-> >> +	 * __activate_vm has the stage-2 configuration. Once this is
-> >> +	 * done, __activate_trap clears HCR_TGE (among other things).
-> >> +	 */
-> > 
-> > I'm not this comment is needed or is helpful here.  For example, I don't
-> > understand what you mean with the offending guest sysregs and how that
-> 
-> TTBR*, TCR, SCTLR... Anything that deals with stage-1 translations.
-> 
-> > relates to the problem of configuring stage 2 before clearing TGE.  Is
-> > this about gettting the stage 1 configuration in place first?
-> 
-> Not only stage-1. Stage-2 is involved as well, as the CPU could
-> otherwise end-up with the wrong translations (bypassing stage-2 altogether).
-> 
-> > 
-> > If so, could I suggest a reword along the lines of:
-> > 
-> > 	/*
-> > 	 * ARM erratum 1165522 requires us to configure both stage 1 and
-> > 	 * stage 2 translation for the guest context before we clear
-> > 	 * HCR_EL2.TGE.
-> > 	 *
-> > 	 * We have already configured the guest's stage 1 translation in
-> > 	 * kvm_vcpu_load_sysregs above.  We must now call __activate_vm
-> > 	 * before __activate_traps, because __activate_vm configures
-> > 	 * stage 2 translation, and __activate_traps clear HCR_EL2.TGE
-> > 	 * (among other things).
-> > 	 */
-> 
-> Works for me (and shows that contrary to what you wrote above, you have
-> perfectly understood the problem)!.
-> 
 
-I may have actually understood the problem by writing up that piece of
-commentary.
+	/*
+         * T32 instruction size is indicated by bits[15:11] of the first
+	 * 16-bit word of the instruction: 0b11101, 0b11110 and 0b11111
+         * denote a 32-bit instruction.
+         */
 
-Great!
+Please address and resend.
 
 Thanks,
+Mathieu
 
-    Christoffer
+> -	return packet->end_addr - A64_INSTR_SIZE;
+> +	return ((instrBytes[1] & 0xF8) >= 0xE8) ? 4 : 2;
+>  }
+>  
+>  static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+> @@ -536,27 +523,32 @@ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+>  	return packet->start_addr;
+>  }
+>  
+> -static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
+> +static inline
+> +u64 cs_etm__last_executed_instr(const struct cs_etm_packet *packet)
+>  {
+> -	/*
+> -	 * Only A64 instructions are currently supported, so can get
+> -	 * instruction count by dividing.
+> -	 * Will need to do instruction level decode for T32 instructions as
+> -	 * they can be variable size (not yet supported).
+> -	 */
+> -	return (packet->end_addr - packet->start_addr) / A64_INSTR_SIZE;
+> +	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+> +	if (packet->sample_type == CS_ETM_TRACE_ON)
+> +		return 0;
+> +
+> +	return packet->end_addr - packet->last_instr_size;
+>  }
+>  
+> -static inline u64 cs_etm__instr_addr(const struct cs_etm_packet *packet,
+> +static inline u64 cs_etm__instr_addr(struct cs_etm_queue *etmq,
+> +				     const struct cs_etm_packet *packet,
+>  				     u64 offset)
+>  {
+> -	/*
+> -	 * Only A64 instructions are currently supported, so can get
+> -	 * instruction address by muliplying.
+> -	 * Will need to do instruction level decode for T32 instructions as
+> -	 * they can be variable size (not yet supported).
+> -	 */
+> -	return packet->start_addr + offset * A64_INSTR_SIZE;
+> +	if (packet->isa == CS_ETM_ISA_T32) {
+> +		u64 addr = packet->start_addr;
+> +
+> +		while (offset > 0) {
+> +			addr += cs_etm__t32_instr_size(etmq, addr);
+> +			offset--;
+> +		}
+> +		return addr;
+> +	}
+> +
+> +	/* Assume a 4 byte instruction size (A32/A64) */
+> +	return packet->start_addr + offset * 4;
+>  }
+>  
+>  static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
+> @@ -888,9 +880,8 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+>  	struct cs_etm_auxtrace *etm = etmq->etm;
+>  	struct cs_etm_packet *tmp;
+>  	int ret;
+> -	u64 instrs_executed;
+> +	u64 instrs_executed = etmq->packet->instr_count;
+>  
+> -	instrs_executed = cs_etm__instr_count(etmq->packet);
+>  	etmq->period_instructions += instrs_executed;
+>  
+>  	/*
+> @@ -920,7 +911,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+>  		 * executed, but PC has not advanced to next instruction)
+>  		 */
+>  		u64 offset = (instrs_executed - instrs_over - 1);
+> -		u64 addr = cs_etm__instr_addr(etmq->packet, offset);
+> +		u64 addr = cs_etm__instr_addr(etmq, etmq->packet, offset);
+>  
+>  		ret = cs_etm__synth_instruction_sample(
+>  			etmq, addr, etm->instructions_sample_period);
+> -- 
+> 2.7.4
+> 
