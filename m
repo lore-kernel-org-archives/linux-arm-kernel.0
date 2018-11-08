@@ -1,77 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Nov 2018 19:23:09 +0000
-Subject: [PATCH 2/4] KVM: arm64: Allow implementations to be confined to
- using VHE
-In-Reply-To: <20181105143617.120602-3-marc.zyngier@arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-3-marc.zyngier@arm.com>
-Message-ID: <20181108192309.GH3505@e103592.cambridge.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu,  8 Nov 2018 20:41:28 +0100
+Subject: [PATCH] locking/atomics: Fix out-of-tree build
+Message-ID: <20181108194128.13368-1-bp@alien8.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 02:36:14PM +0000, Marc Zyngier wrote:
-> Some implementations may be forced to use VHE to work around HW
-> errata, for example. Let's introduce a helper that checks for
-> these cases.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_host.h   | 1 +
->  arch/arm64/include/asm/kvm_host.h | 6 ++++++
->  virt/kvm/arm/arm.c                | 5 +++++
->  3 files changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index c3469729f40c..0f2f782548cb 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -286,6 +286,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->  
->  static inline bool kvm_arch_sve_requires_vhe(void) { return false; }
-> +static inline bool kvm_arch_impl_requires_vhe(void) { return false; }
->  static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index ca1714148400..7d6e974d024a 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -432,6 +432,12 @@ static inline bool kvm_arch_sve_requires_vhe(void)
->  	return system_supports_sve();
->  }
->  
-> +static inline bool kvm_arch_impl_requires_vhe(void)
-> +{
-> +	/* Some implementations have defects that confine them to VHE */
-> +	return false;
-> +}
-> +
->  static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 66de2efddfca..bc90a1cdd27f 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1647,6 +1647,11 @@ int kvm_arch_init(void *opaque)
->  			kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
->  			return -ENODEV;
->  		}
-> +
-> +		if (kvm_arch_impl_requires_vhe()) {
-> +			kvm_pr_unimpl("CPU requiring VHE in non-VHE mode");
+From: Borislav Petkov <bp@suse.de>
 
-( Scratch my previous comment if unless you restructure the code so
-there's only one nested if() here. )
+Building a kernel out of tree with:
 
-Also, minor nit: it sounds like "VHE in non-VHE mode" is the thing this
-CPU requires, which is somewhat confusing.
+  make O=/tmp/b oldconfig
+  cd /tmp/b
+  make
 
-Does it work to word this as
-"CPU requiring VHE was booted in non-VHE mode"
+gives this:
 
-?
+  CALL    /mnt/kernel/kernel/linux/scripts/atomic/check-atomics.sh
+/bin/bash: scripts/atomic/check-atomics.sh: No such file or directory
+make[3]: *** [/mnt/kernel/kernel/linux/./Kbuild:86: old-atomics] Error 127
+make[3]: *** Waiting for unfinished jobs....
 
-Cheers
----Dave
+Make the command use the proper build prerequisite which is the absolute
+path to the script.
+
+Fixes: 8d32588077bd ("locking/atomics: Check generated headers are up-to-date")
+Signed-off-by: Borislav Petkov <bp@suse.de>
+Cc: arnd at arndb.de
+Cc: aryabinin at virtuozzo.com
+Cc: Boqun Feng <boqun.feng@gmail.com>
+Cc: catalin.marinas at arm.com
+Cc: dvyukov at google.com
+Cc: glider at google.com
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linuxdrivers at attotech.com
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra (Intel) <peterz@infradead.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ Kbuild | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Kbuild b/Kbuild
+index 47c9fe175bd9..780048056ac5 100644
+--- a/Kbuild
++++ b/Kbuild
+@@ -80,7 +80,7 @@ always += old-atomics
+ targets += old-atomics
+ 
+ quiet_cmd_atomics = CALL    $<
+-      cmd_atomics = $(CONFIG_SHELL) scripts/atomic/check-atomics.sh
++      cmd_atomics = $(CONFIG_SHELL) $<
+ 
+ old-atomics: scripts/atomic/check-atomics.sh FORCE
+ 	$(call cmd,atomics)
+-- 
+2.19.1
