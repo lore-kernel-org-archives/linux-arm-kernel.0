@@ -1,63 +1,78 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 7 Nov 2018 22:49:59 -0800
-Subject: [PATCH 1/5] dt-bindings: hwlock: Document STM32 hwspinlock
- bindings
-In-Reply-To: <20181031093032.20386-2-benjamin.gaignard@st.com>
-References: <20181031093032.20386-1-benjamin.gaignard@st.com>
- <20181031093032.20386-2-benjamin.gaignard@st.com>
-Message-ID: <20181108064959.GC12063@builder>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 8 Nov 2018 07:45:42 +0100
+Subject: [PATCH] pinctrl: zynq: Use define directive for
+ PIN_CONFIG_IO_STANDARD
+In-Reply-To: <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
+References: <20181101005724.9622-1-natechancellor@gmail.com>
+ <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
+ <20181107085503.GA31517@flashbox>
+ <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
+ <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
+Message-ID: <af717713-9e51-139d-1206-1682b83ae434@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 31 Oct 02:30 PDT 2018, Benjamin Gaignard wrote:
-
-> Add bindings for STM32 hardware spinlock device
+On 07. 11. 18 18:48, Nick Desaulniers wrote:
+> On Wed, Nov 7, 2018 at 1:01 AM Michal Simek <michal.simek@xilinx.com> wrote:
+>>
+>> On 07. 11. 18 9:55, Nathan Chancellor wrote:
+>>> On Wed, Nov 07, 2018 at 09:46:12AM +0100, Michal Simek wrote:
+>>>> On 01. 11. 18 1:57, Nathan Chancellor wrote:
+>>>>> Clang warns when one enumerated type is implicitly converted to another:
+>>>>>
+>>>>> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
+>>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
+>>>>> type 'enum pin_config_param' [-Wenum-conversion]
+>>>>>         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
+>>>>>         ~               ^~~~~~~~~~~~~~~~~~~~~
+>>>>> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
+>>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
+>>>>> type 'enum pin_config_param' [-Wenum-conversion]
+>>>>>         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
+>>>>>             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>>>>> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
+>>>>> macro 'PCONFDUMP'
+>>>>>         .param = a, .display = b, .format = c, .has_arg = d     \
+>>>>>                  ^
+>>>>> 2 warnings generated.
+>>>>
+>>>> This is interesting. I have never tried to use llvm for building the
+>>>> kernel. Do you have any description how this can be done?
+>>>>
+>>>
+>>> Depending on what version of Clang you have access to, it is usually just as
+>>> simple as running 'make ARCH=arm CC=clang CROSS_COMPILE=arm-linux-gnueabi-'.
+>>>
+>>> Clang 7.0+ is recommended but 6.0 might work too.
+>>
+>> TBH I would expect to download container and run this there to make sure
+>> that I don't break anything else.
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> new file mode 100644
-> index 000000000000..7a999479d802
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> @@ -0,0 +1,23 @@
-> +STM32 Hardware Spinlock Device Binding
-> +-------------------------------------
-> +
-> +Required properties :
-> +- compatible : should be "st,stm32-hwspinlock".
-> +- reg : the register address of hwspinlock.
-> +- #hwlock-cells : hwlock users only use the hwlock id to represent a specific
-> +	hwlock, so the number of cells should be <1> here.
-> +- clock-names : Must contain "hwspinlock".
+> This is the first request we've had for a container in order to test a
+> patch.  If it comes up again from other folks, I think it makes sense
+> to create one.  Until then, its nice to have.  It's definitely
+> overkill for this patch.
 
-This is supposed to be the name of the clock signal of this hardware
-block, is it really named "hwspinlock"? Note that you can probably omit
-the clock-names property, as you only have a single clock...
+I have played with it to see that error and here are some steps I did.
 
-Apart from that, I think the binding looks good.
+docker run --name test-clang -it --rm debian:latest bash
+apt-get update
+apt-get install gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu clang git bc
+build-essential bison flex make llvm vim libssl-dev sparse
 
-Regards,
-Bjorn
+git clone
+git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git --depth 1
+cd linux
 
-> +- clocks : Must contain a phandle entry for the clock in clock-names, see the
-> +	common clock bindings.
-> +
-> +Please look at the generic hwlock binding for usage information for consumers,
-> +"Documentation/devicetree/bindings/hwlock/hwlock.txt"
-> +
-> +Example of hwlock provider:
-> +	hwspinlock at 4c000000 {
-> +		compatible = "st,stm32-hwspinlock";
-> +		#hwlock-cells = <1>;
-> +		reg = <0x4c000000 0x400>;
-> +		clocks = <&rcc HSEM>;
-> +		clock-names = "hwspinlock";
-> +	};
-> -- 
-> 2.15.0
-> 
+export ARCH=arm64
+export CROSS_COMPILE=aarch64-linux-gnu-
+
+make defconfig
+make CC=clang drivers/pinctrl/pinctrl-zynq.o C=1 V=1
+
+There was not a problem to run it for arm64 but I had issues to run this
+for arm32.
+Do you see any problem with above steps?
+
+Thanks,
+Michal
