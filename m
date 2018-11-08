@@ -1,67 +1,69 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Nov 2018 09:49:28 +0000
-Subject: [PATCH 3/3] coresight: etm3x: Release CLAIM tag when operated
- from perf
-In-Reply-To: <20181107032350.GH3983@leoy-ThinkPad-X240s>
-References: <1541456790-28282-1-git-send-email-mathieu.poirier@linaro.org>
- <1541456790-28282-4-git-send-email-mathieu.poirier@linaro.org>
- <20181107032350.GH3983@leoy-ThinkPad-X240s>
-Message-ID: <054f82c1-451f-3c82-d5ab-e156c50e0c10@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Nov 2018 10:06:15 +0000
+Subject: [PATCH] arm64: mm: define NET_IP_ALIGN to 0
+In-Reply-To: <CAKv+Gu-_gcpRaMK3CLh14-wyjYbYNbHZ6bBMPGHWx-fGyFmujw@mail.gmail.com>
+References: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+ <20181107181047.fx4zbpdunfpwivjc@lakrids.cambridge.arm.com>
+ <CAKv+Gu-_gcpRaMK3CLh14-wyjYbYNbHZ6bBMPGHWx-fGyFmujw@mail.gmail.com>
+Message-ID: <20181108100614.2otaqmz3hoe7wsax@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Leo,
-
-On 07/11/2018 03:23, leo.yan at linaro.org wrote:
-> Hi Mathieu,
+On Thu, Nov 08, 2018 at 12:18:33AM +0100, Ard Biesheuvel wrote:
+> (+ Arnd)
 > 
-> On Mon, Nov 05, 2018 at 03:26:30PM -0700, Mathieu Poirier wrote:
->> This patch deals with the release of the CLAIM tag when the ETM is
->> operated from perf.  Otherwise the tag is left asserted and subsequent
->> requests to use the device fail.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>   drivers/hwtracing/coresight/coresight-etm3x.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
->> index fd5c4cca7db5..000796394662 100644
->> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
->> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
->> @@ -603,6 +603,8 @@ static void etm_disable_perf(struct coresight_device *csdev)
->>   	 */
->>   	etm_set_pwrdwn(drvdata);
->>   
->> +	coresight_disclaim_device_unlocked(drvdata->base);
->> +
-
-
+> On 7 November 2018 at 19:10, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Nov 07, 2018 at 06:10:38PM +0100, Ard Biesheuvel wrote:
+> >> On arm64, there is no need to add 2 bytes of padding to the start of
+> >> each network buffer just to make the IP header appear 32-bit aligned.
+> >>
+> >> Since this might actually adversely affect DMA performance some
+> >> platforms, let's override NET_IP_ALIGN to 0 to get rid of this
+> >> padding.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/processor.h | 8 ++++++++
+> >>  1 file changed, 8 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> >> index 3e2091708b8e..6b0d4dff5012 100644
+> >> --- a/arch/arm64/include/asm/processor.h
+> >> +++ b/arch/arm64/include/asm/processor.h
+> >> @@ -24,6 +24,14 @@
+> >>  #define KERNEL_DS    UL(-1)
+> >>  #define USER_DS              (TASK_SIZE_64 - 1)
+> >>
+> >> +/*
+> >> + * On arm64 systems, unaligned accesses by the CPU are cheap, and so there is
+> >> + * no point in shifting all network buffers by 2 bytes just to make some IP
+> >> + * header fields appear aligned in memory, potentially sacrificing some DMA
+> >> + * performance on some platforms.
+> >> + */
+> >> +#define NET_IP_ALIGN 0
+> >
+> > Might it be better for core code to do this based on
+> > CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS?
 > 
-> Just remind, this isn't consistent with the sequency in function
-> etm_disable_hw(), which has the reversed sequence between
-> etm_set_pwrdwn() and coresight_disclaim_device_unlocked().
-> 
-> Not sure which one sequence is more suitable, at the first glance,
-> accessing register after pwrdwn related operation might have risk for
-> deadlock?
+> In general, yes. But that will cause performance issues on ARMv6+,
+> since we will end up using ldrd instructions that require alignment
+> fixups.
 
-Good point.
+Ok.
 
-I assume that the CLAIMSET/CLR registers are in the same power domain as
-the LAR (Software Lock Access register) accessed below. But I will
-confirm this with the architect. Based on the response, we could
-streamline both the sequences.
+> In my opinion, CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS should signify
+> that unaligned accessors are cheap, not that they are not required at
+> all.
 
-Suzuki
+I'm not sure I follow the distinction you're trying to make.
 
-> 
-> Thanks,
-> Leo Yan
-> 
->>   	CS_LOCK(drvdata->base);
->>   }
->>   
->> -- 
->> 2.7.4
->>
+I do see that *certain* unaligned accesses may be cheap while others are not,
+so maybe that's worth addressing (e.g. HAVE_EFFICIENT_UNALIGNED_32BIT_ACCESS),
+but that is a more general thing.
+
+FWIW, for this as-is:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
