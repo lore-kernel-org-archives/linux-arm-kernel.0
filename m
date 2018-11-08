@@ -1,42 +1,36 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Thu,  8 Nov 2018 10:22:26 -0600
-Subject: [PATCH] arm: dts: socfpga: remove dma-mask property
-Message-ID: <20181108162226.5648-1-dinguyen@kernel.org>
+From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
+Date: Thu, 8 Nov 2018 17:23:02 +0100
+Subject: [PATCH v2 1/3] ARM: socfpga: Clean unused functions
+In-Reply-To: <27e04998-8e67-e543-d717-2ac7e47b1732@kernel.org>
+References: <20181009112021.756-1-peron.clem@gmail.com>
+ <CAJiuCceqyPY+dYr+1xdSyUh5x1Fr=M_p1nsMF9h52v5CXt1uYw@mail.gmail.com>
+ <20181023085208.GL30658@n2100.armlinux.org.uk>
+ <CAJiuCcdKFKmwB5mqW-bP+4A4HtVr=1z9avxoDPrD3NL9X9i8MQ@mail.gmail.com>
+ <27e04998-8e67-e543-d717-2ac7e47b1732@kernel.org>
+Message-ID: <CAJiuCcfzPRgmq9rytE5rcg7XPBL9LvTSs6FV5ys0hhLMMVH98g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma-mask property has been removed from the NAND driver. Remove the
-property from the DTS files.
+Hi Dinh
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
- arch/arm/boot/dts/socfpga.dtsi         | 1 -
- arch/arm/boot/dts/socfpga_arria10.dtsi | 1 -
- 2 files changed, 2 deletions(-)
+On Thu, 8 Nov 2018 at 16:38, Dinh Nguyen <dinguyen@kernel.org> wrote:
+>
+> Hi Cl?ment,
+>
+> On 11/2/18 10:58 AM, Cl?ment P?ron wrote:
+> > Hi Dinh,
+> >
+> > Could you have a look at this serie ?
+> >
+>
+> I've applied 1/3 and 3/3. I need to look over 2/3 to determine if that
+> patch is still valid. I think a better solution would be to set a clock
+> as critical so that it doesn't get gated.
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 77dbb3cda496..c25dede54398 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -753,7 +753,6 @@
- 			      <0xffb80000 0x10000>;
- 			reg-names = "nand_data", "denali_reg";
- 			interrupts = <0x0 0x90 0x4>;
--			dma-mask = <0xffffffff>;
- 			clocks = <&nand_clk>, <&nand_x_clk>, <&nand_ecc_clk>;
- 			clock-names = "nand", "nand_x", "ecc";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 0b1ab88b4039..e41fa23481c3 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -653,7 +653,6 @@
- 			      <0xffb80000 0x10000>;
- 			reg-names = "nand_data", "denali_reg";
- 			interrupts = <0 99 4>;
--			dma-mask = <0xffffffff>;
- 			clocks = <&nand_clk>, <&nand_x_clk>, <&nand_ecc_clk>;
- 			clock-names = "nand", "nand_x", "ecc";
- 			status = "disabled";
--- 
-2.17.1
+Ok,
+Thanks,
+Cl?ment
+
+>
+> Thanks,
+> Dinh
