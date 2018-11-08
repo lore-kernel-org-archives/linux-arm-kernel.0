@@ -1,56 +1,107 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 8 Nov 2018 16:27:28 +0000
-Subject: [PATCH] ARM: vfp: Fix wrong assignement to ufp_exc
-In-Reply-To: <20181108154616.GX30658@n2100.armlinux.org.uk>
-References: <1541523938-13800-1-git-send-email-julien.thierry@arm.com>
- <20181108154616.GX30658@n2100.armlinux.org.uk>
-Message-ID: <0a60f6cf-3ad2-aa22-d9be-7dddd0cbb8cf@arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 8 Nov 2018 08:28:07 -0800
+Subject: [PATCH v6 3/3] arm64: dts: allwinner: a64: enable sound on
+ Pinebook
+In-Reply-To: <CAGb2v65zb4rXJJv018AfDC-YQgAAmahmQ=-Bb5CyU3kA6wBAqg@mail.gmail.com>
+References: <20181108063929.29720-1-anarsoul@gmail.com>
+ <20181108063929.29720-4-anarsoul@gmail.com>
+ <CAGb2v65zb4rXJJv018AfDC-YQgAAmahmQ=-Bb5CyU3kA6wBAqg@mail.gmail.com>
+Message-ID: <CA+E=qVeG0g1axC1YhAhMOo2xcM3_5RupkiJEu3Aebaomx_7Gww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Nov 7, 2018 at 11:30 PM Chen-Yu Tsai <wens@csie.org> wrote:
+>
+> On Thu, Nov 8, 2018 at 2:42 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> >
+> > This commit enables I2S, digital and analog parts of audiocodec on
+> > Pinebook
+> >
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > ---
+> >  .../dts/allwinner/sun50i-a64-pinebook.dts     | 42 +++++++++++++++++++
+> >  1 file changed, 42 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> > index 77fac84797e9..73f171f4ba9b 100644
+> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> > @@ -64,6 +64,23 @@
+> >                 compatible = "mmc-pwrseq-simple";
+> >                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+> >         };
+> > +
+> > +       speaker_amp: speaker_amp {
+> > +               compatible = "simple-audio-amplifier";
+> > +               enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
+>
+> You might want to add a sound-name-prefix property. See
 
-On 08/11/18 15:46, Russell King - ARM Linux wrote:
-> On Tue, Nov 06, 2018 at 05:05:38PM +0000, Julien Thierry wrote:
->> In vfp_preserve_user_clear_hwstate, ufp_exc->fpinst2 gets assigned to
->> itself. It should actually be hwstate->fpinst2 that gets assigned to the
->> ufp_exc field.
->>
->> Fixes commit 3aa2df6ec2ca6bc143a65351cca4266d03a8bc41 ("ARM: 8791/1:
->> vfp: use __copy_to_user() when saving VFP state").
->>
->> Reported-by: David Binderman <dcb314@hotmail.com>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
-> 
-> Please put this in the patch system, thanks.
+No need, there's only speaker amplifier in Pinebook.
 
-It is done.
+>
+>     Documentation/devicetree/bindings/sound/name-prefix.txt
+>
+> Also this should have a reference to its power supply regulator.
 
-Thanks,
+It's powered from V5P0_USB according to schematics, which comes out of
+5V BOOST USB HOST MODE POWER - and it's not controlled by software. So
+there's nothing to reference.
 
-> 
->> ---
->>   arch/arm/vfp/vfpmodule.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
->> index aff6e6e..ee7b079 100644
->> --- a/arch/arm/vfp/vfpmodule.c
->> +++ b/arch/arm/vfp/vfpmodule.c
->> @@ -573,7 +573,7 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp *ufp,
->>   	 */
->>   	ufp_exc->fpexc = hwstate->fpexc;
->>   	ufp_exc->fpinst = hwstate->fpinst;
->> -	ufp_exc->fpinst2 = ufp_exc->fpinst2;
->> +	ufp_exc->fpinst2 = hwstate->fpinst2;
->>   
->>   	/* Ensure that VFP is disabled. */
->>   	vfp_flush_hwstate(thread);
->> -- 
->> 1.9.1
->>
-> 
-
--- 
-Julien Thierry
+>
+> > +       };
+> > +};
+> > +
+> > +&codec {
+> > +       status = "okay";
+> > +};
+> > +
+> > +&codec_analog {
+> > +       status = "okay";
+> > +};
+> > +
+> > +&dai {
+> > +       status = "okay";
+> >  };
+> >
+> >  &ehci0 {
+> > @@ -267,6 +284,31 @@
+> >         vcc-hdmi-supply = <&reg_dldo1>;
+> >  };
+> >
+> > +&sound {
+> > +       status = "okay";
+> > +       simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
+> > +                                   "Microphone", "Internal Microphone Right",
+> > +                                   "Headphone", "Headphone Jack",
+> > +                                   "Speaker", "Internal Speaker";
+> > +       simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
+> > +       simple-audio-card,routing =
+> > +                       "Left DAC", "AIF1 Slot 0 Left",
+> > +                       "Right DAC", "AIF1 Slot 0 Right",
+> > +                       "INL", "LINEOUT",
+> > +                       "INR", "LINEOUT",
+> > +                       "Internal Speaker", "OUTL",
+> > +                       "Internal Speaker", "OUTR",
+> > +                       "Headphone Jack", "HP",
+> > +                       "AIF1 Slot 0 Left ADC", "Left ADC",
+> > +                       "AIF1 Slot 0 Right ADC", "Right ADC",
+> > +                       "Left ADC", "ADC",
+> > +                       "Right ADC", "ADC",
+> > +                       "Internal Microphone Left", "MBIAS",
+> > +                       "MIC1", "Internal Microphone Left",
+> > +                       "Internal Microphone Right", "HBIAS",
+> > +                       "MIC2", "Internal Microphone Right";
+>
+> The schematics is missing the actual jack, but this looks to be correct.
+>
+> ChenYu
+>
+> > +};
+> > +
+> >  &uart0 {
+> >         pinctrl-names = "default";
+> >         pinctrl-0 = <&uart0_pb_pins>;
+> > --
+> > 2.19.1
+> >
