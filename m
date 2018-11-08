@@ -1,118 +1,49 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 Nov 2018 13:25:45 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add I2C-DVFS device
- node
-In-Reply-To: <20181108115219.47lf5iauoygomdbh@verge.net.au>
-References: <1540071349-27483-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdV=ZinKOWZco9t4rGncYY5BqghXxGE6w9qCNW55UVSa+A@mail.gmail.com>
- <20181107123002.t6xg4m4vbq7cuapb@verge.net.au>
- <20181108102201.kuheale47tqygoe4@verge.net.au>
- <CAMuHMdW=f77EafYXSzD3BiuMLirm+gjMnQZ7WzE0kX-TjXwkdg@mail.gmail.com>
- <20181108115219.47lf5iauoygomdbh@verge.net.au>
-Message-ID: <CAMuHMdX=Gj1a5rjfRWSDKMbDuqyeztBCGb+9yam8w8UQMLkUPg@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 08 Nov 2018 12:26:16 +0000
+Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
+In-Reply-To: <CAFEAcA8mKCTeswpiznVWR3kSfVfjbot1aTSfemFVNjzXYdSJwA@mail.gmail.com>
+References: <20181107171031.22573-1-alex.bennee@linaro.org>
+ <CAFEAcA8LL0uC6o1V3W2T=2P47xZ0zGhMR5mEE+x=8qwmDKZL_g@mail.gmail.com>
+ <CAFEAcA8mKCTeswpiznVWR3kSfVfjbot1aTSfemFVNjzXYdSJwA@mail.gmail.com>
+Message-ID: <87sh0b69hz.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-On Thu, Nov 8, 2018 at 12:52 PM Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Nov 08, 2018 at 11:27:31AM +0100, Geert Uytterhoeven wrote:
-> > On Thu, Nov 8, 2018 at 11:22 AM Simon Horman <horms@verge.net.au> wrote:
-> > > On Wed, Nov 07, 2018 at 01:30:10PM +0100, Simon Horman wrote:
-> > > > On Mon, Nov 05, 2018 at 09:52:48AM +0100, Geert Uytterhoeven wrote:
-> > > > > On Sat, Oct 20, 2018 at 11:35 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > > > > > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > > >
-> > > > > > This patch adds I2C-DVFS device node for the R8A77990 SoC.
-> > > > > >
-> > > > > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> > > > >
-> > > > > Thanks for your patch!
-> > > > >
-> > > > > > --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-> > > > > > +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-> >
-> > > > > >         };
-> > > > > >
-> > > > > >         cpus {
-> > > > > > @@ -337,6 +338,22 @@
-> > > > > >                         reg = <0 0xe6060000 0 0x508>;
-> > > > > >                 };
-> > > > > >
-> > > > > > +               i2c_dvfs: i2c at e60b0000 {
-> > > > > > +                       #address-cells = <1>;
-> > > > > > +                       #size-cells = <0>;
-> > > > > > +                       compatible = "renesas,iic-r8a77990",
-> > > > >
-> > > > > "renesas,iic-r8a77990" is not yet documented.
-> > > >
-> > > > Thanks, as per my comment below I wonder if as well as documenting
-> > > > "renesas,iic-r8a77990" we also to teach the driver about it.
-> > > >
-> > > > >
-> > > > > > +                                    "renesas,rcar-gen3-iic",
-> > > > > > +                                    "renesas,rmobile-iic";
-> > > > >
-> > > > > Also, IIC on R-Car E3 does not have the automatic transmission registers.
-> > > > > Does this affect claiming compatibility with the family-specific or generic
-> > > > > compatible values?
-> > > >
-> > > > My cursory reading of the driver indicates that only register that is
-> > > > used by it but documented as not existing on E3 is ICSTART (offset 0x70).
-> > > >
-> > > > It seems to me that we should confirm with Renesas that the register does
-> > > > indeed not exist - as this patch comes from the BSP which implies it is
-> > > > being used there. And if it does not exist we should try teaching the
-> > > > driver not to use ICSTART via the "renesas,iic-r8a77990" compat string.
-> > > > What do you think?
-> > >
-> > > Further examination by Wolfram Sang has shown that the code in question is
-> > > only used on the r8a7740. I don't think there is any compatibility issue
-> > > for r8a77990 when using the current driver.
-> >
-> > "When using the current driver".
-> > Do we want to claim compatibility with "renesas,rcar-gen3-iic" and/or
-> > "renesas,rmobile-iic"?
+Peter Maydell <peter.maydell@linaro.org> writes:
+
+> On 7 November 2018 at 17:39, Peter Maydell <peter.maydell@linaro.org> wrote:
+>> On 7 November 2018 at 17:10, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>>> Not all faults handled by handle_exit are instruction emulations. For
+>>> example a ESR_ELx_EC_IABT will result in the page tables being updated
+>>> but the instruction that triggered the fault hasn't actually executed
+>>> yet. We use the simple heuristic of checking for a changed PC before
+>>> seeing if kvm_arm_handle_step_debug wants to claim we stepped an
+>>> instruction.
+>>>
+>>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>>
+>> What's the rationale for this change? Presumably it's fixing
+>> something, but the commit message doesn't really say what...
+>>
+>> This feels to me like it's working around the fact that
+>> we've separated two things ("advance pc (or set it if we're
+>> going to make the guest take an exception)" and "notice that
+>> we have completed a single step") that should be handled
+>> at one point in the code.
 >
-> Thinking a bit more since I wrote my previous email.
->
-> It seems that the r8a77990 has a different feature set to other R-Car Gen3
-> SoCs but that the current driver implementation "renesas,rcar-gen3-iic"
-> and "renesas,rmobile-iic" do not exceed that feature set.
->
-> In future we could expand the features supported by the driver for other
-> Gen3 SoCs beyond what is supported for r8a77990. If we chose to describe
-> r8a77990 as compatible with renesas,rcar-gen3-iic then that implies those
-> new features would not be activated by matching on "renesas,rcar-gen3-iic",
-> though we could choose to control that using soc_match. Conversely if we
-> decide that r8a77990 is not compatible with renesas,rcar-gen3-iic then we
-> have more freedom to move with regards to adding features not supported by
-> r8a77990 to renesas,rcar-gen3-iic in future.
->
-> So perhaps it would be wise to be conservative and, for now,
-> not document r8a77990 as being compatible with renesas,iic-r8a77990.
->
-> I'm tempted to say that renesas,rmobile-iic is a lowest common denominator
-> and r8a77990 can be documented as being compatible with it. But we could
-> say the same of renesas,rcar-gen3-iic.
->
-> What do you think?
+> ...so for instance if your guest PC is at the entrypoint for
+> an exception, and you singlestep and take the same exception
+> again, this should count as a single step completed, even
+> though the PC has not changed. Granted, that's a little
+> contrived, but it can happen in cases where the guest gets
+> completely confused and is sitting in a tight loop taking
+> exceptions because there's no ram at the vector table
+> address, or whatever.
 
-That matches my thoughts.
+The alternative I thought of as I was hacking^H^H^H^H^H^H carefully
+engineering this was to expand arm_exit_handlers[] and tag each handler
+that was an instruction emulation and gate on that.
 
-Given R-Mobile A1 does have the register, I think r8a77990 should not claim
-compatibility with it.
-
-Of course all this assumes there's no bug in the datasheet w.r.t. r8a77990...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+--
+Alex Benn?e
