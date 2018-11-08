@@ -1,120 +1,81 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Nov 2018 14:18:16 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add I2C-DVFS device
- node
-In-Reply-To: <CAMuHMdX=Gj1a5rjfRWSDKMbDuqyeztBCGb+9yam8w8UQMLkUPg@mail.gmail.com>
-References: <1540071349-27483-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdV=ZinKOWZco9t4rGncYY5BqghXxGE6w9qCNW55UVSa+A@mail.gmail.com>
- <20181107123002.t6xg4m4vbq7cuapb@verge.net.au>
- <20181108102201.kuheale47tqygoe4@verge.net.au>
- <CAMuHMdW=f77EafYXSzD3BiuMLirm+gjMnQZ7WzE0kX-TjXwkdg@mail.gmail.com>
- <20181108115219.47lf5iauoygomdbh@verge.net.au>
- <CAMuHMdX=Gj1a5rjfRWSDKMbDuqyeztBCGb+9yam8w8UQMLkUPg@mail.gmail.com>
-Message-ID: <20181108131815.5jebwxqbaldofk6d@verge.net.au>
+From: marc.w.gonzalez@free.fr (Marc Gonzalez)
+Date: Thu, 08 Nov 2018 14:23:01 +0100
+Subject: [PATCH 7/9] arm64: defconfig: Drop CRYPTO_DEV_FSL_DPAA2_CAAM
+In-Reply-To: <VI1PR0402MB348569B15DBAB6503303D41798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
+References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
+ <e6e0105f-3135-e5b7-8224-419c9f730a09@free.fr>
+ <85a73243-0c53-43e5-5002-90631c0a8c90@free.fr>
+ <VI1PR0402MB3485342DB8A0F5C5791E213798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
+ <VI1PR0402MB348569B15DBAB6503303D41798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
+Message-ID: <2ABE50FD-FF08-4E16-8D8F-A81A92722478@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 01:25:45PM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Thu, Nov 8, 2018 at 12:52 PM Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Nov 08, 2018 at 11:27:31AM +0100, Geert Uytterhoeven wrote:
-> > > On Thu, Nov 8, 2018 at 11:22 AM Simon Horman <horms@verge.net.au> wrote:
-> > > > On Wed, Nov 07, 2018 at 01:30:10PM +0100, Simon Horman wrote:
-> > > > > On Mon, Nov 05, 2018 at 09:52:48AM +0100, Geert Uytterhoeven wrote:
-> > > > > > On Sat, Oct 20, 2018 at 11:35 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > > > > > > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > > > >
-> > > > > > > This patch adds I2C-DVFS device node for the R8A77990 SoC.
-> > > > > > >
-> > > > > > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > > > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> > > > > >
-> > > > > > Thanks for your patch!
-> > > > > >
-> > > > > > > --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-> > > > > > > +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-> > >
-> > > > > > >         };
-> > > > > > >
-> > > > > > >         cpus {
-> > > > > > > @@ -337,6 +338,22 @@
-> > > > > > >                         reg = <0 0xe6060000 0 0x508>;
-> > > > > > >                 };
-> > > > > > >
-> > > > > > > +               i2c_dvfs: i2c at e60b0000 {
-> > > > > > > +                       #address-cells = <1>;
-> > > > > > > +                       #size-cells = <0>;
-> > > > > > > +                       compatible = "renesas,iic-r8a77990",
-> > > > > >
-> > > > > > "renesas,iic-r8a77990" is not yet documented.
-> > > > >
-> > > > > Thanks, as per my comment below I wonder if as well as documenting
-> > > > > "renesas,iic-r8a77990" we also to teach the driver about it.
-> > > > >
-> > > > > >
-> > > > > > > +                                    "renesas,rcar-gen3-iic",
-> > > > > > > +                                    "renesas,rmobile-iic";
-> > > > > >
-> > > > > > Also, IIC on R-Car E3 does not have the automatic transmission registers.
-> > > > > > Does this affect claiming compatibility with the family-specific or generic
-> > > > > > compatible values?
-> > > > >
-> > > > > My cursory reading of the driver indicates that only register that is
-> > > > > used by it but documented as not existing on E3 is ICSTART (offset 0x70).
-> > > > >
-> > > > > It seems to me that we should confirm with Renesas that the register does
-> > > > > indeed not exist - as this patch comes from the BSP which implies it is
-> > > > > being used there. And if it does not exist we should try teaching the
-> > > > > driver not to use ICSTART via the "renesas,iic-r8a77990" compat string.
-> > > > > What do you think?
-> > > >
-> > > > Further examination by Wolfram Sang has shown that the code in question is
-> > > > only used on the r8a7740. I don't think there is any compatibility issue
-> > > > for r8a77990 when using the current driver.
-> > >
-> > > "When using the current driver".
-> > > Do we want to claim compatibility with "renesas,rcar-gen3-iic" and/or
-> > > "renesas,rmobile-iic"?
-> >
-> > Thinking a bit more since I wrote my previous email.
-> >
-> > It seems that the r8a77990 has a different feature set to other R-Car Gen3
-> > SoCs but that the current driver implementation "renesas,rcar-gen3-iic"
-> > and "renesas,rmobile-iic" do not exceed that feature set.
-> >
-> > In future we could expand the features supported by the driver for other
-> > Gen3 SoCs beyond what is supported for r8a77990. If we chose to describe
-> > r8a77990 as compatible with renesas,rcar-gen3-iic then that implies those
-> > new features would not be activated by matching on "renesas,rcar-gen3-iic",
-> > though we could choose to control that using soc_match. Conversely if we
-> > decide that r8a77990 is not compatible with renesas,rcar-gen3-iic then we
-> > have more freedom to move with regards to adding features not supported by
-> > r8a77990 to renesas,rcar-gen3-iic in future.
-> >
-> > So perhaps it would be wise to be conservative and, for now,
-> > not document r8a77990 as being compatible with renesas,iic-r8a77990.
-> >
-> > I'm tempted to say that renesas,rmobile-iic is a lowest common denominator
-> > and r8a77990 can be documented as being compatible with it. But we could
-> > say the same of renesas,rcar-gen3-iic.
-> >
-> > What do you think?
-> 
-> That matches my thoughts.
-> 
-> Given R-Mobile A1 does have the register, I think r8a77990 should not claim
-> compatibility with it.
 
-Right, but the ICSTART register is only used on R-Mobile A1
-(r8a7740) via the "renesas,iic-r8a7740" compat string. Never, in my reading
-of the driver, via more generic compat strings.
 
-Also, fwiw, the function the ICSTART register is called
-sh_mobile_i2c_r8a7740_workaround. Note the use of workaround.
+On November 8, 2018 12:38:10 PM GMT+01:00, Horia Geanta <horia.geanta@nxp.com> wrote:
+>On 11/8/2018 1:23 PM, Horia Geanta wrote:
+>> On 11/7/2018 10:49 PM, Marc Gonzalez wrote:
+>>> [ Add interested parties ]
+>>>
+>>> On 07/11/2018 21:18, Marc Gonzalez wrote:
+>>>
+>>>> Commit e8342cc7954e ("enable CAAM crypto engine on QorIQ DPAA2
+>SoCs")
+>>>> enabled CRYPTO_DEV_FSL_DPAA2_CAAM, which depends on FSL_MC_DPIO,
+>>>> which is not set.
+>>>>
+>> Thanks Marc.
+>> 
+>> Though I would prefer enabling the dependencies:
+>> dpaa2-caam driver -> dpio driver (FSL_MC_DPIO) -> fsl-mc driver
+>(FSL_MC_BUS).
+>> 
+>Could you instead incorporate below patch in your series?
+>(I am pretty sure it won't apply clean)
+>
+>Thanks,
+>Horia
+>
+>-- >8 --
+>
+>Subject: [PATCH] arm64: defconfig: enable DPAA2 fsl-mc bus and DPIO
+>driver
+>
+>Enable fsl-mc bus and DPIO (Datapath I/O) driver, which are needed on
+>Layerscape SoCs with QorIQ Data Path Acceleration Architecture (DPAA)
+>v2.
+>
+>Suggested-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+>Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+>---
+> arch/arm64/configs/defconfig | 2 ++
+> 1 file changed, 2 insertions(+)
+>
+>diff --git a/arch/arm64/configs/defconfig
+>b/arch/arm64/configs/defconfig
+>index c9a57d11330b..7c3785e61ef9 100644
+>--- a/arch/arm64/configs/defconfig
+>+++ b/arch/arm64/configs/defconfig
+>@@ -181,6 +181,7 @@ CONFIG_DMA_CMA=y
+> CONFIG_CMA_SIZE_MBYTES=32
+> CONFIG_HISILICON_LPC=y
+> CONFIG_SIMPLE_PM_BUS=y
+>+CONFIG_FSL_MC_BUS=y
+> CONFIG_MTD=y
+> CONFIG_MTD_BLOCK=y
+> CONFIG_MTD_M25P80=y
+>@@ -615,6 +616,7 @@ CONFIG_QCOM_IOMMU=y
+> CONFIG_RPMSG_QCOM_GLINK_RPM=y
+> CONFIG_RPMSG_QCOM_SMD=y
+> CONFIG_RASPBERRYPI_POWER=y
+>+CONFIG_FSL_MC_DPIO=y
+> CONFIG_QCOM_SMEM=y
+> CONFIG_QCOM_SMD_RPM=y
+> CONFIG_QCOM_SMP2P=y
+>-- 
+>2.16.2
 
-> Of course all this assumes there's no bug in the datasheet w.r.t. r8a77990...
+Are CRYPTO_DEV_FSL_DPAA2_CAAM and CONFIG_FSL_MC_DPIO required to boot the platform? If not, we will build them as modules. I can send a v3 tonight with that change, as well as the various Acks.
 
-The safest approach would be not to declare r8a77990 as being compatible
-with the more generic compat strings. We can reverse that decision in
-future.  The converse is not, strictly speaking, true.
+Regards
