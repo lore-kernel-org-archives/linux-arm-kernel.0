@@ -1,81 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Nov 2018 12:22:29 +0000
-Subject: [PATCH v10 12/22] kasan, arm64: fix up fault handling logic
-In-Reply-To: <4891a504adf61c0daf1e83642b6f7519328dfd5f.1541525354.git.andreyknvl@google.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <4891a504adf61c0daf1e83642b6f7519328dfd5f.1541525354.git.andreyknvl@google.com>
-Message-ID: <20181108122228.xqwhpkjritrvqneq@lakrids.cambridge.arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 8 Nov 2018 12:23:06 +0000
+Subject: [PATCH 5/7] arm64: Do not apply BP hardening for hyp entries from
+ EL2
+In-Reply-To: <20181107215918.GG12248@brain-police>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-6-git-send-email-julien.thierry@arm.com>
+ <20181107215918.GG12248@brain-police>
+Message-ID: <36b8c11d-345a-efd5-c3e0-9b6284c16e87@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2018 at 06:30:27PM +0100, Andrey Konovalov wrote:
-> show_pte in arm64 fault handling relies on the fact that the top byte of
-> a kernel pointer is 0xff, which isn't always the case with tag-based
-> KASAN.
 
-That's for the TTBR1 check, right?
 
-i.e. for the following to work:
-
-	if (addr >= VA_START)
-
-... we need the tag bits to be an extension of bit 55...
-
+On 07/11/18 21:59, Will Deacon wrote:
+> On Wed, Sep 26, 2018 at 02:56:22PM +0100, Julien Thierry wrote:
+>> When an EL2 entry of __kvm_hyp_vector is taken, it means an entry from a
+>> lower EL was previously taken to exit the guest. Taking that lower EL entry
+>> already applied BP hardening if it was needed, so there is no need to do
+>> it again.
+>>
+>> Only apply BP hardening for exception coming from lower EL.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: kvmarm at lists.cs.columbia.edu
+>> ---
+>>   arch/arm64/kernel/cpu_errata.c | 10 ++++++++--
+>>   1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>> index dec1089..9db5ecc 100644
+>> --- a/arch/arm64/kernel/cpu_errata.c
+>> +++ b/arch/arm64/kernel/cpu_errata.c
+>> @@ -103,10 +103,16 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>>   	void *dst = lm_alias(__bp_harden_hyp_vecs_start + slot * SZ_2K);
+>>   	int i;
+>>
+>> -	for (i = 0; i < SZ_2K; i += 0x80)
+>> +	/*
+>> +	 * Only overwrite hyp entries for exceptions from lower EL.
+>> +	 * Exception vection vector is 2K bytes, first 1K bytes concern
+>> +	 * exception from EL2 (EL2t, EL2h), last 1K concert lower exception
+>> +	 * levels (ELx-64bits, ELx-32bits).
+>> +	 */
+>> +	for (i = SZ_1K; i < SZ_2K; i += 0x80)
+>>   		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
+>>
+>> -	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
+>> +	__flush_icache_range((uintptr_t)dst + SZ_1K, (uintptr_t)dst + SZ_2K);
+>>   }
 > 
-> This patch resets the top byte in show_pte.
+> I'd personally find this clearer if you did:
 > 
-> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  arch/arm64/mm/fault.c | 3 +++
->  1 file changed, 3 insertions(+)
+> 	dst += SZ_1K;
 > 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 7d9571f4ae3d..d9a84d6f3343 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -32,6 +32,7 @@
->  #include <linux/perf_event.h>
->  #include <linux/preempt.h>
->  #include <linux/hugetlb.h>
-> +#include <linux/kasan.h>
->  
->  #include <asm/bug.h>
->  #include <asm/cmpxchg.h>
-> @@ -141,6 +142,8 @@ void show_pte(unsigned long addr)
->  	pgd_t *pgdp;
->  	pgd_t pgd;
->  
-> +	addr = (unsigned long)kasan_reset_tag((void *)addr);
+> before the for loop and with your comment above it. Then the for loop
+> becomes:
+> 
+> 	for (i = 0; i < SZ_1K; i += 0x80)
+> 
+> and the range of the cache maintenance is [dst, dst + SZ_1K)
+> > But I'll leave it up to Marc.
+> 
 
-... but this ORs in (0xffUL << 56), which is not correct for addresses
-which aren't TTBR1 addresses to begin with, where bit 55 is clear, and
-throws away useful information.
-
-We could use untagged_addr() here, but that wouldn't be right for
-kernels which don't use TBI1, and we'd erroneously report addresses
-under the TTBR1 range as being in the TTBR1 range.
-
-I also see that the entry assembly for el{1,0}_{da,ia} clears the tag
-for EL0 addresses.
-
-So we could have:
-
-static inline bool is_ttbr0_addr(unsigned long addr)
-{
-	/* entry assembly clears tags for TTBR0 addrs */
-	return addr < TASK_SIZE_64;
-}
-
-static inline bool is_ttbr1_addr(unsigned long addr)
-{
-	/* TTBR1 addresses may have a tag if HWKASAN is in use */
-	return arch_kasan_reset_tag(addr) >= VA_START;
-}
-
-... and use those in the conditionals, leaving the addr as-is for
-reporting purposes.
+I'd say I agree with your suggestion, so unless Marc finds it better in 
+the current state, I'll make the change.
 
 Thanks,
-Mark.
+
+-- 
+Julien Thierry
