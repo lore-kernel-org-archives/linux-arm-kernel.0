@@ -1,63 +1,51 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 8 Nov 2018 12:21:39 +0000
-Subject: [PATCH 4/7] arm64: Add fast-path for stack alignment
-In-Reply-To: <20181107215911.GF12248@brain-police>
-References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
- <1537970184-44348-5-git-send-email-julien.thierry@arm.com>
- <20181107215911.GF12248@brain-police>
-Message-ID: <39c576f6-3456-4815-4573-0efd08306a50@arm.com>
+From: ilias.apalodimas@linaro.org (Ilias Apalodimas)
+Date: Thu, 8 Nov 2018 14:22:24 +0200
+Subject: [PATCH] arm64: mm: define NET_IP_ALIGN to 0
+In-Reply-To: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+References: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181108122224.GA14244@apalos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/11/18 21:59, Will Deacon wrote:
-> On Wed, Sep 26, 2018 at 02:56:21PM +0100, Julien Thierry wrote:
->> Avoiding stack alignment for already aligned stack can give a small
->> performance boost.
->>
->> Branch out of the aligning code when the stack is known to be aligned.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> ---
->>   arch/arm64/kernel/entry.S | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 8fb66e4..bd8d52c 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -61,6 +61,10 @@
->>   
->>   	.macro force_stack_align
->>   	xchg_sp	x0
->> +
->> +	tst	x0, #0xf
->> +	b.eq	0f
->> +
->>   	str	x1, [x0] // store x1 far away from S_SP
->>   
->>   	// aligned_sp[S_SP] = old_sp
->> @@ -69,6 +73,11 @@
->>   
->>   	ldr	x1, [x0]
->>   	bic	x0, x0, #0xf	// x0 = aligned_sp
->> +	b	1f
->> +
->> +0:
->> +	str	x0, [x0, #S_SP]
->> +1:
+Hi, 
+> On arm64, there is no need to add 2 bytes of padding to the start of
+> each network buffer just to make the IP header appear 32-bit aligned.
 > 
-> I couldn't figure out a better way to do this, but please remove the empty
-> lines that you're adding here. With that:
+> Since this might actually adversely affect DMA performance some
+> platforms, let's override NET_IP_ALIGN to 0 to get rid of this
+> padding.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/processor.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 3e2091708b8e..6b0d4dff5012 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -24,6 +24,14 @@
+>  #define KERNEL_DS	UL(-1)
+>  #define USER_DS		(TASK_SIZE_64 - 1)
+>  
+> +/*
+> + * On arm64 systems, unaligned accesses by the CPU are cheap, and so there is
+> + * no point in shifting all network buffers by 2 bytes just to make some IP
+> + * header fields appear aligned in memory, potentially sacrificing some DMA
+> + * performance on some platforms.
+> + */
+> +#define NET_IP_ALIGN	0
+> +
+>  #ifndef __ASSEMBLY__
+>  #ifdef __KERNEL__
+>  
+> -- 
+> 2.19.1
 > 
 
-Sure, I'll do that.
+I saw no impact on network performance testing this on socionext synquasher.
+It makes sense to keep DMA aligned knowing unaligned accesses by the CPU are
+cheap
 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-
-Thanks,
-
--- 
-Julien Thierry
+Acked-by: Ilias Apalodimas <ilias.apalodimas@linaro.org>
+Tested-by: Ilias Apalodimas <ilias.apalodimas@linaro.org>
