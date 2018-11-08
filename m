@@ -1,56 +1,45 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 08 Nov 2018 10:28:47 -0800
-Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
-In-Reply-To: <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
-References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
- <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
- <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
- <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
- <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
- <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
- <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
- <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
-Message-ID: <154170172752.88331.2213352243956732809@swboyd.mtv.corp.google.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Nov 2018 19:35:52 +0100
+Subject: [PATCH 1/7] arm64: Add static check for pt_regs alignment
+In-Reply-To: <1537970184-44348-2-git-send-email-julien.thierry@arm.com>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <CAKv+Gu_-FD3sW_4R4PZKb7Q9xiF=bgh0bsUCH5eqOQDiX2a2JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Abel Vesa (2018-11-08 04:29:39)
-> On Wed, Nov 07, 2018 at 04:18:35PM -0800, Stephen Boyd wrote:
-> > Quoting Abel Vesa (2018-11-07 12:26:25)
-> > > On Wed, Nov 07, 2018 at 11:01:02AM -0800, Stephen Boyd wrote:
-> > > > 
-> > > > 
-> > > > What's the plan to clean it up?
-> > > 
-> > > So I'm doing this in our internal tree first to make sure I don't break the
-> > > other (newer) socs.
-> > > 
-> > > I already have a prototype in testing but it's a long way to upstream it.
-> > > 
-> > > Basically, I'm replacing all of this with a single, more like a composite,
-> > > more complex, clock type that does all the magic inside.
-> > > 
-> > > One of the problems is the fact that the bypasses can have the same sources
-> > > and in my case, I'm implementing that as a list of parents name, but the
-> > > parent names list doesn't work with duplicates, so I have to find some other
-> > > way to do it.
-> > > 
-> > > Once I have something clean and tested enough I'll send it upstream.
-> > 
-> > Ok. Thanks for the info.
-> > 
-> 
-> Just to avoid any kind of confusion.
-> 
-> The whole refactoring of the SCCG clock will be done in a separate (later) change
-> and will not be part of this patchset.
-> 
-> I already sent the 12th version of this current patch series and I would really
-> like to get this in ASAP so that the booting up of imx8mq will not be delayed.
-> 
+On 26 September 2018 at 15:56, Julien Thierry <julien.thierry@arm.com> wrote:
+> The pt_regs structure's size is required to be a multiple of 16 to maintain
+> the stack alignment upon kernel entries.
+>
+> Add a static check to ensure this is the case.
+>
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> ---
+>  arch/arm64/include/asm/ptrace.h | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index 177b851..cc17fad 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -229,6 +229,8 @@ static inline u64 regs_get_register(struct pt_regs *regs, unsigned int offset)
+>
+>         WARN_ON(offset & 7);
+>
+> +       BUILD_BUG_ON((sizeof (struct pt_regs) % 16 != 0));
 
-Ok. Well we're in rc1 right now, and so we're not merging new drivers
-into mainline. I can merge the clk driver into clk-next, but you'll have
-to wait for the stabilization period to end (approximately 6 or 7 weeks)
-before this can get into the next kernel version. It will be in
-linux-next much sooner of course.
+The parens inside BUILD_BUG_ON() are redundant (unless you move the
+closing one right after '16', which I would prefer)
+
+> +
+>         offset >>= 3;
+>         switch (offset) {
+>         case 0 ... 30:
+> --
+> 1.9.1
+>
+
+Wherever you manage to put this:
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
