@@ -1,103 +1,38 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 8 Nov 2018 10:15:03 +0530
-Subject: [PATCH] cpufreq: s3c24xx: Change to use DEFINE_SHOW_ATTRIBUTE
- macro
-In-Reply-To: <20181107161346.9887-1-tiny.windzz@gmail.com>
-References: <20181107161346.9887-1-tiny.windzz@gmail.com>
-Message-ID: <20181108044503.7zqgi3cjsxnsziuo@vireshk-i7>
+Date: Thu, 8 Nov 2018 10:17:18 +0530
+Subject: [PATCH 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+In-Reply-To: <147b3b1d-e395-7e8c-c1e9-7995d1abddfe@free.fr>
+References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
+ <596a4b64-e2ef-878d-0873-dd59d14c2d85@free.fr>
+ <147b3b1d-e395-7e8c-c1e9-7995d1abddfe@free.fr>
+Message-ID: <20181108044718.qkvw55srkctfkkye@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-11-18, 11:13, Yangtao Li wrote:
-> Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
+On 07-11-18, 21:54, Marc Gonzalez wrote:
+> [ Add interested parties ]
 > 
-> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> ---
->  drivers/cpufreq/s3c24xx-cpufreq-debugfs.c | 46 +++--------------------
->  1 file changed, 6 insertions(+), 40 deletions(-)
+> On 07/11/2018 21:14, Marc Gonzalez wrote:
 > 
-> diff --git a/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c b/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
-> index 4d976e8dbb2f..0df87b6480fe 100644
-> --- a/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
-> +++ b/drivers/cpufreq/s3c24xx-cpufreq-debugfs.c
-> @@ -63,18 +63,7 @@ static int board_show(struct seq_file *seq, void *p)
->  	return 0;
->  }
->  
-> -static int fops_board_open(struct inode *inode, struct file *file)
-> -{
-> -	return single_open(file, board_show, NULL);
-> -}
-> -
-> -static const struct file_operations fops_board = {
-> -	.open		= fops_board_open,
-> -	.read		= seq_read,
-> -	.llseek		= seq_lseek,
-> -	.release	= single_release,
-> -	.owner		= THIS_MODULE,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(board);
->  
->  static int info_show(struct seq_file *seq, void *p)
->  {
-> @@ -105,18 +94,7 @@ static int info_show(struct seq_file *seq, void *p)
->  	return 0;
->  }
->  
-> -static int fops_info_open(struct inode *inode, struct file *file)
-> -{
-> -	return single_open(file, info_show, NULL);
-> -}
-> -
-> -static const struct file_operations fops_info = {
-> -	.open		= fops_info_open,
-> -	.read		= seq_read,
-> -	.llseek		= seq_lseek,
-> -	.release	= single_release,
-> -	.owner		= THIS_MODULE,
-> -};
-> +DEFINE_SHOW_ATTRIBUTE(info);
->  
->  static int io_show(struct seq_file *seq, void *p)
->  {
-> @@ -162,19 +140,7 @@ static int io_show(struct seq_file *seq, void *p)
->  	return 0;
->  }
->  
-> -static int fops_io_open(struct inode *inode, struct file *file)
-> -{
-> -	return single_open(file, io_show, NULL);
-> -}
-> -
-> -static const struct file_operations fops_io = {
-> -	.open		= fops_io_open,
-> -	.read		= seq_read,
-> -	.llseek		= seq_lseek,
-> -	.release	= single_release,
-> -	.owner		= THIS_MODULE,
-> -};
-> -
-> +DEFINE_SHOW_ATTRIBUTE(io);
->  
->  static int __init s3c_freq_debugfs_init(void)
->  {
-> @@ -185,13 +151,13 @@ static int __init s3c_freq_debugfs_init(void)
->  	}
->  
->  	dbgfs_file_io = debugfs_create_file("io-timing", S_IRUGO, dbgfs_root,
-> -					    NULL, &fops_io);
-> +					    NULL, &io_fops);
->  
->  	dbgfs_file_info = debugfs_create_file("info", S_IRUGO, dbgfs_root,
-> -					      NULL, &fops_info);
-> +					      NULL, &info_fops);
->  
->  	dbgfs_file_board = debugfs_create_file("board", S_IRUGO, dbgfs_root,
-> -					       NULL, &fops_board);
-> +					       NULL, &board_fops);
->  
->  	return 0;
->  }
+> > Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
+> > 
+> > Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+> > ---
+> >  arch/arm64/configs/defconfig | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index f786c95504d3..8d6878c1e794 100644
+> > --- a/arch/arm64/configs/defconfig
+> > +++ b/arch/arm64/configs/defconfig
+> > @@ -107,7 +107,6 @@ CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+> >  CONFIG_CPUFREQ_DT=y
+> >  CONFIG_ACPI_CPPC_CPUFREQ=m
+> >  CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
+> > -CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
+> >  CONFIG_ARM_SCPI_CPUFREQ=y
+> >  CONFIG_ARM_TEGRA186_CPUFREQ=y
+> >  CONFIG_ARM_SCPI_PROTOCOL=y
 
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
