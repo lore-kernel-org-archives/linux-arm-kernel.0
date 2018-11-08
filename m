@@ -1,70 +1,57 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 8 Nov 2018 15:54:31 +0000
-Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
-In-Reply-To: <CAL_JsqJh08wZCyGxg7HMbtKjOJTZKMoQcNOB_hPuSfJKQQK8JA@mail.gmail.com>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-14-robh@kernel.org> <20181009115713.GE6248@arm.com>
- <CAL_JsqJh08wZCyGxg7HMbtKjOJTZKMoQcNOB_hPuSfJKQQK8JA@mail.gmail.com>
-Message-ID: <08738708-1c38-fab7-eb34-694e5f4d4b7e@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Nov 2018 07:54:59 -0800
+Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
+ beagle-xm
+In-Reply-To: <CAOesGMgAxvERhQjnyZ7P4vqhhWdBdA20XrFnDn48Na5wrEAkEA@mail.gmail.com>
+References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
+ <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+ <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
+ <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
+ <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
+ <CAOesGMgAxvERhQjnyZ7P4vqhhWdBdA20XrFnDn48Na5wrEAkEA@mail.gmail.com>
+Message-ID: <20181108155459.GJ56134@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2018 19:32, Rob Herring wrote:
-> On Tue, Oct 9, 2018 at 6:57 AM Will Deacon <will.deacon@arm.com> wrote:
->>
->> Hi Rob,
->>
->> On Fri, Oct 05, 2018 at 11:58:25AM -0500, Rob Herring wrote:
->>> Convert ARM PMU binding to DT schema format using json-schema.
->>>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: devicetree at vger.kernel.org
->>> Signed-off-by: Rob Herring <robh@kernel.org>
->>> ---
->>>   Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
->>>   .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
->>>   2 files changed, 96 insertions(+), 70 deletions(-)
->>>   delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
->>>   create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
->>
->> [...]
->>
->>> -- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
->>> -               interrupt (PPI) then 1 interrupt should be specified.
->>
->> [...]
->>
->>> +  interrupts:
->>> +    oneOf:
->>> +      - maxItems: 1
->>> +      - minItems: 2
->>> +        maxItems: 8
->>> +        description: 1 interrupt per core.
->>> +
->>> +  interrupts-extended:
->>> +    $ref: '#/properties/interrupts'
->>
->> This seems like a semantic different between the two representations, or am
->> I missing something here? Specifically, both the introduction of
->> interrupts-extended and also dropping any mention of using a single per-cpu
->> interrupt (the single combined case is no longer support by Linux; not sure
->> if you want to keep it in the binding).
+* Olof Johansson <olof@lixom.net> [181107 16:17]:
+> On Wed, Nov 7, 2018 at 8:09 AM Guillaume Tucker
+> <guillaume.tucker@collabora.com> wrote:
+> >
+> > On 06/11/2018 10:54, Guillaume Tucker wrote:
+> > > On 05/11/2018 14:33, Olof Johansson wrote:
+> > >> On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
+> > >> <guillaume.tucker@collabora.com> wrote:
+> > >>>
+> > >>> Hi Linus,
+> > >>>
+> > >>> Please see below, the kernelci.org automated boot bisection found
+> > >>> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
+> > >>> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
+> > >>> log output after the bootloader so the kernel seems to be
+> > >>> crashing very early on.
+> > >>
+> > >> Can you enable DEBUG_LL to capture what goes wrong?
+> > >
+> > > Yes I've scheduled a re-run of the automated bisection with
+> > > DEBUG_LL turned on, but the beagle-xm board is currently offline
+> > > in lab-baylibre.  I'll keep you posted when I get some results.
+> >
+> > Unfortunately, enabling the DEBUG_LL config didn't help.  There's
+> > still no visible kernel log at all from the failing LAVA jobs:
+> >
+> >     http://lava.baylibre.com:10080/scheduler/alljobs?length=25&search=lava-bisect-9638#table
+> >
+> >
+> > This might be a hard one to debug without physical access to the
+> > board, but please let me know if you think there's anything else
+> > I can try.  For example, if there's a known older kernel revision
+> > where the combination of SMP=n and PREEMPT=y worked then I could
+> > try to run an automated boot bisection based on that.
 > 
-> In regards to no support for the single combined interrupt, it looks
-> like Marvell Armada SoCs at least (armada-375 is what I'm looking at)
-> have only a single interrupt. Though the interrupt gets routed to MPIC
-> which then has a GIC PPI. So it isn't supported or happens to work
-> still since it is a PPI?
+> Is this only beagle-xm, or do we see it on all OMAP3 hardware?
 
-Well, the description of the MPIC in the Armada XP functional spec says:
+Seems to not happen on three other omap3 boards I've tried with.
 
-"Interrupt sources ID0?ID28 are private events per CPU. Thus, each 
-processor has a different set of events map interrupts ID0?ID28."
+Regards,
 
-Odd grammar aside, that would seem to imply that <&mpic 3> is a per-cpu 
-interrupt itself, thus AFAICS so long as it's cascaded to a GIC PPI and 
-not an SPI then there's no issue there.
-
-Robin.
+Tony
