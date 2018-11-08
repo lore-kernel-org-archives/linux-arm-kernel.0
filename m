@@ -1,33 +1,41 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 8 Nov 2018 08:22:08 +0800
-Subject: [xlnx:master 2120/2152] Warning: ffffffff813df6a6: 26 47 es rex.RXB
-Message-ID: <201811080803.YzlpgpU3%fengguang.wu@intel.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Thu, 08 Nov 2018 11:05:16 +1030
+Subject: [PATCH] usb: gadget: aspeed-vhub: constify usb_gadget_ops
+ structure
+In-Reply-To: <1540916399-22426-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1540916399-22426-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1541637316.1471870.1569457840.5A56DC54@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   b68293ad2c935d09fa4476750f8c378d4896b1c8
-commit: 7c9997cc698ba94529884e6b4edbd93d46a4f4be [2120/2152] gpio: Fix the Dual Channel gpio driver removal issue
-config: x86_64-randconfig-j3-201844 (attached as .config)
-compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
-reproduce:
-        git checkout 7c9997cc698ba94529884e6b4edbd93d46a4f4be
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On Wed, 31 Oct 2018, at 02:49, Julia Lawall wrote:
+> The usb_gadget_ops structure can be const as it is only stored in
+> the ops field of a usb_gadget structure and this field is const.
+> 
+> Done with the help of Coccinelle.
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-All warnings (new ones prefixed by >>):
+Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
->> Warning: ffffffff813df6a6: 26 47 es rex.RXB
-   Warning: objdump says 2 bytes, but insn_get_length() says 4
-   Warning: arch/x86/tools/test_get_len found difference at <set_primary_fwnode>:ffffffff813dfa90
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30387 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181108/7aeac0c3/attachment-0001.gz>
+> 
+> ---
+>  drivers/usb/gadget/udc/aspeed-vhub/dev.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/aspeed-vhub/dev.c b/drivers/usb/
+> gadget/udc/aspeed-vhub/dev.c
+> index f0233912bace..6b1b16b17d7d 100644
+> --- a/drivers/usb/gadget/udc/aspeed-vhub/dev.c
+> +++ b/drivers/usb/gadget/udc/aspeed-vhub/dev.c
+> @@ -438,7 +438,7 @@ static int ast_vhub_udc_stop(struct usb_gadget 
+> *gadget)
+>  	return 0;
+>  }
+>  
+> -static struct usb_gadget_ops ast_vhub_udc_ops = {
+> +static const struct usb_gadget_ops ast_vhub_udc_ops = {
+>  	.get_frame	= ast_vhub_udc_get_frame,
+>  	.wakeup		= ast_vhub_udc_wakeup,
+>  	.pullup		= ast_vhub_udc_pullup,
+> 
