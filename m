@@ -1,49 +1,52 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 08 Nov 2018 12:26:16 +0000
-Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
-In-Reply-To: <CAFEAcA8mKCTeswpiznVWR3kSfVfjbot1aTSfemFVNjzXYdSJwA@mail.gmail.com>
-References: <20181107171031.22573-1-alex.bennee@linaro.org>
- <CAFEAcA8LL0uC6o1V3W2T=2P47xZ0zGhMR5mEE+x=8qwmDKZL_g@mail.gmail.com>
- <CAFEAcA8mKCTeswpiznVWR3kSfVfjbot1aTSfemFVNjzXYdSJwA@mail.gmail.com>
-Message-ID: <87sh0b69hz.fsf@linaro.org>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Thu, 8 Nov 2018 12:29:39 +0000
+Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
+In-Reply-To: <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
+ <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
+ <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
+ <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
+ <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
+ <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
+Message-ID: <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 07, 2018 at 04:18:35PM -0800, Stephen Boyd wrote:
+> Quoting Abel Vesa (2018-11-07 12:26:25)
+> > On Wed, Nov 07, 2018 at 11:01:02AM -0800, Stephen Boyd wrote:
+> > > 
+> > > 
+> > > What's the plan to clean it up?
+> > 
+> > So I'm doing this in our internal tree first to make sure I don't break the
+> > other (newer) socs.
+> > 
+> > I already have a prototype in testing but it's a long way to upstream it.
+> > 
+> > Basically, I'm replacing all of this with a single, more like a composite,
+> > more complex, clock type that does all the magic inside.
+> > 
+> > One of the problems is the fact that the bypasses can have the same sources
+> > and in my case, I'm implementing that as a list of parents name, but the
+> > parent names list doesn't work with duplicates, so I have to find some other
+> > way to do it.
+> > 
+> > Once I have something clean and tested enough I'll send it upstream.
+> 
+> Ok. Thanks for the info.
+> 
 
-Peter Maydell <peter.maydell@linaro.org> writes:
+Just to avoid any kind of confusion.
 
-> On 7 November 2018 at 17:39, Peter Maydell <peter.maydell@linaro.org> wrote:
->> On 7 November 2018 at 17:10, Alex Benn?e <alex.bennee@linaro.org> wrote:
->>> Not all faults handled by handle_exit are instruction emulations. For
->>> example a ESR_ELx_EC_IABT will result in the page tables being updated
->>> but the instruction that triggered the fault hasn't actually executed
->>> yet. We use the simple heuristic of checking for a changed PC before
->>> seeing if kvm_arm_handle_step_debug wants to claim we stepped an
->>> instruction.
->>>
->>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>
->> What's the rationale for this change? Presumably it's fixing
->> something, but the commit message doesn't really say what...
->>
->> This feels to me like it's working around the fact that
->> we've separated two things ("advance pc (or set it if we're
->> going to make the guest take an exception)" and "notice that
->> we have completed a single step") that should be handled
->> at one point in the code.
->
-> ...so for instance if your guest PC is at the entrypoint for
-> an exception, and you singlestep and take the same exception
-> again, this should count as a single step completed, even
-> though the PC has not changed. Granted, that's a little
-> contrived, but it can happen in cases where the guest gets
-> completely confused and is sitting in a tight loop taking
-> exceptions because there's no ram at the vector table
-> address, or whatever.
+The whole refactoring of the SCCG clock will be done in a separate (later) change
+and will not be part of this patchset.
 
-The alternative I thought of as I was hacking^H^H^H^H^H^H carefully
-engineering this was to expand arm_exit_handlers[] and tag each handler
-that was an instruction emulation and gate on that.
+I already sent the 12th version of this current patch series and I would really
+like to get this in ASAP so that the booting up of imx8mq will not be delayed.
 
---
-Alex Benn?e
+Thanks
+Abel
+
+-- 
