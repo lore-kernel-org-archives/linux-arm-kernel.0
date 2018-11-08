@@ -1,31 +1,32 @@
-From: Steve.Capper@arm.com (Steve Capper)
-Date: Thu, 8 Nov 2018 10:33:52 +0000
-Subject: [PATCH V3 1/5] mm/hugetlb: Distinguish between migratability and
- movability
-In-Reply-To: <1540299721-26484-2-git-send-email-anshuman.khandual@arm.com>
-References: <1540299721-26484-1-git-send-email-anshuman.khandual@arm.com>
- <1540299721-26484-2-git-send-email-anshuman.khandual@arm.com>
-Message-ID: <20181108103340.ajeg566spidprzzk@capper-debian.cambridge.arm.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 8 Nov 2018 12:34:03 +0200
+Subject: [PATCH 1/3] ARM: dts: imx31: Fix memory node duplicaton
+In-Reply-To: <1541518847-5640-1-git-send-email-festevam@gmail.com>
+References: <1541518847-5640-1-git-send-email-festevam@gmail.com>
+Message-ID: <d73ce8ce-64a0-14e9-74f5-12fde63df1cc@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anshuman,
+Hi Fabio,
 
-On Tue, Oct 23, 2018 at 06:31:57PM +0530, Anshuman Khandual wrote:
-> During huge page allocation it's migratability is checked to determine if
-> it should be placed under movable zones with GFP_HIGHUSER_MOVABLE. But the
-> movability aspect of the huge page could depend on other factors than just
-> migratability. Movability in itself is a distinct property which should not
-> be tied with migratability alone.
+On 11/06/2018 05:40 PM, Fabio Estevam wrote:
+> Boards based on imx31 have duplicate memory nodes:
 > 
-> This differentiates these two and implements an enhanced movability check
-> which also considers huge page size to determine if it is feasible to be
-> placed under a movable zone. At present it just checks for gigantic pages
-> but going forward it can incorporate other enhanced checks.
+> - One coming from the board dts file: memory@
 > 
-> Reviewed-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
-> Suggested-by: Michal Hocko <mhocko@kernel.org>
-> Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+> - One coming from the imx31.dtsi file.
+> 
+> Fix the duplication by removing the memory node from the dtsi file
+> and by adding 'device_type = "memory";' in the board dts.
+> 
+> Reported-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Fabio Estevam <festevam@gmail.com>
 
-FWIW:
-Reviewed-by: Steve Capper <steve.capper@arm.com>
+thank you for the change, I've successfully tested it on my i.MX31 Lite board.
+
+Reviewed-by: Vladimir Zapolskiy <vz@mleia.com>
+Tested-by: Vladimir Zapolskiy <vz@mleia.com>
+
+--
+Best wishes,
+Vladimir
