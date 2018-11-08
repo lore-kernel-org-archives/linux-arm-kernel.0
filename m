@@ -1,36 +1,56 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Thu, 8 Nov 2018 17:23:02 +0100
-Subject: [PATCH v2 1/3] ARM: socfpga: Clean unused functions
-In-Reply-To: <27e04998-8e67-e543-d717-2ac7e47b1732@kernel.org>
-References: <20181009112021.756-1-peron.clem@gmail.com>
- <CAJiuCceqyPY+dYr+1xdSyUh5x1Fr=M_p1nsMF9h52v5CXt1uYw@mail.gmail.com>
- <20181023085208.GL30658@n2100.armlinux.org.uk>
- <CAJiuCcdKFKmwB5mqW-bP+4A4HtVr=1z9avxoDPrD3NL9X9i8MQ@mail.gmail.com>
- <27e04998-8e67-e543-d717-2ac7e47b1732@kernel.org>
-Message-ID: <CAJiuCcfzPRgmq9rytE5rcg7XPBL9LvTSs6FV5ys0hhLMMVH98g@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 8 Nov 2018 16:27:28 +0000
+Subject: [PATCH] ARM: vfp: Fix wrong assignement to ufp_exc
+In-Reply-To: <20181108154616.GX30658@n2100.armlinux.org.uk>
+References: <1541523938-13800-1-git-send-email-julien.thierry@arm.com>
+ <20181108154616.GX30658@n2100.armlinux.org.uk>
+Message-ID: <0a60f6cf-3ad2-aa22-d9be-7dddd0cbb8cf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh
+Hi Russell,
 
-On Thu, 8 Nov 2018 at 16:38, Dinh Nguyen <dinguyen@kernel.org> wrote:
->
-> Hi Cl?ment,
->
-> On 11/2/18 10:58 AM, Cl?ment P?ron wrote:
-> > Hi Dinh,
-> >
-> > Could you have a look at this serie ?
-> >
->
-> I've applied 1/3 and 3/3. I need to look over 2/3 to determine if that
-> patch is still valid. I think a better solution would be to set a clock
-> as critical so that it doesn't get gated.
+On 08/11/18 15:46, Russell King - ARM Linux wrote:
+> On Tue, Nov 06, 2018 at 05:05:38PM +0000, Julien Thierry wrote:
+>> In vfp_preserve_user_clear_hwstate, ufp_exc->fpinst2 gets assigned to
+>> itself. It should actually be hwstate->fpinst2 that gets assigned to the
+>> ufp_exc field.
+>>
+>> Fixes commit 3aa2df6ec2ca6bc143a65351cca4266d03a8bc41 ("ARM: 8791/1:
+>> vfp: use __copy_to_user() when saving VFP state").
+>>
+>> Reported-by: David Binderman <dcb314@hotmail.com>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+> 
+> Please put this in the patch system, thanks.
 
-Ok,
+It is done.
+
 Thanks,
-Cl?ment
 
->
-> Thanks,
-> Dinh
+> 
+>> ---
+>>   arch/arm/vfp/vfpmodule.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+>> index aff6e6e..ee7b079 100644
+>> --- a/arch/arm/vfp/vfpmodule.c
+>> +++ b/arch/arm/vfp/vfpmodule.c
+>> @@ -573,7 +573,7 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp *ufp,
+>>   	 */
+>>   	ufp_exc->fpexc = hwstate->fpexc;
+>>   	ufp_exc->fpinst = hwstate->fpinst;
+>> -	ufp_exc->fpinst2 = ufp_exc->fpinst2;
+>> +	ufp_exc->fpinst2 = hwstate->fpinst2;
+>>   
+>>   	/* Ensure that VFP is disabled. */
+>>   	vfp_flush_hwstate(thread);
+>> -- 
+>> 1.9.1
+>>
+> 
+
+-- 
+Julien Thierry
