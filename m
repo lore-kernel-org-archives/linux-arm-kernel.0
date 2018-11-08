@@ -1,25 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 Nov 2018 13:00:11 +0100
-Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
- device nodes
-In-Reply-To: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
-References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdVB0G3R5bbZchJE01dJkOtESE+NDEakqYuRu_Fkh+F9Sw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 8 Nov 2018 12:00:17 +0000
+Subject: [TECH TOPIC] SoC maintainer group
+In-Reply-To: <20181107171723.GI9919@thunk.org>
+References: <CAOesGMgVPsK9YsV2nGoBptWwtHYv=3yMytLx2_tF_ujS5c5p3Q@mail.gmail.com>
+ <20181107171723.GI9919@thunk.org>
+Message-ID: <20181108120017.GB6675@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2018 at 9:46 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI device nodes
+On Wed, Nov 07, 2018 at 12:17:23PM -0500, Theodore Y. Ts'o wrote:
 
-arm64: dts: renesas: r8a77990: ebisu: Add and enable SDHI device nodes
+> Could the poeple listed on this list please list potential schedule conflicts?
 
-Gr{oetje,eeting}s,
+> I'm going to assume we should avoid: Andriod uConf, RISC-V uConf,
+> Device Tree uConf.  What are other potential conflicts.  I'm going to
+> guess this might be "interesting" to schedule.  :-)
 
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+The clang BoFs, RT and testing would be bad for me.  Possibly some other
+stuff but I've not seen the schedule yet.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181108/0bae645f/attachment.sig>
