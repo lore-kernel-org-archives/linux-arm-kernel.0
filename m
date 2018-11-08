@@ -1,81 +1,63 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 7 Nov 2018 22:47:35 -0800
-Subject: [PATCH 2/5] hwspinlock: add STM32 hwspinlock device
-In-Reply-To: <20181031093032.20386-3-benjamin.gaignard@st.com>
+Date: Wed, 7 Nov 2018 22:49:59 -0800
+Subject: [PATCH 1/5] dt-bindings: hwlock: Document STM32 hwspinlock
+ bindings
+In-Reply-To: <20181031093032.20386-2-benjamin.gaignard@st.com>
 References: <20181031093032.20386-1-benjamin.gaignard@st.com>
- <20181031093032.20386-3-benjamin.gaignard@st.com>
-Message-ID: <20181108064735.GB12063@builder>
+ <20181031093032.20386-2-benjamin.gaignard@st.com>
+Message-ID: <20181108064959.GC12063@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed 31 Oct 02:30 PDT 2018, Benjamin Gaignard wrote:
-> diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
-> index e895d29500ee..e1a20b460590 100644
-> --- a/drivers/hwspinlock/Kconfig
-> +++ b/drivers/hwspinlock/Kconfig
-> @@ -59,3 +59,12 @@ config HSEM_U8500
->  	  SoC.
->  
->  	  If unsure, say N.
-> +
-> +config HWSPINLOCK_STM32
 
-Please keep these alphabetically sorted.
-
-> +	tristate "STM32 Hardware Spinlock device"
-> +	depends on MACH_STM32MP157
-> +	depends on HWSPINLOCK
-> +	help
-> +	  Say y here to support the STM32 Hardware Spinlock device.
-> +
-> +	  If unsure, say N.
-> diff --git a/drivers/hwspinlock/Makefile b/drivers/hwspinlock/Makefile
-> index b87c01a506a4..c0a9505b4dcf 100644
-> --- a/drivers/hwspinlock/Makefile
-> +++ b/drivers/hwspinlock/Makefile
-> @@ -9,3 +9,4 @@ obj-$(CONFIG_HWSPINLOCK_QCOM)		+= qcom_hwspinlock.o
->  obj-$(CONFIG_HWSPINLOCK_SIRF)		+= sirf_hwspinlock.o
->  obj-$(CONFIG_HWSPINLOCK_SPRD)		+= sprd_hwspinlock.o
->  obj-$(CONFIG_HSEM_U8500)		+= u8500_hsem.o
-> +obj-$(CONFIG_HWSPINLOCK_STM32)		+= stm32_hwspinlock.o
-
-Ditto.
-
-> diff --git a/drivers/hwspinlock/stm32_hwspinlock.c b/drivers/hwspinlock/stm32_hwspinlock.c
+> Add bindings for STM32 hardware spinlock device
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
 > new file mode 100644
-> index 000000000000..6a0fafac7389
+> index 000000000000..7a999479d802
 > --- /dev/null
-> +++ b/drivers/hwspinlock/stm32_hwspinlock.c
-> @@ -0,0 +1,147 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) STMicroelectronics SA 2018
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
-> + * License terms:  GNU General Public License (GPL), version 2
-
-Didn't you already state your license terms with the SPDX header above?
-
-> + */
-[..]
-> +static int stm32_hwspinlock_remove(struct platform_device *pdev)
-> +{
-> +	struct stm32_hwspinlock *hw = platform_get_drvdata(pdev);
-> +	int ret;
+> +++ b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> @@ -0,0 +1,23 @@
+> +STM32 Hardware Spinlock Device Binding
+> +-------------------------------------
 > +
-> +	ret = hwspin_lock_unregister(&hw->bank);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "%s failed: %d\n", __func__, ret);
-> +		return ret;
+> +Required properties :
+> +- compatible : should be "st,stm32-hwspinlock".
+> +- reg : the register address of hwspinlock.
+> +- #hwlock-cells : hwlock users only use the hwlock id to represent a specific
+> +	hwlock, so the number of cells should be <1> here.
+> +- clock-names : Must contain "hwspinlock".
 
-The return value of platform_device is ignored, so printing an error
-message is fine, but don't "abort".
+This is supposed to be the name of the clock signal of this hardware
+block, is it really named "hwspinlock"? Note that you can probably omit
+the clock-names property, as you only have a single clock...
 
-> +	}
-> +
-> +	pm_runtime_disable(&pdev->dev);
-> +
-> +	return 0;
-> +}
+Apart from that, I think the binding looks good.
 
 Regards,
 Bjorn
+
+> +- clocks : Must contain a phandle entry for the clock in clock-names, see the
+> +	common clock bindings.
+> +
+> +Please look at the generic hwlock binding for usage information for consumers,
+> +"Documentation/devicetree/bindings/hwlock/hwlock.txt"
+> +
+> +Example of hwlock provider:
+> +	hwspinlock at 4c000000 {
+> +		compatible = "st,stm32-hwspinlock";
+> +		#hwlock-cells = <1>;
+> +		reg = <0x4c000000 0x400>;
+> +		clocks = <&rcc HSEM>;
+> +		clock-names = "hwspinlock";
+> +	};
+> -- 
+> 2.15.0
+> 
