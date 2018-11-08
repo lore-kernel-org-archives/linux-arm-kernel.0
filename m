@@ -1,115 +1,110 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Fri, 9 Nov 2018 00:43:04 +0530
-Subject: [PATCH v2 0/6] arm/efi: fix memblock reallocation crash due to
- persistent reservations
-In-Reply-To: <20181107141611.12076-1-ard.biesheuvel@linaro.org>
-References: <20181107141611.12076-1-ard.biesheuvel@linaro.org>
-Message-ID: <CACi5LpPWo6wjOLdXP1ZO1scdbyyus6_D6C+gdg6YjUszsiaMaA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 8 Nov 2018 20:13:44 +0100
+Subject: [PATCH v2 1/2] mm: Introduce common STRUCT_PAGE_MAX_SHIFT define
+In-Reply-To: <20181107205433.3875-2-logang@deltatee.com>
+References: <20181107205433.3875-1-logang@deltatee.com>
+ <20181107205433.3875-2-logang@deltatee.com>
+Message-ID: <CAKv+Gu9c+img+yqpmG9HD_bOihXLzQ70W+5Wki0FTmx7wYj37w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 7 November 2018 at 21:54, Logan Gunthorpe <logang@deltatee.com> wrote:
+> This define is used by arm64 to calculate the size of the vmemmap
+> region. It is defined as the log2 of the upper bound on the size
+> of a struct page.
+>
+> We move it into mm_types.h so it can be defined properly instead of
+> set and checked with a build bug. This also allows us to use the same
+> define for riscv.
+>
+> Signed-off-by: Logan Gunthorpe <logang@deltatee.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Acked-by: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Christoph Hellwig <hch@lst.de>
 
-On Wed, Nov 7, 2018 at 7:46 PM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+> ---
+>  arch/arm64/include/asm/memory.h | 9 ---------
+>  arch/arm64/mm/init.c            | 8 --------
+>  include/asm-generic/fixmap.h    | 1 +
+>  include/linux/mm_types.h        | 5 +++++
+>  4 files changed, 6 insertions(+), 17 deletions(-)
 >
-> This series addresses the kexec/kdump crash on arm64 system with many CPUs
-> that was reported by Bhupesh.
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index b96442960aea..f0a5c9531e8b 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -34,15 +34,6 @@
+>   */
+>  #define PCI_IO_SIZE            SZ_16M
 >
-> Patch #1 fixes the actual crash, but may result in memblock_reserve() to
-> fail. This is fixed in patch #4, where the point that the persistent
-> reservations are applied is moved to after memblock_allow_resize() has
-> been called.
+> -/*
+> - * Log2 of the upper bound of the size of a struct page. Used for sizing
+> - * the vmemmap region only, does not affect actual memory footprint.
+> - * We don't use sizeof(struct page) directly since taking its size here
+> - * requires its definition to be available at this point in the inclusion
+> - * chain, and it may not be a power of 2 in the first place.
+> - */
+> -#define STRUCT_PAGE_MAX_SHIFT  6
+> -
+>  /*
+>   * VMEMMAP_SIZE - allows the whole linear region to be covered by
+>   *                a struct page array
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 9d9582cac6c4..1a3e411a1d08 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -612,14 +612,6 @@ void __init mem_init(void)
+>         BUILD_BUG_ON(TASK_SIZE_32                       > TASK_SIZE_64);
+>  #endif
 >
-> Patches #2 and #3 contain some minor preparatory changes that are
-> required on ARM to ensure that efi_apply_persistent_mem_reservations()
-> can be called at some point (i.e., when memblock resizing is already
-> permitted and early memremap() is still usable)
+> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
+> -       /*
+> -        * Make sure we chose the upper bound of sizeof(struct page)
+> -        * correctly when sizing the VMEMMAP array.
+> -        */
+> -       BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
+> -#endif
+> -
+>         if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
+>                 extern int sysctl_overcommit_memory;
+>                 /*
+> diff --git a/include/asm-generic/fixmap.h b/include/asm-generic/fixmap.h
+> index 827e4d3bbc7a..8cc7b09c1bc7 100644
+> --- a/include/asm-generic/fixmap.h
+> +++ b/include/asm-generic/fixmap.h
+> @@ -16,6 +16,7 @@
+>  #define __ASM_GENERIC_FIXMAP_H
 >
-> Patches #5 and #6 optimize the EFI persistent memreserve infrastructure
-> so that fewer memblock reservations are required.
+>  #include <linux/bug.h>
+> +#include <linux/mm_types.h>
 >
-> Changes since v1:
-> - Russell pointed out that switching to ordinary memremap() was not
->   possible this early, and so I refactored the ARM early boot code
->   slightly so that we can keep using early_memremap().
+>  #define __fix_to_virt(x)       (FIXADDR_TOP - ((x) << PAGE_SHIFT))
+>  #define __virt_to_fix(x)       ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
+> diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+> index 5ed8f6292a53..2c471a2c43fa 100644
+> --- a/include/linux/mm_types.h
+> +++ b/include/linux/mm_types.h
+> @@ -206,6 +206,11 @@ struct page {
+>  #endif
+>  } _struct_page_alignment;
 >
-> Ard Biesheuvel (6):
->   arm64: memblock: don't permit memblock resizing until linear mapping
->     is up
->   ARM: mm: permit memblock resizing right after mapping the linear
->     region
->   ARM: mm: permit early_memremap() to be used in paging_init()
->   efi/arm: defer persistent reservations until after paging_init()
->   efi: permit multiple entries in persistent memreserve data structure
->   efi: reduce the amount of memblock reservations for persistent
->     allocations
->
->  arch/arm/kernel/setup.c                 |  2 -
->  arch/arm/mm/init.c                      |  1 -
->  arch/arm/mm/mmu.c                       |  5 ++
->  arch/arm64/kernel/setup.c               |  1 +
->  arch/arm64/mm/init.c                    |  2 -
->  arch/arm64/mm/mmu.c                     |  2 +
->  drivers/firmware/efi/efi.c              | 59 ++++++++++++++------
->  drivers/firmware/efi/libstub/arm-stub.c |  2 +-
->  include/linux/efi.h                     | 23 +++++++-
->  9 files changed, 72 insertions(+), 25 deletions(-)
+> +/*
+> + * Used for sizing the vmemmap region on some architectures
+> + */
+> +#define STRUCT_PAGE_MAX_SHIFT  (order_base_2(sizeof(struct page)))
+> +
+>  #define PAGE_FRAG_CACHE_MAX_SIZE       __ALIGN_MASK(32768, ~PAGE_MASK)
+>  #define PAGE_FRAG_CACHE_MAX_ORDER      get_order(PAGE_FRAG_CACHE_MAX_SIZE)
 >
 > --
-> 2.19.1
+> 2.19.0
 >
-
-I did some quick checks (as I just returned from my holidays and got
-hold of the hardware just now) and I haven't had the opportunity to
-look closely at the entire patch set, but it looks like a step in the
-right direction especially as we try to have fewer memblock
-reservations (I will have a closer look at the patchset perhaps over
-the weekend).
-
-I tested this on the hardware (with 224 CPUs) where I was seeing the
-crash initially and kdump seems to work fine on the same. Here are
-some kdump kernel logs with 'memblock=debug' set in bootargs:
-
-[    0.000000] memblock_reserve:
-[0x00000000e2e02e18-0x00000000e2e02e4f] efi_mem_reserve+0x3c/0x54
-[    0.000000] memblock_reserve:
-[0x00000000dac70000-0x00000000dac7ffff] efi_init+0xc4/0x17c
-[    0.000000] memblock_remove:
-[0x0001000000000000-0x0000fffffffffffe] arm64_memblock_init+0x6c/0x418
-[    0.000000] memblock_remove:
-[0x0000800080000000-0x000080007ffffffe] arm64_memblock_init+0xac/0x418
-[    0.0001dd0000-0x00000000a2cfffff] arm64_memblock_init+0x184/0x418
-[    0.000000] memblock_add: [0x00000000a1dd0000-0x00000000a2cfffff]
-arm64_memblock_init+0x190/0x418
-[    0.000000] memblock_reserve:
-[0x00000000a1dd0000-0x00000000a2cfffff]
-arm64_memblock_init+0x19c/0x418
-[    0.000000] memblock_reserve:
-[0x00000000a0080000-0x00000000a1dcffff]
-arm64_memblock_init+0x1f8/0x418
-[    0.000000] memblock_reserve:
-[0x00000000a1dd0000-0x00000000a2cfb402]     0.000000]
-memblock_reserve: [0x00000000bfff0000-0x00000000bfff33ff]
-arm64_memblock_init+0x3b4/0x418
-[    0.000000] Reserving 13KB of memory at 0xbfff0000 for elfcorehdr
-[    0.000000] memblock_reserve:
-[0x00000000bffe0000-0x00000000bffeffff]
-memblock_alloc_base_nid+0x70/0x8c
-[    0.000000] memblock_reserve:
-[0x00000000bffd0000-0x00000000bffdffff]
-memblock_alloc_base_nid+0x70/0x8c
-[    0.000000] memblock_reserve: [0x00000000bffc0se_nid+0x70/0x8c
-[    0.000000] memblock_reserve:
-[0x00000000bffb0000-0x00000000bffbffff]
-memblock_alloc_base_nid+0x70/0x8c
-[    0.000000]    memblock_free:
-[0x00000000a1d80000-0x00000000a1dcffff] paging_init+0x6d4/0x6fc
-[    0.000000] memblock_reserve:
-[0x00000000ddab9e18-0x00000000ddab9e27]
-efi_apply_persistent_mem_reservations+0x8c/0xbc
-
-So, things look great so far. So, please feel free to add:
-Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
-
-Thanks,
-Bhupesh
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
