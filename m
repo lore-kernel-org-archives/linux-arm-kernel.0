@@ -1,78 +1,51 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 8 Nov 2018 07:45:42 +0100
-Subject: [PATCH] pinctrl: zynq: Use define directive for
- PIN_CONFIG_IO_STANDARD
-In-Reply-To: <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
-References: <20181101005724.9622-1-natechancellor@gmail.com>
- <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
- <20181107085503.GA31517@flashbox>
- <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
- <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
-Message-ID: <af717713-9e51-139d-1206-1682b83ae434@xilinx.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 7 Nov 2018 22:51:03 -0800
+Subject: [PATCH 3/5] ARM: dts: stm32: Add hwspinlock node for stm32mp157
+ SoC
+In-Reply-To: <20181031093032.20386-4-benjamin.gaignard@st.com>
+References: <20181031093032.20386-1-benjamin.gaignard@st.com>
+ <20181031093032.20386-4-benjamin.gaignard@st.com>
+Message-ID: <20181108065103.GD12063@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07. 11. 18 18:48, Nick Desaulniers wrote:
-> On Wed, Nov 7, 2018 at 1:01 AM Michal Simek <michal.simek@xilinx.com> wrote:
->>
->> On 07. 11. 18 9:55, Nathan Chancellor wrote:
->>> On Wed, Nov 07, 2018 at 09:46:12AM +0100, Michal Simek wrote:
->>>> On 01. 11. 18 1:57, Nathan Chancellor wrote:
->>>>> Clang warns when one enumerated type is implicitly converted to another:
->>>>>
->>>>> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
->>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
->>>>> type 'enum pin_config_param' [-Wenum-conversion]
->>>>>         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
->>>>>         ~               ^~~~~~~~~~~~~~~~~~~~~
->>>>> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
->>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
->>>>> type 'enum pin_config_param' [-Wenum-conversion]
->>>>>         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
->>>>>             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->>>>> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
->>>>> macro 'PCONFDUMP'
->>>>>         .param = a, .display = b, .format = c, .has_arg = d     \
->>>>>                  ^
->>>>> 2 warnings generated.
->>>>
->>>> This is interesting. I have never tried to use llvm for building the
->>>> kernel. Do you have any description how this can be done?
->>>>
->>>
->>> Depending on what version of Clang you have access to, it is usually just as
->>> simple as running 'make ARCH=arm CC=clang CROSS_COMPILE=arm-linux-gnueabi-'.
->>>
->>> Clang 7.0+ is recommended but 6.0 might work too.
->>
->> TBH I would expect to download container and run this there to make sure
->> that I don't break anything else.
+On Wed 31 Oct 02:30 PDT 2018, Benjamin Gaignard wrote:
+
+> Declare hwspinlock device for stm32mp157 SoC
 > 
-> This is the first request we've had for a container in order to test a
-> patch.  If it comes up again from other folks, I think it makes sense
-> to create one.  Until then, its nice to have.  It's definitely
-> overkill for this patch.
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-I have played with it to see that error and here are some steps I did.
+Pending the clock-names question,
 
-docker run --name test-clang -it --rm debian:latest bash
-apt-get update
-apt-get install gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu clang git bc
-build-essential bison flex make llvm vim libssl-dev sparse
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-git clone
-git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git --depth 1
-cd linux
+Regards,
+Bjorn
 
-export ARCH=arm64
-export CROSS_COMPILE=aarch64-linux-gnu-
-
-make defconfig
-make CC=clang drivers/pinctrl/pinctrl-zynq.o C=1 V=1
-
-There was not a problem to run it for arm64 but I had issues to run this
-for arm32.
-Do you see any problem with above steps?
-
-Thanks,
-Michal
+> ---
+>  arch/arm/boot/dts/stm32mp157c.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index 185541a5b69f..9b16c28f8ac3 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -803,6 +803,15 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		hsem: hwspinlock at 4c000000 {
+> +			compatible = "st,stm32-hwspinlock";
+> +			#hwlock-cells = <1>;
+> +			reg = <0x4c000000 0x400>;
+> +			clocks = <&rcc HSEM>;
+> +			clock-names = "hwspinlock";
+> +			status = "disabled";
+> +		};
+> +
+>  		rcc: rcc at 50000000 {
+>  			compatible = "st,stm32mp1-rcc", "syscon";
+>  			reg = <0x50000000 0x1000>;
+> -- 
+> 2.15.0
+> 
