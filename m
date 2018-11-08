@@ -1,81 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Nov 2018 17:51:53 +0000
-Subject: [PATCH 2/4] KVM: arm64: Allow implementations to be confined to
- using VHE
-In-Reply-To: <20181106075353.GF12057@e113682-lin.lund.arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-3-marc.zyngier@arm.com>
- <20181106075353.GF12057@e113682-lin.lund.arm.com>
-Message-ID: <f75dfeda-63ce-73c1-4798-f47607c45cb3@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Nov 2018 17:53:54 +0000
+Subject: [PATCH v2 1/6] arm64: memblock: don't permit memblock resizing
+ until linear mapping is up
+In-Reply-To: <20181107141611.12076-2-ard.biesheuvel@linaro.org>
+References: <20181107141611.12076-1-ard.biesheuvel@linaro.org>
+ <20181107141611.12076-2-ard.biesheuvel@linaro.org>
+Message-ID: <20181108175354.GF144107@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/18 07:53, Christoffer Dall wrote:
-> On Mon, Nov 05, 2018 at 02:36:14PM +0000, Marc Zyngier wrote:
->> Some implementations may be forced to use VHE to work around HW
->> errata, for example. Let's introduce a helper that checks for
->> these cases.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/kvm_host.h   | 1 +
->>  arch/arm64/include/asm/kvm_host.h | 6 ++++++
->>  virt/kvm/arm/arm.c                | 5 +++++
->>  3 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index c3469729f40c..0f2f782548cb 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -286,6 +286,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->>  
->>  static inline bool kvm_arch_sve_requires_vhe(void) { return false; }
->> +static inline bool kvm_arch_impl_requires_vhe(void) { return false; }
->>  static inline void kvm_arch_hardware_unsetup(void) {}
->>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index ca1714148400..7d6e974d024a 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -432,6 +432,12 @@ static inline bool kvm_arch_sve_requires_vhe(void)
->>  	return system_supports_sve();
->>  }
->>  
->> +static inline bool kvm_arch_impl_requires_vhe(void)
->> +{
->> +	/* Some implementations have defects that confine them to VHE */
->> +	return false;
->> +}
->> +
->>  static inline void kvm_arch_hardware_unsetup(void) {}
->>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->> index 66de2efddfca..bc90a1cdd27f 100644
->> --- a/virt/kvm/arm/arm.c
->> +++ b/virt/kvm/arm/arm.c
->> @@ -1647,6 +1647,11 @@ int kvm_arch_init(void *opaque)
->>  			kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
->>  			return -ENODEV;
->>  		}
->> +
->> +		if (kvm_arch_impl_requires_vhe()) {
->> +			kvm_pr_unimpl("CPU requiring VHE in non-VHE mode");
->> +			return -ENODEV;
->> +		}
+On Wed, Nov 07, 2018 at 03:16:06PM +0100, Ard Biesheuvel wrote:
+> Bhupesh reports that having numerous memblock reservations at early
+> boot may result in the following crash:
 > 
-> So as per my previous comment, I'd prefer this function to only issue a
-> single call, and have the function in kvm_host.h check for all the
-> conditions, do the printing, etc.
+>   Unable to handle kernel paging request at virtual address ffff80003ffe0000
+>   ...
+>   Call trace:
+>    __memcpy+0x110/0x180
+>    memblock_add_range+0x134/0x2e8
+>    memblock_reserve+0x70/0xb8
+>    memblock_alloc_base_nid+0x6c/0x88
+>    __memblock_alloc_base+0x3c/0x4c
+>    memblock_alloc_base+0x28/0x4c
+>    memblock_alloc+0x2c/0x38
+>    early_pgtable_alloc+0x20/0xb0
+>    paging_init+0x28/0x7f8
 > 
-> Thoughts?
+> This is caused by the fact that we permit memblock resizing before the
+> linear mapping is up, and so the memblock_reserved() array is moved
+> into memory that is not mapped yet.
+> 
+> So let's ensure that this crash can no longer occur, by deferring to
+> call to memblock_allow_resize() to after the linear mapping has been
+> created.
+> 
+> Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Tested-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Indeed, this seems a sensible alternative.
+I missed this patch (wasn't cc'ed) but Will pinged me on IRC, so queued
+for 4.20. Thanks.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
