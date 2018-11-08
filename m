@@ -1,61 +1,39 @@
-From: jbrunet@baylibre.com (jbrunet at baylibre.com)
-Date: Thu, 08 Nov 2018 16:56:40 +0100
-Subject: [PATCH 3/3] ARM64: dts: meson-gxl: Add support for the
- Smartlabs SML-5442TW
-In-Reply-To: <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
-References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
- <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
-Message-ID: <bafa32609200e57d8efe9843247429a46916bbef.camel@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Nov 2018 15:59:39 +0000
+Subject: Please check linux-next boot results from tonight for next seven days
+Message-ID: <20181108155938.GY30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-11-08 at 19:33 +0400, Christian Hewitt wrote:
-> 
-> +&audio {
-> +	status = "okay";
-> +};
-> +
-> +&aiu_i2s_dma {
-> +	status = "okay";
-> +};
-> +
-> +&i2s_dai {
-> +	status = "okay";
-> +};
+For anyone running builds and boot tests of tonight's linux-next,
+I've pushed out the final bits of the Spectre big.Little fixes
+for sfr to pick up tonight.
 
-The audio stuff has not made it's way upstream (yet) please drop this
+These were omitted from the last merge window because towards the
+end of the -rc cycle, it was belatedly reported that it was causing
+a regression on some platforms, so they had to be dropped out of
+that merge window.  I believe that this was discovered on some
+non-kernelci based test system.
 
-> +
-> +&cvbs_vdac_port {
-> +	cvbs_vdac_out: endpoint {
-> +		remote-endpoint = <&cvbs_connector_in>;
-> +	};
-> +};
-> +
-> 
-[ ... ]
+However, they really need to go in before the end of the year, so
+I'm proposing to send them before 4.20-rc3.
 
-> +
-> +/* This is connected to the Bluetooth module: */
-> +&uart_A {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
-> +	pinctrl-names = "default";
+This means I need help to test them and make sure that they do not
+cause any other unknown regressions.  Please note that merely looking
+at kernelci and checking whether it says the boot test passed is
+_insufficient_ - the boot logs must be inspected becaues a "green"
+pass result does _not_ mean that there isn't some kind of warning.
+The same problem may also be present in other automated boot testing
+systems elsewhere.
 
-Did you forget to put 'uart-has-rtscts;' here ?
+Please check your boot logs for tonight's linux-next over the next
+seven days and report ASAP if the Spectre fixes are causing a
+regression for your platform.  If I don't hear anything, I will be
+sending them for -rc3.
 
-> +};
-> +
-> +/* This UART is brought out to the debug header */
-> +&uart_AO {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_ao_a_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
-> +};
+Thanks.
 
-Also, you sent a multipatch series. Such patchset should start with a cover
-letter describing the general intent ... even if it is obvious.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
