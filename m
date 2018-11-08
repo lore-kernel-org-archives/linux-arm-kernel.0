@@ -1,74 +1,36 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 08 Nov 2018 10:32:00 +1030
-Subject: [PATCH v2 1/2] ARM: dts: Add Facebook BMC flash layout
-In-Reply-To: <20181106042829.2771226-1-taoren@fb.com>
-References: <20181106042829.2771226-1-taoren@fb.com>
-Message-ID: <1541635320.1462459.1569430616.0F5E4C4D@webmail.messagingengine.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 07 Nov 2018 16:18:35 -0800
+Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
+In-Reply-To: <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
+ <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
+ <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
+ <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
+ <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
+Message-ID: <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tao,
-
-On Tue, 6 Nov 2018, at 14:58, Tao Ren wrote:
-> This is the layout used by Facebook BMC systems. It describes the fixed
-> flash layout of a 32MB mtd device.
+Quoting Abel Vesa (2018-11-07 12:26:25)
+> On Wed, Nov 07, 2018 at 11:01:02AM -0800, Stephen Boyd wrote:
+> > 
+> > 
+> > What's the plan to clean it up?
 > 
-> Signed-off-by: Tao Ren <taoren@fb.com>
-> ---
->  Changes since v1:
->   - adding facebook copyright.
+> So I'm doing this in our internal tree first to make sure I don't break the
+> other (newer) socs.
 > 
->  .../boot/dts/facebook-bmc-flash-layout.dtsi   | 33 +++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 arch/arm/boot/dts/facebook-bmc-flash-layout.dtsi
+> I already have a prototype in testing but it's a long way to upstream it.
 > 
-> diff --git a/arch/arm/boot/dts/facebook-bmc-flash-layout.dtsi b/arch/
-> arm/boot/dts/facebook-bmc-flash-layout.dtsi
-> new file mode 100644
-> index 000000000000..94039d7b7de5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/facebook-bmc-flash-layout.dtsi
-> @@ -0,0 +1,33 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +// Copyright (c) 2018 Facebook Inc.
-> +
-> +partitions {
-> +	compatible = "fixed-partitions";
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	u-boot at 0 {
-> +		reg = <0x0 0x60000>;
-> +		label = "u-boot";
-> +	};
-> +
-> +	u-boot-env at 60000 {
-> +		reg = <0x60000 0x20000>;
-> +		label = "env";
-> +	};
-> +
-> +	fit at 80000 {
-> +		reg = <0x80000 0x1b80000>;
-> +		label = "fit";
-> +	};
-> +
-> +	data0 at 1c00000 {
-> +		reg = <0x1c00000 0x400000>;
-> +		label = "data0";
-> +	};
-> +
-> +	flash0 at 0 {
-> +		reg = <0x0 0x2000000>;
-> +		label = "flash0";
-> +	};
-
-Is this necessary? Isn't the same thing achieved with the /dev/mtd0 device?
-
-Cheers,
-
-Andrew
-
-> +};
-> -- 
-> 2.17.1
+> Basically, I'm replacing all of this with a single, more like a composite,
+> more complex, clock type that does all the magic inside.
 > 
+> One of the problems is the fact that the bypasses can have the same sources
+> and in my case, I'm implementing that as a list of parents name, but the
+> parent names list doesn't work with duplicates, so I have to find some other
+> way to do it.
+> 
+> Once I have something clean and tested enough I'll send it upstream.
+
+Ok. Thanks for the info.
