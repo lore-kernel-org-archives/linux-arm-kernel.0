@@ -1,44 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Nov 2018 00:42:00 +0000
-Subject: [PATCH 2/5] phy: core: add PHY_MODE_ETHERNET
-In-Reply-To: <20181108003617.10334-3-grygorii.strashko@ti.com>
-References: <20181108003617.10334-1-grygorii.strashko@ti.com>
- <20181108003617.10334-3-grygorii.strashko@ti.com>
-Message-ID: <20181108004200.GW30658@n2100.armlinux.org.uk>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 7 Nov 2018 17:13:02 -0800
+Subject: [PATCH v2 2/2] arm64: dts: rockchip: add Gru Scarlet devicetrees
+In-Reply-To: <55055985.ydjp5xQfPl@phil>
+References: <20181101123639.15560-1-heiko@sntech.de>
+ <20181101123639.15560-2-heiko@sntech.de> <55055985.ydjp5xQfPl@phil>
+Message-ID: <CA+ASDXO_G9NhmNUh_DVdJ+2S8GsKmHPS4YQwe3H9_SW-a-q6+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 06:36:14PM -0600, Grygorii Strashko wrote:
-> Add new PHY's mode to be used by Ethernet PHY interface drivers or
-> multipurpose PHYs like serdes. It will be reused in further changes.
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  include/linux/phy/phy.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index b17e770..02c9ef0 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -42,6 +42,7 @@ enum phy_mode {
->  	PHY_MODE_UFS_HS_A,
->  	PHY_MODE_UFS_HS_B,
->  	PHY_MODE_PCIE,
-> +	PHY_MODE_ETHERNET,
+On Tue, Nov 6, 2018 at 3:31 AM Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Donnerstag, 1. November 2018, 13:36:39 CET schrieb Heiko Stuebner:
+> > Gru-Scarlet is a tablet device using ChomeOS, dual-dsi display
+> > and Wacom touchscreen with stylus.
+> >
+> > There exist two variants in the market using different displays
+> > that are differentiated via their sku-id.
+> > The bootloader on them also determines the correct devicetree to
+> > load via the sku-id.
+> >
+> > So add a common scarlet dtsi and two minimal board devicetrees
+> > for the two display variants.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>
+> looks like I already applied patch1 in time for 4.20
+> (and forgot about it), but have now also applied this patch2
+> for 4.21 with Rob's review.
 
-Are you sure about this - we already have a bunch of "ethernet" modes
-that are more specific, like PHY_MODE_SGMII, PHY_MODE_2500SGMII and
-PHY_MODE_10GKR which require PHYs to be configured differently.  Having
-a very generic "ethernet" mode brings up questions about when it should
-be used vs the more specific modes.
+Thanks, by the way! This worked well for me today, testing 4.20-rc1.
+Well, except for this silly bit, but that bug has been around (and
+more or less untested) for several releases:
 
-(I've already mentioned that the SGMII modes are mis-named, since
-they also apply to 1000base-X and 2500base-X - the only difference
-is how one 16-bit word in the data stream is used which has no effect
-on the PHY.)
+https://lore.kernel.org/patchwork/patch/1008074/
+[PATCH] input: cros_ec_keyb: fix button/switch capability reports
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+And this silly one that slipped into this merge window:
+
+https://lore.kernel.org/patchwork/patch/1008098/
+[PATCH 4.20] ath10k: don't assume 'vif' is non-NULL in flush()
+
+*Grumble*: one would think people would test their changes before
+submitting them, but apparently that's too much to ask.
