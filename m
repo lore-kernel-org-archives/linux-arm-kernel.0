@@ -1,107 +1,57 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 8 Nov 2018 08:28:07 -0800
-Subject: [PATCH v6 3/3] arm64: dts: allwinner: a64: enable sound on
- Pinebook
-In-Reply-To: <CAGb2v65zb4rXJJv018AfDC-YQgAAmahmQ=-Bb5CyU3kA6wBAqg@mail.gmail.com>
-References: <20181108063929.29720-1-anarsoul@gmail.com>
- <20181108063929.29720-4-anarsoul@gmail.com>
- <CAGb2v65zb4rXJJv018AfDC-YQgAAmahmQ=-Bb5CyU3kA6wBAqg@mail.gmail.com>
-Message-ID: <CA+E=qVeG0g1axC1YhAhMOo2xcM3_5RupkiJEu3Aebaomx_7Gww@mail.gmail.com>
+From: jbrunet@baylibre.com (jbrunet at baylibre.com)
+Date: Thu, 08 Nov 2018 17:29:47 +0100
+Subject: [PATCH 3/4] Documentation: bindings: Add missing Amlogic SCPI
+ sensor bindings
+In-Reply-To: <20181108160457.GA10953@e107155-lin>
+References: <20181108135352.8459-1-jbrunet@baylibre.com>
+ <20181108135352.8459-4-jbrunet@baylibre.com>
+ <20181108160457.GA10953@e107155-lin>
+Message-ID: <a52c64d6159c73e1cb97089ed051321f121f0467.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 11:30 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> On Thu, Nov 8, 2018 at 2:42 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> >
-> > This commit enables I2S, digital and analog parts of audiocodec on
-> > Pinebook
-> >
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+On Thu, 2018-11-08 at 16:04 +0000, Sudeep Holla wrote:
+> On Thu, Nov 08, 2018 at 02:53:51PM +0100, Jerome Brunet wrote:
+> > amlogic,meson-gxbb-scpi-sensors is both the driver and DT but is not
+> > documented. Just add it to amlogic's scpi documentation
+> > 
+> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > > ---
-> >  .../dts/allwinner/sun50i-a64-pinebook.dts     | 42 +++++++++++++++++++
-> >  1 file changed, 42 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> > index 77fac84797e9..73f171f4ba9b 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> > @@ -64,6 +64,23 @@
-> >                 compatible = "mmc-pwrseq-simple";
-> >                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-> >         };
+> >  Documentation/devicetree/bindings/arm/amlogic,scpi.txt | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
+> > b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
+> > index 7b9a861e9306..5ab59da052df 100644
+> > --- a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
+> > +++ b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
+> > @@ -17,4 +17,11 @@ Required sub-node properties:
+> >  - compatible : should be "amlogic,meson-gxbb-scp-shmem" for SRAM based
+> > shared
+> >  		memory on Amlogic GXBB SoC.
+> >  
+> > +Sensor bindings for the sensors based on SCPI Message Protocol
+> > +--------------------------------------------------------------
+> > +SCPI provides an API to access the various sensors on the SoC.
 > > +
-> > +       speaker_amp: speaker_amp {
-> > +               compatible = "simple-audio-amplifier";
-> > +               enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
->
-> You might want to add a sound-name-prefix property. See
+> > +Required properties:
+> > +- compatible : should be "amlogic,meson-gxbb-scpi-sensors".
+> > +
+> 
+> Not sure if it's worth mentioning the reason for being able to identify
+> amlogic,meson-gxbb sensors from generic scpi ones. IIRC it was for the
+> unit values of these sensors are different ? But I will leave that to
+> DT or platform maintainers' taste.
 
-No need, there's only speaker amplifier in Pinebook.
+Yes Sudeep, the unit are different.
+If we probe on the generic one, it will "work" but the result is just not
+good. 
 
->
->     Documentation/devicetree/bindings/sound/name-prefix.txt
->
-> Also this should have a reference to its power supply regulator.
+BTW, the point of this patch is merely to remove an existing issue.
+The scpi driver and meson-gx.dtsi are both refering to an undocumented
+compatible.
 
-It's powered from V5P0_USB according to schematics, which comes out of
-5V BOOST USB HOST MODE POWER - and it's not controlled by software. So
-there's nothing to reference.
-
->
-> > +       };
-> > +};
-> > +
-> > +&codec {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&codec_analog {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&dai {
-> > +       status = "okay";
-> >  };
-> >
-> >  &ehci0 {
-> > @@ -267,6 +284,31 @@
-> >         vcc-hdmi-supply = <&reg_dldo1>;
-> >  };
-> >
-> > +&sound {
-> > +       status = "okay";
-> > +       simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
-> > +                                   "Microphone", "Internal Microphone Right",
-> > +                                   "Headphone", "Headphone Jack",
-> > +                                   "Speaker", "Internal Speaker";
-> > +       simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
-> > +       simple-audio-card,routing =
-> > +                       "Left DAC", "AIF1 Slot 0 Left",
-> > +                       "Right DAC", "AIF1 Slot 0 Right",
-> > +                       "INL", "LINEOUT",
-> > +                       "INR", "LINEOUT",
-> > +                       "Internal Speaker", "OUTL",
-> > +                       "Internal Speaker", "OUTR",
-> > +                       "Headphone Jack", "HP",
-> > +                       "AIF1 Slot 0 Left ADC", "Left ADC",
-> > +                       "AIF1 Slot 0 Right ADC", "Right ADC",
-> > +                       "Left ADC", "ADC",
-> > +                       "Right ADC", "ADC",
-> > +                       "Internal Microphone Left", "MBIAS",
-> > +                       "MIC1", "Internal Microphone Left",
-> > +                       "Internal Microphone Right", "HBIAS",
-> > +                       "MIC2", "Internal Microphone Right";
->
-> The schematics is missing the actual jack, but this looks to be correct.
->
-> ChenYu
->
-> > +};
-> > +
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> >         pinctrl-0 = <&uart0_pb_pins>;
-> > --
-> > 2.19.1
-> >
+> 
+> --
+> Regards,
+> Sudeep
