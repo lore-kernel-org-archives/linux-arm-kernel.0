@@ -1,30 +1,35 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed,  7 Nov 2018 22:39:28 -0800
-Subject: [PATCH v6 2/3] arm64: dts: allwinner: a64: enable sound on Pine64 and
- SoPine
+Date: Wed,  7 Nov 2018 22:39:29 -0800
+Subject: [PATCH v6 3/3] arm64: dts: allwinner: a64: enable sound on Pinebook
 In-Reply-To: <20181108063929.29720-1-anarsoul@gmail.com>
 References: <20181108063929.29720-1-anarsoul@gmail.com>
-Message-ID: <20181108063929.29720-3-anarsoul@gmail.com>
+Message-ID: <20181108063929.29720-4-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This commit enables I2S, digital and analog parts of audiocodec on
-Pine64 and SoPine boards.
+Pinebook
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 28 +++++++++++++++++++
- .../allwinner/sun50i-a64-sopine-baseboard.dts | 28 +++++++++++++++++++
- 2 files changed, 56 insertions(+)
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 42 +++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index c077b6c1f458..ff352bdfbb93 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -75,6 +75,18 @@
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index 77fac84797e9..73f171f4ba9b 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -64,6 +64,23 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
  	};
- };
- 
++
++	speaker_amp: speaker_amp {
++		compatible = "simple-audio-amplifier";
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
++	};
++};
++
 +&codec {
 +	status = "okay";
 +};
@@ -35,75 +40,36 @@ index c077b6c1f458..ff352bdfbb93 100644
 +
 +&dai {
 +	status = "okay";
-+};
-+
- &de {
- 	status = "okay";
- };
-@@ -264,6 +276,22 @@
- 	status = "disabled";
  };
  
-+&sound {
-+	status = "okay";
-+	simple-audio-card,widgets = "Microphone", "Microphone Jack",
-+				    "Headphone", "Headphone Jack";
-+	simple-audio-card,routing =
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right",
-+			"Headphone Jack", "HP",
-+			"AIF1 Slot 0 Left ADC", "Left ADC",
-+			"AIF1 Slot 0 Right ADC", "Right ADC",
-+			"Left ADC", "ADC",
-+			"Right ADC", "ADC",
-+			"Microphone Jack", "HBIAS",
-+			"MIC2", "Microphone Jack";
-+};
-+
- /* On Exp and Euler connectors */
- &uart0 {
- 	pinctrl-names = "default";
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index 53fcc9098df3..25d732df37c4 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -80,6 +80,18 @@
- 	};
- };
- 
-+&codec {
-+	status = "okay";
-+};
-+
-+&codec_analog {
-+	status = "okay";
-+};
-+
-+&dai {
-+	status = "okay";
-+};
-+
- &de {
- 	status = "okay";
- };
-@@ -164,6 +176,22 @@
+ &ehci0 {
+@@ -267,6 +284,31 @@
  	vcc-hdmi-supply = <&reg_dldo1>;
  };
  
 +&sound {
 +	status = "okay";
-+	simple-audio-card,widgets = "Microphone", "Microphone Jack",
-+				    "Headphone", "Headphone Jack";
++	simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
++				    "Microphone", "Internal Microphone Right",
++				    "Headphone", "Headphone Jack",
++				    "Speaker", "Internal Speaker";
++	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
 +	simple-audio-card,routing =
 +			"Left DAC", "AIF1 Slot 0 Left",
 +			"Right DAC", "AIF1 Slot 0 Right",
++			"INL", "LINEOUT",
++			"INR", "LINEOUT",
++			"Internal Speaker", "OUTL",
++			"Internal Speaker", "OUTR",
 +			"Headphone Jack", "HP",
 +			"AIF1 Slot 0 Left ADC", "Left ADC",
 +			"AIF1 Slot 0 Right ADC", "Right ADC",
 +			"Left ADC", "ADC",
 +			"Right ADC", "ADC",
-+			"Microphone Jack", "HBIAS",
-+			"MIC2", "Microphone Jack";
++			"Internal Microphone Left", "MBIAS",
++			"MIC1", "Internal Microphone Left",
++			"Internal Microphone Right", "HBIAS",
++			"MIC2", "Internal Microphone Right";
 +};
 +
  &uart0 {
